@@ -1,0 +1,163 @@
+import { TimedEffect, Vector2 } from '../core.js';
+import { Ability } from './Ability.js';
+
+export class EaterAbility extends Ability {
+      constructor(owner, simulation) {
+        super(owner, simulation);
+        this.cooldown = 7.2;
+        this.timer = 2.4;
+        this.feastDuration = 3.3;
+        this.feastTimer = 0;
+        this.feastElapsed = 0;
+        this.radiusScale = 1;
+        this.swallowedTarget = null;
+        this.swallowTimer = 0;
+        this.spitDirection = new Vector2(1, 0);
+        this.hasEatenThisFeast = false;
+      }
+
+      update(delta, target) {
+        this.timer -= delta;
+        this.updateRadiusScale(delta);
+
+        if (this.swallowedTarget) {
+          this.swallowTimer -= delta;
+          this.swallowedTarget.position = this.owner.position.clone();
+          if (this.swallowTimer <= 0 || this.swallowedTarget.isDefeated) {
+            this.releaseSwallowed();
+          }
+        }
+
+        if (this.feastTimer > 0) {
+          this.feastTimer = Math.max(0, this.feastTimer - delta);
+          this.feastElapsed = Math.min(this.feastDuration, this.feastElapsed + delta);
+          if (this.feastTimer > 0 && !this.swallowedTarget && Math.random() < delta * 8) {
+            this.simulation.spawnParticleBurst(this.owner.position.clone(), this.owner.color, {
+              count: 1,
+              speed: 80,
+              radiusMin: 3,
+              radiusMax: 5,
+              upBias: 70,
+              gravity: 720,
+              life: 0.8
+            });
+          }
+          return;
+        }
+
+        if (this.timer <= 0 && target) {
+          this.timer = this.cooldown;
+          this.feastTimer = this.feastDuration;
+          this.feastElapsed = 0;
+          this.hasEatenThisFeast = false;
+          this.simulation.playSound("chomp", 0.8);
+          this.simulation.spawnPulse(this.owner.position.clone(), this.owner.color);
+          this.simulation.addLog(`${this.owner.name} enters feast mode.`);
+        }
+      }
+
+      onCollision(target) {
+        if (!this.isFeasting() || this.hasEatenThisFeast || this.swallowedTarget || target.swallowedState || target.isDefeated) {
+          return;
+        }
+
+        this.hasEatenThisFeast = true;
+        this.feastTimer = Math.min(this.feastTimer, 0.28);
+        this.swallowedTarget = target;
+        this.swallowTimer = 0.72;
+        this.spitDirection =
+          this.owner.velocity.length() > 0
+            ? this.owner.velocity.clone().normalize()
+            : Vector2.subtract(target.position, this.owner.position).normalize();
+
+        target.swallowedState = { owner: this.owner };
+        target.clearDash();
+        target.velocity = new Vector2();
+        target.trail = [];
+        this.simulation.playSound("chomp", 1.25);
+        this.simulation.spawnParticleBurst(target.position.clone(), this.owner.color, {
+          count: 30,
+          speed: 230,
+          radiusMin: 3,
+          radiusMax: 6,
+          upBias: 30,
+          gravity: 940,
+          life: 1.35
+        });
+        this.simulation.addLog(`${this.owner.name} swallows ${target.name}.`);
+      }
+
+      releaseSwallowed() {
+        const target = this.swallowedTarget;
+        if (!target) {
+          return;
+        }
+
+        if (target.isDefeated) {
+          target.swallowedState = null;
+          this.swallowedTarget = null;
+          return;
+        }
+
+        const direction = this.spitDirection.clone().normalize();
+        target.swallowedState = null;
+        target.position = Vector2.add(this.owner.position, direction.clone().scale(this.owner.radius + target.radius + 10));
+        target.startDash(direction, {
+          multiplier: 2,
+          speedOverride: target.baseSpeed * 2,
+          color: target.color,
+          collisionDamage: 0,
+          collisionLabel: "Spit Dash",
+          lockHeading: false,
+          showSpeedRing: false,
+          maxDuration: 2.45
+        });
+        target.wallSlamState = {
+          effect: new TimedEffect(2.45),
+          source: this.owner,
+          damage: 8,
+          cooldown: 0
+        };
+        this.simulation.keepInsideArena(target);
+        this.simulation.playSound("spit", 1.2);
+        this.simulation.spawnSlash(this.owner.position.clone(), target.position.clone(), this.owner.color);
+        this.simulation.addSparkBurst(target.position.clone(), this.owner.color);
+        this.simulation.addLog(`${this.owner.name} spits ${target.name} into the walls.`);
+        this.swallowedTarget = null;
+      }
+
+      isFeasting() {
+        return this.feastTimer > 0 && !this.hasEatenThisFeast;
+      }
+
+      getMouthTarget() {
+        return this.simulation.getOpponent(this.owner);
+      }
+
+      updateRadiusScale(delta) {
+        const activeProgress =
+          this.feastTimer > 0
+            ? Math.min(1, this.feastElapsed / this.feastDuration)
+            : 0;
+        const targetScale = this.feastTimer > 0 ? 1 + activeProgress : 1;
+        const smoothing = 1 - Math.exp(-delta * (targetScale > this.radiusScale ? 4.8 : 7.2));
+        this.radiusScale += (targetScale - this.radiusScale) * smoothing;
+        if (Math.abs(this.radiusScale - 1) < 0.01 && targetScale === 1) {
+          this.radiusScale = 1;
+        }
+      }
+
+      getRadiusScale() {
+        return Math.max(1, Math.min(2, this.radiusScale));
+      }
+
+      getUiState() {
+        if (this.swallowedTarget) {
+          return { label: "Eating", progress: Math.max(0, Math.min(1, this.swallowTimer / 0.72)) };
+        }
+        if (this.feastTimer > 0) {
+          return { label: "Feast", progress: Math.max(0, Math.min(1, this.feastTimer / this.feastDuration)) };
+        }
+        return { label: "Feast", progress: Math.max(0, Math.min(1, 1 - this.timer / this.cooldown)) };
+      }
+    }

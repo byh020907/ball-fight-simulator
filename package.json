@@ -1,0 +1,11 @@
+{
+  "name": "ball-fight-simulator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-bundle.mjs",
+    "test": "node tests/regression.mjs",
+    "check": "node --check src/app.js && node --check src/entities.js && node --check src/simulation.js && node --check tests/regression.mjs && node --check dist/app.bundle.js"
+  }
+}
