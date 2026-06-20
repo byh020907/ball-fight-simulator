@@ -37,6 +37,7 @@ http://127.0.0.1:4173/
 - `src/ui.js`: 캔버스 렌더링과 UI
 - `src/tournament.js`: 자동 토너먼트 진행
 - `src/roster.js`: 캐릭터 스탯과 정보
+- `docs/game-rules.md`: 게임 흐름, 스탯 배분, 등수 규칙
 - `docs/design.md`: 시각 방향과 캐릭터 표현 규칙
 - `docs/development-rules.md`: 개발, 문서, Git 운영 규칙
 

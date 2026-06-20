@@ -8,7 +8,7 @@ export function createRoster() {
             color: "#f7b34d",
             face: "archer",
             ability: "archer",
-            stats: { hp: 112, damage: 1.02, speed: 270, force: 240, radius: 50, mass: 1.2 }
+            stats: { hp: 112, damage: 1.02, speed: 270, radius: 50, mass: 1.2 }
           },
           {
             id: "orbit",
@@ -18,7 +18,7 @@ export function createRoster() {
             color: "#6fe3ff",
             face: "orbit",
             ability: "orbit",
-            stats: { hp: 102, damage: 1, speed: 308, force: 290, radius: 48, mass: 1.1 }
+            stats: { hp: 102, damage: 1, speed: 308, radius: 48, mass: 1.1 }
           },
           {
             id: "clone",
@@ -28,7 +28,7 @@ export function createRoster() {
             color: "#d99cff",
             face: "clone",
             ability: "clone",
-            stats: { hp: 98, damage: 1.02, speed: 320, force: 275, radius: 46, mass: 1.02 }
+            stats: { hp: 98, damage: 1.02, speed: 320, radius: 46, mass: 1.02 }
           },
           {
             id: "grenade",
@@ -38,7 +38,7 @@ export function createRoster() {
             color: "#ff7676",
             face: "grenade",
             ability: "grenade",
-            stats: { hp: 108, damage: 1.08, speed: 278, force: 255, radius: 49, mass: 1.18 }
+            stats: { hp: 108, damage: 1.08, speed: 278, radius: 49, mass: 1.18 }
           },
           {
             id: "frosty",
@@ -48,7 +48,7 @@ export function createRoster() {
             color: "#8ee8d7",
             face: "frosty",
             ability: "frostySword",
-            stats: { hp: 110, damage: 1.12, speed: 294, force: 280, radius: 49, mass: 1.16 }
+            stats: { hp: 110, damage: 1.12, speed: 294, radius: 49, mass: 1.16 }
           },
           {
             id: "berserker",
@@ -58,7 +58,7 @@ export function createRoster() {
             color: "#ffae6e",
             face: "berserker",
             ability: "berserker",
-            stats: { hp: 124, damage: 1.02, speed: 238, force: 250, radius: 51, mass: 1.28 }
+            stats: { hp: 124, damage: 1.02, speed: 238, radius: 51, mass: 1.28 }
           },
           {
             id: "eater",
@@ -68,7 +68,7 @@ export function createRoster() {
             color: "#a6ff4d",
             face: "eater",
             ability: "eater",
-            stats: { hp: 118, damage: 0.98, speed: 268, force: 265, radius: 52, mass: 1.34 }
+            stats: { hp: 118, damage: 0.98, speed: 268, radius: 52, mass: 1.34 }
           }
         ];
 }

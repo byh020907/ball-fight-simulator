@@ -1,5 +1,7 @@
 
 
+import { formatStatAllocation } from './stat-allocation.js';
+
 export class ArenaRenderer {
       constructor(canvas) {
         this.canvas = canvas;
@@ -57,6 +59,42 @@ export class UIController {
         this.renderRoster();
       }
 
+      renderPlayerSetup({ fighter, stats, allocation, totalPoints, remainingPoints, locked = false }) {
+        if (!this.elements.playerPanel || !fighter) {
+          return;
+        }
+
+        const spent = totalPoints - remainingPoints;
+        this.elements.playerPanel.innerHTML = `
+          <div class="player-title">
+            <span>내 캐릭터</span>
+            <strong style="color:${fighter.color}">${fighter.name}</strong>
+          </div>
+          <p class="player-note">${fighter.title} · 시작 전 ${totalPoints} 포인트를 배분하세요.</p>
+          <div class="point-meter">
+            <span>사용 ${spent}/${totalPoints}</span>
+            <b>${remainingPoints > 0 ? `${remainingPoints} 남음` : "준비 완료"}</b>
+          </div>
+          <div class="allocation-summary">${formatStatAllocation(allocation)}</div>
+          <div class="stat-board">
+            ${stats.map((stat) => `
+              <div class="stat-row">
+                <div class="stat-copy">
+                  <strong>${stat.label}</strong>
+                  <span>${stat.description}</span>
+                </div>
+                <button type="button" data-stat="${stat.key}" data-action="decrease" data-step="10" ${locked || allocation[stat.key] <= 0 ? "disabled" : ""}>-10</button>
+                <button type="button" data-stat="${stat.key}" data-action="decrease" data-step="1" ${locked || allocation[stat.key] <= 0 ? "disabled" : ""}>-</button>
+                <em>${allocation[stat.key] ?? 0}%</em>
+                <button type="button" data-stat="${stat.key}" data-action="increase" data-step="1" ${locked || remainingPoints <= 0 ? "disabled" : ""}>+</button>
+                <button type="button" data-stat="${stat.key}" data-action="increase" data-step="10" ${locked || remainingPoints <= 0 ? "disabled" : ""}>+10</button>
+              </div>
+            `).join("")}
+          </div>
+          <button class="random-stat-button" type="button" data-random-stats ${locked ? "disabled" : ""}>자동 배분</button>
+        `;
+      }
+
       renderRoster(activeIds = []) {
         this.elements.fighterCards.innerHTML = "";
         const visibleRoster = activeIds.length
@@ -66,14 +104,16 @@ export class UIController {
         for (const fighter of visibleRoster) {
           const card = document.createElement("article");
           card.className = `fighter-card${activeIds.includes(fighter.id) ? " active" : ""}`;
+          card.dataset.fighterId = fighter.id;
           card.innerHTML = `
             <div class="fighter-head">
               <div class="fighter-meta">
-                <strong>${fighter.name}</strong>
-                <span>250 / 250</span>
+                <strong>${fighter.isPlayer ? "내 캐릭터 · " : ""}${fighter.name}</strong>
+                <span>${fighter.isPlayer ? "내 배분" : "AI 배분"}</span>
               </div>
             </div>
             <div class="hp-bar"><div class="hp-fill" style="background:${fighter.color};width:${activeIds.includes(fighter.id) ? "100%" : "18%"}"></div></div>
+            <div class="fighter-stat-line">${formatStatAllocation(fighter.statAllocation ?? {})}</div>
             <div class="cooldown-wrap">
               <div class="cooldown-meta"><span class="cooldown-label">Skill</span><span class="cooldown-text">Ready</span></div>
               <div class="cooldown-bar"><div class="cooldown-fill" style="width:100%"></div></div>
@@ -172,8 +212,8 @@ export class UIController {
 
         const isWinner = winner?.id === fighter.id;
         return `
-          <div class="bracket-slot${isWinner ? " winner" : ""}">
-            <span class="bracket-dot" style="background:${fighter.color}"></span>${fighter.name}
+          <div class="bracket-slot${isWinner ? " winner" : ""}${fighter.isPlayer ? " player" : ""}">
+            <span class="bracket-dot" style="background:${fighter.color}"></span>${fighter.isPlayer ? "YOU · " : ""}${fighter.name}
           </div>
         `;
       }
@@ -181,7 +221,8 @@ export class UIController {
       updateLiveCards(fighters) {
         const cards = Array.from(this.elements.fighterCards.children);
         for (const fighter of fighters) {
-          const card = cards.find((item) => item.querySelector(".fighter-meta strong").textContent === fighter.name);
+          const card = cards.find((item) => item.dataset?.fighterId === fighter.id)
+            ?? cards.find((item) => item.querySelector(".fighter-meta strong").textContent.endsWith(fighter.name));
           if (!card) {
             continue;
           }

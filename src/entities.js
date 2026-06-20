@@ -206,7 +206,6 @@ export class BattleBall {
         this.hp = spec.stats.hp;
         this.baseDamage = spec.stats.damage;
         this.baseSpeed = spec.stats.speed;
-        this.baseForce = spec.stats.force;
         this.baseRadius = spec.stats.radius;
         this.radius = spec.stats.radius;
         this.mass = spec.stats.mass;

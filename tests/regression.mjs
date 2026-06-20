@@ -1,4 +1,13 @@
 import assert from "node:assert/strict";
+import {
+  PLAYER_STAT_POINTS,
+  adjustStatAllocation,
+  applyStatAllocation,
+  createRandomStatAllocation,
+  createTournamentRoster,
+  formatStatAllocation,
+  getSpentStatPoints
+} from "../src/stat-allocation.js";
 
 function makeClassList() {
   const set = new Set();
@@ -26,6 +35,7 @@ function makeElement(id = "el") {
     textContent: "",
     innerHTML: "",
     className: "",
+    dataset: {},
     children,
     classList: makeClassList(),
     appendChild(child) {
@@ -125,7 +135,8 @@ function makeHarness() {
     "fighterCards",
     "battleLog",
     "tournamentBracket",
-    "tournamentPhase"
+    "tournamentPhase",
+    "playerPanel"
   ]) {
     elements.set(id, makeElement(id));
   }
@@ -380,7 +391,12 @@ async function testOrbitShardRecharge(app) {
 }
 
 async function testTournament(app) {
+  app.playerStatAllocation = createRandomStatAllocation(() => 0);
+  app.refreshPlayerSetup();
   await app.startTournament();
+  const player = app.tournamentRoster.find((fighter) => fighter.id === app.playerFighterId);
+  assert.ok(player.isPlayer, "Tournament roster should mark the user's random fighter");
+  assert.equal(getSpentStatPoints(player.statAllocation), PLAYER_STAT_POINTS, "Player should spend all stat points");
   let matches = 0;
   while (!app.tournament.champion && matches < 8) {
     const match = app.currentTournamentMatch;
@@ -397,9 +413,38 @@ async function testTournament(app) {
   assert.equal(app.roster.length, 7, "Roster should include seven fighters");
   assert.equal(matches, 6, "Seven-fighter tournament should play six matches");
   assert.ok(app.tournament.champion, "Tournament should produce a champion");
+  assert.ok(app.playerResult, "Tournament should record the user's final rank");
+}
+
+function testStatAllocationRules(app) {
+  assert.ok(app.elements.playerPanel.innerHTML.includes("내 캐릭터"), "Player setup should render readable Korean title text");
+  assert.ok(app.elements.playerPanel.innerHTML.includes("+10"), "Player setup should render touch-friendly large step buttons");
+
+  const archer = app.roster.find((fighter) => fighter.id === "archer");
+  let stepped = { hp: 0, damage: 0, speed: 0 };
+  stepped = adjustStatAllocation(stepped, "hp", 10);
+  stepped = adjustStatAllocation(stepped, "damage", 95);
+  assert.deepEqual(stepped, { hp: 10, damage: 90, speed: 0 }, "Large stat steps should clamp to the remaining budget");
+  stepped = adjustStatAllocation(stepped, "damage", -10);
+  assert.equal(stepped.damage, 80, "Large negative stat steps should subtract multiple points");
+
+  const allocation = { hp: 30, damage: 40, speed: 30 };
+  const boosted = applyStatAllocation(archer, allocation, true);
+  assert.equal(boosted.stats.hp, Number((archer.stats.hp * 1.3).toFixed(3)), "HP points should multiply base health");
+  assert.equal(boosted.stats.damage, Number((archer.stats.damage * 1.4).toFixed(3)), "Damage points should multiply base damage");
+  assert.equal(boosted.stats.speed, Number((archer.stats.speed * 1.3).toFixed(3)), "Speed points should multiply base speed");
+  assert.equal("force" in boosted.stats, false, "Force should not exist as an unused gameplay stat");
+  assert.equal(formatStatAllocation(allocation), "체력 +30% · 공격 +40% · 속도 +30%", "Allocation summary should show percentages instead of raw stats");
+  assert.equal(boosted.stats.radius, archer.stats.radius, "Radius should stay character-specific");
+  assert.equal(boosted.stats.mass, archer.stats.mass, "Mass should stay character-specific");
+
+  const roster = createTournamentRoster(app.roster, archer.id, allocation, () => 0);
+  assert.equal(roster.length, app.roster.length, "Tournament roster should keep every fighter");
+  assert.ok(roster.every((fighter) => getSpentStatPoints(fighter.statAllocation) === PLAYER_STAT_POINTS), "Every fighter should receive the same stat budget");
 }
 
 const app = await loadModuleApp();
+testStatAllocationRules(app);
 await testCloneSeedDash(app);
 await testEaterFeast(app);
 await testBerserkerMomentum(app);
