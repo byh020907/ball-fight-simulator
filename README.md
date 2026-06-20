@@ -4,9 +4,13 @@ Ball Fight Simulator is a browser-based auto battle toy inspired by versus simul
 
 ## Play
 
-Open `index.html` directly in a browser.
+Open the GitHub Pages URL after enabling Pages for the repository:
 
-The page loads `dist/app.bundle.js`, so it works without a local web server and avoids `file://` module CORS issues.
+```text
+https://byh020907.github.io/ball-fight-simulator/
+```
+
+For local development, serve the folder with a local web server instead of opening `index.html` by double-clicking. The game uses native ES modules from `src/`, and browsers block module imports from `file://`.
 
 ## Development
 
@@ -19,12 +23,6 @@ Source code is split by responsibility:
 - `src/tournament.js`: automatic bracket flow
 - `docs/design.md`: visual direction and design notes
 
-After editing source modules, rebuild the browser bundle:
-
-```bash
-npm run build
-```
-
 Run regression tests:
 
 ```bash
@@ -34,7 +32,6 @@ npm test
 ## Scripts
 
 ```bash
-npm run build
 npm test
 npm run check
 ```
