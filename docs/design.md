@@ -1,20 +1,26 @@
-# Ball Fight Visual Direction
+# Ball Fight 시각 방향
 
-## Base Style
+## 기본 스타일
 
-- Use flat, readable shapes over glossy rendering.
-- Fighter balls use a strong solid color with a dark outline; avoid glossy highlights.
-- Character identity should be readable from the center face first, then from ability effects.
-- Faces are vector/line based, emoji-like, and scaled from each ball radius.
-- Face animation should be subtle: blink, wobble, pulse, mouth movement, or eye motion.
-- Effects can be energetic, but the arena and base UI should stay simple and high-contrast.
+- 광택 표현보다 납작하고 읽기 쉬운 형태를 우선합니다.
+- 전투 공은 강한 단색과 어두운 외곽선으로 구분합니다.
+- 캐릭터 정체성은 먼저 중앙 얼굴에서 읽히고, 그다음 능력 이펙트로 보강되어야 합니다.
+- 얼굴은 공 반지름에 맞춰 스케일되는 벡터/라인 기반의 이모지풍 표현을 사용합니다.
+- 얼굴 애니메이션은 눈 깜빡임, 흔들림, 맥박감, 입 움직임, 시선 이동처럼 작고 명확하게 유지합니다.
+- 능력 이펙트는 과감해도 되지만, 경기장과 기본 UI는 단순하고 대비가 높아야 합니다.
 
-## Character Face Notes
+## 캐릭터 얼굴 메모
 
-- Archer Ball: focused eyes, tight confident mouth.
-- Orbit Ball: wide curious eyes, small orbiting/dizzy expression.
-- Clone Ball: playful double-smile trickster face.
-- Grenade Ball: tense angry eyes, explosive grit mouth.
-- Frosty Sword: calm sharp eyes, icy slash mouth.
-- Berserker: heavy eyebrows, charged growl expression.
-- Eater Ball: Pac-Man-like mouth direction in feast mode, hungry eyes otherwise.
+- Archer Ball: 집중한 눈, 짧고 자신감 있는 입.
+- Orbit Ball: 크고 호기심 있는 눈, 궤도/어지러움을 암시하는 표정.
+- Clone Ball: 장난스러운 이중 미소와 속임수 느낌.
+- Grenade Ball: 긴장된 화난 눈, 폭발 직전의 이를 악문 입.
+- Frosty Sword: 차분하고 날카로운 눈, 얼음 베기 느낌의 입.
+- Berserker: 두꺼운 눈썹, 충전된 포효 표정.
+- Eater Ball: 먹기 모드에서는 Pac-Man처럼 방향성이 있는 입, 그 외에는 배고픈 눈.
+
+## 최근 표현 규칙
+
+- Orbit Ball은 주변 공이 피격되면 사라지고, 빠르게 회전한 뒤 본체에서 공이 하나씩 궤도로 재충전되는 흐름을 보여줍니다.
+- Eater Ball이 뱉은 공은 초록 원 이펙트 대신 표정이 빙글빙글 회전하는 상태로 표현합니다.
+- Archer 투사체는 벽에 튕긴 뒤 탄환 방향도 실제 속도 벡터에 맞춰 보여야 합니다.
