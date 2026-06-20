@@ -253,7 +253,7 @@ async function testEaterFeast(app) {
   );
 }
 
-async function testBerserkerMomentum(app) {
+async function testRageBallMomentum(app) {
   await app.startMatch([
     app.roster.find((fighter) => fighter.id === "berserker"),
     app.roster.find((fighter) => fighter.id === "orbit")
@@ -262,10 +262,10 @@ async function testBerserkerMomentum(app) {
   const initialSpeed = berserker.ability.getStatModifiers().speed;
   berserker.ability.update(7.5, opponent);
   const chargedSpeed = berserker.ability.getStatModifiers().speed;
-  assert.ok(initialSpeed < 1, "Berserker should start slower than normal");
-  assert.ok(chargedSpeed > 1.7, "Berserker should gain speed while avoiding collision");
+  assert.ok(initialSpeed < 1, "Rage Ball should start slower than normal");
+  assert.ok(chargedSpeed > 1.7, "Rage Ball should gain speed while avoiding collision");
   berserker.ability.onCollision(opponent);
-  assert.equal(berserker.ability.getChargeProgress(), 0, "Berserker collision should reset momentum");
+  assert.equal(berserker.ability.getChargeProgress(), 0, "Rage Ball collision should reset momentum");
 }
 
 async function testFrostyDash(app) {
@@ -379,7 +379,7 @@ async function testOrbitShardRecharge(app) {
     ability.getShardRenderStates().some((shard) => shard.refilling && shard.progress > 0 && shard.progress < 1),
     "Refilling shard should render between the body and orbit"
   );
-  ability.update(0.45, target);
+  ability.update(1.98, target);
   assert.equal(ability.getActiveShardCount(), 3, "Orbit shard should return after refill animation");
 
   ability.consumeShard(0);
@@ -447,7 +447,7 @@ const app = await loadModuleApp();
 testStatAllocationRules(app);
 await testCloneSeedDash(app);
 await testEaterFeast(app);
-await testBerserkerMomentum(app);
+await testRageBallMomentum(app);
 await testFrostyDash(app);
 await testGrenadeAdaptiveFuse(app);
 await testDamageShake(app);

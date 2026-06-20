@@ -18,18 +18,13 @@ export class VisualBurst extends CombatEntity {
       }
 
       draw(ctx) {
-        const alpha = Math.max(0, this.life / this.maxLife);
         ctx.save();
-        ctx.globalAlpha = alpha * 0.72;
         ctx.fillStyle = this.color;
         ctx.beginPath();
         ctx.arc(this.position.x, this.position.y, this.radius * 0.72, 0, Math.PI * 2);
         ctx.fill();
-        ctx.globalAlpha = alpha * 0.9;
         ctx.strokeStyle = this.color;
         ctx.lineWidth = 4;
-        ctx.shadowBlur = 18;
-        ctx.shadowColor = this.color;
         ctx.beginPath();
         ctx.arc(this.position.x, this.position.y, this.radius, 0, Math.PI * 2);
         ctx.stroke();
@@ -55,30 +50,26 @@ export class OrbitHitEffect extends CombatEntity {
       }
 
       draw(ctx) {
-        const alpha = Math.max(0, this.life / this.maxLife);
+        const progress = 1 - Math.max(0, this.life / this.maxLife);
         ctx.save();
-        ctx.globalAlpha = alpha;
         ctx.strokeStyle = this.color;
         ctx.lineWidth = 7;
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = this.color;
         ctx.lineCap = "round";
         ctx.beginPath();
         ctx.moveTo(this.shardPosition.x, this.shardPosition.y);
         ctx.lineTo(this.targetPosition.x, this.targetPosition.y);
         ctx.stroke();
 
-        ctx.globalAlpha = alpha * 0.82;
         ctx.strokeStyle = "#ffffff";
         ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.arc(this.targetPosition.x, this.targetPosition.y, 18 + (1 - alpha) * 48, 0, Math.PI * 2);
+        ctx.arc(this.targetPosition.x, this.targetPosition.y, 18 + progress * 48, 0, Math.PI * 2);
         ctx.stroke();
 
         ctx.fillStyle = this.color;
         for (let index = 0; index < 6; index += 1) {
           const angle = (Math.PI * 2 * index) / 6;
-          const distance = 22 + (1 - alpha) * 36;
+          const distance = 22 + progress * 36;
           ctx.save();
           ctx.translate(
             this.targetPosition.x + Math.cos(angle) * distance,
@@ -109,18 +100,13 @@ export class DeathBurstEffect extends CombatEntity {
 
       draw(ctx) {
         const progress = 1 - Math.max(0, this.life / this.maxLife);
-        const alpha = 1 - progress;
         ctx.save();
-        ctx.globalAlpha = alpha;
         ctx.strokeStyle = "#ffffff";
         ctx.lineWidth = 8;
-        ctx.shadowBlur = 28;
-        ctx.shadowColor = this.color;
         ctx.beginPath();
         ctx.arc(this.position.x, this.position.y, 26 + progress * 110, 0, Math.PI * 2);
         ctx.stroke();
 
-        ctx.globalAlpha = alpha * 0.8;
         ctx.strokeStyle = this.color;
         ctx.lineWidth = 16;
         ctx.beginPath();
@@ -208,18 +194,13 @@ export class GravityParticle extends CombatEntity {
       }
 
       draw(ctx) {
-        const alpha = Math.max(0, this.life / this.maxLife);
         ctx.save();
-        ctx.globalAlpha = this.settled ? alpha * 0.46 : alpha * 0.85;
         ctx.fillStyle = this.color;
-        ctx.shadowBlur = this.settled ? 0 : 10;
-        ctx.shadowColor = this.color;
         ctx.translate(this.position.x, this.position.y);
         ctx.rotate(this.settled ? 0 : this.rotation);
         const width = this.settled ? this.width * 1.45 : this.width;
         const height = this.settled ? Math.max(2, this.height * 0.42) : this.height;
         ctx.fillRect(-width / 2, -height / 2, width, height);
-        ctx.globalAlpha = this.settled ? alpha * 0.18 : alpha * 0.36;
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(-width / 2, -height / 2, width, Math.max(1, height * 0.24));
         ctx.restore();
@@ -244,11 +225,8 @@ export class SlashTrail extends CombatEntity {
 
       draw(ctx) {
         ctx.save();
-        ctx.globalAlpha = Math.max(0, this.life / 0.18);
         ctx.strokeStyle = this.color;
         ctx.lineWidth = 10;
-        ctx.shadowBlur = 18;
-        ctx.shadowColor = this.color;
         ctx.lineCap = "round";
         ctx.beginPath();
         ctx.moveTo(this.from.x, this.from.y);

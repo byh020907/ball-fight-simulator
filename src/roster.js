@@ -22,7 +22,7 @@ export function createRoster() {
           },
           {
             id: "clone",
-            name: "Clone Ball",
+            name: "Trickster Ball",
             title: "Seed Gamble",
             description: "분신을 전방으로 쏘아 상대를 압박하는 속임수형 전투 공입니다.",
             color: "#d99cff",
@@ -42,7 +42,7 @@ export function createRoster() {
           },
           {
             id: "frosty",
-            name: "Frosty Sword",
+            name: "Frost Blade",
             title: "Freeze Clash",
             description: "순간 대시로 적을 베고, 짧게 둔화시켜 다음 충돌을 유리하게 만듭니다.",
             color: "#8ee8d7",
@@ -52,7 +52,7 @@ export function createRoster() {
           },
           {
             id: "berserker",
-            name: "Berserker",
+            name: "Rage Ball",
             title: "Visible Rage",
             description: "체력이 낮아질수록 속도와 충돌 화력이 폭발적으로 올라갑니다.",
             color: "#ffae6e",

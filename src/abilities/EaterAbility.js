@@ -73,7 +73,6 @@ export class EaterAbility extends Ability {
         target.swallowedState = { owner: this.owner };
         target.clearDash();
         target.velocity = new Vector2();
-        target.trail = [];
         this.simulation.playSound("chomp", 1.25);
         this.simulation.spawnParticleBurst(target.position.clone(), this.owner.color, {
           count: 30,

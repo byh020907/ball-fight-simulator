@@ -19,7 +19,7 @@ export class OrbitAbility extends Ability {
         this.spinBurstDuration = 0.85;
         this.spinBurst = 0;
         this.rechargeDelay = 0;
-        this.rechargeDuration = 0.42;
+        this.rechargeDuration = 2;
         this.rechargeGap = 0.16;
         this.rechargeGapTimer = 0;
       }

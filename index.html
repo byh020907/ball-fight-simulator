@@ -8,8 +8,8 @@
     :root {
       --bg-1: #08111f;
       --bg-2: #13233f;
-      --panel: rgba(7, 14, 26, 0.76);
-      --panel-border: rgba(255, 255, 255, 0.12);
+      --panel: #ffffff;
+      --panel-border: #202020;
       --text: #f4f7fb;
       --muted: #9fb2cb;
       --accent: #ffb84c;
@@ -17,7 +17,6 @@
       --danger: #ff6b81;
       --success: #6df7b1;
       --arena: #0f1a2e;
-      --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
     }
 
     * {
@@ -29,10 +28,7 @@
       min-height: 100vh;
       font-family: "Bahnschrift", "Segoe UI", sans-serif;
       color: var(--text);
-      background:
-        radial-gradient(circle at top, rgba(89, 214, 255, 0.22), transparent 34%),
-        radial-gradient(circle at 80% 20%, rgba(255, 184, 76, 0.22), transparent 30%),
-        linear-gradient(180deg, var(--bg-2), var(--bg-1));
+      background: #d9d9d9;
       overflow-x: hidden;
     }
 
@@ -40,11 +36,7 @@
       content: "";
       position: fixed;
       inset: 0;
-      background:
-        linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-      background-size: 36px 36px;
-      opacity: 0.2;
+      display: none;
       pointer-events: none;
     }
 
@@ -70,8 +62,6 @@
     .log-panel {
       border: 1px solid var(--panel-border);
       background: var(--panel);
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(18px);
       border-radius: 24px;
     }
 
@@ -87,8 +77,7 @@
       inset: auto -10% -28% auto;
       width: 220px;
       height: 220px;
-      background: radial-gradient(circle, rgba(255, 184, 76, 0.35), transparent 66%);
-      filter: blur(6px);
+      display: none;
     }
 
     .eyebrow {
@@ -127,12 +116,12 @@
       align-self: flex-start;
       padding: 8px 14px;
       border-radius: 999px;
-      background: rgba(109, 247, 177, 0.12);
+      background: #ffffff;
       color: var(--success);
       font-size: 0.82rem;
       letter-spacing: 0.06em;
       text-transform: uppercase;
-      border: 1px solid rgba(109, 247, 177, 0.22);
+      border: 1px solid #28c84e;
     }
 
     .matchup {
@@ -161,16 +150,12 @@
       font-weight: 700;
       color: #07111b;
       cursor: pointer;
-      background:
-        linear-gradient(135deg, #ffe07e, var(--accent)),
-        linear-gradient(135deg, var(--accent), #ff9b6a);
-      box-shadow: 0 14px 32px rgba(255, 184, 76, 0.34);
-      transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+      background: #ffcb3d;
+      transition: transform 180ms ease, opacity 180ms ease;
     }
 
     .control-button:hover:not(:disabled) {
       transform: translateY(-2px);
-      box-shadow: 0 20px 38px rgba(255, 184, 76, 0.42);
     }
 
     .control-button:disabled {
@@ -188,9 +173,8 @@
       position: relative;
       border-radius: 30px;
       padding: 16px;
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      box-shadow: var(--shadow);
+      background: #ffffff;
+      border: 1px solid #202020;
     }
 
     .arena {
@@ -198,9 +182,7 @@
       display: block;
       aspect-ratio: 16 / 9;
       border-radius: 24px;
-      background:
-        radial-gradient(circle at center, rgba(89, 214, 255, 0.08), transparent 45%),
-        linear-gradient(180deg, #13203a, var(--arena));
+      background: #ffffff;
     }
 
     .overlay {
@@ -214,7 +196,7 @@
       transition: opacity 300ms ease, transform 300ms ease;
       opacity: 0;
       transform: scale(0.96);
-      background: radial-gradient(circle at center, rgba(0, 0, 0, 0.54), rgba(0, 0, 0, 0.78));
+      background: #eeeeee;
     }
 
     .overlay.visible {
@@ -280,16 +262,16 @@
     .fighter-card {
       padding: 16px;
       border-radius: 18px;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.06);
+      background: #ffffff;
+      border: 1px solid #202020;
       display: grid;
       gap: 10px;
       transition: border-color 180ms ease, transform 180ms ease, background 180ms ease;
     }
 
     .fighter-card.active {
-      border-color: rgba(255, 184, 76, 0.45);
-      background: rgba(255, 184, 76, 0.09);
+      border-color: #ffcb3d;
+      background: #fff2b8;
       transform: translateY(-2px);
     }
 
@@ -303,8 +285,7 @@
       width: 42px;
       height: 42px;
       border-radius: 50%;
-      border: 3px solid rgba(255, 255, 255, 0.22);
-      box-shadow: inset 0 0 16px rgba(255, 255, 255, 0.22);
+      border: 3px solid #202020;
       flex: 0 0 auto;
     }
 
@@ -339,7 +320,7 @@
       height: 10px;
       border-radius: 999px;
       overflow: hidden;
-      background: rgba(255, 255, 255, 0.08);
+      background: #dcdcdc;
     }
 
     .hp-fill {
@@ -367,10 +348,10 @@
     .log-list li {
       padding: 12px 14px;
       border-radius: 14px;
-      background: rgba(255, 255, 255, 0.04);
+      background: #ffffff;
       color: #d9e4f3;
       line-height: 1.45;
-      border: 1px solid rgba(255, 255, 255, 0.04);
+      border: 1px solid #202020;
     }
 
     .legend {
@@ -384,8 +365,8 @@
     .legend span {
       padding: 8px 12px;
       border-radius: 999px;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.06);
+      background: #ffffff;
+      border: 1px solid #202020;
     }
 
     @media (max-width: 940px) {
@@ -445,27 +426,27 @@
     .battle-stage {
       width: min(calc(100vw - 364px), calc(100vh - 208px), 852px);
       display: grid;
-      grid-template-rows: auto 1fr auto;
+      grid-template-rows: 1fr auto;
       gap: 5px;
       align-items: stretch;
       min-height: 0;
     }
 
     .top-bar {
+      display: none;
       border: 3px solid #202020;
       background: #28c84e;
       color: #ffffff;
       min-height: 38px;
-      display: grid;
+      display: none;
       gap: 2px;
       align-items: center;
       justify-items: center;
       padding: 3px 9px;
-      box-shadow: none;
     }
 
     .top-bar.overtime {
-      background: linear-gradient(90deg, #ff3d00, #ffb300, #ff3d00);
+      background: #ff6d00;
       animation: overtimePulse 650ms ease-in-out infinite alternate;
     }
 
@@ -476,17 +457,17 @@
 
     @keyframes overtimePulse {
       from {
-        filter: saturate(1);
+        opacity: 1;
       }
       to {
-        filter: saturate(1.45) brightness(1.08);
+        opacity: 0.82;
       }
     }
 
     .top-bar .status-badge {
-      background: transparent;
+      background: #28c84e;
       border: 0;
-      color: rgba(255, 255, 255, 0.86);
+      color: #ffffff;
       padding: 0;
       font-size: 0.74rem;
       letter-spacing: 0.16em;
@@ -500,7 +481,7 @@
     }
 
     .top-bar .matchup small {
-      color: rgba(255, 255, 255, 0.84);
+      color: #ffffff;
       margin-top: 2px;
       font-size: 0.72rem;
     }
@@ -510,7 +491,6 @@
       border-radius: 0;
       background: #ffffff;
       border: 4px solid #202020;
-      box-shadow: none;
       aspect-ratio: 1 / 1;
       overflow: hidden;
     }
@@ -524,8 +504,7 @@
     .overlay {
       inset: 0;
       border-radius: 0;
-      background: rgba(255, 255, 255, 0.16);
-      backdrop-filter: blur(2px);
+      background: #eeeeee;
     }
 
     .overlay-card span {
@@ -536,12 +515,11 @@
 
     .overlay-card strong {
       color: #111111;
-      text-shadow: none;
       font-size: clamp(2rem, 8vw, 3.4rem);
     }
 
     .overlay-card p {
-      color: rgba(17, 17, 17, 0.72);
+      color: #202020;
     }
 
     .control-button {
@@ -552,8 +530,11 @@
       min-width: 220px;
       border-radius: 999px;
       background: #ffcb3d;
-      box-shadow: none;
       z-index: 2;
+    }
+
+    .control-button:hover:not(:disabled) {
+      transform: translateX(-50%) translateY(-2px);
     }
 
     .control-button.hidden {
@@ -649,7 +630,7 @@
 
     .cooldown-fill {
       height: 100%;
-      background: linear-gradient(90deg, #ffa726, #ff6d00);
+      background: #ff6d00;
     }
 
     .debug-hidden,
@@ -849,7 +830,8 @@
 
     .bracket-match.active {
       background: #fff2b8;
-      box-shadow: inset 0 0 0 2px #ffcb3d;
+      outline: 2px solid #ffcb3d;
+      outline-offset: -4px;
     }
 
     .bracket-match.done {
@@ -945,7 +927,7 @@
         width: 100%;
         min-height: 0;
         display: grid;
-        grid-template-rows: auto minmax(0, 1fr) auto;
+        grid-template-rows: minmax(0, 1fr) auto;
         gap: 6px;
       }
 

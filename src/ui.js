@@ -45,7 +45,7 @@ export class ArenaRenderer {
         ctx.save();
         ctx.font = "700 13px Bahnschrift, Segoe UI, sans-serif";
         ctx.textAlign = "center";
-        ctx.fillStyle = "rgba(32, 32, 32, 0.7)";
+        ctx.fillStyle = "#444444";
         ctx.fillText(fighter.name, fighter.position.x, y);
         ctx.restore();
       }
@@ -132,6 +132,18 @@ export class UIController {
       }
 
       showOverlay(label, text) {
+        delete this.elements.overlay.dataset.transientToken;
+        this.elements.overlay.innerHTML = `
+          <div class="overlay-card">
+            <span>${label}</span>
+            <strong>${text}</strong>
+          </div>
+        `;
+        this.elements.overlay.classList.add("visible");
+      }
+
+      showTransientOverlay(label, text, token) {
+        this.elements.overlay.dataset.transientToken = String(token);
         this.elements.overlay.innerHTML = `
           <div class="overlay-card">
             <span>${label}</span>
@@ -142,6 +154,7 @@ export class UIController {
       }
 
       hideOverlay() {
+        delete this.elements.overlay.dataset.transientToken;
         this.elements.overlay.classList.remove("visible");
       }
 

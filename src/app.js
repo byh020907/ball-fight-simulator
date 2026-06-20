@@ -45,6 +45,7 @@ export class BattleApp {
         this.rafId = 0;
         this.resultSequenceAnnounced = false;
         this.matchFinalized = false;
+        this.transientOverlayToken = 0;
         this.elements.startButton.addEventListener("click", () => this.startTournament());
         this.elements.playerPanel?.addEventListener("click", (event) => this.handlePlayerPanelClick(event));
         this.refreshPlayerSetup();
@@ -160,6 +161,7 @@ export class BattleApp {
           onLog: (message) => this.ui.addLog(message),
           onOvertime: () => {
             this.ui.updateStatus(label, "Overtime");
+            this.showTransientOverlay("Overtime", "속도와 피해 증가", 1250);
             this.audio.play("overtime");
           },
           onSound: (type, intensity) => this.audio.play(type, intensity)
@@ -175,6 +177,16 @@ export class BattleApp {
         this.lastTime = performance.now();
         cancelAnimationFrame(this.rafId);
         this.rafId = requestAnimationFrame((time) => this.loop(time));
+      }
+
+      showTransientOverlay(label, text, duration = 1200) {
+        const token = String(++this.transientOverlayToken);
+        this.ui.showTransientOverlay(label, text, token);
+        window.setTimeout(() => {
+          if (this.elements.overlay.dataset.transientToken === token && !this.simulation?.finished) {
+            this.ui.hideOverlay();
+          }
+        }, duration);
       }
 
       loop(timestamp) {

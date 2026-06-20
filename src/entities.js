@@ -51,10 +51,7 @@ export class SeedOrb extends CombatEntity {
 
       draw(ctx) {
         ctx.save();
-        ctx.globalAlpha = 0.84;
         ctx.fillStyle = this.owner.color;
-        ctx.shadowBlur = 22;
-        ctx.shadowColor = this.owner.color;
         ctx.beginPath();
         ctx.arc(this.position.x, this.position.y, this.radius, 0, Math.PI * 2);
         ctx.fill();
@@ -115,8 +112,6 @@ export class ArrowProjectile extends CombatEntity {
         ctx.translate(this.position.x, this.position.y);
         ctx.rotate(this.angle);
         ctx.fillStyle = this.owner.color;
-        ctx.shadowBlur = 14;
-        ctx.shadowColor = this.owner.color;
         ctx.fillRect(-20, -4, 40, 8);
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(6, -2, 14, 4);
@@ -171,7 +166,6 @@ export class Grenade extends CombatEntity {
       draw(ctx) {
         const charge = 1 - Math.max(0, this.timer / this.maxTimer);
         ctx.save();
-        ctx.globalAlpha = 0.16 + charge * 0.22;
         ctx.strokeStyle = this.owner.color;
         ctx.lineWidth = 5;
         ctx.setLineDash([12, 10]);
@@ -180,14 +174,11 @@ export class Grenade extends CombatEntity {
         ctx.stroke();
         ctx.setLineDash([]);
 
-        ctx.globalAlpha = 1;
         ctx.fillStyle = this.owner.color;
-        ctx.shadowBlur = 18;
-        ctx.shadowColor = this.owner.color;
         ctx.beginPath();
         ctx.arc(this.position.x, this.position.y, this.radius, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = "rgba(255,255,255,0.7)";
+        ctx.strokeStyle = "#ffffff";
         ctx.lineWidth = 2;
         ctx.stroke();
         ctx.restore();
@@ -221,8 +212,6 @@ export class BattleBall {
         this.ability = null;
         this.isDefeated = false;
         this.isDestroyed = false;
-        this.trail = [];
-        this.trailTimer = 0;
         this.spinRotation = 0;
       }
 
@@ -280,7 +269,6 @@ export class BattleBall {
         this.slowEffect = null;
         this.swallowedState = null;
         this.wallSlamState = null;
-        this.trail = [];
       }
 
       destroyForResult() {
@@ -366,21 +354,6 @@ export class BattleBall {
         this.position.add(this.velocity.clone().scale(delta));
         simulation.keepInsideArena(this);
 
-        this.trailTimer -= delta;
-        if (this.trailTimer <= 0) {
-          this.trailTimer = 0.04;
-          this.trail.unshift({
-            position: this.position.clone(),
-            radius: this.radius,
-            alpha: this.speedBoost ? 0.34 : 0.18
-          });
-          this.trail = this.trail.slice(0, this.speedBoost ? 12 : 7);
-        }
-        this.trail.forEach((item) => {
-          item.alpha *= 0.88;
-          item.radius *= 0.992;
-        });
-        this.trail = this.trail.filter((item) => item.alpha > 0.03);
       }
 
       applySlow(duration, amount) {
@@ -415,19 +388,7 @@ export class BattleBall {
           return;
         }
 
-        for (const [index, ghost] of this.trail.entries()) {
-          ctx.save();
-          ctx.globalAlpha = ghost.alpha * (1 - index / Math.max(1, this.trail.length + 1));
-          ctx.fillStyle = this.speedBoost?.color ?? this.color;
-          ctx.beginPath();
-          ctx.arc(ghost.position.x, ghost.position.y, ghost.radius, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-        }
-
         ctx.save();
-        ctx.shadowBlur = this.speedBoost ? 18 : 0;
-        ctx.shadowColor = this.speedBoost?.color ?? this.color;
         ctx.fillStyle = this.color;
         ctx.beginPath();
         ctx.arc(this.position.x, this.position.y, this.radius, 0, Math.PI * 2);
@@ -443,43 +404,40 @@ export class BattleBall {
           const shards = this.ability?.getShardRenderStates?.() ?? [];
           const fastOrbit = this.ability?.spinBurst > 0;
           const missingCount = this.ability?.getMissingShardCount?.() ?? 0;
-          ctx.strokeStyle = fastOrbit ? "rgba(255, 255, 255, 0.78)" : "rgba(111, 227, 255, 0.42)";
+          ctx.strokeStyle = fastOrbit ? "#ffea00" : "#243cff";
           ctx.lineWidth = fastOrbit ? 5 : 3;
-          ctx.globalAlpha = missingCount >= 3 ? 0.5 : 1;
           ctx.setLineDash(fastOrbit ? [16, 7] : missingCount > 0 ? [6, 13] : [8, 9]);
           ctx.beginPath();
           ctx.arc(this.position.x, this.position.y, this.radius + (this.ability?.orbitRadius ?? 44), 0, Math.PI * 2);
           ctx.stroke();
           ctx.setLineDash([]);
-          ctx.globalAlpha = 1;
           for (const shard of shards) {
             const size = shard.refilling ? 8 + shard.progress * 10 : fastOrbit ? 22 : 16;
             if (shard.refilling) {
-              ctx.strokeStyle = "rgba(255, 255, 255, 0.38)";
+              ctx.strokeStyle = "#ffffff";
               ctx.lineWidth = 2;
               ctx.beginPath();
               ctx.moveTo(this.position.x, this.position.y);
               ctx.lineTo(shard.position.x, shard.position.y);
               ctx.stroke();
             }
-            ctx.globalAlpha = shard.refilling ? 0.58 + shard.progress * 0.42 : 1;
-            ctx.fillStyle = fastOrbit || shard.refilling ? "#ffffff" : "#dff7ff";
-            ctx.shadowBlur = fastOrbit || shard.refilling ? 28 : 18;
-            ctx.shadowColor = this.color;
+            ctx.fillStyle = shard.refilling ? "#ffffff" : fastOrbit ? "#ffea00" : "#ffcf24";
+            ctx.strokeStyle = "#202020";
+            ctx.lineWidth = 3;
             ctx.fillRect(shard.position.x - size / 2, shard.position.y - size / 2, size, size);
-            ctx.globalAlpha = 1;
+            ctx.strokeRect(shard.position.x - size / 2, shard.position.y - size / 2, size, size);
           }
         }
 
         if (this.id === "berserker" && this.ability?.isCharged?.()) {
           const charge = this.ability.getChargeProgress();
           const pulse = 1 + Math.sin(performance.now() / 70) * (0.04 + charge * 0.08);
-          ctx.strokeStyle = "rgba(255, 66, 26, 0.82)";
+          ctx.strokeStyle = "#ff421a";
           ctx.lineWidth = 4 + charge * 4;
           ctx.beginPath();
           ctx.arc(this.position.x, this.position.y, (this.radius + 12 + charge * 16) * pulse, 0, Math.PI * 2);
           ctx.stroke();
-          ctx.strokeStyle = "rgba(255, 180, 80, 0.55)";
+          ctx.strokeStyle = "#ffb450";
           ctx.lineWidth = 3;
           ctx.beginPath();
           ctx.arc(this.position.x, this.position.y, (this.radius + 22 + charge * 20) * pulse, 0, Math.PI * 2);
@@ -487,21 +445,13 @@ export class BattleBall {
         }
 
         if (this.id === "eater" && this.ability?.isFeasting?.()) {
-          const radiusScale = this.ability?.getRadiusScale?.() ?? 1;
-          const pulse = 1 + Math.sin(performance.now() / 55) * 0.09;
           const target = this.ability?.getMouthTarget?.();
           const mouthAngle = target
             ? Math.atan2(target.position.y - this.position.y, target.position.x - this.position.x)
             : Math.atan2(this.velocity.y, this.velocity.x);
           const mouthOpen = 0.5 + Math.sin(performance.now() / 95) * 0.12;
-          ctx.strokeStyle = "rgba(160, 255, 72, 0.88)";
-          ctx.lineWidth = 7;
-          ctx.beginPath();
-          ctx.arc(this.position.x, this.position.y, (this.radius + 14 + radiusScale * 10) * pulse, 0.2, Math.PI * 1.8);
-          ctx.stroke();
 
           ctx.fillStyle = "#fafafa";
-          ctx.shadowBlur = 0;
           ctx.beginPath();
           ctx.moveTo(this.position.x, this.position.y);
           ctx.arc(
@@ -514,7 +464,7 @@ export class BattleBall {
           ctx.closePath();
           ctx.fill();
 
-          ctx.strokeStyle = "rgba(32, 32, 32, 0.68)";
+          ctx.strokeStyle = "#202020";
           ctx.lineWidth = 5;
           ctx.beginPath();
           ctx.moveTo(this.position.x, this.position.y);
@@ -533,7 +483,6 @@ export class BattleBall {
         if (this.speedBoost && this.speedBoost.showRing !== false) {
           ctx.strokeStyle = this.speedBoost.color;
           ctx.lineWidth = 4;
-          ctx.globalAlpha = 0.8;
           ctx.beginPath();
           ctx.arc(this.position.x, this.position.y, this.radius + 18, 0, Math.PI * 2);
           ctx.stroke();
