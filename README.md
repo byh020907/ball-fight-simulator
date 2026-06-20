@@ -12,6 +12,16 @@ https://byh020907.github.io/ball-fight-simulator/
 
 For local development, serve the folder with a local web server instead of opening `index.html` by double-clicking. The game uses native ES modules from `src/`, and browsers block module imports from `file://`.
 
+```bash
+npm start
+```
+
+Then open:
+
+```text
+http://127.0.0.1:4173/
+```
+
 ## Development
 
 Source code is split by responsibility:
@@ -32,6 +42,7 @@ npm test
 ## Scripts
 
 ```bash
+npm start
 npm test
 npm run check
 ```

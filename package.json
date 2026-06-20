@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "start": "node scripts/serve.mjs",
     "test": "node tests/regression.mjs",
-    "check": "node --check src/main.js && node --check src/app.js && node --check src/entities.js && node --check src/simulation.js && node --check tests/regression.mjs"
+    "check": "node --check scripts/serve.mjs && node --check src/main.js && node --check src/app.js && node --check src/entities.js && node --check src/simulation.js && node --check tests/regression.mjs"
   }
 }
