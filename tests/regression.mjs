@@ -8,6 +8,7 @@ import {
   formatStatAllocation,
   getSpentStatPoints
 } from "../src/stat-allocation.js";
+import { FIGHTER_IDS } from "../src/core.js";
 import { Vector2 } from "../src/core.js";
 
 function makeClassList() {
@@ -179,8 +180,8 @@ async function loadModuleApp() {
 
 async function testCloneSeedDash(app) {
   await app.startMatch([
-    app.roster.find((fighter) => fighter.id === "trickster"),
-    app.roster.find((fighter) => fighter.id === "orbit")
+    app.roster.find((fighter) => fighter.id === FIGHTER_IDS.TRICKSTER),
+    app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ORBIT)
   ]);
   const [trickster, opponent] = app.simulation.fighters;
   trickster.position.x = 200;
@@ -219,8 +220,8 @@ async function testCloneSeedDash(app) {
 
 async function testEaterFeast(app) {
   await app.startMatch([
-    app.roster.find((fighter) => fighter.id === "eater"),
-    app.roster.find((fighter) => fighter.id === "archer")
+    app.roster.find((fighter) => fighter.id === FIGHTER_IDS.EATER),
+    app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER)
   ]);
   const [eater, target] = app.simulation.fighters;
   eater.position.x = 300;
@@ -266,8 +267,8 @@ async function testEaterFeast(app) {
 
 async function testRageBallMomentum(app) {
   await app.startMatch([
-    app.roster.find((fighter) => fighter.id === "rage"),
-    app.roster.find((fighter) => fighter.id === "orbit")
+    app.roster.find((fighter) => fighter.id === FIGHTER_IDS.RAGE),
+    app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ORBIT)
   ]);
   const [rage, opponent] = app.simulation.fighters;
   const initialSpeed = rage.ability.getStatModifiers().speed;
@@ -281,8 +282,8 @@ async function testRageBallMomentum(app) {
 
 async function testDashBallCooldownDash(app) {
   await app.startMatch([
-    app.roster.find((fighter) => fighter.id === "dash"),
-    app.roster.find((fighter) => fighter.id === "archer")
+    app.roster.find((fighter) => fighter.id === FIGHTER_IDS.DASH),
+    app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER)
   ]);
   const [dashBall, target] = app.simulation.fighters;
   assert.equal(dashBall.baseDamage, 0.92, "Dash Ball should have reduced base damage");
@@ -370,8 +371,8 @@ async function testDashBallCooldownDash(app) {
 
 async function testGrenadeAdaptiveFuse(app) {
   await app.startMatch([
-    app.roster.find((fighter) => fighter.id === "grenade"),
-    app.roster.find((fighter) => fighter.id === "orbit")
+    app.roster.find((fighter) => fighter.id === FIGHTER_IDS.GRENADE),
+    app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ORBIT)
   ]);
   const [grenadeBall, target] = app.simulation.fighters;
   const ability = grenadeBall.ability;
@@ -393,8 +394,8 @@ async function testGrenadeAdaptiveFuse(app) {
 
 async function testDamageShake(app) {
   await app.startMatch([
-    app.roster.find((fighter) => fighter.id === "archer"),
-    app.roster.find((fighter) => fighter.id === "orbit")
+    app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER),
+    app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ORBIT)
   ]);
   const [attacker, target] = app.simulation.fighters;
   target.takeDamage(10, attacker, "Test Hit");
@@ -405,8 +406,8 @@ async function testDamageShake(app) {
 
 async function testArrowBounceFacing(app) {
   await app.startMatch([
-    app.roster.find((fighter) => fighter.id === "archer"),
-    app.roster.find((fighter) => fighter.id === "orbit")
+    app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER),
+    app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ORBIT)
   ]);
   const [archer, target] = app.simulation.fighters;
   const Vector2 = archer.position.constructor;
@@ -425,8 +426,8 @@ async function testArrowBounceFacing(app) {
 
 async function testOrbitShardRecharge(app) {
   await app.startMatch([
-    app.roster.find((fighter) => fighter.id === "orbit"),
-    app.roster.find((fighter) => fighter.id === "archer")
+    app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ORBIT),
+    app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER)
   ]);
   const [orbit, target] = app.simulation.fighters;
   const ability = orbit.ability;
@@ -489,7 +490,7 @@ function testStatAllocationRules(app) {
   assert.ok(app.elements.playerPanel.innerHTML.includes("내 캐릭터"), "Player setup should render readable Korean title text");
   assert.ok(app.elements.playerPanel.innerHTML.includes("+10"), "Player setup should render touch-friendly large step buttons");
 
-  const archer = app.roster.find((fighter) => fighter.id === "archer");
+  const archer = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
   let stepped = { hp: 0, damage: 0, speed: 0 };
   stepped = adjustStatAllocation(stepped, "hp", 10);
   stepped = adjustStatAllocation(stepped, "damage", 95);

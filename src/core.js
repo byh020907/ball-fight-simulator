@@ -1,5 +1,3 @@
-
-
 export class Vector2 {
       constructor(x = 0, y = 0) {
         this.x = x;
@@ -78,3 +76,14 @@ export class TimedEffect {
         this.elapsed += delta;
       }
     }
+
+export const FIGHTER_IDS = Object.freeze({
+  ARCHER: "archer",
+  ORBIT: "orbit",
+  TRICKSTER: "trickster",
+  GRENADE: "grenade",
+  DASH: "dash",
+  RAGE: "rage",
+  EATER: "eater"
+});
+

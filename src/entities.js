@@ -1,4 +1,4 @@
-import { CombatEntity, TimedEffect, Vector2 } from './core.js';
+import { CombatEntity, FIGHTER_IDS, TimedEffect, Vector2 } from './core.js';
 
 export class SeedOrb extends CombatEntity {
       constructor(owner, position, velocity, life) {
@@ -400,7 +400,7 @@ export class BattleBall {
 
         this.drawFace(ctx, this.wallSlamState ? this.spinRotation : 0);
 
-        if (this.id === "orbit") {
+        if (this.id === FIGHTER_IDS.ORBIT) {
           const shards = this.ability?.getShardRenderStates?.() ?? [];
           const fastOrbit = this.ability?.spinBurst > 0;
           const missingCount = this.ability?.getMissingShardCount?.() ?? 0;
@@ -429,7 +429,7 @@ export class BattleBall {
           }
         }
 
-        if (this.id === "rage" && this.ability?.isCharged?.()) {
+        if (this.id === FIGHTER_IDS.RAGE && this.ability?.isCharged?.()) {
           const charge = this.ability.getChargeProgress();
           const pulse = 1 + Math.sin(performance.now() / 70) * (0.04 + charge * 0.08);
           ctx.strokeStyle = "#ff421a";
@@ -444,7 +444,7 @@ export class BattleBall {
           ctx.stroke();
         }
 
-        if (this.id === "eater" && this.ability?.isFeasting?.()) {
+        if (this.id === FIGHTER_IDS.EATER && this.ability?.isFeasting?.()) {
           const target = this.ability?.getMouthTarget?.();
           const mouthAngle = target
             ? Math.atan2(target.position.y - this.position.y, target.position.x - this.position.x)
