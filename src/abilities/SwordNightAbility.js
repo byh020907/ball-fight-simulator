@@ -245,21 +245,31 @@ export class SwordNightAbility extends Ability {
     /** 기합띠를 맨 검사 얼굴 */
     drawFace(ctx, rotation, ball) {
         const { r } = this._faceContext(ball);
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+
+        // 눈썹 (강인한 인상)
+        ctx.strokeStyle = "#202020";
+        ctx.lineWidth = Math.max(2.5, r * 0.06);
+        this._line(ctx, ball, [
+            [-0.32, -0.2],
+            [-0.14, -0.16]
+        ]);
+        this._line(ctx, ball, [
+            [0.32, -0.2],
+            [0.14, -0.16]
+        ]);
 
         // 날카로운 눈 (사선)
         ctx.lineWidth = Math.max(3, r * 0.075);
-
-        // 왼쪽 눈
-        ctx.beginPath();
-        ctx.moveTo(-0.28 * r, -0.08 * r);
-        ctx.lineTo(-0.12 * r, -0.02 * r);
-        ctx.stroke();
-
-        // 오른쪽 눈
-        ctx.beginPath();
-        ctx.moveTo(0.28 * r, -0.08 * r);
-        ctx.lineTo(0.12 * r, -0.02 * r);
-        ctx.stroke();
+        this._line(ctx, ball, [
+            [-0.28, -0.08],
+            [-0.12, -0.02]
+        ]);
+        this._line(ctx, ball, [
+            [0.28, -0.08],
+            [0.12, -0.02]
+        ]);
 
         // 입 (약간 비웃는 표정)
         ctx.beginPath();
@@ -270,31 +280,18 @@ export class SwordNightAbility extends Ability {
         // 기합띠 (headband) — 이마를 가로지르는 띠
         ctx.strokeStyle = "#ff4444";
         ctx.lineWidth = Math.max(4, r * 0.1);
-        ctx.beginPath();
-        ctx.moveTo(-0.52 * r, -0.28 * r);
-        ctx.lineTo(0.52 * r, -0.28 * r);
-        ctx.stroke();
+        this._line(ctx, ball, [
+            [-0.52, -0.28],
+            [0.52, -0.28]
+        ]);
 
         // 기합띠 끝 — 오른쪽에서 늘어뜨리기
-        ctx.strokeStyle = "#ff4444";
         ctx.lineWidth = Math.max(2.5, r * 0.06);
-        ctx.beginPath();
-        ctx.moveTo(0.52 * r, -0.28 * r);
-        ctx.lineTo(0.62 * r, -0.08 * r);
-        ctx.lineTo(0.56 * r, 0.02 * r);
-        ctx.stroke();
-
-        // 눈썹 (강인한 인상)
-        ctx.strokeStyle = "#202020";
-        ctx.lineWidth = Math.max(2.5, r * 0.06);
-        ctx.beginPath();
-        ctx.moveTo(-0.32 * r, -0.2 * r);
-        ctx.lineTo(-0.14 * r, -0.16 * r);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(0.32 * r, -0.2 * r);
-        ctx.lineTo(0.14 * r, -0.16 * r);
-        ctx.stroke();
+        this._line(ctx, ball, [
+            [0.52, -0.28],
+            [0.62, -0.08],
+            [0.56, 0.02]
+        ]);
 
         return true;
     }
