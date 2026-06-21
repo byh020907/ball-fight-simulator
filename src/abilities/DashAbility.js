@@ -15,7 +15,10 @@ export class DashAbility extends Ability {
 
     update(delta, target) {
         if (this.owner.dashState && target && this.cooldownLevel === 0) {
-            this.steerDash(delta, target);
+            const dist = Vector2.subtract(target.position, this.owner.position).length();
+            if (dist < 400) {
+                this.steerDash(delta, target);
+            }
         }
 
         this.timer -= delta;

@@ -1,6 +1,5 @@
 import { TimedEffect, Vector2 } from "../core.js";
 import { Ability } from "./Ability.js";
-import { steerBallToward } from "../core.js";
 
 export class EaterAbility extends Ability {
     constructor(owner, simulation) {
@@ -40,11 +39,10 @@ export class EaterAbility extends Ability {
             this.feastElapsed = Math.min(this.feastDuration, this.feastElapsed + delta);
 
             if (target && !target.isDefeated && !this.swallowedTarget) {
-                steerBallToward(this.owner, target, delta, {
-                    turnRate: 8,
-                    instant: true,
-                    persist: true
-                });
+                // Direct velocity override: go straight toward target
+                const dir = Vector2.subtract(target.position, this.owner.position).normalize();
+                this.owner.velocity = dir.scale(this.owner.velocity.length() || this.owner.baseSpeed);
+                this.owner.forceHeading(dir, 0.2);
             }
 
             if (this.feastTimer > 0 && !this.swallowedTarget && Math.random() < delta * 8) {
