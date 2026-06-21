@@ -81,6 +81,8 @@ export class Simulation {
             this.shakeScreen(0.24, 16);
             this.addLog(`${ball.name} takes wall slam damage.`);
         }
+
+        return bounced;
     }
 
     clearWallDash(ball) {

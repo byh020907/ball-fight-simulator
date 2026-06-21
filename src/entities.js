@@ -464,12 +464,9 @@ export class BattleBall {
             );
 
         this.position.add(this.velocity.clone().scale(delta));
-        if (knockbackVel) {
-            const bx = this.position.x,
-                by = this.position.y;
-            simulation.keepInsideArena(this);
-            if (this.position.x !== bx || this.position.y !== by) this.forcedHeading = null;
-        } else {
+        if (knockbackVel && simulation.keepInsideArena(this)) {
+            this.forcedHeading = null;
+        } else if (!knockbackVel) {
             simulation.keepInsideArena(this);
         }
     }
