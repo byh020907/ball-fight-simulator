@@ -19,6 +19,26 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.5.0",
+        date: "2026-06-21",
+        title: "v0.5.0 업데이트",
+        changes: [
+            {
+                type: "refactor",
+                text: "쿨타임 공식 변경 — 선형(1 - skill/100)에서 체감형(100/(100+skill))으로, 100포인트 시 50% 단축."
+            },
+            { type: "feature", text: "Rage Ball 상향 — 최고 속도 5배, 쿨타임 스탯이 충전 시간에 반영됩니다." },
+            {
+                type: "fix",
+                text: "Eater Ball 버그 수정 — 피스트 종료 후 쿨타임 즉시 재시작 버그 수정, 뱉은 후 쿨타임 초기화."
+            },
+            {
+                type: "fix",
+                text: "Eater Ball 크기 조절 버그 수정 — 삼키면 1.5배로 커지고, 뱉으면 원래 크기로 돌아옵니다."
+            }
+        ]
+    },
+    {
         version: "0.4.0",
         date: "2026-06-21",
         title: "v0.4.0 업데이트",
