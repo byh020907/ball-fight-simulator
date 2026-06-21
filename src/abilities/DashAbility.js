@@ -57,14 +57,15 @@ export class DashAbility extends Ability {
     }
 
     onDashWall() {
-        this.cooldownLevel = Math.max(0, this.cooldownLevel - 1);
+        this.cooldownLevel = 0;
         this._baseCooldown = this.getCooldownForLevel();
         this.timer = this.cooldown;
-        this.simulation.addLog(`${this.owner.name} hits a wall and loses one dash cooldown stack.`);
+        this.simulation.addLog(`${this.owner.name} hits a wall and resets dash cooldown.`);
     }
 
     getCooldownForLevel() {
-        return this.baseCooldown * 0.5 ** this.cooldownLevel;
+        const reduction = (this.cooldownLevel / this.maxCooldownLevel) * 0.25;
+        return this.baseCooldown * (1 - reduction);
     }
 
     drawFace(ctx, rotation, ball) {
