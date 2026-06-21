@@ -205,12 +205,11 @@ export class BattleSimulation extends Simulation {
         const speedEff = Math.min(1, attackerSpeed / attacker.baseSpeed);
         // Direction efficiency: 0~1 (alignment + hitting from the side)
         const dirEff = aimAlignment * 0.55 + sideExposure * 0.45;
-        // Combined efficiency: 0~1
-        const efficiency = Math.min(1, speedEff * 0.5 + dirEff * 0.5);
-        // Glancing blow penalty
-        const glancingPenalty = aimAlignment < 0.22 ? 0.5 : 1;
+        // Combined efficiency: 0~1 (glancing blow halves efficiency)
+        let efficiency = Math.min(1, speedEff * 0.5 + dirEff * 0.5);
+        if (aimAlignment < 0.22) efficiency *= 0.5;
 
-        return Math.max(1, Math.round(attacker.baseDamage * efficiency * glancingPenalty * this.getDamageMultiplier()));
+        return Math.max(1, Math.round(attacker.baseDamage * efficiency * this.getDamageMultiplier()));
     }
 
     checkResult() {
