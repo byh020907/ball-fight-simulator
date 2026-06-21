@@ -3,7 +3,7 @@ import { Ability } from "./Ability.js";
 
 const WINDUP = 0.6;
 const SPREAD_ANGLE = 0.22;
-const EVADE_RANGE = 160;
+const EVADE_RANGE = 320;
 const EVADE_STRENGTH = 0.7;
 
 export class ArcherAbility extends Ability {
