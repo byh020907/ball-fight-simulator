@@ -44,7 +44,7 @@ export const HELP_CONTENT = `
     <li><b>Orbit</b> — 궤도 구체를 소환합니다.</li>
     <li><b>Trickster</b> — 순간 이동 + 잔상을 남깁니다.</li>
     <li><b>Grenade</b> — 지연 폭탄을 투척합니다.</li>
-    <li><b>Dash</b> — 돌진追加 충돌 데미지를 줍니다.</li>
+    <li><b>Dash</b> — 돌진 — 추가 충돌 데미지를 줍니다.</li>
     <li><b>Rage</b> — 받은 데미지에 비례해 분노 모드가 발동합니다.</li>
     <li><b>Eater</b> — 상대를 삼켜 지속 데미지를 줍니다.</li>
   </ul>

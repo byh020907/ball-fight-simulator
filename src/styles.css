@@ -870,19 +870,18 @@ body::before {
 }
 
 .help-icon {
-    flex-shrink: 0;
-    width: 22px;
-    height: 22px;
-    margin-left: auto;
+    vertical-align: middle;
+    width: 24px;
+    height: 24px;
     border: 2px solid #202020;
     border-radius: 50%;
     background: none;
     color: #202020;
     font:
-        900 12px/1 "Bahnschrift",
+        900 13px/1 "Bahnschrift",
         sans-serif;
     cursor: pointer;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     transition:

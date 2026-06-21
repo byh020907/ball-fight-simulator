@@ -179,9 +179,6 @@
                     <div class="tournament-title">
                         <strong>Bracket</strong>
                         <span id="tournamentPhase" x-text="tournamentPhase">Ready</span>
-                        <button class="help-icon" type="button" title="게임 도움말" @click="$dispatch('open-help')">
-                            ?
-                        </button>
                     </div>
 
                     <section class="player-panel" id="playerPanel" x-bind:class="{ locked: locked }">
@@ -252,6 +249,9 @@
                             x-bind:disabled="locked"
                         >
                             자동 배분
+                        </button>
+                        <button class="help-icon" type="button" title="게임 도움말" @click="$dispatch('open-help')">
+                            ?
                         </button>
                         <div class="player-actions" data-player-actions></div>
                     </section>
