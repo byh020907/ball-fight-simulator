@@ -32,6 +32,10 @@ export const PATCH_NOTES = [
                 text: "Sword Night → Bat Ball 리브랜딩: 방망이 VFX, 캡 모자 얼굴로 변경"
             },
             {
+                type: "style",
+                text: "Bat Ball 캡모자 크기 확대 + 눈과 간격 조정"
+            },
+            {
                 type: "refactor",
                 text: "넉백 시스템 재설계 — forceHeading에 overrideVelocity 통합, knockbackState 제거. 벽 충돌 시 넉백 종료."
             },

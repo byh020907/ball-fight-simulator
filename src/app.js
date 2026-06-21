@@ -20,7 +20,7 @@ export class BattleApp {
          * @type {string|null}
          */
         this.startCharacter = null;
-        this.startCharacter = 'bat_ball';
+        // this.startCharacter = 'bat_ball';
 
         this.elements = {
             canvas: document.getElementById("arenaCanvas"),

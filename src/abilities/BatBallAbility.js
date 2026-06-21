@@ -266,57 +266,56 @@ export class BatBallAbility extends Ability {
         ctx.lineJoin = "round";
 
         // ── 캡 모자 몸통 (크라운) ──
-        // 윗부분을 채우는 반원 형태
+        // 윗부분을 채우는 반원 형태 (더 크게, 눈과 간격 확보)
         ctx.fillStyle = "#2244aa";
         ctx.beginPath();
-        ctx.arc(0, -0.06 * r, r * 0.52, Math.PI * 1.05, Math.PI * 1.95);
+        ctx.arc(0, -0.1 * r, r * 0.55, Math.PI * 1.08, Math.PI * 1.92);
         ctx.fill();
         ctx.strokeStyle = "#1a3388";
         ctx.lineWidth = Math.max(2, r * 0.04);
         ctx.stroke();
 
         // ── 캡 모자 챙 (앞으로 튀어나온 부분) ──
-        // 챙은 윤곽선으로: 정면에서 앞으로 삐져나온 형태
         ctx.strokeStyle = "#1a3388";
         ctx.lineWidth = Math.max(5, r * 0.12);
         ctx.beginPath();
-        ctx.moveTo(-0.3 * r, -0.32 * r);
-        ctx.lineTo(0, -0.44 * r);
-        ctx.lineTo(0.3 * r, -0.32 * r);
+        ctx.moveTo(-0.34 * r, -0.34 * r);
+        ctx.lineTo(0, -0.48 * r);
+        ctx.lineTo(0.34 * r, -0.34 * r);
         ctx.stroke();
 
-        // 챙 아랫면 (약간의 두께감)
+        // 챙 아랫면 (곡선 두께감)
         ctx.strokeStyle = "#2244aa";
         ctx.lineWidth = Math.max(3, r * 0.07);
         ctx.beginPath();
-        ctx.moveTo(-0.28 * r, -0.3 * r);
-        ctx.quadraticCurveTo(0, -0.4 * r, 0.28 * r, -0.3 * r);
+        ctx.moveTo(-0.32 * r, -0.32 * r);
+        ctx.quadraticCurveTo(0, -0.44 * r, 0.32 * r, -0.32 * r);
         ctx.stroke();
 
         // ── 상단 단추 ──
         ctx.fillStyle = "#1a3388";
         ctx.beginPath();
-        ctx.arc(0, -0.52 * r, Math.max(2, r * 0.04), 0, Math.PI * 2);
+        ctx.arc(0, -0.58 * r, Math.max(2.5, r * 0.045), 0, Math.PI * 2);
         ctx.fill();
 
-        // ── 눈 (집중하는 타자 표정) ──
+        // ── 눈 (집중하는 타자 표정, 모자와 간격 둠) ──
         ctx.strokeStyle = "#202020";
         ctx.lineWidth = Math.max(3, r * 0.075);
         // 왼쪽 눈
         ctx.beginPath();
-        ctx.moveTo(-0.28 * r, -0.08 * r);
-        ctx.lineTo(-0.12 * r, -0.02 * r);
+        ctx.moveTo(-0.28 * r, 0.02 * r);
+        ctx.lineTo(-0.1 * r, 0.08 * r);
         ctx.stroke();
         // 오른쪽 눈
         ctx.beginPath();
-        ctx.moveTo(0.28 * r, -0.08 * r);
-        ctx.lineTo(0.12 * r, -0.02 * r);
+        ctx.moveTo(0.28 * r, 0.02 * r);
+        ctx.lineTo(0.1 * r, 0.08 * r);
         ctx.stroke();
 
         // ── 입 (다짐한 표정) ──
         ctx.beginPath();
-        ctx.moveTo(-0.1 * r, 0.24 * r);
-        ctx.lineTo(0.12 * r, 0.2 * r);
+        ctx.moveTo(-0.1 * r, 0.28 * r);
+        ctx.lineTo(0.12 * r, 0.24 * r);
         ctx.stroke();
 
         return true;
