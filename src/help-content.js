@@ -52,7 +52,6 @@ export const HELP_CONTENT = `
 
 <div class="help-section">
   <h4 class="help-h">🏆 토너먼트</h4>
-  <p>4명이 참가하는 싱글 엘리미네이션 토너먼트입니다.<br>
-  준결승 → 결승 순으로 진행되며, 최종 우승자가 결정됩니다.</p>
+  <p>토너먼트를 진행하여 최종 우승자가 되세요.</p>
 </div>
 `;
