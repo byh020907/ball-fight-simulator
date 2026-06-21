@@ -30,11 +30,12 @@ export class ArcherAbility extends Ability {
                     target.velocity.length() > 5
                         ? target.velocity.clone().normalize()
                         : towardOpponent.clone().scale(-1);
+                // Cross product: positive = I'm on opponent's left side
                 const side =
                     oppDir.x * (this.owner.position.y - target.position.y) -
                     oppDir.y * (this.owner.position.x - target.position.x);
-                const perp = new Vector2(-towardOpponent.y, towardOpponent.x);
-                const dodgeDir = side > 0 ? perp : perp.scale(-1);
+                // Dodge toward opponent's left or right (not toward/away)
+                const dodgeDir = side > 0 ? new Vector2(-oppDir.y, oppDir.x) : new Vector2(oppDir.y, -oppDir.x);
 
                 const intensity = (1 - dist / EVADE_RANGE) * EVADE_STRENGTH;
                 const current = myDir ?? dodgeDir;
