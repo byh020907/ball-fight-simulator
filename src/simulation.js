@@ -92,18 +92,14 @@ export class BattleSimulation {
           bounced = true;
           wallNormal = new Vector2(1, 0);
           wallPoint = ball.position.clone();
-          if (ball.dashState?.untilWall) {
-            ball.clearDash();
-          }
+          this.clearWallDash(ball);
         } else if (ball.position.x >= this.width - ball.radius) {
           ball.position.x = this.width - ball.radius;
           ball.velocity.x = -Math.abs(ball.velocity.x);
           bounced = true;
           wallNormal = new Vector2(-1, 0);
           wallPoint = ball.position.clone();
-          if (ball.dashState?.untilWall) {
-            ball.clearDash();
-          }
+          this.clearWallDash(ball);
         }
 
         if (ball.position.y <= ball.radius) {
@@ -112,18 +108,14 @@ export class BattleSimulation {
           bounced = true;
           wallNormal = new Vector2(0, 1);
           wallPoint = ball.position.clone();
-          if (ball.dashState?.untilWall) {
-            ball.clearDash();
-          }
+          this.clearWallDash(ball);
         } else if (ball.position.y >= this.height - ball.radius) {
           ball.position.y = this.height - ball.radius;
           ball.velocity.y = -Math.abs(ball.velocity.y);
           bounced = true;
           wallNormal = new Vector2(0, -1);
           wallPoint = ball.position.clone();
-          if (ball.dashState?.untilWall) {
-            ball.clearDash();
-          }
+          this.clearWallDash(ball);
         }
 
         if (bounced && ball.wallSlamState && ball.wallSlamState.cooldown <= 0) {
@@ -134,6 +126,15 @@ export class BattleSimulation {
           this.shakeScreen(0.24, 16);
           this.addLog(`${ball.name} takes wall slam damage.`);
         }
+      }
+
+      clearWallDash(ball) {
+        if (!ball.dashState?.untilWall) {
+          return;
+        }
+
+        ball.ability?.onDashWall?.(ball.dashState);
+        ball.clearDash();
       }
 
       keepEntityInsideArena(entity) {
@@ -225,18 +226,24 @@ export class BattleSimulation {
         a.velocity = tangent.clone().scale(aTangent).add(normal.clone().scale(nextANormal * bModifiers.impact));
         b.velocity = tangent.clone().scale(bTangent).add(normal.clone().scale(nextBNormal * aModifiers.impact));
 
-        if (a.dashState?.collisionDamage) {
-          b.takeDamage(a.dashState.collisionDamage, a, a.dashState.collisionLabel);
-          if (a.dashState.collisionSlow) {
-            b.applySlow(a.dashState.collisionSlow.duration, a.dashState.collisionSlow.amount);
+        if (a.dashState) {
+          if (a.dashState.collisionDamage) {
+            b.takeDamage(a.dashState.collisionDamage, a, a.dashState.collisionLabel);
+            if (a.dashState.collisionSlow) {
+              b.applySlow(a.dashState.collisionSlow.duration, a.dashState.collisionSlow.amount);
+            }
           }
+          a.ability?.onDashHit?.(b, a.dashState);
         }
 
-        if (b.dashState?.collisionDamage) {
-          a.takeDamage(b.dashState.collisionDamage, b, b.dashState.collisionLabel);
-          if (b.dashState.collisionSlow) {
-            a.applySlow(b.dashState.collisionSlow.duration, b.dashState.collisionSlow.amount);
+        if (b.dashState) {
+          if (b.dashState.collisionDamage) {
+            a.takeDamage(b.dashState.collisionDamage, b, b.dashState.collisionLabel);
+            if (b.dashState.collisionSlow) {
+              a.applySlow(b.dashState.collisionSlow.duration, b.dashState.collisionSlow.amount);
+            }
           }
+          b.ability?.onDashHit?.(a, b.dashState);
         }
 
         if (a.dashState?.untilImpact) {
@@ -333,8 +340,8 @@ export class BattleSimulation {
         }
       }
 
-      spawnSeedOrb(owner, position, velocity) {
-        this.entities.push(new SeedOrb(owner, position, velocity));
+      spawnSeedOrb(owner, position, velocity, life) {
+        this.entities.push(new SeedOrb(owner, position, velocity, life));
       }
 
       spawnArrow(owner, position, velocity) {

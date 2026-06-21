@@ -42,13 +42,13 @@ export function createRoster() {
           },
           {
             id: "frosty",
-            name: "Frost Blade",
-            title: "Freeze Clash",
-            description: "순간 대시로 적을 베고, 짧게 둔화시켜 다음 충돌을 유리하게 만듭니다.",
+            name: "Dash Ball",
+            title: "Cooldown Dash",
+            description: "벽에 닿기 전까지 직선 대시를 유지하고, 적중하면 남은 쿨타임이 절반으로 줄어듭니다.",
             color: "#8ee8d7",
             face: "frosty",
             ability: "frostySword",
-            stats: { hp: 110, damage: 1.12, speed: 294, radius: 49, mass: 1.16 }
+            stats: { hp: 110, damage: 0.92, speed: 294, radius: 49, mass: 1.16 }
           },
           {
             id: "berserker",

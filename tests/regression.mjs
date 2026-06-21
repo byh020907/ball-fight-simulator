@@ -8,6 +8,7 @@ import {
   formatStatAllocation,
   getSpentStatPoints
 } from "../src/stat-allocation.js";
+import { Vector2 } from "../src/core.js";
 
 function makeClassList() {
   const set = new Set();
@@ -191,6 +192,10 @@ async function testCloneSeedDash(app) {
   clone.ability.update(0.016, opponent);
   const seeds = app.simulation.entities.filter((entity) => entity.constructor.name === "SeedOrb");
   assert.equal(seeds.length, 3, "Clone should launch three seeds");
+  assert.ok(
+    seeds.every((seed) => seed.life === clone.ability.cooldown),
+    "Clone seeds should live for the same duration as the seed cooldown"
+  );
 
   const angles = seeds
     .map((seed) => Math.atan2(seed.velocity.y, seed.velocity.x))
@@ -200,6 +205,11 @@ async function testCloneSeedDash(app) {
     return Math.round(((next - angle) * 180) / Math.PI);
   });
   assert.deepEqual(gaps, [120, 120, 120], "Clone seeds should spread at 120 degree intervals");
+
+  seeds[1].update(clone.ability.cooldown - 0.01, app.simulation);
+  assert.equal(seeds[1].isExpired, false, "Clone seed should stay alive before cooldown duration");
+  seeds[1].update(0.02, app.simulation);
+  assert.equal(seeds[1].isExpired, true, "Clone seed should expire at the seed cooldown duration");
 
   seeds[0].position = opponent.position.clone();
   seeds[0].update(0.016, app.simulation);
@@ -269,35 +279,93 @@ async function testRageBallMomentum(app) {
   assert.equal(berserker.ability.getChargeProgress(), 0, "Rage Ball collision should reset momentum");
 }
 
-async function testFrostyDash(app) {
+async function testDashBallCooldownDash(app) {
   await app.startMatch([
     app.roster.find((fighter) => fighter.id === "frosty"),
     app.roster.find((fighter) => fighter.id === "archer")
   ]);
-  const [frosty, target] = app.simulation.fighters;
-  frosty.position.x = 300;
-  frosty.position.y = 480;
+  const [dashBall, target] = app.simulation.fighters;
+  assert.equal(dashBall.baseDamage, 0.92, "Dash Ball should have reduced base damage");
+  dashBall.position.x = 300;
+  dashBall.position.y = 480;
   target.position.x = 620;
   target.position.y = 480;
-  frosty.ability.timer = 0;
-  frosty.ability.update(0.016, target);
-  assert.ok(frosty.dashState, "Frosty should enter dash state");
+  dashBall.ability.timer = 0;
+  dashBall.ability.update(0.016, target);
+  assert.ok(dashBall.dashState, "Dash Ball should enter dash state");
   assert.ok(
-    Math.abs(frosty.forcedHeading.direction.length() - 1) < 0.001,
-    "Frosty forced heading should remain a unit direction"
+    Math.abs(dashBall.forcedHeading.direction.length() - 1) < 0.001,
+    "Dash Ball forced heading should remain a unit direction"
   );
-  frosty.update(0.016, app.simulation);
-  assert.ok(frosty.velocity.length() < 800, "Frosty dash velocity should stay bounded");
+  dashBall.update(0.016, app.simulation);
+  assert.ok(dashBall.velocity.length() < 800, "Dash Ball dash velocity should stay bounded");
+  assert.ok(dashBall.velocity.length() > 600, "Dash Ball dash should be faster than before");
+  const directionBeforeSteer = dashBall.forcedHeading.direction.clone();
+  target.position.y = 300;
+  dashBall.ability.update(0.1, target);
+  assert.ok(
+    dashBall.forcedHeading.direction.y < directionBeforeSteer.y,
+    "Dash Ball dash should steer toward the target at full cooldown"
+  );
+  dashBall.ability.cooldownLevel = 1;
+  const directionAfterFullCooldownSteer = dashBall.forcedHeading.direction.clone();
+  target.position.y = 660;
+  dashBall.ability.update(0.1, target);
+  assert.deepEqual(
+    dashBall.forcedHeading.direction,
+    directionAfterFullCooldownSteer,
+    "Dash Ball dash should not steer after cooldown stacks are gained"
+  );
+  dashBall.ability.cooldownLevel = 0;
 
-  frosty.position.x = 480;
-  frosty.position.y = 480;
-  target.position.x = 480 + frosty.radius + target.radius - 2;
+  dashBall.position.x = 480;
+  dashBall.position.y = 480;
+  target.position.x = 480 + dashBall.radius + target.radius - 2;
   target.position.y = 480;
   const hpBefore = target.hp;
+  const baseCooldown = dashBall.ability.baseCooldown;
   app.simulation.handleCollision();
-  assert.ok(target.hp < hpBefore, "Frosty collision should damage target");
-  assert.ok(target.slowEffect, "Frosty collision should slow target");
-  assert.equal(frosty.dashState, null, "Frosty dash should clear after impact");
+  assert.ok(target.hp < hpBefore, "Dash Ball collision should damage target");
+  assert.equal(
+    app.ui.logItems.some((item) => item.includes("Dash Contact lands")),
+    false,
+    "Dash Ball dash should not add separate collision damage"
+  );
+  assert.equal(target.slowEffect, null, "Dash Ball collision should not slow target");
+  assert.equal(baseCooldown, 3, "Dash Ball base cooldown should be 3 seconds");
+  assert.equal(dashBall.ability.cooldownLevel, 1, "First dash hit should add one cooldown stack");
+  assert.equal(dashBall.ability.cooldown, baseCooldown * 0.5, "First dash hit should halve future cooldown");
+  assert.equal(dashBall.ability.timer, dashBall.ability.cooldown, "Dash hit should clamp timer to the shorter cooldown");
+  assert.equal(dashBall.dashState, null, "Dash Ball dash should clear after impact");
+
+  dashBall.ability.onDashHit();
+  assert.equal(dashBall.ability.cooldownLevel, 2, "Second dash hit should add a second cooldown stack");
+  assert.equal(dashBall.ability.cooldown, baseCooldown * 0.25, "Second dash hit should leave 25% base cooldown");
+  dashBall.ability.onDashHit();
+  assert.equal(dashBall.ability.cooldownLevel, 3, "Third dash hit should reach max cooldown stacks");
+  assert.equal(dashBall.ability.cooldown, baseCooldown * 0.125, "Third dash hit should reach 12.5% base cooldown");
+  dashBall.ability.onDashHit();
+  assert.equal(dashBall.ability.cooldownLevel, 3, "Dash cooldown stacks should cap at three");
+  assert.equal(dashBall.ability.cooldown, baseCooldown * 0.125, "Dash cooldown should not shrink below 12.5% base cooldown");
+
+  dashBall.position.x = app.simulation.width - dashBall.radius + 1;
+  dashBall.position.y = 200;
+  target.position.x = 200;
+  target.position.y = 760;
+  dashBall.ability.cooldownLevel = 2;
+  dashBall.ability.cooldown = dashBall.ability.getCooldownForLevel();
+  dashBall.ability.timer = dashBall.ability.cooldown;
+  dashBall.startDash(new Vector2(1, 0), {
+    collisionLabel: "Dash Contact",
+    untilImpact: true,
+    untilWall: true,
+    maxDuration: 1.4
+  });
+  app.simulation.keepInsideArena(dashBall);
+  assert.equal(dashBall.dashState, null, "Dash Ball dash should clear on wall contact");
+  assert.equal(dashBall.ability.cooldownLevel, 1, "Wall contact should remove one cooldown stack");
+  assert.equal(dashBall.ability.cooldown, baseCooldown * 0.5, "Wall contact should fall back by one cooldown tier");
+  assert.equal(dashBall.ability.timer, baseCooldown * 0.5, "Wall contact should restart from the reduced stack cooldown");
 }
 
 async function testGrenadeAdaptiveFuse(app) {
@@ -449,7 +517,7 @@ testStatAllocationRules(app);
 await testCloneSeedDash(app);
 await testEaterFeast(app);
 await testRageBallMomentum(app);
-await testFrostyDash(app);
+await testDashBallCooldownDash(app);
 await testGrenadeAdaptiveFuse(app);
 await testDamageShake(app);
 await testArrowBounceFacing(app);

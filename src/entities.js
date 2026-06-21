@@ -1,10 +1,10 @@
 import { CombatEntity, TimedEffect, Vector2 } from './core.js';
 
 export class SeedOrb extends CombatEntity {
-      constructor(owner, position, velocity) {
+      constructor(owner, position, velocity, life) {
         super(position, velocity, 14);
         this.owner = owner;
-        this.life = 4.6;
+        this.life = life;
       }
 
       update(delta, simulation) {

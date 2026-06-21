@@ -21,7 +21,7 @@ export class CloneAbility extends Ability {
           const angle = baseAngle + (Math.PI * 2 * index) / 3;
           const direction = Vector2.fromAngle(angle, 1);
           const start = Vector2.add(this.owner.position, direction.clone().scale(this.owner.radius + 20));
-          this.simulation.spawnSeedOrb(this.owner, start, direction.scale(speed));
+          this.simulation.spawnSeedOrb(this.owner, start, direction.scale(speed), this.cooldown);
         }
         this.simulation.playSound("seed");
         this.simulation.addLog(`${this.owner.name} launches three dash seeds.`);
