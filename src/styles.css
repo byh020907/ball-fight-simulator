@@ -650,7 +650,7 @@ body::before {
     border-radius: 0;
     border: 2px solid #202020;
     background: #dcdcdc;
-    overflow: hidden;
+    display: flex;
 }
 
 .hp-fill {
@@ -677,7 +677,7 @@ body::before {
     height: 7px;
     border: 2px solid #202020;
     background: #ececec;
-    overflow: hidden;
+    display: flex;
 }
 
 .cooldown-fill {
