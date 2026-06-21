@@ -121,6 +121,53 @@ export class ArrowProjectile extends CombatEntity {
     }
 }
 
+export class OrbitProjectile extends CombatEntity {
+    constructor(owner, position, velocity) {
+        super(position, velocity, 11);
+        this.owner = owner;
+        this.life = 1.2;
+        this.angle = Math.atan2(velocity.y, velocity.x);
+    }
+
+    update(delta, simulation) {
+        this.life -= delta;
+        this.position.add(this.velocity.clone().scale(delta));
+        simulation.keepEntityInsideArena(this);
+        if (this.life <= 0) {
+            this.isExpired = true;
+        }
+
+        const target = simulation.getOpponent(this.owner);
+        if (!target || target.isDefeated) {
+            return;
+        }
+
+        const distance = Vector2.subtract(this.position, target.position).length();
+        if (distance <= target.radius + this.radius) {
+            target.takeDamage(Math.round(this.owner.baseDamage * 0.8), this.owner, "Orbit Shot");
+            target.velocity.add(this.velocity.clone().normalize().scale(180));
+            simulation.spawnSlash(this.position.clone(), target.position.clone(), this.owner.color);
+            simulation.addSparkBurst(this.position.clone(), this.owner.color);
+            simulation.playSound("orbit");
+            simulation.addLog(`${this.owner.name}'s orbit shard strikes ${target.name}.`);
+            this.isExpired = true;
+        }
+    }
+
+    draw(ctx) {
+        const s = 16;
+        ctx.save();
+        ctx.translate(this.position.x, this.position.y);
+        ctx.rotate(this.angle);
+        ctx.fillStyle = "#ffea00";
+        ctx.strokeStyle = "#202020";
+        ctx.lineWidth = 3;
+        ctx.fillRect(-s / 2, -s / 2, s, s);
+        ctx.strokeRect(-s / 2, -s / 2, s, s);
+        ctx.restore();
+    }
+}
+
 export class Grenade extends CombatEntity {
     constructor(owner, targetPosition, fuseTime = 1.08) {
         const start = owner.position.clone();

@@ -1,5 +1,5 @@
 import { Vector2 } from "../core.js";
-import { ArrowProjectile, Grenade, SeedOrb } from "../entities.js";
+import { ArrowProjectile, Grenade, OrbitProjectile, SeedOrb } from "../entities.js";
 import {
     DeathBurstEffect,
     GravityParticle,
@@ -120,6 +120,10 @@ export class Simulation {
 
     spawnGrenade(owner, targetPosition, fuseTime) {
         this.entities.push(new Grenade(owner, targetPosition, fuseTime));
+    }
+
+    spawnOrbitShot(owner, position, velocity) {
+        this.entities.push(new OrbitProjectile(owner, position, velocity));
     }
 
     spawnPulse(position, color) {
