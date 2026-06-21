@@ -95,6 +95,8 @@ export class TestEnv {
             for (const e of this.sim.entities) {
                 e.update?.(dt, this.sim);
             }
+            // Clean up expired entities (arrows, effects, etc.)
+            this.sim.entities = this.sim.entities.filter((e) => !e.isExpired);
         }
     }
 
