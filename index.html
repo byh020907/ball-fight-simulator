@@ -188,6 +188,9 @@
                                 x-text="playerFighter?.name"
                                 x-bind:style="'color:' + (playerFighter?.color || '#000')"
                             ></strong>
+                            <button class="help-icon" type="button" title="게임 도움말" @click="$dispatch('open-help')">
+                                ?
+                            </button>
                         </div>
                         <p class="player-note">
                             <span x-text="playerFighter?.title || ''"></span>
@@ -249,9 +252,6 @@
                             x-bind:disabled="locked"
                         >
                             자동 배분
-                        </button>
-                        <button class="help-icon" type="button" title="게임 도움말" @click="$dispatch('open-help')">
-                            ?
                         </button>
                         <div class="player-actions" data-player-actions></div>
                     </section>

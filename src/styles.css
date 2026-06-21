@@ -744,6 +744,13 @@ body::before {
 .player-title {
     display: grid;
     gap: 2px;
+    position: relative;
+}
+
+.player-title .help-icon {
+    position: absolute;
+    top: 0;
+    right: 0;
 }
 
 .player-title span,
