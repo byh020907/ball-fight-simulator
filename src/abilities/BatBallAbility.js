@@ -60,7 +60,7 @@ export class BatBallAbility extends Ability {
         const diff = Math.abs(normalizeAngle(targetAngle - this.arcAngle));
         if (diff > ARC_ANGLE / 2) return;
 
-        // 범위 안에 들어왔다 — 베기!
+        // 범위 안에 들어왔다 — 휘두르기!
         this.performSlash(target);
         this.timer = this.cooldown;
     }
@@ -84,7 +84,7 @@ export class BatBallAbility extends Ability {
         this.slashStartAngle = this.arcAngle - ARC_ANGLE / 2;
         this.slashEndAngle = this.arcAngle + ARC_ANGLE / 2;
 
-        // 시각 효과 — 아크 베기 + 충돌 스파크 (직선 SlashTrail 제거)
+        // 시각 효과 — 스윙 아크 + 충돌 스파크
         this.simulation.addSparkBurst(this.owner.position.clone(), this.owner.color);
         this.simulation.addSparkBurst(target.position.clone(), "#ffffff");
         this.simulation.playSound("dash", 1.0);
@@ -105,11 +105,11 @@ export class BatBallAbility extends Ability {
         // ── 시야 범위 ──
         this._drawVisionArc(ctx, pos);
 
-        // ── 검 ──
+        // ── 방망이 ──
         this._drawBat(ctx, time);
     }
 
-    /** Slash 베기 궤적 애니메이션 */
+    /** 스윙 아크 애니메이션 */
     _drawSlashEffect(ctx, pos) {
         if (this.slashTimer <= 0) return;
 
@@ -127,7 +127,7 @@ export class BatBallAbility extends Ability {
         ctx.arc(pos.x, pos.y, ARC_RANGE * 0.55, this.slashStartAngle, currentEnd);
         ctx.stroke();
 
-        // 메인 베기 선
+        // 메인 스윙 선
         ctx.strokeStyle = this.owner.color;
         ctx.lineWidth = 5 - progress * 3;
         ctx.globalAlpha = glowAlpha * 0.9;
