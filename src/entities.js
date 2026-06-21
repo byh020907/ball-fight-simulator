@@ -95,7 +95,7 @@ export class ArrowProjectile extends CombatEntity {
         const distance = Vector2.subtract(this.position, target.position).length();
         if (distance <= target.radius + this.radius) {
             target.takeDamage(Math.round(this.owner.baseDamage * 1.4), this.owner, "Arrow Shot");
-            target.applyKnockback(this.velocity.clone().normalize(), 0.2, 1.8);
+            target.applyKnockback(this.velocity.clone().scale(0.6), 0.2);
             simulation.playSound("hit");
             simulation.spawnSlash(
                 this.position.clone(),
@@ -166,7 +166,7 @@ export class OrbitProjectile extends CombatEntity {
         const distance = Vector2.subtract(this.position, target.position).length();
         if (distance <= target.radius + this.radius) {
             target.takeDamage(Math.round(this.owner.baseDamage * 0.8), this.owner, "Orbit Shot");
-            target.applyKnockback(this.velocity.clone().normalize(), 0.15, 1.5);
+            target.applyKnockback(this.velocity.clone().scale(0.4), 0.15);
             simulation.spawnSlash(this.position.clone(), target.position.clone(), this.owner.color);
             simulation.addSparkBurst(this.position.clone(), this.owner.color);
             simulation.playSound("orbit");
@@ -237,7 +237,7 @@ export class Grenade extends CombatEntity {
                 const damage = Math.round(this.owner.baseDamage * (4.0 - edgeProgress * 2.0));
                 target.takeDamage(damage, this.owner, "Grenade");
                 const kbDir = Vector2.subtract(target.position, this.position).normalize();
-                target.applyKnockback(kbDir, 0.35, 3);
+                target.applyKnockback(kbDir.scale(400), 0.35);
             }
         }
 
@@ -318,17 +318,17 @@ export class BattleBall {
         this.speedBoost = { effect: new TimedEffect(duration), multiplier, color };
     }
 
-    forceHeading(direction, duration, speedMultiplier = 0) {
+    forceHeading(direction, duration, overrideVelocity = null) {
         this.forcedHeading = {
             effect: new TimedEffect(duration),
             direction: direction.clone().normalize(),
-            speedMultiplier
+            overrideVelocity
         };
     }
 
-    /** 방향 고정 + 속도 오버라이드 (forceHeading에 속도 배율 추가) */
-    applyKnockback(direction, duration, multiplier) {
-        this.forceHeading(direction, duration, multiplier);
+    /** 속도 벡터 기반 넉백 (forceHeading에 velocity 오버라이드) */
+    applyKnockback(velocity, duration) {
+        this.forceHeading(velocity, duration, velocity.clone());
     }
 
     startDash(direction, config = {}) {
@@ -450,23 +450,25 @@ export class BattleBall {
                 : Vector2.fromAngle(Math.random() * Math.PI * 2, 1);
         const direction = this.forcedHeading ? this.forcedHeading.direction.clone() : currentDirection;
 
-        const isKnockback = this.forcedHeading?.speedMultiplier > 0;
-        const speedLimit = isKnockback
-            ? this.baseSpeed * this.forcedHeading.speedMultiplier
-            : (this.dashState?.speedOverride ??
-              this.speedBoost?.speedOverride ??
-              this.baseSpeed * modifiers.speed * slowMultiplier * boostMultiplier * simulation.getSpeedMultiplier());
-        this.velocity = direction.scale(speedLimit);
+        const knockbackVel = this.forcedHeading?.overrideVelocity;
+        this.velocity =
+            knockbackVel ??
+            direction.scale(
+                this.dashState?.speedOverride ??
+                    this.speedBoost?.speedOverride ??
+                    this.baseSpeed *
+                        modifiers.speed *
+                        slowMultiplier *
+                        boostMultiplier *
+                        simulation.getSpeedMultiplier()
+            );
 
         this.position.add(this.velocity.clone().scale(delta));
-        // 벽 충돌 시 knockback 종료
-        if (isKnockback) {
+        if (knockbackVel) {
             const bx = this.position.x,
                 by = this.position.y;
             simulation.keepInsideArena(this);
-            if (this.position.x !== bx || this.position.y !== by) {
-                this.forcedHeading = null;
-            }
+            if (this.position.x !== bx || this.position.y !== by) this.forcedHeading = null;
         } else {
             simulation.keepInsideArena(this);
         }
