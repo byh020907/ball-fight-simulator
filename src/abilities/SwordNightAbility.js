@@ -53,7 +53,8 @@ export class SwordNightAbility extends Ability {
 
         const toTarget = Vector2.subtract(target.position, this.owner.position);
         const dist = toTarget.length();
-        if (dist > ARC_RANGE) return;
+        // 시야 거리는 공 표면 기준: 중심거리 - 내 반지름 > ARC_RANGE 이면 범위 밖
+        if (dist - this.owner.radius > ARC_RANGE) return;
 
         const targetAngle = Math.atan2(toTarget.y, toTarget.x);
         const diff = Math.abs(normalizeAngle(targetAngle - this.arcAngle));
@@ -143,10 +144,11 @@ export class SwordNightAbility extends Ability {
         ctx.restore();
     }
 
-    /** 120도 시야 범위 표시 */
+    /** 120도 시야 범위 표시 (공 표면 기준 거리) */
     _drawVisionArc(ctx, pos) {
         const arcStart = this.arcAngle - ARC_ANGLE / 2;
         const arcEnd = this.arcAngle + ARC_ANGLE / 2;
+        const range = ARC_RANGE + this.owner.radius;
 
         // 평소에는 진하게, slash 중에는 약간 흐리게
         ctx.save();
@@ -155,7 +157,7 @@ export class SwordNightAbility extends Ability {
         ctx.lineWidth = 2.5;
         ctx.setLineDash([5, 7]);
         ctx.beginPath();
-        ctx.arc(pos.x, pos.y, ARC_RANGE, arcStart, arcEnd);
+        ctx.arc(pos.x, pos.y, range, arcStart, arcEnd);
         ctx.stroke();
         ctx.setLineDash([]);
 
@@ -164,11 +166,11 @@ export class SwordNightAbility extends Ability {
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(pos.x, pos.y);
-        ctx.lineTo(pos.x + Math.cos(arcStart) * ARC_RANGE, pos.y + Math.sin(arcStart) * ARC_RANGE);
+        ctx.lineTo(pos.x + Math.cos(arcStart) * range, pos.y + Math.sin(arcStart) * range);
         ctx.stroke();
         ctx.beginPath();
         ctx.moveTo(pos.x, pos.y);
-        ctx.lineTo(pos.x + Math.cos(arcEnd) * ARC_RANGE, pos.y + Math.sin(arcEnd) * ARC_RANGE);
+        ctx.lineTo(pos.x + Math.cos(arcEnd) * range, pos.y + Math.sin(arcEnd) * range);
         ctx.stroke();
         ctx.restore();
     }
