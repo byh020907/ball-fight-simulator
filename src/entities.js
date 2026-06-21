@@ -122,16 +122,27 @@ export class ArrowProjectile extends CombatEntity {
 }
 
 export class OrbitProjectile extends CombatEntity {
-    constructor(owner, position, velocity, size) {
-        super(position, velocity, 11);
+    constructor(owner, position, direction, size) {
+        super(position, new Vector2(0, 0), 11);
         this.owner = owner;
+        this.dir = direction.clone().normalize();
         this.life = 1.2;
-        this.angle = Math.atan2(velocity.y, velocity.x);
+        this.angle = Math.atan2(this.dir.y, this.dir.x);
         this.size = size;
+        this.elapsed = 0;
+        this.accelDuration = 1;
+        this.maxSpeed = owner.baseSpeed * 5;
     }
 
     update(delta, simulation) {
+        this.elapsed += delta;
         this.life -= delta;
+
+        // Accelerate from 0 to maxSpeed over accelDuration
+        const progress = Math.min(1, this.elapsed / this.accelDuration);
+        const speed = progress * this.maxSpeed;
+        this.velocity = this.dir.clone().scale(speed);
+
         this.position.add(this.velocity.clone().scale(delta));
         simulation.keepEntityInsideArena(this);
         if (this.life <= 0) {

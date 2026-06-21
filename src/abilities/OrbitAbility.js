@@ -5,7 +5,6 @@ const VOLLEY_COOLDOWN = 3.5;
 const VOLLEY_DELAY = 0.18;
 const VOLLEY_MIN_RANGE = 200;
 const VOLLEY_MAX_RANGE = 500;
-const SHARD_SPEED = 550;
 const SHARD_SIZE = 16;
 
 export class OrbitAbility extends Ability {
@@ -186,7 +185,7 @@ export class OrbitAbility extends Ability {
 
         const entry = activeEntries[0];
         const dir = Vector2.subtract(target.position, entry.position).normalize();
-        this.simulation.spawnOrbitShot(this.owner, entry.position.clone(), dir.scale(SHARD_SPEED), SHARD_SIZE);
+        this.simulation.spawnOrbitShot(this.owner, entry.position.clone(), dir, SHARD_SIZE);
         this.consumeShard(entry.index);
         this.simulation.playSound("shoot", 0.6);
     }
