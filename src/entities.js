@@ -95,7 +95,8 @@ export class ArrowProjectile extends CombatEntity {
         const distance = Vector2.subtract(this.position, target.position).length();
         if (distance <= target.radius + this.radius) {
             target.takeDamage(Math.round(this.owner.baseDamage * 1.4), this.owner, "Arrow Shot");
-            target.velocity.add(this.velocity.clone().normalize().scale(160));
+            target.forceHeading(this.velocity.clone().normalize(), 0.2);
+            target.setSpeedBoost(0.2, 1.8);
             simulation.playSound("hit");
             simulation.spawnSlash(
                 this.position.clone(),
@@ -166,7 +167,8 @@ export class OrbitProjectile extends CombatEntity {
         const distance = Vector2.subtract(this.position, target.position).length();
         if (distance <= target.radius + this.radius) {
             target.takeDamage(Math.round(this.owner.baseDamage * 0.8), this.owner, "Orbit Shot");
-            target.velocity.add(this.velocity.clone().normalize().scale(350));
+            target.forceHeading(this.velocity.clone().normalize(), 0.25);
+            target.setSpeedBoost(0.25, 2.5);
             simulation.spawnSlash(this.position.clone(), target.position.clone(), this.owner.color);
             simulation.addSparkBurst(this.position.clone(), this.owner.color);
             simulation.playSound("orbit");
@@ -235,9 +237,10 @@ export class Grenade extends CombatEntity {
                     Math.min(1, (distance - this.innerRadius) / (this.explosionRadius - this.innerRadius))
                 );
                 const damage = Math.round(this.owner.baseDamage * (4.0 - edgeProgress * 2.0));
-                const knockback = 350 - edgeProgress * 140;
                 target.takeDamage(damage, this.owner, "Grenade");
-                target.velocity.add(Vector2.subtract(target.position, this.position).normalize().scale(knockback));
+                const kbDir = Vector2.subtract(target.position, this.position).normalize();
+                target.forceHeading(kbDir, 0.35);
+                target.setSpeedBoost(0.35, 3);
             }
         }
 
