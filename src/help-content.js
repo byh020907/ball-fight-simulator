@@ -51,7 +51,7 @@ export const HELP_CONTENT = `
 </div>
 
 <div class="help-section">
-  <h4 class="help-h">🏆 토너먼트</h4>
+  <h4 class="help-h">🏆 목표</h4>
   <p>토너먼트를 진행하여 최종 우승자가 되세요.</p>
 </div>
 `;
