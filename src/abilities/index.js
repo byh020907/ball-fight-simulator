@@ -6,3 +6,4 @@ export { GrenadeAbility } from "./GrenadeAbility.js";
 export { DashAbility } from "./DashAbility.js";
 export { RageAbility } from "./RageAbility.js";
 export { EaterAbility } from "./EaterAbility.js";
+export { SwordNightAbility } from "./SwordNightAbility.js";

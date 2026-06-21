@@ -6,7 +6,8 @@ import {
     OrbitAbility,
     RageAbility,
     TricksterAbility,
-    DashAbility
+    DashAbility,
+    SwordNightAbility
 } from "../abilities/index.js";
 import { BattleBall } from "../entities.js";
 import { GravityParticle } from "../effects.js";
@@ -58,7 +59,8 @@ export class BattleSimulation extends Simulation {
             grenade: GrenadeAbility,
             dash: DashAbility,
             rage: RageAbility,
-            eater: EaterAbility
+            eater: EaterAbility,
+            sword_night: SwordNightAbility
         };
         return new table[type](owner, this);
     }

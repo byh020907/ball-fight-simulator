@@ -19,10 +19,14 @@
  */
 export const PATCH_NOTES = [
     {
-        version: "0.6.5",
+        version: "0.7.0",
         date: "2026-06-22",
-        title: "v0.6.5 업데이트",
+        title: "v0.7.0 업데이트",
         changes: [
+            {
+                type: "feature",
+                text: "신규 캐릭터 Sword Night 추가 — 120도 시야 범위가 좌우로 스캔하며 적을 베어 넉백을 줍니다."
+            },
             {
                 type: "refactor",
                 text: "넉백 시스템 재설계 — forceHeading에 overrideVelocity 통합, knockbackState 제거. 벽 충돌 시 넉백 종료."

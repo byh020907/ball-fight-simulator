@@ -75,6 +75,16 @@ export function createRoster() {
             face: "eater",
             ability: "eater",
             stats: { hp: 118, damage: 10, speed: 268, radius: 52, mass: 1.34, defense: 4 }
+        },
+        {
+            id: FIGHTER_IDS.SWORD_NIGHT,
+            name: "Sword Night",
+            title: "Slash Vision",
+            description: "120도의 시야 범위가 좌우로 스캔하며, 적이 범위 안에 들어오면 검으로 베어 넉백을 줍니다.",
+            color: "#66ccff",
+            face: "sword_night",
+            ability: "sword_night",
+            stats: { hp: 106, damage: 10, speed: 280, radius: 48, mass: 1.14, defense: 1 }
         }
     ];
 }
