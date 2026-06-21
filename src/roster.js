@@ -7,7 +7,7 @@ export function createRoster() {
             name: "Archer Ball",
             title: "Piercing Arrow",
             description:
-                "잠시 조준 후 관통 화살을 발사합니다. 두 번 연속 빗나가면 세 발을 한 번에 쏩니다. 적이 접근하면 옆으로 자동 회피합니다.",
+                "잠시 조준 후 화살을 발사합니다. 두 번 연속 빗나가면 세 발을 한 번에 쏩니다. 적이 접근하면 옆으로 자동 회피합니다.",
             color: "#f7b34d",
             face: "archer",
             ability: "archer",
