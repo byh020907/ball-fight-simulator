@@ -9,7 +9,7 @@ const EVADE_STRENGTH = 0.7;
 export class ArcherAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation);
-        this.cooldown = 3.9;
+        this._baseCooldown = 3.9;
         this.timer = 1.2;
         this.windUp = 0;
         this.missStreak = 0;
@@ -34,7 +34,7 @@ export class ArcherAbility extends Ability {
 
         this.timer -= delta;
         if (this.timer <= 0 && target) {
-            this.timer = this.cooldown * this.getCooldownFactor();
+            this.timer = this.cooldown;
             this.lastAimDir = Vector2.subtract(target.position, this.owner.position).normalize();
             this.windUp = WINDUP;
         }

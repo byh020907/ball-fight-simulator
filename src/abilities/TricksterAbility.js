@@ -4,7 +4,7 @@ import { Ability } from "./Ability.js";
 export class TricksterAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation);
-        this.cooldown = 6.4;
+        this._baseCooldown = 6.4;
         this.timer = 1.9;
     }
 
@@ -14,7 +14,7 @@ export class TricksterAbility extends Ability {
             return;
         }
 
-        this.timer = this.cooldown * this.getCooldownFactor();
+        this.timer = this.cooldown;
         const baseAngle = Math.random() * Math.PI * 2;
         const speed = 250;
         for (let index = 0; index < 3; index += 1) {

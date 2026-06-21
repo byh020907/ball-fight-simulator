@@ -7,7 +7,7 @@ export class DashAbility extends Ability {
         this.baseCooldown = 3;
         this.cooldownLevel = 0;
         this.maxCooldownLevel = 3;
-        this.cooldown = this.getCooldownForLevel();
+        this._baseCooldown = this.getCooldownForLevel();
         this.timer = this.cooldown * 0.5;
         this.dashMultiplier = 2.15;
         this.homingTurnRate = 2.4;
@@ -23,7 +23,7 @@ export class DashAbility extends Ability {
             return;
         }
 
-        this.timer = this.cooldown * this.getCooldownFactor();
+        this.timer = this.cooldown;
         const direction = Vector2.subtract(target.position, this.owner.position).normalize();
         this.owner.startDash(direction, {
             multiplier: this.dashMultiplier,
@@ -66,8 +66,8 @@ export class DashAbility extends Ability {
 
     onDashWall() {
         this.cooldownLevel = Math.max(0, this.cooldownLevel - 1);
-        this.cooldown = this.getCooldownForLevel();
-        this.timer = this.cooldown * this.getCooldownFactor();
+        this._baseCooldown = this.getCooldownForLevel();
+        this.timer = this.cooldown;
         this.simulation.addLog(`${this.owner.name} hits a wall and loses one dash cooldown stack.`);
     }
 

@@ -2,6 +2,19 @@ export class Ability {
     constructor(owner, simulation) {
         this.owner = owner;
         this.simulation = simulation;
+        /** Base cooldown before skill stat reduction. Set by subclasses. */
+        this._baseCooldown = 0;
+    }
+
+    /** Effective cooldown after skill stat reduction. */
+    get cooldown() {
+        const skill = this.owner.statAllocation?.skill ?? 0;
+        const factor = Math.max(0.1, 1 - skill / 100);
+        return this._baseCooldown * factor;
+    }
+
+    set cooldown(val) {
+        this._baseCooldown = val;
     }
 
     update() {}
@@ -23,15 +36,6 @@ export class Ability {
     /** Override to draw a custom face. Return true if handled. */
     drawFace(ctx, rotation, ball) {
         return false;
-    }
-
-    /**
-     * skill 스탯 기반 쿨타임 배율.
-     * 포인트당 1% 단축, 최소 10%까지.
-     */
-    getCooldownFactor() {
-        const skill = this.owner.statAllocation?.skill ?? 0;
-        return Math.max(0.1, 1 - skill / 100);
     }
 
     // ── Face-drawing helpers (for use in subclasses' drawFace) ──────────

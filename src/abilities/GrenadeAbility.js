@@ -4,7 +4,7 @@ import { Ability } from "./Ability.js";
 export class GrenadeAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation);
-        this.cooldown = 4.7;
+        this._baseCooldown = 4.7;
         this.timer = 1.5;
         this.missStreak = 0;
         this.baseFuse = 1.08;
@@ -17,7 +17,7 @@ export class GrenadeAbility extends Ability {
             return;
         }
 
-        this.timer = this.cooldown * this.getCooldownFactor();
+        this.timer = this.cooldown;
         const prediction = Vector2.add(target.position.clone(), target.velocity.clone().scale(0.48));
         this.simulation.spawnGrenade(this.owner, prediction, this.getFuseTime());
         this.simulation.playSound("toss");

@@ -4,7 +4,7 @@ import { Ability } from "./Ability.js";
 export class EaterAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation);
-        this.cooldown = 7.2;
+        this._baseCooldown = 7.2;
         this.timer = 2.4;
         this.feastDuration = 3.3;
         this.feastTimer = 0;
@@ -46,7 +46,7 @@ export class EaterAbility extends Ability {
         }
 
         if (this.timer <= 0 && target) {
-            this.timer = this.cooldown * this.getCooldownFactor();
+            this.timer = this.cooldown;
             this.feastTimer = this.feastDuration;
             this.feastElapsed = 0;
             this.hasEatenThisFeast = false;
