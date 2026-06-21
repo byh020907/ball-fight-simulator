@@ -2,6 +2,7 @@ import {
     ALLOCATABLE_STATS,
     PLAYER_STAT_POINTS,
     adjustStatAllocation,
+    calculateStatMultiplier,
     createEmptyStatAllocation,
     createRandomStatAllocation,
     formatStatAllocation,
@@ -35,8 +36,12 @@ export function appStore() {
 
         // Start button
         startHidden: true,
-        startDisabled: true,
-        startText: "싸움 시작",
+        get startDisabled() {
+            return this.remainingPoints > 0 || this.locked;
+        },
+        get startText() {
+            return this.remainingPoints > 0 ? `스탯 ${this.remainingPoints} 남음` : "토너먼트 시작";
+        },
 
         // Fighter cards (roster)
         fighters: [],
@@ -54,17 +59,29 @@ export function appStore() {
             return formatStatAllocation(this.allocation);
         },
 
+        get balanceMultiplier() {
+            const vals = [this.allocation.hp ?? 0, this.allocation.damage ?? 0, this.allocation.speed ?? 0];
+            return calculateStatMultiplier(vals).multiplier;
+        },
+
         // Actions
         adjustStat(key, delta) {
             if (this.locked) return;
             this.allocation = adjustStatAllocation(this.allocation, key, delta);
             this.remainingPoints = getRemainingStatPoints(this.allocation);
+            this._syncStartButton();
         },
 
         randomAllocation() {
             if (this.locked) return;
             this.allocation = createRandomStatAllocation();
             this.remainingPoints = getRemainingStatPoints(this.allocation);
+            this._syncStartButton();
+        },
+
+        _syncStartButton() {
+            this.startDisabled = this.remainingPoints > 0 || this.locked;
+            this.startText = this.remainingPoints > 0 ? `스탯 ${this.remainingPoints} 남음` : "토너먼트 시작";
         }
     };
 }
@@ -180,12 +197,6 @@ export class UIController {
         s.totalPoints = totalPoints;
         s.remainingPoints = remainingPoints;
         s.locked = locked;
-        s.startDisabled = remainingPoints > 0;
-        s.startText = s.tournamentActive
-            ? "다시 시작"
-            : remainingPoints > 0
-              ? `스탯 ${remainingPoints} 남음`
-              : "토너먼트 시작";
     }
 
     renderRoster(activeIds = []) {
@@ -198,8 +209,11 @@ export class UIController {
             color: fighter.color,
             isPlayer: fighter.isPlayer,
             defeated: false,
+            hp: Math.ceil(fighter.stats?.hp ?? 0),
+            maxHp: Math.ceil(fighter.stats?.hp ?? 0),
             hpPct: 100,
             statLine: formatStatAllocation(fighter.statAllocation ?? {}),
+            balanceMult: 1,
             skillLabel: "Skill",
             skillPct: 1,
             skillText: "Ready"
@@ -244,9 +258,8 @@ export class UIController {
     setStartButton({ disabled, text, hidden }) {
         const s = this.state;
         if (!s) return;
-        if (disabled !== undefined) s.startDisabled = disabled;
-        if (text !== undefined) s.startText = text;
         if (hidden !== undefined) s.startHidden = hidden;
+        // disabled/text are synced by Alpine's _syncStartButton()
     }
 
     resetLog() {
@@ -316,10 +329,16 @@ export class UIController {
         s.fighters = s.fighters.map((card) => {
             const fighter = fighters.find((f) => f.id === card.id || f.name === card.name);
             if (!fighter) return card;
+            const alloc = fighter.statAllocation ?? {};
+            const pts = [alloc.hp ?? 0, alloc.damage ?? 0, alloc.speed ?? 0];
+            const mult = calculateStatMultiplier(pts).multiplier;
             return {
                 ...card,
+                hp: Math.ceil(fighter.hp),
+                maxHp: Math.ceil(fighter.maxHp),
                 hpPct: Math.max(0, (fighter.hp / fighter.maxHp) * 100),
                 defeated: fighter.isDefeated,
+                balanceMult: mult,
                 skillLabel: fighter.getAbilityUiState().label,
                 skillPct: Math.max(0, Math.min(1, fighter.getAbilityUiState().progress)),
                 skillText:

@@ -1,8 +1,10 @@
 ﻿import assert from "node:assert/strict";
 import {
     PLAYER_STAT_POINTS,
+    STAT_BALANCER_CONFIG,
     adjustStatAllocation,
     applyStatAllocation,
+    calculateStatMultiplier,
     createRandomStatAllocation,
     createTournamentRoster,
     formatStatAllocation,
@@ -516,16 +518,21 @@ function testStatAllocationRules(app) {
 
     const allocation = { hp: 30, damage: 40, speed: 30 };
     const boosted = applyStatAllocation(archer, allocation, true);
-    assert.equal(boosted.stats.hp, Number((archer.stats.hp * 1.3).toFixed(3)), "HP points should multiply base health");
+    const { multiplier } = calculateStatMultiplier([30, 40, 30]);
+    assert.equal(
+        boosted.stats.hp,
+        Number((archer.stats.hp * 1.3 * multiplier).toFixed(3)),
+        "HP points should multiply base health and balance multiplier"
+    );
     assert.equal(
         boosted.stats.damage,
-        Number((archer.stats.damage * 1.4).toFixed(3)),
-        "Damage points should multiply base damage"
+        Number((archer.stats.damage * 1.4 * multiplier).toFixed(3)),
+        "Damage points should multiply base damage and balance multiplier"
     );
     assert.equal(
         boosted.stats.speed,
-        Number((archer.stats.speed * 1.3).toFixed(3)),
-        "Speed points should multiply base speed"
+        Number((archer.stats.speed * 1.3 * multiplier).toFixed(3)),
+        "Speed points should multiply base speed and balance multiplier"
     );
     assert.equal("force" in boosted.stats, false, "Force should not exist as an unused gameplay stat");
     assert.equal(
@@ -544,8 +551,41 @@ function testStatAllocationRules(app) {
     );
 }
 
+function testStatBalanceSystem() {
+    // 극단 올인 [100, 0, 0] → 표준편차 큼 → 배율 낮음
+    const allIn = calculateStatMultiplier([100, 0, 0]);
+    assert.ok(allIn.stdDev > 40, "All-in build should have high stdDev");
+    assert.ok(
+        allIn.multiplier < STAT_BALANCER_CONFIG.BASE_MULTIPLIER + STAT_BALANCER_CONFIG.MAX_BONUS * 0.5,
+        "All-in build should get less than half of max bonus"
+    );
+
+    // 완벽 균등 [30, 30, 30] → 표준편차 0 → 최대 배율
+    const even = calculateStatMultiplier([30, 30, 30]);
+    assert.equal(even.stdDev, 0, "Even build should have zero stdDev");
+    assert.equal(
+        even.multiplier,
+        STAT_BALANCER_CONFIG.BASE_MULTIPLIER + STAT_BALANCER_CONFIG.MAX_BONUS,
+        "Even build should receive maximum bonus"
+    );
+
+    // 분산이 작을수록 multiplier가 높음
+    const lowVar = calculateStatMultiplier([35, 30, 35]);
+    const highVar = calculateStatMultiplier([70, 30, 0]);
+    assert.ok(lowVar.multiplier > highVar.multiplier, "Lower variance build should have higher multiplier");
+    assert.ok(
+        lowVar.multiplier >= STAT_BALANCER_CONFIG.BASE_MULTIPLIER,
+        "Multiplier should never drop below BASE_MULTIPLIER"
+    );
+    assert.ok(
+        lowVar.multiplier <= STAT_BALANCER_CONFIG.BASE_MULTIPLIER + STAT_BALANCER_CONFIG.MAX_BONUS,
+        "Multiplier should never exceed BASE_MULTIPLIER + MAX_BONUS"
+    );
+}
+
 const app = await loadModuleApp();
 testStatAllocationRules(app);
+testStatBalanceSystem();
 await testCloneSeedDash(app);
 await testEaterFeast(app);
 await testRageBallMomentum(app);

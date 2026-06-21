@@ -1251,3 +1251,128 @@ body::before {
         font-size: 0.72em;
     }
 }
+
+
+/* ── Balance multiplier badge ─────────────────────────────────── */
+
+.allocation-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.balance-badge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.balance-badge__value {
+    font-size: 0.72rem;
+    color: #28c84e;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.balance-badge__info {
+    position: relative;
+    display: inline-flex;
+}
+
+.balance-badge__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #cccccc;
+    color: #ffffff;
+    font-size: 0.62rem;
+    font-weight: 700;
+    font-style: normal;
+    cursor: help;
+    line-height: 1;
+}
+
+.balance-badge__tooltip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 8px);
+    right: 0;
+    width: 220px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #222222;
+    color: #eeeeee;
+    font-size: 0.72rem;
+    font-weight: 400;
+    line-height: 1.45;
+    text-align: left;
+    z-index: 100;
+    pointer-events: none;
+    white-space: normal;
+}
+
+.balance-badge__info:hover .balance-badge__tooltip,
+.balance-badge__info:focus-within .balance-badge__tooltip {
+    display: block;
+}
+
+@media (max-width: 420px) {
+    .balance-badge__tooltip {
+        width: 180px;
+        font-size: 0.68rem;
+    }
+}
+
+
+/* ── In-game fighter card HP text & balance ────────────── */
+
+.fighter-hp-text {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: #333333;
+    line-height: 1;
+}
+
+.fighter-hp-text span:last-child {
+    color: #28a447;
+}
+
+@media (max-width: 760px) {
+    .fighter-hp-text {
+        font-size: 0.58rem;
+    }
+}
+
+
+/* ── Fighter card stat line with balance mult ──────────── */
+
+.fighter-stat-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px;
+}
+
+.fighter-stat-line > span:first-child {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fighter-balance-mult {
+    flex-shrink: 0;
+    color: #28a447;
+    font-size: 0.64rem;
+}
+

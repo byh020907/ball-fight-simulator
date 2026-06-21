@@ -42,6 +42,10 @@ export class BattleApp {
         // Listen for Alpine.js start-tournament event
         try {
             document.addEventListener("start-tournament", () => this.startTournament());
+            document.addEventListener("allocation-changed", () => {
+                const s = this.ui.state;
+                if (s) this.playerStatAllocation = { ...s.allocation };
+            });
         } catch {
             // no-op in non-browser environments
         }
@@ -118,6 +122,12 @@ export class BattleApp {
     }
 
     async startTournament() {
+        // Sync allocation from Alpine (user may have clicked +/- buttons there)
+        const alpineData = this.ui.state;
+        if (alpineData) {
+            this.playerStatAllocation = { ...alpineData.allocation };
+        }
+
         const remaining = getRemainingStatPoints(this.playerStatAllocation);
         if (remaining > 0) {
             this.ui.showOverlay("스탯 배분 필요", `${remaining} 포인트 남음`);

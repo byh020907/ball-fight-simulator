@@ -216,6 +216,7 @@ export class BattleBall {
         this.isDefeated = false;
         this.isDestroyed = false;
         this.spinRotation = 0;
+        this.statAllocation = spec.statAllocation ?? null;
     }
 
     bindAbility(ability) {
