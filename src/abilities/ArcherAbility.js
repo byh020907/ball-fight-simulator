@@ -17,17 +17,23 @@ export class ArcherAbility extends Ability {
     }
 
     update(delta, target) {
-        // Passive evade — gentle dodge when opponent closes in
+        // Passive evade — steers away when opponent closes in
         if (target && !target.isDefeated) {
             const toTarget = Vector2.subtract(target.position, this.owner.position);
             const dist = toTarget.length();
-            if (dist < EVADE_RANGE && dist > 0) {
+            if (dist < EVADE_RANGE && dist > 5) {
                 const approach = toTarget.normalize();
                 const dodgeDir = new Vector2(-approach.y, approach.x);
                 const intensity = (1 - dist / EVADE_RANGE) * EVADE_STRENGTH;
-                const current = this.owner.velocity.clone().normalize();
-                const desired = current.add(dodgeDir.scale(intensity)).normalize();
-                this.owner.velocity = desired.scale(this.owner.velocity.length());
+                const current = this.owner.velocity.length() > 0 ? this.owner.velocity.clone().normalize() : dodgeDir;
+                const blended = current.add(dodgeDir.scale(intensity)).normalize();
+
+                if (this.owner.forcedHeading) {
+                    this.owner.forcedHeading.direction = blended;
+                    this.owner.forcedHeading.effect.elapsed = 0;
+                } else {
+                    this.owner.forceHeading(blended, 0.35);
+                }
             }
         }
 
