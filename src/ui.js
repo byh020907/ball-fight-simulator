@@ -10,7 +10,7 @@ import {
 } from "./stat-allocation.js";
 import { RENDER_LAYERS, Vector2 } from "./core.js";
 import { BattleBall } from "./entities.js";
-import { getUnseenEntries, dismissPatchNotes } from "./patch-notes.js";
+import { getUnseenEntries, dismissPatchNotes } from "./utils.js";
 
 // ── Alpine.js x-data function ───────────────────────────────────────────────
 

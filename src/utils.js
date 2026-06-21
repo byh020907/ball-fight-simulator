@@ -1,0 +1,54 @@
+// ── Cookie utilities ────────────────────────────────────────────────────────
+//
+// 범용 쿠키 읽기/쓰기. patch-notes 외 다른 곳에서도 재사용 가능.
+// 이 파일이 너무 커지면 목적별로 분리하세요 (예: src/cookie.js, src/patch-utils.js 등).
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { PATCH_NOTES } from "./patch-notes.js";
+
+const COOKIE_PATCH = "ballfight_patch";
+
+/** @param {string} name */
+function getCookie(name) {
+    const match = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
+    return match ? decodeURIComponent(match[1]) : "";
+}
+
+/** @param {string} name @param {string} value */
+function setCookie(name, value) {
+    document.cookie =
+        name + "=" + encodeURIComponent(value) + "; path=/; max-age=" + 60 * 60 * 24 * 365 + "; SameSite=Lax";
+}
+
+// ── Patch-note helpers (depends on PATCH_NOTES from patch-notes.js) ────────
+
+/** 지금까지 본 가장 최신 버전 (쿠키). */
+export function getSeenVersion() {
+    return getCookie(COOKIE_PATCH);
+}
+
+/** @param {string} version */
+export function setSeenVersion(version) {
+    setCookie(COOKIE_PATCH, version);
+}
+
+/** PATCH_NOTES 배열에서 가장 최신 항목의 버전. */
+export function getLatestVersion() {
+    return PATCH_NOTES.length > 0 ? PATCH_NOTES[PATCH_NOTES.length - 1].version : "";
+}
+
+/** 쿠키보다 새로운 항목만 반환 (오래된 순). */
+export function getUnseenEntries() {
+    const seen = getSeenVersion();
+    if (!seen) return [...PATCH_NOTES];
+    const idx = PATCH_NOTES.findIndex((e) => e.version === seen);
+    return idx >= 0 ? PATCH_NOTES.slice(idx + 1) : [...PATCH_NOTES];
+}
+
+export function shouldShowPatchNotes() {
+    return getUnseenEntries().length > 0;
+}
+
+export function dismissPatchNotes() {
+    setSeenVersion(getLatestVersion());
+}
