@@ -134,13 +134,21 @@ export class ArenaRenderer {
         ctx.fillStyle = "#fafafa";
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
+        // Background entities (effects, particles — behind fighters)
         for (const entity of simulation.entities) {
+            if (entity.constructor.name === "DamageNumber") continue;
             entity.draw(ctx, simulation);
         }
 
         for (const fighter of simulation.fighters) {
             fighter.draw(ctx);
             this.drawNameplate(fighter);
+        }
+
+        // Foreground entities (DamageNumber — on top of fighters)
+        for (const entity of simulation.entities) {
+            if (entity.constructor.name !== "DamageNumber") continue;
+            entity.draw(ctx, simulation);
         }
 
         ctx.restore();
