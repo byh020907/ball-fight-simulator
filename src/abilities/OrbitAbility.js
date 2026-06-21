@@ -43,7 +43,7 @@ export class OrbitAbility extends Ability {
         );
         if (hitShard && this.hitCooldown <= 0) {
             const repelDirection = Vector2.subtract(target.position, hitShard.position).normalize();
-            target.takeDamage(8, this.owner, "Orbit Shard");
+            target.takeDamage(Math.round(this.owner.baseDamage * 0.8), this.owner, "Orbit Shard");
             target.velocity = repelDirection.scale(Math.max(target.baseSpeed * 1.35, target.velocity.length()));
             this.consumeShard(hitShard.index);
             this.hitCooldown = 0.32;
