@@ -869,6 +869,32 @@ body::before {
     text-transform: uppercase;
 }
 
+.help-icon {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    margin-left: auto;
+    border: 2px solid #202020;
+    border-radius: 50%;
+    background: none;
+    color: #202020;
+    font:
+        900 12px/1 "Bahnschrift",
+        sans-serif;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition:
+        background 0.12s,
+        color 0.12s;
+}
+
+.help-icon:hover {
+    background: #202020;
+    color: #ffffff;
+}
+
 .bracket {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1480,4 +1506,111 @@ body::before {
     border: none;
     border-top: 1px solid #e0e0e0;
     margin: 20px 0;
+}
+
+/* ── PopupService (imperative popup) ───────────────────────────────────────── */
+
+.bf-popup-container {
+    position: relative;
+    z-index: 10001;
+}
+
+.bf-popup-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(2px);
+}
+
+.bf-popup-card {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 28px 32px;
+    max-width: 500px;
+    width: 90vw;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.25);
+    color: #222222;
+}
+
+.bf-popup-title {
+    display: block;
+    font-size: 1.2rem;
+    font-weight: 900;
+    margin-bottom: 14px;
+}
+
+.bf-popup-body {
+    font-size: 0.88rem;
+    line-height: 1.6;
+}
+
+.bf-popup-body ul {
+    padding-left: 18px;
+    margin: 6px 0;
+}
+
+.bf-popup-body li {
+    margin-bottom: 3px;
+}
+
+.bf-popup-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 20px;
+}
+
+.bf-popup-btn {
+    padding: 8px 28px;
+    border: 2px solid #202020;
+    border-radius: 8px;
+    background: none;
+    color: #202020;
+    font:
+        700 0.85rem "Bahnschrift",
+        "Segoe UI",
+        sans-serif;
+    cursor: pointer;
+    transition:
+        background 0.12s,
+        color 0.12s;
+}
+
+.bf-popup-btn:hover {
+    background: #202020;
+    color: #ffffff;
+}
+
+.bf-popup-btn--primary {
+    background: #202020;
+    color: #ffffff;
+}
+
+.bf-popup-btn--primary:hover {
+    opacity: 0.8;
+}
+
+/* ── Help popup content ──────────────────────────────────────────────────── */
+
+.help-section {
+    margin-bottom: 14px;
+}
+
+.help-h {
+    margin: 0 0 4px;
+    font-size: 0.92rem;
+    font-weight: 700;
+}
+
+.help-section p {
+    margin: 0;
+}
+
+.help-section ul {
+    margin: 4px 0 0;
 }

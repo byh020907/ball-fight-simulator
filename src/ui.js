@@ -11,6 +11,7 @@ import {
 import { RENDER_LAYERS, Vector2 } from "./core.js";
 import { BattleBall } from "./entities.js";
 import { getUnseenEntries, dismissPatchNotes } from "./utils.js";
+import { PopupService } from "./popup.js";
 
 // ── Alpine.js x-data function ───────────────────────────────────────────────
 
@@ -62,6 +63,9 @@ export function appStore() {
         patchEntries: [],
         patchNotesVisible: false,
 
+        // Popup (used by PopupService)
+        popupContent: null,
+
         init() {
             this._syncSummary();
             this.patchEntries = getUnseenEntries();
@@ -71,6 +75,11 @@ export function appStore() {
         closePatchNotes() {
             this.patchNotesVisible = false;
             dismissPatchNotes();
+        },
+
+        closePopup(value) {
+            this.popupContent = null;
+            PopupService.resolve(value ?? "close");
         },
 
         // Actions
