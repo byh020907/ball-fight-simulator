@@ -58,8 +58,10 @@ export class EaterAbility extends Ability {
             return;
         }
 
-        // Cooldown timer only counts down when not feasting
-        this.timer -= delta;
+        // Cooldown timer only counts down when not feasting and not swallowing
+        if (!this.swallowedTarget) {
+            this.timer -= delta;
+        }
 
         if (this.timer <= 0 && target) {
             this.timer = this.cooldown;
@@ -118,6 +120,9 @@ export class EaterAbility extends Ability {
         if (!target) {
             return;
         }
+
+        // Reset cooldown timer after spitting
+        this.timer = this.cooldown;
 
         if (target.isDefeated) {
             target.swallowedState = null;
