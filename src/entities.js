@@ -133,12 +133,41 @@ export class Grenade extends CombatEntity {
         this.maxTimer = this.timer;
         this.explosionRadius = 150;
         this.innerRadius = 62;
+        this.bounces = 0;
+        this.maxBounces = 2;
+        this.hitStopped = false;
     }
 
     update(delta, simulation) {
         this.timer -= delta;
-        const travelDelta = Math.min(delta, Math.max(this.timer, 0) + delta);
-        this.position.add(this.velocity.clone().scale(travelDelta));
+        this.position.add(this.velocity.clone().scale(delta));
+
+        // Wall bounce
+        if (this.bounces < this.maxBounces) {
+            let bounced = false;
+            if (this.position.x <= this.radius) {
+                this.position.x = this.radius;
+                this.velocity.x = Math.abs(this.velocity.x);
+                bounced = true;
+            } else if (this.position.x >= simulation.width - this.radius) {
+                this.position.x = simulation.width - this.radius;
+                this.velocity.x = -Math.abs(this.velocity.x);
+                bounced = true;
+            }
+            if (this.position.y <= this.radius) {
+                this.position.y = this.radius;
+                this.velocity.y = Math.abs(this.velocity.y);
+                bounced = true;
+            } else if (this.position.y >= simulation.height - this.radius) {
+                this.position.y = simulation.height - this.radius;
+                this.velocity.y = -Math.abs(this.velocity.y);
+                bounced = true;
+            }
+            if (bounced) {
+                this.bounces++;
+                simulation.playSound("bounce", 0.5);
+            }
+        }
 
         if (this.timer > 0) {
             return;
