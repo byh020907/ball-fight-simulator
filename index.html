@@ -182,14 +182,14 @@
                     </div>
 
                     <section class="player-panel" id="playerPanel" x-bind:class="{ locked: locked }">
+                        <button class="help-icon" type="button" title="게임 도움말" @click="$dispatch('open-help')">?</button>
                         <div class="player-title">
                             <span>내 캐릭터</span>
                             <strong
                                 x-text="playerFighter?.name"
                                 x-bind:style="'color:' + (playerFighter?.color || '#000')"
                             ></strong>
-                            <button class="help-icon" type="button" title="게임 도움말" @click="$dispatch('open-help')">
-                                ?
+                        </div>
                             </button>
                         </div>
                         <p class="player-note">
