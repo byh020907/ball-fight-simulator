@@ -166,7 +166,7 @@ export class OrbitProjectile extends CombatEntity {
         const distance = Vector2.subtract(this.position, target.position).length();
         if (distance <= target.radius + this.radius) {
             target.takeDamage(Math.round(this.owner.baseDamage * 0.8), this.owner, "Orbit Shot");
-            target.velocity.add(this.velocity.clone().normalize().scale(180));
+            target.velocity.add(this.velocity.clone().normalize().scale(350));
             simulation.spawnSlash(this.position.clone(), target.position.clone(), this.owner.color);
             simulation.addSparkBurst(this.position.clone(), this.owner.color);
             simulation.playSound("orbit");
