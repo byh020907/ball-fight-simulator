@@ -10,8 +10,16 @@ export class Matchmaker {
 }
 
 export class TournamentManager {
-    constructor(roster) {
+    constructor(roster, forcedFirstId = null) {
         const entrants = [...roster].sort(() => Math.random() - 0.5);
+        // startCharacter가 지정된 경우 첫 번째 엔트리에 강제 배치
+        if (forcedFirstId) {
+            const forcedIndex = entrants.findIndex((f) => f.id === forcedFirstId);
+            if (forcedIndex > 0) {
+                const item = entrants.splice(forcedIndex, 1)[0];
+                entrants.unshift(item);
+            }
+        }
         const slots = new Array(8).fill(null);
         const byeIndexes = [1, 6, 3, 4].slice(0, Math.max(0, 8 - entrants.length));
         const playIndexes = slots.map((_, index) => index).filter((index) => !byeIndexes.includes(index));

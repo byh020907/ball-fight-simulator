@@ -14,6 +14,13 @@ import {
 
 export class BattleApp {
     constructor() {
+        /**
+         * 시작 캐릭터 ID. 비워두면(null) 랜덤, ID를 지정하면 해당 캐릭터가
+         * 플레이어로 고정되고 토너먼트 첫 엔트리에 배치됩니다.
+         * @type {string|null}
+         */
+        this.startCharacter = null;
+
         this.elements = {
             canvas: document.getElementById("arenaCanvas"),
             overlay: document.getElementById("overlay")
@@ -57,9 +64,8 @@ export class BattleApp {
     }
 
     pickPlayerFighterId() {
-        // TODO: 임시 — Sword Night 테스트. 배포 전에 원래 random 로직으로 되돌릴 것
-        return "sword_night";
-        // return this.roster[Math.floor(Math.random() * this.roster.length)].id;
+        if (this.startCharacter) return this.startCharacter;
+        return this.roster[Math.floor(Math.random() * this.roster.length)].id;
     }
 
     refreshPlayerSetup() {
@@ -143,20 +149,11 @@ export class BattleApp {
         this.stopPlayerPreviewLoop();
         this.ui.setStartButton({ disabled: true, hidden: true, text: "다시 시작" });
         this.ui.resetLog();
-        // TODO: 임시 — Sword Night 테스트: 로스터 내 다른 한 자리를 Sword Night 복제로 대체
-        const adjustedRoster = [...this.roster];
-        if (this.playerFighterId === "sword_night") {
-            const otherIndex = adjustedRoster.findIndex((f) => f.id !== "sword_night");
-            if (otherIndex !== -1) {
-                const sn = adjustedRoster.find((f) => f.id === "sword_night");
-                adjustedRoster[otherIndex] = { ...sn, id: "sword_night_clone", name: sn.name + " (복제)" };
-            }
-        }
-        this.tournamentRoster = createTournamentRoster(adjustedRoster, this.playerFighterId, this.playerStatAllocation);
+        this.tournamentRoster = createTournamentRoster(this.roster, this.playerFighterId, this.playerStatAllocation);
         this.ui.roster = this.tournamentRoster;
         this.matchmaker = new Matchmaker(this.tournamentRoster);
         this.playerResult = null;
-        this.tournament = new TournamentManager(this.tournamentRoster);
+        this.tournament = new TournamentManager(this.tournamentRoster, this.startCharacter);
         this.currentTournamentMatch = null;
         this.refreshPlayerSetup();
         this.ui.renderTournament(this.tournament);
