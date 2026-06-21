@@ -405,7 +405,13 @@ export class BattleBall {
             const dir = this.knockbackState.direction;
             this.velocity = dir.scale(this.baseSpeed * this.knockbackState.multiplier);
             this.position.add(this.velocity.clone().scale(delta));
+            // 벽 튕김 시 knockback 방향도 함께 갱신
+            const bx = this.position.x,
+                by = this.position.y;
             simulation.keepInsideArena(this);
+            if (this.position.x !== bx || this.position.y !== by) {
+                this.knockbackState.direction = this.velocity.clone().normalize();
+            }
             if (this.knockbackState.effect.finished) {
                 this.knockbackState = null;
             }
