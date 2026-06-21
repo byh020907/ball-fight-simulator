@@ -19,6 +19,16 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.2.2",
+        date: "2026-06-21",
+        title: "v0.2.2 업데이트",
+        changes: [
+            { type: "fix", text: "팝업 닫힐 때 콘텐츠가 먼저 사라지던 버그를 수정했습니다." },
+            { type: "fix", text: "파이터 카드가 좁은 화면에서 레이아웃이 깨지던 문제를 수정했습니다." },
+            { type: "style", text: "게임 도움말 아이콘을 스탯 창 상단으로 이동했습니다." }
+        ]
+    },
+    {
         version: "0.2.1",
         date: "2026-06-21",
         title: "v0.2.1 업데이트",
