@@ -3,7 +3,8 @@ import { Ability } from "./Ability.js";
 
 const VOLLEY_COOLDOWN = 3.5;
 const VOLLEY_DELAY = 0.18;
-const VOLLEY_RANGE = 500;
+const VOLLEY_MIN_RANGE = 200;
+const VOLLEY_MAX_RANGE = 500;
 const SHARD_SPEED = 550;
 
 export class OrbitAbility extends Ability {
@@ -162,16 +163,13 @@ export class OrbitAbility extends Ability {
             return;
         }
 
-        if (
-            this.volleyTimer <= 0 &&
-            target &&
-            !target.isDefeated &&
-            this.getActiveShardCount() === this.shardCount &&
-            Vector2.subtract(target.position, this.owner.position).length() <= VOLLEY_RANGE
-        ) {
-            this.volleyActive = true;
-            this.volleyIndex = 0;
-            this.volleyStartTime = 0;
+        if (this.volleyTimer <= 0 && target && !target.isDefeated && this.getActiveShardCount() === this.shardCount) {
+            const dist = Vector2.subtract(target.position, this.owner.position).length();
+            if (dist >= VOLLEY_MIN_RANGE && dist <= VOLLEY_MAX_RANGE) {
+                this.volleyActive = true;
+                this.volleyIndex = 0;
+                this.volleyStartTime = 0;
+            }
         }
     }
 
