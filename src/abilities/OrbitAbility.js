@@ -6,6 +6,7 @@ const VOLLEY_DELAY = 0.18;
 const VOLLEY_MIN_RANGE = 200;
 const VOLLEY_MAX_RANGE = 500;
 const SHARD_SPEED = 550;
+const SHARD_SIZE = 16;
 
 export class OrbitAbility extends Ability {
     constructor(owner, simulation) {
@@ -329,7 +330,7 @@ export class OrbitAbility extends Ability {
         ctx.setLineDash([]);
 
         for (const shard of shards) {
-            const size = shard.refilling ? 8 + shard.progress * 10 : fastOrbit ? 22 : 16;
+            const size = shard.refilling ? 8 + shard.progress * 10 : fastOrbit ? SHARD_SIZE + 6 : SHARD_SIZE;
             if (shard.refilling) {
                 ctx.strokeStyle = "#ffffff";
                 ctx.lineWidth = 2;
@@ -345,7 +346,7 @@ export class OrbitAbility extends Ability {
             ctx.strokeRect(shard.position.x - size / 2, shard.position.y - size / 2, size, size);
         }
 
-        // Draw flying projectiles (same size as active shards)
+        // Draw flying projectiles (same size as shards)
         for (const p of this.shotProjectiles) {
             ctx.save();
             ctx.translate(p.position.x, p.position.y);
@@ -353,8 +354,8 @@ export class OrbitAbility extends Ability {
             ctx.fillStyle = "#ffea00";
             ctx.strokeStyle = "#202020";
             ctx.lineWidth = 3;
-            ctx.fillRect(-8, -8, 16, 16);
-            ctx.strokeRect(-8, -8, 16, 16);
+            ctx.fillRect(-SHARD_SIZE / 2, -SHARD_SIZE / 2, SHARD_SIZE, SHARD_SIZE);
+            ctx.strokeRect(-SHARD_SIZE / 2, -SHARD_SIZE / 2, SHARD_SIZE, SHARD_SIZE);
             ctx.restore();
         }
 
