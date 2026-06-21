@@ -492,8 +492,8 @@ async function testTournament(app) {
         app.finishMatch();
         matches += 1;
     }
-    assert.equal(app.roster.length, 7, "Roster should include seven fighters");
-    assert.equal(matches, 6, "Seven-fighter tournament should play six matches");
+    assert.equal(app.roster.length, 8, "Roster should include eight fighters");
+    assert.equal(matches, 7, "Eight-fighter tournament should play seven matches");
     assert.ok(app.tournament.champion, "Tournament should produce a champion");
     assert.ok(app.playerResult, "Tournament should record the user's final rank");
 }
