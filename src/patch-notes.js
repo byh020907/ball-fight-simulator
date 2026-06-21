@@ -1,4 +1,12 @@
 // ── Patch notes data ────────────────────────────────────────────────────────
+//
+// 패치노트 작성 규칙은 docs/patch-notes-guide.md 를 참고하세요.
+//   - version 증가 / date 갱신 / changes 배열 추가
+//   - type: feature | refactor | fix | style (새 type 추가시 CSS도 필요)
+//   - 한국어, 유저 시점, 간결하게
+//
+// 이전 버전 패치노트는 docs/patch-notes-archive.md 에 보관합니다.
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const PATCH_NOTES = {
     /** Bump this when new patch notes should be shown. */

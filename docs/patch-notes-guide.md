@@ -1,8 +1,10 @@
 # 패치 노트 관리 가이드
 
+> **실제 데이터 파일**: `src/patch-notes.js` — 여기에 나온 규칙을 따라 `PATCH_NOTES` 객체를 수정하세요.
+
 ## 파일 위치
 
-- **데이터**: `src/patch-notes.js`
+- **데이터**: `src/patch-notes.js` — 실제 패치노트 내용을 수정하려면 이 파일을 편집하세요.
 - **팝업 UI**: `index.html` (`.patch-overlay` 영역)
 - **스타일**: `src/styles.css` (`.patch-overlay` / `.patch-card` / `.patch-badge--*`)
 
