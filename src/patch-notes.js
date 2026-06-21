@@ -19,6 +19,18 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.3.0",
+        date: "2026-06-21",
+        title: "v0.3.0 업데이트",
+        changes: [
+            { type: "feature", text: "Archer Ball 능력 개선 — 활 당기기 애니메이션, 2연속 빗나감 시 3연속 발사." },
+            { type: "feature", text: "Archer Ball 패시브 회피 — 상대가 접근하면 옆으로 자동 회피합니다." },
+            { type: "refactor", text: "시뮬레이션 구조 개선 — Simulation/TestSimulation 베이스 클래스 도입." },
+            { type: "refactor", text: "패치노트 시스템 개선 — 놓친 버전도 함께 표시됩니다." },
+            { type: "style", text: "데미지 숫자 디자인 개선 및 팝업 버튼 하단 고정." }
+        ]
+    },
+    {
         version: "0.2.2",
         date: "2026-06-21",
         title: "v0.2.2 업데이트",
