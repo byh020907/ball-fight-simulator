@@ -6,7 +6,7 @@ export class DashAbility extends Ability {
         super(owner, simulation);
         this.baseCooldown = 3;
         this.cooldownLevel = 0;
-        this.maxCooldownLevel = 3;
+        this.maxCooldownLevel = 2;
         this._baseCooldown = this.getCooldownForLevel();
         this.timer = this.cooldown * 0.5;
         this.dashMultiplier = 2.15;
@@ -64,8 +64,7 @@ export class DashAbility extends Ability {
     }
 
     getCooldownForLevel() {
-        const reduction = (this.cooldownLevel / this.maxCooldownLevel) * 0.25;
-        return this.baseCooldown * (1 - reduction);
+        return this.baseCooldown * 0.5 ** this.cooldownLevel;
     }
 
     drawFace(ctx, rotation, ball) {

@@ -863,6 +863,24 @@ body::before {
     background: #f8f8f8;
 }
 
+.reset-stat-button {
+    flex: 1;
+    border: 2px solid #202020;
+    background: #e74c3c;
+    color: #fff;
+    font: inherit;
+    font-size: 0.74rem;
+    font-weight: 900;
+    cursor: pointer;
+    min-height: 30px;
+    padding: 0 3px;
+}
+
+.reset-stat-button:disabled {
+    cursor: default;
+    opacity: 0.35;
+}
+
 .tournament-title {
     display: flex;
     align-items: center;

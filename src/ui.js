@@ -102,6 +102,13 @@ export function appStore() {
             this._syncSummary();
         },
 
+        resetAllocation() {
+            if (this.locked) return;
+            this.allocation = createEmptyStatAllocation();
+            this.remainingPoints = getRemainingStatPoints(this.allocation);
+            this._syncSummary();
+        },
+
         _syncSummary() {
             const m = formatStatAllocation(this.allocation);
             const vals = [

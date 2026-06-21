@@ -253,7 +253,16 @@
                         >
                             자동 배분
                         </button>
-                        <div class="player-actions" data-player-actions></div>
+                        <div class="player-actions" data-player-actions>
+                            <button
+                                class="reset-stat-button"
+                                type="button"
+                                @click="resetAllocation()"
+                                x-bind:disabled="locked"
+                            >
+                                초기화
+                            </button>
+                        </div>
                     </section>
 
                     <div class="bracket" id="tournamentBracket">

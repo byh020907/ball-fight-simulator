@@ -340,6 +340,7 @@ async function testDashBallCooldownDash(app) {
     assert.equal(baseCooldown, 3, "Dash Ball base cooldown should be 3 seconds");
     assert.equal(dashBall.ability.cooldownLevel, 1, "First dash hit should add one cooldown stack");
     assert.equal(dashBall.ability.cooldown, baseCooldown * 0.5, "First dash hit should halve future cooldown");
+    assert.equal(dashBall.ability.maxCooldownLevel, 2, "Dash should have max 2 cooldown stacks");
     assert.equal(
         dashBall.ability.timer,
         dashBall.ability.cooldown,
@@ -348,17 +349,14 @@ async function testDashBallCooldownDash(app) {
     assert.equal(dashBall.dashState, null, "Dash Ball dash should clear after impact");
 
     dashBall.ability.onDashHit();
-    assert.equal(dashBall.ability.cooldownLevel, 2, "Second dash hit should add a second cooldown stack");
+    assert.equal(dashBall.ability.cooldownLevel, 2, "Second dash hit should reach max cooldown stacks");
     assert.equal(dashBall.ability.cooldown, baseCooldown * 0.25, "Second dash hit should leave 25% base cooldown");
     dashBall.ability.onDashHit();
-    assert.equal(dashBall.ability.cooldownLevel, 3, "Third dash hit should reach max cooldown stacks");
-    assert.equal(dashBall.ability.cooldown, baseCooldown * 0.125, "Third dash hit should reach 12.5% base cooldown");
-    dashBall.ability.onDashHit();
-    assert.equal(dashBall.ability.cooldownLevel, 3, "Dash cooldown stacks should cap at three");
+    assert.equal(dashBall.ability.cooldownLevel, 2, "Dash cooldown stacks should cap at two");
     assert.equal(
         dashBall.ability.cooldown,
-        baseCooldown * 0.125,
-        "Dash cooldown should not shrink below 12.5% base cooldown"
+        baseCooldown * 0.25,
+        "Dash cooldown should not shrink below 25% base cooldown"
     );
 
     dashBall.position.x = app.simulation.width - dashBall.radius + 1;
