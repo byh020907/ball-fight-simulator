@@ -135,35 +135,18 @@ export class Grenade extends CombatEntity {
         this.innerRadius = 62;
         this.bounces = 0;
         this.maxBounces = 2;
-        this.hitStopped = false;
     }
 
     update(delta, simulation) {
         this.timer -= delta;
         this.position.add(this.velocity.clone().scale(delta));
 
-        // Wall bounce
+        // Wall bounce (공용 keepEntityInsideArena 사용, 최대 2회)
         if (this.bounces < this.maxBounces) {
-            let bounced = false;
-            if (this.position.x <= this.radius) {
-                this.position.x = this.radius;
-                this.velocity.x = Math.abs(this.velocity.x);
-                bounced = true;
-            } else if (this.position.x >= simulation.width - this.radius) {
-                this.position.x = simulation.width - this.radius;
-                this.velocity.x = -Math.abs(this.velocity.x);
-                bounced = true;
-            }
-            if (this.position.y <= this.radius) {
-                this.position.y = this.radius;
-                this.velocity.y = Math.abs(this.velocity.y);
-                bounced = true;
-            } else if (this.position.y >= simulation.height - this.radius) {
-                this.position.y = simulation.height - this.radius;
-                this.velocity.y = -Math.abs(this.velocity.y);
-                bounced = true;
-            }
-            if (bounced) {
+            const bx = this.position.x,
+                by = this.position.y;
+            simulation.keepEntityInsideArena(this);
+            if (this.position.x !== bx || this.position.y !== by) {
                 this.bounces++;
                 simulation.playSound("bounce", 0.5);
             }
