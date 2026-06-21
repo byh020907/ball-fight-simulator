@@ -245,17 +245,17 @@
                                 </div>
                             </template>
                         </div>
-                        <button
-                            class="random-stat-button"
-                            type="button"
-                            @click="randomAllocation()"
-                            x-bind:disabled="locked"
-                        >
-                            자동 배분
-                        </button>
                         <div class="player-actions" data-player-actions>
                             <button
-                                class="reset-stat-button"
+                                class="action-btn"
+                                type="button"
+                                @click="randomAllocation()"
+                                x-bind:disabled="locked"
+                            >
+                                자동 배분
+                            </button>
+                            <button
+                                class="action-btn reset"
                                 type="button"
                                 @click="resetAllocation()"
                                 x-bind:disabled="locked"
