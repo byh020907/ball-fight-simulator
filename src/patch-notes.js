@@ -19,6 +19,30 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.4.0",
+        date: "2026-06-21",
+        title: "v0.4.0 업데이트",
+        changes: [
+            {
+                type: "refactor",
+                text: "충돌 피해 공식 개선 — damage가 최대 피해량을 의미하는 정수로 변경, 속도/방향 기반 효율(0~1) 곱셈."
+            },
+            { type: "feature", text: "스탯 초기화 버튼 추가 — 자동 배분 옆에 초기화 버튼이 생겼습니다." },
+            { type: "fix", text: "Dash Ball 너프 — 쿨다운 최대 2단계(75% 감소), 벽 충돌 시 스택 완전 초기화." },
+            { type: "refactor", text: "ESM 모듈 로딩 방식으로 변경 — window 전역 패턴 제거." }
+        ]
+    },
+    {
+        version: "0.3.1",
+        date: "2026-06-21",
+        title: "v0.3.1 업데이트",
+        changes: [
+            { type: "feature", text: "Eater Ball 방어력 상향 — 기본 방어 1.5배, 피스트 중 3배." },
+            { type: "feature", text: "Eater Ball 피스트 중 상대 유도 기능 추가." },
+            { type: "feature", text: "쿨타임 스탯 추가 — 스킬 쿨타임을 포인트당 1% 단축합니다." }
+        ]
+    },
+    {
         version: "0.3.0",
         date: "2026-06-21",
         title: "v0.3.0 업데이트",
