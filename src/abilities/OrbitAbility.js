@@ -12,7 +12,7 @@ export class OrbitAbility extends Ability {
         super(owner, simulation);
         this.angle = Math.random() * Math.PI * 2;
         this.hitCooldown = 0;
-        this.shardCount = 3;
+        this.shardCount = 5;
         this.shards = Array.from({ length: this.shardCount }, () => ({
             active: true,
             refilling: false,
@@ -25,7 +25,7 @@ export class OrbitAbility extends Ability {
         this.spinBurstDuration = 0.85;
         this.spinBurst = 0;
         this.rechargeDelay = 0;
-        this._baseRechargeDuration = 2;
+        this._baseRechargeDuration = 1;
         this.rechargeGap = 0.16;
         this.rechargeGapTimer = 0;
         this.volleyTimer = 0;
