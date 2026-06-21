@@ -1,5 +1,6 @@
 import { TimedEffect, Vector2 } from "../core.js";
 import { Ability } from "./Ability.js";
+import { steerBallToward } from "../core.js";
 
 export class EaterAbility extends Ability {
     constructor(owner, simulation) {
@@ -16,10 +17,15 @@ export class EaterAbility extends Ability {
         this.hasEatenThisFeast = false;
     }
 
+    isFeasting() {
+        return this.feastTimer > 0 && !this.hasEatenThisFeast;
+    }
+
     update(delta, target) {
         this.timer -= delta;
         this.updateRadiusScale(delta);
 
+        // Update swallowed target position (runs even during feast)
         if (this.swallowedTarget) {
             this.swallowTimer -= delta;
             this.swallowedTarget.position = this.owner.position.clone();
@@ -28,9 +34,19 @@ export class EaterAbility extends Ability {
             }
         }
 
-        if (this.feastTimer > 0) {
+        // Feast mode: home toward target + passive defense
+        if (this.isFeasting()) {
             this.feastTimer = Math.max(0, this.feastTimer - delta);
             this.feastElapsed = Math.min(this.feastDuration, this.feastElapsed + delta);
+
+            if (target && !target.isDefeated && !this.swallowedTarget) {
+                steerBallToward(this.owner, target, delta, {
+                    turnRate: 8,
+                    instant: true,
+                    persist: true
+                });
+            }
+
             if (this.feastTimer > 0 && !this.swallowedTarget && Math.random() < delta * 8) {
                 this.simulation.spawnParticleBurst(this.owner.position.clone(), this.owner.color, {
                     count: 1,
@@ -54,6 +70,11 @@ export class EaterAbility extends Ability {
             this.simulation.spawnPulse(this.owner.position.clone(), this.owner.color);
             this.simulation.addLog(`${this.owner.name} enters feast mode.`);
         }
+    }
+
+    getStatModifiers() {
+        const def = this.isFeasting() ? 3 : 1.5;
+        return { speed: 0.95, damage: 1, defense: def, impact: 1 };
     }
 
     onCollision(target) {
@@ -170,10 +191,6 @@ export class EaterAbility extends Ability {
         );
         ctx.stroke();
         ctx.restore();
-    }
-
-    isFeasting() {
-        return this.feastTimer > 0 && !this.hasEatenThisFeast;
     }
 
     getMouthTarget() {

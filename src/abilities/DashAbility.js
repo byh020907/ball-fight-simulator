@@ -1,4 +1,4 @@
-import { Vector2 } from "../core.js";
+import { steerBallToward, Vector2 } from "../core.js";
 import { Ability } from "./Ability.js";
 
 export class DashAbility extends Ability {
@@ -43,18 +43,7 @@ export class DashAbility extends Ability {
     }
 
     steerDash(delta, target) {
-        const current = this.owner.forcedHeading?.direction?.clone() ?? this.owner.velocity.clone().normalize();
-        const desired = Vector2.subtract(target.position, this.owner.position).normalize();
-        const cross = current.x * desired.y - current.y * desired.x;
-        const dot = current.x * desired.x + current.y * desired.y;
-        const angle = Math.atan2(cross, dot);
-        const turn = Math.max(-this.homingTurnRate * delta, Math.min(this.homingTurnRate * delta, angle));
-        const nextAngle = Math.atan2(current.y, current.x) + turn;
-        const nextDirection = Vector2.fromAngle(nextAngle, 1);
-
-        if (this.owner.forcedHeading) {
-            this.owner.forcedHeading.direction = nextDirection;
-        }
+        steerBallToward(this.owner, target, delta, { turnRate: this.homingTurnRate, persist: true });
     }
 
     onDashHit() {
