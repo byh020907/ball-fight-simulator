@@ -399,23 +399,11 @@ export class BattleBall {
             return;
         }
 
-        // Knockback 최우선 — 일반 이동 중단
+        // Knockback 최우선 (기존 이동 로직에 통합)
+        const useKnockback = this.knockbackState && !this.knockbackState.effect.finished;
         if (this.knockbackState) {
             this.knockbackState.effect.tick(delta);
-            const dir = this.knockbackState.direction;
-            this.velocity = dir.scale(this.baseSpeed * this.knockbackState.multiplier);
-            this.position.add(this.velocity.clone().scale(delta));
-            // 벽 튕김 시 knockback 방향도 함께 갱신
-            const bx = this.position.x,
-                by = this.position.y;
-            simulation.keepInsideArena(this);
-            if (this.position.x !== bx || this.position.y !== by) {
-                this.knockbackState.direction = this.velocity.clone().normalize();
-            }
-            if (this.knockbackState.effect.finished) {
-                this.knockbackState = null;
-            }
-            return;
+            if (this.knockbackState.effect.finished) this.knockbackState = null;
         }
 
         const target = simulation.getOpponent(this);
@@ -469,16 +457,27 @@ export class BattleBall {
             this.velocity.length() > 0
                 ? this.velocity.clone().normalize()
                 : Vector2.fromAngle(Math.random() * Math.PI * 2, 1);
-        const direction = this.forcedHeading ? this.forcedHeading.direction.clone() : currentDirection;
+        const direction = useKnockback
+            ? this.knockbackState.direction.clone()
+            : this.forcedHeading
+              ? this.forcedHeading.direction.clone()
+              : currentDirection;
 
-        const speedLimit =
-            this.dashState?.speedOverride ??
-            this.speedBoost?.speedOverride ??
-            this.baseSpeed * modifiers.speed * slowMultiplier * boostMultiplier * simulation.getSpeedMultiplier();
+        const speedLimit = useKnockback
+            ? this.baseSpeed * this.knockbackState.multiplier
+            : (this.dashState?.speedOverride ??
+              this.speedBoost?.speedOverride ??
+              this.baseSpeed * modifiers.speed * slowMultiplier * boostMultiplier * simulation.getSpeedMultiplier());
         this.velocity = direction.scale(speedLimit);
 
         this.position.add(this.velocity.clone().scale(delta));
+        // 벽 충돌 시 knockback 방향 갱신
+        const bx = this.position.x,
+            by = this.position.y;
         simulation.keepInsideArena(this);
+        if (useKnockback && (this.position.x !== bx || this.position.y !== by)) {
+            this.knockbackState.direction = this.velocity.clone().normalize();
+        }
     }
 
     applySlow(duration, amount) {
