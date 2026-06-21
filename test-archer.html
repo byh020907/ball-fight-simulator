@@ -73,17 +73,17 @@
         </div>
 
         <script type="module">
-            import { TestEnv } from "./src/test-env.js";
+            import { TestEnv, TestTarget } from "./src/test-env.js";
             import { Vector2 } from "./src/core.js";
             import { ArcherAbility } from "./src/abilities/ArcherAbility.js";
             import { BattleBall } from "./src/entities.js";
             import { TestSimulation } from "./src/simulation/TestSimulation.js";
 
-            // ── Simulation (real arena, wall bouncing) ──────────────────────
+            // ── Simulation ─────────────────────────────────────────────────
 
             const sim = new TestSimulation();
-
-            const target = { position: new Vector2(380, 180), isDefeated: false, _angle: 0 };
+            const target = new TestTarget(new Vector2(380, 180));
+            sim.entities.push(target);
 
             // ── Environment ──────────────────────────────────────────────────
 
@@ -105,32 +105,11 @@
             ball.velocity = new Vector2(0, 0);
             ball.simulation = sim;
             sim.fighters.push(ball);
-            sim.entities.push(ball); // rendered by test-env automatically
+            // ball NOT added to sim.entities — drawn manually in onRender (auto-moves otherwise)
 
             const ability = new ArcherAbility(ball, sim);
             ball.ability = ability;
             ball.bindAbility(ability);
-
-            // ── Target (env entity) ─────────────────────────────────────────
-
-            target._angle = 0;
-            target.update = function (dt) {
-                this._angle += dt * 0.8;
-                this.position.x = 360 + Math.cos(this._angle) * 100;
-                this.position.y = 200 + Math.sin(this._angle) * 80;
-            };
-            target.draw = function (ctx) {
-                ctx.save();
-                ctx.fillStyle = "#ff6b6b";
-                ctx.beginPath();
-                ctx.arc(this.position.x, this.position.y, 16, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.strokeStyle = "#202020";
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                ctx.restore();
-            };
-            sim.entities.push(target);
 
             // ── Custom hooks ────────────────────────────────────────────────
 
@@ -144,6 +123,10 @@
             };
 
             env.onRender = (ctx) => {
+                // Ball + bow (stationary — drawn manually)
+                ball.draw(ctx);
+                ability.draw(ctx);
+
                 // Top HUD
                 ctx.font = "700 14px Bahnschrift, sans-serif";
                 ctx.textAlign = "center";

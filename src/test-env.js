@@ -1,3 +1,5 @@
+import { CombatEntity, RENDER_LAYERS, Vector2 } from "./core.js";
+
 /**
  * Canvas + 애니메이션 루프 + Simulation.entities 렌더 파이프라인.
  *
@@ -10,6 +12,38 @@
  *   env.onRender = (ctx) => { ... };
  *   env.start();
  */
+
+/**
+ * 움직이는 타겟 — 테스트 페이지에서 사용.
+ * 확장 없이 바로 사용: const t = new TestTarget(new Vector2(380, 180));
+ */
+export class TestTarget extends CombatEntity {
+    constructor(position) {
+        super(position.clone(), new Vector2(0, 0), 16);
+        this._angle = 0;
+        this.orbitCenter = position.clone();
+        this.orbitRadius = 100;
+        this.speed = 0.8;
+    }
+
+    update(dt) {
+        this._angle += dt * this.speed;
+        this.position.x = this.orbitCenter.x + Math.cos(this._angle) * this.orbitRadius;
+        this.position.y = this.orbitCenter.y + Math.sin(this._angle) * this.orbitRadius;
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.fillStyle = "#ff6b6b";
+        ctx.beginPath();
+        ctx.arc(this.position.x, this.position.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#202020";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+    }
+}
 
 export class TestEnv {
     /**
