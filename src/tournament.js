@@ -4,9 +4,6 @@ export class Matchmaker {
     }
 
     pick() {
-        // TODO: 임시 — Sword Night 테스트. 배포 전에 원래 random 로직으로 되돌릴 것
-        const swordNight = this.roster.find((f) => f.id === "sword_night");
-        if (swordNight) return [swordNight, { ...swordNight, name: swordNight.name + " (복제)" }];
         const shuffled = [...this.roster].sort(() => Math.random() - 0.5);
         return shuffled.slice(0, 2);
     }

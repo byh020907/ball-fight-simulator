@@ -143,7 +143,16 @@ export class BattleApp {
         this.stopPlayerPreviewLoop();
         this.ui.setStartButton({ disabled: true, hidden: true, text: "다시 시작" });
         this.ui.resetLog();
-        this.tournamentRoster = createTournamentRoster(this.roster, this.playerFighterId, this.playerStatAllocation);
+        // TODO: 임시 — Sword Night 테스트: 로스터 내 다른 한 자리를 Sword Night 복제로 대체
+        const adjustedRoster = [...this.roster];
+        if (this.playerFighterId === "sword_night") {
+            const otherIndex = adjustedRoster.findIndex((f) => f.id !== "sword_night");
+            if (otherIndex !== -1) {
+                const sn = adjustedRoster.find((f) => f.id === "sword_night");
+                adjustedRoster[otherIndex] = { ...sn, id: "sword_night_clone", name: sn.name + " (복제)" };
+            }
+        }
+        this.tournamentRoster = createTournamentRoster(adjustedRoster, this.playerFighterId, this.playerStatAllocation);
         this.ui.roster = this.tournamentRoster;
         this.matchmaker = new Matchmaker(this.tournamentRoster);
         this.playerResult = null;
