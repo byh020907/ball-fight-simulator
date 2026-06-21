@@ -1,14 +1,12 @@
 /**
- * 재사용 가능한 단일 엔티티 테스트 환경.
+ * Canvas + 애니메이션 루프 + entity render 파이프라인.
  *
- * Canvas + 애니메이션 루프 + update/render 파이프라인을 추상화합니다.
- * 각 테스트 페이지에서는 필요한 객체를 add()하고
- * onRender(ctx) 만 구현하면 됩니다.
+ * 선택적으로 Simulation 인스턴스를 연결하면 sim.entities도 함께 렌더합니다.
+ * sim을 연결해도 env.entities는 별도로 유지되며 onRender에서 추가 렌더 가능.
  *
  * 사용법:
- *   const env = new TestEnv(canvas);
+ *   const env = new TestEnv(canvas, sim);
  *   env.statusEl = document.getElementById("status");
- *   env.add(someEntityWithUpdateDraw);
  *   env.onRender = (ctx) => { ... };
  *   env.start();
  */
@@ -16,14 +14,14 @@
 export class TestEnv {
     /**
      * @param {HTMLCanvasElement} canvas
-     * @param {object} [sim] Optional mock simulation passed as 2nd arg to entity.update(dt, sim).
+     * @param {object} [sim] Optional Simulation (or mock) — its entities are rendered after env.entities.
      */
     constructor(canvas, sim) {
         this.canvas = canvas;
         this.ctx = canvas.getContext("2d");
-        /** @type {Array<{update?:(dt:number, sim?:any)=>void, draw?:(ctx:CanvasRenderingContext2D)=>void}>} */
+        /** @type {Array<{draw?:(ctx:CanvasRenderingContext2D)=>void, update?:(dt:number, sim?:any)=>void}>} */
         this.entities = [];
-        /** Mock simulation context passed to entity.update(dt, sim). */
+        /** Optional Simulation whose entities are rendered each frame. */
         this.sim = sim ?? null;
         /** Optional status element to update each frame. */
         this.statusEl = null;
@@ -31,15 +29,15 @@ export class TestEnv {
         this._animId = null;
     }
 
-    /** Register an object that has update(dt) and/or draw(ctx). */
+    /** Register a renderable/updatable object. */
     add(obj) {
         this.entities.push(obj);
     }
 
-    /** Hook called at the start of each update tick, before entities update. Receives (dt). */
+    /** Called each frame before entity updates. Receives (dt). */
     onUpdate(dt) {}
 
-    /** Hook for custom rendering after entities are drawn. Receives (ctx, dt). */
+    /** Called each frame after all entities are drawn. Receives (ctx, dt). */
     onRender(ctx, dt) {}
 
     /** Start the animation loop. */
@@ -54,7 +52,6 @@ export class TestEnv {
         this._animId = requestAnimationFrame(loop);
     }
 
-    /** Stop the animation loop. */
     stop() {
         if (this._animId) {
             cancelAnimationFrame(this._animId);
@@ -77,10 +74,19 @@ export class TestEnv {
         ctx.fillStyle = "#fafafa";
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
+        // 1. env entities (test-specific, e.g. target)
         for (const e of this.entities) {
             e.draw?.(ctx);
         }
 
+        // 2. sim entities (fighters, projectiles, effects — all have draw)
+        if (this.sim) {
+            for (const e of this.sim.entities) {
+                e.draw?.(ctx);
+            }
+        }
+
+        // 3. custom overlay
         this.onRender(ctx, dt);
     }
 }

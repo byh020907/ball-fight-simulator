@@ -107,12 +107,11 @@
             ball.velocity = new Vector2(0, 0);
             ball.simulation = sim;
             sim.fighters.push(ball);
-            // ball NOT added to env — drawn manually in onRender
+            sim.entities.push(ball); // rendered by test-env automatically
 
             const ability = new ArcherAbility(ball, sim);
             ball.ability = ability;
             ball.bindAbility(ability);
-            // ability is NOT added to env — updated manually in onRender with target
 
             // ── Target (env entity) ─────────────────────────────────────────
 
@@ -140,12 +139,6 @@
             env.onUpdate = (dt) => ability.update(dt, target);
 
             env.onRender = (ctx) => {
-                // Ball (stationary — manually drawn)
-                ball.draw(ctx);
-
-                // Ability overlay (bow animation)
-                ability.draw(ctx);
-
                 // Guidance line during wind-up
                 if (ability.windUp > 0) {
                     const dir = Vector2.subtract(target.position, ball.position).normalize();
