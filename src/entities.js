@@ -122,11 +122,12 @@ export class ArrowProjectile extends CombatEntity {
 }
 
 export class OrbitProjectile extends CombatEntity {
-    constructor(owner, position, velocity) {
+    constructor(owner, position, velocity, size) {
         super(position, velocity, 11);
         this.owner = owner;
         this.life = 1.2;
         this.angle = Math.atan2(velocity.y, velocity.x);
+        this.size = size;
     }
 
     update(delta, simulation) {
@@ -155,7 +156,7 @@ export class OrbitProjectile extends CombatEntity {
     }
 
     draw(ctx) {
-        const s = 16;
+        const s = this.size ?? 16;
         ctx.save();
         ctx.translate(this.position.x, this.position.y);
         ctx.rotate(this.angle);

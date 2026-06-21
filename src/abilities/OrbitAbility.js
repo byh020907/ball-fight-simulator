@@ -186,7 +186,7 @@ export class OrbitAbility extends Ability {
 
         const entry = activeEntries[0];
         const dir = Vector2.subtract(target.position, entry.position).normalize();
-        this.simulation.spawnOrbitShot(this.owner, entry.position.clone(), dir.scale(SHARD_SPEED));
+        this.simulation.spawnOrbitShot(this.owner, entry.position.clone(), dir.scale(SHARD_SPEED), SHARD_SIZE);
         this.consumeShard(entry.index);
         this.simulation.playSound("shoot", 0.6);
     }

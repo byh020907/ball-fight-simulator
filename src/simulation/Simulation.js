@@ -122,8 +122,8 @@ export class Simulation {
         this.entities.push(new Grenade(owner, targetPosition, fuseTime));
     }
 
-    spawnOrbitShot(owner, position, velocity) {
-        this.entities.push(new OrbitProjectile(owner, position, velocity));
+    spawnOrbitShot(owner, position, velocity, size) {
+        this.entities.push(new OrbitProjectile(owner, position, velocity, size));
     }
 
     spawnPulse(position, color) {
