@@ -87,8 +87,10 @@ export class TimedEffect {
 export const RENDER_LAYERS = Object.freeze({
     /** Particles, visual effects, projectiles — behind fighters. */
     BACKGROUND: 0,
+    /** Fighters. */
+    FIGHTER: 1,
     /** Floating text, UI overlays on the canvas — in front of fighters. */
-    FOREGROUND: 1
+    FOREGROUND: 2
 });
 
 export const FIGHTER_IDS = Object.freeze({

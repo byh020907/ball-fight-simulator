@@ -22,7 +22,7 @@ export class BattleSimulation {
         this.fighters[1].simulation = this;
         this.fighters[0].bindAbility(this.createAbility(fighterSpecs[0].ability, this.fighters[0]));
         this.fighters[1].bindAbility(this.createAbility(fighterSpecs[1].ability, this.fighters[1]));
-        this.entities = [];
+        this.entities = [...this.fighters];
         this.elapsed = 0;
         this.overtimeStartsAt = 26;
         this.overtimeAnnounced = false;
@@ -183,10 +183,6 @@ export class BattleSimulation {
                 this.addLog("Overtime begins. Impact speed and crash damage are rising.");
             }
             this.updateOvertimeParticles(delta);
-        }
-
-        for (const fighter of this.fighters) {
-            fighter.update(delta, this);
         }
 
         this.handleCollision();

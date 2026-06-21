@@ -135,15 +135,8 @@ export class ArenaRenderer {
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
         for (const pass of ArenaRenderer.renderPasses) {
-            if (pass.kind === "entities") {
-                for (const e of simulation.entities) {
-                    if (e.renderLayer === pass.layer) e.draw(ctx, simulation);
-                }
-            } else if (pass.kind === "fighters") {
-                for (const f of simulation.fighters) {
-                    f.draw(ctx);
-                    this.drawNameplate(f);
-                }
+            for (const e of simulation.entities) {
+                if (e.renderLayer === pass.layer) e.draw(ctx, simulation);
             }
         }
 
@@ -152,25 +145,10 @@ export class ArenaRenderer {
 
     /** Ordered render passes — add/remove/reorder entries to change draw priority. */
     static renderPasses = [
-        { kind: "entities", layer: RENDER_LAYERS.BACKGROUND },
-        { kind: "fighters" },
-        { kind: "entities", layer: RENDER_LAYERS.FOREGROUND }
+        { layer: RENDER_LAYERS.BACKGROUND },
+        { layer: RENDER_LAYERS.FIGHTER },
+        { layer: RENDER_LAYERS.FOREGROUND }
     ];
-
-    drawNameplate(fighter) {
-        if (fighter.isDestroyed) {
-            return;
-        }
-
-        const ctx = this.ctx;
-        const y = fighter.position.y + fighter.radius + 18;
-        ctx.save();
-        ctx.font = "700 13px Bahnschrift, Segoe UI, sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillStyle = "#444444";
-        ctx.fillText(fighter.name, fighter.position.x, y);
-        ctx.restore();
-    }
 }
 
 // ── UIController — updates Alpine component data ────────────────────────────

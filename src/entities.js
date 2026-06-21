@@ -1,4 +1,4 @@
-import { CombatEntity, TimedEffect, Vector2 } from "./core.js";
+import { CombatEntity, RENDER_LAYERS, TimedEffect, Vector2 } from "./core.js";
 
 export class SeedOrb extends CombatEntity {
     constructor(owner, position, velocity, life) {
@@ -219,6 +219,10 @@ export class BattleBall {
         this.statAllocation = spec.statAllocation ?? null;
     }
 
+    get renderLayer() {
+        return RENDER_LAYERS.FIGHTER;
+    }
+
     bindAbility(ability) {
         this.ability = ability;
     }
@@ -421,6 +425,19 @@ export class BattleBall {
             ctx.stroke();
         }
 
+        this._drawNameplate(ctx);
+
+        ctx.restore();
+    }
+
+    _drawNameplate(ctx) {
+        if (this.isDestroyed) return;
+        const y = this.position.y + this.radius + 18;
+        ctx.save();
+        ctx.font = "700 13px Bahnschrift, Segoe UI, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#444444";
+        ctx.fillText(this.name, this.position.x, y);
         ctx.restore();
     }
 
