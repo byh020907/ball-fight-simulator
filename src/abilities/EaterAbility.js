@@ -21,7 +21,6 @@ export class EaterAbility extends Ability {
     }
 
     update(delta, target) {
-        this.timer -= delta;
         this.updateRadiusScale(delta);
 
         // Update swallowed target position (runs even during feast)
@@ -58,6 +57,9 @@ export class EaterAbility extends Ability {
             }
             return;
         }
+
+        // Cooldown timer only counts down when not feasting
+        this.timer -= delta;
 
         if (this.timer <= 0 && target) {
             this.timer = this.cooldown;
