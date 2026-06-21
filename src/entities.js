@@ -166,7 +166,7 @@ export class OrbitProjectile extends CombatEntity {
         const distance = Vector2.subtract(this.position, target.position).length();
         if (distance <= target.radius + this.radius) {
             target.takeDamage(Math.round(this.owner.baseDamage * 0.8), this.owner, "Orbit Shot");
-            target.applyKnockback(this.velocity.clone().normalize(), 0.25, 2.5);
+            target.applyKnockback(this.velocity.clone().normalize(), 0.15, 1.5);
             simulation.spawnSlash(this.position.clone(), target.position.clone(), this.owner.color);
             simulation.addSparkBurst(this.position.clone(), this.owner.color);
             simulation.playSound("orbit");
@@ -325,7 +325,7 @@ export class BattleBall {
     /** 방향 고정 + 속도 강제로 다프레임 넉백 */
     applyKnockback(direction, duration, multiplier) {
         this.forceHeading(direction, duration);
-        this.setSpeedBoost(duration, multiplier);
+        this.setSpeedBoost(duration, multipiler);
     }
 
     startDash(direction, config = {}) {
