@@ -46,7 +46,7 @@ export class RageAbility extends Ability {
     getStatModifiers() {
         const charge = this.getChargeProgress();
         return {
-            speed: 0.78 + charge * 1.05,
+            speed: 0.78 + charge * 4.22,
             damage: 0.96 + charge * 0.34,
             defense: 1,
             impact: 0.9 + charge * 0.62
