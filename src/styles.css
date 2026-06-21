@@ -747,14 +747,7 @@ body::before {
 }
 
 .player-panel > .help-icon {
-    float: right;
-    margin: -2px 0 0 6px;
-}
-
-.player-title .help-icon {
-    position: absolute;
-    top: 0;
-    right: 0;
+    justify-self: end;
 }
 
 .player-title span,
