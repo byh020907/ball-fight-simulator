@@ -19,6 +19,19 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.6.1",
+        date: "2026-06-21",
+        title: "v0.6.1 업데이트",
+        changes: [
+            {
+                type: "fix",
+                text: "충돌 피해 speedEff 상한 제거 — 빠른 볼이 속도 비례 더 큰 피해를 줍니다. (Rage 5배속 보상)"
+            },
+            { type: "fix", text: "Eater Ball UI 버그 수정 — 삼킨 후 쿨타임 게이지가 8.5%에 고정되던 문제 수정." },
+            { type: "fix", text: "벽꿍 데미지 상향 — 방어력 적용 후太低하여 8→15로 상승." }
+        ]
+    },
+    {
         version: "0.6.0",
         date: "2026-06-21",
         title: "v0.6.0 업데이트",
