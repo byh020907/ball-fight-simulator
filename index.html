@@ -300,25 +300,27 @@
             <!-- Patch notes popup -->
             <div class="patch-overlay" x-show="patchNotesVisible" x-transition.opacity.duration.200ms>
                 <div class="patch-card" @click.outside="closePatchNotes()">
-                    <template x-for="(entry, eIdx) in patchEntries" :key="entry.version">
-                        <div>
-                            <strong class="patch-title" x-text="entry.title"></strong>
-                            <span class="patch-date" x-text="entry.date"></span>
-                            <ul class="patch-list">
-                                <template x-for="item in entry.changes" :key="item.text">
-                                    <li>
-                                        <span
-                                            class="patch-badge"
-                                            x-bind:class="'patch-badge--' + item.type"
-                                            x-text="item.type"
-                                        ></span>
-                                        <span x-text="item.text"></span>
-                                    </li>
-                                </template>
-                            </ul>
-                            <hr class="patch-divider" x-show="eIdx < patchEntries.length - 1" />
-                        </div>
-                    </template>
+                    <div class="patch-card-scroll">
+                        <template x-for="(entry, eIdx) in patchEntries" :key="entry.version">
+                            <div>
+                                <strong class="patch-title" x-text="entry.title"></strong>
+                                <span class="patch-date" x-text="entry.date"></span>
+                                <ul class="patch-list">
+                                    <template x-for="item in entry.changes" :key="item.text">
+                                        <li>
+                                            <span
+                                                class="patch-badge"
+                                                x-bind:class="'patch-badge--' + item.type"
+                                                x-text="item.type"
+                                            ></span>
+                                            <span x-text="item.text"></span>
+                                        </li>
+                                    </template>
+                                </ul>
+                                <hr class="patch-divider" x-show="eIdx < patchEntries.length - 1" />
+                            </div>
+                        </template>
+                    </div>
                     <button class="patch-dismiss" type="button" @click="closePatchNotes()">확인</button>
                 </div>
             </div>
@@ -331,8 +333,10 @@
                 @click.self="closePopup('close')"
             >
                 <div class="bf-popup-card">
-                    <strong class="bf-popup-title" x-text="popupContent?.title ?? ''"></strong>
-                    <div class="bf-popup-body" x-html="popupContent?.bodyHtml ?? ''"></div>
+                    <div class="bf-popup-scroll">
+                        <strong class="bf-popup-title" x-text="popupContent?.title ?? ''"></strong>
+                        <div class="bf-popup-body" x-html="popupContent?.bodyHtml ?? ''"></div>
+                    </div>
                     <div class="bf-popup-footer" x-show="popupContent?.buttons?.length">
                         <template x-for="btn in popupContent?.buttons" :key="btn.value">
                             <button

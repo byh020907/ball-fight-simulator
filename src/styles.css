@@ -1430,14 +1430,21 @@ body::before {
 .patch-card {
     background: #ffffff;
     border-radius: 16px;
-    padding: 32px 36px;
+    padding: 32px 36px 24px;
     max-width: 460px;
     width: 90vw;
     max-height: 80vh;
-    overflow-y: auto;
     box-shadow: 0 8px 40px rgba(0, 0, 0, 0.25);
     color: #222222;
     text-align: center;
+    display: flex;
+    flex-direction: column;
+}
+
+.patch-card-scroll {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
 }
 
 .patch-title {
@@ -1502,6 +1509,7 @@ body::before {
 
 .patch-dismiss {
     display: inline-block;
+    margin-top: 16px;
     padding: 10px 40px;
     border: none;
     border-radius: 8px;
@@ -1546,13 +1554,20 @@ body::before {
 .bf-popup-card {
     background: #ffffff;
     border-radius: 16px;
-    padding: 28px 32px;
+    padding: 28px 32px 24px;
     max-width: 500px;
     width: 90vw;
     max-height: 85vh;
-    overflow-y: auto;
     box-shadow: 0 8px 40px rgba(0, 0, 0, 0.25);
     color: #222222;
+    display: flex;
+    flex-direction: column;
+}
+
+.bf-popup-scroll {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
 }
 
 .bf-popup-title {
@@ -1580,7 +1595,8 @@ body::before {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
-    margin-top: 20px;
+    margin-top: 16px;
+    flex-shrink: 0;
 }
 
 .bf-popup-btn {
