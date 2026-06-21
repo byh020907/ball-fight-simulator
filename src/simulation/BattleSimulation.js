@@ -200,12 +200,17 @@ export class BattleSimulation extends Simulation {
             defenderDirection.x * -attackerToDefender.x + defenderDirection.y * -attackerToDefender.y
         );
         const sideExposure = 1 - defenderFacing;
-        const relativeSpeed = Math.max(0, attacker.velocity.clone().subtract(defender.velocity).length());
-        const speedScore = attackerSpeed * 0.72 + relativeSpeed * 0.28;
-        const directionalMultiplier = 0.38 + aimAlignment * 0.72 + sideExposure * 0.55;
-        const glancingFloor = aimAlignment < 0.22 ? 0.45 : 1;
-        const raw = speedScore * 0.018 * directionalMultiplier * glancingFloor;
-        return Math.max(1, Math.round(raw * (attacker.baseDamage / 10) * this.getDamageMultiplier()));
+
+        // Speed efficiency: 0~1 (relative to attacker's own base speed)
+        const speedEff = Math.min(1, attackerSpeed / attacker.baseSpeed);
+        // Direction efficiency: 0~1 (alignment + hitting from the side)
+        const dirEff = aimAlignment * 0.55 + sideExposure * 0.45;
+        // Combined efficiency: 0~1
+        const efficiency = Math.min(1, speedEff * 0.5 + dirEff * 0.5);
+        // Glancing blow penalty
+        const glancingPenalty = aimAlignment < 0.22 ? 0.5 : 1;
+
+        return Math.max(1, Math.round(attacker.baseDamage * efficiency * glancingPenalty * this.getDamageMultiplier()));
     }
 
     checkResult() {
