@@ -11,6 +11,34 @@
 - 새 의존성은 명시적으로 필요할 때만 추가합니다.
 - 번들 파일을 생성해서 커밋하지 않습니다. 현재 배포 구조는 `index.html`이 `./src/main.js`를 직접 로드합니다.
 
+## 코드 스타일
+
+### 들여쓰기
+
+- **탭 대신 공백 4칸**을 사용합니다.
+- `editor.insertSpaces: true`, `editor.tabSize: 4`로 설정합니다.
+- VS Code 상태 표시줄에서 `Tab Size: 4`로 표시되는지 확인합니다.
+
+### 인코딩과 줄바꿈
+
+이 프로젝트는 **VS Code (Windows)** 환경에서 개발하며, 아래 기준을 따릅니다.
+
+| 항목 | 기준 | 이유 |
+|------|------|------|
+| 파일 인코딩 | **UTF-8 (BOM 없음)** | 웹 표준, 브라우저와 호환 |
+| 줄바꿈 문자 | **LF (`\n`)** | Git 저장소 기준, `.gitattributes`로 통일 |
+| 파일 끝 | **빈 줄로 끝남** (`insertFinalNewline`) | POSIX 표준, diff 마지막 줄 노이즈 방지 |
+| 후행 공백 | **제거** (`trimTrailingWhitespace`) | diff 노이즈 방지 |
+
+> **Windows에서 LF 규칙이 적용되는 방식**: `.gitattributes`에 `* text=auto eol=lf`가 설정되어 있어, 커밋 시점에 모든 텍스트 파일이 LF로 저장됩니다. 로컬에서 CRLF로 작업해도 Git이 LF로 변환합니다.
+
+### 적용 설정 파일
+
+위 규칙은 아래 두 파일로 프로젝트 전역에 적용됩니다.
+
+- **`.gitattributes`**: Git이 줄바꿈을 자동 관리 (LF 통일)
+- **`.vscode/settings.json`**: VS Code 편집기 설정 (인코딩, 들여쓰기, 후행 공백 등)
+
 ## 로컬 실행과 검증
 
 로컬 실행은 Node 정적 서버를 사용합니다.
