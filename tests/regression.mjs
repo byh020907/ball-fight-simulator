@@ -233,15 +233,15 @@ async function testEaterFeast(app) {
     eater.ability.feastTimer = eater.ability.feastDuration;
     eater.ability.feastElapsed = eater.ability.feastDuration;
     eater.ability.update(0.2, target);
-    assert.ok(eater.ability.getRadiusScale() > 1.5, "Eater should grow during feast mode");
+    assert.equal(eater.ability.getRadiusScale(), 1, "Eater should stay normal size during feast (no swallow)");
     eater.ability.feastTimer = 0;
-    eater.ability.update(0.5, target);
-    assert.ok(eater.ability.getRadiusScale() < 1.5, "Eater should smoothly shrink after feast mode");
 
     eater.ability.feastTimer = 1.2;
     eater.ability.hasEatenThisFeast = false;
     eater.ability.onCollision(target);
     assert.ok(target.swallowedState, "Eater should swallow on feast collision");
+    eater.ability.update(0.3, target);
+    assert.ok(eater.ability.getRadiusScale() > 1.1, "Eater should start growing after swallowing");
 
     app.simulation.update(0.8);
     assert.equal(target.swallowedState, null, "Eater should spit target back out");
