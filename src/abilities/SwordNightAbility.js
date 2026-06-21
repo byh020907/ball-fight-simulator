@@ -71,9 +71,9 @@ export class SwordNightAbility extends Ability {
 
         // 강한 넉백 + 벽 충돌 시 추가 데미지 (Eater wallSlamState 재사용)
         const kbDir = Vector2.subtract(target.position, this.owner.position).normalize();
-        target.applyKnockback(kbDir.scale(550), 0.4);
+        target.applyKnockback(kbDir.scale(550), 0.85);
         target.wallSlamState = {
-            effect: new TimedEffect(0.5),
+            effect: new TimedEffect(1.0),
             source: this.owner,
             damage: Math.round(this.owner.baseDamage * 1.2),
             cooldown: 0
