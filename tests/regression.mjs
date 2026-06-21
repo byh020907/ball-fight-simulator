@@ -531,7 +531,7 @@ function testStatAllocationRules(app) {
     assert.equal("force" in boosted.stats, false, "Force should not exist as an unused gameplay stat");
     assert.equal(
         formatStatAllocation(allocation),
-        "체력 +30% · 공격 +40% · 속도 +30% · 쿨타임 +0%",
+        "체력 +30% · 공격 +40% · 속도 +30% · 쿨타임 +0% · 방어력 +0%",
         "Allocation summary should show percentages instead of raw stats"
     );
     assert.equal(boosted.stats.radius, archer.stats.radius, "Radius should stay character-specific");
