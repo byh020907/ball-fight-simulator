@@ -201,6 +201,7 @@ export class BattleBall {
         this.maxHp = spec.stats.hp;
         this.hp = spec.stats.hp;
         this.baseDamage = spec.stats.damage;
+        this.baseDefense = spec.stats.defense;
         this.baseSpeed = spec.stats.speed;
         this.baseRadius = spec.stats.radius;
         this.radius = spec.stats.radius;
@@ -230,7 +231,7 @@ export class BattleBall {
     }
 
     getStatModifiers() {
-        return this.ability ? this.ability.getStatModifiers() : { speed: 1, damage: 1, defense: 1, impact: 1 };
+        return this.ability ? this.ability.getStatModifiers() : { speed: 1, damage: 1, defense: 0, impact: 1 };
     }
 
     setSpeedBoost(duration, multiplier, color = this.color) {
@@ -380,10 +381,9 @@ export class BattleBall {
             return;
         }
 
-        const modifiers = this.getStatModifiers();
-        const defensePts = this.statAllocation?.defense ?? 0;
-        const defenseReduction = 100 / (100 + defensePts);
-        const actual = Math.max(1, amount * modifiers.defense * defenseReduction);
+        const abilityDefense = this.getStatModifiers().defense;
+        const totalDefense = this.baseDefense + abilityDefense;
+        const actual = Math.max(1, Math.round(amount - totalDefense));
         this.hp = Math.max(0, this.hp - actual);
         if (label !== "Wall Slam") {
             source?.simulation?.shakeScreen?.(0.16, Math.min(18, 7 + actual * 0.55));

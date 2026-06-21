@@ -260,7 +260,7 @@ async function testEaterFeast(app) {
     target.velocity.x = Math.abs(target.velocity.x) || 500;
     target.position.x = app.simulation.width + target.radius + 5;
     app.simulation.keepInsideArena(target);
-    assert.equal(beforeHp - target.hp, 8, "Wall bounce should deal wall slam damage");
+    assert.equal(beforeHp - target.hp, 7, "Wall bounce should deal wall slam damage (8 - 1 defense)");
     assert.ok(target.velocity.x < 0, "Wall bounce should reverse spat target direction");
     assert.ok(app.simulation.screenShake, "Wall slam should trigger screen shake");
     assert.ok(
@@ -410,7 +410,7 @@ async function testDamageShake(app) {
     const [attacker, target] = app.simulation.fighters;
     target.takeDamage(10, attacker, "Test Hit");
     assert.ok(app.simulation.screenShake, "Taking damage should trigger screen shake");
-    assert.ok(app.simulation.screenShake.strength >= 12, "Damage shake should be visible");
+    assert.ok(app.simulation.screenShake.strength >= 11, "Damage shake should be visible");
     assert.ok(app.simulation.screenShake.remaining >= 0.16, "Damage shake should last multiple frames");
 }
 
