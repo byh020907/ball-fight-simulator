@@ -95,8 +95,7 @@ export class ArrowProjectile extends CombatEntity {
         const distance = Vector2.subtract(this.position, target.position).length();
         if (distance <= target.radius + this.radius) {
             target.takeDamage(Math.round(this.owner.baseDamage * 1.4), this.owner, "Arrow Shot");
-            target.forceHeading(this.velocity.clone().normalize(), 0.2);
-            target.setSpeedBoost(0.2, 1.8);
+            target.applyKnockback(this.velocity.clone().normalize(), 0.2, 1.8);
             simulation.playSound("hit");
             simulation.spawnSlash(
                 this.position.clone(),
@@ -167,8 +166,7 @@ export class OrbitProjectile extends CombatEntity {
         const distance = Vector2.subtract(this.position, target.position).length();
         if (distance <= target.radius + this.radius) {
             target.takeDamage(Math.round(this.owner.baseDamage * 0.8), this.owner, "Orbit Shot");
-            target.forceHeading(this.velocity.clone().normalize(), 0.25);
-            target.setSpeedBoost(0.25, 2.5);
+            target.applyKnockback(this.velocity.clone().normalize(), 0.25, 2.5);
             simulation.spawnSlash(this.position.clone(), target.position.clone(), this.owner.color);
             simulation.addSparkBurst(this.position.clone(), this.owner.color);
             simulation.playSound("orbit");
@@ -239,8 +237,7 @@ export class Grenade extends CombatEntity {
                 const damage = Math.round(this.owner.baseDamage * (4.0 - edgeProgress * 2.0));
                 target.takeDamage(damage, this.owner, "Grenade");
                 const kbDir = Vector2.subtract(target.position, this.position).normalize();
-                target.forceHeading(kbDir, 0.35);
-                target.setSpeedBoost(0.35, 3);
+                target.applyKnockback(kbDir, 0.35, 3);
             }
         }
 
@@ -323,6 +320,12 @@ export class BattleBall {
 
     forceHeading(direction, duration) {
         this.forcedHeading = { effect: new TimedEffect(duration), direction: direction.clone().normalize() };
+    }
+
+    /** 방향 고정 + 속도 강제로 다프레임 넉백 */
+    applyKnockback(direction, duration, multiplier) {
+        this.forceHeading(direction, duration);
+        this.setSpeedBoost(duration, multiplier);
     }
 
     startDash(direction, config = {}) {
