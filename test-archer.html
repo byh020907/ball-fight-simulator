@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="ko">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Archer Animation Test</title>
+        <style>
+            * {
+                box-sizing: border-box;
+            }
+            body {
+                margin: 0;
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: #f0f0f0;
+                font-family: "Bahnschrift", "Segoe UI", sans-serif;
+            }
+            .test-app {
+                text-align: center;
+            }
+            canvas {
+                border: 3px solid #202020;
+                background: #fafafa;
+                display: block;
+                margin: 0 auto 16px;
+                border-radius: 12px;
+            }
+            .controls {
+                display: flex;
+                gap: 8px;
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+            .controls button {
+                padding: 8px 20px;
+                border: 2px solid #202020;
+                border-radius: 8px;
+                background: #ffffff;
+                font:
+                    700 0.85rem "Bahnschrift",
+                    "Segoe UI",
+                    sans-serif;
+                cursor: pointer;
+                transition: background 0.12s;
+            }
+            .controls button:hover {
+                background: #e0e0e0;
+            }
+            .controls button.primary {
+                background: #202020;
+                color: #ffffff;
+            }
+            .controls button.primary:hover {
+                opacity: 0.8;
+            }
+            .status {
+                margin-top: 12px;
+                font-size: 0.9rem;
+                color: #555;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="test-app">
+            <canvas id="c" width="500" height="500"></canvas>
+            <div class="controls">
+                <button class="primary" id="btnDraw">활 당기기 (0.6s)</button>
+                <button id="btnRelease">발사</button>
+                <button id="btnTriple">트리플 샷</button>
+                <button id="btnReset">초기화</button>
+            </div>
+            <div class="status" id="status">준비</div>
+        </div>
+
+        <script type="module">
+            import { TestEnv } from "./src/test-env.js";
+            import { Vector2 } from "./src/core.js";
+            import { ArcherAbility } from "./src/abilities/ArcherAbility.js";
+            import { BattleBall } from "./src/entities.js";
+            import { TestSimulation } from "./src/simulation/TestSimulation.js";
+
+            // ── Simulation (real arena, wall bouncing) ──────────────────────
+
+            const sim = new TestSimulation();
+
+            const target = { position: new Vector2(380, 180), isDefeated: false, _angle: 0 };
+
+            // ── Environment ──────────────────────────────────────────────────
+
+            const canvas = document.getElementById("c");
+            const env = new TestEnv(canvas, sim);
+            env.statusEl = document.getElementById("status");
+
+            // ── Entities ─────────────────────────────────────────────────────
+
+            const ball = new BattleBall(
+                {
+                    id: "archer",
+                    name: "Archer Ball",
+                    color: "#f7b34d",
+                    stats: { hp: 112, damage: 1.02, speed: 270, radius: 50, mass: 1.2 }
+                },
+                new Vector2(250, 250)
+            );
+            ball.velocity = new Vector2(0, 0);
+            ball.simulation = sim;
+            sim.fighters.push(ball);
+            // ball NOT added to env — drawn manually in onRender
+
+            const ability = new ArcherAbility(ball, sim);
+            ball.ability = ability;
+            ball.bindAbility(ability);
+            // ability is NOT added to env — updated manually in onRender with target
+
+            // ── Target (env entity) ─────────────────────────────────────────
+
+            target._angle = 0;
+            target.update = function (dt) {
+                this._angle += dt * 0.8;
+                this.position.x = 360 + Math.cos(this._angle) * 100;
+                this.position.y = 200 + Math.sin(this._angle) * 80;
+            };
+            target.draw = function (ctx) {
+                ctx.save();
+                ctx.fillStyle = "#ff6b6b";
+                ctx.beginPath();
+                ctx.arc(this.position.x, this.position.y, 16, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = "#202020";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.restore();
+            };
+            env.add(target);
+
+            // ── Custom hooks ────────────────────────────────────────────────
+
+            env.onUpdate = (dt) => ability.update(dt, target);
+
+            env.onRender = (ctx) => {
+                // Ball (stationary — manually drawn)
+                ball.draw(ctx);
+
+                // Ability overlay (bow animation)
+                ability.draw(ctx);
+
+                // Guidance line during wind-up
+                if (ability.windUp > 0) {
+                    const dir = Vector2.subtract(target.position, ball.position).normalize();
+                    ctx.save();
+                    ctx.setLineDash([4, 6]);
+                    ctx.strokeStyle = "#ccc";
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(ball.position.x, ball.position.y);
+                    ctx.lineTo(ball.position.x + dir.x * 200, ball.position.y + dir.y * 200);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+
+                // Status text
+                env.statusEl &&
+                    (env.statusEl.textContent =
+                        ability.windUp > 0
+                            ? `🏹 당기는 중... ${((1 - ability.windUp / 0.6) * 100).toFixed(0)}%`
+                            : "준비");
+
+                // Top HUD
+                ctx.font = "700 14px Bahnschrift, sans-serif";
+                ctx.textAlign = "center";
+                ctx.fillStyle = ability.windUp > 0 ? "#202020" : "#888";
+                ctx.fillText(ability.windUp > 0 ? "DRAWING" : "READY", canvas.width / 2, 28);
+
+                if (ability.missStreak >= 2) {
+                    ctx.fillStyle = "#d97706";
+                    ctx.fillText(`TRIPLE (miss: ${ability.missStreak})`, canvas.width / 2, 48);
+                } else if (ability.missStreak > 0) {
+                    ctx.fillStyle = "#888";
+                    ctx.fillText(`Miss: ${ability.missStreak}`, canvas.width / 2, 48);
+                }
+            };
+
+            // ── Buttons ──────────────────────────────────────────────────────
+
+            document.getElementById("btnDraw").addEventListener("click", () => {
+                ability.timer = 0;
+            });
+
+            document.getElementById("btnRelease").addEventListener("click", () => {
+                ability.windUp = 0;
+                ability.release();
+            });
+
+            document.getElementById("btnTriple").addEventListener("click", () => {
+                ability.missStreak = 3;
+                ability.timer = 0;
+            });
+
+            document.getElementById("btnReset").addEventListener("click", () => {
+                ability.windUp = 0;
+                ability.missStreak = 0;
+                ability.timer = ability.cooldown;
+            });
+
+            // ── Go ───────────────────────────────────────────────────────────
+
+            env.start();
+        </script>
+    </body>
+</html>

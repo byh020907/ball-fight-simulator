@@ -1,5 +1,5 @@
 ﻿import { AudioEngine } from "./audio.js";
-import { BattleSimulation } from "./simulation.js";
+import { BattleSimulation } from "./simulation/BattleSimulation.js";
 import { ArenaRenderer, UIController } from "./ui.js";
 import { Matchmaker, TournamentManager } from "./tournament.js";
 import { createRoster } from "./roster.js";

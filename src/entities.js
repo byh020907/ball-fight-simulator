@@ -84,6 +84,7 @@ export class ArrowProjectile extends CombatEntity {
         this.syncFacingToVelocity();
         if (this.life <= 0) {
             this.isExpired = true;
+            this._abilityRef?.onArrowResult?.(false);
         }
 
         const target = simulation.getOpponent(this.owner);
@@ -104,6 +105,7 @@ export class ArrowProjectile extends CombatEntity {
             simulation.addSparkBurst(this.position.clone(), this.owner.color);
             simulation.addLog(`${this.owner.name}'s arrow pierces ${target.name}.`);
             this.isExpired = true;
+            this._abilityRef?.onArrowResult?.(true);
         }
     }
 
