@@ -9,7 +9,7 @@ export class Ability {
     /** Effective cooldown after skill stat reduction. */
     get cooldown() {
         const skill = this.owner.statAllocation?.skill ?? 0;
-        const factor = Math.max(0.1, 1 - skill / 100);
+        const factor = 100 / (100 + skill);
         return this._baseCooldown * factor;
     }
 

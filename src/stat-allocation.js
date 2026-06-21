@@ -24,7 +24,7 @@ export const ALLOCATABLE_STATS = [
         key: "skill",
         label: "쿨타임",
         shortLabel: "CD",
-        description: "스킬 쿨타임을 포인트당 1% 단축합니다."
+        description: "스킬 쿨타임이 100/(100+스탯) 비율로 줄어듭니다."
     }
 ];
 

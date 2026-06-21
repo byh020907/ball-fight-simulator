@@ -10,7 +10,7 @@ export class RageAbility extends Ability {
 
     getMaxChargeTime() {
         const skill = this.owner.statAllocation?.skill ?? 0;
-        const factor = Math.max(0.1, 1 - skill / 100);
+        const factor = 100 / (100 + skill);
         return this._baseMaxChargeTime * factor;
     }
 
