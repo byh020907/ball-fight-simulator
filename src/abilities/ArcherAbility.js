@@ -3,19 +3,35 @@ import { Ability } from "./Ability.js";
 
 const WINDUP = 0.6;
 const SPREAD_ANGLE = 0.22;
+const EVADE_RANGE = 160;
+const EVADE_STRENGTH = 0.7;
 
 export class ArcherAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation);
         this.cooldown = 3.9;
         this.timer = 1.2;
-        this.windUp = 0; // >0 while drawing the bow
+        this.windUp = 0;
         this.missStreak = 0;
         this.lastAimDir = new Vector2(1, 0);
     }
 
     update(delta, target) {
-        // Wind-up phase — playing draw animation, tracking target
+        // Passive evade — gentle dodge when opponent closes in
+        if (target && !target.isDefeated) {
+            const toTarget = Vector2.subtract(target.position, this.owner.position);
+            const dist = toTarget.length();
+            if (dist < EVADE_RANGE && dist > 0) {
+                const approach = toTarget.normalize();
+                const dodgeDir = new Vector2(-approach.y, approach.x);
+                const intensity = (1 - dist / EVADE_RANGE) * EVADE_STRENGTH;
+                const current = this.owner.velocity.clone().normalize();
+                const desired = current.add(dodgeDir.scale(intensity)).normalize();
+                this.owner.velocity = desired.scale(this.owner.velocity.length());
+            }
+        }
+
+        // Wind-up phase — tracking target
         if (this.windUp > 0) {
             if (target) {
                 this.lastAimDir = Vector2.subtract(target.position, this.owner.position).normalize();
