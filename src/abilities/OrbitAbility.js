@@ -1,6 +1,11 @@
 import { Vector2 } from "../core.js";
 import { Ability } from "./Ability.js";
 
+const VOLLEY_COOLDOWN = 3.5;
+const VOLLEY_DELAY = 0.18;
+const VOLLEY_RANGE = 500;
+const SHARD_SPEED = 550;
+
 export class OrbitAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation);
@@ -19,9 +24,21 @@ export class OrbitAbility extends Ability {
         this.spinBurstDuration = 0.85;
         this.spinBurst = 0;
         this.rechargeDelay = 0;
-        this.rechargeDuration = 2;
+        this._baseRechargeDuration = 2;
         this.rechargeGap = 0.16;
         this.rechargeGapTimer = 0;
+        this.volleyTimer = 0;
+        this.volleyIndex = 0;
+        this.volleyActive = false;
+        this.volleyStartTime = 0;
+        this.volleyTarget = null;
+        this.shotProjectiles = [];
+    }
+
+    get rechargeDuration() {
+        const skill = this.owner.statAllocation?.skill ?? 0;
+        const factor = 100 / (100 + skill);
+        return this._baseRechargeDuration * factor;
     }
 
     update(delta, target) {
@@ -33,6 +50,8 @@ export class OrbitAbility extends Ability {
         this.angle += delta * this.baseSpinSpeed * spinMultiplier;
         this.hitCooldown = Math.max(0, this.hitCooldown - delta);
         this.updateRecharge(delta);
+        this.updateVolley(delta, target);
+        this.updateProjectiles(delta, target);
 
         if (!target) {
             return;
@@ -121,6 +140,102 @@ export class OrbitAbility extends Ability {
                 radiusMax: 4,
                 upBias: 8
             });
+        }
+    }
+
+    /** Launch a shard volley at the target when all shards are full. */
+    updateVolley(delta, target) {
+        this.volleyTimer -= delta;
+
+        if (this.volleyActive) {
+            this.volleyStartTime -= delta;
+            if (this.volleyStartTime <= 0 && this.volleyIndex < this.shardCount) {
+                this.fireShardAt(target);
+                this.volleyIndex++;
+                this.volleyStartTime = VOLLEY_DELAY;
+            }
+            if (this.volleyIndex >= this.shardCount) {
+                this.volleyActive = false;
+                this.volleyIndex = 0;
+                this.volleyTimer = VOLLEY_COOLDOWN;
+            }
+            return;
+        }
+
+        if (
+            this.volleyTimer <= 0 &&
+            target &&
+            !target.isDefeated &&
+            this.getActiveShardCount() === this.shardCount &&
+            Vector2.subtract(target.position, this.owner.position).length() <= VOLLEY_RANGE
+        ) {
+            this.volleyActive = true;
+            this.volleyIndex = 0;
+            this.volleyStartTime = 0;
+        }
+    }
+
+    /** Fire one shard as a projectile toward the target. */
+    fireShardAt(target) {
+        const activeEntries = this.getActiveShardEntries();
+        if (activeEntries.length === 0) return;
+
+        const entry = activeEntries[0];
+        const dir = Vector2.subtract(target.position, entry.position).normalize();
+        this.shotProjectiles.push({
+            position: entry.position.clone(),
+            velocity: dir.scale(SHARD_SPEED),
+            life: 1.2
+        });
+        this.consumeShard(entry.index);
+        this.simulation.playSound("shoot", 0.6);
+    }
+
+    /** Update flying projectiles and check hits. */
+    updateProjectiles(delta, target) {
+        for (let i = this.shotProjectiles.length - 1; i >= 0; i--) {
+            const p = this.shotProjectiles[i];
+            p.position.add(p.velocity.clone().scale(delta));
+            p.life -= delta;
+
+            let expired = false;
+            if (p.life <= 0) {
+                expired = true;
+            }
+
+            // Check wall collision
+            if (
+                p.position.x <= this.shardRadius ||
+                p.position.x >= this.simulation.width - this.shardRadius ||
+                p.position.y <= this.shardRadius ||
+                p.position.y >= this.simulation.height - this.shardRadius
+            ) {
+                expired = true;
+            }
+
+            // Check hit on target
+            if (target && !target.isDefeated) {
+                const dist = Vector2.subtract(p.position, target.position).length();
+                if (dist <= target.radius + this.shardRadius) {
+                    target.takeDamage(Math.round(this.owner.baseDamage * 0.8), this.owner, "Orbit Shot");
+                    target.velocity.add(p.velocity.clone().normalize().scale(180));
+                    this.simulation.spawnSlash(p.position.clone(), target.position.clone(), this.owner.color);
+                    this.simulation.addSparkBurst(p.position.clone(), this.owner.color);
+                    this.simulation.playSound("orbit");
+                    expired = true;
+                }
+            }
+
+            if (expired) {
+                this.simulation.spawnParticleBurst(p.position.clone(), this.owner.color, {
+                    count: 6,
+                    speed: 100,
+                    radiusMin: 2,
+                    radiusMax: 4,
+                    upBias: 30
+                });
+                this.shotProjectiles.splice(i, 1);
+            }
         }
     }
 
@@ -236,11 +351,17 @@ export class OrbitAbility extends Ability {
         if (this.spinBurst > 0) {
             return { label: "Fast Orbit", progress: Math.max(0, Math.min(1, this.spinBurst / this.spinBurstDuration)) };
         }
+        if (this.volleyActive) {
+            return { label: `Volley ${this.volleyIndex + 1}/${this.shardCount}`, progress: 1 };
+        }
         if (this.getMissingShardCount() > 0) {
             return {
                 label: `Refill ${this.getActiveShardCount()}/${this.shardCount}`,
                 progress: this.getActiveShardCount() / this.shardCount
             };
+        }
+        if (this.volleyTimer > 0) {
+            return { label: "Orbit Ready", progress: Math.max(0.08, 1 - this.volleyTimer / VOLLEY_COOLDOWN) };
         }
         return { label: "Orbit Ready", progress: 1 };
     }

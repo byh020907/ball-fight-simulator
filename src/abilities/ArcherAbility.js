@@ -7,7 +7,7 @@ const SPREAD_ANGLE = 0.22;
 export class ArcherAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation);
-        this._baseCooldown = 3.9;
+        this._baseCooldown = 3;
         this.timer = 1.2;
         this.windUp = 0;
         this.missStreak = 0;
