@@ -25,6 +25,15 @@ export class Ability {
         return false;
     }
 
+    /**
+     * skill 스탯 기반 쿨타임 배율.
+     * 포인트당 1% 단축, 최소 10%까지.
+     */
+    getCooldownFactor() {
+        const skill = this.owner.statAllocation?.skill ?? 0;
+        return Math.max(0.1, 1 - skill / 100);
+    }
+
     // ── Face-drawing helpers (for use in subclasses' drawFace) ──────────
 
     _eye(ctx, ball, ex, ey, size) {

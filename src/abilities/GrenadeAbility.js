@@ -17,7 +17,7 @@ export class GrenadeAbility extends Ability {
             return;
         }
 
-        this.timer = this.cooldown;
+        this.timer = this.cooldown * this.getCooldownFactor();
         const prediction = Vector2.add(target.position.clone(), target.velocity.clone().scale(0.48));
         this.simulation.spawnGrenade(this.owner, prediction, this.getFuseTime());
         this.simulation.playSound("toss");

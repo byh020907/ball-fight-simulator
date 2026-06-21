@@ -505,20 +505,20 @@ async function testTournament(app) {
 function testStatAllocationRules(app) {
     // Stat allocation logic is tested below via adjustStatAllocation / applyStatAllocation
     const archer = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
-    let stepped = { hp: 0, damage: 0, speed: 0 };
+    let stepped = { hp: 0, damage: 0, speed: 0, skill: 0 };
     stepped = adjustStatAllocation(stepped, "hp", 10);
     stepped = adjustStatAllocation(stepped, "damage", 95);
     assert.deepEqual(
         stepped,
-        { hp: 10, damage: 90, speed: 0 },
+        { hp: 10, damage: 90, speed: 0, skill: 0 },
         "Large stat steps should clamp to the remaining budget"
     );
     stepped = adjustStatAllocation(stepped, "damage", -10);
     assert.equal(stepped.damage, 80, "Large negative stat steps should subtract multiple points");
 
-    const allocation = { hp: 30, damage: 40, speed: 30 };
+    const allocation = { hp: 30, damage: 40, speed: 30, skill: 0 };
     const boosted = applyStatAllocation(archer, allocation, true);
-    const { multiplier } = calculateStatMultiplier([30, 40, 30]);
+    const { multiplier } = calculateStatMultiplier([30, 40, 30, 0]);
     assert.equal(
         boosted.stats.hp,
         Number((archer.stats.hp * 1.3 * multiplier).toFixed(3)),
@@ -537,7 +537,7 @@ function testStatAllocationRules(app) {
     assert.equal("force" in boosted.stats, false, "Force should not exist as an unused gameplay stat");
     assert.equal(
         formatStatAllocation(allocation),
-        "체력 +30% · 공격 +40% · 속도 +30%",
+        "체력 +30% · 공격 +40% · 속도 +30% · 쿨타임 +0%",
         "Allocation summary should show percentages instead of raw stats"
     );
     assert.equal(boosted.stats.radius, archer.stats.radius, "Radius should stay character-specific");

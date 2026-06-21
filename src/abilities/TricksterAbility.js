@@ -14,7 +14,7 @@ export class TricksterAbility extends Ability {
             return;
         }
 
-        this.timer = this.cooldown;
+        this.timer = this.cooldown * this.getCooldownFactor();
         const baseAngle = Math.random() * Math.PI * 2;
         const speed = 250;
         for (let index = 0; index < 3; index += 1) {

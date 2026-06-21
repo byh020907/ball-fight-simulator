@@ -46,7 +46,7 @@ export class EaterAbility extends Ability {
         }
 
         if (this.timer <= 0 && target) {
-            this.timer = this.cooldown;
+            this.timer = this.cooldown * this.getCooldownFactor();
             this.feastTimer = this.feastDuration;
             this.feastElapsed = 0;
             this.hasEatenThisFeast = false;

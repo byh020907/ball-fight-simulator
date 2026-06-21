@@ -19,6 +19,12 @@ export const ALLOCATABLE_STATS = [
         label: "속도",
         shortLabel: "SPD",
         description: "종족값 이동 속도를 포인트당 1% 올립니다."
+    },
+    {
+        key: "skill",
+        label: "쿨타임",
+        shortLabel: "CD",
+        description: "스킬 쿨타임을 포인트당 1% 단축합니다."
     }
 ];
 
@@ -112,7 +118,11 @@ export function applyStatAllocation(fighter, allocation, isPlayer = false) {
 
     for (const stat of ALLOCATABLE_STATS) {
         const pts = allocation[stat.key] ?? 0;
-        stats[stat.key] = Number((stats[stat.key] * (1 + pts / 100) * multiplier).toFixed(3));
+        if (stat.key === "skill") {
+            stats.skill = pts;
+        } else {
+            stats[stat.key] = Number((stats[stat.key] * (1 + pts / 100) * multiplier).toFixed(3));
+        }
     }
 
     return {

@@ -34,7 +34,7 @@ export class ArcherAbility extends Ability {
 
         this.timer -= delta;
         if (this.timer <= 0 && target) {
-            this.timer = this.cooldown;
+            this.timer = this.cooldown * this.getCooldownFactor();
             this.lastAimDir = Vector2.subtract(target.position, this.owner.position).normalize();
             this.windUp = WINDUP;
         }
