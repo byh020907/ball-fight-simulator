@@ -510,9 +510,9 @@ function testStatAllocationRules(app) {
     stepped = adjustStatAllocation(stepped, "damage", -10);
     assert.equal(stepped.damage, 80, "Large negative stat steps should subtract multiple points");
 
-    const allocation = { hp: 30, damage: 40, speed: 30, skill: 0 };
+    const allocation = { hp: 30, damage: 40, speed: 30, skill: 0, defense: 0 };
     const boosted = applyStatAllocation(archer, allocation, true);
-    const { multiplier } = calculateStatMultiplier([30, 40, 30, 0]);
+    const { multiplier } = calculateStatMultiplier([30, 40, 30, 0, 0]);
     assert.equal(
         boosted.stats.hp,
         Number((archer.stats.hp * 1.3 * multiplier).toFixed(3)),
