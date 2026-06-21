@@ -19,6 +19,21 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.6.3",
+        date: "2026-06-21",
+        title: "v0.6.3 업데이트",
+        changes: [
+            {
+                type: "feature",
+                text: "Orbit Ball 상향 — 위성 3개 충전 시 3연속 원거리 발사 (가속/벽튕김), 쿨타임 스탯이 재충전 속도에 반영."
+            },
+            {
+                type: "refactor",
+                text: "OrbitProjectile 엔티티 분리 — 기존 Ability 내부 배열 대신 Arrow/Grenade와 동일한 구조."
+            }
+        ]
+    },
+    {
         version: "0.6.2",
         date: "2026-06-21",
         title: "v0.6.2 업데이트",
