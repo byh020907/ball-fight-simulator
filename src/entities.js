@@ -463,13 +463,13 @@ export class BattleBall {
         this.velocity = direction.scale(speedLimit);
 
         this.position.add(this.velocity.clone().scale(delta));
-        // 벽 충돌 시 knockback 방향 갱신
+        // 벽 충돌 시 knockback 종료
         if (knockbackMult) {
             const bx = this.position.x,
                 by = this.position.y;
             simulation.keepInsideArena(this);
             if (this.position.x !== bx || this.position.y !== by) {
-                this.forcedHeading.direction = this.velocity.clone().normalize();
+                this.forcedHeading = null;
             }
         } else {
             simulation.keepInsideArena(this);
