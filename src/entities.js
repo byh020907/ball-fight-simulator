@@ -397,13 +397,13 @@ export class BattleBall {
             return;
         }
 
+        this.initState();
+
         if (this.swallowedState) {
             this.position = this.swallowedState.owner.position.clone();
             this.velocity = new Vector2();
             return;
         }
-
-        this.initState();
 
         const target = simulation.getOpponent(this);
 
