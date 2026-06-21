@@ -345,16 +345,16 @@ export class OrbitAbility extends Ability {
             ctx.strokeRect(shard.position.x - size / 2, shard.position.y - size / 2, size, size);
         }
 
-        // Draw flying projectiles
+        // Draw flying projectiles (same size as active shards)
         for (const p of this.shotProjectiles) {
             ctx.save();
             ctx.translate(p.position.x, p.position.y);
             ctx.rotate(p.angle ?? 0);
             ctx.fillStyle = "#ffea00";
             ctx.strokeStyle = "#202020";
-            ctx.lineWidth = 2;
-            ctx.fillRect(-8, -5, 16, 10);
-            ctx.strokeRect(-8, -5, 16, 10);
+            ctx.lineWidth = 3;
+            ctx.fillRect(-8, -8, 16, 16);
+            ctx.strokeRect(-8, -8, 16, 16);
             ctx.restore();
         }
 
