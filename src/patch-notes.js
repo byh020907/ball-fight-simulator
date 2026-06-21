@@ -19,6 +19,18 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.6.4",
+        date: "2026-06-21",
+        title: "v0.6.4 업데이트",
+        changes: [
+            {
+                type: "refactor",
+                text: "넉백 시스템 개선 — forceHeading+speedBoost 기반 다프레임 지속, applyKnockback 공용 메서드."
+            },
+            { type: "buff", text: "Orbit 위성 3→5개, 리차지 2초→1초 (쿨타임 스탯으로 추가 단축)." }
+        ]
+    },
+    {
         version: "0.6.3",
         date: "2026-06-21",
         title: "v0.6.3 업데이트",
