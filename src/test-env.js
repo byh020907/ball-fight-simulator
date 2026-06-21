@@ -56,6 +56,12 @@ export class TestEnv {
 
     _update(dt) {
         this.onUpdate(dt);
+        // Update all sim entities (target, projectiles, fighters, etc.)
+        if (this.sim) {
+            for (const e of this.sim.entities) {
+                e.update?.(dt, this.sim);
+            }
+        }
     }
 
     _render(dt) {
