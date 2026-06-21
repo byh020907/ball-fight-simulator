@@ -18,7 +18,7 @@ export class ArcherAbility extends Ability {
 
     update(delta, target) {
         // Passive evade — steers away when opponent closes in
-        if (target && !target.isDefeated) {
+        if (target && !target.isDefeated && !this.owner.swallowedState && !this.owner.wallSlamState) {
             const toTarget = Vector2.subtract(target.position, this.owner.position);
             const dist = toTarget.length();
             if (dist < EVADE_RANGE && dist > 5) {
