@@ -326,7 +326,7 @@
             <!-- Alpine-driven popup (used by PopupService) -->
             <div
                 class="bf-popup-overlay"
-                x-show="popupContent"
+                x-show="popupVisible"
                 x-transition.opacity.duration.200ms
                 @click.self="closePopup('close')"
             >

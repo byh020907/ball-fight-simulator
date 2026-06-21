@@ -36,6 +36,7 @@ export class PopupService {
                 resolve("error");
                 return;
             }
+            data.popupVisible = true;
             data.popupContent = {
                 title: options.title ?? "",
                 bodyHtml: options.bodyHtml ?? "",
@@ -45,7 +46,7 @@ export class PopupService {
         });
     }
 
-    /** @internal 앱에서 호출 */
+    /** @internal PopupService.closePopup에서 setTimeout 이후 호출 */
     static resolve(value) {
         if (_resolve) {
             const r = _resolve;

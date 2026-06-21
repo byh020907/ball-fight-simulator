@@ -64,6 +64,7 @@ export function appStore() {
         patchNotesVisible: false,
 
         // Popup (used by PopupService)
+        popupVisible: false,
         popupContent: null,
 
         init() {
@@ -78,8 +79,12 @@ export function appStore() {
         },
 
         closePopup(value) {
-            this.popupContent = null;
-            PopupService.resolve(value ?? "close");
+            this.popupVisible = false;
+            // Clear content after transition completes
+            setTimeout(() => {
+                this.popupContent = null;
+                PopupService.resolve(value ?? "close");
+            }, 250);
         },
 
         // Actions
