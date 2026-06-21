@@ -144,7 +144,16 @@ export class OrbitProjectile extends CombatEntity {
         this.velocity = this.dir.clone().scale(speed);
 
         this.position.add(this.velocity.clone().scale(delta));
+
+        // Bounce off walls, update direction after bounce
+        const bx = this.position.x,
+            by = this.position.y;
         simulation.keepEntityInsideArena(this);
+        if (this.position.x !== bx || this.position.y !== by) {
+            this.dir = this.velocity.clone().normalize();
+            this.angle = Math.atan2(this.dir.y, this.dir.x);
+        }
+
         if (this.life <= 0) {
             this.isExpired = true;
         }
