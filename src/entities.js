@@ -1,55 +1,55 @@
-import { CombatEntity, TimedEffect, Vector2 } from './core.js';
+import { CombatEntity, TimedEffect, Vector2 } from "./core.js";
 
 export class SeedOrb extends CombatEntity {
-      constructor(owner, position, velocity, life) {
+    constructor(owner, position, velocity, life) {
         super(position, velocity, 14);
         this.owner = owner;
         this.life = life;
-      }
+    }
 
-      update(delta, simulation) {
+    update(delta, simulation) {
         this.life -= delta;
         this.position.add(this.velocity.clone().scale(delta));
         simulation.keepEntityInsideArena(this);
         if (this.life <= 0) {
-          this.isExpired = true;
+            this.isExpired = true;
         }
 
         for (const fighter of simulation.fighters.filter((candidate) => !candidate.isDefeated)) {
-          const distance = Vector2.subtract(this.position, fighter.position).length();
-          if (distance > this.radius + fighter.radius) {
-            continue;
-          }
+            const distance = Vector2.subtract(this.position, fighter.position).length();
+            if (distance > this.radius + fighter.radius) {
+                continue;
+            }
 
-          const target = simulation.getOpponent(this.owner);
-          const dashDirection = target
-            ? Vector2.subtract(target.position, this.owner.position).normalize()
-            : this.velocity.clone().normalize();
-          this.owner.startDash(dashDirection, {
-            multiplier: 2.05,
-            color: this.owner.color,
-            collisionDamage: 13,
-            collisionLabel: "Seed Dash",
-            untilImpact: true,
-            untilWall: true,
-            maxDuration: 1.55
-          });
-          simulation.spawnSlash(
-            this.owner.position.clone(),
-            Vector2.add(this.owner.position, dashDirection.clone().scale(150)),
-            this.owner.color
-          );
-          simulation.spawnPulse(this.position.clone(), this.owner.color);
-          simulation.playSound("dash");
-          simulation.addLog(`${fighter.name} catches a seed and triggers ${this.owner.name}'s dash.`);
+            const target = simulation.getOpponent(this.owner);
+            const dashDirection = target
+                ? Vector2.subtract(target.position, this.owner.position).normalize()
+                : this.velocity.clone().normalize();
+            this.owner.startDash(dashDirection, {
+                multiplier: 2.05,
+                color: this.owner.color,
+                collisionDamage: 13,
+                collisionLabel: "Seed Dash",
+                untilImpact: true,
+                untilWall: true,
+                maxDuration: 1.55
+            });
+            simulation.spawnSlash(
+                this.owner.position.clone(),
+                Vector2.add(this.owner.position, dashDirection.clone().scale(150)),
+                this.owner.color
+            );
+            simulation.spawnPulse(this.position.clone(), this.owner.color);
+            simulation.playSound("dash");
+            simulation.addLog(`${fighter.name} catches a seed and triggers ${this.owner.name}'s dash.`);
 
-          simulation.addSparkBurst(this.position.clone(), this.owner.color);
-          this.isExpired = true;
-          break;
+            simulation.addSparkBurst(this.position.clone(), this.owner.color);
+            this.isExpired = true;
+            break;
         }
-      }
+    }
 
-      draw(ctx) {
+    draw(ctx) {
         ctx.save();
         ctx.fillStyle = this.owner.color;
         ctx.beginPath();
@@ -59,55 +59,55 @@ export class SeedOrb extends CombatEntity {
         ctx.lineWidth = 3;
         ctx.stroke();
         ctx.restore();
-      }
     }
+}
 
 export class ArrowProjectile extends CombatEntity {
-      constructor(owner, position, velocity) {
+    constructor(owner, position, velocity) {
         super(position, velocity, 8);
         this.owner = owner;
         this.life = 1.55;
         this.angle = 0;
         this.syncFacingToVelocity();
-      }
+    }
 
-      syncFacingToVelocity() {
+    syncFacingToVelocity() {
         if (this.velocity.length() > 0) {
-          this.angle = Math.atan2(this.velocity.y, this.velocity.x);
+            this.angle = Math.atan2(this.velocity.y, this.velocity.x);
         }
-      }
+    }
 
-      update(delta, simulation) {
+    update(delta, simulation) {
         this.life -= delta;
         this.position.add(this.velocity.clone().scale(delta));
         simulation.keepEntityInsideArena(this);
         this.syncFacingToVelocity();
         if (this.life <= 0) {
-          this.isExpired = true;
+            this.isExpired = true;
         }
 
         const target = simulation.getOpponent(this.owner);
         if (!target || target.isDefeated) {
-          return;
+            return;
         }
 
         const distance = Vector2.subtract(this.position, target.position).length();
         if (distance <= target.radius + this.radius) {
-          target.takeDamage(14, this.owner, "Arrow Shot");
-          target.velocity.add(this.velocity.clone().normalize().scale(160));
-          simulation.playSound("hit");
-          simulation.spawnSlash(
-            this.position.clone(),
-            Vector2.add(this.position, this.velocity.clone().normalize().scale(70)),
-            this.owner.color
-          );
-          simulation.addSparkBurst(this.position.clone(), this.owner.color);
-          simulation.addLog(`${this.owner.name}'s arrow pierces ${target.name}.`);
-          this.isExpired = true;
+            target.takeDamage(14, this.owner, "Arrow Shot");
+            target.velocity.add(this.velocity.clone().normalize().scale(160));
+            simulation.playSound("hit");
+            simulation.spawnSlash(
+                this.position.clone(),
+                Vector2.add(this.position, this.velocity.clone().normalize().scale(70)),
+                this.owner.color
+            );
+            simulation.addSparkBurst(this.position.clone(), this.owner.color);
+            simulation.addLog(`${this.owner.name}'s arrow pierces ${target.name}.`);
+            this.isExpired = true;
         }
-      }
+    }
 
-      draw(ctx) {
+    draw(ctx) {
         ctx.save();
         ctx.translate(this.position.x, this.position.y);
         ctx.rotate(this.angle);
@@ -116,11 +116,11 @@ export class ArrowProjectile extends CombatEntity {
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(6, -2, 14, 4);
         ctx.restore();
-      }
     }
+}
 
 export class Grenade extends CombatEntity {
-      constructor(owner, targetPosition, fuseTime = 1.08) {
+    constructor(owner, targetPosition, fuseTime = 1.08) {
         const start = owner.position.clone();
         const safeFuse = Math.max(0.32, fuseTime);
         const drift = Vector2.subtract(targetPosition, start).scale(1 / safeFuse);
@@ -131,29 +131,32 @@ export class Grenade extends CombatEntity {
         this.maxTimer = this.timer;
         this.explosionRadius = 150;
         this.innerRadius = 62;
-      }
+    }
 
-      update(delta, simulation) {
+    update(delta, simulation) {
         this.timer -= delta;
         const travelDelta = Math.min(delta, Math.max(this.timer, 0) + delta);
         this.position.add(this.velocity.clone().scale(travelDelta));
 
         if (this.timer > 0) {
-          return;
+            return;
         }
 
         const target = simulation.getOpponent(this.owner);
         let hit = false;
         if (target && !target.isDefeated) {
-          const distance = Vector2.subtract(this.position, target.position).length();
-          if (distance <= this.explosionRadius) {
-            hit = true;
-            const edgeProgress = Math.max(0, Math.min(1, (distance - this.innerRadius) / (this.explosionRadius - this.innerRadius)));
-            const damage = 22 - edgeProgress * 11;
-            const knockback = 350 - edgeProgress * 140;
-            target.takeDamage(damage, this.owner, "Grenade");
-            target.velocity.add(Vector2.subtract(target.position, this.position).normalize().scale(knockback));
-          }
+            const distance = Vector2.subtract(this.position, target.position).length();
+            if (distance <= this.explosionRadius) {
+                hit = true;
+                const edgeProgress = Math.max(
+                    0,
+                    Math.min(1, (distance - this.innerRadius) / (this.explosionRadius - this.innerRadius))
+                );
+                const damage = 22 - edgeProgress * 11;
+                const knockback = 350 - edgeProgress * 140;
+                target.takeDamage(damage, this.owner, "Grenade");
+                target.velocity.add(Vector2.subtract(target.position, this.position).normalize().scale(knockback));
+            }
         }
 
         simulation.spawnExplosion(this.position.clone(), this.owner.color);
@@ -161,9 +164,9 @@ export class Grenade extends CombatEntity {
         this.owner.ability?.onGrenadeResult?.(hit);
         simulation.addLog(`${this.owner.name}'s grenade explodes.`);
         this.isExpired = true;
-      }
+    }
 
-      draw(ctx) {
+    draw(ctx) {
         const charge = 1 - Math.max(0, this.timer / this.maxTimer);
         ctx.save();
         ctx.strokeStyle = this.owner.color;
@@ -182,11 +185,11 @@ export class Grenade extends CombatEntity {
         ctx.lineWidth = 2;
         ctx.stroke();
         ctx.restore();
-      }
     }
+}
 
 export class BattleBall {
-      constructor(spec, position) {
+    constructor(spec, position) {
         this.id = spec.id;
         this.name = spec.name;
         this.title = spec.title;
@@ -213,127 +216,129 @@ export class BattleBall {
         this.isDefeated = false;
         this.isDestroyed = false;
         this.spinRotation = 0;
-      }
+    }
 
-      bindAbility(ability) {
+    bindAbility(ability) {
         this.ability = ability;
-      }
+    }
 
-      getStatModifiers() {
+    getStatModifiers() {
         return this.ability ? this.ability.getStatModifiers() : { speed: 1, damage: 1, defense: 1, impact: 1 };
-      }
+    }
 
-      setSpeedBoost(duration, multiplier, color = this.color) {
+    setSpeedBoost(duration, multiplier, color = this.color) {
         this.speedBoost = { effect: new TimedEffect(duration), multiplier, color };
-      }
+    }
 
-      forceHeading(direction, duration) {
+    forceHeading(direction, duration) {
         this.forcedHeading = { effect: new TimedEffect(duration), direction: direction.clone().normalize() };
-      }
+    }
 
-      startDash(direction, config = {}) {
+    startDash(direction, config = {}) {
         const duration = config.maxDuration ?? 1.4;
         const normalized = direction.clone().normalize();
         this.dashState = {
-          color: config.color ?? this.color,
-          multiplier: config.multiplier ?? 1.8,
-          speedOverride: config.speedOverride ?? null,
-          collisionDamage: config.collisionDamage ?? 0,
-          collisionLabel: config.collisionLabel ?? "Dash",
-          collisionSlow: config.collisionSlow ?? null,
-          untilImpact: Boolean(config.untilImpact),
-          untilWall: Boolean(config.untilWall),
-          effect: new TimedEffect(duration)
+            color: config.color ?? this.color,
+            multiplier: config.multiplier ?? 1.8,
+            speedOverride: config.speedOverride ?? null,
+            collisionDamage: config.collisionDamage ?? 0,
+            collisionLabel: config.collisionLabel ?? "Dash",
+            collisionSlow: config.collisionSlow ?? null,
+            untilImpact: Boolean(config.untilImpact),
+            untilWall: Boolean(config.untilWall),
+            effect: new TimedEffect(duration)
         };
-        this.forcedHeading = config.lockHeading === false ? null : { effect: new TimedEffect(duration), direction: normalized.clone() };
+        this.forcedHeading =
+            config.lockHeading === false ? null : { effect: new TimedEffect(duration), direction: normalized.clone() };
         const dashSpeed = this.dashState.speedOverride ?? this.baseSpeed * this.dashState.multiplier;
         this.velocity = normalized.clone().scale(dashSpeed);
         this.speedBoost = {
-          effect: new TimedEffect(duration),
-          multiplier: this.dashState.multiplier,
-          color: this.dashState.color,
-          speedOverride: this.dashState.speedOverride,
-          showRing: config.showSpeedRing !== false
+            effect: new TimedEffect(duration),
+            multiplier: this.dashState.multiplier,
+            color: this.dashState.color,
+            speedOverride: this.dashState.speedOverride,
+            showRing: config.showSpeedRing !== false
         };
-      }
+    }
 
-      clearDash() {
+    clearDash() {
         this.dashState = null;
         this.forcedHeading = null;
         this.speedBoost = null;
-      }
+    }
 
-      freezeForResult() {
+    freezeForResult() {
         this.velocity = new Vector2();
         this.clearDash();
         this.slowEffect = null;
         this.swallowedState = null;
         this.wallSlamState = null;
-      }
+    }
 
-      destroyForResult() {
+    destroyForResult() {
         this.freezeForResult();
         this.isDefeated = true;
         this.isDestroyed = true;
-      }
+    }
 
-      heal(amount) {
+    heal(amount) {
         this.hp = Math.min(this.maxHp, this.hp + amount);
-      }
+    }
 
-      getAbilityUiState() {
+    getAbilityUiState() {
         return this.ability?.getUiState?.() ?? { label: "Passive", progress: 1 };
-      }
+    }
 
-      update(delta, simulation) {
+    update(delta, simulation) {
         if (this.isDefeated) {
-          return;
+            return;
         }
 
         if (this.swallowedState) {
-          this.position = this.swallowedState.owner.position.clone();
-          this.velocity = new Vector2();
-          return;
+            this.position = this.swallowedState.owner.position.clone();
+            this.velocity = new Vector2();
+            return;
         }
 
         const target = simulation.getOpponent(this);
 
         if (this.slowEffect) {
-          this.slowEffect.tick(delta);
-          if (this.slowEffect.finished) {
-            this.slowEffect = null;
-          }
+            this.slowEffect.tick(delta);
+            if (this.slowEffect.finished) {
+                this.slowEffect = null;
+            }
         }
 
         if (this.speedBoost) {
-          this.speedBoost.effect.tick(delta);
-          if (this.speedBoost.effect.finished) {
-            this.speedBoost = null;
-          }
+            this.speedBoost.effect.tick(delta);
+            if (this.speedBoost.effect.finished) {
+                this.speedBoost = null;
+            }
         }
 
         if (this.forcedHeading) {
-          this.forcedHeading.effect.tick(delta);
-          if (this.forcedHeading.effect.finished) {
-            this.forcedHeading = null;
-          }
+            this.forcedHeading.effect.tick(delta);
+            if (this.forcedHeading.effect.finished) {
+                this.forcedHeading = null;
+            }
         }
 
         if (this.dashState) {
-          this.dashState.effect.tick(delta);
-          if (this.dashState.effect.finished) {
-            this.clearDash();
-          }
+            this.dashState.effect.tick(delta);
+            if (this.dashState.effect.finished) {
+                this.clearDash();
+            }
         }
 
         if (this.wallSlamState) {
-          this.wallSlamState.effect.tick(delta);
-          this.wallSlamState.cooldown = Math.max(0, this.wallSlamState.cooldown - delta);
-          const spinDirection = this.velocity.x >= 0 ? 1 : -1;
-          this.spinRotation += spinDirection * Math.max(8, this.velocity.length() / Math.max(1, this.radius)) * delta * 1.55;
-          if (this.wallSlamState.effect.finished) {
-            this.wallSlamState = null;
-          }
+            this.wallSlamState.effect.tick(delta);
+            this.wallSlamState.cooldown = Math.max(0, this.wallSlamState.cooldown - delta);
+            const spinDirection = this.velocity.x >= 0 ? 1 : -1;
+            this.spinRotation +=
+                spinDirection * Math.max(8, this.velocity.length() / Math.max(1, this.radius)) * delta * 1.55;
+            if (this.wallSlamState.effect.finished) {
+                this.wallSlamState = null;
+            }
         }
 
         this.ability?.update(delta, target);
@@ -343,49 +348,51 @@ export class BattleBall {
         const slowMultiplier = this.slowEffect ? this.slowEffect.amount : 1;
         const boostMultiplier = this.speedBoost ? this.speedBoost.multiplier : 1;
         const currentDirection =
-          this.velocity.length() > 0
-            ? this.velocity.clone().normalize()
-            : Vector2.fromAngle(Math.random() * Math.PI * 2, 1);
+            this.velocity.length() > 0
+                ? this.velocity.clone().normalize()
+                : Vector2.fromAngle(Math.random() * Math.PI * 2, 1);
         const direction = this.forcedHeading ? this.forcedHeading.direction.clone() : currentDirection;
 
-        const speedLimit = this.dashState?.speedOverride ?? this.speedBoost?.speedOverride ?? this.baseSpeed * modifiers.speed * slowMultiplier * boostMultiplier * simulation.getSpeedMultiplier();
+        const speedLimit =
+            this.dashState?.speedOverride ??
+            this.speedBoost?.speedOverride ??
+            this.baseSpeed * modifiers.speed * slowMultiplier * boostMultiplier * simulation.getSpeedMultiplier();
         this.velocity = direction.scale(speedLimit);
 
         this.position.add(this.velocity.clone().scale(delta));
         simulation.keepInsideArena(this);
+    }
 
-      }
-
-      applySlow(duration, amount) {
+    applySlow(duration, amount) {
         this.slowEffect = new TimedEffect(duration);
         this.slowEffect.amount = amount;
-      }
+    }
 
-      takeDamage(amount, source, label = "Hit") {
+    takeDamage(amount, source, label = "Hit") {
         if (this.isDefeated) {
-          return;
+            return;
         }
 
         const modifiers = this.getStatModifiers();
         const actual = Math.max(1, amount * modifiers.defense);
         this.hp = Math.max(0, this.hp - actual);
         if (label !== "Wall Slam") {
-          source?.simulation?.shakeScreen?.(0.16, Math.min(18, 7 + actual * 0.55));
+            source?.simulation?.shakeScreen?.(0.16, Math.min(18, 7 + actual * 0.55));
         }
         if (label !== "Crash") {
-          source?.simulation?.playSound?.("hit", Math.min(1.8, 0.7 + actual / 18));
+            source?.simulation?.playSound?.("hit", Math.min(1.8, 0.7 + actual / 18));
         }
         if (actual >= 10) {
-          source?.simulation?.addLog?.(`${label} lands on ${this.name} for ${Math.round(actual)} damage.`);
+            source?.simulation?.addLog?.(`${label} lands on ${this.name} for ${Math.round(actual)} damage.`);
         }
         if (this.hp <= 0) {
-          this.isDefeated = true;
+            this.isDefeated = true;
         }
-      }
+    }
 
-      draw(ctx) {
+    draw(ctx) {
         if (this.isDestroyed || this.swallowedState) {
-          return;
+            return;
         }
 
         ctx.save();
@@ -403,17 +410,17 @@ export class BattleBall {
         this.ability?.draw?.(ctx);
 
         if (this.speedBoost && this.speedBoost.showRing !== false) {
-          ctx.strokeStyle = this.speedBoost.color;
-          ctx.lineWidth = 4;
-          ctx.beginPath();
-          ctx.arc(this.position.x, this.position.y, this.radius + 18, 0, Math.PI * 2);
-          ctx.stroke();
+            ctx.strokeStyle = this.speedBoost.color;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(this.position.x, this.position.y, this.radius + 18, 0, Math.PI * 2);
+            ctx.stroke();
         }
 
         ctx.restore();
-      }
+    }
 
-      drawFace(ctx, rotation = 0) {
+    drawFace(ctx, rotation = 0) {
         const r = this.radius;
         const x = this.position.x;
         const y = this.position.y;
@@ -430,30 +437,30 @@ export class BattleBall {
         ctx.lineWidth = Math.max(3, r * 0.075);
 
         if (!this.ability?.drawFace?.(ctx, rotation, this)) {
-          this._drawDefaultFace(ctx);
+            this._drawDefaultFace(ctx);
         }
 
         ctx.restore();
-      }
+    }
 
-      _drawDefaultFace(ctx) {
+    _drawDefaultFace(ctx) {
         const r = this.radius;
         const time = performance.now() / 1000;
         const blink = Math.sin(time * 2.6 + this.position.y * 0.01) > 0.93 ? 0.22 : 1;
 
         const dotEye = (ex, ey, size = 0.055) => {
-          ctx.beginPath();
-          ctx.ellipse(ex * r, ey * r, size * r, size * r * blink, 0, 0, Math.PI * 2);
-          ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(ex * r, ey * r, size * r, size * r * blink, 0, 0, Math.PI * 2);
+            ctx.fill();
         };
         const arc = (cx, cy, radius, start, end) => {
-          ctx.beginPath();
-          ctx.arc(cx * r, cy * r, radius * r, start, end);
-          ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(cx * r, cy * r, radius * r, start, end);
+            ctx.stroke();
         };
 
         dotEye(-0.22, -0.08, 0.052);
         dotEye(0.22, -0.08, 0.052);
         arc(0, 0.16, 0.2, 0.1, Math.PI - 0.1);
-      }
     }
+}

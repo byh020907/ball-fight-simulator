@@ -39,6 +39,31 @@
 - **`.gitattributes`**: Git이 줄바꿈을 자동 관리 (LF 통일)
 - **`.vscode/settings.json`**: VS Code 편집기 설정 (인코딩, 들여쓰기, 후행 공백 등)
 
+### Prettier 자동 포맷
+
+들여쓰기는 **Prettier**로 자동 관리합니다. 수동으로 맞추지 말고 아래 명령어를 실행하세요.
+
+```bash
+# 코드 포맷 적용
+npm run format
+
+# 포맷 상태만 확인 (파일 변경 없음)
+npm run format:check
+```
+
+포맷 규칙은 `.prettierrc`에 정의되어 있습니다. 주요 값:
+
+```json
+{
+  "tabWidth": 4,
+  "useTabs": false,
+  "printWidth": 120,
+  "semi": true,
+  "singleQuote": false,
+  "trailingComma": "none"
+}
+```
+
 ## 로컬 실행과 검증
 
 로컬 실행은 Node 정적 서버를 사용합니다.
@@ -56,6 +81,7 @@ http://127.0.0.1:4173/
 변경 후 기본 검증:
 
 ```bash
+npm run format:check
 npm test
 npm run check
 ```

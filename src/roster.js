@@ -1,8 +1,8 @@
-import { FIGHTER_IDS } from './core.js';
+import { FIGHTER_IDS } from "./core.js";
 
 export function createRoster() {
-  return [
-          {
+    return [
+        {
             id: FIGHTER_IDS.ARCHER,
             name: "Archer Ball",
             title: "Piercing Arrow",
@@ -11,8 +11,8 @@ export function createRoster() {
             face: "archer",
             ability: "archer",
             stats: { hp: 112, damage: 1.02, speed: 270, radius: 50, mass: 1.2 }
-          },
-          {
+        },
+        {
             id: FIGHTER_IDS.ORBIT,
             name: "Orbit Ball",
             title: "Visible Halo",
@@ -21,8 +21,8 @@ export function createRoster() {
             face: "orbit",
             ability: "orbit",
             stats: { hp: 102, damage: 1, speed: 308, radius: 48, mass: 1.1 }
-          },
-          {
+        },
+        {
             id: FIGHTER_IDS.TRICKSTER,
             name: "Trickster Ball",
             title: "Seed Gamble",
@@ -31,8 +31,8 @@ export function createRoster() {
             face: "trickster",
             ability: "trickster",
             stats: { hp: 98, damage: 1.02, speed: 320, radius: 46, mass: 1.02 }
-          },
-          {
+        },
+        {
             id: FIGHTER_IDS.GRENADE,
             name: "Grenade Ball",
             title: "Blast Arc",
@@ -41,8 +41,8 @@ export function createRoster() {
             face: "grenade",
             ability: "grenade",
             stats: { hp: 108, damage: 1.08, speed: 278, radius: 49, mass: 1.18 }
-          },
-          {
+        },
+        {
             id: FIGHTER_IDS.DASH,
             name: "Dash Ball",
             title: "Cooldown Dash",
@@ -51,8 +51,8 @@ export function createRoster() {
             face: "dash",
             ability: "dash",
             stats: { hp: 110, damage: 0.92, speed: 294, radius: 49, mass: 1.16 }
-          },
-          {
+        },
+        {
             id: FIGHTER_IDS.RAGE,
             name: "Rage Ball",
             title: "Visible Rage",
@@ -61,8 +61,8 @@ export function createRoster() {
             face: "rage",
             ability: "rage",
             stats: { hp: 124, damage: 1.02, speed: 238, radius: 51, mass: 1.28 }
-          },
-          {
+        },
+        {
             id: FIGHTER_IDS.EATER,
             name: "Eater Ball",
             title: "Feast Bounce",
@@ -71,8 +71,6 @@ export function createRoster() {
             face: "eater",
             ability: "eater",
             stats: { hp: 118, damage: 0.98, speed: 268, radius: 52, mass: 1.34 }
-          }
-        ];
-
+        }
+    ];
 }
-

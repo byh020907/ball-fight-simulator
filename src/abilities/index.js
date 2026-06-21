@@ -1,8 +1,8 @@
-export { Ability } from './Ability.js';
-export { ArcherAbility } from './ArcherAbility.js';
-export { OrbitAbility } from './OrbitAbility.js';
-export { TricksterAbility } from './TricksterAbility.js';
-export { GrenadeAbility } from './GrenadeAbility.js';
-export { DashAbility } from './DashAbility.js';
-export { RageAbility } from './RageAbility.js';
-export { EaterAbility } from './EaterAbility.js';
+export { Ability } from "./Ability.js";
+export { ArcherAbility } from "./ArcherAbility.js";
+export { OrbitAbility } from "./OrbitAbility.js";
+export { TricksterAbility } from "./TricksterAbility.js";
+export { GrenadeAbility } from "./GrenadeAbility.js";
+export { DashAbility } from "./DashAbility.js";
+export { RageAbility } from "./RageAbility.js";
+export { EaterAbility } from "./EaterAbility.js";

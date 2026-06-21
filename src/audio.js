@@ -1,40 +1,38 @@
-
-
 export class AudioEngine {
-      constructor() {
+    constructor() {
         this.context = null;
         this.enabled = true;
         this.lastPlayed = new Map();
-      }
+    }
 
-      unlock() {
+    unlock() {
         if (!this.enabled) {
-          return;
+            return;
         }
 
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         if (!AudioContextClass) {
-          this.enabled = false;
-          return;
+            this.enabled = false;
+            return;
         }
 
         if (!this.context) {
-          this.context = new AudioContextClass();
+            this.context = new AudioContextClass();
         }
 
         if (this.context.state === "suspended") {
-          this.context.resume();
+            this.context.resume();
         }
-      }
+    }
 
-      play(type, intensity = 1) {
+    play(type, intensity = 1) {
         if (!this.enabled) {
-          return;
+            return;
         }
 
         this.unlock();
         if (!this.context) {
-          return;
+            return;
         }
 
         const now = this.context.currentTime;
@@ -42,46 +40,46 @@ export class AudioEngine {
         const last = this.lastPlayed.get(throttleKey) ?? -1;
         const throttle = type === "hit" || type === "crash" ? 0.055 : 0.025;
         if (now - last < throttle) {
-          return;
+            return;
         }
         this.lastPlayed.set(throttleKey, now);
 
         const safeIntensity = Math.max(0.45, Math.min(1.8, intensity));
         const voices = {
-          crash: () => this.playThud(96, 0.16, 0.13 * safeIntensity),
-          hit: () => this.playZap(420, 0.08, 0.055 * safeIntensity),
-          orbit: () => this.playZap(760, 0.12, 0.05 * safeIntensity),
-          charge: () => this.playSweep(320, 920, 0.2, 0.04 * safeIntensity),
-          chomp: () => {
-            this.playThud(130, 0.12, 0.12 * safeIntensity);
-            this.playZap(180, 0.07, 0.045 * safeIntensity);
-          },
-          dash: () => this.playSweep(180, 620, 0.15, 0.045 * safeIntensity),
-          spit: () => this.playSweep(120, 520, 0.18, 0.055 * safeIntensity),
-          shoot: () => this.playZap(520, 0.1, 0.052 * safeIntensity),
-          seed: () => {
-            this.playZap(360, 0.075, 0.035 * safeIntensity);
-            this.playZap(520, 0.09, 0.025 * safeIntensity);
-          },
-          toss: () => this.playSweep(240, 120, 0.18, 0.04 * safeIntensity),
-          rage: () => {
-            this.playThud(72, 0.22, 0.1 * safeIntensity);
-            this.playNoiseBurst(0.18, 0.055 * safeIntensity);
-          },
-          wall: () => this.playThud(116, 0.1, 0.08 * safeIntensity),
-          explosion: () => this.playNoiseBurst(0.38, 0.16 * safeIntensity),
-          ko: () => {
-            this.playNoiseBurst(0.58, 0.22 * safeIntensity);
-            this.playThud(58, 0.34, 0.18 * safeIntensity);
-          },
-          start: () => this.playSweep(260, 760, 0.22, 0.045),
-          overtime: () => this.playSweep(620, 180, 0.28, 0.055)
+            crash: () => this.playThud(96, 0.16, 0.13 * safeIntensity),
+            hit: () => this.playZap(420, 0.08, 0.055 * safeIntensity),
+            orbit: () => this.playZap(760, 0.12, 0.05 * safeIntensity),
+            charge: () => this.playSweep(320, 920, 0.2, 0.04 * safeIntensity),
+            chomp: () => {
+                this.playThud(130, 0.12, 0.12 * safeIntensity);
+                this.playZap(180, 0.07, 0.045 * safeIntensity);
+            },
+            dash: () => this.playSweep(180, 620, 0.15, 0.045 * safeIntensity),
+            spit: () => this.playSweep(120, 520, 0.18, 0.055 * safeIntensity),
+            shoot: () => this.playZap(520, 0.1, 0.052 * safeIntensity),
+            seed: () => {
+                this.playZap(360, 0.075, 0.035 * safeIntensity);
+                this.playZap(520, 0.09, 0.025 * safeIntensity);
+            },
+            toss: () => this.playSweep(240, 120, 0.18, 0.04 * safeIntensity),
+            rage: () => {
+                this.playThud(72, 0.22, 0.1 * safeIntensity);
+                this.playNoiseBurst(0.18, 0.055 * safeIntensity);
+            },
+            wall: () => this.playThud(116, 0.1, 0.08 * safeIntensity),
+            explosion: () => this.playNoiseBurst(0.38, 0.16 * safeIntensity),
+            ko: () => {
+                this.playNoiseBurst(0.58, 0.22 * safeIntensity);
+                this.playThud(58, 0.34, 0.18 * safeIntensity);
+            },
+            start: () => this.playSweep(260, 760, 0.22, 0.045),
+            overtime: () => this.playSweep(620, 180, 0.28, 0.055)
         };
 
         voices[type]?.();
-      }
+    }
 
-      createGain(volume, duration) {
+    createGain(volume, duration) {
         const gain = this.context.createGain();
         const now = this.context.currentTime;
         gain.gain.setValueAtTime(0.0001, now);
@@ -89,9 +87,9 @@ export class AudioEngine {
         gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
         gain.connect(this.context.destination);
         return gain;
-      }
+    }
 
-      playThud(frequency, duration, volume) {
+    playThud(frequency, duration, volume) {
         const oscillator = this.context.createOscillator();
         const gain = this.createGain(volume, duration);
         const now = this.context.currentTime;
@@ -101,9 +99,9 @@ export class AudioEngine {
         oscillator.connect(gain);
         oscillator.start(now);
         oscillator.stop(now + duration + 0.02);
-      }
+    }
 
-      playZap(frequency, duration, volume) {
+    playZap(frequency, duration, volume) {
         const oscillator = this.context.createOscillator();
         const gain = this.createGain(volume, duration);
         const now = this.context.currentTime;
@@ -113,9 +111,9 @@ export class AudioEngine {
         oscillator.connect(gain);
         oscillator.start(now);
         oscillator.stop(now + duration + 0.02);
-      }
+    }
 
-      playSweep(from, to, duration, volume) {
+    playSweep(from, to, duration, volume) {
         const oscillator = this.context.createOscillator();
         const gain = this.createGain(volume, duration);
         const now = this.context.currentTime;
@@ -125,15 +123,15 @@ export class AudioEngine {
         oscillator.connect(gain);
         oscillator.start(now);
         oscillator.stop(now + duration + 0.02);
-      }
+    }
 
-      playNoiseBurst(duration, volume) {
+    playNoiseBurst(duration, volume) {
         const sampleRate = this.context.sampleRate;
         const buffer = this.context.createBuffer(1, Math.floor(sampleRate * duration), sampleRate);
         const data = buffer.getChannelData(0);
         for (let index = 0; index < data.length; index += 1) {
-          const fade = 1 - index / data.length;
-          data[index] = (Math.random() * 2 - 1) * fade * fade;
+            const fade = 1 - index / data.length;
+            data[index] = (Math.random() * 2 - 1) * fade * fade;
         }
 
         const source = this.context.createBufferSource();
@@ -141,5 +139,5 @@ export class AudioEngine {
         source.buffer = buffer;
         source.connect(gain);
         source.start(this.context.currentTime);
-      }
     }
+}

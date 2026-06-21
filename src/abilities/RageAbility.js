@@ -1,61 +1,61 @@
-import { Ability } from './Ability.js';
+import { Ability } from "./Ability.js";
 
 export class RageAbility extends Ability {
-      constructor(owner, simulation) {
+    constructor(owner, simulation) {
         super(owner, simulation);
         this.particleTimer = 0;
         this.timeWithoutCollision = 0;
         this.maxChargeTime = 7.0;
-      }
+    }
 
-      update(delta) {
+    update(delta) {
         this.timeWithoutCollision = Math.min(this.maxChargeTime, this.timeWithoutCollision + delta);
         if (this.getChargeProgress() > 0.22) {
-          this.particleTimer -= delta;
-          if (this.particleTimer <= 0) {
-            this.particleTimer = 0.15 - this.getChargeProgress() * 0.07;
-            this.simulation.spawnParticleBurst(this.owner.position.clone(), this.owner.color, {
-              count: 1 + Math.floor(this.getChargeProgress() * 3),
-              speed: 90 + this.getChargeProgress() * 90,
-              radiusMin: 2,
-              radiusMax: 4,
-              upBias: 120,
-              gravity: 900,
-              life: 1.1
-            });
-          }
+            this.particleTimer -= delta;
+            if (this.particleTimer <= 0) {
+                this.particleTimer = 0.15 - this.getChargeProgress() * 0.07;
+                this.simulation.spawnParticleBurst(this.owner.position.clone(), this.owner.color, {
+                    count: 1 + Math.floor(this.getChargeProgress() * 3),
+                    speed: 90 + this.getChargeProgress() * 90,
+                    radiusMin: 2,
+                    radiusMax: 4,
+                    upBias: 120,
+                    gravity: 900,
+                    life: 1.1
+                });
+            }
         }
-      }
+    }
 
-      onCollision() {
+    onCollision() {
         if (this.getChargeProgress() > 0.45) {
-          this.simulation.playSound("rage", 0.75);
-          this.simulation.addLog(`${this.owner.name}'s momentum resets on impact.`);
+            this.simulation.playSound("rage", 0.75);
+            this.simulation.addLog(`${this.owner.name}'s momentum resets on impact.`);
         }
         this.timeWithoutCollision = 0;
-      }
+    }
 
-      getChargeProgress() {
+    getChargeProgress() {
         return Math.max(0, Math.min(1, this.timeWithoutCollision / this.maxChargeTime));
-      }
+    }
 
-      isCharged() {
+    isCharged() {
         return this.getChargeProgress() > 0.22;
-      }
+    }
 
-      getStatModifiers() {
+    getStatModifiers() {
         const charge = this.getChargeProgress();
         return {
-          speed: 0.78 + charge * 1.05,
-          damage: 0.96 + charge * 0.34,
-          defense: 1,
-          impact: 0.9 + charge * 0.62
+            speed: 0.78 + charge * 1.05,
+            damage: 0.96 + charge * 0.34,
+            defense: 1,
+            impact: 0.9 + charge * 0.62
         };
-      }
+    }
 
-      draw(ctx) {
+    draw(ctx) {
         if (!this.isCharged()) {
-          return;
+            return;
         }
 
         const pos = this.owner.position;
@@ -76,19 +76,25 @@ export class RageAbility extends Ability {
         ctx.arc(pos.x, pos.y, (r + 22 + charge * 20) * pulse, 0, Math.PI * 2);
         ctx.stroke();
         ctx.restore();
-      }
+    }
 
-      drawFace(ctx, rotation, ball) {
+    drawFace(ctx, rotation, ball) {
         const growl = this.getChargeProgress();
-        this._line(ctx, ball, [[-0.38, -0.24], [-0.12, -0.08]]);
-        this._line(ctx, ball, [[0.38, -0.24], [0.12, -0.08]]);
+        this._line(ctx, ball, [
+            [-0.38, -0.24],
+            [-0.12, -0.08]
+        ]);
+        this._line(ctx, ball, [
+            [0.38, -0.24],
+            [0.12, -0.08]
+        ]);
         this._dotEye(ctx, ball, -0.22, 0, 0.052 + growl * 0.025);
         this._dotEye(ctx, ball, 0.22, 0, 0.052 + growl * 0.025);
         this._arc(ctx, ball, 0, 0.32, 0.2, Math.PI + 0.15, Math.PI * 2 - 0.15);
         return true;
-      }
-
-      getUiState() {
-        return { label: "Momentum", progress: Math.max(0.08, this.getChargeProgress()) };
-      }
     }
+
+    getUiState() {
+        return { label: "Momentum", progress: Math.max(0.08, this.getChargeProgress()) };
+    }
+}

@@ -1,35 +1,33 @@
-
-
 export class Ability {
-      constructor(owner, simulation) {
+    constructor(owner, simulation) {
         this.owner = owner;
         this.simulation = simulation;
-      }
+    }
 
-      update() {}
-      onCollision() {}
-      onDamageTaken() {}
-      getRadiusScale() {
+    update() {}
+    onCollision() {}
+    onDamageTaken() {}
+    getRadiusScale() {
         return 1;
-      }
-      getStatModifiers() {
+    }
+    getStatModifiers() {
         return { speed: 1, damage: 1, defense: 1, impact: 1 };
-      }
-      getUiState() {
+    }
+    getUiState() {
         return { label: "Passive", progress: 1 };
-      }
+    }
 
-      /** Override to draw character-specific effects around/on top of the ball. */
-      draw(ctx) {}
+    /** Override to draw character-specific effects around/on top of the ball. */
+    draw(ctx) {}
 
-      /** Override to draw a custom face. Return true if handled. */
-      drawFace(ctx, rotation, ball) {
+    /** Override to draw a custom face. Return true if handled. */
+    drawFace(ctx, rotation, ball) {
         return false;
-      }
+    }
 
-      // ── Face-drawing helpers (for use in subclasses' drawFace) ──────────
+    // ── Face-drawing helpers (for use in subclasses' drawFace) ──────────
 
-      _eye(ctx, ball, ex, ey, size) {
+    _eye(ctx, ball, ex, ey, size) {
         const { r, blink } = this._faceContext(ball);
         const half = size * r * 1.18;
         const lift = size * r * 0.32 * blink;
@@ -37,45 +35,45 @@ export class Ability {
         ctx.moveTo(ex * r - half, ey * r + lift);
         ctx.quadraticCurveTo(ex * r, ey * r - lift, ex * r + half, ey * r + lift);
         ctx.stroke();
-      }
+    }
 
-      _dotEye(ctx, ball, ex, ey, size) {
+    _dotEye(ctx, ball, ex, ey, size) {
         const { r, blink } = this._faceContext(ball);
         ctx.beginPath();
         ctx.ellipse(ex * r, ey * r, size * r, size * r * blink, 0, 0, Math.PI * 2);
         ctx.fill();
-      }
+    }
 
-      _sharpEye(ctx, ball, ex, ey, flip, size) {
+    _sharpEye(ctx, ball, ex, ey, flip, size) {
         const { r } = this._faceContext(ball);
         ctx.beginPath();
         ctx.moveTo((ex - size) * r, (ey - 0.02 * flip) * r);
         ctx.lineTo((ex + size) * r, (ey + 0.04 * flip) * r);
         ctx.stroke();
-      }
+    }
 
-      _line(ctx, ball, points) {
+    _line(ctx, ball, points) {
         const { r } = this._faceContext(ball);
         ctx.beginPath();
         points.forEach(([px, py], index) => {
-          if (index === 0) ctx.moveTo(px * r, py * r);
-          else ctx.lineTo(px * r, py * r);
+            if (index === 0) ctx.moveTo(px * r, py * r);
+            else ctx.lineTo(px * r, py * r);
         });
         ctx.stroke();
-      }
+    }
 
-      _arc(ctx, ball, cx, cy, radius, start, end) {
+    _arc(ctx, ball, cx, cy, radius, start, end) {
         const { r } = this._faceContext(ball);
         ctx.beginPath();
         ctx.arc(cx * r, cy * r, radius * r, start, end);
         ctx.stroke();
-      }
+    }
 
-      _faceContext(ball) {
+    _faceContext(ball) {
         const time = performance.now() / 1000;
         return {
-          r: ball.radius,
-          blink: Math.sin(time * 2.6 + ball.position.y * 0.01) > 0.93 ? 0.22 : 1
+            r: ball.radius,
+            blink: Math.sin(time * 2.6 + ball.position.y * 0.01) > 0.93 ? 0.22 : 1
         };
-      }
     }
+}

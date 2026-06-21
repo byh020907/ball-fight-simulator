@@ -1,32 +1,32 @@
-﻿import { AudioEngine } from './audio.js';
-import { BattleSimulation } from './simulation.js';
-import { ArenaRenderer, UIController } from './ui.js';
-import { Matchmaker, TournamentManager } from './tournament.js';
-import { createRoster } from './roster.js';
+﻿import { AudioEngine } from "./audio.js";
+import { BattleSimulation } from "./simulation.js";
+import { ArenaRenderer, UIController } from "./ui.js";
+import { Matchmaker, TournamentManager } from "./tournament.js";
+import { createRoster } from "./roster.js";
 import {
-  ALLOCATABLE_STATS,
-  PLAYER_STAT_POINTS,
-  adjustStatAllocation,
-  createEmptyStatAllocation,
-  createRandomStatAllocation,
-  createTournamentRoster,
-  getRemainingStatPoints
-} from './stat-allocation.js';
+    ALLOCATABLE_STATS,
+    PLAYER_STAT_POINTS,
+    adjustStatAllocation,
+    createEmptyStatAllocation,
+    createRandomStatAllocation,
+    createTournamentRoster,
+    getRemainingStatPoints
+} from "./stat-allocation.js";
 
 export class BattleApp {
-      constructor() {
+    constructor() {
         this.elements = {
-          canvas: document.getElementById("arenaCanvas"),
-          overlay: document.getElementById("overlay"),
-          startButton: document.getElementById("startButton"),
-          matchupLabel: document.getElementById("matchupLabel"),
-          statusBadge: document.getElementById("statusBadge"),
-          fighterCards: document.getElementById("fighterCards"),
-          battleLog: document.getElementById("battleLog"),
-          tournamentPanel: document.getElementById("tournamentPanel"),
-          tournamentBracket: document.getElementById("tournamentBracket"),
-          tournamentPhase: document.getElementById("tournamentPhase"),
-          playerPanel: document.getElementById("playerPanel")
+            canvas: document.getElementById("arenaCanvas"),
+            overlay: document.getElementById("overlay"),
+            startButton: document.getElementById("startButton"),
+            matchupLabel: document.getElementById("matchupLabel"),
+            statusBadge: document.getElementById("statusBadge"),
+            fighterCards: document.getElementById("fighterCards"),
+            battleLog: document.getElementById("battleLog"),
+            tournamentPanel: document.getElementById("tournamentPanel"),
+            tournamentBracket: document.getElementById("tournamentBracket"),
+            tournamentPhase: document.getElementById("tournamentPhase"),
+            playerPanel: document.getElementById("playerPanel")
         };
 
         this.roster = createRoster();
@@ -54,117 +54,119 @@ export class BattleApp {
         this.ui.updateStatus("내 캐릭터 스탯을 배분하세요", "Setup");
         this.ui.hideOverlay();
         this.startPlayerPreviewLoop();
-      }
+    }
 
-      pickPlayerFighterId() {
+    pickPlayerFighterId() {
         return this.roster[Math.floor(Math.random() * this.roster.length)].id;
-      }
+    }
 
-      handlePlayerPanelClick(event) {
+    handlePlayerPanelClick(event) {
         const randomButton = event.target.closest?.("[data-random-stats]");
         if (randomButton) {
-          this.playerStatAllocation = createRandomStatAllocation();
-          this.refreshPlayerSetup();
-          return;
+            this.playerStatAllocation = createRandomStatAllocation();
+            this.refreshPlayerSetup();
+            return;
         }
 
         const button = event.target.closest?.("button[data-stat]");
         if (!button) {
-          return;
+            return;
         }
 
         const step = Number(button.dataset.step ?? 1);
         const delta = button.dataset.action === "increase" ? step : -step;
         this.playerStatAllocation = adjustStatAllocation(this.playerStatAllocation, button.dataset.stat, delta);
         this.refreshPlayerSetup();
-      }
+    }
 
-      refreshPlayerSetup() {
+    refreshPlayerSetup() {
         const remaining = getRemainingStatPoints(this.playerStatAllocation);
         const player = this.roster.find((fighter) => fighter.id === this.playerFighterId);
         this.ui.renderPlayerSetup({
-          fighter: player,
-          stats: ALLOCATABLE_STATS,
-          allocation: this.playerStatAllocation,
-          totalPoints: PLAYER_STAT_POINTS,
-          remainingPoints: remaining,
-          locked: Boolean(this.tournament && !this.tournament.champion)
+            fighter: player,
+            stats: ALLOCATABLE_STATS,
+            allocation: this.playerStatAllocation,
+            totalPoints: PLAYER_STAT_POINTS,
+            remainingPoints: remaining,
+            locked: Boolean(this.tournament && !this.tournament.champion)
         });
         this.mountSetupStartButton();
 
         if (!this.tournament || this.tournament.champion) {
-          this.elements.startButton.disabled = remaining > 0;
-          this.elements.startButton.textContent = this.tournament?.champion
-            ? "다시 시작"
-            : remaining > 0 ? `스탯 ${remaining} 남음` : "토너먼트 시작";
-          if (remaining === 0) {
-            this.scrollSetupActionsIntoView();
-          }
-          this.startPlayerPreviewLoop();
+            this.elements.startButton.disabled = remaining > 0;
+            this.elements.startButton.textContent = this.tournament?.champion
+                ? "다시 시작"
+                : remaining > 0
+                  ? `스탯 ${remaining} 남음`
+                  : "토너먼트 시작";
+            if (remaining === 0) {
+                this.scrollSetupActionsIntoView();
+            }
+            this.startPlayerPreviewLoop();
         }
-      }
+    }
 
-      scrollSetupActionsIntoView() {
+    scrollSetupActionsIntoView() {
         if (!this.elements.playerPanel) {
-          return;
+            return;
         }
 
         this.elements.playerPanel.scrollTop = this.elements.playerPanel.scrollHeight;
-      }
+    }
 
-      mountSetupStartButton() {
+    mountSetupStartButton() {
         if (this.tournament && !this.tournament.champion) {
-          return;
+            return;
         }
 
         const actions = this.elements.playerPanel?.querySelector?.("[data-player-actions]");
         if (actions) {
-          actions.appendChild(this.elements.startButton);
+            actions.appendChild(this.elements.startButton);
         }
-      }
+    }
 
-      renderPlayerPreview() {
+    renderPlayerPreview() {
         if (this.tournament && !this.tournament.champion) {
-          return;
+            return;
         }
 
         const player = this.roster.find((fighter) => fighter.id === this.playerFighterId);
         this.renderer.renderPlayerPreview(player);
-      }
+    }
 
-      startPlayerPreviewLoop() {
+    startPlayerPreviewLoop() {
         if (this.previewRafId || (this.tournament && !this.tournament.champion)) {
-          return;
+            return;
         }
 
         const tick = () => {
-          if (this.tournament && !this.tournament.champion) {
-            this.previewRafId = 0;
-            return;
-          }
+            if (this.tournament && !this.tournament.champion) {
+                this.previewRafId = 0;
+                return;
+            }
 
-          this.renderPlayerPreview();
-          this.previewRafId = requestAnimationFrame(tick);
+            this.renderPlayerPreview();
+            this.previewRafId = requestAnimationFrame(tick);
         };
         tick();
-      }
+    }
 
-      stopPlayerPreviewLoop() {
+    stopPlayerPreviewLoop() {
         if (!this.previewRafId) {
-          return;
+            return;
         }
 
         cancelAnimationFrame(this.previewRafId);
         this.previewRafId = 0;
-      }
+    }
 
-      async startTournament() {
+    async startTournament() {
         const remaining = getRemainingStatPoints(this.playerStatAllocation);
         if (remaining > 0) {
-          this.ui.showOverlay("스탯 배분 필요", `${remaining} 포인트 남음`);
-          this.ui.addLog(`토너먼트 시작 전 스탯 ${remaining} 포인트를 더 배분해야 합니다.`);
-          this.refreshPlayerSetup();
-          return;
+            this.ui.showOverlay("스탯 배분 필요", `${remaining} 포인트 남음`);
+            this.ui.addLog(`토너먼트 시작 전 스탯 ${remaining} 포인트를 더 배분해야 합니다.`);
+            this.refreshPlayerSetup();
+            return;
         }
 
         this.audio.unlock();
@@ -186,33 +188,33 @@ export class BattleApp {
         this.ui.addLog(`내 캐릭터는 ${player.name}. 배분한 스탯으로 토너먼트에 참가합니다.`);
         this.ui.addLog("다른 캐릭터들도 같은 포인트를 랜덤으로 받은 뒤 대진표가 확정되었습니다.");
         await this.runNextTournamentMatch();
-      }
+    }
 
-      async runNextTournamentMatch() {
+    async runNextTournamentMatch() {
         if (!this.tournament) {
-          return;
+            return;
         }
 
         const nextMatch = this.tournament.nextMatch();
         if (!nextMatch) {
-          this.showTournamentChampion();
-          return;
+            this.showTournamentChampion();
+            return;
         }
 
         this.currentTournamentMatch = nextMatch;
         this.tournament.markActive(nextMatch);
         this.ui.renderTournament(this.tournament);
         await this.startMatch([nextMatch.a, nextMatch.b], { keepLog: true });
-      }
+    }
 
-      async startMatch(customMatch = null, options = {}) {
+    async startMatch(customMatch = null, options = {}) {
         this.audio.unlock();
         this.elements.startButton.disabled = true;
         this.elements.startButton.classList.add("hidden");
         this.resultSequenceAnnounced = false;
         this.matchFinalized = false;
         if (!options.keepLog) {
-          this.ui.resetLog();
+            this.ui.resetLog();
         }
 
         const match = customMatch ?? this.matchmaker.pick();
@@ -224,13 +226,13 @@ export class BattleApp {
         this.ui.addLog(`아레나가 ${match[0].title}와 ${match[1].title}의 능력을 감지했습니다.`);
 
         this.simulation = new BattleSimulation(match, {
-          onLog: (message) => this.ui.addLog(message),
-          onOvertime: () => {
-            this.ui.updateStatus(label, "Overtime");
-            this.showTransientOverlay("Overtime", "", 1250);
-            this.audio.play("overtime");
-          },
-          onSound: (type, intensity) => this.audio.play(type, intensity)
+            onLog: (message) => this.ui.addLog(message),
+            onOvertime: () => {
+                this.ui.updateStatus(label, "Overtime");
+                this.showTransientOverlay("Overtime", "", 1250);
+                this.audio.play("overtime");
+            },
+            onSound: (type, intensity) => this.audio.play(type, intensity)
         });
 
         this.renderer.render(this.simulation);
@@ -243,19 +245,19 @@ export class BattleApp {
         this.lastTime = performance.now();
         cancelAnimationFrame(this.rafId);
         this.rafId = requestAnimationFrame((time) => this.loop(time));
-      }
+    }
 
-      showTransientOverlay(label, text, duration = 1200) {
+    showTransientOverlay(label, text, duration = 1200) {
         const token = String(++this.transientOverlayToken);
         this.ui.showTransientOverlay(label, text, token);
         window.setTimeout(() => {
-          if (this.elements.overlay.dataset.transientToken === token && !this.simulation?.finished) {
-            this.ui.hideOverlay();
-          }
+            if (this.elements.overlay.dataset.transientToken === token && !this.simulation?.finished) {
+                this.ui.hideOverlay();
+            }
         }, duration);
-      }
+    }
 
-      loop(timestamp) {
+    loop(timestamp) {
         const delta = Math.min(0.032, (timestamp - this.lastTime) / 1000 || 0.016);
         this.lastTime = timestamp;
         this.simulation.update(delta);
@@ -263,71 +265,78 @@ export class BattleApp {
         this.ui.updateLiveCards(this.simulation.fighters);
 
         if (this.simulation.finished) {
-          if (!this.resultSequenceAnnounced) {
-            this.resultSequenceAnnounced = true;
-            const loser = this.simulation.loser;
-            this.ui.updateStatus(loser ? `${loser.name} is down` : "Final impact", "KO");
-          }
+            if (!this.resultSequenceAnnounced) {
+                this.resultSequenceAnnounced = true;
+                const loser = this.simulation.loser;
+                this.ui.updateStatus(loser ? `${loser.name} is down` : "Final impact", "KO");
+            }
 
-          if (this.simulation.resultReady) {
-            this.finishMatch();
+            if (this.simulation.resultReady) {
+                this.finishMatch();
+                return;
+            }
+
+            this.rafId = requestAnimationFrame((time) => this.loop(time));
             return;
-          }
-
-          this.rafId = requestAnimationFrame((time) => this.loop(time));
-          return;
         }
 
         this.rafId = requestAnimationFrame((time) => this.loop(time));
-      }
+    }
 
-      finishMatch() {
+    finishMatch() {
         if (this.matchFinalized) {
-          return;
+            return;
         }
 
         this.matchFinalized = true;
         const winner = this.simulation.winner;
         const loser = this.simulation.loser ?? this.simulation.fighters.find((fighter) => fighter !== winner);
         if (this.tournament && this.currentTournamentMatch) {
-          const winnerSpec =
-            [this.currentTournamentMatch.a, this.currentTournamentMatch.b].find((fighter) => fighter?.id === winner.id)
-            ?? this.tournamentRoster.find((fighter) => fighter.id === winner.id);
-          const playerWasInMatch = [this.currentTournamentMatch.a, this.currentTournamentMatch.b]
-            .some((fighter) => fighter?.id === this.playerFighterId);
-          const playerLost = playerWasInMatch && winnerSpec.id !== this.playerFighterId;
-          if (playerLost && !this.playerResult) {
-            this.playerResult = {
-              rankLabel: this.getPlayerRankLabel(this.currentTournamentMatch.roundIndex),
-              fighterName: [this.currentTournamentMatch.a, this.currentTournamentMatch.b]
-                .find((fighter) => fighter?.id === this.playerFighterId)?.name
-            };
-          }
-          this.tournament.complete(this.currentTournamentMatch, winnerSpec);
-          this.ui.renderTournament(this.tournament);
-          this.ui.showOverlay(
-            playerLost ? "아쉽네요" : this.tournament.champion ? "Champion" : "Advances",
-            playerLost ? `${this.playerResult.fighterName} ${this.playerResult.rankLabel}` : winner.name
-          );
-          this.ui.updateStatus(
-            playerLost
-              ? `내 캐릭터는 ${this.playerResult.rankLabel}로 탈락`
-              : this.tournament.champion ? `${winner.name} is champion` : `${winner.name} advances`,
-            "Result"
-          );
-          this.ui.addLog(`${winner.name} defeats ${loser.name}.`);
-          if (playerLost) {
-            this.ui.addLog(`아쉽네요. 내 캐릭터 ${this.playerResult.fighterName}는 ${this.playerResult.rankLabel}입니다.`);
-          }
-          this.currentTournamentMatch = null;
+            const winnerSpec =
+                [this.currentTournamentMatch.a, this.currentTournamentMatch.b].find(
+                    (fighter) => fighter?.id === winner.id
+                ) ?? this.tournamentRoster.find((fighter) => fighter.id === winner.id);
+            const playerWasInMatch = [this.currentTournamentMatch.a, this.currentTournamentMatch.b].some(
+                (fighter) => fighter?.id === this.playerFighterId
+            );
+            const playerLost = playerWasInMatch && winnerSpec.id !== this.playerFighterId;
+            if (playerLost && !this.playerResult) {
+                this.playerResult = {
+                    rankLabel: this.getPlayerRankLabel(this.currentTournamentMatch.roundIndex),
+                    fighterName: [this.currentTournamentMatch.a, this.currentTournamentMatch.b].find(
+                        (fighter) => fighter?.id === this.playerFighterId
+                    )?.name
+                };
+            }
+            this.tournament.complete(this.currentTournamentMatch, winnerSpec);
+            this.ui.renderTournament(this.tournament);
+            this.ui.showOverlay(
+                playerLost ? "아쉽네요" : this.tournament.champion ? "Champion" : "Advances",
+                playerLost ? `${this.playerResult.fighterName} ${this.playerResult.rankLabel}` : winner.name
+            );
+            this.ui.updateStatus(
+                playerLost
+                    ? `내 캐릭터는 ${this.playerResult.rankLabel}로 탈락`
+                    : this.tournament.champion
+                      ? `${winner.name} is champion`
+                      : `${winner.name} advances`,
+                "Result"
+            );
+            this.ui.addLog(`${winner.name} defeats ${loser.name}.`);
+            if (playerLost) {
+                this.ui.addLog(
+                    `아쉽네요. 내 캐릭터 ${this.playerResult.fighterName}는 ${this.playerResult.rankLabel}입니다.`
+                );
+            }
+            this.currentTournamentMatch = null;
 
-          if (this.tournament.champion) {
-            this.showTournamentChampion();
+            if (this.tournament.champion) {
+                this.showTournamentChampion();
+                return;
+            }
+
+            window.setTimeout(() => this.runNextTournamentMatch(), 1450);
             return;
-          }
-
-          window.setTimeout(() => this.runNextTournamentMatch(), 1450);
-          return;
         }
 
         this.ui.showOverlay("Winner", winner.name);
@@ -338,55 +347,56 @@ export class BattleApp {
         this.elements.startButton.classList.remove("hidden");
         this.elements.startButton.disabled = false;
         this.refreshPlayerSetup();
-      }
+    }
 
-      getPlayerRankLabel(roundIndex) {
+    getPlayerRankLabel(roundIndex) {
         if (roundIndex === 2) {
-          return "2위";
+            return "2위";
         }
 
         if (roundIndex === 1) {
-          return "공동 3위";
+            return "공동 3위";
         }
 
         return "공동 5위";
-      }
+    }
 
-      showTournamentChampion() {
+    showTournamentChampion() {
         if (!this.tournament?.champion) {
-          return;
+            return;
         }
 
         const champion = this.tournament.champion;
         const player = this.tournamentRoster.find((fighter) => fighter.id === this.playerFighterId);
         const playerWon = champion.id === this.playerFighterId;
         if (playerWon) {
-          this.playerResult = { rankLabel: "1위", fighterName: champion.name };
+            this.playerResult = { rankLabel: "1위", fighterName: champion.name };
         }
 
         this.ui.renderTournament(this.tournament);
         this.ui.showOverlay(
-          playerWon ? "축하합니다!" : "토너먼트 종료",
-          playerWon ? `${champion.name} 우승` : `${player.name} ${this.playerResult?.rankLabel ?? "결과 확정"}`
+            playerWon ? "축하합니다!" : "토너먼트 종료",
+            playerWon ? `${champion.name} 우승` : `${player.name} ${this.playerResult?.rankLabel ?? "결과 확정"}`
         );
         this.ui.updateStatus(
-          playerWon ? `내 캐릭터 ${champion.name} 우승` : `내 캐릭터 ${player.name} ${this.playerResult?.rankLabel ?? ""}`,
-          "Result"
+            playerWon
+                ? `내 캐릭터 ${champion.name} 우승`
+                : `내 캐릭터 ${player.name} ${this.playerResult?.rankLabel ?? ""}`,
+            "Result"
         );
         this.ui.addLog(`${champion.name} takes the whole bracket.`);
         this.ui.addLog(
-          playerWon
-            ? `축하합니다! 내 캐릭터 ${champion.name}가 토너먼트에서 우승했습니다.`
-            : `아쉽네요. 내 캐릭터 ${player.name}의 최종 성적은 ${this.playerResult?.rankLabel ?? "기록 없음"}입니다.`
+            playerWon
+                ? `축하합니다! 내 캐릭터 ${champion.name}가 토너먼트에서 우승했습니다.`
+                : `아쉽네요. 내 캐릭터 ${player.name}의 최종 성적은 ${this.playerResult?.rankLabel ?? "기록 없음"}입니다.`
         );
         this.elements.startButton.textContent = "다시 시작";
         this.elements.startButton.classList.remove("hidden");
         this.elements.startButton.disabled = false;
         this.refreshPlayerSetup();
-      }
-
-      wait(ms) {
-        return new Promise((resolve) => window.setTimeout(resolve, ms));
-      }
     }
 
+    wait(ms) {
+        return new Promise((resolve) => window.setTimeout(resolve, ms));
+    }
+}
