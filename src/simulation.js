@@ -33,6 +33,7 @@ export class BattleSimulation {
         this.resultAnimationTime = 0;
         this.resultReady = false;
         this.screenShake = null;
+        this.showDamageNumbers = true;
     }
 
     createSpawnPoints(count) {
