@@ -71,10 +71,18 @@ export class BattleSimulation extends Simulation {
         return Math.max(0, this.elapsed - this.overtimeStartsAt);
     }
 
+    /**
+     * 오버타임 전용 피해량 배율.
+     * 평소에는 1 (영향 없음), 오버타임 진입 후 1.35부터 서서히 증가해 최대 3까지 올라갑니다.
+     */
     getDamageMultiplier() {
         return this.isOvertime() ? Math.min(3, 1.35 + this.getOvertimeProgress() * 0.085) : 1;
     }
 
+    /**
+     * 오버타임 전용 속도 배율.
+     * 평소에는 1 (영향 없음), 오버타임 진입 후 1.12부터 서서히 증가해 최대 1.58까지 올라갑니다.
+     */
     getSpeedMultiplier() {
         return this.isOvertime() ? Math.min(1.58, 1.12 + this.getOvertimeProgress() * 0.026) : 1;
     }
