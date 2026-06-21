@@ -25,6 +25,12 @@ export const ALLOCATABLE_STATS = [
         label: "쿨타임",
         shortLabel: "CD",
         description: "스킬 쿨타임이 100/(100+스탯) 비율로 줄어듭니다."
+    },
+    {
+        key: "defense",
+        label: "방어력",
+        shortLabel: "DEF",
+        description: "받는 피해가 100/(100+스탯) 비율로 감소합니다."
     }
 ];
 
@@ -118,8 +124,8 @@ export function applyStatAllocation(fighter, allocation, isPlayer = false) {
 
     for (const stat of ALLOCATABLE_STATS) {
         const pts = allocation[stat.key] ?? 0;
-        if (stat.key === "skill") {
-            stats.skill = pts;
+        if (stat.key === "skill" || stat.key === "defense") {
+            stats[stat.key] = pts;
         } else {
             stats[stat.key] = Number((stats[stat.key] * (1 + pts / 100) * multiplier).toFixed(3));
         }

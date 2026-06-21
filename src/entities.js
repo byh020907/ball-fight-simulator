@@ -381,7 +381,9 @@ export class BattleBall {
         }
 
         const modifiers = this.getStatModifiers();
-        const actual = Math.max(1, amount * modifiers.defense);
+        const defensePts = this.statAllocation?.defense ?? 0;
+        const defenseReduction = 100 / (100 + defensePts);
+        const actual = Math.max(1, amount * modifiers.defense * defenseReduction);
         this.hp = Math.max(0, this.hp - actual);
         if (label !== "Wall Slam") {
             source?.simulation?.shakeScreen?.(0.16, Math.min(18, 7 + actual * 0.55));
