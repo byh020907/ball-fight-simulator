@@ -387,6 +387,11 @@ export class BattleBall {
         return this.ability?.getUiState?.() ?? { label: "Passive", progress: 1 };
     }
 
+    /** 매 update 프레임마다 초기화할 상태 */
+    initState() {
+        this.bounced = false;
+    }
+
     update(delta, simulation) {
         if (this.isDefeated) {
             return;
@@ -398,7 +403,7 @@ export class BattleBall {
             return;
         }
 
-        this.bounced = false;
+        this.initState();
 
         const target = simulation.getOpponent(this);
 
