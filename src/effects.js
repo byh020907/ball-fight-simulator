@@ -254,16 +254,18 @@ export class DamageNumber extends CombatEntity {
 
     draw(ctx) {
         const alpha = Math.max(0, this.life / this.maxLife);
+        const text = String(this.amount);
         ctx.save();
         ctx.globalAlpha = alpha;
         ctx.font = "900 " + this.fontSize + 'px Bahnschrift, "Segoe UI", sans-serif';
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.strokeStyle = "#000000";
-        ctx.lineWidth = Math.max(3, this.fontSize * 0.1);
-        ctx.strokeText(String(this.amount), this.position.x, this.position.y);
+
+        ctx.shadowColor = "rgba(0,0,0,0.4)";
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetY = 2;
         ctx.fillStyle = this.color;
-        ctx.fillText(String(this.amount), this.position.x, this.position.y);
+        ctx.fillText(text, this.position.x, this.position.y);
         ctx.restore();
     }
 }
