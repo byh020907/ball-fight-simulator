@@ -5,6 +5,7 @@
 ## 파일 위치
 
 - **데이터**: `src/patch-notes.js` — 실제 패치노트 내용을 수정하려면 이 파일을 편집하세요.
+- **유틸 함수**: `src/utils.js` — `getUnseenEntries()`, `dismissPatchNotes()` 등
 - **팝업 UI**: `index.html` (`.patch-overlay` 영역)
 - **스타일**: `src/styles.css` (`.patch-overlay` / `.patch-card` / `.patch-badge--*`)
 
@@ -14,7 +15,7 @@
 
 ### 1. `PATCH_NOTES` 배열에 새 항목 추가
 
-`PATCH_NOTES`는 누적 배열입니다. 새 패치노트는 **배열 끝**에 `{ version, date, title, changes }`를 추가하세요.
+`PATCH_NOTES`는 누적 배열입니다. 새 패치노트는 **배열 맨 앞**에 `{ version, date, title, changes }`를 추가하세요. (최신 버전이 항상 위에 오도록)
 
 ```js
 {
@@ -81,7 +82,7 @@
 
 1. 앱 초기화 시 `src/ui.js`의 `appStore.init()`가 `getUnseenEntries()` 호출
 2. `getUnseenEntries()`는 쿠키 `ballfight_patch` 값 이후의 `PATCH_NOTES` 배열 항목만 반환
-3. 반환된 항목이 있으면 `patchNotesVisible = true` → 팝업에 **못 본 버전 모두** 표시 (오래된 순)
+3. 반환된 항목이 있으면 `patchNotesVisible = true` → 팝업에 **못 본 버전 모두** 표시 (최신순)
 4. 유저가 "확인" 클릭 → `dismissPatchNotes()` → 쿠키에 **가장 최신 버전** 저장 → 팝업 숨김
 5. 다음 방문 시 쿠키 버전보다 새로운 항목이 없으면 팝업 없음
 
