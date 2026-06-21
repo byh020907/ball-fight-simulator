@@ -23,6 +23,17 @@ import {
     SwordNightAbility
 } from "./abilities/index.js";
 
+const ABILITY_MAP = {
+    archer: ArcherAbility,
+    orbit: OrbitAbility,
+    trickster: TricksterAbility,
+    grenade: GrenadeAbility,
+    dash: DashAbility,
+    rage: RageAbility,
+    eater: EaterAbility,
+    sword_night: SwordNightAbility
+};
+
 // ── Alpine.js x-data function ───────────────────────────────────────────────
 
 export function appStore() {
@@ -155,6 +166,13 @@ export class ArenaRenderer {
         const preview = new BattleBall(fighter, new Vector2(this.canvas.width / 2, this.canvas.height / 2 - 28));
         preview.velocity = new Vector2(0, 0);
         preview.radius = Math.round(preview.baseRadius * 1.35);
+
+        // Preview에도 ability를 바인딩하여 고유 표정/머리띠가 보이게 함
+        const AbilityClass = ABILITY_MAP[fighter.ability];
+        if (AbilityClass) {
+            preview.bindAbility(new AbilityClass(preview, {}));
+        }
+
         preview.draw(ctx);
 
         ctx.save();
@@ -256,17 +274,6 @@ export class UIController {
 
         // ability drawFace 재사용을 위한 fake ball
         const fakeBall = { radius: size / 2 - 2, position: { x: size / 2, y: size / 2 } };
-
-        const ABILITY_MAP = {
-            archer: ArcherAbility,
-            orbit: OrbitAbility,
-            trickster: TricksterAbility,
-            grenade: GrenadeAbility,
-            dash: DashAbility,
-            rage: RageAbility,
-            eater: EaterAbility,
-            sword_night: SwordNightAbility
-        };
 
         const AbilityClass = ABILITY_MAP[fighter.ability];
         if (AbilityClass) {
