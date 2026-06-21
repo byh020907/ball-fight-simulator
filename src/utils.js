@@ -32,17 +32,18 @@ export function setSeenVersion(version) {
     setCookie(COOKIE_PATCH, version);
 }
 
-/** PATCH_NOTES 배열에서 가장 최신 항목의 버전. */
+/** PATCH_NOTES 배열에서 가장 최신 항목의 버전 (맨 앞). */
 export function getLatestVersion() {
-    return PATCH_NOTES.length > 0 ? PATCH_NOTES[PATCH_NOTES.length - 1].version : "";
+    return PATCH_NOTES.length > 0 ? PATCH_NOTES[0].version : "";
 }
 
-/** 쿠키보다 새로운 항목만 반환 (오래된 순). */
+/** 쿠키보다 새로운 항목만 반환 (최신순, 배열 순서 유지). */
 export function getUnseenEntries() {
     const seen = getSeenVersion();
     if (!seen) return [...PATCH_NOTES];
     const idx = PATCH_NOTES.findIndex((e) => e.version === seen);
-    return idx >= 0 ? PATCH_NOTES.slice(idx + 1) : [...PATCH_NOTES];
+    // newest-first → entries before `idx` are newer than seen
+    return idx > 0 ? PATCH_NOTES.slice(0, idx) : [];
 }
 
 export function shouldShowPatchNotes() {

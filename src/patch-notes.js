@@ -13,11 +13,22 @@
 /**
  * @typedef {{ version:string, date:string, title:string, changes:Array<{type:string,text:string}> }} PatchEntry
  *
- * 누적 패치노트 목록. 가장 오래된 버전이 앞, 최신이 뒤.
+ * 누적 패치노트 목록. **맨 앞이 최신 버전**입니다.
  * 유저가 마지막으로 확인한 버전 이후의 항목만 팝업에 표시됩니다.
  * @type {PatchEntry[]}
  */
 export const PATCH_NOTES = [
+    {
+        version: "0.2.1",
+        date: "2026-06-21",
+        title: "v0.2.1 업데이트",
+        changes: [
+            { type: "feature", text: "게임 시스템 도움말 추가 — 우측 상단 ? 버튼을 눌러 확인하세요." },
+            { type: "refactor", text: "팝업 시스템을 Alpine 컴포넌트 기반으로 개선했습니다." },
+            { type: "fix", text: "고유 능력 설명을 실제 구현과 일치하도록 수정했습니다." },
+            { type: "style", text: "데미지 숫자 디자인을 개선했습니다." }
+        ]
+    },
     {
         version: "0.2.0",
         date: "2026-06-21",
@@ -28,17 +39,6 @@ export const PATCH_NOTES = [
             { type: "refactor", text: "UI 시스템을 Alpine.js 컴포넌트 기반으로 개선했습니다." },
             { type: "fix", text: "스탯 분배 화면에서 발생하던 스택 오버플로우 오류를 수정했습니다." },
             { type: "style", text: "데미지 숫자 폰트 및 디자인을 플랫 스타일로 개선했습니다." }
-        ]
-    },
-    {
-        version: "0.2.1",
-        date: "2026-06-21",
-        title: "v0.2.1 업데이트",
-        changes: [
-            { type: "feature", text: "게임 시스템 도움말 추가 — 우측 상단 ? 버튼을 눌러 확인하세요." },
-            { type: "refactor", text: "팝업 시스템을 Alpine 컴포넌트 기반으로 개선했습니다." },
-            { type: "fix", text: "고유 능력 설명을 실제 구현과 일치하도록 수정했습니다." },
-            { type: "style", text: "데미지 숫자 디자인을 개선했습니다." }
         ]
     }
 ];
