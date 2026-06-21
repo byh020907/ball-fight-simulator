@@ -17,15 +17,27 @@ export class ArcherAbility extends Ability {
     }
 
     update(delta, target) {
-        // Passive evade — steers away when opponent closes in
+        // Passive evade — steers perpendicular to opponent
         if (target && !target.isDefeated && !this.owner.swallowedState && !this.owner.wallSlamState) {
             const toTarget = Vector2.subtract(target.position, this.owner.position);
             const dist = toTarget.length();
-            if (dist < EVADE_RANGE && dist > 5) {
-                const approach = toTarget.normalize();
-                const dodgeDir = new Vector2(-approach.y, approach.x);
+            const towardOpponent = toTarget.normalize();
+            const myDir = this.owner.velocity.length() > 5 ? this.owner.velocity.clone().normalize() : null;
+            const movingToward = myDir ? myDir.x * towardOpponent.x + myDir.y * towardOpponent.y > 0 : true;
+
+            if (dist < EVADE_RANGE && dist > 5 && movingToward) {
+                const oppDir =
+                    target.velocity.length() > 5
+                        ? target.velocity.clone().normalize()
+                        : towardOpponent.clone().scale(-1);
+                const side =
+                    oppDir.x * (this.owner.position.y - target.position.y) -
+                    oppDir.y * (this.owner.position.x - target.position.x);
+                const perp = new Vector2(-towardOpponent.y, towardOpponent.x);
+                const dodgeDir = side > 0 ? perp : perp.scale(-1);
+
                 const intensity = (1 - dist / EVADE_RANGE) * EVADE_STRENGTH;
-                const current = this.owner.velocity.length() > 0 ? this.owner.velocity.clone().normalize() : dodgeDir;
+                const current = myDir ?? dodgeDir;
                 const blended = current.add(dodgeDir.scale(intensity)).normalize();
 
                 if (this.owner.forcedHeading) {
