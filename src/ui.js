@@ -104,7 +104,12 @@ export function appStore() {
 
         _syncSummary() {
             const m = formatStatAllocation(this.allocation);
-            const vals = [this.allocation.hp ?? 0, this.allocation.damage ?? 0, this.allocation.speed ?? 0];
+            const vals = [
+                this.allocation.hp ?? 0,
+                this.allocation.damage ?? 0,
+                this.allocation.speed ?? 0,
+                this.allocation.skill ?? 0
+            ];
             const mult = calculateStatMultiplier(vals).multiplier;
             this.allocationSummary = m + "  \u00D7" + mult.toFixed(3);
         }
@@ -344,7 +349,7 @@ export class UIController {
             const fighter = fighters.find((f) => f.id === card.id || f.name === card.name);
             if (!fighter) return card;
             const alloc = fighter.statAllocation ?? {};
-            const pts = [alloc.hp ?? 0, alloc.damage ?? 0, alloc.speed ?? 0];
+            const pts = [alloc.hp ?? 0, alloc.damage ?? 0, alloc.speed ?? 0, alloc.skill ?? 0];
             const mult = calculateStatMultiplier(pts).multiplier;
             return {
                 ...card,
