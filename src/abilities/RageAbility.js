@@ -5,11 +5,17 @@ export class RageAbility extends Ability {
         super(owner, simulation);
         this.particleTimer = 0;
         this.timeWithoutCollision = 0;
-        this.maxChargeTime = 7.0;
+        this._baseMaxChargeTime = 7.0;
+    }
+
+    getMaxChargeTime() {
+        const skill = this.owner.statAllocation?.skill ?? 0;
+        const factor = Math.max(0.1, 1 - skill / 100);
+        return this._baseMaxChargeTime * factor;
     }
 
     update(delta) {
-        this.timeWithoutCollision = Math.min(this.maxChargeTime, this.timeWithoutCollision + delta);
+        this.timeWithoutCollision = Math.min(this.getMaxChargeTime(), this.timeWithoutCollision + delta);
         if (this.getChargeProgress() > 0.22) {
             this.particleTimer -= delta;
             if (this.particleTimer <= 0) {
@@ -36,7 +42,7 @@ export class RageAbility extends Ability {
     }
 
     getChargeProgress() {
-        return Math.max(0, Math.min(1, this.timeWithoutCollision / this.maxChargeTime));
+        return Math.max(0, Math.min(1, this.timeWithoutCollision / this.getMaxChargeTime()));
     }
 
     isCharged() {
