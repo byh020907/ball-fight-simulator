@@ -383,6 +383,9 @@ export class BattleBall {
         if (label !== "Crash") {
             source?.simulation?.playSound?.("hit", Math.min(1.8, 0.7 + actual / 18));
         }
+        if (actual >= 1 && label !== "Wall Slam" && label !== "Crash") {
+            source?.simulation?.spawnDamageNumber?.(this.position.clone(), Math.round(actual), this.color);
+        }
         if (actual >= 10) {
             source?.simulation?.addLog?.(`${label} lands on ${this.name} for ${Math.round(actual)} damage.`);
         }

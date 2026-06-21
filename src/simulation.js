@@ -9,7 +9,7 @@ import {
     DashAbility
 } from "./abilities/index.js";
 import { ArrowProjectile, BattleBall, Grenade, SeedOrb } from "./entities.js";
-import { DeathBurstEffect, GravityParticle, OrbitHitEffect, SlashTrail, VisualBurst } from "./effects.js";
+import { DeathBurstEffect, GravityParticle, OrbitHitEffect, SlashTrail, VisualBurst, DamageNumber } from "./effects.js";
 
 export class BattleSimulation {
     constructor(fighterSpecs, hooks) {
@@ -519,5 +519,10 @@ export class BattleSimulation {
 
     playSound(type, intensity = 1) {
         this.hooks.onSound?.(type, intensity);
+    }
+
+    spawnDamageNumber(position, amount, color = "#ff3333") {
+        if (!this.showDamageNumbers) return;
+        this.entities.push(new DamageNumber(position, amount, color));
     }
 }

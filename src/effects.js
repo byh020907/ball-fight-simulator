@@ -232,3 +232,36 @@ export class SlashTrail extends CombatEntity {
         ctx.restore();
     }
 }
+
+/** Floating damage number that rises and fades. */
+export class DamageNumber extends CombatEntity {
+    constructor(position, amount, color = "#ff3333") {
+        super(position.clone(), new Vector2(0, -70), 0);
+        this.amount = amount;
+        this.color = color;
+        this.life = 0.9;
+        this.maxLife = this.life;
+        this.fontSize = Math.min(52, 20 + Math.floor(amount / 10) * 4);
+    }
+
+    update(delta) {
+        this.life -= delta;
+        this.position.add(this.velocity.clone().scale(delta));
+        if (this.life <= 0) this.isExpired = true;
+    }
+
+    draw(ctx) {
+        const alpha = Math.max(0, this.life / this.maxLife);
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.font = "900 " + this.fontSize + 'px Bahnschrift, "Segoe UI", sans-serif';
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.strokeStyle = "#000000";
+        ctx.lineWidth = Math.max(3, this.fontSize * 0.1);
+        ctx.strokeText(String(this.amount), this.position.x, this.position.y);
+        ctx.fillStyle = this.color;
+        ctx.fillText(String(this.amount), this.position.x, this.position.y);
+        ctx.restore();
+    }
+}
