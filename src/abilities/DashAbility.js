@@ -1,7 +1,7 @@
 import { Vector2 } from '../core.js';
 import { Ability } from './Ability.js';
 
-export class FrostySwordAbility extends Ability {
+export class DashAbility extends Ability {
       constructor(owner, simulation) {
         super(owner, simulation);
         this.baseCooldown = 3;

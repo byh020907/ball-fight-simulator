@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import {
   PLAYER_STAT_POINTS,
   adjustStatAllocation,
@@ -179,21 +179,21 @@ async function loadModuleApp() {
 
 async function testCloneSeedDash(app) {
   await app.startMatch([
-    app.roster.find((fighter) => fighter.id === "clone"),
+    app.roster.find((fighter) => fighter.id === "trickster"),
     app.roster.find((fighter) => fighter.id === "orbit")
   ]);
-  const [clone, opponent] = app.simulation.fighters;
-  clone.position.x = 200;
-  clone.position.y = 480;
+  const [trickster, opponent] = app.simulation.fighters;
+  trickster.position.x = 200;
+  trickster.position.y = 480;
   opponent.position.x = 640;
   opponent.position.y = 480;
   app.simulation.entities = [];
-  clone.ability.timer = 0;
-  clone.ability.update(0.016, opponent);
+  trickster.ability.timer = 0;
+  trickster.ability.update(0.016, opponent);
   const seeds = app.simulation.entities.filter((entity) => entity.constructor.name === "SeedOrb");
   assert.equal(seeds.length, 3, "Clone should launch three seeds");
   assert.ok(
-    seeds.every((seed) => seed.life === clone.ability.cooldown),
+    seeds.every((seed) => seed.life === trickster.ability.cooldown),
     "Clone seeds should live for the same duration as the seed cooldown"
   );
 
@@ -206,14 +206,14 @@ async function testCloneSeedDash(app) {
   });
   assert.deepEqual(gaps, [120, 120, 120], "Clone seeds should spread at 120 degree intervals");
 
-  seeds[1].update(clone.ability.cooldown - 0.01, app.simulation);
+  seeds[1].update(trickster.ability.cooldown - 0.01, app.simulation);
   assert.equal(seeds[1].isExpired, false, "Clone seed should stay alive before cooldown duration");
   seeds[1].update(0.02, app.simulation);
   assert.equal(seeds[1].isExpired, true, "Clone seed should expire at the seed cooldown duration");
 
   seeds[0].position = opponent.position.clone();
   seeds[0].update(0.016, app.simulation);
-  assert.ok(clone.dashState, "Clone should dash when any seed is collected");
+  assert.ok(trickster.dashState, "Clone should dash when any seed is collected");
   assert.equal(opponent.dashState, null, "The collector should not dash");
 }
 
@@ -266,22 +266,22 @@ async function testEaterFeast(app) {
 
 async function testRageBallMomentum(app) {
   await app.startMatch([
-    app.roster.find((fighter) => fighter.id === "berserker"),
+    app.roster.find((fighter) => fighter.id === "rage"),
     app.roster.find((fighter) => fighter.id === "orbit")
   ]);
-  const [berserker, opponent] = app.simulation.fighters;
-  const initialSpeed = berserker.ability.getStatModifiers().speed;
-  berserker.ability.update(7.5, opponent);
-  const chargedSpeed = berserker.ability.getStatModifiers().speed;
+  const [rage, opponent] = app.simulation.fighters;
+  const initialSpeed = rage.ability.getStatModifiers().speed;
+  rage.ability.update(7.5, opponent);
+  const chargedSpeed = rage.ability.getStatModifiers().speed;
   assert.ok(initialSpeed < 1, "Rage Ball should start slower than normal");
   assert.ok(chargedSpeed > 1.7, "Rage Ball should gain speed while avoiding collision");
-  berserker.ability.onCollision(opponent);
-  assert.equal(berserker.ability.getChargeProgress(), 0, "Rage Ball collision should reset momentum");
+  rage.ability.onCollision(opponent);
+  assert.equal(rage.ability.getChargeProgress(), 0, "Rage Ball collision should reset momentum");
 }
 
 async function testDashBallCooldownDash(app) {
   await app.startMatch([
-    app.roster.find((fighter) => fighter.id === "frosty"),
+    app.roster.find((fighter) => fighter.id === "dash"),
     app.roster.find((fighter) => fighter.id === "archer")
   ]);
   const [dashBall, target] = app.simulation.fighters;

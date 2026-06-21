@@ -1,6 +1,6 @@
 import { Ability } from './Ability.js';
 
-export class BerserkerAbility extends Ability {
+export class RageAbility extends Ability {
       constructor(owner, simulation) {
         super(owner, simulation);
         this.particleTimer = 0;

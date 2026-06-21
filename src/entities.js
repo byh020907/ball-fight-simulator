@@ -429,7 +429,7 @@ export class BattleBall {
           }
         }
 
-        if (this.id === "berserker" && this.ability?.isCharged?.()) {
+        if (this.id === "rage" && this.ability?.isCharged?.()) {
           const charge = this.ability.getChargeProgress();
           const pulse = 1 + Math.sin(performance.now() / 70) * (0.04 + charge * 0.08);
           ctx.strokeStyle = "#ff421a";
@@ -554,7 +554,7 @@ export class BattleBall {
             dotEye(0.23, -0.08, 0.055);
             arc(0, 0.18, 0.12, 0.1, Math.PI - 0.1);
             break;
-          case "clone":
+          case "trickster":
             dotEye(-0.25, -0.08, 0.047);
             eye(0.25, -0.08, 0.07);
             arc(-0.1, 0.18, 0.16, 0.15, Math.PI - 0.15);
@@ -567,14 +567,14 @@ export class BattleBall {
             sharpEye(0.22, 0, -1, 0.09);
             line([[-0.22, 0.28], [-0.07, 0.22], [0.08, 0.29], [0.24, 0.22]]);
             break;
-          case "frosty":
+          case "dash":
             line([[-0.34, -0.16], [-0.1, -0.16]]);
             line([[0.1, -0.16], [0.34, -0.16]]);
             sharpEye(-0.22, -0.02, 0.3, 0.075);
             sharpEye(0.22, -0.02, -0.3, 0.075);
             line([[-0.22, 0.26], [0.22, 0.18]]);
             break;
-          case "berserker": {
+          case "rage": {
             const growl = this.ability?.getChargeProgress?.() ?? 0;
             line([[-0.38, -0.24], [-0.12, -0.08]]);
             line([[0.38, -0.24], [0.12, -0.08]]);

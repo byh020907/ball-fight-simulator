@@ -21,13 +21,13 @@ export function createRoster() {
             stats: { hp: 102, damage: 1, speed: 308, radius: 48, mass: 1.1 }
           },
           {
-            id: "clone",
+            id: "trickster",
             name: "Trickster Ball",
             title: "Seed Gamble",
             description: "분신을 전방으로 쏘아 상대를 압박하는 속임수형 전투 공입니다.",
             color: "#d99cff",
-            face: "clone",
-            ability: "clone",
+            face: "trickster",
+            ability: "trickster",
             stats: { hp: 98, damage: 1.02, speed: 320, radius: 46, mass: 1.02 }
           },
           {
@@ -41,23 +41,23 @@ export function createRoster() {
             stats: { hp: 108, damage: 1.08, speed: 278, radius: 49, mass: 1.18 }
           },
           {
-            id: "frosty",
+            id: "dash",
             name: "Dash Ball",
             title: "Cooldown Dash",
             description: "벽에 닿기 전까지 직선 대시를 유지하고, 적중하면 남은 쿨타임이 절반으로 줄어듭니다.",
             color: "#8ee8d7",
-            face: "frosty",
-            ability: "frostySword",
+            face: "dash",
+            ability: "dash",
             stats: { hp: 110, damage: 0.92, speed: 294, radius: 49, mass: 1.16 }
           },
           {
-            id: "berserker",
+            id: "rage",
             name: "Rage Ball",
             title: "Visible Rage",
             description: "체력이 낮아질수록 속도와 충돌 화력이 폭발적으로 올라갑니다.",
             color: "#ffae6e",
-            face: "berserker",
-            ability: "berserker",
+            face: "rage",
+            ability: "rage",
             stats: { hp: 124, damage: 1.02, speed: 238, radius: 51, mass: 1.28 }
           },
           {
@@ -71,4 +71,6 @@ export function createRoster() {
             stats: { hp: 118, damage: 0.98, speed: 268, radius: 52, mass: 1.34 }
           }
         ];
+
 }
+

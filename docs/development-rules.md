@@ -70,3 +70,47 @@ Tested: npm test, npm run check
 - GitHub Pages는 `main` 브랜치의 root 배포를 기준으로 합니다.
 - `.nojekyll`은 유지합니다.
 - 배포 URL은 `https://byh020907.github.io/ball-fight-simulator/`입니다.
+
+## 개발 환경 시행착오와 방지 규칙
+
+### Windows PowerShell 차이
+
+이 프로젝트는 Windows PowerShell을 기본 셸로 사용합니다. Linux/macOS와 명령어 차이가 있습니다.
+
+- `&&` 연산자는 PowerShell에서 지원하지 않습니다. 명령어 연결은 `;`(세미콜론)을 사용합니다.
+  ```powershell
+  # bad
+  cd path && git status
+  # good
+  cd path; git status
+  ```
+- `>` 리디렉션 출력이 예상과 다른 인코딩(UTF-16LE)으로 저장될 수 있으므로, 파일 복원 후 내용을 확인합니다.
+- `Get-Content` / `Set-Content`는 `-Encoding UTF8`을 명시해야 한글이 깨지지 않습니다.
+- `Select-String -SimpleMatch`로 단순 문자열 존재 여부를 확인할 수 있습니다.
+
+### `tests/regression.mjs` 보호
+
+`tests/regression.mjs`는 `src/simulation.js`와 import 경로가 유사해 실수로 덮어쓰기 쉽습니다. 특히 `single_find_and_replace`가 파일 경로를 잘못 지정하면 파일 전체가 다른 내용으로 대체될 수 있습니다.
+
+- `tests/regression.mjs` 수정 시 대상 경로를 다시 확인합니다.
+- 덮어써졌다면 `git checkout -- tests/regression.mjs`로 즉시 복원합니다.
+- 복원 후 id 참조(`"clone"` → `"trickster"`, `"berserker"` → `"rage"`, `"frosty"` → `"dash"`)와 변수명을 다시 적용합니다.
+
+### `single_find_and_replace` 도구 사용 시
+
+이 도구는 **들여쓰기와 공백까지 정확히 일치해야** 동작합니다. 실패하면 `read_file`로 실제 파일 내용을 다시 읽고 정확한 문자열을 확인합니다.
+
+### 파일명과 클래스명 변경 절차
+
+1. **새 파일 먼저 생성** — 기존 파일을 지우기 전에 새 파일을 만듭니다.
+2. **`src/abilities/index.js` 갱신** — 바로 새 파일을 export합니다.
+3. **참조하는 모든 파일 업데이트** — 아래를 빠짐없이 확인합니다.
+   - `src/simulation.js` — import 구문, `createAbility` 테이블
+   - `src/entities.js` — `this.id` 할당, `switch(ball.id)` case
+   - `src/roster.js` — `id`, `face`, `ability` 필드
+   - 그 외 해당 클래스를 import/참조하는 모든 파일
+4. **함수/클래스 선언을 실수로 지우지 않도록 `git diff`로 확인**
+   - `roster.js`는 전체 배열을 `export function createRoster()`로 감싸고 있습니다. `return [` 앞의 함수 선언과 끝의 `}`를 유지해야 합니다.
+5. **기존 파일 삭제** — 새 파일이 정상 참조됨을 확인한 후 삭제합니다.
+6. **`tests/regression.mjs`도 함께 업데이트** — id 참조와 변수명을 변경합니다.
+7. **`npm test`로 전체 회귀 테스트 통과 확인**

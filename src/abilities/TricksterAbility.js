@@ -1,7 +1,7 @@
 import { Vector2 } from '../core.js';
 import { Ability } from './Ability.js';
 
-export class CloneAbility extends Ability {
+export class TricksterAbility extends Ability {
       constructor(owner, simulation) {
         super(owner, simulation);
         this.cooldown = 6.4;

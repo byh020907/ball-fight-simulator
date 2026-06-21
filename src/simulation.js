@@ -1,5 +1,5 @@
 import { Vector2 } from './core.js';
-import { ArcherAbility, BerserkerAbility, CloneAbility, EaterAbility, FrostySwordAbility, GrenadeAbility, OrbitAbility } from './abilities/index.js';
+import { ArcherAbility, EaterAbility, GrenadeAbility, OrbitAbility, RageAbility, TricksterAbility, DashAbility } from './abilities/index.js';
 import { ArrowProjectile, BattleBall, Grenade, SeedOrb } from './entities.js';
 import { DeathBurstEffect, GravityParticle, OrbitHitEffect, SlashTrail, VisualBurst } from './effects.js';
 
@@ -52,10 +52,10 @@ export class BattleSimulation {
         const table = {
           archer: ArcherAbility,
           orbit: OrbitAbility,
-          clone: CloneAbility,
+          trickster: TricksterAbility,
           grenade: GrenadeAbility,
-          frostySword: FrostySwordAbility,
-          berserker: BerserkerAbility,
+          dash: DashAbility,
+          rage: RageAbility,
           eater: EaterAbility
         };
         const AbilityClass = table[type];
