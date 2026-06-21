@@ -260,7 +260,7 @@ async function testEaterFeast(app) {
     target.velocity.x = Math.abs(target.velocity.x) || 500;
     target.position.x = app.simulation.width + target.radius + 5;
     app.simulation.keepInsideArena(target);
-    assert.equal(beforeHp - target.hp, 8, "Wall bounce should deal wall slam damage");
+    assert.equal(beforeHp - target.hp, 7, "Wall bounce should deal wall slam damage (8 - 1 defense)");
     assert.ok(target.velocity.x < 0, "Wall bounce should reverse spat target direction");
     assert.ok(app.simulation.screenShake, "Wall slam should trigger screen shake");
     assert.ok(

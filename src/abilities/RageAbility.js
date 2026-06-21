@@ -54,7 +54,7 @@ export class RageAbility extends Ability {
         return {
             speed: 0.78 + charge * 4.22,
             damage: 0.96 + charge * 0.34,
-            defense: 0,
+            defense: 1,
             impact: 0.9 + charge * 0.62
         };
     }

@@ -75,7 +75,7 @@ export class EaterAbility extends Ability {
     }
 
     getStatModifiers() {
-        const def = this.isFeasting() ? 3 : 0;
+        const def = this.isFeasting() ? 3 : 1;
         return { speed: 0.95, damage: 1, defense: def, impact: 1 };
     }
 

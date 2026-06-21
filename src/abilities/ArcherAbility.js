@@ -131,7 +131,7 @@ export class ArcherAbility extends Ability {
     }
 
     getStatModifiers() {
-        return { speed: 0.95, damage: 1, defense: 0, impact: 1 };
+        return { speed: 0.95, damage: 1, defense: 1, impact: 1 };
     }
 
     draw(ctx) {
