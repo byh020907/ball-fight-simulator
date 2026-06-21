@@ -66,10 +66,8 @@
         <div class="test-app">
             <canvas id="c" width="500" height="500"></canvas>
             <div class="controls">
-                <button class="primary" id="btnDraw">활 당기기 (0.6s)</button>
-                <button id="btnRelease">발사</button>
-                <button id="btnTriple">트리플 샷</button>
-                <button id="btnReset">초기화</button>
+                <button class="primary" id="btnRelease">발사</button>
+                <button id="btnTriple">3발사</button>
             </div>
             <div class="status" id="status">준비</div>
         </div>
@@ -136,7 +134,14 @@
 
             // ── Custom hooks ────────────────────────────────────────────────
 
-            env.onUpdate = (dt) => ability.update(dt, target);
+            env.onUpdate = (dt) => {
+                ability.update(dt, target);
+                env.statusEl &&
+                    (env.statusEl.textContent =
+                        ability.windUp > 0
+                            ? `🏹 당기는 중... ${((1 - ability.windUp / 0.6) * 100).toFixed(0)}%`
+                            : "준비");
+            };
 
             env.onRender = (ctx) => {
                 // Guidance line during wind-up
@@ -152,13 +157,6 @@
                     ctx.stroke();
                     ctx.restore();
                 }
-
-                // Status text
-                env.statusEl &&
-                    (env.statusEl.textContent =
-                        ability.windUp > 0
-                            ? `🏹 당기는 중... ${((1 - ability.windUp / 0.6) * 100).toFixed(0)}%`
-                            : "준비");
 
                 // Top HUD
                 ctx.font = "700 14px Bahnschrift, sans-serif";
@@ -177,10 +175,6 @@
 
             // ── Buttons ──────────────────────────────────────────────────────
 
-            document.getElementById("btnDraw").addEventListener("click", () => {
-                ability.timer = 0;
-            });
-
             document.getElementById("btnRelease").addEventListener("click", () => {
                 ability.windUp = 0;
                 ability.release();
@@ -189,12 +183,6 @@
             document.getElementById("btnTriple").addEventListener("click", () => {
                 ability.missStreak = 3;
                 ability.timer = 0;
-            });
-
-            document.getElementById("btnReset").addEventListener("click", () => {
-                ability.windUp = 0;
-                ability.missStreak = 0;
-                ability.timer = ability.cooldown;
             });
 
             // ── Go ───────────────────────────────────────────────────────────
