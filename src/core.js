@@ -142,3 +142,46 @@ export function steerBallToward(ball, target, delta, opts = {}) {
         ball.forceHeading(heading, 0.1);
     }
 }
+
+/**
+ * 패시브 회피 — 상대가 일정 거리 이내로 접근하고, owner가 상대를 향해 이동 중일 때 발동합니다.
+ *
+ * 회피 방향: 상대 진행 방향 기준 owner의 위치에 따라 좌/우로 회피합니다.
+ * forceHeading을 사용해 Ball.update()에서 속도가 덮어써져도 유지됩니다.
+ *
+ * @param {import("./entities.js").BattleBall} owner - 회피할 볼
+ * @param {import("./entities.js").BattleBall} target - 접근하는 상대
+ * @param {number} range - 회피 발동 거리
+ * @param {number} strength - 회피 강도 (0~1)
+ */
+export function evadeTarget(owner, target, range, strength) {
+    if (!target || target.isDefeated || owner.swallowedState || owner.wallSlamState) return;
+
+    const toTarget = Vector2.subtract(target.position, owner.position);
+    const dist = toTarget.length();
+    if (dist >= range || dist <= 5) return;
+
+    const towardOpponent = toTarget.normalize();
+
+    const myDir = owner.velocity.length() > 5 ? owner.velocity.clone().normalize() : null;
+    const movingToward = myDir ? myDir.x * towardOpponent.x + myDir.y * towardOpponent.y > 0 : true;
+    if (!movingToward) return;
+
+    const oppDir =
+        target.velocity.length() > 5 ? target.velocity.clone().normalize() : towardOpponent.clone().scale(-1);
+
+    const side = oppDir.x * (owner.position.y - target.position.y) - oppDir.y * (owner.position.x - target.position.x);
+
+    const dodgeDir = side > 0 ? new Vector2(-oppDir.y, oppDir.x) : new Vector2(oppDir.y, -oppDir.x);
+
+    const intensity = (1 - dist / range) * strength;
+    const current = myDir ?? dodgeDir;
+    const blended = current.add(dodgeDir.scale(intensity)).normalize();
+
+    if (owner.forcedHeading) {
+        owner.forcedHeading.direction = blended;
+        owner.forcedHeading.effect.elapsed = 0;
+    } else {
+        owner.forceHeading(blended, 0.35);
+    }
+}

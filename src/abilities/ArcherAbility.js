@@ -1,10 +1,8 @@
-import { Vector2 } from "../core.js";
+import { Vector2, evadeTarget } from "../core.js";
 import { Ability } from "./Ability.js";
 
 const WINDUP = 0.6;
 const SPREAD_ANGLE = 0.22;
-const EVADE_RANGE = 320;
-const EVADE_STRENGTH = 0.7;
 
 export class ArcherAbility extends Ability {
     constructor(owner, simulation) {
@@ -80,54 +78,10 @@ export class ArcherAbility extends Ability {
     }
 
     /**
-     * 패시브 회피 — 상대가 일정 거리 이내로 접근하고,
-     * 내가 상대를 향해 이동 중일 때 발동합니다.
-     *
-     * 회피 방향:
-     *   상대 진행 방향(oppDir) 기준 내가 왼쪽에 있으면 → 상대의 왼쪽으로 회피
-     *   오른쪽에 있으면 → 상대의 오른쪽으로 회피
-     *
-     * forceHeading을 사용해 Ball.update()에서 속도가 덮어써져도 유지됩니다.
+     * 패시브 회피 — 상대가 접근하면 옆으로 자동 회피합니다.
      */
     _evade(target) {
-        if (!target || target.isDefeated || this.owner.swallowedState || this.owner.wallSlamState) return;
-
-        const toTarget = Vector2.subtract(target.position, this.owner.position);
-        const dist = toTarget.length();
-        if (dist >= EVADE_RANGE || dist <= 5) return;
-
-        const towardOpponent = toTarget.normalize();
-
-        // 내 이동 방향과 상대 방향의 내적으로 접근 여부 확인
-        const myDir = this.owner.velocity.length() > 5 ? this.owner.velocity.clone().normalize() : null;
-        const movingToward = myDir ? myDir.x * towardOpponent.x + myDir.y * towardOpponent.y > 0 : true;
-        if (!movingToward) return;
-
-        // 상대 진행 방향 (속도가 없으면 나→상대 반대 방향 사용)
-        const oppDir =
-            target.velocity.length() > 5 ? target.velocity.clone().normalize() : towardOpponent.clone().scale(-1);
-
-        // 2D 외적으로 내가 상대 진행방향 기준 어느 쪽에 있는지 판단
-        // 양수 = 왼쪽, 음수 = 오른쪽
-        const side =
-            oppDir.x * (this.owner.position.y - target.position.y) -
-            oppDir.y * (this.owner.position.x - target.position.x);
-
-        // 상대 기준 왼쪽(-oppDir.y, oppDir.x) 또는 오른쪽(oppDir.y, -oppDir.x)으로 회피
-        const dodgeDir = side > 0 ? new Vector2(-oppDir.y, oppDir.x) : new Vector2(oppDir.y, -oppDir.x);
-
-        // 거리가 가까울수록 회피 강도 증가
-        const intensity = (1 - dist / EVADE_RANGE) * EVADE_STRENGTH;
-        const current = myDir ?? dodgeDir;
-        const blended = current.add(dodgeDir.scale(intensity)).normalize();
-
-        // forceHeading으로 방향 유지 (Ball.update에서 덮어써지지 않음)
-        if (this.owner.forcedHeading) {
-            this.owner.forcedHeading.direction = blended;
-            this.owner.forcedHeading.effect.elapsed = 0;
-        } else {
-            this.owner.forceHeading(blended, 0.35);
-        }
+        evadeTarget(this.owner, target, 320, 0.7);
     }
 
     getStatModifiers() {
