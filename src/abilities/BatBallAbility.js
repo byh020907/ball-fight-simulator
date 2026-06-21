@@ -5,9 +5,9 @@ const ARC_ANGLE = (Math.PI * 2) / 3; // 120도
 const ARC_RANGE = 200;
 const SWEEP_SPEED = 2.5;
 const SLASH_DURATION = 0.3;
-const SWORD_LENGTH = 52;
-const HAND_OFFSET = 24;
-const SWORD_HANDLE = 12;
+const BAT_LENGTH = 54;
+const HAND_OFFSET = 22;
+const BAT_HANDLE = 14;
 
 function normalizeAngle(a) {
     while (a > Math.PI) a -= Math.PI * 2;
@@ -15,7 +15,7 @@ function normalizeAngle(a) {
     return a;
 }
 
-export class SwordNightAbility extends Ability {
+export class BatBallAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation);
         this._baseCooldown = 2.2;
@@ -88,7 +88,7 @@ export class SwordNightAbility extends Ability {
         this.simulation.addSparkBurst(this.owner.position.clone(), this.owner.color);
         this.simulation.addSparkBurst(target.position.clone(), "#ffffff");
         this.simulation.playSound("dash", 1.0);
-        this.simulation.addLog(`${this.owner.name} slashes ${target.name}!`);
+        this.simulation.addLog(`${this.owner.name} swings the bat at ${target.name}!`);
     }
 
     getStatModifiers() {
@@ -106,7 +106,7 @@ export class SwordNightAbility extends Ability {
         this._drawVisionArc(ctx, pos);
 
         // ── 검 ──
-        this._drawSword(ctx, time);
+        this._drawBat(ctx, time);
     }
 
     /** Slash 베기 궤적 애니메이션 */
@@ -182,100 +182,105 @@ export class SwordNightAbility extends Ability {
         ctx.restore();
     }
 
-    /** 검을 항상 들고 있는 모습 */
-    _drawSword(ctx, time) {
+    /** 방망이를 항상 들고 있는 모습 */
+    _drawBat(ctx, time) {
         const pos = this.owner.position;
         const r = this.owner.radius;
 
-        // 검 방향 — arcAngle 기준
-        // slash 중에는 휘두르는 방향으로 회전
-        let swordAngle = this.arcAngle;
+        // 방망이 방향 — arcAngle 기준
+        let batAngle = this.arcAngle;
         if (this.slashTimer > 0) {
             const progress = 1 - this.slashTimer / SLASH_DURATION;
-            swordAngle = this.slashStartAngle + (this.slashEndAngle - this.slashStartAngle) * progress;
+            batAngle = this.slashStartAngle + (this.slashEndAngle - this.slashStartAngle) * progress;
         } else {
-            // Idle — 검을 약간 떨림 (호흡)
             const idleBob = Math.sin(time * 3) * 0.04;
-            swordAngle += idleBob;
+            batAngle += idleBob;
         }
 
-        // 검 시작점 (공 표면에서 나가는 위치)
-        const hx = pos.x + Math.cos(swordAngle) * (r + HAND_OFFSET);
-        const hy = pos.y + Math.sin(swordAngle) * (r + HAND_OFFSET);
+        // 방망이 시작점 (공 표면)
+        const hx = pos.x + Math.cos(batAngle) * (r + HAND_OFFSET);
+        const hy = pos.y + Math.sin(batAngle) * (r + HAND_OFFSET);
 
-        // 검 끝점
-        const sx = hx + Math.cos(swordAngle) * SWORD_LENGTH;
-        const sy = hy + Math.sin(swordAngle) * SWORD_LENGTH;
+        // 방망이 끝 (배럴)
+        const bx = hx + Math.cos(batAngle) * BAT_LENGTH;
+        const by = hy + Math.sin(batAngle) * BAT_LENGTH;
 
         // 손잡이 끝
-        const handleEndX = hx - Math.cos(swordAngle) * SWORD_HANDLE;
-        const handleEndY = hy - Math.sin(swordAngle) * SWORD_HANDLE;
+        const handleEndX = hx - Math.cos(batAngle) * BAT_HANDLE;
+        const handleEndY = hy - Math.sin(batAngle) * BAT_HANDLE;
 
         ctx.save();
 
-        // 검날 — 메인 블레이드
-        ctx.strokeStyle = "#e0e0e0";
-        ctx.lineWidth = 6;
+        // 배럴 (두꺼운 부분) — 갈색 원통
+        ctx.strokeStyle = "#c4773a";
+        ctx.lineWidth = 9;
         ctx.lineCap = "round";
         ctx.beginPath();
         ctx.moveTo(hx, hy);
-        ctx.lineTo(sx, sy);
+        ctx.lineTo(bx, by);
         ctx.stroke();
 
-        // 검날 하이라이트 (중앙 흰선)
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 2;
+        // 배럴 하이라이트
+        ctx.strokeStyle = "#e8a86a";
+        ctx.lineWidth = 3;
         ctx.beginPath();
         ctx.moveTo(hx, hy);
-        ctx.lineTo(sx, sy);
+        ctx.lineTo(bx, by);
         ctx.stroke();
 
-        // 가드 (검과 손잡이 사이 십자가)
-        ctx.strokeStyle = "#cc9900";
-        ctx.lineWidth = 4;
-        ctx.lineCap = "butt";
-        const guardPerp = new Vector2(-Math.sin(swordAngle), Math.cos(swordAngle));
-        ctx.beginPath();
-        ctx.moveTo(hx + guardPerp.x * 8, hy + guardPerp.y * 8);
-        ctx.lineTo(hx - guardPerp.x * 8, hy - guardPerp.y * 8);
-        ctx.stroke();
-
-        // 손잡이
-        ctx.strokeStyle = "#8b4513";
+        // 손잡이 (가는 부분) — 검정 테이프
+        ctx.strokeStyle = "#222222";
         ctx.lineWidth = 5;
         ctx.beginPath();
         ctx.moveTo(hx, hy);
         ctx.lineTo(handleEndX, handleEndY);
         ctx.stroke();
 
-        // 손잡이 마감 (pommel)
-        ctx.fillStyle = "#cc9900";
+        // 그립 테이프 감긴 느낌
+        ctx.strokeStyle = "#444444";
+        ctx.lineWidth = 1.5;
+        for (let i = 0; i < 4; i++) {
+            const t = 0.15 + i * 0.22;
+            const tx = hx - Math.cos(batAngle) * BAT_HANDLE * t;
+            const ty = hy - Math.sin(batAngle) * BAT_HANDLE * t;
+            const perp = new Vector2(-Math.sin(batAngle), Math.cos(batAngle));
+            ctx.beginPath();
+            ctx.moveTo(tx + perp.x * 3, ty + perp.y * 3);
+            ctx.lineTo(tx - perp.x * 3, ty - perp.y * 3);
+            ctx.stroke();
+        }
+
+        // 손잡이 마감
+        ctx.fillStyle = "#111111";
         ctx.beginPath();
-        ctx.arc(handleEndX, handleEndY, 4, 0, Math.PI * 2);
+        ctx.arc(handleEndX, handleEndY, 3.5, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.restore();
     }
 
-    /** 기합띠를 맨 검사 얼굴 */
+    /** 캡 모자를 쓴 타자 얼굴 */
     drawFace(ctx, rotation, ball) {
         const { r } = this._faceContext(ball);
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
 
-        // 눈썹 (강인한 인상)
-        ctx.strokeStyle = "#202020";
-        ctx.lineWidth = Math.max(2.5, r * 0.06);
-        this._line(ctx, ball, [
-            [-0.32, -0.2],
-            [-0.14, -0.16]
-        ]);
-        this._line(ctx, ball, [
-            [0.32, -0.2],
-            [0.14, -0.16]
-        ]);
+        // 캡 모자 챙 (앞으로 튀어나온 부분)
+        ctx.strokeStyle = "#2244aa";
+        ctx.lineWidth = Math.max(5, r * 0.12);
+        ctx.beginPath();
+        ctx.arc(0, -0.08 * r, r * 0.52, -Math.PI * 0.85, -Math.PI * 0.15);
+        ctx.stroke();
 
-        // 날카로운 눈 (사선)
+        // 캡 모자 몸통 (둥그렇게 머리 감싸기)
+        ctx.strokeStyle = "#2244aa";
+        ctx.lineWidth = Math.max(4, r * 0.1);
+        ctx.beginPath();
+        ctx.arc(0, -0.06 * r, r * 0.48, Math.PI * 0.15, Math.PI * 0.85);
+        ctx.stroke();
+
+        // 눈 (집중하는 표정)
+        ctx.strokeStyle = "#202020";
         ctx.lineWidth = Math.max(3, r * 0.075);
         this._line(ctx, ball, [
             [-0.28, -0.08],
@@ -286,27 +291,11 @@ export class SwordNightAbility extends Ability {
             [0.12, -0.02]
         ]);
 
-        // 입 (약간 비웃는 표정)
+        // 입 (다짐한 표정)
         ctx.beginPath();
-        ctx.moveTo(-0.12 * r, 0.22 * r);
-        ctx.quadraticCurveTo(0, 0.32 * r, 0.14 * r, 0.2 * r);
+        ctx.moveTo(-0.1 * r, 0.24 * r);
+        ctx.lineTo(0.12 * r, 0.2 * r);
         ctx.stroke();
-
-        // 기합띠 (headband) — 이마를 가로지르는 띠
-        ctx.strokeStyle = "#ff4444";
-        ctx.lineWidth = Math.max(4, r * 0.1);
-        this._line(ctx, ball, [
-            [-0.52, -0.28],
-            [0.52, -0.28]
-        ]);
-
-        // 기합띠 끝 — 오른쪽에서 늘어뜨리기
-        ctx.lineWidth = Math.max(2.5, r * 0.06);
-        this._line(ctx, ball, [
-            [0.52, -0.28],
-            [0.62, -0.08],
-            [0.56, 0.02]
-        ]);
 
         return true;
     }

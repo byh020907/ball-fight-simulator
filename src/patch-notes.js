@@ -25,7 +25,11 @@ export const PATCH_NOTES = [
         changes: [
             {
                 type: "feature",
-                text: "신규 캐릭터 Sword Night 추가 — 120도 시야 범위가 좌우로 스캔하며 적을 베어 넉백을 줍니다."
+                text: "신규 캐릭터 Bat Ball 추가 — 120도 시야 범위가 좌우로 스캔하며 적을 휘둘러 넉백을 줍니다."
+            },
+            {
+                type: "refactor",
+                text: "Sword Night → Bat Ball 리브랜딩: 방망이 VFX, 캡 모자 얼굴로 변경"
             },
             {
                 type: "refactor",

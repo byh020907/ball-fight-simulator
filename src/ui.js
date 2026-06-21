@@ -20,7 +20,7 @@ import {
     DashAbility,
     RageAbility,
     EaterAbility,
-    SwordNightAbility
+    BatBallAbility
 } from "./abilities/index.js";
 
 const ABILITY_MAP = {
@@ -31,7 +31,7 @@ const ABILITY_MAP = {
     dash: DashAbility,
     rage: RageAbility,
     eater: EaterAbility,
-    sword_night: SwordNightAbility
+    bat_ball: BatBallAbility
 };
 
 // ── Alpine.js x-data function ───────────────────────────────────────────────
