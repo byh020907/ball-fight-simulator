@@ -105,7 +105,7 @@
             ball.velocity = new Vector2(0, 0);
             ball.simulation = sim;
             sim.fighters.push(ball);
-            // ball NOT added to sim.entities — drawn manually in onRender (auto-moves otherwise)
+            sim.entities.push(ball);
 
             const ability = new ArcherAbility(ball, sim);
             ball.ability = ability;
@@ -123,10 +123,6 @@
             };
 
             env.onRender = (ctx) => {
-                // Ball + bow (stationary — drawn manually)
-                ball.draw(ctx);
-                ability.draw(ctx);
-
                 // Top HUD
                 ctx.font = "700 14px Bahnschrift, sans-serif";
                 ctx.textAlign = "center";
