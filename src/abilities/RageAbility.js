@@ -53,6 +53,41 @@ export class RageAbility extends Ability {
         };
       }
 
+      draw(ctx) {
+        if (!this.isCharged()) {
+          return;
+        }
+
+        const pos = this.owner.position;
+        const r = this.owner.radius;
+        const charge = this.getChargeProgress();
+        const pulse = 1 + Math.sin(performance.now() / 70) * (0.04 + charge * 0.08);
+
+        ctx.save();
+        ctx.strokeStyle = "#ff421a";
+        ctx.lineWidth = 4 + charge * 4;
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, (r + 12 + charge * 16) * pulse, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = "#ffb450";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, (r + 22 + charge * 20) * pulse, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      drawFace(ctx, rotation, ball) {
+        const growl = this.getChargeProgress();
+        this._line(ctx, ball, [[-0.38, -0.24], [-0.12, -0.08]]);
+        this._line(ctx, ball, [[0.38, -0.24], [0.12, -0.08]]);
+        this._dotEye(ctx, ball, -0.22, 0, 0.052 + growl * 0.025);
+        this._dotEye(ctx, ball, 0.22, 0, 0.052 + growl * 0.025);
+        this._arc(ctx, ball, 0, 0.32, 0.2, Math.PI + 0.15, Math.PI * 2 - 0.15);
+        return true;
+      }
+
       getUiState() {
         return { label: "Momentum", progress: Math.max(0.08, this.getChargeProgress()) };
       }

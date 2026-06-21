@@ -1,4 +1,4 @@
-import { CombatEntity, FIGHTER_IDS, TimedEffect, Vector2 } from './core.js';
+import { CombatEntity, TimedEffect, Vector2 } from './core.js';
 
 export class SeedOrb extends CombatEntity {
       constructor(owner, position, velocity, life) {
@@ -400,85 +400,7 @@ export class BattleBall {
 
         this.drawFace(ctx, this.wallSlamState ? this.spinRotation : 0);
 
-        if (this.id === FIGHTER_IDS.ORBIT) {
-          const shards = this.ability?.getShardRenderStates?.() ?? [];
-          const fastOrbit = this.ability?.spinBurst > 0;
-          const missingCount = this.ability?.getMissingShardCount?.() ?? 0;
-          ctx.strokeStyle = fastOrbit ? "#ffea00" : "#243cff";
-          ctx.lineWidth = fastOrbit ? 5 : 3;
-          ctx.setLineDash(fastOrbit ? [16, 7] : missingCount > 0 ? [6, 13] : [8, 9]);
-          ctx.beginPath();
-          ctx.arc(this.position.x, this.position.y, this.radius + (this.ability?.orbitRadius ?? 44), 0, Math.PI * 2);
-          ctx.stroke();
-          ctx.setLineDash([]);
-          for (const shard of shards) {
-            const size = shard.refilling ? 8 + shard.progress * 10 : fastOrbit ? 22 : 16;
-            if (shard.refilling) {
-              ctx.strokeStyle = "#ffffff";
-              ctx.lineWidth = 2;
-              ctx.beginPath();
-              ctx.moveTo(this.position.x, this.position.y);
-              ctx.lineTo(shard.position.x, shard.position.y);
-              ctx.stroke();
-            }
-            ctx.fillStyle = shard.refilling ? "#ffffff" : fastOrbit ? "#ffea00" : "#ffcf24";
-            ctx.strokeStyle = "#202020";
-            ctx.lineWidth = 3;
-            ctx.fillRect(shard.position.x - size / 2, shard.position.y - size / 2, size, size);
-            ctx.strokeRect(shard.position.x - size / 2, shard.position.y - size / 2, size, size);
-          }
-        }
-
-        if (this.id === FIGHTER_IDS.RAGE && this.ability?.isCharged?.()) {
-          const charge = this.ability.getChargeProgress();
-          const pulse = 1 + Math.sin(performance.now() / 70) * (0.04 + charge * 0.08);
-          ctx.strokeStyle = "#ff421a";
-          ctx.lineWidth = 4 + charge * 4;
-          ctx.beginPath();
-          ctx.arc(this.position.x, this.position.y, (this.radius + 12 + charge * 16) * pulse, 0, Math.PI * 2);
-          ctx.stroke();
-          ctx.strokeStyle = "#ffb450";
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.arc(this.position.x, this.position.y, (this.radius + 22 + charge * 20) * pulse, 0, Math.PI * 2);
-          ctx.stroke();
-        }
-
-        if (this.id === FIGHTER_IDS.EATER && this.ability?.isFeasting?.()) {
-          const target = this.ability?.getMouthTarget?.();
-          const mouthAngle = target
-            ? Math.atan2(target.position.y - this.position.y, target.position.x - this.position.x)
-            : Math.atan2(this.velocity.y, this.velocity.x);
-          const mouthOpen = 0.5 + Math.sin(performance.now() / 95) * 0.12;
-
-          ctx.fillStyle = "#fafafa";
-          ctx.beginPath();
-          ctx.moveTo(this.position.x, this.position.y);
-          ctx.arc(
-            this.position.x,
-            this.position.y,
-            this.radius + 3,
-            mouthAngle - mouthOpen,
-            mouthAngle + mouthOpen
-          );
-          ctx.closePath();
-          ctx.fill();
-
-          ctx.strokeStyle = "#202020";
-          ctx.lineWidth = 5;
-          ctx.beginPath();
-          ctx.moveTo(this.position.x, this.position.y);
-          ctx.lineTo(
-            this.position.x + Math.cos(mouthAngle - mouthOpen) * (this.radius + 8),
-            this.position.y + Math.sin(mouthAngle - mouthOpen) * (this.radius + 8)
-          );
-          ctx.moveTo(this.position.x, this.position.y);
-          ctx.lineTo(
-            this.position.x + Math.cos(mouthAngle + mouthOpen) * (this.radius + 8),
-            this.position.y + Math.sin(mouthAngle + mouthOpen) * (this.radius + 8)
-          );
-          ctx.stroke();
-        }
+        this.ability?.draw?.(ctx);
 
         if (this.speedBoost && this.speedBoost.showRing !== false) {
           ctx.strokeStyle = this.speedBoost.color;
@@ -497,7 +419,6 @@ export class BattleBall {
         const y = this.position.y;
         const time = performance.now() / 1000;
         const bob = Math.sin(time * 5 + x * 0.01) * r * 0.025;
-        const blink = Math.sin(time * 2.6 + y * 0.01) > 0.93 ? 0.22 : 1;
 
         ctx.save();
         ctx.translate(x, y + bob);
@@ -508,32 +429,22 @@ export class BattleBall {
         ctx.fillStyle = "#202020";
         ctx.lineWidth = Math.max(3, r * 0.075);
 
-        const eye = (ex, ey, size = 0.08) => {
-          const half = size * r * 1.18;
-          const lift = size * r * 0.32 * blink;
-          ctx.beginPath();
-          ctx.moveTo(ex * r - half, ey * r + lift);
-          ctx.quadraticCurveTo(ex * r, ey * r - lift, ex * r + half, ey * r + lift);
-          ctx.stroke();
-        };
+        if (!this.ability?.drawFace?.(ctx, rotation, this)) {
+          this._drawDefaultFace(ctx);
+        }
+
+        ctx.restore();
+      }
+
+      _drawDefaultFace(ctx) {
+        const r = this.radius;
+        const time = performance.now() / 1000;
+        const blink = Math.sin(time * 2.6 + this.position.y * 0.01) > 0.93 ? 0.22 : 1;
+
         const dotEye = (ex, ey, size = 0.055) => {
           ctx.beginPath();
           ctx.ellipse(ex * r, ey * r, size * r, size * r * blink, 0, 0, Math.PI * 2);
           ctx.fill();
-        };
-        const sharpEye = (ex, ey, flip = 1, size = 0.12) => {
-          ctx.beginPath();
-          ctx.moveTo((ex - size) * r, (ey - 0.02 * flip) * r);
-          ctx.lineTo((ex + size) * r, (ey + 0.04 * flip) * r);
-          ctx.stroke();
-        };
-        const line = (points) => {
-          ctx.beginPath();
-          points.forEach(([px, py], index) => {
-            if (index === 0) ctx.moveTo(px * r, py * r);
-            else ctx.lineTo(px * r, py * r);
-          });
-          ctx.stroke();
         };
         const arc = (cx, cy, radius, start, end) => {
           ctx.beginPath();
@@ -541,59 +452,8 @@ export class BattleBall {
           ctx.stroke();
         };
 
-        switch (this.face) {
-          case "archer":
-            line([[-0.34, -0.2], [-0.12, -0.12]]);
-            line([[0.34, -0.2], [0.12, -0.12]]);
-            sharpEye(-0.23, -0.02, 1, 0.095);
-            sharpEye(0.23, -0.02, -1, 0.095);
-            line([[-0.18, 0.28], [0.2, 0.2]]);
-            break;
-          case "orbit":
-            dotEye(-0.23, -0.08, 0.055);
-            dotEye(0.23, -0.08, 0.055);
-            arc(0, 0.18, 0.12, 0.1, Math.PI - 0.1);
-            break;
-          case "trickster":
-            dotEye(-0.25, -0.08, 0.047);
-            eye(0.25, -0.08, 0.07);
-            arc(-0.1, 0.18, 0.16, 0.15, Math.PI - 0.15);
-            arc(0.18, 0.18, 0.16, 0.15, Math.PI - 0.15);
-            break;
-          case "grenade":
-            line([[-0.36, -0.2], [-0.12, -0.05]]);
-            line([[0.36, -0.2], [0.12, -0.05]]);
-            sharpEye(-0.22, 0, 1, 0.09);
-            sharpEye(0.22, 0, -1, 0.09);
-            line([[-0.22, 0.28], [-0.07, 0.22], [0.08, 0.29], [0.24, 0.22]]);
-            break;
-          case "dash":
-            line([[-0.34, -0.16], [-0.1, -0.16]]);
-            line([[0.1, -0.16], [0.34, -0.16]]);
-            sharpEye(-0.22, -0.02, 0.3, 0.075);
-            sharpEye(0.22, -0.02, -0.3, 0.075);
-            line([[-0.22, 0.26], [0.22, 0.18]]);
-            break;
-          case "rage": {
-            const growl = this.ability?.getChargeProgress?.() ?? 0;
-            line([[-0.38, -0.24], [-0.12, -0.08]]);
-            line([[0.38, -0.24], [0.12, -0.08]]);
-            dotEye(-0.22, 0, 0.052 + growl * 0.025);
-            dotEye(0.22, 0, 0.052 + growl * 0.025);
-            arc(0, 0.32, 0.2, Math.PI + 0.15, Math.PI * 2 - 0.15);
-            break;
-          }
-          case "eater":
-            dotEye(-0.22, -0.12, 0.06);
-            dotEye(0.22, -0.12, 0.06);
-            arc(0, 0.14, 0.24, 0.15, Math.PI - 0.15);
-            break;
-          default:
-            dotEye(-0.22, -0.08, 0.052);
-            dotEye(0.22, -0.08, 0.052);
-            arc(0, 0.16, 0.2, 0.1, Math.PI - 0.1);
-        }
-
-        ctx.restore();
+        dotEye(-0.22, -0.08, 0.052);
+        dotEye(0.22, -0.08, 0.052);
+        arc(0, 0.16, 0.2, 0.1, Math.PI - 0.1);
       }
     }

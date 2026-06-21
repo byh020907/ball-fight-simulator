@@ -76,6 +76,15 @@ export class DashAbility extends Ability {
         return this.baseCooldown * (0.5 ** this.cooldownLevel);
       }
 
+      drawFace(ctx, rotation, ball) {
+        this._line(ctx, ball, [[-0.34, -0.16], [-0.1, -0.16]]);
+        this._line(ctx, ball, [[0.1, -0.16], [0.34, -0.16]]);
+        this._sharpEye(ctx, ball, -0.22, -0.02, 0.3, 0.075);
+        this._sharpEye(ctx, ball, 0.22, -0.02, -0.3, 0.075);
+        this._line(ctx, ball, [[-0.22, 0.26], [0.22, 0.18]]);
+        return true;
+      }
+
       getUiState() {
         if (this.owner.dashState) {
           return { label: "Dash", progress: 1 };

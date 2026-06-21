@@ -25,6 +25,15 @@ export class ArcherAbility extends Ability {
         return { speed: 0.95, damage: 1, defense: 1, impact: 1 };
       }
 
+      drawFace(ctx, rotation, ball) {
+        this._line(ctx, ball, [[-0.34, -0.2], [-0.12, -0.12]]);
+        this._line(ctx, ball, [[0.34, -0.2], [0.12, -0.12]]);
+        this._sharpEye(ctx, ball, -0.23, -0.02, 1, 0.095);
+        this._sharpEye(ctx, ball, 0.23, -0.02, -1, 0.095);
+        this._line(ctx, ball, [[-0.18, 0.28], [0.2, 0.2]]);
+        return true;
+      }
+
       getUiState() {
         return { label: "Arrow", progress: Math.max(0, Math.min(1, 1 - this.timer / this.cooldown)) };
       }

@@ -125,6 +125,38 @@ export class EaterAbility extends Ability {
         this.swallowedTarget = null;
       }
 
+      draw(ctx) {
+        if (!this.isFeasting()) {
+          return;
+        }
+
+        const pos = this.owner.position;
+        const r = this.owner.radius;
+        const target = this.getMouthTarget();
+        const mouthAngle = target
+          ? Math.atan2(target.position.y - pos.y, target.position.x - pos.x)
+          : Math.atan2(this.owner.velocity.y, this.owner.velocity.x);
+        const mouthOpen = 0.5 + Math.sin(performance.now() / 95) * 0.12;
+
+        ctx.save();
+        ctx.fillStyle = "#fafafa";
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+        ctx.arc(pos.x, pos.y, r + 3, mouthAngle - mouthOpen, mouthAngle + mouthOpen);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = "#202020";
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+        ctx.lineTo(pos.x + Math.cos(mouthAngle - mouthOpen) * (r + 8), pos.y + Math.sin(mouthAngle - mouthOpen) * (r + 8));
+        ctx.moveTo(pos.x, pos.y);
+        ctx.lineTo(pos.x + Math.cos(mouthAngle + mouthOpen) * (r + 8), pos.y + Math.sin(mouthAngle + mouthOpen) * (r + 8));
+        ctx.stroke();
+        ctx.restore();
+      }
+
       isFeasting() {
         return this.feastTimer > 0 && !this.hasEatenThisFeast;
       }
@@ -148,6 +180,13 @@ export class EaterAbility extends Ability {
 
       getRadiusScale() {
         return Math.max(1, Math.min(2, this.radiusScale));
+      }
+
+      drawFace(ctx, rotation, ball) {
+        this._dotEye(ctx, ball, -0.22, -0.12, 0.06);
+        this._dotEye(ctx, ball, 0.22, -0.12, 0.06);
+        this._arc(ctx, ball, 0, 0.14, 0.24, 0.15, Math.PI - 0.15);
+        return true;
       }
 
       getUiState() {

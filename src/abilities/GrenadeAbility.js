@@ -38,6 +38,15 @@ export class GrenadeAbility extends Ability {
         this.simulation.addLog(`${this.owner.name}'s next grenade fuse shortens.`);
       }
 
+      drawFace(ctx, rotation, ball) {
+        this._line(ctx, ball, [[-0.36, -0.2], [-0.12, -0.05]]);
+        this._line(ctx, ball, [[0.36, -0.2], [0.12, -0.05]]);
+        this._sharpEye(ctx, ball, -0.22, 0, 1, 0.09);
+        this._sharpEye(ctx, ball, 0.22, 0, -1, 0.09);
+        this._line(ctx, ball, [[-0.22, 0.28], [-0.07, 0.22], [0.08, 0.29], [0.24, 0.22]]);
+        return true;
+      }
+
       getUiState() {
         return {
           label: this.missStreak > 0 ? `Fuse x${this.missStreak}` : "Grenade",

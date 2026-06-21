@@ -182,6 +182,48 @@ export class OrbitAbility extends Ability {
         return 1 - Math.pow(1 - clamped, 3);
       }
 
+      draw(ctx) {
+        const pos = this.owner.position;
+        const r = this.owner.radius;
+        const shards = this.getShardRenderStates() ?? [];
+        const fastOrbit = this.spinBurst > 0;
+        const missingCount = this.getMissingShardCount() ?? 0;
+
+        ctx.save();
+        ctx.strokeStyle = fastOrbit ? "#ffea00" : "#243cff";
+        ctx.lineWidth = fastOrbit ? 5 : 3;
+        ctx.setLineDash(fastOrbit ? [16, 7] : missingCount > 0 ? [6, 13] : [8, 9]);
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, r + (this.orbitRadius ?? 44), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        for (const shard of shards) {
+          const size = shard.refilling ? 8 + shard.progress * 10 : fastOrbit ? 22 : 16;
+          if (shard.refilling) {
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y);
+            ctx.lineTo(shard.position.x, shard.position.y);
+            ctx.stroke();
+          }
+          ctx.fillStyle = shard.refilling ? "#ffffff" : fastOrbit ? "#ffea00" : "#ffcf24";
+          ctx.strokeStyle = "#202020";
+          ctx.lineWidth = 3;
+          ctx.fillRect(shard.position.x - size / 2, shard.position.y - size / 2, size, size);
+          ctx.strokeRect(shard.position.x - size / 2, shard.position.y - size / 2, size, size);
+        }
+        ctx.restore();
+      }
+
+      drawFace(ctx, rotation, ball) {
+        this._dotEye(ctx, ball, -0.23, -0.08, 0.055);
+        this._dotEye(ctx, ball, 0.23, -0.08, 0.055);
+        this._arc(ctx, ball, 0, 0.18, 0.12, 0.1, Math.PI - 0.1);
+        return true;
+      }
+
       getUiState() {
         if (this.spinBurst > 0) {
           return { label: "Fast Orbit", progress: Math.max(0, Math.min(1, this.spinBurst / this.spinBurstDuration)) };

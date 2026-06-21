@@ -27,6 +27,14 @@ export class TricksterAbility extends Ability {
         this.simulation.addLog(`${this.owner.name} launches three dash seeds.`);
       }
 
+      drawFace(ctx, rotation, ball) {
+        this._dotEye(ctx, ball, -0.25, -0.08, 0.047);
+        this._eye(ctx, ball, 0.25, -0.08, 0.07);
+        this._arc(ctx, ball, -0.1, 0.18, 0.16, 0.15, Math.PI - 0.15);
+        this._arc(ctx, ball, 0.18, 0.18, 0.16, 0.15, Math.PI - 0.15);
+        return true;
+      }
+
       getUiState() {
         return { label: "Seeds", progress: Math.max(0, Math.min(1, 1 - this.timer / this.cooldown)) };
       }
