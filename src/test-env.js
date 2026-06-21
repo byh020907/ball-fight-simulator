@@ -1,8 +1,8 @@
 /**
- * Canvas + 애니메이션 루프 + entity render 파이프라인.
+ * Canvas + 애니메이션 루프 + Simulation.entities 렌더 파이프라인.
  *
- * 선택적으로 Simulation 인스턴스를 연결하면 sim.entities도 함께 렌더합니다.
- * sim을 연결해도 env.entities는 별도로 유지되며 onRender에서 추가 렌더 가능.
+ * 모든 엔티티는 Simulation.entities에서 관리되며,
+ * onUpdate / onRender 후크로 추가 로직을 주입합니다.
  *
  * 사용법:
  *   const env = new TestEnv(canvas, sim);
@@ -14,30 +14,23 @@
 export class TestEnv {
     /**
      * @param {HTMLCanvasElement} canvas
-     * @param {object} [sim] Optional Simulation (or mock) — its entities are rendered after env.entities.
+     * @param {object} sim Simulation whose entities are rendered each frame.
      */
     constructor(canvas, sim) {
         this.canvas = canvas;
         this.ctx = canvas.getContext("2d");
-        /** @type {Array<{draw?:(ctx:CanvasRenderingContext2D)=>void, update?:(dt:number, sim?:any)=>void}>} */
-        this.entities = [];
-        /** Optional Simulation whose entities are rendered each frame. */
-        this.sim = sim ?? null;
+        /** Simulation whose entities are rendered each frame. */
+        this.sim = sim;
         /** Optional status element to update each frame. */
         this.statusEl = null;
         this._lastTime = 0;
         this._animId = null;
     }
 
-    /** Register a renderable/updatable object. */
-    add(obj) {
-        this.entities.push(obj);
-    }
-
-    /** Called each frame before entity updates. Receives (dt). */
+    /** Called each frame. Receives (dt). */
     onUpdate(dt) {}
 
-    /** Called each frame after all entities are drawn. Receives (ctx, dt). */
+    /** Called after all sim entities are drawn. Receives (ctx, dt). */
     onRender(ctx, dt) {}
 
     /** Start the animation loop. */
@@ -63,9 +56,6 @@ export class TestEnv {
 
     _update(dt) {
         this.onUpdate(dt);
-        for (const e of this.entities) {
-            e.update?.(dt, this.sim);
-        }
     }
 
     _render(dt) {
@@ -74,19 +64,13 @@ export class TestEnv {
         ctx.fillStyle = "#fafafa";
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // 1. env entities (test-specific, e.g. target)
-        for (const e of this.entities) {
-            e.draw?.(ctx);
-        }
-
-        // 2. sim entities (fighters, projectiles, effects — all have draw)
+        // Render all sim entities (fighters, projectiles, effects, test objects)
         if (this.sim) {
             for (const e of this.sim.entities) {
                 e.draw?.(ctx);
             }
         }
 
-        // 3. custom overlay
         this.onRender(ctx, dt);
     }
 }
