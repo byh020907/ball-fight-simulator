@@ -209,14 +209,14 @@ export class BattleSimulation extends Simulation {
         );
         const sideExposure = 1 - defenderFacing;
 
-        // Speed efficiency: 0~1 (relative to attacker's own base speed)
-        const speedEff = Math.min(1, attackerSpeed / attacker.baseSpeed);
+        // Speed efficiency: relative to attacker's own base speed (최대 2배)
+        const speedEff = Math.min(2, attackerSpeed / attacker.baseSpeed);
         // Direction efficiency: 0~1 (alignment + hitting from the side)
         const dirEff = aimAlignment * 0.55 + sideExposure * 0.45;
         // Glancing blow penalty
         const glancingPenalty = aimAlignment < 0.22 ? 0.5 : 1;
-        // Combined efficiency: 0~1 (all factors multiplied)
-        const efficiency = Math.min(1, speedEff * dirEff * glancingPenalty);
+        // Combined efficiency (최대 2배, 빠른 속도가 추가 피해)
+        const efficiency = Math.min(2, speedEff * dirEff * glancingPenalty);
 
         return Math.max(1, Math.round(attacker.baseDamage * efficiency * this.getDamageMultiplier()));
     }
