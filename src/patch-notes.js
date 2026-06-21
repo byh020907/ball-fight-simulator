@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.2.1",
+        date: "2026-06-21",
+        title: "v0.2.1 업데이트",
+        changes: [
+            { type: "feature", text: "게임 시스템 도움말 추가 — 우측 상단 ? 버튼을 눌러 확인하세요." },
+            { type: "refactor", text: "팝업 시스템을 Alpine 컴포넌트 기반으로 개선했습니다." },
+            { type: "fix", text: "고유 능력 설명을 실제 구현과 일치하도록 수정했습니다." },
+            { type: "style", text: "데미지 숫자 디자인을 개선했습니다." }
+        ]
+    },
+    {
         version: "0.2.0",
         date: "2026-06-21",
         title: "v0.2.0 업데이트",
