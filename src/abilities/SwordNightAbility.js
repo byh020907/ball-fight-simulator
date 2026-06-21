@@ -76,10 +76,9 @@ export class SwordNightAbility extends Ability {
         this.slashStartAngle = this.arcAngle - ARC_ANGLE / 2;
         this.slashEndAngle = this.arcAngle + ARC_ANGLE / 2;
 
-        // 시각 효과 — 베기 궤적
-        const slashEnd = Vector2.add(this.owner.position, kbDir.clone().scale(ARC_RANGE));
-        this.simulation.spawnSlash(this.owner.position.clone(), slashEnd, this.owner.color);
-        this.simulation.spawnSlash(this.owner.position.clone(), target.position.clone(), "#ffffff");
+        // 시각 효과 — 아크 베기 + 충돌 스파크 (직선 SlashTrail 제거)
+        this.simulation.addSparkBurst(this.owner.position.clone(), this.owner.color);
+        this.simulation.addSparkBurst(target.position.clone(), "#ffffff");
         this.simulation.playSound("dash", 1.0);
         this.simulation.addLog(`${this.owner.name} slashes ${target.name}!`);
     }
@@ -149,20 +148,20 @@ export class SwordNightAbility extends Ability {
         const arcStart = this.arcAngle - ARC_ANGLE / 2;
         const arcEnd = this.arcAngle + ARC_ANGLE / 2;
 
-        // 평소에는 흐리게, slash 중에는 더 흐리게
+        // 평소에는 진하게, slash 중에는 약간 흐리게
         ctx.save();
         ctx.strokeStyle = this.owner.color;
-        ctx.globalAlpha = this.slashTimer > 0 ? 0.08 : 0.25;
-        ctx.lineWidth = 2;
-        ctx.setLineDash([6, 8]);
+        ctx.globalAlpha = this.slashTimer > 0 ? 0.18 : 0.45;
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([5, 7]);
         ctx.beginPath();
         ctx.arc(pos.x, pos.y, ARC_RANGE, arcStart, arcEnd);
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // arc 양 끝 선
-        ctx.globalAlpha = this.slashTimer > 0 ? 0.05 : 0.15;
-        ctx.lineWidth = 1.5;
+        // arc 양 끝 경계선
+        ctx.globalAlpha = this.slashTimer > 0 ? 0.12 : 0.3;
+        ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(pos.x, pos.y);
         ctx.lineTo(pos.x + Math.cos(arcStart) * ARC_RANGE, pos.y + Math.sin(arcStart) * ARC_RANGE);
