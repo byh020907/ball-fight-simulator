@@ -57,7 +57,9 @@ export class BattleApp {
     }
 
     pickPlayerFighterId() {
-        return this.roster[Math.floor(Math.random() * this.roster.length)].id;
+        // TODO: 임시 — Sword Night 테스트. 배포 전에 원래 random 로직으로 되돌릴 것
+        return "sword_night";
+        // return this.roster[Math.floor(Math.random() * this.roster.length)].id;
     }
 
     refreshPlayerSetup() {
