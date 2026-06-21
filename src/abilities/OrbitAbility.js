@@ -149,6 +149,12 @@ export class OrbitAbility extends Ability {
         this.volleyTimer -= delta;
 
         if (this.volleyActive) {
+            if (!target || target.isDefeated) {
+                this.volleyActive = false;
+                this.volleyIndex = 0;
+                this.volleyTimer = VOLLEY_COOLDOWN;
+                return;
+            }
             this.volleyStartTime -= delta;
             if (this.volleyStartTime <= 0 && this.volleyIndex < this.shardCount) {
                 this.fireShardAt(target);
@@ -175,6 +181,8 @@ export class OrbitAbility extends Ability {
 
     /** Fire one shard as a projectile toward the target. */
     fireShardAt(target) {
+        if (!target || target.isDefeated) return;
+
         const activeEntries = this.getActiveShardEntries();
         if (activeEntries.length === 0) return;
 
@@ -183,7 +191,8 @@ export class OrbitAbility extends Ability {
         this.shotProjectiles.push({
             position: entry.position.clone(),
             velocity: dir.scale(SHARD_SPEED),
-            life: 1.2
+            life: 1.2,
+            angle: Math.atan2(dir.y, dir.x)
         });
         this.consumeShard(entry.index);
         this.simulation.playSound("shoot", 0.6);
@@ -335,6 +344,20 @@ export class OrbitAbility extends Ability {
             ctx.fillRect(shard.position.x - size / 2, shard.position.y - size / 2, size, size);
             ctx.strokeRect(shard.position.x - size / 2, shard.position.y - size / 2, size, size);
         }
+
+        // Draw flying projectiles
+        for (const p of this.shotProjectiles) {
+            ctx.save();
+            ctx.translate(p.position.x, p.position.y);
+            ctx.rotate(p.angle ?? 0);
+            ctx.fillStyle = "#ffea00";
+            ctx.strokeStyle = "#202020";
+            ctx.lineWidth = 2;
+            ctx.fillRect(-8, -5, 16, 10);
+            ctx.strokeRect(-8, -5, 16, 10);
+            ctx.restore();
+        }
+
         ctx.restore();
     }
 
