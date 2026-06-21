@@ -295,6 +295,7 @@ export class BattleBall {
         this.swallowedState = null;
         this.wallSlamState = null;
         this.flags = {};
+        this.bounced = false;
         this.ability = null;
         this.isDefeated = false;
         this.isDestroyed = false;
@@ -397,6 +398,8 @@ export class BattleBall {
             return;
         }
 
+        this.bounced = false;
+
         const target = simulation.getOpponent(this);
 
         if (this.slowEffect) {
@@ -464,11 +467,8 @@ export class BattleBall {
             );
 
         this.position.add(this.velocity.clone().scale(delta));
-        if (knockbackVel && simulation.keepInsideArena(this)) {
-            this.forcedHeading = null;
-        } else if (!knockbackVel) {
-            simulation.keepInsideArena(this);
-        }
+        simulation.keepInsideArena(this);
+        if (knockbackVel && this.bounced) this.forcedHeading = null;
     }
 
     applySlow(duration, amount) {

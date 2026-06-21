@@ -69,20 +69,21 @@ export class Simulation {
             this.clearWallDash(ball);
         }
 
-        if (bounced && ball.wallSlamState && ball.wallSlamState.cooldown <= 0) {
-            ball.wallSlamState.cooldown = 0.18;
-            ball.takeDamage(ball.wallSlamState.damage, ball.wallSlamState.source, "Wall Slam");
-            this.spawnWallImpact(
-                wallPoint ?? ball.position.clone(),
-                wallNormal ?? ball.velocity.clone().normalize().scale(-1),
-                ball.wallSlamState.source?.color ?? ball.color
-            );
-            this.playSound("wall", 1.15);
-            this.shakeScreen(0.24, 16);
-            this.addLog(`${ball.name} takes wall slam damage.`);
+        if (bounced) {
+            ball.bounced = true;
+            if (ball.wallSlamState && ball.wallSlamState.cooldown <= 0) {
+                ball.wallSlamState.cooldown = 0.18;
+                ball.takeDamage(ball.wallSlamState.damage, ball.wallSlamState.source, "Wall Slam");
+                this.spawnWallImpact(
+                    wallPoint ?? ball.position.clone(),
+                    wallNormal ?? ball.velocity.clone().normalize().scale(-1),
+                    ball.wallSlamState.source?.color ?? ball.color
+                );
+                this.playSound("wall", 1.15);
+                this.shakeScreen(0.24, 16);
+                this.addLog(`${ball.name} takes wall slam damage.`);
+            }
         }
-
-        return bounced;
     }
 
     clearWallDash(ball) {
