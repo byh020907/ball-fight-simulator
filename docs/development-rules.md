@@ -64,6 +64,72 @@ npm run format:check
 }
 ```
 
+### 파일 길이 관리
+
+한 파일이 **1000줄**을 넘어가면 분리를 고려합니다. 단, 파일 성격에 따라 기준을 다르게 적용합니다.
+
+| 파일 성격 | 분리 기준 | 분리 방향 | 예시 |
+|---|---|---|---|
+| **데이터/설정** | 1000줄 넘어도 분리 불필요 | 값 추가만으로 유지보수에 지장 없으면 그대로 둠 | `roster.js`, `stat-allocation.js` |
+| **게임 로직/상태** | 700~1000줄에서 분리 검토 | 책임별로 클래스/모듈 분리 | `simulation.js`, `entities.js` |
+| **UI/렌더링** | 700~1000줄에서 분리 검토 | 컴포넌트나 역할 단위로 분리 | `ui.js` (Alpine store / UIController / ArenaRenderer) |
+| **능력(Ability)** | 각 Ability 파일은 개별 클래스이므로 1000줄까지 허용 | 능력 하나가 1000줄 넘으면 내부 책임 분리 | `OrbitAbility.js`, `RageAbility.js` |
+| **유틸리티** | 500줄 이상이면 분리 검토 | 함수 성격별 파일 분리 | `core.js`, `effects.js` |
+
+분리할 때는 아래 원칙을 따릅니다.
+
+- **행동 변경 없이**: 분리만 하고 로직이나 인터페이스를 바꾸지 않습니다.
+- **파일 간 import는 명시적으로**: `index.js` 배럴 파일을 사용해 외부 import 경로가 바뀌지 않게 합니다.
+- **분리 후 `npm test` 통과 확인**: 회귀 테스트로 동작이 유지됨을 검증합니다.
+
+## UI 아키텍처
+
+UI는 **Alpine.js**를 통해 컴포넌트 기반으로 관리됩니다.
+
+### 핵심 원칙
+
+- **문자열 결합 금지**: `innerHTML`로 HTML을 조립하지 않습니다.
+- **Alpine.js 템플릿**: `index.html`에 `x-text`, `x-for`, `x-bind`, `@click` 등의 Alpine.js 디렉티브를 사용합니다.
+- **반응형 상태**: `src/ui.js`의 `appStore()` 함수가 Alpine 컴포넌트의 상태를 정의합니다.
+- **CSS 분리**: 모든 스타일은 `src/styles.css`에 있으며, `index.html`은 `<link>`로 참조합니다.
+
+### 데이터 흐름
+
+```
+app.js → UIController 메서드 호출
+         → Alpine 컴포넌트 데이터 업데이트
+         → Alpine.js가 자동으로 DOM 렌더링
+```
+
+- `BattleApp`은 `UIController`의 메서드(`renderPlayerSetup`, `updateStatus`, `showOverlay` 등)를 호출합니다.
+- `UIController`는 Alpine 컴포넌트의 `$data`를 찾아 상태 속성을 갱신합니다.
+- Alpine.js가 변경을 감지하여 HTML 템플릿을 다시 렌더링합니다.
+- Canvas 렌더링(`ArenaRenderer`)은 이 흐름과 별도로 동작합니다.
+
+### 컴포넌트 구조 (index.html)
+
+| Alpine 바인딩 | 역할 | 상태 출처 |
+|---|---|---|
+| `x-data="appStore"` | 메인 컴포넌트 (`<main>`) | `appStore()` |
+| `x-text="statusBadge"` | 상태 뱃지 텍스트 | `UIController.updateStatus()` |
+| `x-text="statusText"` | 매치업 레이블 | `UIController.updateStatus()` |
+| `x-bind:class="{ visible: overlayVisible }"` | 오버레이 표시 | `UIController.showOverlay()` / `hideOverlay()` |
+| `@click="$dispatch('start-tournament')"` | 시작 버튼 클릭 | `document` 이벤트 리스너 → `BattleApp.startTournament()` |
+| `x-for="fighter in fighters"` | 파이터 카드 목록 | `UIController.renderRoster()` / `updateLiveCards()` |
+| `x-for="stat in statDefs"` | 스탯 배분 버튼 그리드 | `appStore().adjustStat()` |
+| `x-for="(round, rIndex) in tournamentRounds"` | 토너먼트 대진표 | `UIController.renderTournament()` |
+| `x-text="item"` in `x-for` | 배틀 로그 | `UIController.addLog()` |
+
+### 새 UI 컴포넌트 추가 규칙
+
+1. **`index.html`**에 Alpine.js 템플릿을 작성합니다 (`x-data`, `x-for`, `x-text` 등).
+2. **`ui.js`**의 `appStore()`에 필요한 상태와 액션을 추가합니다.
+3. **`UIController`**에 상태를 갱신하는 메서드를 추가합니다.
+4. **`src/styles.css`**에 스타일을 추가합니다.
+
+`innerHTML`을 직접 조작하거나 jQuery 등을 도입하지 않습니다.
+```
+
 ## 로컬 실행과 검증
 
 로컬 실행은 Node 정적 서버를 사용합니다.
@@ -87,6 +153,7 @@ npm run check
 ```
 
 `index.html`을 `file://`로 직접 열면 ES module CORS 문제로 정상 동작하지 않을 수 있습니다.
+또한 Alpine.js는 CDN에서 로드되므로 인터넷 연결이 필요합니다.
 
 ## Git 운영
 
@@ -160,7 +227,7 @@ Tested: npm test, npm run check
 2. **`src/abilities/index.js` 갱신** — 바로 새 파일을 export합니다.
 3. **참조하는 모든 파일 업데이트** — 아래를 빠짐없이 확인합니다.
    - `src/simulation.js` — import 구문, `createAbility` 테이블
-   - `src/entities.js` — `this.id` 할당, `switch(ball.id)` case
+   - `src/entities.js` — `this.id` 할당
    - `src/roster.js` — `id`, `face`, `ability` 필드
    - 그 외 해당 클래스를 import/참조하는 모든 파일
 4. **함수/클래스 선언을 실수로 지우지 않도록 `git diff`로 확인**

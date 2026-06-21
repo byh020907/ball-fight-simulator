@@ -6,7 +6,6 @@ import { createRoster } from "./roster.js";
 import {
     ALLOCATABLE_STATS,
     PLAYER_STAT_POINTS,
-    adjustStatAllocation,
     createEmptyStatAllocation,
     createRandomStatAllocation,
     createTournamentRoster,
@@ -17,16 +16,7 @@ export class BattleApp {
     constructor() {
         this.elements = {
             canvas: document.getElementById("arenaCanvas"),
-            overlay: document.getElementById("overlay"),
-            startButton: document.getElementById("startButton"),
-            matchupLabel: document.getElementById("matchupLabel"),
-            statusBadge: document.getElementById("statusBadge"),
-            fighterCards: document.getElementById("fighterCards"),
-            battleLog: document.getElementById("battleLog"),
-            tournamentPanel: document.getElementById("tournamentPanel"),
-            tournamentBracket: document.getElementById("tournamentBracket"),
-            tournamentPhase: document.getElementById("tournamentPhase"),
-            playerPanel: document.getElementById("playerPanel")
+            overlay: document.getElementById("overlay")
         };
 
         this.roster = createRoster();
@@ -35,7 +25,7 @@ export class BattleApp {
         this.playerStatAllocation = createEmptyStatAllocation();
         this.playerResult = null;
         this.renderer = new ArenaRenderer(this.elements.canvas);
-        this.ui = new UIController(this.elements, this.roster);
+        this.ui = new UIController(this.roster);
         this.ui.renderTournament();
         this.matchmaker = new Matchmaker(this.roster);
         this.audio = new AudioEngine();
@@ -48,8 +38,14 @@ export class BattleApp {
         this.resultSequenceAnnounced = false;
         this.matchFinalized = false;
         this.transientOverlayToken = 0;
-        this.elements.startButton.addEventListener("click", () => this.startTournament());
-        this.elements.playerPanel?.addEventListener("click", (event) => this.handlePlayerPanelClick(event));
+
+        // Listen for Alpine.js start-tournament event
+        try {
+            document.addEventListener("start-tournament", () => this.startTournament());
+        } catch {
+            // no-op in non-browser environments
+        }
+
         this.refreshPlayerSetup();
         this.ui.updateStatus("내 캐릭터 스탯을 배분하세요", "Setup");
         this.ui.hideOverlay();
@@ -58,25 +54,6 @@ export class BattleApp {
 
     pickPlayerFighterId() {
         return this.roster[Math.floor(Math.random() * this.roster.length)].id;
-    }
-
-    handlePlayerPanelClick(event) {
-        const randomButton = event.target.closest?.("[data-random-stats]");
-        if (randomButton) {
-            this.playerStatAllocation = createRandomStatAllocation();
-            this.refreshPlayerSetup();
-            return;
-        }
-
-        const button = event.target.closest?.("button[data-stat]");
-        if (!button) {
-            return;
-        }
-
-        const step = Number(button.dataset.step ?? 1);
-        const delta = button.dataset.action === "increase" ? step : -step;
-        this.playerStatAllocation = adjustStatAllocation(this.playerStatAllocation, button.dataset.stat, delta);
-        this.refreshPlayerSetup();
     }
 
     refreshPlayerSetup() {
@@ -90,38 +67,18 @@ export class BattleApp {
             remainingPoints: remaining,
             locked: Boolean(this.tournament && !this.tournament.champion)
         });
-        this.mountSetupStartButton();
 
         if (!this.tournament || this.tournament.champion) {
-            this.elements.startButton.disabled = remaining > 0;
-            this.elements.startButton.textContent = this.tournament?.champion
-                ? "다시 시작"
-                : remaining > 0
-                  ? `스탯 ${remaining} 남음`
-                  : "토너먼트 시작";
-            if (remaining === 0) {
-                this.scrollSetupActionsIntoView();
-            }
+            this.ui.setStartButton({
+                disabled: remaining > 0,
+                text: this.tournament?.champion
+                    ? "다시 시작"
+                    : remaining > 0
+                      ? `스탯 ${remaining} 남음`
+                      : "토너먼트 시작",
+                hidden: false
+            });
             this.startPlayerPreviewLoop();
-        }
-    }
-
-    scrollSetupActionsIntoView() {
-        if (!this.elements.playerPanel) {
-            return;
-        }
-
-        this.elements.playerPanel.scrollTop = this.elements.playerPanel.scrollHeight;
-    }
-
-    mountSetupStartButton() {
-        if (this.tournament && !this.tournament.champion) {
-            return;
-        }
-
-        const actions = this.elements.playerPanel?.querySelector?.("[data-player-actions]");
-        if (actions) {
-            actions.appendChild(this.elements.startButton);
         }
     }
 
@@ -172,9 +129,7 @@ export class BattleApp {
         this.audio.unlock();
         cancelAnimationFrame(this.rafId);
         this.stopPlayerPreviewLoop();
-        this.elements.startButton.disabled = true;
-        this.elements.startButton.classList.add("hidden");
-        this.elements.startButton.textContent = "다시 시작";
+        this.ui.setStartButton({ disabled: true, hidden: true, text: "다시 시작" });
         this.ui.resetLog();
         this.tournamentRoster = createTournamentRoster(this.roster, this.playerFighterId, this.playerStatAllocation);
         this.ui.roster = this.tournamentRoster;
@@ -209,8 +164,7 @@ export class BattleApp {
 
     async startMatch(customMatch = null, options = {}) {
         this.audio.unlock();
-        this.elements.startButton.disabled = true;
-        this.elements.startButton.classList.add("hidden");
+        this.ui.setStartButton({ disabled: true, hidden: true });
         this.resultSequenceAnnounced = false;
         this.matchFinalized = false;
         if (!options.keepLog) {
@@ -251,7 +205,8 @@ export class BattleApp {
         const token = String(++this.transientOverlayToken);
         this.ui.showTransientOverlay(label, text, token);
         window.setTimeout(() => {
-            if (this.elements.overlay.dataset.transientToken === token && !this.simulation?.finished) {
+            const s = this.ui.state;
+            if (s && s.overlayVisible && s.overlayTransient && !this.simulation?.finished) {
                 this.ui.hideOverlay();
             }
         }, duration);
@@ -343,9 +298,7 @@ export class BattleApp {
         this.ui.updateStatus(`${winner.name} wins`, "Result");
         this.ui.addLog(`${winner.name} defeats ${loser.name}.`);
         this.ui.addLog("Press the button again for another random matchup.");
-        this.elements.startButton.textContent = "다시 시작";
-        this.elements.startButton.classList.remove("hidden");
-        this.elements.startButton.disabled = false;
+        this.ui.setStartButton({ text: "다시 시작", hidden: false, disabled: false });
         this.refreshPlayerSetup();
     }
 
@@ -390,9 +343,7 @@ export class BattleApp {
                 ? `축하합니다! 내 캐릭터 ${champion.name}가 토너먼트에서 우승했습니다.`
                 : `아쉽네요. 내 캐릭터 ${player.name}의 최종 성적은 ${this.playerResult?.rankLabel ?? "기록 없음"}입니다.`
         );
-        this.elements.startButton.textContent = "다시 시작";
-        this.elements.startButton.classList.remove("hidden");
-        this.elements.startButton.disabled = false;
+        this.ui.setStartButton({ text: "다시 시작", hidden: false, disabled: false });
         this.refreshPlayerSetup();
     }
 

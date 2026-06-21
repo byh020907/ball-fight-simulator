@@ -1,6 +1,75 @@
-import { formatStatAllocation } from "./stat-allocation.js";
+import {
+    ALLOCATABLE_STATS,
+    PLAYER_STAT_POINTS,
+    adjustStatAllocation,
+    createEmptyStatAllocation,
+    createRandomStatAllocation,
+    formatStatAllocation,
+    getRemainingStatPoints
+} from "./stat-allocation.js";
 import { Vector2 } from "./core.js";
 import { BattleBall } from "./entities.js";
+
+// ── Alpine.js x-data function ───────────────────────────────────────────────
+
+export function appStore() {
+    return {
+        // Player setup
+        playerFighter: null,
+        allocation: createEmptyStatAllocation(),
+        totalPoints: PLAYER_STAT_POINTS,
+        remainingPoints: PLAYER_STAT_POINTS,
+        locked: false,
+        statDefs: ALLOCATABLE_STATS,
+
+        // Status bar
+        statusBadge: "Setup",
+        statusText: "내 캐릭터 스탯을 배분하세요",
+        statusSubtext: "랜덤 대진과 전투 결과가 여기에 갱신됩니다.",
+
+        // Overlay
+        overlayVisible: false,
+        overlayTransient: false,
+        overlayLabel: "",
+        overlayText: "",
+
+        // Start button
+        startHidden: true,
+        startDisabled: true,
+        startText: "싸움 시작",
+
+        // Fighter cards (roster)
+        fighters: [],
+
+        // Battle log
+        logItems: [],
+
+        // Tournament
+        tournamentActive: false,
+        tournamentPhase: "Ready",
+        tournamentRounds: [],
+
+        // Computed
+        get allocationSummary() {
+            return formatStatAllocation(this.allocation);
+        },
+
+        // Actions
+        adjustStat(key, delta) {
+            if (this.locked) return;
+            this.allocation = adjustStatAllocation(this.allocation, key, delta);
+            this.remainingPoints = getRemainingStatPoints(this.allocation);
+        },
+
+        randomAllocation() {
+            if (this.locked) return;
+            this.allocation = createRandomStatAllocation();
+            this.remainingPoints = getRemainingStatPoints(this.allocation);
+        }
+    };
+}
+
+// ── Canvas renderer (unchanged) ─────────────────────────────────────────────
 
 export class ArenaRenderer {
     constructor(canvas) {
@@ -77,117 +146,107 @@ export class ArenaRenderer {
     }
 }
 
+// ── UIController — updates Alpine component data ────────────────────────────
+
 export class UIController {
-    constructor(elements, roster) {
-        this.elements = elements;
+    constructor(roster) {
         this.roster = roster;
+        this._rootData = null;
         this.logItems = [];
-        this.renderRoster();
+    }
+
+    get state() {
+        try {
+            if (!this._rootData && typeof Alpine !== "undefined") {
+                const root = document.querySelector(".app");
+                this._rootData = root ? Alpine.$data(root) : null;
+            }
+        } catch {
+            return null;
+        }
+        return this._rootData;
+    }
+
+    _update(fn) {
+        const s = this.state;
+        if (s) fn(s);
     }
 
     renderPlayerSetup({ fighter, stats, allocation, totalPoints, remainingPoints, locked = false }) {
-        if (!this.elements.playerPanel || !fighter) {
-            return;
-        }
-
-        this.elements.playerPanel.classList.toggle("locked", locked);
-        const spent = totalPoints - remainingPoints;
-        this.elements.playerPanel.innerHTML = `
-          <div class="player-title">
-            <span>내 캐릭터</span>
-            <strong style="color:${fighter.color}">${fighter.name}</strong>
-          </div>
-          <p class="player-note">${fighter.title} · 시작 전 ${totalPoints} 포인트를 배분하세요.</p>
-          <div class="point-meter">
-            <span>사용 ${spent}/${totalPoints}</span>
-            <b>${remainingPoints > 0 ? `${remainingPoints} 남음` : "준비 완료"}</b>
-          </div>
-          <div class="allocation-summary">${formatStatAllocation(allocation)}</div>
-          <div class="stat-board">
-            ${stats
-                .map(
-                    (stat) => `
-              <div class="stat-row">
-                <div class="stat-copy">
-                  <strong>${stat.label}</strong>
-                  <span>${stat.description}</span>
-                </div>
-                <button type="button" data-stat="${stat.key}" data-action="decrease" data-step="10" ${locked || allocation[stat.key] <= 0 ? "disabled" : ""}>-10</button>
-                <button type="button" data-stat="${stat.key}" data-action="decrease" data-step="1" ${locked || allocation[stat.key] <= 0 ? "disabled" : ""}>-</button>
-                <em>${allocation[stat.key] ?? 0}%</em>
-                <button type="button" data-stat="${stat.key}" data-action="increase" data-step="1" ${locked || remainingPoints <= 0 ? "disabled" : ""}>+</button>
-                <button type="button" data-stat="${stat.key}" data-action="increase" data-step="10" ${locked || remainingPoints <= 0 ? "disabled" : ""}>+10</button>
-              </div>
-            `
-                )
-                .join("")}
-          </div>
-          <button class="random-stat-button" type="button" data-random-stats ${locked ? "disabled" : ""}>자동 배분</button>
-          <div class="player-actions" data-player-actions></div>
-        `;
+        const s = this.state;
+        if (!s) return;
+        s.playerFighter = fighter;
+        s.allocation = allocation;
+        s.totalPoints = totalPoints;
+        s.remainingPoints = remainingPoints;
+        s.locked = locked;
+        s.startDisabled = remainingPoints > 0;
+        s.startText = s.tournamentActive
+            ? "다시 시작"
+            : remainingPoints > 0
+              ? `스탯 ${remainingPoints} 남음`
+              : "토너먼트 시작";
     }
 
     renderRoster(activeIds = []) {
-        this.elements.fighterCards.innerHTML = "";
-        const visibleRoster = activeIds.length ? this.roster.filter((fighter) => activeIds.includes(fighter.id)) : [];
-
-        for (const fighter of visibleRoster) {
-            const card = document.createElement("article");
-            card.className = `fighter-card${activeIds.includes(fighter.id) ? " active" : ""}`;
-            card.dataset.fighterId = fighter.id;
-            card.innerHTML = `
-            <div class="fighter-head">
-              <div class="fighter-meta">
-                <strong>${fighter.isPlayer ? "내 캐릭터 · " : ""}${fighter.name}</strong>
-                <span>${fighter.isPlayer ? "내 배분" : "AI 배분"}</span>
-              </div>
-            </div>
-            <div class="hp-bar"><div class="hp-fill" style="background:${fighter.color};width:${activeIds.includes(fighter.id) ? "100%" : "18%"}"></div></div>
-            <div class="fighter-stat-line">${formatStatAllocation(fighter.statAllocation ?? {})}</div>
-            <div class="cooldown-wrap">
-              <div class="cooldown-meta"><span class="cooldown-label">Skill</span><span class="cooldown-text">Ready</span></div>
-              <div class="cooldown-bar"><div class="cooldown-fill" style="width:100%"></div></div>
-            </div>
-          `;
-            this.elements.fighterCards.appendChild(card);
-        }
+        const s = this.state;
+        if (!s) return;
+        const visibleRoster = activeIds.length ? this.roster.filter((f) => activeIds.includes(f.id)) : [];
+        s.fighters = visibleRoster.map((fighter) => ({
+            id: fighter.id,
+            name: fighter.name,
+            color: fighter.color,
+            isPlayer: fighter.isPlayer,
+            defeated: false,
+            hpPct: 100,
+            statLine: formatStatAllocation(fighter.statAllocation ?? {}),
+            skillLabel: "Skill",
+            skillPct: 1,
+            skillText: "Ready"
+        }));
     }
 
     updateStatus(text, badge = "Ready") {
-        this.elements.matchupLabel.innerHTML = `${text}<small>랜덤 대진과 전투 결과가 여기에 갱신됩니다.</small>`;
-        this.elements.statusBadge.textContent = badge.toUpperCase();
-        const topBar = this.elements.statusBadge.closest(".top-bar");
-        topBar?.classList.toggle("overtime", badge.toLowerCase() === "overtime");
-        topBar?.classList.toggle("result", badge.toLowerCase() === "result");
+        const s = this.state;
+        if (!s) return;
+        s.statusText = text;
+        s.statusBadge = badge.toUpperCase();
+        s.statusSubtext = "랜덤 대진과 전투 결과가 여기에 갱신됩니다.";
     }
 
     showOverlay(label, text) {
-        delete this.elements.overlay.dataset.transientToken;
-        this.elements.overlay.classList.remove("transient");
-        this.elements.overlay.innerHTML = `
-          <div class="overlay-card">
-            <span>${label}</span>
-            <strong>${text}</strong>
-          </div>
-        `;
-        this.elements.overlay.classList.add("visible");
+        const s = this.state;
+        if (!s) return;
+        s.overlayVisible = true;
+        s.overlayTransient = false;
+        s.overlayLabel = label;
+        s.overlayText = text;
     }
 
     showTransientOverlay(label, text, token) {
-        this.elements.overlay.dataset.transientToken = String(token);
-        this.elements.overlay.classList.add("transient");
-        const content = text ? `<span>${label}</span><strong>${text}</strong>` : `<strong>${label}</strong>`;
-        this.elements.overlay.innerHTML = `
-          <div class="overlay-card">
-            ${content}
-          </div>
-        `;
-        this.elements.overlay.classList.add("visible");
+        const s = this.state;
+        if (!s) return;
+        s.overlayVisible = true;
+        s.overlayTransient = true;
+        s.overlayLabel = label;
+        s.overlayText = text;
     }
 
     hideOverlay() {
-        delete this.elements.overlay.dataset.transientToken;
-        this.elements.overlay.classList.remove("visible", "transient");
+        const s = this.state;
+        if (!s) return;
+        s.overlayVisible = false;
+        s.overlayTransient = false;
+        s.overlayLabel = "";
+        s.overlayText = "";
+    }
+
+    setStartButton({ disabled, text, hidden }) {
+        const s = this.state;
+        if (!s) return;
+        if (disabled !== undefined) s.startDisabled = disabled;
+        if (text !== undefined) s.startText = text;
+        if (hidden !== undefined) s.startHidden = hidden;
     }
 
     resetLog() {
@@ -202,105 +261,72 @@ export class UIController {
     }
 
     renderLog() {
-        this.elements.battleLog.innerHTML = this.logItems.map((text) => `<li>${text}</li>`).join("");
+        const s = this.state;
+        if (!s) return;
+        s.logItems = [...this.logItems];
     }
 
     renderTournament(tournament = null) {
-        if (!this.elements.tournamentBracket) {
-            return;
-        }
+        const s = this.state;
+        if (!s) return;
 
-        this.elements.tournamentPanel?.classList.toggle("setup-hidden", !tournament);
         if (!tournament) {
-            this.elements.tournamentPhase.textContent = "Ready";
-            this.elements.tournamentBracket.innerHTML = `
-            <div class="bracket-round">
-              <div class="round-title">Round 1</div>
-              <div class="bracket-match"><div class="bracket-slot empty">Press start</div><span class="bracket-status">WAIT</span></div>
-            </div>
-            <div class="bracket-round">
-              <div class="round-title">Semi</div>
-              <div class="bracket-match"><div class="bracket-slot empty">Auto battle</div><span class="bracket-status">LOCK</span></div>
-            </div>
-            <div class="bracket-round">
-              <div class="round-title">Final</div>
-              <div class="bracket-match"><div class="bracket-slot empty">Champion</div><span class="bracket-status">LOCK</span></div>
-            </div>
-          `;
+            s.tournamentActive = false;
+            s.tournamentPhase = "Ready";
             return;
         }
 
-        this.elements.tournamentPhase.textContent = tournament.champion ? "Champion" : "Running";
-        this.elements.tournamentBracket.innerHTML = tournament.rounds
-            .map(
-                (round, roundIndex) => `
-          <div class="bracket-round">
-            <div class="round-title">${["Round 1", "Semi", "Final"][roundIndex]}</div>
-            ${round.map((match) => this.renderTournamentMatch(match)).join("")}
-          </div>
-        `
-            )
-            .join("");
-    }
-
-    renderTournamentMatch(match) {
-        const classes = ["bracket-match", match.status];
-        const status = match.winner
-            ? "WIN"
-            : match.status === "active"
-              ? "LIVE"
-              : match.status === "bye"
-                ? "BYE"
-                : "WAIT";
-        return `
-          <div class="${classes.join(" ")}">
-            ${this.renderTournamentSlot(match.a, match.winner, match.roundIndex === 0 ? "BYE" : "TBD")}
-            ${this.renderTournamentSlot(match.b, match.winner, match.roundIndex === 0 ? "BYE" : "TBD")}
-            <span class="bracket-status">${status}</span>
-          </div>
-        `;
-    }
-
-    renderTournamentSlot(fighter, winner, emptyLabel = "TBD") {
-        if (!fighter) {
-            return `<div class="bracket-slot empty"><span class="bracket-dot"></span>${emptyLabel}</div>`;
-        }
-
-        const isWinner = winner?.id === fighter.id;
-        return `
-          <div class="bracket-slot${isWinner ? " winner" : ""}${fighter.isPlayer ? " player" : ""}">
-            <span class="bracket-dot" style="background:${fighter.color}"></span>${fighter.isPlayer ? "YOU · " : ""}${fighter.name}
-          </div>
-        `;
+        s.tournamentActive = true;
+        s.tournamentPhase = tournament.champion ? "Champion" : "Running";
+        s.tournamentRounds = tournament.rounds.map((round, roundIndex) =>
+            round.map((match) => ({
+                id: match.id,
+                status: match.status,
+                winnerId: match.winner?.id ?? null,
+                label: match.winner
+                    ? "WIN"
+                    : match.status === "active"
+                      ? "LIVE"
+                      : match.status === "bye"
+                        ? "BYE"
+                        : "WAIT",
+                a: match.a
+                    ? {
+                          id: match.a.id,
+                          name: match.a.name,
+                          color: match.a.color,
+                          isPlayer: match.a.isPlayer
+                      }
+                    : null,
+                b: match.b
+                    ? {
+                          id: match.b.id,
+                          name: match.b.name,
+                          color: match.b.color,
+                          isPlayer: match.b.isPlayer
+                      }
+                    : null
+            }))
+        );
     }
 
     updateLiveCards(fighters) {
-        const cards = Array.from(this.elements.fighterCards.children);
-        for (const fighter of fighters) {
-            const card =
-                cards.find((item) => item.dataset?.fighterId === fighter.id) ??
-                cards.find((item) => item.querySelector(".fighter-meta strong").textContent.endsWith(fighter.name));
-            if (!card) {
-                continue;
-            }
-
-            const fill = card.querySelector(".hp-fill");
-            const hpText = card.querySelector(".fighter-meta span");
-            const cooldownFill = card.querySelector(".cooldown-fill");
-            const cooldownLabel = card.querySelector(".cooldown-label");
-            const cooldownText = card.querySelector(".cooldown-text");
-            const abilityUi = fighter.getAbilityUiState();
-            fill.style.width = `${Math.max(0, (fighter.hp / fighter.maxHp) * 100)}%`;
-            hpText.textContent = `${Math.ceil(fighter.hp)} / ${fighter.maxHp}`;
-            cooldownFill.style.width = `${Math.max(0, Math.min(1, abilityUi.progress)) * 100}%`;
-            cooldownLabel.textContent = abilityUi.label;
-            cooldownText.textContent =
-                abilityUi.progress >= 0.995 ? "Ready" : `${Math.round(abilityUi.progress * 100)}%`;
-            card.classList.toggle("active", !fighter.isDefeated);
-            if (fighter.isDefeated) {
-                fill.style.opacity = "0.3";
-                cooldownFill.style.opacity = "0.35";
-            }
-        }
+        const s = this.state;
+        if (!s) return;
+        s.fighters = s.fighters.map((card) => {
+            const fighter = fighters.find((f) => f.id === card.id || f.name === card.name);
+            if (!fighter) return card;
+            return {
+                ...card,
+                hpPct: Math.max(0, (fighter.hp / fighter.maxHp) * 100),
+                defeated: fighter.isDefeated,
+                skillLabel: fighter.getAbilityUiState().label,
+                skillPct: Math.max(0, Math.min(1, fighter.getAbilityUiState().progress)),
+                skillText:
+                    fighter.getAbilityUiState().progress >= 0.995
+                        ? "Ready"
+                        : `${Math.round(fighter.getAbilityUiState().progress * 100)}%`
+            };
+        });
     }
 }
