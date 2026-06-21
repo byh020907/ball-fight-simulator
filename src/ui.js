@@ -8,7 +8,7 @@ import {
     formatStatAllocation,
     getRemainingStatPoints
 } from "./stat-allocation.js";
-import { Vector2 } from "./core.js";
+import { RENDER_LAYERS, Vector2 } from "./core.js";
 import { BattleBall } from "./entities.js";
 
 // ── Alpine.js x-data function ───────────────────────────────────────────────
@@ -134,21 +134,20 @@ export class ArenaRenderer {
         ctx.fillStyle = "#fafafa";
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Background entities (effects, particles — behind fighters)
+        // Background layer (particles, effects, projectiles — behind fighters)
         for (const entity of simulation.entities) {
-            if (entity.constructor.name === "DamageNumber") continue;
-            entity.draw(ctx, simulation);
+            if (entity.renderLayer < RENDER_LAYERS.FOREGROUND) entity.draw(ctx, simulation);
         }
 
+        // Fighter layer
         for (const fighter of simulation.fighters) {
             fighter.draw(ctx);
             this.drawNameplate(fighter);
         }
 
-        // Foreground entities (DamageNumber — on top of fighters)
+        // Foreground layer (DamageNumber, etc. — on top of fighters)
         for (const entity of simulation.entities) {
-            if (entity.constructor.name !== "DamageNumber") continue;
-            entity.draw(ctx, simulation);
+            if (entity.renderLayer >= RENDER_LAYERS.FOREGROUND) entity.draw(ctx, simulation);
         }
 
         ctx.restore();

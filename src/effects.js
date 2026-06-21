@@ -235,6 +235,8 @@ export class SlashTrail extends CombatEntity {
 
 /** Floating damage number that rises and fades. */
 export class DamageNumber extends CombatEntity {
+    static renderLayer = 2;
+
     constructor(position, amount, color = "#ff3333") {
         super(position.clone(), new Vector2(0, -70), 0);
         this.amount = amount;

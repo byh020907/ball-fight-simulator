@@ -58,6 +58,12 @@ export class CombatEntity {
         this.isExpired = false;
     }
 
+    /** Render priority — lower values draw first (behind). */
+    static renderLayer = 0;
+    get renderLayer() {
+        return this.constructor.renderLayer;
+    }
+
     update() {}
     draw() {}
 }
@@ -76,6 +82,14 @@ export class TimedEffect {
         this.elapsed += delta;
     }
 }
+
+/** Named render layers for ArenaRenderer — lower values draw first. */
+export const RENDER_LAYERS = Object.freeze({
+    /** Particles, visual effects, projectiles — behind fighters. */
+    BACKGROUND: 0,
+    /** Floating text, UI overlays on the canvas — in front of fighters. */
+    FOREGROUND: 1
+});
 
 export const FIGHTER_IDS = Object.freeze({
     ARCHER: "archer",
