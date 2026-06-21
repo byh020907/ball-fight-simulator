@@ -134,24 +134,28 @@ export class ArenaRenderer {
         ctx.fillStyle = "#fafafa";
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Background layer (particles, effects, projectiles — behind fighters)
-        for (const entity of simulation.entities) {
-            if (entity.renderLayer < RENDER_LAYERS.FOREGROUND) entity.draw(ctx, simulation);
-        }
-
-        // Fighter layer
-        for (const fighter of simulation.fighters) {
-            fighter.draw(ctx);
-            this.drawNameplate(fighter);
-        }
-
-        // Foreground layer (DamageNumber, etc. — on top of fighters)
-        for (const entity of simulation.entities) {
-            if (entity.renderLayer >= RENDER_LAYERS.FOREGROUND) entity.draw(ctx, simulation);
+        for (const pass of ArenaRenderer.renderPasses) {
+            if (pass.kind === "entities") {
+                for (const e of simulation.entities) {
+                    if (e.renderLayer === pass.layer) e.draw(ctx, simulation);
+                }
+            } else if (pass.kind === "fighters") {
+                for (const f of simulation.fighters) {
+                    f.draw(ctx);
+                    this.drawNameplate(f);
+                }
+            }
         }
 
         ctx.restore();
     }
+
+    /** Ordered render passes — add/remove/reorder entries to change draw priority. */
+    static renderPasses = [
+        { kind: "entities", layer: RENDER_LAYERS.BACKGROUND },
+        { kind: "fighters" },
+        { kind: "entities", layer: RENDER_LAYERS.FOREGROUND }
+    ];
 
     drawNameplate(fighter) {
         if (fighter.isDestroyed) {
