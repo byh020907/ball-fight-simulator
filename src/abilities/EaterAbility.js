@@ -91,7 +91,7 @@ export class EaterAbility extends Ability {
         }
 
         this.hasEatenThisFeast = true;
-        this.feastTimer = Math.min(this.feastTimer, 0.28);
+        this.feastTimer = 0;
         this.swallowedTarget = target;
         this.swallowTimer = 0.72;
         this.spitDirection =
@@ -149,7 +149,7 @@ export class EaterAbility extends Ability {
         target.wallSlamState = {
             effect: new TimedEffect(2.45),
             source: this.owner,
-            damage: 8,
+            damage: 15,
             cooldown: 0
         };
         this.simulation.keepInsideArena(target);
