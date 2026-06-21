@@ -30,16 +30,20 @@
 ### 공격(damage) 상세
 
 `roster.js`의 `damage`는 **최대 충돌 피해량**을 의미하는 정수입니다.
-실제 충돌 피해는 아래 요인에 따라 0~최대값 범위로 결정됩니다.
+실제 충돌 피해는 아래 요인에 따라 최대값 이하로 결정됩니다.
 
 ```
-충돌 피해 = baseDamage × 효율 × 능력보정
-  - 효율 (0~1): 속도(0~1) + 정렬도/측면노출(0~1) 평균
-  - 글랜싱: 정렬도 0.22 미만 시 효율 50% 추가 감소
-  - 능력보정: 각 Ability의 getStatModifiers().damage (최종 곱)
+충돌 피해 = baseDamage × efficiency × 능력보정(damage)
+
+efficiency (0~1) = speedEff × dirEff × glancingPenalty
+  - speedEff  (0~1): 공격자 속도 / baseSpeed (최대 1)
+  - dirEff    (0~1): aimAlignment × 0.55 + sideExposure × 0.45
+  - glancingPenalty: aimAlignment < 0.22 시 0.5, 아니면 1
+
+능력보정: 각 Ability의 getStatModifiers().damage (최종 곱)
 ```
 
-예: `damage=10` 캐릭터가 평균 속도로 정면 충돌 시 보통 5~7, 최적 조건에서 최대 10의 피해를 줍니다.
+예: `damage=10` 캐릭터가 보통 속도로 정면 충돌 시 약 5~7, 최적 조건에서 최대 10의 피해를 줍니다.
 
 ## 스탯으로 열지 않은 값
 
