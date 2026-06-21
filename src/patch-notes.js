@@ -19,6 +19,22 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.6.2",
+        date: "2026-06-21",
+        title: "v0.6.2 업데이트",
+        changes: [
+            {
+                type: "feature",
+                text: "Grenade Ball 상향 — 수류탄 벽 튕김(최대 2회), 폭발 데미지 20~40, 패시브 회피 추가."
+            },
+            {
+                type: "feature",
+                text: "투사체 데미지 baseDamage 연동 — Arrow/Grenade/Shard/Seed 데미지가 공격 스탯에 비례합니다."
+            },
+            { type: "refactor", text: "evadeTarget 공용 함수 추출 — Archer/Grenade가 회피 로직 공유." }
+        ]
+    },
+    {
         version: "0.6.1",
         date: "2026-06-21",
         title: "v0.6.1 업데이트",

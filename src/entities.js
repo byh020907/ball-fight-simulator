@@ -166,7 +166,7 @@ export class Grenade extends CombatEntity {
                     0,
                     Math.min(1, (distance - this.innerRadius) / (this.explosionRadius - this.innerRadius))
                 );
-                const damage = Math.round(this.owner.baseDamage * (2.0 - edgeProgress * 1.0));
+                const damage = Math.round(40 - edgeProgress * 20);
                 const knockback = 350 - edgeProgress * 140;
                 target.takeDamage(damage, this.owner, "Grenade");
                 target.velocity.add(Vector2.subtract(target.position, this.position).normalize().scale(knockback));
