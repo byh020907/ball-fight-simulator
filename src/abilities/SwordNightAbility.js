@@ -1,4 +1,5 @@
 import { TimedEffect, Vector2 } from "../core.js";
+import { Ability } from "./Ability.js";
 
 const ARC_ANGLE = (Math.PI * 2) / 3; // 120도
 const ARC_RANGE = 200;
