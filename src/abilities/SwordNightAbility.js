@@ -38,11 +38,11 @@ export class SwordNightAbility extends Ability {
 
         // 시야 범위가 좌우로 자유롭게 스윕 (벽 반동 시 부드럽게 회전)
         const time = performance.now() / 1000;
-        const targetAngle =
+        const velAngle =
             this.owner.velocity.length() > 0
                 ? Math.atan2(this.owner.velocity.y, this.owner.velocity.x)
                 : this._facingAngle;
-        let diff = targetAngle - this._facingAngle;
+        let diff = velAngle - this._facingAngle;
         while (diff > Math.PI) diff -= Math.PI * 2;
         while (diff < -Math.PI) diff += Math.PI * 2;
         this._facingAngle += diff * Math.min(1, 8 * delta);
