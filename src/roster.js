@@ -10,7 +10,7 @@ export function createRoster() {
             color: "#f7b34d",
             face: "archer",
             ability: "archer",
-            stats: { hp: 112, damage: 1.02, speed: 270, radius: 50, mass: 1.2 }
+            stats: { hp: 112, damage: 10, speed: 270, radius: 50, mass: 1.2 }
         },
         {
             id: FIGHTER_IDS.ORBIT,
@@ -20,7 +20,7 @@ export function createRoster() {
             color: "#6fe3ff",
             face: "orbit",
             ability: "orbit",
-            stats: { hp: 102, damage: 1, speed: 308, radius: 48, mass: 1.1 }
+            stats: { hp: 102, damage: 10, speed: 308, radius: 48, mass: 1.1 }
         },
         {
             id: FIGHTER_IDS.TRICKSTER,
@@ -30,7 +30,7 @@ export function createRoster() {
             color: "#d99cff",
             face: "trickster",
             ability: "trickster",
-            stats: { hp: 98, damage: 1.02, speed: 320, radius: 46, mass: 1.02 }
+            stats: { hp: 98, damage: 10, speed: 320, radius: 46, mass: 1.02 }
         },
         {
             id: FIGHTER_IDS.GRENADE,
@@ -40,7 +40,7 @@ export function createRoster() {
             color: "#ff7676",
             face: "grenade",
             ability: "grenade",
-            stats: { hp: 108, damage: 1.08, speed: 278, radius: 49, mass: 1.18 }
+            stats: { hp: 108, damage: 11, speed: 278, radius: 49, mass: 1.18 }
         },
         {
             id: FIGHTER_IDS.DASH,
@@ -50,7 +50,7 @@ export function createRoster() {
             color: "#8ee8d7",
             face: "dash",
             ability: "dash",
-            stats: { hp: 110, damage: 0.92, speed: 294, radius: 49, mass: 1.16 }
+            stats: { hp: 110, damage: 9, speed: 294, radius: 49, mass: 1.16 }
         },
         {
             id: FIGHTER_IDS.RAGE,
@@ -60,7 +60,7 @@ export function createRoster() {
             color: "#ffae6e",
             face: "rage",
             ability: "rage",
-            stats: { hp: 124, damage: 1.02, speed: 238, radius: 51, mass: 1.28 }
+            stats: { hp: 124, damage: 10, speed: 238, radius: 51, mass: 1.28 }
         },
         {
             id: FIGHTER_IDS.EATER,
@@ -70,7 +70,7 @@ export function createRoster() {
             color: "#a6ff4d",
             face: "eater",
             ability: "eater",
-            stats: { hp: 118, damage: 0.98, speed: 268, radius: 52, mass: 1.34 }
+            stats: { hp: 118, damage: 10, speed: 268, radius: 52, mass: 1.34 }
         }
     ];
 }

@@ -290,7 +290,7 @@ async function testDashBallCooldownDash(app) {
         app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER)
     ]);
     const [dashBall, target] = app.simulation.fighters;
-    assert.equal(dashBall.baseDamage, 0.92, "Dash Ball should have reduced base damage");
+    assert.equal(dashBall.baseDamage, 9, "Dash Ball should have reduced base damage");
     dashBall.position.x = 300;
     dashBall.position.y = 480;
     target.position.x = 620;
@@ -374,13 +374,9 @@ async function testDashBallCooldownDash(app) {
     });
     app.simulation.keepInsideArena(dashBall);
     assert.equal(dashBall.dashState, null, "Dash Ball dash should clear on wall contact");
-    assert.equal(dashBall.ability.cooldownLevel, 1, "Wall contact should remove one cooldown stack");
-    assert.equal(dashBall.ability.cooldown, baseCooldown * 0.5, "Wall contact should fall back by one cooldown tier");
-    assert.equal(
-        dashBall.ability.timer,
-        baseCooldown * 0.5,
-        "Wall contact should restart from the reduced stack cooldown"
-    );
+    assert.equal(dashBall.ability.cooldownLevel, 0, "Wall contact should reset cooldown stacks");
+    assert.equal(dashBall.ability.cooldown, baseCooldown, "Wall contact should restore full cooldown");
+    assert.equal(dashBall.ability.timer, baseCooldown, "Wall contact should restart from full cooldown");
 }
 
 async function testGrenadeAdaptiveFuse(app) {

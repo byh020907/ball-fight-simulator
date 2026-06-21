@@ -204,7 +204,8 @@ export class BattleSimulation extends Simulation {
         const speedScore = attackerSpeed * 0.72 + relativeSpeed * 0.28;
         const directionalMultiplier = 0.38 + aimAlignment * 0.72 + sideExposure * 0.55;
         const glancingFloor = aimAlignment < 0.22 ? 0.45 : 1;
-        return Math.max(2, speedScore * 0.018 * directionalMultiplier * glancingFloor * this.getDamageMultiplier());
+        const raw = speedScore * 0.018 * directionalMultiplier * glancingFloor;
+        return Math.max(1, Math.round(raw * (attacker.baseDamage / 10) * this.getDamageMultiplier()));
     }
 
     checkResult() {
