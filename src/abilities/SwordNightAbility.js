@@ -83,83 +83,88 @@ export class SwordNightAbility extends Ability {
 
     draw(ctx) {
         const pos = this.owner.position;
-        const r = this.owner.radius;
         const time = performance.now() / 1000;
 
-        // ── Slash 애니메이션 (베기 궤적) ─────────────────────────────
-        if (this.slashTimer > 0) {
-            const progress = 1 - this.slashTimer / SLASH_DURATION; // 0→1
+        // ── Slash 애니메이션 ──
+        this._drawSlashEffect(ctx, pos);
 
-            // 회전하는 베기 호 — 애니메이션 진행에 따라 arc 확장
-            const currentEnd = this.slashStartAngle + (this.slashEndAngle - this.slashStartAngle) * progress;
-            const glowAlpha = 0.5 * (1 - progress);
+        // ── 시야 범위 ──
+        this._drawVisionArc(ctx, pos);
 
-            ctx.save();
-
-            // 바깥 글로우
-            ctx.strokeStyle = "#ffffff";
-            ctx.lineWidth = 10 - progress * 6;
-            ctx.globalAlpha = glowAlpha * 0.6;
-            ctx.beginPath();
-            ctx.arc(pos.x, pos.y, ARC_RANGE * 0.55, this.slashStartAngle, currentEnd);
-            ctx.stroke();
-
-            // 메인 베기 선
-            ctx.strokeStyle = this.owner.color;
-            ctx.lineWidth = 5 - progress * 3;
-            ctx.globalAlpha = glowAlpha * 0.9;
-            ctx.beginPath();
-            ctx.arc(pos.x, pos.y, ARC_RANGE * 0.55, this.slashStartAngle, currentEnd);
-            ctx.stroke();
-
-            // 잔상 (trail) — 여러 겹
-            for (let i = 1; i <= 3; i++) {
-                const trailProgress = Math.max(0, progress - i * 0.08);
-                if (trailProgress <= 0) continue;
-                const trailEnd = this.slashStartAngle + (this.slashEndAngle - this.slashStartAngle) * trailProgress;
-                ctx.strokeStyle = this.owner.color;
-                ctx.lineWidth = 3 - i * 0.6;
-                ctx.globalAlpha = glowAlpha * 0.3 * (1 - i * 0.25);
-                ctx.beginPath();
-                ctx.arc(pos.x, pos.y, ARC_RANGE * 0.55 - i * 8, this.slashStartAngle, trailEnd);
-                ctx.stroke();
-            }
-
-            ctx.restore();
-        }
-
-        // ── 시야 범위(arc) 표시 ──────────────────────────────────────
-        {
-            const arcStart = this.arcAngle - ARC_ANGLE / 2;
-            const arcEnd = this.arcAngle + ARC_ANGLE / 2;
-
-            // 평소에는 흐리게, slash 중에는 더 흐리게
-            ctx.save();
-            ctx.strokeStyle = this.owner.color;
-            ctx.globalAlpha = this.slashTimer > 0 ? 0.08 : 0.25;
-            ctx.lineWidth = 2;
-            ctx.setLineDash([6, 8]);
-            ctx.beginPath();
-            ctx.arc(pos.x, pos.y, ARC_RANGE, arcStart, arcEnd);
-            ctx.stroke();
-            ctx.setLineDash([]);
-
-            // arc 양 끝 선
-            ctx.globalAlpha = this.slashTimer > 0 ? 0.05 : 0.15;
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.moveTo(pos.x, pos.y);
-            ctx.lineTo(pos.x + Math.cos(arcStart) * ARC_RANGE, pos.y + Math.sin(arcStart) * ARC_RANGE);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(pos.x, pos.y);
-            ctx.lineTo(pos.x + Math.cos(arcEnd) * ARC_RANGE, pos.y + Math.sin(arcEnd) * ARC_RANGE);
-            ctx.stroke();
-            ctx.restore();
-        }
-
-        // ── 검 그리기 ────────────────────────────────────────────────
+        // ── 검 ──
         this._drawSword(ctx, time);
+    }
+
+    /** Slash 베기 궤적 애니메이션 */
+    _drawSlashEffect(ctx, pos) {
+        if (this.slashTimer <= 0) return;
+
+        const progress = 1 - this.slashTimer / SLASH_DURATION; // 0→1
+        const currentEnd = this.slashStartAngle + (this.slashEndAngle - this.slashStartAngle) * progress;
+        const glowAlpha = 0.5 * (1 - progress);
+
+        ctx.save();
+
+        // 바깥 글로우
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 10 - progress * 6;
+        ctx.globalAlpha = glowAlpha * 0.6;
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, ARC_RANGE * 0.55, this.slashStartAngle, currentEnd);
+        ctx.stroke();
+
+        // 메인 베기 선
+        ctx.strokeStyle = this.owner.color;
+        ctx.lineWidth = 5 - progress * 3;
+        ctx.globalAlpha = glowAlpha * 0.9;
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, ARC_RANGE * 0.55, this.slashStartAngle, currentEnd);
+        ctx.stroke();
+
+        // 잔상 (trail) — 여러 겹
+        for (let i = 1; i <= 3; i++) {
+            const trailProgress = Math.max(0, progress - i * 0.08);
+            if (trailProgress <= 0) continue;
+            const trailEnd = this.slashStartAngle + (this.slashEndAngle - this.slashStartAngle) * trailProgress;
+            ctx.strokeStyle = this.owner.color;
+            ctx.lineWidth = 3 - i * 0.6;
+            ctx.globalAlpha = glowAlpha * 0.3 * (1 - i * 0.25);
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, ARC_RANGE * 0.55 - i * 8, this.slashStartAngle, trailEnd);
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    }
+
+    /** 120도 시야 범위 표시 */
+    _drawVisionArc(ctx, pos) {
+        const arcStart = this.arcAngle - ARC_ANGLE / 2;
+        const arcEnd = this.arcAngle + ARC_ANGLE / 2;
+
+        // 평소에는 흐리게, slash 중에는 더 흐리게
+        ctx.save();
+        ctx.strokeStyle = this.owner.color;
+        ctx.globalAlpha = this.slashTimer > 0 ? 0.08 : 0.25;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 8]);
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, ARC_RANGE, arcStart, arcEnd);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // arc 양 끝 선
+        ctx.globalAlpha = this.slashTimer > 0 ? 0.05 : 0.15;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+        ctx.lineTo(pos.x + Math.cos(arcStart) * ARC_RANGE, pos.y + Math.sin(arcStart) * ARC_RANGE);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+        ctx.lineTo(pos.x + Math.cos(arcEnd) * ARC_RANGE, pos.y + Math.sin(arcEnd) * ARC_RANGE);
+        ctx.stroke();
+        ctx.restore();
     }
 
     /** 검을 항상 들고 있는 모습 */

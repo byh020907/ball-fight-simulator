@@ -33,6 +33,42 @@
 - `editor.insertSpaces: true`, `editor.tabSize: 4`로 설정합니다.
 - VS Code 상태 표시줄에서 `Tab Size: 4`로 표시되는지 확인합니다.
 
+### 기능 단위 코드 분리 (함수/모듈화)
+
+**항상 기능 단위로 코드를 쪼개서 함수 및 모듈화합니다.**
+
+- 하나의 함수가 여러 책임을 가지지 않도록 합니다.
+- `draw(ctx)` 같은 메서드가 모든 그리기 로직을 한 번에 처리하지 않고, 각 하위 기능을 private 메서드(`_drawSword`, `_drawSlashArc` 등)로 분리합니다.
+- `update(delta, target)`도 능력 발동 조건 체크, 쿨타임 관리, 애니메이션 타이머 갱신을 별도 책임으로 분리합니다.
+- 분리 기준은 **"하나의 함수는 하나의 일만 한다"** 입니다.
+
+**적용 예 — SwordNightAbility.js의 `draw()` 구조:**
+
+```js
+draw(ctx) {
+    // ── Slash 애니메이션 ──
+    this._drawSlashEffect(ctx);
+
+    // ── 시야 범위 ──
+    this._drawVisionArc(ctx);
+
+    // ── 검 ──
+    this._drawSword(ctx, time);
+}
+
+/** 검을 항상 들고 있는 모습 */
+_drawSword(ctx, time) { ... }
+
+/** Slash 베기 궤적 애니메이션 */
+_drawSlashEffect(ctx) { ... }
+
+/** 120도 시야 범위 표시 */
+_drawVisionArc(ctx) { ... }
+```
+
+- 메서드 분리뿐 아니라 Ability 클래스 자체도 하나의 파일(SwordNightAbility.js)로 모듈화되어 있습니다.
+- 새 기능을 추가할 때도 같은 원칙을 적용합니다. 예를 들어 `update()` 내에서 시야 스윕, 적 탐지, 쿨타임 관리를 각각의 책임으로 분리하여 가독성과 유지보수성을 높입니다.
+
 ### 인코딩과 줄바꿈
 
 이 프로젝트는 **VS Code (Windows)** 환경에서 개발하며, 아래 기준을 따릅니다.
