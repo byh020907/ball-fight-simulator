@@ -595,6 +595,8 @@ body::before {
     padding: 5px 7px 6px;
     gap: 4px;
     transform: none;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .fighter-card.active {
@@ -617,6 +619,9 @@ body::before {
     color: #222222;
     text-align: center;
     line-height: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .fighter-meta span {
@@ -624,6 +629,9 @@ body::before {
     color: #555555;
     text-align: center;
     font-size: 0.68rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .fighter-stat-line {
@@ -632,7 +640,9 @@ body::before {
     font-weight: 900;
     text-align: center;
     line-height: 1.15;
-    word-break: keep-all;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .hp-bar {
