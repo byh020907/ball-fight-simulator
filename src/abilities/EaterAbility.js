@@ -198,8 +198,7 @@ export class EaterAbility extends Ability {
     }
 
     updateRadiusScale(delta) {
-        const activeProgress = this.feastTimer > 0 ? Math.min(1, this.feastElapsed / this.feastDuration) : 0;
-        const targetScale = this.feastTimer > 0 ? 1 + activeProgress : 1;
+        const targetScale = this.swallowedTarget ? 1.5 : 1;
         const smoothing = 1 - Math.exp(-delta * (targetScale > this.radiusScale ? 4.8 : 7.2));
         this.radiusScale += (targetScale - this.radiusScale) * smoothing;
         if (Math.abs(this.radiusScale - 1) < 0.01 && targetScale === 1) {
@@ -208,7 +207,7 @@ export class EaterAbility extends Ability {
     }
 
     getRadiusScale() {
-        return Math.max(1, Math.min(2, this.radiusScale));
+        return Math.max(1, Math.min(1.5, this.radiusScale));
     }
 
     drawFace(ctx, rotation, ball) {
