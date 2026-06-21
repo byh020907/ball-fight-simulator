@@ -65,14 +65,6 @@ export function calculateStatMultiplier(stats) {
     };
 }
 
-// Expose to window for Alpine inline appStore (browser only)
-if (typeof window !== "undefined") {
-    window._balanceMult = function (alloc) {
-        const points = [alloc.hp ?? 0, alloc.damage ?? 0, alloc.speed ?? 0];
-        return calculateStatMultiplier(points);
-    };
-}
-
 export function createEmptyStatAllocation() {
     return Object.fromEntries(STAT_KEYS.map((key) => [key, 0]));
 }

@@ -53,15 +53,12 @@ export function appStore() {
         tournamentActive: false,
         tournamentPhase: "Ready",
         tournamentRounds: [],
+        showTip: false,
 
-        // Computed
-        get allocationSummary() {
-            return formatStatAllocation(this.allocation);
-        },
+        allocationSummary: "체력 +0% · 공격 +0% · 속도 +0%",
 
-        get balanceMultiplier() {
-            const vals = [this.allocation.hp ?? 0, this.allocation.damage ?? 0, this.allocation.speed ?? 0];
-            return calculateStatMultiplier(vals).multiplier;
+        init() {
+            this._syncSummary();
         },
 
         // Actions
@@ -69,19 +66,21 @@ export function appStore() {
             if (this.locked) return;
             this.allocation = adjustStatAllocation(this.allocation, key, delta);
             this.remainingPoints = getRemainingStatPoints(this.allocation);
-            this._syncStartButton();
+            this._syncSummary();
         },
 
         randomAllocation() {
             if (this.locked) return;
             this.allocation = createRandomStatAllocation();
             this.remainingPoints = getRemainingStatPoints(this.allocation);
-            this._syncStartButton();
+            this._syncSummary();
         },
 
-        _syncStartButton() {
-            this.startDisabled = this.remainingPoints > 0 || this.locked;
-            this.startText = this.remainingPoints > 0 ? `스탯 ${this.remainingPoints} 남음` : "토너먼트 시작";
+        _syncSummary() {
+            const m = formatStatAllocation(this.allocation);
+            const vals = [this.allocation.hp ?? 0, this.allocation.damage ?? 0, this.allocation.speed ?? 0];
+            const mult = calculateStatMultiplier(vals).multiplier;
+            this.allocationSummary = m + "  \u00D7" + mult.toFixed(3);
         }
     };
 }
