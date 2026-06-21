@@ -28,6 +28,39 @@
 
 게임 UI에서는 캐릭터의 원본 값을 직접 보여주지 않고, `체력 +30% · 공격 +40% · 속도 +30% · 쿨타임 +30%`처럼 배분 결과만 표시합니다.
 
+### 스탯 배분 계산 방식
+
+`applyStatAllocation()`에서 모든 스탯은 **pre-compute**됩니다 (전투 중 재계산 없음).
+
+```
+hp      = baseHP      × (1 + pts/100) × 밸런스배율
+damage  = baseDamage  × (1 + pts/100) × 밸런스배율
+speed   = baseSpeed   × (1 + pts/100) × 밸런스배율
+defense = baseDefense × (1 + pts/100) × 밸런스배율
+skill   = pts         (별도 저장, Ability.cooldown에서 100/(100+pts)로 계산)
+```
+
+`skill`만 포인트를 그대로 저장하고, `Ability` 베이스 클래스의 `cooldown` getter에서 `100/(100+스탯)` 공식으로 동적 계산합니다.
+
+### 충돌 피해 계산 (3단계)
+
+```
+1단계 — calculateCollisionDamage()
+  ㄴ round(baseDamage × efficiency × getDamageMultiplier())
+     - efficiency = speedEff × dirEff × glancingPenalty (모두 0~1)
+     - getDamageMultiplier(): 오버타임 전용, 평소 1
+
+2단계 — aModifiers.damage (곱)
+  ㄴ Ability.getStatModifiers().damage (능력별 피해 보정)
+
+3단계 — takeDamage() 방어력 차감
+  ㄴ actual = max(1, round(amount - totalDefense))
+     - totalDefense = round(baseDefense × abilityDefMult)
+     - abilityDefMult: Ability.getStatModifiers().defense (기본 ×1, Eater 피스트 ×3)
+```
+
+예: `damage=10, efficiency=0.7` → 1단계: 7 → 2단계: `×1.0` → 3단계: 방어력 4면 `7-4=3` 실제 피해.
+
 ### 방어력(defense) 상세
 
 받는 피해 계산은 **뺄셈** 기반이며, 각 캐릭터의 기본 방어력에 능력 보정(곱)이 적용됩니다.
@@ -73,6 +106,6 @@ totalDefense = round(baseDefense × abilityDefMult)
 - Orbit Ball은 잃은 위성을 한 개씩 재충전하며, 위성 1개당 충전 시간은 2초입니다.
 - Trickster Ball의 시드는 시드 생성 쿨다운과 같은 시간 동안 유지됩니다. 시드 쿨다운을 조정하면 시드 수명도 항상 같은 값으로 따라갑니다.
 - Dash Ball은 기본 쿨다운 3초의 빠른 대시를 사용하지만, 대시 자체의 추가 피해는 없고 일반 충돌 피해만 적용합니다. 유도 보정은 쿨다운 스택이 없는 100% 쿨 상태의 대시에서만 적용됩니다. 대시 중 상대를 맞히면 쿨다운이 50%씩 누적 감소하며, 최대 2단계(75% 감소)까지 줄어듭니다. 벽에 먼저 닿으면 쿨다운 스택이 완전히 초기화됩니다. 기본 공격력(damage=9)은 평균보다 낮습니다.
-- Eater Ball은 피스트(Feast) 모드 진입 시 3.3초간 지속되며, 삼키기 전까지 상대를 추적합니다. 충돌 시 상대를 삼키고(0.72초), 이후 뱉어내면 상대는 벽 충돌 대시 상태가 됩니다. 쿨타임은 피스트 중 및 삼키는 중에는 감소하지 않으며, 뱉은 후 풀로 초기화됩니다. 삼키는 동안 Eater의 크기는 1.5배로 커지고, 뱉으면 원래 크기로 돌아옵니다. 기본 방어력 4(최고), 피스트 중 추가 방어 +3.
+- Eater Ball은 피스트(Feast) 모드 진입 시 3.3초간 지속되며, 삼키기 전까지 상대를 추적합니다. 충돌 시 상대를 삼키고(0.72초), 이후 뱉어내면 상대는 벽 충돌 대시 상태가 됩니다. 쿨타임은 피스트 중 및 삼키는 중에는 감소하지 않으며, 뱉은 후 풀로 초기화됩니다. 삼키는 동안 Eater의 크기는 1.5배로 커지고, 뱉으면 원래 크기로 돌아옵니다. 기본 방어력 4(최고), 피스트 중 방어력 3배(12).
 - Rage Ball은 충돌하지 않는 시간이 길수록 점점 강해집니다. 최고 속도는 기본의 5배까지 올라가며, 쿨타임 스탯이 충전 시간을 단축합니다. (100포인트 시 7초 → 3.5초)
 - 모든 캐릭터의 쿨타임 스탯 공식은 `100/(100+skill)`입니다. 100포인트 투자 시 원래 쿨타임의 50%까지 줄어듭니다.
