@@ -47,7 +47,8 @@ skill   = pts         (별도 저장, Ability.cooldown에서 100/(100+pts)로 �
 ```
 1단계 — calculateCollisionDamage()
   ㄴ round(baseDamage × efficiency × getDamageMultiplier())
-     - efficiency = speedEff × dirEff × glancingPenalty (모두 0~1)
+     - efficiency = speedEff × dirEff × glancingPenalty (모두 상한 없음)
+     - speedEff = 현재 속도 / baseSpeed (스탯 보정 완료된 기준, 1=기본)
      - getDamageMultiplier(): 오버타임 전용, 평소 1
 
 2단계 — aModifiers.damage (곱)

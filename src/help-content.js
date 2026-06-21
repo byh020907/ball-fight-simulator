@@ -32,7 +32,7 @@ export const HELP_CONTENT = `
 <div class="help-section">
   <h4 class="help-h">💥 전투 시스템</h4>
   <ul>
-    <li><b>충돌 피해</b> — efficiency × baseDamage × 능력보정(damage). 효율(efficiency)은 속도(0~1) × 정렬도(0~1) × 글랜싱(0.5/1)의 곱입니다. 최종 피해는 상대의 방어력만큼 차감됩니다.</li>
+    <li><b>충돌 피해</b> — 현재 속도 / baseSpeed × 방향 × baseDamage × 능력보정. 최종 피해는 상대의 방어력만큼 차감됩니다. 빠를수록 더 큰 피해를 줍니다.</li>
     <li><b>벽꿍</b> — 벽에 튕길 때 일정 데미지를 추가로 받습니다.</li>
     <li><b>오버타임</b> — 26초 이후 데미지와 속도가 점점 증가합니다.</li>
   </ul>
