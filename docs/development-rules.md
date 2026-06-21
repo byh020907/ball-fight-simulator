@@ -10,6 +10,7 @@
 - 기존 동작을 바꾸는 수정은 가능하면 회귀 테스트를 먼저 추가하거나 기존 테스트를 갱신합니다.
 - 새 의존성은 명시적으로 필요할 때만 추가합니다.
 - 번들 파일을 생성해서 커밋하지 않습니다. 현재 배포 구조는 `index.html`이 `./src/main.js`를 직접 로드합니다.
+- **main에 푸시 또는 머지하기 전에 반드시 `src/patch-notes.js`의 `PATCH_NOTES`에 패치노트를 먼저 작성합니다.** 패치노트 작성 규칙은 `docs/patch-notes-guide.md`를 참고하세요.
 
 ## 코드 스타일
 
@@ -23,12 +24,12 @@
 
 이 프로젝트는 **VS Code (Windows)** 환경에서 개발하며, 아래 기준을 따릅니다.
 
-| 항목 | 기준 | 이유 |
-|------|------|------|
-| 파일 인코딩 | **UTF-8 (BOM 없음)** | 웹 표준, 브라우저와 호환 |
-| 줄바꿈 문자 | **LF (`\n`)** | Git 저장소 기준, `.gitattributes`로 통일 |
-| 파일 끝 | **빈 줄로 끝남** (`insertFinalNewline`) | POSIX 표준, diff 마지막 줄 노이즈 방지 |
-| 후행 공백 | **제거** (`trimTrailingWhitespace`) | diff 노이즈 방지 |
+| 항목        | 기준                                    | 이유                                     |
+| ----------- | --------------------------------------- | ---------------------------------------- |
+| 파일 인코딩 | **UTF-8 (BOM 없음)**                    | 웹 표준, 브라우저와 호환                 |
+| 줄바꿈 문자 | **LF (`\n`)**                           | Git 저장소 기준, `.gitattributes`로 통일 |
+| 파일 끝     | **빈 줄로 끝남** (`insertFinalNewline`) | POSIX 표준, diff 마지막 줄 노이즈 방지   |
+| 후행 공백   | **제거** (`trimTrailingWhitespace`)     | diff 노이즈 방지                         |
 
 > **Windows에서 LF 규칙이 적용되는 방식**: `.gitattributes`에 `* text=auto eol=lf`가 설정되어 있어, 커밋 시점에 모든 텍스트 파일이 LF로 저장됩니다. 로컬에서 CRLF로 작업해도 Git이 LF로 변환합니다.
 
@@ -55,12 +56,12 @@ npm run format:check
 
 ```json
 {
-  "tabWidth": 4,
-  "useTabs": false,
-  "printWidth": 120,
-  "semi": true,
-  "singleQuote": false,
-  "trailingComma": "none"
+    "tabWidth": 4,
+    "useTabs": false,
+    "printWidth": 120,
+    "semi": true,
+    "singleQuote": false,
+    "trailingComma": "none"
 }
 ```
 
@@ -68,13 +69,13 @@ npm run format:check
 
 한 파일이 **1000줄**을 넘어가면 분리를 고려합니다. 단, 파일 성격에 따라 기준을 다르게 적용합니다.
 
-| 파일 성격 | 분리 기준 | 분리 방향 | 예시 |
-|---|---|---|---|
-| **데이터/설정** | 1000줄 넘어도 분리 불필요 | 값 추가만으로 유지보수에 지장 없으면 그대로 둠 | `roster.js`, `stat-allocation.js` |
-| **게임 로직/상태** | 700~1000줄에서 분리 검토 | 책임별로 클래스/모듈 분리 | `simulation.js`, `entities.js` |
-| **UI/렌더링** | 700~1000줄에서 분리 검토 | 컴포넌트나 역할 단위로 분리 | `ui.js` (Alpine store / UIController / ArenaRenderer) |
-| **능력(Ability)** | 각 Ability 파일은 개별 클래스이므로 1000줄까지 허용 | 능력 하나가 1000줄 넘으면 내부 책임 분리 | `OrbitAbility.js`, `RageAbility.js` |
-| **유틸리티** | 500줄 이상이면 분리 검토 | 함수 성격별 파일 분리 | `core.js`, `effects.js` |
+| 파일 성격          | 분리 기준                                           | 분리 방향                                      | 예시                                                  |
+| ------------------ | --------------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------- |
+| **데이터/설정**    | 1000줄 넘어도 분리 불필요                           | 값 추가만으로 유지보수에 지장 없으면 그대로 둠 | `roster.js`, `stat-allocation.js`                     |
+| **게임 로직/상태** | 700~1000줄에서 분리 검토                            | 책임별로 클래스/모듈 분리                      | `simulation.js`, `entities.js`                        |
+| **UI/렌더링**      | 700~1000줄에서 분리 검토                            | 컴포넌트나 역할 단위로 분리                    | `ui.js` (Alpine store / UIController / ArenaRenderer) |
+| **능력(Ability)**  | 각 Ability 파일은 개별 클래스이므로 1000줄까지 허용 | 능력 하나가 1000줄 넘으면 내부 책임 분리       | `OrbitAbility.js`, `RageAbility.js`                   |
+| **유틸리티**       | 500줄 이상이면 분리 검토                            | 함수 성격별 파일 분리                          | `core.js`, `effects.js`                               |
 
 분리할 때는 아래 원칙을 따릅니다.
 
@@ -108,17 +109,17 @@ app.js → UIController 메서드 호출
 
 ### 컴포넌트 구조 (index.html)
 
-| Alpine 바인딩 | 역할 | 상태 출처 |
-|---|---|---|
-| `x-data="appStore"` | 메인 컴포넌트 (`<main>`) | `appStore()` |
-| `x-text="statusBadge"` | 상태 뱃지 텍스트 | `UIController.updateStatus()` |
-| `x-text="statusText"` | 매치업 레이블 | `UIController.updateStatus()` |
-| `x-bind:class="{ visible: overlayVisible }"` | 오버레이 표시 | `UIController.showOverlay()` / `hideOverlay()` |
-| `@click="$dispatch('start-tournament')"` | 시작 버튼 클릭 | `document` 이벤트 리스너 → `BattleApp.startTournament()` |
-| `x-for="fighter in fighters"` | 파이터 카드 목록 | `UIController.renderRoster()` / `updateLiveCards()` |
-| `x-for="stat in statDefs"` | 스탯 배분 버튼 그리드 | `appStore().adjustStat()` |
-| `x-for="(round, rIndex) in tournamentRounds"` | 토너먼트 대진표 | `UIController.renderTournament()` |
-| `x-text="item"` in `x-for` | 배틀 로그 | `UIController.addLog()` |
+| Alpine 바인딩                                 | 역할                     | 상태 출처                                                |
+| --------------------------------------------- | ------------------------ | -------------------------------------------------------- |
+| `x-data="appStore"`                           | 메인 컴포넌트 (`<main>`) | `appStore()`                                             |
+| `x-text="statusBadge"`                        | 상태 뱃지 텍스트         | `UIController.updateStatus()`                            |
+| `x-text="statusText"`                         | 매치업 레이블            | `UIController.updateStatus()`                            |
+| `x-bind:class="{ visible: overlayVisible }"`  | 오버레이 표시            | `UIController.showOverlay()` / `hideOverlay()`           |
+| `@click="$dispatch('start-tournament')"`      | 시작 버튼 클릭           | `document` 이벤트 리스너 → `BattleApp.startTournament()` |
+| `x-for="fighter in fighters"`                 | 파이터 카드 목록         | `UIController.renderRoster()` / `updateLiveCards()`      |
+| `x-for="stat in statDefs"`                    | 스탯 배분 버튼 그리드    | `appStore().adjustStat()`                                |
+| `x-for="(round, rIndex) in tournamentRounds"` | 토너먼트 대진표          | `UIController.renderTournament()`                        |
+| `x-text="item"` in `x-for`                    | 배틀 로그                | `UIController.addLog()`                                  |
 
 ### 새 UI 컴포넌트 추가 규칙
 
@@ -128,7 +129,8 @@ app.js → UIController 메서드 호출
 4. **`src/styles.css`**에 스타일을 추가합니다.
 
 `innerHTML`을 직접 조작하거나 jQuery 등을 도입하지 않습니다.
-```
+
+````
 
 ## 로컬 실행과 검증
 
@@ -136,7 +138,7 @@ app.js → UIController 메서드 호출
 
 ```bash
 npm start
-```
+````
 
 브라우저 주소:
 
@@ -199,12 +201,12 @@ Tested: npm test, npm run check
 이 프로젝트는 Windows PowerShell을 기본 셸로 사용합니다. Linux/macOS와 명령어 차이가 있습니다.
 
 - `&&` 연산자는 PowerShell에서 지원하지 않습니다. 명령어 연결은 `;`(세미콜론)을 사용합니다.
-  ```powershell
-  # bad
-  cd path && git status
-  # good
-  cd path; git status
-  ```
+    ```powershell
+    # bad
+    cd path && git status
+    # good
+    cd path; git status
+    ```
 - `>` 리디렉션 출력이 예상과 다른 인코딩(UTF-16LE)으로 저장될 수 있으므로, 파일 복원 후 내용을 확인합니다.
 - `Get-Content` / `Set-Content`는 `-Encoding UTF8`을 명시해야 한글이 깨지지 않습니다.
 - `Select-String -SimpleMatch`로 단순 문자열 존재 여부를 확인할 수 있습니다.
@@ -226,12 +228,12 @@ Tested: npm test, npm run check
 1. **새 파일 먼저 생성** — 기존 파일을 지우기 전에 새 파일을 만듭니다.
 2. **`src/abilities/index.js` 갱신** — 바로 새 파일을 export합니다.
 3. **참조하는 모든 파일 업데이트** — 아래를 빠짐없이 확인합니다.
-   - `src/simulation.js` — import 구문, `createAbility` 테이블
-   - `src/entities.js` — `this.id` 할당
-   - `src/roster.js` — `id`, `face`, `ability` 필드
-   - 그 외 해당 클래스를 import/참조하는 모든 파일
+    - `src/simulation.js` — import 구문, `createAbility` 테이블
+    - `src/entities.js` — `this.id` 할당
+    - `src/roster.js` — `id`, `face`, `ability` 필드
+    - 그 외 해당 클래스를 import/참조하는 모든 파일
 4. **함수/클래스 선언을 실수로 지우지 않도록 `git diff`로 확인**
-   - `roster.js`는 전체 배열을 `export function createRoster()`로 감싸고 있습니다. `return [` 앞의 함수 선언과 끝의 `}`를 유지해야 합니다.
+    - `roster.js`는 전체 배열을 `export function createRoster()`로 감싸고 있습니다. `return [` 앞의 함수 선언과 끝의 `}`를 유지해야 합니다.
 5. **기존 파일 삭제** — 새 파일이 정상 참조됨을 확인한 후 삭제합니다.
 6. **`tests/regression.mjs`도 함께 업데이트** — id 참조와 변수명을 변경합니다.
 7. **`npm test`로 전체 회귀 테스트 통과 확인**
