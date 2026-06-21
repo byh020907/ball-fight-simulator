@@ -746,6 +746,19 @@ body::before {
     gap: 2px;
 }
 
+.player-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.player-title-row canvas {
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 2px solid #202020;
+    background: #eeeeee;
+}
+
 .player-panel > .help-icon {
     justify-self: end;
 }

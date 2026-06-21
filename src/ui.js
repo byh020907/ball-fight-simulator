@@ -12,6 +12,16 @@ import { RENDER_LAYERS, Vector2 } from "./core.js";
 import { BattleBall } from "./entities.js";
 import { getUnseenEntries, dismissPatchNotes } from "./utils.js";
 import { PopupService } from "./popup.js";
+import {
+    ArcherAbility,
+    OrbitAbility,
+    TricksterAbility,
+    GrenadeAbility,
+    DashAbility,
+    RageAbility,
+    EaterAbility,
+    SwordNightAbility
+} from "./abilities/index.js";
 
 // ── Alpine.js x-data function ───────────────────────────────────────────────
 
@@ -224,6 +234,68 @@ export class UIController {
         s.totalPoints = totalPoints;
         s.remainingPoints = remainingPoints;
         s.locked = locked;
+        this._drawPlayerFace(fighter);
+    }
+
+    /** 플레이어 패널에 캐릭터 얼굴 그리기 */
+    _drawPlayerFace(fighter) {
+        if (!fighter) return;
+        const canvas = document.getElementById("playerFaceCanvas");
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        const size = 50;
+
+        // 배경 원
+        ctx.clearRect(0, 0, size, size);
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.fillStyle = fighter.color;
+        ctx.fillRect(0, 0, size, size);
+
+        // ability drawFace 재사용을 위한 fake ball
+        const fakeBall = { radius: size / 2 - 2, position: { x: size / 2, y: size / 2 } };
+
+        const ABILITY_MAP = {
+            archer: ArcherAbility,
+            orbit: OrbitAbility,
+            trickster: TricksterAbility,
+            grenade: GrenadeAbility,
+            dash: DashAbility,
+            rage: RageAbility,
+            eater: EaterAbility,
+            sword_night: SwordNightAbility
+        };
+
+        const AbilityClass = ABILITY_MAP[fighter.ability];
+        if (AbilityClass) {
+            const fakeOwner = {
+                color: fighter.color,
+                position: new Vector2(size / 2, size / 2),
+                radius: size / 2 - 2,
+                velocity: new Vector2()
+            };
+            const ability = new AbilityClass(fakeOwner, {});
+            ctx.save();
+            ctx.strokeStyle = "#202020";
+            ctx.fillStyle = "#202020";
+            ctx.lineWidth = Math.max(3, fakeBall.radius * 0.075);
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            ctx.translate(size / 2, size / 2);
+            ability.drawFace(ctx, 0, fakeBall);
+            ctx.restore();
+        }
+
+        ctx.restore();
+
+        // 테두리
+        ctx.beginPath();
+        ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
+        ctx.strokeStyle = "#202020";
+        ctx.lineWidth = 2;
+        ctx.stroke();
     }
 
     renderRoster(activeIds = []) {

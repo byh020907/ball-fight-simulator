@@ -187,10 +187,21 @@
                         </button>
                         <div class="player-title">
                             <span>내 캐릭터</span>
-                            <strong
-                                x-text="playerFighter?.name"
-                                x-bind:style="'color:' + (playerFighter?.color || '#000')"
-                            ></strong>
+                            <div class="player-title-row">
+                                <canvas
+                                    id="playerFaceCanvas"
+                                    width="50"
+                                    height="50"
+                                    x-init="
+                                        $el.width = 50;
+                                        $el.height = 50
+                                    "
+                                ></canvas>
+                                <strong
+                                    x-text="playerFighter?.name"
+                                    x-bind:style="'color:' + (playerFighter?.color || '#000')"
+                                ></strong>
+                            </div>
                         </div>
                         <p class="player-note">
                             <span x-text="playerFighter?.title || ''"></span>
