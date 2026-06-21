@@ -19,6 +19,20 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.6.0",
+        date: "2026-06-21",
+        title: "v0.6.0 업데이트",
+        changes: [
+            {
+                type: "feature",
+                text: "방어력(DEF) 스탯 추가 — 받는 피해에서 방어력만큼 차감됩니다. roster에 캐릭터별 기본 방어력 추가."
+            },
+            { type: "feature", text: "Eater Ball 방어력 재설계 — 피스트 중 방어력 3배 (4→12), 뱉은 후 쿨타임 초기화." },
+            { type: "refactor", text: "충돌 피해 계산 체계 정리 — 3단계(충돌效率 × 능력보정 − 방어력)로 문서화." },
+            { type: "style", text: "게임 도움말 업데이트 — 방어력/5스탯, 모든 능력 설명 최신화." }
+        ]
+    },
+    {
         version: "0.5.0",
         date: "2026-06-21",
         title: "v0.5.0 업데이트",
