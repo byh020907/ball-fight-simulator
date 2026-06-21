@@ -1,4 +1,4 @@
-import { CombatEntity, Vector2 } from "./core.js";
+import { CombatEntity, RENDER_LAYERS, Vector2 } from "./core.js";
 
 export class VisualBurst extends CombatEntity {
     constructor(position, color, radiusGrowth, life) {
@@ -235,7 +235,7 @@ export class SlashTrail extends CombatEntity {
 
 /** Floating damage number that rises and fades. */
 export class DamageNumber extends CombatEntity {
-    static renderLayer = 2;
+    static renderLayer = RENDER_LAYERS.FOREGROUND;
 
     constructor(position, amount, color = "#ff3333") {
         super(position.clone(), new Vector2(0, -70), 0);

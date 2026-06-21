@@ -50,6 +50,16 @@ export class Vector2 {
     }
 }
 
+/** Named render layers for ArenaRenderer — lower values draw first. */
+export const RENDER_LAYERS = Object.freeze({
+    /** Particles, visual effects, projectiles — behind fighters. */
+    BACKGROUND: 0,
+    /** Fighters. */
+    FIGHTER: 1,
+    /** Floating text, UI overlays on the canvas — in front of fighters. */
+    FOREGROUND: 2
+});
+
 export class CombatEntity {
     constructor(position, velocity, radius) {
         this.position = position;
@@ -59,7 +69,7 @@ export class CombatEntity {
     }
 
     /** Render priority — lower values draw first (behind). */
-    static renderLayer = 0;
+    static renderLayer = RENDER_LAYERS.BACKGROUND;
     get renderLayer() {
         return this.constructor.renderLayer;
     }
@@ -82,16 +92,6 @@ export class TimedEffect {
         this.elapsed += delta;
     }
 }
-
-/** Named render layers for ArenaRenderer — lower values draw first. */
-export const RENDER_LAYERS = Object.freeze({
-    /** Particles, visual effects, projectiles — behind fighters. */
-    BACKGROUND: 0,
-    /** Fighters. */
-    FIGHTER: 1,
-    /** Floating text, UI overlays on the canvas — in front of fighters. */
-    FOREGROUND: 2
-});
 
 export const FIGHTER_IDS = Object.freeze({
     ARCHER: "archer",
