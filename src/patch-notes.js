@@ -19,6 +19,21 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.6.5",
+        date: "2026-06-22",
+        title: "v0.6.5 업데이트",
+        changes: [
+            {
+                type: "refactor",
+                text: "넉백 시스템 재설계 — forceHeading에 overrideVelocity 통합, knockbackState 제거. 벽 충돌 시 넉백 종료."
+            },
+            {
+                type: "refactor",
+                text: "applyKnockback이 속도 벡터를 직접 받도록 변경 — 투사체 속도가 넉백에 반영됩니다."
+            }
+        ]
+    },
+    {
         version: "0.6.4",
         date: "2026-06-21",
         title: "v0.6.4 업데이트",
