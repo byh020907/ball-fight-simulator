@@ -331,8 +331,8 @@
                 @click.self="closePopup('close')"
             >
                 <div class="bf-popup-card">
-                    <strong class="bf-popup-title" x-text="popupContent?.title"></strong>
-                    <div class="bf-popup-body" x-html="popupContent?.bodyHtml"></div>
+                    <strong class="bf-popup-title" x-text="popupContent?.title ?? ''"></strong>
+                    <div class="bf-popup-body" x-html="popupContent?.bodyHtml ?? ''"></div>
                     <div class="bf-popup-footer" x-show="popupContent?.buttons?.length">
                         <template x-for="btn in popupContent?.buttons" :key="btn.value">
                             <button
