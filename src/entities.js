@@ -397,10 +397,6 @@ export class BattleBall {
             return;
         }
 
-        // Knockback 감지 (forcedHeading에 speedMultiplier가 설정된 경우)
-        const knockbackDir = this.forcedHeading?.speedMultiplier > 0 ? this.forcedHeading.direction.clone() : null;
-        const knockbackMult = this.forcedHeading?.speedMultiplier > 0 ? this.forcedHeading.speedMultiplier : 0;
-
         const target = simulation.getOpponent(this);
 
         if (this.slowEffect) {
@@ -452,11 +448,11 @@ export class BattleBall {
             this.velocity.length() > 0
                 ? this.velocity.clone().normalize()
                 : Vector2.fromAngle(Math.random() * Math.PI * 2, 1);
-        const direction =
-            knockbackDir ?? (this.forcedHeading ? this.forcedHeading.direction.clone() : currentDirection);
+        const direction = this.forcedHeading ? this.forcedHeading.direction.clone() : currentDirection;
 
-        const speedLimit = knockbackMult
-            ? this.baseSpeed * knockbackMult
+        const isKnockback = this.forcedHeading?.speedMultiplier > 0;
+        const speedLimit = isKnockback
+            ? this.baseSpeed * this.forcedHeading.speedMultiplier
             : (this.dashState?.speedOverride ??
               this.speedBoost?.speedOverride ??
               this.baseSpeed * modifiers.speed * slowMultiplier * boostMultiplier * simulation.getSpeedMultiplier());
@@ -464,7 +460,7 @@ export class BattleBall {
 
         this.position.add(this.velocity.clone().scale(delta));
         // 벽 충돌 시 knockback 종료
-        if (knockbackMult) {
+        if (isKnockback) {
             const bx = this.position.x,
                 by = this.position.y;
             simulation.keepInsideArena(this);
