@@ -291,6 +291,7 @@ export class BattleBall {
         this.slowEffect = null;
         this.speedBoost = null;
         this.forcedHeading = null;
+        this.knockbackState = null;
         this.dashState = null;
         this.swallowedState = null;
         this.wallSlamState = null;
@@ -324,8 +325,11 @@ export class BattleBall {
 
     /** 방향 고정 + 속도 강제로 다프레임 넉백 */
     applyKnockback(direction, duration, multiplier) {
-        this.forceHeading(direction, duration);
-        this.setSpeedBoost(duration, multiplier);
+        this.knockbackState = {
+            effect: new TimedEffect(duration),
+            direction: direction.clone().normalize(),
+            multiplier
+        };
     }
 
     startDash(direction, config = {}) {
@@ -364,6 +368,7 @@ export class BattleBall {
     freezeForResult() {
         this.velocity = new Vector2();
         this.clearDash();
+        this.knockbackState = null;
         this.slowEffect = null;
         this.swallowedState = null;
         this.wallSlamState = null;
@@ -391,6 +396,19 @@ export class BattleBall {
         if (this.swallowedState) {
             this.position = this.swallowedState.owner.position.clone();
             this.velocity = new Vector2();
+            return;
+        }
+
+        // Knockback 최우선 — 일반 이동 중단
+        if (this.knockbackState) {
+            this.knockbackState.effect.tick(delta);
+            const dir = this.knockbackState.direction;
+            this.velocity = dir.scale(this.baseSpeed * this.knockbackState.multiplier);
+            this.position.add(this.velocity.clone().scale(delta));
+            simulation.keepInsideArena(this);
+            if (this.knockbackState.effect.finished) {
+                this.knockbackState = null;
+            }
             return;
         }
 
