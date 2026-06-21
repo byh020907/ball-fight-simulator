@@ -447,7 +447,7 @@ async function testOrbitShardRecharge(app) {
     const hpBefore = target.hp;
     ability.update(0.016, target);
     assert.ok(target.hp < hpBefore, "Orbit shard should damage when it hits");
-    assert.equal(ability.getActiveShardCount(), 2, "Hit orbit shard should disappear");
+    assert.equal(ability.getActiveShardCount(), 4, "Hit orbit shard should disappear (5→4)");
     assert.ok(ability.spinBurst > 0, "Orbit should spin faster after spending a shard");
 
     target.position.x = 80;
@@ -460,11 +460,13 @@ async function testOrbitShardRecharge(app) {
         "Refilling shard should render between the body and orbit"
     );
     ability.update(1.98, target);
-    assert.equal(ability.getActiveShardCount(), 3, "Orbit shard should return after refill animation");
+    assert.equal(ability.getActiveShardCount(), 5, "Orbit shard should return after refill animation");
 
     ability.consumeShard(0);
     ability.consumeShard(1);
     ability.consumeShard(2);
+    ability.consumeShard(3);
+    ability.consumeShard(4);
     assert.equal(ability.getActiveShardCount(), 0, "All orbit shards can be spent");
     ability.update(0.016, target);
     assert.ok(ability.getRefillingShard(), "Orbit should immediately refill when every shard is gone");
