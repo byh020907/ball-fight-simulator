@@ -61,7 +61,7 @@ export class ArcherAbility extends Ability {
 
     /** Spawn a single arrow with hit/miss callback. */
     fireOne(start, dir) {
-        const arrow = this.simulation.spawnArrow(this.owner, start, dir.clone().scale(540));
+        const arrow = this.simulation.spawnArrow(this.owner, start, dir.clone().scale(this.owner.baseSpeed * 2));
         arrow._abilityRef = this;
         this.simulation.spawnSlash(this.owner.position.clone(), start.clone(), this.owner.color);
     }
