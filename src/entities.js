@@ -325,7 +325,7 @@ export class BattleBall {
     /** 방향 고정 + 속도 강제로 다프레임 넉백 */
     applyKnockback(direction, duration, multiplier) {
         this.forceHeading(direction, duration);
-        this.setSpeedBoost(duration, multipiler);
+        this.setSpeedBoost(duration, multiplier);
     }
 
     startDash(direction, config = {}) {
