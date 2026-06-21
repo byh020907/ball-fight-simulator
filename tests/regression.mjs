@@ -134,6 +134,7 @@ function makeHarness() {
     "statusBadge",
     "fighterCards",
     "battleLog",
+    "tournamentPanel",
     "tournamentBracket",
     "tournamentPhase",
     "playerPanel"

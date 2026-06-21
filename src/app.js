@@ -23,6 +23,7 @@ export class BattleApp {
           statusBadge: document.getElementById("statusBadge"),
           fighterCards: document.getElementById("fighterCards"),
           battleLog: document.getElementById("battleLog"),
+          tournamentPanel: document.getElementById("tournamentPanel"),
           tournamentBracket: document.getElementById("tournamentBracket"),
           tournamentPhase: document.getElementById("tournamentPhase"),
           playerPanel: document.getElementById("playerPanel")
@@ -43,6 +44,7 @@ export class BattleApp {
         this.simulation = null;
         this.lastTime = 0;
         this.rafId = 0;
+        this.previewRafId = 0;
         this.resultSequenceAnnounced = false;
         this.matchFinalized = false;
         this.transientOverlayToken = 0;
@@ -50,6 +52,8 @@ export class BattleApp {
         this.elements.playerPanel?.addEventListener("click", (event) => this.handlePlayerPanelClick(event));
         this.refreshPlayerSetup();
         this.ui.updateStatus("내 캐릭터 스탯을 배분하세요", "Setup");
+        this.ui.hideOverlay();
+        this.startPlayerPreviewLoop();
       }
 
       pickPlayerFighterId() {
@@ -86,11 +90,72 @@ export class BattleApp {
           remainingPoints: remaining,
           locked: Boolean(this.tournament && !this.tournament.champion)
         });
+        this.mountSetupStartButton();
 
         if (!this.tournament || this.tournament.champion) {
           this.elements.startButton.disabled = remaining > 0;
-          this.elements.startButton.textContent = remaining > 0 ? `스탯 ${remaining} 남음` : "토너먼트 시작";
+          this.elements.startButton.textContent = this.tournament?.champion
+            ? "다시 시작"
+            : remaining > 0 ? `스탯 ${remaining} 남음` : "토너먼트 시작";
+          if (remaining === 0) {
+            this.scrollSetupActionsIntoView();
+          }
+          this.startPlayerPreviewLoop();
         }
+      }
+
+      scrollSetupActionsIntoView() {
+        if (!this.elements.playerPanel) {
+          return;
+        }
+
+        this.elements.playerPanel.scrollTop = this.elements.playerPanel.scrollHeight;
+      }
+
+      mountSetupStartButton() {
+        if (this.tournament && !this.tournament.champion) {
+          return;
+        }
+
+        const actions = this.elements.playerPanel?.querySelector?.("[data-player-actions]");
+        if (actions) {
+          actions.appendChild(this.elements.startButton);
+        }
+      }
+
+      renderPlayerPreview() {
+        if (this.tournament && !this.tournament.champion) {
+          return;
+        }
+
+        const player = this.roster.find((fighter) => fighter.id === this.playerFighterId);
+        this.renderer.renderPlayerPreview(player);
+      }
+
+      startPlayerPreviewLoop() {
+        if (this.previewRafId || (this.tournament && !this.tournament.champion)) {
+          return;
+        }
+
+        const tick = () => {
+          if (this.tournament && !this.tournament.champion) {
+            this.previewRafId = 0;
+            return;
+          }
+
+          this.renderPlayerPreview();
+          this.previewRafId = requestAnimationFrame(tick);
+        };
+        tick();
+      }
+
+      stopPlayerPreviewLoop() {
+        if (!this.previewRafId) {
+          return;
+        }
+
+        cancelAnimationFrame(this.previewRafId);
+        this.previewRafId = 0;
       }
 
       async startTournament() {
@@ -104,6 +169,7 @@ export class BattleApp {
 
         this.audio.unlock();
         cancelAnimationFrame(this.rafId);
+        this.stopPlayerPreviewLoop();
         this.elements.startButton.disabled = true;
         this.elements.startButton.classList.add("hidden");
         this.elements.startButton.textContent = "다시 시작";
@@ -161,7 +227,7 @@ export class BattleApp {
           onLog: (message) => this.ui.addLog(message),
           onOvertime: () => {
             this.ui.updateStatus(label, "Overtime");
-            this.showTransientOverlay("Overtime", "속도와 피해 증가", 1250);
+            this.showTransientOverlay("Overtime", "", 1250);
             this.audio.play("overtime");
           },
           onSound: (type, intensity) => this.audio.play(type, intensity)

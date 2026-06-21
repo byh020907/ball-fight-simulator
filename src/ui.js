@@ -1,11 +1,39 @@
 
 
 import { formatStatAllocation } from './stat-allocation.js';
+import { Vector2 } from './core.js';
+import { BattleBall } from './entities.js';
 
 export class ArenaRenderer {
       constructor(canvas) {
         this.canvas = canvas;
         this.ctx = canvas.getContext("2d");
+      }
+
+      renderPlayerPreview(fighter) {
+        const ctx = this.ctx;
+        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillStyle = "#fafafa";
+        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        if (!fighter) {
+          return;
+        }
+
+        const preview = new BattleBall(fighter, new Vector2(this.canvas.width / 2, this.canvas.height / 2 - 28));
+        preview.velocity = new Vector2(0, 0);
+        preview.radius = Math.round(preview.baseRadius * 1.35);
+        preview.draw(ctx);
+
+        ctx.save();
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#202020";
+        ctx.font = "900 28px Bahnschrift, Segoe UI, sans-serif";
+        ctx.fillText("내 캐릭터", this.canvas.width / 2, preview.position.y + preview.radius + 48);
+        ctx.font = "700 22px Bahnschrift, Segoe UI, sans-serif";
+        ctx.fillStyle = fighter.color;
+        ctx.fillText(fighter.name, this.canvas.width / 2, preview.position.y + preview.radius + 82);
+        ctx.restore();
       }
 
       render(simulation) {
@@ -64,6 +92,7 @@ export class UIController {
           return;
         }
 
+        this.elements.playerPanel.classList.toggle("locked", locked);
         const spent = totalPoints - remainingPoints;
         this.elements.playerPanel.innerHTML = `
           <div class="player-title">
@@ -92,6 +121,7 @@ export class UIController {
             `).join("")}
           </div>
           <button class="random-stat-button" type="button" data-random-stats ${locked ? "disabled" : ""}>자동 배분</button>
+          <div class="player-actions" data-player-actions></div>
         `;
       }
 
@@ -133,6 +163,7 @@ export class UIController {
 
       showOverlay(label, text) {
         delete this.elements.overlay.dataset.transientToken;
+        this.elements.overlay.classList.remove("transient");
         this.elements.overlay.innerHTML = `
           <div class="overlay-card">
             <span>${label}</span>
@@ -144,10 +175,13 @@ export class UIController {
 
       showTransientOverlay(label, text, token) {
         this.elements.overlay.dataset.transientToken = String(token);
+        this.elements.overlay.classList.add("transient");
+        const content = text
+          ? `<span>${label}</span><strong>${text}</strong>`
+          : `<strong>${label}</strong>`;
         this.elements.overlay.innerHTML = `
           <div class="overlay-card">
-            <span>${label}</span>
-            <strong>${text}</strong>
+            ${content}
           </div>
         `;
         this.elements.overlay.classList.add("visible");
@@ -155,7 +189,7 @@ export class UIController {
 
       hideOverlay() {
         delete this.elements.overlay.dataset.transientToken;
-        this.elements.overlay.classList.remove("visible");
+        this.elements.overlay.classList.remove("visible", "transient");
       }
 
       resetLog() {
@@ -178,6 +212,7 @@ export class UIController {
           return;
         }
 
+        this.elements.tournamentPanel?.classList.toggle("setup-hidden", !tournament);
         if (!tournament) {
           this.elements.tournamentPhase.textContent = "Ready";
           this.elements.tournamentBracket.innerHTML = `

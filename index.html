@@ -204,6 +204,29 @@
       transform: scale(1);
     }
 
+    .overlay.transient {
+      background: transparent;
+      align-items: center;
+    }
+
+    .overlay.transient .overlay-card {
+      max-width: min(78%, 360px);
+      padding: 0;
+      border: 0;
+      background: transparent;
+    }
+
+    .overlay.transient .overlay-card span {
+      margin-bottom: 4px;
+      color: rgba(17, 17, 17, 0.58);
+      letter-spacing: 0.18em;
+    }
+
+    .overlay.transient .overlay-card strong {
+      font-size: clamp(1.2rem, 4vw, 2rem);
+      color: rgba(17, 17, 17, 0.72);
+    }
+
     .overlay-card {
       text-align: center;
       padding: 28px 32px;
@@ -542,6 +565,23 @@
       pointer-events: none;
     }
 
+    .player-panel .control-button {
+      position: static;
+      left: auto;
+      bottom: auto;
+      transform: none;
+      width: 100%;
+      min-width: 0;
+      min-height: 42px;
+      border: 2px solid #202020;
+      border-radius: 0;
+      z-index: auto;
+    }
+
+    .player-panel .control-button:hover:not(:disabled) {
+      transform: none;
+    }
+
     .fighter-strip {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -653,13 +693,40 @@
       overflow: auto;
     }
 
+    .tournament-panel.setup-hidden {
+      width: 0 !important;
+      max-height: 0 !important;
+      padding: 0 !important;
+      border: 0;
+      gap: 0;
+      overflow: visible;
+      background: transparent;
+    }
+
+    .tournament-panel.setup-hidden .tournament-title,
+    .tournament-panel.setup-hidden .bracket {
+      display: none;
+    }
+
     .player-panel {
+      position: fixed;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 10;
+      width: min(360px, calc(100vw - 24px));
+      max-height: calc(100dvh - 24px);
+      overflow: auto;
       border: 2px solid #202020;
       background: #f8f8f8;
       color: #202020;
       padding: 7px;
       display: grid;
       gap: 8px;
+    }
+
+    .player-panel.locked {
+      display: none;
     }
 
     .player-title {
@@ -771,6 +838,13 @@
       width: 100%;
       min-height: 30px;
       background: #59d6ff;
+    }
+
+    .player-actions {
+      display: flex;
+      gap: 6px;
+      padding-top: 6px;
+      background: #f8f8f8;
     }
 
     .tournament-title {
@@ -998,6 +1072,46 @@
 
       .player-panel {
         padding: 8px;
+        font-size: clamp(11px, 2.8vw, 13px);
+      }
+
+      .player-title span,
+      .point-meter span {
+        font-size: 0.78em;
+      }
+
+      .player-title strong {
+        font-size: 1.08em;
+      }
+
+      .player-note {
+        font-size: 0.84em;
+      }
+
+      .point-meter b,
+      .stat-row em {
+        font-size: 0.86em;
+      }
+
+      .allocation-summary {
+        font-size: 0.84em;
+      }
+
+      .stat-copy strong {
+        font-size: 0.9em;
+      }
+
+      .stat-copy span {
+        font-size: 0.72em;
+      }
+
+      .stat-row button,
+      .random-stat-button {
+        font-size: 0.82em;
+      }
+
+      .player-panel .control-button {
+        font-size: 1em;
       }
 
       .stat-row {
@@ -1010,9 +1124,115 @@
       }
     }
 
+    @media (max-width: 760px) and (orientation: portrait) {
+      .game-frame {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: flex-start;
+        gap: 6px;
+      }
+
+      .battle-stage {
+        order: 1;
+        flex: 0 0 auto;
+        width: 100%;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        align-content: start;
+      }
+
+      .tournament-panel {
+        order: 2;
+        flex: 1 1 0;
+        min-height: 0;
+        max-height: none;
+        padding: 6px;
+        gap: 6px;
+      }
+
+      .tournament-panel.setup-hidden {
+        flex: 1 1 0;
+        min-height: 0;
+        width: 100% !important;
+        max-height: none !important;
+      }
+
+      .tournament-title {
+        padding-bottom: 4px;
+      }
+
+      .arena-shell {
+        flex: 0 0 auto;
+        width: 100%;
+        max-width: 100%;
+        align-self: start;
+      }
+
+      .overlay.transient {
+        align-items: center;
+      }
+
+      .overlay.transient .overlay-card {
+        max-width: min(84%, 320px);
+      }
+
+      .fighter-strip {
+        flex: 0 0 auto;
+        align-self: start;
+        width: 100%;
+      }
+
+      .fighter-card {
+        padding: 4px 5px;
+      }
+
+      .tournament-title strong {
+        font-size: 0.82em;
+      }
+
+      .bracket {
+        gap: 3px;
+      }
+
+      .bracket-round {
+        gap: 3px;
+      }
+
+      .round-title {
+        font-size: 0.62em;
+      }
+
+      .bracket-match {
+        min-height: 34px;
+        padding: 2px;
+      }
+
+      .bracket-slot {
+        font-size: 0.68em;
+      }
+
+      .bracket-status {
+        font-size: 0.58em;
+      }
+
+      .player-panel {
+        position: relative;
+        left: auto;
+        top: auto;
+        bottom: auto;
+        transform: none;
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        max-height: none;
+      }
+    }
+
     @media (max-width: 420px) {
       .app {
-        padding: 6px;
+        padding: 0;
       }
 
       .stat-row {
@@ -1024,11 +1244,11 @@
       }
 
       .allocation-summary {
-        font-size: 0.72rem;
+        font-size: 0.8em;
       }
 
       .bracket-slot {
-        font-size: 0.7rem;
+        font-size: 0.72em;
       }
     }
   </style>
@@ -1060,7 +1280,7 @@
       <footer class="fighter-strip" id="fighterCards"></footer>
       <div class="debug-hidden"><ul id="battleLog"></ul></div>
     </section>
-    <aside class="tournament-panel" aria-label="Tournament bracket">
+    <aside class="tournament-panel" id="tournamentPanel" aria-label="Tournament bracket">
       <div class="tournament-title">
         <strong>Bracket</strong>
         <span id="tournamentPhase">Ready</span>
