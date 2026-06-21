@@ -42,10 +42,10 @@ export class SwordNightAbility extends Ability {
             this.owner.velocity.length() > 0
                 ? Math.atan2(this.owner.velocity.y, this.owner.velocity.x)
                 : this._facingAngle;
-        let diff = velAngle - this._facingAngle;
-        while (diff > Math.PI) diff -= Math.PI * 2;
-        while (diff < -Math.PI) diff += Math.PI * 2;
-        this._facingAngle += diff * Math.min(1, 8 * delta);
+        let angleDiff = velAngle - this._facingAngle;
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        this._facingAngle += angleDiff * Math.min(1, 8 * delta);
         const sweepOffset = Math.sin(time * SWEEP_SPEED) * (Math.PI * 0.45); // ±81°
         this.arcAngle = this._facingAngle + sweepOffset;
 
