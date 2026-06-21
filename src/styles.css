@@ -1252,7 +1252,6 @@ body::before {
     }
 }
 
-
 /* ── Balance multiplier badge ─────────────────────────────────── */
 
 .allocation-summary {
@@ -1328,7 +1327,6 @@ body::before {
     }
 }
 
-
 /* ── In-game fighter card HP text & balance ────────────── */
 
 .fighter-hp-text {
@@ -1351,7 +1349,6 @@ body::before {
         font-size: 0.58rem;
     }
 }
-
 
 /* ── Fighter card stat line with balance mult ──────────── */
 
@@ -1376,3 +1373,105 @@ body::before {
     font-size: 0.64rem;
 }
 
+/* ── Patch notes popup ─────────────────────────────────────────────────────── */
+
+.patch-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(2px);
+}
+
+.patch-card {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 32px 36px;
+    max-width: 460px;
+    width: 90vw;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.25);
+    color: #222222;
+    text-align: center;
+}
+
+.patch-title {
+    display: block;
+    font-size: 1.35rem;
+    font-weight: 900;
+    margin-bottom: 4px;
+}
+
+.patch-date {
+    display: block;
+    font-size: 0.75rem;
+    color: #888888;
+    margin-bottom: 20px;
+}
+
+.patch-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 24px;
+    text-align: left;
+}
+
+.patch-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 0.85rem;
+    line-height: 1.45;
+    padding: 6px 0;
+}
+
+.patch-badge {
+    flex-shrink: 0;
+    display: inline-block;
+    min-width: 52px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #ffffff;
+}
+
+.patch-badge--feature {
+    background: #28a447;
+}
+
+.patch-badge--refactor {
+    background: #4a7fc1;
+}
+
+.patch-badge--fix {
+    background: #d97706;
+}
+
+.patch-badge--style {
+    background: #7c3aed;
+}
+
+.patch-dismiss {
+    display: inline-block;
+    padding: 10px 40px;
+    border: none;
+    border-radius: 8px;
+    background: #222222;
+    color: #ffffff;
+    font:
+        700 0.9rem "Bahnschrift",
+        "Segoe UI",
+        sans-serif;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+
+.patch-dismiss:hover {
+    opacity: 0.8;
+}

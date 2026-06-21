@@ -10,6 +10,7 @@ import {
 } from "./stat-allocation.js";
 import { RENDER_LAYERS, Vector2 } from "./core.js";
 import { BattleBall } from "./entities.js";
+import { PATCH_NOTES, shouldShowPatchNotes, dismissPatchNotes } from "./patch-notes.js";
 
 // ── Alpine.js x-data function ───────────────────────────────────────────────
 
@@ -57,8 +58,20 @@ export function appStore() {
 
         allocationSummary: "체력 +0% · 공격 +0% · 속도 +0%",
 
+        // Patch notes
+        patchNotesTitle: PATCH_NOTES.title,
+        patchNotesDate: PATCH_NOTES.date,
+        patchNotesChanges: PATCH_NOTES.changes,
+        patchNotesVisible: false,
+
         init() {
             this._syncSummary();
+            this.patchNotesVisible = shouldShowPatchNotes();
+        },
+
+        closePatchNotes() {
+            this.patchNotesVisible = false;
+            dismissPatchNotes();
         },
 
         // Actions

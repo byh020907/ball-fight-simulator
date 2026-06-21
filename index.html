@@ -293,6 +293,27 @@
                     </div>
                 </aside>
             </section>
+
+            <!-- Patch notes popup -->
+            <div class="patch-overlay" x-show="patchNotesVisible" x-transition.opacity.duration.200ms>
+                <div class="patch-card" @click.outside="closePatchNotes()">
+                    <strong class="patch-title" x-text="patchNotesTitle"></strong>
+                    <span class="patch-date" x-text="patchNotesDate"></span>
+                    <ul class="patch-list">
+                        <template x-for="item in patchNotesChanges" :key="item.text">
+                            <li>
+                                <span
+                                    class="patch-badge"
+                                    x-bind:class="'patch-badge--' + item.type"
+                                    x-text="item.type"
+                                ></span>
+                                <span x-text="item.text"></span>
+                            </li>
+                        </template>
+                    </ul>
+                    <button class="patch-dismiss" type="button" @click="closePatchNotes()">확인</button>
+                </div>
+            </div>
         </main>
 
         <script type="module">
