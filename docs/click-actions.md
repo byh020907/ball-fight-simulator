@@ -72,12 +72,22 @@ class ClickAction {
         throw new Error("override");
     }
 
+    /**
+     * 트리거 방식.
+     *   "tap"     — pointerdown 즉시 apply() (기본)
+     *   "release" — pointerup 시 apply()
+     *   "hold"    — 누르는 동안 매 프레임 canHoldContinue→apply, 떼면 onRelease()
+     */
+    get triggerType() {
+        return "tap";
+    }
+
     /** maxHP 대비 소모율 (0.2 = 0.2%) */
     get hpCostPercent() {
         return 0.2;
     }
 
-    /** 클릭 시 발동 조건 */
+    /** 발동 조건 */
     isAvailable(sim, playerBall) {
         return true;
     }
@@ -86,7 +96,25 @@ class ClickAction {
     apply(sim, playerBall) {
         throw new Error("override");
     }
+
+    /** triggerType "hold" 전용 — 손 뗐을 때 호출 */
+    onRelease(sim, playerBall) {}
+
+    /** triggerType "hold" 전용 — false 반환 시 apply 건너뜀 */
+    canHoldContinue(sim, playerBall) {
+        return true;
+    }
 }
+
+// ── 트리거 방식별 입력 동작 ──
+//
+// triggerType  | pointerdown    | pointerup     | 매 프레임
+// "tap"        | apply() + HP   | 무시          | —
+// "release"    | 대기 시작      | apply() + HP  | —
+// "hold"       | 대기 시작      | onRelease()   | canHoldContinue()? → apply() + HP
+//
+// 미래 예: "hold" 타입 액션 (누르는 동안 충전)
+//   apply()로 매 프레임 충전값 누적, onRelease()로 방출.
 
 class TimeWarpAction extends ClickAction {
     get id() {
@@ -224,17 +252,19 @@ const ACTION_DEFS = Object.freeze([
 
 ## 5. 입력 방식
 
-- **별도 버튼 없음.** 전투 캔버스 전체가 입력 대상 (`pointerdown` 이벤트 바인딩)
-- 클릭/탭 1회당 1회 효과 발동 시도 (홀드 불필요)
-- 모바일/PC 공통, 클릭 위치와 무관하게 동작 (좌표 조준 불필요)
-- 매치가 `finished` 상태일 때는 클릭 핸들러가 동작하지 않음
+- **별도 버튼 없음.** 전투 캔버스 전체가 입력 대상 (`pointerdown` + `pointerup` 바인딩)
+- 클릭/탭 1회당 1회 효과 발동 시도 (홀드는 triggerType에 따름)
+- 모바일/PC 공통, 클릭 위치와 무관하게 동작
+- 매치가 `finished` 상태일 때는 모든 핸들러가 동작하지 않음
+- **triggerType**에 따라 포인터 이벤트 해석 방식이 달라짐 (위 트리거 표 참고)
 
 ### 클릭 핸들러 검사 순서
 
 1. 현재 매치에 내 캐릭터가 있는지
 2. 배정된 액션의 `isAvailable()` 조건을 만족하는지
-3. 자해 비용 적용 후 HP가 1 미만으로 떨어지지 않는지 (떨어진다면 무효)
-4. 디바운스 시간이 지났는지
+3. 자해 비용 적용 후 HP가 1 미만으로 떨어지지 않는지
+4. (tap의 경우) 디바운스 시간이 지났는지
+5. (hold의 경우) `canHoldContinue()`가 true인지
 
 ### HP 자해 소모
 

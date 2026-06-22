@@ -279,49 +279,85 @@ spendHpForAction(amount) {
 }
 ```
 
-#### 4-B. 캔버스에 클릭 핸들러 바인딩
+#### 4-B. 캔버스에 확장형 클릭 핸들러 바인딩
 
-`app.js` — `startMatch()` 내에서 simulation 생성 후:
+`app.js` — `startMatch()` 내에서 simulation 생성 후. 모든 triggerType을 처리:
 
 ```js
-this._clickHandler = (e) => {
+this._pointerState = { down: false, downTime: 0, actionConsumed: false };
+this._lastActionTime = 0;
+
+// pointerdown: triggerType에 따라 즉시 발동 or 대기
+this._pointerHandler = (e) => {
     if (this.simulation?.finished) return;
     if (!this.currentMatchAction) return;
-
-    // 디바운스 (80ms)
-    const now = performance.now();
-    if (now - this._lastClickTime < 80) return;
-    this._lastClickTime = now;
-
-    const playerBall = this._getPlayerBall(match);
-    if (!playerBall || playerBall.isDefeated) return;
-
-    // HP 5% 미만이면 무효
-    if (playerBall.hp / playerBall.maxHp < 0.05) return;
-
     const action = this.currentMatchAction;
+
+    this._pointerState.down = true;
+    this._pointerState.downTime = performance.now();
+    this._pointerState.actionConsumed = false;
+
+    if (action.triggerType === "tap") {
+        this._tryFireAction(action);
+    }
+    // "release" / "hold" → pointerup에서 처리
+};
+
+// pointerup: "release" 타입 발동, "hold" 타입 종료
+this._pointerUpHandler = (e) => {
+    if (!this._pointerState.down) return;
+    this._pointerState.down = false;
+    if (!this.currentMatchAction) return;
+    const action = this.currentMatchAction;
+
+    if (action.triggerType === "release") {
+        this._tryFireAction(action);
+    } else if (action.triggerType === "hold" && this._pointerState.actionConsumed) {
+        action.onRelease(this.simulation, playerBall);
+    }
+};
+
+// 매 프레임: "hold" 타입 지속 처리
+_holdTick() {
+    if (!this._pointerState.down) return;
+    if (!this.currentMatchAction) return;
+    const action = this.currentMatchAction;
+    if (action.triggerType !== "hold") return;
+    if (!action.canHoldContinue(this.simulation, playerBall)) return;
+
+    this._tryFireAction(action);  // 매 프레임 apply + HP 소모
+    this._pointerState.actionConsumed = true;
+}
+
+// 공통 발동
+_tryFireAction(action) {
+    const playerBall = this.simulation.playerBall;
+    if (!playerBall || playerBall.isDefeated) return;
+    if (playerBall.hp / playerBall.maxHp < 0.05) return;
     if (!action.isAvailable(this.simulation, playerBall)) return;
 
-    // HP 소모
     const cost = Math.ceil((playerBall.maxHp * action.hpCostPercent) / 100);
-    const actualCost = playerBall.spendHpForAction(cost);
-    if (actualCost <= 0) return;
+    if (playerBall.spendHpForAction(cost) <= 0) return;
 
-    // 효과 적용
-    action.apply(this.simulation, playerBall);
-    this.simulation.addLog(`[액션] ${action.name} 발동! HP ${actualCost} 소모.`);
-};
-this.elements.canvas.addEventListener("pointerdown", this._clickHandler);
+    // 지연 적용 패턴
+    this.simulation._pendingAction = { actionInstance: action, playerBall };
+}
+
+// 바인딩
+this.elements.canvas.addEventListener("pointerdown", this._pointerHandler);
+this.elements.canvas.addEventListener("pointerup", this._pointerUpHandler);
+this.elements.canvas.addEventListener("pointerleave", this._pointerUpHandler);
 ```
 
-#### 4-C. 매치 종료 시 클릭 핸들러 제거
-
-`app.js` — `finishMatch()` 또는 match 종료 시점:
+#### 4-C. 매치 종료 시 핸들러 제거
 
 ```js
-if (this._clickHandler) {
-    this.elements.canvas.removeEventListener("pointerdown", this._clickHandler);
-    this._clickHandler = null;
+if (this._pointerHandler) {
+    this.elements.canvas.removeEventListener("pointerdown", this._pointerHandler);
+    this.elements.canvas.removeEventListener("pointerup", this._pointerUpHandler);
+    this.elements.canvas.removeEventListener("pointerleave", this._pointerUpHandler);
+    this._pointerHandler = null;
+    this._pointerUpHandler = null;
 }
 ```
 
