@@ -370,6 +370,32 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Action picker (Alpine template, no x-html) -->
+            <div
+                class="bf-popup-overlay"
+                x-show="actionPickerVisible"
+                x-transition.opacity.duration.200ms
+                @click.self="cancelActionPick"
+            >
+                <div class="bf-popup-card">
+                    <div class="bf-popup-scroll">
+                        <strong class="bf-popup-title">매치 액션 선택</strong>
+                        <p style="text-align: center; font-size: 0.85rem; color: #555; margin: 0 0 10px">
+                            전투 중 클릭하여 발동하세요
+                        </p>
+                        <div class="action-cards">
+                            <template x-for="(card, index) in actionPickerCards" :key="card.id">
+                                <button class="action-card" type="button" @click="pickAction(index)">
+                                    <strong x-text="card.name"></strong>
+                                    <span x-text="card.description"></span>
+                                    <small x-text="'HP ' + card.hpCost + '% 소모'"></small>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </main>
 
         <script type="module">

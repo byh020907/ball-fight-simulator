@@ -88,6 +88,13 @@ export function appStore() {
         popupVisible: false,
         popupContent: null,
 
+        // Action picker (Alpine template)
+        actionPickerCards: [],
+        get actionPickerVisible() {
+            return this.actionPickerCards.length > 0;
+        },
+        _actionPickResolve: null,
+
         init() {
             this._syncSummary();
             this.patchEntries = getUnseenEntries();
@@ -106,6 +113,19 @@ export function appStore() {
                 this.popupContent = null;
                 PopupService.resolve(value ?? "close");
             }, 250);
+        },
+
+        /** 액션 카드 선택 (Alpine @click에서 호출) */
+        pickAction(index) {
+            const resolve = this._actionPickResolve;
+            this.actionPickerCards = [];
+            this._actionPickResolve = null;
+            if (resolve) resolve(index);
+        },
+
+        /** 액션 선택 취소 (배경 클릭 등) — 첫 번째 카드 자동 선택 */
+        cancelActionPick() {
+            this.pickAction(0);
         },
 
         // Actions
@@ -361,75 +381,27 @@ export class UIController {
         s.overlayText = "";
     }
 
-    /** 카드 선택 UI — Alpine 상태 직접 조작 */
+    /** 카드 선택 UI — Alpine 템플릿 사용 (index.html의 action-picker) */
     async waitForActionPick(cards) {
         if (typeof document === "undefined" || !document.addEventListener) {
             return cards[0]?.id ?? null;
         }
 
-        const root = document.querySelector(".app");
-        const data = root ? window.Alpine.$data(root) : null;
-        if (!data) return cards[0]?.id ?? null;
+        const s = this.state;
+        if (!s) return cards[0]?.id ?? null;
 
-        const bodyHtml = `
-            <div class="action-pick">
-                <p>매치 액션을 선택하세요</p>
-                <div class="action-cards">
-                    ${cards
-                        .map(
-                            (c, i) => `
-                        <button class="action-card" data-index="${i}">
-                            <strong>${c.name}</strong>
-                            <span>${c.description}</span>
-                            <small>HP ${c.hpCostPercent}% 소모</small>
-                        </button>`
-                        )
-                        .join("")}
-                </div>
-            </div>`;
-
-        // Alpine popup 표시
-        data.popupVisible = true;
-        data.popupContent = {
-            title: "매치 액션 선택",
-            bodyHtml,
-            buttons: [],
-            closeOnOutside: false
-        };
+        // Alpine 템플릿에 카드 데이터 설정
+        s.actionPickerCards = cards.map((c) => ({
+            id: c.id,
+            name: c.name,
+            description: c.description,
+            hpCost: c.hpCostPercent
+        }));
 
         return new Promise((resolve) => {
-            let resolved = false;
-            const finish = (id) => {
-                if (resolved) return;
-                resolved = true;
-                document.removeEventListener("click", handler, true);
-                clearTimeout(timeoutId);
-                resolve(id);
-            };
-
-            // 카드 클릭 (capture phase)
-            const handler = (e) => {
-                const btn = e.target.closest(".action-card");
-                if (!btn) return;
-                const idx = parseInt(btn.dataset.index, 10);
-                const picked = cards[idx];
-                if (!picked) return;
-                data.closePopup(picked.id);
-                finish(picked.id);
-            };
-            document.addEventListener("click", handler, true);
-
-            // 15초 타임아웃
-            const timeoutId = setTimeout(() => {
-                if (data.popupVisible) data.closePopup("timeout");
-                finish(cards[0].id);
-            }, 15000);
-
-            // @click.self로 닫힌 경우 대비 (배경 클릭)
-            const _origClose = data.closePopup.bind(data);
-            data.closePopup = (val) => {
-                _origClose(val);
-                finish(cards[0].id);
+            s._actionPickResolve = (index) => {
+                const picked = cards[index];
+                resolve(picked?.id ?? cards[0].id);
             };
         });
     }
