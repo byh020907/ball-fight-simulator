@@ -115,11 +115,9 @@ export function appStore() {
             }, 250);
         },
 
-        /** 액션 카드 선택 (Alpine @click에서 호출) */
+        /** 액션 카드 선택 (Alpine @click에서 호출) — 단 한 번만 실행 */
         pickAction(index) {
             const resolve = this._actionPickResolve;
-            this.actionPickerCards = [];
-            this._actionPickResolve = null;
             if (resolve) resolve(index);
         },
 
@@ -385,6 +383,11 @@ export class UIController {
         const s = this.state;
         if (!s) return cards[0]?.id ?? null;
 
+        // 이미 선택 중이면 새 요청 거부 (단 한 번만 고를 수 있음)
+        if (s._actionPickResolve) {
+            return cards[0]?.id ?? null;
+        }
+
         // Alpine 템플릿에 카드 데이터 설정
         s.actionPickerCards = cards.map((c) => ({
             id: c.id,
@@ -395,6 +398,8 @@ export class UIController {
 
         return new Promise((resolve) => {
             s._actionPickResolve = (index) => {
+                s.actionPickerCards = [];
+                s._actionPickResolve = null;
                 const picked = cards[index];
                 resolve(picked?.id ?? cards[0].id);
             };
