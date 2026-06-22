@@ -195,7 +195,7 @@ class EndureAction extends ClickAction {
         return "버티기";
     }
     get description() {
-        return "0.1초간 받는 데미지 50% 경감 (HP 50% 이하)";
+        return "0.1초간 받는 데미지 50% 경감";
     }
     get hpCostPercent() {
         return 0.9;

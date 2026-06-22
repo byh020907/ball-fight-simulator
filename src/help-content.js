@@ -54,6 +54,18 @@ export const HELP_CONTENT = `
 </div>
 
 <div class="help-section">
+  <h4 class="help-h">👆 클릭 액션</h4>
+  <p>매치 시작 시 5개 액션 중 1개를 선택합니다. 전투 중 캔버스를 클릭해 발동, HP를 소모합니다.</p>
+  <ul>
+    <li><b>시간 왜곡</b> — 0.5초간 상대만 슬로우</li>
+    <li><b>돌진</b> — 0.5초간 속도 +25%</li>
+    <li><b>카운터</b> — 충돌 임박 시 데미지 +12%</li>
+    <li><b>받아치기</b> — 투사체 데미지 50% 경감</li>
+    <li><b>버티기</b> — 0.1초간 받는 데미지 50% 경감</li>
+  </ul>
+</div>
+
+<div class="help-section">
   <h4 class="help-h">🏆 목표</h4>
   <p>토너먼트를 진행하여 최종 우승자가 되세요.</p>
 </div>
