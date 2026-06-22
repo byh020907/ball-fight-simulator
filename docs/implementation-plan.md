@@ -19,7 +19,7 @@
 
 ---
 
-## 1단계: `src/click-actions.js` — 액션 클래스 계층
+## 1단계: `src/click-actions.js` — Strategy Pattern + 액션 클래스 계층
 
 ### 대상 파일
 
@@ -28,30 +28,32 @@
 ### 클래스 구조
 
 ```js
-class ClickAction {
-    get id() {
-        throw new Error("override");
-    }
-    get name() {
-        throw new Error("override");
-    }
-    get description() {
-        throw new Error("override");
-    }
-    get hpCostPercent() {
-        return 0.2;
-    }
+// ── Trigger Strategy ──
+class TriggerStrategy {
+    get type() { return "tap"; }
+    onPointerDown(ctx) {}
+    onPointerUp(ctx) {}
+    onTick(ctx) {}
+}
+class TapTrigger extends TriggerStrategy { ... }
+class ReleaseTrigger extends TriggerStrategy { ... }
+class HoldTrigger extends TriggerStrategy { ... }
 
-    isAvailable(sim, playerBall) {
-        return true;
-    }
-    apply(sim, playerBall) {
-        throw new Error("override");
-    }
+// ── Action ──
+class ClickAction {
+    constructor(trigger = new TapTrigger()) { this.trigger = trigger; }
+    get id()           { throw new Error("override"); }
+    get name()         { throw new Error("override"); }
+    get description()  { throw new Error("override"); }
+    get hpCostPercent(){ return 0.2; }
+    isAvailable(sim, playerBall) { return true; }
+    apply(sim, playerBall)       { throw new Error("override"); }
+    onRelease(sim, playerBall)   {}  // HoldTrigger 전용
+    canHoldContinue(sim, playerBall) { return true; }
 }
 
-// 5개 서브클래스: TimeWarpAction, RushAction, CounterAction,
-//                 ParryAction, EndureAction
+// 5개 서브클래스: 모두 new TapTrigger() 기본 사용
+// class TimeWarpAction extends ClickAction { ... }
 ```
 
 ### 내보내는 심볼
@@ -279,68 +281,55 @@ spendHpForAction(amount) {
 }
 ```
 
-#### 4-B. 캔버스에 확장형 클릭 핸들러 바인딩
+#### 4-B. 캔버스 핸들러 — TriggerStrategy 기반 위임
 
-`app.js` — `startMatch()` 내에서 simulation 생성 후. 모든 triggerType을 처리:
+`app.js` — `startMatch()` 내에서. action.trigger가 모든 포인터 해석을 담당:
 
 ```js
-this._pointerState = { down: false, downTime: 0, actionConsumed: false };
-this._lastActionTime = 0;
+// ctx 객체 — TriggerStrategy의 onPointerDown/Up/Tick에 전달됨
+this._actionCtx = {
+    action: null,       // startMatch에서 설정
+    sim: null,
+    player: null,
+    _holding: false,
+    _consumed: false,
+    _holdStarted: false,
+    fireAction: () => this._tryFireAction()
+};
 
-// pointerdown: triggerType에 따라 즉시 발동 or 대기
+// pointerdown: action.trigger.onPointerDown(ctx) 위임
 this._pointerHandler = (e) => {
     if (this.simulation?.finished) return;
     if (!this.currentMatchAction) return;
-    const action = this.currentMatchAction;
-
-    this._pointerState.down = true;
-    this._pointerState.downTime = performance.now();
-    this._pointerState.actionConsumed = false;
-
-    if (action.triggerType === "tap") {
-        this._tryFireAction(action);
-    }
-    // "release" / "hold" → pointerup에서 처리
+    this._actionCtx.action = this.currentMatchAction;
+    this._actionCtx.sim = this.simulation;
+    this._actionCtx.player = this.simulation.playerBall;
+    this.currentMatchAction.trigger.onPointerDown(this._actionCtx);
 };
 
-// pointerup: "release" 타입 발동, "hold" 타입 종료
+// pointerup / pointerleave: 위임
 this._pointerUpHandler = (e) => {
-    if (!this._pointerState.down) return;
-    this._pointerState.down = false;
-    if (!this.currentMatchAction) return;
-    const action = this.currentMatchAction;
-
-    if (action.triggerType === "release") {
-        this._tryFireAction(action);
-    } else if (action.triggerType === "hold" && this._pointerState.actionConsumed) {
-        action.onRelease(this.simulation, playerBall);
-    }
+    this._actionCtx.action?.trigger.onPointerUp(this._actionCtx);
 };
 
-// 매 프레임: "hold" 타입 지속 처리
-_holdTick() {
-    if (!this._pointerState.down) return;
-    if (!this.currentMatchAction) return;
-    const action = this.currentMatchAction;
-    if (action.triggerType !== "hold") return;
-    if (!action.canHoldContinue(this.simulation, playerBall)) return;
-
-    this._tryFireAction(action);  // 매 프레임 apply + HP 소모
-    this._pointerState.actionConsumed = true;
+// 매 프레임 (game loop tick 내): 위임
+_handleActionTick() {
+    this._actionCtx.action?.trigger.onTick(this._actionCtx);
 }
 
-// 공통 발동
-_tryFireAction(action) {
-    const playerBall = this.simulation.playerBall;
-    if (!playerBall || playerBall.isDefeated) return;
-    if (playerBall.hp / playerBall.maxHp < 0.05) return;
-    if (!action.isAvailable(this.simulation, playerBall)) return;
+// 공통 fireAction 로직
+_tryFireAction() {
+    const { player, sim, action } = this._actionCtx;
+    if (!player || player.isDefeated) return false;
+    if (player.hp / player.maxHp < 0.05) return false;
+    if (!action.isAvailable(sim, player)) return false;
 
-    const cost = Math.ceil((playerBall.maxHp * action.hpCostPercent) / 100);
-    if (playerBall.spendHpForAction(cost) <= 0) return;
+    const cost = Math.ceil((player.maxHp * action.hpCostPercent) / 100);
+    if (player.spendHpForAction(cost) <= 0) return false;
 
-    // 지연 적용 패턴
-    this.simulation._pendingAction = { actionInstance: action, playerBall };
+    // 지연 적용 (리스크 ①)
+    sim._pendingAction = { actionInstance: action, playerBall: player };
+    return true;
 }
 
 // 바인딩
@@ -348,6 +337,9 @@ this.elements.canvas.addEventListener("pointerdown", this._pointerHandler);
 this.elements.canvas.addEventListener("pointerup", this._pointerUpHandler);
 this.elements.canvas.addEventListener("pointerleave", this._pointerUpHandler);
 ```
+
+핸들러는 `trigger.onPointerDown(ctx)` / `onPointerUp(ctx)` / `onTick(ctx)`만 호출.
+TapTrigger / ReleaseTrigger / HoldTrigger 각각의 내부 로직이 `ctx.fireAction()` 호출 시점을 결정.
 
 #### 4-C. 매치 종료 시 핸들러 제거
 
@@ -358,6 +350,7 @@ if (this._pointerHandler) {
     this.elements.canvas.removeEventListener("pointerleave", this._pointerUpHandler);
     this._pointerHandler = null;
     this._pointerUpHandler = null;
+    this._actionCtx = null;
 }
 ```
 
@@ -482,12 +475,14 @@ class CounterAction extends ClickAction {
 
 ```js
 // PointerEvent 핸들러: 직접 실행하지 않고 예약만
-this.simulation._pendingAction = { actionId, playerBall };
+this.simulation._pendingAction = { actionInstance: action, playerBall };
 
 // update() 맨 앞에서 충돌 전에 먼저 적용
 update(delta) {
     if (this._pendingAction) {
-        this.applyPendingAction();  // HP 소모 + 효과
+        const { actionInstance, playerBall } = this._pendingAction;
+        this._pendingAction = null;
+        if (actionInstance && playerBall) actionInstance.apply(this, playerBall);
     }
     this.handleCollision();
     // ...

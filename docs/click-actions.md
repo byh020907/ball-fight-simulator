@@ -59,64 +59,116 @@
 ### 액션 정의 형식 (클래스 기반)
 
 ```js
-// src/click-actions.js
+// src/click-actions.js — Strategy Pattern
 
-class ClickAction {
-    get id() {
-        throw new Error("override");
-    }
-    get name() {
-        throw new Error("override");
-    }
-    get description() {
-        throw new Error("override");
-    }
+// ── Trigger Strategy ─────────────────────────────────────────────
+// Action의 "어떻게 발동되는지"를 캡슐화한다.
+// 입력 핸들러는 trigger의 메서드만 호출하면 됨.
 
-    /**
-     * 트리거 방식.
-     *   "tap"     — pointerdown 즉시 apply() (기본)
-     *   "release" — pointerup 시 apply()
-     *   "hold"    — 누르는 동안 매 프레임 canHoldContinue→apply, 떼면 onRelease()
-     */
-    get triggerType() {
-        return "tap";
-    }
+class TriggerStrategy {
+    get type() { return "tap"; }
+    onPointerDown(ctx) {}
+    onPointerUp(ctx) {}
+    onTick(ctx) {}
+}
 
-    /** maxHP 대비 소모율 (0.2 = 0.2%) */
-    get hpCostPercent() {
-        return 0.2;
-    }
+class TapTrigger extends TriggerStrategy {
+    get type() { return "tap"; }
+    onPointerDown(ctx) { ctx.fireAction(); }
+}
 
-    /** 발동 조건 */
-    isAvailable(sim, playerBall) {
-        return true;
-    }
-
-    /** 액션 효과 적용 */
-    apply(sim, playerBall) {
-        throw new Error("override");
-    }
-
-    /** triggerType "hold" 전용 — 손 뗐을 때 호출 */
-    onRelease(sim, playerBall) {}
-
-    /** triggerType "hold" 전용 — false 반환 시 apply 건너뜀 */
-    canHoldContinue(sim, playerBall) {
-        return true;
+class ReleaseTrigger extends TriggerStrategy {
+    get type() { return "release"; }
+    onPointerDown(ctx) { ctx._holdStarted = true; }
+    onPointerUp(ctx) {
+        if (ctx._holdStarted) ctx.fireAction();
+        ctx._holdStarted = false;
     }
 }
 
-// ── 트리거 방식별 입력 동작 ──
-//
-// triggerType  | pointerdown    | pointerup     | 매 프레임
-// "tap"        | apply() + HP   | 무시          | —
-// "release"    | 대기 시작      | apply() + HP  | —
-// "hold"       | 대기 시작      | onRelease()   | canHoldContinue()? → apply() + HP
-//
-// 미래 예: "hold" 타입 액션 (누르는 동안 충전)
-//   apply()로 매 프레임 충전값 누적, onRelease()로 방출.
+class HoldTrigger extends TriggerStrategy {
+    get type() { return "hold"; }
+    onPointerDown(ctx) { ctx._holding = true; }
+    onPointerUp(ctx) {
+        if (ctx._holding && ctx._consumed) {
+            ctx.action.onRelease?.(ctx.sim, ctx.player);
+        }
+        ctx._holding = false;
+        ctx._consumed = false;
+    }
+    onTick(ctx) {
+        if (!ctx._holding) return;
+        if (!ctx.action.canHoldContinue?.(ctx.sim, ctx.player)) return;
+        ctx.fireAction();
+        ctx._consumed = true;
+    }
+}
 
-class TimeWarpAction extends ClickAction {
+// ── Action Base ──────────────────────────────────────────────────
+
+class ClickAction {
+    /**
+     * @param {TriggerStrategy} trigger — 발동 방식. 기본 TapTrigger.
+     */
+    constructor(trigger = new TapTrigger()) {
+        this.trigger = trigger;
+    }
+
+    get id()           { throw new Error("override"); }
+    get name()         { throw new Error("override"); }
+    get description()  { throw new Error("override"); }
+
+    /** maxHP 대비 소모율 (0.2 = 0.2%) */
+    get hpCostPercent() { return 0.2; }
+
+    /** 발동 조건 */
+    isAvailable(sim, playerBall) { return true; }
+
+    /** 효과 적용 */
+    apply(sim, playerBall) { throw new Error("override"); }
+
+    /** trigger === HoldTrigger 전용 */
+    onRelease(sim, playerBall) {}
+    canHoldContinue(sim, playerBall) { return true; }
+}
+
+// ── 입력 핸들러 측 사용 예 ──────────────────────────────────────
+
+// 핸들러 ctx 객체는 app.js에서 이렇게 구성:
+// const ctx = {
+//     action: this.currentMatchAction,
+//     sim: this.simulation,
+//     player: this.simulation?.playerBall,
+//     _holding: false, _consumed: false, _holdStarted: false,
+//     fireAction() { /* 공통: HP 소모 + 지연 적용 */ }
+// };
+
+// pointerdown → action.trigger.onPointerDown(ctx);
+// pointerup   → action.trigger.onPointerUp(ctx);
+// 매 프레임   → action.trigger.onTick(ctx);
+
+// ── 미래 확장 예: HoldTrigger 사용 ──────────────────────────────
+
+class ChargeAction extends ClickAction {
+    constructor() { super(new HoldTrigger()); }
+
+    get id() { return "charge"; }
+    get name() { return "차지"; }
+    get description() { return "누르는 동안 충전, 떼면 방출"; }
+    get hpCostPercent() { return 0.15; }
+
+    apply(sim, playerBall) {
+        sim.chargeLevel = Math.min(1, (sim.chargeLevel ?? 0) + 0.03);
+    }
+
+    onRelease(sim, playerBall) {
+        const dmg = Math.round((sim.chargeLevel ?? 0) * 30);
+        sim.getOpponent(playerBall).takeDamage(dmg, playerBall, "Charge");
+        sim.chargeLevel = 0;
+    }
+}
+
+// ── 기존 액션들 (모두 TapTrigger 기본값) ─────────────────────────
     get id() {
         return "time_warp";
     }
@@ -250,21 +302,27 @@ const ACTION_DEFS = Object.freeze([
 
 ---
 
-## 5. 입력 방식
+## 5. 입력 방식 (Strategy Pattern)
 
-- **별도 버튼 없음.** 전투 캔버스 전체가 입력 대상 (`pointerdown` + `pointerup` 바인딩)
-- 클릭/탭 1회당 1회 효과 발동 시도 (홀드는 triggerType에 따름)
-- 모바일/PC 공통, 클릭 위치와 무관하게 동작
-- 매치가 `finished` 상태일 때는 모든 핸들러가 동작하지 않음
-- **triggerType**에 따라 포인터 이벤트 해석 방식이 달라짐 (위 트리거 표 참고)
+- **별도 버튼 없음.** 전투 캔버스 전체가 입력 대상 (`pointerdown` + `pointerup` + `pointerleave`)
+- 입력 핸들러는 `action.trigger.onPointerDown(ctx)` / `onPointerUp(ctx)` / `onTick(ctx)` 만 호출
+- 각 TriggerStrategy 구현체(TapTrigger / ReleaseTrigger / HoldTrigger)가 내부에서 `ctx.fireAction()` 호출 시점 결정
+- `ctx` 객체는 `{ action, sim, player, _holding, _consumed, fireAction() }` 형태
 
-### 클릭 핸들러 검사 순서
+| Trigger          | pointerdown   | pointerup    | tick                       |
+| ---------------- | ------------- | ------------ | -------------------------- |
+| `TapTrigger`     | fireAction()  | —            | —                          |
+| `ReleaseTrigger` | \_holdStarted | fireAction() | —                          |
+| `HoldTrigger`    | \_holding     | onRelease()  | canHoldContinue→fireAction |
 
-1. 현재 매치에 내 캐릭터가 있는지
-2. 배정된 액션의 `isAvailable()` 조건을 만족하는지
-3. 자해 비용 적용 후 HP가 1 미만으로 떨어지지 않는지
-4. (tap의 경우) 디바운스 시간이 지났는지
-5. (hold의 경우) `canHoldContinue()`가 true인지
+### fireAction 검사 순서 (모든 trigger 공통)
+
+1. 매치 finished? → 무시
+2. playerBall exists + not defeated?
+3. HP 5% 미만? → 무시
+4. `action.isAvailable()`? → 무시
+5. HP 소모 (`spendHpForAction`, 최소 1 보장)
+6. `sim._pendingAction`에 예약 (지연 적용 패턴)
 
 ### HP 자해 소모
 
