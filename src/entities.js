@@ -4,6 +4,7 @@ export class SeedOrb extends CombatEntity {
     constructor(owner, position, velocity, life) {
         super(position, velocity, 14);
         this.owner = owner;
+        this.ownerId = owner.id;
         this.life = life;
     }
 
@@ -66,6 +67,7 @@ export class ArrowProjectile extends CombatEntity {
     constructor(owner, position, velocity) {
         super(position, velocity, 8);
         this.owner = owner;
+        this.ownerId = owner.id;
         this.life = 1.55;
         this.angle = 0;
         this.syncFacingToVelocity();
@@ -94,7 +96,9 @@ export class ArrowProjectile extends CombatEntity {
 
         const distance = Vector2.subtract(this.position, target.position).length();
         if (distance <= target.radius + this.radius) {
-            target.takeDamage(Math.round(this.owner.baseDamage * 1.4), this.owner, "Arrow Shot");
+            let dmg = Math.round(this.owner.baseDamage * 1.4);
+            if (this._parryReduction) dmg = Math.round(dmg * (1 - this._parryReduction));
+            target.takeDamage(dmg, this.owner, "Arrow Shot");
             target.applyKnockback(this.velocity.clone().scale(0.6), 0.2);
             simulation.playSound("hit");
             simulation.spawnSlash(
@@ -125,6 +129,7 @@ export class OrbitProjectile extends CombatEntity {
     constructor(owner, position, direction, size) {
         super(position, new Vector2(0, 0), 11);
         this.owner = owner;
+        this.ownerId = owner.id;
         this.dir = direction.clone().normalize();
         this.life = 1.2;
         this.angle = Math.atan2(this.dir.y, this.dir.x);
@@ -165,7 +170,9 @@ export class OrbitProjectile extends CombatEntity {
 
         const distance = Vector2.subtract(this.position, target.position).length();
         if (distance <= target.radius + this.radius) {
-            target.takeDamage(Math.round(this.owner.baseDamage * 0.8), this.owner, "Orbit Shot");
+            let dmg = Math.round(this.owner.baseDamage * 0.8);
+            if (this._parryReduction) dmg = Math.round(dmg * (1 - this._parryReduction));
+            target.takeDamage(dmg, this.owner, "Orbit Shot");
             target.applyKnockback(this.velocity.clone().scale(0.4), 0.15);
             simulation.spawnSlash(this.position.clone(), target.position.clone(), this.owner.color);
             simulation.addSparkBurst(this.position.clone(), this.owner.color);
@@ -196,6 +203,7 @@ export class Grenade extends CombatEntity {
         const drift = Vector2.subtract(targetPosition, start).scale(1 / safeFuse);
         super(start, drift, 12);
         this.owner = owner;
+        this.ownerId = owner.id;
         this.targetPosition = targetPosition;
         this.timer = safeFuse;
         this.maxTimer = this.timer;
@@ -235,7 +243,8 @@ export class Grenade extends CombatEntity {
                     Math.min(1, (distance - this.innerRadius) / (this.explosionRadius - this.innerRadius))
                 );
                 const damage = Math.round(this.owner.baseDamage * (4.0 - edgeProgress * 2.0));
-                target.takeDamage(damage, this.owner, "Grenade");
+                const finalDmg = this._parryReduction ? Math.round(damage * (1 - this._parryReduction)) : damage;
+                target.takeDamage(finalDmg, this.owner, "Grenade");
                 const kbDir = Vector2.subtract(target.position, this.position).normalize();
                 target.applyKnockback(kbDir.scale(400), 0.35);
             }
@@ -301,6 +310,12 @@ export class BattleBall {
         this.isDestroyed = false;
         this.spinRotation = 0;
         this.statAllocation = spec.statAllocation ?? null;
+
+        // ── 클릭 액션 시스템 ──
+        this._rushRemaining = 0;
+        this._rushMultiplier = 1;
+        this._endureRemaining = 0;
+        this._endureReduction = 0;
     }
 
     get renderLayer() {
@@ -383,6 +398,31 @@ export class BattleBall {
         this.hp = Math.min(this.maxHp, this.hp + amount);
     }
 
+    // ── 클릭 액션 데이터 인터페이스 ──
+
+    getRushRemaining() {
+        return this._rushRemaining;
+    }
+    setRush(duration, multiplier) {
+        this._rushRemaining = duration;
+        this._rushMultiplier = multiplier;
+    }
+
+    getEndureRemaining() {
+        return this._endureRemaining;
+    }
+    setEndureRemaining(duration, reduction) {
+        this._endureRemaining = duration;
+        this._endureReduction = reduction;
+    }
+
+    spendHpForAction(amount) {
+        if (this.hp <= 1) return 0;
+        const cost = Math.min(amount, this.hp - 1);
+        this.hp -= cost;
+        return cost;
+    }
+
     getAbilityUiState() {
         return this.ability?.getUiState?.() ?? { label: "Passive", progress: 1 };
     }
@@ -446,6 +486,10 @@ export class BattleBall {
             }
         }
 
+        // 액션 효과 타이머
+        if (this._rushRemaining > 0) this._rushRemaining -= delta;
+        if (this._endureRemaining > 0) this._endureRemaining -= delta;
+
         this.ability?.update(delta, target);
         const radiusScale = this.ability?.getRadiusScale?.() ?? 1;
         this.radius = this.baseRadius * radiusScale;
@@ -484,6 +528,11 @@ export class BattleBall {
     takeDamage(amount, source, label = "Hit") {
         if (this.isDefeated) {
             return;
+        }
+
+        // 버티기 — 받는 데미지 경감 (Action이 setEndureRemaining으로 설정)
+        if (this._endureRemaining > 0) {
+            amount = Math.round(amount * this._endureReduction);
         }
 
         const abilityDefMult = this.getStatModifiers().defense;

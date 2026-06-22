@@ -14,7 +14,7 @@ import { GravityParticle } from "../effects.js";
 import { Simulation } from "./Simulation.js";
 
 export class BattleSimulation extends Simulation {
-    constructor(fighterSpecs, hooks) {
+    constructor(fighterSpecs, hooks, playerBall = null) {
         super();
         this.hooks = hooks;
         const spawnPoints = this.createSpawnPoints(fighterSpecs.length);
@@ -33,6 +33,46 @@ export class BattleSimulation extends Simulation {
         this.loser = null;
         this.resultAnimationTime = 0;
         this.resultReady = false;
+
+        // ── 클릭 액션 시스템 ──
+        this.playerBall = playerBall;
+        this._pendingAction = null;
+        this._timeSlowRemaining = 0;
+        this._timeSlowFactor = 0.45;
+        this._counterCharged = false;
+    }
+
+    // ── Action data interfaces ──────────────────────────────────────
+
+    getTimeSlowRemaining() {
+        return this._timeSlowRemaining;
+    }
+    setTimeSlowRemaining(v) {
+        this._timeSlowRemaining = v;
+    }
+
+    getCounterCharged() {
+        return this._counterCharged;
+    }
+    setCounterCharged(v) {
+        this._counterCharged = v;
+    }
+
+    isCollisionImminent(playerBall) {
+        const opponent = this.fighters.find((f) => f !== playerBall);
+        if (!opponent) return false;
+        const dist = Vector2.subtract(opponent.position, playerBall.position).length();
+        const gap = dist - playerBall.radius - opponent.radius;
+        return gap <= 20;
+    }
+
+    getIncomingProjectile(playerBall) {
+        for (const e of this.entities) {
+            if (!e.ownerId || e.ownerId === playerBall.id) continue;
+            const toPlayer = Vector2.subtract(playerBall.position, e.position);
+            if (toPlayer.length() < 300 && e.velocity.dot(toPlayer) > 0) return e;
+        }
+        return null;
     }
 
     createSpawnPoints(count) {
@@ -86,7 +126,9 @@ export class BattleSimulation extends Simulation {
      * 평소에는 1 (영향 없음), 오버타임 진입 후 1.12부터 서서히 증가해 최대 1.58까지 올라갑니다.
      */
     getSpeedMultiplier() {
-        return this.isOvertime() ? Math.min(1.58, 1.12 + this.getOvertimeProgress() * 0.026) : 1;
+        const overtimeMult = this.isOvertime() ? Math.min(1.58, 1.12 + this.getOvertimeProgress() * 0.026) : 1;
+        const rushMult = this.playerBall?.getRushRemaining() > 0 ? 1.25 : 1;
+        return overtimeMult * rushMult;
     }
 
     addLog(message) {
@@ -105,6 +147,13 @@ export class BattleSimulation extends Simulation {
             return;
         }
 
+        // 지연 적용 패턴 — 클릭 핸들러가 예약한 액션을 충돌 전에 처리
+        if (this._pendingAction) {
+            const { actionInstance, playerBall: pb } = this._pendingAction;
+            this._pendingAction = null;
+            if (actionInstance && pb) actionInstance.apply(this, pb);
+        }
+
         this.elapsed += delta;
         this.updateScreenShake(delta);
 
@@ -117,10 +166,16 @@ export class BattleSimulation extends Simulation {
             this.updateOvertimeParticles(delta);
         }
 
+        // 시간 왜곡 타이머
+        if (this._timeSlowRemaining > 0) this._timeSlowRemaining -= delta;
+
         this.handleCollision();
 
+        // 시간 왜곡 적용: 상대 엔티티만 느린 delta
         for (const entity of this.entities) {
-            entity.update(delta, this);
+            const isPlayer = entity === this.playerBall;
+            const scaledDelta = this._timeSlowRemaining > 0 && !isPlayer ? delta * this._timeSlowFactor : delta;
+            entity.update(scaledDelta, this);
         }
         this.entities = this.entities.filter((entity) => !entity.isExpired);
 
@@ -144,6 +199,19 @@ export class BattleSimulation extends Simulation {
         const bModifiers = b.getStatModifiers();
         const damageFromAToB = this.calculateCollisionDamage(a, b, normal) * aModifiers.damage;
         const damageFromBToA = this.calculateCollisionDamage(b, a, normal.clone().scale(-1)) * bModifiers.damage;
+
+        // 카운터 보너스 — Action이 setCounterCharged(true)로 설정
+        if (this._counterCharged) {
+            const attackerIsPlayer = a === this.playerBall;
+            if (attackerIsPlayer) {
+                const bonus = Math.round(damageFromAToB * 0.12);
+                b.takeDamage(bonus, a, "Counter");
+            } else {
+                const bonus = Math.round(damageFromBToA * 0.12);
+                a.takeDamage(bonus, b, "Counter");
+            }
+            this._counterCharged = false;
+        }
 
         a.takeDamage(damageFromBToA, b, "Crash");
         b.takeDamage(damageFromAToB, a, "Crash");

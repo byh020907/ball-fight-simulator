@@ -37,6 +37,10 @@ export class Vector2 {
         return this;
     }
 
+    dot(other) {
+        return this.x * other.x + this.y * other.y;
+    }
+
     static add(a, b) {
         return new Vector2(a.x + b.x, a.y + b.y);
     }
@@ -76,6 +80,11 @@ export class CombatEntity {
 
     update() {}
     draw() {}
+
+    /** 받아치기 — 투사체 데미지 경감률 설정 */
+    setParryReduction(factor) {
+        this._parryReduction = factor;
+    }
 }
 
 export class TimedEffect {
