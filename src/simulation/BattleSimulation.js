@@ -42,6 +42,11 @@ export class BattleSimulation extends Simulation {
         this._counterCharged = false;
     }
 
+    /** 액션 예약 — app.js의 _tryFireAction에서 직접 _pendingAction에 접근하지 않도록 캡슐화 */
+    scheduleAction(actionInstance, playerBall) {
+        this._pendingAction = { actionInstance, playerBall };
+    }
+
     // ── Action data interfaces ──────────────────────────────────────
 
     getTimeSlowRemaining() {

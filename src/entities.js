@@ -1,10 +1,8 @@
-import { CombatEntity, RENDER_LAYERS, TimedEffect, Vector2 } from "./core.js";
+import { CombatEntity, Projectile, RENDER_LAYERS, TimedEffect, Vector2 } from "./core.js";
 
-export class SeedOrb extends CombatEntity {
+export class SeedOrb extends Projectile {
     constructor(owner, position, velocity, life) {
-        super(position, velocity, 14);
-        this.owner = owner;
-        this.ownerId = owner.id;
+        super(owner, position, velocity, 14);
         this.life = life;
     }
 
@@ -16,38 +14,45 @@ export class SeedOrb extends CombatEntity {
             this.isExpired = true;
         }
 
-        for (const fighter of simulation.fighters.filter((candidate) => !candidate.isDefeated)) {
-            const distance = Vector2.subtract(this.position, fighter.position).length();
-            if (distance > this.radius + fighter.radius) {
-                continue;
-            }
+        // hit 체크 — 템플릿 메서드 사용
+        this._projectileHitCheck(simulation);
+    }
 
-            const target = simulation.getOpponent(this.owner);
-            const dashDirection = target
-                ? Vector2.subtract(target.position, this.owner.position).normalize()
-                : this.velocity.clone().normalize();
-            this.owner.startDash(dashDirection, {
-                multiplier: 2.05,
-                color: this.owner.color,
-                collisionDamage: Math.round(this.owner.baseDamage * 1.3),
-                collisionLabel: "Seed Dash",
-                untilImpact: true,
-                untilWall: true,
-                maxDuration: 1.55
-            });
-            simulation.spawnSlash(
-                this.owner.position.clone(),
-                Vector2.add(this.owner.position, dashDirection.clone().scale(150)),
-                this.owner.color
-            );
-            simulation.spawnPulse(this.position.clone(), this.owner.color);
-            simulation.playSound("dash");
-            simulation.addLog(`${fighter.name} catches a seed and triggers ${this.owner.name}'s dash.`);
+    /** @returns {import("./core.js").CombatEntity} */
+    _findTarget(simulation) {
+        return simulation.getOpponent(this.owner);
+    }
 
-            simulation.addSparkBurst(this.position.clone(), this.owner.color);
-            this.isExpired = true;
-            break;
-        }
+    _getHitDamage() {
+        return 0;
+    }
+
+    _getHitLabel() {
+        return "";
+    }
+
+    _onHitEffects(target, simulation) {
+        const dashDirection = target
+            ? Vector2.subtract(target.position, this.owner.position).normalize()
+            : this.velocity.clone().normalize();
+        this.owner.startDash(dashDirection, {
+            multiplier: 2.05,
+            color: this.owner.color,
+            collisionDamage: Math.round(this.owner.baseDamage * 1.3),
+            collisionLabel: "Seed Dash",
+            untilImpact: true,
+            untilWall: true,
+            maxDuration: 1.55
+        });
+        simulation.spawnSlash(
+            this.owner.position.clone(),
+            Vector2.add(this.owner.position, dashDirection.clone().scale(150)),
+            this.owner.color
+        );
+        simulation.spawnPulse(this.position.clone(), this.owner.color);
+        simulation.playSound("dash");
+        simulation.addLog(`${target?.name ?? "Someone"} catches a seed and triggers ${this.owner.name}'s dash.`);
+        simulation.addSparkBurst(this.position.clone(), this.owner.color);
     }
 
     draw(ctx) {
@@ -63,11 +68,9 @@ export class SeedOrb extends CombatEntity {
     }
 }
 
-export class ArrowProjectile extends CombatEntity {
+export class ArrowProjectile extends Projectile {
     constructor(owner, position, velocity) {
-        super(position, velocity, 8);
-        this.owner = owner;
-        this.ownerId = owner.id;
+        super(owner, position, velocity, 8);
         this.life = 1.55;
         this.angle = 0;
         this.syncFacingToVelocity();
@@ -125,11 +128,9 @@ export class ArrowProjectile extends CombatEntity {
     }
 }
 
-export class OrbitProjectile extends CombatEntity {
+export class OrbitProjectile extends Projectile {
     constructor(owner, position, direction, size) {
-        super(position, new Vector2(0, 0), 11);
-        this.owner = owner;
-        this.ownerId = owner.id;
+        super(owner, position, new Vector2(0, 0), 11);
         this.dir = direction.clone().normalize();
         this.life = 1.2;
         this.angle = Math.atan2(this.dir.y, this.dir.x);
@@ -201,14 +202,12 @@ export class OrbitProjectile extends CombatEntity {
     }
 }
 
-export class Grenade extends CombatEntity {
+export class Grenade extends Projectile {
     constructor(owner, targetPosition, fuseTime = 1.08) {
         const start = owner.position.clone();
         const safeFuse = Math.max(0.32, fuseTime);
         const drift = Vector2.subtract(targetPosition, start).scale(1 / safeFuse);
-        super(start, drift, 12);
-        this.owner = owner;
-        this.ownerId = owner.id;
+        super(owner, start, drift, 12);
         this.targetPosition = targetPosition;
         this.timer = safeFuse;
         this.maxTimer = this.timer;

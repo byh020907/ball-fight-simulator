@@ -151,6 +151,18 @@ export class CombatEntity {
     _onExpired(simulation) {}
 }
 
+/**
+ * 투사체 공통 베이스 — owner/ownerId 중복 제거.
+ * 모든 투사체(SeedOrb, ArrowProjectile, OrbitProjectile, Grenade)는 이 클래스를 extends.
+ */
+export class Projectile extends CombatEntity {
+    constructor(owner, position, velocity, radius) {
+        super(position, velocity, radius);
+        this.owner = owner;
+        this.ownerId = owner.id;
+    }
+}
+
 export class TimedEffect {
     constructor(duration) {
         this.duration = duration;
