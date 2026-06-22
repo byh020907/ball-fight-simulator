@@ -20,8 +20,7 @@ export class BattleApp {
          * 플레이어로 고정되고 토너먼트 첫 엔트리에 배치됩니다.
          * @type {string|null}
          */
-        this.startCharacter = null;
-        // this.startCharacter = 'bat_ball';
+        this.startCharacter = "bat_ball";
 
         this.elements = {
             canvas: document.getElementById("arenaCanvas"),

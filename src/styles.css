@@ -756,7 +756,6 @@ body::before {
 .hero,
 .roster-panel,
 .log-panel {
-.log-panel {
     display: none !important;
 }
 
