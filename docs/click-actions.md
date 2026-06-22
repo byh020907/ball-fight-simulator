@@ -56,17 +56,159 @@
 | **받아치기**  | 상대 투사체가 나를 향해 비행 중                        | 클릭 성공 시 그 투사체 데미지 50% 경감                                                         | 캐릭터 매치업에 따라 가변   | 1.0~1.3%            |
 | **버티기**    | HP 50% 이하                                            | 클릭 시 0.1초간 받는 데미지 50% 경감                                                           | 위기 구간에서 몰아서 사용   | 0.8~1.0%            |
 
-### 액션 정의 형식 (구현 참조)
+### 액션 정의 형식 (클래스 기반)
 
 ```js
-{
-    id: "time_warp",
-    name: "시간 왜곡",
-    description: "0.25초간 상대만 슬로우 (HP 50% 이하)",
-    hpCostPercent: 0.2,
-    isAvailable(sim, player) { return player.hp / player.maxHp <= 0.5; },
-    apply(sim, player) { sim.timeSlowRemaining = 0.25; }
+// src/click-actions.js
+
+class ClickAction {
+    get id() {
+        throw new Error("override");
+    }
+    get name() {
+        throw new Error("override");
+    }
+    get description() {
+        throw new Error("override");
+    }
+
+    /** maxHP 대비 소모율 (0.2 = 0.2%) */
+    get hpCostPercent() {
+        return 0.2;
+    }
+
+    /** 클릭 시 발동 조건 */
+    isAvailable(sim, playerBall) {
+        return true;
+    }
+
+    /** 액션 효과 적용 */
+    apply(sim, playerBall) {
+        throw new Error("override");
+    }
 }
+
+class TimeWarpAction extends ClickAction {
+    get id() {
+        return "time_warp";
+    }
+    get name() {
+        return "시간 왜곡";
+    }
+    get description() {
+        return "0.25초간 상대만 슬로우 (HP 50% 이하)";
+    }
+    get hpCostPercent() {
+        return 0.2;
+    }
+
+    isAvailable(sim, playerBall) {
+        return playerBall.hp / playerBall.maxHp <= 0.5;
+    }
+
+    apply(sim, playerBall) {
+        sim.timeSlowRemaining = Math.max(sim.timeSlowRemaining, 0.25);
+    }
+}
+
+class RushAction extends ClickAction {
+    get id() {
+        return "rush";
+    }
+    get name() {
+        return "돌진";
+    }
+    get description() {
+        return "0.2초간 속도 +25%";
+    }
+    get hpCostPercent() {
+        return 0.7;
+    }
+
+    apply(sim, playerBall) {
+        sim.rushRemaining = Math.max(sim.rushRemaining, 0.2);
+    }
+}
+
+class CounterAction extends ClickAction {
+    get id() {
+        return "counter";
+    }
+    get name() {
+        return "카운터";
+    }
+    get description() {
+        return "충돌 임박 시 클릭 → 데미지 +12%";
+    }
+    get hpCostPercent() {
+        return 1.35;
+    }
+
+    isAvailable(sim, playerBall) {
+        return sim._isCollisionImminent(playerBall);
+    }
+
+    apply(sim, playerBall) {
+        sim.counterCharged = true;
+        sim.counterChargeTimer = 0.3;
+    }
+}
+
+class ParryAction extends ClickAction {
+    get id() {
+        return "parry";
+    }
+    get name() {
+        return "받아치기";
+    }
+    get description() {
+        return "날아오는 투사체 데미지 50% 경감";
+    }
+    get hpCostPercent() {
+        return 1.15;
+    }
+
+    isAvailable(sim, playerBall) {
+        return sim._getIncomingProjectile(playerBall) !== null;
+    }
+
+    apply(sim, playerBall) {
+        const proj = sim._getIncomingProjectile(playerBall);
+        if (proj) proj._parryReduction = 0.5;
+    }
+}
+
+class EndureAction extends ClickAction {
+    get id() {
+        return "endure";
+    }
+    get name() {
+        return "버티기";
+    }
+    get description() {
+        return "0.1초간 받는 데미지 50% 경감 (HP 50% 이하)";
+    }
+    get hpCostPercent() {
+        return 0.9;
+    }
+
+    isAvailable(sim, playerBall) {
+        return playerBall.hp / playerBall.maxHp <= 0.5;
+    }
+
+    apply(sim, playerBall) {
+        sim.endureRemaining = Math.max(sim.endureRemaining, 0.1);
+    }
+}
+
+// 레지스트리
+const ACTION_DEFS = Object.freeze([
+    new TimeWarpAction(),
+    new RushAction(),
+    new CounterAction(),
+    new ParryAction(),
+    new EndureAction()
+]);
 ```
 
 ---

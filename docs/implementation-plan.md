@@ -19,52 +19,59 @@
 
 ---
 
-## 1단계: `src/click-actions.js` — 액션 정의
+## 1단계: `src/click-actions.js` — 액션 클래스 계층
 
 ### 대상 파일
 
 - **신규**: `src/click-actions.js`
 
-### 작업 내용
-
-5개 액션을 객체 배열로 정의. 각 액션의 인터페이스:
+### 클래스 구조
 
 ```js
-{
-    id: "time_warp",
-    name: "시간 왜곡",
-    description: "0.25초간 상대만 슬로우",
-    hpCostPercent: 0.2,          // maxHP 대비 %
-    isAvailable(sim, playerBall) { return boolean; },
-    apply(sim, playerBall) { /* 효과 적용 */ }
+class ClickAction {
+    get id() {
+        throw new Error("override");
+    }
+    get name() {
+        throw new Error("override");
+    }
+    get description() {
+        throw new Error("override");
+    }
+    get hpCostPercent() {
+        return 0.2;
+    }
+
+    isAvailable(sim, playerBall) {
+        return true;
+    }
+    apply(sim, playerBall) {
+        throw new Error("override");
+    }
 }
+
+// 5개 서브클래스: TimeWarpAction, RushAction, CounterAction,
+//                 ParryAction, EndureAction
 ```
 
-### 함수
+### 내보내는 심볼
 
-| 함수                           | 역할                              |
-| ------------------------------ | --------------------------------- |
-| `getActionPool()`              | 전체 액션 5개 배열 반환           |
-| `pickRandomActions(count = 3)` | 풀에서 무작위 count개 (중복 없음) |
-| `findActionById(id)`           | id로 액션 객체 lookup             |
+| 심볼                           | 설명                                         |
+| ------------------------------ | -------------------------------------------- |
+| `ClickAction`                  | 베이스 클래스                                |
+| `ActionPool`                   | `Object.freeze([new TimeWarpAction(), ...])` |
+| `pickRandomActions(count = 3)` | 풀에서 shuffle 후 count개 반환               |
+| `findActionById(id)`           | id로 Action 인스턴스 lookup                  |
 
 ### 구현 순서
 
-1. 액션 5개 객체를 `ACTION_DEFS` 배열에 정의
-2. `pickRandomActions()` — Fisher-Yates 셔플 후 slice
-3. 각 액션의 `isAvailable()`은 1단계에서는 **항상 true** 반환 (조건 로직은 5단계)
-4. 각 액션의 `apply()`는 1단계에서는 **아무것도 안 함** (효과 로직은 2단계)
-
-### 검증
-
-```bash
-node -e "
-  import('./src/click-actions.js').then(m => {
-    console.log(m.pickRandomActions(3).length === 3 ? 'pick OK' : 'FAIL');
-    console.log(m.getActionPool().length === 5 ? 'pool OK' : 'FAIL');
-  });
-"
-```
+1. `ClickAction` 베이스 클래스 정의 (getter + `isAvailable` + `apply`)
+2. 5개 서브클래스 정의 (id, name, description, hpCostPercent)
+3. 1단계에서는 `isAvailable()` → 항상 `true` 반환 (조건 로직은 5단계)
+4. 1단계에서는 `apply()` → 빈 구현 (효과 로직은 2단계)
+5. `ActionPool` 인스턴스 배열
+6. `pickRandomActions()` — Fisher-Yates 셔플 후 slice
+7. `findActionById(id)` — `ActionPool.find(a => a.id === id)`
 
 ---
 
@@ -94,6 +101,10 @@ constructor(fighterSpecs, hooks, playerBall = null) {
 
     // 카운터 상태
     this.counterCharged = false;
+    this.counterChargeTimer = 0;
+
+    // 버티기 상태
+    this.endureRemaining = 0;
 }
 ```
 
@@ -128,6 +139,27 @@ applyAction(actionId) {
     const action = findActionById(actionId);
     if (!action) return;
     action.apply(this, this.playerBall);
+}
+```
+
+#### 2-E. 카운터/받아치기용 헬퍼 (5단계에서 구현)
+
+```js
+_isCollisionImminent(playerBall) {
+    const opponent = this.fighters.find(f => f !== playerBall);
+    if (!opponent) return false;
+    const dist = Vector2.subtract(opponent.position, playerBall.position).length();
+    const gap = dist - playerBall.radius - opponent.radius;
+    return gap <= 20;
+}
+
+_getIncomingProjectile(playerBall) {
+    for (const e of this.entities) {
+        if (!e.ownerId || e.ownerId === playerBall.id) continue;
+        const toPlayer = Vector2.subtract(playerBall.position, e.position);
+        if (toPlayer.length() < 300 && e.velocity.dot(toPlayer) > 0) return e;
+    }
+    return null;
 }
 ```
 
@@ -306,53 +338,62 @@ if (this._clickHandler) {
 
 ### 대상 파일
 
-- `src/click-actions.js` (isAvailable/apply 채우기)
-- `src/simulation/BattleSimulation.js`
+- `src/click-actions.js` (서브클래스 `isAvailable`/`apply` 채우기)
+- `src/simulation/BattleSimulation.js` (헬퍼 2-E 구현)
 - `src/entities.js` (ownerId)
 
 ### 작업 내용
 
 #### 5-A. 투사체에 `ownerId` 참조 추가
 
-`entities.js` — 각 투사체 클래스에 `this.ownerId = owner.id` 추가:
+`entities.js` — 각 투사체 생성자에 추가 (기존 `this.owner` 유지):
 
-- `ArrowProjectile`
-- `Grenade`
-- `OrbitProjectile`
-- `SeedOrb`
+- `ArrowProjectile`: `this.ownerId = owner.id`
+- `Grenade`: `this.ownerId = owner.id`
+- `OrbitProjectile`: `this.ownerId = owner.id`
+- `SeedOrb`: `this.ownerId = owner.id`
 
-#### 5-B. 받아치기 — 투사체 감지
+#### 5-B. 받아치기(ParryAction) — isAvailable/apply 구현
 
-`isAvailable`에서 simulation의 entities를 순회하며:
+```js
+class ParryAction extends ClickAction {
+    isAvailable(sim, playerBall) {
+        return sim._getIncomingProjectile(playerBall) !== null;
+    }
 
-- 투사체 엔티티인지 확인 (instanceof 또는 타입 플래그)
-- `entity.ownerId !== playerBall.id` (상대 것이면서)
-- playerBall 방향으로 접근 중인지 (velocity 방향 vs position 차이)
+    apply(sim, playerBall) {
+        const proj = sim._getIncomingProjectile(playerBall);
+        if (proj) proj._parryReduction = 0.5;
+    }
+}
+```
 
-`apply`에서는 해당 투사체에 `damageReduction` 플래그 설정.
+투사체 `update()`의 `takeDamage` 전에 `_parryReduction` 확인 → `Math.round(damage * (1 - this._parryReduction))`.
 
-투사체 `update()`에서 `takeDamage` 전에 플래그 확인 → 50% 경감.
+#### 5-C. 카운터(CounterAction) — isAvailable/apply 구현
 
-#### 5-C. 카운터 — 충돌 직전 감지
+```js
+class CounterAction extends ClickAction {
+    isAvailable(sim, playerBall) {
+        return sim._isCollisionImminent(playerBall);
+    }
 
-`isAvailable`에서:
+    apply(sim, playerBall) {
+        sim.counterCharged = true;
+        sim.counterChargeTimer = 0.3;
+    }
+}
+```
 
-- 두 공의 거리 `distance - (a.radius + b.radius)`가 임계값(예: 20px) 이하
-- 상대방의 속도가 플레이어 방향인지 (다가오는 중)
-
-`apply`에서는 `this.counterCharged = true` 설정.
-
-`handleCollision()`에서 `counterCharged` 확인 → 데미지 +10~15%.
+`handleCollision()`에서 `counterCharged` 확인 → 데미지 +12%, 사용 후 `false`.
 
 #### 5-D. 나머지 액션 isAvailable 조건 구현
 
-| 액션      | isAvailable 조건                          |
-| --------- | ----------------------------------------- |
-| 시간 왜곡 | `playerBall.hp / playerBall.maxHp <= 0.5` |
-| 돌진      | 항상 true                                 |
-| 카운터    | 충돌 임박 윈도우 (위 5-C)                 |
-| 받아치기  | 투사체 접근 중 (위 5-B)                   |
-| 버티기    | `playerBall.hp / playerBall.maxHp <= 0.5` |
+| 액션           | isAvailable                               |
+| -------------- | ----------------------------------------- |
+| TimeWarpAction | `playerBall.hp / playerBall.maxHp <= 0.5` |
+| RushAction     | 항상 `true`                               |
+| EndureAction   | `playerBall.hp / playerBall.maxHp <= 0.5` |
 
 ### 검증
 
