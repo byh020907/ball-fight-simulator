@@ -214,7 +214,10 @@ class EndureAction extends ClickAction {
     }
 
     apply(sim, playerBall) {
-        playerBall.setDamageReduction(0.5, "버팀!", 0.1);
+        playerBall.registerDamageHandler((amount, source, label) => {
+            source?.simulation?.spawnActionText?.(playerBall.position.clone(), "버팀!", "#44ff44");
+            return Math.round(amount * 0.5);
+        }, 0.1);
     }
 }
 

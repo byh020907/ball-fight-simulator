@@ -317,8 +317,9 @@ export class BattleBall {
         // ── 클릭 액션 시스템 ──
         this._rushRemaining = 0;
         this._rushMultiplier = 1;
-        /** { factor: number, label: string, remaining: number } | null — 액션이 등록 */
-        this._damageReduction = null;
+        /** function(amount, source, label): number | null — ClickAction이 등록, takeDamage가 호출 */
+        this._damageHandler = null;
+        this._damageHandlerRemaining = 0;
     }
 
     get renderLayer() {
@@ -411,12 +412,10 @@ export class BattleBall {
         this._rushMultiplier = multiplier;
     }
 
-    /** 액션이 데미지 경감 등록. takeDamage()가 이 값을 읽어 적용. */
-    getDamageReduction() {
-        return this._damageReduction;
-    }
-    setDamageReduction(factor, label, duration) {
-        this._damageReduction = { factor, label, remaining: duration };
+    /** 액션이 데미지 핸들러 등록. takeDamage()가 호출만 함. */
+    registerDamageHandler(handler, duration) {
+        this._damageHandler = handler;
+        this._damageHandlerRemaining = duration;
     }
 
     spendHpForAction(amount) {
@@ -481,9 +480,9 @@ export class BattleBall {
         }
 
         if (this._rushRemaining > 0) this._rushRemaining -= delta;
-        if (this._damageReduction) {
-            this._damageReduction.remaining -= delta;
-            if (this._damageReduction.remaining <= 0) this._damageReduction = null;
+        if (this._damageHandler) {
+            this._damageHandlerRemaining -= delta;
+            if (this._damageHandlerRemaining <= 0) this._damageHandler = null;
         }
     }
 
@@ -519,10 +518,9 @@ export class BattleBall {
             return;
         }
 
-        // 데미지 경감 — ClickAction(setDamageReduction)이 등록한 감소율 적용
-        if (this._damageReduction) {
-            amount = Math.round(amount * this._damageReduction.factor);
-            source?.simulation?.spawnActionText?.(this.position.clone(), this._damageReduction.label, "#44ff44");
+        // ClickAction이 등록한 데미지 핸들러 (takeDamage는 호출만, 로직은 액션에)
+        if (this._damageHandler) {
+            amount = this._damageHandler(amount, source, label);
         }
 
         const abilityDefMult = this.getStatModifiers().defense;
