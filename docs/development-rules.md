@@ -207,9 +207,11 @@ UI는 **Alpine.js**를 통해 컴포넌트 기반으로 관리됩니다.
 ### 핵심 원칙
 
 - **문자열 결합 금지**: `innerHTML`로 HTML을 조립하지 않습니다.
+- **직접 DOM 조작 금지**: `document.createElement`, `appendChild`, `classList.add` 등 DOM API를 직접 호출하지 않습니다. 모든 UI 변경은 Alpine.js의 반응형 상태(`x-text`, `x-show`, `x-for`, `x-bind` 등)를 통해 선언적으로 처리합니다.
 - **Alpine.js 템플릿**: `index.html`에 `x-text`, `x-for`, `x-bind`, `@click` 등의 Alpine.js 디렉티브를 사용합니다.
 - **반응형 상태**: `src/ui.js`의 `appStore()` 함수가 Alpine 컴포넌트의 상태를 정의합니다.
 - **CSS 분리**: 모든 스타일은 `src/styles.css`에 있으며, `index.html`은 `<link>`로 참조합니다.
+- **Alpine.js 공식 문서 우선**: Alpine.js 동작이 모호한 경우 [공식 문서](https://alpinejs.dev/)를 참고합니다. 구버전 블로그 글보다 최신 릴리스(3.x) 문서를 우선합니다. (예: `x-model` vs `x-modelable`, `$watch` vs `watch()`)
 
 ### 데이터 흐름
 
