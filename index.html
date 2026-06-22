@@ -350,7 +350,7 @@
                 class="bf-popup-overlay"
                 x-show="popupVisible"
                 x-transition.opacity.duration.200ms
-                @click.self="popupContent?.disableClose || closePopup('close')"
+                @click.self="popupContent?.closeOnOutside === false || closePopup('close')"
             >
                 <div class="bf-popup-card">
                     <div class="bf-popup-scroll">

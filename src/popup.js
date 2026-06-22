@@ -13,7 +13,7 @@
 
 /**
  * @typedef {{ text:string, value?:string, primary?:boolean }} PopupButton
- * @typedef {{ title:string, bodyHtml:string, buttons?:PopupButton[], closeOnOutside?:boolean, disableClose?:boolean }} PopupOptions
+ * @typedef {{ title:string, bodyHtml:string, buttons?:PopupButton[], closeOnOutside?:boolean }} PopupOptions
  */
 
 let _resolve = null;
@@ -41,8 +41,7 @@ export class PopupService {
                 title: options.title ?? "",
                 bodyHtml: options.bodyHtml ?? "",
                 buttons: options.buttons ?? [{ text: "닫기", value: "ok", primary: true }],
-                closeOnOutside: options.closeOnOutside !== false,
-                disableClose: options.disableClose === true
+                closeOnOutside: options.closeOnOutside !== false
             };
         });
     }
