@@ -361,6 +361,53 @@ export class UIController {
         s.overlayText = "";
     }
 
+    /** 카드 선택 UI — Promise 기반, PopupService 재사용 */
+    async waitForActionPick(cards) {
+        // non-browser 환경 (테스트) — 첫 번째 카드 자동 선택
+        if (typeof document === "undefined" || !document.addEventListener) {
+            return cards[0]?.id ?? null;
+        }
+
+        return new Promise((resolve) => {
+            const bodyHtml = `
+                <div class="action-pick">
+                    <p>매치 액션을 선택하세요</p>
+                    <div class="action-cards">
+                        ${cards
+                            .map(
+                                (c, i) => `
+                            <button class="action-card" data-index="${i}">
+                                <strong>${c.name}</strong>
+                                <span>${c.description}</span>
+                                <small>HP ${c.hpCostPercent}% 소모</small>
+                            </button>`
+                            )
+                            .join("")}
+                    </div>
+                </div>`;
+
+            PopupService.show({
+                title: "매치 액션 선택",
+                bodyHtml,
+                buttons: [],
+                closeOnOutside: false
+            });
+
+            // 카드 클릭 리스너 (일회성)
+            const handler = (e) => {
+                const btn = e.target.closest(".action-card");
+                if (!btn) return;
+                const idx = parseInt(btn.dataset.index, 10);
+                const picked = cards[idx];
+                if (!picked) return;
+                document.removeEventListener("click", handler, true);
+                PopupService.resolve(picked.id);
+                resolve(picked.id);
+            };
+            document.addEventListener("click", handler, true);
+        });
+    }
+
     setStartButton({ disabled, text, hidden }) {
         const s = this.state;
         if (!s) return;

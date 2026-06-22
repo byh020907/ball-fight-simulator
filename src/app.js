@@ -11,6 +11,7 @@ import {
     createTournamentRoster,
     getRemainingStatPoints
 } from "./stat-allocation.js";
+import { pickRandomActions } from "./click-actions.js";
 
 export class BattleApp {
     constructor() {
@@ -198,6 +199,7 @@ export class BattleApp {
         this.ui.addLog(`대진 확정: ${label}`);
         this.ui.addLog(`아레나가 ${match[0].title}와 ${match[1].title}의 능력을 감지했습니다.`);
 
+        // 시뮬레이션 생성 (playerBall은 아직 null)
         this.simulation = new BattleSimulation(match, {
             onLog: (message) => this.ui.addLog(message),
             onOvertime: () => {
@@ -207,6 +209,24 @@ export class BattleApp {
             },
             onSound: (type, intensity) => this.audio.play(type, intensity)
         });
+
+        // 내 캐릭터 식별
+        const playerBall = this.simulation.fighters.find((f) => f.id === this.playerFighterId) ?? null;
+        this.simulation.playerBall = playerBall;
+
+        // 클릭 액션 — 내 캐릭터가 있으면 카드 선택
+        this.currentMatchAction = null;
+        if (playerBall) {
+            const cards = pickRandomActions(3);
+            const pickedId = await this.ui.waitForActionPick(cards);
+            this.currentMatchAction = cards.find((c) => c.id === pickedId) ?? null;
+            if (this.currentMatchAction) {
+                this.ui.addLog(`[액션] ${this.currentMatchAction.name} 준비 완료.`);
+            }
+        }
+
+        // 클릭 핸들러 바인딩
+        this._bindClickHandler();
 
         this.renderer.render(this.simulation);
         await this.wait(1350);
@@ -218,6 +238,82 @@ export class BattleApp {
         this.lastTime = performance.now();
         cancelAnimationFrame(this.rafId);
         this.rafId = requestAnimationFrame((time) => this.loop(time));
+    }
+
+    // ── 클릭 액션 핸들러 ──
+
+    _bindClickHandler() {
+        // 기존 핸들러 제거
+        this._unbindClickHandler();
+
+        const canvas = this.elements?.canvas;
+        if (!canvas) return;
+        this._lastActionTime = 0;
+
+        // ctx — TriggerStrategy에 전달
+        this._actionCtx = {
+            action: null,
+            sim: null,
+            player: null,
+            _holding: false,
+            _consumed: false,
+            _holdStarted: false,
+            fireAction: () => this._tryFireAction()
+        };
+
+        this._pointerHandler = () => {
+            if (this.simulation?.finished) return;
+            this._actionCtx.action = this.currentMatchAction;
+            this._actionCtx.sim = this.simulation;
+            this._actionCtx.player = this.simulation?.playerBall ?? null;
+            if (!this._actionCtx.action) return;
+            this._actionCtx.trigger = this._actionCtx.action.trigger;
+            this._actionCtx.trigger.onPointerDown(this._actionCtx);
+        };
+
+        this._pointerUpHandler = () => {
+            this._actionCtx.trigger?.onPointerUp(this._actionCtx);
+        };
+
+        canvas.addEventListener("pointerdown", this._pointerHandler);
+        canvas.addEventListener("pointerup", this._pointerUpHandler);
+        canvas.addEventListener("pointerleave", this._pointerUpHandler);
+    }
+
+    _unbindClickHandler() {
+        try {
+            const canvas = this.elements?.canvas;
+            if (!canvas || typeof canvas.removeEventListener !== "function") return;
+            if (this._pointerHandler) {
+                canvas.removeEventListener("pointerdown", this._pointerHandler);
+                canvas.removeEventListener("pointerup", this._pointerUpHandler);
+                canvas.removeEventListener("pointerleave", this._pointerUpHandler);
+            }
+        } catch {
+            // no-op in non-browser environments
+        }
+        this._actionCtx = null;
+    }
+
+    /** TriggerStrategy.fireAction()에서 호출 — HP 소모 + 지연 예약 */
+    _tryFireAction() {
+        const { action, sim, player } = this._actionCtx ?? {};
+        if (!action || !sim || !player) return false;
+        if (player.isDefeated) return false;
+        if (player.hp / player.maxHp < 0.05) return false;
+        if (!action.isAvailable(sim, player)) return false;
+
+        const cost = Math.ceil((player.maxHp * action.hpCostPercent) / 100);
+        if (player.spendHpForAction(cost) <= 0) return false;
+
+        sim._pendingAction = { actionInstance: action, playerBall: player };
+        return true;
+    }
+
+    // Match end cleanup
+    _cleanupMatch() {
+        this._unbindClickHandler();
+        this.currentMatchAction = null;
     }
 
     showTransientOverlay(label, text, duration = 1200) {
@@ -234,6 +330,12 @@ export class BattleApp {
     loop(timestamp) {
         const delta = Math.min(0.032, (timestamp - this.lastTime) / 1000 || 0.016);
         this.lastTime = timestamp;
+
+        // HoldTrigger tick — 매 프레임 pointer down 상태 확인
+        if (this._actionCtx?.trigger?.type === "hold") {
+            this._actionCtx.trigger.onTick(this._actionCtx);
+        }
+
         this.simulation.update(delta);
         this.renderer.render(this.simulation);
         this.ui.updateLiveCards(this.simulation.fighters);
@@ -262,6 +364,7 @@ export class BattleApp {
             return;
         }
 
+        this._cleanupMatch();
         this.matchFinalized = true;
         const winner = this.simulation.winner;
         const loser = this.simulation.loser ?? this.simulation.fighters.find((fighter) => fighter !== winner);
