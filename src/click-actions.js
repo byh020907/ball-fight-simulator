@@ -102,18 +102,23 @@ class ClickAction {
 // 모든 값은 모듈 상수로 관리 — description과 apply가 같은 값을 사용
 
 const TIME_WARP_DURATION = 0.5;
+const TIME_WARP_COST = 0.5;
 
 const RUSH_DURATION = 0.5;
 const RUSH_SPEED_BONUS = 0.25;
+const RUSH_COST = 0.5;
 
 const COUNTER_WINDOW_SECONDS = 0.2;
 const COUNTER_BONUS_RATE = 0.1;
+const COUNTER_COST = 1.5;
 
 const PARRY_WINDOW_SECONDS = 0.3;
 const PARRY_DAMAGE_MULTIPLIER = 0.5;
+const PARRY_COST = 1.0;
 
 const ENDURE_DURATION = 0.1;
 const ENDURE_DAMAGE_MULTIPLIER = 0.5;
+const ENDURE_COST = 1.0;
 
 class TimeWarpAction extends ClickAction {
     get id() {
@@ -126,7 +131,7 @@ class TimeWarpAction extends ClickAction {
         return `${TIME_WARP_DURATION}초간 상대만 슬로우`;
     }
     get hpCostPercent() {
-        return 0.2;
+        return TIME_WARP_COST;
     }
 
     apply(sim, playerBall) {
@@ -146,7 +151,7 @@ class RushAction extends ClickAction {
         return `${RUSH_DURATION}초간 속도 +${RUSH_SPEED_BONUS * 100}%`;
     }
     get hpCostPercent() {
-        return 0.7;
+        return RUSH_COST;
     }
 
     apply(sim, playerBall) {
@@ -169,7 +174,7 @@ class CounterAction extends ClickAction {
         return `${COUNTER_WINDOW_SECONDS.toFixed(2)}초 안에 충돌 시 데미지 +${COUNTER_BONUS_RATE * 100}%`;
     }
     get hpCostPercent() {
-        return 1.35;
+        return COUNTER_COST;
     }
 
     apply(sim, playerBall) {
@@ -200,7 +205,7 @@ class ParryAction extends ClickAction {
         return `${PARRY_WINDOW_SECONDS}초 안에 맞는 투사체 데미지 ${PARRY_DAMAGE_MULTIPLIER * 100}% 경감`;
     }
     get hpCostPercent() {
-        return 1.15;
+        return PARRY_COST;
     }
 
     apply(sim, playerBall) {
@@ -228,7 +233,7 @@ class EndureAction extends ClickAction {
         return `${ENDURE_DURATION}초간 받는 데미지 ${ENDURE_DAMAGE_MULTIPLIER * 100}% 경감`;
     }
     get hpCostPercent() {
-        return 0.9;
+        return ENDURE_COST;
     }
 
     apply(sim, playerBall) {
