@@ -104,7 +104,7 @@ class TimeWarpAction extends ClickAction {
         return "시간 왜곡";
     }
     get description() {
-        return "0.25초간 상대만 슬로우 (HP 50% 이하)";
+        return "0.5초간 상대만 슬로우";
     }
     get hpCostPercent() {
         return 0.2;
@@ -116,7 +116,7 @@ class TimeWarpAction extends ClickAction {
 
     apply(sim, playerBall) {
         const current = sim.getTimeSlowRemaining();
-        sim.setTimeSlowRemaining(Math.max(current, 0.25));
+        sim.setTimeSlowRemaining(Math.max(current, 0.5));
     }
 }
 
