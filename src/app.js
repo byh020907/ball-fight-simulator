@@ -307,6 +307,10 @@ export class BattleApp {
         if (player.spendHpForAction(cost) <= 0) return false;
 
         sim._pendingAction = { actionInstance: action, playerBall: player };
+
+        // 사용자 피드백 — 파티클 + 사운드
+        sim.spawnPulse(player.position.clone(), "#ffffff");
+        this.audio.play("dash", 0.7);
         return true;
     }
 
