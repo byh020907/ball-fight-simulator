@@ -96,11 +96,8 @@ export class ArrowProjectile extends CombatEntity {
 
         const distance = Vector2.subtract(this.position, target.position).length();
         if (distance <= target.radius + this.radius) {
-            let dmg = Math.round(this.owner.baseDamage * 1.4);
-            if (this._parryReduction) {
-                dmg = Math.round(dmg * (1 - this._parryReduction));
-                simulation.spawnActionText(target.position.clone(), "받아치기!", "#44ddff");
-            }
+            let dmg = this.getEffectiveDamage(Math.round(this.owner.baseDamage * 1.4));
+            if (this._parryReduction) simulation.spawnActionText(target.position.clone(), "받아치기!", "#44ddff");
             target.takeDamage(dmg, this.owner, "Arrow Shot");
             target.applyKnockback(this.velocity.clone().scale(0.6), 0.2);
             simulation.playSound("hit");
@@ -173,11 +170,8 @@ export class OrbitProjectile extends CombatEntity {
 
         const distance = Vector2.subtract(this.position, target.position).length();
         if (distance <= target.radius + this.radius) {
-            let dmg = Math.round(this.owner.baseDamage * 0.8);
-            if (this._parryReduction) {
-                dmg = Math.round(dmg * (1 - this._parryReduction));
-                simulation.spawnActionText(target.position.clone(), "받아치기!", "#44ddff");
-            }
+            let dmg = this.getEffectiveDamage(Math.round(this.owner.baseDamage * 0.8));
+            if (this._parryReduction) simulation.spawnActionText(target.position.clone(), "받아치기!", "#44ddff");
             target.takeDamage(dmg, this.owner, "Orbit Shot");
             target.applyKnockback(this.velocity.clone().scale(0.4), 0.15);
             simulation.spawnSlash(this.position.clone(), target.position.clone(), this.owner.color);
@@ -248,11 +242,9 @@ export class Grenade extends CombatEntity {
                     0,
                     Math.min(1, (distance - this.innerRadius) / (this.explosionRadius - this.innerRadius))
                 );
-                const damage = Math.round(this.owner.baseDamage * (4.0 - edgeProgress * 2.0));
-                const finalDmg = this._parryReduction ? Math.round(damage * (1 - this._parryReduction)) : damage;
-                if (this._parryReduction) {
-                    simulation.spawnActionText(target.position.clone(), "받아치기!", "#44ddff");
-                }
+                const raw = Math.round(this.owner.baseDamage * (4.0 - edgeProgress * 2.0));
+                const finalDmg = this.getEffectiveDamage(raw);
+                if (this._parryReduction) simulation.spawnActionText(target.position.clone(), "받아치기!", "#44ddff");
                 target.takeDamage(finalDmg, this.owner, "Grenade");
                 const kbDir = Vector2.subtract(target.position, this.position).normalize();
                 target.applyKnockback(kbDir.scale(400), 0.35);

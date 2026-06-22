@@ -85,6 +85,11 @@ export class CombatEntity {
     setParryReduction(factor) {
         this._parryReduction = factor;
     }
+
+    /** 받아치기 경감 적용 — 투사체에서 호출 */
+    getEffectiveDamage(rawDamage) {
+        return this._parryReduction ? Math.round(rawDamage * (1 - this._parryReduction)) : rawDamage;
+    }
 }
 
 export class TimedEffect {
