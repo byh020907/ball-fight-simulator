@@ -151,7 +151,10 @@ export class BattleSimulation extends Simulation {
         if (this._pendingAction) {
             const { actionInstance, playerBall: pb } = this._pendingAction;
             this._pendingAction = null;
-            if (actionInstance && pb) actionInstance.apply(this, pb);
+            if (actionInstance && pb) {
+                this.addLog(`[액션] 효과 적용: ${actionInstance.name}`);
+                actionInstance.apply(this, pb);
+            }
         }
 
         this.elapsed += delta;
