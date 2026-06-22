@@ -50,7 +50,7 @@
 
 | 액션          | 발동 조건      | 효과                                                                                 | 예상 클릭 빈도              | HP 소모(maxHP 비율) |
 | ------------- | -------------- | ------------------------------------------------------------------------------------ | --------------------------- | ------------------- |
-| **시간 왜곡** | 상시           | 클릭 시 0.5초간 상대(플레이어 제외 모든 엔티티)만 delta ×0.45로 슬로우. 연타 시 갱신 | 매우 높음 (~0.2초마다 연타) | 0.5%                |
+| **시간 왜곡** | 상시           | 클릭 시 0.5초간 상대(플레이어 제외 모든 엔티티)만 35% 속도로 슬로우. 연타 시 갱신      | 매우 높음 (~0.2초마다 연타) | 0.5%                |
 | **돌진**      | 상시           | 클릭 시 0.5초간 내 캐릭터 속도 +25%                                                  | 중간 (1~2초마다)            | 0.5%                |
 | **카운터**    | 상시           | 클릭 시 0.20초간 충돌 window. 맞으면 공격 데미지 +10%, 빗나가면 HP만 소모.             | 낮음 (매치당 손에 꼽음)     | 1.5%               |
 | **받아치기**  | 상시           | 클릭 시 0.3초간 투사체 피해 50% 경감 window. 맞지 않으면 HP만 소모.                   | 중간 (예측 샷)             | 1.0%               |
@@ -414,7 +414,7 @@ const ACTION_DEFS = Object.freeze([
 // BattleSimulation.update(delta):
 for (const entity of this.entities) {
     const isPlayerOwned = entity === this.playerBall;
-    const scaledDelta = this.timeSlowRemaining > 0 && !isPlayerOwned ? delta * 0.45 : delta;
+    const scaledDelta = this.timeSlowRemaining > 0 && !isPlayerOwned ? delta * 0.35 : delta;
     entity.update(scaledDelta, this);
 }
 ```

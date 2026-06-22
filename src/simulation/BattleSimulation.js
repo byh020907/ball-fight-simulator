@@ -51,7 +51,7 @@ export class BattleSimulation extends Simulation {
         this._clickActionContext = {
             pendingAction: null,
             timeSlowRemaining: 0,
-            timeSlowFactor: 0.45
+            timeSlowFactor: 0.35
         };
     }
 
