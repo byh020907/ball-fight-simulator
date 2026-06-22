@@ -437,9 +437,7 @@ export class BattleBall {
     }
 
     update(delta, simulation) {
-        if (this.isDefeated) {
-            return;
-        }
+        if (this.isDefeated) return;
 
         this.initState();
 
@@ -450,34 +448,29 @@ export class BattleBall {
         }
 
         const target = simulation.getOpponent(this);
+        this._tickTimers(delta);
 
-        if (this.slowEffect) {
-            this.slowEffect.tick(delta);
-            if (this.slowEffect.finished) {
-                this.slowEffect = null;
-            }
-        }
+        this.ability?.update(delta, target);
+        this.radius = this.baseRadius * (this.ability?.getRadiusScale?.() ?? 1);
+        this.velocity = this._computeVelocity(simulation);
 
-        if (this.speedBoost) {
-            this.speedBoost.effect.tick(delta);
-            if (this.speedBoost.effect.finished) {
-                this.speedBoost = null;
-            }
-        }
+        this.position.add(this.velocity.clone().scale(delta));
+        simulation.keepInsideArena(this);
+        if (this.forcedHeading?.overrideVelocity && this.bounced) this.forcedHeading = null;
+    }
 
-        if (this.forcedHeading) {
-            this.forcedHeading.effect.tick(delta);
-            if (this.forcedHeading.effect.finished) {
-                this.forcedHeading = null;
-            }
-        }
+    /** 모든 프레임 기반 타이머를 한 번에 갱신 */
+    _tickTimers(delta) {
+        const tick = (effect, onFinish) => {
+            if (!effect) return;
+            effect.tick(delta);
+            if (effect.finished) onFinish();
+        };
 
-        if (this.dashState) {
-            this.dashState.effect.tick(delta);
-            if (this.dashState.effect.finished) {
-                this.clearDash();
-            }
-        }
+        tick(this.slowEffect, () => (this.slowEffect = null));
+        tick(this.speedBoost?.effect, () => (this.speedBoost = null));
+        tick(this.forcedHeading?.effect, () => (this.forcedHeading = null));
+        tick(this.dashState?.effect, () => this.clearDash());
 
         if (this.wallSlamState) {
             this.wallSlamState.effect.tick(delta);
@@ -485,43 +478,33 @@ export class BattleBall {
             const spinDirection = this.velocity.x >= 0 ? 1 : -1;
             this.spinRotation +=
                 spinDirection * Math.max(8, this.velocity.length() / Math.max(1, this.radius)) * delta * 1.55;
-            if (this.wallSlamState.effect.finished) {
-                this.wallSlamState = null;
-            }
+            if (this.wallSlamState.effect.finished) this.wallSlamState = null;
         }
 
-        // 액션 효과 타이머
         if (this._rushRemaining > 0) this._rushRemaining -= delta;
         if (this._endureRemaining > 0) this._endureRemaining -= delta;
+    }
 
-        this.ability?.update(delta, target);
-        const radiusScale = this.ability?.getRadiusScale?.() ?? 1;
-        this.radius = this.baseRadius * radiusScale;
+    /** 속도 계산 — 이동 보정치, 강제 방향, 넉백을 종합 */
+    _computeVelocity(simulation) {
         const modifiers = this.getStatModifiers();
-        const slowMultiplier = this.slowEffect ? this.slowEffect.amount : 1;
-        const boostMultiplier = this.speedBoost ? this.speedBoost.multiplier : 1;
-        const currentDirection =
+        const slowMult = this.slowEffect ? this.slowEffect.amount : 1;
+        const boostMult = this.speedBoost ? this.speedBoost.multiplier : 1;
+        const currentDir =
             this.velocity.length() > 0
                 ? this.velocity.clone().normalize()
                 : Vector2.fromAngle(Math.random() * Math.PI * 2, 1);
-        const direction = this.forcedHeading ? this.forcedHeading.direction.clone() : currentDirection;
-
+        const direction = this.forcedHeading ? this.forcedHeading.direction.clone() : currentDir;
         const knockbackVel = this.forcedHeading?.overrideVelocity;
-        this.velocity =
+
+        return (
             knockbackVel ??
             direction.scale(
                 this.dashState?.speedOverride ??
                     this.speedBoost?.speedOverride ??
-                    this.baseSpeed *
-                        modifiers.speed *
-                        slowMultiplier *
-                        boostMultiplier *
-                        simulation.getSpeedMultiplier()
-            );
-
-        this.position.add(this.velocity.clone().scale(delta));
-        simulation.keepInsideArena(this);
-        if (knockbackVel && this.bounced) this.forcedHeading = null;
+                    this.baseSpeed * modifiers.speed * slowMult * boostMult * simulation.getSpeedMultiplier()
+            )
+        );
     }
 
     applySlow(duration, amount) {
