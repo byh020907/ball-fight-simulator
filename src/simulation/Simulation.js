@@ -35,79 +35,69 @@ export class Simulation {
     }
 
     keepInsideArena(ball) {
-        let bounced = false;
-        let wallNormal = null;
-        let wallPoint = null;
-        if (ball.position.x <= ball.radius) {
-            ball.position.x = ball.radius;
-            ball.velocity.x = Math.abs(ball.velocity.x);
-            bounced = true;
-            wallNormal = new Vector2(1, 0);
-            wallPoint = ball.position.clone();
-            this.clearWallDash(ball);
-        } else if (ball.position.x >= this.width - ball.radius) {
-            ball.position.x = this.width - ball.radius;
-            ball.velocity.x = -Math.abs(ball.velocity.x);
-            bounced = true;
-            wallNormal = new Vector2(-1, 0);
-            wallPoint = ball.position.clone();
-            this.clearWallDash(ball);
-        }
+        const xBounce = this._reflectX(ball);
+        const yBounce = this._reflectY(ball);
+        if (!xBounce && !yBounce) return;
 
-        if (ball.position.y <= ball.radius) {
-            ball.position.y = ball.radius;
-            ball.velocity.y = Math.abs(ball.velocity.y);
-            bounced = true;
-            wallNormal = new Vector2(0, 1);
-            wallPoint = ball.position.clone();
-            this.clearWallDash(ball);
-        } else if (ball.position.y >= this.height - ball.radius) {
-            ball.position.y = this.height - ball.radius;
-            ball.velocity.y = -Math.abs(ball.velocity.y);
-            bounced = true;
-            wallNormal = new Vector2(0, -1);
-            wallPoint = ball.position.clone();
-            this.clearWallDash(ball);
+        ball.bounced = true;
+        if (ball.wallSlamState && ball.wallSlamState.cooldown <= 0) {
+            ball.wallSlamState.cooldown = 0.18;
+            ball.takeDamage(ball.wallSlamState.damage, ball.wallSlamState.source, "Wall Slam");
+            const normal = xBounce ?? yBounce;
+            this.spawnWallImpact(
+                ball.position.clone(),
+                normal ?? ball.velocity.clone().normalize().scale(-1),
+                ball.wallSlamState.source?.color ?? ball.color
+            );
+            this.playSound("wall", 1.15);
+            this.shakeScreen(0.24, 16);
+            this.addLog(`${ball.name} takes wall slam damage.`);
         }
+    }
 
-        if (bounced) {
-            ball.bounced = true;
-            if (ball.wallSlamState && ball.wallSlamState.cooldown <= 0) {
-                ball.wallSlamState.cooldown = 0.18;
-                ball.takeDamage(ball.wallSlamState.damage, ball.wallSlamState.source, "Wall Slam");
-                this.spawnWallImpact(
-                    wallPoint ?? ball.position.clone(),
-                    wallNormal ?? ball.velocity.clone().normalize().scale(-1),
-                    ball.wallSlamState.source?.color ?? ball.color
-                );
-                this.playSound("wall", 1.15);
-                this.shakeScreen(0.24, 16);
-                this.addLog(`${ball.name} takes wall slam damage.`);
-            }
+    keepEntityInsideArena(entity) {
+        this._reflectX(entity);
+        this._reflectY(entity);
+    }
+
+    /** X축 벽 반사. bounce 발생 시 normal 반환. */
+    _reflectX(entity) {
+        if (entity.position.x <= entity.radius) {
+            entity.position.x = entity.radius;
+            entity.velocity.x = Math.abs(entity.velocity.x);
+            if (entity.dashState) this.clearWallDash(entity);
+            return new Vector2(1, 0);
         }
+        if (entity.position.x >= this.width - entity.radius) {
+            entity.position.x = this.width - entity.radius;
+            entity.velocity.x = -Math.abs(entity.velocity.x);
+            if (entity.dashState) this.clearWallDash(entity);
+            return new Vector2(-1, 0);
+        }
+        return null;
+    }
+
+    /** Y축 벽 반사. bounce 발생 시 normal 반환. */
+    _reflectY(entity) {
+        if (entity.position.y <= entity.radius) {
+            entity.position.y = entity.radius;
+            entity.velocity.y = Math.abs(entity.velocity.y);
+            if (entity.dashState) this.clearWallDash(entity);
+            return new Vector2(0, 1);
+        }
+        if (entity.position.y >= this.height - entity.radius) {
+            entity.position.y = this.height - entity.radius;
+            entity.velocity.y = -Math.abs(entity.velocity.y);
+            if (entity.dashState) this.clearWallDash(entity);
+            return new Vector2(0, -1);
+        }
+        return null;
     }
 
     clearWallDash(ball) {
         if (!ball.dashState?.untilWall) return;
         ball.ability?.onDashWall?.(ball.dashState);
         ball.clearDash();
-    }
-
-    keepEntityInsideArena(entity) {
-        if (entity.position.x <= entity.radius) {
-            entity.position.x = entity.radius;
-            entity.velocity.x = Math.abs(entity.velocity.x);
-        } else if (entity.position.x >= this.width - entity.radius) {
-            entity.position.x = this.width - entity.radius;
-            entity.velocity.x = -Math.abs(entity.velocity.x);
-        }
-        if (entity.position.y <= entity.radius) {
-            entity.position.y = entity.radius;
-            entity.velocity.y = Math.abs(entity.velocity.y);
-        } else if (entity.position.y >= this.height - entity.radius) {
-            entity.position.y = this.height - entity.radius;
-            entity.velocity.y = -Math.abs(entity.velocity.y);
-        }
     }
 
     // ── Spawn helpers ─────────────────────────────────────────────────────
