@@ -350,7 +350,7 @@
                 class="bf-popup-overlay"
                 x-show="popupVisible"
                 x-transition.opacity.duration.200ms
-                @click.self="closePopup('close')"
+                @click.self="popupContent?.disableClose || closePopup('close')"
             >
                 <div class="bf-popup-card">
                     <div class="bf-popup-scroll">
@@ -371,12 +371,11 @@
                 </div>
             </div>
 
-            <!-- Action picker (Alpine template, no x-html) -->
+            <!-- Action picker (Alpine template, no x-html) — disableClose: 반드시 선택해야 함 -->
             <div
                 class="bf-popup-overlay"
                 x-show="actionPickerVisible"
                 x-transition.opacity.duration.200ms
-                @click.self="cancelActionPick"
             >
                 <div class="bf-popup-card">
                     <div class="bf-popup-scroll">

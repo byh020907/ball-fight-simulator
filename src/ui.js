@@ -123,11 +123,6 @@ export function appStore() {
             if (resolve) resolve(index);
         },
 
-        /** 액션 선택 취소 (배경 클릭 등) — 첫 번째 카드 자동 선택 */
-        cancelActionPick() {
-            this.pickAction(0);
-        },
-
         // Actions
         adjustStat(key, delta) {
             if (this.locked) return;
