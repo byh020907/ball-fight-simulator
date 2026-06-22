@@ -214,7 +214,7 @@ class EndureAction extends ClickAction {
     }
 
     apply(sim, playerBall) {
-        playerBall.setEndureRemaining(0.1, 0.5);
+        playerBall.setDamageReduction(0.5, "버팀!", 0.1);
     }
 }
 

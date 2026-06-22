@@ -317,8 +317,8 @@ export class BattleBall {
         // ── 클릭 액션 시스템 ──
         this._rushRemaining = 0;
         this._rushMultiplier = 1;
-        this._endureRemaining = 0;
-        this._endureReduction = 0;
+        /** { factor: number, label: string, remaining: number } | null — 액션이 등록 */
+        this._damageReduction = null;
     }
 
     get renderLayer() {
@@ -411,12 +411,12 @@ export class BattleBall {
         this._rushMultiplier = multiplier;
     }
 
-    getEndureRemaining() {
-        return this._endureRemaining;
+    /** 액션이 데미지 경감 등록. takeDamage()가 이 값을 읽어 적용. */
+    getDamageReduction() {
+        return this._damageReduction;
     }
-    setEndureRemaining(duration, reduction) {
-        this._endureRemaining = duration;
-        this._endureReduction = reduction;
+    setDamageReduction(factor, label, duration) {
+        this._damageReduction = { factor, label, remaining: duration };
     }
 
     spendHpForAction(amount) {
@@ -481,7 +481,10 @@ export class BattleBall {
         }
 
         if (this._rushRemaining > 0) this._rushRemaining -= delta;
-        if (this._endureRemaining > 0) this._endureRemaining -= delta;
+        if (this._damageReduction) {
+            this._damageReduction.remaining -= delta;
+            if (this._damageReduction.remaining <= 0) this._damageReduction = null;
+        }
     }
 
     /** 속도 계산 — 이동 보정치, 강제 방향, 넉백을 종합 */
@@ -516,10 +519,10 @@ export class BattleBall {
             return;
         }
 
-        // 버티기 — 받는 데미지 경감 (Action이 setEndureRemaining으로 설정)
-        if (this._endureRemaining > 0) {
-            amount = Math.round(amount * this._endureReduction);
-            source?.simulation?.spawnActionText?.(this.position.clone(), "버팀!", "#44ff44");
+        // 데미지 경감 — ClickAction(setDamageReduction)이 등록한 감소율 적용
+        if (this._damageReduction) {
+            amount = Math.round(amount * this._damageReduction.factor);
+            source?.simulation?.spawnActionText?.(this.position.clone(), this._damageReduction.label, "#44ff44");
         }
 
         const abilityDefMult = this.getStatModifiers().defense;
