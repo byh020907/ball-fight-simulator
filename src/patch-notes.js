@@ -64,11 +64,11 @@ export const PATCH_NOTES = [
             },
             {
                 type: "feature",
-                text: "액션: 카운터 — 충돌 임박 시 클릭 → 데미지 +12%"
+                text: "액션: 카운터 — 0.22초 안에 충돌 시 데미지 +12%"
             },
             {
                 type: "feature",
-                text: "액션: 받아치기 — 날아오는 투사체 데미지 50% 경감"
+                text: "액션: 받아치기 — 0.3초 안에 맞는 투사체 데미지 50% 경감"
             },
             {
                 type: "feature",

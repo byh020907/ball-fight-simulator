@@ -52,7 +52,7 @@
 | ------------- | -------------- | ------------------------------------------------------------------------------------ | --------------------------- | ------------------- |
 | **시간 왜곡** | 상시           | 클릭 시 0.5초간 상대(플레이어 제외 모든 엔티티)만 delta ×0.45로 슬로우. 연타 시 갱신 | 매우 높음 (~0.2초마다 연타) | 0.2%                |
 | **돌진**      | 상시           | 클릭 시 0.5초간 내 캐릭터 속도 +25%                                                  | 중간 (1~2초마다)            | 0.7%                |
-| **카운터**    | 충돌 임박 시   | 클릭 성공 시 다음 충돌 내 공격 데미지 +12%                                           | 낮음 (매치당 손에 꼽음)     | 1.35%               |
+| **카운터**    | 상시           | 클릭 시 0.22초간 충돌 window. 맞으면 공격 데미지 +12%, 빗나가면 HP만 소모.             | 낮음 (매치당 손에 꼽음)     | 1.35%               |
 | **받아치기**  | 상시           | 클릭 시 0.3초간 투사체 피해 50% 경감 window. 맞지 않으면 HP만 소모.                   | 중간 (예측 샷)             | 1.15%               |
 | **버티기**    | 상시           | 클릭 시 0.1초간 받는 데미지 50% 경감                                                 | 위기 구간에서 몰아서 사용   | 0.9%                |
 
@@ -170,8 +170,8 @@ class ClickAction {
 // ────────────  ─────────────────────────────────────────  ──────────────────────────────
 // 시간 왜곡     max(현재값, duration) 후 저장               sim.get/ setTimeSlowRemaining()
 // 돌진          지속시간 연장 or 신규 + 배율 적용            ball.actionContext.getEffect(), setEffect()
-// 카운터        충돌 임박 판정 + 플래그 설정                sim.isCollisionImminent(), setCounterCharged()
-// 받아치기      timed effect 등록 (0.3s, onDamageTaken)      ball.actionContext.setEffect()
+// 카운터        timed effect 등록 (0.22s, onFighterCollision) ball.actionContext.setEffect()
+// 받아치기      timed effect 등록 (0.3s, onProjectileDamage)  ball.actionContext.setEffect()
 // 버티기        경감 effect 등록                            ball.actionContext.setEffect()
 
 // 핸들러 ctx 객체는 app.js에서 이렇게 구성:
@@ -269,16 +269,19 @@ class CounterAction extends ClickAction {
         return "카운터";
     }
     get description() {
-        return "충돌 임박 시 클릭 → 데미지 +12%";
+        return "0.22초 안에 충돌 시 데미지 +12%";
     }
     get hpCostPercent() {
         return 1.35;
     }
-    getFailureReason(sim, playerBall) {
-        return sim.isCollisionImminent(playerBall) ? null : "충돌 직전이 아닙니다";
-    }
     apply(sim, playerBall) {
-        sim.setCounterCharged(true);
+        playerBall.actionContext.setEffect(this.id, {
+            remaining: 0.22,
+            onFighterCollision: (owner, opponent, outgoingDamage, incomingDamage, simulation) => {
+                opponent.takeDamage(Math.round(outgoingDamage * 0.12), owner, "Counter");
+                simulation.spawnActionText(opponent.position.clone(), "카운터!", "#ff8844");
+            }
+        });
     }
 }
 
@@ -290,17 +293,19 @@ class ParryAction extends ClickAction {
         return "받아치기";
     }
     get description() {
-        return "날아오는 투사체 데미지 50% 경감";
+        return "0.3초 안에 맞는 투사체 데미지 50% 경감";
     }
     get hpCostPercent() {
         return 1.15;
     }
-    getFailureReason(sim, playerBall) {
-        return sim.getIncomingProjectile(playerBall) ? null : "날아오는 투사체가 없습니다";
-    }
     apply(sim, playerBall) {
-        const proj = sim.getIncomingProjectile(playerBall);
-        if (proj) proj.setParryReduction(0.5);
+        playerBall.actionContext.setEffect(this.id, {
+            remaining: 0.3,
+            onProjectileDamage: (amount, projectile, source, label, simulation, target) => {
+                simulation.spawnActionText(target.position.clone(), "받아치기!", "#44ddff");
+                return Math.round(amount * 0.5);
+            }
+        });
     }
 }
 
@@ -397,11 +402,11 @@ const ACTION_DEFS = Object.freeze([
 
 ### 카운터 판정
 
-`BattleSimulation.handleCollision()` 참고. 두 공의 거리가 충돌 직전(임계값 이하) 상태일 때만 유효한 좁은 윈도우(~0.15초)로 구현.
+더 이상 충돌 임박 여부를 미리 체크하지 않는다. 사용자가 카운터를 누르면 무조건 HP를 소모하고 0.22초짜리 충돌 window가 열린다. 이 window 안에 충돌하면 `ActionContext.onFighterCollision()`이 추가 피해와 텍스트를 처리하고, 충돌하지 못하면 HP만 소모된 채 만료된다.
 
 ### 받아치기 판정
 
-더 이상 투사체 접근 여부를 미리 체크하지 않는다. 사용자가 받아치기를 누르면 무조건 HP를 소모하고 0.3초짜리 받아치기 window가 열린다. 이 window 안에 `BattleBall.takeDamage()`가 호출되면 `ActionContext.onDamageTaken()`이 피해량을 50% 경감하고 "받아치기!" 텍스트를 표시한다. window가 끝나면 아무 효과 없이 만료된다.
+더 이상 투사체 접근 여부를 미리 체크하지 않는다. 사용자가 받아치기를 누르면 무조건 HP를 소모하고 0.3초짜리 받아치기 window가 열린다. 이 window 안에 투사체 공통 hit 경로가 `ActionContext.onProjectileDamage()`를 호출하면 피해량을 50% 경감하고 "받아치기!" 텍스트를 표시한다. 일반 충돌/근접 피해는 받아치기로 줄어들지 않는다.
 
 ### 시간 왜곡 구현
 

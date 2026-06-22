@@ -51,8 +51,7 @@ export class BattleSimulation extends Simulation {
         this._clickActionContext = {
             pendingAction: null,
             timeSlowRemaining: 0,
-            timeSlowFactor: 0.45,
-            counterCharged: false
+            timeSlowFactor: 0.45
         };
     }
 
@@ -80,21 +79,6 @@ export class BattleSimulation extends Simulation {
     }
     get timeSlowFactor() {
         return this._clickActionContext.timeSlowFactor;
-    }
-
-    getCounterCharged() {
-        return this._clickActionContext.counterCharged;
-    }
-    setCounterCharged(v) {
-        this._clickActionContext.counterCharged = v;
-    }
-
-    isCollisionImminent(playerBall) {
-        const opponent = this.fighters.find((f) => f !== playerBall);
-        if (!opponent) return false;
-        const dist = Vector2.subtract(opponent.position, playerBall.position).length();
-        const gap = dist - playerBall.radius - opponent.radius;
-        return gap <= 20;
     }
 
     getIncomingProjectile(playerBall) {
@@ -239,7 +223,8 @@ export class BattleSimulation extends Simulation {
         const damageFromAToB = this.calculateCollisionDamage(a, b, normal) * aModifiers.damage;
         const damageFromBToA = this.calculateCollisionDamage(b, a, normal.clone().scale(-1)) * bModifiers.damage;
 
-        this._applyCounterBonus(a, b, damageFromAToB, damageFromBToA);
+        a.actionContext.onFighterCollision(a, b, damageFromAToB, damageFromBToA, this);
+        b.actionContext.onFighterCollision(b, a, damageFromBToA, damageFromAToB, this);
 
         a.takeDamage(damageFromBToA, b, "Crash");
         b.takeDamage(damageFromAToB, a, "Crash");
@@ -259,25 +244,6 @@ export class BattleSimulation extends Simulation {
     _resolveOverlap(a, b, normal, overlap) {
         a.position.add(normal.clone().scale(-overlap / 2));
         b.position.add(normal.clone().scale(overlap / 2));
-    }
-
-    _applyCounterBonus(a, b, damageAToB, damageBToA) {
-        const ctx = this._clickActionContext;
-        if (!ctx.counterCharged) return;
-
-        if (a === this.playerBall) {
-            const bonus = Math.round(damageAToB * 0.12);
-            b.takeDamage(bonus, a, "Counter");
-            this.spawnActionText(b.position.clone(), "카운터!", "#ff8844");
-        } else if (b === this.playerBall) {
-            const bonus = Math.round(damageBToA * 0.12);
-            a.takeDamage(bonus, b, "Counter");
-            this.spawnActionText(a.position.clone(), "카운터!", "#ff8844");
-        } else {
-            return;
-        }
-
-        ctx.counterCharged = false;
     }
 
     _applyCollisionPhysics(a, b, normal, aMod, bMod) {

@@ -98,10 +98,6 @@ constructor(fighterSpecs, hooks, playerBall = null) {
     this.timeSlowRemaining = 0;
     this.timeSlowFactor = 0.45;
 
-    // 카운터 상태 (BattleSimulation 소유)
-    this.counterCharged = false;
-    this.counterChargeTimer = 0;
-
     // 데이터 접근 인터페이스 — Action이 getter로 읽고 setter로 쓴다
 }
 
@@ -110,18 +106,6 @@ getTimeSlowRemaining() { return this._timeSlowRemaining; }
 
 /** @param {number} v */
 setTimeSlowRemaining(v) { this._timeSlowRemaining = v; }
-
-getCounterCharged() { return this._counterCharged; }
-setCounterCharged(v) { this._counterCharged = v; }
-
-/** 충돌 임박 감지 — Action → sim.isCollisionImminent(player) */
-isCollisionImminent(playerBall) {
-    const opponent = this.fighters.find(f => f !== playerBall);
-    if (!opponent) return false;
-    const gap = Vector2.subtract(opponent.position, playerBall.position).length()
-                - playerBall.radius - opponent.radius;
-    return gap <= 20;
-}
 
 /** 접근 중인 투사체 찾기 — Action → sim.getIncomingProjectile(player) */
 getIncomingProjectile(playerBall) {
@@ -178,24 +162,21 @@ applyAction(actionId) {
 }
 ```
 
-#### 2-E. 카운터/받아치기용 헬퍼 (5단계에서 구현)
+#### 2-E. 카운터/받아치기용 ActionContext hook (5단계에서 구현)
 
 ```js
-isCollisionImminent(playerBall) {
-    const opponent = this.fighters.find(f => f !== playerBall);
-    if (!opponent) return false;
-    const dist = Vector2.subtract(opponent.position, playerBall.position).length();
-    const gap = dist - playerBall.radius - opponent.radius;
-    return gap <= 20;
+onFighterCollision(owner, opponent, outgoingDamage, incomingDamage, simulation) {
+    for (const effect of this._effects.values()) {
+        effect.onFighterCollision?.(owner, opponent, outgoingDamage, incomingDamage, simulation);
+    }
 }
 
-getIncomingProjectile(playerBall) {
-    for (const e of this.entities) {
-        if (!e.ownerId || e.ownerId === playerBall.id) continue;
-        const toPlayer = Vector2.subtract(playerBall.position, e.position);
-        if (toPlayer.length() < 300 && e.velocity.dot(toPlayer) > 0) return e;
+onProjectileDamage(amount, projectile, source, label, simulation, target) {
+    let nextAmount = amount;
+    for (const effect of this._effects.values()) {
+        nextAmount = effect.onProjectileDamage?.(nextAmount, projectile, source, label, simulation, target) ?? nextAmount;
     }
-    return null;
+    return nextAmount;
 }
 ```
 
@@ -418,38 +399,47 @@ if (this._pointerHandler) {
 - `OrbitProjectile`: `this.ownerId = owner.id`
 - `SeedOrb`: `this.ownerId = owner.id`
 
-#### 5-B. 받아치기(ParryAction) — 로직 소유: 투사체 엔티티
+#### 5-B. 받아치기(ParryAction) — 로직 소유: ParryAction effect
 
 ```js
 class ParryAction extends ClickAction {
-    getFailureReason(sim, playerBall) {
-        return sim.getIncomingProjectile(playerBall) ? null : "날아오는 투사체가 없습니다";
-    }
-
     apply(sim, playerBall) {
-        const proj = sim.getIncomingProjectile(playerBall);
-        if (proj) proj.setParryReduction(0.5);
+        const effect = {
+            remaining: 0.3,
+            onProjectileDamage: (amount, projectile, source, label, simulation, target) => {
+                effect.isExpired = true;
+                simulation.spawnActionText(target.position.clone(), "받아치기!", "#44ddff");
+                return Math.round(amount * 0.5);
+            }
+        };
+
+        playerBall.actionContext.setEffect(this.id, effect);
     }
 }
 ```
 
-투사체 `takeDamage` 전에 `setParryReduction()` 값 확인 → 50% 경감.
+투사체 공통 hit 경로에서 `target.actionContext.onProjectileDamage()`를 호출한다. `ParryAction`은 발동 전에 투사체 접근 여부를 검사하지 않고, 성공/실패 판단은 0.3초 window 안에서 이루어진다.
 
-#### 5-C. 카운터(CounterAction) — 로직 소유: BattleSimulation
+#### 5-C. 카운터(CounterAction) — 로직 소유: CounterAction effect
 
 ```js
 class CounterAction extends ClickAction {
-    getFailureReason(sim, playerBall) {
-        return sim.isCollisionImminent(playerBall) ? null : "충돌 직전이 아닙니다";
-    }
-
     apply(sim, playerBall) {
-        sim.setCounterCharged(true); // Action이 로직 결정
+        const effect = {
+            remaining: 0.22,
+            onFighterCollision: (owner, opponent, outgoingDamage, incomingDamage, simulation) => {
+                effect.isExpired = true;
+                opponent.takeDamage(Math.round(outgoingDamage * 0.12), owner, "Counter");
+                simulation.spawnActionText(opponent.position.clone(), "카운터!", "#ff8844");
+            }
+        };
+
+        playerBall.actionContext.setEffect(this.id, effect);
     }
 }
 ```
 
-`handleCollision()`에서 `counterCharged` 확인 → 데미지 +12%, 사용 후 즉시 `false`.
+`handleCollision()`은 양쪽 공의 `actionContext.onFighterCollision()`을 호출만 한다. 추가 피해, 텍스트, 1회 소비 여부는 `CounterAction` effect가 소유한다.
 
 #### 5-D. 버티기(EndureAction) + spendHpForAction — 로직 소유: Action
 
@@ -490,8 +480,8 @@ Rush/Endure의 배율, 지속시간 연장, 경감 계산은 각 Action이 등�
 
 ### 검증
 
-- 카운터: 충돌 직전에만 발동되는지 확인
-- 받아치기: 투사체 데미지 50% 경감 확인
+- 카운터: 클릭 후 0.22초 window 안에서만 추가 피해가 들어가고, 빗나가면 HP만 소모되는지 확인
+- 받아치기: 클릭 후 0.3초 window 안의 투사체 데미지만 50% 경감하는지 확인
 - 모든 액션 조건이 의도대로 동작하는지
 
 ---
@@ -517,8 +507,8 @@ Rush/Endure의 배율, 지속시간 연장, 경감 계산은 각 Action이 등�
 
 | 파일                                 | 1단계    | 2단계                                  | 3단계                              | 4단계            | 5단계                  |
 | ------------------------------------ | -------- | -------------------------------------- | ---------------------------------- | ---------------- | ---------------------- |
-| `src/click-actions.js`               | **신규** | -                                      | -                                  | ActionContext effect 저장소 | apply/getFailureReason |
-| `src/simulation/BattleSimulation.js` | -        | playerBall + 액션 상태 + 시간왜곡/돌진 | -                                  | -                | 카운터                 |
+| `src/click-actions.js`               | **신규** | -                                      | -                                  | ActionContext effect 저장소 | apply/effect hook      |
+| `src/simulation/BattleSimulation.js` | -        | playerBall + 액션 상태 + 시간왜곡      | -                                  | -                | 충돌 이벤트 전달       |
 | `src/app.js`                         | -        | -                                      | 카드 선택 + currentMatchAction     | 클릭 핸들러      | -                      |
 | `src/ui.js`                          | -        | -                                      | waitForActionPick                  | -                | -                      |
 | `index.html`                         | -        | -                                      | action-pick CSS 템플릿             | -                | -                      |
@@ -577,24 +567,21 @@ this.simulation.playerBall = this.simulation.fighters.find((f) => f.id === this.
 
 ---
 
-### 리스크 ③: `counterCharged` 1회성 소비
+### 리스크 ③: 카운터 effect 1회성 소비
 
 ```
-문제:  한 번 충전되면 모든 충돌에 계속 적용.
+문제:  충돌 window effect가 소비되지 않으면 여러 충돌에 계속 적용.
 ```
 
 **대책:**
 
 ```js
-// handleCollision(): 사용 즉시 소비
-if (a === this.playerBall && this.counterCharged) {
-    damageMultiplier += 0.12;
-    this.counterCharged = false;
-}
-
-// update(): 타임아웃으로 자동 소멸 (윈도우 0.3초)
-this.counterChargeTimer -= delta;
-if (this.counterChargeTimer <= 0) this.counterCharged = false;
+const effect = {
+    remaining: 0.22,
+    onFighterCollision: () => {
+        effect.isExpired = true;
+    }
+};
 ```
 
 ---
@@ -666,13 +653,13 @@ document.addEventListener("pick-action-card", (e) => {
 
 ```
 각 투사체 생성자에 this.ownerId = owner.id 추가 (기존 this.owner 유지)
-받아치기 감지: entity.ownerId !== playerBall.id
+투사체 공통 hit 경로에서 target.actionContext.onProjectileDamage() 호출
 확인: BattleBall.id = spec.id = roster의 FIGHTER_IDS.xxx
 ```
 
 | 리스크                                                              | 영향                          | 대비                                                      |
 | ------------------------------------------------------------------- | ----------------------------- | --------------------------------------------------------- |
 | `entity.update(scaledDelta, this)`에서 `this`(simulation) 참조 깨짐 | 시간 왜곡 버그                | entity.update 내부에서 simulation 참조하는 부분 확인 필요 |
-| 카운터 윈도우가 너무 좁음                                           | 사실상 발동 불가              | 임계값 20px부터 시작, 테스트 후 조정                      |
-| 받아치기가 투사체 없는 매치에서 무용지물                            | 해당 매치의 카드 선택 UX 나쁨 | 풀에서 제외하거나 근접공격에도 일부 적용 검토             |
+| 카운터 윈도우가 너무 좁음                                           | 사실상 발동 불가              | 0.22초부터 시작, 테스트 후 조정                           |
+| 받아치기가 일반 피해까지 줄임                                       | 방어 액션 역할 침범           | `onProjectileDamage`에서만 경감                           |
 | HP 자해로 인한 연속 클릭 폭주                                       | HP 광탈                       | ActionContext.spendHpForAction + 최소 HP 1 보장           |

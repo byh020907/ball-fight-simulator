@@ -660,12 +660,64 @@ function testClickActionEffectOwnership(app) {
     assert.equal(player.actionContext.onDamageTaken(11, opponent, "Test"), 11, "Endure effect should expire");
 }
 
+function testRiskWindowActionOwnership(app) {
+    const sim = new BattleSimulation(app.roster.slice(0, 2), {
+        onLog() {},
+        onSound() {}
+    });
+    const [player, opponent] = sim.fighters;
+    const counter = findActionById("counter");
+    const parry = findActionById("parry");
+
+    assert.equal(counter.getFailureReason(sim, player), null, "Counter should not fail for free before HP cost");
+    assert.equal(parry.getFailureReason(sim, player), null, "Parry should not fail for free before HP cost");
+
+    counter.apply(sim, player);
+    assert.ok(player.actionContext.getEffect("counter"), "Counter should arm a short collision window");
+    const opponentHpBeforeCounter = opponent.hp;
+    player.actionContext.onFighterCollision(player, opponent, 50, 0, sim);
+    assert.ok(opponent.hp < opponentHpBeforeCounter, "Counter effect should own bonus damage on collision");
+    const opponentHpAfterCounter = opponent.hp;
+    player.actionContext.onFighterCollision(player, opponent, 50, 0, sim);
+    assert.equal(opponent.hp, opponentHpAfterCounter, "Counter should not apply twice in the same frame");
+    player.actionContext.tickTimers(0);
+    assert.equal(player.actionContext.getEffect("counter"), null, "Counter should expire after it is consumed");
+
+    parry.apply(sim, player);
+    assert.equal(
+        player.actionContext.onDamageTaken(20, opponent, "Crash"),
+        20,
+        "Parry should not reduce normal collision damage"
+    );
+    assert.equal(
+        player.actionContext.onProjectileDamage(20, {}, opponent, "Arrow Shot", sim, player),
+        10,
+        "Parry should reduce projectile damage inside its window"
+    );
+    assert.equal(
+        player.actionContext.onProjectileDamage(20, {}, opponent, "Arrow Shot", sim, player),
+        20,
+        "Parry should not reduce a second projectile after it is consumed"
+    );
+    player.actionContext.tickTimers(0);
+    assert.equal(player.actionContext.getEffect("parry"), null, "Parry should expire after reducing one projectile");
+
+    parry.apply(sim, player);
+    player.actionContext.tickTimers(0.31);
+    assert.equal(
+        player.actionContext.onProjectileDamage(20, {}, opponent, "Arrow Shot", sim, player),
+        20,
+        "Parry should do nothing after the window expires"
+    );
+}
+
 const app = await loadModuleApp();
 testShuffledUtility();
 testStatAllocationRules(app);
 testStatBalanceSystem();
 testMultiFighterSimulationSetup(app);
 testClickActionEffectOwnership(app);
+testRiskWindowActionOwnership(app);
 await testCloneSeedDash(app);
 await testEaterFeast(app);
 await testRageBallMomentum(app);

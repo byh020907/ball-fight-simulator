@@ -100,6 +100,11 @@ class ClickAction {
 // ── Concrete Actions ────────────────────────────────────────────
 // 모두 TapTrigger 기본값 사용
 
+const COUNTER_WINDOW_SECONDS = 0.22;
+const COUNTER_BONUS_RATE = 0.12;
+const PARRY_WINDOW_SECONDS = 0.3;
+const PARRY_DAMAGE_MULTIPLIER = 0.5;
+
 class TimeWarpAction extends ClickAction {
     get id() {
         return "time_warp";
@@ -151,18 +156,26 @@ class CounterAction extends ClickAction {
         return "카운터";
     }
     get description() {
-        return "충돌 임박 시 클릭 → 데미지 +12%";
+        return "0.22초 안에 충돌 시 데미지 +12%";
     }
     get hpCostPercent() {
         return 1.35;
     }
 
-    getFailureReason(sim, playerBall) {
-        return sim.isCollisionImminent(playerBall) ? null : "충돌 직전이 아닙니다";
-    }
-
     apply(sim, playerBall) {
-        sim.setCounterCharged(true);
+        const effect = {
+            remaining: COUNTER_WINDOW_SECONDS,
+            onFighterCollision: (owner, opponent, outgoingDamage, incomingDamage, simulation) => {
+                const bonus = Math.round(outgoingDamage * COUNTER_BONUS_RATE);
+                if (bonus > 0) {
+                    opponent.takeDamage(bonus, owner, "Counter");
+                    simulation.spawnActionText(opponent.position.clone(), "카운터!", "#ff8844");
+                }
+                effect.isExpired = true;
+            }
+        };
+
+        playerBall.actionContext.setEffect(this.id, effect);
     }
 }
 
@@ -174,21 +187,23 @@ class ParryAction extends ClickAction {
         return "받아치기";
     }
     get description() {
-        return "날아오는 투사체 데미지 50% 경감";
+        return "0.3초 안에 맞는 투사체 데미지 50% 경감";
     }
     get hpCostPercent() {
         return 1.15;
     }
 
-    /** 받아치기는 항상 발동. HP 소모 후 0.3초 window 안에 맞은 투사체만 경감. */
     apply(sim, playerBall) {
-        playerBall.actionContext.setEffect(this.id, {
-            remaining: 0.3,
-            onDamageTaken: (amount, source, label) => {
-                source?.simulation?.spawnActionText?.(playerBall.position.clone(), "받아치기!", "#44ddff");
-                return Math.round(amount * 0.5);
+        const effect = {
+            remaining: PARRY_WINDOW_SECONDS,
+            onProjectileDamage: (amount, projectile, source, label, simulation, target) => {
+                effect.isExpired = true;
+                simulation.spawnActionText(target.position.clone(), "받아치기!", "#44ddff");
+                return Math.round(amount * PARRY_DAMAGE_MULTIPLIER);
             }
-        });
+        };
+
+        playerBall.actionContext.setEffect(this.id, effect);
     }
 }
 
@@ -281,9 +296,27 @@ export class ActionContext {
     onDamageTaken(amount, source, label) {
         let nextAmount = amount;
         for (const effect of this._effects.values()) {
+            if (effect.isExpired) continue;
             nextAmount = effect.onDamageTaken?.(nextAmount, source, label) ?? nextAmount;
         }
         return nextAmount;
+    }
+
+    onProjectileDamage(amount, projectile, source, label, simulation, target) {
+        let nextAmount = amount;
+        for (const effect of this._effects.values()) {
+            if (effect.isExpired) continue;
+            nextAmount =
+                effect.onProjectileDamage?.(nextAmount, projectile, source, label, simulation, target) ?? nextAmount;
+        }
+        return nextAmount;
+    }
+
+    onFighterCollision(owner, opponent, outgoingDamage, incomingDamage, simulation) {
+        for (const effect of this._effects.values()) {
+            if (effect.isExpired) continue;
+            effect.onFighterCollision?.(owner, opponent, outgoingDamage, incomingDamage, simulation);
+        }
     }
 
     // ── 프레임 갱신 ──

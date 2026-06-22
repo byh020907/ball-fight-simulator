@@ -84,10 +84,13 @@ export class CombatEntity {
     /**
      * 투사체 공통 hit 처리 (Template Method).
      * Subclass는 _getHitDamage, _getHitLabel, _onHitEffects만 구현.
-     * 데미지 경감은 target의 ActionContext.onDamageTaken()에서 처리.
+     * Projectile-only mitigation is owned by target ActionContext effects.
      */
     dealDamageToTarget(target, rawDamage, source, label, simulation) {
-        target.takeDamage(rawDamage, source, label);
+        const finalDamage =
+            target.actionContext?.onProjectileDamage?.(rawDamage, this, source, label, simulation, target) ??
+            rawDamage;
+        target.takeDamage(finalDamage, source, label);
     }
 
     /**
