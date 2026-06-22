@@ -110,8 +110,8 @@ class TimeWarpAction extends ClickAction {
         return 0.2;
     }
 
-    isAvailable(sim, playerBall) {
-        return playerBall.hp / playerBall.maxHp <= 0.5;
+    isAvailable() {
+        return true;
     }
 
     apply(sim, playerBall) {
@@ -201,8 +201,8 @@ class EndureAction extends ClickAction {
         return 0.9;
     }
 
-    isAvailable(sim, playerBall) {
-        return playerBall.hp / playerBall.maxHp <= 0.5;
+    isAvailable() {
+        return true;
     }
 
     apply(sim, playerBall) {
