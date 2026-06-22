@@ -52,6 +52,30 @@ export const PATCH_NOTES = [
                 text: "코드베이스 안티패턴 11건 개선 — Template Method, 메서드 분리, 중복 제거, 캡슐화 강화."
             },
             {
+                type: "refactor",
+                text: "PopupService closeOnOutside 속성 복원 — false 시 바깥 클릭으로 팝업 닫힘 방지."
+            },
+            {
+                type: "fix",
+                text: "Dash Ball 충돌/벽 꽂힘 버그 수정 — 대시 종료 시 forcedHeading 미제거로 속도가 덮어써지던 문제."
+            },
+            {
+                type: "fix",
+                text: "Trickster 씨앗 본인도 먹을 수 있도록 수정 — 모든 파이터 검사, 대시 방향은 항상 상대방."
+            },
+            {
+                type: "fix",
+                text: "Orbit Ball 프리뷰 화면 shard 지글거림 수정 — 매 프레임 BattleBall 재생성 제거."
+            },
+            {
+                type: "fix",
+                text: "액션 선택 중복 요청 방지 — waitForActionPick 가드 추가."
+            },
+            {
+                type: "fix",
+                text: "UI 텍스트 커서 숨김 — .app에 user-select:none 적용."
+            },
+            {
                 type: "style",
                 text: "액션 효과값 0.05(5%) 단위, HP 코스트 0.5%p 단위로 정렬."
             },
