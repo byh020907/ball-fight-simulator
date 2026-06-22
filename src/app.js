@@ -12,6 +12,29 @@ import {
     getRemainingStatPoints
 } from "./stat-allocation.js";
 import { pickRandomActions, showActionFailure } from "./click-actions.js";
+import { BattleBall } from "./entities.js";
+import { Vector2 } from "./core.js";
+import {
+    ArcherAbility,
+    OrbitAbility,
+    TricksterAbility,
+    GrenadeAbility,
+    DashAbility,
+    RageAbility,
+    EaterAbility,
+    BatBallAbility
+} from "./abilities/index.js";
+
+const ABILITY_MAP = {
+    archer: ArcherAbility,
+    orbit: OrbitAbility,
+    trickster: TricksterAbility,
+    grenade: GrenadeAbility,
+    dash: DashAbility,
+    rage: RageAbility,
+    eater: EaterAbility,
+    bat_ball: BatBallAbility
+};
 
 export class BattleApp {
     constructor() {
@@ -46,6 +69,7 @@ export class BattleApp {
         this.resultSequenceAnnounced = false;
         this.matchFinalized = false;
         this.transientOverlayToken = 0;
+        this._previewBall = null;
 
         // Listen for Alpine.js start-tournament event
         try {
@@ -95,13 +119,34 @@ export class BattleApp {
         }
     }
 
+    _ensurePreviewBall(fighter) {
+        if (!fighter) {
+            this._previewBall = null;
+            return null;
+        }
+        if (this._previewBall && this._previewBall.id === fighter.id) {
+            return this._previewBall;
+        }
+        const ball = new BattleBall(
+            fighter,
+            new Vector2(this.renderer.canvas.width / 2, this.renderer.canvas.height / 2 - 28)
+        );
+        ball.velocity = new Vector2(0, 0);
+        ball.radius = Math.round(ball.baseRadius * 1.35);
+        const AbilityClass = ABILITY_MAP[fighter.ability];
+        if (AbilityClass) ball.bindAbility(new AbilityClass(ball, {}));
+        this._previewBall = ball;
+        return ball;
+    }
+
     renderPlayerPreview() {
         if (this.tournament && !this.tournament.champion) {
             return;
         }
 
         const player = this.roster.find((fighter) => fighter.id === this.playerFighterId);
-        this.renderer.renderPlayerPreview(player);
+        const ball = this._ensurePreviewBall(player);
+        this.renderer.renderPlayerPreview(ball, player);
     }
 
     startPlayerPreviewLoop() {

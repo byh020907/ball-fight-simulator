@@ -9,7 +9,6 @@ import {
     getRemainingStatPoints
 } from "./stat-allocation.js";
 import { RENDER_LAYERS, Vector2 } from "./core.js";
-import { BattleBall } from "./entities.js";
 import { getUnseenEntries, dismissPatchNotes } from "./utils.js";
 import { PopupService } from "./popup.js";
 import {
@@ -166,40 +165,24 @@ export class ArenaRenderer {
         this.ctx = canvas.getContext("2d");
     }
 
-    renderPlayerPreview(fighter) {
+    renderPlayerPreview(previewBall, fighter) {
         const ctx = this.ctx;
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         ctx.fillStyle = "#fafafa";
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        if (!fighter) {
-            this._previewBall = null;
-            return;
-        }
+        if (!previewBall || !fighter) return;
 
-        // 캐싱: 같은 fighter면 기존 previewBall 재사용 (Orbit 각도 유지)
-        if (!this._previewBall || this._previewBallId !== fighter.id) {
-            this._previewBall = new BattleBall(fighter, new Vector2(this.canvas.width / 2, this.canvas.height / 2 - 28));
-            this._previewBall.velocity = new Vector2(0, 0);
-            this._previewBall.radius = Math.round(this._previewBall.baseRadius * 1.35);
-            this._previewBallId = fighter.id;
-
-            const AbilityClass = ABILITY_MAP[fighter.ability];
-            if (AbilityClass) {
-                this._previewBall.bindAbility(new AbilityClass(this._previewBall, {}));
-            }
-        }
-
-        this._previewBall.draw(ctx);
+        previewBall.draw(ctx);
 
         ctx.save();
         ctx.textAlign = "center";
         ctx.fillStyle = "#202020";
         ctx.font = "900 28px Bahnschrift, Segoe UI, sans-serif";
-        ctx.fillText("내 캐릭터", this.canvas.width / 2, this._previewBall.position.y + this._previewBall.radius + 48);
+        ctx.fillText("내 캐릭터", this.canvas.width / 2, previewBall.position.y + previewBall.radius + 48);
         ctx.font = "700 22px Bahnschrift, Segoe UI, sans-serif";
         ctx.fillStyle = fighter.color;
-        ctx.fillText(fighter.name, this.canvas.width / 2, this._previewBall.position.y + this._previewBall.radius + 82);
+        ctx.fillText(fighter.name, this.canvas.width / 2, previewBall.position.y + previewBall.radius + 82);
         ctx.restore();
     }
 
