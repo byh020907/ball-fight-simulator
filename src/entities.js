@@ -1,5 +1,6 @@
 import { CombatEntity, Projectile, RENDER_LAYERS, TimedEffect, Vector2 } from "./core.js";
 import { ActionContext } from "./click-actions.js";
+import { DashEffect } from "./combat-effects.js";
 
 export class SeedOrb extends Projectile {
     constructor(owner, position, velocity, life) {
@@ -36,15 +37,19 @@ export class SeedOrb extends Projectile {
         const dashDirection = target
             ? Vector2.subtract(target.position, this.owner.position).normalize()
             : this.velocity.clone().normalize();
-        this.owner.startDash(dashDirection, {
-            multiplier: 2.05,
-            color: this.owner.color,
-            collisionDamage: Math.round(this.owner.baseDamage * 1.3),
-            collisionLabel: "Seed Dash",
-            untilImpact: true,
-            untilWall: true,
-            maxDuration: 1.55
-        });
+        this.owner.setMovementEffect(
+            new DashEffect({
+                duration: 1.55,
+                multiplier: 2.05,
+                color: this.owner.color,
+                collisionDamage: Math.round(this.owner.baseDamage * 1.3),
+                collisionLabel: "Seed Dash",
+                untilImpact: true,
+                untilWall: true
+            })
+        );
+        this.owner.forceHeading(dashDirection, 1.55);
+        this.owner.velocity = dashDirection.clone().scale(this.owner.baseSpeed * 2.05);
         simulation.spawnSlash(
             this.owner.position.clone(),
             Vector2.add(this.owner.position, dashDirection.clone().scale(150)),
@@ -304,7 +309,7 @@ export class BattleBall {
         this.slowEffect = null;
         this.speedBoost = null;
         this.forcedHeading = null;
-        this.dashState = null;
+        this.movementEffect = null;
         this.swallowedState = null;
         this.wallSlamState = null;
         this.flags = {};
@@ -348,35 +353,13 @@ export class BattleBall {
         this.forceHeading(velocity, duration, velocity.clone());
     }
 
-    startDash(direction, config = {}) {
-        const duration = config.maxDuration ?? 1.4;
-        const normalized = direction.clone().normalize();
-        this.dashState = {
-            color: config.color ?? this.color,
-            multiplier: config.multiplier ?? 1.8,
-            speedOverride: config.speedOverride ?? null,
-            collisionDamage: config.collisionDamage ?? 0,
-            collisionLabel: config.collisionLabel ?? "Dash",
-            collisionSlow: config.collisionSlow ?? null,
-            untilImpact: Boolean(config.untilImpact),
-            untilWall: Boolean(config.untilWall),
-            effect: new TimedEffect(duration)
-        };
-        this.forcedHeading =
-            config.lockHeading === false ? null : { effect: new TimedEffect(duration), direction: normalized.clone() };
-        const dashSpeed = this.dashState.speedOverride ?? this.baseSpeed * this.dashState.multiplier;
-        this.velocity = normalized.clone().scale(dashSpeed);
-        this.speedBoost = {
-            effect: new TimedEffect(duration),
-            multiplier: this.dashState.multiplier,
-            color: this.dashState.color,
-            speedOverride: this.dashState.speedOverride,
-            showRing: config.showSpeedRing !== false
-        };
+    /** DashEffect 등록 (Ability/Projectile이 생성) */
+    setMovementEffect(effect) {
+        this.movementEffect = effect;
     }
 
     clearDash() {
-        this.dashState = null;
+        this.movementEffect = null;
         this.forcedHeading = null;
         this.speedBoost = null;
     }
@@ -444,7 +427,11 @@ export class BattleBall {
         tick(this.slowEffect, () => (this.slowEffect = null));
         tick(this.speedBoost?.effect, () => (this.speedBoost = null));
         tick(this.forcedHeading?.effect, () => (this.forcedHeading = null));
-        tick(this.dashState?.effect, () => this.clearDash());
+
+        if (this.movementEffect) {
+            this.movementEffect.tick(this, delta);
+            if (this.movementEffect.expired) this.movementEffect = null;
+        }
 
         if (this.wallSlamState) {
             if (this.wallSlamState.tick(this, delta)) {
@@ -460,6 +447,7 @@ export class BattleBall {
         const modifiers = this.getStatModifiers();
         const slowMult = this.slowEffect ? this.slowEffect.amount : 1;
         const boostMult = this.speedBoost ? this.speedBoost.multiplier : 1;
+        const movementSpeed = this.movementEffect?.getSpeed(this);
         const currentDir =
             this.velocity.length() > 0
                 ? this.velocity.clone().normalize()
@@ -470,7 +458,7 @@ export class BattleBall {
         return (
             knockbackVel ??
             direction.scale(
-                this.dashState?.speedOverride ??
+                movementSpeed ??
                     this.speedBoost?.speedOverride ??
                     this.baseSpeed * modifiers.speed * slowMult * boostMult * simulation.getSpeedMultiplier(this)
             )
@@ -530,8 +518,8 @@ export class BattleBall {
 
         this.ability?.draw?.(ctx);
 
-        if (this.speedBoost && this.speedBoost.showRing !== false) {
-            ctx.strokeStyle = this.speedBoost.color;
+        if (this.movementEffect?.showRing) {
+            ctx.strokeStyle = this.movementEffect.color;
             ctx.lineWidth = 4;
             ctx.beginPath();
             ctx.arc(this.position.x, this.position.y, this.radius + 18, 0, Math.PI * 2);

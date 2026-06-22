@@ -1,4 +1,4 @@
-import { WallSlamEffect } from "../combat-effects.js";
+import { DashEffect, WallSlamEffect } from "../combat-effects.js";
 import { Vector2 } from "../core.js";
 import { Ability } from "./Ability.js";
 
@@ -146,16 +146,19 @@ export class EaterAbility extends Ability {
             this.owner.position,
             direction.clone().scale(this.owner.radius + target.radius + 10)
         );
-        target.startDash(direction, {
-            multiplier: 2,
-            speedOverride: target.baseSpeed * 2,
-            color: target.color,
-            collisionDamage: 0,
-            collisionLabel: "Spit Dash",
-            lockHeading: false,
-            showSpeedRing: false,
-            maxDuration: 2.45
-        });
+        target.setMovementEffect(
+            new DashEffect({
+                duration: 2.45,
+                multiplier: 2,
+                speedOverride: target.baseSpeed * 2,
+                color: target.color,
+                showRing: false,
+                collisionLabel: "Spit Dash",
+                untilImpact: true,
+                untilWall: true
+            })
+        );
+        target.velocity = direction.clone().scale(target.baseSpeed * 2);
         target.wallSlamState = new WallSlamEffect({
             source: this.owner,
             damage: WALL_SLAM_DAMAGE,

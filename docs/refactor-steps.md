@@ -140,27 +140,23 @@ class DashAbility extends Ability {
 - Eater가 뱉은 대상의 얼굴 회전 연출은 유지되어야 합니다.
 - Bat Ball의 타격 후 벽 충돌 추가 피해도 유지되어야 합니다.
 
-## 다음 후보 스텝
+### Step 3. Dash runtime effect 분리 ✅
 
-### Step 3. Dash runtime effect 분리
+커밋: `724c426` (ActionContext) + 현재 작업
 
-현재 문제:
-- `BattleBall.startDash()`가 dash 상태 구성, heading lock, speedBoost 구성, 속도 적용을 모두 처리합니다.
-- `Simulation`은 dash 내부 필드(`collisionDamage`, `collisionSlow`, `untilImpact`)를 직접 해석합니다.
-- Dash Ball, Trickster seed, Eater spit dash가 같은 dash 메서드를 공유하지만 각자의 규칙이 config object에 섞여 있습니다.
-
-목표:
-- `DashEffect` 또는 유사 runtime effect가 dash 지속시간, 충돌 이벤트, 벽 이벤트, heading lock, 표시용 speed ring 여부를 소유합니다.
-- Ability/Projectile은 dash effect를 생성하고 자기 규칙만 넘깁니다.
-- `BattleBall`은 dash effect가 제공하는 속도/heading을 반영하고 tick만 전달합니다.
-- `Simulation`은 충돌 이벤트를 dash effect에 전달합니다.
+- `DashEffect` 클래스가 dash 지속시간, 충돌 이벤트, 벽 이벤트, 속도 계산, speed ring 표시 여부를 소유합니다.
+- `DashAbility`, Trickster seed, Eater spit가 각자의 규칙으로 `DashEffect`를 생성합니다.
+- `Simulation`은 충돌/벽 이벤트를 `DashEffect.onCollision()` / `.onWallBounce()`에 전달만 합니다.
+- `BattleBall`은 `movementEffect` 저장, tick, expired 시 해제만 담당합니다.
 
 검증 체크리스트:
-- Dash Ball은 충돌 자체의 추가 피해 없이 일반 충돌 피해만 줘야 합니다.
-- Dash Ball은 쿨다운 100% 상태에서만 대시 보정을 받아야 합니다.
-- Dash Ball은 적중 시 쿨다운 스택이 증가하고, 벽 접촉 시 규칙대로 스택이 감소/초기화되어야 합니다.
-- Trickster seed dash는 기존 Seed Dash 피해와 벽/충돌 종료 조건을 유지해야 합니다.
-- Eater spit dash는 속도 2배, 초록 원 제거, speed ring 숨김을 유지해야 합니다.
+- Dash Ball은 충돌 자체의 추가 피해 없이 일반 충돌 피해만 줘야 합니다. ✅
+- Dash Ball은 쿨다운 100% 상태에서만 대시 보정을 받아야 합니다. ✅
+- Dash Ball은 적중 시 쿨다운 스택이 증가하고, 벽 접촉 시 규칙대로 스택이 감소/초기화되어야 합니다. ✅
+- Trickster seed dash는 기존 Seed Dash 피해와 벽/충돌 종료 조건을 유지해야 합니다. ✅
+- Eater spit dash는 속도 2배, speed ring 숨김을 유지해야 합니다. ✅
+
+## 다음 후보 스텝
 
 ### Step 4. Swallow/Hold effect 분리
 

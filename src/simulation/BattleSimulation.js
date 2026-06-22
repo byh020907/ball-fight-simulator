@@ -303,17 +303,11 @@ export class BattleSimulation extends Simulation {
             [a, b],
             [b, a]
         ]) {
-            if (!attacker.dashState) continue;
-            if (attacker.dashState.collisionDamage) {
-                defender.takeDamage(attacker.dashState.collisionDamage, attacker, attacker.dashState.collisionLabel);
-                if (attacker.dashState.collisionSlow)
-                    defender.applySlow(
-                        attacker.dashState.collisionSlow.duration,
-                        attacker.dashState.collisionSlow.amount
-                    );
+            if (!attacker.movementEffect) continue;
+            attacker.movementEffect.onCollision(attacker, defender, this);
+            if (attacker.movementEffect?.expired) {
+                attacker.movementEffect = null;
             }
-            attacker.ability?.onDashHit?.(defender, attacker.dashState);
-            if (attacker.dashState?.untilImpact) attacker.clearDash();
         }
     }
 

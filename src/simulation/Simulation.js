@@ -53,13 +53,13 @@ export class Simulation {
         if (entity.position.x <= entity.radius) {
             entity.position.x = entity.radius;
             entity.velocity.x = Math.abs(entity.velocity.x);
-            if (entity.dashState) this.clearWallDash(entity);
+            if (entity.movementEffect) this._handleWallBounce(entity);
             return new Vector2(1, 0);
         }
         if (entity.position.x >= this.width - entity.radius) {
             entity.position.x = this.width - entity.radius;
             entity.velocity.x = -Math.abs(entity.velocity.x);
-            if (entity.dashState) this.clearWallDash(entity);
+            if (entity.movementEffect) this._handleWallBounce(entity);
             return new Vector2(-1, 0);
         }
         return null;
@@ -70,22 +70,23 @@ export class Simulation {
         if (entity.position.y <= entity.radius) {
             entity.position.y = entity.radius;
             entity.velocity.y = Math.abs(entity.velocity.y);
-            if (entity.dashState) this.clearWallDash(entity);
+            if (entity.movementEffect) this._handleWallBounce(entity);
             return new Vector2(0, 1);
         }
         if (entity.position.y >= this.height - entity.radius) {
             entity.position.y = this.height - entity.radius;
             entity.velocity.y = -Math.abs(entity.velocity.y);
-            if (entity.dashState) this.clearWallDash(entity);
+            if (entity.movementEffect) this._handleWallBounce(entity);
             return new Vector2(0, -1);
         }
         return null;
     }
 
-    clearWallDash(ball) {
-        if (!ball.dashState?.untilWall) return;
-        ball.ability?.onDashWall?.(ball.dashState);
-        ball.clearDash();
+    _handleWallBounce(ball) {
+        ball.movementEffect.onWallBounce(ball, this);
+        if (ball.movementEffect?.expired) {
+            ball.movementEffect = null;
+        }
     }
 
     // ── Spawn helpers ─────────────────────────────────────────────────────

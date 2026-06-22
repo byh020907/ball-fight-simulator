@@ -13,6 +13,7 @@ import {
 import { FIGHTER_IDS } from "../src/core.js";
 import { Vector2 } from "../src/core.js";
 import { findActionById } from "../src/click-actions.js";
+import { DashEffect } from "../src/combat-effects.js";
 import { shuffled } from "../src/random.js";
 import { BattleSimulation } from "../src/simulation/BattleSimulation.js";
 
@@ -217,8 +218,8 @@ async function testCloneSeedDash(app) {
 
     seeds[0].position = opponent.position.clone();
     seeds[0].update(0.016, app.simulation);
-    assert.ok(trickster.dashState, "Clone should dash when any seed is collected");
-    assert.equal(opponent.dashState, null, "The collector should not dash");
+    assert.ok(trickster.movementEffect, "Clone should dash when any seed is collected");
+    assert.equal(opponent.movementEffect, null, "The collector should not dash");
 }
 
 async function testEaterFeast(app) {
@@ -260,7 +261,7 @@ async function testEaterFeast(app) {
         target.baseSpeed * 2,
         "Spat target should launch at twice its base speed"
     );
-    assert.equal(target.speedBoost.showRing, false, "Spit dash should not draw the normal speed ring");
+    assert.equal(target.movementEffect.showRing, false, "Spit dash should not draw the normal speed ring");
     const spinBefore = target.spinRotation;
     target.update(0.12, app.simulation);
     assert.ok(Math.abs(target.spinRotation - spinBefore) > 1, "Spat target face should spin while flying");
@@ -309,7 +310,7 @@ async function testDashBallCooldownDash(app) {
     target.position.y = 480;
     dashBall.ability.timer = 0;
     dashBall.ability.update(0.016, target);
-    assert.ok(dashBall.dashState, "Dash Ball should enter dash state");
+    assert.ok(dashBall.movementEffect, "Dash Ball should enter dash state");
     assert.ok(
         Math.abs(dashBall.forcedHeading.direction.length() - 1) < 0.001,
         "Dash Ball forced heading should remain a unit direction"
@@ -358,7 +359,7 @@ async function testDashBallCooldownDash(app) {
         dashBall.ability.cooldown,
         "Dash hit should clamp timer to the shorter cooldown"
     );
-    assert.equal(dashBall.dashState, null, "Dash Ball dash should clear after impact");
+    assert.equal(dashBall.movementEffect, null, "Dash Ball dash should clear after impact");
 
     dashBall.ability.onDashHit();
     assert.equal(dashBall.ability.cooldownLevel, 2, "Second dash hit should reach max cooldown stacks");
@@ -378,14 +379,20 @@ async function testDashBallCooldownDash(app) {
     dashBall.ability.cooldownLevel = 2;
     dashBall.ability.cooldown = dashBall.ability.getCooldownForLevel();
     dashBall.ability.timer = dashBall.ability.cooldown;
-    dashBall.startDash(new Vector2(1, 0), {
-        collisionLabel: "Dash Contact",
-        untilImpact: true,
-        untilWall: true,
-        maxDuration: 1.4
-    });
+    dashBall.setMovementEffect(
+        new DashEffect({
+            duration: 1.4,
+            multiplier: 1,
+            color: dashBall.color,
+            collisionLabel: "Dash Contact",
+            untilImpact: true,
+            untilWall: true
+        })
+    );
+    dashBall.forceHeading(new Vector2(1, 0), 1.4);
+    dashBall.velocity = new Vector2(1, 0).scale(dashBall.baseSpeed);
     app.simulation.keepInsideArena(dashBall);
-    assert.equal(dashBall.dashState, null, "Dash Ball dash should clear on wall contact");
+    assert.equal(dashBall.movementEffect, null, "Dash Ball dash should clear on wall contact");
     assert.equal(dashBall.ability.cooldownLevel, 0, "Wall contact should reset cooldown stacks");
     assert.equal(dashBall.ability.cooldown, baseCooldown, "Wall contact should restore full cooldown");
     assert.equal(dashBall.ability.timer, baseCooldown, "Wall contact should restart from full cooldown");

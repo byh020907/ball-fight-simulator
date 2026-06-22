@@ -1,4 +1,5 @@
 import { steerBallToward, Vector2 } from "../core.js";
+import { DashEffect } from "../combat-effects.js";
 import { Ability } from "./Ability.js";
 
 const INITIAL_COOLDOWN_LEVEL = 0;
@@ -20,7 +21,7 @@ export class DashAbility extends Ability {
     }
 
     update(delta, target) {
-        if (this.owner.dashState && target && this.cooldownLevel === 0) {
+        if (this.owner.movementEffect && target && this.cooldownLevel === 0) {
             const dist = Vector2.subtract(target.position, this.owner.position).length();
             if (dist < HOMING_RANGE) {
                 this.steerDash(delta, target);
@@ -28,20 +29,24 @@ export class DashAbility extends Ability {
         }
 
         this.timer -= delta;
-        if (this.owner.dashState || this.timer > 0 || !target) {
+        if (this.owner.movementEffect || this.timer > 0 || !target) {
             return;
         }
 
         this.timer = this.cooldown;
         const direction = Vector2.subtract(target.position, this.owner.position).normalize();
-        this.owner.startDash(direction, {
-            multiplier: this.dashMultiplier,
-            color: this.owner.color,
-            collisionLabel: "Dash Contact",
-            untilImpact: true,
-            untilWall: true,
-            maxDuration: MAX_DASH_DURATION
-        });
+        this.owner.setMovementEffect(
+            new DashEffect({
+                duration: MAX_DASH_DURATION,
+                multiplier: this.dashMultiplier,
+                color: this.owner.color,
+                collisionLabel: "Dash Contact",
+                untilImpact: true,
+                untilWall: true
+            })
+        );
+        this.owner.forceHeading(direction, MAX_DASH_DURATION);
+        this.owner.velocity = direction.clone().scale(this.owner.baseSpeed * this.dashMultiplier);
         this.simulation.playSound("dash", DASH_SOUND_PITCH);
         this.simulation.spawnSlash(
             this.owner.position.clone(),
@@ -92,7 +97,7 @@ export class DashAbility extends Ability {
     }
 
     getUiState() {
-        if (this.owner.dashState) {
+        if (this.owner.movementEffect) {
             return { label: "Dash", progress: 1 };
         }
         return { label: "Dash", progress: Math.max(0, Math.min(1, 1 - this.timer / this.cooldown)) };
