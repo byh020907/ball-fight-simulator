@@ -173,29 +173,33 @@ export class ArenaRenderer {
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
         if (!fighter) {
+            this._previewBall = null;
             return;
         }
 
-        const preview = new BattleBall(fighter, new Vector2(this.canvas.width / 2, this.canvas.height / 2 - 28));
-        preview.velocity = new Vector2(0, 0);
-        preview.radius = Math.round(preview.baseRadius * 1.35);
+        // 캐싱: 같은 fighter면 기존 previewBall 재사용 (Orbit 각도 유지)
+        if (!this._previewBall || this._previewBallId !== fighter.id) {
+            this._previewBall = new BattleBall(fighter, new Vector2(this.canvas.width / 2, this.canvas.height / 2 - 28));
+            this._previewBall.velocity = new Vector2(0, 0);
+            this._previewBall.radius = Math.round(this._previewBall.baseRadius * 1.35);
+            this._previewBallId = fighter.id;
 
-        // Preview에도 ability를 바인딩하여 고유 표정/머리띠가 보이게 함
-        const AbilityClass = ABILITY_MAP[fighter.ability];
-        if (AbilityClass) {
-            preview.bindAbility(new AbilityClass(preview, {}));
+            const AbilityClass = ABILITY_MAP[fighter.ability];
+            if (AbilityClass) {
+                this._previewBall.bindAbility(new AbilityClass(this._previewBall, {}));
+            }
         }
 
-        preview.draw(ctx);
+        this._previewBall.draw(ctx);
 
         ctx.save();
         ctx.textAlign = "center";
         ctx.fillStyle = "#202020";
         ctx.font = "900 28px Bahnschrift, Segoe UI, sans-serif";
-        ctx.fillText("내 캐릭터", this.canvas.width / 2, preview.position.y + preview.radius + 48);
+        ctx.fillText("내 캐릭터", this.canvas.width / 2, this._previewBall.position.y + this._previewBall.radius + 48);
         ctx.font = "700 22px Bahnschrift, Segoe UI, sans-serif";
         ctx.fillStyle = fighter.color;
-        ctx.fillText(fighter.name, this.canvas.width / 2, preview.position.y + preview.radius + 82);
+        ctx.fillText(fighter.name, this.canvas.width / 2, this._previewBall.position.y + this._previewBall.radius + 82);
         ctx.restore();
     }
 
