@@ -11,7 +11,7 @@ import {
     createTournamentRoster,
     getRemainingStatPoints
 } from "./stat-allocation.js";
-import { pickRandomActions } from "./click-actions.js";
+import { pickRandomActions, showActionFailure } from "./click-actions.js";
 
 export class BattleApp {
     constructor() {
@@ -311,8 +311,10 @@ export class BattleApp {
             console.log("[액션 디버그] 실패: HP 5% 미만");
             return false;
         }
-        if (!action.isAvailable(sim, player)) {
-            console.log("[액션 디버그] 실패: 조건 불충족 -", action.name);
+
+        // 조건 불충족 시 피드백 문구 표시 (HP 소모 없이 리턴)
+        if (action.getFailureReason(sim, player)) {
+            showActionFailure(action, sim, player);
             return false;
         }
 

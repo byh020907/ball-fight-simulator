@@ -76,9 +76,17 @@ class ClickAction {
         return 0.2;
     }
 
-    /** 발동 조건 — false면 fireAction에서 skip */
+    /** 발동 조건 — 항상 true (실패 시 getFailureReason()로 피드백) */
     isAvailable(sim, playerBall) {
         return true;
+    }
+
+    /**
+     * 조건 불충족 시 실패 이유 문자열 반환. null이면 조건 만족.
+     * isAvailable()은 항상 true를 반환하므로, 실제 조건 체크는 여기서 수행.
+     */
+    getFailureReason(sim, playerBall) {
+        return null;
     }
 
     /** 액션 효과 적용. Action이 로직의 주체, domain의 getter/setter 사용 */
@@ -154,8 +162,8 @@ class CounterAction extends ClickAction {
         return 1.35;
     }
 
-    isAvailable(sim, playerBall) {
-        return sim.isCollisionImminent(playerBall);
+    getFailureReason(sim, playerBall) {
+        return sim.isCollisionImminent(playerBall) ? null : "충돌 직전이 아닙니다";
     }
 
     apply(sim, playerBall) {
@@ -177,8 +185,8 @@ class ParryAction extends ClickAction {
         return 1.15;
     }
 
-    isAvailable(sim, playerBall) {
-        return sim.getIncomingProjectile(playerBall) !== null;
+    getFailureReason(sim, playerBall) {
+        return sim.getIncomingProjectile(playerBall) ? null : "날아오는 투사체가 없습니다";
     }
 
     apply(sim, playerBall) {
@@ -231,4 +239,16 @@ export function pickRandomActions(count = 3) {
 
 export function findActionById(id) {
     return ACTION_POOL.find((a) => a.id === id) ?? null;
+}
+
+/**
+ * 조건 불충족 시 실패 피드백을 보여주는 헬퍼.
+ * app.js의 _tryFireAction에서 호출. 나중에 메시지 표시 방식 개선 시 이 함수만 수정.
+ */
+export function showActionFailure(action, sim, playerBall) {
+    const reason = action.getFailureReason(sim, playerBall);
+    if (!reason) return false;
+    sim.spawnActionText(playerBall.position.clone(), reason, "#ff8888");
+    console.log("[액션 피드백] 실패:", action.name, "-", reason);
+    return true;
 }
