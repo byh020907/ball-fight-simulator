@@ -20,12 +20,16 @@
 export const PATCH_NOTES = [
     {
         version: "0.9.0",
-        date: "2026-06-22",
+        date: "2026-06-23",
         title: "v0.9.0 업데이트",
         changes: [
             {
                 type: "feature",
-                text: "액션 실패 시 피드백 텍스트 추가 — 카운터/받아치기 조건 불충족 시 빨간색 문구가 표시됩니다."
+                text: "카운터/받아치기 리워크 — 이제 무조건 발동 후 판정 window 방식. HP 소모 후 0.20초/0.3초 안에 조건 충족 시 보너스."
+            },
+            {
+                type: "feature",
+                text: "액션 실패 시 피드백 텍스트 추가 — 조건 불충족 시 빨간색 문구가 표시됩니다."
             },
             {
                 type: "refactor",
@@ -33,15 +37,27 @@ export const PATCH_NOTES = [
             },
             {
                 type: "refactor",
-                text: "DashEffect 런타임 이펙트 분리 — DashAbility/Trickster/Eater의 대시 로직이 DashEffect에 통합되었습니다."
+                text: "DashEffect/WallSlamEffect 런타임 이펙트 분리 — 대시/벽 충돌 로직이 독립 클래스로 통합되었습니다."
             },
             {
                 type: "refactor",
-                text: "WallSlamEffect 런타임 이펙트 분리 — 벽 충돌 피해/회전 연출이 독립 클래스로 분리되었습니다."
+                text: "받아치기(ParryAction) 재설계 — 투사체 사전 탐색 제거, CombatEntity 경감 로직 제거, ActionContext timed effect로 대체."
+            },
+            {
+                type: "refactor",
+                text: "액션 description/cost를 모듈 상수 기반 템플릿으로 변경 — 정합성 자동 유지."
             },
             {
                 type: "refactor",
                 text: "코드베이스 안티패턴 11건 개선 — Template Method, 메서드 분리, 중복 제거, 캡슐화 강화."
+            },
+            {
+                type: "style",
+                text: "액션 효과값 0.05(5%) 단위, HP 코스트 0.5%p 단위로 정렬."
+            },
+            {
+                type: "style",
+                text: "시간 왜곡 슬로우 강화 — 상대 속도 45%→35%."
             }
         ]
     },
