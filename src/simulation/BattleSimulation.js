@@ -209,9 +209,11 @@ export class BattleSimulation extends Simulation {
             if (attackerIsPlayer) {
                 const bonus = Math.round(damageFromAToB * 0.12);
                 b.takeDamage(bonus, a, "Counter");
+                this.spawnActionText(b.position.clone(), "카운터!", "#ff8844");
             } else {
                 const bonus = Math.round(damageFromBToA * 0.12);
                 a.takeDamage(bonus, b, "Counter");
+                this.spawnActionText(a.position.clone(), "카운터!", "#ff8844");
             }
             this._counterCharged = false;
         }

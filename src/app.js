@@ -324,11 +324,10 @@ export class BattleApp {
 
         sim._pendingAction = { actionInstance: action, playerBall: player };
 
-        // 사용자 피드백 — 강한 파티클 + 사운드 + 액션명 텍스트
+        // 사용자 피드백 — 파티클 + 사운드 (액션명 텍스트는 실제 효과 시점에 표시)
         console.log("[액션 디버그] ✅ 발동 성공!", action.name);
         sim.spawnExplosion(player.position.clone(), "#88ddff");
         sim.spawnPulse(player.position.clone(), "#ffffff");
-        sim.spawnActionText(player.position.clone(), action.name, "#ffff44");
         this.audio.play("dash", 1.0);
         return true;
     }
