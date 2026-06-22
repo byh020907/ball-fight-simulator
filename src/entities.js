@@ -401,14 +401,6 @@ export class BattleBall {
 
     // ── 클릭 액션 데이터 인터페이스 ──
 
-    /** ActionContext에 위임. app.js에서 HP 소모용. */
-    spendHpForAction(amount) {
-        if (this.hp <= 1) return 0;
-        const cost = Math.min(amount, this.hp - 1);
-        this.hp -= cost;
-        return cost;
-    }
-
     getAbilityUiState() {
         return this.ability?.getUiState?.() ?? { label: "Passive", progress: 1 };
     }

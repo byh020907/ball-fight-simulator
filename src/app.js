@@ -319,7 +319,7 @@ export class BattleApp {
         }
 
         const cost = Math.ceil((player.maxHp * action.hpCostPercent) / 100);
-        if (player.spendHpForAction(cost) <= 0) {
+        if (player.actionContext.spendHpForAction(player, cost) <= 0) {
             console.log("[액션 디버그] 실패: HP 소모 불가");
             return false;
         }

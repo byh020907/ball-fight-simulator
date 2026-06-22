@@ -300,6 +300,14 @@ export class ActionContext {
 
     // ── 프레임 갱신 ──
 
+    /** app.js에서 HP 소모. BattleBall.actionContext 통해 호출. */
+    spendHpForAction(ball, amount) {
+        if (ball.hp <= 1) return 0;
+        const cost = Math.min(amount, ball.hp - 1);
+        ball.hp -= cost;
+        return cost;
+    }
+
     /** BattleBall._tickTimers()에서 호출 */
     tickTimers(delta) {
         if (this._rushRemaining > 0) this._rushRemaining -= delta;
