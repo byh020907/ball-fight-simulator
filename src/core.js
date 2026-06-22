@@ -88,8 +88,7 @@ export class CombatEntity {
      */
     dealDamageToTarget(target, rawDamage, source, label, simulation) {
         const finalDamage =
-            target.actionContext?.onProjectileDamage?.(rawDamage, this, source, label, simulation, target) ??
-            rawDamage;
+            target.actionContext?.onProjectileDamage?.(rawDamage, this, source, label, simulation, target) ?? rawDamage;
         target.takeDamage(finalDamage, source, label);
     }
 

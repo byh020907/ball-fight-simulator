@@ -107,15 +107,9 @@ getTimeSlowRemaining() { return this._timeSlowRemaining; }
 /** @param {number} v */
 setTimeSlowRemaining(v) { this._timeSlowRemaining = v; }
 
-/** 접근 중인 투사체 찾기 — Action → sim.getIncomingProjectile(player) */
-getIncomingProjectile(playerBall) {
-    for (const e of this.entities) {
-        if (!e.ownerId || e.ownerId === playerBall.id) continue;
-        const toPlayer = Vector2.subtract(playerBall.position, e.position);
-        if (toPlayer.length() < 300 && e.velocity.dot(toPlayer) > 0) return e;
-    }
-    return null;
-}
+// [DEPRECATED] getIncomingProjectile — ParryAction은 더 이상 투사체 사전 탐색을 하지 않는다.
+// 받아치기는 무조건 HP 소모 후 0.3초 onProjectileDamage window를 등록한다.
+// 참고: src/click-actions.js ParryAction + ActionContext.onProjectileDamage()
 ```
 
 #### 2-B. 엔티티 update에 시간 왜곡 적용

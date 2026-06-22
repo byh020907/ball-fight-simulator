@@ -81,15 +81,6 @@ export class BattleSimulation extends Simulation {
         return this._clickActionContext.timeSlowFactor;
     }
 
-    getIncomingProjectile(playerBall) {
-        for (const e of this.entities) {
-            if (!e.ownerId || e.ownerId === playerBall.id) continue;
-            const toPlayer = Vector2.subtract(playerBall.position, e.position);
-            if (toPlayer.length() < 300 && e.velocity.dot(toPlayer) > 0) return e;
-        }
-        return null;
-    }
-
     createSpawnPoints(count) {
         const points = [];
         const margin = 140;
