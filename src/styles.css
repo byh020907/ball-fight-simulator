@@ -749,9 +749,13 @@ body::before {
     background: #ff6d00;
 }
 
-.debug-hidden,
+.debug-hidden {
+    display: block;
+}
+
 .hero,
 .roster-panel,
+.log-panel {
 .log-panel {
     display: none !important;
 }

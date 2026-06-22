@@ -297,36 +297,38 @@ export class BattleApp {
 
     /** TriggerStrategy.fireAction()에서 호출 — HP 소모 + 지연 예약 */
     _tryFireAction() {
+        console.log("[액션 디버그] _tryFireAction called", this._actionCtx?.action?.name);
+
         const { action, sim, player } = this._actionCtx ?? {};
         if (!action || !sim || !player) {
-            this.ui.addLog("[액션] ⚠️ action/sim/player 없음");
+            console.log("[액션 디버그] 실패: action/sim/player 없음", !!action, !!sim, !!player);
             return false;
         }
         if (player.isDefeated) {
-            this.ui.addLog("[액션] ⚠️ 플레이어가 이미 패배");
+            console.log("[액션 디버그] 실패: 플레이어 패배");
             return false;
         }
         if (player.hp / player.maxHp < 0.05) {
-            this.ui.addLog("[액션] ⚠️ HP 5% 미만");
+            console.log("[액션 디버그] 실패: HP 5% 미만");
             return false;
         }
         if (!action.isAvailable(sim, player)) {
-            this.ui.addLog(`[액션] ⚠️ ${action.name} 발동 조건 불충족`);
+            console.log("[액션 디버그] 실패: 조건 불충족 -", action.name);
             return false;
         }
 
         const cost = Math.ceil((player.maxHp * action.hpCostPercent) / 100);
         if (player.spendHpForAction(cost) <= 0) {
-            this.ui.addLog("[액션] ⚠️ HP 소모 불가");
+            console.log("[액션 디버그] 실패: HP 소모 불가");
             return false;
         }
 
         sim._pendingAction = { actionInstance: action, playerBall: player };
 
         // 사용자 피드백
+        console.log("[액션 디버그] ✅ 발동 성공!", action.name);
         sim.spawnPulse(player.position.clone(), "#ffffff");
         this.audio.play("dash", 0.7);
-        this.ui.addLog(`[액션] ${action.name} 발동! HP -${cost}`);
         return true;
     }
 
