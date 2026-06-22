@@ -94,19 +94,45 @@ constructor(fighterSpecs, hooks, playerBall = null) {
     this.matchAction = null;
     this.actionCooldown = 0;
 
-    // 시간 왜곡 상태
+    // 시간 왜곡 상태 (BattleSimulation 소유)
     this.timeSlowRemaining = 0;
     this.timeSlowFactor = 0.45;
 
-    // 돌진 상태
-    this.rushRemaining = 0;
-
-    // 카운터 상태
+    // 카운터 상태 (BattleSimulation 소유)
     this.counterCharged = false;
     this.counterChargeTimer = 0;
 
-    // 버티기 상태
-    this.endureRemaining = 0;
+    // 수신자 메서드 — 액션의 apply()가 이 메서드를 호출한다
+}
+
+/** 시간 왜곡 — Action → sim.applyTimeWarp(duration) */
+applyTimeWarp(duration) {
+    this.timeSlowRemaining = Math.max(this.timeSlowRemaining, duration);
+}
+
+/** 카운터 — Action → sim.applyCounter() */
+applyCounter() {
+    this.counterCharged = true;
+    this.counterChargeTimer = 0.3;
+}
+
+/** 충돌 임박 감지 — Action → sim.isCollisionImminent(player) */
+isCollisionImminent(playerBall) {
+    const opponent = this.fighters.find(f => f !== playerBall);
+    if (!opponent) return false;
+    const gap = Vector2.subtract(opponent.position, playerBall.position).length()
+                - playerBall.radius - opponent.radius;
+    return gap <= 20;
+}
+
+/** 접근 중인 투사체 찾기 — Action → sim.getIncomingProjectile(player) */
+getIncomingProjectile(playerBall) {
+    for (const e of this.entities) {
+        if (!e.ownerId || e.ownerId === playerBall.id) continue;
+        const toPlayer = Vector2.subtract(playerBall.position, e.position);
+        if (toPlayer.length() < 300 && e.velocity.dot(toPlayer) > 0) return e;
+    }
+    return null;
 }
 ```
 
@@ -124,12 +150,19 @@ for (const entity of this.entities) {
 if (this.timeSlowRemaining > 0) this.timeSlowRemaining -= delta;
 ```
 
-#### 2-C. `getSpeedMultiplier()`에 돌진 효과 반영
+#### 2-C. `getSpeedMultiplier()`에 돌진 효과 반영 (BattleBall 소유)
 
 ```js
+// BattleBall
+applyRush(duration, multiplier) {
+    this.rushEffect = { remaining: duration, multiplier };
+}
+
+// BattleSimulation.getSpeedMultiplier()에 반영 (playerBall만 적용)
 getSpeedMultiplier() {
     const overtimeMult = this.isOvertime() ? Math.min(1.58, 1.12 + ...) : 1;
-    const rushMult = this.rushRemaining > 0 ? 1.25 : 1;
+    const rushMult = this.playerBall?.rushEffect?.remaining > 0
+        ? this.playerBall.rushEffect.multiplier : 1;
     return overtimeMult * rushMult;
 }
 ```
@@ -147,7 +180,7 @@ applyAction(actionId) {
 #### 2-E. 카운터/받아치기용 헬퍼 (5단계에서 구현)
 
 ```js
-_isCollisionImminent(playerBall) {
+isCollisionImminent(playerBall) {
     const opponent = this.fighters.find(f => f !== playerBall);
     if (!opponent) return false;
     const dist = Vector2.subtract(opponent.position, playerBall.position).length();
@@ -155,7 +188,7 @@ _isCollisionImminent(playerBall) {
     return gap <= 20;
 }
 
-_getIncomingProjectile(playerBall) {
+getIncomingProjectile(playerBall) {
     for (const e of this.entities) {
         if (!e.ownerId || e.ownerId === playerBall.id) continue;
         const toPlayer = Vector2.subtract(playerBall.position, e.position);
@@ -382,36 +415,66 @@ if (this._pointerHandler) {
 - `OrbitProjectile`: `this.ownerId = owner.id`
 - `SeedOrb`: `this.ownerId = owner.id`
 
-#### 5-B. 받아치기(ParryAction) — isAvailable/apply 구현
+#### 5-B. 받아치기(ParryAction) — 로직 소유: 투사체 엔티티
 
 ```js
 class ParryAction extends ClickAction {
     isAvailable(sim, playerBall) {
-        return sim._getIncomingProjectile(playerBall) !== null;
+        return sim.getIncomingProjectile(playerBall) !== null;
     }
 
     apply(sim, playerBall) {
-        const proj = sim._getIncomingProjectile(playerBall);
+        const proj = sim.getIncomingProjectile(playerBall);
         if (proj) proj._parryReduction = 0.5;
     }
 }
 ```
 
-투사체 `update()`의 `takeDamage` 전에 `_parryReduction` 확인 → `Math.round(damage * (1 - this._parryReduction))`.
+투사체 `update()`의 `takeDamage` 전에 `_parryReduction` 확인 → 50% 경감.
 
-#### 5-C. 카운터(CounterAction) — isAvailable/apply 구현
+#### 5-C. 카운터(CounterAction) — 로직 소유: BattleSimulation
 
 ```js
 class CounterAction extends ClickAction {
     isAvailable(sim, playerBall) {
-        return sim._isCollisionImminent(playerBall);
+        return sim.isCollisionImminent(playerBall);
     }
 
     apply(sim, playerBall) {
-        sim.counterCharged = true;
-        sim.counterChargeTimer = 0.3;
+        sim.applyCounter(); // 내부: counterCharged = true + 타이머
     }
 }
+```
+
+`handleCollision()`에서 `counterCharged` 확인 → 데미지 +12%, 사용 후 즉시 `false`.
+
+#### 5-D. 버티기(EndureAction) + spendHpForAction — 로직 소유: BattleBall
+
+`src/entities.js`:
+
+```js
+// BattleBall
+spendHpForAction(amount) {
+    if (this.hp <= 1) return 0;                // 최소 HP 1 보장
+    const cost = Math.min(amount, this.hp - 1);
+    this.hp -= cost;
+    return cost;
+}
+
+applyEndure(duration, reduction = 0.5) {
+    this.endureEffect = { remaining: duration, reduction };
+}
+
+applyRush(duration, multiplier) {
+    this.rushEffect = { remaining: duration, multiplier };
+}
+```
+
+`takeDamage()`에서 `endureEffect` 확인 → 데미지 경감.
+rush/endure 타이머 감소는 `BattleBall.update()`에서 처리.
+}
+}
+
 ```
 
 `handleCollision()`에서 `counterCharged` 확인 → 데미지 +12%, 사용 후 `false`.
@@ -435,11 +498,13 @@ class CounterAction extends ClickAction {
 ## 의존성 그래프
 
 ```
+
 1단계 (click-actions.js)
-  └── 2단계 (BattleSimulation) ── 필요: click-actions.js의 apply()
-        └── 3단계 (app.js + UI) ── 필요: click-actions.js의 pickRandomActions()
-              └── 4단계 (클릭 핸들러) ── 필요: simulation.matchAction
-                    └── 5단계 (고급 판정) ── 필요: entities.js ownerId
+└── 2단계 (BattleSimulation) ── 필요: click-actions.js의 apply()
+└── 3단계 (app.js + UI) ── 필요: click-actions.js의 pickRandomActions()
+└── 4단계 (클릭 핸들러) ── 필요: simulation.matchAction
+└── 5단계 (고급 판정) ── 필요: entities.js ownerId
+
 ```
 
 1~2단계는 병렬로 안전하게 작업 가능.
@@ -466,10 +531,12 @@ class CounterAction extends ClickAction {
 ### 리스크 ①: 게임 루프와 액션 적용 시점 충돌
 
 ```
-현재 루프:  handleCollision() → entity.update() → checkResult()
-문제:      PointerEvent는 루프 밖에서 언제든 호출.
-           HP 소모 직후 checkResult 실행되면 자해 패배 가능.
-```
+
+현재 루프: handleCollision() → entity.update() → checkResult()
+문제: PointerEvent는 루프 밖에서 언제든 호출.
+HP 소모 직후 checkResult 실행되면 자해 패배 가능.
+
+````
 
 **대책: 지연 적용 패턴**
 
@@ -487,7 +554,7 @@ update(delta) {
     this.handleCollision();
     // ...
 }
-```
+````
 
 → 액션 효과가 항상 handleCollision 이전에 적용되므로, 동일 프레임 내 일관된 순서 보장.
 

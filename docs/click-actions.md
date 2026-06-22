@@ -66,20 +66,30 @@
 // 입력 핸들러는 trigger의 메서드만 호출하면 됨.
 
 class TriggerStrategy {
-    get type() { return "tap"; }
+    get type() {
+        return "tap";
+    }
     onPointerDown(ctx) {}
     onPointerUp(ctx) {}
     onTick(ctx) {}
 }
 
 class TapTrigger extends TriggerStrategy {
-    get type() { return "tap"; }
-    onPointerDown(ctx) { ctx.fireAction(); }
+    get type() {
+        return "tap";
+    }
+    onPointerDown(ctx) {
+        ctx.fireAction();
+    }
 }
 
 class ReleaseTrigger extends TriggerStrategy {
-    get type() { return "release"; }
-    onPointerDown(ctx) { ctx._holdStarted = true; }
+    get type() {
+        return "release";
+    }
+    onPointerDown(ctx) {
+        ctx._holdStarted = true;
+    }
     onPointerUp(ctx) {
         if (ctx._holdStarted) ctx.fireAction();
         ctx._holdStarted = false;
@@ -87,8 +97,12 @@ class ReleaseTrigger extends TriggerStrategy {
 }
 
 class HoldTrigger extends TriggerStrategy {
-    get type() { return "hold"; }
-    onPointerDown(ctx) { ctx._holding = true; }
+    get type() {
+        return "hold";
+    }
+    onPointerDown(ctx) {
+        ctx._holding = true;
+    }
     onPointerUp(ctx) {
         if (ctx._holding && ctx._consumed) {
             ctx.action.onRelease?.(ctx.sim, ctx.player);
@@ -114,25 +128,59 @@ class ClickAction {
         this.trigger = trigger;
     }
 
-    get id()           { throw new Error("override"); }
-    get name()         { throw new Error("override"); }
-    get description()  { throw new Error("override"); }
+    get id() {
+        throw new Error("override");
+    }
+    get name() {
+        throw new Error("override");
+    }
+    get description() {
+        throw new Error("override");
+    }
 
     /** maxHP 대비 소모율 (0.2 = 0.2%) */
-    get hpCostPercent() { return 0.2; }
+    get hpCostPercent() {
+        return 0.2;
+    }
 
     /** 발동 조건 */
-    isAvailable(sim, playerBall) { return true; }
+    isAvailable(sim, playerBall) {
+        return true;
+    }
 
-    /** 효과 적용 */
-    apply(sim, playerBall) { throw new Error("override"); }
+    /**
+     * 액션 효과 적용 (Command Pattern).
+     * 직접 상태를 변경하지 않고, 수신자(receiver) 객체의 메서드를 호출한다.
+     *
+     *   TimeWarpAction → sim.applyTimeWarp(0.25)
+     *   RushAction     → playerBall.applyRush(0.2, 1.25)
+     *   CounterAction  → sim.applyCounter()
+     *   ParryAction    → proj._parryReduction = 0.5
+     *   EndureAction   → playerBall.applyEndure(0.1)
+     */
+    apply(sim, playerBall) {
+        throw new Error("override");
+    }
 
     /** trigger === HoldTrigger 전용 */
     onRelease(sim, playerBall) {}
-    canHoldContinue(sim, playerBall) { return true; }
+    canHoldContinue(sim, playerBall) {
+        return true;
+    }
 }
 
-// ── 입력 핸들러 측 사용 예 ──────────────────────────────────────
+// ── 로직 소유권 ──────────────────────────────────────────────────
+//
+// 액션          로직 주체              수신자 메서드
+// ────────────  ────────────────────  ──────────────────────
+// 시간 왜곡     BattleSimulation      applyTimeWarp(dur)
+// 돌진          BattleBall            applyRush(dur, mult)
+// 카운터        BattleSimulation      applyCounter()
+// 받아치기      투사체 엔티티         _parryReduction 플래그
+// 버티기        BattleBall            applyEndure(dur)
+//
+// 각 액션의 apply()는 위 수신자 메서드를 호출만 하고,
+// 상태 전이/검증 로직은 수신자 클래스가 소유합니다.
 
 // 핸들러 ctx 객체는 app.js에서 이렇게 구성:
 // const ctx = {
@@ -150,12 +198,22 @@ class ClickAction {
 // ── 미래 확장 예: HoldTrigger 사용 ──────────────────────────────
 
 class ChargeAction extends ClickAction {
-    constructor() { super(new HoldTrigger()); }
+    constructor() {
+        super(new HoldTrigger());
+    }
 
-    get id() { return "charge"; }
-    get name() { return "차지"; }
-    get description() { return "누르는 동안 충전, 떼면 방출"; }
-    get hpCostPercent() { return 0.15; }
+    get id() {
+        return "charge";
+    }
+    get name() {
+        return "차지";
+    }
+    get description() {
+        return "누르는 동안 충전, 떼면 방출";
+    }
+    get hpCostPercent() {
+        return 0.15;
+    }
 
     apply(sim, playerBall) {
         sim.chargeLevel = Math.min(1, (sim.chargeLevel ?? 0) + 0.03);
@@ -169,6 +227,8 @@ class ChargeAction extends ClickAction {
 }
 
 // ── 기존 액션들 (모두 TapTrigger 기본값) ─────────────────────────
+
+class TimeWarpAction extends ClickAction {
     get id() {
         return "time_warp";
     }
@@ -181,13 +241,11 @@ class ChargeAction extends ClickAction {
     get hpCostPercent() {
         return 0.2;
     }
-
     isAvailable(sim, playerBall) {
         return playerBall.hp / playerBall.maxHp <= 0.5;
     }
-
     apply(sim, playerBall) {
-        sim.timeSlowRemaining = Math.max(sim.timeSlowRemaining, 0.25);
+        sim.applyTimeWarp(0.25);
     }
 }
 
@@ -204,9 +262,8 @@ class RushAction extends ClickAction {
     get hpCostPercent() {
         return 0.7;
     }
-
     apply(sim, playerBall) {
-        sim.rushRemaining = Math.max(sim.rushRemaining, 0.2);
+        playerBall.applyRush(0.2, 1.25);
     }
 }
 
@@ -223,14 +280,11 @@ class CounterAction extends ClickAction {
     get hpCostPercent() {
         return 1.35;
     }
-
     isAvailable(sim, playerBall) {
-        return sim._isCollisionImminent(playerBall);
+        return sim.isCollisionImminent(playerBall);
     }
-
     apply(sim, playerBall) {
-        sim.counterCharged = true;
-        sim.counterChargeTimer = 0.3;
+        sim.applyCounter();
     }
 }
 
@@ -247,13 +301,11 @@ class ParryAction extends ClickAction {
     get hpCostPercent() {
         return 1.15;
     }
-
     isAvailable(sim, playerBall) {
-        return sim._getIncomingProjectile(playerBall) !== null;
+        return sim.getIncomingProjectile(playerBall) !== null;
     }
-
     apply(sim, playerBall) {
-        const proj = sim._getIncomingProjectile(playerBall);
+        const proj = sim.getIncomingProjectile(playerBall);
         if (proj) proj._parryReduction = 0.5;
     }
 }
@@ -271,13 +323,11 @@ class EndureAction extends ClickAction {
     get hpCostPercent() {
         return 0.9;
     }
-
     isAvailable(sim, playerBall) {
         return playerBall.hp / playerBall.maxHp <= 0.5;
     }
-
     apply(sim, playerBall) {
-        sim.endureRemaining = Math.max(sim.endureRemaining, 0.1);
+        playerBall.applyEndure(0.1, 0.5);
     }
 }
 

@@ -69,6 +69,61 @@ _drawVisionArc(ctx) { ... }
 - 메서드 분리뿐 아니라 Ability 클래스 자체도 하나의 파일(BatBallAbility.js)로 모듈화되어 있습니다.
 - 새 기능을 추가할 때도 같은 원칙을 적용합니다. 예를 들어 `update()` 내에서 시야 스윕, 적 탐지, 쿨타임 관리를 각각의 책임으로 분리하여 가독성과 유지보수성을 높입니다.
 
+### 로직 소유권 원칙
+
+**각 로직은 그 로직의 주체(영향을 받는 객체)가 소유합니다.**
+
+```
+잘못된 예: ClickAction.apply()가 sim.timeSlowRemaining을 직접 수정
+올바른 예: ClickAction.apply()가 sim.applyTimeWarp()를 호출하고,
+           BattleSimulation.applyTimeWarp()가 내부 상태를 변경
+```
+
+#### 적용 예 — 클릭 액션 시스템
+
+```js
+// Action의 apply()는 Command 역할 — 수신자(domain 객체)의 메서드를 호출
+class TimeWarpAction extends ClickAction {
+    apply(sim, playerBall) {
+        sim.applyTimeWarp(0.25); // ← BattleSimulation이 소유
+    }
+}
+
+class RushAction extends ClickAction {
+    apply(sim, playerBall) {
+        playerBall.applyRush(0.2, 1.25); // ← BattleBall이 소유
+    }
+}
+
+// 수신자 객체에 실제 로직이 위치
+class BattleSimulation {
+    applyTimeWarp(duration) {
+        this.timeSlowRemaining = Math.max(this.timeSlowRemaining, duration);
+    }
+}
+
+class BattleBall {
+    applyRush(duration, multiplier) {
+        this.rushEffect = { remaining: duration, multiplier };
+    }
+}
+```
+
+| 액션      | 로직 주체          | 메서드                    | 설명                              |
+| --------- | ------------------ | ------------------------- | --------------------------------- |
+| 시간 왜곡 | `BattleSimulation` | `applyTimeWarp(duration)` | 엔티티 update의 delta 스케일링    |
+| 돌진      | `BattleBall`       | `applyRush(dur, mult)`    | getSpeedMultiplier에 반영         |
+| 카운터    | `BattleSimulation` | `applyCounter()`          | handleCollision에서 데미지 보너스 |
+| 받아치기  | 투사체 엔티티      | `_parryReduction` 플래그  | takeDamage 전 50% 경감            |
+| 버티기    | `BattleBall`       | `applyEndure(duration)`   | takeDamage에서 데미지 경감        |
+
+#### 행동 규칙
+
+1. **새 기능을 추가할 때 "이 로직은 어느 객체가 소유해야 하는가"를 먼저 결정**합니다.
+2. Action/Command 객체는 `apply()`에서 **수신자(receiver)의 메서드를 호출만** 하고, 직접 상태를 변경하지 않습니다.
+3. 수신자 객체(Entity, Simulation 등)가 내부 상태 전이와 검증을 모두 담당합니다.
+4. 여러 Action에서 공유하는 로직은 공유 수신자(예: `BattleSimulation`)에 한 번만 구현합니다.
+
 ### 인코딩과 줄바꿈
 
 이 프로젝트는 **VS Code (Windows)** 환경에서 개발하며, 아래 기준을 따릅니다.
