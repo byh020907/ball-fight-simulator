@@ -12,6 +12,7 @@ import {
 } from "../src/stat-allocation.js";
 import { FIGHTER_IDS } from "../src/core.js";
 import { Vector2 } from "../src/core.js";
+import { findActionById } from "../src/click-actions.js";
 import { shuffled } from "../src/random.js";
 import { BattleSimulation } from "../src/simulation/BattleSimulation.js";
 
@@ -607,11 +608,48 @@ function testMultiFighterSimulationSetup(app) {
     );
 }
 
+function testClickActionEffectOwnership(app) {
+    const sim = new BattleSimulation(app.roster.slice(0, 2), {
+        onLog() {},
+        onSound() {}
+    });
+    const [player, opponent] = sim.fighters;
+    const rush = findActionById("rush");
+    const endure = findActionById("endure");
+
+    rush.apply(sim, player);
+
+    assert.equal(sim.getSpeedMultiplier(player), 1.25, "RushAction should register speed effect on its target ball");
+    assert.equal(sim.getSpeedMultiplier(opponent), 1, "RushAction should not boost unrelated balls");
+
+    player.actionContext.tickTimers(0.25);
+    rush.apply(sim, player);
+    assert.equal(
+        player.actionContext.getEffect("rush").remaining,
+        0.75,
+        "RushAction should own duration extension logic"
+    );
+
+    player.actionContext.tickTimers(0.76);
+    assert.equal(sim.getSpeedMultiplier(player), 1, "Rush effect should expire through the generic action context");
+
+    endure.apply(sim, player);
+    assert.equal(
+        player.actionContext.onDamageTaken(11, opponent, "Test"),
+        6,
+        "EndureAction should own damage reduction logic"
+    );
+
+    player.actionContext.tickTimers(0.11);
+    assert.equal(player.actionContext.onDamageTaken(11, opponent, "Test"), 11, "Endure effect should expire");
+}
+
 const app = await loadModuleApp();
 testShuffledUtility();
 testStatAllocationRules(app);
 testStatBalanceSystem();
 testMultiFighterSimulationSetup(app);
+testClickActionEffectOwnership(app);
 await testCloneSeedDash(app);
 await testEaterFeast(app);
 await testRageBallMomentum(app);

@@ -315,7 +315,7 @@ export class BattleBall {
         this.spinRotation = 0;
         this.statAllocation = spec.statAllocation ?? null;
 
-        // ── 클릭 액션 시스템 (단일 ref, 모든 로직은 ActionContext에) ──
+        // ── 클릭 액션 시스템 (Action이 등록한 런타임 effect 저장소) ──
         this.actionContext = new ActionContext();
     }
 
@@ -475,7 +475,7 @@ export class BattleBall {
             direction.scale(
                 this.dashState?.speedOverride ??
                     this.speedBoost?.speedOverride ??
-                    this.baseSpeed * modifiers.speed * slowMult * boostMult * simulation.getSpeedMultiplier()
+                    this.baseSpeed * modifiers.speed * slowMult * boostMult * simulation.getSpeedMultiplier(this)
             )
         );
     }
@@ -490,7 +490,7 @@ export class BattleBall {
             return;
         }
 
-        // ClickAction이 등록한 데미지 핸들러 (ActionContext에 위임)
+        // ClickAction이 등록한 effect를 ActionContext가 전달한다.
         amount = this.actionContext.onDamageTaken(amount, source, label);
 
         const abilityDefMult = this.getStatModifiers().defense;

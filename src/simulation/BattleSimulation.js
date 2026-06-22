@@ -150,10 +150,10 @@ export class BattleSimulation extends Simulation {
      * 오버타임 전용 속도 배율.
      * 평소에는 1 (영향 없음), 오버타임 진입 후 1.12부터 서서히 증가해 최대 1.58까지 올라갑니다.
      */
-    getSpeedMultiplier() {
+    getSpeedMultiplier(ball = null) {
         const overtimeMult = this.isOvertime() ? Math.min(1.58, 1.12 + this.getOvertimeProgress() * 0.026) : 1;
-        const rushMult = this.playerBall?.actionContext?.getRushSpeedMultiplier() ?? 1;
-        return overtimeMult * rushMult;
+        const actionMult = ball?.actionContext?.getSpeedMultiplier() ?? 1;
+        return overtimeMult * actionMult;
     }
 
     addLog(message) {

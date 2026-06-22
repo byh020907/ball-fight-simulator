@@ -96,9 +96,12 @@ class TimeWarpAction extends ClickAction {
 
 class RushAction extends ClickAction {
     apply(sim, playerBall) {
-        const current = playerBall.actionContext.getRushRemaining();
+        const current = playerBall.actionContext.getEffect(this.id)?.remaining ?? 0;
         // Action이 지속시간 연장 로직을 직접 수행
-        playerBall.actionContext.setRush(current > 0 ? current + 0.5 : 0.5, 1.25);
+        playerBall.actionContext.setEffect(this.id, {
+            remaining: current > 0 ? current + 0.5 : 0.5,
+            getSpeedMultiplier: () => 1.25
+        });
     }
 }
 
@@ -113,11 +116,11 @@ class BattleSimulation {
 }
 
 class ActionContext {
-    getRushRemaining() {
-        return this._rushRemaining;
+    getEffect(id) {
+        return this._effects.get(id) ?? null;
     }
-    setRush(duration, multiplier) {
-        this._rushEffect = { duration, multiplier };
+    setEffect(id, effect) {
+        this._effects.set(id, effect);
     }
 }
 ```
@@ -125,10 +128,10 @@ class ActionContext {
 | 액션      | Action이 소유한 로직                                   | Domain이 제공하는 인터페이스                                   |
 | --------- | ------------------------------------------------------ | -------------------------------------------------------------- |
 | 시간 왜곡 | `max(현재값, duration)` 후 저장                        | `sim.get/ setTimeSlowRemaining()`                              |
-| 돌진      | 지속시간 연장 또는 신규 설정 + 속도 배율 적용          | `ball.actionContext.getRushRemaining()`, `ball.actionContext.setRush(dur, mult)` |
+| 돌진      | 지속시간 연장 또는 신규 설정 + 속도 배율 적용          | `ball.actionContext.getEffect(id)`, `ball.actionContext.setEffect(id, effect)` |
 | 카운터    | 충돌 임박 판정 + 플래그 설정 (`counterCharged = true`) | `sim.isCollisionImminent(ball)`, `sim.setCounterCharged(b)`    |
 | 받아치기  | 접근 중인 투사체 탐색 + 경감 플래그 설정               | `sim.getIncomingProjectile(ball)`, `proj.setParryReduction(v)` |
-| 버티기    | 경감 지속시간 설정                                     | `ball.actionContext.registerDamageHandler(handler, duration)`  |
+| 버티기    | 경감 effect 등록                                       | `ball.actionContext.setEffect(id, effect)`                     |
 
 #### 행동 규칙
 

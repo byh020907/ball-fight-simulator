@@ -169,10 +169,10 @@ class ClickAction {
 // 액션          Action이 소유한 로직                        Domain 인터페이스
 // ────────────  ─────────────────────────────────────────  ──────────────────────────────
 // 시간 왜곡     max(현재값, duration) 후 저장               sim.get/ setTimeSlowRemaining()
-// 돌진          지속시간 연장 or 신규 + 배율 적용            ball.actionContext.getRushRemaining(), ball.actionContext.setRush()
+// 돌진          지속시간 연장 or 신규 + 배율 적용            ball.actionContext.getEffect(), setEffect()
 // 카운터        충돌 임박 판정 + 플래그 설정                sim.isCollisionImminent(), setCounterCharged()
 // 받아치기      접근 중 투사체 탐색 + 경감 플래그            sim.getIncomingProjectile(), proj.setParryReduction()
-// 버티기        경감 지속시간 설정                          ball.actionContext.registerDamageHandler()
+// 버티기        경감 effect 등록                            ball.actionContext.setEffect()
 
 // 핸들러 ctx 객체는 app.js에서 이렇게 구성:
 // const ctx = {
@@ -253,8 +253,11 @@ class RushAction extends ClickAction {
         return 0.7;
     }
     apply(sim, playerBall) {
-        const current = playerBall.actionContext.getRushRemaining();
-        playerBall.actionContext.setRush(current > 0 ? current + 0.5 : 0.5, 1.25);
+        const current = playerBall.actionContext.getEffect(this.id)?.remaining ?? 0;
+        playerBall.actionContext.setEffect(this.id, {
+            remaining: current > 0 ? current + 0.5 : 0.5,
+            getSpeedMultiplier: () => 1.25
+        });
     }
 }
 
@@ -315,7 +318,10 @@ class EndureAction extends ClickAction {
         return 0.9;
     }
     apply(sim, playerBall) {
-        playerBall.actionContext.registerDamageHandler((amount) => Math.round(amount * 0.5), 0.1);
+        playerBall.actionContext.setEffect(this.id, {
+            remaining: 0.1,
+            onDamageTaken: (amount) => Math.round(amount * 0.5)
+        });
     }
 }
 
@@ -386,7 +392,7 @@ const ACTION_DEFS = Object.freeze([
 | `src/app.js`                         | `startMatch()`에서 카드 선택 단계 추가, `currentMatchAction` 관리   |
 | `src/simulation/BattleSimulation.js` | 생성자에 `playerFighterId`, `matchAction` 인자 추가, 시간 왜곡 구현 |
 | `src/entities.js`                    | `BattleBall.actionContext` 보유, 투사체에 `ownerId` 참조 확인       |
-| `src/click-actions.js`               | 액션 정의, 실패 피드백, `ActionContext.spendHpForAction()` 보유     |
+| `src/click-actions.js`               | 액션 정의, 실패 피드백, `ActionContext` effect 저장소 보유          |
 | `ArenaRenderer`                      | 캔버스 `pointerdown` 이벤트 바인딩                                  |
 
 ### 카운터 판정

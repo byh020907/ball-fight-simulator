@@ -135,8 +135,11 @@ class RushAction extends ClickAction {
     }
 
     apply(sim, playerBall) {
-        const current = playerBall.actionContext.getRushRemaining();
-        playerBall.actionContext.setRush(current > 0 ? current + 0.5 : 0.5, 1.25);
+        const current = playerBall.actionContext.getEffect(this.id)?.remaining ?? 0;
+        playerBall.actionContext.setEffect(this.id, {
+            remaining: current > 0 ? current + 0.5 : 0.5,
+            getSpeedMultiplier: () => 1.25
+        });
     }
 }
 
@@ -202,10 +205,13 @@ class EndureAction extends ClickAction {
     }
 
     apply(sim, playerBall) {
-        playerBall.actionContext.registerDamageHandler((amount, source, label) => {
-            source?.simulation?.spawnActionText?.(playerBall.position.clone(), "버팀!", "#44ff44");
-            return Math.round(amount * 0.5);
-        }, 0.1);
+        playerBall.actionContext.setEffect(this.id, {
+            remaining: 0.1,
+            onDamageTaken: (amount, source, label) => {
+                source?.simulation?.spawnActionText?.(playerBall.position.clone(), "버팀!", "#44ff44");
+                return Math.round(amount * 0.5);
+            }
+        });
     }
 }
 
@@ -249,40 +255,33 @@ export function showActionFailure(action, sim, playerBall) {
  */
 export class ActionContext {
     constructor() {
-        this._rushRemaining = 0;
-        this._rushMultiplier = 1;
-        this._damageHandler = null;
-        this._damageHandlerRemaining = 0;
+        this._effects = new Map();
     }
 
-    // ── Rush (돌진) ──
-
-    getRushRemaining() {
-        return this._rushRemaining;
-    }
-    setRush(duration, multiplier) {
-        this._rushRemaining = duration;
-        this._rushMultiplier = multiplier;
+    getEffect(id) {
+        return this._effects.get(id) ?? null;
     }
 
-    /** BattleSimulation.getSpeedMultiplier()에서 호출 */
-    getRushSpeedMultiplier() {
-        return this._rushRemaining > 0 ? 1.25 : 1;
+    setEffect(id, effect) {
+        this._effects.set(id, effect);
+        return effect;
     }
 
-    // ── Damage Handler (버티기 등) ──
-
-    registerDamageHandler(handler, duration) {
-        this._damageHandler = handler;
-        this._damageHandlerRemaining = duration;
+    getSpeedMultiplier() {
+        let multiplier = 1;
+        for (const effect of this._effects.values()) {
+            multiplier *= effect.getSpeedMultiplier?.() ?? 1;
+        }
+        return multiplier;
     }
 
     /** BattleBall.takeDamage()에서 호출 */
     onDamageTaken(amount, source, label) {
-        if (this._damageHandler) {
-            return this._damageHandler(amount, source, label);
+        let nextAmount = amount;
+        for (const effect of this._effects.values()) {
+            nextAmount = effect.onDamageTaken?.(nextAmount, source, label) ?? nextAmount;
         }
-        return amount;
+        return nextAmount;
     }
 
     // ── 프레임 갱신 ──
@@ -297,10 +296,14 @@ export class ActionContext {
 
     /** BattleBall._tickTimers()에서 호출 */
     tickTimers(delta) {
-        if (this._rushRemaining > 0) this._rushRemaining -= delta;
-        if (this._damageHandler) {
-            this._damageHandlerRemaining -= delta;
-            if (this._damageHandlerRemaining <= 0) this._damageHandler = null;
+        for (const [id, effect] of this._effects) {
+            if (typeof effect.remaining === "number") {
+                effect.remaining -= delta;
+            }
+            effect.tick?.(delta);
+            if (effect.isExpired || effect.remaining <= 0) {
+                this._effects.delete(id);
+            }
         }
     }
 }

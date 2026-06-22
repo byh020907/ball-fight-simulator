@@ -148,20 +148,23 @@ for (const entity of this.entities) {
 if (this.timeSlowRemaining > 0) this.timeSlowRemaining -= delta;
 ```
 
-#### 2-C. `getSpeedMultiplier()`에 돌진 효과 반영 (BattleBall 소유)
+#### 2-C. `getSpeedMultiplier(ball)`에 액션 effect 배율 반영
 
 ```js
-// BattleBall
-applyRush(duration, multiplier) {
-    this.rushEffect = { remaining: duration, multiplier };
+// RushAction
+apply(sim, playerBall) {
+    const current = playerBall.actionContext.getEffect(this.id)?.remaining ?? 0;
+    playerBall.actionContext.setEffect(this.id, {
+        remaining: current > 0 ? current + 0.5 : 0.5,
+        getSpeedMultiplier: () => 1.25
+    });
 }
 
-// BattleSimulation.getSpeedMultiplier()에 반영 (playerBall만 적용)
-getSpeedMultiplier() {
+// BattleSimulation.getSpeedMultiplier(ball)에 반영
+getSpeedMultiplier(ball) {
     const overtimeMult = this.isOvertime() ? Math.min(1.58, 1.12 + ...) : 1;
-    const rushMult = this.playerBall?.rushEffect?.remaining > 0
-        ? this.playerBall.rushEffect.multiplier : 1;
-    return overtimeMult * rushMult;
+    const actionMult = ball?.actionContext?.getSpeedMultiplier() ?? 1;
+    return overtimeMult * actionMult;
 }
 ```
 
@@ -448,21 +451,22 @@ class CounterAction extends ClickAction {
 
 `handleCollision()`에서 `counterCharged` 확인 → 데미지 +12%, 사용 후 즉시 `false`.
 
-#### 5-D. 버티기(EndureAction) + spendHpForAction — 로직 소유: ActionContext
+#### 5-D. 버티기(EndureAction) + spendHpForAction — 로직 소유: Action
 
 `src/click-actions.js`:
 
 ```js
-// ActionContext
-getRushRemaining() { return this._rushRemaining; }
-setRush(duration, multiplier) {
-    this._rushRemaining = duration;
-    this._rushMultiplier = multiplier;
+// EndureAction
+apply(sim, playerBall) {
+    playerBall.actionContext.setEffect(this.id, {
+        remaining: 0.1,
+        onDamageTaken: (amount) => Math.round(amount * 0.5)
+    });
 }
 
-registerDamageHandler(handler, duration) {
-    this._damageHandler = handler;
-    this._damageHandlerRemaining = duration;
+// ActionContext
+setEffect(id, effect) {
+    this._effects.set(id, effect);
 }
 
 spendHpForAction(ball, amount) {
@@ -473,8 +477,8 @@ spendHpForAction(ball, amount) {
 }
 ```
 
-`takeDamage()`는 `actionContext.onDamageTaken()`에 경감 처리를 위임한다.
-rush/damage handler 타이머 감소는 `ActionContext.tickTimers()`에서 처리한다.
+`takeDamage()`는 `actionContext.onDamageTaken()`으로 effect 전달만 수행한다.
+Rush/Endure의 배율, 지속시간 연장, 경감 계산은 각 Action이 등록한 effect가 소유한다.
 
 #### 5-D. 나머지 액션 실패 조건 구현
 
@@ -513,7 +517,7 @@ rush/damage handler 타이머 감소는 `ActionContext.tickTimers()`에서 처�
 
 | 파일                                 | 1단계    | 2단계                                  | 3단계                              | 4단계            | 5단계                  |
 | ------------------------------------ | -------- | -------------------------------------- | ---------------------------------- | ---------------- | ---------------------- |
-| `src/click-actions.js`               | **신규** | -                                      | -                                  | ActionContext    | apply/getFailureReason |
+| `src/click-actions.js`               | **신규** | -                                      | -                                  | ActionContext effect 저장소 | apply/getFailureReason |
 | `src/simulation/BattleSimulation.js` | -        | playerBall + 액션 상태 + 시간왜곡/돌진 | -                                  | -                | 카운터                 |
 | `src/app.js`                         | -        | -                                      | 카드 선택 + currentMatchAction     | 클릭 핸들러      | -                      |
 | `src/ui.js`                          | -        | -                                      | waitForActionPick                  | -                | -                      |

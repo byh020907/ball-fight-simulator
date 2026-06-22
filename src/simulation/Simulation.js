@@ -245,7 +245,7 @@ export class Simulation {
     }
 
     /** Override in subclass. */
-    getSpeedMultiplier() {
+    getSpeedMultiplier(ball = null) {
         return 1;
     }
 
