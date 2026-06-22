@@ -391,7 +391,143 @@ if (this._clickHandler) {
 
 ---
 
-## 리스크
+## 리스크 분석 및 구체적 대책
+
+### 리스크 ①: 게임 루프와 액션 적용 시점 충돌
+
+```
+현재 루프:  handleCollision() → entity.update() → checkResult()
+문제:      PointerEvent는 루프 밖에서 언제든 호출.
+           HP 소모 직후 checkResult 실행되면 자해 패배 가능.
+```
+
+**대책: 지연 적용 패턴**
+
+```js
+// PointerEvent 핸들러: 직접 실행하지 않고 예약만
+this.simulation._pendingAction = { actionId, playerBall };
+
+// update() 맨 앞에서 충돌 전에 먼저 적용
+update(delta) {
+    if (this._pendingAction) {
+        this.applyPendingAction();  // HP 소모 + 효과
+    }
+    this.handleCollision();
+    // ...
+}
+```
+
+→ 액션 효과가 항상 handleCollision 이전에 적용되므로, 동일 프레임 내 일관된 순서 보장.
+
+---
+
+### 리스크 ②: `playerBall` 참조 시점
+
+```
+문제:  startMatch() 내 _getPlayerBall(match) 호출 시점엔
+       simulation이 아직 생성 안 됨.
+```
+
+**대책: simulation 생성 직후 id 기반 조회**
+
+```js
+this.simulation = new BattleSimulation(match, hooks);
+this.simulation.playerBall = this.simulation.fighters.find((f) => f.id === this.playerFighterId) ?? null;
+```
+
+---
+
+### 리스크 ③: `counterCharged` 1회성 소비
+
+```
+문제:  한 번 충전되면 모든 충돌에 계속 적용.
+```
+
+**대책:**
+
+```js
+// handleCollision(): 사용 즉시 소비
+if (a === this.playerBall && this.counterCharged) {
+    damageMultiplier += 0.12;
+    this.counterCharged = false;
+}
+
+// update(): 타임아웃으로 자동 소멸 (윈도우 0.3초)
+this.counterChargeTimer -= delta;
+if (this.counterChargeTimer <= 0) this.counterCharged = false;
+```
+
+---
+
+### 리스크 ④: `rushRemaining` 타이머 누락
+
+```
+문제:  돌진 효과 영구 지속.
+```
+
+**대책:** `update()` 내 `handleCollision` 전에 감소:
+
+```js
+if (this.rushRemaining > 0) this.rushRemaining -= delta;
+```
+
+---
+
+### 리스크 ⑤: 카드 선택 UI Promise 해경
+
+```
+문제:  PopupService.resolve()는 closePopup()의 setTimeout에서만 호출.
+       카드 클릭 시 외부에서 직접 resolve 불가.
+```
+
+**대책:** `UIController._actionPickResolve` 콜백 + Alpine dispatch:
+
+```js
+// waitForActionPick(): resolve 콜백 저장
+this._actionPickResolve = resolve;
+await PopupService.show({ ... buttons: [] });
+
+// document listener: 카드 클릭 시 resolve → closePopup
+document.addEventListener("pick-action-card", (e) => {
+    const cardId = this._pendingCards[e.detail.index].id;
+    this.ui._actionPickResolve?.(cardId);
+});
+```
+
+---
+
+### 리스크 ⑥: 시간 왜곡 delta — 타이머까지 느려지는 것의 의도 명확화
+
+| 엔티티          | 느려지는 동작                         |
+| --------------- | ------------------------------------- |
+| BattleBall      | 이동, 쿨다운, 디버프 타이머, wallSlam |
+| ArrowProjectile | 수명, 이동                            |
+| Grenade         | 퓨즈, 이동                            |
+| OrbitProjectile | 수명, 가속, 이동                      |
+| SeedOrb         | 수명, 이동                            |
+
+→ **의도된 동작**. "시간 팽창" 환상. 이동만 분리하려면 `velocity.scale(factor)` 필요하지만 복잡도 대비 이득 없음.
+
+---
+
+### 리스크 ⑦: `spendHpForAction` 최소 HP 1 보장 검증
+
+| hp  | amount | `cost = min(amount, hp-1)` | 결과                                        |
+| --- | ------ | -------------------------- | ------------------------------------------- |
+| 10  | 3      | 3                          | hp=7 ✅                                     |
+| 2   | 10     | 1                          | hp=1 ✅                                     |
+| 1   | 5      | 0                          | hp=1, 무효 ✅                               |
+| 0   | 5      | -1                         | **가드 필요**: `if (this.hp <= 1) return 0` |
+
+---
+
+### 리스크 ⑧: 투사체 `ownerId` — 기존 `owner` 객체와 충돌 없음
+
+```
+각 투사체 생성자에 this.ownerId = owner.id 추가 (기존 this.owner 유지)
+받아치기 감지: entity.ownerId !== playerBall.id
+확인: BattleBall.id = spec.id = roster의 FIGHTER_IDS.xxx
+```
 
 | 리스크                                                              | 영향                          | 대비                                                      |
 | ------------------------------------------------------------------- | ----------------------------- | --------------------------------------------------------- |
