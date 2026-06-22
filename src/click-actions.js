@@ -100,8 +100,8 @@ class ClickAction {
 // ── Concrete Actions ────────────────────────────────────────────
 // 모두 TapTrigger 기본값 사용
 
-const COUNTER_WINDOW_SECONDS = 0.22;
-const COUNTER_BONUS_RATE = 0.12;
+const COUNTER_WINDOW_SECONDS = 0.2;
+const COUNTER_BONUS_RATE = 0.1;
 const PARRY_WINDOW_SECONDS = 0.3;
 const PARRY_DAMAGE_MULTIPLIER = 0.5;
 
@@ -156,7 +156,7 @@ class CounterAction extends ClickAction {
         return "카운터";
     }
     get description() {
-        return "0.22초 안에 충돌 시 데미지 +12%";
+        return "0.20초 안에 충돌 시 데미지 +10%";
     }
     get hpCostPercent() {
         return 1.35;
