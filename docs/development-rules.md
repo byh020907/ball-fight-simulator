@@ -125,10 +125,10 @@ class BattleBall {
 | 액션      | Action이 소유한 로직                                   | Domain이 제공하는 인터페이스                                   |
 | --------- | ------------------------------------------------------ | -------------------------------------------------------------- |
 | 시간 왜곡 | `max(현재값, duration)` 후 저장                        | `sim.get/ setTimeSlowRemaining()`                              |
-| 돌진      | 지속시간 연장 또는 신규 설정 + 속도 배율 적용          | `ball.getRushRemaining()`, `ball.setRush(dur, mult)`           |
+| 돌진      | 지속시간 연장 또는 신규 설정 + 속도 배율 적용          | `ball.actionContext.getRushRemaining()`, `ball.actionContext.setRush(dur, mult)` |
 | 카운터    | 충돌 임박 판정 + 플래그 설정 (`counterCharged = true`) | `sim.isCollisionImminent(ball)`, `sim.setCounterCharged(b)`    |
 | 받아치기  | 접근 중인 투사체 탐색 + 경감 플래그 설정               | `sim.getIncomingProjectile(ball)`, `proj.setParryReduction(v)` |
-| 버티기    | 경감 지속시간 설정                                     | `ball.setEndureRemaining(dur, reduction)`                      |
+| 버티기    | 경감 지속시간 설정                                     | `ball.actionContext.registerDamageHandler(handler, duration)`  |
 
 #### 행동 규칙
 

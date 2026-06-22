@@ -143,7 +143,12 @@ class ClickAction {
         return 0.2;
     }
 
-    /** 발동 조건 */
+    /** 발동 조건은 실패 이유로 표현한다. null이면 조건 만족. */
+    getFailureReason(sim, playerBall) {
+        return null;
+    }
+
+    /** 기존 호환용. 실제 조건 피드백은 getFailureReason()을 사용한다. */
     isAvailable(sim, playerBall) {
         return true;
     }
@@ -169,12 +174,10 @@ class ClickAction {
 // 액션          Action이 소유한 로직                        Domain 인터페이스
 // ────────────  ─────────────────────────────────────────  ──────────────────────────────
 // 시간 왜곡     max(현재값, duration) 후 저장               sim.get/ setTimeSlowRemaining()
-// 돌진          지속시간 연장 or 신규 + 배율 적용            ball.getRushRemaining(), setRush()
+// 돌진          지속시간 연장 or 신규 + 배율 적용            ball.actionContext.getRushRemaining(), ball.actionContext.setRush()
 // 카운터        충돌 임박 판정 + 플래그 설정                sim.isCollisionImminent(), setCounterCharged()
 // 받아치기      접근 중 투사체 탐색 + 경감 플래그            sim.getIncomingProjectile(), proj.setParryReduction()
-// 버티기        경감 지속시간 설정                          ball.setEndureRemaining()
-
-// 핸들러 ctx 객체는 app.js에서 이렇게 구성:
+// 버티기        경감 지속시간 설정                          ball.actionContext.registerDamageHandler()
 
 // 핸들러 ctx 객체는 app.js에서 이렇게 구성:
 // const ctx = {
@@ -235,12 +238,9 @@ class TimeWarpAction extends ClickAction {
     get hpCostPercent() {
         return 0.2;
     }
-    isAvailable() {
-        return playerBall.hp / playerBall.maxHp <= 0.5;
-    }
     apply(sim, playerBall) {
         const current = sim.getTimeSlowRemaining();
-        sim.setTimeSlowRemaining(Math.max(current, 0.25));
+        sim.setTimeSlowRemaining(Math.max(current, 0.5));
     }
 }
 
@@ -252,14 +252,14 @@ class RushAction extends ClickAction {
         return "돌진";
     }
     get description() {
-        return "0.2초간 속도 +25%";
+        return "0.5초간 속도 +25%";
     }
     get hpCostPercent() {
         return 0.7;
     }
     apply(sim, playerBall) {
-        const current = playerBall.getRushRemaining();
-        playerBall.setRush(current > 0 ? current + 0.2 : 0.2, 1.25);
+        const current = playerBall.actionContext.getRushRemaining();
+        playerBall.actionContext.setRush(current > 0 ? current + 0.5 : 0.5, 1.25);
     }
 }
 
@@ -276,8 +276,8 @@ class CounterAction extends ClickAction {
     get hpCostPercent() {
         return 1.35;
     }
-    isAvailable(sim, playerBall) {
-        return sim.isCollisionImminent(playerBall);
+    getFailureReason(sim, playerBall) {
+        return sim.isCollisionImminent(playerBall) ? null : "충돌 직전이 아닙니다";
     }
     apply(sim, playerBall) {
         sim.setCounterCharged(true);
@@ -297,12 +297,12 @@ class ParryAction extends ClickAction {
     get hpCostPercent() {
         return 1.15;
     }
-    isAvailable(sim, playerBall) {
-        return sim.getIncomingProjectile(playerBall) !== null;
+    getFailureReason(sim, playerBall) {
+        return sim.getIncomingProjectile(playerBall) ? null : "날아오는 투사체가 없습니다";
     }
     apply(sim, playerBall) {
         const proj = sim.getIncomingProjectile(playerBall);
-        if (proj) proj._parryReduction = 0.5;
+        if (proj) proj.setParryReduction(0.5);
     }
 }
 
@@ -319,11 +319,8 @@ class EndureAction extends ClickAction {
     get hpCostPercent() {
         return 0.9;
     }
-    isAvailable(sim, playerBall) {
-        return playerBall.hp / playerBall.maxHp <= 0.5;
-    }
     apply(sim, playerBall) {
-        playerBall.setEndureRemaining(0.1, 0.5);
+        playerBall.actionContext.registerDamageHandler((amount) => Math.round(amount * 0.5), 0.1);
     }
 }
 
@@ -342,7 +339,7 @@ const ACTION_DEFS = Object.freeze([
 ## 4. 안전장치
 
 - **자해 소모로 인해 본인이 죽지 않아야 한다.** 최소 HP 1을 보장. 현재 HP가 5% 이하면 액션 자동 무효.
-- **클릭 디바운스**: 최소 50~80ms 간격으로 입력 폭주 방지.
+- 과도한 연타는 별도 디바운스가 아니라 HP 소모와 최소 HP 1 보장으로 억제한다.
 
 ---
 
@@ -364,13 +361,15 @@ const ACTION_DEFS = Object.freeze([
 1. 매치 finished? → 무시
 2. playerBall exists + not defeated?
 3. HP 5% 미만? → 무시
-4. `action.isAvailable()`? → 무시
-5. HP 소모 (`spendHpForAction`, 최소 1 보장)
-6. `sim._pendingAction`에 예약 (지연 적용 패턴)
+4. `action.getFailureReason(sim, player)`가 이유를 반환하면 화면 텍스트로 실패 피드백 표시 후 무시
+5. HP 소모 (`player.actionContext.spendHpForAction(player, cost)`, 최소 1 보장)
+6. `sim.scheduleAction(action, player)`로 예약 (지연 적용 패턴)
+
+실패 피드백은 브라우저 콘솔 로그가 아니라 전투 화면 텍스트(`spawnActionText`)를 기준으로 표시한다.
 
 ### HP 자해 소모
 
-- 기존 `takeDamage()` 대신 `player.spendHpForAction(amount)` 별도 메서드
+- 기존 `takeDamage()` 대신 `player.actionContext.spendHpForAction(player, amount)` 경로 사용
 - 어그로/킬로그(`"Crash"` 등)에 영향 주지 않음
 - 결과 판정(`checkResult()`)에서 자해로 인한 패배까지 가지 않도록 최소 1 보장
 
@@ -391,7 +390,8 @@ const ACTION_DEFS = Object.freeze([
 | `src/ui.js`                          | `waitForActionPick(cards)` — 카드 선택 UI 비동기 메서드 추가        |
 | `src/app.js`                         | `startMatch()`에서 카드 선택 단계 추가, `currentMatchAction` 관리   |
 | `src/simulation/BattleSimulation.js` | 생성자에 `playerFighterId`, `matchAction` 인자 추가, 시간 왜곡 구현 |
-| `src/entities.js`                    | `BattleBall.spendHpForAction()` 추가, 투사체에 `ownerId` 참조 확인  |
+| `src/entities.js`                    | `BattleBall.actionContext` 보유, 투사체에 `ownerId` 참조 확인       |
+| `src/click-actions.js`               | 액션 정의, 실패 피드백, `ActionContext.spendHpForAction()` 보유     |
 | `ArenaRenderer`                      | 캔버스 `pointerdown` 이벤트 바인딩                                  |
 
 ### 카운터 판정
@@ -440,4 +440,4 @@ for (const entity of this.entities) {
 - [ ] 받아치기: 투사체 없는 매치업에서 무용지물 문제 검토
 - [ ] 오버타임과 동시 사용 시 충돌 없음
 - [ ] 매치 종료 후 캔버스 클릭 트리거 안 됨
-- [ ] 클릭 디바운스가 과도한 연타 방지
+- [x] HP 소모와 최소 HP 1 보장이 과도한 연타를 억제

@@ -252,7 +252,6 @@ export function showActionFailure(action, sim, playerBall) {
     const reason = action.getFailureReason(sim, playerBall);
     if (!reason) return false;
     sim.spawnActionText(playerBall.position.clone(), reason, "#ff8888");
-    console.log("[액션 피드백] 실패:", action.name, "-", reason);
     return true;
 }
 

@@ -297,17 +297,19 @@ async waitForActionPick(cards) {
 - `src/ui.js` (ArenaRenderer)
 - `src/app.js`
 - `src/entities.js`
+- `src/click-actions.js`
 
 ### 작업 내용
 
-#### 4-A. `BattleBall.spendHpForAction(amount)` 추가
+#### 4-A. `ActionContext.spendHpForAction(ball, amount)` 추가
 
-`src/entities.js`:
+`src/click-actions.js`:
 
 ```js
-spendHpForAction(amount) {
-    const cost = Math.min(amount, this.hp - 1);  // 최소 1 남김
-    this.hp -= cost;
+spendHpForAction(ball, amount) {
+    if (ball.hp <= 1) return 0;
+    const cost = Math.min(amount, ball.hp - 1);  // 최소 1 남김
+    ball.hp -= cost;
     return cost;
 }
 ```
@@ -353,13 +355,13 @@ _tryFireAction() {
     const { player, sim, action } = this._actionCtx;
     if (!player || player.isDefeated) return false;
     if (player.hp / player.maxHp < 0.05) return false;
-    if (!action.isAvailable(sim, player)) return false;
+    if (action.getFailureReason(sim, player)) return false;
 
     const cost = Math.ceil((player.maxHp * action.hpCostPercent) / 100);
-    if (player.spendHpForAction(cost) <= 0) return false;
+    if (player.actionContext.spendHpForAction(player, cost) <= 0) return false;
 
     // 지연 적용 (리스크 ①)
-    sim._pendingAction = { actionInstance: action, playerBall: player };
+    sim.scheduleAction(action, player);
     return true;
 }
 
@@ -390,7 +392,7 @@ if (this._pointerHandler) {
 - 클릭 시 HP가 정상적으로 차감되는지
 - HP 1 이하로 안 떨어지는지
 - finished 상태에서 클릭 무시되는지
-- 디바운스 동작 확인
+- HP 소모와 최소 HP 1 보장이 과도한 연타를 억제하는지
 
 ---
 
@@ -417,25 +419,25 @@ if (this._pointerHandler) {
 
 ```js
 class ParryAction extends ClickAction {
-    isAvailable(sim, playerBall) {
-        return sim.getIncomingProjectile(playerBall) !== null;
+    getFailureReason(sim, playerBall) {
+        return sim.getIncomingProjectile(playerBall) ? null : "날아오는 투사체가 없습니다";
     }
 
     apply(sim, playerBall) {
         const proj = sim.getIncomingProjectile(playerBall);
-        if (proj) proj._parryReduction = 0.5;
+        if (proj) proj.setParryReduction(0.5);
     }
 }
 ```
 
-투사체 `update()`의 `takeDamage` 전에 `_parryReduction` 확인 → 50% 경감.
+투사체 `takeDamage` 전에 `setParryReduction()` 값 확인 → 50% 경감.
 
 #### 5-C. 카운터(CounterAction) — 로직 소유: BattleSimulation
 
 ```js
 class CounterAction extends ClickAction {
-    isAvailable(sim, playerBall) {
-        return sim.isCollisionImminent(playerBall);
+    getFailureReason(sim, playerBall) {
+        return sim.isCollisionImminent(playerBall) ? null : "충돌 직전이 아닙니다";
     }
 
     apply(sim, playerBall) {
@@ -446,54 +448,41 @@ class CounterAction extends ClickAction {
 
 `handleCollision()`에서 `counterCharged` 확인 → 데미지 +12%, 사용 후 즉시 `false`.
 
-#### 5-D. 버티기(EndureAction) + spendHpForAction — 로직 소유: BattleBall
+#### 5-D. 버티기(EndureAction) + spendHpForAction — 로직 소유: ActionContext
 
-`src/entities.js`:
+`src/click-actions.js`:
 
 ```js
-// BattleBall
+// ActionContext
 getRushRemaining() { return this._rushRemaining; }
 setRush(duration, multiplier) {
     this._rushRemaining = duration;
     this._rushMultiplier = multiplier;
 }
-setEndureRemaining(duration, reduction) {
-    this._endureRemaining = duration;
-    this._endureReduction = reduction;
+
+registerDamageHandler(handler, duration) {
+    this._damageHandler = handler;
+    this._damageHandlerRemaining = duration;
 }
 
-spendHpForAction(amount) {
-    if (this.hp <= 1) return 0;                // 최소 HP 1 보장
-    const cost = Math.min(amount, this.hp - 1);
-    this.hp -= cost;
+spendHpForAction(ball, amount) {
+    if (ball.hp <= 1) return 0;                // 최소 HP 1 보장
+    const cost = Math.min(amount, ball.hp - 1);
+    ball.hp -= cost;
     return cost;
 }
-
-applyEndure(duration, reduction = 0.5) {
-    this.endureEffect = { remaining: duration, reduction };
-}
-
-applyRush(duration, multiplier) {
-    this.rushEffect = { remaining: duration, multiplier };
-}
 ```
 
-`takeDamage()`에서 `endureEffect` 확인 → 데미지 경감.
-rush/endure 타이머 감소는 `BattleBall.update()`에서 처리.
-}
-}
+`takeDamage()`는 `actionContext.onDamageTaken()`에 경감 처리를 위임한다.
+rush/damage handler 타이머 감소는 `ActionContext.tickTimers()`에서 처리한다.
 
-```
+#### 5-D. 나머지 액션 실패 조건 구현
 
-`handleCollision()`에서 `counterCharged` 확인 → 데미지 +12%, 사용 후 `false`.
-
-#### 5-D. 나머지 액션 isAvailable 조건 구현
-
-| 액션           | isAvailable                               |
+| 액션           | getFailureReason                          |
 | -------------- | ----------------------------------------- |
-| TimeWarpAction | `playerBall.hp / playerBall.maxHp <= 0.5` |
-| RushAction     | 항상 `true`                               |
-| EndureAction   | `playerBall.hp / playerBall.maxHp <= 0.5` |
+| TimeWarpAction | 항상 `null`                               |
+| RushAction     | 항상 `null`                               |
+| EndureAction   | 항상 `null`                               |
 
 ### 검증
 
@@ -524,12 +513,12 @@ rush/endure 타이머 감소는 `BattleBall.update()`에서 처리.
 
 | 파일                                 | 1단계    | 2단계                                  | 3단계                              | 4단계            | 5단계                  |
 | ------------------------------------ | -------- | -------------------------------------- | ---------------------------------- | ---------------- | ---------------------- |
-| `src/click-actions.js`               | **신규** | -                                      | -                                  | -                | apply/isAvailable 채움 |
+| `src/click-actions.js`               | **신규** | -                                      | -                                  | ActionContext    | apply/getFailureReason |
 | `src/simulation/BattleSimulation.js` | -        | playerBall + 액션 상태 + 시간왜곡/돌진 | -                                  | -                | 카운터                 |
 | `src/app.js`                         | -        | -                                      | 카드 선택 + currentMatchAction     | 클릭 핸들러      | -                      |
 | `src/ui.js`                          | -        | -                                      | waitForActionPick                  | -                | -                      |
 | `index.html`                         | -        | -                                      | action-pick CSS 템플릿             | -                | -                      |
-| `src/entities.js`                    | -        | -                                      | -                                  | spendHpForAction | ownerId                |
+| `src/entities.js`                    | -        | -                                      | -                                  | actionContext    | ownerId                |
 | `src/styles.css`                     | -        | -                                      | .action-pick / .action-card 스타일 | -                | -                      |
 
 ---
@@ -550,13 +539,13 @@ HP 소모 직후 checkResult 실행되면 자해 패배 가능.
 
 ```js
 // PointerEvent 핸들러: 직접 실행하지 않고 예약만
-this.simulation._pendingAction = { actionInstance: action, playerBall };
+this.simulation.scheduleAction(action, playerBall);
 
 // update() 맨 앞에서 충돌 전에 먼저 적용
 update(delta) {
-    if (this._pendingAction) {
-        const { actionInstance, playerBall } = this._pendingAction;
-        this._pendingAction = null;
+    const pendingAction = this._consumePendingAction();
+    if (pendingAction) {
+        const { actionInstance, playerBall } = pendingAction;
         if (actionInstance && playerBall) actionInstance.apply(this, playerBall);
     }
     this.handleCollision();
@@ -681,4 +670,4 @@ document.addEventListener("pick-action-card", (e) => {
 | `entity.update(scaledDelta, this)`에서 `this`(simulation) 참조 깨짐 | 시간 왜곡 버그                | entity.update 내부에서 simulation 참조하는 부분 확인 필요 |
 | 카운터 윈도우가 너무 좁음                                           | 사실상 발동 불가              | 임계값 20px부터 시작, 테스트 후 조정                      |
 | 받아치기가 투사체 없는 매치에서 무용지물                            | 해당 매치의 카드 선택 UX 나쁨 | 풀에서 제외하거나 근접공격에도 일부 적용 검토             |
-| HP 자해로 인한 연속 클릭 폭주                                       | HP 광탈                       | spendHpForAction + 디바운스 이중 안전장치                 |
+| HP 자해로 인한 연속 클릭 폭주                                       | HP 광탈                       | ActionContext.spendHpForAction + 최소 HP 1 보장           |

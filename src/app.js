@@ -247,7 +247,6 @@ export class BattleApp {
 
         const canvas = this.elements?.canvas;
         if (!canvas) return;
-        this._lastActionTime = 0;
 
         // ctx — TriggerStrategy에 전달
         this._actionCtx = {
@@ -296,19 +295,14 @@ export class BattleApp {
 
     /** TriggerStrategy.fireAction()에서 호출 — HP 소모 + 지연 예약 */
     _tryFireAction() {
-        console.log("[액션 디버그] _tryFireAction called", this._actionCtx?.action?.name);
-
         const { action, sim, player } = this._actionCtx ?? {};
         if (!action || !sim || !player) {
-            console.log("[액션 디버그] 실패: action/sim/player 없음", !!action, !!sim, !!player);
             return false;
         }
         if (player.isDefeated) {
-            console.log("[액션 디버그] 실패: 플레이어 패배");
             return false;
         }
         if (player.hp / player.maxHp < 0.05) {
-            console.log("[액션 디버그] 실패: HP 5% 미만");
             return false;
         }
 
@@ -320,14 +314,12 @@ export class BattleApp {
 
         const cost = Math.ceil((player.maxHp * action.hpCostPercent) / 100);
         if (player.actionContext.spendHpForAction(player, cost) <= 0) {
-            console.log("[액션 디버그] 실패: HP 소모 불가");
             return false;
         }
 
         sim.scheduleAction(action, player);
 
         // 사용자 피드백 — 파티클 + 사운드 (액션명 텍스트는 실제 효과 시점에 표시)
-        console.log("[액션 디버그] ✅ 발동 성공!", action.name);
         sim.spawnExplosion(player.position.clone(), "#88ddff");
         sim.spawnPulse(player.position.clone(), "#ffffff");
         this.audio.play("dash", 1.0);
