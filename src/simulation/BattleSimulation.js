@@ -195,68 +195,20 @@ export class BattleSimulation extends Simulation {
         if (overlap <= 0) return;
 
         const normal = difference.normalize();
-        a.position.add(normal.clone().scale(-overlap / 2));
-        b.position.add(normal.clone().scale(overlap / 2));
+        this._resolveOverlap(a, b, normal, overlap);
 
         const aModifiers = a.getStatModifiers();
         const bModifiers = b.getStatModifiers();
         const damageFromAToB = this.calculateCollisionDamage(a, b, normal) * aModifiers.damage;
         const damageFromBToA = this.calculateCollisionDamage(b, a, normal.clone().scale(-1)) * bModifiers.damage;
 
-        // 카운터 보너스 — Action이 setCounterCharged(true)로 설정
-        if (this._counterCharged) {
-            const attackerIsPlayer = a === this.playerBall;
-            if (attackerIsPlayer) {
-                const bonus = Math.round(damageFromAToB * 0.12);
-                b.takeDamage(bonus, a, "Counter");
-                this.spawnActionText(b.position.clone(), "카운터!", "#ff8844");
-            } else {
-                const bonus = Math.round(damageFromBToA * 0.12);
-                a.takeDamage(bonus, b, "Counter");
-                this.spawnActionText(a.position.clone(), "카운터!", "#ff8844");
-            }
-            this._counterCharged = false;
-        }
+        this._applyCounterBonus(a, b, damageFromAToB, damageFromBToA);
 
         a.takeDamage(damageFromBToA, b, "Crash");
         b.takeDamage(damageFromAToB, a, "Crash");
 
-        const tangent = new Vector2(-normal.y, normal.x);
-        const aNormal = a.velocity.x * normal.x + a.velocity.y * normal.y;
-        const bNormal = b.velocity.x * normal.x + b.velocity.y * normal.y;
-        const aTangent = a.velocity.x * tangent.x + a.velocity.y * tangent.y;
-        const bTangent = b.velocity.x * tangent.x + b.velocity.y * tangent.y;
-
-        const nextANormal = (aNormal * (a.mass - b.mass) + 2 * b.mass * bNormal) / (a.mass + b.mass);
-        const nextBNormal = (bNormal * (b.mass - a.mass) + 2 * a.mass * aNormal) / (a.mass + b.mass);
-
-        a.velocity = tangent
-            .clone()
-            .scale(aTangent)
-            .add(normal.clone().scale(nextANormal * bModifiers.impact));
-        b.velocity = tangent
-            .clone()
-            .scale(bTangent)
-            .add(normal.clone().scale(nextBNormal * aModifiers.impact));
-
-        if (a.dashState) {
-            if (a.dashState.collisionDamage) {
-                b.takeDamage(a.dashState.collisionDamage, a, a.dashState.collisionLabel);
-                if (a.dashState.collisionSlow)
-                    b.applySlow(a.dashState.collisionSlow.duration, a.dashState.collisionSlow.amount);
-            }
-            a.ability?.onDashHit?.(b, a.dashState);
-        }
-        if (b.dashState) {
-            if (b.dashState.collisionDamage) {
-                a.takeDamage(b.dashState.collisionDamage, b, b.dashState.collisionLabel);
-                if (b.dashState.collisionSlow)
-                    a.applySlow(b.dashState.collisionSlow.duration, b.dashState.collisionSlow.amount);
-            }
-            b.ability?.onDashHit?.(a, b.dashState);
-        }
-        if (a.dashState?.untilImpact) a.clearDash();
-        if (b.dashState?.untilImpact) b.clearDash();
+        this._applyCollisionPhysics(a, b, normal, aModifiers, bModifiers);
+        this._handleDashCollisions(a, b);
 
         a.ability?.onCollision(b);
         b.ability?.onCollision(a);
@@ -265,6 +217,62 @@ export class BattleSimulation extends Simulation {
         this.addSparkBurst(Vector2.add(a.position, b.position).scale(0.5), "#ffffff");
         this.addSparkBurst(a.position.clone(), a.color);
         this.addSparkBurst(b.position.clone(), b.color);
+    }
+
+    _resolveOverlap(a, b, normal, overlap) {
+        a.position.add(normal.clone().scale(-overlap / 2));
+        b.position.add(normal.clone().scale(overlap / 2));
+    }
+
+    _applyCounterBonus(a, b, damageAToB, damageBToA) {
+        if (!this._counterCharged) return;
+        if (a === this.playerBall) {
+            const bonus = Math.round(damageAToB * 0.12);
+            b.takeDamage(bonus, a, "Counter");
+            this.spawnActionText(b.position.clone(), "카운터!", "#ff8844");
+        } else {
+            const bonus = Math.round(damageBToA * 0.12);
+            a.takeDamage(bonus, b, "Counter");
+            this.spawnActionText(a.position.clone(), "카운터!", "#ff8844");
+        }
+        this._counterCharged = false;
+    }
+
+    _applyCollisionPhysics(a, b, normal, aMod, bMod) {
+        const tangent = new Vector2(-normal.y, normal.x);
+        const aN = a.velocity.x * normal.x + a.velocity.y * normal.y;
+        const bN = b.velocity.x * normal.x + b.velocity.y * normal.y;
+        const aT = a.velocity.x * tangent.x + a.velocity.y * tangent.y;
+        const bT = b.velocity.x * tangent.x + b.velocity.y * tangent.y;
+        const nextAN = (aN * (a.mass - b.mass) + 2 * b.mass * bN) / (a.mass + b.mass);
+        const nextBN = (bN * (b.mass - a.mass) + 2 * a.mass * aN) / (a.mass + b.mass);
+        a.velocity = tangent
+            .clone()
+            .scale(aT)
+            .add(normal.clone().scale(nextAN * bMod.impact));
+        b.velocity = tangent
+            .clone()
+            .scale(bT)
+            .add(normal.clone().scale(nextBN * aMod.impact));
+    }
+
+    _handleDashCollisions(a, b) {
+        for (const [attacker, defender] of [
+            [a, b],
+            [b, a]
+        ]) {
+            if (!attacker.dashState) continue;
+            if (attacker.dashState.collisionDamage) {
+                defender.takeDamage(attacker.dashState.collisionDamage, attacker, attacker.dashState.collisionLabel);
+                if (attacker.dashState.collisionSlow)
+                    defender.applySlow(
+                        attacker.dashState.collisionSlow.duration,
+                        attacker.dashState.collisionSlow.amount
+                    );
+            }
+            attacker.ability?.onDashHit?.(defender, attacker.dashState);
+            if (attacker.dashState?.untilImpact) attacker.clearDash();
+        }
     }
 
     calculateCollisionDamage(attacker, defender, attackerToDefender) {
