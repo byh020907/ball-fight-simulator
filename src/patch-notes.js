@@ -19,6 +19,33 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.9.0",
+        date: "2026-06-22",
+        title: "v0.9.0 업데이트",
+        changes: [
+            {
+                type: "feature",
+                text: "액션 실패 시 피드백 텍스트 추가 — 카운터/받아치기 조건 불충족 시 빨간색 문구가 표시됩니다."
+            },
+            {
+                type: "refactor",
+                text: "BattleBall 클릭 액션 시스템 리팩토링 — ActionContext 단일 ref로 통합, 모든 액션 변수/로직 분리."
+            },
+            {
+                type: "refactor",
+                text: "DashEffect 런타임 이펙트 분리 — DashAbility/Trickster/Eater의 대시 로직이 DashEffect에 통합되었습니다."
+            },
+            {
+                type: "refactor",
+                text: "WallSlamEffect 런타임 이펙트 분리 — 벽 충돌 피해/회전 연출이 독립 클래스로 분리되었습니다."
+            },
+            {
+                type: "refactor",
+                text: "코드베이스 안티패턴 11건 개선 — Template Method, 메서드 분리, 중복 제거, 캡슐화 강화."
+            }
+        ]
+    },
+    {
         version: "0.8.0",
         date: "2026-06-22",
         title: "v0.8.0 업데이트",
