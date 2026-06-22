@@ -12,6 +12,8 @@ import {
 } from "../src/stat-allocation.js";
 import { FIGHTER_IDS } from "../src/core.js";
 import { Vector2 } from "../src/core.js";
+import { shuffled } from "../src/random.js";
+import { BattleSimulation } from "../src/simulation/BattleSimulation.js";
 
 function makeClassList() {
     const set = new Set();
@@ -579,9 +581,37 @@ function testStatBalanceSystem() {
     );
 }
 
+function testShuffledUtility() {
+    const original = [1, 2, 3, 4];
+    const result = shuffled(original, () => 0);
+
+    assert.deepEqual(original, [1, 2, 3, 4], "shuffled should not mutate the source array");
+    assert.deepEqual(result, [2, 3, 4, 1], "shuffled should use deterministic Fisher-Yates ordering with a fixed rng");
+}
+
+function testMultiFighterSimulationSetup(app) {
+    const sim = new BattleSimulation(app.roster.slice(0, 3), {
+        onLog() {},
+        onSound() {}
+    });
+
+    assert.equal(sim.fighters.length, 3, "BattleSimulation should create every requested fighter");
+    assert.equal(sim.getFighterPairs().length, 3, "Three fighters should create three collision pairs");
+    assert.ok(
+        sim.fighters.every((fighter) => fighter.simulation === sim),
+        "Every fighter should reference the simulation"
+    );
+    assert.ok(
+        sim.fighters.every((fighter) => fighter.ability),
+        "Every fighter should bind its ability"
+    );
+}
+
 const app = await loadModuleApp();
+testShuffledUtility();
 testStatAllocationRules(app);
 testStatBalanceSystem();
+testMultiFighterSimulationSetup(app);
 await testCloneSeedDash(app);
 await testEaterFeast(app);
 await testRageBallMomentum(app);

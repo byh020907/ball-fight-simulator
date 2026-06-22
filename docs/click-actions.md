@@ -148,11 +148,6 @@ class ClickAction {
         return null;
     }
 
-    /** 기존 호환용. 실제 조건 피드백은 getFailureReason()을 사용한다. */
-    isAvailable(sim, playerBall) {
-        return true;
-    }
-
     /**
      * 액션 효과 적용. Action이 로직의 주체.
      * domain 객체의 데이터 접근 함수(getXxx/setXxx)를 통해 값을 읽고,
@@ -381,7 +376,7 @@ const ACTION_DEFS = Object.freeze([
 
 | 파일                   | 역할                                                                                           |
 | ---------------------- | ---------------------------------------------------------------------------------------------- |
-| `src/click-actions.js` | 액션 정의 모음 (각 액션은 `{ id, name, description, hpCostPercent, isAvailable, apply }` 형태) |
+| `src/click-actions.js` | 액션 정의 모음 (각 액션은 `{ id, name, description, hpCostPercent, getFailureReason, apply }` 형태) |
 
 ### 기존 파일 변경
 

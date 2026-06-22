@@ -46,7 +46,7 @@ class ClickAction {
     get name()         { throw new Error("override"); }
     get description()  { throw new Error("override"); }
     get hpCostPercent(){ return 0.2; }
-    isAvailable(sim, playerBall) { return true; }
+    getFailureReason(sim, playerBall) { return null; }
     apply(sim, playerBall)       { throw new Error("override"); }
     onRelease(sim, playerBall)   {}  // HoldTrigger 전용
     canHoldContinue(sim, playerBall) { return true; }
@@ -67,9 +67,9 @@ class ClickAction {
 
 ### 구현 순서
 
-1. `ClickAction` 베이스 클래스 정의 (getter + `isAvailable` + `apply`)
+1. `ClickAction` 베이스 클래스 정의 (getter + `getFailureReason` + `apply`)
 2. 5개 서브클래스 정의 (id, name, description, hpCostPercent)
-3. 1단계에서는 `isAvailable()` → 항상 `true` 반환 (조건 로직은 5단계)
+3. 1단계에서는 `getFailureReason()` → 항상 `null` 반환 (조건 로직은 5단계)
 4. 1단계에서는 `apply()` → 빈 구현 (효과 로직은 2단계)
 5. `ActionPool` 인스턴스 배열
 6. `pickRandomActions()` — Fisher-Yates 셔플 후 slice
@@ -400,7 +400,7 @@ if (this._pointerHandler) {
 
 ### 대상 파일
 
-- `src/click-actions.js` (서브클래스 `isAvailable`/`apply` 채우기)
+- `src/click-actions.js` (서브클래스 `getFailureReason`/`apply` 채우기)
 - `src/simulation/BattleSimulation.js` (헬퍼 2-E 구현)
 - `src/entities.js` (ownerId)
 

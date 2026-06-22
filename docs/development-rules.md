@@ -90,15 +90,15 @@ class TimeWarpAction extends ClickAction {
         // sim.getTimeSlowRemaining() — domain이 제공하는 인터페이스
         // Action이 Math.max 로직을 직접 수행
         const current = sim.getTimeSlowRemaining();
-        sim.setTimeSlowRemaining(Math.max(current, 0.25));
+        sim.setTimeSlowRemaining(Math.max(current, 0.5));
     }
 }
 
 class RushAction extends ClickAction {
     apply(sim, playerBall) {
-        const current = playerBall.getRushRemaining();
+        const current = playerBall.actionContext.getRushRemaining();
         // Action이 지속시간 연장 로직을 직접 수행
-        playerBall.setRush(current > 0 ? current + 0.2 : 0.2, 1.25);
+        playerBall.actionContext.setRush(current > 0 ? current + 0.5 : 0.5, 1.25);
     }
 }
 
@@ -112,7 +112,7 @@ class BattleSimulation {
     }
 }
 
-class BattleBall {
+class ActionContext {
     getRushRemaining() {
         return this._rushRemaining;
     }

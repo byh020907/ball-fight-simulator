@@ -1,3 +1,5 @@
+import { shuffled } from "./random.js";
+
 // ── Trigger Strategy ─────────────────────────────────────────────
 // 발동 방식을 캡슐화. ctx = { action, sim, player, fireAction(), 상태 }
 
@@ -76,14 +78,8 @@ class ClickAction {
         return 0.2;
     }
 
-    /** 발동 조건 — 항상 true (실패 시 getFailureReason()로 피드백) */
-    isAvailable(sim, playerBall) {
-        return true;
-    }
-
     /**
      * 조건 불충족 시 실패 이유 문자열 반환. null이면 조건 만족.
-     * isAvailable()은 항상 true를 반환하므로, 실제 조건 체크는 여기서 수행.
      */
     getFailureReason(sim, playerBall) {
         return null;
@@ -116,10 +112,6 @@ class TimeWarpAction extends ClickAction {
     }
     get hpCostPercent() {
         return 0.2;
-    }
-
-    isAvailable() {
-        return true;
     }
 
     apply(sim, playerBall) {
@@ -209,10 +201,6 @@ class EndureAction extends ClickAction {
         return 0.9;
     }
 
-    isAvailable() {
-        return true;
-    }
-
     apply(sim, playerBall) {
         playerBall.actionContext.registerDamageHandler((amount, source, label) => {
             source?.simulation?.spawnActionText?.(playerBall.position.clone(), "버팀!", "#44ff44");
@@ -236,8 +224,8 @@ export function getActionPool() {
 }
 
 export function pickRandomActions(count = 3) {
-    const shuffled = [...ACTION_POOL].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, Math.min(count, shuffled.length));
+    const actions = shuffled(ACTION_POOL);
+    return actions.slice(0, Math.min(count, actions.length));
 }
 
 export function findActionById(id) {

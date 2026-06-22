@@ -1,17 +1,18 @@
+import { shuffled } from "./random.js";
+
 export class Matchmaker {
     constructor(roster) {
         this.roster = roster;
     }
 
     pick() {
-        const shuffled = [...this.roster].sort(() => Math.random() - 0.5);
-        return shuffled.slice(0, 2);
+        return shuffled(this.roster).slice(0, 2);
     }
 }
 
 export class TournamentManager {
     constructor(roster, forcedFirstId = null) {
-        const entrants = [...roster].sort(() => Math.random() - 0.5);
+        const entrants = shuffled(roster);
         // startCharacter가 지정된 경우 첫 번째 엔트리에 강제 배치
         if (forcedFirstId) {
             const forcedIndex = entrants.findIndex((f) => f.id === forcedFirstId);

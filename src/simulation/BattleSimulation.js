@@ -13,16 +13,28 @@ import { BattleBall } from "../entities.js";
 import { GravityParticle } from "../effects.js";
 import { Simulation } from "./Simulation.js";
 
+const ABILITY_TYPES = {
+    archer: ArcherAbility,
+    orbit: OrbitAbility,
+    trickster: TricksterAbility,
+    grenade: GrenadeAbility,
+    dash: DashAbility,
+    rage: RageAbility,
+    eater: EaterAbility,
+    bat_ball: BatBallAbility
+};
+
 export class BattleSimulation extends Simulation {
     constructor(fighterSpecs, hooks, playerBall = null) {
         super();
         this.hooks = hooks;
         const spawnPoints = this.createSpawnPoints(fighterSpecs.length);
-        this.fighters = fighterSpecs.map((spec, index) => new BattleBall(spec, spawnPoints[index]));
-        this.fighters[0].simulation = this;
-        this.fighters[1].simulation = this;
-        this.fighters[0].bindAbility(this.createAbility(fighterSpecs[0].ability, this.fighters[0]));
-        this.fighters[1].bindAbility(this.createAbility(fighterSpecs[1].ability, this.fighters[1]));
+        this.fighters = fighterSpecs.map((spec, index) => {
+            const fighter = new BattleBall(spec, spawnPoints[index]);
+            fighter.simulation = this;
+            fighter.bindAbility(this.createAbility(spec.ability, fighter));
+            return fighter;
+        });
         this.entities = [...this.fighters];
         this.elapsed = 0;
         this.overtimeStartsAt = 26;
@@ -111,17 +123,11 @@ export class BattleSimulation extends Simulation {
     }
 
     createAbility(type, owner) {
-        const table = {
-            archer: ArcherAbility,
-            orbit: OrbitAbility,
-            trickster: TricksterAbility,
-            grenade: GrenadeAbility,
-            dash: DashAbility,
-            rage: RageAbility,
-            eater: EaterAbility,
-            bat_ball: BatBallAbility
-        };
-        return new table[type](owner, this);
+        const AbilityType = ABILITY_TYPES[type];
+        if (!AbilityType) {
+            throw new Error(`Unknown ability type: ${type}`);
+        }
+        return new AbilityType(owner, this);
     }
 
     isOvertime() {
@@ -206,7 +212,18 @@ export class BattleSimulation extends Simulation {
     }
 
     handleCollision() {
-        const [a, b] = this.fighters;
+        for (const [a, b] of this.getFighterPairs()) {
+            this.handleFighterCollision(a, b);
+        }
+    }
+
+    getFighterPairs() {
+        return this.fighters.flatMap((fighter, index) =>
+            this.fighters.slice(index + 1).map((opponent) => [fighter, opponent])
+        );
+    }
+
+    handleFighterCollision(a, b) {
         if (a.isDefeated || b.isDefeated || a.swallowedState || b.swallowedState) return;
 
         const difference = Vector2.subtract(b.position, a.position);
@@ -247,15 +264,19 @@ export class BattleSimulation extends Simulation {
     _applyCounterBonus(a, b, damageAToB, damageBToA) {
         const ctx = this._clickActionContext;
         if (!ctx.counterCharged) return;
+
         if (a === this.playerBall) {
             const bonus = Math.round(damageAToB * 0.12);
             b.takeDamage(bonus, a, "Counter");
             this.spawnActionText(b.position.clone(), "카운터!", "#ff8844");
-        } else {
+        } else if (b === this.playerBall) {
             const bonus = Math.round(damageBToA * 0.12);
             a.takeDamage(bonus, b, "Counter");
             this.spawnActionText(a.position.clone(), "카운터!", "#ff8844");
+        } else {
+            return;
         }
+
         ctx.counterCharged = false;
     }
 
