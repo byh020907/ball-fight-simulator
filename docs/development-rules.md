@@ -136,16 +136,6 @@ class BattleBall {
 2. Domain 객체는 `getXxx()` / `setXxx()` 형태의 **의도가 드러나는 데이터 접근 인터페이스**를 제공합니다.
 3. Action은 domain의 내부 변수를 직접 읽거나 쓰지 않고, 반드시 domain이 제공하는 함수를 통해서만 접근합니다.
 4. 판단 기준: **"이 로직의 실행 결과를 누가 결정하는가?"** → Action이 결정한다면 Action이 로직을 소유합니다.
-   | 카운터 | `BattleSimulation` | `applyCounter()` | handleCollision에서 데미지 보너스 |
-   | 받아치기 | 투사체 엔티티 | `_parryReduction` 플래그 | takeDamage 전 50% 경감 |
-   | 버티기 | `BattleBall` | `applyEndure(duration)` | takeDamage에서 데미지 경감 |
-
-#### 행동 규칙
-
-1. **새 기능을 추가할 때 "이 로직은 어느 객체가 소유해야 하는가"를 먼저 결정**합니다.
-2. Action/Command 객체는 `apply()`에서 **수신자(receiver)의 메서드를 호출만** 하고, 직접 상태를 변경하지 않습니다.
-3. 수신자 객체(Entity, Simulation 등)가 내부 상태 전이와 검증을 모두 담당합니다.
-4. 여러 Action에서 공유하는 로직은 공유 수신자(예: `BattleSimulation`)에 한 번만 구현합니다.
 
 ### 인코딩과 줄바꿈
 
