@@ -333,6 +333,7 @@ Tested: npm test, npm run check
 - `docs/design.md`는 시각 스타일과 캐릭터 표현 규칙을 기록합니다.
 - `docs/click-actions.md`는 클릭 액션 시스템의 전체 설계를 기록합니다. (구현 전 설계 단계)
 - `docs/implementation-plan.md`는 기능 단위 구현 계획과 단계별 작업 내용을 기록합니다.
+- `docs/refactor-steps.md`는 책임 분리 리팩토링 스텝과 외부 검증 체크리스트를 기록합니다.
 - `docs/development-rules.md`는 개발, 검증, Git 운영 규칙의 기준 문서입니다.
 - 구현과 문서가 어긋나면 구현을 확인한 뒤 문서를 즉시 갱신합니다.
 
