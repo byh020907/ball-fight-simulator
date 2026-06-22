@@ -102,19 +102,17 @@ constructor(fighterSpecs, hooks, playerBall = null) {
     this.counterCharged = false;
     this.counterChargeTimer = 0;
 
-    // 수신자 메서드 — 액션의 apply()가 이 메서드를 호출한다
+    // 데이터 접근 인터페이스 — Action이 getter로 읽고 setter로 쓴다
 }
 
-/** 시간 왜곡 — Action → sim.applyTimeWarp(duration) */
-applyTimeWarp(duration) {
-    this.timeSlowRemaining = Math.max(this.timeSlowRemaining, duration);
-}
+/** @returns {number} */
+getTimeSlowRemaining() { return this._timeSlowRemaining; }
 
-/** 카운터 — Action → sim.applyCounter() */
-applyCounter() {
-    this.counterCharged = true;
-    this.counterChargeTimer = 0.3;
-}
+/** @param {number} v */
+setTimeSlowRemaining(v) { this._timeSlowRemaining = v; }
+
+getCounterCharged() { return this._counterCharged; }
+setCounterCharged(v) { this._counterCharged = v; }
 
 /** 충돌 임박 감지 — Action → sim.isCollisionImminent(player) */
 isCollisionImminent(playerBall) {
@@ -441,7 +439,7 @@ class CounterAction extends ClickAction {
     }
 
     apply(sim, playerBall) {
-        sim.applyCounter(); // 내부: counterCharged = true + 타이머
+        sim.setCounterCharged(true); // Action이 로직 결정
     }
 }
 ```
@@ -454,6 +452,16 @@ class CounterAction extends ClickAction {
 
 ```js
 // BattleBall
+getRushRemaining() { return this._rushRemaining; }
+setRush(duration, multiplier) {
+    this._rushRemaining = duration;
+    this._rushMultiplier = multiplier;
+}
+setEndureRemaining(duration, reduction) {
+    this._endureRemaining = duration;
+    this._endureReduction = reduction;
+}
+
 spendHpForAction(amount) {
     if (this.hp <= 1) return 0;                // 최소 HP 1 보장
     const cost = Math.min(amount, this.hp - 1);

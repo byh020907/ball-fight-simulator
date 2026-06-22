@@ -149,14 +149,9 @@ class ClickAction {
     }
 
     /**
-     * 액션 효과 적용 (Command Pattern).
-     * 직접 상태를 변경하지 않고, 수신자(receiver) 객체의 메서드를 호출한다.
-     *
-     *   TimeWarpAction → sim.applyTimeWarp(0.25)
-     *   RushAction     → playerBall.applyRush(0.2, 1.25)
-     *   CounterAction  → sim.applyCounter()
-     *   ParryAction    → proj._parryReduction = 0.5
-     *   EndureAction   → playerBall.applyEndure(0.1)
+     * 액션 효과 적용. Action이 로직의 주체.
+     * domain 객체의 데이터 접근 함수(getXxx/setXxx)를 통해 값을 읽고,
+     * Action 내에서 알고리즘(계산/연장/조건)을 직접 수행한다.
      */
     apply(sim, playerBall) {
         throw new Error("override");
@@ -169,18 +164,17 @@ class ClickAction {
     }
 }
 
-// ── 로직 소유권 ──────────────────────────────────────────────────
+// ── 액션별 로직 소유권 ──────────────────────────────────────────
 //
-// 액션          로직 주체              수신자 메서드
-// ────────────  ────────────────────  ──────────────────────
-// 시간 왜곡     BattleSimulation      applyTimeWarp(dur)
-// 돌진          BattleBall            applyRush(dur, mult)
-// 카운터        BattleSimulation      applyCounter()
-// 받아치기      투사체 엔티티         _parryReduction 플래그
-// 버티기        BattleBall            applyEndure(dur)
-//
-// 각 액션의 apply()는 위 수신자 메서드를 호출만 하고,
-// 상태 전이/검증 로직은 수신자 클래스가 소유합니다.
+// 액션          Action이 소유한 로직                        Domain 인터페이스
+// ────────────  ─────────────────────────────────────────  ──────────────────────────────
+// 시간 왜곡     max(현재값, duration) 후 저장               sim.get/ setTimeSlowRemaining()
+// 돌진          지속시간 연장 or 신규 + 배율 적용            ball.getRushRemaining(), setRush()
+// 카운터        충돌 임박 판정 + 플래그 설정                sim.isCollisionImminent(), setCounterCharged()
+// 받아치기      접근 중 투사체 탐색 + 경감 플래그            sim.getIncomingProjectile(), proj.setParryReduction()
+// 버티기        경감 지속시간 설정                          ball.setEndureRemaining()
+
+// 핸들러 ctx 객체는 app.js에서 이렇게 구성:
 
 // 핸들러 ctx 객체는 app.js에서 이렇게 구성:
 // const ctx = {
@@ -245,7 +239,8 @@ class TimeWarpAction extends ClickAction {
         return playerBall.hp / playerBall.maxHp <= 0.5;
     }
     apply(sim, playerBall) {
-        sim.applyTimeWarp(0.25);
+        const current = sim.getTimeSlowRemaining();
+        sim.setTimeSlowRemaining(Math.max(current, 0.25));
     }
 }
 
@@ -263,7 +258,8 @@ class RushAction extends ClickAction {
         return 0.7;
     }
     apply(sim, playerBall) {
-        playerBall.applyRush(0.2, 1.25);
+        const current = playerBall.getRushRemaining();
+        playerBall.setRush(current > 0 ? current + 0.2 : 0.2, 1.25);
     }
 }
 
@@ -284,7 +280,7 @@ class CounterAction extends ClickAction {
         return sim.isCollisionImminent(playerBall);
     }
     apply(sim, playerBall) {
-        sim.applyCounter();
+        sim.setCounterCharged(true);
     }
 }
 
@@ -327,7 +323,7 @@ class EndureAction extends ClickAction {
         return playerBall.hp / playerBall.maxHp <= 0.5;
     }
     apply(sim, playerBall) {
-        playerBall.applyEndure(0.1, 0.5);
+        playerBall.setEndureRemaining(0.1, 0.5);
     }
 }
 

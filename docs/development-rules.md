@@ -71,51 +71,74 @@ _drawVisionArc(ctx) { ... }
 
 ### 로직 소유권 원칙
 
-**각 로직은 그 로직의 주체(영향을 받는 객체)가 소유합니다.**
+**각 로직은 그 로직을 실행하는 액션 클래스가 직접 소유합니다.**
+도메인 객체(Simulation, Entity)는 로직 수행에 필요한 **데이터 접근 인터페이스**만 제공합니다.
 
 ```
-잘못된 예: ClickAction.apply()가 sim.timeSlowRemaining을 직접 수정
-올바른 예: ClickAction.apply()가 sim.applyTimeWarp()를 호출하고,
-           BattleSimulation.applyTimeWarp()가 내부 상태를 변경
+잘못된 예 #1: ClickAction이 sim.timeSlowRemaining을 직접 수정 (캡슐화 위반)
+잘못된 예 #2: ClickAction이 sim.applyTimeWarp()를 호출 (로직을 domain에 위임)
+올바른 예:    ClickAction이 sim.getTimeSlow() / sim.setTimeSlow()로 데이터를 읽고,
+              Action 내에서 알고리즘(Math.max 등)을 직접 수행
 ```
 
 #### 적용 예 — 클릭 액션 시스템
 
 ```js
-// Action의 apply()는 Command 역할 — 수신자(domain 객체)의 메서드를 호출
+// ✅ Action이 로직의 주체
 class TimeWarpAction extends ClickAction {
     apply(sim, playerBall) {
-        sim.applyTimeWarp(0.25); // ← BattleSimulation이 소유
+        // sim.getTimeSlowRemaining() — domain이 제공하는 인터페이스
+        // Action이 Math.max 로직을 직접 수행
+        const current = sim.getTimeSlowRemaining();
+        sim.setTimeSlowRemaining(Math.max(current, 0.25));
     }
 }
 
 class RushAction extends ClickAction {
     apply(sim, playerBall) {
-        playerBall.applyRush(0.2, 1.25); // ← BattleBall이 소유
+        const current = playerBall.getRushRemaining();
+        // Action이 지속시간 연장 로직을 직접 수행
+        playerBall.setRush(current > 0 ? current + 0.2 : 0.2, 1.25);
     }
 }
 
-// 수신자 객체에 실제 로직이 위치
+// Domain 객체는 Action이 필요로 하는 데이터 접근 함수를 제공
 class BattleSimulation {
-    applyTimeWarp(duration) {
-        this.timeSlowRemaining = Math.max(this.timeSlowRemaining, duration);
+    getTimeSlowRemaining() {
+        return this._timeSlowRemaining;
+    }
+    setTimeSlowRemaining(v) {
+        this._timeSlowRemaining = v;
     }
 }
 
 class BattleBall {
-    applyRush(duration, multiplier) {
-        this.rushEffect = { remaining: duration, multiplier };
+    getRushRemaining() {
+        return this._rushRemaining;
+    }
+    setRush(duration, multiplier) {
+        this._rushEffect = { duration, multiplier };
     }
 }
 ```
 
-| 액션      | 로직 주체          | 메서드                    | 설명                              |
-| --------- | ------------------ | ------------------------- | --------------------------------- |
-| 시간 왜곡 | `BattleSimulation` | `applyTimeWarp(duration)` | 엔티티 update의 delta 스케일링    |
-| 돌진      | `BattleBall`       | `applyRush(dur, mult)`    | getSpeedMultiplier에 반영         |
-| 카운터    | `BattleSimulation` | `applyCounter()`          | handleCollision에서 데미지 보너스 |
-| 받아치기  | 투사체 엔티티      | `_parryReduction` 플래그  | takeDamage 전 50% 경감            |
-| 버티기    | `BattleBall`       | `applyEndure(duration)`   | takeDamage에서 데미지 경감        |
+| 액션      | Action이 소유한 로직                                   | Domain이 제공하는 인터페이스                                   |
+| --------- | ------------------------------------------------------ | -------------------------------------------------------------- |
+| 시간 왜곡 | `max(현재값, duration)` 후 저장                        | `sim.get/ setTimeSlowRemaining()`                              |
+| 돌진      | 지속시간 연장 또는 신규 설정 + 속도 배율 적용          | `ball.getRushRemaining()`, `ball.setRush(dur, mult)`           |
+| 카운터    | 충돌 임박 판정 + 플래그 설정 (`counterCharged = true`) | `sim.isCollisionImminent(ball)`, `sim.setCounterCharged(b)`    |
+| 받아치기  | 접근 중인 투사체 탐색 + 경감 플래그 설정               | `sim.getIncomingProjectile(ball)`, `proj.setParryReduction(v)` |
+| 버티기    | 경감 지속시간 설정                                     | `ball.setEndureRemaining(dur, reduction)`                      |
+
+#### 행동 규칙
+
+1. **Action 클래스가 비즈니스 로직(알고리즘, 조건 판정, 값 계산)을 직접 소유**합니다.
+2. Domain 객체는 `getXxx()` / `setXxx()` 형태의 **의도가 드러나는 데이터 접근 인터페이스**를 제공합니다.
+3. Action은 domain의 내부 변수를 직접 읽거나 쓰지 않고, 반드시 domain이 제공하는 함수를 통해서만 접근합니다.
+4. 판단 기준: **"이 로직의 실행 결과를 누가 결정하는가?"** → Action이 결정한다면 Action이 로직을 소유합니다.
+   | 카운터 | `BattleSimulation` | `applyCounter()` | handleCollision에서 데미지 보너스 |
+   | 받아치기 | 투사체 엔티티 | `_parryReduction` 플래그 | takeDamage 전 50% 경감 |
+   | 버티기 | `BattleBall` | `applyEndure(duration)` | takeDamage에서 데미지 경감 |
 
 #### 행동 규칙
 
