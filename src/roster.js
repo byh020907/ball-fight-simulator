@@ -18,11 +18,11 @@ export function createRoster() {
             name: "Orbit Ball",
             title: "Visible Halo",
             description:
-                "몸 주위를 도는 위성 3개가 가까운 적을 계속 긁어내며 피해를 줍니다. 위성은 하나씩 재충전됩니다.",
+                "몸 주위를 도는 위성 5개가 가까운 적을 계속 긁어내며 피해를 줍니다. 위성은 하나씩 재충전됩니다.",
             color: "#6fe3ff",
             face: "orbit",
             ability: "orbit",
-            stats: { hp: 102, damage: 10, speed: 308, radius: 48, mass: 1.1, defense: 1 }
+            stats: { hp: 102, damage: 10, speed: 280, radius: 48, mass: 1.1, defense: 1 }
         },
         {
             id: FIGHTER_IDS.TRICKSTER,
