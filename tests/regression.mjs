@@ -249,6 +249,11 @@ async function testEaterFeast(app) {
     app.simulation.update(0.8);
     assert.equal(target.swallowedState, null, "Eater should spit target back out");
     assert.ok(target.wallSlamState, "Spat target should receive wall slam state");
+    assert.equal(
+        typeof target.wallSlamState.onWallBounce,
+        "function",
+        "Wall slam behavior should live on the wall slam effect"
+    );
     assert.equal(target.forcedHeading, null, "Spit dash should allow wall bounce direction changes");
     assert.equal(
         Math.round(target.velocity.length()),
@@ -264,6 +269,10 @@ async function testEaterFeast(app) {
     target.position.x = app.simulation.width + target.radius + 5;
     app.simulation.keepInsideArena(target);
     assert.equal(beforeHp - target.hp, 14, "Wall bounce should deal wall slam damage (15 - 1 defense)");
+    const afterFirstWallSlamHp = target.hp;
+    target.position.x = app.simulation.width + target.radius + 5;
+    app.simulation.keepInsideArena(target);
+    assert.equal(target.hp, afterFirstWallSlamHp, "Wall slam effect should own its repeat-hit cooldown");
     assert.ok(target.velocity.x < 0, "Wall bounce should reverse spat target direction");
     assert.ok(app.simulation.screenShake, "Wall slam should trigger screen shake");
     assert.ok(

@@ -1,4 +1,5 @@
-import { TimedEffect, Vector2 } from "../core.js";
+import { WallSlamEffect } from "../combat-effects.js";
+import { Vector2 } from "../core.js";
 import { Ability } from "./Ability.js";
 
 const FEAST_DURATION = 3.3;
@@ -155,12 +156,11 @@ export class EaterAbility extends Ability {
             showSpeedRing: false,
             maxDuration: 2.45
         });
-        target.wallSlamState = {
-            effect: new TimedEffect(2.45),
+        target.wallSlamState = new WallSlamEffect({
             source: this.owner,
             damage: WALL_SLAM_DAMAGE,
-            cooldown: 0
-        };
+            duration: SPIT_MAX_DURATION
+        });
         this.simulation.keepInsideArena(target);
         this.simulation.playSound("spit", 1.2);
         this.simulation.spawnSlash(this.owner.position.clone(), target.position.clone(), this.owner.color);

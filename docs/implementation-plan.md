@@ -640,7 +640,8 @@ document.addEventListener("pick-action-card", (e) => {
 
 | 엔티티          | 느려지는 동작                         |
 | --------------- | ------------------------------------- |
-| BattleBall      | 이동, 쿨다운, 디버프 타이머, wallSlam |
+| BattleBall      | 이동, 쿨다운, 디버프 타이머           |
+| WallSlamEffect  | 벽 충돌 피해, 반복 피해 쿨다운, 회전  |
 | ArrowProjectile | 수명, 이동                            |
 | Grenade         | 퓨즈, 이동                            |
 | OrbitProjectile | 수명, 가속, 이동                      |

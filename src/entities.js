@@ -447,12 +447,9 @@ export class BattleBall {
         tick(this.dashState?.effect, () => this.clearDash());
 
         if (this.wallSlamState) {
-            this.wallSlamState.effect.tick(delta);
-            this.wallSlamState.cooldown = Math.max(0, this.wallSlamState.cooldown - delta);
-            const spinDirection = this.velocity.x >= 0 ? 1 : -1;
-            this.spinRotation +=
-                spinDirection * Math.max(8, this.velocity.length() / Math.max(1, this.radius)) * delta * 1.55;
-            if (this.wallSlamState.effect.finished) this.wallSlamState = null;
+            if (this.wallSlamState.tick(this, delta)) {
+                this.wallSlamState = null;
+            }
         }
 
         this.actionContext.tickTimers(delta);

@@ -133,6 +133,30 @@ class ActionContext {
 | 받아치기  | 접근 중인 투사체 탐색 + 경감 플래그 설정               | `sim.getIncomingProjectile(ball)`, `proj.setParryReduction(v)` |
 | 버티기    | 경감 effect 등록                                       | `ball.actionContext.setEffect(id, effect)`                     |
 
+#### 적용 예 — 런타임 effect / 게임 오브젝트
+
+상태성 게임 오브젝트도 같은 원칙을 따릅니다. 예를 들어 벽 충돌 추가 피해는 `BattleBall`이나 `Simulation`이 직접 계산하지 않고, `WallSlamEffect`가 피해량, 반복 피해 쿨다운, 회전 연출을 소유합니다.
+
+```js
+class WallSlamEffect {
+    onWallBounce(ball, normal, simulation) {
+        if (this.cooldown > 0) return;
+        this.cooldown = 0.18;
+        ball.takeDamage(this.damage, this.source, "Wall Slam");
+        simulation.spawnWallImpact(ball.position.clone(), normal, this.source.color);
+    }
+
+    tick(ball, delta) {
+        this.cooldown = Math.max(0, this.cooldown - delta);
+        this.updateSpin(ball, delta);
+    }
+}
+```
+
+- Ability는 `new WallSlamEffect(...)`처럼 effect를 생성하고 필요한 값만 전달합니다.
+- `Simulation`은 벽 충돌 이벤트를 effect에 전달합니다.
+- `BattleBall`은 effect의 `tick()`을 호출하고, effect 내부 계산을 직접 소유하지 않습니다.
+
 #### 행동 규칙
 
 1. **Action 클래스가 비즈니스 로직(알고리즘, 조건 판정, 값 계산)을 직접 소유**합니다.

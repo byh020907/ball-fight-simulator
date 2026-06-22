@@ -40,19 +40,7 @@ export class Simulation {
         if (!xBounce && !yBounce) return;
 
         ball.bounced = true;
-        if (ball.wallSlamState && ball.wallSlamState.cooldown <= 0) {
-            ball.wallSlamState.cooldown = 0.18;
-            ball.takeDamage(ball.wallSlamState.damage, ball.wallSlamState.source, "Wall Slam");
-            const normal = xBounce ?? yBounce;
-            this.spawnWallImpact(
-                ball.position.clone(),
-                normal ?? ball.velocity.clone().normalize().scale(-1),
-                ball.wallSlamState.source?.color ?? ball.color
-            );
-            this.playSound("wall", 1.15);
-            this.shakeScreen(0.24, 16);
-            this.addLog(`${ball.name} takes wall slam damage.`);
-        }
+        ball.wallSlamState?.onWallBounce(ball, xBounce ?? yBounce, this);
     }
 
     keepEntityInsideArena(entity) {

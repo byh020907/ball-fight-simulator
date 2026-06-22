@@ -1,4 +1,5 @@
-import { TimedEffect, Vector2 } from "../core.js";
+import { WallSlamEffect } from "../combat-effects.js";
+import { Vector2 } from "../core.js";
 import { Ability } from "./Ability.js";
 
 const ARC_ANGLE = (Math.PI * 2) / 3; // 120도
@@ -78,15 +79,14 @@ export class BatBallAbility extends Ability {
         const damage = Math.round(this.owner.baseDamage * SLASH_DAMAGE_MULT);
         target.takeDamage(damage, this.owner, "Slash");
 
-        // 강한 넉백 + 벽 충돌 시 추가 데미지 (Eater wallSlamState 재사용)
+        // 강한 넉백 + 벽 충돌 시 추가 데미지
         const kbDir = Vector2.subtract(target.position, this.owner.position).normalize();
         target.applyKnockback(kbDir.scale(KNOCKBACK_FORCE), KNOCKBACK_DURATION);
-        target.wallSlamState = {
-            effect: new TimedEffect(WALL_SLAM_EFFECT_DURATION),
+        target.wallSlamState = new WallSlamEffect({
             source: this.owner,
             damage: Math.round(this.owner.baseDamage * WALL_SLAM_DAMAGE_MULT),
-            cooldown: 0
-        };
+            duration: WALL_SLAM_EFFECT_DURATION
+        });
 
         // Slash 애니메이션 설정 — arcAngle 기준으로 ±60도 휘두르기
         this.slashTimer = SLASH_DURATION;
