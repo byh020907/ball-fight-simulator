@@ -234,16 +234,16 @@ export class SlashTrail extends CombatEntity {
 }
 
 /** Floating damage number that rises and fades. */
-export class DamageNumber extends CombatEntity {
+class FloatingText extends CombatEntity {
     static renderLayer = RENDER_LAYERS.FOREGROUND;
 
-    constructor(position, amount, color = "#ff3333") {
-        super(position.clone(), new Vector2(0, -70), 0);
-        this.amount = amount;
+    constructor(position, velY, text, color, fontSize, life = 0.9) {
+        super(position.clone(), new Vector2(0, velY), 0);
+        this.displayText = text;
         this.color = color;
-        this.life = 0.9;
+        this.life = life;
         this.maxLife = this.life;
-        this.fontSize = Math.min(52, 20 + Math.floor(amount / 10) * 4);
+        this.fontSize = fontSize;
     }
 
     update(delta) {
@@ -254,51 +254,30 @@ export class DamageNumber extends CombatEntity {
 
     draw(ctx) {
         const alpha = Math.max(0, this.life / this.maxLife);
-        const text = String(this.amount);
         ctx.save();
         ctx.globalAlpha = alpha;
         ctx.font = "900 " + this.fontSize + 'px Bahnschrift, "Segoe UI", sans-serif';
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-
         ctx.shadowColor = "rgba(0,0,0,0.4)";
         ctx.shadowBlur = 6;
         ctx.shadowOffsetY = 2;
         ctx.fillStyle = this.color;
-        ctx.fillText(text, this.position.x, this.position.y);
+        ctx.fillText(this.displayText, this.position.x, this.position.y);
         ctx.restore();
     }
 }
 
-export class ActionText extends CombatEntity {
-    static renderLayer = RENDER_LAYERS.FOREGROUND;
+export class DamageNumber extends FloatingText {
+    constructor(position, amount, color = "#ff3333") {
+        const fontSize = Math.min(52, 20 + Math.floor(amount / 10) * 4);
+        super(position, -70, String(amount), color, fontSize);
+        this.amount = amount;
+    }
+}
 
+export class ActionText extends FloatingText {
     constructor(position, text, color = "#ffffff") {
-        super(position.clone(), new Vector2(0, -50), 0);
-        this.text = text;
-        this.color = color;
-        this.life = 0.9;
-        this.maxLife = this.life;
-        this.fontSize = 24;
-    }
-
-    update(delta) {
-        this.life -= delta;
-        this.position.add(this.velocity.clone().scale(delta));
-        if (this.life <= 0) this.isExpired = true;
-    }
-
-    draw(ctx) {
-        const alpha = Math.max(0, this.life / this.maxLife);
-        ctx.save();
-        ctx.globalAlpha = alpha;
-        ctx.font = "900 " + this.fontSize + 'px Bahnschrift, "Segoe UI", sans-serif';
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.shadowColor = "rgba(0,0,0,0.6)";
-        ctx.shadowBlur = 8;
-        ctx.fillStyle = this.color;
-        ctx.fillText(this.text, this.position.x, this.position.y);
-        ctx.restore();
+        super(position, -50, text, color, 24);
     }
 }
