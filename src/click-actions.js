@@ -180,13 +180,15 @@ class ParryAction extends ClickAction {
         return 1.15;
     }
 
-    getFailureReason(sim, playerBall) {
-        return sim.getIncomingProjectile(playerBall) ? null : "날아오는 투사체가 없습니다";
-    }
-
+    /** 받아치기는 항상 발동. HP 소모 후 0.3초 window 안에 맞은 투사체만 경감. */
     apply(sim, playerBall) {
-        const proj = sim.getIncomingProjectile(playerBall);
-        if (proj) proj.setParryReduction(0.5);
+        playerBall.actionContext.setEffect(this.id, {
+            remaining: 0.3,
+            onDamageTaken: (amount, source, label) => {
+                source?.simulation?.spawnActionText?.(playerBall.position.clone(), "받아치기!", "#44ddff");
+                return Math.round(amount * 0.5);
+            }
+        });
     }
 }
 

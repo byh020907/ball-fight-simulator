@@ -81,26 +81,13 @@ export class CombatEntity {
     update() {}
     draw() {}
 
-    /** 받아치기 — 투사체 데미지 경감률 설정 */
-    setParryReduction(factor) {
-        this._parryReduction = factor;
-    }
-
-    /** 받아치기 경감 적용 */
-    getEffectiveDamage(rawDamage) {
-        return this._parryReduction ? Math.round(rawDamage * (1 - this._parryReduction)) : rawDamage;
-    }
-
     /**
      * 투사체 공통 hit 처리 (Template Method).
      * Subclass는 _getHitDamage, _getHitLabel, _onHitEffects만 구현.
+     * 데미지 경감은 target의 ActionContext.onDamageTaken()에서 처리.
      */
     dealDamageToTarget(target, rawDamage, source, label, simulation) {
-        const finalDmg = this.getEffectiveDamage(rawDamage);
-        if (this._parryReduction) {
-            simulation.spawnActionText(target.position.clone(), "받아치기!", "#44ddff");
-        }
-        target.takeDamage(finalDmg, source, label);
+        target.takeDamage(rawDamage, source, label);
     }
 
     /**
