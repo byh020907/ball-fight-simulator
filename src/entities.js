@@ -80,37 +80,37 @@ export class ArrowProjectile extends CombatEntity {
     }
 
     update(delta, simulation) {
-        this.life -= delta;
-        this.position.add(this.velocity.clone().scale(delta));
-        simulation.keepEntityInsideArena(this);
+        this.updateProjectile(delta, simulation);
         this.syncFacingToVelocity();
-        if (this.life <= 0) {
-            this.isExpired = true;
-            this._abilityRef?.onArrowResult?.(false);
-        }
+    }
 
-        const target = simulation.getOpponent(this.owner);
-        if (!target || target.isDefeated) {
-            return;
-        }
+    _findTarget(simulation) {
+        return simulation.getOpponent(this.owner);
+    }
 
-        const distance = Vector2.subtract(this.position, target.position).length();
-        if (distance <= target.radius + this.radius) {
-            let dmg = this.getEffectiveDamage(Math.round(this.owner.baseDamage * 1.4));
-            if (this._parryReduction) simulation.spawnActionText(target.position.clone(), "받아치기!", "#44ddff");
-            target.takeDamage(dmg, this.owner, "Arrow Shot");
-            target.applyKnockback(this.velocity.clone().scale(0.6), 0.2);
-            simulation.playSound("hit");
-            simulation.spawnSlash(
-                this.position.clone(),
-                Vector2.add(this.position, this.velocity.clone().normalize().scale(70)),
-                this.owner.color
-            );
-            simulation.addSparkBurst(this.position.clone(), this.owner.color);
-            simulation.addLog(`${this.owner.name}'s arrow pierces ${target.name}.`);
-            this.isExpired = true;
-            this._abilityRef?.onArrowResult?.(true);
-        }
+    _getHitDamage() {
+        return Math.round(this.owner.baseDamage * 1.4);
+    }
+
+    _getHitLabel() {
+        return "Arrow Shot";
+    }
+
+    _onHitEffects(target, simulation) {
+        target.applyKnockback(this.velocity.clone().scale(0.6), 0.2);
+        simulation.playSound("hit");
+        simulation.spawnSlash(
+            this.position.clone(),
+            Vector2.add(this.position, this.velocity.clone().normalize().scale(70)),
+            this.owner.color
+        );
+        simulation.addSparkBurst(this.position.clone(), this.owner.color);
+        simulation.addLog(`${this.owner.name}'s arrow pierces ${target.name}.`);
+        this._abilityRef?.onArrowResult?.(true);
+    }
+
+    _onExpired(simulation) {
+        this._abilityRef?.onArrowResult?.(false);
     }
 
     draw(ctx) {
@@ -163,23 +163,28 @@ export class OrbitProjectile extends CombatEntity {
             this.isExpired = true;
         }
 
-        const target = simulation.getOpponent(this.owner);
-        if (!target || target.isDefeated) {
-            return;
-        }
+        // Hit check (공통 템플릿 사용)
+        this._projectileHitCheck(simulation);
+    }
 
-        const distance = Vector2.subtract(this.position, target.position).length();
-        if (distance <= target.radius + this.radius) {
-            let dmg = this.getEffectiveDamage(Math.round(this.owner.baseDamage * 0.8));
-            if (this._parryReduction) simulation.spawnActionText(target.position.clone(), "받아치기!", "#44ddff");
-            target.takeDamage(dmg, this.owner, "Orbit Shot");
-            target.applyKnockback(this.velocity.clone().scale(0.4), 0.15);
-            simulation.spawnSlash(this.position.clone(), target.position.clone(), this.owner.color);
-            simulation.addSparkBurst(this.position.clone(), this.owner.color);
-            simulation.playSound("orbit");
-            simulation.addLog(`${this.owner.name}'s orbit shard strikes ${target.name}.`);
-            this.isExpired = true;
-        }
+    _findTarget(simulation) {
+        return simulation.getOpponent(this.owner);
+    }
+
+    _getHitDamage() {
+        return Math.round(this.owner.baseDamage * 0.8);
+    }
+
+    _getHitLabel() {
+        return "Orbit Shot";
+    }
+
+    _onHitEffects(target, simulation) {
+        target.applyKnockback(this.velocity.clone().scale(0.4), 0.15);
+        simulation.spawnSlash(this.position.clone(), target.position.clone(), this.owner.color);
+        simulation.addSparkBurst(this.position.clone(), this.owner.color);
+        simulation.playSound("orbit");
+        simulation.addLog(`${this.owner.name}'s orbit shard strikes ${target.name}.`);
     }
 
     draw(ctx) {
@@ -243,9 +248,7 @@ export class Grenade extends CombatEntity {
                     Math.min(1, (distance - this.innerRadius) / (this.explosionRadius - this.innerRadius))
                 );
                 const raw = Math.round(this.owner.baseDamage * (4.0 - edgeProgress * 2.0));
-                const finalDmg = this.getEffectiveDamage(raw);
-                if (this._parryReduction) simulation.spawnActionText(target.position.clone(), "받아치기!", "#44ddff");
-                target.takeDamage(finalDmg, this.owner, "Grenade");
+                this.dealDamageToTarget(target, raw, this.owner, "Grenade", simulation);
                 const kbDir = Vector2.subtract(target.position, this.position).normalize();
                 target.applyKnockback(kbDir.scale(400), 0.35);
             }

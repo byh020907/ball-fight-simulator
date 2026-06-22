@@ -86,10 +86,69 @@ export class CombatEntity {
         this._parryReduction = factor;
     }
 
-    /** 받아치기 경감 적용 — 투사체에서 호출 */
+    /** 받아치기 경감 적용 */
     getEffectiveDamage(rawDamage) {
         return this._parryReduction ? Math.round(rawDamage * (1 - this._parryReduction)) : rawDamage;
     }
+
+    /**
+     * 투사체 공통 hit 처리 (Template Method).
+     * Subclass는 _getHitDamage, _getHitLabel, _onHitEffects만 구현.
+     */
+    dealDamageToTarget(target, rawDamage, source, label, simulation) {
+        const finalDmg = this.getEffectiveDamage(rawDamage);
+        if (this._parryReduction) {
+            simulation.spawnActionText(target.position.clone(), "받아치기!", "#44ddff");
+        }
+        target.takeDamage(finalDmg, source, label);
+    }
+
+    /**
+     * 투사체 update 공통 템플릿.
+     * Subclass는 _findTarget(sim), _getHitDamage(), _getHitLabel(), _onHitEffects()를 구현.
+     */
+    updateProjectile(delta, simulation) {
+        this.position.add(this.velocity.clone().scale(delta));
+        simulation.keepEntityInsideArena(this);
+
+        if (this.life != null) {
+            this.life -= delta;
+            if (this.life <= 0) {
+                this._onExpired(simulation);
+                this.isExpired = true;
+                return;
+            }
+        }
+
+        this._projectileHitCheck(simulation);
+    }
+
+    /** hit 체크만 — 커스텀 update에서 호출 가능 */
+    _projectileHitCheck(simulation) {
+        const target = this._findTarget(simulation);
+        if (!target || target.isDefeated) return;
+
+        const dist = Vector2.subtract(this.position, target.position).length();
+        if (dist > target.radius + this.radius) return;
+
+        const rawDmg = this._getHitDamage(simulation);
+        this.dealDamageToTarget(target, rawDmg, this.owner, this._getHitLabel(), simulation);
+        this._onHitEffects(target, simulation);
+        this.isExpired = true;
+    }
+
+    /** @returns {import("./entities.js").BattleBall|null} — subclass override */
+    _findTarget(simulation) {
+        return null;
+    }
+    _getHitDamage() {
+        return 0;
+    }
+    _getHitLabel() {
+        return "Hit";
+    }
+    _onHitEffects(target, simulation) {}
+    _onExpired(simulation) {}
 }
 
 export class TimedEffect {
