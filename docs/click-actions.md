@@ -1,6 +1,7 @@
 # 클릭 액션 시스템
 
 > **구현 상태**: 미구현 (설계 단계)
+> **구현 계획**: [`docs/implementation-plan.md`](implementation-plan.md)
 > **관련 문서**: [`docs/design.md`](design.md) (시각 방향), [`docs/game-rules.md`](game-rules.md) (게임 규칙)
 
 ## 한 줄 요약
