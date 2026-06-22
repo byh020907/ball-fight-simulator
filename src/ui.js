@@ -361,50 +361,76 @@ export class UIController {
         s.overlayText = "";
     }
 
-    /** 카드 선택 UI — Promise 기반, PopupService 재사용 */
+    /** 카드 선택 UI — Alpine 상태 직접 조작 */
     async waitForActionPick(cards) {
-        // non-browser 환경 (테스트) — 첫 번째 카드 자동 선택
         if (typeof document === "undefined" || !document.addEventListener) {
             return cards[0]?.id ?? null;
         }
 
+        const root = document.querySelector(".app");
+        const data = root ? window.Alpine.$data(root) : null;
+        if (!data) return cards[0]?.id ?? null;
+
+        const bodyHtml = `
+            <div class="action-pick">
+                <p>매치 액션을 선택하세요</p>
+                <div class="action-cards">
+                    ${cards
+                        .map(
+                            (c, i) => `
+                        <button class="action-card" data-index="${i}">
+                            <strong>${c.name}</strong>
+                            <span>${c.description}</span>
+                            <small>HP ${c.hpCostPercent}% 소모</small>
+                        </button>`
+                        )
+                        .join("")}
+                </div>
+            </div>`;
+
+        // Alpine popup 표시
+        data.popupVisible = true;
+        data.popupContent = {
+            title: "매치 액션 선택",
+            bodyHtml,
+            buttons: [],
+            closeOnOutside: false
+        };
+
         return new Promise((resolve) => {
-            const bodyHtml = `
-                <div class="action-pick">
-                    <p>매치 액션을 선택하세요</p>
-                    <div class="action-cards">
-                        ${cards
-                            .map(
-                                (c, i) => `
-                            <button class="action-card" data-index="${i}">
-                                <strong>${c.name}</strong>
-                                <span>${c.description}</span>
-                                <small>HP ${c.hpCostPercent}% 소모</small>
-                            </button>`
-                            )
-                            .join("")}
-                    </div>
-                </div>`;
+            let resolved = false;
+            const finish = (id) => {
+                if (resolved) return;
+                resolved = true;
+                document.removeEventListener("click", handler, true);
+                clearTimeout(timeoutId);
+                resolve(id);
+            };
 
-            PopupService.show({
-                title: "매치 액션 선택",
-                bodyHtml,
-                buttons: [],
-                closeOnOutside: false
-            });
-
-            // 카드 클릭 리스너 (일회성)
+            // 카드 클릭 (capture phase)
             const handler = (e) => {
                 const btn = e.target.closest(".action-card");
                 if (!btn) return;
                 const idx = parseInt(btn.dataset.index, 10);
                 const picked = cards[idx];
                 if (!picked) return;
-                document.removeEventListener("click", handler, true);
-                PopupService.resolve(picked.id);
-                resolve(picked.id);
+                data.closePopup(picked.id);
+                finish(picked.id);
             };
             document.addEventListener("click", handler, true);
+
+            // 15초 타임아웃
+            const timeoutId = setTimeout(() => {
+                if (data.popupVisible) data.closePopup("timeout");
+                finish(cards[0].id);
+            }, 15000);
+
+            // @click.self로 닫힌 경우 대비 (배경 클릭)
+            const _origClose = data.closePopup.bind(data);
+            data.closePopup = (val) => {
+                _origClose(val);
+                finish(cards[0].id);
+            };
         });
     }
 
