@@ -1,5 +1,7 @@
 # 게임 규칙
 
+> **클릭 액션 시스템 설계**: [`docs/click-actions.md`](click-actions.md)
+
 이 문서는 Ball Fight Simulator의 게임성 규칙을 기록하는 기준 문서입니다. 전투 규칙, 스탯, 토너먼트 진행 방식이 바뀌면 구현과 함께 이 문서를 업데이트합니다.
 
 ## 현재 게임 흐름

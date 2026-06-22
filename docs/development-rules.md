@@ -234,6 +234,7 @@ Tested: npm test, npm run check
 - `README.md`는 처음 보는 사람이 실행, 구조, 검증 방법을 바로 알 수 있게 유지합니다.
 - `docs/game-rules.md`는 게임 흐름, 스탯, 토너먼트 규칙을 기록합니다.
 - `docs/design.md`는 시각 스타일과 캐릭터 표현 규칙을 기록합니다.
+- `docs/click-actions.md`는 클릭 액션 시스템의 전체 설계를 기록합니다. (구현 전 설계 단계)
 - `docs/development-rules.md`는 개발, 검증, Git 운영 규칙의 기준 문서입니다.
 - 구현과 문서가 어긋나면 구현을 확인한 뒤 문서를 즉시 갱신합니다.
 

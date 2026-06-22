@@ -36,6 +36,10 @@ export const PATCH_NOTES = [
                 text: "Bat Ball 캡모자 크기 확대 + 눈과 간격 조정"
             },
             {
+                type: "style",
+                text: "docs/click-actions.md 설계 문서 추가 (클릭 액션 시스템, 미구현)"
+            },
+            {
                 type: "refactor",
                 text: "넉백 시스템 재설계 — forceHeading에 overrideVelocity 통합, knockbackState 제거. 벽 충돌 시 넉백 종료."
             },

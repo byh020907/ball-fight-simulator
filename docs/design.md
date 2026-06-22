@@ -1,6 +1,7 @@
 # Ball Fight 시각 방향
 
 > **CSS 파일 위치**: 모든 스타일은 `src/styles.css`에 정의되어 있습니다.
+> **클릭 액션 시스템 설계**: [`docs/click-actions.md`](click-actions.md)
 
 ## 기본 스타일
 
