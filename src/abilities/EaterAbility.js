@@ -1,12 +1,21 @@
 import { TimedEffect, Vector2 } from "../core.js";
 import { Ability } from "./Ability.js";
 
+const FEAST_DURATION = 3.3;
+const SWALLOW_HOLD_DURATION = 0.72;
+const DEFENSE_MULT_DURING_FEAST = 3;
+const SPIT_DASH_MULTIPLIER = 2;
+const SPIT_SPEED_MULTIPLIER = 2;
+const SPIT_MAX_DURATION = 2.45;
+const WALL_SLAM_DAMAGE = 15;
+const FEAST_HEADING_FORCE = 0.2;
+
 export class EaterAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation);
         this._baseCooldown = 7.2;
         this.timer = 2.4;
-        this.feastDuration = 3.3;
+        this.feastDuration = FEAST_DURATION;
         this.feastTimer = 0;
         this.feastElapsed = 0;
         this.radiusScale = 1;
@@ -41,7 +50,7 @@ export class EaterAbility extends Ability {
                 // Direct velocity override: go straight toward target
                 const dir = Vector2.subtract(target.position, this.owner.position).normalize();
                 this.owner.velocity = dir.scale(this.owner.velocity.length() || this.owner.baseSpeed);
-                this.owner.forceHeading(dir, 0.2);
+                this.owner.forceHeading(dir, FEAST_HEADING_FORCE);
             }
 
             if (this.feastTimer > 0 && !this.swallowedTarget && Math.random() < delta * 8) {
@@ -76,7 +85,7 @@ export class EaterAbility extends Ability {
 
     getStatModifiers() {
         const def = this.isFeasting() ? 3 : 1;
-        return { speed: 0.95, damage: 1, defense: def, impact: 1 };
+        return { speed: 0.95, damage: 1, defense: DEFENSE_MULT_DURING_FEAST, impact: 1 };
     }
 
     onCollision(target) {
@@ -93,7 +102,7 @@ export class EaterAbility extends Ability {
         this.hasEatenThisFeast = true;
         this.feastTimer = 0;
         this.swallowedTarget = target;
-        this.swallowTimer = 0.72;
+        this.swallowTimer = SWALLOW_HOLD_DURATION;
         this.spitDirection =
             this.owner.velocity.length() > 0
                 ? this.owner.velocity.clone().normalize()
@@ -149,7 +158,7 @@ export class EaterAbility extends Ability {
         target.wallSlamState = {
             effect: new TimedEffect(2.45),
             source: this.owner,
-            damage: 15,
+            damage: WALL_SLAM_DAMAGE,
             cooldown: 0
         };
         this.simulation.keepInsideArena(target);

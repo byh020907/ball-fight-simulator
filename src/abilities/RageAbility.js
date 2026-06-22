@@ -1,5 +1,19 @@
 import { Ability } from "./Ability.js";
 
+const CHARGE_THRESHOLD_PARTICLES = 0.22;
+const PARTICLE_BASE_INTERVAL = 0.15;
+const PARTICLE_INTERVAL_REDUCTION = 0.07;
+const PARTICLE_BASE_COUNT = 1;
+const PARTICLE_COUNT_PER_CHARGE = 3;
+const PARTICLE_BASE_SPEED = 90;
+const PARTICLE_SPEED_PER_CHARGE = 90;
+const SPEED_BASE = 0.78;
+const SPEED_PER_CHARGE = 4.22;
+const DAMAGE_BASE = 0.96;
+const DAMAGE_PER_CHARGE = 0.34;
+const IMPACT_BASE = 0.9;
+const IMPACT_PER_CHARGE = 0.62;
+
 export class RageAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation);
@@ -16,13 +30,13 @@ export class RageAbility extends Ability {
 
     update(delta) {
         this.timeWithoutCollision = Math.min(this.getMaxChargeTime(), this.timeWithoutCollision + delta);
-        if (this.getChargeProgress() > 0.22) {
+        if (this.getChargeProgress() > CHARGE_THRESHOLD_PARTICLES) {
             this.particleTimer -= delta;
             if (this.particleTimer <= 0) {
-                this.particleTimer = 0.15 - this.getChargeProgress() * 0.07;
+                this.particleTimer = PARTICLE_BASE_INTERVAL - this.getChargeProgress() * PARTICLE_INTERVAL_REDUCTION;
                 this.simulation.spawnParticleBurst(this.owner.position.clone(), this.owner.color, {
-                    count: 1 + Math.floor(this.getChargeProgress() * 3),
-                    speed: 90 + this.getChargeProgress() * 90,
+                    count: PARTICLE_BASE_COUNT + Math.floor(this.getChargeProgress() * PARTICLE_COUNT_PER_CHARGE),
+                    speed: PARTICLE_BASE_SPEED + this.getChargeProgress() * PARTICLE_SPEED_PER_CHARGE,
                     radiusMin: 2,
                     radiusMax: 4,
                     upBias: 120,

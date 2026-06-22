@@ -36,31 +36,45 @@ export class BattleSimulation extends Simulation {
 
         // ── 클릭 액션 시스템 ──
         this.playerBall = playerBall;
-        this._pendingAction = null;
-        this._timeSlowRemaining = 0;
-        this._timeSlowFactor = 0.45;
-        this._counterCharged = false;
+        this._clickActionContext = {
+            pendingAction: null,
+            timeSlowRemaining: 0,
+            timeSlowFactor: 0.45,
+            counterCharged: false
+        };
     }
 
-    /** 액션 예약 — app.js의 _tryFireAction에서 직접 _pendingAction에 접근하지 않도록 캡슐화 */
+    /** 액션 예약 — _clickActionContext로 위임 */
     scheduleAction(actionInstance, playerBall) {
-        this._pendingAction = { actionInstance, playerBall };
+        this._clickActionContext.pendingAction = { actionInstance, playerBall };
+    }
+
+    /** 예약된 액션을 꺼내서 적용 (update()에서 호출) */
+    _consumePendingAction() {
+        const ctx = this._clickActionContext;
+        if (!ctx.pendingAction) return null;
+        const pa = ctx.pendingAction;
+        ctx.pendingAction = null;
+        return pa;
     }
 
     // ── Action data interfaces ──────────────────────────────────────
 
     getTimeSlowRemaining() {
-        return this._timeSlowRemaining;
+        return this._clickActionContext.timeSlowRemaining;
     }
     setTimeSlowRemaining(v) {
-        this._timeSlowRemaining = v;
+        this._clickActionContext.timeSlowRemaining = v;
+    }
+    get timeSlowFactor() {
+        return this._clickActionContext.timeSlowFactor;
     }
 
     getCounterCharged() {
-        return this._counterCharged;
+        return this._clickActionContext.counterCharged;
     }
     setCounterCharged(v) {
-        this._counterCharged = v;
+        this._clickActionContext.counterCharged = v;
     }
 
     isCollisionImminent(playerBall) {
@@ -153,9 +167,9 @@ export class BattleSimulation extends Simulation {
         }
 
         // 지연 적용 패턴 — 클릭 핸들러가 예약한 액션을 충돌 전에 처리
-        if (this._pendingAction) {
-            const { actionInstance, playerBall: pb } = this._pendingAction;
-            this._pendingAction = null;
+        const pa = this._consumePendingAction();
+        if (pa) {
+            const { actionInstance, playerBall: pb } = pa;
             if (actionInstance && pb) {
                 this.addLog(`[액션] 효과 적용: ${actionInstance.name}`);
                 actionInstance.apply(this, pb);
@@ -175,14 +189,15 @@ export class BattleSimulation extends Simulation {
         }
 
         // 시간 왜곡 타이머
-        if (this._timeSlowRemaining > 0) this._timeSlowRemaining -= delta;
+        const ctx = this._clickActionContext;
+        if (ctx.timeSlowRemaining > 0) ctx.timeSlowRemaining -= delta;
 
         this.handleCollision();
 
         // 시간 왜곡 적용: 상대 엔티티만 느린 delta
         for (const entity of this.entities) {
             const isPlayer = entity === this.playerBall;
-            const scaledDelta = this._timeSlowRemaining > 0 && !isPlayer ? delta * this._timeSlowFactor : delta;
+            const scaledDelta = ctx.timeSlowRemaining > 0 && !isPlayer ? delta * ctx.timeSlowFactor : delta;
             entity.update(scaledDelta, this);
         }
         this.entities = this.entities.filter((entity) => !entity.isExpired);
@@ -230,7 +245,8 @@ export class BattleSimulation extends Simulation {
     }
 
     _applyCounterBonus(a, b, damageAToB, damageBToA) {
-        if (!this._counterCharged) return;
+        const ctx = this._clickActionContext;
+        if (!ctx.counterCharged) return;
         if (a === this.playerBall) {
             const bonus = Math.round(damageAToB * 0.12);
             b.takeDamage(bonus, a, "Counter");
@@ -240,7 +256,7 @@ export class BattleSimulation extends Simulation {
             a.takeDamage(bonus, b, "Counter");
             this.spawnActionText(a.position.clone(), "카운터!", "#ff8844");
         }
-        this._counterCharged = false;
+        ctx.counterCharged = false;
     }
 
     _applyCollisionPhysics(a, b, normal, aMod, bMod) {

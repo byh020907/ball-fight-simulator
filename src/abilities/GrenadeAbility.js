@@ -1,6 +1,12 @@
 import { Vector2, evadeTarget } from "../core.js";
 import { Ability } from "./Ability.js";
 
+const EVADE_RANGE = 260;
+const EVADE_STRENGTH = 0.5;
+const PREDICTION_FACTOR = 0.48;
+const FUSE_REDUCTION_PER_MISS = 0.18;
+const MAX_MISS_STREAK = 4;
+
 export class GrenadeAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation);
@@ -19,14 +25,14 @@ export class GrenadeAbility extends Ability {
         }
 
         this.timer = this.cooldown;
-        const prediction = Vector2.add(target.position.clone(), target.velocity.clone().scale(0.48));
+        const prediction = Vector2.add(target.position.clone(), target.velocity.clone().scale(PREDICTION_FACTOR));
         this.simulation.spawnGrenade(this.owner, prediction, this.getFuseTime());
         this.simulation.playSound("toss");
         this.simulation.addLog(`${this.owner.name} tosses a grenade into the arena.`);
     }
 
     getFuseTime() {
-        return Math.max(this.minFuse, this.baseFuse - this.missStreak * 0.18);
+        return Math.max(this.minFuse, this.baseFuse - this.missStreak * FUSE_REDUCTION_PER_MISS);
     }
 
     onGrenadeResult(hit) {
@@ -35,7 +41,7 @@ export class GrenadeAbility extends Ability {
             return;
         }
 
-        this.missStreak = Math.min(4, this.missStreak + 1);
+        this.missStreak = Math.min(MAX_MISS_STREAK, this.missStreak + 1);
         this.simulation.addLog(`${this.owner.name}'s next grenade fuse shortens.`);
     }
 

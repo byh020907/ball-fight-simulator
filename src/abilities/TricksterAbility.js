@@ -1,6 +1,10 @@
 import { Vector2 } from "../core.js";
 import { Ability } from "./Ability.js";
 
+const SEED_SPEED = 250;
+const SEED_COUNT = 3;
+const SPAWN_OFFSET = 20;
+
 export class TricksterAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation);
@@ -16,12 +20,11 @@ export class TricksterAbility extends Ability {
 
         this.timer = this.cooldown;
         const baseAngle = Math.random() * Math.PI * 2;
-        const speed = 250;
-        for (let index = 0; index < 3; index += 1) {
-            const angle = baseAngle + (Math.PI * 2 * index) / 3;
+        for (let index = 0; index < SEED_COUNT; index += 1) {
+            const angle = baseAngle + (Math.PI * 2 * index) / SEED_COUNT;
             const direction = Vector2.fromAngle(angle, 1);
-            const start = Vector2.add(this.owner.position, direction.clone().scale(this.owner.radius + 20));
-            this.simulation.spawnSeedOrb(this.owner, start, direction.scale(speed), this.cooldown);
+            const start = Vector2.add(this.owner.position, direction.clone().scale(this.owner.radius + SPAWN_OFFSET));
+            this.simulation.spawnSeedOrb(this.owner, start, direction.scale(SEED_SPEED), this.cooldown);
         }
         this.simulation.playSound("seed");
         this.simulation.addLog(`${this.owner.name} launches three dash seeds.`);

@@ -3,12 +3,17 @@ import { Ability } from "./Ability.js";
 
 const WINDUP = 0.6;
 const SPREAD_ANGLE = 0.22;
+const EVADE_RANGE = 320;
+const EVADE_STRENGTH = 0.7;
+const ARROW_SPEED_MULT = 2;
+const MAX_MISS_STREAK = 5;
 
 export class ArcherAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation);
         this._baseCooldown = 3;
         this.timer = 1.2;
+        this.arrowSpeedMult = ARROW_SPEED_MULT;
         this.windUp = 0;
         this.missStreak = 0;
         this.lastAimDir = new Vector2(1, 0);
@@ -73,7 +78,7 @@ export class ArcherAbility extends Ability {
         if (hit) {
             this.missStreak = 0;
         } else {
-            this.missStreak = Math.min(5, this.missStreak + 1);
+            this.missStreak = Math.min(MAX_MISS_STREAK, this.missStreak + 1);
         }
     }
 

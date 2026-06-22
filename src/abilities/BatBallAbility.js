@@ -15,6 +15,15 @@ function normalizeAngle(a) {
     return a;
 }
 
+const SLASH_DAMAGE_MULT = 1.6;
+const WALL_SLAM_DAMAGE_MULT = 1.2;
+const KNOCKBACK_FORCE = 550;
+const KNOCKBACK_DURATION = 0.85;
+const WALL_SLAM_EFFECT_DURATION = 1.0;
+const FACING_SMOOTH_RATE = 8;
+const SWEEP_AMPLITUDE = 0.45;
+const VISION_ARC_RADIUS_SCALE = 0.55;
+
 export class BatBallAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation);
@@ -45,8 +54,8 @@ export class BatBallAbility extends Ability {
         let angleDiff = velAngle - this._facingAngle;
         while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
         while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-        this._facingAngle += angleDiff * Math.min(1, 8 * delta);
-        const sweepOffset = Math.sin(time * SWEEP_SPEED) * (Math.PI * 0.45); // ±81°
+        this._facingAngle += angleDiff * Math.min(1, FACING_SMOOTH_RATE * delta);
+        const sweepOffset = Math.sin(time * SWEEP_SPEED) * (Math.PI * SWEEP_AMPLITUDE);
         this.arcAngle = this._facingAngle + sweepOffset;
 
         if (!target || this.timer > 0) return;
@@ -66,16 +75,16 @@ export class BatBallAbility extends Ability {
     }
 
     performSlash(target) {
-        const damage = Math.round(this.owner.baseDamage * 1.6);
+        const damage = Math.round(this.owner.baseDamage * SLASH_DAMAGE_MULT);
         target.takeDamage(damage, this.owner, "Slash");
 
         // 강한 넉백 + 벽 충돌 시 추가 데미지 (Eater wallSlamState 재사용)
         const kbDir = Vector2.subtract(target.position, this.owner.position).normalize();
-        target.applyKnockback(kbDir.scale(550), 0.85);
+        target.applyKnockback(kbDir.scale(KNOCKBACK_FORCE), KNOCKBACK_DURATION);
         target.wallSlamState = {
-            effect: new TimedEffect(1.0),
+            effect: new TimedEffect(WALL_SLAM_EFFECT_DURATION),
             source: this.owner,
-            damage: Math.round(this.owner.baseDamage * 1.2),
+            damage: Math.round(this.owner.baseDamage * WALL_SLAM_DAMAGE_MULT),
             cooldown: 0
         };
 
@@ -124,7 +133,7 @@ export class BatBallAbility extends Ability {
         ctx.lineWidth = 10 - progress * 6;
         ctx.globalAlpha = glowAlpha * 0.6;
         ctx.beginPath();
-        ctx.arc(pos.x, pos.y, ARC_RANGE * 0.55, this.slashStartAngle, currentEnd);
+        ctx.arc(pos.x, pos.y, ARC_RANGE * VISION_ARC_RADIUS_SCALE, this.slashStartAngle, currentEnd);
         ctx.stroke();
 
         // 메인 스윙 선
@@ -132,7 +141,7 @@ export class BatBallAbility extends Ability {
         ctx.lineWidth = 5 - progress * 3;
         ctx.globalAlpha = glowAlpha * 0.9;
         ctx.beginPath();
-        ctx.arc(pos.x, pos.y, ARC_RANGE * 0.55, this.slashStartAngle, currentEnd);
+        ctx.arc(pos.x, pos.y, ARC_RANGE * VISION_ARC_RADIUS_SCALE, this.slashStartAngle, currentEnd);
         ctx.stroke();
 
         // 잔상 (trail) — 여러 겹
@@ -144,7 +153,7 @@ export class BatBallAbility extends Ability {
             ctx.lineWidth = 3 - i * 0.6;
             ctx.globalAlpha = glowAlpha * 0.3 * (1 - i * 0.25);
             ctx.beginPath();
-            ctx.arc(pos.x, pos.y, ARC_RANGE * 0.55 - i * 8, this.slashStartAngle, trailEnd);
+            ctx.arc(pos.x, pos.y, ARC_RANGE * VISION_ARC_RADIUS_SCALE - i * 8, this.slashStartAngle, trailEnd);
             ctx.stroke();
         }
 
@@ -210,8 +219,13 @@ export class BatBallAbility extends Ability {
         const handleEndY = hy - Math.sin(batAngle) * BAT_HANDLE;
 
         ctx.save();
+        this._drawBarrel(ctx, hx, hy, bx, by);
+        this._drawHandle(ctx, hx, hy, handleEndX, handleEndY, batAngle);
+        ctx.restore();
+    }
 
-        // 배럴 (두꺼운 부분) — 갈색 원통
+    /** 배럴 (두꺼운 부분) + 하이라이트 */
+    _drawBarrel(ctx, hx, hy, bx, by) {
         ctx.strokeStyle = "#c4773a";
         ctx.lineWidth = 9;
         ctx.lineCap = "round";
@@ -220,15 +234,16 @@ export class BatBallAbility extends Ability {
         ctx.lineTo(bx, by);
         ctx.stroke();
 
-        // 배럴 하이라이트
         ctx.strokeStyle = "#e8a86a";
         ctx.lineWidth = 3;
         ctx.beginPath();
         ctx.moveTo(hx, hy);
         ctx.lineTo(bx, by);
         ctx.stroke();
+    }
 
-        // 손잡이 (가는 부분) — 검정 테이프
+    /** 손잡이 + 그립 테이프 + 마감 */
+    _drawHandle(ctx, hx, hy, handleEndX, handleEndY, batAngle) {
         ctx.strokeStyle = "#222222";
         ctx.lineWidth = 5;
         ctx.beginPath();
@@ -236,7 +251,6 @@ export class BatBallAbility extends Ability {
         ctx.lineTo(handleEndX, handleEndY);
         ctx.stroke();
 
-        // 그립 테이프 감긴 느낌
         ctx.strokeStyle = "#444444";
         ctx.lineWidth = 1.5;
         for (let i = 0; i < 4; i++) {
@@ -250,13 +264,10 @@ export class BatBallAbility extends Ability {
             ctx.stroke();
         }
 
-        // 손잡이 마감
         ctx.fillStyle = "#111111";
         ctx.beginPath();
         ctx.arc(handleEndX, handleEndY, 3.5, 0, Math.PI * 2);
         ctx.fill();
-
-        ctx.restore();
     }
 
     /** 캡 모자를 쓴 타자 얼굴 */
