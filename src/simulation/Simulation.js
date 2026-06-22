@@ -6,7 +6,8 @@ import {
     OrbitHitEffect,
     SlashTrail,
     VisualBurst,
-    DamageNumber
+    DamageNumber,
+    ActionText
 } from "../effects.js";
 
 /**
@@ -228,6 +229,11 @@ export class Simulation {
     spawnDamageNumber(position, amount, color = "#ff3333") {
         if (!this.showDamageNumbers) return;
         this.entities.push(new DamageNumber(position, amount, color));
+    }
+
+    spawnActionText(position, text, color = "#ffffff") {
+        if (!this.showDamageNumbers) return;
+        this.entities.push(new ActionText(position, text, color));
     }
 
     // ── Shared helpers ────────────────────────────────────────────────────

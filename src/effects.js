@@ -269,3 +269,36 @@ export class DamageNumber extends CombatEntity {
         ctx.restore();
     }
 }
+
+export class ActionText extends CombatEntity {
+    static renderLayer = RENDER_LAYERS.FOREGROUND;
+
+    constructor(position, text, color = "#ffffff") {
+        super(position.clone(), new Vector2(0, -50), 0);
+        this.text = text;
+        this.color = color;
+        this.life = 0.9;
+        this.maxLife = this.life;
+        this.fontSize = 24;
+    }
+
+    update(delta) {
+        this.life -= delta;
+        this.position.add(this.velocity.clone().scale(delta));
+        if (this.life <= 0) this.isExpired = true;
+    }
+
+    draw(ctx) {
+        const alpha = Math.max(0, this.life / this.maxLife);
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.font = "900 " + this.fontSize + 'px Bahnschrift, "Segoe UI", sans-serif';
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.shadowColor = "rgba(0,0,0,0.6)";
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = this.color;
+        ctx.fillText(this.text, this.position.x, this.position.y);
+        ctx.restore();
+    }
+}
