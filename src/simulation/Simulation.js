@@ -86,6 +86,11 @@ export class Simulation {
         ball.movementEffect.onWallBounce(ball, this);
         if (ball.movementEffect?.expired) {
             ball.movementEffect = null;
+            // 대시/효과 종료 시 forcedHeading도 제거 — overrideVelocity가 없으면
+            // update()의 bounced 체크가 걸리지 않아 벽 방향 속도가 유지됨
+            if (ball.forcedHeading && !ball.forcedHeading.overrideVelocity) {
+                ball.forcedHeading = null;
+            }
         }
     }
 

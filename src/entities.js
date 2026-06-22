@@ -430,7 +430,10 @@ export class BattleBall {
 
         if (this.movementEffect) {
             this.movementEffect.tick(this, delta);
-            if (this.movementEffect.expired) this.movementEffect = null;
+            if (this.movementEffect.expired) {
+                this.movementEffect = null;
+                if (this.forcedHeading) this.forcedHeading = null;
+            }
         }
 
         if (this.wallSlamState) {

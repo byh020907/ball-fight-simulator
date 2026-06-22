@@ -264,9 +264,8 @@ export class BattleSimulation extends Simulation {
             attacker.movementEffect.onCollision(attacker, defender, this);
             if (attacker.movementEffect?.expired) {
                 attacker.movementEffect = null;
-                // 대시 종료 시 overrideVelocity도 제거 — 안 그러면 다음 프레임에서
-                // _computeVelocity가 overrideVelocity를 반환해 충돌 물리 결과를 덮어씀
-                if (attacker.forcedHeading?.overrideVelocity) {
+                // 대시 종료 시 forcedHeading 제거 (overrideVelocity 유무 불문)
+                if (attacker.forcedHeading) {
                     attacker.forcedHeading = null;
                 }
             }
