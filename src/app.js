@@ -20,7 +20,7 @@ export class BattleApp {
          * 플레이어로 고정되고 토너먼트 첫 엔트리에 배치됩니다.
          * @type {string|null}
          */
-        this.startCharacter = "bat_ball";
+        this.startCharacter = null;
 
         this.elements = {
             canvas: document.getElementById("arenaCanvas"),
@@ -154,7 +154,7 @@ export class BattleApp {
         this.ui.roster = this.tournamentRoster;
         this.matchmaker = new Matchmaker(this.tournamentRoster);
         this.playerResult = null;
-        this.tournament = new TournamentManager(this.tournamentRoster, this.startCharacter);
+        this.tournament = new TournamentManager(this.tournamentRoster, this.playerFighterId);
         this.currentTournamentMatch = null;
         this.refreshPlayerSetup();
         this.ui.renderTournament(this.tournament);
