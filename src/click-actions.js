@@ -128,7 +128,7 @@ class RushAction extends ClickAction {
         return "돌진";
     }
     get description() {
-        return "0.2초간 속도 +25%";
+        return "0.5초간 속도 +25%";
     }
     get hpCostPercent() {
         return 0.7;
@@ -136,7 +136,7 @@ class RushAction extends ClickAction {
 
     apply(sim, playerBall) {
         const current = playerBall.getRushRemaining();
-        playerBall.setRush(current > 0 ? current + 0.2 : 0.2, 1.25);
+        playerBall.setRush(current > 0 ? current + 0.5 : 0.5, 1.25);
     }
 }
 
