@@ -19,6 +19,41 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.8.0",
+        date: "2026-06-22",
+        title: "v0.8.0 업데이트",
+        changes: [
+            {
+                type: "feature",
+                text: "클릭 액션 시스템 추가 — 매치 시작 시 5개 액션 중 3개를 뽑아 1개 선택. 캔버스 클릭으로 발동, HP 소모."
+            },
+            {
+                type: "feature",
+                text: "액션: 시간 왜곡 — HP 50% 이하에서 0.25초간 상대만 슬로우"
+            },
+            {
+                type: "feature",
+                text: "액션: 돌진 — 0.2초간 속도 +25%"
+            },
+            {
+                type: "feature",
+                text: "액션: 카운터 — 충돌 임박 시 클릭 → 데미지 +12%"
+            },
+            {
+                type: "feature",
+                text: "액션: 받아치기 — 날아오는 투사체 데미지 50% 경감"
+            },
+            {
+                type: "feature",
+                text: "액션: 버티기 — HP 50% 이하에서 0.1초간 데미지 50% 경감"
+            },
+            {
+                type: "feature",
+                text: "TriggerStrategy 패턴 — Tap/Release/Hold 세 가지 발동 방식 지원 (현재는 Tap만 사용)"
+            }
+        ]
+    },
+    {
         version: "0.7.0",
         date: "2026-06-22",
         title: "v0.7.0 업데이트",

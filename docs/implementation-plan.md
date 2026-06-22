@@ -1,6 +1,6 @@
 # 클릭 액션 시스템 — 구현 계획
 
-> **상태**: 계획 단계 (미구현)
+> **상태**: 구현 완료 (v0.8.0, [`src/click-actions.js`](../src/click-actions.js))
 > **설계 문서**: [`docs/click-actions.md`](click-actions.md)
 
 ---
