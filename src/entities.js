@@ -16,26 +16,21 @@ export class SeedOrb extends Projectile {
             this.isExpired = true;
         }
 
-        // hit 체크 — 템플릿 메서드 사용
-        this._projectileHitCheck(simulation);
-    }
-
-    /** @returns {import("./core.js").CombatEntity} */
-    _findTarget(simulation) {
-        return simulation.getOpponent(this.owner);
-    }
-
-    _getHitDamage() {
-        return 0;
-    }
-
-    _getHitLabel() {
-        return "";
+        // hit 체크 — 모든 파이터(본인 포함)에 대해 검사
+        for (const fighter of simulation.fighters) {
+            if (fighter.isDefeated) continue;
+            const distance = Vector2.subtract(this.position, fighter.position).length();
+            if (distance > this.radius + fighter.radius) continue;
+            this._onHitEffects(fighter, simulation);
+            this.isExpired = true;
+            break;
+        }
     }
 
     _onHitEffects(target, simulation) {
-        const dashDirection = target
-            ? Vector2.subtract(target.position, this.owner.position).normalize()
+        const opponent = simulation.getOpponent(this.owner);
+        const dashDirection = opponent
+            ? Vector2.subtract(opponent.position, this.owner.position).normalize()
             : this.velocity.clone().normalize();
         this.owner.setMovementEffect(
             new DashEffect({
