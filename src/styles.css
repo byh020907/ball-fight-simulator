@@ -753,6 +753,42 @@ body::before {
     display: block;
 }
 
+/* 배틀 로그 — PC 전용, 우측 상단 고정 */
+#battleLog {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 10001;
+    width: 280px;
+    max-height: 40vh;
+    overflow-y: auto;
+    list-style: none;
+    margin: 0;
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.7);
+    border-radius: 8px;
+    font-size: 0.72rem;
+    line-height: 1.5;
+    color: #eee;
+    pointer-events: none;
+}
+
+#battleLog li {
+    padding: 2px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#battleLog li:last-child {
+    border-bottom: none;
+}
+
+/* 모바일에서는 숨김 */
+@media (max-width: 768px) {
+    #battleLog {
+        display: none !important;
+    }
+}
+
 .hero,
 .roster-panel,
 .log-panel {
