@@ -10,6 +10,102 @@
 - 스텝별 구현 후 전체 회귀 테스트는 별도 검증 담당이 수행할 수 있도록 체크리스트를 문서에 남깁니다.
 - 구현 중 즉시 필요한 최소 문법 확인만 수행하고, 긴 회귀 검증은 이 문서의 항목을 기준으로 분리합니다.
 
+## 구현 패턴 예시
+
+아래 예시는 실제 구현 시 따라야 하는 코드 모양입니다. 핵심은 `BattleBall`이나 `Simulation`이 effect 내부 필드를 해석하지 않는 것입니다.
+
+### Bad: Ball/Simulation이 특수 로직을 해석
+
+```js
+// bad: BattleBall이 dash 규칙을 직접 구성함
+startDash(direction, config) {
+    this.dashState = {
+        collisionDamage: config.collisionDamage,
+        untilImpact: config.untilImpact,
+        untilWall: config.untilWall
+    };
+    this.speedBoost = { multiplier: config.multiplier };
+}
+
+// bad: Simulation이 dash 내부 필드를 직접 해석함
+if (attacker.dashState.collisionDamage) {
+    defender.takeDamage(attacker.dashState.collisionDamage, attacker, attacker.dashState.collisionLabel);
+}
+if (attacker.dashState.untilImpact) {
+    attacker.clearDash();
+}
+```
+
+### Good: Runtime effect가 자기 이벤트를 소유
+
+```js
+class DashEffect {
+    constructor({ source, multiplier, collisionDamage = 0, untilImpact = false }) {
+        this.source = source;
+        this.multiplier = multiplier;
+        this.collisionDamage = collisionDamage;
+        this.untilImpact = untilImpact;
+        this.expired = false;
+    }
+
+    getSpeed(ball) {
+        return ball.baseSpeed * this.multiplier;
+    }
+
+    onCollision(attacker, defender, simulation) {
+        if (this.collisionDamage > 0) {
+            defender.takeDamage(this.collisionDamage, attacker, "Dash");
+        }
+        attacker.ability?.onDashHit?.(defender, this);
+        if (this.untilImpact) {
+            this.expired = true;
+        }
+    }
+
+    onWallBounce(ball, normal, simulation) {
+        ball.ability?.onDashWall?.(this);
+        this.expired = true;
+    }
+}
+
+// BattleBall은 저장과 위임만 담당
+setMovementEffect(effect) {
+    this.movementEffect = effect;
+}
+
+// Simulation은 충돌 이벤트만 전달
+attacker.movementEffect?.onCollision?.(attacker, defender, this);
+if (attacker.movementEffect?.expired) {
+    attacker.clearMovementEffect();
+}
+```
+
+### Ability에서 effect 생성
+
+```js
+class DashAbility extends Ability {
+    startDash(target) {
+        const direction = Vector2.subtract(target.position, this.owner.position).normalize();
+        this.owner.setMovementEffect(
+            new DashEffect({
+                source: this.owner,
+                multiplier: 2.15,
+                collisionDamage: 0,
+                untilImpact: true
+            })
+        );
+        this.owner.forceHeading(direction, 1.4);
+    }
+}
+```
+
+### 구현 시 금지 규칙
+
+- `Simulation`에서 `effect.collisionDamage`, `effect.untilImpact`, `effect.cooldown` 같은 내부 필드를 직접 읽지 않습니다.
+- `BattleBall`에 `startDash(config)`, `applySwallow(owner)`, `applyWallSlam(data)`처럼 특정 능력 규칙을 아는 메서드를 늘리지 않습니다.
+- 새 effect를 만들 때는 `onCollision`, `onWallBounce`, `tick`, `getSpeed`, `onDamageTaken`처럼 이벤트/질문 단위 메서드를 제공합니다.
+- 기존 테스트가 직접 상태명을 확인하는 경우는 한 스텝 안에서만 유지하고, 새 테스트는 effect 메서드 존재나 결과 행동을 확인합니다.
+
 ## 완료된 스텝
 
 ### Step 1. 클릭 액션 effect 책임 정리
