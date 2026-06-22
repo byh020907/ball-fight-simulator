@@ -143,8 +143,8 @@ class RushAction extends ClickAction {
     }
 
     apply(sim, playerBall) {
-        const current = playerBall.getRushRemaining();
-        playerBall.setRush(current > 0 ? current + 0.5 : 0.5, 1.25);
+        const current = playerBall.actionContext.getRushRemaining();
+        playerBall.actionContext.setRush(current > 0 ? current + 0.5 : 0.5, 1.25);
     }
 }
 
@@ -214,7 +214,7 @@ class EndureAction extends ClickAction {
     }
 
     apply(sim, playerBall) {
-        playerBall.registerDamageHandler((amount, source, label) => {
+        playerBall.actionContext.registerDamageHandler((amount, source, label) => {
             source?.simulation?.spawnActionText?.(playerBall.position.clone(), "버팀!", "#44ff44");
             return Math.round(amount * 0.5);
         }, 0.1);
@@ -254,4 +254,58 @@ export function showActionFailure(action, sim, playerBall) {
     sim.spawnActionText(playerBall.position.clone(), reason, "#ff8888");
     console.log("[액션 피드백] 실패:", action.name, "-", reason);
     return true;
+}
+
+/**
+ * BattleBall이 단일 ref로 참조하는 액션 상태 컨텍스트.
+ * 모든 ClickAction 관련 변수와 로직은 여기서 관리.
+ */
+export class ActionContext {
+    constructor() {
+        this._rushRemaining = 0;
+        this._rushMultiplier = 1;
+        this._damageHandler = null;
+        this._damageHandlerRemaining = 0;
+    }
+
+    // ── Rush (돌진) ──
+
+    getRushRemaining() {
+        return this._rushRemaining;
+    }
+    setRush(duration, multiplier) {
+        this._rushRemaining = duration;
+        this._rushMultiplier = multiplier;
+    }
+
+    /** BattleSimulation.getSpeedMultiplier()에서 호출 */
+    getRushSpeedMultiplier() {
+        return this._rushRemaining > 0 ? 1.25 : 1;
+    }
+
+    // ── Damage Handler (버티기 등) ──
+
+    registerDamageHandler(handler, duration) {
+        this._damageHandler = handler;
+        this._damageHandlerRemaining = duration;
+    }
+
+    /** BattleBall.takeDamage()에서 호출 */
+    onDamageTaken(amount, source, label) {
+        if (this._damageHandler) {
+            return this._damageHandler(amount, source, label);
+        }
+        return amount;
+    }
+
+    // ── 프레임 갱신 ──
+
+    /** BattleBall._tickTimers()에서 호출 */
+    tickTimers(delta) {
+        if (this._rushRemaining > 0) this._rushRemaining -= delta;
+        if (this._damageHandler) {
+            this._damageHandlerRemaining -= delta;
+            if (this._damageHandlerRemaining <= 0) this._damageHandler = null;
+        }
+    }
 }

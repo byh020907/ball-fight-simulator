@@ -1,4 +1,5 @@
 import { CombatEntity, Projectile, RENDER_LAYERS, TimedEffect, Vector2 } from "./core.js";
+import { ActionContext } from "./click-actions.js";
 
 export class SeedOrb extends Projectile {
     constructor(owner, position, velocity, life) {
@@ -314,12 +315,8 @@ export class BattleBall {
         this.spinRotation = 0;
         this.statAllocation = spec.statAllocation ?? null;
 
-        // ── 클릭 액션 시스템 ──
-        this._rushRemaining = 0;
-        this._rushMultiplier = 1;
-        /** function(amount, source, label): number | null — ClickAction이 등록, takeDamage가 호출 */
-        this._damageHandler = null;
-        this._damageHandlerRemaining = 0;
+        // ── 클릭 액션 시스템 (단일 ref, 모든 로직은 ActionContext에) ──
+        this.actionContext = new ActionContext();
     }
 
     get renderLayer() {
@@ -404,20 +401,7 @@ export class BattleBall {
 
     // ── 클릭 액션 데이터 인터페이스 ──
 
-    getRushRemaining() {
-        return this._rushRemaining;
-    }
-    setRush(duration, multiplier) {
-        this._rushRemaining = duration;
-        this._rushMultiplier = multiplier;
-    }
-
-    /** 액션이 데미지 핸들러 등록. takeDamage()가 호출만 함. */
-    registerDamageHandler(handler, duration) {
-        this._damageHandler = handler;
-        this._damageHandlerRemaining = duration;
-    }
-
+    /** ActionContext에 위임. app.js에서 HP 소모용. */
     spendHpForAction(amount) {
         if (this.hp <= 1) return 0;
         const cost = Math.min(amount, this.hp - 1);
@@ -479,11 +463,7 @@ export class BattleBall {
             if (this.wallSlamState.effect.finished) this.wallSlamState = null;
         }
 
-        if (this._rushRemaining > 0) this._rushRemaining -= delta;
-        if (this._damageHandler) {
-            this._damageHandlerRemaining -= delta;
-            if (this._damageHandlerRemaining <= 0) this._damageHandler = null;
-        }
+        this.actionContext.tickTimers(delta);
     }
 
     /** 속도 계산 — 이동 보정치, 강제 방향, 넉백을 종합 */
@@ -518,10 +498,8 @@ export class BattleBall {
             return;
         }
 
-        // ClickAction이 등록한 데미지 핸들러 (takeDamage는 호출만, 로직은 액션에)
-        if (this._damageHandler) {
-            amount = this._damageHandler(amount, source, label);
-        }
+        // ClickAction이 등록한 데미지 핸들러 (ActionContext에 위임)
+        amount = this.actionContext.onDamageTaken(amount, source, label);
 
         const abilityDefMult = this.getStatModifiers().defense;
         const totalDefense = Math.round(this.baseDefense * abilityDefMult);

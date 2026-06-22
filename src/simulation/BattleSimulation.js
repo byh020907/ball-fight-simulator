@@ -146,7 +146,7 @@ export class BattleSimulation extends Simulation {
      */
     getSpeedMultiplier() {
         const overtimeMult = this.isOvertime() ? Math.min(1.58, 1.12 + this.getOvertimeProgress() * 0.026) : 1;
-        const rushMult = this.playerBall?.getRushRemaining() > 0 ? 1.25 : 1;
+        const rushMult = this.playerBall?.actionContext?.getRushSpeedMultiplier() ?? 1;
         return overtimeMult * rushMult;
     }
 
