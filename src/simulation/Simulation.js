@@ -7,7 +7,10 @@ import {
     SlashTrail,
     VisualBurst,
     DamageNumber,
-    ActionText
+    ActionText,
+    ActionWindowEffect,
+    ActionSuccessEffect,
+    ActionWhiffEffect
 } from "../effects.js";
 
 /**
@@ -218,6 +221,18 @@ export class Simulation {
     spawnActionText(position, text, color = "#ffffff") {
         if (!this.showDamageNumbers) return;
         this.entities.push(new ActionText(position, text, color));
+    }
+
+    spawnActionWindow(ball, actionId, duration) {
+        this.entities.push(new ActionWindowEffect(ball, actionId, duration));
+    }
+
+    spawnActionSuccess(position, actionId) {
+        this.entities.push(new ActionSuccessEffect(position, actionId));
+    }
+
+    spawnActionWhiff(position) {
+        this.entities.push(new ActionWhiffEffect(position));
     }
 
     // ── Shared helpers ────────────────────────────────────────────────────

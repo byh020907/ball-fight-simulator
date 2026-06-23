@@ -437,7 +437,7 @@ export class BattleBall {
             }
         }
 
-        this.actionContext.tickTimers(delta);
+        this.actionContext.tickTimers(this, delta);
     }
 
     /** 속도 계산 — 이동 보정치, 강제 방향, 넉백을 종합 */

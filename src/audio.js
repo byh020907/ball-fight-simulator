@@ -73,7 +73,11 @@ export class AudioEngine {
                 this.playThud(58, 0.34, 0.18 * safeIntensity);
             },
             start: () => this.playSweep(260, 760, 0.22, 0.045),
-            overtime: () => this.playSweep(620, 180, 0.28, 0.055)
+            overtime: () => this.playSweep(620, 180, 0.28, 0.055),
+            counter: () => this.playZap(880, 0.1, 0.07 * safeIntensity),
+            parry: () => this.playZap(1100, 0.12, 0.06 * safeIntensity),
+            guard: () => this.playThud(320, 0.08, 0.05 * safeIntensity),
+            whiff: () => this.playThud(180, 0.04, 0.025 * safeIntensity)
         };
 
         voices[type]?.();

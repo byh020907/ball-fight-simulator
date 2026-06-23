@@ -178,6 +178,8 @@ class CounterAction extends ClickAction {
     }
 
     apply(sim, playerBall) {
+        sim.spawnActionWindow(playerBall, this.id, COUNTER_WINDOW_SECONDS);
+        sim.playSound("counter");
         const effect = {
             remaining: COUNTER_WINDOW_SECONDS,
             onFighterCollision: (owner, opponent, outgoingDamage, incomingDamage, simulation) => {
@@ -185,6 +187,8 @@ class CounterAction extends ClickAction {
                 if (bonus > 0) {
                     opponent.takeDamage(bonus, owner, "Counter");
                     simulation.spawnActionText(opponent.position.clone(), "카운터!", "#ff8844");
+                    simulation.spawnActionSuccess(opponent.position.clone(), "counter");
+                    simulation.playSound("counter");
                 }
                 effect.isExpired = true;
             }
@@ -209,11 +213,15 @@ class ParryAction extends ClickAction {
     }
 
     apply(sim, playerBall) {
+        sim.spawnActionWindow(playerBall, this.id, PARRY_WINDOW_SECONDS);
+        sim.playSound("parry");
         const effect = {
             remaining: PARRY_WINDOW_SECONDS,
             onProjectileDamage: (amount, projectile, source, label, simulation, target) => {
                 effect.isExpired = true;
                 simulation.spawnActionText(target.position.clone(), "받아치기!", "#44ddff");
+                simulation.spawnActionSuccess(target.position.clone(), "parry");
+                simulation.playSound("parry");
                 return Math.round(amount * PARRY_DAMAGE_MULTIPLIER);
             }
         };
@@ -237,10 +245,14 @@ class EndureAction extends ClickAction {
     }
 
     apply(sim, playerBall) {
+        sim.spawnActionWindow(playerBall, this.id, ENDURE_DURATION);
+        sim.playSound("guard");
         playerBall.actionContext.setEffect(this.id, {
             remaining: ENDURE_DURATION,
             onDamageTaken: (amount, source, label) => {
                 source?.simulation?.spawnActionText?.(playerBall.position.clone(), "버팀!", "#44ff44");
+                source?.simulation?.spawnActionSuccess?.(playerBall.position.clone(), "endure");
+                source?.simulation?.playSound?.("guard");
                 return Math.round(amount * ENDURE_DAMAGE_MULTIPLIER);
             }
         });
@@ -345,13 +357,20 @@ export class ActionContext {
     }
 
     /** BattleBall._tickTimers()에서 호출 */
-    tickTimers(delta) {
+    tickTimers(ball, delta) {
         for (const [id, effect] of this._effects) {
             if (typeof effect.remaining === "number") {
                 effect.remaining -= delta;
             }
             effect.tick?.(delta);
             if (effect.isExpired || effect.remaining <= 0) {
+                if (!effect.isExpired && ball?.simulation) {
+                    // window 만료 — whiff 효과 (방어/회피 액션만)
+                    if (id === "counter" || id === "parry" || id === "endure") {
+                        ball.simulation.spawnActionWhiff(ball.position.clone());
+                        ball.simulation.playSound("whiff");
+                    }
+                }
                 this._effects.delete(id);
             }
         }

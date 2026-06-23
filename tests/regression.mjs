@@ -638,7 +638,7 @@ function testClickActionEffectOwnership(app) {
     assert.equal(sim.getSpeedMultiplier(player), 1.25, "RushAction should register speed effect on its target ball");
     assert.equal(sim.getSpeedMultiplier(opponent), 1, "RushAction should not boost unrelated balls");
 
-    player.actionContext.tickTimers(0.25);
+    player.actionContext.tickTimers(player, 0.25);
     rush.apply(sim, player);
     assert.equal(
         player.actionContext.getEffect("rush").remaining,
@@ -646,7 +646,7 @@ function testClickActionEffectOwnership(app) {
         "RushAction should own duration extension logic"
     );
 
-    player.actionContext.tickTimers(0.76);
+    player.actionContext.tickTimers(player, 0.76);
     assert.equal(sim.getSpeedMultiplier(player), 1, "Rush effect should expire through the generic action context");
 
     endure.apply(sim, player);
@@ -656,7 +656,7 @@ function testClickActionEffectOwnership(app) {
         "EndureAction should own damage reduction logic"
     );
 
-    player.actionContext.tickTimers(0.11);
+    player.actionContext.tickTimers(player, 0.11);
     assert.equal(player.actionContext.onDamageTaken(11, opponent, "Test"), 11, "Endure effect should expire");
 }
 
@@ -680,7 +680,7 @@ function testRiskWindowActionOwnership(app) {
     const opponentHpAfterCounter = opponent.hp;
     player.actionContext.onFighterCollision(player, opponent, 50, 0, sim);
     assert.equal(opponent.hp, opponentHpAfterCounter, "Counter should not apply twice in the same frame");
-    player.actionContext.tickTimers(0);
+    player.actionContext.tickTimers(player, 0);
     assert.equal(player.actionContext.getEffect("counter"), null, "Counter should expire after it is consumed");
 
     parry.apply(sim, player);
@@ -699,11 +699,11 @@ function testRiskWindowActionOwnership(app) {
         20,
         "Parry should not reduce a second projectile after it is consumed"
     );
-    player.actionContext.tickTimers(0);
+    player.actionContext.tickTimers(player, 0);
     assert.equal(player.actionContext.getEffect("parry"), null, "Parry should expire after reducing one projectile");
 
     parry.apply(sim, player);
-    player.actionContext.tickTimers(0.31);
+    player.actionContext.tickTimers(player, 0.31);
     assert.equal(
         player.actionContext.onProjectileDamage(20, {}, opponent, "Arrow Shot", sim, player),
         20,
