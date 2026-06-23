@@ -1,8 +1,8 @@
 import { Vector2, evadeTarget } from "../core.js";
 import { Ability } from "./Ability.js";
 
-const EVADE_RANGE = 260;
-const EVADE_STRENGTH = 0.5;
+const EVADE_RANGE = 320;
+const EVADE_STRENGTH = 0.7;
 const PREDICTION_FACTOR = 0.48;
 const FUSE_REDUCTION_PER_MISS = 0.18;
 const MAX_MISS_STREAK = 4;
@@ -73,6 +73,6 @@ export class GrenadeAbility extends Ability {
     }
 
     _evade(target) {
-        evadeTarget(this.owner, target, 260, 0.5);
+        evadeTarget(this.owner, target, EVADE_RANGE, EVADE_STRENGTH);
     }
 }

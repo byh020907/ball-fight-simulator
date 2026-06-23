@@ -51,7 +51,7 @@
 | 액션          | 발동 조건      | 효과                                                                                 | 예상 클릭 빈도              | HP 소모(maxHP 비율) |
 | ------------- | -------------- | ------------------------------------------------------------------------------------ | --------------------------- | ------------------- |
 | **시간 왜곡** | 상시           | 클릭 시 0.5초간 상대(플레이어 제외 모든 엔티티)만 35% 속도로 슬로우. 연타 시 갱신      | 매우 높음 (~0.2초마다 연타) | 0.5%                |
-| **돌진**      | 상시           | 클릭 시 1초간 내 캐릭터 속도 +50%                                                    | 중간 (1~2초마다)            | 1.0%               |
+| **돌진**      | 상시           | 클릭 시 현재 진행 방향으로 즉시 튀어나가고, 1초간 내 캐릭터 속도 +50% 유지             | 중간 (1~2초마다)            | 1.0%               |
 | **카운터**    | 상시           | 클릭 시 0.20초간 충돌 window. 맞으면 상대가 나에게 줄 충돌 피해를 상대에게 반사.        | 낮음 (매치당 손에 꼽음)     | 1.5%               |
 | **투사체 방어** | 상시         | 클릭 시 0.3초간 투사체 피해 75% 경감 window. 성공하면 HP 비용 회수.                    | 중간 (예측 샷)             | 1.0%               |
 | **버티기**    | 상시           | 클릭 시 0.1초간 받는 모든 데미지 80% 경감                                             | 위기 구간에서 몰아서 사용   | 1.0%               |
@@ -169,7 +169,8 @@ class ClickAction {
 // 액션          Action이 소유한 로직                        Domain 인터페이스
 // ────────────  ─────────────────────────────────────────  ──────────────────────────────
 // 시간 왜곡     max(현재값, duration) 후 저장               sim.get/ setTimeSlowRemaining()
-// 돌진          지속시간 연장 or 신규 + 배율 적용            ball.actionContext.getEffect(), setEffect()
+// 돌진          지속시간 연장 or 신규 + 배율 적용 + 즉시 impulse
+//                ball.actionContext.getEffect(), setEffect(), ball.applyImpulse()
 // 카운터        timed effect 등록 (0.20s, onFighterCollision) ball.actionContext.setEffect()
 // 투사체 방어   timed effect 등록 (0.3s, onProjectileDamage)  ball.actionContext.setEffect()
 // 버티기        경감 effect 등록                            ball.actionContext.setEffect()
@@ -277,6 +278,7 @@ class RushAction extends ClickAction {
             remaining: current > 0 ? current + RUSH_DURATION : RUSH_DURATION,
             getSpeedMultiplier: () => 1 + RUSH_SPEED_BONUS
         });
+        this._applyBurstImpulse(sim, playerBall);
     }
 }
 
@@ -459,7 +461,7 @@ for (const entity of this.entities) {
 | 액션 | 코스트 | 효과 |
 |------|--------|------|
 | 시간 왜곡 | 0.5% | 0.5s 슬로우 |
-| 돌진 | 1.0% | 1.0s 속도 +50% |
+| 돌진 | 1.0% | 즉시 전방 돌진 + 1.0s 속도 +50% |
 | 카운터 | 1.5% | 0.20s window, 상대가 나에게 줄 충돌 피해 반사 |
 | 투사체 방어 | 1.0% | 0.3s window, 투사체 75% 경감 + 성공 시 비용 회수 |
 | 버티기 | 1.0% | 0.1s window, 모든 피해 80% 경감 |
@@ -477,7 +479,7 @@ for (const entity of this.entities) {
 - [ ] 각 액션의 발동 조건 정확히 동작
 - [ ] HP 자해 소모로 패배 처리되지 않음 (최소 HP 1 보장)
 - [ ] 시간 왜곡: 연타 시 슬로우 갱신, 상대만 느려짐
-- [ ] 돌진: 1초 지속 자연스럽게 적용/해제
+- [ ] 돌진: 발동 순간 전방 impulse 적용 + 1초 지속 자연스럽게 적용/해제
 - [ ] 카운터: 판정 윈도우 난이도 적절
 - [x] 투사체 방어: 투사체 없는 매치업에서 무용지물 문제 해결 (상시 발동 + 0.3s window)
 - [ ] 오버타임과 동시 사용 시 충돌 없음

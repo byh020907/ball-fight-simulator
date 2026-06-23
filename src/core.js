@@ -184,6 +184,8 @@ export const FIGHTER_IDS = Object.freeze({
     HERO: "hero"
 });
 
+const EVADE_IMPULSE_RESPONSE = 0.72;
+
 /**
  * 볼을 목표 방향으로 유도합니다.
  *
@@ -258,6 +260,9 @@ export function evadeTarget(owner, target, range, strength) {
     const intensity = (1 - dist / range) * strength;
     const current = myDir ?? dodgeDir;
     const blended = current.add(dodgeDir.scale(intensity)).normalize();
+    const desiredSpeed = Math.max(owner.velocity.length(), owner.baseSpeed * owner.getStatModifiers().speed);
+    const desiredVelocity = blended.clone().scale(desiredSpeed);
+    owner.applyImpulse(Vector2.subtract(desiredVelocity, owner.velocity).scale(EVADE_IMPULSE_RESPONSE * intensity));
 
     if (owner.forcedHeading) {
         owner.forcedHeading.direction = blended;

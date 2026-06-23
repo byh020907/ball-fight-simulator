@@ -1,4 +1,5 @@
 import { shuffled } from "./random.js";
+import { Vector2 } from "./core.js";
 
 // ── Trigger Strategy ─────────────────────────────────────────────
 // 발동 방식을 캡슐화. ctx = { action, sim, player, fireAction(), 상태 }
@@ -160,6 +161,28 @@ class RushAction extends ClickAction {
             remaining: current > 0 ? current + RUSH_DURATION : RUSH_DURATION,
             getSpeedMultiplier: () => 1 + RUSH_SPEED_BONUS
         });
+        this._applyBurstImpulse(sim, playerBall);
+    }
+
+    _applyBurstImpulse(sim, playerBall) {
+        const currentSpeed = playerBall.velocity.length();
+        const direction = this._getRushDirection(sim, playerBall, currentSpeed);
+        const targetSpeed = Math.max(
+            currentSpeed,
+            playerBall.baseSpeed * playerBall.getStatModifiers().speed * sim.getSpeedMultiplier(playerBall)
+        );
+        playerBall.applyImpulse(direction.scale(targetSpeed).subtract(playerBall.velocity));
+    }
+
+    _getRushDirection(sim, playerBall, currentSpeed) {
+        if (currentSpeed > 5) {
+            return playerBall.velocity.clone().normalize();
+        }
+        const opponent = sim.getOpponent(playerBall);
+        if (opponent) {
+            return Vector2.subtract(opponent.position, playerBall.position).normalize();
+        }
+        return Vector2.fromAngle(Math.random() * Math.PI * 2, 1);
     }
 }
 

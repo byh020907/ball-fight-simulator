@@ -128,7 +128,7 @@ class ActionContext {
 | 액션      | Action이 소유한 로직                                   | Domain이 제공하는 인터페이스                                   |
 | --------- | ------------------------------------------------------ | -------------------------------------------------------------- |
 | 시간 왜곡 | `max(현재값, duration)` 후 저장                        | `sim.get/ setTimeSlowRemaining()`                              |
-| 돌진      | 지속시간 연장 또는 신규 설정 + 속도 배율 적용          | `ball.actionContext.getEffect(id)`, `ball.actionContext.setEffect(id, effect)` |
+| 돌진      | 지속시간 연장 또는 신규 설정 + 속도 배율 적용 + 즉시 돌진 impulse | `ball.actionContext.getEffect(id)`, `ball.actionContext.setEffect(id, effect)`, `ball.applyImpulse()` |
 | 카운터    | timed effect 등록 (0.20s, onFighterCollision), incoming damage 반사 | `ball.actionContext.setEffect(id, effect)`                     |
 | 투사체 방어 | timed effect 등록 (0.3s, onProjectileDamage)            | `ball.actionContext.setEffect(id, effect)`                     |
 | 버티기    | 경감 effect 등록                                       | `ball.actionContext.setEffect(id, effect)`                     |

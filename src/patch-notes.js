@@ -19,6 +19,25 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.15.1",
+        date: "2026-06-24",
+        title: "v0.15.1 업데이트",
+        changes: [
+            {
+                type: "feature",
+                text: "클릭 액션 돌진이 발동 즉시 앞으로 튀어나가도록 개선했습니다."
+            },
+            {
+                type: "refactor",
+                text: "돌진 액션도 impulse 기반 속도 변경 규칙에 맞췄습니다."
+            },
+            {
+                type: "fix",
+                text: "Archer/Grenade 패시브 회피가 즉시 옆으로 빠지도록 반응성을 복구했습니다."
+            }
+        ]
+    },
+    {
         version: "0.15.0",
         date: "2026-06-24",
         title: "v0.15.0 업데이트",

@@ -10,8 +10,7 @@ import {
     formatStatAllocation,
     getSpentStatPoints
 } from "../src/stat-allocation.js";
-import { FIGHTER_IDS } from "../src/core.js";
-import { Vector2 } from "../src/core.js";
+import { FIGHTER_IDS, Vector2 } from "../src/core.js";
 import { findActionById } from "../src/click-actions.js";
 import { DashEffect } from "../src/combat-effects.js";
 import { shuffled } from "../src/random.js";
@@ -665,6 +664,37 @@ function testMultiFighterSimulationSetup(app) {
     );
 }
 
+function assertPassiveEvasionAppliesImpulse(app, fighterId, label) {
+    const sim = new BattleSimulation(
+        [
+            app.roster.find((fighter) => fighter.id === fighterId),
+            app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ORBIT)
+        ],
+        {
+            onLog() {},
+            onSound() {}
+        }
+    );
+    const [evader, target] = sim.fighters;
+    evader.position = new Vector2(300, 480);
+    target.position = new Vector2(380, 480);
+    evader.applyImpulse(Vector2.subtract(new Vector2(180, 0), evader.velocity));
+    target.applyImpulse(Vector2.subtract(new Vector2(180, 0), target.velocity));
+
+    evader.ability.update(0.016, target);
+
+    assert.ok(evader.forcedHeading, `${label} passive evasion should still hold a short dodge heading`);
+    assert.ok(
+        Math.abs(evader.velocity.y) > 20,
+        `${label} passive evasion should apply immediate lateral impulse after velocity became impulse-based`
+    );
+}
+
+function testPassiveEvasionAppliesImpulse(app) {
+    assertPassiveEvasionAppliesImpulse(app, FIGHTER_IDS.ARCHER, "Archer");
+    assertPassiveEvasionAppliesImpulse(app, FIGHTER_IDS.GRENADE, "Grenade");
+}
+
 function testClickActionEffectOwnership(app) {
     const sim = new BattleSimulation(app.roster.slice(0, 2), {
         onLog() {},
@@ -674,10 +704,17 @@ function testClickActionEffectOwnership(app) {
     const rush = findActionById("rush");
     const endure = findActionById("endure");
 
+    player.applyImpulse(Vector2.subtract(new Vector2(120, 0), player.velocity));
     rush.apply(sim, player);
 
     assert.equal(sim.getSpeedMultiplier(player), 1.5, "RushAction should register speed effect on its target ball");
     assert.equal(sim.getSpeedMultiplier(opponent), 1, "RushAction should not boost unrelated balls");
+    const expectedRushSpeed = player.baseSpeed * player.getStatModifiers().speed * sim.getSpeedMultiplier(player);
+    assert.ok(player.velocity.x > 120, "RushAction should immediately burst forward instead of only buffing speed");
+    assert.ok(
+        Math.abs(player.velocity.length() - expectedRushSpeed) < 0.001,
+        "RushAction should snap to the boosted movement speed through impulse"
+    );
 
     player.actionContext.tickTimers(player, 0.25);
     rush.apply(sim, player);
@@ -2018,6 +2055,7 @@ testShuffledUtility();
 testStatAllocationRules(app);
 testStatBalanceSystem();
 testMultiFighterSimulationSetup(app);
+testPassiveEvasionAppliesImpulse(app);
 testClickActionEffectOwnership(app);
 testRiskWindowActionOwnership(app);
 await testCloneSeedDash(app);
