@@ -234,8 +234,7 @@ async function testEaterFeast(app) {
     eater.position.y = 480;
     target.position.x = 360;
     target.position.y = 300;
-    eater.velocity.x = 260;
-    eater.velocity.y = 0;
+    eater.applyImpulse(Vector2.subtract(new Vector2(260, 0), eater.velocity));
     eater.ability.feastTimer = eater.ability.feastDuration;
     eater.ability.feastElapsed = eater.ability.feastDuration;
     eater.ability.update(0.2, target);
@@ -272,7 +271,9 @@ async function testEaterFeast(app) {
     target.update(0.12, app.simulation);
     assert.ok(Math.abs(target.spinRotation - spinBefore) > 1, "Spat target face should spin while flying");
     const beforeHp = target.hp;
-    target.velocity.x = Math.abs(target.velocity.x) || 500;
+    target.applyImpulse(
+        Vector2.subtract(new Vector2(Math.abs(target.velocity.x) || 500, target.velocity.y), target.velocity)
+    );
     target.position.x = app.simulation.width + target.radius + 5;
     app.simulation.keepInsideArena(target);
     assert.equal(beforeHp - target.hp, 14, "Wall bounce should deal wall slam damage (15 - 1 defense)");
@@ -396,12 +397,45 @@ async function testDashBallCooldownDash(app) {
         })
     );
     dashBall.forceHeading(new Vector2(1, 0), 1.4);
-    dashBall.velocity = new Vector2(1, 0).scale(dashBall.baseSpeed);
+    dashBall.applyImpulse(Vector2.subtract(new Vector2(1, 0).scale(dashBall.baseSpeed), dashBall.velocity));
     app.simulation.keepInsideArena(dashBall);
     assert.equal(dashBall.movementEffect, null, "Dash Ball dash should clear on wall contact");
     assert.equal(dashBall.ability.cooldownLevel, 0, "Wall contact should reset cooldown stacks");
     assert.equal(dashBall.ability.cooldown, baseCooldown, "Wall contact should restore full cooldown");
     assert.equal(dashBall.ability.timer, baseCooldown, "Wall contact should restart from full cooldown");
+}
+
+async function testCollisionImpulsePersists(app) {
+    const sim = new BattleSimulation(
+        [
+            app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER),
+            app.roster.find((fighter) => fighter.id === FIGHTER_IDS.GRENADE)
+        ],
+        {
+            onLog() {},
+            onSound() {}
+        }
+    );
+    const [a, b] = sim.fighters;
+    a.position = new Vector2(440, 480);
+    b.position = new Vector2(440 + a.radius + b.radius - 4, 480);
+    a.applyImpulse(Vector2.subtract(new Vector2(700, 0), a.velocity));
+    b.applyImpulse(Vector2.subtract(new Vector2(-520, 0), b.velocity));
+
+    sim.handleCollision();
+    assert.ok(a.velocity.x < 0, "Collision impulse should reverse the first fighter");
+    assert.ok(b.velocity.x > 0, "Collision impulse should reverse the second fighter");
+
+    a.update(0.016, sim);
+    b.update(0.016, sim);
+    assert.ok(
+        a.velocity.length() > a.baseSpeed * 1.2,
+        "Collision impulse should persist instead of snapping back to base speed"
+    );
+    assert.ok(
+        b.velocity.length() > b.baseSpeed * 1.2,
+        "Collision impulse should persist on both fighters after one update"
+    );
 }
 
 async function testGrenadeAdaptiveFuse(app) {
@@ -1990,6 +2024,7 @@ await testCloneSeedDash(app);
 await testEaterFeast(app);
 await testRageBallMomentum(app);
 await testDashBallCooldownDash(app);
+await testCollisionImpulsePersists(app);
 await testGrenadeAdaptiveFuse(app);
 await testDamageShake(app);
 await testArrowBounceFacing(app);

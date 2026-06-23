@@ -134,7 +134,7 @@ export class BattleApp {
             fighter,
             new Vector2(this.renderer.canvas.width / 2, this.renderer.canvas.height / 2 - 28)
         );
-        ball.velocity = new Vector2(0, 0);
+        ball.applyImpulse(ball.velocity.clone().scale(-1));
         ball.radius = Math.round(ball.baseRadius * 1.35);
         const AbilityClass = ABILITY_MAP[fighter.ability];
         if (AbilityClass) ball.bindAbility(new AbilityClass(ball, {}));

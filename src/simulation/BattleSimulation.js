@@ -26,6 +26,9 @@ const ABILITY_TYPES = {
     hero: HeroAbility
 };
 
+const COLLISION_RESTITUTION = 0.92;
+const COLLISION_SEPARATION_PADDING = 0.6;
+
 export class BattleSimulation extends Simulation {
     constructor(fighterSpecs, hooks, playerBall = null) {
         super();
@@ -208,7 +211,7 @@ export class BattleSimulation extends Simulation {
         const overlap = a.radius + b.radius - distance;
         if (overlap <= 0) return;
 
-        const normal = difference.normalize();
+        const normal = distance > 0 ? difference.normalize() : new Vector2(1, 0);
         this._resolveOverlap(a, b, normal, overlap);
 
         const aModifiers = a.getStatModifiers();
@@ -240,26 +243,23 @@ export class BattleSimulation extends Simulation {
     }
 
     _resolveOverlap(a, b, normal, overlap) {
-        a.position.add(normal.clone().scale(-overlap / 2));
-        b.position.add(normal.clone().scale(overlap / 2));
+        const separation = overlap + COLLISION_SEPARATION_PADDING;
+        a.position.add(normal.clone().scale(-separation / 2));
+        b.position.add(normal.clone().scale(separation / 2));
     }
 
     _applyCollisionPhysics(a, b, normal, aMod, bMod) {
-        const tangent = new Vector2(-normal.y, normal.x);
-        const aN = a.velocity.x * normal.x + a.velocity.y * normal.y;
-        const bN = b.velocity.x * normal.x + b.velocity.y * normal.y;
-        const aT = a.velocity.x * tangent.x + a.velocity.y * tangent.y;
-        const bT = b.velocity.x * tangent.x + b.velocity.y * tangent.y;
-        const nextAN = (aN * (a.mass - b.mass) + 2 * b.mass * bN) / (a.mass + b.mass);
-        const nextBN = (bN * (b.mass - a.mass) + 2 * a.mass * aN) / (a.mass + b.mass);
-        a.velocity = tangent
-            .clone()
-            .scale(aT)
-            .add(normal.clone().scale(nextAN * bMod.impact));
-        b.velocity = tangent
-            .clone()
-            .scale(bT)
-            .add(normal.clone().scale(nextBN * aMod.impact));
+        const relativeVelocity = Vector2.subtract(b.velocity, a.velocity);
+        const velocityAlongNormal = relativeVelocity.dot(normal);
+        if (velocityAlongNormal > 0) return;
+
+        const invMassA = 1 / Math.max(0.001, a.mass);
+        const invMassB = 1 / Math.max(0.001, b.mass);
+        const impulseMagnitude = (-(1 + COLLISION_RESTITUTION) * velocityAlongNormal) / (invMassA + invMassB);
+        const impulse = normal.clone().scale(impulseMagnitude);
+
+        a.applyImpulse(impulse.clone().scale(-invMassA * bMod.impact));
+        b.applyImpulse(impulse.clone().scale(invMassB * aMod.impact));
     }
 
     _handleDashCollisions(a, b) {
@@ -271,7 +271,7 @@ export class BattleSimulation extends Simulation {
             attacker.movementEffect.onCollision(attacker, defender, this);
             if (attacker.movementEffect?.expired) {
                 attacker.movementEffect = null;
-                // 대시 종료 시 forcedHeading 제거 (overrideVelocity 유무 불문)
+                // 대시 종료 시 방향 고정도 같이 제거합니다.
                 if (attacker.forcedHeading) {
                     attacker.forcedHeading = null;
                 }

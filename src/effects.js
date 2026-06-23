@@ -160,8 +160,8 @@ export class GravityParticle extends CombatEntity {
             return;
         }
 
-        this.velocity.y += this.gravity * delta;
-        this.velocity.x *= this.drag;
+        this.applyImpulse(new Vector2(0, this.gravity * delta));
+        this._matchVelocity(new Vector2(this.velocity.x * this.drag, this.velocity.y));
         this.rotation += this.spin * delta;
         this.position.add(this.velocity.clone().scale(delta));
 
@@ -171,23 +171,27 @@ export class GravityParticle extends CombatEntity {
 
         if (this.position.x <= left) {
             this.position.x = left;
-            this.velocity.x = Math.abs(this.velocity.x) * 0.72;
+            this._matchVelocity(new Vector2(Math.abs(this.velocity.x) * 0.72, this.velocity.y));
         } else if (this.position.x >= right) {
             this.position.x = right;
-            this.velocity.x = -Math.abs(this.velocity.x) * 0.72;
+            this._matchVelocity(new Vector2(-Math.abs(this.velocity.x) * 0.72, this.velocity.y));
         }
 
         if (this.position.y >= floor) {
             this.position.y = floor;
             if (Math.abs(this.velocity.y) > 42) {
-                this.velocity.y = -Math.abs(this.velocity.y) * this.bounce;
-                this.velocity.x *= this.floorFriction;
+                this._matchVelocity(
+                    new Vector2(this.velocity.x * this.floorFriction, -Math.abs(this.velocity.y) * this.bounce)
+                );
             } else {
-                this.velocity.x *= 0.35;
-                this.velocity.y = 0;
+                this._matchVelocity(new Vector2(this.velocity.x * 0.35, 0));
                 this.settled = true;
             }
         }
+    }
+
+    _matchVelocity(velocity) {
+        this.applyImpulse(Vector2.subtract(velocity, this.velocity));
     }
 
     draw(ctx) {

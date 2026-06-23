@@ -67,6 +67,7 @@ export const RENDER_LAYERS = Object.freeze({
 export class CombatEntity {
     constructor(position, velocity, radius) {
         this.position = position;
+        // Initial state only. Runtime velocity changes should use applyImpulse().
         this.velocity = velocity;
         this.radius = radius;
         this.isExpired = false;
@@ -80,6 +81,10 @@ export class CombatEntity {
 
     update() {}
     draw() {}
+
+    applyImpulse(impulse) {
+        this.velocity.add(impulse);
+    }
 
     /**
      * 투사체 공통 hit 처리 (Template Method).
@@ -223,7 +228,7 @@ export function steerBallToward(ball, target, delta, opts = {}) {
  * 패시브 회피 — 상대가 일정 거리 이내로 접근하고, owner가 상대를 향해 이동 중일 때 발동합니다.
  *
  * 회피 방향: 상대 진행 방향 기준 owner의 위치에 따라 좌/우로 회피합니다.
- * forceHeading을 사용해 Ball.update()에서 속도가 덮어써져도 유지됩니다.
+ * forceHeading을 사용해 기본 이동 목표 방향을 잠깐 고정합니다.
  *
  * @param {import("./entities.js").BattleBall} owner - 회피할 볼
  * @param {import("./entities.js").BattleBall} target - 접근하는 상대

@@ -157,6 +157,26 @@ class WallSlamEffect {
 - `Simulation`은 벽 충돌 이벤트를 effect에 전달합니다.
 - `BattleBall`은 effect의 `tick()`을 호출하고, effect 내부 계산을 직접 소유하지 않습니다.
 
+### 충돌 물리 / 이동 속도 소유권
+
+전투 볼의 `velocity`는 **충돌 impulse와 기본 이동 목표가 섞인 실제 속도**입니다. 특정 능력이나 액션이 매 틱 `velocity`를 직접 덮어써서 충돌 결과를 지우면, 볼이 겹친 상태에서 매 프레임 충돌 피해가 반복되는 문제가 생깁니다.
+
+```
+BattleSimulation:          볼-볼 충돌 감지, 겹침 해소, impulse 계산, applyImpulse() 호출
+BattleBall:                현재 velocity를 보존하고 목표 주행 속도로 impulse 보정
+Ability / Action / Effect: 목표 방향, 목표 속도, movementEffect, forceHeading 제공
+```
+
+- 볼끼리 충돌한 뒤 튕겨 나가는 힘은 `BattleSimulation._applyCollisionPhysics()`가 소유합니다.
+- `BattleBall.update()`는 `velocity`를 즉시 목표 속도로 교체하지 않고, `_computeDesiredVelocity()` 결과와 현재 속도의 차이를 `applyImpulse()`로 보정합니다.
+- `forceHeading()`은 방향 고정만 소유하고, 고정 속도(`overrideVelocity`)를 소유하지 않습니다.
+- `applyKnockback()`은 넉백 impulse를 즉시 더하고, duration 동안 방향만 고정합니다.
+- 새 능력에서 순간 이동/대시/넉백이 필요하면 `setMovementEffect()`, `forceHeading()`, `applyKnockback()`, `applyImpulse()` 같은 기존 인터페이스를 사용합니다.
+- 충돌 impulse를 추가해야 하는 경우 `BattleBall.applyImpulse()`를 사용하고, ability가 직접 탄성 충돌 공식을 복사하지 않습니다.
+- 전투 중 `BattleBall.velocity = ...`, `ball.velocity.x = ...`처럼 속도 필드를 직접 수정하지 않습니다.
+- 예외적으로 삼킴, 프리뷰 정지처럼 이동 자체를 멈춰야 하는 상태도 `velocity`를 직접 초기화하지 않고, 현재 속도의 반대 impulse를 넣어 정지시킵니다.
+- 생성자에서 초기 `velocity` 필드를 만드는 것은 예외입니다. 아직 물리 상태가 존재하지 않는 객체의 초기 상태 정의이기 때문입니다.
+
 ### TricksterAbility / Seed 로직 소유권
 
 ```

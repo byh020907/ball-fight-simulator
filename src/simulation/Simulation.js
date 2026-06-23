@@ -55,13 +55,13 @@ export class Simulation {
     _reflectX(entity) {
         if (entity.position.x <= entity.radius) {
             entity.position.x = entity.radius;
-            entity.velocity.x = Math.abs(entity.velocity.x);
+            this._matchVelocity(entity, new Vector2(Math.abs(entity.velocity.x), entity.velocity.y));
             if (entity.movementEffect) this._handleWallBounce(entity);
             return new Vector2(1, 0);
         }
         if (entity.position.x >= this.width - entity.radius) {
             entity.position.x = this.width - entity.radius;
-            entity.velocity.x = -Math.abs(entity.velocity.x);
+            this._matchVelocity(entity, new Vector2(-Math.abs(entity.velocity.x), entity.velocity.y));
             if (entity.movementEffect) this._handleWallBounce(entity);
             return new Vector2(-1, 0);
         }
@@ -72,28 +72,29 @@ export class Simulation {
     _reflectY(entity) {
         if (entity.position.y <= entity.radius) {
             entity.position.y = entity.radius;
-            entity.velocity.y = Math.abs(entity.velocity.y);
+            this._matchVelocity(entity, new Vector2(entity.velocity.x, Math.abs(entity.velocity.y)));
             if (entity.movementEffect) this._handleWallBounce(entity);
             return new Vector2(0, 1);
         }
         if (entity.position.y >= this.height - entity.radius) {
             entity.position.y = this.height - entity.radius;
-            entity.velocity.y = -Math.abs(entity.velocity.y);
+            this._matchVelocity(entity, new Vector2(entity.velocity.x, -Math.abs(entity.velocity.y)));
             if (entity.movementEffect) this._handleWallBounce(entity);
             return new Vector2(0, -1);
         }
         return null;
     }
 
+    _matchVelocity(entity, velocity) {
+        entity.applyImpulse(Vector2.subtract(velocity, entity.velocity));
+    }
+
     _handleWallBounce(ball) {
         ball.movementEffect.onWallBounce(ball, this);
         if (ball.movementEffect?.expired) {
             ball.movementEffect = null;
-            // 대시/효과 종료 시 forcedHeading도 제거 — overrideVelocity가 없으면
-            // update()의 bounced 체크가 걸리지 않아 벽 방향 속도가 유지됨
-            if (ball.forcedHeading && !ball.forcedHeading.overrideVelocity) {
-                ball.forcedHeading = null;
-            }
+            // 대시/효과 종료 시 벽 방향 forceHeading도 같이 제거합니다.
+            if (ball.forcedHeading) ball.forcedHeading = null;
         }
     }
 

@@ -19,6 +19,25 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.15.0",
+        date: "2026-06-24",
+        title: "v0.15.0 업데이트",
+        changes: [
+            {
+                type: "refactor",
+                text: "충격 기반 충돌 물리 적용 — 충돌 후 튕김이 더 자연스럽게 유지됩니다."
+            },
+            {
+                type: "fix",
+                text: "빠른 대시 중 같은 충돌 피해가 연속으로 반복되던 현상을 완화했습니다."
+            },
+            {
+                type: "refactor",
+                text: "대시, 넉백, 벽 반사, 파티클 속도 변경을 impulse 방식으로 통일했습니다."
+            }
+        ]
+    },
+    {
         version: "0.14.0",
         date: "2026-06-24",
         title: "v0.14.0 업데이트",

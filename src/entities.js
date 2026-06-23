@@ -3,6 +3,8 @@ import { ActionContext } from "./click-actions.js";
 import { DashEffect } from "./combat-effects.js";
 import { computeOwnerCombatSpeed } from "./abilities/HeroAbility.js";
 
+const BASE_VELOCITY_CORRECTION_RATE = 5.5;
+
 export class SeedOrb extends Projectile {
     constructor(owner, position, velocity, life) {
         super(owner, position, velocity, 14);
@@ -45,7 +47,12 @@ export class SeedOrb extends Projectile {
             })
         );
         this.owner.forceHeading(dashDirection, 1.55);
-        this.owner.velocity = dashDirection.clone().scale(this.owner.baseSpeed * 2.05);
+        this.owner.applyImpulse(
+            dashDirection
+                .clone()
+                .scale(this.owner.baseSpeed * 2.05)
+                .subtract(this.owner.velocity)
+        );
         simulation.spawnSlash(
             this.owner.position.clone(),
             Vector2.add(this.owner.position, dashDirection.clone().scale(150)),
@@ -149,7 +156,7 @@ export class OrbitProjectile extends Projectile {
         // Accelerate from 0 to maxSpeed over accelDuration
         const progress = Math.min(1, this.elapsed / this.accelDuration);
         const speed = progress * this.maxSpeed;
-        this.velocity = this.dir.clone().scale(speed);
+        this.applyImpulse(this.dir.clone().scale(speed).subtract(this.velocity));
 
         this.position.add(this.velocity.clone().scale(delta));
 
@@ -420,7 +427,7 @@ export const HERO_ORB_EFFECTS = {
                 })
             );
             owner.forceHeading(direction, 1.55);
-            owner.velocity = direction.clone().scale(speed);
+            owner.applyImpulse(direction.clone().scale(speed).subtract(owner.velocity));
             ctx.simulation.spawnSlash(
                 owner.position.clone(),
                 Vector2.add(owner.position, direction.clone().scale(150)),
@@ -690,6 +697,7 @@ export class BattleBall {
         this.radius = spec.stats.radius;
         this.mass = spec.stats.mass;
         this.position = position;
+        // Initial state only. Runtime velocity changes should use applyImpulse().
         this.velocity = Vector2.fromAngle(Math.random() * Math.PI * 2, 120 + Math.random() * 90);
         this.slowEffect = null;
         this.speedBoost = null;
@@ -729,17 +737,17 @@ export class BattleBall {
         this.speedBoost = { effect: new TimedEffect(duration), multiplier, color };
     }
 
-    forceHeading(direction, duration, overrideVelocity = null) {
+    forceHeading(direction, duration) {
         this.forcedHeading = {
             effect: new TimedEffect(duration),
-            direction: direction.clone().normalize(),
-            overrideVelocity
+            direction: direction.clone().normalize()
         };
     }
 
-    /** 속도 벡터 기반 넉백 (forceHeading에 velocity 오버라이드) */
+    /** 속도 벡터 기반 넉백 — 방향 고정 + 즉시 impulse */
     applyKnockback(velocity, duration) {
-        this.forceHeading(velocity, duration, velocity.clone());
+        this.forceHeading(velocity, duration);
+        this.applyImpulse(velocity);
     }
 
     /** DashEffect 등록 (Ability/Projectile이 생성) */
@@ -754,7 +762,7 @@ export class BattleBall {
     }
 
     freezeForResult() {
-        this.velocity = new Vector2();
+        this.applyImpulse(this.velocity.clone().scale(-1));
         this.clearDash();
         this.slowEffect = null;
         this.swallowedState = null;
@@ -789,7 +797,7 @@ export class BattleBall {
 
         if (this.swallowedState) {
             this.position = this.swallowedState.owner.position.clone();
-            this.velocity = new Vector2();
+            this.applyImpulse(this.velocity.clone().scale(-1));
             return;
         }
 
@@ -798,7 +806,7 @@ export class BattleBall {
 
         this.ability?.update(delta, target);
         this.radius = this.baseRadius * (this.ability?.getRadiusScale?.() ?? 1);
-        this.velocity = this._computeVelocity(simulation);
+        this._applyVelocityCorrection(simulation, delta);
 
         this.position.add(this.velocity.clone().scale(delta));
         simulation.keepInsideArena(this);
@@ -834,8 +842,14 @@ export class BattleBall {
         this.actionContext.tickTimers(this, delta);
     }
 
-    /** 속도 계산 — 이동 보정치, 강제 방향, 넉백을 종합 */
-    _computeVelocity(simulation) {
+    /** 속도 보정 — 충돌 속도를 보존하며 목표 주행 속도로 서서히 보정 */
+    _applyVelocityCorrection(simulation, delta) {
+        const desiredVelocity = this._computeDesiredVelocity(simulation);
+        const correction = 1 - Math.exp(-BASE_VELOCITY_CORRECTION_RATE * delta);
+        this.applyImpulse(Vector2.subtract(desiredVelocity, this.velocity).scale(correction));
+    }
+
+    _computeDesiredVelocity(simulation) {
         const modifiers = this.getStatModifiers();
         const slowMult = this.slowEffect ? this.slowEffect.amount : 1;
         const boostMult = this.speedBoost ? this.speedBoost.multiplier : 1;
@@ -845,16 +859,15 @@ export class BattleBall {
                 ? this.velocity.clone().normalize()
                 : Vector2.fromAngle(Math.random() * Math.PI * 2, 1);
         const direction = this.forcedHeading ? this.forcedHeading.direction.clone() : currentDir;
-        const knockbackVel = this.forcedHeading?.overrideVelocity;
-
-        return (
-            knockbackVel ??
-            direction.scale(
-                movementSpeed ??
-                    this.speedBoost?.speedOverride ??
-                    this.baseSpeed * modifiers.speed * slowMult * boostMult * simulation.getSpeedMultiplier(this)
-            )
+        return direction.scale(
+            movementSpeed ??
+                this.speedBoost?.speedOverride ??
+                this.baseSpeed * modifiers.speed * slowMult * boostMult * simulation.getSpeedMultiplier(this)
         );
+    }
+
+    applyImpulse(impulse) {
+        this.velocity.add(impulse);
     }
 
     applySlow(duration, amount) {

@@ -46,7 +46,12 @@ export class DashAbility extends Ability {
             })
         );
         this.owner.forceHeading(direction, MAX_DASH_DURATION);
-        this.owner.velocity = direction.clone().scale(this.owner.baseSpeed * this.dashMultiplier);
+        this.owner.applyImpulse(
+            direction
+                .clone()
+                .scale(this.owner.baseSpeed * this.dashMultiplier)
+                .subtract(this.owner.velocity)
+        );
         this.simulation.playSound("dash", DASH_SOUND_PITCH);
         this.simulation.spawnSlash(
             this.owner.position.clone(),
