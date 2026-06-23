@@ -25,7 +25,7 @@ export const PATCH_NOTES = [
         changes: [
             {
                 type: "feature",
-                text: "카운터/받아치기 리워크 — 이제 무조건 발동 후 판정 window 방식. 카운터는 0.20초 안에 +100%, 받아치기는 0.3초 안에 투사체 75% 경감 및 성공 시 비용 회수."
+                text: "카운터/투사체 방어 리워크 — 이제 무조건 발동 후 판정 window 방식. 카운터는 0.20초 안에 상대 충돌 피해를 반사하고, 투사체 방어는 0.3초 안에 투사체 75% 경감 및 성공 시 비용 회수."
             },
             {
                 type: "feature",
@@ -41,7 +41,7 @@ export const PATCH_NOTES = [
             },
             {
                 type: "refactor",
-                text: "받아치기(ParryAction) 재설계 — 투사체 사전 탐색 제거, CombatEntity 경감 로직 제거, ActionContext timed effect로 대체."
+                text: "투사체 방어 재설계 — 투사체 사전 탐색 제거, CombatEntity 경감 로직 제거, ActionContext timed effect로 대체."
             },
             {
                 type: "refactor",
@@ -104,11 +104,11 @@ export const PATCH_NOTES = [
             },
             {
                 type: "feature",
-                text: "액션: 카운터 — 0.20초 안에 충돌 시 데미지 +100%"
+                text: "액션: 카운터 — 0.20초 안에 충돌 시 상대 충돌 피해 반사"
             },
             {
                 type: "feature",
-                text: "액션: 받아치기 — 0.3초 안에 맞는 투사체 데미지 75% 경감, 성공 시 비용 회수"
+                text: "액션: 투사체 방어 — 0.3초 안에 맞는 투사체 데미지 75% 경감, 성공 시 비용 회수"
             },
             {
                 type: "feature",
@@ -216,7 +216,7 @@ export const PATCH_NOTES = [
                 type: "feature",
                 text: "방어력(DEF) 스탯 추가 — 받는 피해에서 방어력만큼 차감됩니다. roster에 캐릭터별 기본 방어력 추가."
             },
-            { type: "feature", text: "Eater Ball 방어력 재설계 — 피스트 중 방어력 3배 (4→12), 뱉은 후 쿨타임 초기화." },
+            { type: "feature", text: "Eater Ball 방어력 재설계 — 피스트 중 방어력 1.5배, 뱉은 후 쿨타임 초기화." },
             { type: "refactor", text: "충돌 피해 계산 체계 정리 — 3단계(충돌 × 능력보정 − 방어력)로 문서화." },
             { type: "style", text: "게임 도움말 업데이트 — 방어력/5스탯, 모든 능력 설명 최신화." }
         ]
@@ -260,8 +260,8 @@ export const PATCH_NOTES = [
         date: "2026-06-21",
         title: "v0.3.1 업데이트",
         changes: [
-            { type: "feature", text: "Eater Ball 방어력 상향 — 기본 방어 1.5배, 피스트 중 3배." },
-            { type: "feature", text: "Eater Ball 피스트 중 상대 유도 기능 추가." },
+            { type: "feature", text: "Eater Ball 방어력 조정 — 평균권 기본 방어와 피스트 중 1.5배 보정." },
+            { type: "feature", text: "Eater Ball 피스트 중 제한 각도 유도 기능 추가." },
             { type: "feature", text: "쿨타임 스탯 추가 — 스킬 쿨타임을 포인트당 1% 단축합니다." }
         ]
     },

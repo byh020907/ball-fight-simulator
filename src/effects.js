@@ -286,7 +286,7 @@ export class ActionText extends FloatingText {
 
 const ACTION_WINDOW_COLORS = {
     counter: "#ff8844",
-    parry: "#44ddff",
+    projectile_guard: "#44ddff",
     endure: "#44ff44",
     time_warp: "#aa44ff",
     rush: "#4488ff"

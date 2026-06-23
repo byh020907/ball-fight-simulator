@@ -74,7 +74,7 @@ export function createRoster() {
             color: "#a6ff4d",
             face: "eater",
             ability: "eater",
-            stats: { hp: 118, damage: 10, speed: 268, radius: 52, mass: 1.34, defense: 4 }
+            stats: { hp: 118, damage: 10, speed: 268, radius: 52, mass: 1.34, defense: 2 }
         },
         {
             id: FIGHTER_IDS.BAT_BALL,

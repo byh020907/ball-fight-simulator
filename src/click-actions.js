@@ -109,12 +109,12 @@ const RUSH_SPEED_BONUS = 0.5;
 const RUSH_COST = 1.0;
 
 const COUNTER_WINDOW_SECONDS = 0.2;
-const COUNTER_BONUS_RATE = 1.0;
+const COUNTER_REFLECT_RATE = 1.0;
 const COUNTER_COST = 1.5;
 
-const PARRY_WINDOW_SECONDS = 0.3;
-const PARRY_DAMAGE_MULTIPLIER = 0.25;
-const PARRY_COST = 1.0;
+const PROJECTILE_GUARD_WINDOW_SECONDS = 0.3;
+const PROJECTILE_GUARD_DAMAGE_MULTIPLIER = 0.25;
+const PROJECTILE_GUARD_COST = 1.0;
 
 const ENDURE_DURATION = 0.1;
 const ENDURE_DAMAGE_MULTIPLIER = 0.2;
@@ -171,7 +171,7 @@ class CounterAction extends ClickAction {
         return "카운터";
     }
     get description() {
-        return `${COUNTER_WINDOW_SECONDS.toFixed(2)}초 안에 충돌 시 데미지 +${COUNTER_BONUS_RATE * 100}%`;
+        return `${COUNTER_WINDOW_SECONDS.toFixed(2)}초 안에 충돌 시 받는 충돌 데미지 반사`;
     }
     get hpCostPercent() {
         return COUNTER_COST;
@@ -183,14 +183,15 @@ class CounterAction extends ClickAction {
         const effect = {
             remaining: COUNTER_WINDOW_SECONDS,
             onFighterCollision: (owner, opponent, outgoingDamage, incomingDamage, simulation) => {
-                const bonus = Math.round(outgoingDamage * COUNTER_BONUS_RATE);
-                if (bonus > 0) {
-                    opponent.takeDamage(bonus, owner, "Counter");
+                const reflectedDamage = Math.round(incomingDamage * COUNTER_REFLECT_RATE);
+                if (reflectedDamage > 0) {
+                    opponent.takeDamage(reflectedDamage, owner, "Counter");
                     simulation.spawnActionText(opponent.position.clone(), "카운터!", "#ff8844");
                     simulation.spawnActionSuccess(opponent.position.clone(), "counter");
                     simulation.playSound("counter");
                 }
                 effect.isExpired = true;
+                return { incomingDamage: 0 };
             }
         };
 
@@ -198,32 +199,32 @@ class CounterAction extends ClickAction {
     }
 }
 
-class ParryAction extends ClickAction {
+class ProjectileGuardAction extends ClickAction {
     get id() {
-        return "parry";
+        return "projectile_guard";
     }
     get name() {
-        return "받아치기";
+        return "투사체 방어";
     }
     get description() {
-        return `${PARRY_WINDOW_SECONDS}초 안에 맞는 투사체 데미지 ${(1 - PARRY_DAMAGE_MULTIPLIER) * 100}% 경감`;
+        return `${PROJECTILE_GUARD_WINDOW_SECONDS}초 안에 맞는 투사체 데미지 ${(1 - PROJECTILE_GUARD_DAMAGE_MULTIPLIER) * 100}% 경감`;
     }
     get hpCostPercent() {
-        return PARRY_COST;
+        return PROJECTILE_GUARD_COST;
     }
 
     apply(sim, playerBall, paidCost = 0) {
-        sim.spawnActionWindow(playerBall, this.id, PARRY_WINDOW_SECONDS);
-        sim.playSound("parry");
+        sim.spawnActionWindow(playerBall, this.id, PROJECTILE_GUARD_WINDOW_SECONDS);
+        sim.playSound("projectile_guard");
         const effect = {
-            remaining: PARRY_WINDOW_SECONDS,
+            remaining: PROJECTILE_GUARD_WINDOW_SECONDS,
             onProjectileDamage: (amount, projectile, source, label, simulation, target) => {
                 effect.isExpired = true;
                 target.actionContext.refundHpForAction(target, paidCost);
-                simulation.spawnActionText(target.position.clone(), "받아치기!", "#44ddff");
-                simulation.spawnActionSuccess(target.position.clone(), "parry");
-                simulation.playSound("parry");
-                return Math.round(amount * PARRY_DAMAGE_MULTIPLIER);
+                simulation.spawnActionText(target.position.clone(), "투사체 방어!", "#44ddff");
+                simulation.spawnActionSuccess(target.position.clone(), "projectile_guard");
+                simulation.playSound("projectile_guard");
+                return Math.round(amount * PROJECTILE_GUARD_DAMAGE_MULTIPLIER);
             }
         };
 
@@ -266,7 +267,7 @@ const ACTION_POOL = Object.freeze([
     new TimeWarpAction(),
     new RushAction(),
     new CounterAction(),
-    new ParryAction(),
+    new ProjectileGuardAction(),
     new EndureAction()
 ]);
 
@@ -341,10 +342,24 @@ export class ActionContext {
     }
 
     onFighterCollision(owner, opponent, outgoingDamage, incomingDamage, simulation) {
+        let result = { outgoingDamage, incomingDamage };
         for (const effect of this._effects.values()) {
             if (effect.isExpired) continue;
-            effect.onFighterCollision?.(owner, opponent, outgoingDamage, incomingDamage, simulation);
+            const next = effect.onFighterCollision?.(
+                owner,
+                opponent,
+                result.outgoingDamage,
+                result.incomingDamage,
+                simulation
+            );
+            if (next) {
+                result = {
+                    outgoingDamage: next.outgoingDamage ?? result.outgoingDamage,
+                    incomingDamage: next.incomingDamage ?? result.incomingDamage
+                };
+            }
         }
+        return result;
     }
 
     // ── 프레임 갱신 ──
@@ -374,7 +389,7 @@ export class ActionContext {
             if (effect.isExpired || effect.remaining <= 0) {
                 if (!effect.isExpired && ball?.simulation) {
                     // window 만료 — whiff 효과 (방어/회피 액션만)
-                    if (id === "counter" || id === "parry" || id === "endure") {
+                    if (id === "counter" || id === "projectile_guard" || id === "endure") {
                         ball.simulation.spawnActionWhiff(ball.position.clone());
                         ball.simulation.playSound("whiff");
                     }

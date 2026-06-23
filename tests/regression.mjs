@@ -228,17 +228,22 @@ async function testEaterFeast(app) {
         app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER)
     ]);
     const [eater, target] = app.simulation.fighters;
+    assert.equal(eater.baseDefense, 2, "Eater base defense should stay near the roster average");
     eater.position.x = 300;
     eater.position.y = 480;
     target.position.x = 360;
-    target.position.y = 480;
+    target.position.y = 300;
     eater.velocity.x = 260;
     eater.velocity.y = 0;
     eater.ability.feastTimer = eater.ability.feastDuration;
     eater.ability.feastElapsed = eater.ability.feastDuration;
     eater.ability.update(0.2, target);
     assert.equal(eater.ability.getRadiusScale(), 1, "Eater should stay normal size during feast (no swallow)");
+    assert.equal(eater.ability.getStatModifiers().defense, 1.5, "Eater feast defense should be moderate");
+    assert.ok(eater.forcedHeading.direction.y < 0, "Eater feast should steer toward the target");
+    assert.ok(eater.forcedHeading.direction.y > -0.7, "Eater feast should not snap directly to the target");
     eater.ability.feastTimer = 0;
+    target.position.y = 480;
 
     eater.ability.feastTimer = 1.2;
     eater.ability.hasEatenThisFeast = false;
@@ -667,16 +672,21 @@ function testRiskWindowActionOwnership(app) {
     });
     const [player, opponent] = sim.fighters;
     const counter = findActionById("counter");
-    const parry = findActionById("parry");
+    const projectileGuard = findActionById("projectile_guard");
 
     assert.equal(counter.getFailureReason(sim, player), null, "Counter should not fail for free before HP cost");
-    assert.equal(parry.getFailureReason(sim, player), null, "Parry should not fail for free before HP cost");
+    assert.equal(
+        projectileGuard.getFailureReason(sim, player),
+        null,
+        "Projectile guard should not fail for free before HP cost"
+    );
 
     counter.apply(sim, player);
     assert.ok(player.actionContext.getEffect("counter"), "Counter should arm a short collision window");
     const opponentHpBeforeCounter = opponent.hp;
-    player.actionContext.onFighterCollision(player, opponent, 50, 0, sim);
-    assert.ok(opponent.hp < opponentHpBeforeCounter, "Counter effect should own bonus damage on collision");
+    const counterResult = player.actionContext.onFighterCollision(player, opponent, 10, 50, sim);
+    assert.equal(counterResult.incomingDamage, 0, "Counter should cancel reflected incoming collision damage");
+    assert.ok(opponent.hp < opponentHpBeforeCounter, "Counter should reflect incoming damage back to the opponent");
     const opponentHpAfterCounter = opponent.hp;
     player.actionContext.onFighterCollision(player, opponent, 50, 0, sim);
     assert.equal(opponent.hp, opponentHpAfterCounter, "Counter should not apply twice in the same frame");
@@ -684,32 +694,36 @@ function testRiskWindowActionOwnership(app) {
     assert.equal(player.actionContext.getEffect("counter"), null, "Counter should expire after it is consumed");
 
     player.hp = 50;
-    parry.apply(sim, player, 2);
+    projectileGuard.apply(sim, player, 2);
     assert.equal(
         player.actionContext.onDamageTaken(20, opponent, "Crash"),
         20,
-        "Parry should not reduce normal collision damage"
+        "Projectile guard should not reduce normal collision damage"
     );
     assert.equal(
         player.actionContext.onProjectileDamage(20, {}, opponent, "Arrow Shot", sim, player),
         5,
-        "Parry should reduce projectile damage inside its window"
+        "Projectile guard should reduce projectile damage inside its window"
     );
-    assert.equal(player.hp, 52, "Parry should refund its paid HP cost on success");
+    assert.equal(player.hp, 52, "Projectile guard should refund its paid HP cost on success");
     assert.equal(
         player.actionContext.onProjectileDamage(20, {}, opponent, "Arrow Shot", sim, player),
         20,
-        "Parry should not reduce a second projectile after it is consumed"
+        "Projectile guard should not reduce a second projectile after it is consumed"
     );
     player.actionContext.tickTimers(player, 0);
-    assert.equal(player.actionContext.getEffect("parry"), null, "Parry should expire after reducing one projectile");
+    assert.equal(
+        player.actionContext.getEffect("projectile_guard"),
+        null,
+        "Projectile guard should expire after reducing one projectile"
+    );
 
-    parry.apply(sim, player);
+    projectileGuard.apply(sim, player);
     player.actionContext.tickTimers(player, 0.31);
     assert.equal(
         player.actionContext.onProjectileDamage(20, {}, opponent, "Arrow Shot", sim, player),
         20,
-        "Parry should do nothing after the window expires"
+        "Projectile guard should do nothing after the window expires"
     );
 }
 

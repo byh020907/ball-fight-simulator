@@ -211,14 +211,19 @@ export class BattleSimulation extends Simulation {
 
         const aModifiers = a.getStatModifiers();
         const bModifiers = b.getStatModifiers();
-        const damageFromAToB = this.calculateCollisionDamage(a, b, normal) * aModifiers.damage;
-        const damageFromBToA = this.calculateCollisionDamage(b, a, normal.clone().scale(-1)) * bModifiers.damage;
+        let damageFromAToB = this.calculateCollisionDamage(a, b, normal) * aModifiers.damage;
+        let damageFromBToA = this.calculateCollisionDamage(b, a, normal.clone().scale(-1)) * bModifiers.damage;
 
-        a.actionContext.onFighterCollision(a, b, damageFromAToB, damageFromBToA, this);
-        b.actionContext.onFighterCollision(b, a, damageFromBToA, damageFromAToB, this);
+        const aCollision = a.actionContext.onFighterCollision(a, b, damageFromAToB, damageFromBToA, this);
+        damageFromAToB = aCollision.outgoingDamage;
+        damageFromBToA = aCollision.incomingDamage;
 
-        a.takeDamage(damageFromBToA, b, "Crash");
-        b.takeDamage(damageFromAToB, a, "Crash");
+        const bCollision = b.actionContext.onFighterCollision(b, a, damageFromBToA, damageFromAToB, this);
+        damageFromBToA = bCollision.outgoingDamage;
+        damageFromAToB = bCollision.incomingDamage;
+
+        if (damageFromBToA > 0) a.takeDamage(damageFromBToA, b, "Crash");
+        if (damageFromAToB > 0) b.takeDamage(damageFromAToB, a, "Crash");
 
         this._applyCollisionPhysics(a, b, normal, aModifiers, bModifiers);
         this._handleDashCollisions(a, b);

@@ -1,15 +1,15 @@
 import { DashEffect, WallSlamEffect } from "../combat-effects.js";
-import { Vector2 } from "../core.js";
+import { steerBallToward, Vector2 } from "../core.js";
 import { Ability } from "./Ability.js";
 
 const FEAST_DURATION = 3.3;
 const SWALLOW_HOLD_DURATION = 0.72;
-const DEFENSE_MULT_DURING_FEAST = 3;
+const DEFENSE_MULT_DURING_FEAST = 1.5;
 const SPIT_DASH_MULTIPLIER = 2;
 const SPIT_SPEED_MULTIPLIER = 2;
 const SPIT_MAX_DURATION = 2.45;
 const WALL_SLAM_DAMAGE = 15;
-const FEAST_HEADING_FORCE = 0.2;
+const FEAST_HOMING_TURN_RATE = 2.1;
 
 export class EaterAbility extends Ability {
     constructor(owner, simulation) {
@@ -48,10 +48,10 @@ export class EaterAbility extends Ability {
             this.feastElapsed = Math.min(this.feastDuration, this.feastElapsed + delta);
 
             if (target && !target.isDefeated && !this.swallowedTarget) {
-                // Direct velocity override: go straight toward target
-                const dir = Vector2.subtract(target.position, this.owner.position).normalize();
-                this.owner.velocity = dir.scale(this.owner.velocity.length() || this.owner.baseSpeed);
-                this.owner.forceHeading(dir, FEAST_HEADING_FORCE);
+                steerBallToward(this.owner, target, delta, {
+                    turnRate: FEAST_HOMING_TURN_RATE,
+                    persist: true
+                });
             }
 
             if (this.feastTimer > 0 && !this.swallowedTarget && Math.random() < delta * 8) {
@@ -85,8 +85,7 @@ export class EaterAbility extends Ability {
     }
 
     getStatModifiers() {
-        const def = this.isFeasting() ? 3 : 1;
-        return { speed: 0.95, damage: 1, defense: DEFENSE_MULT_DURING_FEAST, impact: 1 };
+        return { speed: 0.95, damage: 1, defense: this.isFeasting() ? DEFENSE_MULT_DURING_FEAST : 1, impact: 1 };
     }
 
     onCollision(target) {
