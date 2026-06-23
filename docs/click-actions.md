@@ -1,6 +1,6 @@
 # 클릭 액션 시스템
 
-> **구현 상태**: 구현 완료 (v0.8.0)
+> **구현 상태**: 구현 완료 (v0.9.0)
 > **구현 계획**: [`docs/implementation-plan.md`](implementation-plan.md)
 > **관련 문서**: [`docs/design.md`](design.md) (시각 방향), [`docs/game-rules.md`](game-rules.md) (게임 규칙)
 
@@ -138,7 +138,7 @@ class ClickAction {
         throw new Error("override");
     }
 
-    /** maxHP 대비 소모율 (0.2 = 0.2%) */
+    /** maxHP 대비 소모율 (0.5 = 0.5%) */
     get hpCostPercent() {
         return 0.2;
     }
@@ -220,6 +220,25 @@ class ChargeAction extends ClickAction {
 
 // ── 기존 액션들 (모두 TapTrigger 기본값) ─────────────────────────
 
+const TIME_WARP_DURATION = 0.5;
+const TIME_WARP_COST = 0.5;
+
+const RUSH_DURATION = 0.5;
+const RUSH_SPEED_BONUS = 0.25;
+const RUSH_COST = 0.5;
+
+const COUNTER_WINDOW_SECONDS = 0.2;
+const COUNTER_BONUS_RATE = 0.1;
+const COUNTER_COST = 1.5;
+
+const PARRY_WINDOW_SECONDS = 0.3;
+const PARRY_DAMAGE_MULTIPLIER = 0.5;
+const PARRY_COST = 1.0;
+
+const ENDURE_DURATION = 0.1;
+const ENDURE_DAMAGE_MULTIPLIER = 0.5;
+const ENDURE_COST = 1.0;
+
 class TimeWarpAction extends ClickAction {
     get id() {
         return "time_warp";
@@ -228,14 +247,14 @@ class TimeWarpAction extends ClickAction {
         return "시간 왜곡";
     }
     get description() {
-        return "0.5초간 상대만 슬로우";
+        return `${TIME_WARP_DURATION}초간 상대만 슬로우`;
     }
     get hpCostPercent() {
-        return 0.2;
+        return TIME_WARP_COST;
     }
     apply(sim, playerBall) {
         const current = sim.getTimeSlowRemaining();
-        sim.setTimeSlowRemaining(Math.max(current, 0.5));
+        sim.setTimeSlowRemaining(Math.max(current, TIME_WARP_DURATION));
     }
 }
 
@@ -247,16 +266,16 @@ class RushAction extends ClickAction {
         return "돌진";
     }
     get description() {
-        return "0.5초간 속도 +25%";
+        return `${RUSH_DURATION}초간 속도 +${RUSH_SPEED_BONUS * 100}%`;
     }
     get hpCostPercent() {
-        return 0.7;
+        return RUSH_COST;
     }
     apply(sim, playerBall) {
         const current = playerBall.actionContext.getEffect(this.id)?.remaining ?? 0;
         playerBall.actionContext.setEffect(this.id, {
-            remaining: current > 0 ? current + 0.5 : 0.5,
-            getSpeedMultiplier: () => 1.25
+            remaining: current > 0 ? current + RUSH_DURATION : RUSH_DURATION,
+            getSpeedMultiplier: () => 1 + RUSH_SPEED_BONUS
         });
     }
 }
@@ -269,16 +288,16 @@ class CounterAction extends ClickAction {
         return "카운터";
     }
     get description() {
-        return "0.22초 안에 충돌 시 데미지 +12%";
+        return `${COUNTER_WINDOW_SECONDS.toFixed(2)}초 안에 충돌 시 데미지 +${COUNTER_BONUS_RATE * 100}%`;
     }
     get hpCostPercent() {
-        return 1.35;
+        return COUNTER_COST;
     }
     apply(sim, playerBall) {
         playerBall.actionContext.setEffect(this.id, {
-            remaining: 0.22,
+            remaining: COUNTER_WINDOW_SECONDS,
             onFighterCollision: (owner, opponent, outgoingDamage, incomingDamage, simulation) => {
-                opponent.takeDamage(Math.round(outgoingDamage * 0.12), owner, "Counter");
+                opponent.takeDamage(Math.round(outgoingDamage * COUNTER_BONUS_RATE), owner, "Counter");
                 simulation.spawnActionText(opponent.position.clone(), "카운터!", "#ff8844");
             }
         });
@@ -293,17 +312,17 @@ class ParryAction extends ClickAction {
         return "받아치기";
     }
     get description() {
-        return "0.3초 안에 맞는 투사체 데미지 50% 경감";
+        return `${PARRY_WINDOW_SECONDS}초 안에 맞는 투사체 데미지 ${PARRY_DAMAGE_MULTIPLIER * 100}% 경감`;
     }
     get hpCostPercent() {
-        return 1.15;
+        return PARRY_COST;
     }
     apply(sim, playerBall) {
         playerBall.actionContext.setEffect(this.id, {
-            remaining: 0.3,
+            remaining: PARRY_WINDOW_SECONDS,
             onProjectileDamage: (amount, projectile, source, label, simulation, target) => {
                 simulation.spawnActionText(target.position.clone(), "받아치기!", "#44ddff");
-                return Math.round(amount * 0.5);
+                return Math.round(amount * PARRY_DAMAGE_MULTIPLIER);
             }
         });
     }
@@ -317,15 +336,15 @@ class EndureAction extends ClickAction {
         return "버티기";
     }
     get description() {
-        return "0.1초간 받는 데미지 50% 경감";
+        return `${ENDURE_DURATION}초간 받는 데미지 ${ENDURE_DAMAGE_MULTIPLIER * 100}% 경감`;
     }
     get hpCostPercent() {
-        return 0.9;
+        return ENDURE_COST;
     }
     apply(sim, playerBall) {
         playerBall.actionContext.setEffect(this.id, {
-            remaining: 0.1,
-            onDamageTaken: (amount) => Math.round(amount * 0.5)
+            remaining: ENDURE_DURATION,
+            onDamageTaken: (amount) => Math.round(amount * ENDURE_DAMAGE_MULTIPLIER)
         });
     }
 }
