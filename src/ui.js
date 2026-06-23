@@ -8,7 +8,8 @@ import {
     formatStatAllocation,
     getRemainingStatPoints
 } from "./stat-allocation.js";
-import { RENDER_LAYERS, Vector2 } from "./core.js";
+import { formatHeroStatLine, formatHeroStatParts } from "./entities.js";
+import { FIGHTER_IDS, RENDER_LAYERS, Vector2 } from "./core.js";
 import { getUnseenEntries, dismissPatchNotes } from "./utils.js";
 import { PopupService } from "./popup.js";
 import {
@@ -19,7 +20,8 @@ import {
     DashAbility,
     RageAbility,
     EaterAbility,
-    BatBallAbility
+    BatBallAbility,
+    HeroAbility
 } from "./abilities/index.js";
 
 const ABILITY_MAP = {
@@ -30,7 +32,8 @@ const ABILITY_MAP = {
     dash: DashAbility,
     rage: RageAbility,
     eater: EaterAbility,
-    bat_ball: BatBallAbility
+    bat_ball: BatBallAbility,
+    hero: HeroAbility
 };
 
 // ── Alpine.js x-data function ───────────────────────────────────────────────
@@ -309,21 +312,28 @@ export class UIController {
         const s = this.state;
         if (!s) return;
         const visibleRoster = activeIds.length ? this.roster.filter((f) => activeIds.includes(f.id)) : [];
-        s.fighters = visibleRoster.map((fighter) => ({
-            id: fighter.id,
-            name: fighter.name,
-            color: fighter.color,
-            isPlayer: fighter.isPlayer,
-            defeated: false,
-            hp: Math.ceil(fighter.stats?.hp ?? 0),
-            maxHp: Math.ceil(fighter.stats?.hp ?? 0),
-            hpPct: 100,
-            statLine: formatStatAllocation(fighter.statAllocation ?? {}),
-            balanceMult: 1,
-            skillLabel: "Skill",
-            skillPct: 1,
-            skillText: "Ready"
-        }));
+        s.fighters = visibleRoster.map((fighter) => {
+            const isHero = fighter.id === FIGHTER_IDS.HERO;
+            return {
+                id: fighter.id,
+                name: fighter.name,
+                color: fighter.color,
+                isPlayer: fighter.isPlayer,
+                defeated: false,
+                hp: Math.ceil(fighter.stats?.hp ?? 0),
+                maxHp: Math.ceil(fighter.stats?.hp ?? 0),
+                hpPct: 100,
+                statLine: isHero
+                    ? formatHeroStatLine(fighter.statAllocation ?? {})
+                    : formatStatAllocation(fighter.statAllocation ?? {}),
+                heroStatParts: isHero ? formatHeroStatParts(fighter.statAllocation ?? {}) : [],
+                isHero,
+                balanceMult: 1,
+                skillLabel: "Skill",
+                skillPct: 1,
+                skillText: "Ready"
+            };
+        });
     }
 
     updateStatus(text, badge = "Ready") {
@@ -468,6 +478,7 @@ export class UIController {
             const fighter = fighters.find((f) => f.id === card.id || f.name === card.name);
             if (!fighter) return card;
             const alloc = fighter.statAllocation ?? {};
+            const isHero = fighter.id === FIGHTER_IDS.HERO;
             const pts = [alloc.hp ?? 0, alloc.damage ?? 0, alloc.speed ?? 0, alloc.skill ?? 0, alloc.defense ?? 0];
             const mult = calculateStatMultiplier(pts).multiplier;
             return {
@@ -477,6 +488,11 @@ export class UIController {
                 hpPct: Math.max(0, (fighter.hp / fighter.maxHp) * 100),
                 defeated: fighter.isDefeated,
                 balanceMult: mult,
+                isHero,
+                statLine: isHero
+                    ? formatHeroStatLine(fighter.statAllocation ?? {}, fighter.heroOrbBonuses)
+                    : formatStatAllocation(fighter.statAllocation ?? {}),
+                heroStatParts: isHero ? formatHeroStatParts(fighter.statAllocation ?? {}, fighter.heroOrbBonuses) : [],
                 skillLabel: fighter.getAbilityUiState().label,
                 skillPct: Math.max(0, Math.min(1, fighter.getAbilityUiState().progress)),
                 skillText:

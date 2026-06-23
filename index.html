@@ -138,8 +138,21 @@
                                 <div class="fighter-hp-text">
                                     <span x-text="fighter.hp + ' / ' + fighter.maxHp"></span>
                                 </div>
-                                <div class="fighter-stat-line">
-                                    <span x-text="fighter.statLine"></span>
+                                <div class="fighter-stat-line" x-bind:class="{ 'hero-stat-line': fighter.isHero }">
+                                    <span x-show="!fighter.isHero" x-text="fighter.statLine"></span>
+                                    <span class="hero-stat-parts" x-show="fighter.isHero">
+                                        <template x-for="part in fighter.heroStatParts" :key="part.key">
+                                            <span class="hero-stat-part">
+                                                <span x-text="part.baseText"></span
+                                                ><span
+                                                    class="hero-stat-bonus"
+                                                    x-show="part.bonusText"
+                                                    x-text="part.bonusText"
+                                                    x-bind:style="'color:' + part.color"
+                                                ></span>
+                                            </span>
+                                        </template>
+                                    </span>
                                     <span
                                         class="fighter-balance-mult"
                                         x-text="'×' + fighter.balanceMult.toFixed(3)"

@@ -143,10 +143,33 @@ export function formatStatAllocation(allocation) {
     return ALLOCATABLE_STATS.map((stat) => `${stat.label} +${allocation[stat.key] ?? 0}%`).join(" · ");
 }
 
-export function createTournamentRoster(roster, playerId, playerAllocation, rng = Math.random) {
-    return roster.map((fighter) => {
-        const isPlayer = fighter.id === playerId;
-        const allocation = isPlayer ? playerAllocation : createRandomStatAllocation(rng);
-        return applyStatAllocation(fighter, allocation, isPlayer);
-    });
+/**
+ * 토너먼트 참가자 선발 규칙 (v0.10.0+):
+ * - 전체 roster가 size(기본 8) 이상이면 → 유저 캐릭터 1명 + 유저 제외 랜덤(size-1)명 = 총 size명
+ * - 전체 roster가 size 미만이면 → 가능한 모든 캐릭터 참가 (기존 부전승 로직 유지)
+ * - 원본 roster 배열을 직접 변형하지 않음
+ */
+export function createTournamentRoster(roster, playerId, playerAllocation, rng = Math.random, size = 8) {
+    // player 캐릭터에 statAllocation 적용
+    const playerSpec = roster.find((f) => f.id === playerId);
+    if (!playerSpec) return [];
+
+    const player = applyStatAllocation(playerSpec, playerAllocation, true);
+    const others = roster.filter((f) => f.id !== playerId);
+
+    // 전체 roster가 size 미만이면 모두 참가 (기존 부전승 유지)
+    if (roster.length <= size) {
+        return [player, ...others.map((f) => applyStatAllocation(f, createRandomStatAllocation(rng), false))];
+    }
+
+    // size 이상: 유저 1명 + 유저 제외 랜덤 (size-1)명
+    const shuffledOthers = [...others];
+    // Fisher-Yates shuffle with provided rng
+    for (let i = shuffledOthers.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        [shuffledOthers[i], shuffledOthers[j]] = [shuffledOthers[j], shuffledOthers[i]];
+    }
+
+    const picked = shuffledOthers.slice(0, size - 1);
+    return [player, ...picked.map((f) => applyStatAllocation(f, createRandomStatAllocation(rng), false))];
 }

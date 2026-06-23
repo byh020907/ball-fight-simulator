@@ -85,6 +85,17 @@ export function createRoster() {
             face: "bat_ball",
             ability: "bat_ball",
             stats: { hp: 106, damage: 10, speed: 280, radius: 48, mass: 1.14, defense: 1 }
+        },
+        {
+            id: FIGHTER_IDS.HERO,
+            name: "Hero Ball",
+            title: "Hero Orb",
+            description:
+                "쿨타임마다 랜덤 스탯 오브를 던집니다. 본인이 먹으면 해당 스탯이 영구 증가합니다. 상대가 먹으면 아무 효과 없이 사라집니다.",
+            color: "#ffcc00",
+            face: "hero",
+            ability: "hero",
+            stats: { hp: 108, damage: 10, speed: 286, radius: 49, mass: 1.2, defense: 1 }
         }
     ];
 }

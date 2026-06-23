@@ -1549,6 +1549,31 @@ body::before {
     font-size: 0.64rem;
 }
 
+.fighter-stat-line.hero-stat-line {
+    font-size: 0.55rem;
+    gap: 2px;
+}
+
+.fighter-stat-line.hero-stat-line .fighter-balance-mult {
+    font-size: 0.5rem;
+}
+
+.hero-stat-parts {
+    display: flex;
+    gap: 3px;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.hero-stat-part {
+    flex-shrink: 0;
+}
+
+.hero-stat-bonus {
+    font-weight: 800;
+}
+
 /* ── Patch notes popup ─────────────────────────────────────────────────────── */
 
 .patch-overlay {

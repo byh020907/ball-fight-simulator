@@ -7,7 +7,8 @@ import {
     RageAbility,
     TricksterAbility,
     DashAbility,
-    BatBallAbility
+    BatBallAbility,
+    HeroAbility
 } from "../abilities/index.js";
 import { BattleBall } from "../entities.js";
 import { GravityParticle } from "../effects.js";
@@ -21,7 +22,8 @@ const ABILITY_TYPES = {
     dash: DashAbility,
     rage: RageAbility,
     eater: EaterAbility,
-    bat_ball: BatBallAbility
+    bat_ball: BatBallAbility,
+    hero: HeroAbility
 };
 
 export class BattleSimulation extends Simulation {

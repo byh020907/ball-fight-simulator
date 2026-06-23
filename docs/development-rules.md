@@ -157,6 +157,58 @@ class WallSlamEffect {
 - `Simulation`은 벽 충돌 이벤트를 effect에 전달합니다.
 - `BattleBall`은 effect의 `tick()`을 호출하고, effect 내부 계산을 직접 소유하지 않습니다.
 
+### TricksterAbility / Seed 로직 소유권
+
+```
+TricksterAbility:          쿨타임 관리, seed 발사 속도 계산(computeOwnerCombatSpeed × 1.2~1.5),
+                           seed 수명 계산(cooldown × 2), seed 생성
+SeedOrb (entities.js):     이동, 충돌 대상 판정, 충돌 시 대시 발동 (기존 유지)
+```
+
+- Trickster seed 속도 계산식은 Hero Orb의 `computeOwnerCombatSpeed()`를 재사용합니다.
+- Hero Orb와 동일하게 `movementSpeed ?? baseSpeed × speedModifier × slowMult × boostMult` 기준입니다.
+- seed 수명은 effective cooldown(`this.cooldown`, skill 스탯 반영)의 2배입니다.
+- seed 개수(`SEED_COUNT = 3`)와 충돌/대시 로직은 변경되지 않습니다.
+
+### HeroAbility / HeroOrb 로직 소유권
+
+```
+HeroAbility:               쿨타임(HERO_ORB_BASE_COOLDOWN=1.0) 관리,
+                           cooldown_burst 상태 소유 (_cooldownBurstTimer/_cooldownBurstMultiplier),
+                           특수 orb 확률 선택 (pickHeroOrbEffectType),
+                           발사 속도 계산(computeOwnerCombatSpeed, owner 속도 × 1.2~1.5),
+                           Hero Orb 생성, owner별 orb 제한(10개) 관리
+HeroOrb entity:            이동, 충돌 대상 판정, owner/상대 구분,
+                           apply() 반환값 기반 획득 텍스트 피드백(spawnActionText)
+rollHeroOrbStatGain():     스탯 orb amount 1~3 랜덤 roll (rng 제어 가능)
+clampStatGain():           cap clamp — bonus+roll이 cap을 넘지 않도록 실제 amount 조정
+HERO_ORB_EFFECTS:          effect type별 적용 로직 + label(표시명) + apply() 반환값
+                           ({ applied, amount } — cap에서 실패 시 applied=false)
+                           각 스탯 orb는 rollHeroOrbStatGain() + clampStatGain() 사용
+formatHeroStatLine():      시작 전 statAllocation과 heroOrbBonuses를 한 줄에 합친 UI 문자열 포맷
+formatHeroStatParts():     `+10%(+3)` 중 `(+3)`만 스탯 색상으로 칠하기 위한 UI 조각 포맷
+UIController / Alpine.js:  Hero Ball만 fighter card의 statLine을 "기본 배분 + 오브 보너스" 형태로 표시
+BattleSimulation:          HeroOrb를 entities 목록에 추가/제거 (spawnHeroOrb)
+BattleBall:                heroOrbBonuses 누적값 보유, 직접적인 Hero Ball 전용 if문 없음
+```
+
+- 특수 Hero Orb (dash/arrow/cooldown_burst)는 HERO_ORB_EFFECTS에 등록, 기존 로직 재사용:
+  - dash: `DashEffect` + `BattleBall.setMovementEffect()` + `forceHeading()` (Dash Ball 전용 로직 복사 금지)
+  - arrow: `Simulation.spawnArrow()` + `ArrowProjectile` (owner damage 비례, Archer 회피/쿨타임 복사 금지)
+  - cooldown_burst: `HeroAbility.applyCooldownBurst()` → HeroAbility가 multiplier 상태 소유
+- 특수 orb 확률: `pickHeroOrbEffectType(rng)` 함수. 기본값 dash=0.10, arrow=0.10, cooldown_burst=0.05. 특수 미선택 시 기존 5종 스탯 orb 중 랜덤.
+- 특수 orb는 `heroOrbBonuses` 누적치에 포함되지 않음. `formatHeroStatParts`에서 제외.
+- cooldown_burst 중첩 시 duration은 max 연장, multiplier는 0.1 고정.
+- 다른 캐릭터와 달리 Hero Ball 고유 로직은 `HeroAbility`, `HeroOrb`, `HERO_ORB_EFFECTS`에 완전히 캡슐화됩니다.
+- `BattleSimulation`이나 `BattleBall`에 Hero Ball 전용 조건문이 추가되지 않도록 합니다.
+- 새 effect type을 추가하려면 `HERO_ORB_EFFECTS`에 `{ color, label, apply(owner, context) }`만 등록하면 됩니다.
+- `apply()`는 반드시 `{ applied: boolean, amount: number }`를 반환해야 합니다.
+- `HERO_ORB_STAT_CAP = -1` (기본값, 무한 성장). 0 이상이면 해당 스탯 보너스 상한 도달 시 증가 중단.
+- `HERO_ORB_MAX_ACTIVE_PER_OWNER = 10` — owner 1개체당 최대 10개 (일반+특수 합산). 전체 필드 20개 제한 없음.
+- Hero Orb 기본 수명은 무제한입니다. `HeroAbility`에서 `cooldown + 1` 같은 자연 만료 수명을 넘기지 말고, 실제 active entity 수로 owner별 10개 제한을 적용합니다.
+- Hero Orb 발사 속도: `computeOwnerCombatSpeed()`가 owner의 실제 전투 속도 × 1.2~1.5 랜덤 배율로 계산.
+- Hero Ball 스탯 UI는 `+10%(+3)`처럼 공백 없이 표시하며, 괄호 안 오브 보너스만 해당 스탯 색상으로 표시합니다.
+
 #### 행동 규칙
 
 1. **Action 클래스가 비즈니스 로직(알고리즘, 조건 판정, 값 계산)을 직접 소유**합니다.

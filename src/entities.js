@@ -1,6 +1,7 @@
 import { CombatEntity, Projectile, RENDER_LAYERS, TimedEffect, Vector2 } from "./core.js";
 import { ActionContext } from "./click-actions.js";
 import { DashEffect } from "./combat-effects.js";
+import { computeOwnerCombatSpeed } from "./abilities/HeroAbility.js";
 
 export class SeedOrb extends Projectile {
     constructor(owner, position, velocity, life) {
@@ -283,6 +284,314 @@ export class Grenade extends Projectile {
     }
 }
 
+// ── Hero Orb effect registry ────────────────────────────────────────────────
+// 확장 가능: 새 effect type을 HERO_ORB_EFFECTS에 추가하기만 하면 됨.
+// 각 effect는 { color, apply(owner, context) } 형태.
+// context: { orb, simulation, effectType }
+
+/**
+ * Hero Orb 스탯 성장 상한.
+ * -1이면 무한 성장. 0 이상이면 Hero Orb로 얻은 해당 스탯 보너스가 그 값에 도달했을 때 더 이상 증가하지 않음.
+ * cap에 걸린 경우에도 orb는 먹은 것으로 처리되어 제거됨.
+ */
+export let HERO_ORB_STAT_CAP = -1;
+export function setHeroOrbStatCap(value) {
+    HERO_ORB_STAT_CAP = value;
+}
+
+const HERO_ORB_STAT_GAIN_MIN = 1;
+const HERO_ORB_STAT_GAIN_MAX = 3;
+
+/** 1~3 랜덤 stat gain roll. rng 제어 가능. */
+export function rollHeroOrbStatGain(rng = Math.random) {
+    return HERO_ORB_STAT_GAIN_MIN + Math.floor(rng() * (HERO_ORB_STAT_GAIN_MAX - HERO_ORB_STAT_GAIN_MIN + 1));
+}
+
+/**
+ * Cap clamp: 현재 bonus + roll amount가 cap을 넘지 않도록 amount 조정.
+ * bonus가 이미 cap 이상이면 applied=false.
+ */
+function clampStatGain(bonusValue, rollAmount, cap) {
+    if (cap >= 0 && bonusValue >= cap) return { applied: false, amount: 0 };
+    if (cap >= 0) {
+        const maxAdd = cap - bonusValue;
+        const actual = Math.min(rollAmount, maxAdd);
+        if (actual <= 0) return { applied: false, amount: 0 };
+        return { applied: true, amount: actual };
+    }
+    return { applied: true, amount: rollAmount };
+}
+
+export const HERO_ORB_EFFECTS = {
+    hp: {
+        color: "#44dd44",
+        label: "체력",
+        /** HP +5×amount 증가, 현재 HP도 같은 값만큼 증가 */
+        apply(owner, ctx) {
+            const rollAmount = rollHeroOrbStatGain();
+            const clamped = clampStatGain(owner.heroOrbBonuses.hp, rollAmount, HERO_ORB_STAT_CAP);
+            if (!clamped.applied) return { applied: false };
+            const amount = clamped.amount;
+            owner.heroOrbBonuses.hp += amount;
+            owner.maxHp += 5 * amount;
+            owner.hp = Math.min(owner.hp + 5 * amount, owner.maxHp);
+            return { applied: true, amount };
+        }
+    },
+    damage: {
+        color: "#ff4444",
+        label: "힘",
+        /** 대미지 +2%×amount 증가 (baseDamage 곱) */
+        apply(owner, ctx) {
+            const rollAmount = rollHeroOrbStatGain();
+            const clamped = clampStatGain(owner.heroOrbBonuses.damage, rollAmount, HERO_ORB_STAT_CAP);
+            if (!clamped.applied) return { applied: false };
+            const amount = clamped.amount;
+            owner.heroOrbBonuses.damage += amount;
+            owner.baseDamage = Number((owner.baseDamage * Math.pow(1.02, amount)).toFixed(1));
+            return { applied: true, amount };
+        }
+    },
+    speed: {
+        color: "#4488ff",
+        label: "속도",
+        /** 속도 +4×amount 증가 (baseSpeed flat) */
+        apply(owner, ctx) {
+            const rollAmount = rollHeroOrbStatGain();
+            const clamped = clampStatGain(owner.heroOrbBonuses.speed, rollAmount, HERO_ORB_STAT_CAP);
+            if (!clamped.applied) return { applied: false };
+            const amount = clamped.amount;
+            owner.heroOrbBonuses.speed += amount;
+            owner.baseSpeed = Math.round(owner.baseSpeed + 4 * amount);
+            return { applied: true, amount };
+        }
+    },
+    defense: {
+        color: "#dddd44",
+        label: "방어",
+        /** 방어력 +0.33×amount 증가 (baseDefense flat, takeDamage에서 반올림) */
+        apply(owner, ctx) {
+            const rollAmount = rollHeroOrbStatGain();
+            const clamped = clampStatGain(owner.heroOrbBonuses.defense, rollAmount, HERO_ORB_STAT_CAP);
+            if (!clamped.applied) return { applied: false };
+            const amount = clamped.amount;
+            owner.heroOrbBonuses.defense += amount;
+            owner.baseDefense = Number((owner.baseDefense + 0.33 * amount).toFixed(2));
+            return { applied: true, amount };
+        }
+    },
+    skill: {
+        color: "#bb66ff",
+        label: "쿨타임",
+        /** 쿨타임 +amount 증가 (statAllocation.skill과 동일한 효과, Ability.cooldown getter에서 사용) */
+        apply(owner, ctx) {
+            const rollAmount = rollHeroOrbStatGain();
+            const clamped = clampStatGain(owner.heroOrbBonuses.skill, rollAmount, HERO_ORB_STAT_CAP);
+            if (!clamped.applied) return { applied: false };
+            const amount = clamped.amount;
+            owner.heroOrbBonuses.skill += amount;
+            return { applied: true, amount };
+        }
+    },
+    // ── 특수 Hero Orb ───────────────────────────────────────────────
+    // 스탯 UI 누적치(heroOrbBonuses)에 포함되지 않음.
+    // formatHeroStatParts/formatHeroStatLine에서 제외됨.
+    dash: {
+        color: "#ff8833",
+        label: "대시",
+        /** 상대를 향해 돌진. DashEffect 재사용. */
+        apply(owner, ctx) {
+            const target = ctx.simulation.getOpponent(owner);
+            if (!target || target.isDefeated) return { applied: false };
+            const direction = Vector2.subtract(target.position, owner.position);
+            if (direction.length() < 0.01) return { applied: false };
+            direction.normalize();
+            const speed = computeOwnerCombatSpeed(owner) * 1.5;
+            owner.setMovementEffect(
+                new DashEffect({
+                    duration: 1.55,
+                    multiplier: 1,
+                    speedOverride: speed,
+                    color: "#ff8833",
+                    showRing: true,
+                    collisionDamage: 0,
+                    untilImpact: true,
+                    untilWall: true
+                })
+            );
+            owner.forceHeading(direction, 1.55);
+            owner.velocity = direction.clone().scale(speed);
+            ctx.simulation.spawnSlash(
+                owner.position.clone(),
+                Vector2.add(owner.position, direction.clone().scale(150)),
+                owner.color
+            );
+            ctx.simulation.spawnPulse(ctx.orb.position.clone(), "#ff8833");
+            ctx.simulation.playSound("dash", 0.8);
+            ctx.simulation.addLog(`${owner.name} dashes toward ${target.name}!`);
+            return { applied: true, amount: 1 };
+        }
+    },
+    arrow: {
+        color: "#ff6666",
+        label: "화살",
+        /** 상대를 향해 화살 발사. ArrowProjectile/spawnArrow 재사용. */
+        apply(owner, ctx) {
+            const target = ctx.simulation.getOpponent(owner);
+            if (!target || target.isDefeated) return { applied: false };
+            const direction = Vector2.subtract(target.position, owner.position);
+            if (direction.length() < 0.01) return { applied: false };
+            direction.normalize();
+            const speed = computeOwnerCombatSpeed(owner) * 2.0;
+            const start = Vector2.add(owner.position, direction.clone().scale(owner.radius + 12));
+            ctx.simulation.spawnArrow(owner, start, direction.scale(speed));
+            ctx.simulation.playSound("arrow", 0.8);
+            ctx.simulation.addLog(`${owner.name} fires an arrow at ${target.name}!`);
+            return { applied: true, amount: 1 };
+        }
+    },
+    cooldown_burst: {
+        color: "#66ddff",
+        label: "쿨타임 버스트",
+        /** 1초간 HeroAbility 쿨타임 25%로 단축. */
+        apply(owner, ctx) {
+            if (!owner.ability || owner.ability.constructor?.name !== "HeroAbility") {
+                return { applied: false };
+            }
+            owner.ability.applyCooldownBurst(1.0, 0.1);
+            ctx.simulation.spawnPulse(ctx.orb.position.clone(), "#66ddff");
+            ctx.simulation.playSound("powerup", 1.1);
+            ctx.simulation.addLog(`${owner.name} activates cooldown burst!`);
+            return { applied: true, amount: 1 };
+        }
+    }
+};
+
+/**
+ * Hero Ball 전용 스탯 줄 포맷.
+ * 예: "체력 +30%(+3) · 힘 +20%(+1) · 속도 +10%"
+ */
+export function formatHeroStatLine(allocation = {}, bonuses = {}) {
+    return formatHeroStatParts(allocation, bonuses)
+        .map((part) => `${part.baseText}${part.bonusText}`)
+        .join(" · ");
+}
+
+/** 스탯 orb만 UI 표시 대상 (특수 orb 제외) */
+const STAT_ORB_KEYS = ["hp", "damage", "speed", "skill", "defense"];
+
+export function formatHeroStatParts(allocation = {}, bonuses = {}) {
+    return STAT_ORB_KEYS.map((key) => {
+        const effect = HERO_ORB_EFFECTS[key];
+        const label = effect?.label ?? key;
+        const base = allocation[key] ?? 0;
+        const bonus = bonuses[key] ?? 0;
+        return {
+            key,
+            baseText: `${label} +${base}%`,
+            bonusText: bonus > 0 ? `(+${bonus})` : "",
+            color: effect?.color ?? "#ffffff"
+        };
+    });
+}
+
+/**
+ * Hero Orb — Hero Ball이 던지는 스탯 공.
+ * Projectile이 아닌 CombatEntity 직접 확장 (데미지 처리 흐름 타지 않음).
+ */
+export class HeroOrb extends CombatEntity {
+    constructor(owner, position, velocity, effectType, life) {
+        super(position, velocity, 12);
+        this.owner = owner;
+        this.ownerId = owner.id;
+        this.effectType = effectType;
+        this.life = life ?? Infinity;
+    }
+
+    get renderLayer() {
+        return RENDER_LAYERS.FOREGROUND;
+    }
+
+    update(delta, simulation) {
+        if (Number.isFinite(this.life)) this.life -= delta;
+        this.position.add(this.velocity.clone().scale(delta));
+        simulation.keepEntityInsideArena(this);
+        if (Number.isFinite(this.life) && this.life <= 0) {
+            this.isExpired = true;
+            return;
+        }
+
+        // 충돌 체크 — 모든 파이터에 대해 검사
+        for (const fighter of simulation.fighters) {
+            if (fighter.isDefeated) continue;
+            const dist = Vector2.subtract(this.position, fighter.position).length();
+            if (dist > this.radius + fighter.radius) continue;
+
+            if (fighter.id === this.ownerId) {
+                // Owner collects → apply effect
+                const effectDef = HERO_ORB_EFFECTS[this.effectType];
+                if (effectDef) {
+                    const result = effectDef.apply(fighter, {
+                        orb: this,
+                        simulation,
+                        effectType: this.effectType
+                    });
+                    simulation.spawnPulse(this.position.clone(), effectDef.color);
+                    if (result?.applied) {
+                        simulation.spawnActionText(
+                            this.position.clone(),
+                            `${effectDef.label} +${result.amount}`,
+                            effectDef.color
+                        );
+                        simulation.playSound("powerup", 0.9);
+                        simulation.addLog(`${fighter.name} collects a ${effectDef.label} orb!`);
+                    }
+                }
+            } else {
+                // Opponent collects → no bonus, just remove
+                simulation.playSound("bounce", 0.4);
+                simulation.addLog(`${fighter.name} picks up ${this.owner.name}'s orb (no effect).`);
+            }
+
+            this.isExpired = true;
+            return;
+        }
+    }
+
+    /** 특수 orb인지 여부 */
+    get _isSpecial() {
+        return ["dash", "arrow", "cooldown_burst"].includes(this.effectType);
+    }
+
+    draw(ctx) {
+        const effectDef = HERO_ORB_EFFECTS[this.effectType];
+        const color = effectDef?.color ?? "#ffffff";
+        const pulse = Math.sin(performance.now() / 150) * 0.15 + 1;
+        const r = this.radius * pulse;
+
+        ctx.save();
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(this.position.x, this.position.y, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = this._isSpecial ? 3 : 2;
+        ctx.stroke();
+
+        // 특수 orb: 내부 기호 표시
+        if (this._isSpecial) {
+            ctx.fillStyle = "#ffffff";
+            ctx.font = `900 ${Math.round(r * 1.1)}px Bahnschrift, "Segoe UI", sans-serif`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            const icon = this.effectType === "dash" ? "≫" : this.effectType === "arrow" ? "↑" : "⚡";
+            ctx.fillText(icon, this.position.x, this.position.y + 1);
+        }
+
+        ctx.restore();
+    }
+}
+
 export class BattleBall {
     constructor(spec, position) {
         this.id = spec.id;
@@ -314,6 +623,9 @@ export class BattleBall {
         this.isDestroyed = false;
         this.spinRotation = 0;
         this.statAllocation = spec.statAllocation ?? null;
+
+        // ── Hero Orb 스탯 보너스 (전투 중 누적) ──
+        this.heroOrbBonuses = { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 };
 
         // ── 클릭 액션 시스템 (Action이 등록한 런타임 effect 저장소) ──
         this.actionContext = new ActionContext();
@@ -408,7 +720,7 @@ export class BattleBall {
 
         this.position.add(this.velocity.clone().scale(delta));
         simulation.keepInsideArena(this);
-        if (this.forcedHeading?.overrideVelocity && this.bounced) this.forcedHeading = null;
+        if (this.bounced) this.forcedHeading = null;
     }
 
     /** 모든 프레임 기반 타이머를 한 번에 갱신 */

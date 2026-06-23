@@ -175,7 +175,8 @@ export const FIGHTER_IDS = Object.freeze({
     DASH: "dash",
     RAGE: "rage",
     EATER: "eater",
-    BAT_BALL: "bat_ball"
+    BAT_BALL: "bat_ball",
+    HERO: "hero"
 });
 
 /**

@@ -19,6 +19,126 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.13.0",
+        date: "2026-06-24",
+        title: "v0.13.0 업데이트",
+        changes: [
+            {
+                type: "feature",
+                text: "Hero Orb 스탯 증가량 1~3 랜덤으로 변경 — 체감 큰 폭 증가. cap clamp 시 실제 amount만 적용."
+            },
+            {
+                type: "feature",
+                text: "Trickster seed 발사 속도 버프 — owner 전투 속도 × 1.2~1.5 (기존 250 고정)."
+            },
+            {
+                type: "feature",
+                text: "Trickster seed 유지시간 버프 — 스킬 쿨타임의 2배 (기존 쿨타임 동일)."
+            },
+            {
+                type: "refactor",
+                text: "rollHeroOrbStatGain() / clampStatGain() 공용 helper 분리."
+            },
+            {
+                type: "refactor",
+                text: "TricksterAbility seed 속도/수명 계산 — computeOwnerCombatSpeed 재사용."
+            }
+        ]
+    },
+    {
+        version: "0.12.0",
+        date: "2026-06-23",
+        title: "v0.12.0 업데이트",
+        changes: [
+            {
+                type: "feature",
+                text: "특수 Hero Orb 3종 추가 — dash(10%, 돌진), arrow(10%, 화살), cooldown_burst(5%, 쿨타임 25% 단축)."
+            },
+            {
+                type: "feature",
+                text: "pickHeroOrbEffectType() 확률 선택 함수 — rng 제어 가능, 특수 미선택 시 기존 5종 스탯 orb."
+            },
+            {
+                type: "feature",
+                text: "dash orb — DashEffect 재사용, owner 속도 × 1.5 돌진."
+            },
+            {
+                type: "feature",
+                text: "arrow orb — spawnArrow/ArrowProjectile 재사용, owner 속도 × 2.0 화살."
+            },
+            {
+                type: "feature",
+                text: "cooldown_burst orb — 1초간 HeroAbility 쿨타임 ×0.25. HeroAbility가 multiplier 상태 소유."
+            },
+            {
+                type: "feature",
+                text: "특수 orb 시각 구분 — 내부 ≫/↑/⚡ 기호, 외곽선 3px."
+            },
+            {
+                type: "refactor",
+                text: "computeOwnerCombatSpeed() 공용 함수 분리 — HeroAbility/entities.js 재사용."
+            }
+        ]
+    },
+    {
+        version: "0.11.0",
+        date: "2026-06-23",
+        title: "v0.11.0 업데이트",
+        changes: [
+            {
+                type: "feature",
+                text: "Hero Ball 기본 쿨타임 1초로 변경 — 더 자주 오브를 생성합니다."
+            },
+            {
+                type: "feature",
+                text: "Hero Orb 발사 속도 owner 기준으로 변경 — 내 전투 속도 × 1.2~1.5 랜덤 배율. 정지 시에도 일정 속도 보장."
+            },
+            {
+                type: "feature",
+                text: "Hero Orb 획득 시 스탯명 +1 텍스트 피드백 추가 — effect 색상에 맞는 색으로 표시, cap 상태에서는 미표시."
+            },
+            {
+                type: "feature",
+                text: "HERO_ORB_EFFECTS에 label 및 apply() 반환값 추가 — { applied, amount } 구조로 UI/피드백 정합성 확보."
+            },
+            {
+                type: "feature",
+                text: "Hero Ball 스탯 UI 개선 — 시작 전 배분과 Hero Orb 보너스를 체력 +30%(+3) 형태로 같은 스탯 줄에 표시."
+            },
+            {
+                type: "refactor",
+                text: "HeroAbility 발사 속도 함수 _computeOrbSpeed() 분리."
+            }
+        ]
+    },
+    {
+        version: "0.10.0",
+        date: "2026-06-23",
+        title: "v0.10.0 업데이트",
+        changes: [
+            {
+                type: "feature",
+                text: "신규 캐릭터 Hero Ball 추가 — 쿨타임마다 랜덤 스탯 오브를 던집니다. 본인이 먹으면 해당 스탯 영구 증가, 상대가 먹으면 보너스 없이 제거됩니다."
+            },
+            {
+                type: "feature",
+                text: "Hero Orb effect registry 기반 구현 — hp/damage/speed/defense/skill 5종. 추후 heal/shield 등 확장 가능."
+            },
+            {
+                type: "feature",
+                text: "Hero Orb 스탯 성장 상한 시스템 — HERO_ORB_STAT_CAP = -1 (무한). 0 이상 설정 시 해당 스탯 보너스 상한 도달 후 증가 중단."
+            },
+            {
+                type: "feature",
+                text: "Hero Orb 필드 제한 — HERO_ORB_MAX_ACTIVE_PER_OWNER = 10. owner 1개체당 최대 10개, 전체 제한 없음."
+            },
+            {
+                type: "feature",
+                text: "토너먼트 참가자 선발 규칙 변경 — 캐릭터가 8명 이상일 때 유저 캐릭터 1명 + 유저 제외 랜덤 7명 = 총 8명 참가. 8명 미만이면 기존 부전승 로직 유지."
+            }
+        ]
+    },
+    {
         version: "0.9.0",
         date: "2026-06-23",
         title: "v0.9.0 업데이트",

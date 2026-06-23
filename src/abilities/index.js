@@ -7,3 +7,4 @@ export { DashAbility } from "./DashAbility.js";
 export { RageAbility } from "./RageAbility.js";
 export { EaterAbility } from "./EaterAbility.js";
 export { BatBallAbility } from "./BatBallAbility.js";
+export { HeroAbility } from "./HeroAbility.js";

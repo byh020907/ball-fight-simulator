@@ -22,7 +22,8 @@ import {
     DashAbility,
     RageAbility,
     EaterAbility,
-    BatBallAbility
+    BatBallAbility,
+    HeroAbility
 } from "./abilities/index.js";
 
 const ABILITY_MAP = {
@@ -33,7 +34,8 @@ const ABILITY_MAP = {
     dash: DashAbility,
     rage: RageAbility,
     eater: EaterAbility,
-    bat_ball: BatBallAbility
+    bat_ball: BatBallAbility,
+    hero: HeroAbility
 };
 
 export class BattleApp {

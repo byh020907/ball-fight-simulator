@@ -101,9 +101,99 @@ totalDefense = round(baseDefense × abilityDefMult)
 
 `radius`와 `mass`는 캐릭터별 고유성에 가깝기 때문에 당장은 고정합니다. 추후 장비, 난이도, 특수 모드가 생기면 별도 규칙으로 다시 검토합니다.
 
+## Hero Ball / Hero Orb
+
+### 능력: Hero Orb
+
+Hero Ball은 쿨타임마다 랜덤 방향으로 **Hero Orb** 1개를 던집니다. Hero Orb는 5가지 스탯 타입 중 하나를 랜덤으로 가집니다.
+
+| 타입 | 색상 | 효과 (1개 수집 시) |
+|------|------|--------------------|
+Hero Ball의 기본 쿨타임은 **1.0초**이며, 쿨타임 스탯(`skill`)으로 단축할 수 있습니다.
+
+| 타입 | 색상 | 효과 (1개 수집 시) |
+|------|------|--------------------|
+| `hp` | 초록 (`#44dd44`) | `maxHp +5×amount`, 현재 HP도 `+5×amount` |
+| `damage` | 빨강 (`#ff4444`) | `baseDamage × 1.02^amount` |
+| `speed` | 파랑 (`#4488ff`) | `baseSpeed +4×amount` |
+| `defense` | 노랑 (`#dddd44`) | `baseDefense +0.33×amount` |
+| `skill` | 보라 (`#bb66ff`) | `heroOrbBonuses.skill +amount` (Ability.cooldown에 반영) |
+
+> **amount**는 1, 2, 3 중 균등 랜덤입니다. (`rollHeroOrbStatGain()`)
+> `HERO_ORB_STAT_CAP`이 0 이상일 때는 bonus + amount가 cap을 넘지 않도록 clamp되며, clamp된 실제 amount만 적용됩니다.
+
+### Hero Orb 동작 규칙
+
+- **Hero Ball 본인이 오브와 충돌** → 해당 effect를 적용하고 오브는 사라집니다.
+- **상대가 오브와 충돌** → 아무 보너스 없이 오브만 사라집니다. 피해/넉백 없음.
+- Hero Orb는 `CombatEntity` 기반 엔티티로, `Projectile`의 공통 데미지 처리 흐름을 타지 않습니다.
+- `HERO_ORB_STAT_CAP = -1` (기본값). -1이면 무한 성장. 0 이상으로 설정 시 Hero Orb로 얻은 해당 스탯 보너스가 cap에 도달하면 더 이상 증가하지 않음. cap에 걸려도 오브는 먹은 것으로 처리되어 제거됩니다.
+- `HERO_ORB_MAX_ACTIVE_PER_OWNER = 10` — Hero Ball 1개체당 자신이 만든 Hero Orb는 최대 10개까지 필드에 존재할 수 있습니다. 전체 필드 20개 제한은 없습니다. 새 오브 생성 시 owner의 오브가 10개를 넘으면 가장 오래된 오브부터 제거됩니다.
+- Hero Orb의 기본 수명은 무제한입니다. 쿨타임 기반 자연 만료는 없으며, owner 수집/상대 제거/owner별 10개 제한으로만 사라집니다.
+- Hero Ball이 여러 명일 때 owner별 10개 제한은 서로 독립적으로 적용됩니다.
+- 상대가 먹은 Hero Orb는 owner의 active 목록에서 제거됩니다.
+
+### 특수 Hero Orb
+
+Hero Ball은 일정 확률로 일반 스탯 orb 대신 **특수 orb**를 던집니다. 특수 orb는 `heroOrbBonuses` 스탯 누적치에 포함되지 않으며, 시각적으로 내부에 기호(`≫`/`↑`/`⚡`)가 표시됩니다.
+
+| 타입 | 색상 | 확률 | 효과 |
+|------|------|------|------|
+| `dash` | 주황 (`#ff8833`) | 10% | owner 현재 전투 속도 × 1.5로 상대를 향해 돌진 |
+| `arrow` | 빨강 (`#ff6666`) | 10% | owner 현재 전투 속도 × 2.0의 화살을 상대에게 발사 (owner damage 비례) |
+| `cooldown_burst` | 청록 (`#66ddff`) | 5% | 1초간 HeroAbility 쿨타임이 10%로 단축 |
+
+- 특수 orb는 기존 `DashEffect` / `spawnArrow` / `ArrowProjectile` 로직을 재사용합니다.
+- 확률은 각각 독립 설정 가능하며, 기본 총 특수 확률은 25%입니다.
+- 상대가 특수 orb를 먹으면 기존과 동일하게 보너스 없이 제거됩니다.
+- 특수 orb도 `HERO_ORB_MAX_ACTIVE_PER_OWNER = 10` 제한에 포함됩니다.
+
+### Hero Orb 발사 속도
+
+Hero Orb는 Hero Ball의 현재 전투 속도를 기준으로 발사됩니다.
+
+```
+Hero Orb 속도 = owner 전투 속도 × 랜덤 배율 (1.2 ~ 1.5)
+
+owner 전투 속도 = movementSpeed ?? baseSpeed × speedModifier × slowMult × boostMult
+  - movementSpeed: DashEffect 등에 의한 현재 이동 속도 오버라이드 (우선)
+  - baseSpeed: 캐릭터 기본 속도 (스탯 배분 + Hero Orb 보너스 반영)
+  - speedModifier: Ability.getStatModifiers().speed
+  - slowMult: slowEffect 적용 시 1 미만
+  - boostMult: speedBoost 적용 시 1 이상
+```
+
+### Hero Orb 획득 피드백
+
+- owner가 Hero Orb를 먹으면 해당 effect 색상에 맞는 `스탯명 +N` 텍스트가 오브 위치에 표시됩니다.
+- `N`은 실제 적용된 amount로, 1~3 랜덤이며 cap clamp 시 줄어들 수 있습니다.
+- 예: `체력 +3` (초록), `힘 +2` (빨강), `속도 +1` (파랑), `방어 +3` (노랑), `쿨타임 +2` (보라)
+- `HERO_ORB_STAT_CAP`에 걸려 스탯이 증가하지 않은 경우에는 텍스트가 표시되지 않습니다.
+- 상대가 Hero Orb를 먹어 제거하는 경우에도 텍스트가 표시되지 않습니다.
+
+### Hero Orb UI 표시
+
+- Hero Ball의 fighter card 스탯 줄은 시작 전 배분과 Hero Orb 보너스를 같은 항목에 합쳐 표시합니다.
+- 예: `체력 +30%(+3) · 힘 +20%(+1) · 속도 +10%`
+- Hero Orb 보너스 표기는 기본 배분 뒤에 공백 없이 붙입니다. 예: `+10%(+3)`
+- 앞의 `%` 값은 토너먼트 시작 전 배분한 기본 스탯이고, 뒤의 `+n`은 전투 중 Hero Orb로 먹은 누적 보너스입니다.
+- Hero Orb 보너스가 0인 스탯은 기본 배분만 표시합니다.
+- Hero Ball은 표시 문자열이 길어질 수 있으므로 fighter card 스탯 줄의 폰트 크기를 다른 캐릭터보다 작게 사용합니다.
+
+### effect registry 확장
+
+Hero Orb의 effect type은 `HERO_ORB_EFFECTS` 레지스트리로 관리됩니다. 각 entry는 `{ color, label, apply(owner, context) }` 형태입니다. `apply()`는 `{ applied: boolean, amount: number }`를 반환합니다. `applied: false`이면 cap이나 다른 이유로 실제 스탯이 증가하지 않은 상태입니다. 새 타입(`heal`, `shield`, `temporary_buff` 등)은 레지스트리에 entry를 추가하기만 하면 됩니다. `context`는 `{ orb, simulation, effectType }`을 포함합니다.
+
 ## 등수 규칙
 
-현재 7명 로스터는 8강 슬롯에 배치되며 일부 캐릭터는 부전승을 받을 수 있습니다.
+현재 8명 로스터는 8강 슬롯에 배치되며 일부 캐릭터는 부전승을 받을 수 있습니다.
+
+## 토너먼트 참가자 선발 규칙 (v0.10.0+)
+
+- **전체 roster가 8명 이상** → 유저 캐릭터 1명 + 유저 제외 랜덤 7명 = 총 **8명**이 토너먼트에 참가합니다.
+- **전체 roster가 정확히 8명** → 기존과 동일하게 유저 캐릭터 + 나머지 7명이 모두 참가합니다.
+- **전체 roster가 8명 미만** → 가능한 모든 캐릭터가 참가하며, 기존 부전승(bye) 로직을 유지합니다. 강제로 8명을 채우기 위한 중복 캐릭터를 추가하지 않습니다.
+- 유저 캐릭터가 상대 풀에 중복으로 들어가지 않습니다.
 
 - 우승: 1위
 - 결승 탈락: 2위
@@ -118,9 +208,7 @@ totalDefense = round(baseDefense × abilityDefMult)
 - 공격과 속도는 전투 시간과 KO 빈도에 크게 영향을 주므로 테스트를 보며 먼저 조정합니다.
 - AI 캐릭터는 사용자와 같은 총 포인트를 받되 분배만 무작위로 하여 시작 조건의 총량을 맞춥니다.
 - Orbit Ball은 잃은 위성을 한 개씩 재충전하며, 위성 1개당 충전 시간은 1초(쿨타임 스탯으로 단축)입니다. 위성 5개가 모두 모이면 200~500px 거리의 적에게 5연속 발사합니다. 발사체는 벽에 튕기며 0→baseSpeed×5로 가속합니다. 근접 위성 충돌 시 넉백(0.3초/2.5배), 원거리 발사체 넉백(0.15초/1.5배).
-- Trickster Ball의 시드는 시드 생성 쿨다운과 같은 시간 동안 유지됩니다. 시드 쿨다운을 조정하면 시드 수명도 항상 같은 값으로 따라갑니다.
-- Trickster Ball의 시드는 시드 생성 쿨다운과 같은 시간 동안 유지됩니다. 시드 쿨다운을 조정하면 시드 수명도 항상 같은 값으로 따라갑니다.
-- Trickster Ball의 시드는 시드 생성 쿨다운과 같은 시간 동안 유지됩니다. 시드 쿨다운을 조정하면 시드 수명도 항상 같은 값으로 따라갑니다.
+- Trickster Ball의 시드 속도는 owner 전투 속도 × 1.2~1.5 랜덤 배율입니다. 시드 수명은 스킬 쿨타임(쿨타임 스탯 적용 후)의 2배입니다.
 - Dash Ball은 기본 쿨다운 3초의 빠른 대시를 사용하지만, 대시 자체의 추가 피해는 없고 일반 충돌 피해만 적용합니다. 유도 보정은 쿨다운 스택이 없는 100% 쿨 상태의 대시에서만 적용됩니다. 대시 중 상대를 맞히면 쿨다운이 50%씩 누적 감소하며, 최대 2단계(75% 감소)까지 줄어듭니다. 벽에 먼저 닿으면 쿨다운 스택이 완전히 초기화됩니다. 기본 공격력(damage=9)은 평균보다 낮습니다.
 - Eater Ball은 피스트(Feast) 모드 진입 시 3.3초간 지속되며, 삼키기 전까지 `steerBallToward` 기반 제한 유도로 상대를 추적합니다. 충돌 시 상대를 삼키고(0.72초), 이후 뱉어내면 상대는 벽 충돌 대시 상태가 됩니다. 쿨타임은 피스트 중 및 삼키는 중에는 감소하지 않으며, 뱉은 후 풀로 초기화됩니다. 삼키는 동안 Eater의 크기는 1.5배로 커지고, 뱉으면 원래 크기로 돌아옵니다. 기본 방어력은 2이며, 피스트 중 방어력은 1.5배(실질 3)입니다.
 - Grenade Ball의 수류탄은 벽에 최대 2회 튕깁니다. 폭발 데미지는 중심 40에서 가장자리 20까지 거리 비례 감소. 빗나갈수록 퓨즈가 짧아져 더 빨리 터집니다.
