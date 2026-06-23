@@ -196,6 +196,12 @@ BattleBall:                heroOrbBonuses 누적값 보유, 직접적인 Hero Ba
   - dash: `DashEffect` + `BattleBall.setMovementEffect()` + `forceHeading()` (Dash Ball 전용 로직 복사 금지)
   - arrow: `Simulation.spawnArrow()` + `ArrowProjectile` (owner damage 비례, Archer 회피/쿨타임 복사 금지)
   - cooldown_burst: `HeroAbility.applyCooldownBurst()` → HeroAbility가 multiplier 상태 소유
+- Hero Ball 승리 시 carryover: `entities.js`의 `mergeHeroOrbCarryover(spec, gained)`가 소유. `app.js`의 `finishMatch()`는 `winnerSpec.ability === "hero"` 조건으로 호출만 한다.
+- carryover 적용: `entities.js`의 `applyHeroOrbCarryoverToBattleBall(ball, carryover)`가 소유. `app.js`의 `startMatch()`는 호출만 한다.
+- `computeHeroOrbCarryover(gained, rate)`: 순수 계산 함수. `rate` 기본값 `HERO_ORB_CARRYOVER_RATE = 0.5`.
+- `applyHeroOrbStatAmount()`: 랜덤 roll 없이 스탯 1점당 효과만 적용. carryover 전용.
+- UI 표시: `mergeOrbBonuses(heroOrbBonuses, heroOrbCarryover)`로 합산.
+- `app.js`는 Hero 전용 스탯별 계산(Math.floor, hp/damage/speed/defense/skill 반영)을 직접 하지 않는다.
 - 특수 orb 확률: `pickHeroOrbEffectType(rng)` 함수. 기본값 dash=0.10, arrow=0.10, cooldown_burst=0.05. 특수 미선택 시 기존 5종 스탯 orb 중 랜덤.
 - 특수 orb는 `heroOrbBonuses` 누적치에 포함되지 않음. `formatHeroStatParts`에서 제외.
 - cooldown_burst 중첩 시 duration은 max 연장, multiplier는 0.1 고정.

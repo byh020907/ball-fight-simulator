@@ -814,7 +814,7 @@ async function testHeroOrbOwnerCollects(app) {
         orb.update(0.016, sim);
         const after = heroFighter.heroOrbBonuses;
         const gained = after[type] - before[type];
-        assert.ok(gained >= 1 && gained <= 3, `Collecting ${type} orb should gain 1~3, got ${gained}`);
+        assert.ok(gained >= 1 && gained <= 5, `Collecting ${type} orb should gain 1~5, got ${gained}`);
     }
 }
 
@@ -955,7 +955,7 @@ async function testHeroOrbStatCapInfinite(app) {
         sim.entities.push(orb);
         orb.update(0.016, sim);
         const gained = heroFighter.heroOrbBonuses.hp - before;
-        assert.ok(gained >= 1 && gained <= 3, `HP bonus should gain 1~3 per orb (iteration ${i}, gained ${gained})`);
+        assert.ok(gained >= 1 && gained <= 5, `HP bonus should gain 1~5 per orb (iteration ${i}, gained ${gained})`);
         totalGained += gained;
     }
     assert.ok(totalGained >= 5, `Over 5 collects, total gain should be at least 5, got ${totalGained}`);
@@ -1134,7 +1134,7 @@ async function testHeroOrbOwnerCollectFeedback(app) {
     const match = lastText.displayText?.match(/\+(\d+)/);
     assert.ok(match, `ActionText should contain +N (${lastText.displayText})`);
     const gainValue = parseInt(match[1], 10);
-    assert.ok(gainValue >= 1 && gainValue <= 3, `Gain value should be 1~3, got ${gainValue}`);
+    assert.ok(gainValue >= 1 && gainValue <= 5, `Gain value should be 1~5, got ${gainValue}`);
 }
 
 async function testHeroOrbOpponentNoFeedback(app) {
@@ -1530,30 +1530,55 @@ async function testRollHeroOrbStatGain() {
         "rng=0.0 should produce amount 1"
     );
     assert.equal(
-        rollHeroOrbStatGain(() => 0.33),
+        rollHeroOrbStatGain(() => 0.19),
         1,
-        "rng=0.33 should produce amount 1"
+        "rng=0.19 should produce amount 1"
     );
     assert.equal(
-        rollHeroOrbStatGain(() => 0.34),
+        rollHeroOrbStatGain(() => 0.2),
         2,
-        "rng=0.34 should produce amount 2"
+        "rng=0.2 should produce amount 2"
     );
     assert.equal(
-        rollHeroOrbStatGain(() => 0.66),
+        rollHeroOrbStatGain(() => 0.39),
         2,
-        "rng=0.66 should produce amount 2"
+        "rng=0.39 should produce amount 2"
+    );
+    assert.equal(
+        rollHeroOrbStatGain(() => 0.4),
+        3,
+        "rng=0.4 should produce amount 3"
+    );
+    assert.equal(
+        rollHeroOrbStatGain(() => 0.59),
+        3,
+        "rng=0.59 should produce amount 3"
+    );
+    assert.equal(
+        rollHeroOrbStatGain(() => 0.6),
+        4,
+        "rng=0.6 should produce amount 4"
+    );
+    assert.equal(
+        rollHeroOrbStatGain(() => 0.79),
+        4,
+        "rng=0.79 should produce amount 4"
+    );
+    assert.equal(
+        rollHeroOrbStatGain(() => 0.8),
+        5,
+        "rng=0.8 should produce amount 5"
     );
     assert.equal(
         rollHeroOrbStatGain(() => 0.999),
-        3,
-        "rng=0.999 should produce amount 3"
+        5,
+        "rng=0.999 should produce amount 5"
     );
 
-    // Test with multiple values - always 1~3
+    // Test with multiple values - always 1~5
     for (let i = 0; i < 100; i++) {
         const val = rollHeroOrbStatGain();
-        assert.ok(val >= 1 && val <= 3, `rollHeroOrbStatGain should return 1~3, got ${val}`);
+        assert.ok(val >= 1 && val <= 5, `rollHeroOrbStatGain should return 1~5, got ${val}`);
     }
 }
 
@@ -1571,7 +1596,7 @@ async function testHeroOrbStatGainAmountApplied(app) {
     sim.entities.push(orb);
     orb.update(0.016, sim);
     const gained = heroFighter.heroOrbBonuses.hp;
-    assert.ok(gained >= 1 && gained <= 3, "HP gain should be 1~3");
+    assert.ok(gained >= 1 && gained <= 5, "HP gain should be 1~5");
     assert.equal(heroFighter.maxHp, hpBefore.maxHp + 5 * gained, "maxHp should increase by 5×gained");
     assert.equal(heroFighter.hp, hpBefore.hp + 5 * gained, "current HP should increase by 5×gained");
 }
@@ -1589,7 +1614,7 @@ async function testHeroOrbStatGainDamage(app) {
     sim.entities.push(orb);
     orb.update(0.016, sim);
     const gained = heroFighter.heroOrbBonuses.damage;
-    assert.ok(gained >= 1 && gained <= 3, "Damage gain should be 1~3");
+    assert.ok(gained >= 1 && gained <= 5, "Damage gain should be 1~5");
     assert.ok(
         Math.abs(heroFighter.baseDamage - dmgBefore * Math.pow(1.02, gained)) < 0.1,
         `baseDamage should reflect 1.02^${gained} increase`
@@ -1609,7 +1634,7 @@ async function testHeroOrbStatGainSpeed(app) {
     sim.entities.push(orb);
     orb.update(0.016, sim);
     const gained = heroFighter.heroOrbBonuses.speed;
-    assert.ok(gained >= 1 && gained <= 3, "Speed gain should be 1~3");
+    assert.ok(gained >= 1 && gained <= 5, "Speed gain should be 1~5");
     assert.equal(heroFighter.baseSpeed, Math.round(speedBefore + 4 * gained), "baseSpeed should increase by 4×gained");
 }
 
@@ -1626,7 +1651,7 @@ async function testHeroOrbStatGainDefense(app) {
     sim.entities.push(orb);
     orb.update(0.016, sim);
     const gained = heroFighter.heroOrbBonuses.defense;
-    assert.ok(gained >= 1 && gained <= 3, "Defense gain should be 1~3");
+    assert.ok(gained >= 1 && gained <= 5, "Defense gain should be 1~5");
     assert.equal(
         heroFighter.baseDefense,
         Number((defBefore + 0.33 * gained).toFixed(2)),
@@ -1648,7 +1673,7 @@ async function testHeroOrbStatGainSkill(app) {
     sim.entities.push(orb);
     orb.update(0.016, sim);
     const gained = heroFighter.heroOrbBonuses.skill - skillBefore;
-    assert.ok(gained >= 1 && gained <= 3, "Skill gain should be 1~3");
+    assert.ok(gained >= 1 && gained <= 5, "Skill gain should be 1~5");
     // Cooldown getter uses statAllocation.skill, not heroOrbBonuses.skill.
     // heroOrbBonuses.skill is stored but cooldown getter doesn't read it yet.
     assert.ok(heroFighter.heroOrbBonuses.skill > skillBefore, "heroOrbBonuses.skill should increase");
@@ -1705,6 +1730,116 @@ async function testHeroOrbSpecialNotAffectedByGain(app) {
             `${specialType} orb should not increment heroOrbBonuses`
         );
     }
+}
+
+// ── Hero Orb Carryover Tests (v0.14.0) ───────────────────────────────────────
+
+async function testCarryoverRateConstant() {
+    const { HERO_ORB_CARRYOVER_RATE } = await import("../src/entities.js");
+    assert.equal(HERO_ORB_CARRYOVER_RATE, 0.5, "HERO_ORB_CARRYOVER_RATE should be 0.5");
+}
+
+async function testComputeHeroOrbCarryover() {
+    const { computeHeroOrbCarryover } = await import("../src/entities.js");
+    const gained = { hp: 5, damage: 1, speed: 4, defense: 2, skill: 0 };
+    const carry = computeHeroOrbCarryover(gained, 0.5);
+    assert.equal(carry.hp, 2, "hp +5 → carry +2");
+    assert.equal(carry.damage, undefined, "damage +1 → carry undefined (floor(1*0.5)=0)");
+    assert.equal(carry.speed, 2, "speed +4 → carry +2");
+    assert.equal(carry.defense, 1, "defense +2 → carry +1");
+    assert.equal(carry.skill, undefined, "skill +0 → carry undefined");
+}
+
+async function testComputeHeroOrbCarryoverCustomRate() {
+    const { computeHeroOrbCarryover } = await import("../src/entities.js");
+    // rate 0.25: hp 5 → floor(5*0.25)=1
+    const carry = computeHeroOrbCarryover({ hp: 5, speed: 10 }, 0.25);
+    assert.equal(carry.hp, 1, "hp +5 with rate 0.25 → carry +1");
+    assert.equal(carry.speed, 2, "speed +10 with rate 0.25 → carry +2");
+}
+
+async function testMergeHeroOrbCarryover() {
+    const { mergeHeroOrbCarryover } = await import("../src/entities.js");
+    const spec = { heroOrbCarryover: { hp: 2, damage: 0, speed: 1, defense: 0, skill: 0 } };
+    const gained = { hp: 5, damage: 0, speed: 0, defense: 0, skill: 0 };
+
+    mergeHeroOrbCarryover(spec, gained, 0.5);
+    assert.equal(spec.heroOrbCarryover.hp, 4, "기존 2 + 새 floor(5*0.5)=2 → 총 4");
+    assert.equal(spec.heroOrbCarryover.speed, 1, "speed는 변하지 않음 (gained 0)");
+}
+
+async function testMergeHeroOrbCarryoverNoRecycle() {
+    const { mergeHeroOrbCarryover } = await import("../src/entities.js");
+    // 기존 carry +2, 새 획득 +5 → carry 추가 = floor(5*0.5)=2
+    const spec = {};
+    mergeHeroOrbCarryover(spec, { hp: 5 }, 0.5);
+    assert.equal(spec.heroOrbCarryover.hp, 2, "첫 승리: hp 5 → carry 2");
+
+    // 두 번째 승리: 새 획득 hp +3 → floor(3*0.5)=1
+    mergeHeroOrbCarryover(spec, { hp: 3 }, 0.5);
+    assert.equal(spec.heroOrbCarryover.hp, 3, "기존 2 + 새 1 → 총 3 (기존 2를 다시 절반 계산 안 함)");
+}
+
+async function testApplyHeroOrbCarryoverToBattleBall(app) {
+    const hero = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.HERO);
+    const { BattleBall, applyHeroOrbCarryoverToBattleBall } = await import("../src/entities.js");
+    const ball = new BattleBall(hero, { x: 480, y: 480 });
+
+    const hpBefore = ball.maxHp;
+    const speedBefore = ball.baseSpeed;
+
+    applyHeroOrbCarryoverToBattleBall(ball, { hp: 2, speed: 2 });
+
+    assert.equal(ball.maxHp, hpBefore + 10, "hp carry +2 should increase maxHp by 10");
+    assert.equal(ball.baseSpeed, speedBefore + 8, "speed carry +2 should increase baseSpeed by 8");
+    assert.equal(ball.heroOrbBonuses.hp, 0, "carryover should NOT count as current match gain");
+    assert.equal(ball.heroOrbBonuses.speed, 0, "carryover should NOT count as current match gain");
+}
+
+async function testMergeOrbBonuses(app) {
+    const { mergeOrbBonuses } = await import("../src/entities.js");
+    const current = { hp: 3, damage: 1, speed: 0, defense: 0, skill: 2 };
+    const carry = { hp: 2, damage: 0, speed: 1, defense: 0, skill: 0 };
+
+    const merged = mergeOrbBonuses(current, carry);
+    assert.equal(merged.hp, 5, "3+2=5");
+    assert.equal(merged.damage, 1, "1+0=1");
+    assert.equal(merged.speed, 1, "0+1=1");
+    assert.equal(merged.defense, 0, "0+0=0");
+    assert.equal(merged.skill, 2, "2+0=2");
+}
+
+async function testCarryoverNotForNonHero(app) {
+    const archer = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
+    const { BattleBall, applyHeroOrbStatAmount } = await import("../src/entities.js");
+    const ball = new BattleBall(archer, { x: 480, y: 480 });
+
+    const hpBefore = ball.maxHp;
+    applyHeroOrbStatAmount(ball, "hp", 2, { countAsCurrentMatch: false });
+    assert.equal(ball.maxHp, hpBefore + 10, "applyHeroOrbStatAmount should work on any BattleBall");
+    assert.equal(ball.heroOrbBonuses.hp, 0, "countAsCurrentMatch=false should not increment bonuses");
+}
+
+async function testCarryoverSkillAffectsCooldown(app) {
+    const hero = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.HERO);
+    const { BattleBall, applyHeroOrbStatAmount } = await import("../src/entities.js");
+    const ball = new BattleBall(hero, { x: 480, y: 480 });
+    ball.statAllocation = { hp: 0, damage: 0, speed: 0, skill: 0, defense: 0 };
+
+    applyHeroOrbStatAmount(ball, "skill", 2, { countAsCurrentMatch: false });
+    assert.equal(ball.statAllocation.skill, 2, "skill carryover should update statAllocation.skill");
+}
+
+async function testCarryoverDoesNotAffectSpecialOrbs(app) {
+    const hero = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.HERO);
+    const { BattleBall, applyHeroOrbStatAmount } = await import("../src/entities.js");
+    const ball = new BattleBall(hero, { x: 480, y: 480 });
+
+    const bonusesBefore = { ...ball.heroOrbBonuses };
+    applyHeroOrbStatAmount(ball, "dash", 5, { countAsCurrentMatch: true });
+    applyHeroOrbStatAmount(ball, "arrow", 5, { countAsCurrentMatch: true });
+    applyHeroOrbStatAmount(ball, "cooldown_burst", 5, { countAsCurrentMatch: true });
+    assert.deepEqual(ball.heroOrbBonuses, bonusesBefore, "special orb keys should not affect heroOrbBonuses");
 }
 
 async function testTricksterSeedSpeedBuff(app) {
@@ -1889,6 +2024,16 @@ await testSpecialOrbOpponentCollects(app);
 await testSpecialOrbNotInStatBonuses(app);
 await testSpecialOrbCountsTowardMaxActive(app);
 await testSpecialOrbDrawDistinction(app);
+await testCarryoverRateConstant();
+await testComputeHeroOrbCarryover();
+await testComputeHeroOrbCarryoverCustomRate();
+await testMergeHeroOrbCarryover();
+await testMergeHeroOrbCarryoverNoRecycle();
+await testApplyHeroOrbCarryoverToBattleBall(app);
+await testMergeOrbBonuses(app);
+await testCarryoverNotForNonHero(app);
+await testCarryoverSkillAffectsCooldown(app);
+await testCarryoverDoesNotAffectSpecialOrbs(app);
 await testRollHeroOrbStatGain();
 await testHeroOrbStatGainAmountApplied(app);
 await testHeroOrbStatGainDamage(app);

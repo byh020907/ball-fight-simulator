@@ -8,7 +8,7 @@ import {
     formatStatAllocation,
     getRemainingStatPoints
 } from "./stat-allocation.js";
-import { formatHeroStatLine, formatHeroStatParts } from "./entities.js";
+import { formatHeroStatLine, formatHeroStatParts, mergeOrbBonuses } from "./entities.js";
 import { FIGHTER_IDS, RENDER_LAYERS, Vector2 } from "./core.js";
 import { getUnseenEntries, dismissPatchNotes } from "./utils.js";
 import { PopupService } from "./popup.js";
@@ -489,10 +489,19 @@ export class UIController {
                 defeated: fighter.isDefeated,
                 balanceMult: mult,
                 isHero,
+                mergedBonuses: mergeOrbBonuses(fighter.heroOrbBonuses ?? {}, fighter.heroOrbCarryover ?? {}),
                 statLine: isHero
-                    ? formatHeroStatLine(fighter.statAllocation ?? {}, fighter.heroOrbBonuses)
+                    ? formatHeroStatLine(
+                          fighter.statAllocation ?? {},
+                          mergeOrbBonuses(fighter.heroOrbBonuses ?? {}, fighter.heroOrbCarryover ?? {})
+                      )
                     : formatStatAllocation(fighter.statAllocation ?? {}),
-                heroStatParts: isHero ? formatHeroStatParts(fighter.statAllocation ?? {}, fighter.heroOrbBonuses) : [],
+                heroStatParts: isHero
+                    ? formatHeroStatParts(
+                          fighter.statAllocation ?? {},
+                          mergeOrbBonuses(fighter.heroOrbBonuses ?? {}, fighter.heroOrbCarryover ?? {})
+                      )
+                    : [],
                 skillLabel: fighter.getAbilityUiState().label,
                 skillPct: Math.max(0, Math.min(1, fighter.getAbilityUiState().progress)),
                 skillText:

@@ -12,8 +12,8 @@ import {
     getRemainingStatPoints
 } from "./stat-allocation.js";
 import { pickRandomActions, findActionById, showActionFailure } from "./click-actions.js";
-import { BattleBall } from "./entities.js";
-import { Vector2 } from "./core.js";
+import { BattleBall, mergeHeroOrbCarryover, applyHeroOrbCarryoverToBattleBall } from "./entities.js";
+import { FIGHTER_IDS, Vector2 } from "./core.js";
 import {
     ArcherAbility,
     OrbitAbility,
@@ -283,6 +283,14 @@ export class BattleApp {
         const playerBall = this.simulation.fighters.find((f) => f.id === this.playerFighterId) ?? null;
         this.simulation.playerBall = playerBall;
 
+        // Hero Orb carryover 적용 — entities.js helper로 위임
+        for (const fighter of this.simulation.fighters) {
+            const spec = match.find((s) => s.id === fighter.id);
+            if (spec?.heroOrbCarryover) {
+                applyHeroOrbCarryoverToBattleBall(fighter, spec.heroOrbCarryover);
+            }
+        }
+
         // 클릭 액션 — 내 캐릭터가 있으면 카드 선택
         this.currentMatchAction = null;
         if (playerBall) {
@@ -459,6 +467,11 @@ export class BattleApp {
                 (fighter) => fighter?.id === this.playerFighterId
             );
             const playerLost = playerWasInMatch && winnerSpec.id !== this.playerFighterId;
+
+            // Hero Ball 승리 시 carryover — HeroAbility/entities.js helper로 위임
+            if (winnerSpec.ability === "hero") {
+                mergeHeroOrbCarryover(winnerSpec, this.simulation.winner?.heroOrbBonuses);
+            }
             if (playerLost && !this.playerResult) {
                 this.playerResult = {
                     rankLabel: this.getPlayerRankLabel(this.currentTournamentMatch.roundIndex),

@@ -300,9 +300,9 @@ export function setHeroOrbStatCap(value) {
 }
 
 const HERO_ORB_STAT_GAIN_MIN = 1;
-const HERO_ORB_STAT_GAIN_MAX = 3;
+const HERO_ORB_STAT_GAIN_MAX = 5;
 
-/** 1~3 랜덤 stat gain roll. rng 제어 가능. */
+/** 1~5 랜덤 stat gain roll. rng 제어 가능. */
 export function rollHeroOrbStatGain(rng = Math.random) {
     return HERO_ORB_STAT_GAIN_MIN + Math.floor(rng() * (HERO_ORB_STAT_GAIN_MAX - HERO_ORB_STAT_GAIN_MIN + 1));
 }
@@ -478,7 +478,16 @@ export function formatHeroStatLine(allocation = {}, bonuses = {}) {
 }
 
 /** 스탯 orb만 UI 표시 대상 (특수 orb 제외) */
-const STAT_ORB_KEYS = ["hp", "damage", "speed", "skill", "defense"];
+export const STAT_ORB_KEYS = ["hp", "damage", "speed", "skill", "defense"];
+
+/** 두 bonus 객체를 합산 (carryover + currentMatch) */
+export function mergeOrbBonuses(current = {}, carry = {}) {
+    const result = {};
+    for (const key of STAT_ORB_KEYS) {
+        result[key] = (current[key] ?? 0) + (carry[key] ?? 0);
+    }
+    return result;
+}
 
 export function formatHeroStatParts(allocation = {}, bonuses = {}) {
     return STAT_ORB_KEYS.map((key) => {
@@ -493,6 +502,78 @@ export function formatHeroStatParts(allocation = {}, bonuses = {}) {
             color: effect?.color ?? "#ffffff"
         };
     });
+}
+
+/**
+/**
+ * Hero Orb 스탯 1점당 효과를 owner에 적용. 랜덤 roll/text 피드백 없음.
+ * carryover 적용 등에서 호출.
+ */
+export function applyHeroOrbStatAmount(owner, statKey, amount, opts = {}) {
+    const { countAsCurrentMatch = true } = opts;
+    if (amount <= 0) return;
+    // 일반 스탯 orb 5종만 처리 (특수 orb 키 무시)
+    if (!STAT_ORB_KEYS.includes(statKey)) return;
+    if (countAsCurrentMatch && owner.heroOrbBonuses) {
+        owner.heroOrbBonuses[statKey] = (owner.heroOrbBonuses[statKey] ?? 0) + amount;
+    }
+    switch (statKey) {
+        case "hp":
+            owner.maxHp += 5 * amount;
+            owner.hp = Math.min(owner.hp + 5 * amount, owner.maxHp);
+            break;
+        case "damage":
+            owner.baseDamage = Number((owner.baseDamage * Math.pow(1.02, amount)).toFixed(1));
+            break;
+        case "speed":
+            owner.baseSpeed = Math.round(owner.baseSpeed + 4 * amount);
+            break;
+        case "defense":
+            owner.baseDefense = Number((owner.baseDefense + 0.33 * amount).toFixed(2));
+            break;
+        case "skill":
+            if (owner.statAllocation) {
+                owner.statAllocation.skill = (owner.statAllocation.skill ?? 0) + amount;
+            }
+            break;
+    }
+}
+
+// ── Hero Ball 승리 시 스탯 계승 (Carryover) ──────────────────────────────────
+
+/** 계승 비율: 이번 경기 획득량 × CARRYOVER_RATE를 floor 처리 */
+export const HERO_ORB_CARRYOVER_RATE = 0.5;
+
+/** runtime heroOrbBonuses에서 carryover 계산 */
+export function computeHeroOrbCarryover(gained = {}, rate = HERO_ORB_CARRYOVER_RATE) {
+    const result = {};
+    for (const key of STAT_ORB_KEYS) {
+        const carry = Math.floor((gained[key] ?? 0) * rate);
+        if (carry > 0) result[key] = carry;
+    }
+    return result;
+}
+
+/** winnerSpec.heroOrbCarryover에 새 carryover 누적 */
+export function mergeHeroOrbCarryover(spec, gained = {}, rate = HERO_ORB_CARRYOVER_RATE) {
+    const carryover = computeHeroOrbCarryover(gained, rate);
+    if (Object.keys(carryover).length === 0) return carryover;
+    spec.heroOrbCarryover = spec.heroOrbCarryover || { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 };
+    for (const key of Object.keys(carryover)) {
+        spec.heroOrbCarryover[key] = (spec.heroOrbCarryover[key] ?? 0) + carryover[key];
+    }
+    return carryover;
+}
+
+/** BattleBall에 carryover 적용 (다음 매치 시작 시) */
+export function applyHeroOrbCarryoverToBattleBall(ball, carryover) {
+    if (!carryover) return;
+    for (const key of STAT_ORB_KEYS) {
+        const amount = carryover[key] ?? 0;
+        if (amount <= 0) continue;
+        applyHeroOrbStatAmount(ball, key, amount, { countAsCurrentMatch: false });
+        ball.heroOrbCarryover[key] = (ball.heroOrbCarryover[key] ?? 0) + amount;
+    }
 }
 
 /**
@@ -626,6 +707,7 @@ export class BattleBall {
 
         // ── Hero Orb 스탯 보너스 (전투 중 누적) ──
         this.heroOrbBonuses = { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 };
+        this.heroOrbCarryover = { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 };
 
         // ── 클릭 액션 시스템 (Action이 등록한 런타임 effect 저장소) ──
         this.actionContext = new ActionContext();

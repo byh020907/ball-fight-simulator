@@ -19,6 +19,33 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.14.0",
+        date: "2026-06-24",
+        title: "v0.14.0 업데이트",
+        changes: [
+            {
+                type: "feature",
+                text: "Hero Orb 스탯 증가량 1~5로 상향 — 체감 폭 증가."
+            },
+            {
+                type: "feature",
+                text: "Hero Ball 승리 시 스탯 계승 시스템 추가 — 이번 경기 Hero Orb 획득량의 절반을 floor 처리하여 다음 스테이지에 carryover."
+            },
+            {
+                type: "feature",
+                text: "applyHeroOrbStatAmount() helper 분리 — 랜덤 roll 없는 스탯 적용, carryover 전용."
+            },
+            {
+                type: "feature",
+                text: "UI carryover 합산 표시 — mergeOrbBonuses()로 carryover + current match 합산."
+            },
+            {
+                type: "refactor",
+                text: "STAT_ORB_KEYS export, mergeOrbBonuses() 공용 함수 분리."
+            }
+        ]
+    },
+    {
         version: "0.13.0",
         date: "2026-06-24",
         title: "v0.13.0 업데이트",
