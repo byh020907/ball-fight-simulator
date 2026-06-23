@@ -376,11 +376,12 @@ export class BattleApp {
         }
 
         const cost = Math.ceil((player.maxHp * action.hpCostPercent) / 100);
-        if (player.actionContext.spendHpForAction(player, cost) <= 0) {
+        const paidCost = player.actionContext.spendHpForAction(player, cost);
+        if (paidCost <= 0) {
             return false;
         }
 
-        sim.scheduleAction(action, player);
+        sim.scheduleAction(action, player, paidCost);
 
         // 사용자 피드백 — 파티클 + 사운드 (액션명 텍스트는 실제 효과 시점에 표시)
         sim.spawnExplosion(player.position.clone(), "#cccccc");

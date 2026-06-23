@@ -56,8 +56,8 @@ export class BattleSimulation extends Simulation {
     }
 
     /** 액션 예약 — _clickActionContext로 위임 */
-    scheduleAction(actionInstance, playerBall) {
-        this._clickActionContext.pendingAction = { actionInstance, playerBall };
+    scheduleAction(actionInstance, playerBall, paidCost = 0) {
+        this._clickActionContext.pendingAction = { actionInstance, playerBall, paidCost };
     }
 
     /** 예약된 액션을 꺼내서 적용 (update()에서 호출) */
@@ -150,10 +150,10 @@ export class BattleSimulation extends Simulation {
         // 지연 적용 패턴 — 클릭 핸들러가 예약한 액션을 충돌 전에 처리
         const pa = this._consumePendingAction();
         if (pa) {
-            const { actionInstance, playerBall: pb } = pa;
+            const { actionInstance, playerBall: pb, paidCost } = pa;
             if (actionInstance && pb) {
                 this.addLog(`[액션] 효과 적용: ${actionInstance.name}`);
-                actionInstance.apply(this, pb);
+                actionInstance.apply(this, pb, paidCost);
             }
         }
 

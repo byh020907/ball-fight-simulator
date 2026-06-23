@@ -635,24 +635,24 @@ function testClickActionEffectOwnership(app) {
 
     rush.apply(sim, player);
 
-    assert.equal(sim.getSpeedMultiplier(player), 1.25, "RushAction should register speed effect on its target ball");
+    assert.equal(sim.getSpeedMultiplier(player), 1.5, "RushAction should register speed effect on its target ball");
     assert.equal(sim.getSpeedMultiplier(opponent), 1, "RushAction should not boost unrelated balls");
 
     player.actionContext.tickTimers(player, 0.25);
     rush.apply(sim, player);
     assert.equal(
         player.actionContext.getEffect("rush").remaining,
-        0.75,
+        1.75,
         "RushAction should own duration extension logic"
     );
 
-    player.actionContext.tickTimers(player, 0.76);
+    player.actionContext.tickTimers(player, 1.76);
     assert.equal(sim.getSpeedMultiplier(player), 1, "Rush effect should expire through the generic action context");
 
     endure.apply(sim, player);
     assert.equal(
         player.actionContext.onDamageTaken(11, opponent, "Test"),
-        6,
+        2,
         "EndureAction should own damage reduction logic"
     );
 
@@ -683,7 +683,8 @@ function testRiskWindowActionOwnership(app) {
     player.actionContext.tickTimers(player, 0);
     assert.equal(player.actionContext.getEffect("counter"), null, "Counter should expire after it is consumed");
 
-    parry.apply(sim, player);
+    player.hp = 50;
+    parry.apply(sim, player, 2);
     assert.equal(
         player.actionContext.onDamageTaken(20, opponent, "Crash"),
         20,
@@ -691,9 +692,10 @@ function testRiskWindowActionOwnership(app) {
     );
     assert.equal(
         player.actionContext.onProjectileDamage(20, {}, opponent, "Arrow Shot", sim, player),
-        10,
+        5,
         "Parry should reduce projectile damage inside its window"
     );
+    assert.equal(player.hp, 52, "Parry should refund its paid HP cost on success");
     assert.equal(
         player.actionContext.onProjectileDamage(20, {}, opponent, "Arrow Shot", sim, player),
         20,

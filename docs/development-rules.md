@@ -129,7 +129,7 @@ class ActionContext {
 | --------- | ------------------------------------------------------ | -------------------------------------------------------------- |
 | 시간 왜곡 | `max(현재값, duration)` 후 저장                        | `sim.get/ setTimeSlowRemaining()`                              |
 | 돌진      | 지속시간 연장 또는 신규 설정 + 속도 배율 적용          | `ball.actionContext.getEffect(id)`, `ball.actionContext.setEffect(id, effect)` |
-| 카운터    | timed effect 등록 (0.22s, onFighterCollision)           | `ball.actionContext.setEffect(id, effect)`                     |
+| 카운터    | timed effect 등록 (0.20s, onFighterCollision)           | `ball.actionContext.setEffect(id, effect)`                     |
 | 받아치기    | timed effect 등록 (0.3s, onProjectileDamage)            | `ball.actionContext.setEffect(id, effect)`                     |
 | 버티기    | 경감 effect 등록                                       | `ball.actionContext.setEffect(id, effect)`                     |
 

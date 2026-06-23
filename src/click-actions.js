@@ -104,20 +104,20 @@ class ClickAction {
 const TIME_WARP_DURATION = 0.5;
 const TIME_WARP_COST = 0.5;
 
-const RUSH_DURATION = 0.5;
-const RUSH_SPEED_BONUS = 0.25;
-const RUSH_COST = 0.5;
+const RUSH_DURATION = 1;
+const RUSH_SPEED_BONUS = 0.5;
+const RUSH_COST = 1.0;
 
 const COUNTER_WINDOW_SECONDS = 0.2;
-const COUNTER_BONUS_RATE = 0.1;
+const COUNTER_BONUS_RATE = 1.0;
 const COUNTER_COST = 1.5;
 
 const PARRY_WINDOW_SECONDS = 0.3;
-const PARRY_DAMAGE_MULTIPLIER = 0.5;
+const PARRY_DAMAGE_MULTIPLIER = 0.25;
 const PARRY_COST = 1.0;
 
 const ENDURE_DURATION = 0.1;
-const ENDURE_DAMAGE_MULTIPLIER = 0.5;
+const ENDURE_DAMAGE_MULTIPLIER = 0.2;
 const ENDURE_COST = 1.0;
 
 class TimeWarpAction extends ClickAction {
@@ -206,19 +206,20 @@ class ParryAction extends ClickAction {
         return "받아치기";
     }
     get description() {
-        return `${PARRY_WINDOW_SECONDS}초 안에 맞는 투사체 데미지 ${PARRY_DAMAGE_MULTIPLIER * 100}% 경감`;
+        return `${PARRY_WINDOW_SECONDS}초 안에 맞는 투사체 데미지 ${(1 - PARRY_DAMAGE_MULTIPLIER) * 100}% 경감`;
     }
     get hpCostPercent() {
         return PARRY_COST;
     }
 
-    apply(sim, playerBall) {
+    apply(sim, playerBall, paidCost = 0) {
         sim.spawnActionWindow(playerBall, this.id, PARRY_WINDOW_SECONDS);
         sim.playSound("parry");
         const effect = {
             remaining: PARRY_WINDOW_SECONDS,
             onProjectileDamage: (amount, projectile, source, label, simulation, target) => {
                 effect.isExpired = true;
+                target.actionContext.refundHpForAction(target, paidCost);
                 simulation.spawnActionText(target.position.clone(), "받아치기!", "#44ddff");
                 simulation.spawnActionSuccess(target.position.clone(), "parry");
                 simulation.playSound("parry");
@@ -238,7 +239,7 @@ class EndureAction extends ClickAction {
         return "버티기";
     }
     get description() {
-        return `${ENDURE_DURATION}초간 받는 데미지 ${ENDURE_DAMAGE_MULTIPLIER * 100}% 경감`;
+        return `${ENDURE_DURATION}초간 받는 모든 데미지 ${(1 - ENDURE_DAMAGE_MULTIPLIER) * 100}% 경감`;
     }
     get hpCostPercent() {
         return ENDURE_COST;
@@ -354,6 +355,13 @@ export class ActionContext {
         const cost = Math.min(amount, ball.hp - 1);
         ball.hp -= cost;
         return cost;
+    }
+
+    refundHpForAction(ball, amount) {
+        if (amount <= 0) return 0;
+        const refund = Math.min(amount, ball.maxHp - ball.hp);
+        ball.hp += refund;
+        return refund;
     }
 
     /** BattleBall._tickTimers()에서 호출 */

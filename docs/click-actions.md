@@ -51,10 +51,10 @@
 | 액션          | 발동 조건      | 효과                                                                                 | 예상 클릭 빈도              | HP 소모(maxHP 비율) |
 | ------------- | -------------- | ------------------------------------------------------------------------------------ | --------------------------- | ------------------- |
 | **시간 왜곡** | 상시           | 클릭 시 0.5초간 상대(플레이어 제외 모든 엔티티)만 35% 속도로 슬로우. 연타 시 갱신      | 매우 높음 (~0.2초마다 연타) | 0.5%                |
-| **돌진**      | 상시           | 클릭 시 0.5초간 내 캐릭터 속도 +25%                                                  | 중간 (1~2초마다)            | 0.5%                |
-| **카운터**    | 상시           | 클릭 시 0.20초간 충돌 window. 맞으면 공격 데미지 +10%, 빗나가면 HP만 소모.             | 낮음 (매치당 손에 꼽음)     | 1.5%               |
-| **받아치기**  | 상시           | 클릭 시 0.3초간 투사체 피해 50% 경감 window. 맞지 않으면 HP만 소모.                   | 중간 (예측 샷)             | 1.0%               |
-| **버티기**    | 상시           | 클릭 시 0.1초간 받는 데미지 50% 경감                                                 | 위기 구간에서 몰아서 사용   | 1.0%               |
+| **돌진**      | 상시           | 클릭 시 1초간 내 캐릭터 속도 +50%                                                    | 중간 (1~2초마다)            | 1.0%               |
+| **카운터**    | 상시           | 클릭 시 0.20초간 충돌 window. 맞으면 공격 데미지 +100%, 빗나가면 HP만 소모.            | 낮음 (매치당 손에 꼽음)     | 1.5%               |
+| **받아치기**  | 상시           | 클릭 시 0.3초간 투사체 피해 75% 경감 window. 성공하면 HP 비용 회수.                    | 중간 (예측 샷)             | 1.0%               |
+| **버티기**    | 상시           | 클릭 시 0.1초간 받는 모든 데미지 80% 경감                                             | 위기 구간에서 몰아서 사용   | 1.0%               |
 
 ### 액션 정의 형식 (클래스 기반)
 
@@ -170,7 +170,7 @@ class ClickAction {
 // ────────────  ─────────────────────────────────────────  ──────────────────────────────
 // 시간 왜곡     max(현재값, duration) 후 저장               sim.get/ setTimeSlowRemaining()
 // 돌진          지속시간 연장 or 신규 + 배율 적용            ball.actionContext.getEffect(), setEffect()
-// 카운터        timed effect 등록 (0.22s, onFighterCollision) ball.actionContext.setEffect()
+// 카운터        timed effect 등록 (0.20s, onFighterCollision) ball.actionContext.setEffect()
 // 받아치기      timed effect 등록 (0.3s, onProjectileDamage)  ball.actionContext.setEffect()
 // 버티기        경감 effect 등록                            ball.actionContext.setEffect()
 
@@ -223,20 +223,20 @@ class ChargeAction extends ClickAction {
 const TIME_WARP_DURATION = 0.5;
 const TIME_WARP_COST = 0.5;
 
-const RUSH_DURATION = 0.5;
-const RUSH_SPEED_BONUS = 0.25;
-const RUSH_COST = 0.5;
+const RUSH_DURATION = 1;
+const RUSH_SPEED_BONUS = 0.5;
+const RUSH_COST = 1.0;
 
 const COUNTER_WINDOW_SECONDS = 0.2;
-const COUNTER_BONUS_RATE = 0.1;
+const COUNTER_BONUS_RATE = 1.0;
 const COUNTER_COST = 1.5;
 
 const PARRY_WINDOW_SECONDS = 0.3;
-const PARRY_DAMAGE_MULTIPLIER = 0.5;
+const PARRY_DAMAGE_MULTIPLIER = 0.25;
 const PARRY_COST = 1.0;
 
 const ENDURE_DURATION = 0.1;
-const ENDURE_DAMAGE_MULTIPLIER = 0.5;
+const ENDURE_DAMAGE_MULTIPLIER = 0.2;
 const ENDURE_COST = 1.0;
 
 class TimeWarpAction extends ClickAction {
@@ -312,15 +312,16 @@ class ParryAction extends ClickAction {
         return "받아치기";
     }
     get description() {
-        return `${PARRY_WINDOW_SECONDS}초 안에 맞는 투사체 데미지 ${PARRY_DAMAGE_MULTIPLIER * 100}% 경감`;
+        return `${PARRY_WINDOW_SECONDS}초 안에 맞는 투사체 데미지 ${(1 - PARRY_DAMAGE_MULTIPLIER) * 100}% 경감`;
     }
     get hpCostPercent() {
         return PARRY_COST;
     }
-    apply(sim, playerBall) {
+    apply(sim, playerBall, paidCost = 0) {
         playerBall.actionContext.setEffect(this.id, {
             remaining: PARRY_WINDOW_SECONDS,
             onProjectileDamage: (amount, projectile, source, label, simulation, target) => {
+                target.actionContext.refundHpForAction(target, paidCost);
                 simulation.spawnActionText(target.position.clone(), "받아치기!", "#44ddff");
                 return Math.round(amount * PARRY_DAMAGE_MULTIPLIER);
             }
@@ -336,7 +337,7 @@ class EndureAction extends ClickAction {
         return "버티기";
     }
     get description() {
-        return `${ENDURE_DURATION}초간 받는 데미지 ${ENDURE_DAMAGE_MULTIPLIER * 100}% 경감`;
+        return `${ENDURE_DURATION}초간 받는 모든 데미지 ${(1 - ENDURE_DAMAGE_MULTIPLIER) * 100}% 경감`;
     }
     get hpCostPercent() {
         return ENDURE_COST;
@@ -387,8 +388,8 @@ const ACTION_DEFS = Object.freeze([
 2. playerBall exists + not defeated?
 3. HP 5% 미만? → 무시
 4. `action.getFailureReason(sim, player)`가 이유를 반환하면 화면 텍스트로 실패 피드백 표시 후 무시
-5. HP 소모 (`player.actionContext.spendHpForAction(player, cost)`, 최소 1 보장)
-6. `sim.scheduleAction(action, player)`로 예약 (지연 적용 패턴)
+5. HP 소모 (`player.actionContext.spendHpForAction(player, cost)`, 최소 1 보장) 후 실제 소모량 `paidCost` 저장
+6. `sim.scheduleAction(action, player, paidCost)`로 예약 (지연 적용 패턴)
 
 실패 피드백은 브라우저 콘솔 로그가 아니라 전투 화면 텍스트(`spawnActionText`)를 기준으로 표시한다.
 
@@ -421,11 +422,11 @@ const ACTION_DEFS = Object.freeze([
 
 ### 카운터 판정
 
-더 이상 충돌 임박 여부를 미리 체크하지 않는다. 사용자가 카운터를 누르면 무조건 HP를 소모하고 0.22초짜리 충돌 window가 열린다. 이 window 안에 충돌하면 `ActionContext.onFighterCollision()`이 추가 피해와 텍스트를 처리하고, 충돌하지 못하면 HP만 소모된 채 만료된다.
+더 이상 충돌 임박 여부를 미리 체크하지 않는다. 사용자가 카운터를 누르면 무조건 HP를 소모하고 0.20초짜리 충돌 window가 열린다. 이 window 안에 충돌하면 `ActionContext.onFighterCollision()`이 +100% 추가 피해와 텍스트를 처리하고, 충돌하지 못하면 HP만 소모된 채 만료된다.
 
 ### 받아치기 판정
 
-더 이상 투사체 접근 여부를 미리 체크하지 않는다. 사용자가 받아치기를 누르면 무조건 HP를 소모하고 0.3초짜리 받아치기 window가 열린다. 이 window 안에 투사체 공통 hit 경로가 `ActionContext.onProjectileDamage()`를 호출하면 피해량을 50% 경감하고 "받아치기!" 텍스트를 표시한다. 일반 충돌/근접 피해는 받아치기로 줄어들지 않는다.
+더 이상 투사체 접근 여부를 미리 체크하지 않는다. 사용자가 받아치기를 누르면 무조건 HP를 소모하고 0.3초짜리 받아치기 window가 열린다. 이 window 안에 투사체 공통 hit 경로가 `ActionContext.onProjectileDamage()`를 호출하면 피해량을 75% 경감하고 "받아치기!" 텍스트를 표시하며, 실제로 지불한 HP 비용을 회수한다. 일반 충돌/근접 피해는 받아치기로 줄어들지 않는다.
 
 ### 시간 왜곡 구현
 
@@ -457,10 +458,10 @@ for (const entity of this.entities) {
 | 액션 | 코스트 | 효과 |
 |------|--------|------|
 | 시간 왜곡 | 0.5% | 0.5s 슬로우 |
-| 돌진 | 0.5% | 0.5s 속도 +25% |
-| 카운터 | 1.5% | 0.20s window, 충돌 시 +10% |
-| 받아치기 | 1.0% | 0.3s window, 투사체 50% 경감 |
-| 버티기 | 1.0% | 0.1s window, 전체 50% 경감 |
+| 돌진 | 1.0% | 1.0s 속도 +50% |
+| 카운터 | 1.5% | 0.20s window, 충돌 시 +100% |
+| 받아치기 | 1.0% | 0.3s window, 투사체 75% 경감 + 성공 시 비용 회수 |
+| 버티기 | 1.0% | 0.1s window, 모든 피해 80% 경감 |
 
 ---
 
@@ -475,7 +476,7 @@ for (const entity of this.entities) {
 - [ ] 각 액션의 발동 조건 정확히 동작
 - [ ] HP 자해 소모로 패배 처리되지 않음 (최소 HP 1 보장)
 - [ ] 시간 왜곡: 연타 시 슬로우 갱신, 상대만 느려짐
-- [ ] 돌진: 0.2초 지속 자연스럽게 적용/해제
+- [ ] 돌진: 1초 지속 자연스럽게 적용/해제
 - [ ] 카운터: 판정 윈도우 난이도 적절
 - [x] 받아치기: 투사체 없는 매치업에서 무용지물 문제 해결 (상시 발동 + 0.3s window)
 - [ ] 오버타임과 동시 사용 시 충돌 없음
