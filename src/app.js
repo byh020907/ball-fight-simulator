@@ -228,6 +228,27 @@ export class BattleApp {
         await this.startMatch([nextMatch.a, nextMatch.b], { keepLog: true });
     }
 
+    // ── 액션 선택 정책 ──
+    // true면 매 매치마다 선택, false면 토너먼트 첫 판만 선택
+    _pickActionEveryMatch = false;
+
+    async _resolveAction(playerBall) {
+        if (!playerBall) return null;
+
+        // 첫 선택이거나 매판 선택 모드면 카드 띄움
+        if (!this.selectedActionId || this._pickActionEveryMatch) {
+            const cards = pickRandomActions(3);
+            const pickedId = await this.ui.waitForActionPick(cards);
+            this.selectedActionId = pickedId;
+        }
+
+        this.currentMatchAction = findActionById(this.selectedActionId);
+        if (this.currentMatchAction) {
+            this.ui.addLog(`[액션] ${this.currentMatchAction.name} 준비 완료.`);
+        }
+        return this.currentMatchAction;
+    }
+
     async startMatch(customMatch = null, options = {}) {
         this.audio.unlock();
         this.ui.setStartButton({ disabled: true, hidden: true });
@@ -260,18 +281,10 @@ export class BattleApp {
         const playerBall = this.simulation.fighters.find((f) => f.id === this.playerFighterId) ?? null;
         this.simulation.playerBall = playerBall;
 
-        // 클릭 액션 — 내 캐릭터가 있으면 카드 선택 (토너먼트全程 1회)
+        // 클릭 액션 — 내 캐릭터가 있으면 카드 선택
         this.currentMatchAction = null;
         if (playerBall) {
-            if (!this.selectedActionId) {
-                const cards = pickRandomActions(3);
-                const pickedId = await this.ui.waitForActionPick(cards);
-                this.selectedActionId = pickedId;
-            }
-            this.currentMatchAction = findActionById(this.selectedActionId);
-            if (this.currentMatchAction) {
-                this.ui.addLog(`[액션] ${this.currentMatchAction.name} 준비 완료.`);
-            }
+            await this._resolveAction(playerBall);
         }
 
         // 클릭 핸들러 바인딩
