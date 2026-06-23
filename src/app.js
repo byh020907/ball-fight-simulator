@@ -11,7 +11,7 @@ import {
     createTournamentRoster,
     getRemainingStatPoints
 } from "./stat-allocation.js";
-import { pickRandomActions, showActionFailure } from "./click-actions.js";
+import { pickRandomActions, findActionById, showActionFailure } from "./click-actions.js";
 import { BattleBall } from "./entities.js";
 import { Vector2 } from "./core.js";
 import {
@@ -70,6 +70,7 @@ export class BattleApp {
         this.matchFinalized = false;
         this.transientOverlayToken = 0;
         this._previewBall = null;
+        this.selectedActionId = null;
 
         // Listen for Alpine.js start-tournament event
         try {
@@ -201,6 +202,7 @@ export class BattleApp {
         this.playerResult = null;
         this.tournament = new TournamentManager(this.tournamentRoster, this.playerFighterId);
         this.currentTournamentMatch = null;
+        this.selectedActionId = null;
         this.refreshPlayerSetup();
         this.ui.renderTournament(this.tournament);
         const player = this.tournamentRoster.find((fighter) => fighter.id === this.playerFighterId);
@@ -258,12 +260,15 @@ export class BattleApp {
         const playerBall = this.simulation.fighters.find((f) => f.id === this.playerFighterId) ?? null;
         this.simulation.playerBall = playerBall;
 
-        // 클릭 액션 — 내 캐릭터가 있으면 카드 선택
+        // 클릭 액션 — 내 캐릭터가 있으면 카드 선택 (토너먼트全程 1회)
         this.currentMatchAction = null;
         if (playerBall) {
-            const cards = pickRandomActions(3);
-            const pickedId = await this.ui.waitForActionPick(cards);
-            this.currentMatchAction = cards.find((c) => c.id === pickedId) ?? null;
+            if (!this.selectedActionId) {
+                const cards = pickRandomActions(3);
+                const pickedId = await this.ui.waitForActionPick(cards);
+                this.selectedActionId = pickedId;
+            }
+            this.currentMatchAction = findActionById(this.selectedActionId);
             if (this.currentMatchAction) {
                 this.ui.addLog(`[액션] ${this.currentMatchAction.name} 준비 완료.`);
             }
