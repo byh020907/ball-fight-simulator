@@ -58,6 +58,25 @@ export const PATCH_NOTES = [
         ]
     },
     {
+        version: "0.17.0",
+        date: "2026-06-25",
+        title: "v0.17.0 업데이트",
+        changes: [
+            {
+                type: "feature",
+                text: "전투 배속 시스템 — x2/x4 배속, 업적 해금 시 사용 가능."
+            },
+            {
+                type: "feature",
+                text: "업적 3종 추가: 단일 대미지 150(gold), 속도 해방 1단계/2단계."
+            },
+            {
+                type: "refactor",
+                text: "회귀 테스트 9개 추가 (업적/숙련도/토너먼트리포트/ViewModel)."
+            }
+        ]
+    },
+    {
         version: "0.15.1",
         date: "2026-06-24",
         title: "v0.15.1 업데이트",
