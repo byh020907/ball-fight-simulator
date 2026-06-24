@@ -2143,6 +2143,46 @@ async function testEvaluateAchievements() {
         results5.some((r) => r.id === "marathon_50"),
         "marathon_50 should unlock at 50 matches"
     );
+
+    // speed_2x: first win — 첫 evaluateCall에서 함께 해금됨
+    assert.ok(
+        results.some((r) => r.id === "speed_2x"),
+        "speed_2x should unlock with first win"
+    );
+
+    // speed_4x: bestTournamentWinStreak >= 3
+    const profile7 = createDefaultPlayerProfile();
+    const report7 = createTournamentReport();
+    report7.playerFighterId = "archer";
+    profile7.collection.careerStats.bestTournamentWinStreak = 3;
+    const results7 = evaluateAchievements(profile7, ACHIEVEMENT_DEFINITIONS, {
+        profile: profile7,
+        report: report7,
+        roster,
+        playerFighterId: "archer"
+    });
+    assert.ok(
+        results7.some((r) => r.id === "speed_4x"),
+        "speed_4x should unlock at 3-win streak"
+    );
+
+    // single_hit_monster: maxHitDamage >= 150
+    const profile8 = createDefaultPlayerProfile();
+    const report8 = createTournamentReport();
+    report8.playerFighterId = "archer";
+    const matchBig = createMatchReport();
+    matchBig.maxHitDamage = 150;
+    addMatchReport(report8, matchBig);
+    const results8 = evaluateAchievements(profile8, ACHIEVEMENT_DEFINITIONS, {
+        profile: profile8,
+        report: report8,
+        roster,
+        playerFighterId: "archer"
+    });
+    assert.ok(
+        results8.some((r) => r.id === "single_hit_monster"),
+        "single_hit_monster should unlock at 150 maxHitDamage"
+    );
 }
 
 async function testApplyAchievementRewards() {
