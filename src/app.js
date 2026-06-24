@@ -9,7 +9,8 @@ import {
     createEmptyStatAllocation,
     createRandomStatAllocation,
     createTournamentRoster,
-    getRemainingStatPoints
+    getRemainingStatPoints,
+    updateEffectiveStatCap
 } from "./statAllocation.js";
 import { STAT_BALANCER_CONFIG as _STAT_BALANCER_CONFIG } from "./statAllocation.js";
 
@@ -151,7 +152,18 @@ export class BattleApp {
         this.ui.renderCollectionHub(vm);
     }
 
+    /** 스탯 배분 UI용 MAX_POINTS_PER_STAT 업데이트 */
+    _updateStatCapForUI() {
+        const masteryCtx = this.playerProfile?.characterMastery?.levels
+            ? collectActiveEffects(this.playerProfile, this.playerFighterId)
+            : { allocationModifiers: { perStatCapBonus: 0 } };
+        const progressionBonus = this.playerProfile?.progression?.bonuses?.perStatCapBonus ?? 0;
+        const masteryBonus = masteryCtx.allocationModifiers?.perStatCapBonus ?? 0;
+        updateEffectiveStatCap(progressionBonus, masteryBonus);
+    }
+
     refreshPlayerSetup() {
+        this._updateStatCapForUI();
         const remaining = getRemainingStatPoints(this.playerStatAllocation);
         const player = this.roster.find((fighter) => fighter.id === this.playerFighterId);
         this.ui.renderPlayerSetup({
@@ -234,6 +246,9 @@ export class BattleApp {
     }
 
     async startTournament() {
+        // MAX_POINTS_PER_STAT 초기화 (이전 토너먼트에서 변경된 값 복원)
+        updateEffectiveStatCap(0, 0);
+
         // 재선정 대기 상태면 먼저 새 캐릭터 선정
         if (this._pickPending) {
             this.prepareNewTournament();
@@ -264,9 +279,23 @@ export class BattleApp {
         const masteryCtx = collectActiveEffects(this.playerProfile, this.playerFighterId);
         this._currentChallengeLevel = getCharacterChallengeLevel(this.playerProfile, this.playerFighterId);
 
-        // 숙련도의 balanceTolerance를 SENSITIVITY에 반영
-        if (masteryCtx.allocationModifiers.balanceTolerance > 0) {
-            _STAT_BALANCER_CONFIG.SENSITIVITY = 20 + masteryCtx.allocationModifiers.balanceTolerance;
+        // 숙련도 + 성장 보너스의 balanceTolerance를 SENSITIVITY에 반영
+        const totalBalanceTol =
+            masteryCtx.allocationModifiers.balanceTolerance +
+            (this.playerProfile?.progression?.bonuses?.balanceTolerance ?? 0);
+        if (totalBalanceTol > 0) {
+            _STAT_BALANCER_CONFIG.SENSITIVITY = 20 + totalBalanceTol;
+        }
+
+        // 집중 투자 한도 업데이트 (성장 보너스 + 숙련도)
+        const perStatCapBonus =
+            (this.playerProfile?.progression?.bonuses?.perStatCapBonus ?? 0) +
+            masteryCtx.allocationModifiers.perStatCapBonus;
+        if (perStatCapBonus > 0) {
+            updateEffectiveStatCap(
+                this.playerProfile?.progression?.bonuses?.perStatCapBonus ?? 0,
+                masteryCtx.allocationModifiers.perStatCapBonus
+            );
         }
 
         // 숙련도 효과 + 성장 보너스를 반영한 statAllocation 생성

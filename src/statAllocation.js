@@ -1,5 +1,10 @@
 export const PLAYER_STAT_POINTS = 100;
-export const MAX_POINTS_PER_STAT = 50;
+export let MAX_POINTS_PER_STAT = 50;
+
+/** 성장 보너스 + 숙련도 보너스를 반영하여 MAX_POINTS_PER_STAT 업데이트 */
+export function updateEffectiveStatCap(progressionBonus = 0, masteryBonus = 0) {
+    MAX_POINTS_PER_STAT = 50 + progressionBonus + masteryBonus;
+}
 
 export const ALLOCATABLE_STATS = [
     {
