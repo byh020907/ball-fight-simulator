@@ -573,7 +573,7 @@ export class BattleApp {
         }, duration);
     }
 
-    /** 사용 가능한 최대 배속 (업적 해금 기반) */
+    /** 사용 가능한 최대 배속 (speed_2x/speed_4x 업적 해금 기반) */
     _getMaxBattleSpeed() {
         const achievements = this.playerProfile?.collection?.achievements ?? {};
         if (achievements.speed_4x?.unlockedAt) return 4;

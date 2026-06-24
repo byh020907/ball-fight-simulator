@@ -21,6 +21,18 @@ export const PROGRESSION_BONUS_CAPS = Object.freeze({
  * @returns {{ applied: boolean, bonusKey: string, amount: number, capped: number }} 적용 결과
  */
 export function applyProgressionBonus(profile, reward, achievementId) {
+    // FEATURE_UNLOCK: 기능 해금 보상, 스탯 변화 없음
+    if (reward?.type === "FEATURE_UNLOCK") {
+        const achievementState = profile.collection.achievements[achievementId];
+        if (achievementState?.rewardClaimed) {
+            return { applied: false, bonusKey: "", amount: 0, capped: 0 };
+        }
+        if (achievementState) {
+            achievementState.rewardClaimed = true;
+        }
+        return { applied: true, bonusKey: "", amount: 0, capped: 0 };
+    }
+
     if (!reward || reward.type !== "PROGRESSION_BONUS") {
         return { applied: false, bonusKey: "", amount: 0, capped: 0 };
     }
@@ -88,7 +100,11 @@ export function applyAchievementRewards(profile, results) {
  * @returns {string} 예: "추가 스탯 포인트 +2"
  */
 export function formatRewardDescription(reward) {
-    if (!reward || reward.type !== "PROGRESSION_BONUS") return "";
+    if (!reward) return "";
+    if (reward.type === "FEATURE_UNLOCK") {
+        return reward.payload?.description ?? "";
+    }
+    if (reward.type !== "PROGRESSION_BONUS") return "";
     const { bonusKey, amount } = reward.payload ?? {};
     if (!bonusKey || !amount) return "";
 

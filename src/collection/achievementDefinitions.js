@@ -181,23 +181,29 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
     {
         id: "speed_2x",
         name: "속도 해방 1단계",
-        description: "2배속 전투 관전을 해금합니다.",
+        description: "토너먼트에서 처음 우승하세요.",
         tier: "bronze",
         evaluate(context) {
             const career = context.profile.collection.careerStats;
             return career.playerTournamentsCompleted >= 1 && context.report?.playerWon === true;
         },
-        reward: null
+        reward: {
+            type: "FEATURE_UNLOCK",
+            payload: { feature: "battle_speed_2x", description: "2배속 전투 관전 해금 (전투화면 상단 탭)" }
+        }
     },
     {
         id: "speed_4x",
         name: "속도 해방 2단계",
-        description: "4배속 전투 관전을 해금합니다.",
+        description: "토너먼트에서 3회 연속 우승하세요.",
         tier: "silver",
         evaluate(context) {
             const career = context.profile.collection.careerStats;
             return (career.bestTournamentWinStreak ?? 0) >= 3;
         },
-        reward: null
+        reward: {
+            type: "FEATURE_UNLOCK",
+            payload: { feature: "battle_speed_4x", description: "4배속 전투 관전 해금 (전투화면 상단 탭)" }
+        }
     }
 ]);
