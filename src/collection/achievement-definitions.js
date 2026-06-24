@@ -152,6 +152,19 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         }
     },
     {
+        id: "single_hit_monster",
+        name: "단일 대미지 150",
+        description: "한 번의 공격으로 150 이상의 피해를 주세요.",
+        tier: "gold",
+        evaluate(context) {
+            return context.report.matchReports.some((m) => (m.maxHitDamage ?? 0) >= 150);
+        },
+        reward: {
+            type: "PROGRESSION_BONUS",
+            payload: { bonusKey: "extraStatPoints", amount: 15 }
+        }
+    },
+    {
         id: "tournament_streak_3",
         name: "연승",
         description: "토너먼트 3회 연속 우승하세요.",

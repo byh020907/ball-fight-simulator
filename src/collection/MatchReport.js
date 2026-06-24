@@ -19,6 +19,7 @@ export function createMatchReport({ generateId } = {}) {
         // 피해 기록
         combatDamageTaken: 0,
         combatDamageDealt: 0,
+        maxHitDamage: 0,
         actionHpCost: 0,
         lowestHpRatio: 1,
         // 액션 기록
@@ -38,6 +39,9 @@ export function recordDamageTaken(report, actualDamage) {
 export function recordDamageDealt(report, actualDamage) {
     if (actualDamage <= 0) return;
     report.combatDamageDealt += actualDamage;
+    if (actualDamage > report.maxHitDamage) {
+        report.maxHitDamage = actualDamage;
+    }
 }
 
 export function recordActionHpCost(report, cost) {
