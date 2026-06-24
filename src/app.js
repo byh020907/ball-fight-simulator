@@ -113,6 +113,9 @@ export class BattleApp {
         this.selectedActionId = null;
         this._currentChallengeLevel = 0;
         this._lastMasteryResult = null;
+        this._battleSpeed = 1;
+        this._speedIndicatorTimer = 0;
+        this._speedIndicatorText = "";
 
         // Listen for Alpine.js start-tournament event
         try {
@@ -358,6 +361,9 @@ export class BattleApp {
     async startMatch(customMatch = null, options = {}) {
         this.audio.unlock();
         this.ui.setStartButton({ disabled: true, hidden: true });
+        this._battleSpeed = 1;
+        this._speedIndicatorTimer = 0;
+        this._speedIndicatorText = "";
         this.resultSequenceAnnounced = false;
         this.matchFinalized = false;
         if (!options.keepLog) {
@@ -479,6 +485,16 @@ export class BattleApp {
         canvas.addEventListener("pointerdown", this._pointerHandler);
         canvas.addEventListener("pointerup", this._pointerUpHandler);
         canvas.addEventListener("pointerleave", this._pointerUpHandler);
+        // 배속 토글 (상단 60px 탭)
+        this._speedToggleHandler = (e) => {
+            if (this.simulation?.finished) return;
+            const rect = canvas.getBoundingClientRect();
+            const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+            if (y < 60) {
+                this._cycleBattleSpeed();
+            }
+        };
+        canvas.addEventListener("pointerdown", this._speedToggleHandler);
     }
 
     _unbindClickHandler() {
@@ -489,6 +505,10 @@ export class BattleApp {
                 canvas.removeEventListener("pointerdown", this._pointerHandler);
                 canvas.removeEventListener("pointerup", this._pointerUpHandler);
                 canvas.removeEventListener("pointerleave", this._pointerUpHandler);
+            }
+            if (this._speedToggleHandler) {
+                canvas.removeEventListener("pointerdown", this._speedToggleHandler);
+                this._speedToggleHandler = null;
             }
         } catch {
             // no-op in non-browser environments
@@ -553,17 +573,58 @@ export class BattleApp {
         }, duration);
     }
 
+    /** 사용 가능한 최대 배속 (우승 횟수 기반) */
+    _getMaxBattleSpeed() {
+        const totalWins = this.playerProfile?.collection?.careerStats?.bestTournamentWinStreak ?? 0;
+        if (totalWins >= 2) return 4;
+        if (totalWins >= 1) return 2;
+        return 1;
+    }
+
+    /** 배속 순환 */
+    _cycleBattleSpeed() {
+        const maxSpeed = this._getMaxBattleSpeed();
+        const speeds = [1];
+        if (maxSpeed >= 2) speeds.push(2);
+        if (maxSpeed >= 4) speeds.push(4);
+        const idx = speeds.indexOf(this._battleSpeed);
+        this._battleSpeed = speeds[(idx + 1) % speeds.length];
+        this._speedIndicatorText = `x${this._battleSpeed}`;
+        this._speedIndicatorTimer = 1.2;
+    }
+
+    /** 배속 표시 렌더링 */
+    _renderSpeedIndicator() {
+        if (this._speedIndicatorTimer <= 0 && this._battleSpeed === 1) return;
+        const ctx = this.renderer.ctx;
+        const alpha = this._speedIndicatorTimer > 0 ? Math.min(1, this._speedIndicatorTimer / 0.3) : 0.5;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "900 28px Bahnschrift, Segoe UI, sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+        const text = this._speedIndicatorTimer > 0 ? this._speedIndicatorText : `x${this._battleSpeed}`;
+        ctx.fillText(text, 16, 16);
+        ctx.restore();
+    }
+
     loop(timestamp) {
         const delta = Math.min(0.032, (timestamp - this.lastTime) / 1000 || 0.016);
         this.lastTime = timestamp;
+        const speedDelta = delta * this._battleSpeed;
+        if (this._speedIndicatorTimer > 0) this._speedIndicatorTimer -= delta;
+
+        // HoldTrigger tick
 
         // HoldTrigger tick — 매 프레임 pointer down 상태 확인
         if (this._actionCtx?.trigger?.type === "hold") {
             this._actionCtx.trigger.onTick(this._actionCtx);
         }
 
-        this.simulation.update(delta);
+        this.simulation.update(speedDelta);
         this.renderer.render(this.simulation);
+        this._renderSpeedIndicator();
         this.ui.updateLiveCards(this.simulation.fighters);
 
         if (this.simulation.finished) {
