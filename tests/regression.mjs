@@ -872,7 +872,7 @@ async function testHeroOrbOwnerCollects(app) {
     // Simulate collecting each type of orb (gain is 1~3 random)
     for (const type of ["hp", "damage", "speed", "defense", "skill"]) {
         const before = { ...heroFighter.heroOrbBonuses };
-        const orb = new (await import("../src/entities.js")).HeroOrb(
+        const orb = new (await import("../src/entities/index.js")).HeroOrb(
             heroFighter,
             heroFighter.position.clone(),
             new Vector2(0, 0),
@@ -900,7 +900,7 @@ async function testHeroOrbOpponentCollects(app) {
     const target = sim.fighters.find((f) => f.id !== FIGHTER_IDS.HERO);
     sim.entities = sim.fighters.slice();
 
-    const HeroOrb = (await import("../src/entities.js")).HeroOrb;
+    const HeroOrb = (await import("../src/entities/index.js")).HeroOrb;
     const hpBefore = target.hp;
     const bonusesBefore = { ...heroFighter.heroOrbBonuses };
 
@@ -929,7 +929,7 @@ async function testHeroOrbMaxActivePerOwner(app) {
 
     // Override timer and spawn orbs repeatedly
     sim.entities = sim.fighters.slice();
-    const HeroOrb = (await import("../src/entities.js")).HeroOrb;
+    const HeroOrb = (await import("../src/entities/index.js")).HeroOrb;
 
     // Create 12 orbs in simulation (bypass ability to control exactly)
     for (let i = 0; i < 12; i++) {
@@ -986,7 +986,7 @@ async function testHeroOrbLimitIgnoresCollectedOrbs(app) {
     });
     const heroFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.HERO);
     const target = sim.fighters.find((f) => f.id !== FIGHTER_IDS.HERO);
-    const { HeroOrb } = await import("../src/entities.js");
+    const { HeroOrb } = await import("../src/entities/index.js");
 
     sim.entities = sim.fighters.slice();
     for (let i = 0; i < 10; i++) {
@@ -1011,12 +1011,12 @@ async function testHeroOrbStatCapInfinite(app) {
     });
     const heroFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.HERO);
     const target = sim.fighters.find((f) => f.id !== FIGHTER_IDS.HERO);
-    const { HERO_ORB_STAT_CAP } = await import("../src/entities.js");
+    const { HERO_ORB_STAT_CAP } = await import("../src/entities/index.js");
 
     assert.equal(HERO_ORB_STAT_CAP, -1, "Default HERO_ORB_STAT_CAP should be -1 (infinite)");
 
     // Apply the same stat type many times - should never be blocked
-    const HeroOrb = (await import("../src/entities.js")).HeroOrb;
+    const HeroOrb = (await import("../src/entities/index.js")).HeroOrb;
     let totalGained = 0;
     for (let i = 0; i < 5; i++) {
         const before = heroFighter.heroOrbBonuses.hp;
@@ -1041,8 +1041,8 @@ async function testHeroOrbStatCapLimited(app) {
     });
     const heroFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.HERO);
     const target = sim.fighters.find((f) => f.id !== FIGHTER_IDS.HERO);
-    const { setHeroOrbStatCap, rollHeroOrbStatGain } = await import("../src/entities.js");
-    const HeroOrb = (await import("../src/entities.js")).HeroOrb;
+    const { setHeroOrbStatCap, rollHeroOrbStatGain } = await import("../src/entities/index.js");
+    const HeroOrb = (await import("../src/entities/index.js")).HeroOrb;
 
     // Temporarily set cap to 5
     setHeroOrbStatCap(5);
@@ -1083,7 +1083,7 @@ async function testHeroOrbNoDamage(app) {
     });
     const heroFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.HERO);
     const target = sim.fighters.find((f) => f.id !== FIGHTER_IDS.HERO);
-    const HeroOrb = (await import("../src/entities.js")).HeroOrb;
+    const HeroOrb = (await import("../src/entities/index.js")).HeroOrb;
 
     const hpBefore = target.hp;
     const orb = new HeroOrb(heroFighter, target.position.clone(), new Vector2(0, 0), "hp", 10);
@@ -1181,7 +1181,7 @@ async function testHeroOrbOwnerCollectFeedback(app) {
     });
     const heroFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.HERO);
     const target = sim.fighters.find((f) => f.id !== FIGHTER_IDS.HERO);
-    const { HeroOrb, HERO_ORB_EFFECTS } = await import("../src/entities.js");
+    const { HeroOrb, HERO_ORB_EFFECTS } = await import("../src/entities/index.js");
 
     // Check that collecting an orb spawns an action text entity
     const beforeTextCount = sim.entities.filter((e) => e.constructor?.name === "ActionText").length;
@@ -1217,7 +1217,7 @@ async function testHeroOrbOpponentNoFeedback(app) {
     });
     const heroFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.HERO);
     const target = sim.fighters.find((f) => f.id !== FIGHTER_IDS.HERO);
-    const { HeroOrb } = await import("../src/entities.js");
+    const { HeroOrb } = await import("../src/entities/index.js");
 
     const textCountBefore = sim.entities.filter((e) => e.constructor?.name === "ActionText").length;
 
@@ -1238,7 +1238,7 @@ async function testHeroOrbCapNoFeedback(app) {
     });
     const heroFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.HERO);
     const target = sim.fighters.find((f) => f.id !== FIGHTER_IDS.HERO);
-    const { HeroOrb, setHeroOrbStatCap } = await import("../src/entities.js");
+    const { HeroOrb, setHeroOrbStatCap } = await import("../src/entities/index.js");
 
     setHeroOrbStatCap(0);
     try {
@@ -1259,7 +1259,7 @@ async function testHeroOrbCapNoFeedback(app) {
 }
 
 async function testHeroOrbBonusUiFormat(app) {
-    const { HERO_ORB_EFFECTS, formatHeroStatLine, formatHeroStatParts } = await import("../src/entities.js");
+    const { HERO_ORB_EFFECTS, formatHeroStatLine, formatHeroStatParts } = await import("../src/entities/index.js");
 
     const baseAllocation = { hp: 30, damage: 20, speed: 10, skill: 25, defense: 15 };
     assert.equal(
@@ -1298,7 +1298,7 @@ async function testHeroOrbBonusUiOnlyForHero(app) {
 
     heroFighter.heroOrbBonuses.hp = 3;
     heroFighter.statAllocation = { hp: 12, damage: 18, speed: 22, skill: 28, defense: 20 };
-    const { formatHeroStatLine } = await import("../src/entities.js");
+    const { formatHeroStatLine } = await import("../src/entities/index.js");
     const heroLine = formatHeroStatLine(heroFighter.statAllocation, heroFighter.heroOrbBonuses);
     const normalLine = formatStatAllocation(heroFighter.statAllocation);
     assert.ok(heroLine.includes("체력 +12%(+3)"), "Hero's stat line should show base allocation plus orb bonuses");
@@ -1316,7 +1316,7 @@ async function testHeroExistingRulesNotBroken(app) {
     });
     const heroFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.HERO);
     const target = sim.fighters.find((f) => f.id !== FIGHTER_IDS.HERO);
-    const { HeroOrb, HERO_ORB_EFFECTS } = await import("../src/entities.js");
+    const { HeroOrb, HERO_ORB_EFFECTS } = await import("../src/entities/index.js");
 
     // 1) Max 10 orbs per owner
     sim.entities = sim.fighters.slice();
@@ -1382,7 +1382,7 @@ async function testSpecialOrbOwnerCollectDash(app) {
     const sim = new BattleSimulation([hero, opponent], { onLog() {}, onSound() {} });
     const heroFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.HERO);
     const target = sim.fighters.find((f) => f.id !== FIGHTER_IDS.HERO);
-    const { HeroOrb } = await import("../src/entities.js");
+    const { HeroOrb } = await import("../src/entities/index.js");
 
     heroFighter.position.x = 200;
     heroFighter.position.y = 480;
@@ -1413,7 +1413,7 @@ async function testSpecialOrbOwnerCollectArrow(app) {
     const sim = new BattleSimulation([hero, opponent], { onLog() {}, onSound() {} });
     const heroFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.HERO);
     const target = sim.fighters.find((f) => f.id !== FIGHTER_IDS.HERO);
-    const { HeroOrb } = await import("../src/entities.js");
+    const { HeroOrb } = await import("../src/entities/index.js");
 
     heroFighter.position.x = 200;
     heroFighter.position.y = 480;
@@ -1445,7 +1445,7 @@ async function testSpecialOrbOwnerCollectCooldownBurst(app) {
     const sim = new BattleSimulation([hero, opponent], { onLog() {}, onSound() {} });
     const heroFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.HERO);
     const target = sim.fighters.find((f) => f.id !== FIGHTER_IDS.HERO);
-    const { HeroOrb } = await import("../src/entities.js");
+    const { HeroOrb } = await import("../src/entities/index.js");
 
     const bonusesBefore = { ...heroFighter.heroOrbBonuses };
     const normalCooldown = heroFighter.ability.cooldown;
@@ -1474,7 +1474,7 @@ async function testSpecialOrbCooldownBurstExpires(app) {
     const sim = new BattleSimulation([hero, opponent], { onLog() {}, onSound() {} });
     const heroFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.HERO);
     const target = sim.fighters.find((f) => f.id !== FIGHTER_IDS.HERO);
-    const { HeroOrb } = await import("../src/entities.js");
+    const { HeroOrb } = await import("../src/entities/index.js");
 
     const normalCooldown = heroFighter.ability.cooldown;
 
@@ -1500,7 +1500,7 @@ async function testSpecialOrbOpponentCollects(app) {
         const sim = new BattleSimulation([hero, opponent], { onLog() {}, onSound() {} });
         const heroFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.HERO);
         const target = sim.fighters.find((f) => f.id !== FIGHTER_IDS.HERO);
-        const { HeroOrb } = await import("../src/entities.js");
+        const { HeroOrb } = await import("../src/entities/index.js");
 
         heroFighter.position.x = 200;
         heroFighter.position.y = 480;
@@ -1530,7 +1530,7 @@ async function testSpecialOrbOpponentCollects(app) {
 
 async function testSpecialOrbNotInStatBonuses(app) {
     const hero = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.HERO);
-    const { formatHeroStatLine, formatHeroStatParts } = await import("../src/entities.js");
+    const { formatHeroStatLine, formatHeroStatParts } = await import("../src/entities/index.js");
     const allocation = { hp: 30, damage: 20, speed: 10, skill: 0, defense: 0 };
     const bonuses = { hp: 3, damage: 1, speed: 0, defense: 0, skill: 2 };
 
@@ -1556,7 +1556,7 @@ async function testSpecialOrbCountsTowardMaxActive(app) {
     const sim = new BattleSimulation([hero, opponent], { onLog() {}, onSound() {} });
     const heroFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.HERO);
     const target = sim.fighters.find((f) => f.id !== FIGHTER_IDS.HERO);
-    const { HeroOrb } = await import("../src/entities.js");
+    const { HeroOrb } = await import("../src/entities/index.js");
 
     sim.entities = sim.fighters.slice();
     // Add 8 stat orbs + 4 special orbs = 12 total
@@ -1575,7 +1575,7 @@ async function testSpecialOrbCountsTowardMaxActive(app) {
 }
 
 async function testSpecialOrbDrawDistinction(app) {
-    const { HeroOrb, HERO_ORB_EFFECTS } = await import("../src/entities.js");
+    const { HeroOrb, HERO_ORB_EFFECTS } = await import("../src/entities/index.js");
     const hero = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.HERO);
     const fakeOwner = { id: hero.id };
 
@@ -1592,7 +1592,7 @@ async function testSpecialOrbDrawDistinction(app) {
 // ── Hero Orb Stat Gain 1~3 + Trickster Buff Tests (v0.13.0) ──────────────────
 
 async function testRollHeroOrbStatGain() {
-    const { rollHeroOrbStatGain } = await import("../src/entities.js");
+    const { rollHeroOrbStatGain } = await import("../src/entities/index.js");
 
     // Deterministic rng: amount = 1 + floor(rng * 3)
     assert.equal(
@@ -1658,7 +1658,7 @@ async function testHeroOrbStatGainAmountApplied(app) {
     const opponent = app.roster.find((f) => f.id !== FIGHTER_IDS.HERO);
     const sim = new BattleSimulation([hero, opponent], { onLog() {}, onSound() {} });
     const heroFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.HERO);
-    const { HeroOrb, setHeroOrbStatCap } = await import("../src/entities.js");
+    const { HeroOrb, setHeroOrbStatCap } = await import("../src/entities/index.js");
 
     // Test hp: each point = +5 maxHp and +5 current hp
     const hpBefore = { maxHp: heroFighter.maxHp, hp: heroFighter.hp };
@@ -1677,7 +1677,7 @@ async function testHeroOrbStatGainDamage(app) {
     const opponent = app.roster.find((f) => f.id !== FIGHTER_IDS.HERO);
     const sim = new BattleSimulation([hero, opponent], { onLog() {}, onSound() {} });
     const heroFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.HERO);
-    const { HeroOrb } = await import("../src/entities.js");
+    const { HeroOrb } = await import("../src/entities/index.js");
 
     const dmgBefore = heroFighter.baseDamage;
     const orb = new HeroOrb(heroFighter, heroFighter.position.clone(), new Vector2(0, 0), "damage", 10);
@@ -1697,7 +1697,7 @@ async function testHeroOrbStatGainSpeed(app) {
     const opponent = app.roster.find((f) => f.id !== FIGHTER_IDS.HERO);
     const sim = new BattleSimulation([hero, opponent], { onLog() {}, onSound() {} });
     const heroFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.HERO);
-    const { HeroOrb } = await import("../src/entities.js");
+    const { HeroOrb } = await import("../src/entities/index.js");
 
     const speedBefore = heroFighter.baseSpeed;
     const orb = new HeroOrb(heroFighter, heroFighter.position.clone(), new Vector2(0, 0), "speed", 10);
@@ -1714,7 +1714,7 @@ async function testHeroOrbStatGainDefense(app) {
     const opponent = app.roster.find((f) => f.id !== FIGHTER_IDS.HERO);
     const sim = new BattleSimulation([hero, opponent], { onLog() {}, onSound() {} });
     const heroFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.HERO);
-    const { HeroOrb } = await import("../src/entities.js");
+    const { HeroOrb } = await import("../src/entities/index.js");
 
     const defBefore = heroFighter.baseDefense;
     const orb = new HeroOrb(heroFighter, heroFighter.position.clone(), new Vector2(0, 0), "defense", 10);
@@ -1735,7 +1735,7 @@ async function testHeroOrbStatGainSkill(app) {
     const opponent = app.roster.find((f) => f.id !== FIGHTER_IDS.HERO);
     const sim = new BattleSimulation([hero, opponent], { onLog() {}, onSound() {} });
     const heroFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.HERO);
-    const { HeroOrb } = await import("../src/entities.js");
+    const { HeroOrb } = await import("../src/entities/index.js");
 
     const skillBefore = heroFighter.heroOrbBonuses.skill;
     const cooldownBefore = heroFighter.ability.cooldown;
@@ -1755,7 +1755,7 @@ async function testHeroOrbStatGainCapClamp(app) {
     const opponent = app.roster.find((f) => f.id !== FIGHTER_IDS.HERO);
     const sim = new BattleSimulation([hero, opponent], { onLog() {}, onSound() {} });
     const heroFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.HERO);
-    const { HeroOrb, setHeroOrbStatCap } = await import("../src/entities.js");
+    const { HeroOrb, setHeroOrbStatCap } = await import("../src/entities/index.js");
 
     // cap=5, current=4 → max add = 1
     setHeroOrbStatCap(5);
@@ -1782,7 +1782,7 @@ async function testHeroOrbSpecialNotAffectedByGain(app) {
     const sim = new BattleSimulation([hero, opponent], { onLog() {}, onSound() {} });
     const heroFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.HERO);
     const target = sim.fighters.find((f) => f.id !== FIGHTER_IDS.HERO);
-    const { HeroOrb } = await import("../src/entities.js");
+    const { HeroOrb } = await import("../src/entities/index.js");
 
     heroFighter.position.x = 200;
     heroFighter.position.y = 480;
@@ -1806,12 +1806,12 @@ async function testHeroOrbSpecialNotAffectedByGain(app) {
 // ── Hero Orb Carryover Tests (v0.14.0) ───────────────────────────────────────
 
 async function testCarryoverRateConstant() {
-    const { HERO_ORB_CARRYOVER_RATE } = await import("../src/entities.js");
+    const { HERO_ORB_CARRYOVER_RATE } = await import("../src/entities/index.js");
     assert.equal(HERO_ORB_CARRYOVER_RATE, 0.5, "HERO_ORB_CARRYOVER_RATE should be 0.5");
 }
 
 async function testComputeHeroOrbCarryover() {
-    const { computeHeroOrbCarryover } = await import("../src/entities.js");
+    const { computeHeroOrbCarryover } = await import("../src/entities/index.js");
     const gained = { hp: 5, damage: 1, speed: 4, defense: 2, skill: 0 };
     const carry = computeHeroOrbCarryover(gained, 0.5);
     assert.equal(carry.hp, 2, "hp +5 → carry +2");
@@ -1822,7 +1822,7 @@ async function testComputeHeroOrbCarryover() {
 }
 
 async function testComputeHeroOrbCarryoverCustomRate() {
-    const { computeHeroOrbCarryover } = await import("../src/entities.js");
+    const { computeHeroOrbCarryover } = await import("../src/entities/index.js");
     // rate 0.25: hp 5 → floor(5*0.25)=1
     const carry = computeHeroOrbCarryover({ hp: 5, speed: 10 }, 0.25);
     assert.equal(carry.hp, 1, "hp +5 with rate 0.25 → carry +1");
@@ -1830,7 +1830,7 @@ async function testComputeHeroOrbCarryoverCustomRate() {
 }
 
 async function testMergeHeroOrbCarryover() {
-    const { mergeHeroOrbCarryover } = await import("../src/entities.js");
+    const { mergeHeroOrbCarryover } = await import("../src/entities/index.js");
     const spec = { heroOrbCarryover: { hp: 2, damage: 0, speed: 1, defense: 0, skill: 0 } };
     const gained = { hp: 5, damage: 0, speed: 0, defense: 0, skill: 0 };
 
@@ -1840,7 +1840,7 @@ async function testMergeHeroOrbCarryover() {
 }
 
 async function testMergeHeroOrbCarryoverNoRecycle() {
-    const { mergeHeroOrbCarryover } = await import("../src/entities.js");
+    const { mergeHeroOrbCarryover } = await import("../src/entities/index.js");
     // 기존 carry +2, 새 획득 +5 → carry 추가 = floor(5*0.5)=2
     const spec = {};
     mergeHeroOrbCarryover(spec, { hp: 5 }, 0.5);
@@ -1853,7 +1853,7 @@ async function testMergeHeroOrbCarryoverNoRecycle() {
 
 async function testApplyHeroOrbCarryoverToBattleBall(app) {
     const hero = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.HERO);
-    const { BattleBall, applyHeroOrbCarryoverToBattleBall } = await import("../src/entities.js");
+    const { BattleBall, applyHeroOrbCarryoverToBattleBall } = await import("../src/entities/index.js");
     const ball = new BattleBall(hero, { x: 480, y: 480 });
 
     const hpBefore = ball.maxHp;
@@ -1868,7 +1868,7 @@ async function testApplyHeroOrbCarryoverToBattleBall(app) {
 }
 
 async function testMergeOrbBonuses(app) {
-    const { mergeOrbBonuses } = await import("../src/entities.js");
+    const { mergeOrbBonuses } = await import("../src/entities/index.js");
     const current = { hp: 3, damage: 1, speed: 0, defense: 0, skill: 2 };
     const carry = { hp: 2, damage: 0, speed: 1, defense: 0, skill: 0 };
 
@@ -1882,7 +1882,7 @@ async function testMergeOrbBonuses(app) {
 
 async function testCarryoverNotForNonHero(app) {
     const archer = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
-    const { BattleBall, applyHeroOrbStatAmount } = await import("../src/entities.js");
+    const { BattleBall, applyHeroOrbStatAmount } = await import("../src/entities/index.js");
     const ball = new BattleBall(archer, { x: 480, y: 480 });
 
     const hpBefore = ball.maxHp;
@@ -1893,7 +1893,7 @@ async function testCarryoverNotForNonHero(app) {
 
 async function testCarryoverSkillAffectsCooldown(app) {
     const hero = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.HERO);
-    const { BattleBall, applyHeroOrbStatAmount } = await import("../src/entities.js");
+    const { BattleBall, applyHeroOrbStatAmount } = await import("../src/entities/index.js");
     const ball = new BattleBall(hero, { x: 480, y: 480 });
     ball.statAllocation = { hp: 0, damage: 0, speed: 0, skill: 0, defense: 0 };
 
@@ -1903,7 +1903,7 @@ async function testCarryoverSkillAffectsCooldown(app) {
 
 async function testCarryoverDoesNotAffectSpecialOrbs(app) {
     const hero = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.HERO);
-    const { BattleBall, applyHeroOrbStatAmount } = await import("../src/entities.js");
+    const { BattleBall, applyHeroOrbStatAmount } = await import("../src/entities/index.js");
     const ball = new BattleBall(hero, { x: 480, y: 480 });
 
     const bonusesBefore = { ...ball.heroOrbBonuses };

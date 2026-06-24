@@ -1,5 +1,5 @@
 import { Vector2 } from "../core.js";
-import { ArrowProjectile, Grenade, HeroOrb, OrbitProjectile, SeedOrb } from "../entities.js";
+import { ArrowProjectile, Grenade, HeroOrb, OrbitProjectile, SeedOrb } from "../entities/index.js";
 import {
     DeathBurstEffect,
     GravityParticle,
@@ -21,7 +21,7 @@ export class Simulation {
     constructor() {
         this.width = 960;
         this.height = 960;
-        /** @type {import("./entities.js").BattleBall[]} */
+        /** @type {import("./entities/index.js").BattleBall[]} */
         this.fighters = [];
         /** @type {import("./core.js").CombatEntity[]} */
         this.entities = [];
