@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node scripts/serve.mjs",
     "test": "node tests/regression.mjs",
-    "check": "node scripts/check-syntax.mjs",
+    "check": "node scripts/checkSyntax.mjs",
     "format": "prettier --write \"src/**/*.js\" \"tests/**/*.mjs\" \"scripts/**/*.mjs\" \"*.html\"",
     "format:check": "prettier --check \"src/**/*.js\" \"tests/**/*.mjs\" \"scripts/**/*.mjs\" \"*.html\""
   },
