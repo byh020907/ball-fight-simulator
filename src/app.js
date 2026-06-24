@@ -269,9 +269,11 @@ export class BattleApp {
             _STAT_BALANCER_CONFIG.SENSITIVITY = 20 + masteryCtx.allocationModifiers.balanceTolerance;
         }
 
-        // 숙련도 효과를 반영한 statAllocation 생성
+        // 숙련도 효과 + 성장 보너스를 반영한 statAllocation 생성
         const adjustedAllocation = { ...this.playerStatAllocation };
-        const extraPoints = masteryCtx.allocationModifiers.extraStatPoints;
+        const masteryExtra = masteryCtx.allocationModifiers.extraStatPoints;
+        const progressionExtra = this.playerProfile?.progression?.bonuses?.extraStatPoints ?? 0;
+        const extraPoints = masteryExtra + progressionExtra;
         if (extraPoints > 0) {
             // extraStatPoints를 비례 배분 (hp 우선, 나머지는 고르게)
             const half = Math.ceil(extraPoints / 2);
