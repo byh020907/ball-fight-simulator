@@ -177,5 +177,27 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
             type: "PROGRESSION_BONUS",
             payload: { bonusKey: "extraStatPoints", amount: 10 }
         }
+    },
+    {
+        id: "speed_2x",
+        name: "속도 해방 1단계",
+        description: "2배속 전투 관전을 해금합니다.",
+        tier: "bronze",
+        evaluate(context) {
+            const career = context.profile.collection.careerStats;
+            return career.playerTournamentsCompleted >= 1 && context.report?.playerWon === true;
+        },
+        reward: null
+    },
+    {
+        id: "speed_4x",
+        name: "속도 해방 2단계",
+        description: "4배속 전투 관전을 해금합니다.",
+        tier: "silver",
+        evaluate(context) {
+            const career = context.profile.collection.careerStats;
+            return (career.bestTournamentWinStreak ?? 0) >= 3;
+        },
+        reward: null
     }
 ]);
