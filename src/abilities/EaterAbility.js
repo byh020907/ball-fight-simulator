@@ -1,6 +1,6 @@
 import { DashEffect, WallSlamEffect } from "../combatEffects.js";
 import { steerBallToward, Vector2 } from "../core.js";
-import { Ability } from "./Ability.js";
+import { Ability } from "./ability.js";
 
 const FEAST_DURATION = 3.3;
 const SWALLOW_HOLD_DURATION = 0.72;

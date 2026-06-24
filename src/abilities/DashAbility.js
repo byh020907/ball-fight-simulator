@@ -1,6 +1,6 @@
 import { steerBallToward, Vector2 } from "../core.js";
 import { DashEffect } from "../combatEffects.js";
-import { Ability } from "./Ability.js";
+import { Ability } from "./ability.js";
 
 const INITIAL_COOLDOWN_LEVEL = 0;
 const HOMING_RANGE = 400;

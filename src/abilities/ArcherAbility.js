@@ -1,5 +1,5 @@
 import { Vector2, evadeTarget } from "../core.js";
-import { Ability } from "./Ability.js";
+import { Ability } from "./ability.js";
 
 const WINDUP = 0.6;
 const SPREAD_ANGLE = 0.22;

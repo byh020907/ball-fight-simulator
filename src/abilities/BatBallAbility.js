@@ -1,6 +1,6 @@
 import { WallSlamEffect } from "../combatEffects.js";
 import { Vector2 } from "../core.js";
-import { Ability } from "./Ability.js";
+import { Ability } from "./ability.js";
 
 const ARC_ANGLE = (Math.PI * 2) / 3; // 120도
 const ARC_RANGE = 200;

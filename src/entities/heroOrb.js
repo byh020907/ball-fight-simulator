@@ -1,6 +1,6 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
 import { DashEffect } from "../combatEffects.js";
-import { computeOwnerCombatSpeed } from "../abilities/HeroAbility.js";
+import { computeOwnerCombatSpeed } from "../abilities/heroAbility.js";
 
 // ── Hero Orb stat cap ────────────────────────────────────────────────────────
 

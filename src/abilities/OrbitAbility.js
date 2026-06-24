@@ -1,5 +1,5 @@
 import { Vector2 } from "../core.js";
-import { Ability } from "./Ability.js";
+import { Ability } from "./ability.js";
 
 const VOLLEY_COOLDOWN = 3.5;
 const VOLLEY_DELAY = 0.18;

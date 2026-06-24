@@ -12,7 +12,7 @@ import {
 } from "../abilities/index.js";
 import { BattleBall } from "../entities/index.js";
 import { GravityParticle } from "../effects.js";
-import { Simulation } from "./Simulation.js";
+import { Simulation } from "./simulation.js";
 
 const ABILITY_TYPES = {
     archer: ArcherAbility,

@@ -7,7 +7,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { getActionPool } from "../clickActions.js";
-import { MASTERY_THRESHOLDS } from "./collection-view-model.js";
+import { MASTERY_THRESHOLDS } from "./collectionViewModel.js";
 
 /**
  * 숙련도 계산 (collection-view-model.js와 동일한 로직)

@@ -14,7 +14,7 @@ import { FIGHTER_IDS, Vector2 } from "../src/core.js";
 import { findActionById } from "../src/clickActions.js";
 import { DashEffect } from "../src/combatEffects.js";
 import { shuffled } from "../src/random.js";
-import { BattleSimulation } from "../src/simulation/BattleSimulation.js";
+import { BattleSimulation } from "../src/simulation/battleSimulation.js";
 
 function makeClassList() {
     const set = new Set();
@@ -807,7 +807,7 @@ async function testHeroBallRegistered(app) {
     assert.ok(hero, "Hero Ball should be registered in the roster");
     assert.equal(hero.ability, "hero", "Hero Ball should have 'hero' ability type");
 
-    const { HeroAbility } = await import("../src/abilities/HeroAbility.js");
+    const { HeroAbility } = await import("../src/abilities/heroAbility.js");
     const sim = new BattleSimulation([hero, app.roster.find((f) => f.id !== FIGHTER_IDS.HERO)], {
         onLog() {},
         onSound() {}

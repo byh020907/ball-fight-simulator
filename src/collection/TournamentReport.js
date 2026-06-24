@@ -2,7 +2,7 @@
 // 토너먼트 완료 후 한 번 생성. 중복 반영 방지를 위해 reportId 보유.
 
 import { VALID_CHARACTER_IDS } from "../playerProfile.js";
-import { createMatchReport } from "./MatchReport.js";
+import { createMatchReport } from "./matchReport.js";
 
 let _reportIdCounter = 0;
 

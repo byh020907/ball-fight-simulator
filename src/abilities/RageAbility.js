@@ -1,4 +1,4 @@
-import { Ability } from "./Ability.js";
+import { Ability } from "./ability.js";
 
 const CHARGE_THRESHOLD_PARTICLES = 0.22;
 const PARTICLE_BASE_INTERVAL = 0.15;

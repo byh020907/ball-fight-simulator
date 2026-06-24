@@ -1,6 +1,6 @@
 import { DashEffect } from "../combatEffects.js";
 import { Vector2 } from "../core.js";
-import { Ability } from "./Ability.js";
+import { Ability } from "./ability.js";
 
 export const HERO_ORB_STAT_CAP = -1;
 export const HERO_ORB_MAX_ACTIVE_PER_OWNER = 10;

@@ -4,8 +4,8 @@
 // 현재 캐릭터 자신의 효과는 제외한다.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { MASTERY_EFFECT_DEFS } from "./mastery-definitions.js";
-import { getCharacterMasteryLevel } from "./mastery-state.js";
+import { MASTERY_EFFECT_DEFS } from "./masteryDefinitions.js";
+import { getCharacterMasteryLevel } from "./masteryState.js";
 
 function createMasteryContext() {
     return {

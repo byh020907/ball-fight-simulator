@@ -4,7 +4,7 @@
 // Alpine 템플릿과 UIController는 이 ViewModel을 통해 데이터를 표시한다.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { formatRewardDescription } from "../progression/progression-state.js";
+import { formatRewardDescription } from "../progression/progressionState.js";
 
 export const MASTERY_THRESHOLDS = Object.freeze([1, 5, 15]);
 export const COLLECTION_HUB_TABS = Object.freeze([

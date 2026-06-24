@@ -1,5 +1,5 @@
 ﻿import { AudioEngine } from "./audio.js";
-import { BattleSimulation } from "./simulation/BattleSimulation.js";
+import { BattleSimulation } from "./simulation/battleSimulation.js";
 import { ArenaRenderer, UIController } from "./ui.js";
 import { Matchmaker, TournamentManager } from "./tournament.js";
 import { createRoster } from "./roster.js";
@@ -31,7 +31,7 @@ import {
     getCharacterChallengeLevel,
     advanceCharacterMastery
 } from "./character-mastery/index.js";
-import { createCollectionHubViewModel } from "./collection/collection-view-model.js";
+import { createCollectionHubViewModel } from "./collection/collectionViewModel.js";
 import {
     createMatchReport,
     createTournamentReport,
@@ -46,7 +46,7 @@ import {
     ACHIEVEMENT_DEFINITIONS,
     evaluateAchievements
 } from "./collection/index.js";
-import { applyAchievementRewards, formatRewardDescription } from "./progression/progression-state.js";
+import { applyAchievementRewards, formatRewardDescription } from "./progression/progressionState.js";
 import { FIGHTER_IDS, Vector2 } from "./core.js";
 import {
     ArcherAbility,
@@ -774,6 +774,13 @@ export class BattleApp {
                 challengeLevel: this._currentChallengeLevel ?? 0,
                 playerWon
             });
+            if (masteryResult.changed) {
+                const sourceName = this.roster.find((f) => f.id === this.playerFighterId)?.name ?? this.playerFighterId;
+                this.ui.showToast(
+                    `[숙련도 승급] ${sourceName} ${masteryResult.previousTier} → ${masteryResult.newTier}`
+                );
+                this.ui.addLog(`[숙련도 승급] ${sourceName} ${masteryResult.previousTier} → ${masteryResult.newTier}`);
+            }
             savePlayerProfile(this.playerProfile);
             this._lastMasteryResult = masteryResult;
         }

@@ -1,6 +1,6 @@
 import { Vector2 } from "../core.js";
-import { computeOwnerCombatSpeed } from "./HeroAbility.js";
-import { Ability } from "./Ability.js";
+import { computeOwnerCombatSpeed } from "./heroAbility.js";
+import { Ability } from "./ability.js";
 
 const SEED_COUNT = 3;
 const SPAWN_OFFSET = 20;

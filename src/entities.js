@@ -1,7 +1,7 @@
 import { CombatEntity, Projectile, RENDER_LAYERS, TimedEffect, Vector2 } from "./core.js";
 import { ActionContext } from "./clickActions.js";
 import { DashEffect } from "./combatEffects.js";
-import { computeOwnerCombatSpeed } from "./abilities/HeroAbility.js";
+import { computeOwnerCombatSpeed } from "./abilities/heroAbility.js";
 
 const BASE_VELOCITY_CORRECTION_RATE = 5.5;
 

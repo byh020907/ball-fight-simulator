@@ -1,5 +1,5 @@
 import { Vector2, evadeTarget } from "../core.js";
-import { Ability } from "./Ability.js";
+import { Ability } from "./ability.js";
 
 const EVADE_RANGE = 320;
 const EVADE_STRENGTH = 0.7;

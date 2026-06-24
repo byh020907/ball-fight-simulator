@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { VALID_CHARACTER_IDS } from "../playerProfile.js";
-import { MASTERY_EFFECT_DEFS, TIER_LABELS } from "./mastery-definitions.js";
+import { MASTERY_EFFECT_DEFS, TIER_LABELS } from "./masteryDefinitions.js";
 
 /** 캐릭터의 현재 숙련도 등급 (0~3) */
 export function getCharacterMasteryLevel(profile, characterId) {

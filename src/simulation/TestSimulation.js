@@ -1,4 +1,4 @@
-import { Simulation } from "./Simulation.js";
+import { Simulation } from "./simulation.js";
 
 /**
  * Test simulation — extends Simulation with no-op hooks.

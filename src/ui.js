@@ -12,7 +12,7 @@ import { formatHeroStatLine, formatHeroStatParts, mergeOrbBonuses } from "./enti
 import { FIGHTER_IDS, RENDER_LAYERS, Vector2 } from "./core.js";
 import { getUnseenEntries, dismissPatchNotes } from "./utils.js";
 import { PopupService } from "./popup.js";
-import { createCollectionHubViewModel, COLLECTION_HUB_TABS } from "./collection/collection-view-model.js";
+import { createCollectionHubViewModel, COLLECTION_HUB_TABS } from "./collection/collectionViewModel.js";
 import {
     ArcherAbility,
     OrbitAbility,
