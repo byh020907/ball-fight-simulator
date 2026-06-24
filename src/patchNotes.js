@@ -19,6 +19,45 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.16.0",
+        date: "2026-06-24",
+        title: "v0.16.0 업데이트",
+        changes: [
+            {
+                type: "feature",
+                text: "업적 시스템 구현 — 9개 업적, 컬렉션 허브에서 확인 가능."
+            },
+            {
+                type: "feature",
+                text: "업적 해금 시 성장 보너스 자동 지급 (최대 100 스탯 가치)."
+            },
+            {
+                type: "feature",
+                text: "숙련도(계승) 시스템 — 캐릭터별 등급(BRONZE/SILVER/GOLD) 및 전투 보너스."
+            },
+            {
+                type: "refactor",
+                text: '"연계" → "숙련도"로 UI/코드 명칭 통일, 프로필 마이그레이션 포함.'
+            },
+            {
+                type: "refactor",
+                text: "entities.js를 entities/ 폴더로 분리 (개별 파일 + barrel)."
+            },
+            {
+                type: "style",
+                text: "파일명 camelCase, 클래스 PascalCase로 네이밍 규칙 통일."
+            },
+            {
+                type: "refactor",
+                text: "액션 사용/성공 기록 시스템 연동 — MatchReport가 실제 데이터 수집."
+            },
+            {
+                type: "fix",
+                text: "클릭 액션 HP 비용 기록, 카운터/투사체방어/버티기 성공 기록."
+            }
+        ]
+    },
+    {
         version: "0.15.1",
         date: "2026-06-24",
         title: "v0.15.1 업데이트",

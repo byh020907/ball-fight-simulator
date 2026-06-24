@@ -1,4 +1,4 @@
-import { DashEffect } from "../combat-effects.js";
+import { DashEffect } from "../combatEffects.js";
 import { Vector2 } from "../core.js";
 import { Ability } from "./Ability.js";
 

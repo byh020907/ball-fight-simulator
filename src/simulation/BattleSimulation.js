@@ -10,7 +10,7 @@ import {
     BatBallAbility,
     HeroAbility
 } from "../abilities/index.js";
-import { BattleBall } from "../entities.js";
+import { BattleBall } from "../entities/index.js";
 import { GravityParticle } from "../effects.js";
 import { Simulation } from "./Simulation.js";
 

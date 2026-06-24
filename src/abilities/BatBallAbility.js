@@ -1,4 +1,4 @@
-import { WallSlamEffect } from "../combat-effects.js";
+import { WallSlamEffect } from "../combatEffects.js";
 import { Vector2 } from "../core.js";
 import { Ability } from "./Ability.js";
 

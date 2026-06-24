@@ -9,10 +9,10 @@ import {
     createTournamentRoster,
     formatStatAllocation,
     getSpentStatPoints
-} from "../src/stat-allocation.js";
+} from "../src/statAllocation.js";
 import { FIGHTER_IDS, Vector2 } from "../src/core.js";
-import { findActionById } from "../src/click-actions.js";
-import { DashEffect } from "../src/combat-effects.js";
+import { findActionById } from "../src/clickActions.js";
+import { DashEffect } from "../src/combatEffects.js";
 import { shuffled } from "../src/random.js";
 import { BattleSimulation } from "../src/simulation/BattleSimulation.js";
 
@@ -564,11 +564,11 @@ function testStatAllocationRules(app) {
     stepped = adjustStatAllocation(stepped, "damage", 95);
     assert.deepEqual(
         stepped,
-        { hp: 10, damage: 90, speed: 0, skill: 0 },
-        "Large stat steps should clamp to the remaining budget"
+        { hp: 10, damage: 50, speed: 0, skill: 0 },
+        "Large stat steps should clamp to the per-stat cap of 50"
     );
     stepped = adjustStatAllocation(stepped, "damage", -10);
-    assert.equal(stepped.damage, 80, "Large negative stat steps should subtract multiple points");
+    assert.equal(stepped.damage, 40, "Large negative stat steps should subtract multiple points");
 
     const allocation = { hp: 30, damage: 40, speed: 30, skill: 0, defense: 0 };
     const boosted = applyStatAllocation(archer, allocation, true);
@@ -2003,7 +2003,7 @@ async function testTournamentRosterOverEight() {
     // Currently has 9 (8 old + Hero)
     if (app.roster.length < 9) return; // Skip if roster count changed
 
-    const { createEmptyStatAllocation } = await import("../src/stat-allocation.js");
+    const { createEmptyStatAllocation } = await import("../src/statAllocation.js");
     const playerAllocation = createEmptyStatAllocation();
     const tournamentRoster = createTournamentRoster(app.roster, FIGHTER_IDS.ARCHER, playerAllocation, Math.random);
     assert.equal(tournamentRoster.length, 8, "Tournament roster should have exactly 8 participants when roster has 9+");
@@ -2015,7 +2015,7 @@ async function testTournamentRosterOverEight() {
 }
 
 async function testTournamentRosterUnderEight() {
-    const { createEmptyStatAllocation } = await import("../src/stat-allocation.js");
+    const { createEmptyStatAllocation } = await import("../src/statAllocation.js");
     // Use a subset of roster with fewer than 8 entries
     const smallRoster = app.roster.slice(0, 4);
     const playerAllocation = createEmptyStatAllocation();
@@ -2033,7 +2033,7 @@ async function testTournamentRosterUnderEight() {
 }
 
 async function testTournamentRosterNoExcessMultipleRuns() {
-    const { createEmptyStatAllocation } = await import("../src/stat-allocation.js");
+    const { createEmptyStatAllocation } = await import("../src/statAllocation.js");
     const playerAllocation = createEmptyStatAllocation();
     for (let run = 0; run < 20; run++) {
         const roster = createTournamentRoster(app.roster, FIGHTER_IDS.HERO, playerAllocation, Math.random);

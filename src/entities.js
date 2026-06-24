@@ -1,6 +1,6 @@
 import { CombatEntity, Projectile, RENDER_LAYERS, TimedEffect, Vector2 } from "./core.js";
-import { ActionContext } from "./click-actions.js";
-import { DashEffect } from "./combat-effects.js";
+import { ActionContext } from "./clickActions.js";
+import { DashEffect } from "./combatEffects.js";
 import { computeOwnerCombatSpeed } from "./abilities/HeroAbility.js";
 
 const BASE_VELOCITY_CORRECTION_RATE = 5.5;
@@ -877,7 +877,7 @@ export class BattleBall {
 
     takeDamage(amount, source, label = "Hit") {
         if (this.isDefeated) {
-            return;
+            return { actualDamage: 0 };
         }
 
         // ClickAction이 등록한 effect를 ActionContext가 전달한다.
@@ -885,23 +885,36 @@ export class BattleBall {
 
         const abilityDefMult = this.getStatModifiers().defense;
         const totalDefense = Math.round(this.baseDefense * abilityDefMult);
-        const actual = Math.max(1, Math.round(amount - totalDefense));
+        const hpBefore = this.hp;
+        const rawActual = Math.max(1, Math.round(amount - totalDefense));
+        const actual = Math.min(rawActual, hpBefore);
         this.hp = Math.max(0, this.hp - actual);
+        const actualDamage = hpBefore - this.hp;
+
+        // 수집 시스템 알림
+        const sim = source?.simulation ?? this.simulation;
+        if (sim && actualDamage > 0) {
+            sim.hooks?.onDamageTaken?.(this.id, actualDamage);
+            if (source) sim.hooks?.onDamageDealt?.(source.id, actualDamage);
+            sim.hooks?.onHpChanged?.(this.id, this.hp, this.maxHp);
+        }
+
         if (label !== "Wall Slam") {
-            source?.simulation?.shakeScreen?.(0.16, Math.min(18, 7 + actual * 0.55));
+            sim?.shakeScreen?.(0.16, Math.min(18, 7 + actual * 0.55));
         }
         if (label !== "Crash") {
-            source?.simulation?.playSound?.("hit", Math.min(1.8, 0.7 + actual / 18));
+            sim?.playSound?.("hit", Math.min(1.8, 0.7 + actual / 18));
         }
-        if (actual >= 1 && source?.simulation) {
-            source.simulation.spawnDamageNumber(this.position.clone(), Math.round(actual), "#ff3333");
+        if (actual >= 1 && sim) {
+            sim.spawnDamageNumber(this.position.clone(), Math.round(actual), "#ff3333");
         }
         if (actual >= 10) {
-            source?.simulation?.addLog?.(`${label} lands on ${this.name} for ${Math.round(actual)} damage.`);
+            sim?.addLog?.(`${label} lands on ${this.name} for ${Math.round(actual)} damage.`);
         }
         if (this.hp <= 0) {
             this.isDefeated = true;
         }
+        return { actualDamage };
     }
 
     draw(ctx) {

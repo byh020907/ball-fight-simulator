@@ -7,11 +7,12 @@ import {
     createRandomStatAllocation,
     formatStatAllocation,
     getRemainingStatPoints
-} from "./stat-allocation.js";
-import { formatHeroStatLine, formatHeroStatParts, mergeOrbBonuses } from "./entities.js";
+} from "./statAllocation.js";
+import { formatHeroStatLine, formatHeroStatParts, mergeOrbBonuses } from "./entities/index.js";
 import { FIGHTER_IDS, RENDER_LAYERS, Vector2 } from "./core.js";
 import { getUnseenEntries, dismissPatchNotes } from "./utils.js";
 import { PopupService } from "./popup.js";
+import { createCollectionHubViewModel, COLLECTION_HUB_TABS } from "./collection/collection-view-model.js";
 import {
     ArcherAbility,
     OrbitAbility,
@@ -70,6 +71,111 @@ export function appStore() {
 
         // Fighter cards (roster)
         fighters: [],
+
+        // Collection hub
+        collectionHub: {
+            visible: false,
+            activeTab: "roster",
+            tabs: [],
+            filters: {
+                roster: "all",
+                mastery: "all",
+                achievements: "all"
+            },
+            searchQueries: {
+                roster: "",
+                mastery: "",
+                achievements: ""
+            },
+            sortModes: {
+                roster: "roster",
+                achievements: "default"
+            },
+            selectedCharacterId: null,
+            rosterItems: [],
+            masteryItems: [],
+            achievementItems: [],
+            summary: {}
+        },
+
+        // Collection hub actions
+        openCollectionHub(tabId) {
+            const validTabs =
+                this.collectionHub.tabs.length > 0 ? this.collectionHub.tabs.map((t) => t.id) : ["roster"];
+            if (tabId && validTabs.includes(tabId)) {
+                this.collectionHub.activeTab = tabId;
+            } else {
+                this.collectionHub.activeTab = validTabs[0];
+            }
+            this.collectionHub.visible = true;
+        },
+        closeCollectionHub() {
+            this.collectionHub.visible = false;
+            this.collectionHub.selectedCharacterId = null;
+        },
+        setCollectionTab(tabId) {
+            const validTabs =
+                this.collectionHub.tabs.length > 0 ? this.collectionHub.tabs.map((t) => t.id) : ["roster"];
+            if (validTabs.includes(tabId)) {
+                this.collectionHub.activeTab = tabId;
+            }
+        },
+        setCollectionFilter(filterId) {
+            const tab = this.collectionHub.activeTab;
+            if (tab && filterId) {
+                this.collectionHub.filters[tab] = filterId;
+            }
+        },
+        clearCollectionSearch(tabId) {
+            if (tabId && this.collectionHub.searchQueries[tabId] !== undefined) {
+                this.collectionHub.searchQueries[tabId] = "";
+            }
+        },
+        selectCollectionCharacter(characterId) {
+            this.collectionHub.selectedCharacterId =
+                this.collectionHub.selectedCharacterId === characterId ? null : characterId;
+        },
+        closeCollectionCharacterDetail() {
+            this.collectionHub.selectedCharacterId = null;
+        },
+        get filteredRosterItems() {
+            const tab = this.collectionHub.activeTab;
+            if (tab !== "roster") return [];
+            const filter = this.collectionHub.filters.roster || "all";
+            const query = (this.collectionHub.searchQueries.roster || "").toLowerCase();
+            const sort = this.collectionHub.sortModes.roster || "roster";
+            let items = [...(this.collectionHub.rosterItems || [])];
+            if (query) {
+                items = items.filter((item) => item.name.toLowerCase().includes(query));
+            }
+            if (filter === "unplayed") items = items.filter((i) => !i.hasRecord);
+            else if (filter === "played") items = items.filter((i) => i.hasRecord);
+            else if (filter === "won") items = items.filter((i) => i.tournamentWins > 0);
+            else if (filter === "master") items = items.filter((i) => i.mastery >= 3);
+            if (sort === "wins") items = items.sort((a, b) => b.tournamentWins - a.tournamentWins);
+            else if (sort === "recent")
+                items = items.sort((a, b) => (b.lastTournamentAt ?? 0) - (a.lastTournamentAt ?? 0));
+            return items;
+        },
+        get filteredMasteryItems() {
+            const tab = this.collectionHub.activeTab;
+            if (tab !== "mastery") return [];
+            const filter = this.collectionHub.filters.mastery || "all";
+            let items = [...(this.collectionHub.masteryItems || [])];
+            if (filter === "unlocked") items = items.filter((i) => i.unlocked);
+            else if (filter === "locked") items = items.filter((i) => !i.unlocked);
+            else if (filter === "active") items = items.filter((i) => i.active);
+            return items;
+        },
+        get filteredAchievementItems() {
+            const tab = this.collectionHub.activeTab;
+            if (tab !== "achievements") return [];
+            const filter = this.collectionHub.filters.achievements || "all";
+            let items = [...(this.collectionHub.achievementItems || [])];
+            if (filter === "unlocked") items = items.filter((i) => i.unlocked);
+            else if (filter === "locked") items = items.filter((i) => !i.unlocked);
+            return items;
+        },
 
         // Battle log
         logItems: [],
@@ -369,6 +475,28 @@ export class UIController {
         s.overlayTransient = false;
         s.overlayLabel = "";
         s.overlayText = "";
+    }
+
+    renderCollectionHub(vm) {
+        const s = this.state;
+        if (!s) return;
+        s.collectionHub.tabs = [...COLLECTION_HUB_TABS];
+        s.collectionHub.summary = vm.summary;
+        s.collectionHub.rosterItems = vm.rosterItems;
+        s.collectionHub.masteryItems = vm.masteryItems;
+        s.collectionHub.achievementItems = vm.achievementItems;
+    }
+
+    openCollectionHub(tabId) {
+        const s = this.state;
+        if (!s) return;
+        s.openCollectionHub(tabId);
+    }
+
+    closeCollectionHub() {
+        const s = this.state;
+        if (!s) return;
+        s.closeCollectionHub();
     }
 
     /** 카드 선택 UI — Alpine 템플릿 사용 (index.html의 action-picker) */

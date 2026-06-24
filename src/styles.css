@@ -252,7 +252,7 @@ h1 {
     color: var(--muted);
 }
 
-/* ── 클릭 액션 카드 선택 ── */
+/* ?�?� ?�릭 ?�션 카드 ?�택 ?�?� */
 
 .action-pick {
     text-align: center;
@@ -756,7 +756,7 @@ body::before {
     display: block;
 }
 
-/* 배틀 로그 — PC 전용, 우측 상단 고정 */
+/* 배�? 로그 ??PC ?�용, ?�측 ?�단 고정 */
 #battleLog {
     position: fixed;
     top: 12px;
@@ -785,7 +785,7 @@ body::before {
     border-bottom: none;
 }
 
-/* 모바일에서는 숨김 */
+/* 모바?�에?�는 ?��? */
 @media (max-width: 768px) {
     #battleLog {
         display: none !important;
@@ -865,8 +865,16 @@ body::before {
     background: #eeeeee;
 }
 
-.player-panel > .help-icon {
-    justify-self: end;
+.player-panel-actions {
+    width: 100%;
+    min-width: 0;
+    min-height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
 }
 
 .player-title span,
@@ -1020,7 +1028,8 @@ body::before {
     text-transform: uppercase;
 }
 
-.help-icon {
+.player-panel-actions > button {
+    flex: 0 0 auto;
     vertical-align: middle;
     width: 24px;
     height: 24px;
@@ -1040,7 +1049,7 @@ body::before {
         color 0.12s;
 }
 
-.help-icon:hover {
+.player-panel-actions > button:hover {
     background: #202020;
     color: #ffffff;
 }
@@ -1428,7 +1437,7 @@ body::before {
     }
 }
 
-/* ── Balance multiplier badge ─────────────────────────────────── */
+/* ?�?� Balance multiplier badge ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?� */
 
 .allocation-summary {
     display: flex;
@@ -1503,7 +1512,7 @@ body::before {
     }
 }
 
-/* ── In-game fighter card HP text & balance ────────────── */
+/* ?�?� In-game fighter card HP text & balance ?�?�?�?�?�?�?�?�?�?�?�?�?�?� */
 
 .fighter-hp-text {
     display: flex;
@@ -1526,7 +1535,7 @@ body::before {
     }
 }
 
-/* ── Fighter card stat line with balance mult ──────────── */
+/* ?�?� Fighter card stat line with balance mult ?�?�?�?�?�?�?�?�?�?�?�?� */
 
 .fighter-stat-line {
     display: flex;
@@ -1563,7 +1572,479 @@ body::before {
     gap: 3px;
     min-width: 0;
     overflow: hidden;
+}
+
+/* ?�?� 컬렉???�브 ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?� */
+
+.ch-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.55);
+}
+
+.ch-frame {
+    display: flex;
+    flex-direction: column;
+    background: #ffffff;
+    color: #202020;
+    border-radius: 8px;
+    border: 2px solid #202020;
+    width: min(920px, calc(100vw - 40px));
+    height: min(760px, calc(100vh - 40px));
+    max-height: calc(100dvh - 16px);
+    overflow: hidden;
+}
+
+@media (max-width: 600px) {
+    .ch-frame {
+        width: calc(100vw - 16px);
+        max-height: calc(100dvh - 16px);
+    }
+}
+
+.ch-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border-bottom: 2px solid #202020;
+    flex-shrink: 0;
+    color: #202020;
+}
+
+.ch-title {
+    font-size: 1.1rem;
     white-space: nowrap;
+    color: #202020;
+}
+
+.ch-summary {
+    flex: 1;
+    font-size: 0.75rem;
+    color: #333;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ch-summary b {
+    color: #202020;
+}
+
+.ch-close {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border: 2px solid #202020;
+    border-radius: 6px;
+    background: #fff;
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ch-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid #202020;
+    flex-shrink: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.ch-tab {
+    flex-shrink: 0;
+    padding: 10px 20px;
+    border: none;
+    background: #eee;
+    font-size: 0.85rem;
+    cursor: pointer;
+    font-weight: 600;
+    border-right: 1px solid #ccc;
+    min-height: 40px;
+}
+
+.ch-tab.active {
+    background: #fff;
+    border-bottom: 3px solid #202020;
+}
+
+.ch-toolbar {
+    display: flex;
+    gap: 8px;
+    padding: 8px 16px;
+    border-bottom: 1px solid #ddd;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
+.ch-search {
+    flex: 1;
+    min-width: 120px;
+    padding: 6px 10px;
+    border: 2px solid #202020;
+    border-radius: 6px;
+    font-size: 0.8rem;
+}
+
+.ch-select {
+    padding: 6px 10px;
+    border: 2px solid #202020;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    background: #fff;
+    min-height: 36px;
+}
+
+.ch-content {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    color: #202020;
+}
+
+.ch-scroll-region {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+.ch-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    padding: 12px 16px;
+}
+
+@media (max-width: 360px) {
+    .ch-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.ch-card {
+    border: 2px solid #202020;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #202020;
+    overflow: hidden;
+    cursor: pointer;
+    min-height: 80px;
+}
+
+.ch-card.selected {
+    border-color: #4488ff;
+    box-shadow: 0 0 0 1px #4488ff;
+}
+
+.ch-card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    color: #1a1a1a;
+    font-weight: 700;
+    font-size: 0.8rem;
+}
+
+.ch-card-head.unplayed {
+    opacity: 0.5;
+}
+
+.ch-card-icon {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 900;
+    color: #1a1a1a;
+}
+
+.ch-card-head-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px;
+}
+
+.ch-card-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ch-card-mastery {
+    flex-shrink: 0;
+    font-size: 0.7rem;
+    opacity: 0.9;
+}
+
+.ch-card-body.unplayed {
+    opacity: 0.5;
+}
+
+.ch-card-body {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    padding: 8px 10px;
+    font-size: 0.72rem;
+    color: #222;
+}
+
+.ch-empty-badge {
+    color: #666;
+    font-weight: 600;
+    font-style: italic;
+}
+
+.ch-mast-badge {
+    color: #1a7a30;
+    font-weight: 700;
+}
+
+.ch-current-badge {
+    color: #4488ff;
+    font-weight: 600;
+}
+
+.ch-empty {
+    padding: 40px 16px;
+    text-align: center;
+    color: #555;
+    font-size: 0.85rem;
+}
+
+.ch-detail {
+    flex: 0 0 auto;
+    border-top: 2px solid #202020;
+    padding: 12px 16px;
+    font-size: 0.8rem;
+    color: #202020;
+}
+
+.ch-detail-close {
+    margin-bottom: 8px;
+}
+
+.ch-detail-close button {
+    border: none;
+    background: none;
+    color: #4488ff;
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 0;
+}
+
+.ch-detail-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    color: #202020;
+}
+
+.ch-detail-body b {
+    color: #202020;
+}
+
+.ch-list {
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ch-mast-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    background: #fafafa;
+    color: #202020;
+}
+
+.ch-mast-card.unlocked {
+    border-color: #202020;
+    background: #fff;
+}
+
+.ch-mast-card.active {
+    border-color: #28a447;
+}
+
+.ch-mast-tier {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #202020;
+}
+
+.ch-mast-next {
+    font-size: 0.65rem;
+    color: #555;
+}
+
+.ch-mast-source {
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #202020;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.2;
+}
+
+.ch-mast-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.ch-mast-info strong {
+    font-size: 0.82rem;
+    color: #202020;
+}
+
+.ch-mast-desc {
+    font-size: 0.7rem;
+    color: #444;
+}
+
+.ch-mast-status {
+    flex-shrink: 0;
+}
+
+.ch-mast-badge--self {
+    color: #555;
+}
+
+.ch-mast-badge--locked {
+    color: #666;
+}
+
+/* ?�적 카드 */
+.ch-ach-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    background: #fafafa;
+    color: #202020;
+}
+
+.ch-ach-card.unlocked {
+    border-color: #202020;
+    background: #fff;
+}
+
+.ch-ach-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.ch-ach-info strong {
+    font-size: 0.82rem;
+    color: #202020;
+}
+
+.ch-ach-desc {
+    font-size: 0.7rem;
+    color: #444;
+}
+
+.ch-ach-status {
+    flex-shrink: 0;
+}
+
+.ch-ach-badge {
+    font-size: 1.2rem;
+}
+
+.ch-ach-badge--done {
+    color: #1a7a30;
+}
+
+.ch-ach-badge--locked {
+    color: #ccc;
+}
+
+.ch-ach-reward {
+    font-size: 0.7rem;
+    color: #666;
+    margin-top: 2px;
+}
+
+.ch-ach-tier-label {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.ch-tier--bronze {
+    background: #f0d9b5;
+    color: #8b6914;
+}
+
+.ch-tier--silver {
+    background: #e0e4e8;
+    color: #4a5568;
+}
+
+.ch-tier--gold {
+    background: #fdecc8;
+    color: #b8860b;
+}
+
+.ch-ach-tier--bronze.unlocked {
+    border-color: #d4a84b;
+}
+
+.ch-ach-tier--silver.unlocked {
+    border-color: #a0aec0;
+}
+
+.ch-ach-tier--gold.unlocked {
+    border-color: #d4a017;
 }
 
 .hero-stat-part {
@@ -1574,7 +2055,7 @@ body::before {
     font-weight: 800;
 }
 
-/* ── Patch notes popup ─────────────────────────────────────────────────────── */
+/* ?�?� Patch notes popup ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?� */
 
 .patch-overlay {
     position: fixed;
@@ -1693,7 +2174,7 @@ body::before {
     margin: 20px 0;
 }
 
-/* ── PopupService (imperative popup) ───────────────────────────────────────── */
+/* ?�?� PopupService (imperative popup) ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?� */
 
 .bf-popup-container {
     position: relative;
@@ -1789,7 +2270,7 @@ body::before {
     opacity: 0.8;
 }
 
-/* ── Help popup content ──────────────────────────────────────────────────── */
+/* ?�?� Help popup content ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?� */
 
 .help-section {
     margin-bottom: 14px;

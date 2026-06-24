@@ -1,4 +1,4 @@
-import { DashEffect, WallSlamEffect } from "../combat-effects.js";
+import { DashEffect, WallSlamEffect } from "../combatEffects.js";
 import { steerBallToward, Vector2 } from "../core.js";
 import { Ability } from "./Ability.js";
 

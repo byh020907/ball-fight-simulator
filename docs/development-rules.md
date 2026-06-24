@@ -6,6 +6,7 @@
 
 - 프로젝트 문서, 이슈 정리, 작업 메모의 기본 언어는 한국어입니다.
 - 코드 식별자는 기존 JavaScript 스타일을 따르고, 사용자에게 보이는 문구는 한국어를 우선합니다.
+- **UI 명칭과 코드 식별자는 항상 정합해야 합니다.** 사용자에게 `숙련도`로 표시하는 개념은 코드에서도 `mastery`를 사용하고, `link` 같은 다른 용어를 섞지 않습니다. 명칭 변경이 있으면 UI 문자열, 코드 식별자(변수/함수/파일명), CSS 클래스, 프로필 키, 문서를 모두 함께 변경합니다.
 - 변경은 작고 되돌리기 쉽게 유지합니다.
 - 기존 동작을 바꾸는 수정은 가능하면 회귀 테스트를 먼저 추가하거나 기존 테스트를 갱신합니다.
 - 새 의존성은 명시적으로 필요할 때만 추가합니다.
@@ -26,6 +27,24 @@
 - 새 능력/시스템을 추가할 때도 1대1 전제 없이 다수의 Ball이 공존할 수 있는 구조로 설계합니다.
 
 ## 코드 스타일
+
+### 네이밍 규칙
+
+| 대상 | 규칙 | 예시 |
+|---|---|---|
+| **파일명** | `camelCase` | `archerAbility.js`, `battleBall.js`, `clickActions.js` |
+| **디렉토리명** | `kebab-case` | `character-mastery/`, `click-actions/` |
+| **클래스** | `PascalCase` | `class BattleBall`, `class ArcherAbility` |
+| **함수/변수** | `camelCase` | `collectActiveEffects()`, `const masteryLevel` |
+| **상수(모듈 레벨)** | `UPPER_SNAKE_CASE` | `export const MAX_POINTS_PER_STAT = 50` |
+| **CSS 클래스** | `kebab-case` (접두사: `ch-`) | `.ch-mast-card`, `.ch-ach-badge--gold` |
+
+### 파일 구조
+
+- **한 파일 = 한 개념.** 클래스 하나면 파일 하나. 여러 관련 함수를 모아 내보낼 때는 `index.js` barrel로.
+- **폴더링 기준:** 200줄 이상이거나 자연스러운 분리점(예: Ability 클래스들)이 있으면 폴더로 분리.
+- **`index.js`**는 폴더 내부의 exports를 모아서 외부에 공개하는 barrel 파일로만 사용. 자체 로직 금지.
+- **디렉토리명은 `kebab-case`**, 파일명은 `camelCase` (예외: `index.js`).
 
 ### 들여쓰기
 
@@ -380,6 +399,18 @@ npm run check
 
 `index.html`을 `file://`로 직접 열면 ES module CORS 문제로 정상 동작하지 않을 수 있습니다.
 또한 Alpine.js는 CDN에서 로드되므로 인터넷 연결이 필요합니다.
+
+## 플레이어 데이터 저장
+
+도감, 업적, 캐릭터 연계, 메타 성장처럼 브라우저를 닫은 뒤에도 유지되어야 하는 데이터는 [`player-data-storage-security.md`](player-data-storage-security.md)를 기준으로 구현합니다.
+
+- 현재 GitHub Pages 단계에서는 `src/player-profile.js`만 `localStorage`에 직접 접근합니다.
+- 저장 키는 `bfs:player-profile:v1`을 사용하고 모든 영구 시스템이 하나의 버전 프로필을 공유합니다.
+- 다른 모듈은 저장소 API가 아니라 프로필 도메인 함수만 호출합니다.
+- 로드한 데이터는 신뢰하지 않고 ID, 숫자 상한, 배열 중복, 스키마 버전을 항상 검증합니다.
+- 쿠키에는 진행 데이터를 저장하지 않습니다.
+- 클라이언트에 포함된 암호키, HMAC 키, RSA 개인키로 부정 방지를 구현하지 않습니다.
+- 온라인 랭킹, 거래, 결제, PvP처럼 조작 데이터가 다른 사용자에게 영향을 주기 시작하면 서버 권위 저장으로 전환합니다.
 
 ## Git 운영
 

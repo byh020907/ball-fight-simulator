@@ -4,7 +4,7 @@
 // 이 파일이 너무 커지면 목적별로 분리하세요 (예: src/cookie.js, src/patch-utils.js 등).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { PATCH_NOTES } from "./patch-notes.js";
+import { PATCH_NOTES } from "./patchNotes.js";
 
 const COOKIE_PATCH = "ballfight_patch";
 
