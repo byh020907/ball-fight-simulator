@@ -183,6 +183,33 @@ h1 {
     background: #ffffff;
 }
 
+/* ── Toast notification ──────────────────────────────────────────── */
+.toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #202020;
+    color: #fff;
+    padding: 12px 28px;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    z-index: 9999;
+    pointer-events: none;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    white-space: nowrap;
+}
+.toast-enter {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+}
+.toast-leave {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+    transition: all 300ms ease;
+}
+
 .overlay {
     position: absolute;
     inset: 16px;

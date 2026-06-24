@@ -763,6 +763,8 @@ export class BattleApp {
                         }
                     }
                     this.ui.addLog(msg);
+                    // 토스트 알림
+                    this.ui.showToast(msg);
                 }
             }
 

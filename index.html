@@ -90,6 +90,15 @@
                     <section class="arena-shell">
                         <canvas class="arena" id="arenaCanvas" width="960" height="960"></canvas>
 
+                        <!-- 토스트 알림 -->
+                        <div
+                            class="toast"
+                            x-show="toastVisible"
+                            x-transition:enter="toast-enter"
+                            x-transition:leave="toast-leave"
+                            x-text="toastMessage"
+                        ></div>
+
                         <div
                             class="overlay"
                             id="overlay"

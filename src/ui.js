@@ -60,6 +60,11 @@ export function appStore() {
         overlayLabel: "",
         overlayText: "",
 
+        // Toast notification
+        toastVisible: false,
+        toastMessage: "",
+        toastTimer: null,
+
         // Start button
         startHidden: true,
         get startDisabled() {
@@ -457,6 +462,18 @@ export class UIController {
         s.overlayTransient = false;
         s.overlayLabel = label;
         s.overlayText = text;
+    }
+
+    showToast(message, duration = 3500) {
+        const s = this.state;
+        if (!s) return;
+        if (s.toastTimer) clearTimeout(s.toastTimer);
+        s.toastMessage = message;
+        s.toastVisible = true;
+        s.toastTimer = setTimeout(() => {
+            s.toastVisible = false;
+            s.toastTimer = null;
+        }, duration);
     }
 
     showTransientOverlay(label, text, token) {
