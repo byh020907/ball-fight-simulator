@@ -2050,6 +2050,357 @@ async function testTournamentRosterNoExcessMultipleRuns() {
     }
 }
 
+// ── Achievement system tests ────────────────────────────────────────────────
+
+async function testEvaluateAchievements() {
+    const { createDefaultPlayerProfile } = await import("../src/playerProfile.js");
+    const { ACHIEVEMENT_DEFINITIONS } = await import("../src/collection/achievementDefinitions.js");
+    const { evaluateAchievements } = await import("../src/collection/achievementRules.js");
+    const { createRoster } = await import("../src/roster.js");
+    const { createMatchReport, createTournamentReport, addMatchReport } = await import("../src/collection/index.js");
+
+    // first_tournament_win: playerTournamentsCompleted >= 1 && report.playerWon
+    const profile = createDefaultPlayerProfile();
+    const roster = createRoster();
+    const report = createTournamentReport();
+    report.playerWon = true;
+    report.playerFighterId = "archer";
+
+    // Apply tournament report to populate playerTournamentsCompleted
+    const { applyTournamentReport } = await import("../src/collection/index.js");
+    applyTournamentReport(profile, report);
+
+    const results = evaluateAchievements(profile, ACHIEVEMENT_DEFINITIONS, {
+        profile,
+        report,
+        roster,
+        playerFighterId: "archer"
+    });
+    const firstWin = results.find((r) => r.id === "first_tournament_win");
+    assert.ok(firstWin, "first_tournament_win should unlock after first win");
+    assert.ok(firstWin.reward, "first_tournament_win should have a reward");
+
+    // 이미 해금된 업적은 다시 해금되지 않음
+    const results2 = evaluateAchievements(profile, ACHIEVEMENT_DEFINITIONS, {
+        profile,
+        report,
+        roster,
+        playerFighterId: "archer"
+    });
+    assert.equal(results2.length, 0, "Already unlocked achievements should not fire again");
+
+    // flawless_tournament: matchReports with combatDamageTaken === 0
+    const profile2 = createDefaultPlayerProfile();
+    const report2 = createTournamentReport();
+    report2.playerWon = true;
+    const match1 = createMatchReport();
+    match1.combatDamageTaken = 0;
+    const match2 = createMatchReport();
+    match2.combatDamageTaken = 5;
+    addMatchReport(report2, match1);
+    applyTournamentReport(profile2, report2);
+
+    const results3 = evaluateAchievements(profile2, ACHIEVEMENT_DEFINITIONS, {
+        profile: profile2,
+        report: report2,
+        roster,
+        playerFighterId: "archer"
+    });
+    // flawless_tournament: now checks .some() — one match with 0 damage is enough
+    assert.ok(
+        results3.some((r) => r.id === "flawless_tournament"),
+        "flawless_tournament should unlock when any match has 0 damage"
+    );
+
+    // counter_expert: actionSuccessCounts.counter >= 10
+    const profile3 = createDefaultPlayerProfile();
+    profile3.collection.careerStats.actionSuccessCounts.counter = 10;
+    const results4 = evaluateAchievements(profile3, ACHIEVEMENT_DEFINITIONS, {
+        profile: profile3,
+        report: createTournamentReport(),
+        roster,
+        playerFighterId: "archer"
+    });
+    assert.ok(
+        results4.some((r) => r.id === "counter_expert"),
+        "counter_expert should unlock at 10 counter successes"
+    );
+    assert.ok(
+        results4.some((r) => r.id === "first_tournament_win") === false,
+        "first_tournament_win should NOT unlock without win"
+    );
+
+    // marathon_50: playerMatchesCompleted >= 50
+    const profile5 = createDefaultPlayerProfile();
+    profile5.collection.careerStats.playerMatchesCompleted = 50;
+    const results5 = evaluateAchievements(profile5, ACHIEVEMENT_DEFINITIONS, {
+        profile: profile5,
+        report: createTournamentReport(),
+        roster,
+        playerFighterId: "archer"
+    });
+    assert.ok(
+        results5.some((r) => r.id === "marathon_50"),
+        "marathon_50 should unlock at 50 matches"
+    );
+}
+
+async function testApplyAchievementRewards() {
+    const { createDefaultPlayerProfile } = await import("../src/playerProfile.js");
+    const { applyAchievementRewards } = await import("../src/progression/progressionState.js");
+
+    const profile = createDefaultPlayerProfile();
+    const results = [
+        {
+            id: "test_ach_1",
+            reward: { type: "PROGRESSION_BONUS", payload: { bonusKey: "extraStatPoints", amount: 5 } }
+        },
+        { id: "test_ach_2", reward: null }
+    ];
+
+    const outcomes = applyAchievementRewards(profile, results);
+    assert.equal(outcomes.length, 2, "Should return outcome for each result");
+    assert.ok(outcomes[0].applied, "Reward with valid bonus should be applied");
+    assert.equal(outcomes[0].bonusKey, "extraStatPoints");
+    assert.equal(outcomes[0].amount, 5);
+    assert.equal(profile.progression.bonuses.extraStatPoints, 5, "Profile bonus should increase");
+
+    assert.ok(!outcomes[1].applied, "Null reward should not be applied");
+
+    // 중복 지급 방지: evaluateAchievements를 통해 등록된 achievement는 rewardClaimed=true로 설정됨
+    const results2 = [
+        { id: "test_ach_1", reward: { type: "PROGRESSION_BONUS", payload: { bonusKey: "extraStatPoints", amount: 3 } } }
+    ];
+    // achievement 상태를 직접 설정 (evaluateAchievements가 하는 일을 시뮬레이션)
+    profile.collection.achievements["test_ach_1"] = { unlockedAt: Date.now(), rewardClaimed: true };
+
+    const outcomes2 = applyAchievementRewards(profile, results2);
+    assert.ok(!outcomes2[0].applied, "Reward with rewardClaimed flag should not be applied again");
+}
+
+async function testFormatRewardDescription() {
+    const { formatRewardDescription } = await import("../src/progression/progressionState.js");
+
+    assert.equal(formatRewardDescription(null), "", "Null reward should return empty");
+    assert.equal(formatRewardDescription({}), "", "Reward without type should return empty");
+
+    const r1 = { type: "PROGRESSION_BONUS", payload: { bonusKey: "extraStatPoints", amount: 5 } };
+    assert.ok(
+        formatRewardDescription(r1).includes("추가 스탯 포인트"),
+        "extraStatPoints reward should describe correctly"
+    );
+    assert.ok(formatRewardDescription(r1).includes("+5"), "Reward amount should be included");
+}
+
+async function testProgressionBonusCapClamp() {
+    const { createDefaultPlayerProfile } = await import("../src/playerProfile.js");
+    const { applyProgressionBonus } = await import("../src/progression/progressionState.js");
+
+    const profile = createDefaultPlayerProfile();
+    // extraStatPoints cap is 40
+    profile.progression.bonuses.extraStatPoints = 38;
+
+    const r1 = applyProgressionBonus(
+        profile,
+        { type: "PROGRESSION_BONUS", payload: { bonusKey: "extraStatPoints", amount: 5 } },
+        "test_id"
+    );
+    assert.ok(r1.applied, "Should apply within cap");
+    assert.equal(r1.amount, 2, "Should clamp to cap (38+2=40)");
+    assert.equal(profile.progression.bonuses.extraStatPoints, 40, "Should stop at cap exactly");
+
+    const r2 = applyProgressionBonus(
+        profile,
+        { type: "PROGRESSION_BONUS", payload: { bonusKey: "extraStatPoints", amount: 5 } },
+        "test_id_2"
+    );
+    assert.ok(!r2.applied, "Should not apply when at cap");
+    assert.equal(r2.capped, 0, "Capped amount should be 0");
+    assert.equal(profile.progression.bonuses.extraStatPoints, 40, "Should stay at cap");
+}
+
+// ── Mastery system tests ───────────────────────────────────────────────────
+
+async function testGetCharacterMasteryLevel() {
+    const { createDefaultPlayerProfile } = await import("../src/playerProfile.js");
+    const { getCharacterMasteryLevel } = await import("../src/character-mastery/index.js");
+
+    const profile = createDefaultPlayerProfile();
+    assert.equal(getCharacterMasteryLevel(profile, "archer"), 0, "New profile should have level 0");
+    assert.equal(getCharacterMasteryLevel(profile, "invalid"), 0, "Invalid ID should return 0");
+
+    profile.characterMastery.levels = { archer: 2 };
+    assert.equal(getCharacterMasteryLevel(profile, "archer"), 2, "Should return stored level");
+}
+
+async function testGetCharacterChallengeLevel() {
+    const { createDefaultPlayerProfile } = await import("../src/playerProfile.js");
+    const { getCharacterChallengeLevel } = await import("../src/character-mastery/index.js");
+
+    const profile = createDefaultPlayerProfile();
+    assert.equal(getCharacterChallengeLevel(profile, "archer"), 0, "Level 0 -> challenge 0");
+
+    profile.characterMastery.levels = { archer: 1 };
+    assert.equal(getCharacterChallengeLevel(profile, "archer"), 1, "Level 1 -> challenge 1");
+
+    profile.characterMastery.levels = { archer: 3 };
+    assert.equal(getCharacterChallengeLevel(profile, "archer"), 2, "Level 3 (GOLD) -> challenge 2 (capped)");
+}
+
+async function testAdvanceCharacterMastery() {
+    const { createDefaultPlayerProfile } = await import("../src/playerProfile.js");
+    const { advanceCharacterMastery, getCharacterMasteryLevel } = await import("../src/character-mastery/index.js");
+
+    const profile = createDefaultPlayerProfile();
+
+    // 레벨 0 → BRONZE (난도 0)
+    const r1 = advanceCharacterMastery(profile, { characterId: "archer", challengeLevel: 0, playerWon: true });
+    assert.ok(r1.changed, "Win at challenge 0 should advance to BRONZE");
+    assert.equal(r1.newLevel, 1);
+    assert.equal(r1.previousTier, "미해금");
+    assert.equal(r1.newTier, "BRONZE");
+
+    // BRONZE → SILVER: needs challenge >= 1
+    const r2 = advanceCharacterMastery(profile, { characterId: "archer", challengeLevel: 0, playerWon: true });
+    assert.ok(!r2.changed, "Bronze needs challenge >= 1");
+    assert.equal(r2.reason, "insufficient_challenge");
+
+    const r3 = advanceCharacterMastery(profile, { characterId: "archer", challengeLevel: 1, playerWon: true });
+    assert.ok(r3.changed, "Win at challenge 1 should advance to SILVER");
+    assert.equal(r3.newLevel, 2);
+
+    // SILVER → GOLD: needs challenge >= 2
+    const r4 = advanceCharacterMastery(profile, { characterId: "archer", challengeLevel: 2, playerWon: true });
+    assert.ok(r4.changed, "Win at challenge 2 should advance to GOLD");
+    assert.equal(r4.newLevel, 3);
+
+    // GOLD: max, no further advance
+    const r5 = advanceCharacterMastery(profile, { characterId: "archer", challengeLevel: 2, playerWon: true });
+    assert.ok(!r5.changed, "GOLD should not advance");
+    assert.equal(r5.reason, "max_level");
+
+    // 패배
+    const r6 = advanceCharacterMastery(profile, { characterId: "archer", challengeLevel: 0, playerWon: false });
+    assert.ok(!r6.changed, "Loss should not advance");
+    assert.equal(r6.reason, "lost");
+
+    // 잘못된 ID
+    const r7 = advanceCharacterMastery(profile, { characterId: "invalid", challengeLevel: 0, playerWon: true });
+    assert.ok(!r7.changed, "Invalid ID should not advance");
+}
+
+// ── Tournament report tests ─────────────────────────────────────────────────
+
+async function testApplyTournamentReport() {
+    const { createDefaultPlayerProfile } = await import("../src/playerProfile.js");
+    const { createMatchReport, createTournamentReport, addMatchReport, applyTournamentReport } =
+        await import("../src/collection/index.js");
+
+    const profile = createDefaultPlayerProfile();
+    const report = createTournamentReport();
+    report.playerFighterId = "archer";
+    report.playerWon = true;
+    report.placement = 1;
+
+    const match = createMatchReport();
+    match.playerWon = true;
+    match.combatDamageDealt = 100;
+    match.combatDamageTaken = 5;
+    match.lowestHpRatio = 0.5;
+    match.usedActionIds = ["rush", "counter"];
+    match.actionSuccessCounts = { counter: 1 };
+    addMatchReport(report, match);
+
+    const result = applyTournamentReport(profile, report);
+    assert.ok(!result.alreadyProcessed, "First apply should succeed");
+
+    const charRecord = profile.collection.characters.archer;
+    assert.ok(charRecord, "Character record should exist");
+    assert.equal(charRecord.tournamentsCompleted, 1, "Tournament count should increment");
+    assert.equal(charRecord.tournamentWins, 1, "Win should be recorded");
+    assert.equal(charRecord.matchWins, 1, "Match win should be recorded");
+    assert.equal(charRecord.totalDamageDealt, 100, "Damage dealt should match");
+    assert.equal(charRecord.bestPlacement, 1, "Best placement should be 1");
+
+    assert.equal(profile.collection.careerStats.playerTournamentsCompleted, 1);
+    assert.equal(profile.collection.careerStats.playerMatchesCompleted, 1);
+    assert.equal(profile.collection.careerStats.currentTournamentWinStreak, 1);
+    assert.ok(profile.collection.careerStats.usedActionIds.includes("rush"), "Action IDs should be recorded");
+    assert.equal(profile.collection.careerStats.actionSuccessCounts.counter, 1);
+
+    // 중복 반영 방지
+    const result2 = applyTournamentReport(profile, report);
+    assert.ok(result2.alreadyProcessed, "Duplicate report should be skipped");
+}
+
+// ── Collection hub ViewModel tests ──────────────────────────────────────────
+
+async function testCreateCollectionHubViewModel() {
+    const { createCollectionHubViewModel } = await import("../src/collection/collectionViewModel.js");
+    const { MASTERY_EFFECT_DEFS } = await import("../src/character-mastery/index.js");
+    const { createDefaultPlayerProfile } = await import("../src/playerProfile.js");
+    const { createRoster } = await import("../src/roster.js");
+
+    const roster = createRoster();
+    const profile = createDefaultPlayerProfile();
+
+    const vm = createCollectionHubViewModel({
+        profile,
+        roster,
+        masteryDefinitions: MASTERY_EFFECT_DEFS,
+        achievementDefinitions: [],
+        currentPlayerFighterId: "archer"
+    });
+
+    assert.equal(vm.rosterSize, roster.length, "rosterSize should match");
+    assert.equal(vm.rosterItems.length, roster.length, "rosterItems should include all characters");
+    assert.equal(vm.masteryItems.length, MASTERY_EFFECT_DEFS.length, "masteryItems should match definitions");
+
+    const allHaveIds = vm.rosterItems.every((item) => item.id);
+    assert.ok(allHaveIds, "Every roster item should have an id");
+
+    // 숙련도 항목에 sourceName과 unlockCondition이 있는지
+    const firstMastery = vm.masteryItems[0];
+    assert.ok(firstMastery.sourceName, "Mastery item should have sourceName");
+    assert.ok(firstMastery.unlockCondition, "Mastery item should have unlockCondition");
+
+    // 승리 기록 추가 시 masteryLevel/masteryUnlocked 반영
+    profile.collection.characters.archer = {
+        tournamentsCompleted: 10,
+        tournamentWins: 6,
+        matchWins: 15,
+        bestPlacement: 1,
+        totalDamageDealt: 5000,
+        comebackMatchWins: 2,
+        firstTournamentAt: 1000,
+        lastTournamentAt: 2000
+    };
+    const vm2 = createCollectionHubViewModel({
+        profile,
+        roster,
+        masteryDefinitions: MASTERY_EFFECT_DEFS,
+        achievementDefinitions: [],
+        currentPlayerFighterId: "archer"
+    });
+    const archerItem = vm2.rosterItems.find((i) => i.id === "archer");
+    assert.equal(archerItem.tournamentWins, 6, "tournamentWins should match");
+    assert.equal(archerItem.bestPlacement, 1, "bestPlacement should match");
+
+    // 숙련도 레벨이 있으면 masteryItems에 반영
+    profile.characterMastery.levels = { archer: 1, orbit: 2, eater: 3 };
+    const vm3 = createCollectionHubViewModel({
+        profile,
+        roster,
+        masteryDefinitions: MASTERY_EFFECT_DEFS,
+        achievementDefinitions: [],
+        currentPlayerFighterId: "archer"
+    });
+    const arcMastery = vm3.masteryItems.find((i) => i.sourceFighterId === "archer");
+    assert.ok(arcMastery.unlocked, "Archer mastery should be unlocked");
+    assert.ok(arcMastery.isSelf, "Archer mastery should be marked as self");
+    assert.equal(arcMastery.level, 1, "Archer mastery level should be 1");
+}
+
 const app = await loadModuleApp();
 testShuffledUtility();
 testStatAllocationRules(app);
@@ -2122,4 +2473,17 @@ await testTricksterSeedSpeedScalesWithOwner(app);
 await testTournamentRosterOverEight();
 await testTournamentRosterUnderEight();
 await testTournamentRosterNoExcessMultipleRuns();
+// Achievement system tests
+await testEvaluateAchievements();
+await testApplyAchievementRewards();
+await testFormatRewardDescription();
+await testProgressionBonusCapClamp();
+// Mastery system tests
+await testAdvanceCharacterMastery();
+await testGetCharacterMasteryLevel();
+await testGetCharacterChallengeLevel();
+// Tournament report tests
+await testApplyTournamentReport();
+// Collection hub view model tests
+await testCreateCollectionHubViewModel();
 console.log("regression tests ok");
