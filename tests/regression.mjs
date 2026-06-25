@@ -901,20 +901,19 @@ async function testHeroOrbOpponentCollects(app) {
     sim.entities = sim.fighters.slice();
 
     const HeroOrb = (await import("../src/entities/index.js")).HeroOrb;
-    const hpBefore = target.hp;
     const bonusesBefore = { ...heroFighter.heroOrbBonuses };
 
-    const orb = new HeroOrb(heroFighter, target.position.clone(), new Vector2(0, 0), "hp", 10);
+    const orbVelocity = new Vector2(0, 0);
+    const orb = new HeroOrb(heroFighter, target.position.clone(), orbVelocity, "hp", 10);
     sim.entities.push(orb);
+    const velocityBefore = orb.velocity.length();
     orb.update(0.016, sim);
 
-    assert.deepEqual(
-        heroFighter.heroOrbBonuses,
-        bonusesBefore,
-        "Opponent collecting orb should not give bonus to owner"
-    );
-    assert.equal(orb.isExpired, true, "Orb should disappear on opponent collection");
-    assert.equal(target.hp, hpBefore, "Opponent should not take damage from orb");
+    assert.deepEqual(heroFighter.heroOrbBonuses, bonusesBefore, "Opponent touching orb should not give bonus to owner");
+    assert.equal(orb.isExpired, false, "Orb should bounce off opponent, not disappear");
+    // orb가 상대에게서 멀어졌는지 확인 (겹침 해소로 position 변경)
+    const distAfter = Vector2.subtract(orb.position, target.position).length();
+    assert.ok(distAfter > orb.radius + target.radius - 1, "Orb should be pushed away from opponent");
 }
 
 async function testHeroOrbMaxActivePerOwner(app) {
@@ -1088,11 +1087,11 @@ async function testHeroOrbNoDamage(app) {
     const hpBefore = target.hp;
     const orb = new HeroOrb(heroFighter, target.position.clone(), new Vector2(0, 0), "hp", 10);
     sim.entities = [orb, ...sim.fighters];
-    // Orb overlapping with opponent should not damage them
+    // Orb overlapping with opponent should bounce off, not deal damage
     orb.position = target.position.clone();
     orb.update(0.016, sim);
     assert.equal(target.hp, hpBefore, "Hero Orb should not damage opponents on contact");
-    assert.equal(orb.isExpired, true, "Hero Orb should disappear on opponent contact");
+    assert.equal(orb.isExpired, false, "Hero Orb should bounce off opponent, not disappear");
 }
 
 // ── Hero Ball v0.11.0 Improvement Tests ─────────────────────────────────────
@@ -1524,7 +1523,7 @@ async function testSpecialOrbOpponentCollects(app) {
             movementBefore,
             `${specialType} orb collected by opponent should not trigger dash on owner`
         );
-        assert.equal(orb.isExpired, true, `${specialType} orb should be expired after opponent collection`);
+        assert.equal(orb.isExpired, false, `${specialType} orb should bounce off opponent, not disappear`);
     }
 }
 
