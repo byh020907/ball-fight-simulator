@@ -260,13 +260,13 @@ h1 {
 
 .overlay.transient .overlay-card span {
     margin-bottom: 4px;
-    color: rgba(17, 17, 17, 0.35);
+    color: rgba(17, 17, 17, 0.1);
     letter-spacing: 0.18em;
 }
 
 .overlay.transient .overlay-card strong {
     font-size: clamp(1.2rem, 4vw, 2rem);
-    color: rgba(17, 17, 17, 0.45);
+    color: rgba(17, 17, 17, 0.1);
 }
 
 .overlay-card {
