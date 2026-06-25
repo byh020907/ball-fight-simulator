@@ -102,7 +102,14 @@
                         <div
                             class="overlay"
                             id="overlay"
-                            x-bind:class="{ visible: overlayVisible, transient: overlayTransient }"
+                            x-show="overlayVisible"
+                            x-transition:enter="overlay-enter"
+                            x-transition:enter-start="overlay-enter-start"
+                            x-transition:enter-end="overlay-enter-end"
+                            x-transition:leave="overlay-leave"
+                            x-transition:leave-start="overlay-leave-start"
+                            x-transition:leave-end="overlay-leave-end"
+                            x-bind:class="{ transient: overlayTransient }"
                         >
                             <div class="overlay-card">
                                 <span x-text="overlayLabel">Waiting Room</span>

@@ -218,18 +218,37 @@ h1 {
     align-items: center;
     justify-content: center;
     pointer-events: none;
-    transition: opacity 400ms ease;
-    opacity: 0;
     background: #eeeeee;
 }
 
-.overlay.visible {
+.overlay-enter {
+    transition: opacity 400ms ease;
+}
+.overlay-enter-start {
+    opacity: 0;
+}
+.overlay-enter-end {
     opacity: 1;
+}
+.overlay-leave {
+    transition: opacity 300ms ease;
+}
+.overlay-leave-start {
+    opacity: 1;
+}
+.overlay-leave-end {
+    opacity: 0;
 }
 
 .overlay.transient {
     background: transparent;
+}
+
+.overlay.transient .overlay-enter {
     transition: opacity 200ms ease;
+}
+.overlay.transient .overlay-leave {
+    transition: opacity 150ms ease;
 }
 
 .overlay.transient .overlay-card {
