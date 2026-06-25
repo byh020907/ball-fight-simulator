@@ -492,6 +492,7 @@ export class UIController {
         if (!s) return;
         s.overlayVisible = true;
         s.overlayTransient = true;
+        s._transientToken = token;
         s.overlayLabel = label;
         s.overlayText = text;
     }

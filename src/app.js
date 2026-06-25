@@ -605,7 +605,7 @@ export class BattleApp {
         this.ui.showTransientOverlay(label, text, token);
         window.setTimeout(() => {
             const s = this.ui.state;
-            if (s && s.overlayVisible && s.overlayTransient && !this.simulation?.finished) {
+            if (s && s.overlayTransient && s._transientToken === token && !this.simulation?.finished) {
                 this.ui.hideOverlay();
             }
         }, duration);
