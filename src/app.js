@@ -629,6 +629,7 @@ export class BattleApp {
         this._battleSpeed = speeds[(idx + 1) % speeds.length];
         this._speedIndicatorText = `x${this._battleSpeed}`;
         this._speedIndicatorTimer = 1.2;
+        this.showTransientOverlay(`x${this._battleSpeed}`, "", 900);
     }
 
     /** 배속 표시 렌더링 */
