@@ -1069,7 +1069,7 @@ body::before {
     background: none;
     color: #202020;
     font:
-        900 13px/1 "Bahnschrift",
+        900 13px "Bahnschrift",
         sans-serif;
     cursor: pointer;
     display: inline-flex;
@@ -1085,9 +1085,10 @@ body::before {
     color: #ffffff;
 }
 
-.player-panel-actions > button:hover {
-    background: #202020;
-    color: #ffffff;
+.player-panel-actions > button > span {
+    display: block;
+    line-height: 1;
+    font: inherit;
 }
 
 .bracket {
