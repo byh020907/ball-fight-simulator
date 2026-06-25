@@ -523,14 +523,11 @@ export class BattleApp {
         canvas.addEventListener("pointerdown", this._pointerHandler);
         canvas.addEventListener("pointerup", this._pointerUpHandler);
         canvas.addEventListener("pointerleave", this._pointerUpHandler);
-        // 배속 토글 (상단 60px 탭)
-        this._speedToggleHandler = (e) => {
+        // 배속 토글 (관전 중에만 동작, 전투 영역 전체)
+        this._speedToggleHandler = () => {
             if (this.simulation?.finished) return;
-            const rect = canvas.getBoundingClientRect();
-            const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-            if (y < 60) {
-                this._cycleBattleSpeed();
-            }
+            if (this.simulation?.playerBall) return;
+            this._cycleBattleSpeed();
         };
         canvas.addEventListener("pointerdown", this._speedToggleHandler);
     }
