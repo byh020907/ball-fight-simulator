@@ -218,7 +218,7 @@ h1 {
     align-items: center;
     justify-content: center;
     pointer-events: none;
-    background: #eeeeee;
+    background: rgba(238, 238, 238, 0.85);
 }
 
 .overlay-enter {
@@ -260,13 +260,13 @@ h1 {
 
 .overlay.transient .overlay-card span {
     margin-bottom: 4px;
-    color: rgba(17, 17, 17, 0.1);
+    color: rgba(17, 17, 17, 0.58);
     letter-spacing: 0.18em;
 }
 
 .overlay.transient .overlay-card strong {
     font-size: clamp(1.2rem, 4vw, 2rem);
-    color: rgba(17, 17, 17, 0.1);
+    color: rgba(17, 17, 17, 0.72);
 }
 
 .overlay-card {
