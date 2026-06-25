@@ -11,7 +11,7 @@ import {
     HeroAbility
 } from "../abilities/index.js";
 import { BattleBall } from "../entities/index.js";
-import { GravityParticle } from "../effects.js";
+import { GravityParticle } from "../effects/index.js";
 import { Simulation } from "./simulation.js";
 
 const ABILITY_TYPES = {

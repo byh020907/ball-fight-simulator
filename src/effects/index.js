@@ -1,17 +1,11 @@
 // ── Effects barrel ──────────────────────────────────────────────────────────
-// 점진적 리팩터: 현재는 effects.js를 그대로 re-export.
-// 향후 개별 파일로 분리 시 이 파일만 수정하면 됨.
+// 개별 파일로 분리 완료. 새 효과 추가 시 이 파일과 effects/ 내 파일을 추가.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export {
-    VisualBurst,
-    OrbitHitEffect,
-    DeathBurstEffect,
-    GravityParticle,
-    SlashTrail,
-    DamageNumber,
-    ActionText,
-    ActionWindowEffect,
-    ActionSuccessEffect,
-    ActionWhiffEffect
-} from "../effects.js";
+export { VisualBurst } from "./visualBurst.js";
+export { OrbitHitEffect } from "./orbitHitEffect.js";
+export { DeathBurstEffect } from "./deathBurstEffect.js";
+export { GravityParticle } from "./gravityParticle.js";
+export { SlashTrail } from "./slashTrail.js";
+export { DamageNumber, ActionText } from "./floatingText.js";
+export { ActionWindowEffect, ActionSuccessEffect, ActionWhiffEffect } from "./actionEffects.js";

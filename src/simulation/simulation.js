@@ -11,7 +11,7 @@ import {
     ActionWindowEffect,
     ActionSuccessEffect,
     ActionWhiffEffect
-} from "../effects.js";
+} from "../effects/index.js";
 
 /**
  * Base simulation — arena boundaries, wall bouncing, effect spawning.
