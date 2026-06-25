@@ -197,7 +197,7 @@ h1 {
     font-weight: 600;
     z-index: 9999;
     pointer-events: none;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
     white-space: nowrap;
 }
 .toast-enter {
@@ -1084,6 +1084,10 @@ body::before {
 .player-panel-actions > button:hover {
     background: #202020;
     color: #ffffff;
+}
+
+.collection-icon {
+    transform: translateY(-1px);
 }
 
 .bracket {
