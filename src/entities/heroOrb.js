@@ -315,9 +315,9 @@ export class HeroOrb extends CombatEntity {
                 return;
             }
 
-            // 상대와 충돌: 일반 공 충돌처럼 튕겨나감 (낮은 mass + 최소 충돌속도 보장)
+            // 상대와 충돌: orb만 튕겨나감 (fighter는 밀리지 않음)
             this.position.add(normal.clone().scale(overlap + 0.6));
-            applyCollisionImpulse(this, fighter, normal, 0.6, { minApproachSpeed: 60 });
+            applyCollisionImpulse(this, fighter, normal, 0.4, { impactA: 0, minApproachSpeed: 60 });
             simulation.playSound("bounce", 0.3);
             return;
         }
