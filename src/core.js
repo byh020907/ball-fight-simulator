@@ -280,19 +280,24 @@ export function evadeTarget(owner, target, range, strength) {
  * @param {{ mass:number, velocity:Vector2, applyImpulse:(v:Vector2)=>void }} b
  * @param {Vector2} normal - a에서 b로의 충돌 법선
  * @param {number} restitution - 반발 계수 (0~1)
- * @param {{ impactA?:number, impactB?:number }} [modifiers]
+ * @param {{ impactA?:number, impactB?:number, minApproachSpeed?:number }} [modifiers]
  * @returns {{ impulseMagnitude:number }} 계산된 impulse 크기
  */
 export function applyCollisionImpulse(a, b, normal, restitution, modifiers = {}) {
     const impactA = modifiers.impactA ?? 1;
     const impactB = modifiers.impactB ?? 1;
+    const minApproachSpeed = modifiers.minApproachSpeed ?? 0;
     const relativeVelocity = Vector2.subtract(b.velocity, a.velocity);
-    const velocityAlongNormal = relativeVelocity.dot(normal);
-    if (velocityAlongNormal > 0) return { impulseMagnitude: 0 };
+    let approachSpeed = relativeVelocity.dot(normal);
+    // 분리 중이어도 최소 접근 속도가 설정되어 있으면 impulse 적용
+    if (approachSpeed > 0 && minApproachSpeed <= 0) return { impulseMagnitude: 0 };
+    if (Math.abs(approachSpeed) < minApproachSpeed) {
+        approachSpeed = approachSpeed >= 0 ? minApproachSpeed : -minApproachSpeed;
+    }
 
     const invMassA = 1 / Math.max(0.001, a.mass);
     const invMassB = 1 / Math.max(0.001, b.mass);
-    const impulseMagnitude = (-(1 + restitution) * velocityAlongNormal) / (invMassA + invMassB);
+    const impulseMagnitude = (-(1 + restitution) * approachSpeed) / (invMassA + invMassB);
 
     a.applyImpulse(normal.clone().scale(-impulseMagnitude * invMassA * impactB));
     b.applyImpulse(normal.clone().scale(impulseMagnitude * invMassB * impactA));
