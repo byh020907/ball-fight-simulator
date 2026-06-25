@@ -925,6 +925,11 @@ body::before {
     color: #333333;
 }
 
+.bonus-points-badge {
+    color: #d4a017;
+    font-weight: 700;
+}
+
 .point-meter {
     display: flex;
     align-items: center;

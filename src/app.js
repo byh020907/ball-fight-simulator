@@ -152,25 +152,44 @@ export class BattleApp {
         this.ui.renderCollectionHub(vm);
     }
 
-    /** 스탯 배분 UI용 MAX_POINTS_PER_STAT 업데이트 */
-    _updateStatCapForUI() {
+    /** 스탯 배분 UI용 MAX_POINTS_PER_STAT 업데이트 및 유효 총 포인트 계산 */
+    _getStatBonusContext() {
         const masteryCtx = this.playerProfile?.characterMastery?.levels
             ? collectActiveEffects(this.playerProfile, this.playerFighterId)
-            : { allocationModifiers: { perStatCapBonus: 0 } };
-        const progressionBonus = this.playerProfile?.progression?.bonuses?.perStatCapBonus ?? 0;
-        const masteryBonus = masteryCtx.allocationModifiers?.perStatCapBonus ?? 0;
-        updateEffectiveStatCap(progressionBonus, masteryBonus);
+            : {
+                  allocationModifiers: { perStatCapBonus: 0, extraStatPoints: 0, balanceTolerance: 0 }
+              };
+        const progressionPerStatCap = this.playerProfile?.progression?.bonuses?.perStatCapBonus ?? 0;
+        const masteryPerStatCap = masteryCtx.allocationModifiers?.perStatCapBonus ?? 0;
+        const progressionExtra = this.playerProfile?.progression?.bonuses?.extraStatPoints ?? 0;
+        const masteryExtra = masteryCtx.allocationModifiers?.extraStatPoints ?? 0;
+        return {
+            progressionPerStatCapBonus: progressionPerStatCap,
+            masteryPerStatCapBonus: masteryPerStatCap,
+            perStatCapBonus: progressionPerStatCap + masteryPerStatCap,
+            progressionExtraStatPoints: progressionExtra,
+            masteryExtraStatPoints: masteryExtra,
+            extraStatPoints: progressionExtra + masteryExtra
+        };
+    }
+
+    _updateStatCapForUI() {
+        const ctx = this._getStatBonusContext();
+        updateEffectiveStatCap(ctx.progressionPerStatCapBonus, ctx.masteryPerStatCapBonus);
     }
 
     refreshPlayerSetup() {
         this._updateStatCapForUI();
-        const remaining = getRemainingStatPoints(this.playerStatAllocation);
+        const bonusCtx = this._getStatBonusContext();
+        const effectiveTotal = PLAYER_STAT_POINTS + bonusCtx.extraStatPoints;
+        const remaining = getRemainingStatPoints(this.playerStatAllocation, effectiveTotal);
         const player = this.roster.find((fighter) => fighter.id === this.playerFighterId);
         this.ui.renderPlayerSetup({
             fighter: player,
             stats: ALLOCATABLE_STATS,
             allocation: this.playerStatAllocation,
-            totalPoints: PLAYER_STAT_POINTS,
+            totalPoints: effectiveTotal,
+            bonusPoints: bonusCtx.extraStatPoints,
             remainingPoints: remaining,
             locked: Boolean(this.tournament && !this.tournament.champion)
         });
@@ -261,10 +280,13 @@ export class BattleApp {
             this.playerStatAllocation = { ...alpineData.allocation };
         }
 
-        const remaining = getRemainingStatPoints(this.playerStatAllocation);
-        if (remaining > 0) {
-            this.ui.showOverlay("스탯 배분 필요", `${remaining} 포인트 남음`);
-            this.ui.addLog(`토너먼트 시작 전 스탯 ${remaining} 포인트를 더 배분해야 합니다.`);
+        const bonusCtx = this._getStatBonusContext();
+        const effectiveTotal = PLAYER_STAT_POINTS + bonusCtx.extraStatPoints;
+        // 플레이어는 기본 100 포인트 이상을 반드시 배분해야 함 (보너스는 선택)
+        const baseRemaining = getRemainingStatPoints(this.playerStatAllocation);
+        if (baseRemaining > 0) {
+            this.ui.showOverlay("스탯 배분 필요", `${baseRemaining} 포인트 남음`);
+            this.ui.addLog(`토너먼트 시작 전 스탯 ${baseRemaining} 포인트를 더 배분해야 합니다.`);
             this.refreshPlayerSetup();
             return;
         }
@@ -283,9 +305,7 @@ export class BattleApp {
         const totalBalanceTol =
             masteryCtx.allocationModifiers.balanceTolerance +
             (this.playerProfile?.progression?.bonuses?.balanceTolerance ?? 0);
-        if (totalBalanceTol > 0) {
-            _STAT_BALANCER_CONFIG.SENSITIVITY = 20 + totalBalanceTol;
-        }
+        _STAT_BALANCER_CONFIG.SENSITIVITY = 20 + totalBalanceTol;
 
         // 집중 투자 한도 업데이트 (성장 보너스 + 숙련도)
         const perStatCapBonus =
@@ -298,22 +318,9 @@ export class BattleApp {
             );
         }
 
-        // 숙련도 효과 + 성장 보너스를 반영한 statAllocation 생성
+        // adjustedAllocation: 사용자가 UI에서 직접 배분한 값 그대로 사용
+        // (extraStatPoints는 이미 UI의 totalPoints에 포함되어 있으므로 별도 분배 불필요)
         const adjustedAllocation = { ...this.playerStatAllocation };
-        const masteryExtra = masteryCtx.allocationModifiers.extraStatPoints;
-        const progressionExtra = this.playerProfile?.progression?.bonuses?.extraStatPoints ?? 0;
-        const extraPoints = masteryExtra + progressionExtra;
-        if (extraPoints > 0) {
-            // extraStatPoints를 비례 배분 (hp 우선, 나머지는 고르게)
-            const half = Math.ceil(extraPoints / 2);
-            adjustedAllocation.hp = (adjustedAllocation.hp ?? 0) + half;
-            const rest = extraPoints - half;
-            const spreadStats = ["damage", "speed", "skill", "defense"];
-            for (let i = 0; i < rest; i++) {
-                const key = spreadStats[i % spreadStats.length];
-                adjustedAllocation[key] = (adjustedAllocation[key] ?? 0) + 1;
-            }
-        }
 
         this.tournamentRoster = createTournamentRoster(
             this.roster,
@@ -331,7 +338,14 @@ export class BattleApp {
             if (masteryCtx.statModifiers.hp > 0) {
                 const hpBonus = 1 + masteryCtx.statModifiers.hp;
                 playerSpec.stats.hp = Math.round(playerSpec.stats.hp * hpBonus);
+            }
+            if (masteryCtx.statModifiers.damage > 0) {
                 playerSpec.stats.damage = Math.round(playerSpec.stats.damage * (1 + masteryCtx.statModifiers.damage));
+            }
+            if (masteryCtx.statModifiers.defense > 0) {
+                playerSpec.stats.defense = Number(
+                    (playerSpec.stats.defense * (1 + masteryCtx.statModifiers.defense)).toFixed(3)
+                );
             }
             // 전투 시 physics/action modifier 전달
             playerSpec.masteryPhysicsModifiers = { ...masteryCtx.physicsModifiers };
@@ -566,7 +580,10 @@ export class BattleApp {
             return false;
         }
 
-        const cost = Math.ceil((player.maxHp * action.hpCostPercent) / 100);
+        const reduction = player.masteryActionModifiers?.hpCostPercentReduction ?? 0;
+        const minPct = (player.masteryActionModifiers?.minHpCostPercent ?? 0) * 100;
+        const effectivePct = Math.max(minPct, action.hpCostPercent - reduction * 100);
+        const cost = Math.ceil((player.maxHp * effectivePct) / 100);
         const paidCost = player.actionContext.spendHpForAction(player, cost);
         if (paidCost <= 0) {
             return false;

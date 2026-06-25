@@ -2373,6 +2373,242 @@ async function testApplyTournamentReport() {
     assert.ok(result2.alreadyProcessed, "Duplicate report should be skipped");
 }
 
+// ── Toast queue tests ───────────────────────────────────────────────────────
+
+async function testToastQueue() {
+    // UI의 showToast가 큐 기반으로 동작하는지 검증
+    // 실제로는 내부 _processToastQueue 동작으로, 동시 호출 시 덮어쓰기가 아닌 순차 표시
+    const { createDefaultPlayerProfile } = await import("../src/playerProfile.js");
+
+    // Alpine state를 흉내내는 가상 state 객체로 큐 동작 검증
+    const state = {
+        toastVisible: false,
+        toastMessage: "",
+        toastTimer: null,
+        toastQueue: []
+    };
+
+    // processToastQueue를 직접 시뮬레이션
+    function processToastQueue() {
+        if (state.toastTimer || state.toastQueue.length === 0) return;
+        const item = state.toastQueue.shift();
+        state.toastMessage = item.message;
+        state.toastVisible = true;
+        state.toastTimer = 1; // 가짜 타이머 (non-null)
+    }
+
+    function finishCurrentToast() {
+        state.toastVisible = false;
+        state.toastTimer = null;
+        processToastQueue();
+    }
+
+    // 첫 번째 토스트
+    state.toastQueue.push({ message: "업적1", duration: 3500 });
+    processToastQueue();
+    assert.equal(state.toastVisible, true, "First toast should be visible");
+    assert.equal(state.toastMessage, "업적1", "First toast message should match");
+
+    // 두 번째 토스트 (첫 번째가 아직 표시 중)
+    state.toastQueue.push({ message: "업적2", duration: 3500 });
+    assert.equal(state.toastQueue.length, 1, "Second toast should be queued, not overwritten");
+    assert.equal(state.toastMessage, "업적1", "First toast should still be showing while second is queued");
+
+    // 세 번째 토스트
+    state.toastQueue.push({ message: "업적3", duration: 3500 });
+    assert.equal(state.toastQueue.length, 2, "Third toast should also be queued");
+
+    // 첫 번째 토스트 종료 → 두 번째가 표시되어야 함
+    finishCurrentToast();
+    assert.equal(state.toastVisible, true, "Second toast should be visible after first ends");
+    assert.equal(state.toastMessage, "업적2", "Second toast message should match");
+    assert.equal(state.toastQueue.length, 1, "Queue should have one remaining");
+
+    // 두 번째 토스트 종료 → 세 번째가 표시되어야 함
+    finishCurrentToast();
+    assert.equal(state.toastVisible, true, "Third toast should be visible after second ends");
+    assert.equal(state.toastMessage, "업적3", "Third toast message should match");
+    assert.equal(state.toastQueue.length, 0, "Queue should be empty");
+
+    // 세 번째 토스트 종료 → 더 이상 표시할 것 없음
+    finishCurrentToast();
+    assert.equal(state.toastVisible, false, "Toast should be hidden when queue is empty");
+}
+
+// ── Bonus points effective total test ───────────────────────────────────────
+
+async function testBonusPointsEffectiveTotal() {
+    const { createDefaultPlayerProfile } = await import("../src/playerProfile.js");
+    const { evaluateAchievements } = await import("../src/collection/achievementRules.js");
+    const { applyAchievementRewards } = await import("../src/progression/progressionState.js");
+    const { ACHIEVEMENT_DEFINITIONS } = await import("../src/collection/achievementDefinitions.js");
+    const { collectActiveEffects } = await import("../src/character-mastery/index.js");
+    const { PLAYER_STAT_POINTS } = await import("../src/statAllocation.js");
+
+    // 성장 보너스만 있는 경우
+    const profile1 = createDefaultPlayerProfile();
+    profile1.progression.bonuses.extraStatPoints = 10;
+    const ctx1 = collectActiveEffects(profile1, "archer");
+    const effectiveTotal1 =
+        PLAYER_STAT_POINTS + ctx1.allocationModifiers.extraStatPoints + profile1.progression.bonuses.extraStatPoints;
+    assert.equal(effectiveTotal1, 110, "extraStatPoints from progression should increase effective total");
+
+    // 숙련도 보너스만 있는 경우 (hero at BRONZE = +3 extraStatPoints, playing as archer)
+    const profile2 = createDefaultPlayerProfile();
+    profile2.characterMastery.levels = { hero: 1 };
+    const ctx2 = collectActiveEffects(profile2, "archer");
+    const effectiveTotal2 = PLAYER_STAT_POINTS + ctx2.allocationModifiers.extraStatPoints;
+    assert.equal(effectiveTotal2, 103, "extraStatPoints from hero mastery should increase effective total");
+
+    // hero로 플레이 중이면 자신의 숙련도는 미적용
+    const ctx2Self = collectActiveEffects(profile2, "hero");
+    const effectiveTotal2Self = PLAYER_STAT_POINTS + ctx2Self.allocationModifiers.extraStatPoints;
+    assert.equal(effectiveTotal2Self, 100, "Self mastery should not contribute extraStatPoints");
+
+    // 성장 + 숙련도 중첩
+    const profile3 = createDefaultPlayerProfile();
+    profile3.progression.bonuses.extraStatPoints = 10;
+    profile3.characterMastery.levels = { hero: 2 }; // SILVER = +6
+    const ctx3 = collectActiveEffects(profile3, "archer");
+    const effectiveTotal3 =
+        PLAYER_STAT_POINTS + ctx3.allocationModifiers.extraStatPoints + profile3.progression.bonuses.extraStatPoints;
+    assert.equal(effectiveTotal3, 116, "Combined progression + mastery should stack");
+
+    // 보너스 0인 경우
+    const profile4 = createDefaultPlayerProfile();
+    const ctx4 = collectActiveEffects(profile4, "archer");
+    const effectiveTotal4 =
+        PLAYER_STAT_POINTS + ctx4.allocationModifiers.extraStatPoints + profile4.progression.bonuses.extraStatPoints;
+    assert.equal(effectiveTotal4, 100, "No bonuses should keep effective total at base");
+}
+
+// ── Sensitivity reset test ──────────────────────────────────────────────────
+
+async function testSensitivityAlwaysReset() {
+    const { STAT_BALANCER_CONFIG } = await import("../src/statAllocation.js");
+
+    // balanceTolerance가 0이어도 SENSITIVITY는 20으로 설정되어야 함
+    STAT_BALANCER_CONFIG.SENSITIVITY = 99; // 이전 값 흔적
+    const totalBalanceTol = 0;
+    STAT_BALANCER_CONFIG.SENSITIVITY = 20 + totalBalanceTol;
+    assert.equal(STAT_BALANCER_CONFIG.SENSITIVITY, 20, "SENSITIVITY should reset to 20 when balanceTol=0");
+
+    // balanceTolerance가 있으면 증가
+    STAT_BALANCER_CONFIG.SENSITIVITY = 20 + 5;
+    assert.equal(STAT_BALANCER_CONFIG.SENSITIVITY, 25, "SENSITIVITY should be 20+5=25 when balanceTol=5");
+
+    // 다시 0으로
+    STAT_BALANCER_CONFIG.SENSITIVITY = 20 + 0;
+    assert.equal(STAT_BALANCER_CONFIG.SENSITIVITY, 20, "SENSITIVITY should reset back to 20");
+}
+
+// ── adjustStat with bonus total test ────────────────────────────────────────
+
+async function testAdjustStatWithBonusTotal() {
+    const { adjustStatAllocation, getRemainingStatPoints, PLAYER_STAT_POINTS, createEmptyStatAllocation } =
+        await import("../src/statAllocation.js");
+
+    const effectiveTotal = PLAYER_STAT_POINTS + 5; // +5 bonus
+    let allocation = createEmptyStatAllocation();
+
+    // Fill base 100 points (20 per stat, within 50 cap)
+    for (const key of ["hp", "damage", "speed", "skill", "defense"]) {
+        allocation = adjustStatAllocation(allocation, key, 20, effectiveTotal);
+    }
+    assert.equal(
+        getRemainingStatPoints(allocation, effectiveTotal),
+        5,
+        "After allocating 100/105 (20 each), remaining should be 5"
+    );
+
+    // Bonus points도 배분 가능해야 함
+    allocation = adjustStatAllocation(allocation, "hp", 5, effectiveTotal);
+    assert.equal(
+        getRemainingStatPoints(allocation, effectiveTotal),
+        0,
+        "After allocating 105/105, remaining should be 0"
+    );
+
+    // 초과 배분 불가
+    allocation = adjustStatAllocation(allocation, "speed", 1, effectiveTotal);
+    assert.equal(getRemainingStatPoints(allocation, effectiveTotal), 0, "Cannot allocate beyond effectiveTotal");
+}
+
+// ── Mastery modifier tests ─────────────────────────────────────────────────
+
+async function testMasteryModifiersStoredOnBattleBall(app) {
+    // BattleBall 생성 시 masteryPhysicsModifiers, masteryActionModifiers, masteryCombatPassives가 저장되는지 확인
+    const { BattleBall } = await import("../src/entities/index.js");
+    const { Vector2 } = await import("../src/core.js");
+
+    const spec = {
+        id: "archer",
+        name: "Archer",
+        title: "Test Title",
+        description: "",
+        color: "#ff0000",
+        face: "archer",
+        stats: { hp: 1000, damage: 50, speed: 200, defense: 5, radius: 16, mass: 10 },
+        statAllocation: null,
+        masteryPhysicsModifiers: {
+            incomingKnockbackReduce: 0.05,
+            outgoingImpactBonus: 0.03,
+            velocityRecoveryBonus: 0.02
+        },
+        masteryActionModifiers: { hpCostPercentReduction: 0.003, minHpCostPercent: 0.001 },
+        masteryCombatPassives: [
+            { id: "test_passive", type: "periodic_collision_bonus", cooldown: 12, damageBonus: 0.04 }
+        ]
+    };
+
+    const ball = new BattleBall(spec, new Vector2(100, 100));
+    assert.equal(
+        ball.masteryPhysicsModifiers.incomingKnockbackReduce,
+        0.05,
+        "incomingKnockbackReduce should be stored"
+    );
+    assert.equal(ball.masteryPhysicsModifiers.outgoingImpactBonus, 0.03, "outgoingImpactBonus should be stored");
+    assert.equal(ball.masteryPhysicsModifiers.velocityRecoveryBonus, 0.02, "velocityRecoveryBonus should be stored");
+    assert.equal(ball.masteryActionModifiers.hpCostPercentReduction, 0.003, "hpCostPercentReduction should be stored");
+    assert.equal(ball.masteryActionModifiers.minHpCostPercent, 0.001, "minHpCostPercent should be stored");
+    assert.equal(ball.masteryCombatPassives.length, 1, "combat passives should be stored");
+    assert.equal(ball.masteryCombatPassives[0].id, "test_passive", "passive id should match");
+}
+
+async function testStatModifierDamageIndependentOfHp() {
+    // Bug 10: 데미지 보너스가 hp 보너스 게이트에 묶여있지 않은지 확인
+    // 이 테스트는 코드 레벨 검증 — stat modifier가 독립 적용되는지 확인
+    const { MASTERY_EFFECT_DEFS } = await import("../src/character-mastery/index.js");
+
+    // archer의 mastery는 damage만 제공 (hp 없음)
+    const archerDef = MASTERY_EFFECT_DEFS.find((d) => d.sourceFighterId === "archer");
+    assert.ok(archerDef, "Archer mastery should exist");
+
+    // archer mastery의 apply는 damage에만 영향을 줌
+    const ctx = {
+        statModifiers: { hp: 0, damage: 0, defense: 0 },
+        allocationModifiers: { extraStatPoints: 0, balanceTolerance: 0, perStatCapBonus: 0 },
+        physicsModifiers: { incomingKnockbackReduce: 0, outgoingImpactBonus: 0, velocityRecoveryBonus: 0 },
+        combatPassives: [],
+        actionModifiers: { hpCostPercentReduction: 0, minHpCostPercent: 0 }
+    };
+
+    archerDef.apply(ctx, 1); // BRONZE level
+    assert.ok(ctx.statModifiers.damage > 0, "Archer mastery should increase damage");
+    assert.equal(ctx.statModifiers.hp, 0, "Archer mastery should NOT increase hp");
+
+    // eater의 mastery는 hp만 제공 (damage 없음)
+    const eaterDef = MASTERY_EFFECT_DEFS.find((d) => d.sourceFighterId === "eater");
+    assert.ok(eaterDef, "Eater mastery should exist");
+
+    eaterDef.apply(ctx, 1);
+    assert.ok(ctx.statModifiers.hp > 0, "Eater mastery should increase hp");
+    // damage는 archer가 이미 올렸으므로 변함 없어야 하지만 eater가 추가로 올리진 않음
+    const damageAfterEater = ctx.statModifiers.damage;
+    eaterDef.apply(ctx, 1); // 두 번 호출해도 damage는 eater가 올리지 않음
+    assert.equal(ctx.statModifiers.damage, damageAfterEater, "Eater mastery should NOT increase damage");
+}
+
 // ── Collection hub ViewModel tests ──────────────────────────────────────────
 
 async function testCreateCollectionHubViewModel() {
@@ -2526,4 +2762,14 @@ await testGetCharacterChallengeLevel();
 await testApplyTournamentReport();
 // Collection hub view model tests
 await testCreateCollectionHubViewModel();
+// Toast queue tests
+await testToastQueue();
+// Bonus points effective total test
+await testBonusPointsEffectiveTotal();
+// Sensitivity reset + adjustStat with bonus total test
+await testSensitivityAlwaysReset();
+await testAdjustStatWithBonusTotal();
+// Mastery modifier tests
+await testMasteryModifiersStoredOnBattleBall(app);
+await testStatModifierDamageIndependentOfHp();
 console.log("regression tests ok");

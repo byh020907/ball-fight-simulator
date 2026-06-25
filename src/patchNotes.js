@@ -19,6 +19,49 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.18.0",
+        date: "2026-06-25",
+        title: "v0.18.0 업데이트",
+        changes: [
+            {
+                type: "fix",
+                text: "숙련도 물리 보정(넉백 감소/충격 증가/속도 복귀)이 전투에 적용되지 않던 버그 수정."
+            },
+            {
+                type: "fix",
+                text: "숙련도 액션 HP 비용 감소(bat_ball)가 실제 비용 계산에 반영되지 않던 버그 수정."
+            },
+            {
+                type: "fix",
+                text: "숙련도 전투 패시브(rage 주기적 충돌 보너스)가 발동하지 않던 버그 수정."
+            },
+            {
+                type: "fix",
+                text: "archer 숙련도의 공격력 보너스가 단독으로 적용되지 않던 버그 수정."
+            },
+            {
+                type: "fix",
+                text: "성장 보너스(extraStatPoints)가 UI에 표시되지 않고 실제 배분도 불가능했던 버그 수정."
+            },
+            {
+                type: "fix",
+                text: "balanceTolerance 0일 때 SENSITIVITY가 초기화되지 않던 버그 수정."
+            },
+            {
+                type: "fix",
+                text: "여러 업적 동시 해금 시 토스트가 하나만 표시되던 버그 수정 (큐 기반 순차 표시)."
+            },
+            {
+                type: "refactor",
+                text: "성장 보너스 포인트를 UI에 표시하고 사용자가 직접 배분 가능하도록 개선."
+            },
+            {
+                type: "refactor",
+                text: "core.js 깨진 한글 주석 전체 복구."
+            }
+        ]
+    },
+    {
         version: "0.16.0",
         date: "2026-06-24",
         title: "v0.16.0 업데이트",

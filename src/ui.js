@@ -45,6 +45,7 @@ export function appStore() {
         playerFighter: null,
         allocation: createEmptyStatAllocation(),
         totalPoints: PLAYER_STAT_POINTS,
+        bonusPoints: 0,
         remainingPoints: PLAYER_STAT_POINTS,
         locked: false,
         statDefs: ALLOCATABLE_STATS,
@@ -60,10 +61,11 @@ export function appStore() {
         overlayLabel: "",
         overlayText: "",
 
-        // Toast notification
+        // Toast notification (queue-based)
         toastVisible: false,
         toastMessage: "",
         toastTimer: null,
+        toastQueue: [],
 
         // Start button
         startHidden: true,
@@ -237,22 +239,22 @@ export function appStore() {
         // Actions
         adjustStat(key, delta) {
             if (this.locked) return;
-            this.allocation = adjustStatAllocation(this.allocation, key, delta);
-            this.remainingPoints = getRemainingStatPoints(this.allocation);
+            this.allocation = adjustStatAllocation(this.allocation, key, delta, this.totalPoints);
+            this.remainingPoints = getRemainingStatPoints(this.allocation, this.totalPoints);
             this._syncSummary();
         },
 
         randomAllocation() {
             if (this.locked) return;
-            this.allocation = createRandomStatAllocation();
-            this.remainingPoints = getRemainingStatPoints(this.allocation);
+            this.allocation = createRandomStatAllocation(undefined, this.totalPoints);
+            this.remainingPoints = getRemainingStatPoints(this.allocation, this.totalPoints);
             this._syncSummary();
         },
 
         resetAllocation() {
             if (this.locked) return;
             this.allocation = createEmptyStatAllocation();
-            this.remainingPoints = getRemainingStatPoints(this.allocation);
+            this.remainingPoints = getRemainingStatPoints(this.allocation, this.totalPoints);
             this._syncSummary();
         },
 
@@ -358,12 +360,13 @@ export class UIController {
         if (s) fn(s);
     }
 
-    renderPlayerSetup({ fighter, stats, allocation, totalPoints, remainingPoints, locked = false }) {
+    renderPlayerSetup({ fighter, stats, allocation, totalPoints, bonusPoints = 0, remainingPoints, locked = false }) {
         const s = this.state;
         if (!s) return;
         s.playerFighter = fighter;
         s.allocation = allocation;
         s.totalPoints = totalPoints;
+        s.bonusPoints = bonusPoints;
         s.remainingPoints = remainingPoints;
         s.locked = locked;
         this._drawPlayerFace(fighter);
@@ -467,13 +470,21 @@ export class UIController {
     showToast(message, duration = 3500) {
         const s = this.state;
         if (!s) return;
-        if (s.toastTimer) clearTimeout(s.toastTimer);
-        s.toastMessage = message;
+        s.toastQueue.push({ message, duration });
+        this._processToastQueue();
+    }
+
+    _processToastQueue() {
+        const s = this.state;
+        if (!s || s.toastTimer || s.toastQueue.length === 0) return;
+        const item = s.toastQueue.shift();
+        s.toastMessage = item.message;
         s.toastVisible = true;
         s.toastTimer = setTimeout(() => {
             s.toastVisible = false;
             s.toastTimer = null;
-        }, duration);
+            this._processToastQueue();
+        }, item.duration);
     }
 
     showTransientOverlay(label, text, token) {

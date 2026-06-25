@@ -36,6 +36,16 @@ export class BattleBall {
         this.statAllocation = spec.statAllocation ?? null;
         this.heroOrbBonuses = { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 };
         this.heroOrbCarryover = { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 };
+        this.masteryPhysicsModifiers = spec.masteryPhysicsModifiers ?? {
+            incomingKnockbackReduce: 0,
+            outgoingImpactBonus: 0,
+            velocityRecoveryBonus: 0
+        };
+        this.masteryActionModifiers = spec.masteryActionModifiers ?? {
+            hpCostPercentReduction: 0,
+            minHpCostPercent: 0
+        };
+        this.masteryCombatPassives = spec.masteryCombatPassives ?? [];
         this.actionContext = new ActionContext();
     }
 
@@ -115,12 +125,45 @@ export class BattleBall {
 
         const target = simulation.getOpponent(this);
         this._tickTimers(delta);
+        this._tickMasteryPassives(delta);
         this.ability?.update(delta, target);
         this.radius = this.baseRadius * (this.ability?.getRadiusScale?.() ?? 1);
         this._applyVelocityCorrection(simulation, delta);
         this.position.add(this.velocity.clone().scale(delta));
         simulation.keepInsideArena(this);
         if (this.bounced) this.forcedHeading = null;
+    }
+
+    _tickMasteryPassives(delta) {
+        if (!this._masteryPassiveStates) {
+            this._masteryPassiveStates = this.masteryCombatPassives.map((def) => ({
+                id: def.id,
+                type: def.type,
+                damageBonus: def.damageBonus ?? 0,
+                cooldownRemaining: 0,
+                cooldownDuration: def.cooldown ?? 0,
+                active: false
+            }));
+        }
+        for (const state of this._masteryPassiveStates) {
+            if (state.active) continue;
+            state.cooldownRemaining -= delta;
+            if (state.cooldownRemaining <= 0) {
+                state.active = true;
+                state.cooldownRemaining = state.cooldownDuration;
+            }
+        }
+    }
+
+    /** 충돌 시 숙련도 패시브 적용. 충돌 핸들러에서 호출. */
+    consumeMasteryCollisionBonus() {
+        let bonus = 0;
+        for (const state of this._masteryPassiveStates ?? []) {
+            if (!state.active || state.type !== "periodic_collision_bonus") continue;
+            bonus += state.damageBonus;
+            state.active = false;
+        }
+        return bonus;
     }
 
     _tickTimers(delta) {
@@ -149,7 +192,9 @@ export class BattleBall {
 
     _applyVelocityCorrection(simulation, delta) {
         const desiredVelocity = this._computeDesiredVelocity(simulation);
-        const correction = 1 - Math.exp(-BASE_VELOCITY_CORRECTION_RATE * delta);
+        const velocityBonus = 1 + (this.masteryPhysicsModifiers?.velocityRecoveryBonus ?? 0);
+        const effectiveRate = BASE_VELOCITY_CORRECTION_RATE * velocityBonus;
+        const correction = 1 - Math.exp(-effectiveRate * delta);
         this.applyImpulse(Vector2.subtract(desiredVelocity, this.velocity).scale(correction));
     }
 

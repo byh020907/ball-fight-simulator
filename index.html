@@ -242,6 +242,11 @@
                                 x-show="!locked"
                                 x-text="' · 시작 전 ' + totalPoints + ' 포인트를 배분하세요.'"
                             ></span>
+                            <span
+                                x-show="!locked && bonusPoints > 0"
+                                class="bonus-points-badge"
+                                x-text="' (+' + bonusPoints + ' 보너스)'"
+                            ></span>
                         </p>
                         <div class="point-meter">
                             <span x-text="'사용 ' + (totalPoints - remainingPoints) + '/' + totalPoints"></span>

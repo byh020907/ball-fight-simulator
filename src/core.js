@@ -87,8 +87,8 @@ export class CombatEntity {
     }
 
     /**
-     * ?ъ궗泥?怨듯넻 hit 泥섎━ (Template Method).
-     * Subclass??_getHitDamage, _getHitLabel, _onHitEffects留?援ы쁽.
+     * 투사체 공통 hit 처리 (Template Method).
+     * Subclass는 _getHitDamage, _getHitLabel, _onHitEffects만 구현.
      * Projectile-only mitigation is owned by target ActionContext effects.
      */
     dealDamageToTarget(target, rawDamage, source, label, simulation) {
@@ -98,8 +98,8 @@ export class CombatEntity {
     }
 
     /**
-     * ?ъ궗泥?update 怨듯넻 ?쒗뵆由?
-     * Subclass??_findTarget(sim), _getHitDamage(), _getHitLabel(), _onHitEffects()瑜?援ы쁽.
+     * 투사체 update 공통 템플릿.
+     * Subclass는 _findTarget(sim), _getHitDamage(), _getHitLabel(), _onHitEffects()를 구현.
      */
     updateProjectile(delta, simulation) {
         this.position.add(this.velocity.clone().scale(delta));
@@ -117,7 +117,7 @@ export class CombatEntity {
         this._projectileHitCheck(simulation);
     }
 
-    /** hit 泥댄겕留???而ㅼ뒪? update?먯꽌 ?몄텧 媛??*/
+    /** hit 체크만 — 코스트는 update에서 소모 가능 */
     _projectileHitCheck(simulation) {
         const target = this._findTarget(simulation);
         if (!target || target.isDefeated) return;
@@ -131,7 +131,7 @@ export class CombatEntity {
         this.isExpired = true;
     }
 
-    /** @returns {import("./entities/index.js").BattleBall|null} ??subclass override */
+    /** @returns {import("./entities/index.js").BattleBall|null} — subclass override */
     _findTarget(simulation) {
         return null;
     }
@@ -146,8 +146,8 @@ export class CombatEntity {
 }
 
 /**
- * ?ъ궗泥?怨듯넻 踰좎씠????owner/ownerId 以묐났 ?쒓굅.
- * 紐⑤뱺 ?ъ궗泥?SeedOrb, ArrowProjectile, OrbitProjectile, Grenade)?????대옒?ㅻ? extends.
+ * 투사체 공통 베이스 — owner/ownerId 중복 제거.
+ * 모든 투사체(SeedOrb, ArrowProjectile, OrbitProjectile, Grenade)가 이 클래스를 extends.
  */
 export class Projectile extends CombatEntity {
     constructor(owner, position, velocity, radius) {
@@ -187,15 +187,15 @@ export const FIGHTER_IDS = Object.freeze({
 const EVADE_IMPULSE_RESPONSE = 0.72;
 
 /**
- * 蹂쇱쓣 紐⑺몴 諛⑺뼢?쇰줈 ?좊룄?⑸땲??
+ * 볼을 목표 방향으로 조준.
  *
  * @param {import("./entities/index.js").BattleBall} ball
  * @param {{ position:Vector2 }} target
  * @param {number} delta
  * @param {{ turnRate?:number, instant?:boolean, persist?:boolean }} [opts]
- *   turnRate: 珥덈떦 ?뚯쟾 媛곷룄 (?쇰뵒?? 湲곕낯 2.4)
- *   instant: true硫??꾩옱 諛⑺뼢 臾댁떆?섍퀬 利됱떆 紐⑺몴 諛⑺뼢 (湲곕낯 false)
- *   persist: true硫?forceHeading 吏??媛깆떊 (湲곕낯 false)
+ *   turnRate: 초당 회전 속도 (라디안, 기본 2.4)
+ *   instant: true면 현재 방향 무시하고 즉시 목표 방향 (기본 false)
+ *   persist: true면 forceHeading 지속 가능 (기본 false)
  */
 export function steerBallToward(ball, target, delta, opts = {}) {
     const { turnRate = 2.4, instant = false, persist = false } = opts;
@@ -227,14 +227,15 @@ export function steerBallToward(ball, target, delta, opts = {}) {
 }
 
 /**
- * ?⑥떆釉??뚰뵾 ???곷?媛 ?쇱젙 嫄곕━ ?대궡濡??묎렐?섍퀬, owner媛 ?곷?瑜??ν빐 ?대룞 以묒씪 ??諛쒕룞?⑸땲??
+ * 패시브 회피 — 상대가 일정 거리 이내로 접근하고, owner가 상대를 향해 이동 중일 때 발동.
  *
- * ?뚰뵾 諛⑺뼢: ?곷? 吏꾪뻾 諛⑺뼢 湲곗? owner???꾩튂???곕씪 醫??곕줈 ?뚰뵾?⑸땲??
- * forceHeading???ъ슜??湲곕낯 ?대룞 紐⑺몴 諛⑺뼢???좉퉸 怨좎젙?⑸땲??
+ * 회피 방향: 상대 진행 방향 기준 owner의 위치에 따라 좌/우로 회피.
+ * forceHeading을 사용해 기본 이동 목표 방향을 잠깐 고정.
  *
- * @param {import("./entities/index.js").BattleBall} owner - ?뚰뵾??蹂? * @param {import("./entities/index.js").BattleBall} target - ?묎렐?섎뒗 ?곷?
- * @param {number} range - ?뚰뵾 諛쒕룞 嫄곕━
- * @param {number} strength - ?뚰뵾 媛뺣룄 (0~1)
+ * @param {import("./entities/index.js").BattleBall} owner - 회피할 볼
+ * @param {import("./entities/index.js").BattleBall} target - 접근하는 상대
+ * @param {number} range - 회피 발동 거리
+ * @param {number} strength - 회피 강도 (0~1)
  */
 export function evadeTarget(owner, target, range, strength) {
     if (!target || target.isDefeated || owner.swallowedState || owner.wallSlamState) return;

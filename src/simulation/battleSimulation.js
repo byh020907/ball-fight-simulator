@@ -219,6 +219,8 @@ export class BattleSimulation extends Simulation {
         let damageFromAToB = this.calculateCollisionDamage(a, b, normal) * aModifiers.damage;
         let damageFromBToA = this.calculateCollisionDamage(b, a, normal.clone().scale(-1)) * bModifiers.damage;
 
+        [damageFromAToB, damageFromBToA] = this._applyMasteryCollisionPassives(a, b, damageFromAToB, damageFromBToA);
+
         const aCollision = a.actionContext.onFighterCollision(a, b, damageFromAToB, damageFromBToA, this);
         damageFromAToB = aCollision.outgoingDamage;
         damageFromBToA = aCollision.incomingDamage;
@@ -253,13 +255,36 @@ export class BattleSimulation extends Simulation {
         const velocityAlongNormal = relativeVelocity.dot(normal);
         if (velocityAlongNormal > 0) return;
 
+        // 숙련도 물리 보정 적용
+        const aOutgoingBonus = 1 + (a.masteryPhysicsModifiers?.outgoingImpactBonus ?? 0);
+        const bOutgoingBonus = 1 + (b.masteryPhysicsModifiers?.outgoingImpactBonus ?? 0);
+        const aIncomingReduce = 1 - (a.masteryPhysicsModifiers?.incomingKnockbackReduce ?? 0);
+        const bIncomingReduce = 1 - (b.masteryPhysicsModifiers?.incomingKnockbackReduce ?? 0);
+
         const invMassA = 1 / Math.max(0.001, a.mass);
         const invMassB = 1 / Math.max(0.001, b.mass);
         const impulseMagnitude = (-(1 + COLLISION_RESTITUTION) * velocityAlongNormal) / (invMassA + invMassB);
         const impulse = normal.clone().scale(impulseMagnitude);
 
-        a.applyImpulse(impulse.clone().scale(-invMassA * bMod.impact));
-        b.applyImpulse(impulse.clone().scale(invMassB * aMod.impact));
+        // A에 가해지는 충격량: B의 outgoing 영향 × A의 incoming 감소
+        a.applyImpulse(impulse.clone().scale(-invMassA * bMod.impact * bOutgoingBonus * aIncomingReduce));
+        // B에 가해지는 충격량: A의 outgoing 영향 × B의 incoming 감소
+        b.applyImpulse(impulse.clone().scale(invMassB * aMod.impact * aOutgoingBonus * bIncomingReduce));
+    }
+
+    /** 숙련도 충돌 패시브: 주기적 충돌 피해 보너스 적용 */
+    _applyMasteryCollisionPassives(a, b, damageFromAToB, damageFromBToA) {
+        const aPassiveBonus = a.consumeMasteryCollisionBonus?.() ?? 0;
+        const bPassiveBonus = b.consumeMasteryCollisionBonus?.() ?? 0;
+        if (aPassiveBonus > 0) {
+            damageFromAToB = Math.round(damageFromAToB * (1 + aPassiveBonus));
+            this.spawnActionText(a.position.clone(), `숙련도 +${(aPassiveBonus * 100).toFixed(0)}%`, "#ff4444");
+        }
+        if (bPassiveBonus > 0) {
+            damageFromBToA = Math.round(damageFromBToA * (1 + bPassiveBonus));
+            this.spawnActionText(b.position.clone(), `숙련도 +${(bPassiveBonus * 100).toFixed(0)}%`, "#ff4444");
+        }
+        return [damageFromAToB, damageFromBToA];
     }
 
     _handleDashCollisions(a, b) {
