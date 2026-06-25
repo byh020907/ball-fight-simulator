@@ -1,4 +1,4 @@
-import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
+import { applyCollisionImpulse, CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
 import { DashEffect } from "../combatEffects.js";
 import { computeOwnerCombatSpeed } from "../abilities/heroAbility.js";
 
@@ -316,31 +316,11 @@ export class HeroOrb extends CombatEntity {
             }
 
             // 상대와 충돌: 일반 공 충돌처럼 튕겨나감 (낮은 mass로 인해 크게 밀려남)
-            this._bounceOffFighter(fighter, normal, overlap, simulation);
+            this.position.add(normal.clone().scale(overlap + 0.6));
+            applyCollisionImpulse(this, fighter, normal, 0.6);
+            simulation.playSound("bounce", 0.3);
             return;
         }
-    }
-
-    /** 상대에게 부딪힌 orb가 튕겨나가는 물리 처리 */
-    _bounceOffFighter(fighter, normal, overlap, simulation) {
-        // 겹침 해소: orb만 밀어냄
-        this.position.add(normal.clone().scale(overlap + 0.6));
-
-        // 충돌 반응: orb가 상대에게서 튕겨나감 (항상 impulse 적용)
-        const relativeVelocity = Vector2.subtract(this.velocity, fighter.velocity);
-        const velocityAlongNormal = relativeVelocity.dot(normal);
-
-        const restitution = 0.6;
-        const invMassOrb = 1 / Math.max(0.001, this.mass);
-        const invMassFighter = 1 / Math.max(0.001, fighter.mass);
-        // 최소 충돌 속도 보장 (상대가 orb 위를 천천히 지나가도 튕겨나가도록)
-        const effectiveApproachSpeed = Math.max(Math.abs(velocityAlongNormal), 60);
-        const impulseMagnitude = ((1 + restitution) * effectiveApproachSpeed) / (invMassOrb + invMassFighter);
-
-        this.applyImpulse(normal.clone().scale(impulseMagnitude * invMassOrb));
-        fighter.applyImpulse(normal.clone().scale(-impulseMagnitude * invMassFighter));
-
-        simulation.playSound("bounce", 0.3);
     }
 
     get _isSpecial() {

@@ -1,4 +1,4 @@
-import { Vector2 } from "../core.js";
+import { applyCollisionImpulse, Vector2 } from "../core.js";
 import {
     ArcherAbility,
     EaterAbility,
@@ -261,15 +261,10 @@ export class BattleSimulation extends Simulation {
         const aIncomingReduce = 1 - (a.masteryPhysicsModifiers?.incomingKnockbackReduce ?? 0);
         const bIncomingReduce = 1 - (b.masteryPhysicsModifiers?.incomingKnockbackReduce ?? 0);
 
-        const invMassA = 1 / Math.max(0.001, a.mass);
-        const invMassB = 1 / Math.max(0.001, b.mass);
-        const impulseMagnitude = (-(1 + COLLISION_RESTITUTION) * velocityAlongNormal) / (invMassA + invMassB);
-        const impulse = normal.clone().scale(impulseMagnitude);
-
-        // A에 가해지는 충격량: B의 outgoing 영향 × A의 incoming 감소
-        a.applyImpulse(impulse.clone().scale(-invMassA * bMod.impact * bOutgoingBonus * aIncomingReduce));
-        // B에 가해지는 충격량: A의 outgoing 영향 × B의 incoming 감소
-        b.applyImpulse(impulse.clone().scale(invMassB * aMod.impact * aOutgoingBonus * bIncomingReduce));
+        applyCollisionImpulse(a, b, normal, COLLISION_RESTITUTION, {
+            impactA: aMod.impact * aOutgoingBonus * bIncomingReduce,
+            impactB: bMod.impact * bOutgoingBonus * aIncomingReduce
+        });
     }
 
     /** 숙련도 충돌 패시브: 주기적 충돌 피해 보너스 적용 */

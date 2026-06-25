@@ -271,3 +271,30 @@ export function evadeTarget(owner, target, range, strength) {
         owner.forceHeading(blended, 0.35);
     }
 }
+
+/**
+ * 탄성 충돌 impulse를 두 엔티티에 적용한다.
+ * CollisionEntity(mass, velocity, applyImpulse) 인터페이스를 가진 모든 객체에 사용 가능.
+ *
+ * @param {{ mass:number, velocity:Vector2, applyImpulse:(v:Vector2)=>void }} a
+ * @param {{ mass:number, velocity:Vector2, applyImpulse:(v:Vector2)=>void }} b
+ * @param {Vector2} normal - a에서 b로의 충돌 법선
+ * @param {number} restitution - 반발 계수 (0~1)
+ * @param {{ impactA?:number, impactB?:number }} [modifiers]
+ * @returns {{ impulseMagnitude:number }} 계산된 impulse 크기
+ */
+export function applyCollisionImpulse(a, b, normal, restitution, modifiers = {}) {
+    const impactA = modifiers.impactA ?? 1;
+    const impactB = modifiers.impactB ?? 1;
+    const relativeVelocity = Vector2.subtract(b.velocity, a.velocity);
+    const velocityAlongNormal = relativeVelocity.dot(normal);
+    if (velocityAlongNormal > 0) return { impulseMagnitude: 0 };
+
+    const invMassA = 1 / Math.max(0.001, a.mass);
+    const invMassB = 1 / Math.max(0.001, b.mass);
+    const impulseMagnitude = (-(1 + restitution) * velocityAlongNormal) / (invMassA + invMassB);
+
+    a.applyImpulse(normal.clone().scale(-impulseMagnitude * invMassA * impactB));
+    b.applyImpulse(normal.clone().scale(impulseMagnitude * invMassB * impactA));
+    return { impulseMagnitude };
+}
