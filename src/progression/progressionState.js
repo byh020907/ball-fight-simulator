@@ -1,7 +1,8 @@
-// ── 메타 성장 상태 — 보상 적용 ──────────────────────────────────────────────
+// ── 메타 성장 상태 — 보상 계산 ──────────────────────────────────────────────
 //
-// 업적 해금 시 지급되는 성장 보너스의 누적, 상한 보정, 중복 지급 방지를 담당.
-// 보상 출처와 관계없이 이 모듈이 실제 누적과 상한 검증을 소유한다.
+// 업적 해금 상태(achievements.unlockedAt)만 저장하고, 보상 수치는 정의에서 동적 계산.
+// 보상 수치 변경 시 재접속만으로 자동 반영된다.
+// evaluateAchievements가 unlockedAt 중복 체크를 하므로 rewardClaimed 불필요.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** 성장 보너스별 누적 상한 */
@@ -12,84 +13,77 @@ export const PROGRESSION_BONUS_CAPS = Object.freeze({
 });
 
 /**
- * 성장 보너스 보상을 플레이어 프로필에 적용한다.
- * 이미 해금된 업적의 보상(rewardClaimed)은 건너뛴다.
+ * 해금된 업적의 PROGRESSION_BONUS 보상을 합산하여 현재 유효 보너스를 계산한다.
+ * 저장된 상태(achievements.unlockedAt)만 참조하며, 정의 변경 시 자동 반영된다.
  *
- * @param {object} profile - 플레이어 프로필 (직접 수정됨)
- * @param {object} reward - { type: "PROGRESSION_BONUS", payload: { bonusKey, amount } }
- * @param {string} achievementId - 보상 출처 업적 ID (중복 지급 방지용)
- * @returns {{ applied: boolean, bonusKey: string, amount: number, capped: number }} 적용 결과
+ * @param {object} profile - 플레이어 프로필 (읽기 전용)
+ * @param {ReadonlyArray<{id:string,reward:object|null}>} definitions - 업적 정의 목록
+ * @returns {{ extraStatPoints: number, balanceTolerance: number, perStatCapBonus: number }}
  */
-export function applyProgressionBonus(profile, reward, achievementId) {
-    // FEATURE_UNLOCK: 기능 해금 보상, 스탯 변화 없음
+export function computeEffectiveBonuses(profile, definitions) {
+    const totals = { extraStatPoints: 0, balanceTolerance: 0, perStatCapBonus: 0 };
+    const achievements = profile?.collection?.achievements ?? {};
+
+    for (const def of definitions) {
+        const state = achievements[def.id];
+        if (!state?.unlockedAt) continue;
+
+        const reward = def.reward;
+        if (!reward || reward.type !== "PROGRESSION_BONUS") continue;
+
+        const { bonusKey, amount } = reward.payload ?? {};
+        if (!bonusKey || typeof amount !== "number") continue;
+
+        totals[bonusKey] = (totals[bonusKey] ?? 0) + amount;
+    }
+
+    // 상한 적용
+    for (const key of Object.keys(totals)) {
+        const cap = PROGRESSION_BONUS_CAPS[key] ?? Infinity;
+        totals[key] = Math.min(totals[key], cap);
+    }
+
+    return totals;
+}
+
+/**
+ * 업적 해금 알림용. evaluateAchievements가 중복을 막으므로 항상 applied: true 반환.
+ * FEATURE_UNLOCK 타입만 별도 처리 (기능 해금 알림).
+ *
+ * @param {object} reward - { type: "PROGRESSION_BONUS" | "FEATURE_UNLOCK", payload: {...} }
+ * @returns {{ applied: boolean, bonusKey: string, amount: number }}
+ */
+export function applyProgressionBonus(reward) {
     if (reward?.type === "FEATURE_UNLOCK") {
-        const achievementState = profile.collection.achievements[achievementId];
-        if (achievementState?.rewardClaimed) {
-            return { applied: false, bonusKey: "", amount: 0, capped: 0 };
-        }
-        if (achievementState) {
-            achievementState.rewardClaimed = true;
-        }
-        return { applied: true, bonusKey: "", amount: 0, capped: 0 };
+        return { applied: true, bonusKey: "", amount: 0 };
     }
 
     if (!reward || reward.type !== "PROGRESSION_BONUS") {
-        return { applied: false, bonusKey: "", amount: 0, capped: 0 };
+        return { applied: false, bonusKey: "", amount: 0 };
     }
 
     const { bonusKey, amount } = reward.payload ?? {};
     if (!bonusKey || typeof amount !== "number" || amount <= 0) {
-        return { applied: false, bonusKey: "", amount: 0, capped: 0 };
+        return { applied: false, bonusKey: "", amount: 0 };
     }
 
-    // 중복 지급 방지
-    const achievementState = profile.collection.achievements[achievementId];
-    if (achievementState?.rewardClaimed) {
-        return { applied: false, bonusKey, amount, capped: 0 };
-    }
-
-    const bonuses = profile.progression.bonuses;
-    const current = bonuses[bonusKey] ?? 0;
-    const cap = PROGRESSION_BONUS_CAPS[bonusKey] ?? Infinity;
-    const capped = Math.min(amount, Math.max(0, cap - current));
-
-    if (capped <= 0) {
-        return { applied: false, bonusKey, amount, capped: 0 };
-    }
-
-    bonuses[bonusKey] = current + capped;
-
-    // 중복 지급 방지 플래그
-    if (achievementState) {
-        achievementState.rewardClaimed = true;
-    }
-
-    return { applied: true, bonusKey, amount: capped, capped };
+    return { applied: true, bonusKey, amount };
 }
 
 /**
- * 여러 보상을 순서대로 적용한다.
- * @param {object} profile
+ * 여러 보상의 알림 결과를 반환한다.
  * @param {Array<{id:string,reward:object|null}>} results - [{ id, reward }]
  * @returns {Array<{achievementId:string,applied:boolean,bonusKey:string,amount:number}>}
  */
-export function applyAchievementRewards(profile, results) {
+export function applyAchievementRewards(results) {
     const outcomes = [];
     for (const result of results) {
         if (!result.reward) {
-            outcomes.push({
-                achievementId: result.id,
-                applied: false,
-                bonusKey: "",
-                amount: 0
-            });
+            outcomes.push({ achievementId: result.id, applied: false, bonusKey: "", amount: 0 });
             continue;
         }
-        const outcome = applyProgressionBonus(profile, result.reward, result.id);
-        outcomes.push({
-            achievementId: result.id,
-            ...outcome
-        });
+        const outcome = applyProgressionBonus(result.reward);
+        outcomes.push({ achievementId: result.id, ...outcome });
     }
     return outcomes;
 }

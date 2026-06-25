@@ -47,7 +47,7 @@ import {
     ACHIEVEMENT_DEFINITIONS,
     evaluateAchievements
 } from "./collection/index.js";
-import { applyAchievementRewards, formatRewardDescription } from "./progression/progressionState.js";
+import { computeEffectiveBonuses, formatRewardDescription } from "./progression/progressionState.js";
 import { FIGHTER_IDS, Vector2 } from "./core.js";
 import {
     ArcherAbility,
@@ -159,17 +159,16 @@ export class BattleApp {
             : {
                   allocationModifiers: { perStatCapBonus: 0, extraStatPoints: 0, balanceTolerance: 0 }
               };
-        const progressionPerStatCap = this.playerProfile?.progression?.bonuses?.perStatCapBonus ?? 0;
+        const computed = computeEffectiveBonuses(this.playerProfile, ACHIEVEMENT_DEFINITIONS);
         const masteryPerStatCap = masteryCtx.allocationModifiers?.perStatCapBonus ?? 0;
-        const progressionExtra = this.playerProfile?.progression?.bonuses?.extraStatPoints ?? 0;
         const masteryExtra = masteryCtx.allocationModifiers?.extraStatPoints ?? 0;
         return {
-            progressionPerStatCapBonus: progressionPerStatCap,
+            progressionPerStatCapBonus: computed.perStatCapBonus,
             masteryPerStatCapBonus: masteryPerStatCap,
-            perStatCapBonus: progressionPerStatCap + masteryPerStatCap,
-            progressionExtraStatPoints: progressionExtra,
+            perStatCapBonus: computed.perStatCapBonus + masteryPerStatCap,
+            progressionExtraStatPoints: computed.extraStatPoints,
             masteryExtraStatPoints: masteryExtra,
-            extraStatPoints: progressionExtra + masteryExtra
+            extraStatPoints: computed.extraStatPoints + masteryExtra
         };
     }
 
@@ -301,21 +300,15 @@ export class BattleApp {
         const masteryCtx = collectActiveEffects(this.playerProfile, this.playerFighterId);
         this._currentChallengeLevel = getCharacterChallengeLevel(this.playerProfile, this.playerFighterId);
 
-        // 숙련도 + 성장 보너스의 balanceTolerance를 SENSITIVITY에 반영
-        const totalBalanceTol =
-            masteryCtx.allocationModifiers.balanceTolerance +
-            (this.playerProfile?.progression?.bonuses?.balanceTolerance ?? 0);
+        // 숙련도 + 업적 보너스의 balanceTolerance를 SENSITIVITY에 반영 (동적 계산)
+        const computedBonuses = computeEffectiveBonuses(this.playerProfile, ACHIEVEMENT_DEFINITIONS);
+        const totalBalanceTol = masteryCtx.allocationModifiers.balanceTolerance + computedBonuses.balanceTolerance;
         _STAT_BALANCER_CONFIG.SENSITIVITY = 20 + totalBalanceTol;
 
-        // 집중 투자 한도 업데이트 (성장 보너스 + 숙련도)
-        const perStatCapBonus =
-            (this.playerProfile?.progression?.bonuses?.perStatCapBonus ?? 0) +
-            masteryCtx.allocationModifiers.perStatCapBonus;
+        // 집중 투자 한도 업데이트 (업적 보너스 + 숙련도, 동적 계산)
+        const perStatCapBonus = computedBonuses.perStatCapBonus + masteryCtx.allocationModifiers.perStatCapBonus;
         if (perStatCapBonus > 0) {
-            updateEffectiveStatCap(
-                this.playerProfile?.progression?.bonuses?.perStatCapBonus ?? 0,
-                masteryCtx.allocationModifiers.perStatCapBonus
-            );
+            updateEffectiveStatCap(computedBonuses.perStatCapBonus, masteryCtx.allocationModifiers.perStatCapBonus);
         }
 
         // adjustedAllocation: 사용자가 UI에서 직접 배분한 값 그대로 사용
@@ -854,25 +847,14 @@ export class BattleApp {
                 playerFighterId: this.playerFighterId
             });
             if (achievementResults.length > 0) {
-                // 보상 적용
-                const rewardOutcomes = applyAchievementRewards(this.playerProfile, achievementResults);
-                for (let i = 0; i < achievementResults.length; i++) {
-                    const result = achievementResults[i];
+                for (const result of achievementResults) {
                     const def = ACHIEVEMENT_DEFINITIONS.find((d) => d.id === result.id);
                     if (!def) continue;
 
                     const rewardDesc = formatRewardDescription(def.reward);
-                    const rewardOutcome = rewardOutcomes[i];
                     let msg = `[업적 해금] ${def.name} (${def.tier})`;
-                    if (rewardDesc) {
-                        if (rewardOutcome?.applied) {
-                            msg += ` — ${rewardDesc} 적용됨`;
-                        } else {
-                            msg += ` — ${rewardDesc}`;
-                        }
-                    }
+                    if (rewardDesc) msg += ` — ${rewardDesc}`;
                     this.ui.addLog(msg);
-                    // 토스트 알림
                     this.ui.showToast(msg);
                 }
             }

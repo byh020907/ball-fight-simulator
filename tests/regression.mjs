@@ -2187,9 +2187,13 @@ async function testEvaluateAchievements() {
 
 async function testApplyAchievementRewards() {
     const { createDefaultPlayerProfile } = await import("../src/playerProfile.js");
-    const { applyAchievementRewards } = await import("../src/progression/progressionState.js");
+    const { applyAchievementRewards, computeEffectiveBonuses } = await import("../src/progression/progressionState.js");
 
     const profile = createDefaultPlayerProfile();
+
+    // 업적 해금 시뮬레이션 (evaluateAchievements가 하는 일)
+    profile.collection.achievements["test_ach_1"] = { unlockedAt: Date.now() };
+
     const results = [
         {
             id: "test_ach_1",
@@ -2198,24 +2202,18 @@ async function testApplyAchievementRewards() {
         { id: "test_ach_2", reward: null }
     ];
 
-    const outcomes = applyAchievementRewards(profile, results);
+    const outcomes = applyAchievementRewards(results);
     assert.equal(outcomes.length, 2, "Should return outcome for each result");
     assert.ok(outcomes[0].applied, "Reward with valid bonus should be applied");
     assert.equal(outcomes[0].bonusKey, "extraStatPoints");
     assert.equal(outcomes[0].amount, 5);
-    assert.equal(profile.progression.bonuses.extraStatPoints, 5, "Profile bonus should increase");
+
+    // 동적 계산으로 보상 확인
+    const defs = [{ id: "test_ach_1", reward: results[0].reward }];
+    const computed = computeEffectiveBonuses(profile, defs);
+    assert.equal(computed.extraStatPoints, 5, "Computed bonus should be 5 from unlocked achievement");
 
     assert.ok(!outcomes[1].applied, "Null reward should not be applied");
-
-    // 중복 지급 방지: evaluateAchievements를 통해 등록된 achievement는 rewardClaimed=true로 설정됨
-    const results2 = [
-        { id: "test_ach_1", reward: { type: "PROGRESSION_BONUS", payload: { bonusKey: "extraStatPoints", amount: 3 } } }
-    ];
-    // achievement 상태를 직접 설정 (evaluateAchievements가 하는 일을 시뮬레이션)
-    profile.collection.achievements["test_ach_1"] = { unlockedAt: Date.now(), rewardClaimed: true };
-
-    const outcomes2 = applyAchievementRewards(profile, results2);
-    assert.ok(!outcomes2[0].applied, "Reward with rewardClaimed flag should not be applied again");
 }
 
 async function testFormatRewardDescription() {
@@ -2234,29 +2232,29 @@ async function testFormatRewardDescription() {
 
 async function testProgressionBonusCapClamp() {
     const { createDefaultPlayerProfile } = await import("../src/playerProfile.js");
-    const { applyProgressionBonus } = await import("../src/progression/progressionState.js");
+    const { computeEffectiveBonuses } = await import("../src/progression/progressionState.js");
 
     const profile = createDefaultPlayerProfile();
-    // extraStatPoints cap is 40
-    profile.progression.bonuses.extraStatPoints = 38;
 
-    const r1 = applyProgressionBonus(
-        profile,
-        { type: "PROGRESSION_BONUS", payload: { bonusKey: "extraStatPoints", amount: 5 } },
-        "test_id"
-    );
-    assert.ok(r1.applied, "Should apply within cap");
-    assert.equal(r1.amount, 2, "Should clamp to cap (38+2=40)");
-    assert.equal(profile.progression.bonuses.extraStatPoints, 40, "Should stop at cap exactly");
+    // extraStatPoints cap is 40 — 업적 여러 개가 합산 45를 줘도 상한 40
+    const defs = [
+        { id: "ach1", reward: { type: "PROGRESSION_BONUS", payload: { bonusKey: "extraStatPoints", amount: 20 } } },
+        { id: "ach2", reward: { type: "PROGRESSION_BONUS", payload: { bonusKey: "extraStatPoints", amount: 20 } } },
+        { id: "ach3", reward: { type: "PROGRESSION_BONUS", payload: { bonusKey: "extraStatPoints", amount: 5 } } }
+    ];
 
-    const r2 = applyProgressionBonus(
-        profile,
-        { type: "PROGRESSION_BONUS", payload: { bonusKey: "extraStatPoints", amount: 5 } },
-        "test_id_2"
-    );
-    assert.ok(!r2.applied, "Should not apply when at cap");
-    assert.equal(r2.capped, 0, "Capped amount should be 0");
-    assert.equal(profile.progression.bonuses.extraStatPoints, 40, "Should stay at cap");
+    // 세 업적 모두 해금
+    for (const def of defs) {
+        profile.collection.achievements[def.id] = { unlockedAt: Date.now() };
+    }
+
+    const computed = computeEffectiveBonuses(profile, defs);
+    assert.equal(computed.extraStatPoints, 40, "Should cap at 40 even with 45 total from definitions");
+
+    // 두 개만 해금 → 40 (cap)
+    delete profile.collection.achievements["ach3"];
+    const computed2 = computeEffectiveBonuses(profile, defs);
+    assert.equal(computed2.extraStatPoints, 40, "Should cap at 40 with two 20-point achievements");
 }
 
 // ── Mastery system tests ───────────────────────────────────────────────────
@@ -2439,18 +2437,22 @@ async function testToastQueue() {
 
 async function testBonusPointsEffectiveTotal() {
     const { createDefaultPlayerProfile } = await import("../src/playerProfile.js");
-    const { evaluateAchievements } = await import("../src/collection/achievementRules.js");
-    const { applyAchievementRewards } = await import("../src/progression/progressionState.js");
-    const { ACHIEVEMENT_DEFINITIONS } = await import("../src/collection/achievementDefinitions.js");
+    const { computeEffectiveBonuses } = await import("../src/progression/progressionState.js");
     const { collectActiveEffects } = await import("../src/character-mastery/index.js");
     const { PLAYER_STAT_POINTS } = await import("../src/statAllocation.js");
 
-    // 성장 보너스만 있는 경우
+    // 성장 보너스만 있는 경우 — 해금된 업적으로 동적 계산
     const profile1 = createDefaultPlayerProfile();
-    profile1.progression.bonuses.extraStatPoints = 10;
+    profile1.collection.achievements["test_ach"] = { unlockedAt: Date.now() };
+    const defs1 = [
+        {
+            id: "test_ach",
+            reward: { type: "PROGRESSION_BONUS", payload: { bonusKey: "extraStatPoints", amount: 10 } }
+        }
+    ];
+    const computed1 = computeEffectiveBonuses(profile1, defs1);
     const ctx1 = collectActiveEffects(profile1, "archer");
-    const effectiveTotal1 =
-        PLAYER_STAT_POINTS + ctx1.allocationModifiers.extraStatPoints + profile1.progression.bonuses.extraStatPoints;
+    const effectiveTotal1 = PLAYER_STAT_POINTS + ctx1.allocationModifiers.extraStatPoints + computed1.extraStatPoints;
     assert.equal(effectiveTotal1, 110, "extraStatPoints from progression should increase effective total");
 
     // 숙련도 보너스만 있는 경우 (hero at BRONZE = +3 extraStatPoints, playing as archer)
@@ -2467,18 +2469,18 @@ async function testBonusPointsEffectiveTotal() {
 
     // 성장 + 숙련도 중첩
     const profile3 = createDefaultPlayerProfile();
-    profile3.progression.bonuses.extraStatPoints = 10;
+    profile3.collection.achievements["test_ach"] = { unlockedAt: Date.now() };
     profile3.characterMastery.levels = { hero: 2 }; // SILVER = +6
+    const computed3 = computeEffectiveBonuses(profile3, defs1);
     const ctx3 = collectActiveEffects(profile3, "archer");
-    const effectiveTotal3 =
-        PLAYER_STAT_POINTS + ctx3.allocationModifiers.extraStatPoints + profile3.progression.bonuses.extraStatPoints;
+    const effectiveTotal3 = PLAYER_STAT_POINTS + ctx3.allocationModifiers.extraStatPoints + computed3.extraStatPoints;
     assert.equal(effectiveTotal3, 116, "Combined progression + mastery should stack");
 
     // 보너스 0인 경우
     const profile4 = createDefaultPlayerProfile();
+    const computed4 = computeEffectiveBonuses(profile4, []);
     const ctx4 = collectActiveEffects(profile4, "archer");
-    const effectiveTotal4 =
-        PLAYER_STAT_POINTS + ctx4.allocationModifiers.extraStatPoints + profile4.progression.bonuses.extraStatPoints;
+    const effectiveTotal4 = PLAYER_STAT_POINTS + ctx4.allocationModifiers.extraStatPoints + computed4.extraStatPoints;
     assert.equal(effectiveTotal4, 100, "No bonuses should keep effective total at base");
 }
 
@@ -2607,6 +2609,49 @@ async function testStatModifierDamageIndependentOfHp() {
     const damageAfterEater = ctx.statModifiers.damage;
     eaterDef.apply(ctx, 1); // 두 번 호출해도 damage는 eater가 올리지 않음
     assert.equal(ctx.statModifiers.damage, damageAfterEater, "Eater mastery should NOT increase damage");
+}
+
+// ── Dynamic bonus computation test ──────────────────────────────────────────
+
+async function testComputeEffectiveBonusesDynamic() {
+    const { createDefaultPlayerProfile } = await import("../src/playerProfile.js");
+    const { computeEffectiveBonuses } = await import("../src/progression/progressionState.js");
+
+    const profile = createDefaultPlayerProfile();
+
+    // 업적 하나 해금
+    profile.collection.achievements["ach_1"] = { unlockedAt: Date.now() };
+
+    // 정의 v1: +5 extraStatPoints
+    const defsV1 = [
+        {
+            id: "ach_1",
+            reward: { type: "PROGRESSION_BONUS", payload: { bonusKey: "extraStatPoints", amount: 5 } }
+        }
+    ];
+    const computedV1 = computeEffectiveBonuses(profile, defsV1);
+    assert.equal(computedV1.extraStatPoints, 5, "v1: bonus should be 5");
+
+    // 정의 v2 (업데이트): 동일 업적 보상이 +10으로 상향 — 재접속 시 자동 반영되어야 함
+    const defsV2 = [
+        {
+            id: "ach_1",
+            reward: { type: "PROGRESSION_BONUS", payload: { bonusKey: "extraStatPoints", amount: 10 } }
+        }
+    ];
+    const computedV2 = computeEffectiveBonuses(profile, defsV2);
+    assert.equal(computedV2.extraStatPoints, 10, "v2: bonus should auto-update to 10 without re-unlock");
+
+    // 미해금 업적은 계산에서 제외
+    const defsWithLocked = [
+        ...defsV2,
+        {
+            id: "ach_locked",
+            reward: { type: "PROGRESSION_BONUS", payload: { bonusKey: "extraStatPoints", amount: 99 } }
+        }
+    ];
+    const computedLocked = computeEffectiveBonuses(profile, defsWithLocked);
+    assert.equal(computedLocked.extraStatPoints, 10, "Locked achievement should not contribute");
 }
 
 // ── Collection hub ViewModel tests ──────────────────────────────────────────
@@ -2772,4 +2817,6 @@ await testAdjustStatWithBonusTotal();
 // Mastery modifier tests
 await testMasteryModifiersStoredOnBattleBall(app);
 await testStatModifierDamageIndependentOfHp();
+// Dynamic bonus computation test
+await testComputeEffectiveBonusesDynamic();
 console.log("regression tests ok");

@@ -23,8 +23,7 @@ export function evaluateAchievements(profile, definitions, context) {
 
         if (def.evaluate(context)) {
             achievements[def.id] = {
-                unlockedAt: Date.now(),
-                rewardClaimed: false
+                unlockedAt: Date.now()
             };
             results.push({
                 id: def.id,

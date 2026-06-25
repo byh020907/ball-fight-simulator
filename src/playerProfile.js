@@ -12,7 +12,7 @@ export const PROFILE_LIMITS = Object.freeze({
     MAX_TIMESTAMP: 8_640_000_000_000_000
 });
 
-export const PROFILE_VERSION = 3;
+export const PROFILE_VERSION = 4;
 
 // ── 기본 프로필 ─────────────────────────────────────────────────────────────
 
@@ -23,11 +23,6 @@ export function createDefaultPlayerProfile() {
             levels: {}
         },
         progression: {
-            bonuses: {
-                extraStatPoints: 0,
-                balanceTolerance: 0,
-                perStatCapBonus: 0
-            },
             challenge: {
                 highestUnlockedLevel: 0,
                 selectedLevel: 0
@@ -79,15 +74,6 @@ function sanitizeTimestamp(value) {
     return value;
 }
 
-function sanitizeBonusObj(obj) {
-    if (!obj || typeof obj !== "object") return { extraStatPoints: 0, balanceTolerance: 0, perStatCapBonus: 0 };
-    return {
-        extraStatPoints: Math.max(0, Math.min(sanitizeNumber(obj.extraStatPoints), 40)),
-        balanceTolerance: Math.max(0, Math.min(sanitizeNumber(obj.balanceTolerance), 10)),
-        perStatCapBonus: Math.max(0, Math.min(sanitizeNumber(obj.perStatCapBonus), 50))
-    };
-}
-
 function sanitizeChallenge(obj) {
     if (!obj || typeof obj !== "object") return { highestUnlockedLevel: 0, selectedLevel: 0 };
     const highest = Math.max(0, sanitizeNumber(obj.highestUnlockedLevel));
@@ -128,8 +114,7 @@ function sanitizeAchievements(obj) {
     for (const [key, value] of Object.entries(obj)) {
         if (value && typeof value === "object") {
             result[key] = {
-                unlockedAt: sanitizeTimestamp(value.unlockedAt),
-                rewardClaimed: !!value.rewardClaimed
+                unlockedAt: sanitizeTimestamp(value.unlockedAt)
             };
         }
     }
@@ -190,7 +175,6 @@ export function sanitizePlayerProfile(raw) {
         version: PROFILE_VERSION,
         characterMastery: sanitizeCharacterMastery(raw.characterMastery ?? raw.characterLinks),
         progression: {
-            bonuses: sanitizeBonusObj(raw.progression?.bonuses),
             challenge: sanitizeChallenge(raw.progression?.challenge)
         },
         collection: {
