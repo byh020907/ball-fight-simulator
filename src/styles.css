@@ -1062,7 +1062,6 @@ body::before {
 
 .player-panel-actions > button {
     flex: 0 0 auto;
-    vertical-align: middle;
     width: 24px;
     height: 24px;
     border: 2px solid #202020;
@@ -1086,8 +1085,9 @@ body::before {
     color: #ffffff;
 }
 
-.collection-icon {
-    transform: translateY(-1px);
+.player-panel-actions > button:hover {
+    background: #202020;
+    color: #ffffff;
 }
 
 .bracket {
