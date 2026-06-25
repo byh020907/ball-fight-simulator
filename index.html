@@ -707,22 +707,21 @@
 
         <script type="module">
             import Alpine from "https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/module.esm.js";
-            import { appStore } from "./src/ui.js";
+
+            // GitHub Pages 캐시 방지용 버전 파라미터
+            const V = "0.18.1";
+
+            const { appStore } = await import(`./src/ui.js?v=${V}`);
 
             Alpine.data("appStore", appStore);
             window.Alpine = Alpine;
 
-            // Start Alpine first — processes the DOM and creates components
             Alpine.start();
-
-            // Wait for Alpine's microtask-based initTree to complete,
-            // then boot the game (which depends on Alpine components existing)
             await Promise.resolve();
-            await import("./src/main.js");
+            await import(`./src/main.js?v=${V}`);
 
-            // Wire up help icon
-            const { PopupService } = await import("./src/popup.js");
-            const { HELP_TITLE, HELP_CONTENT } = await import("./src/helpContent.js");
+            const { PopupService } = await import(`./src/popup.js?v=${V}`);
+            const { HELP_TITLE, HELP_CONTENT } = await import(`./src/helpContent.js?v=${V}`);
             document.addEventListener("open-help", () =>
                 PopupService.show({ title: HELP_TITLE, bodyHtml: HELP_CONTENT })
             );
