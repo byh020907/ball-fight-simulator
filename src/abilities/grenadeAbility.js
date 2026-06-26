@@ -9,9 +9,7 @@ const MAX_MISS_STREAK = 4;
 
 export class GrenadeAbility extends Ability {
     constructor(owner, simulation) {
-        super(owner, simulation);
-        this._baseCooldown = 4.7;
-        this.timer = 1.5;
+        super(owner, simulation, 4.7);
         this.missStreak = 0;
         this.baseFuse = 1.08;
         this.minFuse = 0.48;
@@ -24,7 +22,7 @@ export class GrenadeAbility extends Ability {
             return;
         }
 
-        this.timer = this.cooldown;
+        this.timer = this.cooldown * (0.5 + Math.random());
         const prediction = Vector2.add(target.position.clone(), target.velocity.clone().scale(PREDICTION_FACTOR));
         this.simulation.spawnGrenade(this.owner, prediction, this.getFuseTime());
         this.simulation.playSound("toss");

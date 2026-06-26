@@ -8,7 +8,10 @@ import {
     TricksterAbility,
     DashAbility,
     BatBallAbility,
-    HeroAbility
+    HeroAbility,
+    VampireAbility,
+    GunnerAbility,
+    PhantomAbility
 } from "../abilities/index.js";
 import { BattleBall } from "../entities/index.js";
 import { GravityParticle } from "../effects/index.js";
@@ -23,7 +26,10 @@ const ABILITY_TYPES = {
     rage: RageAbility,
     eater: EaterAbility,
     bat_ball: BatBallAbility,
-    hero: HeroAbility
+    hero: HeroAbility,
+    vampire: VampireAbility,
+    gunner: GunnerAbility,
+    phantom: PhantomAbility
 };
 
 const COLLISION_RESTITUTION = 0.92;

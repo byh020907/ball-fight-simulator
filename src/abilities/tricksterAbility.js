@@ -9,9 +9,7 @@ const SEED_SPEED_MAX_MULTIPLIER = 1.5;
 
 export class TricksterAbility extends Ability {
     constructor(owner, simulation) {
-        super(owner, simulation);
-        this._baseCooldown = 6.4;
-        this.timer = 1.9;
+        super(owner, simulation, 7.0);
     }
 
     update(delta, target) {

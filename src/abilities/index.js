@@ -8,3 +8,6 @@ export { RageAbility } from "./rageAbility.js";
 export { EaterAbility } from "./eaterAbility.js";
 export { BatBallAbility } from "./batBallAbility.js";
 export { HeroAbility } from "./heroAbility.js";
+export { VampireAbility } from "./vampireAbility.js";
+export { GunnerAbility } from "./gunnerAbility.js";
+export { PhantomAbility } from "./phantomAbility.js";

@@ -2,20 +2,18 @@ import { DashEffect, WallSlamEffect } from "../combatEffects.js";
 import { steerBallToward, Vector2 } from "../core.js";
 import { Ability } from "./ability.js";
 
-const FEAST_DURATION = 3.3;
+const FEAST_DURATION = 4.0;
 const SWALLOW_HOLD_DURATION = 0.72;
 const DEFENSE_MULT_DURING_FEAST = 1.5;
 const SPIT_DASH_MULTIPLIER = 2;
 const SPIT_SPEED_MULTIPLIER = 2;
 const SPIT_MAX_DURATION = 2.45;
-const WALL_SLAM_DAMAGE = 15;
-const FEAST_HOMING_TURN_RATE = 2.1;
+const WALL_SLAM_DAMAGE = 25;
+const FEAST_HOMING_TURN_RATE = 3.5;
 
 export class EaterAbility extends Ability {
     constructor(owner, simulation) {
-        super(owner, simulation);
-        this._baseCooldown = 7.2;
-        this.timer = 2.4;
+        super(owner, simulation, 6.0);
         this.feastDuration = FEAST_DURATION;
         this.feastTimer = 0;
         this.feastElapsed = 0;

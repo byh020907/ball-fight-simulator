@@ -56,7 +56,10 @@ export const VALID_CHARACTER_IDS = Object.freeze([
     "rage",
     "eater",
     "bat_ball",
-    "hero"
+    "hero",
+    "vampire",
+    "gunner",
+    "phantom"
 ]);
 
 export const MASTERY_EFFECT_IDS = Object.freeze(VALID_CHARACTER_IDS);

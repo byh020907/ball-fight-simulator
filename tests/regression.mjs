@@ -275,7 +275,7 @@ async function testEaterFeast(app) {
     );
     target.position.x = app.simulation.width + target.radius + 5;
     app.simulation.keepInsideArena(target);
-    assert.equal(beforeHp - target.hp, 14, "Wall bounce should deal wall slam damage (15 - 1 defense)");
+    assert.equal(beforeHp - target.hp, 24, "Wall bounce should deal wall slam damage (25 - 1 defense)");
     const afterFirstWallSlamHp = target.hp;
     target.position.x = app.simulation.width + target.radius + 5;
     app.simulation.keepInsideArena(target);
@@ -309,7 +309,7 @@ async function testDashBallCooldownDash(app) {
         app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER)
     ]);
     const [dashBall, target] = app.simulation.fighters;
-    assert.equal(dashBall.baseDamage, 9, "Dash Ball should have reduced base damage");
+    assert.equal(dashBall.baseDamage, 10, "Dash Ball should have reduced base damage");
     dashBall.position.x = 300;
     dashBall.position.y = 480;
     target.position.x = 620;
@@ -2818,4 +2818,106 @@ await testMasteryModifiersStoredOnBattleBall(app);
 await testStatModifierDamageIndependentOfHp();
 // Dynamic bonus computation test
 await testComputeEffectiveBonusesDynamic();
+// ── New character tests ──────────────────────────────────────────────────────
+
+async function testNewCharactersRegistered(app) {
+    const vampire = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.VAMPIRE);
+    assert.ok(vampire, "Vampire Ball should be registered in the roster");
+    assert.equal(vampire.ability, "vampire", "Vampire Ball should have 'vampire' ability type");
+
+    const gunner = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.GUNNER);
+    assert.ok(gunner, "Gunner Ball should be registered in the roster");
+    assert.equal(gunner.ability, "gunner", "Gunner Ball should have 'gunner' ability type");
+
+    const phantom = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.PHANTOM);
+    assert.ok(phantom, "Phantom Ball should be registered in the roster");
+    assert.equal(phantom.ability, "phantom", "Phantom Ball should have 'phantom' ability type");
+}
+
+async function testVampireBatsSpawn(app) {
+    const vampire = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.VAMPIRE);
+    const opponent = app.roster.find((f) => f.id !== FIGHTER_IDS.VAMPIRE);
+    const sim = new BattleSimulation([vampire, opponent], { onLog() {}, onSound() {} });
+    const vampireFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.VAMPIRE);
+    const target = sim.fighters.find((f) => f.id !== FIGHTER_IDS.VAMPIRE);
+
+    sim.entities = sim.fighters.slice();
+    vampireFighter.ability.timer = 0;
+    vampireFighter.ability.update(0.016, target);
+    const bats = sim.entities.filter((e) => e.constructor?.name === "BatProjectile");
+    assert.equal(bats.length, 3, "Vampire should spawn 3 bats when cooldown triggers");
+}
+
+async function testVampireLifestealOnCollision(app) {
+    const vampire = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.VAMPIRE);
+    const opponent = app.roster.find((f) => f.id !== FIGHTER_IDS.VAMPIRE);
+    const sim = new BattleSimulation([vampire, opponent], { onLog() {}, onSound() {} });
+    const vampireFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.VAMPIRE);
+    const target = sim.fighters.find((f) => f.id !== FIGHTER_IDS.VAMPIRE);
+
+    vampireFighter.position.x = 200;
+    vampireFighter.position.y = 480;
+    target.position.x = 240;
+    target.position.y = 480;
+    vampireFighter.applyImpulse(Vector2.subtract(new Vector2(500, 0), vampireFighter.velocity));
+    target.applyImpulse(Vector2.subtract(new Vector2(-300, 0), target.velocity));
+    vampireFighter.hp = 10;
+
+    const hpBefore = vampireFighter.hp;
+    vampireFighter.ability.onCollision(target);
+    assert.ok(vampireFighter.hp > hpBefore, "Vampire should heal on collision (lifesteal)");
+}
+
+async function testGunnerBulletsSpawn(app) {
+    const gunner = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.GUNNER);
+    const opponent = app.roster.find((f) => f.id !== FIGHTER_IDS.GUNNER);
+    const sim = new BattleSimulation([gunner, opponent], { onLog() {}, onSound() {} });
+    const gunnerFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.GUNNER);
+    const target = sim.fighters.find((f) => f.id !== FIGHTER_IDS.GUNNER);
+
+    sim.entities = sim.fighters.slice();
+    gunnerFighter.ability.timer = 0;
+    gunnerFighter.ability.update(0.016, target); // starts burst
+    gunnerFighter.ability.update(0.016, target); // fires first bullet
+    const bullets = sim.entities.filter((e) => e.constructor?.name === "BulletProjectile");
+    assert.ok(bullets.length >= 1, "Gunner should fire at least 1 bullet");
+    assert.ok(bullets.length <= 6, "Gunner should fire at most 6 bullets");
+}
+
+async function testPhantomRegistered(app) {
+    const phantom = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.PHANTOM);
+    const opponent = app.roster.find((f) => f.id !== FIGHTER_IDS.PHANTOM);
+    const sim = new BattleSimulation([phantom, opponent], { onLog() {}, onSound() {} });
+    const phantomFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.PHANTOM);
+    assert.ok(phantomFighter.ability.constructor.name === "PhantomAbility", "Phantom should have PhantomAbility");
+}
+
+async function testPhantomShadowStrike(app) {
+    const phantom = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.PHANTOM);
+    const opponent = app.roster.find((f) => f.id !== FIGHTER_IDS.PHANTOM);
+    const sim = new BattleSimulation([phantom, opponent], { onLog() {}, onSound() {} });
+    const phantomFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.PHANTOM);
+    const target = sim.fighters.find((f) => f.id !== FIGHTER_IDS.PHANTOM);
+
+    phantomFighter.position.x = 200;
+    phantomFighter.position.y = 480;
+    target.position.x = 250;
+    target.position.y = 480;
+    phantomFighter.ability.timer = -0.1;
+
+    const posBefore = phantomFighter.position.clone();
+    phantomFighter.ability.onCollision(target);
+    assert.ok(phantomFighter.ability.timer > 0, "Phantom should set cooldown after shadow strike");
+    assert.ok(phantomFighter.movementEffect, "Phantom should start dashing after shadow strike");
+    // Position should have changed (teleported behind target)
+    const distFromTarget = Vector2.subtract(phantomFighter.position, target.position).length();
+    assert.ok(distFromTarget > 10, "Phantom should teleport away from target position");
+}
+
+await testNewCharactersRegistered(app);
+await testVampireBatsSpawn(app);
+await testVampireLifestealOnCollision(app);
+await testGunnerBulletsSpawn(app);
+await testPhantomRegistered(app);
+await testPhantomShadowStrike(app);
 console.log("regression tests ok");

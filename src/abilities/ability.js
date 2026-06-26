@@ -1,9 +1,9 @@
 export class Ability {
-    constructor(owner, simulation) {
+    constructor(owner, simulation, baseCooldown = 0) {
         this.owner = owner;
         this.simulation = simulation;
-        /** Base cooldown before skill stat reduction. Set by subclasses. */
-        this._baseCooldown = 0;
+        this._baseCooldown = baseCooldown;
+        this.timer = this.cooldown;
     }
 
     /** Effective cooldown after skill stat reduction. */

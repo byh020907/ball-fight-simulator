@@ -8,18 +8,18 @@ const PARTICLE_COUNT_PER_CHARGE = 3;
 const PARTICLE_BASE_SPEED = 90;
 const PARTICLE_SPEED_PER_CHARGE = 90;
 const SPEED_BASE = 0.78;
-const SPEED_PER_CHARGE = 4.22;
+const SPEED_PER_CHARGE = 0.2;
 const DAMAGE_BASE = 0.96;
-const DAMAGE_PER_CHARGE = 0.34;
+const DAMAGE_PER_CHARGE = 0.04;
 const IMPACT_BASE = 0.9;
-const IMPACT_PER_CHARGE = 0.62;
+const IMPACT_PER_CHARGE = 0.1;
 
 export class RageAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation);
         this.particleTimer = 0;
         this.timeWithoutCollision = 0;
-        this._baseMaxChargeTime = 7.0;
+        this._baseMaxChargeTime = 14.0;
     }
 
     getMaxChargeTime() {

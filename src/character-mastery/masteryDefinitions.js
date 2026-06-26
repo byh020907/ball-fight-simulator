@@ -136,6 +136,53 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         apply(ctx, level) {
             ctx.allocationModifiers.extraStatPoints += this.tierValues[level];
         }
+    },
+    {
+        id: "vampire_blood_thirst",
+        sourceFighterId: "vampire",
+        name: "갈증",
+        kind: "combat_passive",
+        description: "8초마다 다음 충돌 흡혈률이 {value} 증가합니다.",
+        tierValues: Object.freeze([0, 0.05, 0.1, 0.15]),
+        formatValue(v) {
+            return (v * 100).toFixed(0) + "%";
+        },
+        apply(ctx, level) {
+            ctx.combatPassives.push({
+                id: "vampire_mastery_passive",
+                type: "periodic_collision_bonus",
+                cooldown: 8,
+                damageBonus: 0
+            });
+        }
+    },
+    {
+        id: "gunner_lucky_shot",
+        sourceFighterId: "gunner",
+        name: "행운",
+        kind: "stat_modifier",
+        description: "공격력이 {value} 증가합니다.",
+        tierValues: Object.freeze([0, 0.03, 0.07, 0.12]),
+        formatValue(v) {
+            return (v * 100).toFixed(0) + "%";
+        },
+        apply(ctx, level) {
+            ctx.statModifiers.damage += this.tierValues[level];
+        }
+    },
+    {
+        id: "phantom_shadow_weave",
+        sourceFighterId: "phantom",
+        name: "그림자 직조",
+        kind: "physics_modifier",
+        description: "받는 명시적 넉백이 {value} 감소합니다.",
+        tierValues: Object.freeze([0, 0.04, 0.09, 0.15]),
+        formatValue(v) {
+            return (v * 100).toFixed(0) + "%";
+        },
+        apply(ctx, level) {
+            ctx.physicsModifiers.incomingKnockbackReduce += this.tierValues[level];
+        }
     }
 ]);
 

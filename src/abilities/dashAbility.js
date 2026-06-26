@@ -15,7 +15,7 @@ export class DashAbility extends Ability {
         this.cooldownLevel = INITIAL_COOLDOWN_LEVEL;
         this.maxCooldownLevel = 2;
         this._baseCooldown = this.getCooldownForLevel();
-        this.timer = this.cooldown * 0.5;
+        this.timer = this.cooldown;
         this.dashMultiplier = 2.15;
         this.homingTurnRate = 2.4;
     }

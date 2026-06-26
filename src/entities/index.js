@@ -6,6 +6,8 @@ export { SeedOrb } from "./seedOrb.js";
 export { ArrowProjectile } from "./arrowProjectile.js";
 export { OrbitProjectile } from "./orbitProjectile.js";
 export { Grenade } from "./grenade.js";
+export { BatProjectile } from "./batProjectile.js";
+export { BulletProjectile } from "./bulletProjectile.js";
 export {
     HeroOrb,
     HERO_ORB_STAT_CAP,

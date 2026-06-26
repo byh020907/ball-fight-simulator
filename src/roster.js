@@ -53,7 +53,7 @@ export function createRoster() {
             color: "#8ee8d7",
             face: "dash",
             ability: "dash",
-            stats: { hp: 110, damage: 9, speed: 294, radius: 49, mass: 1.16, defense: 1 }
+            stats: { hp: 110, damage: 10, speed: 294, radius: 49, mass: 1.16, defense: 1 }
         },
         {
             id: FIGHTER_IDS.RAGE,
@@ -85,6 +85,38 @@ export function createRoster() {
             face: "bat_ball",
             ability: "bat_ball",
             stats: { hp: 106, damage: 10, speed: 280, radius: 48, mass: 1.14, defense: 1 }
+        },
+        {
+            id: FIGHTER_IDS.VAMPIRE,
+            name: "Vampire Ball",
+            title: "Blood Leech",
+            description:
+                "모든 피해의 일부를 HP로 흡수합니다. HP가 낮을수록 흡혈률이 증가합니다. 쿨타임마다 박쥐 떼를 발사합니다.",
+            color: "#cc3355",
+            face: "vampire",
+            ability: "vampire",
+            stats: { hp: 100, damage: 11, speed: 282, radius: 47, mass: 1.05, defense: 1 }
+        },
+        {
+            id: FIGHTER_IDS.GUNNER,
+            name: "Gunner Ball",
+            title: "Roulette Shot",
+            description:
+                "쿨타임마다 1~6발의 총알을 360도 랜덤 방향으로 연사합니다. 발수가 많을수록 발당 데미지가 증가합니다.",
+            color: "#8877cc",
+            face: "gunner",
+            ability: "gunner",
+            stats: { hp: 100, damage: 11, speed: 278, radius: 48, mass: 1.1, defense: 1 }
+        },
+        {
+            id: FIGHTER_IDS.PHANTOM,
+            name: "Phantom Ball",
+            title: "Shadow Strike",
+            description: "충돌 시 사라졌다가 상대 뒤에서 나타나 돌진합니다. 쿨타임 동안 충돌은 일반 충돌로 처리됩니다.",
+            color: "#55bbdd",
+            face: "phantom",
+            ability: "phantom",
+            stats: { hp: 100, damage: 10, speed: 305, radius: 47, mass: 1.0, defense: 1 }
         },
         {
             id: FIGHTER_IDS.HERO,

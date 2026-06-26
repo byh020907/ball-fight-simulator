@@ -45,9 +45,7 @@ export function computeOwnerCombatSpeed(owner) {
 
 export class HeroAbility extends Ability {
     constructor(owner, simulation) {
-        super(owner, simulation);
-        this._baseCooldown = HERO_ORB_BASE_COOLDOWN;
-        this.timer = 0;
+        super(owner, simulation, HERO_ORB_BASE_COOLDOWN);
         this._cooldownBurstTimer = 0;
         this._cooldownBurstMultiplier = 1;
     }

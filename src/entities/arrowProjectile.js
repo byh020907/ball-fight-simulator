@@ -24,7 +24,7 @@ export class ArrowProjectile extends Projectile {
     }
 
     _getHitDamage() {
-        return Math.round(this.owner.baseDamage * 1.4);
+        return Math.round(this.owner.baseDamage * 1.6);
     }
 
     _getHitLabel() {

@@ -1,5 +1,8 @@
 import { Projectile, Vector2 } from "../core.js";
 
+const SENSOR_RANGE = 180;
+const PROXIMITY_DELAY = 0.2;
+
 export class Grenade extends Projectile {
     constructor(owner, targetPosition, fuseTime = 1.08) {
         const start = owner.position.clone();
@@ -13,10 +16,11 @@ export class Grenade extends Projectile {
         this.innerRadius = 62;
         this.bounces = 0;
         this.maxBounces = 2;
+        this._proximityTriggered = false;
+        this._proximityTimer = 0;
     }
 
     update(delta, simulation) {
-        this.timer -= delta;
         this.position.add(this.velocity.clone().scale(delta));
 
         if (this.bounces < this.maxBounces) {
@@ -29,10 +33,32 @@ export class Grenade extends Projectile {
             }
         }
 
-        if (this.timer > 0) {
+        if (this._proximityTriggered) {
+            this._proximityTimer -= delta;
+            if (this._proximityTimer <= 0) {
+                this._detonate(simulation);
+                return;
+            }
+        } else {
+            this.timer -= delta;
+            const target = simulation.getOpponent(this.owner);
+            if (target && !target.isDefeated) {
+                const distance = Vector2.subtract(this.position, target.position).length();
+                if (distance <= SENSOR_RANGE && !this._proximityTriggered) {
+                    this._proximityTriggered = true;
+                    this._proximityTimer = PROXIMITY_DELAY;
+                }
+            }
+        }
+
+        if (this.timer > 0 || this._proximityTriggered) {
             return;
         }
 
+        this._detonate(simulation);
+    }
+
+    _detonate(simulation) {
         const target = simulation.getOpponent(this.owner);
         let hit = false;
         if (target && !target.isDefeated) {

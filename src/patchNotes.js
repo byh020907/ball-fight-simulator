@@ -19,6 +19,53 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.19.0",
+        date: "2026-06-27",
+        title: "v0.19.0 업데이트",
+        changes: [
+            {
+                type: "refactor",
+                text: "대규모 밸런스 조정 — 200회 토너먼트 시뮬레이션 기반 데이터 분석."
+            },
+            {
+                type: "refactor",
+                text: "Vampire Ball 상향 — HP 92→100, 박쥐 쿨타임 4초→3초, 흡혈률/발사체/데미지 전반 개선."
+            },
+            {
+                type: "refactor",
+                text: "Eater Ball 상향 — 피스트 쿨타임 7.2초→6초, 유도력/지속시간/벽꿍 데미지 증가."
+            },
+            {
+                type: "refactor",
+                text: "Phantom Ball 개선 — 쿨타임 4초→2초, 방어력 증가, 충돌 시 섀도우 스트라이크 보너스 데미지 5→12. 기존 충돌 발동 방식 유지."
+            },
+            {
+                type: "refactor",
+                text: "Grenade Ball 센서 신관 추가 — 수류탄이 적 근처(180px)에 접근하면 0.2초 후 자동 폭발. 기존 타이머 퓨즈와 병행."
+            },
+            {
+                type: "refactor",
+                text: "Archer Ball 상향 — 활시위 당기기 0.6초→0.4초, 화살 데미지 1.4배→1.6배."
+            },
+            {
+                type: "refactor",
+                text: "Archer Ball / Grenade Ball 쿨타임 랜덤화 — 다음 발사까지 대기시간이 매번 달라져 예측 불가능한 전투 리듬 제공."
+            },
+            {
+                type: "refactor",
+                text: "Dash Ball 상향 — 기본 공격력 9→10."
+            },
+            {
+                type: "refactor",
+                text: "Bat Ball 하향 — 방망이 쿨타임 2.2초→3초, 데미지 계수 1.6배→1.3배, 탐지 범위 감소."
+            },
+            {
+                type: "refactor",
+                text: "Rage Ball 하향 — 충전 속도/데미지/충격 계수 대폭 감소, 최대 충전 시간 7초→12초."
+            }
+        ]
+    },
+    {
         version: "0.18.0",
         date: "2026-06-25",
         title: "v0.18.0 업데이트",

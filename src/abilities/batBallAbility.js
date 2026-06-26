@@ -3,7 +3,7 @@ import { Vector2 } from "../core.js";
 import { Ability } from "./ability.js";
 
 const ARC_ANGLE = (Math.PI * 2) / 3; // 120도
-const ARC_RANGE = 200;
+const ARC_RANGE = 160;
 const SWEEP_SPEED = 2.5;
 const SLASH_DURATION = 0.3;
 const BAT_LENGTH = 54;
@@ -16,7 +16,7 @@ function normalizeAngle(a) {
     return a;
 }
 
-const SLASH_DAMAGE_MULT = 1.6;
+const SLASH_DAMAGE_MULT = 1.3;
 const WALL_SLAM_DAMAGE_MULT = 1.2;
 const KNOCKBACK_FORCE = 550;
 const KNOCKBACK_DURATION = 0.85;
@@ -27,9 +27,7 @@ const VISION_ARC_RADIUS_SCALE = 0.55;
 
 export class BatBallAbility extends Ability {
     constructor(owner, simulation) {
-        super(owner, simulation);
-        this._baseCooldown = 2.2;
-        this.timer = 0;
+        super(owner, simulation, 3.0);
         this.arcAngle = 0;
         this.slashTimer = 0;
         this.slashStartAngle = 0;

@@ -1,7 +1,7 @@
 import { Vector2, evadeTarget } from "../core.js";
 import { Ability } from "./ability.js";
 
-const WINDUP = 0.6;
+const WINDUP = 0.4;
 const SPREAD_ANGLE = 0.22;
 const EVADE_RANGE = 320;
 const EVADE_STRENGTH = 0.7;
@@ -10,9 +10,7 @@ const MAX_MISS_STREAK = 5;
 
 export class ArcherAbility extends Ability {
     constructor(owner, simulation) {
-        super(owner, simulation);
-        this._baseCooldown = 3;
-        this.timer = 1.2;
+        super(owner, simulation, 3);
         this.arrowSpeedMult = ARROW_SPEED_MULT;
         this.windUp = 0;
         this.missStreak = 0;
@@ -37,7 +35,7 @@ export class ArcherAbility extends Ability {
 
         this.timer -= delta;
         if (this.timer <= 0 && target) {
-            this.timer = this.cooldown;
+            this.timer = this.cooldown * (0.7 + Math.random() * 0.6);
             this.lastAimDir = Vector2.subtract(target.position, this.owner.position).normalize();
             this.windUp = WINDUP;
         }

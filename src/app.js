@@ -58,7 +58,10 @@ import {
     RageAbility,
     EaterAbility,
     BatBallAbility,
-    HeroAbility
+    HeroAbility,
+    VampireAbility,
+    GunnerAbility,
+    PhantomAbility
 } from "./abilities/index.js";
 
 const ABILITY_MAP = {
@@ -70,7 +73,10 @@ const ABILITY_MAP = {
     rage: RageAbility,
     eater: EaterAbility,
     bat_ball: BatBallAbility,
-    hero: HeroAbility
+    hero: HeroAbility,
+    vampire: VampireAbility,
+    gunner: GunnerAbility,
+    phantom: PhantomAbility
 };
 
 export class BattleApp {
@@ -81,6 +87,7 @@ export class BattleApp {
          * @type {string|null}
          */
         this.startCharacter = null;
+        this.startCharacter = FIGHTER_IDS.GUNNER;
 
         this.elements = {
             canvas: document.getElementById("arenaCanvas"),
