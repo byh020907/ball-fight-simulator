@@ -1,17 +1,38 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <defs>
-    <radialGradient id="ball1" cx="45%" cy="40%">
+    <radialGradient id="rageGrad" cx="50%" cy="40%">
       <stop offset="0%" stop-color="#ff8833"/>
-      <stop offset="100%" stop-color="#cc3300"/>
+      <stop offset="100%" stop-color="#cc2200"/>
     </radialGradient>
-    <radialGradient id="ball2" cx="45%" cy="40%">
-      <stop offset="0%" stop-color="#66ccff"/>
-      <stop offset="100%" stop-color="#2255cc"/>
+    <radialGradient id="batGrad" cx="50%" cy="40%">
+      <stop offset="0%" stop-color="#88ddff"/>
+      <stop offset="100%" stop-color="#3388cc"/>
     </radialGradient>
   </defs>
-  <circle cx="12" cy="12" r="8" fill="url(#ball1)"/>
-  <circle cx="20" cy="20" r="8" fill="url(#ball2)"/>
-  <line x1="18" y1="10" x2="14" y2="22" stroke="#fff" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
-  <line x1="22" y1="14" x2="10" y2="18" stroke="#fff" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
-  <circle cx="16" cy="16" r="2" fill="#fff" opacity="0.8"/>
+
+  <!-- Rage Ball (right) -->
+  <circle cx="22" cy="14" r="9" fill="url(#rageGrad)" stroke="#cc2200" stroke-width="0.5"/>
+  <!-- Rage eyebrows -->
+  <line x1="17" y1="9" x2="20" y2="10" stroke="#fff" stroke-width="1.2" stroke-linecap="round" opacity="0.8"/>
+  <line x1="27" y1="9" x2="24" y2="10" stroke="#fff" stroke-width="1.2" stroke-linecap="round" opacity="0.8"/>
+  <!-- Rage eyes -->
+  <circle cx="19" cy="12.5" r="1" fill="#fff"/>
+  <circle cx="25" cy="12.5" r="1" fill="#fff"/>
+  <!-- Rage mouth -->
+  <path d="M20 17 Q22 18.5 24 17" stroke="#fff" stroke-width="0.8" fill="none" stroke-linecap="round" opacity="0.8"/>
+
+  <!-- Bat Ball (left) -->
+  <circle cx="10" cy="18" r="9" fill="url(#batGrad)" stroke="#3388cc" stroke-width="0.5"/>
+  <!-- Bat cap -->
+  <path d="M4 15 Q10 10 16 15" fill="#2244aa" stroke="#1a3388" stroke-width="0.5"/>
+  <line x1="4" y1="15" x2="16" y2="15" stroke="#1a3388" stroke-width="1.4" stroke-linecap="round"/>
+  <!-- Bat eyes -->
+  <circle cx="7" cy="17" r="0.9" fill="#fff"/>
+  <circle cx="13" cy="17" r="0.9" fill="#fff"/>
+  <!-- Bat mouth (grin) -->
+  <path d="M8 20 Q10 21.5 12 20" stroke="#fff" stroke-width="0.7" fill="none" stroke-linecap="round" opacity="0.8"/>
+
+  <!-- Bat in right hand -->
+  <line x1="16" y1="14" x2="22" y2="7" stroke="#c4773a" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="22" y1="7" x2="24" y2="5" stroke="#e8a86a" stroke-width="1.8" stroke-linecap="round"/>
 </svg>
