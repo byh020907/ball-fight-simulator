@@ -2845,7 +2845,7 @@ async function testVampireBatsSpawn(app) {
     vampireFighter.ability.timer = 0;
     vampireFighter.ability.update(0.016, target);
     const bats = sim.entities.filter((e) => e.constructor?.name === "BatProjectile");
-    assert.equal(bats.length, 3, "Vampire should spawn 3 bats when cooldown triggers");
+    assert.equal(bats.length, 5, "Vampire should spawn 5 bats when cooldown triggers");
 }
 
 async function testVampireLifestealOnCollision(app) {

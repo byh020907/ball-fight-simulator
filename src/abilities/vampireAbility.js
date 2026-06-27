@@ -6,9 +6,9 @@ const LIFESTEAL_RATE_NORMAL = 0.35;
 const LIFESTEAL_RATE_LOW_HP = 0.5;
 const LOW_HP_THRESHOLD = 0.3;
 const BAT_COOLDOWN = 2.8;
-const BAT_COUNT = 4;
+const BAT_COUNT = 5;
 const BAT_SPEED_MULT = 2.5;
-const BAT_SPREAD_DEG = 30;
+const BAT_SPREAD_DEG = 40;
 
 export class VampireAbility extends Ability {
     constructor(owner, simulation) {
@@ -29,13 +29,20 @@ export class VampireAbility extends Ability {
         const spreadRad = (BAT_SPREAD_DEG * Math.PI) / 180;
         const speed = owner.baseSpeed * BAT_SPEED_MULT;
 
-        const offsets = [-spreadRad, 0, spreadRad];
-        for (const offset of offsets) {
-            const angle = baseAngle + offset;
+        const bats = [];
+        const total = BAT_COUNT;
+        for (let i = 0; i < total; i++) {
+            const t = total > 1 ? i / (total - 1) - 0.5 : 0;
+            const angle = baseAngle + t * spreadRad;
             const dir = new Vector2(Math.cos(angle), Math.sin(angle));
             const start = Vector2.add(owner.position, dir.clone().scale(owner.radius + 16));
-            const bat = new BatProjectile(owner, start, dir.clone().scale(speed));
+            const bat = new BatProjectile(owner, start, dir.clone().scale(speed), bats);
+            bats.push(bat);
             this.simulation.entities.push(bat);
+        }
+        // Link flock after all bats created
+        for (const b of bats) {
+            b._flock = bats;
         }
         this.simulation.spawnParticleBurst(owner.position.clone(), "#442233", {
             count: 10,

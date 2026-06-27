@@ -1,24 +1,28 @@
 import { Projectile, Vector2 } from "../core.js";
 
-const BAT_RADIUS = 12;
-const BAT_LIFE = 1.8;
-const HOMING_STRENGTH = 4;
+const BAT_RADIUS = 10;
+const BAT_LIFE = 2.0;
 const MAX_SPEED_MULT = 3.5;
-const DART_INTERVAL_MIN = 0.06;
-const DART_INTERVAL_MAX = 0.18;
-const DART_STRENGTH = 40;
+
+// Boids weights
+const COHESION_WEIGHT = 0.04;
+const ALIGNMENT_WEIGHT = 0.08;
+const SEPARATION_WEIGHT = 1.2;
+const SEPARATION_RADIUS = 32;
+const TARGET_ATTRACTION_WEIGHT = 0.4;
+
+// Flutter
 const FLUTTER_FREQ = 28;
-const FLUTTER_AMP = 8;
+const FLUTTER_AMP = 6;
 
 export class BatProjectile extends Projectile {
-    constructor(owner, position, velocity) {
+    constructor(owner, position, velocity, flock) {
         super(owner, position, velocity, BAT_RADIUS);
         this.life = BAT_LIFE;
         this.angle = Math.atan2(velocity.y, velocity.x);
         this.time = 0;
-        this._dartTimer = 0;
-        this._dartDir = new Vector2(0, 0);
-        this._perp = new Vector2(-velocity.y, velocity.x).normalize();
+        this._flock = flock;
+        this._dartTimer = Math.random() * 0.15;
     }
 
     update(delta, simulation) {
@@ -26,32 +30,26 @@ export class BatProjectile extends Projectile {
 
         const target = this._findTarget(simulation);
 
-        // random dart: sharp direction change at irregular intervals
-        this._dartTimer -= delta;
-        if (this._dartTimer <= 0) {
-            this._dartTimer = DART_INTERVAL_MIN + Math.random() * (DART_INTERVAL_MAX - DART_INTERVAL_MIN);
-            this._dartDir = new Vector2((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2).normalize();
-        }
+        // Boids forces
+        const boidsForce = this._computeBoidsForce(delta);
+        this.velocity.add(boidsForce);
 
-        // forward velocity
-        const forward = this.velocity.clone().scale(delta);
-
-        // dart impulse + flutter oscillation
-        const dartDelta = this._dartDir.clone().scale(DART_STRENGTH * delta);
-        const flutter = Math.sin(this.time * FLUTTER_FREQ) * FLUTTER_AMP * delta;
-
-        this.position.add(Vector2.add(forward, dartDelta));
-        this.position.add(this._perp.clone().scale(flutter));
-
-        // homing toward target
+        // target attraction
         if (target && !target.isDefeated) {
             const toTarget = Vector2.subtract(target.position, this.position).normalize();
-            this.velocity.add(toTarget.clone().scale(HOMING_STRENGTH * delta));
+            this.velocity.add(toTarget.clone().scale(TARGET_ATTRACTION_WEIGHT * 60 * delta));
             const maxSpeed = this.owner.baseSpeed * MAX_SPEED_MULT;
             if (this.velocity.length() > maxSpeed) {
                 this.velocity.normalize().scale(maxSpeed);
             }
         }
+
+        // flutter oscillation
+        const flutter = Math.sin(this.time * FLUTTER_FREQ) * FLUTTER_AMP * delta;
+        const forward = this.velocity.clone().scale(delta);
+        this.position.add(forward);
+        const perp = new Vector2(-this.velocity.y, this.velocity.x).normalize();
+        this.position.add(perp.scale(flutter));
 
         simulation.keepEntityInsideArena(this);
         this.life -= delta;
@@ -70,12 +68,53 @@ export class BatProjectile extends Projectile {
         this._projectileHitCheck(simulation);
     }
 
+    _computeBoidsForce(delta) {
+        if (!this._flock || this._flock.length < 2) return new Vector2(0, 0);
+
+        let cohesion = new Vector2(0, 0);
+        let alignment = new Vector2(0, 0);
+        let separation = new Vector2(0, 0);
+        let neighborCount = 0;
+
+        for (const other of this._flock) {
+            if (other === this || other.isExpired || other.isExpired === undefined) continue;
+            const diff = Vector2.subtract(other.position, this.position);
+            const dist = diff.length();
+            if (dist > 150) continue; // ignore far boids
+
+            neighborCount++;
+            cohesion.add(other.position);
+            alignment.add(other.velocity);
+
+            if (dist < SEPARATION_RADIUS && dist > 0.1) {
+                const repulse = diff
+                    .clone()
+                    .normalize()
+                    .scale(1 / dist);
+                separation.subtract(repulse);
+            }
+        }
+
+        if (neighborCount === 0) return new Vector2(0, 0);
+
+        cohesion.scale(1 / neighborCount);
+        cohesion.subtract(this.position);
+        cohesion.normalize().scale(COHESION_WEIGHT * 60 * delta);
+
+        alignment.scale(1 / neighborCount);
+        alignment.normalize().scale(ALIGNMENT_WEIGHT * 60 * delta);
+
+        separation.scale(SEPARATION_WEIGHT * 60 * delta);
+
+        return Vector2.add(Vector2.add(cohesion, alignment), separation);
+    }
+
     _findTarget(simulation) {
         return simulation.getOpponent(this.owner);
     }
 
     _getHitDamage() {
-        return Math.round(this.owner.baseDamage * 0.35);
+        return Math.round(this.owner.baseDamage * 0.2);
     }
 
     _getHitLabel() {
@@ -99,32 +138,32 @@ export class BatProjectile extends Projectile {
         ctx.rotate(this.angle);
         const flap = Math.sin(this.time * 20);
         const wingSpread = 0.5 + Math.abs(flap) * 0.5;
-        const wingLift = Math.sin(this.time * 20) * 4;
+        const wingLift = Math.sin(this.time * 20) * 3;
 
         // Wing shadows (lower wings)
         ctx.fillStyle = "#331122";
         ctx.beginPath();
         ctx.moveTo(-3, wingLift);
-        ctx.quadraticCurveTo(-10 * wingSpread - 4, -wingSpread * 14 - 4, -18 * wingSpread, -4);
-        ctx.quadraticCurveTo(-12 * wingSpread, wingLift + 2, -3, wingLift);
+        ctx.quadraticCurveTo(-9 * wingSpread - 3, -wingSpread * 12 - 3, -16 * wingSpread, -3);
+        ctx.quadraticCurveTo(-10 * wingSpread, wingLift + 2, -3, wingLift);
         ctx.fill();
         ctx.beginPath();
         ctx.moveTo(3, wingLift);
-        ctx.quadraticCurveTo(10 * wingSpread + 4, -wingSpread * 14 - 4, 18 * wingSpread, -4);
-        ctx.quadraticCurveTo(12 * wingSpread, wingLift + 2, 3, wingLift);
+        ctx.quadraticCurveTo(9 * wingSpread + 3, -wingSpread * 12 - 3, 16 * wingSpread, -3);
+        ctx.quadraticCurveTo(10 * wingSpread, wingLift + 2, 3, wingLift);
         ctx.fill();
 
         // Body
         ctx.fillStyle = "#442233";
         ctx.beginPath();
-        ctx.ellipse(0, 0, 7, 5, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, 6, 4, 0, 0, Math.PI * 2);
         ctx.fill();
 
         // Inner body (owner color tint)
         ctx.fillStyle = this.owner.color;
         ctx.globalAlpha = 0.5;
         ctx.beginPath();
-        ctx.ellipse(0, 0, 5, 3.5, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, 4, 3, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.globalAlpha = 1;
 
@@ -132,19 +171,19 @@ export class BatProjectile extends Projectile {
         const glow = Math.sin(this.time * 8) * 0.3 + 0.7;
         ctx.fillStyle = `rgba(255, 60, 80, ${glow})`;
         ctx.beginPath();
-        ctx.arc(4, -1.5, 2.5, 0, Math.PI * 2);
+        ctx.arc(3.5, -1.2, 2, 0, Math.PI * 2);
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(-4, -1.5, 2.5, 0, Math.PI * 2);
+        ctx.arc(-3.5, -1.2, 2, 0, Math.PI * 2);
         ctx.fill();
 
-        // Eye pupils (white core)
+        // Eye pupils
         ctx.fillStyle = "#ffccdd";
         ctx.beginPath();
-        ctx.arc(4, -1.5, 1.2, 0, Math.PI * 2);
+        ctx.arc(3.5, -1.2, 1, 0, Math.PI * 2);
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(-4, -1.5, 1.2, 0, Math.PI * 2);
+        ctx.arc(-3.5, -1.2, 1, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.restore();
