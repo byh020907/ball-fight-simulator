@@ -18,6 +18,7 @@ export class BatProjectile extends Projectile {
         this.time = 0;
         this._dartTimer = 0;
         this._dartDir = new Vector2(0, 0);
+        this._perp = new Vector2(-velocity.y, velocity.x).normalize();
     }
 
     update(delta, simulation) {
