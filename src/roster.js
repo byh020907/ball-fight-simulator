@@ -32,7 +32,7 @@ export function createRoster() {
             color: "#d99cff",
             face: "trickster",
             ability: "trickster",
-            stats: { hp: 98, damage: 10, speed: 320, radius: 46, mass: 1.02, defense: 1 }
+            stats: { hp: 110, damage: 10, speed: 320, radius: 46, mass: 1.02, defense: 1 }
         },
         {
             id: FIGHTER_IDS.GRENADE,
@@ -42,7 +42,7 @@ export function createRoster() {
             color: "#ff7676",
             face: "grenade",
             ability: "grenade",
-            stats: { hp: 108, damage: 11, speed: 278, radius: 49, mass: 1.18, defense: 2 }
+            stats: { hp: 108, damage: 11, speed: 290, radius: 49, mass: 1.18, defense: 2 }
         },
         {
             id: FIGHTER_IDS.DASH,
@@ -116,7 +116,7 @@ export function createRoster() {
             color: "#55bbdd",
             face: "phantom",
             ability: "phantom",
-            stats: { hp: 100, damage: 10, speed: 305, radius: 47, mass: 1.0, defense: 1 }
+            stats: { hp: 110, damage: 10, speed: 305, radius: 47, mass: 1.0, defense: 1 }
         },
         {
             id: FIGHTER_IDS.HERO,

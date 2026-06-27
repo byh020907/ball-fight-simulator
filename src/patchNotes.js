@@ -19,6 +19,25 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.21.0",
+        date: "2026-06-28",
+        title: "v0.21.0 업데이트",
+        changes: [
+            {
+                type: "refactor",
+                text: "Trickster Ball 상향 — 체력 98→110."
+            },
+            {
+                type: "refactor",
+                text: "Grenade Ball 상향 — 속도 278→290, 수류탄 예측 정확도 0.18→0.30."
+            },
+            {
+                type: "refactor",
+                text: "Phantom Ball 상향 — 체력 100→110, 방어력 보정 1.3→1.5."
+            }
+        ]
+    },
+    {
         version: "0.20.0",
         date: "2026-06-27",
         title: "v0.20.0 업데이트",

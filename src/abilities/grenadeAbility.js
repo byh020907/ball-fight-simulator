@@ -3,7 +3,7 @@ import { Ability } from "./ability.js";
 
 const EVADE_RANGE = 320;
 const EVADE_STRENGTH = 0.7;
-const PREDICTION_FACTOR = 0.18;
+const PREDICTION_FACTOR = 0.3;
 const FUSE_REDUCTION_PER_MISS = 0.18;
 const MAX_MISS_STREAK = 4;
 

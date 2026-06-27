@@ -16,6 +16,7 @@ import {
 import { BattleBall } from "../entities/index.js";
 import { GravityParticle } from "../effects/index.js";
 import { Simulation } from "./simulation.js";
+import { AIActionController } from "./aiActionController.js";
 
 const ABILITY_TYPES = {
     archer: ArcherAbility,
@@ -36,7 +37,7 @@ const COLLISION_RESTITUTION = 0.92;
 const COLLISION_SEPARATION_PADDING = 0.6;
 
 export class BattleSimulation extends Simulation {
-    constructor(fighterSpecs, hooks, playerBall = null) {
+    constructor(fighterSpecs, hooks, playerBall = null, options = {}) {
         super();
         this.hooks = hooks;
         const spawnPoints = this.createSpawnPoints(fighterSpecs.length);
@@ -64,6 +65,11 @@ export class BattleSimulation extends Simulation {
             timeSlowRemaining: 0,
             timeSlowFactor: 0.35
         };
+
+        // ── AI 액션 컨트롤러 ──
+        if (options.assignActions) {
+            this.aiControllers = this.fighters.map(() => new AIActionController());
+        }
     }
 
     /** 액션 예약 — _clickActionContext로 위임 */
@@ -77,7 +83,13 @@ export class BattleSimulation extends Simulation {
         if (!ctx.pendingAction) return null;
         const pa = ctx.pendingAction;
         ctx.pendingAction = null;
-        return pa;
+        this._executeAction(pa.actionInstance, pa.playerBall, pa.paidCost);
+    }
+
+    _executeAction(actionInstance, ball, paidCost) {
+        if (!actionInstance || !ball) return;
+        this.addLog(`[액션] 효과 적용: ${actionInstance.name}`);
+        actionInstance.apply(this, ball, paidCost);
     }
 
     // ── Action data interfaces ──────────────────────────────────────
@@ -159,12 +171,17 @@ export class BattleSimulation extends Simulation {
         }
 
         // 지연 적용 패턴 — 클릭 핸들러가 예약한 액션을 충돌 전에 처리
-        const pa = this._consumePendingAction();
-        if (pa) {
-            const { actionInstance, playerBall: pb, paidCost } = pa;
-            if (actionInstance && pb) {
-                this.addLog(`[액션] 효과 적용: ${actionInstance.name}`);
-                actionInstance.apply(this, pb, paidCost);
+        this._consumePendingAction();
+
+        // AI 액션 의사결정
+        if (this.aiControllers) {
+            for (let i = 0; i < this.fighters.length; i++) {
+                const fighter = this.fighters[i];
+                if (fighter.isDefeated) continue;
+                const result = this.aiControllers[i].evaluate(this, fighter, delta);
+                if (result) {
+                    this._executeAction(result.action, result.fighter, result.paidCost);
+                }
             }
         }
 

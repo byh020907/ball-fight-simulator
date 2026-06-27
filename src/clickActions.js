@@ -96,32 +96,30 @@ class ClickAction {
     canHoldContinue(sim, playerBall) {
         return true;
     }
+
+    /**
+     * AI가 이 액션을 사용할 조건. sim, fighter, opponent 객체를 전달받아
+     * 실제로 이득을 볼 수 있는 상황인지 판단합니다.
+     * 각 Action이 자신의 발동 조건을 직접 소유합니다.
+     */
+    canAIUse(sim, fighter, opponent, hpRatio, distance) {
+        return false;
+    }
 }
 
 // ── Concrete Actions ────────────────────────────────────────────
-// 모두 TapTrigger 기본값 사용
-// 모든 값은 모듈 상수로 관리 — description과 apply가 같은 값을 사용
-
-const TIME_WARP_DURATION = 0.5;
-const TIME_WARP_COST = 0.5;
-
-const RUSH_DURATION = 1;
-const RUSH_SPEED_BONUS = 0.5;
-const RUSH_COST = 1.0;
-
-const COUNTER_WINDOW_SECONDS = 0.2;
-const COUNTER_REFLECT_RATE = 1.0;
-const COUNTER_COST = 1.5;
-
-const PROJECTILE_GUARD_WINDOW_SECONDS = 0.3;
-const PROJECTILE_GUARD_DAMAGE_MULTIPLIER = 0.25;
-const PROJECTILE_GUARD_COST = 1.0;
-
-const ENDURE_DURATION = 0.1;
-const ENDURE_DAMAGE_MULTIPLIER = 0.2;
-const ENDURE_COST = 1.0;
+// 각 Action이 자신의 파라미터를 static DEFAULT + 인스턴스 변수로 소유
 
 class TimeWarpAction extends ClickAction {
+    static DEFAULT_DURATION = 0.5;
+    static DEFAULT_HP_COST = 0.5;
+
+    constructor() {
+        super();
+        this.duration = TimeWarpAction.DEFAULT_DURATION;
+        this._hpCostPercent = TimeWarpAction.DEFAULT_HP_COST;
+    }
+
     get id() {
         return "time_warp";
     }
@@ -129,19 +127,36 @@ class TimeWarpAction extends ClickAction {
         return "시간 왜곡";
     }
     get description() {
-        return `${TIME_WARP_DURATION}초간 상대만 슬로우`;
+        return `${this.duration}초간 상대만 슬로우`;
     }
     get hpCostPercent() {
-        return TIME_WARP_COST;
+        return this._hpCostPercent;
     }
 
     apply(sim, playerBall) {
         const current = sim.getTimeSlowRemaining();
-        sim.setTimeSlowRemaining(Math.max(current, TIME_WARP_DURATION));
+        sim.setTimeSlowRemaining(Math.max(current, this.duration));
+    }
+
+    canAIUse(sim, fighter, opponent, hpRatio, distance) {
+        const opponentSpeed = opponent.velocity?.length() ?? 0;
+        const mySpeed = fighter.velocity?.length() ?? 0;
+        return opponentSpeed > mySpeed * 1.5;
     }
 }
 
 class RushAction extends ClickAction {
+    static DEFAULT_DURATION = 1;
+    static DEFAULT_SPEED_BONUS = 0.5;
+    static DEFAULT_HP_COST = 1.0;
+
+    constructor() {
+        super();
+        this.duration = RushAction.DEFAULT_DURATION;
+        this.speedBonus = RushAction.DEFAULT_SPEED_BONUS;
+        this._hpCostPercent = RushAction.DEFAULT_HP_COST;
+    }
+
     get id() {
         return "rush";
     }
@@ -149,17 +164,17 @@ class RushAction extends ClickAction {
         return "돌진";
     }
     get description() {
-        return `${RUSH_DURATION}초간 속도 +${RUSH_SPEED_BONUS * 100}%`;
+        return `${this.duration}초간 속도 +${this.speedBonus * 100}%`;
     }
     get hpCostPercent() {
-        return RUSH_COST;
+        return this._hpCostPercent;
     }
 
     apply(sim, playerBall) {
         const current = playerBall.actionContext.getEffect(this.id)?.remaining ?? 0;
         playerBall.actionContext.setEffect(this.id, {
-            remaining: current > 0 ? current + RUSH_DURATION : RUSH_DURATION,
-            getSpeedMultiplier: () => 1 + RUSH_SPEED_BONUS
+            remaining: current > 0 ? current + this.duration : this.duration,
+            getSpeedMultiplier: () => 1 + this.speedBonus
         });
         this._applyBurstImpulse(sim, playerBall);
     }
@@ -184,9 +199,24 @@ class RushAction extends ClickAction {
         }
         return Vector2.fromAngle(Math.random() * Math.PI * 2, 1);
     }
+
+    canAIUse(sim, fighter, opponent, hpRatio, distance) {
+        return distance > 250;
+    }
 }
 
 class CounterAction extends ClickAction {
+    static DEFAULT_WINDOW_SECONDS = 0.2;
+    static DEFAULT_REFLECT_RATE = 1.0;
+    static DEFAULT_HP_COST = 1.5;
+
+    constructor() {
+        super();
+        this.windowSeconds = CounterAction.DEFAULT_WINDOW_SECONDS;
+        this.reflectRate = CounterAction.DEFAULT_REFLECT_RATE;
+        this._hpCostPercent = CounterAction.DEFAULT_HP_COST;
+    }
+
     get id() {
         return "counter";
     }
@@ -194,19 +224,19 @@ class CounterAction extends ClickAction {
         return "카운터";
     }
     get description() {
-        return `${COUNTER_WINDOW_SECONDS.toFixed(2)}초 안에 충돌 시 받는 충돌 데미지 반사`;
+        return `${this.windowSeconds.toFixed(2)}초 안에 충돌 시 받는 충돌 데미지 반사`;
     }
     get hpCostPercent() {
-        return COUNTER_COST;
+        return this._hpCostPercent;
     }
 
     apply(sim, playerBall) {
-        sim.spawnActionWindow(playerBall, this.id, COUNTER_WINDOW_SECONDS);
+        sim.spawnActionWindow(playerBall, this.id, this.windowSeconds);
         sim.playSound("counter");
         const effect = {
-            remaining: COUNTER_WINDOW_SECONDS,
+            remaining: this.windowSeconds,
             onFighterCollision: (owner, opponent, outgoingDamage, incomingDamage, simulation) => {
-                const reflectedDamage = Math.round(incomingDamage * COUNTER_REFLECT_RATE);
+                const reflectedDamage = Math.round(incomingDamage * this.reflectRate);
                 if (reflectedDamage > 0) {
                     opponent.takeDamage(reflectedDamage, owner, "Counter");
                     simulation.spawnActionText(opponent.position.clone(), "카운터!", "#ff8844");
@@ -220,9 +250,29 @@ class CounterAction extends ClickAction {
 
         playerBall.actionContext.setEffect(this.id, effect);
     }
+
+    canAIUse(sim, fighter, opponent, hpRatio, distance) {
+        if (distance > 250) return false;
+        const toMe = Vector2.subtract(fighter.position, opponent.position);
+        const dist = toMe.length();
+        if (dist === 0) return false;
+        const approach = opponent.velocity.dot(toMe.normalize());
+        return approach > fighter.baseSpeed * 0.5;
+    }
 }
 
 class ProjectileGuardAction extends ClickAction {
+    static DEFAULT_WINDOW_SECONDS = 0.3;
+    static DEFAULT_DAMAGE_MULTIPLIER = 0.25;
+    static DEFAULT_HP_COST = 1.0;
+
+    constructor() {
+        super();
+        this.windowSeconds = ProjectileGuardAction.DEFAULT_WINDOW_SECONDS;
+        this.damageMultiplier = ProjectileGuardAction.DEFAULT_DAMAGE_MULTIPLIER;
+        this._hpCostPercent = ProjectileGuardAction.DEFAULT_HP_COST;
+    }
+
     get id() {
         return "projectile_guard";
     }
@@ -230,32 +280,58 @@ class ProjectileGuardAction extends ClickAction {
         return "투사체 방어";
     }
     get description() {
-        return `${PROJECTILE_GUARD_WINDOW_SECONDS}초 안에 맞는 투사체 데미지 ${(1 - PROJECTILE_GUARD_DAMAGE_MULTIPLIER) * 100}% 경감`;
+        return `${this.windowSeconds}초 안에 맞는 투사체 데미지 ${(1 - this.damageMultiplier) * 100}% 경감`;
     }
     get hpCostPercent() {
-        return PROJECTILE_GUARD_COST;
+        return this._hpCostPercent;
     }
 
     apply(sim, playerBall, paidCost = 0) {
-        sim.spawnActionWindow(playerBall, this.id, PROJECTILE_GUARD_WINDOW_SECONDS);
+        sim.spawnActionWindow(playerBall, this.id, this.windowSeconds);
         sim.playSound("projectile_guard");
         const effect = {
-            remaining: PROJECTILE_GUARD_WINDOW_SECONDS,
+            remaining: this.windowSeconds,
             onProjectileDamage: (amount, projectile, source, label, simulation, target) => {
                 effect.isExpired = true;
                 target.actionContext.refundHpForAction(target, paidCost);
                 simulation.spawnActionText(target.position.clone(), "투사체 방어!", "#44ddff");
                 simulation.spawnActionSuccess(target.position.clone(), "projectile_guard");
                 simulation.playSound("projectile_guard");
-                return Math.round(amount * PROJECTILE_GUARD_DAMAGE_MULTIPLIER);
+                return Math.round(amount * this.damageMultiplier);
             }
         };
 
         playerBall.actionContext.setEffect(this.id, effect);
     }
+
+    canAIUse(sim, fighter, opponent, hpRatio, distance) {
+        return sim.entities.some((e) => {
+            if (e === fighter || e === opponent || !e.velocity) return false;
+            const speed = e.velocity.length();
+            if (speed < 50) return false;
+            const toMe = Vector2.subtract(fighter.position, e.position);
+            const dist = toMe.length();
+            if (dist > 300) return false;
+            const approach = e.velocity.dot(toMe.normalize());
+            if (approach <= 0) return false;
+            const timeToHit = dist / approach;
+            return timeToHit < 0.35;
+        });
+    }
 }
 
 class EndureAction extends ClickAction {
+    static DEFAULT_DURATION = 0.2;
+    static DEFAULT_DAMAGE_MULTIPLIER = 0.2;
+    static DEFAULT_HP_COST = 1.0;
+
+    constructor() {
+        super();
+        this.duration = EndureAction.DEFAULT_DURATION;
+        this.damageMultiplier = EndureAction.DEFAULT_DAMAGE_MULTIPLIER;
+        this._hpCostPercent = EndureAction.DEFAULT_HP_COST;
+    }
+
     get id() {
         return "endure";
     }
@@ -263,24 +339,190 @@ class EndureAction extends ClickAction {
         return "버티기";
     }
     get description() {
-        return `${ENDURE_DURATION}초간 받는 모든 데미지 ${(1 - ENDURE_DAMAGE_MULTIPLIER) * 100}% 경감`;
+        return `${this.duration}초간 받는 모든 데미지 ${(1 - this.damageMultiplier) * 100}% 경감`;
     }
     get hpCostPercent() {
-        return ENDURE_COST;
+        return this._hpCostPercent;
     }
 
     apply(sim, playerBall) {
-        sim.spawnActionWindow(playerBall, this.id, ENDURE_DURATION);
+        sim.spawnActionWindow(playerBall, this.id, this.duration);
         sim.playSound("guard");
         playerBall.actionContext.setEffect(this.id, {
-            remaining: ENDURE_DURATION,
+            remaining: this.duration,
             onDamageTaken: (amount, source, label) => {
                 source?.simulation?.spawnActionText?.(playerBall.position.clone(), "버팀!", "#44ff44");
                 source?.simulation?.spawnActionSuccess?.(playerBall.position.clone(), "endure");
                 source?.simulation?.playSound?.("guard");
-                return Math.round(amount * ENDURE_DAMAGE_MULTIPLIER);
+                return Math.round(amount * this.damageMultiplier);
             }
         });
+    }
+
+    canAIUse(sim, fighter, opponent, hpRatio, distance) {
+        if (distance > 300) return false;
+        const toMe = Vector2.subtract(fighter.position, opponent.position);
+        const dist = toMe.length();
+        if (dist === 0) return false;
+        const approach = opponent.velocity.dot(toMe.normalize());
+        if (approach <= 10) return false;
+        const timeToHit = dist / approach;
+        return timeToHit < 0.3;
+    }
+}
+
+class LifeStealAction extends ClickAction {
+    static DEFAULT_DURATION = 2.0;
+    static DEFAULT_LIFESTEAL_RATE = 0.5;
+    static DEFAULT_HP_COST = 1.0;
+
+    constructor() {
+        super();
+        this.duration = LifeStealAction.DEFAULT_DURATION;
+        this.lifestealRate = LifeStealAction.DEFAULT_LIFESTEAL_RATE;
+        this._hpCostPercent = LifeStealAction.DEFAULT_HP_COST;
+    }
+
+    get id() {
+        return "life_steal";
+    }
+    get name() {
+        return "흡혈";
+    }
+    get description() {
+        return `${this.duration}초간 다음 충돌 피해의 ${this.lifestealRate * 100}% HP 회복`;
+    }
+    get hpCostPercent() {
+        return this._hpCostPercent;
+    }
+
+    apply(sim, playerBall) {
+        let consumed = false;
+        playerBall.actionContext.setEffect(this.id, {
+            remaining: this.duration,
+            onFighterCollision: (owner, opponent, outgoingDamage, incomingDamage, simulation) => {
+                if (consumed || outgoingDamage <= 0) return;
+                consumed = true;
+                const heal = Math.round(outgoingDamage * this.lifestealRate);
+                const actual = owner.actionContext.refundHpForAction(owner, heal);
+                if (actual > 0) {
+                    simulation.spawnActionText(owner.position.clone(), `흡혈 +${actual}`, "#ff6666");
+                    simulation.spawnActionSuccess(owner.position.clone(), "life_steal");
+                }
+            }
+        });
+    }
+
+    canAIUse(sim, fighter, opponent, hpRatio, distance) {
+        return hpRatio < 0.6 && distance < 250;
+    }
+}
+
+class ShockwaveAction extends ClickAction {
+    static DEFAULT_RADIUS = 150;
+    static DEFAULT_PUSH_FORCE = 400;
+    static DEFAULT_HP_COST = 1.2;
+
+    constructor() {
+        super();
+        this.radius = ShockwaveAction.DEFAULT_RADIUS;
+        this.pushForce = ShockwaveAction.DEFAULT_PUSH_FORCE;
+        this._hpCostPercent = ShockwaveAction.DEFAULT_HP_COST;
+    }
+
+    get id() {
+        return "shockwave";
+    }
+    get name() {
+        return "충격파";
+    }
+    get description() {
+        return `반경 ${this.radius}px 내 대상을 밀쳐냄`;
+    }
+    get hpCostPercent() {
+        return this._hpCostPercent;
+    }
+
+    apply(sim, playerBall) {
+        for (const fighter of sim.fighters) {
+            if (fighter === playerBall || fighter.isDefeated) continue;
+            const toFighter = Vector2.subtract(fighter.position, playerBall.position);
+            const dist = toFighter.length();
+            if (dist > this.radius || dist === 0) continue;
+            const force = this.pushForce * (1 - dist / this.radius);
+            fighter.applyImpulse(toFighter.normalize().scale(force));
+        }
+        for (const entity of sim.entities) {
+            if (entity === playerBall || entity.isExpired || typeof entity.applyImpulse !== "function") continue;
+            const toEntity = Vector2.subtract(entity.position, playerBall.position);
+            const dist = toEntity.length();
+            if (dist > this.radius || dist === 0) continue;
+            const force = this.pushForce * 0.5 * (1 - dist / this.radius);
+            entity.applyImpulse(toEntity.normalize().scale(force));
+        }
+        sim.spawnPulse(playerBall.position.clone(), "#88aaff");
+    }
+
+    canAIUse(sim, fighter, opponent, hpRatio, distance) {
+        return distance < 200 && hpRatio < 0.7;
+    }
+}
+
+class EvadeAction extends ClickAction {
+    static DEFAULT_WINDOW = 0.2;
+    static DEFAULT_SPEED_BOOST = 0.4;
+    static DEFAULT_SPEED_BOOST_DURATION = 0.5;
+    static DEFAULT_HP_COST = 0.8;
+
+    constructor() {
+        super();
+        this.window = EvadeAction.DEFAULT_WINDOW;
+        this.speedBoost = EvadeAction.DEFAULT_SPEED_BOOST;
+        this.speedBoostDuration = EvadeAction.DEFAULT_SPEED_BOOST_DURATION;
+        this._hpCostPercent = EvadeAction.DEFAULT_HP_COST;
+    }
+
+    get id() {
+        return "evade";
+    }
+    get name() {
+        return "회피";
+    }
+    get description() {
+        return `${this.window}초 회피 윈도우, 성공 시 속도 +${this.speedBoost * 100}%`;
+    }
+    get hpCostPercent() {
+        return this._hpCostPercent;
+    }
+
+    apply(sim, playerBall) {
+        sim.spawnActionWindow(playerBall, this.id, this.window);
+        let evaded = false;
+        playerBall.actionContext.setEffect(this.id, {
+            remaining: this.window,
+            onDamageTaken: (amount, source, label) => {
+                if (evaded) return amount;
+                evaded = true;
+                playerBall.actionContext.setEffect("evade_speed", {
+                    remaining: this.speedBoostDuration,
+                    getSpeedMultiplier: () => 1 + this.speedBoost
+                });
+                sim.spawnActionText(playerBall.position.clone(), "회피!", "#44ddff");
+                sim.spawnActionSuccess(playerBall.position.clone(), "evade");
+                return 0;
+            }
+        });
+    }
+
+    canAIUse(sim, fighter, opponent, hpRatio, distance) {
+        if (distance > 300) return false;
+        const toMe = Vector2.subtract(fighter.position, opponent.position);
+        const dist = toMe.length();
+        if (dist === 0) return false;
+        const approach = opponent.velocity.dot(toMe.normalize());
+        if (approach <= 10) return false;
+        const timeToHit = dist / approach;
+        return timeToHit < 0.25;
     }
 }
 
@@ -291,7 +533,10 @@ const ACTION_POOL = Object.freeze([
     new RushAction(),
     new CounterAction(),
     new ProjectileGuardAction(),
-    new EndureAction()
+    new EndureAction(),
+    new LifeStealAction(),
+    new ShockwaveAction(),
+    new EvadeAction()
 ]);
 
 export function getActionPool() {

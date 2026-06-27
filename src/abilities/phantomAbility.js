@@ -219,7 +219,7 @@ export class PhantomAbility extends Ability {
     }
 
     getStatModifiers() {
-        return { speed: 1.1, damage: 1, defense: 1.3, impact: 1.1 };
+        return { speed: 1.1, damage: 1, defense: 1.5, impact: 1.1 };
     }
 
     draw(ctx) {

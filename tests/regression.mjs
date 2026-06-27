@@ -734,7 +734,7 @@ function testClickActionEffectOwnership(app) {
         "EndureAction should own damage reduction logic"
     );
 
-    player.actionContext.tickTimers(player, 0.11);
+    player.actionContext.tickTimers(player, 0.21);
     assert.equal(player.actionContext.onDamageTaken(11, opponent, "Test"), 11, "Endure effect should expire");
 }
 
