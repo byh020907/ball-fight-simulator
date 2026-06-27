@@ -40,6 +40,7 @@ export class DashAbility extends Ability {
                 duration: MAX_DASH_DURATION,
                 multiplier: this.dashMultiplier,
                 color: this.owner.color,
+                collisionDamage: Math.round(this.owner.baseDamage * 0.4),
                 collisionLabel: "Dash Contact",
                 untilImpact: true,
                 untilWall: true
