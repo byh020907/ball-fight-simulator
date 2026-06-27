@@ -165,7 +165,8 @@ export class PhantomAbility extends Ability {
                 showRing: false,
                 collisionDamage: BONUS_DAMAGE,
                 collisionLabel: "Shadow Strike",
-                untilImpact: true
+                untilImpact: true,
+                untilWall: true
             })
         );
         owner.forceHeading(dashDir, DASH_DURATION);
