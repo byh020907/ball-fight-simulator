@@ -231,7 +231,7 @@ async function testEaterFeast(app) {
         app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER)
     ]);
     const [eater, target] = app.simulation.fighters;
-    assert.equal(eater.baseDefense, 2, "Eater base defense should stay near the roster average");
+    assert.equal(eater.stats.baseDefense, 2, "Eater base defense should stay near the roster average");
     eater.position.x = 300;
     eater.position.y = 480;
     target.position.x = 360;
@@ -265,7 +265,7 @@ async function testEaterFeast(app) {
     assert.equal(target.state.forcedHeading, null, "Spit dash should allow wall bounce direction changes");
     assert.equal(
         Math.round(target.velocity.length()),
-        target.baseSpeed * 2,
+        target.stats.baseSpeed * 2,
         "Spat target should launch at twice its base speed"
     );
     assert.equal(target.state.movement.showRing, false, "Spit dash should not draw the normal speed ring");
@@ -312,7 +312,7 @@ async function testDashBallCooldownDash(app) {
         app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER)
     ]);
     const [dashBall, target] = app.simulation.fighters;
-    assert.equal(dashBall.baseDamage, 10, "Dash Ball should have reduced base damage");
+    assert.equal(dashBall.stats.baseDamage, 10, "Dash Ball should have reduced base damage");
     dashBall.position.x = 300;
     dashBall.position.y = 480;
     target.position.x = 620;
@@ -399,7 +399,7 @@ async function testDashBallCooldownDash(app) {
         })
     );
     dashBall.forceHeading(new Vector2(1, 0), 1.4);
-    dashBall.applyImpulse(Vector2.subtract(new Vector2(1, 0).scale(dashBall.baseSpeed), dashBall.velocity));
+    dashBall.applyImpulse(Vector2.subtract(new Vector2(1, 0).scale(dashBall.stats.baseSpeed), dashBall.velocity));
     app.simulation.keepInsideArena(dashBall);
     assert.equal(dashBall.state.movement, null, "Dash Ball dash should clear on wall contact");
     assert.equal(dashBall.ability.state.cooldownLevel, 0, "Wall contact should reset cooldown stacks");
@@ -431,11 +431,11 @@ async function testCollisionImpulsePersists(app) {
     a.update(0.016, sim);
     b.update(0.016, sim);
     assert.ok(
-        a.velocity.length() > a.baseSpeed * 1.2,
+        a.velocity.length() > a.stats.baseSpeed * 1.2,
         "Collision impulse should persist instead of snapping back to base speed"
     );
     assert.ok(
-        b.velocity.length() > b.baseSpeed * 1.2,
+        b.velocity.length() > b.stats.baseSpeed * 1.2,
         "Collision impulse should persist on both fighters after one update"
     );
 }
@@ -717,7 +717,7 @@ function testClickActionEffectOwnership(app) {
 
     assert.equal(sim.getSpeedMultiplier(player), 1.5, "RushAction should register speed effect on its target ball");
     assert.equal(sim.getSpeedMultiplier(opponent), 1, "RushAction should not boost unrelated balls");
-    const expectedRushSpeed = player.baseSpeed * player.getStatModifiers().speed * sim.getSpeedMultiplier(player);
+    const expectedRushSpeed = player.stats.baseSpeed * player.getStatModifiers().speed * sim.getSpeedMultiplier(player);
     assert.ok(player.velocity.x > 120, "RushAction should immediately burst forward instead of only buffing speed");
     assert.ok(
         Math.abs(player.velocity.length() - expectedRushSpeed) < 0.001,
@@ -1138,7 +1138,7 @@ async function testHeroOrbSpeedMinMax(app) {
         assert.ok(orb, `Orb should be spawned (iteration ${i})`);
 
         const orbSpeed = orb.velocity.length();
-        const effectiveBaseSpeed = heroFighter.baseSpeed * (heroFighter.getStatModifiers()?.speed ?? 1);
+        const effectiveBaseSpeed = heroFighter.stats.baseSpeed * (heroFighter.getStatModifiers()?.speed ?? 1);
         const expectedMin = effectiveBaseSpeed * 1.2;
         const expectedMax = effectiveBaseSpeed * 1.5;
         assert.ok(
@@ -1170,7 +1170,7 @@ async function testHeroOrbSpeedScalesWithOwner(app) {
     const speed1 = orb1.velocity.length();
 
     // Increase owner baseSpeed and spawn again
-    heroFighter.baseSpeed *= 2;
+    heroFighter.stats.baseSpeed *= 2;
     sim.entities = sim.fighters.slice();
     heroFighter.ability.timer = 0;
     heroFighter.ability.update(0.016, target);
@@ -1406,7 +1406,7 @@ async function testSpecialOrbOwnerCollectDash(app) {
     assert.ok(heroFighter.state.movement, "Dash orb should set movementEffect on owner");
     assert.ok(heroFighter.state.movement.constructor?.name === "DashEffect", "Dash orb should use DashEffect");
     const dashSpeed = heroFighter.state.movement.getSpeed(heroFighter);
-    const expectedSpeed = heroFighter.baseSpeed * 1.5;
+    const expectedSpeed = heroFighter.stats.baseSpeed * 1.5;
     assert.ok(
         Math.abs(dashSpeed - expectedSpeed) < 1,
         `Dash orb speed (${dashSpeed.toFixed(1)}) should be ~${expectedSpeed.toFixed(1)}`
@@ -1438,7 +1438,7 @@ async function testSpecialOrbOwnerCollectArrow(app) {
     const arrow = newEntities.find((e) => e.constructor?.name === "ArrowProjectile");
     assert.ok(arrow, "Arrow orb should spawn an ArrowProjectile");
     const arrowSpeed = arrow.velocity.length();
-    const expectedSpeed = heroFighter.baseSpeed * 2.0;
+    const expectedSpeed = heroFighter.stats.baseSpeed * 2.0;
     assert.ok(
         Math.abs(arrowSpeed - expectedSpeed) < expectedSpeed * 0.1,
         `Arrow speed (${arrowSpeed.toFixed(1)}) should be ~${expectedSpeed.toFixed(1)}`
@@ -1682,7 +1682,7 @@ async function testHeroOrbStatGainDamage(app) {
     const heroFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.HERO);
     const { HeroOrb } = await import("../src/entities/index.js");
 
-    const dmgBefore = heroFighter.baseDamage;
+    const dmgBefore = heroFighter.stats.baseDamage;
     const orb = new HeroOrb(heroFighter, heroFighter.position.clone(), new Vector2(0, 0), "damage", 10);
     orb.position = heroFighter.position.clone();
     sim.entities.push(orb);
@@ -1690,7 +1690,7 @@ async function testHeroOrbStatGainDamage(app) {
     const gained = heroFighter.hero.bonuses.damage;
     assert.ok(gained >= 1 && gained <= 5, "Damage gain should be 1~5");
     assert.ok(
-        Math.abs(heroFighter.baseDamage - dmgBefore * Math.pow(1.02, gained)) < 0.1,
+        Math.abs(heroFighter.stats.baseDamage - dmgBefore * Math.pow(1.02, gained)) < 0.1,
         `baseDamage should reflect 1.02^${gained} increase`
     );
 }
@@ -1702,14 +1702,18 @@ async function testHeroOrbStatGainSpeed(app) {
     const heroFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.HERO);
     const { HeroOrb } = await import("../src/entities/index.js");
 
-    const speedBefore = heroFighter.baseSpeed;
+    const speedBefore = heroFighter.stats.baseSpeed;
     const orb = new HeroOrb(heroFighter, heroFighter.position.clone(), new Vector2(0, 0), "speed", 10);
     orb.position = heroFighter.position.clone();
     sim.entities.push(orb);
     orb.update(0.016, sim);
     const gained = heroFighter.hero.bonuses.speed;
     assert.ok(gained >= 1 && gained <= 5, "Speed gain should be 1~5");
-    assert.equal(heroFighter.baseSpeed, Math.round(speedBefore + 4 * gained), "baseSpeed should increase by 4×gained");
+    assert.equal(
+        heroFighter.stats.baseSpeed,
+        Math.round(speedBefore + 4 * gained),
+        "baseSpeed should increase by 4×gained"
+    );
 }
 
 async function testHeroOrbStatGainDefense(app) {
@@ -1719,7 +1723,7 @@ async function testHeroOrbStatGainDefense(app) {
     const heroFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.HERO);
     const { HeroOrb } = await import("../src/entities/index.js");
 
-    const defBefore = heroFighter.baseDefense;
+    const defBefore = heroFighter.stats.baseDefense;
     const orb = new HeroOrb(heroFighter, heroFighter.position.clone(), new Vector2(0, 0), "defense", 10);
     orb.position = heroFighter.position.clone();
     sim.entities.push(orb);
@@ -1727,7 +1731,7 @@ async function testHeroOrbStatGainDefense(app) {
     const gained = heroFighter.hero.bonuses.defense;
     assert.ok(gained >= 1 && gained <= 5, "Defense gain should be 1~5");
     assert.equal(
-        heroFighter.baseDefense,
+        heroFighter.stats.baseDefense,
         Number((defBefore + 0.33 * gained).toFixed(2)),
         "baseDefense should increase by 0.33×gained"
     );
@@ -1860,12 +1864,12 @@ async function testApplyHeroOrbCarryoverToBattleBall(app) {
     const ball = new BattleBall(hero, { x: 480, y: 480 });
 
     const hpBefore = ball.maxHp;
-    const speedBefore = ball.baseSpeed;
+    const speedBefore = ball.stats.baseSpeed;
 
     applyHeroOrbCarryoverToBattleBall(ball, { hp: 2, speed: 2 });
 
     assert.equal(ball.maxHp, hpBefore + 10, "hp carry +2 should increase maxHp by 10");
-    assert.equal(ball.baseSpeed, speedBefore + 8, "speed carry +2 should increase baseSpeed by 8");
+    assert.equal(ball.stats.baseSpeed, speedBefore + 8, "speed carry +2 should increase baseSpeed by 8");
     assert.equal(ball.hero.bonuses.hp, 0, "carryover should NOT count as current match gain");
     assert.equal(ball.hero.bonuses.speed, 0, "carryover should NOT count as current match gain");
 }
@@ -1935,7 +1939,7 @@ async function testTricksterSeedSpeedBuff(app) {
     // Check speed range: owner combat speed × 1.2~1.5
     for (const seed of seeds) {
         const seedSpeed = seed.velocity.length();
-        const ownerSpeed = trickster.baseSpeed * (trickster.getStatModifiers()?.speed ?? 1);
+        const ownerSpeed = trickster.stats.baseSpeed * (trickster.getStatModifiers()?.speed ?? 1);
         const expectedMin = ownerSpeed * 1.2;
         const expectedMax = ownerSpeed * 1.5;
         assert.ok(
@@ -1987,7 +1991,7 @@ async function testTricksterSeedSpeedScalesWithOwner(app) {
     const speed1 = seeds1[0].velocity.length();
 
     // Double baseSpeed
-    trickster.baseSpeed *= 2;
+    trickster.stats.baseSpeed *= 2;
     app.simulation.entities = [];
     trickster.ability.timer = 0;
     trickster.ability.update(0.016, opponent);

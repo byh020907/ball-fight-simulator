@@ -40,7 +40,7 @@ export class DashAbility extends Ability {
                 duration: MAX_DASH_DURATION,
                 multiplier: this.dashMultiplier,
                 color: this.owner.color,
-                collisionDamage: Math.round(this.owner.baseDamage * 0.4),
+                collisionDamage: Math.round(this.owner.stats.baseDamage * 0.4),
                 collisionLabel: "Dash Contact",
                 untilImpact: true,
                 untilWall: true
@@ -50,7 +50,7 @@ export class DashAbility extends Ability {
         this.owner.applyImpulse(
             direction
                 .clone()
-                .scale(this.owner.baseSpeed * this.dashMultiplier)
+                .scale(this.owner.stats.baseSpeed * this.dashMultiplier)
                 .subtract(this.owner.velocity)
         );
         this.simulation.playSound("dash", DASH_SOUND_PITCH);

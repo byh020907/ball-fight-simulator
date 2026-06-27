@@ -53,7 +53,7 @@ export const HERO_ORB_EFFECTS = {
             if (!clamped.applied) return { applied: false };
             const amount = clamped.amount;
             owner.hero.bonuses.damage += amount;
-            owner.baseDamage = Number((owner.baseDamage * Math.pow(1.02, amount)).toFixed(1));
+            owner.stats.baseDamage = Number((owner.stats.baseDamage * Math.pow(1.02, amount)).toFixed(1));
             return { applied: true, amount };
         }
     },
@@ -66,7 +66,7 @@ export const HERO_ORB_EFFECTS = {
             if (!clamped.applied) return { applied: false };
             const amount = clamped.amount;
             owner.hero.bonuses.speed += amount;
-            owner.baseSpeed = Math.round(owner.baseSpeed + 4 * amount);
+            owner.stats.baseSpeed = Math.round(owner.stats.baseSpeed + 4 * amount);
             return { applied: true, amount };
         }
     },
@@ -79,7 +79,7 @@ export const HERO_ORB_EFFECTS = {
             if (!clamped.applied) return { applied: false };
             const amount = clamped.amount;
             owner.hero.bonuses.defense += amount;
-            owner.baseDefense = Number((owner.baseDefense + 0.33 * amount).toFixed(2));
+            owner.stats.baseDefense = Number((owner.stats.baseDefense + 0.33 * amount).toFixed(2));
             return { applied: true, amount };
         }
     },
@@ -209,13 +209,13 @@ export function applyHeroOrbStatAmount(owner, statKey, amount, opts = {}) {
             owner.hp = Math.min(owner.hp + 5 * amount, owner.maxHp);
             break;
         case "damage":
-            owner.baseDamage = Number((owner.baseDamage * Math.pow(1.02, amount)).toFixed(1));
+            owner.stats.baseDamage = Number((owner.stats.baseDamage * Math.pow(1.02, amount)).toFixed(1));
             break;
         case "speed":
-            owner.baseSpeed = Math.round(owner.baseSpeed + 4 * amount);
+            owner.stats.baseSpeed = Math.round(owner.stats.baseSpeed + 4 * amount);
             break;
         case "defense":
-            owner.baseDefense = Number((owner.baseDefense + 0.33 * amount).toFixed(2));
+            owner.stats.baseDefense = Number((owner.stats.baseDefense + 0.33 * amount).toFixed(2));
             break;
         case "skill":
             if (owner.statAllocation) {

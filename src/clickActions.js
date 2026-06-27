@@ -194,7 +194,7 @@ class RushAction extends ClickAction {
         const direction = this._getRushDirection(sim, playerBall, currentSpeed);
         const targetSpeed = Math.max(
             currentSpeed,
-            playerBall.baseSpeed * playerBall.getStatModifiers().speed * sim.getSpeedMultiplier(playerBall)
+            playerBall.stats.baseSpeed * playerBall.getStatModifiers().speed * sim.getSpeedMultiplier(playerBall)
         );
         playerBall.applyImpulse(direction.scale(targetSpeed).subtract(playerBall.velocity));
     }

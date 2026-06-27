@@ -27,7 +27,7 @@ export class VampireAbility extends Ability {
         const owner = this.owner;
         const baseAngle = Math.atan2(target.position.y - owner.position.y, target.position.x - owner.position.x);
         const spreadRad = (BAT_SPREAD_DEG * Math.PI) / 180;
-        const speed = owner.baseSpeed * BAT_SPEED_MULT;
+        const speed = owner.stats.baseSpeed * BAT_SPEED_MULT;
 
         const bats = [];
         const total = BAT_COUNT;
@@ -71,7 +71,7 @@ export class VampireAbility extends Ability {
         const dist = Vector2.subtract(target.position, owner.position).length();
         if (dist > owner.radius + target.radius + 10) return 0;
         const relativeSpeed = Vector2.subtract(target.velocity, owner.velocity).length();
-        return Math.round(owner.baseDamage * 0.5 * Math.min(3, relativeSpeed / owner.baseSpeed));
+        return Math.round(owner.stats.baseDamage * 0.5 * Math.min(3, relativeSpeed / owner.stats.baseSpeed));
     }
 
     getStatModifiers() {

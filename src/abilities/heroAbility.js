@@ -40,7 +40,7 @@ export function computeOwnerCombatSpeed(owner) {
     const slowMult = owner.state.slow ? owner.state.slow.amount : 1;
     const boostMult = owner.state.speedBoost ? owner.state.speedBoost.multiplier : 1;
     const movementSpeed = owner.state.movement?.getSpeed?.(owner);
-    return movementSpeed ?? owner.baseSpeed * baseMult * slowMult * boostMult;
+    return movementSpeed ?? owner.stats.baseSpeed * baseMult * slowMult * boostMult;
 }
 
 export class HeroAbility extends Ability {

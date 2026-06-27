@@ -70,7 +70,7 @@ export class BatBallAbility extends Ability {
     }
 
     performSlash(target) {
-        const damage = Math.round(this.owner.baseDamage * SLASH_DAMAGE_MULT);
+        const damage = Math.round(this.owner.stats.baseDamage * SLASH_DAMAGE_MULT);
         target.takeDamage(damage, this.owner, "Slash");
 
         // 강한 넉백 + 벽 충돌 시 추가 데미지
@@ -78,7 +78,7 @@ export class BatBallAbility extends Ability {
         target.applyKnockback(kbDir.scale(KNOCKBACK_FORCE), KNOCKBACK_DURATION);
         target.state.wallSlam = new WallSlamEffect({
             source: this.owner,
-            damage: Math.round(this.owner.baseDamage * WALL_SLAM_DAMAGE_MULT),
+            damage: Math.round(this.owner.stats.baseDamage * WALL_SLAM_DAMAGE_MULT),
             duration: WALL_SLAM_EFFECT_DURATION
         });
 

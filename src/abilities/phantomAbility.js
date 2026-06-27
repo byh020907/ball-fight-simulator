@@ -157,7 +157,7 @@ export class PhantomAbility extends Ability {
         sim.spawnSlash(owner.position.clone(), trailEnd, "#55bbdd");
         sim.spawnPulse(target.position.clone(), "#ff88cc");
 
-        const dashSpeed = owner.baseSpeed * DASH_MULTIPLIER;
+        const dashSpeed = owner.stats.baseSpeed * DASH_MULTIPLIER;
 
         owner.setMovementEffect(
             new DashEffect({
@@ -202,7 +202,7 @@ export class PhantomAbility extends Ability {
         owner.position.y = pos.y;
 
         const randomAngle = Math.random() * Math.PI * 2;
-        const speed = owner.baseSpeed * (0.7 + Math.random() * 0.6);
+        const speed = owner.stats.baseSpeed * (0.7 + Math.random() * 0.6);
         owner.velocity = Vector2.fromAngle(randomAngle, speed);
         owner.clearDash();
 

@@ -53,7 +53,7 @@ export class BulletProjectile extends Projectile {
     }
 
     _getHitDamage() {
-        return Math.round(this.owner.baseDamage * this.damageMult);
+        return Math.round(this.owner.stats.baseDamage * this.damageMult);
     }
 
     _getHitLabel() {

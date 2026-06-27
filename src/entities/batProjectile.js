@@ -37,7 +37,7 @@ export class BatProjectile extends Projectile {
         if (target && !target.flags.defeated) {
             const toTarget = Vector2.subtract(target.position, this.position).normalize();
             this.velocity.add(toTarget.clone().scale(TARGET_ATTRACTION_WEIGHT * 60 * delta));
-            const maxSpeed = this.owner.baseSpeed * MAX_SPEED_MULT;
+            const maxSpeed = this.owner.stats.baseSpeed * MAX_SPEED_MULT;
             if (this.velocity.length() > maxSpeed) {
                 this.velocity.normalize().scale(maxSpeed);
             }
@@ -117,7 +117,7 @@ export class BatProjectile extends Projectile {
     }
 
     _getHitDamage() {
-        return Math.round(this.owner.baseDamage * 0.2);
+        return Math.round(this.owner.stats.baseDamage * 0.2);
     }
 
     _getHitLabel() {

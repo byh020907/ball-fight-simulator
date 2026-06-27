@@ -341,10 +341,10 @@ export class BattleSimulation extends Simulation {
         const sideExposure = 1 - defenderFacing;
 
         // Speed efficiency: 현재 속도 / baseSpeed (스탯 보정 완료된 기준, 1=기본)
-        if (!Number.isFinite(attacker.baseSpeed) || attacker.baseSpeed <= 0) {
-            this.addLog(`[오류] ${attacker.name} 스탯 이상 (baseSpeed=${attacker.baseSpeed})`);
+        if (!Number.isFinite(attacker.stats.baseSpeed) || attacker.stats.baseSpeed <= 0) {
+            this.addLog(`[오류] ${attacker.name} 스탯 이상 (baseSpeed=${attacker.stats.baseSpeed})`);
         }
-        const speedEff = attacker.baseSpeed > 0 ? attackerSpeed / attacker.baseSpeed : 1;
+        const speedEff = attacker.stats.baseSpeed > 0 ? attackerSpeed / attacker.stats.baseSpeed : 1;
         // Direction efficiency: 0~1 (alignment + hitting from the side)
         const dirEff = aimAlignment * 0.55 + sideExposure * 0.45;
         // Glancing blow penalty
@@ -352,7 +352,7 @@ export class BattleSimulation extends Simulation {
         // Combined efficiency (상한 없음, 기본속도=1 기준 speedEff × 방향 × 글랜싱)
         const efficiency = speedEff * dirEff * glancingPenalty;
 
-        return Math.max(1, Math.round(attacker.baseDamage * efficiency * this.getDamageMultiplier()));
+        return Math.max(1, Math.round(attacker.stats.baseDamage * efficiency * this.getDamageMultiplier()));
     }
 
     checkResult() {

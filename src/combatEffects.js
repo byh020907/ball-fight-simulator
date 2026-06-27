@@ -27,7 +27,7 @@ export class DashEffect {
     }
 
     getSpeed(ball) {
-        return this.speedOverride ?? ball.baseSpeed * this.multiplier;
+        return this.speedOverride ?? ball.stats.baseSpeed * this.multiplier;
     }
 
     tick(ball, delta) {

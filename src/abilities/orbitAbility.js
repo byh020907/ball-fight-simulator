@@ -62,8 +62,8 @@ export class OrbitAbility extends Ability {
         );
         if (hitShard && this.state.hitCooldown <= 0) {
             const repelDirection = Vector2.subtract(target.position, hitShard.position).normalize();
-            target.takeDamage(Math.round(this.owner.baseDamage * 0.8), this.owner, "Orbit Shard");
-            target.applyKnockback(repelDirection.scale(target.baseSpeed * 2.5), 0.3);
+            target.takeDamage(Math.round(this.owner.stats.baseDamage * 0.8), this.owner, "Orbit Shard");
+            target.applyKnockback(repelDirection.scale(target.stats.baseSpeed * 2.5), 0.3);
             this.consumeShard(hitShard.index);
             this.state.hitCooldown = 0.32;
             this.simulation.spawnOrbitHit(hitShard.position.clone(), target.position.clone(), this.owner.color);

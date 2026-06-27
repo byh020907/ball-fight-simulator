@@ -13,10 +13,14 @@ export class BattleBall {
         this.face = spec.face ?? spec.id;
         this.maxHp = spec.stats.hp;
         this.hp = spec.stats.hp;
-        this.baseDamage = spec.stats.damage;
-        this.baseDefense = spec.stats.defense;
-        this.baseSpeed = spec.stats.speed;
-        this.baseRadius = spec.stats.radius;
+        this.stats = {
+            baseDamage: spec.stats.damage,
+            baseDefense: spec.stats.defense,
+            baseSpeed: spec.stats.speed,
+            baseRadius: spec.stats.radius,
+            mass: spec.stats.mass,
+            allocation: spec.statAllocation ?? null
+        };
         this.radius = spec.stats.radius;
         this.mass = spec.stats.mass;
         this.position = position;
@@ -39,7 +43,6 @@ export class BattleBall {
             scale: 1
         };
         this.ability = null;
-        this.statAllocation = spec.statAllocation ?? null;
         this.hero = {
             bonuses: { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 },
             carryover: { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 }
@@ -152,7 +155,7 @@ export class BattleBall {
             }
         }
 
-        this.radius = this.baseRadius * (this.ability?.getRadiusScale?.() ?? 1);
+        this.radius = this.stats.baseRadius * (this.ability?.getRadiusScale?.() ?? 1);
         this._applyVelocityCorrection(simulation, delta);
         this.position.add(this.velocity.clone().scale(delta));
         simulation.keepInsideArena(this);
@@ -236,7 +239,7 @@ export class BattleBall {
         return direction.scale(
             movementSpeed ??
                 this.state.speedBoost?.speedOverride ??
-                this.baseSpeed * modifiers.speed * slowMult * boostMult * simulation.getSpeedMultiplier(this)
+                this.stats.baseSpeed * modifiers.speed * slowMult * boostMult * simulation.getSpeedMultiplier(this)
         );
     }
 
@@ -253,7 +256,7 @@ export class BattleBall {
         if (this.flags.defeated) return { actualDamage: 0 };
         amount = this.actionContext.onDamageTaken(amount, source, label);
         const abilityDefMult = this.getStatModifiers().defense;
-        const totalDefense = Math.round(this.baseDefense * abilityDefMult);
+        const totalDefense = Math.round(this.stats.baseDefense * abilityDefMult);
         const hpBefore = this.hp;
         const rawActual = Math.max(1, Math.round(amount - totalDefense));
         const actual = Math.min(rawActual, hpBefore);

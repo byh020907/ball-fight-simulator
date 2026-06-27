@@ -149,7 +149,7 @@ export class EaterAbility extends Ability {
             new DashEffect({
                 duration: 2.45,
                 multiplier: 2,
-                speedOverride: target.baseSpeed * 2,
+                speedOverride: target.stats.baseSpeed * 2,
                 color: target.color,
                 showRing: false,
                 collisionLabel: "Spit Dash",
@@ -160,7 +160,7 @@ export class EaterAbility extends Ability {
         target.applyImpulse(
             direction
                 .clone()
-                .scale(target.baseSpeed * 2)
+                .scale(target.stats.baseSpeed * 2)
                 .subtract(target.velocity)
         );
         target.state.wallSlam = new WallSlamEffect({

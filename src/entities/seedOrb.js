@@ -35,7 +35,7 @@ export class SeedOrb extends Projectile {
                 duration: 1.55,
                 multiplier: 2.05,
                 color: this.owner.color,
-                collisionDamage: Math.round(this.owner.baseDamage * 0.9),
+                collisionDamage: Math.round(this.owner.stats.baseDamage * 0.9),
                 collisionLabel: "Seed Dash",
                 untilImpact: true,
                 untilWall: true
@@ -45,7 +45,7 @@ export class SeedOrb extends Projectile {
         this.owner.applyImpulse(
             dashDirection
                 .clone()
-                .scale(this.owner.baseSpeed * 2.05)
+                .scale(this.owner.stats.baseSpeed * 2.05)
                 .subtract(this.owner.velocity)
         );
         simulation.spawnSlash(

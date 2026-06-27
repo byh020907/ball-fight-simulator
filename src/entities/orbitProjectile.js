@@ -9,7 +9,7 @@ export class OrbitProjectile extends Projectile {
         this.size = size;
         this.elapsed = 0;
         this.accelDuration = 1;
-        this.maxSpeed = owner.baseSpeed * 5;
+        this.maxSpeed = owner.stats.baseSpeed * 5;
     }
 
     update(delta, simulation) {
@@ -42,7 +42,7 @@ export class OrbitProjectile extends Projectile {
     }
 
     _getHitDamage() {
-        return Math.round(this.owner.baseDamage * 0.8);
+        return Math.round(this.owner.stats.baseDamage * 0.8);
     }
 
     _getHitLabel() {

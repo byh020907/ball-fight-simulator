@@ -75,7 +75,7 @@ export class GunnerAbility extends Ability {
         const isFinisher = isLast && bulletCount === MAX_BULLETS;
         const finalMult = isFinisher ? dmgMult * 2 : dmgMult;
 
-        const speed = owner.baseSpeed * BULLET_SPEED_MULT;
+        const speed = owner.stats.baseSpeed * BULLET_SPEED_MULT;
         const cdReduction = GUNNER_COOLDOWN / 2 / MAX_BULLETS;
         const bullet = new BulletProjectile(
             owner,
