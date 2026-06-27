@@ -136,6 +136,7 @@ class TimeWarpAction extends ClickAction {
     apply(sim, playerBall) {
         const current = sim.getTimeSlowRemaining();
         sim.setTimeSlowRemaining(Math.max(current, this.duration));
+        sim._clickActionContext.timeSlowExempt.add(playerBall);
     }
 
     canAIUse(sim, fighter, opponent, hpRatio, distance) {

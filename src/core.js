@@ -181,10 +181,10 @@ export const FIGHTER_IDS = Object.freeze({
     RAGE: "rage",
     EATER: "eater",
     BAT_BALL: "bat_ball",
-    HERO: "hero",
     VAMPIRE: "vampire",
     GUNNER: "gunner",
-    PHANTOM: "phantom"
+    PHANTOM: "phantom",
+    HERO: "hero"
 });
 
 const EVADE_IMPULSE_RESPONSE = 0.72;

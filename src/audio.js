@@ -44,7 +44,7 @@ export class AudioEngine {
         }
         this.lastPlayed.set(throttleKey, now);
 
-        const safeIntensity = Math.max(0.45, Math.min(1.8, intensity));
+        const safeIntensity = Number.isFinite(intensity) ? Math.max(0.45, Math.min(1.8, intensity)) : 0.45;
         const voices = {
             crash: () => this.playThud(96, 0.16, 0.13 * safeIntensity),
             hit: () => this.playZap(420, 0.08, 0.055 * safeIntensity),
@@ -85,10 +85,11 @@ export class AudioEngine {
     }
 
     createGain(volume, duration) {
+        const safeVol = Number.isFinite(volume) ? Math.max(0.0001, volume) : 0.0001;
         const gain = this.context.createGain();
         const now = this.context.currentTime;
         gain.gain.setValueAtTime(0.0001, now);
-        gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, volume), now + 0.012);
+        gain.gain.exponentialRampToValueAtTime(safeVol, now + 0.012);
         gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
         gain.connect(this.context.destination);
         return gain;

@@ -129,6 +129,7 @@ export function applyStatAllocation(fighter, allocation, isPlayer = false) {
 
     for (const stat of ALLOCATABLE_STATS) {
         const pts = allocation[stat.key] ?? 0;
+        if (!Number.isFinite(pts)) continue;
         if (stat.key === "skill") {
             stats[stat.key] = pts;
         } else {
