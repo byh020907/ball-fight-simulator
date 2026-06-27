@@ -1,12 +1,13 @@
 import { Vector2 } from "../core.js";
 import { Ability } from "./ability.js";
 
-const GRENADE_COOLDOWN = 4.0;
+const GRENADE_COOLDOWN = 4.5;
 const SCATTER_COUNT_MIN = 2;
 const SCATTER_COUNT_MAX = 4;
 const SPREAD_ANGLE = Math.PI * 0.6;
 const SCATTER_RANGE = 800;
-const SCATTER_FUSE = 0.8;
+const FUSE_CENTER = 0.25;
+const FUSE_EDGE = 0.8;
 
 export class GrenadeAbility extends Ability {
     constructor(owner, simulation) {
@@ -32,7 +33,9 @@ export class GrenadeAbility extends Ability {
             const angle = baseAngle - halfSpread + SPREAD_ANGLE * t + jitter;
             const dir = Vector2.fromAngle(angle, 1);
             const targetPos = Vector2.add(this.owner.position, dir.clone().scale(SCATTER_RANGE));
-            this.simulation.spawnGrenade(this.owner, targetPos, SCATTER_FUSE);
+            const centerDist = Math.abs(t - 0.5) * 2;
+            const fuse = FUSE_CENTER + centerDist * (FUSE_EDGE - FUSE_CENTER);
+            this.simulation.spawnGrenade(this.owner, targetPos, fuse);
         }
 
         this.simulation.playSound("shoot", 0.7);
