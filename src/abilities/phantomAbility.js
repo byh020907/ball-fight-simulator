@@ -2,7 +2,7 @@ import { Vector2 } from "../core.js";
 import { DashEffect } from "../combatEffects.js";
 import { Ability } from "./ability.js";
 
-const PHANTOM_COOLDOWN = 2.0;
+const PHANTOM_COOLDOWN = 3.0;
 const DASH_DURATION = 0.8;
 const DASH_MULTIPLIER = 2.5;
 const TELEPORT_BEHIND_DIST = 250;
@@ -144,6 +144,10 @@ export class PhantomAbility extends Ability {
 
         sim.playSound("dash", 0.9);
         sim.addLog(`${owner.name} vanishes and strikes from the shadows!`);
+    }
+
+    onDashHit(target, effect) {
+        this.timer = 0;
     }
 
     getStatModifiers() {
