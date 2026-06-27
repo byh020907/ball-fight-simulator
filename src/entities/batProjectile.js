@@ -140,53 +140,53 @@ export class BatProjectile extends Projectile {
         ctx.translate(this.position.x, this.position.y);
         ctx.rotate(this.angle);
         const flap = Math.sin(this.time * 20);
-        const wingSpread = 0.5 + Math.abs(flap) * 0.5;
-        const wingLift = Math.sin(this.time * 20) * 3;
+        const ws = 0.5 + Math.abs(flap) * 0.5;
+        const wl = Math.sin(this.time * 20) * 3;
 
-        // Wing shadows (lower wings)
+        // ── Left wing (extends upward, perpendicular to body) ──
         ctx.fillStyle = "#331122";
         ctx.beginPath();
-        ctx.moveTo(-3, wingLift);
-        ctx.quadraticCurveTo(-9 * wingSpread - 3, -wingSpread * 12 - 3, -16 * wingSpread, -3);
-        ctx.quadraticCurveTo(-10 * wingSpread, wingLift + 2, -3, wingLift);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.moveTo(3, wingLift);
-        ctx.quadraticCurveTo(9 * wingSpread + 3, -wingSpread * 12 - 3, 16 * wingSpread, -3);
-        ctx.quadraticCurveTo(10 * wingSpread, wingLift + 2, 3, wingLift);
+        ctx.moveTo(wl, -3);
+        ctx.quadraticCurveTo(-ws * 12 - 3, -9 * ws - 3, -3, -16 * ws);
+        ctx.quadraticCurveTo(wl + 2, -10 * ws, wl, -3);
         ctx.fill();
 
-        // Body
+        // ── Right wing (extends downward, perpendicular to body) ──
+        ctx.beginPath();
+        ctx.moveTo(-wl, 3);
+        ctx.quadraticCurveTo(ws * 12 + 3, 9 * ws + 3, 3, 16 * ws);
+        ctx.quadraticCurveTo(-wl - 2, 10 * ws, -wl, 3);
+        ctx.fill();
+
+        // ── Body ──
         ctx.fillStyle = "#442233";
         ctx.beginPath();
-        ctx.ellipse(0, 0, 6, 4, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, 7, 4, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // Inner body (owner color tint)
         ctx.fillStyle = this.owner.color;
         ctx.globalAlpha = 0.5;
         ctx.beginPath();
-        ctx.ellipse(0, 0, 4, 3, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, 5, 3, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.globalAlpha = 1;
 
-        // Eyes (glowing red)
+        // ── Eyes at front (positive X = forward) ──
         const glow = Math.sin(this.time * 8) * 0.3 + 0.7;
         ctx.fillStyle = `rgba(255, 60, 80, ${glow})`;
         ctx.beginPath();
-        ctx.arc(3.5, -1.2, 2, 0, Math.PI * 2);
+        ctx.arc(5.5, -1.8, 1.8, 0, Math.PI * 2);
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(-3.5, -1.2, 2, 0, Math.PI * 2);
+        ctx.arc(5.5, 1.8, 1.8, 0, Math.PI * 2);
         ctx.fill();
 
-        // Eye pupils
         ctx.fillStyle = "#ffccdd";
         ctx.beginPath();
-        ctx.arc(3.5, -1.2, 1, 0, Math.PI * 2);
+        ctx.arc(5.5, -1.8, 0.9, 0, Math.PI * 2);
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(-3.5, -1.2, 1, 0, Math.PI * 2);
+        ctx.arc(5.5, 1.8, 0.9, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.restore();
