@@ -38,7 +38,7 @@ export function createRoster() {
             id: FIGHTER_IDS.GRENADE,
             name: "Grenade Ball",
             title: "Blast Arc",
-            description: "상대 예상 위치로 수류탄을 던져 지연 폭발시킵니다. 빗나갈수록 퓨즈가 짧아져 더 빨리 터집니다.",
+            description: "상대 방향으로 2~4개의 파편을 산탄처럼 발사합니다. 각 파편은 벽에 한 번 튕깁니다.",
             color: "#ff7676",
             face: "grenade",
             ability: "grenade",

@@ -29,7 +29,7 @@ export const PATCH_NOTES = [
             },
             {
                 type: "refactor",
-                text: "Grenade Ball 상향 — 속도 278→290, 수류탄 예측 정확도 0.18→0.30."
+                text: "Grenade Ball 리워크 — 지연 폭탄 대신 2~4발 산탄 발사. 속도 278→290."
             },
             {
                 type: "refactor",

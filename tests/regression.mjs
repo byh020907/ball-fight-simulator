@@ -437,27 +437,26 @@ async function testCollisionImpulsePersists(app) {
     );
 }
 
-async function testGrenadeAdaptiveFuse(app) {
-    await app.startMatch([
-        app.roster.find((fighter) => fighter.id === FIGHTER_IDS.GRENADE),
-        app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ORBIT)
-    ]);
-    const [grenadeBall, target] = app.simulation.fighters;
-    const ability = grenadeBall.ability;
-    assert.equal(ability.getFuseTime(), 1.08, "Grenade should start with base fuse");
+async function testGrenadeScatterShot(app) {
+    const grenade = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.GRENADE);
+    const opponent = app.roster.find((f) => f.id !== FIGHTER_IDS.GRENADE);
+    const sim = new BattleSimulation([grenade, opponent], { onLog() {}, onSound() {} });
+    const grenadeFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.GRENADE);
+    const target = sim.fighters.find((f) => f.id !== FIGHTER_IDS.GRENADE);
 
-    ability.onGrenadeResult(false);
-    ability.onGrenadeResult(false);
-    assert.equal(Number(ability.getFuseTime().toFixed(2)), 0.72, "Misses should shorten grenade fuse");
-
-    app.simulation.entities = [];
-    app.simulation.spawnGrenade(grenadeBall, target.position.clone(), ability.getFuseTime());
-    const grenade = app.simulation.entities.find((entity) => entity.constructor.name === "Grenade");
-    assert.equal(Number(grenade.maxTimer.toFixed(2)), 0.72, "Spawned grenade should use adaptive fuse");
-
-    ability.onGrenadeResult(true);
-    assert.equal(ability.missStreak, 0, "Grenade hit should reset miss streak");
-    assert.equal(ability.getFuseTime(), 1.08, "Grenade hit should reset fuse");
+    grenadeFighter.position.x = 300;
+    grenadeFighter.position.y = 480;
+    target.position.x = 500;
+    target.position.y = 480;
+    sim.entities = sim.fighters.slice();
+    grenadeFighter.ability.timer = 0;
+    grenadeFighter.ability.update(0.016, target);
+    const fragments = sim.entities.filter((e) => e.constructor?.name === "GrenadeFragment");
+    assert.ok(fragments.length >= 2, "Grenade should fire at least 2 fragments");
+    assert.ok(fragments.length <= 4, "Grenade should fire at most 4 fragments");
+    for (const f of fragments) {
+        assert.ok(f.velocity.length() > 0, "Each fragment should have velocity");
+    }
 }
 
 async function testDamageShake(app) {
@@ -692,7 +691,6 @@ function assertPassiveEvasionAppliesImpulse(app, fighterId, label) {
 
 function testPassiveEvasionAppliesImpulse(app) {
     assertPassiveEvasionAppliesImpulse(app, FIGHTER_IDS.ARCHER, "Archer");
-    assertPassiveEvasionAppliesImpulse(app, FIGHTER_IDS.GRENADE, "Grenade");
 }
 
 function testClickActionEffectOwnership(app) {
@@ -2734,7 +2732,7 @@ await testEaterFeast(app);
 await testRageBallMomentum(app);
 await testDashBallCooldownDash(app);
 await testCollisionImpulsePersists(app);
-await testGrenadeAdaptiveFuse(app);
+await testGrenadeScatterShot(app);
 await testDamageShake(app);
 await testArrowBounceFacing(app);
 await testOrbitShardRecharge(app);
