@@ -63,11 +63,12 @@ export class BattleSimulation extends Simulation {
         this._clickActionContext = {
             pendingAction: null,
             timeSlowRemaining: 0,
-            timeSlowFactor: 0.35
+            timeSlowFactor: 0.35,
+            timeSlowExempt: new Set()
         };
 
         // ── AI 액션 컨트롤러 ──
-        if (options.assignActions) {
+        if (hooks.assignActions || options.assignActions) {
             this.aiControllers = this.fighters.map(() => new AIActionController());
         }
     }
@@ -164,7 +165,11 @@ export class BattleSimulation extends Simulation {
 
     // ── Game loop ─────────────────────────────────────────────────────────
 
-    update(delta) {
+    /**
+     * @param {number} delta - 배속이 적용된 delta (엔티티 이동, 경과 시간 등)
+     * @param {number} [realDelta=delta] - 실제 경과 시간 (시간 왜곡 타이머 등)
+     */
+    update(delta, realDelta = delta) {
         if (this.finished) {
             this.updateResultEffects(delta);
             return;
@@ -197,16 +202,20 @@ export class BattleSimulation extends Simulation {
             this.updateOvertimeParticles(delta);
         }
 
-        // 시간 왜곡 타이머
+        // 시간 왜곡 타이머 — 실제 시간으로 카운트다운 (배속 영향 없음)
         const ctx = this._clickActionContext;
-        if (ctx.timeSlowRemaining > 0) ctx.timeSlowRemaining -= delta;
+        if (ctx.timeSlowRemaining > 0) {
+            ctx.timeSlowRemaining -= realDelta;
+            if (ctx.timeSlowRemaining <= 0) ctx.timeSlowExempt.clear();
+        }
 
         this.handleCollision();
 
-        // 시간 왜곡 적용: 상대 엔티티만 느린 delta
+        // 시간 왜곡 적용: 시전자만 면제, 나머지 엔티티는 느린 delta
+        // scaledDelta는 배속이 적용된 delta 기준으로 계산 (상대 속도 비율 유지)
         for (const entity of this.entities) {
-            const isPlayer = entity === this.playerBall;
-            const scaledDelta = ctx.timeSlowRemaining > 0 && !isPlayer ? delta * ctx.timeSlowFactor : delta;
+            const isExempt = ctx.timeSlowExempt.has(entity);
+            const scaledDelta = ctx.timeSlowRemaining > 0 && !isExempt ? delta * ctx.timeSlowFactor : delta;
             entity.update(scaledDelta, this);
         }
         this.entities = this.entities.filter((entity) => !entity.isExpired);
@@ -340,7 +349,10 @@ export class BattleSimulation extends Simulation {
         const sideExposure = 1 - defenderFacing;
 
         // Speed efficiency: 현재 속도 / baseSpeed (스탯 보정 완료된 기준, 1=기본)
-        const speedEff = attackerSpeed / attacker.baseSpeed;
+        if (!Number.isFinite(attacker.baseSpeed) || attacker.baseSpeed <= 0) {
+            this.addLog(`[오류] ${attacker.name} 스탯 이상 (baseSpeed=${attacker.baseSpeed})`);
+        }
+        const speedEff = attacker.baseSpeed > 0 ? attackerSpeed / attacker.baseSpeed : 1;
         // Direction efficiency: 0~1 (alignment + hitting from the side)
         const dirEff = aimAlignment * 0.55 + sideExposure * 0.45;
         // Glancing blow penalty

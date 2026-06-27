@@ -87,7 +87,7 @@ export class BattleApp {
          * @type {string|null}
          */
         this.startCharacter = null;
-        this.startCharacter = FIGHTER_IDS.GRENADE;
+        // this.startCharacter = FIGHTER_IDS.GRENADE;
 
         this.elements = {
             canvas: document.getElementById("arenaCanvas"),
@@ -418,6 +418,7 @@ export class BattleApp {
         this.currentMatchAction = findActionById(this.selectedActionId);
         if (this.currentMatchAction) {
             this.ui.addLog(`[액션] ${this.currentMatchAction.name} 준비 완료.`);
+            playerBall.clickActionName = this.currentMatchAction.name;
         }
         return this.currentMatchAction;
     }
@@ -445,6 +446,7 @@ export class BattleApp {
         // 시뮬레이션 생성 (playerBall은 아직 null)
         this._currentMatchReport = createMatchReport();
         this.simulation = new BattleSimulation(match, {
+            assignActions: this._currentChallengeLevel > 0,
             onLog: (message) => this.ui.addLog(message),
             onOvertime: () => {
                 this.ui.updateStatus(label, "Overtime");
@@ -687,7 +689,7 @@ export class BattleApp {
             this._actionCtx.trigger.onTick(this._actionCtx);
         }
 
-        this.simulation.update(speedDelta);
+        this.simulation.update(speedDelta, delta);
         this.renderer.render(this.simulation);
         this._renderSpeedIndicator();
         this.ui.updateLiveCards(this.simulation.fighters);

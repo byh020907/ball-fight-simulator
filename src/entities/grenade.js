@@ -59,7 +59,7 @@ export class Grenade extends Projectile {
                 const raw = Math.round(this.owner.baseDamage * (2.5 - edgeProgress * 1.0));
                 this.dealDamageToTarget(target, raw, this.owner, "Grenade", simulation);
                 const kbDir = Vector2.subtract(target.position, this.position).normalize();
-                target.applyKnockback(kbDir.scale(650), 0.55);
+                target.applyKnockback(kbDir.scale(900), 1.3);
             }
         }
 
@@ -73,23 +73,33 @@ export class Grenade extends Projectile {
         const charge = 1 - Math.max(0, this.timer / this.maxTimer);
         ctx.save();
 
-        // 폭발 예고 링 — 타이머가 줄수록 빠르게 커짐
-        ctx.strokeStyle = this._proximityTriggered ? "#ff4444" : this.owner.color;
-        ctx.lineWidth = 5;
-        ctx.setLineDash([12, 10]);
+        // 시계 링 — 남은 시간만큼 채워진 원호가 회전
+        // 폭발 범위 외곽선
+        ctx.strokeStyle = this.owner.color;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 8]);
+        ctx.globalAlpha = 0.08 + charge * 0.7;
         ctx.beginPath();
-        ctx.arc(this.position.x, this.position.y, this.explosionRadius * (0.72 + charge * 0.28), 0, Math.PI * 2);
+        ctx.arc(this.position.x, this.position.y, this.explosionRadius, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
 
-        // 근접 가속 발동 시 붉은 섬광 링
-        if (this._proximityTriggered) {
-            ctx.strokeStyle = `rgba(255, 68, 68, ${0.3 + charge * 0.4})`;
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.arc(this.position.x, this.position.y, this.explosionRadius * 1.05, 0, Math.PI * 2);
-            ctx.stroke();
-        }
+        // 시계 링 — 남은 시간만큼 채워진 원호가 회전
+        const ringR = this.radius + 8;
+        const startAngle = -Math.PI / 2 + charge * Math.PI * 2;
+        const remaining = Math.max(0.02, 1 - charge);
+        const endAngle = startAngle + Math.PI * 2 * remaining;
+        const hue = 30 + (1 - charge) * 120;
+        ctx.strokeStyle = this._proximityTriggered
+            ? `rgba(255, 68, 68, ${0.4 + charge * 0.6})`
+            : `hsl(${hue}, 100%, ${50 + charge * 20}%)`;
+        ctx.lineWidth = 4;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.arc(this.position.x, this.position.y, ringR, startAngle, endAngle);
+        ctx.stroke();
+        ctx.lineCap = "butt";
 
         // 수류탄 본체
         ctx.fillStyle = this.owner.color;
@@ -99,13 +109,6 @@ export class Grenade extends Projectile {
         ctx.strokeStyle = "#ffffff";
         ctx.lineWidth = 2;
         ctx.stroke();
-
-        // 남은 퓨즈 시간 텍스트
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "700 14px Bahnschrift, Segoe UI, sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(this.timer.toFixed(1) + "s", this.position.x, this.position.y);
 
         ctx.restore();
     }
