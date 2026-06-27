@@ -451,11 +451,12 @@ async function testGrenadeScatterShot(app) {
     sim.entities = sim.fighters.slice();
     grenadeFighter.ability.timer = 0;
     grenadeFighter.ability.update(0.016, target);
-    const fragments = sim.entities.filter((e) => e.constructor?.name === "GrenadeFragment");
-    assert.ok(fragments.length >= 2, "Grenade should fire at least 2 fragments");
-    assert.ok(fragments.length <= 4, "Grenade should fire at most 4 fragments");
-    for (const f of fragments) {
-        assert.ok(f.velocity.length() > 0, "Each fragment should have velocity");
+    const grenades = sim.entities.filter((e) => e.constructor?.name === "Grenade");
+    assert.ok(grenades.length >= 2, "Grenade should fire at least 2 grenades");
+    assert.ok(grenades.length <= 4, "Grenade should fire at most 4 grenades");
+    for (const g of grenades) {
+        assert.ok(g.velocity.length() > 0, "Each grenade should have velocity");
+        assert.ok(g.timer > 0, "Each grenade should have a fuse timer");
     }
 }
 

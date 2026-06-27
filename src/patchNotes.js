@@ -29,7 +29,7 @@ export const PATCH_NOTES = [
             },
             {
                 type: "refactor",
-                text: "Grenade Ball 리워크 — 지연 폭탄 대신 2~4발 산탄 발사. 속도 278→290."
+                text: "Grenade Ball 리워크 — 예측 조준 폭탄 대신 2~4발 산탄 발사(쿨타임 4.0초). 각 수류탄은 벽튕김/폭발/센서신관 유지. 속도 278→290."
             },
             {
                 type: "refactor",

@@ -1,11 +1,12 @@
 import { Vector2 } from "../core.js";
 import { Ability } from "./ability.js";
-import { GrenadeFragment } from "../entities/index.js";
 
 const GRENADE_COOLDOWN = 4.0;
-const FRAGMENT_SPEED_MULT = 3.0;
-const FRAGMENT_DAMAGE_MULT = 1.2;
+const SCATTER_COUNT_MIN = 2;
+const SCATTER_COUNT_MAX = 4;
 const SPREAD_ANGLE = Math.PI * 0.6;
+const SCATTER_RANGE = 800;
+const SCATTER_FUSE = 0.8;
 
 export class GrenadeAbility extends Ability {
     constructor(owner, simulation) {
@@ -19,7 +20,7 @@ export class GrenadeAbility extends Ability {
         }
 
         this.timer = this.cooldown;
-        const count = 2 + Math.floor(Math.random() * 3);
+        const count = SCATTER_COUNT_MIN + Math.floor(Math.random() * (SCATTER_COUNT_MAX - SCATTER_COUNT_MIN + 1));
 
         const toTarget = Vector2.subtract(target.position, this.owner.position);
         const baseAngle = Math.atan2(toTarget.y, toTarget.x);
@@ -30,14 +31,12 @@ export class GrenadeAbility extends Ability {
             const jitter = (Math.random() - 0.5) * 0.2;
             const angle = baseAngle - halfSpread + SPREAD_ANGLE * t + jitter;
             const dir = Vector2.fromAngle(angle, 1);
-            const speed = this.owner.baseSpeed * FRAGMENT_SPEED_MULT;
-            const start = Vector2.add(this.owner.position, dir.clone().scale(this.owner.radius + 12));
-            const fragment = new GrenadeFragment(this.owner, start, dir.scale(speed));
-            this.simulation.entities.push(fragment);
+            const targetPos = Vector2.add(this.owner.position, dir.clone().scale(SCATTER_RANGE));
+            this.simulation.spawnGrenade(this.owner, targetPos, SCATTER_FUSE);
         }
 
         this.simulation.playSound("shoot", 0.7);
-        this.simulation.addLog(`${this.owner.name} fires ${count} shrapnel round${count > 1 ? "s" : ""}!`);
+        this.simulation.addLog(`${this.owner.name} scatters ${count} grenade${count > 1 ? "s" : ""}!`);
     }
 
     drawFace(ctx, rotation, ball) {
