@@ -458,8 +458,8 @@ async function testGrenadeScatterShot(app) {
         grenadeFighter.ability.update(0.12, target);
     }
     const total = allGrenades().length;
-    assert.ok(total >= 2, "Grenade should fire 2-4 grenades in burst");
-    assert.ok(total <= 4, "Grenade should fire at most 4 grenades total");
+    assert.ok(total >= 3, "Grenade should fire 3-5 grenades in burst");
+    assert.ok(total <= 5, "Grenade should fire at most 5 grenades total");
     for (const g of allGrenades()) {
         assert.ok(g.velocity.length() > 0, "Each grenade should have velocity");
         assert.ok(g.timer > 0, "Each grenade should have a fuse timer");

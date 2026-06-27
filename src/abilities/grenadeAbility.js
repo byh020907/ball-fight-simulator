@@ -1,14 +1,14 @@
 import { Vector2 } from "../core.js";
 import { Ability } from "./ability.js";
 
-const GRENADE_COOLDOWN = 3.5;
-const BURST_COUNT_MIN = 2;
-const BURST_COUNT_MAX = 4;
+const GRENADE_COOLDOWN = 3.0;
+const BURST_COUNT_MIN = 3;
+const BURST_COUNT_MAX = 5;
 const BURST_INTERVAL = 0.12;
-const SPREAD_ANGLE = Math.PI / 2;
-const SCATTER_SPEED = 1000;
-const FUSE_FIRST = 0.3;
-const FUSE_LAST = 0.8;
+const SPREAD_ANGLE = (Math.PI * 2) / 3;
+const SCATTER_SPEED = 800;
+const FUSE_FIRST = 0.6;
+const FUSE_LAST = 2.0;
 
 export class GrenadeAbility extends Ability {
     constructor(owner, simulation) {
