@@ -75,11 +75,17 @@ export function appStore() {
 
         // Start button
         startHidden: true,
+        _startDisabled: null,
+        _startText: null,
         get startDisabled() {
-            return this.remainingPoints > 0 || this.locked;
+            return this._startDisabled !== null ? this._startDisabled : this.remainingPoints > 0 || this.locked;
         },
         get startText() {
-            return this.remainingPoints > 0 ? `스탯 ${this.remainingPoints} 남음` : "토너먼트 시작";
+            return this._startText !== null
+                ? this._startText
+                : this.remainingPoints > 0
+                  ? `스탯 ${this.remainingPoints} 남음`
+                  : "토너먼트 시작";
         },
 
         // Fighter cards (roster)
@@ -375,6 +381,8 @@ export class UIController {
         s.bonusPoints = bonusPoints;
         s.remainingPoints = remainingPoints;
         s.locked = locked;
+        s._startDisabled = null;
+        s._startText = null;
         this._drawPlayerFace(fighter);
     }
 
@@ -570,7 +578,8 @@ export class UIController {
         const s = this.state;
         if (!s) return;
         if (hidden !== undefined) s.startHidden = hidden;
-        // disabled/text are synced by Alpine's _syncStartButton()
+        s._startDisabled = disabled !== undefined ? disabled : null;
+        s._startText = text !== undefined ? text : null;
     }
 
     resetLog() {

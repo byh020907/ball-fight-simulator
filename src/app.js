@@ -775,8 +775,8 @@ export class BattleApp {
         this.ui.updateStatus(`${winner.name} wins`, "Result");
         this.ui.addLog(`${winner.name} defeats ${loser.name}.`);
         this.ui.addLog("Press the button again for another random matchup.");
-        this.ui.setStartButton({ text: "다시 시작", hidden: false, disabled: false });
         this.refreshPlayerSetup();
+        this.ui.setStartButton({ text: "다시 시작", hidden: false, disabled: false });
     }
 
     getPlayerRankLabel(roundIndex) {
