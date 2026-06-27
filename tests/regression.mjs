@@ -2908,7 +2908,14 @@ async function testPhantomShadowStrike(app) {
     const posBefore = phantomFighter.position.clone();
     phantomFighter.ability.onCollision(target);
     assert.ok(phantomFighter.ability.timer > 0, "Phantom should set cooldown after shadow strike");
-    assert.ok(phantomFighter.movementEffect, "Phantom should start dashing after shadow strike");
+    // During vanish phase, position hasn't changed yet
+    const distBefore = Vector2.subtract(phantomFighter.position, posBefore).length();
+    assert.ok(distBefore < 1, "Phantom should not teleport yet during vanish phase");
+    // Simulate through vanish + appear animation
+    for (let i = 0; i < 60; i++) {
+        phantomFighter.ability.update(0.01, target);
+    }
+    assert.ok(phantomFighter.movementEffect, "Phantom should start dashing after teleport animation");
     // Position should have changed (teleported behind target)
     const distFromTarget = Vector2.subtract(phantomFighter.position, target.position).length();
     assert.ok(distFromTarget > 10, "Phantom should teleport away from target position");

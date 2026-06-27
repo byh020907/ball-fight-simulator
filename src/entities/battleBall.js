@@ -47,6 +47,7 @@ export class BattleBall {
         };
         this.masteryCombatPassives = spec.masteryCombatPassives ?? [];
         this.actionContext = new ActionContext();
+        this.renderScale = 1;
     }
 
     get renderLayer() {
@@ -261,6 +262,13 @@ export class BattleBall {
     draw(ctx) {
         if (this.isDestroyed || this.swallowedState) return;
         ctx.save();
+        const scale = this.renderScale;
+        if (scale !== 1) {
+            ctx.translate(this.position.x, this.position.y);
+            ctx.scale(scale, scale);
+            ctx.translate(-this.position.x, -this.position.y);
+            ctx.globalAlpha *= scale;
+        }
         ctx.fillStyle = this.color;
         ctx.beginPath();
         ctx.arc(this.position.x, this.position.y, this.radius, 0, Math.PI * 2);

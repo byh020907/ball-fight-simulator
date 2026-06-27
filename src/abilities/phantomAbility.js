@@ -8,23 +8,63 @@ const DASH_MULTIPLIER = 2.5;
 const TELEPORT_BEHIND_DIST = 250;
 const BONUS_DAMAGE = 12;
 const COLLISION_DAMAGE_WHEN_READY = 5;
+const VANISH_DURATION = 0.15;
+const APPEAR_DURATION = 0.4;
 
 export class PhantomAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation, PHANTOM_COOLDOWN);
         this.timer = this.cooldown;
-        this._isTeleporting = false;
+        this._teleportPhase = 0;
+        this._teleportTimer = 0;
+        this._vanishPos = null;
+        this._appearPos = null;
+        this._teleportTargetId = null;
     }
 
     update(delta, target) {
-        this.timer -= delta;
+        const owner = this.owner;
+
+        if (this._teleportPhase === 0) {
+            this.timer -= delta;
+            return;
+        }
+
+        this._teleportTimer += delta;
+
+        if (this._teleportPhase === 1) {
+            const t = Math.min(this._teleportTimer / VANISH_DURATION, 1);
+            owner.renderScale = 1 - t * t;
+            if (this._teleportTimer >= VANISH_DURATION) {
+                owner.renderScale = 0;
+                this._doTeleport();
+                this._teleportPhase = 2;
+                this._teleportTimer = 0;
+            }
+            return;
+        }
+
+        if (this._teleportPhase === 2) {
+            const t = Math.min(this._teleportTimer / APPEAR_DURATION, 1);
+            owner.renderScale = 1 - Math.exp(-5.5 * t) * Math.cos(11 * t);
+
+            if (this._teleportTimer >= APPEAR_DURATION) {
+                owner.renderScale = 1;
+                this._startDashAfterTeleport();
+                this._teleportPhase = 0;
+                this._teleportTimer = 0;
+                this._vanishPos = null;
+                this._appearPos = null;
+                this._teleportTargetId = null;
+            }
+            return;
+        }
     }
 
     onCollision(target) {
         if (this.owner.swallowedState || target.swallowedState) return;
-        if (this.timer <= 0) {
+        if (this.timer <= 0 && this._teleportPhase === 0) {
             this._triggerShadowStrike(target);
-            return;
         }
     }
 
@@ -33,7 +73,8 @@ export class PhantomAbility extends Ability {
         const sim = this.simulation;
         this.timer = this.cooldown;
 
-        const oldPos = owner.position.clone();
+        this._vanishPos = owner.position.clone();
+        this._teleportTargetId = target.id;
 
         const toTarget = Vector2.subtract(target.position, owner.position).normalize();
         const behindAngle = (Math.random() - 0.5) * Math.PI;
@@ -46,19 +87,41 @@ export class PhantomAbility extends Ability {
         behindPos.x = Math.max(r, Math.min(sim.width - r, behindPos.x));
         behindPos.y = Math.max(r, Math.min(sim.height - r, behindPos.y));
 
-        sim.spawnParticleBurst(oldPos, "#55bbdd", { count: 20, speed: 280, radiusMin: 3, radiusMax: 6, gravity: 600 });
-        sim.spawnPulse(oldPos, "#55bbdd");
+        this._appearPos = behindPos;
 
-        owner.position.x = behindPos.x;
-        owner.position.y = behindPos.y;
+        sim.spawnParticleBurst(this._vanishPos, "#55bbdd", {
+            count: 20,
+            speed: 280,
+            radiusMin: 3,
+            radiusMax: 6,
+            gravity: 600
+        });
+        sim.spawnPulse(this._vanishPos, "#55bbdd");
 
-        sim.spawnExplosion(behindPos, "#55bbdd");
-        sim.spawnPulse(behindPos.clone(), "#aaddff");
+        this._teleportPhase = 1;
+        this._teleportTimer = 0;
+    }
+
+    _doTeleport() {
+        const owner = this.owner;
+        const sim = this.simulation;
+
+        owner.position.x = this._appearPos.x;
+        owner.position.y = this._appearPos.y;
+
+        sim.spawnExplosion(this._appearPos, "#55bbdd");
+        sim.spawnPulse(this._appearPos.clone(), "#aaddff");
+    }
+
+    _startDashAfterTeleport() {
+        const owner = this.owner;
+        const sim = this.simulation;
+        const target = sim.fighters.find((f) => f.id === this._teleportTargetId);
+        if (!target) return;
 
         const dashDir = Vector2.subtract(target.position, owner.position).normalize();
         const trailEnd = Vector2.add(owner.position, dashDir.clone().scale(TELEPORT_BEHIND_DIST * 0.6));
         sim.spawnSlash(owner.position.clone(), trailEnd, "#55bbdd");
-
         sim.spawnPulse(target.position.clone(), "#ff88cc");
 
         const dashSpeed = owner.baseSpeed * DASH_MULTIPLIER;
@@ -91,6 +154,20 @@ export class PhantomAbility extends Ability {
         const shimmer = Math.sin(time * 6) * 0.12 + 0.88;
 
         ctx.save();
+
+        // appear ring effect
+        if (this._teleportPhase === 2) {
+            const t = Math.min(this._teleportTimer / APPEAR_DURATION, 1);
+            const ringR = owner.radius * 1.5 + (1 - t) * 30;
+            ctx.beginPath();
+            ctx.arc(owner.position.x, owner.position.y, ringR, 0, Math.PI * 2);
+            ctx.strokeStyle = "#55bbdd";
+            ctx.lineWidth = 3 * (1 - t) + 1;
+            ctx.globalAlpha = 0.5 * (1 - t);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+        }
+
         ctx.globalAlpha = shimmer;
         ctx.strokeStyle = "#55bbdd";
         ctx.lineWidth = 2;
