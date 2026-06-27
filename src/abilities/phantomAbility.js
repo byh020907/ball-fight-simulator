@@ -212,7 +212,9 @@ export class PhantomAbility extends Ability {
     }
 
     onDashHit(target, effect) {
-        // cooldown already set to full in _triggerShadowStrike
+        this.timer = 0;
+        this._primed = true;
+        this._primedTimer = PRIMED_DURATION;
     }
 
     getStatModifiers() {
