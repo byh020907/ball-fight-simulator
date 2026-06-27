@@ -1,15 +1,15 @@
 import { Projectile, Vector2 } from "../core.js";
 
 const BAT_RADIUS = 10;
-const BAT_LIFE = 3.5;
-const MAX_SPEED_MULT = 2.5;
+const BAT_LIFE = 4.0;
+const MAX_SPEED_MULT = 1.5;
 
-// Boids weights
-const COHESION_WEIGHT = 0.2;
-const ALIGNMENT_WEIGHT = 0.25;
-const SEPARATION_WEIGHT = 3.0;
-const SEPARATION_RADIUS = 28;
-const TARGET_ATTRACTION_WEIGHT = 0.6;
+// Boids weights (px/s/s accelerations, frame-rate independent)
+const COHESION_WEIGHT = 5;
+const ALIGNMENT_WEIGHT = 8;
+const SEPARATION_WEIGHT = 30;
+const SEPARATION_RADIUS = 24;
+const TARGET_ATTRACTION_WEIGHT = 10;
 
 // Flutter
 const FLUTTER_FREQ = 28;
@@ -79,7 +79,7 @@ export class BatProjectile extends Projectile {
             if (other === this || other.isExpired || other.isExpired === undefined) continue;
             const diff = Vector2.subtract(other.position, this.position);
             const dist = diff.length();
-            if (dist > 120) continue; // ignore far boids
+            if (dist > 150) continue; // ignore far boids
 
             neighborCount++;
             cohesion.add(other.position);
