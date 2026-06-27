@@ -253,6 +253,8 @@ export function appStore() {
             if (this.locked) return;
             this.allocation = adjustStatAllocation(this.allocation, key, delta, this.totalPoints);
             this.remainingPoints = getRemainingStatPoints(this.allocation, this.totalPoints);
+            this._startDisabled = null;
+            this._startText = null;
             this._syncSummary();
         },
 
@@ -260,6 +262,8 @@ export function appStore() {
             if (this.locked) return;
             this.allocation = createRandomStatAllocation(undefined, this.totalPoints);
             this.remainingPoints = getRemainingStatPoints(this.allocation, this.totalPoints);
+            this._startDisabled = null;
+            this._startText = null;
             this._syncSummary();
         },
 
@@ -267,6 +271,8 @@ export function appStore() {
             if (this.locked) return;
             this.allocation = createEmptyStatAllocation();
             this.remainingPoints = getRemainingStatPoints(this.allocation, this.totalPoints);
+            this._startDisabled = null;
+            this._startText = null;
             this._syncSummary();
         },
 
