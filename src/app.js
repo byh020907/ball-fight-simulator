@@ -124,6 +124,7 @@ export class BattleApp {
         this._battleSpeed = 1;
         this._speedIndicatorTimer = 0;
         this._speedIndicatorText = "";
+        this._selectionAnimTime = 999;
 
         // Listen for Alpine.js start-tournament event
         try {
@@ -231,6 +232,7 @@ export class BattleApp {
         const AbilityClass = ABILITY_MAP[fighter.ability];
         if (AbilityClass) ball.bindAbility(new AbilityClass(ball, {}));
         this._previewBall = ball;
+        this._selectionAnimTime = 0;
         return ball;
     }
 
@@ -241,7 +243,7 @@ export class BattleApp {
 
         const player = this.roster.find((fighter) => fighter.id === this.playerFighterId);
         const ball = this._ensurePreviewBall(player);
-        this.renderer.renderPlayerPreview(ball, player);
+        this.renderer.renderPlayerPreview(ball, player, this._selectionAnimTime);
     }
 
     startPlayerPreviewLoop() {
@@ -249,16 +251,23 @@ export class BattleApp {
             return;
         }
 
-        const tick = () => {
+        let lastTime = performance.now();
+        const tick = (now) => {
             if (this.tournament && !this.tournament.champion) {
                 this.previewRafId = 0;
                 return;
             }
 
+            const dt = Math.min((now - lastTime) / 1000, 0.05);
+            lastTime = now;
+            if (this._selectionAnimTime < 0.6) {
+                this._selectionAnimTime += dt;
+            }
+
             this.renderPlayerPreview();
             this.previewRafId = requestAnimationFrame(tick);
         };
-        tick();
+        tick(performance.now());
     }
 
     stopPlayerPreviewLoop() {

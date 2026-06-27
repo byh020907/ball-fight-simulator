@@ -299,7 +299,7 @@ export class ArenaRenderer {
         this.ctx = canvas.getContext("2d");
     }
 
-    renderPlayerPreview(previewBall, fighter) {
+    renderPlayerPreview(previewBall, fighter, selectionAnimTime = 999) {
         const ctx = this.ctx;
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         ctx.fillStyle = "#fafafa";
@@ -307,16 +307,39 @@ export class ArenaRenderer {
 
         if (!previewBall || !fighter) return;
 
+        const cx = this.canvas.width / 2;
+        const cy = previewBall.position.y;
+        const progress = Math.min(selectionAnimTime / 0.5, 1);
+        const scale = progress < 1 ? 1 - Math.exp(-5.5 * progress) * Math.cos(11 * progress) : 1;
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.scale(scale, scale);
+        ctx.translate(-cx, -cy);
+
+        // selection ring
+        if (progress < 1) {
+            const ringR = previewBall.radius * 1.5 + (1 - progress) * 30;
+            ctx.beginPath();
+            ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
+            ctx.strokeStyle = fighter.color;
+            ctx.lineWidth = 3 * (1 - progress) + 1;
+            ctx.globalAlpha = 0.5 * (1 - progress);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+        }
+
         previewBall.draw(ctx);
+        ctx.restore();
 
         ctx.save();
         ctx.textAlign = "center";
         ctx.fillStyle = "#202020";
         ctx.font = "900 28px Bahnschrift, Segoe UI, sans-serif";
-        ctx.fillText("내 캐릭터", this.canvas.width / 2, previewBall.position.y + previewBall.radius + 48);
+        ctx.fillText("내 캐릭터", cx, previewBall.position.y + previewBall.radius + 48);
         ctx.font = "700 22px Bahnschrift, Segoe UI, sans-serif";
         ctx.fillStyle = fighter.color;
-        ctx.fillText(fighter.name, this.canvas.width / 2, previewBall.position.y + previewBall.radius + 82);
+        ctx.fillText(fighter.name, cx, previewBall.position.y + previewBall.radius + 82);
         ctx.restore();
     }
 
@@ -440,6 +463,11 @@ export class UIController {
         ctx.strokeStyle = "#202020";
         ctx.lineWidth = 2;
         ctx.stroke();
+
+        // face pop animation restart
+        canvas.classList.remove("face-pop");
+        void canvas.offsetWidth; // force reflow
+        canvas.classList.add("face-pop");
     }
 
     renderRoster(activeIds = []) {
