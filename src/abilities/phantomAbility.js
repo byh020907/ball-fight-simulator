@@ -35,6 +35,8 @@ export class PhantomAbility extends Ability {
         if (this._teleportPhase === 1) {
             const t = Math.min(this._teleportTimer / VANISH_DURATION, 1);
             owner.renderScale = 1 - t * t;
+            owner.position.x = this._vanishPos.x;
+            owner.position.y = this._vanishPos.y;
             if (this._teleportTimer >= VANISH_DURATION) {
                 owner.renderScale = 0;
                 this._doTeleport();
@@ -47,6 +49,8 @@ export class PhantomAbility extends Ability {
         if (this._teleportPhase === 2) {
             const t = Math.min(this._teleportTimer / APPEAR_DURATION, 1);
             owner.renderScale = 1 - Math.exp(-5.5 * t) * Math.cos(11 * t);
+            owner.position.x = this._appearPos.x;
+            owner.position.y = this._appearPos.y;
 
             if (this._teleportTimer >= APPEAR_DURATION) {
                 owner.renderScale = 1;
