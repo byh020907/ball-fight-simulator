@@ -15,6 +15,9 @@ import { findActionById } from "../src/clickActions.js";
 import { DashEffect } from "../src/combatEffects.js";
 import { shuffled } from "../src/random.js";
 import { BattleSimulation } from "../src/simulation/battleSimulation.js";
+import { createDefaultPlayerProfile } from "../src/playerProfile.js";
+import { completeChallengeTournament, formatBonusSummary } from "../src/progression/progressionState.js";
+import { Grenade } from "../src/entities/grenade.js";
 
 function makeClassList() {
     const set = new Set();
@@ -2928,6 +2931,82 @@ async function testPhantomShadowStrike(app) {
     assert.ok(distFromTarget > 10, "Phantom should teleport away from target position");
 }
 
+function testCompleteChallengeTournament() {
+    const profile = createDefaultPlayerProfile();
+    // 기본: highestUnlockedLevel=0, selectedLevel=0
+    assert.equal(profile.progression.challenge.highestUnlockedLevel, 0);
+    assert.equal(profile.progression.challenge.selectedLevel, 0);
+
+    // 레벨 0에서 우승 → 레벨 1 해금
+    const r1 = completeChallengeTournament(profile, { selectedLevel: 0, playerWon: true });
+    assert.ok(r1.unlocked);
+    assert.equal(r1.unlockedLevel, 1);
+    assert.equal(profile.progression.challenge.highestUnlockedLevel, 1);
+    assert.equal(profile.progression.challenge.selectedLevel, 1);
+
+    // 레벨 1에서 패배 → 변화 없음
+    const r2 = completeChallengeTournament(profile, { selectedLevel: 1, playerWon: false });
+    assert.ok(!r2.unlocked);
+    assert.equal(profile.progression.challenge.highestUnlockedLevel, 1);
+
+    // 낮은 레벨(0)에서 우승 → 변화 없음 (이미 1 해금)
+    const r3 = completeChallengeTournament(profile, { selectedLevel: 0, playerWon: true });
+    assert.ok(!r3.unlocked);
+    assert.equal(profile.progression.challenge.highestUnlockedLevel, 1);
+
+    // 레벨 1에서 우승 → 레벨 2 해금
+    const r4 = completeChallengeTournament(profile, { selectedLevel: 1, playerWon: true });
+    assert.ok(r4.unlocked);
+    assert.equal(r4.unlockedLevel, 2);
+    assert.equal(profile.progression.challenge.highestUnlockedLevel, 2);
+    assert.equal(profile.progression.challenge.selectedLevel, 2);
+}
+
+function testFormatBonusSummary() {
+    assert.equal(formatBonusSummary({ extraStatPoints: 0, balanceTolerance: 0, perStatCapBonus: 0 }), "");
+    assert.equal(formatBonusSummary({ extraStatPoints: 10, balanceTolerance: 0, perStatCapBonus: 0 }), "배분 +10");
+    assert.equal(
+        formatBonusSummary({ extraStatPoints: 20, balanceTolerance: 5, perStatCapBonus: 15 }),
+        "배분 +20 · 유연성 +5 · 집중 한도 +15"
+    );
+}
+
+function testGrenadeProximityTrigger() {
+    const grenadeFighter = app.roster.find((fighter) => fighter.ability === "grenade");
+    const archer = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
+    const sim = new BattleSimulation([archer, grenadeFighter], { onLog() {}, onSound() {} });
+    const owner = sim.fighters.find((f) => f.id === grenadeFighter.id);
+    const archerBall = sim.fighters.find((f) => f.id !== grenadeFighter.id);
+
+    owner.position = new Vector2(400, 480);
+    const g = new Grenade(owner, new Vector2(500, 480), 1.0);
+    g.position = new Vector2(400, 480);
+    assert.ok(g.timer > 0.5, "Grenade should start with full fuse timer");
+
+    // 아처가 수류탄 폭발 범위 밖에 있음 → 타이머 변화 없음
+    archerBall.position = new Vector2(100, 100);
+    g.update(0.016, sim);
+    assert.ok(!g._proximityTriggered, "Proximity should not trigger when target is far");
+
+    // 아처가 폭발 범위 내로 이동
+    archerBall.position = new Vector2(420, 480);
+    g.update(0.016, sim);
+    assert.ok(g._proximityTriggered, "Proximity should trigger when target enters explosion radius");
+    // 타이머가 0.6배로 단축되었어야 함
+    const proximityTimer = g.timer;
+    // 다시 업데이트해도 두 번째 가속은 없어야 함
+    g.update(0.016, sim);
+    assert.ok(g.timer < proximityTimer, "Timer should keep decreasing after proximity trigger");
+    // 아처가 멀어져도 이미 발동했으므로 추가 가속 없음
+    archerBall.position = new Vector2(100, 100);
+    const timerAfter = g.timer;
+    g.update(0.016, sim);
+    assert.ok(g.timer < timerAfter, "Timer should decrease even when target moves away");
+}
+
+testCompleteChallengeTournament();
+testFormatBonusSummary();
+testGrenadeProximityTrigger();
 await testNewCharactersRegistered(app);
 await testVampireBatsSpawn(app);
 await testVampireLifestealOnCollision(app);

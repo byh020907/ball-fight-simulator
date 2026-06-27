@@ -26,12 +26,7 @@ import {
     ensureCharacterRecords,
     unlockCharacterMastery
 } from "./playerProfile.js";
-import {
-    collectActiveEffects,
-    MASTERY_EFFECT_DEFS,
-    getCharacterChallengeLevel,
-    advanceCharacterMastery
-} from "./character-mastery/index.js";
+import { collectActiveEffects, MASTERY_EFFECT_DEFS, advanceCharacterMastery } from "./character-mastery/index.js";
 import { createCollectionHubViewModel } from "./collection/collectionViewModel.js";
 import {
     createMatchReport,
@@ -47,7 +42,12 @@ import {
     ACHIEVEMENT_DEFINITIONS,
     evaluateAchievements
 } from "./collection/index.js";
-import { computeEffectiveBonuses, formatRewardDescription } from "./progression/progressionState.js";
+import {
+    computeEffectiveBonuses,
+    formatRewardDescription,
+    completeChallengeTournament,
+    formatBonusSummary
+} from "./progression/progressionState.js";
 import { FIGHTER_IDS, Vector2 } from "./core.js";
 import {
     ArcherAbility,
@@ -191,6 +191,13 @@ export class BattleApp {
         const effectiveTotal = PLAYER_STAT_POINTS + bonusCtx.extraStatPoints;
         const remaining = getRemainingStatPoints(this.playerStatAllocation, effectiveTotal);
         const player = this.roster.find((fighter) => fighter.id === this.playerFighterId);
+        const cl = this.playerProfile?.progression?.challenge;
+        const balanceTol = computeEffectiveBonuses(this.playerProfile, ACHIEVEMENT_DEFINITIONS).balanceTolerance;
+        const bonusSummary = formatBonusSummary({
+            extraStatPoints: bonusCtx.extraStatPoints,
+            balanceTolerance: balanceTol,
+            perStatCapBonus: bonusCtx.perStatCapBonus
+        });
         this.ui.renderPlayerSetup({
             fighter: player,
             stats: ALLOCATABLE_STATS,
@@ -198,7 +205,10 @@ export class BattleApp {
             totalPoints: effectiveTotal,
             bonusPoints: bonusCtx.extraStatPoints,
             remainingPoints: remaining,
-            locked: Boolean(this.tournament && !this.tournament.champion)
+            locked: Boolean(this.tournament && !this.tournament.champion),
+            challengeLevel: cl?.selectedLevel ?? 0,
+            highestUnlockedLevel: cl?.highestUnlockedLevel ?? 0,
+            progressionBonusSummary: bonusSummary
         });
 
         if (!this.tournament || this.tournament.champion) {
@@ -314,7 +324,7 @@ export class BattleApp {
 
         // 연계 효과 계산: 해금된 ID 중 현재 캐릭터가 아닌 효과만 적용
         const masteryCtx = collectActiveEffects(this.playerProfile, this.playerFighterId);
-        this._currentChallengeLevel = getCharacterChallengeLevel(this.playerProfile, this.playerFighterId);
+        this._currentChallengeLevel = this.playerProfile?.progression?.challenge?.selectedLevel ?? 0;
 
         // 숙련도 + 업적 보너스의 balanceTolerance를 SENSITIVITY에 반영 (동적 계산)
         const computedBonuses = computeEffectiveBonuses(this.playerProfile, ACHIEVEMENT_DEFINITIONS);
@@ -889,6 +899,15 @@ export class BattleApp {
             savePlayerProfile(this.playerProfile);
             this._lastMasteryResult = masteryResult;
         }
+
+        // 도전 단계 해금 처리 (리포트 블록 밖에서도 접근 가능)
+        const challengeResult = this._currentTournamentReport
+            ? completeChallengeTournament(this.playerProfile, {
+                  selectedLevel: this._currentChallengeLevel,
+                  playerWon
+              })
+            : null;
+
         this._matchReports = [];
         this._currentTournamentReport = null;
         this._refreshCollectionHub();
@@ -899,6 +918,22 @@ export class BattleApp {
             masteryMsg = ` ${this._lastMasteryResult.previousTier} → ${this._lastMasteryResult.newTier}`;
         }
 
+        // 도전 단계 해금 메시지
+        let challengeMsg = "";
+        if (playerWon) {
+            const cl = this._currentChallengeLevel;
+            if (cl > 0) {
+                challengeMsg = `도전 단계 ${cl} 클리어`;
+            }
+            if (challengeResult?.unlocked) {
+                challengeMsg += `\n새로운 도전 단계 ${challengeResult.unlockedLevel} 해금!`;
+            } else if (cl > 0) {
+                challengeMsg += `\n최고 해금 단계 ${this.playerProfile?.progression?.challenge?.highestUnlockedLevel ?? cl}`;
+            }
+        } else {
+            challengeMsg = `도전 단계 ${this._currentChallengeLevel} 도전 실패\n해금 단계는 유지됩니다`;
+        }
+
         this.ui.renderTournament(this.tournament);
         this.ui.showOverlay(
             playerWon ? "축하합니다!" : "토너먼트 종료",
@@ -906,6 +941,9 @@ export class BattleApp {
                 ? `${champion.name} 우승${masteryMsg}`
                 : `${player.name} ${this.playerResult?.rankLabel ?? "결과 확정"}`
         );
+        if (challengeMsg) {
+            this.showTransientOverlay("도전 단계", challengeMsg, 2500);
+        }
         this.ui.updateStatus(
             playerWon
                 ? `내 캐릭터 ${champion.name} 우승${masteryMsg}`
@@ -918,6 +956,9 @@ export class BattleApp {
                 ? `축하합니다! 내 캐릭터 ${champion.name}가 토너먼트에서 우승했습니다.${masteryMsg}`
                 : `아쉽네요. 내 캐릭터 ${player.name}의 최종 성적은 ${this.playerResult?.rankLabel ?? "기록 없음"}입니다.`
         );
+        if (challengeMsg) {
+            this.ui.addLog(challengeMsg.replace(/\n/g, " — "));
+        }
         this.ui.setStartButton({ text: "새 토너먼트 준비", hidden: false, disabled: false });
         // 재선정 대기 상태
         this._pickPending = true;

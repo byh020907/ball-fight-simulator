@@ -302,6 +302,33 @@
                                 </div>
                             </template>
                         </div>
+                        <!-- 도전 단계 선택 -->
+                        <div class="challenge-level-row" x-show="!locked">
+                            <span class="challenge-label">도전 단계</span>
+                            <button
+                                type="button"
+                                class="challenge-btn"
+                                @click="adjustChallengeLevel(-1)"
+                                x-bind:disabled="challengeLevel <= 0"
+                            >
+                                -
+                            </button>
+                            <em class="challenge-value" x-text="challengeLevel"></em>
+                            <button
+                                type="button"
+                                class="challenge-btn"
+                                @click="adjustChallengeLevel(1)"
+                                x-bind:disabled="challengeLevel >= highestUnlockedLevel"
+                            >
+                                +
+                            </button>
+                            <span class="challenge-max" x-text="'/ ' + highestUnlockedLevel"></span>
+                        </div>
+                        <div
+                            class="bonus-summary"
+                            x-show="progressionBonusSummary"
+                            x-text="progressionBonusSummary"
+                        ></div>
                         <div class="player-actions" data-player-actions>
                             <button
                                 class="action-btn"

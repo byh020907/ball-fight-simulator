@@ -1042,6 +1042,59 @@ body::before {
     text-align: center;
 }
 
+.challenge-level-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 0 4px;
+    font-size: 0.82rem;
+}
+
+.challenge-label {
+    font-weight: 700;
+    color: #202020;
+    margin-right: auto;
+}
+
+.challenge-btn {
+    border: 2px solid #202020;
+    background: #fff;
+    color: #202020;
+    font: inherit;
+    font-weight: 900;
+    font-size: 0.85rem;
+    cursor: pointer;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.challenge-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.challenge-value {
+    font-weight: 900;
+    font-size: 0.95rem;
+    color: #202020;
+    min-width: 18px;
+    text-align: center;
+}
+
+.challenge-max {
+    color: #888;
+    font-size: 0.75rem;
+}
+
+.bonus-summary {
+    font-size: 0.72rem;
+    color: #555;
+    padding: 2px 0 4px;
+}
+
 .player-actions {
     display: flex;
     gap: 6px;

@@ -110,3 +110,44 @@ export function formatRewardDescription(reward) {
     const label = LABELS[bonusKey] ?? bonusKey;
     return `${label} +${amount}`;
 }
+
+/**
+ * 도전 단계 완료 처리.
+ * 최고 해금 단계에서 플레이어가 우승하면 다음 단계를 해금하고 자동 선택한다.
+ *
+ * @param {object} profile - 플레이어 프로필 (변경됨)
+ * @param {{ selectedLevel: number, playerWon: boolean }} params
+ * @returns {{ unlocked: boolean, previousLevel: number, unlockedLevel: number|null }}
+ */
+export function completeChallengeTournament(profile, { selectedLevel, playerWon }) {
+    if (typeof profile.progression?.challenge?.highestUnlockedLevel !== "number") {
+        return { unlocked: false, previousLevel: selectedLevel, unlockedLevel: null };
+    }
+
+    if (!playerWon) {
+        return { unlocked: false, previousLevel: selectedLevel, unlockedLevel: null };
+    }
+
+    const current = profile.progression.challenge.highestUnlockedLevel;
+    if (selectedLevel >= current) {
+        const newLevel = current + 1;
+        profile.progression.challenge.highestUnlockedLevel = newLevel;
+        profile.progression.challenge.selectedLevel = newLevel;
+        return { unlocked: true, previousLevel: current, unlockedLevel: newLevel };
+    }
+
+    return { unlocked: false, previousLevel: selectedLevel, unlockedLevel: null };
+}
+
+/**
+ * 성장 보너스 요약 문자열 (UI 표시용).
+ * @param {{ extraStatPoints: number, balanceTolerance: number, perStatCapBonus: number }} bonuses
+ * @returns {string} 예: "배분 +20 · 유연성 +5 · 집중 한도 +15"
+ */
+export function formatBonusSummary(bonuses) {
+    const parts = [];
+    if (bonuses.extraStatPoints > 0) parts.push(`배분 +${bonuses.extraStatPoints}`);
+    if (bonuses.balanceTolerance > 0) parts.push(`유연성 +${bonuses.balanceTolerance}`);
+    if (bonuses.perStatCapBonus > 0) parts.push(`집중 한도 +${bonuses.perStatCapBonus}`);
+    return parts.length > 0 ? parts.join(" · ") : "";
+}

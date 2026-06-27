@@ -8,6 +8,7 @@ import {
     formatStatAllocation,
     getRemainingStatPoints
 } from "./statAllocation.js";
+import { DEFAULT_STAT_RULES, CHALLENGE_CONFIG } from "./progression/index.js";
 import { formatHeroStatLine, formatHeroStatParts, mergeOrbBonuses } from "./entities/index.js";
 import { FIGHTER_IDS, RENDER_LAYERS, Vector2 } from "./core.js";
 import { getUnseenEntries, dismissPatchNotes } from "./utils.js";
@@ -207,6 +208,19 @@ export function appStore() {
 
         allocationSummary: "체력 +0% · 공격 +0% · 속도 +0%",
 
+        // Challenge level
+        challengeLevel: 0,
+        highestUnlockedLevel: 0,
+        progressionBonusSummary: "",
+
+        adjustChallengeLevel(delta) {
+            const next = this.challengeLevel + delta;
+            if (next < 0 || next > this.highestUnlockedLevel) return;
+            this.challengeLevel = next;
+            this._startDisabled = null;
+            this._startText = null;
+        },
+
         // Patch notes
         patchEntries: [],
         patchNotesVisible: false,
@@ -401,7 +415,18 @@ export class UIController {
         if (s) fn(s);
     }
 
-    renderPlayerSetup({ fighter, stats, allocation, totalPoints, bonusPoints = 0, remainingPoints, locked = false }) {
+    renderPlayerSetup({
+        fighter,
+        stats,
+        allocation,
+        totalPoints,
+        bonusPoints = 0,
+        remainingPoints,
+        locked = false,
+        challengeLevel = 0,
+        highestUnlockedLevel = 0,
+        progressionBonusSummary = ""
+    } = {}) {
         const s = this.state;
         if (!s) return;
         s.playerFighter = fighter;
@@ -410,6 +435,9 @@ export class UIController {
         s.bonusPoints = bonusPoints;
         s.remainingPoints = remainingPoints;
         s.locked = locked;
+        s.challengeLevel = challengeLevel;
+        s.highestUnlockedLevel = highestUnlockedLevel;
+        s.progressionBonusSummary = progressionBonusSummary;
         s._startDisabled = null;
         s._startText = null;
         this._drawPlayerFace(fighter);
