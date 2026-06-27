@@ -87,7 +87,7 @@ export class BattleApp {
          * @type {string|null}
          */
         this.startCharacter = null;
-        // this.startCharacter = FIGHTER_IDS.PHANTOM;
+        this.startCharacter = FIGHTER_IDS.VAMPIRE;
 
         this.elements = {
             canvas: document.getElementById("arenaCanvas"),

@@ -35,7 +35,7 @@ export const ALLOCATABLE_STATS = [
         key: "defense",
         label: "방어력",
         shortLabel: "DEF",
-        description: "받는 피해가 100/(100+스탯) 비율로 감소합니다."
+        description: "종족값 방어력을 포인트당 1% 올립니다."
     }
 ];
 
