@@ -1,6 +1,6 @@
 import { Projectile, Vector2 } from "../core.js";
 
-const SENSOR_RANGE = 180;
+const SENSOR_RANGE = 140;
 const PROXIMITY_DELAY = 0.2;
 
 export class Grenade extends Projectile {

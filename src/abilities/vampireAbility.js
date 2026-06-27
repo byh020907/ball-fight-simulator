@@ -6,7 +6,7 @@ const LIFESTEAL_RATE_NORMAL = 0.35;
 const LIFESTEAL_RATE_LOW_HP = 0.5;
 const LOW_HP_THRESHOLD = 0.3;
 const BAT_COOLDOWN = 4.0;
-const BAT_COUNT = 5;
+const BAT_COUNT = 7;
 const BAT_SPEED_MULT = 0.5;
 const BAT_SPREAD_DEG = 40;
 
