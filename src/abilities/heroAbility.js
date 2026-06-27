@@ -37,37 +37,37 @@ export function pickHeroOrbEffectType(rng = Math.random) {
 export function computeOwnerCombatSpeed(owner) {
     const modifiers = owner.getStatModifiers?.() ?? { speed: 1 };
     const baseMult = modifiers.speed;
-    const slowMult = owner.slowEffect ? owner.slowEffect.amount : 1;
-    const boostMult = owner.speedBoost ? owner.speedBoost.multiplier : 1;
-    const movementSpeed = owner.movementEffect?.getSpeed?.(owner);
+    const slowMult = owner.state.slow ? owner.state.slow.amount : 1;
+    const boostMult = owner.state.speedBoost ? owner.state.speedBoost.multiplier : 1;
+    const movementSpeed = owner.state.movement?.getSpeed?.(owner);
     return movementSpeed ?? owner.baseSpeed * baseMult * slowMult * boostMult;
 }
 
 export class HeroAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation, HERO_ORB_BASE_COOLDOWN);
-        this._cooldownBurstTimer = 0;
-        this._cooldownBurstMultiplier = 1;
+        this.state = { cooldownBurstTimer: 0, cooldownBurstMultiplier: 1 };
     }
 
     /** cooldown burst 상태에서 effective cooldown getter 오버라이드 */
     get cooldown() {
         const base = super.cooldown;
-        return base * this._cooldownBurstMultiplier;
+        if (!this.state) return base;
+        return base * this.state.cooldownBurstMultiplier;
     }
 
     /** cooldown burst 발동 */
     applyCooldownBurst(duration = COOLDOWN_BURST_DURATION, multiplier = COOLDOWN_BURST_MULTIPLIER) {
-        this._cooldownBurstTimer = Math.max(this._cooldownBurstTimer, duration);
-        this._cooldownBurstMultiplier = multiplier;
+        this.state.cooldownBurstTimer = Math.max(this.state.cooldownBurstTimer, duration);
+        this.state.cooldownBurstMultiplier = multiplier;
     }
 
     _tickCooldownBurst(delta) {
-        if (this._cooldownBurstTimer <= 0) return;
-        this._cooldownBurstTimer -= delta;
-        if (this._cooldownBurstTimer <= 0) {
-            this._cooldownBurstTimer = 0;
-            this._cooldownBurstMultiplier = 1;
+        if (this.state.cooldownBurstTimer <= 0) return;
+        this.state.cooldownBurstTimer -= delta;
+        if (this.state.cooldownBurstTimer <= 0) {
+            this.state.cooldownBurstTimer = 0;
+            this.state.cooldownBurstMultiplier = 1;
         }
     }
 
@@ -116,7 +116,7 @@ export class HeroAbility extends Ability {
 
     getUiState() {
         const progress = Math.max(0, Math.min(1, 1 - this.timer / this.cooldown));
-        const label = this._cooldownBurstTimer > 0 ? "Burst" : "Orbs";
+        const label = this.state.cooldownBurstTimer > 0 ? "Burst" : "Orbs";
         return { label, progress };
     }
 

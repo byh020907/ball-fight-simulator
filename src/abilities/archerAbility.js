@@ -11,23 +11,21 @@ const MAX_MISS_STREAK = 5;
 export class ArcherAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation, 3);
+        this.state = { windUp: 0, missStreak: 0, lastAimDir: new Vector2(1, 0) };
         this.arrowSpeedMult = ARROW_SPEED_MULT;
-        this.windUp = 0;
-        this.missStreak = 0;
-        this.lastAimDir = new Vector2(1, 0);
     }
 
     update(delta, target) {
         this._evade(target);
 
         // Wind-up phase — tracking target
-        if (this.windUp > 0) {
+        if (this.state.windUp > 0) {
             if (target) {
-                this.lastAimDir = Vector2.subtract(target.position, this.owner.position).normalize();
+                this.state.lastAimDir = Vector2.subtract(target.position, this.owner.position).normalize();
             }
-            this.windUp -= delta;
-            if (this.windUp <= 0) {
-                this.windUp = 0;
+            this.state.windUp -= delta;
+            if (this.state.windUp <= 0) {
+                this.state.windUp = 0;
                 this.release();
             }
             return;
@@ -36,19 +34,19 @@ export class ArcherAbility extends Ability {
         this.timer -= delta;
         if (this.timer <= 0 && target) {
             this.timer = this.cooldown * (0.7 + Math.random() * 0.6);
-            this.lastAimDir = Vector2.subtract(target.position, this.owner.position).normalize();
-            this.windUp = WINDUP;
+            this.state.lastAimDir = Vector2.subtract(target.position, this.owner.position).normalize();
+            this.state.windUp = WINDUP;
         }
     }
 
     /** Fire the arrow(s) after wind-up completes. */
     release() {
-        const dir = this.lastAimDir;
+        const dir = this.state.lastAimDir;
         const base = Vector2.add(this.owner.position, dir.clone().scale(this.owner.radius + 24));
 
-        if (this.missStreak >= 2) {
+        if (this.state.missStreak >= 2) {
             // Triple shot
-            this.missStreak = 0;
+            this.state.missStreak = 0;
             const angles = [-SPREAD_ANGLE, 0, SPREAD_ANGLE];
             for (const offset of angles) {
                 const a = Math.atan2(dir.y, dir.x) + offset;
@@ -74,9 +72,9 @@ export class ArcherAbility extends Ability {
     /** Called by arrow when it hits or expires. */
     onArrowResult(hit) {
         if (hit) {
-            this.missStreak = 0;
+            this.state.missStreak = 0;
         } else {
-            this.missStreak = Math.min(MAX_MISS_STREAK, this.missStreak + 1);
+            this.state.missStreak = Math.min(MAX_MISS_STREAK, this.state.missStreak + 1);
         }
     }
 
@@ -92,10 +90,10 @@ export class ArcherAbility extends Ability {
     }
 
     draw(ctx) {
-        if (this.windUp <= 0) return;
+        if (this.state.windUp <= 0) return;
 
-        const progress = 1 - this.windUp / WINDUP; // 0→1 during wind-up
-        const dir = this.lastAimDir;
+        const progress = 1 - this.state.windUp / WINDUP; // 0→1 during wind-up
+        const dir = this.state.lastAimDir;
         const pos = this.owner.position;
         const r = this.owner.radius;
 
@@ -152,10 +150,10 @@ export class ArcherAbility extends Ability {
     }
 
     getUiState() {
-        if (this.windUp > 0) {
-            return { label: "Draw", progress: 1 - this.windUp / WINDUP };
+        if (this.state.windUp > 0) {
+            return { label: "Draw", progress: 1 - this.state.windUp / WINDUP };
         }
-        const label = this.missStreak >= 2 ? `Triple x${this.missStreak}` : "Arrow";
+        const label = this.state.missStreak >= 2 ? `Triple x${this.state.missStreak}` : "Arrow";
         return {
             label,
             progress: Math.max(0, Math.min(1, 1 - this.timer / this.cooldown))

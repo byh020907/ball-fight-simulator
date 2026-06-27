@@ -11,8 +11,8 @@ const SLASH_LENGTH = 120;
 export class DashAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation);
+        this.state = { cooldownLevel: INITIAL_COOLDOWN_LEVEL };
         this.baseCooldown = 3;
-        this.cooldownLevel = INITIAL_COOLDOWN_LEVEL;
         this.maxCooldownLevel = 2;
         this._baseCooldown = this.getCooldownForLevel();
         this.timer = this.cooldown;
@@ -21,7 +21,7 @@ export class DashAbility extends Ability {
     }
 
     update(delta, target) {
-        if (this.owner.movementEffect && target && this.cooldownLevel === 0) {
+        if (this.owner.state.movement && target && this.state.cooldownLevel === 0) {
             const dist = Vector2.subtract(target.position, this.owner.position).length();
             if (dist < HOMING_RANGE) {
                 this.steerDash(delta, target);
@@ -29,7 +29,7 @@ export class DashAbility extends Ability {
         }
 
         this.timer -= delta;
-        if (this.owner.movementEffect || this.timer > 0 || !target) {
+        if (this.owner.state.movement || this.timer > 0 || !target) {
             return;
         }
 
@@ -67,21 +67,21 @@ export class DashAbility extends Ability {
     }
 
     onDashHit() {
-        this.cooldownLevel = Math.min(this.maxCooldownLevel, this.cooldownLevel + 1);
+        this.state.cooldownLevel = Math.min(this.maxCooldownLevel, this.state.cooldownLevel + 1);
         this.cooldown = this.getCooldownForLevel();
         this.timer = Math.min(this.timer, this.cooldown);
         this.simulation.addLog(`${this.owner.name} lands a dash and shortens future cooldowns.`);
     }
 
     onDashWall() {
-        this.cooldownLevel = 0;
+        this.state.cooldownLevel = 0;
         this._baseCooldown = this.getCooldownForLevel();
         this.timer = this.cooldown;
         this.simulation.addLog(`${this.owner.name} hits a wall and resets dash cooldown.`);
     }
 
     getCooldownForLevel() {
-        return this.baseCooldown * 0.5 ** this.cooldownLevel;
+        return this.baseCooldown * 0.5 ** this.state.cooldownLevel;
     }
 
     drawFace(ctx, rotation, ball) {
@@ -103,7 +103,7 @@ export class DashAbility extends Ability {
     }
 
     getUiState() {
-        if (this.owner.movementEffect) {
+        if (this.owner.state.movement) {
             return { label: "Dash", progress: 1 };
         }
         return { label: "Dash", progress: Math.max(0, Math.min(1, 1 - this.timer / this.cooldown)) };

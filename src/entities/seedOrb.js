@@ -16,7 +16,7 @@ export class SeedOrb extends Projectile {
         }
 
         for (const fighter of simulation.fighters) {
-            if (fighter.isDefeated) continue;
+            if (fighter.flags.defeated) continue;
             const distance = Vector2.subtract(this.position, fighter.position).length();
             if (distance > this.radius + fighter.radius) continue;
             this._onHitEffects(fighter, simulation);

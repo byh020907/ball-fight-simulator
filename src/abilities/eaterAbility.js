@@ -14,45 +14,47 @@ const FEAST_HOMING_TURN_RATE = 3.5;
 export class EaterAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation, 6.0);
+        this.state = {
+            feastTimer: 0,
+            feastElapsed: 0,
+            radiusScale: 1,
+            swallowedTarget: null,
+            swallowTimer: 0,
+            spitDirection: new Vector2(1, 0),
+            hasEatenThisFeast: false
+        };
         this.feastDuration = FEAST_DURATION;
-        this.feastTimer = 0;
-        this.feastElapsed = 0;
-        this.radiusScale = 1;
-        this.swallowedTarget = null;
-        this.swallowTimer = 0;
-        this.spitDirection = new Vector2(1, 0);
-        this.hasEatenThisFeast = false;
     }
 
     isFeasting() {
-        return this.feastTimer > 0 && !this.hasEatenThisFeast;
+        return this.state.feastTimer > 0 && !this.state.hasEatenThisFeast;
     }
 
     update(delta, target) {
         this.updateRadiusScale(delta);
 
         // Update swallowed target position (runs even during feast)
-        if (this.swallowedTarget) {
-            this.swallowTimer -= delta;
-            this.swallowedTarget.position = this.owner.position.clone();
-            if (this.swallowTimer <= 0 || this.swallowedTarget.isDefeated) {
+        if (this.state.swallowedTarget) {
+            this.state.swallowTimer -= delta;
+            this.state.swallowedTarget.position = this.owner.position.clone();
+            if (this.state.swallowTimer <= 0 || this.state.swallowedTarget.flags.defeated) {
                 this.releaseSwallowed();
             }
         }
 
         // Feast mode: home toward target + passive defense
         if (this.isFeasting()) {
-            this.feastTimer = Math.max(0, this.feastTimer - delta);
-            this.feastElapsed = Math.min(this.feastDuration, this.feastElapsed + delta);
+            this.state.feastTimer = Math.max(0, this.state.feastTimer - delta);
+            this.state.feastElapsed = Math.min(this.feastDuration, this.state.feastElapsed + delta);
 
-            if (target && !target.isDefeated && !this.swallowedTarget) {
+            if (target && !target.flags.defeated && !this.state.swallowedTarget) {
                 steerBallToward(this.owner, target, delta, {
                     turnRate: FEAST_HOMING_TURN_RATE,
                     persist: true
                 });
             }
 
-            if (this.feastTimer > 0 && !this.swallowedTarget && Math.random() < delta * 8) {
+            if (this.state.feastTimer > 0 && !this.state.swallowedTarget && Math.random() < delta * 8) {
                 this.simulation.spawnParticleBurst(this.owner.position.clone(), this.owner.color, {
                     count: 1,
                     speed: 80,
@@ -67,15 +69,15 @@ export class EaterAbility extends Ability {
         }
 
         // Cooldown timer only counts down when not feasting and not swallowing
-        if (!this.swallowedTarget) {
+        if (!this.state.swallowedTarget) {
             this.timer -= delta;
         }
 
         if (this.timer <= 0 && target) {
             this.timer = this.cooldown;
-            this.feastTimer = this.feastDuration;
-            this.feastElapsed = 0;
-            this.hasEatenThisFeast = false;
+            this.state.feastTimer = this.feastDuration;
+            this.state.feastElapsed = 0;
+            this.state.hasEatenThisFeast = false;
             this.simulation.playSound("chomp", 0.8);
             this.simulation.spawnPulse(this.owner.position.clone(), this.owner.color);
             this.simulation.addLog(`${this.owner.name} enters feast mode.`);
@@ -89,24 +91,24 @@ export class EaterAbility extends Ability {
     onCollision(target) {
         if (
             !this.isFeasting() ||
-            this.hasEatenThisFeast ||
-            this.swallowedTarget ||
-            target.swallowedState ||
-            target.isDefeated
+            this.state.hasEatenThisFeast ||
+            this.state.swallowedTarget ||
+            target.state.swallowed ||
+            target.flags.defeated
         ) {
             return;
         }
 
-        this.hasEatenThisFeast = true;
-        this.feastTimer = 0;
-        this.swallowedTarget = target;
-        this.swallowTimer = SWALLOW_HOLD_DURATION;
-        this.spitDirection =
+        this.state.hasEatenThisFeast = true;
+        this.state.feastTimer = 0;
+        this.state.swallowedTarget = target;
+        this.state.swallowTimer = SWALLOW_HOLD_DURATION;
+        this.state.spitDirection =
             this.owner.velocity.length() > 0
                 ? this.owner.velocity.clone().normalize()
                 : Vector2.subtract(target.position, this.owner.position).normalize();
 
-        target.swallowedState = { owner: this.owner };
+        target.state.swallowed = { owner: this.owner };
         target.clearDash();
         target.applyImpulse(target.velocity.clone().scale(-1));
         this.simulation.playSound("chomp", 1.25);
@@ -123,7 +125,7 @@ export class EaterAbility extends Ability {
     }
 
     releaseSwallowed() {
-        const target = this.swallowedTarget;
+        const target = this.state.swallowedTarget;
         if (!target) {
             return;
         }
@@ -131,14 +133,14 @@ export class EaterAbility extends Ability {
         // Reset cooldown timer after spitting
         this.timer = this.cooldown;
 
-        if (target.isDefeated) {
-            target.swallowedState = null;
-            this.swallowedTarget = null;
+        if (target.flags.defeated) {
+            target.state.swallowed = null;
+            this.state.swallowedTarget = null;
             return;
         }
 
-        const direction = this.spitDirection.clone().normalize();
-        target.swallowedState = null;
+        const direction = this.state.spitDirection.clone().normalize();
+        target.state.swallowed = null;
         target.position = Vector2.add(
             this.owner.position,
             direction.clone().scale(this.owner.radius + target.radius + 10)
@@ -161,7 +163,7 @@ export class EaterAbility extends Ability {
                 .scale(target.baseSpeed * 2)
                 .subtract(target.velocity)
         );
-        target.wallSlamState = new WallSlamEffect({
+        target.state.wallSlam = new WallSlamEffect({
             source: this.owner,
             damage: WALL_SLAM_DAMAGE,
             duration: SPIT_MAX_DURATION
@@ -171,7 +173,7 @@ export class EaterAbility extends Ability {
         this.simulation.spawnSlash(this.owner.position.clone(), target.position.clone(), this.owner.color);
         this.simulation.addSparkBurst(target.position.clone(), this.owner.color);
         this.simulation.addLog(`${this.owner.name} spits ${target.name} into the walls.`);
-        this.swallowedTarget = null;
+        this.state.swallowedTarget = null;
     }
 
     draw(ctx) {
@@ -217,16 +219,16 @@ export class EaterAbility extends Ability {
     }
 
     updateRadiusScale(delta) {
-        const targetScale = this.swallowedTarget ? 1.5 : 1;
-        const smoothing = 1 - Math.exp(-delta * (targetScale > this.radiusScale ? 4.8 : 7.2));
-        this.radiusScale += (targetScale - this.radiusScale) * smoothing;
-        if (Math.abs(this.radiusScale - 1) < 0.01 && targetScale === 1) {
-            this.radiusScale = 1;
+        const targetScale = this.state.swallowedTarget ? 1.5 : 1;
+        const smoothing = 1 - Math.exp(-delta * (targetScale > this.state.radiusScale ? 4.8 : 7.2));
+        this.state.radiusScale += (targetScale - this.state.radiusScale) * smoothing;
+        if (Math.abs(this.state.radiusScale - 1) < 0.01 && targetScale === 1) {
+            this.state.radiusScale = 1;
         }
     }
 
     getRadiusScale() {
-        return Math.max(1, Math.min(1.5, this.radiusScale));
+        return Math.max(1, Math.min(1.5, this.state.radiusScale));
     }
 
     drawFace(ctx, rotation, ball) {
@@ -237,11 +239,11 @@ export class EaterAbility extends Ability {
     }
 
     getUiState() {
-        if (this.swallowedTarget) {
-            return { label: "Eating", progress: Math.max(0, Math.min(1, this.swallowTimer / 0.72)) };
+        if (this.state.swallowedTarget) {
+            return { label: "Eating", progress: Math.max(0, Math.min(1, this.state.swallowTimer / 0.72)) };
         }
-        if (this.feastTimer > 0) {
-            return { label: "Feast", progress: Math.max(0, Math.min(1, this.feastTimer / this.feastDuration)) };
+        if (this.state.feastTimer > 0) {
+            return { label: "Feast", progress: Math.max(0, Math.min(1, this.state.feastTimer / this.feastDuration)) };
         }
         return { label: "Feast", progress: Math.max(0, Math.min(1, 1 - this.timer / this.cooldown)) };
     }

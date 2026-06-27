@@ -16,30 +16,32 @@ const APPEAR_DURATION = 0.4;
 export class PhantomAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation, PHANTOM_COOLDOWN);
+        this.state = {
+            primed: false,
+            primedTimer: 0,
+            teleportPhase: 0,
+            teleportTimer: 0,
+            vanishPos: null,
+            appearPos: null,
+            teleportTargetId: null
+        };
         this.timer = this.cooldown;
-        this._primed = false;
-        this._primedTimer = 0;
-        this._teleportPhase = 0;
-        this._teleportTimer = 0;
-        this._vanishPos = null;
-        this._appearPos = null;
-        this._teleportTargetId = null;
     }
 
     update(delta, target) {
         const owner = this.owner;
 
         // animation phases
-        if (this._teleportPhase > 0) {
+        if (this.state.teleportPhase > 0) {
             this._tickTeleport(delta, owner);
             return;
         }
 
         // primed: waiting for collision or timeout
-        if (this._primed) {
-            this._primedTimer -= delta;
-            if (this._primedTimer <= 0) {
-                this._primed = false;
+        if (this.state.primed) {
+            this.state.primedTimer -= delta;
+            if (this.state.primedTimer <= 0) {
+                this.state.primed = false;
                 this._randomTeleport();
                 this.timer = this.cooldown * RANDOM_MISS_COOLDOWN_FACTOR;
             }
@@ -50,51 +52,51 @@ export class PhantomAbility extends Ability {
         this.timer -= delta;
         if (this.timer <= 0) {
             this.timer = 0;
-            this._primed = true;
-            this._primedTimer = PRIMED_DURATION;
+            this.state.primed = true;
+            this.state.primedTimer = PRIMED_DURATION;
         }
     }
 
     _tickTeleport(delta, owner) {
-        this._teleportTimer += delta;
+        this.state.teleportTimer += delta;
 
-        if (this._teleportPhase === 1) {
-            const t = Math.min(this._teleportTimer / VANISH_DURATION, 1);
-            owner.renderScale = 1 - t * t;
-            if (this._teleportTimer >= VANISH_DURATION) {
-                owner.renderScale = 0;
+        if (this.state.teleportPhase === 1) {
+            const t = Math.min(this.state.teleportTimer / VANISH_DURATION, 1);
+            owner.display.scale = 1 - t * t;
+            if (this.state.teleportTimer >= VANISH_DURATION) {
+                owner.display.scale = 0;
                 this._doTeleport();
-                this._teleportPhase = 2;
-                this._teleportTimer = 0;
+                this.state.teleportPhase = 2;
+                this.state.teleportTimer = 0;
             }
             return;
         }
 
-        if (this._teleportPhase === 2) {
-            const t = Math.min(this._teleportTimer / APPEAR_DURATION, 1);
-            owner.renderScale = 1 - Math.exp(-5.5 * t) * Math.cos(11 * t);
-            owner.position.x = this._appearPos.x;
-            owner.position.y = this._appearPos.y;
+        if (this.state.teleportPhase === 2) {
+            const t = Math.min(this.state.teleportTimer / APPEAR_DURATION, 1);
+            owner.display.scale = 1 - Math.exp(-5.5 * t) * Math.cos(11 * t);
+            owner.position.x = this.state.appearPos.x;
+            owner.position.y = this.state.appearPos.y;
 
-            if (this._teleportTimer >= APPEAR_DURATION) {
-                owner.renderScale = 1;
+            if (this.state.teleportTimer >= APPEAR_DURATION) {
+                owner.display.scale = 1;
                 this._startDashAfterTeleport();
-                this._teleportPhase = 0;
-                this._teleportTimer = 0;
-                this._vanishPos = null;
-                this._appearPos = null;
-                this._teleportTargetId = null;
+                this.state.teleportPhase = 0;
+                this.state.teleportTimer = 0;
+                this.state.vanishPos = null;
+                this.state.appearPos = null;
+                this.state.teleportTargetId = null;
             }
             return;
         }
     }
 
     onCollision(target) {
-        if (this._teleportPhase > 0) return;
-        if (this.owner.swallowedState || target.swallowedState) return;
+        if (this.state.teleportPhase > 0) return;
+        if (this.owner.state.swallowed || target.state.swallowed) return;
 
-        if (this._primed) {
-            this._primed = false;
+        if (this.state.primed) {
+            this.state.primed = false;
             this._triggerShadowStrike(target);
         }
     }
@@ -104,8 +106,8 @@ export class PhantomAbility extends Ability {
         const sim = this.simulation;
         this.timer = this.cooldown;
 
-        this._vanishPos = owner.position.clone();
-        this._teleportTargetId = target.id;
+        this.state.vanishPos = owner.position.clone();
+        this.state.teleportTargetId = target.id;
 
         const toTarget = Vector2.subtract(target.position, owner.position).normalize();
         const behindAngle = (Math.random() - 0.5) * Math.PI;
@@ -118,36 +120,36 @@ export class PhantomAbility extends Ability {
         behindPos.x = Math.max(r, Math.min(sim.width - r, behindPos.x));
         behindPos.y = Math.max(r, Math.min(sim.height - r, behindPos.y));
 
-        this._appearPos = behindPos;
+        this.state.appearPos = behindPos;
 
-        sim.spawnParticleBurst(this._vanishPos, "#55bbdd", {
+        sim.spawnParticleBurst(this.state.vanishPos, "#55bbdd", {
             count: 20,
             speed: 280,
             radiusMin: 3,
             radiusMax: 6,
             gravity: 600
         });
-        sim.spawnPulse(this._vanishPos, "#55bbdd");
+        sim.spawnPulse(this.state.vanishPos, "#55bbdd");
 
-        this._teleportPhase = 1;
-        this._teleportTimer = 0;
+        this.state.teleportPhase = 1;
+        this.state.teleportTimer = 0;
     }
 
     _doTeleport() {
         const owner = this.owner;
         const sim = this.simulation;
 
-        owner.position.x = this._appearPos.x;
-        owner.position.y = this._appearPos.y;
+        owner.position.x = this.state.appearPos.x;
+        owner.position.y = this.state.appearPos.y;
 
-        sim.spawnExplosion(this._appearPos, "#55bbdd");
-        sim.spawnPulse(this._appearPos.clone(), "#aaddff");
+        sim.spawnExplosion(this.state.appearPos, "#55bbdd");
+        sim.spawnPulse(this.state.appearPos.clone(), "#aaddff");
     }
 
     _startDashAfterTeleport() {
         const owner = this.owner;
         const sim = this.simulation;
-        const target = sim.fighters.find((f) => f.id === this._teleportTargetId);
+        const target = sim.fighters.find((f) => f.id === this.state.teleportTargetId);
         if (!target) return;
 
         const dashDir = Vector2.subtract(target.position, owner.position).normalize();
@@ -214,8 +216,8 @@ export class PhantomAbility extends Ability {
 
     onDashHit(target, effect) {
         this.timer = 0;
-        this._primed = true;
-        this._primedTimer = PRIMED_DURATION;
+        this.state.primed = true;
+        this.state.primedTimer = PRIMED_DURATION;
     }
 
     getStatModifiers() {
@@ -230,8 +232,8 @@ export class PhantomAbility extends Ability {
         ctx.save();
 
         // appear ring effect during teleport
-        if (this._teleportPhase === 2) {
-            const t = Math.min(this._teleportTimer / APPEAR_DURATION, 1);
+        if (this.state.teleportPhase === 2) {
+            const t = Math.min(this.state.teleportTimer / APPEAR_DURATION, 1);
             const ringR = owner.radius * 1.5 + (1 - t) * 30;
             ctx.beginPath();
             ctx.arc(owner.position.x, owner.position.y, ringR, 0, Math.PI * 2);
@@ -243,7 +245,7 @@ export class PhantomAbility extends Ability {
         }
 
         // primed pulsing ring
-        if (this._primed) {
+        if (this.state.primed) {
             const pulse = Math.sin(time * 8) * 0.25 + 0.75;
             ctx.strokeStyle = "#55bbdd";
             ctx.lineWidth = 3;
@@ -298,13 +300,13 @@ export class PhantomAbility extends Ability {
     }
 
     getUiState() {
-        if (this._teleportPhase > 0) {
+        if (this.state.teleportPhase > 0) {
             return { label: "Strike", progress: 1 };
         }
-        if (this._primed) {
+        if (this.state.primed) {
             return {
-                label: `Primed ${Math.max(0, this._primedTimer).toFixed(1)}s`,
-                progress: Math.max(0, Math.min(1, this._primedTimer / PRIMED_DURATION))
+                label: `Primed ${Math.max(0, this.state.primedTimer).toFixed(1)}s`,
+                progress: Math.max(0, Math.min(1, this.state.primedTimer / PRIMED_DURATION))
             };
         }
         return {

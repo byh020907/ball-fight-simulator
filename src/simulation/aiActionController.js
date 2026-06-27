@@ -18,6 +18,15 @@ export class AIActionController {
         }
     }
 
+    /** 즉시 액션 선택 (겜 시작 시점에 UI 표시용) */
+    selectAction(sim, fighter) {
+        if (this._chosenAction) return;
+        this._chosenAction = this._pickAction(sim, fighter);
+        if (this._chosenAction && fighter) {
+            fighter.clickActionName = this._chosenAction.name;
+        }
+    }
+
     evaluate(sim, fighter, delta) {
         this.cooldownRemaining -= delta;
         if (this.cooldownRemaining > 0) return null;
@@ -56,10 +65,11 @@ export class AIActionController {
         const opponent = sim.getOpponent(fighter);
         if (!opponent) return null;
 
+        const isRanged = fighter.meta?.isRanged ?? false;
         const hpRatio = fighter.hp / fighter.maxHp;
         const dist = Vector2.subtract(opponent.position, fighter.position).length();
 
-        // HP 낮으면 생존형 액션(흡혈, 회피) 우선
+        // 후보 필터링
         const viable = this.actions.filter((a) => {
             if (!a.canAIUse(sim, fighter, opponent, hpRatio, dist)) return false;
             if (a.getFailureReason?.(sim, fighter)) return false;
@@ -70,18 +80,35 @@ export class AIActionController {
 
         if (viable.length === 0) return null;
 
-        // HP 낮을 땐 흡혈 > 회피 > 저코스트 순으로 가중치
-        const scored = viable.map((a) => {
-            let score = 0;
-            if (hpRatio < 0.5 && a.id === "life_steal") score += 3;
-            if (hpRatio < 0.5 && a.id === "evade") score += 2;
-            score += 1 - a.hpCostPercent; // 저코스트 선호
-            return { action: a, score };
+        // 가중치 계산 (캐릭터 유형 + HP 상황 + 코스트)
+        const weighted = viable.map((a) => {
+            let w = 1;
+            // 원거리: 투사체방어/시간왜곡 선호, 돌진 안 함
+            if (isRanged) {
+                if (a.id === "projectile_guard") w += 2;
+                if (a.id === "time_warp") w += 1;
+                if (a.id === "rush") w = 0;
+            } else {
+                // 근접: 돌진/카운터/충격파 선호
+                if (a.id === "rush") w += 2;
+                if (a.id === "counter") w += 1;
+                if (a.id === "shockwave") w += 1;
+            }
+            // HP 상황
+            if (hpRatio < 0.5 && a.id === "life_steal") w += 2;
+            if (hpRatio < 0.5 && a.id === "evade") w += 1;
+            // 저코스트 선호
+            w += Math.max(0, 1 - a.hpCostPercent);
+            return { action: a, weight: Math.max(1, w) };
         });
-        scored.sort((a, b) => b.score - a.score);
 
-        const picked = scored[0].action;
-        if (fighter) fighter.clickActionName = picked.name;
-        return picked;
+        // 가중치 기반 랜덤 선택
+        const totalWeight = weighted.reduce((s, w) => s + w.weight, 0);
+        let roll = Math.random() * totalWeight;
+        for (const { action, weight } of weighted) {
+            roll -= weight;
+            if (roll <= 0) return action;
+        }
+        return weighted[weighted.length - 1].action;
     }
 }

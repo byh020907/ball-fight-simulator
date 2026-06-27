@@ -17,8 +17,7 @@ const IMPACT_PER_CHARGE = 0.1;
 export class RageAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation);
-        this.particleTimer = 0;
-        this.timeWithoutCollision = 0;
+        this.state = { particleTimer: 0, timeWithoutCollision: 0 };
         this._baseMaxChargeTime = 14.0;
     }
 
@@ -29,11 +28,12 @@ export class RageAbility extends Ability {
     }
 
     update(delta) {
-        this.timeWithoutCollision = Math.min(this.getMaxChargeTime(), this.timeWithoutCollision + delta);
+        this.state.timeWithoutCollision = Math.min(this.getMaxChargeTime(), this.state.timeWithoutCollision + delta);
         if (this.getChargeProgress() > CHARGE_THRESHOLD_PARTICLES) {
-            this.particleTimer -= delta;
-            if (this.particleTimer <= 0) {
-                this.particleTimer = PARTICLE_BASE_INTERVAL - this.getChargeProgress() * PARTICLE_INTERVAL_REDUCTION;
+            this.state.particleTimer -= delta;
+            if (this.state.particleTimer <= 0) {
+                this.state.particleTimer =
+                    PARTICLE_BASE_INTERVAL - this.getChargeProgress() * PARTICLE_INTERVAL_REDUCTION;
                 this.simulation.spawnParticleBurst(this.owner.position.clone(), this.owner.color, {
                     count: PARTICLE_BASE_COUNT + Math.floor(this.getChargeProgress() * PARTICLE_COUNT_PER_CHARGE),
                     speed: PARTICLE_BASE_SPEED + this.getChargeProgress() * PARTICLE_SPEED_PER_CHARGE,
@@ -52,11 +52,11 @@ export class RageAbility extends Ability {
             this.simulation.playSound("rage", 0.75);
             this.simulation.addLog(`${this.owner.name}'s momentum resets on impact.`);
         }
-        this.timeWithoutCollision = 0;
+        this.state.timeWithoutCollision = 0;
     }
 
     getChargeProgress() {
-        return Math.max(0, Math.min(1, this.timeWithoutCollision / this.getMaxChargeTime()));
+        return Math.max(0, Math.min(1, this.state.timeWithoutCollision / this.getMaxChargeTime()));
     }
 
     isCharged() {

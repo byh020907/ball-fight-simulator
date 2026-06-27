@@ -33,7 +33,8 @@ export class Simulation {
 
     getOpponent(ball) {
         return (
-            this.fighters.find((fighter) => fighter !== ball && !fighter.isDefeated && !fighter.swallowedState) || null
+            this.fighters.find((fighter) => fighter !== ball && !fighter.flags.defeated && !fighter.state.swallowed) ||
+            null
         );
     }
 
@@ -42,8 +43,8 @@ export class Simulation {
         const yBounce = this._reflectY(ball);
         if (!xBounce && !yBounce) return;
 
-        ball.bounced = true;
-        ball.wallSlamState?.onWallBounce(ball, xBounce ?? yBounce, this);
+        ball.state.bounced = true;
+        ball.state.wallSlam?.onWallBounce(ball, xBounce ?? yBounce, this);
     }
 
     keepEntityInsideArena(entity) {
@@ -56,13 +57,13 @@ export class Simulation {
         if (entity.position.x <= entity.radius) {
             entity.position.x = entity.radius;
             this._matchVelocity(entity, new Vector2(Math.abs(entity.velocity.x), entity.velocity.y));
-            if (entity.movementEffect) this._handleWallBounce(entity);
+            if (entity.state?.movement) this._handleWallBounce(entity);
             return new Vector2(1, 0);
         }
         if (entity.position.x >= this.width - entity.radius) {
             entity.position.x = this.width - entity.radius;
             this._matchVelocity(entity, new Vector2(-Math.abs(entity.velocity.x), entity.velocity.y));
-            if (entity.movementEffect) this._handleWallBounce(entity);
+            if (entity.state?.movement) this._handleWallBounce(entity);
             return new Vector2(-1, 0);
         }
         return null;
@@ -73,13 +74,13 @@ export class Simulation {
         if (entity.position.y <= entity.radius) {
             entity.position.y = entity.radius;
             this._matchVelocity(entity, new Vector2(entity.velocity.x, Math.abs(entity.velocity.y)));
-            if (entity.movementEffect) this._handleWallBounce(entity);
+            if (entity.state?.movement) this._handleWallBounce(entity);
             return new Vector2(0, 1);
         }
         if (entity.position.y >= this.height - entity.radius) {
             entity.position.y = this.height - entity.radius;
             this._matchVelocity(entity, new Vector2(entity.velocity.x, -Math.abs(entity.velocity.y)));
-            if (entity.movementEffect) this._handleWallBounce(entity);
+            if (entity.state?.movement) this._handleWallBounce(entity);
             return new Vector2(0, -1);
         }
         return null;
@@ -90,11 +91,11 @@ export class Simulation {
     }
 
     _handleWallBounce(ball) {
-        ball.movementEffect.onWallBounce(ball, this);
-        if (ball.movementEffect?.expired) {
-            ball.movementEffect = null;
+        ball.state.movement.onWallBounce(ball, this);
+        if (ball.state.movement?.expired) {
+            ball.state.movement = null;
             // 대시/효과 종료 시 벽 방향 forceHeading도 같이 제거합니다.
-            if (ball.forcedHeading) ball.forcedHeading = null;
+            if (ball.state.forcedHeading) ball.state.forcedHeading = null;
         }
     }
 

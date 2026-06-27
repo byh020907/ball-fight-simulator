@@ -140,19 +140,17 @@ class TimeWarpAction extends ClickAction {
     }
 
     canAIUse(sim, fighter, opponent, hpRatio, distance) {
-        // 원거리(archer/grenade/gunner): 상대가 빠르게 접근 중일 때 사용
-        // 근접(그 외): 상대가 도망 중일 때 사용
-        const RANGED_IDS = new Set(["archer", "grenade", "gunner"]);
         const toOpponent = Vector2.subtract(opponent.position, fighter.position);
         const dist = toOpponent.length();
         if (dist < 20) return false;
         const toDir = toOpponent.normalize();
-        // 양수: 상대 접근, 음수: 상대 도망
         const opponentApproachSpeed = opponent.velocity.dot(toDir.scale(-1));
 
-        if (RANGED_IDS.has(fighter.id)) {
+        if (fighter.meta?.isRanged) {
+            // 원거리: 상대가 빠르게 접근 중
             return opponentApproachSpeed > 80 && dist < 350;
         }
+        // 근접: 상대가 도망 중
         return opponentApproachSpeed < -40 && dist < 300;
     }
 }
@@ -214,8 +212,7 @@ class RushAction extends ClickAction {
 
     canAIUse(sim, fighter, opponent, hpRatio, distance) {
         // 근접 캐릭터만: 상대가 멀고 접근 중이 아닐 때 돌진
-        const RANGED_IDS = new Set(["archer", "grenade", "gunner"]);
-        if (RANGED_IDS.has(fighter.id)) return false;
+        if (fighter.meta?.isRanged) return false;
         const toOpp = Vector2.subtract(opponent.position, fighter.position).normalize();
         const oppApproach = opponent.velocity.dot(toOpp.scale(-1));
         return distance > 300 && oppApproach < 30;
@@ -455,7 +452,7 @@ class ShockwaveAction extends ClickAction {
 
     apply(sim, playerBall) {
         for (const fighter of sim.fighters) {
-            if (fighter === playerBall || fighter.isDefeated) continue;
+            if (fighter === playerBall || fighter.flags.defeated) continue;
             const toFighter = Vector2.subtract(fighter.position, playerBall.position);
             const dist = toFighter.length();
             if (dist > this.radius || dist === 0) continue;

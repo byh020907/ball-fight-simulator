@@ -120,7 +120,7 @@ export class CombatEntity {
     /** hit 체크만 — 코스트는 update에서 소모 가능 */
     _projectileHitCheck(simulation) {
         const target = this._findTarget(simulation);
-        if (!target || target.isDefeated) return;
+        if (!target || target.flags.defeated) return;
 
         const dist = Vector2.subtract(this.position, target.position).length();
         if (dist > target.radius + this.radius) return;
@@ -209,7 +209,7 @@ export function steerBallToward(ball, target, delta, opts = {}) {
         heading = desired;
     } else {
         const current =
-            ball.forcedHeading?.direction?.clone() ??
+            ball.state.forcedHeading?.direction?.clone() ??
             (ball.velocity.length() > 0 ? ball.velocity.clone().normalize() : desired);
         const cross = current.x * desired.y - current.y * desired.x;
         const dot = current.x * desired.x + current.y * desired.y;
@@ -219,9 +219,9 @@ export function steerBallToward(ball, target, delta, opts = {}) {
         heading = Vector2.fromAngle(nextAngle, 1);
     }
 
-    if (ball.forcedHeading && persist) {
-        ball.forcedHeading.direction = heading;
-        ball.forcedHeading.effect.elapsed = 0;
+    if (ball.state.forcedHeading && persist) {
+        ball.state.forcedHeading.direction = heading;
+        ball.state.forcedHeading.effect.elapsed = 0;
     } else if (persist) {
         ball.forceHeading(heading, 0.35);
     } else {
@@ -241,7 +241,7 @@ export function steerBallToward(ball, target, delta, opts = {}) {
  * @param {number} strength - 회피 강도 (0~1)
  */
 export function evadeTarget(owner, target, range, strength) {
-    if (!target || target.isDefeated || owner.swallowedState || owner.wallSlamState) return;
+    if (!target || target.flags.defeated || owner.state.swallowed || owner.state.wallSlam) return;
 
     const toTarget = Vector2.subtract(target.position, owner.position);
     const dist = toTarget.length();
@@ -267,9 +267,9 @@ export function evadeTarget(owner, target, range, strength) {
     const desiredVelocity = blended.clone().scale(desiredSpeed);
     owner.applyImpulse(Vector2.subtract(desiredVelocity, owner.velocity).scale(EVADE_IMPULSE_RESPONSE * intensity));
 
-    if (owner.forcedHeading) {
-        owner.forcedHeading.direction = blended;
-        owner.forcedHeading.effect.elapsed = 0;
+    if (owner.state.forcedHeading) {
+        owner.state.forcedHeading.direction = blended;
+        owner.state.forcedHeading.effect.elapsed = 0;
     } else {
         owner.forceHeading(blended, 0.35);
     }

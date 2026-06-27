@@ -151,26 +151,25 @@ function runReport(label, assignActions, overrides) {
         }
 
         // 액션 보유별 승률
-        if (sim.aiControllers) {
-            for (let i = 0; i < sim.fighters.length; i++) {
-                const fighterId = sim.fighters[i].id;
-                const ctrl = sim.aiControllers[i];
+        for (const fighter of sim.fighters) {
+            const fighterId = fighter.id;
+            const ctrl = fighter.aiController;
+            if (!ctrl) continue;
 
-                // 액션 사용량
-                if (!actionStats[fighterId]) actionStats[fighterId] = {};
-                for (const [actionId, count] of Object.entries(ctrl.usageCount)) {
-                    actionStats[fighterId][actionId] = (actionStats[fighterId][actionId] ?? 0) + count;
-                }
+            // 액션 사용량
+            if (!actionStats[fighterId]) actionStats[fighterId] = {};
+            for (const [actionId, count] of Object.entries(ctrl.usageCount)) {
+                actionStats[fighterId][actionId] = (actionStats[fighterId][actionId] ?? 0) + count;
+            }
 
-                // 액션 보유별 승패
-                for (const action of ctrl.actions) {
-                    if (!actionWinStats[fighterId]) actionWinStats[fighterId] = {};
-                    if (!actionWinStats[fighterId][action.id])
-                        actionWinStats[fighterId][action.id] = { matches: 0, wins: 0 };
-                    actionWinStats[fighterId][action.id].matches++;
-                    if (sim.winner && sim.winner.id === fighterId) {
-                        actionWinStats[fighterId][action.id].wins++;
-                    }
+            // 액션 보유별 승패
+            for (const action of ctrl.actions) {
+                if (!actionWinStats[fighterId]) actionWinStats[fighterId] = {};
+                if (!actionWinStats[fighterId][action.id])
+                    actionWinStats[fighterId][action.id] = { matches: 0, wins: 0 };
+                actionWinStats[fighterId][action.id].matches++;
+                if (sim.winner && sim.winner.id === fighterId) {
+                    actionWinStats[fighterId][action.id].wins++;
                 }
             }
         }

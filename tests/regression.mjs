@@ -221,8 +221,8 @@ async function testCloneSeedDash(app) {
 
     seeds[0].position = opponent.position.clone();
     seeds[0].update(0.016, app.simulation);
-    assert.ok(trickster.movementEffect, "Clone should dash when any seed is collected");
-    assert.equal(opponent.movementEffect, null, "The collector should not dash");
+    assert.ok(trickster.state.movement, "Clone should dash when any seed is collected");
+    assert.equal(opponent.state.movement, null, "The collector should not dash");
 }
 
 async function testEaterFeast(app) {
@@ -237,41 +237,41 @@ async function testEaterFeast(app) {
     target.position.x = 360;
     target.position.y = 300;
     eater.applyImpulse(Vector2.subtract(new Vector2(260, 0), eater.velocity));
-    eater.ability.feastTimer = eater.ability.feastDuration;
-    eater.ability.feastElapsed = eater.ability.feastDuration;
+    eater.ability.state.feastTimer = eater.ability.feastDuration;
+    eater.ability.state.feastElapsed = eater.ability.feastDuration;
     eater.ability.update(0.2, target);
     assert.equal(eater.ability.getRadiusScale(), 1, "Eater should stay normal size during feast (no swallow)");
     assert.equal(eater.ability.getStatModifiers().defense, 1.5, "Eater feast defense should be moderate");
-    assert.ok(eater.forcedHeading.direction.y < 0, "Eater feast should steer toward the target");
-    assert.ok(eater.forcedHeading.direction.y > -0.7, "Eater feast should not snap directly to the target");
-    eater.ability.feastTimer = 0;
+    assert.ok(eater.state.forcedHeading.direction.y < 0, "Eater feast should steer toward the target");
+    assert.ok(eater.state.forcedHeading.direction.y > -0.7, "Eater feast should not snap directly to the target");
+    eater.ability.state.feastTimer = 0;
     target.position.y = 480;
 
-    eater.ability.feastTimer = 1.2;
-    eater.ability.hasEatenThisFeast = false;
+    eater.ability.state.feastTimer = 1.2;
+    eater.ability.state.hasEatenThisFeast = false;
     eater.ability.onCollision(target);
-    assert.ok(target.swallowedState, "Eater should swallow on feast collision");
+    assert.ok(target.state.swallowed, "Eater should swallow on feast collision");
     eater.ability.update(0.3, target);
     assert.ok(eater.ability.getRadiusScale() > 1.1, "Eater should start growing after swallowing");
 
     app.simulation.update(0.8);
-    assert.equal(target.swallowedState, null, "Eater should spit target back out");
-    assert.ok(target.wallSlamState, "Spat target should receive wall slam state");
+    assert.equal(target.state.swallowed, null, "Eater should spit target back out");
+    assert.ok(target.state.wallSlam, "Spat target should receive wall slam state");
     assert.equal(
-        typeof target.wallSlamState.onWallBounce,
+        typeof target.state.wallSlam.onWallBounce,
         "function",
         "Wall slam behavior should live on the wall slam effect"
     );
-    assert.equal(target.forcedHeading, null, "Spit dash should allow wall bounce direction changes");
+    assert.equal(target.state.forcedHeading, null, "Spit dash should allow wall bounce direction changes");
     assert.equal(
         Math.round(target.velocity.length()),
         target.baseSpeed * 2,
         "Spat target should launch at twice its base speed"
     );
-    assert.equal(target.movementEffect.showRing, false, "Spit dash should not draw the normal speed ring");
-    const spinBefore = target.spinRotation;
+    assert.equal(target.state.movement.showRing, false, "Spit dash should not draw the normal speed ring");
+    const spinBefore = target.display.spinRotation;
     target.update(0.12, app.simulation);
-    assert.ok(Math.abs(target.spinRotation - spinBefore) > 1, "Spat target face should spin while flying");
+    assert.ok(Math.abs(target.display.spinRotation - spinBefore) > 1, "Spat target face should spin while flying");
     const beforeHp = target.hp;
     target.applyImpulse(
         Vector2.subtract(new Vector2(Math.abs(target.velocity.x) || 500, target.velocity.y), target.velocity)
@@ -319,31 +319,31 @@ async function testDashBallCooldownDash(app) {
     target.position.y = 480;
     dashBall.ability.timer = 0;
     dashBall.ability.update(0.016, target);
-    assert.ok(dashBall.movementEffect, "Dash Ball should enter dash state");
+    assert.ok(dashBall.state.movement, "Dash Ball should enter dash state");
     assert.ok(
-        Math.abs(dashBall.forcedHeading.direction.length() - 1) < 0.001,
+        Math.abs(dashBall.state.forcedHeading.direction.length() - 1) < 0.001,
         "Dash Ball forced heading should remain a unit direction"
     );
     dashBall.update(0.016, app.simulation);
     assert.ok(dashBall.velocity.length() < 800, "Dash Ball dash velocity should stay bounded");
     assert.ok(dashBall.velocity.length() > 600, "Dash Ball dash should be faster than before");
-    const directionBeforeSteer = dashBall.forcedHeading.direction.clone();
+    const directionBeforeSteer = dashBall.state.forcedHeading.direction.clone();
     target.position.y = 300;
     dashBall.ability.update(0.1, target);
     assert.ok(
-        dashBall.forcedHeading.direction.y < directionBeforeSteer.y,
+        dashBall.state.forcedHeading.direction.y < directionBeforeSteer.y,
         "Dash Ball dash should steer toward the target at full cooldown"
     );
-    dashBall.ability.cooldownLevel = 1;
-    const directionAfterFullCooldownSteer = dashBall.forcedHeading.direction.clone();
+    dashBall.ability.state.cooldownLevel = 1;
+    const directionAfterFullCooldownSteer = dashBall.state.forcedHeading.direction.clone();
     target.position.y = 660;
     dashBall.ability.update(0.1, target);
     assert.deepEqual(
-        dashBall.forcedHeading.direction,
+        dashBall.state.forcedHeading.direction,
         directionAfterFullCooldownSteer,
         "Dash Ball dash should not steer after cooldown stacks are gained"
     );
-    dashBall.ability.cooldownLevel = 0;
+    dashBall.ability.state.cooldownLevel = 0;
 
     dashBall.position.x = 480;
     dashBall.position.y = 480;
@@ -358,9 +358,9 @@ async function testDashBallCooldownDash(app) {
         false,
         "Dash Ball dash should not add separate collision damage"
     );
-    assert.equal(target.slowEffect, null, "Dash Ball collision should not slow target");
+    assert.equal(target.state.slow, null, "Dash Ball collision should not slow target");
     assert.equal(baseCooldown, 3, "Dash Ball base cooldown should be 3 seconds");
-    assert.equal(dashBall.ability.cooldownLevel, 1, "First dash hit should add one cooldown stack");
+    assert.equal(dashBall.ability.state.cooldownLevel, 1, "First dash hit should add one cooldown stack");
     assert.equal(dashBall.ability.cooldown, baseCooldown * 0.5, "First dash hit should halve future cooldown");
     assert.equal(dashBall.ability.maxCooldownLevel, 2, "Dash should have max 2 cooldown stacks");
     assert.equal(
@@ -368,13 +368,13 @@ async function testDashBallCooldownDash(app) {
         dashBall.ability.cooldown,
         "Dash hit should clamp timer to the shorter cooldown"
     );
-    assert.equal(dashBall.movementEffect, null, "Dash Ball dash should clear after impact");
+    assert.equal(dashBall.state.movement, null, "Dash Ball dash should clear after impact");
 
     dashBall.ability.onDashHit();
-    assert.equal(dashBall.ability.cooldownLevel, 2, "Second dash hit should reach max cooldown stacks");
+    assert.equal(dashBall.ability.state.cooldownLevel, 2, "Second dash hit should reach max cooldown stacks");
     assert.equal(dashBall.ability.cooldown, baseCooldown * 0.25, "Second dash hit should leave 25% base cooldown");
     dashBall.ability.onDashHit();
-    assert.equal(dashBall.ability.cooldownLevel, 2, "Dash cooldown stacks should cap at two");
+    assert.equal(dashBall.ability.state.cooldownLevel, 2, "Dash cooldown stacks should cap at two");
     assert.equal(
         dashBall.ability.cooldown,
         baseCooldown * 0.25,
@@ -385,7 +385,7 @@ async function testDashBallCooldownDash(app) {
     dashBall.position.y = 200;
     target.position.x = 200;
     target.position.y = 760;
-    dashBall.ability.cooldownLevel = 2;
+    dashBall.ability.state.cooldownLevel = 2;
     dashBall.ability.cooldown = dashBall.ability.getCooldownForLevel();
     dashBall.ability.timer = dashBall.ability.cooldown;
     dashBall.setMovementEffect(
@@ -401,8 +401,8 @@ async function testDashBallCooldownDash(app) {
     dashBall.forceHeading(new Vector2(1, 0), 1.4);
     dashBall.applyImpulse(Vector2.subtract(new Vector2(1, 0).scale(dashBall.baseSpeed), dashBall.velocity));
     app.simulation.keepInsideArena(dashBall);
-    assert.equal(dashBall.movementEffect, null, "Dash Ball dash should clear on wall contact");
-    assert.equal(dashBall.ability.cooldownLevel, 0, "Wall contact should reset cooldown stacks");
+    assert.equal(dashBall.state.movement, null, "Dash Ball dash should clear on wall contact");
+    assert.equal(dashBall.ability.state.cooldownLevel, 0, "Wall contact should reset cooldown stacks");
     assert.equal(dashBall.ability.cooldown, baseCooldown, "Wall contact should restore full cooldown");
     assert.equal(dashBall.ability.timer, baseCooldown, "Wall contact should restart from full cooldown");
 }
@@ -515,7 +515,7 @@ async function testOrbitShardRecharge(app) {
     ability.update(0.016, target);
     assert.ok(target.hp < hpBefore, "Orbit shard should damage when it hits");
     assert.equal(ability.getActiveShardCount(), 4, "Hit orbit shard should disappear (5→4)");
-    assert.ok(ability.spinBurst > 0, "Orbit should spin faster after spending a shard");
+    assert.ok(ability.state.spinBurst > 0, "Orbit should spin faster after spending a shard");
 
     target.position.x = 80;
     target.position.y = 80;
@@ -692,7 +692,7 @@ function assertPassiveEvasionAppliesImpulse(app, fighterId, label) {
 
     evader.ability.update(0.016, target);
 
-    assert.ok(evader.forcedHeading, `${label} passive evasion should still hold a short dodge heading`);
+    assert.ok(evader.state.forcedHeading, `${label} passive evasion should still hold a short dodge heading`);
     assert.ok(
         Math.abs(evader.velocity.y) > 20,
         `${label} passive evasion should apply immediate lateral impulse after velocity became impulse-based`
@@ -1396,16 +1396,16 @@ async function testSpecialOrbOwnerCollectDash(app) {
     target.position.x = 600;
     target.position.y = 480;
     const bonusesBefore = { ...heroFighter.hero.bonuses };
-    const dashBefore = heroFighter.movementEffect;
+    const dashBefore = heroFighter.state.movement;
 
     const orb = new HeroOrb(heroFighter, heroFighter.position.clone(), new Vector2(0, 0), "dash", 10);
     orb.position = heroFighter.position.clone();
     sim.entities.push(orb);
     orb.update(0.016, sim);
 
-    assert.ok(heroFighter.movementEffect, "Dash orb should set movementEffect on owner");
-    assert.ok(heroFighter.movementEffect.constructor?.name === "DashEffect", "Dash orb should use DashEffect");
-    const dashSpeed = heroFighter.movementEffect.getSpeed(heroFighter);
+    assert.ok(heroFighter.state.movement, "Dash orb should set movementEffect on owner");
+    assert.ok(heroFighter.state.movement.constructor?.name === "DashEffect", "Dash orb should use DashEffect");
+    const dashSpeed = heroFighter.state.movement.getSpeed(heroFighter);
     const expectedSpeed = heroFighter.baseSpeed * 1.5;
     assert.ok(
         Math.abs(dashSpeed - expectedSpeed) < 1,
@@ -1468,7 +1468,7 @@ async function testSpecialOrbOwnerCollectCooldownBurst(app) {
         `Cooldown burst should reduce cooldown to 10% (${burstCooldown.toFixed(3)} vs ${normalCooldown.toFixed(3)})`
     );
     assert.deepEqual(heroFighter.hero.bonuses, bonusesBefore, "Cooldown burst orb should not increment hero.bonuses");
-    assert.ok(heroFighter.ability._cooldownBurstTimer > 0, "Cooldown burst timer should be active");
+    assert.ok(heroFighter.ability.state.cooldownBurstTimer > 0, "Cooldown burst timer should be active");
 }
 
 async function testSpecialOrbCooldownBurstExpires(app) {
@@ -1493,7 +1493,7 @@ async function testSpecialOrbCooldownBurstExpires(app) {
         Math.abs(afterBurstCooldown - normalCooldown) < 0.01,
         `After burst expires, cooldown should return to normal (${afterBurstCooldown.toFixed(3)} vs ${normalCooldown.toFixed(3)})`
     );
-    assert.equal(heroFighter.ability._cooldownBurstTimer, 0, "Burst timer should be 0 after expiry");
+    assert.equal(heroFighter.ability.state.cooldownBurstTimer, 0, "Burst timer should be 0 after expiry");
 }
 
 async function testSpecialOrbOpponentCollects(app) {
@@ -1510,7 +1510,7 @@ async function testSpecialOrbOpponentCollects(app) {
         target.position.x = 600;
         target.position.y = 480;
         const bonusesBefore = { ...heroFighter.hero.bonuses };
-        const movementBefore = heroFighter.movementEffect;
+        const movementBefore = heroFighter.state.movement;
         const entitiesBefore = sim.entities.length;
 
         const orb = new HeroOrb(heroFighter, target.position.clone(), new Vector2(0, 0), specialType, 10);
@@ -1523,7 +1523,7 @@ async function testSpecialOrbOpponentCollects(app) {
             `${specialType} orb collected by opponent should not give bonus to owner`
         );
         assert.equal(
-            heroFighter.movementEffect,
+            heroFighter.state.movement,
             movementBefore,
             `${specialType} orb collected by opponent should not trigger dash on owner`
         );
@@ -2904,8 +2904,8 @@ async function testPhantomShadowStrike(app) {
     target.position.x = 250;
     target.position.y = 480;
     phantomFighter.ability.timer = 0;
-    phantomFighter.ability._primed = true;
-    phantomFighter.ability._primedTimer = 99;
+    phantomFighter.ability.state.primed = true;
+    phantomFighter.ability.state.primedTimer = 99;
 
     const posBefore = phantomFighter.position.clone();
     phantomFighter.ability.onCollision(target);
@@ -2917,7 +2917,7 @@ async function testPhantomShadowStrike(app) {
     for (let i = 0; i < 60; i++) {
         phantomFighter.ability.update(0.01, target);
     }
-    assert.ok(phantomFighter.movementEffect, "Phantom should start dashing after teleport animation");
+    assert.ok(phantomFighter.state.movement, "Phantom should start dashing after teleport animation");
     // Position should have changed (teleported behind target)
     const distFromTarget = Vector2.subtract(phantomFighter.position, target.position).length();
     assert.ok(distFromTarget > 10, "Phantom should teleport away from target position");

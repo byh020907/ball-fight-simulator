@@ -21,18 +21,24 @@ export class BattleBall {
         this.mass = spec.stats.mass;
         this.position = position;
         this.velocity = Vector2.fromAngle(Math.random() * Math.PI * 2, 120 + Math.random() * 90);
-        this.slowEffect = null;
-        this.speedBoost = null;
-        this.forcedHeading = null;
-        this.movementEffect = null;
-        this.swallowedState = null;
-        this.wallSlamState = null;
-        this.flags = {};
-        this.bounced = false;
+        this.state = {
+            slow: null,
+            speedBoost: null,
+            forcedHeading: null,
+            movement: null,
+            swallowed: null,
+            wallSlam: null,
+            bounced: false
+        };
+        this.flags = {
+            defeated: false,
+            destroyed: false
+        };
+        this.display = {
+            spinRotation: 0,
+            scale: 1
+        };
         this.ability = null;
-        this.isDefeated = false;
-        this.isDestroyed = false;
-        this.spinRotation = 0;
         this.statAllocation = spec.statAllocation ?? null;
         this.hero = {
             bonuses: { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 },
@@ -52,11 +58,15 @@ export class BattleBall {
             _states: null
         };
         this.actionContext = new ActionContext();
-        this.renderScale = 1;
+        this.aiController = null;
     }
 
     get renderLayer() {
         return RENDER_LAYERS.FIGHTER;
+    }
+
+    get meta() {
+        return this.ability?.meta ?? { isRanged: false };
     }
 
     bindAbility(ability) {
@@ -68,11 +78,11 @@ export class BattleBall {
     }
 
     setSpeedBoost(duration, multiplier, color = this.color) {
-        this.speedBoost = { effect: new TimedEffect(duration), multiplier, color };
+        this.state.speedBoost = { effect: new TimedEffect(duration), multiplier, color };
     }
 
     forceHeading(direction, duration) {
-        this.forcedHeading = {
+        this.state.forcedHeading = {
             effect: new TimedEffect(duration),
             direction: direction.clone().normalize()
         };
@@ -84,27 +94,27 @@ export class BattleBall {
     }
 
     setMovementEffect(effect) {
-        this.movementEffect = effect;
+        this.state.movement = effect;
     }
 
     clearDash() {
-        this.movementEffect = null;
-        this.forcedHeading = null;
-        this.speedBoost = null;
+        this.state.movement = null;
+        this.state.forcedHeading = null;
+        this.state.speedBoost = null;
     }
 
     freezeForResult() {
         this.applyImpulse(this.velocity.clone().scale(-1));
         this.clearDash();
-        this.slowEffect = null;
-        this.swallowedState = null;
-        this.wallSlamState = null;
+        this.state.slow = null;
+        this.state.swallowed = null;
+        this.state.wallSlam = null;
     }
 
     destroyForResult() {
         this.freezeForResult();
-        this.isDefeated = true;
-        this.isDestroyed = true;
+        this.flags.defeated = true;
+        this.flags.destroyed = true;
     }
 
     heal(amount) {
@@ -116,15 +126,15 @@ export class BattleBall {
     }
 
     initState() {
-        this.bounced = false;
+        this.state.bounced = false;
     }
 
     update(delta, simulation) {
-        if (this.isDefeated) return;
+        if (this.flags.defeated) return;
         this.initState();
 
-        if (this.swallowedState) {
-            this.position = this.swallowedState.owner.position.clone();
+        if (this.state.swallowed) {
+            this.position = this.state.swallowed.owner.position.clone();
             this.applyImpulse(this.velocity.clone().scale(-1));
             return;
         }
@@ -133,11 +143,20 @@ export class BattleBall {
         this._tickTimers(delta);
         this._tickMasteryPassives(delta);
         this.ability?.update(delta, target);
+
+        // AI 액션 의사결정
+        if (this.aiController) {
+            const result = this.aiController.evaluate(simulation, this, delta);
+            if (result) {
+                result.action.apply(simulation, result.fighter, result.paidCost);
+            }
+        }
+
         this.radius = this.baseRadius * (this.ability?.getRadiusScale?.() ?? 1);
         this._applyVelocityCorrection(simulation, delta);
         this.position.add(this.velocity.clone().scale(delta));
         simulation.keepInsideArena(this);
-        if (this.bounced) this.forcedHeading = null;
+        if (this.state.bounced) this.state.forcedHeading = null;
     }
 
     _tickMasteryPassives(delta) {
@@ -178,19 +197,19 @@ export class BattleBall {
             effect.tick(delta);
             if (effect.finished) onFinish();
         };
-        tick(this.slowEffect, () => (this.slowEffect = null));
-        tick(this.speedBoost?.effect, () => (this.speedBoost = null));
-        tick(this.forcedHeading?.effect, () => (this.forcedHeading = null));
-        if (this.movementEffect) {
-            this.movementEffect.tick(this, delta);
-            if (this.movementEffect.expired) {
-                this.movementEffect = null;
-                if (this.forcedHeading) this.forcedHeading = null;
+        tick(this.state.slow, () => (this.state.slow = null));
+        tick(this.state.speedBoost?.effect, () => (this.state.speedBoost = null));
+        tick(this.state.forcedHeading?.effect, () => (this.state.forcedHeading = null));
+        if (this.state.movement) {
+            this.state.movement.tick(this, delta);
+            if (this.state.movement.expired) {
+                this.state.movement = null;
+                if (this.state.forcedHeading) this.state.forcedHeading = null;
             }
         }
-        if (this.wallSlamState) {
-            if (this.wallSlamState.tick(this, delta)) {
-                this.wallSlamState = null;
+        if (this.state.wallSlam) {
+            if (this.state.wallSlam.tick(this, delta)) {
+                this.state.wallSlam = null;
             }
         }
         this.actionContext.tickTimers(this, delta);
@@ -206,17 +225,17 @@ export class BattleBall {
 
     _computeDesiredVelocity(simulation) {
         const modifiers = this.getStatModifiers();
-        const slowMult = this.slowEffect ? this.slowEffect.amount : 1;
-        const boostMult = this.speedBoost ? this.speedBoost.multiplier : 1;
-        const movementSpeed = this.movementEffect?.getSpeed(this);
+        const slowMult = this.state.slow ? this.state.slow.amount : 1;
+        const boostMult = this.state.speedBoost ? this.state.speedBoost.multiplier : 1;
+        const movementSpeed = this.state.movement?.getSpeed(this);
         const currentDir =
             this.velocity.length() > 0
                 ? this.velocity.clone().normalize()
                 : Vector2.fromAngle(Math.random() * Math.PI * 2, 1);
-        const direction = this.forcedHeading ? this.forcedHeading.direction.clone() : currentDir;
+        const direction = this.state.forcedHeading ? this.state.forcedHeading.direction.clone() : currentDir;
         return direction.scale(
             movementSpeed ??
-                this.speedBoost?.speedOverride ??
+                this.state.speedBoost?.speedOverride ??
                 this.baseSpeed * modifiers.speed * slowMult * boostMult * simulation.getSpeedMultiplier(this)
         );
     }
@@ -226,12 +245,12 @@ export class BattleBall {
     }
 
     applySlow(duration, amount) {
-        this.slowEffect = new TimedEffect(duration);
-        this.slowEffect.amount = amount;
+        this.state.slow = new TimedEffect(duration);
+        this.state.slow.amount = amount;
     }
 
     takeDamage(amount, source, label = "Hit") {
-        if (this.isDefeated) return { actualDamage: 0 };
+        if (this.flags.defeated) return { actualDamage: 0 };
         amount = this.actionContext.onDamageTaken(amount, source, label);
         const abilityDefMult = this.getStatModifiers().defense;
         const totalDefense = Math.round(this.baseDefense * abilityDefMult);
@@ -259,15 +278,15 @@ export class BattleBall {
             sim?.addLog?.(`${label} lands on ${this.name} for ${Math.round(actual)} damage.`);
         }
         if (this.hp <= 0) {
-            this.isDefeated = true;
+            this.flags.defeated = true;
         }
         return { actualDamage };
     }
 
     draw(ctx) {
-        if (this.isDestroyed || this.swallowedState) return;
+        if (this.flags.destroyed || this.state.swallowed) return;
         ctx.save();
-        const scale = this.renderScale;
+        const scale = this.display.scale;
         if (scale !== 1) {
             ctx.translate(this.position.x, this.position.y);
             ctx.scale(scale, scale);
@@ -281,10 +300,10 @@ export class BattleBall {
         ctx.strokeStyle = "#202020";
         ctx.lineWidth = Math.max(3, this.radius * 0.07);
         ctx.stroke();
-        this.drawFace(ctx, this.wallSlamState ? this.spinRotation : 0);
+        this.drawFace(ctx, this.state.wallSlam ? this.display.spinRotation : 0);
         this.ability?.draw?.(ctx);
-        if (this.movementEffect?.showRing) {
-            ctx.strokeStyle = this.movementEffect.color;
+        if (this.state.movement?.showRing) {
+            ctx.strokeStyle = this.state.movement.color;
             ctx.lineWidth = 4;
             ctx.beginPath();
             ctx.arc(this.position.x, this.position.y, this.radius + 18, 0, Math.PI * 2);
@@ -295,7 +314,7 @@ export class BattleBall {
     }
 
     _drawNameplate(ctx) {
-        if (this.isDestroyed) return;
+        if (this.flags.destroyed) return;
         const y = this.position.y + this.radius + 18;
         ctx.save();
         ctx.font = "700 13px Bahnschrift, Segoe UI, sans-serif";

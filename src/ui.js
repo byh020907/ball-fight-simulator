@@ -507,6 +507,7 @@ export class UIController {
             return {
                 id: fighter.id,
                 name: fighter.name,
+                title: fighter.title,
                 color: fighter.color,
                 isPlayer: fighter.isPlayer,
                 defeated: false,
@@ -521,18 +522,13 @@ export class UIController {
                 balanceMult: 1,
                 skillLabel: "Skill",
                 skillPct: 1,
-                skillText: "Ready"
+                skillText: "Ready",
+                actionName: null
             };
         });
     }
 
-    updateStatus(text, badge = "Ready") {
-        const s = this.state;
-        if (!s) return;
-        s.statusText = text;
-        s.statusBadge = badge.toUpperCase();
-        s.statusSubtext = "랜덤 대진과 전투 결과가 여기에 갱신됩니다.";
-    }
+    updateStatus() {}
 
     showOverlay(label, text) {
         const s = this.state;
@@ -719,7 +715,7 @@ export class UIController {
                 hp: Math.ceil(fighter.hp),
                 maxHp: Math.ceil(fighter.maxHp),
                 hpPct: Math.max(0, (fighter.hp / fighter.maxHp) * 100),
-                defeated: fighter.isDefeated,
+                defeated: fighter.flags.defeated,
                 balanceMult: mult,
                 isHero,
                 mergedBonuses: mergeOrbBonuses(fighter.hero.bonuses ?? {}, fighter.hero.carryover ?? {}),
@@ -740,7 +736,8 @@ export class UIController {
                 skillText:
                     fighter.getAbilityUiState().progress >= 0.995
                         ? "Ready"
-                        : `${Math.round(fighter.getAbilityUiState().progress * 100)}%`
+                        : `${Math.round(fighter.getAbilityUiState().progress * 100)}%`,
+                actionName: fighter.clickActionName ?? null
             };
         });
     }

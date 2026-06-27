@@ -433,6 +433,13 @@ h1 {
     font-size: 0.9rem;
 }
 
+.fighter-meta .fighter-title {
+    color: #f7b34d;
+    font-weight: 600;
+    font-size: 0.78rem;
+    letter-spacing: 0.03em;
+}
+
 .fighter-stat-line {
     color: #dce8f7;
     font-size: 0.82rem;
@@ -558,64 +565,10 @@ body::before {
 .battle-stage {
     width: min(calc(100vw - 364px), calc(100vh - 208px), 852px);
     display: grid;
-    grid-template-rows: 1fr auto;
+    grid-template-rows: 1fr;
     gap: 5px;
     align-items: stretch;
     min-height: 0;
-}
-
-.top-bar {
-    display: none;
-    border: 3px solid #202020;
-    background: #28c84e;
-    color: #ffffff;
-    min-height: 38px;
-    display: none;
-    gap: 2px;
-    align-items: center;
-    justify-items: center;
-    padding: 3px 9px;
-}
-
-.top-bar.overtime {
-    background: #ff6d00;
-    animation: overtimePulse 650ms ease-in-out infinite alternate;
-}
-
-.top-bar.result {
-    background: #28c84e;
-    animation: none;
-}
-
-@keyframes overtimePulse {
-    from {
-        opacity: 1;
-    }
-    to {
-        opacity: 0.82;
-    }
-}
-
-.top-bar .status-badge {
-    background: #28c84e;
-    border: 0;
-    color: #ffffff;
-    padding: 0;
-    font-size: 0.74rem;
-    letter-spacing: 0.16em;
-}
-
-.top-bar .matchup {
-    font-size: 0.88rem;
-    letter-spacing: 0.01em;
-    text-align: center;
-    line-height: 1.04;
-}
-
-.top-bar .matchup small {
-    color: #ffffff;
-    margin-top: 2px;
-    font-size: 0.72rem;
 }
 
 .arena-shell {
@@ -780,6 +733,19 @@ body::before {
     color: #4a4a4a;
     text-transform: uppercase;
     letter-spacing: 0.06em;
+}
+
+.action-badge {
+    font-size: 0.65rem;
+    font-weight: 900;
+    color: #59d6ff;
+    margin-left: auto;
+    letter-spacing: 0.04em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 80px;
+    flex-shrink: 0;
 }
 
 .cooldown-bar {

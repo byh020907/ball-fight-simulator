@@ -28,20 +28,16 @@ const VISION_ARC_RADIUS_SCALE = 0.55;
 export class BatBallAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation, 3.0);
-        this.arcAngle = 0;
-        this.slashTimer = 0;
-        this.slashStartAngle = 0;
-        this.slashEndAngle = 0;
-        this._facingAngle = 0;
+        this.state = { arcAngle: 0, slashTimer: 0, slashStartAngle: 0, slashEndAngle: 0, _facingAngle: 0 };
     }
 
     update(delta, target) {
         this.timer -= delta;
 
         // Slash 애니메이션 타이머
-        if (this.slashTimer > 0) {
-            this.slashTimer -= delta;
-            if (this.slashTimer < 0) this.slashTimer = 0;
+        if (this.state.slashTimer > 0) {
+            this.state.slashTimer -= delta;
+            if (this.state.slashTimer < 0) this.state.slashTimer = 0;
         }
 
         // 시야 범위가 좌우로 자유롭게 스윕 (벽 반동 시 부드럽게 회전)
@@ -49,13 +45,13 @@ export class BatBallAbility extends Ability {
         const velAngle =
             this.owner.velocity.length() > 0
                 ? Math.atan2(this.owner.velocity.y, this.owner.velocity.x)
-                : this._facingAngle;
-        let angleDiff = velAngle - this._facingAngle;
+                : this.state._facingAngle;
+        let angleDiff = velAngle - this.state._facingAngle;
         while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
         while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-        this._facingAngle += angleDiff * Math.min(1, FACING_SMOOTH_RATE * delta);
+        this.state._facingAngle += angleDiff * Math.min(1, FACING_SMOOTH_RATE * delta);
         const sweepOffset = Math.sin(time * SWEEP_SPEED) * (Math.PI * SWEEP_AMPLITUDE);
-        this.arcAngle = this._facingAngle + sweepOffset;
+        this.state.arcAngle = this.state._facingAngle + sweepOffset;
 
         if (!target || this.timer > 0) return;
 
@@ -65,7 +61,7 @@ export class BatBallAbility extends Ability {
         if (dist - this.owner.radius > ARC_RANGE) return;
 
         const targetAngle = Math.atan2(toTarget.y, toTarget.x);
-        const diff = Math.abs(normalizeAngle(targetAngle - this.arcAngle));
+        const diff = Math.abs(normalizeAngle(targetAngle - this.state.arcAngle));
         if (diff > ARC_ANGLE / 2) return;
 
         // 범위 안에 들어왔다 — 휘두르기!
@@ -80,16 +76,16 @@ export class BatBallAbility extends Ability {
         // 강한 넉백 + 벽 충돌 시 추가 데미지
         const kbDir = Vector2.subtract(target.position, this.owner.position).normalize();
         target.applyKnockback(kbDir.scale(KNOCKBACK_FORCE), KNOCKBACK_DURATION);
-        target.wallSlamState = new WallSlamEffect({
+        target.state.wallSlam = new WallSlamEffect({
             source: this.owner,
             damage: Math.round(this.owner.baseDamage * WALL_SLAM_DAMAGE_MULT),
             duration: WALL_SLAM_EFFECT_DURATION
         });
 
         // Slash 애니메이션 설정 — arcAngle 기준으로 ±60도 휘두르기
-        this.slashTimer = SLASH_DURATION;
-        this.slashStartAngle = this.arcAngle - ARC_ANGLE / 2;
-        this.slashEndAngle = this.arcAngle + ARC_ANGLE / 2;
+        this.state.slashTimer = SLASH_DURATION;
+        this.state.slashStartAngle = this.state.arcAngle - ARC_ANGLE / 2;
+        this.state.slashEndAngle = this.state.arcAngle + ARC_ANGLE / 2;
 
         // 시각 효과 — 스윙 아크 + 충돌 스파크
         this.simulation.addSparkBurst(this.owner.position.clone(), this.owner.color);
@@ -118,10 +114,11 @@ export class BatBallAbility extends Ability {
 
     /** 스윙 아크 애니메이션 */
     _drawSlashEffect(ctx, pos) {
-        if (this.slashTimer <= 0) return;
+        if (this.state.slashTimer <= 0) return;
 
-        const progress = 1 - this.slashTimer / SLASH_DURATION; // 0→1
-        const currentEnd = this.slashStartAngle + (this.slashEndAngle - this.slashStartAngle) * progress;
+        const progress = 1 - this.state.slashTimer / SLASH_DURATION; // 0→1
+        const currentEnd =
+            this.state.slashStartAngle + (this.state.slashEndAngle - this.state.slashStartAngle) * progress;
         const glowAlpha = 0.5 * (1 - progress);
 
         ctx.save();
@@ -131,7 +128,7 @@ export class BatBallAbility extends Ability {
         ctx.lineWidth = 10 - progress * 6;
         ctx.globalAlpha = glowAlpha * 0.6;
         ctx.beginPath();
-        ctx.arc(pos.x, pos.y, ARC_RANGE * VISION_ARC_RADIUS_SCALE, this.slashStartAngle, currentEnd);
+        ctx.arc(pos.x, pos.y, ARC_RANGE * VISION_ARC_RADIUS_SCALE, this.state.slashStartAngle, currentEnd);
         ctx.stroke();
 
         // 메인 스윙 선
@@ -139,19 +136,20 @@ export class BatBallAbility extends Ability {
         ctx.lineWidth = 5 - progress * 3;
         ctx.globalAlpha = glowAlpha * 0.9;
         ctx.beginPath();
-        ctx.arc(pos.x, pos.y, ARC_RANGE * VISION_ARC_RADIUS_SCALE, this.slashStartAngle, currentEnd);
+        ctx.arc(pos.x, pos.y, ARC_RANGE * VISION_ARC_RADIUS_SCALE, this.state.slashStartAngle, currentEnd);
         ctx.stroke();
 
         // 잔상 (trail) — 여러 겹
         for (let i = 1; i <= 3; i++) {
             const trailProgress = Math.max(0, progress - i * 0.08);
             if (trailProgress <= 0) continue;
-            const trailEnd = this.slashStartAngle + (this.slashEndAngle - this.slashStartAngle) * trailProgress;
+            const trailEnd =
+                this.state.slashStartAngle + (this.state.slashEndAngle - this.state.slashStartAngle) * trailProgress;
             ctx.strokeStyle = this.owner.color;
             ctx.lineWidth = 3 - i * 0.6;
             ctx.globalAlpha = glowAlpha * 0.3 * (1 - i * 0.25);
             ctx.beginPath();
-            ctx.arc(pos.x, pos.y, ARC_RANGE * VISION_ARC_RADIUS_SCALE - i * 8, this.slashStartAngle, trailEnd);
+            ctx.arc(pos.x, pos.y, ARC_RANGE * VISION_ARC_RADIUS_SCALE - i * 8, this.state.slashStartAngle, trailEnd);
             ctx.stroke();
         }
 
@@ -160,14 +158,14 @@ export class BatBallAbility extends Ability {
 
     /** 120도 시야 범위 표시 (공 표면 기준 거리) */
     _drawVisionArc(ctx, pos) {
-        const arcStart = this.arcAngle - ARC_ANGLE / 2;
-        const arcEnd = this.arcAngle + ARC_ANGLE / 2;
+        const arcStart = this.state.arcAngle - ARC_ANGLE / 2;
+        const arcEnd = this.state.arcAngle + ARC_ANGLE / 2;
         const range = ARC_RANGE + this.owner.radius;
 
         // 평소에는 진하게, slash 중에는 약간 흐리게
         ctx.save();
         ctx.strokeStyle = this.owner.color;
-        ctx.globalAlpha = this.slashTimer > 0 ? 0.18 : 0.45;
+        ctx.globalAlpha = this.state.slashTimer > 0 ? 0.18 : 0.45;
         ctx.lineWidth = 2.5;
         ctx.setLineDash([5, 7]);
         ctx.beginPath();
@@ -176,7 +174,7 @@ export class BatBallAbility extends Ability {
         ctx.setLineDash([]);
 
         // arc 양 끝 경계선
-        ctx.globalAlpha = this.slashTimer > 0 ? 0.12 : 0.3;
+        ctx.globalAlpha = this.state.slashTimer > 0 ? 0.12 : 0.3;
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(pos.x, pos.y);
@@ -195,10 +193,10 @@ export class BatBallAbility extends Ability {
         const r = this.owner.radius;
 
         // 방망이 방향 — arcAngle 기준
-        let batAngle = this.arcAngle;
-        if (this.slashTimer > 0) {
-            const progress = 1 - this.slashTimer / SLASH_DURATION;
-            batAngle = this.slashStartAngle + (this.slashEndAngle - this.slashStartAngle) * progress;
+        let batAngle = this.state.arcAngle;
+        if (this.state.slashTimer > 0) {
+            const progress = 1 - this.state.slashTimer / SLASH_DURATION;
+            batAngle = this.state.slashStartAngle + (this.state.slashEndAngle - this.state.slashStartAngle) * progress;
         } else {
             const idleBob = Math.sin(time * 3) * 0.04;
             batAngle += idleBob;

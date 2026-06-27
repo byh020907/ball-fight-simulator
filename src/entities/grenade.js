@@ -30,7 +30,7 @@ export class Grenade extends Projectile {
         // 상대가 폭발 범위 내에 들어오면 남은 퓨즈 시간 2배 단축 (1회)
         if (!this._proximityTriggered) {
             const target = simulation.getOpponent(this.owner);
-            if (target && !target.isDefeated) {
+            if (target && !target.flags.defeated) {
                 const dist = Vector2.subtract(this.position, target.position).length();
                 if (dist <= this.explosionRadius) {
                     this.timer *= 0.6;
@@ -49,7 +49,7 @@ export class Grenade extends Projectile {
 
     _detonate(simulation) {
         const target = simulation.getOpponent(this.owner);
-        if (target && !target.isDefeated) {
+        if (target && !target.flags.defeated) {
             const distance = Vector2.subtract(this.position, target.position).length();
             if (distance <= this.explosionRadius) {
                 const edgeProgress = Math.max(

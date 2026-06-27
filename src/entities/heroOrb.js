@@ -100,7 +100,7 @@ export const HERO_ORB_EFFECTS = {
         label: "대시",
         apply(owner, ctx) {
             const target = ctx.simulation.getOpponent(owner);
-            if (!target || target.isDefeated) return { applied: false };
+            if (!target || target.flags.defeated) return { applied: false };
             const direction = Vector2.subtract(target.position, owner.position);
             if (direction.length() < 0.01) return { applied: false };
             direction.normalize();
@@ -135,7 +135,7 @@ export const HERO_ORB_EFFECTS = {
         label: "화살",
         apply(owner, ctx) {
             const target = ctx.simulation.getOpponent(owner);
-            if (!target || target.isDefeated) return { applied: false };
+            if (!target || target.flags.defeated) return { applied: false };
             const direction = Vector2.subtract(target.position, owner.position);
             if (direction.length() < 0.01) return { applied: false };
             direction.normalize();
@@ -285,7 +285,7 @@ export class HeroOrb extends CombatEntity {
         }
 
         for (const fighter of simulation.fighters) {
-            if (fighter.isDefeated) continue;
+            if (fighter.flags.defeated) continue;
             const difference = Vector2.subtract(this.position, fighter.position);
             const dist = difference.length();
             const overlap = this.radius + fighter.radius - dist;

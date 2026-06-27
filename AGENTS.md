@@ -60,6 +60,15 @@ L1, L2 위주로 기록하고 L3는 요약만 남깁니다.
 ```
 추측으로 코드를 수정하지 말고, `BattleSimulation`을 직접 생성하는 `.mjs` 파일로 정량적 지표를 확인하세요.
 
+## 일괄 치환 규칙
+
+**절대 PowerShell `Set-Content`로 소스 파일을 수정하지 않습니다.** 인코딩이 깨져 한글이 손상됩니다.
+대신 Node.js로 처리합니다:
+```bash
+node -e "const fs=require('fs');let c=fs.readFileSync('파일','utf8');c=c.replace(/찾기/g,'바꾸기');fs.writeFileSync('파일',c,'utf8')"
+```
+`git checkout` 복구 시 미커밋 변경사항이 소실되므로, **작업 단위가 끝날 때마다 커밋**하여 보호합니다.
+
 ## 코드 스타일 요약
 
 | 항목 | 규칙 |

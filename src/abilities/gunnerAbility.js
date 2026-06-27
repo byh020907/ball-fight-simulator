@@ -14,23 +14,25 @@ const KNOCKBACK_DURATION = 0.15;
 export class GunnerAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation, GUNNER_COOLDOWN);
-        this._burstRemaining = 0;
-        this._burstTimer = 0;
-        this._burstBulletCount = 0;
-        this._burstIndex = 0;
-        this._gunHand = 0;
-        this._spinAngle = 0;
-        this._activeBullets = [];
+        this.state = {
+            burstRemaining: 0,
+            burstTimer: 0,
+            burstBulletCount: 0,
+            burstIndex: 0,
+            gunHand: 0,
+            spinAngle: 0,
+            activeBullets: []
+        };
     }
 
     update(delta, target) {
         const time = performance.now() / 1000;
-        this._spinAngle = Math.sin(time * 4) * 0.5;
+        this.state.spinAngle = Math.sin(time * 4) * 0.5;
 
-        if (this._burstRemaining > 0) {
-            this._spinAngle = time * 12;
-            this._burstTimer -= delta;
-            if (this._burstTimer <= 0) {
+        if (this.state.burstRemaining > 0) {
+            this.state.spinAngle = time * 12;
+            this.state.burstTimer -= delta;
+            if (this.state.burstTimer <= 0) {
                 this._fireBurstBullet();
             }
             return;
@@ -44,32 +46,32 @@ export class GunnerAbility extends Ability {
     }
 
     _startBurst() {
-        this._burstBulletCount = MIN_BULLETS + Math.floor(Math.random() * (MAX_BULLETS - MIN_BULLETS + 1));
-        this._burstRemaining = this._burstBulletCount;
-        this._burstIndex = 0;
-        this._burstTimer = 0;
-        this._gunHand = 0;
+        this.state.burstBulletCount = MIN_BULLETS + Math.floor(Math.random() * (MAX_BULLETS - MIN_BULLETS + 1));
+        this.state.burstRemaining = this.state.burstBulletCount;
+        this.state.burstIndex = 0;
+        this.state.burstTimer = 0;
+        this.state.gunHand = 0;
         this.simulation.spawnPulse(this.owner.position.clone(), "#ffee88");
         this.simulation.addLog(
-            `${this.owner.name} fires ${this._burstBulletCount} bullet${this._burstBulletCount > 1 ? "s" : ""}!`
+            `${this.owner.name} fires ${this.state.burstBulletCount} bullet${this.state.burstBulletCount > 1 ? "s" : ""}!`
         );
         this.simulation.playSound("shoot", 0.9);
     }
 
     _fireBurstBullet() {
-        if (this._burstRemaining <= 0) return;
+        if (this.state.burstRemaining <= 0) return;
 
         const owner = this.owner;
-        const gunAngle = this._spinAngle + (this._gunHand === 0 ? 0 : Math.PI);
+        const gunAngle = this.state.spinAngle + (this.state.gunHand === 0 ? 0 : Math.PI);
         const gx = owner.position.x + Math.cos(gunAngle) * (owner.radius + 10);
         const gy = owner.position.y + Math.sin(gunAngle) * (owner.radius + 10);
 
         const bulletAngle = Math.random() * Math.PI * 2;
         const dir = new Vector2(Math.cos(bulletAngle), Math.sin(bulletAngle));
 
-        const bulletCount = this._burstBulletCount;
+        const bulletCount = this.state.burstBulletCount;
         const dmgMult = 0.2 + (bulletCount / MAX_BULLETS) * 0.8;
-        const isLast = this._burstIndex === bulletCount - 1;
+        const isLast = this.state.burstIndex === bulletCount - 1;
         const isFinisher = isLast && bulletCount === MAX_BULLETS;
         const finalMult = isFinisher ? dmgMult * 2 : dmgMult;
 
@@ -83,10 +85,10 @@ export class GunnerAbility extends Ability {
             isFinisher,
             cdReduction
         );
-        this._activeBullets = this._activeBullets.filter((b) => !b.isExpired);
-        this._activeBullets.push(bullet);
-        while (this._activeBullets.length > MAX_FIELD_BULLETS) {
-            const oldest = this._activeBullets.shift();
+        this.state.activeBullets = this.state.activeBullets.filter((b) => !b.isExpired);
+        this.state.activeBullets.push(bullet);
+        while (this.state.activeBullets.length > MAX_FIELD_BULLETS) {
+            const oldest = this.state.activeBullets.shift();
             oldest.isExpired = true;
         }
         this.simulation.entities.push(bullet);
@@ -105,10 +107,10 @@ export class GunnerAbility extends Ability {
             life: isFinisher ? 0.3 : 0.15
         });
 
-        this._burstRemaining--;
-        this._burstIndex++;
-        this._burstTimer = BULLET_INTERVAL;
-        this._gunHand = 1 - this._gunHand;
+        this.state.burstRemaining--;
+        this.state.burstIndex++;
+        this.state.burstTimer = BULLET_INTERVAL;
+        this.state.gunHand = 1 - this.state.gunHand;
 
         if (isLast && bulletCount === MAX_BULLETS) {
             this.simulation.addLog(`${owner.name} lands a full burst!`);
@@ -124,7 +126,7 @@ export class GunnerAbility extends Ability {
         const time = performance.now() / 1000;
 
         ctx.save();
-        if (this._burstRemaining > 0) {
+        if (this.state.burstRemaining > 0) {
             const flash = Math.sin(time * 40) * 0.3 + 0.7;
             ctx.fillStyle = `rgba(255, 238, 136, ${flash * 0.15})`;
             ctx.beginPath();
@@ -134,16 +136,16 @@ export class GunnerAbility extends Ability {
 
         const r = owner.radius;
         for (const handOffset of [0, Math.PI]) {
-            const gunAngle = this._spinAngle + handOffset;
+            const gunAngle = this.state.spinAngle + handOffset;
             const gx = owner.position.x + Math.cos(gunAngle) * (r + 8);
             const gy = owner.position.y + Math.sin(gunAngle) * (r + 8);
-            ctx.strokeStyle = this._burstRemaining > 0 ? "#666666" : "#444444";
+            ctx.strokeStyle = this.state.burstRemaining > 0 ? "#666666" : "#444444";
             ctx.lineWidth = 4;
             ctx.beginPath();
             ctx.moveTo(gx, gy);
             ctx.lineTo(gx + Math.cos(gunAngle) * 14, gy + Math.sin(gunAngle) * 14);
             ctx.stroke();
-            ctx.fillStyle = this._burstRemaining > 0 ? "#888888" : "#666666";
+            ctx.fillStyle = this.state.burstRemaining > 0 ? "#888888" : "#666666";
             ctx.beginPath();
             ctx.arc(gx + Math.cos(gunAngle) * 14, gy + Math.sin(gunAngle) * 14, 3, 0, Math.PI * 2);
             ctx.fill();
@@ -160,10 +162,10 @@ export class GunnerAbility extends Ability {
     }
 
     getUiState() {
-        if (this._burstRemaining > 0) {
+        if (this.state.burstRemaining > 0) {
             return {
-                label: `${this._burstBulletCount}B x${this._burstBulletCount - this._burstIndex}`,
-                progress: 1 - (this._burstIndex % this._burstBulletCount) / this._burstBulletCount
+                label: `${this.state.burstBulletCount}B x${this.state.burstBulletCount - this.state.burstIndex}`,
+                progress: 1 - (this.state.burstIndex % this.state.burstBulletCount) / this.state.burstBulletCount
             };
         }
         return {

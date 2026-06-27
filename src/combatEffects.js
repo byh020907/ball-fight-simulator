@@ -92,7 +92,7 @@ export class WallSlamEffect {
 
     updateSpin(ball, delta) {
         const spinDirection = ball.velocity.x >= 0 ? 1 : -1;
-        ball.spinRotation +=
+        ball.display.spinRotation +=
             spinDirection * Math.max(8, ball.velocity.length() / Math.max(1, ball.radius)) * delta * 1.55;
     }
 }

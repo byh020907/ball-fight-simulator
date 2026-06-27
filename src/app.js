@@ -86,8 +86,8 @@ export class BattleApp {
         this.debug = {
             startCharacter: null,
             // startCharacter: FIGHTER_IDS.GRENADE,
-            aiEnabled: false
-            // aiEnabled: true
+            aiEnabled: false,
+            aiEnabled: true
         };
 
         this.elements = {
@@ -597,7 +597,7 @@ export class BattleApp {
         if (!action || !sim || !player) {
             return false;
         }
-        if (player.isDefeated) {
+        if (player.flags.defeated) {
             return false;
         }
         if (player.hp / player.maxHp < 0.05) {

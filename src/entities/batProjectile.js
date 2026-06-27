@@ -34,7 +34,7 @@ export class BatProjectile extends Projectile {
         this.velocity.add(boidsForce);
 
         // target attraction
-        if (target && !target.isDefeated) {
+        if (target && !target.flags.defeated) {
             const toTarget = Vector2.subtract(target.position, this.position).normalize();
             this.velocity.add(toTarget.clone().scale(TARGET_ATTRACTION_WEIGHT * 60 * delta));
             const maxSpeed = this.owner.baseSpeed * MAX_SPEED_MULT;
@@ -63,7 +63,7 @@ export class BatProjectile extends Projectile {
             });
             return;
         }
-        if (target && !target.isDefeated) {
+        if (target && !target.flags.defeated) {
             this.angle = Math.atan2(target.position.y - this.position.y, target.position.x - this.position.x);
         } else {
             this.angle = Math.atan2(this.velocity.y, this.velocity.x);

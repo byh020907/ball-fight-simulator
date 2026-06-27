@@ -10,28 +10,30 @@ const SHARD_SIZE = 16;
 export class OrbitAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation);
-        this.angle = Math.random() * Math.PI * 2;
-        this.hitCooldown = 0;
         this.shardCount = 5;
-        this.shards = Array.from({ length: this.shardCount }, () => ({
-            active: true,
-            refilling: false,
-            refillProgress: 1
-        }));
         this.orbitRadius = 44;
         this.shardRadius = 11;
         this.baseSpinSpeed = 4.2;
         this.spinBurstMultiplier = 3.15;
         this.spinBurstDuration = 0.85;
-        this.spinBurst = 0;
-        this.rechargeDelay = 0;
         this._baseRechargeDuration = 1;
         this.rechargeGap = 0.16;
-        this.rechargeGapTimer = 0;
-        this.volleyTimer = 0;
-        this.volleyIndex = 0;
-        this.volleyActive = false;
-        this.volleyStartTime = 0;
+        this.state = {
+            angle: Math.random() * Math.PI * 2,
+            hitCooldown: 0,
+            shards: Array.from({ length: this.shardCount }, () => ({
+                active: true,
+                refilling: false,
+                refillProgress: 1
+            })),
+            spinBurst: 0,
+            rechargeDelay: 0,
+            rechargeGapTimer: 0,
+            volleyTimer: 0,
+            volleyIndex: 0,
+            volleyActive: false,
+            volleyStartTime: 0
+        };
     }
 
     get rechargeDuration() {
@@ -41,13 +43,13 @@ export class OrbitAbility extends Ability {
     }
 
     update(delta, target) {
-        if (this.spinBurst > 0) {
-            this.spinBurst = Math.max(0, this.spinBurst - delta);
+        if (this.state.spinBurst > 0) {
+            this.state.spinBurst = Math.max(0, this.state.spinBurst - delta);
         }
 
-        const spinMultiplier = this.spinBurst > 0 ? this.spinBurstMultiplier : 1;
-        this.angle += delta * this.baseSpinSpeed * spinMultiplier;
-        this.hitCooldown = Math.max(0, this.hitCooldown - delta);
+        const spinMultiplier = this.state.spinBurst > 0 ? this.spinBurstMultiplier : 1;
+        this.state.angle += delta * this.baseSpinSpeed * spinMultiplier;
+        this.state.hitCooldown = Math.max(0, this.state.hitCooldown - delta);
         this.updateRecharge(delta);
         this.updateVolley(delta, target);
 
@@ -58,12 +60,12 @@ export class OrbitAbility extends Ability {
         const hitShard = this.getActiveShardEntries().find(
             ({ position }) => Vector2.subtract(position, target.position).length() <= target.radius + this.shardRadius
         );
-        if (hitShard && this.hitCooldown <= 0) {
+        if (hitShard && this.state.hitCooldown <= 0) {
             const repelDirection = Vector2.subtract(target.position, hitShard.position).normalize();
             target.takeDamage(Math.round(this.owner.baseDamage * 0.8), this.owner, "Orbit Shard");
             target.applyKnockback(repelDirection.scale(target.baseSpeed * 2.5), 0.3);
             this.consumeShard(hitShard.index);
-            this.hitCooldown = 0.32;
+            this.state.hitCooldown = 0.32;
             this.simulation.spawnOrbitHit(hitShard.position.clone(), target.position.clone(), this.owner.color);
             this.simulation.playSound("orbit");
             this.simulation.addSparkBurst(target.position.clone(), this.owner.color);
@@ -79,7 +81,7 @@ export class OrbitAbility extends Ability {
     }
 
     consumeShard(index) {
-        const shard = this.shards[index];
+        const shard = this.state.shards[index];
         if (!shard || !shard.active) {
             return;
         }
@@ -87,9 +89,9 @@ export class OrbitAbility extends Ability {
         shard.active = false;
         shard.refilling = false;
         shard.refillProgress = 0;
-        this.spinBurst = this.spinBurstDuration;
-        this.rechargeDelay = this.getActiveShardCount() === 0 ? 0 : this.spinBurstDuration;
-        this.rechargeGapTimer = 0;
+        this.state.spinBurst = this.spinBurstDuration;
+        this.state.rechargeDelay = this.getActiveShardCount() === 0 ? 0 : this.spinBurstDuration;
+        this.state.rechargeGapTimer = 0;
         this.simulation.playSound("charge", 0.9);
     }
 
@@ -99,38 +101,38 @@ export class OrbitAbility extends Ability {
         }
 
         if (this.getActiveShardCount() === 0 && !this.getRefillingShard()) {
-            this.rechargeDelay = 0;
-            this.rechargeGapTimer = 0;
+            this.state.rechargeDelay = 0;
+            this.state.rechargeGapTimer = 0;
         }
 
-        if (this.rechargeDelay > 0) {
-            this.rechargeDelay = Math.max(0, this.rechargeDelay - delta);
+        if (this.state.rechargeDelay > 0) {
+            this.state.rechargeDelay = Math.max(0, this.state.rechargeDelay - delta);
             return;
         }
 
         const refilling = this.getRefillingShard();
         if (refilling) {
-            const shard = this.shards[refilling.index];
+            const shard = this.state.shards[refilling.index];
             shard.refillProgress = Math.min(1, shard.refillProgress + delta / this.rechargeDuration);
             if (shard.refillProgress >= 1) {
                 shard.active = true;
                 shard.refilling = false;
-                this.rechargeGapTimer = this.rechargeGap;
+                this.state.rechargeGapTimer = this.rechargeGap;
                 this.simulation.spawnPulse(this.getOrbitPosition(refilling.index), this.owner.color);
                 this.simulation.playSound("seed", 0.75);
             }
             return;
         }
 
-        if (this.rechargeGapTimer > 0) {
-            this.rechargeGapTimer = Math.max(0, this.rechargeGapTimer - delta);
+        if (this.state.rechargeGapTimer > 0) {
+            this.state.rechargeGapTimer = Math.max(0, this.state.rechargeGapTimer - delta);
             return;
         }
 
-        const nextIndex = this.shards.findIndex((shard) => !shard.active && !shard.refilling);
+        const nextIndex = this.state.shards.findIndex((shard) => !shard.active && !shard.refilling);
         if (nextIndex >= 0) {
-            this.shards[nextIndex].refilling = true;
-            this.shards[nextIndex].refillProgress = 0.01;
+            this.state.shards[nextIndex].refilling = true;
+            this.state.shards[nextIndex].refillProgress = 0.01;
             this.simulation.spawnParticleBurst(this.owner.position.clone(), this.owner.color, {
                 count: 8,
                 speed: 120,
@@ -143,42 +145,47 @@ export class OrbitAbility extends Ability {
 
     /** Launch a shard volley at the target when all shards are full. */
     updateVolley(delta, target) {
-        this.volleyTimer -= delta;
+        this.state.volleyTimer -= delta;
 
-        if (this.volleyActive) {
-            if (!target || target.isDefeated) {
-                this.volleyActive = false;
-                this.volleyIndex = 0;
-                this.volleyTimer = VOLLEY_COOLDOWN;
+        if (this.state.volleyActive) {
+            if (!target || target.flags.defeated) {
+                this.state.volleyActive = false;
+                this.state.volleyIndex = 0;
+                this.state.volleyTimer = VOLLEY_COOLDOWN;
                 return;
             }
-            this.volleyStartTime -= delta;
-            if (this.volleyStartTime <= 0 && this.volleyIndex < this.shardCount) {
+            this.state.volleyStartTime -= delta;
+            if (this.state.volleyStartTime <= 0 && this.state.volleyIndex < this.shardCount) {
                 this.fireShardAt(target);
-                this.volleyIndex++;
-                this.volleyStartTime = VOLLEY_DELAY;
+                this.state.volleyIndex++;
+                this.state.volleyStartTime = VOLLEY_DELAY;
             }
-            if (this.volleyIndex >= this.shardCount) {
-                this.volleyActive = false;
-                this.volleyIndex = 0;
-                this.volleyTimer = VOLLEY_COOLDOWN;
+            if (this.state.volleyIndex >= this.shardCount) {
+                this.state.volleyActive = false;
+                this.state.volleyIndex = 0;
+                this.state.volleyTimer = VOLLEY_COOLDOWN;
             }
             return;
         }
 
-        if (this.volleyTimer <= 0 && target && !target.isDefeated && this.getActiveShardCount() === this.shardCount) {
+        if (
+            this.state.volleyTimer <= 0 &&
+            target &&
+            !target.flags.defeated &&
+            this.getActiveShardCount() === this.shardCount
+        ) {
             const dist = Vector2.subtract(target.position, this.owner.position).length();
             if (dist >= VOLLEY_MIN_RANGE && dist <= VOLLEY_MAX_RANGE) {
-                this.volleyActive = true;
-                this.volleyIndex = 0;
-                this.volleyStartTime = 0;
+                this.state.volleyActive = true;
+                this.state.volleyIndex = 0;
+                this.state.volleyStartTime = 0;
             }
         }
     }
 
     /** Fire one shard as a projectile toward the target. */
     fireShardAt(target) {
-        if (!target || target.isDefeated) return;
+        if (!target || target.flags.defeated) return;
 
         const activeEntries = this.getActiveShardEntries();
         if (activeEntries.length === 0) return;
@@ -191,25 +198,25 @@ export class OrbitAbility extends Ability {
     }
 
     getActiveShardCount() {
-        return this.shards.filter((shard) => shard.active).length;
+        return this.state.shards.filter((shard) => shard.active).length;
     }
 
     getMissingShardCount() {
-        return this.shards.filter((shard) => !shard.active).length;
+        return this.state.shards.filter((shard) => !shard.active).length;
     }
 
     getRefillingShard() {
-        const index = this.shards.findIndex((shard) => shard.refilling);
-        return index >= 0 ? { index, shard: this.shards[index] } : null;
+        const index = this.state.shards.findIndex((shard) => shard.refilling);
+        return index >= 0 ? { index, shard: this.state.shards[index] } : null;
     }
 
     getOrbitPosition(index) {
-        const angle = this.angle + (Math.PI * 2 * index) / this.shardCount;
+        const angle = this.state.angle + (Math.PI * 2 * index) / this.shardCount;
         return Vector2.add(this.owner.position, Vector2.fromAngle(angle, this.owner.radius + this.orbitRadius));
     }
 
     getActiveShardEntries() {
-        return this.shards
+        return this.state.shards
             .map((shard, index) => ({ index, shard, position: this.getOrbitPosition(index) }))
             .filter(({ shard }) => shard.active);
     }
@@ -219,7 +226,7 @@ export class OrbitAbility extends Ability {
     }
 
     getShardRenderStates() {
-        return this.shards
+        return this.state.shards
             .map((shard, index) => {
                 if (!shard.active && !shard.refilling) {
                     return null;
@@ -260,7 +267,7 @@ export class OrbitAbility extends Ability {
         const pos = this.owner.position;
         const r = this.owner.radius;
         const shards = this.getShardRenderStates() ?? [];
-        const fastOrbit = this.spinBurst > 0;
+        const fastOrbit = this.state.spinBurst > 0;
         const missingCount = this.getMissingShardCount() ?? 0;
 
         ctx.save();
@@ -300,11 +307,14 @@ export class OrbitAbility extends Ability {
     }
 
     getUiState() {
-        if (this.spinBurst > 0) {
-            return { label: "Fast Orbit", progress: Math.max(0, Math.min(1, this.spinBurst / this.spinBurstDuration)) };
+        if (this.state.spinBurst > 0) {
+            return {
+                label: "Fast Orbit",
+                progress: Math.max(0, Math.min(1, this.state.spinBurst / this.spinBurstDuration))
+            };
         }
-        if (this.volleyActive) {
-            return { label: `Volley ${this.volleyIndex + 1}/${this.shardCount}`, progress: 1 };
+        if (this.state.volleyActive) {
+            return { label: `Volley ${this.state.volleyIndex + 1}/${this.shardCount}`, progress: 1 };
         }
         if (this.getMissingShardCount() > 0) {
             return {
@@ -312,8 +322,8 @@ export class OrbitAbility extends Ability {
                 progress: this.getActiveShardCount() / this.shardCount
             };
         }
-        if (this.volleyTimer > 0) {
-            return { label: "Orbit Ready", progress: Math.max(0.08, 1 - this.volleyTimer / VOLLEY_COOLDOWN) };
+        if (this.state.volleyTimer > 0) {
+            return { label: "Orbit Ready", progress: Math.max(0.08, 1 - this.state.volleyTimer / VOLLEY_COOLDOWN) };
         }
         return { label: "Orbit Ready", progress: 1 };
     }

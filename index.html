@@ -74,19 +74,6 @@
         <main class="app" x-data="appStore" x-cloak x-init="document.getElementById('app-loading')?.remove()">
             <section class="game-frame">
                 <section class="battle-stage">
-                    <header
-                        class="top-bar"
-                        x-bind:class="{
-                            overtime: statusBadge === 'Overtime',
-                            result: statusBadge === 'Result'
-                        }"
-                    >
-                        <div class="status-badge" x-text="statusBadge">READY</div>
-                        <div class="matchup">
-                            <span x-text="statusText">Press Start</span>
-                            <small x-text="statusSubtext">랜덤 대진과 전투 결과가 여기에 갱신됩니다.</small>
-                        </div>
-                    </header>
 
                     <section class="arena-shell">
                         <canvas class="arena" id="arenaCanvas" width="960" height="960"></canvas>
@@ -143,6 +130,7 @@
                                         <strong
                                             x-text="fighter.isPlayer ? '내 캐릭터 · ' + fighter.name : fighter.name"
                                         ></strong>
+                                        <span class="fighter-title" x-text="fighter.title"></span>
                                         <span x-text="fighter.isPlayer ? '내 배분' : 'AI 배분'"></span>
                                     </div>
                                 </div>
@@ -179,6 +167,11 @@
                                     <div class="cooldown-meta">
                                         <span class="cooldown-label" x-text="fighter.skillLabel">Skill</span>
                                         <span class="cooldown-text" x-text="fighter.skillText">Ready</span>
+                                        <span
+                                            class="action-badge"
+                                            x-show="fighter.actionName"
+                                            x-text="fighter.actionName"
+                                        ></span>
                                     </div>
                                     <div class="cooldown-bar">
                                         <div

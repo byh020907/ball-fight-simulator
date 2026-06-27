@@ -69,7 +69,11 @@ export class BattleSimulation extends Simulation {
 
         // ── AI 액션 컨트롤러 ──
         if (hooks.assignActions || options.assignActions) {
-            this.aiControllers = this.fighters.map(() => new AIActionController());
+            for (const fighter of this.fighters) {
+                if (fighter === this.playerBall) continue;
+                fighter.aiController = new AIActionController();
+                fighter.aiController.selectAction(this, fighter);
+            }
         }
     }
 
@@ -178,18 +182,6 @@ export class BattleSimulation extends Simulation {
         // 지연 적용 패턴 — 클릭 핸들러가 예약한 액션을 충돌 전에 처리
         this._consumePendingAction();
 
-        // AI 액션 의사결정
-        if (this.aiControllers) {
-            for (let i = 0; i < this.fighters.length; i++) {
-                const fighter = this.fighters[i];
-                if (fighter.isDefeated) continue;
-                const result = this.aiControllers[i].evaluate(this, fighter, delta);
-                if (result) {
-                    this._executeAction(result.action, result.fighter, result.paidCost);
-                }
-            }
-        }
-
         this.elapsed += delta;
         this.updateScreenShake(delta);
 
@@ -236,7 +228,7 @@ export class BattleSimulation extends Simulation {
     }
 
     handleFighterCollision(a, b) {
-        if (a.isDefeated || b.isDefeated || a.swallowedState || b.swallowedState) return;
+        if (a.flags.defeated || b.flags.defeated || a.state.swallowed || b.state.swallowed) return;
 
         const difference = Vector2.subtract(b.position, a.position);
         const distance = difference.length();
@@ -319,13 +311,13 @@ export class BattleSimulation extends Simulation {
             [a, b],
             [b, a]
         ]) {
-            if (!attacker.movementEffect) continue;
-            attacker.movementEffect.onCollision(attacker, defender, this);
-            if (attacker.movementEffect?.expired) {
-                attacker.movementEffect = null;
+            if (!attacker.state.movement) continue;
+            attacker.state.movement.onCollision(attacker, defender, this);
+            if (attacker.state.movement?.expired) {
+                attacker.state.movement = null;
                 // 대시 종료 시 방향 고정도 같이 제거합니다.
-                if (attacker.forcedHeading) {
-                    attacker.forcedHeading = null;
+                if (attacker.state.forcedHeading) {
+                    attacker.state.forcedHeading = null;
                 }
             }
         }
@@ -364,7 +356,7 @@ export class BattleSimulation extends Simulation {
     }
 
     checkResult() {
-        const alive = this.fighters.filter((f) => !f.isDefeated);
+        const alive = this.fighters.filter((f) => !f.flags.defeated);
         if (alive.length === 1) {
             this.resolveResult(alive[0]);
             return;
