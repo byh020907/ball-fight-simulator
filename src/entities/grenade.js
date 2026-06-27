@@ -1,23 +1,17 @@
 import { Projectile, Vector2 } from "../core.js";
 
-const SENSOR_RANGE = 140;
-const PROXIMITY_DELAY = 0.2;
-
 export class Grenade extends Projectile {
     constructor(owner, targetPosition, fuseTime = 1.08) {
         const start = owner.position.clone();
         const safeFuse = Math.max(0.32, fuseTime);
         const drift = Vector2.subtract(targetPosition, start).scale(1 / safeFuse);
         super(owner, start, drift, 12);
-        this.targetPosition = targetPosition;
         this.timer = safeFuse;
         this.maxTimer = this.timer;
         this.explosionRadius = 150;
         this.innerRadius = 62;
         this.bounces = 0;
         this.maxBounces = 2;
-        this._proximityTriggered = false;
-        this._proximityTimer = 0;
     }
 
     update(delta, simulation) {
@@ -33,25 +27,8 @@ export class Grenade extends Projectile {
             }
         }
 
-        if (this._proximityTriggered) {
-            this._proximityTimer -= delta;
-            if (this._proximityTimer <= 0) {
-                this._detonate(simulation);
-                return;
-            }
-        } else {
-            this.timer -= delta;
-            const target = simulation.getOpponent(this.owner);
-            if (target && !target.isDefeated) {
-                const distance = Vector2.subtract(this.position, target.position).length();
-                if (distance <= SENSOR_RANGE && !this._proximityTriggered) {
-                    this._proximityTriggered = true;
-                    this._proximityTimer = PROXIMITY_DELAY;
-                }
-            }
-        }
-
-        if (this.timer > 0 || this._proximityTriggered) {
+        this.timer -= delta;
+        if (this.timer > 0) {
             return;
         }
 
@@ -60,11 +37,9 @@ export class Grenade extends Projectile {
 
     _detonate(simulation) {
         const target = simulation.getOpponent(this.owner);
-        let hit = false;
         if (target && !target.isDefeated) {
             const distance = Vector2.subtract(this.position, target.position).length();
             if (distance <= this.explosionRadius) {
-                hit = true;
                 const edgeProgress = Math.max(
                     0,
                     Math.min(1, (distance - this.innerRadius) / (this.explosionRadius - this.innerRadius))
@@ -78,7 +53,6 @@ export class Grenade extends Projectile {
 
         simulation.spawnExplosion(this.position.clone(), this.owner.color);
         simulation.playSound("explosion");
-        this.owner.ability?.onGrenadeResult?.(hit);
         simulation.addLog(`${this.owner.name}'s grenade explodes.`);
         this.isExpired = true;
     }
