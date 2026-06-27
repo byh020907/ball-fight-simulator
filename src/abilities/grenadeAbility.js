@@ -6,9 +6,9 @@ const BURST_COUNT_MIN = 2;
 const BURST_COUNT_MAX = 4;
 const BURST_INTERVAL = 0.12;
 const SPREAD_ANGLE = (Math.PI * 2) / 3;
-const SCATTER_RANGE = 800;
-const FUSE_FIRST = 0.25;
-const FUSE_LAST = 0.8;
+const SCATTER_RANGE = 1500;
+const FUSE_FIRST = 0.6;
+const FUSE_LAST = 2.0;
 
 export class GrenadeAbility extends Ability {
     constructor(owner, simulation) {

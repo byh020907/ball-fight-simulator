@@ -39,7 +39,7 @@ export function createRoster() {
             name: "Grenade Ball",
             title: "Blast Arc",
             description:
-                "상대 방향으로 2~4개의 수류탄을 산탄처럼 발사합니다. 중심일수록 빨리 터져 연쇄 폭발을 노립니다(데미지 반감/넉백 증가).",
+                "상대 방향 120° 범위에서 2~4개의 수류탄을 순차 발사합니다. 첫발 0.6초~마지막 2.0초로 지연 폭발하며 벽에 최대 4회 튕깁니다.",
             color: "#ff7676",
             face: "grenade",
             ability: "grenade",

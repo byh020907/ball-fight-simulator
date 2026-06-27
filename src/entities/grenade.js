@@ -11,7 +11,7 @@ export class Grenade extends Projectile {
         this.explosionRadius = 150;
         this.innerRadius = 62;
         this.bounces = 0;
-        this.maxBounces = 2;
+        this.maxBounces = 4;
     }
 
     update(delta, simulation) {
