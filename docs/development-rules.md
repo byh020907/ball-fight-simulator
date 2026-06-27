@@ -80,11 +80,18 @@ Boids 알고리즘이 눈에 보이지 않는다는 피드백을 받았을 때:
 - **`index.js`**는 폴더 내부의 exports를 모아서 외부에 공개하는 barrel 파일로만 사용. 자체 로직 금지.
 - **디렉토리명은 `kebab-case`**, 파일명은 `camelCase` (예외: `index.js`).
 
-### 들여쓰기
+### 계층 구조 (Namespace)
 
-- **탭 대신 공백 4칸**을 사용합니다.
-- `editor.insertSpaces: true`, `editor.tabSize: 4`로 설정합니다.
-- VS Code 상태 표시줄에서 `Tab Size: 4`로 표시되는지 확인합니다.
+**목적**: 디버그 변수, 설정, 실험용 변수는 네임스페이스 객체로 그룹화합니다.
+
+```js
+this.debug = {
+    startCharacter: null,
+    aiEnabled: false
+};
+```
+
+적용 위치: `assignActions: this.debugAIEnabled || this._currentChallengeLevel > 0`
 
 ### 기능 단위 코드 분리 (함수/모듈화)
 

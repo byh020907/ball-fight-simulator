@@ -35,10 +35,10 @@ export const HERO_ORB_EFFECTS = {
         label: "체력",
         apply(owner, ctx) {
             const rollAmount = rollHeroOrbStatGain();
-            const clamped = clampStatGain(owner.heroOrbBonuses.hp, rollAmount, HERO_ORB_STAT_CAP);
+            const clamped = clampStatGain(owner.hero.bonuses.hp, rollAmount, HERO_ORB_STAT_CAP);
             if (!clamped.applied) return { applied: false };
             const amount = clamped.amount;
-            owner.heroOrbBonuses.hp += amount;
+            owner.hero.bonuses.hp += amount;
             owner.maxHp += 5 * amount;
             owner.hp = Math.min(owner.hp + 5 * amount, owner.maxHp);
             return { applied: true, amount };
@@ -49,10 +49,10 @@ export const HERO_ORB_EFFECTS = {
         label: "힘",
         apply(owner, ctx) {
             const rollAmount = rollHeroOrbStatGain();
-            const clamped = clampStatGain(owner.heroOrbBonuses.damage, rollAmount, HERO_ORB_STAT_CAP);
+            const clamped = clampStatGain(owner.hero.bonuses.damage, rollAmount, HERO_ORB_STAT_CAP);
             if (!clamped.applied) return { applied: false };
             const amount = clamped.amount;
-            owner.heroOrbBonuses.damage += amount;
+            owner.hero.bonuses.damage += amount;
             owner.baseDamage = Number((owner.baseDamage * Math.pow(1.02, amount)).toFixed(1));
             return { applied: true, amount };
         }
@@ -62,10 +62,10 @@ export const HERO_ORB_EFFECTS = {
         label: "속도",
         apply(owner, ctx) {
             const rollAmount = rollHeroOrbStatGain();
-            const clamped = clampStatGain(owner.heroOrbBonuses.speed, rollAmount, HERO_ORB_STAT_CAP);
+            const clamped = clampStatGain(owner.hero.bonuses.speed, rollAmount, HERO_ORB_STAT_CAP);
             if (!clamped.applied) return { applied: false };
             const amount = clamped.amount;
-            owner.heroOrbBonuses.speed += amount;
+            owner.hero.bonuses.speed += amount;
             owner.baseSpeed = Math.round(owner.baseSpeed + 4 * amount);
             return { applied: true, amount };
         }
@@ -75,10 +75,10 @@ export const HERO_ORB_EFFECTS = {
         label: "방어",
         apply(owner, ctx) {
             const rollAmount = rollHeroOrbStatGain();
-            const clamped = clampStatGain(owner.heroOrbBonuses.defense, rollAmount, HERO_ORB_STAT_CAP);
+            const clamped = clampStatGain(owner.hero.bonuses.defense, rollAmount, HERO_ORB_STAT_CAP);
             if (!clamped.applied) return { applied: false };
             const amount = clamped.amount;
-            owner.heroOrbBonuses.defense += amount;
+            owner.hero.bonuses.defense += amount;
             owner.baseDefense = Number((owner.baseDefense + 0.33 * amount).toFixed(2));
             return { applied: true, amount };
         }
@@ -88,10 +88,10 @@ export const HERO_ORB_EFFECTS = {
         label: "쿨타임",
         apply(owner, ctx) {
             const rollAmount = rollHeroOrbStatGain();
-            const clamped = clampStatGain(owner.heroOrbBonuses.skill, rollAmount, HERO_ORB_STAT_CAP);
+            const clamped = clampStatGain(owner.hero.bonuses.skill, rollAmount, HERO_ORB_STAT_CAP);
             if (!clamped.applied) return { applied: false };
             const amount = clamped.amount;
-            owner.heroOrbBonuses.skill += amount;
+            owner.hero.bonuses.skill += amount;
             return { applied: true, amount };
         }
     },
@@ -200,8 +200,8 @@ export function applyHeroOrbStatAmount(owner, statKey, amount, opts = {}) {
     const { countAsCurrentMatch = true } = opts;
     if (amount <= 0) return;
     if (!STAT_ORB_KEYS.includes(statKey)) return;
-    if (countAsCurrentMatch && owner.heroOrbBonuses) {
-        owner.heroOrbBonuses[statKey] = (owner.heroOrbBonuses[statKey] ?? 0) + amount;
+    if (countAsCurrentMatch && owner.hero.bonuses) {
+        owner.hero.bonuses[statKey] = (owner.hero.bonuses[statKey] ?? 0) + amount;
     }
     switch (statKey) {
         case "hp":
@@ -241,9 +241,10 @@ export function computeHeroOrbCarryover(gained = {}, rate = HERO_ORB_CARRYOVER_R
 export function mergeHeroOrbCarryover(spec, gained = {}, rate = HERO_ORB_CARRYOVER_RATE) {
     const carryover = computeHeroOrbCarryover(gained, rate);
     if (Object.keys(carryover).length === 0) return carryover;
-    spec.heroOrbCarryover = spec.heroOrbCarryover || { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 };
+    spec.hero = spec.hero || {};
+    spec.hero.carryover = spec.hero.carryover || { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 };
     for (const key of Object.keys(carryover)) {
-        spec.heroOrbCarryover[key] = (spec.heroOrbCarryover[key] ?? 0) + carryover[key];
+        spec.hero.carryover[key] = (spec.hero.carryover[key] ?? 0) + carryover[key];
     }
     return carryover;
 }
@@ -254,7 +255,7 @@ export function applyHeroOrbCarryoverToBattleBall(ball, carryover) {
         const amount = carryover[key] ?? 0;
         if (amount <= 0) continue;
         applyHeroOrbStatAmount(ball, key, amount, { countAsCurrentMatch: false });
-        ball.heroOrbCarryover[key] = (ball.heroOrbCarryover[key] ?? 0) + amount;
+        ball.hero.carryover[key] = (ball.hero.carryover[key] ?? 0) + amount;
     }
 }
 

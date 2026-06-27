@@ -288,10 +288,10 @@ export class BattleSimulation extends Simulation {
         if (velocityAlongNormal > 0) return;
 
         // 숙련도 물리 보정 적용
-        const aOutgoingBonus = 1 + (a.masteryPhysicsModifiers?.outgoingImpactBonus ?? 0);
-        const bOutgoingBonus = 1 + (b.masteryPhysicsModifiers?.outgoingImpactBonus ?? 0);
-        const aIncomingReduce = 1 - (a.masteryPhysicsModifiers?.incomingKnockbackReduce ?? 0);
-        const bIncomingReduce = 1 - (b.masteryPhysicsModifiers?.incomingKnockbackReduce ?? 0);
+        const aOutgoingBonus = 1 + (a.mastery.physics?.outgoingImpactBonus ?? 0);
+        const bOutgoingBonus = 1 + (b.mastery.physics?.outgoingImpactBonus ?? 0);
+        const aIncomingReduce = 1 - (a.mastery.physics?.incomingKnockbackReduce ?? 0);
+        const bIncomingReduce = 1 - (b.mastery.physics?.incomingKnockbackReduce ?? 0);
 
         applyCollisionImpulse(a, b, normal, COLLISION_RESTITUTION, {
             impactA: aMod.impact * aOutgoingBonus * bIncomingReduce,

@@ -49,13 +49,77 @@
 ## [L3] regression.mjs 테스트 복구 (구현과 불일치하던 테스트 값, 미구현 기능 테스트)
 ## [L3] balanceSim 30T 검증 통과, npm test 통과, format:check 통과
 
----
+## [L1] 2026-06-27 — 시간왜곡 canAIUse 재설계 (원거리/근접 구분)
+- 맥락: 기존 `상대속도 > 내속도 × 1.5`는 조건이 너무 엄격해 AI가 거의 사용 안 함
+- 결정: 원거리(archer/grenade/gunner)는 상대 접근속도>80 & 거리<350, 근접은 상대 도망속도>40 & 거리<300
+- 영향: `src/clickActions.js`
+
+## [L1] 2026-06-27 — 7개 액션 canAIUse 전면 개선
+- 맥락: 30T balanceSim에서 Orbit(-16%), Hero(-16%), Phantom(-11%) 등 액션 사용 시 승률 하락
+- 결정: Rush(근접전용, 거리>300), Counter/Endure/Evade(충돌 임박 시), Guard(투사체 접근 시), LifeSteal(HP≤50%), Shockwave(그대로)
+- 영향: `src/clickActions.js`
+
+## [L1] 2026-06-27 — 캐릭터-액션 조합별 베이스라인 대비 분석
+- 결정: balanceSim 25T로 캐릭터×액션 매트릭스 출력, 베이스라인 대비 델타로 AI 조건 진단
+- 발견: 충격파(Trickster/Dash/Rage에 독), 돌진(Phantom/Gunner에 독), 회피(Eater/Grenade/Hero에 독)
+
+## [L1] 2026-06-27 — 회피(Evade) 리워크: 좌우 90도 꺾기
+- 맥락: 타이밍형은 버티기와 유사, 대시형은 Dash와 유사 → 차별화 필요
+- 결정: 현재 진행방향에서 좌/우 랜덤 90도로 꺾어 회피. 800px/s, +30%속도 0.4초, HP 0.8%, 거리<220 & 접근>40 & 50%확률
+- 영향: `src/clickActions.js`
+
+## [L1] 2026-06-27 — 버티기(Endure) 원복
+- 맥락: 0.5초/50%DR로 버프했으나 리턴이 너무 적어짐
+- 결정: 원래값 0.2초/80%DR/1.0%HP로 복구, canAIUse 인간분산 50% 유지
+- 영향: `src/clickActions.js`, `tests/regression.mjs`
+
+## [L1] 2026-06-27 — 밸런싱 방침 확정
+- 맥락: 특정 조합 사기(OP) 방지가 목적. 안 어울리는 조합은 유저가 안 고르므로 제한 불필요
+- 결정: 캐릭터 타입별 액션 제한 없음. OP 조합 식별 시 해당 액션 파라미터 조정으로 대응
+- 영향: 추후 밸런싱 방향
+
+## [L1] 2026-06-27 — 카운터/버티기 인간 수준 분산 추가
+- 맥락: AI가 충돌 타이밍을 완벽하게 계산, Counter/Endure를 100% 성공률로 사용 → 사기. 시뮬: AI 100% vs 인간(반응150ms+예측오차) 54%
+- 결정: Counter 55%, Endure 50% 확률로만 활성화 → 인간 수준으로
+- 영향: `src/clickActions.js`
+
+## [L1] 2026-06-27 — debug 네임스페이스 + 계층 구조 규칙
+- 맥락: 디버그 변수들이 평면적으로 흩어짐 (startCharacter, debugAIEnabled 등)
+- 결정: `this.debug = { startCharacter, aiEnabled }` 네임스페이스로 그룹화, `docs/development-rules.md`에 계층 구조 규칙 추가
+- 영향: `src/app.js`, `docs/development-rules.md`
 
 ## 진행 중 이슈
-1. **액션-캐릭터 궁합 불일치** — 랜덤 액션 할당으로 특정 캐릭터 승률 하락 (Archer -18%, Eater -18%, Grenade -14%). `canAIUse` 조건 튜닝 필요.
-2. `tests/regression.mjs`에 미구현 기능 테스트 2건 포함됨 → 원본으로 복구해둠
+- 밸런스 30T: 전반적 안정화. ±20%↑ 극단치 사라짐. Dash +27% 강세, Eater -9% 약하락
+- 충격파(Phantom -22%), 투사체방어(Grenade -36%) 등 일부 독 조합 잔존
 
 ## 다음 할 일
-1. 액션-캐릭터별 `canAIUse` 조건 튜닝
-2. GrenadeAbility 회피 기능 구현 또는 테스트 정리
-3. `src/patch-notes.js` 패치노트 작성
+1. `src/patch-notes.js` 패치노트 작성
+2. OP 조합 파라미터 튜닝 (카운터, 충격파 등)
+
+---
+
+## [L1] 2026-06-27 — debug 네임스페이스 + 계층 구조 규칙
+- 맥락: 디버그 변수들이 평면적으로 흩어짐 (startCharacter, debugAIEnabled 등)
+- 결정: `this.debug = { startCharacter, aiEnabled }` 네임스페이스로 그룹화, `docs/development-rules.md`에 계층 구조 규칙 추가
+- 영향: `src/app.js`, `docs/development-rules.md`
+
+## [L1] 2026-06-28 — BattleApp._speed/_action + BattleBall.hero/mastery 네임스페이스
+- 맥락: 계층 구조 규칙을 전체 코드베이스에 적용
+- 결정: `_battleSpeed/_speedIndicator*` → `this._speed`, `selectedActionId/currentMatchAction` → `this._action`, `heroOrbBonuses/Carryover` → `this.hero`, `masteryPhysicsModifiers/ActionModifiers/CombatPassives` → `this.mastery`
+- 영향: `src/app.js`, `src/entities/battleBall.js`, `src/entities/heroOrb.js`, `src/simulation/battleSimulation.js`, `src/ui.js`, `tests/regression.mjs`
+
+## [L1] 2026-06-28 — UI 로그 순서 수정 + appendCapped 공통 헬퍼
+- 맥락: `unshift`로 로그가 위에 쌓임 → 아래로 쌓이게 `push`로 변경, `utils.js`에 `appendCapped` 추가로 통일
+- 영향: `src/ui.js`, `src/utils.js`
+
+## [L1] 2026-06-28 — 도전단계 Alpine ↔ 프로필 동기화 버그 수정
+- 맥락: UI에서 도전단계 조정해도 프로필에 저장 안 됨 → 토너먼트 시작 시 이전 값 사용
+- 결정: `startTournament()`에서 Alpine `challengeLevel` 우선, 프로필도 동기화
+- 영향: `src/app.js`
+
+## 진행 중 이슈
+- 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
+
+## 다음 할 일
+1. `src/patch-notes.js` 패치노트 작성
+2. OP 조합 파라미터 튜닝

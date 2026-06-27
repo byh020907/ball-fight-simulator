@@ -85,7 +85,7 @@ function applyOverrides(overrides) {
                 if (overrides.SHOCKWAVE_COST !== undefined) action._hpCostPercent = overrides.SHOCKWAVE_COST;
                 break;
             case "evade":
-                if (overrides.EVADE_WINDOW !== undefined) action.window = overrides.EVADE_WINDOW;
+                if (overrides.EVADE_DASH_SPEED !== undefined) action.dashSpeed = overrides.EVADE_DASH_SPEED;
                 if (overrides.EVADE_SPEED_BOOST !== undefined) action.speedBoost = overrides.EVADE_SPEED_BOOST;
                 if (overrides.EVADE_SPEED_BOOST_DURATION !== undefined)
                     action.speedBoostDuration = overrides.EVADE_SPEED_BOOST_DURATION;
@@ -111,7 +111,7 @@ function resetActionDefaults() {
         if (Ctor.DEFAULT_SPEED_BOOST !== undefined) action.speedBoost = Ctor.DEFAULT_SPEED_BOOST;
         if (Ctor.DEFAULT_SPEED_BOOST_DURATION !== undefined)
             action.speedBoostDuration = Ctor.DEFAULT_SPEED_BOOST_DURATION;
-        if (Ctor.DEFAULT_WINDOW !== undefined) action.window = Ctor.DEFAULT_WINDOW;
+        if (Ctor.DEFAULT_DASH_SPEED !== undefined) action.dashSpeed = Ctor.DEFAULT_DASH_SPEED;
     }
 }
 

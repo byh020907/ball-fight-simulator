@@ -53,3 +53,12 @@ export function shouldShowPatchNotes() {
 export function dismissPatchNotes() {
     setSeenVersion(getLatestVersion());
 }
+
+// ── 공통 배열 헬퍼 ──────────────────────────────────────────────────────
+
+/** 배열 끝에 항목 추가 후 최대 개수로 자름 (로그 등에 사용) */
+export function appendCapped(arr, item, max) {
+    arr.push(item);
+    if (arr.length > max) arr.splice(0, arr.length - max);
+    return arr;
+}

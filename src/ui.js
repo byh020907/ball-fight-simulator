@@ -11,7 +11,7 @@ import {
 import { DEFAULT_STAT_RULES, CHALLENGE_CONFIG } from "./progression/index.js";
 import { formatHeroStatLine, formatHeroStatParts, mergeOrbBonuses } from "./entities/index.js";
 import { FIGHTER_IDS, RENDER_LAYERS, Vector2 } from "./core.js";
-import { getUnseenEntries, dismissPatchNotes } from "./utils.js";
+import { getUnseenEntries, dismissPatchNotes, appendCapped } from "./utils.js";
 import { PopupService } from "./popup.js";
 import { createCollectionHubViewModel, COLLECTION_HUB_TABS } from "./collection/collectionViewModel.js";
 import {
@@ -650,8 +650,7 @@ export class UIController {
     }
 
     addLog(text) {
-        this.logItems.unshift(text);
-        this.logItems = this.logItems.slice(0, 9);
+        appendCapped(this.logItems, text, 9);
         this.renderLog();
     }
 
@@ -723,17 +722,17 @@ export class UIController {
                 defeated: fighter.isDefeated,
                 balanceMult: mult,
                 isHero,
-                mergedBonuses: mergeOrbBonuses(fighter.heroOrbBonuses ?? {}, fighter.heroOrbCarryover ?? {}),
+                mergedBonuses: mergeOrbBonuses(fighter.hero.bonuses ?? {}, fighter.hero.carryover ?? {}),
                 statLine: isHero
                     ? formatHeroStatLine(
                           fighter.statAllocation ?? {},
-                          mergeOrbBonuses(fighter.heroOrbBonuses ?? {}, fighter.heroOrbCarryover ?? {})
+                          mergeOrbBonuses(fighter.hero.bonuses ?? {}, fighter.hero.carryover ?? {})
                       )
                     : formatStatAllocation(fighter.statAllocation ?? {}),
                 heroStatParts: isHero
                     ? formatHeroStatParts(
                           fighter.statAllocation ?? {},
-                          mergeOrbBonuses(fighter.heroOrbBonuses ?? {}, fighter.heroOrbCarryover ?? {})
+                          mergeOrbBonuses(fighter.hero.bonuses ?? {}, fighter.hero.carryover ?? {})
                       )
                     : [],
                 skillLabel: fighter.getAbilityUiState().label,

@@ -140,9 +140,20 @@ class TimeWarpAction extends ClickAction {
     }
 
     canAIUse(sim, fighter, opponent, hpRatio, distance) {
-        const opponentSpeed = opponent.velocity?.length() ?? 0;
-        const mySpeed = fighter.velocity?.length() ?? 0;
-        return opponentSpeed > mySpeed * 1.5;
+        // 원거리(archer/grenade/gunner): 상대가 빠르게 접근 중일 때 사용
+        // 근접(그 외): 상대가 도망 중일 때 사용
+        const RANGED_IDS = new Set(["archer", "grenade", "gunner"]);
+        const toOpponent = Vector2.subtract(opponent.position, fighter.position);
+        const dist = toOpponent.length();
+        if (dist < 20) return false;
+        const toDir = toOpponent.normalize();
+        // 양수: 상대 접근, 음수: 상대 도망
+        const opponentApproachSpeed = opponent.velocity.dot(toDir.scale(-1));
+
+        if (RANGED_IDS.has(fighter.id)) {
+            return opponentApproachSpeed > 80 && dist < 350;
+        }
+        return opponentApproachSpeed < -40 && dist < 300;
     }
 }
 
@@ -202,7 +213,12 @@ class RushAction extends ClickAction {
     }
 
     canAIUse(sim, fighter, opponent, hpRatio, distance) {
-        return distance > 250;
+        // 근접 캐릭터만: 상대가 멀고 접근 중이 아닐 때 돌진
+        const RANGED_IDS = new Set(["archer", "grenade", "gunner"]);
+        if (RANGED_IDS.has(fighter.id)) return false;
+        const toOpp = Vector2.subtract(opponent.position, fighter.position).normalize();
+        const oppApproach = opponent.velocity.dot(toOpp.scale(-1));
+        return distance > 300 && oppApproach < 30;
     }
 }
 
@@ -253,12 +269,12 @@ class CounterAction extends ClickAction {
     }
 
     canAIUse(sim, fighter, opponent, hpRatio, distance) {
-        if (distance > 250) return false;
-        const toMe = Vector2.subtract(fighter.position, opponent.position);
-        const dist = toMe.length();
-        if (dist === 0) return false;
-        const approach = opponent.velocity.dot(toMe.normalize());
-        return approach > fighter.baseSpeed * 0.5;
+        // 충돌 0.6초 이내 예상 + 상대가 빠르게 접근 중
+        if (distance > 200 || distance < 10) return false;
+        const toMe = Vector2.subtract(fighter.position, opponent.position).normalize();
+        const approach = opponent.velocity.dot(toMe);
+        // 인간 수준 분산: 완벽 타이밍이 아닌 55% 확률로만 활성화
+        return approach > 50 && distance / Math.max(1, approach) < 0.6 && Math.random() < 0.55;
     }
 }
 
@@ -306,17 +322,14 @@ class ProjectileGuardAction extends ClickAction {
     }
 
     canAIUse(sim, fighter, opponent, hpRatio, distance) {
+        // 투사체가 250px 이내에서 접근 중 + 도달 0.6초 이내
         return sim.entities.some((e) => {
-            if (e === fighter || e === opponent || !e.velocity) return false;
-            const speed = e.velocity.length();
-            if (speed < 50) return false;
+            if (e === fighter || e === opponent || e.isExpired || !e.velocity) return false;
             const toMe = Vector2.subtract(fighter.position, e.position);
-            const dist = toMe.length();
-            if (dist > 300) return false;
+            const d = toMe.length();
+            if (d > 250) return false;
             const approach = e.velocity.dot(toMe.normalize());
-            if (approach <= 0) return false;
-            const timeToHit = dist / approach;
-            return timeToHit < 0.35;
+            return approach > 30 && d / Math.max(1, approach) < 0.6;
         });
     }
 }
@@ -361,14 +374,10 @@ class EndureAction extends ClickAction {
     }
 
     canAIUse(sim, fighter, opponent, hpRatio, distance) {
-        if (distance > 300) return false;
-        const toMe = Vector2.subtract(fighter.position, opponent.position);
-        const dist = toMe.length();
-        if (dist === 0) return false;
-        const approach = opponent.velocity.dot(toMe.normalize());
-        if (approach <= 10) return false;
-        const timeToHit = dist / approach;
-        return timeToHit < 0.3;
+        if (distance > 250) return false;
+        const toMe = Vector2.subtract(fighter.position, opponent.position).normalize();
+        const approach = opponent.velocity.dot(toMe);
+        return approach > 50 && distance / Math.max(1, approach) < 0.4 && Math.random() < 0.5;
     }
 }
 
@@ -415,7 +424,7 @@ class LifeStealAction extends ClickAction {
     }
 
     canAIUse(sim, fighter, opponent, hpRatio, distance) {
-        return hpRatio < 0.6 && distance < 250;
+        return hpRatio <= 0.5 && distance < 200;
     }
 }
 
@@ -470,14 +479,14 @@ class ShockwaveAction extends ClickAction {
 }
 
 class EvadeAction extends ClickAction {
-    static DEFAULT_WINDOW = 0.2;
-    static DEFAULT_SPEED_BOOST = 0.4;
-    static DEFAULT_SPEED_BOOST_DURATION = 0.5;
+    static DEFAULT_DASH_SPEED = 800;
+    static DEFAULT_SPEED_BOOST = 0.3;
+    static DEFAULT_SPEED_BOOST_DURATION = 0.4;
     static DEFAULT_HP_COST = 0.8;
 
     constructor() {
         super();
-        this.window = EvadeAction.DEFAULT_WINDOW;
+        this.dashSpeed = EvadeAction.DEFAULT_DASH_SPEED;
         this.speedBoost = EvadeAction.DEFAULT_SPEED_BOOST;
         this.speedBoostDuration = EvadeAction.DEFAULT_SPEED_BOOST_DURATION;
         this._hpCostPercent = EvadeAction.DEFAULT_HP_COST;
@@ -490,40 +499,39 @@ class EvadeAction extends ClickAction {
         return "회피";
     }
     get description() {
-        return `${this.window}초 회피 윈도우, 성공 시 속도 +${this.speedBoost * 100}%`;
+        return `진행 방향에서 좌/우 90도로 꺾어 회피, ${this.speedBoostDuration}초간 속도 +${this.speedBoost * 100}%`;
     }
     get hpCostPercent() {
         return this._hpCostPercent;
     }
 
     apply(sim, playerBall) {
-        sim.spawnActionWindow(playerBall, this.id, this.window);
-        let evaded = false;
-        playerBall.actionContext.setEffect(this.id, {
-            remaining: this.window,
-            onDamageTaken: (amount, source, label) => {
-                if (evaded) return amount;
-                evaded = true;
-                playerBall.actionContext.setEffect("evade_speed", {
-                    remaining: this.speedBoostDuration,
-                    getSpeedMultiplier: () => 1 + this.speedBoost
-                });
-                sim.spawnActionText(playerBall.position.clone(), "회피!", "#44ddff");
-                sim.spawnActionSuccess(playerBall.position.clone(), "evade");
-                return 0;
-            }
+        const currentDir =
+            playerBall.velocity.length() > 10
+                ? playerBall.velocity.clone().normalize()
+                : Vector2.fromAngle(Math.random() * Math.PI * 2, 1);
+        // 좌/우 랜덤 90도 회전
+        const angle = ((Math.random() < 0.5 ? -1 : 1) * Math.PI) / 2;
+        const evadeDir = new Vector2(
+            currentDir.x * Math.cos(angle) - currentDir.y * Math.sin(angle),
+            currentDir.x * Math.sin(angle) + currentDir.y * Math.cos(angle)
+        );
+        playerBall.applyImpulse(evadeDir.scale(this.dashSpeed));
+        playerBall.actionContext.setEffect("evade_speed", {
+            remaining: this.speedBoostDuration,
+            getSpeedMultiplier: () => 1 + this.speedBoost
         });
+        sim.spawnActionText(playerBall.position.clone(), "회피!", "#44ddff");
+        sim.spawnActionSuccess(playerBall.position.clone(), "evade");
+        sim.playSound("dash");
     }
 
     canAIUse(sim, fighter, opponent, hpRatio, distance) {
-        if (distance > 300) return false;
-        const toMe = Vector2.subtract(fighter.position, opponent.position);
-        const dist = toMe.length();
-        if (dist === 0) return false;
-        const approach = opponent.velocity.dot(toMe.normalize());
-        if (approach <= 10) return false;
-        const timeToHit = dist / approach;
-        return timeToHit < 0.25;
+        // 상대가 빠르게 접근 중일 때 회피
+        if (distance > 220 || distance < 15) return false;
+        const toMe = Vector2.subtract(fighter.position, opponent.position).normalize();
+        const approach = opponent.velocity.dot(toMe);
+        return approach > 40 && Math.random() < 0.5;
     }
 }
 

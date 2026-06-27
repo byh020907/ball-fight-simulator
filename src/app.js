@@ -81,13 +81,14 @@ const ABILITY_MAP = {
 
 export class BattleApp {
     constructor() {
-        /**
-         * 시작 캐릭터 ID. 비워두면(null) 랜덤, ID를 지정하면 해당 캐릭터가
-         * 플레이어로 고정되고 토너먼트 첫 엔트리에 배치됩니다.
-         * @type {string|null}
-         */
-        this.startCharacter = null;
-        // this.startCharacter = FIGHTER_IDS.GRENADE;
+        // ── 디버그 변수 (테스트 편의용) ──
+        /** @type {{ startCharacter: string|null, aiEnabled: boolean }} */
+        this.debug = {
+            startCharacter: null,
+            // startCharacter: FIGHTER_IDS.GRENADE,
+            aiEnabled: false
+            // aiEnabled: true
+        };
 
         this.elements = {
             canvas: document.getElementById("arenaCanvas"),
@@ -118,13 +119,15 @@ export class BattleApp {
         this.matchFinalized = false;
         this.transientOverlayToken = 0;
         this._previewBall = null;
-        this.selectedActionId = null;
         this._currentChallengeLevel = 0;
         this._lastMasteryResult = null;
-        this._battleSpeed = 1;
-        this._speedIndicatorTimer = 0;
-        this._speedIndicatorText = "";
         this._selectionAnimTime = 999;
+
+        /** @type {{ selectedId: string|null, current: object|null, pickEveryMatch: boolean, ctx: object|null }} */
+        this._action = { selectedId: null, current: null, pickEveryMatch: false, ctx: null };
+
+        /** @type {{ level: number, indicatorTimer: number, indicatorText: string }} */
+        this._speed = { level: 1, indicatorTimer: 0, indicatorText: "" };
 
         // Listen for Alpine.js start-tournament event
         try {
@@ -145,7 +148,7 @@ export class BattleApp {
     }
 
     pickPlayerFighterId() {
-        if (this.startCharacter) return this.startCharacter;
+        if (this.debug.startCharacter) return this.debug.startCharacter;
         return this.roster[Math.floor(Math.random() * this.roster.length)].id;
     }
 
@@ -319,12 +322,20 @@ export class BattleApp {
         this.audio.unlock();
         cancelAnimationFrame(this.rafId);
         this.stopPlayerPreviewLoop();
+        this.ui.resetLog();
         this.ui.setStartButton({ disabled: true, hidden: true, text: "다시 시작" });
         this._pickPending = false;
 
         // 연계 효과 계산: 해금된 ID 중 현재 캐릭터가 아닌 효과만 적용
         const masteryCtx = collectActiveEffects(this.playerProfile, this.playerFighterId);
-        this._currentChallengeLevel = this.playerProfile?.progression?.challenge?.selectedLevel ?? 0;
+        // Alpine 상태에서 사용자 선택 반영 (프로필보다 우선)
+        const alpineChallengeLevel = this.ui.state?.challengeLevel;
+        this._currentChallengeLevel =
+            alpineChallengeLevel ?? this.playerProfile?.progression?.challenge?.selectedLevel ?? 0;
+        // 프로필도 동기화
+        if (this.playerProfile?.progression?.challenge && alpineChallengeLevel !== undefined) {
+            this.playerProfile.progression.challenge.selectedLevel = alpineChallengeLevel;
+        }
 
         // 숙련도 + 업적 보너스의 balanceTolerance를 SENSITIVITY에 반영 (동적 계산)
         const computedBonuses = computeEffectiveBonuses(this.playerProfile, ACHIEVEMENT_DEFINITIONS);
@@ -367,15 +378,16 @@ export class BattleApp {
                 );
             }
             // 전투 시 physics/action modifier 전달
-            playerSpec.masteryPhysicsModifiers = { ...masteryCtx.physicsModifiers };
-            playerSpec.masteryActionModifiers = { ...masteryCtx.actionModifiers };
-            playerSpec.masteryCombatPassives = [...masteryCtx.combatPassives];
+            playerSpec.mastery = {};
+            playerSpec.mastery.physics = { ...masteryCtx.physicsModifiers };
+            playerSpec.mastery.action = { ...masteryCtx.actionModifiers };
+            playerSpec.mastery.passives = [...masteryCtx.combatPassives];
         }
         this.matchmaker = new Matchmaker(this.tournamentRoster);
         this.playerResult = null;
         this.tournament = new TournamentManager(this.tournamentRoster, this.playerFighterId);
         this.currentTournamentMatch = null;
-        this.selectedActionId = null;
+        this._action.selectedId = null;
         this.refreshPlayerSetup();
         this.ui.renderTournament(this.tournament);
         const player = this.tournamentRoster.find((fighter) => fighter.id === this.playerFighterId);
@@ -409,26 +421,26 @@ export class BattleApp {
         if (!playerBall) return null;
 
         // 첫 선택이거나 매판 선택 모드면 카드 띄움
-        if (!this.selectedActionId || this._pickActionEveryMatch) {
+        if (!this._action.selectedId || this._action.pickEveryMatch) {
             const cards = pickRandomActions(3);
             const pickedId = await this.ui.waitForActionPick(cards);
-            this.selectedActionId = pickedId;
+            this._action.selectedId = pickedId;
         }
 
-        this.currentMatchAction = findActionById(this.selectedActionId);
-        if (this.currentMatchAction) {
-            this.ui.addLog(`[액션] ${this.currentMatchAction.name} 준비 완료.`);
-            playerBall.clickActionName = this.currentMatchAction.name;
+        this._action.current = findActionById(this._action.selectedId);
+        if (this._action.current) {
+            this.ui.addLog(`[액션] ${this._action.current.name} 준비 완료.`);
+            playerBall.clickActionName = this._action.current.name;
         }
-        return this.currentMatchAction;
+        return this._action.current;
     }
 
     async startMatch(customMatch = null, options = {}) {
         this.audio.unlock();
         this.ui.setStartButton({ disabled: true, hidden: true });
-        this._battleSpeed = 1;
-        this._speedIndicatorTimer = 0;
-        this._speedIndicatorText = "";
+        this._speed.level = 1;
+        this._speed.indicatorTimer = 0;
+        this._speed.indicatorText = "";
         this.resultSequenceAnnounced = false;
         this.matchFinalized = false;
         if (!options.keepLog) {
@@ -446,7 +458,7 @@ export class BattleApp {
         // 시뮬레이션 생성 (playerBall은 아직 null)
         this._currentMatchReport = createMatchReport();
         this.simulation = new BattleSimulation(match, {
-            assignActions: this._currentChallengeLevel > 0,
+            assignActions: this.debug.aiEnabled || this._currentChallengeLevel > 0,
             onLog: (message) => this.ui.addLog(message),
             onOvertime: () => {
                 this.ui.updateStatus(label, "Overtime");
@@ -488,13 +500,13 @@ export class BattleApp {
         // Hero Orb carryover 적용 — entities/ helper로 위임
         for (const fighter of this.simulation.fighters) {
             const spec = match.find((s) => s.id === fighter.id);
-            if (spec?.heroOrbCarryover) {
-                applyHeroOrbCarryoverToBattleBall(fighter, spec.heroOrbCarryover);
+            if (spec?.hero?.carryover) {
+                applyHeroOrbCarryoverToBattleBall(fighter, spec.hero.carryover);
             }
         }
 
         // 클릭 액션 — 내 캐릭터가 있으면 카드 선택
-        this.currentMatchAction = null;
+        this._action.current = null;
         if (playerBall) {
             await this._resolveAction(playerBall);
         }
@@ -524,7 +536,7 @@ export class BattleApp {
         if (!canvas) return;
 
         // ctx — TriggerStrategy에 전달
-        this._actionCtx = {
+        this._action.ctx = {
             action: null,
             sim: null,
             player: null,
@@ -536,16 +548,16 @@ export class BattleApp {
 
         this._pointerHandler = () => {
             if (this.simulation?.finished) return;
-            this._actionCtx.action = this.currentMatchAction;
-            this._actionCtx.sim = this.simulation;
-            this._actionCtx.player = this.simulation?.playerBall ?? null;
-            if (!this._actionCtx.action) return;
-            this._actionCtx.trigger = this._actionCtx.action.trigger;
-            this._actionCtx.trigger.onPointerDown(this._actionCtx);
+            this._action.ctx.action = this._action.current;
+            this._action.ctx.sim = this.simulation;
+            this._action.ctx.player = this.simulation?.playerBall ?? null;
+            if (!this._action.ctx.action) return;
+            this._action.ctx.trigger = this._action.ctx.action.trigger;
+            this._action.ctx.trigger.onPointerDown(this._action.ctx);
         };
 
         this._pointerUpHandler = () => {
-            this._actionCtx.trigger?.onPointerUp(this._actionCtx);
+            this._action.ctx.trigger?.onPointerUp(this._action.ctx);
         };
 
         canvas.addEventListener("pointerdown", this._pointerHandler);
@@ -576,12 +588,12 @@ export class BattleApp {
         } catch {
             // no-op in non-browser environments
         }
-        this._actionCtx = null;
+        this._action.ctx = null;
     }
 
     /** TriggerStrategy.fireAction()에서 호출 — HP 소모 + 지연 예약 */
     _tryFireAction() {
-        const { action, sim, player } = this._actionCtx ?? {};
+        const { action, sim, player } = this._action.ctx ?? {};
         if (!action || !sim || !player) {
             return false;
         }
@@ -598,8 +610,8 @@ export class BattleApp {
             return false;
         }
 
-        const reduction = player.masteryActionModifiers?.hpCostPercentReduction ?? 0;
-        const minPct = (player.masteryActionModifiers?.minHpCostPercent ?? 0) * 100;
+        const reduction = player.mastery.action?.hpCostPercentReduction ?? 0;
+        const minPct = (player.mastery.action?.minHpCostPercent ?? 0) * 100;
         const effectivePct = Math.max(minPct, action.hpCostPercent - reduction * 100);
         const cost = Math.ceil((player.maxHp * effectivePct) / 100);
         const paidCost = player.actionContext.spendHpForAction(player, cost);
@@ -625,7 +637,7 @@ export class BattleApp {
     // Match end cleanup
     _cleanupMatch() {
         this._unbindClickHandler();
-        this.currentMatchAction = null;
+        this._action.current = null;
     }
 
     showTransientOverlay(label, text, duration = 1200) {
@@ -653,25 +665,25 @@ export class BattleApp {
         const speeds = [1];
         if (maxSpeed >= 2) speeds.push(2);
         if (maxSpeed >= 4) speeds.push(4);
-        const idx = speeds.indexOf(this._battleSpeed);
-        this._battleSpeed = speeds[(idx + 1) % speeds.length];
-        this._speedIndicatorText = `x${this._battleSpeed}`;
-        this._speedIndicatorTimer = 1.2;
-        this.showTransientOverlay(`x${this._battleSpeed}`, "", 900);
+        const idx = speeds.indexOf(this._speed.level);
+        this._speed.level = speeds[(idx + 1) % speeds.length];
+        this._speed.indicatorText = `x${this._speed.level}`;
+        this._speed.indicatorTimer = 1.2;
+        this.showTransientOverlay(`x${this._speed.level}`, "", 900);
     }
 
     /** 배속 표시 렌더링 */
     _renderSpeedIndicator() {
-        if (this._speedIndicatorTimer <= 0 && this._battleSpeed === 1) return;
+        if (this._speed.indicatorTimer <= 0 && this._speed.level === 1) return;
         const ctx = this.renderer.ctx;
-        const alpha = this._speedIndicatorTimer > 0 ? Math.min(1, this._speedIndicatorTimer / 0.3) : 0.5;
+        const alpha = this._speed.indicatorTimer > 0 ? Math.min(1, this._speed.indicatorTimer / 0.3) : 0.5;
         ctx.save();
         ctx.globalAlpha = alpha;
         ctx.fillStyle = "#ffffff";
         ctx.font = "900 28px Bahnschrift, Segoe UI, sans-serif";
         ctx.textAlign = "left";
         ctx.textBaseline = "top";
-        const text = this._speedIndicatorTimer > 0 ? this._speedIndicatorText : `x${this._battleSpeed}`;
+        const text = this._speed.indicatorTimer > 0 ? this._speed.indicatorText : `x${this._speed.level}`;
         ctx.fillText(text, 16, 16);
         ctx.restore();
     }
@@ -679,14 +691,14 @@ export class BattleApp {
     loop(timestamp) {
         const delta = Math.min(0.032, (timestamp - this.lastTime) / 1000 || 0.016);
         this.lastTime = timestamp;
-        const speedDelta = delta * this._battleSpeed;
-        if (this._speedIndicatorTimer > 0) this._speedIndicatorTimer -= delta;
+        const speedDelta = delta * this._speed.level;
+        if (this._speed.indicatorTimer > 0) this._speed.indicatorTimer -= delta;
 
         // HoldTrigger tick
 
         // HoldTrigger tick — 매 프레임 pointer down 상태 확인
-        if (this._actionCtx?.trigger?.type === "hold") {
-            this._actionCtx.trigger.onTick(this._actionCtx);
+        if (this._action.ctx?.trigger?.type === "hold") {
+            this._action.ctx.trigger.onTick(this._action.ctx);
         }
 
         this.simulation.update(speedDelta, delta);
@@ -751,7 +763,7 @@ export class BattleApp {
 
             // Hero Ball 승리 시 carryover — HeroAbility/entities/ helper로 위임
             if (winnerSpec.ability === "hero") {
-                mergeHeroOrbCarryover(winnerSpec, this.simulation.winner?.heroOrbBonuses);
+                mergeHeroOrbCarryover(winnerSpec, this.simulation.winner?.hero.bonuses);
             }
             if (playerLost && !this.playerResult) {
                 this.playerResult = {

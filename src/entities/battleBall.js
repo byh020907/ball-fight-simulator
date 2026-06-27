@@ -34,18 +34,23 @@ export class BattleBall {
         this.isDestroyed = false;
         this.spinRotation = 0;
         this.statAllocation = spec.statAllocation ?? null;
-        this.heroOrbBonuses = { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 };
-        this.heroOrbCarryover = { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 };
-        this.masteryPhysicsModifiers = spec.masteryPhysicsModifiers ?? {
-            incomingKnockbackReduce: 0,
-            outgoingImpactBonus: 0,
-            velocityRecoveryBonus: 0
+        this.hero = {
+            bonuses: { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 },
+            carryover: { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 }
         };
-        this.masteryActionModifiers = spec.masteryActionModifiers ?? {
-            hpCostPercentReduction: 0,
-            minHpCostPercent: 0
+        this.mastery = {
+            physics: spec.mastery?.physics ?? {
+                incomingKnockbackReduce: 0,
+                outgoingImpactBonus: 0,
+                velocityRecoveryBonus: 0
+            },
+            action: spec.mastery?.action ?? {
+                hpCostPercentReduction: 0,
+                minHpCostPercent: 0
+            },
+            passives: spec.mastery?.passives ?? [],
+            _states: null
         };
-        this.masteryCombatPassives = spec.masteryCombatPassives ?? [];
         this.actionContext = new ActionContext();
         this.renderScale = 1;
     }
@@ -136,8 +141,8 @@ export class BattleBall {
     }
 
     _tickMasteryPassives(delta) {
-        if (!this._masteryPassiveStates) {
-            this._masteryPassiveStates = this.masteryCombatPassives.map((def) => ({
+        if (!this.mastery._states) {
+            this.mastery._states = this.mastery.passives.map((def) => ({
                 id: def.id,
                 type: def.type,
                 damageBonus: def.damageBonus ?? 0,
@@ -146,7 +151,7 @@ export class BattleBall {
                 active: false
             }));
         }
-        for (const state of this._masteryPassiveStates) {
+        for (const state of this.mastery._states) {
             if (state.active) continue;
             state.cooldownRemaining -= delta;
             if (state.cooldownRemaining <= 0) {
@@ -159,7 +164,7 @@ export class BattleBall {
     /** 충돌 시 숙련도 패시브 적용. 충돌 핸들러에서 호출. */
     consumeMasteryCollisionBonus() {
         let bonus = 0;
-        for (const state of this._masteryPassiveStates ?? []) {
+        for (const state of this.mastery._states ?? []) {
             if (!state.active || state.type !== "periodic_collision_bonus") continue;
             bonus += state.damageBonus;
             state.active = false;
@@ -193,7 +198,7 @@ export class BattleBall {
 
     _applyVelocityCorrection(simulation, delta) {
         const desiredVelocity = this._computeDesiredVelocity(simulation);
-        const velocityBonus = 1 + (this.masteryPhysicsModifiers?.velocityRecoveryBonus ?? 0);
+        const velocityBonus = 1 + (this.mastery.physics?.velocityRecoveryBonus ?? 0);
         const effectiveRate = BASE_VELOCITY_CORRECTION_RATE * velocityBonus;
         const correction = 1 - Math.exp(-effectiveRate * delta);
         this.applyImpulse(Vector2.subtract(desiredVelocity, this.velocity).scale(correction));
