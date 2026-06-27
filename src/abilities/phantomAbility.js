@@ -3,6 +3,8 @@ import { DashEffect } from "../combatEffects.js";
 import { Ability } from "./ability.js";
 
 const PHANTOM_COOLDOWN = 3.0;
+const PRIMED_DURATION = 2.5;
+const RANDOM_MISS_COOLDOWN_FACTOR = 0.5;
 const DASH_DURATION = 0.8;
 const DASH_MULTIPLIER = 2.5;
 const TELEPORT_BEHIND_DIST = 250;
@@ -15,6 +17,8 @@ export class PhantomAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation, PHANTOM_COOLDOWN);
         this.timer = this.cooldown;
+        this._primed = false;
+        this._primedTimer = 0;
         this._teleportPhase = 0;
         this._teleportTimer = 0;
         this._vanishPos = null;
@@ -25,11 +29,33 @@ export class PhantomAbility extends Ability {
     update(delta, target) {
         const owner = this.owner;
 
-        if (this._teleportPhase === 0) {
-            this.timer -= delta;
+        // animation phases
+        if (this._teleportPhase > 0) {
+            this._tickTeleport(delta, owner);
             return;
         }
 
+        // primed: waiting for collision or timeout
+        if (this._primed) {
+            this._primedTimer -= delta;
+            if (this._primedTimer <= 0) {
+                this._primed = false;
+                this._randomTeleport();
+                this.timer = this.cooldown * RANDOM_MISS_COOLDOWN_FACTOR;
+            }
+            return;
+        }
+
+        // normal cooldown countdown
+        this.timer -= delta;
+        if (this.timer <= 0) {
+            this.timer = 0;
+            this._primed = true;
+            this._primedTimer = PRIMED_DURATION;
+        }
+    }
+
+    _tickTeleport(delta, owner) {
         this._teleportTimer += delta;
 
         if (this._teleportPhase === 1) {
@@ -64,8 +90,11 @@ export class PhantomAbility extends Ability {
     }
 
     onCollision(target) {
+        if (this._teleportPhase > 0) return;
         if (this.owner.swallowedState || target.swallowedState) return;
-        if (this.timer <= 0 && this._teleportPhase === 0) {
+
+        if (this._primed) {
+            this._primed = false;
             this._triggerShadowStrike(target);
         }
     }
@@ -146,8 +175,44 @@ export class PhantomAbility extends Ability {
         sim.addLog(`${owner.name} vanishes and strikes from the shadows!`);
     }
 
+    _randomTeleport() {
+        const owner = this.owner;
+        const sim = this.simulation;
+        const target = sim.getOpponent(owner);
+
+        const r = owner.radius;
+        const margin = r + 30;
+        const minDistFromTarget = target ? target.radius + r + 60 : 100;
+
+        let pos;
+        let attempts = 0;
+        do {
+            pos = new Vector2(
+                margin + Math.random() * (sim.width - 2 * margin),
+                margin + Math.random() * (sim.height - 2 * margin)
+            );
+            attempts++;
+        } while (target && Vector2.subtract(pos, target.position).length() < minDistFromTarget && attempts < 30);
+
+        const oldPos = owner.position.clone();
+        owner.position.x = pos.x;
+        owner.position.y = pos.y;
+
+        const randomAngle = Math.random() * Math.PI * 2;
+        const speed = owner.baseSpeed * (0.7 + Math.random() * 0.6);
+        owner.velocity = Vector2.fromAngle(randomAngle, speed);
+        owner.clearDash();
+
+        sim.spawnParticleBurst(oldPos, "#55bbdd", { count: 15, speed: 200, radiusMin: 2, radiusMax: 5, gravity: 400 });
+        sim.spawnPulse(oldPos, "#55bbdd");
+        sim.spawnExplosion(pos, "#55bbdd");
+        sim.spawnPulse(pos.clone(), "#aaddff");
+        sim.playSound("dash", 0.6);
+        sim.addLog(`${owner.name} phases through the shadows and repositions.`);
+    }
+
     onDashHit(target, effect) {
-        this.timer = 0;
+        // cooldown already set to full in _triggerShadowStrike
     }
 
     getStatModifiers() {
@@ -161,7 +226,7 @@ export class PhantomAbility extends Ability {
 
         ctx.save();
 
-        // appear ring effect
+        // appear ring effect during teleport
         if (this._teleportPhase === 2) {
             const t = Math.min(this._teleportTimer / APPEAR_DURATION, 1);
             const ringR = owner.radius * 1.5 + (1 - t) * 30;
@@ -174,6 +239,21 @@ export class PhantomAbility extends Ability {
             ctx.globalAlpha = 1;
         }
 
+        // primed pulsing ring
+        if (this._primed) {
+            const pulse = Math.sin(time * 8) * 0.25 + 0.75;
+            ctx.strokeStyle = "#55bbdd";
+            ctx.lineWidth = 3;
+            ctx.globalAlpha = pulse * 0.7;
+            ctx.setLineDash([6, 6]);
+            ctx.beginPath();
+            ctx.arc(owner.position.x, owner.position.y, owner.radius + 10, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.globalAlpha = 1;
+        }
+
+        // idle shimmer ring
         ctx.globalAlpha = shimmer;
         ctx.strokeStyle = "#55bbdd";
         ctx.lineWidth = 2;
@@ -215,6 +295,15 @@ export class PhantomAbility extends Ability {
     }
 
     getUiState() {
+        if (this._teleportPhase > 0) {
+            return { label: "Strike", progress: 1 };
+        }
+        if (this._primed) {
+            return {
+                label: `Primed ${Math.max(0, this._primedTimer).toFixed(1)}s`,
+                progress: Math.max(0, Math.min(1, this._primedTimer / PRIMED_DURATION))
+            };
+        }
         return {
             label: this.timer <= 0 ? "Ready" : `${Math.max(0, this.timer).toFixed(1)}s`,
             progress: this.timer <= 0 ? 1 : Math.max(0, Math.min(1, 1 - this.timer / this.cooldown))

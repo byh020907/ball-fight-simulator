@@ -2,12 +2,13 @@ import { Projectile, Vector2 } from "../core.js";
 
 const BAT_RADIUS = 12;
 const BAT_LIFE = 1.8;
-const WOBBLE_FREQ = 4;
-const WOBBLE_AMP = 60;
-const FLUTTER_FREQ = 22;
-const FLUTTER_AMP = 20;
-const HOMING_STRENGTH = 3;
-const RANDOM_JITTER_INTERVAL = 0.15;
+const HOMING_STRENGTH = 4;
+const MAX_SPEED_MULT = 3.5;
+const DART_INTERVAL_MIN = 0.06;
+const DART_INTERVAL_MAX = 0.18;
+const DART_STRENGTH = 40;
+const FLUTTER_FREQ = 28;
+const FLUTTER_AMP = 8;
 
 export class BatProjectile extends Projectile {
     constructor(owner, position, velocity) {
@@ -15,9 +16,8 @@ export class BatProjectile extends Projectile {
         this.life = BAT_LIFE;
         this.angle = Math.atan2(velocity.y, velocity.x);
         this.time = 0;
-        this._perp = new Vector2(-velocity.y, velocity.x).normalize();
-        this._jitterTimer = 0;
-        this._jitterOffset = 0;
+        this._dartTimer = 0;
+        this._dartDir = new Vector2(0, 0);
     }
 
     update(delta, simulation) {
@@ -25,26 +25,31 @@ export class BatProjectile extends Projectile {
 
         const target = this._findTarget(simulation);
 
-        // erratic bat flight: wobble + flutter + homing + random jitter
-        const wobble = Math.sin(this.time * WOBBLE_FREQ) * WOBBLE_AMP;
-        const flutter = Math.sin(this.time * FLUTTER_FREQ) * FLUTTER_AMP;
-
-        this._jitterTimer -= delta;
-        if (this._jitterTimer <= 0) {
-            this._jitterTimer = RANDOM_JITTER_INTERVAL;
-            this._jitterOffset = (Math.random() - 0.5) * 2;
+        // random dart: sharp direction change at irregular intervals
+        this._dartTimer -= delta;
+        if (this._dartTimer <= 0) {
+            this._dartTimer = DART_INTERVAL_MIN + Math.random() * (DART_INTERVAL_MAX - DART_INTERVAL_MIN);
+            this._dartDir = new Vector2((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2).normalize();
         }
 
-        const lateralOffset = (wobble + flutter + this._jitterOffset * 15) * delta;
-        this.position.add(Vector2.add(this.velocity.clone().scale(delta), this._perp.clone().scale(lateralOffset)));
+        // forward velocity
+        const forward = this.velocity.clone().scale(delta);
 
-        // slight homing toward target
+        // dart impulse + flutter oscillation
+        const dartDelta = this._dartDir.clone().scale(DART_STRENGTH * delta);
+        const flutter = Math.sin(this.time * FLUTTER_FREQ) * FLUTTER_AMP * delta;
+
+        this.position.add(Vector2.add(forward, dartDelta));
+        this.position.add(this._perp.clone().scale(flutter));
+
+        // homing toward target
         if (target && !target.isDefeated) {
             const toTarget = Vector2.subtract(target.position, this.position).normalize();
             this.velocity.add(toTarget.clone().scale(HOMING_STRENGTH * delta));
-            const speed = this.velocity.length();
-            const maxSpeed = this.owner.baseSpeed * 3.5;
-            if (speed > maxSpeed) this.velocity.scale(maxSpeed / speed);
+            const maxSpeed = this.owner.baseSpeed * MAX_SPEED_MULT;
+            if (this.velocity.length() > maxSpeed) {
+                this.velocity.normalize().scale(maxSpeed);
+            }
         }
 
         simulation.keepEntityInsideArena(this);

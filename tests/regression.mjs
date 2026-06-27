@@ -2903,7 +2903,9 @@ async function testPhantomShadowStrike(app) {
     phantomFighter.position.y = 480;
     target.position.x = 250;
     target.position.y = 480;
-    phantomFighter.ability.timer = -0.1;
+    phantomFighter.ability.timer = 0;
+    phantomFighter.ability._primed = true;
+    phantomFighter.ability._primedTimer = 99;
 
     const posBefore = phantomFighter.position.clone();
     phantomFighter.ability.onCollision(target);
