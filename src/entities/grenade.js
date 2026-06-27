@@ -44,7 +44,7 @@ export class Grenade extends Projectile {
                     0,
                     Math.min(1, (distance - this.innerRadius) / (this.explosionRadius - this.innerRadius))
                 );
-                const raw = Math.round(this.owner.baseDamage * (2.0 - edgeProgress));
+                const raw = Math.round(this.owner.baseDamage * (3.0 - edgeProgress * 1.5));
                 this.dealDamageToTarget(target, raw, this.owner, "Grenade", simulation);
                 const kbDir = Vector2.subtract(target.position, this.position).normalize();
                 target.applyKnockback(kbDir.scale(600), 0.5);
