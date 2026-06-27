@@ -5,7 +5,6 @@ const GRENADE_COOLDOWN = 3.0;
 const BURST_COUNT_MIN = 3;
 const BURST_COUNT_MAX = 5;
 const BURST_INTERVAL = 0.12;
-const SPREAD_ANGLE = (Math.PI * 2) / 3;
 const SCATTER_SPEED = 800;
 const FUSE_FIRST = 0.6;
 const FUSE_LAST = 2.0;
@@ -50,9 +49,7 @@ export class GrenadeAbility extends Ability {
         const progress = this._burstTotal > 1 ? shotIndex / (this._burstTotal - 1) : 0.5;
         const fuse = FUSE_FIRST + progress * (FUSE_LAST - FUSE_FIRST);
 
-        const toTarget = Vector2.subtract(target.position, this.owner.position);
-        const baseAngle = Math.atan2(toTarget.y, toTarget.x);
-        const angle = baseAngle + (Math.random() - 0.5) * SPREAD_ANGLE;
+        const angle = Math.random() * Math.PI * 2;
         const dir = Vector2.fromAngle(angle, 1);
         const targetPos = Vector2.add(this.owner.position, dir.clone().scale(SCATTER_SPEED * fuse));
 
