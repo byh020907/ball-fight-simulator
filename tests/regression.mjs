@@ -451,10 +451,16 @@ async function testGrenadeScatterShot(app) {
     sim.entities = sim.fighters.slice();
     grenadeFighter.ability.timer = 0;
     grenadeFighter.ability.update(0.016, target);
-    const grenades = sim.entities.filter((e) => e.constructor?.name === "Grenade");
-    assert.ok(grenades.length >= 2, "Grenade should fire at least 2 grenades");
-    assert.ok(grenades.length <= 4, "Grenade should fire at most 4 grenades");
-    for (const g of grenades) {
+    const allGrenades = () => sim.entities.filter((e) => e.constructor?.name === "Grenade");
+    const firstCount = allGrenades().length;
+    assert.ok(firstCount >= 1, "Grenade should fire 1 grenade on first burst tick");
+    for (let i = 0; i < 10; i++) {
+        grenadeFighter.ability.update(0.12, target);
+    }
+    const total = allGrenades().length;
+    assert.ok(total >= 2, "Grenade should fire 2-4 grenades in burst");
+    assert.ok(total <= 4, "Grenade should fire at most 4 grenades total");
+    for (const g of allGrenades()) {
         assert.ok(g.velocity.length() > 0, "Each grenade should have velocity");
         assert.ok(g.timer > 0, "Each grenade should have a fuse timer");
     }
