@@ -19,6 +19,45 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.20.0",
+        date: "2026-06-27",
+        title: "v0.20.0 업데이트",
+        changes: [
+            {
+                type: "refactor",
+                text: "대규모 밸런스 조정 — 200회 토너먼트 시뮬레이션 3회차 분석 기반."
+            },
+            {
+                type: "refactor",
+                text: "Vampire Ball 박쥐 이동 Boids(Flocking) 알고리즘으로 개선 — 응집/정렬/분리 3규칙 + 표적 추적. 5→7마리 소환, 느리게 떼지어 접근 후 동시타격."
+            },
+            {
+                type: "refactor",
+                text: "Grenade Ball 예측 정확도 하향(0.48→0.18), 센서 범위 축소(180→140). 대신 더 자주 투척(쿨타임 4.7→3.8s, 랜덤폭 증가)."
+            },
+            {
+                type: "refactor",
+                text: "Trickster Ball 시드 대시 충돌 데미지 1.3→0.9배 하향."
+            },
+            {
+                type: "refactor",
+                text: "Dash Ball 대시 충돌 데미지 0.4배 추가 (기존 0 → 보너스뎀)."
+            },
+            {
+                type: "fix",
+                text: "Phantom Ball 대시 벽 충돌 시 종료(untilWall) 추가 — 과도한 연타 방지."
+            },
+            {
+                type: "fix",
+                text: "박쥐 날개 방향 수정 — 몸통 기준 수직(위/아래)으로 펼쳐지도록 교정."
+            },
+            {
+                type: "style",
+                text: "박쥐 시각 개선 — 눈 앞쪽 이동, 몸통/날개 분리 뚜렷하게."
+            }
+        ]
+    },
+    {
         version: "0.19.0",
         date: "2026-06-27",
         title: "v0.19.0 업데이트",
