@@ -63,7 +63,11 @@ export class BatProjectile extends Projectile {
             });
             return;
         }
-        this.angle = Math.atan2(this.velocity.y, this.velocity.x);
+        if (target && !target.isDefeated) {
+            this.angle = Math.atan2(target.position.y - this.position.y, target.position.x - this.position.x);
+        } else {
+            this.angle = Math.atan2(this.velocity.y, this.velocity.x);
+        }
         this._projectileHitCheck(simulation);
     }
 
