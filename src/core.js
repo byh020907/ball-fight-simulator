@@ -55,6 +55,8 @@
 }
 
 /** Named render layers for ArenaRenderer ??lower values draw first. */
+import { mixins, PhysicsBody } from "./physics/index.js";
+
 export const RENDER_LAYERS = Object.freeze({
     /** Particles, visual effects, projectiles ??behind fighters. */
     BACKGROUND: 0,
@@ -64,10 +66,10 @@ export const RENDER_LAYERS = Object.freeze({
     FOREGROUND: 2
 });
 
-export class CombatEntity {
+export class CombatEntity extends mixins([PhysicsBody]) {
     constructor(position, velocity, radius) {
-        this.position = position;
-        // Initial state only. Runtime velocity changes should use applyImpulse().
+        super();
+        this.pos = position;
         this.velocity = velocity;
         this.radius = radius;
         this.isExpired = false;
@@ -81,10 +83,6 @@ export class CombatEntity {
 
     update() {}
     draw() {}
-
-    applyImpulse(impulse) {
-        this.velocity.add(impulse);
-    }
 
     /**
      * 투사체 공통 hit 처리 (Template Method).
@@ -102,7 +100,7 @@ export class CombatEntity {
      * Subclass는 _findTarget(sim), _getHitDamage(), _getHitLabel(), _onHitEffects()를 구현.
      */
     updateProjectile(delta, simulation) {
-        this.position.add(this.velocity.clone().scale(delta));
+        this.integrate(delta);
         simulation.keepEntityInsideArena(this);
 
         if (this.life != null) {

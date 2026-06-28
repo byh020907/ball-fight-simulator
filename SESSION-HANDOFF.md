@@ -137,6 +137,11 @@
 - 결정: `src/physics/` 모듈 신설 — `mixins()` 합성 유틸리티, `PhysicsBody` 믹스인 (pos/velocity/mass/radius/bounced + applyImpulse/applyForce/integrate/_applyVelocityCorrection/_computeDesiredVelocity). `BattleBall extends mixins([PhysicsBody])`로 적용. `position` getter/setter로 기존 외부 코드와 호환 유지. `bounced`는 `state`에서 PhysicsBody 직속으로 이동.
 - 영향: `src/physics/index.js`, `src/physics/mixins.js`, `src/physics/PhysicsBody.js`, `src/entities/battleBall.js`, `src/simulation/simulation.js`
 
+## [L1] 2026-06-28 — CombatEntity PhysicsBody 전환 (모든 엔티티 공유)
+- 맥락: PhysicsBody 믹스인을 BattleBall에만 적용 → CombatEntity를 PhysicsBody 기반으로 전환하여 모든 투사체/이펙트 엔티티도 자동 상속
+- 결정: `CombatEntity extends mixins([PhysicsBody])`로 전환, 중복 `applyImpulse` 제거, `updateProjectile`에서 `this.position.add(...)` → `this.integrate(delta)` 사용. Projectile, GravityParticle, FloatingText, VisualBurst, DeathBurstEffect, ActionEffects, SlashTrail, OrbitHitEffect, HeroOrb, TestTarget 등 12개 하위클래스 모두 PhysicsBody 자동 획득.
+- 영향: `src/core.js`
+
 ## 진행 중 이슈
 - 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
 
