@@ -14,7 +14,7 @@ export class BulletProjectile extends Projectile {
     }
 
     update(delta, simulation) {
-        this.position.add(this.velocity.clone().scale(delta));
+        this.integrate(delta);
         const px = this.position.x;
         const py = this.position.y;
         simulation.keepEntityInsideArena(this);
@@ -25,10 +25,7 @@ export class BulletProjectile extends Projectile {
         }
         this._trail.push(this.position.clone());
         if (this._trail.length > 8) this._trail.shift();
-        this.life -= delta;
-        if (this.life <= 0) {
-            this.isExpired = true;
-            return;
+        if (!this.tickLife(delta)) { return;
         }
         this.angle = Math.atan2(this.velocity.y, this.velocity.x);
         this._projectileHitCheck(simulation);

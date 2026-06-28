@@ -1,16 +1,17 @@
 import { Vector2 } from "../core.js";
 import { pickRandomActions } from "../clickActions.js";
+import { mixins, Cooldown } from "../physics/index.js";
 
 const AI_ACTION_COOLDOWN = 15;
-/** HP가 이 비율 미만이면 액션 사용하지 않음 (사람도 빈사 상태에선 HP 소모를 꺼림) */
 const AI_MIN_HP_RATIO = 0.5;
-/** 액션 사용 후 최소 잔여 HP 비율 */
 const AI_MIN_HP_AFTER_COST = 0.2;
 
-export class AIActionController {
+export class AIActionController extends mixins([Cooldown]) {
     constructor(rng = Math.random) {
+        super();
         this.actions = pickRandomActions(3);
-        this.cooldownRemaining = 2 + rng() * 2;
+        this._cooldownDuration = AI_ACTION_COOLDOWN;
+        this._cooldownRemaining = 2 + rng() * 2;
         this._chosenAction = null;
         this.usageCount = {};
         for (const a of this.actions) {
@@ -28,14 +29,14 @@ export class AIActionController {
     }
 
     evaluate(sim, fighter, delta) {
-        this.cooldownRemaining -= delta;
-        if (this.cooldownRemaining > 0) return null;
+        this.tickCooldown(delta);
+        if (!this.cooldownReady) return null;
 
         // 첫 평가 시 하나의 액션을 선택하여 고정 (사람처럼)
         if (!this._chosenAction) {
             this._chosenAction = this._pickAction(sim, fighter);
             if (!this._chosenAction) {
-                this.cooldownRemaining = 2;
+                this._cooldownRemaining = 2;
                 return null;
             }
         }
@@ -56,7 +57,7 @@ export class AIActionController {
         const paidCost = fighter.actionContext.spendHpForAction(fighter, cost);
         if (paidCost <= 0) return null;
 
-        this.cooldownRemaining = AI_ACTION_COOLDOWN + (Math.random() - 0.5) * 2;
+        this._cooldownRemaining = AI_ACTION_COOLDOWN + (Math.random() - 0.5) * 2;
         this.usageCount[action.id] = (this.usageCount[action.id] ?? 0) + 1;
         return { action, fighter, paidCost };
     }

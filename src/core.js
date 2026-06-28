@@ -55,7 +55,7 @@
 }
 
 /** Named render layers for ArenaRenderer ??lower values draw first. */
-import { mixins, PhysicsBody } from "./physics/index.js";
+import { LifeSpan, mixins, PhysicsBody } from "./physics/index.js";
 
 export const RENDER_LAYERS = Object.freeze({
     /** Particles, visual effects, projectiles ??behind fighters. */
@@ -66,7 +66,7 @@ export const RENDER_LAYERS = Object.freeze({
     FOREGROUND: 2
 });
 
-export class CombatEntity extends mixins([PhysicsBody]) {
+export class CombatEntity extends mixins([PhysicsBody, LifeSpan]) {
     constructor(position, velocity, radius) {
         super();
         this.pos = position;
@@ -103,13 +103,9 @@ export class CombatEntity extends mixins([PhysicsBody]) {
         this.integrate(delta);
         simulation.keepEntityInsideArena(this);
 
-        if (this.life != null) {
-            this.life -= delta;
-            if (this.life <= 0) {
-                this._onExpired(simulation);
-                this.isExpired = true;
-                return;
-            }
+        if (this.life != null && !this.tickLife(delta)) {
+            this._onExpired(simulation);
+            return;
         }
 
         this._projectileHitCheck(simulation);

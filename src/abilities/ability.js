@@ -1,9 +1,13 @@
-export class Ability {
+import { mixins, Cooldown } from "../physics/index.js";
+
+export class Ability extends mixins([Cooldown]) {
     constructor(owner, simulation, baseCooldown = 0) {
+        super();
         this.owner = owner;
         this.simulation = simulation;
         this._baseCooldown = baseCooldown;
-        this.timer = this.cooldown;
+        this._cooldownDuration = baseCooldown;
+        this._cooldownRemaining = this.cooldown;
     }
 
     /** Effective cooldown after skill stat reduction. */
@@ -15,6 +19,14 @@ export class Ability {
 
     set cooldown(val) {
         this._baseCooldown = val;
+    }
+
+    /** @deprecated — use cooldownReady / tickCooldown() instead */
+    get timer() {
+        return this._cooldownRemaining;
+    }
+    set timer(v) {
+        this._cooldownRemaining = v;
     }
 
     update() {}

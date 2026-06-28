@@ -14,7 +14,7 @@ class FloatingText extends CombatEntity {
 
     update(delta) {
         this.life -= delta;
-        this.position.add(this.velocity.clone().scale(delta));
+        this.integrate(delta);
         if (this.life <= 0) {
             this.isExpired = true;
         }

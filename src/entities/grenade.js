@@ -15,7 +15,7 @@ export class Grenade extends Projectile {
     }
 
     update(delta, simulation) {
-        this.position.add(this.velocity.clone().scale(delta));
+        this.integrate(delta);
 
         if (this.bounces < this.maxBounces) {
             const bx = this.position.x,

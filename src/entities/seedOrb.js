@@ -8,8 +8,7 @@ export class SeedOrb extends Projectile {
     }
 
     update(delta, simulation) {
-        this.life -= delta;
-        this.position.add(this.velocity.clone().scale(delta));
+        if (this.tickLife(delta)) this.integrate(delta);
         simulation.keepEntityInsideArena(this);
         if (this.life <= 0) {
             this.isExpired = true;

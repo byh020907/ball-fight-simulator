@@ -19,10 +19,7 @@ export class GravityParticle extends CombatEntity {
     }
 
     update(delta, simulation) {
-        this.life -= delta;
-        if (this.life <= 0) {
-            this.isExpired = true;
-            return;
+        if (!this.tickLife(delta)) { return;
         }
 
         if (this.settled) {
@@ -36,7 +33,7 @@ export class GravityParticle extends CombatEntity {
         this.applyImpulse(new Vector2(0, this.gravity * delta));
         this._matchVelocity(new Vector2(this.velocity.x * this.drag, this.velocity.y));
         this.rotation += this.spin * delta;
-        this.position.add(this.velocity.clone().scale(delta));
+        this.integrate(delta);
 
         const left = 24 + this.radius;
         const right = simulation.width - 24 - this.radius;

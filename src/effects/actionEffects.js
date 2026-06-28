@@ -55,8 +55,7 @@ export class ActionSuccessEffect extends CombatEntity {
     }
 
     update(delta) {
-        this.life -= delta;
-        if (this.life <= 0) this.isExpired = true;
+        this.tickLife(delta);
     }
 
     draw(ctx) {
@@ -99,7 +98,7 @@ export class ActionWhiffEffect extends CombatEntity {
 
     update(delta) {
         this.life -= delta;
-        this.position.add(this.velocity.clone().scale(delta));
+        this.integrate(delta);
         if (this.life <= 0) this.isExpired = true;
     }
 

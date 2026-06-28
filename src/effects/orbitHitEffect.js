@@ -11,10 +11,7 @@ export class OrbitHitEffect extends CombatEntity {
     }
 
     update(delta) {
-        this.life -= delta;
-        if (this.life <= 0) {
-            this.isExpired = true;
-        }
+        if (!this.tickLife(delta)) { }
     }
 
     draw(ctx) {

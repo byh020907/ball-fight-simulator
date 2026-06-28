@@ -12,13 +12,15 @@ const FUSE_LAST = 2.0;
 export class GrenadeAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation, GRENADE_COOLDOWN);
-        this.state = { burstRemaining: 0, burstTotal: 0, burstTimer: 0 };
+        this._burstRemaining = 0;
+        this._burstTotal = 0;
+        this._burstTimer = 0;
     }
 
     update(delta, target) {
-        if (this.state.burstRemaining > 0) {
-            this.state.burstTimer -= delta;
-            if (this.state.burstTimer <= 0) {
+        if (this._burstRemaining > 0) {
+            this._burstTimer -= delta;
+            if (this._burstTimer <= 0) {
                 this._fireNext(target);
             }
             return;
@@ -34,17 +36,17 @@ export class GrenadeAbility extends Ability {
     }
 
     _startBurst(target) {
-        this.state.burstTotal = BURST_COUNT_MIN + Math.floor(Math.random() * (BURST_COUNT_MAX - BURST_COUNT_MIN + 1));
-        this.state.burstRemaining = this.state.burstTotal;
-        this.state.burstTimer = BURST_INTERVAL;
+        this._burstTotal = BURST_COUNT_MIN + Math.floor(Math.random() * (BURST_COUNT_MAX - BURST_COUNT_MIN + 1));
+        this._burstRemaining = this._burstTotal;
+        this._burstTimer = BURST_INTERVAL;
         this._fireNext(target);
     }
 
     _fireNext(target) {
-        if (this.state.burstRemaining <= 0 || !target) return;
+        if (this._burstRemaining <= 0 || !target) return;
 
-        const shotIndex = this.state.burstTotal - this.state.burstRemaining;
-        const progress = this.state.burstTotal > 1 ? shotIndex / (this.state.burstTotal - 1) : 0.5;
+        const shotIndex = this._burstTotal - this._burstRemaining;
+        const progress = this._burstTotal > 1 ? shotIndex / (this._burstTotal - 1) : 0.5;
         const fuse = FUSE_FIRST + progress * (FUSE_LAST - FUSE_FIRST);
 
         const angle = Math.random() * Math.PI * 2;
@@ -53,8 +55,8 @@ export class GrenadeAbility extends Ability {
 
         this.simulation.spawnGrenade(this.owner, targetPos, fuse);
 
-        this.state.burstRemaining--;
-        this.state.burstTimer = BURST_INTERVAL;
+        this._burstRemaining--;
+        this._burstTimer = BURST_INTERVAL;
     }
 
     drawFace(ctx, rotation, ball) {
@@ -78,11 +80,11 @@ export class GrenadeAbility extends Ability {
     }
 
     getUiState() {
-        if (this.state.burstRemaining > 0) {
-            const fired = this.state.burstTotal - this.state.burstRemaining;
+        if (this._burstRemaining > 0) {
+            const fired = this._burstTotal - this._burstRemaining;
             return {
-                label: `${fired + 1}/${this.state.burstTotal}`,
-                progress: fired / this.state.burstTotal
+                label: `${fired + 1}/${this._burstTotal}`,
+                progress: fired / this._burstTotal
             };
         }
         return {

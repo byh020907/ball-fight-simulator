@@ -51,10 +51,7 @@ export class BatProjectile extends Projectile {
         this.position.add(perp.scale(flutter));
 
         simulation.keepEntityInsideArena(this);
-        this.life -= delta;
-        if (this.life <= 0) {
-            this.isExpired = true;
-            simulation.spawnParticleBurst(this.position.clone(), "#441122", {
+        if (!this.tickLife(delta)) { simulation.spawnParticleBurst(this.position.clone(), "#441122", {
                 count: 6,
                 speed: 100,
                 radiusMin: 1,

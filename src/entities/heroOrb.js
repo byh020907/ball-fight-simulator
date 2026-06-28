@@ -276,8 +276,8 @@ export class HeroOrb extends CombatEntity {
     }
 
     update(delta, simulation) {
-        if (Number.isFinite(this.life)) this.life -= delta;
-        this.position.add(this.velocity.clone().scale(delta));
+        this.tickLife(delta);
+        this.integrate(delta);
         simulation.keepEntityInsideArena(this);
         if (Number.isFinite(this.life) && this.life <= 0) {
             this.isExpired = true;

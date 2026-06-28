@@ -14,9 +14,9 @@ const KNOCKBACK_DURATION = 0.15;
 export class GunnerAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation, GUNNER_COOLDOWN);
+        this._burstRemaining = 0;
+        this._burstTimer = 0;
         this.state = {
-            burstRemaining: 0,
-            burstTimer: 0,
             burstBulletCount: 0,
             burstIndex: 0,
             gunHand: 0,
@@ -29,10 +29,10 @@ export class GunnerAbility extends Ability {
         const time = performance.now() / 1000;
         this.state.spinAngle = Math.sin(time * 4) * 0.5;
 
-        if (this.state.burstRemaining > 0) {
+        if (this._burstRemaining > 0) {
             this.state.spinAngle = time * 12;
-            this.state.burstTimer -= delta;
-            if (this.state.burstTimer <= 0) {
+            this._burstTimer -= delta;
+            if (this._burstTimer <= 0) {
                 this._fireBurstBullet();
             }
             return;
@@ -47,10 +47,10 @@ export class GunnerAbility extends Ability {
 
     _startBurst() {
         this.state.burstBulletCount = MIN_BULLETS + Math.floor(Math.random() * (MAX_BULLETS - MIN_BULLETS + 1));
-        this.state.burstRemaining = this.state.burstBulletCount;
         this.state.burstIndex = 0;
-        this.state.burstTimer = 0;
         this.state.gunHand = 0;
+        this._burstRemaining = this.state.burstBulletCount;
+        this._burstTimer = 0;
         this.simulation.spawnPulse(this.owner.position.clone(), "#ffee88");
         this.simulation.addLog(
             `${this.owner.name} fires ${this.state.burstBulletCount} bullet${this.state.burstBulletCount > 1 ? "s" : ""}!`
@@ -59,7 +59,7 @@ export class GunnerAbility extends Ability {
     }
 
     _fireBurstBullet() {
-        if (this.state.burstRemaining <= 0) return;
+        if (this._burstRemaining <= 0) return;
 
         const owner = this.owner;
         const gunAngle = this.state.spinAngle + (this.state.gunHand === 0 ? 0 : Math.PI);
@@ -107,9 +107,9 @@ export class GunnerAbility extends Ability {
             life: isFinisher ? 0.3 : 0.15
         });
 
-        this.state.burstRemaining--;
+        this._burstRemaining--;
         this.state.burstIndex++;
-        this.state.burstTimer = BULLET_INTERVAL;
+        this._burstTimer = BULLET_INTERVAL;
         this.state.gunHand = 1 - this.state.gunHand;
 
         if (isLast && bulletCount === MAX_BULLETS) {
@@ -126,7 +126,7 @@ export class GunnerAbility extends Ability {
         const time = performance.now() / 1000;
 
         ctx.save();
-        if (this.state.burstRemaining > 0) {
+        if (this._burstRemaining > 0) {
             const flash = Math.sin(time * 40) * 0.3 + 0.7;
             ctx.fillStyle = `rgba(255, 238, 136, ${flash * 0.15})`;
             ctx.beginPath();
@@ -139,13 +139,13 @@ export class GunnerAbility extends Ability {
             const gunAngle = this.state.spinAngle + handOffset;
             const gx = owner.position.x + Math.cos(gunAngle) * (r + 8);
             const gy = owner.position.y + Math.sin(gunAngle) * (r + 8);
-            ctx.strokeStyle = this.state.burstRemaining > 0 ? "#666666" : "#444444";
+            ctx.strokeStyle = this._burstRemaining > 0 ? "#666666" : "#444444";
             ctx.lineWidth = 4;
             ctx.beginPath();
             ctx.moveTo(gx, gy);
             ctx.lineTo(gx + Math.cos(gunAngle) * 14, gy + Math.sin(gunAngle) * 14);
             ctx.stroke();
-            ctx.fillStyle = this.state.burstRemaining > 0 ? "#888888" : "#666666";
+            ctx.fillStyle = this._burstRemaining > 0 ? "#888888" : "#666666";
             ctx.beginPath();
             ctx.arc(gx + Math.cos(gunAngle) * 14, gy + Math.sin(gunAngle) * 14, 3, 0, Math.PI * 2);
             ctx.fill();
@@ -162,7 +162,7 @@ export class GunnerAbility extends Ability {
     }
 
     getUiState() {
-        if (this.state.burstRemaining > 0) {
+        if (this._burstRemaining > 0) {
             return {
                 label: `${this.state.burstBulletCount}B x${this.state.burstBulletCount - this.state.burstIndex}`,
                 progress: 1 - (this.state.burstIndex % this.state.burstBulletCount) / this.state.burstBulletCount
