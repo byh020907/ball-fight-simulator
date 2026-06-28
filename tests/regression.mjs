@@ -1,4 +1,5 @@
 ﻿import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
     PLAYER_STAT_POINTS,
     STAT_BALANCER_CONFIG,
@@ -19,6 +20,7 @@ import { createDefaultPlayerProfile } from "../src/playerProfile.js";
 import { completeChallengeTournament, formatBonusSummary } from "../src/progression/progressionState.js";
 import { Grenade } from "../src/entities/grenade.js";
 import { appStore, UIController } from "../src/ui.js";
+import { PATCH_NOTES } from "../src/patchNotes.js";
 
 function makeClassList() {
     const set = new Set();
@@ -658,6 +660,17 @@ function testRenderPlayerSetupCopiesAllocation(app) {
     state.adjustStat("hp", -10);
     assert.equal(allocation.hp, 20, "UI state should not mutate the caller's allocation object");
     assert.equal(state.allocation.hp, 10, "Rendered UI state should remain editable");
+}
+
+function testIndexCacheVersionMatchesLatestPatchNote() {
+    const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+    const match = html.match(/const V = "([^"]+)";/);
+    assert.ok(match, "index.html should define a module cache-busting version");
+    assert.equal(
+        match[1],
+        PATCH_NOTES[0].version,
+        "Module cache-busting version should match the latest patch note version"
+    );
 }
 
 function testStatBalanceSystem() {
@@ -2874,6 +2887,7 @@ testShuffledUtility();
 testStatAllocationRules(app);
 testStatAllocationUiSyncEvent();
 testRenderPlayerSetupCopiesAllocation(app);
+testIndexCacheVersionMatchesLatestPatchNote();
 testStatBalanceSystem();
 testMultiFighterSimulationSetup(app);
 testTeamTargetingAndFriendlyCollision(app);

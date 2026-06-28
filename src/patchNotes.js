@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.23.2",
+        date: "2026-06-28",
+        title: "v0.23.2 핫픽스",
+        changes: [
+            {
+                type: "fix",
+                text: "브라우저가 이전 UI 모듈을 캐시해 스탯 배분 초기화 수정이 반영되지 않을 수 있던 문제를 수정했습니다."
+            }
+        ]
+    },
+    {
         version: "0.23.1",
         date: "2026-06-28",
         title: "v0.23.1 핫픽스",
