@@ -270,6 +270,7 @@ export function appStore() {
             this._startDisabled = null;
             this._startText = null;
             this._syncSummary();
+            this._emitAllocationChanged();
         },
 
         randomAllocation() {
@@ -279,6 +280,7 @@ export function appStore() {
             this._startDisabled = null;
             this._startText = null;
             this._syncSummary();
+            this._emitAllocationChanged();
         },
 
         resetAllocation() {
@@ -288,6 +290,7 @@ export function appStore() {
             this._startDisabled = null;
             this._startText = null;
             this._syncSummary();
+            this._emitAllocationChanged();
         },
 
         _syncSummary() {
@@ -301,6 +304,14 @@ export function appStore() {
             ];
             const mult = calculateStatMultiplier(vals).multiplier;
             this.allocationSummary = m + "  \u00D7" + mult.toFixed(3);
+        },
+
+        _emitAllocationChanged() {
+            try {
+                document.dispatchEvent(new Event("allocation-changed"));
+            } catch {
+                // no-op outside browser tests
+            }
         }
     };
 }
@@ -430,7 +441,7 @@ export class UIController {
         const s = this.state;
         if (!s) return;
         s.playerFighter = fighter;
-        s.allocation = allocation;
+        s.allocation = { ...allocation };
         s.totalPoints = totalPoints;
         s.bonusPoints = bonusPoints;
         s.remainingPoints = remainingPoints;
@@ -440,6 +451,7 @@ export class UIController {
         s.progressionBonusSummary = progressionBonusSummary;
         s._startDisabled = null;
         s._startText = null;
+        s._syncSummary?.();
         this._drawPlayerFace(fighter);
     }
 

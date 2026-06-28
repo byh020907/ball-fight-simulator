@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.23.1",
+        date: "2026-06-28",
+        title: "v0.23.1 핫픽스",
+        changes: [
+            {
+                type: "fix",
+                text: "스탯 배분 후 화면 갱신이 발생하면 배분값이 초기화될 수 있던 문제를 수정했습니다."
+            }
+        ]
+    },
+    {
         version: "0.23.0",
         date: "2026-06-28",
         title: "v0.23.0 업데이트",

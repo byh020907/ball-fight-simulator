@@ -18,6 +18,7 @@ import { BattleSimulation } from "../src/simulation/battleSimulation.js";
 import { createDefaultPlayerProfile } from "../src/playerProfile.js";
 import { completeChallengeTournament, formatBonusSummary } from "../src/progression/progressionState.js";
 import { Grenade } from "../src/entities/grenade.js";
+import { appStore, UIController } from "../src/ui.js";
 
 function makeClassList() {
     const set = new Set();
@@ -613,6 +614,50 @@ function testStatAllocationRules(app) {
         roster.every((fighter) => getSpentStatPoints(fighter.statAllocation) === PLAYER_STAT_POINTS),
         "Every fighter should receive the same stat budget"
     );
+}
+
+function testStatAllocationUiSyncEvent() {
+    const previousDocument = globalThis.document;
+    const events = [];
+    globalThis.document = {
+        dispatchEvent(event) {
+            events.push(event.type);
+        }
+    };
+
+    const state = appStore();
+    state.adjustStat("hp", 10);
+    assert.deepEqual(state.allocation.hp, 10, "UI allocation should update after stat adjustment");
+    assert.deepEqual(events, ["allocation-changed"], "Stat adjustment should notify BattleApp");
+
+    state.randomAllocation();
+    assert.equal(events.length, 2, "Random allocation should notify BattleApp");
+
+    state.resetAllocation();
+    assert.equal(events.length, 3, "Reset allocation should notify BattleApp");
+    assert.deepEqual(state.allocation, { hp: 0, damage: 0, speed: 0, skill: 0, defense: 0 });
+
+    globalThis.document = previousDocument;
+}
+
+function testRenderPlayerSetupCopiesAllocation(app) {
+    const state = appStore();
+    const controller = new UIController(app.roster);
+    controller._rootData = state;
+    controller._drawPlayerFace = () => {};
+    const allocation = { hp: 20, damage: 30, speed: 10, skill: 25, defense: 15 };
+
+    controller.renderPlayerSetup({
+        fighter: app.roster[0],
+        stats: [],
+        allocation,
+        totalPoints: PLAYER_STAT_POINTS,
+        remainingPoints: 0
+    });
+
+    state.adjustStat("hp", -10);
+    assert.equal(allocation.hp, 20, "UI state should not mutate the caller's allocation object");
+    assert.equal(state.allocation.hp, 10, "Rendered UI state should remain editable");
 }
 
 function testStatBalanceSystem() {
@@ -2827,6 +2872,8 @@ async function testCreateCollectionHubViewModel() {
 const app = await loadModuleApp();
 testShuffledUtility();
 testStatAllocationRules(app);
+testStatAllocationUiSyncEvent();
+testRenderPlayerSetupCopiesAllocation(app);
 testStatBalanceSystem();
 testMultiFighterSimulationSetup(app);
 testTeamTargetingAndFriendlyCollision(app);
