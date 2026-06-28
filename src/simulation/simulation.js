@@ -43,7 +43,7 @@ export class Simulation {
         const yBounce = this._reflectY(ball);
         if (!xBounce && !yBounce) return;
 
-        ball.state.bounced = true;
+        ball.bounced = true;
         ball.state.wallSlam?.onWallBounce(ball, xBounce ?? yBounce, this);
     }
 

@@ -1,10 +1,10 @@
 import { RENDER_LAYERS, TimedEffect, Vector2 } from "../core.js";
 import { ActionContext } from "../clickActions.js";
+import { mixins, PhysicsBody } from "../physics/index.js";
 
-const BASE_VELOCITY_CORRECTION_RATE = 5.5;
-
-export class BattleBall {
+export class BattleBall extends mixins([PhysicsBody]) {
     constructor(spec, position) {
+        super();
         this.id = spec.id;
         this.name = spec.name;
         this.title = spec.title;
@@ -21,18 +21,19 @@ export class BattleBall {
             mass: spec.stats.mass,
             allocation: spec.statAllocation ?? null
         };
+        // PhysicsBody 프로퍼티 초기화
+        this.pos = position;
         this.radius = spec.stats.radius;
         this.mass = spec.stats.mass;
-        this.position = position;
         this.velocity = Vector2.fromAngle(Math.random() * Math.PI * 2, 120 + Math.random() * 90);
+        this.bounced = false;
         this.state = {
             slow: null,
             speedBoost: null,
             forcedHeading: null,
             movement: null,
             swallowed: null,
-            wallSlam: null,
-            bounced: false
+            wallSlam: null
         };
         this.flags = {
             defeated: false,
@@ -129,7 +130,7 @@ export class BattleBall {
     }
 
     initState() {
-        this.state.bounced = false;
+        this.bounced = false;
     }
 
     update(delta, simulation) {
@@ -137,7 +138,7 @@ export class BattleBall {
         this.initState();
 
         if (this.state.swallowed) {
-            this.position = this.state.swallowed.owner.position.clone();
+            this.pos = this.state.swallowed.owner.pos.clone();
             this.applyImpulse(this.velocity.clone().scale(-1));
             return;
         }
@@ -147,7 +148,6 @@ export class BattleBall {
         this._tickMasteryPassives(delta);
         this.ability?.update(delta, target);
 
-        // AI 액션 의사결정
         if (this.aiController) {
             const result = this.aiController.evaluate(simulation, this, delta);
             if (result) {
@@ -157,9 +157,9 @@ export class BattleBall {
 
         this.radius = this.stats.baseRadius * (this.ability?.getRadiusScale?.() ?? 1);
         this._applyVelocityCorrection(simulation, delta);
-        this.position.add(this.velocity.clone().scale(delta));
+        this.integrate(delta);
         simulation.keepInsideArena(this);
-        if (this.state.bounced) this.state.forcedHeading = null;
+        if (this.bounced) this.state.forcedHeading = null;
     }
 
     _tickMasteryPassives(delta) {
@@ -216,35 +216,6 @@ export class BattleBall {
             }
         }
         this.actionContext.tickTimers(this, delta);
-    }
-
-    _applyVelocityCorrection(simulation, delta) {
-        const desiredVelocity = this._computeDesiredVelocity(simulation);
-        const velocityBonus = 1 + (this.mastery.physics?.velocityRecoveryBonus ?? 0);
-        const effectiveRate = BASE_VELOCITY_CORRECTION_RATE * velocityBonus;
-        const correction = 1 - Math.exp(-effectiveRate * delta);
-        this.applyImpulse(Vector2.subtract(desiredVelocity, this.velocity).scale(correction));
-    }
-
-    _computeDesiredVelocity(simulation) {
-        const modifiers = this.getStatModifiers();
-        const slowMult = this.state.slow ? this.state.slow.amount : 1;
-        const boostMult = this.state.speedBoost ? this.state.speedBoost.multiplier : 1;
-        const movementSpeed = this.state.movement?.getSpeed(this);
-        const currentDir =
-            this.velocity.length() > 0
-                ? this.velocity.clone().normalize()
-                : Vector2.fromAngle(Math.random() * Math.PI * 2, 1);
-        const direction = this.state.forcedHeading ? this.state.forcedHeading.direction.clone() : currentDir;
-        return direction.scale(
-            movementSpeed ??
-                this.state.speedBoost?.speedOverride ??
-                this.stats.baseSpeed * modifiers.speed * slowMult * boostMult * simulation.getSpeedMultiplier(this)
-        );
-    }
-
-    applyImpulse(impulse) {
-        this.velocity.add(impulse);
     }
 
     applySlow(duration, amount) {

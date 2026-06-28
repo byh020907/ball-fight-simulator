@@ -132,6 +132,11 @@
 - 결정: `this.stats` 네임스페이스 추가 — `baseDamage`, `baseDefense`, `baseSpeed`, `baseRadius`, `mass`, `allocation` 이동. `hp`, `radius`, `mass`는 외부 호환성을 위해 평면 프로퍼티로도 유지
 - 영향: `src/entities/battleBall.js`, `src/abilities/*.js` (12개), `src/app.js`, `src/clickActions.js`, `src/combatEffects.js`, `src/core.js`, `src/entities/*.js` (6개), `src/simulation/battleSimulation.js`, `src/ui.js`, `tests/regression.mjs`
 
+## [L1] 2026-06-28 — PhysicsBody 믹스인 패턴 도입
+- 맥락: 물리 시뮬레이션 관련 변수(position/velocity/mass/radius)와 연산(applyImpulse/velocity correction/integration)이 BattleBall에 평면적으로 흩어짐 → RTS 레포의 mixin 패턴 참고
+- 결정: `src/physics/` 모듈 신설 — `mixins()` 합성 유틸리티, `PhysicsBody` 믹스인 (pos/velocity/mass/radius/bounced + applyImpulse/applyForce/integrate/_applyVelocityCorrection/_computeDesiredVelocity). `BattleBall extends mixins([PhysicsBody])`로 적용. `position` getter/setter로 기존 외부 코드와 호환 유지. `bounced`는 `state`에서 PhysicsBody 직속으로 이동.
+- 영향: `src/physics/index.js`, `src/physics/mixins.js`, `src/physics/PhysicsBody.js`, `src/entities/battleBall.js`, `src/simulation/simulation.js`
+
 ## 진행 중 이슈
 - 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
 
