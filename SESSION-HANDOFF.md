@@ -142,8 +142,24 @@
 - 결정: `CombatEntity extends mixins([PhysicsBody])`로 전환, 중복 `applyImpulse` 제거, `updateProjectile`에서 `this.position.add(...)` → `this.integrate(delta)` 사용. Projectile, GravityParticle, FloatingText, VisualBurst, DeathBurstEffect, ActionEffects, SlashTrail, OrbitHitEffect, HeroOrb, TestTarget 등 12개 하위클래스 모두 PhysicsBody 자동 획득.
 - 영향: `src/core.js`
 
+## [L1] 2026-06-28 — 믹스인 패턴 전면 도입 (LifeSpan/Cooldown/ProjectileBehavior)
+- 맥락: 상속으로 인해 이펙트 클래스들이 불필요한 투사체 메서드(updateProjectile, _projectileHitCheck 등)를 강제 상속받는 문제. 믹스인 = 능력(capability), 상속 = 본질(identity) 개념 확립.
+- 결정:
+  - `LifeSpan` 믹스인 신설 → CombatEntity에 추가, 17개 하위클래스 자동 상속
+  - `Cooldown` 믹스인 신설 → Ability + AIActionController에 적용, `this.timer` getter/setter로 하위 12개 능력 호환
+  - `ProjectileBehavior` 믹스인 신설 (core.js 내부) → 투사체 전용 로직 분리
+  - `CombatEntity` = `mixins([PhysicsBody, LifeSpan])` (isExpired + renderLayer만)
+  - `Projectile` = `mixins([PhysicsBody, LifeSpan, ProjectileBehavior])`
+  - `BattleBall` = `mixins([PhysicsBody])` (시간 제한 불필요)
+  - `BurstSequencer` 믹스인 생성 (Grenade/Gunner는 간소화된 직접 관리)
+  - `_findTarget` 기본값 `simulation.getOpponent(this.owner)`로 변경 → 4개 오버라이드 제거
+  - `BattleBall.initiateDash()` 통합 → 5곳 대시 발동 패턴 12줄→5줄
+  - `HeroOrb` → `CombatEntity` 직접 상속 (Projectile의 불필요 hit 판정 제거)
+  - `this.position.add(velocity.clone().scale(delta))` → `this.integrate(delta)` 8곳 통일
+- 영향: `src/physics/` (5개 믹스인), `src/core.js`, `src/entities/battleBall.js`, `src/entities/heroOrb.js`, `src/abilities/ability.js`, 12개 능력, 8개 투사체/이펙트, `src/simulation/aiActionController.js`, `src/simulation/simulation.js`, `tests/regression.mjs`, `docs/development-rules.md`
+
 ## 진행 중 이슈
-- 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
+- 믹스인 패턴 정착 완료. 밸런스 안정적.
 
 ## 다음 할 일
 1. `src/patch-notes.js` 패치노트 작성
