@@ -93,6 +93,46 @@ this.debug = {
 
 적용 위치: `assignActions: this.debugAIEnabled || this._currentChallengeLevel > 0`
 
+### 믹스인 vs 상속 (Mixin Pattern)
+
+**핵심 개념**:
+
+| | 의미 | 사용 시기 |
+|---|---|---|
+| **믹스인** | 이 클래스가 **어떤 기능을 할 수 있는가** (capability) | 선택적 능력 조합, 여러 클래스가 공통 능력을 "골라 담을" 때 |
+| **상속** | 이 클래스의 **본질이 무엇인가** (identity) | 실제 공통된 기반을 가질 때, 부모의 모든 속성/메서드가 필요할 때 |
+
+```
+❌ 상속으로 능력을 추가하면 → 불필요한 메서드가 따라옴
+✅ 믹스인으로 능력을 추가하면 → 필요한 것만 골라 담음
+```
+
+**프로젝트 믹스인 구성** (`src/physics/`):
+
+| 믹스인 | 제공 능력 | 사용 클래스 |
+|---|---|---|
+| `PhysicsBody` | 움직일 수 있다 (pos, velocity, mass, radius, integrate, applyImpulse) | BattleBall, 모든 CombatEntity |
+| `LifeSpan` | 시간이 지나면 사라진다 (life, tickLife, lifeProgress) | 모든 이펙트, 모든 투사체 |
+| `Cooldown` | 쿨다운이 있다 (tickCooldown, cooldownReady) | 모든 Ability, AIActionController |
+| `ProjectileBehavior` | 발사체다 (owner, updateProjectile, hit 판정) | Arrow/Bat/Bullet/Orbit/Grenade/Seed |
+| `BurstSequencer` | 연발 발사한다 (startBurst, tickBurst) | 필요 시 선택 적용 |
+
+**클래스 본질 (상속)**:
+
+| 클래스 | 본질 | 구성 |
+|---|---|---|
+| `CombatEntity` | 전장에 존재한다 | `PhysicsBody + LifeSpan + isExpired` |
+| `Projectile` | 투사체다 | `CombatEntity의 모든 것 + ProjectileBehavior` |
+| `BattleBall` | 전사다 | `PhysicsBody만` (시간 제한 없음, 직접 전투) |
+| `Ability` | 능력이다 | `Cooldown` |
+
+**적용 원칙**:
+
+1. **상속은 "is-a" 관계일 때만 사용합니다.** `Projectile is a CombatEntity` → 상속 OK. `GravityParticle is a Projectile` → 아님! 투사체 판정 로직이 불필요하게 따라옴.
+2. **능력(capability)은 믹스인으로 제공합니다.** `움직일 수 있다`, `시간 제한이 있다`, `쿨다운이 있다`는 능력이지 본질이 아닙니다.
+3. **`mixins()` 합성으로 필요한 능력만 조합합니다.** `mixins([PhysicsBody, LifeSpan, ProjectileBehavior])` — 세 능력을 가진 클래스가 됩니다.
+4. **믹스인은 `(Base) => class extends Base` 함수 형태로 작성합니다.** RTS 레포(`C:\projects\rts`) 패턴을 따릅니다.
+
 ### 기능 단위 코드 분리 (함수/모듈화)
 
 **항상 기능 단위로 코드를 쪼개서 함수 및 모듈화합니다.**
