@@ -160,6 +160,11 @@ export function dealProjectileDamage(target, rawDamage, source, label, simulatio
 }
 
 export class Projectile extends mixins([PhysicsBody, LifeSpan, ProjectileBehavior]) {
+    static renderLayer = RENDER_LAYERS.BACKGROUND;
+    get renderLayer() {
+        return this.constructor.renderLayer;
+    }
+
     constructor(owner, position, velocity, radius) {
         super();
         this.pos = position;
