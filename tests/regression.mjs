@@ -1504,10 +1504,10 @@ async function testHeroOrbBonusUiOnlyForHero(app) {
     assert.ok(archerFighter.hero.bonuses, "All BattleBalls should have hero.bonuses (initialized to 0)");
 
     heroFighter.hero.bonuses.hp = 3;
-    heroFighter.statAllocation = { hp: 12, damage: 18, speed: 22, skill: 28, defense: 20 };
+    heroFighter.stats.allocation = { hp: 12, damage: 18, speed: 22, skill: 28, defense: 20 };
     const { formatHeroStatLine } = await import("../src/entities/index.js");
-    const heroLine = formatHeroStatLine(heroFighter.statAllocation, heroFighter.hero.bonuses);
-    const normalLine = formatStatAllocation(heroFighter.statAllocation);
+    const heroLine = formatHeroStatLine(heroFighter.stats.allocation, heroFighter.hero.bonuses);
+    const normalLine = formatStatAllocation(heroFighter.stats.allocation);
     assert.ok(heroLine.includes("체력 +12%(+3)"), "Hero's stat line should show base allocation plus orb bonuses");
     assert.ok(!normalLine.includes("+12%(+3)"), "Normal stat formatter should not include Hero Orb bonuses");
     assert.deepEqual(archerFighter.hero.bonuses, { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 });
@@ -2098,10 +2098,10 @@ async function testCarryoverSkillAffectsCooldown(app) {
     const hero = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.HERO);
     const { BattleBall, applyHeroOrbStatAmount } = await import("../src/entities/index.js");
     const ball = new BattleBall(hero, { x: 480, y: 480 });
-    ball.statAllocation = { hp: 0, damage: 0, speed: 0, skill: 0, defense: 0 };
+    ball.stats.allocation = { hp: 0, damage: 0, speed: 0, skill: 0, defense: 0 };
 
     applyHeroOrbStatAmount(ball, "skill", 2, { countAsCurrentMatch: false });
-    assert.equal(ball.statAllocation.skill, 2, "skill carryover should update statAllocation.skill");
+    assert.equal(ball.stats.allocation.skill, 2, "skill carryover should update statAllocation.skill");
 }
 
 async function testCarryoverDoesNotAffectSpecialOrbs(app) {

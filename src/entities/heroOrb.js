@@ -212,8 +212,8 @@ export function applyHeroOrbStatAmount(owner, statKey, amount, opts = {}) {
             owner.stats.baseDefense = Number((owner.stats.baseDefense + 0.33 * amount).toFixed(2));
             break;
         case "skill":
-            if (owner.statAllocation) {
-                owner.statAllocation.skill = (owner.statAllocation.skill ?? 0) + amount;
+            if (owner.stats?.allocation) {
+                owner.stats.allocation.skill = (owner.stats.allocation.skill ?? 0) + amount;
             }
             break;
     }

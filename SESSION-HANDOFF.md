@@ -1,5 +1,20 @@
 # 결정 기록
 
+## [L1] 2026-06-28 — RL 최적화 가이드 문서 작성
+- 맥락: AI 액션 `canAIUse` 파라미터 수동 튜닝이 번거로워 RL/자동최적화 도입 검토
+- 결정: `docs/rl-optimization-guide.md` 작성 — 게임 구조·관측공간(24차원)·행동공간·보상함수·DQN 학습코드·기존 게임 임베딩 전략을 포괄하는 설계 문서
+- 영향: `docs/rl-optimization-guide.md`
+
+## [L1] 2026-06-28 — HP 게이트 30% + 쿨다운 제거 + Shockwave 회피용 전환
+- 맥락: `aiEnabled: true`여도 `_pickAction()`이 `canAIUse` 통과 액션이 없으면 `null` 반환 → `_chosenAction` 미설정 → `clickActionName` 미설정 → UI에 AI 캐릭터 액션명 미표시
+- 결정: (1) `_pickAction()`에서 viable이 0이면 전체 풀에서 랜덤 fallback 선택 — `_chosenAction`이 null이 되는 경우 제거 (2) `docs/click-actions.md`에 AI 액션 규칙(할당·고정·canAIUse) 문서화, 액션 선택 주기를 토너먼트 단위로 정정 (3) `aiEnabled` 중복 키 제거, `false` 기본값 + 주석 힌트 패턴 통일
+- 영향: `src/simulation/aiActionController.js`, `src/app.js`, `docs/click-actions.md`
+
+## [L1] 2026-06-28 — 스탯 표시 버그 수정 (stats 네임스페이스 누락 참조)
+- 맥락: `6538ebb`에서 `statAllocation`을 `BattleBall.stats.allocation`으로 이동했으나 `src/ui.js`, ability 3종, `heroOrb.js`, `tests/regression.mjs`의 참조가 미업데이트되어 스탯 표시가 깨짐
+- 결정: `fighter.statAllocation` → `fighter.stats.allocation` (11곳), `fighter.stats?.hp` → `fighter.hp/maxHp` (2곳), `owner.statAllocation` → `owner.stats?.allocation` (4곳) 으로 수정. optional chaining 보강
+- 영향: `src/ui.js`, `src/abilities/ability.js`, `src/abilities/orbitAbility.js`, `src/abilities/rageAbility.js`, `src/entities/heroOrb.js`, `tests/regression.mjs`
+
 ## [L1] 2026-06-27 — 시간 왜곡 타이머, 배속 영향 제거
 - 맥락: `timeSlowRemaining`이 `speedDelta`(배속 적용된 값)로 카운트다운되어 4배속에서 0.5초가 0.125초만에 만료됨
 - 결정: `BattleSimulation.update(delta, realDelta=delta)`로 실제 시간 파라미터 추가, `timeSlowRemaining`은 `realDelta`로 감소, 엔티티 업데이트는 `delta`(speedDelta) 기준 유지

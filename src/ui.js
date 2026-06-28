@@ -523,13 +523,13 @@ export class UIController {
                 color: fighter.color,
                 isPlayer: fighter.isPlayer,
                 defeated: false,
-                hp: Math.ceil(fighter.stats?.hp ?? 0),
-                maxHp: Math.ceil(fighter.stats?.hp ?? 0),
+                hp: Math.ceil(fighter.hp),
+                maxHp: Math.ceil(fighter.maxHp),
                 hpPct: 100,
                 statLine: isHero
-                    ? formatHeroStatLine(fighter.statAllocation ?? {})
-                    : formatStatAllocation(fighter.statAllocation ?? {}),
-                heroStatParts: isHero ? formatHeroStatParts(fighter.statAllocation ?? {}) : [],
+                    ? formatHeroStatLine(fighter.stats.allocation ?? {})
+                    : formatStatAllocation(fighter.stats.allocation ?? {}),
+                heroStatParts: isHero ? formatHeroStatParts(fighter.stats.allocation ?? {}) : [],
                 isHero,
                 balanceMult: 1,
                 skillLabel: "Skill",
@@ -718,7 +718,7 @@ export class UIController {
         s.fighters = s.fighters.map((card) => {
             const fighter = fighters.find((f) => f.id === card.id || f.name === card.name);
             if (!fighter) return card;
-            const alloc = fighter.statAllocation ?? {};
+            const alloc = fighter.stats.allocation ?? {};
             const isHero = fighter.id === FIGHTER_IDS.HERO;
             const pts = [alloc.hp ?? 0, alloc.damage ?? 0, alloc.speed ?? 0, alloc.skill ?? 0, alloc.defense ?? 0];
             const mult = calculateStatMultiplier(pts).multiplier;
@@ -733,13 +733,13 @@ export class UIController {
                 mergedBonuses: mergeOrbBonuses(fighter.hero.bonuses ?? {}, fighter.hero.carryover ?? {}),
                 statLine: isHero
                     ? formatHeroStatLine(
-                          fighter.statAllocation ?? {},
+                          fighter.stats.allocation ?? {},
                           mergeOrbBonuses(fighter.hero.bonuses ?? {}, fighter.hero.carryover ?? {})
                       )
-                    : formatStatAllocation(fighter.statAllocation ?? {}),
+                    : formatStatAllocation(fighter.stats.allocation ?? {}),
                 heroStatParts: isHero
                     ? formatHeroStatParts(
-                          fighter.statAllocation ?? {},
+                          fighter.stats.allocation ?? {},
                           mergeOrbBonuses(fighter.hero.bonuses ?? {}, fighter.hero.carryover ?? {})
                       )
                     : [],

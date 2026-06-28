@@ -149,8 +149,8 @@ class TimeWarpAction extends ClickAction {
         const opponentApproachSpeed = opponent.velocity.dot(toDir.scale(-1));
 
         if (fighter.meta?.isRanged) {
-            // 원거리: 상대가 빠르게 접근 중
-            return opponentApproachSpeed > 80 && dist < 350;
+            // 원거리: 상대가 접근 중이면 거리 무관 (시작 거리 450px 커버)
+            return opponentApproachSpeed > 30;
         }
         // 근접: 상대가 도망 중
         return opponentApproachSpeed < -40 && dist < 300;
@@ -428,7 +428,7 @@ class LifeStealAction extends ClickAction {
 }
 
 class ShockwaveAction extends ClickAction {
-    static DEFAULT_RADIUS = 150;
+    static DEFAULT_RADIUS = 250;
     static DEFAULT_PUSH_FORCE = 400;
     static DEFAULT_HP_COST = 1.2;
     static get defaults() {
@@ -473,7 +473,8 @@ class ShockwaveAction extends ClickAction {
     }
 
     canAIUse(sim, fighter, opponent, hpRatio, distance) {
-        return distance < 200 && hpRatio < 0.7;
+        // 회피용: 내 HP가 40% 미만이고 상대가 가까울 때만
+        return hpRatio < 0.4 && distance < 250;
     }
 }
 

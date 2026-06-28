@@ -37,7 +37,7 @@ export class OrbitAbility extends Ability {
     }
 
     get rechargeDuration() {
-        const skill = this.owner.statAllocation?.skill ?? 0;
+        const skill = this.owner.stats?.allocation?.skill ?? 0;
         const factor = 100 / (100 + skill);
         return this._baseRechargeDuration * factor;
     }
