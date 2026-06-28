@@ -9,7 +9,7 @@ export class DeathBurstEffect extends CombatEntity {
     }
 
     update(delta) {
-        if (!this.tickLife(delta)) { }
+        this.tickLife(delta);
     }
 
     draw(ctx) {

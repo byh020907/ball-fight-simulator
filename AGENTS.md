@@ -92,4 +92,4 @@ node -e "const fs=require('fs');let c=fs.readFileSync('파일','utf8');c=c.repla
 
 `docs/development-rules.md` — 전체 개발 규칙 (최우선)
 `docs/design.md` — 설계 / `docs/game-rules.md` — 게임 규칙
-`src/help-content.js` — 게임 내 도움말 / `src/patch-notes.js` — 패치노트
+`src/help-content.js` — 게임 내 도움말 / `src/patchNotes.js` — 패치노트

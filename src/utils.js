@@ -20,7 +20,7 @@ function setCookie(name, value) {
         name + "=" + encodeURIComponent(value) + "; path=/; max-age=" + 60 * 60 * 24 * 365 + "; SameSite=Lax";
 }
 
-// ── Patch-note helpers (depends on PATCH_NOTES from patch-notes.js) ────────
+// ── Patch-note helpers (depends on PATCH_NOTES from patchNotes.js) ─────────
 
 /** 지금까지 본 가장 최신 버전 (쿠키). */
 export function getSeenVersion() {

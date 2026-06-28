@@ -1,10 +1,10 @@
 # 패치 노트 관리 가이드
 
-> **실제 데이터 파일**: `src/patch-notes.js` — 여기에 나온 규칙을 따라 `PATCH_NOTES` 객체를 수정하세요.
+> **실제 데이터 파일**: `src/patchNotes.js` — 여기에 나온 규칙을 따라 `PATCH_NOTES` 객체를 수정하세요.
 
 ## 파일 위치
 
-- **데이터**: `src/patch-notes.js` — 실제 패치노트 내용을 수정하려면 이 파일을 편집하세요.
+- **데이터**: `src/patchNotes.js` — 실제 패치노트 내용을 수정하려면 이 파일을 편집하세요.
 - **유틸 함수**: `src/utils.js` — `getUnseenEntries()`, `dismissPatchNotes()` 등
 - **팝업 UI**: `index.html` (`.patch-overlay` 영역)
 - **스타일**: `src/styles.css` (`.patch-overlay` / `.patch-card` / `.patch-badge--*`)
@@ -100,6 +100,6 @@
 
 ## 이전 패치노트 보관 정책
 
-- `src/patch-notes.js`에는 **현재 버전의 패치노트만** 유지합니다.
+- `src/patchNotes.js`에는 **현재 버전의 패치노트만** 유지합니다.
 - 이전 버전의 패치노트는 `docs/patch-notes-archive.md`에 보관합니다.
 - 아카이브는 사람이 수동으로 관리합니다.

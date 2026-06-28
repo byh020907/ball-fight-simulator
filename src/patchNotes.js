@@ -19,6 +19,25 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.22.0",
+        date: "2026-06-28",
+        title: "v0.22.0 업데이트",
+        changes: [
+            {
+                type: "refactor",
+                text: "전투 엔티티 물리/수명/쿨다운 공통 로직을 믹스인 구조로 정리했습니다."
+            },
+            {
+                type: "refactor",
+                text: "BattleBall과 Ability의 상태값을 state, flags, stats 같은 네임스페이스로 묶었습니다."
+            },
+            {
+                type: "fix",
+                text: "투사체 렌더 레이어 누락으로 화살, 총알, 박쥐가 보이지 않던 문제를 수정했습니다."
+            }
+        ]
+    },
+    {
         version: "0.21.0",
         date: "2026-06-28",
         title: "v0.21.0 업데이트",

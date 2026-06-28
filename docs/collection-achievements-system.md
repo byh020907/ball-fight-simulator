@@ -459,7 +459,7 @@ reward: {
 8. `finalizePlayerProgress()`로 캐릭터 연계, 성장, 도전 단계 결과 통합
 9. Alpine 도감 및 업적 팝업 구현
 10. 통합 알림 큐 구현
-11. `docs/game-rules.md`, `src/help-content.js`, `src/patch-notes.js` 갱신
+11. `docs/game-rules.md`, `src/help-content.js`, `src/patchNotes.js` 갱신
 
 ## 13. 필수 회귀 조건
 
