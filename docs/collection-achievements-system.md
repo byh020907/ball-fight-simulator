@@ -2,7 +2,7 @@
 
 > 상태: 구현 완료 (`v0.12.0`)
 > 기준 코드: 2026-06-24 `main`
-> 관련 문서: [`character-link-system.md`](character-link-system.md), [`meta-progression-system.md`](meta-progression-system.md), [`player-data-storage-security.md`](player-data-storage-security.md), [`development-rules.md`](development-rules.md)
+> 관련 문서: [`experience-system.md`](experience-system.md), [`character-link-system.md`](character-link-system.md), [`meta-progression-system.md`](meta-progression-system.md), [`player-data-storage-security.md`](player-data-storage-security.md), [`development-rules.md`](development-rules.md)
 
 ## 1. 시스템 정의
 
@@ -12,6 +12,7 @@
 - AI끼리 진행한 매치는 플레이어의 캐릭터 기록에 포함하지 않습니다.
 - 캐릭터 수, 액션 수, 업적 수를 숫자로 하드코딩하지 않습니다.
 - 도감과 업적은 캐릭터 연계 및 메타 성장과 같은 플레이어 프로필을 공유합니다.
+- 경험치는 업적과 별도로 매 경기 즉시 지급되는 단기 보상이며 [`experience-system.md`](experience-system.md)를 따릅니다.
 - 수집 시스템은 전투 규칙을 변경하지 않고 확정된 전투 결과만 기록합니다.
 
 ## 2. 용어

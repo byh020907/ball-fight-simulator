@@ -2,7 +2,7 @@
 
 > 상태: 설계 확정 전 초안 — 업적 시스템(v0.12.0) 구현 완료, 보상 지급 구현 완료
 > 기준 코드: 2026-06-24 `main`
-> 관련 문서: [`character-link-system.md`](character-link-system.md), [`collection-achievements-system.md`](collection-achievements-system.md), [`player-data-storage-security.md`](player-data-storage-security.md), [`development-rules.md`](development-rules.md), [`game-rules.md`](game-rules.md)
+> 관련 문서: [`experience-system.md`](experience-system.md), [`character-link-system.md`](character-link-system.md), [`collection-achievements-system.md`](collection-achievements-system.md), [`player-data-storage-security.md`](player-data-storage-security.md), [`development-rules.md`](development-rules.md), [`game-rules.md`](game-rules.md)
 
 ## 1. 시스템 정의
 

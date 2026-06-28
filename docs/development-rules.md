@@ -49,14 +49,18 @@ Boids 알고리즘이 눈에 보이지 않는다는 피드백을 받았을 때:
 - **패치노트 작성 시 관련 문서도 함께 업데이트합니다.** `docs/game-rules.md`, `src/help-content.js` 등이 최신 구현과 일치하는지 확인하고, 빠진 내용이 있으면 먼저 보강한 후 패치노트를 작성합니다.
 - **`float`는 사용하지 않습니다.** 레이아웃은 `flex` 또는 `grid`로만 처리합니다.
 
-## 전투 모드 확장 고려
+## 팀 기반 전투 확장 규칙
 
-현재 전투는 **1대1**로 진행되지만, 추후 **개인전(FFA)** 또는 **팀전**으로 확장될 수 있습니다.
+전투 시스템은 **1대1**, **1대n**, **n대n**, **개인전(FFA)**을 모두 수용할 수 있는 구조로 작성합니다.
 
+- **모든 fighter는 `teamId`를 기준으로 적/아군을 구분합니다.**
+    - `BattleSimulation`은 명시적 `teamId`가 없으면 `fighter-0`, `fighter-1`처럼 서로 다른 기본 팀을 부여해 기존 토너먼트와 개인전 동작을 유지합니다.
+    - 같은 `teamId`의 fighter끼리는 충돌 밀어내기 같은 물리는 유지할 수 있지만, 피해와 적대 효과를 주면 안 됩니다.
 - **코드는 현재 1대1 구조에 의존하지 않도록 작성합니다.**
     - 각 Ball(엔티티)은 자신의 상태와 로직을 기준으로 동작해야 하며, 항상 `fighters[0]`/`fighters[1]` 같은 고정 인덱스를 참조하지 않습니다.
-    - 상대방이 필요한 경우 `simulation.getOpponent(this)`처럼 Ball 자신을 기준으로 조회합니다.
-    - Ability 코드에서 특정 상대를 대상으로 하드코딩하지 않고, `update(delta, target)`으로 전달된 target 또는 simulation을 통해 상대를 찾습니다.
+    - 적대 여부가 필요한 경우 `simulation.isHostile(a, b)`를 사용합니다.
+    - 적 목록이 필요한 경우 `simulation.getEnemiesOf(this)`, 단일 대상이 필요한 경우 `simulation.getNearestEnemy(this)` 또는 1v1 호환 별칭인 `simulation.getOpponent(this)`를 사용합니다.
+    - Ability 코드에서 특정 상대를 대상으로 하드코딩하지 않고, `update(delta, target)`으로 전달된 target 또는 simulation을 통해 대상을 찾습니다.
 - **컬렉션 순회는 `filter`, `map`, `forEach`, `for...of`를 사용**하고 인덱스 기반 루프를 피합니다.
 - 새 능력/시스템을 추가할 때도 1대1 전제 없이 다수의 Ball이 공존할 수 있는 구조로 설계합니다.
 

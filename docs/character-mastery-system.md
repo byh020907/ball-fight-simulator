@@ -2,7 +2,7 @@
 
 > 상태: 설계 확정 전 초안, 구현 전
 > 기준 코드: 2026-06-24 `main`
-> 관련 문서: [`meta-progression-system.md`](meta-progression-system.md), [`collection-achievements-system.md`](collection-achievements-system.md), [`player-data-storage-security.md`](player-data-storage-security.md), [`development-rules.md`](development-rules.md)
+> 관련 문서: [`experience-system.md`](experience-system.md), [`meta-progression-system.md`](meta-progression-system.md), [`collection-achievements-system.md`](collection-achievements-system.md), [`player-data-storage-security.md`](player-data-storage-security.md), [`development-rules.md`](development-rules.md)
 
 ## 1. 시스템 정의
 
@@ -16,6 +16,8 @@
 - AI 캐릭터는 플레이어가 수집한 연계 효과를 사용하지 않습니다.
 
 이 시스템은 한 캐릭터를 반복 강화하는 장치가 아닙니다. 여러 캐릭터로 우승한 경험이 다른 캐릭터를 시작할 때 작지만 누적되는 이점으로 돌아오는 수집형 성장 장치입니다.
+
+한 캐릭터를 반복 플레이할 때의 즉각적인 레벨업 보상은 [`experience-system.md`](experience-system.md)의 경험치 시스템이 담당합니다.
 
 효과를 선택하고 조합하는 빌드 시스템은 추후 장비 시스템의 책임으로 남겨둡니다.
 

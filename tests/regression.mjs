@@ -671,6 +671,105 @@ function testMultiFighterSimulationSetup(app) {
         sim.fighters.every((fighter) => fighter.ability),
         "Every fighter should bind its ability"
     );
+    assert.deepEqual(
+        sim.fighters.map((fighter) => fighter.teamId),
+        ["fighter-0", "fighter-1", "fighter-2"],
+        "Fighters without explicit teams should receive unique default teams"
+    );
+    assert.equal(
+        sim.getEnemiesOf(sim.fighters[0]).length,
+        2,
+        "Default multi-fighter battles should remain free-for-all"
+    );
+}
+
+function testTeamTargetingAndFriendlyCollision(app) {
+    const archer = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
+    const orbit = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ORBIT);
+    const trickster = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.TRICKSTER);
+    const sim = new BattleSimulation(
+        [
+            { ...archer, teamId: "player" },
+            { ...orbit, teamId: "player" },
+            { ...trickster, teamId: "enemy" }
+        ],
+        {
+            onLog() {},
+            onSound() {}
+        }
+    );
+    const [player, ally, enemy] = sim.fighters;
+
+    player.position = new Vector2(300, 480);
+    ally.position = new Vector2(330, 480);
+    enemy.position = new Vector2(700, 480);
+
+    assert.equal(sim.isHostile(player, ally), false, "Fighters with the same teamId should be allies");
+    assert.equal(sim.isHostile(player, enemy), true, "Fighters with different teamIds should be hostile");
+    assert.deepEqual(
+        sim.getEnemiesOf(player).map((fighter) => fighter.id),
+        [enemy.id],
+        "Enemy lookup should exclude allies"
+    );
+    assert.equal(sim.getOpponent(player), enemy, "getOpponent should return a hostile fighter, not the nearest ally");
+
+    const hpBeforePlayer = player.hp;
+    const hpBeforeAlly = ally.hp;
+    sim.handleFighterCollision(player, ally);
+    assert.equal(player.hp, hpBeforePlayer, "Friendly collision should not damage the owner");
+    assert.equal(ally.hp, hpBeforeAlly, "Friendly collision should not damage the ally");
+    assert.ok(
+        Vector2.subtract(player.position, ally.position).length() >= player.radius + ally.radius - 1,
+        "Friendly collision should still separate overlapping allies"
+    );
+}
+
+function testTeamsResolveByRemainingHostileTeams(app) {
+    const sim = new BattleSimulation(
+        [
+            { ...app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER), teamId: "player" },
+            { ...app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ORBIT), teamId: "player" },
+            { ...app.roster.find((fighter) => fighter.id === FIGHTER_IDS.TRICKSTER), teamId: "enemy" }
+        ],
+        {
+            onLog() {},
+            onSound() {}
+        }
+    );
+    const [player, ally, enemy] = sim.fighters;
+
+    enemy.takeDamage(999, player, "Forced KO");
+    sim.checkResult();
+
+    assert.equal(sim.finished, true, "Battle should finish when only one team remains alive");
+    assert.equal(sim.winner, player, "Winner should be a surviving fighter from the remaining team");
+    assert.equal(ally.flags.destroyed, false, "Allies on the winning team should not be destroyed as losers");
+}
+
+function testProjectileIgnoresAllies(app) {
+    const archer = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
+    const orbit = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ORBIT);
+    const trickster = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.TRICKSTER);
+    const sim = new BattleSimulation(
+        [
+            { ...archer, teamId: "player" },
+            { ...orbit, teamId: "player" },
+            { ...trickster, teamId: "enemy" }
+        ],
+        {
+            onLog() {},
+            onSound() {}
+        }
+    );
+    const [owner, ally, enemy] = sim.fighters;
+    const arrow = sim.spawnArrow(owner, ally.position.clone(), new Vector2(0, 0));
+
+    arrow.update(0.016, sim);
+    assert.equal(ally.hp, ally.maxHp, "Projectile should not damage an allied fighter it overlaps");
+
+    arrow.position = enemy.position.clone();
+    arrow.update(0.016, sim);
+    assert.ok(enemy.hp < enemy.maxHp, "Projectile should damage a hostile fighter");
 }
 
 function assertPassiveEvasionAppliesImpulse(app, fighterId, label) {
@@ -2730,6 +2829,9 @@ testShuffledUtility();
 testStatAllocationRules(app);
 testStatBalanceSystem();
 testMultiFighterSimulationSetup(app);
+testTeamTargetingAndFriendlyCollision(app);
+testTeamsResolveByRemainingHostileTeams(app);
+testProjectileIgnoresAllies(app);
 testPassiveEvasionAppliesImpulse(app);
 testClickActionEffectOwnership(app);
 testRiskWindowActionOwnership(app);

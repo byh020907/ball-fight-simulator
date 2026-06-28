@@ -1,11 +1,11 @@
 # 컬렉션 허브 UI
 
 > 상태: UI 설계, 구현 전
-> 관련 문서: [`collection-achievements-system.md`](collection-achievements-system.md), [`character-link-system.md`](character-link-system.md), [`meta-progression-system.md`](meta-progression-system.md), [`design.md`](design.md)
+> 관련 문서: [`hunting-grounds-system.md`](hunting-grounds-system.md), [`experience-system.md`](experience-system.md), [`collection-achievements-system.md`](collection-achievements-system.md), [`character-link-system.md`](character-link-system.md), [`meta-progression-system.md`](meta-progression-system.md), [`design.md`](design.md)
 
 ## 1. 목적
 
-도감, 캐릭터 연계, 업적과 이후 추가될 장비·기록·도전 콘텐츠를 하나의 팝업에서 확인하는 **컬렉션 허브**를 제공합니다.
+도감, 캐릭터 연계, 업적과 이후 추가될 보관함·장비·기록·도전 콘텐츠를 하나의 팝업에서 확인하는 **컬렉션 허브**를 제공합니다.
 
 - 수집 요소마다 별도 팝업을 만들지 않습니다.
 - 탭을 이동해도 팝업은 닫히지 않습니다.
@@ -68,7 +68,7 @@ export const COLLECTION_HUB_TABS = Object.freeze([
 향후 추가 순서:
 
 ```text
-도감 · 연계 · 업적 · 장비 · 기록 · 도전
+도감 · 연계 · 업적 · 보관함 · 장비 · 기록 · 도전
 ```
 
 - 존재하지 않는 기능의 빈 탭을 미리 표시하지 않습니다.
@@ -271,6 +271,12 @@ clearCollectionSearch(tabId);
 - 장비만 슬롯, 장착, 해제, 비교 UI를 가집니다.
 - 연계 탭과 시각적으로 구분합니다.
 - 장비 미구현 상태에서는 탭 자체를 등록하지 않습니다.
+
+### 보관함
+
+- 사냥터에서 얻은 상자와 열쇠 조각을 확인합니다.
+- 상자 개봉과 설계도 해금은 보관함 탭이 소유합니다.
+- 보관함은 전투 중 능력 변경을 하지 않고, 다음 사냥터/토너먼트 시작 시 적용 가능한 해금 상태만 보여줍니다.
 
 ### 기록
 

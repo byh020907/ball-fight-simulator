@@ -42,9 +42,13 @@ export class BattleSimulation extends Simulation {
         this.hooks = hooks;
         const spawnPoints = this.createSpawnPoints(fighterSpecs.length);
         this.fighters = fighterSpecs.map((spec, index) => {
-            const fighter = new BattleBall(spec, spawnPoints[index]);
+            const fighterSpec = {
+                ...spec,
+                teamId: spec.teamId ?? spec.team ?? `fighter-${index}`
+            };
+            const fighter = new BattleBall(fighterSpec, spawnPoints[index]);
             fighter.simulation = this;
-            fighter.bindAbility(this.createAbility(spec.ability, fighter));
+            fighter.bindAbility(this.createAbility(fighterSpec.ability, fighter));
             return fighter;
         });
         this.entities = [...this.fighters];
@@ -240,6 +244,11 @@ export class BattleSimulation extends Simulation {
 
         const aModifiers = a.getStatModifiers();
         const bModifiers = b.getStatModifiers();
+        if (!this.isHostile(a, b)) {
+            this._applyCollisionPhysics(a, b, normal, aModifiers, bModifiers);
+            return;
+        }
+
         let damageFromAToB = this.calculateCollisionDamage(a, b, normal) * aModifiers.damage;
         let damageFromBToA = this.calculateCollisionDamage(b, a, normal.clone().scale(-1)) * bModifiers.damage;
 
@@ -357,7 +366,8 @@ export class BattleSimulation extends Simulation {
 
     checkResult() {
         const alive = this.fighters.filter((f) => !f.flags.defeated);
-        if (alive.length === 1) {
+        const aliveTeams = new Set(alive.map((fighter) => fighter.teamId));
+        if (alive.length > 0 && aliveTeams.size === 1) {
             this.resolveResult(alive[0]);
             return;
         }
@@ -370,16 +380,16 @@ export class BattleSimulation extends Simulation {
         if (this.finished) return;
         this.finished = true;
         this.winner = winner;
-        this.loser = this.fighters.find((f) => f !== winner) ?? null;
+        this.loser = this.fighters.find((fighter) => this.isHostile(winner, fighter)) ?? null;
         this.resultAnimationTime = 0;
         this.resultReady = false;
         for (const fighter of this.fighters) fighter.freezeForResult();
-        if (this.loser) {
-            const pos = this.loser.position.clone();
-            const color = this.loser.color;
-            this.loser.destroyForResult();
+        for (const loser of this.fighters.filter((fighter) => this.isHostile(winner, fighter))) {
+            const pos = loser.position.clone();
+            const color = loser.color;
+            loser.destroyForResult();
             this.spawnDeathExplosion(pos, color);
-            this.addLog(`${this.loser.name} bursts apart in the arena.`);
+            this.addLog(`${loser.name} bursts apart in the arena.`);
         }
     }
 

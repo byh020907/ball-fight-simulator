@@ -31,11 +31,30 @@ export class Simulation {
 
     // ── Arena helpers ─────────────────────────────────────────────────────
 
-    getOpponent(ball) {
-        return (
-            this.fighters.find((fighter) => fighter !== ball && !fighter.flags.defeated && !fighter.state.swallowed) ||
-            null
+    isHostile(a, b) {
+        if (!a || !b || a === b) return false;
+        if (a.teamId == null || b.teamId == null) return true;
+        return a.teamId !== b.teamId;
+    }
+
+    getEnemiesOf(ball) {
+        return this.fighters.filter(
+            (fighter) => this.isHostile(ball, fighter) && !fighter.flags.defeated && !fighter.state.swallowed
         );
+    }
+
+    getNearestEnemy(ball) {
+        const enemies = this.getEnemiesOf(ball);
+        if (enemies.length === 0) return null;
+        return enemies.reduce((nearest, enemy) => {
+            const nearestDistance = Vector2.subtract(nearest.position, ball.position).length();
+            const enemyDistance = Vector2.subtract(enemy.position, ball.position).length();
+            return enemyDistance < nearestDistance ? enemy : nearest;
+        });
+    }
+
+    getOpponent(ball) {
+        return this.getNearestEnemy(ball);
     }
 
     keepInsideArena(ball) {

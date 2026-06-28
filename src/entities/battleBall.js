@@ -7,6 +7,7 @@ export class BattleBall extends mixins([PhysicsBody]) {
     constructor(spec, position) {
         super();
         this.id = spec.id;
+        this.teamId = spec.teamId;
         this.name = spec.name;
         this.title = spec.title;
         this.description = spec.description;
