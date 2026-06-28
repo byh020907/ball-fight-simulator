@@ -1,4 +1,4 @@
-import { applyCollisionImpulse, Projectile, RENDER_LAYERS, Vector2 } from "../core.js";
+import { applyCollisionImpulse, CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
 import { DashEffect } from "../combatEffects.js";
 import { computeOwnerCombatSpeed } from "../abilities/heroAbility.js";
 
@@ -255,9 +255,11 @@ export function applyHeroOrbCarryoverToBattleBall(ball, carryover) {
 
 // ── Hero Orb entity ──────────────────────────────────────────────────────────
 
-export class HeroOrb extends Projectile {
+export class HeroOrb extends CombatEntity {
     constructor(owner, position, velocity, effectType, life) {
-        super(owner, position, velocity, 12);
+        super(position, velocity, 12);
+        this.owner = owner;
+        this.ownerId = owner.id;
         this.effectType = effectType;
         this.life = life ?? Infinity;
         this.mass = 2;

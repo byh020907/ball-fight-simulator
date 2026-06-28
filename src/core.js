@@ -58,13 +58,64 @@
 import { LifeSpan, mixins, PhysicsBody } from "./physics/index.js";
 
 export const RENDER_LAYERS = Object.freeze({
-    /** Particles, visual effects, projectiles ??behind fighters. */
     BACKGROUND: 0,
-    /** Fighters. */
     FIGHTER: 1,
-    /** Floating text, UI overlays on the canvas ??in front of fighters. */
     FOREGROUND: 2
 });
+
+// ── ProjectileBehavior (local function, no circular deps) ──────────────────
+
+function ProjectileBehavior(Base) {
+    return class extends Base {
+        constructor() {
+            super();
+            this.owner = null;
+            this.ownerId = null;
+        }
+
+        updateProjectile(delta, simulation) {
+            this.integrate(delta);
+            simulation.keepEntityInsideArena(this);
+            if (this.life != null && !this.tickLife(delta)) {
+                this._onExpired(simulation);
+                return;
+            }
+            this._projectileHitCheck(simulation);
+        }
+
+        _projectileHitCheck(simulation) {
+            const target = this._findTarget(simulation);
+            if (!target || target.flags.defeated) return;
+            const dist = Vector2.subtract(this.position, target.position).length();
+            if (dist > target.radius + this.radius) return;
+            const rawDmg = this._getHitDamage(simulation);
+            this.dealDamageToTarget(target, rawDmg, this.owner, this._getHitLabel(), simulation);
+            this._onHitEffects(target, simulation);
+            this.isExpired = true;
+        }
+
+        dealDamageToTarget(target, rawDamage, source, label, simulation) {
+            const final =
+                target.actionContext?.onProjectileDamage?.(rawDamage, this, source, label, simulation, target) ??
+                rawDamage;
+            target.takeDamage(final, source, label);
+        }
+
+        _findTarget(simulation) {
+            return simulation.getOpponent(this.owner);
+        }
+        _getHitDamage() {
+            return 0;
+        }
+        _getHitLabel() {
+            return "Hit";
+        }
+        _onHitEffects(target, simulation) {}
+        _onExpired(simulation) {}
+    };
+}
+
+// ── CombatEntity (물리 + 수명만, 투사체 로직 없음) ──────────────────────────
 
 export class CombatEntity extends mixins([PhysicsBody, LifeSpan]) {
     constructor(position, velocity, radius) {
@@ -75,7 +126,6 @@ export class CombatEntity extends mixins([PhysicsBody, LifeSpan]) {
         this.isExpired = false;
     }
 
-    /** Render priority ??lower values draw first (behind). */
     static renderLayer = RENDER_LAYERS.BACKGROUND;
     get renderLayer() {
         return this.constructor.renderLayer;
@@ -83,69 +133,17 @@ export class CombatEntity extends mixins([PhysicsBody, LifeSpan]) {
 
     update() {}
     draw() {}
-
-    /**
-     * 투사체 공통 hit 처리 (Template Method).
-     * Subclass는 _getHitDamage, _getHitLabel, _onHitEffects만 구현.
-     * Projectile-only mitigation is owned by target ActionContext effects.
-     */
-    dealDamageToTarget(target, rawDamage, source, label, simulation) {
-        const finalDamage =
-            target.actionContext?.onProjectileDamage?.(rawDamage, this, source, label, simulation, target) ?? rawDamage;
-        target.takeDamage(finalDamage, source, label);
-    }
-
-    /**
-     * 투사체 update 공통 템플릿.
-     * Subclass는 _findTarget(sim), _getHitDamage(), _getHitLabel(), _onHitEffects()를 구현.
-     */
-    updateProjectile(delta, simulation) {
-        this.integrate(delta);
-        simulation.keepEntityInsideArena(this);
-
-        if (this.life != null && !this.tickLife(delta)) {
-            this._onExpired(simulation);
-            return;
-        }
-
-        this._projectileHitCheck(simulation);
-    }
-
-    /** hit 체크만 — 코스트는 update에서 소모 가능 */
-    _projectileHitCheck(simulation) {
-        const target = this._findTarget(simulation);
-        if (!target || target.flags.defeated) return;
-
-        const dist = Vector2.subtract(this.position, target.position).length();
-        if (dist > target.radius + this.radius) return;
-
-        const rawDmg = this._getHitDamage(simulation);
-        this.dealDamageToTarget(target, rawDmg, this.owner, this._getHitLabel(), simulation);
-        this._onHitEffects(target, simulation);
-        this.isExpired = true;
-    }
-
-    /** @returns {import("./entities/index.js").BattleBall|null} — subclass override */
-    _findTarget(simulation) {
-        return simulation.getOpponent(this.owner);
-    }
-    _getHitDamage() {
-        return 0;
-    }
-    _getHitLabel() {
-        return "Hit";
-    }
-    _onHitEffects(target, simulation) {}
-    _onExpired(simulation) {}
 }
 
-/**
- * 투사체 공통 베이스 — owner/ownerId 중복 제거.
- * 모든 투사체(SeedOrb, ArrowProjectile, OrbitProjectile, Grenade)가 이 클래스를 extends.
- */
-export class Projectile extends CombatEntity {
+// ── Projectile (물리 + 수명 + 투사체 로직) ──────────────────────────────────
+
+export class Projectile extends mixins([PhysicsBody, LifeSpan, ProjectileBehavior]) {
     constructor(owner, position, velocity, radius) {
-        super(position, velocity, radius);
+        super();
+        this.pos = position;
+        this.velocity = velocity;
+        this.radius = radius;
+        this.isExpired = false;
         this.owner = owner;
         this.ownerId = owner.id;
     }
