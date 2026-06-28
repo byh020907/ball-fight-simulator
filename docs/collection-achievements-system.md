@@ -2,7 +2,7 @@
 
 > 상태: 구현 완료 (`v0.12.0`)
 > 기준 코드: 2026-06-24 `main`
-> 관련 문서: [`experience-system.md`](experience-system.md), [`character-link-system.md`](character-link-system.md), [`meta-progression-system.md`](meta-progression-system.md), [`player-data-storage-security.md`](player-data-storage-security.md), [`development-rules.md`](development-rules.md)
+> 관련 문서: [`experience-system.md`](experience-system.md), [`character-mastery-system.md`](character-mastery-system.md), [`meta-progression-system.md`](meta-progression-system.md), [`player-data-storage-security.md`](player-data-storage-security.md), [`development-rules.md`](development-rules.md)
 
 ## 1. 시스템 정의
 
@@ -460,7 +460,7 @@ reward: {
 8. `finalizePlayerProgress()`로 캐릭터 연계, 성장, 도전 단계 결과 통합
 9. Alpine 도감 및 업적 팝업 구현
 10. 통합 알림 큐 구현
-11. `docs/game-rules.md`, `src/help-content.js`, `src/patchNotes.js` 갱신
+11. `docs/game-rules.md`, `src/helpContent.js`, `src/patchNotes.js` 갱신
 
 ## 13. 필수 회귀 조건
 

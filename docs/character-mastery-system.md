@@ -366,7 +366,7 @@ const result = unlockCharacterLink(profile, tournamentReport.playerFighterId);
 8. 캐릭터별 연계 효과를 하나씩 구현하고 누적 회귀 테스트
 9. 토너먼트 우승 해금 연결
 10. 스탯 배분 팝업과 도감에 연계 요약 추가
-11. `docs/game-rules.md`, `src/help-content.js`, `src/patchNotes.js` 갱신
+11. `docs/game-rules.md`, `src/helpContent.js`, `src/patchNotes.js` 갱신
 
 ## 15. 필수 회귀 조건
 

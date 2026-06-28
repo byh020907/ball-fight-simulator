@@ -1,7 +1,7 @@
 # 컬렉션 허브 UI
 
 > 상태: UI 설계, 구현 전
-> 관련 문서: [`hunting-grounds-system.md`](hunting-grounds-system.md), [`experience-system.md`](experience-system.md), [`collection-achievements-system.md`](collection-achievements-system.md), [`character-link-system.md`](character-link-system.md), [`meta-progression-system.md`](meta-progression-system.md), [`design.md`](design.md)
+> 관련 문서: [`hunting-grounds-system.md`](hunting-grounds-system.md), [`experience-system.md`](experience-system.md), [`collection-achievements-system.md`](collection-achievements-system.md), [`character-mastery-system.md`](character-mastery-system.md), [`meta-progression-system.md`](meta-progression-system.md), [`design.md`](design.md)
 
 ## 1. 목적
 

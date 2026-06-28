@@ -72,7 +72,8 @@
 - [ ] `PATCH_NOTES` 배열에 새 `{ version, date, title, changes }` 항목 추가
 - [ ] version은 SemVer 규칙에 따라 증가
 - [ ] `date` 오늘 날짜로 설정
-- [ ] 불필요하게 오래된 항목은 `docs/patch-notes-archive.md`로 이동
+- [ ] `index.html`의 모듈 캐시 버전 `V`를 최신 `PATCH_NOTES[0].version`과 일치시킴
+- [ ] 불필요하게 오래된 항목은 필요 시 `docs/patch-notes-archive.md`로 이동
 - [ ] `npm test` 통과
 - [ ] 브라우저에서 팝업 표시/미표시 확인
 
@@ -100,6 +101,7 @@
 
 ## 이전 패치노트 보관 정책
 
-- `src/patchNotes.js`에는 **현재 버전의 패치노트만** 유지합니다.
-- 이전 버전의 패치노트는 `docs/patch-notes-archive.md`에 보관합니다.
-- 아카이브는 사람이 수동으로 관리합니다.
+- `src/patchNotes.js`는 유저가 못 본 버전을 한 번에 표시하기 위해 **최신순 누적 배열**로 유지합니다.
+- 너무 오래된 항목은 필요할 때만 `docs/patch-notes-archive.md`로 옮깁니다.
+- 아카이브 이동 시 쿠키 버전보다 최신인 항목을 제거하면 기존 유저가 변경 내역을 못 볼 수 있으므로, 배포 직후 핫픽스 항목은 보존합니다.
+- `index.html`의 `const V`는 최신 패치노트 버전과 맞춰 브라우저가 새 모듈을 받게 합니다.
