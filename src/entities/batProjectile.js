@@ -51,7 +51,7 @@ export class BatProjectile extends Projectile {
         this.position.add(perp.scale(flutter));
 
         simulation.keepEntityInsideArena(this);
-        if (!this.tickLife(delta)) {
+        if (!this._lifecycleCheck(delta, simulation)) {
             simulation.spawnParticleBurst(this.position.clone(), "#441122", {
                 count: 6,
                 speed: 100,
@@ -66,7 +66,7 @@ export class BatProjectile extends Projectile {
         } else {
             this.angle = Math.atan2(this.velocity.y, this.velocity.x);
         }
-        this._projectileHitCheck(simulation);
+        this._hitCheck(simulation);
     }
 
     _computeBoidsForce(delta) {

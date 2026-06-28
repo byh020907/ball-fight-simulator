@@ -1,9 +1,11 @@
-import { Projectile, Vector2 } from "../core.js";
+import { CombatEntity, Vector2 } from "../core.js";
 import { DashEffect } from "../combatEffects.js";
 
-export class SeedOrb extends Projectile {
+export class SeedOrb extends CombatEntity {
     constructor(owner, position, velocity, life) {
-        super(owner, position, velocity, 14);
+        super(position, velocity, 14);
+        this.owner = owner;
+        this.ownerId = owner.id;
         this.life = life;
     }
 

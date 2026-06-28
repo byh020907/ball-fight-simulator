@@ -62,6 +62,11 @@ class HoldTrigger extends TriggerStrategy {
 class ClickAction {
     constructor(trigger = new TapTrigger()) {
         this.trigger = trigger;
+        Object.assign(this, this.constructor.defaults);
+    }
+
+    static get defaults() {
+        return { _hpCostPercent: 0.2 };
     }
 
     get id() {
@@ -113,11 +118,8 @@ class ClickAction {
 class TimeWarpAction extends ClickAction {
     static DEFAULT_DURATION = 0.5;
     static DEFAULT_HP_COST = 0.5;
-
-    constructor() {
-        super();
-        this.duration = TimeWarpAction.DEFAULT_DURATION;
-        this._hpCostPercent = TimeWarpAction.DEFAULT_HP_COST;
+    static get defaults() {
+        return { duration: this.DEFAULT_DURATION, _hpCostPercent: this.DEFAULT_HP_COST };
     }
 
     get id() {
@@ -159,12 +161,12 @@ class RushAction extends ClickAction {
     static DEFAULT_DURATION = 1;
     static DEFAULT_SPEED_BONUS = 0.5;
     static DEFAULT_HP_COST = 1.0;
-
-    constructor() {
-        super();
-        this.duration = RushAction.DEFAULT_DURATION;
-        this.speedBonus = RushAction.DEFAULT_SPEED_BONUS;
-        this._hpCostPercent = RushAction.DEFAULT_HP_COST;
+    static get defaults() {
+        return {
+            duration: this.DEFAULT_DURATION,
+            speedBonus: this.DEFAULT_SPEED_BONUS,
+            _hpCostPercent: this.DEFAULT_HP_COST
+        };
     }
 
     get id() {
@@ -223,12 +225,12 @@ class CounterAction extends ClickAction {
     static DEFAULT_WINDOW_SECONDS = 0.2;
     static DEFAULT_REFLECT_RATE = 1.0;
     static DEFAULT_HP_COST = 1.5;
-
-    constructor() {
-        super();
-        this.windowSeconds = CounterAction.DEFAULT_WINDOW_SECONDS;
-        this.reflectRate = CounterAction.DEFAULT_REFLECT_RATE;
-        this._hpCostPercent = CounterAction.DEFAULT_HP_COST;
+    static get defaults() {
+        return {
+            windowSeconds: this.DEFAULT_WINDOW_SECONDS,
+            reflectRate: this.DEFAULT_REFLECT_RATE,
+            _hpCostPercent: this.DEFAULT_HP_COST
+        };
     }
 
     get id() {
@@ -279,12 +281,12 @@ class ProjectileGuardAction extends ClickAction {
     static DEFAULT_WINDOW_SECONDS = 0.3;
     static DEFAULT_DAMAGE_MULTIPLIER = 0.25;
     static DEFAULT_HP_COST = 1.0;
-
-    constructor() {
-        super();
-        this.windowSeconds = ProjectileGuardAction.DEFAULT_WINDOW_SECONDS;
-        this.damageMultiplier = ProjectileGuardAction.DEFAULT_DAMAGE_MULTIPLIER;
-        this._hpCostPercent = ProjectileGuardAction.DEFAULT_HP_COST;
+    static get defaults() {
+        return {
+            windowSeconds: this.DEFAULT_WINDOW_SECONDS,
+            damageMultiplier: this.DEFAULT_DAMAGE_MULTIPLIER,
+            _hpCostPercent: this.DEFAULT_HP_COST
+        };
     }
 
     get id() {
@@ -335,12 +337,12 @@ class EndureAction extends ClickAction {
     static DEFAULT_DURATION = 0.2;
     static DEFAULT_DAMAGE_MULTIPLIER = 0.2;
     static DEFAULT_HP_COST = 1.0;
-
-    constructor() {
-        super();
-        this.duration = EndureAction.DEFAULT_DURATION;
-        this.damageMultiplier = EndureAction.DEFAULT_DAMAGE_MULTIPLIER;
-        this._hpCostPercent = EndureAction.DEFAULT_HP_COST;
+    static get defaults() {
+        return {
+            duration: this.DEFAULT_DURATION,
+            damageMultiplier: this.DEFAULT_DAMAGE_MULTIPLIER,
+            _hpCostPercent: this.DEFAULT_HP_COST
+        };
     }
 
     get id() {
@@ -382,12 +384,12 @@ class LifeStealAction extends ClickAction {
     static DEFAULT_DURATION = 2.0;
     static DEFAULT_LIFESTEAL_RATE = 0.5;
     static DEFAULT_HP_COST = 1.0;
-
-    constructor() {
-        super();
-        this.duration = LifeStealAction.DEFAULT_DURATION;
-        this.lifestealRate = LifeStealAction.DEFAULT_LIFESTEAL_RATE;
-        this._hpCostPercent = LifeStealAction.DEFAULT_HP_COST;
+    static get defaults() {
+        return {
+            duration: this.DEFAULT_DURATION,
+            lifestealRate: this.DEFAULT_LIFESTEAL_RATE,
+            _hpCostPercent: this.DEFAULT_HP_COST
+        };
     }
 
     get id() {
@@ -429,12 +431,12 @@ class ShockwaveAction extends ClickAction {
     static DEFAULT_RADIUS = 150;
     static DEFAULT_PUSH_FORCE = 400;
     static DEFAULT_HP_COST = 1.2;
-
-    constructor() {
-        super();
-        this.radius = ShockwaveAction.DEFAULT_RADIUS;
-        this.pushForce = ShockwaveAction.DEFAULT_PUSH_FORCE;
-        this._hpCostPercent = ShockwaveAction.DEFAULT_HP_COST;
+    static get defaults() {
+        return {
+            radius: this.DEFAULT_RADIUS,
+            pushForce: this.DEFAULT_PUSH_FORCE,
+            _hpCostPercent: this.DEFAULT_HP_COST
+        };
     }
 
     get id() {
@@ -480,13 +482,13 @@ class EvadeAction extends ClickAction {
     static DEFAULT_SPEED_BOOST = 0.3;
     static DEFAULT_SPEED_BOOST_DURATION = 0.4;
     static DEFAULT_HP_COST = 0.8;
-
-    constructor() {
-        super();
-        this.dashSpeed = EvadeAction.DEFAULT_DASH_SPEED;
-        this.speedBoost = EvadeAction.DEFAULT_SPEED_BOOST;
-        this.speedBoostDuration = EvadeAction.DEFAULT_SPEED_BOOST_DURATION;
-        this._hpCostPercent = EvadeAction.DEFAULT_HP_COST;
+    static get defaults() {
+        return {
+            dashSpeed: this.DEFAULT_DASH_SPEED,
+            speedBoost: this.DEFAULT_SPEED_BOOST,
+            speedBoostDuration: this.DEFAULT_SPEED_BOOST_DURATION,
+            _hpCostPercent: this.DEFAULT_HP_COST
+        };
     }
 
     get id() {

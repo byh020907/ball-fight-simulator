@@ -14,10 +14,10 @@ export class BulletProjectile extends Projectile {
     }
 
     update(delta, simulation) {
-        this.integrate(delta);
+        this._integrateAndClamp(delta, simulation);
         const px = this.position.x;
         const py = this.position.y;
-        simulation.keepEntityInsideArena(this);
+        // re-check arena after clamp for bounce detection (integrate+clamp already called)
         if (this.position.x !== px || this.position.y !== py) {
             this._bounceCount++;
             simulation.addSparkBurst(this.position.clone(), "#ffdd44");
@@ -25,11 +25,9 @@ export class BulletProjectile extends Projectile {
         }
         this._trail.push(this.position.clone());
         if (this._trail.length > 8) this._trail.shift();
-        if (!this.tickLife(delta)) {
-            return;
-        }
+        if (!this._lifecycleCheck(delta, simulation)) return;
         this.angle = Math.atan2(this.velocity.y, this.velocity.x);
-        this._projectileHitCheck(simulation);
+        this._hitCheck(simulation);
         if (!this.isExpired) this._ownerCollectCheck(simulation);
     }
 

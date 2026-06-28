@@ -73,14 +73,29 @@ function ProjectileBehavior(Base) {
             this.ownerId = null;
         }
 
-        updateProjectile(delta, simulation) {
+        // ── 투사체 update (조합 가능한 단계별 메서드) ──
+
+        _integrateAndClamp(delta, simulation) {
             this.integrate(delta);
             simulation.keepEntityInsideArena(this);
+        }
+
+        _lifecycleCheck(delta, simulation) {
             if (this.life != null && !this.tickLife(delta)) {
                 this._onExpired(simulation);
-                return;
+                return false;
             }
+            return true;
+        }
+
+        _hitCheck(simulation) {
             this._projectileHitCheck(simulation);
+        }
+
+        updateProjectile(delta, simulation) {
+            this._integrateAndClamp(delta, simulation);
+            if (!this._lifecycleCheck(delta, simulation)) return;
+            this._hitCheck(simulation);
         }
 
         _projectileHitCheck(simulation) {
@@ -136,6 +151,13 @@ export class CombatEntity extends mixins([PhysicsBody, LifeSpan]) {
 }
 
 // ── Projectile (물리 + 수명 + 투사체 로직) ──────────────────────────────────
+
+/** 투사체 데미지 전달 (ProjectileGuard 등 방어 체인 적용). */
+export function dealProjectileDamage(target, rawDamage, source, label, simulation) {
+    const final =
+        target.actionContext?.onProjectileDamage?.(rawDamage, source, source, label, simulation, target) ?? rawDamage;
+    target.takeDamage(final, source, label);
+}
 
 export class Projectile extends mixins([PhysicsBody, LifeSpan, ProjectileBehavior]) {
     constructor(owner, position, velocity, radius) {

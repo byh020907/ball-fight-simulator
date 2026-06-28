@@ -1,11 +1,13 @@
-import { Projectile, Vector2 } from "../core.js";
+import { CombatEntity, dealProjectileDamage, Vector2 } from "../core.js";
 
-export class Grenade extends Projectile {
+export class Grenade extends CombatEntity {
     constructor(owner, targetPosition, fuseTime = 1.08) {
         const start = owner.position.clone();
         const safeFuse = Math.max(0.32, fuseTime);
         const drift = Vector2.subtract(targetPosition, start).scale(1 / safeFuse);
-        super(owner, start, drift, 12);
+        super(start, drift, 12);
+        this.owner = owner;
+        this.ownerId = owner.id;
         this.timer = safeFuse;
         this.maxTimer = this.timer;
         this.explosionRadius = 150;
@@ -57,7 +59,7 @@ export class Grenade extends Projectile {
                     Math.min(1, (distance - this.innerRadius) / (this.explosionRadius - this.innerRadius))
                 );
                 const raw = Math.round(this.owner.stats.baseDamage * (2.5 - edgeProgress * 1.0));
-                this.dealDamageToTarget(target, raw, this.owner, "Grenade", simulation);
+                dealProjectileDamage(target, raw, this.owner, "Grenade", simulation);
                 const kbDir = Vector2.subtract(target.position, this.position).normalize();
                 target.applyKnockback(kbDir.scale(900), 1.3);
             }
