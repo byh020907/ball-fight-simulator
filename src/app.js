@@ -132,14 +132,12 @@ export class BattleApp {
         // Listen for Alpine.js start-tournament event
         try {
             document.addEventListener("start-tournament", () => this.startTournament());
-            document.addEventListener("allocation-changed", () => {
-                const s = this.ui.state;
-                if (s) this.playerStatAllocation = { ...s.allocation };
-            });
+            document.addEventListener("allocation-changed", () => this._syncPlayerStatAllocationFromUi());
         } catch {
             // no-op in non-browser environments
         }
 
+        this._syncPlayerStatAllocationFromUi();
         this.refreshPlayerSetup();
         this._refreshCollectionHub();
         this.ui.updateStatus("내 캐릭터 스탯을 배분하세요", "Setup");
@@ -186,6 +184,15 @@ export class BattleApp {
     _updateStatCapForUI() {
         const ctx = this._getStatBonusContext();
         updateEffectiveStatCap(ctx.progressionPerStatCapBonus, ctx.masteryPerStatCapBonus);
+    }
+
+    _syncPlayerStatAllocationFromUi() {
+        const allocation = this.ui.state?.allocation;
+        if (!allocation) return;
+        this.playerStatAllocation = {
+            ...createEmptyStatAllocation(),
+            ...allocation
+        };
     }
 
     refreshPlayerSetup() {

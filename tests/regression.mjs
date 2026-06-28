@@ -150,7 +150,8 @@ function makeHarness() {
         "tournamentPanel",
         "tournamentBracket",
         "tournamentPhase",
-        "playerPanel"
+        "playerPanel",
+        "playerFaceCanvas"
     ]) {
         elements.set(id, makeElement(id));
     }
@@ -159,6 +160,10 @@ function makeHarness() {
     canvas.width = 960;
     canvas.height = 960;
     canvas.getContext = () => makeCanvasContext();
+    const playerFaceCanvas = elements.get("playerFaceCanvas");
+    playerFaceCanvas.width = 50;
+    playerFaceCanvas.height = 50;
+    playerFaceCanvas.getContext = () => makeCanvasContext();
 
     const context = {
         console,
@@ -187,6 +192,22 @@ async function loadModuleApp() {
     const moduleUrl = new URL(`../src/app.js?test=${Date.now()}`, import.meta.url).href;
     const { BattleApp } = await import(moduleUrl);
     return new BattleApp();
+}
+
+async function loadModuleAppWithInitialAlpineAllocation(allocation) {
+    const harness = makeHarness();
+    const appRoot = makeElement("app");
+    const alpineState = appStore();
+    alpineState.allocation = { ...allocation };
+    alpineState.remainingPoints = 0;
+    harness.context.document.querySelector = (selector) => (selector === ".app" ? appRoot : null);
+    harness.context.Alpine = {
+        $data: (root) => (root === appRoot ? alpineState : null)
+    };
+    Object.assign(globalThis, harness.context);
+    const moduleUrl = new URL(`../src/app.js?test=${Date.now()}`, import.meta.url).href;
+    const { BattleApp } = await import(moduleUrl);
+    return { app: new BattleApp(), alpineState };
 }
 
 async function testCloneSeedDash(app) {
@@ -662,6 +683,16 @@ function testRenderPlayerSetupCopiesAllocation(app) {
     assert.equal(state.allocation.hp, 10, "Rendered UI state should remain editable");
 }
 
+async function testBattleAppAdoptsPreExistingAlpineAllocation() {
+    const initialAllocation = { hp: 20, damage: 20, speed: 20, skill: 20, defense: 20 };
+    const { app } = await loadModuleAppWithInitialAlpineAllocation(initialAllocation);
+    assert.deepEqual(
+        app.playerStatAllocation,
+        initialAllocation,
+        "BattleApp should adopt Alpine allocation that changed before event listeners were attached"
+    );
+}
+
 function testIndexCacheVersionMatchesLatestPatchNote() {
     const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
     const match = html.match(/const V = "([^"]+)";/);
@@ -670,6 +701,14 @@ function testIndexCacheVersionMatchesLatestPatchNote() {
         match[1],
         PATCH_NOTES[0].version,
         "Module cache-busting version should match the latest patch note version"
+    );
+    assert.ok(
+        !/<main[^>]*x-init="[^"]*app-loading/.test(html),
+        "Loading overlay should not be removed before BattleApp is imported"
+    );
+    assert.ok(
+        html.includes('document.getElementById("app-loading")?.remove();'),
+        "Loading overlay should be removed after app modules finish importing"
     );
 }
 
@@ -2887,6 +2926,7 @@ testShuffledUtility();
 testStatAllocationRules(app);
 testStatAllocationUiSyncEvent();
 testRenderPlayerSetupCopiesAllocation(app);
+await testBattleAppAdoptsPreExistingAlpineAllocation();
 testIndexCacheVersionMatchesLatestPatchNote();
 testStatBalanceSystem();
 testMultiFighterSimulationSetup(app);

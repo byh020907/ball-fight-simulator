@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.23.3",
+        date: "2026-06-28",
+        title: "v0.23.3 핫픽스",
+        changes: [
+            {
+                type: "fix",
+                text: "앱 초기화 전에 스탯 UI가 먼저 변경된 경우에도 배분값이 0으로 덮이지 않도록 보강했습니다."
+            }
+        ]
+    },
+    {
         version: "0.23.2",
         date: "2026-06-28",
         title: "v0.23.2 핫픽스",

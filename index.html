@@ -71,7 +71,7 @@
             </div>
         </div>
 
-        <main class="app" x-data="appStore" x-cloak x-init="document.getElementById('app-loading')?.remove()">
+        <main class="app" x-data="appStore" x-cloak>
             <section class="game-frame">
                 <section class="battle-stage">
                     <section class="arena-shell">
@@ -736,7 +736,7 @@
             import Alpine from "https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/module.esm.js";
 
             // GitHub Pages 캐시 방지용 버전 파라미터
-            const V = "0.23.2";
+            const V = "0.23.3";
 
             const { appStore } = await import(`./src/ui.js?v=${V}`);
 
@@ -752,6 +752,7 @@
             document.addEventListener("open-help", () =>
                 PopupService.show({ title: HELP_TITLE, bodyHtml: HELP_CONTENT })
             );
+            document.getElementById("app-loading")?.remove();
         </script>
     </body>
 </html>
