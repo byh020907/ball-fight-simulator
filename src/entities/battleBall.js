@@ -1,5 +1,6 @@
 import { RENDER_LAYERS, TimedEffect, Vector2 } from "../core.js";
 import { ActionContext } from "../clickActions.js";
+import { DashEffect } from "../combatEffects.js";
 import { mixins, PhysicsBody } from "../physics/index.js";
 
 export class BattleBall extends mixins([PhysicsBody]) {
@@ -95,6 +96,50 @@ export class BattleBall extends mixins([PhysicsBody]) {
     applyKnockback(velocity, duration) {
         this.forceHeading(velocity, duration);
         this.applyImpulse(velocity);
+    }
+
+    /**
+     * 대시 발동 — setMovementEffect + forceHeading + applyImpulse를 한 번에 처리합니다.
+     * @param {Vector2} direction - 대시 방향
+     * @param {object} opts
+     * @param {number} opts.duration - 지속 시간
+     * @param {number} opts.multiplier - 속도 배율
+     * @param {number} [opts.speedOverride] - 명시적 속도 (생략 시 baseSpeed * multiplier)
+     * @param {string} [opts.color] - 색상 (기본 this.color)
+     * @param {number} [opts.collisionDamage] - 충돌 데미지
+     * @param {string} [opts.collisionLabel] - 충돌 라벨
+     * @param {boolean} [opts.showRing] - 링 표시 여부
+     */
+    initiateDash(direction, opts = {}) {
+        const {
+            duration,
+            multiplier,
+            speedOverride,
+            color = this.color,
+            collisionDamage = 0,
+            collisionLabel = "Dash Contact",
+            showRing = true,
+            noHeading = false
+        } = opts;
+        const speed = speedOverride ?? this.stats.baseSpeed * multiplier;
+
+        this.setMovementEffect(
+            new DashEffect({
+                duration,
+                multiplier,
+                speedOverride: speed,
+                color,
+                showRing,
+                collisionDamage,
+                collisionLabel,
+                untilImpact: true,
+                untilWall: true
+            })
+        );
+        if (!noHeading) {
+            this.forceHeading(direction, duration);
+        }
+        this.applyImpulse(direction.clone().scale(speed).subtract(this.velocity));
     }
 
     setMovementEffect(effect) {

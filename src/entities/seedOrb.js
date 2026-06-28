@@ -29,24 +29,12 @@ export class SeedOrb extends Projectile {
         const dashDirection = opponent
             ? Vector2.subtract(opponent.position, this.owner.position).normalize()
             : this.velocity.clone().normalize();
-        this.owner.setMovementEffect(
-            new DashEffect({
-                duration: 1.55,
-                multiplier: 2.05,
-                color: this.owner.color,
-                collisionDamage: Math.round(this.owner.stats.baseDamage * 0.9),
-                collisionLabel: "Seed Dash",
-                untilImpact: true,
-                untilWall: true
-            })
-        );
-        this.owner.forceHeading(dashDirection, 1.55);
-        this.owner.applyImpulse(
-            dashDirection
-                .clone()
-                .scale(this.owner.stats.baseSpeed * 2.05)
-                .subtract(this.owner.velocity)
-        );
+        this.owner.initiateDash(dashDirection, {
+            duration: 1.55,
+            multiplier: 2.05,
+            collisionDamage: Math.round(this.owner.stats.baseDamage * 0.9),
+            collisionLabel: "Seed Dash"
+        });
         simulation.spawnSlash(
             this.owner.position.clone(),
             Vector2.add(this.owner.position, dashDirection.clone().scale(150)),

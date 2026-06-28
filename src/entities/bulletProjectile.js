@@ -25,7 +25,8 @@ export class BulletProjectile extends Projectile {
         }
         this._trail.push(this.position.clone());
         if (this._trail.length > 8) this._trail.shift();
-        if (!this.tickLife(delta)) { return;
+        if (!this.tickLife(delta)) {
+            return;
         }
         this.angle = Math.atan2(this.velocity.y, this.velocity.x);
         this._projectileHitCheck(simulation);
@@ -43,10 +44,6 @@ export class BulletProjectile extends Projectile {
             simulation.playSound("shoot", 0.4);
         }
         this.isExpired = true;
-    }
-
-    _findTarget(simulation) {
-        return simulation.getOpponent(this.owner);
     }
 
     _getHitDamage() {

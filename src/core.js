@@ -127,7 +127,7 @@ export class CombatEntity extends mixins([PhysicsBody, LifeSpan]) {
 
     /** @returns {import("./entities/index.js").BattleBall|null} — subclass override */
     _findTarget(simulation) {
-        return null;
+        return simulation.getOpponent(this.owner);
     }
     _getHitDamage() {
         return 0;

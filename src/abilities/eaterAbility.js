@@ -145,24 +145,14 @@ export class EaterAbility extends Ability {
             this.owner.position,
             direction.clone().scale(this.owner.radius + target.radius + 10)
         );
-        target.setMovementEffect(
-            new DashEffect({
-                duration: 2.45,
-                multiplier: 2,
-                speedOverride: target.stats.baseSpeed * 2,
-                color: target.color,
-                showRing: false,
-                collisionLabel: "Spit Dash",
-                untilImpact: true,
-                untilWall: true
-            })
-        );
-        target.applyImpulse(
-            direction
-                .clone()
-                .scale(target.stats.baseSpeed * 2)
-                .subtract(target.velocity)
-        );
+        target.initiateDash(direction, {
+            duration: 2.45,
+            multiplier: 2,
+            speedOverride: target.stats.baseSpeed * 2,
+            collisionLabel: "Spit Dash",
+            showRing: false,
+            noHeading: true
+        });
         target.state.wallSlam = new WallSlamEffect({
             source: this.owner,
             damage: WALL_SLAM_DAMAGE,

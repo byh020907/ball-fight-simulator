@@ -1,4 +1,4 @@
-import { applyCollisionImpulse, CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
+import { applyCollisionImpulse, Projectile, RENDER_LAYERS, Vector2 } from "../core.js";
 import { DashEffect } from "../combatEffects.js";
 import { computeOwnerCombatSpeed } from "../abilities/heroAbility.js";
 
@@ -105,20 +105,14 @@ export const HERO_ORB_EFFECTS = {
             if (direction.length() < 0.01) return { applied: false };
             direction.normalize();
             const speed = computeOwnerCombatSpeed(owner) * 1.5;
-            owner.setMovementEffect(
-                new DashEffect({
-                    duration: 1.55,
-                    multiplier: 1,
-                    speedOverride: speed,
-                    color: "#ff8833",
-                    showRing: true,
-                    collisionDamage: 0,
-                    untilImpact: true,
-                    untilWall: true
-                })
-            );
-            owner.forceHeading(direction, 1.55);
-            owner.applyImpulse(direction.clone().scale(speed).subtract(owner.velocity));
+            owner.initiateDash(direction, {
+                duration: 1.55,
+                multiplier: 1,
+                speedOverride: speed,
+                color: "#ff8833",
+                showRing: true,
+                collisionDamage: 0
+            });
             ctx.simulation.spawnSlash(
                 owner.position.clone(),
                 Vector2.add(owner.position, direction.clone().scale(150)),
@@ -261,11 +255,9 @@ export function applyHeroOrbCarryoverToBattleBall(ball, carryover) {
 
 // ── Hero Orb entity ──────────────────────────────────────────────────────────
 
-export class HeroOrb extends CombatEntity {
+export class HeroOrb extends Projectile {
     constructor(owner, position, velocity, effectType, life) {
-        super(position, velocity, 12);
-        this.owner = owner;
-        this.ownerId = owner.id;
+        super(owner, position, velocity, 12);
         this.effectType = effectType;
         this.life = life ?? Infinity;
         this.mass = 2;

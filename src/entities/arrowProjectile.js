@@ -19,10 +19,6 @@ export class ArrowProjectile extends Projectile {
         this.syncFacingToVelocity();
     }
 
-    _findTarget(simulation) {
-        return simulation.getOpponent(this.owner);
-    }
-
     _getHitDamage() {
         return Math.round(this.owner.stats.baseDamage * 1.6);
     }

@@ -51,7 +51,8 @@ export class BatProjectile extends Projectile {
         this.position.add(perp.scale(flutter));
 
         simulation.keepEntityInsideArena(this);
-        if (!this.tickLife(delta)) { simulation.spawnParticleBurst(this.position.clone(), "#441122", {
+        if (!this.tickLife(delta)) {
+            simulation.spawnParticleBurst(this.position.clone(), "#441122", {
                 count: 6,
                 speed: 100,
                 radiusMin: 1,
@@ -107,10 +108,6 @@ export class BatProjectile extends Projectile {
         separation.scale(SEPARATION_WEIGHT * 60 * delta);
 
         return Vector2.add(Vector2.add(cohesion, alignment), separation);
-    }
-
-    _findTarget(simulation) {
-        return simulation.getOpponent(this.owner);
     }
 
     _getHitDamage() {

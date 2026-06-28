@@ -35,24 +35,12 @@ export class DashAbility extends Ability {
 
         this.timer = this.cooldown;
         const direction = Vector2.subtract(target.position, this.owner.position).normalize();
-        this.owner.setMovementEffect(
-            new DashEffect({
-                duration: MAX_DASH_DURATION,
-                multiplier: this.dashMultiplier,
-                color: this.owner.color,
-                collisionDamage: Math.round(this.owner.stats.baseDamage * 0.4),
-                collisionLabel: "Dash Contact",
-                untilImpact: true,
-                untilWall: true
-            })
-        );
-        this.owner.forceHeading(direction, MAX_DASH_DURATION);
-        this.owner.applyImpulse(
-            direction
-                .clone()
-                .scale(this.owner.stats.baseSpeed * this.dashMultiplier)
-                .subtract(this.owner.velocity)
-        );
+        this.owner.initiateDash(direction, {
+            duration: MAX_DASH_DURATION,
+            multiplier: this.dashMultiplier,
+            collisionDamage: Math.round(this.owner.stats.baseDamage * 0.4),
+            collisionLabel: "Dash Contact"
+        });
         this.simulation.playSound("dash", DASH_SOUND_PITCH);
         this.simulation.spawnSlash(
             this.owner.position.clone(),

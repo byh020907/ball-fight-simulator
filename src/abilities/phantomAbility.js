@@ -159,20 +159,13 @@ export class PhantomAbility extends Ability {
 
         const dashSpeed = owner.stats.baseSpeed * DASH_MULTIPLIER;
 
-        owner.setMovementEffect(
-            new DashEffect({
-                duration: DASH_DURATION,
-                multiplier: DASH_MULTIPLIER,
-                color: owner.color,
-                showRing: false,
-                collisionDamage: BONUS_DAMAGE,
-                collisionLabel: "Shadow Strike",
-                untilImpact: true,
-                untilWall: true
-            })
-        );
-        owner.forceHeading(dashDir, DASH_DURATION);
-        owner.applyImpulse(dashDir.clone().scale(dashSpeed).subtract(owner.velocity));
+        owner.initiateDash(dashDir, {
+            duration: DASH_DURATION,
+            multiplier: DASH_MULTIPLIER,
+            collisionDamage: BONUS_DAMAGE,
+            collisionLabel: "Shadow Strike",
+            showRing: false
+        });
 
         sim.playSound("dash", 0.9);
         sim.addLog(`${owner.name} vanishes and strikes from the shadows!`);

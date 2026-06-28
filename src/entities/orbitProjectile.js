@@ -14,7 +14,7 @@ export class OrbitProjectile extends Projectile {
 
     update(delta, simulation) {
         this.elapsed += delta;
-                const progress = Math.min(1, this.elapsed / this.accelDuration);
+        const progress = Math.min(1, this.elapsed / this.accelDuration);
         const speed = progress * this.maxSpeed;
         this.applyImpulse(this.dir.clone().scale(speed).subtract(this.velocity));
 
@@ -28,13 +28,11 @@ export class OrbitProjectile extends Projectile {
             this.angle = Math.atan2(this.dir.y, this.dir.x);
         }
 
-        if (!this.tickLife(0)) { this.isExpired = true; }
+        if (!this.tickLife(0)) {
+            this.isExpired = true;
+        }
 
         this._projectileHitCheck(simulation);
-    }
-
-    _findTarget(simulation) {
-        return simulation.getOpponent(this.owner);
     }
 
     _getHitDamage() {
