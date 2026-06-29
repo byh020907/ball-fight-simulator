@@ -358,7 +358,7 @@ entropy = -(p×log(p) + (1-p)×log(1-p))
 
 ### 0.9 현미경 튜토리얼 — 한 에피소드의 모든 순간
 
-**설정**: 16차원 입력 → 2차원 은닉층 → 1출력 으로 단순화해서 설명.
+**설정**: 14차원 입력 → 2차원 은닉층 → 1출력 으로 단순화해서 설명.
 실제 모델은 48차원 2개 층이지만 원리는 동일합니다.
 
 ```
@@ -531,7 +531,7 @@ for (let ep = 0; ep < 20000; ep++) {
         sim.update(1/60);  // 1프레임 진행
 
         if (shouldMakeDecision(sim)) {
-            const obs = extractFeatures(sim);          // 16차원 벡터
+            const obs = extractFeatures(sim);          // 14차원 벡터
             const { action, logProb } = sampleAction(actor, obs);
 
             trajectory.push({ obs, action, oldLogProb: logProb });
@@ -571,8 +571,8 @@ Critic: Input (16) → FC₁(H) + ReLU → FC₂(H) + ReLU → FC₃(1) → V(s)
 
 | 네트워크 | 입력 | 출력 | 활성화 |
 |---|---|---|---|
-| Actor | 16차원 상태 | 액션 사용 확률 | 마지막 Sigmoid |
-| Critic | 16차원 상태 | 상태 가치 점수 | 마지막 활성화 없음 |
+| Actor | 14차원 상태 | 액션 사용 확률 | 마지막 Sigmoid |
+| Critic | 14차원 상태 | 상태 가치 점수 | 마지막 활성화 없음 |
 
 ### 1.3 가중치 초기화
 
@@ -584,30 +584,32 @@ b = 0
 
 ---
 
-## 2. 입력 특성 (16차원)
+## 2. 입력 특성 (14차원, 전 차원 [-1,1])
+
+> **원칙**: 유도값 없음, pre-computed bool 없음, 원시 벡터만 제공. NN이 거리·내적·충돌시간을 스스로 학습.
 
 ### 2.1 특성 벡터 명세
 
 ```
-인덱스 | 이름               | 범위        | 설명
-───────┼───────────────────┼─────────────┼──────────────────────────
-0      | hpRatio           | [0, 1]      | 내 HP / maxHP
-1      | oppHpRatio        | [0, 1]      | 상대 HP / maxHP
-2      | hpAdvantage       | [-1, 1]     | (내HP-상대HP) / max(내HP,상대HP)
-3      | distance          | [0, 960]    | 상대까지 거리 (px)
-4      | distNorm          | [0, 1]      | distance / 960
-5      | approachSpeed     | [-400, 400] | 상대 접근 속도 (양수=접근)
-6      | approachSpeedNorm | [-1, 1]     | approachSpeed / 400
-7      | mySpeed           | [0, 500]    | 내 현재 속도 크기
-8      | mySpeedNorm       | [0, 1]      | mySpeed / 500
-9      | oppSpeed          | [0, 500]    | 상대 현재 속도 크기
-10     | oppSpeedNorm      | [0, 1]      | 상대 속도 / 500
-11     | speedRatioNorm    | [0, 1]      | 내 속도 / 상대 속도 / 3
-12     | closingSpeedNorm  | [-1, 1]     | 거리 변화율 / 400
-13     | collisionTimeNorm | [0, 1]      | 충돌 예상시간 / 5초
-14     | projectileDist    | [0, 1]      | 최근접 투사체 거리 / 960
-15     | elapsedNorm       | [0, 1]      | 경과 시간 / 30초
+인덱스 | 이름            | 범위    | 설명
+───────┼────────────────┼─────────┼──────────────────────────
+0      | hpRatio        | [0, 1]  | 내 HP / maxHP
+1      | oppHpRatio     | [0, 1]  | 상대 HP / maxHP
+2      | toOppX         | [-1, 1] | 상대 위치 X / arenaW
+3      | toOppY         | [-1, 1] | 상대 위치 Y / arenaH
+4      | myVx           | [-1, 1] | 내 속도 X / MAX_SPEED
+5      | myVy           | [-1, 1] | 내 속도 Y / MAX_SPEED
+6      | oppVx          | [-1, 1] | 상대 속도 X / MAX_SPEED
+7      | oppVy          | [-1, 1] | 상대 속도 Y / MAX_SPEED
+8      | projToMeX      | [-1, 1] | 최근접 투사체 위치 X / arenaW
+9      | projToMeY      | [-1, 1] | 최근접 투사체 위치 Y / arenaH
+10     | projVx         | [-1, 1] | 최근접 투사체 속도 X / MAX_SPEED
+11     | projVy         | [-1, 1] | 최근접 투사체 속도 Y / MAX_SPEED
+12     | projCount      | [0, 1]  | 투사체 개수 / 10
+13     | elapsed        | [0, 1]  | 경과시간 / overtimeStartsAt
 ```
+
+**상수**: `MAX_SPEED=1000`(Trickster 풀투자 Rush 기준), `arenaW/H` = `sim.width/height`
 
 ### 2.2 특성 추출
 
@@ -615,55 +617,62 @@ b = 0
 // scripts/rl/features.js
 import { Vector2 } from "../../src/core.js";
 
-function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+const MAX_SPEED = 1000;
 
 export function extractFeatures(fighter, opponent, sim) {
     const hpRatio = fighter.hp / fighter.maxHp;
     const oppHpRatio = opponent.hp / opponent.maxHp;
-    const maxHp = Math.max(fighter.maxHp, opponent.maxHp);
-    const hpAdvantage = maxHp > 0 ? (fighter.hp - opponent.hp) / maxHp : 0;
-
     const toOpp = Vector2.subtract(opponent.position, fighter.position);
-    const dist = toOpp.length();
-    const approachSpeed = dist > 0
-        ? opponent.velocity.dot(toOpp.normalize().scale(-1))
-        : 0;
 
-    const mySpeed = fighter.velocity.length();
-    const oppSpeed = opponent.velocity.length();
-    const speedRatio = oppSpeed > 0 ? mySpeed / oppSpeed : 999;
-    const estCollisionTime = approachSpeed > 10 ? dist / approachSpeed : 999;
-    let nearestProjectileDist = 999;
+    let nearestDist = 999;
+    let pX = 0, pY = 0, pVx = 0, pVy = 0, pCount = 0;
     for (const e of sim.entities) {
         if (e === fighter || e === opponent || e.isExpired || !e.velocity) continue;
         if (e.owner === fighter) continue;
-        const d = Vector2.subtract(fighter.position, e.position).length();
-        if (d < nearestProjectileDist) nearestProjectileDist = d;
+        pCount++;
+        const toMe = Vector2.subtract(e.position, fighter.position);
+        const d = toMe.length();
+        if (d < nearestDist) {
+            nearestDist = d;
+            pX = toMe.x; pY = toMe.y;
+            pVx = e.velocity.x; pVy = e.velocity.y;
+        }
     }
-    const elapsed = sim.elapsed ?? 0;
+
+    const arenaW = sim.width ?? 960;
+    const arenaH = sim.height ?? 960;
 
     return [
-        hpRatio,                                    // 0
-        oppHpRatio,                                 // 1
-        hpAdvantage,                                // 2
-        dist,                                       // 3
-        dist / 960,                                 // 4
-        approachSpeed,                              // 5
-        clamp(approachSpeed / 400, -1, 1),          // 6
-        mySpeed,                                    // 7
-        clamp(mySpeed / 500, 0, 1),                 // 8
-        oppSpeed,                                   // 9
-        clamp(oppSpeed / 500, 0, 1),                // 10
-        clamp(speedRatio / 3, 0, 1),                // 11
-        clamp(approachSpeed / 400, -1, 1),          // 12
-        clamp(estCollisionTime / 5, 0, 1),          // 13
-        clamp(nearestProjectileDist / 960, 0, 1),   // 14
-        clamp(elapsed / 30, 0, 1),                  // 15
+        hpRatio,
+        oppHpRatio,
+        clamp(toOpp.x / arenaW, -1, 1),
+        clamp(toOpp.y / arenaH, -1, 1),
+        clamp(fighter.velocity.x / MAX_SPEED, -1, 1),
+        clamp(fighter.velocity.y / MAX_SPEED, -1, 1),
+        clamp(opponent.velocity.x / MAX_SPEED, -1, 1),
+        clamp(opponent.velocity.y / MAX_SPEED, -1, 1),
+        clamp(pX / arenaW, -1, 1),
+        clamp(pY / arenaH, -1, 1),
+        clamp(pVx / MAX_SPEED, -1, 1),
+        clamp(pVy / MAX_SPEED, -1, 1),
+        clamp(pCount / 10, 0, 1),
+        clamp((sim.elapsed ?? 0) / (sim.overtimeStartsAt ?? 26), 0, 1),
     ];
 }
 
-export const FEATURE_DIM = 16;
+export const FEATURE_DIM = 14;
 ```
+
+### 2.3 설계 철학
+
+| 제거됨 | 이유 |
+|---|---|
+| `distance` 스칼라 | `toOppX, toOppY`로 NN이 계산 |
+| `approachSpeed` | 속도 벡터 + 위치 벡터로 내적 학습 |
+| `estCollisionTime` | 등속 가정 부정확, 벡터로 예측 |
+| `hpAdvantage` | `hpRatio + oppHpRatio`로 판단 |
+| `isRanged, isSlowed, hasSpeedBoost` | 속도 벡터에 이미 반영 |
+| `collisionImminent(bool)` | 임계값 하드코딩 제거, 원시 벡터로 대체 |
 
 ---
 
@@ -674,7 +683,7 @@ export const FEATURE_DIM = 16;
 ```javascript
 import * as tf from "@tensorflow/tfjs";
 
-export function createActorCriticNetworks(inputDim = 16, hiddenDim = 48) {
+export function createActorCriticNetworks(inputDim = 14, hiddenDim = 48) {
     return {
         actor: createActorNetwork(inputDim, hiddenDim),   // 액션 확률 π(a|s)
         critic: createCriticNetwork(inputDim, hiddenDim), // 상태 가치 V(s)
@@ -815,7 +824,7 @@ evaluate(sim, fighter, delta) {
 scripts/rl/
 ├── train.mjs              ← node scripts/rl/train.mjs
 ├── policyNetwork.js       ← createActorCriticNetworks(), trainPpoEpochs()
-├── features.js            ← extractFeatures() — 16차원
+├── features.js            ← extractFeatures() — 14차원
 └── normalizer.js          ← RunningNormalizer — Welford
 
 package.json               ← "dependencies": { "@tensorflow/tfjs": "^4" }
