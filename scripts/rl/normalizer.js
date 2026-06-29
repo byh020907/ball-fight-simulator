@@ -21,4 +21,12 @@ export class RunningNormalizer {
         }
         return r;
     }
+
+    clone() {
+        const next = new RunningNormalizer(this.mean.length);
+        next.n = this.n;
+        next.mean = [...this.mean];
+        next.M2 = [...this.M2];
+        return next;
+    }
 }

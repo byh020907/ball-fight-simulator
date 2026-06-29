@@ -4,7 +4,7 @@ import { createRoster } from "../../src/roster.js";
 import { applyStatAllocation, createEmptyStatAllocation } from "../../src/statAllocation.js";
 import { BattleSimulation } from "../../src/simulation/battleSimulation.js";
 import { AIActionController } from "../../src/simulation/aiActionController.js";
-import { findActionById } from "../../src/clickActions.js";
+import { findActionById, getActionPool } from "../../src/clickActions.js";
 import {
     createActorCriticNetworks,
     predictValues,
@@ -23,6 +23,15 @@ function readNumberEnv(name, fallback) {
     return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function readIdListEnv(name, fallback = ["all"]) {
+    const raw = process.env[name];
+    if (raw == null || raw.trim() === "") return fallback;
+    return raw
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+}
+
 const CONFIG = {
     episodes: readNumberEnv("RL_EPISODES", 1500),
     lr: readNumberEnv("RL_LR", 3e-4),
@@ -36,13 +45,13 @@ const CONFIG = {
     minDecisionFrames: readNumberEnv("RL_MIN_DECISION_FRAMES", 30),
     maxEpisodeSeconds: readNumberEnv("RL_MAX_EPISODE_SECONDS", 35),
     logInterval: readNumberEnv("RL_LOG_INTERVAL", 100),
+    normalizerSamples: readNumberEnv("RL_NORMALIZER_SAMPLES", 1000),
+    characterIds: readIdListEnv("RL_CHARACTERS"),
+    actionIds: readIdListEnv("RL_ACTIONS"),
+    maxCombos: readNumberEnv("RL_MAX_COMBOS", Number.POSITIVE_INFINITY),
     inputDim: FEATURE_DIM,
     hiddenDim: readNumberEnv("RL_HIDDEN_DIM", 16),
-    combos: [
-        { charId: "dash", actionId: "rush" },
-        { charId: "archer", actionId: "time_warp" },
-        { charId: "eater", actionId: "life_steal" }
-    ],
+    opponentMode: (process.env.RL_OPPONENT_MODE ?? "fixed").toLowerCase(),
     fixedOpponent: process.env.RL_FIXED_OPPONENT ?? "rage"
 };
 
@@ -58,7 +67,7 @@ function createTrainingSimulation(rlSpec, opponentSpec) {
 }
 
 function initNormalizer(normalizer, roster) {
-    for (let i = 0; i < 1000; i++) {
+    for (let i = 0; i < CONFIG.normalizerSamples; i++) {
         const a = roster[Math.floor(Math.random() * roster.length)];
         const b = pickRandom(roster, a.id);
         const sim = createTrainingSimulation(a, b);
@@ -71,6 +80,43 @@ function initNormalizer(normalizer, roster) {
             }
         }
     }
+}
+
+function selectIds(requestedIds, availableIds, label) {
+    if (requestedIds.length === 0 || requestedIds.includes("all")) return availableIds;
+    const available = new Set(availableIds);
+    const unknown = requestedIds.filter((id) => !available.has(id));
+    if (unknown.length > 0) {
+        throw new Error(`${label} ID를 찾을 수 없습니다: ${unknown.join(", ")}`);
+    }
+    return requestedIds;
+}
+
+function buildTrainingCombos(roster, actions) {
+    const characterIds = selectIds(
+        CONFIG.characterIds,
+        roster.map((fighter) => fighter.id),
+        "캐릭터"
+    );
+    const actionIds = selectIds(
+        CONFIG.actionIds,
+        actions.map((action) => action.id),
+        "액션"
+    );
+    const combos = characterIds.flatMap((charId) => actionIds.map((actionId) => ({ charId, actionId })));
+    return combos.slice(0, Math.min(CONFIG.maxCombos, combos.length));
+}
+
+function pickOpponentSpec(roster, rlSpec) {
+    if (CONFIG.opponentMode === "random") {
+        return pickRandom(roster, rlSpec.id);
+    }
+
+    const fixed = roster.find((fighter) => fighter.id === CONFIG.fixedOpponent);
+    if (fixed && fixed.id !== rlSpec.id) {
+        return fixed;
+    }
+    return pickRandom(roster, rlSpec.id);
 }
 
 function canConsiderAction(sim, fighter, action, lastDecisionFrame) {
@@ -171,10 +217,10 @@ function buildPpoBatch(critic, trajectories) {
     return { obs, actions, oldLogProbs, returns, advantages, weights };
 }
 
-async function trainCombo(roster, charId, actionId) {
+async function trainCombo(roster, combo, baseNormalizer, index, total) {
     const { actor, critic } = createActorCriticNetworks(CONFIG.inputDim, CONFIG.hiddenDim);
     const optimizer = tf.train.adam(CONFIG.lr);
-    const normalizer = new RunningNormalizer(CONFIG.inputDim);
+    const normalizer = baseNormalizer.clone();
     let evalWin = 0;
     let evalTotal = 0;
     let lastLoss = 0;
@@ -183,18 +229,24 @@ async function trainCombo(roster, charId, actionId) {
     const useWindow = [];
     const probabilityWindow = [];
 
-    const rlSpec = roster.find((f) => f.id === charId);
-    const fixedAction = findActionById(actionId);
-    const opponentSpec = roster.find((f) => f.id === CONFIG.fixedOpponent);
-    if (!rlSpec || !fixedAction || !opponentSpec) {
-        throw new Error(`학습 조합을 찾을 수 없습니다: ${charId} × ${actionId}`);
+    const rlSpec = roster.find((f) => f.id === combo.charId);
+    const fixedAction = findActionById(combo.actionId);
+    if (!rlSpec || !fixedAction) {
+        throw new Error(`학습 조합을 찾을 수 없습니다: ${combo.charId} × ${combo.actionId}`);
     }
 
-    console.log(`\n=== ${rlSpec.name} × ${fixedAction.name} vs ${opponentSpec.name} ===`);
-    initNormalizer(normalizer, roster);
+    const fixedOpponentSpec = roster.find((fighter) => fighter.id === CONFIG.fixedOpponent);
+    const opponentLabel =
+        CONFIG.opponentMode === "random"
+            ? "Random"
+            : fixedOpponentSpec?.id === rlSpec.id
+              ? `Random (fixed self fallback: ${fixedOpponentSpec.name})`
+              : (fixedOpponentSpec?.name ?? CONFIG.fixedOpponent);
+    console.log(`\n=== [${index}/${total}] ${rlSpec.name} × ${fixedAction.name} vs ${opponentLabel} ===`);
 
     const batch = [];
     for (let ep = 0; ep < CONFIG.episodes; ep++) {
+        const opponentSpec = pickOpponentSpec(roster, rlSpec);
         const episode = runEpisode({ actor, normalizer, rlSpec, opponentSpec, fixedAction });
         batch.push(episode);
         evalTotal++;
@@ -245,16 +297,25 @@ async function trainCombo(roster, charId, actionId) {
     actor.dispose();
     critic.dispose();
     optimizer.dispose?.();
-    return { charId, actionId, winRate, loss: lastLoss };
+    return { charId: combo.charId, actionId: combo.actionId, winRate, loss: lastLoss };
 }
 
 async function main() {
     await prepareTensorflowBackend();
     const roster = createRoster();
+    const actions = getActionPool();
+    const combos = buildTrainingCombos(roster, actions);
+    const baseNormalizer = new RunningNormalizer(CONFIG.inputDim);
     const results = [];
 
-    for (const { charId, actionId } of CONFIG.combos) {
-        results.push(await trainCombo(roster, charId, actionId));
+    console.log(
+        `학습 조합 ${combos.length}개: 캐릭터 ${new Set(combos.map((combo) => combo.charId)).size}개 × ` +
+            `액션 ${new Set(combos.map((combo) => combo.actionId)).size}개, opponentMode=${CONFIG.opponentMode}`
+    );
+    initNormalizer(baseNormalizer, roster);
+
+    for (let i = 0; i < combos.length; i++) {
+        results.push(await trainCombo(roster, combos[i], baseNormalizer, i + 1, combos.length));
     }
 
     console.log("\n=== 조합별 결과 ===");
