@@ -736,6 +736,7 @@ const CONFIG = {
     episodes: 20000, lr: 3e-4, entropyCoef: 0.01,
     gamma: 0.97, batchSize: 16, clipRatio: 0.2,
     ppoEpochs: 3, minDecisionFrames: 10, hpGate: 0.3, maxDist: 400,
+    rewardHpWeight: 0.5, logInterval: 100,
 };
 
 async function main() {
@@ -747,7 +748,7 @@ async function main() {
     initNormalizer(normalizer, roster);
 
     for (let ep = 0; ep < CONFIG.episodes; ep++) {
-        // ... rollout 1 episode → obs/action/oldLogProb trajectory, reward ...
+        // ... rollout 1 episode → obs/action/oldLogProb trajectory, shaped reward ...
 
         // ── 배치 업데이트 ──
         if (batchFull) {
@@ -829,6 +830,8 @@ package.json               ← "dependencies": { "@tensorflow/tfjs": "^4" }
 | `batchSize` | 16 | 배치 에피소드 수 |
 | `clipRatio` | 0.2 | PPO ratio clipping |
 | `ppoEpochs` | 3 | 같은 배치 반복 학습 횟수 |
+| `rewardHpWeight` | 0.5 | 승패 보상에 더하는 최종 HP 차이 가중치 |
+| `logInterval` | 100 | 최근 승률/보상/사용률 로그 윈도우 |
 | `minDecisionFrames` | 10 | 결정 최소 간격 |
 | `hpGate` | 0.3 | HP 30%↑ |
 | `maxDist` | 400 | 거리 400px↓ |

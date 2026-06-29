@@ -207,12 +207,18 @@
 - 결정: `scripts/rl/policyNetwork.js`에 TensorFlow.js 기반 Actor/Critic 생성, Bernoulli sampling, Critic value prediction, PPO clipped update를 구현하고 `scripts/rl/train.mjs`를 에피소드 rollout → discounted return/advantage batch → PPO epoch 학습 흐름으로 변경. Node 실행 시 CPU 백엔드를 명시하고 짧은 학습 실행용 환경변수를 지원. 액션별 `getFailureReason()`은 PPO rollout의 불가능/중복 액션 필터로 사용
 - 영향: `scripts/rl/*`, `src/clickActions.js`, `tests/regression.mjs`, `docs/rl-optimization-guide.md`, `package.json`, `package-lock.json`
 
+## [L1] 2026-06-29 — PPO 학습률 확인 및 보상/로그 보강
+- 맥락: 300 에피소드 비교에서 `lr=3e-4`, `lr=1e-3`, `lr=0` 간 승률 개선이 뚜렷하지 않았고, Eater × LifeSteal은 Rage 상대 승률이 계속 0%라 승패 보상만으로 학습 신호가 부족했음
+- 결정: 최종 승패 보상에 HP 차이 shaped reward(`rewardHpWeight`)를 추가하고, 최근 윈도우 기준 승률/평균 보상/액션 사용률/Actor 평균 확률 로그를 출력해 학습 추세를 확인 가능하게 함. 확인 결과 정책 확률은 움직이나 승률 개선은 아직 제한적이며, 다음 단계는 상대/보상 커리큘럼 조정 필요
+- 영향: `scripts/rl/train.mjs`, `docs/rl-optimization-guide.md`, `SESSION-HANDOFF.md`
+
 ## 진행 중 이슈
 - 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
 
 ## 다음 할 일
-1. PPO 학습 결과 저장/로드 전략 결정: `@tensorflow/tfjs` 유지 시 커스텀 직렬화, `tfjs-node` 도입 시 `file://` 저장
-2. 학습된 Actor를 `AIActionController.evaluate()` 또는 별도 추론 어댑터로 붙이는 브라우저 추론 경로 설계
-3. 원격 배포 반영 후 실제 브라우저/모바일에서 스탯 배분 초기화 race 재검증
-4. 사냥터 MVP 구현 전, `getEnemiesOf()`가 필요한 광역/다수 대상 능력 목록 점검
-5. OP 조합 파라미터 튜닝
+1. PPO 커리큘럼 조정: Eater처럼 계속 지는 조합은 Rage 고정 상대 대신 더 쉬운 상대/랜덤 상대/중간 보상으로 학습 신호 확보
+2. PPO 학습 결과 저장/로드 전략 결정: `@tensorflow/tfjs` 유지 시 커스텀 직렬화, `tfjs-node` 도입 시 `file://` 저장
+3. 학습된 Actor를 `AIActionController.evaluate()` 또는 별도 추론 어댑터로 붙이는 브라우저 추론 경로 설계
+4. 원격 배포 반영 후 실제 브라우저/모바일에서 스탯 배분 초기화 race 재검증
+5. 사냥터 MVP 구현 전, `getEnemiesOf()`가 필요한 광역/다수 대상 능력 목록 점검
+6. OP 조합 파라미터 튜닝

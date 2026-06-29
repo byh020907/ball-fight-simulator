@@ -34,6 +34,8 @@ const CONFIG = {
     entropyCoef: readNumberEnv("RL_ENTROPY_COEF", 0.01),
     minDecisionFrames: readNumberEnv("RL_MIN_DECISION_FRAMES", 30),
     maxEpisodeSeconds: readNumberEnv("RL_MAX_EPISODE_SECONDS", 35),
+    rewardHpWeight: readNumberEnv("RL_REWARD_HP_WEIGHT", 0.5),
+    logInterval: readNumberEnv("RL_LOG_INTERVAL", 100),
     inputDim: FEATURE_DIM,
     hiddenDim: readNumberEnv("RL_HIDDEN_DIM", 16),
     combos: [
@@ -89,6 +91,8 @@ function runEpisode({ actor, normalizer, rlSpec, opponentSpec, fixedAction }) {
     fighter.clickActionName = fixedAction.name;
 
     const trajectory = [];
+    let actionUseCount = 0;
+    let probabilitySum = 0;
     let lastDecisionFrame = -CONFIG.minDecisionFrames;
 
     while (!sim.finished && sim.elapsed < CONFIG.maxEpisodeSeconds) {
@@ -104,19 +108,32 @@ function runEpisode({ actor, normalizer, rlSpec, opponentSpec, fixedAction }) {
         trajectory.push({
             obs,
             action: decision.action,
-            oldLogProb: decision.logProb
+            oldLogProb: decision.logProb,
+            probability: decision.probability
         });
+        probabilitySum += decision.probability;
 
         lastDecisionFrame = Math.floor((sim.elapsed ?? 0) * 60);
         if (decision.action === 1) {
+            actionUseCount++;
             const cost = Math.ceil((fighter.maxHp * fixedAction.hpCostPercent) / 100);
             const paid = fighter.actionContext.spendHpForAction(fighter, cost);
             if (paid > 0) sim.scheduleAction(fixedAction, fighter, paid);
         }
     }
 
-    const reward = sim.winner && sim.winner.id === fighter.id ? 1.0 : -1.0;
-    return { trajectory, reward };
+    const opponent = sim.fighters.find((candidate) => candidate !== fighter);
+    const won = sim.winner && sim.winner.id === fighter.id;
+    const terminalReward = won ? 1.0 : -1.0;
+    const hpDelta = opponent ? fighter.hp / fighter.maxHp - opponent.hp / opponent.maxHp : 0;
+    const reward = terminalReward + CONFIG.rewardHpWeight * hpDelta;
+    return {
+        trajectory,
+        reward,
+        won,
+        actionUseRate: trajectory.length > 0 ? actionUseCount / trajectory.length : 0,
+        actionProbability: trajectory.length > 0 ? probabilitySum / trajectory.length : 0
+    };
 }
 
 function normalize(values) {
@@ -164,6 +181,10 @@ async function trainCombo(roster, charId, actionId) {
     let evalWin = 0;
     let evalTotal = 0;
     let lastLoss = 0;
+    const rewardWindow = [];
+    const winWindow = [];
+    const useWindow = [];
+    const probabilityWindow = [];
 
     const rlSpec = roster.find((f) => f.id === charId);
     const fixedAction = findActionById(actionId);
@@ -180,7 +201,15 @@ async function trainCombo(roster, charId, actionId) {
         const episode = runEpisode({ actor, normalizer, rlSpec, opponentSpec, fixedAction });
         batch.push(episode);
         evalTotal++;
-        if (episode.reward > 0) evalWin++;
+        if (episode.won) evalWin++;
+        rewardWindow.push(episode.reward);
+        winWindow.push(episode.won ? 1 : 0);
+        useWindow.push(episode.actionUseRate);
+        probabilityWindow.push(episode.actionProbability);
+        if (rewardWindow.length > CONFIG.logInterval) rewardWindow.shift();
+        if (winWindow.length > CONFIG.logInterval) winWindow.shift();
+        if (useWindow.length > CONFIG.logInterval) useWindow.shift();
+        if (probabilityWindow.length > CONFIG.logInterval) probabilityWindow.shift();
 
         if (batch.length >= CONFIG.batchSize || ep === CONFIG.episodes - 1) {
             const ppoBatch = buildPpoBatch(critic, batch);
@@ -194,10 +223,20 @@ async function trainCombo(roster, charId, actionId) {
             batch.length = 0;
         }
 
-        if (ep % 300 === 0) {
+        if (ep % CONFIG.logInterval === 0) {
             const winRate = evalWin / Math.max(1, evalTotal);
+            const windowWinRate = winWindow.reduce((sum, value) => sum + value, 0) / Math.max(1, winWindow.length);
+            const windowReward = rewardWindow.reduce((sum, value) => sum + value, 0) / Math.max(1, rewardWindow.length);
+            const windowUseRate = useWindow.reduce((sum, value) => sum + value, 0) / Math.max(1, useWindow.length);
+            const windowProbability =
+                probabilityWindow.reduce((sum, value) => sum + value, 0) / Math.max(1, probabilityWindow.length);
             console.log(
-                `  Ep ${ep}: wr=${(winRate * 100).toFixed(1)}% loss=${lastLoss.toFixed(4)} ` +
+                `  Ep ${ep}: wr=${(winRate * 100).toFixed(1)}% ` +
+                    `win${CONFIG.logInterval}=${(windowWinRate * 100).toFixed(1)}% ` +
+                    `reward${CONFIG.logInterval}=${windowReward.toFixed(3)} ` +
+                    `use${CONFIG.logInterval}=${(windowUseRate * 100).toFixed(1)}% ` +
+                    `prob${CONFIG.logInterval}=${(windowProbability * 100).toFixed(1)}% ` +
+                    `loss=${lastLoss.toFixed(4)} ` +
                     `tensors=${tf.memory().numTensors}`
             );
         }
