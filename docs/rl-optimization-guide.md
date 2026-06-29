@@ -734,9 +734,9 @@ import { RunningNormalizer } from "./normalizer.js";
 
 const CONFIG = {
     episodes: 20000, lr: 3e-4, entropyCoef: 0.01,
-    gamma: 0.97, batchSize: 16, clipRatio: 0.2,
+    gamma: 0.97, batchSize: 64, miniBatchSize: 128, clipRatio: 0.2,
     ppoEpochs: 3, minDecisionFrames: 10, hpGate: 0.3, maxDist: 400,
-    rewardHpWeight: 0.5, logInterval: 100,
+    logInterval: 100,
 };
 
 async function main() {
@@ -748,12 +748,15 @@ async function main() {
     initNormalizer(normalizer, roster);
 
     for (let ep = 0; ep < CONFIG.episodes; ep++) {
-        // ... rollout 1 episode → obs/action/oldLogProb trajectory, shaped reward ...
+        // ... rollout 1 episode → obs/action/oldLogProb trajectory, terminal win/loss reward ...
 
         // ── 배치 업데이트 ──
         if (batchFull) {
             const ppoBatch = buildPpoBatch(critic, batchTraj);
-            trainPpoEpochs(actor, critic, optimizer, ppoBatch, { epochs: CONFIG.ppoEpochs });
+            trainPpoEpochs(actor, critic, optimizer, ppoBatch, {
+                epochs: CONFIG.ppoEpochs,
+                miniBatchSize: CONFIG.miniBatchSize,
+            });
         }
     }
 
@@ -827,10 +830,10 @@ package.json               ← "dependencies": { "@tensorflow/tfjs": "^4" }
 | `lr` | 3e-4 | Adam learning rate |
 | `entropyCoef` | 0.01 | 탐험 장려 |
 | `gamma` | 0.97 | 시간 가중치 감가율 |
-| `batchSize` | 16 | 배치 에피소드 수 |
+| `batchSize` | 64 | PPO rollout buffer에 모을 에피소드 수 |
+| `miniBatchSize` | 128 | PPO 업데이트 시 shuffle 후 나눌 decision 샘플 수 |
 | `clipRatio` | 0.2 | PPO ratio clipping |
 | `ppoEpochs` | 3 | 같은 배치 반복 학습 횟수 |
-| `rewardHpWeight` | 0.5 | 승패 보상에 더하는 최종 HP 차이 가중치 |
 | `logInterval` | 100 | 최근 승률/보상/사용률 로그 윈도우 |
 | `minDecisionFrames` | 10 | 결정 최소 간격 |
 | `hpGate` | 0.3 | HP 30%↑ |

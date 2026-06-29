@@ -82,6 +82,26 @@ function disposeBatchTensors(tensors) {
     }
 }
 
+function shuffledIndices(size) {
+    const indices = Array.from({ length: size }, (_, index) => index);
+    for (let i = indices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    return indices;
+}
+
+function sliceBatch(batch, indices) {
+    return {
+        obs: indices.map((index) => batch.obs[index]),
+        actions: indices.map((index) => batch.actions[index]),
+        oldLogProbs: indices.map((index) => batch.oldLogProbs[index]),
+        returns: indices.map((index) => batch.returns[index]),
+        advantages: indices.map((index) => batch.advantages[index]),
+        weights: indices.map((index) => batch.weights[index])
+    };
+}
+
 function binaryLogProbTensor(actions, probabilities) {
     const probs = tf.clipByValue(probabilities, EPSILON, 1 - EPSILON);
     return tf.add(tf.mul(actions, tf.log(probs)), tf.mul(tf.sub(1, actions), tf.log(tf.sub(1, probs))));
@@ -120,17 +140,24 @@ export function trainPpoEpochs(actor, critic, optimizer, batch, options = {}) {
         epochs: options.epochs ?? 3,
         clipRatio: options.clipRatio ?? 0.2,
         valueCoef: options.valueCoef ?? 0.5,
-        entropyCoef: options.entropyCoef ?? 0.01
+        entropyCoef: options.entropyCoef ?? 0.01,
+        miniBatchSize: Math.max(1, Math.floor(options.miniBatchSize ?? batch.obs.length))
     };
-    const tensors = createBatchTensors(batch);
-    let loss = 0;
+    let lossTotal = 0;
+    let updateCount = 0;
 
     for (let i = 0; i < config.epochs; i++) {
-        const cost = optimizer.minimize(() => ppoLoss(actor, critic, tensors, config), true);
-        loss = cost.dataSync()[0];
-        cost.dispose();
+        const indices = shuffledIndices(batch.obs.length);
+        for (let start = 0; start < indices.length; start += config.miniBatchSize) {
+            const miniBatch = sliceBatch(batch, indices.slice(start, start + config.miniBatchSize));
+            const tensors = createBatchTensors(miniBatch);
+            const cost = optimizer.minimize(() => ppoLoss(actor, critic, tensors, config), true);
+            lossTotal += cost.dataSync()[0];
+            updateCount++;
+            cost.dispose();
+            disposeBatchTensors(tensors);
+        }
     }
 
-    disposeBatchTensors(tensors);
-    return { loss, samples: batch.obs.length };
+    return { loss: updateCount > 0 ? lossTotal / updateCount : 0, samples: batch.obs.length };
 }

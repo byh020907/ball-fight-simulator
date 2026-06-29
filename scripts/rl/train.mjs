@@ -27,14 +27,14 @@ const CONFIG = {
     episodes: readNumberEnv("RL_EPISODES", 1500),
     lr: readNumberEnv("RL_LR", 3e-4),
     gamma: readNumberEnv("RL_GAMMA", 0.97),
-    batchSize: readNumberEnv("RL_BATCH_SIZE", 16),
+    batchSize: readNumberEnv("RL_BATCH_SIZE", 64),
+    miniBatchSize: readNumberEnv("RL_MINI_BATCH_SIZE", 128),
     ppoEpochs: readNumberEnv("RL_PPO_EPOCHS", 3),
     clipRatio: readNumberEnv("RL_CLIP_RATIO", 0.2),
     valueCoef: readNumberEnv("RL_VALUE_COEF", 0.5),
     entropyCoef: readNumberEnv("RL_ENTROPY_COEF", 0.01),
     minDecisionFrames: readNumberEnv("RL_MIN_DECISION_FRAMES", 30),
     maxEpisodeSeconds: readNumberEnv("RL_MAX_EPISODE_SECONDS", 35),
-    rewardHpWeight: readNumberEnv("RL_REWARD_HP_WEIGHT", 0.5),
     logInterval: readNumberEnv("RL_LOG_INTERVAL", 100),
     inputDim: FEATURE_DIM,
     hiddenDim: readNumberEnv("RL_HIDDEN_DIM", 16),
@@ -122,11 +122,8 @@ function runEpisode({ actor, normalizer, rlSpec, opponentSpec, fixedAction }) {
         }
     }
 
-    const opponent = sim.fighters.find((candidate) => candidate !== fighter);
     const won = sim.winner && sim.winner.id === fighter.id;
-    const terminalReward = won ? 1.0 : -1.0;
-    const hpDelta = opponent ? fighter.hp / fighter.maxHp - opponent.hp / opponent.maxHp : 0;
-    const reward = terminalReward + CONFIG.rewardHpWeight * hpDelta;
+    const reward = won ? 1.0 : -1.0;
     return {
         trajectory,
         reward,
@@ -217,7 +214,8 @@ async function trainCombo(roster, charId, actionId) {
                 epochs: CONFIG.ppoEpochs,
                 clipRatio: CONFIG.clipRatio,
                 valueCoef: CONFIG.valueCoef,
-                entropyCoef: CONFIG.entropyCoef
+                entropyCoef: CONFIG.entropyCoef,
+                miniBatchSize: CONFIG.miniBatchSize
             });
             lastLoss = result.loss;
             batch.length = 0;

@@ -3227,7 +3227,7 @@ async function testPpoActorCriticUtilities() {
             advantages: [1, -1],
             weights: [1, 1]
         },
-        { epochs: 1, entropyCoef: 0 }
+        { epochs: 1, entropyCoef: 0, miniBatchSize: 1 }
     );
     assert.equal(result.samples, 2, "PPO update should report trained samples");
     assert.ok(Number.isFinite(result.loss), "PPO loss should stay finite");
