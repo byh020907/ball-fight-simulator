@@ -60,7 +60,8 @@ const CONFIG = {
     hiddenDim: readNumberEnv("RL_HIDDEN_DIM", 16),
     opponentMode: (process.env.RL_OPPONENT_MODE ?? "random").toLowerCase(),
     fixedOpponent: process.env.RL_FIXED_OPPONENT ?? "rage",
-    modelDir: process.env.RL_MODEL_DIR ?? "models"
+    modelDir: process.env.RL_MODEL_DIR ?? "models",
+    cpuThreads: readNumberEnv("RL_CPU_THREADS", 0)  // 0=모든 코어 사용, 2=절반, 1=최저발열
 };
 
 function pickRandom(roster, excludeId) {
@@ -462,6 +463,11 @@ async function trainCombo(roster, combo, baseNormalizer, index, total) {
 }
 
 async function main() {
+    // CPU 코어 제한 (Eigen 백엔드가 초기화 전에 읽어야 함)
+    if (CONFIG.cpuThreads > 0) {
+        process.env.OMP_NUM_THREADS = String(CONFIG.cpuThreads);
+        console.log(`CPU 쓰레드 제한: ${CONFIG.cpuThreads}개`);
+    }
     await prepareTensorflowBackend();
     const roster = createRoster();
     const actions = getActionPool();
@@ -509,10 +515,14 @@ node scripts/rl/train.mjs [--help]
   RL_LR=0.0003             학습률
   RL_THROTTLE_MS=0         에피소드 간 대기 (ms)
   RL_BATCH_THROTTLE_MS=0   배치 학습 간 대기 (ms, 소음↓)
+  RL_CPU_THREADS=0         CPU 코어 제한 (1~4, 0=전체, 발열↓)
 
 예시:
-  # 저소음 모드 (배치 학습 후 100ms 숨 돌리기)
-  $env:RL_BATCH_THROTTLE_MS=100; node scripts/rl/train.mjs
+  # 저소음 풀세트 (2코어 + 배치 간격)
+  $env:RL_CPU_THREADS=2; $env:RL_BATCH_THROTTLE_MS=300; node scripts/rl/train.mjs
+
+  # 노트북 최저발열 (1코어)
+  $env:RL_CPU_THREADS=1; $env:RL_BATCH_THROTTLE_MS=500; node scripts/rl/train.mjs
 
   # Dash만
   $env:RL_CHARACTERS="dash"; node scripts/rl/train.mjs
