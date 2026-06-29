@@ -1,6 +1,7 @@
 // scripts/rl/train.mjs - 캐릭터/액션 조합별 PPO 학습
 import * as tf from "@tensorflow/tfjs";
 import fs from "fs";
+import path from "path";
 import { createRoster } from "../../src/roster.js";
 import { applyStatAllocation, createEmptyStatAllocation } from "../../src/statAllocation.js";
 import { BattleSimulation } from "../../src/simulation/battleSimulation.js";
@@ -58,7 +59,8 @@ const CONFIG = {
     inputDim: FEATURE_DIM,
     hiddenDim: readNumberEnv("RL_HIDDEN_DIM", 16),
     opponentMode: (process.env.RL_OPPONENT_MODE ?? "random").toLowerCase(),
-    fixedOpponent: process.env.RL_FIXED_OPPONENT ?? "rage"
+    fixedOpponent: process.env.RL_FIXED_OPPONENT ?? "rage",
+    modelDir: process.env.RL_MODEL_DIR ?? "models"
 };
 
 function pickRandom(roster, excludeId) {
@@ -204,6 +206,75 @@ function summarizeEpisodes(episodes) {
 function formatPercent(value) {
     return `${(value * 100).toFixed(1)}%`;
 }
+
+// ── 모델 저장 ──
+
+/** ArrayBuffer → base64 (Node.js Buffer 사용) */
+function bufferToBase64(buffer) {
+    return Buffer.from(buffer).toString("base64");
+}
+
+/**
+ * 학습된 actor + normalizer + 메타데이터를 단일 JSON 파일로 저장.
+ * 포맷: models/{actionId}/{charId}.json
+ *
+ * 파일 구조:
+ *   modelTopology  — tf.LayersModel.toJSON() 토폴로지
+ *   weightSpecs    — 가중치 메타 (name, shape, dtype)
+ *   weightData     — 가중치 값을 base64 인코딩한 문자열
+ *   normalizer     — { mean: number[], std: number[] }
+ *   charId, actionId, trainWinRate, ...
+ *
+ * 게임에서 로드:
+ *   RLPolicy.fromJson(fetch("models/rush/dash.json").then(r => r.json()))
+ */
+async function saveModel(actor, normalizer, metadata) {
+    // TF.js 모델 아티팩트 추출
+    const artifacts = await new Promise((resolve) => {
+        actor.save(
+            tf.io.withSaveHandler(async (artifacts) => {
+                resolve(artifacts);
+                return { modelArtifactsInfo: {} };
+            })
+        );
+    });
+
+    // RunningNormalizer의 Welford state → std 계산
+    const std = normalizer.M2.map((m2, i) =>
+        normalizer.n > 1 ? Math.sqrt(m2 / (normalizer.n - 1)) : 1
+    );
+
+    const modelJson = {
+        // ── TF.js 표준 필드 (tf.io.fromMemory 로 복원) ──
+        modelTopology: artifacts.modelTopology,
+        weightSpecs: artifacts.weightSpecs,
+        weightData: bufferToBase64(artifacts.weightData),
+
+        // ── 커스텀 메타 ──
+        format: "ball-fight-rl-v1",
+        ...metadata,
+        normalizer: {
+            mean: [...normalizer.mean],
+            std
+        },
+        trainedAt: new Date().toISOString(),
+        config: {
+            hiddenDim: CONFIG.hiddenDim,
+            episodes: CONFIG.episodes,
+            lr: CONFIG.lr,
+            gamma: CONFIG.gamma,
+            opponentMode: CONFIG.opponentMode
+        }
+    };
+
+    const outDir = path.resolve(CONFIG.modelDir, metadata.actionId);
+    await fs.promises.mkdir(outDir, { recursive: true });
+    const filePath = path.join(outDir, `${metadata.charId}.json`);
+    await fs.promises.writeFile(filePath, JSON.stringify(modelJson, null, 2), "utf-8");
+    console.log(`  모델 저장: ${filePath}`);
+}
+
+// ── eval 유틸 ──
 
 function formatEval(label, evalResult) {
     if (!evalResult) return `${label}: skipped`;
@@ -365,6 +436,17 @@ async function trainCombo(roster, combo, baseNormalizer, index, total) {
         console.log(`  eval delta: ${formatPercent(evalDelta)}`);
     }
     console.log(`  -> train win ${(winRate * 100).toFixed(1)}%, loss ${lastLoss.toFixed(4)}`);
+
+    // ── 모델 저장 ──
+    const charName = rlSpec.name ?? combo.charId;
+    await saveModel(actor, normalizer, {
+        charId: combo.charId,
+        charName,
+        actionId: combo.actionId,
+        actionName: fixedAction.name,
+        trainWinRate: winRate
+    });
+
     actor.dispose();
     critic.dispose();
     optimizer.dispose?.();

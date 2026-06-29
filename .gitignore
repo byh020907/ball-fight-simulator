@@ -7,4 +7,5 @@ yarn-error.log*
 Thumbs.db
 .vscode/
 scripts/rl/report_*.json
+models/
 

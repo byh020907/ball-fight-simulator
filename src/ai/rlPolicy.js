@@ -2,6 +2,16 @@
 import * as tf from "@tensorflow/tfjs";
 import { extractFeatures } from "../../scripts/rl/features.js";
 
+/** base64 문자열 → ArrayBuffer (Node.js + 브라우저 호환) */
+function base64ToArrayBuffer(base64) {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+}
+
 /**
  * 학습 완료된 mean/std로 정규화만 수행 (online update 없음).
  *
@@ -51,7 +61,14 @@ export class RLPolicy {
      * @returns {Promise<RLPolicy>}
      */
     static async fromJson(modelJson) {
-        const actor = await tf.loadLayersModel(tf.io.fromMemory(modelJson));
+        // base64 → ArrayBuffer 복원 (TF.js 표준 형식)
+        const weightData = base64ToArrayBuffer(modelJson.weightData);
+        const artifacts = {
+            modelTopology: modelJson.modelTopology,
+            weightSpecs: modelJson.weightSpecs,
+            weightData
+        };
+        const actor = await tf.loadLayersModel(tf.io.fromMemory(artifacts));
         const norm = new StaticNormalizer(
             modelJson.normalizer.mean,
             modelJson.normalizer.std
