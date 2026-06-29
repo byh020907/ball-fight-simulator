@@ -1,10 +1,6 @@
-import { Vector2 } from "../core.js";
 import { pickRandomActions } from "../clickActions.js";
 
-const AI_MIN_HP_RATIO = 0.3;
-const AI_MIN_HP_AFTER_COST = 0.3;
-const AI_MAX_ACTION_DISTANCE = 400;
-const AI_MIN_INTERVAL = 1.0; // 연속 사용 방지용 최소 간격 (쿨다운 아님, 타이밍 대응 가능)
+const AI_MIN_INTERVAL = 1.0; // 연속 사용 방지용 최소 간격
 
 export class AIActionController {
     constructor(rng = Math.random) {
@@ -56,7 +52,7 @@ export class AIActionController {
     }
 
     evaluate(sim, fighter, delta) {
-        // 최소 간격 타이머 (연속 사용 방지, 쿨다운 아님)
+        // 최소 간격 타이머
         if (this._nextAvailableAt > 0) {
             this._nextAvailableAt -= delta;
             return null;
@@ -64,24 +60,16 @@ export class AIActionController {
 
         const action = this._chosenAction;
         if (!action) return null;
+
+        // 효과 중복 방지 (이미 발동 중이면 사용 불가)
         if (action.getFailureReason?.(sim, fighter)) return null;
 
-        const cost = Math.ceil((fighter.maxHp * action.hpCostPercent) / 100);
-
-        // HP 안전: 체력 80% 이상일 때만 사용
-        const hpRatio = fighter.hp / fighter.maxHp;
-        if (hpRatio < AI_MIN_HP_RATIO) return null;
-
-        // HP 코스트 후에도 30% 이상 남아야 함
-        const hpAfterCost = (fighter.hp - cost) / fighter.maxHp;
-        if (hpAfterCost < AI_MIN_HP_AFTER_COST) return null;
-
-        // 거리 제한: 상대가 400px 이내일 때만 사용 (원거리 낭비 방지)
+        // RL 정책 판단: HP·거리·속도·투사체 등 16차원 맥락을 종합해 사용 여부 결정
         const opponent = sim.getOpponent(fighter);
         if (!opponent) return null;
-        const dist = Vector2.subtract(opponent.position, fighter.position).length();
-        if (dist > AI_MAX_ACTION_DISTANCE) return null;
+        if (!this.rlPolicy?.shouldActivate(fighter, opponent, sim)) return null;
 
+        const cost = Math.ceil((fighter.maxHp * action.hpCostPercent) / 100);
         const paidCost = fighter.actionContext.spendHpForAction(fighter, cost);
         if (paidCost <= 0) return null;
 
