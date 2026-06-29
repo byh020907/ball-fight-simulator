@@ -2,7 +2,21 @@
 import * as tf from "@tensorflow/tfjs";
 import { extractFeatures } from "../../scripts/rl/features.js";
 
-/** 학습 완료된 mean/std로 정규화만 수행 (online update 없음) */
+/**
+ * 학습 완료된 mean/std로 정규화만 수행 (online update 없음).
+ *
+ * [왜 필요한가]
+ * extractFeatures의 출력은 [-1,1] 범위지만 피처별 분포가 불균등하다.
+ * 예: hpRatio는 평균 0.65, velocity.y는 평균 0.01 근처에서만 논다.
+ * 그냥 넣으면 NN이 변화폭 큰 hpRatio만 보고 학습하고, 작은 피처는 무시한다.
+ * 정규화로 모든 피처를 평균 0±std 1 로 맞춰야 동등한 비중으로 학습된다.
+ *
+ * [왜 학습한 mean/std를 저장해야 하는가]
+ * NN은 학습 당시의 mean/std에 맞춰 가중치를 튜닝했다.
+ * 추론 시 다른 mean/std로 정규화하면 완전히 왜곡된 입력이 되어 엉뚱한 확률이 나온다.
+ * → 모델 저장 시 normalizer.mean / normalizer.std 도 함께 저장하고,
+ *   게임에서는 이 클래스로 읽기 전용 복원하여 사용한다.
+ */
 class StaticNormalizer {
     constructor(mean, std) {
         this.mean = mean;
