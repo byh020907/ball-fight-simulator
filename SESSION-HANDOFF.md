@@ -197,10 +197,16 @@
 - 결정: BattleApp 생성 시 이미 존재하는 Alpine `allocation`을 즉시 흡수하고, 로딩 오버레이 제거를 Alpine `x-init`이 아니라 앱 모듈 import 완료 후로 이동. 최신 캐시 버전은 `0.23.3`으로 갱신
 - 영향: `src/app.js`, `index.html`, `src/patchNotes.js`, `tests/regression.mjs`
 
+## [L1] 2026-06-29 — PPO 학습 아키텍처 문서명 및 표현 정리
+- 맥락: AI 코드 개발 관련 문서가 숫자 임시 파일명으로 생성되어 있고, 제목/섹션/코드 주석에 장식 이모티콘이 많아 장기 문서로 쓰기 어려움
+- 결정: 문서 파일명을 `docs/ppo-learning-architecture.md`로 변경하고, PPO/Actor-Critic 데이터 흐름 설명에서 장식 이모티콘과 과한 표현을 문서형 톤으로 정리. 다음 개발 단계는 학습 코드 개선으로 이어감
+- 영향: `docs/ppo-learning-architecture.md`, `SESSION-HANDOFF.md`
+
 ## 진행 중 이슈
 - 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
 
 ## 다음 할 일
-1. 원격 배포 반영 후 실제 브라우저/모바일에서 스탯 배분 초기화 race 재검증
-2. 사냥터 MVP 구현 전, `getEnemiesOf()`가 필요한 광역/다수 대상 능력 목록 점검
-3. OP 조합 파라미터 튜닝
+1. 학습 코드 개선: `docs/ppo-learning-architecture.md`와 `docs/rl-optimization-guide.md` 기준으로 현재 `scripts/rl/` 구현과 `src/clickActions.js` 연동 지점 점검
+2. 원격 배포 반영 후 실제 브라우저/모바일에서 스탯 배분 초기화 race 재검증
+3. 사냥터 MVP 구현 전, `getEnemiesOf()`가 필요한 광역/다수 대상 능력 목록 점검
+4. OP 조합 파라미터 튜닝
