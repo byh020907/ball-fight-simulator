@@ -36,6 +36,8 @@ function readIdListEnv(name, fallback = ["all"]) {
 
 const CONFIG = {
     episodes: readNumberEnv("RL_EPISODES", 1500),
+    throttleMs: readNumberEnv("RL_THROTTLE_MS", 0),
+    batchThrottleMs: readNumberEnv("RL_BATCH_THROTTLE_MS", 0),
     lr: readNumberEnv("RL_LR", 3e-4),
     gamma: readNumberEnv("RL_GAMMA", 0.97),
     batchSize: readNumberEnv("RL_BATCH_SIZE", 64),
@@ -318,6 +320,9 @@ async function trainCombo(roster, combo, baseNormalizer, index, total) {
 
         if (batch.length >= CONFIG.batchSize || ep === CONFIG.episodes - 1) {
             const ppoBatch = buildPpoBatch(critic, batch);
+            if (CONFIG.batchThrottleMs > 0) {
+                await new Promise((resolve) => setTimeout(resolve, CONFIG.batchThrottleMs));
+            }
             const result = trainPpoEpochs(actor, critic, optimizer, ppoBatch, {
                 epochs: CONFIG.ppoEpochs,
                 clipRatio: CONFIG.clipRatio,
@@ -327,6 +332,10 @@ async function trainCombo(roster, combo, baseNormalizer, index, total) {
             });
             lastLoss = result.loss;
             batch.length = 0;
+        }
+
+        if (CONFIG.throttleMs > 0 && ep < CONFIG.episodes - 1) {
+            await new Promise((resolve) => setTimeout(resolve, CONFIG.throttleMs));
         }
 
         if (ep % CONFIG.logInterval === 0) {
@@ -409,15 +418,22 @@ PPO 학습 실행기
 node scripts/rl/train.mjs [--help]
 
 환경변수:
-  RL_CHARACTERS=id1,...   캐릭터 (기본: all)
-  RL_ACTIONS=id1,...      액션 (기본: all)
-  RL_EPISODES=1500        조합당 에피소드
-  RL_OPPONENT_MODE=random 상대 모드
-  RL_HIDDEN_DIM=16        은닉층 크기
+  RL_CHARACTERS=id1,...    캐릭터 (기본: all)
+  RL_ACTIONS=id1,...       액션 (기본: all)
+  RL_EPISODES=1500         조합당 에피소드
+  RL_OPPONENT_MODE=random  상대 모드
+  RL_HIDDEN_DIM=16         은닉층 크기
+  RL_BATCH_SIZE=64         배치 크기
+  RL_LR=0.0003             학습률
+  RL_THROTTLE_MS=0         에피소드 간 대기 (ms)
+  RL_BATCH_THROTTLE_MS=0   배치 학습 간 대기 (ms, 소음↓)
 
 예시:
-  node scripts/rl/train.mjs           # 전체 96조합
-  $env:RL_CHARACTERS="dash"; node scripts/rl/train.mjs  # Dash만
+  # 저소음 모드 (배치 학습 후 100ms 숨 돌리기)
+  $env:RL_BATCH_THROTTLE_MS=100; node scripts/rl/train.mjs
+
+  # Dash만
+  $env:RL_CHARACTERS="dash"; node scripts/rl/train.mjs
 `;
 
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
