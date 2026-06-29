@@ -7,6 +7,7 @@ import { AIActionController } from "../../src/simulation/aiActionController.js";
 import { findActionById, getActionPool } from "../../src/clickActions.js";
 import {
     createActorCriticNetworks,
+    deterministicAction,
     predictValues,
     prepareTensorflowBackend,
     sampleAction,
@@ -46,6 +47,8 @@ const CONFIG = {
     maxEpisodeSeconds: readNumberEnv("RL_MAX_EPISODE_SECONDS", 35),
     logInterval: readNumberEnv("RL_LOG_INTERVAL", 100),
     normalizerSamples: readNumberEnv("RL_NORMALIZER_SAMPLES", 1000),
+    evalEpisodes: readNumberEnv("RL_EVAL_EPISODES", 50),
+    evalThreshold: readNumberEnv("RL_EVAL_THRESHOLD", 0.5),
     characterIds: readIdListEnv("RL_CHARACTERS"),
     actionIds: readIdListEnv("RL_ACTIONS"),
     maxCombos: readNumberEnv("RL_MAX_COMBOS", Number.POSITIVE_INFINITY),
@@ -129,7 +132,11 @@ function canConsiderAction(sim, fighter, action, lastDecisionFrame) {
     return hpAfterCost >= 0.3;
 }
 
-function runEpisode({ actor, normalizer, rlSpec, opponentSpec, fixedAction }) {
+function decideAction(actor, obs, deterministic) {
+    return deterministic ? deterministicAction(actor, obs, CONFIG.evalThreshold) : sampleAction(actor, obs);
+}
+
+function runEpisode({ actor, normalizer, rlSpec, opponentSpec, fixedAction, deterministic = false }) {
     const sim = createTrainingSimulation(rlSpec, opponentSpec);
     const fighter = sim.fighters[0];
     fighter.aiController = new AIActionController();
@@ -148,9 +155,11 @@ function runEpisode({ actor, normalizer, rlSpec, opponentSpec, fixedAction }) {
         if (!canConsiderAction(sim, fighter, fixedAction, lastDecisionFrame)) continue;
 
         const rawObs = extractFeatures(fighter, opponent, sim);
-        normalizer.update(rawObs);
+        if (!deterministic) {
+            normalizer.update(rawObs);
+        }
         const obs = normalizer.normalize(rawObs);
-        const decision = sampleAction(actor, obs);
+        const decision = decideAction(actor, obs, deterministic);
         trajectory.push({
             obs,
             action: decision.action,
@@ -177,6 +186,49 @@ function runEpisode({ actor, normalizer, rlSpec, opponentSpec, fixedAction }) {
         actionUseRate: trajectory.length > 0 ? actionUseCount / trajectory.length : 0,
         actionProbability: trajectory.length > 0 ? probabilitySum / trajectory.length : 0
     };
+}
+
+function summarizeEpisodes(episodes) {
+    const total = Math.max(1, episodes.length);
+    return {
+        winRate: episodes.filter((episode) => episode.won).length / total,
+        reward: episodes.reduce((sum, episode) => sum + episode.reward, 0) / total,
+        actionUseRate: episodes.reduce((sum, episode) => sum + episode.actionUseRate, 0) / total,
+        actionProbability: episodes.reduce((sum, episode) => sum + episode.actionProbability, 0) / total
+    };
+}
+
+function formatPercent(value) {
+    return `${(value * 100).toFixed(1)}%`;
+}
+
+function formatEval(label, evalResult) {
+    if (!evalResult) return `${label}: skipped`;
+    return (
+        `${label}: win=${formatPercent(evalResult.winRate)} ` +
+        `reward=${evalResult.reward.toFixed(3)} ` +
+        `use=${formatPercent(evalResult.actionUseRate)} ` +
+        `prob=${formatPercent(evalResult.actionProbability)}`
+    );
+}
+
+function evaluateCombo(actor, normalizer, roster, rlSpec, fixedAction) {
+    if (CONFIG.evalEpisodes <= 0) return null;
+    const evalNormalizer = normalizer.clone();
+    const episodes = [];
+    for (let i = 0; i < CONFIG.evalEpisodes; i++) {
+        episodes.push(
+            runEpisode({
+                actor,
+                normalizer: evalNormalizer,
+                rlSpec,
+                opponentSpec: pickOpponentSpec(roster, rlSpec),
+                fixedAction,
+                deterministic: true
+            })
+        );
+    }
+    return summarizeEpisodes(episodes);
 }
 
 function normalize(values) {
@@ -244,6 +296,9 @@ async function trainCombo(roster, combo, baseNormalizer, index, total) {
               : (fixedOpponentSpec?.name ?? CONFIG.fixedOpponent);
     console.log(`\n=== [${index}/${total}] ${rlSpec.name} × ${fixedAction.name} vs ${opponentLabel} ===`);
 
+    const preEval = evaluateCombo(actor, normalizer, roster, rlSpec, fixedAction);
+    console.log(`  ${formatEval("eval before", preEval)}`);
+
     const batch = [];
     for (let ep = 0; ep < CONFIG.episodes; ep++) {
         const opponentSpec = pickOpponentSpec(roster, rlSpec);
@@ -293,11 +348,25 @@ async function trainCombo(roster, combo, baseNormalizer, index, total) {
     }
 
     const winRate = evalWin / evalTotal;
-    console.log(`  -> 승률 ${(winRate * 100).toFixed(1)}%, loss ${lastLoss.toFixed(4)}`);
+    const postEval = evaluateCombo(actor, normalizer, roster, rlSpec, fixedAction);
+    const evalDelta = preEval && postEval ? postEval.winRate - preEval.winRate : null;
+    console.log(`  ${formatEval("eval after", postEval)}`);
+    if (evalDelta != null) {
+        console.log(`  eval delta: ${formatPercent(evalDelta)}`);
+    }
+    console.log(`  -> train win ${(winRate * 100).toFixed(1)}%, loss ${lastLoss.toFixed(4)}`);
     actor.dispose();
     critic.dispose();
     optimizer.dispose?.();
-    return { charId: combo.charId, actionId: combo.actionId, winRate, loss: lastLoss };
+    return {
+        charId: combo.charId,
+        actionId: combo.actionId,
+        winRate,
+        loss: lastLoss,
+        preEvalWinRate: preEval?.winRate ?? null,
+        postEvalWinRate: postEval?.winRate ?? null,
+        evalDelta
+    };
 }
 
 async function main() {
@@ -321,7 +390,12 @@ async function main() {
     console.log("\n=== 조합별 결과 ===");
     for (const result of results) {
         const name = roster.find((f) => f.id === result.charId)?.name ?? result.charId;
-        console.log(`  ${name} × ${result.actionId}: 승률 ${(result.winRate * 100).toFixed(1)}%`);
+        const evalSummary =
+            result.preEvalWinRate == null || result.postEvalWinRate == null
+                ? "eval skipped"
+                : `eval ${formatPercent(result.preEvalWinRate)} -> ${formatPercent(result.postEvalWinRate)} ` +
+                  `(delta ${formatPercent(result.evalDelta)})`;
+        console.log(`  ${name} × ${result.actionId}: train ${(result.winRate * 100).toFixed(1)}%, ${evalSummary}`);
     }
 }
 

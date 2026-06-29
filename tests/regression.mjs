@@ -3204,13 +3204,15 @@ function testGrenadeProximityTrigger() {
 }
 
 async function testPpoActorCriticUtilities() {
-    const { createActorCriticNetworks, prepareTensorflowBackend, sampleAction, trainPpoEpochs } =
+    const { createActorCriticNetworks, deterministicAction, prepareTensorflowBackend, sampleAction, trainPpoEpochs } =
         await import("../scripts/rl/policyNetwork.js");
     const { RunningNormalizer } = await import("../scripts/rl/normalizer.js");
     await prepareTensorflowBackend();
     const { actor, critic } = createActorCriticNetworks(2, 4);
     const before = sampleAction(actor, [0.5, -0.5], () => 0).probability;
     assert.ok(before > 0 && before < 1, "PPO actor should return a Bernoulli probability");
+    assert.equal(deterministicAction(actor, [0.5, -0.5], 0).action, 1, "Threshold 0 should always use action");
+    assert.equal(deterministicAction(actor, [0.5, -0.5], 1).action, 0, "Threshold 1 should always wait");
 
     const normalizer = new RunningNormalizer(2);
     normalizer.update([1, 3]);

@@ -36,14 +36,29 @@ export function bernoulliLogProb(action, probability) {
     return action === 1 ? Math.log(p) : Math.log(1 - p);
 }
 
-export function sampleAction(actor, obs, rng = Math.random) {
+export function predictActionProbability(actor, obs) {
     const input = tf.tensor2d([obs]);
     const output = actor.predict(input);
     const probability = output.dataSync()[0];
     input.dispose();
     output.dispose();
+    return probability;
+}
+
+export function sampleAction(actor, obs, rng = Math.random) {
+    const probability = predictActionProbability(actor, obs);
 
     const action = rng() < probability ? 1 : 0;
+    return {
+        action,
+        probability,
+        logProb: bernoulliLogProb(action, probability)
+    };
+}
+
+export function deterministicAction(actor, obs, threshold = 0.5) {
+    const probability = predictActionProbability(actor, obs);
+    const action = probability >= threshold ? 1 : 0;
     return {
         action,
         probability,

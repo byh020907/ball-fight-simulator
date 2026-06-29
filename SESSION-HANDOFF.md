@@ -217,6 +217,11 @@
 - 결정: 기본 학습 대상을 로스터 전체 캐릭터 × 액션 풀 전체 액션으로 확장. `RL_CHARACTERS`, `RL_ACTIONS`, `RL_MAX_COMBOS`, `RL_OPPONENT_MODE`, `RL_FIXED_OPPONENT`, `RL_NORMALIZER_SAMPLES` 환경변수로 부분 학습/랜덤 상대/스모크 테스트를 지원. 공통 normalizer를 한 번 초기화한 뒤 조합별 clone으로 복사해 초기화 비용을 줄임
 - 영향: `scripts/rl/train.mjs`, `scripts/rl/normalizer.js`, `tests/regression.mjs`, `docs/rl-optimization-guide.md`, `SESSION-HANDOFF.md`
 
+## [L1] 2026-06-29 — PPO 학습 전/후 deterministic 평가 추가
+- 맥락: 훈련 중 승률은 Actor 샘플링과 탐험이 섞여 있어 학습 전후 정책 자체가 개선됐는지 판단하기 어려웠음
+- 결정: 각 캐릭터 × 액션 조합마다 학습 전 `eval before`, 학습 후 `eval after`를 deterministic 정책으로 별도 실행. 평가는 `RL_EVAL_THRESHOLD` 이상일 때만 액션을 사용하고 normalizer 통계를 업데이트하지 않으며, `RL_EVAL_EPISODES`로 평가 횟수를 조절. 최종 결과에 `eval before -> after`와 delta를 출력
+- 영향: `scripts/rl/train.mjs`, `scripts/rl/policyNetwork.js`, `tests/regression.mjs`, `docs/rl-optimization-guide.md`
+
 ## 진행 중 이슈
 - 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
 
