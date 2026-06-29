@@ -1,5 +1,6 @@
 // scripts/rl/train.mjs - 캐릭터/액션 조합별 PPO 학습
 import * as tf from "@tensorflow/tfjs";
+import fs from "fs";
 import { createRoster } from "../../src/roster.js";
 import { applyStatAllocation, createEmptyStatAllocation } from "../../src/statAllocation.js";
 import { BattleSimulation } from "../../src/simulation/battleSimulation.js";
@@ -54,7 +55,7 @@ const CONFIG = {
     maxCombos: readNumberEnv("RL_MAX_COMBOS", Number.POSITIVE_INFINITY),
     inputDim: FEATURE_DIM,
     hiddenDim: readNumberEnv("RL_HIDDEN_DIM", 16),
-    opponentMode: (process.env.RL_OPPONENT_MODE ?? "fixed").toLowerCase(),
+    opponentMode: (process.env.RL_OPPONENT_MODE ?? "random").toLowerCase(),
     fixedOpponent: process.env.RL_FIXED_OPPONENT ?? "rage"
 };
 
@@ -387,16 +388,41 @@ async function main() {
         results.push(await trainCombo(roster, combos[i], baseNormalizer, i + 1, combos.length));
     }
 
-    console.log("\n=== 조합별 결과 ===");
-    for (const result of results) {
-        const name = roster.find((f) => f.id === result.charId)?.name ?? result.charId;
-        const evalSummary =
-            result.preEvalWinRate == null || result.postEvalWinRate == null
-                ? "eval skipped"
-                : `eval ${formatPercent(result.preEvalWinRate)} -> ${formatPercent(result.postEvalWinRate)} ` +
-                  `(delta ${formatPercent(result.evalDelta)})`;
-        console.log(`  ${name} × ${result.actionId}: train ${(result.winRate * 100).toFixed(1)}%, ${evalSummary}`);
-    }
+    // ── 리포트 저장 ──
+    const report = {
+        startedAt: new Date().toISOString(),
+        config: { episodes: CONFIG.episodes, lr: CONFIG.lr, gamma: CONFIG.gamma, hiddenDim: CONFIG.hiddenDim, opponentMode: CONFIG.opponentMode },
+        summary: {
+            totalCombos: results.length,
+            avgWinRate: results.reduce((s, r) => s + r.winRate, 0) / Math.max(1, results.length),
+        },
+        combos: results.map(r => ({ charId: r.charId, actionId: r.actionId, trainWinRate: r.winRate, evalDelta: r.evalDelta }))
+    };
+    const reportPath = `scripts/rl/report_${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+    fs.writeFileSync(reportPath, JSON.stringify(report, null, 2), "utf-8");
+    console.log(`\n리포트 저장: ${reportPath}`);
+}
+
+const HELP = `
+PPO 학습 실행기
+===============
+node scripts/rl/train.mjs [--help]
+
+환경변수:
+  RL_CHARACTERS=id1,...   캐릭터 (기본: all)
+  RL_ACTIONS=id1,...      액션 (기본: all)
+  RL_EPISODES=1500        조합당 에피소드
+  RL_OPPONENT_MODE=random 상대 모드
+  RL_HIDDEN_DIM=16        은닉층 크기
+
+예시:
+  node scripts/rl/train.mjs           # 전체 96조합
+  $env:RL_CHARACTERS="dash"; node scripts/rl/train.mjs  # Dash만
+`;
+
+if (process.argv.includes("--help") || process.argv.includes("-h")) {
+    console.log(HELP);
+    process.exit(0);
 }
 
 main().catch((error) => {
