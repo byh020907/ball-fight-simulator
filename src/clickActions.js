@@ -107,8 +107,10 @@ class ClickAction {
      * 실제로 이득을 볼 수 있는 상황인지 판단합니다.
      * 각 Action이 자신의 발동 조건을 직접 소유합니다.
      */
+    // RL 학습으로 대체 — 기존 규칙은 주석 보존
     canAIUse(sim, fighter, opponent, hpRatio, distance) {
-        return false;
+        return true;
+        // return false;
     }
 }
 
@@ -141,19 +143,23 @@ class TimeWarpAction extends ClickAction {
         sim._clickActionContext.timeSlowExempt.add(playerBall);
     }
 
-    canAIUse(sim, fighter, opponent, hpRatio, distance) {
-        const toOpponent = Vector2.subtract(opponent.position, fighter.position);
-        const dist = toOpponent.length();
-        if (dist < 20) return false;
-        const toDir = toOpponent.normalize();
-        const opponentApproachSpeed = opponent.velocity.dot(toDir.scale(-1));
+    getFailureReason(sim, playerBall) {
+        if (sim.getTimeSlowRemaining() > 0) return "이미 시간 왜곡 발동 중";
+        return null;
+    }
 
-        if (fighter.meta?.isRanged) {
-            // 원거리: 상대가 접근 중이면 거리 무관 (시작 거리 450px 커버)
-            return opponentApproachSpeed > 30;
-        }
-        // 근접: 상대가 도망 중
-        return opponentApproachSpeed < -40 && dist < 300;
+    // RL 학습으로 대체 — 기존 규칙은 주석 보존
+    canAIUse(sim, fighter, opponent, hpRatio, distance) {
+        return true;
+        // const toOpponent = Vector2.subtract(opponent.position, fighter.position);
+        // const dist = toOpponent.length();
+        // if (dist < 20) return false;
+        // const toDir = toOpponent.normalize();
+        // const opponentApproachSpeed = opponent.velocity.dot(toDir.scale(-1));
+        // if (fighter.meta?.isRanged) {
+        //     return opponentApproachSpeed > 30;
+        // }
+        // return opponentApproachSpeed < -40 && dist < 300;
     }
 }
 
@@ -201,6 +207,11 @@ class RushAction extends ClickAction {
         playerBall.applyImpulse(direction.scale(targetSpeed).subtract(playerBall.velocity));
     }
 
+    getFailureReason(sim, playerBall) {
+        if (playerBall.actionContext.getEffect(this.id)?.remaining > 0) return "이미 돌진 중";
+        return null;
+    }
+
     _getRushDirection(sim, playerBall, currentSpeed) {
         if (currentSpeed > 5) {
             return playerBall.velocity.clone().normalize();
@@ -212,12 +223,13 @@ class RushAction extends ClickAction {
         return Vector2.fromAngle(Math.random() * Math.PI * 2, 1);
     }
 
+    // RL 학습으로 대체 — 기존 규칙은 주석 보존
     canAIUse(sim, fighter, opponent, hpRatio, distance) {
-        // 근접 캐릭터만: 상대가 멀고 접근 중이 아닐 때 돌진
-        if (fighter.meta?.isRanged) return false;
-        const toOpp = Vector2.subtract(opponent.position, fighter.position).normalize();
-        const oppApproach = opponent.velocity.dot(toOpp.scale(-1));
-        return distance > 300 && oppApproach < 30;
+        return true;
+        // if (fighter.meta?.isRanged) return false;
+        // const toOpp = Vector2.subtract(opponent.position, fighter.position).normalize();
+        // const oppApproach = opponent.velocity.dot(toOpp.scale(-1));
+        // return distance > 300 && oppApproach < 30;
     }
 }
 
@@ -267,13 +279,18 @@ class CounterAction extends ClickAction {
         playerBall.actionContext.setEffect(this.id, effect);
     }
 
+    getFailureReason(sim, playerBall) {
+        if (playerBall.actionContext.getEffect(this.id)?.remaining > 0) return "이미 카운터 발동 중";
+        return null;
+    }
+
+    // RL 학습으로 대체 — 기존 규칙은 주석 보존
     canAIUse(sim, fighter, opponent, hpRatio, distance) {
-        // 충돌 0.6초 이내 예상 + 상대가 빠르게 접근 중
-        if (distance > 200 || distance < 10) return false;
-        const toMe = Vector2.subtract(fighter.position, opponent.position).normalize();
-        const approach = opponent.velocity.dot(toMe);
-        // 인간 수준 분산: 완벽 타이밍이 아닌 55% 확률로만 활성화
-        return approach > 50 && distance / Math.max(1, approach) < 0.6 && Math.random() < 0.55;
+        return true;
+        // if (distance > 200 || distance < 10) return false;
+        // const toMe = Vector2.subtract(fighter.position, opponent.position).normalize();
+        // const approach = opponent.velocity.dot(toMe);
+        // return approach > 50 && distance / Math.max(1, approach) < 0.6 && Math.random() < 0.55;
     }
 }
 
@@ -320,16 +337,22 @@ class ProjectileGuardAction extends ClickAction {
         playerBall.actionContext.setEffect(this.id, effect);
     }
 
+    getFailureReason(sim, playerBall) {
+        if (playerBall.actionContext.getEffect(this.id)?.remaining > 0) return "이미 투사체 방어 발동 중";
+        return null;
+    }
+
+    // RL 학습으로 대체 — 기존 규칙은 주석 보존
     canAIUse(sim, fighter, opponent, hpRatio, distance) {
-        // 투사체가 250px 이내에서 접근 중 + 도달 0.6초 이내
-        return sim.entities.some((e) => {
-            if (e === fighter || e === opponent || e.isExpired || !e.velocity) return false;
-            const toMe = Vector2.subtract(fighter.position, e.position);
-            const d = toMe.length();
-            if (d > 250) return false;
-            const approach = e.velocity.dot(toMe.normalize());
-            return approach > 30 && d / Math.max(1, approach) < 0.6;
-        });
+        return true;
+        // return sim.entities.some((e) => {
+        //     if (e === fighter || e === opponent || e.isExpired || !e.velocity) return false;
+        //     const toMe = Vector2.subtract(fighter.position, e.position);
+        //     const d = toMe.length();
+        //     if (d > 250) return false;
+        //     const approach = e.velocity.dot(toMe.normalize());
+        //     return approach > 30 && d / Math.max(1, approach) < 0.6;
+        // });
     }
 }
 
@@ -372,11 +395,18 @@ class EndureAction extends ClickAction {
         });
     }
 
+    getFailureReason(sim, playerBall) {
+        if (playerBall.actionContext.getEffect(this.id)?.remaining > 0) return "이미 버티기 발동 중";
+        return null;
+    }
+
+    // RL 학습으로 대체 — 기존 규칙은 주석 보존
     canAIUse(sim, fighter, opponent, hpRatio, distance) {
-        if (distance > 250) return false;
-        const toMe = Vector2.subtract(fighter.position, opponent.position).normalize();
-        const approach = opponent.velocity.dot(toMe);
-        return approach > 50 && distance / Math.max(1, approach) < 0.4 && Math.random() < 0.5;
+        return true;
+        // if (distance > 250) return false;
+        // const toMe = Vector2.subtract(fighter.position, opponent.position).normalize();
+        // const approach = opponent.velocity.dot(toMe);
+        // return approach > 50 && distance / Math.max(1, approach) < 0.4 && Math.random() < 0.5;
     }
 }
 
@@ -422,8 +452,15 @@ class LifeStealAction extends ClickAction {
         });
     }
 
+    getFailureReason(sim, playerBall) {
+        if (playerBall.actionContext.getEffect(this.id)?.remaining > 0) return "이미 흡혈 발동 중";
+        return null;
+    }
+
+    // RL 학습으로 대체 — 기존 규칙은 주석 보존
     canAIUse(sim, fighter, opponent, hpRatio, distance) {
-        return hpRatio <= 0.5 && distance < 200;
+        return true;
+        // return hpRatio <= 0.5 && distance < 200;
     }
 }
 
@@ -472,9 +509,14 @@ class ShockwaveAction extends ClickAction {
         sim.spawnPulse(playerBall.position.clone(), "#88aaff");
     }
 
+    getFailureReason(sim, playerBall) {
+        return null; // 충격파는 연속 사용 가능 (물리 효과만)
+    }
+
+    // RL 학습으로 대체 — 기존 규칙은 주석 보존
     canAIUse(sim, fighter, opponent, hpRatio, distance) {
-        // 회피용: 내 HP가 40% 미만이고 상대가 가까울 때만
-        return hpRatio < 0.4 && distance < 250;
+        return true;
+        // return hpRatio < 0.4 && distance < 250;
     }
 }
 
@@ -526,12 +568,18 @@ class EvadeAction extends ClickAction {
         sim.playSound("dash");
     }
 
+    getFailureReason(sim, playerBall) {
+        if (playerBall.actionContext.getEffect("evade_speed")?.remaining > 0) return "이미 회피 중";
+        return null;
+    }
+
+    // RL 학습으로 대체 — 기존 규칙은 주석 보존
     canAIUse(sim, fighter, opponent, hpRatio, distance) {
-        // 상대가 빠르게 접근 중일 때 회피
-        if (distance > 220 || distance < 15) return false;
-        const toMe = Vector2.subtract(fighter.position, opponent.position).normalize();
-        const approach = opponent.velocity.dot(toMe);
-        return approach > 40 && Math.random() < 0.5;
+        return true;
+        // if (distance > 220 || distance < 15) return false;
+        // const toMe = Vector2.subtract(fighter.position, opponent.position).normalize();
+        // const approach = opponent.velocity.dot(toMe);
+        // return approach > 40 && Math.random() < 0.5;
     }
 }
 

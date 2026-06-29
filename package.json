@@ -12,5 +12,8 @@
   },
   "devDependencies": {
     "prettier": "^3.8.4"
+  },
+  "dependencies": {
+    "@tensorflow/tfjs": "^4.22.0"
   }
 }

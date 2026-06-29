@@ -3203,9 +3203,43 @@ function testGrenadeProximityTrigger() {
     assert.ok(g.timer < timerAfter, "Timer should decrease even when target moves away");
 }
 
+async function testPpoActorCriticUtilities() {
+    const { createActorCriticNetworks, prepareTensorflowBackend, sampleAction, trainPpoEpochs } =
+        await import("../scripts/rl/policyNetwork.js");
+    await prepareTensorflowBackend();
+    const { actor, critic } = createActorCriticNetworks(2, 4);
+    const before = sampleAction(actor, [0.5, -0.5], () => 0).probability;
+    assert.ok(before > 0 && before < 1, "PPO actor should return a Bernoulli probability");
+
+    const optimizer = (await import("@tensorflow/tfjs")).train.adam(0.01);
+    const result = trainPpoEpochs(
+        actor,
+        critic,
+        optimizer,
+        {
+            obs: [
+                [0.5, -0.5],
+                [-0.5, 0.5]
+            ],
+            actions: [1, 0],
+            oldLogProbs: [Math.log(0.5), Math.log(0.5)],
+            returns: [1, -1],
+            advantages: [1, -1],
+            weights: [1, 1]
+        },
+        { epochs: 1, entropyCoef: 0 }
+    );
+    assert.equal(result.samples, 2, "PPO update should report trained samples");
+    assert.ok(Number.isFinite(result.loss), "PPO loss should stay finite");
+    actor.dispose();
+    critic.dispose();
+    optimizer.dispose?.();
+}
+
 testCompleteChallengeTournament();
 testFormatBonusSummary();
 testGrenadeProximityTrigger();
+await testPpoActorCriticUtilities();
 await testNewCharactersRegistered(app);
 await testVampireBatsSpawn(app);
 await testVampireLifestealOnCollision(app);

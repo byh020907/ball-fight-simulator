@@ -1,8 +1,8 @@
 # RL 파이프라인 구현 명세
 
-> **알고리즘**: REINFORCE with baseline (Monte Carlo Policy Gradient)
-> **구현 언어**: 순수 JavaScript (Node.js, 외부 ML 라이브러리 불필요)
-> **모델 크기**: ~3,600 파라미터 (24→48→48→1)
+> **알고리즘**: PPO Actor-Critic (clipped policy gradient + value baseline)
+> **프레임워크**: TensorFlow.js (`@tensorflow/tfjs`) — autograd, CPU/WebGL
+> **모델 크기**: Actor/Critic 각각 MLP (입력 차원→은닉층→출력 1)
 
 ---
 
@@ -229,7 +229,7 @@ export class RunningNormalizer {
 
 ```javascript
 // train.mjs — 초기화
-const normalizer = new RunningNormalizer(24);
+const normalizer = new RunningNormalizer(16);
 for (let i = 0; i < 1000; i++) {
     const obs = collectRandomObservation();  // 랜덤 매치업에서 샘플링
     normalizer.update(obs);
@@ -238,12 +238,12 @@ for (let i = 0; i < 1000; i++) {
 // 매 결정 시점
 const rawObs = extractFeatures(fighter, opponent, sim);
 const obs = normalizer.normalize(rawObs);
-const prob = policy.forward(obs);  // 정규화된 입력 사용
+const { probability } = sampleAction(actor, obs);  // 정규화된 입력 사용
 ```
 
-### 0.5d Gradient Clipping — 🟡 가중치 폭발 방지
+### 0.5d PPO Clip — 가중치 폭발 방지
 
-REINFORCE의 그래디언트는 분산이 매우 큽니다:
+정책 그래디언트는 분산이 크고, 한 번의 좋은 승리만으로 확률이 과하게 움직일 수 있습니다:
 
 ```
 // 최악의 시나리오:
@@ -255,36 +255,15 @@ advantage = +1.88 (대승리!)
 // → 역전파로 3600개 가중치가 한 번에 크게 움직임 → 발산
 ```
 
-#### 해결: L2 Norm Clipping
+#### 해결: PPO Ratio Clipping
 
 ```javascript
 // policyNetwork.js
-export function clipGradients(grads, maxNorm = 1.0) {
-    // 모든 그래디언트의 L2 norm 계산
-    let totalNorm = 0;
-    for (const key of ['W1','W2','W3','b1','b2','b3']) {
-        const g = grads[key];
-        if (Array.isArray(g[0])) {
-            for (const row of g) for (const v of row) totalNorm += v * v;
-        } else {
-            for (const v of g) totalNorm += v * v;
-        }
-    }
-    totalNorm = Math.sqrt(totalNorm);
-
-    // norm이 maxNorm 초과하면 비례 축소
-    if (totalNorm > maxNorm) {
-        const scale = maxNorm / totalNorm;
-        for (const key of ['W1','W2','W3','b1','b2','b3']) {
-            const g = grads[key];
-            if (Array.isArray(g[0])) {
-                for (const row of g) for (let j = 0; j < row.length; j++) row[j] *= scale;
-            } else {
-                for (let j = 0; j < g.length; j++) g[j] *= scale;
-            }
-        }
-    }
-}
+const ratios = tf.exp(tf.sub(newLogProbs, oldLogProbs));
+const unclipped = tf.mul(ratios, advantages);
+const clippedRatios = tf.clipByValue(ratios, 1 - clipRatio, 1 + clipRatio);
+const clipped = tf.mul(clippedRatios, advantages);
+const actorLoss = tf.neg(tf.mean(tf.minimum(unclipped, clipped)));
 ```
 
 ### 0.5e Batch Training + Advantage 정규화 — 🟡 분산 감소
@@ -304,29 +283,13 @@ for (let ep = 0; ep < CONFIG.episodes; ep++) {
 
     // 배치가 차면 일괄 업데이트
     if (batchTrajectories.length >= BATCH_SIZE || ep === CONFIG.episodes - 1) {
-        // Advantage 정규화 (μ=0, σ=1)
-        const meanR = batchRewards.reduce((a,b) => a+b, 0) / batchRewards.length;
-        const stdR = Math.sqrt(batchRewards.reduce((s,r) => s + (r-meanR)**2, 0) / batchRewards.length) || 1;
-
-        for (let b = 0; b < batchTrajectories.length; b++) {
-            const advantage = (batchRewards[b] - baseline) / stdR;  // 정규화된 advantage
-
-            const traj = batchTrajectories[b];
-            for (let i = 0; i < traj.length; i++) {
-                const { obs, useAction, prob } = traj[i];
-                const timeWeight = Math.pow(CONFIG.gamma, traj.length - 1 - i);
-                const outputGrad = -(useAction - prob) * advantage * timeWeight;
-                const { grads } = computeGradient(policy, obs, outputGrad);
-                clipGradients(grads, 1.0);  // gradient clipping
-                accumulateBatchGradients(batchGrads, grads);
-            }
-        }
-
-        // 배치 평균 그래디언트로 한 번만 업데이트
-        applyGradients(policy, batchGrads, CONFIG.lr / BATCH_SIZE);
+        const ppoBatch = buildPpoBatch(critic, batchTrajectories);
+        trainPpoEpochs(actor, critic, optimizer, ppoBatch, {
+            epochs: CONFIG.ppoEpochs,
+            clipRatio: CONFIG.clipRatio,
+        });
         batchTrajectories.length = 0;
         batchRewards.length = 0;
-        baseline = 0.05 * meanR + 0.95 * baseline;  // 배치 평균으로 baseline 갱신
     }
 }
 ```
@@ -336,7 +299,7 @@ for (let ep = 0; ep < CONFIG.episodes; ep++) {
 | 기법 | 없는 경우 | 있는 경우 |
 |---|---|---|
 | 입력 정규화 | distance가 학습 장악 | 모든 특성 균등 기여 |
-| Gradient Clipping | 한 에피소드에 가중치 폭발 | 안정적 step 크기 |
+| PPO Clip | 한 에피소드에 정책 급변 | 안정적 step 크기 |
 | Batch + Adv 정규화 | 에피소드마다 지그재그 | 부드러운 수렴 곡선 |
 
 ```
@@ -359,10 +322,10 @@ entropy = -(p×log(p) + (1-p)×log(1-p))
 
 ```
                   ┌──────────────┐
-                  │ Policy Net   │  π(a|s) = sigmoid(MLP(s))
-                  │ 24→48→48→1  │
+                  │ Actor Net    │  π(a|s) = sigmoid(MLP(s))
+                  │ 16→H→H→1    │
                   └──────┬───────┘
-                         │ forward(obs) → prob
+                         │ sampleAction(obs) → action + oldLogProb
                          ▼
                   ┌──────────────┐
                   │   Sample     │  action = random() < prob ? 1 : 0
@@ -375,27 +338,27 @@ entropy = -(p×log(p) + (1-p)×log(1-p))
                          │ reward (+1/-1) at terminal
                          ▼
                   ┌──────────────┐
-                  │   Update     │  ∇L = -(a-p)×(reward-baseline)
-                  │  (backprop)  │  W ← W - lr × ∇L
+                  │ PPO Update   │  clipped ratio + Critic value loss
+                  │  (backprop)  │  Actor/Critic 동시 업데이트
                   └──────────────┘
                          │
                          ▼ (다음 에피소드로)
 ```
 
-### 0.8 왜 이 게임에 REINFORCE가 적합한가
+### 0.8 왜 이 게임에 PPO Actor-Critic이 적합한가
 
-| 게임 특성 | REINFORCE 특징 | 적합 이유 |
+| 게임 특성 | PPO Actor-Critic 특징 | 적합 이유 |
 |---|---|---|
-| 결정 5~15회/매치 | 에피소드가 짧음 | trajectory 작아서 MC return 효율적 |
-| Terminal reward only | 중간 보상 불필요 | 승/패만으로 충분 |
+| 결정 5~15회/매치 | 에피소드 단위 rollout | trajectory 작아서 배치 업데이트 부담이 낮음 |
+| Terminal reward 중심 | Critic이 상태 가치 보정 | 승패 보상을 상태별 기댓값으로 분산 |
 | Binary action | Bernoulli policy | sigmoid 출력과 자연스러움 |
-| Simulator fast | 많은 에피소드 가능 | 20K 매치도 25분 |
+| Simulator fast | 여러 PPO epoch 가능 | 같은 배치를 여러 번 복습해 샘플 효율 개선 |
 
 ---
 
 ### 0.9 현미경 튜토리얼 — 한 에피소드의 모든 순간
 
-**설정**: 24차원 입력 → 2차원 은닉층 → 1출력 으로 단순화해서 설명.
+**설정**: 16차원 입력 → 2차원 은닉층 → 1출력 으로 단순화해서 설명.
 실제 모델은 48차원 2개 층이지만 원리는 동일합니다.
 
 ```
@@ -556,8 +519,8 @@ forward([0.9, 0.8]) → prob = 0.88   // HP 높고 멀면 → 적극 사용
 
 ```javascript
 // 학습 루프 — 모든 단계를 하나로
-const policy = new PolicyNetwork();  // 24→48→48→1, Xavier init
-let baseline = 0;
+const { actor, critic } = createActorCriticNetworks(16, 48);
+const optimizer = tf.train.adam(CONFIG.lr);
 
 for (let ep = 0; ep < 20000; ep++) {
     // ── 1. ROLLOUT ──
@@ -568,11 +531,10 @@ for (let ep = 0; ep < 20000; ep++) {
         sim.update(1/60);  // 1프레임 진행
 
         if (shouldMakeDecision(sim)) {
-            const obs = extractFeatures(sim);         // 24차원 벡터
-            const prob = policy.forward(obs);          // π(use|obs)
-            const action = Math.random() < prob ? 1 : 0;
+            const obs = extractFeatures(sim);          // 16차원 벡터
+            const { action, logProb } = sampleAction(actor, obs);
 
-            trajectory.push({ obs, action, prob });    // 기록
+            trajectory.push({ obs, action, oldLogProb: logProb });
 
             if (action === 1) executeAction(sim);
         }
@@ -581,20 +543,13 @@ for (let ep = 0; ep < 20000; ep++) {
     // ── 2. JUDGE ──
     const reward = (sim.winner.id === myFighter.id) ? 1.0 : -1.0;
 
-    // ── 3. BASELINE ──
-    baseline = 0.05 * reward + 0.95 * baseline;  // EMA
-    const advantage = reward - baseline;
-
-    // ── 4 & 5. CREDIT + UPDATE ──
-    for (const { obs, action, prob } of trajectory) {
-        const grad = -(action - prob) * advantage;   // 정책 그래디언트
-        policy.backward(obs, grad);                   // 역전파
-        policy.applyGradients(0.0003);                // SGD 스텝
-    }
+    // ── 3. CREDIT + UPDATE ──
+    const ppoBatch = buildPpoBatch(critic, [{ trajectory, reward }]);
+    trainPpoEpochs(actor, critic, optimizer, ppoBatch);
 
     // 500 에피소드마다 평가
     if (ep % 500 === 0) {
-        const winRate = evaluate(policy, 200);  // 200매치 평가
+        const winRate = evaluate(actor, 200);  // 200매치 평가
         console.log(`Ep ${ep}: winRate=${(winRate*100).toFixed(1)}%`);
         // 기대: Ep 0 → ~48%, Ep 5000 → ~53%, Ep 20000 → ~55%
     }
@@ -608,18 +563,16 @@ for (let ep = 0; ep < 20000; ep++) {
 ### 1.1 구조도
 
 ```
-Input (24) → FC₁(48) + ReLU → FC₂(48) + ReLU → FC₃(1) + Sigmoid → P(use_action)
+Actor:  Input (16) → FC₁(H) + ReLU → FC₂(H) + ReLU → FC₃(1) + Sigmoid → P(use_action)
+Critic: Input (16) → FC₁(H) + ReLU → FC₂(H) + ReLU → FC₃(1) → V(s)
 ```
 
 ### 1.2 레이어 상세
 
-| 레이어 | 입력 | 출력 | 파라미터 수 | 활성화 |
-|---|---|---|---|---|
-| `fc1` | 24 | 48 | W: 24×48=1152, b: 48 | ReLU |
-| `fc2` | 48 | 48 | W: 48×48=2304, b: 48 | ReLU |
-| `fc3` | 48 | 1 | W: 48×1=48, b: 1 | Sigmoid |
-
-**총 파라미터**: 1152+48+2304+48+48+1 = **3,601개**
+| 네트워크 | 입력 | 출력 | 활성화 |
+|---|---|---|---|
+| Actor | 16차원 상태 | 액션 사용 확률 | 마지막 Sigmoid |
+| Critic | 16차원 상태 | 상태 가치 점수 | 마지막 활성화 없음 |
 
 ### 1.3 가중치 초기화
 
@@ -631,7 +584,7 @@ b = 0
 
 ---
 
-## 2. 입력 특성 (24차원)
+## 2. 입력 특성 (16차원)
 
 ### 2.1 특성 벡터 명세
 
@@ -648,20 +601,12 @@ b = 0
 7      | mySpeed           | [0, 500]    | 내 현재 속도 크기
 8      | mySpeedNorm       | [0, 1]      | mySpeed / 500
 9      | oppSpeed          | [0, 500]    | 상대 현재 속도 크기
-10     | myBaseSpeed       | [238, 320]  | 내 기본 속도 (종족값)
-11     | myBaseSpeedNorm   | [0, 1]      | (myBaseSpeed-200)/150
-12     | isRanged          | {0, 1}      | 원거리 캐릭터 여부
-13     | isSlowed          | {0, 1}      | 내 슬로우 여부
-14     | oppIsSlowed       | {0, 1}      | 상대 슬로우 여부
-15     | hasSpeedBoost     | {0, 1}      | 내 속도버프 여부
-16     | actionHpCost      | [0.5, 1.5]  | 액션 HP 코스트 (%)
-17     | actionHpCostNorm  | [0, 1]      | actionHpCost / 1.5
-18     | canUseNow         | {0, 1}      | getFailureReason()==null
-19     | intervalReady     | {0, 1}      | _nextAvailableAt ≤ 0
-20     | projectileNearby  | {0, 1}      | 250px 내 투사체 존재
-21     | collisionImminent | {0, 1}      | 0.5초 내 충돌 예상
-22     | elapsed           | [0, 30]     | 경과 시간 (초)
-23     | elapsedNorm       | [0, 1]      | elapsed / 30
+10     | oppSpeedNorm      | [0, 1]      | 상대 속도 / 500
+11     | speedRatioNorm    | [0, 1]      | 내 속도 / 상대 속도 / 3
+12     | closingSpeedNorm  | [-1, 1]     | 거리 변화율 / 400
+13     | collisionTimeNorm | [0, 1]      | 충돌 예상시간 / 5초
+14     | projectileDist    | [0, 1]      | 최근접 투사체 거리 / 960
+15     | elapsedNorm       | [0, 1]      | 경과 시간 / 30초
 ```
 
 ### 2.2 특성 추출
@@ -684,17 +629,18 @@ export function extractFeatures(fighter, opponent, sim) {
         ? opponent.velocity.dot(toOpp.normalize().scale(-1))
         : 0;
 
-    const action = fighter.aiController?._chosenAction;
-    const canUse = action ? (action.getFailureReason?.(sim, fighter) ?? null) === null : false;
-    const intervalReady = (fighter.aiController?._nextAvailableAt ?? 0) <= 0;
-
-    const projectileNearby = sim.entities.some(e => {
-        if (e === fighter || e === opponent || e.isExpired || !e.velocity) return false;
-        return Vector2.subtract(fighter.position, e.position).length() < 250;
-    });
-
-    const collisionImminent = dist > 0 && dist < 200 &&
-        approachSpeed > 30 && dist / Math.max(1, approachSpeed) < 0.5;
+    const mySpeed = fighter.velocity.length();
+    const oppSpeed = opponent.velocity.length();
+    const speedRatio = oppSpeed > 0 ? mySpeed / oppSpeed : 999;
+    const estCollisionTime = approachSpeed > 10 ? dist / approachSpeed : 999;
+    let nearestProjectileDist = 999;
+    for (const e of sim.entities) {
+        if (e === fighter || e === opponent || e.isExpired || !e.velocity) continue;
+        if (e.owner === fighter) continue;
+        const d = Vector2.subtract(fighter.position, e.position).length();
+        if (d < nearestProjectileDist) nearestProjectileDist = d;
+    }
+    const elapsed = sim.elapsed ?? 0;
 
     return [
         hpRatio,                                    // 0
@@ -704,278 +650,114 @@ export function extractFeatures(fighter, opponent, sim) {
         dist / 960,                                 // 4
         approachSpeed,                              // 5
         clamp(approachSpeed / 400, -1, 1),          // 6
-        fighter.velocity.length(),                  // 7
-        clamp(fighter.velocity.length() / 500, 0, 1), // 8
-        opponent.velocity.length(),                 // 9
-        fighter.stats.baseSpeed,                    // 10
-        clamp((fighter.stats.baseSpeed - 200) / 150, 0, 1), // 11
-        fighter.meta?.isRanged ? 1 : 0,             // 12
-        fighter.state.slow ? 1 : 0,                 // 13
-        opponent.state.slow ? 1 : 0,                // 14
-        fighter.state.speedBoost ? 1 : 0,           // 15
-        action?.hpCostPercent ?? 0,                 // 16
-        (action?.hpCostPercent ?? 0) / 1.5,         // 17
-        canUse ? 1 : 0,                             // 18
-        intervalReady ? 1 : 0,                      // 19
-        projectileNearby ? 1 : 0,                   // 20
-        collisionImminent ? 1 : 0,                  // 21
-        sim.elapsed ?? 0,                           // 22
-        clamp((sim.elapsed ?? 0) / 30, 0, 1),      // 23
+        mySpeed,                                    // 7
+        clamp(mySpeed / 500, 0, 1),                 // 8
+        oppSpeed,                                   // 9
+        clamp(oppSpeed / 500, 0, 1),                // 10
+        clamp(speedRatio / 3, 0, 1),                // 11
+        clamp(approachSpeed / 400, -1, 1),          // 12
+        clamp(estCollisionTime / 5, 0, 1),          // 13
+        clamp(nearestProjectileDist / 960, 0, 1),   // 14
+        clamp(elapsed / 30, 0, 1),                  // 15
     ];
 }
+
+export const FEATURE_DIM = 16;
 ```
 
 ---
 
 ## 3. 정책 네트워크 (`scripts/rl/policyNetwork.js`)
 
-### 3.1 순전파
+### 3.1 TensorFlow.js Actor-Critic 모델 정의
 
 ```javascript
-export class PolicyNetwork {
-    constructor() {
-        this.W1 = randMatrix(24, 48);  this.b1 = zeros(48);
-        this.W2 = randMatrix(48, 48);  this.b2 = zeros(48);
-        this.W3 = randMatrix(48, 1);   this.b3 = zeros(1);
-    }
+import * as tf from "@tensorflow/tfjs";
 
-    forward(obs) {
-        // fc1: 24 → 48 + ReLU
-        const h1 = matVecMul(this.W1, obs, this.b1);
-        reluInPlace(h1);
-        // fc2: 48 → 48 + ReLU
-        const h2 = matVecMul(this.W2, h1, this.b2);
-        reluInPlace(h2);
-        // fc3: 48 → 1 + Sigmoid
-        const logit = dot(h2, this.W3) + this.b3[0];
-        return sigmoid(logit);
-    }
-
-    sample(obs) {
-        const prob = this.forward(obs);
-        return { action: Math.random() < prob ? 1 : 0, prob };
-    }
-
-    act(obs, threshold = 0.5) {
-        return this.forward(obs) >= threshold ? 1 : 0;
-    }
-
-    serialize() {
-        return { W1: this.W1, b1: this.b1, W2: this.W2, b2: this.b2, W3: this.W3, b3: this.b3 };
-    }
-
-    static deserialize(data) {
-        const p = new PolicyNetwork();
-        p.W1 = data.W1; p.b1 = data.b1;
-        p.W2 = data.W2; p.b2 = data.b2;
-        p.W3 = data.W3; p.b3 = data.b3;
-        return p;
-    }
+export function createActorCriticNetworks(inputDim = 16, hiddenDim = 48) {
+    return {
+        actor: createActorNetwork(inputDim, hiddenDim),   // 액션 확률 π(a|s)
+        critic: createCriticNetwork(inputDim, hiddenDim), // 상태 가치 V(s)
+    };
 }
 ```
 
-### 3.2 수학 헬퍼 (`scripts/rl/math.js`)
+**역전파? 자동.** `tf.GradientTape` 또는 `optimizer.minimize()`가 처리합니다.
+
+### 3.2 추론
 
 ```javascript
-export function matVecMul(W, x, b) {
-    const y = new Array(W.length).fill(0);
-    for (let i = 0; i < W.length; i++) {
-        for (let j = 0; j < x.length; j++) y[i] += W[i][j] * x[j];
-        y[i] += b[i];
-    }
-    return y;
-}
-
-export function reluInPlace(v) { for (let i = 0; i < v.length; i++) v[i] = Math.max(0, v[i]); }
-
-export function sigmoid(x) {
-    const clamped = Math.max(-10, Math.min(10, x));
-    return 1 / (1 + Math.exp(-clamped));
-}
-
-export function dot(a, b) {
-    let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s;
-}
-
-export function randMatrix(rows, cols) {
-    // Xavier init
-    const bound = Math.sqrt(6 / (rows + cols));
-    return Array.from({ length: rows }, () =>
-        Array.from({ length: cols }, () => (Math.random() * 2 - 1) * bound));
-}
-
-export function zeros(n) { return new Array(n).fill(0); }
-export function zeros2D(r, c) { return Array.from({ length: r }, () => new Array(c).fill(0)); }
+// obs: number[] → tf.tensor2d([obs]) → forward → prob
+const prob = model.predict(tf.tensor2d([obs])).dataSync()[0];
+// prob ∈ [0, 1] → Bernoulli 샘플링
+const action = Math.random() < prob ? 1 : 0;
 ```
 
-### 3.3 역전파 (REINFORCE gradient)
+### 3.3 학습 (PPO clipped update + Adam)
 
 ```javascript
-export function computeGradient(policy, obs, outputGrad) {
-    // Forward pass (기록)
-    const h1Pre = matVecMul(policy.W1, obs, policy.b1);
-    const h1 = [...h1Pre]; reluInPlace(h1);
-    const h2Pre = matVecMul(policy.W2, h1, policy.b2);
-    const h2 = [...h2Pre]; reluInPlace(h2);
-    const logit = dot(h2, policy.W3) + policy.b3[0];
-    const prob = sigmoid(logit);
+const optimizer = tf.train.adam(1e-3);
 
-    // Backward (cross-entropy + sigmoid)
-    // dL/d(logit) = prob - target (target = outputGrad 방향)
-    const dLogit = outputGrad; // REINFORCE: -(a - prob) * advantage → advantage 부호로 단순화
-
-    const grads = { W1: zeros2D(24,48), b1: zeros(48), W2: zeros2D(48,48), b2: zeros(48), W3: zeros2D(48,1), b3: zeros(1) };
-
-    // fc3
-    for (let i = 0; i < 48; i++) grads.W3[i][0] = dLogit * h2[i];
-    grads.b3[0] = dLogit;
-
-    // fc2
-    const dh2 = new Array(48).fill(0);
-    for (let i = 0; i < 48; i++) dh2[i] = (h2Pre[i] > 0 ? 1 : 0) * dLogit * policy.W3[i][0];
-    for (let i = 0; i < 48; i++) {
-        for (let j = 0; j < 48; j++) grads.W2[i][j] = dh2[i] * h1[j];
-        grads.b2[i] = dh2[i];
-    }
-
-    // fc1
-    const dh1 = new Array(48).fill(0);
-    for (let i = 0; i < 48; i++) {
-        for (let j = 0; j < 48; j++) dh1[j] += (h1Pre[j] > 0 ? 1 : 0) * dh2[i] * policy.W2[i][j];
-    }
-    for (let i = 0; i < 48; i++) {
-        for (let j = 0; j < 24; j++) grads.W1[i][j] = dh1[i] * obs[j];
-        grads.b1[i] = dh1[i];
-    }
-
-    return { grads, prob };
-}
+const result = trainPpoEpochs(actor, critic, optimizer, {
+    obs,
+    actions,
+    oldLogProbs,
+    returns,
+    advantages,
+    weights,
+});
 ```
+
+`oldLogProbs`는 rollout 당시 Actor가 선택한 행동의 로그 확률입니다. 업데이트 시 현재 로그 확률과의 비율(`ratio`)을 계산하고, `clipRatio` 범위 안에서만 정책이 움직이도록 제한합니다.
+
+### 3.4 저장/로드
+
+```javascript
+// @tensorflow/tfjs 단독 환경에서는 file:// 저장이 없다.
+// 영구 저장이 필요하면 별도 직렬화 또는 tfjs-node 도입을 별도 작업으로 진행한다.
+```
+
+### 3.5 핵심: tf.tidy() 메모리 관리
+
+TensorFlow.js는 GPU 텐서를 수동 해제해야 합니다. `tf.tidy()`가 블록 내 생성된 모든 중간 텐서를 자동 정리합니다. `.dataSync()`는 GPU→CPU 전송.
 
 ---
 
 ## 4. 학습 루프 (`scripts/rl/train.mjs`)
 
 ```javascript
-import { BattleSimulation } from "../../src/simulation/battleSimulation.js";
-import { createRoster } from "../../src/roster.js";
-import { applyStatAllocation, createEmptyStatAllocation } from "../../src/statAllocation.js";
-import { PolicyNetwork, computeGradient } from "./policyNetwork.js";
+import * as tf from "@tensorflow/tfjs";
+import { createActorCriticNetworks, sampleAction, trainPpoEpochs } from "./policyNetwork.js";
 import { extractFeatures } from "./features.js";
-import { Vector2 } from "../../src/core.js";
-import fs from "fs";
+import { RunningNormalizer } from "./normalizer.js";
+// ... 게임 import ...
 
 const CONFIG = {
-    episodes: 20000,
-    lr: 3e-4,
-    baselineAlpha: 0.05,
-    entropyCoef: 0.01,
-    gamma: 0.97,            // 시간 가중치 감가율 (1.0 = uniform)
-    batchSize: 16,           // 배치 크기 (에피소드 누적 후 한 번에 업데이트)
-    gradClipNorm: 1.0,       // 그래디언트 L2 클리핑 임계값
-    evalInterval: 500,
-    minDecisionFrames: 10,
-    hpGate: 0.3,
-    maxDist: 400,
+    episodes: 20000, lr: 3e-4, entropyCoef: 0.01,
+    gamma: 0.97, batchSize: 16, clipRatio: 0.2,
+    ppoEpochs: 3, minDecisionFrames: 10, hpGate: 0.3, maxDist: 400,
 };
 
-function pickRandomFighters(roster) {
-    const shuffled = [...roster].sort(() => Math.random() - 0.5);
-    return [shuffled[0], shuffled[1]];
-}
-
-function applyGradients(policy, grads, lr) {
-    const scale = -lr; // gradient descent 방향
-    for (let i = 0; i < policy.W1.length; i++) {
-        for (let j = 0; j < policy.W1[i].length; j++) policy.W1[i][j] += scale * grads.W1[i][j];
-        policy.b1[i] += scale * grads.b1[i];
-    }
-    for (let i = 0; i < policy.W2.length; i++) {
-        for (let j = 0; j < policy.W2[i].length; j++) policy.W2[i][j] += scale * grads.W2[i][j];
-        policy.b2[i] += scale * grads.b2[i];
-    }
-    for (let i = 0; i < policy.W3.length; i++) {
-        policy.W3[i][0] += scale * grads.W3[i][0];
-    }
-    policy.b3[0] += scale * grads.b3[0];
-}
-
 async function main() {
-    const roster = createRoster();
-    const policy = new PolicyNetwork();
-    let baseline = 0;
+    const { actor, critic } = createActorCriticNetworks(16, 48);
+    const optimizer = tf.train.adam(CONFIG.lr);
+    const normalizer = new RunningNormalizer(16);
+
+    // ── 입력 정규화 초기화 (1000 샘플) ──
+    initNormalizer(normalizer, roster);
 
     for (let ep = 0; ep < CONFIG.episodes; ep++) {
-        const [a, b] = pickRandomFighters(roster);
-        const specA = applyStatAllocation(a, createEmptyStatAllocation(), false);
-        const specB = applyStatAllocation(b, createEmptyStatAllocation(), false);
+        // ... rollout 1 episode → obs/action/oldLogProb trajectory, reward ...
 
-        // assignActions: true → AI 컨트롤러 생성, 하지만 RL이 evaluate 우회
-        const sim = new BattleSimulation([specA, specB], { onLog() {} }, null, { assignActions: true });
-        const fighter = sim.fighters[0];
-        const opponent = sim.getOpponent(fighter);
-        const action = fighter.aiController?._chosenAction;
-        if (!action || !opponent) continue;
-
-        const trajectory = [];
-        let lastDecisionFrame = -CONFIG.minDecisionFrames;
-
-        while (!sim.finished) {
-            sim.update(1/60, 1/60);
-            const opponentNow = sim.getOpponent(fighter);
-            if (!opponentNow) break;
-
-            const frame = Math.floor((sim.elapsed ?? 0) * 60);
-            const canDecide = frame - lastDecisionFrame >= CONFIG.minDecisionFrames;
-            const hpOk = fighter.hp / fighter.maxHp >= CONFIG.hpGate;
-            const distOk = Vector2.subtract(opponentNow.position, fighter.position).length() <= CONFIG.maxDist;
-            const failureFree = action.getFailureReason?.(sim, fighter) == null;
-
-            if (canDecide && hpOk && distOk && failureFree) {
-                const obs = extractFeatures(fighter, opponentNow, sim);
-                const { action: useAction, prob } = policy.sample(obs);
-                trajectory.push({ obs, useAction, prob });
-
-                if (useAction === 1) {
-                    const cost = Math.ceil(fighter.maxHp * action.hpCostPercent / 100);
-                    const paid = fighter.actionContext.spendHpForAction(fighter, cost);
-                    if (paid > 0) sim.scheduleAction(action, fighter, paid);
-                }
-                lastDecisionFrame = frame;
-            }
-        }
-
-        const winner = sim.winner;
-        const reward = (winner && winner.id === fighter.id) ? 1.0 : -1.0;
-        baseline = CONFIG.baselineAlpha * reward + (1 - CONFIG.baselineAlpha) * baseline;
-        const advantage = reward - baseline;
-
-        // 시간 가중치 적용: 마지막 결정일수록 더 큰 영향
-        const totalDecisions = trajectory.length;
-        for (let i = 0; i < totalDecisions; i++) {
-            const { obs, useAction, prob } = trajectory[i];
-            const timeWeight = Math.pow(CONFIG.gamma, totalDecisions - 1 - i);
-            const outputGrad = -(useAction - prob) * advantage * timeWeight;
-            const { grads } = computeGradient(policy, obs, outputGrad);
-            // Entropy regularization
-            const entropyGrad = CONFIG.entropyCoef * (1 - 2 * prob);
-            // entropy 영향은 logit gradient에 추가
-            // (단순화: 이미 computeGradient 안에서 처리)
-            applyGradients(policy, grads, CONFIG.lr);
-        }
-
-        // 주기적 평가 + 저장
-        if (ep % CONFIG.evalInterval === 0) {
-            console.log(`Ep ${ep}: reward=${reward.toFixed(1)} baseline=${baseline.toFixed(3)} trajectory_len=${trajectory.length}`);
-            const data = policy.serialize();
-            fs.writeFileSync("src/aiModelWeights.json", JSON.stringify(data), "utf-8");
+        // ── 배치 업데이트 ──
+        if (batchFull) {
+            const ppoBatch = buildPpoBatch(critic, batchTraj);
+            trainPpoEpochs(actor, critic, optimizer, ppoBatch, { epochs: CONFIG.ppoEpochs });
         }
     }
 
-    console.log("학습 완료 → src/aiModelWeights.json");
+    console.log("학습 완료");
 }
-
-main().catch(e => { console.error(e); process.exit(1); });
 ```
 
 ---
@@ -986,31 +768,39 @@ main().catch(e => { console.error(e); process.exit(1); });
 
 ```javascript
 // src/simulation/aiActionController.js
-import { PolicyNetwork } from "../../scripts/rl/policyNetwork.js";
-import { extractFeatures } from "../../scripts/rl/features.js";
+import * as tf from "@tensorflow/tfjs";
 
-// 생성자에 추가
-this.rlModel = loadModelWeights();
-this.rlThreshold = 0.5;
-
-// evaluate() 내부 — 기존 게이트 통과 후 RL 추론
-const obs = extractFeatures(fighter, opponent, sim);
-const shouldUse = this.rlModel.act(obs, this.rlThreshold);
-if (!shouldUse) return null;
-```
-
-### 5.2 모델 로드 (fallback 포함)
-
-```javascript
-function loadModelWeights() {
+// 생성자에서 모델 로드
+async loadModel() {
     try {
-        const raw = fs.readFileSync("src/aiModelWeights.json", "utf-8");
-        return PolicyNetwork.deserialize(JSON.parse(raw));
+        this.rlModel = await tf.loadLayersModel("file://./src/aiModelWeights/model.json");
+        this.rlThreshold = 0.5;
+        console.log("RL 모델 로드 완료");
     } catch {
-        return null; // 학습 전이면 rule-based로 동작
+        this.rlModel = null; // fallback: rule-based
     }
 }
+
+// evaluate() 내부 — 기존 게이트 통과 후 RL 추론
+evaluate(sim, fighter, delta) {
+    // ... 기존 게이트 (HP, distance, getFailureReason) ...
+    if (!this.rlModel) return this._ruleBasedEvaluate(sim, fighter, delta);
+
+    const obs = extractFeatures(fighter, opponent, sim);
+    const prob = this.rlModel.predict(tf.tensor2d([obs])).dataSync()[0];
+    if (prob < this.rlThreshold) return null;
+
+    // 실행
+    const paidCost = fighter.actionContext.spendHpForAction(fighter, cost);
+    // ...
+}
 ```
+
+### 5.2 학습 vs 추론 환경
+
+- **학습**: 현재 저장소는 설치 부담을 낮추기 위해 `@tensorflow/tfjs` CPU 백엔드를 사용.
+- **저장**: `@tensorflow/tfjs` 단독 사용 시 `file://` 저장은 지원되지 않으므로, 파일 저장은 별도 직렬화 또는 `tfjs-node` 도입 시 처리.
+- **브라우저 추론**: `@tensorflow/tfjs` — `tf.loadLayersModel("model.json")`으로 로드.
 
 ---
 
@@ -1019,13 +809,11 @@ function loadModelWeights() {
 ```
 scripts/rl/
 ├── train.mjs              ← node scripts/rl/train.mjs
-├── policyNetwork.js       ← MLP + 순전파 + 역전파 + 직렬화
-├── features.js            ← extractFeatures()
-├── normalizer.js          ← RunningNormalizer (입력 정규화)
-└── math.js                ← matVecMul, sigmoid, randMatrix 등
+├── policyNetwork.js       ← createActorCriticNetworks(), trainPpoEpochs()
+├── features.js            ← extractFeatures() — 16차원
+└── normalizer.js          ← RunningNormalizer — Welford
 
-src/
-└── aiModelWeights.json    ← 학습 완료 후 자동 생성 (~150KB)
+package.json               ← "dependencies": { "@tensorflow/tfjs": "^4" }
 ```
 
 ---
@@ -1035,13 +823,13 @@ src/
 | 파라미터 | 값 | 설명 |
 |---|---|---|
 | `hiddenDim` | 48×2 | 은닉층 2개 |
-| `lr` | 3e-4 | 학습률 |
-| `baselineAlpha` | 0.05 | baseline EMA |
+| `lr` | 3e-4 | Adam learning rate |
 | `entropyCoef` | 0.01 | 탐험 장려 |
 | `gamma` | 0.97 | 시간 가중치 감가율 |
 | `batchSize` | 16 | 배치 에피소드 수 |
-| `gradClipNorm` | 1.0 | 그래디언트 L2 클리핑 |
-| `minDecisionFrames` | 10 | 결정 최소 간격 (0.17초) |
+| `clipRatio` | 0.2 | PPO ratio clipping |
+| `ppoEpochs` | 3 | 같은 배치 반복 학습 횟수 |
+| `minDecisionFrames` | 10 | 결정 최소 간격 |
 | `hpGate` | 0.3 | HP 30%↑ |
 | `maxDist` | 400 | 거리 400px↓ |
 | `episodes` | 20,000 | 총 학습 매치 |
@@ -1049,15 +837,50 @@ src/
 
 ---
 
-## 8. 실행
+## 8. 단계별 학습 계획
+
+### 8.1 1단계: 기본 액션 (고정 상대: Rage Ball)
+
+Rage Ball은 공격 패턴이 직관적(충돌 기반, 속도·공격력 증가)이라 버티기·회피·카운터 같은 **방어형 액션** 테스트에 최적.
+
+| 캐릭터 | 액션 | 유형 |
+|---|---|---|
+| Dash | Rush | 돌진 |
+| Archer | TimeWarp | CC |
+| Eater | LifeSteal | 흡혈 |
+| Vampire | Counter | 반사 |
+| Bat Ball | Endure | 버티기 |
+| Phantom | Evade | 회피 |
+| Rage | Shockwave | 광역 |
+| Trickster | Rush | 돌진 |
+
+**상대 고정**: Rage Ball — 순수 충돌 딜러, 액션 효과 판별 용이
+
+### 8.2 2단계: 투사체 액션 (고정 상대: Gunner, Archer, Grenade)
+
+ProjectileGuard는 투사체 특성이 필요 → **상대를 원거리 캐릭터로 고정**.
+
+| 캐릭터 | 액션 | 상대 |
+|---|---|---|
+| Bat Ball | ProjectileGuard | Gunner |
+| Dash | ProjectileGuard | Archer |
+| Eater | ProjectileGuard | Grenade |
+
+### 8.3 3단계: 전체 조합 × 랜덤 상대
+
+1·2단계에서 검증된 모델들을 종합해 **모든 캐릭터×모든 액션** 조합을 랜덤 상대로 학습.
+
+---
+
+## 9. 실행
 
 ```bash
-# 학습 (약 25분)
+# 의존성 설치
+npm install @tensorflow/tfjs
+
+# 학습 (조합별 1500eps, 약 5분)
 node scripts/rl/train.mjs
 
 # 검증
 node tests/balanceSim.mjs 30
-
-# 실제 테스트
-# index.html 열고 debug.aiEnabled = true
 ```

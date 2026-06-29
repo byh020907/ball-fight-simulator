@@ -202,11 +202,17 @@
 - 결정: 문서 파일명을 `docs/ppo-learning-architecture.md`로 변경하고, PPO/Actor-Critic 데이터 흐름 설명에서 장식 이모티콘과 과한 표현을 문서형 톤으로 정리. 다음 개발 단계는 학습 코드 개선으로 이어감
 - 영향: `docs/ppo-learning-architecture.md`, `SESSION-HANDOFF.md`
 
+## [L1] 2026-06-29 — PPO Actor-Critic 학습 코드 반영
+- 맥락: 기존 학습 초안은 REINFORCE 단일 정책망 구조라 PPO 문서의 Actor/Critic, old log probability, clipped ratio 업데이트와 맞지 않았음
+- 결정: `scripts/rl/policyNetwork.js`에 TensorFlow.js 기반 Actor/Critic 생성, Bernoulli sampling, Critic value prediction, PPO clipped update를 구현하고 `scripts/rl/train.mjs`를 에피소드 rollout → discounted return/advantage batch → PPO epoch 학습 흐름으로 변경. Node 실행 시 CPU 백엔드를 명시하고 짧은 학습 실행용 환경변수를 지원. 액션별 `getFailureReason()`은 PPO rollout의 불가능/중복 액션 필터로 사용
+- 영향: `scripts/rl/*`, `src/clickActions.js`, `tests/regression.mjs`, `docs/rl-optimization-guide.md`, `package.json`, `package-lock.json`
+
 ## 진행 중 이슈
 - 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
 
 ## 다음 할 일
-1. 학습 코드 개선: `docs/ppo-learning-architecture.md`와 `docs/rl-optimization-guide.md` 기준으로 현재 `scripts/rl/` 구현과 `src/clickActions.js` 연동 지점 점검
-2. 원격 배포 반영 후 실제 브라우저/모바일에서 스탯 배분 초기화 race 재검증
-3. 사냥터 MVP 구현 전, `getEnemiesOf()`가 필요한 광역/다수 대상 능력 목록 점검
-4. OP 조합 파라미터 튜닝
+1. PPO 학습 결과 저장/로드 전략 결정: `@tensorflow/tfjs` 유지 시 커스텀 직렬화, `tfjs-node` 도입 시 `file://` 저장
+2. 학습된 Actor를 `AIActionController.evaluate()` 또는 별도 추론 어댑터로 붙이는 브라우저 추론 경로 설계
+3. 원격 배포 반영 후 실제 브라우저/모바일에서 스탯 배분 초기화 race 재검증
+4. 사냥터 MVP 구현 전, `getEnemiesOf()`가 필요한 광역/다수 대상 능력 목록 점검
+5. OP 조합 파라미터 튜닝
