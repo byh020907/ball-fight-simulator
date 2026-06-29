@@ -1,5 +1,15 @@
 # 결정 기록
 
+## [L1] 2026-06-29 — RL PPO 학습 파이프라인 완성
+- 맥락: AI 액션 canAIUse 수동 튜닝 한계 → PPO로 캐릭터×액션 조합별 최적 사용 확률 자동 학습
+- 결정: (1) PPO Actor-Critic (16→16→1 Bernoulli 정책), GAE, mini-batch SGD로 `scripts/rl/train.mjs` 구현 (2) 피처 16차원 순수 벡터 (HP비율, 위치벡터, 속도벡터, 투사체벡터, 경과시간, 캐릭터 인덱스) — 파생값/불리언 플래그 없음 (3) `--help` 도움말, 학습 완료 시 `scripts/rl/report_*.json` 자동 저장 (4) `node scripts/rl/train.mjs` 한 줄로 전체 실행
+- 영향: `scripts/rl/train.mjs`, `scripts/rl/features.js`, `scripts/rl/policyNetwork.js`, `scripts/rl/normalizer.js`, `docs/rl-optimization-guide.md`
+
+## [L2] 2026-06-28 — AI 액션 시스템 간소화 + Shockwave 버프
+- 배경: canAIUse가 대부분 거리 제한으로 차단되어 AI가 아무 액션도 못 쓰는 문제 → RL 학습 위해 모든 액션 허용 필요
+- 결정: (1) 모든 `canAIUse`가 `true` 반환, 기존 로직은 주석 보존 (2) `_pickAction()` 제거, `selectAction()`에서 캐릭터 타입 기반 가중치 랜덤 선택 (3) Rush/TimeWarp/Counter/ProjectileGuard/Endure/LifeSteal/Evade에 `getFailureReason` 가드 추가 (효과 활성 중 재사용 방지) (4) Shockwave 반경 150→250, HP 40% 미만 + 거리 250 이하에서만 사용 (방어적)
+- 영향: `src/clickActions.js`, `src/simulation/aiActionController.js`
+
 ## [L1] 2026-06-28 — RL 최적화 가이드 문서 작성
 - 맥락: AI 액션 `canAIUse` 파라미터 수동 튜닝이 번거로워 RL/자동최적화 도입 검토
 - 결정: `docs/rl-optimization-guide.md` 작성 — 게임 구조·관측공간(24차원)·행동공간·보상함수·DQN 학습코드·기존 게임 임베딩 전략을 포괄하는 설계 문서
