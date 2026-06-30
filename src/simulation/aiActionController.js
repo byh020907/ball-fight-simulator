@@ -93,7 +93,7 @@ export class AIActionController {
         if (!opponent) return null;
 
         if (!this.rlPolicy) {
-            if (!this._loggedNoPolicy) {
+            if (!this._loggedNoPolicy && sim.playerBall !== fighter) {
                 console.warn(`[RL] ${fighter.id}: rlPolicy 없음 (모델 로드 안 됨?)`);
                 this._loggedNoPolicy = true;
             }
