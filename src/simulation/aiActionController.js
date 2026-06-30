@@ -59,20 +59,26 @@ export class AIActionController {
      * @param {string} charId - 캐릭터 ID (예: "dash")
      */
     async loadRlPolicy(charId) {
-        if (!this._chosenAction) return;
+        if (!this._chosenAction) {
+            console.warn("[RL] loadRlPolicy: _chosenAction is null");
+            return;
+        }
         const url = `${RL_MODEL_BASE}/${this._chosenAction.id}/${charId}.json`;
         try {
             const res = await fetch(url);
-            if (!res.ok) return;  // 404 등 → 모델 없음, 폴백
+            if (!res.ok) {
+                console.warn(`[RL] 모델 없음 (${res.status}): ${url}`);
+                return;
+            }
             const modelJson = await res.json();
             this.rlPolicy = await RLPolicy.fromJson(modelJson);
-        } catch {
-            // 네트워크 오류 등 → 조용히 무시
+            console.log(`[RL] 로드 OK: ${charId}×${this._chosenAction.id} win=${(modelJson.trainWinRate*100).toFixed(0)}%`);
+        } catch (e) {
+            console.warn(`[RL] 로드 실패: ${url}`, e.message);
         }
     }
 
     evaluate(sim, fighter, delta) {
-        // 최소 간격 타이머
         if (this._nextAvailableAt > 0) {
             this._nextAvailableAt -= delta;
             return null;
@@ -81,17 +87,31 @@ export class AIActionController {
         const action = this._chosenAction;
         if (!action) return null;
 
-        // 효과 중복 방지 (이미 발동 중이면 사용 불가)
         if (action.getFailureReason?.(sim, fighter)) return null;
 
-        // RL 정책 판단: HP·거리·속도·투사체 등 16차원 맥락을 종합해 사용 여부 결정
         const opponent = sim.getOpponent(fighter);
         if (!opponent) return null;
-        if (!this.rlPolicy?.shouldActivate(fighter, opponent, sim)) return null;
+
+        if (!this.rlPolicy) {
+            if (!this._loggedNoPolicy) {
+                console.warn(`[RL] ${fighter.id}: rlPolicy 없음 (모델 로드 안 됨?)`);
+                this._loggedNoPolicy = true;
+            }
+            return null;
+        }
+
+        const prob = this.rlPolicy.getProbability(fighter, opponent, sim);
+        if (prob < 0.5) return null;
 
         const cost = Math.ceil((fighter.maxHp * action.hpCostPercent) / 100);
         const paidCost = fighter.actionContext.spendHpForAction(fighter, cost);
         if (paidCost <= 0) return null;
+
+        // 첫 액션 발동 시 로그
+        if (!this._loggedActivation) {
+            console.log(`[RL] ${fighter.id} 첫 액션 발동: ${action.name} (prob=${prob.toFixed(3)})`);
+            this._loggedActivation = true;
+        }
 
         this._nextAvailableAt = AI_MIN_INTERVAL;
         this.usageCount[action.id] = (this.usageCount[action.id] ?? 0) + 1;
