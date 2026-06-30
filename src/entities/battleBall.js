@@ -197,7 +197,7 @@ export class BattleBall extends mixins([PhysicsBody]) {
         if (this.aiController) {
             const result = this.aiController.evaluate(simulation, this, delta);
             if (result) {
-                result.action.apply(simulation, result.fighter, result.paidCost);
+                simulation.scheduleAction(result.action, result.fighter, result.paidCost);
             }
         }
 
