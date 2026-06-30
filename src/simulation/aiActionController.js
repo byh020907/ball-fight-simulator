@@ -2,6 +2,7 @@ import { pickRandomActions } from "../clickActions.js";
 import { RLPolicy } from "../ai/rlPolicy.js";
 
 const AI_MIN_INTERVAL = 1.0; // 연속 사용 방지용 최소 간격
+const AI_ACTION_THRESHOLD = 0.7; // 이 확률 이상일 때만 액션 사용 (0.5=무조건 반, 0.7=확신 있을 때만)
 const RL_MODEL_BASE = "/models";  // 서버에서 모델 디렉토리 경로
 
 export class AIActionController {
@@ -101,15 +102,18 @@ export class AIActionController {
         }
 
         const prob = this.rlPolicy.getProbability(fighter, opponent, sim);
-        if (prob < 0.5) return null;
+        if (prob < AI_ACTION_THRESHOLD) return null;
 
         const cost = Math.ceil((fighter.maxHp * action.hpCostPercent) / 100);
         const paidCost = fighter.actionContext.spendHpForAction(fighter, cost);
         if (paidCost <= 0) return null;
 
-        // 첫 액션 발동 시 로그
+        // 액션 발동 로그 (처음 한 번만)
         if (!this._loggedActivation) {
-            console.log(`[RL] ${fighter.id} 첫 액션 발동: ${action.name} (prob=${prob.toFixed(3)})`);
+            console.log(
+                `[RL] ${fighter.id} ${action.name}: prob=${prob.toFixed(3)} ` +
+                `hp=${(fighter.hp/fighter.maxHp*100).toFixed(0)}% cost=${cost}`
+            );
             this._loggedActivation = true;
         }
 

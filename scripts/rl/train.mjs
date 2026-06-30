@@ -47,6 +47,7 @@ const CONFIG = {
     clipRatio: readNumberEnv("RL_CLIP_RATIO", 0.2),
     valueCoef: readNumberEnv("RL_VALUE_COEF", 0.5),
     entropyCoef: readNumberEnv("RL_ENTROPY_COEF", 0.01),
+    actionPenalty: readNumberEnv("RL_ACTION_PENALTY", 0.02), // 액션 1회당 패널티 (스팸 방지)
     minDecisionFrames: readNumberEnv("RL_MIN_DECISION_FRAMES", 30),
     maxEpisodeSeconds: readNumberEnv("RL_MAX_EPISODE_SECONDS", 35),
     logInterval: readNumberEnv("RL_LOG_INTERVAL", 100),
@@ -184,7 +185,8 @@ function runEpisode({ actor, normalizer, rlSpec, opponentSpec, fixedAction, dete
     }
 
     const won = sim.winner && sim.winner.id === fighter.id;
-    const reward = won ? 1.0 : -1.0;
+    // 승리 보상에서 액션 사용 횟수만큼 차감 → 불필요한 스팸 억제
+    const reward = (won ? 1.0 : -1.0) - actionUseCount * CONFIG.actionPenalty;
     return {
         trajectory,
         reward,
@@ -516,15 +518,16 @@ node scripts/rl/train.mjs [--help]
   RL_THROTTLE_MS=0         에피소드 간 대기 (ms)
   RL_BATCH_THROTTLE_MS=0   배치 학습 간 대기 (ms, 소음↓)
   RL_CPU_THREADS=0         CPU 코어 제한 (1~4, 0=전체, 발열↓)
+  RL_ACTION_PENALTY=0.02   액션 1회당 패널티 (스팸 방지, 높을수록 신중)
 
 예시:
-  # 저소음 풀세트 (2코어 + 배치 간격)
+  # 저소음 풀세트
   $env:RL_CPU_THREADS=2; $env:RL_BATCH_THROTTLE_MS=300; node scripts/rl/train.mjs
 
-  # 노트북 최저발열 (1코어)
-  $env:RL_CPU_THREADS=1; $env:RL_BATCH_THROTTLE_MS=500; node scripts/rl/train.mjs
+  # 스팸 억제 강화 (더 신중한 AI)
+  $env:RL_ACTION_PENALTY=0.05; node scripts/rl/train.mjs
 
-  # Dash만
+  # Dash만 빠르게
   $env:RL_CHARACTERS="dash"; node scripts/rl/train.mjs
 `;
 
