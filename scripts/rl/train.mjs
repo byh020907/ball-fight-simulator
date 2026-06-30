@@ -155,11 +155,21 @@ function runEpisode({ actor, normalizer, rlSpec, opponentSpec, fixedAction, dete
     let actionUseCount = 0;
     let probabilitySum = 0;
     let lastDecisionFrame = -CONFIG.minDecisionFrames;
+    // 액션 직전 상대 HP 추적 → 액션으로 인한 피해량만 측정
+    let lastActionOppHp = 0;
+    let actionDamageDealt = 0; // 액션 덕분에 깎은 상대 HP 누적
 
     while (!sim.finished && sim.elapsed < CONFIG.maxEpisodeSeconds) {
         sim.update(1 / 60, 1 / 60);
         const opponent = sim.getOpponent(fighter);
         if (!opponent) break;
+
+        // 이전 액션의 피해량 정산 (충분한 시간이 지난 후)
+        if (lastActionOppHp > 0 && opponent.hp < lastActionOppHp) {
+            actionDamageDealt += lastActionOppHp - opponent.hp;
+        }
+        lastActionOppHp = 0; // 정산 완료
+
         if (!canConsiderAction(sim, fighter, fixedAction, lastDecisionFrame)) continue;
 
         const rawObs = extractFeatures(fighter, opponent, sim);
@@ -179,20 +189,27 @@ function runEpisode({ actor, normalizer, rlSpec, opponentSpec, fixedAction, dete
         lastDecisionFrame = Math.floor((sim.elapsed ?? 0) * 60);
         if (decision.action === 1) {
             actionUseCount++;
+            // 액션 사용 직전 상대 HP 기록
+            lastActionOppHp = opponent.hp;
             const cost = Math.ceil((fighter.maxHp * fixedAction.hpCostPercent) / 100);
             const paid = fighter.actionContext.spendHpForAction(fighter, cost);
             if (paid > 0) sim.scheduleAction(fixedAction, fighter, paid);
         }
     }
 
-    const won = sim.winner && sim.winner.id === fighter.id;
+    // 마지막 액션의 피해량도 정산
     const opponent = sim.getOpponent(fighter);
-    // 상대 HP를 얼마나 깎았는가 (0~1, 높을수록 많이 깎음)
-    const opponentHpDepleted = opponent ? 1 - opponent.hp / opponent.maxHp : 1;
-    // 보상 = 승패 + HP 깎은 양 - 스팸 패널티
+    if (lastActionOppHp > 0 && opponent && opponent.hp < lastActionOppHp) {
+        actionDamageDealt += lastActionOppHp - opponent.hp;
+    }
+
+    const won = sim.winner && sim.winner.id === fighter.id;
+    const opponentMaxHp = opponent ? opponent.maxHp : 1;
+    // 액션으로 인한 HP 피해 비율 (0~1)
+    const actionHpRatio = Math.min(1, actionDamageDealt / opponentMaxHp);
     const reward =
         (won ? 1.0 : -1.0) +
-        opponentHpDepleted * CONFIG.hpWeight -
+        actionHpRatio * CONFIG.hpWeight -
         actionUseCount * CONFIG.actionPenalty;
     return {
         trajectory,
