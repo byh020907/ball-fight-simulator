@@ -1,12 +1,31 @@
 // src/ai/rlPolicy.js — 학습된 RL 모델을 게임에서 로드 & 추론
-// tf는 index.html의 <script> 태그로 글로벌 로드됨
 import { extractFeatures } from "../../scripts/rl/features.js";
 
-const tf = window.tf;
+// 브라우저: window.tf (index.html <script> 태그), Node.js: import 해야 함
+let _tf;
+function getTf() {
+    if (_tf) return _tf;
+    if (typeof window !== "undefined" && window.tf) {
+        _tf = window.tf;
+    }
+    // Node.js 환경이면 호출 전에 setTf()로 주입해야 함
+    if (!_tf) throw new Error("TF.js not available. Call setTf(tf) before using RLPolicy.");
+    return _tf;
+}
+
+/** Node.js 환경에서 tf 모듈 주입 (브라우저는 window.tf 자동 감지) */
+export function setTf(tfModule) {
+    _tf = tfModule;
+}
 
 /** base64 문자열 → ArrayBuffer (Node.js + 브라우저 호환) */
 function base64ToArrayBuffer(base64) {
-    const binary = atob(base64);
+    // Node.js: Buffer가 더 관대함 (개행 문자 등 처리)
+    if (typeof Buffer !== "undefined") {
+        return new Uint8Array(Buffer.from(base64, "base64")).buffer;
+    }
+    // 브라우저: atob 사용 (개행 제거 후)
+    const binary = atob(base64.replace(/\s/g, ""));
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) {
         bytes[i] = binary.charCodeAt(i);
@@ -63,6 +82,7 @@ export class RLPolicy {
      * @returns {Promise<RLPolicy>}
      */
     static async fromJson(modelJson) {
+        const tf = getTf();
         // base64 → ArrayBuffer 복원 (TF.js 표준 형식)
         const weightData = base64ToArrayBuffer(modelJson.weightData);
         const artifacts = {
@@ -86,6 +106,7 @@ export class RLPolicy {
 
     /** 현재 프레임의 액션 사용 확률 (0~1) */
     getProbability(fighter, opponent, sim) {
+        const tf = getTf();
         const raw = extractFeatures(fighter, opponent, sim);
         const norm = this.normalizer.normalize(raw);
         return tf.tidy(() => this.actor.predict(tf.tensor2d([norm])).dataSync()[0]);
