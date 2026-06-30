@@ -1,6 +1,8 @@
 // src/ai/rlPolicy.js — 학습된 RL 모델을 게임에서 로드 & 추론
-import * as tf from "@tensorflow/tfjs";
+// tf는 index.html의 <script> 태그로 글로벌 로드됨
 import { extractFeatures } from "../../scripts/rl/features.js";
+
+const tf = window.tf;
 
 /** base64 문자열 → ArrayBuffer (Node.js + 브라우저 호환) */
 function base64ToArrayBuffer(base64) {
