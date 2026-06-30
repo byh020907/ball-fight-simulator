@@ -1,6 +1,8 @@
 import { pickRandomActions } from "../clickActions.js";
+import { RLPolicy } from "../ai/rlPolicy.js";
 
 const AI_MIN_INTERVAL = 1.0; // 연속 사용 방지용 최소 간격
+const RL_MODEL_BASE = "/models";  // 서버에서 모델 디렉토리 경로
 
 export class AIActionController {
     constructor(rng = Math.random) {
@@ -48,6 +50,24 @@ export class AIActionController {
 
         if (fighter) {
             fighter.clickActionName = this._chosenAction.name;
+        }
+    }
+
+    /**
+     * 학습된 RL 모델을 로드하여 이 컨트롤러에 연결.
+     * 모델이 없거나 로드 실패 시 조용히 넘어감 (액션 미사용).
+     * @param {string} charId - 캐릭터 ID (예: "dash")
+     */
+    async loadRlPolicy(charId) {
+        if (!this._chosenAction) return;
+        const url = `${RL_MODEL_BASE}/${this._chosenAction.id}/${charId}.json`;
+        try {
+            const res = await fetch(url);
+            if (!res.ok) return;  // 404 등 → 모델 없음, 폴백
+            const modelJson = await res.json();
+            this.rlPolicy = await RLPolicy.fromJson(modelJson);
+        } catch {
+            // 네트워크 오류 등 → 조용히 무시
         }
     }
 

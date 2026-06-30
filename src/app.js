@@ -499,6 +499,15 @@ export class BattleApp {
         const playerBall = this.simulation.fighters.find((f) => f.id === this.playerFighterId) ?? null;
         this.simulation.playerBall = playerBall;
 
+        // ── AI 캐릭터 RL 모델 로드 ──
+        for (const fighter of this.simulation.fighters) {
+            if (fighter === playerBall) continue;
+            const ctrl = fighter.aiController;
+            if (ctrl?._chosenAction) {
+                await ctrl.loadRlPolicy(fighter.id);
+            }
+        }
+
         if (this._currentMatchReport) {
             this._currentMatchReport.playerFighterId = this.playerFighterId;
             this._currentMatchReport.tournamentRoundIndex = this.currentTournamentMatch?.roundIndex ?? -1;
