@@ -1,5 +1,4 @@
 // scripts/benchmark.mjs — 액션 없음 vs RL 모델 사용 승률 비교
-import * as tf from "@tensorflow/tfjs";
 import fs from "fs";
 import path from "path";
 import { createRoster } from "../src/roster.js";
@@ -187,6 +186,33 @@ async function main() {
             console.log(`  ${name} × ${action.name}: ${(r.delta * 100).toFixed(1)}% (${(r.baseline * 100).toFixed(0)}% → ${(r.modelWr * 100).toFixed(0)}%)`);
         }
     }
+}
+
+const HELP = `
+RL 모델 벤치마크
+================
+node scripts/benchmark.mjs [--help]
+
+환경변수:
+  RL_SAMPLES=500           캐릭터당 평가 시합 수 (많을수록 정확)
+  RL_CHARACTERS=id1,...    캐릭터 (기본: all)
+  RL_ACTIONS=id1,...       액션 (기본: all)
+  RL_CPU_THREADS=0         CPU 코어 제한
+
+예시:
+  # 전체 96조합 평가 (500회씩, 약 10분)
+  node scripts/benchmark.mjs
+
+  # Dash, Rage만 Rush 액션 평가
+  $env:RL_CHARACTERS="dash,rage"; $env:RL_ACTIONS="rush"; node scripts/benchmark.mjs
+
+  # 빠른 테스트 (30회)
+  $env:RL_SAMPLES=30; node scripts/benchmark.mjs
+`;
+
+if (process.argv.includes("--help") || process.argv.includes("-h")) {
+    console.log(HELP);
+    process.exit(0);
 }
 
 main().catch((e) => {
