@@ -338,7 +338,7 @@ async function saveModel(actor, normalizer, metadata) {
             lr: CONFIG.lr,
             gamma: CONFIG.gamma,
             opponentMode: CONFIG.opponentMode,
-            weights: w
+            weights: getActionWeights(metadata.actionId)
         }
     };
 
