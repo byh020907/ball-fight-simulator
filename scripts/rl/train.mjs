@@ -47,9 +47,9 @@ const CONFIG = {
     clipRatio: readNumberEnv("RL_CLIP_RATIO", 0.2),
     valueCoef: readNumberEnv("RL_VALUE_COEF", 0.5),
     entropyCoef: readNumberEnv("RL_ENTROPY_COEF", 0.01),
-    actionPenalty: readNumberEnv("RL_ACTION_PENALTY", 0.02), // 액션 1회당 패널티 (스팸 방지)
-    hpWeight: readNumberEnv("RL_HP_WEIGHT", 0.3), // 액션으로 깎은 상대 HP 가중치 (공격형)
-    survivalWeight: readNumberEnv("RL_SURVIVAL_WEIGHT", 0.15), // 내 HP 보존 가중치 (방어형)
+    hpWeight: readNumberEnv("RL_HP_WEIGHT", 0), // 0이면 액션별 기본값 사용
+    survivalWeight: readNumberEnv("RL_SURVIVAL_WEIGHT", 0), // 0이면 액션별 기본값 사용
+    actionPenalty: readNumberEnv("RL_ACTION_PENALTY", 0), // 0이면 액션별 기본값 사용
     minDecisionFrames: readNumberEnv("RL_MIN_DECISION_FRAMES", 30),
     maxEpisodeSeconds: readNumberEnv("RL_MAX_EPISODE_SECONDS", 35),
     logInterval: readNumberEnv("RL_LOG_INTERVAL", 100),
@@ -66,6 +66,42 @@ const CONFIG = {
     modelDir: process.env.RL_MODEL_DIR ?? "models",
     cpuThreads: readNumberEnv("RL_CPU_THREADS", 0)  // 0=모든 코어 사용, 2=절반, 1=최저발열
 };
+
+/**
+ * 액션별 보상 가중치.
+ * env로 RL_HP_WEIGHT 등이 설정되면 전체 override, 아니면 이 맵에서 액션ID로 조회.
+ * 빠진 액션은 DEFAULT_ACTION_WEIGHTS 사용.
+ */
+const DEFAULT_ACTION_WEIGHTS = { hp: 0.3, survival: 0.15, penalty: 0.02 };
+const ACTION_WEIGHT_MAP = {
+    // 공격형 — HP 피해 위주
+    shockwave:        { hp: 0.5, survival: 0.1, penalty: 0.02 },
+    // 방어형 — 생존 위주
+    evade:            { hp: 0.1, survival: 0.5, penalty: 0.01 },
+    counter:          { hp: 0.2, survival: 0.4, penalty: 0.01 },
+    projectile_guard: { hp: 0.1, survival: 0.5, penalty: 0.01 },
+    // 유틸리티 — 균형
+    rush:             { hp: 0.15, survival: 0.15, penalty: 0.02 },
+    time_warp:        { hp: 0.2, survival: 0.2, penalty: 0.02 },
+    // 회복/생존
+    life_steal:       { hp: 0.3, survival: 0.2, penalty: 0.02 },
+    endure:           { hp: 0.1, survival: 0.35, penalty: 0.02 },
+};
+
+/** 액션 ID에 해당하는 (hp, survival, penalty) 반환 */
+function getActionWeights(actionId) {
+    const fromEnv =
+        CONFIG.hpWeight > 0 || CONFIG.survivalWeight > 0 || CONFIG.actionPenalty > 0;
+    if (fromEnv) {
+        // env override: 직접 지정값 사용
+        return {
+            hp: CONFIG.hpWeight || DEFAULT_ACTION_WEIGHTS.hp,
+            survival: CONFIG.survivalWeight || DEFAULT_ACTION_WEIGHTS.survival,
+            penalty: CONFIG.actionPenalty || DEFAULT_ACTION_WEIGHTS.penalty,
+        };
+    }
+    return ACTION_WEIGHT_MAP[actionId] ?? DEFAULT_ACTION_WEIGHTS;
+}
 
 function pickRandom(roster, excludeId) {
     const others = roster.filter((f) => f.id !== excludeId);
@@ -212,16 +248,16 @@ function runEpisode({ actor, normalizer, rlSpec, opponentSpec, fixedAction, dete
     const won = sim.winner && sim.winner.id === fighter.id;
     const oppMaxHp = opponent ? opponent.maxHp : 1;
     const myMaxHp = fighter.maxHp;
+    const w = getActionWeights(fixedAction.id);
 
-    // 액션으로 인한 효과 (0~1 비율)
-    const dealRatio = Math.min(1, actionDamageDealt / oppMaxHp);  // 공격 효과
-    const takeRatio = Math.min(1, actionDamageTaken / myMaxHp);   // 방어 실패
+    const dealRatio = Math.min(1, actionDamageDealt / oppMaxHp);
+    const takeRatio = Math.min(1, actionDamageTaken / myMaxHp);
 
     const reward =
-        (won ? 1.0 : -1.0)                              // 승패 ±1
-        + dealRatio * CONFIG.hpWeight                    // 공격: 상대 HP 깎음 +
-        - takeRatio * CONFIG.survivalWeight               // 방어: 내 HP 손실 -
-        - actionUseCount * CONFIG.actionPenalty;          // 스팸 방지
+        (won ? 1.0 : -1.0)
+        + dealRatio * w.hp
+        - takeRatio * w.survival
+        - actionUseCount * w.penalty;
     return {
         trajectory,
         reward,
@@ -302,9 +338,7 @@ async function saveModel(actor, normalizer, metadata) {
             lr: CONFIG.lr,
             gamma: CONFIG.gamma,
             opponentMode: CONFIG.opponentMode,
-            actionPenalty: CONFIG.actionPenalty,
-            hpWeight: CONFIG.hpWeight,
-            survivalWeight: CONFIG.survivalWeight
+            weights: w
         }
     };
 
@@ -556,13 +590,21 @@ node scripts/rl/train.mjs [--help]
   RL_THROTTLE_MS=0         에피소드 간 대기 (ms)
   RL_BATCH_THROTTLE_MS=0   배치 학습 간 대기 (ms, 소음↓)
   RL_CPU_THREADS=0         CPU 코어 제한 (1~4, 0=전체, 발열↓)
-  RL_ACTION_PENALTY=0.02   스팸 패널티 (1회당)
-  RL_HP_WEIGHT=0.3        공격 가중치 (상대 HP 깎음)
-  RL_SURVIVAL_WEIGHT=0.15  방어 가중치 (내 HP 손실)
+  RL_ACTION_PENALTY=0      스팸 패널티 (0=액션별 자동)
+  RL_HP_WEIGHT=0           공격 가중치 (0=액션별 자동)
+  RL_SURVIVAL_WEIGHT=0     방어 가중치 (0=액션별 자동)
+
+액션별 기본값:
+  공격형(shockwave):        hp=0.5 surv=0.1 pen=0.02
+  방어형(evade/counter):    hp=0.1 surv=0.5 pen=0.01
+  유틸(rush/time_warp):     hp=0.2 surv=0.2 pen=0.02
 
 예시:
-  # 공격형 (딜 중시)
-  $env:RL_HP_WEIGHT=0.5; $env:RL_SURVIVAL_WEIGHT=0.05; node scripts/rl/train.mjs
+  # 액션별 자동 가중치 (권장)
+  node scripts/rl/train.mjs
+
+  # 전체 override
+  $env:RL_HP_WEIGHT=0.5; $env:RL_SURVIVAL_WEIGHT=0.1; node scripts/rl/train.mjs
 
   # 방어형 (회피/카운터 특화)
   $env:RL_HP_WEIGHT=0.1; $env:RL_SURVIVAL_WEIGHT=0.4; node scripts/rl/train.mjs
