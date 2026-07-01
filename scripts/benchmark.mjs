@@ -50,9 +50,15 @@ function createSim(fighterSpec, opponentSpec) {
     return new BattleSimulation([a, b], { onLog() {} }, null, { assignActions: false });
 }
 
-/** 특정 캐릭터가 N회 싸웠을 때 승률 측정 */
+/** 특정 캐릭터가 N회 싸웠을 때 승률 + 스팸 지표 측정 */
 function runMatches(fighterSpec, opponentPicker, actionToUse, sampleCount) {
     let wins = 0;
+    let decisions = 0;       // 총 의사결정 횟수
+    let accepts = 0;         // 액션 수락 횟수
+    let probSum = 0;         // 확률 합계 (평균 계산용)
+    let probMin = 1;         // 최소 확률
+    let probMax = 0;         // 최대 확률
+
     for (let i = 0; i < sampleCount; i++) {
         const opponent = opponentPicker();
         const sim = createSim(fighterSpec, opponent);
@@ -61,22 +67,44 @@ function runMatches(fighterSpec, opponentPicker, actionToUse, sampleCount) {
         if (actionToUse) {
             fighter.aiController = new AIActionController();
             fighter.aiController._chosenAction = actionToUse;
-            // RL 정책을 컨트롤러에 직접 주입 (evaluate에서 사용)
             fighter.aiController.rlPolicy = actionToUse._rlPolicy ?? null;
         }
 
         while (!sim.finished && sim.elapsed < CONFIG.maxEpisodeSeconds) {
             sim.update(1 / 60, 1 / 60);
             if (actionToUse && fighter.aiController) {
-                const result = fighter.aiController.evaluate(sim, fighter, 1 / 60);
-                if (result) {
-                    sim.scheduleAction(result.action, result.fighter, result.paidCost);
+                const ctrl = fighter.aiController;
+                // 쿨다운 중이거나 효과 활성 중이면 건너뜀
+                if (ctrl._nextAvailableAt > 0) continue;
+                if (actionToUse.getFailureReason?.(sim, fighter)) continue;
+
+                const opponent = sim.getOpponent(fighter);
+                if (!opponent) continue;
+
+                decisions++;
+                const prob = ctrl.rlPolicy.getProbability(fighter, opponent, sim);
+                probSum += prob;
+                if (prob < probMin) probMin = prob;
+                if (prob > probMax) probMax = prob;
+
+                if (prob >= 0.7) {
+                    accepts++;
+                    const cost = Math.ceil((fighter.maxHp * actionToUse.hpCostPercent) / 100);
+                    const paid = fighter.actionContext.spendHpForAction(fighter, cost);
+                    if (paid > 0) sim.scheduleAction(actionToUse, fighter, paid);
                 }
             }
         }
         if (sim.winner && sim.winner.id === fighter.id) wins++;
     }
-    return wins / sampleCount;
+
+    const winRate = wins / sampleCount;
+    const acceptRate = decisions > 0 ? accepts / decisions : 0;
+    const probMean = decisions > 0 ? probSum / decisions : 0;
+    // 스팸 점수: 0=전략적, 1=완전 무지성
+    const spamScore = decisions > 10 ? acceptRate : 0;
+
+    return { winRate, decisions, acceptRate, probMean, probMin, probMax, spamScore };
 }
 
 /** 모델 로드 → RLPolicy */
@@ -114,7 +142,7 @@ async function main() {
     for (const charId of characterIds) {
         const spec = roster.find((f) => f.id === charId);
         const opponentPicker = () => pickRandom(roster, charId);
-        const wr = runMatches(spec, opponentPicker, null, CONFIG.samples);
+        const { winRate: wr } = runMatches(spec, opponentPicker, null, CONFIG.samples);
         baselines[charId] = wr;
         const name = spec.name.padEnd(16);
         console.log(`  ${name} baseline=${(wr * 100).toFixed(1)}%`);
@@ -122,6 +150,8 @@ async function main() {
 
     // 2. 모델 사용
     console.log("\n── RL 모델 사용 ──");
+    console.log("  Char             Action      WinRate  Δ        Accept  ProbMean  Spam");
+    console.log("  " + "─".repeat(72));
     const results = [];
     for (const charId of characterIds) {
         const spec = roster.find((f) => f.id === charId);
@@ -134,19 +164,23 @@ async function main() {
             const policy = await loadPolicy(actionId, charId);
             if (!policy) continue;
 
-            // 액션에 rlPolicy 주입 (runMatches에서 사용)
             action._rlPolicy = policy;
-
-            const wr = runMatches(spec, opponentPicker, action, CONFIG.samples);
-            const delta = wr - baseline;
-            const actionName = action.name.padEnd(10);
-            const name = spec.name.padEnd(16);
+            const { winRate, decisions, acceptRate, probMean, spamScore } = runMatches(spec, opponentPicker, action, CONFIG.samples);
+            const delta = winRate - baseline;
             const sig = delta > 0.03 ? "▲" : delta < -0.03 ? "▼" : "─";
+            const spamLabel = spamScore > 0.9 ? "🚨스팸" : spamScore > 0.5 ? "⚠️의심" : "✅전략";
+
+            const name = spec.name.padEnd(16);
+            const aname = action.name.padEnd(10);
             console.log(
-                `  ${name} × ${actionName} wr=${(wr * 100).toFixed(1)}% ` +
-                `(Δ${(delta >= 0 ? "+" : "")}${(delta * 100).toFixed(1)}%) ${sig}`
+                `  ${name} ${aname} ` +
+                `wr=${(winRate * 100).toFixed(1).padStart(5)}% ` +
+                `Δ${(delta >= 0 ? "+" : "")}${(delta * 100).toFixed(1).padStart(5)}% ${sig} ` +
+                `${(acceptRate * 100).toFixed(1).padStart(5)}% ` +
+                `${probMean.toFixed(3).padStart(7)}  ` +
+                `${spamLabel}`
             );
-            results.push({ charId, actionId, baseline, modelWr: wr, delta });
+            results.push({ charId, actionId, baseline, modelWr: winRate, delta, spamScore, decisions, acceptRate });
 
             policy.actor.dispose();
             delete action._rlPolicy;
@@ -160,21 +194,33 @@ async function main() {
     }
 
     results.sort((a, b) => b.delta - a.delta);
-    const useful = results.filter((r) => r.delta > 0.03);
+    const useful = results.filter((r) => r.delta > 0.03 && r.spamScore < 0.9);
+    const usefulButSpam = results.filter((r) => r.delta > 0.03 && r.spamScore >= 0.9);
     const harmful = results.filter((r) => r.delta < -0.03);
+    const spamTotal = results.filter((r) => r.spamScore >= 0.9);
 
     console.log("\n── 요약 ──");
     console.log(`총 ${results.length}개 조합 평가됨`);
-    console.log(`유의미한 승률 상승 (Δ>+3%): ${useful.length}개`);
-    console.log(`유의미한 승률 하락 (Δ<-3%): ${harmful.length}개`);
-    console.log(`무변화 (±3% 이내): ${results.length - useful.length - harmful.length}개`);
+    console.log(`진짜 효과 (Δ>+3%, 스팸 아님): ${useful.length}개`);
+    if (usefulButSpam.length > 0) console.log(`효과는 있지만 스팸 의심: ${usefulButSpam.length}개`);
+    console.log(`오히려 해로움 (Δ<-3%): ${harmful.length}개`);
+    if (spamTotal.length > 0) console.log(`🚨 스팸 판정 (수락률>90%): ${spamTotal.length}개`);
 
     if (useful.length > 0) {
-        console.log("\n🏆 효과 좋은 조합:");
+        console.log("\n🏆 진짜 전략적인 승리:");
         for (const r of useful.slice(0, 10)) {
             const name = roster.find((f) => f.id === r.charId).name;
             const action = findActionById(r.actionId);
-            console.log(`  ${name} × ${action.name}: +${(r.delta * 100).toFixed(1)}% (${(r.baseline * 100).toFixed(0)}% → ${(r.modelWr * 100).toFixed(0)}%)`);
+            console.log(`  ${name} × ${action.name}: +${(r.delta * 100).toFixed(1)}% (${(r.baseline * 100).toFixed(0)}% → ${(r.modelWr * 100).toFixed(0)}%)  accept=${(r.acceptRate * 100).toFixed(0)}%`);
+        }
+    }
+
+    if (usefulButSpam.length > 0) {
+        console.log("\n⚠️ 효과 있지만 무지성 호출 (재학습 필요):");
+        for (const r of usefulButSpam.slice(0, 5)) {
+            const name = roster.find((f) => f.id === r.charId).name;
+            const action = findActionById(r.actionId);
+            console.log(`  ${name} × ${action.name}: +${(r.delta * 100).toFixed(1)}%  accept=${(r.acceptRate * 100).toFixed(0)}%`);
         }
     }
 

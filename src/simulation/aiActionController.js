@@ -60,22 +60,15 @@ export class AIActionController {
      * @param {string} charId - 캐릭터 ID (예: "dash")
      */
     async loadRlPolicy(charId) {
-        if (!this._chosenAction) {
-            console.warn("[RL] loadRlPolicy: _chosenAction is null");
-            return;
-        }
+        if (!this._chosenAction) return;
         const url = `${RL_MODEL_BASE}/${this._chosenAction.id}/${charId}.json`;
         try {
             const res = await fetch(url);
-            if (!res.ok) {
-                console.warn(`[RL] 모델 없음 (${res.status}): ${url}`);
-                return;
-            }
+            if (!res.ok) return; // 모델 없음 → 폴백
             const modelJson = await res.json();
             this.rlPolicy = await RLPolicy.fromJson(modelJson);
-            console.log(`[RL] 로드 OK: ${charId}×${this._chosenAction.id} win=${(modelJson.trainWinRate*100).toFixed(0)}%`);
-        } catch (e) {
-            console.warn(`[RL] 로드 실패: ${url}`, e.message);
+        } catch {
+            // 네트워크 오류 등 → 조용히 무시
         }
     }
 
@@ -103,15 +96,6 @@ export class AIActionController {
         const cost = Math.ceil((fighter.maxHp * action.hpCostPercent) / 100);
         const paidCost = fighter.actionContext.spendHpForAction(fighter, cost);
         if (paidCost <= 0) return null;
-
-        // 액션 발동 로그 (처음 한 번만)
-        if (!this._loggedActivation) {
-            console.log(
-                `[RL] ${fighter.id} ${action.name}: prob=${prob.toFixed(3)} ` +
-                `hp=${(fighter.hp/fighter.maxHp*100).toFixed(0)}% cost=${cost}`
-            );
-            this._loggedActivation = true;
-        }
 
         this._nextAvailableAt = AI_MIN_INTERVAL;
         this.usageCount[action.id] = (this.usageCount[action.id] ?? 0) + 1;

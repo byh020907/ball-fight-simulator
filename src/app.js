@@ -500,19 +500,12 @@ export class BattleApp {
         this.simulation.playerBall = playerBall;
 
         // ── AI 캐릭터 RL 모델 로드 ──
-        let loadedCount = 0;
         for (const fighter of this.simulation.fighters) {
             if (fighter === playerBall) continue;
             const ctrl = fighter.aiController;
             if (ctrl?._chosenAction) {
                 await ctrl.loadRlPolicy(fighter.id);
-                if (ctrl.rlPolicy) loadedCount++;
             }
-        }
-        if (loadedCount > 0) {
-            console.log(`[RL] ${loadedCount}개 AI 컨트롤러에 모델 로드 완료`);
-        } else {
-            console.warn("[RL] 로드된 모델 없음 — AI 액션 미사용");
         }
 
         if (this._currentMatchReport) {
