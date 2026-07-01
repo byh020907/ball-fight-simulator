@@ -48,8 +48,8 @@ const CONFIG = {
     valueCoef: readNumberEnv("RL_VALUE_COEF", 0.5),
     entropyCoef: readNumberEnv("RL_ENTROPY_COEF", 0.01),
     actionPenalty: readNumberEnv("RL_ACTION_PENALTY", 0.02), // 액션 1회당 패널티 (스팸 방지)
-    hpWeight: readNumberEnv("RL_HP_WEIGHT", 0.5), // 액션으로 깎은 상대 HP 가중치 (공격형)
-    survivalWeight: readNumberEnv("RL_SURVIVAL_WEIGHT", 0.3), // 내 HP 보존 가중치 (방어형)
+    hpWeight: readNumberEnv("RL_HP_WEIGHT", 0.3), // 액션으로 깎은 상대 HP 가중치 (공격형)
+    survivalWeight: readNumberEnv("RL_SURVIVAL_WEIGHT", 0.15), // 내 HP 보존 가중치 (방어형)
     minDecisionFrames: readNumberEnv("RL_MIN_DECISION_FRAMES", 30),
     maxEpisodeSeconds: readNumberEnv("RL_MAX_EPISODE_SECONDS", 35),
     logInterval: readNumberEnv("RL_LOG_INTERVAL", 100),
@@ -557,15 +557,15 @@ node scripts/rl/train.mjs [--help]
   RL_BATCH_THROTTLE_MS=0   배치 학습 간 대기 (ms, 소음↓)
   RL_CPU_THREADS=0         CPU 코어 제한 (1~4, 0=전체, 발열↓)
   RL_ACTION_PENALTY=0.02   스팸 패널티 (1회당)
-  RL_HP_WEIGHT=0.5        공격 가중치 (상대 HP 깎음)
-  RL_SURVIVAL_WEIGHT=0.3  방어 가중치 (내 HP 손실)
+  RL_HP_WEIGHT=0.3        공격 가중치 (상대 HP 깎음)
+  RL_SURVIVAL_WEIGHT=0.15  방어 가중치 (내 HP 손실)
 
 예시:
   # 공격형 (딜 중시)
-  $env:RL_HP_WEIGHT=0.8; $env:RL_SURVIVAL_WEIGHT=0.1; node scripts/rl/train.mjs
+  $env:RL_HP_WEIGHT=0.5; $env:RL_SURVIVAL_WEIGHT=0.05; node scripts/rl/train.mjs
 
   # 방어형 (회피/카운터 특화)
-  $env:RL_HP_WEIGHT=0.2; $env:RL_SURVIVAL_WEIGHT=0.6; node scripts/rl/train.mjs
+  $env:RL_HP_WEIGHT=0.1; $env:RL_SURVIVAL_WEIGHT=0.4; node scripts/rl/train.mjs
 
   # 균형
   node scripts/rl/train.mjs
