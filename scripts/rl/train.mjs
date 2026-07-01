@@ -48,7 +48,8 @@ const CONFIG = {
     valueCoef: readNumberEnv("RL_VALUE_COEF", 0.5),
     entropyCoef: readNumberEnv("RL_ENTROPY_COEF", 0.01),
     actionPenalty: readNumberEnv("RL_ACTION_PENALTY", 0.02), // 액션 1회당 패널티 (스팸 방지)
-    hpWeight: readNumberEnv("RL_HP_WEIGHT", 0.3), // 상대 HP 깎은 비율 가중치 (클수록 공격적)
+    hpWeight: readNumberEnv("RL_HP_WEIGHT", 0.5), // 액션으로 깎은 상대 HP 가중치 (공격형)
+    survivalWeight: readNumberEnv("RL_SURVIVAL_WEIGHT", 0.3), // 내 HP 보존 가중치 (방어형)
     minDecisionFrames: readNumberEnv("RL_MIN_DECISION_FRAMES", 30),
     maxEpisodeSeconds: readNumberEnv("RL_MAX_EPISODE_SECONDS", 35),
     logInterval: readNumberEnv("RL_LOG_INTERVAL", 100),
@@ -155,20 +156,24 @@ function runEpisode({ actor, normalizer, rlSpec, opponentSpec, fixedAction, dete
     let actionUseCount = 0;
     let probabilitySum = 0;
     let lastDecisionFrame = -CONFIG.minDecisionFrames;
-    // 액션 직전 상대 HP 추적 → 액션으로 인한 피해량만 측정
+    // 액션 직전 HP 추적 → 액션으로 인한 피해/방어 효과 측정
     let lastActionOppHp = 0;
-    let actionDamageDealt = 0; // 액션 덕분에 깎은 상대 HP 누적
+    let lastActionMyHp = 0;
+    let actionDamageDealt = 0;  // 액션 후 상대가 잃은 HP
+    let actionDamageTaken = 0;  // 액션 후 내가 잃은 HP
 
     while (!sim.finished && sim.elapsed < CONFIG.maxEpisodeSeconds) {
         sim.update(1 / 60, 1 / 60);
         const opponent = sim.getOpponent(fighter);
         if (!opponent) break;
 
-        // 이전 액션의 피해량 정산 (충분한 시간이 지난 후)
-        if (lastActionOppHp > 0 && opponent.hp < lastActionOppHp) {
-            actionDamageDealt += lastActionOppHp - opponent.hp;
+        // 이전 액션의 효과 정산
+        if (lastActionOppHp > 0) {
+            if (opponent.hp < lastActionOppHp) actionDamageDealt += lastActionOppHp - opponent.hp;
+            if (fighter.hp < lastActionMyHp) actionDamageTaken += lastActionMyHp - fighter.hp;
         }
-        lastActionOppHp = 0; // 정산 완료
+        lastActionOppHp = 0;
+        lastActionMyHp = 0;
 
         if (!canConsiderAction(sim, fighter, fixedAction, lastDecisionFrame)) continue;
 
@@ -189,28 +194,34 @@ function runEpisode({ actor, normalizer, rlSpec, opponentSpec, fixedAction, dete
         lastDecisionFrame = Math.floor((sim.elapsed ?? 0) * 60);
         if (decision.action === 1) {
             actionUseCount++;
-            // 액션 사용 직전 상대 HP 기록
             lastActionOppHp = opponent.hp;
+            lastActionMyHp = fighter.hp;
             const cost = Math.ceil((fighter.maxHp * fixedAction.hpCostPercent) / 100);
             const paid = fighter.actionContext.spendHpForAction(fighter, cost);
             if (paid > 0) sim.scheduleAction(fixedAction, fighter, paid);
         }
     }
 
-    // 마지막 액션의 피해량도 정산
+    // 마지막 액션 효과 정산
     const opponent = sim.getOpponent(fighter);
-    if (lastActionOppHp > 0 && opponent && opponent.hp < lastActionOppHp) {
-        actionDamageDealt += lastActionOppHp - opponent.hp;
+    if (lastActionOppHp > 0 && opponent) {
+        if (opponent.hp < lastActionOppHp) actionDamageDealt += lastActionOppHp - opponent.hp;
+        if (fighter.hp < lastActionMyHp) actionDamageTaken += lastActionMyHp - fighter.hp;
     }
 
     const won = sim.winner && sim.winner.id === fighter.id;
-    const opponentMaxHp = opponent ? opponent.maxHp : 1;
-    // 액션으로 인한 HP 피해 비율 (0~1)
-    const actionHpRatio = Math.min(1, actionDamageDealt / opponentMaxHp);
+    const oppMaxHp = opponent ? opponent.maxHp : 1;
+    const myMaxHp = fighter.maxHp;
+
+    // 액션으로 인한 효과 (0~1 비율)
+    const dealRatio = Math.min(1, actionDamageDealt / oppMaxHp);  // 공격 효과
+    const takeRatio = Math.min(1, actionDamageTaken / myMaxHp);   // 방어 실패
+
     const reward =
-        (won ? 1.0 : -1.0) +
-        actionHpRatio * CONFIG.hpWeight -
-        actionUseCount * CONFIG.actionPenalty;
+        (won ? 1.0 : -1.0)                              // 승패 ±1
+        + dealRatio * CONFIG.hpWeight                    // 공격: 상대 HP 깎음 +
+        - takeRatio * CONFIG.survivalWeight               // 방어: 내 HP 손실 -
+        - actionUseCount * CONFIG.actionPenalty;          // 스팸 방지
     return {
         trajectory,
         reward,
@@ -292,7 +303,8 @@ async function saveModel(actor, normalizer, metadata) {
             gamma: CONFIG.gamma,
             opponentMode: CONFIG.opponentMode,
             actionPenalty: CONFIG.actionPenalty,
-            hpWeight: CONFIG.hpWeight
+            hpWeight: CONFIG.hpWeight,
+            survivalWeight: CONFIG.survivalWeight
         }
     };
 
@@ -544,21 +556,19 @@ node scripts/rl/train.mjs [--help]
   RL_THROTTLE_MS=0         에피소드 간 대기 (ms)
   RL_BATCH_THROTTLE_MS=0   배치 학습 간 대기 (ms, 소음↓)
   RL_CPU_THREADS=0         CPU 코어 제한 (1~4, 0=전체, 발열↓)
-  RL_ACTION_PENALTY=0.02   액션 1회당 패널티 (스팸 방지)
-  RL_HP_WEIGHT=0.3        상대 HP 깎은 양 가중치 (클수록 공격적)
+  RL_ACTION_PENALTY=0.02   스팸 패널티 (1회당)
+  RL_HP_WEIGHT=0.5        공격 가중치 (상대 HP 깎음)
+  RL_SURVIVAL_WEIGHT=0.3  방어 가중치 (내 HP 손실)
 
 예시:
-  # 공격적 AI (HP 많이 깎는 걸 중시)
-  $env:RL_HP_WEIGHT=0.5; $env:RL_ACTION_PENALTY=0.01; node scripts/rl/train.mjs
+  # 공격형 (딜 중시)
+  $env:RL_HP_WEIGHT=0.8; $env:RL_SURVIVAL_WEIGHT=0.1; node scripts/rl/train.mjs
 
-  # 신중한 AI (생존 우선)
-  $env:RL_HP_WEIGHT=0.1; $env:RL_ACTION_PENALTY=0.05; node scripts/rl/train.mjs
+  # 방어형 (회피/카운터 특화)
+  $env:RL_HP_WEIGHT=0.2; $env:RL_SURVIVAL_WEIGHT=0.6; node scripts/rl/train.mjs
 
-  # 저소음 풀세트
-  $env:RL_CPU_THREADS=2; $env:RL_BATCH_THROTTLE_MS=300; node scripts/rl/train.mjs
-
-  # Dash만
-  $env:RL_CHARACTERS="dash"; node scripts/rl/train.mjs
+  # 균형
+  node scripts/rl/train.mjs
 `;
 
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
