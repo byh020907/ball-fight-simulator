@@ -94,11 +94,7 @@ export class AIActionController {
         if (!opponent) return null;
 
         if (!this.rlPolicy) {
-            if (!this._loggedNoPolicy && sim.playerBall !== fighter) {
-                console.warn(`[RL] ${fighter.id}: rlPolicy 없음 (모델 로드 안 됨?)`);
-                this._loggedNoPolicy = true;
-            }
-            return null;
+            return null; // 모델 없음 → 액션 미사용 (정상: 훈련 중이거나 모델 미로드)
         }
 
         const prob = this.rlPolicy.getProbability(fighter, opponent, sim);
