@@ -4,7 +4,7 @@ import { RLPolicy } from "../ai/rlPolicy.js";
 const AI_MIN_INTERVAL = 0.5; // 액션 사용 후 최소 대기 (훈련 기준 30프레임과 동일)
 const AI_ACTION_THRESHOLD = 0.5; // 이 확률 이상이면 액션 사용 (모델이 전략적으로 학습되었으므로 0.5로 충분)
 const AI_CONSECUTIVE_REQUIRED = 3; // 연속 몇 프레임 확신해야 실제 발동 (노이즈 필터)
-const RL_MODEL_BASE = "/models";  // 서버에서 모델 디렉토리 경로
+const RL_MODEL_BASE = "/models"; // 서버에서 모델 디렉토리 경로
 
 export class AIActionController {
     constructor(rng = Math.random) {
@@ -72,7 +72,9 @@ export class AIActionController {
             // 첫 추론 시 JIT 컴파일 렉 방지용 웜업
             this.rlPolicy.actor.predict(window.tf.tensor2d([new Array(16).fill(0)]));
             const w = modelJson.config?.weights ?? {};
-            console.log(`[RL] ${charId}×${this._chosenAction.id}: hpW=${w.hp} survW=${w.survival} pen=${w.penalty} | trainWR=${(modelJson.trainWinRate*100).toFixed(0)}%`);
+            console.log(
+                `[RL] ${charId}×${this._chosenAction.id}: hpW=${w.hp} survW=${w.survival} pen=${w.penalty} | trainWR=${(modelJson.trainWinRate * 100).toFixed(0)}%`
+            );
         } catch {
             // 네트워크 오류 등 → 조용히 무시
         }
@@ -119,16 +121,23 @@ export class AIActionController {
         if (!this._lastLogTime || now - this._lastLogTime >= 1.0) {
             this._lastLogTime = now;
             const mark = canAct
-                ? (decided ? "O" : (rawYes ? `${this._consecutiveYes}/${AI_CONSECUTIVE_REQUIRED}` : "X"))
+                ? decided
+                    ? "O"
+                    : rawYes
+                      ? `${this._consecutiveYes}/${AI_CONSECUTIVE_REQUIRED}`
+                      : "X"
                 : "⏳";
-            sim.addLog(`${fighter.name}: ${action.name} ${mark} (${(prob*100).toFixed(0)}%)`);
+            sim.addLog(`${fighter.name}: ${action.name} ${mark} (${(prob * 100).toFixed(0)}%)`);
         }
 
         if (!decided) return null;
 
         const cost = Math.ceil((fighter.maxHp * action.hpCostPercent) / 100);
         const paidCost = fighter.actionContext.spendHpForAction(fighter, cost);
-        if (paidCost <= 0) return null;
+        if (paidCost <= 0) {
+            this._consecutiveYes = 0;
+            return null;
+        }
 
         this._nextAvailableAt = AI_MIN_INTERVAL;
         this._consecutiveYes = 0; // 발동 후 리셋
