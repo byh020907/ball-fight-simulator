@@ -1,7 +1,7 @@
 import { pickRandomActions } from "../clickActions.js";
 import { RLPolicy } from "../ai/rlPolicy.js";
 
-const AI_MIN_INTERVAL = 1.0; // 연속 사용 방지용 최소 간격
+const AI_MIN_INTERVAL = 0.5; // 액션 사용 후 최소 대기 (훈련 기준 30프레임과 동일)
 const AI_ACTION_THRESHOLD = 0.5; // 이 확률 이상이면 액션 사용 (모델이 전략적으로 학습되었으므로 0.5로 충분)
 const RL_MODEL_BASE = "/models";  // 서버에서 모델 디렉토리 경로
 
