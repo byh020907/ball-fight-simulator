@@ -97,7 +97,6 @@ export class BattleSimulation extends Simulation {
 
     _executeAction(actionInstance, ball, paidCost) {
         if (!actionInstance || !ball) return;
-        this.addLog(`[액션] 효과 적용: ${actionInstance.name}`);
         actionInstance.apply(this, ball, paidCost);
     }
 
