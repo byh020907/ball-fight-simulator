@@ -65,7 +65,7 @@ export class BattleSimulation extends Simulation {
         // ── 클릭 액션 시스템 ──
         this.playerBall = playerBall;
         this._clickActionContext = {
-            pendingAction: null,
+            pendingActions: [],  // 큐로 변경: 여러 액션이 한 프레임에 예약되어도 안전
             timeSlowRemaining: 0,
             timeSlowFactor: 0.35,
             timeSlowExempt: new Set()
@@ -81,18 +81,18 @@ export class BattleSimulation extends Simulation {
         }
     }
 
-    /** 액션 예약 — _clickActionContext로 위임 */
+    /** 액션 예약 — 큐에 추가 (여러 액션이 동시에 예약되어도 안전) */
     scheduleAction(actionInstance, playerBall, paidCost = 0) {
-        this._clickActionContext.pendingAction = { actionInstance, playerBall, paidCost };
+        this._clickActionContext.pendingActions.push({ actionInstance, playerBall, paidCost });
     }
 
-    /** 예약된 액션을 꺼내서 적용 (update()에서 호출) */
-    _consumePendingAction() {
+    /** 예약된 액션들을 순차 적용 (update()에서 호출) */
+    _consumePendingActions() {
         const ctx = this._clickActionContext;
-        if (!ctx.pendingAction) return null;
-        const pa = ctx.pendingAction;
-        ctx.pendingAction = null;
-        this._executeAction(pa.actionInstance, pa.playerBall, pa.paidCost);
+        while (ctx.pendingActions.length > 0) {
+            const pa = ctx.pendingActions.shift();
+            this._executeAction(pa.actionInstance, pa.playerBall, pa.paidCost);
+        }
     }
 
     _executeAction(actionInstance, ball, paidCost) {
@@ -183,7 +183,7 @@ export class BattleSimulation extends Simulation {
         }
 
         // 지연 적용 패턴 — 클릭 핸들러가 예약한 액션을 충돌 전에 처리
-        this._consumePendingAction();
+        this._consumePendingActions();
 
         this.elapsed += delta;
         this.updateScreenShake(delta);
