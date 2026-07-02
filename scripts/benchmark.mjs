@@ -53,11 +53,11 @@ function createSim(fighterSpec, opponentSpec) {
 /** 특정 캐릭터가 N회 싸웠을 때 승률 + 스팸 지표 측정 */
 function runMatches(fighterSpec, opponentPicker, actionToUse, sampleCount) {
     let wins = 0;
-    let decisions = 0;       // 총 의사결정 횟수
-    let accepts = 0;         // 액션 수락 횟수
-    let probSum = 0;         // 확률 합계 (평균 계산용)
-    let probMin = 1;         // 최소 확률
-    let probMax = 0;         // 최대 확률
+    let decisions = 0;
+    let accepts = 0;
+    let probSum = 0;
+    let probMin = 1;
+    let probMax = 0;
 
     for (let i = 0; i < sampleCount; i++) {
         const opponent = opponentPicker();
@@ -74,24 +74,26 @@ function runMatches(fighterSpec, opponentPicker, actionToUse, sampleCount) {
             sim.update(1 / 60, 1 / 60);
             if (actionToUse && fighter.aiController) {
                 const ctrl = fighter.aiController;
-                // 쿨다운 중이거나 효과 활성 중이면 건너뜀
-                if (ctrl._nextAvailableAt > 0) continue;
-                if (actionToUse.getFailureReason?.(sim, fighter)) continue;
-
                 const opponent = sim.getOpponent(fighter);
                 if (!opponent) continue;
 
-                decisions++;
-                const prob = ctrl.rlPolicy.getProbability(fighter, opponent, sim);
-                probSum += prob;
-                if (prob < probMin) probMin = prob;
-                if (prob > probMax) probMax = prob;
+                // 효과 활성 중이면 건너뜀 (evaluate와 동일한 조건)
+                if (actionToUse.getFailureReason?.(sim, fighter)) continue;
 
-                if (prob >= 0.7) {
+                // 모델 확률 추적 (스팸 통계용)
+                if (ctrl.rlPolicy) {
+                    decisions++;
+                    const prob = ctrl.rlPolicy.getProbability(fighter, opponent, sim);
+                    probSum += prob;
+                    if (prob < probMin) probMin = prob;
+                    if (prob > probMax) probMax = prob;
+                }
+
+                // 실제 게임과 동일한 evaluate() 호출 (threshold + 연속필터 + 쿨다운)
+                const result = ctrl.evaluate(sim, fighter, 1 / 60);
+                if (result) {
                     accepts++;
-                    const cost = Math.ceil((fighter.maxHp * actionToUse.hpCostPercent) / 100);
-                    const paid = fighter.actionContext.spendHpForAction(fighter, cost);
-                    if (paid > 0) sim.scheduleAction(actionToUse, fighter, paid);
+                    sim.scheduleAction(result.action, result.fighter, result.paidCost);
                 }
             }
         }
