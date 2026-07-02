@@ -96,6 +96,10 @@ export class BattleSimulation extends Simulation {
 
     _executeAction(actionInstance, ball, paidCost) {
         if (!actionInstance || !ball) return;
+        // 공통 피드백 — 플레이어/AI 모두 동일한 시각 효과
+        this.spawnExplosion(ball.position.clone(), "#cccccc");
+        this.spawnPulse(ball.position.clone(), "#ffffff");
+        this.playSound("dash");
         actionInstance.apply(this, ball, paidCost);
     }
 

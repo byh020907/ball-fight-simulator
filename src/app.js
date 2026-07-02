@@ -642,11 +642,6 @@ export class BattleApp {
         }
 
         sim.scheduleAction(action, player, paidCost);
-
-        // 사용자 피드백 — 파티클 + 사운드 (액션명 텍스트는 실제 효과 시점에 표시)
-        sim.spawnExplosion(player.position.clone(), "#cccccc");
-        sim.spawnPulse(player.position.clone(), "#ffffff");
-        this.audio.play("dash", 1.0);
         return true;
     }
 

@@ -201,7 +201,6 @@ export class BattleBall extends mixins([PhysicsBody]) {
                     simulation.scheduleAction(result.action, result.fighter, result.paidCost);
                 }
             } catch (e) {
-                // AI 평가 실패가 게임 플레이를 중단시키지 않도록
                 console.warn("[AI] evaluate error:", e.message);
             }
         }
