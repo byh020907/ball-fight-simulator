@@ -65,10 +65,9 @@ export class BattleSimulation extends Simulation {
         // ── 클릭 액션 시스템 ──
         this.playerBall = playerBall;
         this._clickActionContext = {
-            pendingActions: [],  // 큐로 변경: 여러 액션이 한 프레임에 예약되어도 안전
-            timeSlowRemaining: 0,
+            pendingActions: [],  // 큐: 여러 액션이 한 프레임에 예약되어도 안전
+            timeWarps: new Map(), // Map<ball, remainingSeconds> — 시전자별 독립 타이머
             timeSlowFactor: 0.35,
-            timeSlowExempt: new Set()
         };
 
         // ── AI 액션 컨트롤러 ──
@@ -102,12 +101,22 @@ export class BattleSimulation extends Simulation {
 
     // ── Action data interfaces ──────────────────────────────────────
 
+    /** 시전자별 Time Warp 등록. duration만큼 상대를 느리게 함. */
+    addTimeWarp(caster, duration) {
+        const current = this._clickActionContext.timeWarps.get(caster) ?? 0;
+        this._clickActionContext.timeWarps.set(caster, Math.max(current, duration));
+    }
+
+    /** 활성화된 Time Warp가 하나라도 있으면 true (getFailureReason 용) */
     getTimeSlowRemaining() {
-        return this._clickActionContext.timeSlowRemaining;
+        return this._clickActionContext.timeWarps.size > 0 ? 1 : 0;
     }
-    setTimeSlowRemaining(v) {
-        this._clickActionContext.timeSlowRemaining = v;
+
+    /** @returns {boolean} 이 엔티티가 어떤 Time Warp에든 면제인가 (자신이 시전자) */
+    _isTimeWarpExempt(entity) {
+        return this._clickActionContext.timeWarps.has(entity);
     }
+
     get timeSlowFactor() {
         return this._clickActionContext.timeSlowFactor;
     }
@@ -199,18 +208,21 @@ export class BattleSimulation extends Simulation {
 
         // 시간 왜곡 타이머 — 실제 시간으로 카운트다운 (배속 영향 없음)
         const ctx = this._clickActionContext;
-        if (ctx.timeSlowRemaining > 0) {
-            ctx.timeSlowRemaining -= realDelta;
-            if (ctx.timeSlowRemaining <= 0) ctx.timeSlowExempt.clear();
+        for (const [caster, remaining] of ctx.timeWarps) {
+            const newRemaining = remaining - realDelta;
+            if (newRemaining <= 0) {
+                ctx.timeWarps.delete(caster);
+            } else {
+                ctx.timeWarps.set(caster, newRemaining);
+            }
         }
 
         this.handleCollision();
 
-        // 시간 왜곡 적용: 시전자만 면제, 나머지 엔티티는 느린 delta
-        // scaledDelta는 배속이 적용된 delta 기준으로 계산 (상대 속도 비율 유지)
+        // 시간 왜곡 적용: 자신이 시전한 Time Warp가 아니면 느려짐 (중첩 없음)
         for (const entity of this.entities) {
-            const isExempt = ctx.timeSlowExempt.has(entity);
-            const scaledDelta = ctx.timeSlowRemaining > 0 && !isExempt ? delta * ctx.timeSlowFactor : delta;
+            const isSlowed = ctx.timeWarps.size > 0 && !ctx.timeWarps.has(entity);
+            const scaledDelta = isSlowed ? delta * ctx.timeSlowFactor : delta;
             entity.update(scaledDelta, this);
         }
         this.entities = this.entities.filter((entity) => !entity.isExpired);

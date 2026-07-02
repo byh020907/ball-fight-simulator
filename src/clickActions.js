@@ -138,13 +138,12 @@ class TimeWarpAction extends ClickAction {
     }
 
     apply(sim, playerBall) {
-        const current = sim.getTimeSlowRemaining();
-        sim.setTimeSlowRemaining(Math.max(current, this.duration));
-        sim._clickActionContext.timeSlowExempt.add(playerBall);
+        sim.addTimeWarp(playerBall, this.duration);
     }
 
     getFailureReason(sim, playerBall) {
-        if (sim.getTimeSlowRemaining() > 0) return "이미 시간 왜곡 발동 중";
+        // 자신이 이미 Time Warp를 걸었으면 중복 방지
+        if (sim._clickActionContext.timeWarps.has(playerBall)) return "이미 시간 왜곡 발동 중";
         return null;
     }
 
