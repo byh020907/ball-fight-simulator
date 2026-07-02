@@ -237,8 +237,32 @@
 - 결정: 각 캐릭터 × 액션 조합마다 학습 전 `eval before`, 학습 후 `eval after`를 deterministic 정책으로 별도 실행. 평가는 `RL_EVAL_THRESHOLD` 이상일 때만 액션을 사용하고 normalizer 통계를 업데이트하지 않으며, `RL_EVAL_EPISODES`로 평가 횟수를 조절. 최종 결과에 `eval before -> after`와 delta를 출력
 - 영향: `scripts/rl/train.mjs`, `scripts/rl/policyNetwork.js`, `tests/regression.mjs`, `docs/rl-optimization-guide.md`
 
+## [L1] 2026-07-02 — Orbit 투사체 벽 반사 버그 수정
+- 맥락: Orbit 투사체가 벽에 튕기지 않고 달라붙는 버그 발견
+- 결정: `bx, by` 위치 저장을 `_integrateAndClamp()` 전으로 이동, 중복 `keepEntityInsideArena` 제거
+  - 원인: `_integrateAndClamp()`가 내부에서 이미 클램프한 후에 `bx,by`를 저장해 충돌 감지 실패
+  - `dir`이 갱신되지 않아 매 프레임 `applyImpulse`가 속도를 다시 벽 방향으로 되돌림
+- 영향: `src/entities/orbitProjectile.js`
+
+## [L1] 2026-07-02 — AI 액션 spend 실패 시 _consecutiveYes 미초기화 버그 수정
+- 맥락: AI가 HP=1일 때 spendHpForAction이 0 반환 → _consecutiveYes가 3+ 유지 →
+  매 프레임 decided=true로 재시도 → 회복 시 쿨다운 없이 즉시 발동 (burst)
+- 결정: spend 실패 시 `_consecutiveYes = 0` 리셋 추가, _nextAvailableAt은 유지
+- 영향: `src/simulation/aiActionController.js`
+
+## [L2] 2026-07-03 — Time Warp RL 패널티 0.02→0.15 인상 (코드만, 미학습)
+- 배경: Time Warp가 훈련 중 0.5s마다 무조건 사용하도록 학습 (95.87% 승률). 사용 패널티 0.02가 너무 낮아 스팸이 최적 전략.
+- 결정: `time_warp` penalty 0.02→0.15 (7.5배). 10회 사용 시 -1.5 보상 차감. 재학습 필요.
+- 영향: `scripts/rl/train.mjs`
+
+## [L2] 2026-07-03 — Shockwave 밀치기 재설계 (applyKnockback + 벽꽝)
+- 배경: 1) `applyImpulse`만 사용 → 같은 프레임 `_applyVelocityCorrection`이 즉시 상쇄 → 넉백 미체감. 2) 데미지 0 + 벽 충돌 피드백 없음.
+- 결정: (1) `fighter.applyImpulse()` → `fighter.applyKnockback(vel, 0.12)`로 변경 — `forceHeading`으로 0.12s 동안 넉백 방향 유지, 속도보정이 방해하지 않음. (2) `DEFAULT_PUSH_FORCE` 400→600 (50%↑). (3) `WallSlamEffect` 추가 — 벽 충돌 시 데미지(`force×0.05`, 최대 30) + 시각/사운드 피드백.
+- 영향: `src/clickActions.js` (WallSlamEffect import, applyKnockback 사용, pushForce 증가)
+
 ## 진행 중 이슈
 - 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
+- Time Warp 패널티 인상은 재학습 후 반영
 
 ## 다음 할 일
 1. 전체 N×N PPO 학습 결과 저장 구조 설계: `{charId, actionId}`별 Actor/Critic/normalizer 저장 단위 결정

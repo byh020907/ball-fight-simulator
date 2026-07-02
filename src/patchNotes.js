@@ -19,6 +19,25 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.24.0",
+        date: "2026-07-03",
+        title: "v0.24.0 충격파 리워크 + AI 안정화",
+        changes: [
+            {
+                type: "feature",
+                text: "충격파 재설계: applyKnockback(1200 force, 0.3s 방향고정) + 벽꽝 데미지 + 본인 radius 보정 effectiveDist. 넉백이 명확히 체감됩니다."
+            },
+            {
+                type: "fix",
+                text: "AI burst 패턴 수정: spendHpForAction 실패 시 _consecutiveYes 리셋, HP=1에서 회복 후 즉시 연속 발동 방지."
+            },
+            {
+                type: "refactor",
+                text: "Time Warp RL 패널티 0.02→0.15 (7.5배). 재학습 시 스팸 억제."
+            }
+        ]
+    },
+    {
         version: "0.23.3",
         date: "2026-06-28",
         title: "v0.23.3 핫픽스",

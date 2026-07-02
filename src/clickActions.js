@@ -1,5 +1,6 @@
 import { shuffled } from "./random.js";
 import { Vector2 } from "./core.js";
+import { WallSlamEffect } from "./combatEffects.js";
 
 // ── Trigger Strategy ─────────────────────────────────────────────
 // 발동 방식을 캡슐화. ctx = { action, sim, player, fireAction(), 상태 }
@@ -465,7 +466,7 @@ class LifeStealAction extends ClickAction {
 
 class ShockwaveAction extends ClickAction {
     static DEFAULT_RADIUS = 250;
-    static DEFAULT_PUSH_FORCE = 400;
+    static DEFAULT_PUSH_FORCE = 1200;
     static DEFAULT_HP_COST = 1.2;
     static get defaults() {
         return {
@@ -493,9 +494,15 @@ class ShockwaveAction extends ClickAction {
             if (fighter === playerBall || fighter.flags.defeated) continue;
             const toFighter = Vector2.subtract(fighter.position, playerBall.position);
             const dist = toFighter.length();
-            if (dist > this.radius || dist === 0) continue;
-            const force = this.pushForce * (1 - dist / this.radius);
-            fighter.applyImpulse(toFighter.normalize().scale(force));
+            if (dist > this.radius) continue;
+            const effectiveDist = Math.max(0, dist - playerBall.radius);
+            const force = this.pushForce * (1 - effectiveDist / this.radius);
+            fighter.applyKnockback(toFighter.normalize().scale(force), 0.3);
+            fighter.state.wallSlam = new WallSlamEffect({
+                source: playerBall,
+                damage: Math.round(force * 0.015),
+                duration: 0.3
+            });
         }
         for (const entity of sim.entities) {
             if (entity === playerBall || entity.isExpired || typeof entity.applyImpulse !== "function") continue;

@@ -64,7 +64,7 @@ const CONFIG = {
     opponentMode: (process.env.RL_OPPONENT_MODE ?? "random").toLowerCase(),
     fixedOpponent: process.env.RL_FIXED_OPPONENT ?? "rage",
     modelDir: process.env.RL_MODEL_DIR ?? "models",
-    cpuThreads: readNumberEnv("RL_CPU_THREADS", 0)  // 0=모든 코어 사용, 2=절반, 1=최저발열
+    cpuThreads: readNumberEnv("RL_CPU_THREADS", 0) // 0=모든 코어 사용, 2=절반, 1=최저발열
 };
 
 /**
@@ -75,29 +75,28 @@ const CONFIG = {
 const DEFAULT_ACTION_WEIGHTS = { hp: 0.3, survival: 0.15, penalty: 0.02 };
 const ACTION_WEIGHT_MAP = {
     // 공격형 — HP 피해 위주
-    shockwave:        { hp: 0.5, survival: 0.1, penalty: 0.02 },
+    shockwave: { hp: 0.5, survival: 0.1, penalty: 0.02 },
     // 방어형 — 생존 위주
-    evade:            { hp: 0.1, survival: 0.5, penalty: 0.01 },
-    counter:          { hp: 0.2, survival: 0.4, penalty: 0.01 },
+    evade: { hp: 0.1, survival: 0.5, penalty: 0.01 },
+    counter: { hp: 0.2, survival: 0.4, penalty: 0.01 },
     projectile_guard: { hp: 0.1, survival: 0.5, penalty: 0.01 },
     // 유틸리티 — 균형
-    rush:             { hp: 0.15, survival: 0.15, penalty: 0.02 },
-    time_warp:        { hp: 0.2, survival: 0.2, penalty: 0.02 },
+    rush: { hp: 0.15, survival: 0.15, penalty: 0.02 },
+    time_warp: { hp: 0.2, survival: 0.2, penalty: 0.15 },
     // 회복/생존
-    life_steal:       { hp: 0.3, survival: 0.2, penalty: 0.02 },
-    endure:           { hp: 0.1, survival: 0.35, penalty: 0.02 },
+    life_steal: { hp: 0.3, survival: 0.2, penalty: 0.02 },
+    endure: { hp: 0.1, survival: 0.35, penalty: 0.02 }
 };
 
 /** 액션 ID에 해당하는 (hp, survival, penalty) 반환 */
 function getActionWeights(actionId) {
-    const fromEnv =
-        CONFIG.hpWeight > 0 || CONFIG.survivalWeight > 0 || CONFIG.actionPenalty > 0;
+    const fromEnv = CONFIG.hpWeight > 0 || CONFIG.survivalWeight > 0 || CONFIG.actionPenalty > 0;
     if (fromEnv) {
         // env override: 직접 지정값 사용
         return {
             hp: CONFIG.hpWeight || DEFAULT_ACTION_WEIGHTS.hp,
             survival: CONFIG.survivalWeight || DEFAULT_ACTION_WEIGHTS.survival,
-            penalty: CONFIG.actionPenalty || DEFAULT_ACTION_WEIGHTS.penalty,
+            penalty: CONFIG.actionPenalty || DEFAULT_ACTION_WEIGHTS.penalty
         };
     }
     return ACTION_WEIGHT_MAP[actionId] ?? DEFAULT_ACTION_WEIGHTS;
@@ -195,8 +194,8 @@ function runEpisode({ actor, normalizer, rlSpec, opponentSpec, fixedAction, dete
     // 액션 직전 HP 추적 → 액션으로 인한 피해/방어 효과 측정
     let lastActionOppHp = 0;
     let lastActionMyHp = 0;
-    let actionDamageDealt = 0;  // 액션 후 상대가 잃은 HP
-    let actionDamageTaken = 0;  // 액션 후 내가 잃은 HP
+    let actionDamageDealt = 0; // 액션 후 상대가 잃은 HP
+    let actionDamageTaken = 0; // 액션 후 내가 잃은 HP
 
     while (!sim.finished && sim.elapsed < CONFIG.maxEpisodeSeconds) {
         sim.update(1 / 60, 1 / 60);
@@ -253,11 +252,7 @@ function runEpisode({ actor, normalizer, rlSpec, opponentSpec, fixedAction, dete
     const dealRatio = Math.min(1, actionDamageDealt / oppMaxHp);
     const takeRatio = Math.min(1, actionDamageTaken / myMaxHp);
 
-    const reward =
-        (won ? 1.0 : -1.0)
-        + dealRatio * w.hp
-        - takeRatio * w.survival
-        - actionUseCount * w.penalty;
+    const reward = (won ? 1.0 : -1.0) + dealRatio * w.hp - takeRatio * w.survival - actionUseCount * w.penalty;
     return {
         trajectory,
         reward,
@@ -314,9 +309,7 @@ async function saveModel(actor, normalizer, metadata) {
     });
 
     // RunningNormalizer의 Welford state → std 계산
-    const std = normalizer.M2.map((m2, i) =>
-        normalizer.n > 1 ? Math.sqrt(m2 / (normalizer.n - 1)) : 1
-    );
+    const std = normalizer.M2.map((m2, i) => (normalizer.n > 1 ? Math.sqrt(m2 / (normalizer.n - 1)) : 1));
 
     const modelJson = {
         // ── TF.js 표준 필드 (tf.io.fromMemory 로 복원) ──
@@ -562,12 +555,23 @@ async function main() {
     // ── 리포트 저장 ──
     const report = {
         startedAt: new Date().toISOString(),
-        config: { episodes: CONFIG.episodes, lr: CONFIG.lr, gamma: CONFIG.gamma, hiddenDim: CONFIG.hiddenDim, opponentMode: CONFIG.opponentMode },
+        config: {
+            episodes: CONFIG.episodes,
+            lr: CONFIG.lr,
+            gamma: CONFIG.gamma,
+            hiddenDim: CONFIG.hiddenDim,
+            opponentMode: CONFIG.opponentMode
+        },
         summary: {
             totalCombos: results.length,
-            avgWinRate: results.reduce((s, r) => s + r.winRate, 0) / Math.max(1, results.length),
+            avgWinRate: results.reduce((s, r) => s + r.winRate, 0) / Math.max(1, results.length)
         },
-        combos: results.map(r => ({ charId: r.charId, actionId: r.actionId, trainWinRate: r.winRate, evalDelta: r.evalDelta }))
+        combos: results.map((r) => ({
+            charId: r.charId,
+            actionId: r.actionId,
+            trainWinRate: r.winRate,
+            evalDelta: r.evalDelta
+        }))
     };
     const reportPath = `scripts/rl/report_${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
     fs.writeFileSync(reportPath, JSON.stringify(report, null, 2), "utf-8");
