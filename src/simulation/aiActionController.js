@@ -98,12 +98,18 @@ export class AIActionController {
         // 매 틱 모델 호출 — 타이밍 맞는 순간을 놓치지 않음
         const prob = this.rlPolicy.getProbability(fighter, opponent, sim);
         const canAct = this._nextAvailableAt <= 0;
+
+        // 쿨다운 중이면 카운터 초기화 (쿨다운 끝나자마자 발동 방지)
+        if (!canAct) {
+            this._consecutiveYes = 0;
+        }
+
         const rawYes = prob >= AI_ACTION_THRESHOLD;
 
-        // 연속 확신 필터: 3프레임 연속 "써"여야 진짜 발동 (단발 노이즈 제거)
-        if (rawYes) {
+        // 연속 확신 필터: canAct 상태에서만 카운트
+        if (canAct && rawYes) {
             this._consecutiveYes++;
-        } else {
+        } else if (canAct) {
             this._consecutiveYes = 0;
         }
         const decided = canAct && this._consecutiveYes >= AI_CONSECUTIVE_REQUIRED;
