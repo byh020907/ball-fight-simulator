@@ -18,11 +18,9 @@ export class OrbitProjectile extends Projectile {
         const speed = progress * this.maxSpeed;
         this.applyImpulse(this.dir.clone().scale(speed).subtract(this.velocity));
 
-        this._integrateAndClamp(delta, simulation);
-
         const bx = this.position.x,
             by = this.position.y;
-        simulation.keepEntityInsideArena(this);
+        this._integrateAndClamp(delta, simulation);
         if (this.position.x !== bx || this.position.y !== by) {
             this.dir = this.velocity.clone().normalize();
             this.angle = Math.atan2(this.dir.y, this.dir.x);
