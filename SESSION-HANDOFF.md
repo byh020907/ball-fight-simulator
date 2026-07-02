@@ -1,5 +1,10 @@
 # 결정 기록
 
+## [L2] 2026-07-02 — 보상 3축 설계 + 액션별 가중치 + 게임 통합 완료
+- 배경: 구버전 모델(승패만 보상)이 스팸 문제. HP weight만으로는 방어형 액션 불이익.
+- 결정: (1) 보상 = 승패 ±1 + 액션HP피해×0.3 - 내HP손실×0.15 - 사용횟수×0.02 (2) 액션 타입별 가중치 맵: 공격형(shockwave 0.5/0.1), 방어형(evade 0.1/0.5), 유틸형(rush 0.15/0.15) (3) 훈련 0.5초 간격, 게임 매 틱 평가 (4) 이펙트 _executeAction으로 통합 (5) pendingActions 큐화 (6) TimeWarp 시전자별 독립 타이머
+- 영향: `scripts/rl/train.mjs`, `src/simulation/aiActionController.js`, `src/simulation/battleSimulation.js`, `src/app.js`, `src/clickActions.js`, `scripts/benchmark.mjs`, `src/ai/rlPolicy.js`
+
 ## [L1] 2026-06-29 — RL PPO 학습 파이프라인 완성
 - 맥락: AI 액션 canAIUse 수동 튜닝 한계 → PPO로 캐릭터×액션 조합별 최적 사용 확률 자동 학습
 - 결정: (1) PPO Actor-Critic (16→16→1 Bernoulli 정책), GAE, mini-batch SGD로 `scripts/rl/train.mjs` 구현 (2) 피처 16차원 순수 벡터 (HP비율, 위치벡터, 속도벡터, 투사체벡터, 경과시간, 캐릭터 인덱스) — 파생값/불리언 플래그 없음 (3) `--help` 도움말, 학습 완료 시 `scripts/rl/report_*.json` 자동 저장 (4) `node scripts/rl/train.mjs` 한 줄로 전체 실행
