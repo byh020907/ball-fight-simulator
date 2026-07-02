@@ -67,6 +67,8 @@ export class AIActionController {
             if (!res.ok) return; // 모델 없음 → 폴백
             const modelJson = await res.json();
             this.rlPolicy = await RLPolicy.fromJson(modelJson);
+            const w = modelJson.config?.weights ?? {};
+            console.log(`[RL] ${charId}×${this._chosenAction.id}: hpW=${w.hp} survW=${w.survival} pen=${w.penalty} | trainWR=${(modelJson.trainWinRate*100).toFixed(0)}%`);
         } catch {
             // 네트워크 오류 등 → 조용히 무시
         }
@@ -91,7 +93,20 @@ export class AIActionController {
         }
 
         const prob = this.rlPolicy.getProbability(fighter, opponent, sim);
-        if (prob < AI_ACTION_THRESHOLD) return null;
+        const decided = prob >= AI_ACTION_THRESHOLD;
+
+        // 매 초마다 의사결정 로그 (스팸 방지)
+        const now = sim.elapsed ?? 0;
+        if (!this._lastLogTime || now - this._lastLogTime >= 1.0) {
+            this._lastLogTime = now;
+            const mark = decided ? "⚡" : "—";
+            console.log(
+                `[RL] ${fighter.id}×${action.name}: prob=${prob.toFixed(3)} ${mark} ` +
+                `hp=${(fighter.hp/fighter.maxHp*100).toFixed(0)}%`
+            );
+        }
+
+        if (!decided) return null;
 
         const cost = Math.ceil((fighter.maxHp * action.hpCostPercent) / 100);
         const paidCost = fighter.actionContext.spendHpForAction(fighter, cost);
