@@ -77,31 +77,32 @@ export class AIActionController {
     }
 
     evaluate(sim, fighter, delta) {
+        // 쿨다운 감소 (액션 사용 후 대기)
         if (this._nextAvailableAt > 0) {
             this._nextAvailableAt -= delta;
-            return null;
         }
 
         const action = this._chosenAction;
         if (!action) return null;
 
+        // 이미 발동 중이면 건너뜀
         if (action.getFailureReason?.(sim, fighter)) return null;
 
         const opponent = sim.getOpponent(fighter);
         if (!opponent) return null;
 
-        if (!this.rlPolicy) {
-            return null; // 모델 없음 → 액션 미사용 (정상: 훈련 중이거나 모델 미로드)
-        }
+        if (!this.rlPolicy) return null;
 
+        // 매 틱 모델 호출 — 타이밍 맞는 순간을 놓치지 않음
         const prob = this.rlPolicy.getProbability(fighter, opponent, sim);
-        const decided = prob >= AI_ACTION_THRESHOLD;
+        const canAct = this._nextAvailableAt <= 0;
+        const decided = canAct && prob >= AI_ACTION_THRESHOLD;
 
-        // 매 초마다 의사결정을 게임 로그에 출력
+        // 매 초 로그
         const now = sim.elapsed ?? 0;
         if (!this._lastLogTime || now - this._lastLogTime >= 1.0) {
             this._lastLogTime = now;
-            const mark = decided ? "O" : "X";
+            const mark = canAct ? (decided ? "O" : "X") : "⏳";
             sim.addLog(`${fighter.name}: ${action.name} ${mark} (${(prob*100).toFixed(0)}%)`);
         }
 
