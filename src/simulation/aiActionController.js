@@ -99,7 +99,7 @@ export class AIActionController {
         const now = sim.elapsed ?? 0;
         if (!this._lastLogTime || now - this._lastLogTime >= 1.0) {
             this._lastLogTime = now;
-            const mark = decided ? "⚡" : "—";
+            const mark = decided ? "O" : "X";
             sim.addLog(`${fighter.name}: ${action.name} ${mark} (${(prob*100).toFixed(0)}%)`);
         }
 
