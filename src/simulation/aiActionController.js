@@ -3,6 +3,7 @@ import { RLPolicy } from "../ai/rlPolicy.js";
 
 const AI_MIN_INTERVAL = 0.5; // 액션 사용 후 최소 대기 (훈련 기준 30프레임과 동일)
 const AI_ACTION_THRESHOLD = 0.5; // 이 확률 이상이면 액션 사용 (모델이 전략적으로 학습되었으므로 0.5로 충분)
+const AI_CONSECUTIVE_REQUIRED = 3; // 연속 몇 프레임 확신해야 실제 발동 (노이즈 필터)
 const RL_MODEL_BASE = "/models";  // 서버에서 모델 디렉토리 경로
 
 export class AIActionController {
@@ -10,6 +11,7 @@ export class AIActionController {
         this.actions = pickRandomActions(3);
         this._nextAvailableAt = 2 + rng() * 2; // 초기 지연 (쿨다운 아님)
         this._chosenAction = null;
+        this._consecutiveYes = 0; // 연속 "써" 카운터
         this.usageCount = {};
         for (const a of this.actions) {
             this.usageCount[a.id] = 0;
@@ -96,13 +98,23 @@ export class AIActionController {
         // 매 틱 모델 호출 — 타이밍 맞는 순간을 놓치지 않음
         const prob = this.rlPolicy.getProbability(fighter, opponent, sim);
         const canAct = this._nextAvailableAt <= 0;
-        const decided = canAct && prob >= AI_ACTION_THRESHOLD;
+        const rawYes = prob >= AI_ACTION_THRESHOLD;
+
+        // 연속 확신 필터: 3프레임 연속 "써"여야 진짜 발동 (단발 노이즈 제거)
+        if (rawYes) {
+            this._consecutiveYes++;
+        } else {
+            this._consecutiveYes = 0;
+        }
+        const decided = canAct && this._consecutiveYes >= AI_CONSECUTIVE_REQUIRED;
 
         // 매 초 로그
         const now = sim.elapsed ?? 0;
         if (!this._lastLogTime || now - this._lastLogTime >= 1.0) {
             this._lastLogTime = now;
-            const mark = canAct ? (decided ? "O" : "X") : "⏳";
+            const mark = canAct
+                ? (decided ? "O" : (rawYes ? `${this._consecutiveYes}/${AI_CONSECUTIVE_REQUIRED}` : "X"))
+                : "⏳";
             sim.addLog(`${fighter.name}: ${action.name} ${mark} (${(prob*100).toFixed(0)}%)`);
         }
 
@@ -113,6 +125,7 @@ export class AIActionController {
         if (paidCost <= 0) return null;
 
         this._nextAvailableAt = AI_MIN_INTERVAL;
+        this._consecutiveYes = 0; // 발동 후 리셋
         this.usageCount[action.id] = (this.usageCount[action.id] ?? 0) + 1;
         return { action, fighter, paidCost };
     }
