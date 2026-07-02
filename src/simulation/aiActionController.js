@@ -67,6 +67,8 @@ export class AIActionController {
             if (!res.ok) return; // 모델 없음 → 폴백
             const modelJson = await res.json();
             this.rlPolicy = await RLPolicy.fromJson(modelJson);
+            // 첫 추론 시 JIT 컴파일 렉 방지용 웜업
+            this.rlPolicy.actor.predict(window.tf.tensor2d([new Array(16).fill(0)]));
             const w = modelJson.config?.weights ?? {};
             console.log(`[RL] ${charId}×${this._chosenAction.id}: hpW=${w.hp} survW=${w.survival} pen=${w.penalty} | trainWR=${(modelJson.trainWinRate*100).toFixed(0)}%`);
         } catch {
