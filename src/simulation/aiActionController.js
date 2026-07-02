@@ -95,15 +95,12 @@ export class AIActionController {
         const prob = this.rlPolicy.getProbability(fighter, opponent, sim);
         const decided = prob >= AI_ACTION_THRESHOLD;
 
-        // 매 초마다 의사결정 로그 (스팸 방지)
+        // 매 초마다 의사결정을 게임 로그에 출력
         const now = sim.elapsed ?? 0;
         if (!this._lastLogTime || now - this._lastLogTime >= 1.0) {
             this._lastLogTime = now;
             const mark = decided ? "⚡" : "—";
-            console.log(
-                `[RL] ${fighter.id}×${action.name}: prob=${prob.toFixed(3)} ${mark} ` +
-                `hp=${(fighter.hp/fighter.maxHp*100).toFixed(0)}%`
-            );
+            sim.addLog(`${fighter.name}: ${action.name} ${mark} (${(prob*100).toFixed(0)}%)`);
         }
 
         if (!decided) return null;
