@@ -22,6 +22,9 @@ export function createMatchReport({ generateId } = {}) {
         maxHitDamage: 0,
         actionHpCost: 0,
         lowestHpRatio: 1,
+        opponentMaxHp: 0,
+        hpRemain: 0,
+        myMaxHp: 0,
         // 액션 기록
         usedActionIds: [],
         actionSuccessCounts: {},

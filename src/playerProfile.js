@@ -22,6 +22,9 @@ export function createDefaultPlayerProfile() {
         characterMastery: {
             levels: {}
         },
+        experience: {
+            currentXp: 0
+        },
         progression: {
             challenge: {
                 highestUnlockedLevel: 0,
@@ -124,6 +127,11 @@ function sanitizeAchievements(obj) {
     return result;
 }
 
+function sanitizeExperience(obj) {
+    if (!obj || typeof obj !== "object") return { currentXp: 0 };
+    return { currentXp: sanitizeNumber(obj.currentXp) };
+}
+
 function sanitizeCareerStats(obj) {
     if (!obj || typeof obj !== "object") {
         return createDefaultPlayerProfile().collection.careerStats;
@@ -177,6 +185,7 @@ export function sanitizePlayerProfile(raw) {
     return {
         version: PROFILE_VERSION,
         characterMastery: sanitizeCharacterMastery(raw.characterMastery ?? raw.characterLinks),
+        experience: sanitizeExperience(raw.experience),
         progression: {
             challenge: sanitizeChallenge(raw.progression?.challenge)
         },

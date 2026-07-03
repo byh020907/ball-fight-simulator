@@ -19,3 +19,8 @@ export {
     getXpProgressInLevel,
     calcTournamentXp
 } from "./experienceState.js";
+
+export {
+    grantExperienceFromTournamentReport,
+    matchReportToXpInput
+} from "./experienceService.js";

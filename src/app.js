@@ -26,6 +26,7 @@ import {
     ensureCharacterRecords,
     unlockCharacterMastery
 } from "./playerProfile.js";
+import { grantExperienceFromTournamentReport } from "./experience/experienceService.js";
 import { collectActiveEffects, MASTERY_EFFECT_DEFS, advanceCharacterMastery } from "./character-mastery/index.js";
 import { createCollectionHubViewModel } from "./collection/collectionViewModel.js";
 import {
@@ -749,9 +750,15 @@ export class BattleApp {
         // 매치 리포트 마무리
         if (this._currentMatchReport) {
             const playerBall = this.simulation.fighters.find((f) => f.id === this.playerFighterId);
+            const opponentBall = this.simulation.fighters.find((f) => f.id !== this.playerFighterId);
             this._currentMatchReport.playerWon = winner?.id === this.playerFighterId;
             if (playerBall) {
                 recordLowestHp(this._currentMatchReport, playerBall.hp, playerBall.maxHp);
+                this._currentMatchReport.hpRemain = playerBall.hp;
+                this._currentMatchReport.myMaxHp = playerBall.maxHp;
+            }
+            if (opponentBall) {
+                this._currentMatchReport.opponentMaxHp = opponentBall.maxHp;
             }
             // 토너먼트 리포트에 추가
             if (!this._currentTournamentReport) {
@@ -887,6 +894,18 @@ export class BattleApp {
             this._currentTournamentReport.playerWon = playerWon;
             this._currentTournamentReport.placement = playerWon ? 1 : this.playerResultToPlacement();
             applyTournamentReport(this.playerProfile, this._currentTournamentReport);
+
+            // 경험치 지급
+            const xpResult = grantExperienceFromTournamentReport(
+                this.playerProfile,
+                this._currentTournamentReport
+            );
+            if (xpResult.xpGained > 0) {
+                this.ui.addLog(`[경험치] +${xpResult.xpGained}XP (Lv.${xpResult.level})`);
+                if (xpResult.levelUp) {
+                    this.ui.showToast(`🎉 레벨업! Lv.${xpResult.level}`);
+                }
+            }
 
             // 업적 판정 (applyTournamentReport 후, 프로필에 최신 데이터 반영됨)
             const achievementResults = evaluateAchievements(this.playerProfile, ACHIEVEMENT_DEFINITIONS, {
