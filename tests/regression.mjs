@@ -13,6 +13,8 @@ import {
 } from "../src/statAllocation.js";
 import { FIGHTER_IDS, Vector2 } from "../src/core.js";
 import { findActionById } from "../src/clickActions.js";
+import { calcMatchXp, getLevelFromXp, getXpForNextLevel, calcTournamentXp } from "../src/experience/experienceState.js";
+import { getLevelRequirement } from "../src/experience/experienceConfig.js";
 import { DashEffect } from "../src/combatEffects.js";
 import { shuffled } from "../src/random.js";
 import { BattleSimulation } from "../src/simulation/battleSimulation.js";
@@ -742,6 +744,29 @@ function testStatBalanceSystem() {
         lowVar.multiplier <= STAT_BALANCER_CONFIG.BASE_MULTIPLIER + STAT_BALANCER_CONFIG.MAX_BONUS,
         "Multiplier should never exceed BASE_MULTIPLIER + MAX_BONUS"
     );
+}
+
+function testExperienceSystem() {
+    assert.equal(calcMatchXp({ damageDealt: 60, opponentMaxHp: 100, hpRemain: 40, myMaxHp: 100, minHpRatio: 0.4, won: true, stage: 1 }), 20);
+    const finalXp = calcMatchXp({ damageDealt: 80, opponentMaxHp: 100, hpRemain: 15, myMaxHp: 100, minHpRatio: 0.1, won: true, stage: 3 });
+    assert.equal(finalXp, 53);
+    assert.equal(calcMatchXp({ damageDealt: 30, opponentMaxHp: 100, hpRemain: 0, myMaxHp: 100, minHpRatio: 0, won: false, stage: 1 }), 6);
+    assert.equal(getLevelRequirement(1), 0);
+    assert.equal(getLevelRequirement(2), 100);
+    assert.equal(getLevelRequirement(10), 3968);
+    assert.equal(getLevelFromXp(0), 1);
+    assert.equal(getLevelFromXp(100), 2);
+    assert.equal(getLevelFromXp(3968), 10);
+    assert.equal(getLevelFromXp(9999), 10);
+    assert.equal(getXpForNextLevel(0), 100);
+    assert.equal(getXpForNextLevel(3968), 0);
+    const tourneyXp = calcTournamentXp([
+        { damageDealt: 60, opponentMaxHp: 100, hpRemain: 40, myMaxHp: 100, minHpRatio: 0.4, won: true, stage: 1 },
+        { damageDealt: 70, opponentMaxHp: 100, hpRemain: 30, myMaxHp: 100, minHpRatio: 0.3, won: true, stage: 2 },
+        { damageDealt: 80, opponentMaxHp: 100, hpRemain: 15, myMaxHp: 100, minHpRatio: 0.1, won: true, stage: 3 }
+    ], true);
+    assert.equal(tourneyXp, 118);
+    console.log("[experience] ok");
 }
 
 function testShuffledUtility() {
@@ -2942,6 +2967,7 @@ await testRageBallMomentum(app);
 await testDashBallCooldownDash(app);
 await testCollisionImpulsePersists(app);
 await testGrenadeScatterShot(app);
+testExperienceSystem();
 await testDamageShake(app);
 await testArrowBounceFacing(app);
 await testOrbitShardRecharge(app);
