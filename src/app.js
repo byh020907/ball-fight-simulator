@@ -1005,11 +1005,8 @@ export class BattleApp {
             playerWon
                 ? `${champion.name} 우승${masteryMsg}`
                 : `${player.name} ${this.playerResult?.rankLabel ?? "결과 확정"}`,
-            xpMsg
+            [xpMsg, challengeMsg.replace(/\n/g, " | ")].filter(Boolean).join(" | ")
         );
-        if (challengeMsg) {
-            this.showTransientOverlay("도전 단계", challengeMsg, 2500);
-        }
         this.ui.updateStatus(
             playerWon
                 ? `내 캐릭터 ${champion.name} 우승${masteryMsg}`
