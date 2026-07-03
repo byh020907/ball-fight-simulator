@@ -10,7 +10,7 @@ export function matchReportToXpInput(report) {
         myMaxHp: report.myMaxHp,
         minHpRatio: report.lowestHpRatio,
         won: report.playerWon,
-        stage: report.tournamentRoundIndex
+        stage: report.tournamentRoundIndex + 1
     };
 }
 
