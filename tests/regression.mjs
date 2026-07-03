@@ -747,10 +747,40 @@ function testStatBalanceSystem() {
 }
 
 function testExperienceSystem() {
-    assert.equal(calcMatchXp({ damageDealt: 60, opponentMaxHp: 100, hpRemain: 40, myMaxHp: 100, minHpRatio: 0.4, won: true, stage: 1 }), 20);
-    const finalXp = calcMatchXp({ damageDealt: 80, opponentMaxHp: 100, hpRemain: 15, myMaxHp: 100, minHpRatio: 0.1, won: true, stage: 3 });
+    assert.equal(
+        calcMatchXp({
+            damageDealt: 60,
+            opponentMaxHp: 100,
+            hpRemain: 40,
+            myMaxHp: 100,
+            minHpRatio: 0.4,
+            won: true,
+            stage: 1
+        }),
+        20
+    );
+    const finalXp = calcMatchXp({
+        damageDealt: 80,
+        opponentMaxHp: 100,
+        hpRemain: 15,
+        myMaxHp: 100,
+        minHpRatio: 0.1,
+        won: true,
+        stage: 3
+    });
     assert.equal(finalXp, 53);
-    assert.equal(calcMatchXp({ damageDealt: 30, opponentMaxHp: 100, hpRemain: 0, myMaxHp: 100, minHpRatio: 0, won: false, stage: 1 }), 6);
+    assert.equal(
+        calcMatchXp({
+            damageDealt: 30,
+            opponentMaxHp: 100,
+            hpRemain: 0,
+            myMaxHp: 100,
+            minHpRatio: 0,
+            won: false,
+            stage: 1
+        }),
+        6
+    );
     assert.equal(getLevelRequirement(1), 0);
     assert.equal(getLevelRequirement(2), 100);
     assert.equal(getLevelRequirement(10), 3968);
@@ -760,11 +790,14 @@ function testExperienceSystem() {
     assert.equal(getLevelFromXp(9999), 10);
     assert.equal(getXpForNextLevel(0), 100);
     assert.equal(getXpForNextLevel(3968), 0);
-    const tourneyXp = calcTournamentXp([
-        { damageDealt: 60, opponentMaxHp: 100, hpRemain: 40, myMaxHp: 100, minHpRatio: 0.4, won: true, stage: 1 },
-        { damageDealt: 70, opponentMaxHp: 100, hpRemain: 30, myMaxHp: 100, minHpRatio: 0.3, won: true, stage: 2 },
-        { damageDealt: 80, opponentMaxHp: 100, hpRemain: 15, myMaxHp: 100, minHpRatio: 0.1, won: true, stage: 3 }
-    ], true);
+    const tourneyXp = calcTournamentXp(
+        [
+            { damageDealt: 60, opponentMaxHp: 100, hpRemain: 40, myMaxHp: 100, minHpRatio: 0.4, won: true, stage: 1 },
+            { damageDealt: 70, opponentMaxHp: 100, hpRemain: 30, myMaxHp: 100, minHpRatio: 0.3, won: true, stage: 2 },
+            { damageDealt: 80, opponentMaxHp: 100, hpRemain: 15, myMaxHp: 100, minHpRatio: 0.1, won: true, stage: 3 }
+        ],
+        true
+    );
     assert.equal(tourneyXp, 118);
     console.log("[experience] ok");
 }

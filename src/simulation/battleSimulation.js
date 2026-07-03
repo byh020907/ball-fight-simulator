@@ -65,9 +65,9 @@ export class BattleSimulation extends Simulation {
         // ── 클릭 액션 시스템 ──
         this.playerBall = playerBall;
         this._clickActionContext = {
-            pendingActions: [],  // 큐: 여러 액션이 한 프레임에 예약되어도 안전
+            pendingActions: [], // 큐: 여러 액션이 한 프레임에 예약되어도 안전
             timeWarps: new Map(), // Map<ball, remainingSeconds> — 시전자별 독립 타이머
-            timeSlowFactor: 0.35,
+            timeSlowFactor: 0.35
         };
 
         // ── AI 액션 컨트롤러 ──

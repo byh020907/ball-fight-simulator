@@ -91,10 +91,7 @@ export class RLPolicy {
             weightData
         };
         const actor = await tf.loadLayersModel(tf.io.fromMemory(artifacts));
-        const norm = new StaticNormalizer(
-            modelJson.normalizer.mean,
-            modelJson.normalizer.std
-        );
+        const norm = new StaticNormalizer(modelJson.normalizer.mean, modelJson.normalizer.std);
         return new RLPolicy(actor, norm, {
             charId: modelJson.charId,
             charName: modelJson.charName,

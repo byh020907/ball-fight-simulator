@@ -25,16 +25,19 @@ function readNumberEnv(name, fallback) {
 function readIdListEnv(name, fallback = ["all"]) {
     const raw = process.env[name];
     if (raw == null || raw.trim() === "") return fallback;
-    return raw.split(",").map((v) => v.trim()).filter(Boolean);
+    return raw
+        .split(",")
+        .map((v) => v.trim())
+        .filter(Boolean);
 }
 
 const CONFIG = {
-    samples: readNumberEnv("RL_SAMPLES", 500),        // 캐릭터당 시합 수
+    samples: readNumberEnv("RL_SAMPLES", 500), // 캐릭터당 시합 수
     characterIds: readIdListEnv("RL_CHARACTERS"),
     actionIds: readIdListEnv("RL_ACTIONS"),
     modelDir: process.env.RL_MODEL_DIR ?? "models",
     cpuThreads: readNumberEnv("RL_CPU_THREADS", 0),
-    maxEpisodeSeconds: readNumberEnv("RL_MAX_EPISODE_SECONDS", 35),
+    maxEpisodeSeconds: readNumberEnv("RL_MAX_EPISODE_SECONDS", 35)
 };
 
 // ── Helpers ──
@@ -128,12 +131,8 @@ async function main() {
 
     const roster = createRoster();
     const allActions = getActionPool();
-    const characterIds = CONFIG.characterIds.includes("all")
-        ? roster.map((f) => f.id)
-        : CONFIG.characterIds;
-    const actionIds = CONFIG.actionIds.includes("all")
-        ? allActions.map((a) => a.id)
-        : CONFIG.actionIds;
+    const characterIds = CONFIG.characterIds.includes("all") ? roster.map((f) => f.id) : CONFIG.characterIds;
+    const actionIds = CONFIG.actionIds.includes("all") ? allActions.map((a) => a.id) : CONFIG.actionIds;
 
     console.log(`벤치마크: 캐릭터 ${characterIds.length}개 × 액션 ${actionIds.length}종 × ${CONFIG.samples}회`);
     console.log("");
@@ -167,7 +166,12 @@ async function main() {
             if (!policy) continue;
 
             action._rlPolicy = policy;
-            const { winRate, decisions, acceptRate, probMean, spamScore } = runMatches(spec, opponentPicker, action, CONFIG.samples);
+            const { winRate, decisions, acceptRate, probMean, spamScore } = runMatches(
+                spec,
+                opponentPicker,
+                action,
+                CONFIG.samples
+            );
             const delta = winRate - baseline;
             const sig = delta > 0.03 ? "▲" : delta < -0.03 ? "▼" : "─";
             const spamLabel = spamScore > 0.9 ? "🚨스팸" : spamScore > 0.5 ? "⚠️의심" : "✅전략";
@@ -176,11 +180,11 @@ async function main() {
             const aname = action.name.padEnd(10);
             console.log(
                 `  ${name} ${aname} ` +
-                `wr=${(winRate * 100).toFixed(1).padStart(5)}% ` +
-                `Δ${(delta >= 0 ? "+" : "")}${(delta * 100).toFixed(1).padStart(5)}% ${sig} ` +
-                `${(acceptRate * 100).toFixed(1).padStart(5)}% ` +
-                `${probMean.toFixed(3).padStart(7)}  ` +
-                `${spamLabel}`
+                    `wr=${(winRate * 100).toFixed(1).padStart(5)}% ` +
+                    `Δ${delta >= 0 ? "+" : ""}${(delta * 100).toFixed(1).padStart(5)}% ${sig} ` +
+                    `${(acceptRate * 100).toFixed(1).padStart(5)}% ` +
+                    `${probMean.toFixed(3).padStart(7)}  ` +
+                    `${spamLabel}`
             );
             results.push({ charId, actionId, baseline, modelWr: winRate, delta, spamScore, decisions, acceptRate });
 
@@ -213,7 +217,9 @@ async function main() {
         for (const r of useful.slice(0, 10)) {
             const name = roster.find((f) => f.id === r.charId).name;
             const action = findActionById(r.actionId);
-            console.log(`  ${name} × ${action.name}: +${(r.delta * 100).toFixed(1)}% (${(r.baseline * 100).toFixed(0)}% → ${(r.modelWr * 100).toFixed(0)}%)  accept=${(r.acceptRate * 100).toFixed(0)}%`);
+            console.log(
+                `  ${name} × ${action.name}: +${(r.delta * 100).toFixed(1)}% (${(r.baseline * 100).toFixed(0)}% → ${(r.modelWr * 100).toFixed(0)}%)  accept=${(r.acceptRate * 100).toFixed(0)}%`
+            );
         }
     }
 
@@ -222,7 +228,9 @@ async function main() {
         for (const r of usefulButSpam.slice(0, 5)) {
             const name = roster.find((f) => f.id === r.charId).name;
             const action = findActionById(r.actionId);
-            console.log(`  ${name} × ${action.name}: +${(r.delta * 100).toFixed(1)}%  accept=${(r.acceptRate * 100).toFixed(0)}%`);
+            console.log(
+                `  ${name} × ${action.name}: +${(r.delta * 100).toFixed(1)}%  accept=${(r.acceptRate * 100).toFixed(0)}%`
+            );
         }
     }
 
@@ -231,7 +239,9 @@ async function main() {
         for (const r of harmful.slice(0, 10)) {
             const name = roster.find((f) => f.id === r.charId).name;
             const action = findActionById(r.actionId);
-            console.log(`  ${name} × ${action.name}: ${(r.delta * 100).toFixed(1)}% (${(r.baseline * 100).toFixed(0)}% → ${(r.modelWr * 100).toFixed(0)}%)`);
+            console.log(
+                `  ${name} × ${action.name}: ${(r.delta * 100).toFixed(1)}% (${(r.baseline * 100).toFixed(0)}% → ${(r.modelWr * 100).toFixed(0)}%)`
+            );
         }
     }
 }

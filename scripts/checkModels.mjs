@@ -15,7 +15,7 @@ for (const d of fs.readdirSync(dir)) {
             char: j.charId,
             win: j.trainWinRate,
             eps: j.config.episodes,
-            sizeKB: (fs.statSync(path.join(sub, f)).size / 1024).toFixed(1),
+            sizeKB: (fs.statSync(path.join(sub, f)).size / 1024).toFixed(1)
         });
     }
 }

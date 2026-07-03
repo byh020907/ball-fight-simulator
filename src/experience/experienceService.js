@@ -38,7 +38,14 @@ export function grantExperienceFromTournamentReport(profile, report) {
 
 export function collectActiveExperienceEffects(profile) {
     const level = getLevelFromXp(profile.experience?.currentXp ?? 0);
-    const merged = { hp: 0, damage: 0, actionHpCostPercent: 0, abilityCooldownPercent: 0, signatureBonusPercent: 0, title: false };
+    const merged = {
+        hp: 0,
+        damage: 0,
+        actionHpCostPercent: 0,
+        abilityCooldownPercent: 0,
+        signatureBonusPercent: 0,
+        title: false
+    };
     for (let lv = 2; lv <= level; lv++) {
         const reward = LEVEL_REWARDS[lv];
         if (!reward) continue;

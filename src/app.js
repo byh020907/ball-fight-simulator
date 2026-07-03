@@ -26,7 +26,11 @@ import {
     ensureCharacterRecords,
     unlockCharacterMastery
 } from "./playerProfile.js";
-import { grantExperienceFromTournamentReport, collectActiveExperienceEffects, applyExperienceEffectsToSpec } from "./experience/experienceService.js";
+import {
+    grantExperienceFromTournamentReport,
+    collectActiveExperienceEffects,
+    applyExperienceEffectsToSpec
+} from "./experience/experienceService.js";
 import { collectActiveEffects, MASTERY_EFFECT_DEFS, advanceCharacterMastery } from "./character-mastery/index.js";
 import { createCollectionHubViewModel } from "./collection/collectionViewModel.js";
 import {
@@ -122,6 +126,7 @@ export class BattleApp {
         this._previewBall = null;
         this._currentChallengeLevel = 0;
         this._lastMasteryResult = null;
+        this._lastXpResult = null;
         this._selectionAnimTime = 999;
 
         /** @type {{ selectedId: string|null, current: object|null, pickEveryMatch: boolean, ctx: object|null }} */
@@ -902,14 +907,15 @@ export class BattleApp {
             applyTournamentReport(this.playerProfile, this._currentTournamentReport);
 
             // 경험치 지급
-            const xpResult = grantExperienceFromTournamentReport(
-                this.playerProfile,
-                this._currentTournamentReport
-            );
-            if (xpResult.xpGained > 0) {
-                this.ui.addLog(`[경험치] +${xpResult.xpGained}XP (Lv.${xpResult.level})`);
-                if (xpResult.levelUp) {
-                    this.ui.showToast(`🎉 레벨업! Lv.${xpResult.level}`);
+            this._lastXpResult = grantExperienceFromTournamentReport(this.playerProfile, this._currentTournamentReport);
+            if (this._lastXpResult.xpGained > 0) {
+                this.ui.addLog(
+                    `[경험치] +${this._lastXpResult.xpGained}XP (Lv.${this._lastXpResult.level})${
+                        this._lastXpResult.levelUp ? " 🎉 레벨업!" : ""
+                    }`
+                );
+                if (this._lastXpResult.levelUp) {
+                    this.ui.showToast(`🎉 레벨업! Lv.${this._lastXpResult.level}`);
                 }
             }
 
@@ -968,6 +974,15 @@ export class BattleApp {
             masteryMsg = ` ${this._lastMasteryResult.previousTier} → ${this._lastMasteryResult.newTier}`;
         }
 
+        // 경험치 요약
+        let xpMsg = "";
+        if (this._lastXpResult && this._lastXpResult.xpGained > 0) {
+            xpMsg = `+${this._lastXpResult.xpGained}XP (Lv.${this._lastXpResult.level})`;
+            if (this._lastXpResult.levelUp) {
+                xpMsg += ` 🎉 레벨업!`;
+            }
+        }
+
         // 도전 단계 해금 메시지
         let challengeMsg = "";
         if (playerWon) {
@@ -987,9 +1002,9 @@ export class BattleApp {
         this.ui.renderTournament(this.tournament);
         this.ui.showOverlay(
             playerWon ? "축하합니다!" : "토너먼트 종료",
-            playerWon
+            (playerWon
                 ? `${champion.name} 우승${masteryMsg}`
-                : `${player.name} ${this.playerResult?.rankLabel ?? "결과 확정"}`
+                : `${player.name} ${this.playerResult?.rankLabel ?? "결과 확정"}`) + (xpMsg ? `\n${xpMsg}` : "")
         );
         if (challengeMsg) {
             this.showTransientOverlay("도전 단계", challengeMsg, 2500);
