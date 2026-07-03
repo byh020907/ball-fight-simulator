@@ -67,6 +67,7 @@ export function appStore() {
         overlayTransient: false,
         overlayLabel: "",
         overlayText: "",
+        overlaySubtext: "",
 
         // Toast notification (queue-based)
         toastVisible: false,
@@ -542,13 +543,14 @@ export class UIController {
 
     updateStatus() {}
 
-    showOverlay(label, text) {
+    showOverlay(label, text, subtext = "") {
         const s = this.state;
         if (!s) return;
         s.overlayVisible = true;
         s.overlayTransient = false;
         s.overlayLabel = label;
         s.overlayText = text;
+        s.overlaySubtext = subtext;
     }
 
     showToast(message, duration = 3500) {
@@ -579,6 +581,7 @@ export class UIController {
         s._transientToken = token;
         s.overlayLabel = label;
         s.overlayText = text;
+        s.overlaySubtext = "";
     }
 
     hideOverlay() {
@@ -588,6 +591,7 @@ export class UIController {
         s.overlayTransient = false;
         s.overlayLabel = "";
         s.overlayText = "";
+        s.overlaySubtext = "";
     }
 
     renderCollectionHub(vm) {

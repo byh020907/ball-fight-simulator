@@ -1002,9 +1002,10 @@ export class BattleApp {
         this.ui.renderTournament(this.tournament);
         this.ui.showOverlay(
             playerWon ? "축하합니다!" : "토너먼트 종료",
-            (playerWon
+            playerWon
                 ? `${champion.name} 우승${masteryMsg}`
-                : `${player.name} ${this.playerResult?.rankLabel ?? "결과 확정"}`) + (xpMsg ? `\n${xpMsg}` : "")
+                : `${player.name} ${this.playerResult?.rankLabel ?? "결과 확정"}`,
+            xpMsg
         );
         if (challengeMsg) {
             this.showTransientOverlay("도전 단계", challengeMsg, 2500);
