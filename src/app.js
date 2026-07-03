@@ -91,8 +91,7 @@ export class BattleApp {
         this.debug = {
             startCharacter: null,
             // startCharacter: FIGHTER_IDS.GRENADE,
-            // aiEnabled: false,
-            aiEnabled: true
+            aiEnabled: false
         };
 
         this.elements = {

@@ -265,6 +265,11 @@
 - 결정: `RL_BUILTIN_AI_ACTIONS` 플래그를 추가하고 기본값을 false로 설정. normalizer 샘플링과 학습/평가 episode 모두 기본적으로 기존 AI 컨트롤러를 붙이지 않으며, PPO Actor가 직접 `scheduleAction()`한 액션만 반영
 - 영향: `scripts/rl/train.mjs`, `docs/rl-optimization-guide.md`
 
+## [L1] 2026-07-03 — 앱 기본 디버그 AI 액션 플래그 비활성화
+- 맥락: `BattleApp.debug.aiEnabled`가 true라 일반 앱 실행에서도 `assignActions`가 켜져 기존 AI 액션 컨트롤러가 자동 부착될 수 있었음
+- 결정: `this.debug.aiEnabled` 기본값을 false로 변경. 단, 챌린지 레벨이 1 이상이면 기존 조건 `this._currentChallengeLevel > 0`에 의해 AI 액션 배정은 계속 활성화됨
+- 영향: `src/app.js`
+
 ## 진행 중 이슈
 - 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
 - Time Warp 패널티 인상은 재학습 후 반영
