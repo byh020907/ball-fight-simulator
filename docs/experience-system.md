@@ -128,7 +128,7 @@ matchXP = (dealRatio + hpRemainRatio + comebackBonus) × stageMultiplier × XP_S
 - `hpRemainRatio`는 0 이상으로 클램프합니다(패배 시 0).
 - 매치 종료 후 `BattleSimulation`의 `MatchReport`에서 `damageDealt`, `damageTaken`, `minHpRatio`(매치 중 최저 HP 비율)를 수집합니다.
 - 이 값들은 `hooks.onDamageDealt`/`onDamageTaken`을 통해 실시간으로 추적합니다.
-- XP 계산은 토너먼트 결과 처리 단계(`grantExperienceFromTournamentReport`)가 소유합니다. 전투 중 직접 XP를 지급하지 않습니다.
+- XP 계산과 지급은 유저가 참가한 매치 종료 단계(`grantExperienceFromMatchReport`)가 소유합니다. 토너먼트 종료 단계에서는 업적/숙련도/도전 단계만 처리하고 XP를 다시 지급하지 않습니다.
 
 ## 6. 레벨 곡선
 
@@ -611,9 +611,9 @@ src/
 | `styles.css` | PC/모바일 챔피언 표시 반응형 스타일 |
 | `playerProfile.js` | 기본값과 마이그레이션 |
 | `collectionViewModel.js` | 컬렉션 허브용 레벨/진행도 표시 데이터 |
-| `app.js` | 토너먼트 결과 처리 후 XP 요약 UI 연결 |
+| `app.js` | 매치 종료 직후 XP 지급 및 결과 오버레이 UI 연결 |
 
-전투 중 엔티티나 Ability가 직접 `profile.experience`를 수정하지 않습니다.
+전투 중 엔티티나 Ability가 직접 `profile.experience`를 수정하지 않습니다. `BattleApp.finishMatch()`가 `MatchReport`를 완성한 뒤 유저 참가 매치에 한해 XP를 지급합니다.
 
 ## 13. 처리 흐름
 
@@ -627,12 +627,14 @@ BattleSimulation
   -> 대표 행동 이벤트를 MatchReport에 기록
 BattleApp.finishMatch()
   -> 플레이어 참가 매치 결과 누적
+  -> grantExperienceFromMatchReport(profile, matchReport)
+  -> 매치 결과 오버레이에 XP 표시
+  -> savePlayerProfile()
 BattleApp.showTournamentChampion()
   -> TournamentReport 완성
-  -> grantExperienceFromTournamentReport(profile, report)
   -> 디펜딩 챔피언 격파 여부에 따라 bountyXp 지급
   -> 우승자가 AI면 defendingChampion 등록/갱신
-  -> 레벨업 결과와 XP 요약을 UI에 표시
+  -> 최종 토너먼트 결과를 UI에 표시
   -> savePlayerProfile()
 ```
 

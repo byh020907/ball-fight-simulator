@@ -275,6 +275,12 @@
 - 결정: 로컬 서버(`http://127.0.0.1:4173/`)에서 Playwright 브라우저 E2E로 토너먼트 1회 진행. `window.ballFightApp._lastXpResult`는 `{ xpGained: 7, totalXp: 7, level: 1, levelUp: false }`, `app.ui.state.overlaySubtext`는 `+7XP (Lv.1) | 도전 단계 0 도전 실패 | 해금 단계는 유지됩니다`, overlay `<p>` 텍스트와 `display:block` 확인. 현재 코드 기준 XP UI는 표시 정상으로 판정
 - 영향: 코드 변경 없음, `SESSION-HANDOFF.md`
 
+## [L1] 2026-07-03 — XP를 유저 매치 종료마다 즉시 지급
+- 맥락: XP는 원래 토너먼트 종료 시점이 아니라 유저가 참가한 매 전투 종료 직후 보여야 하는 보상인데, 기존 구현은 `showTournamentChampion()`에서 토너먼트 단위로 지급해 최종 화면에서만 표시됐음
+- 결정: `grantExperienceFromMatchReport()`를 추가하고 `BattleApp.finishMatch()`가 유저 참가 매치 리포트를 완성한 직후 XP 지급, 로그, 토스트, 결과 오버레이 subtext, 프로필 저장을 처리하도록 변경. 토너먼트 종료 단계의 일괄 XP 지급은 제거하고 업적/숙련도/도전 단계 처리만 남김
+- 영향: `src/app.js`, `src/experience/experienceService.js`, `src/experience/index.js`, `tests/regression.mjs`, `docs/experience-system.md`
+- 검증: `npm test`, `npm run check`, `npm run format:check` 통과. Playwright E2E에서 첫 유저 매치 종료 직후 `overlaySubtext="+7XP (Lv.1)"`, overlay `<p>` `display:block`, 스크린샷 `tmp-xp-match-proof.png` 확인
+
 ## 진행 중 이슈
 - 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
 - Time Warp 패널티 인상은 재학습 후 반영

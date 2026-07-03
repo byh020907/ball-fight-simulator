@@ -15,6 +15,7 @@ import { FIGHTER_IDS, Vector2 } from "../src/core.js";
 import { findActionById } from "../src/clickActions.js";
 import { calcMatchXp, getLevelFromXp, getXpForNextLevel, calcTournamentXp } from "../src/experience/experienceState.js";
 import { getLevelRequirement } from "../src/experience/experienceConfig.js";
+import { grantExperienceFromMatchReport } from "../src/experience/experienceService.js";
 import { DashEffect } from "../src/combatEffects.js";
 import { shuffled } from "../src/random.js";
 import { BattleSimulation } from "../src/simulation/battleSimulation.js";
@@ -799,7 +800,52 @@ function testExperienceSystem() {
         true
     );
     assert.equal(tourneyXp, 118);
+
+    const profile = createDefaultPlayerProfile();
+    const matchResult = grantExperienceFromMatchReport(profile, {
+        combatDamageDealt: 60,
+        opponentMaxHp: 100,
+        hpRemain: 40,
+        myMaxHp: 100,
+        lowestHpRatio: 0.4,
+        playerWon: true,
+        tournamentRoundIndex: 0
+    });
+    assert.equal(matchResult.xpGained, 20, "Match report should grant a single match worth of XP");
+    assert.equal(profile.experience.currentXp, 20, "Match XP should be saved immediately to the profile");
     console.log("[experience] ok");
+}
+
+async function testMatchEndGrantsImmediateExperience(app) {
+    app.tournament = null;
+    app.currentTournamentMatch = null;
+    app._currentTournamentReport = null;
+    app.playerProfile = createDefaultPlayerProfile();
+    app.playerFighterId = FIGHTER_IDS.DASH;
+
+    const playerSpec = app.roster.find((fighter) => fighter.id === app.playerFighterId);
+    const opponentSpec = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
+    await app.startMatch([playerSpec, opponentSpec], { keepLog: false });
+
+    const playerBall = app.simulation.fighters.find((fighter) => fighter.id === app.playerFighterId);
+    const opponentBall = app.simulation.fighters.find((fighter) => fighter.id === opponentSpec.id);
+    opponentBall.takeDamage(999, playerBall, "Forced KO");
+    app.simulation.checkResult();
+    app.simulation.update(2.3);
+    app.finishMatch();
+
+    assert.ok(app._lastMatchXpResult.xpGained > 0, "A user match should grant XP as soon as it ends");
+    assert.equal(
+        app.playerProfile.experience.currentXp,
+        app._lastMatchXpResult.xpGained,
+        "Profile XP should be updated at match end"
+    );
+    assert.match(app.ui.state.overlaySubtext, /^\+\d+XP \(Lv\.\d+\)/, "Match result overlay should show XP");
+    assert.ok(
+        app.ui.logItems.some((item) => item.includes("[경험치]")),
+        "Match end should write an XP log entry immediately"
+    );
+    assert.equal(app._currentTournamentReport, null, "Standalone matches should not create a tournament report");
 }
 
 function testShuffledUtility() {
@@ -3001,6 +3047,7 @@ await testDashBallCooldownDash(app);
 await testCollisionImpulsePersists(app);
 await testGrenadeScatterShot(app);
 testExperienceSystem();
+await testMatchEndGrantsImmediateExperience(app);
 await testDamageShake(app);
 await testArrowBounceFacing(app);
 await testOrbitShardRecharge(app);

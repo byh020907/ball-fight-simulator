@@ -18,6 +18,14 @@ export function grantExperienceFromTournamentReport(profile, report) {
     const xpInputs = report.matchReports.map(matchReportToXpInput);
     const totalXp = calcTournamentXp(xpInputs, report.playerWon);
 
+    return grantExperience(profile, totalXp);
+}
+
+export function grantExperienceFromMatchReport(profile, report) {
+    return grantExperience(profile, calcMatchXp(matchReportToXpInput(report)));
+}
+
+function grantExperience(profile, totalXp) {
     if (totalXp <= 0) return { xpGained: 0, totalXp: 0, level: 1, levelUp: false };
 
     const prevTotal = profile.experience?.currentXp ?? 0;

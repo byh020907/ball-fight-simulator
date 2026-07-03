@@ -22,6 +22,7 @@ export {
 
 export {
     grantExperienceFromTournamentReport,
+    grantExperienceFromMatchReport,
     matchReportToXpInput,
     collectActiveExperienceEffects,
     applyExperienceEffectsToSpec
