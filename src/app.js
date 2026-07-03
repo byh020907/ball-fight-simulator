@@ -26,7 +26,7 @@ import {
     ensureCharacterRecords,
     unlockCharacterMastery
 } from "./playerProfile.js";
-import { grantExperienceFromTournamentReport } from "./experience/experienceService.js";
+import { grantExperienceFromTournamentReport, collectActiveExperienceEffects, applyExperienceEffectsToSpec } from "./experience/experienceService.js";
 import { collectActiveEffects, MASTERY_EFFECT_DEFS, advanceCharacterMastery } from "./character-mastery/index.js";
 import { createCollectionHubViewModel } from "./collection/collectionViewModel.js";
 import {
@@ -390,6 +390,12 @@ export class BattleApp {
             playerSpec.mastery.physics = { ...masteryCtx.physicsModifiers };
             playerSpec.mastery.action = { ...masteryCtx.actionModifiers };
             playerSpec.mastery.passives = [...masteryCtx.combatPassives];
+        }
+
+        // XP 레벨 보상 적용 (숙련도 효과 이후)
+        if (playerSpec) {
+            const xpEffects = collectActiveExperienceEffects(this.playerProfile);
+            applyExperienceEffectsToSpec(playerSpec, xpEffects);
         }
         this.matchmaker = new Matchmaker(this.tournamentRoster);
         this.playerResult = null;
