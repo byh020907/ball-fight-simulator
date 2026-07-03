@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { formatRewardDescription } from "../progression/progressionState.js";
+import { getCharacterExperienceSummary } from "../experience/experienceService.js";
 
 export const MASTERY_THRESHOLDS = Object.freeze([1, 5, 15]);
 export const COLLECTION_HUB_TABS = Object.freeze([
@@ -61,6 +62,7 @@ export function createCollectionHubViewModel({
         const masteryUnlocked = masteryLevel > 0;
         const masteryActive = masteryUnlocked && fighter.id !== currentPlayerFighterId;
         const isCurrent = fighter.id === currentPlayerFighterId;
+        const experience = getCharacterExperienceSummary(profile, fighter.id);
 
         return {
             id: fighter.id,
@@ -82,7 +84,15 @@ export function createCollectionHubViewModel({
             isCurrent,
             masteryLevel,
             masteryUnlocked,
-            masteryActive
+            masteryActive,
+            experience,
+            experienceLevel: experience.level,
+            experienceLevelLabel: experience.levelLabel,
+            experienceTotalXp: experience.totalXp,
+            experienceProgressPct: experience.progressPct,
+            experienceProgressText: experience.progressText,
+            experienceNextText: experience.nextText,
+            experienceNextRewardText: experience.nextRewardText
         };
     });
 

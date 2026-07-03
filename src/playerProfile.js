@@ -12,7 +12,7 @@ export const PROFILE_LIMITS = Object.freeze({
     MAX_TIMESTAMP: 8_640_000_000_000_000
 });
 
-export const PROFILE_VERSION = 4;
+export const PROFILE_VERSION = 5;
 
 // ── 기본 프로필 ─────────────────────────────────────────────────────────────
 
@@ -23,7 +23,8 @@ export function createDefaultPlayerProfile() {
             levels: {}
         },
         experience: {
-            currentXp: 0
+            currentXp: 0,
+            byCharacter: {}
         },
         progression: {
             challenge: {
@@ -127,9 +128,32 @@ function sanitizeAchievements(obj) {
     return result;
 }
 
+function sanitizeCharacterExperienceMap(obj) {
+    if (!obj || typeof obj !== "object") return {};
+    const result = {};
+    for (const id of VALID_CHARACTER_IDS) {
+        const record = obj[id];
+        if (!record || typeof record !== "object") continue;
+        const currentXp = sanitizeNumber(record.currentXp ?? record.totalXp);
+        if (currentXp > 0) {
+            result[id] = { currentXp };
+        }
+    }
+    return result;
+}
+
+function sumCharacterExperience(byCharacter) {
+    return Object.values(byCharacter).reduce((sum, record) => sum + sanitizeNumber(record?.currentXp), 0);
+}
+
 function sanitizeExperience(obj) {
-    if (!obj || typeof obj !== "object") return { currentXp: 0 };
-    return { currentXp: sanitizeNumber(obj.currentXp) };
+    if (!obj || typeof obj !== "object") return { currentXp: 0, byCharacter: {} };
+    const byCharacter = sanitizeCharacterExperienceMap(obj.byCharacter ?? obj.characters);
+    const characterTotal = sumCharacterExperience(byCharacter);
+    return {
+        currentXp: characterTotal || sanitizeNumber(obj.currentXp ?? obj.totalXp),
+        byCharacter
+    };
 }
 
 function sanitizeCareerStats(obj) {
@@ -203,6 +227,37 @@ export function migratePlayerProfile(raw) {
     if (!raw || typeof raw !== "object") return createDefaultPlayerProfile();
     // v1 (unlockedIds) → v2 (levels)는 sanitizeCharacterMastery에서 처리
     return sanitizePlayerProfile(raw);
+}
+
+export function migrateLegacyExperienceToCharacter(profile, preferredCharacterId) {
+    const legacyXp = sanitizeNumber(profile?.experience?.currentXp);
+    const byCharacter = profile?.experience?.byCharacter ?? {};
+    if (legacyXp <= 0 || Object.keys(byCharacter).length > 0) {
+        return null;
+    }
+
+    const records = profile?.collection?.characters ?? {};
+    const inferred = VALID_CHARACTER_IDS.map((id) => ({ id, record: records[id] }))
+        .filter(({ record }) => record && typeof record === "object")
+        .sort((a, b) => {
+            const bRecent = b.record.lastTournamentAt ?? b.record.firstTournamentAt ?? 0;
+            const aRecent = a.record.lastTournamentAt ?? a.record.firstTournamentAt ?? 0;
+            if (bRecent !== aRecent) return bRecent - aRecent;
+            const bPlayed = (b.record.tournamentsCompleted ?? 0) + (b.record.matchWins ?? 0);
+            const aPlayed = (a.record.tournamentsCompleted ?? 0) + (a.record.matchWins ?? 0);
+            if (bPlayed !== aPlayed) return bPlayed - aPlayed;
+            return (b.record.totalDamageDealt ?? 0) - (a.record.totalDamageDealt ?? 0);
+        })[0]?.id;
+    const fallback = VALID_CHARACTER_IDS.includes(preferredCharacterId) ? preferredCharacterId : VALID_CHARACTER_IDS[0];
+    const characterId = inferred ?? fallback;
+
+    profile.experience = {
+        currentXp: legacyXp,
+        byCharacter: {
+            [characterId]: { currentXp: legacyXp }
+        }
+    };
+    return characterId;
 }
 
 // ── 저장/로드 ────────────────────────────────────────────────────────────────

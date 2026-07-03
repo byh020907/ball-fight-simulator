@@ -24,10 +24,12 @@ import {
     loadPlayerProfile,
     savePlayerProfile,
     ensureCharacterRecords,
-    unlockCharacterMastery
+    unlockCharacterMastery,
+    migrateLegacyExperienceToCharacter
 } from "./playerProfile.js";
 import {
     grantExperienceFromMatchReport,
+    getCharacterExperienceSummary,
     collectActiveExperienceEffects,
     applyExperienceEffectsToSpec
 } from "./experience/experienceService.js";
@@ -103,6 +105,7 @@ export class BattleApp {
         this.tournamentRoster = this.roster;
         this.playerProfile = loadPlayerProfile();
         this.playerFighterId = this.pickPlayerFighterId();
+        migrateLegacyExperienceToCharacter(this.playerProfile, this.playerFighterId);
         this.playerStatAllocation = createEmptyStatAllocation();
         this.playerResult = null;
         this._matchReports = [];
@@ -214,6 +217,7 @@ export class BattleApp {
             balanceTolerance: balanceTol,
             perStatCapBonus: bonusCtx.perStatCapBonus
         });
+        const experienceSummary = getCharacterExperienceSummary(this.playerProfile, this.playerFighterId);
         this.ui.renderPlayerSetup({
             fighter: player,
             stats: ALLOCATABLE_STATS,
@@ -224,7 +228,8 @@ export class BattleApp {
             locked: Boolean(this.tournament && !this.tournament.champion),
             challengeLevel: cl?.selectedLevel ?? 0,
             highestUnlockedLevel: cl?.highestUnlockedLevel ?? 0,
-            progressionBonusSummary: bonusSummary
+            progressionBonusSummary: bonusSummary,
+            experience: experienceSummary
         });
 
         if (!this.tournament || this.tournament.champion) {
@@ -399,7 +404,7 @@ export class BattleApp {
 
         // XP 레벨 보상 적용 (숙련도 효과 이후)
         if (playerSpec) {
-            const xpEffects = collectActiveExperienceEffects(this.playerProfile);
+            const xpEffects = collectActiveExperienceEffects(this.playerProfile, this.playerFighterId);
             applyExperienceEffectsToSpec(playerSpec, xpEffects);
         }
         this.matchmaker = new Matchmaker(this.tournamentRoster);
@@ -672,6 +677,27 @@ export class BattleApp {
         return `+${result.xpGained}XP (Lv.${result.level})${result.levelUp ? " 레벨업!" : ""}`;
     }
 
+    _createXpRewardView(result) {
+        if (!result || result.xpGained <= 0) {
+            return null;
+        }
+
+        const fighter = this.roster.find((item) => item.id === result.characterId);
+        return {
+            characterName: fighter?.name ?? result.characterId,
+            xpGained: result.xpGained,
+            previousLevel: result.previousLevel,
+            level: result.level,
+            levelLabel: result.levelLabel ?? `Lv.${result.level}`,
+            levelUp: result.levelUp,
+            progressBeforePct: result.progressBeforePct ?? 0,
+            progressAfterPct: result.progressAfterPct ?? 0,
+            progressText: result.progressText ?? "",
+            nextText: result.nextText ?? "",
+            nextRewardText: result.nextRewardText ?? ""
+        };
+    }
+
     _grantExperienceFromMatchReport(report) {
         const result = grantExperienceFromMatchReport(this.playerProfile, report);
         this._lastXpResult = result;
@@ -684,6 +710,7 @@ export class BattleApp {
             }
             savePlayerProfile(this.playerProfile);
             this._refreshCollectionHub();
+            this.refreshPlayerSetup();
         }
 
         return result;
@@ -784,6 +811,7 @@ export class BattleApp {
         const winner = this.simulation.winner;
         const loser = this.simulation.loser ?? this.simulation.fighters.find((fighter) => fighter !== winner);
         let xpSubtext = "";
+        let xpReward = null;
 
         // 매치 리포트 마무리
         if (this._currentMatchReport) {
@@ -813,6 +841,7 @@ export class BattleApp {
 
                 const xpResult = this._grantExperienceFromMatchReport(this._currentMatchReport);
                 xpSubtext = this._formatXpResult(xpResult);
+                xpReward = this._createXpRewardView(xpResult);
             }
             this._currentMatchReport = null;
         }
@@ -844,7 +873,8 @@ export class BattleApp {
             this.ui.showOverlay(
                 playerLost ? "아쉽네요" : this.tournament.champion ? "Champion" : "Advances",
                 playerLost ? `${this.playerResult.fighterName} ${this.playerResult.rankLabel}` : winner.name,
-                xpSubtext
+                xpSubtext,
+                xpReward
             );
             this.ui.updateStatus(
                 playerLost
@@ -871,7 +901,7 @@ export class BattleApp {
             return;
         }
 
-        this.ui.showOverlay("Winner", winner.name, xpSubtext);
+        this.ui.showOverlay("Winner", winner.name, xpSubtext, xpReward);
         this.ui.updateStatus(`${winner.name} wins`, "Result");
         this.ui.addLog(`${winner.name} defeats ${loser.name}.`);
         this.ui.addLog("Press the button again for another random matchup.");
@@ -1024,7 +1054,8 @@ export class BattleApp {
             playerWon
                 ? `${champion.name} 우승${masteryMsg}`
                 : `${player.name} ${this.playerResult?.rankLabel ?? "결과 확정"}`,
-            [xpMsg, challengeMsg.replace(/\n/g, " | ")].filter(Boolean).join(" | ")
+            [xpMsg, challengeMsg.replace(/\n/g, " | ")].filter(Boolean).join(" | "),
+            this._createXpRewardView(this._lastMatchXpResult)
         );
         this.ui.updateStatus(
             playerWon

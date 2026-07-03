@@ -102,6 +102,35 @@
                                 <span x-text="overlayLabel">Waiting Room</span>
                                 <strong x-text="overlayText">START THE FIGHT</strong>
                                 <p x-show="overlaySubtext" x-text="overlaySubtext"></p>
+                                <div
+                                    class="xp-reward"
+                                    x-show="xpReward.visible"
+                                    x-bind:class="{ levelup: xpReward.levelUp }"
+                                >
+                                    <div class="xp-reward-head">
+                                        <span x-text="xpReward.characterName"></span>
+                                        <b x-text="'+' + xpReward.xpGained + ' XP'"></b>
+                                    </div>
+                                    <div class="xp-reward-level">
+                                        <strong x-text="xpReward.levelLabel"></strong>
+                                        <em x-show="xpReward.levelUp">LEVEL UP</em>
+                                    </div>
+                                    <div class="xp-bar" aria-hidden="true">
+                                        <div
+                                            class="xp-bar-fill"
+                                            x-bind:style="'width:' + xpReward.animatedProgressPct + '%'"
+                                        ></div>
+                                    </div>
+                                    <div class="xp-reward-foot">
+                                        <span x-text="xpReward.progressText"></span>
+                                        <span x-text="xpReward.nextText"></span>
+                                    </div>
+                                    <div
+                                        class="xp-reward-next"
+                                        x-show="xpReward.nextRewardText"
+                                        x-text="'다음 보상 · ' + xpReward.nextRewardText"
+                                    ></div>
+                                </div>
                             </div>
                         </div>
 
@@ -249,6 +278,27 @@
                                 x-text="' (+' + bonusPoints + ' 보너스)'"
                             ></span>
                         </p>
+                        <div class="player-xp-meter">
+                            <div class="player-xp-head">
+                                <strong x-text="playerExperience.levelLabel"></strong>
+                                <span x-text="Number(playerExperience.totalXp || 0).toLocaleString() + ' XP'"></span>
+                            </div>
+                            <div class="player-xp-bar" aria-hidden="true">
+                                <div
+                                    class="player-xp-fill"
+                                    x-bind:style="'width:' + (playerExperience.progressPct || 0) + '%; background:' + (playerFighter?.color || '#59d6ff')"
+                                ></div>
+                            </div>
+                            <div class="player-xp-foot">
+                                <span x-text="playerExperience.progressText"></span>
+                                <span x-text="playerExperience.nextText"></span>
+                            </div>
+                            <div
+                                class="player-xp-reward"
+                                x-show="playerExperience.nextRewardText"
+                                x-text="'다음 보상 · ' + playerExperience.nextRewardText"
+                            ></div>
+                        </div>
                         <div class="point-meter">
                             <span x-text="'사용 ' + (totalPoints - remainingPoints) + '/' + totalPoints"></span>
                             <b x-text="remainingPoints > 0 ? remainingPoints + ' 남음' : '준비 완료'"></b>
@@ -544,6 +594,10 @@
                                             <span x-show="item.hasRecord"
                                                 >우승 <b x-text="item.tournamentWins"></b>회</span
                                             >
+                                            <span
+                                                class="ch-xp-chip"
+                                                x-text="item.experienceLevelLabel + ' · ' + Number(item.experienceTotalXp || 0).toLocaleString() + 'XP'"
+                                            ></span>
                                             <span x-show="item.bestPlacement"
                                                 >최고 <b x-text="item.bestPlacement + '위'"></b
                                             ></span>
@@ -567,6 +621,28 @@
                                         </button>
                                     </div>
                                     <div class="ch-detail-body">
+                                        <div class="ch-detail-xp">
+                                            <div class="ch-detail-xp-head">
+                                                <strong x-text="item.experienceLevelLabel"></strong>
+                                                <span
+                                                    x-text="Number(item.experienceTotalXp || 0).toLocaleString() + ' XP'"
+                                                ></span>
+                                            </div>
+                                            <div class="ch-detail-xp-bar" aria-hidden="true">
+                                                <div
+                                                    class="ch-detail-xp-fill"
+                                                    x-bind:style="'width:' + item.experienceProgressPct + '%; background:' + item.color"
+                                                ></div>
+                                            </div>
+                                            <div class="ch-detail-xp-foot">
+                                                <span x-text="item.experienceProgressText"></span>
+                                                <span x-text="item.experienceNextText"></span>
+                                            </div>
+                                            <div
+                                                class="ch-detail-xp-reward"
+                                                x-text="'다음 보상 · ' + item.experienceNextRewardText"
+                                            ></div>
+                                        </div>
                                         <span>토너먼트 완료 <b x-text="item.tournamentsCompleted"></b></span>
                                         <span>토너먼트 우승 <b x-text="item.tournamentWins"></b></span>
                                         <span>매치 승리 <b x-text="item.matchWins"></b></span>

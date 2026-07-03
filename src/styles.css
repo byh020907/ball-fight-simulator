@@ -294,6 +294,73 @@ h1 {
     color: var(--muted);
 }
 
+.xp-reward {
+    width: min(420px, 78vw);
+    margin: 18px auto 0;
+    display: grid;
+    gap: 8px;
+    text-align: left;
+    color: #202020;
+}
+
+.xp-reward-head,
+.xp-reward-level,
+.xp-reward-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.xp-reward-head span,
+.xp-reward-foot span,
+.xp-reward-next {
+    min-width: 0;
+    font-size: 0.76rem;
+    font-weight: 800;
+    color: #555555;
+}
+
+.xp-reward-head b {
+    flex: 0 0 auto;
+    font-size: 1rem;
+    color: #0a8d32;
+}
+
+.xp-reward-level strong {
+    font-size: 1.08rem;
+    letter-spacing: 0;
+}
+
+.xp-reward-level em {
+    flex: 0 0 auto;
+    border: 2px solid #202020;
+    background: #ffcb3d;
+    color: #202020;
+    padding: 3px 7px;
+    font-style: normal;
+    font-size: 0.68rem;
+    font-weight: 900;
+}
+
+.xp-bar {
+    height: 14px;
+    border: 2px solid #202020;
+    background: #ffffff;
+    overflow: hidden;
+}
+
+.xp-bar-fill {
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, #59d6ff, #ffcb3d);
+    transition: width 760ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.xp-reward.levelup .xp-bar-fill {
+    background: linear-gradient(90deg, #0a8d32, #ffcb3d);
+}
+
 /* ?�?� ?�릭 ?�션 카드 ?�택 ?�?� */
 
 .action-pick {
@@ -923,6 +990,53 @@ body::before {
     font-size: 0.76rem;
     line-height: 1.35;
     color: #333333;
+}
+
+.player-xp-meter {
+    border: 2px solid #202020;
+    background: #ffffff;
+    padding: 6px;
+    display: grid;
+    gap: 5px;
+}
+
+.player-xp-head,
+.player-xp-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.player-xp-head strong {
+    font-size: 0.86rem;
+    line-height: 1;
+}
+
+.player-xp-head span,
+.player-xp-foot span,
+.player-xp-reward {
+    min-width: 0;
+    font-size: 0.68rem;
+    font-weight: 800;
+    color: #555555;
+}
+
+.player-xp-foot span:last-child {
+    text-align: right;
+}
+
+.player-xp-bar {
+    height: 9px;
+    border: 2px solid #202020;
+    background: #eeeeee;
+    overflow: hidden;
+}
+
+.player-xp-fill {
+    height: 100%;
+    width: 0;
+    transition: width 260ms ease;
 }
 
 .bonus-points-badge {
@@ -1898,6 +2012,11 @@ body::before {
     color: #222;
 }
 
+.ch-xp-chip {
+    color: #006bb8;
+    font-weight: 800;
+}
+
 .ch-empty-badge {
     color: #666;
     font-weight: 600;
@@ -1947,6 +2066,51 @@ body::before {
     flex-direction: column;
     gap: 6px;
     color: #202020;
+}
+
+.ch-detail-xp {
+    border: 2px solid #202020;
+    background: #ffffff;
+    padding: 8px;
+    display: grid;
+    gap: 6px;
+}
+
+.ch-detail-xp-head,
+.ch-detail-xp-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.ch-detail-xp-head strong {
+    font-size: 0.92rem;
+}
+
+.ch-detail-xp-head span,
+.ch-detail-xp-foot span,
+.ch-detail-xp-reward {
+    min-width: 0;
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: #555555;
+}
+
+.ch-detail-xp-foot span:last-child {
+    text-align: right;
+}
+
+.ch-detail-xp-bar {
+    height: 10px;
+    border: 2px solid #202020;
+    background: #eeeeee;
+    overflow: hidden;
+}
+
+.ch-detail-xp-fill {
+    height: 100%;
+    width: 0;
 }
 
 .ch-detail-body b {

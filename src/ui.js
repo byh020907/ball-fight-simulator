@@ -50,6 +50,14 @@ export function appStore() {
     return {
         // Player setup
         playerFighter: null,
+        playerExperience: {
+            levelLabel: "Lv.1",
+            totalXp: 0,
+            progressPct: 0,
+            progressText: "0/100 XP",
+            nextText: "다음 레벨까지 100XP",
+            nextRewardText: "HP +2"
+        },
         allocation: createEmptyStatAllocation(),
         totalPoints: PLAYER_STAT_POINTS,
         bonusPoints: 0,
@@ -68,6 +76,21 @@ export function appStore() {
         overlayLabel: "",
         overlayText: "",
         overlaySubtext: "",
+        xpReward: {
+            visible: false,
+            characterName: "",
+            xpGained: 0,
+            previousLevel: 1,
+            level: 1,
+            levelLabel: "Lv.1",
+            levelUp: false,
+            progressBeforePct: 0,
+            progressAfterPct: 0,
+            animatedProgressPct: 0,
+            progressText: "",
+            nextText: "",
+            nextRewardText: ""
+        },
 
         // Toast notification (queue-based)
         toastVisible: false,
@@ -437,11 +460,15 @@ export class UIController {
         locked = false,
         challengeLevel = 0,
         highestUnlockedLevel = 0,
-        progressionBonusSummary = ""
+        progressionBonusSummary = "",
+        experience = null
     } = {}) {
         const s = this.state;
         if (!s) return;
         s.playerFighter = fighter;
+        if (experience) {
+            s.playerExperience = { ...experience };
+        }
         s.allocation = { ...allocation };
         s.totalPoints = totalPoints;
         s.bonusPoints = bonusPoints;
@@ -543,7 +570,7 @@ export class UIController {
 
     updateStatus() {}
 
-    showOverlay(label, text, subtext = "") {
+    showOverlay(label, text, subtext = "", xpReward = null) {
         const s = this.state;
         if (!s) return;
         s.overlayVisible = true;
@@ -551,6 +578,74 @@ export class UIController {
         s.overlayLabel = label;
         s.overlayText = text;
         s.overlaySubtext = subtext;
+        this._showXpReward(xpReward);
+    }
+
+    _resetXpReward() {
+        const s = this.state;
+        if (!s) return;
+        s.xpReward = {
+            ...s.xpReward,
+            visible: false,
+            characterName: "",
+            xpGained: 0,
+            previousLevel: 1,
+            level: 1,
+            levelLabel: "Lv.1",
+            levelUp: false,
+            progressBeforePct: 0,
+            progressAfterPct: 0,
+            animatedProgressPct: 0,
+            progressText: "",
+            nextText: "",
+            nextRewardText: ""
+        };
+    }
+
+    _showXpReward(reward) {
+        const s = this.state;
+        if (!s) return;
+        if (!reward) {
+            this._resetXpReward();
+            return;
+        }
+
+        const startPct = Math.max(0, Math.min(100, reward.progressBeforePct ?? 0));
+        const endPct = Math.max(0, Math.min(100, reward.progressAfterPct ?? 0));
+        const token = `${Date.now()}-${Math.random()}`;
+        s.xpReward = {
+            visible: true,
+            characterName: reward.characterName ?? "",
+            xpGained: reward.xpGained ?? 0,
+            previousLevel: reward.previousLevel ?? reward.level ?? 1,
+            level: reward.level ?? 1,
+            levelLabel: reward.levelUp ? `Lv.${reward.previousLevel ?? reward.level ?? 1}` : (reward.levelLabel ?? ""),
+            levelUp: Boolean(reward.levelUp),
+            progressBeforePct: startPct,
+            progressAfterPct: endPct,
+            animatedProgressPct: startPct,
+            progressText: reward.progressText ?? "",
+            nextText: reward.nextText ?? "",
+            nextRewardText: reward.nextRewardText ?? "",
+            _token: token
+        };
+
+        setTimeout(() => {
+            if (s.xpReward._token !== token) return;
+            s.xpReward.animatedProgressPct = reward.levelUp ? 100 : endPct;
+        }, 16);
+
+        if (reward.levelUp) {
+            setTimeout(() => {
+                if (s.xpReward._token !== token) return;
+                s.xpReward.levelLabel = reward.levelLabel ?? `Lv.${reward.level ?? 1}`;
+                s.xpReward.animatedProgressPct = 0;
+                setTimeout(() => {
+                    if (s.xpReward._token !== token) return;
+                    s.xpReward.animatedProgressPct = endPct;
+                }, 40);
+            }, 760);
+        }
     }
 
     showToast(message, duration = 3500) {
@@ -582,6 +677,7 @@ export class UIController {
         s.overlayLabel = label;
         s.overlayText = text;
         s.overlaySubtext = "";
+        this._resetXpReward();
     }
 
     hideOverlay() {
@@ -592,6 +688,7 @@ export class UIController {
         s.overlayLabel = "";
         s.overlayText = "";
         s.overlaySubtext = "";
+        this._resetXpReward();
     }
 
     renderCollectionHub(vm) {

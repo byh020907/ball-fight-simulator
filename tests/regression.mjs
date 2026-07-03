@@ -15,11 +15,11 @@ import { FIGHTER_IDS, Vector2 } from "../src/core.js";
 import { findActionById } from "../src/clickActions.js";
 import { calcMatchXp, getLevelFromXp, getXpForNextLevel, calcTournamentXp } from "../src/experience/experienceState.js";
 import { getLevelRequirement } from "../src/experience/experienceConfig.js";
-import { grantExperienceFromMatchReport } from "../src/experience/experienceService.js";
+import { getCharacterExperienceSummary, grantExperienceFromMatchReport } from "../src/experience/experienceService.js";
 import { DashEffect } from "../src/combatEffects.js";
 import { shuffled } from "../src/random.js";
 import { BattleSimulation } from "../src/simulation/battleSimulation.js";
-import { createDefaultPlayerProfile } from "../src/playerProfile.js";
+import { createDefaultPlayerProfile, migrateLegacyExperienceToCharacter } from "../src/playerProfile.js";
 import { completeChallengeTournament, formatBonusSummary } from "../src/progression/progressionState.js";
 import { Grenade } from "../src/entities/grenade.js";
 import { appStore, UIController } from "../src/ui.js";
@@ -803,6 +803,7 @@ function testExperienceSystem() {
 
     const profile = createDefaultPlayerProfile();
     const matchResult = grantExperienceFromMatchReport(profile, {
+        playerFighterId: FIGHTER_IDS.DASH,
         combatDamageDealt: 60,
         opponentMaxHp: 100,
         hpRemain: 40,
@@ -812,7 +813,52 @@ function testExperienceSystem() {
         tournamentRoundIndex: 0
     });
     assert.equal(matchResult.xpGained, 20, "Match report should grant a single match worth of XP");
-    assert.equal(profile.experience.currentXp, 20, "Match XP should be saved immediately to the profile");
+    assert.equal(
+        profile.experience.byCharacter[FIGHTER_IDS.DASH].currentXp,
+        20,
+        "Match XP should be saved immediately to the selected character"
+    );
+    assert.equal(profile.experience.currentXp, 20, "Aggregate XP should mirror character XP total");
+    assert.equal(
+        getCharacterExperienceSummary(profile, FIGHTER_IDS.DASH).remainingXp,
+        80,
+        "Character summary should expose next-level remaining XP"
+    );
+    profile.experience.byCharacter[FIGHTER_IDS.DASH].currentXp = 90;
+    profile.experience.currentXp = 90;
+    const levelUpResult = grantExperienceFromMatchReport(profile, {
+        playerFighterId: FIGHTER_IDS.DASH,
+        combatDamageDealt: 60,
+        opponentMaxHp: 100,
+        hpRemain: 40,
+        myMaxHp: 100,
+        lowestHpRatio: 0.4,
+        playerWon: true,
+        tournamentRoundIndex: 0
+    });
+    assert.equal(levelUpResult.levelUp, true, "Crossing the level threshold should be reported");
+    assert.equal(levelUpResult.previousLevel, 1, "Level-up result should expose the previous level");
+    assert.equal(levelUpResult.level, 2, "Level-up result should expose the new level");
+    assert.equal(levelUpResult.nextRewardText, "공격 +1", "Level-up result should expose the next reward");
+
+    const legacyProfile = createDefaultPlayerProfile();
+    legacyProfile.experience = { currentXp: 55, byCharacter: {} };
+    legacyProfile.collection.characters.archer = {
+        tournamentsCompleted: 1,
+        tournamentWins: 0,
+        matchWins: 1,
+        bestPlacement: 5,
+        totalDamageDealt: 100,
+        comebackMatchWins: 0,
+        firstTournamentAt: 1000,
+        lastTournamentAt: 2000
+    };
+    assert.equal(
+        migrateLegacyExperienceToCharacter(legacyProfile, FIGHTER_IDS.DASH),
+        FIGHTER_IDS.ARCHER,
+        "Legacy global XP should migrate to the most recent recorded character"
+    );
+    assert.equal(legacyProfile.experience.byCharacter.archer.currentXp, 55);
     console.log("[experience] ok");
 }
 
@@ -836,11 +882,18 @@ async function testMatchEndGrantsImmediateExperience(app) {
 
     assert.ok(app._lastMatchXpResult.xpGained > 0, "A user match should grant XP as soon as it ends");
     assert.equal(
-        app.playerProfile.experience.currentXp,
+        app.playerProfile.experience.byCharacter[FIGHTER_IDS.DASH].currentXp,
         app._lastMatchXpResult.xpGained,
-        "Profile XP should be updated at match end"
+        "Character XP should be updated at match end"
+    );
+    assert.equal(
+        app.ui.state.playerExperience.totalXp,
+        app._lastMatchXpResult.xpGained,
+        "Player setup XP meter should update after match XP is granted"
     );
     assert.match(app.ui.state.overlaySubtext, /^\+\d+XP \(Lv\.\d+\)/, "Match result overlay should show XP");
+    assert.equal(app.ui.state.xpReward.visible, true, "Match result overlay should show the XP reward panel");
+    assert.equal(app.ui.state.xpReward.xpGained, app._lastMatchXpResult.xpGained);
     assert.ok(
         app.ui.logItems.some((item) => item.includes("[경험치]")),
         "Match end should write an XP log entry immediately"
@@ -2999,6 +3052,7 @@ async function testCreateCollectionHubViewModel() {
         firstTournamentAt: 1000,
         lastTournamentAt: 2000
     };
+    profile.experience.byCharacter.archer = { currentXp: 135 };
     const vm2 = createCollectionHubViewModel({
         profile,
         roster,
@@ -3009,6 +3063,9 @@ async function testCreateCollectionHubViewModel() {
     const archerItem = vm2.rosterItems.find((i) => i.id === "archer");
     assert.equal(archerItem.tournamentWins, 6, "tournamentWins should match");
     assert.equal(archerItem.bestPlacement, 1, "bestPlacement should match");
+    assert.equal(archerItem.experienceTotalXp, 135, "Roster item should expose character XP");
+    assert.equal(archerItem.experienceLevel, 2, "Roster item should expose character XP level");
+    assert.ok(archerItem.experienceProgressPct > 0, "Roster item should expose XP progress");
 
     // 숙련도 레벨이 있으면 masteryItems에 반영
     profile.characterMastery.levels = { archer: 1, orbit: 2, eater: 3 };

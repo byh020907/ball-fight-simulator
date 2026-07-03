@@ -281,6 +281,12 @@
 - 영향: `src/app.js`, `src/experience/experienceService.js`, `src/experience/index.js`, `tests/regression.mjs`, `docs/experience-system.md`
 - 검증: `npm test`, `npm run check`, `npm run format:check` 통과. Playwright E2E에서 첫 유저 매치 종료 직후 `overlaySubtext="+7XP (Lv.1)"`, overlay `<p>` `display:block`, 스크린샷 `tmp-xp-match-proof.png` 확인
 
+## [L1] 2026-07-04 — 캐릭터별 XP 저장과 XP 전용 UI 정합화
+- 맥락: 경험치는 원래 캐릭터별 성장인데 구현이 전역 `experience.currentXp`로 되어 있어 캐릭터별 XP를 초기 화면/도감에서 볼 수 없었고, 매치 종료 보상도 텍스트 한 줄이라 보상감이 약했음
+- 결정: `experience.byCharacter[characterId].currentXp`를 정식 저장 구조로 도입하고 전역 `currentXp`는 합계/레거시 호환 필드로 유지. 레거시 전역 XP만 있는 세이브는 최근 플레이 기록 캐릭터로 귀속. 매치 종료 결과 오버레이에 자동 진행을 막지 않는 XP 전용 바 패널을 추가하고, 초기 내 캐릭터 패널과 컬렉션 허브 도감 카드/상세에 캐릭터별 XP 레벨/진행도/다음 보상을 표시
+- 영향: `src/playerProfile.js`, `src/experience/experienceService.js`, `src/experience/index.js`, `src/app.js`, `src/ui.js`, `src/collection/collectionViewModel.js`, `index.html`, `src/styles.css`, `tests/regression.mjs`, `docs/experience-system.md`, `docs/collection-hub-ui.md`
+- 검증: `npm test`, `npm run check`, `npm run format:check` 통과. Playwright E2E에서 PC 결과 XP 패널 `width:60%`, `byCharacter.dash.currentXp=60`, 도감 상세 `60/100 XP`, 모바일 결과 XP 패널 `bodyScrollWidth=viewportWidth=390` 확인
+
 ## 진행 중 이슈
 - 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
 - Time Warp 패널티 인상은 재학습 후 반영
