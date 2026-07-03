@@ -270,15 +270,20 @@
 - 결정: `this.debug.aiEnabled` 기본값을 false로 변경. 단, 챌린지 레벨이 1 이상이면 기존 조건 `this._currentChallengeLevel > 0`에 의해 AI 액션 배정은 계속 활성화됨
 - 영향: `src/app.js`
 
+## [L1] 2026-07-03 — XP 결과 오버레이 브라우저 E2E 진단
+- 맥락: XP 지급 로그/토스트는 나오지만 결과 오버레이의 XP subtext가 실제 브라우저에서 안 보인다는 의심이 있어 DevTools 수준 상태 확인이 필요했음
+- 결정: 로컬 서버(`http://127.0.0.1:4173/`)에서 Playwright 브라우저 E2E로 토너먼트 1회 진행. `window.ballFightApp._lastXpResult`는 `{ xpGained: 7, totalXp: 7, level: 1, levelUp: false }`, `app.ui.state.overlaySubtext`는 `+7XP (Lv.1) | 도전 단계 0 도전 실패 | 해금 단계는 유지됩니다`, overlay `<p>` 텍스트와 `display:block` 확인. 현재 코드 기준 XP UI는 표시 정상으로 판정
+- 영향: 코드 변경 없음, `SESSION-HANDOFF.md`
+
 ## 진행 중 이슈
 - 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
 - Time Warp 패널티 인상은 재학습 후 반영
 
 ## 다음 할 일
-1. 전체 N×N PPO 학습 결과 저장 구조 설계: `{charId, actionId}`별 Actor/Critic/normalizer 저장 단위 결정
-2. PPO 커리큘럼 조정: Eater처럼 계속 지는 조합은 Rage 고정 상대 대신 더 쉬운 상대/랜덤 상대로 승리 terminal reward 샘플 확보
-3. PPO 학습 결과 저장/로드 전략 결정: `@tensorflow/tfjs` 유지 시 커스텀 직렬화, `tfjs-node` 도입 시 `file://` 저장
-4. 학습된 Actor를 `AIActionController.evaluate()` 또는 별도 추론 어댑터로 붙이는 브라우저 추론 경로 설계
-5. 원격 배포 반영 후 실제 브라우저/모바일에서 스탯 배분 초기화 race 재검증
+1. 사냥터 MVP 구현: `docs/hunting-grounds-system.md` 기준, 우승 경험 캐릭터 입장/층간 HP 누적/이벤트 회복/층별 보상/상자 파손 연쇄 확률을 순수 함수부터 작성
+2. 전체 N×N PPO 학습 결과 저장 구조 설계: `{charId, actionId}`별 Actor/Critic/normalizer 저장 단위 결정
+3. PPO 커리큘럼 조정: Eater처럼 계속 지는 조합은 Rage 고정 상대 대신 더 쉬운 상대/랜덤 상대로 승리 terminal reward 샘플 확보
+4. PPO 학습 결과 저장/로드 전략 결정: `@tensorflow/tfjs` 유지 시 커스텀 직렬화, `tfjs-node` 도입 시 `file://` 저장
+5. 학습된 Actor를 `AIActionController.evaluate()` 또는 별도 추론 어댑터로 붙이는 브라우저 추론 경로 설계
 6. 사냥터 MVP 구현 전, `getEnemiesOf()`가 필요한 광역/다수 대상 능력 목록 점검
 7. OP 조합 파라미터 튜닝
