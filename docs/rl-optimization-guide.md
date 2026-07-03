@@ -848,6 +848,7 @@ package.json               ← "dependencies": { "@tensorflow/tfjs": "^4" }
 | `normalizerSamples` | 1000 | 전체 조합이 공유할 초기 정규화 샘플 수 |
 | `evalEpisodes` | 50 | 학습 전/후 deterministic 평가 매치 수 (`RL_EVAL_EPISODES`) |
 | `evalThreshold` | 0.5 | 평가 시 액션 사용 여부를 가르는 확률 임계값 (`RL_EVAL_THRESHOLD`) |
+| `builtinAiActions` | `false` | 기존 `AIActionController` 호출 여부 (`RL_BUILTIN_AI_ACTIONS`) |
 | `characterIds` | `all` | 학습할 캐릭터 ID 목록 (`RL_CHARACTERS`) |
 | `actionIds` | `all` | 학습할 액션 ID 목록 (`RL_ACTIONS`) |
 | `maxCombos` | 무제한 | 앞에서부터 제한할 조합 수 (`RL_MAX_COMBOS`) |
@@ -883,6 +884,8 @@ RL_OPPONENT_MODE=random node scripts/rl/train.mjs
 고정 상대 모드에서 학습 캐릭터가 `RL_FIXED_OPPONENT`와 같으면 같은 `id`끼리 붙는 승패 판정 모호성을 피하기 위해 자동으로 다른 상대를 고릅니다.
 
 각 조합은 학습 전에 `eval before`, 학습 후에 `eval after`를 출력합니다. 평가는 샘플링을 쓰지 않고 Actor 확률이 `RL_EVAL_THRESHOLD` 이상일 때만 액션을 쓰는 deterministic 정책으로 진행하며, 평가 중에는 normalizer 통계를 업데이트하지 않습니다. 따라서 훈련 중 누적 승률은 탐험이 섞인 학습 로그이고, `eval before -> after`와 `delta`는 같은 추론 기준으로 본 개선 신호입니다.
+
+PPO 학습 중에는 기본적으로 기존 `AIActionController`를 붙이지 않습니다. `RL_BUILTIN_AI_ACTIONS=1`로 켜면 기존 규칙 AI가 `BattleBall.update()` 안에서 별도 액션을 발동할 수 있으므로, Actor가 선택한 행동만 학습하려면 기본값 `false`를 유지해야 합니다.
 
 ### 8.2 1단계: 기본 액션 (고정 상대: Rage Ball)
 

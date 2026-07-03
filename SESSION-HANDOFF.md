@@ -260,6 +260,11 @@
 - 결정: (1) `fighter.applyImpulse()` → `fighter.applyKnockback(vel, 0.12)`로 변경 — `forceHeading`으로 0.12s 동안 넉백 방향 유지, 속도보정이 방해하지 않음. (2) `DEFAULT_PUSH_FORCE` 400→600 (50%↑). (3) `WallSlamEffect` 추가 — 벽 충돌 시 데미지(`force×0.05`, 최대 30) + 시각/사운드 피드백.
 - 영향: `src/clickActions.js` (WallSlamEffect import, applyKnockback 사용, pushForce 증가)
 
+## [L1] 2026-07-03 — PPO rollout의 기존 AI 액션 호출 기본 비활성화
+- 맥락: `BattleSimulation`의 `assignActions`는 false여도 `scripts/rl/train.mjs`가 직접 `fighter.aiController`를 붙이면 `BattleBall.update()`에서 기존 `AIActionController.evaluate()`가 Actor 선택과 별개로 액션을 발동할 수 있었음
+- 결정: `RL_BUILTIN_AI_ACTIONS` 플래그를 추가하고 기본값을 false로 설정. normalizer 샘플링과 학습/평가 episode 모두 기본적으로 기존 AI 컨트롤러를 붙이지 않으며, PPO Actor가 직접 `scheduleAction()`한 액션만 반영
+- 영향: `scripts/rl/train.mjs`, `docs/rl-optimization-guide.md`
+
 ## 진행 중 이슈
 - 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
 - Time Warp 패널티 인상은 재학습 후 반영

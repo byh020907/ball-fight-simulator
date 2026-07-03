@@ -35,6 +35,12 @@ function readIdListEnv(name, fallback = ["all"]) {
         .filter(Boolean);
 }
 
+function readBooleanEnv(name, fallback) {
+    const raw = process.env[name];
+    if (raw == null || raw.trim() === "") return fallback;
+    return ["1", "true", "yes", "on"].includes(raw.trim().toLowerCase());
+}
+
 const CONFIG = {
     episodes: readNumberEnv("RL_EPISODES", 1500),
     throttleMs: readNumberEnv("RL_THROTTLE_MS", 0),
@@ -64,7 +70,8 @@ const CONFIG = {
     opponentMode: (process.env.RL_OPPONENT_MODE ?? "random").toLowerCase(),
     fixedOpponent: process.env.RL_FIXED_OPPONENT ?? "rage",
     modelDir: process.env.RL_MODEL_DIR ?? "models",
-    cpuThreads: readNumberEnv("RL_CPU_THREADS", 0) // 0=모든 코어 사용, 2=절반, 1=최저발열
+    cpuThreads: readNumberEnv("RL_CPU_THREADS", 0), // 0=모든 코어 사용, 2=절반, 1=최저발열
+    builtinAiActions: readBooleanEnv("RL_BUILTIN_AI_ACTIONS", false)
 };
 
 /**
@@ -118,8 +125,10 @@ function initNormalizer(normalizer, roster) {
         const a = roster[Math.floor(Math.random() * roster.length)];
         const b = pickRandom(roster, a.id);
         const sim = createTrainingSimulation(a, b);
-        sim.fighters[0].aiController = new AIActionController();
-        sim.fighters[0].aiController.selectAction(sim, sim.fighters[0]);
+        if (CONFIG.builtinAiActions) {
+            sim.fighters[0].aiController = new AIActionController();
+            sim.fighters[0].aiController.selectAction(sim, sim.fighters[0]);
+        }
         for (let j = 0; j < 30; j++) {
             sim.update(1 / 60, 1 / 60);
             if (sim.fighters.length >= 2) {
@@ -183,8 +192,10 @@ function decideAction(actor, obs, deterministic) {
 function runEpisode({ actor, normalizer, rlSpec, opponentSpec, fixedAction, deterministic = false }) {
     const sim = createTrainingSimulation(rlSpec, opponentSpec);
     const fighter = sim.fighters[0];
-    fighter.aiController = new AIActionController();
-    fighter.aiController._chosenAction = fixedAction;
+    if (CONFIG.builtinAiActions) {
+        fighter.aiController = new AIActionController();
+        fighter.aiController._chosenAction = fixedAction;
+    }
     fighter.clickActionName = fixedAction.name;
 
     const trajectory = [];
@@ -594,6 +605,7 @@ node scripts/rl/train.mjs [--help]
   RL_THROTTLE_MS=0         에피소드 간 대기 (ms)
   RL_BATCH_THROTTLE_MS=0   배치 학습 간 대기 (ms, 소음↓)
   RL_CPU_THREADS=0         CPU 코어 제한 (1~4, 0=전체, 발열↓)
+  RL_BUILTIN_AI_ACTIONS=0  기존 AIActionController 호출 여부 (기본: 0)
   RL_ACTION_PENALTY=0      스팸 패널티 (0=액션별 자동)
   RL_HP_WEIGHT=0           공격 가중치 (0=액션별 자동)
   RL_SURVIVAL_WEIGHT=0     방어 가중치 (0=액션별 자동)
