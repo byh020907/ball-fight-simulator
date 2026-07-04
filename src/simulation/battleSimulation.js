@@ -59,6 +59,9 @@ export class BattleSimulation extends Simulation {
         this.finished = false;
         this.winner = null;
         this.loser = null;
+        this.camera = {
+            zoom: Number.isFinite(options.cameraZoom) ? Math.max(0.55, Math.min(1.25, options.cameraZoom)) : 1
+        };
         this.resultAnimationTime = 0;
         this.resultReady = false;
 
@@ -126,18 +129,37 @@ export class BattleSimulation extends Simulation {
     }
 
     createSpawnPoints(count) {
+        if (count <= 0) return [];
+
         const points = [];
-        const margin = 140;
+        const margin = 120;
         const center = new Vector2(this.width / 2, this.height / 2);
-        while (points.length < count) {
-            const angle = Math.random() * Math.PI * 2;
-            const distance = 170 + Math.random() * 120;
-            const candidate = new Vector2(center.x + Math.cos(angle) * distance, center.y + Math.sin(angle) * distance);
+
+        if (count === 1) return [center];
+        if (count === 2) {
+            return [
+                new Vector2(this.width * 0.32, this.height * 0.5),
+                new Vector2(this.width * 0.68, this.height * 0.5)
+            ];
+        }
+
+        points.push(new Vector2(this.width * 0.28, this.height * 0.5));
+        const enemyCount = count - 1;
+        const arcStart = -Math.PI * 0.64;
+        const arcEnd = Math.PI * 0.64;
+
+        for (let index = 0; index < enemyCount; index += 1) {
+            const ratio = enemyCount === 1 ? 0.5 : index / (enemyCount - 1);
+            const angle = arcStart + (arcEnd - arcStart) * ratio;
+            const candidate = new Vector2(
+                this.width * 0.68 + Math.cos(angle) * this.width * 0.12,
+                this.height * 0.5 + Math.sin(angle) * this.height * 0.31
+            );
             candidate.x = Math.max(margin, Math.min(this.width - margin, candidate.x));
             candidate.y = Math.max(margin, Math.min(this.height - margin, candidate.y));
-            const clear = points.every((point) => Vector2.subtract(point, candidate).length() > 210);
-            if (clear) points.push(candidate);
+            points.push(candidate);
         }
+
         return points;
     }
 

@@ -385,3 +385,9 @@
 1. 전체 N×N PPO 학습 결과 저장 구조 설계: `{charId, actionId}`별 Actor/Critic/normalizer 저장 단위 결정
 2. 사냥터 deferred effect 적용 UI/런 시작 연결: `instant_heal`, `temporary_stat` 보상을 다음 사냥터 런에 실제 적용
 3. Time Warp 패널티 인상분 재학습 및 Dash +27% 강세 밸런스 검토
+
+## [L1] 2026-07-04 — 사냥터 전투 컨셉을 1대다 몹 전투로 재정렬
+- 맥락: 사용자가 현재 사냥터가 의도와 다르게 로스터 캐릭터 1대1 반복처럼 구성되어 있다고 지적. 사냥터는 기본적으로 플레이어 1명 대 다수 몹 전투여야 하고, 기존 기본 캐릭터들은 일반 적이 아니라 중간 보스 정도로 사용해야 함.
+- 결정: 사냥터 전용 몹 스펙을 `melee`/`ranged` 2종으로 추가하고, 일반 층은 다수 몹 팩으로 구성. 3층 단위 또는 `champion_intrusion` 이벤트에서는 로스터 캐릭터를 중간 보스로 변환해 몹과 함께 등장. 플레이어/적은 `hunting-player`/`hunting-enemy` 팀으로 구분해 같은 팀 피해를 방지.
+- 결정: 물리 경기장 크기는 유지하고 `ArenaCamera` 렌더 줌으로 사냥터 다수전 시야만 `0.78`로 축소. 일반 1대1은 기본 `1.0` 시야 유지.
+- 영향: `src/hunting/huntingMonsters.js`, `src/hunting/huntingManager.js`, `src/simulation/battleSimulation.js`, `src/camera.js`, `src/ui.js`, `src/app.js`, `tests/regression.mjs`, `docs/hunting-grounds-combat-update.md`

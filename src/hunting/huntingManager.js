@@ -10,9 +10,14 @@ import {
     applyHuntingCursedAltar,
     applyHuntingStatModifiersToSpec
 } from "./huntingState.js";
-import { scaleEnemySpecForHunting } from "./huntingEncounters.js";
 import { rollKeyShardReward, createHuntingChest, createEmptyHuntingLoot } from "./huntingRewards.js";
 import { HUNTING_ENEMY_TYPES, HUNTING_EVENT_TYPES } from "./huntingConfig.js";
+import {
+    HUNTING_TEAMS,
+    createHuntingMinibossSpec,
+    createHuntingMobEncounter,
+    shouldUseRosterMiniboss
+} from "./huntingMonsters.js";
 import { createMatchReport, recordLowestHp } from "../collection/index.js";
 import { grantExperienceFromMatchReport } from "../experience/experienceService.js";
 import { applyStatAllocation } from "../statAllocation.js";
@@ -89,33 +94,34 @@ export class HuntingManager {
         const playerSpec = app.roster.find((f) => f.id === run.characterId);
         if (!playerSpec) return;
 
-        const enemies = app.roster.filter((f) => f.id !== run.characterId);
-        if (enemies.length === 0) return;
-
-        const enemyType =
+        const minibossType =
             run.lastEvent?.type === HUNTING_EVENT_TYPES.CHAMPION_INTRUSION
                 ? HUNTING_ENEMY_TYPES.CHAMPION
-                : HUNTING_ENEMY_TYPES.NORMAL;
-        const enemySpec = scaleEnemySpecForHunting(
-            { ...enemies[Math.floor(Math.random() * enemies.length)] },
-            run.floor,
-            { enemyType }
-        );
+                : HUNTING_ENEMY_TYPES.ELITE;
+        const mobSpecs = createHuntingMobEncounter({ floor: run.floor });
+        const miniboss = shouldUseRosterMiniboss(run.floor, run.lastEvent)
+            ? createHuntingMinibossSpec({
+                  roster: app.roster,
+                  characterId: run.characterId,
+                  floor: run.floor,
+                  enemyType: minibossType
+              })
+            : null;
+        const enemySpecs = miniboss ? [miniboss, ...mobSpecs.slice(0, Math.max(1, mobSpecs.length - 1))] : mobSpecs;
 
         const appliedSpec = applyHuntingStatModifiersToSpec(
-            applyStatAllocation(playerSpec, app.playerStatAllocation, true),
+            { ...applyStatAllocation(playerSpec, app.playerStatAllocation, true), teamId: HUNTING_TEAMS.PLAYER },
             run.statModifiers
         );
-        const matchSpecs = [appliedSpec, enemySpec];
+        const matchSpecs = [appliedSpec, ...enemySpecs];
         app._currentMatchReport = createMatchReport();
         app._currentMatchReport.playerFighterId = run.characterId;
 
         app._onSimulationResult = (a) => this._handleFinish(a);
 
-        const prevId = app.playerFighterId;
         app.playerFighterId = run.characterId;
 
-        app.startMatch(matchSpecs, { keepLog: false, skipActionPick: true });
+        app.startMatch(matchSpecs, { keepLog: false, skipActionPick: true, cameraZoom: 0.78 });
 
         if (run.carriedHp !== null) {
             const ball = app.simulation?.fighters?.find((f) => f.id === run.characterId);
@@ -165,9 +171,19 @@ export class HuntingManager {
             const rewardMultiplier =
                 run.lastEvent?.type === HUNTING_EVENT_TYPES.CHAMPION_INTRUSION
                     ? (run.lastEvent.rewardMultiplier ?? 1.5)
-                    : 1;
+                    : run.floor % 3 === 0
+                      ? 1.25
+                      : 1;
+            const rewardEnemyType =
+                run.lastEvent?.type === HUNTING_EVENT_TYPES.CHAMPION_INTRUSION
+                    ? HUNTING_ENEMY_TYPES.CHAMPION
+                    : run.floor % 3 === 0
+                      ? HUNTING_ENEMY_TYPES.ELITE
+                      : HUNTING_ENEMY_TYPES.NORMAL;
             const floorLoot = {
-                keyShards: Math.round(rollKeyShardReward({ floor: run.floor }) * rewardMultiplier),
+                keyShards: Math.round(
+                    rollKeyShardReward({ floor: run.floor, enemyType: rewardEnemyType }) * rewardMultiplier
+                ),
                 chests: Math.random() < 0.15 ? [createHuntingChest({ rarity: "common" })] : [],
                 xp: 0
             };
@@ -284,8 +300,8 @@ export class HuntingManager {
                 );
                 app.ui.showToast("Cursed altar: stat trade active");
             } else if (event.type === HUNTING_EVENT_TYPES.CHAMPION_INTRUSION) {
-                app.ui.addLog("[Hunting] Champion intrusion: next enemy is empowered");
-                app.ui.showToast("Champion intrusion: empowered enemy");
+                app.ui.addLog("[Hunting] Champion intrusion: next floor includes an empowered miniboss");
+                app.ui.showToast("Champion intrusion: miniboss incoming");
             }
         }
 

@@ -490,7 +490,10 @@ export class BattleApp {
 
         const match = customMatch ?? this.matchmaker.pick();
         const label = `${match[0].name} vs ${match[1].name}`;
-        this.ui.renderRoster(match.map((fighter) => fighter.id));
+        this.ui.renderRoster(
+            match.map((fighter) => fighter.id),
+            match
+        );
         this.ui.updateStatus(label, "Drawing");
         this.ui.showOverlay("Matchup", label);
         this.ui.addLog(`대진 확정: ${label}`);
@@ -498,36 +501,41 @@ export class BattleApp {
 
         // 시뮬레이션 생성 (playerBall은 아직 null)
         this._currentMatchReport = createMatchReport();
-        this.simulation = new BattleSimulation(match, {
-            assignActions: this.debug.aiEnabled || this._currentChallengeLevel > 0,
-            onLog: (message) => this.ui.addLog(message),
-            onOvertime: () => {
-                this.ui.updateStatus(label, "Overtime");
-                this.showTransientOverlay("Overtime", "", 1250);
-                this.audio.play("overtime");
-            },
-            onSound: (type, intensity) => this.audio.play(type, intensity),
-            onDamageTaken: (fighterId, actualDamage) => {
-                if (fighterId === this.playerFighterId && this._currentMatchReport) {
-                    recordDamageTaken(this._currentMatchReport, actualDamage);
+        this.simulation = new BattleSimulation(
+            match,
+            {
+                assignActions: this.debug.aiEnabled || this._currentChallengeLevel > 0,
+                onLog: (message) => this.ui.addLog(message),
+                onOvertime: () => {
+                    this.ui.updateStatus(label, "Overtime");
+                    this.showTransientOverlay("Overtime", "", 1250);
+                    this.audio.play("overtime");
+                },
+                onSound: (type, intensity) => this.audio.play(type, intensity),
+                onDamageTaken: (fighterId, actualDamage) => {
+                    if (fighterId === this.playerFighterId && this._currentMatchReport) {
+                        recordDamageTaken(this._currentMatchReport, actualDamage);
+                    }
+                },
+                onDamageDealt: (fighterId, actualDamage) => {
+                    if (fighterId === this.playerFighterId && this._currentMatchReport) {
+                        recordDamageDealt(this._currentMatchReport, actualDamage);
+                    }
+                },
+                onHpChanged: (fighterId, hp, maxHp) => {
+                    if (fighterId === this.playerFighterId && this._currentMatchReport) {
+                        recordLowestHp(this._currentMatchReport, hp, maxHp);
+                    }
+                },
+                onActionSuccess: (actionId) => {
+                    if (this._currentMatchReport) {
+                        recordActionSuccess(this._currentMatchReport, actionId);
+                    }
                 }
             },
-            onDamageDealt: (fighterId, actualDamage) => {
-                if (fighterId === this.playerFighterId && this._currentMatchReport) {
-                    recordDamageDealt(this._currentMatchReport, actualDamage);
-                }
-            },
-            onHpChanged: (fighterId, hp, maxHp) => {
-                if (fighterId === this.playerFighterId && this._currentMatchReport) {
-                    recordLowestHp(this._currentMatchReport, hp, maxHp);
-                }
-            },
-            onActionSuccess: (actionId) => {
-                if (this._currentMatchReport) {
-                    recordActionSuccess(this._currentMatchReport, actionId);
-                }
-            }
-        });
+            null,
+            { cameraZoom: options.cameraZoom }
+        );
 
         // 내 캐릭터 식별
         const playerBall = this.simulation.fighters.find((f) => f.id === this.playerFighterId) ?? null;

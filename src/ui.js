@@ -27,6 +27,7 @@ import {
     GunnerAbility,
     PhantomAbility
 } from "./abilities/index.js";
+import { ArenaCamera } from "./camera.js";
 
 const ABILITY_MAP = {
     archer: ArcherAbility,
@@ -218,6 +219,7 @@ export class ArenaRenderer {
     constructor(canvas) {
         this.canvas = canvas;
         this.ctx = canvas.getContext("2d");
+        this.camera = new ArenaCamera();
     }
 
     renderPlayerPreview(previewBall, fighter, selectionAnimTime = 999) {
@@ -278,6 +280,7 @@ export class ArenaRenderer {
 
         ctx.fillStyle = "#fafafa";
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        this.camera.apply(ctx, this.canvas, simulation);
 
         for (const pass of ArenaRenderer.renderPasses) {
             for (const e of simulation.entities) {
@@ -410,12 +413,19 @@ export class UIController {
         canvas.classList.add("face-pop");
     }
 
-    renderRoster(activeIds = []) {
+    renderRoster(activeIds = [], activeSpecs = []) {
         const s = this.state;
         if (!s) return;
-        const visibleRoster = activeIds.length ? this.roster.filter((f) => activeIds.includes(f.id)) : [];
+        const activeSpecById = new Map(activeSpecs.map((fighter) => [fighter.id, fighter]));
+        const visibleRoster = activeIds.length
+            ? activeIds
+                  .map((id) => activeSpecById.get(id) ?? this.roster.find((fighter) => fighter.id === id))
+                  .filter(Boolean)
+            : [];
         s.fighters = visibleRoster.map((fighter) => {
             const isHero = fighter.id === FIGHTER_IDS.HERO;
+            const maxHp = fighter.maxHp ?? fighter.stats?.hp ?? 0;
+            const hp = fighter.hp ?? maxHp;
             return {
                 id: fighter.id,
                 name: fighter.name,
@@ -423,8 +433,8 @@ export class UIController {
                 color: fighter.color,
                 isPlayer: fighter.isPlayer,
                 defeated: false,
-                hp: Math.ceil(fighter.hp),
-                maxHp: Math.ceil(fighter.maxHp),
+                hp: Math.ceil(hp),
+                maxHp: Math.ceil(maxHp),
                 hpPct: 100,
                 statLine: isHero
                     ? formatHeroStatLine(fighter.stats.allocation ?? {})

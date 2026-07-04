@@ -44,10 +44,17 @@ import {
     rollHuntingChestReward,
     rollKeyShardReward,
     scaleEnemySpecForHunting,
-    HUNTING_EVENT_TYPES
+    HUNTING_EVENT_TYPES,
+    HUNTING_MONSTER_TYPES,
+    HUNTING_TEAMS,
+    createHuntingMinibossSpec,
+    createHuntingMobEncounter,
+    getHuntingMobCount,
+    shouldUseRosterMiniboss
 } from "../src/hunting/index.js";
 import { Grenade } from "../src/entities/grenade.js";
 import { appStore, UIController } from "../src/ui.js";
+import { ArenaCamera } from "../src/camera.js";
 import { PATCH_NOTES } from "../src/patchNotes.js";
 import {
     createTemplateComponentDirective,
@@ -968,6 +975,52 @@ function testHuntingSystem() {
     assert.equal(scaled.stats.speed, 300, "Hunting scaling should not affect speed");
     assert.equal(scaled.stats.skill, 4, "Hunting scaling should not affect skill");
 
+    assert.equal(getHuntingMobCount(1), 2, "Early hunting floors should start as 1v2 mob fights");
+    assert.equal(getHuntingMobCount(5), 4, "Deep hunting floors should add more mobs without exceeding MVP cap");
+    const mobs = createHuntingMobEncounter({
+        floor: 3,
+        rng: (() => {
+            const rolls = [0, 0.9, 0.2];
+            return () => rolls.shift() ?? 0;
+        })()
+    });
+    assert.equal(mobs.length, 3, "Hunting mob encounters should create multiple enemies");
+    assert.equal(new Set(mobs.map((mob) => mob.id)).size, mobs.length, "Hunting mob IDs should be unique per fight");
+    assert.ok(
+        mobs.every((mob) => mob.teamId === HUNTING_TEAMS.ENEMY),
+        "Hunting mobs should all be assigned to the enemy team"
+    );
+    assert.ok(
+        mobs.some((mob) => mob.hunting.monsterType === HUNTING_MONSTER_TYPES.MELEE) &&
+            mobs.some((mob) => mob.hunting.monsterType === HUNTING_MONSTER_TYPES.RANGED),
+        "Hunting mob encounters should include melee and ranged monster archetypes"
+    );
+    assert.equal(shouldUseRosterMiniboss(3), true, "Every third hunting floor should add a roster miniboss");
+    const miniboss = createHuntingMinibossSpec({
+        roster: [
+            {
+                id: FIGHTER_IDS.DASH,
+                name: "Dash Ball",
+                ability: "dash",
+                color: "#8ee8d7",
+                stats: { hp: 110, damage: 10, speed: 294, radius: 49, mass: 1.16, defense: 1 }
+            },
+            {
+                id: FIGHTER_IDS.ARCHER,
+                name: "Archer Ball",
+                ability: "archer",
+                color: "#f7b34d",
+                stats: { hp: 112, damage: 10, speed: 270, radius: 50, mass: 1.2, defense: 1 }
+            }
+        ],
+        characterId: FIGHTER_IDS.DASH,
+        floor: 3,
+        rng: () => 0
+    });
+    assert.equal(miniboss.hunting.isMiniboss, true, "Roster enemies should be marked as minibosses");
+    assert.equal(miniboss.hunting.sourceFighterId, FIGHTER_IDS.ARCHER, "Minibosses should not copy the player");
+    assert.equal(miniboss.teamId, HUNTING_TEAMS.ENEMY, "Minibosses should fight on the enemy team");
+
     const keyShards = rollKeyShardReward({ floor: 2, rng: () => 0 });
     assert.equal(keyShards, 17, "Key shards should include clear and deep-floor bonuses");
 
@@ -1390,6 +1443,33 @@ function testMultiFighterSimulationSetup(app) {
         sim.getEnemiesOf(sim.fighters[0]).length,
         2,
         "Default multi-fighter battles should remain free-for-all"
+    );
+}
+
+function testArenaCameraZoom() {
+    const camera = new ArenaCamera();
+
+    assert.equal(
+        camera.getTargetZoom({
+            camera: { zoom: 0.78 },
+            fighters: [{ flags: {} }, { flags: {} }]
+        }),
+        0.78,
+        "Explicit simulation camera zoom should be honored"
+    );
+    assert.equal(
+        camera.getTargetZoom({
+            fighters: [{ flags: {} }, { flags: {} }]
+        }),
+        1,
+        "Two-fighter matches should keep the default 1v1 view"
+    );
+    assert.equal(
+        camera.getTargetZoom({
+            fighters: [{ flags: {} }, { flags: {} }, { flags: {} }, { flags: {} }, { flags: {} }]
+        }),
+        0.78,
+        "Large multi-fighter matches should zoom the arena view out"
     );
 }
 
@@ -3553,6 +3633,7 @@ await testBattleAppAdoptsPreExistingAlpineAllocation();
 testIndexCacheVersionMatchesLatestPatchNote();
 testStatBalanceSystem();
 testMultiFighterSimulationSetup(app);
+testArenaCameraZoom();
 testTeamTargetingAndFriendlyCollision(app);
 testTeamsResolveByRemainingHostileTeams(app);
 testProjectileIgnoresAllies(app);
