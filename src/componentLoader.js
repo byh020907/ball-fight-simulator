@@ -1,6 +1,10 @@
-export const COMPONENTS = ["xp-reward-panel", "xp-progress-bar"];
+import { getTemplateComponentNameFromTagName } from "./alpineTemplateComponents.js";
 
 const loaded = new Set();
+
+export function getLoadedComponents() {
+    return [...loaded];
+}
 
 function generateScopeId() {
     return "v-" + Math.random().toString(36).slice(2, 10);
@@ -49,44 +53,58 @@ function executeScript(raw) {
     document.body.append(ns);
 }
 
-export async function loadTemplates(components = COMPONENTS) {
-    const results = await Promise.allSettled(
-        components.map(async (name) => {
-            if (loaded.has(name)) return;
-            const res = await fetch(`./src/components/${name}.html`);
-            if (!res.ok) throw new Error(`Failed to fetch template ${name}: ${res.status}`);
-            const html = await res.text();
+async function loadSingle(name) {
+    if (loaded.has(name)) return;
+    const res = await fetch(`./src/components/${name}.html`);
+    if (!res.ok) throw new Error(`Failed to fetch template ${name}: ${res.status}`);
+    const html = await res.text();
 
-            const { body, styles, scripts } = extractTags(html);
+    const { body, styles, scripts } = extractTags(html);
 
-            const scoped = styles.filter((s) => !s.global);
-            const globalStyles = styles.filter((s) => s.global);
+    const scoped = styles.filter((s) => !s.global);
+    const globalStyles = styles.filter((s) => s.global);
 
-            const scopeId = scoped.length > 0 ? generateScopeId() : null;
-            const scopeAttr = scopeId ? `data-v-${scopeId}` : null;
+    const scopeId = scoped.length > 0 ? generateScopeId() : null;
+    const scopeAttr = scopeId ? `data-v-${scopeId}` : null;
 
-            const templateHtml = scopeAttr ? addScopeToRoot(body, scopeAttr) : body;
+    const templateHtml = scopeAttr ? addScopeToRoot(body, scopeAttr) : body;
 
-            const el = document.createElement("template");
-            el.id = `template-${name}`;
-            el.innerHTML = templateHtml;
-            document.head.append(el);
+    const el = document.createElement("template");
+    el.id = `template-${name}`;
+    el.innerHTML = templateHtml;
+    document.head.append(el);
 
-            for (const s of globalStyles) {
-                injectStyle(s.css);
-            }
+    for (const s of globalStyles) {
+        injectStyle(s.css);
+    }
 
-            for (const s of scoped) {
-                injectStyle(`@scope ([${scopeAttr}]) {\n${s.css}\n}`);
-            }
+    for (const s of scoped) {
+        injectStyle(`@scope ([${scopeAttr}]) {\n${s.css}\n}`);
+    }
 
-            for (const raw of scripts) {
-                executeScript(raw);
-            }
+    for (const raw of scripts) {
+        executeScript(raw);
+    }
 
-            loaded.add(name);
-        })
-    );
+    loaded.add(name);
+}
+
+function scanHtmlForComponentNames(html) {
+    const names = new Set();
+    const tagPattern = /<([a-z][a-z0-9]*(?:-[a-z0-9]+)+)(?:\s|\/|>)/gi;
+    let match;
+    while ((match = tagPattern.exec(html)) !== null) {
+        const name = getTemplateComponentNameFromTagName(match[1]);
+        if (name) names.add(name);
+    }
+    return names;
+}
+
+export async function loadTemplates() {
+    const names = scanHtmlForComponentNames(document.body.innerHTML);
+    const toLoad = [...names].filter((n) => !loaded.has(n));
+    if (toLoad.length === 0) return;
+    const results = await Promise.allSettled(toLoad.map((name) => loadSingle(name)));
     for (const r of results) {
         if (r.status === "rejected") console.warn("[componentLoader]", r.reason);
     }

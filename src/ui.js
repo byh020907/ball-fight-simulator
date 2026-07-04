@@ -12,7 +12,6 @@ import { DEFAULT_STAT_RULES, CHALLENGE_CONFIG } from "./progression/index.js";
 import { formatHeroStatLine, formatHeroStatParts, mergeOrbBonuses } from "./entities/index.js";
 import { FIGHTER_IDS, RENDER_LAYERS, Vector2 } from "./core.js";
 import { getUnseenEntries, dismissPatchNotes, appendCapped } from "./utils.js";
-import { PopupService } from "./popup.js";
 import { createCollectionHubViewModel, COLLECTION_HUB_TABS } from "./collection/collectionViewModel.js";
 import {
     ArcherAbility,
@@ -269,10 +268,6 @@ export function appStore() {
         patchEntries: [],
         patchNotesVisible: false,
 
-        // Popup (used by PopupService)
-        popupVisible: false,
-        popupContent: null,
-
         // Action picker (Alpine template)
         actionPickerCards: [],
         get actionPickerVisible() {
@@ -289,15 +284,6 @@ export function appStore() {
         closePatchNotes() {
             this.patchNotesVisible = false;
             dismissPatchNotes();
-        },
-
-        closePopup(value) {
-            this.popupVisible = false;
-            // Clear content after transition completes
-            setTimeout(() => {
-                this.popupContent = null;
-                PopupService.resolve(value ?? "close");
-            }, 250);
         },
 
         /** 액션 카드 선택 (Alpine @click에서 호출) — 단 한 번만 실행 */

@@ -433,31 +433,8 @@
                 </div>
             </div>
 
-            <!-- Alpine-driven popup (used by PopupService) -->
-            <div
-                class="bf-popup-overlay"
-                x-show="popupVisible"
-                x-transition.opacity.duration.200ms
-                @click.self="popupContent?.closeOnOutside === false || closePopup('close')"
-            >
-                <div class="bf-popup-card">
-                    <div class="bf-popup-scroll">
-                        <strong class="bf-popup-title" x-text="popupContent?.title ?? ''"></strong>
-                        <div class="bf-popup-body" x-html="popupContent?.bodyHtml ?? ''"></div>
-                    </div>
-                    <div class="bf-popup-footer" x-show="popupContent?.buttons?.length">
-                        <template x-for="btn in popupContent?.buttons" :key="btn.value">
-                            <button
-                                type="button"
-                                class="bf-popup-btn"
-                                x-bind:class="btn.primary ? 'bf-popup-btn--primary' : ''"
-                                x-text="btn.text"
-                                @click="closePopup(btn.value ?? btn.text)"
-                            ></button>
-                        </template>
-                    </div>
-                </div>
-            </div>
+            <!-- Alpine-driven popup (component) -->
+            <popup-dialog></popup-dialog>
 
             <!-- 컬렉션 허브 (전용 Alpine 템플릿, PopupService 미사용) -->
             <div
@@ -865,6 +842,7 @@
             await import(`./src/main.js?v=${V}`);
 
             const { PopupService } = await import(`./src/popup.js?v=${V}`);
+            window.PopupService = PopupService;
             const { HELP_TITLE, HELP_CONTENT } = await import(`./src/helpContent.js?v=${V}`);
             document.addEventListener("open-help", () =>
                 PopupService.show({ title: HELP_TITLE, bodyHtml: HELP_CONTENT })

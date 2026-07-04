@@ -1,11 +1,12 @@
 # 결정 기록
 
 ## 현재 기준 요약 (2026-07-04)
-- 컴포넌트 문법: 기본은 태그 기반 템플릿 컴포넌트입니다. `<xp-reward-panel>`은 `template-xp-reward-panel`, `<xp-progress-bar>`는 `template-xp-progress-bar`를 사용합니다.
-- `x-component`: 삭제하지 않고 호스트 태그를 유지해야 하는 경우의 보조/호환 문법으로만 사용합니다.
-- 실제 적용: 결과 오버레이 XP 보상 패널은 `<xp-reward-panel>`, 내부 XP 바는 `<xp-progress-bar>` 중첩 컴포넌트로 구현되어 있습니다.
-- 검증 완료: `npm run format`, `npm test`, `npm run check`, `npm run format:check`, 브라우저 DOM 확인 통과. 브라우저에서는 `xComponentHosts=0`, 두 태그 컴포넌트 `data-component` 스탬프, `.xp-bar` 마운트, 콘솔 에러 없음 확인.
-- 다음 우선순위: 사냥터 MVP 전투 연결. 반복 카드/패널은 `docs/alpine-component-system.md` 기준의 태그 기반 템플릿 컴포넌트 적용 후보로 검토합니다.
+- 컴포넌트 파일 구조: `src/components/<name>.html` (플랫, 폴더 없음)
+- 3개 컴포넌트: `<xp-reward-panel>`, `<xp-progress-bar>`, `<popup-dialog>`
+- 컴포넌트 패턴: 자체 `x-data` 스코프 + `Alpine.store()` 데이터 브릿지 + scoped CSS (`@scope [data-v-xxxxx]`)
+- PopupService: `Alpine.store('popupDialog')` 기반으로 전환, x-html body는 유지 (추후 정리)
+- 검증 완료: `npm test`, `npm run format:check` 통과
+- 다음 우선순위: 사냥터 MVP 전투 연결. 나머지 Alpine 패널(토스트, 액션 선택기, 패치노트, 선수 XP 미터) 점진적 컴포넌트화
 
 ## [L2] 2026-07-02 — 보상 3축 설계 + 액션별 가중치 + 게임 통합 완료
 - 배경: 구버전 모델(승패만 보상)이 스팸 문제. HP weight만으로는 방어형 액션 불이익.
@@ -316,15 +317,28 @@
 - 영향: `src/ui.js`(UIController store 변경), `index.html`, `src/components/xp-reward-panel/template.html`(x-data + $store), `src/components/xp-progress-bar/template.html`(x-data + $store), `tests/regression.mjs`(Alpine store mock 추가)
 - 검증: `npm test`, `npm run check`, `npm run format:check` 통과
 
+## [L2] 2026-07-04 — 컴포넌트 폴더 구조를 단일 HTML 파일로 플랫화
+- 배경: `src/components/<name>/template.html`은 폴더 하나에 파일 하나만 담겨 불필요하게 깊음
+- 결정: `src/components/<name>.html`로 평탄화. 폴더 제거, 파일만 존재
+- 영향: `src/components/xp-reward-panel.html`, `src/components/xp-progress-bar.html`, `src/componentLoader.js`(fetch 경로), `tests/regression.mjs`(URL 경로), `docs/alpine-component-system.md`
+
+## [L1] 2026-07-04 — PopupDialog 컴포넌트화 (x-html → Alpine.store() + scoped CSS)
+- 맥락: PopupService가 `Alpine.$data(root)`로 직접 Alpine 데이터를 조작하고, x-html body를 인라인 Alpine 템플릿이 렌더링하는 구조 → 컴포넌트 시스템 첫 확장 대상
+- 결정: (1) `src/components/popup-dialog.html` 생성 — 자체 `x-data="popupDialog"` + `$store.popupDialog` 구독 + 모든 `bf-popup-*` 스타일 scoped CSS로 이동 + x-html body 유지 (2) `PopupService.show()` → `Alpine.store('popupDialog', data)`로 변경, `window.PopupService = PopupService`로 전역 노출 (3) `src/ui.js`에서 `popupVisible`/`popupContent`/`closePopup()` 제거 (4) `index.html` 인라인 팝업 템플릿 → `<popup-dialog>` 태그로 대체 (5) `src/styles.css`에서 `bf-popup-*` 13개 규칙 제거 (help-section 등은 x-html 컨텐츠 스타일로 유지)
+- 영향: `src/components/popup-dialog.html`(신규), `src/popup.js`, `src/ui.js`, `index.html`, `src/styles.css`, `src/componentLoader.js`(COMPONENTS 추가)
+- 검증: `npm test`, `npm run format:check` 통과
+
+## [L1] 2026-07-04 — componentLoader 자동 발견으로 전환 (COMPONENTS 배열 제거)
+- 맥락: 컴포넌트 추가 시마다 `COMPONENTS` 배열에 이름을 수동 등록해야 하는 번거로움
+- 결정: `loadTemplates()`가 DOM을 스캔하여 `<xp-reward-panel>` 같은 커스텀 태그를 자동 발견. 이미 로드된 템플릿 내부의 중첩 컴포넌트도 재귀적으로 발견. `COMPONENTS` 배열과 `components` 파라미터 제거. `getLoadedComponents()` 헬퍼 export
+- 영향: `src/componentLoader.js`, `tests/regression.mjs`(COMPONENTS import 제거, 파일 존재 검증으로 대체)
+- 검증: `npm test`, `npm run format:check` 통과
+
 ## 진행 중 이슈
 - 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
 - Time Warp 패널티 인상은 재학습 후 반영
 
 ## 다음 할 일
-1. 사냥터 MVP 전투 연결: 메인 화면 입장 버튼, 우승 경험 캐릭터 선택 UI, `BattleSimulation` 층별 1v1 런, 승리 후 귀환/전진 선택, 사냥터 XP 지급/중복 방지 연결. 반복 카드/패널은 `docs/alpine-component-system.md` 기준으로 태그 기반 템플릿 컴포넌트 적용 후보 검토
-2. 전체 N×N PPO 학습 결과 저장 구조 설계: `{charId, actionId}`별 Actor/Critic/normalizer 저장 단위 결정
-3. PPO 커리큘럼 조정: Eater처럼 계속 지는 조합은 Rage 고정 상대 대신 더 쉬운 상대/랜덤 상대로 승리 terminal reward 샘플 확보
-4. PPO 학습 결과 저장/로드 전략 결정: `@tensorflow/tfjs` 유지 시 커스텀 직렬화, `tfjs-node` 도입 시 `file://` 저장
-5. 학습된 Actor를 `AIActionController.evaluate()` 또는 별도 추론 어댑터로 붙이는 브라우저 추론 경로 설계
-6. 사냥터 MVP 구현 전, `getEnemiesOf()`가 필요한 광역/다수 대상 능력 목록 점검
-7. OP 조합 파라미터 튜닝
+1. 사냥터 MVP 전투 연결: 메인 화면 입장 버튼, 우승 경험 캐릭터 선택 UI, `BattleSimulation` 층별 1v1 런, 승리 후 귀환/전진 선택, 사냥터 XP 지급/중복 방지 연결. 반복 카드/패널은 컴포넌트화 후보로 검토
+2. 남은 Alpine 패널 점진적 컴포넌트화: 토스트 알림, 액션 선택기, 패치노트 팝업, 선수 XP 미터 (기존 `<xp-progress-bar>` 재사용)
+3. 전체 N×N PPO 학습 결과 저장 구조 설계: `{charId, actionId}`별 Actor/Critic/normalizer 저장 단위 결정

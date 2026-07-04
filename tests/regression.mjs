@@ -12,7 +12,6 @@ import {
     getSpentStatPoints
 } from "../src/statAllocation.js";
 import { FIGHTER_IDS, Vector2 } from "../src/core.js";
-import { COMPONENTS } from "../src/componentLoader.js";
 import { findActionById } from "../src/clickActions.js";
 import { calcMatchXp, getLevelFromXp, getXpForNextLevel, calcTournamentXp } from "../src/experience/experienceState.js";
 import { getLevelRequirement } from "../src/experience/experienceConfig.js";
@@ -1030,8 +1029,14 @@ function testHuntingSystem() {
 
 function testAlpineTemplateComponentSystem() {
     const indexHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8");
-    assert.ok(COMPONENTS.includes("xp-reward-panel"), "componentLoader should export xp-reward-panel");
-    assert.ok(COMPONENTS.includes("xp-progress-bar"), "componentLoader should export xp-progress-bar");
+    assert.ok(
+        readFileSync(new URL("../src/components/xp-reward-panel.html", import.meta.url), "utf8"),
+        "xp-reward-panel component file should exist"
+    );
+    assert.ok(
+        readFileSync(new URL("../src/components/xp-progress-bar.html", import.meta.url), "utf8"),
+        "xp-progress-bar component file should exist"
+    );
     assert.ok(indexHtml.includes("<xp-reward-panel"), "Index should use a tag component for a real UI panel");
     const rewardTemplateHtml = readFileSync(new URL("../src/components/xp-reward-panel.html", import.meta.url), "utf8");
     assert.ok(

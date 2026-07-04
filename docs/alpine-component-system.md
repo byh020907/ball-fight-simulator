@@ -28,7 +28,6 @@ src/
 
 컴포넌트 추가 시:
 1. `src/components/<name>.html` 생성
-2. `src/componentLoader.js`의 `COMPONENTS` 배열에 이름 추가
 
 ## 3. 컴포넌트 파일 포맷 (Vue SFC 순서)
 
@@ -178,11 +177,12 @@ Alpine.data("xpRewardPanel", () => ({
 ## 6. componentLoader 처리 흐름
 
 ```js
-await loadTemplates(["xp-reward-panel", "xp-progress-bar"]);
+await loadTemplates();
 ```
 
-1. `fetch('./src/components/<name>/template.html')`
-2. HTML 파싱 → `<style>`, `<script>` 태그 분리
+`loadTemplates()`는 `document.body.innerHTML` 정규식 스캔으로 `<xp-reward-panel>`, `<popup-dialog>` 같은 커스텀 태그를 찾아 해당 컴포넌트 HTML만 fetch합니다.
+
+중첩 컴포넌트는 별도 pre-load가 필요 없습니다. 마운트 시스템(`mountTemplateComponentTags`)이 다중 패스로 동작하여, 부모 컴포넌트 마운트 후 DOM에 생긴 자식 태그를 다음 패스에서 자동 발견하고 마운트합니다.
 3. `<style scoped>`: 난수 `data-v-xxxxx` 생성 → 템플릿 루트 요소에 속성 추가 → `@scope ([data-v-xxxxx]) { ... }` 래핑 → `<head>`에 `<style>` 주입
 4. `<style global>`: 원본 그대로 `<head>`에 주입
 5. `<script>`: 각 script 태그를 DOM에 생성하여 실행 (브라우저 보안 문제로 innerHTML이 script를 실행하지 않으므로 별도 태그 생성)
