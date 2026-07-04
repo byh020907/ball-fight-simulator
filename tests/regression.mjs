@@ -44,6 +44,7 @@ import {
     rollHuntingChestReward,
     rollKeyShardReward,
     scaleEnemySpecForHunting,
+    HUNTING_ARENA,
     HUNTING_EVENT_TYPES,
     HUNTING_MONSTER_TYPES,
     HUNTING_TEAMS,
@@ -1452,33 +1453,46 @@ function testMultiFighterSimulationSetup(app) {
         2,
         "Default multi-fighter battles should remain free-for-all"
     );
+
+    const huntingSizedSim = new BattleSimulation(app.roster.slice(0, 3), { onLog() {}, onSound() {} }, null, {
+        arenaWidth: HUNTING_ARENA.WIDTH,
+        arenaHeight: HUNTING_ARENA.HEIGHT
+    });
+    assert.equal(huntingSizedSim.width, HUNTING_ARENA.WIDTH, "BattleSimulation should accept a wider arena");
+    assert.equal(huntingSizedSim.height, HUNTING_ARENA.HEIGHT, "BattleSimulation should accept a taller arena");
+    assert.ok(
+        huntingSizedSim.fighters.every(
+            (fighter) =>
+                fighter.position.x >= 0 &&
+                fighter.position.x <= HUNTING_ARENA.WIDTH &&
+                fighter.position.y >= 0 &&
+                fighter.position.y <= HUNTING_ARENA.HEIGHT
+        ),
+        "Spawn points should stay inside the configured arena"
+    );
 }
 
 function testArenaCameraZoom() {
     const camera = new ArenaCamera();
 
-    assert.equal(
-        camera.getTargetZoom({
-            camera: { zoom: 0.78 },
-            fighters: [{ flags: {} }, { flags: {} }]
-        }),
-        0.78,
-        "Explicit simulation camera zoom should be honored"
+    const defaultView = camera.getViewTransform({ width: 960, height: 960 }, { width: 960, height: 960 });
+    assert.equal(defaultView.scale, 1, "Default 960 arena should render at 1:1 scale");
+    assert.equal(defaultView.offsetX, 0, "Default arena should not need horizontal letterboxing");
+    assert.equal(defaultView.offsetY, 0, "Default arena should not need vertical letterboxing");
+
+    const huntingView = camera.getViewTransform(
+        { width: 960, height: 960 },
+        { width: HUNTING_ARENA.WIDTH, height: HUNTING_ARENA.HEIGHT, camera: { zoom: 1 } }
     );
-    assert.equal(
-        camera.getTargetZoom({
-            fighters: [{ flags: {} }, { flags: {} }]
-        }),
-        1,
-        "Two-fighter matches should keep the default 1v1 view"
+    assert.equal(huntingView.scale, 0.75, "Larger hunting arena should fit fully into the same canvas");
+    assert.equal(huntingView.offsetX, 0, "Square hunting arena should stay centered horizontally");
+    assert.equal(huntingView.offsetY, 0, "Square hunting arena should stay centered vertically");
+
+    const closerView = camera.getViewTransform(
+        { width: 960, height: 960 },
+        { width: HUNTING_ARENA.WIDTH, height: HUNTING_ARENA.HEIGHT, camera: { zoom: 1.2 } }
     );
-    assert.equal(
-        camera.getTargetZoom({
-            fighters: [{ flags: {} }, { flags: {} }, { flags: {} }, { flags: {} }, { flags: {} }]
-        }),
-        0.78,
-        "Large multi-fighter matches should zoom the arena view out"
-    );
+    assert.ok(Math.abs(closerView.scale - 0.9) < 0.001, "Camera zoom should be a multiplier on top of fit-to-map");
 }
 
 function testHuntingMeleeMobChasesTarget(app) {

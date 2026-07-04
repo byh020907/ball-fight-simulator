@@ -11,7 +11,7 @@ import {
     applyHuntingStatModifiersToSpec
 } from "./huntingState.js";
 import { rollKeyShardReward, createHuntingChest, createEmptyHuntingLoot } from "./huntingRewards.js";
-import { HUNTING_ENEMY_TYPES, HUNTING_EVENT_TYPES } from "./huntingConfig.js";
+import { HUNTING_ARENA, HUNTING_ENEMY_TYPES, HUNTING_EVENT_TYPES } from "./huntingConfig.js";
 import {
     HUNTING_TEAMS,
     createHuntingMinibossSpec,
@@ -121,7 +121,13 @@ export class HuntingManager {
 
         app.playerFighterId = run.characterId;
 
-        app.startMatch(matchSpecs, { keepLog: false, skipActionPick: true, cameraZoom: 0.78 });
+        app.startMatch(matchSpecs, {
+            keepLog: false,
+            skipActionPick: true,
+            arenaWidth: HUNTING_ARENA.WIDTH,
+            arenaHeight: HUNTING_ARENA.HEIGHT,
+            cameraZoom: 1
+        });
 
         if (run.carriedHp !== null) {
             const ball = app.simulation?.fighters?.find((f) => f.id === run.characterId);

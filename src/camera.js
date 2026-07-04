@@ -5,7 +5,7 @@ function clamp(value, min, max) {
 }
 
 export class ArenaCamera {
-    constructor({ minZoom = 0.72, maxZoom = 1.08 } = {}) {
+    constructor({ minZoom = 0.55, maxZoom = 1.25 } = {}) {
         this.minZoom = minZoom;
         this.maxZoom = maxZoom;
     }
@@ -16,19 +16,28 @@ export class ArenaCamera {
             return clamp(requestedZoom, this.minZoom, this.maxZoom);
         }
 
-        const aliveCount = (simulation?.fighters ?? []).filter((fighter) => !fighter.flags?.defeated).length;
-        if (aliveCount <= 2) return DEFAULT_ZOOM;
-        if (aliveCount <= 4) return clamp(0.86, this.minZoom, this.maxZoom);
-        return clamp(0.78, this.minZoom, this.maxZoom);
+        return DEFAULT_ZOOM;
+    }
+
+    getViewTransform(canvas, simulation) {
+        const worldWidth = Math.max(1, simulation?.width ?? canvas.width);
+        const worldHeight = Math.max(1, simulation?.height ?? canvas.height);
+        const fitScale = Math.min(canvas.width / worldWidth, canvas.height / worldHeight);
+        const scale = fitScale * this.getTargetZoom(simulation);
+
+        return {
+            scale,
+            offsetX: (canvas.width - worldWidth * scale) / 2,
+            offsetY: (canvas.height - worldHeight * scale) / 2,
+            worldWidth,
+            worldHeight
+        };
     }
 
     apply(ctx, canvas, simulation) {
-        const zoom = this.getTargetZoom(simulation);
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
+        const { scale, offsetX, offsetY } = this.getViewTransform(canvas, simulation);
 
-        ctx.translate(centerX, centerY);
-        ctx.scale(zoom, zoom);
-        ctx.translate(-centerX, -centerY);
+        ctx.translate(offsetX, offsetY);
+        ctx.scale(scale, scale);
     }
 }

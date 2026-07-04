@@ -402,3 +402,9 @@
 - 결정: `HuntingMeleeAbility`를 추가해 근접몹이 매 프레임 가장 가까운 적을 향해 조향하도록 변경. 근접몹 스펙은 `ability: "hunting_melee"`를 사용하고, 시뮬레이션/UI ability map에 등록.
 - 검증: 수치 시뮬레이션에서 근접몹과 플레이어 거리 `460 -> 187.55` 감소 확인. `npm test`, `npm run check`, `npm run format:check` 통과.
 - 영향: `src/abilities/huntingMeleeAbility.js`, `src/abilities/index.js`, `src/hunting/huntingMonsters.js`, `src/simulation/battleSimulation.js`, `src/ui.js`, `tests/regression.mjs`
+
+## [L1] 2026-07-04 — 사냥터는 실제 물리 맵을 키우고 카메라는 전체 맵에 맞춤
+- 맥락: 사용자가 기존 구현은 카메라 줌만 바뀌고 실질 맵 크기가 커지지 않았다고 지적. 카메라는 기본적으로 전체 맵을 보이게 하고, 사냥터는 실제 맵 크기를 더 크게 조절해야 함.
+- 결정: `BattleSimulation`이 `arenaWidth`/`arenaHeight` 옵션을 받아 실제 `Simulation.width/height`를 바꾸도록 변경. 사냥터는 `HUNTING_ARENA` 1280×1280을 사용. `ArenaCamera`는 전투원 수 기반 자동 줌아웃을 제거하고 현재 시뮬레이션 맵 전체를 캔버스에 fit-to-map으로 맞춤.
+- 검증: 수치 시뮬레이션에서 사냥터 arena `[1280,1280]`, 960 캔버스 cameraScale `0.75` 확인. `npm test`, `npm run check`, `npm run format:check` 통과.
+- 영향: `src/hunting/huntingConfig.js`, `src/hunting/huntingManager.js`, `src/simulation/battleSimulation.js`, `src/camera.js`, `src/ui.js`, `src/app.js`, `tests/regression.mjs`, `docs/hunting-grounds-combat-update.md`

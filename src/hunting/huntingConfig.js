@@ -1,5 +1,10 @@
 export const HUNTING_MAX_FLOOR = 5;
 
+export const HUNTING_ARENA = Object.freeze({
+    WIDTH: 1280,
+    HEIGHT: 1280
+});
+
 export const HUNTING_EVENT_CHANCE = Object.freeze({
     MIN: 0.25,
     MAX: 0.4

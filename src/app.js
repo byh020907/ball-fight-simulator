@@ -537,7 +537,11 @@ export class BattleApp {
                 }
             },
             null,
-            { cameraZoom: options.cameraZoom }
+            {
+                arenaWidth: options.arenaWidth,
+                arenaHeight: options.arenaHeight,
+                cameraZoom: options.cameraZoom
+            }
         );
 
         // 내 캐릭터 식별

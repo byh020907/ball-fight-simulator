@@ -283,7 +283,13 @@ export class ArenaRenderer {
 
         ctx.fillStyle = "#fafafa";
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        const view = this.camera.getViewTransform(this.canvas, simulation);
         this.camera.apply(ctx, this.canvas, simulation);
+        ctx.fillStyle = "#fafafa";
+        ctx.fillRect(0, 0, simulation.width, simulation.height);
+        ctx.strokeStyle = "#d7dce6";
+        ctx.lineWidth = Math.max(2, 2 / view.scale);
+        ctx.strokeRect(0, 0, simulation.width, simulation.height);
 
         for (const pass of ArenaRenderer.renderPasses) {
             for (const e of simulation.entities) {

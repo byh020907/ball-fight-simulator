@@ -37,10 +37,18 @@ const ABILITY_TYPES = {
 
 const COLLISION_RESTITUTION = 0.92;
 const COLLISION_SEPARATION_PADDING = 0.6;
+const DEFAULT_ARENA_SIZE = 960;
+
+function normalizeArenaSize(value) {
+    if (!Number.isFinite(value)) return DEFAULT_ARENA_SIZE;
+    return Math.max(DEFAULT_ARENA_SIZE, Math.round(value));
+}
 
 export class BattleSimulation extends Simulation {
     constructor(fighterSpecs, hooks, playerBall = null, options = {}) {
         super();
+        this.width = normalizeArenaSize(options.arenaWidth);
+        this.height = normalizeArenaSize(options.arenaHeight);
         this.hooks = hooks;
         const spawnPoints = this.createSpawnPoints(fighterSpecs.length);
         this.fighters = fighterSpecs.map((spec, index) => {
