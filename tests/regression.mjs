@@ -991,6 +991,17 @@ function testHuntingSystem() {
 }
 
 function testAlpineTemplateComponentSystem() {
+    const indexHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+    assert.ok(
+        indexHtml.includes('template id="template-xp-reward-panel"'),
+        "Index should include a real component template"
+    );
+    assert.ok(indexHtml.includes('x-component="xp-reward-panel"'), "Index should use x-component for a real UI panel");
+    assert.ok(
+        indexHtml.includes('x-component="xp-progress-bar"'),
+        "Real component example should include a nested component"
+    );
+
     assert.equal(normalizeTemplateComponentName("pull-request"), "pull-request");
     assert.equal(normalizeTemplateComponentName("'pull-request'"), "pull-request");
     assert.equal(isValidTemplateComponentName("xp-meter"), true);
@@ -1037,6 +1048,15 @@ function testAlpineTemplateComponentSystem() {
     );
     assert.equal(element.children.length, 1, "Mounted component should replace host children");
     assert.equal(initialized.length, 1, "Mounted component should initialize cloned child roots");
+    assert.equal(
+        mountTemplateComponent(
+            { innerHTML: "" },
+            { innerHTML: "<span>fallback</span>" },
+            { Alpine: null, initialize: true }
+        ),
+        true,
+        "Mount should still work when Alpine.initTree is unavailable"
+    );
 
     const warnings = [];
     const directive = createTemplateComponentDirective({
@@ -1066,6 +1086,63 @@ function testAlpineTemplateComponentSystem() {
 
     directive({ dataset: {} }, { expression: "../bad" }, { Alpine: { initTree() {} } });
     assert.equal(warnings.length, 1, "Invalid component names should warn");
+    directive({ dataset: {} }, { expression: "missing-template" }, { Alpine: { initTree() {} } });
+    assert.equal(warnings.length, 2, "Missing templates should warn without mutating the host");
+
+    const nestedProgressHost = {
+        dataset: {},
+        children: [],
+        replaceChildren(fragment) {
+            this.children = [...fragment.childNodes];
+        }
+    };
+    const nestedPanelTemplate = {
+        content: {
+            cloneNode() {
+                return {
+                    childNodes: [{ nodeType: 1, tagName: "SECTION", nestedHost: nestedProgressHost }]
+                };
+            }
+        }
+    };
+    const nestedProgressTemplate = {
+        content: {
+            cloneNode() {
+                return {
+                    childNodes: [{ nodeType: 1, tagName: "DIV" }]
+                };
+            }
+        }
+    };
+    const nestedRoot = {
+        getElementById(id) {
+            if (id === "template-xp-reward-panel") return nestedPanelTemplate;
+            if (id === "template-xp-progress-bar") return nestedProgressTemplate;
+            return null;
+        }
+    };
+    const nestedDirective = createTemplateComponentDirective({ root: nestedRoot });
+    const nestedPanelHost = {
+        dataset: {},
+        children: [],
+        replaceChildren(fragment) {
+            this.children = [...fragment.childNodes];
+        }
+    };
+    let nestedInitCount = 0;
+    const nestedAlpine = {
+        initTree(child) {
+            nestedInitCount += 1;
+            if (child.nestedHost) {
+                nestedDirective(child.nestedHost, { expression: "xp-progress-bar" }, { Alpine: nestedAlpine });
+            }
+        }
+    };
+    nestedDirective(nestedPanelHost, { expression: "xp-reward-panel" }, { Alpine: nestedAlpine });
+    assert.equal(nestedPanelHost.dataset.component, "xp-reward-panel", "Parent component should mount");
+    assert.equal(nestedProgressHost.dataset.component, "xp-progress-bar", "Nested component should mount");
+    assert.equal(nestedProgressHost.children.length, 1, "Nested component should receive its template content");
+    assert.ok(nestedInitCount >= 2, "Nested component roots should be initialized");
 
     let registeredName = null;
     let registeredDirective = null;

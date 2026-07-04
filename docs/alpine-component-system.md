@@ -32,6 +32,90 @@
 
 `x-component="xp-meter"`는 `template-xp-meter`를 찾아 복제합니다. 복제된 템플릿 내부의 Alpine 지시문은 호스트의 `x-data` 스코프를 사용할 수 있습니다.
 
+### 2.1 실제 일반 예시
+
+현재 결과 오버레이의 XP 보상 패널은 실제 `x-component` 사용 예시입니다.
+
+```html
+<template id="template-xp-reward-panel">
+    <div class="xp-reward-head">
+        <span x-text="xpReward.characterName"></span>
+        <b x-text="'+' + xpReward.xpGained + ' XP'"></b>
+    </div>
+    <div class="xp-reward-level">
+        <strong x-text="xpReward.levelLabel"></strong>
+        <em x-show="xpReward.levelUp">LEVEL UP</em>
+    </div>
+</template>
+
+<div
+    class="xp-reward"
+    x-show="xpReward.visible"
+    x-bind:class="{ levelup: xpReward.levelUp }"
+    x-component="xp-reward-panel"
+></div>
+```
+
+호스트는 `x-show`, `x-bind:class`처럼 표시 상태를 계속 소유하고, 템플릿은 내부 마크업만 제공합니다.
+
+### 2.2 실제 중첩 컴포넌트 예시
+
+`template-xp-reward-panel` 내부에는 진행 바 전용 컴포넌트가 중첩되어 있습니다.
+
+```html
+<template id="template-xp-reward-panel">
+    <div class="xp-reward-level">
+        <strong x-text="xpReward.levelLabel"></strong>
+        <em x-show="xpReward.levelUp">LEVEL UP</em>
+    </div>
+    <div x-component="xp-progress-bar"></div>
+    <div class="xp-reward-foot">
+        <span x-text="xpReward.progressText"></span>
+        <span x-text="xpReward.nextText"></span>
+    </div>
+</template>
+
+<template id="template-xp-progress-bar">
+    <div class="xp-bar" aria-hidden="true">
+        <div class="xp-bar-fill" x-bind:style="'width:' + xpReward.animatedProgressPct + '%'"></div>
+    </div>
+</template>
+```
+
+중첩 컴포넌트도 같은 상위 Alpine 스코프를 사용합니다. 따라서 `xpReward.animatedProgressPct`를 별도 props 전달 없이 읽을 수 있습니다.
+
+### 2.3 예외 예시
+
+잘못된 이름은 mount하지 않고 경고만 남깁니다.
+
+```html
+<!-- 금지: kebab-case 이름이 아니고 경로처럼 보이는 값 -->
+<div x-component="../xp-progress-bar"></div>
+```
+
+없는 템플릿도 mount하지 않습니다.
+
+```html
+<!-- template-missing-panel 이 없으면 경고 후 그대로 둠 -->
+<div x-component="missing-panel"></div>
+```
+
+너무 많은 반복 렌더링에는 쓰지 않습니다.
+
+```html
+<!-- 주의: 수백 개 이상 반복되는 목록에서는 템플릿 복제 비용을 먼저 확인 -->
+<template x-for="item in hugeList">
+    <div x-component="heavy-card"></div>
+</template>
+```
+
+컴포넌트 이름을 사용자 입력에서 직접 만들지 않습니다.
+
+```html
+<!-- 금지: 외부 입력이 템플릿 ID 선택에 직접 개입 -->
+<div x-component="userSelectedTemplate"></div>
+```
+
 ## 3. 등록 위치
 
 Alpine 공식 확장 문서 기준으로 커스텀 directive는 Alpine import 후, `Alpine.start()` 전 등록해야 합니다.

@@ -72,6 +72,35 @@
         </div>
 
         <main class="app" x-data="appStore" x-cloak>
+            <!-- x-component 일반 예시: 결과 오버레이 XP 보상 패널 -->
+            <template id="template-xp-reward-panel">
+                <div class="xp-reward-head">
+                    <span x-text="xpReward.characterName"></span>
+                    <b x-text="'+' + xpReward.xpGained + ' XP'"></b>
+                </div>
+                <div class="xp-reward-level">
+                    <strong x-text="xpReward.levelLabel"></strong>
+                    <em x-show="xpReward.levelUp">LEVEL UP</em>
+                </div>
+                <!-- x-component 중첩 예시: 보상 패널 내부 진행 바 -->
+                <div x-component="xp-progress-bar"></div>
+                <div class="xp-reward-foot">
+                    <span x-text="xpReward.progressText"></span>
+                    <span x-text="xpReward.nextText"></span>
+                </div>
+                <div
+                    class="xp-reward-next"
+                    x-show="xpReward.nextRewardText"
+                    x-text="'다음 보상 · ' + xpReward.nextRewardText"
+                ></div>
+            </template>
+
+            <template id="template-xp-progress-bar">
+                <div class="xp-bar" aria-hidden="true">
+                    <div class="xp-bar-fill" x-bind:style="'width:' + xpReward.animatedProgressPct + '%'"></div>
+                </div>
+            </template>
+
             <section class="game-frame">
                 <section class="battle-stage">
                     <section class="arena-shell">
@@ -106,31 +135,8 @@
                                     class="xp-reward"
                                     x-show="xpReward.visible"
                                     x-bind:class="{ levelup: xpReward.levelUp }"
-                                >
-                                    <div class="xp-reward-head">
-                                        <span x-text="xpReward.characterName"></span>
-                                        <b x-text="'+' + xpReward.xpGained + ' XP'"></b>
-                                    </div>
-                                    <div class="xp-reward-level">
-                                        <strong x-text="xpReward.levelLabel"></strong>
-                                        <em x-show="xpReward.levelUp">LEVEL UP</em>
-                                    </div>
-                                    <div class="xp-bar" aria-hidden="true">
-                                        <div
-                                            class="xp-bar-fill"
-                                            x-bind:style="'width:' + xpReward.animatedProgressPct + '%'"
-                                        ></div>
-                                    </div>
-                                    <div class="xp-reward-foot">
-                                        <span x-text="xpReward.progressText"></span>
-                                        <span x-text="xpReward.nextText"></span>
-                                    </div>
-                                    <div
-                                        class="xp-reward-next"
-                                        x-show="xpReward.nextRewardText"
-                                        x-text="'다음 보상 · ' + xpReward.nextRewardText"
-                                    ></div>
-                                </div>
+                                    x-component="xp-reward-panel"
+                                ></div>
                             </div>
                         </div>
 

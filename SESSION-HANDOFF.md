@@ -299,6 +299,12 @@
 - 영향: `src/alpineTemplateComponents.js`, `index.html`, `tests/regression.mjs`, `docs/alpine-component-system.md`, `docs/development-rules.md`, `SESSION-HANDOFF.md`
 - 검증: `npm test`의 `[alpine-components] ok`에서 이름 검증/템플릿 해석/마운트/등록 동작 확인
 
+## [L1] 2026-07-04 — x-component 실사용/중첩/예외 예시 추가
+- 맥락: 시스템만 있고 실제 사용 예시가 없어 사용자가 일반 예시, 중첩 컴포넌트 예시, 예외사항 예시를 요청
+- 결정: 결과 오버레이 XP 보상 패널을 `template-xp-reward-panel` + `x-component="xp-reward-panel"` 실사용 예시로 전환하고, 내부 XP 진행 바를 `template-xp-progress-bar` + 중첩 `x-component="xp-progress-bar"`로 분리. 문서에 일반/중첩/잘못된 이름/없는 템플릿/대량 반복/외부 입력 금지 예시를 추가하고 회귀 테스트에 실제 HTML 예시 존재, 중첩 mount, invalid/missing template, `initTree` 부재 fallback 검증을 추가
+- 영향: `index.html`, `docs/alpine-component-system.md`, `tests/regression.mjs`, `SESSION-HANDOFF.md`
+- 검증: `npm run format`, `npm test`, `npm run check`, `npm run format:check` 통과. 브라우저 DOM 확인에서 `xp-reward-panel`/`xp-progress-bar` 템플릿 존재, 보상 패널/중첩 진행 바 `data-component` 스탬프, `.xp-bar` 마운트, 콘솔 에러 없음 확인
+
 ## 진행 중 이슈
 - 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
 - Time Warp 패널티 인상은 재학습 후 반영
