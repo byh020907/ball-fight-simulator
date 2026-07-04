@@ -1904,6 +1904,20 @@ body::before {
     min-height: 36px;
 }
 
+.ch-storage-currency {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 10px;
+    border: 2px solid #202020;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #202020;
+    font-size: 0.8rem;
+    font-weight: 700;
+    min-height: 36px;
+}
+
 .ch-content {
     flex: 1;
     min-height: 0;
@@ -2218,6 +2232,18 @@ body::before {
     background: #fff;
 }
 
+.ch-chest--common {
+    border-color: #9aa4ad;
+}
+
+.ch-chest--uncommon {
+    border-color: #35a66b;
+}
+
+.ch-chest--rare {
+    border-color: #3977d6;
+}
+
 .ch-ach-info {
     flex: 1;
     min-width: 0;
@@ -2266,6 +2292,11 @@ body::before {
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+}
+
+.ch-ach-tier-label.unlocked {
+    background: #202020;
+    color: #ffffff;
 }
 
 .ch-tier--bronze {

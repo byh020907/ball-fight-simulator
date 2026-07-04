@@ -124,12 +124,14 @@ export function appStore() {
             filters: {
                 roster: "all",
                 mastery: "all",
-                achievements: "all"
+                achievements: "all",
+                storage: "all"
             },
             searchQueries: {
                 roster: "",
                 mastery: "",
-                achievements: ""
+                achievements: "",
+                storage: ""
             },
             sortModes: {
                 roster: "roster",
@@ -139,6 +141,11 @@ export function appStore() {
             rosterItems: [],
             masteryItems: [],
             achievementItems: [],
+            storage: {
+                keyShards: 0,
+                chests: [],
+                stats: {}
+            },
             summary: {}
         },
 
@@ -218,6 +225,19 @@ export function appStore() {
             let items = [...(this.collectionHub.achievementItems || [])];
             if (filter === "unlocked") items = items.filter((i) => i.unlocked);
             else if (filter === "locked") items = items.filter((i) => !i.unlocked);
+            return items;
+        },
+        get filteredStorageItems() {
+            const tab = this.collectionHub.activeTab;
+            if (tab !== "storage") return [];
+            const filter = this.collectionHub.filters.storage || "all";
+            const query = (this.collectionHub.searchQueries.storage || "").toLowerCase();
+            let items = [...(this.collectionHub.storage?.chests || [])];
+            if (query) {
+                items = items.filter((item) => item.rarity.toLowerCase().includes(query));
+            }
+            if (filter === "openable") items = items.filter((i) => i.canOpen);
+            else if (filter !== "all") items = items.filter((i) => i.rarity === filter);
             return items;
         },
 
@@ -699,6 +719,7 @@ export class UIController {
         s.collectionHub.rosterItems = vm.rosterItems;
         s.collectionHub.masteryItems = vm.masteryItems;
         s.collectionHub.achievementItems = vm.achievementItems;
+        s.collectionHub.storage = vm.storage;
     }
 
     openCollectionHub(tabId) {

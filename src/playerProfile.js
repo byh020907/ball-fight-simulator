@@ -12,7 +12,7 @@ export const PROFILE_LIMITS = Object.freeze({
     MAX_TIMESTAMP: 8_640_000_000_000_000
 });
 
-export const PROFILE_VERSION = 5;
+export const PROFILE_VERSION = 6;
 
 // ── 기본 프로필 ─────────────────────────────────────────────────────────────
 
@@ -25,6 +25,17 @@ export function createDefaultPlayerProfile() {
         experience: {
             currentXp: 0,
             byCharacter: {}
+        },
+        hunting: {
+            keyShards: 0,
+            chests: [],
+            blueprints: {},
+            stats: {
+                runsStarted: 0,
+                runsRetreated: 0,
+                runsDefeated: 0,
+                deepestFloor: 0
+            }
         },
         progression: {
             challenge: {
@@ -142,6 +153,61 @@ function sanitizeCharacterExperienceMap(obj) {
     return result;
 }
 
+function sanitizeHuntingChest(chest) {
+    if (!chest || typeof chest !== "object") return null;
+    const rarity = ["common", "uncommon", "rare", "epic", "legendary"].includes(chest.rarity) ? chest.rarity : "common";
+    const id = typeof chest.id === "string" && chest.id.length > 0 ? chest.id : null;
+    if (!id) return null;
+    return {
+        id,
+        rarity,
+        acquiredAt: sanitizeTimestamp(chest.acquiredAt) ?? Date.now()
+    };
+}
+
+function sanitizeHuntingBlueprints(obj) {
+    if (!obj || typeof obj !== "object") return {};
+    return Object.fromEntries(
+        Object.entries(obj)
+            .filter(([key]) => typeof key === "string" && key.length > 0)
+            .map(([key, value]) => [
+                key,
+                {
+                    discovered: Boolean(value?.discovered),
+                    unlocked: Boolean(value?.unlocked)
+                }
+            ])
+    );
+}
+
+function sanitizeHunting(obj) {
+    const defaults = createDefaultPlayerProfile().hunting;
+    if (!obj || typeof obj !== "object") return defaults;
+    const seen = new Set();
+    const chests = Array.isArray(obj.chests)
+        ? obj.chests
+              .map(sanitizeHuntingChest)
+              .filter(Boolean)
+              .filter((chest) => {
+                  if (seen.has(chest.id)) return false;
+                  seen.add(chest.id);
+                  return true;
+              })
+              .slice(-200)
+        : [];
+    return {
+        keyShards: sanitizeNumber(obj.keyShards),
+        chests,
+        blueprints: sanitizeHuntingBlueprints(obj.blueprints),
+        stats: {
+            runsStarted: sanitizeNumber(obj.stats?.runsStarted),
+            runsRetreated: sanitizeNumber(obj.stats?.runsRetreated),
+            runsDefeated: sanitizeNumber(obj.stats?.runsDefeated),
+            deepestFloor: sanitizeNumber(obj.stats?.deepestFloor)
+        }
+    };
+}
+
 function sumCharacterExperience(byCharacter) {
     return Object.values(byCharacter).reduce((sum, record) => sum + sanitizeNumber(record?.currentXp), 0);
 }
@@ -210,6 +276,7 @@ export function sanitizePlayerProfile(raw) {
         version: PROFILE_VERSION,
         characterMastery: sanitizeCharacterMastery(raw.characterMastery ?? raw.characterLinks),
         experience: sanitizeExperience(raw.experience),
+        hunting: sanitizeHunting(raw.hunting),
         progression: {
             challenge: sanitizeChallenge(raw.progression?.challenge)
         },

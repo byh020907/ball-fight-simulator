@@ -19,8 +19,28 @@ import { getCharacterExperienceSummary, grantExperienceFromMatchReport } from ".
 import { DashEffect } from "../src/combatEffects.js";
 import { shuffled } from "../src/random.js";
 import { BattleSimulation } from "../src/simulation/battleSimulation.js";
-import { createDefaultPlayerProfile, migrateLegacyExperienceToCharacter } from "../src/playerProfile.js";
+import {
+    createDefaultPlayerProfile,
+    migrateLegacyExperienceToCharacter,
+    sanitizePlayerProfile
+} from "../src/playerProfile.js";
 import { completeChallengeTournament, formatBonusSummary } from "../src/progression/progressionState.js";
+import {
+    advanceHuntingRun,
+    canEnterHunting,
+    createHuntingChest,
+    createHuntingRun,
+    defeatHuntingRun,
+    getEligibleHuntingCharacters,
+    getEnemyPowerMultiplier,
+    getRewardMultiplier,
+    getChestOpenCost,
+    openHuntingChest,
+    recordHuntingFloorResult,
+    retreatHuntingRun,
+    rollKeyShardReward,
+    scaleEnemySpecForHunting
+} from "../src/hunting/index.js";
 import { Grenade } from "../src/entities/grenade.js";
 import { appStore, UIController } from "../src/ui.js";
 import { PATCH_NOTES } from "../src/patchNotes.js";
@@ -860,6 +880,105 @@ function testExperienceSystem() {
     );
     assert.equal(legacyProfile.experience.byCharacter.archer.currentXp, 55);
     console.log("[experience] ok");
+}
+
+function testHuntingSystem() {
+    const profile = createDefaultPlayerProfile();
+    assert.equal(canEnterHunting(profile, FIGHTER_IDS.DASH), false, "Characters need one tournament win to enter");
+    profile.collection.characters[FIGHTER_IDS.DASH] = {
+        tournamentsCompleted: 1,
+        tournamentWins: 1,
+        matchWins: 3,
+        bestPlacement: 1,
+        totalDamageDealt: 1200,
+        comebackMatchWins: 0,
+        firstTournamentAt: 100,
+        lastTournamentAt: 200
+    };
+    const eligible = getEligibleHuntingCharacters(profile, [{ id: FIGHTER_IDS.DASH }, { id: FIGHTER_IDS.ARCHER }]);
+    assert.deepEqual(
+        eligible.map((fighter) => fighter.id),
+        [FIGHTER_IDS.DASH],
+        "Only tournament winners should be listed as hunting candidates"
+    );
+
+    assert.equal(getEnemyPowerMultiplier(1), 1, "Floor 1 enemy power should be base");
+    assert.equal(getEnemyPowerMultiplier(3), 1.16, "Enemy power should scale by 8% per floor");
+    assert.equal(getRewardMultiplier(3), 1.3, "Rewards should scale by 15% per floor");
+    const baseSpec = {
+        id: "enemy",
+        stats: { hp: 100, damage: 10, defense: 2, speed: 300, skill: 4, radius: 24 }
+    };
+    const scaled = scaleEnemySpecForHunting(baseSpec, 3);
+    assert.equal(scaled.stats.hp, 116, "Hunting scaling should affect HP");
+    assert.equal(scaled.stats.damage, 12, "Hunting scaling should affect damage");
+    assert.equal(scaled.stats.defense, 2.32, "Hunting scaling should affect defense");
+    assert.equal(scaled.stats.speed, 300, "Hunting scaling should not affect speed");
+    assert.equal(scaled.stats.skill, 4, "Hunting scaling should not affect skill");
+
+    const keyShards = rollKeyShardReward({ floor: 2, rng: () => 0 });
+    assert.equal(keyShards, 17, "Key shards should include clear and deep-floor bonuses");
+
+    const run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, now: 1000 });
+    const common = createHuntingChest({ id: "c1", rarity: "common", acquiredAt: 1000 });
+    const uncommon = createHuntingChest({ id: "u1", rarity: "uncommon", acquiredAt: 1000 });
+    const rare = createHuntingChest({ id: "r1", rarity: "rare", acquiredAt: 1000 });
+    const afterFloor = recordHuntingFloorResult(run, {
+        hpRemain: 55,
+        maxHp: 100,
+        loot: { keyShards: 100, chests: [common, uncommon, rare], xp: 90 }
+    });
+    assert.equal(afterFloor.carriedHp, 55, "Hunting run should carry HP between floors");
+    assert.equal(afterFloor.pendingLoot.chests.length, 3, "Floor rewards should stay pending");
+
+    const advanced = advanceHuntingRun(afterFloor, { rng: () => 0 });
+    assert.equal(advanced.floor, 2, "Advance should move to the next floor");
+    assert.ok(advanced.lastEvent, "A low RNG roll should create a hunting event");
+
+    const retreated = retreatHuntingRun(afterFloor, { now: 2000 });
+    assert.equal(retreated.status, "retreated", "Retreat should end the run safely");
+    assert.equal(retreated.securedLoot.keyShards, 100, "Retreat should secure pending key shards");
+    assert.equal(retreated.pendingLoot.chests.length, 0, "Retreat should clear pending loot");
+
+    const defeated = defeatHuntingRun(afterFloor, {
+        rng: (() => {
+            const rolls = [0.1, 0.2, 0.3, 0.4, 0.4, 0.6];
+            return () => rolls.shift() ?? 0.6;
+        })(),
+        now: 3000
+    });
+    assert.equal(defeated.status, "defeated", "Defeat should end the run");
+    assert.equal(defeated.securedLoot.keyShards, 50, "Defeat should preserve half of key shards");
+    assert.equal(defeated.securedLoot.xp, 62, "Defeat should preserve 70% XP rounded down");
+    assert.deepEqual(
+        defeated.defeatLosses.chests.map((chest) => chest.id),
+        ["r1", "u1"],
+        "Defeat should break higher-rarity chests first with chain probability"
+    );
+
+    profile.hunting.keyShards = 50;
+    profile.hunting.chests = [uncommon];
+    assert.equal(getChestOpenCost("uncommon"), 50, "Uncommon chest open cost should match design");
+    const opened = openHuntingChest(profile, "u1");
+    assert.equal(opened.opened, true, "Chest should open when enough key shards are available");
+    assert.equal(profile.hunting.keyShards, 0, "Opening a chest should spend key shards");
+    assert.equal(profile.hunting.chests.length, 0, "Opened chest should leave storage");
+
+    const sanitized = sanitizePlayerProfile({
+        hunting: {
+            keyShards: 12,
+            chests: [
+                { id: "safe", rarity: "rare", acquiredAt: 1000 },
+                { id: "safe", rarity: "common", acquiredAt: 2000 },
+                { id: "", rarity: "legendary", acquiredAt: 3000 }
+            ],
+            stats: { runsStarted: 2, runsRetreated: 1, runsDefeated: 1, deepestFloor: 4 }
+        }
+    });
+    assert.equal(sanitized.hunting.keyShards, 12, "Sanitized profile should keep hunting key shards");
+    assert.equal(sanitized.hunting.chests.length, 1, "Sanitized profile should dedupe and discard invalid chests");
+    assert.equal(sanitized.hunting.stats.deepestFloor, 4, "Sanitized profile should keep hunting stats");
+    console.log("[hunting] ok");
 }
 
 async function testMatchEndGrantsImmediateExperience(app) {
@@ -3053,6 +3172,8 @@ async function testCreateCollectionHubViewModel() {
         lastTournamentAt: 2000
     };
     profile.experience.byCharacter.archer = { currentXp: 135 };
+    profile.hunting.keyShards = 50;
+    profile.hunting.chests = [{ id: "hunt-chest-1", rarity: "uncommon", acquiredAt: 3000 }];
     const vm2 = createCollectionHubViewModel({
         profile,
         roster,
@@ -3066,6 +3187,10 @@ async function testCreateCollectionHubViewModel() {
     assert.equal(archerItem.experienceTotalXp, 135, "Roster item should expose character XP");
     assert.equal(archerItem.experienceLevel, 2, "Roster item should expose character XP level");
     assert.ok(archerItem.experienceProgressPct > 0, "Roster item should expose XP progress");
+    assert.equal(vm2.storage.keyShards, 50, "Collection hub should expose hunting key shards");
+    assert.equal(vm2.storage.chests.length, 1, "Collection hub should expose hunting chests");
+    assert.equal(vm2.storage.chests[0].canOpen, true, "Collection hub should mark openable chests");
+    assert.equal(vm2.summary.storageChestCount, 1, "Collection summary should count storage chests");
 
     // 숙련도 레벨이 있으면 masteryItems에 반영
     profile.characterMastery.levels = { archer: 1, orbit: 2, eater: 3 };
@@ -3104,6 +3229,7 @@ await testDashBallCooldownDash(app);
 await testCollisionImpulsePersists(app);
 await testGrenadeScatterShot(app);
 testExperienceSystem();
+testHuntingSystem();
 await testMatchEndGrantsImmediateExperience(app);
 await testDamageShake(app);
 await testArrowBounceFacing(app);

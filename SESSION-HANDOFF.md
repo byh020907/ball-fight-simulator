@@ -287,12 +287,18 @@
 - 영향: `src/playerProfile.js`, `src/experience/experienceService.js`, `src/experience/index.js`, `src/app.js`, `src/ui.js`, `src/collection/collectionViewModel.js`, `index.html`, `src/styles.css`, `tests/regression.mjs`, `docs/experience-system.md`, `docs/collection-hub-ui.md`
 - 검증: `npm test`, `npm run check`, `npm run format:check` 통과. Playwright E2E에서 PC 결과 XP 패널 `width:60%`, `byCharacter.dash.currentXp=60`, 도감 상세 `60/100 XP`, 모바일 결과 XP 패널 `bodyScrollWidth=viewportWidth=390` 확인
 
+## [L1] 2026-07-04 — 사냥터 MVP 기반 상태/보상/보관함 저장 구조 구현
+- 맥락: 다음 단계가 사냥터 MVP 구현이며, 실제 전투 UI를 붙이기 전에 우승 캐릭터 입장 조건, 층간 HP 누적 상태, 귀환/패배 보상 처리, 상자 파손 연쇄 확률을 순수 함수로 먼저 고정해야 했음
+- 결정: `src/hunting/` 모듈을 추가해 사냥터 설정, 보상, 적 스케일링, 이벤트, 런 상태, 상자 개봉 가능 여부를 분리 구현. `playerProfile.hunting`에 해조각/상자/설계도/통계를 저장하고 sanitize에서 중복 상자 ID를 제거. 컬렉션 허브에는 보관함 탭을 최소 표시해 해조각과 상자 목록/개봉 가능 여부를 확인할 수 있게 함
+- 영향: `src/hunting/*`, `src/playerProfile.js`, `src/collection/collectionViewModel.js`, `src/ui.js`, `index.html`, `src/styles.css`, `tests/regression.mjs`, `docs/hunting-grounds-system.md`, `docs/collection-hub-ui.md`
+- 검증: `npm test` 통과. 입장 조건, 층별 스케일링, 해조각 보상, pending→secured 귀환, 패배 시 상자 파손 순서/50% 해조각/70% XP 보존, 상자 개봉 비용, 프로필 sanitize, 보관함 ViewModel을 회귀 테스트로 확인
+
 ## 진행 중 이슈
 - 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
 - Time Warp 패널티 인상은 재학습 후 반영
 
 ## 다음 할 일
-1. 사냥터 MVP 구현: `docs/hunting-grounds-system.md` 기준, 우승 경험 캐릭터 입장/층간 HP 누적/이벤트 회복/층별 보상/상자 파손 연쇄 확률을 순수 함수부터 작성
+1. 사냥터 MVP 전투 연결: 메인 화면 입장 버튼, 우승 경험 캐릭터 선택 UI, `BattleSimulation` 층별 1v1 런, 승리 후 귀환/전진 선택, 사냥터 XP 지급/중복 방지 연결
 2. 전체 N×N PPO 학습 결과 저장 구조 설계: `{charId, actionId}`별 Actor/Critic/normalizer 저장 단위 결정
 3. PPO 커리큘럼 조정: Eater처럼 계속 지는 조합은 Rage 고정 상대 대신 더 쉬운 상대/랜덤 상대로 승리 terminal reward 샘플 확보
 4. PPO 학습 결과 저장/로드 전략 결정: `@tensorflow/tfjs` 유지 시 커스텀 직렬화, `tfjs-node` 도입 시 `file://` 저장

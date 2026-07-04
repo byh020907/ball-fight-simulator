@@ -1,7 +1,7 @@
 # 사냥터 및 상자 해금 시스템
 
-> 상태: 설계 초안, 팀 기반 전투 리팩터링 일부 반영
-> 기준 코드: 2026-06-28 `main`
+> 상태: 설계 초안 + MVP 기반 순수 함수/프로필 저장 일부 구현
+> 기준 코드: 2026-07-04 `main`
 > 관련 문서: [`experience-system.md`](experience-system.md), [`collection-hub-ui.md`](collection-hub-ui.md), [`meta-progression-system.md`](meta-progression-system.md), [`player-data-storage-security.md`](player-data-storage-security.md), [`game-rules.md`](game-rules.md)
 > 참고 패턴: Hades의 런/메타 재화 분리, Dead Cells의 설계도 발견 후 Cells 해금, Slay the Spire의 상자/이벤트 방, Vampire Survivors의 보스 상자 보상
 
@@ -445,3 +445,27 @@ src/
 - 동시 다수 전투를 언제 MVP에 포함할지 결정해야 합니다.
 - 설계도 보상이 토너먼트에도 영향을 줄지, 사냥터 전용으로 제한할지 결정해야 합니다.
 - 패배 손실률 50%가 너무 가혹하거나 너무 약한지 플레이 테스트로 조정합니다.
+
+## 19. 구현 현황
+
+2026-07-04 기준으로 전투 UI에 사냥터 런을 붙이기 전 단계의 기반 코드가 구현되었습니다.
+
+구현됨:
+
+- `src/hunting/huntingConfig.js`: 최대 5층, 이벤트 확률, 상자 등급/개봉 비용, 파손 가중치, 해조각 범위, 패배 보존율 정의
+- `src/hunting/huntingRewards.js`: 층별 보상 배율, 해조각 보상, 상자 생성, pending/secured loot 병합, 패배 시 상자 연쇄 파손과 50%/70% 보존
+- `src/hunting/huntingEncounters.js`: 층별 적 스케일링, 이벤트 발생/선택
+- `src/hunting/huntingState.js`: 우승 캐릭터 입장 조건, 사냥터 런 생성, 층 클리어, 전진, 이벤트 회복, 귀환, 패배 처리
+- `src/hunting/chestRewards.js`: 보관함 상자 개봉 가능 여부, 개봉 비용, 임시 보상 미리보기, 상자 제거/해조각 차감
+- `src/playerProfile.js`: `hunting.keyShards`, `hunting.chests`, `hunting.blueprints`, `hunting.stats` 저장/정리
+- `src/collection/collectionViewModel.js`, `src/ui.js`, `index.html`: 컬렉션 허브 보관함 탭 데이터와 최소 UI 노출
+- `tests/regression.mjs`: 입장 조건, 스케일링, HP carried state, 귀환, 패배 파손/보존, 상자 개봉, 프로필 sanitize, 보관함 ViewModel 검증
+
+아직 구현 전:
+
+- 메인 화면 사냥터 입장 버튼
+- 우승 경험 캐릭터 선택 UI
+- 실제 `BattleSimulation`을 이어 붙이는 층별 1v1 런
+- 승리 후 자동 흐름을 해치지 않는 귀환/전진 선택 UI
+- 상자 개봉의 실제 보상 테이블과 XP/외형/설계도 지급
+- 사냥터 매치 XP 지급과 `processedReportIds` 중복 방지 연결

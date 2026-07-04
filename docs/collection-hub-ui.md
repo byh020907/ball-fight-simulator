@@ -1,6 +1,6 @@
 # 컬렉션 허브 UI
 
-> 상태: UI 설계, 구현 전
+> 상태: 도감/숙련도/업적 구현, 보관함 최소 표시 구현
 > 관련 문서: [`hunting-grounds-system.md`](hunting-grounds-system.md), [`experience-system.md`](experience-system.md), [`collection-achievements-system.md`](collection-achievements-system.md), [`character-mastery-system.md`](character-mastery-system.md), [`meta-progression-system.md`](meta-progression-system.md), [`design.md`](design.md)
 
 ## 1. 목적
@@ -60,18 +60,19 @@
 ```js
 export const COLLECTION_HUB_TABS = Object.freeze([
     { id: "roster", label: "도감" },
-    { id: "links", label: "연계" },
-    { id: "achievements", label: "업적" }
+    { id: "mastery", label: "숙련도" },
+    { id: "achievements", label: "업적" },
+    { id: "storage", label: "보관함" }
 ]);
 ```
 
 향후 추가 순서:
 
 ```text
-도감 · 연계 · 업적 · 보관함 · 장비 · 기록 · 도전
+도감 · 숙련도 · 업적 · 보관함 · 장비 · 기록 · 도전
 ```
 
-- 존재하지 않는 기능의 빈 탭을 미리 표시하지 않습니다.
+- 존재하지 않는 기능의 빈 탭을 미리 표시하지 않습니다. 단, 보관함은 사냥터 MVP 기반 저장 구조가 들어오면서 해조각/상자 확인용 최소 탭을 먼저 표시합니다.
 - 탭 추가는 템플릿 분기와 탭 정의 등록으로 처리합니다.
 - 특정 탭이 없어도 나머지 탭의 인덱스나 동작이 바뀌지 않도록 ID를 사용합니다.
 - URL 라우팅은 현재 필요하지 않습니다.

@@ -784,6 +784,58 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- 보관함 탭 -->
+                    <div class="ch-content" x-show="collectionHub.activeTab === 'storage'" role="tabpanel">
+                        <div class="ch-toolbar">
+                            <input
+                                class="ch-search"
+                                type="search"
+                                placeholder="상자 등급 검색..."
+                                x-model="collectionHub.searchQueries.storage"
+                            />
+                            <select
+                                class="ch-select"
+                                x-model="collectionHub.filters.storage"
+                                @change="setCollectionFilter($el.value)"
+                            >
+                                <option value="all">전체</option>
+                                <option value="openable">개봉 가능</option>
+                                <option value="common">Common</option>
+                                <option value="uncommon">Uncommon</option>
+                                <option value="rare">Rare</option>
+                            </select>
+                            <span class="ch-storage-currency">
+                                해조각 <b x-text="Number(collectionHub.storage.keyShards || 0).toLocaleString()"></b>
+                            </span>
+                        </div>
+                        <div class="ch-scroll-region">
+                            <div class="ch-list">
+                                <template x-for="item in filteredStorageItems" :key="item.id">
+                                    <div class="ch-ach-card" x-bind:class="'ch-chest--' + item.rarity">
+                                        <div class="ch-ach-info">
+                                            <strong x-text="item.rarity.toUpperCase() + ' 상자'"></strong>
+                                            <span class="ch-ach-desc" x-text="item.rewardText"></span>
+                                            <span
+                                                class="ch-ach-reward"
+                                                x-text="'개봉 비용: 해조각 ' + item.openCost"
+                                            ></span>
+                                        </div>
+                                        <div class="ch-ach-status">
+                                            <span
+                                                class="ch-ach-tier-label"
+                                                x-bind:class="{ unlocked: item.canOpen }"
+                                                x-text="item.canOpen ? '개봉 가능' : '잠김'"
+                                            ></span>
+                                        </div>
+                                    </div>
+                                </template>
+                                <div class="ch-empty" x-show="filteredStorageItems.length === 0">
+                                    보관 중인 상자가 없습니다
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 

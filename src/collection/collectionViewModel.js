@@ -6,12 +6,14 @@
 
 import { formatRewardDescription } from "../progression/progressionState.js";
 import { getCharacterExperienceSummary } from "../experience/experienceService.js";
+import { canOpenHuntingChest, previewHuntingChest } from "../hunting/index.js";
 
 export const MASTERY_THRESHOLDS = Object.freeze([1, 5, 15]);
 export const COLLECTION_HUB_TABS = Object.freeze([
     { id: "roster", label: "도감" },
     { id: "mastery", label: "숙련도" },
-    { id: "achievements", label: "업적" }
+    { id: "achievements", label: "업적" },
+    { id: "storage", label: "보관함" }
 ]);
 
 /** 숙련도 계산 */
@@ -51,6 +53,7 @@ export function createCollectionHubViewModel({
     const masteryLevels = profile?.characterMastery?.levels ?? {};
     const characters = profile?.collection?.characters ?? {};
     const careerStats = profile?.collection?.careerStats ?? {};
+    const hunting = profile?.hunting ?? {};
 
     // 도감 항목
     const rosterItems = roster.map((fighter) => {
@@ -138,6 +141,18 @@ export function createCollectionHubViewModel({
         };
     });
 
+    const storageItems = (hunting.chests ?? []).map((chest) => {
+        const preview = previewHuntingChest(chest);
+        return {
+            id: chest.id,
+            rarity: preview.rarity,
+            acquiredAt: chest.acquiredAt ?? null,
+            openCost: preview.cost,
+            rewardText: preview.rewardText,
+            canOpen: canOpenHuntingChest(profile, chest)
+        };
+    });
+
     // 요약
     const playedCharacters = rosterItems.filter((item) => item.hasRecord).length;
     const cumulativeLevels = rosterItems.reduce((sum, item) => sum + item.masteryLevel, 0);
@@ -160,7 +175,19 @@ export function createCollectionHubViewModel({
             totalMastery: masteryDefinitions.length,
             unlockedAchievements,
             totalAchievements: achievementDefinitions.length,
-            masteryTotal
+            masteryTotal,
+            keyShards: hunting.keyShards ?? 0,
+            storageChestCount: storageItems.length
+        },
+        storage: {
+            keyShards: hunting.keyShards ?? 0,
+            chests: storageItems,
+            stats: {
+                runsStarted: hunting.stats?.runsStarted ?? 0,
+                runsRetreated: hunting.stats?.runsRetreated ?? 0,
+                runsDefeated: hunting.stats?.runsDefeated ?? 0,
+                deepestFloor: hunting.stats?.deepestFloor ?? 0
+            }
         }
     };
 }
