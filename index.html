@@ -78,13 +78,7 @@
                         <canvas class="arena" id="arenaCanvas" width="960" height="960"></canvas>
 
                         <!-- 토스트 알림 -->
-                        <div
-                            class="toast"
-                            x-show="toastVisible"
-                            x-transition:enter="toast-enter"
-                            x-transition:leave="toast-leave"
-                            x-text="toastMessage"
-                        ></div>
+                        <toast-notification></toast-notification>
 
                         <div
                             class="overlay"
@@ -103,6 +97,19 @@
                                 <strong x-text="overlayText">START THE FIGHT</strong>
                                 <p x-show="overlaySubtext" x-text="overlaySubtext"></p>
                                 <xp-reward-panel class="xp-reward"></xp-reward-panel>
+                                <div class="hunting-choice" x-show="huntingChoiceVisible">
+                                    <div class="hunting-choice-info">
+                                        <span x-text="huntingLootSummary"></span>
+                                    </div>
+                                    <div class="hunting-choice-buttons">
+                                        <button class="hunting-btn retreat" type="button" @click="huntingRetreat()">
+                                            ← 귀환
+                                        </button>
+                                        <button class="hunting-btn advance" type="button" @click="huntingAdvance()">
+                                            전진 →
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -116,6 +123,15 @@
                             @click="$dispatch('start-tournament')"
                         >
                             싸움 시작
+                        </button>
+
+                        <button
+                            class="control-button hunting-btn"
+                            type="button"
+                            x-show="!locked && !tournamentActive && !huntingActive"
+                            @click="openHuntingLobby()"
+                        >
+                            ⚔ 사냥터
                         </button>
                     </section>
 
@@ -405,409 +421,17 @@
                 </aside>
             </section>
 
-            <!-- Patch notes popup -->
-            <div class="patch-overlay" x-show="patchNotesVisible" x-transition.opacity.duration.200ms>
-                <div class="patch-card" @click.outside="closePatchNotes()">
-                    <div class="patch-card-scroll">
-                        <template x-for="(entry, eIdx) in patchEntries" :key="entry.version">
-                            <div>
-                                <strong class="patch-title" x-text="entry.title"></strong>
-                                <span class="patch-date" x-text="entry.date"></span>
-                                <ul class="patch-list">
-                                    <template x-for="item in entry.changes" :key="item.text">
-                                        <li>
-                                            <span
-                                                class="patch-badge"
-                                                x-bind:class="'patch-badge--' + item.type"
-                                                x-text="item.type"
-                                            ></span>
-                                            <span x-text="item.text"></span>
-                                        </li>
-                                    </template>
-                                </ul>
-                                <hr class="patch-divider" x-show="eIdx < patchEntries.length - 1" />
-                            </div>
-                        </template>
-                    </div>
-                    <button class="patch-dismiss" type="button" @click="closePatchNotes()">확인</button>
-                </div>
-            </div>
+            <!-- Patch notes (component) -->
+            <patch-notes></patch-notes>
 
             <!-- Alpine-driven popup (component) -->
             <popup-dialog></popup-dialog>
 
-            <!-- 컬렉션 허브 (전용 Alpine 템플릿, PopupService 미사용) -->
-            <div
-                class="ch-overlay"
-                x-show="collectionHub.visible"
-                x-transition.opacity.duration.200ms
-                role="dialog"
-                aria-modal="true"
-                aria-label="컬렉션"
-                @keydown.escape="closeCollectionHub()"
-                @keydown.left.prevent="setCollectionTab(collectionHub.tabs[Math.max(0, collectionHub.tabs.findIndex(t => t.id === collectionHub.activeTab) - 1)]?.id)"
-                @keydown.right.prevent="setCollectionTab(collectionHub.tabs[Math.min(collectionHub.tabs.length - 1, collectionHub.tabs.findIndex(t => t.id === collectionHub.activeTab) + 1)]?.id)"
-                tabindex="-1"
-            >
-                <div class="ch-frame" @click.outside="closeCollectionHub()">
-                    <!-- 헤더 -->
-                    <div class="ch-header">
-                        <strong class="ch-title">컬렉션</strong>
-                        <span class="ch-summary">
-                            <span
-                                >숙련도
-                                <b
-                                    x-text="collectionHub.summary.cumulativeLevels + '/' + collectionHub.summary.maxLevels"
-                                ></b
-                            ></span>
-                            <span>·</span>
-                            <span
-                                >업적
-                                <b
-                                    x-text="collectionHub.summary.unlockedAchievements + '/' + collectionHub.summary.totalAchievements"
-                                ></b
-                            ></span>
-                            <span>·</span>
-                            <span>숙련도 합계 <b x-text="collectionHub.summary.masteryTotal"></b></span>
-                        </span>
-                        <button class="ch-close" type="button" aria-label="닫기" @click="closeCollectionHub()">
-                            ✕
-                        </button>
-                    </div>
+            <!-- Collection hub (component) -->
+            <collection-hub></collection-hub>
 
-                    <!-- 탭 바 -->
-                    <div class="ch-tabs" role="tablist">
-                        <template x-for="tab in collectionHub.tabs" :key="tab.id">
-                            <button
-                                class="ch-tab"
-                                type="button"
-                                role="tab"
-                                x-bind:aria-selected="collectionHub.activeTab === tab.id"
-                                x-bind:class="{ active: collectionHub.activeTab === tab.id }"
-                                x-text="tab.label"
-                                @click="setCollectionTab(tab.id)"
-                            ></button>
-                        </template>
-                    </div>
-
-                    <!-- 도감 탭 -->
-                    <div class="ch-content" x-show="collectionHub.activeTab === 'roster'" role="tabpanel">
-                        <div class="ch-toolbar">
-                            <input
-                                class="ch-search"
-                                type="search"
-                                placeholder="캐릭터 검색..."
-                                x-model="collectionHub.searchQueries.roster"
-                            />
-                            <select
-                                class="ch-select"
-                                x-model="collectionHub.filters.roster"
-                                @change="setCollectionFilter($el.value)"
-                            >
-                                <option value="all">전체</option>
-                                <option value="unplayed">미기록</option>
-                                <option value="played">플레이</option>
-                                <option value="won">우승</option>
-                                <option value="master">마스터</option>
-                            </select>
-                            <select class="ch-select" x-model="collectionHub.sortModes.roster">
-                                <option value="roster">로스터 순</option>
-                                <option value="wins">우승 많은 순</option>
-                                <option value="recent">최근 플레이</option>
-                            </select>
-                        </div>
-                        <div class="ch-scroll-region">
-                            <div class="ch-grid">
-                                <template x-for="item in filteredRosterItems" :key="item.id">
-                                    <div
-                                        class="ch-card"
-                                        x-bind:class="{ selected: collectionHub.selectedCharacterId === item.id }"
-                                        @click="selectCollectionCharacter(item.id)"
-                                    >
-                                        <div
-                                            class="ch-card-head"
-                                            x-bind:style="'background:' + item.color"
-                                            x-bind:class="{ unplayed: !item.hasRecord }"
-                                        >
-                                            <span class="ch-card-icon" x-text="item.name.charAt(0)"></span>
-                                            <div class="ch-card-head-text">
-                                                <span class="ch-card-name" x-text="item.name"></span>
-                                                <span
-                                                    class="ch-card-mastery"
-                                                    x-text="['-','☆','☆☆','☆☆☆'][item.masteryLevel]"
-                                                ></span>
-                                            </div>
-                                        </div>
-                                        <div class="ch-card-body" x-bind:class="{ unplayed: !item.hasRecord }">
-                                            <span x-show="!item.hasRecord" class="ch-empty-badge">미기록</span>
-                                            <span x-show="item.hasRecord"
-                                                >우승 <b x-text="item.tournamentWins"></b>회</span
-                                            >
-                                            <span
-                                                class="ch-xp-chip"
-                                                x-text="item.experienceLevelLabel + ' · ' + Number(item.experienceTotalXp || 0).toLocaleString() + 'XP'"
-                                            ></span>
-                                            <span x-show="item.bestPlacement"
-                                                >최고 <b x-text="item.bestPlacement + '위'"></b
-                                            ></span>
-                                            <span x-show="item.masteryUnlocked" class="ch-mast-badge">숙련도 ✓</span>
-                                            <span x-show="item.isCurrent" class="ch-current-badge">현재</span>
-                                        </div>
-                                    </div>
-                                </template>
-                                <div class="ch-empty" x-show="filteredRosterItems.length === 0">
-                                    검색 결과가 없습니다
-                                </div>
-                            </div>
-                        </div>
-                        <!-- 캐릭터 상세 -->
-                        <div class="ch-detail" x-show="collectionHub.selectedCharacterId">
-                            <template x-for="item in filteredRosterItems" :key="item.id">
-                                <div x-show="item.id === collectionHub.selectedCharacterId">
-                                    <div class="ch-detail-close">
-                                        <button type="button" @click="closeCollectionCharacterDetail()">
-                                            ← 목록으로
-                                        </button>
-                                    </div>
-                                    <div class="ch-detail-body">
-                                        <div class="ch-detail-xp">
-                                            <div class="ch-detail-xp-head">
-                                                <strong x-text="item.experienceLevelLabel"></strong>
-                                                <span
-                                                    x-text="Number(item.experienceTotalXp || 0).toLocaleString() + ' XP'"
-                                                ></span>
-                                            </div>
-                                            <div class="ch-detail-xp-bar" aria-hidden="true">
-                                                <div
-                                                    class="ch-detail-xp-fill"
-                                                    x-bind:style="'width:' + item.experienceProgressPct + '%; background:' + item.color"
-                                                ></div>
-                                            </div>
-                                            <div class="ch-detail-xp-foot">
-                                                <span x-text="item.experienceProgressText"></span>
-                                                <span x-text="item.experienceNextText"></span>
-                                            </div>
-                                            <div
-                                                class="ch-detail-xp-reward"
-                                                x-text="'다음 보상 · ' + item.experienceNextRewardText"
-                                            ></div>
-                                        </div>
-                                        <span>토너먼트 완료 <b x-text="item.tournamentsCompleted"></b></span>
-                                        <span>토너먼트 우승 <b x-text="item.tournamentWins"></b></span>
-                                        <span>매치 승리 <b x-text="item.matchWins"></b></span>
-                                        <span x-show="item.bestPlacement"
-                                            >최고 등수 <b x-text="item.bestPlacement + '위'"></b
-                                        ></span>
-                                        <span
-                                            >누적 피해
-                                            <b x-text="Number(item.totalDamageDealt || 0).toLocaleString()"></b
-                                        ></span>
-                                        <span x-show="item.comebackMatchWins"
-                                            >역전승 <b x-text="item.comebackMatchWins"></b
-                                        ></span>
-                                        <span>
-                                            숙련도
-                                            <b x-text="['미해금','BRONZE','SILVER','GOLD'][item.masteryLevel]"></b>
-                                            <span x-show="item.masteryLevel === 0">· 이 캐릭터로 우승</span>
-                                            <span x-show="item.masteryLevel === 1">· 다음: SILVER (난도 1)</span>
-                                            <span x-show="item.masteryLevel === 2">· 다음: GOLD (난도 2)</span>
-                                            <span x-show="item.masteryLevel === 3">· MAX</span>
-                                        </span>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-
-                    <!-- 숙련도 탭 -->
-                    <div class="ch-content" x-show="collectionHub.activeTab === 'mastery'" role="tabpanel">
-                        <div class="ch-toolbar">
-                            <select
-                                class="ch-select"
-                                x-model="collectionHub.filters.mastery"
-                                @change="setCollectionFilter($el.value)"
-                            >
-                                <option value="all">전체</option>
-                                <option value="unlocked">해금</option>
-                                <option value="locked">미해금</option>
-                                <option value="active">현재 적용</option>
-                            </select>
-                        </div>
-                        <div class="ch-scroll-region">
-                            <div class="ch-list">
-                                <template x-for="item in filteredMasteryItems" :key="item.id">
-                                    <div
-                                        class="ch-mast-card"
-                                        x-bind:class="{ unlocked: item.unlocked, active: item.active }"
-                                    >
-                                        <div class="ch-mast-source" x-text="item.sourceName"></div>
-                                        <div class="ch-mast-info">
-                                            <strong x-text="item.name"></strong>
-                                            <span
-                                                class="ch-mast-tier"
-                                                x-text="['미해금','BRONZE','SILVER','GOLD'][item.level]"
-                                            ></span>
-                                            <span
-                                                class="ch-mast-desc"
-                                                x-text="item.level > 0 ? item.description.replace('{value}', item.formatValue(item.tierValues[item.level])) : (item.description.replace('{value}', item.formatValue(item.tierValues[1])) + ' · 미해금')"
-                                            ></span>
-                                            <span class="ch-mast-next" x-show="item.level === 0"
-                                                >해금 조건: <span x-text="item.unlockCondition"></span
-                                            ></span>
-                                            <span class="ch-mast-next" x-show="item.level === 1"
-                                                >다음: SILVER (난도 1 우승)</span
-                                            >
-                                            <span class="ch-mast-next" x-show="item.level === 2"
-                                                >다음: GOLD (난도 2 우승)</span
-                                            >
-                                            <span class="ch-mast-next" x-show="item.level === 3">최대 등급</span>
-                                        </div>
-                                        <div class="ch-mast-status">
-                                            <span x-show="item.unlocked && item.active" class="ch-mast-badge"
-                                                >적용 중</span
-                                            >
-                                            <span
-                                                x-show="item.unlocked && item.isSelf"
-                                                class="ch-mast-badge ch-mast-badge--self"
-                                                >보유 · 현재 캐릭터에는 미적용</span
-                                            >
-                                            <span x-show="!item.unlocked" class="ch-mast-badge ch-mast-badge--locked"
-                                                >미해금</span
-                                            >
-                                        </div>
-                                    </div>
-                                </template>
-                                <div class="ch-empty" x-show="filteredMasteryItems.length === 0">
-                                    <span x-show="collectionHub.filters.mastery === 'unlocked'"
-                                        >해금한 숙련도 효과가 없습니다</span
-                                    >
-                                    <span x-show="collectionHub.filters.mastery !== 'unlocked'"
-                                        >숙련도 효과가 없습니다</span
-                                    >
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 업적 탭 -->
-                    <div class="ch-content" x-show="collectionHub.activeTab === 'achievements'" role="tabpanel">
-                        <div class="ch-toolbar">
-                            <select
-                                class="ch-select"
-                                x-model="collectionHub.filters.achievements"
-                                @change="setCollectionFilter($el.value)"
-                            >
-                                <option value="all">전체</option>
-                                <option value="unlocked">달성</option>
-                                <option value="locked">미달성</option>
-                            </select>
-                        </div>
-                        <div class="ch-scroll-region">
-                            <div class="ch-list">
-                                <template x-for="item in filteredAchievementItems" :key="item.id">
-                                    <div
-                                        class="ch-ach-card"
-                                        x-bind:class="'ch-ach-tier--' + item.tier + (item.unlocked ? ' unlocked' : '')"
-                                    >
-                                        <div class="ch-ach-info">
-                                            <strong x-text="item.name"></strong>
-                                            <span class="ch-ach-desc" x-text="item.description"></span>
-                                            <span
-                                                class="ch-ach-reward"
-                                                x-show="item.rewardText"
-                                                x-text="'보상: ' + item.rewardText"
-                                            ></span>
-                                        </div>
-                                        <div class="ch-ach-status">
-                                            <span
-                                                class="ch-ach-tier-label"
-                                                x-text="item.tier"
-                                                x-bind:class="'ch-tier--' + item.tier"
-                                            ></span>
-                                        </div>
-                                    </div>
-                                </template>
-                                <div class="ch-empty" x-show="filteredAchievementItems.length === 0">
-                                    등록된 업적이 없습니다
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 보관함 탭 -->
-                    <div class="ch-content" x-show="collectionHub.activeTab === 'storage'" role="tabpanel">
-                        <div class="ch-toolbar">
-                            <input
-                                class="ch-search"
-                                type="search"
-                                placeholder="상자 등급 검색..."
-                                x-model="collectionHub.searchQueries.storage"
-                            />
-                            <select
-                                class="ch-select"
-                                x-model="collectionHub.filters.storage"
-                                @change="setCollectionFilter($el.value)"
-                            >
-                                <option value="all">전체</option>
-                                <option value="openable">개봉 가능</option>
-                                <option value="common">Common</option>
-                                <option value="uncommon">Uncommon</option>
-                                <option value="rare">Rare</option>
-                            </select>
-                            <span class="ch-storage-currency">
-                                해조각 <b x-text="Number(collectionHub.storage.keyShards || 0).toLocaleString()"></b>
-                            </span>
-                        </div>
-                        <div class="ch-scroll-region">
-                            <div class="ch-list">
-                                <template x-for="item in filteredStorageItems" :key="item.id">
-                                    <div class="ch-ach-card" x-bind:class="'ch-chest--' + item.rarity">
-                                        <div class="ch-ach-info">
-                                            <strong x-text="item.rarity.toUpperCase() + ' 상자'"></strong>
-                                            <span class="ch-ach-desc" x-text="item.rewardText"></span>
-                                            <span
-                                                class="ch-ach-reward"
-                                                x-text="'개봉 비용: 해조각 ' + item.openCost"
-                                            ></span>
-                                        </div>
-                                        <div class="ch-ach-status">
-                                            <span
-                                                class="ch-ach-tier-label"
-                                                x-bind:class="{ unlocked: item.canOpen }"
-                                                x-text="item.canOpen ? '개봉 가능' : '잠김'"
-                                            ></span>
-                                        </div>
-                                    </div>
-                                </template>
-                                <div class="ch-empty" x-show="filteredStorageItems.length === 0">
-                                    보관 중인 상자가 없습니다
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Action picker (Alpine template, no x-html) — disableClose: 반드시 선택해야 함 -->
-            <div class="bf-popup-overlay" x-show="actionPickerVisible" x-transition.opacity.duration.200ms>
-                <div class="bf-popup-card">
-                    <div class="bf-popup-scroll">
-                        <strong class="bf-popup-title">매치 액션 선택</strong>
-                        <p style="text-align: center; font-size: 0.85rem; color: #555; margin: 0 0 10px">
-                            전투 중 클릭하여 발동하세요
-                        </p>
-                        <div class="action-cards">
-                            <template x-for="(card, index) in actionPickerCards" :key="card.id">
-                                <button class="action-card" type="button" @click="pickAction(index)">
-                                    <strong x-text="card.name"></strong>
-                                    <span x-text="card.description"></span>
-                                    <small x-text="'HP ' + card.hpCost + '% 소모'"></small>
-                                </button>
-                            </template>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <!-- Action picker (component) -->
+            <action-picker></action-picker>
         </main>
 
         <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
@@ -821,6 +445,7 @@
             const { registerAlpineComponentSystem } = await import(`./src/alpineTemplateComponents.js?v=${V}`);
             const { appStore } = await import(`./src/ui.js?v=${V}`);
 
+            window.Alpine = Alpine;
             await loadTemplates();
             Alpine.store("xpReward", {
                 visible: false,
@@ -835,7 +460,6 @@
             });
             registerAlpineComponentSystem(Alpine);
             Alpine.data("appStore", appStore);
-            window.Alpine = Alpine;
 
             Alpine.start();
             await Promise.resolve();
@@ -843,10 +467,21 @@
 
             const { PopupService } = await import(`./src/popup.js?v=${V}`);
             window.PopupService = PopupService;
+            const { ActionPickerService } = await import(`./src/actionPicker.js?v=${V}`);
+            window.ActionPickerService = ActionPickerService;
+            const { PatchNotesService } = await import(`./src/patchNotesService.js?v=${V}`);
+            window.PatchNotesService = PatchNotesService;
+            const { CollectionHubService } = await import(`./src/collectionHubService.js?v=${V}`);
+            window.CollectionHubService = CollectionHubService;
             const { HELP_TITLE, HELP_CONTENT } = await import(`./src/helpContent.js?v=${V}`);
             document.addEventListener("open-help", () =>
                 PopupService.show({ title: HELP_TITLE, bodyHtml: HELP_CONTENT })
             );
+
+            const { getUnseenEntries } = await import(`./src/utils.js?v=${V}`);
+            const unseenEntries = getUnseenEntries();
+            if (unseenEntries.length > 0) PatchNotesService.show(unseenEntries);
+
             document.getElementById("app-loading")?.remove();
         </script>
     </body>

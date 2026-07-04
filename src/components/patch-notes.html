@@ -1,0 +1,175 @@
+<div
+    x-data="patchNotes"
+    class="patch-overlay"
+    x-show="state.visible"
+    x-transition.opacity.duration.200ms
+>
+    <div class="patch-card" @click.outside="dismissNotes()">
+        <div class="patch-card-scroll">
+            <template x-for="(entry, eIdx) in state.entries" :key="entry.version">
+                <div>
+                    <strong class="patch-title" x-text="entry.title"></strong>
+                    <span class="patch-date" x-text="entry.date"></span>
+                    <ul class="patch-list">
+                        <template x-for="item in entry.changes" :key="item.text">
+                            <li>
+                                <span
+                                    class="patch-badge"
+                                    x-bind:class="'patch-badge--' + item.type"
+                                    x-text="item.type"
+                                ></span>
+                                <span x-text="item.text"></span>
+                            </li>
+                        </template>
+                    </ul>
+                    <hr class="patch-divider" x-show="eIdx < state.entries.length - 1" />
+                </div>
+            </template>
+        </div>
+        <button class="patch-dismiss" type="button" @click="dismissNotes()">확인</button>
+    </div>
+</div>
+
+<script>
+    Alpine.data("patchNotes", () => {
+        const state = Alpine.reactive({
+            visible: false,
+            entries: []
+        });
+
+        function dismissNotes() {
+            if (window.PatchNotesService) window.PatchNotesService.dismiss();
+        }
+
+        return {
+            state,
+            init() {
+                this.$watch("$store.patchNotes", (val) => {
+                    if (!val || !val.visible) {
+                        state.visible = false;
+                        return;
+                    }
+                    state.entries = val.entries ?? [];
+                    state.visible = true;
+                }, { immediate: true });
+            },
+            dismissNotes
+        };
+    });
+</script>
+
+<style scoped>
+:scope {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(2px);
+}
+
+.patch-card {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 32px 36px 24px;
+    max-width: 460px;
+    width: 90vw;
+    max-height: 80vh;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.25);
+    color: #222222;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+}
+
+.patch-card-scroll {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.patch-title {
+    display: block;
+    font-size: 1.35rem;
+    font-weight: 900;
+    margin-bottom: 4px;
+}
+
+.patch-date {
+    display: block;
+    font-size: 0.75rem;
+    color: #888888;
+    margin-bottom: 20px;
+}
+
+.patch-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 24px;
+    text-align: left;
+}
+
+.patch-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 0.85rem;
+    line-height: 1.45;
+    padding: 6px 0;
+}
+
+.patch-badge {
+    flex-shrink: 0;
+    display: inline-block;
+    min-width: 52px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #ffffff;
+}
+
+.patch-badge--feature {
+    background: #28a447;
+}
+
+.patch-badge--refactor {
+    background: #4a7fc1;
+}
+
+.patch-badge--fix {
+    background: #d97706;
+}
+
+.patch-badge--style {
+    background: #7c3aed;
+}
+
+.patch-dismiss {
+    display: inline-block;
+    margin-top: 16px;
+    padding: 10px 40px;
+    border: none;
+    border-radius: 8px;
+    background: #222222;
+    color: #ffffff;
+    font: 700 0.9rem "Bahnschrift", "Segoe UI", sans-serif;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+
+.patch-dismiss:hover {
+    opacity: 0.8;
+}
+
+.patch-divider {
+    border: none;
+    border-top: 1px solid #e0e0e0;
+    margin: 20px 0;
+}
+</style>

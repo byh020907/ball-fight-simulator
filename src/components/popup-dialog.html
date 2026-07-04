@@ -1,17 +1,17 @@
 <div
     x-data="popupDialog"
     class="bf-popup-overlay"
-    x-show="visible"
+    x-show="state.visible"
     x-transition.opacity.duration.200ms
-    @click.self="closeOnOutside === false || closePopup('close')"
+    @click.self="state.closeOnOutside === false || closePopup('close')"
 >
     <div class="bf-popup-card">
         <div class="bf-popup-scroll">
-            <strong class="bf-popup-title" x-text="title"></strong>
-            <div class="bf-popup-body" x-html="bodyHtml"></div>
+            <strong class="bf-popup-title" x-text="state.title"></strong>
+            <div class="bf-popup-body" x-html="state.bodyHtml"></div>
         </div>
-        <div class="bf-popup-footer" x-show="buttons.length">
-            <template x-for="btn in buttons" :key="btn.value">
+        <div class="bf-popup-footer" x-show="state.buttons.length">
+            <template x-for="btn in state.buttons" :key="btn.value">
                 <button
                     type="button"
                     class="bf-popup-btn"
@@ -25,35 +25,41 @@
 </div>
 
 <script>
-    Alpine.data("popupDialog", () => ({
-        visible: false,
-        title: "",
-        bodyHtml: "",
-        buttons: [],
-        closeOnOutside: true,
+    Alpine.data("popupDialog", () => {
+        const state = Alpine.reactive({
+            visible: false,
+            title: "",
+            bodyHtml: "",
+            buttons: [],
+            closeOnOutside: true
+        });
 
-        init() {
-            this.$watch("$store.popupDialog", (val) => {
-                if (!val) {
-                    this.visible = false;
-                    return;
-                }
-                this.title = val.title ?? "";
-                this.bodyHtml = val.bodyHtml ?? "";
-                this.buttons = val.buttons ?? [];
-                this.closeOnOutside = val.closeOnOutside !== false;
-                this.visible = val.visible ?? false;
-            }, { immediate: true });
-        },
-
-        closePopup(value) {
-            this.visible = false;
+        function closePopup(value) {
+            state.visible = false;
             setTimeout(() => {
-                Alpine.store("popupDialog", null);
+                Alpine.store("popupDialog", { visible: false });
                 if (window.PopupService) window.PopupService.resolve(value ?? "close");
             }, 250);
         }
-    }));
+
+        return {
+            state,
+            init() {
+                this.$watch("$store.popupDialog", (val) => {
+                    if (!val) {
+                        state.visible = false;
+                        return;
+                    }
+                    state.title = val.title ?? "";
+                    state.bodyHtml = val.bodyHtml ?? "";
+                    state.buttons = val.buttons ?? [];
+                    state.closeOnOutside = val.closeOnOutside !== false;
+                    state.visible = val.visible ?? false;
+                }, { immediate: true });
+            },
+            closePopup
+        };
+    });
 </script>
 
 <style scoped>

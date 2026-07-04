@@ -18,6 +18,8 @@ import { STAT_BALANCER_CONFIG as _STAT_BALANCER_CONFIG } from "./statAllocation.
 function requireStatAllocation() {
     return { STAT_BALANCER_CONFIG: _STAT_BALANCER_CONFIG };
 }
+import { ActionPickerService } from "./actionPicker.js";
+import { CollectionHubService } from "./collectionHubService.js";
 import { pickRandomActions, findActionById, showActionFailure } from "./clickActions.js";
 import { BattleBall, mergeHeroOrbCarryover, applyHeroOrbCarryoverToBattleBall } from "./entities/index.js";
 import {
@@ -55,6 +57,7 @@ import {
     completeChallengeTournament,
     formatBonusSummary
 } from "./progression/progressionState.js";
+import { HuntingManager } from "./hunting/huntingManager.js";
 import { FIGHTER_IDS, Vector2 } from "./core.js";
 import {
     ArcherAbility,
@@ -111,6 +114,9 @@ export class BattleApp {
         this._matchReports = [];
         this._currentTournamentReport = null;
         this._pickPending = false;
+        this._onSimulationResult = null;
+        this._huntingDone = false;
+        this.hunting = new HuntingManager(this);
         this.renderer = new ArenaRenderer(this.elements.canvas);
         this.ui = new UIController(this.roster);
         this.ui.renderTournament();
@@ -167,7 +173,7 @@ export class BattleApp {
             achievementDefinitions: ACHIEVEMENT_DEFINITIONS,
             currentPlayerFighterId: this.playerFighterId
         });
-        this.ui.renderCollectionHub(vm);
+        CollectionHubService.render(vm);
     }
 
     /** 스탯 배분 UI용 MAX_POINTS_PER_STAT 업데이트 및 유효 총 포인트 계산 */
@@ -311,6 +317,12 @@ export class BattleApp {
     }
 
     async startTournament() {
+        if (this._huntingDone) {
+            this._huntingDone = false;
+            this.ui.hideOverlay();
+            this.refreshPlayerSetup();
+            return;
+        }
         // MAX_POINTS_PER_STAT 초기화 (이전 토너먼트에서 변경된 값 복원)
         updateEffectiveStatCap(0, 0);
 
@@ -444,10 +456,13 @@ export class BattleApp {
     async _resolveAction(playerBall) {
         if (!playerBall) return null;
 
+        // 사냥터에서는 액션 선택 스킵
+        if (this._action.skipPick) return null;
+
         // 첫 선택이거나 매판 선택 모드면 카드 띄움
         if (!this._action.selectedId || this._action.pickEveryMatch) {
             const cards = pickRandomActions(3);
-            const pickedId = await this.ui.waitForActionPick(cards);
+            const pickedId = await ActionPickerService.show(cards);
             this._action.selectedId = pickedId;
         }
 
@@ -468,6 +483,7 @@ export class BattleApp {
         this.resultSequenceAnnounced = false;
         this.matchFinalized = false;
         this._lastMatchXpResult = null;
+        this._action.skipPick = options.skipActionPick ?? false;
         if (!options.keepLog) {
             this.ui.resetLog();
         }
@@ -790,6 +806,10 @@ export class BattleApp {
             }
 
             if (this.simulation.resultReady) {
+                if (this._onSimulationResult) {
+                    this._onSimulationResult(this);
+                    return;
+                }
                 this.finishMatch();
                 return;
             }

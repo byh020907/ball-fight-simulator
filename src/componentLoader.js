@@ -36,6 +36,86 @@ function addScopeToRoot(html, scopeAttr) {
     return doc.body.innerHTML;
 }
 
+function rewriteScopedCss(css, scopeAttr) {
+    const scopeSel = `[${scopeAttr}]`;
+    let result = "";
+    let i = 0;
+
+    while (i < css.length) {
+        if (/\s/.test(css[i])) {
+            result += css[i];
+            i++;
+            continue;
+        }
+
+        // comment
+        if (css[i] === "/" && css[i + 1] === "*") {
+            const end = css.indexOf("*/", i + 2);
+            result += css.slice(i, end + 2);
+            i = end + 2;
+            continue;
+        }
+
+        // @-rule
+        if (css[i] === "@") {
+            const br = css.indexOf("{", i);
+            if (br === -1) {
+                result += css.slice(i);
+                break;
+            }
+            result += css.slice(i, br + 1);
+            i = br + 1;
+            let depth = 1;
+            const blkStart = i;
+            while (depth > 0 && i < css.length) {
+                if (css[i] === "{") depth++;
+                else if (css[i] === "}") depth--;
+                i++;
+            }
+            const inner = css.slice(blkStart, i - 1);
+            const rName = css.slice(css.lastIndexOf("@", br), br).trim().split(/\s/)[0];
+            if (["@media", "@supports", "@container", "@scope"].includes(rName)) {
+                result += rewriteScopedCss(inner, scopeAttr);
+            } else {
+                result += inner;
+            }
+            result += "}";
+            continue;
+        }
+
+        // regular rule
+        const br = css.indexOf("{", i);
+        if (br === -1) {
+            result += css.slice(i);
+            break;
+        }
+        const selRaw = css.slice(i, br);
+        i = br + 1;
+        let depth = 1;
+        const blkStart = i;
+        while (depth > 0 && i < css.length) {
+            if (css[i] === "{") depth++;
+            else if (css[i] === "}") depth--;
+            i++;
+        }
+        const block = css.slice(blkStart, i - 1);
+
+        const parts = selRaw
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+        const scoped = parts.map((s) => {
+            if (s.includes(scopeSel)) return s;
+            if (/^:scope\b/.test(s)) return s.replace(/^:scope\b/, scopeSel);
+            return scopeSel + " " + s;
+        });
+
+        result += scoped.join(", ") + " {" + block + "}";
+    }
+
+    return result;
+}
+
 function injectStyle(css) {
     const el = document.createElement("style");
     el.textContent = css;
@@ -79,7 +159,7 @@ async function loadSingle(name) {
     }
 
     for (const s of scoped) {
-        injectStyle(`@scope ([${scopeAttr}]) {\n${s.css}\n}`);
+        injectStyle(rewriteScopedCss(s.css, scopeAttr));
     }
 
     for (const raw of scripts) {

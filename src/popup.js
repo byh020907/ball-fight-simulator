@@ -44,4 +44,14 @@ export class PopupService {
             r(value);
         }
     }
+
+    /** 외부에서 팝업을 강제로 닫습니다 */
+    static close() {
+        Alpine.store("popupDialog", { visible: false });
+        if (_resolve) {
+            const r = _resolve;
+            _resolve = null;
+            r("close");
+        }
+    }
 }

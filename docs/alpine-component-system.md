@@ -40,26 +40,37 @@ src/
     <button @click="doSomething">Click</button>
 </div>
 
-<!-- 2. Script: 컴포넌트 로직 -->
+<!-- 2. Script: 컴포넌트 로직 (Vue 3 Composition API 스타일) -->
 <script>
-    Alpine.data("myComponent", () => ({
-        label: "",
-        visible: false,
+    Alpine.data("myComponent", () => {
+        // state: 템플릿이 참조하는 반응형 데이터만 그룹화 (Alpine.reactive()로 반응성 보장)
+        const state = Alpine.reactive({
+            label: "",
+            visible: false
+        });
 
-        init() {
-            // $store 구독 → 로컬 상태로 복사
-            this.$watch("$store.myData", (val) => {
-                if (!val) return;
-                this.label = val.label ?? "";
-                this.visible = val.visible ?? false;
-            }, { immediate: true });
-        },
-
-        doSomething() {
+        // private: 템플릿과 무관한 내부 변수/함수는 클로저에 숨김
+        function privateHelper() {
             // ...
         }
-    }));
+
+        // 템플릿에 노출할 것만 return (state + 필수 메서드)
+        return {
+            state,
+            init() {
+                this.$watch("$store.myData", (val) => {
+                    if (!val) return;
+                    state.label = val.label ?? "";
+                    state.visible = val.visible ?? false;
+                }, { immediate: true });
+            }
+        };
+    });
 </script>
+
+> **`Alpine.data()` 구조 규칙**: 팩토리 함수 바디에서 `const state = Alpine.reactive({...})`로 템플릿 바인딩 데이터를 그룹화하고, 내부 전용 변수/함수는 클로저에 선언합니다. `return { state, ... }`로 꼭 필요한 것만 노출합니다. 이는 Vue 3 `<script setup>`의 Composition API 스타일을 따릅니다. 네임드 함수 `function fooFactory(){}`는 전역 스코프를 오염시키므로 사용하지 않습니다.
+>
+> > **`Alpine.reactive()`가 필요한 이유**: Alpine은 `Alpine.data()`의 반환값을 reactive Proxy로 감싸지만, 클로저 변수 `state`는 원본 객체(비-Proxy)를 참조합니다. 따라서 `state.visible = true` 같은 돌연변이가 Proxy setter를 우회하여 DOM 업데이트가 발생하지 않습니다. `Alpine.reactive({...})`로 생성하면 클로저 변수 자체가 reactive Proxy가 되어, 템플릿에서 접근하든 클로저 함수에서 접근하든 동일한 반응성을 보장합니다.
 
 <!-- 3. Style: scoped (기본) 또는 global -->
 <style scoped>
@@ -90,18 +101,23 @@ this._setXpReward({
 
 ```js
 // 컴포넌트 내부
-Alpine.data("xpRewardPanel", () => ({
-    visible: false,
-    characterName: "",
+Alpine.data("xpRewardPanel", () => {
+    const state = Alpine.reactive({
+        visible: false,
+        characterName: ""
+    });
 
-    init() {
-        this.$watch("$store.xpReward", (val) => {
-            if (!val) return;
-            this.characterName = val.characterName ?? "";
-            this.visible = val.visible ?? false;
-        }, { immediate: true });
-    }
-}));
+    return {
+        state,
+        init() {
+            this.$watch("$store.xpReward", (val) => {
+                if (!val) return;
+                state.characterName = val.characterName ?? "";
+                state.visible = val.visible ?? false;
+            }, { immediate: true });
+        }
+    };
+});
 ```
 
 컴포넌트는 `$store`를 직접 템플릿에서 읽지 않고, `init()`에서 로컬 상태로 복사합니다. 템플릿은 로컬 `x-data` 프로퍼티만 참조하여 각 인스턴스가 독립 스코프를 유지합니다.
@@ -127,19 +143,18 @@ Alpine.data("xpRewardPanel", () => ({
 
 ### 5.1 `<style scoped>` (기본)
 
-`componentLoader`가 난수 `data-v-xxxxx` 속성을 생성하여 템플릿 루트 요소에 추가하고, CSS를 `@scope ([data-v-xxxxx]) { ... }`로 감싸 `<head>`에 주입합니다.
+`componentLoader`가 난수 `data-v-xxxxx` 속성을 생성하여 템플릿 루트 요소에 추가하고, 각 CSS 선택자 앞에 `[data-v-xxxxx]` 프리픽스를 붙여 `<head>`에 주입합니다. `<style scoped>` 내에 선언된 선택자만 스코핑되며, 템플릿 HTML의 클래스명은 변경되지 않습니다.
 
 ```html
 <style scoped>
-/* 이 셀렉터들은 자동으로 @scope ([data-v-abc123]) { ... } 내부에 배치됨 */
+/* .heading → [data-v-abc123] .heading 로 자동 변환됨 */
 .heading {
     font-size: 1.2rem;
 }
 </style>
 ```
 
-- scope root(루트 요소) 자체를 스타일링하려면 `:scope` 선택자를 사용합니다.
-- **루트 요소의 base layout**(width, margin, grid 등)이 필요한 경우, `@scope`는 루트 요소 자체를 descendant selector로 선택할 수 없으므로 `:scope`를 사용하거나 global CSS(`src/styles.css`)에 배치합니다.
+- 루트 요소 자체를 스타일링하려면 `:scope`를 사용합니다. `:scope`는 `[data-v-xxxxx]`로 자동 변환되어 루트 요소를 직접 선택합니다.
 
 ```html
 <style scoped>
@@ -170,7 +185,7 @@ Alpine.data("xpRewardPanel", () => ({
 ### 5.3 스타일 규칙
 
 - `<style>`에 `scoped`/`global` 속성이 없으면 **scoped**가 기본값입니다.
-- scoped CSS는 `@scope` 브라우저 기능(Chrome 118+, Safari 17.4+, Firefox 146+)을 사용합니다.
+- scoped CSS는 각 선택자 앞에 `[data-v-xxxxx]` 프리픽스를 붙이는 전통적인 방식으로, 모든 브라우저에서 동작합니다.
 - 기존 `src/styles.css`는 글로벌 리셋, 디자인 토큰, 레이아웃 기본값만 유지합니다.
 - 컴포넌트별 스타일은 각 `template.html`의 `<style scoped>`로 이동합니다.
 
@@ -183,7 +198,7 @@ await loadTemplates();
 `loadTemplates()`는 `document.body.innerHTML` 정규식 스캔으로 `<xp-reward-panel>`, `<popup-dialog>` 같은 커스텀 태그를 찾아 해당 컴포넌트 HTML만 fetch합니다.
 
 중첩 컴포넌트는 별도 pre-load가 필요 없습니다. 마운트 시스템(`mountTemplateComponentTags`)이 다중 패스로 동작하여, 부모 컴포넌트 마운트 후 DOM에 생긴 자식 태그를 다음 패스에서 자동 발견하고 마운트합니다.
-3. `<style scoped>`: 난수 `data-v-xxxxx` 생성 → 템플릿 루트 요소에 속성 추가 → `@scope ([data-v-xxxxx]) { ... }` 래핑 → `<head>`에 `<style>` 주입
+3. `<style scoped>`: 난수 `data-v-xxxxx` 생성 → 템플릿 루트 요소에 속성 추가 → 각 선택자 앞에 `[data-v-xxxxx]` 프리픽스 → `<head>`에 `<style>` 주입
 4. `<style global>`: 원본 그대로 `<head>`에 주입
 5. `<script>`: 각 script 태그를 DOM에 생성하여 실행 (브라우저 보안 문제로 innerHTML이 script를 실행하지 않으므로 별도 태그 생성)
 6. 나머지 HTML: `<template id="template-<name>">` 요소 생성 → `<head>`에 추가
@@ -194,7 +209,7 @@ await loadTemplates();
 - **파일당 하나의 컴포넌트**: `src/components/<name>.html`
 - **순서**: Template > Script > Style (Vue SFC 규약)
 - **`x-data` 필수**: 템플릿 루트 요소는 반드시 자체 `x-data="ComponentName"`를 가짐
-- **Alpine.data() 등록**: `<script>` 내부에서 `Alpine.data("ComponentName", ...)` 등록
+- **Alpine.data() 등록**: `<script>` 내부에서 `Alpine.data("ComponentName", () => { const state = Alpine.reactive({...}); return { state, init(){} }; })` — `state`로 데이터 그룹화, `Alpine.reactive()`로 반응성 보장, private은 클로저, 공유 객체/네임드 함수 전역 등록 금지
 - **Props**: 부모 → 자식 데이터는 `$store` 또는 호스트 속성으로 전달
 - **로직 소유**: 애니메이션, 표시 전환 등은 컴포넌트가 자체 소유
 - **스코프 격리**: 템플릿에서 `xpReward.xxx`처럼 부모 스코프를 직접 참조하지 않음

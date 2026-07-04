@@ -11,8 +11,8 @@ import {
 import { DEFAULT_STAT_RULES, CHALLENGE_CONFIG } from "./progression/index.js";
 import { formatHeroStatLine, formatHeroStatParts, mergeOrbBonuses } from "./entities/index.js";
 import { FIGHTER_IDS, RENDER_LAYERS, Vector2 } from "./core.js";
-import { getUnseenEntries, dismissPatchNotes, appendCapped } from "./utils.js";
-import { createCollectionHubViewModel, COLLECTION_HUB_TABS } from "./collection/collectionViewModel.js";
+import { appendCapped } from "./utils.js";
+
 import {
     ArcherAbility,
     OrbitAbility,
@@ -91,12 +91,6 @@ export function appStore() {
             nextRewardText: ""
         },
 
-        // Toast notification (queue-based)
-        toastVisible: false,
-        toastMessage: "",
-        toastTimer: null,
-        toastQueue: [],
-
         // Start button
         startHidden: true,
         _startDisabled: null,
@@ -115,129 +109,25 @@ export function appStore() {
         // Fighter cards (roster)
         fighters: [],
 
-        // Collection hub
-        collectionHub: {
-            visible: false,
-            activeTab: "roster",
-            tabs: [],
-            filters: {
-                roster: "all",
-                mastery: "all",
-                achievements: "all",
-                storage: "all"
-            },
-            searchQueries: {
-                roster: "",
-                mastery: "",
-                achievements: "",
-                storage: ""
-            },
-            sortModes: {
-                roster: "roster",
-                achievements: "default"
-            },
-            selectedCharacterId: null,
-            rosterItems: [],
-            masteryItems: [],
-            achievementItems: [],
-            storage: {
-                keyShards: 0,
-                chests: [],
-                stats: {}
-            },
-            summary: {}
+        // Collection hub (thin wrapper for C button)
+        openCollectionHub(tabId) {
+            if (window.CollectionHubService) window.CollectionHubService.open(tabId);
         },
 
-        // Collection hub actions
-        openCollectionHub(tabId) {
-            const validTabs =
-                this.collectionHub.tabs.length > 0 ? this.collectionHub.tabs.map((t) => t.id) : ["roster"];
-            if (tabId && validTabs.includes(tabId)) {
-                this.collectionHub.activeTab = tabId;
-            } else {
-                this.collectionHub.activeTab = validTabs[0];
-            }
-            this.collectionHub.visible = true;
+        // Hunting ground
+        huntingActive: false,
+        huntingChoiceVisible: false,
+        huntingFloor: 1,
+        huntingCharacterName: "",
+        huntingLootSummary: "",
+        openHuntingLobby() {
+            if (window.ballFightApp?.hunting) window.ballFightApp.hunting.showCharacterSelect();
         },
-        closeCollectionHub() {
-            this.collectionHub.visible = false;
-            this.collectionHub.selectedCharacterId = null;
+        huntingRetreat() {
+            if (window.ballFightApp?.hunting) window.ballFightApp.hunting.retreat();
         },
-        setCollectionTab(tabId) {
-            const validTabs =
-                this.collectionHub.tabs.length > 0 ? this.collectionHub.tabs.map((t) => t.id) : ["roster"];
-            if (validTabs.includes(tabId)) {
-                this.collectionHub.activeTab = tabId;
-            }
-        },
-        setCollectionFilter(filterId) {
-            const tab = this.collectionHub.activeTab;
-            if (tab && filterId) {
-                this.collectionHub.filters[tab] = filterId;
-            }
-        },
-        clearCollectionSearch(tabId) {
-            if (tabId && this.collectionHub.searchQueries[tabId] !== undefined) {
-                this.collectionHub.searchQueries[tabId] = "";
-            }
-        },
-        selectCollectionCharacter(characterId) {
-            this.collectionHub.selectedCharacterId =
-                this.collectionHub.selectedCharacterId === characterId ? null : characterId;
-        },
-        closeCollectionCharacterDetail() {
-            this.collectionHub.selectedCharacterId = null;
-        },
-        get filteredRosterItems() {
-            const tab = this.collectionHub.activeTab;
-            if (tab !== "roster") return [];
-            const filter = this.collectionHub.filters.roster || "all";
-            const query = (this.collectionHub.searchQueries.roster || "").toLowerCase();
-            const sort = this.collectionHub.sortModes.roster || "roster";
-            let items = [...(this.collectionHub.rosterItems || [])];
-            if (query) {
-                items = items.filter((item) => item.name.toLowerCase().includes(query));
-            }
-            if (filter === "unplayed") items = items.filter((i) => !i.hasRecord);
-            else if (filter === "played") items = items.filter((i) => i.hasRecord);
-            else if (filter === "won") items = items.filter((i) => i.tournamentWins > 0);
-            else if (filter === "master") items = items.filter((i) => i.mastery >= 3);
-            if (sort === "wins") items = items.sort((a, b) => b.tournamentWins - a.tournamentWins);
-            else if (sort === "recent")
-                items = items.sort((a, b) => (b.lastTournamentAt ?? 0) - (a.lastTournamentAt ?? 0));
-            return items;
-        },
-        get filteredMasteryItems() {
-            const tab = this.collectionHub.activeTab;
-            if (tab !== "mastery") return [];
-            const filter = this.collectionHub.filters.mastery || "all";
-            let items = [...(this.collectionHub.masteryItems || [])];
-            if (filter === "unlocked") items = items.filter((i) => i.unlocked);
-            else if (filter === "locked") items = items.filter((i) => !i.unlocked);
-            else if (filter === "active") items = items.filter((i) => i.active);
-            return items;
-        },
-        get filteredAchievementItems() {
-            const tab = this.collectionHub.activeTab;
-            if (tab !== "achievements") return [];
-            const filter = this.collectionHub.filters.achievements || "all";
-            let items = [...(this.collectionHub.achievementItems || [])];
-            if (filter === "unlocked") items = items.filter((i) => i.unlocked);
-            else if (filter === "locked") items = items.filter((i) => !i.unlocked);
-            return items;
-        },
-        get filteredStorageItems() {
-            const tab = this.collectionHub.activeTab;
-            if (tab !== "storage") return [];
-            const filter = this.collectionHub.filters.storage || "all";
-            const query = (this.collectionHub.searchQueries.storage || "").toLowerCase();
-            let items = [...(this.collectionHub.storage?.chests || [])];
-            if (query) {
-                items = items.filter((item) => item.rarity.toLowerCase().includes(query));
-            }
-            if (filter === "openable") items = items.filter((i) => i.canOpen);
-            else if (filter !== "all") items = items.filter((i) => i.rarity === filter);
-            return items;
+        huntingAdvance() {
+            if (window.ballFightApp?.hunting) window.ballFightApp.hunting.advance();
         },
 
         // Battle log
@@ -264,32 +154,8 @@ export function appStore() {
             this._startText = null;
         },
 
-        // Patch notes
-        patchEntries: [],
-        patchNotesVisible: false,
-
-        // Action picker (Alpine template)
-        actionPickerCards: [],
-        get actionPickerVisible() {
-            return this.actionPickerCards.length > 0;
-        },
-        _actionPickResolve: null,
-
         init() {
             this._syncSummary();
-            this.patchEntries = getUnseenEntries();
-            this.patchNotesVisible = this.patchEntries.length > 0;
-        },
-
-        closePatchNotes() {
-            this.patchNotesVisible = false;
-            dismissPatchNotes();
-        },
-
-        /** 액션 카드 선택 (Alpine @click에서 호출) — 단 한 번만 실행 */
-        pickAction(index) {
-            const resolve = this._actionPickResolve;
-            if (resolve) resolve(index);
         },
 
         // Actions
@@ -626,23 +492,8 @@ export class UIController {
     }
 
     showToast(message, duration = 3500) {
-        const s = this.state;
-        if (!s) return;
-        s.toastQueue.push({ message, duration });
-        this._processToastQueue();
-    }
-
-    _processToastQueue() {
-        const s = this.state;
-        if (!s || s.toastTimer || s.toastQueue.length === 0) return;
-        const item = s.toastQueue.shift();
-        s.toastMessage = item.message;
-        s.toastVisible = true;
-        s.toastTimer = setTimeout(() => {
-            s.toastVisible = false;
-            s.toastTimer = null;
-            this._processToastQueue();
-        }, item.duration);
+        const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
+        if (alpine) alpine.store("toast", { message, duration });
     }
 
     showTransientOverlay(label, text, token) {
@@ -666,61 +517,6 @@ export class UIController {
         s.overlayText = "";
         s.overlaySubtext = "";
         this._resetXpReward();
-    }
-
-    renderCollectionHub(vm) {
-        const s = this.state;
-        if (!s) return;
-        s.collectionHub.tabs = [...COLLECTION_HUB_TABS];
-        s.collectionHub.summary = vm.summary;
-        s.collectionHub.rosterItems = vm.rosterItems;
-        s.collectionHub.masteryItems = vm.masteryItems;
-        s.collectionHub.achievementItems = vm.achievementItems;
-        s.collectionHub.storage = vm.storage;
-    }
-
-    openCollectionHub(tabId) {
-        const s = this.state;
-        if (!s) return;
-        s.openCollectionHub(tabId);
-    }
-
-    closeCollectionHub() {
-        const s = this.state;
-        if (!s) return;
-        s.closeCollectionHub();
-    }
-
-    /** 카드 선택 UI — Alpine 템플릿 사용 (index.html의 action-picker) */
-    async waitForActionPick(cards) {
-        if (typeof document === "undefined" || !document.addEventListener) {
-            return cards[0]?.id ?? null;
-        }
-
-        const s = this.state;
-        if (!s) return cards[0]?.id ?? null;
-
-        // 이미 선택 중이면 새 요청 거부 (단 한 번만 고를 수 있음)
-        if (s._actionPickResolve) {
-            return cards[0]?.id ?? null;
-        }
-
-        // Alpine 템플릿에 카드 데이터 설정
-        s.actionPickerCards = cards.map((c) => ({
-            id: c.id,
-            name: c.name,
-            description: c.description,
-            hpCost: c.hpCostPercent
-        }));
-
-        return new Promise((resolve) => {
-            s._actionPickResolve = (index) => {
-                s.actionPickerCards = [];
-                s._actionPickResolve = null;
-                const picked = cards[index];
-                resolve(picked?.id ?? cards[0].id);
-            };
-        });
     }
 
     setStartButton({ disabled, text, hidden }) {

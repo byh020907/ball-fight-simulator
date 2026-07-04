@@ -1,0 +1,72 @@
+<div x-data="toastNotification" aria-live="polite">
+    <div
+        class="toast"
+        x-show="state.visible"
+        x-transition:enter="toast-enter"
+        x-transition:leave="toast-leave"
+        x-text="state.message"
+    ></div>
+</div>
+
+<script>
+    Alpine.data("toastNotification", () => {
+        const state = Alpine.reactive({
+            visible: false,
+            message: ""
+        });
+
+        let _queue = [];
+        let _timer = null;
+
+        function processQueue() {
+            if (_timer || _queue.length === 0) return;
+            const item = _queue.shift();
+            state.message = item.message;
+            state.visible = true;
+            _timer = setTimeout(() => {
+                state.visible = false;
+                _timer = null;
+                processQueue();
+            }, item.duration);
+        }
+
+        return {
+            state,
+            init() {
+                this.$watch("$store.toast", (val) => {
+                    if (!val || !val.message) return;
+                    _queue.push({ message: val.message, duration: val.duration ?? 3500 });
+                    processQueue();
+                }, { immediate: true });
+            }
+        };
+    });
+</script>
+
+<style scoped>
+.toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #202020;
+    color: #fff;
+    padding: 12px 28px;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    z-index: 9999;
+    pointer-events: none;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    white-space: nowrap;
+}
+.toast-enter {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+}
+.toast-leave {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+    transition: all 300ms ease;
+}
+</style>

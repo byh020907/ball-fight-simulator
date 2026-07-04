@@ -1,0 +1,148 @@
+<div
+    x-data="actionPicker"
+    class="bf-popup-overlay"
+    x-show="state.visible"
+    x-transition.opacity.duration.200ms
+>
+    <div class="bf-popup-card">
+        <div class="bf-popup-scroll">
+            <strong class="bf-popup-title">매치 액션 선택</strong>
+            <p class="action-picker-desc">전투 중 클릭하여 발동하세요</p>
+            <div class="action-cards">
+                <template x-for="(card, index) in state.cards" :key="card.id">
+                    <button class="action-card" type="button" @click="pickAction(index)">
+                        <strong x-text="card.name"></strong>
+                        <span x-text="card.description"></span>
+                        <small x-text="'HP ' + card.hpCost + '% 소모'"></small>
+                    </button>
+                </template>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    Alpine.data("actionPicker", () => {
+        const state = Alpine.reactive({
+            visible: false,
+            cards: []
+        });
+
+        function pickAction(index) {
+            if (window.ActionPickerService) window.ActionPickerService.resolve(index);
+        }
+
+        return {
+            state,
+            init() {
+                this.$watch("$store.actionPicker", (val) => {
+                    if (!val || !val.visible) {
+                        state.visible = false;
+                        return;
+                    }
+                    state.cards = val.cards ?? [];
+                    state.visible = true;
+                }, { immediate: true });
+            },
+            pickAction
+        };
+    });
+</script>
+
+<style scoped>
+:scope {
+    position: fixed;
+    inset: 0;
+    z-index: 10002;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(2px);
+}
+
+.bf-popup-card {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 28px 32px 24px;
+    max-width: 500px;
+    width: 90vw;
+    max-height: 85vh;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.25);
+    color: #222222;
+    display: flex;
+    flex-direction: column;
+}
+
+.bf-popup-scroll {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.bf-popup-title {
+    display: block;
+    font-size: 1.2rem;
+    font-weight: 900;
+    margin-bottom: 14px;
+}
+
+.action-picker-desc {
+    text-align: center;
+    font-size: 0.85rem;
+    color: #555555;
+    margin: 0 0 10px;
+}
+
+.action-cards {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.action-card {
+    flex: 1;
+    min-width: 100px;
+    max-width: 160px;
+    padding: 10px 8px;
+    border: 2px solid #202020;
+    border-radius: 6px;
+    background: #f8f8f8;
+    cursor: pointer;
+    display: grid;
+    gap: 4px;
+    text-align: center;
+    transition:
+        background 0.12s,
+        transform 0.1s;
+}
+
+.action-card:hover {
+    background: #e0e0e0;
+    transform: translateY(-2px);
+}
+
+.action-card:active {
+    transform: translateY(0);
+}
+
+.action-card strong {
+    display: block;
+    font-size: 0.95rem;
+}
+
+.action-card span {
+    display: block;
+    font-size: 0.72rem;
+    color: #555555;
+    line-height: 1.3;
+}
+
+.action-card small {
+    display: block;
+    font-size: 0.68rem;
+    color: #cc4444;
+    font-weight: 700;
+}
+</style>
