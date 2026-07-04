@@ -1,5 +1,12 @@
 # 결정 기록
 
+## 현재 기준 요약 (2026-07-04)
+- 컴포넌트 문법: 기본은 태그 기반 템플릿 컴포넌트입니다. `<xp-reward-panel>`은 `template-xp-reward-panel`, `<xp-progress-bar>`는 `template-xp-progress-bar`를 사용합니다.
+- `x-component`: 삭제하지 않고 호스트 태그를 유지해야 하는 경우의 보조/호환 문법으로만 사용합니다.
+- 실제 적용: 결과 오버레이 XP 보상 패널은 `<xp-reward-panel>`, 내부 XP 바는 `<xp-progress-bar>` 중첩 컴포넌트로 구현되어 있습니다.
+- 검증 완료: `npm run format`, `npm test`, `npm run check`, `npm run format:check`, 브라우저 DOM 확인 통과. 브라우저에서는 `xComponentHosts=0`, 두 태그 컴포넌트 `data-component` 스탬프, `.xp-bar` 마운트, 콘솔 에러 없음 확인.
+- 다음 우선순위: 사냥터 MVP 전투 연결. 반복 카드/패널은 `docs/alpine-component-system.md` 기준의 태그 기반 템플릿 컴포넌트 적용 후보로 검토합니다.
+
 ## [L2] 2026-07-02 — 보상 3축 설계 + 액션별 가중치 + 게임 통합 완료
 - 배경: 구버전 모델(승패만 보상)이 스팸 문제. HP weight만으로는 방어형 액션 불이익.
 - 결정: (1) 보상 = 승패 ±1 + 액션HP피해×0.3 - 내HP손실×0.15 - 사용횟수×0.02 (2) 액션 타입별 가중치 맵: 공격형(shockwave 0.5/0.1), 방어형(evade 0.1/0.5), 유틸형(rush 0.15/0.15) (3) 훈련 0.5초 간격, 게임 매 틱 평가 (4) 이펙트 _executeAction으로 통합 (5) pendingActions 큐화 (6) TimeWarp 시전자별 독립 타이머
@@ -112,21 +119,6 @@
 - 맥락: AI가 충돌 타이밍을 완벽하게 계산, Counter/Endure를 100% 성공률로 사용 → 사기. 시뮬: AI 100% vs 인간(반응150ms+예측오차) 54%
 - 결정: Counter 55%, Endure 50% 확률로만 활성화 → 인간 수준으로
 - 영향: `src/clickActions.js`
-
-## [L1] 2026-06-27 — debug 네임스페이스 + 계층 구조 규칙
-- 맥락: 디버그 변수들이 평면적으로 흩어짐 (startCharacter, debugAIEnabled 등)
-- 결정: `this.debug = { startCharacter, aiEnabled }` 네임스페이스로 그룹화, `docs/development-rules.md`에 계층 구조 규칙 추가
-- 영향: `src/app.js`, `docs/development-rules.md`
-
-## 진행 중 이슈
-- 밸런스 30T: 전반적 안정화. ±20%↑ 극단치 사라짐. Dash +27% 강세, Eater -9% 약하락
-- 충격파(Phantom -22%), 투사체방어(Grenade -36%) 등 일부 독 조합 잔존
-
-## 다음 할 일
-1. `src/patchNotes.js` 패치노트 작성
-2. OP 조합 파라미터 튜닝 (카운터, 충격파 등)
-
----
 
 ## [L1] 2026-06-27 — debug 네임스페이스 + 계층 구조 규칙
 - 맥락: 디버그 변수들이 평면적으로 흩어짐 (startCharacter, debugAIEnabled 등)
@@ -304,6 +296,7 @@
 - 결정: 결과 오버레이 XP 보상 패널을 `template-xp-reward-panel` + `x-component="xp-reward-panel"` 실사용 예시로 전환하고, 내부 XP 진행 바를 `template-xp-progress-bar` + 중첩 `x-component="xp-progress-bar"`로 분리. 문서에 일반/중첩/잘못된 이름/없는 템플릿/대량 반복/외부 입력 금지 예시를 추가하고 회귀 테스트에 실제 HTML 예시 존재, 중첩 mount, invalid/missing template, `initTree` 부재 fallback 검증을 추가
 - 영향: `index.html`, `docs/alpine-component-system.md`, `tests/regression.mjs`, `SESSION-HANDOFF.md`
 - 검증: `npm run format`, `npm test`, `npm run check`, `npm run format:check` 통과. 브라우저 DOM 확인에서 `xp-reward-panel`/`xp-progress-bar` 템플릿 존재, 보상 패널/중첩 진행 바 `data-component` 스탬프, `.xp-bar` 마운트, 콘솔 에러 없음 확인
+- 현재 상태: 바로 아래 태그 기반 전환 결정으로 실제 사용 예시는 `<xp-reward-panel>`/`<xp-progress-bar>`가 기준이며, `x-component`는 보조/호환 문법으로만 유지
 
 ## [L1] 2026-07-04 — 템플릿 컴포넌트 기본 문법을 태그 기반으로 전환
 - 맥락: 사용자가 예전 Alpine 컴포넌트 시스템처럼 `div x-component`가 아니라 태그 자체로 컴포넌트를 쓰는 방식을 선호한다고 확인
