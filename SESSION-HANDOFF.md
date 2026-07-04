@@ -2,11 +2,16 @@
 
 ## 현재 기준 요약 (2026-07-04)
 - 컴포넌트 파일 구조: `src/components/<name>.html` (플랫, 폴더 없음)
-- 3개 컴포넌트: `<xp-reward-panel>`, `<xp-progress-bar>`, `<popup-dialog>`
-- 컴포넌트 패턴: 자체 `x-data` 스코프 + `Alpine.store()` 데이터 브릿지 + scoped CSS (`@scope [data-v-xxxxx]`)
-- PopupService: `Alpine.store('popupDialog')` 기반으로 전환, x-html body는 유지 (추후 정리)
-- 검증 완료: `npm test`, `npm run format:check` 통과
-- 다음 우선순위: 사냥터 MVP 전투 연결. 나머지 Alpine 패널(토스트, 액션 선택기, 패치노트, 선수 XP 미터) 점진적 컴포넌트화
+- 7개 컴포넌트: `<xp-reward-panel>`, `<xp-progress-bar>`, `<popup-dialog>`, `<toast-notification>`, `<action-picker>`, `<patch-notes>`, `<collection-hub>`
+- 컴포넌트 패턴: 자체 `x-data` 스코프 + `Alpine.reactive()` 클로저 상태 + `Alpine.store()` 데이터 브릿지 + scoped CSS (`[data-v-xxxxx]` 선택자 프리픽스)
+- **Alpine.store()는 절대 `null`을 값으로 설정하지 않음** — `Object.getOwnPropertyDescriptors(null)` TypeError 방지를 위해 항상 `{ visible: false, ... }` 객체 사용
+- PopupService: `Alpine.store('popupDialog')` 기반, `close()` 정적 메서드 추가됨
+- 사냥터 MVP: 캐릭터 선택 → 층별 BattleSimulation 1v1 → HP 캐리오버 → 귀환/전진 선택 → 랜덤 이벤트(휴식지/상자방/저주받은 제단/챔피언 난입) → 패배/귀환 시 프로필 병합. 액션 선택은 `skipActionPick: true`로 스킵
+- 사냥터 상자: 5등급 비용/보상 테이블 연결 완료. 해조각은 즉시 반영, HP 회복/임시 스탯은 deferred effect payload로 반환
+- 사냥터 오버레이 내 버튼은 `.overlay { pointer-events: none }` 영향으로 클릭 안 됨 → `.hunting-choice-buttons { pointer-events: auto }` 필수
+- 검증 완료: `npm test`, `npm run check`, `npm run format:check` 통과
+- 인라인 Alpine 패널 0개, 모든 패널/오버레이/모달은 컴포넌트화 완료
+- 다음 우선순위: 사냥터 deferred effect 적용 UI/런 시작 연결, PPO 학습 결과 저장 구조, Time Warp 재학습/Dash 밸런스 검토
 
 ## [L2] 2026-07-02 — 보상 3축 설계 + 액션별 가중치 + 게임 통합 완료
 - 배경: 구버전 모델(승패만 보상)이 스팸 문제. HP weight만으로는 방어형 액션 불이익.
@@ -334,11 +339,49 @@
 - 영향: `src/componentLoader.js`, `tests/regression.mjs`(COMPONENTS import 제거, 파일 존재 검증으로 대체)
 - 검증: `npm test`, `npm run format:check` 통과
 
+## [L2] 2026-07-04 — `Alpine.reactive()`로 컴포넌트 상태 반응성 수정
+- 배경: `Alpine.data()` 컴포넌트의 `$watch` 콜백과 클로저 함수에서 `const state = {}`의 속성을 직접 변경할 때 Alpine의 reactive Proxy를 우회하여 DOM 업데이트가 발생하지 않는 문제 발견. 도움말 `?` 버튼 클릭 시 popup이 표시되지 않던 원인.
+- 결정: 모든 컴포넌트에서 `const state = { ... }`를 `const state = Alpine.reactive({ ... })`로 변경. `Alpine.reactive()`는 Alpine 3.x의 public API로, Proxy 기반 깊은 반응성 객체를 생성하여 클로저 내 돌연변이도 Alpine 의존성 추적을 트리거함.
+- 영향: `src/components/popup-dialog.html`, `src/components/xp-reward-panel.html`, `src/components/toast-notification.html`
+- 검증: `npm test`, `npm run format:check` 통과
+
+## [L1] 2026-07-04 — 액션 선택기, 패치노트, 컬렉션 허브 컴포넌트화 완료
+- 맥락: 남은 인라인 Alpine 패널(액션 선택기, 패치노트, 컬렉션 허브)을 단일 HTML 파일 컴포넌트로 분리. 컬렉션 허브는 4탭/계산 getter/400줄 scoped CSS 포함
+- 결정: (1) `src/components/action-picker.html` — `Alpine.reactive()` 상태 + scoped CSS. `src/actionPicker.js` — `ActionPickerService.show()/resolve()`. (2) `src/components/patch-notes.html` — `Alpine.reactive()` + scoped CSS. `src/patchNotesService.js` — `PatchNotesService.show()/dismiss()`. (3) `src/components/collection-hub.html` — 4탭 모달, `Alpine.reactive()`에 computed getter(`filteredRoster/Mastery/Achievement/StorageItems`) 포함, scoped CSS ~400줄. `src/collectionHubService.js` — `CollectionHubService.render()/open()/close()`. (4) `index.html` — 3개 `<template>` 제거. (5) `src/ui.js` — `actionPicker*`/`patch*`/`collectionHub*` 상태/메서드 제거. (6) `src/app.js` — `waitForActionPick` → `ActionPickerService.show()`, `renderCollectionHub` → `CollectionHubService.render()`. (7) `src/styles.css` — `.action-*` `.patch-*` `.ch-*` CSS 제거 (총 ~650줄). (8) `componentLoader.js` — 자동 발견으로 전환 완료.
+- 영향: `src/components/action-picker.html`, `src/actionPicker.js`, `src/components/patch-notes.html`, `src/patchNotesService.js`, `src/components/collection-hub.html`, `src/collectionHubService.js`, `index.html`, `src/ui.js`, `src/app.js`, `src/styles.css`, `docs/alpine-component-system.md`
+- 검증: `npm test`, `npm run format:check` 통과. 인라인 Alpine 패널 0개
+
+## [L1] 2026-07-04 — 사냥터 MVP 전투 연결 완료
+- 맥락: 사냥터 기반 코드(huntingState/huntingConfig/huntingEncounters/huntingRewards)는 구현되어 있었으나 메인 화면 입장 버튼, 캐릭터 선택, 실제 BattleSimulation 연동, 승리 후 귀환/전진 선택 UI가 없었음
+- 결정: (1) `src/hunting/huntingManager.js` — HuntingManager 클래스. `BattleApp._onSimulationResult` 훅을 통해 사냥 전투 완료 처리, 층별 HP 캐리오버, 귀환/전진/랜덤 이벤트 처리, 프로필 병합 담당. (2) `src/app.js` — `_onSimulationResult` 훅 추가, `loop()`에서 사냥 전투 완료 시 `finishMatch()` 대신 훅 호출, `_huntingDone` 플래그로 "확인" 버튼이 `startTournament()`를 트리거하지 않도록 방지. (3) `index.html` — `⚔ 사냥터` 버튼 (조건 `!locked && !tournamentActive && !huntingActive`), overlay 카드 내 귀환/전진 선택 버튼. (4) `src/ui.js` — `huntingActive`, `huntingChoiceVisible`, `huntingFloor`, `huntingCharacterName`, `huntingLootSummary` 상태 + `openHuntingLobby()/huntingRetreat()/huntingAdvance()` 메서드. (5) `src/styles.css` — 사냥터 버튼/선택/오버레이 CSS 추가
+- 영향: `src/hunting/huntingManager.js`(신규), `src/app.js`, `index.html`, `src/ui.js`, `src/styles.css`
+- 검증: `npm test`, `npm run format:check` 통과
+
+## [L2] 2026-07-04 — scoped CSS `@scope` → 선택자 프리픽스 방식으로 전환
+- 배경: `@scope ([data-v-xxxxx])` 방식은 브라우저 지원 범위가 제한적이고(Chrome 118+/Firefox 146+), `<style scoped>` 내 선언된 선택자만 스코핑하는 원래 의도와 달리 `@scope` 블록 전체가 모든 자손 선택자의 스코프를 변경
+- 결정: `componentLoader.js`에 `rewriteScopedCss()` 추가 — CSS 토크나이저로 각 선택자를 파싱하여 `[data-v-xxxxx]` 프리픽스를 붙임. `:scope`는 `[data-v-xxxxx]`로 변환. `@media`/`@supports`는 재귀 처리. 주석/`@keyframes`는 건너뜀. 템플릿 HTML의 클래스명은 변경되지 않음
+- 영향: `src/componentLoader.js`(신규 함수 `rewriteScopedCss`, `loadSingle`에서 `@scope` 대신 사용), `docs/alpine-component-system.md`(설명 업데이트)
+- 검증: `npm test`, `npm run format:check` 통과
+
+## [L1] 2026-07-04 — 사냥터 운영 버그 5종 수정 + 액션 선택 스킵 플래그
+- 맥락: 사냥터 MVP 전투 연결 후 발견된 버그들 — 컬렉션 허브 흰 글자, 팝업 크기 변동, 사냥터 버튼 위치, Alpine store null 크래시, PopupService.close 미구현, 전진/귀환 버튼 미클릭
+- 결정: (1) 컬렉션 허브 `.ch-detail-body`/`.ch-mast-info`/`.ch-ach-info`에 `color` 추가 (body `#f4f7fb` 상속 방지). (2) `.ch-content` `min-height: 0` → `400px` (탭 전환 시 팝업 수축 방지). (3) `.hunting-btn.control-button` `bottom: 64px` → `90px` (시작 버튼과 간격 확보). (4) `Alpine.store("name", null)` 3건 → `{ visible: false, ... }` 객체로 변경 (Alpine 내부 `Object.getOwnPropertyDescriptors(null)` TypeError 방지). (5) `PopupService.close()` 정적 메서드 추가. (6) `startMatch({ skipActionPick: true })` — 사냥터에서 액션 선택 UI 스킵. (7) `.hunting-choice-buttons { pointer-events: auto }` — overlay의 `pointer-events: none` 우회.
+- 영향: `src/components/collection-hub.html`, `src/actionPicker.js`, `src/patchNotesService.js`, `src/components/popup-dialog.html`, `src/popup.js`, `src/app.js`, `src/hunting/huntingManager.js`, `src/styles.css`
+
+## [L1] 2026-07-04 — 사냥터 상자 보상 테이블과 이벤트 확장 연결
+- 맥락: 사냥터 전투 연결 이후 `createHuntingChest()`가 등급/id 중심 더미에 가까웠고, 이벤트 풀도 휴식지/상자방 중심이라 실제 로그라이크식 보상/위험 선택감이 부족했음
+- 결정: (1) 상자 5등급과 `key_shards`/`instant_heal`/`temporary_stat` 보상 타입, 등급별 reward table, `rewardTableVersion`, `rewardPreview`, `openCost`를 추가. (2) `openHuntingChest()`가 실제 reward를 굴리고 해조각 보상은 즉시 프로필에 반영, HP/임시 스탯은 후속 런 적용용 deferred effect로 반환. (3) `rest_site`, `chest_room`, `cursed_altar`, `champion_intrusion` 이벤트 payload를 생성. (4) 저주받은 제단은 `run.statModifiers`에 gain/loss modifier를 추가하고 전투 클리어 시 지속 층수를 소모. (5) 챔피언 난입은 다음 적을 champion 타입으로 스케일하고 승리 해조각 보상에 1.5배 배율 적용
+- 영향: `src/hunting/huntingConfig.js`, `src/hunting/huntingRewards.js`, `src/hunting/chestRewards.js`, `src/hunting/huntingEncounters.js`, `src/hunting/huntingState.js`, `src/hunting/huntingManager.js`, `tests/regression.mjs`, `docs/hunting-grounds-system.md`, `SESSION-HANDOFF.md`
+- 검증: `npm test`, `npm run check`, `npm run format:check` 통과
+
 ## 진행 중 이슈
 - 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
 - Time Warp 패널티 인상은 재학습 후 반영
+- 사냥터 HP 층간 완전 누적 적용, 휴식지 이벤트 회복량 25%는 임시값
+- 사냥터 HP/임시 스탯 상자 보상은 deferred effect payload까지만 반환됨 — 실제 런 시작/진행 UI 적용은 후속 작업
+- **Alpine.store() 절대 null 설정 금지** — 모든 서비스/컴포넌트에서 강제해야 함. 대신 `{ visible: false, ... }` 빈 상태 객체 사용
 
 ## 다음 할 일
-1. 사냥터 MVP 전투 연결: 메인 화면 입장 버튼, 우승 경험 캐릭터 선택 UI, `BattleSimulation` 층별 1v1 런, 승리 후 귀환/전진 선택, 사냥터 XP 지급/중복 방지 연결. 반복 카드/패널은 컴포넌트화 후보로 검토
-2. 남은 Alpine 패널 점진적 컴포넌트화: 토스트 알림, 액션 선택기, 패치노트 팝업, 선수 XP 미터 (기존 `<xp-progress-bar>` 재사용)
-3. 전체 N×N PPO 학습 결과 저장 구조 설계: `{charId, actionId}`별 Actor/Critic/normalizer 저장 단위 결정
+1. 전체 N×N PPO 학습 결과 저장 구조 설계: `{charId, actionId}`별 Actor/Critic/normalizer 저장 단위 결정
+2. 사냥터 deferred effect 적용 UI/런 시작 연결: `instant_heal`, `temporary_stat` 보상을 다음 사냥터 런에 실제 적용
+3. Time Warp 패널티 인상분 재학습 및 Dash +27% 강세 밸런스 검토

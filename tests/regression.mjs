@@ -31,15 +31,20 @@ import {
     createHuntingChest,
     createHuntingRun,
     defeatHuntingRun,
+    applyHuntingCursedAltar,
+    applyHuntingStatModifiersToSpec,
     getEligibleHuntingCharacters,
     getEnemyPowerMultiplier,
     getRewardMultiplier,
     getChestOpenCost,
+    previewHuntingChest,
     openHuntingChest,
     recordHuntingFloorResult,
     retreatHuntingRun,
+    rollHuntingChestReward,
     rollKeyShardReward,
-    scaleEnemySpecForHunting
+    scaleEnemySpecForHunting,
+    HUNTING_EVENT_TYPES
 } from "../src/hunting/index.js";
 import { Grenade } from "../src/entities/grenade.js";
 import { appStore, UIController } from "../src/ui.js";
@@ -950,6 +955,7 @@ function testHuntingSystem() {
 
     assert.equal(getEnemyPowerMultiplier(1), 1, "Floor 1 enemy power should be base");
     assert.equal(getEnemyPowerMultiplier(3), 1.16, "Enemy power should scale by 8% per floor");
+    assert.equal(getEnemyPowerMultiplier(3, { enemyType: "champion" }), 1.44, "Champion intrusions should be stronger");
     assert.equal(getRewardMultiplier(3), 1.3, "Rewards should scale by 15% per floor");
     const baseSpec = {
         id: "enemy",
@@ -969,6 +975,18 @@ function testHuntingSystem() {
     const common = createHuntingChest({ id: "c1", rarity: "common", acquiredAt: 1000 });
     const uncommon = createHuntingChest({ id: "u1", rarity: "uncommon", acquiredAt: 1000 });
     const rare = createHuntingChest({ id: "r1", rarity: "rare", acquiredAt: 1000 });
+    assert.equal(common.openCost, 20, "Chest instances should expose their open cost");
+    assert.ok(common.rewardPreview.includes("해조각"), "Chest instances should expose reward table preview text");
+    assert.equal(
+        rollHuntingChestReward(common, { rng: () => 0 }).type,
+        "key_shards",
+        "Chest rewards should roll from the rarity reward table"
+    );
+    assert.equal(
+        previewHuntingChest(rare).rewardTable.some((reward) => reward.type === "temporary_stat"),
+        true,
+        "Chest preview should expose concrete possible reward effects"
+    );
     const afterFloor = recordHuntingFloorResult(run, {
         hpRemain: 55,
         maxHp: 100,
@@ -980,6 +998,48 @@ function testHuntingSystem() {
     const advanced = advanceHuntingRun(afterFloor, { rng: () => 0 });
     assert.equal(advanced.floor, 2, "Advance should move to the next floor");
     assert.ok(advanced.lastEvent, "A low RNG roll should create a hunting event");
+    assert.equal(advanced.lastEvent.type, HUNTING_EVENT_TYPES.CHEST_ROOM, "Event rolls should include chest rooms");
+    assert.equal(advanced.lastEvent.chestRarity, "uncommon", "Chest room events should carry a concrete rarity");
+
+    const cursed = advanceHuntingRun(afterFloor, {
+        rng: (() => {
+            const rolls = [0, 0.6, 0];
+            return () => rolls.shift() ?? 0;
+        })()
+    });
+    assert.equal(cursed.lastEvent.type, HUNTING_EVENT_TYPES.CURSED_ALTAR, "Event pool should include cursed altars");
+    const cursedApplied = applyHuntingCursedAltar(cursed, { trade: cursed.lastEvent.trade });
+    assert.equal(cursedApplied.statModifiers.length, 2, "Cursed altars should add a gain and a loss modifier");
+    const altarSpec = applyHuntingStatModifiersToSpec(
+        { id: "hero", stats: { hp: 100, damage: 10, defense: 2, speed: 300, skill: 4 } },
+        cursedApplied.statModifiers
+    );
+    assert.equal(altarSpec.stats.damage, 12, "Cursed altar gain should modify the target stat");
+    assert.equal(altarSpec.stats.defense, 1.8, "Cursed altar loss should modify the traded-away stat");
+    const consumedCursed = recordHuntingFloorResult(cursedApplied, { hpRemain: 50, maxHp: 100 });
+    assert.equal(consumedCursed.statModifiers.length, 0, "One-floor altar modifiers should expire after a floor");
+    const preservedEventBuff = recordHuntingFloorResult(cursedApplied, {
+        loot: { keyShards: 0, chests: [common], xp: 0 },
+        consumeStatModifiers: false
+    });
+    assert.equal(
+        preservedEventBuff.statModifiers.length,
+        2,
+        "Non-combat event rewards should not consume temporary stat modifiers"
+    );
+
+    const champion = advanceHuntingRun(afterFloor, {
+        rng: (() => {
+            const rolls = [0, 0.99];
+            return () => rolls.shift() ?? 0;
+        })()
+    });
+    assert.equal(
+        champion.lastEvent.type,
+        HUNTING_EVENT_TYPES.CHAMPION_INTRUSION,
+        "Event pool should include champion intrusions"
+    );
+    assert.equal(champion.lastEvent.enemyType, "champion", "Champion events should mark the next enemy type");
 
     const retreated = retreatHuntingRun(afterFloor, { now: 2000 });
     assert.equal(retreated.status, "retreated", "Retreat should end the run safely");
@@ -1005,9 +1065,10 @@ function testHuntingSystem() {
     profile.hunting.keyShards = 50;
     profile.hunting.chests = [uncommon];
     assert.equal(getChestOpenCost("uncommon"), 50, "Uncommon chest open cost should match design");
-    const opened = openHuntingChest(profile, "u1");
+    const opened = openHuntingChest(profile, "u1", { rng: () => 0 });
     assert.equal(opened.opened, true, "Chest should open when enough key shards are available");
-    assert.equal(profile.hunting.keyShards, 0, "Opening a chest should spend key shards");
+    assert.equal(opened.reward.type, "key_shards", "Opening a chest should produce a concrete reward");
+    assert.equal(profile.hunting.keyShards, 45, "Opening a shard reward chest should spend cost and apply reward");
     assert.equal(profile.hunting.chests.length, 0, "Opened chest should leave storage");
 
     const sanitized = sanitizePlayerProfile({

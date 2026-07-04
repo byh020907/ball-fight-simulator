@@ -2,6 +2,7 @@ import {
     HUNTING_CHEST_BREAK_WEIGHTS,
     HUNTING_CHEST_OPEN_COSTS,
     HUNTING_CHEST_RARITIES,
+    HUNTING_CHEST_REWARD_TYPES,
     HUNTING_DEFEAT_PRESERVE,
     HUNTING_ENEMY_TYPES,
     HUNTING_KEY_SHARD_RANGES,
@@ -9,6 +10,172 @@ import {
 } from "./huntingConfig.js";
 
 const DEFAULT_RNG = () => Math.random();
+
+export const HUNTING_CHEST_REWARD_TABLE_VERSION = 1;
+
+export const HUNTING_CHEST_REWARD_TABLE = Object.freeze({
+    common: Object.freeze([
+        Object.freeze({
+            id: "common-key-shards",
+            weight: 45,
+            type: HUNTING_CHEST_REWARD_TYPES.KEY_SHARDS,
+            amount: 18,
+            text: "해조각 +18"
+        }),
+        Object.freeze({
+            id: "common-field-heal",
+            weight: 35,
+            type: HUNTING_CHEST_REWARD_TYPES.INSTANT_HEAL,
+            healRatio: 0.18,
+            text: "다음 사냥터 HP 회복 +18%"
+        }),
+        Object.freeze({
+            id: "common-damage-boost",
+            weight: 20,
+            type: HUNTING_CHEST_REWARD_TYPES.TEMP_STAT,
+            stat: "damage",
+            multiplier: 1.08,
+            floors: 1,
+            text: "다음 1층 피해 +8%"
+        })
+    ]),
+    uncommon: Object.freeze([
+        Object.freeze({
+            id: "uncommon-key-shards",
+            weight: 35,
+            type: HUNTING_CHEST_REWARD_TYPES.KEY_SHARDS,
+            amount: 45,
+            text: "해조각 +45"
+        }),
+        Object.freeze({
+            id: "uncommon-field-heal",
+            weight: 30,
+            type: HUNTING_CHEST_REWARD_TYPES.INSTANT_HEAL,
+            healRatio: 0.3,
+            text: "다음 사냥터 HP 회복 +30%"
+        }),
+        Object.freeze({
+            id: "uncommon-defense-boost",
+            weight: 20,
+            type: HUNTING_CHEST_REWARD_TYPES.TEMP_STAT,
+            stat: "defense",
+            multiplier: 1.12,
+            floors: 2,
+            text: "다음 2층 방어 +12%"
+        }),
+        Object.freeze({
+            id: "uncommon-speed-boost",
+            weight: 15,
+            type: HUNTING_CHEST_REWARD_TYPES.TEMP_STAT,
+            stat: "speed",
+            multiplier: 1.08,
+            floors: 2,
+            text: "다음 2층 속도 +8%"
+        })
+    ]),
+    rare: Object.freeze([
+        Object.freeze({
+            id: "rare-key-shards",
+            weight: 30,
+            type: HUNTING_CHEST_REWARD_TYPES.KEY_SHARDS,
+            amount: 105,
+            text: "해조각 +105"
+        }),
+        Object.freeze({
+            id: "rare-fuller-heal",
+            weight: 25,
+            type: HUNTING_CHEST_REWARD_TYPES.INSTANT_HEAL,
+            healRatio: 0.45,
+            text: "다음 사냥터 HP 회복 +45%"
+        }),
+        Object.freeze({
+            id: "rare-damage-boost",
+            weight: 25,
+            type: HUNTING_CHEST_REWARD_TYPES.TEMP_STAT,
+            stat: "damage",
+            multiplier: 1.15,
+            floors: 2,
+            text: "다음 2층 피해 +15%"
+        }),
+        Object.freeze({
+            id: "rare-skill-boost",
+            weight: 20,
+            type: HUNTING_CHEST_REWARD_TYPES.TEMP_STAT,
+            stat: "skill",
+            multiplier: 1.12,
+            floors: 2,
+            text: "다음 2층 기술 +12%"
+        })
+    ]),
+    epic: Object.freeze([
+        Object.freeze({
+            id: "epic-key-shards",
+            weight: 25,
+            type: HUNTING_CHEST_REWARD_TYPES.KEY_SHARDS,
+            amount: 230,
+            text: "해조각 +230"
+        }),
+        Object.freeze({
+            id: "epic-survival-heal",
+            weight: 25,
+            type: HUNTING_CHEST_REWARD_TYPES.INSTANT_HEAL,
+            healRatio: 0.65,
+            text: "다음 사냥터 HP 회복 +65%"
+        }),
+        Object.freeze({
+            id: "epic-damage-boost",
+            weight: 25,
+            type: HUNTING_CHEST_REWARD_TYPES.TEMP_STAT,
+            stat: "damage",
+            multiplier: 1.22,
+            floors: 3,
+            text: "다음 3층 피해 +22%"
+        }),
+        Object.freeze({
+            id: "epic-defense-boost",
+            weight: 25,
+            type: HUNTING_CHEST_REWARD_TYPES.TEMP_STAT,
+            stat: "defense",
+            multiplier: 1.2,
+            floors: 3,
+            text: "다음 3층 방어 +20%"
+        })
+    ]),
+    legendary: Object.freeze([
+        Object.freeze({
+            id: "legendary-key-shards",
+            weight: 20,
+            type: HUNTING_CHEST_REWARD_TYPES.KEY_SHARDS,
+            amount: 520,
+            text: "해조각 +520"
+        }),
+        Object.freeze({
+            id: "legendary-full-heal",
+            weight: 25,
+            type: HUNTING_CHEST_REWARD_TYPES.INSTANT_HEAL,
+            healRatio: 1,
+            text: "다음 사냥터 HP 완전 회복"
+        }),
+        Object.freeze({
+            id: "legendary-damage-boost",
+            weight: 30,
+            type: HUNTING_CHEST_REWARD_TYPES.TEMP_STAT,
+            stat: "damage",
+            multiplier: 1.35,
+            floors: 3,
+            text: "다음 3층 피해 +35%"
+        }),
+        Object.freeze({
+            id: "legendary-all-rounder",
+            weight: 25,
+            type: HUNTING_CHEST_REWARD_TYPES.TEMP_STAT,
+            stat: "speed",
+            multiplier: 1.25,
+            floors: 3,
+            text: "다음 3층 속도 +25%"
+        })
+    ])
+});
 
 function clampFloor(floor) {
     if (!Number.isFinite(floor)) return 1;
@@ -25,6 +192,46 @@ export function getRewardMultiplier(floor) {
     return 1 + (clampFloor(floor) - 1) * HUNTING_SCALING.REWARD_PER_FLOOR;
 }
 
+function cloneRewardDefinition(reward) {
+    return { ...reward };
+}
+
+export function getHuntingChestRewardTable(rarity = "common") {
+    const safeRarity = HUNTING_CHEST_RARITIES.includes(rarity) ? rarity : "common";
+    return HUNTING_CHEST_REWARD_TABLE[safeRarity].map(cloneRewardDefinition);
+}
+
+export function describeHuntingChestRewards(rarity = "common") {
+    return getHuntingChestRewardTable(rarity)
+        .map((reward) => reward.text)
+        .join(" / ");
+}
+
+export function rollHuntingChestReward(chestOrRarity = "common", { rng = DEFAULT_RNG } = {}) {
+    const rarity = typeof chestOrRarity === "string" ? chestOrRarity : chestOrRarity?.rarity;
+    const table = getHuntingChestRewardTable(rarity);
+    const totalWeight = table.reduce((sum, reward) => sum + Math.max(0, reward.weight ?? 0), 0);
+    let roll = Math.max(0, Math.min(0.999999, rng())) * totalWeight;
+
+    for (const reward of table) {
+        roll -= Math.max(0, reward.weight ?? 0);
+        if (roll < 0) {
+            return {
+                ...cloneRewardDefinition(reward),
+                rarity: HUNTING_CHEST_RARITIES.includes(rarity) ? rarity : "common",
+                tableVersion: HUNTING_CHEST_REWARD_TABLE_VERSION
+            };
+        }
+    }
+
+    const fallback = table[0];
+    return {
+        ...cloneRewardDefinition(fallback),
+        rarity: HUNTING_CHEST_RARITIES.includes(rarity) ? rarity : "common",
+        tableVersion: HUNTING_CHEST_REWARD_TABLE_VERSION
+    };
+}
+
 export function rollKeyShardReward({ floor = 1, enemyType = HUNTING_ENEMY_TYPES.NORMAL, rng = DEFAULT_RNG } = {}) {
     const range = HUNTING_KEY_SHARD_RANGES[enemyType] ?? HUNTING_KEY_SHARD_RANGES[HUNTING_ENEMY_TYPES.NORMAL];
     const base = rollInteger(range.min, range.max, rng);
@@ -38,7 +245,10 @@ export function createHuntingChest({ rarity = "common", id = null, acquiredAt = 
     return {
         id: id ?? `chest-${safeRarity}-${acquiredAt}-${Math.floor(Math.random() * 1_000_000)}`,
         rarity: safeRarity,
-        acquiredAt
+        acquiredAt,
+        openCost: getChestOpenCost(safeRarity),
+        rewardTableVersion: HUNTING_CHEST_REWARD_TABLE_VERSION,
+        rewardPreview: describeHuntingChestRewards(safeRarity)
     };
 }
 

@@ -1,5 +1,10 @@
-import { HUNTING_CHEST_RARITIES } from "./huntingConfig.js";
-import { getChestOpenCost } from "./huntingRewards.js";
+import { HUNTING_CHEST_RARITIES, HUNTING_CHEST_REWARD_TYPES } from "./huntingConfig.js";
+import {
+    describeHuntingChestRewards,
+    getChestOpenCost,
+    getHuntingChestRewardTable,
+    rollHuntingChestReward
+} from "./huntingRewards.js";
 
 export function canOpenHuntingChest(profile, chest) {
     if (!profile?.hunting || !chest) return false;
@@ -9,19 +14,41 @@ export function canOpenHuntingChest(profile, chest) {
 export function previewHuntingChest(chest) {
     const rarity = HUNTING_CHEST_RARITIES.includes(chest?.rarity) ? chest.rarity : "common";
     const cost = getChestOpenCost(rarity);
-    const rewardBands = {
-        common: "소량 XP / 해조각 환급 / 일반 외형",
-        uncommon: "중량 XP / 희귀 외형 단서 / 해조각 환급",
-        rare: "대량 XP / 설계도 단서 / 고급 외형"
-    };
     return {
         rarity,
         cost,
-        rewardText: rewardBands[rarity]
+        rewardText: describeHuntingChestRewards(rarity),
+        rewardTable: getHuntingChestRewardTable(rarity)
     };
 }
 
-export function openHuntingChest(profile, chestId) {
+export function applyHuntingChestReward(profile, reward) {
+    const applied = {
+        keyShards: 0,
+        deferredEffects: []
+    };
+
+    if (!profile?.hunting || !reward) return applied;
+
+    if (reward.type === HUNTING_CHEST_REWARD_TYPES.KEY_SHARDS) {
+        const amount = Math.max(0, Math.floor(reward.amount ?? 0));
+        profile.hunting.keyShards = (profile.hunting.keyShards ?? 0) + amount;
+        applied.keyShards += amount;
+        return applied;
+    }
+
+    applied.deferredEffects.push({
+        type: reward.type,
+        stat: reward.stat ?? null,
+        multiplier: reward.multiplier ?? null,
+        floors: reward.floors ?? null,
+        healRatio: reward.healRatio ?? null,
+        text: reward.text
+    });
+    return applied;
+}
+
+export function openHuntingChest(profile, chestId, { rng = Math.random } = {}) {
     const chests = profile?.hunting?.chests;
     if (!Array.isArray(chests)) {
         return { opened: false, reason: "missing_storage" };
@@ -40,10 +67,15 @@ export function openHuntingChest(profile, chestId) {
 
     profile.hunting.keyShards -= cost;
     profile.hunting.chests = chests.filter((item) => item.id !== chestId);
+
+    const reward = rollHuntingChestReward(chest, { rng });
+    const applied = applyHuntingChestReward(profile, reward);
     return {
         opened: true,
         chest,
         cost,
-        reward: previewHuntingChest(chest)
+        reward,
+        applied,
+        preview: previewHuntingChest(chest)
     };
 }

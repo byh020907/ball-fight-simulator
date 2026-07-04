@@ -14,16 +14,18 @@ export const HUNTING_ENEMY_TYPES = Object.freeze({
 export const HUNTING_EVENT_TYPES = Object.freeze({
     CHEST_ROOM: "chest_room",
     REST_SITE: "rest_site",
-    CURSED_ALTAR: "cursed_altar"
+    CURSED_ALTAR: "cursed_altar",
+    CHAMPION_INTRUSION: "champion_intrusion"
 });
 
 export const HUNTING_MVP_EVENT_TYPES = Object.freeze([
     HUNTING_EVENT_TYPES.CHEST_ROOM,
     HUNTING_EVENT_TYPES.REST_SITE,
-    HUNTING_EVENT_TYPES.CURSED_ALTAR
+    HUNTING_EVENT_TYPES.CURSED_ALTAR,
+    HUNTING_EVENT_TYPES.CHAMPION_INTRUSION
 ]);
 
-export const HUNTING_CHEST_RARITIES = Object.freeze(["common", "uncommon", "rare"]);
+export const HUNTING_CHEST_RARITIES = Object.freeze(["common", "uncommon", "rare", "epic", "legendary"]);
 
 export const HUNTING_CHEST_OPEN_COSTS = Object.freeze({
     common: 20,
@@ -55,6 +57,15 @@ export const HUNTING_DEFEAT_PRESERVE = Object.freeze({
 export const HUNTING_SCALING = Object.freeze({
     ENEMY_POWER_PER_FLOOR: 0.08,
     ELITE_POWER_BONUS: 0.12,
+    CHAMPION_POWER_BONUS: 0.28,
     REWARD_PER_FLOOR: 0.15,
     DEEP_FLOOR_BONUS: 0.1
 });
+
+export const HUNTING_CHEST_REWARD_TYPES = Object.freeze({
+    KEY_SHARDS: "key_shards",
+    INSTANT_HEAL: "instant_heal",
+    TEMP_STAT: "temporary_stat"
+});
+
+export const HUNTING_STAT_KEYS = Object.freeze(["hp", "damage", "defense", "speed", "skill"]);

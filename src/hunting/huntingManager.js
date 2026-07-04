@@ -6,10 +6,13 @@ import {
     defeatHuntingRun,
     getEligibleHuntingCharacters,
     canEnterHunting,
-    applyHuntingEventRecovery
+    applyHuntingEventRecovery,
+    applyHuntingCursedAltar,
+    applyHuntingStatModifiersToSpec
 } from "./huntingState.js";
 import { scaleEnemySpecForHunting } from "./huntingEncounters.js";
 import { rollKeyShardReward, createHuntingChest, createEmptyHuntingLoot } from "./huntingRewards.js";
+import { HUNTING_ENEMY_TYPES, HUNTING_EVENT_TYPES } from "./huntingConfig.js";
 import { createMatchReport, recordLowestHp } from "../collection/index.js";
 import { grantExperienceFromMatchReport } from "../experience/experienceService.js";
 import { applyStatAllocation } from "../statAllocation.js";
@@ -89,12 +92,20 @@ export class HuntingManager {
         const enemies = app.roster.filter((f) => f.id !== run.characterId);
         if (enemies.length === 0) return;
 
+        const enemyType =
+            run.lastEvent?.type === HUNTING_EVENT_TYPES.CHAMPION_INTRUSION
+                ? HUNTING_ENEMY_TYPES.CHAMPION
+                : HUNTING_ENEMY_TYPES.NORMAL;
         const enemySpec = scaleEnemySpecForHunting(
             { ...enemies[Math.floor(Math.random() * enemies.length)] },
-            run.floor
+            run.floor,
+            { enemyType }
         );
 
-        const appliedSpec = applyStatAllocation(playerSpec, app.playerStatAllocation, true);
+        const appliedSpec = applyHuntingStatModifiersToSpec(
+            applyStatAllocation(playerSpec, app.playerStatAllocation, true),
+            run.statModifiers
+        );
         const matchSpecs = [appliedSpec, enemySpec];
         app._currentMatchReport = createMatchReport();
         app._currentMatchReport.playerFighterId = run.characterId;
@@ -151,8 +162,12 @@ export class HuntingManager {
         }
 
         if (playerWon) {
+            const rewardMultiplier =
+                run.lastEvent?.type === HUNTING_EVENT_TYPES.CHAMPION_INTRUSION
+                    ? (run.lastEvent.rewardMultiplier ?? 1.5)
+                    : 1;
             const floorLoot = {
-                keyShards: rollKeyShardReward({ floor: run.floor }),
+                keyShards: Math.round(rollKeyShardReward({ floor: run.floor }) * rewardMultiplier),
                 chests: Math.random() < 0.15 ? [createHuntingChest({ rarity: "common" })] : [],
                 xp: 0
             };
@@ -244,21 +259,33 @@ export class HuntingManager {
 
         const event = this._run.lastEvent;
         if (event) {
-            if (event.type === "rest_site") {
-                const healAmount = Math.floor((this._run.carriedMaxHp ?? this._run.carriedHp ?? 100) * 0.25);
+            if (event.type === HUNTING_EVENT_TYPES.REST_SITE) {
+                const healAmount = Math.floor(
+                    (this._run.carriedMaxHp ?? this._run.carriedHp ?? 100) * (event.recoveryRatio ?? 0.25)
+                );
                 this._run = applyHuntingEventRecovery(this._run, { amount: healAmount });
                 const name = app.roster.find((f) => f.id === run.characterId)?.name ?? run.characterId;
                 app.ui.addLog(`[Hunting] Rest site: ${name} recovered ${healAmount} HP`);
                 app.ui.showToast(`Rest site: HP +${healAmount}`);
-            } else if (event.type === "chest_room") {
-                const chest = createHuntingChest({ rarity: Math.random() < 0.3 ? "uncommon" : "common" });
+            } else if (event.type === HUNTING_EVENT_TYPES.CHEST_ROOM) {
+                const chest = createHuntingChest({ rarity: event.chestRarity ?? "common" });
                 this._run = recordHuntingFloorResult(this._run, {
                     hpRemain: run.carriedHp,
                     maxHp: run.carriedMaxHp,
-                    loot: { keyShards: 0, chests: [chest], xp: 0 }
+                    loot: { keyShards: 0, chests: [chest], xp: 0 },
+                    consumeStatModifiers: false
                 });
                 app.ui.addLog(`[Hunting] Chest room: gained ${chest.rarity} chest`);
                 app.ui.showToast(`Chest room: ${chest.rarity} chest`);
+            } else if (event.type === HUNTING_EVENT_TYPES.CURSED_ALTAR) {
+                this._run = applyHuntingCursedAltar(this._run, { trade: event.trade });
+                app.ui.addLog(
+                    `[Hunting] Cursed altar: ${event.trade?.gainStat} x${event.trade?.gainMultiplier} / ${event.trade?.loseStat} x${event.trade?.loseMultiplier}`
+                );
+                app.ui.showToast("Cursed altar: stat trade active");
+            } else if (event.type === HUNTING_EVENT_TYPES.CHAMPION_INTRUSION) {
+                app.ui.addLog("[Hunting] Champion intrusion: next enemy is empowered");
+                app.ui.showToast("Champion intrusion: empowered enemy");
             }
         }
 

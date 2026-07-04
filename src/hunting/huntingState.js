@@ -1,4 +1,4 @@
-import { HUNTING_MAX_FLOOR } from "./huntingConfig.js";
+import { HUNTING_MAX_FLOOR, HUNTING_STAT_KEYS } from "./huntingConfig.js";
 import { applyDefeatPreservation, createEmptyHuntingLoot, mergeHuntingLoot } from "./huntingRewards.js";
 import { rollHuntingEvent } from "./huntingEncounters.js";
 
@@ -36,6 +36,7 @@ export function createHuntingRun({ characterId, now = Date.now(), maxFloor = HUN
         floor: 1,
         maxFloor,
         carriedHp: null,
+        statModifiers: [],
         pendingLoot: createEmptyHuntingLoot(),
         securedLoot: createEmptyHuntingLoot(),
         lastEvent: null,
@@ -45,10 +46,73 @@ export function createHuntingRun({ characterId, now = Date.now(), maxFloor = HUN
     };
 }
 
-export function recordHuntingFloorResult(run, { hpRemain = null, maxHp = null, loot = createEmptyHuntingLoot() } = {}) {
+function sanitizeStatMultiplier(value, fallback) {
+    if (!Number.isFinite(value)) return fallback;
+    return Math.max(0.1, Math.min(3, value));
+}
+
+function sanitizeEffectFloors(value) {
+    if (!Number.isFinite(value)) return 1;
+    return Math.max(1, Math.min(5, Math.floor(value)));
+}
+
+function sanitizeHuntingStatModifier(modifier) {
+    if (!modifier || typeof modifier !== "object") return null;
+    if (!HUNTING_STAT_KEYS.includes(modifier.stat)) return null;
+    return {
+        source: modifier.source ?? "hunting_event",
+        stat: modifier.stat,
+        multiplier: sanitizeStatMultiplier(modifier.multiplier, 1),
+        remainingFloors: sanitizeEffectFloors(modifier.remainingFloors ?? modifier.floors)
+    };
+}
+
+export function applyHuntingStatModifiersToSpec(spec, modifiers = []) {
+    const active = modifiers.map(sanitizeHuntingStatModifier).filter(Boolean);
+    if (!spec || active.length === 0) return spec;
+
+    const stats = { ...(spec.stats ?? {}) };
+    for (const modifier of active) {
+        if (!Number.isFinite(stats[modifier.stat])) continue;
+        const scaled = stats[modifier.stat] * modifier.multiplier;
+        stats[modifier.stat] = modifier.stat === "defense" ? Number(scaled.toFixed(3)) : Math.round(scaled);
+    }
+
+    return {
+        ...spec,
+        stats,
+        hunting: {
+            ...(spec.hunting ?? {}),
+            statModifiers: active
+        }
+    };
+}
+
+export function consumeHuntingStatModifierFloor(run) {
     if (!run || run.status !== "active") return run;
+    const statModifiers = (run.statModifiers ?? [])
+        .map(sanitizeHuntingStatModifier)
+        .filter(Boolean)
+        .map((modifier) => ({
+            ...modifier,
+            remainingFloors: modifier.remainingFloors - 1
+        }))
+        .filter((modifier) => modifier.remainingFloors > 0);
     return {
         ...run,
+        statModifiers
+    };
+}
+
+export function recordHuntingFloorResult(
+    run,
+    { hpRemain = null, maxHp = null, loot = createEmptyHuntingLoot(), consumeStatModifiers = true } = {}
+) {
+    if (!run || run.status !== "active") return run;
+    const consumed = consumeStatModifiers ? consumeHuntingStatModifierFloor(run) : run;
+    return {
+        ...run,
+        statModifiers: consumed.statModifiers,
         carriedHp: hpRemain === null ? run.carriedHp : Math.max(0, hpRemain),
         carriedMaxHp: maxHp === null ? run.carriedMaxHp : Math.max(0, maxHp),
         pendingLoot: mergeHuntingLoot(run.pendingLoot, loot),
@@ -102,6 +166,43 @@ export function applyHuntingEventRecovery(run, { amount = 0 } = {}) {
                 floor: run.floor,
                 amount,
                 hpRemain: recoveredHp
+            }
+        ]
+    };
+}
+
+export function applyHuntingCursedAltar(run, { trade = null } = {}) {
+    if (!run || run.status !== "active" || !trade) return run;
+    const gainModifier = sanitizeHuntingStatModifier({
+        source: "cursed_altar",
+        stat: trade.gainStat,
+        multiplier: trade.gainMultiplier,
+        floors: trade.floors
+    });
+    const loseModifier = sanitizeHuntingStatModifier({
+        source: "cursed_altar",
+        stat: trade.loseStat,
+        multiplier: trade.loseMultiplier,
+        floors: trade.floors
+    });
+    const modifiers = [gainModifier, loseModifier].filter(Boolean);
+    if (modifiers.length === 0) return run;
+
+    return {
+        ...run,
+        statModifiers: [...(run.statModifiers ?? []), ...modifiers],
+        history: [
+            ...run.history,
+            {
+                type: "event_cursed_altar",
+                floor: run.floor,
+                trade: {
+                    gainStat: trade.gainStat,
+                    loseStat: trade.loseStat,
+                    gainMultiplier: trade.gainMultiplier,
+                    loseMultiplier: trade.loseMultiplier,
+                    floors: trade.floors
+                }
             }
         ]
     };

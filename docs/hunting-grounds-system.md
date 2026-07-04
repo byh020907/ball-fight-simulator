@@ -469,3 +469,40 @@ src/
 - 승리 후 자동 흐름을 해치지 않는 귀환/전진 선택 UI
 - 상자 개봉의 실제 보상 테이블과 XP/외형/설계도 지급
 - 사냥터 매치 XP 지급과 `processedReportIds` 중복 방지 연결
+
+## 20. 2026-07-04 추가 구현 — 상자 보상 테이블과 이벤트 확장
+
+사냥터 상자는 더 이상 등급/id만 가진 더미 객체가 아닙니다. `createHuntingChest()`는 등급별 개봉 비용, 보상 테이블 버전, 미리보기 문자열을 함께 생성합니다.
+
+### 상자 보상 테이블
+
+구현 파일:
+
+- `src/hunting/huntingConfig.js`: 상자 5등급, 비용, 보상 타입 정의
+- `src/hunting/huntingRewards.js`: 등급별 보상 테이블, 보상 미리보기, 보상 롤링
+- `src/hunting/chestRewards.js`: 보관함 개봉 가능 여부, 실제 개봉, 즉시 적용 가능한 보상 반영
+
+보상 타입:
+
+| 타입 | 적용 |
+|---|---|
+| `key_shards` | 개봉 즉시 `profile.hunting.keyShards`에 반영 |
+| `instant_heal` | 후속 런 적용용 deferred effect로 반환 |
+| `temporary_stat` | 후속 런 적용용 deferred effect로 반환 |
+
+현재 MVP에서는 보관함에서 즉시 적용 가능한 해조각 보상만 프로필에 직접 반영합니다. HP 회복과 임시 스탯 증가는 런 시작/진행 UI에 연결할 후속 payload로 반환합니다. 새 저장 스키마를 성급히 늘리지 않기 위한 선택입니다.
+
+### 이벤트 확장
+
+`src/hunting/huntingEncounters.js`의 이벤트 풀은 아래 타입을 포함합니다.
+
+| 이벤트 | 효과 |
+|---|---|
+| `rest_site` | carried HP를 최대 HP의 25%만큼 회복 |
+| `chest_room` | 층수 기반 희귀도 상자를 pending loot에 추가 |
+| `cursed_altar` | 다음 전투에 적용되는 능력치 교환 효과 추가 |
+| `champion_intrusion` | 다음 적을 champion 타입으로 스케일하고 보상 해조각 1.5배 |
+
+저주받은 제단은 `applyHuntingCursedAltar()`를 통해 `run.statModifiers`에 gain/loss modifier를 추가합니다. 전투 클리어 시 `recordHuntingFloorResult()`가 modifier 지속 층수를 소모합니다. 상자방처럼 전투가 아닌 이벤트 보상은 `consumeStatModifiers: false`를 사용해 지속 층수를 소모하지 않습니다.
+
+챔피언 난입은 `HUNTING_ENEMY_TYPES.CHAMPION`과 `HUNTING_SCALING.CHAMPION_POWER_BONUS`를 사용합니다. `HuntingManager`는 해당 이벤트가 걸린 층의 적을 champion으로 스케일하고, 승리 시 해조각 보상에 `rewardMultiplier`를 적용합니다.
