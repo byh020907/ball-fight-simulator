@@ -1,0 +1,118 @@
+<div x-data="xpRewardPanel" class="xp-reward" x-show="visible" x-bind:class="{ levelup: levelUp }">
+    <div class="xp-reward-head">
+        <span x-text="characterName"></span>
+        <b x-text="'+' + xpGained + ' XP'"></b>
+    </div>
+    <div class="xp-reward-level">
+        <strong x-text="levelLabel"></strong>
+        <em x-show="levelUp">LEVEL UP</em>
+    </div>
+    <xp-progress-bar></xp-progress-bar>
+    <div class="xp-reward-foot">
+        <span x-text="progressText"></span>
+        <span x-text="nextText"></span>
+    </div>
+    <div class="xp-reward-next" x-show="nextRewardText" x-text="'다음 보상 · ' + nextRewardText"></div>
+</div>
+<script>
+    Alpine.data("xpRewardPanel", () => ({
+        visible: false,
+        characterName: "",
+        xpGained: 0,
+        levelLabel: "Lv.1",
+        levelUp: false,
+        progressText: "",
+        nextText: "",
+        nextRewardText: "",
+        _token: null,
+
+        init() {
+            this.$watch("$store.xpReward", (val) => {
+                if (!val) return;
+                if (!val.visible) {
+                    this.visible = false;
+                    return;
+                }
+                this.characterName = val.characterName ?? "";
+                this.xpGained = val.xpGained ?? 0;
+                this.levelLabel = val.levelLabel ?? "Lv.1";
+                this.levelUp = Boolean(val.levelUp);
+                this.progressText = val.progressText ?? "";
+                this.nextText = val.nextText ?? "";
+                this.nextRewardText = val.nextRewardText ?? "";
+                this.visible = true;
+                this._startAnimation(val);
+            }, { immediate: true });
+        },
+
+        _startAnimation(val) {
+            const startPct = Math.max(0, Math.min(100, val.progressBeforePct ?? 0));
+            const endPct = Math.max(0, Math.min(100, val.progressAfterPct ?? 0));
+            const token = `${Date.now()}-${Math.random()}`;
+            this._token = token;
+            this.$store.xpReward.animatedProgressPct = startPct;
+
+            setTimeout(() => {
+                if (this._token !== token) return;
+                this.$store.xpReward.animatedProgressPct = val.levelUp ? 100 : endPct;
+            }, 16);
+
+            if (val.levelUp) {
+                setTimeout(() => {
+                    if (this._token !== token) return;
+                    this.levelLabel = val.nextLevelLabel ?? `Lv.${val.level ?? 1}`;
+                    this.$store.xpReward.animatedProgressPct = 0;
+                    setTimeout(() => {
+                        if (this._token !== token) return;
+                        this.$store.xpReward.animatedProgressPct = endPct;
+                    }, 40);
+                }, 760);
+            }
+        }
+    }));
+</script>
+<style scoped>
+.xp-reward-head,
+.xp-reward-level,
+.xp-reward-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.xp-reward-head span,
+.xp-reward-foot span,
+.xp-reward-next {
+    min-width: 0;
+    font-size: 0.76rem;
+    font-weight: 800;
+    color: #555555;
+}
+
+.xp-reward-head b {
+    flex: 0 0 auto;
+    font-size: 1rem;
+    color: #0a8d32;
+}
+
+.xp-reward-level strong {
+    font-size: 1.08rem;
+    letter-spacing: 0;
+}
+
+.xp-reward-level em {
+    flex: 0 0 auto;
+    border: 2px solid #202020;
+    background: #ffcb3d;
+    color: #202020;
+    padding: 3px 7px;
+    font-style: normal;
+    font-size: 0.68rem;
+    font-weight: 900;
+}
+
+.levelup .xp-bar-fill {
+    background: linear-gradient(90deg, #0a8d32, #ffcb3d);
+}
+</style>

@@ -1,0 +1,22 @@
+<div x-data="xpProgressBar" class="xp-bar" aria-hidden="true">
+    <div class="xp-bar-fill" x-bind:style="'width:' + $store.xpReward?.animatedProgressPct + '%'"
+    ></div>
+</div>
+<script>
+    Alpine.data("xpProgressBar", () => ({}));
+</script>
+<style scoped>
+.xp-bar {
+    height: 14px;
+    border: 2px solid #202020;
+    background: #ffffff;
+    overflow: hidden;
+}
+
+.xp-bar-fill {
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, #59d6ff, #ffcb3d);
+    transition: width 760ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+</style>

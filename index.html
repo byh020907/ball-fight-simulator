@@ -72,35 +72,6 @@
         </div>
 
         <main class="app" x-data="appStore" x-cloak>
-            <!-- 태그 기반 컴포넌트 일반 예시: 결과 오버레이 XP 보상 패널 -->
-            <template id="template-xp-reward-panel">
-                <div class="xp-reward-head">
-                    <span x-text="xpReward.characterName"></span>
-                    <b x-text="'+' + xpReward.xpGained + ' XP'"></b>
-                </div>
-                <div class="xp-reward-level">
-                    <strong x-text="xpReward.levelLabel"></strong>
-                    <em x-show="xpReward.levelUp">LEVEL UP</em>
-                </div>
-                <!-- 태그 기반 컴포넌트 중첩 예시: 보상 패널 내부 진행 바 -->
-                <xp-progress-bar></xp-progress-bar>
-                <div class="xp-reward-foot">
-                    <span x-text="xpReward.progressText"></span>
-                    <span x-text="xpReward.nextText"></span>
-                </div>
-                <div
-                    class="xp-reward-next"
-                    x-show="xpReward.nextRewardText"
-                    x-text="'다음 보상 · ' + xpReward.nextRewardText"
-                ></div>
-            </template>
-
-            <template id="template-xp-progress-bar">
-                <div class="xp-bar" aria-hidden="true">
-                    <div class="xp-bar-fill" x-bind:style="'width:' + xpReward.animatedProgressPct + '%'"></div>
-                </div>
-            </template>
-
             <section class="game-frame">
                 <section class="battle-stage">
                     <section class="arena-shell">
@@ -131,11 +102,7 @@
                                 <span x-text="overlayLabel">Waiting Room</span>
                                 <strong x-text="overlayText">START THE FIGHT</strong>
                                 <p x-show="overlaySubtext" x-text="overlaySubtext"></p>
-                                <xp-reward-panel
-                                    class="xp-reward"
-                                    x-show="xpReward.visible"
-                                    x-bind:class="{ levelup: xpReward.levelUp }"
-                                ></xp-reward-panel>
+                                <xp-reward-panel class="xp-reward"></xp-reward-panel>
                             </div>
                         </div>
 
@@ -873,9 +840,22 @@
             // GitHub Pages 캐시 방지용 버전 파라미터
             const V = "0.24.0";
 
+            const { loadTemplates } = await import(`./src/componentLoader.js?v=${V}`);
             const { registerAlpineComponentSystem } = await import(`./src/alpineTemplateComponents.js?v=${V}`);
             const { appStore } = await import(`./src/ui.js?v=${V}`);
 
+            await loadTemplates();
+            Alpine.store("xpReward", {
+                visible: false,
+                characterName: "",
+                xpGained: 0,
+                levelLabel: "Lv.1",
+                levelUp: false,
+                animatedProgressPct: 0,
+                progressText: "",
+                nextText: "",
+                nextRewardText: ""
+            });
             registerAlpineComponentSystem(Alpine);
             Alpine.data("appStore", appStore);
             window.Alpine = Alpine;

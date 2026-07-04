@@ -12,6 +12,7 @@ import {
     getSpentStatPoints
 } from "../src/statAllocation.js";
 import { FIGHTER_IDS, Vector2 } from "../src/core.js";
+import { COMPONENTS } from "../src/componentLoader.js";
 import { findActionById } from "../src/clickActions.js";
 import { calcMatchXp, getLevelFromXp, getXpForNextLevel, calcTournamentXp } from "../src/experience/experienceState.js";
 import { getLevelRequirement } from "../src/experience/experienceConfig.js";
@@ -218,6 +219,15 @@ function makeHarness() {
         callback();
         return 0;
     };
+    const alpineStores = {};
+    context.Alpine = {
+        _stores: alpineStores,
+        store(name, value) {
+            if (arguments.length === 1) return this._stores[name];
+            this._stores[name] = value;
+            return value;
+        }
+    };
     context.window = context;
     return { context, elements };
 }
@@ -225,6 +235,17 @@ function makeHarness() {
 async function loadModuleApp() {
     const harness = makeHarness();
     Object.assign(globalThis, harness.context);
+    globalThis.Alpine.store("xpReward", {
+        visible: false,
+        characterName: "",
+        xpGained: 0,
+        levelLabel: "Lv.1",
+        levelUp: false,
+        animatedProgressPct: 0,
+        progressText: "",
+        nextText: "",
+        nextRewardText: ""
+    });
     const moduleUrl = new URL(`../src/app.js?test=${Date.now()}`, import.meta.url).href;
     const { BattleApp } = await import(moduleUrl);
     return new BattleApp();
@@ -237,7 +258,20 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
     alpineState.allocation = { ...allocation };
     alpineState.remainingPoints = 0;
     harness.context.document.querySelector = (selector) => (selector === ".app" ? appRoot : null);
+    harness.context.Alpine.store("xpReward", {
+        visible: false,
+        characterName: "",
+        xpGained: 0,
+        levelLabel: "Lv.1",
+        levelUp: false,
+        animatedProgressPct: 0,
+        progressText: "",
+        nextText: "",
+        nextRewardText: ""
+    });
+    const baseAlpine = harness.context.Alpine;
     harness.context.Alpine = {
+        ...baseAlpine,
         $data: (root) => (root === appRoot ? alpineState : null)
     };
     Object.assign(globalThis, harness.context);
@@ -996,14 +1030,13 @@ function testHuntingSystem() {
 
 function testAlpineTemplateComponentSystem() {
     const indexHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8");
-    assert.ok(
-        indexHtml.includes('template id="template-xp-reward-panel"'),
-        "Index should include a real component template"
-    );
+    assert.ok(COMPONENTS.includes("xp-reward-panel"), "componentLoader should export xp-reward-panel");
+    assert.ok(COMPONENTS.includes("xp-progress-bar"), "componentLoader should export xp-progress-bar");
     assert.ok(indexHtml.includes("<xp-reward-panel"), "Index should use a tag component for a real UI panel");
+    const rewardTemplateHtml = readFileSync(new URL("../src/components/xp-reward-panel.html", import.meta.url), "utf8");
     assert.ok(
-        indexHtml.includes("<xp-progress-bar></xp-progress-bar>"),
-        "Real component example should include a nested tag component"
+        rewardTemplateHtml.includes("<xp-progress-bar"),
+        "Reward panel template should include nested xp-progress-bar"
     );
 
     assert.equal(normalizeTemplateComponentName("pull-request"), "pull-request");
@@ -1245,8 +1278,12 @@ async function testMatchEndGrantsImmediateExperience(app) {
         "Player setup XP meter should update after match XP is granted"
     );
     assert.match(app.ui.state.overlaySubtext, /^\+\d+XP \(Lv\.\d+\)/, "Match result overlay should show XP");
-    assert.equal(app.ui.state.xpReward.visible, true, "Match result overlay should show the XP reward panel");
-    assert.equal(app.ui.state.xpReward.xpGained, app._lastMatchXpResult.xpGained);
+    assert.equal(
+        globalThis.Alpine.store("xpReward").visible,
+        true,
+        "Match result overlay should show the XP reward panel"
+    );
+    assert.equal(globalThis.Alpine.store("xpReward").xpGained, app._lastMatchXpResult.xpGained);
     assert.ok(
         app.ui.logItems.some((item) => item.includes("[경험치]")),
         "Match end should write an XP log entry immediately"

@@ -601,30 +601,20 @@ export class UIController {
         this._showXpReward(xpReward);
     }
 
+    _setXpReward(data) {
+        try {
+            const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
+            if (alpine) alpine.store("xpReward", data);
+        } catch {
+            // no-op outside browser
+        }
+    }
+
     _resetXpReward() {
-        const s = this.state;
-        if (!s) return;
-        s.xpReward = {
-            ...s.xpReward,
-            visible: false,
-            characterName: "",
-            xpGained: 0,
-            previousLevel: 1,
-            level: 1,
-            levelLabel: "Lv.1",
-            levelUp: false,
-            progressBeforePct: 0,
-            progressAfterPct: 0,
-            animatedProgressPct: 0,
-            progressText: "",
-            nextText: "",
-            nextRewardText: ""
-        };
+        this._setXpReward({ visible: false });
     }
 
     _showXpReward(reward) {
-        const s = this.state;
-        if (!s) return;
         if (!reward) {
             this._resetXpReward();
             return;
@@ -632,40 +622,21 @@ export class UIController {
 
         const startPct = Math.max(0, Math.min(100, reward.progressBeforePct ?? 0));
         const endPct = Math.max(0, Math.min(100, reward.progressAfterPct ?? 0));
-        const token = `${Date.now()}-${Math.random()}`;
-        s.xpReward = {
+
+        this._setXpReward({
             visible: true,
             characterName: reward.characterName ?? "",
             xpGained: reward.xpGained ?? 0,
-            previousLevel: reward.previousLevel ?? reward.level ?? 1,
-            level: reward.level ?? 1,
             levelLabel: reward.levelUp ? `Lv.${reward.previousLevel ?? reward.level ?? 1}` : (reward.levelLabel ?? ""),
             levelUp: Boolean(reward.levelUp),
             progressBeforePct: startPct,
             progressAfterPct: endPct,
-            animatedProgressPct: startPct,
             progressText: reward.progressText ?? "",
             nextText: reward.nextText ?? "",
             nextRewardText: reward.nextRewardText ?? "",
-            _token: token
-        };
-
-        setTimeout(() => {
-            if (s.xpReward._token !== token) return;
-            s.xpReward.animatedProgressPct = reward.levelUp ? 100 : endPct;
-        }, 16);
-
-        if (reward.levelUp) {
-            setTimeout(() => {
-                if (s.xpReward._token !== token) return;
-                s.xpReward.levelLabel = reward.levelLabel ?? `Lv.${reward.level ?? 1}`;
-                s.xpReward.animatedProgressPct = 0;
-                setTimeout(() => {
-                    if (s.xpReward._token !== token) return;
-                    s.xpReward.animatedProgressPct = endPct;
-                }, 40);
-            }, 760);
-        }
+            nextLevelLabel: reward.levelLabel ?? `Lv.${reward.level ?? 1}`,
+            level: reward.level ?? 1
+        });
     }
 
     showToast(message, duration = 3500) {

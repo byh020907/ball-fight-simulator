@@ -303,64 +303,6 @@ h1 {
     color: #202020;
 }
 
-.xp-reward-head,
-.xp-reward-level,
-.xp-reward-foot {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-}
-
-.xp-reward-head span,
-.xp-reward-foot span,
-.xp-reward-next {
-    min-width: 0;
-    font-size: 0.76rem;
-    font-weight: 800;
-    color: #555555;
-}
-
-.xp-reward-head b {
-    flex: 0 0 auto;
-    font-size: 1rem;
-    color: #0a8d32;
-}
-
-.xp-reward-level strong {
-    font-size: 1.08rem;
-    letter-spacing: 0;
-}
-
-.xp-reward-level em {
-    flex: 0 0 auto;
-    border: 2px solid #202020;
-    background: #ffcb3d;
-    color: #202020;
-    padding: 3px 7px;
-    font-style: normal;
-    font-size: 0.68rem;
-    font-weight: 900;
-}
-
-.xp-bar {
-    height: 14px;
-    border: 2px solid #202020;
-    background: #ffffff;
-    overflow: hidden;
-}
-
-.xp-bar-fill {
-    height: 100%;
-    width: 0;
-    background: linear-gradient(90deg, #59d6ff, #ffcb3d);
-    transition: width 760ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.xp-reward.levelup .xp-bar-fill {
-    background: linear-gradient(90deg, #0a8d32, #ffcb3d);
-}
-
 /* ?�?� ?�릭 ?�션 카드 ?�택 ?�?� */
 
 .action-pick {

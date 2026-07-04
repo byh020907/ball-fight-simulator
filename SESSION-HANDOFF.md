@@ -304,6 +304,18 @@
 - 영향: `src/alpineTemplateComponents.js`, `index.html`, `tests/regression.mjs`, `docs/alpine-component-system.md`, `docs/development-rules.md`, `SESSION-HANDOFF.md`
 - 검증: `npm run format`, `npm test`, `npm run check`, `npm run format:check` 통과. 브라우저 DOM 확인에서 `xComponentHosts=0`, `<xp-reward-panel>`/`<xp-progress-bar>` `data-component` 스탬프, `.xp-bar` 마운트, 콘솔 에러 없음 확인
 
+## [L1] 2026-07-04 — 템플릿 컴포넌트 파일 분리 (template.html + script 일체형)
+- 맥락: index.html에 인라인 `<template>`이 있어 컴포넌트가 늘어날수록 유지보수 어려움. HTML을 JS 문자열로 넣으면 IDE 도움(구문 강조, 자동완성)을 못 받음
+- 결정: (1) `src/componentLoader.js` 추가 — fetch → `<template>` 주입, `<script>`는 분리해서 실행 (2) 기존 `<template>`을 `src/components/<name>/template.html`로 분리, `<script>` 포함 가능 (3) 컴포넌트별 Alpine.data 등록은 template.html 내 `<script>`로 처리
+- 영향: `src/componentLoader.js` 생성, `src/components/xp-reward-panel/template.html`, `src/components/xp-progress-bar/template.html`, `index.html`(`<template>` 2개 제거, `loadTemplates()` 호출 추가), `tests/regression.mjs`(inline template 검증 대신 COMPONENTS 배열 검증)
+- 검증: `npm test`, `npm run check`, `npm run format:check` 통과
+
+## [L2] 2026-07-04 — 컴포넌트 자체 x-data 스코프 + Alpine.store() 브릿지
+- 배경: 분리된 컴포넌트가 여전히 부모 appStore의 xpReward를 직접 참조해 독립적이지 않음. Vue 컴포넌트처럼 각 컴포넌트가 자체 스코프를 가져야 함
+- 결정: (1) 각 템플릿 root에 `x-data="ComponentName"` 추가 (2) 데이터 교환은 `Alpine.store('xpReward', data)`로 통일 (3) `UIController._showXpReward`에서 `s.xpReward = {...}` → `Alpine.store('xpReward')`로 변경 (4) `index.html`의 `<xp-reward-panel>`에서 `x-show`/`x-bind:class`를 템플릿 내부로 이동
+- 영향: `src/ui.js`(UIController store 변경), `index.html`, `src/components/xp-reward-panel/template.html`(x-data + $store), `src/components/xp-progress-bar/template.html`(x-data + $store), `tests/regression.mjs`(Alpine store mock 추가)
+- 검증: `npm test`, `npm run check`, `npm run format:check` 통과
+
 ## 진행 중 이슈
 - 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
 - Time Warp 패널티 인상은 재학습 후 반영
