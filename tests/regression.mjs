@@ -44,6 +44,15 @@ import {
 import { Grenade } from "../src/entities/grenade.js";
 import { appStore, UIController } from "../src/ui.js";
 import { PATCH_NOTES } from "../src/patchNotes.js";
+import {
+    createTemplateComponentDirective,
+    getTemplateComponentId,
+    isValidTemplateComponentName,
+    mountTemplateComponent,
+    normalizeTemplateComponentName,
+    registerAlpineComponentSystem,
+    resolveTemplateComponent
+} from "../src/alpineTemplateComponents.js";
 
 function makeClassList() {
     const set = new Set();
@@ -979,6 +988,98 @@ function testHuntingSystem() {
     assert.equal(sanitized.hunting.chests.length, 1, "Sanitized profile should dedupe and discard invalid chests");
     assert.equal(sanitized.hunting.stats.deepestFloor, 4, "Sanitized profile should keep hunting stats");
     console.log("[hunting] ok");
+}
+
+function testAlpineTemplateComponentSystem() {
+    assert.equal(normalizeTemplateComponentName("pull-request"), "pull-request");
+    assert.equal(normalizeTemplateComponentName("'pull-request'"), "pull-request");
+    assert.equal(isValidTemplateComponentName("xp-meter"), true);
+    assert.equal(isValidTemplateComponentName("XpMeter"), false);
+    assert.equal(isValidTemplateComponentName("../bad"), false);
+    assert.equal(getTemplateComponentId("xp-meter"), "template-xp-meter");
+
+    const template = {
+        id: "template-xp-meter",
+        content: {
+            cloneNode() {
+                return {
+                    childNodes: [{ nodeType: 1, tagName: "SPAN" }]
+                };
+            }
+        }
+    };
+    const root = {
+        getElementById(id) {
+            return id === "template-xp-meter" ? template : null;
+        }
+    };
+    assert.equal(resolveTemplateComponent("xp-meter", { root }), template, "Template should resolve by prefix + name");
+    assert.equal(resolveTemplateComponent("../bad", { root }), null, "Invalid names should not hit the DOM");
+
+    const initialized = [];
+    const element = {
+        dataset: {},
+        children: [],
+        replaceChildren(fragment) {
+            this.children = [...fragment.childNodes];
+        }
+    };
+    assert.equal(
+        mountTemplateComponent(element, template, {
+            Alpine: {
+                initTree(child) {
+                    initialized.push(child);
+                }
+            }
+        }),
+        true,
+        "Template component mount should clone template content"
+    );
+    assert.equal(element.children.length, 1, "Mounted component should replace host children");
+    assert.equal(initialized.length, 1, "Mounted component should initialize cloned child roots");
+
+    const warnings = [];
+    const directive = createTemplateComponentDirective({
+        root,
+        warn(message) {
+            warnings.push(message);
+        }
+    });
+    const host = {
+        dataset: {},
+        children: [],
+        replaceChildren(fragment) {
+            this.children = [...fragment.childNodes];
+        }
+    };
+    let cleanupHandler = null;
+    directive(
+        host,
+        { expression: "xp-meter" },
+        { Alpine: { initTree() {} }, cleanup: (handler) => (cleanupHandler = handler) }
+    );
+    assert.equal(host.dataset.component, "xp-meter", "Directive should stamp component metadata");
+    assert.equal(host.children.length, 1, "Directive should mount template content");
+    assert.equal(typeof cleanupHandler, "function", "Directive should register cleanup");
+    cleanupHandler();
+    assert.equal(host.__bfsTemplateComponentName, undefined, "Cleanup should clear mount marker");
+
+    directive({ dataset: {} }, { expression: "../bad" }, { Alpine: { initTree() {} } });
+    assert.equal(warnings.length, 1, "Invalid component names should warn");
+
+    let registeredName = null;
+    let registeredDirective = null;
+    const alpine = {
+        directive(name, handler) {
+            registeredName = name;
+            registeredDirective = handler;
+            return { name };
+        }
+    };
+    registerAlpineComponentSystem(alpine, { root });
+    assert.equal(registeredName, "component", "System should register x-component");
+    assert.equal(typeof registeredDirective, "function", "System should register a directive function");
+    console.log("[alpine-components] ok");
 }
 
 async function testMatchEndGrantsImmediateExperience(app) {
@@ -3230,6 +3331,7 @@ await testCollisionImpulsePersists(app);
 await testGrenadeScatterShot(app);
 testExperienceSystem();
 testHuntingSystem();
+testAlpineTemplateComponentSystem();
 await testMatchEndGrantsImmediateExperience(app);
 await testDamageShake(app);
 await testArrowBounceFacing(app);

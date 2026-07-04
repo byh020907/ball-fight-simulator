@@ -421,6 +421,7 @@ UI는 **Alpine.js**를 통해 컴포넌트 기반으로 관리됩니다.
 - **반응형 상태**: `src/ui.js`의 `appStore()` 함수가 Alpine 컴포넌트의 상태를 정의합니다.
 - **CSS 분리**: 모든 스타일은 `src/styles.css`에 있으며, `index.html`은 `<link>`로 참조합니다.
 - **Alpine.js 공식 문서 우선**: Alpine.js 동작이 모호한 경우 [공식 문서](https://alpinejs.dev/)를 참고합니다. 구버전 블로그 글보다 최신 릴리스(3.x) 문서를 우선합니다. (예: `x-model` vs `x-modelable`, `$watch` vs `watch()`)
+- **반복 HTML 조각 재사용**: 중복 마크업은 `src/alpineTemplateComponents.js`의 `x-component` 시스템을 사용할 수 있습니다. 세부 규칙은 `docs/alpine-component-system.md`를 따르며, 상태/메서드 재사용 목적이면 `Alpine.data()`를 우선합니다.
 
 ### 데이터 흐름
 

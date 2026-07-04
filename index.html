@@ -868,8 +868,10 @@
             // GitHub Pages 캐시 방지용 버전 파라미터
             const V = "0.24.0";
 
+            const { registerAlpineComponentSystem } = await import(`./src/alpineTemplateComponents.js?v=${V}`);
             const { appStore } = await import(`./src/ui.js?v=${V}`);
 
+            registerAlpineComponentSystem(Alpine);
             Alpine.data("appStore", appStore);
             window.Alpine = Alpine;
 

@@ -293,12 +293,18 @@
 - 영향: `src/hunting/*`, `src/playerProfile.js`, `src/collection/collectionViewModel.js`, `src/ui.js`, `index.html`, `src/styles.css`, `tests/regression.mjs`, `docs/hunting-grounds-system.md`, `docs/collection-hub-ui.md`
 - 검증: `npm test` 통과. 입장 조건, 층별 스케일링, 해조각 보상, pending→secured 귀환, 패배 시 상자 파손 순서/50% 해조각/70% XP 보존, 상자 개봉 비용, 프로필 sanitize, 보관함 ViewModel을 회귀 테스트로 확인
 
+## [L1] 2026-07-04 — Alpine 템플릿 컴포넌트 시스템 기반 구성
+- 맥락: 사용자가 기존 Alpine 개발에서 쓰던 `x-component`/`template-*` 기반 커스텀 컴포넌트 패턴을 이 프로젝트에도 구성하기 원했고, 사냥터 UI 전에 시스템부터 잡아야 했음
+- 결정: Alpine 공식 확장 문서 기준에 맞춰 `Alpine.start()` 전 `registerAlpineComponentSystem(Alpine)`을 등록. `src/alpineTemplateComponents.js`에 `x-component` directive, kebab-case 이름 검증, `template-` 접두사 해석, `template.content.cloneNode(true)` 복제, 복제된 자식 루트 `Alpine.initTree(child)` 초기화를 구현. 호스트 자체 재초기화는 피함
+- 영향: `src/alpineTemplateComponents.js`, `index.html`, `tests/regression.mjs`, `docs/alpine-component-system.md`, `docs/development-rules.md`, `SESSION-HANDOFF.md`
+- 검증: `npm test`의 `[alpine-components] ok`에서 이름 검증/템플릿 해석/마운트/등록 동작 확인
+
 ## 진행 중 이슈
 - 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
 - Time Warp 패널티 인상은 재학습 후 반영
 
 ## 다음 할 일
-1. 사냥터 MVP 전투 연결: 메인 화면 입장 버튼, 우승 경험 캐릭터 선택 UI, `BattleSimulation` 층별 1v1 런, 승리 후 귀환/전진 선택, 사냥터 XP 지급/중복 방지 연결
+1. 사냥터 MVP 전투 연결: 메인 화면 입장 버튼, 우승 경험 캐릭터 선택 UI, `BattleSimulation` 층별 1v1 런, 승리 후 귀환/전진 선택, 사냥터 XP 지급/중복 방지 연결. 반복 카드/패널은 `docs/alpine-component-system.md` 기준으로 `x-component` 적용 후보 검토
 2. 전체 N×N PPO 학습 결과 저장 구조 설계: `{charId, actionId}`별 Actor/Critic/normalizer 저장 단위 결정
 3. PPO 커리큘럼 조정: Eater처럼 계속 지는 조합은 Rage 고정 상대 대신 더 쉬운 상대/랜덤 상대로 승리 terminal reward 샘플 확보
 4. PPO 학습 결과 저장/로드 전략 결정: `@tensorflow/tfjs` 유지 시 커스텀 직렬화, `tfjs-node` 도입 시 `file://` 저장
