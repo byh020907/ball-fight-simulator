@@ -756,12 +756,14 @@ function testRenderPlayerSetupCopiesAllocation(app) {
         stats: [],
         allocation,
         totalPoints: PLAYER_STAT_POINTS,
-        remainingPoints: 0
+        remainingPoints: 0,
+        huntingAvailable: true
     });
 
     state.adjustStat("hp", -10);
     assert.equal(allocation.hp, 20, "UI state should not mutate the caller's allocation object");
     assert.equal(state.allocation.hp, 10, "Rendered UI state should remain editable");
+    assert.equal(state.huntingAvailable, true, "Player setup should expose hunting availability");
 }
 
 async function testBattleAppAdoptsPreExistingAlpineAllocation() {

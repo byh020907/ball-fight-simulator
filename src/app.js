@@ -57,6 +57,7 @@ import {
     completeChallengeTournament,
     formatBonusSummary
 } from "./progression/progressionState.js";
+import { getEligibleHuntingCharacters } from "./hunting/huntingState.js";
 import { HuntingManager } from "./hunting/huntingManager.js";
 import { FIGHTER_IDS, Vector2 } from "./core.js";
 import {
@@ -224,6 +225,7 @@ export class BattleApp {
             perStatCapBonus: bonusCtx.perStatCapBonus
         });
         const experienceSummary = getCharacterExperienceSummary(this.playerProfile, this.playerFighterId);
+        const huntingAvailable = getEligibleHuntingCharacters(this.playerProfile, this.roster).length > 0;
         this.ui.renderPlayerSetup({
             fighter: player,
             stats: ALLOCATABLE_STATS,
@@ -235,7 +237,8 @@ export class BattleApp {
             challengeLevel: cl?.selectedLevel ?? 0,
             highestUnlockedLevel: cl?.highestUnlockedLevel ?? 0,
             progressionBonusSummary: bonusSummary,
-            experience: experienceSummary
+            experience: experienceSummary,
+            huntingAvailable
         });
 
         if (!this.tournament || this.tournament.champion) {

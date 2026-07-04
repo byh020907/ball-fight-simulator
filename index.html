@@ -128,7 +128,7 @@
                         <button
                             class="control-button hunting-btn"
                             type="button"
-                            x-show="!locked && !tournamentActive && !huntingActive"
+                            x-show="huntingAvailable && !tournamentActive && !huntingActive"
                             @click="openHuntingLobby()"
                         >
                             ⚔ 사냥터

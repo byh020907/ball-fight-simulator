@@ -117,6 +117,7 @@ export function appStore() {
 
         // Hunting ground
         huntingActive: false,
+        huntingAvailable: false,
         huntingChoiceVisible: false,
         huntingFloor: 1,
         huntingCharacterName: "",
@@ -336,7 +337,8 @@ export class UIController {
         challengeLevel = 0,
         highestUnlockedLevel = 0,
         progressionBonusSummary = "",
-        experience = null
+        experience = null,
+        huntingAvailable = false
     } = {}) {
         const s = this.state;
         if (!s) return;
@@ -352,6 +354,7 @@ export class UIController {
         s.challengeLevel = challengeLevel;
         s.highestUnlockedLevel = highestUnlockedLevel;
         s.progressionBonusSummary = progressionBonusSummary;
+        s.huntingAvailable = Boolean(huntingAvailable);
         s._startDisabled = null;
         s._startText = null;
         s._syncSummary?.();
