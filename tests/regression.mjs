@@ -46,9 +46,13 @@ import { appStore, UIController } from "../src/ui.js";
 import { PATCH_NOTES } from "../src/patchNotes.js";
 import {
     createTemplateComponentDirective,
+    findTemplateComponentTagHosts,
+    getTemplateComponentNameFromTagName,
     getTemplateComponentId,
     isValidTemplateComponentName,
     mountTemplateComponent,
+    mountTemplateComponentByName,
+    mountTemplateComponentTags,
     normalizeTemplateComponentName,
     registerAlpineComponentSystem,
     resolveTemplateComponent
@@ -996,10 +1000,10 @@ function testAlpineTemplateComponentSystem() {
         indexHtml.includes('template id="template-xp-reward-panel"'),
         "Index should include a real component template"
     );
-    assert.ok(indexHtml.includes('x-component="xp-reward-panel"'), "Index should use x-component for a real UI panel");
+    assert.ok(indexHtml.includes("<xp-reward-panel"), "Index should use a tag component for a real UI panel");
     assert.ok(
-        indexHtml.includes('x-component="xp-progress-bar"'),
-        "Real component example should include a nested component"
+        indexHtml.includes("<xp-progress-bar></xp-progress-bar>"),
+        "Real component example should include a nested tag component"
     );
 
     assert.equal(normalizeTemplateComponentName("pull-request"), "pull-request");
@@ -1008,6 +1012,8 @@ function testAlpineTemplateComponentSystem() {
     assert.equal(isValidTemplateComponentName("XpMeter"), false);
     assert.equal(isValidTemplateComponentName("../bad"), false);
     assert.equal(getTemplateComponentId("xp-meter"), "template-xp-meter");
+    assert.equal(getTemplateComponentNameFromTagName("XP-METER"), "xp-meter");
+    assert.equal(getTemplateComponentNameFromTagName("meter"), null, "Tag components should require kebab names");
 
     const template = {
         id: "template-xp-meter",
@@ -1057,6 +1063,11 @@ function testAlpineTemplateComponentSystem() {
         true,
         "Mount should still work when Alpine.initTree is unavailable"
     );
+    assert.equal(
+        mountTemplateComponentByName(element, "xp-meter", { root, Alpine: null, initialize: false }),
+        true,
+        "Component should mount by resolved component name"
+    );
 
     const warnings = [];
     const directive = createTemplateComponentDirective({
@@ -1089,7 +1100,32 @@ function testAlpineTemplateComponentSystem() {
     directive({ dataset: {} }, { expression: "missing-template" }, { Alpine: { initTree() {} } });
     assert.equal(warnings.length, 2, "Missing templates should warn without mutating the host");
 
+    const tagHost = {
+        tagName: "XP-METER",
+        dataset: {},
+        children: [],
+        replaceChildren(fragment) {
+            this.children = [...fragment.childNodes];
+        }
+    };
+    const tagRoot = {
+        getElementById(id) {
+            return id === "template-xp-meter" ? template : null;
+        },
+        querySelectorAll() {
+            return [tagHost, { tagName: "unknown-panel", dataset: {} }, { tagName: "meter", dataset: {} }];
+        }
+    };
+    assert.deepEqual(findTemplateComponentTagHosts(tagRoot), [tagHost], "Only matching tag hosts should be found");
+    assert.equal(
+        mountTemplateComponentTags({ root: tagRoot, Alpine: null, initialize: false }),
+        1,
+        "Matching component tags should mount before Alpine.start"
+    );
+    assert.equal(tagHost.dataset.component, "xp-meter", "Tag component should stamp component metadata");
+
     const nestedProgressHost = {
+        tagName: "XP-PROGRESS-BAR",
         dataset: {},
         children: [],
         replaceChildren(fragment) {
@@ -1119,10 +1155,16 @@ function testAlpineTemplateComponentSystem() {
             if (id === "template-xp-reward-panel") return nestedPanelTemplate;
             if (id === "template-xp-progress-bar") return nestedProgressTemplate;
             return null;
+        },
+        querySelectorAll() {
+            const hosts = [nestedPanelHost];
+            if (nestedPanelHost.children.length > 0) hosts.push(nestedProgressHost);
+            return hosts;
         }
     };
     const nestedDirective = createTemplateComponentDirective({ root: nestedRoot });
     const nestedPanelHost = {
+        tagName: "XP-REWARD-PANEL",
         dataset: {},
         children: [],
         replaceChildren(fragment) {
@@ -1143,6 +1185,20 @@ function testAlpineTemplateComponentSystem() {
     assert.equal(nestedProgressHost.dataset.component, "xp-progress-bar", "Nested component should mount");
     assert.equal(nestedProgressHost.children.length, 1, "Nested component should receive its template content");
     assert.ok(nestedInitCount >= 2, "Nested component roots should be initialized");
+
+    nestedPanelHost.children = [];
+    nestedProgressHost.children = [];
+    delete nestedPanelHost.__bfsTemplateComponentName;
+    delete nestedPanelHost.dataset.component;
+    delete nestedProgressHost.__bfsTemplateComponentName;
+    delete nestedProgressHost.dataset.component;
+    assert.equal(
+        mountTemplateComponentTags({ root: nestedRoot, Alpine: null, initialize: false }),
+        2,
+        "Nested tag components should mount across passes"
+    );
+    assert.equal(nestedPanelHost.dataset.component, "xp-reward-panel", "Parent tag component should mount");
+    assert.equal(nestedProgressHost.dataset.component, "xp-progress-bar", "Nested tag component should mount");
 
     let registeredName = null;
     let registeredDirective = null;

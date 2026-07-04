@@ -305,12 +305,18 @@
 - 영향: `index.html`, `docs/alpine-component-system.md`, `tests/regression.mjs`, `SESSION-HANDOFF.md`
 - 검증: `npm run format`, `npm test`, `npm run check`, `npm run format:check` 통과. 브라우저 DOM 확인에서 `xp-reward-panel`/`xp-progress-bar` 템플릿 존재, 보상 패널/중첩 진행 바 `data-component` 스탬프, `.xp-bar` 마운트, 콘솔 에러 없음 확인
 
+## [L1] 2026-07-04 — 템플릿 컴포넌트 기본 문법을 태그 기반으로 전환
+- 맥락: 사용자가 예전 Alpine 컴포넌트 시스템처럼 `div x-component`가 아니라 태그 자체로 컴포넌트를 쓰는 방식을 선호한다고 확인
+- 결정: `src/alpineTemplateComponents.js`에 `<component-name>` 태그 호스트 탐색/마운트 기능을 추가하고, `registerAlpineComponentSystem(Alpine)`이 `Alpine.start()` 전에 태그 컴포넌트를 템플릿으로 확장하게 변경. `x-component` directive는 호환/보조 문법으로 유지. XP 보상 패널 실사용 예시는 `<xp-reward-panel>`, 중첩 진행 바는 `<xp-progress-bar>`로 전환
+- 영향: `src/alpineTemplateComponents.js`, `index.html`, `tests/regression.mjs`, `docs/alpine-component-system.md`, `docs/development-rules.md`, `SESSION-HANDOFF.md`
+- 검증: `npm run format`, `npm test`, `npm run check`, `npm run format:check` 통과. 브라우저 DOM 확인에서 `xComponentHosts=0`, `<xp-reward-panel>`/`<xp-progress-bar>` `data-component` 스탬프, `.xp-bar` 마운트, 콘솔 에러 없음 확인
+
 ## 진행 중 이슈
 - 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
 - Time Warp 패널티 인상은 재학습 후 반영
 
 ## 다음 할 일
-1. 사냥터 MVP 전투 연결: 메인 화면 입장 버튼, 우승 경험 캐릭터 선택 UI, `BattleSimulation` 층별 1v1 런, 승리 후 귀환/전진 선택, 사냥터 XP 지급/중복 방지 연결. 반복 카드/패널은 `docs/alpine-component-system.md` 기준으로 `x-component` 적용 후보 검토
+1. 사냥터 MVP 전투 연결: 메인 화면 입장 버튼, 우승 경험 캐릭터 선택 UI, `BattleSimulation` 층별 1v1 런, 승리 후 귀환/전진 선택, 사냥터 XP 지급/중복 방지 연결. 반복 카드/패널은 `docs/alpine-component-system.md` 기준으로 태그 기반 템플릿 컴포넌트 적용 후보 검토
 2. 전체 N×N PPO 학습 결과 저장 구조 설계: `{charId, actionId}`별 Actor/Critic/normalizer 저장 단위 결정
 3. PPO 커리큘럼 조정: Eater처럼 계속 지는 조합은 Rage 고정 상대 대신 더 쉬운 상대/랜덤 상대로 승리 terminal reward 샘플 확보
 4. PPO 학습 결과 저장/로드 전략 결정: `@tensorflow/tfjs` 유지 시 커스텀 직렬화, `tfjs-node` 도입 시 `file://` 저장

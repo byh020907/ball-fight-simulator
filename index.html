@@ -72,7 +72,7 @@
         </div>
 
         <main class="app" x-data="appStore" x-cloak>
-            <!-- x-component 일반 예시: 결과 오버레이 XP 보상 패널 -->
+            <!-- 태그 기반 컴포넌트 일반 예시: 결과 오버레이 XP 보상 패널 -->
             <template id="template-xp-reward-panel">
                 <div class="xp-reward-head">
                     <span x-text="xpReward.characterName"></span>
@@ -82,8 +82,8 @@
                     <strong x-text="xpReward.levelLabel"></strong>
                     <em x-show="xpReward.levelUp">LEVEL UP</em>
                 </div>
-                <!-- x-component 중첩 예시: 보상 패널 내부 진행 바 -->
-                <div x-component="xp-progress-bar"></div>
+                <!-- 태그 기반 컴포넌트 중첩 예시: 보상 패널 내부 진행 바 -->
+                <xp-progress-bar></xp-progress-bar>
                 <div class="xp-reward-foot">
                     <span x-text="xpReward.progressText"></span>
                     <span x-text="xpReward.nextText"></span>
@@ -131,12 +131,11 @@
                                 <span x-text="overlayLabel">Waiting Room</span>
                                 <strong x-text="overlayText">START THE FIGHT</strong>
                                 <p x-show="overlaySubtext" x-text="overlaySubtext"></p>
-                                <div
+                                <xp-reward-panel
                                     class="xp-reward"
                                     x-show="xpReward.visible"
                                     x-bind:class="{ levelup: xpReward.levelUp }"
-                                    x-component="xp-reward-panel"
-                                ></div>
+                                ></xp-reward-panel>
                             </div>
                         </div>
 
