@@ -11,3 +11,4 @@ export { HeroAbility } from "./heroAbility.js";
 export { VampireAbility } from "./vampireAbility.js";
 export { GunnerAbility } from "./gunnerAbility.js";
 export { PhantomAbility } from "./phantomAbility.js";
+export { HuntingMeleeAbility } from "./huntingMeleeAbility.js";

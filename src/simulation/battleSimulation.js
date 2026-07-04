@@ -11,7 +11,8 @@ import {
     HeroAbility,
     VampireAbility,
     GunnerAbility,
-    PhantomAbility
+    PhantomAbility,
+    HuntingMeleeAbility
 } from "../abilities/index.js";
 import { BattleBall } from "../entities/index.js";
 import { GravityParticle } from "../effects/index.js";
@@ -30,7 +31,8 @@ const ABILITY_TYPES = {
     hero: HeroAbility,
     vampire: VampireAbility,
     gunner: GunnerAbility,
-    phantom: PhantomAbility
+    phantom: PhantomAbility,
+    hunting_melee: HuntingMeleeAbility
 };
 
 const COLLISION_RESTITUTION = 0.92;

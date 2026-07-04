@@ -21,7 +21,7 @@ export const HUNTING_MONSTER_BASE_SPECS = Object.freeze({
         description: "사냥터에서 무리로 달려드는 근접 몹입니다.",
         color: "#9b5d3f",
         face: "dash",
-        ability: "dash",
+        ability: "hunting_melee",
         stats: Object.freeze({ hp: 74, damage: 8, speed: 305, radius: 34, mass: 0.95, defense: 1 })
     }),
     [HUNTING_MONSTER_TYPES.RANGED]: Object.freeze({

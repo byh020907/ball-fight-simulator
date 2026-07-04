@@ -396,3 +396,9 @@
 - 맥락: 사용자가 사냥터는 기본적으로 한 번이라도 우승해서 사용 가능한 캐릭터가 존재할 때 버튼이 생성되어야 한다고 요청.
 - 결정: `refreshPlayerSetup()`에서 `getEligibleHuntingCharacters(playerProfile, roster)` 결과를 기준으로 `huntingAvailable` 상태를 계산하고, 메인 화면 사냥터 버튼은 `huntingAvailable && !tournamentActive && !huntingActive`일 때만 표시.
 - 영향: `src/app.js`, `src/ui.js`, `index.html`, `tests/regression.mjs`
+
+## [L1] 2026-07-04 — 근접몹은 전용 추적 능력으로 이동
+- 맥락: 사용자가 사냥터 근접몹이 움직이지 않는다고 보고. 기존 근접몹은 `dash` 능력을 재사용해 쿨다운 돌진 외에는 플레이어 추적형 몹처럼 보이지 않았음.
+- 결정: `HuntingMeleeAbility`를 추가해 근접몹이 매 프레임 가장 가까운 적을 향해 조향하도록 변경. 근접몹 스펙은 `ability: "hunting_melee"`를 사용하고, 시뮬레이션/UI ability map에 등록.
+- 검증: 수치 시뮬레이션에서 근접몹과 플레이어 거리 `460 -> 187.55` 감소 확인. `npm test`, `npm run check`, `npm run format:check` 통과.
+- 영향: `src/abilities/huntingMeleeAbility.js`, `src/abilities/index.js`, `src/hunting/huntingMonsters.js`, `src/simulation/battleSimulation.js`, `src/ui.js`, `tests/regression.mjs`

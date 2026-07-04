@@ -48,6 +48,7 @@ import {
     HUNTING_MONSTER_TYPES,
     HUNTING_TEAMS,
     createHuntingMinibossSpec,
+    createHuntingMobSpec,
     createHuntingMobEncounter,
     getHuntingMobCount,
     shouldUseRosterMiniboss
@@ -997,6 +998,11 @@ function testHuntingSystem() {
             mobs.some((mob) => mob.hunting.monsterType === HUNTING_MONSTER_TYPES.RANGED),
         "Hunting mob encounters should include melee and ranged monster archetypes"
     );
+    assert.equal(
+        mobs.find((mob) => mob.hunting.monsterType === HUNTING_MONSTER_TYPES.MELEE).ability,
+        "hunting_melee",
+        "Hunting melee mobs should use the chase-focused monster ability"
+    );
     assert.equal(shouldUseRosterMiniboss(3), true, "Every third hunting floor should add a roster miniboss");
     const miniboss = createHuntingMinibossSpec({
         roster: [
@@ -1473,6 +1479,41 @@ function testArenaCameraZoom() {
         0.78,
         "Large multi-fighter matches should zoom the arena view out"
     );
+}
+
+function testHuntingMeleeMobChasesTarget(app) {
+    const playerSpec = {
+        ...app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER),
+        teamId: HUNTING_TEAMS.PLAYER
+    };
+    const meleeSpec = createHuntingMobSpec({
+        type: HUNTING_MONSTER_TYPES.MELEE,
+        floor: 1,
+        index: 0
+    });
+    const sim = new BattleSimulation([playerSpec, meleeSpec], {
+        onLog() {},
+        onSound() {}
+    });
+    const [player, melee] = sim.fighters;
+    player.position = new Vector2(260, 480);
+    player.velocity = new Vector2(0, 0);
+    melee.position = new Vector2(720, 480);
+    melee.velocity = new Vector2(0, 0);
+
+    const before = Vector2.subtract(player.position, melee.position).length();
+    for (let index = 0; index < 30; index += 1) {
+        melee.update(1 / 60, sim);
+    }
+    const after = Vector2.subtract(player.position, melee.position).length();
+
+    assert.equal(
+        melee.ability.constructor.name,
+        "HuntingMeleeAbility",
+        "Melee hunting mobs should bind the dedicated chase ability"
+    );
+    assert.ok(after < before - 20, "Melee hunting mobs should close distance toward the player");
+    assert.ok(melee.velocity.x < 0, "Melee hunting mobs should move horizontally toward the player");
 }
 
 function testTeamTargetingAndFriendlyCollision(app) {
@@ -3636,6 +3677,7 @@ testIndexCacheVersionMatchesLatestPatchNote();
 testStatBalanceSystem();
 testMultiFighterSimulationSetup(app);
 testArenaCameraZoom();
+testHuntingMeleeMobChasesTarget(app);
 testTeamTargetingAndFriendlyCollision(app);
 testTeamsResolveByRemainingHostileTeams(app);
 testProjectileIgnoresAllies(app);

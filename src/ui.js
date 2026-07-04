@@ -25,7 +25,8 @@ import {
     HeroAbility,
     VampireAbility,
     GunnerAbility,
-    PhantomAbility
+    PhantomAbility,
+    HuntingMeleeAbility
 } from "./abilities/index.js";
 import { ArenaCamera } from "./camera.js";
 
@@ -41,7 +42,8 @@ const ABILITY_MAP = {
     hero: HeroAbility,
     vampire: VampireAbility,
     gunner: GunnerAbility,
-    phantom: PhantomAbility
+    phantom: PhantomAbility,
+    hunting_melee: HuntingMeleeAbility
 };
 
 // ── Alpine.js x-data function ───────────────────────────────────────────────
