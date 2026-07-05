@@ -2208,6 +2208,14 @@ function testHuntingTerrain() {
     // angularVelocity=3, damping=0.5 → effective=1.5, angle=1.5+1.5=3.0
     assert.equal(spinner.angle, 3, "angularDamping should reduce effective angularVelocity");
 
+    // ── terrain draw wraps ctx state with save/restore ──
+    const leakCtx = makeRecordingCanvasContext();
+    drawTerrain(leakCtx, caveTerrain);
+    const saveCalls = leakCtx.calls.filter((c) => c[0] === "save");
+    const restoreCalls = leakCtx.calls.filter((c) => c[0] === "restore");
+    assert.ok(saveCalls.length >= caveTerrain.length, "drawTerrain should save ctx state per obstacle");
+    assert.ok(restoreCalls.length >= caveTerrain.length, "drawTerrain should restore ctx state per obstacle");
+
     console.log("[hunting-terrain] ok");
 }
 

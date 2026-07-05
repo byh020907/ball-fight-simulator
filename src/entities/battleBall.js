@@ -385,24 +385,29 @@ export class BattleBall extends mixins([PhysicsBody]) {
     }
 
     _drawPolygonBody(ctx) {
-        const { x, y } = this.position;
-        const n = this.appearance.sides;
-        const a = (Math.PI * 2) / n;
-        const r = this.radius;
-        const offset = -Math.PI / 2 - a / 2;
-        ctx.beginPath();
-        for (let i = 0; i < n; i++) {
-            const angle = i * a + offset;
-            const px = x + Math.cos(angle) * r;
-            const py = y + Math.sin(angle) * r;
-            if (i === 0) ctx.moveTo(px, py);
-            else ctx.lineTo(px, py);
+        ctx.save();
+        try {
+            const { x, y } = this.position;
+            const n = this.appearance.sides;
+            const a = (Math.PI * 2) / n;
+            const r = this.radius;
+            const offset = -Math.PI / 2 - a / 2;
+            ctx.beginPath();
+            for (let i = 0; i < n; i++) {
+                const angle = i * a + offset;
+                const px = x + Math.cos(angle) * r;
+                const py = y + Math.sin(angle) * r;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = "#202020";
+            ctx.lineWidth = Math.max(3, r * 0.07);
+            ctx.stroke();
+        } finally {
+            ctx.restore();
         }
-        ctx.closePath();
-        ctx.fill();
-        ctx.strokeStyle = "#202020";
-        ctx.lineWidth = Math.max(3, r * 0.07);
-        ctx.stroke();
     }
 
     drawFace(ctx, rotation = 0) {

@@ -320,17 +320,21 @@ export class ArenaRenderer {
     }
 
     _drawArenaBackground(ctx, simulation) {
-        const theme = simulation.arenaTheme;
-        if (theme === "cave") {
-            this._drawCaveBackground(ctx, simulation);
-        } else if (theme === "forest") {
-            this._drawForestBackground(ctx, simulation);
-        } else if (theme === "desert") {
-            this._drawDesertBackground(ctx, simulation);
-        } else {
-            // 기본 배경: 밝은 회색 바닥
-            ctx.fillStyle = "#f5f5f5";
-            ctx.fillRect(0, 0, simulation.width, simulation.height);
+        ctx.save();
+        try {
+            const theme = simulation.arenaTheme;
+            if (theme === "cave") {
+                this._drawCaveBackground(ctx, simulation);
+            } else if (theme === "forest") {
+                this._drawForestBackground(ctx, simulation);
+            } else if (theme === "desert") {
+                this._drawDesertBackground(ctx, simulation);
+            } else {
+                ctx.fillStyle = "#f5f5f5";
+                ctx.fillRect(0, 0, simulation.width, simulation.height);
+            }
+        } finally {
+            ctx.restore();
         }
     }
 
