@@ -1,5 +1,11 @@
 # 결정 기록
 
+## [L1] 2026-07-06 — 사냥터 이동 구간 표시를 10층 전진 기준으로 고정
+- 맥락: 사냥터 이동 UI에서 진행 바는 10층 전진 기준인데 좌우 층 표시는 매 1층 이동의 현재/다음층(7F→8F)으로 바뀌어 의미가 어긋남.
+- 결정: `advance()`에서 `routeStartFloor`/`routeEndFloor`/`routeMaxSteps`를 루프 전 한 번 계산. `_setHuntingMoveState`에 `routeStartFloor`/`routeEndFloor` 전달. 95층처럼 끝에 가까우면 routeMaxSteps가 5로 clamp. 중간 정지 시에도 route head는 시작/목표 구간 유지, message만 실제 층 표시.
+- 영향: `src/hunting/huntingManager.js`, `tests/regression.mjs`, `docs/hunting-grounds-system.md`, `SESSION-HANDOFF.md`
+- 검증: `npm test` (9개 스위트), `npm run check`, `npm run format:check` 통과
+
 ## [L1] 2026-07-06 — 방어구 하나가 풀세트처럼 보이지 않게 외형을 분리
 - 맥락: 천 갑옷 한 벌만 착용했는데 상단/하단 띠 + 좌측 방패가 모두 그려져 마치 풀셋 갑옷처럼 보이는 문제. 아이템 이름에 따라 다른 외형을 보여줘야 함.
 - 결정: (1) `inferArmorVariant(item)` 도입 — 아이템 이름 기반 4종 variant 추론 (cloth/vest/shield/plate). `item.visualVariant`가 명시되면 우선. (2) `drawArmorVariant` dispatcher + `drawClothArmor`/`drawVestArmor`/`drawShieldArmor`/`drawPlateArmor` 4종 분리. cloth=얇은 천 띠 1개+측면 주름, vest=가슴 보호대+스트랩, shield=방패 단독, plate=기존 띠×2+방패. (3) 기존 `drawArmor` 삭제. (4) 테스트: 기준선 대비 ellipse 증감 검증, variant 추론 검증, shield/plate variant draw 검증.

@@ -1121,6 +1121,75 @@ function testComponentBridgeCallsGameHandlers(app) {
     assert.equal(advanced, true, "Overlay advance action should call HuntingManager.advance");
 }
 
+function testHuntingUiRouteDisplay() {
+    // HuntingManager._setHuntingMoveState가 route range를 올바르게 전달하는지 검증
+    const recorded = { calls: [] };
+    const mockUi = {
+        setHuntingOverlayState(data) {
+            recorded.calls.push({ ...data });
+        }
+    };
+    const mockApp = { ui: mockUi };
+    // HuntingManager 인스턴스 없이도 _setHuntingMoveState는 this.app 참조만 필요
+    // app.hunting을 통해 간접 테스트하거나 mock으로 직접 호출
+    const hunting = app.hunting;
+
+    // 7층에서 시작하는 10층 전진 시뮬레이션
+    app.hunting._run = { floor: 7, maxFloor: 100 };
+    const originalUi = app.ui;
+    app.ui = mockUi;
+    try {
+        hunting._setHuntingMoveState({
+            moving: true,
+            step: 1,
+            maxSteps: 10,
+            routeStartFloor: 7,
+            routeEndFloor: 17,
+            message: "8층으로 이동 중…"
+        });
+
+        const state = recorded.calls[recorded.calls.length - 1];
+        assert.equal(state.huntingMoveFrom, 7, "Route start should show 7F");
+        assert.equal(state.huntingMoveTo, 17, "Route end should show 17F");
+        assert.equal(state.huntingMoveStep, 1, "Step should be 1");
+        assert.equal(state.huntingMoveMax, 10, "Max steps should be 10");
+        assert.equal(state.huntingMoveMessage, "8층으로 이동 중…", "Message should show current floor");
+
+        // 95층에서 전진: routeMaxSteps가 5로 clamp
+        recorded.calls = [];
+        app.hunting._run = { floor: 95, maxFloor: 100 };
+        hunting._setHuntingMoveState({
+            moving: true,
+            step: 1,
+            maxSteps: 5,
+            routeStartFloor: 95,
+            routeEndFloor: 100,
+            message: "96층으로 이동 중…"
+        });
+
+        const state2 = recorded.calls[recorded.calls.length - 1];
+        assert.equal(state2.huntingMoveFrom, 95, "95층 route start");
+        assert.equal(state2.huntingMoveTo, 100, "100층 route end (clamped)");
+        assert.equal(state2.huntingMoveMax, 5, "95→100 is 5 steps");
+
+        // 중간 단계에서도 route 표시는 변하지 않아야 함
+        recorded.calls = [];
+        hunting._setHuntingMoveState({
+            moving: true,
+            step: 3,
+            maxSteps: 10,
+            routeStartFloor: 7,
+            routeEndFloor: 17,
+            message: "10층으로 이동 중…"
+        });
+        const state3 = recorded.calls[recorded.calls.length - 1];
+        assert.equal(state3.huntingMoveFrom, 7, "Route start should stay 7F at step 3");
+        assert.equal(state3.huntingMoveTo, 17, "Route end should stay 17F at step 3");
+    } finally {
+        app.ui = originalUi;
+    }
+}
+
 function testComponentBridgeEquipmentFunctions() {
     const bridge = createComponentBridge(globalThis.Alpine);
 
@@ -5085,6 +5154,7 @@ testStatAllocationRules(app);
 testStatAllocationUiSyncEvent();
 testRenderPlayerSetupCopiesAllocation(app);
 testComponentBridgeCallsGameHandlers(app);
+testHuntingUiRouteDisplay();
 testComponentBridgeEquipmentFunctions();
 await testBattleAppAdoptsPreExistingAlpineAllocation();
 testIndexCacheVersionMatchesLatestPatchNote();

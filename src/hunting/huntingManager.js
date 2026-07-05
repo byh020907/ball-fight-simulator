@@ -374,18 +374,20 @@ export class HuntingManager {
         app.ui.setHuntingOverlayState({ huntingChoiceVisible: false });
 
         try {
-            const MAX_STEPS = HUNTING_ADVANCE_STEPS;
+            const routeStartFloor = this._run.floor;
+            const routeEndFloor = Math.min(this._run.maxFloor, routeStartFloor + HUNTING_ADVANCE_STEPS);
+            const routeMaxSteps = Math.max(1, routeEndFloor - routeStartFloor);
             const FLOOR_STEP_MS = 350;
 
-            for (let step = 0; step < MAX_STEPS; step++) {
+            for (let step = 0; step < routeMaxSteps; step++) {
                 const fromFloor = this._run.floor;
                 const targetFloor = Math.min(this._run.maxFloor, fromFloor + 1);
                 this._setHuntingMoveState({
                     moving: true,
                     step: step + 1,
-                    maxSteps: MAX_STEPS,
-                    startFloor: fromFloor,
-                    targetFloor,
+                    maxSteps: routeMaxSteps,
+                    routeStartFloor,
+                    routeEndFloor,
                     message: `${targetFloor}층으로 이동 중…`
                 });
 
@@ -462,7 +464,7 @@ export class HuntingManager {
 
             // 모든 이동 단계 소진 — 정지 없이 최대 10층 전진 완료
             this._stopHuntingMoveForChoice(app, {
-                message: `${MAX_STEPS}층 전진 완료 — ${this._run.floor}층`,
+                message: `${routeMaxSteps}층 전진 완료 — ${this._run.floor}층`,
                 canRetreat: false,
                 floor: this._run.floor,
                 summary: `현재 ${this._run.floor}층 · 포탈 없이는 귀환 불가`
@@ -477,11 +479,11 @@ export class HuntingManager {
         }
     }
 
-    _setHuntingMoveState({ moving, step, maxSteps, startFloor, targetFloor, message }) {
+    _setHuntingMoveState({ moving, step, maxSteps, routeStartFloor, routeEndFloor, message }) {
         this.app.ui.setHuntingOverlayState({
             huntingMoving: moving,
-            huntingMoveFrom: startFloor,
-            huntingMoveTo: targetFloor,
+            huntingMoveFrom: routeStartFloor,
+            huntingMoveTo: routeEndFloor,
             huntingMoveStep: step,
             huntingMoveMax: maxSteps,
             huntingMoveMessage: message
