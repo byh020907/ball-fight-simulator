@@ -3,28 +3,30 @@
     type="button"
     x-show="$store.huntingButton.available && !$store.huntingButton.tournamentActive && !$store.huntingButton.active"
     @click="$store.huntingButton._actions.openLobby()"
->사냥터</button>
+>
+    사냥터
+</button>
 <style scoped>
-:scope {
-    font-family: inherit;
-    border: 2px solid #202020;
-    border-radius: 8px;
-    padding: 8px 16px;
-    font-size: 0.82rem;
-    font-weight: 700;
-    cursor: pointer;
-    background: #ffffff;
-    transition: background 0.1s;
-    bottom: 90px;
-}
-
-:scope:hover {
-    background: #eeeeee;
-}
-
-@media (max-width: 760px) {
     :scope {
-        bottom: 76px;
+        font-family: inherit;
+        border: 2px solid #202020;
+        border-radius: 8px;
+        padding: 8px 16px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        cursor: pointer;
+        background: #ffffff;
+        transition: background 0.1s;
+        bottom: 90px;
     }
-}
+
+    :scope:hover {
+        background: #eeeeee;
+    }
+
+    @media (max-width: 760px) {
+        :scope {
+            bottom: 76px;
+        }
+    }
 </style>

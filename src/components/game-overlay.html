@@ -20,155 +20,159 @@
                 <span x-text="$store.gameOverlay.huntingLootSummary"></span>
             </div>
             <div class="hunting-choice-buttons">
-                <button class="hunting-btn retreat" type="button" @click="$store.gameOverlay._actions.huntingRetreat()">귀환</button>
-                <button class="hunting-btn advance" type="button" @click="$store.gameOverlay._actions.huntingAdvance()">전진</button>
+                <button class="hunting-btn retreat" type="button" @click="$store.gameOverlay._actions.huntingRetreat()">
+                    귀환
+                </button>
+                <button class="hunting-btn advance" type="button" @click="$store.gameOverlay._actions.huntingAdvance()">
+                    전진
+                </button>
             </div>
         </div>
     </div>
 </div>
 <style scoped>
-:scope {
-    position: absolute;
-    inset: 0;
-    border-radius: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    pointer-events: none;
-    background: #eeeeee;
-}
+    :scope {
+        position: absolute;
+        inset: 0;
+        border-radius: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        background: #eeeeee;
+    }
 
-:scope.transient {
-    background: transparent;
-    align-items: center;
-}
-
-:scope.transient .overlay-card {
-    max-width: min(78%, 360px);
-    padding: 0;
-    border: 0;
-    background: transparent;
-}
-
-:scope.transient .overlay-card span {
-    margin-bottom: 4px;
-    color: rgba(17, 17, 17, 0.58);
-    letter-spacing: 0.18em;
-}
-
-:scope.transient .overlay-card strong {
-    font-size: clamp(1.2rem, 4vw, 2rem);
-    color: rgba(17, 17, 17, 0.72);
-}
-
-.overlay-enter {
-    transition: opacity 400ms ease;
-}
-.overlay-enter-start {
-    opacity: 0;
-}
-.overlay-enter-end {
-    opacity: 1;
-}
-.overlay-leave {
-    transition: opacity 300ms ease;
-}
-.overlay-leave-start {
-    opacity: 1;
-}
-.overlay-leave-end {
-    opacity: 0;
-}
-
-:scope.transient .overlay-enter {
-    transition: opacity 200ms ease;
-}
-:scope.transient .overlay-leave {
-    transition: opacity 150ms ease;
-}
-
-.overlay-card {
-    text-align: center;
-    padding: 28px 32px;
-}
-
-.overlay-card span {
-    display: block;
-    font-size: 0.82rem;
-    text-transform: uppercase;
-    letter-spacing: 0.18em;
-    color: #111111;
-    margin-bottom: 14px;
-    font-weight: 700;
-}
-
-.overlay-card strong {
-    display: block;
-    font-size: clamp(2rem, 8vw, 3.4rem);
-    letter-spacing: -0.05em;
-    color: #111111;
-}
-
-.overlay-card p {
-    margin: 12px 0 0;
-    color: #202020;
-}
-
-.hunting-btn {
-    font-family: inherit;
-    border: 2px solid #202020;
-    border-radius: 8px;
-    padding: 8px 16px;
-    font-size: 0.82rem;
-    font-weight: 700;
-    cursor: pointer;
-    background: #ffffff;
-    transition: background 0.1s;
-}
-
-.hunting-btn:hover {
-    background: #eeeeee;
-}
-
-.hunting-btn.retreat {
-    border-color: #888888;
-}
-
-.hunting-btn.advance {
-    border-color: #d4a017;
-}
-
-.hunting-choice {
-    margin-top: 12px;
-    padding-top: 10px;
-    border-top: 1px solid #e0e0e0;
-}
-
-.hunting-choice-info {
-    font-size: 0.75rem;
-    color: #555555;
-    margin-bottom: 8px;
-    text-align: center;
-}
-
-.hunting-choice-buttons {
-    display: flex;
-    gap: 8px;
-    justify-content: center;
-    pointer-events: auto;
-}
-
-.hunting-choice-buttons button {
-    flex: 1;
-    max-width: 140px;
-}
-
-@media (max-width: 600px) {
     :scope.transient {
+        background: transparent;
         align-items: center;
     }
+
     :scope.transient .overlay-card {
-        max-width: min(84%, 320px);
+        max-width: min(78%, 360px);
+        padding: 0;
+        border: 0;
+        background: transparent;
     }
-}
+
+    :scope.transient .overlay-card span {
+        margin-bottom: 4px;
+        color: rgba(17, 17, 17, 0.58);
+        letter-spacing: 0.18em;
+    }
+
+    :scope.transient .overlay-card strong {
+        font-size: clamp(1.2rem, 4vw, 2rem);
+        color: rgba(17, 17, 17, 0.72);
+    }
+
+    .overlay-enter {
+        transition: opacity 400ms ease;
+    }
+    .overlay-enter-start {
+        opacity: 0;
+    }
+    .overlay-enter-end {
+        opacity: 1;
+    }
+    .overlay-leave {
+        transition: opacity 300ms ease;
+    }
+    .overlay-leave-start {
+        opacity: 1;
+    }
+    .overlay-leave-end {
+        opacity: 0;
+    }
+
+    :scope.transient .overlay-enter {
+        transition: opacity 200ms ease;
+    }
+    :scope.transient .overlay-leave {
+        transition: opacity 150ms ease;
+    }
+
+    .overlay-card {
+        text-align: center;
+        padding: 28px 32px;
+    }
+
+    .overlay-card span {
+        display: block;
+        font-size: 0.82rem;
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        color: #111111;
+        margin-bottom: 14px;
+        font-weight: 700;
+    }
+
+    .overlay-card strong {
+        display: block;
+        font-size: clamp(2rem, 8vw, 3.4rem);
+        letter-spacing: -0.05em;
+        color: #111111;
+    }
+
+    .overlay-card p {
+        margin: 12px 0 0;
+        color: #202020;
+    }
+
+    .hunting-btn {
+        font-family: inherit;
+        border: 2px solid #202020;
+        border-radius: 8px;
+        padding: 8px 16px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        cursor: pointer;
+        background: #ffffff;
+        transition: background 0.1s;
+    }
+
+    .hunting-btn:hover {
+        background: #eeeeee;
+    }
+
+    .hunting-btn.retreat {
+        border-color: #888888;
+    }
+
+    .hunting-btn.advance {
+        border-color: #d4a017;
+    }
+
+    .hunting-choice {
+        margin-top: 12px;
+        padding-top: 10px;
+        border-top: 1px solid #e0e0e0;
+    }
+
+    .hunting-choice-info {
+        font-size: 0.75rem;
+        color: #555555;
+        margin-bottom: 8px;
+        text-align: center;
+    }
+
+    .hunting-choice-buttons {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        pointer-events: auto;
+    }
+
+    .hunting-choice-buttons button {
+        flex: 1;
+        max-width: 140px;
+    }
+
+    @media (max-width: 600px) {
+        :scope.transient {
+            align-items: center;
+        }
+        :scope.transient .overlay-card {
+            max-width: min(84%, 320px);
+        }
+    }
 </style>

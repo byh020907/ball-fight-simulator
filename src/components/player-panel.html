@@ -65,8 +65,12 @@
         ></div>
     </div>
     <div class="point-meter">
-        <span x-text="'사용 ' + ($store.playerPanel.totalPoints - $store.playerPanel.remainingPoints) + '/' + $store.playerPanel.totalPoints"></span>
-        <b x-text="$store.playerPanel.remainingPoints > 0 ? $store.playerPanel.remainingPoints + ' 남음' : '준비 완료'"></b>
+        <span
+            x-text="'사용 ' + ($store.playerPanel.totalPoints - $store.playerPanel.remainingPoints) + '/' + $store.playerPanel.totalPoints"
+        ></span>
+        <b
+            x-text="$store.playerPanel.remainingPoints > 0 ? $store.playerPanel.remainingPoints + ' 남음' : '준비 완료'"
+        ></b>
     </div>
     <div class="allocation-summary">
         <span x-text="$store.playerPanel.allocationSummary"></span>
@@ -156,351 +160,355 @@
     </div>
 </section>
 <style scoped>
-:scope {
-    position: fixed;
-    left: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 10;
-    width: min(360px, calc(100vw - 24px));
-    max-height: calc(100dvh - 24px);
-    overflow: auto;
-    border: 2px solid #202020;
-    background: #f8f8f8;
-    color: #202020;
-    padding: 7px;
-    display: grid;
-    gap: 8px;
-}
-:scope.locked {
-    display: none;
-}
-.player-title {
-    display: grid;
-    gap: 2px;
-}
-.player-title-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-.player-title-row canvas {
-    flex-shrink: 0;
-    border-radius: 50%;
-    border: 2px solid #202020;
-    background: #eeeeee;
-}
-.player-title-row canvas.face-pop {
-    animation: facePop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-@keyframes facePop {
-    0% {
-        transform: scale(0);
-        opacity: 0;
-    }
-    60% {
-        transform: scale(1.15);
-        opacity: 1;
-    }
-    100% {
-        transform: scale(1);
-        opacity: 1;
-    }
-}
-.player-panel-actions {
-    width: 100%;
-    min-width: 0;
-    min-height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 6px;
-    overflow-x: auto;
-    overflow-y: hidden;
-}
-.player-panel-actions > button {
-    flex: 0 0 auto;
-    width: 24px;
-    height: 24px;
-    border: 2px solid #202020;
-    border-radius: 50%;
-    background: none;
-    color: #202020;
-    font: 900 13px/1 "Bahnschrift", sans-serif;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.12s, color 0.12s;
-}
-.player-panel-actions > button:hover {
-    background: #202020;
-    color: #ffffff;
-}
-.player-title span,
-.point-meter span {
-    font-size: 0.72rem;
-    font-weight: 900;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: #333333;
-}
-.player-title strong {
-    font-size: 1rem;
-    line-height: 1;
-}
-.player-note {
-    margin: 0;
-    font-size: 0.76rem;
-    line-height: 1.35;
-    color: #333333;
-}
-.player-xp-meter {
-    border: 2px solid #202020;
-    background: #ffffff;
-    padding: 6px;
-    display: grid;
-    gap: 5px;
-}
-.player-xp-head,
-.player-xp-foot {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 8px;
-}
-.player-xp-head strong {
-    font-size: 0.86rem;
-    line-height: 1;
-}
-.player-xp-head span,
-.player-xp-foot span,
-.player-xp-reward {
-    min-width: 0;
-    font-size: 0.68rem;
-    font-weight: 800;
-    color: #555555;
-}
-.player-xp-foot span:last-child {
-    text-align: right;
-}
-.player-xp-bar {
-    height: 9px;
-    border: 2px solid #202020;
-    background: #eeeeee;
-    overflow: hidden;
-}
-.player-xp-fill {
-    height: 100%;
-    width: 0;
-    transition: width 260ms ease;
-}
-.bonus-points-badge {
-    color: #d4a017;
-    font-weight: 700;
-}
-.point-meter {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 6px;
-    border-top: 2px solid #202020;
-    padding-top: 5px;
-}
-.point-meter b {
-    font-size: 0.78rem;
-    color: #0a8d32;
-}
-.allocation-summary {
-    border: 2px solid #202020;
-    background: #ffffff;
-    padding: 6px;
-    color: #202020;
-    font-size: 0.76rem;
-    font-weight: 900;
-    line-height: 1.25;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-}
-.stat-board {
-    display: grid;
-    gap: 4px;
-}
-.stat-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 36px 30px 42px 30px 40px;
-    align-items: center;
-    gap: 4px;
-}
-.stat-copy {
-    min-width: 0;
-    display: grid;
-    gap: 1px;
-}
-.stat-copy strong {
-    font-size: 0.82rem;
-    line-height: 1;
-}
-.stat-copy span {
-    font-size: 0.66rem;
-    line-height: 1.2;
-    color: #333333;
-}
-.stat-row button {
-    border: 2px solid #202020;
-    background: #ffcb3d;
-    color: #202020;
-    font: inherit;
-    font-size: 0.74rem;
-    font-weight: 900;
-    cursor: pointer;
-    min-height: 30px;
-    padding: 0 3px;
-}
-.stat-row button:disabled,
-.action-btn:disabled {
-    cursor: default;
-    opacity: 0.35;
-}
-.stat-row em {
-    font-style: normal;
-    font-size: 0.78rem;
-    font-weight: 900;
-    text-align: center;
-}
-.challenge-level-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 0 4px;
-    font-size: 0.82rem;
-}
-.challenge-label {
-    font-weight: 700;
-    color: #202020;
-    margin-right: auto;
-}
-.challenge-btn {
-    border: 2px solid #202020;
-    background: #fff;
-    color: #202020;
-    font: inherit;
-    font-weight: 900;
-    font-size: 0.85rem;
-    cursor: pointer;
-    width: 26px;
-    height: 26px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-.challenge-btn:disabled {
-    opacity: 0.35;
-    cursor: default;
-}
-.challenge-value {
-    font-weight: 900;
-    font-size: 0.95rem;
-    color: #202020;
-    min-width: 18px;
-    text-align: center;
-}
-.challenge-max {
-    color: #888;
-    font-size: 0.75rem;
-}
-.bonus-summary {
-    font-size: 0.72rem;
-    color: #555;
-    padding: 2px 0 4px;
-}
-.player-actions {
-    display: flex;
-    gap: 6px;
-    padding-top: 6px;
-    background: #f8f8f8;
-}
-.action-btn {
-    flex: 1;
-    border: 2px solid #202020;
-    font: inherit;
-    font-size: 0.74rem;
-    font-weight: 900;
-    cursor: pointer;
-    min-height: 30px;
-    padding: 0 3px;
-    background: #59d6ff;
-    color: #202020;
-}
-.action-btn.reset {
-    background: #e74c3c;
-    color: #fff;
-}
-.action-btn:disabled {
-    cursor: default;
-    opacity: 0.35;
-}
-@media (max-width: 760px) {
     :scope {
-        padding: 8px;
-        font-size: clamp(11px, 2.8vw, 13px);
+        position: fixed;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 10;
+        width: min(360px, calc(100vw - 24px));
+        max-height: calc(100dvh - 24px);
+        overflow: auto;
+        border: 2px solid #202020;
+        background: #f8f8f8;
+        color: #202020;
+        padding: 7px;
+        display: grid;
+        gap: 8px;
+    }
+    :scope.locked {
+        display: none;
+    }
+    .player-title {
+        display: grid;
+        gap: 2px;
+    }
+    .player-title-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .player-title-row canvas {
+        flex-shrink: 0;
+        border-radius: 50%;
+        border: 2px solid #202020;
+        background: #eeeeee;
+    }
+    .player-title-row canvas.face-pop {
+        animation: facePop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    @keyframes facePop {
+        0% {
+            transform: scale(0);
+            opacity: 0;
+        }
+        60% {
+            transform: scale(1.15);
+            opacity: 1;
+        }
+        100% {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+    .player-panel-actions {
+        width: 100%;
+        min-width: 0;
+        min-height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 6px;
+        overflow-x: auto;
+        overflow-y: hidden;
+    }
+    .player-panel-actions > button {
+        flex: 0 0 auto;
+        width: 24px;
+        height: 24px;
+        border: 2px solid #202020;
+        border-radius: 50%;
+        background: none;
+        color: #202020;
+        font:
+            900 13px/1 "Bahnschrift",
+            sans-serif;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition:
+            background 0.12s,
+            color 0.12s;
+    }
+    .player-panel-actions > button:hover {
+        background: #202020;
+        color: #ffffff;
     }
     .player-title span,
     .point-meter span {
-        font-size: 0.78em;
+        font-size: 0.72rem;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #333333;
     }
     .player-title strong {
-        font-size: 1.08em;
+        font-size: 1rem;
+        line-height: 1;
     }
     .player-note {
-        font-size: 0.84em;
+        margin: 0;
+        font-size: 0.76rem;
+        line-height: 1.35;
+        color: #333333;
     }
-    .point-meter b,
-    .stat-row em {
-        font-size: 0.86em;
-    }
-    .allocation-summary {
-        font-size: 0.84em;
-    }
-    .stat-row button,
-    .action-btn {
-        font-size: 0.82em;
-    }
-    :scope .control-button {
-        font-size: 1em;
-    }
-    .stat-row {
-        grid-template-columns: minmax(0, 1fr) 42px 34px 48px 34px 46px;
+    .player-xp-meter {
+        border: 2px solid #202020;
+        background: #ffffff;
+        padding: 6px;
+        display: grid;
         gap: 5px;
     }
-    .stat-row button {
-        min-height: 36px;
+    .player-xp-head,
+    .player-xp-foot {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
     }
-}
-@media (max-width: 760px) and (orientation: portrait) {
-    :scope {
-        position: relative;
-        left: auto;
-        top: auto;
-        bottom: auto;
-        transform: none;
-        width: 100%;
+    .player-xp-head strong {
+        font-size: 0.86rem;
+        line-height: 1;
+    }
+    .player-xp-head span,
+    .player-xp-foot span,
+    .player-xp-reward {
+        min-width: 0;
+        font-size: 0.68rem;
+        font-weight: 800;
+        color: #555555;
+    }
+    .player-xp-foot span:last-child {
+        text-align: right;
+    }
+    .player-xp-bar {
+        height: 9px;
+        border: 2px solid #202020;
+        background: #eeeeee;
+        overflow: hidden;
+    }
+    .player-xp-fill {
         height: 100%;
-        min-height: 0;
-        max-height: none;
+        width: 0;
+        transition: width 260ms ease;
     }
-}
-@media (max-width: 420px) {
-    .stat-row {
-        grid-template-columns: 1fr repeat(5, minmax(32px, auto));
+    .bonus-points-badge {
+        color: #d4a017;
+        font-weight: 700;
     }
-    .stat-copy span {
-        display: none;
+    .point-meter {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+        border-top: 2px solid #202020;
+        padding-top: 5px;
+    }
+    .point-meter b {
+        font-size: 0.78rem;
+        color: #0a8d32;
     }
     .allocation-summary {
-        font-size: 0.8em;
+        border: 2px solid #202020;
+        background: #ffffff;
+        padding: 6px;
+        color: #202020;
+        font-size: 0.76rem;
+        font-weight: 900;
+        line-height: 1.25;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
     }
-}
+    .stat-board {
+        display: grid;
+        gap: 4px;
+    }
+    .stat-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 36px 30px 42px 30px 40px;
+        align-items: center;
+        gap: 4px;
+    }
+    .stat-copy {
+        min-width: 0;
+        display: grid;
+        gap: 1px;
+    }
+    .stat-copy strong {
+        font-size: 0.82rem;
+        line-height: 1;
+    }
+    .stat-copy span {
+        font-size: 0.66rem;
+        line-height: 1.2;
+        color: #333333;
+    }
+    .stat-row button {
+        border: 2px solid #202020;
+        background: #ffcb3d;
+        color: #202020;
+        font: inherit;
+        font-size: 0.74rem;
+        font-weight: 900;
+        cursor: pointer;
+        min-height: 30px;
+        padding: 0 3px;
+    }
+    .stat-row button:disabled,
+    .action-btn:disabled {
+        cursor: default;
+        opacity: 0.35;
+    }
+    .stat-row em {
+        font-style: normal;
+        font-size: 0.78rem;
+        font-weight: 900;
+        text-align: center;
+    }
+    .challenge-level-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 0 4px;
+        font-size: 0.82rem;
+    }
+    .challenge-label {
+        font-weight: 700;
+        color: #202020;
+        margin-right: auto;
+    }
+    .challenge-btn {
+        border: 2px solid #202020;
+        background: #fff;
+        color: #202020;
+        font: inherit;
+        font-weight: 900;
+        font-size: 0.85rem;
+        cursor: pointer;
+        width: 26px;
+        height: 26px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .challenge-btn:disabled {
+        opacity: 0.35;
+        cursor: default;
+    }
+    .challenge-value {
+        font-weight: 900;
+        font-size: 0.95rem;
+        color: #202020;
+        min-width: 18px;
+        text-align: center;
+    }
+    .challenge-max {
+        color: #888;
+        font-size: 0.75rem;
+    }
+    .bonus-summary {
+        font-size: 0.72rem;
+        color: #555;
+        padding: 2px 0 4px;
+    }
+    .player-actions {
+        display: flex;
+        gap: 6px;
+        padding-top: 6px;
+        background: #f8f8f8;
+    }
+    .action-btn {
+        flex: 1;
+        border: 2px solid #202020;
+        font: inherit;
+        font-size: 0.74rem;
+        font-weight: 900;
+        cursor: pointer;
+        min-height: 30px;
+        padding: 0 3px;
+        background: #59d6ff;
+        color: #202020;
+    }
+    .action-btn.reset {
+        background: #e74c3c;
+        color: #fff;
+    }
+    .action-btn:disabled {
+        cursor: default;
+        opacity: 0.35;
+    }
+    @media (max-width: 760px) {
+        :scope {
+            padding: 8px;
+            font-size: clamp(11px, 2.8vw, 13px);
+        }
+        .player-title span,
+        .point-meter span {
+            font-size: 0.78em;
+        }
+        .player-title strong {
+            font-size: 1.08em;
+        }
+        .player-note {
+            font-size: 0.84em;
+        }
+        .point-meter b,
+        .stat-row em {
+            font-size: 0.86em;
+        }
+        .allocation-summary {
+            font-size: 0.84em;
+        }
+        .stat-row button,
+        .action-btn {
+            font-size: 0.82em;
+        }
+        :scope .control-button {
+            font-size: 1em;
+        }
+        .stat-row {
+            grid-template-columns: minmax(0, 1fr) 42px 34px 48px 34px 46px;
+            gap: 5px;
+        }
+        .stat-row button {
+            min-height: 36px;
+        }
+    }
+    @media (max-width: 760px) and (orientation: portrait) {
+        :scope {
+            position: relative;
+            left: auto;
+            top: auto;
+            bottom: auto;
+            transform: none;
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+            max-height: none;
+        }
+    }
+    @media (max-width: 420px) {
+        .stat-row {
+            grid-template-columns: 1fr repeat(5, minmax(32px, auto));
+        }
+        .stat-copy span {
+            display: none;
+        }
+        .allocation-summary {
+            font-size: 0.8em;
+        }
+    }
 </style>

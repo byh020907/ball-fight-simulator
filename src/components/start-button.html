@@ -6,29 +6,31 @@
     x-bind:disabled="$store.startButton.disabledOverride !== null ? $store.startButton.disabledOverride : $store.startButton.remainingPoints > 0 || $store.startButton.locked"
     x-text="$store.startButton.textOverride !== null ? $store.startButton.textOverride : ($store.startButton.remainingPoints > 0 ? '스탯 ' + $store.startButton.remainingPoints + ' 남음' : '토너먼트 시작')"
     @click="$store.startButton._actions.startTournament()"
->토너먼트 시작</button>
+>
+    토너먼트 시작
+</button>
 <style scoped>
-:scope {
-    position: absolute;
-    left: 50%;
-    bottom: 18px;
-    transform: translateX(-50%);
-    min-width: 220px;
-    z-index: 2;
-}
-
-:scope.hidden {
-    opacity: 0;
-    pointer-events: none;
-}
-
-@media (max-width: 760px) {
     :scope {
-        bottom: 12px;
-        min-width: min(280px, calc(100% - 32px));
-        min-height: 48px;
-        padding: 14px 18px;
-        font-size: 1rem;
+        position: absolute;
+        left: 50%;
+        bottom: 18px;
+        transform: translateX(-50%);
+        min-width: 220px;
+        z-index: 2;
     }
-}
+
+    :scope.hidden {
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    @media (max-width: 760px) {
+        :scope {
+            bottom: 12px;
+            min-width: min(280px, calc(100% - 32px));
+            min-height: 48px;
+            padding: 14px 18px;
+            font-size: 1rem;
+        }
+    }
 </style>

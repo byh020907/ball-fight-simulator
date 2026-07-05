@@ -1,10 +1,6 @@
 <footer class="fighter-strip" id="fighterCards">
     <template x-for="fighter in $store.fighterStrip.fighters" :key="fighter.id">
-        <article
-            class="fighter-card"
-            x-bind:class="{ active: !fighter.defeated }"
-            x-bind:data-fighter-id="fighter.id"
-        >
+        <article class="fighter-card" x-bind:class="{ active: !fighter.defeated }" x-bind:data-fighter-id="fighter.id">
             <div class="fighter-head">
                 <div class="fighter-meta">
                     <strong x-text="fighter.isPlayer ? '내 캐릭터 · ' + fighter.name : fighter.name"></strong>
@@ -13,7 +9,10 @@
                 </div>
             </div>
             <div class="hp-bar">
-                <div class="hp-fill" x-bind:style="'background:' + fighter.color + ';width:' + fighter.hpPct + '%' + (fighter.defeated ? ';opacity:0.3' : '')"></div>
+                <div
+                    class="hp-fill"
+                    x-bind:style="'background:' + fighter.color + ';width:' + fighter.hpPct + '%' + (fighter.defeated ? ';opacity:0.3' : '')"
+                ></div>
             </div>
             <div class="fighter-hp-text">
                 <span x-text="fighter.hp + ' / ' + fighter.maxHp"></span>
@@ -24,7 +23,12 @@
                     <template x-for="part in fighter.heroStatParts" :key="part.key">
                         <span class="hero-stat-part">
                             <span x-text="part.baseText"></span>
-                            <span class="hero-stat-bonus" x-show="part.bonusText" x-text="part.bonusText" x-bind:style="'color:' + part.color"></span>
+                            <span
+                                class="hero-stat-bonus"
+                                x-show="part.bonusText"
+                                x-text="part.bonusText"
+                                x-bind:style="'color:' + part.color"
+                            ></span>
                         </span>
                     </template>
                 </span>
@@ -37,197 +41,200 @@
                     <span class="action-badge" x-show="fighter.actionName" x-text="fighter.actionName"></span>
                 </div>
                 <div class="cooldown-bar">
-                    <div class="cooldown-fill" x-bind:style="'width:' + (fighter.skillPct * 100) + '%' + (fighter.defeated ? ';opacity:0.35' : '')"></div>
+                    <div
+                        class="cooldown-fill"
+                        x-bind:style="'width:' + (fighter.skillPct * 100) + '%' + (fighter.defeated ? ';opacity:0.35' : '')"
+                    ></div>
                 </div>
             </div>
         </article>
     </template>
 </footer>
 <style scoped>
-:scope {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 4px;
-}
-
-.fighter-card {
-    border-radius: 0;
-    border: 3px solid #202020;
-    background: #ffffff;
-    padding: 6px 10px;
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 4px;
-}
-
-.fighter-head {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.fighter-meta {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-width: 0;
-    font-size: 0.92rem;
-    color: #222222;
-    text-align: center;
-    line-height: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.fighter-meta strong {
-    font-size: 0.92rem;
-    color: #222222;
-    text-align: center;
-    line-height: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.fighter-meta span {
-    margin-top: 2px;
-    color: #555555;
-    text-align: center;
-    font-size: 0.68rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.fighter-stat-line {
-    color: #202020;
-    font-size: 0.68rem;
-    font-weight: 900;
-    text-align: center;
-    line-height: 1.15;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.hp-bar {
-    height: 10px;
-    border-radius: 0;
-    background: #e0e0e0;
-    overflow: hidden;
-}
-
-.hp-fill {
-    height: 100%;
-    border-radius: 0;
-    transition: width 180ms ease;
-}
-
-.fighter-hp-text {
-    display: flex;
-    justify-content: center;
-    font-size: 0.68rem;
-    color: #555555;
-    font-weight: 700;
-}
-
-.cooldown-wrap {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.cooldown-meta {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.68rem;
-    color: #202020;
-}
-
-.cooldown-label {
-    font-weight: 900;
-    text-transform: uppercase;
-    font-size: 0.7rem;
-    letter-spacing: 0.06em;
-}
-
-.cooldown-text {
-    flex: 1;
-    font-size: 0.64rem;
-    color: #555555;
-    font-weight: 700;
-}
-
-.action-badge {
-    padding: 1px 5px;
-    border-radius: 0;
-    font-size: 0.56rem;
-    font-weight: 700;
-    background: #202020;
-    color: #ffffff;
-}
-
-.cooldown-bar {
-    height: 4px;
-    border-radius: 0;
-    background: #e0e0e0;
-}
-
-.cooldown-fill {
-    height: 100%;
-    border-radius: 0;
-    background: #202020;
-    transition: width 80ms linear;
-}
-
-.fighter-balance-mult {
-    font-size: 0.56rem;
-    font-weight: 900;
-    color: #777777;
-}
-
-.fighter-card.active .cooldown-fill {
-    background: #202020;
-}
-
-.hero-stat-line {
-    font-weight: 900;
-    font-size: 0.68rem;
-    text-align: center;
-}
-
-.hero-stat-parts {
-    display: inline;
-}
-
-.hero-stat-part {
-    display: inline;
-}
-
-.hero-stat-bonus {
-    font-weight: 900;
-}
-
-.fighter-title {
-    margin-top: 2px;
-    color: #555555;
-    text-align: center;
-    font-size: 0.68rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-@media (max-width: 760px) {
     :scope {
+        display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        min-height: 0;
+        gap: 4px;
     }
+
     .fighter-card {
-        padding: 4px 5px;
-        border-width: 2px;
+        border-radius: 0;
+        border: 3px solid #202020;
+        background: #ffffff;
+        padding: 6px 10px;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 4px;
     }
-}
+
+    .fighter-head {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .fighter-meta {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-width: 0;
+        font-size: 0.92rem;
+        color: #222222;
+        text-align: center;
+        line-height: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .fighter-meta strong {
+        font-size: 0.92rem;
+        color: #222222;
+        text-align: center;
+        line-height: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .fighter-meta span {
+        margin-top: 2px;
+        color: #555555;
+        text-align: center;
+        font-size: 0.68rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .fighter-stat-line {
+        color: #202020;
+        font-size: 0.68rem;
+        font-weight: 900;
+        text-align: center;
+        line-height: 1.15;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .hp-bar {
+        height: 10px;
+        border-radius: 0;
+        background: #e0e0e0;
+        overflow: hidden;
+    }
+
+    .hp-fill {
+        height: 100%;
+        border-radius: 0;
+        transition: width 180ms ease;
+    }
+
+    .fighter-hp-text {
+        display: flex;
+        justify-content: center;
+        font-size: 0.68rem;
+        color: #555555;
+        font-weight: 700;
+    }
+
+    .cooldown-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .cooldown-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.68rem;
+        color: #202020;
+    }
+
+    .cooldown-label {
+        font-weight: 900;
+        text-transform: uppercase;
+        font-size: 0.7rem;
+        letter-spacing: 0.06em;
+    }
+
+    .cooldown-text {
+        flex: 1;
+        font-size: 0.64rem;
+        color: #555555;
+        font-weight: 700;
+    }
+
+    .action-badge {
+        padding: 1px 5px;
+        border-radius: 0;
+        font-size: 0.56rem;
+        font-weight: 700;
+        background: #202020;
+        color: #ffffff;
+    }
+
+    .cooldown-bar {
+        height: 4px;
+        border-radius: 0;
+        background: #e0e0e0;
+    }
+
+    .cooldown-fill {
+        height: 100%;
+        border-radius: 0;
+        background: #202020;
+        transition: width 80ms linear;
+    }
+
+    .fighter-balance-mult {
+        font-size: 0.56rem;
+        font-weight: 900;
+        color: #777777;
+    }
+
+    .fighter-card.active .cooldown-fill {
+        background: #202020;
+    }
+
+    .hero-stat-line {
+        font-weight: 900;
+        font-size: 0.68rem;
+        text-align: center;
+    }
+
+    .hero-stat-parts {
+        display: inline;
+    }
+
+    .hero-stat-part {
+        display: inline;
+    }
+
+    .hero-stat-bonus {
+        font-weight: 900;
+    }
+
+    .fighter-title {
+        margin-top: 2px;
+        color: #555555;
+        text-align: center;
+        font-size: 0.68rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    @media (max-width: 760px) {
+        :scope {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            min-height: 0;
+        }
+        .fighter-card {
+            padding: 4px 5px;
+            border-width: 2px;
+        }
+    }
 </style>

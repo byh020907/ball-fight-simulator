@@ -1,4 +1,4 @@
-<div style="display:contents">
+<div style="display: contents">
     <div class="tournament-title">
         <strong>Bracket</strong>
         <span id="tournamentPhase" x-text="$store.tournamentBracket.phase">Ready</span>
@@ -43,152 +43,152 @@
     </div>
 </div>
 <style scoped>
-.tournament-title {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding-bottom: 6px;
-    border-bottom: 3px solid #202020;
-}
-.tournament-title strong {
-    font-size: 0.94rem;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-}
-.tournament-title span {
-    font-size: 0.68rem;
-    font-weight: 700;
-    color: #28a447;
-    text-transform: uppercase;
-}
-.bracket {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 7px;
-    min-height: 0;
-}
-.bracket-round {
-    display: grid;
-    gap: 7px;
-    align-content: center;
-}
-.round-title {
-    font-size: 0.62rem;
-    font-weight: 800;
-    color: #555555;
-    text-align: center;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-}
-.bracket-match {
-    border: 2px solid #202020;
-    background: #f4f4f4;
-    min-height: 58px;
-    display: grid;
-    align-content: center;
-    gap: 2px;
-    padding: 4px;
-    position: relative;
-}
-.bracket-match.active {
-    background: #fff2b8;
-    outline: 2px solid #ffcb3d;
-    outline-offset: -4px;
-}
-.bracket-match.done {
-    background: #e9ffef;
-}
-.bracket-match.bye {
-    background: #eeeeee;
-    color: #777777;
-}
-.bracket-slot {
-    min-height: 19px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 0.68rem;
-    font-weight: 800;
-    line-height: 1;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-}
-.bracket-dot {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    border: 1px solid #202020;
-    flex: 0 0 auto;
-    background: #d8d8d8;
-}
-.bracket-slot.empty {
-    color: #999999;
-    font-weight: 700;
-}
-.bracket-slot.winner {
-    color: #0a8d32;
-}
-.bracket-slot.player {
-    color: #006bb8;
-}
-.bracket-status {
-    position: absolute;
-    right: 4px;
-    bottom: 3px;
-    font-size: 0.52rem;
-    font-weight: 900;
-    color: #777777;
-    letter-spacing: 0.06em;
-}
-@media (max-width: 760px) {
-    .bracket {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 4px;
-    }
-    .bracket-round {
-        gap: 4px;
-    }
-    .bracket-match {
-        min-height: 42px;
-        padding: 3px;
-    }
-    .bracket-slot {
-        font-size: 0.6rem;
-        white-space: nowrap;
-    }
-}
-@media (max-width: 760px) and (orientation: portrait) {
     .tournament-title {
-        padding-bottom: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding-bottom: 6px;
+        border-bottom: 3px solid #202020;
     }
     .tournament-title strong {
-        font-size: 0.82em;
+        font-size: 0.94rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+    .tournament-title span {
+        font-size: 0.68rem;
+        font-weight: 700;
+        color: #28a447;
+        text-transform: uppercase;
     }
     .bracket {
-        gap: 3px;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 7px;
+        min-height: 0;
     }
     .bracket-round {
-        gap: 3px;
+        display: grid;
+        gap: 7px;
+        align-content: center;
     }
     .round-title {
-        font-size: 0.62em;
+        font-size: 0.62rem;
+        font-weight: 800;
+        color: #555555;
+        text-align: center;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
     }
     .bracket-match {
-        min-height: 34px;
-        padding: 2px;
+        border: 2px solid #202020;
+        background: #f4f4f4;
+        min-height: 58px;
+        display: grid;
+        align-content: center;
+        gap: 2px;
+        padding: 4px;
+        position: relative;
+    }
+    .bracket-match.active {
+        background: #fff2b8;
+        outline: 2px solid #ffcb3d;
+        outline-offset: -4px;
+    }
+    .bracket-match.done {
+        background: #e9ffef;
+    }
+    .bracket-match.bye {
+        background: #eeeeee;
+        color: #777777;
     }
     .bracket-slot {
-        font-size: 0.68em;
+        min-height: 19px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.68rem;
+        font-weight: 800;
+        line-height: 1;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+    .bracket-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        border: 1px solid #202020;
+        flex: 0 0 auto;
+        background: #d8d8d8;
+    }
+    .bracket-slot.empty {
+        color: #999999;
+        font-weight: 700;
+    }
+    .bracket-slot.winner {
+        color: #0a8d32;
+    }
+    .bracket-slot.player {
+        color: #006bb8;
     }
     .bracket-status {
-        font-size: 0.58em;
+        position: absolute;
+        right: 4px;
+        bottom: 3px;
+        font-size: 0.52rem;
+        font-weight: 900;
+        color: #777777;
+        letter-spacing: 0.06em;
     }
-}
-@media (max-width: 420px) {
-    .bracket-slot {
-        font-size: 0.72em;
+    @media (max-width: 760px) {
+        .bracket {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 4px;
+        }
+        .bracket-round {
+            gap: 4px;
+        }
+        .bracket-match {
+            min-height: 42px;
+            padding: 3px;
+        }
+        .bracket-slot {
+            font-size: 0.6rem;
+            white-space: nowrap;
+        }
     }
-}
+    @media (max-width: 760px) and (orientation: portrait) {
+        .tournament-title {
+            padding-bottom: 4px;
+        }
+        .tournament-title strong {
+            font-size: 0.82em;
+        }
+        .bracket {
+            gap: 3px;
+        }
+        .bracket-round {
+            gap: 3px;
+        }
+        .round-title {
+            font-size: 0.62em;
+        }
+        .bracket-match {
+            min-height: 34px;
+            padding: 2px;
+        }
+        .bracket-slot {
+            font-size: 0.68em;
+        }
+        .bracket-status {
+            font-size: 0.58em;
+        }
+    }
+    @media (max-width: 420px) {
+        .bracket-slot {
+            font-size: 0.72em;
+        }
+    }
 </style>
