@@ -9,6 +9,7 @@ import {
     createRandomStatAllocation,
     createTournamentRoster,
     formatStatAllocation,
+    getRemainingStatPoints,
     getSpentStatPoints
 } from "../src/statAllocation.js";
 import { FIGHTER_IDS, Vector2 } from "../src/core.js";
@@ -864,6 +865,21 @@ function testRenderPlayerSetupCopiesAllocation(app) {
     assert.equal(allocation.hp, 20, "UI state should not mutate the caller's allocation object");
     assert.equal(state.allocation.hp, 10, "Rendered UI state should remain editable");
     assert.equal(state.huntingAvailable, true, "Player setup should expose hunting availability");
+
+    const playerPanelStore = globalThis.Alpine.store("playerPanel");
+    assert.equal(
+        typeof playerPanelStore._actions.adjustStat,
+        "function",
+        "Player panel should expose stat actions through its Alpine store"
+    );
+    playerPanelStore._actions.adjustStat("hp", 1);
+    assert.equal(state.allocation.hp, 11, "Player panel store action should update app allocation");
+    assert.equal(playerPanelStore.allocation.hp, 11, "Player panel store action should sync store allocation");
+    assert.equal(
+        playerPanelStore.remainingPoints,
+        getRemainingStatPoints(state.allocation, PLAYER_STAT_POINTS),
+        "Player panel store action should sync points"
+    );
 }
 
 async function testBattleAppAdoptsPreExistingAlpineAllocation() {

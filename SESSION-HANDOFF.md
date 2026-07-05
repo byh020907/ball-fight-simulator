@@ -440,3 +440,8 @@
 2. 전체 N×N PPO 학습 결과 저장 구조 설계
 3. 사냥터 deferred effect 적용 UI/런 시작 연결
 4. Time Warp 패널티 인상분 재학습 및 Dash +27% 강세 밸런스 검토
+
+## [L1] 2026-07-05 — player-panel 스탯 버튼 브라우저 검증 및 회귀 테스트 고정
+- 맥락: 이전 핸드오프에서 player-panel 스탯 버튼이 실제 브라우저에서 무반응이라고 기록되어 있었고, `$store.playerPanel._actions` 연결 경로가 의심 대상이었다.
+- 결정: 로컬 브라우저에서 `http://127.0.0.1:4173/`를 열어 첫 체력 `+` 버튼 클릭을 검증했다. 클릭 후 체력 배분이 `0% → 1%`, 남은 포인트가 `100 → 99`로 갱신되어 현재 구현은 정상 동작함을 확인했다. 재발 방지를 위해 `renderPlayerSetup()` 회귀 테스트에 `playerPanel` store `_actions.adjustStat()`가 appStore allocation과 store allocation/remainingPoints를 함께 동기화하는 검증을 추가했다.
+- 영향: `tests/regression.mjs`
