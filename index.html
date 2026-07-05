@@ -134,7 +134,10 @@
                 disabledOverride: null,
                 textOverride: null,
                 remainingPoints: 0,
-                locked: false
+                locked: false,
+                _actions: {
+                    startTournament() {}
+                }
             });
             Alpine.store("fighterStrip", {
                 fighters: []
@@ -145,7 +148,10 @@
             Alpine.store("huntingButton", {
                 available: false,
                 active: false,
-                tournamentActive: false
+                tournamentActive: false,
+                _actions: {
+                    openLobby() {}
+                }
             });
             Alpine.store("gameOverlay", {
                 visible: false,
@@ -156,7 +162,11 @@
                 huntingChoiceVisible: false,
                 huntingFloor: 1,
                 huntingCharacterName: "",
-                huntingLootSummary: ""
+                huntingLootSummary: "",
+                _actions: {
+                    huntingRetreat() {},
+                    huntingAdvance() {}
+                }
             });
             Alpine.store("xpReward", {
                 visible: false,
@@ -189,7 +199,14 @@
                 highestUnlockedLevel: 0,
                 progressionBonusSummary: "",
                 allocationSummary: "",
-                _actions: null
+                _actions: {
+                    adjustStat() {},
+                    randomAllocation() {},
+                    resetAllocation() {},
+                    adjustChallengeLevel() {},
+                    openCollectionHub() {},
+                    openHelp() {}
+                }
             });
             Alpine.store("tournamentBracket", {
                 visible: false,
@@ -212,9 +229,9 @@
             const { CollectionHubService } = await import(`./src/collectionHubService.js?v=${V}`);
             window.CollectionHubService = CollectionHubService;
             const { HELP_TITLE, HELP_CONTENT } = await import(`./src/helpContent.js?v=${V}`);
-            document.addEventListener("open-help", () =>
-                PopupService.show({ title: HELP_TITLE, bodyHtml: HELP_CONTENT })
-            );
+            Alpine.store("playerPanel")._actions.openHelp = () => {
+                PopupService.show({ title: HELP_TITLE, bodyHtml: HELP_CONTENT });
+            };
 
             const { getUnseenEntries } = await import(`./src/utils.js?v=${V}`);
             const unseenEntries = getUnseenEntries();

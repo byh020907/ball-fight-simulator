@@ -1,5 +1,5 @@
-<footer x-data="fighterStrip" class="fighter-strip" id="fighterCards">
-    <template x-for="fighter in state.fighters" :key="fighter.id">
+<footer class="fighter-strip" id="fighterCards">
+    <template x-for="fighter in $store.fighterStrip.fighters" :key="fighter.id">
         <article
             class="fighter-card"
             x-bind:class="{ active: !fighter.defeated }"
@@ -43,22 +43,6 @@
         </article>
     </template>
 </footer>
-<script>
-    Alpine.data("fighterStrip", () => {
-        const state = Alpine.reactive({
-            fighters: []
-        });
-        return {
-            state,
-            init() {
-                this.$watch("$store.fighterStrip", (val) => {
-                    if (!val) return;
-                    state.fighters = val.fighters ? [...val.fighters] : [];
-                }, { immediate: true });
-            }
-        };
-    });
-</script>
 <style scoped>
 :scope {
     display: grid;

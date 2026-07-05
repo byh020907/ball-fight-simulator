@@ -1,49 +1,12 @@
 <button
-    x-data="startButton"
     class="control-button"
     id="startButton"
     type="button"
-    x-bind:class="{ hidden: state.hidden }"
-    x-bind:disabled="computedDisabled"
-    x-text="computedText"
-    @click="$dispatch('start-tournament')"
->싸움 시작</button>
-<script>
-    Alpine.data("startButton", () => {
-        const state = Alpine.reactive({
-            hidden: true,
-            disabledOverride: null,
-            textOverride: null,
-            remainingPoints: 0,
-            locked: false
-        });
-        return {
-            state,
-            get computedDisabled() {
-                return state.disabledOverride !== null
-                    ? state.disabledOverride
-                    : state.remainingPoints > 0 || state.locked;
-            },
-            get computedText() {
-                return state.textOverride !== null
-                    ? state.textOverride
-                    : state.remainingPoints > 0
-                        ? "스탯 " + state.remainingPoints + " 남음"
-                        : "토너먼트 시작";
-            },
-            init() {
-                this.$watch("$store.startButton", (val) => {
-                    if (!val) return;
-                    state.hidden = Boolean(val.hidden);
-                    state.disabledOverride = val.disabledOverride !== undefined ? val.disabledOverride : null;
-                    state.textOverride = val.textOverride !== undefined ? val.textOverride : null;
-                    state.remainingPoints = val.remainingPoints ?? 0;
-                    state.locked = Boolean(val.locked);
-                }, { immediate: true });
-            }
-        };
-    });
-</script>
+    x-bind:class="{ hidden: $store.startButton.hidden }"
+    x-bind:disabled="$store.startButton.disabledOverride !== null ? $store.startButton.disabledOverride : $store.startButton.remainingPoints > 0 || $store.startButton.locked"
+    x-text="$store.startButton.textOverride !== null ? $store.startButton.textOverride : ($store.startButton.remainingPoints > 0 ? '스탯 ' + $store.startButton.remainingPoints + ' 남음' : '토너먼트 시작')"
+    @click="$store.startButton._actions.startTournament()"
+>토너먼트 시작</button>
 <style scoped>
 :scope {
     position: absolute;

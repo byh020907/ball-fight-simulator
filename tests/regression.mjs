@@ -269,19 +269,29 @@ async function loadModuleApp() {
         huntingChoiceVisible: false,
         huntingFloor: 1,
         huntingCharacterName: "",
-        huntingLootSummary: ""
+        huntingLootSummary: "",
+        _actions: {
+            huntingRetreat() {},
+            huntingAdvance() {}
+        }
     });
     globalThis.Alpine.store("startButton", {
         hidden: true,
         disabledOverride: null,
         textOverride: null,
         remainingPoints: 0,
-        locked: false
+        locked: false,
+        _actions: {
+            startTournament() {}
+        }
     });
     globalThis.Alpine.store("huntingButton", {
         available: false,
         active: false,
-        tournamentActive: false
+        tournamentActive: false,
+        _actions: {
+            openLobby() {}
+        }
     });
     globalThis.Alpine.store("fighterStrip", {
         fighters: []
@@ -302,7 +312,14 @@ async function loadModuleApp() {
         highestUnlockedLevel: 0,
         progressionBonusSummary: "",
         allocationSummary: "",
-        _actions: null
+        _actions: {
+            adjustStat() {},
+            randomAllocation() {},
+            resetAllocation() {},
+            adjustChallengeLevel() {},
+            openCollectionHub() {},
+            openHelp() {}
+        }
     });
     globalThis.Alpine.store("tournamentBracket", {
         visible: false,
@@ -341,19 +358,29 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
         huntingChoiceVisible: false,
         huntingFloor: 1,
         huntingCharacterName: "",
-        huntingLootSummary: ""
+        huntingLootSummary: "",
+        _actions: {
+            huntingRetreat() {},
+            huntingAdvance() {}
+        }
     });
     harness.context.Alpine.store("startButton", {
         hidden: true,
         disabledOverride: null,
         textOverride: null,
         remainingPoints: 0,
-        locked: false
+        locked: false,
+        _actions: {
+            startTournament() {}
+        }
     });
     harness.context.Alpine.store("huntingButton", {
         available: false,
         active: false,
-        tournamentActive: false
+        tournamentActive: false,
+        _actions: {
+            openLobby() {}
+        }
     });
     harness.context.Alpine.store("fighterStrip", {
         fighters: []
@@ -374,7 +401,14 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
         highestUnlockedLevel: 0,
         progressionBonusSummary: "",
         allocationSummary: "",
-        _actions: null
+        _actions: {
+            adjustStat() {},
+            randomAllocation() {},
+            resetAllocation() {},
+            adjustChallengeLevel() {},
+            openCollectionHub() {},
+            openHelp() {}
+        }
     });
     harness.context.Alpine.store("tournamentBracket", {
         visible: false,
@@ -880,6 +914,47 @@ function testRenderPlayerSetupCopiesAllocation(app) {
         getRemainingStatPoints(state.allocation, PLAYER_STAT_POINTS),
         "Player panel store action should sync points"
     );
+}
+
+function testComponentStoreActionsAreBound(app) {
+    let started = false;
+    let openedLobby = false;
+    let retreated = false;
+    let advanced = false;
+    const originalStartTournament = app.startTournament;
+    const originalShowCharacterSelect = app.hunting.showCharacterSelect;
+    const originalRetreat = app.hunting.retreat;
+    const originalAdvance = app.hunting.advance;
+
+    try {
+        app.startTournament = () => {
+            started = true;
+        };
+        app.hunting.showCharacterSelect = () => {
+            openedLobby = true;
+        };
+        app.hunting.retreat = () => {
+            retreated = true;
+        };
+        app.hunting.advance = () => {
+            advanced = true;
+        };
+
+        globalThis.Alpine.store("startButton")._actions.startTournament();
+        globalThis.Alpine.store("huntingButton")._actions.openLobby();
+        globalThis.Alpine.store("gameOverlay")._actions.huntingRetreat();
+        globalThis.Alpine.store("gameOverlay")._actions.huntingAdvance();
+    } finally {
+        app.startTournament = originalStartTournament;
+        app.hunting.showCharacterSelect = originalShowCharacterSelect;
+        app.hunting.retreat = originalRetreat;
+        app.hunting.advance = originalAdvance;
+    }
+
+    assert.equal(started, true, "Start button store action should call BattleApp.startTournament");
+    assert.equal(openedLobby, true, "Hunting button store action should open the hunting lobby");
+    assert.equal(retreated, true, "Overlay retreat action should call HuntingManager.retreat");
+    assert.equal(advanced, true, "Overlay advance action should call HuntingManager.advance");
 }
 
 async function testBattleAppAdoptsPreExistingAlpineAllocation() {
@@ -3811,6 +3886,7 @@ testShuffledUtility();
 testStatAllocationRules(app);
 testStatAllocationUiSyncEvent();
 testRenderPlayerSetupCopiesAllocation(app);
+testComponentStoreActionsAreBound(app);
 await testBattleAppAdoptsPreExistingAlpineAllocation();
 testIndexCacheVersionMatchesLatestPatchNote();
 testStatBalanceSystem();

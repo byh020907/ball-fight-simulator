@@ -1,10 +1,10 @@
-<div x-data="tournamentBracket" style="display:contents">
+<div style="display:contents">
     <div class="tournament-title">
         <strong>Bracket</strong>
-        <span id="tournamentPhase" x-text="state.phase">Ready</span>
+        <span id="tournamentPhase" x-text="$store.tournamentBracket.phase">Ready</span>
     </div>
     <div class="bracket" id="tournamentBracket">
-        <template x-for="(round, rIndex) in state.rounds" :key="rIndex">
+        <template x-for="(round, rIndex) in $store.tournamentBracket.rounds" :key="rIndex">
             <div class="bracket-round">
                 <div class="round-title" x-text="['Round 1', 'Semi', 'Final'][rIndex]"></div>
                 <template x-for="match in round" :key="match.id">
@@ -42,24 +42,6 @@
         </template>
     </div>
 </div>
-<script>
-    Alpine.data("tournamentBracket", () => {
-        const state = Alpine.reactive({
-            phase: "Ready",
-            rounds: []
-        });
-        return {
-            state,
-            init() {
-                this.$watch("$store.tournamentBracket", (val) => {
-                    if (!val) return;
-                    state.phase = val.phase ?? "Ready";
-                    state.rounds = val.rounds ? val.rounds.map((r) => r.map((m) => ({ ...m }))) : [];
-                }, { immediate: true });
-            }
-        };
-    });
-</script>
 <style scoped>
 .tournament-title {
     display: flex;

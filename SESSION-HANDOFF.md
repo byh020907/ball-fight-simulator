@@ -445,3 +445,9 @@
 - 맥락: 이전 핸드오프에서 player-panel 스탯 버튼이 실제 브라우저에서 무반응이라고 기록되어 있었고, `$store.playerPanel._actions` 연결 경로가 의심 대상이었다.
 - 결정: 로컬 브라우저에서 `http://127.0.0.1:4173/`를 열어 첫 체력 `+` 버튼 클릭을 검증했다. 클릭 후 체력 배분이 `0% → 1%`, 남은 포인트가 `100 → 99`로 갱신되어 현재 구현은 정상 동작함을 확인했다. 재발 방지를 위해 `renderPlayerSetup()` 회귀 테스트에 `playerPanel` store `_actions.adjustStat()`가 appStore allocation과 store allocation/remainingPoints를 함께 동기화하는 검증을 추가했다.
 - 영향: `tests/regression.mjs`
+
+## [L2] 2026-07-05 — UI 컴포넌트 store 복사층 제거 + 액션 패턴 통일
+- 배경: UI 컴포넌트화 과정에서 단순 표시 컴포넌트도 `$watch("$store...")`로 store를 로컬 `Alpine.reactive()` state에 복사하고 있어 불필요한 중간 상태가 늘어났다. 또한 버튼 액션이 `$dispatch`, `window.ballFightApp`, `$store._actions`로 섞여 있어 다음 컴포넌트 작업의 기준이 흐려졌다.
+- 결정: 중첩 컴포넌트 로더는 사용자가 의도적으로 제외한 단순 로딩 구조를 유지한다. 대신 start-button/hunting-button/battle-log/fighter-strip/game-overlay/tournament-bracket/player-panel은 가능한 범위에서 `$store` 직접 참조로 전환하고, 사용자 액션은 store `_actions` 콜백으로 통일한다. `UIController`에는 `getAlpineStore`/`patchAlpineStore`/`setAlpineStore` 헬퍼를 추가해 반복 store 접근을 줄인다.
+- 영향: `src/components/*.html` 일부, `src/ui.js`, `src/app.js`, `index.html`, `tests/regression.mjs`
+- 검증: `npm test`, `npm run check`, `npm run format:check`, 브라우저에서 스탯 버튼/자동 배분/시작 버튼 흐름 확인

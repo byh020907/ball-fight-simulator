@@ -1,70 +1,31 @@
 <div
-    x-data="gameOverlay"
     class="overlay"
     id="overlay"
-    x-show="state.visible"
+    x-show="$store.gameOverlay.visible"
     x-transition:enter="overlay-enter"
     x-transition:enter-start="overlay-enter-start"
     x-transition:enter-end="overlay-enter-end"
     x-transition:leave="overlay-leave"
     x-transition:leave-start="overlay-leave-start"
     x-transition:leave-end="overlay-leave-end"
-    x-bind:class="{ transient: state.transient }"
+    x-bind:class="{ transient: $store.gameOverlay.transient }"
 >
     <div class="overlay-card">
-        <span x-text="state.label">Waiting Room</span>
-        <strong x-text="state.text">START THE FIGHT</strong>
-        <p x-show="state.subtext" x-text="state.subtext"></p>
+        <span x-text="$store.gameOverlay.label">Waiting Room</span>
+        <strong x-text="$store.gameOverlay.text">START THE FIGHT</strong>
+        <p x-show="$store.gameOverlay.subtext" x-text="$store.gameOverlay.subtext"></p>
         <xp-reward-panel class="xp-reward"></xp-reward-panel>
-        <div class="hunting-choice" x-show="state.huntingChoiceVisible">
+        <div class="hunting-choice" x-show="$store.gameOverlay.huntingChoiceVisible">
             <div class="hunting-choice-info">
-                <span x-text="state.huntingLootSummary"></span>
+                <span x-text="$store.gameOverlay.huntingLootSummary"></span>
             </div>
             <div class="hunting-choice-buttons">
-                <button class="hunting-btn retreat" type="button" @click="huntingRetreat()">← 귀환</button>
-                <button class="hunting-btn advance" type="button" @click="huntingAdvance()">전진 →</button>
+                <button class="hunting-btn retreat" type="button" @click="$store.gameOverlay._actions.huntingRetreat()">귀환</button>
+                <button class="hunting-btn advance" type="button" @click="$store.gameOverlay._actions.huntingAdvance()">전진</button>
             </div>
         </div>
     </div>
 </div>
-<script>
-    Alpine.data("gameOverlay", () => {
-        const state = Alpine.reactive({
-            visible: false,
-            transient: false,
-            label: "",
-            text: "",
-            subtext: "",
-            huntingChoiceVisible: false,
-            huntingFloor: 1,
-            huntingCharacterName: "",
-            huntingLootSummary: ""
-        });
-        return {
-            state,
-            init() {
-                this.$watch("$store.gameOverlay", (val) => {
-                    if (!val) return;
-                    state.visible = Boolean(val.visible);
-                    state.transient = Boolean(val.transient);
-                    state.label = val.label ?? "";
-                    state.text = val.text ?? "";
-                    state.subtext = val.subtext ?? "";
-                    state.huntingChoiceVisible = Boolean(val.huntingChoiceVisible);
-                    state.huntingFloor = val.huntingFloor ?? 1;
-                    state.huntingCharacterName = val.huntingCharacterName ?? "";
-                    state.huntingLootSummary = val.huntingLootSummary ?? "";
-                }, { immediate: true });
-            },
-            huntingRetreat() {
-                if (window.ballFightApp?.hunting) window.ballFightApp.hunting.retreat();
-            },
-            huntingAdvance() {
-                if (window.ballFightApp?.hunting) window.ballFightApp.hunting.advance();
-            }
-        };
-    });
-</script>
 <style scoped>
 :scope {
     position: absolute;

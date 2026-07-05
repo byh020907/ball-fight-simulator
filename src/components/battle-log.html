@@ -1,24 +1,8 @@
-<div x-data="battleLog" id="battleLog">
-    <template x-for="(item, index) in state.items" :key="index">
+<div id="battleLog">
+    <template x-for="(item, index) in $store.battleLog.items" :key="index">
         <li x-text="item"></li>
     </template>
 </div>
-<script>
-    Alpine.data("battleLog", () => {
-        const state = Alpine.reactive({
-            items: []
-        });
-        return {
-            state,
-            init() {
-                this.$watch("$store.battleLog", (val) => {
-                    if (!val) return;
-                    state.items = val.items ? [...val.items] : [];
-                }, { immediate: true });
-            }
-        };
-    });
-</script>
 <style scoped>
 :scope {
     position: fixed;

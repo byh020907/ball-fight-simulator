@@ -1,33 +1,9 @@
 <button
-    x-data="huntingButton"
     class="control-button hunting-btn"
     type="button"
-    x-show="state.available && !state.tournamentActive && !state.active"
-    @click="openHuntingLobby()"
->⚔ 사냥터</button>
-<script>
-    Alpine.data("huntingButton", () => {
-        const state = Alpine.reactive({
-            available: false,
-            active: false,
-            tournamentActive: false
-        });
-        return {
-            state,
-            openHuntingLobby() {
-                if (window.ballFightApp?.hunting) window.ballFightApp.hunting.showCharacterSelect();
-            },
-            init() {
-                this.$watch("$store.huntingButton", (val) => {
-                    if (!val) return;
-                    state.available = Boolean(val.available);
-                    state.active = Boolean(val.active);
-                    state.tournamentActive = Boolean(val.tournamentActive);
-                }, { immediate: true });
-            }
-        };
-    });
-</script>
+    x-show="$store.huntingButton.available && !$store.huntingButton.tournamentActive && !$store.huntingButton.active"
+    @click="$store.huntingButton._actions.openLobby()"
+>사냥터</button>
 <style scoped>
 :scope {
     font-family: inherit;

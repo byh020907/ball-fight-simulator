@@ -46,6 +46,31 @@ const ABILITY_MAP = {
     hunting_melee: HuntingMeleeAbility
 };
 
+function getAlpineStore(name) {
+    try {
+        const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
+        return alpine ? alpine.store(name) : null;
+    } catch {
+        return null;
+    }
+}
+
+function patchAlpineStore(name, patch) {
+    const store = getAlpineStore(name);
+    if (!store) return null;
+    Object.assign(store, typeof patch === "function" ? patch(store) : patch);
+    return store;
+}
+
+function setAlpineStore(name, value) {
+    try {
+        const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
+        if (alpine) alpine.store(name, value);
+    } catch {
+        // no-op outside browser
+    }
+}
+
 // ── Alpine.js x-data function ───────────────────────────────────────────────
 
 export function appStore() {
@@ -114,17 +139,12 @@ export function appStore() {
         progressionBonusSummary: "",
 
         _syncStartButton() {
-            try {
-                const store = typeof Alpine !== "undefined" ? Alpine.store("startButton") : null;
-                if (store) {
-                    store.disabledOverride = null;
-                    store.textOverride = null;
-                    store.remainingPoints = this.remainingPoints ?? 0;
-                    store.locked = Boolean(this.locked);
-                }
-            } catch {
-                // no-op outside browser
-            }
+            patchAlpineStore("startButton", {
+                disabledOverride: null,
+                textOverride: null,
+                remainingPoints: this.remainingPoints ?? 0,
+                locked: Boolean(this.locked)
+            });
         },
 
         adjustChallengeLevel(delta) {
@@ -136,16 +156,10 @@ export function appStore() {
         },
 
         _syncPlayerPanelChallenge() {
-            try {
-                const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
-                const store = alpine ? alpine.store("playerPanel") : null;
-                if (store) {
-                    store.challengeLevel = this.challengeLevel;
-                    store.highestUnlockedLevel = this.highestUnlockedLevel;
-                }
-            } catch {
-                // no-op
-            }
+            patchAlpineStore("playerPanel", {
+                challengeLevel: this.challengeLevel,
+                highestUnlockedLevel: this.highestUnlockedLevel
+            });
         },
 
         init() {
@@ -193,18 +207,12 @@ export function appStore() {
             ];
             const mult = calculateStatMultiplier(vals).multiplier;
             this.allocationSummary = m + "  \u00D7" + mult.toFixed(3);
-            try {
-                const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
-                const store = alpine ? alpine.store("playerPanel") : null;
-                if (store) {
-                    store.allocation = { ...this.allocation };
-                    store.remainingPoints = this.remainingPoints;
-                    store.totalPoints = this.totalPoints;
-                    store.allocationSummary = this.allocationSummary;
-                }
-            } catch {
-                // no-op
-            }
+            patchAlpineStore("playerPanel", {
+                allocation: { ...this.allocation },
+                remainingPoints: this.remainingPoints,
+                totalPoints: this.totalPoints,
+                allocationSummary: this.allocationSummary
+            });
         },
 
         _emitAllocationChanged() {
@@ -330,9 +338,10 @@ export class UIController {
 
     get state() {
         try {
-            if (!this._rootData && typeof Alpine !== "undefined") {
+            const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
+            if (!this._rootData && alpine) {
                 const root = document.querySelector(".app");
-                this._rootData = root ? Alpine.$data(root) : null;
+                this._rootData = root ? alpine.$data(root) : null;
             }
         } catch {
             return null;
@@ -346,21 +355,16 @@ export class UIController {
     }
 
     _exposeActionsToPlayerPanel() {
-        try {
-            const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
-            const store = alpine ? alpine.store("playerPanel") : null;
-            if (store) {
-                store._actions = {
-                    adjustStat: (key, delta) => this.state?.adjustStat(key, delta),
-                    randomAllocation: () => this.state?.randomAllocation(),
-                    resetAllocation: () => this.state?.resetAllocation(),
-                    adjustChallengeLevel: (delta) => this.state?.adjustChallengeLevel(delta),
-                    openCollectionHub: () => this.state?.openCollectionHub("roster")
-                };
+        patchAlpineStore("playerPanel", (store) => ({
+            _actions: {
+                ...store._actions,
+                adjustStat: (key, delta) => this.state?.adjustStat(key, delta),
+                randomAllocation: () => this.state?.randomAllocation(),
+                resetAllocation: () => this.state?.resetAllocation(),
+                adjustChallengeLevel: (delta) => this.state?.adjustChallengeLevel(delta),
+                openCollectionHub: () => this.state?.openCollectionHub("roster")
             }
-        } catch {
-            // no-op
-        }
+        }));
     }
 
     renderPlayerSetup({
@@ -393,36 +397,27 @@ export class UIController {
         }
         this._syncHuntingButtonStore();
         s._syncSummary?.();
-        try {
-            const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
-            const store = alpine ? alpine.store("playerPanel") : null;
-            if (store) {
-                store.fighter = fighter ? { name: fighter.name, title: fighter.title, color: fighter.color } : null;
-                if (experience) {
-                    store.experience = { ...experience };
-                }
-                store.allocation = { ...allocation };
-                store.totalPoints = totalPoints;
-                store.bonusPoints = bonusPoints;
-                store.remainingPoints = remainingPoints;
-                store.locked = Boolean(locked);
-                store.challengeLevel = challengeLevel;
-                store.highestUnlockedLevel = highestUnlockedLevel;
-                store.progressionBonusSummary = progressionBonusSummary;
-                if (stats && Array.isArray(stats)) {
-                    store.statDefs = stats.map((s) => ({ key: s.key, label: s.label, description: s.description }));
-                }
-            }
-            const startStore = alpine ? alpine.store("startButton") : null;
-            if (startStore) {
-                startStore.disabledOverride = null;
-                startStore.textOverride = null;
-                startStore.remainingPoints = remainingPoints ?? 0;
-                startStore.locked = Boolean(locked);
-            }
-        } catch {
-            // no-op outside browser
-        }
+        patchAlpineStore("playerPanel", {
+            fighter: fighter ? { name: fighter.name, title: fighter.title, color: fighter.color } : null,
+            ...(experience ? { experience: { ...experience } } : {}),
+            allocation: { ...allocation },
+            totalPoints,
+            bonusPoints,
+            remainingPoints,
+            locked: Boolean(locked),
+            challengeLevel,
+            highestUnlockedLevel,
+            progressionBonusSummary,
+            ...(stats && Array.isArray(stats)
+                ? { statDefs: stats.map((s) => ({ key: s.key, label: s.label, description: s.description })) }
+                : {})
+        });
+        patchAlpineStore("startButton", {
+            disabledOverride: null,
+            textOverride: null,
+            remainingPoints: remainingPoints ?? 0,
+            locked: Boolean(locked)
+        });
         this._drawPlayerFace(fighter);
         this._exposeActionsToPlayerPanel();
     }
@@ -515,29 +510,13 @@ export class UIController {
                 actionName: null
             };
         });
-        try {
-            const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
-            if (alpine) {
-                const store = alpine.store("fighterStrip");
-                if (store) store.fighters = fighters;
-            }
-        } catch {
-            // no-op outside browser
-        }
+        patchAlpineStore("fighterStrip", { fighters });
     }
 
     updateStatus() {}
 
     _setGameOverlay(data) {
-        try {
-            const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
-            if (alpine) {
-                const store = alpine.store("gameOverlay");
-                if (store) Object.assign(store, data);
-            }
-        } catch {
-            // no-op outside browser
-        }
+        patchAlpineStore("gameOverlay", data);
     }
 
     setHuntingActive(active) {
@@ -547,15 +526,7 @@ export class UIController {
     }
 
     setHuntingOverlayState(data) {
-        try {
-            const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
-            if (alpine) {
-                const store = alpine.store("gameOverlay");
-                if (store) Object.assign(store, data);
-            }
-        } catch {
-            // no-op outside browser
-        }
+        patchAlpineStore("gameOverlay", data);
     }
 
     showOverlay(label, text, subtext = "", xpReward = null) {
@@ -571,12 +542,7 @@ export class UIController {
     }
 
     _setXpReward(data) {
-        try {
-            const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
-            if (alpine) alpine.store("xpReward", data);
-        } catch {
-            // no-op outside browser
-        }
+        setAlpineStore("xpReward", data);
     }
 
     _resetXpReward() {
@@ -609,8 +575,7 @@ export class UIController {
     }
 
     showToast(message, duration = 3500) {
-        const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
-        if (alpine) alpine.store("toast", { message, duration });
+        setAlpineStore("toast", { message, duration });
     }
 
     showTransientOverlay(label, text, token) {
@@ -641,19 +606,11 @@ export class UIController {
     }
 
     setStartButton({ disabled, text, hidden }) {
-        try {
-            const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
-            if (alpine) {
-                const store = alpine.store("startButton");
-                if (store) {
-                    if (hidden !== undefined) store.hidden = Boolean(hidden);
-                    store.disabledOverride = disabled !== undefined ? disabled : null;
-                    store.textOverride = text !== undefined ? text : null;
-                }
-            }
-        } catch {
-            // no-op outside browser
-        }
+        patchAlpineStore("startButton", {
+            ...(hidden !== undefined ? { hidden: Boolean(hidden) } : {}),
+            disabledOverride: disabled !== undefined ? disabled : null,
+            textOverride: text !== undefined ? text : null
+        });
     }
 
     resetLog() {
@@ -667,32 +624,17 @@ export class UIController {
     }
 
     renderLog() {
-        try {
-            const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
-            if (alpine) {
-                const store = alpine.store("battleLog");
-                if (store) store.items = [...this.logItems];
-            }
-        } catch {
-            // no-op outside browser
-        }
+        patchAlpineStore("battleLog", { items: [...this.logItems] });
     }
 
     _syncHuntingButtonStore() {
-        try {
-            const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
-            if (alpine) {
-                const s = this.state;
-                const store = alpine.store("huntingButton");
-                if (store && s) {
-                    store.available = Boolean(s.huntingAvailable);
-                    store.active = Boolean(s.huntingActive);
-                    store.tournamentActive = Boolean(s.tournamentActive);
-                }
-            }
-        } catch {
-            // no-op outside browser
-        }
+        const s = this.state;
+        if (!s) return;
+        patchAlpineStore("huntingButton", {
+            available: Boolean(s.huntingAvailable),
+            active: Boolean(s.huntingActive),
+            tournamentActive: Boolean(s.tournamentActive)
+        });
     }
 
     renderTournament(tournament = null) {
@@ -702,17 +644,11 @@ export class UIController {
         if (!tournament) {
             s.tournamentActive = false;
             this._syncHuntingButtonStore();
-            try {
-                const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
-                const store = alpine ? alpine.store("tournamentBracket") : null;
-                if (store) {
-                    store.visible = false;
-                    store.phase = "Ready";
-                    store.rounds = [];
-                }
-            } catch {
-                // no-op
-            }
+            patchAlpineStore("tournamentBracket", {
+                visible: false,
+                phase: "Ready",
+                rounds: []
+            });
             return;
         }
 
@@ -748,64 +684,61 @@ export class UIController {
                     : null
             }))
         );
-        try {
-            const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
-            const store = alpine ? alpine.store("tournamentBracket") : null;
-            if (store) {
-                store.visible = true;
-                store.phase = tournament.champion ? "Champion" : "Running";
-                store.rounds = rounds;
-            }
-        } catch {
-            // no-op
-        }
+        patchAlpineStore("tournamentBracket", {
+            visible: true,
+            phase: tournament.champion ? "Champion" : "Running",
+            rounds
+        });
     }
 
     updateLiveCards(fighters) {
-        try {
-            const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
-            const store = alpine ? alpine.store("fighterStrip") : null;
-            if (!store) return;
+        patchAlpineStore("fighterStrip", (store) => {
             const current = store.fighters || [];
-            store.fighters = current.map((card) => {
-                const fighter = fighters.find((f) => f.id === card.id || f.name === card.name);
-                if (!fighter) return card;
-                const alloc = fighter.stats.allocation ?? {};
-                const isHero = fighter.id === FIGHTER_IDS.HERO;
-                const pts = [alloc.hp ?? 0, alloc.damage ?? 0, alloc.speed ?? 0, alloc.skill ?? 0, alloc.defense ?? 0];
-                const mult = calculateStatMultiplier(pts).multiplier;
-                return {
-                    ...card,
-                    hp: Math.ceil(fighter.hp),
-                    maxHp: Math.ceil(fighter.maxHp),
-                    hpPct: Math.max(0, (fighter.hp / fighter.maxHp) * 100),
-                    defeated: fighter.flags.defeated,
-                    balanceMult: mult,
-                    isHero,
-                    mergedBonuses: mergeOrbBonuses(fighter.hero.bonuses ?? {}, fighter.hero.carryover ?? {}),
-                    statLine: isHero
-                        ? formatHeroStatLine(
-                              fighter.stats.allocation ?? {},
-                              mergeOrbBonuses(fighter.hero.bonuses ?? {}, fighter.hero.carryover ?? {})
-                          )
-                        : formatStatAllocation(fighter.stats.allocation ?? {}),
-                    heroStatParts: isHero
-                        ? formatHeroStatParts(
-                              fighter.stats.allocation ?? {},
-                              mergeOrbBonuses(fighter.hero.bonuses ?? {}, fighter.hero.carryover ?? {})
-                          )
-                        : [],
-                    skillLabel: fighter.getAbilityUiState().label,
-                    skillPct: Math.max(0, Math.min(1, fighter.getAbilityUiState().progress)),
-                    skillText:
-                        fighter.getAbilityUiState().progress >= 0.995
-                            ? "Ready"
-                            : `${Math.round(fighter.getAbilityUiState().progress * 100)}%`,
-                    actionName: fighter.clickActionName ?? null
-                };
-            });
-        } catch {
-            // no-op outside browser
-        }
+            return {
+                fighters: current.map((card) => {
+                    const fighter = fighters.find((f) => f.id === card.id || f.name === card.name);
+                    if (!fighter) return card;
+                    const alloc = fighter.stats.allocation ?? {};
+                    const isHero = fighter.id === FIGHTER_IDS.HERO;
+                    const pts = [
+                        alloc.hp ?? 0,
+                        alloc.damage ?? 0,
+                        alloc.speed ?? 0,
+                        alloc.skill ?? 0,
+                        alloc.defense ?? 0
+                    ];
+                    const mult = calculateStatMultiplier(pts).multiplier;
+                    return {
+                        ...card,
+                        hp: Math.ceil(fighter.hp),
+                        maxHp: Math.ceil(fighter.maxHp),
+                        hpPct: Math.max(0, (fighter.hp / fighter.maxHp) * 100),
+                        defeated: fighter.flags.defeated,
+                        balanceMult: mult,
+                        isHero,
+                        mergedBonuses: mergeOrbBonuses(fighter.hero.bonuses ?? {}, fighter.hero.carryover ?? {}),
+                        statLine: isHero
+                            ? formatHeroStatLine(
+                                  fighter.stats.allocation ?? {},
+                                  mergeOrbBonuses(fighter.hero.bonuses ?? {}, fighter.hero.carryover ?? {})
+                              )
+                            : formatStatAllocation(fighter.stats.allocation ?? {}),
+                        heroStatParts: isHero
+                            ? formatHeroStatParts(
+                                  fighter.stats.allocation ?? {},
+                                  mergeOrbBonuses(fighter.hero.bonuses ?? {}, fighter.hero.carryover ?? {})
+                              )
+                            : [],
+                        skillLabel: fighter.getAbilityUiState().label,
+                        skillPct: Math.max(0, Math.min(1, fighter.getAbilityUiState().progress)),
+                        skillText:
+                            fighter.getAbilityUiState().progress >= 0.995
+                                ? "Ready"
+                                : `${Math.round(fighter.getAbilityUiState().progress * 100)}%`,
+                        actionName: fighter.clickActionName ?? null
+                    };
+                })
+            };
+        });
     }
 }
