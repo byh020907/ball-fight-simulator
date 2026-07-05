@@ -419,9 +419,10 @@ UI는 **Alpine.js**를 통해 컴포넌트 기반으로 관리됩니다.
 - **직접 DOM 조작 금지**: `document.createElement`, `appendChild`, `classList.add` 등 DOM API를 직접 호출하지 않습니다. 모든 UI 변경은 Alpine.js의 반응형 상태(`x-text`, `x-show`, `x-for`, `x-bind` 등)를 통해 선언적으로 처리합니다.
 - **Alpine.js 템플릿**: `index.html`에 `x-text`, `x-for`, `x-bind`, `@click` 등의 Alpine.js 디렉티브를 사용합니다.
 - **반응형 상태**: `src/ui.js`의 `appStore()` 함수가 Alpine 컴포넌트의 상태를 정의합니다.
-- **CSS 분리**: 모든 스타일은 `src/styles.css`에 있으며, `index.html`은 `<link>`로 참조합니다.
+- **CSS 분리**: 전역 스타일은 `src/styles.css`, 태그 컴포넌트 전용 스타일은 각 `src/components/<name>.html`의 `<style scoped>`에 둡니다.
 - **Alpine.js 공식 문서 우선**: Alpine.js 동작이 모호한 경우 [공식 문서](https://alpinejs.dev/)를 참고합니다. 구버전 블로그 글보다 최신 릴리스(3.x) 문서를 우선합니다. (예: `x-model` vs `x-modelable`, `$watch` vs `watch()`)
 - **반복 HTML 조각 재사용**: 중복 마크업은 `src/alpineTemplateComponents.js`의 태그 기반 템플릿 컴포넌트 시스템(`<xp-meter>` ↔ `template-xp-meter`)을 기본으로 사용합니다. `x-component`는 호스트 태그를 유지해야 할 때의 보조 문법입니다. 세부 규칙은 `docs/alpine-component-system.md`를 따르며, 상태/메서드 재사용 목적이면 `Alpine.data()`를 우선합니다.
+- **UI 핸들러 위치**: 버튼 클릭 같은 UI 이벤트 핸들러는 해당 태그 컴포넌트의 `Alpine.data()`에 둡니다. 컴포넌트는 `BallFightComponentBridge`를 통해 `appStore()`/`BattleApp` 공개 메서드를 호출하고, `Alpine.store()`를 콜백 저장소로 쓰지 않습니다.
 
 ### 데이터 흐름
 
@@ -429,6 +430,11 @@ UI는 **Alpine.js**를 통해 컴포넌트 기반으로 관리됩니다.
 app.js → UIController 메서드 호출
          → Alpine 컴포넌트 데이터 업데이트
          → Alpine.js가 자동으로 DOM 렌더링
+
+태그 컴포넌트 @click
+         → 컴포넌트 Alpine.data() 메서드
+         → BallFightComponentBridge
+         → appStore() 또는 BattleApp 공개 메서드
 ```
 
 - `BattleApp`은 `UIController`의 메서드(`renderPlayerSetup`, `updateStatus`, `showOverlay` 등)를 호출합니다.
@@ -444,7 +450,7 @@ app.js → UIController 메서드 호출
 | `x-text="statusBadge"`                        | 상태 뱃지 텍스트         | `UIController.updateStatus()`                            |
 | `x-text="statusText"`                         | 매치업 레이블            | `UIController.updateStatus()`                            |
 | `x-bind:class="{ visible: overlayVisible }"`  | 오버레이 표시            | `UIController.showOverlay()` / `hideOverlay()`           |
-| `@click="$dispatch('start-tournament')"`      | 시작 버튼 클릭           | `document` 이벤트 리스너 → `BattleApp.startTournament()` |
+| `@click="startTournament()"`                  | 시작 버튼 클릭           | 컴포넌트 핸들러 → `BattleApp.startTournament()`          |
 | `x-for="fighter in fighters"`                 | 파이터 카드 목록         | `UIController.renderRoster()` / `updateLiveCards()`      |
 | `x-for="stat in statDefs"`                    | 스탯 배분 버튼 그리드    | `appStore().adjustStat()`                                |
 | `x-for="(round, rIndex) in tournamentRounds"` | 토너먼트 대진표          | `UIController.renderTournament()`                        |
@@ -452,10 +458,10 @@ app.js → UIController 메서드 호출
 
 ### 새 UI 컴포넌트 추가 규칙
 
-1. **`index.html`**에 Alpine.js 템플릿을 작성합니다 (`x-data`, `x-for`, `x-text` 등).
-2. **`ui.js`**의 `appStore()`에 필요한 상태와 액션을 추가합니다.
-3. **`UIController`**에 상태를 갱신하는 메서드를 추가합니다.
-4. **`src/styles.css`**에 스타일을 추가합니다.
+1. **`src/components/<name>.html`**에 태그 컴포넌트 템플릿, `Alpine.data()`, scoped style을 작성합니다.
+2. **`ui.js`**의 `appStore()`에는 화면 상태와 UI 설정 액션만 추가합니다.
+3. **`UIController`**에는 컴포넌트 store 데이터를 갱신하는 메서드를 추가합니다.
+4. 게임 진행, 토너먼트, 사냥터 같은 도메인 동작은 `BattleApp`/도메인 서비스의 공개 메서드에 두고, 컴포넌트 핸들러는 `BallFightComponentBridge`를 통해 호출합니다.
 
 `innerHTML`을 직접 조작하거나 jQuery 등을 도입하지 않습니다.
 

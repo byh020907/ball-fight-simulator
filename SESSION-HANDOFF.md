@@ -456,3 +456,8 @@
 - 맥락: store 직접 참조로 단순화하는 과정에서 일부 태그 컴포넌트의 루트 `x-data`와 `<script> Alpine.data(...)` 등록까지 제거되어, 파일 구조상 컴포넌트 정의가 사라진 것처럼 보이는 문제가 있었다.
 - 결정: start-button/hunting-button/battle-log/fighter-strip/game-overlay/player-panel/tournament-bracket는 `$store` 직접 참조를 유지하되, 루트 `x-data="<componentName>"`와 `<script> Alpine.data("<componentName>", () => ({})) </script>`를 반드시 둔다. 로컬 state 복사와 watcher는 필요한 컴포넌트에만 사용한다.
 - 영향: `src/components/start-button.html`, `src/components/hunting-button.html`, `src/components/battle-log.html`, `src/components/fighter-strip.html`, `src/components/game-overlay.html`, `src/components/player-panel.html`, `src/components/tournament-bracket.html`, `docs/alpine-component-system.md`
+
+## [L1] 2026-07-05 — UI 핸들러는 컴포넌트에, 게임 로직은 app/game에 둔다
+- 맥락: `_actions`를 Alpine store에 주입하는 방식은 store가 데이터 브릿지가 아니라 콜백 레지스트리가 되어 책임 경계가 흐려졌다. 사용자는 UI 관련 로직은 컴포넌트가 갖고, 게임 관련 로직은 게임/app 쪽 공개 핸들러에 남는 구조를 요청했다.
+- 결정: start-button/hunting-button/game-overlay/player-panel의 `@click`은 컴포넌트 `Alpine.data()` 메서드를 호출한다. 컴포넌트 메서드는 `window.BallFightComponentBridge`를 통해 `appStore()` 또는 `BattleApp`/`HuntingManager` 공개 메서드를 호출한다. `Alpine.store()`의 `_actions` 초기값과 `BattleApp._exposeComponentActions()`, `UIController._exposeActionsToPlayerPanel()`는 제거한다.
+- 영향: `src/componentBridge.js`, `src/components/start-button.html`, `src/components/hunting-button.html`, `src/components/game-overlay.html`, `src/components/player-panel.html`, `index.html`, `src/app.js`, `src/ui.js`, `tests/regression.mjs`, `docs/alpine-component-system.md`, `docs/development-rules.md`

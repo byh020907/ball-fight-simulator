@@ -21,18 +21,21 @@
                 <span x-text="$store.gameOverlay.huntingLootSummary"></span>
             </div>
             <div class="hunting-choice-buttons">
-                <button class="hunting-btn retreat" type="button" @click="$store.gameOverlay._actions.huntingRetreat()">
-                    귀환
-                </button>
-                <button class="hunting-btn advance" type="button" @click="$store.gameOverlay._actions.huntingAdvance()">
-                    전진
-                </button>
+                <button class="hunting-btn retreat" type="button" @click="huntingRetreat()">귀환</button>
+                <button class="hunting-btn advance" type="button" @click="huntingAdvance()">전진</button>
             </div>
         </div>
     </div>
 </div>
 <script>
-    Alpine.data("gameOverlay", () => ({}));
+    Alpine.data("gameOverlay", () => ({
+        huntingRetreat() {
+            window.BallFightComponentBridge?.huntingRetreat();
+        },
+        huntingAdvance() {
+            window.BallFightComponentBridge?.huntingAdvance();
+        }
+    }));
 </script>
 <style scoped>
     :scope {

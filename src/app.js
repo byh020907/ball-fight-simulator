@@ -145,8 +145,6 @@ export class BattleApp {
         /** @type {{ level: number, indicatorTimer: number, indicatorText: string }} */
         this._speed = { level: 1, indicatorTimer: 0, indicatorText: "" };
 
-        this._exposeComponentActions();
-
         // Listen for Alpine.js allocation updates emitted by appStore actions.
         try {
             document.addEventListener("allocation-changed", () => this._syncPlayerStatAllocationFromUi());
@@ -160,38 +158,6 @@ export class BattleApp {
         this.ui.updateStatus("내 캐릭터 스탯을 배분하세요", "Setup");
         this.ui.hideOverlay();
         this.startPlayerPreviewLoop();
-    }
-
-    _exposeComponentActions() {
-        try {
-            const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
-            const startStore = alpine ? alpine.store("startButton") : null;
-            if (startStore) {
-                startStore._actions = {
-                    ...startStore._actions,
-                    startTournament: () => this.startTournament()
-                };
-            }
-
-            const huntingStore = alpine ? alpine.store("huntingButton") : null;
-            if (huntingStore) {
-                huntingStore._actions = {
-                    ...huntingStore._actions,
-                    openLobby: () => this.hunting.showCharacterSelect()
-                };
-            }
-
-            const overlayStore = alpine ? alpine.store("gameOverlay") : null;
-            if (overlayStore) {
-                overlayStore._actions = {
-                    ...overlayStore._actions,
-                    huntingRetreat: () => this.hunting.retreat(),
-                    huntingAdvance: () => this.hunting.advance()
-                };
-            }
-        } catch {
-            // no-op in non-browser environments
-        }
     }
 
     pickPlayerFighterId() {

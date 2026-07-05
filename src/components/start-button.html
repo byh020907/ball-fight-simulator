@@ -6,12 +6,16 @@
     x-bind:class="{ hidden: $store.startButton.hidden }"
     x-bind:disabled="$store.startButton.disabledOverride !== null ? $store.startButton.disabledOverride : $store.startButton.remainingPoints > 0 || $store.startButton.locked"
     x-text="$store.startButton.textOverride !== null ? $store.startButton.textOverride : ($store.startButton.remainingPoints > 0 ? '스탯 ' + $store.startButton.remainingPoints + ' 남음' : '토너먼트 시작')"
-    @click="$store.startButton._actions.startTournament()"
+    @click="startTournament()"
 >
     토너먼트 시작
 </button>
 <script>
-    Alpine.data("startButton", () => ({}));
+    Alpine.data("startButton", () => ({
+        startTournament() {
+            window.BallFightComponentBridge?.startTournament();
+        }
+    }));
 </script>
 <style scoped>
     :scope {

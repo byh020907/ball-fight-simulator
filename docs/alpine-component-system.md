@@ -122,6 +122,8 @@ Alpine.data("xpRewardPanel", () => {
 
 단순 표시/컨트롤 컴포넌트처럼 인스턴스별 로컬 상태가 필요 없는 경우에는 템플릿에서 `$store.<name>.*`를 직접 읽습니다. 이때도 루트 `x-data`와 `<script>`의 `Alpine.data("<name>", () => ({}))` 등록은 유지하여 태그 컴포넌트 경계를 명확히 둡니다. `$watch`로 `$store`를 로컬 state에 복사하는 방식은 컴포넌트가 자체 상태, 애니메이션 상태, 인스턴스별 파생 상태를 실제로 소유해야 할 때만 사용합니다.
 
+클릭 같은 UI 이벤트 핸들러는 컴포넌트의 `Alpine.data()` 메서드에 둡니다. 컴포넌트는 `window.BallFightComponentBridge`를 통해 `appStore()` 또는 `BattleApp`의 공개 메서드를 호출하고, 게임 규칙/사냥터 진행/토너먼트 시작 같은 도메인 로직을 store 객체나 템플릿 표현식 안에 직접 넣지 않습니다.
+
 ### 4.2 컴포넌트 → 컴포넌트 (중첩)
 
 부모 컴포넌트가 자식에게 props를 `x-bind`로 전달합니다.
@@ -210,6 +212,7 @@ await loadTemplates();
 - **순서**: Template > Script > Style (Vue SFC 규약)
 - **`x-data` 필수**: 템플릿 루트 요소는 반드시 자체 `x-data="ComponentName"`를 가짐
 - **Alpine.data() 등록**: `<script>` 내부에서 `Alpine.data("ComponentName", () => ({}))` 형태라도 반드시 등록. 로컬 상태가 필요할 때만 `const state = Alpine.reactive({...}); return { state, init(){} };` 패턴을 사용하며, private은 클로저에 숨기고 공유 객체/네임드 함수 전역 등록은 금지
+- **UI 핸들러 소유**: `@click="doThing()"`처럼 컴포넌트 메서드를 호출하고, 그 메서드에서 `BallFightComponentBridge`를 통해 app/game 공개 핸들러를 호출. `Alpine.store()`에는 `_actions` 같은 콜백 레지스트리를 두지 않음
 - **Props**: 부모 → 자식 데이터는 `$store` 또는 호스트 속성으로 전달
 - **로직 소유**: 애니메이션, 표시 전환 등은 컴포넌트가 자체 소유
 - **스코프 격리**: 템플릿에서 `xpReward.xxx`처럼 부모 스코프를 직접 참조하지 않음

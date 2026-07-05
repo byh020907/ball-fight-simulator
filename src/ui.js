@@ -354,19 +354,6 @@ export class UIController {
         if (s) fn(s);
     }
 
-    _exposeActionsToPlayerPanel() {
-        patchAlpineStore("playerPanel", (store) => ({
-            _actions: {
-                ...store._actions,
-                adjustStat: (key, delta) => this.state?.adjustStat(key, delta),
-                randomAllocation: () => this.state?.randomAllocation(),
-                resetAllocation: () => this.state?.resetAllocation(),
-                adjustChallengeLevel: (delta) => this.state?.adjustChallengeLevel(delta),
-                openCollectionHub: () => this.state?.openCollectionHub("roster")
-            }
-        }));
-    }
-
     renderPlayerSetup({
         fighter,
         stats,
@@ -419,7 +406,6 @@ export class UIController {
             locked: Boolean(locked)
         });
         this._drawPlayerFace(fighter);
-        this._exposeActionsToPlayerPanel();
     }
 
     /** 플레이어 패널에 캐릭터 얼굴 그리기 */

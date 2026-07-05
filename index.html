@@ -125,19 +125,18 @@
 
             const { loadTemplates } = await import(`./src/componentLoader.js?v=${V}`);
             const { registerAlpineComponentSystem } = await import(`./src/alpineTemplateComponents.js?v=${V}`);
+            const { createComponentBridge } = await import(`./src/componentBridge.js?v=${V}`);
             const { appStore } = await import(`./src/ui.js?v=${V}`);
 
             window.Alpine = Alpine;
+            window.BallFightComponentBridge = createComponentBridge(Alpine);
             await loadTemplates();
             Alpine.store("startButton", {
                 hidden: true,
                 disabledOverride: null,
                 textOverride: null,
                 remainingPoints: 0,
-                locked: false,
-                _actions: {
-                    startTournament() {}
-                }
+                locked: false
             });
             Alpine.store("fighterStrip", {
                 fighters: []
@@ -148,10 +147,7 @@
             Alpine.store("huntingButton", {
                 available: false,
                 active: false,
-                tournamentActive: false,
-                _actions: {
-                    openLobby() {}
-                }
+                tournamentActive: false
             });
             Alpine.store("gameOverlay", {
                 visible: false,
@@ -162,11 +158,7 @@
                 huntingChoiceVisible: false,
                 huntingFloor: 1,
                 huntingCharacterName: "",
-                huntingLootSummary: "",
-                _actions: {
-                    huntingRetreat() {},
-                    huntingAdvance() {}
-                }
+                huntingLootSummary: ""
             });
             Alpine.store("xpReward", {
                 visible: false,
@@ -198,15 +190,7 @@
                 challengeLevel: 0,
                 highestUnlockedLevel: 0,
                 progressionBonusSummary: "",
-                allocationSummary: "",
-                _actions: {
-                    adjustStat() {},
-                    randomAllocation() {},
-                    resetAllocation() {},
-                    adjustChallengeLevel() {},
-                    openCollectionHub() {},
-                    openHelp() {}
-                }
+                allocationSummary: ""
             });
             Alpine.store("tournamentBracket", {
                 visible: false,
@@ -228,10 +212,6 @@
             window.PatchNotesService = PatchNotesService;
             const { CollectionHubService } = await import(`./src/collectionHubService.js?v=${V}`);
             window.CollectionHubService = CollectionHubService;
-            const { HELP_TITLE, HELP_CONTENT } = await import(`./src/helpContent.js?v=${V}`);
-            Alpine.store("playerPanel")._actions.openHelp = () => {
-                PopupService.show({ title: HELP_TITLE, bodyHtml: HELP_CONTENT });
-            };
 
             const { getUnseenEntries } = await import(`./src/utils.js?v=${V}`);
             const unseenEntries = getUnseenEntries();

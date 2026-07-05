@@ -57,6 +57,7 @@ import {
 } from "../src/hunting/index.js";
 import { Grenade } from "../src/entities/grenade.js";
 import { appStore, UIController } from "../src/ui.js";
+import { createComponentBridge } from "../src/componentBridge.js";
 import { ArenaCamera } from "../src/camera.js";
 import { PATCH_NOTES } from "../src/patchNotes.js";
 import {
@@ -269,29 +270,19 @@ async function loadModuleApp() {
         huntingChoiceVisible: false,
         huntingFloor: 1,
         huntingCharacterName: "",
-        huntingLootSummary: "",
-        _actions: {
-            huntingRetreat() {},
-            huntingAdvance() {}
-        }
+        huntingLootSummary: ""
     });
     globalThis.Alpine.store("startButton", {
         hidden: true,
         disabledOverride: null,
         textOverride: null,
         remainingPoints: 0,
-        locked: false,
-        _actions: {
-            startTournament() {}
-        }
+        locked: false
     });
     globalThis.Alpine.store("huntingButton", {
         available: false,
         active: false,
-        tournamentActive: false,
-        _actions: {
-            openLobby() {}
-        }
+        tournamentActive: false
     });
     globalThis.Alpine.store("fighterStrip", {
         fighters: []
@@ -311,15 +302,7 @@ async function loadModuleApp() {
         challengeLevel: 0,
         highestUnlockedLevel: 0,
         progressionBonusSummary: "",
-        allocationSummary: "",
-        _actions: {
-            adjustStat() {},
-            randomAllocation() {},
-            resetAllocation() {},
-            adjustChallengeLevel() {},
-            openCollectionHub() {},
-            openHelp() {}
-        }
+        allocationSummary: ""
     });
     globalThis.Alpine.store("tournamentBracket", {
         visible: false,
@@ -358,29 +341,19 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
         huntingChoiceVisible: false,
         huntingFloor: 1,
         huntingCharacterName: "",
-        huntingLootSummary: "",
-        _actions: {
-            huntingRetreat() {},
-            huntingAdvance() {}
-        }
+        huntingLootSummary: ""
     });
     harness.context.Alpine.store("startButton", {
         hidden: true,
         disabledOverride: null,
         textOverride: null,
         remainingPoints: 0,
-        locked: false,
-        _actions: {
-            startTournament() {}
-        }
+        locked: false
     });
     harness.context.Alpine.store("huntingButton", {
         available: false,
         active: false,
-        tournamentActive: false,
-        _actions: {
-            openLobby() {}
-        }
+        tournamentActive: false
     });
     harness.context.Alpine.store("fighterStrip", {
         fighters: []
@@ -400,15 +373,7 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
         challengeLevel: 0,
         highestUnlockedLevel: 0,
         progressionBonusSummary: "",
-        allocationSummary: "",
-        _actions: {
-            adjustStat() {},
-            randomAllocation() {},
-            resetAllocation() {},
-            adjustChallengeLevel() {},
-            openCollectionHub() {},
-            openHelp() {}
-        }
+        allocationSummary: ""
     });
     harness.context.Alpine.store("tournamentBracket", {
         visible: false,
@@ -901,22 +866,27 @@ function testRenderPlayerSetupCopiesAllocation(app) {
     assert.equal(state.huntingAvailable, true, "Player setup should expose hunting availability");
 
     const playerPanelStore = globalThis.Alpine.store("playerPanel");
-    assert.equal(
-        typeof playerPanelStore._actions.adjustStat,
-        "function",
-        "Player panel should expose stat actions through its Alpine store"
-    );
-    playerPanelStore._actions.adjustStat("hp", 1);
-    assert.equal(state.allocation.hp, 11, "Player panel store action should update app allocation");
-    assert.equal(playerPanelStore.allocation.hp, 11, "Player panel store action should sync store allocation");
-    assert.equal(
-        playerPanelStore.remainingPoints,
-        getRemainingStatPoints(state.allocation, PLAYER_STAT_POINTS),
-        "Player panel store action should sync points"
-    );
+    const previousQuerySelector = globalThis.document.querySelector;
+    const previousData = globalThis.Alpine.$data;
+    const appRoot = makeElement("app");
+    try {
+        globalThis.document.querySelector = (selector) => (selector === ".app" ? appRoot : null);
+        globalThis.Alpine.$data = (root) => (root === appRoot ? state : null);
+        createComponentBridge(globalThis.Alpine).adjustStat("hp", 1);
+        assert.equal(state.allocation.hp, 11, "Player panel bridge action should update app allocation");
+        assert.equal(playerPanelStore.allocation.hp, 11, "Player panel bridge action should sync store allocation");
+        assert.equal(
+            playerPanelStore.remainingPoints,
+            getRemainingStatPoints(state.allocation, PLAYER_STAT_POINTS),
+            "Player panel bridge action should sync points"
+        );
+    } finally {
+        globalThis.document.querySelector = previousQuerySelector;
+        globalThis.Alpine.$data = previousData;
+    }
 }
 
-function testComponentStoreActionsAreBound(app) {
+function testComponentBridgeCallsGameHandlers(app) {
     let started = false;
     let openedLobby = false;
     let retreated = false;
@@ -939,11 +909,13 @@ function testComponentStoreActionsAreBound(app) {
         app.hunting.advance = () => {
             advanced = true;
         };
+        globalThis.ballFightApp = app;
+        const bridge = createComponentBridge(globalThis.Alpine);
 
-        globalThis.Alpine.store("startButton")._actions.startTournament();
-        globalThis.Alpine.store("huntingButton")._actions.openLobby();
-        globalThis.Alpine.store("gameOverlay")._actions.huntingRetreat();
-        globalThis.Alpine.store("gameOverlay")._actions.huntingAdvance();
+        bridge.startTournament();
+        bridge.openHuntingLobby();
+        bridge.huntingRetreat();
+        bridge.huntingAdvance();
     } finally {
         app.startTournament = originalStartTournament;
         app.hunting.showCharacterSelect = originalShowCharacterSelect;
@@ -951,8 +923,8 @@ function testComponentStoreActionsAreBound(app) {
         app.hunting.advance = originalAdvance;
     }
 
-    assert.equal(started, true, "Start button store action should call BattleApp.startTournament");
-    assert.equal(openedLobby, true, "Hunting button store action should open the hunting lobby");
+    assert.equal(started, true, "Start button bridge action should call BattleApp.startTournament");
+    assert.equal(openedLobby, true, "Hunting button bridge action should open the hunting lobby");
     assert.equal(retreated, true, "Overlay retreat action should call HuntingManager.retreat");
     assert.equal(advanced, true, "Overlay advance action should call HuntingManager.advance");
 }
@@ -3886,7 +3858,7 @@ testShuffledUtility();
 testStatAllocationRules(app);
 testStatAllocationUiSyncEvent();
 testRenderPlayerSetupCopiesAllocation(app);
-testComponentStoreActionsAreBound(app);
+testComponentBridgeCallsGameHandlers(app);
 await testBattleAppAdoptsPreExistingAlpineAllocation();
 testIndexCacheVersionMatchesLatestPatchNote();
 testStatBalanceSystem();

@@ -3,12 +3,16 @@
     type="button"
     x-data="huntingButton"
     x-show="$store.huntingButton.available && !$store.huntingButton.tournamentActive && !$store.huntingButton.active"
-    @click="$store.huntingButton._actions.openLobby()"
+    @click="openLobby()"
 >
     사냥터
 </button>
 <script>
-    Alpine.data("huntingButton", () => ({}));
+    Alpine.data("huntingButton", () => ({
+        openLobby() {
+            window.BallFightComponentBridge?.openHuntingLobby();
+        }
+    }));
 </script>
 <style scoped>
     :scope {
