@@ -29,6 +29,8 @@ import { completeChallengeTournament, formatBonusSummary } from "../src/progress
 import {
     advanceHuntingRun,
     canEnterHunting,
+    canRetreatFromHuntingRun,
+    completeHuntingStage,
     createHuntingChest,
     createHuntingRun,
     defeatHuntingRun,
@@ -36,16 +38,24 @@ import {
     applyHuntingStatModifiersToSpec,
     getEligibleHuntingCharacters,
     getEnemyPowerMultiplier,
+    getHuntingFloorChances,
+    getHuntingStage,
+    getHuntingStageArena,
+    getNextHuntingStageId,
     getRewardMultiplier,
     getChestOpenCost,
+    getSelectedHuntingStageId,
+    getUnlockedHuntingStageIds,
     previewHuntingChest,
     openHuntingChest,
     recordHuntingFloorResult,
     retreatHuntingRun,
     rollHuntingChestReward,
+    rollHuntingFloorOutcome,
     rollShardReward,
     scaleEnemySpecForHunting,
     HUNTING_ARENA,
+    HUNTING_ENEMY_TYPES,
     HUNTING_EVENT_TYPES,
     HUNTING_FLOOR_OUTCOME_TYPES,
     HUNTING_MONSTER_TYPES,
@@ -1475,6 +1485,178 @@ function testHuntingSystem() {
     assert.equal(sanitized.hunting.chests.length, 1, "Sanitized profile should dedupe and discard invalid chests");
     assert.equal(sanitized.hunting.stats.deepestFloor, 4, "Sanitized profile should keep hunting stats");
     console.log("[hunting] ok");
+}
+
+function testHunting100FloorStructure() {
+    // ── Run starts at floor 0 ──
+    const run0 = createHuntingRun({ characterId: FIGHTER_IDS.DASH, now: 1000 });
+    assert.equal(run0.floor, 0, "Hunting run should start at floor 0");
+    assert.equal(run0.maxFloor, 100, "Default max floor should be 100");
+    assert.equal(run0.stageId, HUNTING_STAGE_IDS.CAVE, "Default stage should be cave");
+    assert.equal(run0.lastEncounter, null, "New run should have no last encounter");
+
+    // ── advanceHuntingRun moves 0→1 with empty outcome ──
+    // rng=0.9 → empty (above combat+event threshold)
+    const advanced1 = advanceHuntingRun(run0, { rng: () => 0.9 });
+    assert.equal(advanced1.floor, 1, "First advance should move from floor 0 to 1");
+    assert.equal(advanced1.lastEncounter.type, HUNTING_FLOOR_OUTCOME_TYPES.EMPTY, "Empty outcome with high rng");
+
+    // ── 100층에서 final_boss 고정 ──
+    const run99 = { ...run0, floor: 99 };
+    const bossEncounter = rollHuntingFloorOutcome(100, () => 0);
+    assert.equal(bossEncounter.type, HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS, "Floor 100 should always be final_boss");
+    assert.equal(bossEncounter.floor, 100, "Final boss floor should be exactly 100");
+    assert.equal(bossEncounter.enemyType, HUNTING_ENEMY_TYPES.CHAMPION, "Final boss should be champion type");
+
+    // floor >= maxFloor → retreat
+    const runAtMax = { ...run0, floor: 100, status: "active", maxFloor: 100 };
+    const retreatedAtMax = advanceHuntingRun(runAtMax, { rng: () => 0 });
+    assert.equal(retreatedAtMax.status, "retreated", "Floor >= maxFloor should auto-retreat with max_floor_clear");
+
+    // advanceHuntingRun from 99 → 100 should set final_boss encounter
+    const run98 = { ...run0, floor: 98, status: "active", maxFloor: 100 };
+    const to99 = advanceHuntingRun(run98, { rng: () => 0.9 });
+    assert.equal(to99.floor, 99, "Advance from 98 should go to 99");
+    const to100 = advanceHuntingRun(to99, { rng: () => 0.9 });
+    assert.equal(to100.floor, 100, "Advance from 99 should go to 100");
+    assert.equal(
+        to100.lastEncounter.type,
+        HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS,
+        "Floor 100 encounter should be final_boss"
+    );
+
+    // ── canRetreatFromHuntingRun: portal only ──
+    const noEventRun = { ...run0, status: "active", floor: 5, lastEvent: null };
+    assert.equal(canRetreatFromHuntingRun(noEventRun), false, "No event → cannot retreat");
+
+    const combatRun = {
+        ...run0,
+        status: "active",
+        floor: 5,
+        lastEvent: null,
+        lastEncounter: { type: HUNTING_FLOOR_OUTCOME_TYPES.COMBAT }
+    };
+    assert.equal(canRetreatFromHuntingRun(combatRun), false, "Combat encounter → cannot retreat");
+
+    const portalRun = {
+        ...run0,
+        status: "active",
+        floor: 5,
+        lastEvent: { type: HUNTING_EVENT_TYPES.PORTAL, floor: 5 },
+        lastEncounter: {
+            type: HUNTING_FLOOR_OUTCOME_TYPES.EVENT,
+            event: { type: HUNTING_EVENT_TYPES.PORTAL, floor: 5 }
+        }
+    };
+    assert.equal(canRetreatFromHuntingRun(portalRun), true, "Portal event → can retreat");
+
+    const merchantRun = {
+        ...run0,
+        status: "active",
+        floor: 5,
+        lastEvent: { type: HUNTING_EVENT_TYPES.WANDERING_MERCHANT, floor: 5 }
+    };
+    assert.equal(canRetreatFromHuntingRun(merchantRun), false, "Merchant event → cannot retreat");
+
+    const defeatedRun = { ...portalRun, status: "defeated" };
+    assert.equal(canRetreatFromHuntingRun(defeatedRun), false, "Defeated run → cannot retreat");
+
+    // ── getHuntingFloorChances ──
+    const earlyChances = getHuntingFloorChances(1);
+    assert.ok(
+        earlyChances.combatChance > 0 && earlyChances.combatChance < 1,
+        "Early floor combat chance should be valid"
+    );
+    assert.ok(earlyChances.eventChance > 0 && earlyChances.eventChance < 1, "Early floor event chance should be valid");
+    assert.ok(earlyChances.emptyChance > 0 && earlyChances.emptyChance < 1, "Early floor empty chance should be valid");
+    assert.ok(
+        Math.abs(earlyChances.combatChance + earlyChances.eventChance + earlyChances.emptyChance - 1) < 0.01,
+        "Floor chances should sum to ~1"
+    );
+
+    const lateChances = getHuntingFloorChances(99);
+    assert.ok(lateChances.combatChance > earlyChances.combatChance, "Deep floor should have higher combat chance");
+
+    // ── completeHuntingStage ──
+    const profile = createDefaultPlayerProfile();
+    assert.deepEqual(
+        getUnlockedHuntingStageIds(profile),
+        [HUNTING_STAGE_IDS.CAVE],
+        "New profile should only have cave"
+    );
+    assert.equal(getSelectedHuntingStageId(profile), HUNTING_STAGE_IDS.CAVE, "Default selected stage should be cave");
+
+    // Clear cave → unlock forest
+    const result1 = completeHuntingStage(profile, HUNTING_STAGE_IDS.CAVE);
+    assert.equal(result1.unlockedStageId, HUNTING_STAGE_IDS.FOREST, "Clearing cave should unlock forest");
+    assert.deepEqual(
+        getUnlockedHuntingStageIds(profile),
+        [HUNTING_STAGE_IDS.CAVE, HUNTING_STAGE_IDS.FOREST],
+        "Profile should have cave + forest unlocked"
+    );
+    assert.equal(getSelectedHuntingStageId(profile), HUNTING_STAGE_IDS.FOREST, "Selected stage should auto-advance");
+
+    // Clear forest → unlock desert
+    const result2 = completeHuntingStage(profile, HUNTING_STAGE_IDS.FOREST);
+    assert.equal(result2.unlockedStageId, HUNTING_STAGE_IDS.DESERT, "Clearing forest should unlock desert");
+    assert.deepEqual(
+        getUnlockedHuntingStageIds(profile),
+        [HUNTING_STAGE_IDS.CAVE, HUNTING_STAGE_IDS.FOREST, HUNTING_STAGE_IDS.DESERT],
+        "All three stages should be unlocked"
+    );
+
+    // Clear desert → no more stages
+    const result3 = completeHuntingStage(profile, HUNTING_STAGE_IDS.DESERT);
+    assert.equal(result3.unlockedStageId, null, "Clearing last stage should unlock nothing");
+
+    // Invalid stage ID in profile
+    profile.hunting.unlockedStageIds = ["cave", "invalid_id"];
+    assert.deepEqual(
+        getUnlockedHuntingStageIds(profile),
+        [HUNTING_STAGE_IDS.CAVE],
+        "Invalid stage IDs should be filtered out"
+    );
+
+    // selectedStageId fallback
+    profile.hunting.selectedStageId = "invalid";
+    assert.equal(
+        getSelectedHuntingStageId(profile),
+        HUNTING_STAGE_IDS.CAVE,
+        "Invalid selection should fallback to cave"
+    );
+
+    // ── Stage helpers ──
+    const caveStage = getHuntingStage(HUNTING_STAGE_IDS.CAVE);
+    assert.equal(caveStage.name, "동굴", "Cave stage should have correct name");
+    assert.equal(getHuntingStageArena(HUNTING_STAGE_IDS.CAVE).WIDTH, 1120, "Cave arena should be 1120 wide");
+
+    const nextAfterCave = getNextHuntingStageId(HUNTING_STAGE_IDS.CAVE);
+    assert.equal(nextAfterCave, HUNTING_STAGE_IDS.FOREST, "Next after cave should be forest");
+    assert.equal(getNextHuntingStageId(HUNTING_STAGE_IDS.DESERT), null, "Next after desert should be null");
+
+    // ── HUNTING_FLOOR_OUTCOME_TYPES completeness ──
+    assert.equal(HUNTING_FLOOR_OUTCOME_TYPES.EMPTY, "empty");
+    assert.equal(HUNTING_FLOOR_OUTCOME_TYPES.COMBAT, "combat");
+    assert.equal(HUNTING_FLOOR_OUTCOME_TYPES.EVENT, "event");
+    assert.equal(HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS, "final_boss");
+
+    // ── New event types ──
+    assert.equal(HUNTING_EVENT_TYPES.PORTAL, "portal");
+    assert.equal(HUNTING_EVENT_TYPES.WANDERING_MERCHANT, "wandering_merchant");
+    assert.equal(HUNTING_EVENT_TYPES.BOON, "boon");
+    assert.equal(HUNTING_EVENT_TYPES.MISHAP, "mishap");
+
+    // ── gameOverlay store default values ──
+    const overlayStore = Alpine.store("gameOverlay");
+    assert.equal(overlayStore.huntingCanRetreat, false, "gameOverlay huntingCanRetreat default should be false");
+    assert.equal(overlayStore.huntingMoving, false, "gameOverlay huntingMoving default should be false");
+    assert.equal(overlayStore.huntingMoveFrom, 0, "gameOverlay huntingMoveFrom default should be 0");
+    assert.equal(overlayStore.huntingMoveTo, 0, "gameOverlay huntingMoveTo default should be 0");
+    assert.equal(overlayStore.huntingMoveStep, 0, "gameOverlay huntingMoveStep default should be 0");
+    assert.equal(overlayStore.huntingMoveMax, 10, "gameOverlay huntingMoveMax default should be 10");
+    assert.equal(overlayStore.huntingMoveMessage, "", "gameOverlay huntingMoveMessage default should be empty");
+
+    console.log("[hunting-floors] ok");
 }
 
 function testEquipmentEnhancement() {
@@ -4295,6 +4477,7 @@ await testCollisionImpulsePersists(app);
 await testGrenadeScatterShot(app);
 testExperienceSystem();
 testHuntingSystem();
+testHunting100FloorStructure();
 testEquipmentEnhancement();
 testEquipmentLevelRequirement();
 testEquipmentDraw();
