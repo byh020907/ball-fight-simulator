@@ -1,5 +1,11 @@
 # 결정 기록
 
+## [L1] 2026-07-05 — 사냥터 stage 배경 밝기 조정 (이름표 가독성 개선)
+- 맥락: cave(`#4a4543`) 배경이 이름표 `#444444`와 대비 1.03:1로 거의 안 보이고, forest 줄무늬도 이름표와 대비 부족. desert는 비교적 괜찮았으나 전체적으로 패턴이 너무 진해 이펙트를 방해함.
+- 결정: cave base `#4a4543→#9a928b`(대비 4.5:1), crack `#3d3836→#7f7770`, mineral `#5c5654→#b5ada4`. forest base `#7a9a5c→#9fbd7a`(대비 5.5:1), bush `#5d8040→#89aa66`, stripe `#4a6930→#78965b`. desert base `#d4b88c→#dcc9a3`, ripple `#c4a67a→#ccb78e`, grain `#bfa070→#c4a87a`. 인덱스 루프를 `Array.from`+`for...of`로 변환(프로젝트 코딩 규칙 준수). 이름표/HP바/이펙트 로직은 변경하지 않음.
+- 영향: `src/ui.js`(3종 배경 색상+루프 스타일), `docs/hunting-grounds-system.md`(밝은 팔레트 언급), `SESSION-HANDOFF.md`
+- 검증: `npm test`, `npm run check`, `npm run format:check`, `node scripts/huntingUserScenario.mjs` 통과
+
 ## [L1] 2026-07-05 — 사냥터 스테이지 선택 UI + stage theme 배경 렌더링
 - 맥락: 동굴/숲/사막 스테이지 데이터가 이미 존재하나 유저가 선택할 UI가 없고, 전투 캔버스도 흰색 단일 배경이라 맵 차이를 체감할 수 없었음.
 - 결정: (1) `showCharacterSelect()` 팝업에 `getUnlockedHuntingStageIds()` 기반 stage 선택 버튼 추가, 선택 시 `profile.hunting.selectedStageId` 갱신 후 `savePlayerProfile()`. 해금된 stage만 표시, 선택된 stage는 `.active` 하이라이트. (2) `BattleSimulation` constructor options에 `arenaTheme` 추가, `ArenaRenderer._drawArenaBackground()`에서 theme별 Canvas 2D 패턴 렌더링 — cave(암석 균열+광물), forest(덤불+나무 그림자), desert(모래결+모래알). unknown/null theme는 기본 밝은 회색 fallback. (3) `HuntingManager._startFloorBattle()`에서 stage theme를 `app.startMatch()`로 전달. (4) CSS: `.hunting-stage-select`, `.hunting-stage-btn.active` 등 스타일 추가.

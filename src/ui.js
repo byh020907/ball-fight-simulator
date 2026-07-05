@@ -335,15 +335,15 @@ export class ArenaRenderer {
     _drawCaveBackground(ctx, simulation) {
         const w = simulation.width;
         const h = simulation.height;
-        // 어두운 암석 바닥
-        ctx.fillStyle = "#4a4543";
+        // 밝은 암석 바닥 — 이름표 #444444 대비 약 4.5:1
+        ctx.fillStyle = "#9a928b";
         ctx.fillRect(0, 0, w, h);
 
-        // 암석 패턴 — 무작위 균열선
-        ctx.strokeStyle = "#3d3836";
+        // 암석 균열선
+        ctx.strokeStyle = "#7f7770";
         ctx.lineWidth = 3;
         const seed = 42;
-        for (let i = 0; i < 18; i++) {
+        for (const i of Array.from({ length: 18 }, (_, n) => n)) {
             const sx = (i * 173 + seed) % w;
             const sy = (i * 241 + seed * 3) % h;
             ctx.beginPath();
@@ -354,9 +354,9 @@ export class ArenaRenderer {
             ctx.stroke();
         }
 
-        // 밝은 반점 — 광물 느낌
-        ctx.fillStyle = "#5c5654";
-        for (let i = 0; i < 25; i++) {
+        // 광물 반점
+        ctx.fillStyle = "#b5ada4";
+        for (const i of Array.from({ length: 25 }, (_, n) => n)) {
             const cx = (i * 311 + seed * 7) % w;
             const cy = (i * 197 + seed * 11) % h;
             const r = 3 + ((i * 53) % 8);
@@ -369,14 +369,14 @@ export class ArenaRenderer {
     _drawForestBackground(ctx, simulation) {
         const w = simulation.width;
         const h = simulation.height;
-        // 녹색 바닥
-        ctx.fillStyle = "#7a9a5c";
+        // 밝은 녹색 바닥 — 이름표 #444444 대비 약 5.5:1
+        ctx.fillStyle = "#9fbd7a";
         ctx.fillRect(0, 0, w, h);
 
         // 덤불 패치
-        ctx.fillStyle = "#5d8040";
+        ctx.fillStyle = "#89aa66";
         const seed = 77;
-        for (let i = 0; i < 30; i++) {
+        for (const i of Array.from({ length: 30 }, (_, n) => n)) {
             const cx = (i * 257 + seed) % w;
             const cy = (i * 179 + seed * 5) % h;
             const r = 12 + ((i * 67) % 22);
@@ -386,8 +386,8 @@ export class ArenaRenderer {
         }
 
         // 나무 그림자 줄무늬
-        ctx.fillStyle = "#4a6930";
-        for (let i = 0; i < 12; i++) {
+        ctx.fillStyle = "#78965b";
+        for (const i of Array.from({ length: 12 }, (_, n) => n)) {
             const x = (i * 193 + seed * 3) % w;
             ctx.fillRect(x, 0, 4 + (i % 3) * 3, h);
         }
@@ -396,15 +396,15 @@ export class ArenaRenderer {
     _drawDesertBackground(ctx, simulation) {
         const w = simulation.width;
         const h = simulation.height;
-        // 모래색 바닥
-        ctx.fillStyle = "#d4b88c";
+        // 모래색 바닥 — 이미 밝으므로 미세 조정만
+        ctx.fillStyle = "#dcc9a3";
         ctx.fillRect(0, 0, w, h);
 
         // 모래결 — 가로 웨이브 라인
-        ctx.strokeStyle = "#c4a67a";
+        ctx.strokeStyle = "#ccb78e";
         ctx.lineWidth = 2;
         const seed = 99;
-        for (let row = 0; row < 14; row++) {
+        for (const row of Array.from({ length: 14 }, (_, n) => n)) {
             const y = (row * 87 + seed) % h;
             ctx.beginPath();
             ctx.moveTo(0, y);
@@ -415,9 +415,9 @@ export class ArenaRenderer {
             ctx.stroke();
         }
 
-        // 모래 점 — 바람에 날리는 모래알 느낌
-        ctx.fillStyle = "#bfa070";
-        for (let i = 0; i < 50; i++) {
+        // 모래알
+        ctx.fillStyle = "#c4a87a";
+        for (const i of Array.from({ length: 50 }, (_, n) => n)) {
             const cx = (i * 401 + seed * 7) % w;
             const cy = (i * 283 + seed * 13) % h;
             ctx.beginPath();
