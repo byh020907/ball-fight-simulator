@@ -303,8 +303,7 @@ export class ArenaRenderer {
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         const view = this.camera.getViewTransform(this.canvas, simulation);
         this.camera.apply(ctx, this.canvas, simulation);
-        ctx.fillStyle = "#fafafa";
-        ctx.fillRect(0, 0, simulation.width, simulation.height);
+        this._drawArenaBackground(ctx, simulation);
         ctx.strokeStyle = "#d7dce6";
         ctx.lineWidth = Math.max(2, 2 / view.scale);
         ctx.strokeRect(0, 0, simulation.width, simulation.height);
@@ -316,6 +315,115 @@ export class ArenaRenderer {
         }
 
         ctx.restore();
+    }
+
+    _drawArenaBackground(ctx, simulation) {
+        const theme = simulation.arenaTheme;
+        if (theme === "cave") {
+            this._drawCaveBackground(ctx, simulation);
+        } else if (theme === "forest") {
+            this._drawForestBackground(ctx, simulation);
+        } else if (theme === "desert") {
+            this._drawDesertBackground(ctx, simulation);
+        } else {
+            // 기본 배경: 밝은 회색 바닥
+            ctx.fillStyle = "#f5f5f5";
+            ctx.fillRect(0, 0, simulation.width, simulation.height);
+        }
+    }
+
+    _drawCaveBackground(ctx, simulation) {
+        const w = simulation.width;
+        const h = simulation.height;
+        // 어두운 암석 바닥
+        ctx.fillStyle = "#4a4543";
+        ctx.fillRect(0, 0, w, h);
+
+        // 암석 패턴 — 무작위 균열선
+        ctx.strokeStyle = "#3d3836";
+        ctx.lineWidth = 3;
+        const seed = 42;
+        for (let i = 0; i < 18; i++) {
+            const sx = (i * 173 + seed) % w;
+            const sy = (i * 241 + seed * 3) % h;
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            const ex = Math.min(w, Math.max(0, sx + ((i * 97) % 160) - 80));
+            const ey = Math.min(h, Math.max(0, sy + ((i * 131) % 120) - 60));
+            ctx.lineTo(ex, ey);
+            ctx.stroke();
+        }
+
+        // 밝은 반점 — 광물 느낌
+        ctx.fillStyle = "#5c5654";
+        for (let i = 0; i < 25; i++) {
+            const cx = (i * 311 + seed * 7) % w;
+            const cy = (i * 197 + seed * 11) % h;
+            const r = 3 + ((i * 53) % 8);
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    _drawForestBackground(ctx, simulation) {
+        const w = simulation.width;
+        const h = simulation.height;
+        // 녹색 바닥
+        ctx.fillStyle = "#7a9a5c";
+        ctx.fillRect(0, 0, w, h);
+
+        // 덤불 패치
+        ctx.fillStyle = "#5d8040";
+        const seed = 77;
+        for (let i = 0; i < 30; i++) {
+            const cx = (i * 257 + seed) % w;
+            const cy = (i * 179 + seed * 5) % h;
+            const r = 12 + ((i * 67) % 22);
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // 나무 그림자 줄무늬
+        ctx.fillStyle = "#4a6930";
+        for (let i = 0; i < 12; i++) {
+            const x = (i * 193 + seed * 3) % w;
+            ctx.fillRect(x, 0, 4 + (i % 3) * 3, h);
+        }
+    }
+
+    _drawDesertBackground(ctx, simulation) {
+        const w = simulation.width;
+        const h = simulation.height;
+        // 모래색 바닥
+        ctx.fillStyle = "#d4b88c";
+        ctx.fillRect(0, 0, w, h);
+
+        // 모래결 — 가로 웨이브 라인
+        ctx.strokeStyle = "#c4a67a";
+        ctx.lineWidth = 2;
+        const seed = 99;
+        for (let row = 0; row < 14; row++) {
+            const y = (row * 87 + seed) % h;
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            for (let x = 0; x < w; x += 40) {
+                const wy = y + Math.sin((x + row * 31) * 0.03) * 8;
+                ctx.lineTo(x, wy);
+            }
+            ctx.stroke();
+        }
+
+        // 모래 점 — 바람에 날리는 모래알 느낌
+        ctx.fillStyle = "#bfa070";
+        for (let i = 0; i < 50; i++) {
+            const cx = (i * 401 + seed * 7) % w;
+            const cy = (i * 283 + seed * 13) % h;
+            ctx.beginPath();
+            ctx.arc(cx, cy, 1.5 + (i % 3), 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
 
     /** Ordered render passes — add/remove/reorder entries to change draw priority. */

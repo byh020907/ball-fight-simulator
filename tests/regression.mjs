@@ -63,6 +63,7 @@ import {
     HUNTING_MONSTER_TYPES,
     HUNTING_PORTAL_DECLINE,
     HUNTING_STAGE_IDS,
+    HUNTING_STAGES,
     HUNTING_TEAMS,
     createHuntingMinibossSpec,
     createHuntingMobSpec,
@@ -87,7 +88,7 @@ import {
     getEquipmentRequiredLevel,
     ENHANCE_MAX_LEVEL
 } from "../src/hunting/equipmentConfig.js";
-import { appStore, UIController } from "../src/ui.js";
+import { ArenaRenderer, appStore, UIController } from "../src/ui.js";
 import { createComponentBridge } from "../src/componentBridge.js";
 import { ArenaCamera } from "../src/camera.js";
 import { PATCH_NOTES } from "../src/patchNotes.js";
@@ -1919,6 +1920,79 @@ function testHuntingPortalDecline() {
     assert.equal(freshRun.portalDeclineFloors ?? 0, 0, "New run should start with no portal decline");
 
     console.log("[hunting-portal] ok");
+}
+
+function testHuntingStageSelectionAndArenaTheme() {
+    // ── stage selection state ──
+    const profile = createDefaultPlayerProfile();
+    assert.deepEqual(
+        getUnlockedHuntingStageIds(profile),
+        [HUNTING_STAGE_IDS.CAVE],
+        "New profile should only have cave unlocked"
+    );
+    assert.equal(getSelectedHuntingStageId(profile), HUNTING_STAGE_IDS.CAVE, "Default selected stage should be cave");
+
+    // selectedStageId fallback when invalid
+    profile.hunting.selectedStageId = "invalid";
+    assert.equal(
+        getSelectedHuntingStageId(profile),
+        HUNTING_STAGE_IDS.CAVE,
+        "Invalid selectedStageId should fallback to cave"
+    );
+
+    // unlocked stage list reflects actual HUNTING_STAGES config
+    const validIds = HUNTING_STAGES.map((s) => s.id);
+    const unlockedIds = getUnlockedHuntingStageIds(profile);
+    assert.ok(
+        unlockedIds.every((id) => validIds.includes(id)),
+        "All unlocked IDs must be valid stage IDs"
+    );
+
+    // stage has theme property
+    const caveStage = getHuntingStage(HUNTING_STAGE_IDS.CAVE);
+    assert.equal(caveStage.theme, "cave", "Cave stage should have theme=cave");
+    const forestStage = getHuntingStage(HUNTING_STAGE_IDS.FOREST);
+    assert.equal(forestStage.theme, "forest", "Forest stage should have theme=forest");
+    const desertStage = getHuntingStage(HUNTING_STAGE_IDS.DESERT);
+    assert.equal(desertStage.theme, "desert", "Desert stage should have theme=desert");
+
+    // ── BattleSimulation stores arenaTheme from options ──
+    const testSpecs = app.roster.slice(0, 2).map((spec) => ({ ...spec }));
+    const sim = new BattleSimulation(testSpecs, { onLog() {}, onSound() {} }, null, { arenaTheme: "forest" });
+    assert.equal(sim.arenaTheme, "forest", "BattleSimulation should store arenaTheme from options");
+
+    const simNoTheme = new BattleSimulation(testSpecs, { onLog() {}, onSound() {} }, null, {});
+    assert.equal(simNoTheme.arenaTheme, null, "BattleSimulation should default arenaTheme to null");
+
+    // ── ArenaRenderer._drawArenaBackground dispatches by theme ──
+    const canvasCtx = makeRecordingCanvasContext();
+    const renderer = new ArenaRenderer({ getContext: () => canvasCtx, width: 800, height: 600 });
+    // Call _drawArenaBackground directly to verify dispatch
+    renderer._drawArenaBackground(canvasCtx, { arenaTheme: "cave", width: 960, height: 960 });
+    const caveCalls = canvasCtx.calls.filter((c) => c[0] === "fillRect" || c[0] === "arc" || c[0] === "stroke");
+    assert.ok(caveCalls.length > 3, "Cave background should draw multiple shapes");
+
+    const canvasCtx2 = makeRecordingCanvasContext();
+    const renderer2 = new ArenaRenderer({ getContext: () => canvasCtx2, width: 800, height: 600 });
+    renderer2._drawArenaBackground(canvasCtx2, { arenaTheme: "forest", width: 960, height: 960 });
+    const forestCalls = canvasCtx2.calls.filter((c) => c[0] === "fillRect" || c[0] === "arc" || c[0] === "stroke");
+    assert.ok(forestCalls.length > 3, "Forest background should draw multiple shapes");
+
+    const canvasCtx3 = makeRecordingCanvasContext();
+    const renderer3 = new ArenaRenderer({ getContext: () => canvasCtx3, width: 800, height: 600 });
+    renderer3._drawArenaBackground(canvasCtx3, { arenaTheme: "desert", width: 960, height: 960 });
+    const desertCalls = canvasCtx3.calls.filter((c) => c[0] === "fillRect" || c[0] === "arc" || c[0] === "stroke");
+    assert.ok(desertCalls.length > 3, "Desert background should draw multiple shapes");
+
+    // unknown theme falls back to default
+    const canvasCtx4 = makeRecordingCanvasContext();
+    const renderer4 = new ArenaRenderer({ getContext: () => canvasCtx4, width: 800, height: 600 });
+    renderer4._drawArenaBackground(canvasCtx4, { arenaTheme: null, width: 960, height: 960 });
+    // default fallback should call fillRect
+    const defaultCalls = canvasCtx4.calls.filter((c) => c[0] === "fillRect");
+    assert.ok(defaultCalls.length >= 1, "Unknown theme should fall back to default fill");
+
+    console.log("[hunting-stage] ok");
 }
 
 function testEquipmentEnhancement() {
@@ -4742,6 +4816,7 @@ testHuntingSystem();
 testHunting100FloorStructure();
 testHuntingCombatRelief();
 testHuntingPortalDecline();
+testHuntingStageSelectionAndArenaTheme();
 testEquipmentEnhancement();
 testEquipmentLevelRequirement();
 testEquipmentDraw();

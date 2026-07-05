@@ -1,5 +1,11 @@
 # 결정 기록
 
+## [L1] 2026-07-05 — 사냥터 스테이지 선택 UI + stage theme 배경 렌더링
+- 맥락: 동굴/숲/사막 스테이지 데이터가 이미 존재하나 유저가 선택할 UI가 없고, 전투 캔버스도 흰색 단일 배경이라 맵 차이를 체감할 수 없었음.
+- 결정: (1) `showCharacterSelect()` 팝업에 `getUnlockedHuntingStageIds()` 기반 stage 선택 버튼 추가, 선택 시 `profile.hunting.selectedStageId` 갱신 후 `savePlayerProfile()`. 해금된 stage만 표시, 선택된 stage는 `.active` 하이라이트. (2) `BattleSimulation` constructor options에 `arenaTheme` 추가, `ArenaRenderer._drawArenaBackground()`에서 theme별 Canvas 2D 패턴 렌더링 — cave(암석 균열+광물), forest(덤불+나무 그림자), desert(모래결+모래알). unknown/null theme는 기본 밝은 회색 fallback. (3) `HuntingManager._startFloorBattle()`에서 stage theme를 `app.startMatch()`로 전달. (4) CSS: `.hunting-stage-select`, `.hunting-stage-btn.active` 등 스타일 추가.
+- 영향: `src/hunting/huntingManager.js`(stage 선택 UI, theme 전달), `src/simulation/battleSimulation.js`(arenaTheme 옵션), `src/ui.js`(_drawArenaBackground, 3종 테마 메서드), `src/app.js`(arenaTheme 전달), `src/hunting/huntingConfig.js`(stage.theme 소스), `src/styles.css`(stage UI CSS), `tests/regression.mjs`(hunting-stage 테스트), `docs/hunting-grounds-system.md`(§2.2), `SESSION-HANDOFF.md`
+- 검증: `npm test` (8개 스위트), `npm run check`, `npm run format:check`, `node scripts/huntingUserScenario.mjs` 통과
+
 ## [L1] 2026-07-05 — 저HP 포탈 확률 보정 + 포탈 거부 억제 시스템
 - 맥락: HP가 낮을 때 귀환 기회를 더 자주 제공하고, 포탈을 거부하면 일정 기간 포탈 반복을 억제하는 장치 필요.
 - 결정: (1) `HUNTING_PORTAL_DECLINE` 상수 추가 (INITIAL_FLOORS=5, HP_MULT: [≥50%:×1.0, ≥30%:×1.8, <30%:×3.0]). (2) `getHuntingPortalWeightMultiplier(hpRatio, portalDeclineFloors)`로 포탈 가중치 계산 — HP 낮을수록 높고, decline 중이면 ×1.0 고정. (3) `rollWeightedEventType()`로 균등→가중치 기반 이벤트 선택 전환. (4) `advanceHuntingRun()`이 `portalDeclineFloors`를 1씩 감소, `hpRatio`를 context로 전달. (5) `HuntingManager.advance()` 시작 시 이전 이벤트가 PORTAL이면 `portalDeclineFloors=5` 설정. (6) run 상태에 `portalDeclineFloors` 필드 추가 (기본 0).

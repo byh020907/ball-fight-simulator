@@ -9,6 +9,7 @@ import {
     getEligibleHuntingCharacters,
     canEnterHunting,
     getSelectedHuntingStageId,
+    getUnlockedHuntingStageIds,
     applyHuntingEventRecovery,
     applyHuntingCursedAltar,
     applyHuntingStatModifiersToSpec
@@ -55,7 +56,32 @@ export class HuntingManager {
             return;
         }
 
+        const unlockedIds = getUnlockedHuntingStageIds(app.playerProfile);
+        const selectedId = getSelectedHuntingStageId(app.playerProfile);
+        const stages = unlockedIds.map((id) => getHuntingStage(id)).filter(Boolean);
+        const selectedStage = getHuntingStage(selectedId);
+
+        const stageButtons = stages
+            .map(
+                (stage) => `
+                <button class="hunting-stage-btn${stage.id === selectedId ? " active" : ""}" data-stage="${stage.id}">
+                    <strong>${stage.name}</strong>
+                    <span>${stage.arena.WIDTH}×${stage.arena.HEIGHT}</span>
+                </button>`
+            )
+            .join("");
+
+        const stageDesc = selectedStage
+            ? `<p class="hunting-stage-desc">${selectedStage.description}<br>전장 ${selectedStage.arena.WIDTH}×${selectedStage.arena.HEIGHT}</p>`
+            : "";
+
         const bodyHtml = `
+            <div class="hunting-stage-select">
+                <span class="hunting-section-label">원정지 선택</span>
+                <div class="hunting-stage-grid">${stageButtons}</div>
+                ${stageDesc}
+            </div>
+            <div class="hunting-section-divider"></div>
             <div class="hunting-char-grid">
                 ${eligible
                     .map(
@@ -72,9 +98,17 @@ export class HuntingManager {
         `;
 
         if (window.PopupService) {
-            window.PopupService.show({ title: "사냥터 — 캐릭터 선택", bodyHtml });
-            // Delegate click on character buttons
+            window.PopupService.show({ title: "사냥터 — 원정 준비", bodyHtml });
             setTimeout(() => {
+                document.querySelectorAll(".hunting-stage-btn").forEach((btn) => {
+                    btn.addEventListener("click", () => {
+                        const stageId = btn.dataset.stage;
+                        app.playerProfile.hunting.selectedStageId = stageId;
+                        savePlayerProfile(app.playerProfile);
+                        // Refresh popup with updated selection
+                        this.showCharacterSelect();
+                    });
+                });
                 document.querySelectorAll(".hunting-char-btn").forEach((btn) => {
                     btn.addEventListener("click", () => {
                         const charId = btn.dataset.char;
@@ -142,12 +176,14 @@ export class HuntingManager {
         app.playerFighterId = run.characterId;
 
         const arena = getHuntingStageArena(run.stageId);
+        const stageTheme = getHuntingStage(run.stageId).theme;
         app.startMatch(matchSpecs, {
             keepLog: false,
             skipActionPick: true,
             arenaWidth: arena.WIDTH,
             arenaHeight: arena.HEIGHT,
-            cameraZoom: 1
+            cameraZoom: 1,
+            arenaTheme: stageTheme
         });
 
         if (run.carriedHp !== null) {
