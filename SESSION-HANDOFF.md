@@ -1,5 +1,12 @@
 # 결정 기록
 
+## [L1] 2026-07-06 — 박쥐 투사체가 타겟이 아닌 자신의 진행 방향을 보도록 수정
+- 맥락: 뱀파이어 박쥐 투사체가 타겟을 바라보며 날아가서 어색함. 박쥐는 자신의 velocity 방향을 보는 것이 자연스러움.
+- 결정: `BatProjectile.update()`에서 `this.angle`을 항상 `Math.atan2(this.velocity.y, this.velocity.x)`로 설정. 타겟 유무에 따른 분기 제거.
+- 영향: `src/entities/batProjectile.js`
+- 검증: `npm test` (9개 스위트), `npm run check`, `npm run format:check` 통과
+- 미검증: 실제 브라우저에서 박쥐 떼 방향 육안 확인
+
 ## [L1] 2026-07-06 — 사냥터 초반 선택 이벤트에서 진행 UI가 막히지 않게 정리
 - 맥락: 첫 번째나 두 번째 층에서 선택 이벤트(포탈/방랑 상인)가 발생하면 route 진행 상태가 남아 선택 UI가 가려지거나 진행이 막힘. `huntingMoveTo > 0`이 stale 상태로 남아 route UI가 계속 표시되고 choice UI와 겹치는 문제.
 - 결정: (1) `_stopHuntingMoveForChoice()`에서 route 상태 완전 초기화(huntingMoveFrom/MoveTo/Step=0, MoveMax=10). (2) game-overlay.html의 route 표시 조건을 `huntingMoving || huntingMoveTo > 0` → `huntingMoving`으로 변경 (stale route 방지). (3) `Math.random` mock + `setTimeout` mock으로 첫층 포탈 시나리오 테스트 추가.
