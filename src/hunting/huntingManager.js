@@ -84,7 +84,7 @@ export class HuntingManager {
         }
     }
 
-    startRun(characterId) {
+    async startRun(characterId) {
         if (window.PopupService) window.PopupService.close();
         if (!canEnterHunting(this.app.playerProfile, characterId)) return;
         const stageId = getSelectedHuntingStageId(this.app.playerProfile);
@@ -94,7 +94,7 @@ export class HuntingManager {
         this.app.ui.setHuntingOverlayState({ huntingChoiceVisible: false });
         const stage = getHuntingStage(stageId);
         this.app.ui.addLog(`[Hunting] ${stage.name} 원정 시작`);
-        this.advance();
+        await this.advance();
     }
 
     _startFloorBattle() {
@@ -310,52 +310,188 @@ export class HuntingManager {
         this._run = null;
     }
 
-    advance() {
+    async advance() {
         const app = this.app;
         const run = this._run;
-        if (!run || run.status !== "active") return;
+        if (!run || run.status !== "active" || this._moving) return;
 
-        this._run = advanceHuntingRun(this._run);
-        if (this._run.status !== "active") {
-            this.retreat();
-            return;
-        }
-
+        this._moving = true;
         app.ui.setHuntingOverlayState({ huntingChoiceVisible: false });
 
-        const event = this._run.lastEvent;
-        if (event) {
-            if (event.type === HUNTING_EVENT_TYPES.REST_SITE) {
-                const healAmount = Math.floor(
-                    (this._run.carriedMaxHp ?? this._run.carriedHp ?? 100) * (event.recoveryRatio ?? 0.25)
-                );
-                this._run = applyHuntingEventRecovery(this._run, { amount: healAmount });
-                const name = app.roster.find((f) => f.id === run.characterId)?.name ?? run.characterId;
-                app.ui.addLog(`[Hunting] Rest site: ${name} recovered ${healAmount} HP`);
-                app.ui.showToast(`Rest site: HP +${healAmount}`);
-            } else if (event.type === HUNTING_EVENT_TYPES.CHEST_ROOM) {
-                const chest = createHuntingChest({ rarity: event.chestRarity ?? "common" });
-                this._run = recordHuntingFloorResult(this._run, {
-                    hpRemain: run.carriedHp,
-                    maxHp: run.carriedMaxHp,
-                    loot: { shards: 0, chests: [chest], xp: 0 },
-                    consumeStatModifiers: false
+        const startFloor = run.floor;
+        const MAX_STEPS = HUNTING_ADVANCE_STEPS;
+        const FLOOR_STEP_MS = 350;
+
+        for (let step = 0; step < MAX_STEPS; step++) {
+            const targetFloor = Math.min(run.maxFloor, startFloor + step + 1);
+            app.ui.setHuntingOverlayState({
+                huntingMoving: true,
+                huntingMoveFrom: startFloor,
+                huntingMoveTo: targetFloor,
+                huntingMoveStep: step + 1,
+                huntingMoveMax: MAX_STEPS,
+                huntingMoveMessage: `${targetFloor}층으로 이동 중…`
+            });
+
+            await new Promise((resolve) => setTimeout(resolve, FLOOR_STEP_MS));
+
+            this._run = advanceHuntingRun(this._run);
+            if (this._run.status !== "active") {
+                app.ui.setHuntingOverlayState({ huntingMoving: false });
+                this._moving = false;
+                this.retreat();
+                return;
+            }
+
+            const encounter = this._run.lastEncounter;
+            const currentFloor = this._run.floor;
+            const event = this._run.lastEvent;
+
+            if (encounter.type === HUNTING_FLOOR_OUTCOME_TYPES.EMPTY) {
+                app.ui.addLog(`[사냥터] ${currentFloor}층 — 빈 통로`);
+                app.ui.setHuntingOverlayState({
+                    huntingMoveMessage: `${currentFloor}층 — 빈 통로`
                 });
-                app.ui.addLog(`[Hunting] Chest room: gained ${chest.rarity} chest`);
-                app.ui.showToast(`Chest room: ${chest.rarity} chest`);
-            } else if (event.type === HUNTING_EVENT_TYPES.CURSED_ALTAR) {
-                this._run = applyHuntingCursedAltar(this._run, { trade: event.trade });
-                app.ui.addLog(
-                    `[Hunting] Cursed altar: ${event.trade?.gainStat} x${event.trade?.gainMultiplier} / ${event.trade?.loseStat} x${event.trade?.loseMultiplier}`
-                );
-                app.ui.showToast("Cursed altar: stat trade active");
-            } else if (event.type === HUNTING_EVENT_TYPES.CHAMPION_INTRUSION) {
-                app.ui.addLog("[Hunting] Champion intrusion: next floor includes an empowered miniboss");
-                app.ui.showToast("Champion intrusion: miniboss incoming");
+                continue;
+            }
+
+            if (encounter.type === HUNTING_FLOOR_OUTCOME_TYPES.COMBAT) {
+                app.ui.addLog(`[사냥터] ${currentFloor}층 — 적 조우!`);
+                app.ui.setHuntingOverlayState({
+                    huntingMoving: false,
+                    huntingMoveMessage: `${currentFloor}층 — 적 조우!`
+                });
+                this._moving = false;
+                this._startFloorBattle();
+                return;
+            }
+
+            if (encounter.type === HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS) {
+                app.ui.addLog(`[사냥터] ${currentFloor}층 — 최종 보스 등장!`);
+                app.ui.setHuntingOverlayState({
+                    huntingMoving: false,
+                    huntingMoveMessage: `${currentFloor}층 — 최종 보스!`
+                });
+                this._moving = false;
+                this._startFloorBattle();
+                return;
+            }
+
+            if (encounter.type === HUNTING_FLOOR_OUTCOME_TYPES.EVENT && event) {
+                this._handleAdvanceEvent(event, app);
+
+                if (event.type === HUNTING_EVENT_TYPES.PORTAL) {
+                    app.ui.setHuntingOverlayState({
+                        huntingMoving: false,
+                        huntingChoiceVisible: true,
+                        huntingCanRetreat: true,
+                        huntingFloor: currentFloor,
+                        huntingMoveMessage: `${currentFloor}층 — 포탈 발견!`
+                    });
+                    this._moving = false;
+                    return;
+                }
+
+                if (event.type === HUNTING_EVENT_TYPES.WANDERING_MERCHANT) {
+                    app.ui.setHuntingOverlayState({
+                        huntingMoving: false,
+                        huntingChoiceVisible: true,
+                        huntingCanRetreat: false,
+                        huntingFloor: currentFloor,
+                        huntingMoveMessage: `${currentFloor}층 — 떠돌이 상인 발견`
+                    });
+                    this._moving = false;
+                    return;
+                }
+
+                if (event.type === HUNTING_EVENT_TYPES.CHAMPION_INTRUSION) {
+                    app.ui.setHuntingOverlayState({
+                        huntingMoving: false,
+                        huntingMoveMessage: `${currentFloor}층 — 챔피언 난입!`
+                    });
+                    this._moving = false;
+                    this._startFloorBattle();
+                    return;
+                }
+
+                // boon / mishap / rest_site / chest_room / cursed_altar: auto-continue
+                continue;
             }
         }
 
-        this._startFloorBattle();
+        // 모든 이동 단계 소진 — 정지 없이 최대 10층 전진 완료
+        app.ui.setHuntingOverlayState({
+            huntingMoving: false,
+            huntingChoiceVisible: true,
+            huntingCanRetreat: false,
+            huntingFloor: this._run.floor,
+            huntingMoveMessage: `${MAX_STEPS}층 전진 완료 — ${this._run.floor}층`
+        });
+        this._moving = false;
+    }
+
+    _handleAdvanceEvent(event, app) {
+        const run = this._run;
+        if (event.type === HUNTING_EVENT_TYPES.BOON) {
+            this._run = recordHuntingFloorResult(this._run, {
+                hpRemain: run.carriedHp,
+                maxHp: run.carriedMaxHp,
+                loot: { shards: event.shards ?? 8, chests: [], xp: 0 },
+                consumeStatModifiers: false
+            });
+            app.ui.addLog(`[사냥터] 축복: 파편 +${event.shards ?? 8}`);
+            app.ui.showToast(`축복: 파편 +${event.shards ?? 8}`);
+            return;
+        }
+
+        if (event.type === HUNTING_EVENT_TYPES.MISHAP) {
+            const damageRatio = event.damageRatio ?? 0.1;
+            const currentHp = this._run.carriedHp ?? this._run.carriedMaxHp ?? 100;
+            const damage = Math.max(1, Math.floor(currentHp * damageRatio));
+            const newHp = Math.max(1, currentHp - damage);
+            this._run = recordHuntingFloorResult(this._run, {
+                hpRemain: newHp,
+                maxHp: run.carriedMaxHp,
+                loot: { shards: 0, chests: [], xp: 0 },
+                consumeStatModifiers: false
+            });
+            app.ui.addLog(`[사냥터] 함정: HP -${damage}`);
+            app.ui.showToast(`함정: HP -${damage}`);
+            return;
+        }
+
+        if (event.type === HUNTING_EVENT_TYPES.REST_SITE) {
+            const healAmount = Math.floor(
+                (this._run.carriedMaxHp ?? this._run.carriedHp ?? 100) * (event.recoveryRatio ?? 0.25)
+            );
+            this._run = applyHuntingEventRecovery(this._run, { amount: healAmount });
+            const name = app.roster.find((f) => f.id === run.characterId)?.name ?? run.characterId;
+            app.ui.addLog(`[사냥터] 휴식: ${name} HP +${healAmount}`);
+            app.ui.showToast(`휴식: HP +${healAmount}`);
+            return;
+        }
+
+        if (event.type === HUNTING_EVENT_TYPES.CHEST_ROOM) {
+            const chest = createHuntingChest({ rarity: event.chestRarity ?? "common" });
+            this._run = recordHuntingFloorResult(this._run, {
+                hpRemain: run.carriedHp,
+                maxHp: run.carriedMaxHp,
+                loot: { shards: 0, chests: [chest], xp: 0 },
+                consumeStatModifiers: false
+            });
+            app.ui.addLog(`[사냥터] 상자방: ${chest.rarity} 상자 획득`);
+            app.ui.showToast(`상자방: ${chest.rarity} 상자`);
+            return;
+        }
+
+        if (event.type === HUNTING_EVENT_TYPES.CURSED_ALTAR) {
+            this._run = applyHuntingCursedAltar(this._run, { trade: event.trade });
+            app.ui.addLog(
+                `[사냥터] 저주받은 제단: ${event.trade?.gainStat} x${event.trade?.gainMultiplier} / ${event.trade?.loseStat} x${event.trade?.loseMultiplier}`
+            );
+            app.ui.showToast("저주받은 제단: 스탯 교환");
+            return;
+        }
     }
 
     _mergeIntoSecured(app) {
