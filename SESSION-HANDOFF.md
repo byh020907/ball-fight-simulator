@@ -1,5 +1,11 @@
 # 결정 기록
 
+## [L1] 2026-07-05 — 사냥터 실제 지형 시스템 1차 구조 (cave 암벽 장애물)
+- 맥락: 사냥터 맵을 단순 배경에서 실제 지형으로 확장하기 위한 기반 필요. 1차로 cave stage에 원형 암벽 장애물을 추가하고 fighter-terrain 충돌을 구현.
+- 결정: (1) `src/terrain/` 모듈 신설 — config(TERRAIN_SHAPES/TYPES), factory(`createHuntingTerrain`), collision(`resolveTerrainCollision`), renderer(`drawTerrain`). (2) cave stage에만 3~5개 원형 암벽 생성, stageId+floor 기반 결정론적 배치, spawn 영역 회피. forest/desert는 빈 배열. (3) `BattleSimulation` constructor에 `terrain` 옵션 추가, `Simulation.keepInsideArena()`에서 `resolveTerrainCollisions()` 호출. (4) `ArenaRenderer`에서 배경과 border 사이에 terrain draw. (5) coincident center fallback 처리 (nx=1, ny=0). 투사체 충돌과 pathfinding은 후속 과제로 명시.
+- 영향: `src/terrain/`(신규 5파일), `src/simulation/simulation.js`(terrain collision), `src/simulation/battleSimulation.js`(terrain 옵션), `src/app.js`(terrain 전달), `src/hunting/huntingManager.js`(createHuntingTerrain 호출), `src/ui.js`(drawTerrain), `tests/regression.mjs`(hunting-terrain 테스트), `docs/hunting-grounds-system.md`(§2.3), `SESSION-HANDOFF.md`
+- 검증: `npm test` (9개 스위트), `npm run check`(114파일), `npm run format:check`, `node scripts/huntingUserScenario.mjs` 통과
+
 ## [L1] 2026-07-05 — 사냥터 stage 배경 밝기 조정 (이름표 가독성 개선)
 - 맥락: cave(`#4a4543`) 배경이 이름표 `#444444`와 대비 1.03:1로 거의 안 보이고, forest 줄무늬도 이름표와 대비 부족. desert는 비교적 괜찮았으나 전체적으로 패턴이 너무 진해 이펙트를 방해함.
 - 결정: cave base `#4a4543→#9a928b`(대비 4.5:1), crack `#3d3836→#7f7770`, mineral `#5c5654→#b5ada4`. forest base `#7a9a5c→#9fbd7a`(대비 5.5:1), bush `#5d8040→#89aa66`, stripe `#4a6930→#78965b`. desert base `#d4b88c→#dcc9a3`, ripple `#c4a67a→#ccb78e`, grain `#bfa070→#c4a87a`. 인덱스 루프를 `Array.from`+`for...of`로 변환(프로젝트 코딩 규칙 준수). 이름표/HP바/이펙트 로직은 변경하지 않음.

@@ -24,6 +24,7 @@ import {
 } from "./huntingConfig.js";
 import { getHuntingStage, getHuntingStageArena, getNextHuntingStageId } from "./huntingEncounters.js";
 import { applyEquipmentStats } from "./equipmentConfig.js";
+import { createHuntingTerrain } from "../terrain/index.js";
 import {
     HUNTING_TEAMS,
     createHuntingMinibossSpec,
@@ -177,13 +178,20 @@ export class HuntingManager {
 
         const arena = getHuntingStageArena(run.stageId);
         const stageTheme = getHuntingStage(run.stageId).theme;
+        const terrain = createHuntingTerrain({
+            stageId: run.stageId,
+            floor: run.floor,
+            width: arena.WIDTH,
+            height: arena.HEIGHT
+        });
         app.startMatch(matchSpecs, {
             keepLog: false,
             skipActionPick: true,
             arenaWidth: arena.WIDTH,
             arenaHeight: arena.HEIGHT,
             cameraZoom: 1,
-            arenaTheme: stageTheme
+            arenaTheme: stageTheme,
+            terrain
         });
 
         if (run.carriedHp !== null) {

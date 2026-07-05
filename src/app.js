@@ -613,7 +613,8 @@ export class BattleApp {
                 arenaWidth: options.arenaWidth,
                 arenaHeight: options.arenaHeight,
                 cameraZoom: options.cameraZoom,
-                arenaTheme: options.arenaTheme ?? null
+                arenaTheme: options.arenaTheme ?? null,
+                terrain: options.terrain ?? []
             }
         );
 

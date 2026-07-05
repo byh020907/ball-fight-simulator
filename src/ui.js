@@ -8,6 +8,7 @@ import {
     formatStatAllocation,
     getRemainingStatPoints
 } from "./statAllocation.js";
+import { drawTerrain } from "./terrain/index.js";
 import { DEFAULT_STAT_RULES, CHALLENGE_CONFIG } from "./progression/index.js";
 import { formatHeroStatLine, formatHeroStatParts, mergeOrbBonuses } from "./entities/index.js";
 import { FIGHTER_IDS, RENDER_LAYERS, Vector2 } from "./core.js";
@@ -304,6 +305,7 @@ export class ArenaRenderer {
         const view = this.camera.getViewTransform(this.canvas, simulation);
         this.camera.apply(ctx, this.canvas, simulation);
         this._drawArenaBackground(ctx, simulation);
+        drawTerrain(ctx, simulation.terrain);
         ctx.strokeStyle = "#d7dce6";
         ctx.lineWidth = Math.max(2, 2 / view.scale);
         ctx.strokeRect(0, 0, simulation.width, simulation.height);

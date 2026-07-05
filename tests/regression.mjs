@@ -88,6 +88,9 @@ import {
     getEquipmentRequiredLevel,
     ENHANCE_MAX_LEVEL
 } from "../src/hunting/equipmentConfig.js";
+import { createHuntingTerrain } from "../src/terrain/terrainFactory.js";
+import { resolveTerrainCollision, resolveTerrainCollisions } from "../src/terrain/terrainCollision.js";
+import { drawTerrain } from "../src/terrain/terrainRenderer.js";
 import { ArenaRenderer, appStore, UIController } from "../src/ui.js";
 import { createComponentBridge } from "../src/componentBridge.js";
 import { ArenaCamera } from "../src/camera.js";
@@ -1993,6 +1996,131 @@ function testHuntingStageSelectionAndArenaTheme() {
     assert.ok(defaultCalls.length >= 1, "Unknown theme should fall back to default fill");
 
     console.log("[hunting-stage] ok");
+}
+
+function testHuntingTerrain() {
+    // ── cave stage generates terrain ──
+    const caveTerrain = createHuntingTerrain({ stageId: HUNTING_STAGE_IDS.CAVE, floor: 1, width: 1120, height: 1120 });
+    assert.ok(Array.isArray(caveTerrain), "Cave terrain should be an array");
+    assert.ok(caveTerrain.length >= 3, "Cave should generate at least 3 obstacles");
+    assert.ok(caveTerrain.length <= 5, "Cave should generate at most 5 obstacles");
+
+    // 모든 terrain이 유효한 원형 장애물인지 확인
+    for (const obs of caveTerrain) {
+        assert.equal(obs.shape, "circle", "Terrain obstacles should be circle shape");
+        assert.equal(obs.type, "rock", "Terrain type should be rock");
+        assert.equal(obs.blocking, true, "Terrain should be blocking");
+        assert.ok(
+            Number.isFinite(obs.x) && Number.isFinite(obs.y) && Number.isFinite(obs.radius),
+            "Terrain should have valid position/radius"
+        );
+        assert.ok(obs.x >= obs.radius && obs.x <= 1120 - obs.radius, "Terrain x should be within arena");
+        assert.ok(obs.y >= obs.radius && obs.y <= 1120 - obs.radius, "Terrain y should be within arena");
+    }
+
+    // ── deterministic: same input → same terrain ──
+    const cave1 = createHuntingTerrain({ stageId: HUNTING_STAGE_IDS.CAVE, floor: 1, width: 1120, height: 1120 });
+    const cave2 = createHuntingTerrain({ stageId: HUNTING_STAGE_IDS.CAVE, floor: 1, width: 1120, height: 1120 });
+    assert.deepEqual(cave1, cave2, "Same input should produce identical terrain");
+
+    // ── forest/desert produce no terrain ──
+    const forestTerrain = createHuntingTerrain({
+        stageId: HUNTING_STAGE_IDS.FOREST,
+        floor: 1,
+        width: 1280,
+        height: 1280
+    });
+    assert.deepEqual(forestTerrain, [], "Forest should produce no terrain in 1st implementation");
+
+    const desertTerrain = createHuntingTerrain({
+        stageId: HUNTING_STAGE_IDS.DESERT,
+        floor: 1,
+        width: 1440,
+        height: 1280
+    });
+    assert.deepEqual(desertTerrain, [], "Desert should produce no terrain in 1st implementation");
+
+    // ── no stage → no terrain ──
+    const noStage = createHuntingTerrain({ stageId: null, floor: 1 });
+    assert.deepEqual(noStage, [], "Null stage should produce no terrain");
+
+    // ── BattleSimulation stores terrain ──
+    const testSpecs = app.roster.slice(0, 2).map((spec) => ({ ...spec }));
+    const simWithTerrain = new BattleSimulation(testSpecs, { onLog() {}, onSound() {} }, null, {
+        terrain: caveTerrain
+    });
+    assert.deepEqual(simWithTerrain.terrain, caveTerrain, "BattleSimulation should store terrain from options");
+
+    const simNoTerrain = new BattleSimulation(testSpecs, { onLog() {}, onSound() {} }, null, {});
+    assert.deepEqual(simNoTerrain.terrain, [], "BattleSimulation should default terrain to empty array");
+
+    // ── circle terrain collision: fighter pushed out ──
+    const mockApplyImpulse = {
+        calls: [],
+        fn(impulse) {
+            this.calls.push(impulse);
+        }
+    };
+    const fighter = {
+        position: { x: 200, y: 200 },
+        velocity: { x: 50, y: 0 },
+        radius: 24,
+        applyImpulse(impulse) {
+            mockApplyImpulse.fn(impulse);
+            this.velocity.x += impulse.x;
+            this.velocity.y += impulse.y;
+        }
+    };
+    const rock = { shape: "circle", type: "rock", x: 200, y: 200, radius: 50, blocking: true };
+
+    // fighter starts at exact center of rock → collision should push it out
+    const collided = resolveTerrainCollision(fighter, rock);
+    assert.equal(collided, true, "Fighter at rock center should collide");
+    const distAfter = Math.sqrt((fighter.position.x - rock.x) ** 2 + (fighter.position.y - rock.y) ** 2);
+    assert.ok(
+        distAfter >= fighter.radius + rock.radius - 0.01,
+        "Fighter should be pushed outside rock after collision"
+    );
+
+    // ── non-blocking terrain ignored ──
+    const nonBlocking = { shape: "circle", type: "rock", x: 200, y: 200, radius: 50, blocking: false };
+    const fighter2 = {
+        position: { x: 200, y: 200 },
+        velocity: { x: 50, y: 0 },
+        radius: 24,
+        applyImpulse() {}
+    };
+    assert.equal(resolveTerrainCollision(fighter2, nonBlocking), false, "Non-blocking terrain should be ignored");
+
+    // ── far fighter: no collision ──
+    const farFighter = {
+        position: { x: 500, y: 500 },
+        velocity: { x: 0, y: 0 },
+        radius: 24,
+        applyImpulse() {}
+    };
+    assert.equal(resolveTerrainCollision(farFighter, rock), false, "Far fighter should not collide with rock");
+
+    // ── invalid terrain shape/values ignored ──
+    const invalidTerrain = { shape: "polygon", x: 200, y: 200, radius: 50, blocking: true };
+    const fighter3 = {
+        position: { x: 200, y: 200 },
+        velocity: { x: 0, y: 0 },
+        radius: 24,
+        applyImpulse() {}
+    };
+    assert.equal(resolveTerrainCollision(fighter3, invalidTerrain), false, "Non-circle terrain should be ignored");
+
+    // ── renderer draws terrain circles ──
+    const ctx = makeRecordingCanvasContext();
+    drawTerrain(ctx, caveTerrain);
+    const arcCalls = ctx.calls.filter((c) => c[0] === "arc");
+    assert.ok(
+        arcCalls.length >= caveTerrain.length * 3,
+        "Each obstacle should produce at least 3 arc calls (shadow, body, outline)"
+    );
+
+    console.log("[hunting-terrain] ok");
 }
 
 function testEquipmentEnhancement() {
@@ -4817,6 +4945,7 @@ testHunting100FloorStructure();
 testHuntingCombatRelief();
 testHuntingPortalDecline();
 testHuntingStageSelectionAndArenaTheme();
+testHuntingTerrain();
 testEquipmentEnhancement();
 testEquipmentLevelRequirement();
 testEquipmentDraw();

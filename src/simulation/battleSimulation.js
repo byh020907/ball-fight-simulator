@@ -50,6 +50,7 @@ export class BattleSimulation extends Simulation {
         this.width = normalizeArenaSize(options.arenaWidth);
         this.height = normalizeArenaSize(options.arenaHeight);
         this.arenaTheme = options.arenaTheme ?? null;
+        this.terrain = Array.isArray(options.terrain) ? options.terrain : [];
         this.hooks = hooks;
         const spawnPoints = this.createSpawnPoints(fighterSpecs.length);
         this.fighters = fighterSpecs.map((spec, index) => {

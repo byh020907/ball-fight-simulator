@@ -12,6 +12,7 @@ import {
     ActionSuccessEffect,
     ActionWhiffEffect
 } from "../effects/index.js";
+import { resolveTerrainCollisions } from "../terrain/terrainCollision.js";
 
 /**
  * Base simulation — arena boundaries, wall bouncing, effect spawning.
@@ -60,6 +61,7 @@ export class Simulation {
     keepInsideArena(ball) {
         const xBounce = this._reflectX(ball);
         const yBounce = this._reflectY(ball);
+        resolveTerrainCollisions(ball, this.terrain);
         if (!xBounce && !yBounce) return;
 
         ball.bounced = true;
