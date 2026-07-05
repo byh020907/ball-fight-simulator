@@ -1,0 +1,509 @@
+<section x-data="playerPanel" class="player-panel" id="playerPanel" x-bind:class="{ locked: $store.playerPanel.locked }">
+    <div class="player-panel-actions" aria-label="보조 메뉴">
+        <button class="help-icon" type="button" title="게임 도움말" @click="$dispatch('open-help')">
+            ?
+        </button>
+        <button
+            class="collection-icon"
+            type="button"
+            title="컬렉션"
+            aria-label="컬렉션 열기"
+            @click="$store.playerPanel._actions.openCollectionHub()"
+        >
+            C
+        </button>
+    </div>
+    <div class="player-title">
+        <span>내 캐릭터</span>
+        <div class="player-title-row">
+            <canvas
+                id="playerFaceCanvas"
+                width="50"
+                height="50"
+                x-init="
+                    $el.width = 50;
+                    $el.height = 50
+                "
+            ></canvas>
+            <strong
+                x-text="$store.playerPanel.fighter?.name"
+                x-bind:style="'color:' + ($store.playerPanel.fighter?.color || '#000')"
+            ></strong>
+        </div>
+    </div>
+    <p class="player-note">
+        <span x-text="$store.playerPanel.fighter?.title || ''"></span>
+        <span
+            x-show="!$store.playerPanel.locked"
+            x-text="' \u00B7 시작 전 ' + $store.playerPanel.totalPoints + ' 포인트를 배분하세요.'"
+        ></span>
+        <span
+            x-show="!$store.playerPanel.locked && $store.playerPanel.bonusPoints > 0"
+            class="bonus-points-badge"
+            x-text="' (+' + $store.playerPanel.bonusPoints + ' 보너스)'"
+        ></span>
+    </p>
+    <div class="player-xp-meter">
+        <div class="player-xp-head">
+            <strong x-text="$store.playerPanel.experience.levelLabel"></strong>
+            <span x-text="Number($store.playerPanel.experience.totalXp || 0).toLocaleString() + ' XP'"></span>
+        </div>
+        <div class="player-xp-bar" aria-hidden="true">
+            <div
+                class="player-xp-fill"
+                x-bind:style="'width:' + ($store.playerPanel.experience.progressPct || 0) + '%; background:' + ($store.playerPanel.fighter?.color || '#59d6ff')"
+            ></div>
+        </div>
+        <div class="player-xp-foot">
+            <span x-text="$store.playerPanel.experience.progressText"></span>
+            <span x-text="$store.playerPanel.experience.nextText"></span>
+        </div>
+        <div
+            class="player-xp-reward"
+            x-show="$store.playerPanel.experience.nextRewardText"
+            x-text="$store.playerPanel.experience.nextRewardText"
+        ></div>
+    </div>
+    <div class="point-meter">
+        <span x-text="'사용 ' + ($store.playerPanel.totalPoints - $store.playerPanel.remainingPoints) + '/' + $store.playerPanel.totalPoints"></span>
+        <b x-text="$store.playerPanel.remainingPoints > 0 ? $store.playerPanel.remainingPoints + ' 남음' : '준비 완료'"></b>
+    </div>
+    <div class="allocation-summary">
+        <span x-text="$store.playerPanel.allocationSummary"></span>
+    </div>
+    <div class="stat-board">
+        <template x-for="stat in $store.playerPanel.statDefs" :key="stat.key">
+            <div class="stat-row">
+                <div class="stat-copy">
+                    <strong x-text="stat.label"></strong>
+                    <span x-text="stat.description"></span>
+                </div>
+                <button
+                    type="button"
+                    @click="$store.playerPanel._actions.adjustStat(stat.key, -10)"
+                    x-bind:disabled="$store.playerPanel.locked || ($store.playerPanel.allocation[stat.key] ?? 0) <= 0"
+                >
+                    -10
+                </button>
+                <button
+                    type="button"
+                    @click="$store.playerPanel._actions.adjustStat(stat.key, -1)"
+                    x-bind:disabled="$store.playerPanel.locked || ($store.playerPanel.allocation[stat.key] ?? 0) <= 0"
+                >
+                    -
+                </button>
+                <em x-text="($store.playerPanel.allocation[stat.key] ?? 0) + '%'"></em>
+                <button
+                    type="button"
+                    @click="$store.playerPanel._actions.adjustStat(stat.key, 1)"
+                    x-bind:disabled="$store.playerPanel.locked || $store.playerPanel.remainingPoints <= 0"
+                >
+                    +
+                </button>
+                <button
+                    type="button"
+                    @click="$store.playerPanel._actions.adjustStat(stat.key, 10)"
+                    x-bind:disabled="$store.playerPanel.locked || $store.playerPanel.remainingPoints <= 0"
+                >
+                    +10
+                </button>
+            </div>
+        </template>
+    </div>
+    <div class="challenge-level-row" x-show="!$store.playerPanel.locked">
+        <span class="challenge-label">도전 단계</span>
+        <button
+            type="button"
+            class="challenge-btn"
+            @click="$store.playerPanel._actions.adjustChallengeLevel(-1)"
+            x-bind:disabled="$store.playerPanel.challengeLevel <= 0"
+        >
+            -
+        </button>
+        <em class="challenge-value" x-text="$store.playerPanel.challengeLevel"></em>
+        <button
+            type="button"
+            class="challenge-btn"
+            @click="$store.playerPanel._actions.adjustChallengeLevel(1)"
+            x-bind:disabled="$store.playerPanel.challengeLevel >= $store.playerPanel.highestUnlockedLevel"
+        >
+            +
+        </button>
+        <span class="challenge-max" x-text="'/ ' + $store.playerPanel.highestUnlockedLevel"></span>
+    </div>
+    <div
+        class="bonus-summary"
+        x-show="$store.playerPanel.progressionBonusSummary"
+        x-text="$store.playerPanel.progressionBonusSummary"
+    ></div>
+    <div class="player-actions" data-player-actions>
+        <button
+            class="action-btn"
+            type="button"
+            @click="$store.playerPanel._actions.randomAllocation()"
+            x-bind:disabled="$store.playerPanel.locked"
+        >
+            자동 배분
+        </button>
+        <button
+            class="action-btn reset"
+            type="button"
+            @click="$store.playerPanel._actions.resetAllocation()"
+            x-bind:disabled="$store.playerPanel.locked"
+        >
+            초기화
+        </button>
+    </div>
+</section>
+<script>
+    Alpine.data("playerPanel", () => ({ }));
+</script>
+<style scoped>
+:scope {
+    position: fixed;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+    width: min(360px, calc(100vw - 24px));
+    max-height: calc(100dvh - 24px);
+    overflow: auto;
+    border: 2px solid #202020;
+    background: #f8f8f8;
+    color: #202020;
+    padding: 7px;
+    display: grid;
+    gap: 8px;
+}
+:scope.locked {
+    display: none;
+}
+.player-title {
+    display: grid;
+    gap: 2px;
+}
+.player-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.player-title-row canvas {
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 2px solid #202020;
+    background: #eeeeee;
+}
+.player-title-row canvas.face-pop {
+    animation: facePop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes facePop {
+    0% {
+        transform: scale(0);
+        opacity: 0;
+    }
+    60% {
+        transform: scale(1.15);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+.player-panel-actions {
+    width: 100%;
+    min-width: 0;
+    min-height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+.player-panel-actions > button {
+    flex: 0 0 auto;
+    width: 24px;
+    height: 24px;
+    border: 2px solid #202020;
+    border-radius: 50%;
+    background: none;
+    color: #202020;
+    font: 900 13px/1 "Bahnschrift", sans-serif;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.12s, color 0.12s;
+}
+.player-panel-actions > button:hover {
+    background: #202020;
+    color: #ffffff;
+}
+.player-title span,
+.point-meter span {
+    font-size: 0.72rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #333333;
+}
+.player-title strong {
+    font-size: 1rem;
+    line-height: 1;
+}
+.player-note {
+    margin: 0;
+    font-size: 0.76rem;
+    line-height: 1.35;
+    color: #333333;
+}
+.player-xp-meter {
+    border: 2px solid #202020;
+    background: #ffffff;
+    padding: 6px;
+    display: grid;
+    gap: 5px;
+}
+.player-xp-head,
+.player-xp-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+.player-xp-head strong {
+    font-size: 0.86rem;
+    line-height: 1;
+}
+.player-xp-head span,
+.player-xp-foot span,
+.player-xp-reward {
+    min-width: 0;
+    font-size: 0.68rem;
+    font-weight: 800;
+    color: #555555;
+}
+.player-xp-foot span:last-child {
+    text-align: right;
+}
+.player-xp-bar {
+    height: 9px;
+    border: 2px solid #202020;
+    background: #eeeeee;
+    overflow: hidden;
+}
+.player-xp-fill {
+    height: 100%;
+    width: 0;
+    transition: width 260ms ease;
+}
+.bonus-points-badge {
+    color: #d4a017;
+    font-weight: 700;
+}
+.point-meter {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    border-top: 2px solid #202020;
+    padding-top: 5px;
+}
+.point-meter b {
+    font-size: 0.78rem;
+    color: #0a8d32;
+}
+.allocation-summary {
+    border: 2px solid #202020;
+    background: #ffffff;
+    padding: 6px;
+    color: #202020;
+    font-size: 0.76rem;
+    font-weight: 900;
+    line-height: 1.25;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+.stat-board {
+    display: grid;
+    gap: 4px;
+}
+.stat-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 36px 30px 42px 30px 40px;
+    align-items: center;
+    gap: 4px;
+}
+.stat-copy {
+    min-width: 0;
+    display: grid;
+    gap: 1px;
+}
+.stat-copy strong {
+    font-size: 0.82rem;
+    line-height: 1;
+}
+.stat-copy span {
+    font-size: 0.66rem;
+    line-height: 1.2;
+    color: #333333;
+}
+.stat-row button {
+    border: 2px solid #202020;
+    background: #ffcb3d;
+    color: #202020;
+    font: inherit;
+    font-size: 0.74rem;
+    font-weight: 900;
+    cursor: pointer;
+    min-height: 30px;
+    padding: 0 3px;
+}
+.stat-row button:disabled,
+.action-btn:disabled {
+    cursor: default;
+    opacity: 0.35;
+}
+.stat-row em {
+    font-style: normal;
+    font-size: 0.78rem;
+    font-weight: 900;
+    text-align: center;
+}
+.challenge-level-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 0 4px;
+    font-size: 0.82rem;
+}
+.challenge-label {
+    font-weight: 700;
+    color: #202020;
+    margin-right: auto;
+}
+.challenge-btn {
+    border: 2px solid #202020;
+    background: #fff;
+    color: #202020;
+    font: inherit;
+    font-weight: 900;
+    font-size: 0.85rem;
+    cursor: pointer;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.challenge-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+.challenge-value {
+    font-weight: 900;
+    font-size: 0.95rem;
+    color: #202020;
+    min-width: 18px;
+    text-align: center;
+}
+.challenge-max {
+    color: #888;
+    font-size: 0.75rem;
+}
+.bonus-summary {
+    font-size: 0.72rem;
+    color: #555;
+    padding: 2px 0 4px;
+}
+.player-actions {
+    display: flex;
+    gap: 6px;
+    padding-top: 6px;
+    background: #f8f8f8;
+}
+.action-btn {
+    flex: 1;
+    border: 2px solid #202020;
+    font: inherit;
+    font-size: 0.74rem;
+    font-weight: 900;
+    cursor: pointer;
+    min-height: 30px;
+    padding: 0 3px;
+    background: #59d6ff;
+    color: #202020;
+}
+.action-btn.reset {
+    background: #e74c3c;
+    color: #fff;
+}
+.action-btn:disabled {
+    cursor: default;
+    opacity: 0.35;
+}
+@media (max-width: 760px) {
+    :scope {
+        padding: 8px;
+        font-size: clamp(11px, 2.8vw, 13px);
+    }
+    .player-title span,
+    .point-meter span {
+        font-size: 0.78em;
+    }
+    .player-title strong {
+        font-size: 1.08em;
+    }
+    .player-note {
+        font-size: 0.84em;
+    }
+    .point-meter b,
+    .stat-row em {
+        font-size: 0.86em;
+    }
+    .allocation-summary {
+        font-size: 0.84em;
+    }
+    .stat-row button,
+    .action-btn {
+        font-size: 0.82em;
+    }
+    :scope .control-button {
+        font-size: 1em;
+    }
+    .stat-row {
+        grid-template-columns: minmax(0, 1fr) 42px 34px 48px 34px 46px;
+        gap: 5px;
+    }
+    .stat-row button {
+        min-height: 36px;
+    }
+}
+@media (max-width: 760px) and (orientation: portrait) {
+    :scope {
+        position: relative;
+        left: auto;
+        top: auto;
+        bottom: auto;
+        transform: none;
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        max-height: none;
+    }
+}
+@media (max-width: 420px) {
+    .stat-row {
+        grid-template-columns: 1fr repeat(5, minmax(32px, auto));
+    }
+    .stat-copy span {
+        display: none;
+    }
+    .allocation-summary {
+        font-size: 0.8em;
+    }
+}
+</style>

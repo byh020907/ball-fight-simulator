@@ -1,0 +1,213 @@
+<div
+    x-data="gameOverlay"
+    class="overlay"
+    id="overlay"
+    x-show="state.visible"
+    x-transition:enter="overlay-enter"
+    x-transition:enter-start="overlay-enter-start"
+    x-transition:enter-end="overlay-enter-end"
+    x-transition:leave="overlay-leave"
+    x-transition:leave-start="overlay-leave-start"
+    x-transition:leave-end="overlay-leave-end"
+    x-bind:class="{ transient: state.transient }"
+>
+    <div class="overlay-card">
+        <span x-text="state.label">Waiting Room</span>
+        <strong x-text="state.text">START THE FIGHT</strong>
+        <p x-show="state.subtext" x-text="state.subtext"></p>
+        <xp-reward-panel class="xp-reward"></xp-reward-panel>
+        <div class="hunting-choice" x-show="state.huntingChoiceVisible">
+            <div class="hunting-choice-info">
+                <span x-text="state.huntingLootSummary"></span>
+            </div>
+            <div class="hunting-choice-buttons">
+                <button class="hunting-btn retreat" type="button" @click="huntingRetreat()">← 귀환</button>
+                <button class="hunting-btn advance" type="button" @click="huntingAdvance()">전진 →</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    Alpine.data("gameOverlay", () => {
+        const state = Alpine.reactive({
+            visible: false,
+            transient: false,
+            label: "",
+            text: "",
+            subtext: "",
+            huntingChoiceVisible: false,
+            huntingFloor: 1,
+            huntingCharacterName: "",
+            huntingLootSummary: ""
+        });
+        return {
+            state,
+            init() {
+                this.$watch("$store.gameOverlay", (val) => {
+                    if (!val) return;
+                    state.visible = Boolean(val.visible);
+                    state.transient = Boolean(val.transient);
+                    state.label = val.label ?? "";
+                    state.text = val.text ?? "";
+                    state.subtext = val.subtext ?? "";
+                    state.huntingChoiceVisible = Boolean(val.huntingChoiceVisible);
+                    state.huntingFloor = val.huntingFloor ?? 1;
+                    state.huntingCharacterName = val.huntingCharacterName ?? "";
+                    state.huntingLootSummary = val.huntingLootSummary ?? "";
+                }, { immediate: true });
+            },
+            huntingRetreat() {
+                if (window.ballFightApp?.hunting) window.ballFightApp.hunting.retreat();
+            },
+            huntingAdvance() {
+                if (window.ballFightApp?.hunting) window.ballFightApp.hunting.advance();
+            }
+        };
+    });
+</script>
+<style scoped>
+:scope {
+    position: absolute;
+    inset: 0;
+    border-radius: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    background: #eeeeee;
+}
+
+:scope.transient {
+    background: transparent;
+    align-items: center;
+}
+
+:scope.transient .overlay-card {
+    max-width: min(78%, 360px);
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+:scope.transient .overlay-card span {
+    margin-bottom: 4px;
+    color: rgba(17, 17, 17, 0.58);
+    letter-spacing: 0.18em;
+}
+
+:scope.transient .overlay-card strong {
+    font-size: clamp(1.2rem, 4vw, 2rem);
+    color: rgba(17, 17, 17, 0.72);
+}
+
+.overlay-enter {
+    transition: opacity 400ms ease;
+}
+.overlay-enter-start {
+    opacity: 0;
+}
+.overlay-enter-end {
+    opacity: 1;
+}
+.overlay-leave {
+    transition: opacity 300ms ease;
+}
+.overlay-leave-start {
+    opacity: 1;
+}
+.overlay-leave-end {
+    opacity: 0;
+}
+
+:scope.transient .overlay-enter {
+    transition: opacity 200ms ease;
+}
+:scope.transient .overlay-leave {
+    transition: opacity 150ms ease;
+}
+
+.overlay-card {
+    text-align: center;
+    padding: 28px 32px;
+}
+
+.overlay-card span {
+    display: block;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: #111111;
+    margin-bottom: 14px;
+    font-weight: 700;
+}
+
+.overlay-card strong {
+    display: block;
+    font-size: clamp(2rem, 8vw, 3.4rem);
+    letter-spacing: -0.05em;
+    color: #111111;
+}
+
+.overlay-card p {
+    margin: 12px 0 0;
+    color: #202020;
+}
+
+.hunting-btn {
+    font-family: inherit;
+    border: 2px solid #202020;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    background: #ffffff;
+    transition: background 0.1s;
+}
+
+.hunting-btn:hover {
+    background: #eeeeee;
+}
+
+.hunting-btn.retreat {
+    border-color: #888888;
+}
+
+.hunting-btn.advance {
+    border-color: #d4a017;
+}
+
+.hunting-choice {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.hunting-choice-info {
+    font-size: 0.75rem;
+    color: #555555;
+    margin-bottom: 8px;
+    text-align: center;
+}
+
+.hunting-choice-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    pointer-events: auto;
+}
+
+.hunting-choice-buttons button {
+    flex: 1;
+    max-width: 140px;
+}
+
+@media (max-width: 600px) {
+    :scope.transient {
+        align-items: center;
+    }
+    :scope.transient .overlay-card {
+        max-width: min(84%, 320px);
+    }
+}
+</style>

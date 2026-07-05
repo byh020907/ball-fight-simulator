@@ -259,6 +259,55 @@ async function loadModuleApp() {
         nextText: "",
         nextRewardText: ""
     });
+    globalThis.Alpine.store("gameOverlay", {
+        visible: false,
+        transient: false,
+        label: "",
+        text: "",
+        subtext: "",
+        huntingChoiceVisible: false,
+        huntingFloor: 1,
+        huntingCharacterName: "",
+        huntingLootSummary: ""
+    });
+    globalThis.Alpine.store("startButton", {
+        hidden: true,
+        disabledOverride: null,
+        textOverride: null,
+        remainingPoints: 0,
+        locked: false
+    });
+    globalThis.Alpine.store("huntingButton", {
+        available: false,
+        active: false,
+        tournamentActive: false
+    });
+    globalThis.Alpine.store("fighterStrip", {
+        fighters: []
+    });
+    globalThis.Alpine.store("battleLog", {
+        items: []
+    });
+    globalThis.Alpine.store("playerPanel", {
+        fighter: null,
+        experience: {},
+        allocation: {},
+        totalPoints: 0,
+        bonusPoints: 0,
+        remainingPoints: 0,
+        locked: false,
+        statDefs: [],
+        challengeLevel: 0,
+        highestUnlockedLevel: 0,
+        progressionBonusSummary: "",
+        allocationSummary: "",
+        _actions: null
+    });
+    globalThis.Alpine.store("tournamentBracket", {
+        visible: false,
+        phase: "Ready",
+        rounds: []
+    });
     const moduleUrl = new URL(`../src/app.js?test=${Date.now()}`, import.meta.url).href;
     const { BattleApp } = await import(moduleUrl);
     return new BattleApp();
@@ -281,6 +330,55 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
         progressText: "",
         nextText: "",
         nextRewardText: ""
+    });
+    harness.context.Alpine.store("gameOverlay", {
+        visible: false,
+        transient: false,
+        label: "",
+        text: "",
+        subtext: "",
+        huntingChoiceVisible: false,
+        huntingFloor: 1,
+        huntingCharacterName: "",
+        huntingLootSummary: ""
+    });
+    harness.context.Alpine.store("startButton", {
+        hidden: true,
+        disabledOverride: null,
+        textOverride: null,
+        remainingPoints: 0,
+        locked: false
+    });
+    harness.context.Alpine.store("huntingButton", {
+        available: false,
+        active: false,
+        tournamentActive: false
+    });
+    harness.context.Alpine.store("fighterStrip", {
+        fighters: []
+    });
+    harness.context.Alpine.store("battleLog", {
+        items: []
+    });
+    harness.context.Alpine.store("playerPanel", {
+        fighter: null,
+        experience: {},
+        allocation: {},
+        totalPoints: 0,
+        bonusPoints: 0,
+        remainingPoints: 0,
+        locked: false,
+        statDefs: [],
+        challengeLevel: 0,
+        highestUnlockedLevel: 0,
+        progressionBonusSummary: "",
+        allocationSummary: "",
+        _actions: null
+    });
+    harness.context.Alpine.store("tournamentBracket", {
+        visible: false,
+        phase: "Ready",
+        rounds: []
     });
     const baseAlpine = harness.context.Alpine;
     harness.context.Alpine = {
@@ -1160,7 +1258,14 @@ function testAlpineTemplateComponentSystem() {
         readFileSync(new URL("../src/components/xp-progress-bar.html", import.meta.url), "utf8"),
         "xp-progress-bar component file should exist"
     );
-    assert.ok(indexHtml.includes("<xp-reward-panel"), "Index should use a tag component for a real UI panel");
+    assert.ok(indexHtml.includes("<game-overlay"), "Index should use a tag component for the game overlay");
+    assert.ok(
+        indexHtml.includes("<xp-reward-panel") ||
+            readFileSync(new URL("../src/components/game-overlay.html", import.meta.url), "utf8").includes(
+                "<xp-reward-panel"
+            ),
+        "xp-reward-panel should be used as a tag component (in index or child component)"
+    );
     const rewardTemplateHtml = readFileSync(new URL("../src/components/xp-reward-panel.html", import.meta.url), "utf8");
     assert.ok(
         rewardTemplateHtml.includes("<xp-progress-bar"),
@@ -1405,7 +1510,11 @@ async function testMatchEndGrantsImmediateExperience(app) {
         app._lastMatchXpResult.xpGained,
         "Player setup XP meter should update after match XP is granted"
     );
-    assert.match(app.ui.state.overlaySubtext, /^\+\d+XP \(Lv\.\d+\)/, "Match result overlay should show XP");
+    assert.match(
+        globalThis.Alpine.store("gameOverlay").subtext,
+        /^\+\d+XP \(Lv\.\d+\)/,
+        "Match result overlay should show XP"
+    );
     assert.equal(
         globalThis.Alpine.store("xpReward").visible,
         true,

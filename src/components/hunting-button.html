@@ -1,0 +1,54 @@
+<button
+    x-data="huntingButton"
+    class="control-button hunting-btn"
+    type="button"
+    x-show="state.available && !state.tournamentActive && !state.active"
+    @click="openHuntingLobby()"
+>⚔ 사냥터</button>
+<script>
+    Alpine.data("huntingButton", () => {
+        const state = Alpine.reactive({
+            available: false,
+            active: false,
+            tournamentActive: false
+        });
+        return {
+            state,
+            openHuntingLobby() {
+                if (window.ballFightApp?.hunting) window.ballFightApp.hunting.showCharacterSelect();
+            },
+            init() {
+                this.$watch("$store.huntingButton", (val) => {
+                    if (!val) return;
+                    state.available = Boolean(val.available);
+                    state.active = Boolean(val.active);
+                    state.tournamentActive = Boolean(val.tournamentActive);
+                }, { immediate: true });
+            }
+        };
+    });
+</script>
+<style scoped>
+:scope {
+    font-family: inherit;
+    border: 2px solid #202020;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    background: #ffffff;
+    transition: background 0.1s;
+    bottom: 90px;
+}
+
+:scope:hover {
+    background: #eeeeee;
+}
+
+@media (max-width: 760px) {
+    :scope {
+        bottom: 76px;
+    }
+}
+</style>

@@ -3,6 +3,7 @@
     class="bf-popup-overlay"
     x-show="state.visible"
     x-transition.opacity.duration.200ms
+    @pick-action="handlePickAction($event.detail.index)"
 >
     <div class="bf-popup-card">
         <div class="bf-popup-scroll">
@@ -10,7 +11,7 @@
             <p class="action-picker-desc">전투 중 클릭하여 발동하세요</p>
             <div class="action-cards">
                 <template x-for="(card, index) in state.cards" :key="card.id">
-                    <button class="action-card" type="button" @click="pickAction(index)">
+                    <button class="action-card" type="button" @click="$dispatch('pick-action', { index })">
                         <strong x-text="card.name"></strong>
                         <span x-text="card.description"></span>
                         <small x-text="'HP ' + card.hpCost + '% 소모'"></small>
@@ -28,10 +29,6 @@
             cards: []
         });
 
-        function pickAction(index) {
-            if (window.ActionPickerService) window.ActionPickerService.resolve(index);
-        }
-
         return {
             state,
             init() {
@@ -44,7 +41,9 @@
                     state.visible = true;
                 }, { immediate: true });
             },
-            pickAction
+            handlePickAction(index) {
+                if (window.ActionPickerService) window.ActionPickerService.resolve(index);
+            }
         };
     });
 </script>

@@ -1,0 +1,71 @@
+<button
+    x-data="startButton"
+    class="control-button"
+    id="startButton"
+    type="button"
+    x-bind:class="{ hidden: state.hidden }"
+    x-bind:disabled="computedDisabled"
+    x-text="computedText"
+    @click="$dispatch('start-tournament')"
+>싸움 시작</button>
+<script>
+    Alpine.data("startButton", () => {
+        const state = Alpine.reactive({
+            hidden: true,
+            disabledOverride: null,
+            textOverride: null,
+            remainingPoints: 0,
+            locked: false
+        });
+        return {
+            state,
+            get computedDisabled() {
+                return state.disabledOverride !== null
+                    ? state.disabledOverride
+                    : state.remainingPoints > 0 || state.locked;
+            },
+            get computedText() {
+                return state.textOverride !== null
+                    ? state.textOverride
+                    : state.remainingPoints > 0
+                        ? "스탯 " + state.remainingPoints + " 남음"
+                        : "토너먼트 시작";
+            },
+            init() {
+                this.$watch("$store.startButton", (val) => {
+                    if (!val) return;
+                    state.hidden = Boolean(val.hidden);
+                    state.disabledOverride = val.disabledOverride !== undefined ? val.disabledOverride : null;
+                    state.textOverride = val.textOverride !== undefined ? val.textOverride : null;
+                    state.remainingPoints = val.remainingPoints ?? 0;
+                    state.locked = Boolean(val.locked);
+                }, { immediate: true });
+            }
+        };
+    });
+</script>
+<style scoped>
+:scope {
+    position: absolute;
+    left: 50%;
+    bottom: 18px;
+    transform: translateX(-50%);
+    min-width: 220px;
+    z-index: 2;
+}
+
+:scope.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+@media (max-width: 760px) {
+    :scope {
+        bottom: 12px;
+        min-width: min(280px, calc(100% - 32px));
+        min-height: 48px;
+        padding: 14px 18px;
+        font-size: 1rem;
+    }
+}
+</style>
