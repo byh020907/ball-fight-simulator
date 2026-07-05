@@ -432,6 +432,7 @@ export class BattleSimulation extends Simulation {
         this.resultReady = false;
         for (const fighter of this.fighters) fighter.freezeForResult();
         for (const loser of this.fighters.filter((fighter) => this.isHostile(winner, fighter))) {
+            if (loser.flags.destroyed) continue;
             const pos = loser.position.clone();
             const color = loser.color;
             loser.destroyForResult();

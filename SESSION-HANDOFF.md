@@ -431,6 +431,12 @@
 - 검증: `npm test`, `npm run format:check` 통과. BUT 브라우저에서 버튼 여전히 무반응 (원인 불명)
 - 미해결 원인 추정: `$watch("$store.playerPanel", callback)`가 전체 store 참조를 감시하므로 store 내부 속성 변경(alocation 등)이 발생해도 watcher가 재실행되지 않을 가능성. 현지 `state → `$store.playerPanel` 직접 참조로 전환 시도 예정. player-panel 템플릿이 `state.xxx` 대신 `$store.playerPanel.xxx`를 직접 사용하면 watcher 회피 가능.
 
+## [L1] 2026-07-05 — 사냥터 몹 사망 즉시 폭발 이펙트 + 화면 제거
+- 맥락: 몹 캐릭터가 HP=0이 되면 `flags.defeated=true`만 설정되어 `update()`가 중단되지만 `draw()`는 계속 그려서 죽은 몹이 멈춰있는 버그처럼 보임
+- 결정: (1) `BattleBall.takeDamage()`에서 HP<=0 시 `flags.destroyed=true`를 함께 설정하고 `sim.spawnDeathExplosion()` + 로그를 즉시 호출. (2) `BattleSimulation.resolveResult()`에서 이미 `flags.destroyed`가 true인 패자는 중복 이펙트를 건너뛰도록 `continue` 추가.
+- 영향: `src/entities/battleBall.js:304-311`, `src/simulation/battleSimulation.js:435`
+- 검증: `npm test`, `npm run format:check` 통과
+
 ## 진행 중 이슈 (2026-07-05 갱신)
 - **player-panel 버튼 무반응**: `$store._actions` 콜백은 논리적으로 정상 (`UIController._exposeActionsToPlayerPanel`가 `this.state?.adjustStat()`를 바인딩). 원인이 `$watch` 의존성 추적 문제일 가능성이 높아, `state` + watcher 패턴을 폐기하고 템플릿이 직접 `$store.playerPanel.xxx`를 읽도록 전환할 계획. `$store`는 Alpine magic으로 의존성 추적이 정확함.
 - **사냥터 deferred effect UI 연결**: instant_heal/temporary_stat 보상은 payload까지만 반환, 실제 런 연결은 미구현

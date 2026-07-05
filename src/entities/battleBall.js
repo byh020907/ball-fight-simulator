@@ -303,6 +303,12 @@ export class BattleBall extends mixins([PhysicsBody]) {
         }
         if (this.hp <= 0) {
             this.flags.defeated = true;
+            this.flags.destroyed = true;
+            const s = source?.simulation ?? this.simulation;
+            if (s) {
+                s.spawnDeathExplosion(this.position.clone(), this.color);
+                s.addLog(`${this.name} has been defeated.`);
+            }
         }
         return { actualDamage };
     }
