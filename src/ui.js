@@ -660,7 +660,7 @@ export class UIController {
             return;
         }
 
-        s.tournamentActive = true;
+        s.tournamentActive = !tournament.champion;
         this._syncHuntingButtonStore();
         const rounds = tournament.rounds.map((round, roundIndex) =>
             round.map((match) => ({

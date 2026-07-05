@@ -1,5 +1,11 @@
 # 결정 기록
 
+## [L1] 2026-07-05 — 사냥터 버그 2건 수정: 첫 우승 후 버튼 미노출 / 이동 멈춤 혼동
+- 맥락: 사용자 제보로 발견된 버그 2건. (1) 첫 토너먼트 우승 후 사냥터 버튼이 새로고침 전까지 나타나지 않음. (2) 사냥터 10층 전진이 2층에서 멈춘 것처럼 보이고, 다음 행동을 알려주지 않아 혼란.
+- 결정: (1) `UIController.renderTournament()`에서 챔피언 결정 시 `tournamentActive = !tournament.champion`(false)로 설정하고, `showTournamentChampion()`에서 `refreshPlayerSetup()`을 호출해 `huntingAvailable`을 즉시 재계산. (2) `advance()`에 try-catch 안전장치 추가해 `_moving` 플래그 고착 방지. (3) 전투 승리 후 `huntingMoveMessage`에 "10층 전진 가능" 메시지 추가. (4) 포탈/상인 이벤트에서 `huntingLootSummary`로 현재 상태와 가능한 행동 표시. (5) `game-overlay.html`에 `.hunting-choice-hint` 요소 추가해 이동 상태 메시지를 선택 영역에서도 표시.
+- 영향: `src/ui.js`(renderTournament 조건부), `src/app.js`(showTournamentChampion), `src/hunting/huntingManager.js`(try-catch, 메시지), `src/components/game-overlay.html`(hint 요소), `tests/regression.mjs`(tournamentActive/available 검증)
+- 검증: `npm test`, `npm run check`, `npm run format:check`, `node scripts/huntingUserScenario.mjs` 통과
+
 ## [L1] 2026-07-05 — 사냥터 100층 스테이지 원정 구조 구현
 - 맥락: Codex가 사냥터 패턴 강화 구현을 일부 진행하다 중단. partial diff를 읽고 이어서 완성.
 - 결정: (1) 사냥터 100층 구조 확정 — 시작 0층, 10층 전진 시 1층씩 이동, 전투/선택형이벤트/포탈/100층보스에서 정지, 빈층은 자동 진행. (2) `advance()`를 async 10-step 루프로 재작성, 층당 350ms 이동 애니메이션. (3) 포탈에서만 귀환 가능 (`canRetreatFromHuntingRun`), 포탈 지나치면 귀환 권한 소멸. (4) 새 이벤트 4종: portal(귀환 가능), wandering_merchant(정지), boon(파편 즉시), mishap(HP 손실). (5) 동굴/숲/사막 3스테이지, 100층 보스 처치 시 다음 스테이지 해금. (6) `rollHuntingFloorOutcome`으로 층 판정 (empty/combat/event/final_boss). (7) 테스트: 100층 구조, portal 전용 귀환, floor outcome, stage 해금, gameOverlay store 검증 완료.

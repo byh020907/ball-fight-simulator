@@ -262,7 +262,8 @@ export class HuntingManager {
                 huntingMoving: false,
                 huntingFloor: run.floor,
                 huntingCharacterName: name,
-                huntingLootSummary: pendingText
+                huntingLootSummary: pendingText,
+                huntingMoveMessage: `${run.floor}층 전투 승리 · 10층 전진 가능`
             });
             app.ui.setStartButton({ hidden: true, disabled: true, text: "" });
             savePlayerProfile(app.playerProfile);
@@ -318,92 +319,108 @@ export class HuntingManager {
         this._moving = true;
         app.ui.setHuntingOverlayState({ huntingChoiceVisible: false });
 
-        const startFloor = run.floor;
-        const MAX_STEPS = HUNTING_ADVANCE_STEPS;
-        const FLOOR_STEP_MS = 350;
+        try {
+            const startFloor = run.floor;
+            const MAX_STEPS = HUNTING_ADVANCE_STEPS;
+            const FLOOR_STEP_MS = 350;
 
-        for (let step = 0; step < MAX_STEPS; step++) {
-            const targetFloor = Math.min(run.maxFloor, startFloor + step + 1);
-            this._setHuntingMoveState({
-                moving: true,
-                step: step + 1,
-                maxSteps: MAX_STEPS,
-                startFloor,
-                targetFloor,
-                message: `${targetFloor}층으로 이동 중…`
-            });
-
-            await new Promise((resolve) => setTimeout(resolve, FLOOR_STEP_MS));
-
-            this._run = advanceHuntingRun(this._run);
-            if (this._run.status !== "active") {
-                app.ui.setHuntingOverlayState({ huntingMoving: false });
-                this._moving = false;
-                this.retreat();
-                return;
-            }
-
-            const encounter = this._run.lastEncounter;
-            const currentFloor = this._run.floor;
-            const event = this._run.lastEvent;
-
-            if (encounter.type === HUNTING_FLOOR_OUTCOME_TYPES.EMPTY) {
-                app.ui.addLog(`[사냥터] ${currentFloor}층 — 빈 통로`);
-                app.ui.setHuntingOverlayState({
-                    huntingMoveMessage: `${currentFloor}층 — 빈 통로`
+            for (let step = 0; step < MAX_STEPS; step++) {
+                const targetFloor = Math.min(run.maxFloor, startFloor + step + 1);
+                this._setHuntingMoveState({
+                    moving: true,
+                    step: step + 1,
+                    maxSteps: MAX_STEPS,
+                    startFloor,
+                    targetFloor,
+                    message: `${targetFloor}층으로 이동 중…`
                 });
-                continue;
-            }
 
-            if (encounter.type === HUNTING_FLOOR_OUTCOME_TYPES.COMBAT) {
-                app.ui.addLog(`[사냥터] ${currentFloor}층 — 적 조우!`);
-                this._stopHuntingMoveForBattle(app, `${currentFloor}층 — 적 조우!`);
-                return;
-            }
+                await new Promise((resolve) => setTimeout(resolve, FLOOR_STEP_MS));
 
-            if (encounter.type === HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS) {
-                app.ui.addLog(`[사냥터] ${currentFloor}층 — 최종 보스 등장!`);
-                this._stopHuntingMoveForBattle(app, `${currentFloor}층 — 최종 보스!`);
-                return;
-            }
+                this._run = advanceHuntingRun(this._run);
+                if (this._run.status !== "active") {
+                    app.ui.setHuntingOverlayState({ huntingMoving: false });
+                    this._moving = false;
+                    this.retreat();
+                    return;
+                }
 
-            if (encounter.type === HUNTING_FLOOR_OUTCOME_TYPES.EVENT && event) {
-                this._handleAdvanceEvent(event, app);
+                const encounter = this._run.lastEncounter;
+                const currentFloor = this._run.floor;
+                const event = this._run.lastEvent;
 
-                if (event.type === HUNTING_EVENT_TYPES.PORTAL) {
-                    this._stopHuntingMoveForChoice(app, {
-                        message: `${currentFloor}층 — 포탈 발견!`,
-                        canRetreat: true,
-                        floor: currentFloor
+                if (encounter.type === HUNTING_FLOOR_OUTCOME_TYPES.EMPTY) {
+                    app.ui.addLog(`[사냥터] ${currentFloor}층 — 빈 통로`);
+                    app.ui.setHuntingOverlayState({
+                        huntingMoveMessage: `${currentFloor}층 — 빈 통로`
                     });
+                    continue;
+                }
+
+                if (encounter.type === HUNTING_FLOOR_OUTCOME_TYPES.COMBAT) {
+                    app.ui.addLog(`[사냥터] ${currentFloor}층 — 적 조우!`);
+                    this._stopHuntingMoveForBattle(app, `${currentFloor}층 — 적 조우!`);
                     return;
                 }
 
-                if (event.type === HUNTING_EVENT_TYPES.WANDERING_MERCHANT) {
-                    this._stopHuntingMoveForChoice(app, {
-                        message: `${currentFloor}층 — 떠돌이 상인 발견`,
-                        canRetreat: false,
-                        floor: currentFloor
-                    });
+                if (encounter.type === HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS) {
+                    app.ui.addLog(`[사냥터] ${currentFloor}층 — 최종 보스 등장!`);
+                    this._stopHuntingMoveForBattle(app, `${currentFloor}층 — 최종 보스!`);
                     return;
                 }
 
-                if (event.type === HUNTING_EVENT_TYPES.CHAMPION_INTRUSION) {
-                    this._stopHuntingMoveForBattle(app, `${currentFloor}층 — 챔피언 난입!`);
-                    return;
-                }
+                if (encounter.type === HUNTING_FLOOR_OUTCOME_TYPES.EVENT && event) {
+                    this._handleAdvanceEvent(event, app);
 
-                // boon / mishap / rest_site / chest_room / cursed_altar: auto-continue
-                continue;
+                    if (event.type === HUNTING_EVENT_TYPES.PORTAL) {
+                        app.ui.addLog(`[사냥터] ${currentFloor}층 — 포탈 발견, 귀환하거나 계속 전진할 수 있습니다.`);
+                        this._stopHuntingMoveForChoice(app, {
+                            message: `${currentFloor}층 — 포탈 발견!`,
+                            canRetreat: true,
+                            floor: currentFloor,
+                            summary: `포탈 발견 · 현재 ${currentFloor}층 · 귀환 또는 10층 전진`
+                        });
+                        return;
+                    }
+
+                    if (event.type === HUNTING_EVENT_TYPES.WANDERING_MERCHANT) {
+                        app.ui.addLog(
+                            `[사냥터] ${currentFloor}층 — 떠돌이 상인 발견, 정비 후 계속 전진할 수 있습니다.`
+                        );
+                        this._stopHuntingMoveForChoice(app, {
+                            message: `${currentFloor}층 — 떠돌이 상인 발견`,
+                            canRetreat: false,
+                            floor: currentFloor,
+                            summary: `떠돌이 상인 · 현재 ${currentFloor}층 · 10층 전진 가능`
+                        });
+                        return;
+                    }
+
+                    if (event.type === HUNTING_EVENT_TYPES.CHAMPION_INTRUSION) {
+                        this._stopHuntingMoveForBattle(app, `${currentFloor}층 — 챔피언 난입!`);
+                        return;
+                    }
+
+                    // boon / mishap / rest_site / chest_room / cursed_altar: auto-continue
+                    continue;
+                }
             }
+
+            // 모든 이동 단계 소진 — 정지 없이 최대 10층 전진 완료
+            this._stopHuntingMoveForChoice(app, {
+                message: `${MAX_STEPS}층 전진 완료 — ${this._run.floor}층`,
+                canRetreat: false,
+                floor: this._run.floor,
+                summary: `현재 ${this._run.floor}층 · 포탈 없이는 귀환 불가`
+            });
+        } catch (error) {
+            console.error("[Hunting] advance loop error:", error);
+            app.ui.setHuntingOverlayState({
+                huntingMoving: false,
+                huntingMoveMessage: "이동 중 오류 발생 — 새로고침 후 다시 시도해주세요"
+            });
+            this._moving = false;
         }
-
-        // 모든 이동 단계 소진 — 정지 없이 최대 10층 전진 완료
-        this._stopHuntingMoveForChoice(app, {
-            message: `${MAX_STEPS}층 전진 완료 — ${this._run.floor}층`,
-            canRetreat: false,
-            floor: this._run.floor
-        });
     }
 
     _setHuntingMoveState({ moving, step, maxSteps, startFloor, targetFloor, message }) {
@@ -426,13 +443,14 @@ export class HuntingManager {
         this._startFloorBattle();
     }
 
-    _stopHuntingMoveForChoice(app, { message, canRetreat, floor }) {
+    _stopHuntingMoveForChoice(app, { message, canRetreat, floor, summary = "" }) {
         app.ui.setHuntingOverlayState({
             huntingMoving: false,
             huntingChoiceVisible: true,
             huntingCanRetreat: canRetreat,
             huntingFloor: floor,
-            huntingMoveMessage: message
+            huntingMoveMessage: message,
+            huntingLootSummary: summary || `현재 ${floor}층 · 10층 전진 가능`
         });
         this._moving = false;
     }

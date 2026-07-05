@@ -1005,6 +1005,23 @@ function testRenderPlayerSetupCopiesAllocation(app) {
         equipmentSummary,
         "Player panel store should sync the current equipment summary"
     );
+    controller.renderTournament({ champion: null, rounds: [] });
+    assert.equal(
+        globalThis.Alpine.store("huntingButton").tournamentActive,
+        true,
+        "Hunting button should stay hidden while a tournament is running"
+    );
+    controller.renderTournament({ champion: app.roster[0], rounds: [] });
+    assert.equal(
+        globalThis.Alpine.store("huntingButton").tournamentActive,
+        false,
+        "Hunting button should become available immediately after a tournament champion is decided"
+    );
+    assert.equal(
+        globalThis.Alpine.store("huntingButton").available,
+        true,
+        "Hunting button should be available when huntingAvailable is true in player setup"
+    );
     const previousQuerySelector = globalThis.document.querySelector;
     const previousData = globalThis.Alpine.$data;
     const previousOpenCollectionHub = state.openCollectionHub;

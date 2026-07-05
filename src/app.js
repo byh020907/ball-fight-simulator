@@ -1155,6 +1155,7 @@ export class BattleApp {
         }
 
         this.ui.renderTournament(this.tournament);
+        this.refreshPlayerSetup();
         this.ui.showOverlay(
             playerWon ? "축하합니다!" : "토너먼트 종료",
             playerWon

@@ -28,12 +28,20 @@
             </div>
             <div class="hunting-route-foot">
                 <span x-text="$store.gameOverlay.huntingMoveMessage"></span>
-                <b x-text="($store.gameOverlay.huntingMoveStep || 0) + '/' + ($store.gameOverlay.huntingMoveMax || 10)"></b>
+                <b
+                    x-text="($store.gameOverlay.huntingMoveStep || 0) + '/' + ($store.gameOverlay.huntingMoveMax || 10)"
+                ></b>
             </div>
         </div>
-        <div class="hunting-choice" x-show="$store.gameOverlay.huntingChoiceVisible && !$store.gameOverlay.huntingMoving">
+        <div
+            class="hunting-choice"
+            x-show="$store.gameOverlay.huntingChoiceVisible && !$store.gameOverlay.huntingMoving"
+        >
             <div class="hunting-choice-info">
                 <span x-text="$store.gameOverlay.huntingLootSummary"></span>
+            </div>
+            <div class="hunting-choice-hint" x-show="$store.gameOverlay.huntingMoveMessage">
+                <span x-text="$store.gameOverlay.huntingMoveMessage"></span>
             </div>
             <div class="hunting-choice-buttons">
                 <button
@@ -231,6 +239,14 @@
     .hunting-choice-info {
         font-size: 0.75rem;
         color: #555555;
+        margin-bottom: 8px;
+        text-align: center;
+    }
+
+    .hunting-choice-hint {
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: #d4a017;
         margin-bottom: 8px;
         text-align: center;
     }
