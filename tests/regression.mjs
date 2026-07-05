@@ -26,6 +26,7 @@ import {
     sanitizePlayerProfile
 } from "../src/playerProfile.js";
 import { completeChallengeTournament, formatBonusSummary } from "../src/progression/progressionState.js";
+import { HuntingManager } from "../src/hunting/huntingManager.js";
 import {
     advanceHuntingRun,
     canEnterHunting,
@@ -1187,6 +1188,59 @@ function testHuntingUiRouteDisplay() {
         assert.equal(state3.huntingMoveTo, 17, "Route end should stay 17F at step 3");
     } finally {
         app.ui = originalUi;
+    }
+}
+
+async function testHuntingEarlyEventUi() {
+    // 첫 층에서 포탈 이벤트 발생 시 choice UI가 정상 표시되고 route가 숨겨지는지 검증
+    const overlayCalls = [];
+    const mockUi = {
+        setHuntingOverlayState(data) {
+            overlayCalls.push({ ...data });
+        },
+        addLog() {},
+        showToast() {},
+        setHuntingActive() {},
+        hideOverlay() {},
+        setStartButton() {},
+        showOverlay() {}
+    };
+    const mockApp = { ui: mockUi, roster: app.roster, playerProfile: createDefaultPlayerProfile() };
+    const manager = new HuntingManager(mockApp);
+
+    // rng sequence: 첫 호출(floor outcome)=0.5→EVENT, 둘째 호출(weighted event)=0.05→PORTAL
+    const rngSeq = [0.5, 0.05];
+    let rngIdx = 0;
+    const origRandom = Math.random;
+    Math.random = () => rngSeq[rngIdx++] ?? 0;
+
+    // setTimeout을 즉시 resolve하도록 mock
+    const origSetTimeout = globalThis.setTimeout;
+    globalThis.setTimeout = (fn, ms) => {
+        if (ms === 350) {
+            fn();
+            return { unref() {} };
+        }
+        return origSetTimeout(fn, ms);
+    };
+
+    try {
+        manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE });
+        await manager.advance();
+
+        // 마지막 overlay 상태가 choice UI여야 함
+        const choiceStates = overlayCalls.filter((s) => s.huntingChoiceVisible === true);
+        assert.ok(choiceStates.length >= 1, "선택 이벤트 후 choice UI가 최소 1회 호출되어야 함");
+        const lastState = choiceStates[choiceStates.length - 1];
+        assert.equal(lastState.huntingMoving, false, "선택 이벤트 후 huntingMoving은 false여야 함");
+        assert.equal(lastState.huntingMoveTo, 0, "선택 이벤트 후 huntingMoveTo는 0으로 초기화되어야 함");
+        assert.equal(lastState.huntingMoveFrom, 0, "선택 이벤트 후 huntingMoveFrom은 0으로 초기화되어야 함");
+        assert.equal(lastState.huntingMoveStep, 0, "선택 이벤트 후 huntingMoveStep은 0으로 초기화되어야 함");
+        assert.equal(manager._moving, false, "선택 이벤트 후 _moving은 false로 풀려야 함");
+        assert.equal(manager._run.lastEvent?.type, HUNTING_EVENT_TYPES.PORTAL, "첫 층에서 포탈 이벤트가 발생해야 함");
+    } finally {
+        Math.random = origRandom;
+        globalThis.setTimeout = origSetTimeout;
     }
 }
 
@@ -5155,6 +5209,7 @@ testStatAllocationUiSyncEvent();
 testRenderPlayerSetupCopiesAllocation(app);
 testComponentBridgeCallsGameHandlers(app);
 testHuntingUiRouteDisplay();
+await testHuntingEarlyEventUi();
 testComponentBridgeEquipmentFunctions();
 await testBattleAppAdoptsPreExistingAlpineAllocation();
 testIndexCacheVersionMatchesLatestPatchNote();

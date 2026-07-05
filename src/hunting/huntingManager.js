@@ -505,6 +505,10 @@ export class HuntingManager {
             huntingChoiceVisible: true,
             huntingCanRetreat: canRetreat,
             huntingFloor: floor,
+            huntingMoveFrom: 0,
+            huntingMoveTo: 0,
+            huntingMoveStep: 0,
+            huntingMoveMax: HUNTING_ADVANCE_STEPS,
             huntingMoveMessage: message,
             huntingLootSummary: summary || `현재 ${floor}층 · 10층 전진 가능`
         });

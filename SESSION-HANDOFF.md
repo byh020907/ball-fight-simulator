@@ -1,5 +1,11 @@
 # 결정 기록
 
+## [L1] 2026-07-06 — 사냥터 초반 선택 이벤트에서 진행 UI가 막히지 않게 정리
+- 맥락: 첫 번째나 두 번째 층에서 선택 이벤트(포탈/방랑 상인)가 발생하면 route 진행 상태가 남아 선택 UI가 가려지거나 진행이 막힘. `huntingMoveTo > 0`이 stale 상태로 남아 route UI가 계속 표시되고 choice UI와 겹치는 문제.
+- 결정: (1) `_stopHuntingMoveForChoice()`에서 route 상태 완전 초기화(huntingMoveFrom/MoveTo/Step=0, MoveMax=10). (2) game-overlay.html의 route 표시 조건을 `huntingMoving || huntingMoveTo > 0` → `huntingMoving`으로 변경 (stale route 방지). (3) `Math.random` mock + `setTimeout` mock으로 첫층 포탈 시나리오 테스트 추가.
+- 영향: `src/hunting/huntingManager.js`, `src/components/game-overlay.html`, `tests/regression.mjs`, `SESSION-HANDOFF.md`
+- 검증: `npm test` (9개 스위트), `npm run check`, `npm run format:check` 통과
+
 ## [L1] 2026-07-06 — 사냥터 이동 구간 표시를 10층 전진 기준으로 고정
 - 맥락: 사냥터 이동 UI에서 진행 바는 10층 전진 기준인데 좌우 층 표시는 매 1층 이동의 현재/다음층(7F→8F)으로 바뀌어 의미가 어긋남.
 - 결정: `advance()`에서 `routeStartFloor`/`routeEndFloor`/`routeMaxSteps`를 루프 전 한 번 계산. `_setHuntingMoveState`에 `routeStartFloor`/`routeEndFloor` 전달. 95층처럼 끝에 가까우면 routeMaxSteps가 5로 clamp. 중간 정지 시에도 route head는 시작/목표 구간 유지, message만 실제 층 표시.
