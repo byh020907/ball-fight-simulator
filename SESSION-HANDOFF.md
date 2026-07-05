@@ -1,5 +1,17 @@
 # 결정 기록
 
+## [L1] 2026-07-05 — 장비 렌더링 가독성 개선 (얼굴 침범 방지 + 슬롯별 시각 언어)
+- 맥락: 장비 외형이 캐릭터 얼굴 영역을 가로질러 "이상한 폴리곤"처럼 보이는 문제. terrain polygon 버그가 아니라 장비 배치/형태의 시각 언어 문제.
+- 결정: (1) Weapon: 칼날을 몸 중심을 가로지르는 대신 오른쪽 하단(angle=0.75 rad)으로 배치, 손잡이 이중 레일, 칼날 중앙선 추가. (2) Armor: 중앙 대형 육각 방패 대신 어깨 보호대(좌우 상단 호) + 하단 흉갑 호로 분리. (3) Accessory: 4방향 분산 배치(1.28/0.72/0.35/1.65 rad), 연결 링크 추가. (4) drawEquipmentItems에 ctx.save/restore 추가.
+- 영향: `src/entities/equipmentVisuals.js`, `SESSION-HANDOFF.md`
+- 검증: `npm test` (9개 스위트), `npm run check`, `npm run format:check` 통과
+
+## [L1] 2026-07-05 — terrain/body drawing ctx state 누수 방지 (save/restore)
+- 맥락: terrainRenderer, _drawArenaBackground, _drawPolygonBody가 ctx.fillStyle/strokeStyle/lineWidth를 save/restore 없이 변경해 후속 face/equipment drawing에 누수.
+- 결정: terrainRenderer의 drawCircleTerrain/drawPolygonTerrain, ui.js의 _drawArenaBackground, battleBall.js의 _drawPolygonBody에 ctx.save()/try-finally/restore() 적용.
+- 영향: `src/terrain/terrainRenderer.js`, `src/ui.js`, `src/entities/battleBall.js`, `tests/regression.mjs`, `SESSION-HANDOFF.md`
+- 검증: `npm test` (9개 스위트), `npm run check`, `npm run format:check` 통과
+
 ## [L1] 2026-07-05 — 컬렉션 허브 장비 버튼 bridge 참조 오류 수정 + 장착/해제 저장 누락
 - 맥락: collection-hub.html의 bridge가 `window.ballFightApp?.bridge` 또는 `window.CollectionHubService`를 참조 → 실제 장비 함수(`equipItem`, `unequipItem` 등)는 `window.BallFightComponentBridge`에만 존재 → Alpine 런타임 에러 `bridge.equipItem is not a function`.
 - 결정: (1) bridge 참조 우선순위를 `window.BallFightComponentBridge`로 교정. (2) `componentBridge.js`의 `equipItem`/`unequipItem`에 `savePlayerProfile()` 호출 추가 (다른 장비 함수들과 일관성 확보, 새로고침 후 장착 상태 유지). (3) bridge 장비 함수 존재 여부 및 equip/unequip 저장 검증 테스트 추가.
