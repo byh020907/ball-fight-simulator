@@ -41,6 +41,12 @@ export const HUNTING_EVENT_CHANCE = Object.freeze({
     MAX: 0.35
 });
 
+export const HUNTING_COMBAT_RELIEF = Object.freeze({
+    INITIAL_FLOORS: 3,
+    COMBAT_MULT: Object.freeze([1.0, 0.75, 0.55, 0.35]),
+    EVENT_TRANSFER: Object.freeze([0.0, 0.55, 0.65, 0.7])
+});
+
 export const HUNTING_FLOOR_OUTCOME_TYPES = Object.freeze({
     EMPTY: "empty",
     COMBAT: "combat",

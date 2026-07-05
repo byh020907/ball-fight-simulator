@@ -214,7 +214,25 @@ rewardMultiplier = 1 + (floor - 1) * 0.15
   empty:  ~30%  (깊을수록 ↓)
 ```
 
-### 7.1 이벤트 유형
+### 6.1 전투 직후 완충 (Combat Relief)
+
+전투 승리 직후에는 다음 3층 동안 전투 확률이 감소하고 이벤트 확률이 증가합니다.
+이는 연속 전투로 인한 피로감을 줄이기 위한 장치입니다.
+
+```text
+HUNTING_COMBAT_RELIEF.INITIAL_FLOORS = 3
+
+전투 승리 시 combatReliefFloors = 3
+  relief=3: combat × 0.35  event + (감소분 × 0.7)
+  relief=2: combat × 0.55  event + (감소분 × 0.65)
+  relief=1: combat × 0.75  event + (감소분 × 0.55)
+  relief=0: 기본 확률
+
+층 이동마다 relief는 1씩 감소.
+100층 final_boss는 완충 영향을 받지 않음.
+```
+
+### 7. 층 판정과 이벤트
 
 | 이벤트 | 코드 | 동작 | 정지 여부 |
 | --- | --- | --- | --- |

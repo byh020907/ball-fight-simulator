@@ -55,6 +55,7 @@ import {
     rollShardReward,
     scaleEnemySpecForHunting,
     HUNTING_ARENA,
+    HUNTING_COMBAT_RELIEF,
     HUNTING_ENEMY_TYPES,
     HUNTING_EVENT_TYPES,
     HUNTING_FLOOR_OUTCOME_TYPES,
@@ -1674,6 +1675,122 @@ function testHunting100FloorStructure() {
     assert.equal(overlayStore.huntingMoveMessage, "", "gameOverlay huntingMoveMessage default should be empty");
 
     console.log("[hunting-floors] ok");
+}
+
+function testHuntingCombatRelief() {
+    // ── 기본 확률 vs 완충 확률 ──
+    const baseChances = getHuntingFloorChances(1, 0);
+    const relief3 = getHuntingFloorChances(1, 3);
+    const relief2 = getHuntingFloorChances(1, 2);
+    const relief1 = getHuntingFloorChances(1, 1);
+
+    // 완충 중 combatChance는 기본보다 낮아야 함
+    assert.ok(relief3.combatChance < baseChances.combatChance, "Relief 3 should reduce combat chance");
+    assert.ok(relief2.combatChance < baseChances.combatChance, "Relief 2 should reduce combat chance");
+    assert.ok(relief1.combatChance < baseChances.combatChance, "Relief 1 should reduce combat chance");
+
+    // 완충 중 eventChance는 기본보다 높아야 함
+    assert.ok(relief3.eventChance > baseChances.eventChance, "Relief 3 should increase event chance");
+    assert.ok(relief2.eventChance > baseChances.eventChance, "Relief 2 should increase event chance");
+    assert.ok(relief1.eventChance > baseChances.eventChance, "Relief 1 should increase event chance");
+
+    // relief=0이면 기본값과 동일
+    assert.equal(
+        relief3.combatChance,
+        getHuntingFloorChances(1, 3).combatChance,
+        "Same relief should give same result"
+    );
+    const zeroRelief = getHuntingFloorChances(1, 0);
+    assert.equal(zeroRelief.combatChance, baseChances.combatChance, "Zero relief should equal base");
+    assert.equal(zeroRelief.eventChance, baseChances.eventChance, "Zero relief should equal base");
+
+    // 확률은 항상 0~1 범위이며 합이 ~1
+    for (const chances of [relief3, relief2, relief1, baseChances]) {
+        assert.ok(chances.combatChance >= 0 && chances.combatChance <= 1, "Combat chance should be in [0,1]");
+        assert.ok(chances.eventChance >= 0 && chances.eventChance <= 1, "Event chance should be in [0,1]");
+        assert.ok(chances.emptyChance >= 0 && chances.emptyChance <= 1, "Empty chance should be in [0,1]");
+        assert.ok(
+            Math.abs(chances.combatChance + chances.eventChance + chances.emptyChance - 1) < 0.01,
+            "Chances should sum to ~1"
+        );
+    }
+
+    // 완충은 점진적으로 약해짐 (단조성)
+    assert.ok(relief3.combatChance < relief2.combatChance, "More relief → lower combat chance");
+    assert.ok(relief2.combatChance < relief1.combatChance, "Less relief → higher combat chance (approaching base)");
+
+    // deep floor에서도 완충 작동
+    const deepBase = getHuntingFloorChances(90, 0);
+    const deepRelief = getHuntingFloorChances(90, 3);
+    assert.ok(deepRelief.combatChance < deepBase.combatChance, "Deep floor relief should still reduce combat");
+
+    // ── 100층은 완충 무시하고 항상 final_boss ──
+    const bossOutcome = rollHuntingFloorOutcome(100, () => 0, 3);
+    assert.equal(
+        bossOutcome.type,
+        HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS,
+        "Floor 100 should be final_boss even with combat relief"
+    );
+
+    // ── combatReliefFloors 설정/소비 ──
+    const run = createHuntingRun({ characterId: FIGHTER_IDS.DASH });
+    assert.equal(run.combatReliefFloors ?? 0, 0, "New run should have no combat relief");
+
+    // 전투 클리어 시 relief 설정
+    const afterCombat = recordHuntingFloorResult(run, {
+        hpRemain: 50,
+        maxHp: 100,
+        loot: { shards: 0, chests: [], xp: 0 },
+        combatCleared: true
+    });
+    assert.equal(
+        afterCombat.combatReliefFloors,
+        HUNTING_COMBAT_RELIEF.INITIAL_FLOORS,
+        "Combat clear should set initial relief floors"
+    );
+
+    // 비전투 이벤트에서는 relief 유지
+    const afterEvent = recordHuntingFloorResult(afterCombat, {
+        hpRemain: 50,
+        maxHp: 100,
+        loot: { shards: 10, chests: [], xp: 0 },
+        consumeStatModifiers: false
+    });
+    assert.equal(
+        afterEvent.combatReliefFloors,
+        HUNTING_COMBAT_RELIEF.INITIAL_FLOORS,
+        "Non-combat event should preserve relief"
+    );
+
+    // ── advanceHuntingRun이 relief를 소비 ──
+    const afterAdvance = advanceHuntingRun(afterCombat, { rng: () => 0.9 });
+    assert.equal(
+        afterAdvance.combatReliefFloors,
+        HUNTING_COMBAT_RELIEF.INITIAL_FLOORS - 1,
+        "Advance should decrement relief by 1"
+    );
+
+    // 연속 전진으로 relief 완전 소비
+    const twiceAdvanced = advanceHuntingRun(afterAdvance, { rng: () => 0.9 });
+    assert.equal(twiceAdvanced.combatReliefFloors, 1, "Two advances should leave relief at 1");
+    const thriceAdvanced = advanceHuntingRun(twiceAdvanced, { rng: () => 0.9 });
+    assert.equal(thriceAdvanced.combatReliefFloors, 0, "Three advances should exhaust relief");
+    const fourthAdvanced = advanceHuntingRun(thriceAdvanced, { rng: () => 0.9 });
+    assert.equal(fourthAdvanced.combatReliefFloors, 0, "Relief should not go below 0");
+
+    // ── combatCleared=false는 relief 재설정 안 함 ──
+    const noReset = recordHuntingFloorResult(afterCombat, {
+        hpRemain: 50,
+        maxHp: 100,
+        combatCleared: false
+    });
+    assert.equal(
+        noReset.combatReliefFloors,
+        HUNTING_COMBAT_RELIEF.INITIAL_FLOORS,
+        "combatCleared=false should keep existing relief"
+    );
+
+    console.log("[hunting-relief] ok");
 }
 
 function testEquipmentEnhancement() {
@@ -4495,6 +4612,7 @@ await testGrenadeScatterShot(app);
 testExperienceSystem();
 testHuntingSystem();
 testHunting100FloorStructure();
+testHuntingCombatRelief();
 testEquipmentEnhancement();
 testEquipmentLevelRequirement();
 testEquipmentDraw();

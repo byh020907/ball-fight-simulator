@@ -1,4 +1,10 @@
-import { HUNTING_MAX_FLOOR, HUNTING_STAGE_IDS, HUNTING_STAGES, HUNTING_STAT_KEYS } from "./huntingConfig.js";
+import {
+    HUNTING_MAX_FLOOR,
+    HUNTING_STAGE_IDS,
+    HUNTING_STAGES,
+    HUNTING_STAT_KEYS,
+    HUNTING_COMBAT_RELIEF
+} from "./huntingConfig.js";
 import { applyDefeatPreservation, createEmptyHuntingLoot, mergeHuntingLoot } from "./huntingRewards.js";
 import { getNextHuntingStageId, rollHuntingFloorOutcome } from "./huntingEncounters.js";
 import { HUNTING_EVENT_TYPES } from "./huntingConfig.js";
@@ -146,13 +152,21 @@ export function consumeHuntingStatModifierFloor(run) {
 
 export function recordHuntingFloorResult(
     run,
-    { hpRemain = null, maxHp = null, loot = createEmptyHuntingLoot(), consumeStatModifiers = true } = {}
+    {
+        hpRemain = null,
+        maxHp = null,
+        loot = createEmptyHuntingLoot(),
+        consumeStatModifiers = true,
+        combatCleared = false
+    } = {}
 ) {
     if (!run || run.status !== "active") return run;
     const consumed = consumeStatModifiers ? consumeHuntingStatModifierFloor(run) : run;
+    const combatReliefFloors = combatCleared ? HUNTING_COMBAT_RELIEF.INITIAL_FLOORS : (run.combatReliefFloors ?? 0);
     return {
         ...run,
         statModifiers: consumed.statModifiers,
+        combatReliefFloors,
         carriedHp: hpRemain === null ? run.carriedHp : Math.max(0, hpRemain),
         carriedMaxHp: maxHp === null ? run.carriedMaxHp : Math.max(0, maxHp),
         pendingLoot: mergeHuntingLoot(run.pendingLoot, loot),
@@ -176,11 +190,13 @@ export function advanceHuntingRun(run, { rng = Math.random } = {}) {
     }
 
     const nextFloor = Math.min(run.maxFloor, run.floor + 1);
-    const encounter = rollHuntingFloorOutcome(nextFloor, rng);
+    const currentRelief = Math.max(0, (run.combatReliefFloors ?? 0) - 1);
+    const encounter = rollHuntingFloorOutcome(nextFloor, rng, currentRelief);
     const event = encounter.type === "event" ? encounter.event : null;
     return {
         ...run,
         floor: nextFloor,
+        combatReliefFloors: currentRelief,
         lastEvent: event,
         lastEncounter: encounter,
         history: [

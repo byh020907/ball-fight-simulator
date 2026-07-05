@@ -1,5 +1,11 @@
 # 결정 기록
 
+## [L1] 2026-07-05 — 전투 직후 확률 완충 시스템 + 이동 UI stale floor 버그 수정
+- 맥락: (1) 사냥터 전투가 너무 자주 발생해 연속 전투 피로감 크다는 제보. (2) 전투 후 재전진 시 UI가 이전 전투 층을 기준으로 표시되는 버그.
+- 결정: (1) `HUNTING_COMBAT_RELIEF` 상수 도입 (INITIAL_FLOORS=3). 전투 승리 후 `recordHuntingFloorResult(..., combatCleared: true)`로 relief 설정. `getHuntingFloorChances(floor, combatReliefFloors)`가 완충 단계에 따라 combat×0.35~0.75, event+(감소분×0.55~0.7)로 조정. `advanceHuntingRun()`이 층 이동마다 relief 1 감소. 100층은 완충 무시. (2) `HuntingManager.advance()`에서 `startFloor` 대신 `this._run.floor` 기준으로 UI 표시하도록 수정.
+- 영향: `src/hunting/huntingConfig.js`(HUNTING_COMBAT_RELIEF 상수), `src/hunting/huntingEncounters.js`(getHuntingFloorChances/rollHuntingFloorOutcome 확장), `src/hunting/huntingState.js`(recordHuntingFloorResult/advanceHuntingRun), `src/hunting/huntingManager.js`(UI stale floor 수정, combatCleared 전달), `tests/regression.mjs`(hunting-relief 테스트 그룹), `docs/hunting-grounds-system.md`(§6.1 완충 규칙)
+- 검증: `npm test`, `npm run check`, `npm run format:check`, `node scripts/huntingUserScenario.mjs` 통과
+
 ## [L1] 2026-07-05 — 사냥터 버그 2건 수정: 첫 우승 후 버튼 미노출 / 이동 멈춤 혼동
 - 맥락: 사용자 제보로 발견된 버그 2건. (1) 첫 토너먼트 우승 후 사냥터 버튼이 새로고침 전까지 나타나지 않음. (2) 사냥터 10층 전진이 2층에서 멈춘 것처럼 보이고, 다음 행동을 알려주지 않아 혼란.
 - 결정: (1) `UIController.renderTournament()`에서 챔피언 결정 시 `tournamentActive = !tournament.champion`(false)로 설정하고, `showTournamentChampion()`에서 `refreshPlayerSetup()`을 호출해 `huntingAvailable`을 즉시 재계산. (2) `advance()`에 try-catch 안전장치 추가해 `_moving` 플래그 고착 방지. (3) 전투 승리 후 `huntingMoveMessage`에 "10층 전진 가능" 메시지 추가. (4) 포탈/상인 이벤트에서 `huntingLootSummary`로 현재 상태와 가능한 행동 표시. (5) `game-overlay.html`에 `.hunting-choice-hint` 요소 추가해 이동 상태 메시지를 선택 영역에서도 표시.

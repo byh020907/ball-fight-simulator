@@ -7,7 +7,8 @@ import {
     HUNTING_SCALING,
     HUNTING_MAX_FLOOR,
     HUNTING_STAGES,
-    HUNTING_STAGE_IDS
+    HUNTING_STAGE_IDS,
+    HUNTING_COMBAT_RELIEF
 } from "./huntingConfig.js";
 
 const DEFAULT_RNG = () => Math.random();
@@ -74,15 +75,24 @@ export function getHuntingStageArena(stageId = HUNTING_STAGE_IDS.CAVE) {
     return getHuntingStage(stageId).arena;
 }
 
-export function getHuntingFloorChances(floor) {
+export function getHuntingFloorChances(floor, combatReliefFloors = 0) {
     const safe = safeFloor(floor);
     const depth = Math.min(1, safe / HUNTING_MAX_FLOOR);
     const combatChance = 0.35 + depth * 0.35;
     const eventChance = HUNTING_EVENT_CHANCE.MAX - (HUNTING_EVENT_CHANCE.MAX - HUNTING_EVENT_CHANCE.MIN) * depth;
+
+    const relief = Math.min(Math.max(0, combatReliefFloors), HUNTING_COMBAT_RELIEF.COMBAT_MULT.length - 1);
+    const combatMult = HUNTING_COMBAT_RELIEF.COMBAT_MULT[relief];
+    const eventTransfer = HUNTING_COMBAT_RELIEF.EVENT_TRANSFER[relief];
+
+    const adjustedCombat = combatChance * combatMult;
+    const combatReduction = combatChance - adjustedCombat;
+    const adjustedEvent = Math.min(eventChance + combatReduction * eventTransfer, 1 - adjustedCombat);
+
     return {
-        combatChance: Number(combatChance.toFixed(3)),
-        eventChance: Number(eventChance.toFixed(3)),
-        emptyChance: Number(Math.max(0, 1 - combatChance - eventChance).toFixed(3))
+        combatChance: Number(adjustedCombat.toFixed(3)),
+        eventChance: Number(adjustedEvent.toFixed(3)),
+        emptyChance: Number(Math.max(0, 1 - adjustedCombat - adjustedEvent).toFixed(3))
     };
 }
 
@@ -189,7 +199,7 @@ export function rollHuntingEvent(floor, rng = DEFAULT_RNG) {
     return createHuntingEvent(HUNTING_MVP_EVENT_TYPES[index], safe, rng);
 }
 
-export function rollHuntingFloorOutcome(floor, rng = DEFAULT_RNG) {
+export function rollHuntingFloorOutcome(floor, rng = DEFAULT_RNG, combatReliefFloors = 0) {
     const safe = safeFloor(floor);
     if (safe >= HUNTING_MAX_FLOOR) {
         return {
@@ -199,7 +209,7 @@ export function rollHuntingFloorOutcome(floor, rng = DEFAULT_RNG) {
         };
     }
 
-    const chances = getHuntingFloorChances(safe);
+    const chances = getHuntingFloorChances(safe, combatReliefFloors);
     const roll = rng();
     if (roll < chances.combatChance) {
         return {

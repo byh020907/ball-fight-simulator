@@ -219,7 +219,8 @@ export class HuntingManager {
             this._run = recordHuntingFloorResult(run, {
                 hpRemain: Math.ceil(playerBall?.hp ?? run.carriedHp ?? 0),
                 maxHp: playerBall?.maxHp ?? run.carriedMaxHp,
-                loot: floorLoot
+                loot: floorLoot,
+                combatCleared: true
             });
 
             const name = playerBall?.name ?? run.characterId;
@@ -325,12 +326,13 @@ export class HuntingManager {
             const FLOOR_STEP_MS = 350;
 
             for (let step = 0; step < MAX_STEPS; step++) {
-                const targetFloor = Math.min(run.maxFloor, startFloor + step + 1);
+                const fromFloor = this._run.floor;
+                const targetFloor = Math.min(this._run.maxFloor, fromFloor + 1);
                 this._setHuntingMoveState({
                     moving: true,
                     step: step + 1,
                     maxSteps: MAX_STEPS,
-                    startFloor,
+                    startFloor: fromFloor,
                     targetFloor,
                     message: `${targetFloor}층으로 이동 중…`
                 });
