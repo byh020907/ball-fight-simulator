@@ -54,6 +54,8 @@ export function createHuntingRun({
         securedLoot: createEmptyHuntingLoot(),
         lastEvent: null,
         lastEncounter: null,
+        combatReliefFloors: 0,
+        portalDeclineFloors: 0,
         history: [],
         startedAt: now,
         endedAt: null
@@ -192,12 +194,18 @@ export function advanceHuntingRun(run, { rng = Math.random } = {}) {
     const nextFloor = Math.min(run.maxFloor, run.floor + 1);
     const reliefForRoll = Math.max(0, run.combatReliefFloors ?? 0);
     const nextRelief = Math.max(0, reliefForRoll - 1);
-    const encounter = rollHuntingFloorOutcome(nextFloor, rng, reliefForRoll);
+    const nextPortalDecline = Math.max(0, (run.portalDeclineFloors ?? 0) - 1);
+    const hpRatio = run.carriedMaxHp > 0 ? (run.carriedHp ?? run.carriedMaxHp) / run.carriedMaxHp : 1.0;
+    const encounter = rollHuntingFloorOutcome(nextFloor, rng, reliefForRoll, {
+        hpRatio,
+        portalDeclineFloors: run.portalDeclineFloors ?? 0
+    });
     const event = encounter.type === "event" ? encounter.event : null;
     return {
         ...run,
         floor: nextFloor,
         combatReliefFloors: nextRelief,
+        portalDeclineFloors: nextPortalDecline,
         lastEvent: event,
         lastEncounter: encounter,
         history: [

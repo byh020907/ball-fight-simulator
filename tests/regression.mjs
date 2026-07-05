@@ -39,6 +39,7 @@ import {
     getEligibleHuntingCharacters,
     getEnemyPowerMultiplier,
     getHuntingFloorChances,
+    getHuntingPortalWeightMultiplier,
     getHuntingStage,
     getHuntingStageArena,
     getNextHuntingStageId,
@@ -60,6 +61,7 @@ import {
     HUNTING_EVENT_TYPES,
     HUNTING_FLOOR_OUTCOME_TYPES,
     HUNTING_MONSTER_TYPES,
+    HUNTING_PORTAL_DECLINE,
     HUNTING_STAGE_IDS,
     HUNTING_TEAMS,
     createHuntingMinibossSpec,
@@ -1811,6 +1813,112 @@ function testHuntingCombatRelief() {
     );
 
     console.log("[hunting-relief] ok");
+}
+
+function testHuntingPortalDecline() {
+    // ── portal weight multiplier ──
+    assert.equal(getHuntingPortalWeightMultiplier(0.6, 0), 1.0, "HP >= 50% should use base portal weight");
+    assert.equal(getHuntingPortalWeightMultiplier(0.5, 0), 1.0, "HP >= 50% boundary should use base portal weight");
+    assert.equal(getHuntingPortalWeightMultiplier(0.4, 0), 1.8, "HP 30-50% should increase portal weight");
+    assert.equal(getHuntingPortalWeightMultiplier(0.3, 0), 1.8, "HP 30% boundary should use mid-tier portal weight");
+    assert.equal(getHuntingPortalWeightMultiplier(0.2, 0), 3.0, "HP < 30% should strongly increase portal weight");
+    assert.equal(getHuntingPortalWeightMultiplier(0.01, 0), 3.0, "Very low HP should use max portal weight");
+
+    // ── portal decline suppresses HP boost ──
+    assert.equal(getHuntingPortalWeightMultiplier(0.2, 1), 1.0, "Portal decline should suppress HP boost to 1.0");
+    assert.equal(getHuntingPortalWeightMultiplier(0.2, 5), 1.0, "Full decline should suppress HP boost");
+    assert.equal(
+        getHuntingPortalWeightMultiplier(0.6, 3),
+        1.0,
+        "Decline should keep base weight at 1.0 regardless of HP"
+    );
+
+    // ── invalid HP → base weight ──
+    assert.equal(getHuntingPortalWeightMultiplier(-1, 0), 1.0, "Negative HP should use base weight");
+    assert.equal(getHuntingPortalWeightMultiplier(NaN, 0), 1.0, "NaN HP should use base weight");
+
+    // ── low HP makes portal more likely in weighted selection ──
+    // 8 event types, base portal weight = 1/8. low-HP: portal mult=3 →
+    // portal weight=3, others=1, total=10, portal prob=3/10=0.3
+    // rng seq [0.5, 0.2]: 0.5→EVENT, 0.2 picks:
+    //   base (mult=1): 0.2*8=1.6 → index 1 = WANDERING_MERCHANT
+    //   high (mult=3): 0.2*10=2.0 → index 0 = PORTAL
+
+    const outcomeBase = rollHuntingFloorOutcome(
+        1,
+        (() => {
+            const seq = [0.5, 0.2];
+            let i = 0;
+            return () => seq[i++] ?? 0;
+        })(),
+        0,
+        { hpRatio: 0.6, portalDeclineFloors: 0 }
+    );
+    assert.equal(outcomeBase.type, HUNTING_FLOOR_OUTCOME_TYPES.EVENT, "Should be event");
+    assert.equal(
+        outcomeBase.event.type,
+        HUNTING_EVENT_TYPES.WANDERING_MERCHANT,
+        "Base HP should give non-portal event at rng=0.2"
+    );
+
+    const outcomeLowHp = rollHuntingFloorOutcome(
+        1,
+        (() => {
+            const seq = [0.5, 0.2];
+            let i = 0;
+            return () => seq[i++] ?? 0;
+        })(),
+        0,
+        { hpRatio: 0.2, portalDeclineFloors: 0 }
+    );
+    assert.equal(outcomeLowHp.type, HUNTING_FLOOR_OUTCOME_TYPES.EVENT, "Should be event");
+    assert.equal(outcomeLowHp.event.type, HUNTING_EVENT_TYPES.PORTAL, "Low HP should give portal at rng=0.2");
+
+    // ── portal decline floors suppress the low-HP boost ──
+    const outcomeDeclined = rollHuntingFloorOutcome(
+        1,
+        (() => {
+            const seq = [0.5, 0.2];
+            let i = 0;
+            return () => seq[i++] ?? 0;
+        })(),
+        0,
+        { hpRatio: 0.2, portalDeclineFloors: 3 }
+    );
+    assert.equal(outcomeDeclined.type, HUNTING_FLOOR_OUTCOME_TYPES.EVENT, "Should be event");
+    assert.equal(
+        outcomeDeclined.event.type,
+        HUNTING_EVENT_TYPES.WANDERING_MERCHANT,
+        "Portal decline should suppress low-HP portal boost"
+    );
+
+    // ── 100층 final_boss unaffected by portal weighting ──
+    const bossOutcome = rollHuntingFloorOutcome(100, () => 0, 0, { hpRatio: 0.1, portalDeclineFloors: 0 });
+    assert.equal(
+        bossOutcome.type,
+        HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS,
+        "Floor 100 should be final_boss even with low HP and high portal weight"
+    );
+
+    // ── portalDeclineFloors decrements in advanceHuntingRun ──
+    const run = createHuntingRun({ characterId: FIGHTER_IDS.DASH });
+    const runWithDecline = { ...run, portalDeclineFloors: 5, status: "active" };
+    const advanced1 = advanceHuntingRun(runWithDecline, { rng: () => 0.9 });
+    assert.equal(advanced1.portalDeclineFloors, 4, "Advance should decrement portal decline by 1");
+    const advanced2 = advanceHuntingRun(advanced1, { rng: () => 0.9 });
+    assert.equal(advanced2.portalDeclineFloors, 3, "Second advance should decrement further");
+    // Exhaust decline
+    let runPtr = runWithDecline;
+    for (let i = 0; i < 6; i++) {
+        runPtr = advanceHuntingRun(runPtr, { rng: () => 0.9 });
+    }
+    assert.equal(runPtr.portalDeclineFloors, 0, "Portal decline should not go below 0");
+
+    // ── new run has portalDeclineFloors = 0 ──
+    const freshRun = createHuntingRun({ characterId: FIGHTER_IDS.DASH });
+    assert.equal(freshRun.portalDeclineFloors ?? 0, 0, "New run should start with no portal decline");
+
+    console.log("[hunting-portal] ok");
 }
 
 function testEquipmentEnhancement() {
@@ -4633,6 +4741,7 @@ testExperienceSystem();
 testHuntingSystem();
 testHunting100FloorStructure();
 testHuntingCombatRelief();
+testHuntingPortalDecline();
 testEquipmentEnhancement();
 testEquipmentLevelRequirement();
 testEquipmentDraw();

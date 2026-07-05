@@ -18,7 +18,8 @@ import {
     HUNTING_ADVANCE_STEPS,
     HUNTING_ENEMY_TYPES,
     HUNTING_EVENT_TYPES,
-    HUNTING_FLOOR_OUTCOME_TYPES
+    HUNTING_FLOOR_OUTCOME_TYPES,
+    HUNTING_PORTAL_DECLINE
 } from "./huntingConfig.js";
 import { getHuntingStage, getHuntingStageArena, getNextHuntingStageId } from "./huntingEncounters.js";
 import { applyEquipmentStats } from "./equipmentConfig.js";
@@ -316,6 +317,14 @@ export class HuntingManager {
         const app = this.app;
         const run = this._run;
         if (!run || run.status !== "active" || this._moving) return;
+
+        // 포탈에서 귀환하지 않고 전진을 선택한 경우, 거부 상태 설정
+        if (run.lastEvent?.type === HUNTING_EVENT_TYPES.PORTAL) {
+            this._run = {
+                ...this._run,
+                portalDeclineFloors: HUNTING_PORTAL_DECLINE.INITIAL_FLOORS
+            };
+        }
 
         this._moving = true;
         app.ui.setHuntingOverlayState({ huntingChoiceVisible: false });

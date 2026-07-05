@@ -8,7 +8,8 @@ import {
     HUNTING_MAX_FLOOR,
     HUNTING_STAGES,
     HUNTING_STAGE_IDS,
-    HUNTING_COMBAT_RELIEF
+    HUNTING_COMBAT_RELIEF,
+    HUNTING_PORTAL_DECLINE
 } from "./huntingConfig.js";
 
 const DEFAULT_RNG = () => Math.random();
@@ -59,6 +60,26 @@ export function shouldRollHuntingEvent(floor, rng = DEFAULT_RNG) {
 
 function rollIndex(length, rng = DEFAULT_RNG) {
     return Math.floor(Math.max(0, Math.min(0.999999, rng())) * length);
+}
+
+function rollWeightedEventType(rng, portalMultiplier = 1.0) {
+    const types = HUNTING_MVP_EVENT_TYPES;
+    const weights = types.map((type) => (type === HUNTING_EVENT_TYPES.PORTAL ? portalMultiplier : 1.0));
+    const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+    const roll = rng() * totalWeight;
+    let cumulative = 0;
+    for (let i = 0; i < weights.length; i++) {
+        cumulative += weights[i];
+        if (roll < cumulative) return types[i];
+    }
+    return types[types.length - 1];
+}
+
+export function getHuntingPortalWeightMultiplier(hpRatio, portalDeclineFloors = 0) {
+    if (!Number.isFinite(hpRatio) || hpRatio < 0) return 1.0;
+    if (portalDeclineFloors > 0) return 1.0;
+    const tier = HUNTING_PORTAL_DECLINE.HP_MULT.find((entry) => hpRatio >= entry.minRatio);
+    return tier ? tier.mult : 1.0;
 }
 
 export function getHuntingStage(stageId = HUNTING_STAGE_IDS.CAVE) {
@@ -199,7 +220,7 @@ export function rollHuntingEvent(floor, rng = DEFAULT_RNG) {
     return createHuntingEvent(HUNTING_MVP_EVENT_TYPES[index], safe, rng);
 }
 
-export function rollHuntingFloorOutcome(floor, rng = DEFAULT_RNG, combatReliefFloors = 0) {
+export function rollHuntingFloorOutcome(floor, rng = DEFAULT_RNG, combatReliefFloors = 0, context = {}) {
     const safe = safeFloor(floor);
     if (safe >= HUNTING_MAX_FLOOR) {
         return {
@@ -219,11 +240,9 @@ export function rollHuntingFloorOutcome(floor, rng = DEFAULT_RNG, combatReliefFl
         };
     }
     if (roll < chances.combatChance + chances.eventChance) {
-        const event = createHuntingEvent(
-            HUNTING_MVP_EVENT_TYPES[rollIndex(HUNTING_MVP_EVENT_TYPES.length, rng)],
-            safe,
-            rng
-        );
+        const portalMult = getHuntingPortalWeightMultiplier(context.hpRatio ?? 1.0, context.portalDeclineFloors ?? 0);
+        const eventType = rollWeightedEventType(rng, portalMult);
+        const event = createHuntingEvent(eventType, safe, rng);
         return {
             type: HUNTING_FLOOR_OUTCOME_TYPES.EVENT,
             floor: safe,

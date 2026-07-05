@@ -1,5 +1,11 @@
 # 결정 기록
 
+## [L1] 2026-07-05 — 저HP 포탈 확률 보정 + 포탈 거부 억제 시스템
+- 맥락: HP가 낮을 때 귀환 기회를 더 자주 제공하고, 포탈을 거부하면 일정 기간 포탈 반복을 억제하는 장치 필요.
+- 결정: (1) `HUNTING_PORTAL_DECLINE` 상수 추가 (INITIAL_FLOORS=5, HP_MULT: [≥50%:×1.0, ≥30%:×1.8, <30%:×3.0]). (2) `getHuntingPortalWeightMultiplier(hpRatio, portalDeclineFloors)`로 포탈 가중치 계산 — HP 낮을수록 높고, decline 중이면 ×1.0 고정. (3) `rollWeightedEventType()`로 균등→가중치 기반 이벤트 선택 전환. (4) `advanceHuntingRun()`이 `portalDeclineFloors`를 1씩 감소, `hpRatio`를 context로 전달. (5) `HuntingManager.advance()` 시작 시 이전 이벤트가 PORTAL이면 `portalDeclineFloors=5` 설정. (6) run 상태에 `portalDeclineFloors` 필드 추가 (기본 0).
+- 영향: `src/hunting/huntingConfig.js`(HUNTING_PORTAL_DECLINE), `src/hunting/huntingEncounters.js`(weighted event selection, getHuntingPortalWeightMultiplier, context 파라미터), `src/hunting/huntingState.js`(portalDeclineFloors, hpRatio 전달), `src/hunting/huntingManager.js`(portal decline 감지), `tests/regression.mjs`(hunting-portal 테스트 그룹), `docs/hunting-grounds-system.md`(§7.2), `SESSION-HANDOFF.md`
+- 검증: `npm test` (7개 스위트), `npm run check`, `npm run format:check`, `node scripts/huntingUserScenario.mjs` 통과
+
 ## [L1] 2026-07-05 — combat relief 적용 순서 수정 (판정 전 감소 → 판정 후 감소)
 - 맥락: 전투 직후 첫 층에 relief=2로 판정되는 버그. `advanceHuntingRun()`이 relief를 먼저 1 감소시킨 뒤 `rollHuntingFloorOutcome()`에 넘겨, 가장 강한 완충 단계(relief=3)를 건너뜀.
 - 결정: 판정 시점에는 현재 `run.combatReliefFloors` 값을 그대로 사용하고, 반환 run에만 1 감소한 값을 저장. 테스트로 rng=0.17을 사용해 relief=3에서 COMBAT이 아닌 EVENT가 나오는지 검증. `huntingManager.js`의 미사용 `startFloor` 변수 제거.

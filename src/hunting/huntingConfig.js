@@ -47,6 +47,15 @@ export const HUNTING_COMBAT_RELIEF = Object.freeze({
     EVENT_TRANSFER: Object.freeze([0.0, 0.55, 0.65, 0.7])
 });
 
+export const HUNTING_PORTAL_DECLINE = Object.freeze({
+    INITIAL_FLOORS: 5,
+    HP_MULT: Object.freeze([
+        Object.freeze({ minRatio: 0.5, mult: 1.0 }),
+        Object.freeze({ minRatio: 0.3, mult: 1.8 }),
+        Object.freeze({ minRatio: 0.0, mult: 3.0 })
+    ])
+});
+
 export const HUNTING_FLOOR_OUTCOME_TYPES = Object.freeze({
     EMPTY: "empty",
     COMBAT: "combat",
