@@ -14,15 +14,27 @@
 import { createDefaultPlayerProfile } from "../src/playerProfile.js";
 import { openHuntingChest } from "../src/hunting/chestRewards.js";
 import { createHuntingChest } from "../src/hunting/huntingRewards.js";
-import { rollShardReward } from "../src/hunting/huntingRewards.js";
 import { HUNTING_ENEMY_TYPES, HUNTING_SCALING } from "../src/hunting/huntingConfig.js";
-import { createRoster } from "../src/roster.js";
-import { getEquippedStatBonuses, applyEquipmentStats, EQUIPMENT_SLOTS } from "../src/hunting/equipmentConfig.js";
+import {
+    getEquippedStatBonuses,
+    applyEquipmentStats,
+    EQUIPMENT_SLOTS,
+    isInventoryFull,
+    canExpandInventory,
+    expandInventory,
+    disassembleEquipment,
+    fuseEquipment,
+    sellEquipment,
+    getInventoryUsed,
+    getInventorySlots,
+    INVENTORY_EXPAND_COST,
+    INVENTORY_EXPAND_GAIN
+} from "../src/hunting/equipmentConfig.js";
 
 // ── 시나리오 설정 ──────────────────────────────────────────────
 const CONFIG = {
     RUNS: 100, // 사냥터 반복 횟수
-    FLOORS_PER_RUN: 5, // 한 런당 최대 층수
+    FLOORS_PER_RUN: 12, // 한 런당 시뮬레이션 층수 (최대 100층 중 일부)
     BASE_STATS: { hp: 110, damage: 10, speed: 290, radius: 48, mass: 1.1, defense: 2 },
     CHEST_DROP_CHANCE: 0.15, // 층 클리어 시 상자 드랍 확률
     SHARDS_PER_ENEMY: { normal: { min: 5, max: 8 }, elite: { min: 15, max: 25 } }
@@ -77,11 +89,28 @@ function runScenario(config) {
         totalEquipmentObtained: 0,
         totalChestDrops: 0,
         floorsCleared: 0,
+        expansions: 0,
+        disassembled: 0,
+        fused: 0,
+        sold: 0,
+        totalStonesEarned: 0,
+        totalShardsFromSales: 0,
         equipmentByRarity: {},
         statBonusesOverTime: [],
         shardsOverTime: [],
         shardSource: { enemy: 0, chest: 0 }
     };
+
+    function findFusionPair() {
+        const byRarity = new Map();
+        for (const item of profile.equipment.inventory) {
+            if (item.rarity === "legendary") continue;
+            const items = byRarity.get(item.rarity) ?? [];
+            items.push(item);
+            byRarity.set(item.rarity, items);
+        }
+        return [...byRarity.values()].find((items) => items.length >= 2)?.slice(0, 2) ?? null;
+    }
 
     for (let run = 0; run < config.RUNS; run++) {
         // ── 런 시작 ──
@@ -138,9 +167,57 @@ function runScenario(config) {
 
         addLog(`  [귀환] 파편+${runShards} | 상자 ${runChests.length}개 보관`);
 
-        // ── 상자 개봉 ──
+        // ── 상자 개봉 + 인벤토리 관리 ──
         let runOpenCount = 0;
         while (true) {
+            // 인벤토리 부족 시 확장, 합성, 판매/분해 순으로 정리
+            while (isInventoryFull(profile)) {
+                if (canExpandInventory(profile)) {
+                    expandInventory(profile);
+                    stats.expansions++;
+                    addLog(`  [관리] 인벤토리 확장 (+${INVENTORY_EXPAND_GAIN}칸, -${INVENTORY_EXPAND_COST}파편)`);
+                } else if (findFusionPair()) {
+                    const [first, second] = findFusionPair();
+                    const fResult = fuseEquipment(profile, first.instanceId, second.instanceId);
+                    if (fResult?.item) {
+                        stats.fused++;
+                        addLog(`  [관리] ${first.rarity} 장비 2개 합성 → ${fResult.item.rarity}`);
+                    } else {
+                        break;
+                    }
+                } else {
+                    // 최하위 장비 판매/분해
+                    const worst = [...profile.equipment.inventory].sort((a, b) => {
+                        const sumA = (a.stats ?? []).reduce((s, st) => s + st.value, 0);
+                        const sumB = (b.stats ?? []).reduce((s, st) => s + st.value, 0);
+                        return sumA - sumB;
+                    })[0];
+                    if (worst) {
+                        if ((profile.hunting.shards ?? 0) < INVENTORY_EXPAND_COST) {
+                            const sold = sellEquipment(profile, worst.instanceId);
+                            if (sold) {
+                                stats.sold++;
+                                stats.totalShardsFromSales += sold.shards;
+                                addLog(`  [관리] ${sold.item.name} 판매 → 파편+${sold.shards}`);
+                            } else {
+                                break;
+                            }
+                        } else {
+                            const dResult = disassembleEquipment(profile, worst.instanceId);
+                            if (dResult) {
+                                stats.disassembled++;
+                                stats.totalStonesEarned += dResult.stones;
+                                addLog(`  [관리] ${dResult.item.name} 분해 → 강화석+${dResult.stones}`);
+                            } else {
+                                break;
+                            }
+                        }
+                    } else {
+                        break;
+                    }
+                }
+            }
+
             const openable = profile.hunting.chests
                 .map((c, i) => ({ chest: c, index: i }))
                 .filter(({ chest }) => {
@@ -293,7 +370,11 @@ function printReport(config, result) {
     );
     console.log(`  상자 개봉:      ${stats.totalChestsOpened}`);
     console.log(`  장비 획득:      ${stats.totalEquipmentObtained}`);
-    console.log(`  보유 장비:      ${totalItems} (장착 ${equippedCount}/${totalItems})`);
+    console.log(`  보유 장비: ${totalItems} (장착 ${equippedCount}/${totalItems})`);
+    console.log(`  인벤토리 확장: ${stats.expansions}회 (총 +${stats.expansions * INVENTORY_EXPAND_GAIN}칸)`);
+    console.log(`  장비 합성:     ${stats.fused}회`);
+    console.log(`  장비 판매:     ${stats.sold}회 (파편 +${stats.totalShardsFromSales})`);
+    console.log(`  장비 분해:     ${stats.disassembled}회 (강화석 +${stats.totalStonesEarned})`);
     console.log("");
 
     // ── 파편 순환 ──
@@ -302,8 +383,9 @@ function printReport(config, result) {
     console.log(`    - 전투:       ${stats.shardSource.enemy}`);
     console.log(`    - 상자:       ${stats.shardSource.chest}`);
     console.log(`  총 소비(개봉):  ${stats.totalShardsSpent}`);
+    const expansionCost = stats.expansions * INVENTORY_EXPAND_COST;
+    console.log(`  확장 비용:      ${expansionCost} (${stats.expansions}회)`);
     console.log(`  최종 잔여:      ${result.profile.hunting.shards}`);
-    console.log(`  순이익:         ${stats.totalShardsEarned + stats.shardSource.chest - stats.totalShardsSpent}`);
     console.log(
         `  개봉당 평균:    ${stats.totalChestsOpened > 0 ? Math.round(stats.totalShardsSpent / stats.totalChestsOpened) : 0} 파편`
     );
@@ -383,6 +465,9 @@ function printReport(config, result) {
     console.log(`  보유 장비: ${totalItems} (최대 ${result.profile.equipment.maxInventorySlots})`);
     if (totalItems > result.profile.equipment.maxInventorySlots) {
         console.log(`  ⚠ 인벤토리 초과! ${totalItems - result.profile.equipment.maxInventorySlots}개 초과`);
+    }
+    if (totalItems >= result.profile.equipment.maxInventorySlots) {
+        console.log(`  ⚠ 인벤토리 가득 참 (분해/확장 필요)`);
     }
     console.log(`  강화석:   ${result.profile.equipment.enhancementStones}`);
     console.log("");

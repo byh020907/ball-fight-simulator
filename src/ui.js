@@ -85,6 +85,15 @@ export function appStore() {
             nextText: "다음 레벨까지 100XP",
             nextRewardText: "HP +2"
         },
+        equipmentSummary: {
+            characterLevel: 1,
+            inventoryUsed: 0,
+            inventorySlots: 5,
+            equippedCount: 0,
+            activeCount: 0,
+            slots: [],
+            statLine: "적용 중인 장비 스탯 없음"
+        },
         allocation: createEmptyStatAllocation(),
         totalPoints: PLAYER_STAT_POINTS,
         bonusPoints: 0,
@@ -366,6 +375,7 @@ export class UIController {
         highestUnlockedLevel = 0,
         progressionBonusSummary = "",
         experience = null,
+        equipmentSummary = null,
         huntingAvailable = false
     } = {}) {
         const s = this.state;
@@ -382,11 +392,15 @@ export class UIController {
         if (experience) {
             s.playerExperience = { ...experience };
         }
+        if (equipmentSummary) {
+            s.equipmentSummary = { ...equipmentSummary };
+        }
         this._syncHuntingButtonStore();
         s._syncSummary?.();
         patchAlpineStore("playerPanel", {
             fighter: fighter ? { name: fighter.name, title: fighter.title, color: fighter.color } : null,
             ...(experience ? { experience: { ...experience } } : {}),
+            ...(equipmentSummary ? { equipmentSummary: { ...equipmentSummary } } : {}),
             allocation: { ...allocation },
             totalPoints,
             bonusPoints,
@@ -587,7 +601,14 @@ export class UIController {
             label: "",
             text: "",
             subtext: "",
-            huntingChoiceVisible: false
+            huntingChoiceVisible: false,
+            huntingCanRetreat: false,
+            huntingMoving: false,
+            huntingMoveFrom: 0,
+            huntingMoveTo: 0,
+            huntingMoveStep: 0,
+            huntingMoveMax: 10,
+            huntingMoveMessage: ""
         });
         this._resetXpReward();
     }

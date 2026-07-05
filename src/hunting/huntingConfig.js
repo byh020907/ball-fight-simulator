@@ -1,4 +1,35 @@
-export const HUNTING_MAX_FLOOR = 5;
+export const HUNTING_MAX_FLOOR = 100;
+export const HUNTING_ADVANCE_STEPS = 10;
+
+export const HUNTING_STAGE_IDS = Object.freeze({
+    CAVE: "cave",
+    FOREST: "forest",
+    DESERT: "desert"
+});
+
+export const HUNTING_STAGES = Object.freeze([
+    Object.freeze({
+        id: HUNTING_STAGE_IDS.CAVE,
+        name: "동굴",
+        description: "좁은 암벽 통로가 이어지는 첫 원정지",
+        arena: Object.freeze({ WIDTH: 1120, HEIGHT: 1120 }),
+        theme: "cave"
+    }),
+    Object.freeze({
+        id: HUNTING_STAGE_IDS.FOREST,
+        name: "숲",
+        description: "회복과 함정이 뒤섞인 깊은 숲",
+        arena: Object.freeze({ WIDTH: 1280, HEIGHT: 1280 }),
+        theme: "forest"
+    }),
+    Object.freeze({
+        id: HUNTING_STAGE_IDS.DESERT,
+        name: "사막",
+        description: "넓은 전장과 거친 모래바람의 원정지",
+        arena: Object.freeze({ WIDTH: 1440, HEIGHT: 1280 }),
+        theme: "desert"
+    })
+]);
 
 export const HUNTING_ARENA = Object.freeze({
     WIDTH: 1280,
@@ -6,8 +37,15 @@ export const HUNTING_ARENA = Object.freeze({
 });
 
 export const HUNTING_EVENT_CHANCE = Object.freeze({
-    MIN: 0.25,
-    MAX: 0.4
+    MIN: 0.18,
+    MAX: 0.35
+});
+
+export const HUNTING_FLOOR_OUTCOME_TYPES = Object.freeze({
+    EMPTY: "empty",
+    COMBAT: "combat",
+    EVENT: "event",
+    FINAL_BOSS: "final_boss"
 });
 
 export const HUNTING_ENEMY_TYPES = Object.freeze({
@@ -17,6 +55,10 @@ export const HUNTING_ENEMY_TYPES = Object.freeze({
 });
 
 export const HUNTING_EVENT_TYPES = Object.freeze({
+    PORTAL: "portal",
+    WANDERING_MERCHANT: "wandering_merchant",
+    BOON: "boon",
+    MISHAP: "mishap",
     CHEST_ROOM: "chest_room",
     REST_SITE: "rest_site",
     CURSED_ALTAR: "cursed_altar",
@@ -24,6 +66,10 @@ export const HUNTING_EVENT_TYPES = Object.freeze({
 });
 
 export const HUNTING_MVP_EVENT_TYPES = Object.freeze([
+    HUNTING_EVENT_TYPES.PORTAL,
+    HUNTING_EVENT_TYPES.WANDERING_MERCHANT,
+    HUNTING_EVENT_TYPES.BOON,
+    HUNTING_EVENT_TYPES.MISHAP,
     HUNTING_EVENT_TYPES.CHEST_ROOM,
     HUNTING_EVENT_TYPES.REST_SITE,
     HUNTING_EVENT_TYPES.CURSED_ALTAR,

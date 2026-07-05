@@ -121,8 +121,9 @@
             import Alpine from "https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/module.esm.js";
 
             // GitHub Pages 캐시 방지용 버전 파라미터
-            const V = "0.24.0";
+            const V = "0.24.5";
 
+            window.BFS_ASSET_VERSION = V;
             const { loadTemplates } = await import(`./src/componentLoader.js?v=${V}`);
             const { registerAlpineComponentSystem } = await import(`./src/alpineTemplateComponents.js?v=${V}`);
             const { createComponentBridge } = await import(`./src/componentBridge.js?v=${V}`);
@@ -158,7 +159,14 @@
                 huntingChoiceVisible: false,
                 huntingFloor: 1,
                 huntingCharacterName: "",
-                huntingLootSummary: ""
+                huntingLootSummary: "",
+                huntingCanRetreat: false,
+                huntingMoving: false,
+                huntingMoveFrom: 0,
+                huntingMoveTo: 0,
+                huntingMoveStep: 0,
+                huntingMoveMax: 10,
+                huntingMoveMessage: ""
             });
             Alpine.store("xpReward", {
                 visible: false,
@@ -180,6 +188,15 @@
                     progressText: "0/100 XP",
                     nextText: "다음 레벨까지 100XP",
                     nextRewardText: ""
+                },
+                equipmentSummary: {
+                    characterLevel: 1,
+                    inventoryUsed: 0,
+                    inventorySlots: 5,
+                    equippedCount: 0,
+                    activeCount: 0,
+                    slots: [],
+                    statLine: "적용 중인 장비 스탯 없음"
                 },
                 allocation: {},
                 totalPoints: 0,

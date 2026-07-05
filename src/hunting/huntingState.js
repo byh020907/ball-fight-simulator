@@ -1,6 +1,7 @@
-import { HUNTING_MAX_FLOOR, HUNTING_STAT_KEYS } from "./huntingConfig.js";
+import { HUNTING_MAX_FLOOR, HUNTING_STAGE_IDS, HUNTING_STAGES, HUNTING_STAT_KEYS } from "./huntingConfig.js";
 import { applyDefeatPreservation, createEmptyHuntingLoot, mergeHuntingLoot } from "./huntingRewards.js";
-import { rollHuntingEvent } from "./huntingEncounters.js";
+import { getNextHuntingStageId, rollHuntingFloorOutcome } from "./huntingEncounters.js";
+import { HUNTING_EVENT_TYPES } from "./huntingConfig.js";
 
 function cloneLoot(loot = createEmptyHuntingLoot()) {
     return {
@@ -23,7 +24,12 @@ export function getEligibleHuntingCharacters(profile, roster = []) {
     return roster.filter((fighter) => canEnterHunting(profile, fighter.id));
 }
 
-export function createHuntingRun({ characterId, now = Date.now(), maxFloor = HUNTING_MAX_FLOOR } = {}) {
+export function createHuntingRun({
+    characterId,
+    stageId = HUNTING_STAGE_IDS.CAVE,
+    now = Date.now(),
+    maxFloor = HUNTING_MAX_FLOOR
+} = {}) {
     if (!characterId) {
         throw new Error("characterId is required to start a hunting run");
     }
@@ -33,17 +39,51 @@ export function createHuntingRun({ characterId, now = Date.now(), maxFloor = HUN
         mode: "hunting",
         status: "active",
         characterId,
-        floor: 1,
+        stageId,
+        floor: 0,
         maxFloor,
         carriedHp: null,
         statModifiers: [],
         pendingLoot: createEmptyHuntingLoot(),
         securedLoot: createEmptyHuntingLoot(),
         lastEvent: null,
+        lastEncounter: null,
         history: [],
         startedAt: now,
         endedAt: null
     };
+}
+
+export function getUnlockedHuntingStageIds(profile) {
+    const knownIds = new Set(HUNTING_STAGES.map((stage) => stage.id));
+    const unlocked = Array.isArray(profile?.hunting?.unlockedStageIds)
+        ? profile.hunting.unlockedStageIds.filter((id) => knownIds.has(id))
+        : [];
+    return unlocked.length > 0 ? [...new Set(unlocked)] : [HUNTING_STAGE_IDS.CAVE];
+}
+
+export function getSelectedHuntingStageId(profile) {
+    const unlocked = getUnlockedHuntingStageIds(profile);
+    const selected = profile?.hunting?.selectedStageId;
+    return unlocked.includes(selected) ? selected : unlocked[unlocked.length - 1];
+}
+
+export function canRetreatFromHuntingRun(run) {
+    return run?.status === "active" && run.lastEvent?.type === HUNTING_EVENT_TYPES.PORTAL;
+}
+
+export function completeHuntingStage(profile, stageId = HUNTING_STAGE_IDS.CAVE) {
+    if (!profile?.hunting) return { unlockedStageId: null };
+    const unlocked = getUnlockedHuntingStageIds(profile);
+    const nextStageId = getNextHuntingStageId(stageId);
+    if (nextStageId && !unlocked.includes(nextStageId)) {
+        profile.hunting.unlockedStageIds = [...unlocked, nextStageId];
+        profile.hunting.selectedStageId = nextStageId;
+        return { unlockedStageId: nextStageId };
+    }
+    profile.hunting.unlockedStageIds = unlocked;
+    profile.hunting.selectedStageId = stageId;
+    return { unlockedStageId: null };
 }
 
 function sanitizeStatMultiplier(value, fallback) {
@@ -135,18 +175,20 @@ export function advanceHuntingRun(run, { rng = Math.random } = {}) {
         return retreatHuntingRun(run, { reason: "max_floor_clear" });
     }
 
-    const nextFloor = run.floor + 1;
-    const event = rollHuntingEvent(nextFloor, rng);
+    const nextFloor = Math.min(run.maxFloor, run.floor + 1);
+    const encounter = rollHuntingFloorOutcome(nextFloor, rng);
+    const event = encounter.type === "event" ? encounter.event : null;
     return {
         ...run,
         floor: nextFloor,
         lastEvent: event,
+        lastEncounter: encounter,
         history: [
             ...run.history,
             {
                 type: "advance",
                 floor: nextFloor,
-                event
+                encounter
             }
         ]
     };

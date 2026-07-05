@@ -36,6 +36,8 @@ export function createDefaultPlayerProfile() {
             shards: 0,
             chests: [],
             blueprints: {},
+            unlockedStageIds: ["cave"],
+            selectedStageId: "cave",
             stats: {
                 runsStarted: 0,
                 runsRetreated: 0,
@@ -186,6 +188,12 @@ function sanitizeHuntingBlueprints(obj) {
     );
 }
 
+function sanitizeHuntingStageIds(value) {
+    const validIds = ["cave", "forest", "desert"];
+    const ids = Array.isArray(value) ? value.filter((id) => validIds.includes(id)) : [];
+    return ids.length > 0 ? [...new Set(ids)] : ["cave"];
+}
+
 function sanitizeHunting(obj) {
     const defaults = createDefaultPlayerProfile().hunting;
     if (!obj || typeof obj !== "object") return defaults;
@@ -201,10 +209,16 @@ function sanitizeHunting(obj) {
               })
               .slice(-200)
         : [];
+    const unlockedStageIds = sanitizeHuntingStageIds(obj.unlockedStageIds);
+    const selectedStageId = unlockedStageIds.includes(obj.selectedStageId)
+        ? obj.selectedStageId
+        : unlockedStageIds[unlockedStageIds.length - 1];
     return {
         shards: sanitizeNumber(obj.shards),
         chests,
         blueprints: sanitizeHuntingBlueprints(obj.blueprints),
+        unlockedStageIds,
+        selectedStageId,
         stats: {
             runsStarted: sanitizeNumber(obj.stats?.runsStarted),
             runsRetreated: sanitizeNumber(obj.stats?.runsRetreated),

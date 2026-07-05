@@ -16,13 +16,35 @@
         <strong x-text="$store.gameOverlay.text">START THE FIGHT</strong>
         <p x-show="$store.gameOverlay.subtext" x-text="$store.gameOverlay.subtext"></p>
         <xp-reward-panel class="xp-reward"></xp-reward-panel>
-        <div class="hunting-choice" x-show="$store.gameOverlay.huntingChoiceVisible">
+        <div class="hunting-route" x-show="$store.gameOverlay.huntingMoving || $store.gameOverlay.huntingMoveTo > 0">
+            <div class="hunting-route-head">
+                <span x-text="$store.gameOverlay.huntingMoveFrom + 'F'"></span>
+                <strong x-text="$store.gameOverlay.huntingMoveTo + 'F'"></strong>
+            </div>
+            <div class="hunting-route-track" aria-hidden="true">
+                <i
+                    x-bind:style="'width:' + Math.min(100, Math.round((($store.gameOverlay.huntingMoveStep || 0) / Math.max(1, $store.gameOverlay.huntingMoveMax || 10)) * 100)) + '%'"
+                ></i>
+            </div>
+            <div class="hunting-route-foot">
+                <span x-text="$store.gameOverlay.huntingMoveMessage"></span>
+                <b x-text="($store.gameOverlay.huntingMoveStep || 0) + '/' + ($store.gameOverlay.huntingMoveMax || 10)"></b>
+            </div>
+        </div>
+        <div class="hunting-choice" x-show="$store.gameOverlay.huntingChoiceVisible && !$store.gameOverlay.huntingMoving">
             <div class="hunting-choice-info">
                 <span x-text="$store.gameOverlay.huntingLootSummary"></span>
             </div>
             <div class="hunting-choice-buttons">
-                <button class="hunting-btn retreat" type="button" @click="huntingRetreat()">귀환</button>
-                <button class="hunting-btn advance" type="button" @click="huntingAdvance()">전진</button>
+                <button
+                    class="hunting-btn retreat"
+                    type="button"
+                    x-show="$store.gameOverlay.huntingCanRetreat"
+                    @click="huntingRetreat()"
+                >
+                    포탈 귀환
+                </button>
+                <button class="hunting-btn advance" type="button" @click="huntingAdvance()">10층 전진</button>
             </div>
         </div>
     </div>
@@ -147,6 +169,57 @@
 
     .hunting-btn.advance {
         border-color: #d4a017;
+    }
+
+    .hunting-route {
+        min-width: min(320px, 72vw);
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px solid #e0e0e0;
+    }
+
+    .hunting-route-head,
+    .hunting-route-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 0.75rem;
+        font-weight: 900;
+        color: #333333;
+    }
+
+    .hunting-route-head strong {
+        display: inline;
+        font-size: 1rem;
+        letter-spacing: 0;
+    }
+
+    .hunting-route-track {
+        height: 8px;
+        margin: 8px 0;
+        border: 2px solid #202020;
+        background: #ffffff;
+        overflow: hidden;
+    }
+
+    .hunting-route-track i {
+        display: block;
+        width: 0;
+        height: 100%;
+        background: #d4a017;
+        transition: width 240ms ease;
+    }
+
+    .hunting-route-foot span {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .hunting-route-foot b {
+        flex: 0 0 auto;
     }
 
     .hunting-choice {

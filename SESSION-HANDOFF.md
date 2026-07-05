@@ -1,13 +1,22 @@
 # 결정 기록
 
+## [L1] 2026-07-05 — 사냥터 100층 스테이지 원정 구조 구현
+- 맥락: Codex가 사냥터 패턴 강화 구현을 일부 진행하다 중단. partial diff를 읽고 이어서 완성.
+- 결정: (1) 사냥터 100층 구조 확정 — 시작 0층, 10층 전진 시 1층씩 이동, 전투/선택형이벤트/포탈/100층보스에서 정지, 빈층은 자동 진행. (2) `advance()`를 async 10-step 루프로 재작성, 층당 350ms 이동 애니메이션. (3) 포탈에서만 귀환 가능 (`canRetreatFromHuntingRun`), 포탈 지나치면 귀환 권한 소멸. (4) 새 이벤트 4종: portal(귀환 가능), wandering_merchant(정지), boon(파편 즉시), mishap(HP 손실). (5) 동굴/숲/사막 3스테이지, 100층 보스 처치 시 다음 스테이지 해금. (6) `rollHuntingFloorOutcome`으로 층 판정 (empty/combat/event/final_boss). (7) 테스트: 100층 구조, portal 전용 귀환, floor outcome, stage 해금, gameOverlay store 검증 완료.
+- 영향: `src/hunting/huntingManager.js`(advance async 루프), `src/hunting/huntingState.js`(stage/portal), `src/hunting/huntingEncounters.js`(rollHuntingFloorOutcome), `src/hunting/huntingConfig.js`(100층/스테이지/이벤트), `src/components/game-overlay.html`(이동 UI/포탈 버튼), `src/playerProfile.js`(stage 해금), `src/ui.js`(store 초기값), `index.html`(V=0.24.5), `src/patchNotes.js`(v0.24.5), `tests/regression.mjs`(신규 100층 테스트), `scripts/huntingUserScenario.mjs`(12층 시나리오)
+- 검증: `npm test`, `npm run check`, `npm run format:check`, `node scripts/huntingUserScenario.mjs` 통과
+
 ## [L1] 2026-07-04 — 인라인 Alpine UI 5종 컴포넌트화 + ES module 이중 import 버그 수정
 - 맥락: 남은 인라인 Alpine 패널(game-overlay, start-button, hunting-button, battle-log, fighter-strip)을 `src/components/<name>.html` 단일 HTML 컴포넌트로 분리. 컴포넌트화 후 액션 선택 팝업 클릭 불가 + 배틀 로그 위치 이상 버그 2건 발견.
 - 결정: (1) game-overlay/start-button/hunting-button/battle-log/fighter-strip 5종 컴포넌트 생성 — 자체 `x-data` + `Alpine.reactive()` 상태 + `Alpine.store()` 브릿지 + scoped CSS. (2) 배틀 로그 `position: fixed` 누락 복구. (3) 액션 선택 팝업 클릭 버그 근본 원인: `index.html`에서 `?v=${V}` 캐시 버스팅으로 import한 module과 `app.js`에서 static import한 module이 다른 instance가 되어 module-level `_resolve` 변수가 공유되지 않음. (4) 수정: `_resolve`를 module-level 변수 → `Alpine.store("actionPicker")._resolve`에 저장. (5) 액션 선택기 `@click`을 `$dispatch('pick-action')` 이벤트 위임으로 변경 (x-for 내부 스코프 우회). (6) `docs/development-rules.md`에 "ES Module import 일관성 규칙" 섹션 추가.
 - 영향: `src/components/game-overlay.html`(신규), `src/components/start-button.html`(신규), `src/components/hunting-button.html`(신규), `src/components/battle-log.html`(신규), `src/components/fighter-strip.html`(신규), `src/actionPicker.js`(Alpine store _resolve), `src/components/action-picker.html`($dispatch), `index.html`(스토어 초기화 6종), `src/ui.js`(store 브릿지 메서드), `src/app.js`(showTransientOverlay), `src/hunting/huntingManager.js`(store 브릿지), `src/styles.css`(CSS 5블록 제거), `docs/development-rules.md`(ES Module import 규칙 추가)
 - 검증: `npm test`, `npm run format:check` 통과
 
-## 현재 기준 요약 (2026-07-04)
+## 현재 기준 요약 (2026-07-05)
 - 컴포넌트 파일 구조: `src/components/<name>.html` (플랫, 폴더 없음), 9개 컴포넌트
+- **사냥터 100층 구조**: 시작 0층, 10층 전진 루프, 전투/포탈/상인/챔피언에서 정지, 빈층/축복/함정/휴식/상자/제단은 자동 진행
+- **3스테이지**: 동굴→숲→사막, 100층 보스 처치 시 해금
+- **포탈 귀환**: 포탈 이벤트에서만 귀환 가능, 포탈 지나치면 권한 소멸
 - 컴포넌트 목록: `<xp-reward-panel>`, `<xp-progress-bar>`, `<popup-dialog>`, `<toast-notification>`, `<action-picker>`, `<patch-notes>`, `<collection-hub>`, `<player-panel>`, `<tournament-bracket>`
 - 컴포넌트 패턴: 자체 `x-data` 스코프 + `Alpine.reactive()` 클로저 상태 + `Alpine.store()` 데이터 브릿지 + scoped CSS (`[data-v-xxxxx]` 선택자 프리픽스)
 - **Alpine.store()는 절대 `null`을 값으로 설정하지 않음** — `Object.getOwnPropertyDescriptors(null)` TypeError 방지를 위해 항상 `{ visible: false, ... }` 객체 사용
@@ -491,3 +500,71 @@
 - 맥락: `_actions`를 Alpine store에 주입하는 방식은 store가 데이터 브릿지가 아니라 콜백 레지스트리가 되어 책임 경계가 흐려졌다. 사용자는 UI 관련 로직은 컴포넌트가 갖고, 게임 관련 로직은 게임/app 쪽 공개 핸들러에 남는 구조를 요청했다.
 - 결정: start-button/hunting-button/game-overlay/player-panel의 `@click`은 컴포넌트 `Alpine.data()` 메서드를 호출한다. 컴포넌트 메서드는 `window.BallFightComponentBridge`를 통해 `appStore()` 또는 `BattleApp`/`HuntingManager` 공개 메서드를 호출한다. `Alpine.store()`의 `_actions` 초기값과 `BattleApp._exposeComponentActions()`, `UIController._exposeActionsToPlayerPanel()`는 제거한다.
 - 영향: `src/componentBridge.js`, `src/components/start-button.html`, `src/components/hunting-button.html`, `src/components/game-overlay.html`, `src/components/player-panel.html`, `index.html`, `src/app.js`, `src/ui.js`, `tests/regression.mjs`, `docs/alpine-component-system.md`, `docs/development-rules.md`
+
+## [L1] 2026-07-05 — 장비 시스템: 상자 보상을 장비로 교체 (INSTANT_HEAL/TEMP_STAT 제거)
+- 맥락: 상자가 INSTANT_HEAL/TEMP_STAT 같은 일시적 효과 대신 docs/equipment-system.md 설계대로 장비를 주도록 변경.
+- 결정: (1) `HUNTING_CHEST_REWARD_TYPES`에서 INSTANT_HEAL/TEMP_STAT 삭제, deferredEffects 체계 전면 제거(`_consumeDeferredEffects()`, `_pendingHeal`, `deferredEffects` 필드). (2) `src/hunting/equipmentData.js` — 순수 계층형 설정 데이터(EQUIPMENT.SLOTS.WEAPON 형태). (3) `src/hunting/equipmentConfig.js` — create/apply/disassemble/expandInventory. (4) 프로필 `equipment.inventory/equipped/enhancementStones/maxInventorySlots`. (5) 상자 보상 SHARDS+EQUIPMENT 2지선다, 용량 초과 시 `inventory_full` 차단. (6) 컬렉션 허브 장비 탭(슬롯/인벤토리/장착/해제/분해/확장). (7) `componentBridge.js`에 expandInventory/disassembleItem 추가.
+- 영향: `src/hunting/equipmentData.js`(신규), `src/hunting/equipmentConfig.js`(신규), `src/hunting/chestRewards.js`, `src/hunting/huntingRewards.js`, `src/hunting/huntingManager.js`, `src/playerProfile.js`, `src/collectionHubService.js`, `src/componentBridge.js`, `src/components/collection-hub.html`, `src/collection/collectionViewModel.js`, `tests/regression.mjs`
+- 검증: `npm test`, `npm run format` 통과. `node scripts/huntingUserScenario.mjs` 100런 인벤토리 초과 없이 정상 동작.
+
+## [L1] 2026-07-05 — 사냥 시뮬레이션 스크립트 (huntingSim + huntingUserScenario)
+- 맥락: 장비 드롭 분포와 인벤토리 관리 시나리오를 시뮬레이션으로 검증 필요. 추측만으로 코드 수정 금지 규칙에 따라 먼저 시뮬레이션.
+- 결정: (1) `scripts/huntingSim.mjs` — 장비 드롭/스탯 분포 시뮬레이터. OVERRIDES 블록으로 rarity 비율/스탯 범위 조절 가능. (2) `scripts/huntingUserScenario.mjs` — 실제 유저 시나리오: 100런 반복, 파편 순환, 인벤토리 관리(확장/분해), 장비 스탯 성장 추적. 10런 단위 리포트.
+- 영향: `scripts/huntingSim.mjs`(신규), `scripts/huntingUserScenario.mjs`(신규)
+- 검증: 시뮬레이션에서 인벤토리 초과 자동 탐지 → expandInventory/disassembleEquipment 추가 → 정상 순환 확인 (인벤토리 40/41, 확장 12회, 파편 1787 잔여)
+
+## [L2] 2026-07-05 — 컬렉션 허브 글자색 버그 수정
+- 배경: `body` 기본 글자색 `--text: #f4f7fb`(거의 흰색)이 `.ch-frame`(배경 `#ffffff`)에 상속되어 흰 바탕에 흰 글자가 되어 안 보임.
+- 결정: `.ch-frame`에 `color: #202020` 추가. 중복으로 지정된 `color: #202020` 10개 요소에서 제거 (이제 상속받음).
+- 영향: `src/components/collection-hub.html`
+
+## 진행 중 이슈 (2026-07-05 갱신)
+- 장비 시스템 MVP 완료. 강화(Enhancement) 시스템 미구현.
+- 인벤토리 자동 관리: 확장(파편 100→+3칸, 최대 100), 분해(등급별 강화석).
+- 사냥 deferred effects 완전 제거됨 (장비 시스템으로 대체).
+
+## [L1] 2026-07-05 — 장비 강화 시스템 구현
+- 맥락: docs/equipment-system.md 설계에 따른 강화 시스템 MVP 구현. 장비 스탯 % 증가, 실패 확률, 분해 시 강화 단계 비례 보상.
+- 결정: (1) `equipmentData.js` — ENHANCE 상수 추가(MAX_LEVEL=5, MAX_FAILURE_RATE=0.8, STAT_BONUS_PER_LEVEL=0.2, COST 테이블). (2) `equipmentConfig.js` — `calculateEnhanceCost()`, `calculateEnhanceFailureRate()`, `enhanceEquipment()` (성공 시 +1레벨, 실패 시 -1레벨(0下限)). 분해 시 `enhanceLevel` 비례 추가 보상(+50%/레벨). `getEquippedStatBonuses()`에 강화 배율 반영. (3) `instanceId` 중복 버그 수정 — `_eqCounter` 추가. (4) `componentBridge.js` — `enhanceItem()` 동적 import. (5) `collectionViewModel.js` — 각 장비에 `canEnhance`, `enhanceCost`, `enhanceFailureRate` 추가. (6) `collection-hub.html` — 카드 헤더에 `+N` 강화 레벨 배지, 액션에 강화 버튼(실패율 표시). (7) `src/hunting/index.js` — `equipmentConfig.js` re-export 추가.
+- 영향: `src/hunting/equipmentData.js`, `src/hunting/equipmentConfig.js`, `src/hunting/index.js`, `src/componentBridge.js`, `src/collection/collectionViewModel.js`, `src/components/collection-hub.html`, `tests/regression.mjs`
+- 검증: `npm test` 4/4 ok, `npm run format` 통과. 회귀 테스트에서 강화 성공/실패/0下限/최대레벨차단/재료부족/스탯반영/없는장비 케이스 모두 검증.
+
+## 진행 중 이슈 (2026-07-05 갱신)
+- 장비 시스템 MVP + 강화 완료. 합성 승급/판매/레벨 제한/외형 draw는 미구현.
+- `createEquipmentInstance` instanceId 중복 방지용 `_eqCounter` 도입 (모듈 수준 카운터).
+
+## 다음 할 일 (2026-07-05 갱신)
+1. **장비 합성 승급 시스템**: 같은 등급 장비 2개 + 추가 재료 → 한 단계 높은 등급 장비 1개. 캐릭터 레벨 제한 적용.
+2. 장비 판매 (파편 환급)
+3. 전체 N×N PPO 학습 결과 저장 구조 설계
+4. Time Warp 패널티 인상분 재학습 및 Dash +27% 강세 밸런스 검토
+
+## [L1] 2026-07-05 — 장비 합성/판매 및 토너먼트 적용 검증
+- 맥락: 사용자가 장비 시스템 구현과 테스트 구성을 이어서 완료/검증하라고 요청. 기존 구현은 강화/분해/확장까지 있었고, 문서상 중복 장비 처리(합성/판매)와 토너먼트 장비 스탯 적용이 비어 있었음.
+- 결정: 같은 등급 장비 2개 + 강화석/파편 비용으로 다음 등급 랜덤 장비 1개를 만드는 합성 승급, 등급별 파편 환급 판매를 추가. 장비 스탯은 사냥터뿐 아니라 토너먼트 시작 시 플레이어 스펙에도 적용. 컬렉션 허브 장비 카드에 합성/판매 버튼과 비용/보상 정보를 노출.
+- 영향: `src/hunting/equipmentData.js`, `src/hunting/equipmentConfig.js`, `src/collection/collectionViewModel.js`, `src/components/collection-hub.html`, `src/componentBridge.js`, `src/app.js`, `tests/regression.mjs`, `scripts/huntingUserScenario.mjs`, `docs/equipment-system.md`
+- 검증: `npm test`, `npm run check`, `npm run format:check`, `node scripts/huntingUserScenario.mjs` 통과. 회귀 테스트에서 강화/합성/판매/토너먼트 장비 스탯 적용을 검증.
+
+## 진행 중 이슈 (2026-07-05 갱신)
+- 장비 시스템 MVP + 강화 + 합성/판매 완료. 캐릭터 레벨 제한과 장비 외형 draw는 미구현.
+- 합성 MVP 수치: common→uncommon 강화석2/파편20, uncommon→rare 강화석5/파편40, rare→epic 강화석12/파편80, epic→legendary 강화석25/파편150.
+
+## [L1] 2026-07-05 — 장비 외형 draw 구현
+- 맥락: 사용자가 장비 draw 구현을 요청. 기존 장비 시스템은 스탯/인벤토리/강화/합성/판매까지 있었지만 전투 캔버스에서 장착 장비가 보이지 않았음.
+- 결정: 프로필에는 함수 대신 순수 데이터 `draw` 키(`weapon`/`armor`/`accessory`)만 저장하고, 런타임에서 `src/entities/equipmentVisuals.js`가 슬롯/등급별 draw 함수를 해석한다. `applyEquipmentStats()`는 장착 장비 목록을 `equipment.equippedItems`로 전투 스펙에 전달하고, `BattleBall.draw()`는 몸체 렌더링 후 무기/방어구/장신구 오버레이를 그린다.
+- 영향: `src/hunting/equipmentData.js`, `src/hunting/equipmentConfig.js`, `src/entities/equipmentVisuals.js`, `src/entities/battleBall.js`, `src/components/collection-hub.html`, `src/componentLoader.js`, `index.html`, `src/patchNotes.js`, `tests/regression.mjs`, `docs/equipment-system.md`
+- 검증: `npm test`, `npm run check`, `npm run format:check` 통과. 로컬 브라우저 새 로드에서 `v0.24.2` 패치노트 노출, 로딩 제거, 컬렉션 허브 마운트, 새 로드 이후 콘솔 에러 없음 확인.
+
+## [L1] 2026-07-05 — 장비 캐릭터 레벨 제한 적용
+- 맥락: 장비 시스템의 다음 미구현 항목이 캐릭터 레벨 제한이었고, 문서상 Rare/Epic/Legendary 장비는 캐릭터별 XP 레벨 요구 조건을 만족해야 장착 가능해야 했다. 구현 전 시뮬레이션에서 Lv.1 캐릭터도 Rare 장비 스탯을 받는 결함을 확인했다.
+- 결정: 등급별 요구 레벨(Common 1, Uncommon 3, Rare 5, Epic 8, Legendary 10)을 `equipmentData`에 추가하고, `equipmentConfig`에 요구 레벨/캐릭터 레벨/장착 가능 판정 함수를 모았다. `applyEquipmentStats()`와 `getEquippedItems()`는 `spec.id`의 캐릭터 레벨을 기준으로 잠긴 장비를 스탯/외형에서 제외한다. 컬렉션 허브 장비 카드는 요구 레벨과 잠김 상태를 보여주며, 실제 장착 액션도 같은 판정으로 차단한다. 토너먼트 시작 시 장비 외형 목록도 전투 스펙에 복사하도록 보강했다.
+- 영향: `src/hunting/equipmentData.js`, `src/hunting/equipmentConfig.js`, `src/componentBridge.js`, `src/collection/collectionViewModel.js`, `src/components/collection-hub.html`, `src/app.js`, `src/patchNotes.js`, `index.html`, `tests/regression.mjs`, `docs/equipment-system.md`
+- 검증: 구현 전 `scripts/equipmentLevelLimitProbe.mjs`로 Lv.1 Rare 장비 스탯이 적용되는 결함 확인 → 구현 후 Lv.1 damage 10 / Lv.5 damage 18로 수정 확인 후 임시 스크립트 제거. `npm test`, `npm run check`, `npm run format:check`, `node scripts/huntingUserScenario.mjs` 통과.
+
+## 진행 중 이슈 (2026-07-05 갱신)
+- 장비 시스템 MVP + 강화 + 합성/판매 + 슬롯별 외형 draw + 캐릭터 레벨 제한 + 시작 전 장비 UI 연결 완료. 아이템별 고유 외형 세분화는 추후 결정.
+
+## [L1] 2026-07-05 — 시작 전 장비 화면 UI 연결
+- 맥락: 사용자가 장비 화면 UI 진행을 요청. 컬렉션 허브 장비 탭은 이미 실제 관리 UI를 제공하므로, 토너먼트/사냥터 입장 직전 중복 UI를 새로 만들기보다 시작 패널에서 현재 장비 상태를 확인하고 장비 탭으로 바로 진입하는 흐름이 적합했음.
+- 결정: player-panel에 장비 요약 블록을 추가해 현재 캐릭터 레벨, 인벤토리 사용량, 슬롯별 장착/잠김 상태, 적용 중인 장비 스탯을 표시한다. “장비 화면” 버튼은 `BallFightComponentBridge.openCollectionHub("equipment")`를 통해 컬렉션 허브 장비 탭을 연다. `UIController.renderPlayerSetup()`과 Alpine store 초기값, 테스트 하네스를 모두 같은 `equipmentSummary` 구조로 맞춘다.
+- 영향: `src/app.js`, `src/ui.js`, `src/components/player-panel.html`, `index.html`, `src/patchNotes.js`, `tests/regression.mjs`, `docs/equipment-system.md`
