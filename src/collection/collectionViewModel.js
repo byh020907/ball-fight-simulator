@@ -176,11 +176,11 @@ export function createCollectionHubViewModel({
             unlockedAchievements,
             totalAchievements: achievementDefinitions.length,
             masteryTotal,
-            keyShards: hunting.keyShards ?? 0,
+            shards: hunting.shards ?? 0,
             storageChestCount: storageItems.length
         },
         storage: {
-            keyShards: hunting.keyShards ?? 0,
+            shards: hunting.shards ?? 0,
             chests: storageItems,
             stats: {
                 runsStarted: hunting.stats?.runsStarted ?? 0,

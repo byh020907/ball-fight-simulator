@@ -48,6 +48,9 @@ export function createComponentBridge(Alpine) {
         },
         huntingAdvance() {
             getGameApp()?.hunting?.advance?.();
+        },
+        async openChest(chestId) {
+            await globalThis.CollectionHubService?.openChest?.(chestId);
         }
     };
 }

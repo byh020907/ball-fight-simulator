@@ -1,4 +1,4 @@
-﻿import assert from "node:assert/strict";
+import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
     PLAYER_STAT_POINTS,
@@ -43,7 +43,7 @@ import {
     recordHuntingFloorResult,
     retreatHuntingRun,
     rollHuntingChestReward,
-    rollKeyShardReward,
+    rollShardReward,
     scaleEnemySpecForHunting,
     HUNTING_ARENA,
     HUNTING_EVENT_TYPES,
@@ -1191,18 +1191,18 @@ function testHuntingSystem() {
     assert.equal(miniboss.hunting.sourceFighterId, FIGHTER_IDS.ARCHER, "Minibosses should not copy the player");
     assert.equal(miniboss.teamId, HUNTING_TEAMS.ENEMY, "Minibosses should fight on the enemy team");
 
-    const keyShards = rollKeyShardReward({ floor: 2, rng: () => 0 });
-    assert.equal(keyShards, 17, "Key shards should include clear and deep-floor bonuses");
+    const shards = rollShardReward({ floor: 2, rng: () => 0 });
+    assert.equal(shards, 17, "Key shards should include clear and deep-floor bonuses");
 
     const run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, now: 1000 });
     const common = createHuntingChest({ id: "c1", rarity: "common", acquiredAt: 1000 });
     const uncommon = createHuntingChest({ id: "u1", rarity: "uncommon", acquiredAt: 1000 });
     const rare = createHuntingChest({ id: "r1", rarity: "rare", acquiredAt: 1000 });
     assert.equal(common.openCost, 20, "Chest instances should expose their open cost");
-    assert.ok(common.rewardPreview.includes("해조각"), "Chest instances should expose reward table preview text");
+    assert.ok(common.rewardPreview.includes("파편"), "Chest instances should expose reward table preview text");
     assert.equal(
         rollHuntingChestReward(common, { rng: () => 0 }).type,
-        "key_shards",
+        "SHARDS",
         "Chest rewards should roll from the rarity reward table"
     );
     assert.equal(
@@ -1213,7 +1213,7 @@ function testHuntingSystem() {
     const afterFloor = recordHuntingFloorResult(run, {
         hpRemain: 55,
         maxHp: 100,
-        loot: { keyShards: 100, chests: [common, uncommon, rare], xp: 90 }
+        loot: { shards: 100, chests: [common, uncommon, rare], xp: 90 }
     });
     assert.equal(afterFloor.carriedHp, 55, "Hunting run should carry HP between floors");
     assert.equal(afterFloor.pendingLoot.chests.length, 3, "Floor rewards should stay pending");
@@ -1242,7 +1242,7 @@ function testHuntingSystem() {
     const consumedCursed = recordHuntingFloorResult(cursedApplied, { hpRemain: 50, maxHp: 100 });
     assert.equal(consumedCursed.statModifiers.length, 0, "One-floor altar modifiers should expire after a floor");
     const preservedEventBuff = recordHuntingFloorResult(cursedApplied, {
-        loot: { keyShards: 0, chests: [common], xp: 0 },
+        loot: { shards: 0, chests: [common], xp: 0 },
         consumeStatModifiers: false
     });
     assert.equal(
@@ -1266,7 +1266,7 @@ function testHuntingSystem() {
 
     const retreated = retreatHuntingRun(afterFloor, { now: 2000 });
     assert.equal(retreated.status, "retreated", "Retreat should end the run safely");
-    assert.equal(retreated.securedLoot.keyShards, 100, "Retreat should secure pending key shards");
+    assert.equal(retreated.securedLoot.shards, 100, "Retreat should secure pending key shards");
     assert.equal(retreated.pendingLoot.chests.length, 0, "Retreat should clear pending loot");
 
     const defeated = defeatHuntingRun(afterFloor, {
@@ -1277,7 +1277,7 @@ function testHuntingSystem() {
         now: 3000
     });
     assert.equal(defeated.status, "defeated", "Defeat should end the run");
-    assert.equal(defeated.securedLoot.keyShards, 50, "Defeat should preserve half of key shards");
+    assert.equal(defeated.securedLoot.shards, 50, "Defeat should preserve half of key shards");
     assert.equal(defeated.securedLoot.xp, 62, "Defeat should preserve 70% XP rounded down");
     assert.deepEqual(
         defeated.defeatLosses.chests.map((chest) => chest.id),
@@ -1285,18 +1285,18 @@ function testHuntingSystem() {
         "Defeat should break higher-rarity chests first with chain probability"
     );
 
-    profile.hunting.keyShards = 50;
+    profile.hunting.shards = 50;
     profile.hunting.chests = [uncommon];
     assert.equal(getChestOpenCost("uncommon"), 50, "Uncommon chest open cost should match design");
     const opened = openHuntingChest(profile, "u1", { rng: () => 0 });
     assert.equal(opened.opened, true, "Chest should open when enough key shards are available");
-    assert.equal(opened.reward.type, "key_shards", "Opening a chest should produce a concrete reward");
-    assert.equal(profile.hunting.keyShards, 45, "Opening a shard reward chest should spend cost and apply reward");
+    assert.equal(opened.reward.type, "SHARDS", "Opening a chest should produce a concrete reward");
+    assert.equal(profile.hunting.shards, 45, "Opening a shard reward chest should spend cost and apply reward");
     assert.equal(profile.hunting.chests.length, 0, "Opened chest should leave storage");
 
     const sanitized = sanitizePlayerProfile({
         hunting: {
-            keyShards: 12,
+            shards: 12,
             chests: [
                 { id: "safe", rarity: "rare", acquiredAt: 1000 },
                 { id: "safe", rarity: "common", acquiredAt: 2000 },
@@ -1305,7 +1305,7 @@ function testHuntingSystem() {
             stats: { runsStarted: 2, runsRetreated: 1, runsDefeated: 1, deepestFloor: 4 }
         }
     });
-    assert.equal(sanitized.hunting.keyShards, 12, "Sanitized profile should keep hunting key shards");
+    assert.equal(sanitized.hunting.shards, 12, "Sanitized profile should keep hunting key shards");
     assert.equal(sanitized.hunting.chests.length, 1, "Sanitized profile should dedupe and discard invalid chests");
     assert.equal(sanitized.hunting.stats.deepestFloor, 4, "Sanitized profile should keep hunting stats");
     console.log("[hunting] ok");
@@ -3818,7 +3818,7 @@ async function testCreateCollectionHubViewModel() {
         lastTournamentAt: 2000
     };
     profile.experience.byCharacter.archer = { currentXp: 135 };
-    profile.hunting.keyShards = 50;
+    profile.hunting.shards = 50;
     profile.hunting.chests = [{ id: "hunt-chest-1", rarity: "uncommon", acquiredAt: 3000 }];
     const vm2 = createCollectionHubViewModel({
         profile,
@@ -3833,7 +3833,7 @@ async function testCreateCollectionHubViewModel() {
     assert.equal(archerItem.experienceTotalXp, 135, "Roster item should expose character XP");
     assert.equal(archerItem.experienceLevel, 2, "Roster item should expose character XP level");
     assert.ok(archerItem.experienceProgressPct > 0, "Roster item should expose XP progress");
-    assert.equal(vm2.storage.keyShards, 50, "Collection hub should expose hunting key shards");
+    assert.equal(vm2.storage.shards, 50, "Collection hub should expose hunting key shards");
     assert.equal(vm2.storage.chests.length, 1, "Collection hub should expose hunting chests");
     assert.equal(vm2.storage.chests[0].canOpen, true, "Collection hub should mark openable chests");
     assert.equal(vm2.summary.storageChestCount, 1, "Collection summary should count storage chests");

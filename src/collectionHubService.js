@@ -25,4 +25,39 @@ export class CollectionHubService {
         data.selectedCharacterId = null;
         Alpine.store("collectionHub", { ...data });
     }
+
+    static async openChest(chestId) {
+        const app = globalThis.ballFightApp;
+        if (!app?.playerProfile?.hunting) return;
+
+        const { openHuntingChest } = await import("./hunting/chestRewards.js");
+        const { savePlayerProfile } = await import("./playerProfile.js");
+
+        const result = openHuntingChest(app.playerProfile, chestId);
+        if (!result.opened) {
+            const msg =
+                result.reason === "not_enough_shards"
+                    ? `파편이 부족합니다 (필요: ${result.cost})`
+                    : "상자를 찾을 수 없습니다.";
+            globalThis.PopupService?.show?.({ title: "개봉 실패", bodyHtml: `<p>${msg}</p>` });
+            return;
+        }
+
+        savePlayerProfile(app.playerProfile);
+        app._refreshCollectionHub?.();
+
+        let bodyHtml = `<p><strong>${result.chest.rarity.toUpperCase()} 상자</strong> 개봉 완료!</p>`;
+        bodyHtml += `<p>${result.reward.text}</p>`;
+        if (result.applied.shards > 0) {
+            bodyHtml += `<p>보유 파편: ${result.currentShards}</p>`;
+        }
+        if (result.applied.deferredEffect) {
+            bodyHtml += `<p style="color:#ff9800;margin-top:6px">⚠ 다음 사냥터 런 시작 시 적용됩니다.</p>`;
+        }
+
+        globalThis.PopupService?.show?.({
+            title: "🎁 상자 개봉 결과",
+            bodyHtml
+        });
+    }
 }

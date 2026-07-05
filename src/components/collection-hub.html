@@ -231,19 +231,26 @@
                     <option value="common">Common</option>
                     <option value="uncommon">Uncommon</option>
                     <option value="rare">Rare</option>
+                    <option value="epic">Epic</option>
+                    <option value="legendary">Legendary</option>
                 </select>
                 <span class="ch-storage-currency">
-                    해조각 <b x-text="Number(state.storage.keyShards || 0).toLocaleString()"></b>
+                    파편 <b x-text="Number(state.storage.shards || 0).toLocaleString()"></b>
                 </span>
             </div>
             <div class="ch-scroll-region">
                 <div class="ch-list">
                     <template x-for="item in state.filteredStorageItems" :key="item.id">
-                        <div class="ch-ach-card" x-bind:class="'ch-chest--' + item.rarity">
+                        <div
+                            class="ch-ach-card"
+                            x-bind:class="'ch-chest--' + item.rarity"
+                            x-bind:style="item.canOpen ? 'cursor:pointer' : ''"
+                            @click="item.canOpen && openChest(item)"
+                        >
                             <div class="ch-ach-info">
                                 <strong x-text="item.rarity.toUpperCase() + ' 상자'"></strong>
                                 <span class="ch-ach-desc" x-text="item.rewardText"></span>
-                                <span class="ch-ach-reward" x-text="'개봉 비용: 해조각 ' + item.openCost"></span>
+                                <span class="ch-ach-reward" x-text="'개봉 비용: 파편 ' + item.openCost"></span>
                             </div>
                             <div class="ch-ach-status">
                                 <span
@@ -274,7 +281,7 @@
             rosterItems: [],
             masteryItems: [],
             achievementItems: [],
-            storage: { keyShards: 0, chests: [], stats: {} },
+            storage: { shards: 0, chests: [], stats: {} },
             summary: {},
 
             get filteredRosterItems() {
@@ -358,7 +365,7 @@
                     state.rosterItems = val.rosterItems ?? [];
                     state.masteryItems = val.masteryItems ?? [];
                     state.achievementItems = val.achievementItems ?? [];
-                    state.storage = val.storage ?? { keyShards: 0, chests: [], stats: {} };
+                    state.storage = val.storage ?? { shards: 0, chests: [], stats: {} };
                     state.summary = val.summary ?? {};
                     state.tabs = val.tabs ?? [];
                     if (val.visible === true) {
@@ -375,7 +382,12 @@
             setCollectionTab,
             setCollectionFilter,
             selectCollectionCharacter,
-            closeCollectionCharacterDetail
+            closeCollectionCharacterDetail,
+            async openChest(item) {
+                if (item.canOpen && window.CollectionHubService) {
+                    await window.CollectionHubService.openChest(item.id);
+                }
+            }
         };
     });
 </script>
@@ -878,5 +890,14 @@
 
 .ch-chest--rare {
     border-left: 4px solid #d4a017;
+}
+
+.ch-chest--epic {
+    border-left: 4px solid #a855f7;
+}
+
+.ch-chest--legendary {
+    border-left: 4px solid #f59e0b;
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.3);
 }
 </style>

@@ -27,9 +27,10 @@ export function createDefaultPlayerProfile() {
             byCharacter: {}
         },
         hunting: {
-            keyShards: 0,
+            shards: 0,
             chests: [],
             blueprints: {},
+            deferredEffects: [],
             stats: {
                 runsStarted: 0,
                 runsRetreated: 0,
@@ -196,9 +197,10 @@ function sanitizeHunting(obj) {
               .slice(-200)
         : [];
     return {
-        keyShards: sanitizeNumber(obj.keyShards),
+        shards: sanitizeNumber(obj.shards),
         chests,
         blueprints: sanitizeHuntingBlueprints(obj.blueprints),
+        deferredEffects: Array.isArray(obj.deferredEffects) ? obj.deferredEffects.slice(0, 50) : [],
         stats: {
             runsStarted: sanitizeNumber(obj.stats?.runsStarted),
             runsRetreated: sanitizeNumber(obj.stats?.runsRetreated),

@@ -8,7 +8,7 @@ import {
 
 export function canOpenHuntingChest(profile, chest) {
     if (!profile?.hunting || !chest) return false;
-    return (profile.hunting.keyShards ?? 0) >= getChestOpenCost(chest.rarity);
+    return (profile.hunting.shards ?? 0) >= getChestOpenCost(chest.rarity);
 }
 
 export function previewHuntingChest(chest) {
@@ -24,27 +24,33 @@ export function previewHuntingChest(chest) {
 
 export function applyHuntingChestReward(profile, reward) {
     const applied = {
-        keyShards: 0,
-        deferredEffects: []
+        shards: 0,
+        deferredEffect: null
     };
 
     if (!profile?.hunting || !reward) return applied;
 
-    if (reward.type === HUNTING_CHEST_REWARD_TYPES.KEY_SHARDS) {
+    if (reward.type === HUNTING_CHEST_REWARD_TYPES.SHARDS) {
         const amount = Math.max(0, Math.floor(reward.amount ?? 0));
-        profile.hunting.keyShards = (profile.hunting.keyShards ?? 0) + amount;
-        applied.keyShards += amount;
+        profile.hunting.shards = (profile.hunting.shards ?? 0) + amount;
+        applied.shards += amount;
         return applied;
     }
 
-    applied.deferredEffects.push({
+    const effect = {
         type: reward.type,
         stat: reward.stat ?? null,
         multiplier: reward.multiplier ?? null,
         floors: reward.floors ?? null,
         healRatio: reward.healRatio ?? null,
-        text: reward.text
-    });
+        text: reward.text,
+        active: true
+    };
+    if (!Array.isArray(profile.hunting.deferredEffects)) {
+        profile.hunting.deferredEffects = [];
+    }
+    profile.hunting.deferredEffects.push(effect);
+    applied.deferredEffect = effect;
     return applied;
 }
 
@@ -61,11 +67,11 @@ export function openHuntingChest(profile, chestId, { rng = Math.random } = {}) {
 
     const chest = chests[index];
     const cost = getChestOpenCost(chest.rarity);
-    if ((profile.hunting.keyShards ?? 0) < cost) {
-        return { opened: false, reason: "not_enough_key_shards", cost };
+    if ((profile.hunting.shards ?? 0) < cost) {
+        return { opened: false, reason: "not_enough_shards", cost };
     }
 
-    profile.hunting.keyShards -= cost;
+    profile.hunting.shards -= cost;
     profile.hunting.chests = chests.filter((item) => item.id !== chestId);
 
     const reward = rollHuntingChestReward(chest, { rng });
@@ -76,6 +82,7 @@ export function openHuntingChest(profile, chestId, { rng = Math.random } = {}) {
         cost,
         reward,
         applied,
-        preview: previewHuntingChest(chest)
+        preview: previewHuntingChest(chest),
+        currentShards: profile.hunting.shards
     };
 }

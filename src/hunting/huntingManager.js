@@ -10,8 +10,13 @@ import {
     applyHuntingCursedAltar,
     applyHuntingStatModifiersToSpec
 } from "./huntingState.js";
-import { rollKeyShardReward, createHuntingChest, createEmptyHuntingLoot } from "./huntingRewards.js";
-import { HUNTING_ARENA, HUNTING_ENEMY_TYPES, HUNTING_EVENT_TYPES } from "./huntingConfig.js";
+import { rollShardReward, createHuntingChest, createEmptyHuntingLoot } from "./huntingRewards.js";
+import {
+    HUNTING_ARENA,
+    HUNTING_ENEMY_TYPES,
+    HUNTING_EVENT_TYPES,
+    HUNTING_CHEST_REWARD_TYPES
+} from "./huntingConfig.js";
 import {
     HUNTING_TEAMS,
     createHuntingMinibossSpec,
@@ -118,6 +123,8 @@ export class HuntingManager {
 
         app.playerFighterId = run.characterId;
 
+        this._consumeDeferredEffects(run, appliedSpec);
+
         app.startMatch(matchSpecs, {
             keepLog: false,
             skipActionPick: true,
@@ -132,6 +139,45 @@ export class HuntingManager {
                 ball.hp = Math.min(ball.maxHp, Math.max(1, run.carriedHp));
             }
         }
+        if (run._pendingHeal && run.carriedHp === null) {
+            const ball = app.simulation?.fighters?.find((f) => f.id === run.characterId);
+            if (ball) {
+                ball.hp = Math.min(ball.maxHp, Math.ceil(ball.maxHp * run._pendingHeal));
+            }
+        }
+    }
+
+    _consumeDeferredEffects(run, appliedSpec) {
+        const profile = this.app.playerProfile;
+        const effects = profile.hunting?.deferredEffects;
+        if (!Array.isArray(effects) || effects.length === 0) return;
+
+        const remaining = [];
+        for (const effect of effects) {
+            if (!effect.active) continue;
+            if (effect.type === HUNTING_CHEST_REWARD_TYPES.INSTANT_HEAL) {
+                if (run.carriedHp === null) {
+                    run._pendingHeal = Math.max(0, Math.min(1, effect.healRatio ?? 0));
+                } else {
+                    const maxHp = run.carriedMaxHp ?? run.carriedHp;
+                    const heal = Math.floor(maxHp * (effect.healRatio ?? 0));
+                    run.carriedHp = Math.min(maxHp, (run.carriedHp ?? 0) + heal);
+                }
+            } else if (effect.type === HUNTING_CHEST_REWARD_TYPES.TEMP_STAT) {
+                const floors = effect.floors ?? 1;
+                run.statModifiers = [
+                    ...(run.statModifiers ?? []),
+                    {
+                        source: "chest_reward",
+                        stat: effect.stat,
+                        multiplier: effect.multiplier ?? 1,
+                        remainingFloors: floors
+                    }
+                ];
+            }
+        }
+        profile.hunting.deferredEffects = remaining;
+        savePlayerProfile(profile);
     }
 
     _handleFinish(app) {
@@ -184,8 +230,8 @@ export class HuntingManager {
                       ? HUNTING_ENEMY_TYPES.ELITE
                       : HUNTING_ENEMY_TYPES.NORMAL;
             const floorLoot = {
-                keyShards: Math.round(
-                    rollKeyShardReward({ floor: run.floor, enemyType: rewardEnemyType }) * rewardMultiplier
+                shards: Math.round(
+                    rollShardReward({ floor: run.floor, enemyType: rewardEnemyType }) * rewardMultiplier
                 ),
                 chests: Math.random() < 0.15 ? [createHuntingChest({ rarity: "common" })] : [],
                 xp: 0
@@ -198,8 +244,8 @@ export class HuntingManager {
             });
 
             const name = playerBall?.name ?? run.characterId;
-            const shardsText = `해조각 +${floorLoot.keyShards}`;
-            const pendingText = `보유 해조각 ${this._run.pendingLoot.keyShards}`;
+            const shardsText = `파편 +${floorLoot.shards}`;
+            const pendingText = `보유 파편 ${this._run.pendingLoot.shards}`;
             const subtext = `층 ${run.floor} 완료 · ${shardsText}`;
 
             app.ui.showOverlay("사냥터", `${name} 승리!`, subtext);
@@ -214,18 +260,14 @@ export class HuntingManager {
         } else {
             this._run = defeatHuntingRun(run);
             const name = playerBall?.name ?? run.characterId;
-            const securedShards = this._run.securedLoot?.keyShards ?? 0;
-            const lostShards = this._run.defeatLosses?.keyShards ?? 0;
+            const securedShards = this._run.securedLoot?.shards ?? 0;
+            const lostShards = this._run.defeatLosses?.shards ?? 0;
 
             this._mergeIntoSecured(app);
             app._refreshCollectionHub();
             app.refreshPlayerSetup();
 
-            app.ui.showOverlay(
-                "사냥터 패배",
-                `${name} 쓰러짐`,
-                `획득 ${securedShards} 해조각 · 손실 ${lostShards} 해조각`
-            );
+            app.ui.showOverlay("사냥터 패배", `${name} 쓰러짐`, `획득 ${securedShards} 파편 · 손실 ${lostShards} 파편`);
             app.ui.setHuntingActive(false);
             app.ui.setHuntingOverlayState({ huntingChoiceVisible: false });
             app._huntingDone = true;
@@ -240,7 +282,7 @@ export class HuntingManager {
         if (!run || run.status !== "active") return;
 
         this._run = retreatHuntingRun(run);
-        const securedShards = this._run.securedLoot?.keyShards ?? 0;
+        const securedShards = this._run.securedLoot?.shards ?? 0;
 
         this._mergeIntoSecured(app);
         app._refreshCollectionHub();
@@ -250,7 +292,7 @@ export class HuntingManager {
         app.ui.setHuntingOverlayState({ huntingChoiceVisible: false });
 
         app._huntingDone = true;
-        app.ui.showOverlay("사냥터 종료", "귀환 완료", `해조각 ${securedShards} 확보 · 최고 층 ${run.floor}`);
+        app.ui.showOverlay("사냥터 종료", "귀환 완료", `파편 ${securedShards} 확보 · 최고 층 ${run.floor}`);
         app.ui.setStartButton({ text: "확인", hidden: false, disabled: false });
         this._run = null;
     }
@@ -283,7 +325,7 @@ export class HuntingManager {
                 this._run = recordHuntingFloorResult(this._run, {
                     hpRemain: run.carriedHp,
                     maxHp: run.carriedMaxHp,
-                    loot: { keyShards: 0, chests: [chest], xp: 0 },
+                    loot: { shards: 0, chests: [chest], xp: 0 },
                     consumeStatModifiers: false
                 });
                 app.ui.addLog(`[Hunting] Chest room: gained ${chest.rarity} chest`);
@@ -308,7 +350,7 @@ export class HuntingManager {
         if (!run) return;
         const profile = app.playerProfile;
         if (profile.hunting) {
-            profile.hunting.keyShards = (profile.hunting.keyShards ?? 0) + (run.securedLoot?.keyShards ?? 0);
+            profile.hunting.shards = (profile.hunting.shards ?? 0) + (run.securedLoot?.shards ?? 0);
             if (run.securedLoot?.chests?.length > 0) {
                 profile.hunting.chests.push(...run.securedLoot.chests);
             }

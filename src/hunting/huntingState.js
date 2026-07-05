@@ -4,7 +4,7 @@ import { rollHuntingEvent } from "./huntingEncounters.js";
 
 function cloneLoot(loot = createEmptyHuntingLoot()) {
     return {
-        keyShards: Math.max(0, Math.floor(loot.keyShards ?? 0)),
+        shards: Math.max(0, Math.floor(loot.shards ?? 0)),
         chests: [...(loot.chests ?? [])],
         xp: Math.max(0, Math.floor(loot.xp ?? 0))
     };

@@ -384,7 +384,7 @@ export class BattleBall extends mixins([PhysicsBody]) {
         const n = this.appearance.sides;
         const a = (Math.PI * 2) / n;
         const r = this.radius;
-        const offset = n % 2 === 0 ? a / 2 : -Math.PI / 2;
+        const offset = -Math.PI / 2 - a / 2;
         ctx.beginPath();
         for (let i = 0; i < n; i++) {
             const angle = i * a + offset;

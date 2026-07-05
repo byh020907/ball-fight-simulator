@@ -443,6 +443,12 @@
 - 영향: `src/ui.js:469`(필터), `src/entities/battleBall.js:48,317-322,347-361`(hunting prop, HP바)
 - 검증: `npm test`, `npm run format:check` 통과
 
+## [L1] 2026-07-05 — 파편 리네임 + 상자 개봉 UI + deferredEffects 적용
+- 맥락: "해조각" 명칭을 "파편"으로 변경. 상자 개봉/보상 시스템 미완성 상태를 완료.
+- 결정: (1) `keyShards`→`shards`, `KEY_SHARDS`→`SHARDS`, `rollKeyShardReward`→`rollShardReward`, 상수명 전체 리네임, UI 텍스트 "해조각"→"파편". (2) `profile.hunting.deferredEffects` 배열 추가 — INSTANT_HEAL/TEMP_STAT 보상을 프로필에 저장. (3) `huntingManager._consumeDeferredEffects()` 사냥터 런 시작 시 deferredEffects 소비 (HP 회복, 임시 스탯 버프). (4) `collectionHubService.openChest()` 보관함 개봉 로직 연결. (5) collection-hub storage 탭 상자 카드에 `@click` + `openChest(item)` 핸들러. (6) 개봉 결과 PopupService 팝업 표시. (7) epic/legendary CSS + 필터 옵션 추가.
+- 영향: `src/components/collection-hub.html`, `src/collectionHubService.js`, `src/componentBridge.js`, `src/hunting/chestRewards.js`, `src/hunting/huntingConfig.js`, `src/hunting/huntingManager.js`, `src/hunting/huntingRewards.js`, `src/hunting/huntingState.js`, `src/playerProfile.js`, `src/collection/collectionViewModel.js`, `tests/regression.mjs`
+- 검증: `npm test`, `npm run format` 통과
+
 ## [L1] 2026-07-05 — 몹 랜덤 외형 시스템 (다각형 몸 + 다양한 표정)
 - 맥락: 사냥터 몹이 모두 동그란 원형 + 기본 표정이라 단조로움. 랜덤 외형으로 다양화 요청.
 - 결정: (1) `src/entities/mobAppearance.js` 신규 — BODY_SHAPES(0/3/4/5/6/8각형), FACE_TEMPLATES 8종(default/angry/xeye/ooo/dash/skele/cyclops/happy), `generateMobAppearance(rng)` 내보냄. (2) `BattleBall.appearance`에 `{sides, face}` 저장. (3) `draw()`에서 `sides>0`이면 `_drawPolygonBody()`로 n각형 렌더링(짝수는 상단 평면 정렬). (4) `drawFace()`에서 ability fallback 후 `_drawAppearanceFace()` 호출. (5) `createHuntingMobSpec()`에서 `appearance: generateMobAppearance(rng)` 추가.

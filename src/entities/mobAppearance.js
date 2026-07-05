@@ -1,20 +1,8 @@
 export const BODY_SHAPES = Object.freeze({
     CIRCLE: 0,
-    TRIANGLE: 3,
-    SQUARE: 4,
-    PENTAGON: 5,
-    HEXAGON: 6,
-    OCTAGON: 8
+    MIN_SIDES: 5,
+    MAX_SIDES: 16
 });
-
-const SIDE_WEIGHTS = [
-    BODY_SHAPES.CIRCLE,
-    BODY_SHAPES.TRIANGLE,
-    BODY_SHAPES.SQUARE,
-    BODY_SHAPES.PENTAGON,
-    BODY_SHAPES.HEXAGON,
-    BODY_SHAPES.OCTAGON
-];
 
 const FACE_TEMPLATES = Object.freeze({
     default: {
@@ -164,7 +152,7 @@ export function getFaceTemplate(name) {
 const FACE_NAMES = Object.keys(FACE_TEMPLATES);
 
 export function generateMobAppearance(rng = Math.random) {
-    const sides = SIDE_WEIGHTS[Math.floor(rng() * SIDE_WEIGHTS.length)];
+    const sides = Math.floor(rng() * (BODY_SHAPES.MAX_SIDES - BODY_SHAPES.MIN_SIDES + 1)) + BODY_SHAPES.MIN_SIDES;
     const face = FACE_NAMES[Math.floor(rng() * FACE_NAMES.length)];
     return { sides, face };
 }

@@ -48,14 +48,14 @@ export const HUNTING_CHEST_BREAK_WEIGHTS = Object.freeze({
     legendary: 5
 });
 
-export const HUNTING_KEY_SHARD_RANGES = Object.freeze({
+export const HUNTING_SHARD_REWARDS = Object.freeze({
     [HUNTING_ENEMY_TYPES.NORMAL]: Object.freeze({ min: 5, max: 8 }),
     [HUNTING_ENEMY_TYPES.ELITE]: Object.freeze({ min: 15, max: 25 }),
     [HUNTING_ENEMY_TYPES.CHAMPION]: Object.freeze({ min: 40, max: 40 })
 });
 
 export const HUNTING_DEFEAT_PRESERVE = Object.freeze({
-    KEY_SHARDS: 0.5,
+    SHARDS: 0.5,
     XP: 0.7
 });
 
@@ -68,7 +68,7 @@ export const HUNTING_SCALING = Object.freeze({
 });
 
 export const HUNTING_CHEST_REWARD_TYPES = Object.freeze({
-    KEY_SHARDS: "key_shards",
+    SHARDS: "SHARDS",
     INSTANT_HEAL: "instant_heal",
     TEMP_STAT: "temporary_stat"
 });

@@ -5,7 +5,7 @@ import {
     HUNTING_CHEST_REWARD_TYPES,
     HUNTING_DEFEAT_PRESERVE,
     HUNTING_ENEMY_TYPES,
-    HUNTING_KEY_SHARD_RANGES,
+    HUNTING_SHARD_REWARDS,
     HUNTING_SCALING
 } from "./huntingConfig.js";
 
@@ -18,9 +18,9 @@ export const HUNTING_CHEST_REWARD_TABLE = Object.freeze({
         Object.freeze({
             id: "common-key-shards",
             weight: 45,
-            type: HUNTING_CHEST_REWARD_TYPES.KEY_SHARDS,
+            type: HUNTING_CHEST_REWARD_TYPES.SHARDS,
             amount: 18,
-            text: "해조각 +18"
+            text: "파편 +18"
         }),
         Object.freeze({
             id: "common-field-heal",
@@ -43,9 +43,9 @@ export const HUNTING_CHEST_REWARD_TABLE = Object.freeze({
         Object.freeze({
             id: "uncommon-key-shards",
             weight: 35,
-            type: HUNTING_CHEST_REWARD_TYPES.KEY_SHARDS,
+            type: HUNTING_CHEST_REWARD_TYPES.SHARDS,
             amount: 45,
-            text: "해조각 +45"
+            text: "파편 +45"
         }),
         Object.freeze({
             id: "uncommon-field-heal",
@@ -77,9 +77,9 @@ export const HUNTING_CHEST_REWARD_TABLE = Object.freeze({
         Object.freeze({
             id: "rare-key-shards",
             weight: 30,
-            type: HUNTING_CHEST_REWARD_TYPES.KEY_SHARDS,
+            type: HUNTING_CHEST_REWARD_TYPES.SHARDS,
             amount: 105,
-            text: "해조각 +105"
+            text: "파편 +105"
         }),
         Object.freeze({
             id: "rare-fuller-heal",
@@ -111,9 +111,9 @@ export const HUNTING_CHEST_REWARD_TABLE = Object.freeze({
         Object.freeze({
             id: "epic-key-shards",
             weight: 25,
-            type: HUNTING_CHEST_REWARD_TYPES.KEY_SHARDS,
+            type: HUNTING_CHEST_REWARD_TYPES.SHARDS,
             amount: 230,
-            text: "해조각 +230"
+            text: "파편 +230"
         }),
         Object.freeze({
             id: "epic-survival-heal",
@@ -145,9 +145,9 @@ export const HUNTING_CHEST_REWARD_TABLE = Object.freeze({
         Object.freeze({
             id: "legendary-key-shards",
             weight: 20,
-            type: HUNTING_CHEST_REWARD_TYPES.KEY_SHARDS,
+            type: HUNTING_CHEST_REWARD_TYPES.SHARDS,
             amount: 520,
-            text: "해조각 +520"
+            text: "파편 +520"
         }),
         Object.freeze({
             id: "legendary-full-heal",
@@ -232,8 +232,8 @@ export function rollHuntingChestReward(chestOrRarity = "common", { rng = DEFAULT
     };
 }
 
-export function rollKeyShardReward({ floor = 1, enemyType = HUNTING_ENEMY_TYPES.NORMAL, rng = DEFAULT_RNG } = {}) {
-    const range = HUNTING_KEY_SHARD_RANGES[enemyType] ?? HUNTING_KEY_SHARD_RANGES[HUNTING_ENEMY_TYPES.NORMAL];
+export function rollShardReward({ floor = 1, enemyType = HUNTING_ENEMY_TYPES.NORMAL, rng = DEFAULT_RNG } = {}) {
+    const range = HUNTING_SHARD_REWARDS[enemyType] ?? HUNTING_SHARD_REWARDS[HUNTING_ENEMY_TYPES.NORMAL];
     const base = rollInteger(range.min, range.max, rng);
     const clearBonus = 10;
     const deepBonus = 1 + (clampFloor(floor) - 1) * HUNTING_SCALING.DEEP_FLOOR_BONUS;
@@ -254,7 +254,7 @@ export function createHuntingChest({ rarity = "common", id = null, acquiredAt = 
 
 export function createEmptyHuntingLoot() {
     return {
-        keyShards: 0,
+        shards: 0,
         chests: [],
         xp: 0
     };
@@ -262,7 +262,7 @@ export function createEmptyHuntingLoot() {
 
 export function mergeHuntingLoot(base = createEmptyHuntingLoot(), addition = createEmptyHuntingLoot()) {
     return {
-        keyShards: Math.max(0, Math.floor((base.keyShards ?? 0) + (addition.keyShards ?? 0))),
+        shards: Math.max(0, Math.floor((base.shards ?? 0) + (addition.shards ?? 0))),
         chests: [...(base.chests ?? []), ...(addition.chests ?? [])],
         xp: Math.max(0, Math.floor((base.xp ?? 0) + (addition.xp ?? 0)))
     };
@@ -298,12 +298,12 @@ export function applyDefeatPreservation(pendingLoot = createEmptyHuntingLoot(), 
     const { destroyedChests, preservedChests } = destroyChestsOnDefeat(pendingLoot.chests ?? [], rng);
     return {
         preservedLoot: {
-            keyShards: Math.floor((pendingLoot.keyShards ?? 0) * HUNTING_DEFEAT_PRESERVE.KEY_SHARDS),
+            shards: Math.floor((pendingLoot.shards ?? 0) * HUNTING_DEFEAT_PRESERVE.SHARDS),
             chests: preservedChests,
             xp: Math.floor((pendingLoot.xp ?? 0) * HUNTING_DEFEAT_PRESERVE.XP)
         },
         lostLoot: {
-            keyShards: Math.ceil((pendingLoot.keyShards ?? 0) * (1 - HUNTING_DEFEAT_PRESERVE.KEY_SHARDS)),
+            shards: Math.ceil((pendingLoot.shards ?? 0) * (1 - HUNTING_DEFEAT_PRESERVE.SHARDS)),
             chests: destroyedChests,
             xp: Math.ceil((pendingLoot.xp ?? 0) * (1 - HUNTING_DEFEAT_PRESERVE.XP))
         }
