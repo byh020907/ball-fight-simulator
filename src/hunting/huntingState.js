@@ -190,13 +190,14 @@ export function advanceHuntingRun(run, { rng = Math.random } = {}) {
     }
 
     const nextFloor = Math.min(run.maxFloor, run.floor + 1);
-    const currentRelief = Math.max(0, (run.combatReliefFloors ?? 0) - 1);
-    const encounter = rollHuntingFloorOutcome(nextFloor, rng, currentRelief);
+    const reliefForRoll = Math.max(0, run.combatReliefFloors ?? 0);
+    const nextRelief = Math.max(0, reliefForRoll - 1);
+    const encounter = rollHuntingFloorOutcome(nextFloor, rng, reliefForRoll);
     const event = encounter.type === "event" ? encounter.event : null;
     return {
         ...run,
         floor: nextFloor,
-        combatReliefFloors: currentRelief,
+        combatReliefFloors: nextRelief,
         lastEvent: event,
         lastEncounter: encounter,
         history: [

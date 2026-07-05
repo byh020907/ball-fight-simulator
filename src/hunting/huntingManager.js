@@ -321,7 +321,6 @@ export class HuntingManager {
         app.ui.setHuntingOverlayState({ huntingChoiceVisible: false });
 
         try {
-            const startFloor = run.floor;
             const MAX_STEPS = HUNTING_ADVANCE_STEPS;
             const FLOOR_STEP_MS = 350;
 

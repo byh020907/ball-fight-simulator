@@ -1,5 +1,11 @@
 # 결정 기록
 
+## [L1] 2026-07-05 — combat relief 적용 순서 수정 (판정 전 감소 → 판정 후 감소)
+- 맥락: 전투 직후 첫 층에 relief=2로 판정되는 버그. `advanceHuntingRun()`이 relief를 먼저 1 감소시킨 뒤 `rollHuntingFloorOutcome()`에 넘겨, 가장 강한 완충 단계(relief=3)를 건너뜀.
+- 결정: 판정 시점에는 현재 `run.combatReliefFloors` 값을 그대로 사용하고, 반환 run에만 1 감소한 값을 저장. 테스트로 rng=0.17을 사용해 relief=3에서 COMBAT이 아닌 EVENT가 나오는지 검증. `huntingManager.js`의 미사용 `startFloor` 변수 제거.
+- 영향: `src/hunting/huntingState.js`(advanceHuntingRun 순서), `src/hunting/huntingManager.js`(미사용 변수 제거), `tests/regression.mjs`(판정 순서 검증 추가)
+- 검증: `npm test`, `npm run check`, `npm run format:check`, `node scripts/huntingUserScenario.mjs` 통과
+
 ## [L1] 2026-07-05 — 전투 직후 확률 완충 시스템 + 이동 UI stale floor 버그 수정
 - 맥락: (1) 사냥터 전투가 너무 자주 발생해 연속 전투 피로감 크다는 제보. (2) 전투 후 재전진 시 UI가 이전 전투 층을 기준으로 표시되는 버그.
 - 결정: (1) `HUNTING_COMBAT_RELIEF` 상수 도입 (INITIAL_FLOORS=3). 전투 승리 후 `recordHuntingFloorResult(..., combatCleared: true)`로 relief 설정. `getHuntingFloorChances(floor, combatReliefFloors)`가 완충 단계에 따라 combat×0.35~0.75, event+(감소분×0.55~0.7)로 조정. `advanceHuntingRun()`이 층 이동마다 relief 1 감소. 100층은 완충 무시. (2) `HuntingManager.advance()`에서 `startFloor` 대신 `this._run.floor` 기준으로 UI 표시하도록 수정.

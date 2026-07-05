@@ -1763,6 +1763,26 @@ function testHuntingCombatRelief() {
     );
 
     // ── advanceHuntingRun이 relief를 소비 ──
+    // 첫 번째 전진: 판정은 relief=3으로, 저장은 2로
+    const firstAdvance = advanceHuntingRun(afterCombat, { rng: () => 0.17 });
+    assert.equal(
+        firstAdvance.combatReliefFloors,
+        HUNTING_COMBAT_RELIEF.INITIAL_FLOORS - 1,
+        "First advance should store relief=2 after roll"
+    );
+    // relief=3일 때 floor 1 combatChance ≈ 0.124, rng=0.17는 combat이 아니어야 함
+    // relief=2였다면 combatChance ≈ 0.194, rng=0.17는 combat — 버그 검증
+    assert.notEqual(
+        firstAdvance.lastEncounter.type,
+        HUNTING_FLOOR_OUTCOME_TYPES.COMBAT,
+        "First post-combat roll must use relief=3 (not relief=2), so rng=0.17 should not be combat"
+    );
+    assert.equal(
+        firstAdvance.lastEncounter.type,
+        HUNTING_FLOOR_OUTCOME_TYPES.EVENT,
+        "First post-combat roll with relief=3 and rng=0.17 should be event"
+    );
+
     const afterAdvance = advanceHuntingRun(afterCombat, { rng: () => 0.9 });
     assert.equal(
         afterAdvance.combatReliefFloors,
