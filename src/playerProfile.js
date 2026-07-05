@@ -5,6 +5,8 @@
 // 다른 모듈은 loadPlayerProfile() / savePlayerProfile()을 호출합니다.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { HUNTING_STAGES } from "./hunting/huntingConfig.js";
+
 export const PLAYER_PROFILE_STORAGE_KEY = "bfs:player-profile:v1";
 
 export const PROFILE_LIMITS = Object.freeze({
@@ -189,9 +191,9 @@ function sanitizeHuntingBlueprints(obj) {
 }
 
 function sanitizeHuntingStageIds(value) {
-    const validIds = ["cave", "forest", "desert"];
+    const validIds = HUNTING_STAGES.map((stage) => stage.id);
     const ids = Array.isArray(value) ? value.filter((id) => validIds.includes(id)) : [];
-    return ids.length > 0 ? [...new Set(ids)] : ["cave"];
+    return ids.length > 0 ? [...new Set(ids)] : [validIds[0]];
 }
 
 function sanitizeHunting(obj) {

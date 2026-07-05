@@ -324,13 +324,13 @@ export class HuntingManager {
 
         for (let step = 0; step < MAX_STEPS; step++) {
             const targetFloor = Math.min(run.maxFloor, startFloor + step + 1);
-            app.ui.setHuntingOverlayState({
-                huntingMoving: true,
-                huntingMoveFrom: startFloor,
-                huntingMoveTo: targetFloor,
-                huntingMoveStep: step + 1,
-                huntingMoveMax: MAX_STEPS,
-                huntingMoveMessage: `${targetFloor}층으로 이동 중…`
+            this._setHuntingMoveState({
+                moving: true,
+                step: step + 1,
+                maxSteps: MAX_STEPS,
+                startFloor,
+                targetFloor,
+                message: `${targetFloor}층으로 이동 중…`
             });
 
             await new Promise((resolve) => setTimeout(resolve, FLOOR_STEP_MS));
@@ -357,23 +357,13 @@ export class HuntingManager {
 
             if (encounter.type === HUNTING_FLOOR_OUTCOME_TYPES.COMBAT) {
                 app.ui.addLog(`[사냥터] ${currentFloor}층 — 적 조우!`);
-                app.ui.setHuntingOverlayState({
-                    huntingMoving: false,
-                    huntingMoveMessage: `${currentFloor}층 — 적 조우!`
-                });
-                this._moving = false;
-                this._startFloorBattle();
+                this._stopHuntingMoveForBattle(app, `${currentFloor}층 — 적 조우!`);
                 return;
             }
 
             if (encounter.type === HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS) {
                 app.ui.addLog(`[사냥터] ${currentFloor}층 — 최종 보스 등장!`);
-                app.ui.setHuntingOverlayState({
-                    huntingMoving: false,
-                    huntingMoveMessage: `${currentFloor}층 — 최종 보스!`
-                });
-                this._moving = false;
-                this._startFloorBattle();
+                this._stopHuntingMoveForBattle(app, `${currentFloor}층 — 최종 보스!`);
                 return;
             }
 
@@ -381,36 +371,25 @@ export class HuntingManager {
                 this._handleAdvanceEvent(event, app);
 
                 if (event.type === HUNTING_EVENT_TYPES.PORTAL) {
-                    app.ui.setHuntingOverlayState({
-                        huntingMoving: false,
-                        huntingChoiceVisible: true,
-                        huntingCanRetreat: true,
-                        huntingFloor: currentFloor,
-                        huntingMoveMessage: `${currentFloor}층 — 포탈 발견!`
+                    this._stopHuntingMoveForChoice(app, {
+                        message: `${currentFloor}층 — 포탈 발견!`,
+                        canRetreat: true,
+                        floor: currentFloor
                     });
-                    this._moving = false;
                     return;
                 }
 
                 if (event.type === HUNTING_EVENT_TYPES.WANDERING_MERCHANT) {
-                    app.ui.setHuntingOverlayState({
-                        huntingMoving: false,
-                        huntingChoiceVisible: true,
-                        huntingCanRetreat: false,
-                        huntingFloor: currentFloor,
-                        huntingMoveMessage: `${currentFloor}층 — 떠돌이 상인 발견`
+                    this._stopHuntingMoveForChoice(app, {
+                        message: `${currentFloor}층 — 떠돌이 상인 발견`,
+                        canRetreat: false,
+                        floor: currentFloor
                     });
-                    this._moving = false;
                     return;
                 }
 
                 if (event.type === HUNTING_EVENT_TYPES.CHAMPION_INTRUSION) {
-                    app.ui.setHuntingOverlayState({
-                        huntingMoving: false,
-                        huntingMoveMessage: `${currentFloor}층 — 챔피언 난입!`
-                    });
-                    this._moving = false;
-                    this._startFloorBattle();
+                    this._stopHuntingMoveForBattle(app, `${currentFloor}층 — 챔피언 난입!`);
                     return;
                 }
 
@@ -420,12 +399,40 @@ export class HuntingManager {
         }
 
         // 모든 이동 단계 소진 — 정지 없이 최대 10층 전진 완료
+        this._stopHuntingMoveForChoice(app, {
+            message: `${MAX_STEPS}층 전진 완료 — ${this._run.floor}층`,
+            canRetreat: false,
+            floor: this._run.floor
+        });
+    }
+
+    _setHuntingMoveState({ moving, step, maxSteps, startFloor, targetFloor, message }) {
+        this.app.ui.setHuntingOverlayState({
+            huntingMoving: moving,
+            huntingMoveFrom: startFloor,
+            huntingMoveTo: targetFloor,
+            huntingMoveStep: step,
+            huntingMoveMax: maxSteps,
+            huntingMoveMessage: message
+        });
+    }
+
+    _stopHuntingMoveForBattle(app, message) {
+        app.ui.setHuntingOverlayState({
+            huntingMoving: false,
+            huntingMoveMessage: message
+        });
+        this._moving = false;
+        this._startFloorBattle();
+    }
+
+    _stopHuntingMoveForChoice(app, { message, canRetreat, floor }) {
         app.ui.setHuntingOverlayState({
             huntingMoving: false,
             huntingChoiceVisible: true,
-            huntingCanRetreat: false,
-            huntingFloor: this._run.floor,
-            huntingMoveMessage: `${MAX_STEPS}층 전진 완료 — ${this._run.floor}층`
+            huntingCanRetreat: canRetreat,
+            huntingFloor: floor,
+            huntingMoveMessage: message
         });
         this._moving = false;
     }
