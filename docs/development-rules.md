@@ -120,6 +120,8 @@ this.debug = {
 | `Cooldown` | 쿨다운이 있다 (tickCooldown, cooldownReady) | 모든 Ability, AIActionController |
 | `ProjectileBehavior` | 발사체다 (owner, updateProjectile, hit 판정) | Arrow/Bat/Bullet/Orbit/Grenade/Seed |
 | `BurstSequencer` | 연발 발사한다 (startBurst, tickBurst) | 필요 시 선택 적용 |
+| `RotationalBody` | 회전한다 (angle, angularVelocity, applyAngularImpulse, integrateRotation) | 회전 가능한 지형/캐릭터/투사체 확장용 |
+| `CollisionShape` (helper) | polygon world points 변환, SAT 기반 circle-polygon 충돌 | terrain collision |
 
 **클래스 본질 (상속)**:
 

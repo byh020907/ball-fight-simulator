@@ -3,19 +3,32 @@ import { TERRAIN_SHAPES, TERRAIN_TYPES, TERRAIN_DEFAULTS } from "./terrainConfig
 
 function sanitizeTerrain(obstacle) {
     if (!obstacle || typeof obstacle !== "object") return null;
-    const radius = Number.isFinite(obstacle.radius) ? obstacle.radius : TERRAIN_DEFAULTS.MIN_RADIUS;
     const x = Number.isFinite(obstacle.x) ? obstacle.x : 0;
     const y = Number.isFinite(obstacle.y) ? obstacle.y : 0;
-    return {
+    const shape = obstacle.shape === TERRAIN_SHAPES.POLYGON ? TERRAIN_SHAPES.POLYGON : TERRAIN_SHAPES.CIRCLE;
+
+    const base = {
         id: obstacle.id ?? `terrain-${x}-${y}`,
         type: TERRAIN_TYPES.ROCK,
-        shape: TERRAIN_SHAPES.CIRCLE,
+        shape,
         x,
         y,
-        radius,
         blocking: true,
-        theme: obstacle.theme ?? null
+        theme: obstacle.theme ?? null,
+        angle: Number.isFinite(obstacle.angle) ? obstacle.angle : 0
     };
+
+    if (shape === TERRAIN_SHAPES.POLYGON) {
+        const points =
+            Array.isArray(obstacle.points) && obstacle.points.length >= 3
+                ? obstacle.points.filter((p) => Number.isFinite(p?.x) && Number.isFinite(p?.y))
+                : null;
+        if (!points || points.length < 3) return null;
+        return { ...base, points };
+    }
+
+    const radius = Number.isFinite(obstacle.radius) ? obstacle.radius : TERRAIN_DEFAULTS.MIN_RADIUS;
+    return { ...base, radius };
 }
 
 function deterministicSeed(stageId, floor, width, height) {
@@ -39,26 +52,39 @@ function clampToArena(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
 
-/**
- * terrain을 피해야 할 spawn 영역 (arena 가장자리)
- */
 function isTooCloseToSpawnEdge(x, y, width, height, buffer = 80) {
-    if (x < buffer || x > width - buffer) return true;
-    if (y < buffer || y > height - buffer) return true;
-    return false;
+    return x < buffer || x > width - buffer || y < buffer || y > height - buffer;
 }
 
-/**
- * 두 점 사이 거리 계산
- */
 function distance(x1, y1, x2, y2) {
     return Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2);
 }
 
-/**
- * 특정 stage/floor에 대한 지형 장애물 목록 생성.
- * forest/desert는 1차 구현에서 terrain 없음.
- */
+function boundingRadius(obstacle) {
+    if (obstacle.shape === TERRAIN_SHAPES.CIRCLE) return obstacle.radius ?? 0;
+    if (obstacle.shape === TERRAIN_SHAPES.POLYGON && Array.isArray(obstacle.points)) {
+        let maxSq = 0;
+        for (const p of obstacle.points) {
+            const sq = p.x * p.x + p.y * p.y;
+            if (sq > maxSq) maxSq = sq;
+        }
+        return Math.sqrt(maxSq);
+    }
+    return 0;
+}
+
+function createPolygonPoints(rng) {
+    const vertexCount = 4 + Math.floor(rng() * 3);
+    const baseRadius = 45 + rng() * 25;
+    const points = [];
+    for (let i = 0; i < vertexCount; i++) {
+        const angle = (Math.PI * 2 * i) / vertexCount + (rng() - 0.5) * 0.4;
+        const r = baseRadius * (0.75 + rng() * 0.25);
+        points.push({ x: Math.cos(angle) * r, y: Math.sin(angle) * r });
+    }
+    return points;
+}
+
 export function createHuntingTerrain({ stageId, floor = 1, width = 960, height = 960 } = {}) {
     if (!stageId) return [];
     const stage = HUNTING_STAGES.find((s) => s.id === stageId);
@@ -68,7 +94,6 @@ export function createHuntingTerrain({ stageId, floor = 1, width = 960, height =
         return createCaveTerrain({ floor, width, height });
     }
 
-    // forest/desert: terrain 확장 가능하도록 빈 배열 반환
     return [];
 }
 
@@ -76,27 +101,22 @@ function createCaveTerrain({ floor = 1, width = 960, height = 960 }) {
     const seed = deterministicSeed(HUNTING_STAGE_IDS.CAVE, floor, width, height);
     const rng = pseudoRandom(seed);
 
-    const count = 3 + (floor % 3); // 3~5개
-    const obstacles = [];
-    const buffer = 90; // spawn 영역 피하기
-    const minDist = 110; // 장애물 간 최소 거리
-    const attempts = count * 8;
+    const totalCount = 3 + (floor % 3);
+    const polygonCount = floor % 2 === 1 ? 1 : 0;
+    const circleCount = totalCount - polygonCount;
 
-    for (let attempt = 0; attempt < attempts && obstacles.length < count; attempt++) {
+    const obstacles = [];
+    const buffer = 90;
+    const minDist = 110;
+    const attempts = totalCount * 10;
+
+    function createCircleObstacle(idx) {
         const radius =
             TERRAIN_DEFAULTS.MIN_RADIUS + rng() * (TERRAIN_DEFAULTS.MAX_RADIUS - TERRAIN_DEFAULTS.MIN_RADIUS);
         const x = clampToArena(buffer + rng() * (width - buffer * 2), buffer + radius, width - buffer - radius);
         const y = clampToArena(buffer + rng() * (height - buffer * 2), buffer + radius, height - buffer - radius);
-
-        // spawn 영역 가장자리 피하기
-        if (isTooCloseToSpawnEdge(x, y, width, height, buffer)) continue;
-
-        // 기존 장애물과 충분한 거리 확인
-        const tooClose = obstacles.some((obs) => distance(x, y, obs.x, obs.y) < minDist + radius + obs.radius);
-        if (tooClose) continue;
-
-        obstacles.push({
-            id: `cave-rock-${obstacles.length}`,
+        return {
+            id: `cave-rock-${idx}`,
             type: TERRAIN_TYPES.ROCK,
             shape: TERRAIN_SHAPES.CIRCLE,
             x,
@@ -104,8 +124,40 @@ function createCaveTerrain({ floor = 1, width = 960, height = 960 }) {
             radius,
             blocking: true,
             theme: HUNTING_STAGE_IDS.CAVE
-        });
+        };
     }
 
-    return obstacles.map(sanitizeTerrain);
+    function createPolygonObstacle(idx) {
+        const points = createPolygonPoints(rng);
+        const br = Math.max(...points.map((p) => Math.sqrt(p.x * p.x + p.y * p.y)));
+        const x = clampToArena(buffer + rng() * (width - buffer * 2), buffer + br, width - buffer - br);
+        const y = clampToArena(buffer + rng() * (height - buffer * 2), buffer + br, height - buffer - br);
+        return {
+            id: `cave-rock-${idx}`,
+            type: TERRAIN_TYPES.ROCK,
+            shape: TERRAIN_SHAPES.POLYGON,
+            x,
+            y,
+            points,
+            blocking: true,
+            theme: HUNTING_STAGE_IDS.CAVE
+        };
+    }
+
+    for (let attempt = 0; attempt < attempts && obstacles.length < totalCount; attempt++) {
+        const isPolygon = obstacles.length < polygonCount;
+        const candidate = isPolygon ? createPolygonObstacle(obstacles.length) : createCircleObstacle(obstacles.length);
+
+        if (isTooCloseToSpawnEdge(candidate.x, candidate.y, width, height, buffer)) continue;
+
+        const candidateRadius = boundingRadius(candidate);
+        const tooClose = obstacles.some(
+            (obs) => distance(candidate.x, candidate.y, obs.x, obs.y) < minDist + candidateRadius + boundingRadius(obs)
+        );
+        if (tooClose) continue;
+
+        obstacles.push(candidate);
+    }
+
+    return obstacles.map(sanitizeTerrain).filter(Boolean);
 }

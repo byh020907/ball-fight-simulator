@@ -1,5 +1,11 @@
 # 결정 기록
 
+## [L1] 2026-07-05 — terrain polygon + rotational body 기반 확장
+- 맥락: 기존 terrain 시스템이 circle shape만 지원해 확장성이 부족. polygon 충돌/렌더링과 회전 물리 mixin을 추가해 범용 shape 기반 구조로 정리.
+- 결정: (1) `TERRAIN_SHAPES.POLYGON` 추가, terrain 데이터 모델에 `points` 배열, `angle` 필드 지원. (2) `RotationalBody` mixin 신설 (`src/physics/RotationalBody.js`): angle, angularVelocity, applyAngularImpulse, integrateRotation. `PhysicsBody`와 분리해 회전 가능한 객체만 선택 적용 가능. (3) `CollisionShape` helper 신설 (`src/physics/CollisionShape.js`): getWorldPolygonPoints, polygonBoundingRadius, resolvePolygonTerrainCollision (SAT 기반 circle-polygon). (4) terrainCollision/terrainRenderer를 shape dispatcher로 변경. (5) cave terrain factory에서 홀수 층에 polygon 1개 포함 생성 (4~6 vertex convex polygon). (6) concave polygon, projectile collision, pathfinding, 동적 회전 장애물은 후속 과제로 명시.
+- 영향: `src/physics/RotationalBody.js`(신규), `src/physics/CollisionShape.js`(신규), `src/physics/index.js`, `src/terrain/terrainConfig.js`, `src/terrain/terrainFactory.js`, `src/terrain/terrainCollision.js`, `src/terrain/terrainRenderer.js`, `tests/regression.mjs`, `docs/development-rules.md`, `docs/hunting-grounds-system.md`, `SESSION-HANDOFF.md`
+- 검증: `npm test` (9개 스위트), `npm run check`(116파일), `npm run format:check`, `node scripts/huntingUserScenario.mjs` 통과
+
 ## [L1] 2026-07-05 — 사냥터 실제 지형 시스템 1차 구조 (cave 암벽 장애물)
 - 맥락: 사냥터 맵을 단순 배경에서 실제 지형으로 확장하기 위한 기반 필요. 1차로 cave stage에 원형 암벽 장애물을 추가하고 fighter-terrain 충돌을 구현.
 - 결정: (1) `src/terrain/` 모듈 신설 — config(TERRAIN_SHAPES/TYPES), factory(`createHuntingTerrain`), collision(`resolveTerrainCollision`), renderer(`drawTerrain`). (2) cave stage에만 3~5개 원형 암벽 생성, stageId+floor 기반 결정론적 배치, spawn 영역 회피. forest/desert는 빈 배열. (3) `BattleSimulation` constructor에 `terrain` 옵션 추가, `Simulation.keepInsideArena()`에서 `resolveTerrainCollisions()` 호출. (4) `ArenaRenderer`에서 배경과 border 사이에 terrain draw. (5) coincident center fallback 처리 (nx=1, ny=0). 투사체 충돌과 pathfinding은 후속 과제로 명시.

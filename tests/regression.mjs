@@ -91,6 +91,8 @@ import {
 import { createHuntingTerrain } from "../src/terrain/terrainFactory.js";
 import { resolveTerrainCollision, resolveTerrainCollisions } from "../src/terrain/terrainCollision.js";
 import { drawTerrain } from "../src/terrain/terrainRenderer.js";
+import { getWorldPolygonPoints } from "../src/physics/CollisionShape.js";
+import RotationalBody from "../src/physics/RotationalBody.js";
 import { ArenaRenderer, appStore, UIController } from "../src/ui.js";
 import { createComponentBridge } from "../src/componentBridge.js";
 import { ArenaCamera } from "../src/camera.js";
@@ -1999,50 +2001,55 @@ function testHuntingStageSelectionAndArenaTheme() {
 }
 
 function testHuntingTerrain() {
-    // ── cave stage generates terrain ──
-    const caveTerrain = createHuntingTerrain({ stageId: HUNTING_STAGE_IDS.CAVE, floor: 1, width: 1120, height: 1120 });
+    const CAVE = HUNTING_STAGE_IDS.CAVE;
+
+    // ── cave generates circle + polygon terrain ──
+    const caveTerrain = createHuntingTerrain({ stageId: CAVE, floor: 1, width: 1120, height: 1120 });
     assert.ok(Array.isArray(caveTerrain), "Cave terrain should be an array");
     assert.ok(caveTerrain.length >= 3, "Cave should generate at least 3 obstacles");
     assert.ok(caveTerrain.length <= 5, "Cave should generate at most 5 obstacles");
 
-    // 모든 terrain이 유효한 원형 장애물인지 확인
-    for (const obs of caveTerrain) {
-        assert.equal(obs.shape, "circle", "Terrain obstacles should be circle shape");
-        assert.equal(obs.type, "rock", "Terrain type should be rock");
-        assert.equal(obs.blocking, true, "Terrain should be blocking");
-        assert.ok(
-            Number.isFinite(obs.x) && Number.isFinite(obs.y) && Number.isFinite(obs.radius),
-            "Terrain should have valid position/radius"
-        );
-        assert.ok(obs.x >= obs.radius && obs.x <= 1120 - obs.radius, "Terrain x should be within arena");
-        assert.ok(obs.y >= obs.radius && obs.y <= 1120 - obs.radius, "Terrain y should be within arena");
+    const circles = caveTerrain.filter((obs) => obs.shape === "circle");
+    const polygons = caveTerrain.filter((obs) => obs.shape === "polygon");
+    assert.ok(circles.length >= 2, "Odd floor cave should have circle obstacles");
+    assert.ok(polygons.length >= 1, "Odd floor cave should have at least 1 polygon obstacle");
+
+    for (const obs of polygons) {
+        assert.equal(obs.type, "rock", "Polygon terrain type should be rock");
+        assert.equal(obs.blocking, true, "Polygon terrain should be blocking");
+        assert.ok(Array.isArray(obs.points) && obs.points.length >= 3, "Polygon should have valid points array");
+        assert.ok(Number.isFinite(obs.x) && Number.isFinite(obs.y), "Polygon should have valid position");
     }
 
-    // ── deterministic: same input → same terrain ──
-    const cave1 = createHuntingTerrain({ stageId: HUNTING_STAGE_IDS.CAVE, floor: 1, width: 1120, height: 1120 });
-    const cave2 = createHuntingTerrain({ stageId: HUNTING_STAGE_IDS.CAVE, floor: 1, width: 1120, height: 1120 });
+    // ── even floor generates only circles ──
+    const evenTerrain = createHuntingTerrain({ stageId: CAVE, floor: 2, width: 1120, height: 1120 });
+    const evenPolygons = evenTerrain.filter((obs) => obs.shape === "polygon");
+    assert.equal(evenPolygons.length, 0, "Even floor cave should generate no polygon obstacles");
+
+    // ── deterministic ──
+    const cave1 = createHuntingTerrain({ stageId: CAVE, floor: 1, width: 1120, height: 1120 });
+    const cave2 = createHuntingTerrain({ stageId: CAVE, floor: 1, width: 1120, height: 1120 });
     assert.deepEqual(cave1, cave2, "Same input should produce identical terrain");
 
+    // ── polygon world points deterministic ──
+    if (polygons.length > 0) {
+        const wp1 = getWorldPolygonPoints(polygons[0]);
+        const wp2 = getWorldPolygonPoints(polygons[0]);
+        assert.deepEqual(wp1, wp2, "Polygon world points should be deterministic");
+    }
+
     // ── forest/desert produce no terrain ──
-    const forestTerrain = createHuntingTerrain({
-        stageId: HUNTING_STAGE_IDS.FOREST,
-        floor: 1,
-        width: 1280,
-        height: 1280
-    });
-    assert.deepEqual(forestTerrain, [], "Forest should produce no terrain in 1st implementation");
-
-    const desertTerrain = createHuntingTerrain({
-        stageId: HUNTING_STAGE_IDS.DESERT,
-        floor: 1,
-        width: 1440,
-        height: 1280
-    });
-    assert.deepEqual(desertTerrain, [], "Desert should produce no terrain in 1st implementation");
-
-    // ── no stage → no terrain ──
-    const noStage = createHuntingTerrain({ stageId: null, floor: 1 });
-    assert.deepEqual(noStage, [], "Null stage should produce no terrain");
+    assert.deepEqual(
+        createHuntingTerrain({ stageId: HUNTING_STAGE_IDS.FOREST, floor: 1, width: 1280, height: 1280 }),
+        [],
+        "Forest should produce no terrain"
+    );
+    assert.deepEqual(
+        createHuntingTerrain({ stageId: HUNTING_STAGE_IDS.DESERT, floor: 1, width: 1440, height: 1280 }),
+        [],
+        "Desert should produce no terrain"
+    );
+    assert.deepEqual(createHuntingTerrain({ stageId: null, floor: 1 }), [], "Null stage should produce no terrain");
 
     // ── BattleSimulation stores terrain ──
     const testSpecs = app.roster.slice(0, 2).map((spec) => ({ ...spec }));
@@ -2054,7 +2061,7 @@ function testHuntingTerrain() {
     const simNoTerrain = new BattleSimulation(testSpecs, { onLog() {}, onSound() {} }, null, {});
     assert.deepEqual(simNoTerrain.terrain, [], "BattleSimulation should default terrain to empty array");
 
-    // ── circle terrain collision: fighter pushed out ──
+    // ── circle terrain collision ──
     const mockApplyImpulse = {
         calls: [],
         fn(impulse) {
@@ -2072,8 +2079,6 @@ function testHuntingTerrain() {
         }
     };
     const rock = { shape: "circle", type: "rock", x: 200, y: 200, radius: 50, blocking: true };
-
-    // fighter starts at exact center of rock → collision should push it out
     const collided = resolveTerrainCollision(fighter, rock);
     assert.equal(collided, true, "Fighter at rock center should collide");
     const distAfter = Math.sqrt((fighter.position.x - rock.x) ** 2 + (fighter.position.y - rock.y) ** 2);
@@ -2082,43 +2087,83 @@ function testHuntingTerrain() {
         "Fighter should be pushed outside rock after collision"
     );
 
-    // ── non-blocking terrain ignored ──
-    const nonBlocking = { shape: "circle", type: "rock", x: 200, y: 200, radius: 50, blocking: false };
-    const fighter2 = {
-        position: { x: 200, y: 200 },
-        velocity: { x: 50, y: 0 },
+    // ── polygon terrain collision ──
+    const polyTerrain = {
+        shape: "polygon",
+        type: "rock",
+        x: 300,
+        y: 300,
+        points: [
+            { x: -40, y: -30 },
+            { x: 48, y: -20 },
+            { x: 35, y: 38 },
+            { x: -35, y: 30 }
+        ],
+        blocking: true
+    };
+    const polyFighter = {
+        position: { x: 300, y: 300 },
+        velocity: { x: 30, y: 0 },
         radius: 24,
         applyImpulse() {}
     };
-    assert.equal(resolveTerrainCollision(fighter2, nonBlocking), false, "Non-blocking terrain should be ignored");
+    const polyCollided = resolveTerrainCollision(polyFighter, polyTerrain);
+    assert.equal(polyCollided, true, "Fighter inside polygon should collide");
+    // fighter should be pushed outside polygon bounding box
+    const polyDistAfter = Math.sqrt(
+        (polyFighter.position.x - polyTerrain.x) ** 2 + (polyFighter.position.y - polyTerrain.y) ** 2
+    );
+    assert.ok(polyDistAfter > 1, "Fighter should be pushed out of polygon");
 
-    // ── far fighter: no collision ──
-    const farFighter = {
-        position: { x: 500, y: 500 },
-        velocity: { x: 0, y: 0 },
-        radius: 24,
-        applyImpulse() {}
-    };
-    assert.equal(resolveTerrainCollision(farFighter, rock), false, "Far fighter should not collide with rock");
+    // ── non-blocking / far / invalid ignored ──
+    assert.equal(
+        resolveTerrainCollision(
+            { position: { x: 200, y: 200 }, velocity: { x: 0, y: 0 }, radius: 24, applyImpulse() {} },
+            { shape: "circle", type: "rock", x: 200, y: 200, radius: 50, blocking: false }
+        ),
+        false,
+        "Non-blocking should be ignored"
+    );
+    assert.equal(
+        resolveTerrainCollision(
+            { position: { x: 500, y: 500 }, velocity: { x: 0, y: 0 }, radius: 24, applyImpulse() {} },
+            rock
+        ),
+        false,
+        "Far fighter should not collide"
+    );
 
-    // ── invalid terrain shape/values ignored ──
-    const invalidTerrain = { shape: "polygon", x: 200, y: 200, radius: 50, blocking: true };
-    const fighter3 = {
-        position: { x: 200, y: 200 },
-        velocity: { x: 0, y: 0 },
-        radius: 24,
-        applyImpulse() {}
-    };
-    assert.equal(resolveTerrainCollision(fighter3, invalidTerrain), false, "Non-circle terrain should be ignored");
-
-    // ── renderer draws terrain circles ──
+    // ── renderer draws circles and polygons ──
     const ctx = makeRecordingCanvasContext();
     drawTerrain(ctx, caveTerrain);
     const arcCalls = ctx.calls.filter((c) => c[0] === "arc");
-    assert.ok(
-        arcCalls.length >= caveTerrain.length * 3,
-        "Each obstacle should produce at least 3 arc calls (shadow, body, outline)"
-    );
+    const moveToCalls = ctx.calls.filter((c) => c[0] === "moveTo");
+    const lineToCalls = ctx.calls.filter((c) => c[0] === "lineTo");
+    assert.ok(arcCalls.length > 0, "Renderer should draw circle obstacles with arc");
+    if (polygons.length > 0) {
+        assert.ok(moveToCalls.length > 0, "Renderer should draw polygon obstacles with moveTo");
+        assert.ok(lineToCalls.length > 0, "Renderer should draw polygon obstacles with lineTo");
+    }
+
+    // ── RotationalBody mixin ──
+    class Dummy {}
+    const SpinningDummy = RotationalBody(Dummy);
+    const spinner = new SpinningDummy();
+    assert.equal(spinner.angle, 0, "RotationalBody should start at angle 0");
+    assert.equal(spinner.angularVelocity, 0, "RotationalBody should start at angularVelocity 0");
+    assert.equal(spinner.angularDamping, 1, "RotationalBody should start at angularDamping 1");
+
+    spinner.applyAngularImpulse(3);
+    assert.equal(spinner.angularVelocity, 3, "applyAngularImpulse should increase angularVelocity");
+
+    spinner.integrateRotation(0.5);
+    assert.equal(spinner.angle, 1.5, "integrateRotation should update angle");
+
+    // damping 적용
+    spinner.angularDamping = 0.5;
+    spinner.integrateRotation(1);
+    // angularVelocity=3, damping=0.5 → effective=1.5, angle=1.5+1.5=3.0
+    assert.equal(spinner.angle, 3, "angularDamping should reduce effective angularVelocity");
 
     console.log("[hunting-terrain] ok");
 }

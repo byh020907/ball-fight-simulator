@@ -1,5 +1,6 @@
 export const TERRAIN_SHAPES = Object.freeze({
-    CIRCLE: "circle"
+    CIRCLE: "circle",
+    POLYGON: "polygon"
 });
 
 export const TERRAIN_TYPES = Object.freeze({
