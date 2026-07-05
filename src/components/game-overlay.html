@@ -1,6 +1,7 @@
 <div
     class="overlay"
     id="overlay"
+    x-data="gameOverlay"
     x-show="$store.gameOverlay.visible"
     x-transition:enter="overlay-enter"
     x-transition:enter-start="overlay-enter-start"
@@ -30,6 +31,9 @@
         </div>
     </div>
 </div>
+<script>
+    Alpine.data("gameOverlay", () => ({}));
+</script>
 <style scoped>
     :scope {
         position: absolute;

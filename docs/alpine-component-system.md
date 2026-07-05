@@ -120,7 +120,7 @@ Alpine.data("xpRewardPanel", () => {
 });
 ```
 
-컴포넌트는 `$store`를 직접 템플릿에서 읽지 않고, `init()`에서 로컬 상태로 복사합니다. 템플릿은 로컬 `x-data` 프로퍼티만 참조하여 각 인스턴스가 독립 스코프를 유지합니다.
+단순 표시/컨트롤 컴포넌트처럼 인스턴스별 로컬 상태가 필요 없는 경우에는 템플릿에서 `$store.<name>.*`를 직접 읽습니다. 이때도 루트 `x-data`와 `<script>`의 `Alpine.data("<name>", () => ({}))` 등록은 유지하여 태그 컴포넌트 경계를 명확히 둡니다. `$watch`로 `$store`를 로컬 state에 복사하는 방식은 컴포넌트가 자체 상태, 애니메이션 상태, 인스턴스별 파생 상태를 실제로 소유해야 할 때만 사용합니다.
 
 ### 4.2 컴포넌트 → 컴포넌트 (중첩)
 
@@ -209,7 +209,7 @@ await loadTemplates();
 - **파일당 하나의 컴포넌트**: `src/components/<name>.html`
 - **순서**: Template > Script > Style (Vue SFC 규약)
 - **`x-data` 필수**: 템플릿 루트 요소는 반드시 자체 `x-data="ComponentName"`를 가짐
-- **Alpine.data() 등록**: `<script>` 내부에서 `Alpine.data("ComponentName", () => { const state = Alpine.reactive({...}); return { state, init(){} }; })` — `state`로 데이터 그룹화, `Alpine.reactive()`로 반응성 보장, private은 클로저, 공유 객체/네임드 함수 전역 등록 금지
+- **Alpine.data() 등록**: `<script>` 내부에서 `Alpine.data("ComponentName", () => ({}))` 형태라도 반드시 등록. 로컬 상태가 필요할 때만 `const state = Alpine.reactive({...}); return { state, init(){} };` 패턴을 사용하며, private은 클로저에 숨기고 공유 객체/네임드 함수 전역 등록은 금지
 - **Props**: 부모 → 자식 데이터는 `$store` 또는 호스트 속성으로 전달
 - **로직 소유**: 애니메이션, 표시 전환 등은 컴포넌트가 자체 소유
 - **스코프 격리**: 템플릿에서 `xpReward.xxx`처럼 부모 스코프를 직접 참조하지 않음

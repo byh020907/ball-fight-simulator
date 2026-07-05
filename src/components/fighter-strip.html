@@ -1,4 +1,4 @@
-<footer class="fighter-strip" id="fighterCards">
+<footer class="fighter-strip" id="fighterCards" x-data="fighterStrip">
     <template x-for="fighter in $store.fighterStrip.fighters" :key="fighter.id">
         <article class="fighter-card" x-bind:class="{ active: !fighter.defeated }" x-bind:data-fighter-id="fighter.id">
             <div class="fighter-head">
@@ -50,6 +50,9 @@
         </article>
     </template>
 </footer>
+<script>
+    Alpine.data("fighterStrip", () => ({}));
+</script>
 <style scoped>
     :scope {
         display: grid;

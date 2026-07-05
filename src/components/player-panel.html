@@ -1,4 +1,9 @@
-<section class="player-panel" id="playerPanel" x-bind:class="{ locked: $store.playerPanel.locked }">
+<section
+    class="player-panel"
+    id="playerPanel"
+    x-data="playerPanel"
+    x-bind:class="{ locked: $store.playerPanel.locked }"
+>
     <div class="player-panel-actions" aria-label="보조 메뉴">
         <button class="help-icon" type="button" title="게임 도움말" @click="$store.playerPanel._actions.openHelp()">
             ?
@@ -159,6 +164,9 @@
         </button>
     </div>
 </section>
+<script>
+    Alpine.data("playerPanel", () => ({}));
+</script>
 <style scoped>
     :scope {
         position: fixed;

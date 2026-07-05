@@ -2,6 +2,7 @@
     class="control-button"
     id="startButton"
     type="button"
+    x-data="startButton"
     x-bind:class="{ hidden: $store.startButton.hidden }"
     x-bind:disabled="$store.startButton.disabledOverride !== null ? $store.startButton.disabledOverride : $store.startButton.remainingPoints > 0 || $store.startButton.locked"
     x-text="$store.startButton.textOverride !== null ? $store.startButton.textOverride : ($store.startButton.remainingPoints > 0 ? '스탯 ' + $store.startButton.remainingPoints + ' 남음' : '토너먼트 시작')"
@@ -9,6 +10,9 @@
 >
     토너먼트 시작
 </button>
+<script>
+    Alpine.data("startButton", () => ({}));
+</script>
 <style scoped>
     :scope {
         position: absolute;

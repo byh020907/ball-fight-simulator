@@ -1,8 +1,11 @@
-<div id="battleLog">
+<div id="battleLog" x-data="battleLog">
     <template x-for="(item, index) in $store.battleLog.items" :key="index">
         <li x-text="item"></li>
     </template>
 </div>
+<script>
+    Alpine.data("battleLog", () => ({}));
+</script>
 <style scoped>
     :scope {
         position: fixed;

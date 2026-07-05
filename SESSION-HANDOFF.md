@@ -451,3 +451,8 @@
 - 결정: 중첩 컴포넌트 로더는 사용자가 의도적으로 제외한 단순 로딩 구조를 유지한다. 대신 start-button/hunting-button/battle-log/fighter-strip/game-overlay/tournament-bracket/player-panel은 가능한 범위에서 `$store` 직접 참조로 전환하고, 사용자 액션은 store `_actions` 콜백으로 통일한다. `UIController`에는 `getAlpineStore`/`patchAlpineStore`/`setAlpineStore` 헬퍼를 추가해 반복 store 접근을 줄인다.
 - 영향: `src/components/*.html` 일부, `src/ui.js`, `src/app.js`, `index.html`, `tests/regression.mjs`
 - 검증: `npm test`, `npm run check`, `npm run format:check`, 브라우저에서 스탯 버튼/자동 배분/시작 버튼 흐름 확인
+
+## [L1] 2026-07-05 — 태그 컴포넌트 정의는 빈 스코프라도 유지
+- 맥락: store 직접 참조로 단순화하는 과정에서 일부 태그 컴포넌트의 루트 `x-data`와 `<script> Alpine.data(...)` 등록까지 제거되어, 파일 구조상 컴포넌트 정의가 사라진 것처럼 보이는 문제가 있었다.
+- 결정: start-button/hunting-button/battle-log/fighter-strip/game-overlay/player-panel/tournament-bracket는 `$store` 직접 참조를 유지하되, 루트 `x-data="<componentName>"`와 `<script> Alpine.data("<componentName>", () => ({})) </script>`를 반드시 둔다. 로컬 state 복사와 watcher는 필요한 컴포넌트에만 사용한다.
+- 영향: `src/components/start-button.html`, `src/components/hunting-button.html`, `src/components/battle-log.html`, `src/components/fighter-strip.html`, `src/components/game-overlay.html`, `src/components/player-panel.html`, `src/components/tournament-bracket.html`, `docs/alpine-component-system.md`

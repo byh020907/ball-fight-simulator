@@ -1,11 +1,15 @@
 <button
     class="control-button hunting-btn"
     type="button"
+    x-data="huntingButton"
     x-show="$store.huntingButton.available && !$store.huntingButton.tournamentActive && !$store.huntingButton.active"
     @click="$store.huntingButton._actions.openLobby()"
 >
     사냥터
 </button>
+<script>
+    Alpine.data("huntingButton", () => ({}));
+</script>
 <style scoped>
     :scope {
         font-family: inherit;
