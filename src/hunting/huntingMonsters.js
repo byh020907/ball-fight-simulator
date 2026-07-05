@@ -1,5 +1,6 @@
 import { HUNTING_ENEMY_TYPES } from "./huntingConfig.js";
 import { scaleEnemySpecForHunting } from "./huntingEncounters.js";
+import { generateMobAppearance } from "../entities/mobAppearance.js";
 
 const DEFAULT_RNG = () => Math.random();
 
@@ -55,7 +56,12 @@ export function getHuntingMobCount(floor) {
     return Math.min(4, 2 + Math.floor((safeFloor(floor) - 1) / 2));
 }
 
-export function createHuntingMobSpec({ type = HUNTING_MONSTER_TYPES.MELEE, floor = 1, index = 0 } = {}) {
+export function createHuntingMobSpec({
+    type = HUNTING_MONSTER_TYPES.MELEE,
+    floor = 1,
+    index = 0,
+    rng = DEFAULT_RNG
+} = {}) {
     const safeType = HUNTING_MONSTER_BASE_SPECS[type] ? type : HUNTING_MONSTER_TYPES.MELEE;
     const base = HUNTING_MONSTER_BASE_SPECS[safeType];
     return {
@@ -67,7 +73,8 @@ export function createHuntingMobSpec({ type = HUNTING_MONSTER_TYPES.MELEE, floor
         hunting: {
             monsterType: safeType,
             isMob: true
-        }
+        },
+        appearance: generateMobAppearance(rng)
     };
 }
 

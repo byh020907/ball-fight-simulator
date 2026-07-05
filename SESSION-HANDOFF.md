@@ -443,6 +443,12 @@
 - 영향: `src/ui.js:469`(필터), `src/entities/battleBall.js:48,317-322,347-361`(hunting prop, HP바)
 - 검증: `npm test`, `npm run format:check` 통과
 
+## [L1] 2026-07-05 — 몹 랜덤 외형 시스템 (다각형 몸 + 다양한 표정)
+- 맥락: 사냥터 몹이 모두 동그란 원형 + 기본 표정이라 단조로움. 랜덤 외형으로 다양화 요청.
+- 결정: (1) `src/entities/mobAppearance.js` 신규 — BODY_SHAPES(0/3/4/5/6/8각형), FACE_TEMPLATES 8종(default/angry/xeye/ooo/dash/skele/cyclops/happy), `generateMobAppearance(rng)` 내보냄. (2) `BattleBall.appearance`에 `{sides, face}` 저장. (3) `draw()`에서 `sides>0`이면 `_drawPolygonBody()`로 n각형 렌더링(짝수는 상단 평면 정렬). (4) `drawFace()`에서 ability fallback 후 `_drawAppearanceFace()` 호출. (5) `createHuntingMobSpec()`에서 `appearance: generateMobAppearance(rng)` 추가.
+- 영향: `src/entities/mobAppearance.js`(신규), `src/entities/battleBall.js`, `src/entities/index.js`, `src/hunting/huntingMonsters.js`
+- 검증: `npm test`, `npm run format:check` 통과
+
 ## 진행 중 이슈 (2026-07-05 갱신)
 - **player-panel 버튼 무반응**: `$store._actions` 콜백은 논리적으로 정상 (`UIController._exposeActionsToPlayerPanel`가 `this.state?.adjustStat()`를 바인딩). 원인이 `$watch` 의존성 추적 문제일 가능성이 높아, `state` + watcher 패턴을 폐기하고 템플릿이 직접 `$store.playerPanel.xxx`를 읽도록 전환할 계획. `$store`는 Alpine magic으로 의존성 추적이 정확함.
 - **사냥터 deferred effect UI 연결**: instant_heal/temporary_stat 보상은 payload까지만 반환, 실제 런 연결은 미구현

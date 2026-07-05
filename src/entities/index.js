@@ -25,3 +25,4 @@ export {
     applyHeroOrbCarryoverToBattleBall
 } from "./heroOrb.js";
 export { BattleBall } from "./battleBall.js";
+export { generateMobAppearance, getFaceTemplate, BODY_SHAPES } from "./mobAppearance.js";

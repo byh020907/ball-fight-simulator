@@ -2,6 +2,7 @@ import { RENDER_LAYERS, TimedEffect, Vector2 } from "../core.js";
 import { ActionContext } from "../clickActions.js";
 import { DashEffect } from "../combatEffects.js";
 import { mixins, PhysicsBody } from "../physics/index.js";
+import { getFaceTemplate } from "./mobAppearance.js";
 
 export class BattleBall extends mixins([PhysicsBody]) {
     constructor(spec, position) {
@@ -51,6 +52,7 @@ export class BattleBall extends mixins([PhysicsBody]) {
             carryover: { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 }
         };
         this.hunting = spec.hunting ?? null;
+        this.appearance = spec.appearance ?? { sides: 0, face: "default" };
         this.mastery = {
             physics: spec.mastery?.physics ?? {
                 incomingKnockbackReduce: 0,
@@ -325,12 +327,16 @@ export class BattleBall extends mixins([PhysicsBody]) {
             ctx.globalAlpha *= scale;
         }
         ctx.fillStyle = this.color;
-        ctx.beginPath();
-        ctx.arc(this.position.x, this.position.y, this.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = "#202020";
-        ctx.lineWidth = Math.max(3, this.radius * 0.07);
-        ctx.stroke();
+        if (this.appearance.sides > 0) {
+            this._drawPolygonBody(ctx);
+        } else {
+            ctx.beginPath();
+            ctx.arc(this.position.x, this.position.y, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "#202020";
+            ctx.lineWidth = Math.max(3, this.radius * 0.07);
+            ctx.stroke();
+        }
         this.drawFace(ctx, this.state.wallSlam ? this.display.spinRotation : 0);
         this.ability?.draw?.(ctx);
         if (this.state.movement?.showRing) {
@@ -373,6 +379,27 @@ export class BattleBall extends mixins([PhysicsBody]) {
         ctx.restore();
     }
 
+    _drawPolygonBody(ctx) {
+        const { x, y } = this.position;
+        const n = this.appearance.sides;
+        const a = (Math.PI * 2) / n;
+        const r = this.radius;
+        const offset = n % 2 === 0 ? a / 2 : -Math.PI / 2;
+        ctx.beginPath();
+        for (let i = 0; i < n; i++) {
+            const angle = i * a + offset;
+            const px = x + Math.cos(angle) * r;
+            const py = y + Math.sin(angle) * r;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = "#202020";
+        ctx.lineWidth = Math.max(3, r * 0.07);
+        ctx.stroke();
+    }
+
     drawFace(ctx, rotation = 0) {
         const r = this.radius;
         const x = this.position.x;
@@ -387,28 +414,15 @@ export class BattleBall extends mixins([PhysicsBody]) {
         ctx.strokeStyle = "#202020";
         ctx.fillStyle = "#202020";
         ctx.lineWidth = Math.max(3, r * 0.075);
-        if (!this.ability?.drawFace?.(ctx, rotation, this)) {
-            this._drawDefaultFace(ctx);
+        const drawn = this.ability?.drawFace?.(ctx, rotation, this);
+        if (!drawn) {
+            this._drawAppearanceFace(ctx);
         }
         ctx.restore();
     }
 
-    _drawDefaultFace(ctx) {
-        const r = this.radius;
-        const time = performance.now() / 1000;
-        const blink = Math.sin(time * 2.6 + this.position.y * 0.01) > 0.93 ? 0.22 : 1;
-        const dotEye = (ex, ey, size = 0.055) => {
-            ctx.beginPath();
-            ctx.ellipse(ex * r, ey * r, size * r, size * r * blink, 0, 0, Math.PI * 2);
-            ctx.fill();
-        };
-        const arc = (cx, cy, radius, start, end) => {
-            ctx.beginPath();
-            ctx.arc(cx * r, cy * r, radius * r, start, end);
-            ctx.stroke();
-        };
-        dotEye(-0.22, -0.08, 0.052);
-        dotEye(0.22, -0.08, 0.052);
-        arc(0, 0.16, 0.2, 0.1, Math.PI - 0.1);
+    _drawAppearanceFace(ctx) {
+        const template = getFaceTemplate(this.appearance.face);
+        template.draw(ctx, this.radius);
     }
 }
