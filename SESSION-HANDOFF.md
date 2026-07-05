@@ -1,5 +1,24 @@
 # 결정 기록
 
+## [L1] 2026-07-06 — 방어구 하나가 풀세트처럼 보이지 않게 외형을 분리
+- 맥락: 천 갑옷 한 벌만 착용했는데 상단/하단 띠 + 좌측 방패가 모두 그려져 마치 풀셋 갑옷처럼 보이는 문제. 아이템 이름에 따라 다른 외형을 보여줘야 함.
+- 결정: (1) `inferArmorVariant(item)` 도입 — 아이템 이름 기반 4종 variant 추론 (cloth/vest/shield/plate). `item.visualVariant`가 명시되면 우선. (2) `drawArmorVariant` dispatcher + `drawClothArmor`/`drawVestArmor`/`drawShieldArmor`/`drawPlateArmor` 4종 분리. cloth=얇은 천 띠 1개+측면 주름, vest=가슴 보호대+스트랩, shield=방패 단독, plate=기존 띠×2+방패. (3) 기존 `drawArmor` 삭제. (4) 테스트: 기준선 대비 ellipse 증감 검증, variant 추론 검증, shield/plate variant draw 검증.
+- 영향: `src/entities/equipmentVisuals.js`, `tests/regression.mjs`, `SESSION-HANDOFF.md`
+- 검증: `npm test` (9개 스위트), `npm run check`, `npm run format:check` 통과
+
+## [L1] 2026-07-06 — 장비 외형을 게임용 실루엣 원칙에 맞춰 다듬음
+- 맥락: 장비 외형이 임시 선화처럼 보이고 완성도가 낮다는 피드백. 2D 게임 캐릭터 가독성 원칙(shape language, silhouette, soft outline)을 조사해 적용.
+- 결정: (1) 무기: shaft+cross-guard+blade head 구조로 정착, 외곽선을 `#202020` 대신 `palette.dark`로 변경, blade에 하이라이트 라인 추가. (2) 방어구: 직선 band를 호(arc) 기반으로 변경, shield 내부에 십자 문양 추가, shield fill을 `glow`→`fill`로 변경해 실루엣 강화. (3) 장신구: 금속 받침 링 + 보석 본체 + 하이라이트 3단 구조 유지, 작은 연결 장식 추가. (4) RARITY_COLORS에 `dark` 키 추가(등급별 어두운 외곽선 색상). (5) 불필요한 `strokeEquipmentLine` helper 제거, 각 draw 함수에서 직접 stroke 호출로 가독성 향상.
+- 영향: `src/entities/equipmentVisuals.js`, `docs/equipment-system.md`, `SESSION-HANDOFF.md`
+- 검증: `npm test` (9개 스위트), `npm run check`, `npm run format:check` 통과
+- 참고: 80Level shape language, Disney Shape Language, Sprite-AI pixel art guide, Reddit pixel art outline feedback
+
+## [L1] 2026-07-05 — 장비 외형 구체화 (창/장갑 띠/방패/원형 장신구)
+- 맥락: 장비를 처음 착용했을 때 단순 선/다각형 조각처럼 보여 캐릭터 얼굴의 이상한 폴리곤으로 오해될 수 있음. 사용자가 샘플로 머리띠/몸띠/방패/창이 붙은 볼 실루엣을 제시.
+- 결정: (1) Weapon은 오른쪽 외곽에 장착된 창 형태(손잡이, 창날, 손막이)로 구체화. (2) Armor는 얼굴 중앙을 덮지 않고 상단/하단 장갑 띠와 왼쪽 타원 방패로 표현. (3) Accessory는 마름모 보석 대신 장갑 띠 위의 원형 리벳/보석으로 변경해 얼굴 선과 혼동을 줄임. (4) 장비 draw 테스트를 새 실루엣 호출(weapon line, accessory circle, shield ellipse) 기준으로 갱신.
+- 영향: `src/entities/equipmentVisuals.js`, `tests/regression.mjs`, `docs/equipment-system.md`, `SESSION-HANDOFF.md`
+- 검증: `npm run format:check`, `npm run check`, `npm test`, `node scripts/huntingUserScenario.mjs` 통과
+
 ## [L1] 2026-07-05 — 장비 렌더링 가독성 개선 (얼굴 침범 방지 + 슬롯별 시각 언어)
 - 맥락: 장비 외형이 캐릭터 얼굴 영역을 가로질러 "이상한 폴리곤"처럼 보이는 문제. terrain polygon 버그가 아니라 장비 배치/형태의 시각 언어 문제.
 - 결정: (1) Weapon: 칼날을 몸 중심을 가로지르는 대신 오른쪽 하단(angle=0.75 rad)으로 배치, 손잡이 이중 레일, 칼날 중앙선 추가. (2) Armor: 중앙 대형 육각 방패 대신 어깨 보호대(좌우 상단 호) + 하단 흉갑 호로 분리. (3) Accessory: 4방향 분산 배치(1.28/0.72/0.35/1.65 rad), 연결 링크 추가. (4) drawEquipmentItems에 ctx.save/restore 추가.
