@@ -1,5 +1,6 @@
 import { HELP_CONTENT, HELP_TITLE } from "./helpContent.js";
 import { equipEquipmentItem } from "./hunting/equipmentConfig.js";
+import { savePlayerProfile } from "./playerProfile.js";
 
 function getAppRoot() {
     try {
@@ -70,6 +71,7 @@ export function createComponentBridge(Alpine) {
                 return false;
             }
             if (!result?.item) return false;
+            savePlayerProfile(app.playerProfile);
             app._refreshCollectionHub?.();
             return true;
         },
@@ -80,6 +82,7 @@ export function createComponentBridge(Alpine) {
             for (const [slot, id] of Object.entries(equipped)) {
                 if (id === instanceId) {
                     equipped[slot] = null;
+                    savePlayerProfile(app.playerProfile);
                     app._refreshCollectionHub?.();
                     return true;
                 }

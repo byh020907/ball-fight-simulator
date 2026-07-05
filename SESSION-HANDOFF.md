@@ -1,5 +1,11 @@
 # 결정 기록
 
+## [L1] 2026-07-05 — 컬렉션 허브 장비 버튼 bridge 참조 오류 수정 + 장착/해제 저장 누락
+- 맥락: collection-hub.html의 bridge가 `window.ballFightApp?.bridge` 또는 `window.CollectionHubService`를 참조 → 실제 장비 함수(`equipItem`, `unequipItem` 등)는 `window.BallFightComponentBridge`에만 존재 → Alpine 런타임 에러 `bridge.equipItem is not a function`.
+- 결정: (1) bridge 참조 우선순위를 `window.BallFightComponentBridge`로 교정. (2) `componentBridge.js`의 `equipItem`/`unequipItem`에 `savePlayerProfile()` 호출 추가 (다른 장비 함수들과 일관성 확보, 새로고침 후 장착 상태 유지). (3) bridge 장비 함수 존재 여부 및 equip/unequip 저장 검증 테스트 추가.
+- 영향: `src/components/collection-hub.html`, `src/componentBridge.js`, `tests/regression.mjs`, `SESSION-HANDOFF.md`
+- 검증: `npm test` (9개 스위트), `npm run check`, `npm run format:check` 통과
+
 ## [L1] 2026-07-05 — terrain polygon + rotational body 기반 확장
 - 맥락: 기존 terrain 시스템이 circle shape만 지원해 확장성이 부족. polygon 충돌/렌더링과 회전 물리 mixin을 추가해 범용 shape 기반 구조로 정리.
 - 결정: (1) `TERRAIN_SHAPES.POLYGON` 추가, terrain 데이터 모델에 `points` 배열, `angle` 필드 지원. (2) `RotationalBody` mixin 신설 (`src/physics/RotationalBody.js`): angle, angularVelocity, applyAngularImpulse, integrateRotation. `PhysicsBody`와 분리해 회전 가능한 객체만 선택 적용 가능. (3) `CollisionShape` helper 신설 (`src/physics/CollisionShape.js`): getWorldPolygonPoints, polygonBoundingRadius, resolvePolygonTerrainCollision (SAT 기반 circle-polygon). (4) terrainCollision/terrainRenderer를 shape dispatcher로 변경. (5) cave terrain factory에서 홀수 층에 polygon 1개 포함 생성 (4~6 vertex convex polygon). (6) concave polygon, projectile collision, pathfinding, 동적 회전 장애물은 후속 과제로 명시.

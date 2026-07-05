@@ -1119,6 +1119,49 @@ function testComponentBridgeCallsGameHandlers(app) {
     assert.equal(advanced, true, "Overlay advance action should call HuntingManager.advance");
 }
 
+function testComponentBridgeEquipmentFunctions() {
+    const bridge = createComponentBridge(globalThis.Alpine);
+
+    // 모든 장비 관련 함수가 bridge에 존재하는지 확인
+    const requiredFunctions = [
+        "equipItem",
+        "unequipItem",
+        "enhanceItem",
+        "fuseItem",
+        "disassembleItem",
+        "sellItem",
+        "expandInventory"
+    ];
+    for (const fnName of requiredFunctions) {
+        assert.equal(typeof bridge[fnName], "function", `Bridge should expose ${fnName}`);
+    }
+
+    // ── equipItem은 프로필을 저장해야 함 ──
+    const profile = createDefaultPlayerProfile();
+    const weapon = createEquipmentInstance({ rarity: "common", slot: "weapon", rng: () => 0.5 });
+    weapon.stats = [{ type: "damage", value: 9, min: 4, max: 8 }];
+    profile.equipment.inventory.push(weapon);
+
+    const mockApp = {
+        playerProfile: profile,
+        playerFighterId: "archer",
+        _refreshCollectionHub() {}
+    };
+    globalThis.ballFightApp = mockApp;
+
+    const result = bridge.equipItem(weapon.instanceId);
+    assert.equal(result, true, "equipItem should return true on success");
+    assert.equal(profile.equipment.equipped.weapon, weapon.instanceId, "Weapon should be equipped in profile");
+
+    // ── unequipItem은 프로필을 저장해야 함 ──
+    const unequipResult = bridge.unequipItem(weapon.instanceId);
+    assert.equal(unequipResult, true, "unequipItem should return true on success");
+    assert.equal(profile.equipment.equipped.weapon, null, "Weapon should be unequipped in profile");
+
+    // clean up
+    globalThis.ballFightApp = null;
+}
+
 async function testBattleAppAdoptsPreExistingAlpineAllocation() {
     const initialAllocation = { hp: 20, damage: 20, speed: 20, skill: 20, defense: 20 };
     const { app } = await loadModuleAppWithInitialAlpineAllocation(initialAllocation);
@@ -4966,6 +5009,7 @@ testStatAllocationRules(app);
 testStatAllocationUiSyncEvent();
 testRenderPlayerSetupCopiesAllocation(app);
 testComponentBridgeCallsGameHandlers(app);
+testComponentBridgeEquipmentFunctions();
 await testBattleAppAdoptsPreExistingAlpineAllocation();
 testIndexCacheVersionMatchesLatestPatchNote();
 testStatBalanceSystem();

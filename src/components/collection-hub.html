@@ -458,7 +458,7 @@
             state.selectedCharacterId = null;
         }
 
-        const bridge = window.ballFightApp?.bridge ?? window.CollectionHubService ?? {};
+        const bridge = window.BallFightComponentBridge ?? window.ballFightApp?.bridge ?? window.CollectionHubService ?? {};
 
         return {
             state,
