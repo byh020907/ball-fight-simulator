@@ -1205,9 +1205,8 @@ function testHuntingSystem() {
         "SHARDS",
         "Chest rewards should roll from the rarity reward table"
     );
-    assert.equal(
-        previewHuntingChest(rare).rewardTable.some((reward) => reward.type === "temporary_stat"),
-        true,
+    assert.ok(
+        previewHuntingChest(rare).rewardTable.some((reward) => reward.type === "SHARDS"),
         "Chest preview should expose concrete possible reward effects"
     );
     const afterFloor = recordHuntingFloorResult(run, {

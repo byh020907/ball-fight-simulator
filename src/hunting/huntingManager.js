@@ -11,12 +11,8 @@ import {
     applyHuntingStatModifiersToSpec
 } from "./huntingState.js";
 import { rollShardReward, createHuntingChest, createEmptyHuntingLoot } from "./huntingRewards.js";
-import {
-    HUNTING_ARENA,
-    HUNTING_ENEMY_TYPES,
-    HUNTING_EVENT_TYPES,
-    HUNTING_CHEST_REWARD_TYPES
-} from "./huntingConfig.js";
+import { HUNTING_ARENA, HUNTING_ENEMY_TYPES, HUNTING_EVENT_TYPES } from "./huntingConfig.js";
+import { applyEquipmentStats } from "./equipmentConfig.js";
 import {
     HUNTING_TEAMS,
     createHuntingMinibossSpec,
@@ -112,7 +108,10 @@ export class HuntingManager {
         const enemySpecs = miniboss ? [miniboss, ...mobSpecs.slice(0, Math.max(1, mobSpecs.length - 1))] : mobSpecs;
 
         const appliedSpec = applyHuntingStatModifiersToSpec(
-            { ...applyStatAllocation(playerSpec, app.playerStatAllocation, true), teamId: HUNTING_TEAMS.PLAYER },
+            applyEquipmentStats(
+                { ...applyStatAllocation(playerSpec, app.playerStatAllocation, true), teamId: HUNTING_TEAMS.PLAYER },
+                app.playerProfile
+            ),
             run.statModifiers
         );
         const matchSpecs = [appliedSpec, ...enemySpecs];
@@ -122,8 +121,6 @@ export class HuntingManager {
         app._onSimulationResult = (a) => this._handleFinish(a);
 
         app.playerFighterId = run.characterId;
-
-        this._consumeDeferredEffects(run, appliedSpec);
 
         app.startMatch(matchSpecs, {
             keepLog: false,
@@ -139,45 +136,6 @@ export class HuntingManager {
                 ball.hp = Math.min(ball.maxHp, Math.max(1, run.carriedHp));
             }
         }
-        if (run._pendingHeal && run.carriedHp === null) {
-            const ball = app.simulation?.fighters?.find((f) => f.id === run.characterId);
-            if (ball) {
-                ball.hp = Math.min(ball.maxHp, Math.ceil(ball.maxHp * run._pendingHeal));
-            }
-        }
-    }
-
-    _consumeDeferredEffects(run, appliedSpec) {
-        const profile = this.app.playerProfile;
-        const effects = profile.hunting?.deferredEffects;
-        if (!Array.isArray(effects) || effects.length === 0) return;
-
-        const remaining = [];
-        for (const effect of effects) {
-            if (!effect.active) continue;
-            if (effect.type === HUNTING_CHEST_REWARD_TYPES.INSTANT_HEAL) {
-                if (run.carriedHp === null) {
-                    run._pendingHeal = Math.max(0, Math.min(1, effect.healRatio ?? 0));
-                } else {
-                    const maxHp = run.carriedMaxHp ?? run.carriedHp;
-                    const heal = Math.floor(maxHp * (effect.healRatio ?? 0));
-                    run.carriedHp = Math.min(maxHp, (run.carriedHp ?? 0) + heal);
-                }
-            } else if (effect.type === HUNTING_CHEST_REWARD_TYPES.TEMP_STAT) {
-                const floors = effect.floors ?? 1;
-                run.statModifiers = [
-                    ...(run.statModifiers ?? []),
-                    {
-                        source: "chest_reward",
-                        stat: effect.stat,
-                        multiplier: effect.multiplier ?? 1,
-                        remainingFloors: floors
-                    }
-                ];
-            }
-        }
-        profile.hunting.deferredEffects = remaining;
-        savePlayerProfile(profile);
     }
 
     _handleFinish(app) {

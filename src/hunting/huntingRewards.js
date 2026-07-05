@@ -17,162 +17,76 @@ export const HUNTING_CHEST_REWARD_TABLE = Object.freeze({
     common: Object.freeze([
         Object.freeze({
             id: "common-key-shards",
-            weight: 45,
+            weight: 55,
             type: HUNTING_CHEST_REWARD_TYPES.SHARDS,
             amount: 18,
             text: "파편 +18"
         }),
         Object.freeze({
-            id: "common-field-heal",
-            weight: 35,
-            type: HUNTING_CHEST_REWARD_TYPES.INSTANT_HEAL,
-            healRatio: 0.18,
-            text: "다음 사냥터 HP 회복 +18%"
-        }),
-        Object.freeze({
-            id: "common-damage-boost",
-            weight: 20,
-            type: HUNTING_CHEST_REWARD_TYPES.TEMP_STAT,
-            stat: "damage",
-            multiplier: 1.08,
-            floors: 1,
-            text: "다음 1층 피해 +8%"
+            id: "common-equipment",
+            weight: 45,
+            type: HUNTING_CHEST_REWARD_TYPES.EQUIPMENT,
+            text: "일반 장비"
         })
     ]),
     uncommon: Object.freeze([
         Object.freeze({
             id: "uncommon-key-shards",
-            weight: 35,
+            weight: 45,
             type: HUNTING_CHEST_REWARD_TYPES.SHARDS,
             amount: 45,
             text: "파편 +45"
         }),
         Object.freeze({
-            id: "uncommon-field-heal",
-            weight: 30,
-            type: HUNTING_CHEST_REWARD_TYPES.INSTANT_HEAL,
-            healRatio: 0.3,
-            text: "다음 사냥터 HP 회복 +30%"
-        }),
-        Object.freeze({
-            id: "uncommon-defense-boost",
-            weight: 20,
-            type: HUNTING_CHEST_REWARD_TYPES.TEMP_STAT,
-            stat: "defense",
-            multiplier: 1.12,
-            floors: 2,
-            text: "다음 2층 방어 +12%"
-        }),
-        Object.freeze({
-            id: "uncommon-speed-boost",
-            weight: 15,
-            type: HUNTING_CHEST_REWARD_TYPES.TEMP_STAT,
-            stat: "speed",
-            multiplier: 1.08,
-            floors: 2,
-            text: "다음 2층 속도 +8%"
+            id: "uncommon-equipment",
+            weight: 55,
+            type: HUNTING_CHEST_REWARD_TYPES.EQUIPMENT,
+            text: "고급 장비"
         })
     ]),
     rare: Object.freeze([
         Object.freeze({
             id: "rare-key-shards",
-            weight: 30,
+            weight: 35,
             type: HUNTING_CHEST_REWARD_TYPES.SHARDS,
             amount: 105,
             text: "파편 +105"
         }),
         Object.freeze({
-            id: "rare-fuller-heal",
-            weight: 25,
-            type: HUNTING_CHEST_REWARD_TYPES.INSTANT_HEAL,
-            healRatio: 0.45,
-            text: "다음 사냥터 HP 회복 +45%"
-        }),
-        Object.freeze({
-            id: "rare-damage-boost",
-            weight: 25,
-            type: HUNTING_CHEST_REWARD_TYPES.TEMP_STAT,
-            stat: "damage",
-            multiplier: 1.15,
-            floors: 2,
-            text: "다음 2층 피해 +15%"
-        }),
-        Object.freeze({
-            id: "rare-skill-boost",
-            weight: 20,
-            type: HUNTING_CHEST_REWARD_TYPES.TEMP_STAT,
-            stat: "skill",
-            multiplier: 1.12,
-            floors: 2,
-            text: "다음 2층 기술 +12%"
+            id: "rare-equipment",
+            weight: 65,
+            type: HUNTING_CHEST_REWARD_TYPES.EQUIPMENT,
+            text: "희귀 장비"
         })
     ]),
     epic: Object.freeze([
         Object.freeze({
             id: "epic-key-shards",
-            weight: 25,
+            weight: 30,
             type: HUNTING_CHEST_REWARD_TYPES.SHARDS,
             amount: 230,
             text: "파편 +230"
         }),
         Object.freeze({
-            id: "epic-survival-heal",
-            weight: 25,
-            type: HUNTING_CHEST_REWARD_TYPES.INSTANT_HEAL,
-            healRatio: 0.65,
-            text: "다음 사냥터 HP 회복 +65%"
-        }),
-        Object.freeze({
-            id: "epic-damage-boost",
-            weight: 25,
-            type: HUNTING_CHEST_REWARD_TYPES.TEMP_STAT,
-            stat: "damage",
-            multiplier: 1.22,
-            floors: 3,
-            text: "다음 3층 피해 +22%"
-        }),
-        Object.freeze({
-            id: "epic-defense-boost",
-            weight: 25,
-            type: HUNTING_CHEST_REWARD_TYPES.TEMP_STAT,
-            stat: "defense",
-            multiplier: 1.2,
-            floors: 3,
-            text: "다음 3층 방어 +20%"
+            id: "epic-equipment",
+            weight: 70,
+            type: HUNTING_CHEST_REWARD_TYPES.EQUIPMENT,
+            text: "에픽 장비"
         })
     ]),
     legendary: Object.freeze([
         Object.freeze({
             id: "legendary-key-shards",
-            weight: 20,
+            weight: 25,
             type: HUNTING_CHEST_REWARD_TYPES.SHARDS,
             amount: 520,
             text: "파편 +520"
         }),
         Object.freeze({
-            id: "legendary-full-heal",
-            weight: 25,
-            type: HUNTING_CHEST_REWARD_TYPES.INSTANT_HEAL,
-            healRatio: 1,
-            text: "다음 사냥터 HP 완전 회복"
-        }),
-        Object.freeze({
-            id: "legendary-damage-boost",
-            weight: 30,
-            type: HUNTING_CHEST_REWARD_TYPES.TEMP_STAT,
-            stat: "damage",
-            multiplier: 1.35,
-            floors: 3,
-            text: "다음 3층 피해 +35%"
-        }),
-        Object.freeze({
-            id: "legendary-all-rounder",
-            weight: 25,
-            type: HUNTING_CHEST_REWARD_TYPES.TEMP_STAT,
-            stat: "speed",
-            multiplier: 1.25,
-            floors: 3,
-            text: "다음 3층 속도 +25%"
+            id: "legendary-equipment",
+            weight: 75,
+            type: HUNTING_CHEST_REWARD_TYPES.EQUIPMENT,
+            text: "전설 장비"
         })
     ])
 });

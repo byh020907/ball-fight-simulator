@@ -265,6 +265,61 @@
                 </div>
             </div>
         </div>
+
+        <div class="ch-content" x-show="state.activeTab === 'equipment'" role="tabpanel">
+            <div class="ch-toolbar">
+                <span class="ch-toolbar-title">장비 인벤토리</span>
+                <span class="ch-storage-currency">강화석 <b x-text="state.equipment.enhancementStones"></b></span>
+            </div>
+            <div class="ch-scroll-region">
+                <div class="ch-equip-slots">
+                    <h4>장착 슬롯</h4>
+                    <div class="ch-equip-slot-grid">
+                        <template x-for="(slotName, slotId) in { weapon: '무기', armor: '방어구', accessory1: '장신구1', accessory2: '장신구2' }">
+                            <div class="ch-equip-slot-card">
+                                <div class="ch-equip-slot-label" x-text="slotName"></div>
+                                <div class="ch-equip-slot-item" x-text="state.equipment.equippedSlots[slotId] || '—'"></div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                <div class="ch-equip-list">
+                    <h4>보유 장비 (<span x-text="state.equipment.items.length"></span>/<span x-text="state.equipment.maxInventorySlots"></span>)</h4>
+                    <template x-for="item in state.equipment.items" :key="item.instanceId">
+                        <div class="ch-equip-card" x-bind:class="'ch-equip--' + item.rarity">
+                            <div class="ch-equip-card-header">
+                                <strong x-text="item.name"></strong>
+                                <span class="ch-equip-rarity" x-text="item.rarity"></span>
+                                <span class="ch-equip-slot-badge" x-text="item.slot"></span>
+                            </div>
+                            <div class="ch-equip-card-stats">
+                                <template x-for="stat in item.stats">
+                                    <span class="ch-equip-stat" x-text="stat.type + ' +' + stat.value"></span>
+                                </template>
+                                <template x-if="item.specialOptions">
+                                    <span class="ch-equip-stat ch-equip-stat--special" x-text="'특수: ' + item.specialOptions.map(o => o.type + ' +' + o.value + '%').join(', ')"></span>
+                                </template>
+                            </div>
+                            <div class="ch-equip-card-actions">
+                                <button
+                                    x-show="!item.isEquipped"
+                                    class="ch-btn"
+                                    @click="bridge.equipItem(item.instanceId)"
+                                    x-text="'장착'"
+                                ></button>
+                                <button
+                                    x-show="item.isEquipped"
+                                    class="ch-btn ch-btn--danger"
+                                    @click="bridge.unequipItem(item.instanceId)"
+                                    x-text="'해제'"
+                                ></button>
+                            </div>
+                        </div>
+                    </template>
+                    <div class="ch-empty" x-show="state.equipment.items.length === 0">보유한 장비가 없습니다</div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -357,14 +412,18 @@
             state.selectedCharacterId = null;
         }
 
+        const bridge = window.ballFightApp?.bridge ?? window.CollectionHubService ?? {};
+
         return {
             state,
+            bridge,
             init() {
                 this.$watch("$store.collectionHub", (val) => {
                     if (!val) return;
                     state.rosterItems = val.rosterItems ?? [];
                     state.masteryItems = val.masteryItems ?? [];
                     state.achievementItems = val.achievementItems ?? [];
+                    state.equipment = val.equipment ?? { items: [], enhancementStones: 0, maxInventorySlots: 5, equippedSlots: {} };
                     state.storage = val.storage ?? { shards: 0, chests: [], stats: {} };
                     state.summary = val.summary ?? {};
                     state.tabs = val.tabs ?? [];
@@ -898,6 +957,141 @@
 }
 
 .ch-chest--legendary {
+    border-left: 4px solid #f59e0b;
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.3);
+}
+
+.ch-equip-slots {
+    margin-bottom: 16px;
+}
+
+.ch-equip-slots h4 {
+    margin: 0 0 8px;
+    font-size: 0.85rem;
+    color: #202020;
+}
+
+.ch-equip-slot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+}
+
+.ch-equip-slot-card {
+    border: 2px solid #202020;
+    border-radius: 8px;
+    padding: 8px 10px;
+    background: #fafafa;
+}
+
+.ch-equip-slot-label {
+    font-size: 0.7rem;
+    color: #777777;
+    margin-bottom: 2px;
+}
+
+.ch-equip-slot-item {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #202020;
+}
+
+.ch-equip-list h4 {
+    margin: 0 0 8px;
+    font-size: 0.85rem;
+    color: #202020;
+}
+
+.ch-equip-card {
+    border: 2px solid #202020;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    background: #ffffff;
+}
+
+.ch-equip-card-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.ch-equip-rarity {
+    font-size: 0.65rem;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: #eeeeee;
+    color: #555555;
+    text-transform: uppercase;
+}
+
+.ch-equip-slot-badge {
+    font-size: 0.65rem;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: #e0e0e0;
+    color: #555555;
+}
+
+.ch-equip-card-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 6px;
+}
+
+.ch-equip-stat {
+    font-size: 0.72rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #eef2ff;
+    color: #4338ca;
+}
+
+.ch-equip-stat--special {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.ch-equip-card-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.ch-btn {
+    padding: 4px 12px;
+    border: 2px solid #202020;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #202020;
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.ch-btn--danger {
+    border-color: #dc2626;
+    color: #dc2626;
+}
+
+.ch-equip--common {
+    border-left: 4px solid #9ca3af;
+}
+
+.ch-equip--uncommon {
+    border-left: 4px solid #28a447;
+}
+
+.ch-equip--rare {
+    border-left: 4px solid #d4a017;
+}
+
+.ch-equip--epic {
+    border-left: 4px solid #a855f7;
+}
+
+.ch-equip--legendary {
     border-left: 4px solid #f59e0b;
     box-shadow: 0 0 6px rgba(245, 158, 11, 0.3);
 }

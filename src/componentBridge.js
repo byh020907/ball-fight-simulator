@@ -51,6 +51,39 @@ export function createComponentBridge(Alpine) {
         },
         async openChest(chestId) {
             await globalThis.CollectionHubService?.openChest?.(chestId);
+        },
+        equipItem(instanceId) {
+            const app = getGameApp();
+            if (!app?.playerProfile?.equipment) return false;
+            const item = app.playerProfile.equipment.inventory.find((i) => i.instanceId === instanceId);
+            if (!item) return false;
+            const slot = item.slot;
+            if (slot === "accessory") {
+                if (!app.playerProfile.equipment.equipped.accessory1) {
+                    app.playerProfile.equipment.equipped.accessory1 = instanceId;
+                } else if (!app.playerProfile.equipment.equipped.accessory2) {
+                    app.playerProfile.equipment.equipped.accessory2 = instanceId;
+                } else {
+                    return false;
+                }
+            } else {
+                app.playerProfile.equipment.equipped[slot] = instanceId;
+            }
+            app._refreshCollectionHub?.();
+            return true;
+        },
+        unequipItem(instanceId) {
+            const app = getGameApp();
+            if (!app?.playerProfile?.equipment) return false;
+            const equipped = app.playerProfile.equipment.equipped;
+            for (const [slot, id] of Object.entries(equipped)) {
+                if (id === instanceId) {
+                    equipped[slot] = null;
+                    app._refreshCollectionHub?.();
+                    return true;
+                }
+            }
+            return false;
         }
     };
 }

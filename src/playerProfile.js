@@ -26,11 +26,16 @@ export function createDefaultPlayerProfile() {
             currentXp: 0,
             byCharacter: {}
         },
+        equipment: {
+            inventory: [],
+            equipped: { weapon: null, armor: null, accessory1: null, accessory2: null },
+            enhancementStones: 0,
+            maxInventorySlots: 5
+        },
         hunting: {
             shards: 0,
             chests: [],
             blueprints: {},
-            deferredEffects: [],
             stats: {
                 runsStarted: 0,
                 runsRetreated: 0,
@@ -200,7 +205,6 @@ function sanitizeHunting(obj) {
         shards: sanitizeNumber(obj.shards),
         chests,
         blueprints: sanitizeHuntingBlueprints(obj.blueprints),
-        deferredEffects: Array.isArray(obj.deferredEffects) ? obj.deferredEffects.slice(0, 50) : [],
         stats: {
             runsStarted: sanitizeNumber(obj.stats?.runsStarted),
             runsRetreated: sanitizeNumber(obj.stats?.runsRetreated),
@@ -272,12 +276,32 @@ function sanitizeCharacterMastery(obj) {
     return { levels };
 }
 
+function sanitizeEquipment(obj) {
+    if (!obj || typeof obj !== "object") return createDefaultPlayerProfile().equipment;
+    const inventory = Array.isArray(obj.inventory)
+        ? obj.inventory.filter((item) => item && typeof item.instanceId === "string").slice(-100)
+        : [];
+    const equipped = obj.equipped && typeof obj.equipped === "object" ? obj.equipped : {};
+    return {
+        inventory,
+        equipped: {
+            weapon: typeof equipped.weapon === "string" ? equipped.weapon : null,
+            armor: typeof equipped.armor === "string" ? equipped.armor : null,
+            accessory1: typeof equipped.accessory1 === "string" ? equipped.accessory1 : null,
+            accessory2: typeof equipped.accessory2 === "string" ? equipped.accessory2 : null
+        },
+        enhancementStones: sanitizeNumber(obj.enhancementStones),
+        maxInventorySlots: Math.max(5, sanitizeNumber(obj.maxInventorySlots) || 5)
+    };
+}
+
 export function sanitizePlayerProfile(raw) {
     if (!raw || typeof raw !== "object") return createDefaultPlayerProfile();
     return {
         version: PROFILE_VERSION,
         characterMastery: sanitizeCharacterMastery(raw.characterMastery ?? raw.characterLinks),
         experience: sanitizeExperience(raw.experience),
+        equipment: sanitizeEquipment(raw.equipment),
         hunting: sanitizeHunting(raw.hunting),
         progression: {
             challenge: sanitizeChallenge(raw.progression?.challenge)

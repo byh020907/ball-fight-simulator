@@ -13,7 +13,8 @@ export const COLLECTION_HUB_TABS = Object.freeze([
     { id: "roster", label: "도감" },
     { id: "mastery", label: "숙련도" },
     { id: "achievements", label: "업적" },
-    { id: "storage", label: "보관함" }
+    { id: "storage", label: "보관함" },
+    { id: "equipment", label: "장비" }
 ]);
 
 /** 숙련도 계산 */
@@ -141,6 +142,23 @@ export function createCollectionHubViewModel({
         };
     });
 
+    const equipment = profile?.equipment ?? {};
+    const inventory = equipment.inventory ?? [];
+    const equipped = equipment.equipped ?? {};
+    const equippedIdSet = new Set(Object.values(equipped).filter(Boolean));
+
+    const equipmentItems = inventory.map((item) => ({
+        instanceId: item.instanceId,
+        rarity: item.rarity,
+        slot: item.slot,
+        name: item.name,
+        description: item.description,
+        stats: item.stats ?? [],
+        specialOptions: item.specialOptions,
+        enhanceLevel: item.enhanceLevel ?? 0,
+        isEquipped: equippedIdSet.has(item.instanceId)
+    }));
+
     const storageItems = (hunting.chests ?? []).map((chest) => {
         const preview = previewHuntingChest(chest);
         return {
@@ -178,6 +196,21 @@ export function createCollectionHubViewModel({
             masteryTotal,
             shards: hunting.shards ?? 0,
             storageChestCount: storageItems.length
+        },
+        equipment: {
+            items: equipmentItems,
+            enhancementStones: equipment.enhancementStones ?? 0,
+            maxInventorySlots: equipment.maxInventorySlots ?? 5,
+            equippedSlots: {
+                weapon: equipped.weapon ? (inventory.find((i) => i.instanceId === equipped.weapon)?.name ?? "—") : "—",
+                armor: equipped.armor ? (inventory.find((i) => i.instanceId === equipped.armor)?.name ?? "—") : "—",
+                accessory1: equipped.accessory1
+                    ? (inventory.find((i) => i.instanceId === equipped.accessory1)?.name ?? "—")
+                    : "—",
+                accessory2: equipped.accessory2
+                    ? (inventory.find((i) => i.instanceId === equipped.accessory2)?.name ?? "—")
+                    : "—"
+            }
         },
         storage: {
             shards: hunting.shards ?? 0,

@@ -69,8 +69,7 @@ export const HUNTING_SCALING = Object.freeze({
 
 export const HUNTING_CHEST_REWARD_TYPES = Object.freeze({
     SHARDS: "SHARDS",
-    INSTANT_HEAL: "instant_heal",
-    TEMP_STAT: "temporary_stat"
+    EQUIPMENT: "equipment"
 });
 
 export const HUNTING_STAT_KEYS = Object.freeze(["hp", "damage", "defense", "speed", "skill"]);

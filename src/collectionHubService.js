@@ -6,6 +6,7 @@ export class CollectionHubService {
         data.rosterItems = vm.rosterItems;
         data.masteryItems = vm.masteryItems;
         data.achievementItems = vm.achievementItems;
+        data.equipment = vm.equipment;
         data.storage = vm.storage;
         data.summary = vm.summary;
         data.tabs = [...COLLECTION_HUB_TABS];
@@ -46,17 +47,18 @@ export class CollectionHubService {
         savePlayerProfile(app.playerProfile);
         app._refreshCollectionHub?.();
 
-        let bodyHtml = `<p><strong>${result.chest.rarity.toUpperCase()} 상자</strong> 개봉 완료!</p>`;
-        bodyHtml += `<p>${result.reward.text}</p>`;
+        let bodyHtml = "";
         if (result.applied.shards > 0) {
-            bodyHtml += `<p>보유 파편: ${result.currentShards}</p>`;
+            bodyHtml += `<p>파편 +${result.applied.shards} (보유: ${result.currentShards})</p>`;
         }
-        if (result.applied.deferredEffect) {
-            bodyHtml += `<p style="color:#ff9800;margin-top:6px">⚠ 다음 사냥터 런 시작 시 적용됩니다.</p>`;
+        if (result.applied.equipment) {
+            const eq = result.applied.equipment;
+            const statsText = eq.stats.map((s) => `${s.type} +${s.value}`).join(", ");
+            bodyHtml += `<p><strong>${eq.name}</strong> (${eq.rarity})<br><span style="font-size:0.8rem">${eq.description} · ${statsText}</span></p>`;
         }
 
         globalThis.PopupService?.show?.({
-            title: "🎁 상자 개봉 결과",
+            title: "상자 개봉 결과",
             bodyHtml
         });
     }

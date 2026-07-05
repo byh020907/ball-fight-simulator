@@ -5,6 +5,7 @@ import {
     getHuntingChestRewardTable,
     rollHuntingChestReward
 } from "./huntingRewards.js";
+import { generateEquipmentFromRarity } from "./equipmentConfig.js";
 
 export function canOpenHuntingChest(profile, chest) {
     if (!profile?.hunting || !chest) return false;
@@ -22,35 +23,30 @@ export function previewHuntingChest(chest) {
     };
 }
 
-export function applyHuntingChestReward(profile, reward) {
-    const applied = {
-        shards: 0,
-        deferredEffect: null
-    };
+export function applyHuntingChestReward(profile, reward, { rng = Math.random } = {}) {
+    const applied = { shards: 0, equipment: null };
 
     if (!profile?.hunting || !reward) return applied;
 
     if (reward.type === HUNTING_CHEST_REWARD_TYPES.SHARDS) {
         const amount = Math.max(0, Math.floor(reward.amount ?? 0));
         profile.hunting.shards = (profile.hunting.shards ?? 0) + amount;
-        applied.shards += amount;
+        applied.shards = amount;
         return applied;
     }
 
-    const effect = {
-        type: reward.type,
-        stat: reward.stat ?? null,
-        multiplier: reward.multiplier ?? null,
-        floors: reward.floors ?? null,
-        healRatio: reward.healRatio ?? null,
-        text: reward.text,
-        active: true
-    };
-    if (!Array.isArray(profile.hunting.deferredEffects)) {
-        profile.hunting.deferredEffects = [];
+    if (reward.type === HUNTING_CHEST_REWARD_TYPES.EQUIPMENT) {
+        if (!Array.isArray(profile.equipment?.inventory)) {
+            profile.equipment = profile.equipment || {};
+            profile.equipment.inventory = [];
+        }
+        const rarity = reward.rarity ?? "common";
+        const equipment = generateEquipmentFromRarity(rarity, rng);
+        profile.equipment.inventory.push(equipment);
+        applied.equipment = equipment;
+        return applied;
     }
-    profile.hunting.deferredEffects.push(effect);
-    applied.deferredEffect = effect;
+
     return applied;
 }
 
@@ -75,7 +71,10 @@ export function openHuntingChest(profile, chestId, { rng = Math.random } = {}) {
     profile.hunting.chests = chests.filter((item) => item.id !== chestId);
 
     const reward = rollHuntingChestReward(chest, { rng });
-    const applied = applyHuntingChestReward(profile, reward);
+    if (reward.type === HUNTING_CHEST_REWARD_TYPES.EQUIPMENT) {
+        reward.rarity = chest.rarity;
+    }
+    const applied = applyHuntingChestReward(profile, reward, { rng });
     return {
         opened: true,
         chest,

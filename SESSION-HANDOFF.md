@@ -443,6 +443,12 @@
 - 영향: `src/ui.js:469`(필터), `src/entities/battleBall.js:48,317-322,347-361`(hunting prop, HP바)
 - 검증: `npm test`, `npm run format:check` 통과
 
+## [L1] 2026-07-05 — 장비 시스템 MVP (상자 보상 교체 + 인벤토리 + 스탯 적용)
+- 맥락: 상자가 INSTANT_HEAL/TEMP_STAT 일시적 효과를 주고 있었으나, docs/equipment-system.md 설계대로 장비를 주도록 변경. deferredEffects 체계 정리.
+- 결정: (1) INSTANT_HEAL/TEMP_STAT 제거 — `HUNTING_CHEST_REWARD_TYPES`에서 삭제, 보상 테이블에서 항목 제거, `_consumeDeferredEffects()`, `_pendingHeal`, `deferredEffects` 필드 전면 제거. (2) `src/hunting/equipmentConfig.js` 생성 — 슬롯/등급별 스탯 범위, 특수 옵션 풀, 장비 이름 풀, `createEquipmentInstance()`, `applyEquipmentStats()`, `getEquippedStatBonuses()`. (3) 프로필 `equipment.inventory/equipped/enhancementStones/maxInventorySlots` 추가 + sanitize. (4) 상자 보상 테이블에 EQUIPMENT 타입 추가 — SHARDS와 장비 2지선다. (5) `openHuntingChest()` → 장비 인스턴스 생성 → 인벤토리 추가 → 팝업에 장비 정보 표시. (6) `applyEquipmentStats()`를 `huntingManager._startFloorBattle()`에 적용. (7) 컬렉션 허브 장비 탭 추가 — 슬롯 현황 + 인벤토리 목록 + 장착/해제 버튼. (8) equip/unequip 브릿지 메서드 추가.
+- 영향: `src/hunting/equipmentConfig.js`(신규), `src/hunting/huntingConfig.js`, `src/hunting/huntingRewards.js`, `src/hunting/chestRewards.js`, `src/hunting/huntingManager.js`, `src/playerProfile.js`, `src/collectionHubService.js`, `src/componentBridge.js`, `src/components/collection-hub.html`, `src/collection/collectionViewModel.js`, `tests/regression.mjs`
+- 검증: `npm test`, `npm run format` 통과
+
 ## [L1] 2026-07-05 — 파편 리네임 + 상자 개봉 UI + deferredEffects 적용
 - 맥락: "해조각" 명칭을 "파편"으로 변경. 상자 개봉/보상 시스템 미완성 상태를 완료.
 - 결정: (1) `keyShards`→`shards`, `KEY_SHARDS`→`SHARDS`, `rollKeyShardReward`→`rollShardReward`, 상수명 전체 리네임, UI 텍스트 "해조각"→"파편". (2) `profile.hunting.deferredEffects` 배열 추가 — INSTANT_HEAL/TEMP_STAT 보상을 프로필에 저장. (3) `huntingManager._consumeDeferredEffects()` 사냥터 런 시작 시 deferredEffects 소비 (HP 회복, 임시 스탯 버프). (4) `collectionHubService.openChest()` 보관함 개봉 로직 연결. (5) collection-hub storage 탭 상자 카드에 `@click` + `openChest(item)` 핸들러. (6) 개봉 결과 PopupService 팝업 표시. (7) epic/legendary CSS + 필터 옵션 추가.
