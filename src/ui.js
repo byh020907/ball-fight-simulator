@@ -72,12 +72,7 @@ export function appStore() {
         statusText: "내 캐릭터 스탯을 배분하세요",
         statusSubtext: "랜덤 대진과 전투 결과가 여기에 갱신됩니다.",
 
-        // Overlay
-        overlayVisible: false,
-        overlayTransient: false,
-        overlayLabel: "",
-        overlayText: "",
-        overlaySubtext: "",
+        // Overlay (handled by <game-overlay> component via Alpine.store)
         xpReward: {
             visible: false,
             characterName: "",
@@ -94,23 +89,7 @@ export function appStore() {
             nextRewardText: ""
         },
 
-        // Start button
-        startHidden: true,
-        _startDisabled: null,
-        _startText: null,
-        get startDisabled() {
-            return this._startDisabled !== null ? this._startDisabled : this.remainingPoints > 0 || this.locked;
-        },
-        get startText() {
-            return this._startText !== null
-                ? this._startText
-                : this.remainingPoints > 0
-                  ? `스탯 ${this.remainingPoints} 남음`
-                  : "토너먼트 시작";
-        },
-
-        // Fighter cards (roster)
-        fighters: [],
+        // Start button (handled by <start-button> component via Alpine.store)
 
         // Collection hub (thin wrapper for C button)
         openCollectionHub(tabId) {
@@ -120,22 +99,6 @@ export function appStore() {
         // Hunting ground
         huntingActive: false,
         huntingAvailable: false,
-        huntingChoiceVisible: false,
-        huntingFloor: 1,
-        huntingCharacterName: "",
-        huntingLootSummary: "",
-        openHuntingLobby() {
-            if (window.ballFightApp?.hunting) window.ballFightApp.hunting.showCharacterSelect();
-        },
-        huntingRetreat() {
-            if (window.ballFightApp?.hunting) window.ballFightApp.hunting.retreat();
-        },
-        huntingAdvance() {
-            if (window.ballFightApp?.hunting) window.ballFightApp.hunting.advance();
-        },
-
-        // Battle log
-        logItems: [],
 
         // Tournament
         tournamentActive: false,
@@ -150,16 +113,45 @@ export function appStore() {
         highestUnlockedLevel: 0,
         progressionBonusSummary: "",
 
+        _syncStartButton() {
+            try {
+                const store = typeof Alpine !== "undefined" ? Alpine.store("startButton") : null;
+                if (store) {
+                    store.disabledOverride = null;
+                    store.textOverride = null;
+                    store.remainingPoints = this.remainingPoints ?? 0;
+                    store.locked = Boolean(this.locked);
+                }
+            } catch {
+                // no-op outside browser
+            }
+        },
+
         adjustChallengeLevel(delta) {
             const next = this.challengeLevel + delta;
             if (next < 0 || next > this.highestUnlockedLevel) return;
             this.challengeLevel = next;
-            this._startDisabled = null;
-            this._startText = null;
+            this._syncStartButton();
+            this._syncPlayerPanelChallenge();
+        },
+
+        _syncPlayerPanelChallenge() {
+            try {
+                const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
+                const store = alpine ? alpine.store("playerPanel") : null;
+                if (store) {
+                    store.challengeLevel = this.challengeLevel;
+                    store.highestUnlockedLevel = this.highestUnlockedLevel;
+                }
+            } catch {
+                // no-op
+            }
         },
 
         init() {
             this._syncSummary();
+            this._syncStartButton();
+            this._syncPlayerPanelChallenge();
         },
 
         // Actions
@@ -167,8 +159,7 @@ export function appStore() {
             if (this.locked) return;
             this.allocation = adjustStatAllocation(this.allocation, key, delta, this.totalPoints);
             this.remainingPoints = getRemainingStatPoints(this.allocation, this.totalPoints);
-            this._startDisabled = null;
-            this._startText = null;
+            this._syncStartButton();
             this._syncSummary();
             this._emitAllocationChanged();
         },
@@ -177,8 +168,7 @@ export function appStore() {
             if (this.locked) return;
             this.allocation = createRandomStatAllocation(undefined, this.totalPoints);
             this.remainingPoints = getRemainingStatPoints(this.allocation, this.totalPoints);
-            this._startDisabled = null;
-            this._startText = null;
+            this._syncStartButton();
             this._syncSummary();
             this._emitAllocationChanged();
         },
@@ -187,8 +177,7 @@ export function appStore() {
             if (this.locked) return;
             this.allocation = createEmptyStatAllocation();
             this.remainingPoints = getRemainingStatPoints(this.allocation, this.totalPoints);
-            this._startDisabled = null;
-            this._startText = null;
+            this._syncStartButton();
             this._syncSummary();
             this._emitAllocationChanged();
         },
@@ -204,6 +193,18 @@ export function appStore() {
             ];
             const mult = calculateStatMultiplier(vals).multiplier;
             this.allocationSummary = m + "  \u00D7" + mult.toFixed(3);
+            try {
+                const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
+                const store = alpine ? alpine.store("playerPanel") : null;
+                if (store) {
+                    store.allocation = { ...this.allocation };
+                    store.remainingPoints = this.remainingPoints;
+                    store.totalPoints = this.totalPoints;
+                    store.allocationSummary = this.allocationSummary;
+                }
+            } catch {
+                // no-op
+            }
         },
 
         _emitAllocationChanged() {
@@ -315,6 +316,16 @@ export class UIController {
         this.roster = roster;
         this._rootData = null;
         this.logItems = [];
+        this._overlayTransient = false;
+        this._transientToken = "";
+    }
+
+    get overlayTransient() {
+        return this._overlayTransient;
+    }
+
+    get transientToken() {
+        return this._transientToken;
     }
 
     get state() {
@@ -334,6 +345,24 @@ export class UIController {
         if (s) fn(s);
     }
 
+    _exposeActionsToPlayerPanel() {
+        try {
+            const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
+            const store = alpine ? alpine.store("playerPanel") : null;
+            if (store) {
+                store._actions = {
+                    adjustStat: (key, delta) => this.state?.adjustStat(key, delta),
+                    randomAllocation: () => this.state?.randomAllocation(),
+                    resetAllocation: () => this.state?.resetAllocation(),
+                    adjustChallengeLevel: (delta) => this.state?.adjustChallengeLevel(delta),
+                    openCollectionHub: () => this.state?.openCollectionHub("roster")
+                };
+            }
+        } catch {
+            // no-op
+        }
+    }
+
     renderPlayerSetup({
         fighter,
         stats,
@@ -350,10 +379,6 @@ export class UIController {
     } = {}) {
         const s = this.state;
         if (!s) return;
-        s.playerFighter = fighter;
-        if (experience) {
-            s.playerExperience = { ...experience };
-        }
         s.allocation = { ...allocation };
         s.totalPoints = totalPoints;
         s.bonusPoints = bonusPoints;
@@ -363,10 +388,43 @@ export class UIController {
         s.highestUnlockedLevel = highestUnlockedLevel;
         s.progressionBonusSummary = progressionBonusSummary;
         s.huntingAvailable = Boolean(huntingAvailable);
-        s._startDisabled = null;
-        s._startText = null;
+        if (experience) {
+            s.playerExperience = { ...experience };
+        }
+        this._syncHuntingButtonStore();
         s._syncSummary?.();
+        try {
+            const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
+            const store = alpine ? alpine.store("playerPanel") : null;
+            if (store) {
+                store.fighter = fighter ? { name: fighter.name, title: fighter.title, color: fighter.color } : null;
+                if (experience) {
+                    store.experience = { ...experience };
+                }
+                store.allocation = { ...allocation };
+                store.totalPoints = totalPoints;
+                store.bonusPoints = bonusPoints;
+                store.remainingPoints = remainingPoints;
+                store.locked = Boolean(locked);
+                store.challengeLevel = challengeLevel;
+                store.highestUnlockedLevel = highestUnlockedLevel;
+                store.progressionBonusSummary = progressionBonusSummary;
+                if (stats && Array.isArray(stats)) {
+                    store.statDefs = stats.map((s) => ({ key: s.key, label: s.label, description: s.description }));
+                }
+            }
+            const startStore = alpine ? alpine.store("startButton") : null;
+            if (startStore) {
+                startStore.disabledOverride = null;
+                startStore.textOverride = null;
+                startStore.remainingPoints = remainingPoints ?? 0;
+                startStore.locked = Boolean(locked);
+            }
+        } catch {
+            // no-op outside browser
+        }
         this._drawPlayerFace(fighter);
+        this._exposeActionsToPlayerPanel();
     }
 
     /** 플레이어 패널에 캐릭터 얼굴 그리기 */
@@ -425,15 +483,13 @@ export class UIController {
     }
 
     renderRoster(activeIds = [], activeSpecs = []) {
-        const s = this.state;
-        if (!s) return;
         const activeSpecById = new Map(activeSpecs.map((fighter) => [fighter.id, fighter]));
         const visibleRoster = activeIds.length
             ? activeIds
                   .map((id) => activeSpecById.get(id) ?? this.roster.find((fighter) => fighter.id === id))
                   .filter(Boolean)
             : [];
-        s.fighters = visibleRoster.map((fighter) => {
+        const fighters = visibleRoster.map((fighter) => {
             const isHero = fighter.id === FIGHTER_IDS.HERO;
             const maxHp = fighter.maxHp ?? fighter.stats?.hp ?? 0;
             const hp = fighter.hp ?? maxHp;
@@ -459,18 +515,58 @@ export class UIController {
                 actionName: null
             };
         });
+        try {
+            const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
+            if (alpine) {
+                const store = alpine.store("fighterStrip");
+                if (store) store.fighters = fighters;
+            }
+        } catch {
+            // no-op outside browser
+        }
     }
 
     updateStatus() {}
 
-    showOverlay(label, text, subtext = "", xpReward = null) {
+    _setGameOverlay(data) {
+        try {
+            const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
+            if (alpine) {
+                const store = alpine.store("gameOverlay");
+                if (store) Object.assign(store, data);
+            }
+        } catch {
+            // no-op outside browser
+        }
+    }
+
+    setHuntingActive(active) {
         const s = this.state;
-        if (!s) return;
-        s.overlayVisible = true;
-        s.overlayTransient = false;
-        s.overlayLabel = label;
-        s.overlayText = text;
-        s.overlaySubtext = subtext;
+        if (s) s.huntingActive = Boolean(active);
+        this._syncHuntingButtonStore();
+    }
+
+    setHuntingOverlayState(data) {
+        try {
+            const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
+            if (alpine) {
+                const store = alpine.store("gameOverlay");
+                if (store) Object.assign(store, data);
+            }
+        } catch {
+            // no-op outside browser
+        }
+    }
+
+    showOverlay(label, text, subtext = "", xpReward = null) {
+        this._overlayTransient = false;
+        this._setGameOverlay({
+            visible: true,
+            transient: false,
+            label,
+            text,
+            subtext
+        });
         this._showXpReward(xpReward);
     }
 
@@ -518,34 +614,46 @@ export class UIController {
     }
 
     showTransientOverlay(label, text, token) {
-        const s = this.state;
-        if (!s) return;
-        s.overlayVisible = true;
-        s.overlayTransient = true;
-        s._transientToken = token;
-        s.overlayLabel = label;
-        s.overlayText = text;
-        s.overlaySubtext = "";
+        this._overlayTransient = true;
+        this._transientToken = token;
+        this._setGameOverlay({
+            visible: true,
+            transient: true,
+            label,
+            text,
+            subtext: ""
+        });
         this._resetXpReward();
     }
 
     hideOverlay() {
-        const s = this.state;
-        if (!s) return;
-        s.overlayVisible = false;
-        s.overlayTransient = false;
-        s.overlayLabel = "";
-        s.overlayText = "";
-        s.overlaySubtext = "";
+        this._overlayTransient = false;
+        this._transientToken = "";
+        this._setGameOverlay({
+            visible: false,
+            transient: false,
+            label: "",
+            text: "",
+            subtext: "",
+            huntingChoiceVisible: false
+        });
         this._resetXpReward();
     }
 
     setStartButton({ disabled, text, hidden }) {
-        const s = this.state;
-        if (!s) return;
-        if (hidden !== undefined) s.startHidden = hidden;
-        s._startDisabled = disabled !== undefined ? disabled : null;
-        s._startText = text !== undefined ? text : null;
+        try {
+            const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
+            if (alpine) {
+                const store = alpine.store("startButton");
+                if (store) {
+                    if (hidden !== undefined) store.hidden = Boolean(hidden);
+                    store.disabledOverride = disabled !== undefined ? disabled : null;
+                    store.textOverride = text !== undefined ? text : null;
+                }
+            }
+        } catch {
+            // no-op outside browser
+        }
     }
 
     resetLog() {
@@ -559,9 +667,32 @@ export class UIController {
     }
 
     renderLog() {
-        const s = this.state;
-        if (!s) return;
-        s.logItems = [...this.logItems];
+        try {
+            const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
+            if (alpine) {
+                const store = alpine.store("battleLog");
+                if (store) store.items = [...this.logItems];
+            }
+        } catch {
+            // no-op outside browser
+        }
+    }
+
+    _syncHuntingButtonStore() {
+        try {
+            const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
+            if (alpine) {
+                const s = this.state;
+                const store = alpine.store("huntingButton");
+                if (store && s) {
+                    store.available = Boolean(s.huntingAvailable);
+                    store.active = Boolean(s.huntingActive);
+                    store.tournamentActive = Boolean(s.tournamentActive);
+                }
+            }
+        } catch {
+            // no-op outside browser
+        }
     }
 
     renderTournament(tournament = null) {
@@ -570,13 +701,24 @@ export class UIController {
 
         if (!tournament) {
             s.tournamentActive = false;
-            s.tournamentPhase = "Ready";
+            this._syncHuntingButtonStore();
+            try {
+                const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
+                const store = alpine ? alpine.store("tournamentBracket") : null;
+                if (store) {
+                    store.visible = false;
+                    store.phase = "Ready";
+                    store.rounds = [];
+                }
+            } catch {
+                // no-op
+            }
             return;
         }
 
         s.tournamentActive = true;
-        s.tournamentPhase = tournament.champion ? "Champion" : "Running";
-        s.tournamentRounds = tournament.rounds.map((round, roundIndex) =>
+        this._syncHuntingButtonStore();
+        const rounds = tournament.rounds.map((round, roundIndex) =>
             round.map((match) => ({
                 id: match.id,
                 status: match.status,
@@ -606,47 +748,64 @@ export class UIController {
                     : null
             }))
         );
+        try {
+            const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
+            const store = alpine ? alpine.store("tournamentBracket") : null;
+            if (store) {
+                store.visible = true;
+                store.phase = tournament.champion ? "Champion" : "Running";
+                store.rounds = rounds;
+            }
+        } catch {
+            // no-op
+        }
     }
 
     updateLiveCards(fighters) {
-        const s = this.state;
-        if (!s) return;
-        s.fighters = s.fighters.map((card) => {
-            const fighter = fighters.find((f) => f.id === card.id || f.name === card.name);
-            if (!fighter) return card;
-            const alloc = fighter.stats.allocation ?? {};
-            const isHero = fighter.id === FIGHTER_IDS.HERO;
-            const pts = [alloc.hp ?? 0, alloc.damage ?? 0, alloc.speed ?? 0, alloc.skill ?? 0, alloc.defense ?? 0];
-            const mult = calculateStatMultiplier(pts).multiplier;
-            return {
-                ...card,
-                hp: Math.ceil(fighter.hp),
-                maxHp: Math.ceil(fighter.maxHp),
-                hpPct: Math.max(0, (fighter.hp / fighter.maxHp) * 100),
-                defeated: fighter.flags.defeated,
-                balanceMult: mult,
-                isHero,
-                mergedBonuses: mergeOrbBonuses(fighter.hero.bonuses ?? {}, fighter.hero.carryover ?? {}),
-                statLine: isHero
-                    ? formatHeroStatLine(
-                          fighter.stats.allocation ?? {},
-                          mergeOrbBonuses(fighter.hero.bonuses ?? {}, fighter.hero.carryover ?? {})
-                      )
-                    : formatStatAllocation(fighter.stats.allocation ?? {}),
-                heroStatParts: isHero
-                    ? formatHeroStatParts(
-                          fighter.stats.allocation ?? {},
-                          mergeOrbBonuses(fighter.hero.bonuses ?? {}, fighter.hero.carryover ?? {})
-                      )
-                    : [],
-                skillLabel: fighter.getAbilityUiState().label,
-                skillPct: Math.max(0, Math.min(1, fighter.getAbilityUiState().progress)),
-                skillText:
-                    fighter.getAbilityUiState().progress >= 0.995
-                        ? "Ready"
-                        : `${Math.round(fighter.getAbilityUiState().progress * 100)}%`,
-                actionName: fighter.clickActionName ?? null
-            };
-        });
+        try {
+            const alpine = typeof globalThis.Alpine !== "undefined" ? globalThis.Alpine : null;
+            const store = alpine ? alpine.store("fighterStrip") : null;
+            if (!store) return;
+            const current = store.fighters || [];
+            store.fighters = current.map((card) => {
+                const fighter = fighters.find((f) => f.id === card.id || f.name === card.name);
+                if (!fighter) return card;
+                const alloc = fighter.stats.allocation ?? {};
+                const isHero = fighter.id === FIGHTER_IDS.HERO;
+                const pts = [alloc.hp ?? 0, alloc.damage ?? 0, alloc.speed ?? 0, alloc.skill ?? 0, alloc.defense ?? 0];
+                const mult = calculateStatMultiplier(pts).multiplier;
+                return {
+                    ...card,
+                    hp: Math.ceil(fighter.hp),
+                    maxHp: Math.ceil(fighter.maxHp),
+                    hpPct: Math.max(0, (fighter.hp / fighter.maxHp) * 100),
+                    defeated: fighter.flags.defeated,
+                    balanceMult: mult,
+                    isHero,
+                    mergedBonuses: mergeOrbBonuses(fighter.hero.bonuses ?? {}, fighter.hero.carryover ?? {}),
+                    statLine: isHero
+                        ? formatHeroStatLine(
+                              fighter.stats.allocation ?? {},
+                              mergeOrbBonuses(fighter.hero.bonuses ?? {}, fighter.hero.carryover ?? {})
+                          )
+                        : formatStatAllocation(fighter.stats.allocation ?? {}),
+                    heroStatParts: isHero
+                        ? formatHeroStatParts(
+                              fighter.stats.allocation ?? {},
+                              mergeOrbBonuses(fighter.hero.bonuses ?? {}, fighter.hero.carryover ?? {})
+                          )
+                        : [],
+                    skillLabel: fighter.getAbilityUiState().label,
+                    skillPct: Math.max(0, Math.min(1, fighter.getAbilityUiState().progress)),
+                    skillText:
+                        fighter.getAbilityUiState().progress >= 0.995
+                            ? "Ready"
+                            : `${Math.round(fighter.getAbilityUiState().progress * 100)}%`,
+                    actionName: fighter.clickActionName ?? null
+                };
+            });
+        } catch {
+            // no-op outside browser
+        }
     }
 }

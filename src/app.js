@@ -751,8 +751,7 @@ export class BattleApp {
         const token = String(++this.transientOverlayToken);
         this.ui.showTransientOverlay(label, text, token);
         window.setTimeout(() => {
-            const s = this.ui.state;
-            if (s && s.overlayTransient && s._transientToken === token && !this.simulation?.finished) {
+            if (this.ui.overlayTransient && this.ui.transientToken === token && !this.simulation?.finished) {
                 this.ui.hideOverlay();
             }
         }, duration);

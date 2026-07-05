@@ -78,11 +78,8 @@ export class HuntingManager {
         if (!canEnterHunting(this.app.playerProfile, characterId)) return;
         this._run = createHuntingRun({ characterId });
         this.app.playerFighterId = characterId;
-        const s = this.app.ui.state;
-        if (s) {
-            s.huntingActive = true;
-            s.huntingChoiceVisible = false;
-        }
+        this.app.ui.setHuntingActive(true);
+        this.app.ui.setHuntingOverlayState({ huntingChoiceVisible: false });
         this._startFloorBattle();
     }
 
@@ -206,13 +203,12 @@ export class HuntingManager {
             const subtext = `층 ${run.floor} 완료 · ${shardsText}`;
 
             app.ui.showOverlay("사냥터", `${name} 승리!`, subtext);
-            const s = app.ui.state;
-            if (s) {
-                s.huntingChoiceVisible = true;
-                s.huntingFloor = run.floor;
-                s.huntingCharacterName = name;
-                s.huntingLootSummary = pendingText;
-            }
+            app.ui.setHuntingOverlayState({
+                huntingChoiceVisible: true,
+                huntingFloor: run.floor,
+                huntingCharacterName: name,
+                huntingLootSummary: pendingText
+            });
             app.ui.setStartButton({ hidden: true, disabled: true, text: "" });
             savePlayerProfile(app.playerProfile);
         } else {
@@ -230,11 +226,8 @@ export class HuntingManager {
                 `${name} 쓰러짐`,
                 `획득 ${securedShards} 해조각 · 손실 ${lostShards} 해조각`
             );
-            const s = app.ui.state;
-            if (s) {
-                s.huntingActive = false;
-                s.huntingChoiceVisible = false;
-            }
+            app.ui.setHuntingActive(false);
+            app.ui.setHuntingOverlayState({ huntingChoiceVisible: false });
             app._huntingDone = true;
             app.ui.setStartButton({ text: "확인", hidden: false, disabled: false });
             this._run = null;
@@ -253,11 +246,8 @@ export class HuntingManager {
         app._refreshCollectionHub();
         app.refreshPlayerSetup();
 
-        const s = app.ui.state;
-        if (s) {
-            s.huntingActive = false;
-            s.huntingChoiceVisible = false;
-        }
+        app.ui.setHuntingActive(false);
+        app.ui.setHuntingOverlayState({ huntingChoiceVisible: false });
 
         app._huntingDone = true;
         app.ui.showOverlay("사냥터 종료", "귀환 완료", `해조각 ${securedShards} 확보 · 최고 층 ${run.floor}`);
@@ -276,8 +266,7 @@ export class HuntingManager {
             return;
         }
 
-        const s = app.ui.state;
-        if (s) s.huntingChoiceVisible = false;
+        app.ui.setHuntingOverlayState({ huntingChoiceVisible: false });
 
         const event = this._run.lastEvent;
         if (event) {

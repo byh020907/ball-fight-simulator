@@ -80,134 +80,16 @@
                         <!-- 토스트 알림 -->
                         <toast-notification></toast-notification>
 
-                        <div
-                            class="overlay"
-                            id="overlay"
-                            x-show="overlayVisible"
-                            x-transition:enter="overlay-enter"
-                            x-transition:enter-start="overlay-enter-start"
-                            x-transition:enter-end="overlay-enter-end"
-                            x-transition:leave="overlay-leave"
-                            x-transition:leave-start="overlay-leave-start"
-                            x-transition:leave-end="overlay-leave-end"
-                            x-bind:class="{ transient: overlayTransient }"
-                        >
-                            <div class="overlay-card">
-                                <span x-text="overlayLabel">Waiting Room</span>
-                                <strong x-text="overlayText">START THE FIGHT</strong>
-                                <p x-show="overlaySubtext" x-text="overlaySubtext"></p>
-                                <xp-reward-panel class="xp-reward"></xp-reward-panel>
-                                <div class="hunting-choice" x-show="huntingChoiceVisible">
-                                    <div class="hunting-choice-info">
-                                        <span x-text="huntingLootSummary"></span>
-                                    </div>
-                                    <div class="hunting-choice-buttons">
-                                        <button class="hunting-btn retreat" type="button" @click="huntingRetreat()">
-                                            ← 귀환
-                                        </button>
-                                        <button class="hunting-btn advance" type="button" @click="huntingAdvance()">
-                                            전진 →
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <game-overlay></game-overlay>
 
-                        <button
-                            class="control-button"
-                            id="startButton"
-                            type="button"
-                            x-bind:class="{ hidden: startHidden }"
-                            x-bind:disabled="startDisabled"
-                            x-text="startText"
-                            @click="$dispatch('start-tournament')"
-                        >
-                            싸움 시작
-                        </button>
+                        <start-button></start-button>
 
-                        <button
-                            class="control-button hunting-btn"
-                            type="button"
-                            x-show="huntingAvailable && !tournamentActive && !huntingActive"
-                            @click="openHuntingLobby()"
-                        >
-                            ⚔ 사냥터
-                        </button>
+                        <hunting-button></hunting-button>
                     </section>
 
-                    <footer class="fighter-strip" id="fighterCards">
-                        <template x-for="fighter in fighters" :key="fighter.id">
-                            <article
-                                class="fighter-card"
-                                x-bind:class="{ active: !fighter.defeated }"
-                                x-bind:data-fighter-id="fighter.id"
-                            >
-                                <div class="fighter-head">
-                                    <div class="fighter-meta">
-                                        <strong
-                                            x-text="fighter.isPlayer ? '내 캐릭터 · ' + fighter.name : fighter.name"
-                                        ></strong>
-                                        <span class="fighter-title" x-text="fighter.title"></span>
-                                        <span x-text="fighter.isPlayer ? '내 배분' : 'AI 배분'"></span>
-                                    </div>
-                                </div>
-                                <div class="hp-bar">
-                                    <div
-                                        class="hp-fill"
-                                        x-bind:style="'background:' + fighter.color + ';width:' + fighter.hpPct + '%' + (fighter.defeated ? ';opacity:0.3' : '')"
-                                    ></div>
-                                </div>
-                                <div class="fighter-hp-text">
-                                    <span x-text="fighter.hp + ' / ' + fighter.maxHp"></span>
-                                </div>
-                                <div class="fighter-stat-line" x-bind:class="{ 'hero-stat-line': fighter.isHero }">
-                                    <span x-show="!fighter.isHero" x-text="fighter.statLine"></span>
-                                    <span class="hero-stat-parts" x-show="fighter.isHero">
-                                        <template x-for="part in fighter.heroStatParts" :key="part.key">
-                                            <span class="hero-stat-part">
-                                                <span x-text="part.baseText"></span
-                                                ><span
-                                                    class="hero-stat-bonus"
-                                                    x-show="part.bonusText"
-                                                    x-text="part.bonusText"
-                                                    x-bind:style="'color:' + part.color"
-                                                ></span>
-                                            </span>
-                                        </template>
-                                    </span>
-                                    <span
-                                        class="fighter-balance-mult"
-                                        x-text="'×' + fighter.balanceMult.toFixed(3)"
-                                    ></span>
-                                </div>
-                                <div class="cooldown-wrap">
-                                    <div class="cooldown-meta">
-                                        <span class="cooldown-label" x-text="fighter.skillLabel">Skill</span>
-                                        <span class="cooldown-text" x-text="fighter.skillText">Ready</span>
-                                        <span
-                                            class="action-badge"
-                                            x-show="fighter.actionName"
-                                            x-text="fighter.actionName"
-                                        ></span>
-                                    </div>
-                                    <div class="cooldown-bar">
-                                        <div
-                                            class="cooldown-fill"
-                                            x-bind:style="'width:' + (fighter.skillPct * 100) + '%' + (fighter.defeated ? ';opacity:0.35' : '')"
-                                        ></div>
-                                    </div>
-                                </div>
-                            </article>
-                        </template>
-                    </footer>
+                    <fighter-strip></fighter-strip>
 
-                    <div>
-                        <ul id="battleLog">
-                            <template x-for="(item, index) in logItems" :key="index">
-                                <li x-text="item"></li>
-                            </template>
-                        </ul>
-                    </div>
+                    <battle-log></battle-log>
                 </section>
 
                 <aside
@@ -216,208 +98,8 @@
                     aria-label="Tournament bracket"
                     x-bind:class="{ 'setup-hidden': !tournamentActive }"
                 >
-                    <div class="tournament-title">
-                        <strong>Bracket</strong>
-                        <span id="tournamentPhase" x-text="tournamentPhase">Ready</span>
-                    </div>
-
-                    <section class="player-panel" id="playerPanel" x-bind:class="{ locked: locked }">
-                        <div class="player-panel-actions" aria-label="보조 메뉴">
-                            <button class="help-icon" type="button" title="게임 도움말" @click="$dispatch('open-help')">
-                                ?
-                            </button>
-                            <button
-                                class="collection-icon"
-                                type="button"
-                                title="컬렉션"
-                                aria-label="컬렉션 열기"
-                                @click="openCollectionHub('roster')"
-                            >
-                                C
-                            </button>
-                        </div>
-                        <div class="player-title">
-                            <span>내 캐릭터</span>
-                            <div class="player-title-row">
-                                <canvas
-                                    id="playerFaceCanvas"
-                                    width="50"
-                                    height="50"
-                                    x-init="
-                                        $el.width = 50;
-                                        $el.height = 50
-                                    "
-                                ></canvas>
-                                <strong
-                                    x-text="playerFighter?.name"
-                                    x-bind:style="'color:' + (playerFighter?.color || '#000')"
-                                ></strong>
-                            </div>
-                        </div>
-                        <p class="player-note">
-                            <span x-text="playerFighter?.title || ''"></span>
-                            <span
-                                x-show="!locked"
-                                x-text="' · 시작 전 ' + totalPoints + ' 포인트를 배분하세요.'"
-                            ></span>
-                            <span
-                                x-show="!locked && bonusPoints > 0"
-                                class="bonus-points-badge"
-                                x-text="' (+' + bonusPoints + ' 보너스)'"
-                            ></span>
-                        </p>
-                        <div class="player-xp-meter">
-                            <div class="player-xp-head">
-                                <strong x-text="playerExperience.levelLabel"></strong>
-                                <span x-text="Number(playerExperience.totalXp || 0).toLocaleString() + ' XP'"></span>
-                            </div>
-                            <div class="player-xp-bar" aria-hidden="true">
-                                <div
-                                    class="player-xp-fill"
-                                    x-bind:style="'width:' + (playerExperience.progressPct || 0) + '%; background:' + (playerFighter?.color || '#59d6ff')"
-                                ></div>
-                            </div>
-                            <div class="player-xp-foot">
-                                <span x-text="playerExperience.progressText"></span>
-                                <span x-text="playerExperience.nextText"></span>
-                            </div>
-                            <div
-                                class="player-xp-reward"
-                                x-show="playerExperience.nextRewardText"
-                                x-text="'다음 보상 · ' + playerExperience.nextRewardText"
-                            ></div>
-                        </div>
-                        <div class="point-meter">
-                            <span x-text="'사용 ' + (totalPoints - remainingPoints) + '/' + totalPoints"></span>
-                            <b x-text="remainingPoints > 0 ? remainingPoints + ' 남음' : '준비 완료'"></b>
-                        </div>
-                        <div class="allocation-summary">
-                            <span x-text="allocationSummary"></span>
-                        </div>
-                        <div class="stat-board">
-                            <template x-for="stat in statDefs" :key="stat.key">
-                                <div class="stat-row">
-                                    <div class="stat-copy">
-                                        <strong x-text="stat.label"></strong>
-                                        <span x-text="stat.description"></span>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        @click="adjustStat(stat.key, -10)"
-                                        x-bind:disabled="locked || (allocation[stat.key] ?? 0) <= 0"
-                                    >
-                                        -10
-                                    </button>
-                                    <button
-                                        type="button"
-                                        @click="adjustStat(stat.key, -1)"
-                                        x-bind:disabled="locked || (allocation[stat.key] ?? 0) <= 0"
-                                    >
-                                        -
-                                    </button>
-                                    <em x-text="(allocation[stat.key] ?? 0) + '%'"></em>
-                                    <button
-                                        type="button"
-                                        @click="adjustStat(stat.key, 1)"
-                                        x-bind:disabled="locked || remainingPoints <= 0"
-                                    >
-                                        +
-                                    </button>
-                                    <button
-                                        type="button"
-                                        @click="adjustStat(stat.key, 10)"
-                                        x-bind:disabled="locked || remainingPoints <= 0"
-                                    >
-                                        +10
-                                    </button>
-                                </div>
-                            </template>
-                        </div>
-                        <!-- 도전 단계 선택 -->
-                        <div class="challenge-level-row" x-show="!locked">
-                            <span class="challenge-label">도전 단계</span>
-                            <button
-                                type="button"
-                                class="challenge-btn"
-                                @click="adjustChallengeLevel(-1)"
-                                x-bind:disabled="challengeLevel <= 0"
-                            >
-                                -
-                            </button>
-                            <em class="challenge-value" x-text="challengeLevel"></em>
-                            <button
-                                type="button"
-                                class="challenge-btn"
-                                @click="adjustChallengeLevel(1)"
-                                x-bind:disabled="challengeLevel >= highestUnlockedLevel"
-                            >
-                                +
-                            </button>
-                            <span class="challenge-max" x-text="'/ ' + highestUnlockedLevel"></span>
-                        </div>
-                        <div
-                            class="bonus-summary"
-                            x-show="progressionBonusSummary"
-                            x-text="progressionBonusSummary"
-                        ></div>
-                        <div class="player-actions" data-player-actions>
-                            <button
-                                class="action-btn"
-                                type="button"
-                                @click="randomAllocation()"
-                                x-bind:disabled="locked"
-                            >
-                                자동 배분
-                            </button>
-                            <button
-                                class="action-btn reset"
-                                type="button"
-                                @click="resetAllocation()"
-                                x-bind:disabled="locked"
-                            >
-                                초기화
-                            </button>
-                        </div>
-                    </section>
-
-                    <div class="bracket" id="tournamentBracket">
-                        <template x-for="(round, rIndex) in tournamentRounds" :key="rIndex">
-                            <div class="bracket-round">
-                                <div class="round-title" x-text="['Round 1', 'Semi', 'Final'][rIndex]"></div>
-                                <template x-for="match in round" :key="match.id">
-                                    <div class="bracket-match" x-bind:class="match.status">
-                                        <div
-                                            class="bracket-slot"
-                                            x-bind:class="{ winner: match.winnerId === (match.a?.id ?? -1), player: match.a?.isPlayer, empty: !match.a }"
-                                        >
-                                            <span
-                                                class="bracket-dot"
-                                                x-bind:style="match.a ? 'background:' + match.a.color : ''"
-                                                x-show="match.a"
-                                            ></span>
-                                            <span
-                                                x-text="match.a ? (match.a.isPlayer ? 'YOU · ' : '') + match.a.name : (rIndex === 0 ? 'BYE' : 'TBD')"
-                                            ></span>
-                                        </div>
-                                        <div
-                                            class="bracket-slot"
-                                            x-bind:class="{ winner: match.winnerId === (match.b?.id ?? -1), player: match.b?.isPlayer, empty: !match.b }"
-                                        >
-                                            <span
-                                                class="bracket-dot"
-                                                x-bind:style="match.b ? 'background:' + match.b.color : ''"
-                                                x-show="match.b"
-                                            ></span>
-                                            <span
-                                                x-text="match.b ? (match.b.isPlayer ? 'YOU · ' : '') + match.b.name : (rIndex === 0 ? 'BYE' : 'TBD')"
-                                            ></span>
-                                        </div>
-                                        <span class="bracket-status" x-text="match.label"></span>
-                                    </div>
-                                </template>
-                            </div>
-                        </template>
-                    </div>
+                    <player-panel></player-panel>
+                    <tournament-bracket></tournament-bracket>
                 </aside>
             </section>
 
@@ -447,6 +129,35 @@
 
             window.Alpine = Alpine;
             await loadTemplates();
+            Alpine.store("startButton", {
+                hidden: true,
+                disabledOverride: null,
+                textOverride: null,
+                remainingPoints: 0,
+                locked: false
+            });
+            Alpine.store("fighterStrip", {
+                fighters: []
+            });
+            Alpine.store("battleLog", {
+                items: []
+            });
+            Alpine.store("huntingButton", {
+                available: false,
+                active: false,
+                tournamentActive: false
+            });
+            Alpine.store("gameOverlay", {
+                visible: false,
+                transient: false,
+                label: "",
+                text: "",
+                subtext: "",
+                huntingChoiceVisible: false,
+                huntingFloor: 1,
+                huntingCharacterName: "",
+                huntingLootSummary: ""
+            });
             Alpine.store("xpReward", {
                 visible: false,
                 characterName: "",
@@ -457,6 +168,33 @@
                 progressText: "",
                 nextText: "",
                 nextRewardText: ""
+            });
+            Alpine.store("playerPanel", {
+                fighter: null,
+                experience: {
+                    levelLabel: "Lv.1",
+                    totalXp: 0,
+                    progressPct: 0,
+                    progressText: "0/100 XP",
+                    nextText: "다음 레벨까지 100XP",
+                    nextRewardText: ""
+                },
+                allocation: {},
+                totalPoints: 0,
+                bonusPoints: 0,
+                remainingPoints: 0,
+                locked: false,
+                statDefs: [],
+                challengeLevel: 0,
+                highestUnlockedLevel: 0,
+                progressionBonusSummary: "",
+                allocationSummary: "",
+                _actions: null
+            });
+            Alpine.store("tournamentBracket", {
+                visible: false,
+                phase: "Ready",
+                rounds: []
             });
             registerAlpineComponentSystem(Alpine);
             Alpine.data("appStore", appStore);
