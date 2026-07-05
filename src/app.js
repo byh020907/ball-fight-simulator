@@ -59,6 +59,15 @@ import {
 } from "./progression/progressionState.js";
 import { getEligibleHuntingCharacters } from "./hunting/huntingState.js";
 import { HuntingManager } from "./hunting/huntingManager.js";
+import {
+    applyEquipmentStats,
+    canCharacterEquipItem,
+    getCharacterEquipmentLevel,
+    getEquipmentRequiredLevel,
+    getEquippedStatBonuses,
+    getInventorySlots,
+    getInventoryUsed
+} from "./hunting/equipmentConfig.js";
 import { FIGHTER_IDS, Vector2 } from "./core.js";
 import {
     ArcherAbility,
@@ -201,6 +210,62 @@ export class BattleApp {
         updateEffectiveStatCap(ctx.progressionPerStatCapBonus, ctx.masteryPerStatCapBonus);
     }
 
+    _getPlayerEquipmentSummary(characterId = this.playerFighterId) {
+        const equipment = this.playerProfile?.equipment ?? {};
+        const inventory = equipment.inventory ?? [];
+        const equipped = equipment.equipped ?? {};
+        const slotLabels = {
+            weapon: "무기",
+            armor: "방어구",
+            accessory1: "장신구1",
+            accessory2: "장신구2"
+        };
+        const slots = Object.entries(slotLabels).map(([slotId, label]) => {
+            const item = inventory.find((candidate) => candidate.instanceId === equipped[slotId]) ?? null;
+            if (!item) {
+                return {
+                    id: slotId,
+                    label,
+                    empty: true,
+                    name: "비어 있음",
+                    rarity: "",
+                    locked: false,
+                    requiredLevel: 1
+                };
+            }
+            const requiredLevel = getEquipmentRequiredLevel(item);
+            const locked = !canCharacterEquipItem(this.playerProfile, item, characterId);
+            return {
+                id: slotId,
+                label,
+                empty: false,
+                name: item.name,
+                rarity: item.rarity,
+                locked,
+                requiredLevel
+            };
+        });
+        const activeBonuses = getEquippedStatBonuses(this.playerProfile, characterId);
+        const statParts = [
+            ["hp", "HP"],
+            ["damage", "공격"],
+            ["defense", "방어"],
+            ["speed", "속도"]
+        ]
+            .filter(([key]) => activeBonuses[key] > 0)
+            .map(([key, label]) => `${label} +${activeBonuses[key]}`);
+
+        return {
+            characterLevel: getCharacterEquipmentLevel(this.playerProfile, characterId),
+            inventoryUsed: getInventoryUsed(this.playerProfile),
+            inventorySlots: getInventorySlots(this.playerProfile),
+            equippedCount: slots.filter((slot) => !slot.empty).length,
+            activeCount: slots.filter((slot) => !slot.empty && !slot.locked).length,
+            slots,
+            statLine: statParts.length > 0 ? statParts.join(" · ") : "적용 중인 장비 스탯 없음"
+        };
+    }
+
     _syncPlayerStatAllocationFromUi() {
         const allocation = this.ui.state?.allocation;
         if (!allocation) return;
@@ -224,6 +289,7 @@ export class BattleApp {
             perStatCapBonus: bonusCtx.perStatCapBonus
         });
         const experienceSummary = getCharacterExperienceSummary(this.playerProfile, this.playerFighterId);
+        const equipmentSummary = this._getPlayerEquipmentSummary(this.playerFighterId);
         const huntingAvailable = getEligibleHuntingCharacters(this.playerProfile, this.roster).length > 0;
         this.ui.renderPlayerSetup({
             fighter: player,
@@ -237,6 +303,7 @@ export class BattleApp {
             highestUnlockedLevel: cl?.highestUnlockedLevel ?? 0,
             progressionBonusSummary: bonusSummary,
             experience: experienceSummary,
+            equipmentSummary,
             huntingAvailable
         });
 
@@ -420,6 +487,12 @@ export class BattleApp {
         if (playerSpec) {
             const xpEffects = collectActiveExperienceEffects(this.playerProfile, this.playerFighterId);
             applyExperienceEffectsToSpec(playerSpec, xpEffects);
+        }
+
+        if (playerSpec) {
+            const equippedSpec = applyEquipmentStats(playerSpec, this.playerProfile);
+            playerSpec.stats = equippedSpec.stats;
+            playerSpec.equipment = equippedSpec.equipment;
         }
         this.matchmaker = new Matchmaker(this.tournamentRoster);
         this.playerResult = null;

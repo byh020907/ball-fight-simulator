@@ -282,15 +282,27 @@
                             </div>
                         </template>
                     </div>
+                    <div style="margin-top:10px;display:flex;align-items:center;gap:8px;font-size:0.8rem">
+                        <span>인벤토리 <b x-text="state.equipment.inventoryUsed"></b>/<b x-text="state.equipment.inventorySlots"></b></span>
+                        <button
+                            class="ch-btn"
+                            x-show="state.equipment.canExpand"
+                            @click="bridge.expandInventory()"
+                            x-text="`확장 (파편 ${state.equipment.expandCost} · +${state.equipment.expandGain}칸)`"
+                        ></button>
+                        <span x-show="!state.equipment.canExpand && state.equipment.inventoryUsed >= state.equipment.inventorySlots" style="color:#dc2626;font-size:0.72rem">가득 참 — 장비를 분해하거나 확장하세요</span>
+                    </div>
                 </div>
                 <div class="ch-equip-list">
-                    <h4>보유 장비 (<span x-text="state.equipment.items.length"></span>/<span x-text="state.equipment.maxInventorySlots"></span>)</h4>
+                    <h4>보유 장비</h4>
                     <template x-for="item in state.equipment.items" :key="item.instanceId">
                         <div class="ch-equip-card" x-bind:class="'ch-equip--' + item.rarity">
                             <div class="ch-equip-card-header">
                                 <strong x-text="item.name"></strong>
                                 <span class="ch-equip-rarity" x-text="item.rarity"></span>
+                                <span class="ch-equip-slot-badge" x-text="'Lv.' + item.requiredLevel"></span>
                                 <span class="ch-equip-slot-badge" x-text="item.slot"></span>
+                                <span class="ch-equip-enhance" x-show="item.enhanceLevel > 0" x-text="'+' + item.enhanceLevel"></span>
                             </div>
                             <div class="ch-equip-card-stats">
                                 <template x-for="stat in item.stats">
@@ -304,14 +316,38 @@
                                 <button
                                     x-show="!item.isEquipped"
                                     class="ch-btn"
+                                    x-bind:disabled="!item.canEquip"
                                     @click="bridge.equipItem(item.instanceId)"
-                                    x-text="'장착'"
+                                    x-text="item.canEquip ? '장착' : `잠김 Lv.${item.requiredLevel}`"
                                 ></button>
                                 <button
                                     x-show="item.isEquipped"
                                     class="ch-btn ch-btn--danger"
                                     @click="bridge.unequipItem(item.instanceId)"
                                     x-text="'해제'"
+                                ></button>
+                                <button
+                                    class="ch-btn"
+                                    x-show="item.canEnhance"
+                                    @click="bridge.enhanceItem(item.instanceId)"
+                                    x-text="`강화 (+${item.enhanceLevel}→+${item.enhanceLevel + 1}, ${Math.round(item.enhanceFailureRate * 100)}%실패)`"
+                                ></button>
+                                <button
+                                    class="ch-btn"
+                                    x-show="item.nextRarity"
+                                    x-bind:disabled="!item.canFuse"
+                                    @click="bridge.fuseItem(item.instanceId)"
+                                    x-text="item.fusionCost ? `합성 (${item.nextRarity}, 강화석 ${item.fusionCost.stones} · 파편 ${item.fusionCost.shards})` : '합성'"
+                                ></button>
+                                <button
+                                    class="ch-btn ch-btn--danger"
+                                    @click="bridge.disassembleItem(item.instanceId)"
+                                    x-text="`분해 (+${item.disassembleReward}강화석)`"
+                                ></button>
+                                <button
+                                    class="ch-btn"
+                                    @click="bridge.sellItem(item.instanceId)"
+                                    x-text="`판매 (+${item.sellReward}파편)`"
                                 ></button>
                             </div>
                         </div>
@@ -337,6 +373,16 @@
             masteryItems: [],
             achievementItems: [],
             storage: { shards: 0, chests: [], stats: {} },
+            equipment: {
+                items: [],
+                enhancementStones: 0,
+                inventoryUsed: 0,
+                inventorySlots: 5,
+                canExpand: false,
+                expandCost: 0,
+                expandGain: 0,
+                equippedSlots: {}
+            },
             summary: {},
 
             get filteredRosterItems() {
@@ -423,7 +469,13 @@
                     state.rosterItems = val.rosterItems ?? [];
                     state.masteryItems = val.masteryItems ?? [];
                     state.achievementItems = val.achievementItems ?? [];
-                    state.equipment = val.equipment ?? { items: [], enhancementStones: 0, maxInventorySlots: 5, equippedSlots: {} };
+                    state.equipment = val.equipment ?? {
+                        items: [],
+                        enhancementStones: 0,
+                        inventoryUsed: 0,
+                        inventorySlots: 5,
+                        equippedSlots: {}
+                    };
                     state.storage = val.storage ?? { shards: 0, chests: [], stats: {} };
                     state.summary = val.summary ?? {};
                     state.tabs = val.tabs ?? [];
@@ -464,6 +516,7 @@
 
 .ch-frame {
     background: #ffffff;
+    color: #202020;
     border-radius: 16px;
     width: min(920px, 90vw);
     max-height: 85vh;
@@ -491,7 +544,6 @@
 
 .ch-title {
     font-size: 1.1rem;
-    color: #202020;
     font-weight: 900;
 }
 
@@ -582,7 +634,6 @@
     font-size: 0.75rem;
     font-weight: 700;
     background: #ffffff;
-    color: #202020;
 }
 
 .ch-content {
@@ -735,9 +786,7 @@
     color: #333333;
 }
 
-.ch-detail-body b {
-    color: #202020;
-}
+
 
 .ch-detail-xp {
     border: 2px solid #202020;
@@ -753,7 +802,6 @@
     justify-content: space-between;
     align-items: center;
     font-size: 0.82rem;
-    color: #202020;
 }
 
 .ch-detail-xp-bar {
@@ -820,12 +868,6 @@
     flex-shrink: 0;
 }
 
-.ch-mast-info {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-    color: #202020;
 }
 
 .ch-mast-tier {
@@ -872,13 +914,6 @@
     background: #ffffff;
 }
 
-.ch-ach-info {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    flex: 1;
-    min-width: 0;
-    color: #202020;
 }
 
 .ch-ach-desc {
@@ -965,10 +1000,6 @@
     margin-bottom: 16px;
 }
 
-.ch-equip-slots h4 {
-    margin: 0 0 8px;
-    font-size: 0.85rem;
-    color: #202020;
 }
 
 .ch-equip-slot-grid {
@@ -990,16 +1021,8 @@
     margin-bottom: 2px;
 }
 
-.ch-equip-slot-item {
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: #202020;
 }
 
-.ch-equip-list h4 {
-    margin: 0 0 8px;
-    font-size: 0.85rem;
-    color: #202020;
 }
 
 .ch-equip-card {
@@ -1054,8 +1077,19 @@
     color: #92400e;
 }
 
+.ch-equip-enhance {
+    font-size: 0.7rem;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: #fbbf24;
+    color: #92400e;
+    font-weight: 800;
+    margin-left: auto;
+}
+
 .ch-equip-card-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
 }
 
@@ -1064,10 +1098,15 @@
     border: 2px solid #202020;
     border-radius: 6px;
     background: #ffffff;
-    color: #202020;
     font-size: 0.72rem;
     font-weight: 700;
     cursor: pointer;
+}
+
+.ch-btn:disabled {
+    border-color: #cccccc;
+    color: #999999;
+    cursor: not-allowed;
 }
 
 .ch-btn--danger {

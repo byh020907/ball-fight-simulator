@@ -126,16 +126,28 @@ function executeScript(raw) {
     const wrapper = document.createElement("div");
     wrapper.innerHTML = raw;
     const scriptTag = wrapper.querySelector("script");
-    if (!scriptTag) return;
+    if (!scriptTag) return Promise.resolve();
+    if (!scriptTag.src) {
+        Function(scriptTag.textContent)();
+        return Promise.resolve();
+    }
+
     const ns = document.createElement("script");
-    if (scriptTag.src) ns.src = scriptTag.src;
-    else ns.textContent = scriptTag.textContent;
+    ns.src = scriptTag.src;
+    const loaded = new Promise((resolve, reject) => {
+        ns.addEventListener("load", resolve, { once: true });
+        ns.addEventListener("error", () => reject(new Error(`Failed to load component script: ${scriptTag.src}`)), {
+            once: true
+        });
+    });
     document.body.append(ns);
+    return loaded;
 }
 
 async function loadSingle(name) {
     if (loaded.has(name)) return;
-    const res = await fetch(`./src/components/${name}.html`);
+    const version = globalThis.BFS_ASSET_VERSION ? `?v=${encodeURIComponent(globalThis.BFS_ASSET_VERSION)}` : "";
+    const res = await fetch(`./src/components/${name}.html${version}`);
     if (!res.ok) throw new Error(`Failed to fetch template ${name}: ${res.status}`);
     const html = await res.text();
 
@@ -163,7 +175,7 @@ async function loadSingle(name) {
     }
 
     for (const raw of scripts) {
-        executeScript(raw);
+        await executeScript(raw);
     }
 
     loaded.add(name);

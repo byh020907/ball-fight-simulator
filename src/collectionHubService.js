@@ -36,11 +36,16 @@ export class CollectionHubService {
 
         const result = openHuntingChest(app.playerProfile, chestId);
         if (!result.opened) {
-            const msg =
-                result.reason === "not_enough_shards"
-                    ? `파편이 부족합니다 (필요: ${result.cost})`
-                    : "상자를 찾을 수 없습니다.";
-            globalThis.PopupService?.show?.({ title: "개봉 실패", bodyHtml: `<p>${msg}</p>` });
+            const msgs = {
+                not_enough_shards: `파편이 부족합니다 (필요: ${result.cost})`,
+                inventory_full: "장비 인벤토리가 가득 찼습니다. 장비를 분해하거나 인벤토리를 확장해주세요.",
+                not_found: "상자를 찾을 수 없습니다.",
+                missing_storage: "보관함 정보를 불러올 수 없습니다."
+            };
+            globalThis.PopupService?.show?.({
+                title: "개봉 실패",
+                bodyHtml: `<p>${msgs[result.reason] ?? "알 수 없는 오류"}</p>`
+            });
             return;
         }
 

@@ -1,4 +1,5 @@
 import { HELP_CONTENT, HELP_TITLE } from "./helpContent.js";
+import { equipEquipmentItem } from "./hunting/equipmentConfig.js";
 
 function getAppRoot() {
     try {
@@ -32,7 +33,12 @@ export function createComponentBridge(Alpine) {
             getAppStore()?.adjustChallengeLevel?.(delta);
         },
         openCollectionHub(tabId = "roster") {
-            getAppStore()?.openCollectionHub?.(tabId);
+            const appStore = getAppStore();
+            if (appStore?.openCollectionHub) {
+                appStore.openCollectionHub(tabId);
+                return;
+            }
+            globalThis.CollectionHubService?.open?.(tabId);
         },
         openHelp() {
             globalThis.PopupService?.show?.({ title: HELP_TITLE, bodyHtml: HELP_CONTENT });
@@ -54,21 +60,16 @@ export function createComponentBridge(Alpine) {
         },
         equipItem(instanceId) {
             const app = getGameApp();
-            if (!app?.playerProfile?.equipment) return false;
-            const item = app.playerProfile.equipment.inventory.find((i) => i.instanceId === instanceId);
-            if (!item) return false;
-            const slot = item.slot;
-            if (slot === "accessory") {
-                if (!app.playerProfile.equipment.equipped.accessory1) {
-                    app.playerProfile.equipment.equipped.accessory1 = instanceId;
-                } else if (!app.playerProfile.equipment.equipped.accessory2) {
-                    app.playerProfile.equipment.equipped.accessory2 = instanceId;
-                } else {
-                    return false;
-                }
-            } else {
-                app.playerProfile.equipment.equipped[slot] = instanceId;
+            if (!app?.playerProfile) return false;
+            const result = equipEquipmentItem(app.playerProfile, instanceId, app.playerFighterId);
+            if (result?.error === "level") {
+                globalThis.PopupService?.show?.({
+                    title: "장착 제한",
+                    bodyHtml: `<p>현재 캐릭터 Lv.${result.characterLevel}에서는 ${result.item.name}을 장착할 수 없습니다.<br>필요 레벨: Lv.${result.requiredLevel}</p>`
+                });
+                return false;
             }
+            if (!result?.item) return false;
             app._refreshCollectionHub?.();
             return true;
         },
@@ -84,6 +85,66 @@ export function createComponentBridge(Alpine) {
                 }
             }
             return false;
+        },
+        async expandInventory() {
+            const app = getGameApp();
+            if (!app?.playerProfile) return false;
+            const { expandInventory: doExpand } = await import("./hunting/equipmentConfig.js");
+            const result = doExpand(app.playerProfile);
+            if (result) {
+                const { savePlayerProfile } = await import("./playerProfile.js");
+                savePlayerProfile(app.playerProfile);
+                app._refreshCollectionHub?.();
+            }
+            return result;
+        },
+        async disassembleItem(instanceId) {
+            const app = getGameApp();
+            if (!app?.playerProfile) return false;
+            const { disassembleEquipment } = await import("./hunting/equipmentConfig.js");
+            const result = disassembleEquipment(app.playerProfile, instanceId);
+            if (result) {
+                const { savePlayerProfile } = await import("./playerProfile.js");
+                savePlayerProfile(app.playerProfile);
+                app._refreshCollectionHub?.();
+            }
+            return result;
+        },
+        async enhanceItem(instanceId) {
+            const app = getGameApp();
+            if (!app?.playerProfile) return false;
+            const { enhanceEquipment } = await import("./hunting/equipmentConfig.js");
+            const result = enhanceEquipment(app.playerProfile, instanceId);
+            if (result) {
+                const { savePlayerProfile } = await import("./playerProfile.js");
+                savePlayerProfile(app.playerProfile);
+                app._refreshCollectionHub?.();
+            }
+            return result;
+        },
+        async fuseItem(instanceId) {
+            const app = getGameApp();
+            if (!app?.playerProfile) return false;
+            const { fuseEquipment } = await import("./hunting/equipmentConfig.js");
+            const result = fuseEquipment(app.playerProfile, instanceId);
+            if (result?.item) {
+                const { savePlayerProfile } = await import("./playerProfile.js");
+                savePlayerProfile(app.playerProfile);
+                app._refreshCollectionHub?.();
+            }
+            return result;
+        },
+        async sellItem(instanceId) {
+            const app = getGameApp();
+            if (!app?.playerProfile) return false;
+            const { sellEquipment } = await import("./hunting/equipmentConfig.js");
+            const result = sellEquipment(app.playerProfile, instanceId);
+            if (result) {
+                const { savePlayerProfile } = await import("./playerProfile.js");
+                savePlayerProfile(app.playerProfile);
+                app._refreshCollectionHub?.();
+            }
+            return result;
         }
     };
 }

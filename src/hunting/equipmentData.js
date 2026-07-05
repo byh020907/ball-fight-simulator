@@ -5,6 +5,58 @@ export const EQUIPMENT = Object.freeze({
         ACCESSORY: Object.freeze({ id: "accessory", label: "장신구", max: 2 })
     }),
     RARITIES: Object.freeze(["common", "uncommon", "rare", "epic", "legendary"]),
+    LEVEL_REQUIREMENTS: Object.freeze({
+        COMMON: 1,
+        UNCOMMON: 3,
+        RARE: 5,
+        EPIC: 8,
+        LEGENDARY: 10
+    }),
+    INVENTORY: Object.freeze({
+        DEFAULT_SLOTS: 5,
+        EXPAND_COST: 100,
+        EXPAND_GAIN: 3,
+        MAX_SLOTS: 100
+    }),
+    ENHANCE: Object.freeze({
+        MAX_LEVEL: 5,
+        MAX_FAILURE_RATE: 0.8,
+        STAT_BONUS_PER_LEVEL: 0.2,
+        COST: Object.freeze([
+            Object.freeze({ stones: 2, shards: 10 }),
+            Object.freeze({ stones: 4, shards: 15 }),
+            Object.freeze({ stones: 8, shards: 25 }),
+            Object.freeze({ stones: 15, shards: 40 }),
+            Object.freeze({ stones: 25, shards: 60 })
+        ])
+    }),
+    DISASSEMBLE: Object.freeze({
+        COMMON: 1,
+        UNCOMMON: 3,
+        RARE: 8,
+        EPIC: 20,
+        LEGENDARY: 50
+    }),
+    SELL: Object.freeze({
+        COMMON: 5,
+        UNCOMMON: 12,
+        RARE: 30,
+        EPIC: 80,
+        LEGENDARY: 200
+    }),
+    FUSION: Object.freeze({
+        COST: Object.freeze({
+            COMMON: Object.freeze({ stones: 2, shards: 20 }),
+            UNCOMMON: Object.freeze({ stones: 5, shards: 40 }),
+            RARE: Object.freeze({ stones: 12, shards: 80 }),
+            EPIC: Object.freeze({ stones: 25, shards: 150 })
+        })
+    }),
+    DRAW: Object.freeze({
+        WEAPON: "weapon",
+        ARMOR: "armor",
+        ACCESSORY: "accessory"
+    }),
     STAT_RANGES: Object.freeze({
         COMMON: Object.freeze({ min: 1, max: 3, statCount: Object.freeze({ min: 1, max: 1 }) }),
         UNCOMMON: Object.freeze({ min: 2, max: 5, statCount: Object.freeze({ min: 1, max: 1 }) }),

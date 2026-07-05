@@ -3,6 +3,7 @@ import { ActionContext } from "../clickActions.js";
 import { DashEffect } from "../combatEffects.js";
 import { mixins, PhysicsBody } from "../physics/index.js";
 import { getFaceTemplate } from "./mobAppearance.js";
+import { drawEquipmentItems } from "./equipmentVisuals.js";
 
 export class BattleBall extends mixins([PhysicsBody]) {
     constructor(spec, position) {
@@ -53,6 +54,9 @@ export class BattleBall extends mixins([PhysicsBody]) {
         };
         this.hunting = spec.hunting ?? null;
         this.appearance = spec.appearance ?? { sides: 0, face: "default" };
+        this.equipment = {
+            items: Array.isArray(spec.equipment?.equippedItems) ? spec.equipment.equippedItems : []
+        };
         this.mastery = {
             physics: spec.mastery?.physics ?? {
                 incomingKnockbackReduce: 0,
@@ -337,6 +341,7 @@ export class BattleBall extends mixins([PhysicsBody]) {
             ctx.lineWidth = Math.max(3, this.radius * 0.07);
             ctx.stroke();
         }
+        drawEquipmentItems(ctx, this, this.equipment.items);
         this.drawFace(ctx, this.state.wallSlam ? this.display.spinRotation : 0);
         this.ability?.draw?.(ctx);
         if (this.state.movement?.showRing) {

@@ -7,6 +7,24 @@
 import { formatRewardDescription } from "../progression/progressionState.js";
 import { getCharacterExperienceSummary } from "../experience/experienceService.js";
 import { canOpenHuntingChest, previewHuntingChest } from "../hunting/index.js";
+import {
+    getInventorySlots,
+    getInventoryUsed,
+    canExpandInventory,
+    INVENTORY_EXPAND_COST,
+    INVENTORY_EXPAND_GAIN,
+    getDisassembleReward,
+    getSellReward,
+    getFusionCost,
+    getNextEquipmentRarity,
+    canFuseEquipment,
+    canCharacterEquipItem,
+    getCharacterEquipmentLevel,
+    getEquipmentRequiredLevel,
+    calculateEnhanceCost,
+    calculateEnhanceFailureRate,
+    ENHANCE_MAX_LEVEL
+} from "../hunting/equipmentConfig.js";
 
 export const MASTERY_THRESHOLDS = Object.freeze([1, 5, 15]);
 export const COLLECTION_HUB_TABS = Object.freeze([
@@ -146,18 +164,42 @@ export function createCollectionHubViewModel({
     const inventory = equipment.inventory ?? [];
     const equipped = equipment.equipped ?? {};
     const equippedIdSet = new Set(Object.values(equipped).filter(Boolean));
+    const currentEquipmentLevel = getCharacterEquipmentLevel(profile, currentPlayerFighterId);
 
-    const equipmentItems = inventory.map((item) => ({
-        instanceId: item.instanceId,
-        rarity: item.rarity,
-        slot: item.slot,
-        name: item.name,
-        description: item.description,
-        stats: item.stats ?? [],
-        specialOptions: item.specialOptions,
-        enhanceLevel: item.enhanceLevel ?? 0,
-        isEquipped: equippedIdSet.has(item.instanceId)
-    }));
+    const equipmentItems = inventory.map((item) => {
+        const level = item.enhanceLevel ?? 0;
+        const cost = calculateEnhanceCost(level);
+        const stones = equipment.enhancementStones ?? 0;
+        const shards = profile.hunting?.shards ?? 0;
+        const requiredLevel = getEquipmentRequiredLevel(item);
+        const canEquip = canCharacterEquipItem(profile, item, currentPlayerFighterId);
+        return {
+            instanceId: item.instanceId,
+            rarity: item.rarity,
+            slot: item.slot,
+            name: item.name,
+            description: item.description,
+            stats: item.stats ?? [],
+            specialOptions: item.specialOptions,
+            enhanceLevel: level,
+            isEquipped: equippedIdSet.has(item.instanceId),
+            requiredLevel,
+            characterLevel: currentEquipmentLevel,
+            levelLocked: !canEquip,
+            canEquip,
+            disassembleReward: getDisassembleReward(item.rarity),
+            sellReward: getSellReward(item.rarity),
+            fusionCost: getFusionCost(item.rarity),
+            nextRarity: getNextEquipmentRarity(item.rarity),
+            fusionPartnerCount: inventory.filter(
+                (candidate) => candidate.instanceId !== item.instanceId && candidate.rarity === item.rarity
+            ).length,
+            canFuse: canFuseEquipment(profile, item.instanceId),
+            canEnhance: level < ENHANCE_MAX_LEVEL && stones >= cost.stones && shards >= cost.shards,
+            enhanceCost: cost,
+            enhanceFailureRate: calculateEnhanceFailureRate(level)
+        };
+    });
 
     const storageItems = (hunting.chests ?? []).map((chest) => {
         const preview = previewHuntingChest(chest);
@@ -200,7 +242,11 @@ export function createCollectionHubViewModel({
         equipment: {
             items: equipmentItems,
             enhancementStones: equipment.enhancementStones ?? 0,
-            maxInventorySlots: equipment.maxInventorySlots ?? 5,
+            inventoryUsed: getInventoryUsed(profile),
+            inventorySlots: getInventorySlots(profile),
+            canExpand: canExpandInventory(profile),
+            expandCost: INVENTORY_EXPAND_COST,
+            expandGain: INVENTORY_EXPAND_GAIN,
             equippedSlots: {
                 weapon: equipped.weapon ? (inventory.find((i) => i.instanceId === equipped.weapon)?.name ?? "—") : "—",
                 armor: equipped.armor ? (inventory.find((i) => i.instanceId === equipped.armor)?.name ?? "—") : "—",
