@@ -50,6 +50,7 @@ export class BattleBall extends mixins([PhysicsBody]) {
             bonuses: { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 },
             carryover: { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 }
         };
+        this.hunting = spec.hunting ?? null;
         this.mastery = {
             physics: spec.mastery?.physics ?? {
                 incomingKnockbackReduce: 0,
@@ -339,6 +340,9 @@ export class BattleBall extends mixins([PhysicsBody]) {
             ctx.arc(this.position.x, this.position.y, this.radius + 18, 0, Math.PI * 2);
             ctx.stroke();
         }
+        if (this.hunting?.isMob) {
+            this._drawMobHpBar(ctx);
+        }
         this._drawNameplate(ctx);
         ctx.restore();
     }
@@ -351,6 +355,21 @@ export class BattleBall extends mixins([PhysicsBody]) {
         ctx.textAlign = "center";
         ctx.fillStyle = "#444444";
         ctx.fillText(this.name, this.position.x, y);
+        ctx.restore();
+    }
+
+    _drawMobHpBar(ctx) {
+        if (this.flags.defeated) return;
+        const barWidth = this.radius * 2.2;
+        const barHeight = 5;
+        const x = this.position.x - barWidth / 2;
+        const y = this.position.y - this.radius - 10;
+        const hpPct = Math.max(0, this.hp / this.maxHp);
+        ctx.save();
+        ctx.fillStyle = "rgba(0,0,0,0.5)";
+        ctx.fillRect(x, y, barWidth, barHeight);
+        ctx.fillStyle = hpPct > 0.5 ? "#4caf50" : hpPct > 0.25 ? "#ff9800" : "#f44336";
+        ctx.fillRect(x, y, barWidth * hpPct, barHeight);
         ctx.restore();
     }
 

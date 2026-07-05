@@ -437,6 +437,12 @@
 - 영향: `src/entities/battleBall.js:304-311`, `src/simulation/battleSimulation.js:435`
 - 검증: `npm test`, `npm run format:check` 통과
 
+## [L1] 2026-07-05 — 몹 전투원 fighter strip 제외 + 인게임 HP바
+- 맥락: 몹이 많으면 fighter strip이 늘어나 캔버스가 위로 밀리는 레이아웃 문제. UX 개선 요청으로 미니보스만 strip 표시, 일반 몹은 캔버스 내 HP 바로만 확인.
+- 결정: (1) `ui.js renderRoster()`에서 `fighter.hunting?.isMob` 필터 추가. (2) `BattleBall`에 `this.hunting = spec.hunting` 저장. (3) `BattleBall._drawMobHpBar()` 신규 — 몹 볼 위에 컬러 구간 HP바 렌더링 (초록>노랑>빨강).
+- 영향: `src/ui.js:469`(필터), `src/entities/battleBall.js:48,317-322,347-361`(hunting prop, HP바)
+- 검증: `npm test`, `npm run format:check` 통과
+
 ## 진행 중 이슈 (2026-07-05 갱신)
 - **player-panel 버튼 무반응**: `$store._actions` 콜백은 논리적으로 정상 (`UIController._exposeActionsToPlayerPanel`가 `this.state?.adjustStat()`를 바인딩). 원인이 `$watch` 의존성 추적 문제일 가능성이 높아, `state` + watcher 패턴을 폐기하고 템플릿이 직접 `$store.playerPanel.xxx`를 읽도록 전환할 계획. `$store`는 Alpine magic으로 의존성 추적이 정확함.
 - **사냥터 deferred effect UI 연결**: instant_heal/temporary_stat 보상은 payload까지만 반환, 실제 런 연결은 미구현

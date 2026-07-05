@@ -469,6 +469,7 @@ export class UIController {
             ? activeIds
                   .map((id) => activeSpecById.get(id) ?? this.roster.find((fighter) => fighter.id === id))
                   .filter(Boolean)
+                  .filter((fighter) => !fighter.hunting?.isMob)
             : [];
         const fighters = visibleRoster.map((fighter) => {
             const isHero = fighter.id === FIGHTER_IDS.HERO;
