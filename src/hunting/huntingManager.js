@@ -4,14 +4,23 @@ import {
     advanceHuntingRun,
     retreatHuntingRun,
     defeatHuntingRun,
+    canRetreatFromHuntingRun,
+    completeHuntingStage,
     getEligibleHuntingCharacters,
     canEnterHunting,
+    getSelectedHuntingStageId,
     applyHuntingEventRecovery,
     applyHuntingCursedAltar,
     applyHuntingStatModifiersToSpec
 } from "./huntingState.js";
 import { rollShardReward, createHuntingChest, createEmptyHuntingLoot } from "./huntingRewards.js";
-import { HUNTING_ARENA, HUNTING_ENEMY_TYPES, HUNTING_EVENT_TYPES } from "./huntingConfig.js";
+import {
+    HUNTING_ADVANCE_STEPS,
+    HUNTING_ENEMY_TYPES,
+    HUNTING_EVENT_TYPES,
+    HUNTING_FLOOR_OUTCOME_TYPES
+} from "./huntingConfig.js";
+import { getHuntingStage, getHuntingStageArena, getNextHuntingStageId } from "./huntingEncounters.js";
 import { applyEquipmentStats } from "./equipmentConfig.js";
 import {
     HUNTING_TEAMS,
@@ -28,6 +37,7 @@ export class HuntingManager {
     constructor(app) {
         this.app = app;
         this._run = null;
+        this._moving = false;
     }
 
     showCharacterSelect() {
@@ -77,11 +87,14 @@ export class HuntingManager {
     startRun(characterId) {
         if (window.PopupService) window.PopupService.close();
         if (!canEnterHunting(this.app.playerProfile, characterId)) return;
-        this._run = createHuntingRun({ characterId });
+        const stageId = getSelectedHuntingStageId(this.app.playerProfile);
+        this._run = createHuntingRun({ characterId, stageId });
         this.app.playerFighterId = characterId;
         this.app.ui.setHuntingActive(true);
         this.app.ui.setHuntingOverlayState({ huntingChoiceVisible: false });
-        this._startFloorBattle();
+        const stage = getHuntingStage(stageId);
+        this.app.ui.addLog(`[Hunting] ${stage.name} 원정 시작`);
+        this.advance();
     }
 
     _startFloorBattle() {
@@ -92,19 +105,24 @@ export class HuntingManager {
         const playerSpec = app.roster.find((f) => f.id === run.characterId);
         if (!playerSpec) return;
 
+        const isFinalBoss = run.lastEncounter?.type === HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS;
+        const encounterEnemyType = run.lastEncounter?.enemyType;
         const minibossType =
-            run.lastEvent?.type === HUNTING_EVENT_TYPES.CHAMPION_INTRUSION
+            isFinalBoss || run.lastEvent?.type === HUNTING_EVENT_TYPES.CHAMPION_INTRUSION
                 ? HUNTING_ENEMY_TYPES.CHAMPION
-                : HUNTING_ENEMY_TYPES.ELITE;
+                : encounterEnemyType === HUNTING_ENEMY_TYPES.ELITE
+                  ? HUNTING_ENEMY_TYPES.ELITE
+                  : HUNTING_ENEMY_TYPES.ELITE;
         const mobSpecs = createHuntingMobEncounter({ floor: run.floor });
-        const miniboss = shouldUseRosterMiniboss(run.floor, run.lastEvent)
-            ? createHuntingMinibossSpec({
-                  roster: app.roster,
-                  characterId: run.characterId,
-                  floor: run.floor,
-                  enemyType: minibossType
-              })
-            : null;
+        const miniboss =
+            isFinalBoss || shouldUseRosterMiniboss(run.floor, run.lastEvent)
+                ? createHuntingMinibossSpec({
+                      roster: app.roster,
+                      characterId: run.characterId,
+                      floor: run.floor,
+                      enemyType: minibossType
+                  })
+                : null;
         const enemySpecs = miniboss ? [miniboss, ...mobSpecs.slice(0, Math.max(1, mobSpecs.length - 1))] : mobSpecs;
 
         const appliedSpec = applyHuntingStatModifiersToSpec(
@@ -122,11 +140,12 @@ export class HuntingManager {
 
         app.playerFighterId = run.characterId;
 
+        const arena = getHuntingStageArena(run.stageId);
         app.startMatch(matchSpecs, {
             keepLog: false,
             skipActionPick: true,
-            arenaWidth: HUNTING_ARENA.WIDTH,
-            arenaHeight: HUNTING_ARENA.HEIGHT,
+            arenaWidth: arena.WIDTH,
+            arenaHeight: arena.HEIGHT,
             cameraZoom: 1
         });
 
@@ -175,14 +194,16 @@ export class HuntingManager {
         }
 
         if (playerWon) {
-            const rewardMultiplier =
-                run.lastEvent?.type === HUNTING_EVENT_TYPES.CHAMPION_INTRUSION
-                    ? (run.lastEvent.rewardMultiplier ?? 1.5)
-                    : run.floor % 3 === 0
-                      ? 1.25
-                      : 1;
+            const isFinalBoss = run.lastEncounter?.type === HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS;
+            const rewardMultiplier = isFinalBoss
+                ? 2
+                : run.lastEvent?.type === HUNTING_EVENT_TYPES.CHAMPION_INTRUSION
+                  ? (run.lastEvent.rewardMultiplier ?? 1.5)
+                  : run.floor % 3 === 0
+                    ? 1.25
+                    : 1;
             const rewardEnemyType =
-                run.lastEvent?.type === HUNTING_EVENT_TYPES.CHAMPION_INTRUSION
+                isFinalBoss || run.lastEvent?.type === HUNTING_EVENT_TYPES.CHAMPION_INTRUSION
                     ? HUNTING_ENEMY_TYPES.CHAMPION
                     : run.floor % 3 === 0
                       ? HUNTING_ENEMY_TYPES.ELITE
@@ -206,9 +227,39 @@ export class HuntingManager {
             const pendingText = `보유 파편 ${this._run.pendingLoot.shards}`;
             const subtext = `층 ${run.floor} 완료 · ${shardsText}`;
 
+            if (isFinalBoss) {
+                const stage = getHuntingStage(run.stageId);
+                const nextStageId = getNextHuntingStageId(run.stageId);
+                const stageResult = completeHuntingStage(app.playerProfile, run.stageId);
+                this._run = retreatHuntingRun(this._run, { reason: "stage_clear" });
+                const securedShards = this._run.securedLoot?.shards ?? 0;
+                this._mergeIntoSecured(app);
+                app._refreshCollectionHub();
+                app.refreshPlayerSetup();
+                app.ui.setHuntingActive(false);
+                app.ui.setHuntingOverlayState({
+                    huntingChoiceVisible: false,
+                    huntingCanRetreat: false,
+                    huntingMoving: false
+                });
+                app._huntingDone = true;
+                app.ui.showOverlay(
+                    "스테이지 클리어",
+                    `${stage.name} 보스 격파`,
+                    stageResult.unlockedStageId
+                        ? `${getHuntingStage(nextStageId).name} 해금 · 파편 ${securedShards} 확보`
+                        : `파편 ${securedShards} 확보`
+                );
+                app.ui.setStartButton({ text: "확인", hidden: false, disabled: false });
+                this._run = null;
+                return;
+            }
+
             app.ui.showOverlay("사냥터", `${name} 승리!`, subtext);
             app.ui.setHuntingOverlayState({
                 huntingChoiceVisible: true,
+                huntingCanRetreat: false,
+                huntingMoving: false,
                 huntingFloor: run.floor,
                 huntingCharacterName: name,
                 huntingLootSummary: pendingText
@@ -238,6 +289,10 @@ export class HuntingManager {
         const app = this.app;
         const run = this._run;
         if (!run || run.status !== "active") return;
+        if (!canRetreatFromHuntingRun(run)) {
+            app.ui.showToast("포탈을 발견해야 귀환할 수 있습니다.");
+            return;
+        }
 
         this._run = retreatHuntingRun(run);
         const securedShards = this._run.securedLoot?.shards ?? 0;

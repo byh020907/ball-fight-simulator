@@ -47,7 +47,9 @@ import {
     scaleEnemySpecForHunting,
     HUNTING_ARENA,
     HUNTING_EVENT_TYPES,
+    HUNTING_FLOOR_OUTCOME_TYPES,
     HUNTING_MONSTER_TYPES,
+    HUNTING_STAGE_IDS,
     HUNTING_TEAMS,
     createHuntingMinibossSpec,
     createHuntingMobSpec,
@@ -56,6 +58,22 @@ import {
     shouldUseRosterMiniboss
 } from "../src/hunting/index.js";
 import { Grenade } from "../src/entities/grenade.js";
+import {
+    createEquipmentInstance,
+    enhanceEquipment,
+    fuseEquipment,
+    sellEquipment,
+    getFusionCost,
+    getSellReward,
+    calculateEnhanceCost,
+    calculateEnhanceFailureRate,
+    getEquippedStatBonuses,
+    applyEquipmentStats,
+    canCharacterEquipItem,
+    equipEquipmentItem,
+    getEquipmentRequiredLevel,
+    ENHANCE_MAX_LEVEL
+} from "../src/hunting/equipmentConfig.js";
 import { appStore, UIController } from "../src/ui.js";
 import { createComponentBridge } from "../src/componentBridge.js";
 import { ArenaCamera } from "../src/camera.js";
@@ -73,6 +91,17 @@ import {
     registerAlpineComponentSystem,
     resolveTemplateComponent
 } from "../src/alpineTemplateComponents.js";
+import { BattleBall } from "../src/entities/battleBall.js";
+
+const EMPTY_EQUIPMENT_SUMMARY = {
+    characterLevel: 1,
+    inventoryUsed: 0,
+    inventorySlots: 5,
+    equippedCount: 0,
+    activeCount: 0,
+    slots: [],
+    statLine: "적용 중인 장비 스탯 없음"
+};
 
 function makeClassList() {
     const set = new Set();
@@ -119,6 +148,47 @@ function makeElement(id = "el") {
         }
     };
     return element;
+}
+
+function makeRecordingCanvasContext() {
+    const calls = [];
+    const methods = new Set([
+        "save",
+        "restore",
+        "translate",
+        "scale",
+        "rotate",
+        "beginPath",
+        "arc",
+        "ellipse",
+        "fill",
+        "stroke",
+        "fillRect",
+        "strokeRect",
+        "moveTo",
+        "lineTo",
+        "closePath",
+        "fillText"
+    ]);
+    return new Proxy(
+        { calls, globalAlpha: 1 },
+        {
+            get(target, prop) {
+                if (prop in target) return target[prop];
+                if (methods.has(prop)) {
+                    return (...args) => {
+                        calls.push([prop, ...args]);
+                    };
+                }
+                return target[prop];
+            },
+            set(target, prop, value) {
+                target[prop] = value;
+                calls.push(["set", prop, value]);
+                return true;
+            }
+        }
+    );
 }
 
 function makeCanvasContext() {
@@ -270,7 +340,14 @@ async function loadModuleApp() {
         huntingChoiceVisible: false,
         huntingFloor: 1,
         huntingCharacterName: "",
-        huntingLootSummary: ""
+        huntingLootSummary: "",
+        huntingCanRetreat: false,
+        huntingMoving: false,
+        huntingMoveFrom: 0,
+        huntingMoveTo: 0,
+        huntingMoveStep: 0,
+        huntingMoveMax: 10,
+        huntingMoveMessage: ""
     });
     globalThis.Alpine.store("startButton", {
         hidden: true,
@@ -293,6 +370,7 @@ async function loadModuleApp() {
     globalThis.Alpine.store("playerPanel", {
         fighter: null,
         experience: {},
+        equipmentSummary: { ...EMPTY_EQUIPMENT_SUMMARY },
         allocation: {},
         totalPoints: 0,
         bonusPoints: 0,
@@ -341,7 +419,14 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
         huntingChoiceVisible: false,
         huntingFloor: 1,
         huntingCharacterName: "",
-        huntingLootSummary: ""
+        huntingLootSummary: "",
+        huntingCanRetreat: false,
+        huntingMoving: false,
+        huntingMoveFrom: 0,
+        huntingMoveTo: 0,
+        huntingMoveStep: 0,
+        huntingMoveMax: 10,
+        huntingMoveMessage: ""
     });
     harness.context.Alpine.store("startButton", {
         hidden: true,
@@ -364,6 +449,7 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
     harness.context.Alpine.store("playerPanel", {
         fighter: null,
         experience: {},
+        equipmentSummary: { ...EMPTY_EQUIPMENT_SUMMARY },
         allocation: {},
         totalPoints: 0,
         bonusPoints: 0,
@@ -745,12 +831,26 @@ async function testOrbitShardRecharge(app) {
 }
 
 async function testTournament(app) {
+    app.playerProfile = createDefaultPlayerProfile();
     app.playerStatAllocation = createRandomStatAllocation(() => 0);
+    const playerBase = app.roster.find((fighter) => fighter.id === app.playerFighterId);
+    const weapon = createEquipmentInstance({ rarity: "common", slot: "weapon", rng: () => 0.5 });
+    weapon.stats = [{ type: "damage", value: 9, min: 4, max: 8 }];
+    app.playerProfile.equipment.inventory.push(weapon);
+    app.playerProfile.equipment.equipped.weapon = weapon.instanceId;
     app.refreshPlayerSetup();
     await app.startTournament();
     const player = app.tournamentRoster.find((fighter) => fighter.id === app.playerFighterId);
+    const baselineSpec = applyStatAllocation(playerBase, app.playerStatAllocation, true);
+    const equippedSpec = applyEquipmentStats(baselineSpec, app.playerProfile);
     assert.ok(player.isPlayer, "Tournament roster should mark the user's random fighter");
     assert.equal(getSpentStatPoints(player.statAllocation), PLAYER_STAT_POINTS, "Player should spend all stat points");
+    assert.equal(
+        player.stats.damage,
+        equippedSpec.stats.damage,
+        "Tournament player spec should include equipped item stat bonuses"
+    );
+    assert.equal(player.equipment.equippedItems.length, 1, "Tournament player spec should carry equipment visuals");
     let matches = 0;
     while (!app.tournament.champion && matches < 8) {
         const match = app.currentTournamentMatch;
@@ -850,6 +950,24 @@ function testRenderPlayerSetupCopiesAllocation(app) {
     controller._rootData = state;
     controller._drawPlayerFace = () => {};
     const allocation = { hp: 20, damage: 30, speed: 10, skill: 25, defense: 15 };
+    const equipmentSummary = {
+        characterLevel: 5,
+        inventoryUsed: 3,
+        inventorySlots: 8,
+        equippedCount: 2,
+        activeCount: 1,
+        slots: [
+            {
+                id: "weapon",
+                label: "무기",
+                name: "훈련 검",
+                empty: false,
+                locked: false,
+                requiredLevel: 1
+            }
+        ],
+        statLine: "공격 +4"
+    };
 
     controller.renderPlayerSetup({
         fighter: app.roster[0],
@@ -857,6 +975,7 @@ function testRenderPlayerSetupCopiesAllocation(app) {
         allocation,
         totalPoints: PLAYER_STAT_POINTS,
         remainingPoints: 0,
+        equipmentSummary,
         huntingAvailable: true
     });
 
@@ -866,13 +985,30 @@ function testRenderPlayerSetupCopiesAllocation(app) {
     assert.equal(state.huntingAvailable, true, "Player setup should expose hunting availability");
 
     const playerPanelStore = globalThis.Alpine.store("playerPanel");
+    assert.deepEqual(
+        state.equipmentSummary,
+        equipmentSummary,
+        "Rendered UI state should expose the current equipment summary"
+    );
+    assert.deepEqual(
+        playerPanelStore.equipmentSummary,
+        equipmentSummary,
+        "Player panel store should sync the current equipment summary"
+    );
     const previousQuerySelector = globalThis.document.querySelector;
     const previousData = globalThis.Alpine.$data;
+    const previousOpenCollectionHub = state.openCollectionHub;
     const appRoot = makeElement("app");
     try {
+        let openedTab = "";
+        state.openCollectionHub = (tabId) => {
+            openedTab = tabId;
+        };
         globalThis.document.querySelector = (selector) => (selector === ".app" ? appRoot : null);
         globalThis.Alpine.$data = (root) => (root === appRoot ? state : null);
-        createComponentBridge(globalThis.Alpine).adjustStat("hp", 1);
+        const bridge = createComponentBridge(globalThis.Alpine);
+        bridge.adjustStat("hp", 1);
+        bridge.openCollectionHub("equipment");
         assert.equal(state.allocation.hp, 11, "Player panel bridge action should update app allocation");
         assert.equal(playerPanelStore.allocation.hp, 11, "Player panel bridge action should sync store allocation");
         assert.equal(
@@ -880,9 +1016,27 @@ function testRenderPlayerSetupCopiesAllocation(app) {
             getRemainingStatPoints(state.allocation, PLAYER_STAT_POINTS),
             "Player panel bridge action should sync points"
         );
+        assert.equal(openedTab, "equipment", "Player panel bridge action should open the equipment tab");
     } finally {
         globalThis.document.querySelector = previousQuerySelector;
         globalThis.Alpine.$data = previousData;
+        state.openCollectionHub = previousOpenCollectionHub;
+    }
+
+    const previousCollectionHubService = globalThis.CollectionHubService;
+    try {
+        let fallbackTab = "";
+        globalThis.document.querySelector = () => null;
+        globalThis.CollectionHubService = {
+            open(tabId) {
+                fallbackTab = tabId;
+            }
+        };
+        createComponentBridge(globalThis.Alpine).openCollectionHub("equipment");
+        assert.equal(fallbackTab, "equipment", "Collection bridge should fall back to CollectionHubService");
+    } finally {
+        globalThis.document.querySelector = previousQuerySelector;
+        globalThis.CollectionHubService = previousCollectionHubService;
     }
 }
 
@@ -1195,6 +1349,8 @@ function testHuntingSystem() {
     assert.equal(shards, 17, "Key shards should include clear and deep-floor bonuses");
 
     const run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, now: 1000 });
+    assert.equal(run.floor, 0, "Hunting run should start at floor 0");
+    assert.equal(run.stageId, HUNTING_STAGE_IDS.CAVE, "Default stage should be cave");
     const common = createHuntingChest({ id: "c1", rarity: "common", acquiredAt: 1000 });
     const uncommon = createHuntingChest({ id: "u1", rarity: "uncommon", acquiredAt: 1000 });
     const rare = createHuntingChest({ id: "r1", rarity: "rare", acquiredAt: 1000 });
@@ -1217,18 +1373,27 @@ function testHuntingSystem() {
     assert.equal(afterFloor.carriedHp, 55, "Hunting run should carry HP between floors");
     assert.equal(afterFloor.pendingLoot.chests.length, 3, "Floor rewards should stay pending");
 
-    const advanced = advanceHuntingRun(afterFloor, { rng: () => 0 });
-    assert.equal(advanced.floor, 2, "Advance should move to the next floor");
-    assert.ok(advanced.lastEvent, "A low RNG roll should create a hunting event");
-    assert.equal(advanced.lastEvent.type, HUNTING_EVENT_TYPES.CHEST_ROOM, "Event rolls should include chest rooms");
-    assert.equal(advanced.lastEvent.chestRarity, "uncommon", "Chest room events should carry a concrete rarity");
-
-    const cursed = advanceHuntingRun(afterFloor, {
+    // rng(1)=0.4→EVENT, rng(2)=0.5→CHEST_ROOM(idx4), rng(3)=0→uncommon
+    const advanced = advanceHuntingRun(afterFloor, {
         rng: (() => {
-            const rolls = [0, 0.6, 0];
+            const rolls = [0.4, 0.5, 0];
             return () => rolls.shift() ?? 0;
         })()
     });
+    assert.equal(advanced.floor, 1, "Advance should move from floor 0 to 1");
+    assert.equal(advanced.lastEncounter.type, HUNTING_FLOOR_OUTCOME_TYPES.EVENT, "Should produce an event encounter");
+    assert.ok(advanced.lastEvent, "Event encounter should set lastEvent");
+    assert.equal(advanced.lastEvent.type, HUNTING_EVENT_TYPES.CHEST_ROOM, "Event rolls should include chest rooms");
+    assert.equal(advanced.lastEvent.chestRarity, "uncommon", "Chest room events should carry a concrete rarity");
+
+    // rng(1)=0.4→EVENT, rng(2)=0.75→CURSED_ALTAR(idx6), rng(3)=0→first trade
+    const cursed = advanceHuntingRun(afterFloor, {
+        rng: (() => {
+            const rolls = [0.4, 0.75, 0];
+            return () => rolls.shift() ?? 0;
+        })()
+    });
+    assert.equal(cursed.lastEncounter.type, HUNTING_FLOOR_OUTCOME_TYPES.EVENT, "Should produce an event encounter");
     assert.equal(cursed.lastEvent.type, HUNTING_EVENT_TYPES.CURSED_ALTAR, "Event pool should include cursed altars");
     const cursedApplied = applyHuntingCursedAltar(cursed, { trade: cursed.lastEvent.trade });
     assert.equal(cursedApplied.statModifiers.length, 2, "Cursed altars should add a gain and a loss modifier");
@@ -1250,12 +1415,14 @@ function testHuntingSystem() {
         "Non-combat event rewards should not consume temporary stat modifiers"
     );
 
+    // rng(1)=0.4→EVENT, rng(2)=0.95→CHAMPION_INTRUSION(idx7)
     const champion = advanceHuntingRun(afterFloor, {
         rng: (() => {
-            const rolls = [0, 0.99];
+            const rolls = [0.4, 0.95];
             return () => rolls.shift() ?? 0;
         })()
     });
+    assert.equal(champion.lastEncounter.type, HUNTING_FLOOR_OUTCOME_TYPES.EVENT, "Should produce an event encounter");
     assert.equal(
         champion.lastEvent.type,
         HUNTING_EVENT_TYPES.CHAMPION_INTRUSION,
@@ -1308,6 +1475,256 @@ function testHuntingSystem() {
     assert.equal(sanitized.hunting.chests.length, 1, "Sanitized profile should dedupe and discard invalid chests");
     assert.equal(sanitized.hunting.stats.deepestFloor, 4, "Sanitized profile should keep hunting stats");
     console.log("[hunting] ok");
+}
+
+function testEquipmentEnhancement() {
+    const profile = createDefaultPlayerProfile();
+
+    // 기본값 확인
+    assert.equal(profile.equipment.enhancementStones, 0, "New profiles should start with 0 enhancement stones");
+    assert.equal(profile.equipment.maxInventorySlots, 5, "New profiles should start with default inventory slots");
+
+    // 강화석 추가 (분해 시뮬레이션)
+    profile.equipment.enhancementStones = 100;
+    profile.hunting.shards = 200;
+
+    // 장비 생성
+    const item = createEquipmentInstance({ rarity: "common", slot: "weapon", rng: () => 0.5 });
+    profile.equipment.inventory.push(item);
+
+    // 강화 비용 계산
+    const cost0 = calculateEnhanceCost(0);
+    assert.equal(cost0.stones, 2, "Enhance +0→+1 should cost 2 stones");
+    assert.equal(cost0.shards, 10, "Enhance +0→+1 should cost 10 shards");
+
+    // 실패율 계산
+    const failRate0 = calculateEnhanceFailureRate(0);
+    assert.ok(Math.abs(failRate0 - 0.16) < 0.001, `Failure rate at +0 should be ~16%, got ${failRate0}`);
+
+    const failRate3 = calculateEnhanceFailureRate(3);
+    assert.ok(Math.abs(failRate3 - 0.64) < 0.001, `Failure rate at +3 should be ~64%, got ${failRate3}`);
+
+    const failRate4 = calculateEnhanceFailureRate(4);
+    assert.ok(Math.abs(failRate4 - 0.8) < 0.001, `Failure rate at +4 should be ~80%, got ${failRate4}`);
+
+    const failRateMax = calculateEnhanceFailureRate(ENHANCE_MAX_LEVEL);
+    assert.equal(failRateMax, 1, "Failure rate at max level should be 1 (100%)");
+
+    // 강화 성공 테스트 (rng=0.5, failRate=0.16 → 성공)
+    const resultSuccess = enhanceEquipment(profile, item.instanceId, () => 0.5);
+    assert.notEqual(resultSuccess, null, "EnhanceEquipment should return a result");
+    assert.equal(resultSuccess.success, true, "Common enhance should succeed with high RNG roll");
+    assert.equal(resultSuccess.oldLevel, 0, "Previous level should be 0");
+    assert.equal(resultSuccess.newLevel, 1, "New level should be 1 after success");
+    assert.equal(item.enhanceLevel, 1, "Item enhance level should be updated to 1");
+    assert.equal(profile.equipment.enhancementStones, 98, "Enhance should deduct 2 stones");
+    assert.equal(profile.hunting.shards, 190, "Enhance should deduct 10 shards");
+
+    // 강화 실패 테스트 (rng=0, failRate=0.32 → 실패)
+    profile.hunting.shards = 200;
+    profile.equipment.enhancementStones = 100;
+    const item2 = createEquipmentInstance({ rarity: "uncommon", slot: "armor", rng: () => 0.5 });
+    item2.enhanceLevel = 1;
+    profile.equipment.inventory.push(item2);
+
+    const resultFail = enhanceEquipment(profile, item2.instanceId, () => 0);
+    assert.notEqual(resultFail, null, "EnhanceEquipment should return a result for failure case");
+    assert.equal(resultFail.success, false, "Enhance should fail with low RNG roll");
+    assert.equal(resultFail.oldLevel, 1, "Previous level should be 1");
+    assert.equal(resultFail.newLevel, 0, "Level should drop to 0 after failure");
+
+    // 0 레벨에서 실패 시 0 유지
+    const item3 = createEquipmentInstance({ rarity: "common", slot: "accessory", rng: () => 0.5 });
+    profile.equipment.inventory.push(item3);
+    const resultFail0 = enhanceEquipment(profile, item3.instanceId, () => 0);
+    assert.equal(resultFail0.success, false, "Enhance at +0 should fail with low RNG");
+    assert.equal(resultFail0.newLevel, 0, "Level should not drop below 0");
+
+    // 최대 레벨 도달 시 강화 불가
+    const itemMax = createEquipmentInstance({ rarity: "legendary", slot: "weapon", rng: () => 0.5 });
+    itemMax.enhanceLevel = ENHANCE_MAX_LEVEL;
+    profile.equipment.inventory.push(itemMax);
+    const resultMax = enhanceEquipment(profile, itemMax.instanceId, () => 0);
+    assert.equal(resultMax, null, "Max level equipment should not be enhanceable");
+
+    // 재료 부족 시 오류 반환
+    profile.equipment.enhancementStones = 0;
+    profile.hunting.shards = 0;
+    const item4 = createEquipmentInstance({ rarity: "common", slot: "weapon", rng: () => 0.5 });
+    profile.equipment.inventory.push(item4);
+    const resultNoStones = enhanceEquipment(profile, item4.instanceId, () => 0);
+    assert.equal(resultNoStones.error, "stones", "Enhance with no stones should return stones error");
+
+    profile.equipment.enhancementStones = 100;
+    profile.hunting.shards = 0;
+    const resultNoShards = enhanceEquipment(profile, item4.instanceId, () => 0);
+    assert.equal(resultNoShards.error, "shards", "Enhance with no shards should return shards error");
+
+    // 장착된 장비 강화 + 스탯 반영 확인
+    profile.equipment.enhancementStones = 100;
+    profile.hunting.shards = 200;
+    const item5 = createEquipmentInstance({ rarity: "rare", slot: "weapon", rng: () => 0.5 });
+    item5.stats = [{ type: "damage", value: 6, min: 4, max: 8 }];
+    profile.equipment.inventory.push(item5);
+    // 기존 장착 해제 후 item5 장착
+    profile.equipment.equipped.weapon = null;
+    profile.equipment.equipped.weapon = item5.instanceId;
+
+    // 강화 전 스탯 (레벨 0 → 1.0배)
+    const bonusesBefore = getEquippedStatBonuses(profile);
+    assert.equal(bonusesBefore.damage, 6, "Before enhance, +0 item should give base stat");
+
+    // 장착된 상태로 강화 성공 (+0→+1)
+    const enhanceEquipped = enhanceEquipment(profile, item5.instanceId, () => 0.5);
+    assert.equal(enhanceEquipped.success, true, "Equipped item should be enhanceable");
+    assert.equal(enhanceEquipped.newLevel, 1, "Equipped item should reach level 1");
+
+    // 강화 후 스탯 반영 확인 (레벨 1 → 1.2배, 6*1.2=7.2 → round=7)
+    const bonusesAfter = getEquippedStatBonuses(profile);
+    assert.equal(
+        bonusesAfter.damage,
+        7,
+        `After +1 enhance, stat should be 7 (6*1.2=7.2→round), got ${bonusesAfter.damage}`
+    );
+
+    // 장착된 상태로 한 번 더 강화 (+1→+2, 실패 → +1→+0)
+    profile.equipment.enhancementStones = 100;
+    profile.hunting.shards = 200;
+    const enhanceEquippedFail = enhanceEquipment(profile, item5.instanceId, () => 0);
+    assert.equal(enhanceEquippedFail.success, false, "Equipped item enhance should fail with low RNG");
+    assert.equal(enhanceEquippedFail.newLevel, 0, "Level should drop from +1 to +0 on fail");
+
+    // 실패 후 스탯이 원래대로 돌아왔는지 확인 (레벨 0 → 1.0배)
+    const bonusesAfterFail = getEquippedStatBonuses(profile);
+    assert.equal(bonusesAfterFail.damage, 6, "After fail to +0, stat should return to base 6");
+
+    // 존재하지 않는 장비 강화 시도
+    const resultMissing = enhanceEquipment(profile, "non-existent-id", () => 0);
+    assert.equal(resultMissing, null, "Enhance on non-existent item should return null");
+
+    const craftProfile = createDefaultPlayerProfile();
+    craftProfile.hunting.shards = 500;
+    craftProfile.equipment.enhancementStones = 100;
+    const fuseA = createEquipmentInstance({ rarity: "common", slot: "weapon", rng: () => 0.5 });
+    const fuseB = createEquipmentInstance({ rarity: "common", slot: "armor", rng: () => 0.5 });
+    craftProfile.equipment.inventory.push(fuseA, fuseB);
+    craftProfile.equipment.equipped.weapon = fuseA.instanceId;
+
+    const fusionCost = getFusionCost("common");
+    const fused = fuseEquipment(craftProfile, fuseA.instanceId, fuseB.instanceId, () => 0.5);
+    assert.equal(fused.toRarity, "uncommon", "Fusion should upgrade common equipment to uncommon");
+    assert.equal(fused.consumed.length, 2, "Fusion should consume two source items");
+    assert.equal(craftProfile.equipment.inventory.length, 1, "Fusion should replace two items with one item");
+    assert.equal(craftProfile.equipment.inventory[0].rarity, "uncommon", "Fusion result should be the next rarity");
+    assert.equal(craftProfile.equipment.equipped.weapon, null, "Fusing an equipped item should unequip it");
+    assert.equal(
+        craftProfile.equipment.enhancementStones,
+        100 - fusionCost.stones,
+        "Fusion should deduct enhancement stones"
+    );
+    assert.equal(craftProfile.hunting.shards, 500 - fusionCost.shards, "Fusion should deduct key shards");
+
+    const lonely = createEquipmentInstance({ rarity: "rare", slot: "weapon", rng: () => 0.5 });
+    craftProfile.equipment.inventory.push(lonely);
+    const noPartner = fuseEquipment(craftProfile, lonely.instanceId, null, () => 0.5);
+    assert.equal(noPartner.error, "partner", "Fusion should require a same-rarity partner");
+
+    const legendA = createEquipmentInstance({ rarity: "legendary", slot: "weapon", rng: () => 0.5 });
+    const legendB = createEquipmentInstance({ rarity: "legendary", slot: "armor", rng: () => 0.5 });
+    craftProfile.equipment.inventory.push(legendA, legendB);
+    const maxFusion = fuseEquipment(craftProfile, legendA.instanceId, legendB.instanceId, () => 0.5);
+    assert.equal(maxFusion.error, "max_rarity", "Legendary equipment should not fuse beyond max rarity");
+
+    const sellProfile = createDefaultPlayerProfile();
+    const sellItem = createEquipmentInstance({ rarity: "rare", slot: "weapon", rng: () => 0.5 });
+    sellProfile.equipment.inventory.push(sellItem);
+    sellProfile.equipment.equipped.weapon = sellItem.instanceId;
+    const sold = sellEquipment(sellProfile, sellItem.instanceId);
+    assert.equal(sold.shards, getSellReward("rare"), "Selling should return rarity-based key shards");
+    assert.equal(sellProfile.hunting.shards, getSellReward("rare"), "Selling should add shards to profile");
+    assert.equal(sellProfile.equipment.inventory.length, 0, "Sold equipment should leave inventory");
+    assert.equal(sellProfile.equipment.equipped.weapon, null, "Selling an equipped item should unequip it");
+
+    console.log("[equipment] ok");
+}
+
+function testEquipmentLevelRequirement() {
+    const profile = createDefaultPlayerProfile();
+    const characterId = FIGHTER_IDS.DASH;
+    const rareWeapon = createEquipmentInstance({ rarity: "rare", slot: "weapon", rng: () => 0.5 });
+    rareWeapon.stats = [{ type: "damage", value: 8, min: 4, max: 8 }];
+    profile.equipment.inventory.push(rareWeapon);
+
+    assert.equal(getEquipmentRequiredLevel(rareWeapon), 5, "Rare equipment should require character level 5");
+    assert.equal(
+        canCharacterEquipItem(profile, rareWeapon, characterId),
+        false,
+        "Level 1 character should not be able to equip rare equipment"
+    );
+
+    const equipLocked = equipEquipmentItem(profile, rareWeapon.instanceId, characterId);
+    assert.equal(equipLocked.error, "level", "Equip action should reject locked equipment");
+    assert.equal(profile.equipment.equipped.weapon, null, "Rejected equipment should not be equipped");
+
+    profile.equipment.equipped.weapon = rareWeapon.instanceId;
+    const baseSpec = {
+        id: characterId,
+        name: "장비 레벨 테스트",
+        stats: { hp: 100, damage: 10, defense: 2, speed: 260, radius: 42, mass: 1 }
+    };
+    const lockedSpec = applyEquipmentStats(baseSpec, profile);
+    assert.equal(lockedSpec.stats.damage, 10, "Locked equipment should not add stat bonuses");
+    assert.equal(lockedSpec.equipment.equippedItems.length, 0, "Locked equipment should not be drawn");
+
+    profile.experience.byCharacter[characterId] = { currentXp: getLevelRequirement(5) };
+    assert.equal(
+        canCharacterEquipItem(profile, rareWeapon, characterId),
+        true,
+        "Level 5 character should be able to equip rare equipment"
+    );
+    const unlockedSpec = applyEquipmentStats(baseSpec, profile);
+    assert.equal(unlockedSpec.stats.damage, 18, "Unlocked equipment should add stat bonuses");
+    assert.equal(unlockedSpec.equipment.equippedItems.length, 1, "Unlocked equipment should be drawn");
+}
+
+function testEquipmentDraw() {
+    const profile = createDefaultPlayerProfile();
+    profile.experience.byCharacter["equipment-test"] = { currentXp: getLevelRequirement(10) };
+    const weapon = createEquipmentInstance({ rarity: "rare", slot: "weapon", rng: () => 0.5 });
+    const armor = createEquipmentInstance({ rarity: "epic", slot: "armor", rng: () => 0.5 });
+    const accessory1 = createEquipmentInstance({ rarity: "uncommon", slot: "accessory", rng: () => 0.5 });
+    const accessory2 = createEquipmentInstance({ rarity: "legendary", slot: "accessory", rng: () => 0.5 });
+    profile.equipment.inventory.push(weapon, armor, accessory1, accessory2);
+    profile.equipment.equipped.weapon = weapon.instanceId;
+    profile.equipment.equipped.armor = armor.instanceId;
+    profile.equipment.equipped.accessory1 = accessory1.instanceId;
+    profile.equipment.equipped.accessory2 = accessory2.instanceId;
+
+    const baseSpec = {
+        id: "equipment-test",
+        name: "장비 테스트",
+        title: "테스트",
+        color: "#80bfff",
+        face: "default",
+        stats: { hp: 100, damage: 10, defense: 2, speed: 260, radius: 42, mass: 1 },
+        statAllocation: { hp: 0, damage: 0, speed: 0, skill: 0, defense: 0 }
+    };
+    const spec = applyEquipmentStats(baseSpec, profile);
+    const drawKeys = spec.equipment.equippedItems.map((item) => item.draw);
+    assert.deepEqual(drawKeys, ["weapon", "armor", "accessory", "accessory"], "Equipped items should carry draw keys");
+
+    const ball = new BattleBall(spec, new Vector2(120, 120));
+    assert.equal(ball.equipment.items.length, 4, "BattleBall should store equipped items for rendering");
+
+    const ctx = makeRecordingCanvasContext();
+    ball.draw(ctx);
+
+    const lineCalls = ctx.calls.filter(([name]) => name === "lineTo").length;
+    const arcCalls = ctx.calls.filter(([name]) => name === "arc").length;
+    const fillCalls = ctx.calls.filter(([name]) => name === "fill").length;
+    assert.ok(lineCalls >= 8, "Equipment draw should add polygon/weapon/gem line calls");
+    assert.ok(arcCalls >= 5, "Equipment draw should add armor/accessory/handle arc calls");
+    assert.ok(fillCalls >= 5, "Equipment draw should fill visible equipment shapes");
 }
 
 function testAlpineTemplateComponentSystem() {
@@ -3878,6 +4295,9 @@ await testCollisionImpulsePersists(app);
 await testGrenadeScatterShot(app);
 testExperienceSystem();
 testHuntingSystem();
+testEquipmentEnhancement();
+testEquipmentLevelRequirement();
+testEquipmentDraw();
 testAlpineTemplateComponentSystem();
 await testMatchEndGrantsImmediateExperience(app);
 await testDamageShake(app);
