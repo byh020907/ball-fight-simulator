@@ -461,6 +461,45 @@ app.js → UIController 메서드 호출
 
 ````
 
+### ES Module import 일관성 규칙
+
+`index.html`에서 사용하는 `?v=${V}`(캐시 버스팅)로 인해 같은 .js 파일이 다른 URL로 import되면 **별도의 모듈 인스턴스**가 생성됩니다. module-level 변수(`let _resolve = null` 등)를 사용하는 서비스가 두 번 import되면, 각 인스턴스가 서로 다른 `_resolve`를 갖게 되어 `show()`와 `resolve()`가 다른 인스턴스를 참조하는 버그가 발생합니다.
+
+**방지 규칙:**
+
+1. `index.html`에서 `?v=${V}`로 import하는 모듈이 JS 파일(예: `app.js`)에서도 static import로 참조되는지 확인합니다.
+2. 만약 중복 import가 발생한다면, module-level 변수(`let _resolve = null`) 대신 **Alpine store**(`Alpine.store("storeName")._resolve`)에 상태를 저장해 모든 인스턴스가 공유하게 합니다.
+3. `window.PopupService = PopupService`처럼 전역에 할당하는 서비스는 **`index.html`에서만 import**하고 JS 파일에서는 직접 import하지 않고 `window.*`를 통해 접근합니다.
+4. 새로 추가하는 서비스가 `Promise + resolve 콜백` 패턴을 사용한다면, resolve 함수는 module-level 변수가 아니라 **Alpine store에 저장**하는 방식을 기본으로 합니다.
+
+**적용 예 — actionPicker.js (수정 전후):**
+
+```js
+// ❌ 이중 import 시 각 인스턴스가 별도 _resolve를 가짐
+let _resolve = null;
+export class ActionPickerService {
+    static show(cards) {
+        _resolve = (index) => { ... };
+        Alpine.store("actionPicker", { ... });
+    }
+    static resolve(index) {
+        if (_resolve) _resolve(index); // 다른 인스턴스면 null
+    }
+}
+
+// ✅ Alpine store에 저장 → 모든 인스턴스가 공유
+export class ActionPickerService {
+    static show(cards) {
+        const cb = (index) => { ... };
+        Alpine.store("actionPicker", { ... , _resolve: cb });
+    }
+    static resolve(index) {
+        const s = Alpine.store("actionPicker");
+        if (s?._resolve) s._resolve(index);
+    }
+}
+```
+
 ## 로컬 실행과 검증
 
 로컬 실행은 Node 정적 서버를 사용합니다.

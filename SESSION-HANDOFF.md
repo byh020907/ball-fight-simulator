@@ -1,8 +1,14 @@
 # 결정 기록
 
+## [L1] 2026-07-04 — 인라인 Alpine UI 5종 컴포넌트화 + ES module 이중 import 버그 수정
+- 맥락: 남은 인라인 Alpine 패널(game-overlay, start-button, hunting-button, battle-log, fighter-strip)을 `src/components/<name>.html` 단일 HTML 컴포넌트로 분리. 컴포넌트화 후 액션 선택 팝업 클릭 불가 + 배틀 로그 위치 이상 버그 2건 발견.
+- 결정: (1) game-overlay/start-button/hunting-button/battle-log/fighter-strip 5종 컴포넌트 생성 — 자체 `x-data` + `Alpine.reactive()` 상태 + `Alpine.store()` 브릿지 + scoped CSS. (2) 배틀 로그 `position: fixed` 누락 복구. (3) 액션 선택 팝업 클릭 버그 근본 원인: `index.html`에서 `?v=${V}` 캐시 버스팅으로 import한 module과 `app.js`에서 static import한 module이 다른 instance가 되어 module-level `_resolve` 변수가 공유되지 않음. (4) 수정: `_resolve`를 module-level 변수 → `Alpine.store("actionPicker")._resolve`에 저장. (5) 액션 선택기 `@click`을 `$dispatch('pick-action')` 이벤트 위임으로 변경 (x-for 내부 스코프 우회). (6) `docs/development-rules.md`에 "ES Module import 일관성 규칙" 섹션 추가.
+- 영향: `src/components/game-overlay.html`(신규), `src/components/start-button.html`(신규), `src/components/hunting-button.html`(신규), `src/components/battle-log.html`(신규), `src/components/fighter-strip.html`(신규), `src/actionPicker.js`(Alpine store _resolve), `src/components/action-picker.html`($dispatch), `index.html`(스토어 초기화 6종), `src/ui.js`(store 브릿지 메서드), `src/app.js`(showTransientOverlay), `src/hunting/huntingManager.js`(store 브릿지), `src/styles.css`(CSS 5블록 제거), `docs/development-rules.md`(ES Module import 규칙 추가)
+- 검증: `npm test`, `npm run format:check` 통과
+
 ## 현재 기준 요약 (2026-07-04)
-- 컴포넌트 파일 구조: `src/components/<name>.html` (플랫, 폴더 없음)
-- 7개 컴포넌트: `<xp-reward-panel>`, `<xp-progress-bar>`, `<popup-dialog>`, `<toast-notification>`, `<action-picker>`, `<patch-notes>`, `<collection-hub>`
+- 컴포넌트 파일 구조: `src/components/<name>.html` (플랫, 폴더 없음), 9개 컴포넌트
+- 컴포넌트 목록: `<xp-reward-panel>`, `<xp-progress-bar>`, `<popup-dialog>`, `<toast-notification>`, `<action-picker>`, `<patch-notes>`, `<collection-hub>`, `<player-panel>`, `<tournament-bracket>`
 - 컴포넌트 패턴: 자체 `x-data` 스코프 + `Alpine.reactive()` 클로저 상태 + `Alpine.store()` 데이터 브릿지 + scoped CSS (`[data-v-xxxxx]` 선택자 프리픽스)
 - **Alpine.store()는 절대 `null`을 값으로 설정하지 않음** — `Object.getOwnPropertyDescriptors(null)` TypeError 방지를 위해 항상 `{ visible: false, ... }` 객체 사용
 - PopupService: `Alpine.store('popupDialog')` 기반, `close()` 정적 메서드 추가됨
@@ -11,6 +17,8 @@
 - 사냥터 오버레이 내 버튼은 `.overlay { pointer-events: none }` 영향으로 클릭 안 됨 → `.hunting-choice-buttons { pointer-events: auto }` 필수
 - 검증 완료: `npm test`, `npm run check`, `npm run format:check` 통과
 - 인라인 Alpine 패널 0개, 모든 패널/오버레이/모달은 컴포넌트화 완료
+- **player-panel**: $dispatch 이벤트 패턴 (`adjust-stat`, `random-allocation`, `reset-allocation`, `adjust-challenge-level`, `open-collection-hub`)으로 부모 appStore와 통신. `id="playerFaceCanvas"`는 document.getElementById로 접근 가능
+- **tournament-bracket**: aside.tournament-panel을 root로 포함, `state.visible`로 setup-hidden 제어
 - 다음 우선순위: 사냥터 deferred effect 적용 UI/런 시작 연결, PPO 학습 결과 저장 구조, Time Warp 재학습/Dash 밸런스 검토
 
 ## [L2] 2026-07-02 — 보상 3축 설계 + 액션별 가중치 + 게임 통합 완료
@@ -380,11 +388,18 @@
 - 사냥터 HP 층간 완전 누적 적용, 휴식지 이벤트 회복량 25%는 임시값
 - 사냥터 HP/임시 스탯 상자 보상은 deferred effect payload까지만 반환됨 — 실제 런 시작/진행 UI 적용은 후속 작업
 - **Alpine.store() 절대 null 설정 금지** — 모든 서비스/컴포넌트에서 강제해야 함. 대신 `{ visible: false, ... }` 빈 상태 객체 사용
+- **ES Module 이중 import 방지**: module-level 변수가 필요한 서비스는 Alpine store에 저장. `index.html`에서 `?v=${V}` import와 JS static import가 다른 instance를 생성할 수 있음.
 
 ## 다음 할 일
 1. 전체 N×N PPO 학습 결과 저장 구조 설계: `{charId, actionId}`별 Actor/Critic/normalizer 저장 단위 결정
 2. 사냥터 deferred effect 적용 UI/런 시작 연결: `instant_heal`, `temporary_stat` 보상을 다음 사냥터 런에 실제 적용
 3. Time Warp 패널티 인상분 재학습 및 Dash +27% 강세 밸런스 검토
+
+## [L1] 2026-07-04 — player-panel / tournament-bracket 컴포넌트화 ($dispatch 이벤트 패턴 적용)
+- 맥락: 마지막 남은 인라인 Alpine 패널 2개(player-panel, bracket)를 컴포넌트화. player-panel은 x-for 내부 버튼이 많아 기존 `@click="adjustStat()"` 호출이 컴포넌트 x-data 스코프 밖으로 나가면 동작하지 않는 문제가 있음
+- 결정: (1) `<player-panel>` — 자체 `x-data="playerPanel"` + `Alpine.reactive()` 상태 + `Alpine.store("playerPanel")` 브릿지. 모든 액션 버튼을 `$dispatch('adjust-stat', {key, delta})`, `$dispatch('random-allocation')`, `$dispatch('reset-allocation')`, `$dispatch('adjust-challenge-level', {delta})`, `$dispatch('open-collection-hub')`로 변경. 이벤트 리스너는 appStore.init()의 `_listenComponentEvents()`에서 document.addEventListener로 등록. (2) `<tournament-bracket>` — `aside.tournament-panel`을 root로 포함, `state.visible`/`phase`/`rounds`를 Alpine.store 브릿지로 제어. (3) `renderPlayerSetup()` — appStore + Alpine.store("playerPanel") 이중 동기화. (4) `renderTournament()` — `Alpine.store("tournamentBracket")`에 visible/phase/rounds 기록. (5) `_syncSummary()` — 추가로 `Alpine.store("playerPanel")`에 allocation/allocationSummary/remainingPoints 동기화. (6) `adjustChallengeLevel()` — 추가로 `_syncPlayerPanelChallenge()` 호출. (7) CSS — player-panel/bracket/tournament-panel 전용 CSS ~52개 규칙을 styles.css에서 제거하고 각 컴포넌트 scoped CSS로 이동
+- 영향: `src/components/player-panel.html`(신규), `src/components/tournament-bracket.html`(신규), `src/ui.js`(renderPlayerSetup/renderTournament/_syncSummary store 브릿지 + _listenComponentEvents + _syncPlayerPanelChallenge), `index.html`(store 초기화 2종 + 인라인 패널→컴포넌트 태그 교체), `src/styles.css`(~52개 규칙 제거), `tests/regression.mjs`(store 초기화 2종 추가)
+- 검증: `npm test`, `npm run format:check` 통과
 
 ## [L1] 2026-07-04 — 사냥터 전투 컨셉을 1대다 몹 전투로 재정렬
 - 맥락: 사용자가 현재 사냥터가 의도와 다르게 로스터 캐릭터 1대1 반복처럼 구성되어 있다고 지적. 사냥터는 기본적으로 플레이어 1명 대 다수 몹 전투여야 하고, 기존 기본 캐릭터들은 일반 적이 아니라 중간 보스 정도로 사용해야 함.
@@ -408,3 +423,20 @@
 - 결정: `BattleSimulation`이 `arenaWidth`/`arenaHeight` 옵션을 받아 실제 `Simulation.width/height`를 바꾸도록 변경. 사냥터는 `HUNTING_ARENA` 1280×1280을 사용. `ArenaCamera`는 전투원 수 기반 자동 줌아웃을 제거하고 현재 시뮬레이션 맵 전체를 캔버스에 fit-to-map으로 맞춤.
 - 검증: 수치 시뮬레이션에서 사냥터 arena `[1280,1280]`, 960 캔버스 cameraScale `0.75` 확인. `npm test`, `npm run check`, `npm run format:check` 통과.
 - 영향: `src/hunting/huntingConfig.js`, `src/hunting/huntingManager.js`, `src/simulation/battleSimulation.js`, `src/camera.js`, `src/ui.js`, `src/app.js`, `tests/regression.mjs`, `docs/hunting-grounds-combat-update.md`
+
+## [L1] 2026-07-05 — player-panel $dispatch → $store._actions 전환 (버튼 무반응 디버깅 중)
+- 맥락: `@click="$dispatch(...)"` 이벤트가 `template.cloneNode(true)`로 복제된 컴포넌트 내부에서 `document` 리스너까지 전파되지 않는 문제. `_listenComponentEvents()`를 appStore.init()에서 등록해 document가 이벤트를 수신하게 했으나, 실제 브라우저에서 버튼이 여전히 무반응.
+- 결정: $dispatch 이벤트 패턴을 폐기하고 `Alpine.store("playerPanel")._actions` 콜백 객체로 전환. UIController._exposeActionsToPlayerPanel()이 `renderPlayerSetup()` 실행 직후 store._actions에 바인딩된 콜백({adjustStat, randomAllocation, resetAllocation, adjustChallengeLevel, openCollectionHub})을 저장. 템플릿은 `@click="$store.playerPanel._actions.adjustStat(key, delta)"`로 직접 호출. _listenComponentEvents() 제거.
+- 영향: `src/components/player-panel.html`(@click 모두 $store._actions로 변경, state getter 제거), `src/ui.js`(_exposeActionsToPlayerPanel 추가, _listenComponentEvents 제거), `index.html`(store 초기화에 _actions: null 추가)
+- 검증: `npm test`, `npm run format:check` 통과. BUT 브라우저에서 버튼 여전히 무반응 (원인 불명)
+- 미해결 원인 추정: `$watch("$store.playerPanel", callback)`가 전체 store 참조를 감시하므로 store 내부 속성 변경(alocation 등)이 발생해도 watcher가 재실행되지 않을 가능성. 현지 `state → `$store.playerPanel` 직접 참조로 전환 시도 예정. player-panel 템플릿이 `state.xxx` 대신 `$store.playerPanel.xxx`를 직접 사용하면 watcher 회피 가능.
+
+## 진행 중 이슈 (2026-07-05 갱신)
+- **player-panel 버튼 무반응**: `$store._actions` 콜백은 논리적으로 정상 (`UIController._exposeActionsToPlayerPanel`가 `this.state?.adjustStat()`를 바인딩). 원인이 `$watch` 의존성 추적 문제일 가능성이 높아, `state` + watcher 패턴을 폐기하고 템플릿이 직접 `$store.playerPanel.xxx`를 읽도록 전환할 계획. `$store`는 Alpine magic으로 의존성 추적이 정확함.
+- **사냥터 deferred effect UI 연결**: instant_heal/temporary_stat 보상은 payload까지만 반환, 실제 런 연결은 미구현
+
+## 다음 할 일 (2026-07-05 갱신)
+1. **player-panel 버튼 수정**: `state` + `$watch` → `$store.playerPanel.*` 직접 템플릿 참조로 전환 (watcher 의존성 추적 우회)
+2. 전체 N×N PPO 학습 결과 저장 구조 설계
+3. 사냥터 deferred effect 적용 UI/런 시작 연결
+4. Time Warp 패널티 인상분 재학습 및 Dash +27% 강세 밸런스 검토
