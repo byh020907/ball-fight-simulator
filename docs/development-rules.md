@@ -290,10 +290,12 @@ Ability / Action / Effect: 목표 방향, 목표 속도, movementEffect, forceHe
 ```
 
 - 볼끼리 충돌한 뒤 튕겨 나가는 힘은 `BattleSimulation._applyCollisionPhysics()`가 소유합니다.
-- 충돌 회전 impulse는 `BattleSimulation._applyAngularCollisionResponse()`가 소유하며, 충돌 전 접근 속도(`preCollisionVelAlongNormal`) 기준으로 계산합니다. 선형 impulse 적용 후의 velocity로 재계산하지 않습니다.
-- **모든 angular impulse는 공통 헬퍼 `src/physics/collisionResponse.js`의 `applyCollisionAngularImpulse(body, normal, contactPoint, impulseMag, angularFactor, tangentialSpeed, tangentialFriction)`를 통해 적용합니다.** 벽/terrain/볼-볼 충돌 모두 같은 공식(`r × normal * impulseMag * angularFactor`)을 사용하며, `applyAngularImpulse`가 없는 body는 duck typing으로 자동 무시됩니다.
-- **정적 표면(벽/terrain) 충돌**은 `applyCollisionResponse(body, normal, contactPoint, preCollisionVelocity, options)`를 통해 linear + angular impulse를 한 번에 적용합니다. 호출자가 직접 velocity를 반사하는 대신 `applyCollisionResponse`가 반발 계수와 접선 마찰을 포함한 impulse 계산을 소유합니다.
-- **동적-동적 충돌(볼-볼)**은 `applyDynamicCollisionResponse(bodyA, bodyB, normal, contactPoint, approachSpeed, options)`를 통해 양쪽 body에 angular impulse를 적용합니다. 선형 impulse는 `BattleSimulation._applyCollisionPhysics()`가 별도로 소유합니다.
+- **정적 표면(벽/terrain) 충돌**은 `applyCollisionResponse(body, normal, contactPoint, preCollisionVelocity, options)`를 통해 linear + angular impulse를 한 번에 적용합니다. 호출자는 위치 보정(clamp)과 contact normal/contactPoint/preCollisionVelocity 계산까지만 담당하고, velocity 반사와 angular impulse는 모두 `applyCollisionResponse`가 소유합니다. 반발 계수 기본값 0.92(terrain), 벽은 1.0, 접선 마찰 계수 기본값 0.03.
+- **벽 충돌**은 `simulation.js`의 `_reflectX`/`_reflectY`에서 위치 clamp 후 `applyCollisionResponse(entity, normal, contactPoint, preVel, { restitution: 1, angularFactor: 0.15, tangentialFriction: 0.03 })`를 호출합니다. `_matchVelocity`/`_applyWallAngularImpulse`는 더 이상 사용하지 않습니다.
+- **terrain 충돌(circle/polygon)**은 `terrainCollision.js`/`CollisionShape.js`에서 위치 보정 후 `applyCollisionResponse(entity, normal, contactPoint, preVel, { restitution: 0.92, angularFactor: 0.15, tangentialFriction: 0.03 })`를 호출합니다. `reflectVelocity`/개별 angular impulse 계산이 제거되었습니다.
+- **동적-동적 충돌(볼-볼) 회전 impulse**는 `BattleSimulation._applyAngularCollisionResponse()`가 소유하며, 내부에서 `applyDynamicCollisionResponse(a, b, normal, contactPoint, preCollisionVelAlongNormal, { restitution, angularFactor })`를 호출합니다. 선형 impulse는 `BattleSimulation._applyCollisionPhysics()`가 별도로 소유합니다.
+- **접선 마찰**은 물리 기반으로 작동합니다: linear impulse에서 `-tangent * tangentialSpeed * tangentialFriction` 성분이 접선 속도를 줄이는 방향으로 적용됩니다. torque에서도 `-(r × tangent) * tangentialSpeed * tangentialFriction`으로 동일한 마찰 방향을 반영합니다.
+- **모든 angular impulse**는 `applyCollisionAngularImpulse`를 통해 적용되며, `applyAngularImpulse`가 없는 body는 duck typing으로 자동 무시됩니다.
 - `applyAngularImpulse(value)`는 각운동량 L(angular impulse)을 `_accumulatedAngularImpulse`에 누적합니다. `integrateRotation(delta)`에서 `Δω = L * I⁻¹`로 angularVelocity에 반영되며, I⁻¹는 `0.5 * mass * radius²`의 solid disk 관성 모멘트 역수입니다. 같은 angular impulse라도 mass/radius가 큰 객체는 angularVelocity 변화가 작습니다.
 - `angularDamping`은 초당 유지율로 해석합니다. `integrateRotation`에서 `angularVelocity *= Math.pow(angularDamping, delta)`로 적용되므로, `angularDamping=0.98`이면 60fps 1초 후 각속도의 98%가 유지됩니다. delta가 0.016이든 0.5든 일관된 감쇠율을 보장합니다.
 - `BattleBall.update()`는 `velocity`를 즉시 목표 속도로 교체하지 않고, `_computeDesiredVelocity()` 결과와 현재 속도의 차이를 `applyImpulse()`로 보정합니다.

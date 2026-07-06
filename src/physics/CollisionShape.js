@@ -4,7 +4,7 @@
  * 모든 벡터 연산은 Vector2를 사용합니다.
  */
 import { Vector2 } from "../core.js";
-import { applyCollisionAngularImpulse } from "./collisionResponse.js";
+import { applyCollisionResponse } from "./collisionResponse.js";
 
 /**
  * local coordinates의 polygon 점 배열을 world coordinates로 변환.
@@ -77,30 +77,21 @@ export function resolvePolygonTerrainCollision(entity, terrain) {
 
     // 1. polygon 내부에 entity center가 완전히 들어갔는지 확인
     if (pointInConvexPolygon({ x: cx, y: cy }, worldPoints)) {
-        const result = closestEdgeNormal(cx, cy, worldPoints);
-        const overlap = r + result.distance;
+        const edgeResult = closestEdgeNormal(cx, cy, worldPoints);
+        const overlap = r + edgeResult.distance;
+        entity.position.x += edgeResult.nx * overlap;
+        entity.position.y += edgeResult.ny * overlap;
+        const normal = { x: edgeResult.nx, y: edgeResult.ny };
+        const contactPoint = edgeResult.contactPoint ?? {
+            x: entity.position.x,
+            y: entity.position.y
+        };
         const preVel = { x: entity.velocity.x, y: entity.velocity.y };
-        entity.position.x += result.nx * overlap;
-        entity.position.y += result.ny * overlap;
-        reflectVelocity(entity, result.nx, result.ny);
-        if (result.contactPoint) {
-            const normal = { x: result.nx, y: result.ny };
-            const approachSpeed = preVel.x * normal.x + preVel.y * normal.y;
-            if (approachSpeed < 0) {
-                const impulseMag = Math.abs(approachSpeed) * (1 + 0.92);
-                const tangent = { x: -normal.y, y: normal.x };
-                const tangentialSpeed = preVel.x * tangent.x + preVel.y * tangent.y;
-                applyCollisionAngularImpulse(
-                    entity,
-                    normal,
-                    result.contactPoint,
-                    impulseMag,
-                    0.15,
-                    tangentialSpeed,
-                    0.03
-                );
-            }
-        }
+        applyCollisionResponse(entity, normal, contactPoint, preVel, {
+            restitution: 0.92,
+            angularFactor: 0.15,
+            tangentialFriction: 0.03
+        });
         return true;
     }
 
@@ -145,24 +136,18 @@ export function resolvePolygonTerrainCollision(entity, terrain) {
 
     if (bestOverlap <= 0) return false;
 
-    const preVel = { x: entity.velocity.x, y: entity.velocity.y };
-
     // 밀어내기
     entity.position.x += bestNx * bestOverlap;
     entity.position.y += bestNy * bestOverlap;
 
-    // velocity 반사
-    reflectVelocity(entity, bestNx, bestNy);
-
     const normal = { x: bestNx, y: bestNy };
     const contactPoint = { x: bestContactX, y: bestContactY };
-    const approachSpeed = preVel.x * normal.x + preVel.y * normal.y;
-    if (approachSpeed < 0) {
-        const impulseMag = Math.abs(approachSpeed) * (1 + 0.92);
-        const tangent = { x: -normal.y, y: normal.x };
-        const tangentialSpeed = preVel.x * tangent.x + preVel.y * tangent.y;
-        applyCollisionAngularImpulse(entity, normal, contactPoint, impulseMag, 0.15, tangentialSpeed, 0.03);
-    }
+    const preVel = { x: entity.velocity.x, y: entity.velocity.y };
+    applyCollisionResponse(entity, normal, contactPoint, preVel, {
+        restitution: 0.92,
+        angularFactor: 0.15,
+        tangentialFriction: 0.03
+    });
     return true;
 }
 
@@ -203,15 +188,6 @@ function closestEdgeNormal(cx, cy, worldPoints) {
         distance: minDist,
         contactPoint: { x: bestContactX, y: bestContactY }
     };
-}
-
-function reflectVelocity(entity, nx, ny) {
-    const dot = entity.velocity.x * nx + entity.velocity.y * ny;
-    if (dot < 0) {
-        const reflectedVx = entity.velocity.x - 2 * dot * nx;
-        const reflectedVy = entity.velocity.y - 2 * dot * ny;
-        entity.applyImpulse(new Vector2(reflectedVx - entity.velocity.x, reflectedVy - entity.velocity.y));
-    }
 }
 
 // ──────────────────────────────────────────────

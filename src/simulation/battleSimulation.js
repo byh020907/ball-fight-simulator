@@ -1,6 +1,6 @@
 import { applyCollisionImpulse, Vector2 } from "../core.js";
 import { resolveFighterShapeCollision } from "../physics/CollisionShape.js";
-import { applyCollisionAngularImpulse } from "../physics/collisionResponse.js";
+import { applyDynamicCollisionResponse } from "../physics/collisionResponse.js";
 import {
     ArcherAbility,
     EaterAbility,
@@ -391,15 +391,10 @@ export class BattleSimulation extends Simulation {
      * 각 fighter의 applyAngularImpulse()를 통해 누적되며, 다음 integrateRotation에서 반영됩니다.
      */
     _applyAngularCollisionResponse(a, b, normal, contactPoint, preCollisionVelAlongNormal) {
-        if (!contactPoint) return;
-        if (preCollisionVelAlongNormal >= 0) return;
-
-        const impulseMag = Math.abs(preCollisionVelAlongNormal) * (1 + COLLISION_RESTITUTION);
-        const ANGULAR_COLLISION_FACTOR = 0.15;
-
-        applyCollisionAngularImpulse(a, normal, contactPoint, impulseMag, ANGULAR_COLLISION_FACTOR);
-        const inverseNormal = { x: -normal.x, y: -normal.y };
-        applyCollisionAngularImpulse(b, inverseNormal, contactPoint, impulseMag, ANGULAR_COLLISION_FACTOR);
+        applyDynamicCollisionResponse(a, b, normal, contactPoint, preCollisionVelAlongNormal, {
+            restitution: COLLISION_RESTITUTION,
+            angularFactor: 0.15
+        });
     }
 
     /** 숙련도 충돌 패시브: 주기적 충돌 피해 보너스 적용 */

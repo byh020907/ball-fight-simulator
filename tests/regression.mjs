@@ -6901,12 +6901,65 @@ function testDynamicCollisionResponseNoPotential() {
     console.log("[collision-response-no-potential] ok");
 }
 
+function testTangentialFrictionReducesSpeed() {
+    // 접선 마찰이 접선 속도를 증가시키지 않고 감소시키는지 검증
+    const body = {
+        position: { x: 500, y: 500 },
+        velocity: { x: -100, y: 50 },
+        applyImpulse(impulse) {
+            this.velocity.x += impulse.x;
+            this.velocity.y += impulse.y;
+        },
+        applyAngularImpulse() {}
+    };
+    const tangentialSpeedBefore = Math.abs(body.velocity.y) + Math.abs(body.velocity.x);
+    applyCollisionResponse(
+        body,
+        { x: 1, y: 0 },
+        { x: 480, y: 500 },
+        { x: -100, y: 50 },
+        { restitution: 1, angularFactor: 0, tangentialFriction: 0.1 }
+    );
+    // 선형 반사 후 Y 속도가 마찰로 인해 감소해야 함 (증가 금지)
+    const tangentialAfter = Math.abs(body.velocity.y);
+    assert.ok(
+        tangentialAfter <= 50 + 0.01,
+        `tangential friction should not increase tangential speed: before=50 after=${tangentialAfter}`
+    );
+    console.log("[collision-response-tangential-friction] ok");
+}
+
+function testApplyCollisionResponseWallReflects() {
+    // applyCollisionResponse가 벽 반사(restitution=1)에서 velocity를 올바르게 반전하는지 검증
+    const body = {
+        position: { x: 500, y: 500 },
+        velocity: { x: -100, y: 30 },
+        applyImpulse(impulse) {
+            this.velocity.x += impulse.x;
+            this.velocity.y += impulse.y;
+        },
+        applyAngularImpulse() {}
+    };
+    applyCollisionResponse(
+        body,
+        { x: 1, y: 0 },
+        { x: 480, y: 500 },
+        { x: -100, y: 30 },
+        { restitution: 1, angularFactor: 0, tangentialFriction: 0 }
+    );
+    assert.ok(body.velocity.x > 0, "applyCollisionResponse with restitution=1 should reverse x velocity");
+    assert.equal(body.velocity.y, 30, "tangential (y) velocity should be unchanged when friction=0");
+    console.log("[collision-response-wall-reflect] ok");
+}
+
 testCollisionResponseHelperAngularImpulse();
 testCollisionResponseNoApplyAngularImpulse();
 testCollisionAppliesLinearImpulse();
 testCollisionResponseDuckTypingDetection();
 testDynamicCollisionResponsePair();
 testDynamicCollisionResponseNoPotential();
+testTangentialFrictionReducesSpeed();
+testApplyCollisionResponseWallReflects();
 
 // ── Static surface angular impulse tests ─────────────────────────────────
 

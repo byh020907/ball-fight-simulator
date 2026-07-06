@@ -58,11 +58,11 @@ export function applyCollisionAngularImpulse(
 
     let totalTorque = normalTorque;
 
-    // 접선 마찰 torque: τ_t = (r × T̂) * v_t * friction
+    // 접선 마찰 torque: τ_t = -(r × T̂) * v_t * friction (접선 속도를 줄이는 방향)
     if (tangentialFriction > 0 && tangentialSpeed !== 0) {
         const tangent = { x: -normal.y, y: normal.x };
         const rxt = r.x * tangent.y - r.y * tangent.x;
-        const frictionTorque = rxt * tangentialSpeed * tangentialFriction;
+        const frictionTorque = -rxt * tangentialSpeed * tangentialFriction;
         totalTorque += frictionTorque;
     }
 
@@ -113,14 +113,15 @@ export function applyCollisionResponse(body, normal, contactPoint, preCollisionV
     const tangent = { x: -normal.y, y: normal.x };
     const tangentialSpeed = relVel.x * tangent.x + relVel.y * tangent.y;
 
-    // 선형 impulse (body에 applyImpulse가 있으면)
+    // 선형 impulse: 법선 반발 + 접선 마찰 (마찰은 접선 속도를 줄이는 방향)
     if (typeof body.applyImpulse === "function") {
-        const impulseX = normal.x * impulseMag + tangent.x * tangentialSpeed * tangentialFriction;
-        const impulseY = normal.y * impulseMag + tangent.y * tangentialSpeed * tangentialFriction;
+        const impulseX = normal.x * impulseMag - tangent.x * tangentialSpeed * tangentialFriction;
+        const impulseY = normal.y * impulseMag - tangent.y * tangentialSpeed * tangentialFriction;
         body.applyImpulse({ x: impulseX, y: impulseY });
     }
 
     // Angular impulse (body에 applyAngularImpulse가 있으면)
+    // tangentialSpeed/tangentialFriction을 전달해 접선 마찰 torque도 처리
     applyCollisionAngularImpulse(
         body,
         normal,

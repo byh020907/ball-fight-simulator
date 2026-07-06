@@ -1,6 +1,5 @@
-import { Vector2 } from "../core.js";
 import { TERRAIN_SHAPES } from "./terrainConfig.js";
-import { applyCollisionAngularImpulse } from "../physics/collisionResponse.js";
+import { applyCollisionResponse } from "../physics/collisionResponse.js";
 import { resolvePolygonTerrainCollision } from "../physics/CollisionShape.js";
 
 /**
@@ -24,26 +23,17 @@ function resolveCircleTerrainCollision(entity, terrain) {
     entity.position.x += nx * overlap;
     entity.position.y += ny * overlap;
 
-    const dot = entity.velocity.x * nx + entity.velocity.y * ny;
-    if (dot < 0) {
-        const preVel = { x: entity.velocity.x, y: entity.velocity.y };
-        const reflectedVx = entity.velocity.x - 2 * dot * nx;
-        const reflectedVy = entity.velocity.y - 2 * dot * ny;
-        entity.applyImpulse(new Vector2(reflectedVx - entity.velocity.x, reflectedVy - entity.velocity.y));
-
-        const normal = { x: nx, y: ny };
-        const contactPoint = {
-            x: entity.position.x - normal.x * entityRadius,
-            y: entity.position.y - normal.y * entityRadius
-        };
-        const approachSpeed = preVel.x * normal.x + preVel.y * normal.y;
-        if (approachSpeed < 0) {
-            const impulseMag = Math.abs(approachSpeed) * (1 + 0.92);
-            const tangent = { x: -normal.y, y: normal.x };
-            const tangentialSpeed = preVel.x * tangent.x + preVel.y * tangent.y;
-            applyCollisionAngularImpulse(entity, normal, contactPoint, impulseMag, 0.15, tangentialSpeed, 0.03);
-        }
-    }
+    const normal = { x: nx, y: ny };
+    const contactPoint = {
+        x: entity.position.x - normal.x * entityRadius,
+        y: entity.position.y - normal.y * entityRadius
+    };
+    const preVel = { x: entity.velocity.x, y: entity.velocity.y };
+    applyCollisionResponse(entity, normal, contactPoint, preVel, {
+        restitution: 0.92,
+        angularFactor: 0.15,
+        tangentialFriction: 0.03
+    });
 
     return true;
 }
