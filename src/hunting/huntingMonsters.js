@@ -82,7 +82,7 @@ export function createHuntingMobEncounter({ floor = 1, rng = DEFAULT_RNG } = {})
     const count = getHuntingMobCount(floor);
     return Array.from({ length: count }, (_, index) => {
         const type = getMonsterTypeForSlot(floor, index, rng);
-        return scaleEnemySpecForHunting(createHuntingMobSpec({ type, floor, index }), floor, {
+        return scaleEnemySpecForHunting(createHuntingMobSpec({ type, floor, index, rng }), floor, {
             enemyType: HUNTING_ENEMY_TYPES.NORMAL
         });
     });

@@ -60,9 +60,14 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody]) {
         };
         this.hunting = spec.hunting ?? null;
         this.appearance = spec.appearance ?? { sides: 0, face: "default" };
-        // RotationalBody 초기화: 다각형 몹은 무작위 회전각과 느린 각속도
-        this.angle = this.appearance.sides > 0 ? Math.random() * Math.PI * 2 : 0;
-        this.angularVelocity = this.appearance.sides > 0 ? (Math.random() - 0.5) * 0.8 : 0;
+        // RotationalBody 초기화: 다각형 몹은 appearance 회전값 우선, 없으면 무작위
+        if (this.appearance.sides > 0) {
+            this.angle = this.appearance.angle ?? Math.random() * Math.PI * 2;
+            this.angularVelocity = this.appearance.angularVelocity ?? (Math.random() - 0.5) * 0.8;
+        } else {
+            this.angle = 0;
+            this.angularVelocity = 0;
+        }
         this.equipment = {
             items: Array.isArray(spec.equipment?.equippedItems) ? spec.equipment.equippedItems : []
         };
@@ -425,7 +430,9 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody]) {
             ctx.stroke();
         }
         drawEquipmentItems(ctx, this, this.equipment.items);
-        this.drawFace(ctx, this.state.wallSlam ? this.display.spinRotation : 0);
+        const faceRotation =
+            this.appearance.sides > 0 ? this.angle : this.state.wallSlam ? this.display.spinRotation : 0;
+        this.drawFace(ctx, faceRotation);
         this.ability?.draw?.(ctx);
         if (this.state.movement?.showRing) {
             ctx.strokeStyle = this.state.movement.color;

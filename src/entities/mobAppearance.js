@@ -154,5 +154,7 @@ const FACE_NAMES = Object.keys(FACE_TEMPLATES);
 export function generateMobAppearance(rng = Math.random) {
     const sides = Math.floor(rng() * (BODY_SHAPES.MAX_SIDES - BODY_SHAPES.MIN_SIDES + 1)) + BODY_SHAPES.MIN_SIDES;
     const face = FACE_NAMES[Math.floor(rng() * FACE_NAMES.length)];
-    return { sides, face };
+    const angle = rng() * Math.PI * 2;
+    const angularVelocity = (rng() - 0.5) * 0.8;
+    return { sides, face, angle, angularVelocity };
 }

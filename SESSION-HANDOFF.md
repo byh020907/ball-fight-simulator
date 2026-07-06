@@ -1,5 +1,12 @@
 # 결정 기록
 
+## [L1] 2026-07-06 — 다각형 몹 회전이 화면에서 보이도록 수정
+- 맥락: 다각형 몹의 angle/angularVelocity/body rotate는 구현되어 있었으나, (1) 얼굴이 회전하지 않고 항상 정면을 바라 회전 체감이 거의 없었고, (2) generateMobAppearance(rng)가 angle/angularVelocity를 반환하지 않아 회전값이 rng 재현 불가, (3) createHuntingMobEncounter가 createHuntingMobSpec에 rng를 전달하지 않아 몹 생성 rng 체인이 끊김.
+- 결정: (1) drawFace에 this.angle을 전달해 polygon body의 얼굴이 다각형과 함께 회전, circle 캐릭터는 기존 동작 유지. (2) generateMobAppearance(rng)에 angle/angularVelocity 필드 추가, BattleBall 생성자에서 appearance 값 우선 사용. (3) createHuntingMobEncounter가 rng를 createHuntingMobSpec에 전달하도록 수정. 이름표·HP바는 회전시키지 않음. Set-Content 미사용, Node.js 일괄 치환.
+- 영향: `src/entities/mobAppearance.js`, `src/entities/battleBall.js`, `src/hunting/huntingMonsters.js`, `tests/regression.mjs`, `SESSION-HANDOFF.md`, `docs/hunting-grounds-system.md`
+- 검증: `npm test`, `npm run format:check`, `npm run check` 통과
+- 미검증: 브라우저에서 polygon 몹 얼굴 회전 육안 확인
+
 ## [L1] 2026-07-06 — 물리 디버깅을 위한 ring buffer 기록 추가
 - 맥락: 각속도/다각형 충돌 구현 중 NaN/Infinity 또는 이상 충돌이 발생할 때 직전 물리 이벤트를 추적할 수단이 필요. 과도한 finite guard 대신 ring buffer 기반 원인 추적을 우선.
 - 결정: (1) `src/physics/PhysicsDebugRingBuffer.js` 신설 — 고정 길이(30) ring buffer, `push(event)`, `toArray()`, `clear()`, capacity 초과 시 오래된 이벤트 제거. (2) `snapshotPhysicsState(entity)` — position/velocity/angle/angularVelocity/torqueAccum 등을 값 복사로 스냅샷. (3) `validatePhysicsState(entity, elapsed)` — position/velocity/angle/angularVelocity NaN/Infinity 검사, 무효 시 ring buffer dump를 console.error로 출력. (4) BattleBall에 `physicsDebug` buffer 연결, `applyImpulse`/`applyTorque`/`applyAngularImpulse` 래퍼로 debug 이벤트 기록, `update()` 종료 시 summary snapshot + validate. (5) BattleSimulation.handleFighterCollision에 collision event 기록 (normal, overlap, contactPoint). (6) 테스트: ring buffer 단독(5종), BattleBall debug(4종), validate(3종) 등 12종.

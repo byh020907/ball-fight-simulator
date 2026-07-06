@@ -114,6 +114,7 @@ import {
     resolveTemplateComponent
 } from "../src/alpineTemplateComponents.js";
 import { BattleBall } from "../src/entities/battleBall.js";
+import { generateMobAppearance } from "../src/entities/mobAppearance.js";
 
 const EMPTY_EQUIPMENT_SUMMARY = {
     characterLevel: 1,
@@ -1503,7 +1504,8 @@ function testHuntingSystem() {
     const mobs = createHuntingMobEncounter({
         floor: 3,
         rng: (() => {
-            const rolls = [0, 0.9, 0.2];
+            // [mob1 type, mob2 type, mob0 apperance×4, mob1 appearance×4, mob2 appearance×4]
+            const rolls = [0, 0.9, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.1, 0.2, 0.3, 0.4];
             return () => rolls.shift() ?? 0;
         })()
     });
@@ -3338,6 +3340,82 @@ async function testCollisionProducesAngularImpulse(app) {
 }
 
 console.log("[fighter-collision] ok");
+
+// ──────────────────────────────────────────────
+// Mob rotation visibility
+// ──────────────────────────────────────────────
+
+function testMobAppearanceHasRotationData() {
+    const rng_calls = [];
+    const mockRng = () => {
+        rng_calls.push(rng_calls.length);
+        return rng_calls.length * 0.1;
+    };
+    const app = generateMobAppearance(mockRng);
+    assert.ok(typeof app.angle === "number", "appearance should have angle");
+    assert.ok(typeof app.angularVelocity === "number", "appearance should have angularVelocity");
+    assert.ok(Number.isFinite(app.angle), "angle should be finite");
+    assert.ok(Number.isFinite(app.angularVelocity), "angularVelocity should be finite");
+    assert.ok(app.sides >= 5, "generated sides should be >=5");
+    // 재현성: 같은 rng 시퀀스는 같은 결과
+    const rng_calls2 = [];
+    const mockRng2 = () => {
+        rng_calls2.push(rng_calls2.length);
+        return rng_calls2.length * 0.1;
+    };
+    const app2 = generateMobAppearance(mockRng2);
+    assert.equal(app2.angle, app.angle, "same rng sequence should produce same angle");
+    assert.equal(app2.angularVelocity, app.angularVelocity, "same rng sequence should produce same angularVelocity");
+}
+
+function testBattleBallUsesAppearanceAngle() {
+    const spec = {
+        id: "test-app-angle",
+        name: "AppAngle",
+        teamId: "t",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 30, mass: 10 },
+        color: "#112233",
+        appearance: { sides: 7, face: "default", angle: 1.5, angularVelocity: 0.3 },
+        ability: "dash"
+    };
+    const ball = new BattleBall(spec, new Vector2(400, 400));
+    assert.equal(ball.angle, 1.5, "should use appearance.angle when provided");
+    assert.equal(ball.angularVelocity, 0.3, "should use appearance.angularVelocity when provided");
+}
+
+function testPolygonMobFaceRotatesWithBody() {
+    const ctx = makeRecordingCanvasContext();
+    const spec = {
+        id: "test-face-rot",
+        name: "FaceRot",
+        teamId: "t",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 30, mass: 10 },
+        color: "#ff8800",
+        appearance: { sides: 6, face: "default" },
+        ability: "dash"
+    };
+    const ball = new BattleBall(spec, new Vector2(200, 300));
+    ball.radius = 30;
+    ball.angle = 2.5;
+
+    ball.draw(ctx);
+
+    // drawFace should also call rotate with the body angle for polygon mobs
+    const rotateCalls = ctx.calls.filter((c) => c[0] === "rotate" && Math.abs(c[1] - 2.5) < 0.01);
+    assert.ok(rotateCalls.length >= 2, "face should also rotate with body angle for polygon mobs");
+
+    // circle character should NOT pass body angle to face
+    const ctx2 = makeRecordingCanvasContext();
+    const circleSpec = { ...spec, appearance: { sides: 0, face: "default" } };
+    const circleBall = new BattleBall(circleSpec, new Vector2(300, 300));
+    circleBall.radius = 30;
+    circleBall.angle = 2.5;
+    circleBall.draw(ctx2);
+    const rotateCalls2 = ctx2.calls.filter((c) => c[0] === "rotate" && Math.abs(c[1] - 2.5) < 0.01);
+    assert.equal(rotateCalls2.length, 0, "circle character face should NOT rotate with body angle");
+}
+
+console.log("[mob-rotation-visibility] ok");
 
 // ──────────────────────────────────────────────
 // Physics debug ring buffer
@@ -6227,6 +6305,9 @@ testPolygonVsPolygonCollisionSeparates();
 testCircleVsPolygonCollisionSeparates();
 testPolygonAngleChangesCollisionResult();
 testPolygonBodyDrawAppliesAngle();
+testMobAppearanceHasRotationData();
+testBattleBallUsesAppearanceAngle();
+testPolygonMobFaceRotatesWithBody();
 testGetFighterCollisionShapePolygon();
 testGetFighterCollisionShapeCircle();
 testLocalPointsMatchDrawBody();
