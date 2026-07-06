@@ -292,6 +292,7 @@ Ability / Action / Effect: 목표 방향, 목표 속도, movementEffect, forceHe
 - 볼끼리 충돌한 뒤 튕겨 나가는 힘은 `BattleSimulation._applyCollisionPhysics()`가 소유합니다.
 - 충돌 회전 impulse는 `BattleSimulation._applyAngularCollisionResponse()`가 소유하며, 충돌 전 접근 속도(`preCollisionVelAlongNormal`) 기준으로 계산합니다. 선형 impulse 적용 후의 velocity로 재계산하지 않습니다.
 - `applyAngularImpulse(value)`는 각운동량 L(angular impulse)을 `_accumulatedAngularImpulse`에 누적합니다. `integrateRotation(delta)`에서 `Δω = L * I⁻¹`로 angularVelocity에 반영되며, I⁻¹는 `0.5 * mass * radius²`의 solid disk 관성 모멘트 역수입니다. 같은 angular impulse라도 mass/radius가 큰 객체는 angularVelocity 변화가 작습니다.
+- `angularDamping`은 초당 유지율로 해석합니다. `integrateRotation`에서 `angularVelocity *= Math.pow(angularDamping, delta)`로 적용되므로, `angularDamping=0.98`이면 60fps 1초 후 각속도의 98%가 유지됩니다. delta가 0.016이든 0.5든 일관된 감쇠율을 보장합니다.
 - `BattleBall.update()`는 `velocity`를 즉시 목표 속도로 교체하지 않고, `_computeDesiredVelocity()` 결과와 현재 속도의 차이를 `applyImpulse()`로 보정합니다.
 - `forceHeading()`은 방향 고정만 소유하고, 고정 속도(`overrideVelocity`)를 소유하지 않습니다.
 - `applyKnockback()`은 넉백 impulse를 즉시 더하고, duration 동안 방향만 고정합니다.

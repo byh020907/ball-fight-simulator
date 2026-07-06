@@ -295,6 +295,18 @@ export function evadeTarget(owner, target, range, strength) {
 }
 
 /**
+ * 눈에 띄는 최소 회전 속도의 초기 각속도를 생성합니다.
+ * @param {function} rng - 난수 생성기 (기본 Math.random)
+ * @param {number} min - 최소 절대값 (기본 0.9 rad/s)
+ * @param {number} max - 최대 절대값 (기본 1.6 rad/s)
+ * @returns {number} -0 방지, sign * (min ~ max)
+ */
+export function randomSpin(rng = Math.random, min = 0.9, max = 1.6) {
+    const abs = min + rng() * (max - min);
+    return (rng() < 0.5 ? -1 : 1) * abs;
+}
+
+/**
  * 탄성 충돌 impulse를 두 엔티티에 적용한다.
  * CollisionEntity(mass, velocity, applyImpulse) 인터페이스를 가진 모든 객체에 사용 가능.
  *

@@ -1,4 +1,4 @@
-import { RENDER_LAYERS, TimedEffect, Vector2 } from "../core.js";
+import { RENDER_LAYERS, TimedEffect, Vector2, randomSpin } from "../core.js";
 import { ActionContext } from "../clickActions.js";
 import { DashEffect } from "../combatEffects.js";
 import { mixins, PhysicsBody, RotationalBody } from "../physics/index.js";
@@ -67,10 +67,10 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody]) {
             this.angularVelocity = 0;
         } else if (this.appearance.sides > 0) {
             this.angle = this.appearance.angle ?? Math.random() * Math.PI * 2;
-            this.angularVelocity = this.appearance.angularVelocity ?? (Math.random() - 0.5) * 0.8;
+            this.angularVelocity = this.appearance.angularVelocity ?? randomSpin();
         } else {
             this.angle = Math.random() * Math.PI * 2;
-            this.angularVelocity = (Math.random() - 0.5) * 0.8;
+            this.angularVelocity = randomSpin();
         }
         this.equipment = {
             items: Array.isArray(spec.equipment?.equippedItems) ? spec.equipment.equippedItems : []

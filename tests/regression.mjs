@@ -12,7 +12,7 @@ import {
     getRemainingStatPoints,
     getSpentStatPoints
 } from "../src/statAllocation.js";
-import { FIGHTER_IDS, Vector2 } from "../src/core.js";
+import { FIGHTER_IDS, Vector2, randomSpin } from "../src/core.js";
 import { findActionById } from "../src/clickActions.js";
 import { calcMatchXp, getLevelFromXp, getXpForNextLevel, calcTournamentXp } from "../src/experience/experienceState.js";
 import { getLevelRequirement } from "../src/experience/experienceConfig.js";
@@ -1504,8 +1504,9 @@ function testHuntingSystem() {
     const mobs = createHuntingMobEncounter({
         floor: 3,
         rng: (() => {
-            // [mob1 type, mob2 type, mob0 apperance×4, mob1 appearance×4, mob2 appearance×4]
-            const rolls = [0, 0.9, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.1, 0.2, 0.3, 0.4];
+            // [mob1 type, mob2 type, mob0 apperance×5, mob1 appearance×5, mob2 appearance×5]
+            // generateMobAppearance는 이제 randomSpin 헬퍼로 2회 rng 호출 (abs+sign)
+            const rolls = [0.9, 0, 0.1, 0.2, 0.3, 0.5, 0.6, 0.7, 0.8, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8];
             return () => rolls.shift() ?? 0;
         })()
     });
@@ -2333,14 +2334,16 @@ function testHuntingTerrain() {
     assert.equal(spinner.angularVelocity, 0, "applyAngularImpulse should NOT immediately change angularVelocity");
     assert.equal(spinner._accumulatedAngularImpulse, 3, "applyAngularImpulse should accumulate");
 
-    // integrateRotation: 누적 impulse L → Δω = L * I⁻¹ → velocity → angle
+    // integrateRotation: 누적 impulse L → Δω = L * I⁻¹ → velocity → angle (프레임레이트 독립 damping)
     spinner.integrateRotation(0.5);
-    // Δω = 3 * 0.04 = 0.12, damping 0.98 → 0.1176, angle = 0.1176 * 0.5 = 0.0588
+    // Δω = 3 * 0.04 = 0.12
+    // damping = 0.98 ^ 0.5 ≈ 0.98995 → velocity = 0.12 * 0.98995 ≈ 0.11879
+    // angle = 0.11879 * 0.5 ≈ 0.05940
     assert.ok(
-        Math.abs(spinner.angularVelocity - 0.1176) < 0.001,
-        "integrateRotation should apply L * I⁻¹ to velocity (mass=2, radius=5)"
+        Math.abs(spinner.angularVelocity - 0.1188) < 0.001,
+        "integrateRotation should apply L * I⁻¹ to velocity with FR-independent damping (mass=2, radius=5)"
     );
-    assert.ok(Math.abs(spinner.angle - 0.0588) < 0.001, "integrateRotation should advance angle");
+    assert.ok(Math.abs(spinner.angle - 0.0594) < 0.001, "integrateRotation should advance angle");
     // integrate 후 누적 초기화 확인
     assert.equal(spinner._accumulatedAngularImpulse, 0, "accumulated impulse should clear after integrate");
     assert.equal(spinner._accumulatedTorque, 0, "accumulated torque should clear after integrate");
@@ -3250,10 +3253,11 @@ async function testIntegrateRotationSpins() {
     ball.angle = 0;
     ball.angularVelocity = 1.0;
     ball.integrateRotation(0.5);
-    // damping 0.98: angle = 0 + 1.0 * 0.98 * 0.5 = 0.49
+    // damping 0.98, delta=0.5 → factor = 0.98 ^ 0.5 ≈ 0.98995
+    // angle = 0 + 1.0 * 0.98995 * 0.5 ≈ 0.495
     assert.ok(
-        Math.abs(ball.angle - 0.49) < 0.02,
-        "integrateRotation should advance angle by angularVelocity * delta * damping"
+        Math.abs(ball.angle - 0.495) < 0.02,
+        "integrateRotation should advance angle with frame-rate independent damping"
     );
     // 누적이 초기화되었는지 확인
     assert.equal(ball._accumulatedTorque, 0, "torque should clear after integrate");
@@ -3310,6 +3314,37 @@ function testMultipleTorqueSameFrame() {
     assert.ok(Math.abs(s.angle - 5.8604) < 0.02, "combined torque and impulse should integrate correctly");
 }
 
+function testFrameRateIndependentDamping() {
+    class Dummy {}
+    const SpinningDummy = RotationalBody(Dummy);
+
+    // delta=1, damping=0.5 → factor = 0.5^1 = 0.5
+    const s1 = new SpinningDummy();
+    s1.angularDamping = 0.5;
+    s1.angularVelocity = 1.0;
+    s1.integrateRotation(1.0);
+    assert.ok(Math.abs(s1.angularVelocity - 0.5) < 0.001, "delta=1, damping=0.5 → angularVelocity should halve");
+
+    // delta=0.5, damping=0.5 → factor = 0.5^0.5 ≈ 0.7071
+    const s2 = new SpinningDummy();
+    s2.angularDamping = 0.5;
+    s2.angularVelocity = 1.0;
+    s2.integrateRotation(0.5);
+    assert.ok(
+        Math.abs(s2.angularVelocity - 0.7071) < 0.001,
+        "delta=0.5, damping=0.5 → angularVelocity should be sqrt(0.5)"
+    );
+
+    // delta=2, damping=0.5 → factor = 0.5^2 = 0.25
+    const s3 = new SpinningDummy();
+    s3.angularDamping = 0.5;
+    s3.angularVelocity = 1.0;
+    s3.integrateRotation(2.0);
+    assert.ok(Math.abs(s3.angularVelocity - 0.25) < 0.001, "delta=2, damping=0.5 → angularVelocity should be 0.25");
+
+    console.log("[frame-rate-indep-damping] ok");
+}
+
 async function testPolygonUpdateIntegratesRotation(app) {
     const spec = {
         id: "test-update-rot",
@@ -3325,8 +3360,9 @@ async function testPolygonUpdateIntegratesRotation(app) {
     fighter.angle = 0;
     fighter.angularVelocity = 2.0;
     fighter.update(0.5, sim);
-    // damping 0.98: velocity=1.96, angle=0.98
-    assert.ok(Math.abs(fighter.angle - 0.98) < 0.05, "update should call integrateRotation and advance angle");
+    // damping 0.98, delta=0.5 → factor = 0.98 ^ 0.5 ≈ 0.98995
+    // velocity = 2.0 * 0.98995 ≈ 1.9799, angle = 1.9799 * 0.5 ≈ 0.990
+    assert.ok(Math.abs(fighter.angle - 0.99) < 0.05, "update should call integrateRotation and advance angle");
 }
 
 async function testCollisionProducesAngularImpulse(app) {
@@ -3606,6 +3642,64 @@ function testBattleBallUsesAppearanceAngle() {
     const ball = new BattleBall(spec, new Vector2(400, 400));
     assert.equal(ball.angle, 1.5, "should use appearance.angle when provided");
     assert.equal(ball.angularVelocity, 0.3, "should use appearance.angularVelocity when provided");
+}
+
+function testRandomSpinHelper() {
+    // deterministic rng (0, 0.25, 0.5, 0.75, ...)
+    let calls = 0;
+    const rng = () => (calls++ % 4) / 4;
+    const spin = randomSpin(rng, 0.9, 1.6);
+    // rng[0]=0, rng[1]=0.25 → sign=-1, abs=0.9+0*0.7=0.9 → -0.9
+    // or rng[0]=0.25, rng[1]=0 → sign=-1, abs=0.9+0.25*0.7=1.075 → -1.075
+    assert.ok(Number.isFinite(spin), "randomSpin should return a finite number");
+    assert.ok(Math.abs(spin) >= 0.9, "randomSpin absolute value should be >= min");
+    assert.ok(Math.abs(spin) <= 1.6, "randomSpin absolute value should be <= max");
+    // Test multiple calls
+    for (let i = 0; i < 10; i++) {
+        const s = randomSpin(rng, 0.9, 1.6);
+        assert.ok(Math.abs(s) >= 0.89, `randomSpin iteration ${i} should be >= 0.9, got ${s}`);
+    }
+}
+
+function testCircleMinAngularVelocity() {
+    const spec = {
+        id: "test-min-spin",
+        name: "MinSpin",
+        teamId: "t",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 30, mass: 10 },
+        color: "#ff8800",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash"
+    };
+    for (let i = 0; i < 20; i++) {
+        const ball = new BattleBall(spec, new Vector2(100 + i * 10, 100));
+        assert.ok(
+            Math.abs(ball.angularVelocity) >= 0.8,
+            `circle angularVelocity (${ball.angularVelocity}) should be >= 0.8 rad/s`
+        );
+    }
+}
+
+async function testCircleRotatesVisibly(app) {
+    const spec = {
+        id: "test-vis-rot",
+        name: "VisRot",
+        teamId: "t",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 30, mass: 10 },
+        color: "#ff8800",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash",
+        rotationEnabled: true
+    };
+    const sim = new BattleSimulation([spec, { ...spec, id: "opp", teamId: "t2" }], { onLog() {}, onSound() {} });
+    const ball = sim.fighters[0];
+    const angleBefore = ball.angle;
+    for (let i = 0; i < 60; i++) {
+        ball.update(1 / 60, sim);
+    }
+    const angleAfter = ball.angle;
+    const angleChange = Math.abs(angleAfter - angleBefore);
+    assert.ok(angleChange >= 0.6, `circle should rotate at least 0.6 rad in 1 second, got ${angleChange}`);
 }
 
 function testPolygonMobFaceRotatesWithBody() {
@@ -6637,6 +6731,8 @@ testPolygonAngleChangesCollisionResult();
 testPolygonBodyDrawAppliesAngle();
 testMobAppearanceHasRotationData();
 testBattleBallUsesAppearanceAngle();
+testRandomSpinHelper();
+testCircleMinAngularVelocity();
 testPolygonMobFaceRotatesWithBody();
 testGetFighterCollisionShapePolygon();
 testGetFighterCollisionShapeCircle();
@@ -6645,7 +6741,9 @@ await testRotationInitializedOnPolygonFighter(app);
 testIntegrateRotationSpins();
 testRotationalBodyTorqueAccumulation();
 testMultipleTorqueSameFrame();
+testFrameRateIndependentDamping();
 await testPolygonUpdateIntegratesRotation(app);
+await testCircleRotatesVisibly(app);
 await testCollisionProducesAngularImpulse(app);
 await testCollisionAngularImpulseChangesVelocity(app);
 await testNonHostileCollisionProducesAngularImpulse(app);

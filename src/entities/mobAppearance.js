@@ -1,3 +1,5 @@
+import { randomSpin } from "../core.js";
+
 export const BODY_SHAPES = Object.freeze({
     CIRCLE: 0,
     MIN_SIDES: 5,
@@ -155,6 +157,6 @@ export function generateMobAppearance(rng = Math.random) {
     const sides = Math.floor(rng() * (BODY_SHAPES.MAX_SIDES - BODY_SHAPES.MIN_SIDES + 1)) + BODY_SHAPES.MIN_SIDES;
     const face = FACE_NAMES[Math.floor(rng() * FACE_NAMES.length)];
     const angle = rng() * Math.PI * 2;
-    const angularVelocity = (rng() - 0.5) * 0.8;
+    const angularVelocity = randomSpin(rng);
     return { sides, face, angle, angularVelocity };
 }

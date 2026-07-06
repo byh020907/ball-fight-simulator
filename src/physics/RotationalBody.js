@@ -14,7 +14,8 @@
  * 제공 필드/메서드:
  *   this.angle                    — 현재 회전각 (rad)
  *   this.angularVelocity          — 각속도 (rad/s)
- *   this.angularDamping           — 감쇠 계수 (0~1, 기본 0.98)
+ *   this.angularDamping           — 감쇠 계수, 초당 유지율 (0~1, 기본 0.98).
+ *                                   실제 적용: angularVelocity *= angularDamping ^ delta
  *   this._accumulatedTorque       — 프레임 누적 torque (integrate 시 초기화)
  *   this._accumulatedAngularImpulse — 프레임 누적 angular impulse L (integrate 시 초기화)
  *   this._inverseMomentOfInertia  — 1 / (0.5 * mass * radius^2)
@@ -71,7 +72,7 @@ export default function RotationalBody(Base) {
          *   1. _computeMomentOfInertia() — mass/radius 기반 I⁻¹ 갱신
          *   2. torque → angularAcceleration → angularVelocity
          *   3. angular impulse L → Δω = L * I⁻¹ → angularVelocity
-         *   4. angularVelocity *= angularDamping
+         *   4. angularVelocity *= angularDamping ^ delta (프레임레이트 독립)
          *   5. angularVelocity → angle
          *   6. clearAngularForces() — 누적 초기화
          */
@@ -88,9 +89,9 @@ export default function RotationalBody(Base) {
             // 3. angular impulse L → Δω = L * I⁻¹ (질량/반경이 클수록 회전 변화 적음)
             this.angularVelocity += this._accumulatedAngularImpulse * this._inverseMomentOfInertia;
 
-            // 4. damping (폭주 방지)
+            // 4. damping (폭주 방지, 프레임레이트 독립)
             const dampFactor = Math.max(0, Math.min(1, this.angularDamping));
-            this.angularVelocity *= dampFactor;
+            this.angularVelocity *= Math.pow(dampFactor, delta);
 
             // 5. angularVelocity → angle
             this.angle += this.angularVelocity * delta;

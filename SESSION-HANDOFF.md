@@ -1,5 +1,11 @@
 # 결정 기록
 
+## [L1] 2026-07-06 — 기본 볼 회전이 프레임 독립적으로 계속 보이게 수정
+- 맥락: 원형 캐릭터가 초기 각도만 있고 실제로 "도는" 회전이 보이지 않음. (1) 기본 각속도 -0.4~0.4 rad/s로 너무 느리고 0에 가까울 수 있음. (2) angularDamping이 매 프레임 단순 곱셈이라 60fps 1초 뒤 각속도가 0.98^60≈0.30으로 급감.
+- 결정: (1) angularDamping을 프레임레이트 독립적으로 변경 — `angularVelocity *= Math.pow(angularDamping, delta)`. 기본 0.98은 초당 98% 유지율. (2) `randomSpin(min, max)` 헬퍼 신설 — sign * (0.9 + Math.random() * 0.7) rad/s로 최소 0.9 rad/s 보장. (3) 원형 캐릭터 기본 각속도를 `randomSpin()`으로 교체. (4) 다각형 몹 `generateMobAppearance`도 동일 헬퍼 사용. (5) `appearance.angularVelocity` 명시 시 기존값 우선 유지. (6) `rotationEnabled: false` 동작 변경 없음.
+- 영향: `src/core.js`, `src/physics/RotationalBody.js`, `src/entities/battleBall.js`, `src/entities/mobAppearance.js`, `tests/regression.mjs`, `docs/development-rules.md`, `docs/hunting-grounds-system.md`, `SESSION-HANDOFF.md`
+- 검증: `npm test` (신규: testFrameRateIndependentDamping, testRandomSpinHelper, testCircleMinAngularVelocity, testCircleRotatesVisibly), `npm run format:check`, `npm run check`, `node scripts/huntingUserScenario.mjs` 통과
+
 ## [L1] 2026-07-06 — 충돌 회전 물리를 관성 기반 impulse 흐름에 맞춤
 - 맥락: (1) `applyAngularImpulse(value)`가 angular impulse L을 angularVelocity에 직접 더해 관성(inertia)을 무시. (2) 비적대(friendly) 충돌에서 angular collision response가 빠져 아군끼리 충돌해도 회전이 전혀 발생하지 않음. (3) polygon-polygon contactPoint가 단순 중심 중점(center midpoint) 근사여서 충돌 회전 방향이 부정확.
 - 결정: (1) `integrateRotation`에서 `Δω = L * I⁻¹`로 반영 — solid disk I = 0.5mr². (2) `handleFighterCollision`에서 pre-collision velocity를 미리 계산하고, 선형/회전 물리 반응을 hostile 여부와 무관하게 항상 적용 (damaqe/ability hooks는 hostile 전용 유지). (3) `_computePolygonContactPoint` 신설 — A vertex in B, B vertex in A, edge-edge 교차점 수집 후 평균, fallback=midpoint. (4) circle-polygon fallback을 center midpoint → circle surface point로 개선. (5) MOI weighting, non-hostile angular, polygon contactPoint 테스트 추가/갱신.
