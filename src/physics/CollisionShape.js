@@ -230,6 +230,7 @@ export function resolveFighterShapeCollision(a, b) {
 
     if (shapeA.type === "circle" && shapeB.type === "circle") {
         const result = _resolveCircleCircle(shapeA, shapeB);
+        result.contactPoint = _computeCircleCircleContact(shapeA, shapeB, result.normal, result.overlap);
         return { ...result, separationOverlap: result.overlap };
     }
     if (shapeA.type === "circle" && shapeB.type === "polygon") {
@@ -237,6 +238,10 @@ export function resolveFighterShapeCollision(a, b) {
         if (result.normal && result.overlap > 0) {
             result.separationOverlap = _computeSeparationOverlap(shapeA, shapeB, result.normal, result.overlap);
             result.separationVec = _computeSeparationVector(shapeA, shapeB, result.separationOverlap, result.normal);
+            result.contactPoint = result._closestPoint ?? {
+                x: (shapeA.x + shapeB.x) / 2,
+                y: (shapeA.y + shapeB.y) / 2
+            };
         } else {
             result.separationOverlap = 0;
             result.separationVec = null;
@@ -249,6 +254,10 @@ export function resolveFighterShapeCollision(a, b) {
             result.normal = result.normal.clone().scale(-1);
             result.separationOverlap = _computeSeparationOverlap(shapeA, shapeB, result.normal, result.overlap);
             result.separationVec = _computeSeparationVector(shapeA, shapeB, result.separationOverlap, result.normal);
+            result.contactPoint = result._closestPoint ?? {
+                x: (shapeA.x + shapeB.x) / 2,
+                y: (shapeA.y + shapeB.y) / 2
+            };
         } else {
             result.separationOverlap = 0;
             result.separationVec = null;
@@ -260,6 +269,7 @@ export function resolveFighterShapeCollision(a, b) {
     if (result.normal && result.overlap > 0) {
         result.separationOverlap = _computeSeparationOverlap(shapeA, shapeB, result.normal, result.overlap);
         result.separationVec = _computeSeparationVector(shapeA, shapeB, result.separationOverlap, result.normal);
+        result.contactPoint = { x: (shapeA.x + shapeB.x) / 2, y: (shapeA.y + shapeB.y) / 2 };
     } else {
         result.separationOverlap = 0;
         result.separationVec = null;
@@ -305,6 +315,13 @@ function _resolveCircleCircle(shapeA, shapeB) {
     const overlap = shapeA.radius + shapeB.radius - dist;
     const normal = dist > 0.0001 ? new Vector2(dx / dist, dy / dist) : new Vector2(1, 0);
     return { normal, overlap };
+}
+
+/** circle-circle 충돌의 접촉점 (두 원의 중첩 영역 중점) */
+function _computeCircleCircleContact(shapeA, shapeB, normal, overlap) {
+    const contactX = shapeA.x + normal.x * (shapeA.radius - overlap * 0.5);
+    const contactY = shapeA.y + normal.y * (shapeA.radius - overlap * 0.5);
+    return { x: contactX, y: contactY };
 }
 
 /**
@@ -417,11 +434,15 @@ function _resolveCirclePolygon(circleShape, polyShape) {
             closestVertex = p;
         }
     }
+    let _closestPoint = null;
     if (closestVertex && closestDistSq > 0.0001) {
         const dist = Math.sqrt(closestDistSq);
         const vnx = (cx - closestVertex.x) / dist;
         const vny = (cy - closestVertex.y) / dist;
         const vOverlap = r - dist;
+        if (vOverlap > 0) {
+            _closestPoint = { x: closestVertex.x, y: closestVertex.y };
+        }
         if (vOverlap > 0 && vOverlap < bestOverlap) {
             bestOverlap = vOverlap;
             bestNormal = new Vector2(vnx, vny);
@@ -438,7 +459,9 @@ function _resolveCirclePolygon(circleShape, polyShape) {
     if (bestNormal.dot(toPoly) < 0) {
         bestNormal = bestNormal.clone().scale(-1);
     }
-    return { normal: bestNormal, overlap: bestOverlap };
+    const result = { normal: bestNormal, overlap: bestOverlap };
+    if (_closestPoint) result._closestPoint = _closestPoint;
+    return result;
 }
 
 /**

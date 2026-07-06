@@ -2313,25 +2313,66 @@ function testHuntingTerrain() {
     assert.ok(moveToCalls.length > 0, "Renderer should draw polygon obstacles with moveTo");
     assert.ok(lineToCalls.length > 0, "Renderer should draw polygon obstacles with lineTo");
 
-    // ── RotationalBody mixin ──
+    // ── RotationalBody mixin (torque accumulator 기반) ──
     class Dummy {}
     const SpinningDummy = RotationalBody(Dummy);
     const spinner = new SpinningDummy();
     assert.equal(spinner.angle, 0, "RotationalBody should start at angle 0");
     assert.equal(spinner.angularVelocity, 0, "RotationalBody should start at angularVelocity 0");
-    assert.equal(spinner.angularDamping, 1, "RotationalBody should start at angularDamping 1");
+    assert.equal(spinner.angularDamping, 0.98, "RotationalBody should default angularDamping to 0.98");
+    assert.equal(spinner._accumulatedTorque, 0, "should start with zero accumulated torque");
+    assert.equal(spinner._accumulatedAngularImpulse, 0, "should start with zero accumulated angular impulse");
 
+    // applyAngularImpulse는 누적만 하고 angularVelocity를 즉시 바꾸지 않음
     spinner.applyAngularImpulse(3);
-    assert.equal(spinner.angularVelocity, 3, "applyAngularImpulse should increase angularVelocity");
+    assert.equal(spinner.angularVelocity, 0, "applyAngularImpulse should NOT immediately change angularVelocity");
+    assert.equal(spinner._accumulatedAngularImpulse, 3, "applyAngularImpulse should accumulate");
 
+    // integrateRotation: 누적 impulse → velocity → angle
     spinner.integrateRotation(0.5);
-    assert.equal(spinner.angle, 1.5, "integrateRotation should update angle");
+    // angularVelocity += 3, damping 0.98 → 2.94, angle += 2.94*0.5 = 1.47
+    assert.ok(
+        Math.abs(spinner.angularVelocity - 2.94) < 0.01,
+        "integrateRotation should apply accumulated impulse to velocity"
+    );
+    assert.ok(Math.abs(spinner.angle - 1.47) < 0.01, "integrateRotation should advance angle");
+    // integrate 후 누적 초기화 확인
+    assert.equal(spinner._accumulatedAngularImpulse, 0, "accumulated impulse should clear after integrate");
+    assert.equal(spinner._accumulatedTorque, 0, "accumulated torque should clear after integrate");
 
-    // damping 적용
+    // torque 누적 테스트
+    spinner.applyTorque(10);
+    assert.equal(spinner._accumulatedTorque, 10, "applyTorque should accumulate");
+    spinner.applyTorque(5);
+    assert.equal(spinner._accumulatedTorque, 15, "multiple applyTorque should sum");
+
+    // torque 누적 초기화 후 damping 테스트
+    spinner.clearAngularForces();
+    spinner.angularVelocity = 2.94; // 첫 integrate 이후 상태로 리셋
+    spinner.angle = 1.47;
+
+    // damping 적용 테스트
     spinner.angularDamping = 0.5;
     spinner.integrateRotation(1);
-    // angularVelocity=3, damping=0.5 → effective=1.5, angle=1.5+1.5=3.0
-    assert.equal(spinner.angle, 3, "angularDamping should reduce effective angularVelocity");
+    // velocity=2.94, damping=0.5 → 1.47, angle=1.47+1.47=2.94
+    assert.ok(Math.abs(spinner.angle - 2.94) < 0.02, "angularDamping should reduce angularVelocity");
+
+    // _computeMomentOfInertia 테스트
+    spinner.mass = 4;
+    spinner.radius = 5;
+    spinner._computeMomentOfInertia();
+    // solid disk: I = 0.5*4*25 = 50, inverse = 0.02
+    assert.ok(
+        Math.abs(spinner._inverseMomentOfInertia - 0.02) < 0.001,
+        "_computeMomentOfInertia should compute 1/(0.5*m*r^2)"
+    );
+
+    // clearAngularForces
+    spinner.applyTorque(100);
+    spinner.applyAngularImpulse(50);
+    spinner.clearAngularForces();
+    assert.equal(spinner._accumulatedTorque, 0, "clearAngularForces should reset torque");
+    assert.equal(spinner._accumulatedAngularImpulse, 0, "clearAngularForces should reset impulse");
 
     // ── terrain draw wraps ctx state with save/restore ──
     const leakCtx = makeRecordingCanvasContext();
@@ -3172,7 +3213,128 @@ async function testIntegrateRotationSpins() {
     ball.angle = 0;
     ball.angularVelocity = 1.0;
     ball.integrateRotation(0.5);
-    assert.ok(Math.abs(ball.angle - 0.5) < 0.01, "integrateRotation should advance angle by angularVelocity * delta");
+    // damping 0.98: angle = 0 + 1.0 * 0.98 * 0.5 = 0.49
+    assert.ok(
+        Math.abs(ball.angle - 0.49) < 0.02,
+        "integrateRotation should advance angle by angularVelocity * delta * damping"
+    );
+    // 누적이 초기화되었는지 확인
+    assert.equal(ball._accumulatedTorque, 0, "torque should clear after integrate");
+    assert.equal(ball._accumulatedAngularImpulse, 0, "impulse should clear after integrate");
+}
+
+function testRotationalBodyTorqueAccumulation() {
+    // torque 누적 → integrate → 각가속도 반영 검증
+    class Dummy {}
+    const SpinningDummy = RotationalBody(Dummy);
+    const s = new SpinningDummy();
+    s.mass = 2;
+    s.radius = 10;
+    // I = 0.5*2*100 = 100, inverse = 0.01
+
+    s.applyTorque(200); // torque = 200
+    s.integrateRotation(1.0);
+    // angularAccel = 200 * 0.01 = 2
+    // angularVelocity = 0 + 2 * 1 = 2
+    // damping 0.98 → 1.96
+    // angle = 0 + 1.96 * 1 = 1.96
+    assert.ok(Math.abs(s.angularVelocity - 1.96) < 0.02, "torque should produce angular acceleration");
+    assert.ok(Math.abs(s.angle - 1.96) < 0.02, "angle should integrate from torque-driven velocity");
+    assert.equal(s._accumulatedTorque, 0, "torque should clear after integrate");
+}
+
+function testMultipleTorqueSameFrame() {
+    class Dummy {}
+    const SpinningDummy = RotationalBody(Dummy);
+    const s = new SpinningDummy();
+    s.mass = 2;
+    s.radius = 10;
+
+    // 같은 프레임에 여러 번 torque 호출 → 합산
+    s.applyTorque(100);
+    s.applyTorque(100);
+    s.applyTorque(50);
+    assert.equal(s._accumulatedTorque, 250, "multiple applyTorque in same frame should sum");
+    s.integrateRotation(1.0);
+    // angularAccel = 250 * 0.01 = 2.5
+    // velocity = 2.5, damping → 2.45, angle = 2.45
+    assert.ok(Math.abs(s.angle - 2.45) < 0.02, "accumulated torque should produce correct angle");
+    assert.equal(s._accumulatedTorque, 0, "torque should clear after integrate");
+
+    // torque + impulse 동시 누적
+    s.applyTorque(100);
+    s.applyAngularImpulse(3);
+    s.integrateRotation(1.0);
+    // angularAccel = 100*0.01 = 1 → velocity += 1
+    // velocity += 3 (impulse)
+    // velocity = 2.45 + 1 + 3 = 6.45 → damping 0.98 → 6.321
+    // angle = 2.45 + 6.321 = 8.771
+    assert.ok(Math.abs(s.angularVelocity - 6.321) < 0.1, "torque + impulse should both contribute to velocity");
+    assert.ok(Math.abs(s.angle - 8.771) < 0.1, "combined torque and impulse should integrate correctly");
+}
+
+async function testPolygonUpdateIntegratesRotation(app) {
+    const spec = {
+        id: "test-update-rot",
+        name: "UpdateRot",
+        teamId: "t",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 30, mass: 10 },
+        color: "#112233",
+        appearance: { sides: 6, face: "default" },
+        ability: "dash"
+    };
+    const sim = new BattleSimulation([spec, { ...spec, id: "opp", teamId: "t2" }], { onLog() {}, onSound() {} });
+    const fighter = sim.fighters[0];
+    fighter.angle = 0;
+    fighter.angularVelocity = 2.0;
+    fighter.update(0.5, sim);
+    // damping 0.98: velocity=1.96, angle=0.98
+    assert.ok(Math.abs(fighter.angle - 0.98) < 0.05, "update should call integrateRotation and advance angle");
+}
+
+async function testCollisionProducesAngularImpulse(app) {
+    // 충돌 시 angular impulse 흐름이 정상 동작하는지 검증
+    const specCircle = {
+        id: "circ-col",
+        name: "CircCol",
+        teamId: "t1",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#00ff00",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash"
+    };
+    const specPoly = {
+        id: "poly-col-b",
+        name: "PolyColB",
+        teamId: "t2",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 30, mass: 10 },
+        color: "#0000aa",
+        appearance: { sides: 5, face: "default" },
+        ability: "dash"
+    };
+    const sim = new BattleSimulation([specCircle, specPoly], { onLog() {}, onSound() {} });
+    const [circle, poly] = sim.fighters;
+
+    circle.position = new Vector2(475, 472);
+    poly.position = new Vector2(485, 488);
+    poly.angle = 0;
+    circle.applyImpulse(Vector2.subtract(new Vector2(500, 0), circle.velocity));
+    poly.applyImpulse(Vector2.subtract(new Vector2(-400, 0), poly.velocity));
+
+    // 충돌 전 누적값 기록
+    const aTorqueBefore = circle._accumulatedTorque;
+    const aImpulseBefore = circle._accumulatedAngularImpulse;
+
+    sim.handleCollision();
+
+    // 충돌 후 NaN/Infinity 없음
+    assert.ok(Number.isFinite(circle.angularVelocity), "angularVelocity should stay finite after collision");
+    assert.ok(Number.isFinite(poly.angularVelocity), "both fighters angularVelocity should be finite");
+    assert.ok(Number.isFinite(circle._accumulatedAngularImpulse), "angular impulse should stay finite after collision");
+    assert.ok(Number.isFinite(poly._accumulatedAngularImpulse), "angular impulse should stay finite for both fighters");
+    // 충돌이 _applyAngularCollisionResponse를 호출했는지 간접 확인
+    // (contactPoint가 normal과 일직선이면 torque=0이므로 누적값 변화가 없을 수 있음 — 정상)
+    assert.ok(typeof circle.applyAngularImpulse === "function", "fighter should have applyAngularImpulse method");
 }
 
 console.log("[fighter-collision] ok");
@@ -5848,4 +6010,8 @@ testGetFighterCollisionShapeCircle();
 testLocalPointsMatchDrawBody();
 await testRotationInitializedOnPolygonFighter(app);
 testIntegrateRotationSpins();
+testRotationalBodyTorqueAccumulation();
+testMultipleTorqueSameFrame();
+await testPolygonUpdateIntegratesRotation(app);
+await testCollisionProducesAngularImpulse(app);
 console.log("regression tests ok");

@@ -1,5 +1,12 @@
 # 결정 기록
 
+## [L1] 2026-07-06 — 회전 물리를 torque accumulator 기반으로 재설계
+- 맥락: 기존 RotationalBody는 applyAngularImpulse가 angularVelocity를 직접 수정하고, torque 개념이 없어 한 프레임에 여러 충돌이 겹칠 때 불안정. 일반적인 2D 물리 엔진의 force→acceleration→velocity→position 흐름에 대응되는 회전 구조 필요.
+- 결정: (1) RotationalBody에 torque accumulator(`_accumulatedTorque`), angular impulse accumulator(`_accumulatedAngularImpulse`), `_inverseMomentOfInertia`(solid disk I=0.5mr²), `angularDamping=0.98` 도입. (2) `applyTorque`는 누적만, `applyAngularImpulse`도 누적만 하고 `integrateRotation`에서 torque→angularAccel→velocity→damping→angle 흐름으로 일괄 처리 후 누적 초기화. (3) `_applyAngularCollisionResponse` 신설: 충돌 contactPoint와 normal의 2D cross로 torque 계산 → `applyAngularImpulse`로 누적. (4) `resolveFighterShapeCollision`에 `contactPoint` 추가 (circle-circle: 중첩 중점, circle-polygon: 최근접 vertex, polygon-polygon: 중심 중점). (5) 테스트: torque accumulation, multi-torque same-frame, torque+impulse 동시, polygon update integration, collision angular impulse 안전성 등 6종 추가 + 기존 RotationalBody 테스트 갱신.
+- 영향: `src/physics/RotationalBody.js`, `src/physics/CollisionShape.js`, `src/simulation/battleSimulation.js`, `src/entities/battleBall.js`, `tests/regression.mjs`, `SESSION-HANDOFF.md`
+- 검증: `npm test` (10개 스위트), `npm run format:check`, `npm run check` 통과
+- 미검증: 브라우저에서 polygon 몹의 torque 기반 회전 + 다중 충돌 누적 육안 확인
+
 ## [L1] 2026-07-06 — 다각형 몹 충돌을 회전 shape 기반으로 전환
 - 맥락: 다각형 몹(사냥터)은 외형만 다각형이고 충돌은 원형이어서, 시각적으로 polygon에 닿지 않았는데 충돌하는 문제. RotationalBody mixin이 이미 존재하나 BattleBall에 미적용.
 - 결정: (1) BattleBall에 RotationalBody mixin 추가, polygon 몹은 무작위 angle/angularVelocity 초기화. (2) `_drawPolygonBody`에 `ctx.rotate(this.angle)` 적용, `computeRegularPolygonLocalPoints` 공유 함수로 렌더링-충돌 정합성 확보. (3) `CollisionShape.js`에 `getFighterCollisionShape`, `resolveFighterShapeCollision`, SAT 기반 `_resolvePolygonPolygon`/`_resolveCirclePolygon` 추가. (4) `handleFighterCollision`을 shape 기반으로 교체, SAT normal은 충돌 반응 방향으로, 분리는 SAT normal 방향 + bounding circle 하한 보정. (5) 테스트: circle-circle/polygon-polygon/circle-polygon 분리, 각도별 normal 변화, draw rotate, shape helper, rotation init/integrate 등 11종.

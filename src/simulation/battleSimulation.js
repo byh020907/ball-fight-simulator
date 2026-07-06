@@ -326,6 +326,7 @@ export class BattleSimulation extends Simulation {
         if (damageFromAToB > 0) b.takeDamage(damageFromAToB, a, "Crash");
 
         this._applyCollisionPhysics(a, b, normal, aModifiers, bModifiers);
+        this._applyAngularCollisionResponse(a, b, normal, result.contactPoint);
         this._handleDashCollisions(a, b);
 
         a.ability?.onCollision(b);
@@ -358,6 +359,48 @@ export class BattleSimulation extends Simulation {
             impactA: aMod.impact * aOutgoingBonus * bIncomingReduce,
             impactB: bMod.impact * bOutgoingBonus * aIncomingReduce
         });
+    }
+
+    /**
+     * 충돌 접촉점 기반 회전 angular impulse 적용.
+     * contactPoint가 중심에서 떨어져 있을수록 큰 회전력을 받습니다.
+     * 각 fighter의 applyAngularImpulse()를 통해 누적되며, 다음 integrateRotation에서 반영됩니다.
+     */
+    _applyAngularCollisionResponse(a, b, normal, contactPoint) {
+        if (!contactPoint) return;
+
+        const relativeVelocity = Vector2.subtract(b.velocity, a.velocity);
+        const velAlongNormal = relativeVelocity.dot(normal);
+        if (velAlongNormal >= 0) return; // 분리 중이면 회전 충격 없음
+
+        // 충돌 강도 (속도 차이 + 반발 계수)
+        const impulseMag = Math.abs(velAlongNormal) * (1 + COLLISION_RESTITUTION);
+
+        // Angular impulse factor: 충돌이 중심에서 얼마나 빗겨났는지에 비례
+        const ANGULAR_COLLISION_FACTOR = 0.15;
+
+        // Fighter A
+        if (typeof a.applyAngularImpulse === "function") {
+            const contactVecA = {
+                x: contactPoint.x - a.position.x,
+                y: contactPoint.y - a.position.y
+            };
+            // 2D cross: r × impulse 방향
+            const torqueA =
+                (contactVecA.x * normal.y - contactVecA.y * normal.x) * impulseMag * ANGULAR_COLLISION_FACTOR;
+            a.applyAngularImpulse(torqueA);
+        }
+
+        // Fighter B (impulse 방향 반대)
+        if (typeof b.applyAngularImpulse === "function") {
+            const contactVecB = {
+                x: contactPoint.x - b.position.x,
+                y: contactPoint.y - b.position.y
+            };
+            const torqueB =
+                (contactVecB.x * -normal.y - contactVecB.y * -normal.x) * impulseMag * ANGULAR_COLLISION_FACTOR;
+            b.applyAngularImpulse(torqueB);
+        }
     }
 
     /** 숙련도 충돌 패시브: 주기적 충돌 피해 보너스 적용 */
