@@ -1,4 +1,5 @@
 import { applyCollisionImpulse, Vector2 } from "../core.js";
+import { resolveFighterShapeCollision } from "../physics/CollisionShape.js";
 import {
     ArcherAbility,
     EaterAbility,
@@ -283,13 +284,23 @@ export class BattleSimulation extends Simulation {
     handleFighterCollision(a, b) {
         if (a.flags.defeated || b.flags.defeated || a.state.swallowed || b.state.swallowed) return;
 
-        const difference = Vector2.subtract(b.position, a.position);
-        const distance = difference.length();
-        const overlap = a.radius + b.radius - distance;
-        if (overlap <= 0) return;
+        const result = resolveFighterShapeCollision(a, b);
+        if (!result || !result.normal || result.overlap <= 0) return;
 
-        const normal = distance > 0 ? difference.normalize() : new Vector2(1, 0);
-        this._resolveOverlap(a, b, normal, overlap);
+        const normal = result.normal;
+        const sepVec = result.separationVec;
+        if (sepVec) {
+            // SAT normal 방향 분리 벡터 사용 (polygon 충돌)
+            const pad = COLLISION_SEPARATION_PADDING;
+            const totalX = sepVec.x + (sepVec.x > 0 ? pad : -pad);
+            const totalY = sepVec.y + (sepVec.y > 0 ? pad : -pad);
+            a.position.add(new Vector2(-totalX / 2, -totalY / 2));
+            b.position.add(new Vector2(totalX / 2, totalY / 2));
+        } else {
+            // circle-circle: 기존 normal 기반 분리
+            const separationOverlap = result.separationOverlap ?? result.overlap;
+            this._resolveOverlap(a, b, normal, separationOverlap);
+        }
 
         const aModifiers = a.getStatModifiers();
         const bModifiers = b.getStatModifiers();

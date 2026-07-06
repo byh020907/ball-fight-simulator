@@ -1,12 +1,13 @@
 # 결정 기록
 
-## [L1] 2026-07-06 — 사냥터 기본 지형을 폴리곤 전용으로 전환
-- 맥락: 사용자가 지형 개선 방향으로 기본을 폴리곤으로 두고, 원형 지형은 당장은 쓰지 않기를 요청.
-- 결정: `createHuntingTerrain()`의 동굴 지형 생성은 모든 장애물을 polygon terrain으로 만들도록 변경. circle collision/render 경로는 레거시 호환용으로 남기되, 신규 사냥터 배치에서는 circle obstacle을 생성하지 않음.
-- 영향: `src/terrain/terrainFactory.js`, `tests/regression.mjs`, `docs/hunting-grounds-system.md`, `SESSION-HANDOFF.md`
-- 검증: `npm run format:check`, `npm run check`, `npm test`, `node scripts/huntingUserScenario.mjs` 통과
+## [L1] 2026-07-06 — 다각형 몹 충돌을 회전 shape 기반으로 전환
+- 맥락: 다각형 몹(사냥터)은 외형만 다각형이고 충돌은 원형이어서, 시각적으로 polygon에 닿지 않았는데 충돌하는 문제. RotationalBody mixin이 이미 존재하나 BattleBall에 미적용.
+- 결정: (1) BattleBall에 RotationalBody mixin 추가, polygon 몹은 무작위 angle/angularVelocity 초기화. (2) `_drawPolygonBody`에 `ctx.rotate(this.angle)` 적용, `computeRegularPolygonLocalPoints` 공유 함수로 렌더링-충돌 정합성 확보. (3) `CollisionShape.js`에 `getFighterCollisionShape`, `resolveFighterShapeCollision`, SAT 기반 `_resolvePolygonPolygon`/`_resolveCirclePolygon` 추가. (4) `handleFighterCollision`을 shape 기반으로 교체, SAT normal은 충돌 반응 방향으로, 분리는 SAT normal 방향 + bounding circle 하한 보정. (5) 테스트: circle-circle/polygon-polygon/circle-polygon 분리, 각도별 normal 변화, draw rotate, shape helper, rotation init/integrate 등 11종.
+- 영향: `src/entities/battleBall.js`, `src/physics/CollisionShape.js`, `src/physics/index.js`, `src/simulation/battleSimulation.js`, `tests/regression.mjs`, `SESSION-HANDOFF.md`
+- 검증: `npm test` (10개 스위트), `npm run format:check`, `npm run check`, `node scripts/huntingUserScenario.mjs` 통과
+- 미검증: 실제 브라우저에서 polygon 몹 회전 + shape 충돌 육안 확인
 
-## [L1] 2026-07-06 — 박쥐 투사체가 타겟이 아닌 자신의 진행 방향을 보도록 수정
+## [L1] 2026-07-06 — 사냥터 초반 선택 이벤트에서 진행 UI가 막히지 않게 정리
 - 맥락: 뱀파이어 박쥐 투사체가 타겟을 바라보며 날아가서 어색함. 박쥐는 자신의 velocity 방향을 보는 것이 자연스러움.
 - 결정: `BatProjectile.update()`에서 `this.angle`을 항상 `Math.atan2(this.velocity.y, this.velocity.x)`로 설정. 타겟 유무에 따른 분기 제거.
 - 영향: `src/entities/batProjectile.js`

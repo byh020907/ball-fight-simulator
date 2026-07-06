@@ -2893,6 +2893,290 @@ function testAlpineTemplateComponentSystem() {
     console.log("[alpine-components] ok");
 }
 
+// ──────────────────────────────────────────────
+// Fighter collision: polygon / circle shape 충돌
+// ──────────────────────────────────────────────
+
+import {
+    getFighterCollisionShape,
+    resolveFighterShapeCollision,
+    computeRegularPolygonLocalPoints
+} from "../src/physics/CollisionShape.js";
+
+async function testCircleVsCircleCollisionStillWorks(app) {
+    const sim = new BattleSimulation(
+        [
+            app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER),
+            app.roster.find((fighter) => fighter.id === FIGHTER_IDS.GRENADE)
+        ],
+        { onLog() {}, onSound() {} }
+    );
+    const [a, b] = sim.fighters;
+    a.position = new Vector2(440, 480);
+    b.position = new Vector2(440 + a.radius + b.radius - 4, 480);
+    a.applyImpulse(Vector2.subtract(new Vector2(700, 0), a.velocity));
+    b.applyImpulse(Vector2.subtract(new Vector2(-520, 0), b.velocity));
+
+    sim.handleCollision();
+    assert.ok(a.velocity.x < 0, "circle-circle collision should reverse a's velocity");
+    assert.ok(b.velocity.x > 0, "circle-circle collision should reverse b's velocity");
+
+    a.update(0.016, sim);
+    b.update(0.016, sim);
+    assert.ok(a.velocity.length() > a.stats.baseSpeed * 1.2, "circle-circle impulse should persist after update");
+}
+
+function testPolygonVsPolygonCollisionSeparates() {
+    // 전용 polygon spec 2개 생성
+    const specA = {
+        id: "test-poly-a",
+        name: "PolyA",
+        teamId: "team-a",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 30, mass: 10 },
+        color: "#ff0000",
+        appearance: { sides: 6, face: "default" },
+        ability: "dash"
+    };
+    const specB = {
+        id: "test-poly-b",
+        name: "PolyB",
+        teamId: "team-b",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 30, mass: 10 },
+        color: "#0000ff",
+        appearance: { sides: 8, face: "default" },
+        ability: "dash"
+    };
+    const sim = new BattleSimulation([specA, specB], { onLog() {}, onSound() {} });
+    const [a, b] = sim.fighters;
+
+    // 확실히 겹치게 배치
+    a.position = new Vector2(475, 480);
+    b.position = new Vector2(485, 480);
+    a.angle = 0.3;
+    b.angle = 0.8;
+    a.applyImpulse(Vector2.subtract(new Vector2(400, 0), a.velocity));
+    b.applyImpulse(Vector2.subtract(new Vector2(-350, 0), b.velocity));
+
+    sim.handleCollision();
+    // 충돌 후 분리 확인 (다각형은 bounding circle보다 실제 overlap이 작으므로 재충돌 없음만 확인)
+    const resultAfter = resolveFighterShapeCollision(a, b);
+    assert.ok(resultAfter.overlap <= 0, "polygon-polygon should not overlap after collision resolution");
+    assert.ok(a.velocity.x < 0, "polygon A should bounce left");
+    assert.ok(b.velocity.x > 0, "polygon B should bounce right");
+}
+
+function testCircleVsPolygonCollisionSeparates() {
+    const specCircle = {
+        id: "test-circ",
+        name: "Circle",
+        teamId: "team-c",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#00ff00",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash"
+    };
+    const specPoly = {
+        id: "test-poly-c",
+        name: "PolyC",
+        teamId: "team-p",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 30, mass: 10 },
+        color: "#ff00ff",
+        appearance: { sides: 5, face: "default" },
+        ability: "dash"
+    };
+    const sim = new BattleSimulation([specCircle, specPoly], { onLog() {}, onSound() {} });
+    const [circle, poly] = sim.fighters;
+
+    circle.position = new Vector2(475, 480);
+    poly.position = new Vector2(485, 480);
+    poly.angle = Math.PI / 4;
+    circle.applyImpulse(Vector2.subtract(new Vector2(400, 0), circle.velocity));
+    poly.applyImpulse(Vector2.subtract(new Vector2(-350, 0), poly.velocity));
+
+    sim.handleCollision();
+    const resultAfter = resolveFighterShapeCollision(circle, poly);
+    assert.ok(resultAfter.overlap <= 0, "circle-polygon should not overlap after collision resolution");
+    assert.ok(circle.velocity.x < 0, "circle should bounce left from polygon");
+    assert.ok(poly.velocity.x > 0, "polygon should bounce right from circle");
+}
+
+function testPolygonAngleChangesCollisionResult() {
+    const specA = {
+        id: "poly-ang-a",
+        name: "AngA",
+        teamId: "t1",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 30, mass: 10 },
+        color: "#aa0000",
+        appearance: { sides: 5, face: "default" },
+        ability: "dash"
+    };
+    const specB = {
+        id: "poly-ang-b",
+        name: "AngB",
+        teamId: "t2",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 30, mass: 10 },
+        color: "#0000aa",
+        appearance: { sides: 5, face: "default" },
+        ability: "dash"
+    };
+
+    // B의 각도만 변경 → 상대 기하가 달라져 normal이 바뀜
+    const sim1 = new BattleSimulation(
+        [
+            { ...specA, id: "a1" },
+            { ...specB, id: "b1" }
+        ],
+        { onLog() {}, onSound() {} }
+    );
+    const [a1, b1] = sim1.fighters;
+    a1.position = new Vector2(475, 480);
+    b1.position = new Vector2(485, 488);
+    a1.angle = 0;
+    b1.angle = 0;
+    const r1 = resolveFighterShapeCollision(a1, b1);
+
+    // B만 회전 → 다른 normal
+    const sim2 = new BattleSimulation(
+        [
+            { ...specA, id: "a2" },
+            { ...specB, id: "b2" }
+        ],
+        { onLog() {}, onSound() {} }
+    );
+    const [a2, b2] = sim2.fighters;
+    a2.position = new Vector2(475, 480);
+    b2.position = new Vector2(485, 488);
+    a2.angle = 0;
+    b2.angle = 0.5;
+    const r2 = resolveFighterShapeCollision(a2, b2);
+
+    const normalDiff = Math.abs(r1.normal.x - r2.normal.x) + Math.abs(r1.normal.y - r2.normal.y);
+    assert.ok(normalDiff > 0.05, "rotating one polygon should change collision normal");
+}
+
+function testPolygonBodyDrawAppliesAngle() {
+    const ctx = makeRecordingCanvasContext();
+    const spec = {
+        id: "test-draw",
+        name: "DrawMe",
+        teamId: "t",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 30, mass: 10 },
+        color: "#ff8800",
+        appearance: { sides: 6, face: "default" },
+        ability: "dash"
+    };
+    const ball = new BattleBall(spec, new Vector2(200, 300));
+    ball.radius = 30;
+    ball.angle = 1.2;
+
+    ball.draw(ctx);
+
+    // translate(200, 300) + rotate(1.2) 호출 확인
+    const translateCalls = ctx.calls.filter((c) => c[0] === "translate");
+    assert.ok(translateCalls.length >= 1, "_drawPolygonBody should call translate");
+    const rotateCalls = ctx.calls.filter((c) => c[0] === "rotate");
+    assert.ok(
+        rotateCalls.some((c) => Math.abs(c[1] - 1.2) < 0.01),
+        "draw should apply angle to rotate"
+    );
+}
+
+function testGetFighterCollisionShapePolygon() {
+    const spec = {
+        id: "test-shape",
+        name: "Shape",
+        teamId: "t",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 30, mass: 10 },
+        color: "#ff8800",
+        appearance: { sides: 6, face: "default" },
+        ability: "dash"
+    };
+    const ball = new BattleBall(spec, new Vector2(100, 200));
+    ball.angle = 0.5;
+    const shape = getFighterCollisionShape(ball);
+    assert.equal(shape.type, "polygon", "polygon fighter should return polygon shape");
+    assert.equal(shape.sides, 6, "should have 6 sides");
+    assert.ok(Array.isArray(shape.worldPoints) && shape.worldPoints.length === 6, "should have 6 world points");
+    assert.equal(shape.angle, 0.5, "should preserve angle");
+}
+
+function testGetFighterCollisionShapeCircle() {
+    const spec = {
+        id: "test-circ-shape",
+        name: "CircShape",
+        teamId: "t",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#00ff00",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash"
+    };
+    const ball = new BattleBall(spec, new Vector2(300, 400));
+    const shape = getFighterCollisionShape(ball);
+    assert.equal(shape.type, "circle", "circle fighter should return circle shape");
+    assert.equal(shape.radius, 25, "should preserve radius");
+}
+
+function testLocalPointsMatchDrawBody() {
+    // computeRegularPolygonLocalPoints가 _drawPolygonBody와 동일한 로컬 좌표를 생성하는지 검증
+    const sides = 6;
+    const radius = 30;
+    const points = computeRegularPolygonLocalPoints(sides, radius);
+
+    // 직접 계산한 값과 비교
+    const a = (Math.PI * 2) / sides;
+    const offset = -Math.PI / 2 - a / 2;
+    const expected = [];
+    for (let i = 0; i < sides; i++) {
+        const angle = i * a + offset;
+        expected.push({ x: Math.cos(angle) * radius, y: Math.sin(angle) * radius });
+    }
+    assert.equal(points.length, expected.length, "point count should match");
+    for (let i = 0; i < points.length; i++) {
+        assert.ok(Math.abs(points[i].x - expected[i].x) < 0.0001, `point[${i}].x should match`);
+        assert.ok(Math.abs(points[i].y - expected[i].y) < 0.0001, `point[${i}].y should match`);
+    }
+}
+
+async function testRotationInitializedOnPolygonFighter(app) {
+    const spec = {
+        id: "test-rot-init",
+        name: "RotInit",
+        teamId: "t",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 30, mass: 10 },
+        color: "#112233",
+        appearance: { sides: 7, face: "default" },
+        ability: "dash"
+    };
+    const ball = new BattleBall(spec, new Vector2(400, 400));
+    assert.ok(Number.isFinite(ball.angle), "polygon fighter should have numeric angle");
+    assert.ok(Number.isFinite(ball.angularVelocity), "polygon fighter should have numeric angularVelocity");
+    assert.ok(Math.abs(ball.angularVelocity) > 0.0001, "polygon should have non-zero initial angular velocity");
+
+    const circleSpec = { ...spec, appearance: { sides: 0, face: "default" } };
+    const circleBall = new BattleBall(circleSpec, new Vector2(500, 500));
+    assert.equal(circleBall.angle, 0, "circle fighter should have angle=0");
+    assert.equal(circleBall.angularVelocity, 0, "circle fighter should have angularVelocity=0");
+}
+
+async function testIntegrateRotationSpins() {
+    const spec = {
+        id: "test-spin",
+        name: "Spin",
+        teamId: "t",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 30, mass: 10 },
+        color: "#112233",
+        appearance: { sides: 6, face: "default" },
+        ability: "dash"
+    };
+    const ball = new BattleBall(spec, new Vector2(400, 400));
+    ball.angle = 0;
+    ball.angularVelocity = 1.0;
+    ball.integrateRotation(0.5);
+    assert.ok(Math.abs(ball.angle - 0.5) < 0.01, "integrateRotation should advance angle by angularVelocity * delta");
+}
+
+console.log("[fighter-collision] ok");
+
 async function testMatchEndGrantsImmediateExperience(app) {
     app.tournament = null;
     app.currentTournamentMatch = null;
@@ -5554,4 +5838,14 @@ await testVampireLifestealOnCollision(app);
 await testGunnerBulletsSpawn(app);
 await testPhantomRegistered(app);
 await testPhantomShadowStrike(app);
+testCircleVsCircleCollisionStillWorks(app);
+testPolygonVsPolygonCollisionSeparates();
+testCircleVsPolygonCollisionSeparates();
+testPolygonAngleChangesCollisionResult();
+testPolygonBodyDrawAppliesAngle();
+testGetFighterCollisionShapePolygon();
+testGetFighterCollisionShapeCircle();
+testLocalPointsMatchDrawBody();
+await testRotationInitializedOnPolygonFighter(app);
+testIntegrateRotationSpins();
 console.log("regression tests ok");

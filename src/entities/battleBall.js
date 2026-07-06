@@ -1,11 +1,12 @@
 import { RENDER_LAYERS, TimedEffect, Vector2 } from "../core.js";
 import { ActionContext } from "../clickActions.js";
 import { DashEffect } from "../combatEffects.js";
-import { mixins, PhysicsBody } from "../physics/index.js";
+import { mixins, PhysicsBody, RotationalBody } from "../physics/index.js";
+import { computeRegularPolygonLocalPoints } from "../physics/CollisionShape.js";
 import { getFaceTemplate } from "./mobAppearance.js";
 import { drawEquipmentItems } from "./equipmentVisuals.js";
 
-export class BattleBall extends mixins([PhysicsBody]) {
+export class BattleBall extends mixins([PhysicsBody, RotationalBody]) {
     constructor(spec, position) {
         super();
         this.id = spec.id;
@@ -54,6 +55,9 @@ export class BattleBall extends mixins([PhysicsBody]) {
         };
         this.hunting = spec.hunting ?? null;
         this.appearance = spec.appearance ?? { sides: 0, face: "default" };
+        // RotationalBody 초기화: 다각형 몹은 무작위 회전각과 느린 각속도
+        this.angle = this.appearance.sides > 0 ? Math.random() * Math.PI * 2 : 0;
+        this.angularVelocity = this.appearance.sides > 0 ? (Math.random() - 0.5) * 0.8 : 0;
         this.equipment = {
             items: Array.isArray(spec.equipment?.equippedItems) ? spec.equipment.equippedItems : []
         };
@@ -215,6 +219,7 @@ export class BattleBall extends mixins([PhysicsBody]) {
         this.radius = this.stats.baseRadius * (this.ability?.getRadiusScale?.() ?? 1);
         this._applyVelocityCorrection(simulation, delta);
         this.integrate(delta);
+        this.integrateRotation(delta);
         simulation.keepInsideArena(this);
         if (this.bounced) this.state.forcedHeading = null;
     }
@@ -389,16 +394,15 @@ export class BattleBall extends mixins([PhysicsBody]) {
         try {
             const { x, y } = this.position;
             const n = this.appearance.sides;
-            const a = (Math.PI * 2) / n;
             const r = this.radius;
-            const offset = -Math.PI / 2 - a / 2;
+            const points = computeRegularPolygonLocalPoints(n, r);
+            ctx.translate(x, y);
+            ctx.rotate(this.angle);
             ctx.beginPath();
-            for (let i = 0; i < n; i++) {
-                const angle = i * a + offset;
-                const px = x + Math.cos(angle) * r;
-                const py = y + Math.sin(angle) * r;
-                if (i === 0) ctx.moveTo(px, py);
-                else ctx.lineTo(px, py);
+            for (let i = 0; i < points.length; i++) {
+                const p = points[i];
+                if (i === 0) ctx.moveTo(p.x, p.y);
+                else ctx.lineTo(p.x, p.y);
             }
             ctx.closePath();
             ctx.fill();
