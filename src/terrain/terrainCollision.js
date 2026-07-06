@@ -1,5 +1,6 @@
 import { Vector2 } from "../core.js";
 import { TERRAIN_SHAPES } from "./terrainConfig.js";
+import { applyStaticAngularImpulse } from "../physics/staticCollisionResponse.js";
 import { resolvePolygonTerrainCollision } from "../physics/CollisionShape.js";
 
 /**
@@ -25,9 +26,17 @@ function resolveCircleTerrainCollision(entity, terrain) {
 
     const dot = entity.velocity.x * nx + entity.velocity.y * ny;
     if (dot < 0) {
+        const preVel = { x: entity.velocity.x, y: entity.velocity.y };
         const reflectedVx = entity.velocity.x - 2 * dot * nx;
         const reflectedVy = entity.velocity.y - 2 * dot * ny;
         entity.applyImpulse(new Vector2(reflectedVx - entity.velocity.x, reflectedVy - entity.velocity.y));
+
+        const normal = { x: nx, y: ny };
+        const contactPoint = {
+            x: entity.position.x - normal.x * entityRadius,
+            y: entity.position.y - normal.y * entityRadius
+        };
+        applyStaticAngularImpulse(entity, normal, contactPoint, preVel);
     }
 
     return true;

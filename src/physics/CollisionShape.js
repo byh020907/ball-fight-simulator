@@ -4,6 +4,7 @@
  * 모든 벡터 연산은 Vector2를 사용합니다.
  */
 import { Vector2 } from "../core.js";
+import { applyStaticAngularImpulse } from "./staticCollisionResponse.js";
 
 /**
  * local coordinates의 polygon 점 배열을 world coordinates로 변환.
@@ -76,12 +77,16 @@ export function resolvePolygonTerrainCollision(entity, terrain) {
 
     // 1. polygon 내부에 entity center가 완전히 들어갔는지 확인
     if (pointInConvexPolygon({ x: cx, y: cy }, worldPoints)) {
-        // 가장 가까운 edge의 바깥 normal 방향으로 밀어내기
         const result = closestEdgeNormal(cx, cy, worldPoints);
         const overlap = r + result.distance;
+        const preVel = { x: entity.velocity.x, y: entity.velocity.y };
         entity.position.x += result.nx * overlap;
         entity.position.y += result.ny * overlap;
         reflectVelocity(entity, result.nx, result.ny);
+        if (result.contactPoint) {
+            const normal = { x: result.nx, y: result.ny };
+            applyStaticAngularImpulse(entity, normal, result.contactPoint, preVel);
+        }
         return true;
     }
 
@@ -89,6 +94,8 @@ export function resolvePolygonTerrainCollision(entity, terrain) {
     let bestOverlap = -Infinity;
     let bestNx = 0;
     let bestNy = 0;
+    let bestContactX = cx;
+    let bestContactY = cy;
 
     const n = worldPoints.length;
     for (let i = 0; i < n; i++) {
@@ -117,10 +124,14 @@ export function resolvePolygonTerrainCollision(entity, terrain) {
             bestOverlap = penetration;
             bestNx = dist > 0 ? dx / dist : nx;
             bestNy = dist > 0 ? dy / dist : ny;
+            bestContactX = closestX;
+            bestContactY = closestY;
         }
     }
 
     if (bestOverlap <= 0) return false;
+
+    const preVel = { x: entity.velocity.x, y: entity.velocity.y };
 
     // 밀어내기
     entity.position.x += bestNx * bestOverlap;
@@ -128,6 +139,10 @@ export function resolvePolygonTerrainCollision(entity, terrain) {
 
     // velocity 반사
     reflectVelocity(entity, bestNx, bestNy);
+
+    const normal = { x: bestNx, y: bestNy };
+    const contactPoint = { x: bestContactX, y: bestContactY };
+    applyStaticAngularImpulse(entity, normal, contactPoint, preVel);
     return true;
 }
 
@@ -136,6 +151,8 @@ function closestEdgeNormal(cx, cy, worldPoints) {
     let minDist = Infinity;
     let bestNx = 1;
     let bestNy = 0;
+    let bestContactX = cx;
+    let bestContactY = cy;
 
     for (let i = 0; i < n; i++) {
         const a = worldPoints[i];
@@ -153,9 +170,19 @@ function closestEdgeNormal(cx, cy, worldPoints) {
             minDist = dist;
             bestNx = nx;
             bestNy = ny;
+            // closest point on edge segment
+            const t = ((cx - a.x) * ex + (cy - a.y) * ey) / (len * len);
+            const clampedT = Math.max(0, Math.min(1, t));
+            bestContactX = a.x + ex * clampedT;
+            bestContactY = a.y + ey * clampedT;
         }
     }
-    return { nx: bestNx, ny: bestNy, distance: minDist };
+    return {
+        nx: bestNx,
+        ny: bestNy,
+        distance: minDist,
+        contactPoint: { x: bestContactX, y: bestContactY }
+    };
 }
 
 function reflectVelocity(entity, nx, ny) {

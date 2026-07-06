@@ -13,6 +13,7 @@ import {
     ActionWhiffEffect
 } from "../effects/index.js";
 import { resolveTerrainCollisions } from "../terrain/terrainCollision.js";
+import { applyStaticAngularImpulse } from "../physics/staticCollisionResponse.js";
 
 /**
  * Base simulation — arena boundaries, wall bouncing, effect spawning.
@@ -77,14 +78,18 @@ export class Simulation {
     _reflectX(entity) {
         if (entity.position.x <= entity.radius) {
             entity.position.x = entity.radius;
+            const preVel = { x: entity.velocity.x, y: entity.velocity.y };
             this._matchVelocity(entity, new Vector2(Math.abs(entity.velocity.x), entity.velocity.y));
             if (entity.state?.movement) this._handleWallBounce(entity);
+            applyStaticAngularImpulse(entity, new Vector2(1, 0), { x: 0, y: entity.position.y }, preVel);
             return new Vector2(1, 0);
         }
         if (entity.position.x >= this.width - entity.radius) {
             entity.position.x = this.width - entity.radius;
+            const preVel = { x: entity.velocity.x, y: entity.velocity.y };
             this._matchVelocity(entity, new Vector2(-Math.abs(entity.velocity.x), entity.velocity.y));
             if (entity.state?.movement) this._handleWallBounce(entity);
+            applyStaticAngularImpulse(entity, new Vector2(-1, 0), { x: this.width, y: entity.position.y }, preVel);
             return new Vector2(-1, 0);
         }
         return null;
@@ -94,14 +99,18 @@ export class Simulation {
     _reflectY(entity) {
         if (entity.position.y <= entity.radius) {
             entity.position.y = entity.radius;
+            const preVel = { x: entity.velocity.x, y: entity.velocity.y };
             this._matchVelocity(entity, new Vector2(entity.velocity.x, Math.abs(entity.velocity.y)));
             if (entity.state?.movement) this._handleWallBounce(entity);
+            applyStaticAngularImpulse(entity, new Vector2(0, 1), { x: entity.position.x, y: 0 }, preVel);
             return new Vector2(0, 1);
         }
         if (entity.position.y >= this.height - entity.radius) {
             entity.position.y = this.height - entity.radius;
+            const preVel = { x: entity.velocity.x, y: entity.velocity.y };
             this._matchVelocity(entity, new Vector2(entity.velocity.x, -Math.abs(entity.velocity.y)));
             if (entity.state?.movement) this._handleWallBounce(entity);
+            applyStaticAngularImpulse(entity, new Vector2(0, -1), { x: entity.position.x, y: this.height }, preVel);
             return new Vector2(0, -1);
         }
         return null;

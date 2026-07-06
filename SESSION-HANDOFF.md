@@ -164,7 +164,13 @@
 - 영향: `src/components/game-overlay.html`(신규), `src/components/start-button.html`(신규), `src/components/hunting-button.html`(신규), `src/components/battle-log.html`(신규), `src/components/fighter-strip.html`(신규), `src/actionPicker.js`(Alpine store _resolve), `src/components/action-picker.html`($dispatch), `index.html`(스토어 초기화 6종), `src/ui.js`(store 브릿지 메서드), `src/app.js`(showTransientOverlay), `src/hunting/huntingManager.js`(store 브릿지), `src/styles.css`(CSS 5블록 제거), `docs/development-rules.md`(ES Module import 규칙 추가)
 - 검증: `npm test`, `npm run format:check` 통과
 
-## 현재 기준 요약 (2026-07-05)
+## [L1] 2026-07-06 — 벽/terrain 정적 충돌면 angular impulse 적용
+- 맥락: fighter-fighter 충돌에만 angular impulse가 적용되고, 벽(arena wall)과 terrain(장애물) 충돌에서는 회전 물리가 전혀 발생하지 않아 모든 물리 상호작용을 통일하라는 요구사항을 충족하지 못함. 회전이 시각적 피드백과 플레이 피드백에 중요한 요소임.
+- 결정: (1) `src/physics/staticCollisionResponse.js` 신설 — `applyStaticAngularImpulse(entity, normal, contactPoint, preCollisionVelocity, options)` 공통 헬퍼. 법선 impulse torque + 접선 마찰 torque 2성분 계산. torque arm이 0에 가까우면 접선 속도만으로 spin 생성. (2) `simulation.js`의 `_reflectX`/`_reflectY`에서 충돌 전 velocity를 저장하고 `applyStaticAngularImpulse` 호출 — 접점=벽 표면점. (3) `terrainCollision.js`의 `resolveCircleTerrainCollision`에서 velocity 반사 전 preVel 저장 → entity 표면 접점 계산 → angular impulse 적용. (4) `CollisionShape.js`의 `resolvePolygonTerrainCollision`에서 `closestEdgeNormal`에 contactPoint 반환 추가, edge collision loop에 bestContactX/Y 저장, angular impulse 적용. (5) 회귀 테스트 4종 추가 (wall/corner/circle-terrain/polygon-terrain angular impulse). fighter-fighter 공통 helper 리팩터링은 대규모 변경 방지를 위해 보류.
+- 영향: `src/physics/staticCollisionResponse.js`(신규), `src/simulation/simulation.js`, `src/terrain/terrainCollision.js`, `src/physics/CollisionShape.js`, `tests/regression.mjs`, `SESSION-HANDOFF.md`
+- 검증: `npm test` (17개 스위트), `npm run format:check`, `npm run check`, `node scripts/huntingUserScenario.mjs` 통과
+
+## 현재 기준 요약 (2026-07-06)
 - 컴포넌트 파일 구조: `src/components/<name>.html` (플랫, 폴더 없음), 9개 컴포넌트
 - **사냥터 100층 구조**: 시작 0층, 10층 전진 루프, 전투/포탈/상인/챔피언에서 정지, 빈층/축복/함정/휴식/상자/제단은 자동 진행
 - **3스테이지**: 동굴→숲→사막, 100층 보스 처치 시 해금

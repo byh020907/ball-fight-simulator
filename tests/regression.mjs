@@ -6764,4 +6764,121 @@ testCollisionRecordsDebugEvent();
 testValidatePhysicsStateNoErrorOnValid();
 testValidatePhysicsStateDetectsNaN();
 testDebugBufferDoesNotThrowOnPushFailure();
+
+// ── Static surface angular impulse tests ─────────────────────────────────
+
+function testWallCollisionProducesAngularImpulse() {
+    const spec = {
+        id: "wall-spin",
+        name: "WallSpin",
+        teamId: "t",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#ff8800",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash",
+        rotationEnabled: true
+    };
+    const sim = new BattleSimulation([spec, { ...spec, id: "opp", teamId: "t2" }], { onLog() {}, onSound() {} });
+    const ball = sim.fighters[0];
+    // position just past the right wall boundary, moving right into the wall
+    ball.position = new Vector2(sim.width - ball.radius + 1, 500);
+    ball.velocity = new Vector2(300, 200);
+    const impulseBefore = ball._accumulatedAngularImpulse;
+    sim.keepInsideArena(ball);
+    const impulseChanged = ball._accumulatedAngularImpulse !== impulseBefore;
+    assert.ok(impulseChanged, "wall collision should accumulate angular impulse");
+    ball.integrateRotation(0.016);
+    assert.ok(Number.isFinite(ball.angularVelocity), "angularVelocity should stay finite after wall collision");
+    console.log("[wall-angular] ok");
+}
+
+function testCornerCollisionProducesAngularImpulse() {
+    const spec = {
+        id: "corner-spin",
+        name: "CornerSpin",
+        teamId: "t",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#ff8800",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash",
+        rotationEnabled: true
+    };
+    const sim = new BattleSimulation([spec, { ...spec, id: "opp", teamId: "t2" }], { onLog() {}, onSound() {} });
+    const ball = sim.fighters[0];
+    // top-left corner: both x and y past boundaries
+    ball.position = new Vector2(ball.radius - 5, ball.radius - 5);
+    ball.velocity = new Vector2(-200, -300);
+    const impulseBefore = ball._accumulatedAngularImpulse;
+    sim.keepInsideArena(ball);
+    assert.ok(
+        ball._accumulatedAngularImpulse !== impulseBefore,
+        "corner collision should accumulate angular impulse from both axes"
+    );
+    assert.ok(Number.isFinite(ball._accumulatedAngularImpulse), "corner angular impulse should be finite");
+    ball.integrateRotation(0.016);
+    assert.ok(Number.isFinite(ball.angularVelocity), "corner angularVelocity should stay finite after integrate");
+    console.log("[corner-angular] ok");
+}
+
+function testCircleTerrainCollisionProducesAngularImpulse() {
+    const fighter = {
+        position: { x: 210, y: 215 },
+        velocity: { x: -50, y: -30 },
+        radius: 24,
+        applyImpulse(impulse) {
+            this.velocity.x += impulse.x;
+            this.velocity.y += impulse.y;
+        },
+        applyAngularImpulse(value) {
+            this._angularImpulseApplied = (this._angularImpulseApplied || 0) + value;
+        }
+    };
+    const rock = { shape: "circle", type: "rock", x: 200, y: 200, radius: 50, blocking: true };
+    const collided = resolveTerrainCollision(fighter, rock);
+    assert.equal(collided, true, "fighter at rock edge should collide");
+    assert.ok(Number.isFinite(fighter._angularImpulseApplied), "circle terrain collision should apply angular impulse");
+    const impulseMag = Math.abs(fighter._angularImpulseApplied);
+    assert.ok(impulseMag > 0, "circle terrain collision angular impulse should be non-zero");
+    console.log("[circle-terrain-angular] ok");
+}
+
+function testPolygonTerrainCollisionProducesAngularImpulse() {
+    const polyTerrain = {
+        shape: "polygon",
+        type: "rock",
+        x: 300,
+        y: 300,
+        points: [
+            { x: -40, y: -30 },
+            { x: 48, y: -20 },
+            { x: 35, y: 38 },
+            { x: -35, y: 30 }
+        ],
+        blocking: true
+    };
+    const fighter = {
+        position: { x: 300, y: 300 },
+        velocity: { x: -50, y: -40 },
+        radius: 24,
+        applyImpulse() {},
+        applyAngularImpulse(value) {
+            this._angularImpulseApplied = (this._angularImpulseApplied || 0) + value;
+        }
+    };
+    const collided = resolveTerrainCollision(fighter, polyTerrain);
+    assert.equal(collided, true, "fighter inside polygon should collide");
+    assert.ok(
+        Number.isFinite(fighter._angularImpulseApplied),
+        "polygon terrain collision should apply angular impulse"
+    );
+    const impulseMag = Math.abs(fighter._angularImpulseApplied);
+    assert.ok(impulseMag > 0, "polygon terrain collision angular impulse should be non-zero");
+    console.log("[polygon-terrain-angular] ok");
+}
+
+testWallCollisionProducesAngularImpulse();
+testCornerCollisionProducesAngularImpulse();
+testCircleTerrainCollisionProducesAngularImpulse();
+testPolygonTerrainCollisionProducesAngularImpulse();
+
 console.log("regression tests ok");
