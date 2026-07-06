@@ -1,5 +1,12 @@
 # 결정 기록
 
+## [L1] 2026-07-06 — 충돌 회전 impulse가 각속도에 반영되도록 수정
+- 맥락: Codex 사전 확인 결과 `handleFighterCollision()`에서 `_applyCollisionPhysics()`가 먼저 velocity를 반사시킨 후, `_applyAngularCollisionResponse()`가 재계산한 `velAlongNormal >= 0`이 되어 angular response가 항상 early return. 즉 충돌 angular impulse이 단 한 번도 angularVelocity에 반영되지 않던 버그.
+- 결정: (1) `_applyCollisionPhysics()` 호출 전에 충돌 전 relative velocity와 velAlongNormal을 미리 계산. (2) 이 pre-collision 값을 `_applyAngularCollisionResponse()`에 전달해 선형 impulse 적용 후에도 올바른 접근 속도 기준으로 회전 impulse 계산. (3) 기존 테스트 `testCollisionProducesAngularImpulse`를 강화 — 비중심 충돌에서 `_accumulatedAngularImpulse` 변화 검증. (4) 신규 `testCollisionAngularImpulseChangesVelocity` — polygon-polygon 비중심 충돌 후 `update()` → `integrateRotation()`까지 거쳐 `angularVelocity`가 실제로 변하는지 검증.
+- 영향: `src/simulation/battleSimulation.js`, `tests/regression.mjs`, `SESSION-HANDOFF.md`
+- 검증: `npm test`, `npm run format:check`, `npm run check`, `node scripts/huntingUserScenario.mjs` 통과
+- 미검증: 브라우저에서 polygon 몹 충돌 회전 육안 확인
+
 ## [L1] 2026-07-06 — 다각형 몹 회전이 화면에서 보이도록 수정
 - 맥락: 다각형 몹의 angle/angularVelocity/body rotate는 구현되어 있었으나, (1) 얼굴이 회전하지 않고 항상 정면을 바라 회전 체감이 거의 없었고, (2) generateMobAppearance(rng)가 angle/angularVelocity를 반환하지 않아 회전값이 rng 재현 불가, (3) createHuntingMobEncounter가 createHuntingMobSpec에 rng를 전달하지 않아 몹 생성 rng 체인이 끊김.
 - 결정: (1) drawFace에 this.angle을 전달해 polygon body의 얼굴이 다각형과 함께 회전, circle 캐릭터는 기존 동작 유지. (2) generateMobAppearance(rng)에 angle/angularVelocity 필드 추가, BattleBall 생성자에서 appearance 값 우선 사용. (3) createHuntingMobEncounter가 rng를 createHuntingMobSpec에 전달하도록 수정. 이름표·HP바는 회전시키지 않음. Set-Content 미사용, Node.js 일괄 치환.

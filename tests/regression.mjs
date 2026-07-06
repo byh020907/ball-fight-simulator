@@ -3296,6 +3296,7 @@ async function testPolygonUpdateIntegratesRotation(app) {
 
 async function testCollisionProducesAngularImpulse(app) {
     // 충돌 시 angular impulse 흐름이 정상 동작하는지 검증
+    // circle-polygon 조합, 비중심 충돌을 구성해 angular impulse가 실제로 누적되는지 확인
     const specCircle = {
         id: "circ-col",
         name: "CircCol",
@@ -3317,6 +3318,7 @@ async function testCollisionProducesAngularImpulse(app) {
     const sim = new BattleSimulation([specCircle, specPoly], { onLog() {}, onSound() {} });
     const [circle, poly] = sim.fighters;
 
+    // 비중심 충돌: 두 객체가 normal 방향으로 정렬되지 않게 offset 배치
     circle.position = new Vector2(475, 472);
     poly.position = new Vector2(485, 488);
     poly.angle = 0;
@@ -3324,8 +3326,8 @@ async function testCollisionProducesAngularImpulse(app) {
     poly.applyImpulse(Vector2.subtract(new Vector2(-400, 0), poly.velocity));
 
     // 충돌 전 누적값 기록
-    const aTorqueBefore = circle._accumulatedTorque;
     const aImpulseBefore = circle._accumulatedAngularImpulse;
+    const bImpulseBefore = poly._accumulatedAngularImpulse;
 
     sim.handleCollision();
 
@@ -3335,8 +3337,73 @@ async function testCollisionProducesAngularImpulse(app) {
     assert.ok(Number.isFinite(circle._accumulatedAngularImpulse), "angular impulse should stay finite after collision");
     assert.ok(Number.isFinite(poly._accumulatedAngularImpulse), "angular impulse should stay finite for both fighters");
     // 충돌이 _applyAngularCollisionResponse를 호출했는지 간접 확인
-    // (contactPoint가 normal과 일직선이면 torque=0이므로 누적값 변화가 없을 수 있음 — 정상)
+    const impulseChanged =
+        circle._accumulatedAngularImpulse !== aImpulseBefore || poly._accumulatedAngularImpulse !== bImpulseBefore;
+    // 비중심 충돌이므로 angular impulse가 실제로 누적되어야 함
+    assert.ok(impulseChanged, "off-center collision should change accumulated angular impulse");
     assert.ok(typeof circle.applyAngularImpulse === "function", "fighter should have applyAngularImpulse method");
+}
+
+async function testCollisionAngularImpulseChangesVelocity(app) {
+    // 충돌 angular impulse가 integrateRotation 후 angularVelocity에 반영되는지 검증
+    // polygon-polygon 조합, 완전 비중심 충돌 구성
+    const specA = {
+        id: "ang-a",
+        name: "AngA",
+        teamId: "t1",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#ff0000",
+        appearance: { sides: 6, face: "default" },
+        ability: "dash"
+    };
+    const specB = {
+        id: "ang-b",
+        name: "AngB",
+        teamId: "t2",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#0000ff",
+        appearance: { sides: 5, face: "default" },
+        ability: "dash"
+    };
+    const sim = new BattleSimulation([specA, specB], { onLog() {}, onSound() {} });
+    const [a, b] = sim.fighters;
+
+    // 큰 Y offset으로 비중심 충돌 보장
+    a.position = new Vector2(480, 455);
+    b.position = new Vector2(480, 505);
+    a.angle = 0;
+    b.angle = 0;
+    a.applyImpulse(Vector2.subtract(new Vector2(0, 500), a.velocity));
+    b.applyImpulse(Vector2.subtract(new Vector2(0, -400), b.velocity));
+
+    const aAngVelBefore = a.angularVelocity;
+    const bAngVelBefore = b.angularVelocity;
+
+    sim.handleCollision();
+
+    // 적어도 한 쪽의 angularVelocity가 충돌 후 달라져야 함 (integrateRotation 전이므로 impulse 누적만 확인)
+    // _accumulatedAngularImpulse가 0이 아니어야 함 — off-center collision
+    const aImpulseAfter = a._accumulatedAngularImpulse;
+    const bImpulseAfter = b._accumulatedAngularImpulse;
+
+    // update → integrateRotation 호출
+    a.update(0.016, sim);
+    b.update(0.016, sim);
+
+    // update는 integrateRotation을 호출하므로 angularVelocity가 누적 impulse만큼 변경되어야 함
+    // (damping(0.98)이 적용되므로 정확히 누적 impulse값과 같진 않음)
+    const aAngVelAfter = a.angularVelocity;
+    const bAngVelAfter = b.angularVelocity;
+    const aChanged = Math.abs(aAngVelAfter - aAngVelBefore) > 0.0001;
+    const bChanged = Math.abs(bAngVelAfter - bAngVelBefore) > 0.0001;
+
+    assert.ok(Number.isFinite(aAngVelAfter), "angularVelocity should stay finite after update");
+    assert.ok(Number.isFinite(bAngVelAfter), "angularVelocity should stay finite for both fighters after update");
+    assert.ok(
+        aChanged || bChanged,
+        "off-center polygon collision should change angularVelocity after integrateRotation"
+    );
+    assert.ok(Number.isFinite(a._accumulatedAngularImpulse), "angular impulse should clear properly");
 }
 
 console.log("[fighter-collision] ok");
@@ -6317,6 +6384,7 @@ testRotationalBodyTorqueAccumulation();
 testMultipleTorqueSameFrame();
 await testPolygonUpdateIntegratesRotation(app);
 await testCollisionProducesAngularImpulse(app);
+await testCollisionAngularImpulseChangesVelocity(app);
 testRingBufferPushAndOrder();
 testRingBufferCapacityOverflow();
 testRingBufferToArrayIsCopy();
