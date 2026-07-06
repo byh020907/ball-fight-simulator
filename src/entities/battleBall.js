@@ -291,13 +291,13 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody]) {
         this.radius = this.stats.baseRadius * (this.ability?.getRadiusScale?.() ?? 1);
         this._applyVelocityCorrection(simulation, delta);
         this.integrate(delta);
+        simulation.keepInsideArena(this);
+        if (this.bounced) this.state.forcedHeading = null;
         if (this.rotationEnabled) {
             this.integrateRotation(delta);
         } else {
             this.clearAngularForces();
         }
-        simulation.keepInsideArena(this);
-        if (this.bounced) this.state.forcedHeading = null;
 
         // ── update summary debug snapshot (값 복사) ──
         try {

@@ -139,6 +139,10 @@ export function applyCollisionResponse(body, normal, contactPoint, preCollisionV
  *
  * 입력 normal은 A→B 방향이다.
  *
+ * 접촉점에서 각 body의 선형 속도 + 각속도 ω × r 기여분을 모두 고려하여
+ * 접선 상대 속도를 계산하고, 접선 마찰을 통한 스핀 교환을 적용한다.
+ * 이를 통해 원형-원형 충돌에서도 angularVelocity가 실제로 변화한다.
+ *
  * @param {object} bodyA - 첫 번째 동적 body
  * @param {object} bodyB - 두 번째 동적 body
  * @param {{x:number, y:number}} normal - A→B 방향 법선
@@ -154,12 +158,51 @@ export function applyDynamicCollisionResponse(bodyA, bodyB, normal, contactPoint
 
     const restitution = options.restitution ?? 0.92;
     const angularFactor = options.angularFactor ?? 0.15;
+    const tangentialFriction = options.tangentialFriction ?? 0.03;
     const impulseMag = Math.abs(approachSpeed) * (1 + restitution);
 
-    // Body A: normal 방향 torque
-    applyCollisionAngularImpulse(bodyA, normal, contactPoint, impulseMag, angularFactor);
+    const tangent = { x: -normal.y, y: normal.x };
 
-    // Body B: -normal 방향 torque (반대 방향)
+    // 접촉점에서 각 body의 접선 속도 (각속도 ω × r 기여 포함)
+    function contactTangentVelocity(body) {
+        const v = body.velocity || { x: 0, y: 0 };
+        let linTang = v.x * tangent.x + v.y * tangent.y;
+        if (typeof body.angularVelocity === "number") {
+            const r = {
+                x: contactPoint.x - body.position.x,
+                y: contactPoint.y - body.position.y
+            };
+            // ω × r 기여를 접선 방향으로: dot((-ω*r.y, ω*r.x), tangent)
+            const angContrib = -body.angularVelocity * r.y * tangent.x + body.angularVelocity * r.x * tangent.y;
+            linTang += angContrib;
+        }
+        return linTang;
+    }
+
+    const tangVelA = contactTangentVelocity(bodyA);
+    const tangVelB = contactTangentVelocity(bodyB);
+    const relTangVel = tangVelB - tangVelA;
+
+    // Body A: normal 방향 torque + 접선 마찰 torque
+    applyCollisionAngularImpulse(
+        bodyA,
+        normal,
+        contactPoint,
+        impulseMag,
+        angularFactor,
+        relTangVel,
+        tangentialFriction
+    );
+
+    // Body B: -normal 방향 torque + 접선 마찰 torque (상대 접선 속도 반대)
     const inverseNormal = { x: -normal.x, y: -normal.y };
-    applyCollisionAngularImpulse(bodyB, inverseNormal, contactPoint, impulseMag, angularFactor);
+    applyCollisionAngularImpulse(
+        bodyB,
+        inverseNormal,
+        contactPoint,
+        impulseMag,
+        angularFactor,
+        -relTangVel,
+        tangentialFriction
+    );
 }

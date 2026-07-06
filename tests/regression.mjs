@@ -7077,4 +7077,95 @@ testCornerCollisionProducesAngularImpulse();
 testCircleTerrainCollisionProducesAngularImpulse();
 testPolygonTerrainCollisionProducesAngularImpulse();
 
+// ── 실제 update 루프 경로 테스트 ─────────────────────────────────────────
+
+function testPlayerCircleCollisionChangesAngularVelocity() {
+    // circle-circle 동적 충돌에서 접선 마찰로 angularVelocity가 변하는지 검증
+    const specPlayer = {
+        id: "circ-p",
+        name: "CircP",
+        teamId: "t1",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#00ff00",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash"
+    };
+    const specOpp = {
+        id: "circ-o",
+        name: "CircO",
+        teamId: "t2",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#ff0000",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash"
+    };
+    const sim = new BattleSimulation([specPlayer, specOpp], { onLog() {}, onSound() {} });
+    const [player, opponent] = sim.fighters;
+
+    // 접선 상대 속도 있는 circle-circle 충돌 (같은 Y, 서로 다른 X)
+    player.position = new Vector2(400, 500);
+    opponent.position = new Vector2(430, 500);
+    player.angularVelocity = 0;
+    opponent.angularVelocity = 0;
+    player.applyImpulse(Vector2.subtract(new Vector2(200, 100), player.velocity));
+    opponent.applyImpulse(Vector2.subtract(new Vector2(-200, 0), opponent.velocity));
+
+    const accImpBefore = player._accumulatedAngularImpulse;
+
+    sim.handleCollision();
+
+    // 충돌 후 accumulatedAngularImpulse가 변경되어야 함 (접선 마찰 torque)
+    assert.ok(
+        player._accumulatedAngularImpulse !== accImpBefore,
+        "circle-circle dynamic collision should produce angular impulse via tangential friction"
+    );
+
+    // update → integrateRotation → angularVelocity에 반영
+    player.update(0.016, sim);
+    opponent.update(0.016, sim);
+
+    assert.ok(
+        Math.abs(player.angularVelocity) > 0.0001,
+        "circle player angularVelocity should change after circle-circle collision"
+    );
+    assert.ok(Number.isFinite(player.angularVelocity), "angularVelocity should stay finite");
+    console.log("[circle-circle-angular] ok");
+}
+
+function testWallCollisionAngularImpulseAppliesSameUpdate() {
+    // BattleBall.update() 경로에서 벽 충돌 angular impulse가 같은 프레임
+    // integrateRotation에 반영되는지 검증
+    const spec = {
+        id: "wall-upd",
+        name: "WallUpd",
+        teamId: "t",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#ff8800",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash",
+        rotationEnabled: true
+    };
+    const sim = new BattleSimulation([spec, { ...spec, id: "opp", teamId: "t2" }], { onLog() {}, onSound() {} });
+    const ball = sim.fighters[0];
+
+    // 우측 벽 바로 앞, 벽 쪽으로 이동
+    ball.position = new Vector2(sim.width - ball.radius - 5, 500);
+    ball.velocity = new Vector2(400, 150);
+    ball.angularVelocity = 0;
+
+    // update 한 번 = _applyVelocityCorrection → integrate → keepInsideArena → integrateRotation
+    ball.update(0.016, sim);
+
+    // 벽 충돌 angular impulse가 같은 update의 integrateRotation에서 반영되어야 함
+    assert.ok(
+        Math.abs(ball.angularVelocity) > 0.0001,
+        "wall collision angular impulse should reflect in same update frame"
+    );
+    assert.ok(Number.isFinite(ball.angularVelocity), "angularVelocity should stay finite");
+    console.log("[wall-same-update] ok");
+}
+
+testPlayerCircleCollisionChangesAngularVelocity();
+testWallCollisionAngularImpulseAppliesSameUpdate();
+
 console.log("regression tests ok");

@@ -1,5 +1,11 @@
 # 결정 기록
 
+## [L1] 2026-07-06 — 충돌 impulse가 실제 angularVelocity에 같은 프레임/동적 원형 충돌에서 반영되도록 수정
+- 맥락: (1) 유저 ball이 충돌해도 angularVelocity가 변하지 않음. 원인: circle-circle 충돌의 contactPoint가 normal과 동일선상이어서 r×normal=0 → angular impulse=0. (2) `BattleBall.update()`에서 `integrateRotation`이 `keepInsideArena`보다 먼저 실행되어 벽 충돌 angular impulse가 다음 프레임에나 반영됨.
+- 결정: (1) `BattleBall.update()` 순서 변경 — 위치 적분 후 `keepInsideArena(this)` → `bounced → forcedHeading 해제` → `integrateRotation(delta)` 순으로 재배열. (2) `applyDynamicCollisionResponse`에 접선 마찰/스핀 교환 추가 — 각 body의 접촉점 속도(선형 + 각속도 ω×r 기여) 계산, 접선 상대 속도 기반 friction torque 적용. (3) `_applyAngularCollisionResponse`에 `tangentialFriction: 0.05` 전달. (4) 테스트 2종: `testPlayerCircleCollisionChangesAngularVelocity` (circle-circle 충돌 후 angularVelocity 변화 검증), `testWallCollisionAngularImpulseAppliesSameUpdate` (벽 충돌 impulse가 같은 `update()` 프레임에 angularVelocity에 반영되는지 검증).
+- 영향: `src/entities/battleBall.js`, `src/physics/collisionResponse.js`, `src/simulation/battleSimulation.js`, `tests/regression.mjs`, `docs/development-rules.md`, `SESSION-HANDOFF.md`
+- 검증: `npm test` (신규 [circle-circle-angular], [wall-same-update] 포함), `npm run format:check`, `npm run check`, `node scripts/huntingUserScenario.mjs` 통과
+
 ## [L1] 2026-07-06 — 기본 볼 회전이 프레임 독립적으로 계속 보이게 수정
 - 맥락: 원형 캐릭터가 초기 각도만 있고 실제로 "도는" 회전이 보이지 않음. (1) 기본 각속도 -0.4~0.4 rad/s로 너무 느리고 0에 가까울 수 있음. (2) angularDamping이 매 프레임 단순 곱셈이라 60fps 1초 뒤 각속도가 0.98^60≈0.30으로 급감.
 - 결정: (1) angularDamping을 프레임레이트 독립적으로 변경 — `angularVelocity *= Math.pow(angularDamping, delta)`. 기본 0.98은 초당 98% 유지율. (2) `randomSpin(min, max)` 헬퍼 신설 — sign * (0.9 + Math.random() * 0.7) rad/s로 최소 0.9 rad/s 보장. (3) 원형 캐릭터 기본 각속도를 `randomSpin()`으로 교체. (4) 다각형 몹 `generateMobAppearance`도 동일 헬퍼 사용. (5) `appearance.angularVelocity` 명시 시 기존값 우선 유지. (6) `rotationEnabled: false` 동작 변경 없음.
