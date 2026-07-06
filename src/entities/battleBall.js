@@ -3,6 +3,11 @@ import { ActionContext } from "../clickActions.js";
 import { DashEffect } from "../combatEffects.js";
 import { mixins, PhysicsBody, RotationalBody } from "../physics/index.js";
 import { computeRegularPolygonLocalPoints } from "../physics/CollisionShape.js";
+import {
+    PhysicsDebugRingBuffer,
+    snapshotPhysicsState,
+    validatePhysicsState
+} from "../physics/PhysicsDebugRingBuffer.js";
 import { getFaceTemplate } from "./mobAppearance.js";
 import { drawEquipmentItems } from "./equipmentVisuals.js";
 
@@ -76,6 +81,9 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody]) {
         };
         this.actionContext = new ActionContext();
         this.aiController = null;
+
+        // 물리 디버깅 ring buffer (게임 결과에 영향 없음)
+        this.physicsDebug = new PhysicsDebugRingBuffer(30);
     }
 
     get renderLayer() {
@@ -92,6 +100,61 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody]) {
 
     getStatModifiers() {
         return this.ability ? this.ability.getStatModifiers() : { speed: 1, damage: 1, defense: 1, impact: 1 };
+    }
+
+    // ── 물리 디버그 래퍼 (원본 믹스인 메서드를 보존하고 기록 추가) ──
+
+    applyImpulse(impulse) {
+        // PhysicsBody.applyImpulse 호출 (프로토타입 체인 상의 원본)
+        const proto = Object.getPrototypeOf(Object.getPrototypeOf(this));
+        if (proto && typeof proto.applyImpulse === "function") {
+            proto.applyImpulse.call(this, impulse);
+        }
+        // debug 기록 (실패해도 게임 영향 없음)
+        try {
+            this.physicsDebug?.push({
+                type: "impulse",
+                entityId: this.id,
+                entityName: this.name,
+                impulse: { x: impulse.x, y: impulse.y }
+            });
+        } catch {
+            /* 무시 */
+        }
+    }
+
+    applyTorque(value) {
+        const proto = Object.getPrototypeOf(Object.getPrototypeOf(this));
+        if (proto && typeof proto.applyTorque === "function") {
+            proto.applyTorque.call(this, value);
+        }
+        try {
+            this.physicsDebug?.push({
+                type: "torque",
+                entityId: this.id,
+                entityName: this.name,
+                torque: value
+            });
+        } catch {
+            /* 무시 */
+        }
+    }
+
+    applyAngularImpulse(value) {
+        const proto = Object.getPrototypeOf(Object.getPrototypeOf(this));
+        if (proto && typeof proto.applyAngularImpulse === "function") {
+            proto.applyAngularImpulse.call(this, value);
+        }
+        try {
+            this.physicsDebug?.push({
+                type: "angularImpulse",
+                entityId: this.id,
+                entityName: this.name,
+                angularImpulse: value
+            });
+        } catch {
+            /* 무시 */
+        }
     }
 
     setSpeedBoost(duration, multiplier, color = this.color) {
@@ -222,6 +285,21 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody]) {
         this.integrateRotation(delta);
         simulation.keepInsideArena(this);
         if (this.bounced) this.state.forcedHeading = null;
+
+        // ── update summary debug snapshot (값 복사) ──
+        try {
+            this.physicsDebug?.push({
+                type: "update",
+                entityId: this.id,
+                entityName: this.name,
+                elapsed: simulation.elapsed,
+                ...snapshotPhysicsState(this)
+            });
+        } catch {
+            /* 무시 */
+        }
+        // ── invalid state 검증 ──
+        validatePhysicsState(this, simulation.elapsed);
     }
 
     _tickMasteryPassives(delta) {

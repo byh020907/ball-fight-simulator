@@ -1,5 +1,12 @@
 # 결정 기록
 
+## [L1] 2026-07-06 — 물리 디버깅을 위한 ring buffer 기록 추가
+- 맥락: 각속도/다각형 충돌 구현 중 NaN/Infinity 또는 이상 충돌이 발생할 때 직전 물리 이벤트를 추적할 수단이 필요. 과도한 finite guard 대신 ring buffer 기반 원인 추적을 우선.
+- 결정: (1) `src/physics/PhysicsDebugRingBuffer.js` 신설 — 고정 길이(30) ring buffer, `push(event)`, `toArray()`, `clear()`, capacity 초과 시 오래된 이벤트 제거. (2) `snapshotPhysicsState(entity)` — position/velocity/angle/angularVelocity/torqueAccum 등을 값 복사로 스냅샷. (3) `validatePhysicsState(entity, elapsed)` — position/velocity/angle/angularVelocity NaN/Infinity 검사, 무효 시 ring buffer dump를 console.error로 출력. (4) BattleBall에 `physicsDebug` buffer 연결, `applyImpulse`/`applyTorque`/`applyAngularImpulse` 래퍼로 debug 이벤트 기록, `update()` 종료 시 summary snapshot + validate. (5) BattleSimulation.handleFighterCollision에 collision event 기록 (normal, overlap, contactPoint). (6) 테스트: ring buffer 단독(5종), BattleBall debug(4종), validate(3종) 등 12종.
+- 영향: `src/physics/PhysicsDebugRingBuffer.js`, `src/physics/index.js`, `src/entities/battleBall.js`, `src/simulation/battleSimulation.js`, `tests/regression.mjs`, `SESSION-HANDOFF.md`, `docs/development-rules.md`
+- 검증: `npm test` (11개 스위트), `npm run format:check`, `npm run check` 통과
+- 미검증: 실제 브라우저 게임플레이 중 물리 디버그 버퍼가 메모리에 미치는 영향
+
 ## [L1] 2026-07-06 — 회전 물리를 torque accumulator 기반으로 재설계
 - 맥락: 기존 RotationalBody는 applyAngularImpulse가 angularVelocity를 직접 수정하고, torque 개념이 없어 한 프레임에 여러 충돌이 겹칠 때 불안정. 일반적인 2D 물리 엔진의 force→acceleration→velocity→position 흐름에 대응되는 회전 구조 필요.
 - 결정: (1) RotationalBody에 torque accumulator(`_accumulatedTorque`), angular impulse accumulator(`_accumulatedAngularImpulse`), `_inverseMomentOfInertia`(solid disk I=0.5mr²), `angularDamping=0.98` 도입. (2) `applyTorque`는 누적만, `applyAngularImpulse`도 누적만 하고 `integrateRotation`에서 torque→angularAccel→velocity→damping→angle 흐름으로 일괄 처리 후 누적 초기화. (3) `_applyAngularCollisionResponse` 신설: 충돌 contactPoint와 normal의 2D cross로 torque 계산 → `applyAngularImpulse`로 누적. (4) `resolveFighterShapeCollision`에 `contactPoint` 추가 (circle-circle: 중첩 중점, circle-polygon: 최근접 vertex, polygon-polygon: 중심 중점). (5) 테스트: torque accumulation, multi-torque same-frame, torque+impulse 동시, polygon update integration, collision angular impulse 안전성 등 6종 추가 + 기존 RotationalBody 테스트 갱신.

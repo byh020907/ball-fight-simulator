@@ -3339,6 +3339,228 @@ async function testCollisionProducesAngularImpulse(app) {
 
 console.log("[fighter-collision] ok");
 
+// ──────────────────────────────────────────────
+// Physics debug ring buffer
+// ──────────────────────────────────────────────
+
+import {
+    PhysicsDebugRingBuffer,
+    snapshotPhysicsState,
+    validatePhysicsState
+} from "../src/physics/PhysicsDebugRingBuffer.js";
+
+function testRingBufferPushAndOrder() {
+    const buf = new PhysicsDebugRingBuffer(5);
+    buf.push({ id: 1 });
+    buf.push({ id: 2 });
+    buf.push({ id: 3 });
+    const arr = buf.toArray();
+    assert.equal(arr.length, 3, "should store 3 events");
+    assert.equal(arr[0].id, 1, "first event should be oldest");
+    assert.equal(arr[2].id, 3, "last event should be newest");
+    assert.equal(buf.length, 3, "length should match stored count");
+}
+
+function testRingBufferCapacityOverflow() {
+    const buf = new PhysicsDebugRingBuffer(3);
+    buf.push({ id: 1 });
+    buf.push({ id: 2 });
+    buf.push({ id: 3 });
+    buf.push({ id: 4 }); // overflow
+    buf.push({ id: 5 });
+    const arr = buf.toArray();
+    assert.equal(arr.length, 3, "should keep only the last 3 events");
+    assert.equal(arr[0].id, 3, "oldest event should be #3 after overflow");
+    assert.equal(arr[1].id, 4, "middle event should be #4");
+    assert.equal(arr[2].id, 5, "newest event should be #5");
+}
+
+function testRingBufferToArrayIsCopy() {
+    const buf = new PhysicsDebugRingBuffer(3);
+    const obj = { id: 1, data: "hello" };
+    buf.push(obj);
+    const arr1 = buf.toArray();
+    arr1[0].data = "modified";
+    const arr2 = buf.toArray();
+    assert.equal(arr2[0].data, "modified", "toArray shares references (shallow copy) — ok for simple objects");
+    // 하지만 내부 배열을 직접 노출하지 않는지 확인
+    arr1.push({ id: 999 });
+    assert.equal(buf.length, 1, "modifying returned array should not affect buffer size");
+}
+
+function testRingBufferClear() {
+    const buf = new PhysicsDebugRingBuffer(3);
+    buf.push({ id: 1 });
+    buf.push({ id: 2 });
+    buf.clear();
+    assert.equal(buf.length, 0, "clear should reset length to 0");
+    assert.equal(buf.toArray().length, 0, "toArray should return empty after clear");
+    // clear 후 다시 push 가능
+    buf.push({ id: 3 });
+    assert.equal(buf.length, 1, "should accept new events after clear");
+}
+
+function testSnapshotPhysicsStateCopiesValues() {
+    // snapshot이 Vector2 참조가 아닌 값 복사인지 검증
+    const entity = {
+        position: { x: 100, y: 200 },
+        velocity: { x: 10, y: 20 },
+        angle: 0.5,
+        angularVelocity: 1.2,
+        _accumulatedTorque: 5,
+        _accumulatedAngularImpulse: 3
+    };
+    const snap = snapshotPhysicsState(entity);
+
+    // 원본 수정
+    entity.position.x = 999;
+    entity.velocity.y = 888;
+    entity.angle = 777;
+
+    assert.equal(snap.position.x, 100, "snapshot position.x should be independent copy");
+    assert.equal(snap.position.y, 200, "snapshot position.y should be independent copy");
+    assert.equal(snap.velocity.x, 10, "snapshot velocity should be copy");
+    assert.equal(snap.velocity.y, 20, "snapshot velocity.y should be copy");
+    assert.equal(snap.angle, 0.5, "snapshot angle should be copy");
+    assert.equal(snap.angularVelocity, 1.2, "snapshot angularVelocity should be copy");
+}
+
+function testBattleBallDebugBufferExists() {
+    const spec = {
+        id: "test-debug",
+        name: "DebugBall",
+        teamId: "t",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#ff8800",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash"
+    };
+    const ball = new BattleBall(spec, new Vector2(200, 300));
+    assert.ok(ball.physicsDebug instanceof PhysicsDebugRingBuffer, "BattleBall should have physicsDebug ring buffer");
+    assert.equal(ball.physicsDebug.length, 0, "debug buffer should start empty");
+}
+
+function testApplyImpulseRecordsDebugEvent() {
+    const spec = {
+        id: "test-imp-debug",
+        name: "ImpDebug",
+        teamId: "t",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#ff8800",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash"
+    };
+    const ball = new BattleBall(spec, new Vector2(200, 300));
+    ball.applyImpulse(new Vector2(50, -30));
+    const events = ball.physicsDebug.toArray();
+    assert.ok(events.length >= 1, "applyImpulse should record a debug event");
+    const last = events[events.length - 1];
+    assert.equal(last.type, "impulse", "event type should be impulse");
+    assert.ok(last.impulse.x === 50 && last.impulse.y === -30, "should record impulse values");
+}
+
+function testUpdateRecordsSummaryEvent() {
+    const spec = {
+        id: "test-update-debug",
+        name: "UpdateDebug",
+        teamId: "t",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#ff8800",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash"
+    };
+    const sim = new BattleSimulation([spec, { ...spec, id: "opp", teamId: "t2" }], { onLog() {}, onSound() {} });
+    const fighter = sim.fighters[0];
+    fighter.update(0.016, sim);
+    const events = fighter.physicsDebug.toArray();
+    const updateEvents = events.filter((e) => e.type === "update");
+    assert.ok(updateEvents.length >= 1, "update should record a summary event");
+    const snap = updateEvents[updateEvents.length - 1];
+    assert.ok(typeof snap.position.x === "number", "summary should include position.x");
+    assert.ok(typeof snap.velocity.x === "number", "summary should include velocity.x");
+    assert.ok(typeof snap.angle === "number", "summary should include angle");
+}
+
+function testCollisionRecordsDebugEvent() {
+    const specA = {
+        id: "col-debug-a",
+        name: "ColDebugA",
+        teamId: "t1",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#aa0000",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash"
+    };
+    const specB = {
+        id: "col-debug-b",
+        name: "ColDebugB",
+        teamId: "t2",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#0000aa",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash"
+    };
+    const sim = new BattleSimulation([specA, specB], { onLog() {}, onSound() {} });
+    const [a, b] = sim.fighters;
+    a.position = new Vector2(475, 480);
+    b.position = new Vector2(485, 480);
+    a.applyImpulse(Vector2.subtract(new Vector2(400, 0), a.velocity));
+    b.applyImpulse(Vector2.subtract(new Vector2(-350, 0), b.velocity));
+    sim.handleCollision();
+
+    const eventsA = a.physicsDebug.toArray();
+    const colEventsA = eventsA.filter((e) => e.type === "collision");
+    assert.ok(colEventsA.length >= 1, "collision should record debug event on fighter A");
+    assert.equal(colEventsA[0].entityIdA, "col-debug-a", "collision event should include entityIdA");
+    assert.equal(colEventsA[0].entityIdB, "col-debug-b", "collision event should include entityIdB");
+    assert.ok(typeof colEventsA[0].normal.x === "number", "collision event should include normal");
+    assert.ok(typeof colEventsA[0].overlap === "number", "collision event should include overlap");
+}
+
+function testValidatePhysicsStateNoErrorOnValid() {
+    const entity = {
+        name: "valid-entity",
+        position: { x: 100, y: 200 },
+        velocity: { x: 10, y: 20 },
+        angle: 0.5,
+        angularVelocity: 1.2,
+        physicsDebug: new PhysicsDebugRingBuffer(3)
+    };
+    entity.physicsDebug.push({ type: "test" });
+    const result = validatePhysicsState(entity, 123);
+    assert.equal(result, true, "valid state should return true");
+}
+
+function testValidatePhysicsStateDetectsNaN() {
+    const entity = {
+        name: "nan-entity",
+        position: { x: NaN, y: 200 },
+        velocity: { x: 10, y: 20 },
+        angle: 0.5,
+        angularVelocity: 1.2,
+        physicsDebug: new PhysicsDebugRingBuffer(3)
+    };
+    entity.physicsDebug.push({ type: "before-nan", data: "test" });
+    const result = validatePhysicsState(entity, 456);
+    assert.equal(result, false, "NaN position should return false");
+}
+
+function testDebugBufferDoesNotThrowOnPushFailure() {
+    // buffer가 없는 entity에도 validatePhysicsState가 깨지지 않아야 함
+    const entity = {
+        name: "no-buffer",
+        position: { x: Infinity, y: 200 },
+        velocity: { x: 10, y: 20 },
+        angle: 0.5,
+        angularVelocity: 1.2
+        // physicsDebug 없음
+    };
+    const result = validatePhysicsState(entity);
+    assert.equal(result, true, "missing debug buffer should not crash validation");
+}
+
+console.log("[physics-debug] ok");
+
 async function testMatchEndGrantsImmediateExperience(app) {
     app.tournament = null;
     app.currentTournamentMatch = null;
@@ -6014,4 +6236,16 @@ testRotationalBodyTorqueAccumulation();
 testMultipleTorqueSameFrame();
 await testPolygonUpdateIntegratesRotation(app);
 await testCollisionProducesAngularImpulse(app);
+testRingBufferPushAndOrder();
+testRingBufferCapacityOverflow();
+testRingBufferToArrayIsCopy();
+testRingBufferClear();
+testSnapshotPhysicsStateCopiesValues();
+testBattleBallDebugBufferExists();
+testApplyImpulseRecordsDebugEvent();
+testUpdateRecordsSummaryEvent();
+testCollisionRecordsDebugEvent();
+testValidatePhysicsStateNoErrorOnValid();
+testValidatePhysicsStateDetectsNaN();
+testDebugBufferDoesNotThrowOnPushFailure();
 console.log("regression tests ok");

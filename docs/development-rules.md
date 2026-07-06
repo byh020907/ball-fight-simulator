@@ -122,6 +122,12 @@ this.debug = {
 | `BurstSequencer` | 연발 발사한다 (startBurst, tickBurst) | 필요 시 선택 적용 |
 | `RotationalBody` | 회전한다 (angle, angularVelocity, applyAngularImpulse, integrateRotation) | BattleBall (polygon 몹), 회전 가능한 지형/캐릭터/투사체 확장용 |
 | `CollisionShape` (helper) | polygon world points 변환, SAT 기반 circle-polygon/polygon-polygon 충돌, fighter shape collision resolver | terrain collision, fighter-vs-fighter 충돌 |
+| `PhysicsDebugRingBuffer` (helper) | 고정 길이 ring buffer로 물리 이벤트 기록. NaN/Infinity 감지 시 buffer dump 출력 | 디버깅/트러블슈팅 |
+
+**물리 디버깅 원칙**:
+- 과도한 `Number.isFinite` guard를 코드 곳곳에 흩뿌리지 않고, ring buffer 기반 원인 추적을 우선한다.
+- 이벤트 snapshot은 항상 값 복사로 저장한다 (Vector2 참조를 그대로 보관하지 않는다).
+- 기록 실패가 게임 로직을 깨지 않아야 한다.
 
 **클래스 본질 (상속)**:
 

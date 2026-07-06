@@ -332,6 +332,24 @@ export class BattleSimulation extends Simulation {
         a.ability?.onCollision(b);
         b.ability?.onCollision(a);
 
+        // ── physics debug collision event (실패해도 게임 영향 없음) ──
+        try {
+            const collisionEvent = {
+                type: "collision",
+                entityIdA: a.id,
+                entityNameA: a.name,
+                entityIdB: b.id,
+                entityNameB: b.name,
+                normal: { x: normal.x, y: normal.y },
+                overlap: result.overlap,
+                contactPoint: result.contactPoint ? { x: result.contactPoint.x, y: result.contactPoint.y } : null
+            };
+            a.physicsDebug?.push(collisionEvent);
+            b.physicsDebug?.push(collisionEvent);
+        } catch {
+            /* 무시 */
+        }
+
         this.playSound("crash", Math.min(1.8, 0.8 + Math.abs(damageFromAToB + damageFromBToA) / 24));
         this.addSparkBurst(Vector2.add(a.position, b.position).scale(0.5), "#ffffff");
         this.addSparkBurst(a.position.clone(), a.color);
