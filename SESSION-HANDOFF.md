@@ -1,5 +1,11 @@
 # 결정 기록
 
+## [L1] 2026-07-06 — 사냥터 기본 지형을 폴리곤 전용으로 전환
+- 맥락: 사용자가 지형 개선 방향으로 기본을 폴리곤으로 두고, 원형 지형은 당장은 쓰지 않기를 요청.
+- 결정: `createHuntingTerrain()`의 동굴 지형 생성은 모든 장애물을 polygon terrain으로 만들도록 변경. circle collision/render 경로는 레거시 호환용으로 남기되, 신규 사냥터 배치에서는 circle obstacle을 생성하지 않음.
+- 영향: `src/terrain/terrainFactory.js`, `tests/regression.mjs`, `docs/hunting-grounds-system.md`, `SESSION-HANDOFF.md`
+- 검증: `npm run format:check`, `npm run check`, `npm test`, `node scripts/huntingUserScenario.mjs` 통과
+
 ## [L1] 2026-07-06 — 박쥐 투사체가 타겟이 아닌 자신의 진행 방향을 보도록 수정
 - 맥락: 뱀파이어 박쥐 투사체가 타겟을 바라보며 날아가서 어색함. 박쥐는 자신의 velocity 방향을 보는 것이 자연스러움.
 - 결정: `BatProjectile.update()`에서 `this.angle`을 항상 `Math.atan2(this.velocity.y, this.velocity.x)`로 설정. 타겟 유무에 따른 분기 제거.

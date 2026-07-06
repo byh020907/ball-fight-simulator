@@ -2171,7 +2171,7 @@ function testHuntingStageSelectionAndArenaTheme() {
 function testHuntingTerrain() {
     const CAVE = HUNTING_STAGE_IDS.CAVE;
 
-    // ── cave generates circle + polygon terrain ──
+    // ── cave generates polygon-only terrain ──
     const caveTerrain = createHuntingTerrain({ stageId: CAVE, floor: 1, width: 1120, height: 1120 });
     assert.ok(Array.isArray(caveTerrain), "Cave terrain should be an array");
     assert.ok(caveTerrain.length >= 3, "Cave should generate at least 3 obstacles");
@@ -2179,8 +2179,8 @@ function testHuntingTerrain() {
 
     const circles = caveTerrain.filter((obs) => obs.shape === "circle");
     const polygons = caveTerrain.filter((obs) => obs.shape === "polygon");
-    assert.ok(circles.length >= 2, "Odd floor cave should have circle obstacles");
-    assert.ok(polygons.length >= 1, "Odd floor cave should have at least 1 polygon obstacle");
+    assert.equal(circles.length, 0, "Cave terrain generation should not create circle obstacles");
+    assert.equal(polygons.length, caveTerrain.length, "Cave terrain should use polygons for every obstacle");
 
     for (const obs of polygons) {
         assert.equal(obs.type, "rock", "Polygon terrain type should be rock");
@@ -2189,10 +2189,12 @@ function testHuntingTerrain() {
         assert.ok(Number.isFinite(obs.x) && Number.isFinite(obs.y), "Polygon should have valid position");
     }
 
-    // ── even floor generates only circles ──
+    // ── even floor also generates only polygons ──
     const evenTerrain = createHuntingTerrain({ stageId: CAVE, floor: 2, width: 1120, height: 1120 });
+    const evenCircles = evenTerrain.filter((obs) => obs.shape === "circle");
     const evenPolygons = evenTerrain.filter((obs) => obs.shape === "polygon");
-    assert.equal(evenPolygons.length, 0, "Even floor cave should generate no polygon obstacles");
+    assert.equal(evenCircles.length, 0, "Even floor cave should also avoid circle obstacles");
+    assert.equal(evenPolygons.length, evenTerrain.length, "Even floor cave should also generate polygon obstacles");
 
     // ── deterministic ──
     const cave1 = createHuntingTerrain({ stageId: CAVE, floor: 1, width: 1120, height: 1120 });
@@ -2301,17 +2303,15 @@ function testHuntingTerrain() {
         "Far fighter should not collide"
     );
 
-    // ── renderer draws circles and polygons ──
+    // ── renderer draws generated polygons ──
     const ctx = makeRecordingCanvasContext();
     drawTerrain(ctx, caveTerrain);
     const arcCalls = ctx.calls.filter((c) => c[0] === "arc");
     const moveToCalls = ctx.calls.filter((c) => c[0] === "moveTo");
     const lineToCalls = ctx.calls.filter((c) => c[0] === "lineTo");
-    assert.ok(arcCalls.length > 0, "Renderer should draw circle obstacles with arc");
-    if (polygons.length > 0) {
-        assert.ok(moveToCalls.length > 0, "Renderer should draw polygon obstacles with moveTo");
-        assert.ok(lineToCalls.length > 0, "Renderer should draw polygon obstacles with lineTo");
-    }
+    assert.equal(arcCalls.length, 0, "Generated terrain should not draw circle arcs");
+    assert.ok(moveToCalls.length > 0, "Renderer should draw polygon obstacles with moveTo");
+    assert.ok(lineToCalls.length > 0, "Renderer should draw polygon obstacles with lineTo");
 
     // ── RotationalBody mixin ──
     class Dummy {}

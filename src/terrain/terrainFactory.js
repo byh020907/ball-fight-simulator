@@ -5,7 +5,7 @@ function sanitizeTerrain(obstacle) {
     if (!obstacle || typeof obstacle !== "object") return null;
     const x = Number.isFinite(obstacle.x) ? obstacle.x : 0;
     const y = Number.isFinite(obstacle.y) ? obstacle.y : 0;
-    const shape = obstacle.shape === TERRAIN_SHAPES.POLYGON ? TERRAIN_SHAPES.POLYGON : TERRAIN_SHAPES.CIRCLE;
+    const shape = obstacle.shape === TERRAIN_SHAPES.CIRCLE ? TERRAIN_SHAPES.CIRCLE : TERRAIN_SHAPES.POLYGON;
 
     const base = {
         id: obstacle.id ?? `terrain-${x}-${y}`,
@@ -102,30 +102,11 @@ function createCaveTerrain({ floor = 1, width = 960, height = 960 }) {
     const rng = pseudoRandom(seed);
 
     const totalCount = 3 + (floor % 3);
-    const polygonCount = floor % 2 === 1 ? 1 : 0;
-    const circleCount = totalCount - polygonCount;
 
     const obstacles = [];
     const buffer = 90;
     const minDist = 110;
     const attempts = totalCount * 10;
-
-    function createCircleObstacle(idx) {
-        const radius =
-            TERRAIN_DEFAULTS.MIN_RADIUS + rng() * (TERRAIN_DEFAULTS.MAX_RADIUS - TERRAIN_DEFAULTS.MIN_RADIUS);
-        const x = clampToArena(buffer + rng() * (width - buffer * 2), buffer + radius, width - buffer - radius);
-        const y = clampToArena(buffer + rng() * (height - buffer * 2), buffer + radius, height - buffer - radius);
-        return {
-            id: `cave-rock-${idx}`,
-            type: TERRAIN_TYPES.ROCK,
-            shape: TERRAIN_SHAPES.CIRCLE,
-            x,
-            y,
-            radius,
-            blocking: true,
-            theme: HUNTING_STAGE_IDS.CAVE
-        };
-    }
 
     function createPolygonObstacle(idx) {
         const points = createPolygonPoints(rng);
@@ -139,14 +120,14 @@ function createCaveTerrain({ floor = 1, width = 960, height = 960 }) {
             x,
             y,
             points,
+            angle: rng() * Math.PI * 2,
             blocking: true,
             theme: HUNTING_STAGE_IDS.CAVE
         };
     }
 
     for (let attempt = 0; attempt < attempts && obstacles.length < totalCount; attempt++) {
-        const isPolygon = obstacles.length < polygonCount;
-        const candidate = isPolygon ? createPolygonObstacle(obstacles.length) : createCircleObstacle(obstacles.length);
+        const candidate = createPolygonObstacle(obstacles.length);
 
         if (isTooCloseToSpawnEdge(candidate.x, candidate.y, width, height, buffer)) continue;
 
