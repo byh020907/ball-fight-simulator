@@ -33,7 +33,11 @@
 
 stage는 단순 배경 외에 실제 충돌 지형을 가질 수 있습니다. 현재 동굴(cave) stage는 기본 지형을 폴리곤 암벽 장애물로 생성하며, 원형 장애물은 사냥터 생성에서 사용하지 않습니다. fighter와 충돌 시 arena 벽 반사와 동일한 방식으로 밀려납니다. 충돌 계층은 레거시 호환을 위해 원형 entity vs circle/polygon terrain을 모두 지원하지만, 신규 사냥터 배치는 polygon terrain을 기준으로 합니다 (SAT 기반 polygon 충돌). 지형은 `stageId`와 `floor`에 기반해 결정론적으로 생성되므로 같은 조건에서는 항상 같은 배치가 나옵니다.
 
-사냥터 몹(다각형 외형)은 `RotationalBody` 믹스인을 통해 무작위 회전각과 각속도를 가지며, `_drawPolygonBody` 렌더링에 `this.angle`이 적용됩니다. 몹의 얼굴도 body angle과 함께 회전하므로 실제 화면에서 회전을 식별할 수 있습니다. 회전값은 `generateMobAppearance(rng)`에서 rng 기반으로 생성되어 재현 가능합니다. 몹-vs-플레이어 충돌도 원형 radius가 아닌 polygon shape 기반으로 처리됩니다: `resolveFighterShapeCollision`이 SAT 알고리즘으로 polygon-polygon, circle-polygon 충돌을 감지하고, SAT normal 방향으로 충돌 반응(impulse)을 주며 분리합니다. 분리 시 bounding circle overlap을 하한으로 사용하여 완전한 분리를 보장합니다.
+모든 `BattleBall`(원형 캐릭터 포함)은 기본적으로 `RotationalBody` 믹스인을 통해 회전각과 각속도를 가집니다. 다각형 몹은 `appearance.angle`/`appearance.angularVelocity`를 우선 사용하고, 원형 캐릭터는 무작위 초기값을 받습니다. `spec.rotationEnabled === false`로 캐릭터별 회전을 비활성화할 수 있습니다.
+
+몹의 얼굴과 장착 장비도 `this.angle` 기준으로 회전하며, 이름표·HP바·movement ring 같은 UI 요소는 회전하지 않습니다. wallSlam 시 `display.spinRotation`은 rotationEnabled 여부와 관계없이 시각 회전을 유지합니다. 비활성 상태에서는 `update()`에서 `clearAngularForces()`가 호출되어 accumulator가 초기화됩니다.
+
+회전값은 `generateMobAppearance(rng)`에서 rng 기반으로 생성되어 재현 가능합니다. 몹-vs-플레이어 충돌도 원형 radius가 아닌 polygon shape 기반으로 처리됩니다: `resolveFighterShapeCollision`이 SAT 알고리즘으로 polygon-polygon, circle-polygon 충돌을 감지하고, SAT normal 방향으로 충돌 반응(impulse)을 주며 분리합니다. 분리 시 bounding circle overlap을 하한으로 사용하여 완전한 분리를 보장합니다.
 
 투사체 충돌, 몹 AI의 장애물 우회, concave polygon, 동적 회전 장애물은 후속 과제입니다.
 

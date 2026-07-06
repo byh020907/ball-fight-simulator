@@ -60,13 +60,17 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody]) {
         };
         this.hunting = spec.hunting ?? null;
         this.appearance = spec.appearance ?? { sides: 0, face: "default" };
-        // RotationalBody 초기화: 다각형 몹은 appearance 회전값 우선, 없으면 무작위
-        if (this.appearance.sides > 0) {
+        // RotationalBody 초기화: 모든 볼이 회전 (appearance 우선, rotationEnabled로 비활성 가능)
+        this.rotationEnabled = spec.rotationEnabled !== false;
+        if (!this.rotationEnabled) {
+            this.angle = 0;
+            this.angularVelocity = 0;
+        } else if (this.appearance.sides > 0) {
             this.angle = this.appearance.angle ?? Math.random() * Math.PI * 2;
             this.angularVelocity = this.appearance.angularVelocity ?? (Math.random() - 0.5) * 0.8;
         } else {
-            this.angle = 0;
-            this.angularVelocity = 0;
+            this.angle = Math.random() * Math.PI * 2;
+            this.angularVelocity = (Math.random() - 0.5) * 0.8;
         }
         this.equipment = {
             items: Array.isArray(spec.equipment?.equippedItems) ? spec.equipment.equippedItems : []
@@ -287,7 +291,11 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody]) {
         this.radius = this.stats.baseRadius * (this.ability?.getRadiusScale?.() ?? 1);
         this._applyVelocityCorrection(simulation, delta);
         this.integrate(delta);
-        this.integrateRotation(delta);
+        if (this.rotationEnabled) {
+            this.integrateRotation(delta);
+        } else {
+            this.clearAngularForces();
+        }
         simulation.keepInsideArena(this);
         if (this.bounced) this.state.forcedHeading = null;
 
@@ -429,9 +437,23 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody]) {
             ctx.lineWidth = Math.max(3, this.radius * 0.07);
             ctx.stroke();
         }
-        drawEquipmentItems(ctx, this, this.equipment.items);
+        // 장비 회전: 원형 + rotationEnabled 시 body angle 기준
+        if (this.appearance.sides === 0 && this.rotationEnabled) {
+            ctx.save();
+            ctx.translate(this.position.x, this.position.y);
+            ctx.rotate(this.angle);
+            const origPos = this.position;
+            this.position = { x: 0, y: 0 };
+            drawEquipmentItems(ctx, this, this.equipment.items);
+            this.position = origPos;
+            ctx.restore();
+        } else {
+            drawEquipmentItems(ctx, this, this.equipment.items);
+        }
+        // 얼굴 회전: polygon은 항상 this.angle, 원형은 rotationEnabled에 따라 합성
+        const wallSlamSpin = this.state.wallSlam ? this.display.spinRotation : 0;
         const faceRotation =
-            this.appearance.sides > 0 ? this.angle : this.state.wallSlam ? this.display.spinRotation : 0;
+            this.appearance.sides > 0 ? this.angle : this.rotationEnabled ? this.angle + wallSlamSpin : wallSlamSpin;
         this.drawFace(ctx, faceRotation);
         this.ability?.draw?.(ctx);
         if (this.state.movement?.showRing) {

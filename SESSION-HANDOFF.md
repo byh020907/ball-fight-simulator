@@ -707,3 +707,11 @@
 - 맥락: 사용자가 장비 화면 UI 진행을 요청. 컬렉션 허브 장비 탭은 이미 실제 관리 UI를 제공하므로, 토너먼트/사냥터 입장 직전 중복 UI를 새로 만들기보다 시작 패널에서 현재 장비 상태를 확인하고 장비 탭으로 바로 진입하는 흐름이 적합했음.
 - 결정: player-panel에 장비 요약 블록을 추가해 현재 캐릭터 레벨, 인벤토리 사용량, 슬롯별 장착/잠김 상태, 적용 중인 장비 스탯을 표시한다. “장비 화면” 버튼은 `BallFightComponentBridge.openCollectionHub("equipment")`를 통해 컬렉션 허브 장비 탭을 연다. `UIController.renderPlayerSetup()`과 Alpine store 초기값, 테스트 하네스를 모두 같은 `equipmentSummary` 구조로 맞춘다.
 - 영향: `src/app.js`, `src/ui.js`, `src/components/player-panel.html`, `index.html`, `src/patchNotes.js`, `tests/regression.mjs`, `docs/equipment-system.md`
+
+
+## [L1] 2026-07-06 — 모든 BattleBall 기본 회전 + rotationEnabled 플래그 추가
+- 맥락: 기존에는 다각형 몹(사냥터)만 회전하고 원형 캐릭터는 angle=0/angularVelocity=0으로 고정되어 회전 물리가 전혀 작동하지 않음. 회전 face/equipment도 미적용.
+- 결정: (1) BattleBall 생성자에서 모든 볼에 angle/angularVelocity를 초기화 (원형도 무작위 각도와 각속도). spec.rotationEnabled !== false로 플래그 추가, false면 angle/angularVelocity=0. (2) update()에서 rotationEnabled일 때만 integrateRotation 호출, 비활성 시 clearAngularForces()로 accumulator 정리. (3) faceRotation: polygon은 기존대로 this.angle, circle은 rotationEnabled ? this.angle + wallSlamSpin : wallSlamSpin. (4) 장비 회전: circle + rotationEnabled 시 save → translate(center) → rotate(angle) 컨텍스트에서 drawEquipmentItems 호출. (5) 이름표·HP바·movement ring은 회전하지 않음. (6) wallSlam spinRotation은 rotationEnabled와 관계없이 시각 회전 유지.
+- 영향: src/entities/battleBall.js, tests/regression.mjs, docs/development-rules.md, docs/hunting-grounds-system.md, SESSION-HANDOFF.md
+- 검증: npm test, npm run format:check, npm run check, node scripts/huntingUserScenario.mjs 통과
+- 미검증: 브라우저에서 원형 캐릭터 face/equipment 회전 육안 확인

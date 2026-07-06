@@ -3197,8 +3197,9 @@ async function testRotationInitializedOnPolygonFighter(app) {
 
     const circleSpec = { ...spec, appearance: { sides: 0, face: "default" } };
     const circleBall = new BattleBall(circleSpec, new Vector2(500, 500));
-    assert.equal(circleBall.angle, 0, "circle fighter should have angle=0");
-    assert.equal(circleBall.angularVelocity, 0, "circle fighter should have angularVelocity=0");
+    assert.ok(Number.isFinite(circleBall.angle), "circle fighter should have finite angle");
+    assert.ok(Number.isFinite(circleBall.angularVelocity), "circle fighter should have finite angularVelocity");
+    assert.ok(Math.abs(circleBall.angularVelocity) > 0.0001, "circle should have non-zero initial angular velocity");
 }
 
 async function testIntegrateRotationSpins() {
@@ -3471,7 +3472,7 @@ function testPolygonMobFaceRotatesWithBody() {
     const rotateCalls = ctx.calls.filter((c) => c[0] === "rotate" && Math.abs(c[1] - 2.5) < 0.01);
     assert.ok(rotateCalls.length >= 2, "face should also rotate with body angle for polygon mobs");
 
-    // circle character should NOT pass body angle to face
+    // circle character SHOULD pass body angle to face (rotation enabled by default)
     const ctx2 = makeRecordingCanvasContext();
     const circleSpec = { ...spec, appearance: { sides: 0, face: "default" } };
     const circleBall = new BattleBall(circleSpec, new Vector2(300, 300));
@@ -3479,7 +3480,112 @@ function testPolygonMobFaceRotatesWithBody() {
     circleBall.angle = 2.5;
     circleBall.draw(ctx2);
     const rotateCalls2 = ctx2.calls.filter((c) => c[0] === "rotate" && Math.abs(c[1] - 2.5) < 0.01);
-    assert.equal(rotateCalls2.length, 0, "circle character face should NOT rotate with body angle");
+    assert.ok(rotateCalls2.length >= 1, "circle character face should rotate with body angle (rotation enabled)");
+}
+
+async function testCircleRotationDisabled(app) {
+    // rotationEnabled: false → angle/angularVelocity are 0, update doesn't rotate
+    const spec = {
+        id: "test-no-rot",
+        name: "NoRot",
+        teamId: "t",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 30, mass: 10 },
+        color: "#ff8800",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash",
+        rotationEnabled: false
+    };
+    const ball = new BattleBall(spec, new Vector2(200, 200));
+    assert.equal(ball.angle, 0, "rotationEnabled=false should start at angle=0");
+    assert.equal(ball.angularVelocity, 0, "rotationEnabled=false should start at angularVelocity=0");
+    ball.angularVelocity = 5;
+    const sim = new BattleSimulation(
+        [
+            { ...spec, id: "t1" },
+            { ...spec, id: "t2", rotationEnabled: true }
+        ],
+        { onLog() {}, onSound() {} }
+    );
+    const disabledBall = sim.fighters[0];
+    disabledBall.angularVelocity = 3;
+    disabledBall._accumulatedTorque = 100;
+    disabledBall._accumulatedAngularImpulse = 50;
+    disabledBall.update(0.5, sim);
+    assert.equal(disabledBall.angle, 0, "rotationEnabled=false should not integrate rotation");
+    assert.equal(disabledBall._accumulatedTorque, 0, "rotationEnabled=false should clear torque");
+    assert.equal(disabledBall._accumulatedAngularImpulse, 0, "rotationEnabled=false should clear angular impulse");
+}
+
+function testCircleEquipmentRotatesWithFace() {
+    const ctx = makeRecordingCanvasContext();
+    const spec = {
+        id: "test-eq",
+        name: "EqRot",
+        teamId: "t",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 30, mass: 10 },
+        color: "#ff8800",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash"
+    };
+    const ball = new BattleBall(spec, new Vector2(400, 300));
+    ball.radius = 30;
+    ball.angle = 1.5;
+    ball.equipment.items = [{ slot: "weapon", draw: "weapon", rarity: "common", name: "TestSpear", enhanceLevel: 0 }];
+    ball.draw(ctx);
+    // face rotation(1.5) + 장비 그리기 전에 rotate(1.5) 호출이 있어야 함
+    const rotateCalls = ctx.calls.filter((c) => c[0] === "rotate" && Math.abs(c[1] - 1.5) < 0.01);
+    assert.ok(rotateCalls.length >= 2, "equipment + face should both rotate with body angle");
+}
+
+function testWallSlamSpinPreserved() {
+    // rotation enabled: face rotation = angle + spinRotation
+    // rotation disabled: face rotation = spinRotation only (original behavior)
+    const spec = {
+        id: "test-ws",
+        name: "WS",
+        teamId: "t",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 30, mass: 10 },
+        color: "#ff8800",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash"
+    };
+    const ctxOn = makeRecordingCanvasContext();
+    const ballOn = new BattleBall(spec, new Vector2(200, 200));
+    ballOn.radius = 30;
+    ballOn.angle = 0.8;
+    ballOn.display.spinRotation = 2.0;
+    ballOn.state.wallSlam = { tick() {}, onWallBounce() {} };
+    ballOn.draw(ctxOn);
+    // face should compose angle + spinRotation = 2.8
+    const rotOn = ctxOn.calls.filter((c) => c[0] === "rotate" && Math.abs(c[1] - 2.8) < 0.05);
+    assert.ok(rotOn.length >= 1, "rotation enabled should compose angle + spinRotation");
+
+    const ctxOff = makeRecordingCanvasContext();
+    const ballOff = new BattleBall({ ...spec, rotationEnabled: false }, new Vector2(300, 200));
+    ballOff.radius = 30;
+    ballOff.angle = 0;
+    ballOff.display.spinRotation = 2.0;
+    ballOff.state.wallSlam = { tick() {}, onWallBounce() {} };
+    ballOff.draw(ctxOff);
+    // rotation disabled: face uses only spinRotation
+    const rotOff = ctxOff.calls.filter((c) => c[0] === "rotate" && Math.abs(c[1] - 2.0) < 0.05);
+    assert.ok(rotOff.length >= 1, "rotation disabled should still show wallSlam spin");
+}
+
+function testPolygonAppearanceAnglePriority() {
+    // appearance.angle/angularVelocity should still be used for polygon mobs
+    const spec = {
+        id: "test-poly-app",
+        name: "PolyApp",
+        teamId: "t",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 30, mass: 10 },
+        color: "#ff0000",
+        appearance: { sides: 5, angle: 0.7, angularVelocity: 1.5, face: "default" },
+        ability: "dash"
+    };
+    const ball = new BattleBall(spec, new Vector2(300, 300));
+    assert.ok(Math.abs(ball.angle - 0.7) < 0.01, "polygon should use appearance.angle");
+    assert.ok(Math.abs(ball.angularVelocity - 1.5) < 0.01, "polygon should use appearance.angularVelocity");
 }
 
 console.log("[mob-rotation-visibility] ok");
@@ -6385,6 +6491,10 @@ testMultipleTorqueSameFrame();
 await testPolygonUpdateIntegratesRotation(app);
 await testCollisionProducesAngularImpulse(app);
 await testCollisionAngularImpulseChangesVelocity(app);
+await testCircleRotationDisabled(app);
+testCircleEquipmentRotatesWithFace();
+testWallSlamSpinPreserved();
+testPolygonAppearanceAnglePriority();
 testRingBufferPushAndOrder();
 testRingBufferCapacityOverflow();
 testRingBufferToArrayIsCopy();
