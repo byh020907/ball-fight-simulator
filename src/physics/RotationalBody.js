@@ -1,8 +1,11 @@
 /**
- * RotationalBody mixin — 회전 물리 (torque accumulator 기반).
+ * RotationalBody mixin — 회전 물리 (torque/impulse accumulator 기반).
  *
  * 선형 물리 흐름: force → acceleration → velocity → position
  * 회전 물리 흐름: torque → angularAcceleration → angularVelocity → angle
+ *
+ * applyAngularImpulse(value)는 각운동량 L을 누적합니다.
+ * integrateRotation에서 Δω = L * I⁻¹ 로 angularVelocity에 반영됩니다.
  *
  * 사용법:
  *   import mixins, { RotationalBody } from "./physics/index.js";
@@ -13,12 +16,12 @@
  *   this.angularVelocity          — 각속도 (rad/s)
  *   this.angularDamping           — 감쇠 계수 (0~1, 기본 0.98)
  *   this._accumulatedTorque       — 프레임 누적 torque (integrate 시 초기화)
- *   this._accumulatedAngularImpulse — 프레임 누적 angular impulse (integrate 시 초기화)
+ *   this._accumulatedAngularImpulse — 프레임 누적 angular impulse L (integrate 시 초기화)
  *   this._inverseMomentOfInertia  — 1 / (0.5 * mass * radius^2)
  *
  *   _computeMomentOfInertia()     — mass, radius 기반 MOI 갱신
  *   applyTorque(value)            — torque 누적 (angularVelocity 직접 수정 금지)
- *   applyAngularImpulse(value)    — angular impulse 누적
+ *   applyAngularImpulse(value)    — angular impulse L 누적
  *   clearAngularForces()          — 누적값 초기화
  *   integrateRotation(delta)      — torque→accel→velocity→angle 적분 + 누적 초기화
  */
@@ -65,9 +68,9 @@ export default function RotationalBody(Base) {
          * 회전 적분 (매 프레임 update에서 호출).
          *
          * 흐름:
-         *   1. _computeMomentOfInertia() — mass/radius 반영
+         *   1. _computeMomentOfInertia() — mass/radius 기반 I⁻¹ 갱신
          *   2. torque → angularAcceleration → angularVelocity
-         *   3. angular impulse → angularVelocity
+         *   3. angular impulse L → Δω = L * I⁻¹ → angularVelocity
          *   4. angularVelocity *= angularDamping
          *   5. angularVelocity → angle
          *   6. clearAngularForces() — 누적 초기화
@@ -82,8 +85,8 @@ export default function RotationalBody(Base) {
             // 2. angularAcceleration → angularVelocity
             this.angularVelocity += angularAccel * delta;
 
-            // 3. angular impulse 적용 (충돌 등)
-            this.angularVelocity += this._accumulatedAngularImpulse;
+            // 3. angular impulse L → Δω = L * I⁻¹ (질량/반경이 클수록 회전 변화 적음)
+            this.angularVelocity += this._accumulatedAngularImpulse * this._inverseMomentOfInertia;
 
             // 4. damping (폭주 방지)
             const dampFactor = Math.max(0, Math.min(1, this.angularDamping));

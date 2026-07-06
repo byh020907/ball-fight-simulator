@@ -304,8 +304,16 @@ export class BattleSimulation extends Simulation {
 
         const aModifiers = a.getStatModifiers();
         const bModifiers = b.getStatModifiers();
+
+        // 충돌 전 relative velocity — 선형 impulse 적용 전에 계산하여 angular response에 전달
+        const preCollisionVel = Vector2.subtract(b.velocity, a.velocity);
+        const preCollisionVelAlongNormal = preCollisionVel.dot(normal);
+
+        // 선형/회전 물리 반응은 적대/비적대 관계와 무관하게 동일하게 적용
+        this._applyCollisionPhysics(a, b, normal, aModifiers, bModifiers);
+        this._applyAngularCollisionResponse(a, b, normal, result.contactPoint, preCollisionVelAlongNormal);
+
         if (!this.isHostile(a, b)) {
-            this._applyCollisionPhysics(a, b, normal, aModifiers, bModifiers);
             return;
         }
 
@@ -324,12 +332,6 @@ export class BattleSimulation extends Simulation {
 
         if (damageFromBToA > 0) a.takeDamage(damageFromBToA, b, "Crash");
         if (damageFromAToB > 0) b.takeDamage(damageFromAToB, a, "Crash");
-
-        const preCollisionVel = Vector2.subtract(b.velocity, a.velocity);
-        const preCollisionVelAlongNormal = preCollisionVel.dot(normal);
-
-        this._applyCollisionPhysics(a, b, normal, aModifiers, bModifiers);
-        this._applyAngularCollisionResponse(a, b, normal, result.contactPoint, preCollisionVelAlongNormal);
         this._handleDashCollisions(a, b);
 
         a.ability?.onCollision(b);

@@ -269,6 +269,16 @@ class WallSlamEffect {
 - `Simulation`은 벽 충돌 이벤트를 effect에 전달합니다.
 - `BattleBall`은 effect의 `tick()`을 호출하고, effect 내부 계산을 직접 소유하지 않습니다.
 
+### polygon-polygon 접촉점 계산
+
+polygon-polygon 충돌의 접촉점(`contactPoint`)은 SAT 기반 접촉 후보 수집으로 계산합니다:
+1. **A의 world vertex 중 B 내부/경계에 있는 점**
+2. **B의 world vertex 중 A 내부/경계에 있는 점**
+3. **edge-edge segment 교차점**
+
+위 후보들의 평균을 contactPoint로 사용하고, 후보가 없을 때만 center midpoint로 fallback합니다.
+circle-polygon은 `_closestPoint`(최근접 polygon vertex)를 우선하고, 없을 때 circle surface point를 사용합니다.
+
 ### 충돌 물리 / 이동 속도 소유권
 
 전투 볼의 `velocity`는 **충돌 impulse와 기본 이동 목표가 섞인 실제 속도**입니다. 특정 능력이나 액션이 매 틱 `velocity`를 직접 덮어써서 충돌 결과를 지우면, 볼이 겹친 상태에서 매 프레임 충돌 피해가 반복되는 문제가 생깁니다.
@@ -281,6 +291,7 @@ Ability / Action / Effect: 목표 방향, 목표 속도, movementEffect, forceHe
 
 - 볼끼리 충돌한 뒤 튕겨 나가는 힘은 `BattleSimulation._applyCollisionPhysics()`가 소유합니다.
 - 충돌 회전 impulse는 `BattleSimulation._applyAngularCollisionResponse()`가 소유하며, 충돌 전 접근 속도(`preCollisionVelAlongNormal`) 기준으로 계산합니다. 선형 impulse 적용 후의 velocity로 재계산하지 않습니다.
+- `applyAngularImpulse(value)`는 각운동량 L(angular impulse)을 `_accumulatedAngularImpulse`에 누적합니다. `integrateRotation(delta)`에서 `Δω = L * I⁻¹`로 angularVelocity에 반영되며, I⁻¹는 `0.5 * mass * radius²`의 solid disk 관성 모멘트 역수입니다. 같은 angular impulse라도 mass/radius가 큰 객체는 angularVelocity 변화가 작습니다.
 - `BattleBall.update()`는 `velocity`를 즉시 목표 속도로 교체하지 않고, `_computeDesiredVelocity()` 결과와 현재 속도의 차이를 `applyImpulse()`로 보정합니다.
 - `forceHeading()`은 방향 고정만 소유하고, 고정 속도(`overrideVelocity`)를 소유하지 않습니다.
 - `applyKnockback()`은 넉백 impulse를 즉시 더하고, duration 동안 방향만 고정합니다.

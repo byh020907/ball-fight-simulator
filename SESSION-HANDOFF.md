@@ -1,5 +1,12 @@
 # 결정 기록
 
+## [L1] 2026-07-06 — 충돌 회전 물리를 관성 기반 impulse 흐름에 맞춤
+- 맥락: (1) `applyAngularImpulse(value)`가 angular impulse L을 angularVelocity에 직접 더해 관성(inertia)을 무시. (2) 비적대(friendly) 충돌에서 angular collision response가 빠져 아군끼리 충돌해도 회전이 전혀 발생하지 않음. (3) polygon-polygon contactPoint가 단순 중심 중점(center midpoint) 근사여서 충돌 회전 방향이 부정확.
+- 결정: (1) `integrateRotation`에서 `Δω = L * I⁻¹`로 반영 — solid disk I = 0.5mr². (2) `handleFighterCollision`에서 pre-collision velocity를 미리 계산하고, 선형/회전 물리 반응을 hostile 여부와 무관하게 항상 적용 (damaqe/ability hooks는 hostile 전용 유지). (3) `_computePolygonContactPoint` 신설 — A vertex in B, B vertex in A, edge-edge 교차점 수집 후 평균, fallback=midpoint. (4) circle-polygon fallback을 center midpoint → circle surface point로 개선. (5) MOI weighting, non-hostile angular, polygon contactPoint 테스트 추가/갱신.
+- 영향: `src/physics/RotationalBody.js`, `src/physics/CollisionShape.js`, `src/simulation/battleSimulation.js`, `tests/regression.mjs`, `docs/development-rules.md`, `docs/hunting-grounds-system.md`, `SESSION-HANDOFF.md`
+- 검증: `npm test` (13개 스위트), `npm run format:check`, `npm run check`, `node scripts/huntingUserScenario.mjs` 통과
+- 미검증: 브라우저에서 동일 팀 polygon 충돌 회전 육안 확인
+
 ## [L1] 2026-07-06 — 충돌 회전 impulse가 각속도에 반영되도록 수정
 - 맥락: Codex 사전 확인 결과 `handleFighterCollision()`에서 `_applyCollisionPhysics()`가 먼저 velocity를 반사시킨 후, `_applyAngularCollisionResponse()`가 재계산한 `velAlongNormal >= 0`이 되어 angular response가 항상 early return. 즉 충돌 angular impulse이 단 한 번도 angularVelocity에 반영되지 않던 버그.
 - 결정: (1) `_applyCollisionPhysics()` 호출 전에 충돌 전 relative velocity와 velAlongNormal을 미리 계산. (2) 이 pre-collision 값을 `_applyAngularCollisionResponse()`에 전달해 선형 impulse 적용 후에도 올바른 접근 속도 기준으로 회전 impulse 계산. (3) 기존 테스트 `testCollisionProducesAngularImpulse`를 강화 — 비중심 충돌에서 `_accumulatedAngularImpulse` 변화 검증. (4) 신규 `testCollisionAngularImpulseChangesVelocity` — polygon-polygon 비중심 충돌 후 `update()` → `integrateRotation()`까지 거쳐 `angularVelocity`가 실제로 변하는지 검증.

@@ -238,10 +238,7 @@ export function resolveFighterShapeCollision(a, b) {
         if (result.normal && result.overlap > 0) {
             result.separationOverlap = _computeSeparationOverlap(shapeA, shapeB, result.normal, result.overlap);
             result.separationVec = _computeSeparationVector(shapeA, shapeB, result.separationOverlap, result.normal);
-            result.contactPoint = result._closestPoint ?? {
-                x: (shapeA.x + shapeB.x) / 2,
-                y: (shapeA.y + shapeB.y) / 2
-            };
+            result.contactPoint = result._closestPoint ?? _computeCirclePolyContactFallback(shapeA, result.normal);
         } else {
             result.separationOverlap = 0;
             result.separationVec = null;
@@ -254,10 +251,8 @@ export function resolveFighterShapeCollision(a, b) {
             result.normal = result.normal.clone().scale(-1);
             result.separationOverlap = _computeSeparationOverlap(shapeA, shapeB, result.normal, result.overlap);
             result.separationVec = _computeSeparationVector(shapeA, shapeB, result.separationOverlap, result.normal);
-            result.contactPoint = result._closestPoint ?? {
-                x: (shapeA.x + shapeB.x) / 2,
-                y: (shapeA.y + shapeB.y) / 2
-            };
+            result.contactPoint =
+                result._closestPoint ?? _computeCirclePolyContactFallback(shapeB, result.normal.clone().scale(-1));
         } else {
             result.separationOverlap = 0;
             result.separationVec = null;
@@ -269,7 +264,7 @@ export function resolveFighterShapeCollision(a, b) {
     if (result.normal && result.overlap > 0) {
         result.separationOverlap = _computeSeparationOverlap(shapeA, shapeB, result.normal, result.overlap);
         result.separationVec = _computeSeparationVector(shapeA, shapeB, result.separationOverlap, result.normal);
-        result.contactPoint = { x: (shapeA.x + shapeB.x) / 2, y: (shapeA.y + shapeB.y) / 2 };
+        result.contactPoint = _computePolygonContactPoint(shapeA, shapeB);
     } else {
         result.separationOverlap = 0;
         result.separationVec = null;
@@ -305,6 +300,103 @@ function _computeSeparationOverlap(shapeA, shapeB, normal, satOverlap) {
  */
 function _computeSeparationVector(shapeA, shapeB, separationOverlap, normal) {
     return { x: normal.x * separationOverlap, y: normal.y * separationOverlap };
+}
+
+/**
+ * 두 convex polygon의 SAT 기반 접촉 후보를 수집하여 평균 contactPoint를 반환합니다.
+ * 후보 = A의 vertex 중 B 내부/경계 점 + B의 vertex 중 A 내부/경계 점 + edge-edge 교차점.
+ * 후보가 없으면 center midpoint fallback.
+ */
+function _computePolygonContactPoint(shapeA, shapeB) {
+    const candidates = [];
+
+    const ptsA = shapeA.worldPoints;
+    const ptsB = shapeB.worldPoints;
+
+    // 1. A의 vertex 중 B 내부/경계에 있는 점
+    for (const p of ptsA) {
+        if (pointInConvexPolygon(p, ptsB)) {
+            candidates.push({ x: p.x, y: p.y });
+        }
+    }
+
+    // 2. B의 vertex 중 A 내부/경계에 있는 점
+    for (const p of ptsB) {
+        if (pointInConvexPolygon(p, ptsA)) {
+            candidates.push({ x: p.x, y: p.y });
+        }
+    }
+
+    // 3. edge-edge 교차점
+    for (let i = 0; i < ptsA.length; i++) {
+        const a1 = ptsA[i];
+        const a2 = ptsA[(i + 1) % ptsA.length];
+        for (let j = 0; j < ptsB.length; j++) {
+            const b1 = ptsB[j];
+            const b2 = ptsB[(j + 1) % ptsB.length];
+            const ip = _segmentIntersection(a1, a2, b1, b2);
+            if (ip) {
+                candidates.push(ip);
+            }
+        }
+    }
+
+    if (candidates.length > 0) {
+        let sumX = 0;
+        let sumY = 0;
+        for (const c of candidates) {
+            sumX += c.x;
+            sumY += c.y;
+        }
+        const avgX = sumX / candidates.length;
+        const avgY = sumY / candidates.length;
+        if (Number.isFinite(avgX) && Number.isFinite(avgY)) {
+            return { x: avgX, y: avgY };
+        }
+    }
+
+    // fallback: center midpoint
+    return { x: (shapeA.x + shapeB.x) / 2, y: (shapeA.y + shapeB.y) / 2 };
+}
+
+/**
+ * circle-polygon 충돌의 fallback contactPoint.
+ * SAT 정상에서 _closestPoint가 없을 때 circle surface point를 반환합니다.
+ * @param {{ x: number, y: number, radius: number }} circleShape
+ * @param {{ x: number, y: number }} normal — circle → polygon 방향
+ * @returns {{ x: number, y: number }}
+ */
+function _computeCirclePolyContactFallback(circleShape, normal) {
+    const len = Math.sqrt(normal.x * normal.x + normal.y * normal.y);
+    if (len < 1e-10) return { x: circleShape.x, y: circleShape.y };
+    const nx = normal.x / len;
+    const ny = normal.y / len;
+    return {
+        x: circleShape.x - nx * circleShape.radius,
+        y: circleShape.y - ny * circleShape.radius
+    };
+}
+
+/**
+ * 두 선분 (p1→p2)와 (p3→p4)의 교차점을 반환합니다.
+ * 교차하지 않으면 null을 반환합니다.
+ */
+function _segmentIntersection(p1, p2, p3, p4) {
+    const d1x = p2.x - p1.x;
+    const d1y = p2.y - p1.y;
+    const d2x = p4.x - p3.x;
+    const d2y = p4.y - p3.y;
+
+    const denom = d1x * d2y - d1y * d2x;
+    if (Math.abs(denom) < 1e-10) return null; // parallel
+
+    const t = ((p3.x - p1.x) * d2y - (p3.y - p1.y) * d2x) / denom;
+    const u = ((p3.x - p1.x) * d1y - (p3.y - p1.y) * d1x) / denom;
+
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+        return { x: p1.x + t * d1x, y: p1.y + t * d1y };
+    }
+    return null;
 }
 
 /** circle vs circle — 기존 radius overlap 계산과 동일 */

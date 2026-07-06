@@ -2315,10 +2315,13 @@ function testHuntingTerrain() {
     assert.ok(moveToCalls.length > 0, "Renderer should draw polygon obstacles with moveTo");
     assert.ok(lineToCalls.length > 0, "Renderer should draw polygon obstacles with lineTo");
 
-    // ── RotationalBody mixin (torque accumulator 기반) ──
+    // ── RotationalBody mixin (torque/impulse accumulator + MOI 기반) ──
     class Dummy {}
     const SpinningDummy = RotationalBody(Dummy);
     const spinner = new SpinningDummy();
+    spinner.mass = 2;
+    spinner.radius = 5;
+    // solid disk: I = 0.5*2*25 = 25, inverse = 0.04
     assert.equal(spinner.angle, 0, "RotationalBody should start at angle 0");
     assert.equal(spinner.angularVelocity, 0, "RotationalBody should start at angularVelocity 0");
     assert.equal(spinner.angularDamping, 0.98, "RotationalBody should default angularDamping to 0.98");
@@ -2330,14 +2333,14 @@ function testHuntingTerrain() {
     assert.equal(spinner.angularVelocity, 0, "applyAngularImpulse should NOT immediately change angularVelocity");
     assert.equal(spinner._accumulatedAngularImpulse, 3, "applyAngularImpulse should accumulate");
 
-    // integrateRotation: 누적 impulse → velocity → angle
+    // integrateRotation: 누적 impulse L → Δω = L * I⁻¹ → velocity → angle
     spinner.integrateRotation(0.5);
-    // angularVelocity += 3, damping 0.98 → 2.94, angle += 2.94*0.5 = 1.47
+    // Δω = 3 * 0.04 = 0.12, damping 0.98 → 0.1176, angle = 0.1176 * 0.5 = 0.0588
     assert.ok(
-        Math.abs(spinner.angularVelocity - 2.94) < 0.01,
-        "integrateRotation should apply accumulated impulse to velocity"
+        Math.abs(spinner.angularVelocity - 0.1176) < 0.001,
+        "integrateRotation should apply L * I⁻¹ to velocity (mass=2, radius=5)"
     );
-    assert.ok(Math.abs(spinner.angle - 1.47) < 0.01, "integrateRotation should advance angle");
+    assert.ok(Math.abs(spinner.angle - 0.0588) < 0.001, "integrateRotation should advance angle");
     // integrate 후 누적 초기화 확인
     assert.equal(spinner._accumulatedAngularImpulse, 0, "accumulated impulse should clear after integrate");
     assert.equal(spinner._accumulatedTorque, 0, "accumulated torque should clear after integrate");
@@ -2350,14 +2353,14 @@ function testHuntingTerrain() {
 
     // torque 누적 초기화 후 damping 테스트
     spinner.clearAngularForces();
-    spinner.angularVelocity = 2.94; // 첫 integrate 이후 상태로 리셋
-    spinner.angle = 1.47;
+    spinner.angularVelocity = 0.1176; // 첫 integrate 이후 상태로 리셋
+    spinner.angle = 0.0588;
 
     // damping 적용 테스트
     spinner.angularDamping = 0.5;
     spinner.integrateRotation(1);
-    // velocity=2.94, damping=0.5 → 1.47, angle=1.47+1.47=2.94
-    assert.ok(Math.abs(spinner.angle - 2.94) < 0.02, "angularDamping should reduce angularVelocity");
+    // velocity=0.1176, damping=0.5 → 0.0588, angle=0.0588+0.0588=0.1176
+    assert.ok(Math.abs(spinner.angle - 0.1176) < 0.001, "angularDamping should reduce angularVelocity");
 
     // _computeMomentOfInertia 테스트
     spinner.mass = 4;
@@ -2375,6 +2378,37 @@ function testHuntingTerrain() {
     spinner.clearAngularForces();
     assert.equal(spinner._accumulatedTorque, 0, "clearAngularForces should reset torque");
     assert.equal(spinner._accumulatedAngularImpulse, 0, "clearAngularForces should reset impulse");
+
+    // ── MOI weighting test: 같은 angular impulse라도 mass/radius가 크면 angularVelocity 변화가 작음 ──
+    class Dummy2 {}
+    const SpinnerLight = RotationalBody(Dummy2);
+    const light = new SpinnerLight();
+    light.mass = 1;
+    light.radius = 5;
+    // I = 0.5*1*25 = 12.5, inverse = 0.08
+
+    class Dummy3 {}
+    const SpinnerHeavy = RotationalBody(Dummy3);
+    const heavy = new SpinnerHeavy();
+    heavy.mass = 4;
+    heavy.radius = 10;
+    // I = 0.5*4*100 = 200, inverse = 0.005
+
+    light.applyAngularImpulse(10);
+    heavy.applyAngularImpulse(10);
+    light.integrateRotation(1);
+    heavy.integrateRotation(1);
+    // light: Δω = 10 * 0.08 = 0.8, damping 0.98 → 0.784
+    // heavy: Δω = 10 * 0.005 = 0.05, damping 0.98 → 0.049
+    assert.ok(
+        Math.abs(light.angularVelocity - 0.784) < 0.001,
+        "light object should have larger angularVelocity change (I⁻¹=0.08)"
+    );
+    assert.ok(
+        Math.abs(heavy.angularVelocity - 0.049) < 0.001,
+        "heavy object should have smaller angularVelocity change (I⁻¹=0.005)"
+    );
+    assert.ok(light.angularVelocity > heavy.angularVelocity, "same angular impulse → lighter object spins faster");
 
     // ── terrain draw wraps ctx state with save/restore ──
     const leakCtx = makeRecordingCanvasContext();
@@ -3269,11 +3303,11 @@ function testMultipleTorqueSameFrame() {
     s.applyAngularImpulse(3);
     s.integrateRotation(1.0);
     // angularAccel = 100*0.01 = 1 → velocity += 1
-    // velocity += 3 (impulse)
-    // velocity = 2.45 + 1 + 3 = 6.45 → damping 0.98 → 6.321
-    // angle = 2.45 + 6.321 = 8.771
-    assert.ok(Math.abs(s.angularVelocity - 6.321) < 0.1, "torque + impulse should both contribute to velocity");
-    assert.ok(Math.abs(s.angle - 8.771) < 0.1, "combined torque and impulse should integrate correctly");
+    // impulse L = 3 → Δω = 3 * 0.01 = 0.03
+    // velocity = 2.45 + 1 + 0.03 = 3.48 → damping 0.98 → 3.4104
+    // angle = 2.45 + 3.4104 = 5.8604
+    assert.ok(Math.abs(s.angularVelocity - 3.4104) < 0.02, "torque + impulse should both contribute to velocity");
+    assert.ok(Math.abs(s.angle - 5.8604) < 0.02, "combined torque and impulse should integrate correctly");
 }
 
 async function testPolygonUpdateIntegratesRotation(app) {
@@ -3369,9 +3403,9 @@ async function testCollisionAngularImpulseChangesVelocity(app) {
     const sim = new BattleSimulation([specA, specB], { onLog() {}, onSound() {} });
     const [a, b] = sim.fighters;
 
-    // 큰 Y offset으로 비중심 충돌 보장
-    a.position = new Vector2(480, 455);
-    b.position = new Vector2(480, 505);
+    // 큰 Y offset으로 비중심 충돌 보장 (polygon SAT 감지 범위 내)
+    a.position = new Vector2(480, 468);
+    b.position = new Vector2(480, 498);
     a.angle = 0;
     b.angle = 0;
     a.applyImpulse(Vector2.subtract(new Vector2(0, 500), a.velocity));
@@ -3405,6 +3439,129 @@ async function testCollisionAngularImpulseChangesVelocity(app) {
         "off-center polygon collision should change angularVelocity after integrateRotation"
     );
     assert.ok(Number.isFinite(a._accumulatedAngularImpulse), "angular impulse should clear properly");
+}
+
+async function testNonHostileCollisionProducesAngularImpulse(app) {
+    // 아군(같은 팀) 충돌에서도 angular impulse가 누적되고 update 후 angularVelocity가 변하는지 검증
+    const specA = {
+        id: "ally-a",
+        name: "AllyA",
+        teamId: "same-team",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#ff0000",
+        appearance: { sides: 6, face: "default" },
+        ability: "dash"
+    };
+    const specB = {
+        id: "ally-b",
+        name: "AllyB",
+        teamId: "same-team",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#0000ff",
+        appearance: { sides: 5, face: "default" },
+        ability: "dash"
+    };
+    const sim = new BattleSimulation([specA, specB], { onLog() {}, onSound() {} });
+    const [a, b] = sim.fighters;
+    // 같은 팀인지 확인
+    assert.equal(a.teamId, b.teamId, "both fighters should be on the same team");
+    assert.equal(sim.isHostile(a, b), false, "same team should not be hostile");
+
+    // 비중심 충돌 (polygon SAT가 감지하도록 충분히 가깝게)
+    a.position = new Vector2(480, 468);
+    b.position = new Vector2(480, 498);
+    a.angle = 0;
+    b.angle = 0;
+    a.applyImpulse(Vector2.subtract(new Vector2(0, 500), a.velocity));
+    b.applyImpulse(Vector2.subtract(new Vector2(0, -400), b.velocity));
+
+    const aIncBefore = a._accumulatedAngularImpulse;
+    const bIncBefore = b._accumulatedAngularImpulse;
+    const aVelBefore = a.angularVelocity;
+    const bVelBefore = b.angularVelocity;
+
+    sim.handleCollision();
+
+    // 아군 충돌에서도 angular impulse가 누적되어야 함
+    const aIncAfter = a._accumulatedAngularImpulse;
+    const bIncAfter = b._accumulatedAngularImpulse;
+    const impulseChanged = aIncAfter !== aIncBefore || bIncAfter !== bIncBefore;
+    assert.ok(impulseChanged, "non-hostile collision should still accumulate angular impulse");
+
+    // update → integrateRotation
+    a.update(0.016, sim);
+    b.update(0.016, sim);
+
+    const aVelAfter = a.angularVelocity;
+    const bVelAfter = b.angularVelocity;
+    const velChanged = Math.abs(aVelAfter - aVelBefore) > 0.0001 || Math.abs(bVelAfter - bVelBefore) > 0.0001;
+    assert.ok(velChanged, "non-hostile collision should change angularVelocity after integrateRotation");
+    assert.ok(Number.isFinite(aVelAfter) && Number.isFinite(bVelAfter), "angular velocity should stay finite");
+}
+
+function testPolygonContactPointAsymmetric() {
+    // polygon-polygon 비대칭 배치에서 contactPoint가 단순 center midpoint가 아닌지 검증
+    // SAT 기반 접촉 후보가 실제 교차 영역을 반영하도록
+    const shapeA = {
+        type: "polygon",
+        x: 400,
+        y: 400,
+        radius: 40,
+        angle: 0,
+        points: [
+            { x: -40, y: -40 },
+            { x: 40, y: -40 },
+            { x: 40, y: 40 },
+            { x: -40, y: 40 }
+        ]
+    };
+    const shapeB = {
+        type: "polygon",
+        x: 440,
+        y: 400,
+        radius: 40,
+        angle: 0,
+        points: [
+            { x: -40, y: -40 },
+            { x: 40, y: -40 },
+            { x: 40, y: 40 },
+            { x: -40, y: 40 }
+        ]
+    };
+    shapeA.worldPoints = getWorldPolygonPoints(shapeA);
+    shapeB.worldPoints = getWorldPolygonPoints(shapeB);
+
+    const midpoint = { x: (shapeA.x + shapeB.x) / 2, y: (shapeA.y + shapeB.y) / 2 };
+
+    // _resolvePolygonPolygon 호출하여 contactPoint 확인
+    // resolveFighterShapeCollision 사용
+    // 먼저 정사각형 충돌 테스트 (단순)
+    const a = { position: { x: 400, y: 400 }, radius: 40, angle: 0, appearance: { sides: 4 }, mass: 10 };
+    const b = { position: { x: 430, y: 400 }, radius: 40, angle: 0, appearance: { sides: 4 }, mass: 10 };
+    const result1 = resolveFighterShapeCollision(a, b);
+    assert.ok(result1.normal !== null, "overlapping squares should collide");
+    assert.ok(result1.contactPoint !== undefined, "contactPoint should exist");
+    assert.ok(Number.isFinite(result1.contactPoint.x), "contactPoint.x should be finite");
+    assert.ok(Number.isFinite(result1.contactPoint.y), "contactPoint.y should be finite");
+    // 대칭 배치에서는 midpoint와 가까워야 함
+    assert.ok(
+        Math.abs(result1.contactPoint.x - (400 + 430) / 2) < 10,
+        "symmetric overlap contactPoint should be near center midpoint"
+    );
+
+    // 비대칭 배치: shapeA는 회전, shapeB는 정방향 → SAT 접촉 후보가 midpoint와 다른 지점을 반환
+    const c = { position: { x: 400, y: 370 }, radius: 40, angle: Math.PI / 8, appearance: { sides: 4 }, mass: 10 };
+    const d = { position: { x: 420, y: 400 }, radius: 40, angle: 0, appearance: { sides: 4 }, mass: 10 };
+    const result2 = resolveFighterShapeCollision(c, d);
+    assert.ok(result2.normal !== null, "asymmetric polygons should collide");
+    assert.ok(result2.contactPoint !== undefined, "contactPoint should exist for asymmetric");
+    assert.ok(Number.isFinite(result2.contactPoint.x), "asymmetric contactPoint.x should be finite");
+    assert.ok(Number.isFinite(result2.contactPoint.y), "asymmetric contactPoint.y should be finite");
+    const asymMidpoint = { x: (400 + 420) / 2, y: (370 + 400) / 2 };
+    // SAT 기반 접촉 후보로 계산된 contactPoint는 shape 간 실제 교차 영역을 반영하므로 midpoint와 달라야 함
+    const diffX = Math.abs(result2.contactPoint.x - asymMidpoint.x);
+    const diffY = Math.abs(result2.contactPoint.y - asymMidpoint.y);
+    assert.ok(diffX > 0.5 || diffY > 0.5, "rotated polygon contactPoint should differ from center midpoint");
 }
 
 console.log("[fighter-collision] ok");
@@ -6491,6 +6648,8 @@ testMultipleTorqueSameFrame();
 await testPolygonUpdateIntegratesRotation(app);
 await testCollisionProducesAngularImpulse(app);
 await testCollisionAngularImpulseChangesVelocity(app);
+await testNonHostileCollisionProducesAngularImpulse(app);
+testPolygonContactPointAsymmetric();
 await testCircleRotationDisabled(app);
 testCircleEquipmentRotatesWithFace();
 testWallSlamSpinPreserved();
