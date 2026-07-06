@@ -13,3 +13,8 @@ export {
     getFighterCollisionShape,
     resolveFighterShapeCollision
 } from "./CollisionShape.js";
+export {
+    applyCollisionAngularImpulse,
+    applyCollisionResponse,
+    applyDynamicCollisionResponse
+} from "./collisionResponse.js";

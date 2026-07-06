@@ -13,7 +13,7 @@ import {
     ActionWhiffEffect
 } from "../effects/index.js";
 import { resolveTerrainCollisions } from "../terrain/terrainCollision.js";
-import { applyStaticAngularImpulse } from "../physics/staticCollisionResponse.js";
+import { applyCollisionAngularImpulse } from "../physics/collisionResponse.js";
 
 /**
  * Base simulation — arena boundaries, wall bouncing, effect spawning.
@@ -81,7 +81,7 @@ export class Simulation {
             const preVel = { x: entity.velocity.x, y: entity.velocity.y };
             this._matchVelocity(entity, new Vector2(Math.abs(entity.velocity.x), entity.velocity.y));
             if (entity.state?.movement) this._handleWallBounce(entity);
-            applyStaticAngularImpulse(entity, new Vector2(1, 0), { x: 0, y: entity.position.y }, preVel);
+            this._applyWallAngularImpulse(preVel, entity, { x: 1, y: 0 }, { x: 0, y: entity.position.y });
             return new Vector2(1, 0);
         }
         if (entity.position.x >= this.width - entity.radius) {
@@ -89,7 +89,7 @@ export class Simulation {
             const preVel = { x: entity.velocity.x, y: entity.velocity.y };
             this._matchVelocity(entity, new Vector2(-Math.abs(entity.velocity.x), entity.velocity.y));
             if (entity.state?.movement) this._handleWallBounce(entity);
-            applyStaticAngularImpulse(entity, new Vector2(-1, 0), { x: this.width, y: entity.position.y }, preVel);
+            this._applyWallAngularImpulse(preVel, entity, { x: -1, y: 0 }, { x: this.width, y: entity.position.y });
             return new Vector2(-1, 0);
         }
         return null;
@@ -102,7 +102,7 @@ export class Simulation {
             const preVel = { x: entity.velocity.x, y: entity.velocity.y };
             this._matchVelocity(entity, new Vector2(entity.velocity.x, Math.abs(entity.velocity.y)));
             if (entity.state?.movement) this._handleWallBounce(entity);
-            applyStaticAngularImpulse(entity, new Vector2(0, 1), { x: entity.position.x, y: 0 }, preVel);
+            this._applyWallAngularImpulse(preVel, entity, { x: 0, y: 1 }, { x: entity.position.x, y: 0 });
             return new Vector2(0, 1);
         }
         if (entity.position.y >= this.height - entity.radius) {
@@ -110,10 +110,20 @@ export class Simulation {
             const preVel = { x: entity.velocity.x, y: entity.velocity.y };
             this._matchVelocity(entity, new Vector2(entity.velocity.x, -Math.abs(entity.velocity.y)));
             if (entity.state?.movement) this._handleWallBounce(entity);
-            applyStaticAngularImpulse(entity, new Vector2(0, -1), { x: entity.position.x, y: this.height }, preVel);
+            this._applyWallAngularImpulse(preVel, entity, { x: 0, y: -1 }, { x: entity.position.x, y: this.height });
             return new Vector2(0, -1);
         }
         return null;
+    }
+
+    /** 벽 충돌 angular impulse 공통 처리. */
+    _applyWallAngularImpulse(preVel, entity, normal, contactPoint) {
+        const approachSpeed = preVel.x * normal.x + preVel.y * normal.y;
+        if (approachSpeed >= 0) return;
+        const impulseMag = Math.abs(approachSpeed) * (1 + 0.92);
+        const tangent = { x: -normal.y, y: normal.x };
+        const tangentialSpeed = preVel.x * tangent.x + preVel.y * tangent.y;
+        applyCollisionAngularImpulse(entity, normal, contactPoint, impulseMag, 0.15, tangentialSpeed, 0.03);
     }
 
     _matchVelocity(entity, velocity) {

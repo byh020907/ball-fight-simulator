@@ -4,7 +4,7 @@
  * 모든 벡터 연산은 Vector2를 사용합니다.
  */
 import { Vector2 } from "../core.js";
-import { applyStaticAngularImpulse } from "./staticCollisionResponse.js";
+import { applyCollisionAngularImpulse } from "./collisionResponse.js";
 
 /**
  * local coordinates의 polygon 점 배열을 world coordinates로 변환.
@@ -85,7 +85,21 @@ export function resolvePolygonTerrainCollision(entity, terrain) {
         reflectVelocity(entity, result.nx, result.ny);
         if (result.contactPoint) {
             const normal = { x: result.nx, y: result.ny };
-            applyStaticAngularImpulse(entity, normal, result.contactPoint, preVel);
+            const approachSpeed = preVel.x * normal.x + preVel.y * normal.y;
+            if (approachSpeed < 0) {
+                const impulseMag = Math.abs(approachSpeed) * (1 + 0.92);
+                const tangent = { x: -normal.y, y: normal.x };
+                const tangentialSpeed = preVel.x * tangent.x + preVel.y * tangent.y;
+                applyCollisionAngularImpulse(
+                    entity,
+                    normal,
+                    result.contactPoint,
+                    impulseMag,
+                    0.15,
+                    tangentialSpeed,
+                    0.03
+                );
+            }
         }
         return true;
     }
@@ -142,7 +156,13 @@ export function resolvePolygonTerrainCollision(entity, terrain) {
 
     const normal = { x: bestNx, y: bestNy };
     const contactPoint = { x: bestContactX, y: bestContactY };
-    applyStaticAngularImpulse(entity, normal, contactPoint, preVel);
+    const approachSpeed = preVel.x * normal.x + preVel.y * normal.y;
+    if (approachSpeed < 0) {
+        const impulseMag = Math.abs(approachSpeed) * (1 + 0.92);
+        const tangent = { x: -normal.y, y: normal.x };
+        const tangentialSpeed = preVel.x * tangent.x + preVel.y * tangent.y;
+        applyCollisionAngularImpulse(entity, normal, contactPoint, impulseMag, 0.15, tangentialSpeed, 0.03);
+    }
     return true;
 }
 

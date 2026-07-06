@@ -93,6 +93,11 @@ import { createHuntingTerrain } from "../src/terrain/terrainFactory.js";
 import { resolveTerrainCollision, resolveTerrainCollisions } from "../src/terrain/terrainCollision.js";
 import { drawTerrain } from "../src/terrain/terrainRenderer.js";
 import { getWorldPolygonPoints } from "../src/physics/CollisionShape.js";
+import {
+    applyCollisionAngularImpulse,
+    applyCollisionResponse,
+    applyDynamicCollisionResponse
+} from "../src/physics/collisionResponse.js";
 import RotationalBody from "../src/physics/RotationalBody.js";
 import { inferArmorVariant } from "../src/entities/equipmentVisuals.js";
 import { drawEquipmentItems } from "../src/entities/equipmentVisuals.js";
@@ -6764,6 +6769,144 @@ testCollisionRecordsDebugEvent();
 testValidatePhysicsStateNoErrorOnValid();
 testValidatePhysicsStateDetectsNaN();
 testDebugBufferDoesNotThrowOnPushFailure();
+
+// ── Unified collision response module tests ──────────────────────────────
+
+function testCollisionResponseHelperAngularImpulse() {
+    const body = {
+        position: { x: 400, y: 300 },
+        angularVelocity: 0,
+        applyAngularImpulse(value) {
+            this.angularVelocity += value;
+        }
+    };
+    applyCollisionAngularImpulse(body, { x: 1, y: 0 }, { x: 380, y: 330 }, 100, 0.15);
+    assert.ok(body.angularVelocity !== 0, "applyCollisionAngularImpulse should modify angularVelocity via duck typing");
+    assert.ok(Number.isFinite(body.angularVelocity), "applyCollisionAngularImpulse should produce finite value");
+    console.log("[collision-response-angular-impulse] ok");
+}
+
+function testCollisionResponseNoApplyAngularImpulse() {
+    const body = {
+        position: { x: 400, y: 300 },
+        applyAngularImpulse: undefined
+    };
+    const result = applyCollisionAngularImpulse(body, { x: 0, y: -1 }, { x: 400, y: 340 }, 100, 0.15);
+    assert.equal(result, 0, "applyCollisionAngularImpulse should return 0 when body has no applyAngularImpulse");
+    console.log("[collision-response-no-angular] ok");
+}
+
+function testCollisionAppliesLinearImpulse() {
+    const body = {
+        position: { x: 500, y: 500 },
+        velocity: { x: -100, y: 0 },
+        applyImpulse(impulse) {
+            this.velocity.x += impulse.x;
+            this.velocity.y += impulse.y;
+        },
+        applyAngularImpulse() {}
+    };
+    applyCollisionResponse(
+        body,
+        { x: 1, y: 0 },
+        { x: 475, y: 500 },
+        { x: -100, y: 0 },
+        { restitution: 1, angularFactor: 0, tangentialFriction: 0 }
+    );
+    assert.ok(body.velocity.x > 0, "applyCollisionResponse should reverse velocity via linear impulse (restitution=1)");
+    console.log("[collision-response-linear-impulse] ok");
+}
+
+function testCollisionResponseDuckTypingDetection() {
+    const noLinear = {
+        position: { x: 300, y: 300 },
+        applyAngularImpulse() {}
+    };
+    const noAngular = {
+        position: { x: 300, y: 300 },
+        velocity: { x: -50, y: 0 },
+        applyImpulse() {}
+    };
+    const both = {
+        position: { x: 300, y: 300 },
+        velocity: { x: -50, y: 0 },
+        applyImpulse(impulse) {
+            this.lastImpulse = impulse;
+        },
+        applyAngularImpulse(value) {
+            this.lastAngular = value;
+        }
+    };
+    const neither = {
+        position: { x: 300, y: 300 }
+    };
+    // no linear impulse for body without applyImpulse
+    applyCollisionResponse(noLinear, { x: 1, y: 0 }, { x: 275, y: 300 }, { x: -50, y: 0 });
+    assert.ok(true, "applyCollisionResponse should not throw when body has no applyImpulse");
+
+    // no angular impulse for body without applyAngularImpulse
+    applyCollisionResponse(noAngular, { x: 1, y: 0 }, { x: 275, y: 300 }, { x: -50, y: 0 });
+    assert.ok(true, "applyCollisionResponse should not throw when body has no applyAngularImpulse");
+
+    // both linear and angular for full body (contact offset from center for non-zero torque)
+    applyCollisionResponse(both, { x: 1, y: 0 }, { x: 275, y: 320 }, { x: -50, y: 0 });
+    assert.ok(both.lastImpulse !== undefined, "full body should receive linear impulse");
+    assert.ok(both.lastAngular !== undefined, "full body should receive angular impulse");
+    console.log("[collision-response-duck-typing] ok");
+}
+
+function testDynamicCollisionResponsePair() {
+    const bodyA = {
+        position: { x: 350, y: 300 },
+        angularVelocity: 0,
+        applyImpulse() {},
+        applyAngularImpulse(value) {
+            this.angularVelocity += value;
+        }
+    };
+    const bodyB = {
+        position: { x: 450, y: 300 },
+        angularVelocity: 0,
+        applyImpulse() {},
+        applyAngularImpulse(value) {
+            this.angularVelocity += value;
+        }
+    };
+    applyDynamicCollisionResponse(bodyA, bodyB, { x: 1, y: 0 }, { x: 400, y: 320 }, -200);
+    assert.ok(bodyA.angularVelocity !== 0, "dynamic collision should apply angular impulse to bodyA");
+    assert.ok(bodyB.angularVelocity !== 0, "dynamic collision should apply angular impulse to bodyB");
+    assert.ok(
+        Math.sign(bodyA.angularVelocity) !== Math.sign(bodyB.angularVelocity),
+        "bodyA and bodyB should spin in opposite directions for a centered contact offset"
+    );
+    console.log("[collision-response-dynamic-pair] ok");
+}
+
+function testDynamicCollisionResponseNoPotential() {
+    const bodyA = {
+        position: { x: 300, y: 300 },
+        applyAngularImpulse() {
+            this._applied = true;
+        }
+    };
+    const bodyB = {
+        position: { x: 400, y: 300 },
+        applyAngularImpulse() {
+            this._applied = true;
+        }
+    };
+    applyDynamicCollisionResponse(bodyA, bodyB, { x: 1, y: 0 }, { x: 350, y: 300 }, 50);
+    assert.equal(bodyA._applied, undefined, "no angular impulse when approachSpeed >= 0");
+    assert.equal(bodyB._applied, undefined, "no angular impulse when approachSpeed >= 0");
+    console.log("[collision-response-no-potential] ok");
+}
+
+testCollisionResponseHelperAngularImpulse();
+testCollisionResponseNoApplyAngularImpulse();
+testCollisionAppliesLinearImpulse();
+testCollisionResponseDuckTypingDetection();
+testDynamicCollisionResponsePair();
+testDynamicCollisionResponseNoPotential();
 
 // ── Static surface angular impulse tests ─────────────────────────────────
 

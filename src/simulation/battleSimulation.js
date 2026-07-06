@@ -1,5 +1,6 @@
 import { applyCollisionImpulse, Vector2 } from "../core.js";
 import { resolveFighterShapeCollision } from "../physics/CollisionShape.js";
+import { applyCollisionAngularImpulse } from "../physics/collisionResponse.js";
 import {
     ArcherAbility,
     EaterAbility,
@@ -391,37 +392,14 @@ export class BattleSimulation extends Simulation {
      */
     _applyAngularCollisionResponse(a, b, normal, contactPoint, preCollisionVelAlongNormal) {
         if (!contactPoint) return;
+        if (preCollisionVelAlongNormal >= 0) return;
 
-        if (preCollisionVelAlongNormal >= 0) return; // 분리 중이면 회전 충격 없음
-
-        // 충돌 강도 (속도 차이 + 반발 계수, 충돌 전 접근 속도 기준)
         const impulseMag = Math.abs(preCollisionVelAlongNormal) * (1 + COLLISION_RESTITUTION);
-
-        // Angular impulse factor: 충돌이 중심에서 얼마나 빗겨났는지에 비례
         const ANGULAR_COLLISION_FACTOR = 0.15;
 
-        // Fighter A
-        if (typeof a.applyAngularImpulse === "function") {
-            const contactVecA = {
-                x: contactPoint.x - a.position.x,
-                y: contactPoint.y - a.position.y
-            };
-            // 2D cross: r × impulse 방향
-            const torqueA =
-                (contactVecA.x * normal.y - contactVecA.y * normal.x) * impulseMag * ANGULAR_COLLISION_FACTOR;
-            a.applyAngularImpulse(torqueA);
-        }
-
-        // Fighter B (impulse 방향 반대)
-        if (typeof b.applyAngularImpulse === "function") {
-            const contactVecB = {
-                x: contactPoint.x - b.position.x,
-                y: contactPoint.y - b.position.y
-            };
-            const torqueB =
-                (contactVecB.x * -normal.y - contactVecB.y * -normal.x) * impulseMag * ANGULAR_COLLISION_FACTOR;
-            b.applyAngularImpulse(torqueB);
-        }
+        applyCollisionAngularImpulse(a, normal, contactPoint, impulseMag, ANGULAR_COLLISION_FACTOR);
+        const inverseNormal = { x: -normal.x, y: -normal.y };
+        applyCollisionAngularImpulse(b, inverseNormal, contactPoint, impulseMag, ANGULAR_COLLISION_FACTOR);
     }
 
     /** 숙련도 충돌 패시브: 주기적 충돌 피해 보너스 적용 */
