@@ -121,6 +121,7 @@ this.debug = {
 | `ProjectileBehavior` | 발사체다 (owner, updateProjectile, hit 판정) | Arrow/Bat/Bullet/Orbit/Grenade/Seed |
 | `BurstSequencer` | 연발 발사한다 (startBurst, tickBurst) | 필요 시 선택 적용 |
 | `RotationalBody` | 회전한다 (angle, angularVelocity, applyAngularImpulse, integrateRotation) | BattleBall (전체), 회전 가능한 지형/캐릭터/투사체 확장용 |
+| `PhysicsMaterialBody` | 물리 재질을 소유한다 (physicsMaterial, setPhysicsMaterial, getResolvedPhysicsMaterial) | 물리 재질이 필요한 모든 body |
 | `CollisionShape` (helper) | polygon world points 변환, SAT 기반 circle-polygon/polygon-polygon 충돌, fighter shape collision resolver | terrain collision, fighter-vs-fighter 충돌 |
 | `PhysicsDebugRingBuffer` (helper) | 고정 길이 ring buffer로 물리 이벤트 기록. NaN/Infinity 감지 시 buffer dump 출력 | 디버깅/트러블슈팅 |
 
@@ -135,7 +136,7 @@ this.debug = {
 |---|---|---|
 | `CombatEntity` | 전장에 존재한다 | `PhysicsBody + LifeSpan + isExpired` |
 | `Projectile` | 투사체다 | `CombatEntity의 모든 것 + ProjectileBehavior` |
-| `BattleBall` | 전사다 | `PhysicsBody + RotationalBody` (기본 회전, `rotationEnabled: false`로 비활성 가능) |
+| `BattleBall` | 전사다 | `PhysicsBody + RotationalBody + PhysicsMaterialBody` (기본 회전, `rotationEnabled: false`로 비활성 가능) |
 | `Ability` | 능력이다 | `Cooldown` |
 
 **적용 원칙**:
@@ -291,7 +292,7 @@ Ability / Action / Effect: 목표 방향, 목표 속도, movementEffect, forceHe
 
 - **볼-볼 충돌 impulse**는 `BattleSimulation._applyRigidBodyCollision()`이 소유합니다. 내부에서 `applyDynamicCollisionResponse(a, b, normal, contactPoint, approachSpeed, { restitution, tangentialFriction, impactA, impactB })`를 호출하며, normal impulse + tangent friction impulse를 BODY의 선형/각운동량에 통합 적용합니다. 선형 impulse와 angular impulse가 분리된 임시 공식이 아니라, 하나의 impulse vector J = jn·n + jt·t로 계산되어 각 body에 `-J·invMass`(선형) + `r × J`(angular)로 전달됩니다. `angularFactor` 기본값이 1이므로 angular impulse는 물리적으로 정확하게 적용되며, 시각적 튜닝이 필요하면 외부에서 별도로 처리해야 합니다. `_applyCollisionPhysics`(core.applyCollisionImpulse 사용)와 `_applyAngularCollisionResponse`는 제거되었습니다.
 - **impulse 계산 공식**: effective mass denominator `denom = invMassA + invMassB + (rA×d)²·invIA + (rB×d)²·invIB`를 사용합니다. normal impulse `jn = -(1+e)·vn / denom_n`, tangent impulse `jt = -vt / denom_t` (Coulomb clamp: |jt| ≤ μ·|jn|). 접촉점 속도는 선형 속도 + 각속도 ω×r 기여를 모두 포함합니다.
-- **물리 재질 시스템**: restitution과 friction은 더 이상 호출 사이트의 magic number가 아니라, 각 body/surface가 소유하는 material로부터 결정됩니다. `src/physics/PhysicsMaterial.js`는 카탈로그(`PHYSICS_MATERIALS`)와 두 헬퍼(`resolvePhysicsMaterial`, `combinePhysicsMaterials`)를 제공합니다. 조합 규칙: `restitution = max(a.restitution, b.restitution)`, `friction = sqrt(a.friction * b.friction)`. restitution은 게임의 튀는 동작을 유지하고, friction은 낮은 마찰 표면도 실제로 낮은 조합값을 만들 수 있게 합니다. 현재 기본 rubberBall/wall/wood는 모두 friction=0.20이므로 나무 수준 마찰 체감은 유지됩니다.
+- **물리 재질 시스템**: restitution과 friction은 더 이상 호출 사이트의 magic number가 아니라, 각 body/surface가 소유하는 material로부터 결정됩니다. `src/physics/PhysicsMaterial.js`는 카탈로그(`PHYSICS_MATERIALS`)와 두 헬퍼(`resolvePhysicsMaterial`, `combinePhysicsMaterials`)를 제공합니다. body의 material 소유권은 `PhysicsMaterialBody` 믹스인이 제공하며, 기본값은 `"wood"`입니다. 조합 규칙: `restitution = max(a.restitution, b.restitution)`, `friction = sqrt(a.friction * b.friction)`. restitution은 게임의 튀는 동작을 유지하고, friction은 낮은 마찰 표면도 실제로 낮은 조합값을 만들 수 있게 합니다. 현재 기본 rubberBall/wall/wood는 모두 friction=0.20이므로 나무 수준 마찰 체감은 유지됩니다.
 - **정적 표면(벽/terrain) 충돌**은 `applyCollisionResponse(body, normal, contactPoint, preCollisionVelocity, options)`를 통해 동일한 `_resolveContactImpulse` 공통 solver를 호출합니다. 구현에서는 `bodyA=null`을 정적 표면으로 두고 `bodyB=body`를 동적 body로 전달합니다. restitution/friction은 `body.physicsMaterial`과 `options.surfaceMaterial`의 조합(`combinePhysicsMaterials`)으로 결정됩니다. 명시적 `options.restitution`/`options.tangentialFriction`이 전달되면 재질 조합보다 우선합니다.
 - **벽 충돌**은 `simulation.js`의 `_reflectX`/`_reflectY`에서 위치 clamp 후 `applyCollisionResponse(entity, normal, contactPoint, preVel, { surfaceMaterial: "wall" })`를 호출합니다. wall material(restitution=1.0, friction=0.20)과 body의 physicsMaterial(기본 rubberBall: restitution=0.92, friction=0.20)의 조합으로 restitution=1.0, friction=0.20이 결정됩니다.
 - **terrain 충돌(circle/polygon)**은 `terrainCollision.js`/`CollisionShape.js`에서 위치 보정 후 `applyCollisionResponse(entity, normal, contactPoint, preVel, { surfaceMaterial: "wood" })`를 호출합니다.

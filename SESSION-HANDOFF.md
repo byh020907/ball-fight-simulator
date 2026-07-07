@@ -1,5 +1,10 @@
 # 결정 기록
 
+## [L1] 2026-07-07 — 물리 재질 소유권을 PhysicsMaterialBody 믹스인으로 리팩터
+- 맥락: 125d8f5에서 `battleBall.js`에 `this.physicsMaterial = "rubberBall"`이 직접 할당되어 있었고, 이는 재사용 가능한 물리 바디 능력(capability)으로서 믹스인에 적합.
+- 결정: (1) `src/physics/PhysicsMaterialBody.js` 신설 — `(Base) => class extends Base` 형태 믹스인, constructor에서 `this.physicsMaterial = "wood"` 기본값, `setPhysicsMaterial(material)`, `getResolvedPhysicsMaterial()` 제공. (2) `BattleBall`이 `PhysicsMaterialBody` 믹스인을 사용, 클래스 선언에 추가, `setPhysicsMaterial(spec.physicsMaterial ?? "rubberBall")`로 재질 설정. (3) 기존 `this.physicsMaterial = "rubberBall"` 직접 할당 제거. (4) `collisionResponse.js`에서 `body.physicsMaterial` 참조는 믹스인 제공 필드를 그대로 사용하므로 변경 불필요. (5) docs/회귀 테스트 갱신.
+- 영향: `src/physics/PhysicsMaterialBody.js`(신규), `src/physics/index.js`, `src/entities/battleBall.js`, `tests/regression.mjs`, `docs/development-rules.md`, `SESSION-HANDOFF.md`
+
 ## [L1] 2026-07-07 — 물리 재질 시스템 도입 (material-owned friction/restitution)
 - 맥락: restitution/friction이 collisionResponse.js의 기본값과 각 호출 사이트에 하드코딩된 magic number로 흩어져 있음. 변경 시 모든 호출 사이트를 수동 추적해야 함. 정상적인 물리 엔진은 body/surface가 재질을 소유함.
 - 결정: (1) `src/physics/PhysicsMaterial.js` 신설 — `PHYSICS_MATERIALS` 카탈로그(rubberBall/wall/wood/stone/ice/metal), `resolvePhysicsMaterial()`, `combinePhysicsMaterials()` (restitution=max, friction=sqrt(a*b)). (2) `collisionResponse.js`의 `applyCollisionResponse`/`applyDynamicCollisionResponse`가 `body.physicsMaterial` + `options.surfaceMaterial`에서 restitution/friction을 추론, 명시적 옵션이 재질 조합을 덮어씀. (3) `battleBall.js`에 `physicsMaterial = "rubberBall"` 기본값 추가. (4) 모든 런타임 호출 사이트가 explicit restitution/tangentialFriction 대신 material 옵션 사용. (5) docs 갱신. (6) 회귀 테스트 추가.

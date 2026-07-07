@@ -122,6 +122,7 @@ import {
 import { BattleBall } from "../src/entities/battleBall.js";
 import { generateMobAppearance } from "../src/entities/mobAppearance.js";
 import { PHYSICS_MATERIALS, resolvePhysicsMaterial, combinePhysicsMaterials } from "../src/physics/PhysicsMaterial.js";
+import PhysicsMaterialBody from "../src/physics/PhysicsMaterialBody.js";
 
 const EMPTY_EQUIPMENT_SUMMARY = {
     characterLevel: 1,
@@ -7495,6 +7496,35 @@ testWallCollisionAngularNotReduced();
 
 // ── Physics Material system tests ──────────────────────────────────────────
 
+function testPhysicsMaterialBodyMixin() {
+    class Dummy extends PhysicsMaterialBody(class {}) {}
+    const obj = new Dummy();
+    assert.equal(obj.physicsMaterial, "wood", "PhysicsMaterialBody should default to wood");
+    obj.setPhysicsMaterial("ice");
+    assert.equal(obj.physicsMaterial, "ice", "setPhysicsMaterial should update material");
+    const resolved = obj.getResolvedPhysicsMaterial();
+    assert.equal(resolved.restitution, 0.95, "getResolvedPhysicsMaterial should resolve ice restitution");
+    assert.equal(resolved.friction, 0.03, "getResolvedPhysicsMaterial should resolve ice friction");
+    console.log("[physics-material-body-mixin] ok");
+}
+
+function testBattleBallSpecMaterialOverride() {
+    const spec = {
+        id: "spec-mat",
+        name: "SpecMat",
+        teamId: "t",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#ff8800",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash",
+        rotationEnabled: true,
+        physicsMaterial: "stone"
+    };
+    const ball = new BattleBall(spec, new Vector2(100, 100));
+    assert.equal(ball.physicsMaterial, "stone", "spec.physicsMaterial should override mixin default");
+    console.log("[physics-material-spec-override] ok");
+}
+
 function testResolvePhysicsMaterial() {
     const rb = resolvePhysicsMaterial("rubberBall");
     assert.equal(rb.restitution, 0.92);
@@ -7703,6 +7733,8 @@ function testFighterCollisionUsesMaterial() {
     console.log("[physics-material-fighter-collision] ok");
 }
 
+testPhysicsMaterialBodyMixin();
+testBattleBallSpecMaterialOverride();
 testResolvePhysicsMaterial();
 testCombinePhysicsMaterials();
 testCollisionResponseUsesBodyMaterial();

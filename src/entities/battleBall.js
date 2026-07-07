@@ -1,7 +1,7 @@
 import { RENDER_LAYERS, TimedEffect, Vector2, randomSpin } from "../core.js";
 import { ActionContext } from "../clickActions.js";
 import { DashEffect } from "../combatEffects.js";
-import { mixins, PhysicsBody, RotationalBody } from "../physics/index.js";
+import { mixins, PhysicsBody, RotationalBody, PhysicsMaterialBody } from "../physics/index.js";
 import { computeRegularPolygonLocalPoints } from "../physics/CollisionShape.js";
 import {
     PhysicsDebugRingBuffer,
@@ -11,7 +11,7 @@ import {
 import { getFaceTemplate } from "./mobAppearance.js";
 import { drawEquipmentItems } from "./equipmentVisuals.js";
 
-export class BattleBall extends mixins([PhysicsBody, RotationalBody]) {
+export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMaterialBody]) {
     constructor(spec, position) {
         super();
         this.id = spec.id;
@@ -88,7 +88,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody]) {
             passives: spec.mastery?.passives ?? [],
             _states: null
         };
-        this.physicsMaterial = "rubberBall";
+        this.setPhysicsMaterial(spec.physicsMaterial ?? "rubberBall");
         this.actionContext = new ActionContext();
         this.aiController = null;
 
