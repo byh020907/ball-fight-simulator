@@ -7947,4 +7947,132 @@ await testCrashDamageWithRotation();
 await testDashContactRotationalBonus(app);
 await testVampireRotationalBonus(app);
 
+// ── Anti-stall burst tests ──────────────────────────────────────────────────
+
+function testAntiStallNoBurstBeforeTimeout() {
+    const specA = {
+        id: "as-a",
+        name: "ASA",
+        teamId: "t1",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#ff0000",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash"
+    };
+    const specB = {
+        id: "as-b",
+        name: "ASB",
+        teamId: "t2",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#0000ff",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash"
+    };
+    const sim = new BattleSimulation([specA, specB], { onLog() {}, onSound() {} });
+    sim._antiStallTimer = 7.9;
+    sim._checkAntiStall(0.09);
+    assert.equal(sim._antiStallBurstCount, 0, "should not fire before 8s");
+    console.log("[anti-stall-no-burst] ok");
+}
+
+function testAntiStallBurstAtTimeout() {
+    const specA = {
+        id: "as-c",
+        name: "ASC",
+        teamId: "t1",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#ff0000",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash"
+    };
+    const specB = {
+        id: "as-d",
+        name: "ASD",
+        teamId: "t2",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#0000ff",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash"
+    };
+    const sim = new BattleSimulation([specA, specB], { onLog() {}, onSound() {} });
+    const f0 = sim.fighters[0];
+    const f1 = sim.fighters[1];
+    f0.position = new Vector2(200, 480);
+    f1.position = new Vector2(600, 480);
+    sim._antiStallTimer = 7.9;
+    const velBefore0 = f0.velocity.clone();
+    const velBefore1 = f1.velocity.clone();
+    sim._checkAntiStall(0.2);
+    assert.equal(sim._antiStallBurstCount, 1, "should fire burst at 8s");
+    assert.ok(sim._antiStallTimer < 0.2, "timer should reset after burst");
+    const pushed0 = f0.velocity.length() !== 0;
+    const pushed1 = f1.velocity.length() !== 0;
+    assert.ok(pushed0 || pushed1, "fighters should receive impulse after burst");
+    console.log("[anti-stall-burst] ok");
+}
+
+function testAntiStallCollisionResetsTimer() {
+    const specA = {
+        id: "as-e",
+        name: "ASE",
+        teamId: "t1",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#ff0000",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash"
+    };
+    const specB = {
+        id: "as-f",
+        name: "ASF",
+        teamId: "t2",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#0000ff",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash"
+    };
+    const sim = new BattleSimulation([specA, specB], { onLog() {}, onSound() {} });
+    const a = sim.fighters[0];
+    const b = sim.fighters[1];
+    a.position = new Vector2(400, 480);
+    b.position = new Vector2(400 + a.radius + b.radius - 2, 480);
+    a.applyImpulse(new Vector2(100, 0));
+    b.applyImpulse(new Vector2(-100, 0));
+    sim._antiStallTimer = 7.5;
+    sim.handleCollision();
+    assert.equal(sim._antiStallTimer, 0, "hostile collision should reset timer");
+    console.log("[anti-stall-reset] ok");
+}
+
+function testAntiStallDefeatedFightersSkipped() {
+    const specA = {
+        id: "as-g",
+        name: "ASG",
+        teamId: "t1",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#ff0000",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash"
+    };
+    const specB = {
+        id: "as-h",
+        name: "ASH",
+        teamId: "t2",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#0000ff",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash"
+    };
+    const sim = new BattleSimulation([specA, specB], { onLog() {}, onSound() {} });
+    sim.fighters[0].flags.defeated = true;
+    sim._antiStallTimer = 7.9;
+    sim._checkAntiStall(0.2);
+    assert.equal(sim._antiStallBurstCount, 0, "should not fire with only 1 active fighter");
+    console.log("[anti-stall-defeated] ok");
+}
+
+testAntiStallNoBurstBeforeTimeout();
+testAntiStallBurstAtTimeout();
+testAntiStallCollisionResetsTimer();
+testAntiStallDefeatedFightersSkipped();
+
 console.log("regression tests ok");

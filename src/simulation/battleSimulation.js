@@ -40,6 +40,7 @@ const ABILITY_TYPES = {
 
 const COLLISION_SEPARATION_PADDING = 0.6;
 const DEFAULT_ARENA_SIZE = 960;
+const ANTI_STALL_INTERVAL = 8;
 
 function normalizeArenaSize(value) {
     if (!Number.isFinite(value)) return DEFAULT_ARENA_SIZE;
@@ -86,6 +87,10 @@ export class BattleSimulation extends Simulation {
             timeWarps: new Map(), // Map<ball, remainingSeconds> — 시전자별 독립 타이머
             timeSlowFactor: 0.35
         };
+
+        // ── Anti-stall ──
+        this._antiStallTimer = 0;
+        this._antiStallBurstCount = 0;
 
         // ── AI 액션 컨트롤러 ──
         if (hooks.assignActions || options.assignActions) {
@@ -258,6 +263,7 @@ export class BattleSimulation extends Simulation {
         }
 
         this.handleCollision();
+        this._checkAntiStall(delta);
 
         // 시간 왜곡 적용: 자신이 시전한 Time Warp가 아니면 느려짐 (중첩 없음)
         for (const entity of this.entities) {
@@ -313,6 +319,9 @@ export class BattleSimulation extends Simulation {
             this._applyRigidBodyCollision(a, b, normal, result.contactPoint, preCollisionVel, aModifiers, bModifiers);
             return;
         }
+
+        // 적대 충돌 시 anti-stall 타이머 리셋
+        this._antiStallTimer = 0;
 
         const cp = result.contactPoint;
         let damageFromAToB = this.calculateCollisionDamageWithContact(a, b, normal, cp) * aModifiers.damage;
@@ -460,6 +469,45 @@ export class BattleSimulation extends Simulation {
         const baseDamage = this.calculateCollisionDamage(attacker, defender, attackerToDefender);
         if (!contactPoint) return baseDamage;
         return applyRotationalContactDamage(baseDamage, attacker, contactPoint);
+    }
+
+    _checkAntiStall(delta) {
+        if (this.finished) return;
+        this._antiStallTimer += delta;
+        if (this._antiStallTimer < ANTI_STALL_INTERVAL) return;
+        this._fireAntiStallBurst();
+    }
+
+    _fireAntiStallBurst() {
+        const active = this.fighters.filter((f) => !f.flags.defeated && !f.state.swallowed);
+        if (active.length < 2) return;
+
+        const center = new Vector2(this.width / 2, this.height / 2);
+
+        this.spawnExplosion(center.clone(), "#ff4444");
+        this.spawnPulse(center.clone(), "#ff4444");
+        this.playSound("dash", 1.5);
+        this.addLog("Anti-stall burst: 중앙 충격파가 전투원들을 밀어냅니다.");
+
+        for (let i = 0; i < active.length; i++) {
+            const fighter = active[i];
+            const diff = Vector2.subtract(fighter.position, center);
+            const dist = diff.length();
+
+            let dir;
+            if (dist > 5) {
+                dir = diff.clone().normalize();
+            } else {
+                const angle = (i / active.length) * Math.PI * 2;
+                dir = Vector2.fromAngle(angle, 1);
+            }
+
+            const magnitude = Math.max(180, Math.min(360, fighter.stats.baseSpeed * 0.85));
+            fighter.applyImpulse(dir.scale(magnitude));
+        }
+
+        this._antiStallBurstCount++;
+        this._antiStallTimer = 0;
     }
 
     checkResult() {

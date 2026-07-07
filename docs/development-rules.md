@@ -304,6 +304,23 @@ polygon-polygon 충돌의 접촉점(`contactPoint`)은 SAT 기반 접촉 후보 
 위 후보들의 평균을 contactPoint로 사용하고, 후보가 없을 때만 center midpoint로 fallback합니다.
 circle-polygon은 `_closestPoint`(최근접 polygon vertex)를 우선하고, 없을 때 circle surface point를 사용합니다.
 
+### Anti-stall 장치 (BattleSimulation)
+
+전투가 8초 이상 적대 충돌 없이 지속되면 중앙 충격파가 활성 전투원을 바깥으로 밀어냅니다.
+
+```
+ANTI_STALL_INTERVAL = 8 (초)
+Impulse magnitude: clamp(baseSpeed × 0.85, 180, 360)
+```
+
+- **타이머 리셋 조건**: `handleFighterCollision()`에서 `isHostile(a,b) === true`일 때만 초기화. 아군 충돌은 무시.
+- **버스트 발동 조건**: 활성(패배/삼킴 상태 아님) 전투원이 2명 이상이어야 함.
+- **결정론적 방향**: 전투원 위치가 중앙에서 5px 이상 떨어지면 중→밖 방향, 5px 이내면 인덱스 기반 각도((index/total)×2π).
+- **타이머는 발동 직후 0으로 리셋**되어 다음 버스트까지 다시 8초 카운트.
+- **시각 피드백**: `spawnExplosion(center, "#ff4444")` + `spawnPulse(center, "#ff4444")` + `playSound("dash")` + 한국어 로그.
+- **테스트**: 4종 회귀 테스트(`[anti-stall-no-burst]`, `[anti-stall-burst]`, `[anti-stall-reset]`, `[anti-stall-defeated]`).
+- **적용 범위**: 모든 배틀(토너먼트, 사냥터 포함). AI/길찾기 개입 없이 순수 물리 impulse.
+
 ### 충돌 물리 / 이동 속도 소유권
 
 전투 볼의 `velocity`는 **충돌 impulse와 기본 이동 목표가 섞인 실제 속도**입니다. 특정 능력이나 액션이 매 틱 `velocity`를 직접 덮어써서 충돌 결과를 지우면, 볼이 겹친 상태에서 매 프레임 충돌 피해가 반복되는 문제가 생깁니다.
