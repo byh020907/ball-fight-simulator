@@ -1,5 +1,10 @@
 # 결정 기록
 
+## [L1] 2026-07-07 — 충돌 접선 마찰을 올려 미끄러짐 체감 완화
+- 맥락: 캐릭터 회전은 정상적으로 보이지만, 벽/지형/볼 충돌 후 움직임이 지나치게 미끄러지듯 보임. 확인 결과 접선 마찰이 벽/지형 0.03, 볼-볼 0.05로 낮고, angular impulse를 물리적으로 1배 적용한 뒤 표면 마찰이 약하게 체감됨.
+- 결정: (1) `collisionResponse.js` 기본 `tangentialFriction`을 0.03→0.08로 상향. (2) 벽/지형/볼-볼 런타임 호출의 명시적 `tangentialFriction`도 0.08로 통일. (3) 반발 계수와 angularDamping은 전투 리듬을 과하게 둔하게 만들 수 있어 이번 변경에서 제외.
+- 영향: `src/physics/collisionResponse.js`, `src/simulation/simulation.js`, `src/simulation/battleSimulation.js`, `src/physics/CollisionShape.js`, `src/terrain/terrainCollision.js`, `docs/development-rules.md`, `SESSION-HANDOFF.md`
+
 ## [L1] 2026-07-06 — 충돌 impulse가 실제 angularVelocity에 같은 프레임/동적 원형 충돌에서 반영되도록 수정
 - 맥락: (1) 유저 ball이 충돌해도 angularVelocity가 변하지 않음. 원인: circle-circle 충돌의 contactPoint가 normal과 동일선상이어서 r×normal=0 → angular impulse=0. (2) `BattleBall.update()`에서 `integrateRotation`이 `keepInsideArena`보다 먼저 실행되어 벽 충돌 angular impulse가 다음 프레임에나 반영됨.
 - 결정: (1) `BattleBall.update()` 순서 변경 — 위치 적분 후 `keepInsideArena(this)` → `bounced → forcedHeading 해제` → `integrateRotation(delta)` 순으로 재배열. (2) `applyDynamicCollisionResponse`에 접선 마찰/스핀 교환 추가 — 각 body의 접촉점 속도(선형 + 각속도 ω×r 기여) 계산, 접선 상대 속도 기반 friction torque 적용. (3) `_applyAngularCollisionResponse`에 `tangentialFriction: 0.05` 전달. (4) 테스트 2종: `testPlayerCircleCollisionChangesAngularVelocity` (circle-circle 충돌 후 angularVelocity 변화 검증), `testWallCollisionAngularImpulseAppliesSameUpdate` (벽 충돌 impulse가 같은 `update()` 프레임에 angularVelocity에 반영되는지 검증).

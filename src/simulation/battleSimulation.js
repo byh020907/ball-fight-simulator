@@ -382,7 +382,7 @@ export class BattleSimulation extends Simulation {
 
         applyDynamicCollisionResponse(a, b, normal, contactPoint, preCollisionVel.dot(normal), {
             restitution: COLLISION_RESTITUTION,
-            tangentialFriction: 0.05,
+            tangentialFriction: 0.08,
             impactA,
             impactB
         });
