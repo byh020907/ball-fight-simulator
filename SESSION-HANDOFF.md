@@ -238,6 +238,13 @@
 - 미검증: 브라우저에서 캐릭터 회전 시각적 과도함 여부 — 물리적으로 정확해졌으므로 이전보다 회전이 강하게 보일 수 있음. 게임 느낌 튜닝이 필요하면 rigid body solver 내부가 아닌 시각적 감쇠 또는 외부 damping으로 처리해야 함.
 - 후속 확인: Codex 검증 중 `src/physics/CollisionShape.js`의 폴리곤 지형 충돌 경로에 `angularFactor: 0.15`가 1개 남아 있음을 발견해 제거. `src` 런타임 경로에는 0.15 감쇠 호출이 남지 않음.
 
+## [L1] 2026-07-07 — Anti-stall 책임 분리 리팩터 + 투사체 비리셋 회귀 테스트
+- 맥락: 기존 `_fireAntiStallBurst()`가 active 필터/적대 쌍 검사/방향 계산/impulse 적용/시각 피드백/카운터 갱신을 모두 인라인으로 처리해 책임이 혼재됨. 또한 투사체 명중 시 anti-stall 타이머가 리셋되지 않는다는 명시적 보호 장치와 회귀 테스트가 없었음.
+- 결정: (1) `_fireAntiStallBurst()`를 10개 소책임 메서드로 분리 — `_resetAntiStallTimerForFighterCollision()`, `_getActiveAntiStallFighters()`, `_hasHostileFighterPair()`, `_shouldTriggerAntiStallBurst()`, `_emitAntiStallBurstFeedback()`, `_getAntiStallDirection()`, `_getAntiStallImpulseMagnitude()`, `_applyAntiStallBurstImpulse()`, `_resetAntiStallAfterBurst()`, `_fireAntiStallBurst()`. (2) `handleFighterCollision`에서 `this._antiStallTimer = 0` → `_resetAntiStallTimerForFighterCollision()`으로 대체. (3) 회귀 테스트 `[anti-stall-projectile-no-reset]` 추가 — 실제 `spawnArrow` + projectile hit 경로로 대미지를 입힌 후 `_antiStallTimer`가 변하지 않음을 검증. (4) `docs/development-rules.md` anti-stall 섹션에 타이머 리셋 소스는 적대 전투원-vs-전투원 충돌만 가능하다는 규칙과 투사체/폭발/takeDamage 비리셋 규칙 명시. (5) 헬퍼 메서드 역할 목록 문서화.
+- 영향: `src/simulation/battleSimulation.js`, `tests/regression.mjs`, `docs/development-rules.md`, `SESSION-HANDOFF.md`
+- 검증: `npm test`, `npm run format:check`, `npm run check`, `node scripts/huntingUserScenario.mjs` 통과
+- 타이머 리셋이 적대 전투원 충돌(`handleFighterCollision`)에서만 발생하고 Arrow/Grenade/Orbit/Seed/Bullet/Bat 투사체 경로와 `takeDamage()`에서는 절대 발생하지 않음을 회귀 테스트로 검증 완료.
+
 ## 현재 기준 요약 (2026-07-07)
 - 컴포넌트 파일 구조: `src/components/<name>.html` (플랫, 폴더 없음), 9개 컴포넌트
 - **사냥터 100층 구조**: 시작 0층, 10층 전진 루프, 전투/포탈/상인/챔피언에서 정지, 빈층/축복/함정/휴식/상자/제단은 자동 진행

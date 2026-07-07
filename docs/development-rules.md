@@ -313,12 +313,25 @@ ANTI_STALL_INTERVAL = 8 (초)
 Impulse magnitude: clamp(baseSpeed × 0.85, 180, 360)
 ```
 
-- **타이머 리셋 조건**: `handleFighterCollision()`에서 `isHostile(a,b) === true`일 때만 초기화. 아군 충돌은 무시.
+- **타이머 리셋 조건**: `handleFighterCollision()`에서 `isHostile(a,b) === true`일 때만 `_resetAntiStallTimerForFighterCollision()` 호출. 아군 충돌은 무시.
+  - **타이머 리셋 소스는 실제 적대 전투원-vs-전투원 충돌만 가능.** 투사체 명중(Hit), 원거리 피해, 폭발(Grenade), 직접 `takeDamage()` 호출은 anti-stall 타이머를 리셋하지 않음.
+  - `_resetAntiStallTimerForFighterCollision()`은 `handleFighterCollision` 내부에서만 호출됨.
 - **버스트 발동 조건**: 활성(패배/삼킴 상태 아님) 전투원이 2명 이상이고, 그중 적어도 한 쌍의 적대 관계(서로 다른 팀)가 있어야 함.
 - **결정론적 방향**: 전투원 위치가 중앙에서 5px 이상 떨어지면 중→밖 방향, 5px 이내면 인덱스 기반 각도((index/total)×2π).
 - **타이머는 발동 직후 0으로 리셋**되어 다음 버스트까지 다시 8초 카운트.
 - **시각 피드백**: `spawnExplosion(center, "#ff4444")` + `spawnPulse(center, "#ff4444")` + `playSound("dash")` + 한국어 로그.
-- **테스트**: 5종 회귀 테스트(`[anti-stall-no-burst]`, `[anti-stall-burst]`, `[anti-stall-reset]`, `[anti-stall-defeated]`, `[anti-stall-friendly]`).
+- **헬퍼 메서드 역할 분리**:
+  - `_resetAntiStallTimerForFighterCollision()` — 전투원 충돌 전용 리셋
+  - `_getActiveAntiStallFighters()` — 활성 전투원 목록
+  - `_hasHostileFighterPair(fighters)` — 적대 쌍 존재 여부
+  - `_shouldTriggerAntiStallBurst()` — 발동 결정
+  - `_emitAntiStallBurstFeedback(center)` — 시각/청각/로그 피드백
+  - `_getAntiStallDirection(fighter, center, index, total)` — 방향 계산
+  - `_getAntiStallImpulseMagnitude(fighter)` — impulse 크기 계산
+  - `_applyAntiStallBurstImpulse(fighters, center)` — impulse 적용
+  - `_resetAntiStallAfterBurst()` — 카운터/타이머 갱신
+  - `_fireAntiStallBurst(fighters)` — 오케스트레이션 (루프/조건 직접 없음)
+- **테스트**: 6종 회귀 테스트(`[anti-stall-no-burst]`, `[anti-stall-burst]`, `[anti-stall-reset]`, `[anti-stall-defeated]`, `[anti-stall-friendly]`, `[anti-stall-projectile-no-reset]`).
 - **적용 범위**: 모든 배틀(토너먼트, 사냥터 포함). AI/길찾기 개입 없이 순수 물리 impulse.
 
 ### 충돌 물리 / 이동 속도 소유권

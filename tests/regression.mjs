@@ -8108,10 +8108,70 @@ function testAntiStallFriendlyOnlyNoBurst() {
     console.log("[anti-stall-friendly] ok");
 }
 
+function testAntiStallProjectileHitDoesNotResetTimer() {
+    const specA = {
+        id: "as-proj-a",
+        name: "ASProjA",
+        teamId: "t1",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#ff0000",
+        appearance: { sides: 0, face: "default" },
+        ability: "archer"
+    };
+    const specB = {
+        id: "as-proj-b",
+        name: "ASProjB",
+        teamId: "t2",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#0000ff",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash"
+    };
+    const sim = new BattleSimulation([specA, specB], { onLog() {}, onSound() {} });
+    const archer = sim.fighters[0];
+    const target = sim.fighters[1];
+    archer.position = new Vector2(200, 480);
+    target.position = new Vector2(600, 480);
+
+    // Set anti-stall timer to a non-zero value
+    const TIMER_BEFORE = 5;
+    sim._antiStallTimer = TIMER_BEFORE;
+
+    // Fire an arrow at the target using the simulation's spawnArrow path
+    const startPos = archer.position.clone().add(new Vector2(30, 0));
+    const dir = Vector2.subtract(target.position, startPos).normalize();
+    const velocity = dir.scale(archer.stats.baseSpeed * 2);
+    const arrow = sim.spawnArrow(archer, startPos, velocity);
+    // Move entites list so arrow is in the same collection
+    sim.entities = [arrow, ...sim.fighters];
+
+    // Advance arrow multiple steps until it hits the target
+    for (let i = 0; i < 60; i++) {
+        arrow.update(0.016, sim);
+        if (arrow.isExpired) break;
+    }
+
+    // Arrow should have hit and damaged the target
+    assert.ok(arrow.isExpired, "arrow should hit target and expire");
+    assert.ok(target.hp < target.maxHp, "projectile should deal damage to target");
+
+    // Anti-stall timer must NOT have been reset by the projectile hit
+    assert.equal(
+        sim._antiStallTimer,
+        TIMER_BEFORE,
+        "projectile damage must NOT reset anti-stall timer (fighter-vs-fighter collision only)"
+    );
+
+    // Clean up: remove arrow from entities so it does not affect other tests
+    sim.entities = [...sim.fighters];
+    console.log("[anti-stall-projectile-no-reset] ok");
+}
+
 testAntiStallNoBurstBeforeTimeout();
 testAntiStallBurstAtTimeout();
 testAntiStallCollisionResetsTimer();
 testAntiStallDefeatedFightersSkipped();
 testAntiStallFriendlyOnlyNoBurst();
+testAntiStallProjectileHitDoesNotResetTimer();
 
 console.log("regression tests ok");

@@ -320,8 +320,7 @@ export class BattleSimulation extends Simulation {
             return;
         }
 
-        // 적대 충돌 시 anti-stall 타이머 리셋
-        this._antiStallTimer = 0;
+        this._resetAntiStallTimerForFighterCollision();
 
         const cp = result.contactPoint;
         let damageFromAToB = this.calculateCollisionDamageWithContact(a, b, normal, cp) * aModifiers.damage;
@@ -475,51 +474,79 @@ export class BattleSimulation extends Simulation {
         if (this.finished) return;
         this._antiStallTimer += delta;
         if (this._antiStallTimer < ANTI_STALL_INTERVAL) return;
-        this._fireAntiStallBurst();
+        const burst = this._shouldTriggerAntiStallBurst();
+        if (!burst.shouldTrigger) return;
+        this._fireAntiStallBurst(burst.fighters);
     }
 
-    _fireAntiStallBurst() {
-        const active = this.fighters.filter((f) => !f.flags.defeated && !f.state.swallowed);
-        if (active.length < 2) return;
+    _resetAntiStallTimerForFighterCollision() {
+        this._antiStallTimer = 0;
+    }
 
-        let hasHostilePair = false;
-        for (let i = 0; i < active.length; i++) {
-            for (let j = i + 1; j < active.length; j++) {
-                if (this.isHostile(active[i], active[j])) {
-                    hasHostilePair = true;
-                    break;
+    _getActiveAntiStallFighters() {
+        return this.fighters.filter((f) => !f.flags.defeated && !f.state.swallowed);
+    }
+
+    _hasHostileFighterPair(fighters) {
+        for (let i = 0; i < fighters.length; i++) {
+            for (let j = i + 1; j < fighters.length; j++) {
+                if (this.isHostile(fighters[i], fighters[j])) {
+                    return true;
                 }
             }
-            if (hasHostilePair) break;
         }
-        if (!hasHostilePair) return;
+        return false;
+    }
 
-        const center = new Vector2(this.width / 2, this.height / 2);
+    _shouldTriggerAntiStallBurst() {
+        const active = this._getActiveAntiStallFighters();
+        if (active.length < 2 || !this._hasHostileFighterPair(active)) return { shouldTrigger: false, fighters: [] };
+        return { shouldTrigger: true, fighters: active };
+    }
 
+    _emitAntiStallBurstFeedback(center) {
         this.spawnExplosion(center.clone(), "#ff4444");
         this.spawnPulse(center.clone(), "#ff4444");
         this.playSound("dash", 1.5);
         this.addLog("정체된 궤도를 깨기 위해 경기장 중앙 충격파가 발생했습니다.");
+    }
 
-        for (let i = 0; i < active.length; i++) {
-            const fighter = active[i];
-            const diff = Vector2.subtract(fighter.position, center);
-            const dist = diff.length();
+    _getAntiStallDirection(fighter, center, index, total) {
+        const diff = Vector2.subtract(fighter.position, center);
+        const dist = diff.length();
+        if (dist > 5) {
+            return diff.clone().normalize();
+        }
+        const angle = (index / total) * Math.PI * 2;
+        return Vector2.fromAngle(angle, 1);
+    }
 
-            let dir;
-            if (dist > 5) {
-                dir = diff.clone().normalize();
-            } else {
-                const angle = (i / active.length) * Math.PI * 2;
-                dir = Vector2.fromAngle(angle, 1);
-            }
+    _getAntiStallImpulseMagnitude(fighter) {
+        const baseSpeed = fighter.stats.baseSpeed;
+        if (!Number.isFinite(baseSpeed) || baseSpeed <= 0) return 180;
+        return Math.max(180, Math.min(360, baseSpeed * 0.85));
+    }
 
-            const magnitude = Math.max(180, Math.min(360, fighter.stats.baseSpeed * 0.85));
+    _applyAntiStallBurstImpulse(fighters, center) {
+        for (let i = 0; i < fighters.length; i++) {
+            const fighter = fighters[i];
+            const dir = this._getAntiStallDirection(fighter, center, i, fighters.length);
+            const magnitude = this._getAntiStallImpulseMagnitude(fighter);
             fighter.applyImpulse(dir.scale(magnitude));
         }
+    }
 
+    _resetAntiStallAfterBurst() {
         this._antiStallBurstCount++;
         this._antiStallTimer = 0;
+    }
+
+    _fireAntiStallBurst(fighters) {
+        const center = new Vector2(this.width / 2, this.height / 2);
+
+        this._emitAntiStallBurstFeedback(center);
+        this._applyAntiStallBurstImpulse(fighters, center);
+        this._resetAntiStallAfterBurst();
     }
 
     checkResult() {
