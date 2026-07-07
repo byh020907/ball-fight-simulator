@@ -56,6 +56,12 @@ export function createComponentBridge(Alpine) {
         huntingAdvance() {
             getGameApp()?.hunting?.advance?.();
         },
+        huntingMerchantChoose(offerIndex) {
+            getGameApp()?.hunting?.merchantChoose?.(offerIndex);
+        },
+        huntingMerchantPass() {
+            getGameApp()?.hunting?.merchantPass?.();
+        },
         async openChest(chestId) {
             await globalThis.CollectionHubService?.openChest?.(chestId);
         },

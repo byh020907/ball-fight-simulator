@@ -1,5 +1,11 @@
 # 결정 기록
 
+## [L1] 2026-07-07 — 사냥터 상인 선택지와 전리품 손실 표시 개선
+- 맥락: 방랑 상인 이벤트가 실제 선택지를 제공하지 않고, 전투 문구가 몬스터 타입을 오해하게 만들며, 패배 시 미확보 상자가 사라지는 이유가 UI에 드러나지 않았음.
+- 결정: (1) 방랑 상인은 상시 보유 사냥 파편(`profile.hunting.shards`)으로 결제하는 3개 선택지(회복/상자 구매/안전 운송)와 계속 전진 선택을 제공. (2) 전투 진입 문구는 몬스터 타입 나열 대신 `전투 발생 · 적 N명`으로 단순화. (3) 선택 UI 요약에 미확보 상자 개수를 표시하고, 패배 손실 문구에 상자 등급별 파괴 개수를 표시. (4) 빈 전리품 요약은 출력하지 않아 포탈/이벤트 안내를 가리지 않음.
+- 영향: `src/hunting/huntingMerchant.js`, `src/hunting/huntingFormat.js`, `src/hunting/huntingManager.js`, `src/components/game-overlay.html`, `src/componentBridge.js`, `src/ui.js`, `index.html`, `tests/regression.mjs`
+- 검증: `npm run format:check`, `npm run check`, `npm test`, `node scripts/huntingUserScenario.mjs`
+
 ## [L1] 2026-07-07 — Anti-stall 장치 도입 (8초 무충돌 감지 → 중앙 충격파)
 - 맥락: 전투 중 양측이 충돌하지 않고 멀리서 배회하는 상황(stall)이 발생할 수 있어, 강제로 교전을 유도하는 장치가 필요. AI/길찾기 개입 없는 순수 물리 impulse 방식.
 - 결정: (1) `ANTI_STALL_INTERVAL=8` 상수, `_antiStallTimer`/`_antiStallBurstCount` 상태 추가. (2) `handleFighterCollision()`에서 적대 충돌 시 타이머 리셋 (아군 충돌 무시). (3) `update()`→`handleCollision()` 직후 `_checkAntiStall(delta)` 호출. (4) `_fireAntiStallBurst()` — 활성 전투원 ≥ 2명이면 중앙→외부 방향 impulse 적용, 결정론적 각도(위치 기반, 중앙 근접 시 인덱스 기반), `clamp(baseSpeed*0.85, 180, 360)` magnitude. (5) 시각 피드백: 중앙 `spawnExplosion`/`spawnPulse`/`playSound("dash")`/한국어 로그. (6) 회귀 테스트 4종: 타임아웃 전 미발동, 8초 발동, 충돌 리셋, 패배 스킵. (7) docs 갱신.

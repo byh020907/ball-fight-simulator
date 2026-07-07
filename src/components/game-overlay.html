@@ -35,7 +35,7 @@
         </div>
         <div
             class="hunting-choice"
-            x-show="$store.gameOverlay.huntingChoiceVisible && !$store.gameOverlay.huntingMoving"
+            x-show="$store.gameOverlay.huntingChoiceVisible && !$store.gameOverlay.huntingMoving && !$store.gameOverlay.huntingMerchantActive"
         >
             <div class="hunting-choice-info">
                 <span x-text="$store.gameOverlay.huntingLootSummary"></span>
@@ -55,6 +55,32 @@
                 <button class="hunting-btn advance" type="button" @click="huntingAdvance()">10층 전진</button>
             </div>
         </div>
+        <div
+            class="hunting-merchant"
+            x-show="$store.gameOverlay.huntingMerchantActive"
+        >
+            <div class="hunting-choice-info">
+                <span x-text="$store.gameOverlay.huntingLootSummary"></span>
+            </div>
+            <div class="hunting-merchant-offers">
+                <template x-for="(offer, idx) in ($store.gameOverlay.huntingMerchantOffers || [])" :key="offer.id">
+                    <button
+                        class="hunting-merchant-offer"
+                        type="button"
+                        x-bind:class="{ disabled: offer.purchased || offer.disabled }"
+                        x-bind:disabled="offer.purchased || offer.disabled"
+                        @click="huntingMerchantChoose(idx)"
+                    >
+                        <strong x-text="offer.label"></strong>
+                        <span class="offer-desc" x-text="offer.description"></span>
+                        <span class="offer-cost" x-text="offer.purchased ? '구매 완료' : (offer.disabled ? offer.disabledReason : offer.cost + ' 파편')"></span>
+                    </button>
+                </template>
+            </div>
+            <div class="hunting-merchant-pass">
+                <button class="hunting-btn advance" type="button" @click="huntingMerchantPass()">계속 전진</button>
+            </div>
+        </div>
     </div>
 </div>
 <script>
@@ -64,6 +90,12 @@
         },
         huntingAdvance() {
             window.BallFightComponentBridge?.huntingAdvance();
+        },
+        huntingMerchantChoose(idx) {
+            window.BallFightComponentBridge?.huntingMerchantChoose?.(idx);
+        },
+        huntingMerchantPass() {
+            window.BallFightComponentBridge?.huntingMerchantPass?.();
         }
     }));
 </script>
@@ -261,6 +293,71 @@
     .hunting-choice-buttons button {
         flex: 1;
         max-width: 140px;
+    }
+
+    .hunting-merchant {
+        margin-top: 12px;
+        padding-top: 10px;
+        border-top: 1px solid #e0e0e0;
+    }
+
+    .hunting-merchant-offers {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        pointer-events: auto;
+        margin-top: 8px;
+    }
+
+    .hunting-merchant-offer {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        font-family: inherit;
+        border: 2px solid #202020;
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-size: 0.82rem;
+        cursor: pointer;
+        background: #ffffff;
+        transition: background 0.1s;
+        width: 100%;
+    }
+
+    .hunting-merchant-offer:hover {
+        background: #eeeeee;
+    }
+
+    .hunting-merchant-offer.disabled {
+        opacity: 0.5;
+        cursor: default;
+        border-color: #cccccc;
+    }
+
+    .hunting-merchant-offer strong {
+        font-size: 0.85rem;
+    }
+
+    .hunting-merchant-offer .offer-desc {
+        font-size: 0.72rem;
+        color: #555555;
+    }
+
+    .hunting-merchant-offer .offer-cost {
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: #d4a017;
+    }
+
+    .hunting-merchant-offer.disabled .offer-cost {
+        color: #888888;
+    }
+
+    .hunting-merchant-pass {
+        margin-top: 8px;
+        pointer-events: auto;
+        text-align: center;
     }
 
     @media (max-width: 600px) {

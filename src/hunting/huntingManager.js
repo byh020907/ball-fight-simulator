@@ -29,8 +29,11 @@ import {
     HUNTING_TEAMS,
     createHuntingMinibossSpec,
     createHuntingMobEncounter,
-    shouldUseRosterMiniboss
+    shouldUseRosterMiniboss,
+    getHuntingMobCount
 } from "./huntingMonsters.js";
+import { createMerchantOffers, applyMerchantOffer, formatOfferResultToast } from "./huntingMerchant.js";
+import { formatPendingLootSummary, formatDefeatLossText } from "./huntingFormat.js";
 import { createMatchReport, recordLowestHp } from "../collection/index.js";
 import { grantExperienceFromMatchReport } from "../experience/experienceService.js";
 import { applyStatAllocation } from "../statAllocation.js";
@@ -270,7 +273,7 @@ export class HuntingManager {
 
             const name = playerBall?.name ?? run.characterId;
             const shardsText = `파편 +${floorLoot.shards}`;
-            const pendingText = `보유 파편 ${this._run.pendingLoot.shards}`;
+            const pendingText = formatPendingLootSummary(this._run.pendingLoot);
             const subtext = `층 ${run.floor} 완료 · ${shardsText}`;
 
             if (isFinalBoss) {
@@ -318,12 +321,14 @@ export class HuntingManager {
             const name = playerBall?.name ?? run.characterId;
             const securedShards = this._run.securedLoot?.shards ?? 0;
             const lostShards = this._run.defeatLosses?.shards ?? 0;
+            const defeatLossText = formatDefeatLossText(this._run.defeatLosses);
 
             this._mergeIntoSecured(app);
             app._refreshCollectionHub();
             app.refreshPlayerSetup();
 
-            app.ui.showOverlay("사냥터 패배", `${name} 쓰러짐`, `획득 ${securedShards} 파편 · 손실 ${lostShards} 파편`);
+            const lossDisplay = defeatLossText || `파편 ${lostShards} 손실`;
+            app.ui.showOverlay("사냥터 패배", `${name} 쓰러짐`, `획득 ${securedShards} 파편 · ${lossDisplay}`);
             app.ui.setHuntingActive(false);
             app.ui.setHuntingOverlayState({ huntingChoiceVisible: false });
             app._huntingDone = true;
@@ -414,8 +419,9 @@ export class HuntingManager {
                 }
 
                 if (encounter.type === HUNTING_FLOOR_OUTCOME_TYPES.COMBAT) {
-                    app.ui.addLog(`[사냥터] ${currentFloor}층 — 적 조우!`);
-                    this._stopHuntingMoveForBattle(app, `${currentFloor}층 — 적 조우!`);
+                    const mobCount = getHuntingMobCount(currentFloor);
+                    app.ui.addLog(`[사냥터] ${currentFloor}층 — 전투 발생 · 적 ${mobCount}명`);
+                    this._stopHuntingMoveForBattle(app, `${currentFloor}층 — 전투 발생 · 적 ${mobCount}명`);
                     return;
                 }
 
@@ -440,14 +446,15 @@ export class HuntingManager {
                     }
 
                     if (event.type === HUNTING_EVENT_TYPES.WANDERING_MERCHANT) {
-                        app.ui.addLog(
-                            `[사냥터] ${currentFloor}층 — 떠돌이 상인 발견, 정비 후 계속 전진할 수 있습니다.`
-                        );
-                        this._stopHuntingMoveForChoice(app, {
-                            message: `${currentFloor}층 — 떠돌이 상인 발견`,
-                            canRetreat: false,
+                        app.ui.addLog(`[사냥터] ${currentFloor}층 — 떠돌이 상인 발견`);
+                        const offers = createMerchantOffers(this._run, event, app.playerProfile);
+                        this._run = { ...this._run, merchantOffers: offers };
+                        const pendingText = formatPendingLootSummary(this._run.pendingLoot);
+                        this._stopHuntingMoveForMerchant(app, {
+                            message: `${currentFloor}층 — 떠돌이 상인`,
                             floor: currentFloor,
-                            summary: `떠돌이 상인 · 현재 ${currentFloor}층 · 10층 전진 가능`
+                            offers,
+                            summary: pendingText
                         });
                         return;
                     }
@@ -500,6 +507,8 @@ export class HuntingManager {
     }
 
     _stopHuntingMoveForChoice(app, { message, canRetreat, floor, summary = "" }) {
+        const pendingText = this._run ? formatPendingLootSummary(this._run.pendingLoot) : "";
+        const displaySummary = pendingText || summary || `현재 ${floor}층 · 10층 전진 가능`;
         app.ui.setHuntingOverlayState({
             huntingMoving: false,
             huntingChoiceVisible: true,
@@ -510,9 +519,69 @@ export class HuntingManager {
             huntingMoveStep: 0,
             huntingMoveMax: HUNTING_ADVANCE_STEPS,
             huntingMoveMessage: message,
-            huntingLootSummary: summary || `현재 ${floor}층 · 10층 전진 가능`
+            huntingLootSummary: displaySummary
         });
         this._moving = false;
+    }
+
+    _stopHuntingMoveForMerchant(app, { message, floor, offers, summary }) {
+        app.ui.setHuntingOverlayState({
+            huntingMoving: false,
+            huntingChoiceVisible: false,
+            huntingCanRetreat: false,
+            huntingFloor: floor,
+            huntingMoveFrom: 0,
+            huntingMoveTo: 0,
+            huntingMoveStep: 0,
+            huntingMoveMax: HUNTING_ADVANCE_STEPS,
+            huntingMoveMessage: message,
+            huntingLootSummary: summary || "",
+            huntingMerchantActive: true,
+            huntingMerchantOffers: offers
+        });
+        this._moving = false;
+    }
+
+    merchantChoose(offerIndex) {
+        const app = this.app;
+        const run = this._run;
+        if (!run || run.status !== "active") return;
+        const offers = run.merchantOffers;
+        if (!offers || offerIndex < 0 || offerIndex >= offers.length) return;
+        const offer = offers[offerIndex];
+        if (offer.purchased || offer.disabled) return;
+
+        const result = applyMerchantOffer(run, app.playerProfile, offer);
+        if (!result) {
+            app.ui.showToast("파편이 부족합니다.");
+            return;
+        }
+
+        this._run = result.run;
+        offer.purchased = true;
+        savePlayerProfile(app.playerProfile);
+
+        const toastMsg = formatOfferResultToast(result.result);
+        if (toastMsg) app.ui.showToast(`[상인] ${toastMsg}`);
+
+        // Refresh merchant overlay with updated state
+        const pendingText = formatPendingLootSummary(this._run.pendingLoot);
+        app.ui.setHuntingOverlayState({
+            huntingMerchantOffers: [...offers],
+            huntingLootSummary: pendingText
+        });
+    }
+
+    merchantPass() {
+        const app = this.app;
+        const run = this._run;
+        if (!run || run.status !== "active") return;
+        app.ui.setHuntingOverlayState({
+            huntingMerchantActive: false,
+            huntingMerchantOffers: null
+        });
+        this._run = { ...this._run, merchantOffers: null };
+        this.advance();
     }
 
     _handleAdvanceEvent(event, app) {

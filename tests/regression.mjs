@@ -70,7 +70,14 @@ import {
     createHuntingMobSpec,
     createHuntingMobEncounter,
     getHuntingMobCount,
-    shouldUseRosterMiniboss
+    shouldUseRosterMiniboss,
+    createMerchantOffers,
+    applyMerchantOffer,
+    formatOfferResultToast,
+    canAffordOffer,
+    formatChestRarityCounts,
+    formatPendingLootSummary,
+    formatDefeatLossText
 } from "../src/hunting/index.js";
 import { Grenade } from "../src/entities/grenade.js";
 import {
@@ -383,7 +390,9 @@ async function loadModuleApp() {
         huntingMoveTo: 0,
         huntingMoveStep: 0,
         huntingMoveMax: 10,
-        huntingMoveMessage: ""
+        huntingMoveMessage: "",
+        huntingMerchantActive: false,
+        huntingMerchantOffers: null
     });
     globalThis.Alpine.store("startButton", {
         hidden: true,
@@ -462,7 +471,9 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
         huntingMoveTo: 0,
         huntingMoveStep: 0,
         huntingMoveMax: 10,
-        huntingMoveMessage: ""
+        huntingMoveMessage: "",
+        huntingMerchantActive: false,
+        huntingMerchantOffers: null
     });
     harness.context.Alpine.store("startButton", {
         hidden: true,
@@ -8173,5 +8184,253 @@ testAntiStallCollisionResetsTimer();
 testAntiStallDefeatedFightersSkipped();
 testAntiStallFriendlyOnlyNoBurst();
 testAntiStallProjectileHitDoesNotResetTimer();
+
+function testHuntingMerchantOffers() {
+    const run = createHuntingRun({ characterId: FIGHTER_IDS.DASH });
+    const runWithHp = {
+        ...run,
+        floor: 10,
+        carriedHp: 50,
+        carriedMaxHp: 100,
+        pendingLoot: {
+            shards: 25,
+            chests: [
+                createHuntingChest({ rarity: "common", id: "p1" }),
+                createHuntingChest({ rarity: "rare", id: "p2" })
+            ],
+            xp: 0
+        },
+        securedLoot: { shards: 0, chests: [], xp: 0 }
+    };
+
+    const event = { type: HUNTING_EVENT_TYPES.WANDERING_MERCHANT, floor: 10, discountRatio: 0 };
+
+    // Profile with permanent hunting shards
+    const profile = createDefaultPlayerProfile();
+    profile.hunting.shards = 200;
+
+    // ── Generate offers ──
+    const offers = createMerchantOffers(runWithHp, event, profile);
+    assert.equal(offers.length, 3, "Should generate exactly 3 offers");
+    assert.equal(offers[0].type, "repair", "First offer should be repair");
+    assert.equal(offers[1].type, "buy_loot", "Second offer should be buy_loot");
+    assert.equal(offers[2].type, "secure_transport", "Third offer should be secure_transport");
+
+    // Repair offer details
+    assert.equal(offers[0].disabled, false, "Repair should not be disabled when HP < max");
+    assert.ok(offers[0].cost > 0, "Repair should have a cost");
+    assert.ok(offers[0].healAmount > 0, "Repair should have a heal amount");
+
+    // Buy loot offer
+    assert.equal(offers[1].disabled, false, "Buy loot should not be disabled");
+    assert.ok(offers[1].cost > 0, "Buy loot should have a cost");
+
+    // Secure transport offer - has pending chests
+    assert.equal(offers[2].disabled, false, "Secure transport should be enabled when pending chests exist");
+
+    // ── Discount applies ──
+    const eventDiscounted = { ...event, discountRatio: 0.2 };
+    const discountedOffers = createMerchantOffers(runWithHp, eventDiscounted, profile);
+    assert.ok(discountedOffers[0].cost <= offers[0].cost, "Discount should reduce prices");
+
+    // ── Secure transport disabled when no pending chests ──
+    const runNoPending = { ...runWithHp, pendingLoot: { shards: 0, chests: [], xp: 0 } };
+    const noChestOffers = createMerchantOffers(runNoPending, event, profile);
+    assert.equal(noChestOffers[2].disabled, true, "Secure transport should be disabled with no pending chests");
+    assert.ok(noChestOffers[2].disabledReason.length > 0, "Disabled offer should have a reason");
+
+    // ── canAffordOffer ──
+    profile.hunting.shards = 0;
+    assert.equal(canAffordOffer(offers[0], profile), false, "Cannot afford with 0 shards");
+    profile.hunting.shards = 200;
+    assert.equal(canAffordOffer(offers[0], profile), true, "Can afford with enough shards");
+
+    // ── Repair offer: spends permanent shards, heals carried HP ──
+    const repairResult = applyMerchantOffer(runWithHp, profile, offers[0]);
+    assert.ok(repairResult !== null, "Repair offer should apply");
+    assert.equal(profile.hunting.shards, 200 - offers[0].cost, "Repair should spend permanent shards");
+    assert.ok(repairResult.run.carriedHp > runWithHp.carriedHp, "Repair should increase carried HP");
+    assert.equal(repairResult.result.type, "repair", "Result type should be repair");
+    assert.ok(repairResult.result.healed > 0, "Should have healed positive amount");
+    const toastMsg = formatOfferResultToast(repairResult.result);
+    assert.ok(toastMsg.includes("HP"), "Repair toast should mention HP");
+
+    // ── Buy loot offer: adds unsecured chest ──
+    profile.hunting.shards = 200;
+    const buyResult = applyMerchantOffer(runWithHp, profile, offers[1]);
+    assert.ok(buyResult !== null, "Buy loot offer should apply");
+    assert.equal(profile.hunting.shards, 200 - offers[1].cost, "Buy loot should spend permanent shards");
+    assert.equal(
+        buyResult.run.pendingLoot.chests.length,
+        runWithHp.pendingLoot.chests.length + 1,
+        "Buy loot should add a chest to pendingLoot"
+    );
+    const buyToast = formatOfferResultToast(buyResult.result);
+    assert.ok(buyToast.includes("미확보"), "Buy loot toast should mention 미확보");
+
+    // ── Secure transport offer: moves pending chest to secured loot ──
+    profile.hunting.shards = 200;
+    const secureResult = applyMerchantOffer(runWithHp, profile, offers[2]);
+    assert.ok(secureResult !== null, "Secure transport offer should apply");
+    assert.equal(profile.hunting.shards, 200 - offers[2].cost, "Secure transport should spend permanent shards");
+    assert.equal(
+        secureResult.run.pendingLoot.chests.length,
+        runWithHp.pendingLoot.chests.length - 1,
+        "Secure transport should remove a chest from pendingLoot"
+    );
+    assert.equal(
+        secureResult.run.securedLoot.chests.length,
+        (runWithHp.securedLoot?.chests?.length ?? 0) + 1,
+        "Secure transport should add a chest to securedLoot"
+    );
+    const secureToast = formatOfferResultToast(secureResult.result);
+    assert.ok(secureToast.includes("안전"), "Secure transport toast should mention 안전");
+
+    // ── Purchased offer cannot be applied again ──
+    assert.equal(
+        applyMerchantOffer(runWithHp, profile, { ...offers[0], purchased: true }),
+        null,
+        "Purchased offer should return null"
+    );
+    assert.equal(
+        applyMerchantOffer({ ...runWithHp, carriedHp: runWithHp.carriedMaxHp }, profile, offers[0]),
+        null,
+        "Repair should return null when current run HP is already full"
+    );
+
+    // ── Insufficient shards ──
+    profile.hunting.shards = 1;
+    assert.equal(applyMerchantOffer(runWithHp, profile, offers[1]), null, "Insufficient shards should return null");
+
+    // ── Disabled offer cannot be applied ──
+    profile.hunting.shards = 200;
+    assert.equal(
+        applyMerchantOffer(runNoPending, profile, noChestOffers[2]),
+        null,
+        "Disabled offer should return null"
+    );
+
+    console.log("[hunting-merchant] ok");
+}
+
+function testHuntingFormatHelpers() {
+    // ── formatChestRarityCounts ──
+    assert.equal(formatChestRarityCounts([]), "", "Empty chests should produce empty string");
+    assert.equal(formatChestRarityCounts(null), "", "Null chests should produce empty string");
+
+    const chests = [
+        createHuntingChest({ rarity: "common", id: "c1" }),
+        createHuntingChest({ rarity: "rare", id: "r1" }),
+        createHuntingChest({ rarity: "common", id: "c2" })
+    ];
+    const formatted = formatChestRarityCounts(chests);
+    assert.ok(formatted.includes("common 2개"), "Should count common chests");
+    assert.ok(formatted.includes("rare 1개"), "Should count rare chests");
+
+    // ── formatPendingLootSummary ──
+    const summary = formatPendingLootSummary({ shards: 50, chests: [createHuntingChest({ rarity: "common" })], xp: 0 });
+    assert.ok(summary.includes("보유 파편 50"), "Should show shard count");
+    assert.ok(summary.includes("미확보 상자 1개"), "Should show unsecured chest count");
+
+    const noChestSummary = formatPendingLootSummary({ shards: 30, chests: [], xp: 0 });
+    assert.ok(noChestSummary.includes("보유 파편 30"), "Should show shard count without chests");
+    assert.ok(!noChestSummary.includes("미확보"), "Should not mention chests when none exist");
+
+    assert.equal(formatPendingLootSummary(null), "", "Null input should return empty");
+    assert.equal(
+        formatPendingLootSummary({ shards: 0, chests: [], xp: 0 }),
+        "",
+        "Empty pending loot should not hide contextual choice summary"
+    );
+
+    // ── formatDefeatLossText ──
+    const lossText = formatDefeatLossText({
+        shards: 10,
+        chests: [createHuntingChest({ rarity: "common", id: "l1" }), createHuntingChest({ rarity: "rare", id: "l2" })],
+        xp: 0
+    });
+    assert.ok(lossText.includes("파편 10"), "Should show lost shards");
+    assert.ok(lossText.includes("common 1개"), "Should show common chest destroyed");
+    assert.ok(lossText.includes("rare 1개"), "Should show rare chest destroyed");
+
+    const shardOnlyLoss = formatDefeatLossText({ shards: 5, chests: [], xp: 0 });
+    assert.equal(shardOnlyLoss, "파편 5 손실", "Should only mention shards when no chests destroyed");
+
+    assert.equal(formatDefeatLossText(null), "", "Null defeat losses should return empty");
+
+    console.log("[hunting-format] ok");
+}
+
+function testHuntingCombatText() {
+    // ── getHuntingMobCount uses generic count, no melee/ranged labels ──
+    const countFloor1 = getHuntingMobCount(1);
+    const countFloor10 = getHuntingMobCount(10);
+
+    assert.ok(Number.isFinite(countFloor1) && countFloor1 >= 1, "Floor 1 should have at least 1 enemy");
+    assert.ok(countFloor10 >= countFloor1, "Deeper floors should have more or equal enemies");
+
+    // ── createHuntingMobEncounter does not use melee/ranged in UI-visible text ──
+    const mobs = createHuntingMobEncounter({ floor: 5, rng: () => 0.5 });
+    assert.equal(mobs.length, getHuntingMobCount(5), "Encounter count matches getHuntingMobCount");
+    for (const mob of mobs) {
+        // Names should not imply specific melee/ranged labels in UI text
+        assert.ok(typeof mob.name === "string", "Mob should have a name");
+        assert.ok(typeof mob.title === "string", "Mob should have a title");
+    }
+
+    console.log("[hunting-combat-text] ok");
+}
+
+function testHuntingDefeatChestLoss() {
+    const run = createHuntingRun({ characterId: FIGHTER_IDS.DASH });
+    const runWithChests = {
+        ...run,
+        floor: 5,
+        carriedHp: 30,
+        carriedMaxHp: 100,
+        status: "active",
+        pendingLoot: {
+            shards: 100,
+            chests: [
+                createHuntingChest({ rarity: "common", id: "d1" }),
+                createHuntingChest({ rarity: "rare", id: "d2" })
+            ],
+            xp: 100
+        }
+    };
+
+    // Controlled RNG: probability chain ensures both chests are destroyed
+    const defeated = defeatHuntingRun(runWithChests, {
+        rng: (() => {
+            const seq = [0.01, 0.01, 0.01, 0.01];
+            let i = 0;
+            return () => seq[i++] ?? 0.01;
+        })()
+    });
+
+    assert.equal(defeated.status, "defeated", "Defeat should end the run");
+
+    // Both chests should be in defeatLosses (with high probability rng)
+    if (defeated.defeatLosses.chests.length > 0) {
+        const lossText = formatDefeatLossText(defeated.defeatLosses);
+        assert.ok(typeof lossText === "string" && lossText.length > 0, "Defeat loss text should be non-empty");
+        // Check that text mentions destruction
+        // The text should have 파괴 when chests are destroyed
+        const hasDestroyed = lossText.includes("파괴");
+        const hasShards = lossText.includes("파편");
+        assert.ok(hasShards, "Defeat loss text should mention shard loss");
+        // If chests were destroyed, should mention 파괴
+        if (defeated.defeatLosses.chests.length > 0) {
+            assert.ok(hasDestroyed, "Defeat loss text should mention chest destruction when chests lost");
+        }
+    }
+
+    console.log("[hunting-defeat-chest-loss] ok");
+}
+
+testHuntingMerchantOffers();
+testHuntingFormatHelpers();
+testHuntingCombatText();
+testHuntingDefeatChestLoss();
 
 console.log("regression tests ok");

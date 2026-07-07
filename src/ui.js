@@ -722,7 +722,9 @@ export class UIController {
             huntingMoveTo: 0,
             huntingMoveStep: 0,
             huntingMoveMax: 10,
-            huntingMoveMessage: ""
+            huntingMoveMessage: "",
+            huntingMerchantActive: false,
+            huntingMerchantOffers: null
         });
         this._resetXpReward();
     }
