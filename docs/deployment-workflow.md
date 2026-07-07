@@ -52,6 +52,26 @@ https://byh020907.github.io/ball-fight-simulator/
 
 단, 검증 중에는 이 URL이 `release`가 아니라 `main`을 서빙한다.
 
+## 리모트 Codex 작업 완료 기준
+
+리모트 Codex 환경에서는 사용자가 GitHub/GitSync에서 diff를 확인할 수 있어야 하므로, 사용자 작업 요청을 처리한 뒤에는 **커밋 후 `main` push까지 완료하는 것**을 기본 완료 기준으로 삼는다.
+
+기본 순서:
+
+1. 요청된 작업을 구현한다.
+2. 필요한 검증을 실행한다.
+3. 작업 단위 커밋을 만든다.
+4. `main`에 push한다.
+5. 사용자에게 커밋, push 여부, 검증 결과를 보고한다.
+
+예외:
+
+- 사용자가 명시적으로 push하지 말라고 한 경우
+- 테스트 실패나 불완전 구현처럼 push하면 안 되는 상태인 경우
+- secret, 깨진 산출물, 의도하지 않은 대용량 파일이 포함된 경우
+
+`main` push는 공개 배포가 아니다. 공개 페이지는 `release`가 통제한다.
+
 ## 검증 취소 또는 보류
 
 검증을 취소하거나 보류할 때는 배포하지 않고 Pages source만 되돌린다.
@@ -119,4 +139,3 @@ https://byh020907.github.io/ball-fight-simulator/?v=20260707
 - `release`를 force-push하지 않는다.
 - GitHub Pages source를 임의의 feature branch나 tag로 바꾸지 않는다.
 - Pages source path(`/` 또는 `/docs`)를 명시 요청 없이 바꾸지 않는다.
-
