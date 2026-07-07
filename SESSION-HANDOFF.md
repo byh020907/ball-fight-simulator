@@ -1,5 +1,11 @@
 # 결정 기록
 
+## [L1] 2026-07-07 — BattleBall 초기 각도 기본값을 0도로 변경 (대기화면 upright)
+- 맥락: 대기화면/캐릭터 선택 UI에서 캐릭터가 무작위 각도로 기울어져 있어 모든 캐릭터가 비뚤어져 보이는 문제. `rotationEnabled=false`는 각도 0으로 올바르게 동작했지만, 기본 활성화된 회전에서 `Math.random() * PI * 2`로 각도가 설정되어 캐릭터가 이상하게 보임.
+- 결정: (1) polygon 기본 `angle`을 `Math.random() * PI * 2` → `0`으로 변경 (단, `appearance.angle` 명시 시 우선). (2) circle 기본 `angle`을 `Math.random() * PI * 2` → `0`으로 변경. (3) `angularVelocity`는 `randomSpin()` 유지 (runtime 회전은 이 각속도와 충돌 impulse로 동작). (4) 회귀 테스트 `testDefaultPolygonAngleIsZero` 신설, `testCircleMinAngularVelocity`에 `angle === 0` 검증 추가. (5) `docs/development-rules.md`에 기본 각도 0 정책 문서화.
+- 영향: `src/entities/battleBall.js`, `tests/regression.mjs`, `docs/development-rules.md`, `SESSION-HANDOFF.md`
+- 검증: `npm test`, `npm run format:check`, `npm run check`, `node scripts/huntingUserScenario.mjs`
+
 ## [L1] 2026-07-07 — 접촉점 속도 기반 회전 손상 기여 시스템 도입
 - 맥락: 충돌 대미지가 선형 속도만 고려하고 각속도(회전)는 무시함. 회전하는 볼이 접촉점에서 더 큰 상대 속도를 가지므로 +60% capped 회전 손상 보너스를 Crash/Dash Contact/Vampire Contact 경로에 추가.
 - 결정: (1) `src/physics/contactDamage.js` 신설 — `getContactPointVelocity(body, contactPoint)`, `calculateRotationalContactDamageBonus(body, contactPoint, options)` (0~0.6 계수), `applyRotationalContactDamage(baseDamage, body, contactPoint, options)` (최종 대미지). (2) `BattleSimulation.calculateCollisionDamageWithContact(attacker, defender, normal, contactPoint)` 신설 — 기존 충돌 대미지 + 회전 보너스. (3) `handleFighterCollision`에서 `result.contactPoint` 전달. (4) `DashEffect.onCollision(attacker, defender, simulation, contactPoint)`에 contactPoint 파라미터 추가. (5) `VampireAbility.onCollision(target, context)`에 context 파라미터 추가. (6) 기존 `onCollision` 단일 파라미터 인터페이스와 하위 호환성 유지. (7) docs/회귀 테스트 갱신.

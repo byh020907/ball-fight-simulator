@@ -60,16 +60,16 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         };
         this.hunting = spec.hunting ?? null;
         this.appearance = spec.appearance ?? { sides: 0, face: "default" };
-        // RotationalBody 초기화: 모든 볼이 회전 (appearance 우선, rotationEnabled로 비활성 가능)
+        // RotationalBody 초기화: angle 기본값 0 (대기화면 upright), 회전은 runtime angularVelocity/integrateRotation로 동작
         this.rotationEnabled = spec.rotationEnabled !== false;
         if (!this.rotationEnabled) {
             this.angle = 0;
             this.angularVelocity = 0;
         } else if (this.appearance.sides > 0) {
-            this.angle = this.appearance.angle ?? Math.random() * Math.PI * 2;
+            this.angle = this.appearance.angle ?? 0;
             this.angularVelocity = this.appearance.angularVelocity ?? randomSpin();
         } else {
-            this.angle = Math.random() * Math.PI * 2;
+            this.angle = 0;
             this.angularVelocity = randomSpin();
         }
         this.equipment = {

@@ -3686,11 +3686,33 @@ function testCircleMinAngularVelocity() {
     };
     for (let i = 0; i < 20; i++) {
         const ball = new BattleBall(spec, new Vector2(100 + i * 10, 100));
+        assert.equal(ball.angle, 0, `default circle angle should be 0 (iteration ${i})`);
         assert.ok(
             Math.abs(ball.angularVelocity) >= 0.8,
             `circle angularVelocity (${ball.angularVelocity}) should be >= 0.8 rad/s`
         );
     }
+}
+
+function testDefaultPolygonAngleIsZero() {
+    const spec = {
+        id: "test-poly-zero",
+        name: "PolyZero",
+        teamId: "t",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 30, mass: 10 },
+        color: "#ff0000",
+        appearance: { sides: 6, face: "default" },
+        ability: "dash"
+    };
+    for (let i = 0; i < 10; i++) {
+        const ball = new BattleBall(spec, new Vector2(100 + i * 10, 100));
+        assert.equal(ball.angle, 0, `default polygon angle should be 0 (iteration ${i})`);
+        assert.ok(
+            Math.abs(ball.angularVelocity) >= 0.8,
+            `polygon angularVelocity (${ball.angularVelocity}) should be >= 0.8 rad/s`
+        );
+    }
+    console.log("[default-angle-zero] ok");
 }
 
 async function testCircleRotatesVisibly(app) {
@@ -6746,6 +6768,7 @@ testMobAppearanceHasRotationData();
 testBattleBallUsesAppearanceAngle();
 testRandomSpinHelper();
 testCircleMinAngularVelocity();
+testDefaultPolygonAngleIsZero();
 testPolygonMobFaceRotatesWithBody();
 testGetFighterCollisionShapePolygon();
 testGetFighterCollisionShapeCircle();

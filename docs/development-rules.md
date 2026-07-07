@@ -325,6 +325,7 @@ Ability / Action / Effect: 목표 방향, 목표 속도, movementEffect, forceHe
 - 동적 충돌(circle-circle 포함)은 반드시 접선 마찰/스핀 교환을 포함해야 하며, 충돌 후 angularVelocity가 변화하는지 실제 `update()` 루프 경로에서 검증하는 테스트를 추가해야 한다. `_accumulatedAngularImpulse`만 검증하는 테스트로는 부족하다.
 - `angularDamping`은 초당 유지율로 해석합니다. `integrateRotation`에서 `angularVelocity *= Math.pow(angularDamping, delta)`로 적용되므로, `angularDamping=0.98`이면 60fps 1초 후 각속도의 98%가 유지됩니다. delta가 0.016이든 0.5든 일관된 감쇠율을 보장합니다.
 - `BattleBall.update()`의 실행 순서는 `_applyVelocityCorrection` → `integrate(delta)` → `simulation.keepInsideArena(this)` → `bounced → forcedHeading 해제` → `integrateRotation(delta)`이다. `keepInsideArena`에서 발생하는 벽/지형 충돌 angular impulse가 `integrateRotation`보다 먼저 누적되므로, 같은 프레임에 angularVelocity에 반영된다. `rotationEnabled === false`인 경우 `integrateRotation` 대신 `clearAngularForces`를 호출한다.
+- `BattleBall` 생성 시 `angle` 기본값은 0 rad이다. 이는 대기화면/프리뷰에서 캐릭터가 항상 upright(똑바로 서 있는) 상태로 보이기 위함이다. 다각형의 `appearance.angle`이 명시적으로 제공된 경우 그 값이 우선된다. runtime 회전은 `angularVelocity`(기본값 `randomSpin()`으로 0.9~1.6 rad/s)와 충돌 시 `integrateRotation`/`applyAngularImpulse`를 통해 동작한다.
 - `BattleBall.update()`는 `velocity`를 즉시 목표 속도로 교체하지 않고, `_computeDesiredVelocity()` 결과와 현재 속도의 차이를 `applyImpulse()`로 보정합니다.
 - `forceHeading()`은 방향 고정만 소유하고, 고정 속도(`overrideVelocity`)를 소유하지 않습니다.
 - `applyKnockback()`은 넉백 impulse를 즉시 더하고, duration 동안 방향만 고정합니다.
