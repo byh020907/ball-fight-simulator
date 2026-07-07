@@ -197,6 +197,7 @@
 - 영향: `src/physics/collisionResponse.js`, `src/simulation/battleSimulation.js`, `src/simulation/simulation.js`, `src/terrain/terrainCollision.js`, `src/physics/CollisionShape.js`, `tests/regression.mjs`, `docs/development-rules.md`, `SESSION-HANDOFF.md`
 - 검증: `npm test`, `npm run format:check`, `npm run check`, `node scripts/huntingUserScenario.mjs` 통과
 - 미검증: 브라우저에서 캐릭터 회전 시각적 과도함 여부 — 물리적으로 정확해졌으므로 이전보다 회전이 강하게 보일 수 있음. 게임 느낌 튜닝이 필요하면 rigid body solver 내부가 아닌 시각적 감쇠 또는 외부 damping으로 처리해야 함.
+- 후속 확인: Codex 검증 중 `src/physics/CollisionShape.js`의 폴리곤 지형 충돌 경로에 `angularFactor: 0.15`가 1개 남아 있음을 발견해 제거. `src` 런타임 경로에는 0.15 감쇠 호출이 남지 않음.
 
 ## 현재 기준 요약 (2026-07-07)
 - 컴포넌트 파일 구조: `src/components/<name>.html` (플랫, 폴더 없음), 9개 컴포넌트
