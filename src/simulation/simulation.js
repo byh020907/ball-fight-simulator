@@ -81,7 +81,6 @@ export class Simulation {
             const preVel = { x: entity.velocity.x, y: entity.velocity.y };
             applyCollisionResponse(entity, { x: 1, y: 0 }, { x: 0, y: entity.position.y }, preVel, {
                 restitution: 1,
-                angularFactor: 0.15,
                 tangentialFriction: 0.03
             });
             if (entity.state?.movement) this._handleWallBounce(entity);
@@ -92,7 +91,6 @@ export class Simulation {
             const preVel = { x: entity.velocity.x, y: entity.velocity.y };
             applyCollisionResponse(entity, { x: -1, y: 0 }, { x: this.width, y: entity.position.y }, preVel, {
                 restitution: 1,
-                angularFactor: 0.15,
                 tangentialFriction: 0.03
             });
             if (entity.state?.movement) this._handleWallBounce(entity);
@@ -108,7 +106,6 @@ export class Simulation {
             const preVel = { x: entity.velocity.x, y: entity.velocity.y };
             applyCollisionResponse(entity, { x: 0, y: 1 }, { x: entity.position.x, y: 0 }, preVel, {
                 restitution: 1,
-                angularFactor: 0.15,
                 tangentialFriction: 0.03
             });
             if (entity.state?.movement) this._handleWallBounce(entity);
@@ -119,7 +116,6 @@ export class Simulation {
             const preVel = { x: entity.velocity.x, y: entity.velocity.y };
             applyCollisionResponse(entity, { x: 0, y: -1 }, { x: entity.position.x, y: this.height }, preVel, {
                 restitution: 1,
-                angularFactor: 0.15,
                 tangentialFriction: 0.03
             });
             if (entity.state?.movement) this._handleWallBounce(entity);

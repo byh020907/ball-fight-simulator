@@ -251,13 +251,13 @@ function _resolveContactImpulse(bodyA, bodyB, normal, contactPoint, options = {}
  * @param {{x:number, y:number}} preCollisionVelocity — 충돌 직전 body의 절대 속도
  * @param {object} [options]
  * @param {number} [options.restitution=0.92]
- * @param {number} [options.angularFactor=0.15] — angular impulse 배율
+ * @param {number} [options.angularFactor=1] — angular impulse 배율 (물리적으로 정확한 1, 시각적 튜닝은 이 값을 변경하지 말고 외부에서 처리)
  * @param {number} [options.tangentialFriction=0.03]
  * @param {{x:number, y:number}} [options.surfaceVelocity={0,0}]
  */
 export function applyCollisionResponse(body, normal, contactPoint, preCollisionVelocity, options = {}) {
     const restitution = options.restitution ?? 0.92;
-    const angularFactor = options.angularFactor ?? 0.15;
+    const angularFactor = options.angularFactor ?? 1;
     const tangentialFriction = options.tangentialFriction ?? 0.03;
     const surfaceVel = options.surfaceVelocity ?? { x: 0, y: 0 };
 
@@ -294,7 +294,7 @@ export function applyCollisionResponse(body, normal, contactPoint, preCollisionV
  * @param {number} approachSpeed — 충돌 전 relative velocity dot normal (양수=분리)
  * @param {object} [options]
  * @param {number} [options.restitution=0.92]
- * @param {number} [options.angularFactor=0.15] — angular impulse 배율
+ * @param {number} [options.angularFactor=1] — angular impulse 배율 (물리적으로 정확한 1, 시각적 튜닝은 이 값을 변경하지 말고 외부에서 처리)
  * @param {number} [options.tangentialFriction=0.03]
  * @param {number} [options.impactA=1] — bodyB에 적용할 impulse 배율
  * @param {number} [options.impactB=1] — bodyA에 적용할 impulse 배율
@@ -304,7 +304,7 @@ export function applyDynamicCollisionResponse(bodyA, bodyB, normal, contactPoint
     if (approachSpeed >= 0) return;
 
     const restitution = options.restitution ?? 0.92;
-    const angularFactor = options.angularFactor ?? 0.15;
+    const angularFactor = options.angularFactor ?? 1;
     const tangentialFriction = options.tangentialFriction ?? 0.03;
     const impactA = options.impactA ?? 1;
     const impactB = options.impactB ?? 1;

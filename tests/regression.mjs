@@ -7316,7 +7316,7 @@ function testTangentFrictionChangesLinearAndAngular() {
     // 접근 속도 = (-100 - 100) * 1 + (0 - 50) * 0 = -200 (approaching)
     applyDynamicCollisionResponse(bodyA, bodyB, normal, contact, -200, {
         restitution: 0.5,
-        angularFactor: 0.15,
+        angularFactor: 1,
         tangentialFriction: 0.05
     });
 
@@ -7406,9 +7406,89 @@ function testEffectiveMassRotationalContribution() {
     console.log("[effective-mass-rotational] ok");
 }
 
+function testOffCenterAngularMagnitude() {
+    // 동적 충돌에서 기본 angularFactor=1로 충분히 큰 angularVelocity가 생성되는지 검증.
+    // 이 테스트는 angularFactor=0.15(default)일 때는 실패한다 (약 0.63 rad/s만 생성).
+    const bodyA = {
+        position: { x: 400, y: 300 },
+        velocity: { x: 200, y: 0 },
+        mass: 10,
+        radius: 25,
+        angularVelocity: 0,
+        applyImpulse(impulse) {
+            this.velocity.x += impulse.x;
+            this.velocity.y += impulse.y;
+        },
+        applyAngularImpulse(value) {
+            this._angularMag = (this._angularMag || 0) + Math.abs(value);
+        }
+    };
+    const bodyB = {
+        position: { x: 500, y: 300 },
+        velocity: { x: 0, y: 0 },
+        mass: 1000,
+        radius: 25,
+        angularVelocity: 0,
+        applyImpulse() {},
+        applyAngularImpulse() {}
+    };
+    const normal = { x: 1, y: 0 };
+    const contact = { x: 450, y: 350 }; // off-center → r×n ≠ 0
+    // approachSpeed = (0 - 200) * 1 + (0 - 0) * 0 = -200 → collision
+    applyDynamicCollisionResponse(bodyA, bodyB, normal, contact, -200, {
+        restitution: 0.5,
+        tangentialFriction: 0
+    });
+    const angImpulse = bodyA._angularMag;
+    // With angularFactor=1: expected ~16650 (|r × J|). With 0.15: ~2498.
+    assert.ok(
+        Math.abs(angImpulse) > 5000,
+        `off-center angular impulse should be > 5000 with default angularFactor=1, got ${angImpulse}`
+    );
+    assert.ok(Number.isFinite(angImpulse), "off-center angular impulse should stay finite");
+    console.log("[off-center-magnitude] ok");
+}
+
+function testWallCollisionAngularNotReduced() {
+    // 벽 충돌 angular impulse가 기본 angularFactor=1로 충분히 큰지 검증.
+    const spec = {
+        id: "wall-mag",
+        name: "WallMag",
+        teamId: "t",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#ff8800",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash",
+        rotationEnabled: true
+    };
+    const sim = new BattleSimulation([spec, { ...spec, id: "opp", teamId: "t2" }], { onLog() {}, onSound() {} });
+    const ball = sim.fighters[0];
+    ball.position = new Vector2(sim.width - ball.radius + 1, 500);
+    ball.velocity = new Vector2(300, 200);
+    const impulseBefore = ball._accumulatedAngularImpulse;
+    sim.keepInsideArena(ball);
+    const impulseAfter = ball._accumulatedAngularImpulse;
+    // Apply accumulated angular impulse manually (as done in the update path)
+    if (ball._inverseMomentOfInertia && impulseAfter !== 0) {
+        ball.angularVelocity += impulseAfter * ball._inverseMomentOfInertia;
+    }
+    assert.ok(impulseAfter !== impulseBefore, "wall collision should accumulate angular impulse");
+    // With angularFactor=1: magnitude ~4320 (tangent friction torque, friction-clamped).
+    // With 0.15: ~648. Threshold 2000 distinguishes them.
+    const impulseMag = Math.abs(impulseAfter - impulseBefore);
+    assert.ok(
+        impulseMag > 2000,
+        `wall collision angular impulse should be > 2000 with angularFactor=1, got ${impulseMag}`
+    );
+    assert.ok(Number.isFinite(impulseMag), "wall collision angular impulse should be finite");
+    console.log("[wall-angular-not-reduced] ok");
+}
+
 testImpulseMassDistribution();
 testOffCenterAngularImpulse();
 testTangentFrictionChangesLinearAndAngular();
 testEffectiveMassRotationalContribution();
+testOffCenterAngularMagnitude();
+testWallCollisionAngularNotReduced();
 
 console.log("regression tests ok");

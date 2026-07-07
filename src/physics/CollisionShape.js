@@ -89,7 +89,6 @@ export function resolvePolygonTerrainCollision(entity, terrain) {
         const preVel = { x: entity.velocity.x, y: entity.velocity.y };
         applyCollisionResponse(entity, normal, contactPoint, preVel, {
             restitution: 0.92,
-            angularFactor: 0.15,
             tangentialFriction: 0.03
         });
         return true;

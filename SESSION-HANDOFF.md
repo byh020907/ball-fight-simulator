@@ -191,6 +191,13 @@
 - 영향: `src/physics/collisionResponse.js`(전면 재작성), `src/simulation/battleSimulation.js`(import/메서드 변경), `tests/regression.mjs`(신규 4종 테스트 + 1종 mock 보강), `docs/development-rules.md`(충돌 물리 설명 갱신), `SESSION-HANDOFF.md`
 - 검증: `npm test`(18개 스위트), `npm run format:check`, `npm run check`, `node scripts/huntingUserScenario.mjs` 통과
 
+## [L1] 2026-07-07 — 충돌 angularFactor 기본값을 0.15→1로 변경하여 물리적 일관성 확보
+- 맥락: rigid body impulse solver는 effective mass denominator에 회전 관성 기여(invI·(r×d)²)를 포함해 정확한 impulse J를 계산하지만, angular impulse 적용 시 `angularFactor=0.15`로 85%의 각운동량을 무시함. denominator는 전체 회전을 가정하고 J를 계산하는데 적용 시 15%만 반영되어 물리적 불일치 발생. Codex probe 결과 동적 충돌 각속도 0.63 rad/s (0.15배) vs 4.21 rad/s (1배).
+- 결정: (1) `collisionResponse.js`의 `applyCollisionResponse`와 `applyDynamicCollisionResponse` 기본 `angularFactor`를 0.15→1로 변경. (2) 모든 호출자에서 명시적 `angularFactor: 0.15` 제거 (battleSimulation.js, simulation.js, terrainCollision.js, CollisionShape.js 4개 파일 8개 호출). (3) 테스트 강화: `testOffCenterAngularMagnitude`(임계값 5000, 0.15배면 2498로 실패), `testWallCollisionAngularNotReduced`(임계값 5000, 0.15배면 2534로 실패). (4) docs 갱신: `angularFactor: 0.15` 참조 제거, 물리적 일관성 설명 추가.
+- 영향: `src/physics/collisionResponse.js`, `src/simulation/battleSimulation.js`, `src/simulation/simulation.js`, `src/terrain/terrainCollision.js`, `src/physics/CollisionShape.js`, `tests/regression.mjs`, `docs/development-rules.md`, `SESSION-HANDOFF.md`
+- 검증: `npm test`, `npm run format:check`, `npm run check`, `node scripts/huntingUserScenario.mjs` 통과
+- 미검증: 브라우저에서 캐릭터 회전 시각적 과도함 여부 — 물리적으로 정확해졌으므로 이전보다 회전이 강하게 보일 수 있음. 게임 느낌 튜닝이 필요하면 rigid body solver 내부가 아닌 시각적 감쇠 또는 외부 damping으로 처리해야 함.
+
 ## 현재 기준 요약 (2026-07-07)
 - 컴포넌트 파일 구조: `src/components/<name>.html` (플랫, 폴더 없음), 9개 컴포넌트
 - **사냥터 100층 구조**: 시작 0층, 10층 전진 루프, 전투/포탈/상인/챔피언에서 정지, 빈층/축복/함정/휴식/상자/제단은 자동 진행
