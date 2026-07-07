@@ -184,7 +184,14 @@
 - 영향: `src/physics/staticCollisionResponse.js`(신규), `src/simulation/simulation.js`, `src/terrain/terrainCollision.js`, `src/physics/CollisionShape.js`, `tests/regression.mjs`, `SESSION-HANDOFF.md`
 - 검증: `npm test` (17개 스위트), `npm run format:check`, `npm run check`, `node scripts/huntingUserScenario.mjs` 통과
 
-## 현재 기준 요약 (2026-07-06)
+## [L1] 2026-07-07 — 충돌 응답을 rigid body impulse solver 구조에 맞춘다
+
+- 맥락: 현재 `collisionResponse.js`는 normal impulse magnitude를 `|approachSpeed| * (1+e)`로 계산하고 angular impulse를 분리 적용하여, effective mass denominator에 inverse inertia((r×n)²/IA)가 누락된 임시 공식 상태. `core.applyCollisionImpulse`는 contact point/angular impulse를 무시한 pure linear normal impulse. `battleSimulation.js`는 `_applyCollisionPhysics`(linear normal)와 `_applyAngularCollisionResponse`(angular/tangent)로 분리되어 물리적으로 정확하지 않음.
+- 결정: (1) `collisionResponse.js`에 contact point 기반 2D rigid-body impulse solver(`_resolveContactImpulse`, `_effectiveMassDenom`, `_applyImpulseToBodies`)를 구현. normal impulse `jn = -(1+e)·vn/denom_n`, tangent impulse `jt = -vt/denom_t` (Coulomb clamp), effective mass denominator에 `invMass + (r×d)²·invI` 포함. (2) `applyCollisionResponse`(정적)와 `applyDynamicCollisionResponse`(동적) 모두 공통 `_resolveContactImpulse`를 호출하도록 리팩터. (3) `battleSimulation.js`에서 `_applyCollisionPhysics` + `_applyAngularCollisionResponse` → 단일 `_applyRigidBodyCollision`으로 통합, impact 배율은 options로 전달. (4) `collisionAngularImpulse`는 legacy wrapper 유지. (5) impulse 질량 분배/off-center angular/effective mass 회전 기여/tangent friction 선형+각변환 검증 테스트 4종 추가.
+- 영향: `src/physics/collisionResponse.js`(전면 재작성), `src/simulation/battleSimulation.js`(import/메서드 변경), `tests/regression.mjs`(신규 4종 테스트 + 1종 mock 보강), `docs/development-rules.md`(충돌 물리 설명 갱신), `SESSION-HANDOFF.md`
+- 검증: `npm test`(18개 스위트), `npm run format:check`, `npm run check`, `node scripts/huntingUserScenario.mjs` 통과
+
+## 현재 기준 요약 (2026-07-07)
 - 컴포넌트 파일 구조: `src/components/<name>.html` (플랫, 폴더 없음), 9개 컴포넌트
 - **사냥터 100층 구조**: 시작 0층, 10층 전진 루프, 전투/포탈/상인/챔피언에서 정지, 빈층/축복/함정/휴식/상자/제단은 자동 진행
 - **3스테이지**: 동굴→숲→사막, 100층 보스 처치 시 해금

@@ -1,4 +1,4 @@
-import { applyCollisionImpulse, Vector2 } from "../core.js";
+import { Vector2 } from "../core.js";
 import { resolveFighterShapeCollision } from "../physics/CollisionShape.js";
 import { applyDynamicCollisionResponse } from "../physics/collisionResponse.js";
 import {
@@ -306,13 +306,11 @@ export class BattleSimulation extends Simulation {
         const aModifiers = a.getStatModifiers();
         const bModifiers = b.getStatModifiers();
 
-        // 충돌 전 relative velocity — 선형 impulse 적용 전에 계산하여 angular response에 전달
+        // 충돌 전 relative velocity — impulse solver에 전달
         const preCollisionVel = Vector2.subtract(b.velocity, a.velocity);
-        const preCollisionVelAlongNormal = preCollisionVel.dot(normal);
 
         if (!this.isHostile(a, b)) {
-            this._applyCollisionPhysics(a, b, normal, aModifiers, bModifiers);
-            this._applyAngularCollisionResponse(a, b, normal, result.contactPoint, preCollisionVelAlongNormal);
+            this._applyRigidBodyCollision(a, b, normal, result.contactPoint, preCollisionVel, aModifiers, bModifiers);
             return;
         }
 
@@ -331,8 +329,7 @@ export class BattleSimulation extends Simulation {
 
         if (damageFromBToA > 0) a.takeDamage(damageFromBToA, b, "Crash");
         if (damageFromAToB > 0) b.takeDamage(damageFromAToB, a, "Crash");
-        this._applyCollisionPhysics(a, b, normal, aModifiers, bModifiers);
-        this._applyAngularCollisionResponse(a, b, normal, result.contactPoint, preCollisionVelAlongNormal);
+        this._applyRigidBodyCollision(a, b, normal, result.contactPoint, preCollisionVel, aModifiers, bModifiers);
         this._handleDashCollisions(a, b);
 
         a.ability?.onCollision(b);
@@ -368,33 +365,27 @@ export class BattleSimulation extends Simulation {
         b.position.add(normal.clone().scale(separation / 2));
     }
 
-    _applyCollisionPhysics(a, b, normal, aMod, bMod) {
-        const relativeVelocity = Vector2.subtract(b.velocity, a.velocity);
-        const velocityAlongNormal = relativeVelocity.dot(normal);
-        if (velocityAlongNormal > 0) return;
-
-        // 숙련도 물리 보정 적용
+    /**
+     * 단일 rigid-body collision response 호출.
+     * contactPoint 기반 impulse solver로 normal + tangent, linear + angular를 통합 적용한다.
+     * 숙련도 impact 보정을 impactA/impactB로 전달한다.
+     */
+    _applyRigidBodyCollision(a, b, normal, contactPoint, preCollisionVel, aMod, bMod) {
+        // 숙련도 물리 보정
         const aOutgoingBonus = 1 + (a.mastery.physics?.outgoingImpactBonus ?? 0);
         const bOutgoingBonus = 1 + (b.mastery.physics?.outgoingImpactBonus ?? 0);
         const aIncomingReduce = 1 - (a.mastery.physics?.incomingKnockbackReduce ?? 0);
         const bIncomingReduce = 1 - (b.mastery.physics?.incomingKnockbackReduce ?? 0);
 
-        applyCollisionImpulse(a, b, normal, COLLISION_RESTITUTION, {
-            impactA: aMod.impact * aOutgoingBonus * bIncomingReduce,
-            impactB: bMod.impact * bOutgoingBonus * aIncomingReduce
-        });
-    }
+        const impactA = aMod.impact * aOutgoingBonus * bIncomingReduce;
+        const impactB = bMod.impact * bOutgoingBonus * aIncomingReduce;
 
-    /**
-     * 충돌 접촉점 기반 회전 angular impulse 적용.
-     * contactPoint가 중심에서 떨어져 있을수록 큰 회전력을 받습니다.
-     * 각 fighter의 applyAngularImpulse()를 통해 누적되며, 다음 integrateRotation에서 반영됩니다.
-     */
-    _applyAngularCollisionResponse(a, b, normal, contactPoint, preCollisionVelAlongNormal) {
-        applyDynamicCollisionResponse(a, b, normal, contactPoint, preCollisionVelAlongNormal, {
+        applyDynamicCollisionResponse(a, b, normal, contactPoint, preCollisionVel.dot(normal), {
             restitution: COLLISION_RESTITUTION,
             angularFactor: 0.15,
-            tangentialFriction: 0.05
+            tangentialFriction: 0.05,
+            impactA,
+            impactB
         });
     }
 

@@ -6858,16 +6858,28 @@ function testCollisionResponseDuckTypingDetection() {
 function testDynamicCollisionResponsePair() {
     const bodyA = {
         position: { x: 350, y: 300 },
+        velocity: { x: 100, y: 0 },
+        mass: 10,
+        radius: 25,
         angularVelocity: 0,
-        applyImpulse() {},
+        applyImpulse(impulse) {
+            this.velocity.x += impulse.x;
+            this.velocity.y += impulse.y;
+        },
         applyAngularImpulse(value) {
             this.angularVelocity += value;
         }
     };
     const bodyB = {
         position: { x: 450, y: 300 },
+        velocity: { x: -100, y: 0 },
+        mass: 10,
+        radius: 25,
         angularVelocity: 0,
-        applyImpulse() {},
+        applyImpulse(impulse) {
+            this.velocity.x += impulse.x;
+            this.velocity.y += impulse.y;
+        },
         applyAngularImpulse(value) {
             this.angularVelocity += value;
         }
@@ -7167,5 +7179,236 @@ function testWallCollisionAngularImpulseAppliesSameUpdate() {
 
 testPlayerCircleCollisionChangesAngularVelocity();
 testWallCollisionAngularImpulseAppliesSameUpdate();
+
+// ── Impulse solver correctness tests ──────────────────────────────────────
+
+function testImpulseMassDistribution() {
+    // 동일 접근 속도에서 mass가 큰 body가 velocity 변화가 작은지 검증
+    const normal = { x: 1, y: 0 };
+    const contact = { x: 300, y: 300 };
+    const approachSpeed = -100;
+
+    const lightBody = {
+        position: { x: 280, y: 300 },
+        velocity: { x: 100, y: 0 },
+        mass: 5,
+        radius: 20,
+        angularVelocity: 0,
+        applyImpulse(impulse) {
+            this.velocity.x += impulse.x;
+            this.velocity.y += impulse.y;
+        },
+        applyAngularImpulse() {}
+    };
+    const heavyBody = {
+        position: { x: 280, y: 300 },
+        velocity: { x: 100, y: 0 },
+        mass: 20,
+        radius: 20,
+        angularVelocity: 0,
+        applyImpulse(impulse) {
+            this.velocity.x += impulse.x;
+            this.velocity.y += impulse.y;
+        },
+        applyAngularImpulse() {}
+    };
+    const opp = {
+        position: { x: 320, y: 300 },
+        velocity: { x: 0, y: 0 },
+        mass: 1000,
+        radius: 20,
+        angularVelocity: 0,
+        applyImpulse() {},
+        applyAngularImpulse() {}
+    };
+
+    applyDynamicCollisionResponse(lightBody, opp, normal, contact, approachSpeed, {
+        restitution: 0.5,
+        angularFactor: 0,
+        tangentialFriction: 0
+    });
+    const lightDelta = Math.abs(lightBody.velocity.x - 100);
+
+    applyDynamicCollisionResponse(heavyBody, opp, normal, contact, approachSpeed, {
+        restitution: 0.5,
+        angularFactor: 0,
+        tangentialFriction: 0
+    });
+    const heavyDelta = Math.abs(heavyBody.velocity.x - 100);
+
+    assert.ok(lightDelta > heavyDelta, "lighter body should have larger velocity change than heavier body");
+    assert.ok(heavyDelta > 0, "heavy body should still receive impulse");
+    assert.ok(Number.isFinite(lightDelta) && Number.isFinite(heavyDelta), "velocity deltas should be finite");
+    console.log("[impulse-mass-distribution] ok");
+}
+
+function testOffCenterAngularImpulse() {
+    // 접촉점이 중심에서 대각선으로 떨어진 off-center 충돌이 angular impulse를 생성하는지 검증
+    // r×n ≠ 0이 되도록 접촉점을 중심에서 수직/수평 모두 오프셋함
+    const body = {
+        position: { x: 400, y: 300 },
+        velocity: { x: -50, y: 0 },
+        mass: 10,
+        radius: 25,
+        angularVelocity: 0,
+        applyImpulse(impulse) {
+            this.velocity.x += impulse.x;
+            this.velocity.y += impulse.y;
+        },
+        applyAngularImpulse(value) {
+            this.angularVelocity += value;
+        }
+    };
+    // r = {380-400, 350-300} = {-20, 50}, n = {1,0}
+    // r×n = (-20)*0 - 50*1 = -50 ≠ 0 → angular impulse 생성
+    const contact = { x: 380, y: 350 };
+    const normal = { x: 1, y: 0 };
+
+    const angularBefore = body.angularVelocity;
+    applyCollisionResponse(
+        body,
+        normal,
+        contact,
+        { x: -50, y: 0 },
+        { restitution: 0.5, angularFactor: 1, tangentialFriction: 0 }
+    );
+    assert.ok(body.angularVelocity !== angularBefore, "off-center collision should change angular velocity via r×J");
+    assert.ok(Number.isFinite(body.angularVelocity), "off-center angular velocity should stay finite");
+    console.log("[off-center-angular] ok");
+}
+
+function testTangentFrictionChangesLinearAndAngular() {
+    // tangent friction impulse가 linear tangent velocity와 angularVelocity를 함께 바꾸는지 검증
+    const bodyA = {
+        position: { x: 350, y: 300 },
+        velocity: { x: 100, y: 50 },
+        mass: 10,
+        radius: 25,
+        angularVelocity: 0,
+        applyImpulse(impulse) {
+            this.velocity.x += impulse.x;
+            this.velocity.y += impulse.y;
+        },
+        applyAngularImpulse(value) {
+            this.angularVelocity += value;
+        }
+    };
+    const bodyB = {
+        position: { x: 450, y: 300 },
+        velocity: { x: -100, y: 0 },
+        mass: 10,
+        radius: 25,
+        angularVelocity: 0,
+        applyImpulse(impulse) {
+            this.velocity.x += impulse.x;
+            this.velocity.y += impulse.y;
+        },
+        applyAngularImpulse(value) {
+            this.angularVelocity += value;
+        }
+    };
+    const normal = { x: 1, y: 0 };
+    const contact = { x: 400, y: 310 }; // slightly below center to generate torque
+
+    const velYBeforeA = bodyA.velocity.y;
+    const angVelBeforeA = bodyA.angularVelocity;
+
+    // 접근 속도 = (-100 - 100) * 1 + (0 - 50) * 0 = -200 (approaching)
+    applyDynamicCollisionResponse(bodyA, bodyB, normal, contact, -200, {
+        restitution: 0.5,
+        angularFactor: 0.15,
+        tangentialFriction: 0.05
+    });
+
+    // tangent velocity of bodyA should change (friction reduces relative tangent speed)
+    assert.ok(bodyA.velocity.y !== velYBeforeA, "tangential friction should change linear tangent velocity");
+    // angular velocity should change (friction torque from offset contact + tangent impulse)
+    assert.ok(
+        bodyA.angularVelocity !== angVelBeforeA,
+        "tangential friction should change angular velocity via friction torque"
+    );
+    assert.ok(Number.isFinite(bodyA.angularVelocity), "friction torque angular velocity should stay finite");
+    console.log("[tangent-friction-linear-angular] ok");
+}
+
+function testEffectiveMassRotationalContribution() {
+    // effective mass denominator에 회전 기여 ((r×n)² / I)가 포함되는지 검증.
+    // 같은 조건에서 중심 충돌(r×n=0)과 비중심 충돌(r×n≠0)의 결과가 달라야 함.
+    function makeBall(posX, posY, velX, velY) {
+        return {
+            position: { x: posX, y: posY },
+            velocity: { x: velX, y: velY },
+            mass: 10,
+            radius: 25,
+            angularVelocity: 0,
+            applyImpulse(impulse) {
+                this.velocity.x += impulse.x;
+                this.velocity.y += impulse.y;
+            },
+            applyAngularImpulse(value) {
+                this.angularVelocity += value;
+            }
+        };
+    }
+
+    const normal = { x: 1, y: 0 };
+    const opp = { x: 500, y: 300 };
+
+    // 중심 충돌: contact point at center → r×n = 0
+    const centerContact = { x: 400, y: 300 };
+    const centerBody = makeBall(350, 300, 100, 0);
+
+    // 비중심 충돌: contact point offset → r×n ≠ 0
+    const offsetContact = { x: 400, y: 350 };
+    const offsetBody = makeBall(350, 300, 100, 0);
+
+    const oppBody = {
+        position: opp,
+        velocity: { x: 0, y: 0 },
+        mass: 1000,
+        radius: 25,
+        angularVelocity: 0,
+        applyImpulse() {},
+        applyAngularImpulse() {}
+    };
+
+    applyDynamicCollisionResponse(centerBody, oppBody, normal, centerContact, -100, {
+        restitution: 0.5,
+        angularFactor: 0,
+        tangentialFriction: 0
+    });
+    const centerLinearVelAfter = centerBody.velocity.x;
+
+    // reset + offset (angularFactor=1로 angular impulse를 물리적으로 정확하게 적용)
+    const oppBody2 = {
+        position: opp,
+        velocity: { x: 0, y: 0 },
+        mass: 1000,
+        radius: 25,
+        angularVelocity: 0,
+        applyImpulse() {},
+        applyAngularImpulse() {}
+    };
+
+    applyDynamicCollisionResponse(offsetBody, oppBody2, normal, offsetContact, -100, {
+        restitution: 0.5,
+        angularFactor: 1,
+        tangentialFriction: 0
+    });
+    const offsetLinearVelAfter = offsetBody.velocity.x;
+
+    // 중심 충돌이 더 많은 linear impulse를 전달해야 함 (회전으로 에너지가 분산되지 않으므로)
+    assert.ok(
+        Math.abs(centerLinearVelAfter - 100) > Math.abs(offsetLinearVelAfter - 100),
+        "center collision should transfer more linear impulse than off-center"
+    );
+    assert.ok(offsetBody.angularVelocity !== 0, "off-center collision should produce angular velocity");
+    console.log("[effective-mass-rotational] ok");
+}
+
+testImpulseMassDistribution();
+testOffCenterAngularImpulse();
+testTangentFrictionChangesLinearAndAngular();
+testEffectiveMassRotationalContribution();
 
 console.log("regression tests ok");
