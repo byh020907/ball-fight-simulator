@@ -125,7 +125,7 @@ function _effectiveMassDenom(bodyA, bodyB, direction, contactPoint) {
 /**
  * 공통 impulse solver: normal + tangent impulse 계산 후 두 body에 적용.
  *
- * bodyB가 null이면 정적 표면으로 간주한다 (velB = surfaceVelocity).
+ * bodyA가 null이면 정적 표면으로 간주한다 (velA = surfaceVelocity).
  *
  * normal 방향 규칙: 법선은 bodyA → bodyB 방향.
  * bodyA가 -J를, bodyB가 +J를 받는다.
@@ -240,7 +240,7 @@ function _resolveContactImpulse(bodyA, bodyB, normal, contactPoint, options = {}
 /**
  * 단일 body와 정적 표면(벽/terrain) 간 충돌 응답.
  *
- * 공통 _resolveContactImpulse를 호출하며, bodyB=null로 정적 표면을 나타낸다.
+ * 공통 _resolveContactImpulse를 호출하며, bodyA=null로 정적 표면을 나타낸다.
  * 표면 속도는 options.surfaceVelocity로 전달한다.
  *
  * body의 duck typing으로 linear/angular impulse 적용 여부를 결정한다.
