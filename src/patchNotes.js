@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.24.6",
+        date: "2026-07-07",
+        title: "v0.24.6 브라우저 제목 정리",
+        changes: [
+            {
+                type: "fix",
+                text: "브라우저 탭 제목을 현재 게임 이름인 Ball Fight Simulator로 정리했습니다."
+            }
+        ]
+    },
+    {
         version: "0.24.5",
         date: "2026-07-05",
         title: "v0.24.5 사냥터 100층 원정",
