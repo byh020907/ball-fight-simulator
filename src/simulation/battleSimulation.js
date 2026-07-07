@@ -482,12 +482,24 @@ export class BattleSimulation extends Simulation {
         const active = this.fighters.filter((f) => !f.flags.defeated && !f.state.swallowed);
         if (active.length < 2) return;
 
+        let hasHostilePair = false;
+        for (let i = 0; i < active.length; i++) {
+            for (let j = i + 1; j < active.length; j++) {
+                if (this.isHostile(active[i], active[j])) {
+                    hasHostilePair = true;
+                    break;
+                }
+            }
+            if (hasHostilePair) break;
+        }
+        if (!hasHostilePair) return;
+
         const center = new Vector2(this.width / 2, this.height / 2);
 
         this.spawnExplosion(center.clone(), "#ff4444");
         this.spawnPulse(center.clone(), "#ff4444");
         this.playSound("dash", 1.5);
-        this.addLog("Anti-stall burst: 중앙 충격파가 전투원들을 밀어냅니다.");
+        this.addLog("정체된 궤도를 깨기 위해 경기장 중앙 충격파가 발생했습니다.");
 
         for (let i = 0; i < active.length; i++) {
             const fighter = active[i];

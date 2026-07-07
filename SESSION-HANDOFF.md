@@ -5,6 +5,7 @@
 - 결정: (1) `ANTI_STALL_INTERVAL=8` 상수, `_antiStallTimer`/`_antiStallBurstCount` 상태 추가. (2) `handleFighterCollision()`에서 적대 충돌 시 타이머 리셋 (아군 충돌 무시). (3) `update()`→`handleCollision()` 직후 `_checkAntiStall(delta)` 호출. (4) `_fireAntiStallBurst()` — 활성 전투원 ≥ 2명이면 중앙→외부 방향 impulse 적용, 결정론적 각도(위치 기반, 중앙 근접 시 인덱스 기반), `clamp(baseSpeed*0.85, 180, 360)` magnitude. (5) 시각 피드백: 중앙 `spawnExplosion`/`spawnPulse`/`playSound("dash")`/한국어 로그. (6) 회귀 테스트 4종: 타임아웃 전 미발동, 8초 발동, 충돌 리셋, 패배 스킵. (7) docs 갱신.
 - 영향: `src/simulation/battleSimulation.js`, `tests/regression.mjs`, `docs/development-rules.md`, `SESSION-HANDOFF.md`
 - 검증: `npm test`, `npm run format:check`
+- 후속 수정: `_fireAntiStallBurst()`에 적대 쌍(hostile pair) 가드 추가 — 활성 전투원 중 `isHostile(a,b) === true`인 쌍이 없으면 burst 미발동, 로그 문자열 완전 한글화. friendly-only 테스트 `[anti-stall-friendly]` 추가, burst 테스트에서 양쪽 전투원 outward 방향 검증 강화.
 
 ## [L1] 2026-07-07 — BattleBall 초기 각도 기본값을 0도로 변경 (대기화면 upright)
 - 맥락: 대기화면/캐릭터 선택 UI에서 캐릭터가 무작위 각도로 기울어져 있어 모든 캐릭터가 비뚤어져 보이는 문제. `rotationEnabled=false`는 각도 0으로 올바르게 동작했지만, 기본 활성화된 회전에서 `Math.random() * PI * 2`로 각도가 설정되어 캐릭터가 이상하게 보임.

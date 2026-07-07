@@ -8005,9 +8005,13 @@ function testAntiStallBurstAtTimeout() {
     sim._checkAntiStall(0.2);
     assert.equal(sim._antiStallBurstCount, 1, "should fire burst at 8s");
     assert.ok(sim._antiStallTimer < 0.2, "timer should reset after burst");
-    const pushed0 = f0.velocity.length() !== 0;
-    const pushed1 = f1.velocity.length() !== 0;
-    assert.ok(pushed0 || pushed1, "fighters should receive impulse after burst");
+    const center = new Vector2(sim.width / 2, sim.height / 2);
+    assert.ok(f0.velocity.length() !== 0, "fighters should receive impulse after burst");
+    assert.ok(f1.velocity.length() !== 0, "fighters should receive impulse after burst");
+    const dir0 = Vector2.subtract(f0.position, center);
+    assert.ok(f0.velocity.dot(dir0) > 0, "first fighter pushed generally outward from center");
+    const dir1 = Vector2.subtract(f1.position, center);
+    assert.ok(f1.velocity.dot(dir1) > 0, "second fighter pushed generally outward from center");
     console.log("[anti-stall-burst] ok");
 }
 
@@ -8070,9 +8074,44 @@ function testAntiStallDefeatedFightersSkipped() {
     console.log("[anti-stall-defeated] ok");
 }
 
+function testAntiStallFriendlyOnlyNoBurst() {
+    const specA = {
+        id: "as-i",
+        name: "ASI",
+        teamId: "t1",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#ff0000",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash"
+    };
+    const specB = {
+        id: "as-j",
+        name: "ASJ",
+        teamId: "t1",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#0000ff",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash"
+    };
+    const sim = new BattleSimulation([specA, specB], { onLog() {}, onSound() {} });
+    const f0 = sim.fighters[0];
+    const f1 = sim.fighters[1];
+    f0.position = new Vector2(200, 480);
+    f1.position = new Vector2(600, 480);
+    f0.velocity = new Vector2(0, 0);
+    f1.velocity = new Vector2(0, 0);
+    sim._antiStallTimer = 7.9;
+    sim._checkAntiStall(0.2);
+    assert.equal(sim._antiStallBurstCount, 0, "should not fire with friendly-only active fighters");
+    assert.equal(f0.velocity.length(), 0, "friendly fighter velocity unchanged");
+    assert.equal(f1.velocity.length(), 0, "friendly fighter velocity unchanged");
+    console.log("[anti-stall-friendly] ok");
+}
+
 testAntiStallNoBurstBeforeTimeout();
 testAntiStallBurstAtTimeout();
 testAntiStallCollisionResetsTimer();
 testAntiStallDefeatedFightersSkipped();
+testAntiStallFriendlyOnlyNoBurst();
 
 console.log("regression tests ok");

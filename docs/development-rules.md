@@ -314,11 +314,11 @@ Impulse magnitude: clamp(baseSpeed × 0.85, 180, 360)
 ```
 
 - **타이머 리셋 조건**: `handleFighterCollision()`에서 `isHostile(a,b) === true`일 때만 초기화. 아군 충돌은 무시.
-- **버스트 발동 조건**: 활성(패배/삼킴 상태 아님) 전투원이 2명 이상이어야 함.
+- **버스트 발동 조건**: 활성(패배/삼킴 상태 아님) 전투원이 2명 이상이고, 그중 적어도 한 쌍의 적대 관계(서로 다른 팀)가 있어야 함.
 - **결정론적 방향**: 전투원 위치가 중앙에서 5px 이상 떨어지면 중→밖 방향, 5px 이내면 인덱스 기반 각도((index/total)×2π).
 - **타이머는 발동 직후 0으로 리셋**되어 다음 버스트까지 다시 8초 카운트.
 - **시각 피드백**: `spawnExplosion(center, "#ff4444")` + `spawnPulse(center, "#ff4444")` + `playSound("dash")` + 한국어 로그.
-- **테스트**: 4종 회귀 테스트(`[anti-stall-no-burst]`, `[anti-stall-burst]`, `[anti-stall-reset]`, `[anti-stall-defeated]`).
+- **테스트**: 5종 회귀 테스트(`[anti-stall-no-burst]`, `[anti-stall-burst]`, `[anti-stall-reset]`, `[anti-stall-defeated]`, `[anti-stall-friendly]`).
 - **적용 범위**: 모든 배틀(토너먼트, 사냥터 포함). AI/길찾기 개입 없이 순수 물리 impulse.
 
 ### 충돌 물리 / 이동 속도 소유권
