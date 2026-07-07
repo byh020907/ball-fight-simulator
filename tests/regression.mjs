@@ -8020,9 +8020,11 @@ function testAntiStallBurstAtTimeout() {
     assert.ok(f0.velocity.length() !== 0, "fighters should receive impulse after burst");
     assert.ok(f1.velocity.length() !== 0, "fighters should receive impulse after burst");
     const dir0 = Vector2.subtract(f0.position, center);
-    assert.ok(f0.velocity.dot(dir0) > 0, "first fighter pushed generally outward from center");
+    const delta0 = Vector2.subtract(f0.velocity, velBefore0);
+    assert.ok(delta0.dot(dir0) > 0, "first fighter receives outward anti-stall impulse");
     const dir1 = Vector2.subtract(f1.position, center);
-    assert.ok(f1.velocity.dot(dir1) > 0, "second fighter pushed generally outward from center");
+    const delta1 = Vector2.subtract(f1.velocity, velBefore1);
+    assert.ok(delta1.dot(dir1) > 0, "second fighter receives outward anti-stall impulse");
     console.log("[anti-stall-burst] ok");
 }
 
@@ -8428,9 +8430,47 @@ function testHuntingDefeatChestLoss() {
     console.log("[hunting-defeat-chest-loss] ok");
 }
 
+function testHuntingChoiceSummaryKeepsContextWithPendingLoot() {
+    const app = {
+        ui: {
+            lastOverlayState: null,
+            setHuntingOverlayState(data) {
+                this.lastOverlayState = data;
+            }
+        }
+    };
+    const manager = new HuntingManager(app);
+    manager._run = {
+        pendingLoot: {
+            shards: 12,
+            chests: [createHuntingChest({ rarity: "common" })],
+            xp: 0
+        }
+    };
+
+    manager._stopHuntingMoveForChoice(app, {
+        message: "5층 — 포탈 발견!",
+        canRetreat: true,
+        floor: 5,
+        summary: "포탈 발견 · 현재 5층 · 귀환 또는 10층 전진"
+    });
+
+    assert.ok(
+        app.ui.lastOverlayState.huntingLootSummary.includes("포탈 발견"),
+        "Choice summary should keep event context"
+    );
+    assert.ok(
+        app.ui.lastOverlayState.huntingLootSummary.includes("미확보 상자 1개"),
+        "Choice summary should include pending chests"
+    );
+
+    console.log("[hunting-choice-summary-context] ok");
+}
+
 testHuntingMerchantOffers();
 testHuntingFormatHelpers();
 testHuntingCombatText();
 testHuntingDefeatChestLoss();
+testHuntingChoiceSummaryKeepsContextWithPendingLoot();
 
 console.log("regression tests ok");

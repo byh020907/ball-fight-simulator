@@ -508,7 +508,8 @@ export class HuntingManager {
 
     _stopHuntingMoveForChoice(app, { message, canRetreat, floor, summary = "" }) {
         const pendingText = this._run ? formatPendingLootSummary(this._run.pendingLoot) : "";
-        const displaySummary = pendingText || summary || `현재 ${floor}층 · 10층 전진 가능`;
+        const baseSummary = summary || `현재 ${floor}층 · 10층 전진 가능`;
+        const displaySummary = pendingText ? `${baseSummary} · ${pendingText}` : baseSummary;
         app.ui.setHuntingOverlayState({
             huntingMoving: false,
             huntingChoiceVisible: true,
