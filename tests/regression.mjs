@@ -90,6 +90,7 @@ import {
     ENHANCE_MAX_LEVEL
 } from "../src/hunting/equipmentConfig.js";
 import { createHuntingTerrain } from "../src/terrain/terrainFactory.js";
+import { TERRAIN_SHAPES } from "../src/terrain/terrainConfig.js";
 import { resolveTerrainCollision, resolveTerrainCollisions } from "../src/terrain/terrainCollision.js";
 import { drawTerrain } from "../src/terrain/terrainRenderer.js";
 import { getWorldPolygonPoints } from "../src/physics/CollisionShape.js";
@@ -120,6 +121,7 @@ import {
 } from "../src/alpineTemplateComponents.js";
 import { BattleBall } from "../src/entities/battleBall.js";
 import { generateMobAppearance } from "../src/entities/mobAppearance.js";
+import { PHYSICS_MATERIALS, resolvePhysicsMaterial, combinePhysicsMaterials } from "../src/physics/PhysicsMaterial.js";
 
 const EMPTY_EQUIPMENT_SUMMARY = {
     characterLevel: 1,
@@ -7490,5 +7492,223 @@ testTangentFrictionChangesLinearAndAngular();
 testEffectiveMassRotationalContribution();
 testOffCenterAngularMagnitude();
 testWallCollisionAngularNotReduced();
+
+// ── Physics Material system tests ──────────────────────────────────────────
+
+function testResolvePhysicsMaterial() {
+    const rb = resolvePhysicsMaterial("rubberBall");
+    assert.equal(rb.restitution, 0.92);
+    assert.equal(rb.friction, 0.2);
+
+    const w = resolvePhysicsMaterial("wall");
+    assert.equal(w.restitution, 1.0);
+    assert.equal(w.friction, 0.2);
+
+    // null/undefined → wood default
+    const def = resolvePhysicsMaterial(null);
+    assert.equal(def.restitution, 0.92);
+    assert.equal(def.friction, 0.2);
+
+    const def2 = resolvePhysicsMaterial();
+    assert.equal(def2.restitution, 0.92);
+    assert.equal(def2.friction, 0.2);
+
+    // object passthrough
+    const custom = { restitution: 0.5, friction: 0.1 };
+    const resolved = resolvePhysicsMaterial(custom);
+    assert.equal(resolved.restitution, 0.5);
+    assert.equal(resolved.friction, 0.1);
+
+    // unknown string → wood default
+    const unknown = resolvePhysicsMaterial("nonexistent");
+    assert.equal(unknown.restitution, 0.92);
+    assert.equal(unknown.friction, 0.2);
+
+    console.log("[physics-material-resolve] ok");
+}
+
+function testCombinePhysicsMaterials() {
+    // rubberBall + wall: max restitution, sqrt friction
+    const rbWall = combinePhysicsMaterials(PHYSICS_MATERIALS.rubberBall, PHYSICS_MATERIALS.wall);
+    assert.equal(rbWall.restitution, 1.0, "rubberBall+wall restitution should be max=1.0");
+    assert.equal(rbWall.friction, 0.2, "rubberBall+wall friction should stay wood-level=0.20");
+
+    // rubberBall + rubberBall
+    const rbRb = combinePhysicsMaterials(PHYSICS_MATERIALS.rubberBall, PHYSICS_MATERIALS.rubberBall);
+    assert.equal(rbRb.restitution, 0.92);
+    assert.equal(rbRb.friction, 0.2);
+
+    // wood + rubberBall
+    const woodRb = combinePhysicsMaterials(PHYSICS_MATERIALS.wood, PHYSICS_MATERIALS.rubberBall);
+    assert.equal(woodRb.restitution, 0.92);
+    assert.equal(woodRb.friction, 0.2);
+
+    // 낮은 마찰 재질은 실제로 낮은 조합값을 만들어야 한다.
+    const iceRb = combinePhysicsMaterials(PHYSICS_MATERIALS.ice, PHYSICS_MATERIALS.rubberBall);
+    assert.equal(iceRb.restitution, 0.95);
+    assert.ok(iceRb.friction < 0.2, "ice+rubberBall friction should be lower than wood-level friction");
+
+    // null fallback
+    const onlyA = combinePhysicsMaterials(PHYSICS_MATERIALS.wall, null);
+    assert.equal(onlyA.restitution, 1.0);
+    assert.equal(onlyA.friction, 0.2);
+
+    console.log("[physics-material-combine] ok");
+}
+
+function testCollisionResponseUsesBodyMaterial() {
+    // body의 physicsMaterial로부터 restitution/friction이 추론되는지 검증
+    const body = {
+        position: { x: 500, y: 500 },
+        velocity: { x: -100, y: 50 },
+        physicsMaterial: "rubberBall",
+        applyImpulse(impulse) {
+            this.velocity.x += impulse.x;
+            this.velocity.y += impulse.y;
+        },
+        applyAngularImpulse() {}
+    };
+    applyCollisionResponse(body, { x: 1, y: 0 }, { x: 480, y: 500 }, { x: -100, y: 50 }, { surfaceMaterial: "wood" });
+    // 마찰+반발로 인해 velocity가 변했는지만 검증 (구체적인 방향은 impulse 계산 결과)
+    assert.ok(body.velocity.x > -100, "material-based collision should change velocity");
+    assert.ok(Number.isFinite(body.velocity.x), "velocity should stay finite");
+    console.log("[physics-material-collision-response] ok");
+}
+
+function testExplicitOverrideStillWorks() {
+    const body = {
+        position: { x: 500, y: 500 },
+        velocity: { x: -100, y: 30 },
+        physicsMaterial: "rubberBall",
+        applyImpulse(impulse) {
+            this.velocity.x += impulse.x;
+            this.velocity.y += impulse.y;
+        },
+        applyAngularImpulse() {}
+    };
+    // explicit restitution/tangentialFriction should override material
+    applyCollisionResponse(
+        body,
+        { x: 1, y: 0 },
+        { x: 480, y: 500 },
+        { x: -100, y: 30 },
+        { restitution: 1, tangentialFriction: 0, angularFactor: 0 }
+    );
+    // restitution=1, friction=0 → complete normal reflection, y unchanged
+    assert.ok(body.velocity.x > 0, "explicit restitution=1 should reverse x velocity");
+    assert.equal(body.velocity.y, 30, "explicit friction=0 should leave y unchanged");
+    console.log("[physics-material-explicit-override] ok");
+}
+
+function testWallCollisionUsesMaterial() {
+    // BattleSimulation(ball.physicsMaterial="rubberBall")의 벽 충돌이
+    // surfaceMaterial="wall"을 통해 restitution=1, friction=0.20 조합으로 동작하는지 검증
+    const spec = {
+        id: "wall-mat",
+        name: "WallMat",
+        teamId: "t",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#ff8800",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash",
+        rotationEnabled: true
+    };
+    const sim = new BattleSimulation([spec, { ...spec, id: "opp", teamId: "t2" }], { onLog() {}, onSound() {} });
+    const ball = sim.fighters[0];
+    ball.position = new Vector2(sim.width - ball.radius + 1, 500);
+    ball.velocity = new Vector2(300, 0);
+
+    // 등록된 physicsMaterial 확인
+    assert.equal(ball.physicsMaterial, "rubberBall", "BattleBall should have rubberBall material by default");
+
+    // 벽 충돌: rubberBall(0.92, 0.20) + wall(1.0, 0.20) → restitution=1.0, friction=0.20
+    sim.keepInsideArena(ball);
+    // restitution=1.0, friction=0.20 → 속도는 반대 방향(완전 반사) + 마찰
+    assert.ok(ball.velocity.x < 0, "wall collision should reverse x velocity (restitution=1.0)");
+    assert.ok(Number.isFinite(ball.velocity.x), "velocity should stay finite");
+    console.log("[physics-material-wall-collision] ok");
+}
+
+function testTerrainCollisionUsesMaterial() {
+    // 원형 terrain 충돌이 surfaceMaterial="wood"을 통해
+    // rubberBall(0.92, 0.20) + wood(0.92, 0.20) → restitution=0.92, friction=0.20 조합으로 동작하는지 검증
+    const spec = {
+        id: "terrain-mat",
+        name: "TerrainMat",
+        teamId: "t",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#ff8800",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash",
+        rotationEnabled: true
+    };
+    const sim = new BattleSimulation([spec, { ...spec, id: "opp", teamId: "t2" }], { onLog() {}, onSound() {} });
+    const ball = sim.fighters[0];
+
+    const terrain = {
+        shape: TERRAIN_SHAPES.CIRCLE,
+        x: 480,
+        y: 480,
+        radius: 80,
+        blocking: true
+    };
+    // 볼을 지형과 겹치게 배치
+    ball.position = new Vector2(480, 400);
+    ball.velocity = new Vector2(0, 200);
+
+    const hit = resolveTerrainCollision(ball, terrain);
+    assert.equal(hit, true, "terrain collision should detect overlap");
+    // restitution=0.92, friction=0.20 조합 속도 반전
+    assert.ok(ball.velocity.y < 0, "terrain collision should reverse y velocity");
+    assert.ok(Number.isFinite(ball.velocity.y), "velocity should stay finite");
+    console.log("[physics-material-terrain-collision] ok");
+}
+
+function testFighterCollisionUsesMaterial() {
+    // 볼-볼 충돌이 양쪽 body.physicsMaterial 조합으로 동작하는지 검증
+    const spec = {
+        id: "f-mat-a",
+        name: "FMatA",
+        teamId: "t1",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#ff0000",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash",
+        rotationEnabled: true
+    };
+    const specB = {
+        id: "f-mat-b",
+        name: "FMatB",
+        teamId: "t2",
+        stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#0000ff",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash",
+        rotationEnabled: true
+    };
+    const sim = new BattleSimulation([spec, specB], { onLog() {}, onSound() {} });
+    const [a, b] = sim.fighters;
+    a.position = new Vector2(440, 480);
+    b.position = new Vector2(440 + a.radius + b.radius - 4, 480);
+    a.velocity = new Vector2(300, 0);
+    b.velocity = new Vector2(-300, 0);
+
+    assert.equal(a.physicsMaterial, "rubberBall", "fighter should have rubberBall material");
+    assert.equal(b.physicsMaterial, "rubberBall", "fighter should have rubberBall material");
+
+    sim.handleFighterCollision(a, b);
+    // rubberBall(0.92,0.20)+rubberBall(0.92,0.20) → restitution=0.92, friction=0.20
+    assert.ok(a.velocity.x < 0 || b.velocity.x > 0, "fighter collision should apply impulse");
+    assert.ok(Number.isFinite(a.velocity.x) && Number.isFinite(b.velocity.x), "velocities should stay finite");
+    console.log("[physics-material-fighter-collision] ok");
+}
+
+testResolvePhysicsMaterial();
+testCombinePhysicsMaterials();
+testCollisionResponseUsesBodyMaterial();
+testExplicitOverrideStillWorks();
+testWallCollisionUsesMaterial();
+testTerrainCollisionUsesMaterial();
+testFighterCollisionUsesMaterial();
 
 console.log("regression tests ok");

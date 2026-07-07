@@ -12,9 +12,15 @@
  * - angularVelocity (number) (선택적)
  * - applyImpulse(impulse) — deltaV를 {x,y}로 받음
  * - applyAngularImpulse(value) — angular impulse L을 받음
+ * - physicsMaterial (string|object, 선택적) — 재질 식별자
  *
  * 충돌 판정과 충돌 응답은 분리되어 있다.
  * 새로운 충돌 대상(벽/terrain/투사체 등)은 이 모듈의 공통 helper를 호출해야 한다.
+ *
+ * restitution/friction은 더 이상 호출자가 하드코딩하지 않고,
+ * body.physicsMaterial 또는 options.surfaceMaterial/materialA/materialB를 통해
+ * PhysicsMaterial 모듈이 결정한다. 명시적 options.restitution/options.tangentialFriction은
+ * 재질 조합 결과를 덮어쓴다 (backward compat).
  *
  * impulse 흐름:
  *   1. 접촉점 상대 속도 계산 (선형 + ω×r 기여)
@@ -23,6 +29,8 @@
  *   4. tangent impulse: jt = -vt / denom_t, clamp by |jt| ≤ friction * |jn|
  *   5. 적용: 각 body에 -J·invMass (선형) + r×J (angular) 전달
  */
+
+import { resolvePhysicsMaterial, combinePhysicsMaterials } from "./PhysicsMaterial.js";
 
 /**
  * 2D cross product: r × v = r.x * v.y - r.y * v.x (스칼라)
@@ -136,7 +144,7 @@ function _effectiveMassDenom(bodyA, bodyB, direction, contactPoint) {
  * @param {{x:number,y:number}} contactPoint — 접촉점 (월드 좌표)
  * @param {object} options
  * @param {number} [options.restitution=0.92] — 반발 계수
- * @param {number} [options.tangentialFriction=0.08] — 접선 마찰 계수
+ * @param {number} [options.tangentialFriction=0.20] — 접선 마찰 계수
  * @param {{x:number,y:number}} [options.velocityA] — bodyA velocity override
  * @param {{x:number,y:number}} [options.velocityB] — bodyB velocity override
  * @param {number} [options.linearScaleA=1] — bodyA 선형 impulse 배율
@@ -147,7 +155,7 @@ function _effectiveMassDenom(bodyA, bodyB, direction, contactPoint) {
  */
 function _resolveContactImpulse(bodyA, bodyB, normal, contactPoint, options = {}) {
     const restitution = options.restitution ?? 0.92;
-    const friction = options.tangentialFriction ?? 0.08;
+    const friction = options.tangentialFriction ?? 0.2;
     const linearScaleA = options.linearScaleA ?? 1;
     const linearScaleB = options.linearScaleB ?? 1;
     const angularScaleA = options.angularScaleA ?? 1;
@@ -243,22 +251,28 @@ function _resolveContactImpulse(bodyA, bodyB, normal, contactPoint, options = {}
  * 공통 _resolveContactImpulse를 호출하며, bodyA=null로 정적 표면을 나타낸다.
  * 표면 속도는 options.surfaceVelocity로 전달한다.
  *
- * body의 duck typing으로 linear/angular impulse 적용 여부를 결정한다.
+ * restitution/friction은 body.physicsMaterial과 options.surfaceMaterial의
+ * 조합으로 결정된다. 명시적 options.restitution/options.tangentialFriction이 있으면
+ * 그것이 재질 조합을 덮어쓴다.
  *
  * @param {object} body — 충돌하는 동적 body
  * @param {{x:number, y:number}} normal — 표면 → body 방향 법선
  * @param {{x:number, y:number}} contactPoint — 접점 (월드 좌표)
  * @param {{x:number, y:number}} preCollisionVelocity — 충돌 직전 body의 절대 속도
  * @param {object} [options]
- * @param {number} [options.restitution=0.92]
- * @param {number} [options.angularFactor=1] — angular impulse 배율 (물리적으로 정확한 1, 시각적 튜닝은 이 값을 변경하지 말고 외부에서 처리)
- * @param {number} [options.tangentialFriction=0.08]
+ * @param {number} [options.restitution] — 재질 조합 덮어쓰기
+ * @param {number} [options.angularFactor=1]
+ * @param {number} [options.tangentialFriction] — 재질 조합 덮어쓰기
+ * @param {string|{restitution:number,friction:number}} [options.surfaceMaterial] — 정적 표면 재질
  * @param {{x:number, y:number}} [options.surfaceVelocity={0,0}]
  */
 export function applyCollisionResponse(body, normal, contactPoint, preCollisionVelocity, options = {}) {
-    const restitution = options.restitution ?? 0.92;
+    const bodyMat = resolvePhysicsMaterial(body?.physicsMaterial);
+    const surfaceMat = resolvePhysicsMaterial(options.surfaceMaterial);
+    const combined = combinePhysicsMaterials(bodyMat, surfaceMat);
+    const restitution = options.restitution ?? combined.restitution;
     const angularFactor = options.angularFactor ?? 1;
-    const tangentialFriction = options.tangentialFriction ?? 0.03;
+    const tangentialFriction = options.tangentialFriction ?? combined.friction;
     const surfaceVel = options.surfaceVelocity ?? { x: 0, y: 0 };
 
     // body의 표면에 대한 상대 속도 (접근 검사)
@@ -287,25 +301,32 @@ export function applyCollisionResponse(body, normal, contactPoint, preCollisionV
  * 두 body의 선형/각운동량에 모두 적용한다.
  * 입력 normal은 A→B 방향이다.
  *
+ * restitution/friction은 bodyA.physicsMaterial과 bodyB.physicsMaterial의
+ * 조합으로 결정된다. 명시적 options.restitution/options.tangentialFriction이 있으면
+ * 그것이 재질 조합을 덮어쓴다.
+ *
  * @param {object} bodyA
  * @param {object} bodyB
  * @param {{x:number, y:number}} normal — A→B 방향 법선
  * @param {{x:number, y:number}} contactPoint — 접점 (월드 좌표)
  * @param {number} approachSpeed — 충돌 전 relative velocity dot normal (양수=분리)
  * @param {object} [options]
- * @param {number} [options.restitution=0.92]
- * @param {number} [options.angularFactor=1] — angular impulse 배율 (물리적으로 정확한 1, 시각적 튜닝은 이 값을 변경하지 말고 외부에서 처리)
- * @param {number} [options.tangentialFriction=0.08]
+ * @param {number} [options.restitution] — 재질 조합 덮어쓰기
+ * @param {number} [options.angularFactor=1]
+ * @param {number} [options.tangentialFriction] — 재질 조합 덮어쓰기
  * @param {number} [options.impactA=1] — bodyB에 적용할 impulse 배율
  * @param {number} [options.impactB=1] — bodyA에 적용할 impulse 배율
- * @param {{x:number,y:number}} [options.preCollisionVel] — 충돌 전 상대 속도 (tangent 계산용)
+ * @param {{x:number,y:number}} [options.preCollisionVel]
  */
 export function applyDynamicCollisionResponse(bodyA, bodyB, normal, contactPoint, approachSpeed, options = {}) {
     if (approachSpeed >= 0) return;
 
-    const restitution = options.restitution ?? 0.92;
+    const matA = resolvePhysicsMaterial(bodyA?.physicsMaterial);
+    const matB = resolvePhysicsMaterial(bodyB?.physicsMaterial);
+    const combined = combinePhysicsMaterials(matA, matB);
+    const restitution = options.restitution ?? combined.restitution;
     const angularFactor = options.angularFactor ?? 1;
-    const tangentialFriction = options.tangentialFriction ?? 0.03;
+    const tangentialFriction = options.tangentialFriction ?? combined.friction;
     const impactA = options.impactA ?? 1;
     const impactB = options.impactB ?? 1;
 

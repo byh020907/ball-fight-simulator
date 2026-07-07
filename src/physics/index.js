@@ -18,3 +18,4 @@ export {
     applyCollisionResponse,
     applyDynamicCollisionResponse
 } from "./collisionResponse.js";
+export { PHYSICS_MATERIALS, resolvePhysicsMaterial, combinePhysicsMaterials } from "./PhysicsMaterial.js";

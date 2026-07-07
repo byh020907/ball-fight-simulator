@@ -88,6 +88,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody]) {
             passives: spec.mastery?.passives ?? [],
             _states: null
         };
+        this.physicsMaterial = "rubberBall";
         this.actionContext = new ActionContext();
         this.aiController = null;
 

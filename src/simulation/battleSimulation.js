@@ -37,7 +37,6 @@ const ABILITY_TYPES = {
     hunting_melee: HuntingMeleeAbility
 };
 
-const COLLISION_RESTITUTION = 0.92;
 const COLLISION_SEPARATION_PADDING = 0.6;
 const DEFAULT_ARENA_SIZE = 960;
 
@@ -381,8 +380,6 @@ export class BattleSimulation extends Simulation {
         const impactB = bMod.impact * bOutgoingBonus * aIncomingReduce;
 
         applyDynamicCollisionResponse(a, b, normal, contactPoint, preCollisionVel.dot(normal), {
-            restitution: COLLISION_RESTITUTION,
-            tangentialFriction: 0.08,
             impactA,
             impactB
         });

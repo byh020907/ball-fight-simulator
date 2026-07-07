@@ -80,8 +80,7 @@ export class Simulation {
             entity.position.x = entity.radius;
             const preVel = { x: entity.velocity.x, y: entity.velocity.y };
             applyCollisionResponse(entity, { x: 1, y: 0 }, { x: 0, y: entity.position.y }, preVel, {
-                restitution: 1,
-                tangentialFriction: 0.08
+                surfaceMaterial: "wall"
             });
             if (entity.state?.movement) this._handleWallBounce(entity);
             return new Vector2(1, 0);
@@ -90,8 +89,7 @@ export class Simulation {
             entity.position.x = this.width - entity.radius;
             const preVel = { x: entity.velocity.x, y: entity.velocity.y };
             applyCollisionResponse(entity, { x: -1, y: 0 }, { x: this.width, y: entity.position.y }, preVel, {
-                restitution: 1,
-                tangentialFriction: 0.08
+                surfaceMaterial: "wall"
             });
             if (entity.state?.movement) this._handleWallBounce(entity);
             return new Vector2(-1, 0);
@@ -105,8 +103,7 @@ export class Simulation {
             entity.position.y = entity.radius;
             const preVel = { x: entity.velocity.x, y: entity.velocity.y };
             applyCollisionResponse(entity, { x: 0, y: 1 }, { x: entity.position.x, y: 0 }, preVel, {
-                restitution: 1,
-                tangentialFriction: 0.08
+                surfaceMaterial: "wall"
             });
             if (entity.state?.movement) this._handleWallBounce(entity);
             return new Vector2(0, 1);
@@ -115,8 +112,7 @@ export class Simulation {
             entity.position.y = this.height - entity.radius;
             const preVel = { x: entity.velocity.x, y: entity.velocity.y };
             applyCollisionResponse(entity, { x: 0, y: -1 }, { x: entity.position.x, y: this.height }, preVel, {
-                restitution: 1,
-                tangentialFriction: 0.08
+                surfaceMaterial: "wall"
             });
             if (entity.state?.movement) this._handleWallBounce(entity);
             return new Vector2(0, -1);

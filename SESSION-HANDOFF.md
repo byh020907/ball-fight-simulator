@@ -1,5 +1,15 @@
 # 결정 기록
 
+## [L1] 2026-07-07 — 물리 재질 시스템 도입 (material-owned friction/restitution)
+- 맥락: restitution/friction이 collisionResponse.js의 기본값과 각 호출 사이트에 하드코딩된 magic number로 흩어져 있음. 변경 시 모든 호출 사이트를 수동 추적해야 함. 정상적인 물리 엔진은 body/surface가 재질을 소유함.
+- 결정: (1) `src/physics/PhysicsMaterial.js` 신설 — `PHYSICS_MATERIALS` 카탈로그(rubberBall/wall/wood/stone/ice/metal), `resolvePhysicsMaterial()`, `combinePhysicsMaterials()` (restitution=max, friction=sqrt(a*b)). (2) `collisionResponse.js`의 `applyCollisionResponse`/`applyDynamicCollisionResponse`가 `body.physicsMaterial` + `options.surfaceMaterial`에서 restitution/friction을 추론, 명시적 옵션이 재질 조합을 덮어씀. (3) `battleBall.js`에 `physicsMaterial = "rubberBall"` 기본값 추가. (4) 모든 런타임 호출 사이트가 explicit restitution/tangentialFriction 대신 material 옵션 사용. (5) docs 갱신. (6) 회귀 테스트 추가.
+- 영향: `src/physics/PhysicsMaterial.js`(신규), `src/physics/collisionResponse.js`, `src/physics/index.js`, `src/entities/battleBall.js`, `src/simulation/simulation.js`, `src/terrain/terrainCollision.js`, `src/physics/CollisionShape.js`, `src/simulation/battleSimulation.js`, `tests/regression.mjs`, `docs/development-rules.md`, `SESSION-HANDOFF.md`
+
+## [L1] 2026-07-07 — 튀는 리듬은 유지하고 마찰을 나무 수준으로 상향
+- 맥락: 사용자가 `restitution`과 마찰은 별개임을 확인했고, 게임 특성상 튀는 느낌은 유지하되 미끄러짐만 줄이길 원함. 이전 0.08 접선 마찰은 여전히 매끈하게 느껴질 수 있음.
+- 결정: (1) 벽/지형/볼-볼 충돌의 `tangentialFriction`을 0.20으로 상향. (2) `applyCollisionResponse`/`applyDynamicCollisionResponse` wrapper 기본값도 0.20으로 통일해 명시값 없는 호출도 같은 기준을 사용. (3) `restitution`은 유지.
+- 영향: `src/physics/collisionResponse.js`, `src/simulation/simulation.js`, `src/simulation/battleSimulation.js`, `src/physics/CollisionShape.js`, `src/terrain/terrainCollision.js`, `docs/development-rules.md`, `SESSION-HANDOFF.md`
+
 ## [L1] 2026-07-07 — 충돌 접선 마찰을 올려 미끄러짐 체감 완화
 - 맥락: 캐릭터 회전은 정상적으로 보이지만, 벽/지형/볼 충돌 후 움직임이 지나치게 미끄러지듯 보임. 확인 결과 접선 마찰이 벽/지형 0.03, 볼-볼 0.05로 낮고, angular impulse를 물리적으로 1배 적용한 뒤 표면 마찰이 약하게 체감됨.
 - 결정: (1) `collisionResponse.js` 기본 `tangentialFriction`을 0.03→0.08로 상향. (2) 벽/지형/볼-볼 런타임 호출의 명시적 `tangentialFriction`도 0.08로 통일. (3) 반발 계수와 angularDamping은 전투 리듬을 과하게 둔하게 만들 수 있어 이번 변경에서 제외.
