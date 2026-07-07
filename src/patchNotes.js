@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.24.7",
+        date: "2026-07-07",
+        title: "v0.24.7 PWA 이름 정리",
+        changes: [
+            {
+                type: "fix",
+                text: "홈 화면과 설치 앱 이름을 Ball Fight Simulator / Ball Fight로 고정했습니다."
+            }
+        ]
+    },
+    {
         version: "0.24.6",
         date: "2026-07-07",
         title: "v0.24.6 브라우저 제목 정리",

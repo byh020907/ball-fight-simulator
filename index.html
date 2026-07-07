@@ -3,8 +3,12 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="application-name" content="Ball Fight Simulator" />
+        <meta name="apple-mobile-web-app-title" content="Ball Fight" />
+        <meta name="theme-color" content="#222222" />
         <title>Ball Fight Simulator</title>
         <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+        <link rel="manifest" href="site.webmanifest?v=0.24.7" />
         <link rel="stylesheet" href="src/styles.css" />
         <style>
             /* Hide Alpine components until compiled */
@@ -121,7 +125,7 @@
             import Alpine from "https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/module.esm.js";
 
             // GitHub Pages 캐시 방지용 버전 파라미터
-            const V = "0.24.6";
+            const V = "0.24.7";
 
             window.BFS_ASSET_VERSION = V;
             const { loadTemplates } = await import(`./src/componentLoader.js?v=${V}`);

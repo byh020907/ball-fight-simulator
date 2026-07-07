@@ -1,0 +1,17 @@
+{
+    "name": "Ball Fight Simulator",
+    "short_name": "Ball Fight",
+    "start_url": "./",
+    "scope": "./",
+    "display": "standalone",
+    "background_color": "#fafafa",
+    "theme_color": "#222222",
+    "icons": [
+        {
+            "src": "favicon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        }
+    ]
+}
