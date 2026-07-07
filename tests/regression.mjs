@@ -99,6 +99,11 @@ import {
     applyCollisionResponse,
     applyDynamicCollisionResponse
 } from "../src/physics/collisionResponse.js";
+import {
+    getContactPointVelocity,
+    calculateRotationalContactDamageBonus,
+    applyRotationalContactDamage
+} from "../src/physics/contactDamage.js";
 import RotationalBody from "../src/physics/RotationalBody.js";
 import { inferArmorVariant } from "../src/entities/equipmentVisuals.js";
 import { drawEquipmentItems } from "../src/entities/equipmentVisuals.js";
@@ -7742,5 +7747,181 @@ testExplicitOverrideStillWorks();
 testWallCollisionUsesMaterial();
 testTerrainCollisionUsesMaterial();
 testFighterCollisionUsesMaterial();
+
+// ── Rotational Contact Damage Tests ─────────────────────────────────────────
+
+function testGetContactPointVelocity() {
+    const body = {
+        position: { x: 400, y: 300 },
+        velocity: { x: 100, y: 0 },
+        angularVelocity: 2
+    };
+    // r = (100, 50), v_contact = (100 - 2*50, 0 + 2*100) = (0, 200)
+    const cp = getContactPointVelocity(body, { x: 500, y: 350 });
+    assert.ok(Math.abs(cp.x - 0) < 0.001, `cp.x should be 0, got ${cp.x}`);
+    assert.ok(Math.abs(cp.y - 200) < 0.001, `cp.y should be 200, got ${cp.y}`);
+    console.log("[contact-point-velocity] ok");
+}
+
+function testRotationalContactDamageBonusZero() {
+    // 중심 속도와 접촉점 속도가 같으면 보너스 0
+    const body = {
+        position: { x: 400, y: 300 },
+        velocity: { x: 100, y: 0 },
+        angularVelocity: 0,
+        stats: { baseSpeed: 200 }
+    };
+    const bonus = calculateRotationalContactDamageBonus(body, { x: 500, y: 300 });
+    assert.equal(bonus, 0, "zero angularVelocity should give 0 bonus");
+    console.log("[rotational-bonus-zero] ok");
+}
+
+function testRotationalContactDamageBonusPositive() {
+    const body = {
+        position: { x: 400, y: 300 },
+        velocity: { x: 0, y: 0 },
+        angularVelocity: 10,
+        stats: { baseSpeed: 200 }
+    };
+    // r = (100, 100), v_contact = (0 - 10*100, 0 + 10*100) = (-1000, 1000)
+    // contactSpeed = sqrt(1000^2+1000^2) ≈ 1414, centerSpeed = 0
+    // bonus = min(1414 / 200, 0.6) = min(7.07, 0.6) = 0.6
+    const bonus = calculateRotationalContactDamageBonus(body, { x: 500, y: 400 });
+    assert.ok(Math.abs(bonus - 0.6) < 0.001, `bonus should be capped at 0.6, got ${bonus}`);
+    console.log("[rotational-bonus-capped] ok");
+}
+
+function testRotationalContactDamageApply() {
+    const body = {
+        position: { x: 400, y: 300 },
+        velocity: { x: 0, y: 0 },
+        angularVelocity: 5,
+        stats: { baseSpeed: 200 }
+    };
+    // r = (100, 50), v_contact = (0 - 5*50, 0 + 5*100) = (-250, 500)
+    // contactSpeed ≈ 559, centerSpeed = 0
+    // bonus = min(559 / 200, 0.6) = min(2.795, 0.6) = 0.6
+    const result = applyRotationalContactDamage(20, body, { x: 500, y: 350 });
+    assert.equal(result, 32, "20 * (1+0.6) = 32 should be the capped damage");
+    console.log("[rotational-damage-apply] ok");
+}
+
+function testRotationalDamageZeroBasePreserved() {
+    const body = {
+        position: { x: 400, y: 300 },
+        velocity: { x: 0, y: 0 },
+        angularVelocity: 10,
+        stats: { baseSpeed: 200 }
+    };
+    const result = applyRotationalContactDamage(0, body, { x: 500, y: 300 });
+    assert.equal(result, 0, "baseDamage <= 0 should return unchanged");
+    console.log("[rotational-damage-zero] ok");
+}
+
+async function testCrashDamageWithRotation() {
+    const spec = {
+        id: "rot-crash",
+        name: "RotCrash",
+        teamId: "t1",
+        stats: { hp: 500, damage: 20, defense: 5, speed: 200, radius: 25, mass: 10 },
+        color: "#ff0000",
+        appearance: { sides: 0, face: "default" },
+        ability: "dash"
+    };
+    const sim = new BattleSimulation([spec, { ...spec, id: "opp", teamId: "t2" }], { onLog() {}, onSound() {} });
+    const [a, b] = sim.fighters;
+
+    a.position = new Vector2(400, 480);
+    b.position = new Vector2(440, 480);
+    a.velocity = new Vector2(300, 0);
+    b.velocity = new Vector2(-300, 0);
+    const normal = new Vector2(1, 0);
+    const cp = { x: 425, y: 505 };
+
+    a.angularVelocity = 0;
+    const baseDamage = sim.calculateCollisionDamageWithContact(a, b, normal, cp);
+    a.angularVelocity = 15;
+    const boostedDamage = sim.calculateCollisionDamageWithContact(a, b, normal, cp);
+
+    assert.ok(boostedDamage > baseDamage, `rotation should boost crash damage: ${baseDamage} -> ${boostedDamage}`);
+    assert.ok(boostedDamage <= Math.round(baseDamage * 1.6), "rotation crash damage should respect +60% cap");
+    console.log("[crash-rotation-damage] ok");
+}
+
+async function testDashContactRotationalBonus(app) {
+    const dash = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.DASH);
+    const archer = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
+    const sim = new BattleSimulation([dash, archer], { onLog() {}, onSound() {} });
+    const [attacker, defender] = sim.fighters;
+
+    attacker.position = new Vector2(400, 480);
+    defender.position = new Vector2(460, 480);
+    attacker.angularVelocity = 20;
+    attacker.velocity = new Vector2(300, 0);
+    defender.velocity = new Vector2(0, 0);
+
+    // Set up dash effect via movement
+    attacker.state.movement = new (await import("../src/combatEffects.js")).DashEffect({
+        duration: 1,
+        multiplier: 1.5,
+        color: "#ff0000",
+        collisionDamage: 10,
+        collisionLabel: "Dash Contact",
+        untilImpact: true
+    });
+
+    const hpBefore = defender.hp;
+    // contactPoint will be roughly at (430, 480) - between the two
+    const cp = { x: 430, y: 480 };
+    attacker.state.movement.onCollision(attacker, defender, sim, cp);
+    const damageTaken = hpBefore - defender.hp;
+
+    assert.ok(damageTaken > 10, "dash contact damage should be boosted by rotation (> base 10)");
+    console.log("[dash-contact-rotation] ok");
+}
+
+async function testVampireRotationalBonus(app) {
+    const vampire = app.roster.find((fighter) => fighter.id === "vampire" || fighter.ability === "vampire");
+    const archer = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
+    if (!vampire) {
+        console.log("[vampire-rotation] skip (no vampire in roster)");
+        return;
+    }
+    const sim = new BattleSimulation([vampire, archer], { onLog() {}, onSound() {} });
+    const [owner, target] = sim.fighters;
+
+    owner.position = new Vector2(400, 480);
+    target.position = new Vector2(425, 480);
+    owner.velocity = new Vector2(300, 0);
+    target.velocity = new Vector2(-50, 0);
+    owner.hp = Math.max(1, owner.maxHp - 50);
+
+    const cp = { x: 412, y: 480 };
+    owner.angularVelocity = 0;
+    const baseDamage = owner.ability._getCollisionDamage(owner, target, cp);
+    owner.angularVelocity = 20;
+    const boostedDamage = owner.ability._getCollisionDamage(owner, target, cp);
+
+    const hpBefore = owner.hp;
+    owner.ability.onCollision(target, { contactPoint: cp });
+    const healed = owner.hp - hpBefore;
+
+    assert.ok(
+        boostedDamage > baseDamage,
+        `rotation should boost vampire contact damage: ${baseDamage} -> ${boostedDamage}`
+    );
+    assert.ok(boostedDamage <= Math.round(baseDamage * 1.6), "vampire rotation damage should respect +60% cap");
+    assert.ok(healed >= 1, "vampire collision should heal when owner is below max HP");
+    console.log("[vampire-rotation] ok");
+}
+
+testGetContactPointVelocity();
+testRotationalContactDamageBonusZero();
+testRotationalContactDamageBonusPositive();
+testRotationalContactDamageApply();
+testRotationalDamageZeroBasePreserved();
+await testCrashDamageWithRotation();
+await testDashContactRotationalBonus(app);
+await testVampireRotationalBonus(app);
 
 console.log("regression tests ok");

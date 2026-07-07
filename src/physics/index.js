@@ -20,3 +20,8 @@ export {
     applyDynamicCollisionResponse
 } from "./collisionResponse.js";
 export { PHYSICS_MATERIALS, resolvePhysicsMaterial, combinePhysicsMaterials } from "./PhysicsMaterial.js";
+export {
+    getContactPointVelocity,
+    calculateRotationalContactDamageBonus,
+    applyRotationalContactDamage
+} from "./contactDamage.js";

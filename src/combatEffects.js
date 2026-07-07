@@ -1,4 +1,5 @@
 import { TimedEffect } from "./core.js";
+import { applyRotationalContactDamage } from "./physics/contactDamage.js";
 
 export class DashEffect {
     constructor({
@@ -37,9 +38,12 @@ export class DashEffect {
         }
     }
 
-    onCollision(attacker, defender, simulation) {
+    onCollision(attacker, defender, simulation, contactPoint) {
         if (this.collisionDamage > 0) {
-            defender.takeDamage(this.collisionDamage, attacker, this.collisionLabel);
+            const dmg = contactPoint
+                ? applyRotationalContactDamage(this.collisionDamage, attacker, contactPoint)
+                : this.collisionDamage;
+            defender.takeDamage(dmg, attacker, this.collisionLabel);
         }
         if (this.collisionSlow) {
             defender.applySlow(this.collisionSlow.duration, this.collisionSlow.amount);

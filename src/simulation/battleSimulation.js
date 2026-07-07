@@ -1,6 +1,7 @@
 import { Vector2 } from "../core.js";
 import { resolveFighterShapeCollision } from "../physics/CollisionShape.js";
 import { applyDynamicCollisionResponse } from "../physics/collisionResponse.js";
+import { applyRotationalContactDamage } from "../physics/contactDamage.js";
 import {
     ArcherAbility,
     EaterAbility,
@@ -313,8 +314,10 @@ export class BattleSimulation extends Simulation {
             return;
         }
 
-        let damageFromAToB = this.calculateCollisionDamage(a, b, normal) * aModifiers.damage;
-        let damageFromBToA = this.calculateCollisionDamage(b, a, normal.clone().scale(-1)) * bModifiers.damage;
+        const cp = result.contactPoint;
+        let damageFromAToB = this.calculateCollisionDamageWithContact(a, b, normal, cp) * aModifiers.damage;
+        let damageFromBToA =
+            this.calculateCollisionDamageWithContact(b, a, normal.clone().scale(-1), cp) * bModifiers.damage;
 
         [damageFromAToB, damageFromBToA] = this._applyMasteryCollisionPassives(a, b, damageFromAToB, damageFromBToA);
 
@@ -329,10 +332,10 @@ export class BattleSimulation extends Simulation {
         if (damageFromBToA > 0) a.takeDamage(damageFromBToA, b, "Crash");
         if (damageFromAToB > 0) b.takeDamage(damageFromAToB, a, "Crash");
         this._applyRigidBodyCollision(a, b, normal, result.contactPoint, preCollisionVel, aModifiers, bModifiers);
-        this._handleDashCollisions(a, b);
+        this._handleDashCollisions(a, b, cp);
 
-        a.ability?.onCollision(b);
-        b.ability?.onCollision(a);
+        a.ability?.onCollision(b, { contactPoint: cp });
+        b.ability?.onCollision(a, { contactPoint: cp });
 
         // ── physics debug collision event (실패해도 게임 영향 없음) ──
         try {
@@ -400,13 +403,13 @@ export class BattleSimulation extends Simulation {
         return [damageFromAToB, damageFromBToA];
     }
 
-    _handleDashCollisions(a, b) {
+    _handleDashCollisions(a, b, contactPoint) {
         for (const [attacker, defender] of [
             [a, b],
             [b, a]
         ]) {
             if (!attacker.state.movement) continue;
-            attacker.state.movement.onCollision(attacker, defender, this);
+            attacker.state.movement.onCollision(attacker, defender, this, contactPoint);
             if (attacker.state.movement?.expired) {
                 attacker.state.movement = null;
                 // 대시 종료 시 방향 고정도 같이 제거합니다.
@@ -447,6 +450,16 @@ export class BattleSimulation extends Simulation {
         const efficiency = speedEff * dirEff * glancingPenalty;
 
         return Math.max(1, Math.round(attacker.stats.baseDamage * efficiency * this.getDamageMultiplier()));
+    }
+
+    /**
+     * 접촉점 정보를 포함한 충돌 대미지 계산 (회전 기여도 적용).
+     * contactPoint가 주어지면 접촉점 속도 기반 회전 손상 보너스를 추가합니다.
+     */
+    calculateCollisionDamageWithContact(attacker, defender, attackerToDefender, contactPoint) {
+        const baseDamage = this.calculateCollisionDamage(attacker, defender, attackerToDefender);
+        if (!contactPoint) return baseDamage;
+        return applyRotationalContactDamage(baseDamage, attacker, contactPoint);
     }
 
     checkResult() {

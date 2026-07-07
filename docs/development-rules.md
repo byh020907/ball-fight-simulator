@@ -270,6 +270,30 @@ class WallSlamEffect {
 - `Simulation`은 벽 충돌 이벤트를 effect에 전달합니다.
 - `BattleBall`은 effect의 `tick()`을 호출하고, effect 내부 계산을 직접 소유하지 않습니다.
 
+### 접촉점 속도 기반 회전 손상 기여
+
+전투 충돌 대미지는 공격자의 접촉점 속도를 고려한 회전 손상 보너스를 적용합니다.
+
+```
+v_contact = v_center + ω × r
+(2D cross: ω × r = (-ω·ry, ω·rx))
+bonus = clamp((|v_contact| - |v_center|) / baseSpeed, 0, 0.6)
+damage = round(baseDamage × (1 + bonus))
+```
+
+- **보너스 상한**: +60% (0.6). 회전 속도가 아무리 빨라도 1.6배를 넘지 않습니다.
+- **보너스 계산 기준**: |접촉점 속도| - |중심 속도| 순수 회전 기여분만 사용합니다. 중심 속도가 0이어도 보너스는 0.6으로 제한됩니다.
+- **저속 회전**: |v_contact| - |v_center| ≤ 0이면 보너스 0 (회전 기여 없음).
+- **적용되는 충돌 경로**:
+  1. `BattleSimulation.calculateCollisionDamageWithContact()` — 충돌 대미지(Crash)
+  2. `DashEffect.onCollision()` — 대시 접촉 대미지(Dash Contact)
+  3. `VampireAbility._getCollisionDamage()` — 뱀파이어 접촉 힐/대미지
+- **헬퍼 함수** (`src/physics/contactDamage.js`):
+  - `getContactPointVelocity(body, contactPoint)` → 접촉점 속도 벡터
+  - `calculateRotationalContactDamageBonus(body, contactPoint, options)` → 0~0.6 보너스 계수
+  - `applyRotationalContactDamage(baseDamage, body, contactPoint, options)` → 보너스 적용 최종 대미지
+- **기존 충돌 물리 impulse 계산에는 영향을 주지 않습니다.** 순수 대미지 보너스만 변경합니다.
+
 ### polygon-polygon 접촉점 계산
 
 polygon-polygon 충돌의 접촉점(`contactPoint`)은 SAT 기반 접촉 후보 수집으로 계산합니다:

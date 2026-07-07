@@ -1,5 +1,11 @@
 # 결정 기록
 
+## [L1] 2026-07-07 — 접촉점 속도 기반 회전 손상 기여 시스템 도입
+- 맥락: 충돌 대미지가 선형 속도만 고려하고 각속도(회전)는 무시함. 회전하는 볼이 접촉점에서 더 큰 상대 속도를 가지므로 +60% capped 회전 손상 보너스를 Crash/Dash Contact/Vampire Contact 경로에 추가.
+- 결정: (1) `src/physics/contactDamage.js` 신설 — `getContactPointVelocity(body, contactPoint)`, `calculateRotationalContactDamageBonus(body, contactPoint, options)` (0~0.6 계수), `applyRotationalContactDamage(baseDamage, body, contactPoint, options)` (최종 대미지). (2) `BattleSimulation.calculateCollisionDamageWithContact(attacker, defender, normal, contactPoint)` 신설 — 기존 충돌 대미지 + 회전 보너스. (3) `handleFighterCollision`에서 `result.contactPoint` 전달. (4) `DashEffect.onCollision(attacker, defender, simulation, contactPoint)`에 contactPoint 파라미터 추가. (5) `VampireAbility.onCollision(target, context)`에 context 파라미터 추가. (6) 기존 `onCollision` 단일 파라미터 인터페이스와 하위 호환성 유지. (7) docs/회귀 테스트 갱신.
+- 영향: `src/physics/contactDamage.js`(신규), `src/physics/index.js`, `src/simulation/battleSimulation.js`, `src/combatEffects.js`, `src/abilities/vampireAbility.js`, `tests/regression.mjs`, `docs/development-rules.md`, `SESSION-HANDOFF.md`
+- 검증: `npm test` (38개 스위트), `npm run format:check`, `npm run check`, `node scripts/huntingUserScenario.mjs` 통과
+
 ## [L1] 2026-07-07 — 물리 재질 소유권을 PhysicsMaterialBody 믹스인으로 리팩터
 - 맥락: 125d8f5에서 `battleBall.js`에 `this.physicsMaterial = "rubberBall"`이 직접 할당되어 있었고, 이는 재사용 가능한 물리 바디 능력(capability)으로서 믹스인에 적합.
 - 결정: (1) `src/physics/PhysicsMaterialBody.js` 신설 — `(Base) => class extends Base` 형태 믹스인, constructor에서 `this.physicsMaterial = "wood"` 기본값, `setPhysicsMaterial(material)`, `getResolvedPhysicsMaterial()` 제공. (2) `BattleBall`이 `PhysicsMaterialBody` 믹스인을 사용, 클래스 선언에 추가, `setPhysicsMaterial(spec.physicsMaterial ?? "rubberBall")`로 재질 설정. (3) 기존 `this.physicsMaterial = "rubberBall"` 직접 할당 제거. (4) `collisionResponse.js`에서 `body.physicsMaterial` 참조는 믹스인 제공 필드를 그대로 사용하므로 변경 불필요. (5) docs/회귀 테스트 갱신.

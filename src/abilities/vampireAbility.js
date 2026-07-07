@@ -1,6 +1,7 @@
 import { Vector2 } from "../core.js";
 import { Ability } from "./ability.js";
 import { BatProjectile } from "../entities/index.js";
+import { applyRotationalContactDamage } from "../physics/contactDamage.js";
 
 const LIFESTEAL_RATE_NORMAL = 0.35;
 const LIFESTEAL_RATE_LOW_HP = 0.5;
@@ -56,9 +57,10 @@ export class VampireAbility extends Ability {
         this.simulation.addLog(`${owner.name} releases a swarm of bats!`);
     }
 
-    onCollision(target) {
+    onCollision(target, context) {
         const owner = this.owner;
-        const damage = this._getCollisionDamage(owner, target);
+        const contactPoint = context?.contactPoint;
+        const damage = this._getCollisionDamage(owner, target, contactPoint);
         if (damage <= 0) return;
         const hpRatio = owner.hp / owner.maxHp;
         const rate = hpRatio < LOW_HP_THRESHOLD ? LIFESTEAL_RATE_LOW_HP : LIFESTEAL_RATE_NORMAL;
@@ -67,11 +69,15 @@ export class VampireAbility extends Ability {
         this.simulation.spawnActionText(owner.position.clone(), `+${healAmount} HP`, "#ff4466");
     }
 
-    _getCollisionDamage(owner, target) {
+    _getCollisionDamage(owner, target, contactPoint) {
         const dist = Vector2.subtract(target.position, owner.position).length();
         if (dist > owner.radius + target.radius + 10) return 0;
         const relativeSpeed = Vector2.subtract(target.velocity, owner.velocity).length();
-        return Math.round(owner.stats.baseDamage * 0.5 * Math.min(3, relativeSpeed / owner.stats.baseSpeed));
+        const baseDamage = Math.round(
+            owner.stats.baseDamage * 0.5 * Math.min(3, relativeSpeed / owner.stats.baseSpeed)
+        );
+        if (!contactPoint || baseDamage <= 0) return baseDamage;
+        return applyRotationalContactDamage(baseDamage, owner, contactPoint);
     }
 
     getStatModifiers() {
