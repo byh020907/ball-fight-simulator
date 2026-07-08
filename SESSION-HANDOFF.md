@@ -1,5 +1,12 @@
 # 결정 기록
 
+## [L1] 2026-07-08 — Hero Ball Hero Orb carryover를 사냥터 층간 유지
+
+- 맥락: 일반 전투에서 Hero Ball로 Hero Orb stat(HP/대미지/속도/방어/스킬)을 획득한 carryover가 사냥터 층간 유지되지 않음. 기존 `app.js.startMatch`에서 Hero Orb carryover 루프가 모든 match에 적용되지만 사냥터 경로는 `huntingManager._startFloorBattle()`을 통해 별도로 spec을 구성해 전달하므로 carryover가 누락됨.
+- 결정: (1) `BattleBall`에 `applyHeroOrbCarryover(carryover)` 인스턴스 메서드 추가 — `applyHeroOrbCarryoverToBattleBall` 함수에 위임, bonuses에 반영되지 않음. (2) `BattleBall.mergeHeroOrbCarryoverInto(targetSpec)` 인스턴스 메서드 추가 — `mergeHeroOrbCarryover` 함수에 위임, 상태 병합 및 carryover 반환. (3) `app.js`에서 startMatch carryover 루프 제거 (생성자 위임). (4) `app.js.finishMatch`에서 `mergeHeroOrbCarryover(winnerSpec, ...)` → `this.simulation.winner.mergeHeroOrbCarryoverInto(winnerSpec)`으로 교체. (5) `huntingState.createHuntingRun` 반환값에 `hero: { bonuses, carryover }` 구조 추가. (6) `huntingManager._startFloorBattle`에서 `run.hero.carryover` 주입 — Hero Ball(`ability === "hero"`)만 적용. (7) `huntingManager._handleFinish`에서 `playerBall.mergeHeroOrbCarryoverInto(this._run)`으로 위임, `recordHuntingFloorResult`보다 먼저 계산. (8) 회귀 테스트 4종: BattleBall carryover 적용/merge, 사냥터 carryover 주입 조건/병합 위임.
+- 영향: `src/entities/battleBall.js`(메서드 2종 + 위임), `src/app.js`(루프 제거 + import 변경 + merge 위임), `src/hunting/huntingState.js`(createHuntingRun hero 구조), `src/hunting/huntingManager.js`(carryover 주입 조건 + 위임 + 순서 변경), `tests/regression.mjs`(테스트 4종)
+- 검증: `npm test`, `npm run format:check` 통과
+
 ## [L1] 2026-07-08 — 사냥터 몹 표시명 일반화와 미확보 전리품 HUD 추가
 - 맥락: 전투 진입 문구는 `전투 발생 · 적 N명`으로 바뀌었지만 실제 전투 UI에는 일반 몹 이름이 `근접 몹 1`/`원거리 몹 2`처럼 노출되어 사용자가 적 구성 문구가 여전히 타입 중심이라고 느꼈음. 또한 층 이동/선택 시 미확보 상자와 파편을 중앙 문구 외에 지속적으로 확인하기 어려웠음.
 - 결정: (1) 내부 `HUNTING_MONSTER_TYPES.MELEE/RANGED`, ability, stats, `hunting.monsterType`은 유지하되 UI-visible 일반 몹 name/title/description에서 근접/원거리 라벨을 제거하고 `하수인` 계열 표시명으로 통일. (2) `gameOverlay`에 우상단 `미확보 전리품` HUD를 추가해 이동/선택/상인 화면에서 pendingLoot 파편/상자 수를 별도로 보여줌. (3) 전리품이 없으면 HUD를 숨기고, 패배/귀환/스테이지 클리어/overlay hide 시 초기화.

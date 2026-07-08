@@ -171,6 +171,12 @@ export class HuntingManager {
             ),
             run.statModifiers
         );
+        if (playerSpec.ability === "hero" && run.hero?.carryover) {
+            appliedSpec.hero = {
+                ...(appliedSpec.hero || {}),
+                carryover: { ...run.hero.carryover }
+            };
+        }
         const matchSpecs = [appliedSpec, ...enemySpecs];
         app._currentMatchReport = createMatchReport();
         app._currentMatchReport.playerFighterId = run.characterId;
@@ -263,6 +269,11 @@ export class HuntingManager {
                 chests: Math.random() < 0.15 ? [createHuntingChest({ rarity: "common" })] : [],
                 xp: 0
             };
+
+            // Hero Orb carryover — 전투 중 획득한 bonuses를 run에 반영 (recordHuntingFloorResult 전에 계산)
+            if (playerBall?.hero?.bonuses) {
+                playerBall.mergeHeroOrbCarryoverInto(run);
+            }
 
             this._run = recordHuntingFloorResult(run, {
                 hpRemain: Math.ceil(playerBall?.hp ?? run.carriedHp ?? 0),

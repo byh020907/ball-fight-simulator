@@ -21,7 +21,7 @@ function requireStatAllocation() {
 import { ActionPickerService } from "./actionPicker.js";
 import { CollectionHubService } from "./collectionHubService.js";
 import { pickRandomActions, findActionById, showActionFailure } from "./clickActions.js";
-import { BattleBall, mergeHeroOrbCarryover, applyHeroOrbCarryoverToBattleBall } from "./entities/index.js";
+import { BattleBall } from "./entities/index.js";
 import {
     loadPlayerProfile,
     savePlayerProfile,
@@ -636,14 +636,6 @@ export class BattleApp {
             this._currentMatchReport.tournamentRoundIndex = this.currentTournamentMatch?.roundIndex ?? -1;
         }
 
-        // Hero Orb carryover 적용 — entities/ helper로 위임
-        for (const fighter of this.simulation.fighters) {
-            const spec = match.find((s) => s.id === fighter.id);
-            if (spec?.hero?.carryover) {
-                applyHeroOrbCarryoverToBattleBall(fighter, spec.hero.carryover);
-            }
-        }
-
         // 클릭 액션 — 내 캐릭터가 있으면 카드 선택
         this._action.current = null;
         if (playerBall) {
@@ -964,9 +956,9 @@ export class BattleApp {
             );
             const playerLost = playerWasInMatch && winnerSpec.id !== this.playerFighterId;
 
-            // Hero Ball 승리 시 carryover — HeroAbility/entities/ helper로 위임
-            if (winnerSpec.ability === "hero") {
-                mergeHeroOrbCarryover(winnerSpec, this.simulation.winner?.hero.bonuses);
+            // Hero Ball 승리 시 carryover — BattleBall 인스턴스 메서드로 위임
+            if (winnerSpec.ability === "hero" && this.simulation.winner) {
+                this.simulation.winner.mergeHeroOrbCarryoverInto(winnerSpec);
             }
             if (playerLost && !this.playerResult) {
                 this.playerResult = {

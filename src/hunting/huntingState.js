@@ -46,6 +46,10 @@ export function createHuntingRun({
         status: "active",
         characterId,
         stageId,
+        hero: {
+            bonuses: { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 },
+            carryover: { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 }
+        },
         floor: 0,
         maxFloor,
         carriedHp: null,

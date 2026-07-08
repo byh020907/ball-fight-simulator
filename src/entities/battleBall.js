@@ -10,6 +10,7 @@ import {
 } from "../physics/PhysicsDebugRingBuffer.js";
 import { getFaceTemplate } from "./mobAppearance.js";
 import { drawEquipmentItems } from "./equipmentVisuals.js";
+import { applyHeroOrbCarryoverToBattleBall, mergeHeroOrbCarryover, HERO_ORB_CARRYOVER_RATE } from "./heroOrb.js";
 
 export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMaterialBody]) {
     constructor(spec, position) {
@@ -58,6 +59,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             bonuses: { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 },
             carryover: { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 }
         };
+        this.applyHeroOrbCarryover(spec.hero?.carryover);
         this.hunting = spec.hunting ?? null;
         this.appearance = spec.appearance ?? { sides: 0, face: "default" };
         // RotationalBody 초기화: angle 기본값 0 (대기화면 upright), 회전은 runtime angularVelocity/integrateRotation로 동작
@@ -94,6 +96,23 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
 
         // 물리 디버깅 ring buffer (게임 결과에 영향 없음)
         this.physicsDebug = new PhysicsDebugRingBuffer(30);
+    }
+
+    /**
+     * @param {{ hp?: number, damage?: number, speed?: number, defense?: number, skill?: number }} carryover
+     */
+    applyHeroOrbCarryover(carryover) {
+        applyHeroOrbCarryoverToBattleBall(this, carryover);
+    }
+
+    /**
+     * 승리한 BattleBall의 bonuses를 carryover로 변환해 대상 spec으로 병합합니다.
+     * @param {{ hero?: { carryover: { hp: number, damage: number, speed: number, defense: number, skill: number } } }} targetSpec
+     * @param {number} [rate=HERO_ORB_CARRYOVER_RATE]
+     * @returns {{ hp?: number, damage?: number, speed?: number, defense?: number, skill?: number }}
+     */
+    mergeHeroOrbCarryoverInto(targetSpec, rate = HERO_ORB_CARRYOVER_RATE) {
+        return mergeHeroOrbCarryover(targetSpec, this.hero.bonuses, rate);
     }
 
     get renderLayer() {
