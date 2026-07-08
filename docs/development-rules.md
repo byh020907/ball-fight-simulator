@@ -311,8 +311,18 @@ circle-polygon은 `_closestPoint`(최근접 polygon vertex)를 우선하고, 없
 - **물리 helper 재사용**: 프리뷰 충돌은 `applyDynamicCollisionResponse`를 통해 rigid-body collision impulse를 계산합니다. 직접 `velocity.x` 수정이나 단순 `impulseMag = -velAlongNormal * 0.5` 같은 ad hoc 공식을 사용하지 않습니다.
 - **전용 모듈**: 프리뷰 재선택 물리는 `src/preview/previewReselectSimulation.js`가 소유합니다. `BattleApp`은 시작/갱신/최종화/큐잉만 담당하고 물리 계산은 갖고 있지 않습니다.
 - **콜리전 피드백**: 충돌 시 `VisualBurst`(spark), `GravityParticle`(particle burst), `_triggerScreenShake`(화면 흔들림)을 생성합니다. 반복 spark 방지를 위해 collision cooldown(0.15s)을 적용합니다.
-- **무거운 striker 효과**: 들어오는(incoming) 볼은 `impactA=10`으로 적용되어, outgoing 볼이 강하게 튕겨 나가도록 합니다.
+- **무거운 striker 효과**: 들어오는(incoming) 볼은 `FighterPhysicsSimulation`의 impact 옵션으로 보정되어, outgoing 볼이 강하게 튕겨 나가도록 합니다.
 - **레이블 처리**: 스왑 중 텍스트 레이블("내 캐릭터", 이름)은 완전히 숨기고, `renderPlayerPreview`(일반 프리뷰)에서만 표시합니다.
+
+### 전투원 물리 계층
+
+전투원끼리 상호작용하는 물리 흐름은 `Simulation -> FighterPhysicsSimulation -> BattleSimulation` 계층을 따릅니다.
+
+- `Simulation`: arena boundary, terrain, effect spawn, screen shake 같은 완전 공통 기반만 소유합니다.
+- `FighterPhysicsSimulation`: 전투원 목록, fighter pair 순회, shape collision, overlap separation, `applyDynamicCollisionResponse` 기반 rigid-body 충돌, 공통 충돌 피드백을 소유합니다.
+- `BattleSimulation`: 데미지, 숙련도, dash/ability collision, overtime, anti-stall, 결과 판정 등 실제 게임 규칙을 훅으로 조립합니다.
+- 프리뷰 재선택처럼 전투원 물리를 쓰는 화면도 `FighterPhysicsSimulation`을 상속하거나 이 계층을 경유해야 하며, 별도 미니 물리 엔진이나 ad hoc velocity swap을 만들지 않습니다.
+
 
 ### Anti-stall 장치 (BattleSimulation)
 

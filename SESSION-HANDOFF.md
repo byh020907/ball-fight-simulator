@@ -1,5 +1,11 @@
 # 결정 기록
 
+## [L1] 2026-07-08 — 전투원 물리 계층을 배틀 규칙 아래로 분리한다
+- 맥락: 사용자가 BattleSimulation은 실제 실행 앱/게임 규칙 계층이어야 하고, Simulation과 BattleSimulation 사이에 전투에 필요한 공통 구현을 담는 중간 클래스가 있어야 한다고 명확히 정리했다. 직전 구현은 PreviewReselectSimulation이 독립 미니 물리 구현처럼 남아 구조 의도와 완전히 맞지 않았다.
+- 결정: (1) `src/simulation/fighterPhysicsSimulation.js`를 공통 전투원 물리 계층으로 추가/정리. (2) `BattleSimulation extends FighterPhysicsSimulation`으로 변경하고, 충돌 탐지/분리/rigid-body 충돌은 중간 계층이 소유. (3) BattleSimulation에는 데미지, 숙련도, dash/ability collision, anti-stall, 결과 판정 같은 게임 규칙 훅만 남김. (4) `PreviewReselectSimulation`도 FighterPhysicsSimulation을 상속해 같은 충돌/피드백 흐름을 재사용. (5) 계층 구조 회귀 테스트 추가.
+- 영향: `src/simulation/fighterPhysicsSimulation.js`, `src/simulation/battleSimulation.js`, `src/preview/previewReselectSimulation.js`, `tests/regression.mjs`, `docs/development-rules.md`, `src/patchNotes.js`, `index.html`
+
+
 ## [L1] 2026-07-08 — 프리뷰 재선택 충돌을 전투 물리 피드백으로 맞춘다
 
 - 맥락: 프리뷰 재선택 시 기존 충돌이 단순 속도 교환(impulseMag = -velAlongNormal * 0.5)에 불과해 outgoing 볼이 약하게 밀릴 뿐이고, spark/pulse/화면 흔들림 같은 전투 피드백이 없었음. 텍스트 레이블이 incoming 볼을 따라 날아다니는 문제도 있었음.

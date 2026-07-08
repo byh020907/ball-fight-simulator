@@ -1,6 +1,4 @@
 import { Vector2 } from "../core.js";
-import { resolveFighterShapeCollision } from "../physics/CollisionShape.js";
-import { applyDynamicCollisionResponse } from "../physics/collisionResponse.js";
 import { applyRotationalContactDamage } from "../physics/contactDamage.js";
 import {
     ArcherAbility,
@@ -19,7 +17,7 @@ import {
 } from "../abilities/index.js";
 import { BattleBall } from "../entities/index.js";
 import { GravityParticle } from "../effects/index.js";
-import { Simulation } from "./simulation.js";
+import { FighterPhysicsSimulation } from "./fighterPhysicsSimulation.js";
 import { AIActionController } from "./aiActionController.js";
 
 const ABILITY_TYPES = {
@@ -38,22 +36,11 @@ const ABILITY_TYPES = {
     hunting_melee: HuntingMeleeAbility
 };
 
-const COLLISION_SEPARATION_PADDING = 0.6;
-const DEFAULT_ARENA_SIZE = 960;
 const ANTI_STALL_INTERVAL = 8;
 
-function normalizeArenaSize(value) {
-    if (!Number.isFinite(value)) return DEFAULT_ARENA_SIZE;
-    return Math.max(DEFAULT_ARENA_SIZE, Math.round(value));
-}
-
-export class BattleSimulation extends Simulation {
+export class BattleSimulation extends FighterPhysicsSimulation {
     constructor(fighterSpecs, hooks, playerBall = null, options = {}) {
-        super();
-        this.width = normalizeArenaSize(options.arenaWidth);
-        this.height = normalizeArenaSize(options.arenaHeight);
-        this.arenaTheme = options.arenaTheme ?? null;
-        this.terrain = Array.isArray(options.terrain) ? options.terrain : [];
+        super(options);
         this.hooks = hooks;
         const spawnPoints = this.createSpawnPoints(fighterSpecs.length);
         this.fighters = fighterSpecs.map((spec, index) => {
@@ -276,56 +263,15 @@ export class BattleSimulation extends Simulation {
         this.checkResult();
     }
 
-    handleCollision() {
-        for (const [a, b] of this.getFighterPairs()) {
-            this.handleFighterCollision(a, b);
-        }
-    }
+    beforeFighterPhysicsCollision(context) {
+        if (!context.hostile) return;
 
-    getFighterPairs() {
-        return this.fighters.flatMap((fighter, index) =>
-            this.fighters.slice(index + 1).map((opponent) => [fighter, opponent])
-        );
-    }
-
-    handleFighterCollision(a, b) {
-        if (a.flags.defeated || b.flags.defeated || a.state.swallowed || b.state.swallowed) return;
-
-        const result = resolveFighterShapeCollision(a, b);
-        if (!result || !result.normal || result.overlap <= 0) return;
-
-        const normal = result.normal;
-        const sepVec = result.separationVec;
-        if (sepVec) {
-            // SAT normal 방향 분리 벡터 사용 (polygon 충돌)
-            const pad = COLLISION_SEPARATION_PADDING;
-            const totalX = sepVec.x + (sepVec.x > 0 ? pad : -pad);
-            const totalY = sepVec.y + (sepVec.y > 0 ? pad : -pad);
-            a.position.add(new Vector2(-totalX / 2, -totalY / 2));
-            b.position.add(new Vector2(totalX / 2, totalY / 2));
-        } else {
-            // circle-circle: 기존 normal 기반 분리
-            const separationOverlap = result.separationOverlap ?? result.overlap;
-            this._resolveOverlap(a, b, normal, separationOverlap);
-        }
-
-        const aModifiers = a.getStatModifiers();
-        const bModifiers = b.getStatModifiers();
-
-        // 충돌 전 relative velocity — impulse solver에 전달
-        const preCollisionVel = Vector2.subtract(b.velocity, a.velocity);
-
-        if (!this.isHostile(a, b)) {
-            this._applyRigidBodyCollision(a, b, normal, result.contactPoint, preCollisionVel, aModifiers, bModifiers);
-            return;
-        }
-
+        const { a, b, normal, contactPoint, aModifiers, bModifiers } = context;
         this._resetAntiStallTimerForFighterCollision();
 
-        const cp = result.contactPoint;
-        let damageFromAToB = this.calculateCollisionDamageWithContact(a, b, normal, cp) * aModifiers.damage;
+        let damageFromAToB = this.calculateCollisionDamageWithContact(a, b, normal, contactPoint) * aModifiers.damage;
         let damageFromBToA =
-            this.calculateCollisionDamageWithContact(b, a, normal.clone().scale(-1), cp) * bModifiers.damage;
+            this.calculateCollisionDamageWithContact(b, a, normal.clone().scale(-1), contactPoint) * bModifiers.damage;
 
         [damageFromAToB, damageFromBToA] = this._applyMasteryCollisionPassives(a, b, damageFromAToB, damageFromBToA);
 
@@ -339,14 +285,50 @@ export class BattleSimulation extends Simulation {
 
         if (damageFromBToA > 0) a.takeDamage(damageFromBToA, b, "Crash");
         if (damageFromAToB > 0) b.takeDamage(damageFromAToB, a, "Crash");
-        this._applyRigidBodyCollision(a, b, normal, result.contactPoint, preCollisionVel, aModifiers, bModifiers);
-        this._handleDashCollisions(a, b, cp);
 
-        a.ability?.onCollision(b, { contactPoint: cp });
-        b.ability?.onCollision(a, { contactPoint: cp });
+        context.damageFromAToB = damageFromAToB;
+        context.damageFromBToA = damageFromBToA;
+    }
 
-        // ── physics debug collision event (실패해도 게임 영향 없음) ──
+    getFighterCollisionImpactOptions(context) {
+        const { a, b, aModifiers, bModifiers } = context;
+        const aOutgoingBonus = 1 + (a.mastery.physics?.outgoingImpactBonus ?? 0);
+        const bOutgoingBonus = 1 + (b.mastery.physics?.outgoingImpactBonus ?? 0);
+        const aIncomingReduce = 1 - (a.mastery.physics?.incomingKnockbackReduce ?? 0);
+        const bIncomingReduce = 1 - (b.mastery.physics?.incomingKnockbackReduce ?? 0);
+
+        return {
+            impactA: (aModifiers.impact ?? 1) * aOutgoingBonus * bIncomingReduce,
+            impactB: (bModifiers.impact ?? 1) * bOutgoingBonus * aIncomingReduce
+        };
+    }
+
+    afterFighterPhysicsCollision(context) {
+        if (!context.hostile) return;
+
+        const { a, b, contactPoint } = context;
+        this._handleDashCollisions(a, b, contactPoint);
+
+        a.ability?.onCollision(b, { contactPoint });
+        b.ability?.onCollision(a, { contactPoint });
+        this._recordPhysicsDebugCollision(context);
+    }
+
+    shouldEmitFighterCollisionFeedback(context) {
+        return context.hostile && context.approachSpeed < 0;
+    }
+
+    emitFighterCollisionFeedback(context) {
+        const { a, b, damageFromAToB = 0, damageFromBToA = 0 } = context;
+        this.playSound("crash", Math.min(1.8, 0.8 + Math.abs(damageFromAToB + damageFromBToA) / 24));
+        this.addSparkBurst(Vector2.add(a.position, b.position).scale(0.5), "#ffffff");
+        this.addSparkBurst(a.position.clone(), a.color);
+        this.addSparkBurst(b.position.clone(), b.color);
+    }
+
+    _recordPhysicsDebugCollision(context) {
         try {
+            const { a, b, normal, result, contactPoint } = context;
             const collisionEvent = {
                 type: "collision",
                 entityIdA: a.id,
@@ -355,45 +337,13 @@ export class BattleSimulation extends Simulation {
                 entityNameB: b.name,
                 normal: { x: normal.x, y: normal.y },
                 overlap: result.overlap,
-                contactPoint: result.contactPoint ? { x: result.contactPoint.x, y: result.contactPoint.y } : null
+                contactPoint: contactPoint ? { x: contactPoint.x, y: contactPoint.y } : null
             };
             a.physicsDebug?.push(collisionEvent);
             b.physicsDebug?.push(collisionEvent);
         } catch {
-            /* 무시 */
+            // Debug capture must never affect gameplay.
         }
-
-        this.playSound("crash", Math.min(1.8, 0.8 + Math.abs(damageFromAToB + damageFromBToA) / 24));
-        this.addSparkBurst(Vector2.add(a.position, b.position).scale(0.5), "#ffffff");
-        this.addSparkBurst(a.position.clone(), a.color);
-        this.addSparkBurst(b.position.clone(), b.color);
-    }
-
-    _resolveOverlap(a, b, normal, overlap) {
-        const separation = overlap + COLLISION_SEPARATION_PADDING;
-        a.position.add(normal.clone().scale(-separation / 2));
-        b.position.add(normal.clone().scale(separation / 2));
-    }
-
-    /**
-     * 단일 rigid-body collision response 호출.
-     * contactPoint 기반 impulse solver로 normal + tangent, linear + angular를 통합 적용한다.
-     * 숙련도 impact 보정을 impactA/impactB로 전달한다.
-     */
-    _applyRigidBodyCollision(a, b, normal, contactPoint, preCollisionVel, aMod, bMod) {
-        // 숙련도 물리 보정
-        const aOutgoingBonus = 1 + (a.mastery.physics?.outgoingImpactBonus ?? 0);
-        const bOutgoingBonus = 1 + (b.mastery.physics?.outgoingImpactBonus ?? 0);
-        const aIncomingReduce = 1 - (a.mastery.physics?.incomingKnockbackReduce ?? 0);
-        const bIncomingReduce = 1 - (b.mastery.physics?.incomingKnockbackReduce ?? 0);
-
-        const impactA = aMod.impact * aOutgoingBonus * bIncomingReduce;
-        const impactB = bMod.impact * bOutgoingBonus * aIncomingReduce;
-
-        applyDynamicCollisionResponse(a, b, normal, contactPoint, preCollisionVel.dot(normal), {
-            impactA,
-            impactB
-        });
     }
 
     /** 숙련도 충돌 패시브: 주기적 충돌 피해 보너스 적용 */

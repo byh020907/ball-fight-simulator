@@ -19,6 +19,21 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.24.15",
+        date: "2026-07-08",
+        title: "v0.24.15 전투원 물리 계층을 배틀 규칙 아래로 분리한다",
+        changes: [
+            {
+                type: "refactor",
+                text: "Simulation과 BattleSimulation 사이에 FighterPhysicsSimulation 계층을 추가했습니다. 전투원 충돌 탐지, 분리, rigid-body 충돌, 공통 충돌 피드백은 이 계층이 담당하고 BattleSimulation은 데미지, 능력, 결과 판정 같은 게임 규칙을 조립합니다."
+            },
+            {
+                type: "refactor",
+                text: "프리뷰 캐릭터 재선택도 FighterPhysicsSimulation을 상속하도록 바꿔 전투와 같은 충돌 흐름을 재사용합니다. 별도 미니 물리 구현이 생기지 않도록 구조를 고정했습니다."
+            }
+        ]
+    },
+    {
         version: "0.24.14",
         date: "2026-07-08",
         title: "v0.24.14 프리뷰 재선택 충돌을 전투 물리 피드백으로 맞춘다",

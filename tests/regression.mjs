@@ -21,6 +21,8 @@ import { getCharacterExperienceSummary, grantExperienceFromMatchReport } from ".
 import { DashEffect, WallSlamEffect } from "../src/combatEffects.js";
 import { shuffled } from "../src/random.js";
 import { BattleSimulation } from "../src/simulation/battleSimulation.js";
+import { FighterPhysicsSimulation } from "../src/simulation/fighterPhysicsSimulation.js";
+import { PreviewReselectSimulation } from "../src/preview/previewReselectSimulation.js";
 import {
     createDefaultPlayerProfile,
     migrateLegacyExperienceToCharacter,
@@ -8791,6 +8793,34 @@ function testHuntingStartFloorBattleAppliesStatAllocation(app) {
 
 // ── Preview reselect tests ─────────────────────────────────────────────────────
 
+function testFighterPhysicsSimulationHierarchy(app) {
+    const first = app.roster[0];
+    const second = app.roster.find((fighter) => fighter.id !== first.id);
+    const battle = new BattleSimulation([first, second], { onLog() {}, onSound() {}, onOvertime() {} });
+    const preview = new PreviewReselectSimulation({
+        oldFighter: first,
+        newFighter: second,
+        center: new Vector2(480, 452),
+        canvasWidth: 960
+    });
+
+    assert.ok(
+        battle instanceof FighterPhysicsSimulation,
+        "BattleSimulation should inherit shared fighter physics layer"
+    );
+    assert.ok(
+        preview instanceof FighterPhysicsSimulation,
+        "PreviewReselectSimulation should inherit shared fighter physics layer"
+    );
+    assert.equal(
+        typeof preview.handleCollision,
+        "function",
+        "preview reselection should use shared fighter collision flow"
+    );
+
+    console.log("[fighter-physics-hierarchy] ok");
+}
+
 function testPreviewReselectChangesCharacter(app) {
     const initialId = app.playerFighterId;
     const initialAllocation = { ...app.playerStatAllocation };
@@ -9123,6 +9153,7 @@ testBattleBallMergeHeroOrbCarryoverInto(app);
 testHuntingHeroCarryoverInStartFloorBattle(app);
 testHuntingHeroCarryoverInHandleFinish(app);
 testHuntingStartFloorBattleAppliesStatAllocation(app);
+testFighterPhysicsSimulationHierarchy(app);
 testPreviewReselectChangesCharacter(app);
 testPreviewReselectHeavyKnockAway(app);
 testPreviewReselectCollisionFeedback(app);
