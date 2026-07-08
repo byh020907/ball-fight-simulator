@@ -1,5 +1,12 @@
 # 결정 기록
 
+## [L1] 2026-07-08 — WallSlam 회전을 물리 기반 angular impulse로 전환
+
+- 맥락: WallSlam 효과가 시각 전용 `display.spinRotation`을 사용해 물리 각속도와 무관한 회전을 보여줌. 회전 물리(applyAngularImpulse, _inverseMomentOfInertia, integrateRotation)가 이미 완비되어 WallSlam도 물리 impulse로 전달해야 일관성 확보.
+- 결정: (1) WallSlamEffect.updateSpin() 제거 → _applyPhysicalAngularImpulse() 신설 (one-shot, angularImpulseApplied 가드). (2) impulse = desiredOmega / invI 또는 fallback mass*radius*speed*0.35, desriedOmega = sign*clamp(speed/radius*1.2, 5, 14). (3) BattleBall.display.spinRotation 필드 및 wallSlamSpin face 회전 합성 제거, faceRotation = polygon ? angle : rotationEnabled ? angle : 0. (4) 테스트: testWallSlamSpinPreserved → testWallSlamUsesPhysicalAngularImpulse, testEaterFeast에서 spinRotation 대신 angularVelocity 검증. (5) rotationEnabled===false 볼은 WallSlam angular impulse 영향을 받지 않음.
+- 영향: `src/combatEffects.js`, `src/entities/battleBall.js`, `tests/regression.mjs`, `src/patchNotes.js`, `index.html`(V 0.24.11), `docs/development-rules.md`, `docs/hunting-grounds-system.md`, `SESSION-HANDOFF.md`
+- 검증: `npm run format:check`, `npm run check`, `npm test`, `node scripts/huntingUserScenario.mjs`
+
 ## [L1] 2026-07-08 — 모바일 세팅 화면 스크롤을 패널 내부로 수정 (문서 스크롤 철회)
 
 - 맥락: 09d5d9e에서 도입한 문서 스크롤 방식(body overflow-y:auto, .app/.game-frame height:auto)이 아레나/프리뷰/시작 버튼 영역까지 함께 스크롤되게 하여 사용자가 원하는 동작과 반대였음. 상단 영역은 뷰포트에 고정되고 하단 장비/스탯 패널만 스크롤되어야 함.

@@ -68,12 +68,13 @@ export class WallSlamEffect {
         this.source = source;
         this.damage = damage;
         this.cooldown = 0;
+        this.angularImpulseApplied = false;
     }
 
     tick(ball, delta) {
         this.effect.tick(delta);
         this.cooldown = Math.max(0, this.cooldown - delta);
-        this.updateSpin(ball, delta);
+        this._applyPhysicalAngularImpulse(ball);
         return this.effect.finished;
     }
 
@@ -94,9 +95,27 @@ export class WallSlamEffect {
         simulation.addLog(`${ball.name} takes wall slam damage.`);
     }
 
-    updateSpin(ball, delta) {
-        const spinDirection = ball.velocity.x >= 0 ? 1 : -1;
-        ball.display.spinRotation +=
-            spinDirection * Math.max(8, ball.velocity.length() / Math.max(1, ball.radius)) * delta * 1.55;
+    _applyPhysicalAngularImpulse(ball) {
+        if (this.angularImpulseApplied) return;
+        if (ball.rotationEnabled === false) return;
+        if (typeof ball.applyAngularImpulse !== "function") return;
+        this.angularImpulseApplied = true;
+
+        const speed = ball.velocity.length();
+        const radius = Math.max(1, ball.radius ?? 1);
+        const sign = ball.velocity.x >= 0 ? 1 : -1;
+        const desiredOmega = sign * Math.min(14, Math.max(5, (speed / radius) * 1.2));
+
+        const invI = ball._inverseMomentOfInertia;
+        let impulse;
+        if (Number.isFinite(invI) && invI > 0) {
+            impulse = desiredOmega / invI;
+        } else {
+            impulse = (ball.mass ?? 1) * radius * speed * 0.35 * sign;
+        }
+
+        if (Number.isFinite(impulse) && impulse !== 0) {
+            ball.applyAngularImpulse(impulse);
+        }
     }
 }

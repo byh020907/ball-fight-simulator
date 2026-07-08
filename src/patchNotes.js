@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.24.11",
+        date: "2026-07-08",
+        title: "v0.24.11 WallSlam 회전을 물리 기반 angular impulse로 전환",
+        changes: [
+            {
+                type: "refactor",
+                text: "벽 충돌 슬램(WallSlam) 효과의 회전이 시각 보간(spinRotation) 대신 물리 angular impulse로 동작하도록 재작성했습니다. 회전하는 볼이 벽에 부딪힐 때 속도와 질량에 비례한 실제 각운동량이 전달되어 물리 일관성이 향상되었습니다. 회전이 비활성화된 볼은 영향을 받지 않습니다."
+            }
+        ]
+    },
+    {
         version: "0.24.10",
         date: "2026-07-08",
         title: "v0.24.10 모바일 세팅 화면 스크롤을 패널 내부로 수정",

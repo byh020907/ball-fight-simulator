@@ -261,7 +261,7 @@ class WallSlamEffect {
 
     tick(ball, delta) {
         this.cooldown = Math.max(0, this.cooldown - delta);
-        this.updateSpin(ball, delta);
+        this._applyPhysicalAngularImpulse(ball);
     }
 }
 ```

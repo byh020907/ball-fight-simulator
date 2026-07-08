@@ -17,7 +17,7 @@ import { findActionById } from "../src/clickActions.js";
 import { calcMatchXp, getLevelFromXp, getXpForNextLevel, calcTournamentXp } from "../src/experience/experienceState.js";
 import { getLevelRequirement } from "../src/experience/experienceConfig.js";
 import { getCharacterExperienceSummary, grantExperienceFromMatchReport } from "../src/experience/experienceService.js";
-import { DashEffect } from "../src/combatEffects.js";
+import { DashEffect, WallSlamEffect } from "../src/combatEffects.js";
 import { shuffled } from "../src/random.js";
 import { BattleSimulation } from "../src/simulation/battleSimulation.js";
 import {
@@ -613,9 +613,11 @@ async function testEaterFeast(app) {
         "Spat target should launch at twice its base speed"
     );
     assert.equal(target.state.movement.showRing, false, "Spit dash should not draw the normal speed ring");
-    const spinBefore = target.display.spinRotation;
-    target.update(0.12, app.simulation);
-    assert.ok(Math.abs(target.display.spinRotation - spinBefore) > 1, "Spat target face should spin while flying");
+    // WallSlam one-shot angular impulse was already applied during simulation.update(0.8)
+    assert.ok(
+        Math.abs(target.angularVelocity) > 0.1,
+        "Spat target should have received physical angular impulse from wall slam"
+    );
     const beforeHp = target.hp;
     target.applyImpulse(
         Vector2.subtract(new Vector2(Math.abs(target.velocity.x) || 500, target.velocity.y), target.velocity)
@@ -3840,9 +3842,7 @@ function testCircleEquipmentRotatesWithFace() {
     assert.ok(rotateCalls.length >= 2, "equipment + face should both rotate with body angle");
 }
 
-function testWallSlamSpinPreserved() {
-    // rotation enabled: face rotation = angle + spinRotation
-    // rotation disabled: face rotation = spinRotation only (original behavior)
+function testWallSlamUsesPhysicalAngularImpulse() {
     const spec = {
         id: "test-ws",
         name: "WS",
@@ -3852,27 +3852,51 @@ function testWallSlamSpinPreserved() {
         appearance: { sides: 0, face: "default" },
         ability: "dash"
     };
-    const ctxOn = makeRecordingCanvasContext();
-    const ballOn = new BattleBall(spec, new Vector2(200, 200));
-    ballOn.radius = 30;
-    ballOn.angle = 0.8;
-    ballOn.display.spinRotation = 2.0;
-    ballOn.state.wallSlam = { tick() {}, onWallBounce() {} };
-    ballOn.draw(ctxOn);
-    // face should compose angle + spinRotation = 2.8
-    const rotOn = ctxOn.calls.filter((c) => c[0] === "rotate" && Math.abs(c[1] - 2.8) < 0.05);
-    assert.ok(rotOn.length >= 1, "rotation enabled should compose angle + spinRotation");
 
-    const ctxOff = makeRecordingCanvasContext();
-    const ballOff = new BattleBall({ ...spec, rotationEnabled: false }, new Vector2(300, 200));
-    ballOff.radius = 30;
+    // rotation-enabled ball: WallSlam should produce physical angular impulse
+    const sim = new BattleSimulation([spec, { ...spec, id: "opp", teamId: "t2" }], { onLog() {}, onSound() {} });
+    const ball = sim.fighters[0];
+    ball.position.x = 200;
+    ball.position.y = 200;
+    ball.velocity = new Vector2(300, 0);
+    ball.angle = 0;
+    ball.angularVelocity = 0;
+    ball.clearAngularForces();
+    ball.appearance.sides = 0;
+    ball.state.wallSlam = new WallSlamEffect({ source: sim.fighters[1], damage: 10, duration: 0.5 });
+
+    const angVelBefore = ball.angularVelocity;
+    ball.update(0.12, sim);
+    assert.ok(Math.abs(ball.angularVelocity) > 0, "WallSlam should produce physical angular velocity");
+    assert.notEqual(ball.angle, 0, "WallSlam should change angle through physical rotation");
+
+    // rotation-disabled ball: WallSlam must NOT affect physical rotation
+    const sim2 = new BattleSimulation(
+        [
+            { ...spec, id: "disabled", rotationEnabled: false },
+            { ...spec, id: "opp2", teamId: "t3" }
+        ],
+        { onLog() {}, onSound() {} }
+    );
+    const ballOff = sim2.fighters[0];
+    ballOff.position.x = 200;
+    ballOff.position.y = 200;
+    ballOff.velocity = new Vector2(300, 0);
     ballOff.angle = 0;
-    ballOff.display.spinRotation = 2.0;
-    ballOff.state.wallSlam = { tick() {}, onWallBounce() {} };
-    ballOff.draw(ctxOff);
-    // rotation disabled: face uses only spinRotation
-    const rotOff = ctxOff.calls.filter((c) => c[0] === "rotate" && Math.abs(c[1] - 2.0) < 0.05);
-    assert.ok(rotOff.length >= 1, "rotation disabled should still show wallSlam spin");
+    ballOff.angularVelocity = 0;
+    ballOff.clearAngularForces();
+    ballOff.appearance.sides = 0;
+    ballOff.state.wallSlam = new WallSlamEffect({ source: sim2.fighters[1], damage: 10, duration: 0.5 });
+
+    const angleBeforeOff = ballOff.angle;
+    const angVelBeforeOff = ballOff.angularVelocity;
+    ballOff.update(0.12, sim2);
+    assert.equal(ballOff.angle, angleBeforeOff, "rotation-disabled ball should not change angle from WallSlam");
+    assert.equal(
+        ballOff.angularVelocity,
+        angVelBeforeOff,
+        "rotation-disabled ball should not change angularVelocity from WallSlam"
+    );
 }
 
 function testPolygonAppearanceAnglePriority() {
@@ -6803,7 +6827,7 @@ await testNonHostileCollisionProducesAngularImpulse(app);
 testPolygonContactPointAsymmetric();
 await testCircleRotationDisabled(app);
 testCircleEquipmentRotatesWithFace();
-testWallSlamSpinPreserved();
+testWallSlamUsesPhysicalAngularImpulse();
 testPolygonAppearanceAnglePriority();
 testRingBufferPushAndOrder();
 testRingBufferCapacityOverflow();

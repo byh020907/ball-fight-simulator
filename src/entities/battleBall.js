@@ -51,7 +51,6 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             destroyed: false
         };
         this.display = {
-            spinRotation: 0,
             scale: 1
         };
         this.ability = null;
@@ -469,10 +468,8 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         } else {
             drawEquipmentItems(ctx, this, this.equipment.items);
         }
-        // 얼굴 회전: polygon은 항상 this.angle, 원형은 rotationEnabled에 따라 합성
-        const wallSlamSpin = this.state.wallSlam ? this.display.spinRotation : 0;
-        const faceRotation =
-            this.appearance.sides > 0 ? this.angle : this.rotationEnabled ? this.angle + wallSlamSpin : wallSlamSpin;
+        // 얼굴 회전: polygon은 항상 this.angle, 원형은 rotationEnabled에 따라 적용
+        const faceRotation = this.appearance.sides > 0 ? this.angle : this.rotationEnabled ? this.angle : 0;
         this.drawFace(ctx, faceRotation);
         this.ability?.draw?.(ctx);
         if (this.state.movement?.showRing) {
