@@ -270,8 +270,9 @@ export class HuntingManager {
                 xp: 0
             };
 
-            // Hero Orb carryover — 전투 중 획득한 bonuses를 run에 반영 (recordHuntingFloorResult 전에 계산)
-            if (playerBall?.hero?.bonuses) {
+            // Hero Orb carryover — Hero Ball만 전투 중 획득한 bonuses를 run에 반영
+            const playerSpec = app.roster.find((f) => f.id === run.characterId);
+            if (playerSpec?.ability === "hero" && playerBall?.hero?.bonuses) {
                 playerBall.mergeHeroOrbCarryoverInto(run);
             }
 

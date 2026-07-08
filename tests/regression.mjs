@@ -8619,9 +8619,8 @@ function testHuntingChoiceSummaryKeepsContextWithPendingLoot() {
 
 // ── Hero Orb Carryover — BattleBall 인스턴스 메서드 ────────────────────────────
 
-async function testBattleBallAppliesSpecHeroCarryover(app) {
+function testBattleBallAppliesSpecHeroCarryover(app) {
     const hero = app.roster.find((f) => f.id === FIGHTER_IDS.HERO);
-    const { BattleBall } = await import("../src/entities/index.js");
     const spec = JSON.parse(JSON.stringify(hero));
     spec.hero = { carryover: { hp: 2, damage: 1, speed: 0, defense: 1, skill: 0 } };
     const ball = new BattleBall(spec, { x: 480, y: 480 });
@@ -8637,9 +8636,8 @@ async function testBattleBallAppliesSpecHeroCarryover(app) {
     console.log("[battleball-applies-spec-hero-carryover] ok");
 }
 
-async function testBattleBallMergeHeroOrbCarryoverInto(app) {
+function testBattleBallMergeHeroOrbCarryoverInto(app) {
     const hero = app.roster.find((f) => f.id === FIGHTER_IDS.HERO);
-    const { BattleBall } = await import("../src/entities/index.js");
     const ball = new BattleBall(hero, { x: 480, y: 480 });
 
     // Simulate orb gains: hp=5, damage=3 (rest 0)
@@ -8662,60 +8660,62 @@ async function testBattleBallMergeHeroOrbCarryoverInto(app) {
     console.log("[battleball-merge-hero-orb-carryover-into] ok");
 }
 
-async function testHuntingHeroCarryoverInStartFloorBattle(app) {
-    // Test the carryover injection condition: Hero Ball only
+function testHuntingHeroCarryoverInStartFloorBattle(app) {
     const hero = app.roster.find((f) => f.id === FIGHTER_IDS.HERO);
     const archer = app.roster.find((f) => f.id === FIGHTER_IDS.ARCHER);
 
-    assert.equal(hero.ability, "hero", "Hero Ball should have hero ability");
-    assert.notEqual(archer.ability, "hero", "Non-hero should not have hero ability");
+    const capturedSpecs = [];
+    const mockApp = {
+        roster: [hero, archer],
+        playerProfile: createDefaultPlayerProfile(),
+        playerStatAllocation: createRandomStatAllocation(() => 0),
+        ui: { setHuntingActive() {}, setHuntingOverlayState() {}, addLog() {} },
+        startMatch(specs) {
+            capturedSpecs.push(specs);
+        }
+    };
+    const manager = new HuntingManager(mockApp);
 
-    // Hero Ball spec should get carryover injection
-    const run = createHuntingRun({ characterId: FIGHTER_IDS.HERO, stageId: HUNTING_STAGE_IDS.CAVE });
-    run.hero.carryover.hp = 2;
-    run.hero.carryover.damage = 1;
+    // Hero Ball should receive carryover injection
+    capturedSpecs.length = 0;
+    const runHero = createHuntingRun({ characterId: FIGHTER_IDS.HERO, stageId: HUNTING_STAGE_IDS.CAVE });
+    runHero.hero.carryover.hp = 2;
+    runHero.hero.carryover.damage = 1;
+    manager._run = runHero;
+    manager._startFloorBattle();
 
-    let spec = { stats: { hp: 100, damage: 10, defense: 5, speed: 50, radius: 30, mass: 1 } };
-    if (hero.ability === "hero" && run.hero?.carryover) {
-        spec.hero = { carryover: { ...run.hero.carryover } };
-    }
-    assert.ok(spec.hero?.carryover, "Hero Ball should receive carryover injection");
-    assert.equal(spec.hero.carryover.hp, 2, "carryover.hp should be injected");
+    const heroSpec = capturedSpecs[0][0];
+    assert.ok(heroSpec.hero?.carryover, "Hero Ball should receive carryover injection");
+    assert.equal(heroSpec.hero.carryover.hp, 2, "carryover.hp should be injected for Hero Ball");
 
-    // Non-hero spec should NOT get carryover injection
-    const run2 = createHuntingRun({ characterId: FIGHTER_IDS.ARCHER, stageId: HUNTING_STAGE_IDS.CAVE });
-    run2.hero.carryover.hp = 2;
+    // Non-Hero should NOT receive carryover injection
+    capturedSpecs.length = 0;
+    const runArcher = createHuntingRun({ characterId: FIGHTER_IDS.ARCHER, stageId: HUNTING_STAGE_IDS.CAVE });
+    runArcher.hero.carryover.hp = 2;
+    manager._run = runArcher;
+    manager._startFloorBattle();
 
-    let spec2 = { stats: { hp: 100, damage: 10, defense: 5, speed: 50, radius: 30, mass: 1 } };
-    if (archer.ability === "hero" && run2.hero?.carryover) {
-        spec2.hero = { carryover: { ...run2.hero.carryover } };
-    }
-    assert.equal(spec2.hero, undefined, "Non-hero should NOT receive carryover injection");
+    const archerSpec = capturedSpecs[0][0];
+    assert.equal(archerSpec.hero?.carryover, undefined, "Non-Hero should NOT receive carryover injection");
 
     console.log("[hunting-hero-carryover-start-floor] ok");
 }
 
-async function testHuntingHeroCarryoverInHandleFinish(app) {
-    // Test the carryover merge logic via actual mergeHeroOrbCarryoverInto invocation
+function testHuntingHeroCarryoverInHandleFinish(app) {
     const hero = app.roster.find((f) => f.id === FIGHTER_IDS.HERO);
-    const { BattleBall } = await import("../src/entities/index.js");
     const ball = new BattleBall(hero, { x: 480, y: 480 });
 
-    // Simulate orb gains: hp=5, damage=3 (rest 0)
     ball.hero.bonuses.hp = 5;
     ball.hero.bonuses.damage = 3;
 
     const run = createHuntingRun({ characterId: FIGHTER_IDS.HERO, stageId: HUNTING_STAGE_IDS.CAVE });
 
-    // Use actual method (same path as _handleFinish)
     ball.mergeHeroOrbCarryoverInto(run);
 
-    // hp: floor(5 * 0.5) = 2, damage: floor(3 * 0.5) = 1
     assert.equal(run.hero.carryover.hp, 2, "hp: floor(5*0.5)=2");
     assert.equal(run.hero.carryover.damage, 1, "damage: floor(3*0.5)=1");
     assert.equal(run.hero.carryover.speed, 0, "speed should remain 0");
 
-    // Second floor merge (cumulative) — also uses actual method
     ball.hero.bonuses.hp = 3;
     ball.mergeHeroOrbCarryoverInto(run);
     assert.equal(run.hero.carryover.hp, 2 + 1, "second merge: floor(3*0.5)=1, total 3");
