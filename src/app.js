@@ -148,6 +148,7 @@ export class BattleApp {
         this._lastMatchXpResult = null;
         this._selectionAnimTime = 999;
         this._previewSwap = null;
+        this._queuedPreviewReselect = false;
 
         /** @type {{ selectedId: string|null, current: object|null, pickEveryMatch: boolean, ctx: object|null }} */
         this._action = { selectedId: null, current: null, pickEveryMatch: false, ctx: null };
@@ -194,6 +195,10 @@ export class BattleApp {
     }
 
     reselectPreviewCharacterFromPreview() {
+        if (this._previewSwap) {
+            this._queuedPreviewReselect = true;
+            return true;
+        }
         if (!this.canReselectPreviewCharacter()) return false;
 
         const newId = this._pickDifferentPlayerFighterId();
@@ -226,20 +231,16 @@ export class BattleApp {
         const speed = dist / 0.55;
         incoming.applyImpulse(toCenter.normalize().scale(speed));
 
-        this.playerFighterId = newId;
-        this.playerStatAllocation = createEmptyStatAllocation();
-        migrateLegacyExperienceToCharacter(this.playerProfile, this.playerFighterId);
-
         this._previewSwap = {
             outgoing: outgoing || this._ensurePreviewBall(oldFighter),
             incoming,
             fighter: newFighter,
+            pendingId: newId,
+            pendingFighter: newFighter,
             elapsed: 0,
             duration: 0.8
         };
 
-        this._refreshCollectionHub();
-        this.refreshPlayerSetup();
         return true;
     }
 
@@ -248,6 +249,10 @@ export class BattleApp {
         if (!canvas) return;
 
         const handler = (event) => {
+            if (this._previewSwap) {
+                this._queuedPreviewReselect = true;
+                return;
+            }
             if (!this.canReselectPreviewCharacter()) return;
 
             const rect = canvas.getBoundingClientRect?.();
@@ -304,9 +309,24 @@ export class BattleApp {
             const center = new Vector2(this.renderer.canvas.width / 2, this.renderer.canvas.height / 2 - 28);
             swap.incoming.position = center.clone();
             swap.incoming.applyImpulse(swap.incoming.velocity.clone().scale(-1));
+
+            this.playerFighterId = swap.pendingId;
+            this.playerStatAllocation = createEmptyStatAllocation();
+            migrateLegacyExperienceToCharacter(this.playerProfile, this.playerFighterId);
+
             this._previewBall = swap.incoming;
             this._selectionAnimTime = 0;
             this._previewSwap = null;
+
+            this._refreshCollectionHub();
+            this.refreshPlayerSetup();
+
+            if (this._queuedPreviewReselect) {
+                this._queuedPreviewReselect = false;
+                if (this.canReselectPreviewCharacter()) {
+                    this.reselectPreviewCharacterFromPreview();
+                }
+            }
         }
     }
 

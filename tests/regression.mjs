@@ -8812,11 +8812,30 @@ function testPreviewReselectChangesCharacter(app) {
     const result = app.reselectPreviewCharacterFromPreview();
     assert.ok(result, "reselectPreviewCharacterFromPreview should return true");
 
-    const newId = app.playerFighterId;
-    assert.notEqual(newId, initialId, "playerFighterId should change to a different character");
+    // playerFighterId should NOT change immediately — only after swap finalizes
+    assert.equal(app.playerFighterId, initialId, "playerFighterId should NOT change immediately at swap start");
 
+    // Stat allocation should NOT be reset immediately
+    assert.deepEqual(
+        app.playerStatAllocation,
+        { hp: 99, damage: 0, speed: 0, skill: 0, defense: 0 },
+        "stat allocation should NOT be reset immediately at swap start"
+    );
+
+    // Complete the swap
+    const duration = app._previewSwap.duration;
+    const ticks = Math.ceil(duration / 0.016) + 5;
+    for (let i = 0; i < ticks; i++) {
+        app._updatePreviewSwap(0.016);
+    }
+
+    // After finalization, playerFighterId should have changed
+    const newId = app.playerFighterId;
+    assert.notEqual(newId, initialId, "playerFighterId should change after swap finalizes");
+
+    // Stat allocation should be reset after finalization
     const empty = createEmptyStatAllocation();
-    assert.deepEqual(app.playerStatAllocation, empty, "Stat allocation should be reset to empty");
+    assert.deepEqual(app.playerStatAllocation, empty, "Stat allocation should be reset to empty after swap finalizes");
 
     // Restore
     app.renderer.canvas.width = originalWidth;
@@ -8856,6 +8875,68 @@ function testPreviewReselectBlockedDuringHuntingRun(app) {
     assert.ok(!result, "canReselectPreviewCharacter should be false while hunting run exists");
     app.hunting._run = null;
     console.log("[preview-reselect-blocked-hunting] ok");
+}
+
+function testPreviewReselectQueuesDuringSwap(app) {
+    app.tournament = null;
+    app._previewSwap = null;
+    app._previewBall = null;
+    app.simulation = null;
+    app.hunting._run = null;
+
+    const originalWidth = app.renderer.canvas.width;
+    const originalHeight = app.renderer.canvas.height;
+    app.renderer.canvas.width = 960;
+    app.renderer.canvas.height = 960;
+
+    const initialId = app.playerFighterId;
+
+    // Start first swap
+    const result1 = app.reselectPreviewCharacterFromPreview();
+    assert.ok(result1, "first reselect should return true");
+    assert.ok(app._previewSwap !== null, "_previewSwap should be set after first reselect");
+    assert.equal(app.playerFighterId, initialId, "playerFighterId should still be initial during first swap");
+
+    // Call reselect again while swap in progress — should queue
+    app._queuedPreviewReselect = false;
+    const result2 = app.reselectPreviewCharacterFromPreview();
+    assert.ok(result2, "second reselect during swap should return true (queued)");
+    assert.ok(app._previewSwap !== null, "_previewSwap should still be active after queued call");
+    assert.ok(app._queuedPreviewReselect, "_queuedPreviewReselect should be set to true");
+
+    // Complete the first swap
+    const duration = app._previewSwap.duration;
+    const ticks = Math.ceil(duration / 0.016) + 5;
+    for (let i = 0; i < ticks; i++) {
+        app._updatePreviewSwap(0.016);
+    }
+
+    // After first swap finalizes, the queued reselect should have started a second swap
+    assert.ok(app._previewSwap !== null, "queued reselect should have started a second swap");
+    assert.notEqual(app.playerFighterId, initialId, "playerFighterId should have changed after first swap finalizes");
+    const firstSwapId = app.playerFighterId;
+
+    // Complete the second swap
+    const duration2 = app._previewSwap.duration;
+    const ticks2 = Math.ceil(duration2 / 0.016) + 5;
+    for (let i = 0; i < ticks2; i++) {
+        app._updatePreviewSwap(0.016);
+    }
+
+    // After second swap finalizes, everything should be clean
+    assert.ok(app._previewSwap === null, "_previewSwap should be null after both swaps complete");
+    assert.ok(app._previewBall !== null, "_previewBall should be set after both swaps");
+    assert.equal(app._previewBall.id, app.playerFighterId, "final preview ball should match playerFighterId");
+    assert.notEqual(app.playerFighterId, initialId, "playerFighterId should differ from initial after two swaps");
+    assert.ok(
+        app.canReselectPreviewCharacter(),
+        "canReselectPreviewCharacter should return true after all swaps complete"
+    );
+
+    app.renderer.canvas.width = originalWidth;
+    app.renderer.canvas.height = originalHeight;
+
+    console.log("[preview-reselect-queues-during-swap] ok");
 }
 
 function testPreviewReselectTransitionFinalizes(app) {
@@ -8901,8 +8982,18 @@ function testBridgeReselectPreviewCharacter(app) {
     const result = bridge.reselectPreviewCharacter();
     assert.ok(result, "bridge.reselectPreviewCharacter should return true");
 
+    // playerFighterId should NOT change immediately after bridge call
+    assert.equal(app.playerFighterId, initialId, "playerFighterId should not change immediately after bridge call");
+
+    // Complete the swap
+    const duration = app._previewSwap.duration;
+    const ticks = Math.ceil(duration / 0.016) + 5;
+    for (let i = 0; i < ticks; i++) {
+        app._updatePreviewSwap(0.016);
+    }
+
     const newId = app.playerFighterId;
-    assert.notEqual(newId, initialId, "playerFighterId should change via bridge");
+    assert.notEqual(newId, initialId, "playerFighterId should change after bridge call + swap finalizes");
 
     console.log("[preview-reselect-bridge] ok");
 }
@@ -8922,6 +9013,7 @@ testPreviewReselectChangesCharacter(app);
 testPreviewReselectBlockedWhenTournamentActive(app);
 testPreviewReselectBlockedDuringSwap(app);
 testPreviewReselectBlockedDuringHuntingRun(app);
+testPreviewReselectQueuesDuringSwap(app);
 testPreviewReselectTransitionFinalizes(app);
 testBridgeReselectPreviewCharacter(app);
 
