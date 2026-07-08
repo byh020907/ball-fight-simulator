@@ -1,5 +1,11 @@
 # 결정 기록
 
+## [L1] 2026-07-08 — 프리뷰 재선택 충돌을 전투 물리 피드백으로 맞춘다
+
+- 맥락: 프리뷰 재선택 시 기존 충돌이 단순 속도 교환(impulseMag = -velAlongNormal * 0.5)에 불과해 outgoing 볼이 약하게 밀릴 뿐이고, spark/pulse/화면 흔들림 같은 전투 피드백이 없었음. 텍스트 레이블이 incoming 볼을 따라 날아다니는 문제도 있었음.
+- 결정: (1) `src/preview/previewReselectSimulation.js` 신설 — preview 전용 시뮬레이션 모듈. `BattleApp`의 ad hoc 물리를 완전히 대체. (2) `applyDynamicCollisionResponse` 공유 물리 helper 사용, incoming 볼에 impactA=10(10배 impact)으로 heavy striker 효과 구현. (3) collision cooldown(0.15s)으로 반복 spark 방지. (4) 충돌 시 `VisualBurst`(spark) + `GravityParticle`(particle burst) + `_triggerScreenShake` 피드백. (5) `renderPlayerPreviewSwap`에서 텍스트 레이블 제거, `previewSim.draw(ctx)`로 sim 내부 entities(효과)도 함께 그리도록 변경. (6) 테스트 4종 신설: heavyKnockAway(충돌 후 outgoing velocity ≥ 50 검증), collisionFeedback(effect entity count 증가 확인), labelsHidden(스왑 중 `_previewSim` 존재, 완료 후 null 검증), 기존 테스트 `_previewSwap` → `_previewSim` 마이그레이션.
+- 영향: `src/preview/previewReselectSimulation.js`(신규), `src/app.js`(reselectPreviewCharacterFromPreview/_updatePreviewSwap/선언 일체를 sim 위임으로 변경), `src/ui.js`(renderPlayerPreviewSwap 레이블 제거 + sim draw 위임), `tests/regression.mjs`(기존 6종 갱신 + 신규 4종), `index.html`(V 0.24.14), `src/patchNotes.js`(v0.24.14), `SESSION-HANDOFF.md`, `docs/development-rules.md`
+
 ## [L1] 2026-07-08 — 프리뷰 재선택 확정을 물리 전환 완료 시점으로 늦춘다
 
 - 맥락: 기존 구현이 프리뷰 캐릭터 재선택 시 즉시 `playerFighterId`/스탯/UI를 변경하고 물리 전환은 0.8초 후 완료되어, 첫 탭에서 "캐릭터만 바뀌고 멈춘 것처럼" 보이는 문제(빠른 두 번째 탭은 `canReselectPreviewCharacter()`가 차단해 dead tap으로 느껴짐).

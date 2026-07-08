@@ -288,26 +288,23 @@ export class ArenaRenderer {
         ctx.restore();
     }
 
-    renderPlayerPreviewSwap(outgoing, incoming, fighter) {
+    renderPlayerPreviewSwap(previewSim, fighter) {
         const ctx = this.ctx;
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         ctx.fillStyle = "#fafafa";
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        if (!outgoing || !incoming || !fighter) return;
+        if (!previewSim || !fighter) return;
 
-        outgoing.draw(ctx);
-        incoming.draw(ctx);
-
-        const cx = this.canvas.width / 2;
         ctx.save();
-        ctx.textAlign = "center";
-        ctx.fillStyle = "#202020";
-        ctx.font = "900 28px Bahnschrift, Segoe UI, sans-serif";
-        ctx.fillText("내 캐릭터", cx, incoming.position.y + incoming.radius + 48);
-        ctx.font = "700 22px Bahnschrift, Segoe UI, sans-serif";
-        ctx.fillStyle = fighter.color;
-        ctx.fillText(fighter.name, cx, incoming.position.y + incoming.radius + 82);
+        const shake = previewSim.screenShake;
+        if (shake) {
+            const progress = shake.remaining / shake.duration;
+            const strength = shake.strength * progress;
+            ctx.translate((Math.random() - 0.5) * strength, (Math.random() - 0.5) * strength);
+        }
+
+        previewSim.draw(ctx);
         ctx.restore();
     }
 

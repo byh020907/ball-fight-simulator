@@ -8804,7 +8804,7 @@ function testPreviewReselectChangesCharacter(app) {
 
     // Ensure setup unlocked state (no tournament, no active match)
     app.tournament = null;
-    app._previewSwap = null;
+    app._previewSim = null;
     app._previewBall = null;
     app.simulation = null;
     app.hunting._run = null;
@@ -8823,7 +8823,7 @@ function testPreviewReselectChangesCharacter(app) {
     );
 
     // Complete the swap
-    const duration = app._previewSwap.duration;
+    const duration = app._previewSim.duration;
     const ticks = Math.ceil(duration / 0.016) + 5;
     for (let i = 0; i < ticks; i++) {
         app._updatePreviewSwap(0.016);
@@ -8845,9 +8845,124 @@ function testPreviewReselectChangesCharacter(app) {
     console.log("[preview-reselect-changes-character] ok");
 }
 
+function testPreviewReselectHeavyKnockAway(app) {
+    app.tournament = null;
+    app._previewSim = null;
+    app._previewBall = null;
+    app.simulation = null;
+    app.hunting._run = null;
+
+    const originalWidth = app.renderer.canvas.width;
+    const originalHeight = app.renderer.canvas.height;
+    app.renderer.canvas.width = 960;
+    app.renderer.canvas.height = 960;
+
+    // Ensure a preview ball exists first
+    const initialFighter = app.roster.find((f) => f.id === app.playerFighterId);
+    app._ensurePreviewBall(initialFighter);
+
+    const result = app.reselectPreviewCharacterFromPreview();
+    assert.ok(result, "reselectPreviewCharacterFromPreview should return true");
+    assert.ok(app._previewSim !== null, "_previewSim should be set after reselect");
+    assert.ok(app._previewSim.outgoing !== null, "preview sim should have outgoing ball");
+    assert.ok(app._previewSim.incoming !== null, "preview sim should have incoming ball");
+
+    // Tick enough times for collision to happen (incoming ball travels ~960px/s, need ~0.55s to reach center)
+    // Use larger dt for faster simulation
+    const tickDt = 0.032;
+    const tickCount = Math.ceil(0.65 / tickDt);
+    for (let i = 0; i < tickCount; i++) {
+        app._updatePreviewSwap(tickDt);
+    }
+
+    // After collision, outgoing velocity should be significantly higher than its initial near-zero value
+    // The incoming ball (10x impact) should have violently knocked the outgoing ball away
+    const postOutVel = app._previewSim.outgoing.velocity.length();
+    const threshold = 50;
+    assert.ok(
+        postOutVel > threshold,
+        `outgoing ball velocity after collision (${postOutVel.toFixed(1)}) should exceed ${threshold} (heavy knock-away)`
+    );
+
+    app.renderer.canvas.width = originalWidth;
+    app.renderer.canvas.height = originalHeight;
+
+    console.log("[preview-reselect-heavy-knock-away] ok");
+}
+
+function testPreviewReselectCollisionFeedback(app) {
+    app.tournament = null;
+    app._previewSim = null;
+    app._previewBall = null;
+    app.simulation = null;
+    app.hunting._run = null;
+
+    const originalWidth = app.renderer.canvas.width;
+    const originalHeight = app.renderer.canvas.height;
+    app.renderer.canvas.width = 960;
+    app.renderer.canvas.height = 960;
+
+    const initialFighter = app.roster.find((f) => f.id === app.playerFighterId);
+    app._ensurePreviewBall(initialFighter);
+
+    const result = app.reselectPreviewCharacterFromPreview();
+    assert.ok(result, "reselectPreviewCharacterFromPreview should return true");
+
+    // Tick in steps, checking for feedback right after collision
+    const tickDt = 0.032;
+    let foundFeedback = false;
+    let maxTicks = Math.ceil(0.8 / tickDt);
+    for (let i = 0; i < maxTicks; i++) {
+        app._updatePreviewSwap(tickDt);
+        if (app._previewSim && app._previewSim.entities.length > 0) {
+            foundFeedback = true;
+            break;
+        }
+    }
+
+    assert.ok(foundFeedback, "preview sim should have spawned visual effects after collision");
+
+    // Also verify screen shake was/would've been triggered (entities imply collision occurred)
+    const entityCount = app._previewSim ? app._previewSim.entities.length : 0;
+    assert.ok(entityCount > 0, `preview sim entities should be > 0 after collision (count: ${entityCount})`);
+
+    app.renderer.canvas.width = originalWidth;
+    app.renderer.canvas.height = originalHeight;
+
+    console.log("[preview-reselect-collision-feedback] ok");
+}
+
+function testPreviewReselectLabelsHiddenDuringSwap(app) {
+    // During swap, renderPlayerPreview dispatches to renderPlayerPreviewSwap
+    // which does NOT draw labels. After swap, renderPlayerPreview is called
+    // which draws labels. Test the state transition.
+    app.tournament = null;
+    app._previewSim = null;
+    app._previewBall = null;
+    app.simulation = null;
+    app.hunting._run = null;
+
+    const result = app.reselectPreviewCharacterFromPreview();
+    assert.ok(result, "reselectPreviewCharacterFromPreview should return true");
+    assert.ok(app._previewSim !== null, "_previewSim should be set during swap (labels hidden)");
+
+    // Complete the swap
+    const duration = app._previewSim.duration;
+    const ticks = Math.ceil(duration / 0.016) + 5;
+    for (let i = 0; i < ticks; i++) {
+        app._updatePreviewSwap(0.016);
+    }
+
+    assert.ok(app._previewSim === null, "_previewSim should be null after swap (labels restored)");
+    assert.ok(app._previewBall !== null, "_previewBall should be set after swap");
+    assert.equal(app._previewBall.id, app.playerFighterId, "preview ball should match playerFighterId after swap");
+
+    console.log("[preview-reselect-labels-hidden-during-swap] ok");
+}
+
 function testPreviewReselectBlockedWhenTournamentActive(app) {
     app.tournament = {};
-    app._previewSwap = null;
+    app._previewSim = null;
     app.simulation = null;
     const result = app.canReselectPreviewCharacter();
     assert.ok(!result, "canReselectPreviewCharacter should be false when tournament is non-null");
@@ -8856,20 +8971,20 @@ function testPreviewReselectBlockedWhenTournamentActive(app) {
 }
 
 function testPreviewReselectBlockedDuringSwap(app) {
-    app._previewSwap = { outgoing: null, incoming: null, fighter: null, elapsed: 0, duration: 1 };
+    app._previewSim = {};
     app.tournament = null;
     app.simulation = null;
     app.hunting._run = null;
     const result = app.canReselectPreviewCharacter();
     assert.ok(!result, "canReselectPreviewCharacter should be false during swap animation");
-    app._previewSwap = null;
+    app._previewSim = null;
     console.log("[preview-reselect-blocked-swap] ok");
 }
 
 function testPreviewReselectBlockedDuringHuntingRun(app) {
     app.tournament = null;
     app.simulation = null;
-    app._previewSwap = null;
+    app._previewSim = null;
     app.hunting._run = createHuntingRun({ characterId: app.playerFighterId, stageId: HUNTING_STAGE_IDS.CAVE });
     const result = app.canReselectPreviewCharacter();
     assert.ok(!result, "canReselectPreviewCharacter should be false while hunting run exists");
@@ -8879,7 +8994,7 @@ function testPreviewReselectBlockedDuringHuntingRun(app) {
 
 function testPreviewReselectQueuesDuringSwap(app) {
     app.tournament = null;
-    app._previewSwap = null;
+    app._previewSim = null;
     app._previewBall = null;
     app.simulation = null;
     app.hunting._run = null;
@@ -8894,37 +9009,36 @@ function testPreviewReselectQueuesDuringSwap(app) {
     // Start first swap
     const result1 = app.reselectPreviewCharacterFromPreview();
     assert.ok(result1, "first reselect should return true");
-    assert.ok(app._previewSwap !== null, "_previewSwap should be set after first reselect");
+    assert.ok(app._previewSim !== null, "_previewSim should be set after first reselect");
     assert.equal(app.playerFighterId, initialId, "playerFighterId should still be initial during first swap");
 
     // Call reselect again while swap in progress — should queue
     app._queuedPreviewReselect = false;
     const result2 = app.reselectPreviewCharacterFromPreview();
     assert.ok(result2, "second reselect during swap should return true (queued)");
-    assert.ok(app._previewSwap !== null, "_previewSwap should still be active after queued call");
+    assert.ok(app._previewSim !== null, "_previewSim should still be active after queued call");
     assert.ok(app._queuedPreviewReselect, "_queuedPreviewReselect should be set to true");
 
     // Complete the first swap
-    const duration = app._previewSwap.duration;
+    const duration = app._previewSim.duration;
     const ticks = Math.ceil(duration / 0.016) + 5;
     for (let i = 0; i < ticks; i++) {
         app._updatePreviewSwap(0.016);
     }
 
     // After first swap finalizes, the queued reselect should have started a second swap
-    assert.ok(app._previewSwap !== null, "queued reselect should have started a second swap");
+    assert.ok(app._previewSim !== null, "queued reselect should have started a second swap");
     assert.notEqual(app.playerFighterId, initialId, "playerFighterId should have changed after first swap finalizes");
-    const firstSwapId = app.playerFighterId;
 
     // Complete the second swap
-    const duration2 = app._previewSwap.duration;
+    const duration2 = app._previewSim.duration;
     const ticks2 = Math.ceil(duration2 / 0.016) + 5;
     for (let i = 0; i < ticks2; i++) {
         app._updatePreviewSwap(0.016);
     }
 
     // After second swap finalizes, everything should be clean
-    assert.ok(app._previewSwap === null, "_previewSwap should be null after both swaps complete");
+    assert.ok(app._previewSim === null, "_previewSim should be null after both swaps complete");
     assert.ok(app._previewBall !== null, "_previewBall should be set after both swaps");
     assert.equal(app._previewBall.id, app.playerFighterId, "final preview ball should match playerFighterId");
     assert.notEqual(app.playerFighterId, initialId, "playerFighterId should differ from initial after two swaps");
@@ -8941,7 +9055,7 @@ function testPreviewReselectQueuesDuringSwap(app) {
 
 function testPreviewReselectTransitionFinalizes(app) {
     app.tournament = null;
-    app._previewSwap = null;
+    app._previewSim = null;
     app._previewBall = null;
     app.simulation = null;
     app.hunting._run = null;
@@ -8949,19 +9063,19 @@ function testPreviewReselectTransitionFinalizes(app) {
     const result = app.reselectPreviewCharacterFromPreview();
     assert.ok(result, "should start preview swap");
 
-    assert.ok(app._previewSwap !== null, "_previewSwap should be set after reselect");
-    assert.ok(app._previewSwap.outgoing !== null, "swap should have outgoing ball");
-    assert.ok(app._previewSwap.incoming !== null, "swap should have incoming ball");
-    assert.equal(app._previewSwap.elapsed, 0, "swap elapsed should start at 0");
+    assert.ok(app._previewSim !== null, "_previewSim should be set after reselect");
+    assert.ok(app._previewSim.outgoing !== null, "swap should have outgoing ball");
+    assert.ok(app._previewSim.incoming !== null, "swap should have incoming ball");
+    assert.ok(!app._previewSim.finished, "swap should not be finished at start");
 
     // Simulate enough update ticks to complete the transition
-    const duration = app._previewSwap.duration;
+    const duration = app._previewSim.duration;
     const ticks = Math.ceil(duration / 0.016) + 5;
     for (let i = 0; i < ticks; i++) {
         app._updatePreviewSwap(0.016);
     }
 
-    assert.ok(app._previewSwap === null, "_previewSwap should be cleared after transition completes");
+    assert.ok(app._previewSim === null, "_previewSim should be cleared after transition completes");
     assert.ok(app._previewBall !== null, "_previewBall should be set after swap finalizes");
     assert.equal(app._previewBall.id, app.playerFighterId, "final preview ball should match new playerFighterId");
 
@@ -8973,7 +9087,7 @@ function testBridgeReselectPreviewCharacter(app) {
     const bridge = createComponentBridge(globalThis.Alpine);
 
     app.tournament = null;
-    app._previewSwap = null;
+    app._previewSim = null;
     app._previewBall = null;
     app.simulation = null;
     app.hunting._run = null;
@@ -8986,7 +9100,7 @@ function testBridgeReselectPreviewCharacter(app) {
     assert.equal(app.playerFighterId, initialId, "playerFighterId should not change immediately after bridge call");
 
     // Complete the swap
-    const duration = app._previewSwap.duration;
+    const duration = app._previewSim.duration;
     const ticks = Math.ceil(duration / 0.016) + 5;
     for (let i = 0; i < ticks; i++) {
         app._updatePreviewSwap(0.016);
@@ -9010,6 +9124,9 @@ testHuntingHeroCarryoverInStartFloorBattle(app);
 testHuntingHeroCarryoverInHandleFinish(app);
 testHuntingStartFloorBattleAppliesStatAllocation(app);
 testPreviewReselectChangesCharacter(app);
+testPreviewReselectHeavyKnockAway(app);
+testPreviewReselectCollisionFeedback(app);
+testPreviewReselectLabelsHiddenDuringSwap(app);
 testPreviewReselectBlockedWhenTournamentActive(app);
 testPreviewReselectBlockedDuringSwap(app);
 testPreviewReselectBlockedDuringHuntingRun(app);

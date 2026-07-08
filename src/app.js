@@ -22,6 +22,7 @@ import { ActionPickerService } from "./actionPicker.js";
 import { CollectionHubService } from "./collectionHubService.js";
 import { pickRandomActions, findActionById, showActionFailure } from "./clickActions.js";
 import { BattleBall } from "./entities/index.js";
+import { PreviewReselectSimulation } from "./preview/previewReselectSimulation.js";
 import {
     loadPlayerProfile,
     savePlayerProfile,
@@ -147,7 +148,7 @@ export class BattleApp {
         this._lastXpResult = null;
         this._lastMatchXpResult = null;
         this._selectionAnimTime = 999;
-        this._previewSwap = null;
+        this._previewSim = null;
         this._queuedPreviewReselect = false;
 
         /** @type {{ selectedId: string|null, current: object|null, pickEveryMatch: boolean, ctx: object|null }} */
@@ -178,7 +179,7 @@ export class BattleApp {
     }
 
     canReselectPreviewCharacter() {
-        if (this._previewSwap) return false;
+        if (this._previewSim) return false;
         if (this.tournament !== null) return false;
         if (this.simulation && !this.simulation.finished) return false;
         if (this.hunting?._run) return false;
@@ -195,7 +196,7 @@ export class BattleApp {
     }
 
     reselectPreviewCharacterFromPreview() {
-        if (this._previewSwap) {
+        if (this._previewSim) {
             this._queuedPreviewReselect = true;
             return true;
         }
@@ -211,35 +212,13 @@ export class BattleApp {
         const canvas = this.renderer.canvas;
         const center = new Vector2(canvas.width / 2, canvas.height / 2 - 28);
 
-        const outgoing = this._previewBall || this._ensurePreviewBall(oldFighter);
-        if (outgoing) {
-            outgoing.applyImpulse(outgoing.velocity.clone().scale(-1));
-            outgoing.position = center.clone();
-        }
-
-        const angle = Math.random() * Math.PI * 2;
-        const spawnDist = canvas.width * 0.55;
-        const spawnPos = Vector2.add(center, Vector2.fromAngle(angle, spawnDist));
-
-        const incoming = new BattleBall(newFighter, spawnPos);
-        incoming.radius = Math.round(incoming.stats.baseRadius * 1.35);
-        const AbilityClass = ABILITY_MAP[newFighter.ability];
-        if (AbilityClass) incoming.bindAbility(new AbilityClass(incoming, {}));
-
-        const toCenter = Vector2.subtract(center, incoming.position);
-        const dist = toCenter.length();
-        const speed = dist / 0.55;
-        incoming.applyImpulse(toCenter.normalize().scale(speed));
-
-        this._previewSwap = {
-            outgoing: outgoing || this._ensurePreviewBall(oldFighter),
-            incoming,
-            fighter: newFighter,
-            pendingId: newId,
-            pendingFighter: newFighter,
-            elapsed: 0,
-            duration: 0.8
-        };
+        this._previewBall = this._previewBall || this._ensurePreviewBall(oldFighter);
+        this._previewSim = new PreviewReselectSimulation({
+            oldFighter,
+            newFighter,
+            center,
+            canvasWidth: canvas.width
+        });
 
         return true;
     }
@@ -249,7 +228,7 @@ export class BattleApp {
         if (!canvas) return;
 
         const handler = (event) => {
-            if (this._previewSwap) {
+            if (this._previewSim) {
                 this._queuedPreviewReselect = true;
                 return;
             }
@@ -278,45 +257,19 @@ export class BattleApp {
     }
 
     _updatePreviewSwap(dt) {
-        const swap = this._previewSwap;
-        if (!swap) return;
+        const sim = this._previewSim;
+        if (!sim) return;
 
-        swap.elapsed += dt;
-        swap.outgoing.integrate(dt);
-        swap.incoming.integrate(dt);
+        sim.update(dt);
 
-        const diff = Vector2.subtract(swap.incoming.position, swap.outgoing.position);
-        const dist = diff.length();
-        const minDist = swap.outgoing.radius + swap.incoming.radius;
-
-        if (dist < minDist && dist > 0.001) {
-            const normal = diff.clone().normalize();
-            const overlap = minDist - dist;
-            const correction = normal.clone().scale(overlap * 0.5);
-            swap.outgoing.position.subtract(correction);
-            swap.incoming.position.add(correction);
-
-            const relVel = Vector2.subtract(swap.incoming.velocity, swap.outgoing.velocity);
-            const velAlongNormal = relVel.dot(normal);
-            if (velAlongNormal < 0) {
-                const impulseMag = -velAlongNormal * 0.5;
-                swap.outgoing.applyImpulse(normal.clone().scale(-impulseMag));
-                swap.incoming.applyImpulse(normal.clone().scale(impulseMag));
-            }
-        }
-
-        if (swap.elapsed >= swap.duration) {
-            const center = new Vector2(this.renderer.canvas.width / 2, this.renderer.canvas.height / 2 - 28);
-            swap.incoming.position = center.clone();
-            swap.incoming.applyImpulse(swap.incoming.velocity.clone().scale(-1));
-
-            this.playerFighterId = swap.pendingId;
+        if (sim.finished) {
+            this.playerFighterId = sim.pendingId;
             this.playerStatAllocation = createEmptyStatAllocation();
             migrateLegacyExperienceToCharacter(this.playerProfile, this.playerFighterId);
 
-            this._previewBall = swap.incoming;
+            this._previewBall = sim.incoming;
             this._selectionAnimTime = 0;
-            this._previewSwap = null;
+            this._previewSim = null;
 
             this._refreshCollectionHub();
             this.refreshPlayerSetup();
@@ -503,12 +456,8 @@ export class BattleApp {
             return;
         }
 
-        if (this._previewSwap) {
-            this.renderer.renderPlayerPreviewSwap(
-                this._previewSwap.outgoing,
-                this._previewSwap.incoming,
-                this._previewSwap.fighter
-            );
+        if (this._previewSim) {
+            this.renderer.renderPlayerPreviewSwap(this._previewSim, this._previewSim.pendingFighter);
             return;
         }
 

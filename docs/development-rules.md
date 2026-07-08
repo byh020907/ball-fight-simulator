@@ -304,6 +304,16 @@ polygon-polygon 충돌의 접촉점(`contactPoint`)은 SAT 기반 접촉 후보 
 위 후보들의 평균을 contactPoint로 사용하고, 후보가 없을 때만 center midpoint로 fallback합니다.
 circle-polygon은 `_closestPoint`(최근접 polygon vertex)를 우선하고, 없을 때 circle surface point를 사용합니다.
 
+### 프리뷰/메인화면 물리 상호작용
+
+프리뷰 캐릭터 재선택(preview reselection)을 포함한 메인화면 물리 상호작용은 전투 물리 helper를 재사용하고, ad hoc velocity swap을 사용하지 않습니다.
+
+- **물리 helper 재사용**: 프리뷰 충돌은 `applyDynamicCollisionResponse`를 통해 rigid-body collision impulse를 계산합니다. 직접 `velocity.x` 수정이나 단순 `impulseMag = -velAlongNormal * 0.5` 같은 ad hoc 공식을 사용하지 않습니다.
+- **전용 모듈**: 프리뷰 재선택 물리는 `src/preview/previewReselectSimulation.js`가 소유합니다. `BattleApp`은 시작/갱신/최종화/큐잉만 담당하고 물리 계산은 갖고 있지 않습니다.
+- **콜리전 피드백**: 충돌 시 `VisualBurst`(spark), `GravityParticle`(particle burst), `_triggerScreenShake`(화면 흔들림)을 생성합니다. 반복 spark 방지를 위해 collision cooldown(0.15s)을 적용합니다.
+- **무거운 striker 효과**: 들어오는(incoming) 볼은 `impactA=10`으로 적용되어, outgoing 볼이 강하게 튕겨 나가도록 합니다.
+- **레이블 처리**: 스왑 중 텍스트 레이블("내 캐릭터", 이름)은 완전히 숨기고, `renderPlayerPreview`(일반 프리뷰)에서만 표시합니다.
+
 ### Anti-stall 장치 (BattleSimulation)
 
 전투가 8초 이상 적대 충돌 없이 지속되면 중앙 충격파가 활성 전투원을 바깥으로 밀어냅니다.

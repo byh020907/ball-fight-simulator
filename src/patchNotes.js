@@ -19,6 +19,25 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.24.14",
+        date: "2026-07-08",
+        title: "v0.24.14 프리뷰 재선택 충돌을 전투 물리 피드백으로 맞춘다",
+        changes: [
+            {
+                type: "feature",
+                text: "프리뷰 캐릭터 교체 충돌이 전투 물리를 재사용하도록 개선했습니다. 들어오는 볼이 10배 impact로 충돌해 기존 볼이 강하게 튕겨 나가고, 충돌 시 spark/pulse/particle burst/화면 흔들림이 발생합니다."
+            },
+            {
+                type: "refactor",
+                text: "프리뷰 재선택 물리 로직을 BattleApp에서 분리해 src/preview/previewReselectSimulation.js 전용 모듈로 이전했습니다. applyDynamicCollisionResponse 등 기존 물리 helper를 재사용합니다."
+            },
+            {
+                type: "fix",
+                text: "프리뷰 스왑 중 텍스트 레이블(내 캐릭터, 이름)이 볼을 따라다니지 않도록 완전히 숨기고, 스왑 완료 후 정상 표시됩니다."
+            }
+        ]
+    },
+    {
         version: "0.24.13",
         date: "2026-07-08",
         title: "v0.24.13 프리뷰 재선택 확정을 물리 전환 완료 시점으로 늦춘다",
