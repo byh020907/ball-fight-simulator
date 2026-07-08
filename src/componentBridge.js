@@ -62,6 +62,9 @@ export function createComponentBridge(Alpine) {
         huntingMerchantPass() {
             getGameApp()?.hunting?.merchantPass?.();
         },
+        reselectPreviewCharacter() {
+            return getGameApp()?.reselectPreviewCharacterFromPreview?.() ?? false;
+        },
         async openChest(chestId) {
             await globalThis.CollectionHubService?.openChest?.(chestId);
         },

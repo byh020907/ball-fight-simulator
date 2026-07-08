@@ -6,6 +6,7 @@ import {
     adjustStatAllocation,
     applyStatAllocation,
     calculateStatMultiplier,
+    createEmptyStatAllocation,
     createRandomStatAllocation,
     createTournamentRoster,
     formatStatAllocation,
@@ -8788,6 +8789,124 @@ function testHuntingStartFloorBattleAppliesStatAllocation(app) {
     console.log("[hunting-stat-allocation] ok");
 }
 
+// ── Preview reselect tests ─────────────────────────────────────────────────────
+
+function testPreviewReselectChangesCharacter(app) {
+    const initialId = app.playerFighterId;
+    const initialAllocation = { ...app.playerStatAllocation };
+    app.playerStatAllocation = { hp: 99, damage: 0, speed: 0, skill: 0, defense: 0 };
+
+    // Mock canvas size for reselect method
+    const originalWidth = app.renderer.canvas.width;
+    const originalHeight = app.renderer.canvas.height;
+    app.renderer.canvas.width = 960;
+    app.renderer.canvas.height = 960;
+
+    // Ensure setup unlocked state (no tournament, no active match)
+    app.tournament = null;
+    app._previewSwap = null;
+    app._previewBall = null;
+    app.simulation = null;
+    app.hunting._run = null;
+
+    const result = app.reselectPreviewCharacterFromPreview();
+    assert.ok(result, "reselectPreviewCharacterFromPreview should return true");
+
+    const newId = app.playerFighterId;
+    assert.notEqual(newId, initialId, "playerFighterId should change to a different character");
+
+    const empty = createEmptyStatAllocation();
+    assert.deepEqual(app.playerStatAllocation, empty, "Stat allocation should be reset to empty");
+
+    // Restore
+    app.renderer.canvas.width = originalWidth;
+    app.renderer.canvas.height = originalHeight;
+    app.playerStatAllocation = { ...initialAllocation };
+
+    console.log("[preview-reselect-changes-character] ok");
+}
+
+function testPreviewReselectBlockedWhenTournamentActive(app) {
+    app.tournament = {};
+    app._previewSwap = null;
+    app.simulation = null;
+    const result = app.canReselectPreviewCharacter();
+    assert.ok(!result, "canReselectPreviewCharacter should be false when tournament is non-null");
+    app.tournament = null;
+    console.log("[preview-reselect-blocked-tournament] ok");
+}
+
+function testPreviewReselectBlockedDuringSwap(app) {
+    app._previewSwap = { outgoing: null, incoming: null, fighter: null, elapsed: 0, duration: 1 };
+    app.tournament = null;
+    app.simulation = null;
+    app.hunting._run = null;
+    const result = app.canReselectPreviewCharacter();
+    assert.ok(!result, "canReselectPreviewCharacter should be false during swap animation");
+    app._previewSwap = null;
+    console.log("[preview-reselect-blocked-swap] ok");
+}
+
+function testPreviewReselectBlockedDuringHuntingRun(app) {
+    app.tournament = null;
+    app.simulation = null;
+    app._previewSwap = null;
+    app.hunting._run = createHuntingRun({ characterId: app.playerFighterId, stageId: HUNTING_STAGE_IDS.CAVE });
+    const result = app.canReselectPreviewCharacter();
+    assert.ok(!result, "canReselectPreviewCharacter should be false while hunting run exists");
+    app.hunting._run = null;
+    console.log("[preview-reselect-blocked-hunting] ok");
+}
+
+function testPreviewReselectTransitionFinalizes(app) {
+    app.tournament = null;
+    app._previewSwap = null;
+    app._previewBall = null;
+    app.simulation = null;
+    app.hunting._run = null;
+
+    const result = app.reselectPreviewCharacterFromPreview();
+    assert.ok(result, "should start preview swap");
+
+    assert.ok(app._previewSwap !== null, "_previewSwap should be set after reselect");
+    assert.ok(app._previewSwap.outgoing !== null, "swap should have outgoing ball");
+    assert.ok(app._previewSwap.incoming !== null, "swap should have incoming ball");
+    assert.equal(app._previewSwap.elapsed, 0, "swap elapsed should start at 0");
+
+    // Simulate enough update ticks to complete the transition
+    const duration = app._previewSwap.duration;
+    const ticks = Math.ceil(duration / 0.016) + 5;
+    for (let i = 0; i < ticks; i++) {
+        app._updatePreviewSwap(0.016);
+    }
+
+    assert.ok(app._previewSwap === null, "_previewSwap should be cleared after transition completes");
+    assert.ok(app._previewBall !== null, "_previewBall should be set after swap finalizes");
+    assert.equal(app._previewBall.id, app.playerFighterId, "final preview ball should match new playerFighterId");
+
+    console.log("[preview-reselect-transition-finalizes] ok");
+}
+
+function testBridgeReselectPreviewCharacter(app) {
+    globalThis.ballFightApp = app;
+    const bridge = createComponentBridge(globalThis.Alpine);
+
+    app.tournament = null;
+    app._previewSwap = null;
+    app._previewBall = null;
+    app.simulation = null;
+    app.hunting._run = null;
+    const initialId = app.playerFighterId;
+
+    const result = bridge.reselectPreviewCharacter();
+    assert.ok(result, "bridge.reselectPreviewCharacter should return true");
+
+    const newId = app.playerFighterId;
+    assert.notEqual(newId, initialId, "playerFighterId should change via bridge");
+
+    console.log("[preview-reselect-bridge] ok");
+}
+
 testHuntingMerchantOffers();
 testHuntingFormatHelpers();
 testHuntingCombatText();
@@ -8799,5 +8918,11 @@ testBattleBallMergeHeroOrbCarryoverInto(app);
 testHuntingHeroCarryoverInStartFloorBattle(app);
 testHuntingHeroCarryoverInHandleFinish(app);
 testHuntingStartFloorBattleAppliesStatAllocation(app);
+testPreviewReselectChangesCharacter(app);
+testPreviewReselectBlockedWhenTournamentActive(app);
+testPreviewReselectBlockedDuringSwap(app);
+testPreviewReselectBlockedDuringHuntingRun(app);
+testPreviewReselectTransitionFinalizes(app);
+testBridgeReselectPreviewCharacter(app);
 
 console.log("regression tests ok");

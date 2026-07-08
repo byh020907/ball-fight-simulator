@@ -288,6 +288,29 @@ export class ArenaRenderer {
         ctx.restore();
     }
 
+    renderPlayerPreviewSwap(outgoing, incoming, fighter) {
+        const ctx = this.ctx;
+        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillStyle = "#fafafa";
+        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        if (!outgoing || !incoming || !fighter) return;
+
+        outgoing.draw(ctx);
+        incoming.draw(ctx);
+
+        const cx = this.canvas.width / 2;
+        ctx.save();
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#202020";
+        ctx.font = "900 28px Bahnschrift, Segoe UI, sans-serif";
+        ctx.fillText("내 캐릭터", cx, incoming.position.y + incoming.radius + 48);
+        ctx.font = "700 22px Bahnschrift, Segoe UI, sans-serif";
+        ctx.fillStyle = fighter.color;
+        ctx.fillText(fighter.name, cx, incoming.position.y + incoming.radius + 82);
+        ctx.restore();
+    }
+
     render(simulation) {
         const ctx = this.ctx;
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);

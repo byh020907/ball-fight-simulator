@@ -147,6 +147,7 @@ export class BattleApp {
         this._lastXpResult = null;
         this._lastMatchXpResult = null;
         this._selectionAnimTime = 999;
+        this._previewSwap = null;
 
         /** @type {{ selectedId: string|null, current: object|null, pickEveryMatch: boolean, ctx: object|null }} */
         this._action = { selectedId: null, current: null, pickEveryMatch: false, ctx: null };
@@ -167,11 +168,146 @@ export class BattleApp {
         this.ui.updateStatus("내 캐릭터 스탯을 배분하세요", "Setup");
         this.ui.hideOverlay();
         this.startPlayerPreviewLoop();
+        this._bindPreviewReselectInput();
     }
 
     pickPlayerFighterId() {
         if (this.debug.startCharacter) return this.debug.startCharacter;
         return this.roster[Math.floor(Math.random() * this.roster.length)].id;
+    }
+
+    canReselectPreviewCharacter() {
+        if (this._previewSwap) return false;
+        if (this.tournament !== null) return false;
+        if (this.simulation && !this.simulation.finished) return false;
+        if (this.hunting?._run) return false;
+        if (this.hunting?._moving) return false;
+        const uiState = this.ui?.state;
+        if (uiState?.locked) return false;
+        return true;
+    }
+
+    _pickDifferentPlayerFighterId() {
+        const others = this.roster.filter((f) => f.id !== this.playerFighterId);
+        if (others.length === 0) return this.playerFighterId;
+        return others[Math.floor(Math.random() * others.length)].id;
+    }
+
+    reselectPreviewCharacterFromPreview() {
+        if (!this.canReselectPreviewCharacter()) return false;
+
+        const newId = this._pickDifferentPlayerFighterId();
+        if (newId === this.playerFighterId) return false;
+
+        const oldFighter = this.roster.find((f) => f.id === this.playerFighterId);
+        const newFighter = this.roster.find((f) => f.id === newId);
+        if (!oldFighter || !newFighter) return false;
+
+        const canvas = this.renderer.canvas;
+        const center = new Vector2(canvas.width / 2, canvas.height / 2 - 28);
+
+        const outgoing = this._previewBall || this._ensurePreviewBall(oldFighter);
+        if (outgoing) {
+            outgoing.applyImpulse(outgoing.velocity.clone().scale(-1));
+            outgoing.position = center.clone();
+        }
+
+        const angle = Math.random() * Math.PI * 2;
+        const spawnDist = canvas.width * 0.55;
+        const spawnPos = Vector2.add(center, Vector2.fromAngle(angle, spawnDist));
+
+        const incoming = new BattleBall(newFighter, spawnPos);
+        incoming.radius = Math.round(incoming.stats.baseRadius * 1.35);
+        const AbilityClass = ABILITY_MAP[newFighter.ability];
+        if (AbilityClass) incoming.bindAbility(new AbilityClass(incoming, {}));
+
+        const toCenter = Vector2.subtract(center, incoming.position);
+        const dist = toCenter.length();
+        const speed = dist / 0.55;
+        incoming.applyImpulse(toCenter.normalize().scale(speed));
+
+        this.playerFighterId = newId;
+        this.playerStatAllocation = createEmptyStatAllocation();
+        migrateLegacyExperienceToCharacter(this.playerProfile, this.playerFighterId);
+
+        this._previewSwap = {
+            outgoing: outgoing || this._ensurePreviewBall(oldFighter),
+            incoming,
+            fighter: newFighter,
+            elapsed: 0,
+            duration: 0.8
+        };
+
+        this._refreshCollectionHub();
+        this.refreshPlayerSetup();
+        return true;
+    }
+
+    _bindPreviewReselectInput() {
+        const canvas = this.elements?.canvas;
+        if (!canvas) return;
+
+        const handler = (event) => {
+            if (!this.canReselectPreviewCharacter()) return;
+
+            const rect = canvas.getBoundingClientRect?.();
+            if (!rect) return;
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = (event.clientX - rect.left) * scaleX;
+            const y = (event.clientY - rect.top) * scaleY;
+
+            const ball = this._previewBall;
+            if (!ball) return;
+
+            const dx = x - ball.position.x;
+            const dy = y - ball.position.y;
+            const dist = Math.hypot(dx, dy);
+            const hitRadius = ball.radius * 2.5;
+            if (dist <= hitRadius) {
+                this.reselectPreviewCharacterFromPreview();
+            }
+        };
+
+        canvas.addEventListener("pointerdown", handler);
+    }
+
+    _updatePreviewSwap(dt) {
+        const swap = this._previewSwap;
+        if (!swap) return;
+
+        swap.elapsed += dt;
+        swap.outgoing.integrate(dt);
+        swap.incoming.integrate(dt);
+
+        const diff = Vector2.subtract(swap.incoming.position, swap.outgoing.position);
+        const dist = diff.length();
+        const minDist = swap.outgoing.radius + swap.incoming.radius;
+
+        if (dist < minDist && dist > 0.001) {
+            const normal = diff.clone().normalize();
+            const overlap = minDist - dist;
+            const correction = normal.clone().scale(overlap * 0.5);
+            swap.outgoing.position.subtract(correction);
+            swap.incoming.position.add(correction);
+
+            const relVel = Vector2.subtract(swap.incoming.velocity, swap.outgoing.velocity);
+            const velAlongNormal = relVel.dot(normal);
+            if (velAlongNormal < 0) {
+                const impulseMag = -velAlongNormal * 0.5;
+                swap.outgoing.applyImpulse(normal.clone().scale(-impulseMag));
+                swap.incoming.applyImpulse(normal.clone().scale(impulseMag));
+            }
+        }
+
+        if (swap.elapsed >= swap.duration) {
+            const center = new Vector2(this.renderer.canvas.width / 2, this.renderer.canvas.height / 2 - 28);
+            swap.incoming.position = center.clone();
+            swap.incoming.applyImpulse(swap.incoming.velocity.clone().scale(-1));
+            this._previewBall = swap.incoming;
+            this._selectionAnimTime = 0;
+            this._previewSwap = null;
+        }
     }
 
     _refreshCollectionHub() {
@@ -347,6 +483,15 @@ export class BattleApp {
             return;
         }
 
+        if (this._previewSwap) {
+            this.renderer.renderPlayerPreviewSwap(
+                this._previewSwap.outgoing,
+                this._previewSwap.incoming,
+                this._previewSwap.fighter
+            );
+            return;
+        }
+
         const player = this.roster.find((fighter) => fighter.id === this.playerFighterId);
         const ball = this._ensurePreviewBall(player);
         this.renderer.renderPlayerPreview(ball, player, this._selectionAnimTime);
@@ -370,6 +515,7 @@ export class BattleApp {
                 this._selectionAnimTime += dt;
             }
 
+            this._updatePreviewSwap(dt);
             this.renderPlayerPreview();
             this.previewRafId = requestAnimationFrame(tick);
         };

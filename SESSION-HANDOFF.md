@@ -1,5 +1,12 @@
 # 결정 기록
 
+## [L1] 2026-07-08 — 프리뷰 캐릭터 재선택을 물리 상호작용으로 만든다
+
+- 맥락: 사용자가 앱 내에서 F5를 누르기 어려워 시작 화면에서 캐릭터를 바꾸는 방법이 필요. 단순 버튼이나 CSS 전환이 아닌 물리 기반 상호작용으로 게임 느낌을 유지.
+- 결정: (1) 프리뷰 캐릭터 클릭/탭 시 무작위 방향에서 새 BattleBall이 날아와 기존 볼을 물리적으로 밀쳐내고 교체. (2) 예외: tournament !== null, match active, hunting run/moving, stat locked, swap 진행 중에는 차단. (3) 교체 시 playerStatAllocation 초기화, 즉시 UI 갱신. (4) 전환은 ~0.8초간 간단한 overlap/impulse 물리로 동작. (5) 캔버스 pointerdown 이벤트로 입력 처리, hit radius = ball.radius * 2.5. (6) bridge.reselectPreviewCharacter() 공개 메서드로 테스트 가능. (7) renderPlayerPreviewSwap() 별도 렌더링, UI 라벨은 새 캐릭터 기준.
+- 영향: `src/app.js`(메서드 5종 + _previewSwap 상태 + render/loop 수정), `src/ui.js`(renderPlayerPreviewSwap), `src/componentBridge.js`(bridge 메서드), `tests/regression.mjs`(테스트 5종), `index.html`(V 0.24.12), `src/patchNotes.js`(v0.24.12), `SESSION-HANDOFF.md`
+- 검증: `npm run format:check`, `npm run check`, `npm test`, `node scripts/huntingUserScenario.mjs`
+
 ## [L1] 2026-07-08 — WallSlam 회전을 물리 기반 angular impulse로 전환
 
 - 맥락: WallSlam 효과가 시각 전용 `display.spinRotation`을 사용해 물리 각속도와 무관한 회전을 보여줌. 회전 물리(applyAngularImpulse, _inverseMomentOfInertia, integrateRotation)가 이미 완비되어 WallSlam도 물리 impulse로 전달해야 일관성 확보.
