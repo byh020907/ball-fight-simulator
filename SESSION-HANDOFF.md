@@ -1,5 +1,11 @@
 # 결정 기록
 
+## [L1] 2026-07-08 — 모바일 세팅 화면 스크롤을 문서 스크롤로 전환
+
+- 맥락: 사용자 실기기 스크린샷에서 장비/스탯 패널은 화면 아래로 이어지지만 터치 스크롤이 실제로 먹지 않는 문제가 재현됨. 이전 수정은 `.tournament-panel.setup-hidden` 내부 nested scroll에 의존했는데, 모바일 브라우저에서는 상위 `body/.app/.game-frame`의 `overflow:hidden` 조합 때문에 터치 이벤트가 스크롤 대상으로 안정적으로 전달되지 않을 수 있음.
+- 결정: (1) `.app`에 `setup-mode` 클래스를 Alpine으로 부여. (2) 모바일에서는 `body`의 세로 스크롤을 허용. (3) 모바일 portrait setup-mode에서 `.app`과 `.game-frame`을 `height:auto`, `overflow:visible`로 전환해 아레나+플레이어 패널 전체가 문서 스크롤로 내려가게 함. (4) setup-mode의 `.tournament-panel.setup-hidden`은 내부 스크롤 대신 자연 높이로 펼치도록 `flex:0 0 auto`, `overflow:visible`로 보정. (5) 패치노트 v0.24.9와 캐시 버스터 갱신.
+- 영향: `index.html`, `src/styles.css`, `src/patchNotes.js`, `SESSION-HANDOFF.md`
+
 ## [L1] 2026-07-08 — Hero Ball Hero Orb carryover를 사냥터 층간 유지
 
 - 맥락: 일반 전투에서 Hero Ball로 Hero Orb stat(HP/대미지/속도/방어/스킬)을 획득한 carryover가 사냥터 층간 유지되지 않음. 기존 `app.js.startMatch`에서 Hero Orb carryover 루프가 모든 match에 적용되지만 사냥터 경로는 `huntingManager._startFloorBattle()`을 통해 별도로 spec을 구성해 전달하므로 carryover가 누락됨.
