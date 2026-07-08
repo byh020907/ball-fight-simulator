@@ -1,5 +1,12 @@
 # 결정 기록
 
+## [L1] 2026-07-08 — 모바일 세팅 화면 스크롤을 패널 내부로 수정 (문서 스크롤 철회)
+
+- 맥락: 09d5d9e에서 도입한 문서 스크롤 방식(body overflow-y:auto, .app/.game-frame height:auto)이 아레나/프리뷰/시작 버튼 영역까지 함께 스크롤되게 하여 사용자가 원하는 동작과 반대였음. 상단 영역은 뷰포트에 고정되고 하단 장비/스탯 패널만 스크롤되어야 함.
+- 결정: (1) body 모바일 overflow-y:auto → overflow:hidden 복원 (문서 스크롤 제거). (2) `setup-mode` 클래스 CSS 규칙과 Alpine 바인딩 제거 — 더 이상 문서 스크롤을 활성화하지 않음. (3) `.tournament-panel.setup-hidden`에 overflow-y:auto, touch-action:pan-y 유지/보강 — 하단 패널이 유일한 세로 스크롤 소유자. (4) `player-panel` 모바일 portrait :scope에서 max-height:none + overflow:visible로 변경 — 중첩 스크롤 방지, 부모 `.tournament-panel`이 스크롤 책임.
+- 영향: `src/styles.css`, `src/components/player-panel.html`, `index.html`, `src/patchNotes.js`, `SESSION-HANDOFF.md`
+- 검증: `npm run format:check`, `npm run check`, `npm test`, `node scripts/huntingUserScenario.mjs`, 390x844 모바일 브라우저에서 `window.scrollY=0` 유지 + `.tournament-panel.scrollTop=285` 증가 + 하단 액션/스탯 버튼 가시성 확인
+
 ## [L1] 2026-07-08 — 모바일 세팅 화면 스크롤을 문서 스크롤로 전환
 
 - 맥락: 사용자 실기기 스크린샷에서 장비/스탯 패널은 화면 아래로 이어지지만 터치 스크롤이 실제로 먹지 않는 문제가 재현됨. 이전 수정은 `.tournament-panel.setup-hidden` 내부 nested scroll에 의존했는데, 모바일 브라우저에서는 상위 `body/.app/.game-frame`의 `overflow:hidden` 조합 때문에 터치 이벤트가 스크롤 대상으로 안정적으로 전달되지 않을 수 있음.

@@ -397,8 +397,7 @@ body::before {
 
 @media (max-width: 760px) {
     body {
-        overflow-x: hidden;
-        overflow-y: auto;
+        overflow: hidden;
         align-items: flex-start;
         justify-content: flex-start;
         padding: 6px;
@@ -484,26 +483,11 @@ body::before {
         min-height: 0;
         width: 100% !important;
         max-height: none !important;
-        overflow: auto;
+        overflow-y: auto;
+        overflow-x: hidden;
         overscroll-behavior: contain;
         -webkit-overflow-scrolling: touch;
-    }
-
-    .app.setup-mode {
-        height: auto;
-        min-height: calc(100dvh - 12px);
-        overflow: visible;
-    }
-
-    .app.setup-mode .game-frame {
-        height: auto;
-        min-height: calc(100dvh - 12px);
-        overflow: visible;
-    }
-
-    .app.setup-mode .tournament-panel.setup-hidden {
-        flex: 0 0 auto;
-        overflow: visible;
+        touch-action: pan-y;
     }
 
     .game-frame {
