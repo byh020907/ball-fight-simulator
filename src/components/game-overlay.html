@@ -82,6 +82,19 @@
             </div>
         </div>
     </div>
+    <div
+        class="hunting-loot-hud"
+        x-show="$store.gameOverlay.huntingLootHudVisible"
+    >
+        <span class="hud-head">미확보 전리품</span>
+        <span class="hud-body">
+            <span x-text="'파편 ' + $store.gameOverlay.huntingLootHudShards"></span>
+            <span
+                x-show="$store.gameOverlay.huntingLootHudChests > 0"
+                x-text="' · 상자 ' + $store.gameOverlay.huntingLootHudChests"
+            ></span>
+        </span>
+    </div>
 </div>
 <script>
     Alpine.data("gameOverlay", () => ({
@@ -360,12 +373,59 @@
         text-align: center;
     }
 
+    .hunting-loot-hud {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 2px;
+        padding: 6px 10px;
+        background: rgba(238, 238, 238, 0.92);
+        border: 1px solid #cccccc;
+        border-radius: 6px;
+        pointer-events: none;
+        z-index: 10;
+        max-width: min(200px, 40vw);
+    }
+
+    .hunting-loot-hud .hud-head {
+        font-size: 0.62rem;
+        font-weight: 900;
+        color: #888888;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .hunting-loot-hud .hud-body {
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: #333333;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
     @media (max-width: 600px) {
         :scope.transient {
             align-items: center;
         }
         :scope.transient .overlay-card {
             max-width: min(84%, 320px);
+        }
+        .hunting-loot-hud {
+            top: 4px;
+            right: 4px;
+            padding: 4px 8px;
+            max-width: min(160px, 36vw);
+        }
+        .hunting-loot-hud .hud-head {
+            font-size: 0.55rem;
+        }
+        .hunting-loot-hud .hud-body {
+            font-size: 0.65rem;
         }
     }
 </style>

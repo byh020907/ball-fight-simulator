@@ -17,9 +17,9 @@ export const HUNTING_MONSTER_TYPES = Object.freeze({
 export const HUNTING_MONSTER_BASE_SPECS = Object.freeze({
     [HUNTING_MONSTER_TYPES.MELEE]: Object.freeze({
         id: "hunting-mob-melee",
-        name: "근접 몹",
-        title: "돌진형 하수인",
-        description: "사냥터에서 무리로 달려드는 근접 몹입니다.",
+        name: "하수인",
+        title: "사냥터 하수인",
+        description: "사냥터에서 무리로 달려드는 하수인입니다.",
         color: "#9b5d3f",
         face: "dash",
         ability: "hunting_melee",
@@ -27,9 +27,9 @@ export const HUNTING_MONSTER_BASE_SPECS = Object.freeze({
     }),
     [HUNTING_MONSTER_TYPES.RANGED]: Object.freeze({
         id: "hunting-mob-ranged",
-        name: "원거리 몹",
-        title: "견제형 하수인",
-        description: "사냥터에서 뒤쪽에서 화살로 견제하는 원거리 몹입니다.",
+        name: "하수인",
+        title: "원정지 하수인",
+        description: "사냥터에서 뒤쪽에서 화살로 견제하는 하수인입니다.",
         color: "#426f9e",
         face: "archer",
         ability: "archer",

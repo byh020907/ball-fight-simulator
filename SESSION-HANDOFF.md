@@ -1,5 +1,11 @@
 # 결정 기록
 
+## [L1] 2026-07-08 — 사냥터 몹 표시명 일반화와 미확보 전리품 HUD 추가
+- 맥락: 전투 진입 문구는 `전투 발생 · 적 N명`으로 바뀌었지만 실제 전투 UI에는 일반 몹 이름이 `근접 몹 1`/`원거리 몹 2`처럼 노출되어 사용자가 적 구성 문구가 여전히 타입 중심이라고 느꼈음. 또한 층 이동/선택 시 미확보 상자와 파편을 중앙 문구 외에 지속적으로 확인하기 어려웠음.
+- 결정: (1) 내부 `HUNTING_MONSTER_TYPES.MELEE/RANGED`, ability, stats, `hunting.monsterType`은 유지하되 UI-visible 일반 몹 name/title/description에서 근접/원거리 라벨을 제거하고 `하수인` 계열 표시명으로 통일. (2) `gameOverlay`에 우상단 `미확보 전리품` HUD를 추가해 이동/선택/상인 화면에서 pendingLoot 파편/상자 수를 별도로 보여줌. (3) 전리품이 없으면 HUD를 숨기고, 패배/귀환/스테이지 클리어/overlay hide 시 초기화.
+- 영향: `src/hunting/huntingMonsters.js`, `src/hunting/huntingManager.js`, `src/components/game-overlay.html`, `src/ui.js`, `index.html`, `tests/regression.mjs`
+- 검증: `npm run format:check`, `npm run check`, `npm test`, `node scripts/huntingUserScenario.mjs`
+
 ## [L1] 2026-07-07 — 사냥터 상인 선택지와 전리품 손실 표시 개선
 - 맥락: 방랑 상인 이벤트가 실제 선택지를 제공하지 않고, 전투 문구가 몬스터 타입을 오해하게 만들며, 패배 시 미확보 상자가 사라지는 이유가 UI에 드러나지 않았음.
 - 결정: (1) 방랑 상인은 상시 보유 사냥 파편(`profile.hunting.shards`)으로 결제하는 3개 선택지(회복/상자 구매/안전 운송)와 계속 전진 선택을 제공. (2) 전투 진입 문구는 몬스터 타입 나열 대신 `전투 발생 · 적 N명`으로 단순화. (3) 선택 UI 요약에 미확보 상자 개수를 표시하고, 패배 손실 문구에 상자 등급별 파괴 개수를 표시. (4) 빈 전리품 요약은 출력하지 않아 포탈/이벤트 안내를 가리지 않음.

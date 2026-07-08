@@ -289,7 +289,10 @@ export class HuntingManager {
                 app.ui.setHuntingOverlayState({
                     huntingChoiceVisible: false,
                     huntingCanRetreat: false,
-                    huntingMoving: false
+                    huntingMoving: false,
+                    huntingLootHudVisible: false,
+                    huntingLootHudShards: 0,
+                    huntingLootHudChests: 0
                 });
                 app._huntingDone = true;
                 app.ui.showOverlay(
@@ -305,6 +308,7 @@ export class HuntingManager {
             }
 
             app.ui.showOverlay("사냥터", `${name} 승리!`, subtext);
+            const hud = this._getLootHudState();
             app.ui.setHuntingOverlayState({
                 huntingChoiceVisible: true,
                 huntingCanRetreat: false,
@@ -312,7 +316,8 @@ export class HuntingManager {
                 huntingFloor: run.floor,
                 huntingCharacterName: name,
                 huntingLootSummary: pendingText,
-                huntingMoveMessage: `${run.floor}층 전투 승리 · 10층 전진 가능`
+                huntingMoveMessage: `${run.floor}층 전투 승리 · 10층 전진 가능`,
+                ...hud
             });
             app.ui.setStartButton({ hidden: true, disabled: true, text: "" });
             savePlayerProfile(app.playerProfile);
@@ -330,7 +335,12 @@ export class HuntingManager {
             const lossDisplay = defeatLossText || `파편 ${lostShards} 손실`;
             app.ui.showOverlay("사냥터 패배", `${name} 쓰러짐`, `획득 ${securedShards} 파편 · ${lossDisplay}`);
             app.ui.setHuntingActive(false);
-            app.ui.setHuntingOverlayState({ huntingChoiceVisible: false });
+            app.ui.setHuntingOverlayState({
+                huntingChoiceVisible: false,
+                huntingLootHudVisible: false,
+                huntingLootHudShards: 0,
+                huntingLootHudChests: 0
+            });
             app._huntingDone = true;
             app.ui.setStartButton({ text: "확인", hidden: false, disabled: false });
             this._run = null;
@@ -354,7 +364,12 @@ export class HuntingManager {
         app.refreshPlayerSetup();
 
         app.ui.setHuntingActive(false);
-        app.ui.setHuntingOverlayState({ huntingChoiceVisible: false });
+        app.ui.setHuntingOverlayState({
+            huntingChoiceVisible: false,
+            huntingLootHudVisible: false,
+            huntingLootHudShards: 0,
+            huntingLootHudChests: 0
+        });
 
         app._huntingDone = true;
         app.ui.showOverlay("사냥터 종료", "귀환 완료", `파편 ${securedShards} 확보 · 최고 층 ${run.floor}`);
@@ -487,20 +502,40 @@ export class HuntingManager {
     }
 
     _setHuntingMoveState({ moving, step, maxSteps, routeStartFloor, routeEndFloor, message }) {
+        const hud = this._getLootHudState();
         this.app.ui.setHuntingOverlayState({
             huntingMoving: moving,
             huntingMoveFrom: routeStartFloor,
             huntingMoveTo: routeEndFloor,
             huntingMoveStep: step,
             huntingMoveMax: maxSteps,
-            huntingMoveMessage: message
+            huntingMoveMessage: message,
+            ...hud
         });
     }
 
+    _getLootHudState() {
+        const run = this._run;
+        if (!run) {
+            return { huntingLootHudVisible: false, huntingLootHudShards: 0, huntingLootHudChests: 0 };
+        }
+        const pending = run.pendingLoot;
+        const shards = pending?.shards ?? 0;
+        const chests = pending?.chests ?? [];
+        const visible = shards > 0 || chests.length > 0;
+        return {
+            huntingLootHudVisible: visible,
+            huntingLootHudShards: shards,
+            huntingLootHudChests: chests.length
+        };
+    }
+
     _stopHuntingMoveForBattle(app, message) {
+        const hud = this._getLootHudState();
         app.ui.setHuntingOverlayState({
             huntingMoving: false,
-            huntingMoveMessage: message
+            huntingMoveMessage: message,
+            ...hud
         });
         this._moving = false;
         this._startFloorBattle();
@@ -510,6 +545,7 @@ export class HuntingManager {
         const pendingText = this._run ? formatPendingLootSummary(this._run.pendingLoot) : "";
         const baseSummary = summary || `현재 ${floor}층 · 10층 전진 가능`;
         const displaySummary = pendingText ? `${baseSummary} · ${pendingText}` : baseSummary;
+        const hud = this._getLootHudState();
         app.ui.setHuntingOverlayState({
             huntingMoving: false,
             huntingChoiceVisible: true,
@@ -520,12 +556,14 @@ export class HuntingManager {
             huntingMoveStep: 0,
             huntingMoveMax: HUNTING_ADVANCE_STEPS,
             huntingMoveMessage: message,
-            huntingLootSummary: displaySummary
+            huntingLootSummary: displaySummary,
+            ...hud
         });
         this._moving = false;
     }
 
     _stopHuntingMoveForMerchant(app, { message, floor, offers, summary }) {
+        const hud = this._getLootHudState();
         app.ui.setHuntingOverlayState({
             huntingMoving: false,
             huntingChoiceVisible: false,
@@ -538,7 +576,8 @@ export class HuntingManager {
             huntingMoveMessage: message,
             huntingLootSummary: summary || "",
             huntingMerchantActive: true,
-            huntingMerchantOffers: offers
+            huntingMerchantOffers: offers,
+            ...hud
         });
         this._moving = false;
     }
@@ -567,9 +606,11 @@ export class HuntingManager {
 
         // Refresh merchant overlay with updated state
         const pendingText = formatPendingLootSummary(this._run.pendingLoot);
+        const hud = this._getLootHudState();
         app.ui.setHuntingOverlayState({
             huntingMerchantOffers: [...offers],
-            huntingLootSummary: pendingText
+            huntingLootSummary: pendingText,
+            ...hud
         });
     }
 

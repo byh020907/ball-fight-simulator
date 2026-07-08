@@ -392,7 +392,10 @@ async function loadModuleApp() {
         huntingMoveMax: 10,
         huntingMoveMessage: "",
         huntingMerchantActive: false,
-        huntingMerchantOffers: null
+        huntingMerchantOffers: null,
+        huntingLootHudVisible: false,
+        huntingLootHudShards: 0,
+        huntingLootHudChests: 0
     });
     globalThis.Alpine.store("startButton", {
         hidden: true,
@@ -473,7 +476,10 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
         huntingMoveMax: 10,
         huntingMoveMessage: "",
         huntingMerchantActive: false,
-        huntingMerchantOffers: null
+        huntingMerchantOffers: null,
+        huntingLootHudVisible: false,
+        huntingLootHudShards: 0,
+        huntingLootHudChests: 0
     });
     harness.context.Alpine.store("startButton", {
         hidden: true,
@@ -8371,16 +8377,160 @@ function testHuntingCombatText() {
     assert.ok(Number.isFinite(countFloor1) && countFloor1 >= 1, "Floor 1 should have at least 1 enemy");
     assert.ok(countFloor10 >= countFloor1, "Deeper floors should have more or equal enemies");
 
+    // ── Individual mob specs should not expose melee/ranged labels ──
+    const forbiddenLabels = ["근접", "원거리", "melee", "ranged"];
+    const meleeSpec = createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.MELEE, floor: 1, index: 0 });
+    const rangedSpec = createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.RANGED, floor: 1, index: 1 });
+    for (const spec of [meleeSpec, rangedSpec]) {
+        for (const label of forbiddenLabels) {
+            assert.ok(
+                !spec.name.toLowerCase().includes(label.toLowerCase()),
+                `Mob name "${spec.name}" should not contain "${label}"`
+            );
+            assert.ok(
+                !spec.title.toLowerCase().includes(label.toLowerCase()),
+                `Mob title "${spec.title}" should not contain "${label}"`
+            );
+        }
+    }
+
+    // ── Internal archetypes and abilities still work ──
+    assert.equal(
+        meleeSpec.hunting.monsterType,
+        HUNTING_MONSTER_TYPES.MELEE,
+        "Melee mob should retain internal monsterType"
+    );
+    assert.equal(meleeSpec.ability, "hunting_melee", "Melee mob should retain chase ability");
+    assert.equal(
+        rangedSpec.hunting.monsterType,
+        HUNTING_MONSTER_TYPES.RANGED,
+        "Ranged mob should retain internal monsterType"
+    );
+    assert.equal(rangedSpec.ability, "archer", "Ranged mob should retain archer ability");
+
     // ── createHuntingMobEncounter does not use melee/ranged in UI-visible text ──
     const mobs = createHuntingMobEncounter({ floor: 5, rng: () => 0.5 });
     assert.equal(mobs.length, getHuntingMobCount(5), "Encounter count matches getHuntingMobCount");
     for (const mob of mobs) {
-        // Names should not imply specific melee/ranged labels in UI text
         assert.ok(typeof mob.name === "string", "Mob should have a name");
         assert.ok(typeof mob.title === "string", "Mob should have a title");
+        for (const label of forbiddenLabels) {
+            assert.ok(
+                !mob.name.toLowerCase().includes(label.toLowerCase()),
+                `Encounter mob name "${mob.name}" should not contain "${label}"`
+            );
+            assert.ok(
+                !mob.title.toLowerCase().includes(label.toLowerCase()),
+                `Encounter mob title "${mob.title}" should not contain "${label}"`
+            );
+        }
     }
 
     console.log("[hunting-combat-text] ok");
+}
+
+function testHuntingLootHud() {
+    const app = {
+        ui: {
+            lastOverlayState: null,
+            setHuntingOverlayState(data) {
+                this.lastOverlayState = data;
+            }
+        }
+    };
+
+    // ── HUD hidden when no run ──
+    const manager = new HuntingManager(app);
+    const stateNoRun = manager._getLootHudState();
+    assert.equal(stateNoRun.huntingLootHudVisible, false, "No run: HUD should be hidden");
+    assert.equal(stateNoRun.huntingLootHudShards, 0, "No run: shards should be 0");
+    assert.equal(stateNoRun.huntingLootHudChests, 0, "No run: chests should be 0");
+
+    // ── HUD hidden when pending loot is empty ──
+    manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH });
+    const stateEmpty = manager._getLootHudState();
+    assert.equal(stateEmpty.huntingLootHudVisible, false, "Empty pending loot: HUD should be hidden");
+    assert.equal(stateEmpty.huntingLootHudShards, 0, "Empty pending loot: shards should be 0");
+    assert.equal(stateEmpty.huntingLootHudChests, 0, "Empty pending loot: chests should be 0");
+
+    // ── HUD visible with shards only ──
+    manager._run = {
+        ...manager._run,
+        pendingLoot: { shards: 30, chests: [], xp: 0 }
+    };
+    const stateShards = manager._getLootHudState();
+    assert.equal(stateShards.huntingLootHudVisible, true, "Shards only: HUD should be visible");
+    assert.equal(stateShards.huntingLootHudShards, 30, "Shards only: shards should be 30");
+    assert.equal(stateShards.huntingLootHudChests, 0, "Shards only: chests should be 0");
+
+    // ── HUD visible with shards and chests ──
+    manager._run = {
+        ...manager._run,
+        pendingLoot: {
+            shards: 45,
+            chests: [
+                createHuntingChest({ rarity: "common", id: "h1" }),
+                createHuntingChest({ rarity: "rare", id: "h2" })
+            ],
+            xp: 0
+        }
+    };
+    const stateBoth = manager._getLootHudState();
+    assert.equal(stateBoth.huntingLootHudVisible, true, "Both: HUD should be visible");
+    assert.equal(stateBoth.huntingLootHudShards, 45, "Both: shards should be 45");
+    assert.equal(stateBoth.huntingLootHudChests, 2, "Both: chests should be 2");
+
+    // ── _setHuntingMoveState includes HUD data ──
+    manager._run = {
+        ...manager._run,
+        pendingLoot: { shards: 12, chests: [createHuntingChest({ rarity: "common" })], xp: 0 }
+    };
+    manager._setHuntingMoveState({
+        moving: true,
+        step: 1,
+        maxSteps: 5,
+        routeStartFloor: 5,
+        routeEndFloor: 10,
+        message: "이동 중..."
+    });
+    assert.equal(app.ui.lastOverlayState.huntingLootHudVisible, true, "Movement: HUD should be visible");
+    assert.equal(app.ui.lastOverlayState.huntingLootHudShards, 12, "Movement: shards should be 12");
+    assert.equal(app.ui.lastOverlayState.huntingLootHudChests, 1, "Movement: chests should be 1");
+    assert.equal(app.ui.lastOverlayState.huntingMoving, true, "Movement: huntingMoving should be true");
+
+    // ── _stopHuntingMoveForChoice includes HUD data ──
+    manager._stopHuntingMoveForChoice(app, {
+        message: "5층 — 포탈 발견!",
+        canRetreat: true,
+        floor: 5,
+        summary: "포탈 발견 · 현재 5층 · 귀환 또는 10층 전진"
+    });
+    assert.equal(app.ui.lastOverlayState.huntingLootHudVisible, true, "Choice: HUD should be visible");
+    assert.equal(app.ui.lastOverlayState.huntingLootHudShards, 12, "Choice: shards should be 12");
+    assert.equal(app.ui.lastOverlayState.huntingChoiceVisible, true, "Choice: huntingChoiceVisible should be true");
+
+    // ── _stopHuntingMoveForMerchant includes HUD data ──
+    manager._stopHuntingMoveForMerchant(app, {
+        message: "5층 — 떠돌이 상인",
+        floor: 5,
+        offers: [],
+        summary: ""
+    });
+    assert.equal(app.ui.lastOverlayState.huntingLootHudVisible, true, "Merchant: HUD should be visible");
+    assert.equal(app.ui.lastOverlayState.huntingLootHudShards, 12, "Merchant: shards should be 12");
+    assert.equal(app.ui.lastOverlayState.huntingMerchantActive, true, "Merchant: huntingMerchantActive should be true");
+
+    // ── HUD clears when pending loot becomes empty ──
+    manager._run = {
+        ...manager._run,
+        pendingLoot: { shards: 0, chests: [], xp: 0 }
+    };
+    const stateEmpty2 = manager._getLootHudState();
+    assert.equal(stateEmpty2.huntingLootHudVisible, false, "Empty after having loot: HUD should hide");
+    assert.equal(stateEmpty2.huntingLootHudShards, 0, "Empty after having loot: shards should be 0");
+    assert.equal(stateEmpty2.huntingLootHudChests, 0, "Empty after having loot: chests should be 0");
+
+    console.log("[hunting-loot-hud] ok");
 }
 
 function testHuntingDefeatChestLoss() {
@@ -8470,6 +8620,7 @@ function testHuntingChoiceSummaryKeepsContextWithPendingLoot() {
 testHuntingMerchantOffers();
 testHuntingFormatHelpers();
 testHuntingCombatText();
+testHuntingLootHud();
 testHuntingDefeatChestLoss();
 testHuntingChoiceSummaryKeepsContextWithPendingLoot();
 

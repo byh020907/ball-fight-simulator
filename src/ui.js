@@ -724,7 +724,10 @@ export class UIController {
             huntingMoveMax: 10,
             huntingMoveMessage: "",
             huntingMerchantActive: false,
-            huntingMerchantOffers: null
+            huntingMerchantOffers: null,
+            huntingLootHudVisible: false,
+            huntingLootHudShards: 0,
+            huntingLootHudChests: 0
         });
         this._resetXpReward();
     }
