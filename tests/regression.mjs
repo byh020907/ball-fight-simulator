@@ -8723,6 +8723,47 @@ function testHuntingHeroCarryoverInHandleFinish(app) {
     console.log("[hunting-hero-carryover-handle-finish] ok");
 }
 
+function testHuntingStartFloorBattleAppliesStatAllocation(app) {
+    const playerId = FIGHTER_IDS.DASH;
+    const player = app.roster.find((f) => f.id === playerId);
+    const opponent = app.roster.find((f) => f.id !== playerId);
+
+    const allocation = { hp: 20, damage: 10, speed: 5, skill: 0, defense: 0 };
+    const expectedSpec = applyStatAllocation(player, allocation, true);
+
+    const capturedSpecs = [];
+    const mockApp = {
+        roster: [player, opponent],
+        playerProfile: createDefaultPlayerProfile(),
+        playerStatAllocation: { ...allocation },
+        ui: { setHuntingActive() {}, setHuntingOverlayState() {}, addLog() {} },
+        startMatch(specs) {
+            capturedSpecs.push(specs);
+        }
+    };
+    const manager = new HuntingManager(mockApp);
+    manager._run = createHuntingRun({ characterId: playerId, stageId: HUNTING_STAGE_IDS.CAVE });
+    manager._startFloorBattle();
+
+    const playerSpec = capturedSpecs[0][0];
+    assert.equal(playerSpec.stats.hp, expectedSpec.stats.hp, "Hunting spec hp should match applyStatAllocation");
+    assert.equal(
+        playerSpec.stats.damage,
+        expectedSpec.stats.damage,
+        "Hunting spec damage should match applyStatAllocation"
+    );
+    assert.equal(
+        playerSpec.stats.speed,
+        expectedSpec.stats.speed,
+        "Hunting spec speed should match applyStatAllocation"
+    );
+    assert.equal(playerSpec.teamId, HUNTING_TEAMS.PLAYER, "Hunting spec should be on player team");
+    // 변경 전 roster와 공유되지 않아야 함 (spread clone)
+    assert.notEqual(playerSpec, player, "Hunting spec should be a clone of the roster base spec");
+
+    console.log("[hunting-stat-allocation] ok");
+}
+
 testHuntingMerchantOffers();
 testHuntingFormatHelpers();
 testHuntingCombatText();
@@ -8733,5 +8774,6 @@ testBattleBallAppliesSpecHeroCarryover(app);
 testBattleBallMergeHeroOrbCarryoverInto(app);
 testHuntingHeroCarryoverInStartFloorBattle(app);
 testHuntingHeroCarryoverInHandleFinish(app);
+testHuntingStartFloorBattleAppliesStatAllocation(app);
 
 console.log("regression tests ok");

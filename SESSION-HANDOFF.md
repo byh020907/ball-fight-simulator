@@ -236,6 +236,13 @@
 - 검증: `npm test` (172개 스위트), `npm run format:check`, `npm run check`, `node scripts/huntingUserScenario.mjs` 통과
 - 미검증: 브라우저 육안 확인 (벽/terrain 충돌 회전 방향)
 
+## [L1] 2026-07-08 — 플레이어 패널 모바일 스크롤 + 사냥터 스탯 배분 명시화
+
+- 맥락: 장비 UI 추가 후 플레이어 패널 하단 스탯 배분 컨트롤이 모바일 세로 모드에서 도달 불가능. `:scope`의 `height:100%`가 부모 flex item 안에서 스크롤을 무력화함. 또한 사냥터 전투에 스탯 배분이 적용되긴 하지만 명시적인 검증이 없어 회귀 가능성 존재.
+- 결정: (1) `:scope`에 `overflow-y:auto`, `overscroll-behavior:contain`, `-webkit-overflow-scrolling:touch` 추가. (2) 모바일 세로 portrait에서 `height:100%` 제거 → `max-height:100%`로 변경 + `padding-bottom:max(8px, env(safe-area-inset-bottom))` 추가. (3) 420px 이하에서 장비 슬롯 padding 축소, stat 버튼 min-height 30→32px, `.player-actions` 하단 safe-area 여백 추가. (4) 모바일 setup-hidden 상태에서는 실제 스크롤 소유자가 부모 `.tournament-panel`이므로 `overflow:auto`와 touch scrolling을 추가. (5) `testHuntingStartFloorBattleAppliesStatAllocation` 회귀 테스트 추가 — `_startFloorBattle`가 `applyStatAllocation` 결과와 일치하는 스펙을 생성하는지 검증. (6) 패치노트 v0.24.8 등록, index.html V=0.24.8로 캐시 버스터 갱신.
+- 영향: `src/components/player-panel.html`, `src/styles.css`, `src/patchNotes.js`, `index.html`, `tests/regression.mjs`, `SESSION-HANDOFF.md`
+- 검증: `npm test`, `npm run format:check`, `npm run check`, `node scripts/huntingUserScenario.mjs`, 모바일 브라우저 portrait 패널 스크롤 계측 통과
+
 ## [L1] 2026-07-06 — 벽/terrain 정적 충돌면 angular impulse 적용
 - 맥락: fighter-fighter 충돌에만 angular impulse가 적용되고, 벽(arena wall)과 terrain(장애물) 충돌에서는 회전 물리가 전혀 발생하지 않아 모든 물리 상호작용을 통일하라는 요구사항을 충족하지 못함. 회전이 시각적 피드백과 플레이 피드백에 중요한 요소임.
 - 결정: (1) `src/physics/staticCollisionResponse.js` 신설 — `applyStaticAngularImpulse(entity, normal, contactPoint, preCollisionVelocity, options)` 공통 헬퍼. 법선 impulse torque + 접선 마찰 torque 2성분 계산. torque arm이 0에 가까우면 접선 속도만으로 spin 생성. (2) `simulation.js`의 `_reflectX`/`_reflectY`에서 충돌 전 velocity를 저장하고 `applyStaticAngularImpulse` 호출 — 접점=벽 표면점. (3) `terrainCollision.js`의 `resolveCircleTerrainCollision`에서 velocity 반사 전 preVel 저장 → entity 표면 접점 계산 → angular impulse 적용. (4) `CollisionShape.js`의 `resolvePolygonTerrainCollision`에서 `closestEdgeNormal`에 contactPoint 반환 추가, edge collision loop에 bestContactX/Y 저장, angular impulse 적용. (5) 회귀 테스트 4종 추가 (wall/corner/circle-terrain/polygon-terrain angular impulse). fighter-fighter 공통 helper 리팩터링은 대규모 변경 방지를 위해 보류.

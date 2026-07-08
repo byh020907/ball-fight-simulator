@@ -483,6 +483,9 @@ body::before {
         min-height: 0;
         width: 100% !important;
         max-height: none !important;
+        overflow: auto;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
     }
     .game-frame {
         display: flex;
