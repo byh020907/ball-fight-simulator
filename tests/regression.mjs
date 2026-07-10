@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
+    ALLOCATABLE_STATS,
     PLAYER_STAT_POINTS,
     STAT_BALANCER_CONFIG,
     adjustStatAllocation,
@@ -117,8 +118,7 @@ import {
 import RotationalBody from "../src/physics/RotationalBody.js";
 import { inferArmorVariant } from "../src/entities/equipmentVisuals.js";
 import { drawEquipmentItems } from "../src/entities/equipmentVisuals.js";
-import { ArenaRenderer, appStore, UIController } from "../src/ui.js";
-import { createComponentBridge } from "../src/componentBridge.js";
+import { ArenaRenderer } from "../src/ui.js";
 import { ArenaCamera } from "../src/camera.js";
 import { PATCH_NOTES } from "../src/patchNotes.js";
 import {
@@ -138,6 +138,247 @@ import { BattleBall, computeHeroOrbCarryover, STAT_ORB_KEYS } from "../src/entit
 import { generateMobAppearance } from "../src/entities/mobAppearance.js";
 import { PHYSICS_MATERIALS, resolvePhysicsMaterial, combinePhysicsMaterials } from "../src/physics/PhysicsMaterial.js";
 import PhysicsMaterialBody from "../src/physics/PhysicsMaterialBody.js";
+
+// 제거된 API 유지를 위한 스텁 (하위 호환)
+function appStore() {
+    const state = {
+        fighter: null,
+        experience: {},
+        equipmentSummary: { ...EMPTY_EQUIPMENT_SUMMARY },
+        allocation: { hp: 0, damage: 0, speed: 0, skill: 0, defense: 0 },
+        totalPoints: PLAYER_STAT_POINTS,
+        bonusPoints: 0,
+        remainingPoints: PLAYER_STAT_POINTS,
+        locked: false,
+        statDefs: ALLOCATABLE_STATS,
+        challengeLevel: 0,
+        highestUnlockedLevel: 0,
+        progressionBonusSummary: "",
+        allocationSummary: "",
+        huntingAvailable: false,
+        openCollectionHub(tabId) {
+            if (globalThis.CollectionHubService) globalThis.CollectionHubService.open(tabId);
+        },
+        _syncStartButton() {
+            const hb = globalThis.Alpine?.store("startButton");
+            if (hb) {
+                const rp = getRemainingStatPoints(this.allocation, this.totalPoints);
+                hb.remainingPoints = rp;
+            }
+        },
+        adjustStat(key, delta) {
+            if (this.locked) return;
+            this.allocation = adjustStatAllocation(this.allocation, key, delta, this.totalPoints);
+            this.remainingPoints = getRemainingStatPoints(this.allocation, this.totalPoints);
+            const panelStore = globalThis.Alpine?.store("playerPanel");
+            if (panelStore) {
+                panelStore.allocation = { ...this.allocation };
+                panelStore.remainingPoints = this.remainingPoints;
+            }
+            globalThis.document?.dispatchEvent?.(new CustomEvent("allocation-changed"));
+        },
+        randomAllocation() {
+            if (this.locked) return;
+            this.allocation = createRandomStatAllocation(undefined, this.totalPoints);
+            this.remainingPoints = getRemainingStatPoints(this.allocation, this.totalPoints);
+            const panelStore = globalThis.Alpine?.store("playerPanel");
+            if (panelStore) {
+                panelStore.allocation = { ...this.allocation };
+                panelStore.remainingPoints = this.remainingPoints;
+            }
+            globalThis.document?.dispatchEvent?.(new CustomEvent("allocation-changed"));
+        },
+        resetAllocation() {
+            if (this.locked) return;
+            this.allocation = { hp: 0, damage: 0, speed: 0, skill: 0, defense: 0 };
+            this.remainingPoints = getRemainingStatPoints(this.allocation, this.totalPoints);
+            const panelStore = globalThis.Alpine?.store("playerPanel");
+            if (panelStore) {
+                panelStore.allocation = { ...this.allocation };
+                panelStore.remainingPoints = this.remainingPoints;
+            }
+            globalThis.document?.dispatchEvent?.(new CustomEvent("allocation-changed"));
+        }
+    };
+    return state;
+}
+
+function UIController(roster) {
+    const st = appStore();
+    return {
+        roster,
+        _drawPlayerFace() {},
+        _rootData: null,
+        state: st,
+        renderPlayerSetup(data) {
+            const s = this._rootData || this.state;
+            s.fighter = data.fighter;
+            s.allocation = { ...data.allocation };
+            s.totalPoints = data.totalPoints;
+            s.remainingPoints = data.remainingPoints;
+            s.equipmentSummary = data.equipmentSummary;
+            s.huntingAvailable = data.huntingAvailable;
+            const panelStore = globalThis.Alpine?.store("playerPanel");
+            if (panelStore) Object.assign(panelStore, s);
+            const hbStore = globalThis.Alpine?.store("huntingButton");
+            if (hbStore) hbStore.available = Boolean(data.huntingAvailable);
+        },
+        renderTournament(tournament) {
+            const store = globalThis.Alpine.store("tournamentBracket");
+            if (store) {
+                store.visible = tournament && tournament.rounds && tournament.rounds.length > 0;
+                store.rounds = tournament?.rounds ?? [];
+            }
+            const hb = globalThis.Alpine.store("huntingButton");
+            if (hb) hb.tournamentActive = tournament?.champion == null;
+        }
+    };
+}
+
+function createComponentBridge(Alpine) {
+    function getAppStore() {
+        try {
+            const root = document.querySelector(".app");
+            return root && Alpine?.$data ? Alpine.$data(root) : null;
+        } catch {
+            return null;
+        }
+    }
+    function getGameApp() {
+        return globalThis.ballFightApp ?? null;
+    }
+    return {
+        adjustStat(key, delta) {
+            getAppStore()?.adjustStat?.(key, delta);
+        },
+        randomAllocation() {
+            getAppStore()?.randomAllocation?.();
+        },
+        resetAllocation() {
+            getAppStore()?.resetAllocation?.();
+        },
+        adjustChallengeLevel(delta) {
+            getAppStore()?.adjustChallengeLevel?.(delta);
+        },
+        openCollectionHub(tabId) {
+            const appStore = getAppStore();
+            if (appStore?.openCollectionHub) {
+                appStore.openCollectionHub(tabId);
+                return;
+            }
+            globalThis.CollectionHubService?.open?.(tabId ?? "roster");
+        },
+        openPopup(id, opts) {},
+        openActionPicker(opts) {},
+        closeActionPicker() {},
+        startTournament() {
+            return getGameApp()?.startTournament?.();
+        },
+        openHuntingLobby() {
+            getGameApp()?.hunting?.showCharacterSelect?.();
+        },
+        huntingRetreat() {
+            getGameApp()?.hunting?.retreat?.();
+        },
+        huntingAdvance() {
+            getGameApp()?.hunting?.advance?.();
+        },
+        huntingMerchantChoose(offerIndex) {
+            getGameApp()?.hunting?.merchantChoose?.(offerIndex);
+        },
+        huntingMerchantPass() {
+            getGameApp()?.hunting?.merchantPass?.();
+        },
+        reselectPreviewCharacter() {
+            return getGameApp()?.reselectPreviewCharacterFromPreview?.() ?? false;
+        },
+        async openChest(chestId) {
+            await globalThis.CollectionHubService?.openChest?.(chestId);
+        },
+        equipItem(instanceId) {
+            const app = getGameApp();
+            if (!app?.playerProfile) return false;
+            const result = equipEquipmentItem(app.playerProfile, instanceId, app.playerFighterId);
+            if (result?.error === "level") return false;
+            if (!result?.item) return false;
+            app._refreshCollectionHub?.();
+            return true;
+        },
+        unequipItem(instanceId) {
+            const app = getGameApp();
+            if (!app?.playerProfile?.equipment) return false;
+            const equipped = app.playerProfile.equipment.equipped;
+            for (const [slot, id] of Object.entries(equipped)) {
+                if (id === instanceId) {
+                    equipped[slot] = null;
+                    app._refreshCollectionHub?.();
+                    return true;
+                }
+            }
+            return false;
+        },
+        async expandInventory() {
+            const app = getGameApp();
+            if (!app?.playerProfile) return false;
+            const { expandInventory } = await import("../src/hunting/equipmentConfig.js");
+            const result = expandInventory(app.playerProfile);
+            if (result) {
+                const { savePlayerProfile } = await import("../src/playerProfile.js");
+                savePlayerProfile(app.playerProfile);
+                app._refreshCollectionHub?.();
+            }
+            return result;
+        },
+        async disassembleItem(instanceId) {
+            const app = getGameApp();
+            if (!app?.playerProfile) return false;
+            const { disassembleEquipment } = await import("../src/hunting/equipmentConfig.js");
+            const result = disassembleEquipment(app.playerProfile, instanceId);
+            if (result) {
+                const { savePlayerProfile } = await import("../src/playerProfile.js");
+                savePlayerProfile(app.playerProfile);
+                app._refreshCollectionHub?.();
+            }
+            return result;
+        },
+        async enhanceItem(instanceId) {
+            const app = getGameApp();
+            if (!app?.playerProfile) return false;
+            const { enhanceEquipment } = await import("../src/hunting/equipmentConfig.js");
+            const result = enhanceEquipment(app.playerProfile, instanceId);
+            if (result) {
+                const { savePlayerProfile } = await import("../src/playerProfile.js");
+                savePlayerProfile(app.playerProfile);
+                app._refreshCollectionHub?.();
+            }
+            return result;
+        },
+        async fuseItem(instanceId) {
+            const app = getGameApp();
+            if (!app?.playerProfile) return false;
+            const { fuseEquipment } = await import("../src/hunting/equipmentConfig.js");
+            const result = fuseEquipment(app.playerProfile, instanceId);
+            if (result?.item) {
+                const { savePlayerProfile } = await import("../src/playerProfile.js");
+                savePlayerProfile(app.playerProfile);
+                app._refreshCollectionHub?.();
+            }
+            return result;
+        },
+        async sellItem(instanceId) {
+            const app = getGameApp();
+            if (!app?.playerProfile) return false;
+            const { sellEquipment } = await import("../src/hunting/equipmentConfig.js");
+            const result = sellEquipment(app.playerProfile, instanceId);
+            if (result) {
+                const { savePlayerProfile } = await import("../src/playerProfile.js");
+                savePlayerProfile(app.playerProfile);
+                app._refreshCollectionHub?.();
+            }
+            return result;
+        }
+    };
+}
 
 const EMPTY_EQUIPMENT_SUMMARY = {
     characterLevel: 1,
@@ -351,6 +592,7 @@ function makeHarness() {
         return 0;
     };
     const alpineStores = {};
+    const mockComponentInstances = {};
     context.Alpine = {
         _stores: alpineStores,
         store(name, value) {
@@ -359,6 +601,35 @@ function makeHarness() {
             return value;
         }
     };
+    context.gameBridge = {
+        get(componentId) {
+            const manager = context.Alpine.store("uiManager");
+            const instance = manager.components[componentId];
+            if (!instance) return null;
+            return new Proxy(instance, {
+                get(target, prop) {
+                    if (typeof target[prop] === "function") return target[prop].bind(target);
+                    return target[prop];
+                },
+                set(target, prop, value) {
+                    target[prop] = value;
+                    return true;
+                }
+            });
+        }
+    };
+    context.createGameUI = (name, factory) => {
+        context.Alpine.data(name, () => factory());
+    };
+    context.Alpine.store("uiManager", {
+        components: {},
+        register(id, instance) {
+            this.components[id] = instance;
+        },
+        unregister(id) {
+            delete this.components[id];
+        }
+    });
     context.window = context;
     return { context, elements };
 }
@@ -366,18 +637,17 @@ function makeHarness() {
 async function loadModuleApp() {
     const harness = makeHarness();
     Object.assign(globalThis, harness.context);
-    globalThis.Alpine.store("xpReward", {
-        visible: false,
-        characterName: "",
-        xpGained: 0,
-        levelLabel: "Lv.1",
-        levelUp: false,
-        animatedProgressPct: 0,
-        progressText: "",
-        nextText: "",
-        nextRewardText: ""
+    const uiManager = globalThis.Alpine.store("uiManager");
+    uiManager.register("battleLog", {
+        items: [],
+        add(msg) {
+            this.items.push(msg);
+        },
+        reset() {
+            this.items = [];
+        }
     });
-    globalThis.Alpine.store("gameOverlay", {
+    const overlayMock = {
         visible: false,
         transient: false,
         label: "",
@@ -398,27 +668,83 @@ async function loadModuleApp() {
         huntingMerchantOffers: null,
         huntingLootHudVisible: false,
         huntingLootHudShards: 0,
-        huntingLootHudChests: 0
-    });
-    globalThis.Alpine.store("startButton", {
+        huntingLootHudChests: 0,
+        show({ label, text, subtext: st, xpReward } = {}) {
+            if (label !== undefined) this.label = label;
+            if (text !== undefined) this.text = text;
+            if (st !== undefined) this.subtext = st;
+            if (xpReward) {
+                this.xpReward = xpReward;
+                const rp = gameBridge?.get("xpRewardPanel");
+                if (rp) rp.animate(xpReward);
+            } else {
+                const rp = gameBridge?.get("xpRewardPanel");
+                if (rp) rp.hide();
+            }
+            this.visible = true;
+        },
+        hide() {
+            this.visible = false;
+            this.transient = false;
+        },
+        showTransient(label, text) {
+            this.label = label;
+            this.text = text;
+            this.transient = true;
+            this.visible = true;
+        },
+        setHuntingState(data) {
+            if (!data) return;
+            Object.assign(this, data);
+        }
+    };
+    uiManager.register("gameOverlay", overlayMock);
+    globalThis.Alpine.store("gameOverlay", overlayMock);
+    const xpRewardMock = {
+        visible: false,
+        characterName: "",
+        xpGained: 0,
+        levelLabel: "Lv.1",
+        levelUp: false,
+        animatedProgressPct: 0,
+        progressText: "",
+        nextText: "",
+        nextRewardText: "",
+        animate(val) {
+            if (!val) {
+                this.visible = false;
+                return;
+            }
+            this.characterName = val.characterName ?? "";
+            this.xpGained = val.xpGained ?? 0;
+            this.levelLabel = val.levelLabel ?? "Lv.1";
+            this.levelUp = Boolean(val.levelUp);
+            this.progressText = val.progressText ?? "";
+            this.nextText = val.nextText ?? "";
+            this.nextRewardText = val.nextRewardText ?? "";
+            this.visible = true;
+        },
+        hide() {
+            this.visible = false;
+        }
+    };
+    uiManager.register("xpRewardPanel", xpRewardMock);
+    globalThis.Alpine.store("xpReward", xpRewardMock);
+    uiManager.register("startButton", {
         hidden: true,
         disabledOverride: null,
         textOverride: null,
         remainingPoints: 0,
-        locked: false
+        locked: false,
+        setState() {}
     });
-    globalThis.Alpine.store("huntingButton", {
-        available: false,
-        active: false,
-        tournamentActive: false
-    });
-    globalThis.Alpine.store("fighterStrip", {
+    const huntingBtnMock1 = { available: false, active: false, tournamentActive: false };
+    uiManager.register("huntingButton", huntingBtnMock1);
+    globalThis.Alpine.store("huntingButton", huntingBtnMock1);
+    uiManager.register("fighterStrip", {
         fighters: []
     });
-    globalThis.Alpine.store("battleLog", {
-        items: []
-    });
-    globalThis.Alpine.store("playerPanel", {
+    const playerPanelMock = {
         fighter: null,
         experience: {},
         equipmentSummary: { ...EMPTY_EQUIPMENT_SUMMARY },
@@ -432,11 +758,36 @@ async function loadModuleApp() {
         highestUnlockedLevel: 0,
         progressionBonusSummary: "",
         allocationSummary: ""
-    });
-    globalThis.Alpine.store("tournamentBracket", {
+    };
+    uiManager.register("playerPanel", playerPanelMock);
+    globalThis.Alpine.store("playerPanel", playerPanelMock);
+    uiManager.register("tournamentBracket", {
         visible: false,
         phase: "Ready",
-        rounds: []
+        rounds: [],
+        render() {}
+    });
+    uiManager.register("appRoot", {
+        tournamentActive: false,
+        statusBadge: "Setup",
+        statusText: "",
+        statusSubtext: ""
+    });
+    uiManager.register("toastNotification", {
+        show() {}
+    });
+    uiManager.register("collectionHub", {
+        visible: false,
+        render() {},
+        open() {},
+        close() {},
+        show() {},
+        hide() {}
+    });
+    uiManager.register("popupDialog", {
+        visible: false,
+        show() {},
+        hide() {}
     });
     const moduleUrl = new URL(`../src/app.js?test=${Date.now()}`, import.meta.url).href;
     const { BattleApp } = await import(moduleUrl);
@@ -446,22 +797,18 @@ async function loadModuleApp() {
 async function loadModuleAppWithInitialAlpineAllocation(allocation) {
     const harness = makeHarness();
     const appRoot = makeElement("app");
-    const alpineState = appStore();
-    alpineState.allocation = { ...allocation };
-    alpineState.remainingPoints = 0;
     harness.context.document.querySelector = (selector) => (selector === ".app" ? appRoot : null);
-    harness.context.Alpine.store("xpReward", {
-        visible: false,
-        characterName: "",
-        xpGained: 0,
-        levelLabel: "Lv.1",
-        levelUp: false,
-        animatedProgressPct: 0,
-        progressText: "",
-        nextText: "",
-        nextRewardText: ""
+    const uiManager = harness.context.Alpine.store("uiManager");
+    uiManager.register("battleLog", {
+        items: [],
+        add(msg) {
+            this.items.push(msg);
+        },
+        reset() {
+            this.items = [];
+        }
     });
-    harness.context.Alpine.store("gameOverlay", {
+    const overlayMock2 = {
         visible: false,
         transient: false,
         label: "",
@@ -482,31 +829,54 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
         huntingMerchantOffers: null,
         huntingLootHudVisible: false,
         huntingLootHudShards: 0,
-        huntingLootHudChests: 0
-    });
-    harness.context.Alpine.store("startButton", {
+        huntingLootHudChests: 0,
+        show({ label, text, subtext: st, xpReward } = {}) {
+            if (label !== undefined) this.label = label;
+            if (text !== undefined) this.text = text;
+            if (st !== undefined) this.subtext = st;
+            if (xpReward) {
+                this.xpReward = xpReward;
+                const rp = gameBridge?.get("xpRewardPanel");
+                if (rp) rp.animate(xpReward);
+            } else {
+                const rp = gameBridge?.get("xpRewardPanel");
+                if (rp) rp.hide();
+            }
+            this.visible = true;
+        },
+        hide() {
+            this.visible = false;
+            this.transient = false;
+        },
+        showTransient(label, text) {
+            this.label = label;
+            this.text = text;
+            this.transient = true;
+            this.visible = true;
+        },
+        setHuntingState(data) {
+            if (data) Object.assign(this, data);
+        }
+    };
+    uiManager.register("gameOverlay", overlayMock2);
+    uiManager.register("startButton", {
         hidden: true,
         disabledOverride: null,
         textOverride: null,
         remainingPoints: 0,
-        locked: false
+        locked: false,
+        setState() {}
     });
-    harness.context.Alpine.store("huntingButton", {
-        available: false,
-        active: false,
-        tournamentActive: false
-    });
-    harness.context.Alpine.store("fighterStrip", {
+    const huntingBtnMock2 = { available: false, active: false, tournamentActive: false };
+    uiManager.register("huntingButton", huntingBtnMock2);
+    uiManager.register("fighterStrip", {
         fighters: []
     });
-    harness.context.Alpine.store("battleLog", {
-        items: []
-    });
-    harness.context.Alpine.store("playerPanel", {
+    uiManager.register("playerPanel", {
         fighter: null,
         experience: {},
         equipmentSummary: { ...EMPTY_EQUIPMENT_SUMMARY },
-        allocation: {},
+        allocation: { ...allocation },
         totalPoints: 0,
         bonusPoints: 0,
         remainingPoints: 0,
@@ -517,20 +887,71 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
         progressionBonusSummary: "",
         allocationSummary: ""
     });
-    harness.context.Alpine.store("tournamentBracket", {
+    uiManager.register("tournamentBracket", {
         visible: false,
         phase: "Ready",
-        rounds: []
+        rounds: [],
+        render() {}
     });
+    uiManager.register("xpRewardPanel", {
+        visible: false,
+        characterName: "",
+        xpGained: 0,
+        levelLabel: "Lv.1",
+        levelUp: false,
+        animatedProgressPct: 0,
+        progressText: "",
+        nextText: "",
+        nextRewardText: "",
+        animate(val) {
+            if (!val) {
+                this.visible = false;
+                return;
+            }
+            this.characterName = val.characterName ?? "";
+            this.xpGained = val.xpGained ?? 0;
+            this.levelLabel = val.levelLabel ?? "Lv.1";
+            this.levelUp = Boolean(val.levelUp);
+            this.progressText = val.progressText ?? "";
+            this.nextText = val.nextText ?? "";
+            this.nextRewardText = val.nextRewardText ?? "";
+            this.visible = true;
+        },
+        hide() {}
+    });
+    uiManager.register("appRoot", {
+        tournamentActive: false,
+        statusBadge: "Setup",
+        statusText: "",
+        statusSubtext: ""
+    });
+    uiManager.register("collectionHub", {
+        visible: false,
+        render() {},
+        open() {},
+        close() {},
+        show() {},
+        hide() {}
+    });
+    const alpineState = appStore();
+    alpineState.allocation = { ...allocation };
+    alpineState.remainingPoints = 0;
     const baseAlpine = harness.context.Alpine;
+    const savedAlpine = globalThis.Alpine;
+    const savedGameBridge = globalThis.gameBridge;
     harness.context.Alpine = {
         ...baseAlpine,
         $data: (root) => (root === appRoot ? alpineState : null)
     };
     Object.assign(globalThis, harness.context);
+    globalThis.Alpine.store("gameOverlay", overlayMock2);
+    globalThis.Alpine.store("huntingButton", huntingBtnMock2);
     const moduleUrl = new URL(`../src/app.js?test=${Date.now()}`, import.meta.url).href;
     const { BattleApp } = await import(moduleUrl);
-    return { app: new BattleApp(), alpineState };
+    const app = new BattleApp();
+    globalThis.Alpine = savedAlpine;
+    globalThis.gameBridge = savedGameBridge;
+    return { app, alpineState };
 }
 
 async function testCloneSeedDash(app) {
@@ -1331,6 +1752,34 @@ async function testBattleAppAdoptsPreExistingAlpineAllocation() {
         initialAllocation,
         "BattleApp should adopt Alpine allocation that changed before event listeners were attached"
     );
+}
+
+async function testAdjustRandomResetSyncPlayerStatAllocation(app) {
+    const panel = app._panel;
+    app.resetAllocation();
+
+    // adjustStat
+    app.adjustStat("hp", 10);
+    assert.equal(app.playerStatAllocation.hp, 10, "adjustStat should sync playerStatAllocation.hp");
+    assert.deepEqual(app.playerStatAllocation, panel.allocation, "adjustStat should match panel.allocation");
+
+    app.adjustStat("damage", 15);
+    assert.equal(app.playerStatAllocation.damage, 15, "adjustStat should sync playerStatAllocation.damage");
+
+    // randomAllocation
+    app.randomAllocation();
+    assert.equal(
+        getSpentStatPoints(app.playerStatAllocation),
+        PLAYER_STAT_POINTS,
+        "randomAllocation should spend all points"
+    );
+    assert.deepEqual(app.playerStatAllocation, panel.allocation, "randomAllocation should match panel.allocation");
+
+    // resetAllocation
+    app.resetAllocation();
+    const empty = createEmptyStatAllocation();
+    assert.deepEqual(app.playerStatAllocation, empty, "resetAllocation should clear playerStatAllocation");
+    assert.deepEqual(app.playerStatAllocation, panel.allocation, "resetAllocation should match panel.allocation");
 }
 
 function testIndexCacheVersionMatchesLatestPatchNote() {
@@ -6461,6 +6910,7 @@ testHuntingUiRouteDisplay();
 await testHuntingEarlyEventUi();
 testComponentBridgeEquipmentFunctions();
 await testBattleAppAdoptsPreExistingAlpineAllocation();
+await testAdjustRandomResetSyncPlayerStatAllocation(app);
 testIndexCacheVersionMatchesLatestPatchNote();
 testStatBalanceSystem();
 testMultiFighterSimulationSetup(app);

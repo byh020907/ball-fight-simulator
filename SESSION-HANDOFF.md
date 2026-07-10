@@ -879,3 +879,44 @@
 - 결정: (1) `src/physics/collisionResponse.js` 신설 — `applyCollisionAngularImpulse(body, normal, contactPoint, impulseMag, angularFactor, tangentialSpeed, tangentialFriction)` 저수준 helper. `applyCollisionResponse(body, normal, contactPoint, preCollisionVelocity, options)` 단일-body 충돌. `applyDynamicCollisionResponse(bodyA, bodyB, normal, contactPoint, approachSpeed, options)` 동적-동적 충돌. 모든 body는 duck typing(applyImpulse/applyAngularImpulse 존재 여부)으로 능력 감지. (2) `staticCollisionResponse.js` 삭제 — 모든 호출을 collisionResponse.js로 대체. (3) `simulation.js` _reflectX/_reflectY: `_applyWallAngularImpulse` 공통 메서드로 정리. (4) `terrainCollision.js` resolveCircleTerrainCollision, `CollisionShape.js` resolvePolygonTerrainCollision: inlined impulseMag 계산 → `applyCollisionAngularImpulse` 호출. (5) `battleSimulation.js` _applyAngularCollisionResponse: 자체 torque 계산 → `applyCollisionAngularImpulse` 2회 호출로 대체. (6) 테스트 6종 추가: duck typing 감지, 선형 impulse, 동적 페어, no-potential, no-angular body. (7) `docs/development-rules.md` 충돌 물리 섹션에 collisionResponse 모듈 원칙 명시.
 - 영향: `src/physics/collisionResponse.js`(신규), `src/physics/staticCollisionResponse.js`(삭제), `src/physics/index.js`, `src/simulation/simulation.js`, `src/terrain/terrainCollision.js`, `src/physics/CollisionShape.js`, `src/simulation/battleSimulation.js`, `tests/regression.mjs`, `docs/development-rules.md`, `SESSION-HANDOFF.md`
 - 검증: `npm test` (20개 스위트), `npm run format:check`, `npm run check`, `node scripts/huntingUserScenario.mjs` 통과
+
+## [L2] 2026-07-09 — regression.mjs 정합성 버그 수정 (Alpine store 오염 + mock 누락)
+- 배경: Phase 6(gameBridge 전환) 후 `testMatchEndGrantsImmediateExperience`가 overlay subtext/XPReward/로그 검증에서 실패. 또한 `loadModuleAppWithInitialAlpineAllocation`이 `Object.assign(globalThis, harness.context)`로 global Alpine store를 오염시켜 후속 테스트가 엉뚱한 mock을 읽는 버그가 있었음.
+- 결정:
+  1. `loadModuleAppWithInitialAlpineAllocation`에서 `Object.assign(globalThis, ...)` 전후로 `globalThis.Alpine`/`globalThis.gameBridge` save-restore 추가
+  2. `gameOverlay` mock의 `show()`가 실제 component처럼 `xpRewardPanel.animate(xpReward)`를 호출하도록 수정
+  3. `xpRewardPanel` mock에 `animate()` 메서드 추가 (실제 component 구현과 동일)
+  4. `battleLog` mock의 `add()`가 `items`에 push하도록 수정 (빈 함수여서 로그 테스트 항상 실패)
+  5. `loadModuleApp()` 내 중복 `uiManager.register("xpRewardPanel", ...)` 제거
+- 영향: `tests/regression.mjs` — mock 객체 5종 수정, Alpine store save-restore 추가
+- 검증: `npm test` (57개 스위트 전부 통과), `npm run format:check` 통과
+
+## [L2] 2026-07-09 — 런타임 컴포넌트 미등록 버그 수정 (collection-hub, xp-reward-panel, xp-progress-bar)
+- 배경: Phase 6(gameBridge 전환) 후 브라우저 콘솔에 `[gameBridge] 'collectionHub'/'xpRewardPanel' 컴포넌트를 찾을 수 없습니다` 경고 발생.
+  1. collection-hub.html이 `Alpine.data()`를 직접 사용 — createGameUI로 감싸지 않아 uiManager 미등록
+  2. loadTemplates()가 document.body.innerHTML만 스캔 — xp-reward-panel/xp-progress-bar는 다른 템플릿 내부에만 있어 로딩되지 않음
+  3. xp-progress-bar가 제거된 `$store.xpReward`를 참조
+- 결정:
+  1. collection-hub.html: `Alpine.data` → `createGameUI`
+  2. componentLoader.js: loadTemplates()가 로드된 `<template>` 내용도 재귀 스캔하도록 개선
+  3. xp-progress-bar.html: `Alpine.data` → `createGameUI`, `$store.xpReward` → gameBridge.get()
+- 영향: src/componentLoader.js, src/components/collection-hub.html, src/components/xp-progress-bar.html
+- 검증: npm test (57개 스위트 전부 통과), npm run format:check 통과
+
+## [L1] 2026-07-09 — 스탯 배분 후 시작 버튼 미표시 버그 수정
+- 맥락: Phase 6(gameBridge 전환) 후 `adjustStat()`, `randomAllocation()`, `resetAllocation()`이 `_panel` 할당만 갱신하고 `_startBtn.setState()`를 호출하지 않음. 이전 UIController는 Alpine store 구독으로 버튼이 자동 갱신됐으나 새 아키텍처에서는 `disabledOverride`/`textOverride`가 `refreshPlayerSetup()` 초기값에 고정되어 버튼 상태가 영원히 변하지 않음.
+- 결정:
+  1. `_syncStartButton()` 헬퍼 메서드 추가 — `panel.remainingPoints`를 읽어 `_startBtn.setState({ disabled, text })` 호출
+  2. `adjustStat()`, `randomAllocation()`, `resetAllocation()` 끝에 `_syncStartButton()` 추가
+  3. `refreshPlayerSetup()` 내 중복된 `_startBtn.setState()` 로직을 `_syncStartButton()` 호출로 대체
+- 영향: `src/app.js` — `_syncStartButton()` 신규, stat 3개 mutation 메서드에 추가, refreshPlayerSetup() 내 중복 제거
+- 검증: `npm test` (57개 스위트 전부 통과), `npm run format:check` 통과
+
+## [L1] 2026-07-10 — 스탯 배분 동기화 누락 버그 수정 (UI 배분값이 전투에 미반영)
+- 맥락: `adjustStat()`, `randomAllocation()`, `resetAllocation()`이 `this._panel.allocation`만 갱신하고 `this.playerStatAllocation`을 갱신하지 않아, 토너먼트 시작 시 UI에 표시된 배분값과 실제 전투 스펙이 달랐음. `startTournament()`에서 `alloc`을 다시 읽을 때까지 불일치가 지속됨.
+- 결정: 세 메서드 마지막에 `this._syncPlayerStatAllocationFromUi()` 호출 추가 — 기존 헬퍼가 `panel.allocation`을 `playerStatAllocation`에 즉시 병합. 신규 회귀 테스트 `testAdjustRandomResetSyncPlayerStatAllocation`으로 세 경로 모두 검증.
+- 영향: `src/app.js`(세 메서드에 `this._syncPlayerStatAllocationFromUi()` 추가), `tests/regression.mjs`(신규 테스트 + runner 등록), `SESSION-HANDOFF.md`
+- 검증: `npm test` (신규 테스트 통과, 기존 57개 스위트 유지), `npm run check`, `npm run format:check` 통과. 브라우저에서 자동 배분 후 `playerStatAllocation` 즉시 갱신 확인.
+
+## 진행 중 이슈
+- 없음 (58개 스위트 전부 통과, 브라우저 콘솔 gameBridge 경고 3종 해결 완료)

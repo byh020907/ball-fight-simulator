@@ -1,6 +1,6 @@
 ﻿import { AudioEngine } from "./audio.js";
 import { BattleSimulation } from "./simulation/battleSimulation.js";
-import { ArenaRenderer, UIController } from "./ui.js";
+import { ArenaRenderer } from "./ui.js";
 import { Matchmaker, TournamentManager } from "./tournament.js";
 import { createRoster } from "./roster.js";
 import {
@@ -10,7 +10,10 @@ import {
     createRandomStatAllocation,
     createTournamentRoster,
     getRemainingStatPoints,
-    updateEffectiveStatCap
+    updateEffectiveStatCap,
+    adjustStatAllocation,
+    formatStatAllocation,
+    calculateStatMultiplier
 } from "./statAllocation.js";
 import { STAT_BALANCER_CONFIG as _STAT_BALANCER_CONFIG } from "./statAllocation.js";
 
@@ -70,6 +73,7 @@ import {
     getInventoryUsed
 } from "./hunting/equipmentConfig.js";
 import { FIGHTER_IDS, Vector2 } from "./core.js";
+import { formatHeroStatLine, formatHeroStatParts, mergeOrbBonuses } from "./entities/heroOrb.js";
 import {
     ArcherAbility,
     OrbitAbility,
@@ -129,8 +133,40 @@ export class BattleApp {
         this._huntingDone = false;
         this.hunting = new HuntingManager(this);
         this.renderer = new ArenaRenderer(this.elements.canvas);
-        this.ui = new UIController(this.roster);
-        this.ui.renderTournament();
+        this._bracket = gameBridge.get("tournamentBracket");
+        this._overlay = gameBridge.get("gameOverlay");
+        this._panel = gameBridge.get("playerPanel");
+        this._startBtn = gameBridge.get("startButton");
+        this._log = gameBridge.get("battleLog");
+        this._strip = gameBridge.get("fighterStrip");
+        this._root = gameBridge.get("appRoot");
+        this._toast = gameBridge.get("toastNotification");
+        this._huntingBtn = gameBridge.get("huntingButton");
+        const self = this;
+        this.ui = {
+            get logItems() {
+                return self._log?.items ?? [];
+            },
+            get state() {
+                const panel = self._panel;
+                if (!panel) return null;
+                return new Proxy(panel, {
+                    get(target, prop) {
+                        if (prop === "playerExperience") return target.experience;
+                        return target[prop];
+                    }
+                });
+            },
+            lastOverlayState: null
+        };
+        if (this._overlay) {
+            const origSetHunting = this._overlay.setHuntingState;
+            this._overlay.setHuntingState = (data) => {
+                if (data) self.ui.lastOverlayState = { ...self.ui.lastOverlayState, ...data };
+                if (origSetHunting) origSetHunting.call(self._overlay, data);
+            };
+        }
+        if (this._bracket) this._bracket.render(null);
         this.matchmaker = new Matchmaker(this.roster);
         this.audio = new AudioEngine();
         this.tournament = null;
@@ -157,20 +193,36 @@ export class BattleApp {
         /** @type {{ level: number, indicatorTimer: number, indicatorText: string }} */
         this._speed = { level: 1, indicatorTimer: 0, indicatorText: "" };
 
-        // Listen for Alpine.js allocation updates emitted by appStore actions.
-        try {
-            document.addEventListener("allocation-changed", () => this._syncPlayerStatAllocationFromUi());
-        } catch {
-            // no-op in non-browser environments
-        }
-
         this._syncPlayerStatAllocationFromUi();
         this.refreshPlayerSetup();
         this._refreshCollectionHub();
-        this.ui.updateStatus("내 캐릭터 스탯을 배분하세요", "Setup");
-        this.ui.hideOverlay();
+        if (this._root) {
+            this._root.statusText = "내 캐릭터 스탯을 배분하세요";
+            this._root.statusBadge = "Setup";
+        }
+        if (this._overlay) this._overlay.hide();
         this.startPlayerPreviewLoop();
         this._bindPreviewReselectInput();
+    }
+
+    // ── HuntingManager backward-compat ──
+    setHuntingActive(active) {
+        if (this._huntingBtn) this._huntingBtn.active = Boolean(active);
+    }
+    setHuntingOverlayState(data) {
+        if (this._overlay) this._overlay.setHuntingState(data);
+    }
+    addLog(message) {
+        if (this._log) this._log.add(message);
+    }
+    showOverlay(label, text, subtext) {
+        if (this._overlay) this._overlay.show({ label, text, subtext });
+    }
+    setStartButton(opts) {
+        if (this._startBtn) this._startBtn.setState(opts);
+    }
+    showToast(message) {
+        if (this._toast) this._toast.show(message);
     }
 
     pickPlayerFighterId() {
@@ -184,8 +236,7 @@ export class BattleApp {
         if (this.simulation && !this.simulation.finished) return false;
         if (this.hunting?._run) return false;
         if (this.hunting?._moving) return false;
-        const uiState = this.ui?.state;
-        if (uiState?.locked) return false;
+        if (this._panel?.locked) return false;
         return true;
     }
 
@@ -376,12 +427,76 @@ export class BattleApp {
     }
 
     _syncPlayerStatAllocationFromUi() {
-        const allocation = this.ui.state?.allocation;
-        if (!allocation) return;
+        const panel = this._panel;
+        if (!panel || !panel.allocation) return;
         this.playerStatAllocation = {
             ...createEmptyStatAllocation(),
-            ...allocation
+            ...panel.allocation
         };
+    }
+
+    _updatePlayerPanelSummary() {
+        const panel = this._panel;
+        if (!panel) return;
+        const m = formatStatAllocation(panel.allocation);
+        const vals = [
+            panel.allocation.hp ?? 0,
+            panel.allocation.damage ?? 0,
+            panel.allocation.speed ?? 0,
+            panel.allocation.skill ?? 0,
+            panel.allocation.defense ?? 0
+        ];
+        const mult = calculateStatMultiplier(vals).multiplier;
+        panel.allocationSummary = m + "  \u00D7" + mult.toFixed(3);
+    }
+
+    _syncStartButton() {
+        if (!this._startBtn) return;
+        const panel = this._panel;
+        const remaining = panel?.remainingPoints ?? 0;
+        this._startBtn.setState({
+            disabled: remaining > 0,
+            text: this.tournament?.champion ? "다시 시작" : remaining > 0 ? `스탯 ${remaining} 남음` : "토너먼트 시작",
+            hidden: false
+        });
+    }
+
+    adjustStat(key, delta) {
+        const panel = this._panel;
+        if (!panel || panel.locked) return;
+        panel.allocation = { ...adjustStatAllocation(panel.allocation, key, delta, panel.totalPoints) };
+        panel.remainingPoints = getRemainingStatPoints(panel.allocation, panel.totalPoints);
+        this._updatePlayerPanelSummary();
+        this._syncStartButton();
+        this._syncPlayerStatAllocationFromUi();
+    }
+
+    randomAllocation() {
+        const panel = this._panel;
+        if (!panel || panel.locked) return;
+        panel.allocation = { ...createRandomStatAllocation(undefined, panel.totalPoints) };
+        panel.remainingPoints = getRemainingStatPoints(panel.allocation, panel.totalPoints);
+        this._updatePlayerPanelSummary();
+        this._syncStartButton();
+        this._syncPlayerStatAllocationFromUi();
+    }
+
+    resetAllocation() {
+        const panel = this._panel;
+        if (!panel || panel.locked) return;
+        panel.allocation = { ...createEmptyStatAllocation() };
+        panel.remainingPoints = getRemainingStatPoints(panel.allocation, panel.totalPoints);
+        this._updatePlayerPanelSummary();
+        this._syncStartButton();
+        this._syncPlayerStatAllocationFromUi();
+    }
+
+    adjustChallengeLevel(delta) {
+        const panel = this._panel;
+        if (!panel) return;
+        const next = panel.challengeLevel + delta;
+        if (next < 0 || next > panel.highestUnlockedLevel) return;
+        panel.challengeLevel = next;
     }
 
     refreshPlayerSetup() {
@@ -400,34 +515,151 @@ export class BattleApp {
         const experienceSummary = getCharacterExperienceSummary(this.playerProfile, this.playerFighterId);
         const equipmentSummary = this._getPlayerEquipmentSummary(this.playerFighterId);
         const huntingAvailable = getEligibleHuntingCharacters(this.playerProfile, this.roster).length > 0;
-        this.ui.renderPlayerSetup({
-            fighter: player,
-            stats: ALLOCATABLE_STATS,
-            allocation: this.playerStatAllocation,
-            totalPoints: effectiveTotal,
-            bonusPoints: bonusCtx.extraStatPoints,
-            remainingPoints: remaining,
-            locked: Boolean(this.tournament && !this.tournament.champion),
-            challengeLevel: cl?.selectedLevel ?? 0,
-            highestUnlockedLevel: cl?.highestUnlockedLevel ?? 0,
-            progressionBonusSummary: bonusSummary,
-            experience: experienceSummary,
-            equipmentSummary,
-            huntingAvailable
-        });
+        const panel = this._panel;
+        if (panel) {
+            panel.fighter = player ? { name: player.name, title: player.title, color: player.color } : null;
+            panel.allocation = { ...this.playerStatAllocation };
+            panel.totalPoints = effectiveTotal;
+            panel.bonusPoints = bonusCtx.extraStatPoints;
+            panel.remainingPoints = remaining;
+            panel.locked = Boolean(this.tournament && !this.tournament.champion);
+            panel.challengeLevel = cl?.selectedLevel ?? 0;
+            panel.highestUnlockedLevel = cl?.highestUnlockedLevel ?? 0;
+            panel.progressionBonusSummary = bonusSummary;
+            panel.statDefs = ALLOCATABLE_STATS.map((s) => ({
+                key: s.key,
+                label: s.label,
+                description: s.description
+            }));
+            panel.experience = { ...experienceSummary };
+            panel.equipmentSummary = { ...equipmentSummary };
+            this._updatePlayerPanelSummary();
+            this._drawPlayerFace(player);
+        }
 
         if (!this.tournament || this.tournament.champion) {
-            this.ui.setStartButton({
-                disabled: remaining > 0,
-                text: this.tournament?.champion
-                    ? "다시 시작"
-                    : remaining > 0
-                      ? `스탯 ${remaining} 남음`
-                      : "토너먼트 시작",
-                hidden: false
-            });
+            this._syncStartButton();
             this.startPlayerPreviewLoop();
         }
+    }
+
+    _drawPlayerFace(fighter) {
+        if (!fighter) return;
+        const canvas = document.getElementById("playerFaceCanvas");
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        const size = 50;
+        ctx.clearRect(0, 0, size, size);
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.fillStyle = fighter.color;
+        ctx.fillRect(0, 0, size, size);
+        const fakeBall = { radius: size / 2 - 2, position: { x: size / 2, y: size / 2 } };
+        const AbilityClass = ABILITY_MAP[fighter.ability];
+        if (AbilityClass) {
+            const fakeOwner = {
+                color: fighter.color,
+                position: { x: size / 2, y: size / 2 },
+                radius: size / 2 - 2,
+                velocity: { x: 0, y: 0 }
+            };
+            const ability = new AbilityClass(fakeOwner, {});
+            ctx.save();
+            ctx.strokeStyle = "#202020";
+            ctx.fillStyle = "#202020";
+            ctx.lineWidth = Math.max(3, fakeBall.radius * 0.075);
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            ctx.translate(size / 2, size / 2);
+            ability.drawFace(ctx, 0, fakeBall);
+            ctx.restore();
+        }
+        ctx.restore();
+        ctx.beginPath();
+        ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
+        ctx.strokeStyle = "#202020";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        canvas.classList.remove("face-pop");
+        void canvas.offsetWidth;
+        canvas.classList.add("face-pop");
+    }
+
+    _updateStatus(text, badge) {
+        if (this._root) {
+            this._root.statusText = text;
+            this._root.statusBadge = badge;
+        }
+    }
+
+    _renderRoster(activeIds = [], activeSpecs = []) {
+        const activeSpecById = new Map(activeSpecs.map((f) => [f.id, f]));
+        const visibleRoster = activeIds.length
+            ? activeIds
+                  .map((id) => activeSpecById.get(id) ?? this.tournamentRoster.find((f) => f.id === id))
+                  .filter(Boolean)
+                  .filter((f) => !f.hunting?.isMob)
+            : [];
+        this._strip.fighters = visibleRoster.map((fighter) => {
+            const isHero = fighter.id === FIGHTER_IDS.HERO;
+            const maxHp = fighter.maxHp ?? fighter.stats?.hp ?? 0;
+            const hp = fighter.hp ?? maxHp;
+            return {
+                id: fighter.id,
+                name: fighter.name,
+                title: fighter.title,
+                color: fighter.color,
+                isPlayer: fighter.isPlayer,
+                defeated: false,
+                hp: Math.ceil(hp),
+                maxHp: Math.ceil(maxHp),
+                hpPct: 100,
+                statLine: isHero
+                    ? formatHeroStatLine(fighter.stats.allocation ?? {})
+                    : formatStatAllocation(fighter.stats.allocation ?? {}),
+                heroStatParts: isHero ? formatHeroStatParts(fighter.stats.allocation ?? {}) : [],
+                isHero,
+                balanceMult: 1,
+                skillLabel: "Skill",
+                skillPct: 1,
+                skillText: "Ready",
+                actionName: null
+            };
+        });
+    }
+
+    _updateLiveCards(fighters) {
+        const strip = this._strip;
+        if (!strip) return;
+        strip.fighters = (strip.fighters || []).map((card) => {
+            const fighter = fighters.find((f) => f.id === card.id || f.name === card.name);
+            if (!fighter) return card;
+            const alloc = fighter.stats.allocation ?? {};
+            const isHero = fighter.id === FIGHTER_IDS.HERO;
+            const pts = [alloc.hp ?? 0, alloc.damage ?? 0, alloc.speed ?? 0, alloc.skill ?? 0, alloc.defense ?? 0];
+            const mult = calculateStatMultiplier(pts).multiplier;
+            const bonuses = mergeOrbBonuses(fighter.hero.bonuses ?? {}, fighter.hero.carryover ?? {});
+            const uiState = fighter.getAbilityUiState();
+            return {
+                ...card,
+                hp: Math.ceil(fighter.hp),
+                maxHp: Math.ceil(fighter.maxHp),
+                hpPct: Math.max(0, (fighter.hp / fighter.maxHp) * 100),
+                defeated: fighter.flags.defeated,
+                balanceMult: mult,
+                mergedBonuses: bonuses,
+                statLine: isHero
+                    ? formatHeroStatLine(fighter.stats.allocation ?? {}, bonuses)
+                    : formatStatAllocation(fighter.stats.allocation ?? {}),
+                heroStatParts: isHero ? formatHeroStatParts(fighter.stats.allocation ?? {}, bonuses) : [],
+                skillLabel: uiState.label,
+                skillPct: Math.max(0, Math.min(1, uiState.progress)),
+                skillText: uiState.progress >= 0.995 ? "Ready" : `${Math.round(uiState.progress * 100)}%`,
+                actionName: fighter.clickActionName ?? null
+            };
+        });
     }
 
     _ensurePreviewBall(fighter) {
@@ -503,7 +735,7 @@ export class BattleApp {
     async startTournament() {
         if (this._huntingDone) {
             this._huntingDone = false;
-            this.ui.hideOverlay();
+            this._overlay.hide();
             this.refreshPlayerSetup();
             return;
         }
@@ -517,7 +749,7 @@ export class BattleApp {
         }
 
         // Sync allocation from Alpine (user may have clicked +/- buttons there)
-        const alpineData = this.ui.state;
+        const alpineData = this._panel;
         if (alpineData) {
             this.playerStatAllocation = { ...alpineData.allocation };
         }
@@ -527,8 +759,8 @@ export class BattleApp {
         // 플레이어는 기본 100 포인트 이상을 반드시 배분해야 함 (보너스는 선택)
         const baseRemaining = getRemainingStatPoints(this.playerStatAllocation);
         if (baseRemaining > 0) {
-            this.ui.showOverlay("스탯 배분 필요", `${baseRemaining} 포인트 남음`);
-            this.ui.addLog(`토너먼트 시작 전 스탯 ${baseRemaining} 포인트를 더 배분해야 합니다.`);
+            this._overlay.show({ label: "스탯 배분 필요", text: `${baseRemaining} 포인트 남음` });
+            this._log.add(`토너먼트 시작 전 스탯 ${baseRemaining} 포인트를 더 배분해야 합니다.`);
             this.refreshPlayerSetup();
             return;
         }
@@ -536,14 +768,14 @@ export class BattleApp {
         this.audio.unlock();
         cancelAnimationFrame(this.rafId);
         this.stopPlayerPreviewLoop();
-        this.ui.resetLog();
-        this.ui.setStartButton({ disabled: true, hidden: true, text: "다시 시작" });
+        this._log.reset();
+        this._startBtn.setState({ disabled: true, hidden: true, text: "다시 시작" });
         this._pickPending = false;
 
         // 연계 효과 계산: 해금된 ID 중 현재 캐릭터가 아닌 효과만 적용
         const masteryCtx = collectActiveEffects(this.playerProfile, this.playerFighterId);
         // Alpine 상태에서 사용자 선택 반영 (프로필보다 우선)
-        const alpineChallengeLevel = this.ui.state?.challengeLevel;
+        const alpineChallengeLevel = this._panel?.challengeLevel;
         this._currentChallengeLevel =
             alpineChallengeLevel ?? this.playerProfile?.progression?.challenge?.selectedLevel ?? 0;
         // 프로필도 동기화
@@ -574,8 +806,6 @@ export class BattleApp {
             undefined,
             this._currentChallengeLevel
         );
-        this.ui.roster = this.tournamentRoster;
-
         // 플레이어 fighter spec에 숙련도 스탯 보정 적용
         const playerSpec = this.tournamentRoster.find((f) => f.id === this.playerFighterId);
         if (playerSpec) {
@@ -615,10 +845,10 @@ export class BattleApp {
         this.currentTournamentMatch = null;
         this._action.selectedId = null;
         this.refreshPlayerSetup();
-        this.ui.renderTournament(this.tournament);
+        this._bracket.render(this.tournament);
         const player = this.tournamentRoster.find((fighter) => fighter.id === this.playerFighterId);
-        this.ui.addLog(`내 캐릭터는 ${player.name}. 배분한 스탯으로 토너먼트에 참가합니다.`);
-        this.ui.addLog("다른 캐릭터들도 같은 포인트를 랜덤으로 받은 뒤 대진표가 확정되었습니다.");
+        this._log.add(`내 캐릭터는 ${player.name}. 배분한 스탯으로 토너먼트에 참가합니다.`);
+        this._log.add("다른 캐릭터들도 같은 포인트를 랜덤으로 받은 뒤 대진표가 확정되었습니다.");
         await this.runNextTournamentMatch();
     }
 
@@ -635,7 +865,7 @@ export class BattleApp {
 
         this.currentTournamentMatch = nextMatch;
         this.tournament.markActive(nextMatch);
-        this.ui.renderTournament(this.tournament);
+        this._bracket.render(this.tournament);
         await this.startMatch([nextMatch.a, nextMatch.b], { keepLog: true });
     }
 
@@ -658,7 +888,7 @@ export class BattleApp {
 
         this._action.current = findActionById(this._action.selectedId);
         if (this._action.current) {
-            this.ui.addLog(`[액션] ${this._action.current.name} 준비 완료.`);
+            this._log.add(`[액션] ${this._action.current.name} 준비 완료.`);
             playerBall.clickActionName = this._action.current.name;
         }
         return this._action.current;
@@ -666,7 +896,7 @@ export class BattleApp {
 
     async startMatch(customMatch = null, options = {}) {
         this.audio.unlock();
-        this.ui.setStartButton({ disabled: true, hidden: true });
+        this._startBtn.setState({ disabled: true, hidden: true });
         this._speed.level = 1;
         this._speed.indicatorTimer = 0;
         this._speed.indicatorText = "";
@@ -675,19 +905,19 @@ export class BattleApp {
         this._lastMatchXpResult = null;
         this._action.skipPick = options.skipActionPick ?? false;
         if (!options.keepLog) {
-            this.ui.resetLog();
+            this._log.reset();
         }
 
         const match = customMatch ?? this.matchmaker.pick();
         const label = `${match[0].name} vs ${match[1].name}`;
-        this.ui.renderRoster(
+        this._renderRoster(
             match.map((fighter) => fighter.id),
             match
         );
-        this.ui.updateStatus(label, "Drawing");
-        this.ui.showOverlay("Matchup", label);
-        this.ui.addLog(`대진 확정: ${label}`);
-        this.ui.addLog(`아레나가 ${match[0].title}와 ${match[1].title}의 능력을 감지했습니다.`);
+        this._updateStatus(label, "Drawing");
+        this._overlay.show({ label: "Matchup", text: label });
+        this._log.add(`대진 확정: ${label}`);
+        this._log.add(`아레나가 ${match[0].title}와 ${match[1].title}의 능력을 감지했습니다.`);
 
         // 시뮬레이션 생성 (playerBall은 아직 null)
         this._currentMatchReport = createMatchReport();
@@ -695,9 +925,9 @@ export class BattleApp {
             match,
             {
                 assignActions: this.debug.aiEnabled || this._currentChallengeLevel > 0,
-                onLog: (message) => this.ui.addLog(message),
+                onLog: (message) => this._log.add(message),
                 onOvertime: () => {
-                    this.ui.updateStatus(label, "Overtime");
+                    this._updateStatus(label, "Overtime");
                     this.showTransientOverlay("Overtime", "", 1250);
                     this.audio.play("overtime");
                 },
@@ -763,10 +993,10 @@ export class BattleApp {
         this.renderer.render(this.simulation);
         await this.wait(1350);
 
-        this.ui.hideOverlay();
-        this.ui.updateStatus(label, "Fight");
+        this._overlay.hide();
+        this._updateStatus(label, "Fight");
         this.audio.play("start");
-        this.ui.addLog("전투가 자동으로 시작됩니다.");
+        this._log.add("전투가 자동으로 시작됩니다.");
         this.lastTime = performance.now();
         cancelAnimationFrame(this.rafId);
         this.rafId = requestAnimationFrame((time) => this.loop(time));
@@ -916,9 +1146,9 @@ export class BattleApp {
         this._lastMatchXpResult = result;
 
         if (result.xpGained > 0) {
-            this.ui.addLog(`[경험치] ${this._formatXpResult(result)}`);
+            this._log.add(`[경험치] ${this._formatXpResult(result)}`);
             if (result.levelUp) {
-                this.ui.showToast(`레벨업! Lv.${result.level}`);
+                this._toast.show(`레벨업! Lv.${result.level}`);
             }
             savePlayerProfile(this.playerProfile);
             this._refreshCollectionHub();
@@ -930,10 +1160,10 @@ export class BattleApp {
 
     showTransientOverlay(label, text, duration = 1200) {
         const token = String(++this.transientOverlayToken);
-        this.ui.showTransientOverlay(label, text, token);
+        this._overlay.showTransient(label, text);
         window.setTimeout(() => {
-            if (this.ui.overlayTransient && this.ui.transientToken === token && !this.simulation?.finished) {
-                this.ui.hideOverlay();
+            if (!this.simulation?.finished) {
+                this._overlay.hide();
             }
         }, duration);
     }
@@ -991,13 +1221,13 @@ export class BattleApp {
         this.simulation.update(speedDelta, delta);
         this.renderer.render(this.simulation);
         this._renderSpeedIndicator();
-        this.ui.updateLiveCards(this.simulation.fighters);
+        this._updateLiveCards(this.simulation.fighters);
 
         if (this.simulation.finished) {
             if (!this.resultSequenceAnnounced) {
                 this.resultSequenceAnnounced = true;
                 const loser = this.simulation.loser;
-                this.ui.updateStatus(loser ? `${loser.name} is down` : "Final impact", "KO");
+                this._updateStatus(loser ? `${loser.name} is down` : "Final impact", "KO");
             }
 
             if (this.simulation.resultReady) {
@@ -1084,14 +1314,14 @@ export class BattleApp {
                 };
             }
             this.tournament.complete(this.currentTournamentMatch, winnerSpec);
-            this.ui.renderTournament(this.tournament);
-            this.ui.showOverlay(
-                playerLost ? "아쉽네요" : this.tournament.champion ? "Champion" : "Advances",
-                playerLost ? `${this.playerResult.fighterName} ${this.playerResult.rankLabel}` : winner.name,
-                xpSubtext,
+            this._bracket.render(this.tournament);
+            this._overlay.show({
+                label: playerLost ? "아쉽네요" : this.tournament.champion ? "Champion" : "Advances",
+                text: playerLost ? `${this.playerResult.fighterName} ${this.playerResult.rankLabel}` : winner.name,
+                subtext: xpSubtext,
                 xpReward
-            );
-            this.ui.updateStatus(
+            });
+            this._updateStatus(
                 playerLost
                     ? `내 캐릭터는 ${this.playerResult.rankLabel}로 탈락`
                     : this.tournament.champion
@@ -1099,9 +1329,9 @@ export class BattleApp {
                       : `${winner.name} advances`,
                 "Result"
             );
-            this.ui.addLog(`${winner.name} defeats ${loser.name}.`);
+            this._log.add(`${winner.name} defeats ${loser.name}.`);
             if (playerLost) {
-                this.ui.addLog(
+                this._log.add(
                     `아쉽네요. 내 캐릭터 ${this.playerResult.fighterName}는 ${this.playerResult.rankLabel}입니다.`
                 );
             }
@@ -1116,12 +1346,12 @@ export class BattleApp {
             return;
         }
 
-        this.ui.showOverlay("Winner", winner.name, xpSubtext, xpReward);
-        this.ui.updateStatus(`${winner.name} wins`, "Result");
-        this.ui.addLog(`${winner.name} defeats ${loser.name}.`);
-        this.ui.addLog("Press the button again for another random matchup.");
+        this._overlay.show({ label: "Winner", text: winner.name, subtext: xpSubtext, xpReward });
+        this._updateStatus(`${winner.name} wins`, "Result");
+        this._log.add(`${winner.name} defeats ${loser.name}.`);
+        this._log.add("Press the button again for another random matchup.");
         this.refreshPlayerSetup();
-        this.ui.setStartButton({ text: "다시 시작", hidden: false, disabled: false });
+        this._startBtn.setState({ text: "다시 시작", hidden: false, disabled: false });
     }
 
     getPlayerRankLabel(roundIndex) {
@@ -1166,9 +1396,9 @@ export class BattleApp {
 
         this._refreshCollectionHub();
         this.refreshPlayerSetup();
-        this.ui.hideOverlay();
+        this._overlay.hide();
         this.startPlayerPreviewLoop();
-        this.ui.addLog(`새 대표 캐릭터: ${picked?.name ?? "무작위"}. 스탯을 배분하세요.`);
+        this._log.add(`새 대표 캐릭터: ${picked?.name ?? "무작위"}. 스탯을 배분하세요.`);
     }
 
     showTournamentChampion() {
@@ -1204,8 +1434,8 @@ export class BattleApp {
                     const rewardDesc = formatRewardDescription(def.reward);
                     let msg = `[업적 해금] ${def.name} (${def.tier})`;
                     if (rewardDesc) msg += ` — ${rewardDesc}`;
-                    this.ui.addLog(msg);
-                    this.ui.showToast(msg);
+                    this._log.add(msg);
+                    this._toast.show(msg);
                 }
             }
 
@@ -1217,10 +1447,10 @@ export class BattleApp {
             });
             if (masteryResult.changed) {
                 const sourceName = this.roster.find((f) => f.id === this.playerFighterId)?.name ?? this.playerFighterId;
-                this.ui.showToast(
+                this._toast.show(
                     `[숙련도 승급] ${sourceName} ${masteryResult.previousTier} → ${masteryResult.newTier}`
                 );
-                this.ui.addLog(`[숙련도 승급] ${sourceName} ${masteryResult.previousTier} → ${masteryResult.newTier}`);
+                this._log.add(`[숙련도 승급] ${sourceName} ${masteryResult.previousTier} → ${masteryResult.newTier}`);
             }
             savePlayerProfile(this.playerProfile);
             this._lastMasteryResult = masteryResult;
@@ -1263,32 +1493,32 @@ export class BattleApp {
             challengeMsg = `도전 단계 ${this._currentChallengeLevel} 도전 실패\n해금 단계는 유지됩니다`;
         }
 
-        this.ui.renderTournament(this.tournament);
+        this._bracket.render(this.tournament);
         this.refreshPlayerSetup();
-        this.ui.showOverlay(
-            playerWon ? "축하합니다!" : "토너먼트 종료",
-            playerWon
+        this._overlay.show({
+            label: playerWon ? "축하합니다!" : "토너먼트 종료",
+            text: playerWon
                 ? `${champion.name} 우승${masteryMsg}`
                 : `${player.name} ${this.playerResult?.rankLabel ?? "결과 확정"}`,
-            [xpMsg, challengeMsg.replace(/\n/g, " | ")].filter(Boolean).join(" | "),
-            this._createXpRewardView(this._lastMatchXpResult)
-        );
-        this.ui.updateStatus(
-            playerWon
+            subtext: [xpMsg, challengeMsg.replace(/\n/g, " | ")].filter(Boolean).join(" | "),
+            xpReward: this._createXpRewardView(this._lastMatchXpResult)
+        });
+        if (this._root) {
+            this._root.statusText = playerWon
                 ? `내 캐릭터 ${champion.name} 우승${masteryMsg}`
-                : `내 캐릭터 ${player.name} ${this.playerResult?.rankLabel ?? ""}`,
-            "Result"
-        );
-        this.ui.addLog(`${champion.name} takes the whole bracket.`);
-        this.ui.addLog(
+                : `내 캐릭터 ${player.name} ${this.playerResult?.rankLabel ?? ""}`;
+            this._root.statusBadge = "Result";
+        }
+        this._log.add(`${champion.name} takes the whole bracket.`);
+        this._log.add(
             playerWon
                 ? `축하합니다! 내 캐릭터 ${champion.name}가 토너먼트에서 우승했습니다.${masteryMsg}`
                 : `아쉽네요. 내 캐릭터 ${player.name}의 최종 성적은 ${this.playerResult?.rankLabel ?? "기록 없음"}입니다.`
         );
         if (challengeMsg) {
-            this.ui.addLog(challengeMsg.replace(/\n/g, " — "));
+            this._log.add(challengeMsg.replace(/\n/g, " — "));
         }
-        this.ui.setStartButton({ text: "새 토너먼트 준비", hidden: false, disabled: false });
+        this._startBtn.setState({ text: "새 토너먼트 준비", hidden: false, disabled: false });
         // 재선정 대기 상태
         this._pickPending = true;
     }
