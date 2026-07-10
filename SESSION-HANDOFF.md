@@ -1,5 +1,16 @@
 # 결정 기록
 
+## [L1] 2026-07-12 — 상자 개봉 로직을 collectionHubService → componentBridge로 이동
+
+- 맥락: Codex 리뷰 결과 `CollectionHubService.openChest`가 `globalThis.ballFightApp` 직접 접근, `openHuntingChest`/`savePlayerProfile` 동적 import, `window.gameBridge.get("popupDialog")` 직접 호출로 단일 책임을 위반함. CollectionHubService는 UI 뷰 서비스로, 게임 액션은 componentBridge가, 팝업은 PopupService가 소유해야 함.
+- 결정:
+  (1) `componentBridge.js`에 `openChest(chestId)` 신설 — `openHuntingChest` 정적 import, `PopupService`로 실패/성공 피드백, `savePlayerProfile`/`_refreshCollectionHub` 호출. 일관된 `boolean` 반환.
+  (2) `CollectionHubService.openChest` 제거 및 모든 게임플레이/동적 import 의존성 정리.
+  (3) `collection-hub.html`의 `openChest(item)`이 `bridge.openChest(item.id)`로 위임 (`window.CollectionHubService` 우회).
+  (4) 회귀 테스트 4종 신설: CollectionHubService blacklisted refs 부재, bridge.openChest 존재, 실패 시 PopupService 호출 + false 반환, 성공 시 저장/갱신 + PopupService 호출 + true 반환.
+- 영향: `src/componentBridge.js`, `src/collectionHubService.js`, `src/components/collection-hub.html`, `tests/regression.mjs`, `SESSION-HANDOFF.md`
+- 검증: `npm test`, `npm run check`, `npm run format:check` 통과
+
 ## [L1] 2026-07-10 — UI/gameBridge 리팩터: gameActionBridge 분리 + 사냥터 app.ui 의존 제거
 
 - 맥락: Codex 설계 리뷰 결과, 기존 `window.ballFightApp` 직접 참조(4개 컴포넌트), 삭제된 `componentBridge.js` 의존, `HuntingManager`의 `app.ui.*` 호출 오류, `ActionPickerService`가 ID 대신 인덱스 반환 문제가 확인됨. 단일 책임 원칙에 따라 BattleApp은 게임 데이터 소유자, Alpine 컴포넌트는 시각/로컬 상태만 소유하도록 정리.

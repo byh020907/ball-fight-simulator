@@ -15,6 +15,7 @@ import {
     getEquipmentRequiredLevel,
     getNextEquipmentRarity
 } from "./hunting/equipmentConfig.js";
+import { openHuntingChest } from "./hunting/chestRewards.js";
 import { savePlayerProfile } from "./playerProfile.js";
 
 export function createComponentBridge(app) {
@@ -185,6 +186,50 @@ export function createComponentBridge(app) {
             if (result) {
                 refreshCollectionAndProfile();
             }
+        },
+
+        // ── Chest actions ──
+        openChest(chestId) {
+            const profile = app.playerProfile;
+            if (!profile?.hunting) return false;
+
+            const result = openHuntingChest(profile, chestId);
+            if (!result.opened) {
+                const msgs = {
+                    not_enough_shards: `파편이 부족합니다 (필요: ${result.cost})`,
+                    inventory_full: "장비 인벤토리가 가득 찼습니다. 장비를 분해하거나 인벤토리를 확장해주세요.",
+                    not_found: "상자를 찾을 수 없습니다.",
+                    missing_storage: "보관함 정보를 불러올 수 없습니다."
+                };
+                if (typeof window.PopupService !== "undefined" && window.PopupService) {
+                    window.PopupService.show({
+                        title: "개봉 실패",
+                        bodyHtml: `<p>${msgs[result.reason] ?? "알 수 없는 오류"}</p>`
+                    });
+                }
+                return false;
+            }
+
+            savePlayerProfile(profile);
+            app._refreshCollectionHub?.();
+
+            let bodyHtml = "";
+            if (result.applied.shards > 0) {
+                bodyHtml += `<p>파편 +${result.applied.shards} (보유: ${result.currentShards})</p>`;
+            }
+            if (result.applied.equipment) {
+                const eq = result.applied.equipment;
+                const statsText = eq.stats.map((s) => `${s.type} +${s.value}`).join(", ");
+                bodyHtml += `<p><strong>${eq.name}</strong> (${eq.rarity})<br><span style="font-size:0.8rem">${eq.description} · ${statsText}</span></p>`;
+            }
+
+            if (typeof window.PopupService !== "undefined" && window.PopupService) {
+                window.PopupService.show({
+                    title: "상자 개봉 결과",
+                    bodyHtml
+                });
+            }
+            return true;
         }
     };
 }

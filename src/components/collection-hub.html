@@ -463,8 +463,8 @@
                 return window.gameActionBridge || {};
             },
             async openChest(item) {
-                if (item.canOpen && window.CollectionHubService) {
-                    await window.CollectionHubService.openChest(item.id);
+                if (item.canOpen) {
+                    await this.bridge.openChest(item.id);
                 }
             },
             render(vm) {

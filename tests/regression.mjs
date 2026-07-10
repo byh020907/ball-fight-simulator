@@ -9782,11 +9782,123 @@ function testActionPickerConcurrency() {
 async function runNewBridgeTests() {
     testHuntingManagerNoAppUiMethods(app);
     testComponentBridgeEquipmentActionsReachProfile();
+    testCollectionHubServiceNoBlacklistedRefs();
+    testComponentBridgeOpenChestExists();
+    testComponentBridgeOpenChestFailure();
+    testComponentBridgeOpenChestSuccess();
     await testActionPickerServiceIdAndConcurrency();
     await testActionPickerConcurrency();
 }
 
 await runNewBridgeTests();
+
+// ── CollectionHubService + bridge.openChest regression ─────────────────────
+
+function testCollectionHubServiceNoBlacklistedRefs() {
+    const src = readFileSync("src/collectionHubService.js", "utf8");
+    const blacklisted = [
+        "ballFightApp",
+        "openHuntingChest",
+        "savePlayerProfile",
+        'gameBridge?.get("popupDialog")',
+        "gameBridge?.get('popupDialog')"
+    ];
+    for (const term of blacklisted) {
+        assert.ok(!src.includes(term), `collectionHubService.js should not reference "${term}"`);
+    }
+    console.log("[collection-hub-service-no-blacklisted-refs] ok");
+}
+
+function testComponentBridgeOpenChestExists() {
+    const profile = createDefaultPlayerProfile();
+    profile.hunting.chests = [{ id: "test_chest", rarity: "common", count: 1 }];
+    const app = {
+        playerProfile: profile,
+        playerFighterId: "archer",
+        roster: [{ id: "archer", name: "Archer", title: "Test", color: "#f00" }],
+        _refreshCollectionHub() {},
+        refreshPlayerSetup() {}
+    };
+    const bridge = createAppComponentBridge(app);
+    assert.ok(typeof bridge.openChest === "function", "bridge.openChest should be a function");
+    console.log("[component-bridge-open-chest-exists] ok");
+}
+
+function testComponentBridgeOpenChestFailure() {
+    const profile = createDefaultPlayerProfile();
+    profile.hunting.shards = 0;
+    profile.hunting.chests = [{ id: "test_chest", rarity: "common", count: 1 }];
+    const app = {
+        playerProfile: profile,
+        playerFighterId: "archer",
+        roster: [{ id: "archer", name: "Archer", title: "Test", color: "#f00" }],
+        _refreshCollectionHub() {},
+        refreshPlayerSetup() {}
+    };
+
+    let lastPopup = null;
+    const origWindow = globalThis.window;
+    globalThis.window = {
+        PopupService: {
+            show(opts) {
+                lastPopup = opts;
+                return Promise.resolve("ok");
+            }
+        }
+    };
+
+    const bridge = createAppComponentBridge(app);
+    try {
+        const result = bridge.openChest("test_chest");
+        assert.equal(result, false, "openChest should return false when shards insufficient");
+        assert.ok(lastPopup !== null, "openChest failure should show a popup");
+        assert.ok(lastPopup.title.includes("실패"), "failure popup title should indicate failure");
+    } finally {
+        globalThis.window = origWindow;
+    }
+    console.log("[component-bridge-open-chest-failure] ok");
+}
+
+function testComponentBridgeOpenChestSuccess() {
+    const profile = createDefaultPlayerProfile();
+    profile.hunting.shards = 9999;
+    profile.hunting.chests = [{ id: "test_chest", rarity: "common", count: 1 }];
+    if (!profile.equipment)
+        profile.equipment = { inventory: [], equipped: {}, maxInventorySlots: 5, enhancementStones: 0 };
+    let refreshed = false;
+    const app = {
+        playerProfile: profile,
+        playerFighterId: "archer",
+        roster: [{ id: "archer", name: "Archer", title: "Test", color: "#f00" }],
+        _refreshCollectionHub() {
+            refreshed = true;
+        },
+        refreshPlayerSetup() {}
+    };
+
+    let lastPopup = null;
+    const origWindow = globalThis.window;
+    globalThis.window = {
+        PopupService: {
+            show(opts) {
+                lastPopup = opts;
+                return Promise.resolve("ok");
+            }
+        }
+    };
+
+    const bridge = createAppComponentBridge(app);
+    try {
+        const result = bridge.openChest("test_chest");
+        assert.equal(result, true, "openChest should return true on success");
+        assert.ok(refreshed, "openChest should trigger _refreshCollectionHub");
+        assert.ok(lastPopup !== null, "openChest success should show a popup");
+        assert.ok(lastPopup.title.includes("결과"), "success popup title should indicate result");
+    } finally {
+        globalThis.window = origWindow;
+    }
+    console.log("[component-bridge-open-chest-success] ok");
+}
 
 // ── Popup dialog resolver capture regression ─────────────────────────────────
 
