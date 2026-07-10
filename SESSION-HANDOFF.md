@@ -14,6 +14,17 @@
 - 영향: `src/componentBridge.js`(신규), `src/hunting/huntingManager.js`, `src/main.js`, `src/actionPicker.js`, `src/components/collection-hub.html`, `src/components/player-panel.html`, `src/components/start-button.html`, `src/components/hunting-button.html`, `src/components/game-overlay.html`, `src/components/action-picker.html`, `src/components/popup-dialog.html`, `tests/regression.mjs`, `SESSION-HANDOFF.md`
 - 검증: `npm test`, `npm run check`(125파일), `npm run format:check`, `node scripts/huntingUserScenario.mjs` 통과
 
+## [L1] 2026-07-12 — popup-dialog 동시성 타이밍 버그 수정: closePopup _resolve 캡처 시점 변경
+
+- 맥락: `popup-dialog.html`의 `closePopup()`이 `setTimeout` 콜백 내부에서 `_resolve`를 읽어 `show()`가 그 사이에 `_resolve`를 덮어쓰면 이전 close의 지연 resolve가 새 popup의 Promise를 잘못 해결함. 동시 show/close 패턴에서 popup A가 영원히 pending 상태에 빠지거나 "close"가 아닌 "cancel"로 resolve되는 경합 조건 발생.
+- 결정:
+  (1) `closePopup()`에서 `_resolve`를 `captured`로 즉시 캡처하고 `_resolve = null`로 동기 클리어. `setTimeout` 콜백은 `captured`만 참조하여, 이후 `show()`가 `_resolve`를 바꿔도 이전 popup의 close가 올바른 Promise를 resolve함.
+- 영향: `src/components/popup-dialog.html` (closePopup 내 3줄 변경), `tests/regression.mjs` (회귀 테스트 `testPopupResolverCapture` 신설)
+- 검증:
+  - `npm test` — `[popup-resolver-capture] ok` 포함 전 테스트 통과
+  - `npm run check` — syntax ok (125 files)
+  - `npm run format:check` — 모든 파일 Prettier 준수
+
 ## [L1] 2026-07-08 — 전투원 물리 계층을 배틀 규칙 아래로 분리한다
 - 맥락: 사용자가 BattleSimulation은 실제 실행 앱/게임 규칙 계층이어야 하고, Simulation과 BattleSimulation 사이에 전투에 필요한 공통 구현을 담는 중간 클래스가 있어야 한다고 명확히 정리했다. 직전 구현은 PreviewReselectSimulation이 독립 미니 물리 구현처럼 남아 구조 의도와 완전히 맞지 않았다.
 - 결정: (1) `src/simulation/fighterPhysicsSimulation.js`를 공통 전투원 물리 계층으로 추가/정리. (2) `BattleSimulation extends FighterPhysicsSimulation`으로 변경하고, 충돌 탐지/분리/rigid-body 충돌은 중간 계층이 소유. (3) BattleSimulation에는 데미지, 숙련도, dash/ability collision, anti-stall, 결과 판정 같은 게임 규칙 훅만 남김. (4) `PreviewReselectSimulation`도 FighterPhysicsSimulation을 상속해 같은 충돌/피드백 흐름을 재사용. (5) 계층 구조 회귀 테스트 추가.

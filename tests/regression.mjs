@@ -9788,4 +9788,92 @@ async function runNewBridgeTests() {
 
 await runNewBridgeTests();
 
+// ── Popup dialog resolver capture regression ─────────────────────────────────
+
+async function testPopupResolverCapture() {
+    const timeouts = [];
+    const origSetTimeout = globalThis.setTimeout;
+    globalThis.setTimeout = (fn) => {
+        timeouts.push(fn);
+        return timeouts.length;
+    };
+
+    try {
+        let _resolve = null;
+
+        function show() {
+            if (_resolve) {
+                _resolve("cancel");
+                _resolve = null;
+            }
+            return new Promise((resolve) => {
+                _resolve = resolve;
+            });
+        }
+
+        function closePopup(value) {
+            const captured = _resolve;
+            _resolve = null;
+            setTimeout(() => {
+                if (captured) {
+                    captured(value ?? "close");
+                }
+            }, 250);
+        }
+
+        // 1. Show A → 2. Close A (captures resolver, clears _resolve)
+        const pA = show();
+        assert.ok(_resolve !== null, "A should have a resolver");
+        closePopup("close");
+        assert.equal(_resolve, null, "_resolve should be null after closePopup captures it");
+
+        // 3. Show B before A's close timeout fires
+        const pB = show();
+        assert.ok(_resolve !== null, "B should have a new resolver");
+
+        // 4. Flush A's pending timeout — must resolve A, NOT B
+        assert.equal(timeouts.length, 1, "closePopup should have queued one timeout");
+        timeouts[0]();
+        await Promise.resolve();
+
+        let resolvedA, resolvedB;
+        pA.then((v) => {
+            resolvedA = v;
+        });
+        pB.then((v) => {
+            resolvedB = v;
+        });
+        await Promise.resolve();
+
+        assert.equal(resolvedA, "close", "A should resolve with 'close' from its own closePopup");
+        assert.equal(resolvedB, undefined, "B should NOT be resolved by A's closePopup timeout");
+
+        // 5. Close B — clean close
+        closePopup("ok");
+        assert.equal(timeouts.length, 2, "second closePopup should queue another timeout");
+        timeouts[1]();
+        await Promise.resolve();
+        assert.equal(resolvedB, "ok", "B should resolve with 'ok' from its own closePopup");
+        assert.equal(resolvedA, "close", "A should stay resolved with 'close'");
+
+        // 6. Fresh show + close works independently
+        const pC = show();
+        closePopup("close_from_c");
+        timeouts[2]();
+        await Promise.resolve();
+        let resolvedC;
+        pC.then((v) => {
+            resolvedC = v;
+        });
+        await Promise.resolve();
+        assert.equal(resolvedC, "close_from_c", "C should resolve independently");
+
+        console.log("[popup-resolver-capture] ok");
+    } finally {
+        globalThis.setTimeout = origSetTimeout;
+    }
+}
+
+await testPopupResolverCapture();
+
 console.log("regression tests ok");

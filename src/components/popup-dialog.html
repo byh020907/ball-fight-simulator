@@ -29,12 +29,12 @@
         let _resolve = null;
 
         function closePopup(value) {
+            const captured = _resolve;
+            _resolve = null;
             this.visible = false;
             setTimeout(() => {
-                if (_resolve) {
-                    const r = _resolve;
-                    _resolve = null;
-                    r(value ?? "close");
+                if (captured) {
+                    captured(value ?? "close");
                 }
             }, 250);
         }
