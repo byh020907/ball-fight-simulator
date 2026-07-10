@@ -3,17 +3,28 @@
     id="startButton"
     type="button"
     x-data="startButton"
-    x-bind:class="{ hidden: $store.startButton.hidden }"
-    x-bind:disabled="$store.startButton.disabledOverride !== null ? $store.startButton.disabledOverride : $store.startButton.remainingPoints > 0 || $store.startButton.locked"
-    x-text="$store.startButton.textOverride !== null ? $store.startButton.textOverride : ($store.startButton.remainingPoints > 0 ? '스탯 ' + $store.startButton.remainingPoints + ' 남음' : '토너먼트 시작')"
+    x-bind:class="{ hidden: hidden }"
+    x-bind:disabled="disabledOverride !== null ? disabledOverride : (remainingPoints > 0 || locked)"
+    x-text="textOverride !== null ? textOverride : (remainingPoints > 0 ? '스탯 ' + remainingPoints + ' 남음' : '토너먼트 시작')"
     @click="startTournament()"
 >
     토너먼트 시작
 </button>
 <script>
-    Alpine.data("startButton", () => ({
+    window.createGameUI("startButton", () => ({
+        hidden: true,
+        disabledOverride: null,
+        textOverride: null,
+        remainingPoints: 0,
+        locked: false,
         startTournament() {
-            window.BallFightComponentBridge?.startTournament();
+            const b = window.gameActionBridge;
+            if (b) b.startTournament();
+        },
+        setState({ disabled, text, hidden } = {}) {
+            if (hidden !== undefined) this.hidden = Boolean(hidden);
+            this.disabledOverride = disabled !== undefined ? disabled : null;
+            this.textOverride = text !== undefined ? text : null;
         }
     }));
 </script>

@@ -2,52 +2,50 @@
     class="overlay"
     id="overlay"
     x-data="gameOverlay"
-    x-show="$store.gameOverlay.visible"
+    x-show="visible"
     x-transition:enter="overlay-enter"
     x-transition:enter-start="overlay-enter-start"
     x-transition:enter-end="overlay-enter-end"
     x-transition:leave="overlay-leave"
     x-transition:leave-start="overlay-leave-start"
     x-transition:leave-end="overlay-leave-end"
-    x-bind:class="{ transient: $store.gameOverlay.transient }"
+    x-bind:class="{ transient: transient }"
 >
     <div class="overlay-card">
-        <span x-text="$store.gameOverlay.label">Waiting Room</span>
-        <strong x-text="$store.gameOverlay.text">START THE FIGHT</strong>
-        <p x-show="$store.gameOverlay.subtext" x-text="$store.gameOverlay.subtext"></p>
+        <span x-text="label">Waiting Room</span>
+        <strong x-text="text">START THE FIGHT</strong>
+        <p x-show="subtext" x-text="subtext"></p>
         <xp-reward-panel class="xp-reward"></xp-reward-panel>
-        <div class="hunting-route" x-show="$store.gameOverlay.huntingMoving">
+        <div class="hunting-route" x-show="huntingMoving">
             <div class="hunting-route-head">
-                <span x-text="$store.gameOverlay.huntingMoveFrom + 'F'"></span>
-                <strong x-text="$store.gameOverlay.huntingMoveTo + 'F'"></strong>
+                <span x-text="huntingMoveFrom + 'F'"></span>
+                <strong x-text="huntingMoveTo + 'F'"></strong>
             </div>
             <div class="hunting-route-track" aria-hidden="true">
                 <i
-                    x-bind:style="'width:' + Math.min(100, Math.round((($store.gameOverlay.huntingMoveStep || 0) / Math.max(1, $store.gameOverlay.huntingMoveMax || 10)) * 100)) + '%'"
+                    x-bind:style="'width:' + Math.min(100, Math.round(((huntingMoveStep || 0) / Math.max(1, huntingMoveMax || 10)) * 100)) + '%'"
                 ></i>
             </div>
             <div class="hunting-route-foot">
-                <span x-text="$store.gameOverlay.huntingMoveMessage"></span>
-                <b
-                    x-text="($store.gameOverlay.huntingMoveStep || 0) + '/' + ($store.gameOverlay.huntingMoveMax || 10)"
-                ></b>
+                <span x-text="huntingMoveMessage"></span>
+                <b x-text="(huntingMoveStep || 0) + '/' + (huntingMoveMax || 10)"></b>
             </div>
         </div>
         <div
             class="hunting-choice"
-            x-show="$store.gameOverlay.huntingChoiceVisible && !$store.gameOverlay.huntingMoving && !$store.gameOverlay.huntingMerchantActive"
+            x-show="huntingChoiceVisible && !huntingMoving && !huntingMerchantActive"
         >
             <div class="hunting-choice-info">
-                <span x-text="$store.gameOverlay.huntingLootSummary"></span>
+                <span x-text="huntingLootSummary"></span>
             </div>
-            <div class="hunting-choice-hint" x-show="$store.gameOverlay.huntingMoveMessage">
-                <span x-text="$store.gameOverlay.huntingMoveMessage"></span>
+            <div class="hunting-choice-hint" x-show="huntingMoveMessage">
+                <span x-text="huntingMoveMessage"></span>
             </div>
             <div class="hunting-choice-buttons">
                 <button
                     class="hunting-btn retreat"
                     type="button"
-                    x-show="$store.gameOverlay.huntingCanRetreat"
+                    x-show="huntingCanRetreat"
                     @click="huntingRetreat()"
                 >
                     포탈 귀환
@@ -57,13 +55,13 @@
         </div>
         <div
             class="hunting-merchant"
-            x-show="$store.gameOverlay.huntingMerchantActive"
+            x-show="huntingMerchantActive"
         >
             <div class="hunting-choice-info">
-                <span x-text="$store.gameOverlay.huntingLootSummary"></span>
+                <span x-text="huntingLootSummary"></span>
             </div>
             <div class="hunting-merchant-offers">
-                <template x-for="(offer, idx) in ($store.gameOverlay.huntingMerchantOffers || [])" :key="offer.id">
+                <template x-for="(offer, idx) in (huntingMerchantOffers || [])" :key="offer.id">
                     <button
                         class="hunting-merchant-offer"
                         type="button"
@@ -84,31 +82,119 @@
     </div>
     <div
         class="hunting-loot-hud"
-        x-show="$store.gameOverlay.huntingLootHudVisible"
+        x-show="huntingLootHudVisible"
     >
         <span class="hud-head">미확보 전리품</span>
         <span class="hud-body">
-            <span x-text="'파편 ' + $store.gameOverlay.huntingLootHudShards"></span>
+            <span x-text="'파편 ' + huntingLootHudShards"></span>
             <span
-                x-show="$store.gameOverlay.huntingLootHudChests > 0"
-                x-text="' · 상자 ' + $store.gameOverlay.huntingLootHudChests"
+                x-show="huntingLootHudChests > 0"
+                x-text="' · 상자 ' + huntingLootHudChests"
             ></span>
         </span>
     </div>
 </div>
 <script>
-    Alpine.data("gameOverlay", () => ({
+    window.createGameUI("gameOverlay", () => ({
+        visible: false,
+        transient: false,
+        label: "",
+        text: "",
+        subtext: "",
+        huntingChoiceVisible: false,
+        huntingFloor: 1,
+        huntingCharacterName: "",
+        huntingLootSummary: "",
+        huntingCanRetreat: false,
+        huntingMoving: false,
+        huntingMoveFrom: 0,
+        huntingMoveTo: 0,
+        huntingMoveStep: 0,
+        huntingMoveMax: 10,
+        huntingMoveMessage: "",
+        huntingMerchantActive: false,
+        huntingMerchantOffers: null,
+        huntingLootHudVisible: false,
+        huntingLootHudShards: 0,
+        huntingLootHudChests: 0,
+
         huntingRetreat() {
-            window.BallFightComponentBridge?.huntingRetreat();
+            const b = window.gameActionBridge;
+            if (b) b.huntingRetreat();
         },
         huntingAdvance() {
-            window.BallFightComponentBridge?.huntingAdvance();
+            const b = window.gameActionBridge;
+            if (b) b.huntingAdvance();
         },
         huntingMerchantChoose(idx) {
-            window.BallFightComponentBridge?.huntingMerchantChoose?.(idx);
+            const b = window.gameActionBridge;
+            if (b) b.huntingMerchantChoose(idx);
         },
         huntingMerchantPass() {
-            window.BallFightComponentBridge?.huntingMerchantPass?.();
+            const b = window.gameActionBridge;
+            if (b) b.huntingMerchantPass();
+        },
+        show({ label, text, subtext = "", transient = false, xpReward = null } = {}) {
+            this.visible = true;
+            this.transient = transient;
+            this.label = label ?? "";
+            this.text = text ?? "";
+            this.subtext = subtext;
+            if (xpReward) {
+                const rp = window.gameBridge?.get("xpRewardPanel");
+                if (rp) rp.animate(xpReward);
+            } else {
+                const rp = window.gameBridge?.get("xpRewardPanel");
+                if (rp) rp.hide();
+            }
+        },
+        hide() {
+            this.visible = false;
+            this.transient = false;
+            this.label = "";
+            this.text = "";
+            this.subtext = "";
+            this.huntingChoiceVisible = false;
+            this.huntingCanRetreat = false;
+            this.huntingMoving = false;
+            this.huntingMoveFrom = 0;
+            this.huntingMoveTo = 0;
+            this.huntingMoveStep = 0;
+            this.huntingMoveMax = 10;
+            this.huntingMoveMessage = "";
+            this.huntingMerchantActive = false;
+            this.huntingMerchantOffers = null;
+            this.huntingLootHudVisible = false;
+            this.huntingLootHudShards = 0;
+            this.huntingLootHudChests = 0;
+            const rp = window.gameBridge?.get("xpRewardPanel");
+            if (rp) rp.hide();
+        },
+        showTransient(label, text) {
+            this.show({ label, text, transient: true });
+        },
+        setHuntingState(data) {
+            if (data.visible !== undefined) this.visible = data.visible;
+            if (data.transient !== undefined) this.transient = data.transient;
+            if (data.label !== undefined) this.label = data.label;
+            if (data.text !== undefined) this.text = data.text;
+            if (data.subtext !== undefined) this.subtext = data.subtext;
+            if (data.huntingChoiceVisible !== undefined) this.huntingChoiceVisible = data.huntingChoiceVisible;
+            if (data.huntingFloor !== undefined) this.huntingFloor = data.huntingFloor;
+            if (data.huntingCharacterName !== undefined) this.huntingCharacterName = data.huntingCharacterName;
+            if (data.huntingLootSummary !== undefined) this.huntingLootSummary = data.huntingLootSummary;
+            if (data.huntingCanRetreat !== undefined) this.huntingCanRetreat = data.huntingCanRetreat;
+            if (data.huntingMoving !== undefined) this.huntingMoving = data.huntingMoving;
+            if (data.huntingMoveFrom !== undefined) this.huntingMoveFrom = data.huntingMoveFrom;
+            if (data.huntingMoveTo !== undefined) this.huntingMoveTo = data.huntingMoveTo;
+            if (data.huntingMoveStep !== undefined) this.huntingMoveStep = data.huntingMoveStep;
+            if (data.huntingMoveMax !== undefined) this.huntingMoveMax = data.huntingMoveMax;
+            if (data.huntingMoveMessage !== undefined) this.huntingMoveMessage = data.huntingMoveMessage;
+            if (data.huntingMerchantActive !== undefined) this.huntingMerchantActive = data.huntingMerchantActive;
+            if (data.huntingMerchantOffers !== undefined) this.huntingMerchantOffers = data.huntingMerchantOffers;
+            if (data.huntingLootHudVisible !== undefined) this.huntingLootHudVisible = data.huntingLootHudVisible;
+            if (data.huntingLootHudShards !== undefined) this.huntingLootHudShards = data.huntingLootHudShards;
+            if (data.huntingLootHudChests !== undefined) this.huntingLootHudChests = data.huntingLootHudChests;
         }
     }));
 </script>

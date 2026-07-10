@@ -1,5 +1,19 @@
 # 결정 기록
 
+## [L1] 2026-07-10 — UI/gameBridge 리팩터: gameActionBridge 분리 + 사냥터 app.ui 의존 제거
+
+- 맥락: Codex 설계 리뷰 결과, 기존 `window.ballFightApp` 직접 참조(4개 컴포넌트), 삭제된 `componentBridge.js` 의존, `HuntingManager`의 `app.ui.*` 호출 오류, `ActionPickerService`가 ID 대신 인덱스 반환 문제가 확인됨. 단일 책임 원칙에 따라 BattleApp은 게임 데이터 소유자, Alpine 컴포넌트는 시각/로컬 상태만 소유하도록 정리.
+- 결정:
+  (1) `src/componentBridge.js` 신설 — `createComponentBridge(app)` 팩토리로 명시적 액션 경계 생성. `window.gameActionBridge`로 노출.
+  (2) `HuntingManager`의 모든 `app.ui.*` 호출을 `BattleApp` 직접 메서드(`app.*`)로 마이그레이션.
+  (3) 4개 컴포넌트(`player-panel`, `start-button`, `hunting-button`, `game-overlay`)의 `window.ballFightApp` 참조를 `window.gameActionBridge`로 일괄 대체.
+  (4) `collection-hub.html`에 `bridge` getter 추가 — equipment action 7종(`equipItem`, `unequipItem`, `enhanceItem`, `fuseItem`, `disassembleItem`, `sellItem`, `expandInventory`)을 bridge 경계로 노출, 실제 프로필 변이/저장/갱신 동작.
+  (5) `ActionPickerService.show()`가 카드 ID 반환, 컴포넌트에서 선택 후 `visible=false`/`cards=[]` 초기화, 동시 호출 시 이전 Promise를 `-1`로 resolve.
+  (6) `popup-dialog.html` `show()` 동시 호출 시 이전 Promise를 `"cancel"`로 resolve.
+  (7) 회귀 테스트 4종 신설: huntingManager `app.ui.*` 미참조, bridge 장비 액션 7종 존재+프로필 변이, ActionPickerService ID 반환, 동시성 결정론적 처리.
+- 영향: `src/componentBridge.js`(신규), `src/hunting/huntingManager.js`, `src/main.js`, `src/actionPicker.js`, `src/components/collection-hub.html`, `src/components/player-panel.html`, `src/components/start-button.html`, `src/components/hunting-button.html`, `src/components/game-overlay.html`, `src/components/action-picker.html`, `src/components/popup-dialog.html`, `tests/regression.mjs`, `SESSION-HANDOFF.md`
+- 검증: `npm test`, `npm run check`(125파일), `npm run format:check`, `node scripts/huntingUserScenario.mjs` 통과
+
 ## [L1] 2026-07-08 — 전투원 물리 계층을 배틀 규칙 아래로 분리한다
 - 맥락: 사용자가 BattleSimulation은 실제 실행 앱/게임 규칙 계층이어야 하고, Simulation과 BattleSimulation 사이에 전투에 필요한 공통 구현을 담는 중간 클래스가 있어야 한다고 명확히 정리했다. 직전 구현은 PreviewReselectSimulation이 독립 미니 물리 구현처럼 남아 구조 의도와 완전히 맞지 않았다.
 - 결정: (1) `src/simulation/fighterPhysicsSimulation.js`를 공통 전투원 물리 계층으로 추가/정리. (2) `BattleSimulation extends FighterPhysicsSimulation`으로 변경하고, 충돌 탐지/분리/rigid-body 충돌은 중간 계층이 소유. (3) BattleSimulation에는 데미지, 숙련도, dash/ability collision, anti-stall, 결과 판정 같은 게임 규칙 훅만 남김. (4) `PreviewReselectSimulation`도 FighterPhysicsSimulation을 상속해 같은 충돌/피드백 흐름을 재사용. (5) 계층 구조 회귀 테스트 추가.

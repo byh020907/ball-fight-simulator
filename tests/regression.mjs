@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { createComponentBridge as createAppComponentBridge } from "../src/componentBridge.js";
+import { ActionPickerService } from "../src/actionPicker.js";
 import {
     ALLOCATABLE_STATS,
     PLAYER_STAT_POINTS,
@@ -89,6 +91,9 @@ import {
     enhanceEquipment,
     fuseEquipment,
     sellEquipment,
+    disassembleEquipment,
+    expandInventory,
+    canFuseEquipment,
     getFusionCost,
     getSellReward,
     calculateEnhanceCost,
@@ -1582,20 +1587,14 @@ function testComponentBridgeCallsGameHandlers(app) {
 function testHuntingUiRouteDisplay() {
     // HuntingManager._setHuntingMoveState가 route range를 올바르게 전달하는지 검증
     const recorded = { calls: [] };
-    const mockUi = {
-        setHuntingOverlayState(data) {
-            recorded.calls.push({ ...data });
-        }
+    const originalSetHuntingOverlayState = app.setHuntingOverlayState.bind(app);
+    app.setHuntingOverlayState = (data) => {
+        recorded.calls.push({ ...data });
     };
-    const mockApp = { ui: mockUi };
-    // HuntingManager 인스턴스 없이도 _setHuntingMoveState는 this.app 참조만 필요
-    // app.hunting을 통해 간접 테스트하거나 mock으로 직접 호출
     const hunting = app.hunting;
 
     // 7층에서 시작하는 10층 전진 시뮬레이션
     app.hunting._run = { floor: 7, maxFloor: 100 };
-    const originalUi = app.ui;
-    app.ui = mockUi;
     try {
         hunting._setHuntingMoveState({
             moving: true,
@@ -1644,25 +1643,25 @@ function testHuntingUiRouteDisplay() {
         assert.equal(state3.huntingMoveFrom, 7, "Route start should stay 7F at step 3");
         assert.equal(state3.huntingMoveTo, 17, "Route end should stay 17F at step 3");
     } finally {
-        app.ui = originalUi;
+        app.setHuntingOverlayState = originalSetHuntingOverlayState;
     }
 }
 
 async function testHuntingEarlyEventUi() {
     // 첫 층에서 포탈 이벤트 발생 시 choice UI가 정상 표시되고 route가 숨겨지는지 검증
     const overlayCalls = [];
-    const mockUi = {
+    const mockApp = {
         setHuntingOverlayState(data) {
             overlayCalls.push({ ...data });
         },
         addLog() {},
         showToast() {},
         setHuntingActive() {},
-        hideOverlay() {},
+        showOverlay() {},
         setStartButton() {},
-        showOverlay() {}
+        roster: app.roster,
+        playerProfile: createDefaultPlayerProfile()
     };
-    const mockApp = { ui: mockUi, roster: app.roster, playerProfile: createDefaultPlayerProfile() };
     const manager = new HuntingManager(mockApp);
 
     // rng sequence: 첫 호출(floor outcome)=0.5→EVENT, 둘째 호출(weighted event)=0.05→PORTAL
@@ -8909,10 +8908,10 @@ function testHuntingCombatText() {
 function testHuntingLootHud() {
     const app = {
         ui: {
-            lastOverlayState: null,
-            setHuntingOverlayState(data) {
-                this.lastOverlayState = data;
-            }
+            lastOverlayState: null
+        },
+        setHuntingOverlayState(data) {
+            this.ui.lastOverlayState = data;
         }
     };
 
@@ -9060,10 +9059,10 @@ function testHuntingDefeatChestLoss() {
 function testHuntingChoiceSummaryKeepsContextWithPendingLoot() {
     const app = {
         ui: {
-            lastOverlayState: null,
-            setHuntingOverlayState(data) {
-                this.lastOverlayState = data;
-            }
+            lastOverlayState: null
+        },
+        setHuntingOverlayState(data) {
+            this.ui.lastOverlayState = data;
         }
     };
     const manager = new HuntingManager(app);
@@ -9614,5 +9613,179 @@ testPreviewReselectBlockedDuringHuntingRun(app);
 testPreviewReselectQueuesDuringSwap(app);
 testPreviewReselectTransitionFinalizes(app);
 testBridgeReselectPreviewCharacter(app);
+
+// ── Repair regression tests ──
+
+function testHuntingManagerNoAppUiMethods(app) {
+    // Verify that HuntingManager calls app.* not app.ui.*
+    const src = readFileSync("src/hunting/huntingManager.js", "utf8");
+    const lines = src.split("\n");
+    const badRefs = lines.filter((l) => l.includes("app.ui."));
+    assert.equal(
+        badRefs.length,
+        0,
+        `HuntingManager should not reference app.ui.* (found ${badRefs.length}):\n${badRefs.join("\n")}`
+    );
+    console.log("[hunting-manager-no-app-ui] ok");
+}
+
+function testComponentBridgeEquipmentActionsReachProfile() {
+    const profile = createDefaultPlayerProfile();
+    if (!profile.equipment)
+        profile.equipment = { inventory: [], equipped: {}, maxInventorySlots: 5, enhancementStones: 10 };
+    if (!profile.hunting) profile.hunting = { shards: 100, chests: [], stats: {} };
+    const app = {
+        playerProfile: profile,
+        playerFighterId: "archer",
+        roster: [{ id: "archer", name: "Archer", title: "Test", color: "#f00" }],
+        _refreshCollectionHub() {},
+        refreshPlayerSetup() {}
+    };
+    const bridge = createAppComponentBridge(app);
+
+    // Test: bridge methods exist
+    assert.ok(typeof bridge.equipItem === "function", "bridge.equipItem should be a function");
+    assert.ok(typeof bridge.unequipItem === "function", "bridge.unequipItem should be a function");
+    assert.ok(typeof bridge.enhanceItem === "function", "bridge.enhanceItem should be a function");
+    assert.ok(typeof bridge.fuseItem === "function", "bridge.fuseItem should be a function");
+    assert.ok(typeof bridge.disassembleItem === "function", "bridge.disassembleItem should be a function");
+    assert.ok(typeof bridge.sellItem === "function", "bridge.sellItem should be a function");
+    assert.ok(typeof bridge.expandInventory === "function", "bridge.expandInventory should be a function");
+
+    // Test: creating equipment and equipping it mutates profile
+    const item = createEquipmentInstance({ rarity: "common", rng: () => 0.5 });
+    profile.equipment.inventory.push(item);
+    bridge.equipItem(item.instanceId);
+    const equippedValues = Object.values(profile.equipment.equipped ?? {}).filter(Boolean);
+    assert.ok(equippedValues.includes(item.instanceId), "equipped item ID should appear in equipped slots");
+
+    // Test: unequip removes from slot
+    bridge.unequipItem(item.instanceId);
+    const eqAfterUnequip = Object.values(profile.equipment.equipped ?? {}).filter(Boolean);
+    assert.ok(!eqAfterUnequip.includes(item.instanceId), "unequipped item ID should be removed from equipped slots");
+
+    // Test: expandInventory extends slots
+    const prevSlots = profile.equipment.maxInventorySlots;
+    profile.hunting.shards = 100;
+    bridge.expandInventory();
+    assert.ok(profile.equipment.maxInventorySlots > prevSlots, "expandInventory should increase max slots");
+
+    // Test: disassemble adds enhancement stones
+    profile.equipment.enhancementStones = 0;
+    const item2 = createEquipmentInstance({ rarity: "common", rng: () => 0.5 });
+    profile.equipment.inventory.push(item2);
+    bridge.disassembleItem(item2.instanceId);
+    assert.ok(profile.equipment.enhancementStones > 0, "disassemble should add enhancement stones");
+
+    console.log("[component-bridge-equipment-actions] ok");
+}
+
+function testActionPickerServiceIdAndConcurrency() {
+    // Test that ActionPickerService.show returns card ID, not index
+    const cards = [
+        { id: "dash", name: "Dash", description: "Dodge", hpCostPercent: 10 },
+        { id: "rage", name: "Rage", description: "Attack up", hpCostPercent: 15 },
+        { id: "heal", name: "Heal", description: "Heal", hpCostPercent: 5 }
+    ];
+
+    // Stub document so ActionPickerService uses the picker path
+    const docOrig = globalThis.document;
+    globalThis.document = { addEventListener() {} };
+
+    // Mock gameBridge with actionPicker
+    const origGet = window.gameBridge?.get;
+    if (!window.gameBridge) window.gameBridge = { get: () => null };
+
+    let resolvePromise = null;
+    let pickerVisible = false;
+    let pickerCards = [];
+
+    window.gameBridge.get = (id) => {
+        if (id === "actionPicker") {
+            return {
+                show(cards) {
+                    pickerCards = cards;
+                    pickerVisible = true;
+                    return new Promise((resolve) => {
+                        resolvePromise = resolve;
+                    });
+                }
+            };
+        }
+        return origGet ? origGet.call(window.gameBridge, id) : null;
+    };
+
+    // Start show and immediately resolve with index 1
+    const promise = ActionPickerService.show(cards);
+    assert.ok(resolvePromise !== null, "action picker should have stored resolve function");
+    assert.ok(pickerVisible, "action picker should be visible");
+    assert.equal(pickerCards.length, 3, "picker should receive 3 cards");
+
+    resolvePromise(1);
+    return promise.then(async (result) => {
+        assert.equal(result, "rage", "ActionPickerService.show should return card ID, not index");
+
+        // Test: non-browser environment returns first card ID
+        globalThis.document = undefined;
+        const nonBrowserResult = await ActionPickerService.show(cards);
+        assert.equal(nonBrowserResult, "dash", "non-browser picker should return first card ID");
+        globalThis.document = docOrig;
+
+        console.log("[action-picker-service-id-and-concurrency] ok");
+    });
+}
+
+function testActionPickerConcurrency() {
+    // Simulate the action-picker component behavior: show() replaces old _resolve
+    const docOrig = globalThis.document;
+    globalThis.document = { addEventListener() {} };
+
+    let _resolve = null;
+    const mockPicker = {
+        show(cards) {
+            if (_resolve) {
+                const r = _resolve;
+                _resolve = null;
+                r(-1);
+            }
+            return new Promise((resolve) => {
+                _resolve = resolve;
+            });
+        }
+    };
+
+    const origGet = window.gameBridge?.get;
+    window.gameBridge.get = (id) => {
+        if (id === "actionPicker") return mockPicker;
+        return origGet ? origGet.call(window.gameBridge, id) : null;
+    };
+
+    // First show
+    const p1 = ActionPickerService.show([{ id: "dash", name: "Dash", description: "D", hpCostPercent: 10 }]);
+    assert.ok(_resolve !== null, "first show should register resolver");
+
+    // Second show — cancels first
+    const p2 = ActionPickerService.show([{ id: "rage", name: "Rage", description: "R", hpCostPercent: 15 }]);
+
+    // Resolve second
+    _resolve(0);
+
+    return Promise.all([
+        p1.then((r) => assert.equal(r, null, "cancelled show should resolve null")),
+        p2.then((r) => assert.equal(r, "rage", "second show should resolve with correct ID"))
+    ]).then(() => {
+        globalThis.document = docOrig;
+        console.log("[action-picker-concurrency] ok");
+    });
+}
+
+async function runNewBridgeTests() {
+    testHuntingManagerNoAppUiMethods(app);
+    testComponentBridgeEquipmentActionsReachProfile();
+    await testActionPickerServiceIdAndConcurrency();
+    await testActionPickerConcurrency();
+}
+
+await runNewBridgeTests();
 
 console.log("regression tests ok");

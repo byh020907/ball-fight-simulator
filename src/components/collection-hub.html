@@ -358,7 +358,7 @@
 </div>
 
 <script>
-    Alpine.data("collectionHub", () => {
+    window.createGameUI("collectionHub", () => {
         const state = Alpine.reactive({
             visible: false,
             activeTab: "roster",
@@ -429,10 +429,6 @@
             }
         });
 
-        function openCollectionHub(tabId) {
-            if (window.CollectionHubService) window.CollectionHubService.open(tabId);
-        }
-
         function closeCollectionHub() {
             state.visible = false;
             state.selectedCharacterId = null;
@@ -456,46 +452,43 @@
             state.selectedCharacterId = null;
         }
 
-        const bridge = window.BallFightComponentBridge ?? window.ballFightApp?.bridge ?? window.CollectionHubService ?? {};
-
         return {
             state,
-            bridge,
-            init() {
-                this.$watch("$store.collectionHub", (val) => {
-                    if (!val) return;
-                    state.rosterItems = val.rosterItems ?? [];
-                    state.masteryItems = val.masteryItems ?? [];
-                    state.achievementItems = val.achievementItems ?? [];
-                    state.equipment = val.equipment ?? {
-                        items: [],
-                        enhancementStones: 0,
-                        inventoryUsed: 0,
-                        inventorySlots: 5,
-                        equippedSlots: {}
-                    };
-                    state.storage = val.storage ?? { shards: 0, chests: [], stats: {} };
-                    state.summary = val.summary ?? {};
-                    state.tabs = val.tabs ?? [];
-                    if (val.visible === true) {
-                        state.visible = true;
-                        if (val.activeTab) state.activeTab = val.activeTab;
-                    } else if (val.visible === false) {
-                        state.visible = false;
-                        state.selectedCharacterId = null;
-                    }
-                }, { immediate: true });
-            },
-            openCollectionHub,
             closeCollectionHub,
             setCollectionTab,
             setCollectionFilter,
             selectCollectionCharacter,
             closeCollectionCharacterDetail,
+            get bridge() {
+                return window.gameActionBridge || {};
+            },
             async openChest(item) {
                 if (item.canOpen && window.CollectionHubService) {
                     await window.CollectionHubService.openChest(item.id);
                 }
+            },
+            render(vm) {
+                state.rosterItems = vm.rosterItems ?? [];
+                state.masteryItems = vm.masteryItems ?? [];
+                state.achievementItems = vm.achievementItems ?? [];
+                state.equipment = vm.equipment ?? {
+                    items: [],
+                    enhancementStones: 0,
+                    inventoryUsed: 0,
+                    inventorySlots: 5,
+                    equippedSlots: {}
+                };
+                state.storage = vm.storage ?? { shards: 0, chests: [], stats: {} };
+                state.summary = vm.summary ?? {};
+                state.tabs = vm.tabs ?? [];
+            },
+            open(tabId) {
+                state.visible = true;
+                state.activeTab = tabId || "roster";
+            },
+            close() {
+                state.visible = false;
+                state.selectedCharacterId = null;
             }
         };
     });

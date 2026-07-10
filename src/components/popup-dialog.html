@@ -1,17 +1,17 @@
 <div
     x-data="popupDialog"
     class="bf-popup-overlay"
-    x-show="state.visible"
+    x-show="visible"
     x-transition.opacity.duration.200ms
-    @click.self="state.closeOnOutside === false || closePopup('close')"
+    @click.self="closeOnOutside === false || closePopup('close')"
 >
     <div class="bf-popup-card">
         <div class="bf-popup-scroll">
-            <strong class="bf-popup-title" x-text="state.title"></strong>
-            <div class="bf-popup-body" x-html="state.bodyHtml"></div>
+            <strong class="bf-popup-title" x-text="title"></strong>
+            <div class="bf-popup-body" x-html="bodyHtml"></div>
         </div>
-        <div class="bf-popup-footer" x-show="state.buttons.length">
-            <template x-for="btn in state.buttons" :key="btn.value">
+        <div class="bf-popup-footer" x-show="buttons.length">
+            <template x-for="btn in buttons" :key="btn.value">
                 <button
                     type="button"
                     class="bf-popup-btn"
@@ -25,39 +25,52 @@
 </div>
 
 <script>
-    Alpine.data("popupDialog", () => {
-        const state = Alpine.reactive({
-            visible: false,
-            title: "",
-            bodyHtml: "",
-            buttons: [],
-            closeOnOutside: true
-        });
+    window.createGameUI("popupDialog", () => {
+        let _resolve = null;
 
         function closePopup(value) {
-            state.visible = false;
+            this.visible = false;
             setTimeout(() => {
-                Alpine.store("popupDialog", { visible: false });
-                if (window.PopupService) window.PopupService.resolve(value ?? "close");
+                if (_resolve) {
+                    const r = _resolve;
+                    _resolve = null;
+                    r(value ?? "close");
+                }
             }, 250);
         }
 
         return {
-            state,
-            init() {
-                this.$watch("$store.popupDialog", (val) => {
-                    if (!val) {
-                        state.visible = false;
-                        return;
-                    }
-                    state.title = val.title ?? "";
-                    state.bodyHtml = val.bodyHtml ?? "";
-                    state.buttons = val.buttons ?? [];
-                    state.closeOnOutside = val.closeOnOutside !== false;
-                    state.visible = val.visible ?? false;
-                }, { immediate: true });
+            visible: false,
+            title: "",
+            bodyHtml: "",
+            buttons: [],
+            closeOnOutside: true,
+            closePopup,
+            show(options = {}) {
+                if (_resolve) {
+                    const r = _resolve;
+                    _resolve = null;
+                    r("cancel");
+                }
+                return new Promise((resolve) => {
+                    _resolve = resolve;
+                    this.title = options.title ?? "";
+                    this.bodyHtml = options.bodyHtml ?? "";
+                    this.buttons = options.buttons ?? [{ text: "닫기", value: "ok", primary: true }];
+                    this.closeOnOutside = options.closeOnOutside !== false;
+                    this.visible = true;
+                });
             },
-            closePopup
+            close() {
+                closePopup.call(this, "close");
+            },
+            resolve(value) {
+                if (_resolve) {
+                    const r = _resolve;
+                    _resolve = null;
+                    r(value);
+                }
+            }
         };
     });
 </script>

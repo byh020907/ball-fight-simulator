@@ -2,15 +2,19 @@
     class="control-button hunting-btn"
     type="button"
     x-data="huntingButton"
-    x-show="$store.huntingButton.available && !$store.huntingButton.tournamentActive && !$store.huntingButton.active"
+    x-show="available && !tournamentActive && !active"
     @click="openLobby()"
 >
     사냥터
 </button>
 <script>
-    Alpine.data("huntingButton", () => ({
+    window.createGameUI("huntingButton", () => ({
+        available: false,
+        active: false,
+        tournamentActive: false,
         openLobby() {
-            window.BallFightComponentBridge?.openHuntingLobby();
+            const b = window.gameActionBridge;
+            if (b) b.openHuntingLobby();
         }
     }));
 </script>

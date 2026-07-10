@@ -1,7 +1,7 @@
 <div
     x-data="actionPicker"
     class="bf-popup-overlay"
-    x-show="state.visible"
+    x-show="visible"
     x-transition.opacity.duration.200ms
     @pick-action="handlePickAction($event.detail.index)"
 >
@@ -10,7 +10,7 @@
             <strong class="bf-popup-title">매치 액션 선택</strong>
             <p class="action-picker-desc">전투 중 클릭하여 발동하세요</p>
             <div class="action-cards">
-                <template x-for="(card, index) in state.cards" :key="card.id">
+                <template x-for="(card, index) in cards" :key="card.id">
                     <button class="action-card" type="button" @click="$dispatch('pick-action', { index })">
                         <strong x-text="card.name"></strong>
                         <span x-text="card.description"></span>
@@ -23,26 +23,38 @@
 </div>
 
 <script>
-    Alpine.data("actionPicker", () => {
-        const state = Alpine.reactive({
-            visible: false,
-            cards: []
-        });
+    window.createGameUI("actionPicker", () => {
+        let _resolve = null;
 
         return {
-            state,
-            init() {
-                this.$watch("$store.actionPicker", (val) => {
-                    if (!val || !val.visible) {
-                        state.visible = false;
-                        return;
-                    }
-                    state.cards = val.cards ?? [];
-                    state.visible = true;
-                }, { immediate: true });
-            },
+            visible: false,
+            cards: [],
             handlePickAction(index) {
-                if (window.ActionPickerService) window.ActionPickerService.resolve(index);
+                this.visible = false;
+                const cards = this.cards;
+                this.cards = [];
+                if (_resolve) {
+                    const r = _resolve;
+                    _resolve = null;
+                    r(index);
+                }
+            },
+            show(cards) {
+                if (_resolve) {
+                    const r = _resolve;
+                    _resolve = null;
+                    r(-1);
+                }
+                return new Promise((resolve) => {
+                    _resolve = resolve;
+                    this.cards = cards.map((c) => ({
+                        id: c.id,
+                        name: c.name,
+                        description: c.description,
+                        hpCost: c.hpCostPercent
+                    }));
+                    this.visible = this.cards.length > 0;
+                });
             }
         };
     });

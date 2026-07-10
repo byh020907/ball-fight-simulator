@@ -1,162 +1,190 @@
-import { HELP_CONTENT, HELP_TITLE } from "./helpContent.js";
-import { equipEquipmentItem } from "./hunting/equipmentConfig.js";
+import {
+    equipEquipmentItem,
+    expandInventory as expandEquipmentInventory,
+    disassembleEquipment,
+    sellEquipment,
+    fuseEquipment,
+    enhanceEquipment,
+    canCharacterEquipItem,
+    canFuseEquipment,
+    calculateEnhanceCost,
+    calculateEnhanceFailureRate,
+    ENHANCE_MAX_LEVEL,
+    getEquippedStatBonuses,
+    getCharacterEquipmentLevel,
+    getEquipmentRequiredLevel,
+    getNextEquipmentRarity
+} from "./hunting/equipmentConfig.js";
 import { savePlayerProfile } from "./playerProfile.js";
 
-function getAppRoot() {
-    try {
-        return document.querySelector(".app");
-    } catch {
-        return null;
+export function createComponentBridge(app) {
+    function showLevelLockPopup(item) {
+        const requiredLevel = getEquipmentRequiredLevel(item);
+        const charLevel = getCharacterEquipmentLevel(app.playerProfile, app.playerFighterId);
+        if (typeof window.PopupService !== "undefined" && window.PopupService) {
+            window.PopupService.show({
+                title: "레벨 부족",
+                bodyHtml: `<p>요구 레벨: ${requiredLevel}<br>현재 레벨: ${charLevel}</p>`,
+                buttons: [{ text: "확인", value: "ok", primary: true }]
+            });
+        }
     }
-}
 
-export function createComponentBridge(Alpine) {
-    function getAppStore() {
-        const root = getAppRoot();
-        return root && Alpine?.$data ? Alpine.$data(root) : null;
-    }
-
-    function getGameApp() {
-        return globalThis.ballFightApp ?? null;
+    function refreshCollectionAndProfile() {
+        app._refreshCollectionHub();
+        app.refreshPlayerSetup();
+        savePlayerProfile(app.playerProfile);
     }
 
     return {
+        // ── Tournament/Setup actions ──
+        startTournament() {
+            return app.startTournament();
+        },
         adjustStat(key, delta) {
-            getAppStore()?.adjustStat?.(key, delta);
+            return app.adjustStat(key, delta);
         },
         randomAllocation() {
-            getAppStore()?.randomAllocation?.();
+            return app.randomAllocation();
         },
         resetAllocation() {
-            getAppStore()?.resetAllocation?.();
+            return app.resetAllocation();
         },
         adjustChallengeLevel(delta) {
-            getAppStore()?.adjustChallengeLevel?.(delta);
+            return app.adjustChallengeLevel(delta);
         },
-        openCollectionHub(tabId = "roster") {
-            const appStore = getAppStore();
-            if (appStore?.openCollectionHub) {
-                appStore.openCollectionHub(tabId);
-                return;
-            }
-            globalThis.CollectionHubService?.open?.(tabId);
-        },
-        openHelp() {
-            globalThis.PopupService?.show?.({ title: HELP_TITLE, bodyHtml: HELP_CONTENT });
-        },
-        startTournament() {
-            return getGameApp()?.startTournament?.();
-        },
+
+        // ── Hunting actions ──
         openHuntingLobby() {
-            getGameApp()?.hunting?.showCharacterSelect?.();
+            return app.hunting.showCharacterSelect();
         },
         huntingRetreat() {
-            getGameApp()?.hunting?.retreat?.();
+            return app.hunting.retreat();
         },
         huntingAdvance() {
-            getGameApp()?.hunting?.advance?.();
+            return app.hunting.advance();
         },
-        huntingMerchantChoose(offerIndex) {
-            getGameApp()?.hunting?.merchantChoose?.(offerIndex);
+        huntingMerchantChoose(idx) {
+            return app.hunting.merchantChoose(idx);
         },
         huntingMerchantPass() {
-            getGameApp()?.hunting?.merchantPass?.();
+            return app.hunting.merchantPass();
         },
-        reselectPreviewCharacter() {
-            return getGameApp()?.reselectPreviewCharacterFromPreview?.() ?? false;
-        },
-        async openChest(chestId) {
-            await globalThis.CollectionHubService?.openChest?.(chestId);
-        },
-        equipItem(instanceId) {
-            const app = getGameApp();
-            if (!app?.playerProfile) return false;
-            const result = equipEquipmentItem(app.playerProfile, instanceId, app.playerFighterId);
-            if (result?.error === "level") {
-                globalThis.PopupService?.show?.({
-                    title: "장착 제한",
-                    bodyHtml: `<p>현재 캐릭터 Lv.${result.characterLevel}에서는 ${result.item.name}을 장착할 수 없습니다.<br>필요 레벨: Lv.${result.requiredLevel}</p>`
-                });
-                return false;
-            }
-            if (!result?.item) return false;
-            savePlayerProfile(app.playerProfile);
-            app._refreshCollectionHub?.();
-            return true;
-        },
-        unequipItem(instanceId) {
-            const app = getGameApp();
-            if (!app?.playerProfile?.equipment) return false;
-            const equipped = app.playerProfile.equipment.equipped;
-            for (const [slot, id] of Object.entries(equipped)) {
-                if (id === instanceId) {
-                    equipped[slot] = null;
-                    savePlayerProfile(app.playerProfile);
-                    app._refreshCollectionHub?.();
-                    return true;
+
+        // ── Equipment actions ──
+        expandInventory() {
+            const profile = app.playerProfile;
+            const result = expandEquipmentInventory(profile);
+            if (result) {
+                refreshCollectionAndProfile();
+            } else {
+                if (typeof window.PopupService !== "undefined" && window.PopupService) {
+                    window.PopupService.show({
+                        title: "확장 불가",
+                        bodyHtml: `<p>파편이 부족하거나 최대 인벤토리입니다.</p>`,
+                        buttons: [{ text: "확인", value: "ok", primary: true }]
+                    });
                 }
             }
-            return false;
+            return result;
         },
-        async expandInventory() {
-            const app = getGameApp();
-            if (!app?.playerProfile) return false;
-            const { expandInventory: doExpand } = await import("./hunting/equipmentConfig.js");
-            const result = doExpand(app.playerProfile);
+
+        equipItem(instanceId) {
+            const profile = app.playerProfile;
+            const result = equipEquipmentItem(profile, instanceId, app.playerFighterId);
+            if (!result) return;
+            if (result.error === "level") {
+                showLevelLockPopup(result.item);
+                return;
+            }
+            if (result.error === "slot_full") {
+                if (typeof window.PopupService !== "undefined" && window.PopupService) {
+                    window.PopupService.show({
+                        title: "슬롯 부족",
+                        bodyHtml: `<p>해당 슬롯이 이미 찼습니다.</p>`,
+                        buttons: [{ text: "확인", value: "ok", primary: true }]
+                    });
+                }
+                return;
+            }
+            refreshCollectionAndProfile();
+        },
+
+        unequipItem(instanceId) {
+            const profile = app.playerProfile;
+            const eq = profile?.equipment;
+            if (!eq || !Array.isArray(eq.inventory)) return;
+            const equipped = eq.equipped ?? {};
+            for (const slot of Object.keys(equipped)) {
+                if (equipped[slot] === instanceId) {
+                    equipped[slot] = null;
+                    refreshCollectionAndProfile();
+                    return;
+                }
+            }
+        },
+
+        enhanceItem(instanceId) {
+            const profile = app.playerProfile;
+            const eq = profile?.equipment;
+            if (!eq || !Array.isArray(eq.inventory)) return;
+            const item = eq.inventory.find((i) => i.instanceId === instanceId);
+            if (!item) return;
+            const currentLevel = item.enhanceLevel ?? 0;
+            if (currentLevel >= ENHANCE_MAX_LEVEL) return;
+
+            const cost = calculateEnhanceCost(currentLevel);
+            if (
+                (eq.enhancementStones ?? 0) < (cost?.stones ?? 0) ||
+                (profile.hunting?.shards ?? 0) < (cost?.shards ?? 0)
+            ) {
+                if (typeof window.PopupService !== "undefined" && window.PopupService) {
+                    window.PopupService.show({
+                        title: "강화 불가",
+                        bodyHtml: `<p>강화석 또는 파편이 부족합니다.</p>`,
+                        buttons: [{ text: "확인", value: "ok", primary: true }]
+                    });
+                }
+                return;
+            }
+            const result = enhanceEquipment(profile, instanceId);
             if (result) {
-                const { savePlayerProfile } = await import("./playerProfile.js");
-                savePlayerProfile(app.playerProfile);
-                app._refreshCollectionHub?.();
+                refreshCollectionAndProfile();
             }
-            return result;
         },
-        async disassembleItem(instanceId) {
-            const app = getGameApp();
-            if (!app?.playerProfile) return false;
-            const { disassembleEquipment } = await import("./hunting/equipmentConfig.js");
-            const result = disassembleEquipment(app.playerProfile, instanceId);
+
+        fuseItem(instanceId) {
+            const profile = app.playerProfile;
+            if (!canFuseEquipment(profile, instanceId)) {
+                if (typeof window.PopupService !== "undefined" && window.PopupService) {
+                    window.PopupService.show({
+                        title: "합성 불가",
+                        bodyHtml: `<p>파편, 강화석 부족 또는 같은 등급의 파트너 장비가 없습니다.</p>`,
+                        buttons: [{ text: "확인", value: "ok", primary: true }]
+                    });
+                }
+                return;
+            }
+            const result = fuseEquipment(profile, instanceId);
+            if (result && !result.error) {
+                refreshCollectionAndProfile();
+            }
+        },
+
+        disassembleItem(instanceId) {
+            const profile = app.playerProfile;
+            const result = disassembleEquipment(profile, instanceId);
             if (result) {
-                const { savePlayerProfile } = await import("./playerProfile.js");
-                savePlayerProfile(app.playerProfile);
-                app._refreshCollectionHub?.();
+                refreshCollectionAndProfile();
             }
-            return result;
         },
-        async enhanceItem(instanceId) {
-            const app = getGameApp();
-            if (!app?.playerProfile) return false;
-            const { enhanceEquipment } = await import("./hunting/equipmentConfig.js");
-            const result = enhanceEquipment(app.playerProfile, instanceId);
+
+        sellItem(instanceId) {
+            const profile = app.playerProfile;
+            const result = sellEquipment(profile, instanceId);
             if (result) {
-                const { savePlayerProfile } = await import("./playerProfile.js");
-                savePlayerProfile(app.playerProfile);
-                app._refreshCollectionHub?.();
+                refreshCollectionAndProfile();
             }
-            return result;
-        },
-        async fuseItem(instanceId) {
-            const app = getGameApp();
-            if (!app?.playerProfile) return false;
-            const { fuseEquipment } = await import("./hunting/equipmentConfig.js");
-            const result = fuseEquipment(app.playerProfile, instanceId);
-            if (result?.item) {
-                const { savePlayerProfile } = await import("./playerProfile.js");
-                savePlayerProfile(app.playerProfile);
-                app._refreshCollectionHub?.();
-            }
-            return result;
-        },
-        async sellItem(instanceId) {
-            const app = getGameApp();
-            if (!app?.playerProfile) return false;
-            const { sellEquipment } = await import("./hunting/equipmentConfig.js");
-            const result = sellEquipment(app.playerProfile, instanceId);
-            if (result) {
-                const { savePlayerProfile } = await import("./playerProfile.js");
-                savePlayerProfile(app.playerProfile);
-                app._refreshCollectionHub?.();
-            }
-            return result;
         }
     };
 }

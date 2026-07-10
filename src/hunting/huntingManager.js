@@ -129,10 +129,10 @@ export class HuntingManager {
         const stageId = getSelectedHuntingStageId(this.app.playerProfile);
         this._run = createHuntingRun({ characterId, stageId });
         this.app.playerFighterId = characterId;
-        this.app.ui.setHuntingActive(true);
-        this.app.ui.setHuntingOverlayState({ huntingChoiceVisible: false });
+        this.app.setHuntingActive(true);
+        this.app.setHuntingOverlayState({ huntingChoiceVisible: false });
         const stage = getHuntingStage(stageId);
-        this.app.ui.addLog(`[Hunting] ${stage.name} 원정 시작`);
+        this.app.addLog(`[Hunting] ${stage.name} 원정 시작`);
         await this.advance();
     }
 
@@ -242,7 +242,7 @@ export class HuntingManager {
 
             const xpResult = grantExperienceFromMatchReport(app.playerProfile, app._currentMatchReport);
             if (xpResult?.xpGained > 0) {
-                app.ui.addLog(`[사냥터 XP] ${xpResult.xpGained}XP (Lv.${xpResult.level})`);
+                app.addLog(`[사냥터 XP] ${xpResult.xpGained}XP (Lv.${xpResult.level})`);
             }
             app._currentMatchReport = null;
         }
@@ -297,8 +297,8 @@ export class HuntingManager {
                 this._mergeIntoSecured(app);
                 app._refreshCollectionHub();
                 app.refreshPlayerSetup();
-                app.ui.setHuntingActive(false);
-                app.ui.setHuntingOverlayState({
+                app.setHuntingActive(false);
+                app.setHuntingOverlayState({
                     huntingChoiceVisible: false,
                     huntingCanRetreat: false,
                     huntingMoving: false,
@@ -307,21 +307,21 @@ export class HuntingManager {
                     huntingLootHudChests: 0
                 });
                 app._huntingDone = true;
-                app.ui.showOverlay(
+                app.showOverlay(
                     "스테이지 클리어",
                     `${stage.name} 보스 격파`,
                     stageResult.unlockedStageId
                         ? `${getHuntingStage(nextStageId).name} 해금 · 파편 ${securedShards} 확보`
                         : `파편 ${securedShards} 확보`
                 );
-                app.ui.setStartButton({ text: "확인", hidden: false, disabled: false });
+                app.setStartButton({ text: "확인", hidden: false, disabled: false });
                 this._run = null;
                 return;
             }
 
-            app.ui.showOverlay("사냥터", `${name} 승리!`, subtext);
+            app.showOverlay("사냥터", `${name} 승리!`, subtext);
             const hud = this._getLootHudState();
-            app.ui.setHuntingOverlayState({
+            app.setHuntingOverlayState({
                 huntingChoiceVisible: true,
                 huntingCanRetreat: false,
                 huntingMoving: false,
@@ -331,7 +331,7 @@ export class HuntingManager {
                 huntingMoveMessage: `${run.floor}층 전투 승리 · 10층 전진 가능`,
                 ...hud
             });
-            app.ui.setStartButton({ hidden: true, disabled: true, text: "" });
+            app.setStartButton({ hidden: true, disabled: true, text: "" });
             savePlayerProfile(app.playerProfile);
         } else {
             this._run = defeatHuntingRun(run);
@@ -345,16 +345,16 @@ export class HuntingManager {
             app.refreshPlayerSetup();
 
             const lossDisplay = defeatLossText || `파편 ${lostShards} 손실`;
-            app.ui.showOverlay("사냥터 패배", `${name} 쓰러짐`, `획득 ${securedShards} 파편 · ${lossDisplay}`);
-            app.ui.setHuntingActive(false);
-            app.ui.setHuntingOverlayState({
+            app.showOverlay("사냥터 패배", `${name} 쓰러짐`, `획득 ${securedShards} 파편 · ${lossDisplay}`);
+            app.setHuntingActive(false);
+            app.setHuntingOverlayState({
                 huntingChoiceVisible: false,
                 huntingLootHudVisible: false,
                 huntingLootHudShards: 0,
                 huntingLootHudChests: 0
             });
             app._huntingDone = true;
-            app.ui.setStartButton({ text: "확인", hidden: false, disabled: false });
+            app.setStartButton({ text: "확인", hidden: false, disabled: false });
             this._run = null;
         }
     }
@@ -364,7 +364,7 @@ export class HuntingManager {
         const run = this._run;
         if (!run || run.status !== "active") return;
         if (!canRetreatFromHuntingRun(run)) {
-            app.ui.showToast("포탈을 발견해야 귀환할 수 있습니다.");
+            app.showToast("포탈을 발견해야 귀환할 수 있습니다.");
             return;
         }
 
@@ -375,8 +375,8 @@ export class HuntingManager {
         app._refreshCollectionHub();
         app.refreshPlayerSetup();
 
-        app.ui.setHuntingActive(false);
-        app.ui.setHuntingOverlayState({
+        app.setHuntingActive(false);
+        app.setHuntingOverlayState({
             huntingChoiceVisible: false,
             huntingLootHudVisible: false,
             huntingLootHudShards: 0,
@@ -384,8 +384,8 @@ export class HuntingManager {
         });
 
         app._huntingDone = true;
-        app.ui.showOverlay("사냥터 종료", "귀환 완료", `파편 ${securedShards} 확보 · 최고 층 ${run.floor}`);
-        app.ui.setStartButton({ text: "확인", hidden: false, disabled: false });
+        app.showOverlay("사냥터 종료", "귀환 완료", `파편 ${securedShards} 확보 · 최고 층 ${run.floor}`);
+        app.setStartButton({ text: "확인", hidden: false, disabled: false });
         this._run = null;
     }
 
@@ -403,7 +403,7 @@ export class HuntingManager {
         }
 
         this._moving = true;
-        app.ui.setHuntingOverlayState({ huntingChoiceVisible: false });
+        app.setHuntingOverlayState({ huntingChoiceVisible: false });
 
         try {
             const routeStartFloor = this._run.floor;
@@ -427,7 +427,7 @@ export class HuntingManager {
 
                 this._run = advanceHuntingRun(this._run);
                 if (this._run.status !== "active") {
-                    app.ui.setHuntingOverlayState({ huntingMoving: false });
+                    app.setHuntingOverlayState({ huntingMoving: false });
                     this._moving = false;
                     this.retreat();
                     return;
@@ -438,8 +438,8 @@ export class HuntingManager {
                 const event = this._run.lastEvent;
 
                 if (encounter.type === HUNTING_FLOOR_OUTCOME_TYPES.EMPTY) {
-                    app.ui.addLog(`[사냥터] ${currentFloor}층 — 빈 통로`);
-                    app.ui.setHuntingOverlayState({
+                    app.addLog(`[사냥터] ${currentFloor}층 — 빈 통로`);
+                    app.setHuntingOverlayState({
                         huntingMoveMessage: `${currentFloor}층 — 빈 통로`
                     });
                     continue;
@@ -447,13 +447,13 @@ export class HuntingManager {
 
                 if (encounter.type === HUNTING_FLOOR_OUTCOME_TYPES.COMBAT) {
                     const mobCount = getHuntingMobCount(currentFloor);
-                    app.ui.addLog(`[사냥터] ${currentFloor}층 — 전투 발생 · 적 ${mobCount}명`);
+                    app.addLog(`[사냥터] ${currentFloor}층 — 전투 발생 · 적 ${mobCount}명`);
                     this._stopHuntingMoveForBattle(app, `${currentFloor}층 — 전투 발생 · 적 ${mobCount}명`);
                     return;
                 }
 
                 if (encounter.type === HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS) {
-                    app.ui.addLog(`[사냥터] ${currentFloor}층 — 최종 보스 등장!`);
+                    app.addLog(`[사냥터] ${currentFloor}층 — 최종 보스 등장!`);
                     this._stopHuntingMoveForBattle(app, `${currentFloor}층 — 최종 보스!`);
                     return;
                 }
@@ -462,7 +462,7 @@ export class HuntingManager {
                     this._handleAdvanceEvent(event, app);
 
                     if (event.type === HUNTING_EVENT_TYPES.PORTAL) {
-                        app.ui.addLog(`[사냥터] ${currentFloor}층 — 포탈 발견, 귀환하거나 계속 전진할 수 있습니다.`);
+                        app.addLog(`[사냥터] ${currentFloor}층 — 포탈 발견, 귀환하거나 계속 전진할 수 있습니다.`);
                         this._stopHuntingMoveForChoice(app, {
                             message: `${currentFloor}층 — 포탈 발견!`,
                             canRetreat: true,
@@ -473,7 +473,7 @@ export class HuntingManager {
                     }
 
                     if (event.type === HUNTING_EVENT_TYPES.WANDERING_MERCHANT) {
-                        app.ui.addLog(`[사냥터] ${currentFloor}층 — 떠돌이 상인 발견`);
+                        app.addLog(`[사냥터] ${currentFloor}층 — 떠돌이 상인 발견`);
                         const offers = createMerchantOffers(this._run, event, app.playerProfile);
                         this._run = { ...this._run, merchantOffers: offers };
                         const pendingText = formatPendingLootSummary(this._run.pendingLoot);
@@ -505,7 +505,7 @@ export class HuntingManager {
             });
         } catch (error) {
             console.error("[Hunting] advance loop error:", error);
-            app.ui.setHuntingOverlayState({
+            app.setHuntingOverlayState({
                 huntingMoving: false,
                 huntingMoveMessage: "이동 중 오류 발생 — 새로고침 후 다시 시도해주세요"
             });
@@ -515,7 +515,7 @@ export class HuntingManager {
 
     _setHuntingMoveState({ moving, step, maxSteps, routeStartFloor, routeEndFloor, message }) {
         const hud = this._getLootHudState();
-        this.app.ui.setHuntingOverlayState({
+        this.app.setHuntingOverlayState({
             huntingMoving: moving,
             huntingMoveFrom: routeStartFloor,
             huntingMoveTo: routeEndFloor,
@@ -544,7 +544,7 @@ export class HuntingManager {
 
     _stopHuntingMoveForBattle(app, message) {
         const hud = this._getLootHudState();
-        app.ui.setHuntingOverlayState({
+        app.setHuntingOverlayState({
             huntingMoving: false,
             huntingMoveMessage: message,
             ...hud
@@ -558,7 +558,7 @@ export class HuntingManager {
         const baseSummary = summary || `현재 ${floor}층 · 10층 전진 가능`;
         const displaySummary = pendingText ? `${baseSummary} · ${pendingText}` : baseSummary;
         const hud = this._getLootHudState();
-        app.ui.setHuntingOverlayState({
+        app.setHuntingOverlayState({
             huntingMoving: false,
             huntingChoiceVisible: true,
             huntingCanRetreat: canRetreat,
@@ -576,7 +576,7 @@ export class HuntingManager {
 
     _stopHuntingMoveForMerchant(app, { message, floor, offers, summary }) {
         const hud = this._getLootHudState();
-        app.ui.setHuntingOverlayState({
+        app.setHuntingOverlayState({
             huntingMoving: false,
             huntingChoiceVisible: false,
             huntingCanRetreat: false,
@@ -605,7 +605,7 @@ export class HuntingManager {
 
         const result = applyMerchantOffer(run, app.playerProfile, offer);
         if (!result) {
-            app.ui.showToast("파편이 부족합니다.");
+            app.showToast("파편이 부족합니다.");
             return;
         }
 
@@ -614,12 +614,12 @@ export class HuntingManager {
         savePlayerProfile(app.playerProfile);
 
         const toastMsg = formatOfferResultToast(result.result);
-        if (toastMsg) app.ui.showToast(`[상인] ${toastMsg}`);
+        if (toastMsg) app.showToast(`[상인] ${toastMsg}`);
 
         // Refresh merchant overlay with updated state
         const pendingText = formatPendingLootSummary(this._run.pendingLoot);
         const hud = this._getLootHudState();
-        app.ui.setHuntingOverlayState({
+        app.setHuntingOverlayState({
             huntingMerchantOffers: [...offers],
             huntingLootSummary: pendingText,
             ...hud
@@ -630,7 +630,7 @@ export class HuntingManager {
         const app = this.app;
         const run = this._run;
         if (!run || run.status !== "active") return;
-        app.ui.setHuntingOverlayState({
+        app.setHuntingOverlayState({
             huntingMerchantActive: false,
             huntingMerchantOffers: null
         });
@@ -647,8 +647,8 @@ export class HuntingManager {
                 loot: { shards: event.shards ?? 8, chests: [], xp: 0 },
                 consumeStatModifiers: false
             });
-            app.ui.addLog(`[사냥터] 축복: 파편 +${event.shards ?? 8}`);
-            app.ui.showToast(`축복: 파편 +${event.shards ?? 8}`);
+            app.addLog(`[사냥터] 축복: 파편 +${event.shards ?? 8}`);
+            app.showToast(`축복: 파편 +${event.shards ?? 8}`);
             return;
         }
 
@@ -663,8 +663,8 @@ export class HuntingManager {
                 loot: { shards: 0, chests: [], xp: 0 },
                 consumeStatModifiers: false
             });
-            app.ui.addLog(`[사냥터] 함정: HP -${damage}`);
-            app.ui.showToast(`함정: HP -${damage}`);
+            app.addLog(`[사냥터] 함정: HP -${damage}`);
+            app.showToast(`함정: HP -${damage}`);
             return;
         }
 
@@ -674,8 +674,8 @@ export class HuntingManager {
             );
             this._run = applyHuntingEventRecovery(this._run, { amount: healAmount });
             const name = app.roster.find((f) => f.id === run.characterId)?.name ?? run.characterId;
-            app.ui.addLog(`[사냥터] 휴식: ${name} HP +${healAmount}`);
-            app.ui.showToast(`휴식: HP +${healAmount}`);
+            app.addLog(`[사냥터] 휴식: ${name} HP +${healAmount}`);
+            app.showToast(`휴식: HP +${healAmount}`);
             return;
         }
 
@@ -687,17 +687,17 @@ export class HuntingManager {
                 loot: { shards: 0, chests: [chest], xp: 0 },
                 consumeStatModifiers: false
             });
-            app.ui.addLog(`[사냥터] 상자방: ${chest.rarity} 상자 획득`);
-            app.ui.showToast(`상자방: ${chest.rarity} 상자`);
+            app.addLog(`[사냥터] 상자방: ${chest.rarity} 상자 획득`);
+            app.showToast(`상자방: ${chest.rarity} 상자`);
             return;
         }
 
         if (event.type === HUNTING_EVENT_TYPES.CURSED_ALTAR) {
             this._run = applyHuntingCursedAltar(this._run, { trade: event.trade });
-            app.ui.addLog(
+            app.addLog(
                 `[사냥터] 저주받은 제단: ${event.trade?.gainStat} x${event.trade?.gainMultiplier} / ${event.trade?.loseStat} x${event.trade?.loseMultiplier}`
             );
-            app.ui.showToast("저주받은 제단: 스탯 교환");
+            app.showToast("저주받은 제단: 스탯 교환");
             return;
         }
     }
