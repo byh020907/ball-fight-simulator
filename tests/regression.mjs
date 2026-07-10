@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { createComponentBridge as createAppComponentBridge } from "../src/componentBridge.js";
+import { PopupService } from "../src/popup.js";
 import { ActionPickerService } from "../src/actionPicker.js";
 import {
     ALLOCATABLE_STATS,
@@ -9779,6 +9780,128 @@ function testActionPickerConcurrency() {
     });
 }
 
+// ── PopupService 정적 의존 회귀 테스트 ─────────────────────────────────────
+
+function testNoWindowPopupServiceInProductionSource() {
+    const pattern = "window.PopupService";
+    const dir = "src";
+    const offenders = [];
+    function scanDir(path) {
+        for (const name of readdirSync(path)) {
+            const full = `${path}/${name}`;
+            const stat = statSync(full);
+            if (stat.isDirectory()) {
+                scanDir(full);
+            } else if (full.endsWith(".js") || full.endsWith(".html")) {
+                const content = readFileSync(full, "utf8");
+                if (content.includes(pattern)) {
+                    offenders.push(full);
+                }
+            }
+        }
+    }
+    scanDir(dir);
+    assert.equal(
+        offenders.length,
+        0,
+        `Production source should not contain "${pattern}" (found in ${offenders.length} files):\n${offenders.join("\n")}`
+    );
+    console.log("[no-window-popup-service-in-production] ok");
+}
+
+function testGameActionBridgeOpenHelp() {
+    const profile = createDefaultPlayerProfile();
+    const app = {
+        playerProfile: profile,
+        playerFighterId: "archer",
+        roster: [{ id: "archer", name: "Archer", title: "Test", color: "#f00" }],
+        _refreshCollectionHub() {},
+        refreshPlayerSetup() {}
+    };
+
+    let lastPopup = null;
+    const origDialog = PopupService._testDialog;
+    PopupService.setTestDialog({
+        show(opts) {
+            lastPopup = opts;
+            return Promise.resolve("ok");
+        }
+    });
+
+    try {
+        const bridge = createAppComponentBridge(app);
+        bridge.openHelp();
+        assert.ok(lastPopup !== null, "openHelp should show a popup via PopupService");
+        assert.ok(lastPopup.title === "게임 도움말", "openHelp should use HELP_TITLE");
+        assert.ok(lastPopup.bodyHtml.includes("기본 규칙"), "openHelp should use HELP_CONTENT");
+    } finally {
+        PopupService.setTestDialog(origDialog);
+    }
+    console.log("[game-action-bridge-open-help] ok");
+}
+
+function testHuntingManagerStaticPopupServiceImport() {
+    const src = readFileSync("src/hunting/huntingManager.js", "utf8");
+    assert.ok(src.includes("import { PopupService }"), "huntingManager should statically import PopupService");
+    assert.ok(!src.includes("window.PopupService"), "huntingManager should not reference window.PopupService");
+    console.log("[hunting-manager-static-popup-service] ok");
+}
+
+async function testPopupServiceShowFailsWithoutPopupDialog() {
+    const origDialog = PopupService._testDialog;
+    PopupService.setTestDialog(null);
+    try {
+        await assert.rejects(
+            () => PopupService.show({ title: "test", bodyHtml: "<p>test</p>" }),
+            /popupDialog가 gameBridge에 등록되지 않았습니다/,
+            "PopupService.show should reject with clear error when popupDialog is unavailable"
+        );
+        console.log("[popup-service-show-fails-without-dialog] ok");
+    } finally {
+        PopupService.setTestDialog(origDialog);
+    }
+}
+
+function testComponentBridgePopupCallsThroughServiceSeam() {
+    const profile = createDefaultPlayerProfile();
+    profile.hunting.shards = 0;
+    profile.hunting.chests = [{ id: "t_chest", rarity: "common", count: 1 }];
+    if (!profile.equipment)
+        profile.equipment = { inventory: [], equipped: {}, maxInventorySlots: 5, enhancementStones: 0 };
+    const app = {
+        playerProfile: profile,
+        playerFighterId: "archer",
+        roster: [{ id: "archer", name: "Archer", title: "Test", color: "#f00" }],
+        _refreshCollectionHub() {},
+        refreshPlayerSetup() {}
+    };
+
+    let popupCalls = [];
+    const origDialog = PopupService._testDialog;
+    PopupService.setTestDialog({
+        show(opts) {
+            popupCalls.push(opts);
+            return Promise.resolve("ok");
+        }
+    });
+
+    try {
+        const bridge = createAppComponentBridge(app);
+        // Failure case - triggers popup
+        bridge.openChest("t_chest");
+        assert.equal(popupCalls.length, 1, "openChest failure should call PopupService.show");
+        assert.ok(popupCalls[0].title.includes("실패"), "failure popup title should indicate failure");
+
+        // expandInventory when already max (typically fails if no shards)
+        const expandResult = bridge.expandInventory();
+        assert.equal(expandResult, false, "expandInventory should fail with no shards");
+        assert.ok(popupCalls.length >= 2, "expandInventory failure should call PopupService.show");
+    } finally {
+        PopupService.setTestDialog(origDialog);
+    }
+    console.log("[component-bridge-popup-service-seam] ok");
+}
+
 async function runNewBridgeTests() {
     testHuntingManagerNoAppUiMethods(app);
     testComponentBridgeEquipmentActionsReachProfile();
@@ -9788,6 +9911,11 @@ async function runNewBridgeTests() {
     testComponentBridgeOpenChestSuccess();
     await testActionPickerServiceIdAndConcurrency();
     await testActionPickerConcurrency();
+    testNoWindowPopupServiceInProductionSource();
+    testGameActionBridgeOpenHelp();
+    testHuntingManagerStaticPopupServiceImport();
+    await testPopupServiceShowFailsWithoutPopupDialog();
+    testComponentBridgePopupCallsThroughServiceSeam();
 }
 
 await runNewBridgeTests();
@@ -9837,15 +9965,13 @@ function testComponentBridgeOpenChestFailure() {
     };
 
     let lastPopup = null;
-    const origWindow = globalThis.window;
-    globalThis.window = {
-        PopupService: {
-            show(opts) {
-                lastPopup = opts;
-                return Promise.resolve("ok");
-            }
+    const origDialog = PopupService._testDialog;
+    PopupService.setTestDialog({
+        show(opts) {
+            lastPopup = opts;
+            return Promise.resolve("ok");
         }
-    };
+    });
 
     const bridge = createAppComponentBridge(app);
     try {
@@ -9854,7 +9980,7 @@ function testComponentBridgeOpenChestFailure() {
         assert.ok(lastPopup !== null, "openChest failure should show a popup");
         assert.ok(lastPopup.title.includes("실패"), "failure popup title should indicate failure");
     } finally {
-        globalThis.window = origWindow;
+        PopupService.setTestDialog(origDialog);
     }
     console.log("[component-bridge-open-chest-failure] ok");
 }
@@ -9877,15 +10003,13 @@ function testComponentBridgeOpenChestSuccess() {
     };
 
     let lastPopup = null;
-    const origWindow = globalThis.window;
-    globalThis.window = {
-        PopupService: {
-            show(opts) {
-                lastPopup = opts;
-                return Promise.resolve("ok");
-            }
+    const origDialog = PopupService._testDialog;
+    PopupService.setTestDialog({
+        show(opts) {
+            lastPopup = opts;
+            return Promise.resolve("ok");
         }
-    };
+    });
 
     const bridge = createAppComponentBridge(app);
     try {
@@ -9895,7 +10019,7 @@ function testComponentBridgeOpenChestSuccess() {
         assert.ok(lastPopup !== null, "openChest success should show a popup");
         assert.ok(lastPopup.title.includes("결과"), "success popup title should indicate result");
     } finally {
-        globalThis.window = origWindow;
+        PopupService.setTestDialog(origDialog);
     }
     console.log("[component-bridge-open-chest-success] ok");
 }

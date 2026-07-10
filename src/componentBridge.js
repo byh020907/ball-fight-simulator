@@ -17,18 +17,18 @@ import {
 } from "./hunting/equipmentConfig.js";
 import { openHuntingChest } from "./hunting/chestRewards.js";
 import { savePlayerProfile } from "./playerProfile.js";
+import { PopupService } from "./popup.js";
+import { HELP_TITLE, HELP_CONTENT } from "./helpContent.js";
 
 export function createComponentBridge(app) {
     function showLevelLockPopup(item) {
         const requiredLevel = getEquipmentRequiredLevel(item);
         const charLevel = getCharacterEquipmentLevel(app.playerProfile, app.playerFighterId);
-        if (typeof window.PopupService !== "undefined" && window.PopupService) {
-            window.PopupService.show({
-                title: "레벨 부족",
-                bodyHtml: `<p>요구 레벨: ${requiredLevel}<br>현재 레벨: ${charLevel}</p>`,
-                buttons: [{ text: "확인", value: "ok", primary: true }]
-            });
-        }
+        PopupService.show({
+            title: "레벨 부족",
+            bodyHtml: `<p>요구 레벨: ${requiredLevel}<br>현재 레벨: ${charLevel}</p>`,
+            buttons: [{ text: "확인", value: "ok", primary: true }]
+        });
     }
 
     function refreshCollectionAndProfile() {
@@ -72,6 +72,14 @@ export function createComponentBridge(app) {
             return app.hunting.merchantPass();
         },
 
+        // ── Help action ──
+        openHelp() {
+            PopupService.show({
+                title: HELP_TITLE,
+                bodyHtml: HELP_CONTENT
+            });
+        },
+
         // ── Equipment actions ──
         expandInventory() {
             const profile = app.playerProfile;
@@ -79,13 +87,11 @@ export function createComponentBridge(app) {
             if (result) {
                 refreshCollectionAndProfile();
             } else {
-                if (typeof window.PopupService !== "undefined" && window.PopupService) {
-                    window.PopupService.show({
-                        title: "확장 불가",
-                        bodyHtml: `<p>파편이 부족하거나 최대 인벤토리입니다.</p>`,
-                        buttons: [{ text: "확인", value: "ok", primary: true }]
-                    });
-                }
+                PopupService.show({
+                    title: "확장 불가",
+                    bodyHtml: `<p>파편이 부족하거나 최대 인벤토리입니다.</p>`,
+                    buttons: [{ text: "확인", value: "ok", primary: true }]
+                });
             }
             return result;
         },
@@ -99,13 +105,11 @@ export function createComponentBridge(app) {
                 return;
             }
             if (result.error === "slot_full") {
-                if (typeof window.PopupService !== "undefined" && window.PopupService) {
-                    window.PopupService.show({
-                        title: "슬롯 부족",
-                        bodyHtml: `<p>해당 슬롯이 이미 찼습니다.</p>`,
-                        buttons: [{ text: "확인", value: "ok", primary: true }]
-                    });
-                }
+                PopupService.show({
+                    title: "슬롯 부족",
+                    bodyHtml: `<p>해당 슬롯이 이미 찼습니다.</p>`,
+                    buttons: [{ text: "확인", value: "ok", primary: true }]
+                });
                 return;
             }
             refreshCollectionAndProfile();
@@ -139,13 +143,11 @@ export function createComponentBridge(app) {
                 (eq.enhancementStones ?? 0) < (cost?.stones ?? 0) ||
                 (profile.hunting?.shards ?? 0) < (cost?.shards ?? 0)
             ) {
-                if (typeof window.PopupService !== "undefined" && window.PopupService) {
-                    window.PopupService.show({
-                        title: "강화 불가",
-                        bodyHtml: `<p>강화석 또는 파편이 부족합니다.</p>`,
-                        buttons: [{ text: "확인", value: "ok", primary: true }]
-                    });
-                }
+                PopupService.show({
+                    title: "강화 불가",
+                    bodyHtml: `<p>강화석 또는 파편이 부족합니다.</p>`,
+                    buttons: [{ text: "확인", value: "ok", primary: true }]
+                });
                 return;
             }
             const result = enhanceEquipment(profile, instanceId);
@@ -157,13 +159,11 @@ export function createComponentBridge(app) {
         fuseItem(instanceId) {
             const profile = app.playerProfile;
             if (!canFuseEquipment(profile, instanceId)) {
-                if (typeof window.PopupService !== "undefined" && window.PopupService) {
-                    window.PopupService.show({
-                        title: "합성 불가",
-                        bodyHtml: `<p>파편, 강화석 부족 또는 같은 등급의 파트너 장비가 없습니다.</p>`,
-                        buttons: [{ text: "확인", value: "ok", primary: true }]
-                    });
-                }
+                PopupService.show({
+                    title: "합성 불가",
+                    bodyHtml: `<p>파편, 강화석 부족 또는 같은 등급의 파트너 장비가 없습니다.</p>`,
+                    buttons: [{ text: "확인", value: "ok", primary: true }]
+                });
                 return;
             }
             const result = fuseEquipment(profile, instanceId);
@@ -201,12 +201,10 @@ export function createComponentBridge(app) {
                     not_found: "상자를 찾을 수 없습니다.",
                     missing_storage: "보관함 정보를 불러올 수 없습니다."
                 };
-                if (typeof window.PopupService !== "undefined" && window.PopupService) {
-                    window.PopupService.show({
-                        title: "개봉 실패",
-                        bodyHtml: `<p>${msgs[result.reason] ?? "알 수 없는 오류"}</p>`
-                    });
-                }
+                PopupService.show({
+                    title: "개봉 실패",
+                    bodyHtml: `<p>${msgs[result.reason] ?? "알 수 없는 오류"}</p>`
+                });
                 return false;
             }
 
@@ -223,12 +221,10 @@ export function createComponentBridge(app) {
                 bodyHtml += `<p><strong>${eq.name}</strong> (${eq.rarity})<br><span style="font-size:0.8rem">${eq.description} · ${statsText}</span></p>`;
             }
 
-            if (typeof window.PopupService !== "undefined" && window.PopupService) {
-                window.PopupService.show({
-                    title: "상자 개봉 결과",
-                    bodyHtml
-                });
-            }
+            PopupService.show({
+                title: "상자 개봉 결과",
+                bodyHtml
+            });
             return true;
         }
     };

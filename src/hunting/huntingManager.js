@@ -38,6 +38,7 @@ import { createMatchReport, recordLowestHp } from "../collection/index.js";
 import { grantExperienceFromMatchReport } from "../experience/experienceService.js";
 import { applyStatAllocation } from "../statAllocation.js";
 import { savePlayerProfile } from "../playerProfile.js";
+import { PopupService } from "../popup.js";
 
 export class HuntingManager {
     constructor(app) {
@@ -50,13 +51,11 @@ export class HuntingManager {
         const app = this.app;
         const eligible = getEligibleHuntingCharacters(app.playerProfile, app.roster);
         if (eligible.length === 0) {
-            if (window.PopupService) {
-                window.PopupService.show({
-                    title: "사냥터",
-                    bodyHtml:
-                        '<p style="padding:12px 0">사냥터에 입장하려면 먼저 토너먼트에서 우승한 캐릭터가 필요합니다.</p>'
-                });
-            }
+            PopupService.show({
+                title: "사냥터",
+                bodyHtml:
+                    '<p style="padding:12px 0">사냥터에 입장하려면 먼저 토너먼트에서 우승한 캐릭터가 필요합니다.</p>'
+            });
             return;
         }
 
@@ -101,30 +100,28 @@ export class HuntingManager {
             <p style="margin-top:8px;font-size:0.75rem;color:#888">우승 경험 캐릭터만 입장 가능</p>
         `;
 
-        if (window.PopupService) {
-            window.PopupService.show({ title: "사냥터 — 원정 준비", bodyHtml });
-            setTimeout(() => {
-                document.querySelectorAll(".hunting-stage-btn").forEach((btn) => {
-                    btn.addEventListener("click", () => {
-                        const stageId = btn.dataset.stage;
-                        app.playerProfile.hunting.selectedStageId = stageId;
-                        savePlayerProfile(app.playerProfile);
-                        // Refresh popup with updated selection
-                        this.showCharacterSelect();
-                    });
+        PopupService.show({ title: "사냥터 — 원정 준비", bodyHtml });
+        setTimeout(() => {
+            document.querySelectorAll(".hunting-stage-btn").forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    const stageId = btn.dataset.stage;
+                    app.playerProfile.hunting.selectedStageId = stageId;
+                    savePlayerProfile(app.playerProfile);
+                    // Refresh popup with updated selection
+                    this.showCharacterSelect();
                 });
-                document.querySelectorAll(".hunting-char-btn").forEach((btn) => {
-                    btn.addEventListener("click", () => {
-                        const charId = btn.dataset.char;
-                        this.startRun(charId);
-                    });
+            });
+            document.querySelectorAll(".hunting-char-btn").forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    const charId = btn.dataset.char;
+                    this.startRun(charId);
                 });
-            }, 50);
-        }
+            });
+        }, 50);
     }
 
     async startRun(characterId) {
-        if (window.PopupService) window.PopupService.close();
+        PopupService.close();
         if (!canEnterHunting(this.app.playerProfile, characterId)) return;
         const stageId = getSelectedHuntingStageId(this.app.playerProfile);
         this._run = createHuntingRun({ characterId, stageId });

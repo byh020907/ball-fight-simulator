@@ -237,7 +237,8 @@
             window.CollectionHubService?.open?.("equipment");
         },
         openHelp() {
-            window.PopupService?.show?.({ title: window.__helpTitle || "도움말", bodyHtml: window.__helpContent || "<p>도움말</p>" });
+            const b = window.gameActionBridge;
+            if (b) b.openHelp();
         }
     }));
 </script>

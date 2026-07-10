@@ -25,6 +25,17 @@
 - 영향: `src/componentBridge.js`(신규), `src/hunting/huntingManager.js`, `src/main.js`, `src/actionPicker.js`, `src/components/collection-hub.html`, `src/components/player-panel.html`, `src/components/start-button.html`, `src/components/hunting-button.html`, `src/components/game-overlay.html`, `src/components/action-picker.html`, `src/components/popup-dialog.html`, `tests/regression.mjs`, `SESSION-HANDOFF.md`
 - 검증: `npm test`, `npm run check`(125파일), `npm run format:check`, `node scripts/huntingUserScenario.mjs` 통과
 
+## [L1] 2026-07-12 — PopupService 정적 의존 전환 (window.PopupService 제거)
+
+- 맥락: componentBridge/huntingManager/player-panel이 `typeof window.PopupService` 방어적 가드 또는 `window.PopupService?.show?.()`로 PopupService에 접근. 이는 구조적 보장이 없는 전역 의존 패턴으로, 모듈 간 의존이 암시적이고 누락 시 조용히 무시됨.
+- 결정:
+  (1) PopupService — popupDialog 조회를 `_getPopupDialog()`로 중앙화, `_testDialog` 테스트 주입 경로 추가. `show()`가 popupDialog 미등록 시 `Promise.reject(Error)`로 명확히 실패, 조용한 cancel 반환 제거.
+  (2) componentBridge — PopupService 정적 import, 14개 `typeof window.PopupService` 가드 전부 제거. `openHelp` 액션 신설 (HELP_TITLE/HELP_CONTENT 사용).
+  (3) huntingManager — PopupService 정적 import, `if (window.PopupService)` 3개 가드 전부 PopupService 직접 호출로 교체.
+  (4) player-panel.html — `window.PopupService?.show?.()` help 호출을 `window.gameActionBridge.openHelp()`로 교체. 컴포넌트는 intent만 emit.
+  (5) 테스트 — `globalThis.window = { PopupService: ... }` 전역 뮤테이션 제거, `PopupService.setTestDialog()` 의존 주입 경로로 변경. 신규 회귀 테스트 5종 추가 (window.PopupService 미존재, bridge openHelp 위임, hunting 정적 import, show 실패 clear error, equipment/chest popup seam 경로).
+- 영향: `src/popup.js`, `src/componentBridge.js`, `src/hunting/huntingManager.js`, `src/components/player-panel.html`, `tests/regression.mjs`
+
 ## [L1] 2026-07-12 — popup-dialog 동시성 타이밍 버그 수정: closePopup _resolve 캡처 시점 변경
 
 - 맥락: `popup-dialog.html`의 `closePopup()`이 `setTimeout` 콜백 내부에서 `_resolve`를 읽어 `show()`가 그 사이에 `_resolve`를 덮어쓰면 이전 close의 지연 resolve가 새 popup의 Promise를 잘못 해결함. 동시 show/close 패턴에서 popup A가 영원히 pending 상태에 빠지거나 "close"가 아닌 "cancel"로 resolve되는 경합 조건 발생.
