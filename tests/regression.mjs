@@ -1211,10 +1211,12 @@ function testComponentBridgeCallsGameHandlers(app) {
     let openedStageSelect = false;
     let retreated = false;
     let advanced = false;
+    let chestContinued = false;
     const originalStartTournament = app.startTournament;
     const originalShowStageSelect = app.hunting.showStageSelect;
     const originalRetreat = app.hunting.retreat;
     const originalAdvance = app.hunting.advance;
+    const originalChestContinue = app.hunting.chestContinue;
 
     try {
         app.startTournament = () => {
@@ -1229,23 +1231,29 @@ function testComponentBridgeCallsGameHandlers(app) {
         app.hunting.advance = () => {
             advanced = true;
         };
+        app.hunting.chestContinue = () => {
+            chestContinued = true;
+        };
         const bridge = createAppComponentBridge(app);
 
         bridge.startTournament();
         bridge.openHuntingStageSelect();
         bridge.huntingRetreat();
         bridge.huntingAdvance();
+        bridge.huntingChestContinue();
     } finally {
         app.startTournament = originalStartTournament;
         app.hunting.showStageSelect = originalShowStageSelect;
         app.hunting.retreat = originalRetreat;
         app.hunting.advance = originalAdvance;
+        app.hunting.chestContinue = originalChestContinue;
     }
 
     assert.equal(started, true, "Start button bridge action should call BattleApp.startTournament");
     assert.equal(openedStageSelect, true, "Hunting button bridge action should open stage selection");
     assert.equal(retreated, true, "Overlay retreat action should call HuntingManager.retreat");
     assert.equal(advanced, true, "Overlay advance action should call HuntingManager.advance");
+    assert.equal(chestContinued, true, "Chest reward action should call HuntingManager.chestContinue");
 }
 
 function testStartButtonReceivesRemainingStatPoints(app) {
@@ -1417,6 +1425,82 @@ async function testHuntingFirstMoveUiPaintGate() {
     await advancePromise;
     assert.equal(manager._moving, false, "Aborting during the UI paint gate should release the movement lock");
     console.log("[hunting-first-move-ui-paint-gate] ok");
+}
+
+function testHuntingChestEventStopsAndResumes() {
+    const overlayCalls = [];
+    const mockApp = {
+        setHuntingOverlayState(data) {
+            overlayCalls.push({ ...data });
+        },
+        addLog() {},
+        roster: app.roster,
+        playerProfile: createDefaultPlayerProfile()
+    };
+    const manager = new HuntingManager(mockApp);
+    manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE });
+    const chestEvent = { type: HUNTING_EVENT_TYPES.CHEST_ROOM, chestRarity: "rare" };
+    manager._run = { ...manager._run, lastEvent: chestEvent };
+    manager._handleAdvanceEvent(chestEvent, mockApp);
+
+    const chestState = overlayCalls.at(-1);
+    assert.equal(manager._moving, false, "Chest event should stop the auto-advance loop");
+    assert.equal(chestState.huntingChestEventActive, true, "Chest event should open the chest reward UI");
+    assert.equal(chestState.huntingChestRarity, "rare", "Chest event should pass its rarity to the UI");
+    assert.equal(chestState.huntingChestTitle, "희귀 상자 확보", "Chest event should use the localized rarity title");
+    assert.equal(
+        manager._run.pendingLoot.chests.length,
+        1,
+        "Chest event should add one unsecured chest before display"
+    );
+
+    let advanceCalls = 0;
+    manager.advance = () => {
+        advanceCalls += 1;
+    };
+    manager.chestContinue();
+
+    assert.equal(advanceCalls, 1, "Chest continue should resume the advance loop");
+    assert.equal(overlayCalls.at(-1).huntingChestEventActive, false, "Chest continue should close the chest reward UI");
+    console.log("[hunting-chest-event] ok");
+}
+
+async function testHuntingChestEventStopsAdvanceLoop() {
+    const overlayCalls = [];
+    const mockApp = {
+        setHuntingOverlayState(data) {
+            overlayCalls.push({ ...data });
+        },
+        addLog() {},
+        roster: app.roster,
+        playerProfile: createDefaultPlayerProfile()
+    };
+    const manager = new HuntingManager(mockApp);
+    manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE });
+    const originalRandom = Math.random;
+    const originalSetTimeout = globalThis.setTimeout;
+    const rolls = [0.5, 0.5, 0];
+    Math.random = () => rolls.shift() ?? 0;
+    globalThis.setTimeout = (callback, delay) => {
+        if (delay === 350) callback();
+        return 0;
+    };
+
+    try {
+        await manager.advance();
+    } finally {
+        Math.random = originalRandom;
+        globalThis.setTimeout = originalSetTimeout;
+    }
+
+    assert.equal(manager._run.floor, 2, "Chest room should stop on the floor where it was found");
+    assert.equal(manager._moving, false, "Chest room should release the movement lock");
+    assert.equal(
+        overlayCalls.at(-1).huntingChestEventActive,
+        true,
+        "Chest room should remain visible after advance returns"
+    );
+    console.log("[hunting-chest-event-stops-advance] ok");
 }
 
 function testComponentBridgeEquipmentFunctions() {
@@ -7003,6 +7087,8 @@ testStartButtonReceivesRemainingStatPoints(app);
 testHuntingUiRouteDisplay();
 await testHuntingEarlyEventUi();
 await testHuntingFirstMoveUiPaintGate();
+testHuntingChestEventStopsAndResumes();
+await testHuntingChestEventStopsAdvanceLoop();
 testComponentBridgeEquipmentFunctions();
 await testBattleAppAdoptsPreExistingAlpineAllocation();
 await testAdjustRandomResetSyncPlayerStatAllocation(app);
@@ -9070,6 +9156,16 @@ function testHuntingMerchantMobileScrollContract() {
     console.log("[hunting-merchant-mobile-scroll] ok");
 }
 
+function testHuntingChestIconReuseContract() {
+    const chestIcon = readFileSync("src/components/chest-icon.html", "utf8");
+    const overlay = readFileSync("src/components/game-overlay.html", "utf8");
+    const collectionHub = readFileSync("src/components/collection-hub.html", "utf8");
+    assert.ok(chestIcon.includes('chest-icon[data-rarity="rare"]'), "Chest icon should own rarity color variants");
+    assert.ok(overlay.includes("<chest-icon"), "Hunting chest event should render the shared chest icon");
+    assert.ok(collectionHub.includes("<chest-icon"), "Collection storage should render the shared chest icon");
+    console.log("[hunting-chest-icon-reuse] ok");
+}
+
 function testHuntingOverlayResetContract() {
     const content = readFileSync("src/components/game-overlay.html", "utf8");
     assert.ok(content.includes("resetHuntingState()"), "Game overlay should expose an explicit hunting state reset");
@@ -9947,6 +10043,7 @@ function testPreviewReselectTransitionFinalizes(app) {
 testHuntingMerchantOffers();
 testHuntingMerchantPurchaseRefreshesUiState();
 testHuntingMerchantMobileScrollContract();
+testHuntingChestIconReuseContract();
 testHuntingOverlayResetContract();
 testResultConfirmationReturnsInitialState();
 testHuntingFormatHelpers();

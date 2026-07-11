@@ -75,6 +75,9 @@ export function createComponentBridge(app) {
         huntingMerchantPass() {
             return app.hunting.merchantPass();
         },
+        huntingChestContinue() {
+            return app.hunting.chestContinue();
+        },
 
         // ── Help action ──
         openHelp() {

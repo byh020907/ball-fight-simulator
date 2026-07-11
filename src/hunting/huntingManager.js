@@ -40,6 +40,14 @@ import { applyStatAllocation } from "../statAllocation.js";
 import { savePlayerProfile } from "../playerProfile.js";
 import { PopupService } from "../popup.js";
 
+const CHEST_RARITY_LABELS = Object.freeze({
+    common: "일반",
+    uncommon: "고급",
+    rare: "희귀",
+    epic: "영웅",
+    legendary: "전설"
+});
+
 export class HuntingManager {
     constructor(app) {
         this.app = app;
@@ -136,6 +144,10 @@ export class HuntingManager {
             huntingChoiceVisible: false,
             huntingMerchantActive: false,
             huntingMerchantOffers: null,
+            huntingChestEventActive: false,
+            huntingChestRarity: "common",
+            huntingChestTitle: "",
+            huntingChestSubtext: "",
             huntingMoving: false,
             huntingMoveFrom: 0,
             huntingMoveTo: 0,
@@ -513,7 +525,11 @@ export class HuntingManager {
                         return;
                     }
 
-                    // boon / mishap / rest_site / chest_room / cursed_altar: auto-continue
+                    if (event.type === HUNTING_EVENT_TYPES.CHEST_ROOM) {
+                        return;
+                    }
+
+                    // boon / mishap / rest_site / cursed_altar: auto-continue
                     continue;
                 }
             }
@@ -611,6 +627,33 @@ export class HuntingManager {
             huntingLootSummary: summary || "",
             huntingMerchantActive: true,
             huntingMerchantOffers: offers,
+            huntingChestEventActive: false,
+            ...hud
+        });
+        this._moving = false;
+    }
+
+    _stopHuntingMoveForChest(app, { chest, floor }) {
+        const pendingText = formatPendingLootSummary(this._run?.pendingLoot);
+        const rarityLabel = CHEST_RARITY_LABELS[chest.rarity] ?? chest.rarity;
+        const hud = this._getLootHudState();
+        app.setHuntingOverlayState({
+            huntingMoving: false,
+            huntingChoiceVisible: false,
+            huntingCanRetreat: false,
+            huntingFloor: floor,
+            huntingMoveFrom: 0,
+            huntingMoveTo: 0,
+            huntingMoveStep: 0,
+            huntingMoveMax: HUNTING_ADVANCE_STEPS,
+            huntingMoveMessage: `${floor}층 — ${rarityLabel} 상자 확보`,
+            huntingLootSummary: pendingText,
+            huntingMerchantActive: false,
+            huntingMerchantOffers: null,
+            huntingChestEventActive: true,
+            huntingChestRarity: chest.rarity,
+            huntingChestTitle: `${rarityLabel} 상자 확보`,
+            huntingChestSubtext: "미확보 전리품에 보관됩니다",
             ...hud
         });
         this._moving = false;
@@ -659,6 +702,19 @@ export class HuntingManager {
             huntingMerchantOffers: null
         });
         this._run = { ...this._run, merchantOffers: null };
+        this.advance();
+    }
+
+    chestContinue() {
+        const app = this.app;
+        const run = this._run;
+        if (!run || run.status !== "active" || run.lastEvent?.type !== HUNTING_EVENT_TYPES.CHEST_ROOM) return;
+        app.setHuntingOverlayState({
+            huntingChestEventActive: false,
+            huntingChestRarity: "common",
+            huntingChestTitle: "",
+            huntingChestSubtext: ""
+        });
         this.advance();
     }
 
@@ -712,7 +768,7 @@ export class HuntingManager {
                 consumeStatModifiers: false
             });
             app.addLog(`[사냥터] 상자방: ${chest.rarity} 상자 획득`);
-            app.showToast(`상자방: ${chest.rarity} 상자`);
+            this._stopHuntingMoveForChest(app, { chest, floor: this._run.floor });
             return;
         }
 
