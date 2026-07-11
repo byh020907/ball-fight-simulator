@@ -8112,6 +8112,8 @@ function testAntiStallBurstAtTimeout() {
     const f1 = sim.fighters[1];
     f0.position = new Vector2(200, 480);
     f1.position = new Vector2(600, 480);
+    f0.velocity = new Vector2();
+    f1.velocity = new Vector2();
     sim._antiStallTimer = 7.9;
     const velBefore0 = f0.velocity.clone();
     const velBefore1 = f1.velocity.clone();
@@ -8124,10 +8126,55 @@ function testAntiStallBurstAtTimeout() {
     const dir0 = Vector2.subtract(f0.position, center);
     const delta0 = Vector2.subtract(f0.velocity, velBefore0);
     assert.ok(delta0.dot(dir0) > 0, "first fighter receives outward anti-stall impulse");
+    assert.ok(delta0.length() >= 650, "first fighter receives a meaningful wall-reaching impulse");
     const dir1 = Vector2.subtract(f1.position, center);
     const delta1 = Vector2.subtract(f1.velocity, velBefore1);
     assert.ok(delta1.dot(dir1) > 0, "second fighter receives outward anti-stall impulse");
+    assert.ok(delta1.length() >= 650, "second fighter receives a meaningful wall-reaching impulse");
     console.log("[anti-stall-burst] ok");
+}
+
+function testAntiStallBurstReachesWallsFromCenter() {
+    const specs = [
+        {
+            id: "as-wall-a",
+            name: "ASWallA",
+            teamId: "t1",
+            stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+            color: "#ff0000",
+            appearance: { sides: 0, face: "default" },
+            ability: "dash"
+        },
+        {
+            id: "as-wall-b",
+            name: "ASWallB",
+            teamId: "t2",
+            stats: { hp: 100, damage: 10, defense: 5, speed: 200, radius: 25, mass: 10 },
+            color: "#0000ff",
+            appearance: { sides: 0, face: "default" },
+            ability: "dash"
+        }
+    ];
+    const sim = new BattleSimulation(specs, { onLog() {}, onSound() {} });
+    const [first, second] = sim.fighters;
+    first.position = new Vector2(430, 430);
+    second.position = new Vector2(530, 530);
+    first.velocity = new Vector2();
+    second.velocity = new Vector2();
+    sim._fireAntiStallBurst(sim.fighters);
+
+    let firstBounced = false;
+    let secondBounced = false;
+    for (let frame = 0; frame < 75; frame++) {
+        first.update(1 / 60, sim);
+        second.update(1 / 60, sim);
+        firstBounced ||= first.bounced;
+        secondBounced ||= second.bounced;
+    }
+
+    assert.ok(firstBounced, "center-near first fighter should reach and bounce from a wall within 1.25s");
+    assert.ok(secondBounced, "center-near second fighter should reach and bounce from a wall within 1.25s");
+    console.log("[anti-stall-wall-reaching] ok");
 }
 
 function testAntiStallCollisionResetsTimer() {
@@ -8284,6 +8331,7 @@ function testAntiStallProjectileHitDoesNotResetTimer() {
 
 testAntiStallNoBurstBeforeTimeout();
 testAntiStallBurstAtTimeout();
+testAntiStallBurstReachesWallsFromCenter();
 testAntiStallCollisionResetsTimer();
 testAntiStallDefeatedFightersSkipped();
 testAntiStallFriendlyOnlyNoBurst();

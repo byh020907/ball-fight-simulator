@@ -37,6 +37,10 @@ const ABILITY_TYPES = {
 };
 
 const ANTI_STALL_INTERVAL = 8;
+const ANTI_STALL_WALL_REACH_SECONDS = 1;
+const ANTI_STALL_VELOCITY_CORRECTION_RATE = 5.5;
+const ANTI_STALL_MIN_IMPULSE = 650;
+const ANTI_STALL_MAX_IMPULSE = 2200;
 
 export class BattleSimulation extends FighterPhysicsSimulation {
     constructor(fighterSpecs, hooks, playerBall = null, options = {}) {
@@ -471,18 +475,36 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         return Vector2.fromAngle(angle, 1);
     }
 
-    _getAntiStallImpulseMagnitude(fighter) {
-        const baseSpeed = fighter.stats.baseSpeed;
-        if (!Number.isFinite(baseSpeed) || baseSpeed <= 0) return 180;
-        return Math.max(180, Math.min(360, baseSpeed * 0.85));
+    _getAntiStallDistanceToWall(fighter, direction) {
+        const distances = [];
+        if (direction.x > 0) distances.push((this.width - fighter.radius - fighter.position.x) / direction.x);
+        if (direction.x < 0) distances.push((fighter.position.x - fighter.radius) / -direction.x);
+        if (direction.y > 0) distances.push((this.height - fighter.radius - fighter.position.y) / direction.y);
+        if (direction.y < 0) distances.push((fighter.position.y - fighter.radius) / -direction.y);
+        return Math.max(0, Math.min(...distances.filter(Number.isFinite)));
+    }
+
+    _getAntiStallImpulseMagnitude(fighter, direction) {
+        const baseSpeed =
+            Number.isFinite(fighter.stats.baseSpeed) && fighter.stats.baseSpeed > 0 ? fighter.stats.baseSpeed : 200;
+        const distanceToWall = this._getAntiStallDistanceToWall(fighter, direction);
+        const decay = 1 - Math.exp(-ANTI_STALL_VELOCITY_CORRECTION_RATE * ANTI_STALL_WALL_REACH_SECONDS);
+        const targetSpeed =
+            baseSpeed +
+            (Math.max(0, distanceToWall - baseSpeed * ANTI_STALL_WALL_REACH_SECONDS) *
+                ANTI_STALL_VELOCITY_CORRECTION_RATE) /
+                decay;
+        const currentOutwardSpeed = fighter.velocity.dot(direction);
+        if (currentOutwardSpeed >= targetSpeed) return 0;
+        return Math.max(ANTI_STALL_MIN_IMPULSE, Math.min(ANTI_STALL_MAX_IMPULSE, targetSpeed - currentOutwardSpeed));
     }
 
     _applyAntiStallBurstImpulse(fighters, center) {
         for (let i = 0; i < fighters.length; i++) {
             const fighter = fighters[i];
             const dir = this._getAntiStallDirection(fighter, center, i, fighters.length);
-            const magnitude = this._getAntiStallImpulseMagnitude(fighter);
-            fighter.applyImpulse(dir.scale(magnitude));
+            const magnitude = this._getAntiStallImpulseMagnitude(fighter, dir);
+            if (magnitude > 0) fighter.applyImpulse(dir.scale(magnitude));
         }
     }
 
