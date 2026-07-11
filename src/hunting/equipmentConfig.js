@@ -29,7 +29,7 @@ export const EQUIPMENT_SPECIAL_OPTION_SUFFIXES = Object.freeze(
     Object.fromEntries(SPECIAL_OPTION_POOL.map((option) => [option.type, option.nameSuffix]))
 );
 export const STAT_TYPES = EQUIPMENT.STAT_TYPES;
-export const EQUIPMENT_STAT_VALUE_UNITS = EQUIPMENT.STAT_VALUE_UNITS;
+export const EQUIPMENT_STAT_VALUE_RATIOS = EQUIPMENT.STAT_VALUE_RATIOS;
 export const EQUIPMENT_NAME_PREFIXES = EQUIPMENT.NAME_PREFIXES;
 export const EQUIPMENT_LEVEL_REQUIREMENTS = Object.freeze(
     Object.fromEntries(Object.entries(EQUIPMENT.LEVEL_REQUIREMENTS).map(([key, val]) => [key.toLowerCase(), val]))
@@ -109,9 +109,9 @@ export function createEquipmentInstance({ rarity = "common", slot = null, rng = 
     for (let i = 0; i < statCount && availableStats.length > 0; i++) {
         const statIndex = Math.floor(rng() * availableStats.length);
         const statType = availableStats.splice(statIndex, 1)[0];
-        const valueUnit = EQUIPMENT_STAT_VALUE_UNITS[statType] ?? 1;
-        const value = rollInt(range.min, range.max, rng) * valueUnit;
-        stats.push({ type: statType, value, min: range.min * valueUnit, max: range.max * valueUnit });
+        const valueRatio = EQUIPMENT_STAT_VALUE_RATIOS[statType] ?? 1;
+        const value = rollInt(range.min, range.max, rng) * valueRatio;
+        stats.push({ type: statType, value, min: range.min * valueRatio, max: range.max * valueRatio });
     }
 
     let specialOptions = null;
@@ -123,7 +123,7 @@ export function createEquipmentInstance({ rarity = "common", slot = null, rng = 
     }
 
     const { name, primaryStatType, specialOptionType } = createEquipmentName(baseName, stats, {
-        statValueUnits: EQUIPMENT_STAT_VALUE_UNITS,
+        statValueRatios: EQUIPMENT_STAT_VALUE_RATIOS,
         prefixes: EQUIPMENT_NAME_PREFIXES,
         specialOptions: specialOptions ?? [],
         specialSuffixes: EQUIPMENT_SPECIAL_OPTION_SUFFIXES,

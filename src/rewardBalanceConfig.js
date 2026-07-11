@@ -115,7 +115,8 @@ export const REWARD_BALANCE = deepFreeze({
             epic: { min: 6, max: 12, statCount: { min: 1, max: 2 } },
             legendary: { min: 10, max: 18, statCount: { min: 1, max: 2 } }
         },
-        statValueUnits: { hp: 10, damage: 1, defense: 1, speed: 5 },
+        // 장비 공통 가치 포인트 1당 고정 전투 수치 환산값.
+        statValueRatios: { hp: 10, damage: 1, defense: 1, speed: 5 },
         specialChances: { common: 0, uncommon: 0, rare: 0.25, epic: 0.5, legendary: 0.8 },
         specialRanges: {
             crashDamage: { min: 5, max: 15 },

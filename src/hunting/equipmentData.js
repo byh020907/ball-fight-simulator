@@ -62,7 +62,7 @@ export const EQUIPMENT = Object.freeze({
         EPIC: EQUIPMENT_BALANCE.statRanges.epic,
         LEGENDARY: EQUIPMENT_BALANCE.statRanges.legendary
     }),
-    STAT_VALUE_UNITS: EQUIPMENT_BALANCE.statValueUnits,
+    STAT_VALUE_RATIOS: EQUIPMENT_BALANCE.statValueRatios,
     NAME_PREFIXES: Object.freeze({
         hp: Object.freeze(["튼튼한", "활력의", "거인의"]),
         damage: Object.freeze(["맹공의", "날카로운", "파괴의"]),

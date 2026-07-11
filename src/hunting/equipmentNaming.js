@@ -1,10 +1,10 @@
-export function getDominantEquipmentStat(stats = [], statValueUnits = {}) {
+export function getDominantEquipmentStat(stats = [], statValueRatios = {}) {
     let dominant = null;
     let highestValue = -Infinity;
 
     for (const stat of stats) {
-        const unit = statValueUnits[stat?.type] ?? 1;
-        const normalizedValue = (stat?.value ?? 0) / unit;
+        const ratio = statValueRatios[stat?.type] ?? 1;
+        const normalizedValue = (stat?.value ?? 0) / ratio;
         if (normalizedValue > highestValue) {
             dominant = stat?.type ?? null;
             highestValue = normalizedValue;
@@ -17,9 +17,9 @@ export function getDominantEquipmentStat(stats = [], statValueUnits = {}) {
 export function createEquipmentName(
     baseName,
     stats,
-    { statValueUnits, prefixes, specialOptions = [], specialSuffixes = {}, rng = Math.random } = {}
+    { statValueRatios, prefixes, specialOptions = [], specialSuffixes = {}, rng = Math.random } = {}
 ) {
-    const primaryStatType = getDominantEquipmentStat(stats, statValueUnits);
+    const primaryStatType = getDominantEquipmentStat(stats, statValueRatios);
     const candidates = prefixes?.[primaryStatType] ?? [];
     const specialOptionType = specialOptions[0]?.type ?? null;
     const specialSuffix = specialSuffixes[specialOptionType] ?? "";

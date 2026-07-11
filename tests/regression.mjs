@@ -115,7 +115,7 @@ import {
     canCharacterEquipItem,
     equipEquipmentItem,
     getEquipmentRequiredLevel,
-    EQUIPMENT_STAT_VALUE_UNITS,
+    EQUIPMENT_STAT_VALUE_RATIOS,
     EQUIPMENT_NAME_PREFIXES,
     EQUIPMENT_SPECIAL_OPTION_SUFFIXES,
     ENHANCE_MAX_LEVEL
@@ -3138,11 +3138,16 @@ function testEquipmentEnhancement() {
     console.log("[equipment] ok");
 }
 
-function testEquipmentStatValueUnits() {
+function testEquipmentStatValueRatios() {
+    assert.equal(
+        EQUIPMENT_STAT_VALUE_RATIOS,
+        REWARD_BALANCE.equipment.statValueRatios,
+        "Equipment generation must use the reward-balance stat-value ratios directly"
+    );
     assert.deepEqual(
-        EQUIPMENT_STAT_VALUE_UNITS,
+        EQUIPMENT_STAT_VALUE_RATIOS,
         { hp: 10, damage: 1, defense: 1, speed: 5 },
-        "Equipment stat value units should match the standard-ball win-rate reference"
+        "Equipment stat value ratios should match the standard-ball win-rate reference"
     );
 
     const hpItem = createEquipmentInstance({ rarity: "common", slot: "weapon", rng: () => 0 });
@@ -3163,7 +3168,7 @@ function testEquipmentStatValueUnits() {
         [{ type: "speed", value: 5, min: 5, max: 15 }],
         "Common speed rolls should convert one value unit into speed +5"
     );
-    console.log("[equipment-stat-value-units] ok");
+    console.log("[equipment-stat-value-ratios] ok");
 }
 
 function testEquipmentNaming() {
@@ -3172,13 +3177,13 @@ function testEquipmentNaming() {
         { type: "speed", value: 15 }
     ];
     assert.equal(
-        getDominantEquipmentStat(stats, EQUIPMENT_STAT_VALUE_UNITS),
+        getDominantEquipmentStat(stats, EQUIPMENT_STAT_VALUE_RATIOS),
         "speed",
         "Equipment names should use the stat with the highest normalized combat value"
     );
     assert.deepEqual(
         createEquipmentName("철검", stats, {
-            statValueUnits: EQUIPMENT_STAT_VALUE_UNITS,
+            statValueRatios: EQUIPMENT_STAT_VALUE_RATIOS,
             prefixes: EQUIPMENT_NAME_PREFIXES,
             rng: () => 0
         }),
@@ -3193,7 +3198,7 @@ function testEquipmentNaming() {
 
     assert.deepEqual(
         createEquipmentName("철검", stats, {
-            statValueUnits: EQUIPMENT_STAT_VALUE_UNITS,
+            statValueRatios: EQUIPMENT_STAT_VALUE_RATIOS,
             prefixes: EQUIPMENT_NAME_PREFIXES,
             specialOptions: [{ type: "hpSteal", value: 8 }],
             specialSuffixes: EQUIPMENT_SPECIAL_OPTION_SUFFIXES,
@@ -7288,7 +7293,7 @@ testHuntingStageSelectionAndArenaTheme();
 await testHuntingStageSelectUsesPreviewCharacter();
 testHuntingTerrain();
 testEquipmentEnhancement();
-testEquipmentStatValueUnits();
+testEquipmentStatValueRatios();
 testEquipmentNaming();
 testEquipmentSpecialCombatEffects();
 testEquipmentPhysicalSpecialEffects();
