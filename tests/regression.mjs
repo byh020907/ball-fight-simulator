@@ -2314,6 +2314,7 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
     const manager = new HuntingManager(app);
     let popupOptions = null;
     let advanced = false;
+    let selectStage = null;
     const originalDialog = PopupService._testDialog;
     const originalQuerySelectorAll = document.querySelectorAll;
 
@@ -2324,13 +2325,21 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
         },
         close() {}
     });
-    document.querySelectorAll = () => [];
+    document.querySelectorAll = () => [
+        {
+            dataset: { stage: HUNTING_STAGE_IDS.CAVE },
+            addEventListener(_type, handler) {
+                selectStage = handler;
+            }
+        }
+    ];
     manager.advance = async () => {
         advanced = true;
     };
 
     try {
-        await manager.showStageSelect();
+        manager.showStageSelect();
+        await selectStage();
 
         assert.ok(popupOptions.bodyHtml.includes("hunting-stage-btn"), "Stage selection should render map cards");
         assert.equal(
@@ -2338,11 +2347,7 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
             false,
             "Stage selection should not render character selection cards"
         );
-        assert.deepEqual(
-            popupOptions.buttons.map((button) => button.value),
-            ["cancel", "start"],
-            "Stage selection should provide cancel and start actions"
-        );
+        assert.deepEqual(popupOptions.buttons, [], "Stage selection should not require a second start action");
         assert.equal(manager._run.characterId, FIGHTER_IDS.RAGE, "Run should use the current preview character");
         assert.equal(advanced, true, "Stage selection start action should begin the run");
     } finally {

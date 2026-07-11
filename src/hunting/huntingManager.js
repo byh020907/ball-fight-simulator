@@ -51,7 +51,7 @@ export class HuntingManager {
         return this._run?.status === "active";
     }
 
-    async showStageSelect() {
+    showStageSelect() {
         const app = this.app;
         // 사냥터 진입 시 기존 캐릭터 프리뷰 중지 및 캔버스 초기화
         app.stopPlayerPreviewLoop();
@@ -94,13 +94,10 @@ export class HuntingManager {
             </div>
         `;
 
-        const selectionPromise = PopupService.show({
+        PopupService.show({
             title: "사냥터 — 맵 선택",
             bodyHtml,
-            buttons: [
-                { text: "취소", value: "cancel" },
-                { text: "원정 시작", value: "start", primary: true }
-            ]
+            buttons: []
         });
 
         setTimeout(() => {
@@ -109,15 +106,10 @@ export class HuntingManager {
                     const stageId = btn.dataset.stage;
                     app.playerProfile.hunting.selectedStageId = stageId;
                     savePlayerProfile(app.playerProfile);
-                    this.showStageSelect();
+                    return this.startRun(characterId);
                 });
             });
         }, 50);
-
-        const selection = await selectionPromise;
-        if (selection === "start") {
-            await this.startRun(characterId);
-        }
     }
 
     async startRun(characterId) {
