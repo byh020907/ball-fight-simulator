@@ -157,6 +157,17 @@
                 }
             };
 
+            window.requireGameUIComponent = function (componentId) {
+                const component = window.gameBridge.get(componentId);
+                if (!component) {
+                    throw new Error(
+                        `[BattleApp] 필수 UI 컴포넌트 '${componentId}'를 찾을 수 없습니다. ` +
+                            `createGameUI("${componentId}", ...)로 등록되었는지 확인하세요.`
+                    );
+                }
+                return component;
+            };
+
             window.createGameUI = function (componentName, componentFactory) {
                 Alpine.data(componentName, (customId) => {
                     const instance = componentFactory(customId);

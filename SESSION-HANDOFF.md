@@ -1,5 +1,17 @@
 # 결정 기록
 
+## [L1] 2026-07-12 — 필수 UI 컴포넌트 강제 계약 도입 (requireGameUIComponent)
+
+- 맥락: BattleApp이 `gameBridge.get()`으로 조회한 UI 컴포넌트를 `if (this._overlay)` 같은 optional guard로 감싸 누락 시 조용히 무시함. User는 구조적 원인 고침 없이 개별 패턴 추적에 지쳐, 필수 의존성은 생성 시점에 명시적 Error로 실패하도록 요구.
+- 결정:
+  (1) `window.requireGameUIComponent(id)` 신설 — gameBridge 경계 근처에서 필수 컴포넌트 미등록 시 한국어 Error throw.
+  (2) BattleApp 생성자에서 9개 필드(`_bracket`, `_overlay`, `_panel`, `_startBtn`, `_log`, `_strip`, `_root`, `_toast`, `_huntingBtn`)를 `requireGameUIComponent`로 획득, 모든 optional guard 제거.
+  (3) `collectionHubService.js`와 `patchNotesService.js`도 `window.gameBridge?.get()` → `requireGameUIComponent()`로 일괄 교체.
+  (4) PopupService 패턴은 유지 (다른 라이프사이클, 명시적 Error reject 있음). `actionPicker.js`의 headless fallback은 유지 (명시적 설계).
+  (5) 테스트 하네스에 `requireGameUIComponent` 및 누락 컴포넌트 등록 추가.
+- 영향: `index.html`(requireGameUIComponent), `src/app.js`(전 필드 제거 + 5개 메서드 간소화), `src/collectionHubService.js`(3개 메서드), `src/patchNotesService.js`(2개 메서드), `tests/regression.mjs`(하네스 + 회귀 5종).
+- 검증: `npm test`(5종 회귀 포함), `npm run check`, `npm run format:check`, `node scripts/huntingUserScenario.mjs`, `git diff --check`, `rg` 미검증 통과.
+
 ## [L1] 2026-07-12 — 사냥 버튼 상태 동기화 복원 (_syncHuntingButton)
 
 - 맥락: UIController/appStore 제거 후 huntingButton의 `available`/`tournamentActive` 상태가 `refreshPlayerSetup()`에 계산되지만 `this._huntingBtn`에 전파되지 않는 회귀. `_syncHuntingButtonStore` 제거로 인한 누락.

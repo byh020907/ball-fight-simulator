@@ -383,6 +383,13 @@ function makeHarness() {
             });
         }
     };
+    context.requireGameUIComponent = (componentId) => {
+        const component = context.gameBridge.get(componentId);
+        if (!component) {
+            throw new Error(`[Test] 필수 UI 컴포넌트 '${componentId}'가 uiManager에 등록되지 않았습니다.`);
+        }
+        return component;
+    };
     context.createGameUI = (name, factory) => {
         context.Alpine.data(name, () => factory());
     };
@@ -697,6 +704,9 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
         close() {},
         show() {},
         hide() {}
+    });
+    uiManager.register("toastNotification", {
+        show() {}
     });
     const alpineState = { allocation, remainingPoints: 0 };
     alpineState.allocation = { ...allocation };
@@ -9908,6 +9918,137 @@ async function testHuntingButtonHiddenDuringTournament() {
     assert.equal(app._huntingBtn.tournamentActive, false, "tournament with champion -> tournamentActive false");
     console.log("[hunting-button-hidden-tournament] ok");
 }
+
+// ── Stict UI component contract regression ──
+
+async function testRequireGameUIComponentResolvesAll() {
+    const resolved = {};
+
+    // 검증: loadModuleApp에서 9개 필수 컴포넌트 모두 resolve
+    const app = await loadModuleApp();
+    resolved.bracket = app._bracket !== undefined && app._bracket !== null;
+    resolved.overlay = app._overlay !== undefined && app._overlay !== null;
+    resolved.panel = app._panel !== undefined && app._panel !== null;
+    resolved.startBtn = app._startBtn !== undefined && app._startBtn !== null;
+    resolved.log = app._log !== undefined && app._log !== null;
+    resolved.strip = app._strip !== undefined && app._strip !== null;
+    resolved.root = app._root !== undefined && app._root !== null;
+    resolved.toast = app._toast !== undefined && app._toast !== null;
+    resolved.huntingBtn = app._huntingBtn !== undefined && app._huntingBtn !== null;
+
+    const allResolved = Object.values(resolved).every(Boolean);
+    if (!allResolved) {
+        const missing = Object.entries(resolved)
+            .filter(([, ok]) => !ok)
+            .map(([key]) => key);
+        console.log(`[require-ui-resolves-all] FAIL: missing ${missing.join(", ")}`);
+    }
+    assert.ok(allResolved, "All 9 required UI components must be resolved at startup");
+    console.log("[require-ui-resolves-all] ok");
+}
+
+async function testRequireGameUIComponentMissingFails() {
+    // 검증: 누락된 컴포넌트가 있으면 Error throw
+    const harness = makeHarness();
+    Object.assign(globalThis, harness.context);
+    const uiManager = globalThis.Alpine.store("uiManager");
+    uiManager.register("battleLog", { items: [], add() {}, reset() {} });
+    uiManager.register("gameOverlay", {
+        visible: false,
+        show() {},
+        hide() {},
+        showTransient() {},
+        setHuntingState() {}
+    });
+    uiManager.register("startButton", { hidden: true, setState() {} });
+    uiManager.register("huntingButton", { available: false, active: false, tournamentActive: false });
+    uiManager.register("fighterStrip", { fighters: [] });
+    uiManager.register("playerPanel", {
+        fighter: null,
+        experience: {},
+        equipmentSummary: { slots: [], statLine: "" },
+        allocation: {},
+        totalPoints: 0,
+        bonusPoints: 0,
+        remainingPoints: 0,
+        locked: false,
+        statDefs: [],
+        challengeLevel: 0,
+        highestUnlockedLevel: 0,
+        progressionBonusSummary: "",
+        allocationSummary: ""
+    });
+    // tournamentBracket 등을 등록하지 않음 → 첫 번째 missing에서 throw 발생
+
+    const moduleUrl = new URL(`../src/app.js?test=${Date.now()}`, import.meta.url).href;
+    const { BattleApp } = await import(moduleUrl);
+    try {
+        new BattleApp();
+        assert.fail("Should have thrown for missing tournamentBracket");
+    } catch (e) {
+        assert.ok(e instanceof Error, "Thrown must be an Error");
+        assert.ok(e.message.includes("필수 UI 컴포넌트"), `Error message must be Korean. Got: ${e.message}`);
+        assert.ok(
+            e.message.includes("tournamentBracket") ||
+                e.message.includes("appRoot") ||
+                e.message.includes("toastNotification"),
+            `Error message must mention a missing component name. Got: ${e.message}`
+        );
+    }
+    console.log("[require-ui-component-missing-fails] ok");
+}
+
+async function testRequireGameUIComponentNoRemainingGuards() {
+    const appJs = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
+    const productionLineErrors = [];
+
+    // 9개 필드 주변의 if (this._X) / if (!this._X) / this._X?. 패턴 검사
+    const forbiddenPatterns = [
+        /if\s*\(\s*this\._(bracket|overlay|startBtn|log|strip|root|toast|huntingBtn)\b/,
+        /if\s*\(\s*!this\._(bracket|overlay|startBtn|log|strip|root|toast|huntingBtn)\b/,
+        /this\._panel\?\./,
+        /this\._(bracket|overlay|startBtn|log|strip|root|toast|huntingBtn)\s*\?\./
+    ];
+
+    for (const pattern of forbiddenPatterns) {
+        const match = appJs.match(pattern);
+        if (match) {
+            productionLineErrors.push(`Found forbidden pattern: ${match[0]}`);
+        }
+    }
+
+    if (productionLineErrors.length > 0) {
+        console.log("[require-ui-no-remaining-guards] FAIL: " + productionLineErrors.join("; "));
+    }
+    assert.equal(productionLineErrors.length, 0, "No remaining optional guards for required UI components in app.js");
+    console.log("[require-ui-no-remaining-guards] ok");
+}
+
+async function testCollectionHubServiceUsesRequire() {
+    const src = readFileSync(new URL("../src/collectionHubService.js", import.meta.url), "utf8");
+    assert.ok(!src.includes('window.gameBridge?.get("collectionHub")'), "collectionHubService must not use ?.get");
+    assert.ok(
+        src.includes('requireGameUIComponent("collectionHub")'),
+        "collectionHubService must use requireGameUIComponent"
+    );
+    console.log("[collectionHubService-uses-require] ok");
+}
+
+async function testPatchNotesServiceUsesRequire() {
+    const src = readFileSync(new URL("../src/patchNotesService.js", import.meta.url), "utf8");
+    assert.ok(!src.includes('window.gameBridge?.get("patchNotes")'), "patchNotesService must not use ?.get");
+    assert.ok(
+        src.includes('requireGameUIComponent("patchNotes")'),
+        "patchNotesService must use requireGameUIComponent"
+    );
+    console.log("[patchNotesService-uses-require] ok");
+}
+
+await testRequireGameUIComponentResolvesAll();
+await testRequireGameUIComponentMissingFails();
+await testRequireGameUIComponentNoRemainingGuards();
+await testCollectionHubServiceUsesRequire();
+await testPatchNotesServiceUsesRequire();
 
 await testHuntingButtonInitialHidden();
 await testHuntingButtonShowsWithEligible();

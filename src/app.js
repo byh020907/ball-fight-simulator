@@ -133,24 +133,22 @@ export class BattleApp {
         this._huntingDone = false;
         this.hunting = new HuntingManager(this);
         this.renderer = new ArenaRenderer(this.elements.canvas);
-        this._bracket = gameBridge.get("tournamentBracket");
-        this._overlay = gameBridge.get("gameOverlay");
-        this._panel = gameBridge.get("playerPanel");
-        this._startBtn = gameBridge.get("startButton");
-        this._log = gameBridge.get("battleLog");
-        this._strip = gameBridge.get("fighterStrip");
-        this._root = gameBridge.get("appRoot");
-        this._toast = gameBridge.get("toastNotification");
-        this._huntingBtn = gameBridge.get("huntingButton");
         const self = this;
+        this._bracket = requireGameUIComponent("tournamentBracket");
+        this._overlay = requireGameUIComponent("gameOverlay");
+        this._panel = requireGameUIComponent("playerPanel");
+        this._startBtn = requireGameUIComponent("startButton");
+        this._log = requireGameUIComponent("battleLog");
+        this._strip = requireGameUIComponent("fighterStrip");
+        this._root = requireGameUIComponent("appRoot");
+        this._toast = requireGameUIComponent("toastNotification");
+        this._huntingBtn = requireGameUIComponent("huntingButton");
         this.ui = {
             get logItems() {
-                return self._log?.items ?? [];
+                return self._log.items;
             },
             get state() {
-                const panel = self._panel;
-                if (!panel) return null;
-                return new Proxy(panel, {
+                return new Proxy(self._panel, {
                     get(target, prop) {
                         if (prop === "playerExperience") return target.experience;
                         return target[prop];
@@ -159,14 +157,14 @@ export class BattleApp {
             },
             lastOverlayState: null
         };
-        if (this._overlay) {
+        {
             const origSetHunting = this._overlay.setHuntingState;
             this._overlay.setHuntingState = (data) => {
                 if (data) self.ui.lastOverlayState = { ...self.ui.lastOverlayState, ...data };
                 if (origSetHunting) origSetHunting.call(self._overlay, data);
             };
         }
-        if (this._bracket) this._bracket.render(null);
+        this._bracket.render(null);
         this.matchmaker = new Matchmaker(this.roster);
         this.audio = new AudioEngine();
         this.tournament = null;
@@ -196,41 +194,36 @@ export class BattleApp {
         this._syncPlayerStatAllocationFromUi();
         this.refreshPlayerSetup();
         this._refreshCollectionHub();
-        if (this._root) {
-            this._root.statusText = "내 캐릭터 스탯을 배분하세요";
-            this._root.statusBadge = "Setup";
-        }
-        if (this._overlay) this._overlay.hide();
+        this._root.statusText = "내 캐릭터 스탯을 배분하세요";
+        this._root.statusBadge = "Setup";
+        this._overlay.hide();
         this.startPlayerPreviewLoop();
         this._bindPreviewReselectInput();
     }
 
     // ── HuntingManager backward-compat ──
     _syncHuntingButton() {
-        if (!this._huntingBtn) return;
         this._huntingBtn.available = getEligibleHuntingCharacters(this.playerProfile, this.roster).length > 0;
         this._huntingBtn.tournamentActive = Boolean(this.tournament && !this.tournament.champion);
     }
     setHuntingActive(active) {
-        if (this._huntingBtn) {
-            this._huntingBtn.active = Boolean(active);
-            this._syncHuntingButton();
-        }
+        this._huntingBtn.active = Boolean(active);
+        this._syncHuntingButton();
     }
     setHuntingOverlayState(data) {
-        if (this._overlay) this._overlay.setHuntingState(data);
+        this._overlay.setHuntingState(data);
     }
     addLog(message) {
-        if (this._log) this._log.add(message);
+        this._log.add(message);
     }
     showOverlay(label, text, subtext) {
-        if (this._overlay) this._overlay.show({ label, text, subtext });
+        this._overlay.show({ label, text, subtext });
     }
     setStartButton(opts) {
-        if (this._startBtn) this._startBtn.setState(opts);
+        this._startBtn.setState(opts);
     }
     showToast(message) {
-        if (this._toast) this._toast.show(message);
+        this._toast.show(message);
     }
 
     pickPlayerFighterId() {
@@ -244,7 +237,7 @@ export class BattleApp {
         if (this.simulation && !this.simulation.finished) return false;
         if (this.hunting?._run) return false;
         if (this.hunting?._moving) return false;
-        if (this._panel?.locked) return false;
+        if (this._panel.locked) return false;
         return true;
     }
 
@@ -435,33 +428,28 @@ export class BattleApp {
     }
 
     _syncPlayerStatAllocationFromUi() {
-        const panel = this._panel;
-        if (!panel || !panel.allocation) return;
+        if (!this._panel.allocation) return;
         this.playerStatAllocation = {
             ...createEmptyStatAllocation(),
-            ...panel.allocation
+            ...this._panel.allocation
         };
     }
 
     _updatePlayerPanelSummary() {
-        const panel = this._panel;
-        if (!panel) return;
-        const m = formatStatAllocation(panel.allocation);
+        const m = formatStatAllocation(this._panel.allocation);
         const vals = [
-            panel.allocation.hp ?? 0,
-            panel.allocation.damage ?? 0,
-            panel.allocation.speed ?? 0,
-            panel.allocation.skill ?? 0,
-            panel.allocation.defense ?? 0
+            this._panel.allocation.hp ?? 0,
+            this._panel.allocation.damage ?? 0,
+            this._panel.allocation.speed ?? 0,
+            this._panel.allocation.skill ?? 0,
+            this._panel.allocation.defense ?? 0
         ];
         const mult = calculateStatMultiplier(vals).multiplier;
-        panel.allocationSummary = m + "  \u00D7" + mult.toFixed(3);
+        this._panel.allocationSummary = m + "  \u00D7" + mult.toFixed(3);
     }
 
     _syncStartButton() {
-        if (!this._startBtn) return;
-        const panel = this._panel;
-        const remaining = panel?.remainingPoints ?? 0;
+        const remaining = this._panel.remainingPoints ?? 0;
         this._startBtn.setState({
             disabled: remaining > 0,
             text: this.tournament?.champion ? "다시 시작" : remaining > 0 ? `스탯 ${remaining} 남음` : "토너먼트 시작",
@@ -470,41 +458,38 @@ export class BattleApp {
     }
 
     adjustStat(key, delta) {
-        const panel = this._panel;
-        if (!panel || panel.locked) return;
-        panel.allocation = { ...adjustStatAllocation(panel.allocation, key, delta, panel.totalPoints) };
-        panel.remainingPoints = getRemainingStatPoints(panel.allocation, panel.totalPoints);
+        if (this._panel.locked) return;
+        this._panel.allocation = {
+            ...adjustStatAllocation(this._panel.allocation, key, delta, this._panel.totalPoints)
+        };
+        this._panel.remainingPoints = getRemainingStatPoints(this._panel.allocation, this._panel.totalPoints);
         this._updatePlayerPanelSummary();
         this._syncStartButton();
         this._syncPlayerStatAllocationFromUi();
     }
 
     randomAllocation() {
-        const panel = this._panel;
-        if (!panel || panel.locked) return;
-        panel.allocation = { ...createRandomStatAllocation(undefined, panel.totalPoints) };
-        panel.remainingPoints = getRemainingStatPoints(panel.allocation, panel.totalPoints);
+        if (this._panel.locked) return;
+        this._panel.allocation = { ...createRandomStatAllocation(undefined, this._panel.totalPoints) };
+        this._panel.remainingPoints = getRemainingStatPoints(this._panel.allocation, this._panel.totalPoints);
         this._updatePlayerPanelSummary();
         this._syncStartButton();
         this._syncPlayerStatAllocationFromUi();
     }
 
     resetAllocation() {
-        const panel = this._panel;
-        if (!panel || panel.locked) return;
-        panel.allocation = { ...createEmptyStatAllocation() };
-        panel.remainingPoints = getRemainingStatPoints(panel.allocation, panel.totalPoints);
+        if (this._panel.locked) return;
+        this._panel.allocation = { ...createEmptyStatAllocation() };
+        this._panel.remainingPoints = getRemainingStatPoints(this._panel.allocation, this._panel.totalPoints);
         this._updatePlayerPanelSummary();
         this._syncStartButton();
         this._syncPlayerStatAllocationFromUi();
     }
 
     adjustChallengeLevel(delta) {
-        const panel = this._panel;
-        if (!panel) return;
-        const next = panel.challengeLevel + delta;
-        if (next < 0 || next > panel.highestUnlockedLevel) return;
-        panel.challengeLevel = next;
+        const next = this._panel.challengeLevel + delta;
+        if (next < 0 || next > this._panel.highestUnlockedLevel) return;
+        this._panel.challengeLevel = next;
     }
 
     refreshPlayerSetup() {
@@ -523,27 +508,24 @@ export class BattleApp {
         const experienceSummary = getCharacterExperienceSummary(this.playerProfile, this.playerFighterId);
         const equipmentSummary = this._getPlayerEquipmentSummary(this.playerFighterId);
         this._syncHuntingButton();
-        const panel = this._panel;
-        if (panel) {
-            panel.fighter = player ? { name: player.name, title: player.title, color: player.color } : null;
-            panel.allocation = { ...this.playerStatAllocation };
-            panel.totalPoints = effectiveTotal;
-            panel.bonusPoints = bonusCtx.extraStatPoints;
-            panel.remainingPoints = remaining;
-            panel.locked = Boolean(this.tournament && !this.tournament.champion);
-            panel.challengeLevel = cl?.selectedLevel ?? 0;
-            panel.highestUnlockedLevel = cl?.highestUnlockedLevel ?? 0;
-            panel.progressionBonusSummary = bonusSummary;
-            panel.statDefs = ALLOCATABLE_STATS.map((s) => ({
-                key: s.key,
-                label: s.label,
-                description: s.description
-            }));
-            panel.experience = { ...experienceSummary };
-            panel.equipmentSummary = { ...equipmentSummary };
-            this._updatePlayerPanelSummary();
-            this._drawPlayerFace(player);
-        }
+        this._panel.fighter = player ? { name: player.name, title: player.title, color: player.color } : null;
+        this._panel.allocation = { ...this.playerStatAllocation };
+        this._panel.totalPoints = effectiveTotal;
+        this._panel.bonusPoints = bonusCtx.extraStatPoints;
+        this._panel.remainingPoints = remaining;
+        this._panel.locked = Boolean(this.tournament && !this.tournament.champion);
+        this._panel.challengeLevel = cl?.selectedLevel ?? 0;
+        this._panel.highestUnlockedLevel = cl?.highestUnlockedLevel ?? 0;
+        this._panel.progressionBonusSummary = bonusSummary;
+        this._panel.statDefs = ALLOCATABLE_STATS.map((s) => ({
+            key: s.key,
+            label: s.label,
+            description: s.description
+        }));
+        this._panel.experience = { ...experienceSummary };
+        this._panel.equipmentSummary = { ...equipmentSummary };
+        this._updatePlayerPanelSummary();
+        this._drawPlayerFace(player);
 
         if (!this.tournament || this.tournament.champion) {
             this._syncStartButton();
@@ -596,10 +578,8 @@ export class BattleApp {
     }
 
     _updateStatus(text, badge) {
-        if (this._root) {
-            this._root.statusText = text;
-            this._root.statusBadge = badge;
-        }
+        this._root.statusText = text;
+        this._root.statusBadge = badge;
     }
 
     _renderRoster(activeIds = [], activeSpecs = []) {
@@ -639,9 +619,7 @@ export class BattleApp {
     }
 
     _updateLiveCards(fighters) {
-        const strip = this._strip;
-        if (!strip) return;
-        strip.fighters = (strip.fighters || []).map((card) => {
+        this._strip.fighters = (this._strip.fighters || []).map((card) => {
             const fighter = fighters.find((f) => f.id === card.id || f.name === card.name);
             if (!fighter) return card;
             const alloc = fighter.stats.allocation ?? {};
@@ -757,10 +735,7 @@ export class BattleApp {
         }
 
         // Sync allocation from Alpine (user may have clicked +/- buttons there)
-        const alpineData = this._panel;
-        if (alpineData) {
-            this.playerStatAllocation = { ...alpineData.allocation };
-        }
+        this.playerStatAllocation = { ...this._panel.allocation };
 
         const bonusCtx = this._getStatBonusContext();
         const effectiveTotal = PLAYER_STAT_POINTS + bonusCtx.extraStatPoints;
@@ -783,7 +758,7 @@ export class BattleApp {
         // 연계 효과 계산: 해금된 ID 중 현재 캐릭터가 아닌 효과만 적용
         const masteryCtx = collectActiveEffects(this.playerProfile, this.playerFighterId);
         // Alpine 상태에서 사용자 선택 반영 (프로필보다 우선)
-        const alpineChallengeLevel = this._panel?.challengeLevel;
+        const alpineChallengeLevel = this._panel.challengeLevel;
         this._currentChallengeLevel =
             alpineChallengeLevel ?? this.playerProfile?.progression?.challenge?.selectedLevel ?? 0;
         // 프로필도 동기화
@@ -1511,12 +1486,10 @@ export class BattleApp {
             subtext: [xpMsg, challengeMsg.replace(/\n/g, " | ")].filter(Boolean).join(" | "),
             xpReward: this._createXpRewardView(this._lastMatchXpResult)
         });
-        if (this._root) {
-            this._root.statusText = playerWon
-                ? `내 캐릭터 ${champion.name} 우승${masteryMsg}`
-                : `내 캐릭터 ${player.name} ${this.playerResult?.rankLabel ?? ""}`;
-            this._root.statusBadge = "Result";
-        }
+        this._root.statusText = playerWon
+            ? `내 캐릭터 ${champion.name} 우승${masteryMsg}`
+            : `내 캐릭터 ${player.name} ${this.playerResult?.rankLabel ?? ""}`;
+        this._root.statusBadge = "Result";
         this._log.add(`${champion.name} takes the whole bracket.`);
         this._log.add(
             playerWon
