@@ -9,7 +9,7 @@
     x-transition:leave="overlay-leave"
     x-transition:leave-start="overlay-leave-start"
     x-transition:leave-end="overlay-leave-end"
-    x-bind:class="{ transient: transient }"
+    x-bind:class="{ transient: transient, 'hunting-merchant-active': huntingMerchantActive }"
 >
     <div class="overlay-card">
         <span x-text="label">Waiting Room</span>
@@ -394,6 +394,29 @@
         margin-top: 12px;
         padding-top: 10px;
         border-top: 1px solid #e0e0e0;
+    }
+
+    :scope.hunting-merchant-active .overlay-card {
+        width: min(360px, calc(100% - 24px));
+        max-height: calc(100% - 20px);
+        padding: 16px 20px;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        pointer-events: auto;
+        touch-action: pan-y;
+    }
+
+    :scope.hunting-merchant-active .overlay-card > strong {
+        font-size: clamp(1.3rem, 6vw, 2rem);
+    }
+
+    .hunting-merchant .hunting-choice-info span,
+    .hunting-merchant-offer .offer-desc,
+    .hunting-merchant-offer .offer-cost {
+        margin-bottom: 0;
+        letter-spacing: 0;
+        text-transform: none;
     }
 
     .hunting-merchant-offers {

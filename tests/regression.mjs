@@ -8895,6 +8895,24 @@ function testHuntingMerchantPurchaseRefreshesUiState() {
     console.log("[hunting-merchant-ui-refresh] ok");
 }
 
+function testHuntingMerchantMobileScrollContract() {
+    const content = readFileSync("src/components/game-overlay.html", "utf8");
+    assert.ok(
+        content.includes("'hunting-merchant-active': huntingMerchantActive"),
+        "Overlay should expose a merchant-active class for the compact mobile layout"
+    );
+    assert.ok(
+        content.includes(":scope.hunting-merchant-active .overlay-card"),
+        "Merchant overlay card should have a dedicated bounded layout"
+    );
+    assert.ok(
+        content.includes("overflow-y: auto"),
+        "Merchant overlay should scroll when its choices exceed arena height"
+    );
+    assert.ok(content.includes("touch-action: pan-y"), "Merchant overlay should accept vertical touch scrolling");
+    console.log("[hunting-merchant-mobile-scroll] ok");
+}
+
 function testHuntingFormatHelpers() {
     // ── formatChestRarityCounts ──
     assert.equal(formatChestRarityCounts([]), "", "Empty chests should produce empty string");
@@ -9694,6 +9712,7 @@ function testPreviewReselectTransitionFinalizes(app) {
 
 testHuntingMerchantOffers();
 testHuntingMerchantPurchaseRefreshesUiState();
+testHuntingMerchantMobileScrollContract();
 testHuntingFormatHelpers();
 testHuntingCombatText();
 testHuntingLootHud();
