@@ -1384,6 +1384,41 @@ async function testHuntingEarlyEventUi() {
     }
 }
 
+async function testHuntingFirstMoveUiPaintGate() {
+    const overlayCalls = [];
+    let resolvePaint = null;
+    const mockApp = {
+        setHuntingOverlayState(data) {
+            overlayCalls.push({ ...data });
+        },
+        waitForHuntingMoveUiPaint() {
+            return new Promise((resolve) => {
+                resolvePaint = resolve;
+            });
+        },
+        addLog() {},
+        roster: app.roster,
+        playerProfile: createDefaultPlayerProfile()
+    };
+    const manager = new HuntingManager(mockApp);
+    manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE });
+
+    const advancePromise = manager.advance({ waitForFirstMoveUi: true });
+    const firstMoveState = overlayCalls.at(-1);
+    assert.equal(firstMoveState.huntingMoving, true, "First route state should be visible before processing any floor");
+    assert.equal(firstMoveState.huntingMoveFrom, 1, "Initial route should start from floor 1");
+    assert.equal(firstMoveState.huntingMoveTo, 11, "Initial route should end at floor 11");
+    assert.equal(firstMoveState.huntingMoveStep, 1, "Initial route should show the first movement step");
+    assert.equal(firstMoveState.huntingMoveMax, 10, "Initial route should still process all ten floors");
+    assert.ok(resolvePaint, "First route should wait for the UI paint gate");
+
+    manager._run = null;
+    resolvePaint();
+    await advancePromise;
+    assert.equal(manager._moving, false, "Aborting during the UI paint gate should release the movement lock");
+    console.log("[hunting-first-move-ui-paint-gate] ok");
+}
+
 function testComponentBridgeEquipmentFunctions() {
     const profile = createDefaultPlayerProfile();
     const weapon = createEquipmentInstance({ rarity: "common", slot: "weapon", rng: () => 0.5 });
@@ -1718,7 +1753,7 @@ function testHuntingSystem() {
     assert.equal(shards, 17, "Key shards should include clear and deep-floor bonuses");
 
     const run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, now: 1000 });
-    assert.equal(run.floor, 0, "Hunting run should start at floor 0");
+    assert.equal(run.floor, 1, "Hunting run should start at floor 1");
     assert.equal(run.stageId, HUNTING_STAGE_IDS.CAVE, "Default stage should be cave");
     const common = createHuntingChest({ id: "c1", rarity: "common", acquiredAt: 1000 });
     const uncommon = createHuntingChest({ id: "u1", rarity: "uncommon", acquiredAt: 1000 });
@@ -1749,7 +1784,7 @@ function testHuntingSystem() {
             return () => rolls.shift() ?? 0;
         })()
     });
-    assert.equal(advanced.floor, 1, "Advance should move from floor 0 to 1");
+    assert.equal(advanced.floor, 2, "Advance should move from floor 1 to 2");
     assert.equal(advanced.lastEncounter.type, HUNTING_FLOOR_OUTCOME_TYPES.EVENT, "Should produce an event encounter");
     assert.ok(advanced.lastEvent, "Event encounter should set lastEvent");
     assert.equal(advanced.lastEvent.type, HUNTING_EVENT_TYPES.CHEST_ROOM, "Event rolls should include chest rooms");
@@ -1848,17 +1883,17 @@ function testHuntingSystem() {
 }
 
 function testHunting100FloorStructure() {
-    // ── Run starts at floor 0 ──
+    // ── Run starts at floor 1 ──
     const run0 = createHuntingRun({ characterId: FIGHTER_IDS.DASH, now: 1000 });
-    assert.equal(run0.floor, 0, "Hunting run should start at floor 0");
+    assert.equal(run0.floor, 1, "Hunting run should start at floor 1");
     assert.equal(run0.maxFloor, 100, "Default max floor should be 100");
     assert.equal(run0.stageId, HUNTING_STAGE_IDS.CAVE, "Default stage should be cave");
     assert.equal(run0.lastEncounter, null, "New run should have no last encounter");
 
-    // ── advanceHuntingRun moves 0→1 with empty outcome ──
+    // ── advanceHuntingRun moves 1→2 with empty outcome ──
     // rng=0.9 → empty (above combat+event threshold)
     const advanced1 = advanceHuntingRun(run0, { rng: () => 0.9 });
-    assert.equal(advanced1.floor, 1, "First advance should move from floor 0 to 1");
+    assert.equal(advanced1.floor, 2, "First advance should move from floor 1 to 2");
     assert.equal(advanced1.lastEncounter.type, HUNTING_FLOOR_OUTCOME_TYPES.EMPTY, "Empty outcome with high rng");
 
     // ── 100층에서 final_boss 고정 ──
@@ -2346,8 +2381,19 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
         _syncPlayerStatAllocationFromUi() {},
         refreshPlayerSetup() {},
         setHuntingActive() {},
-        setHuntingOverlayState() {},
-        addLog() {}
+        setHuntingOverlayState(data) {
+            this.overlayStates.push({ ...data });
+        },
+        showOverlay(label, text, subtext) {
+            this.overlayShown = { label, text, subtext };
+        },
+        addLog() {},
+        overlayStates: [],
+        waitForHuntingMoveUiPaint() {
+            return new Promise((resolve) => {
+                this.resolveFirstMoveUi = resolve;
+            });
+        }
     };
     const manager = new HuntingManager(app);
     let popupOptions = null;
@@ -2371,13 +2417,16 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
             }
         }
     ];
-    manager.advance = async () => {
+    manager.advance = async ({ waitForFirstMoveUi } = {}) => {
+        assert.equal(waitForFirstMoveUi, true, "Run start should require the first move UI paint before advancing");
+        await app.waitForHuntingMoveUiPaint();
         advanced = true;
     };
 
     try {
         manager.showStageSelect();
-        await selectStage();
+        const startPromise = selectStage();
+        await Promise.resolve();
 
         assert.ok(popupOptions.bodyHtml.includes("hunting-stage-btn"), "Stage selection should render map cards");
         assert.equal(
@@ -2387,7 +2436,23 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
         );
         assert.deepEqual(popupOptions.buttons, [], "Stage selection should not require a second start action");
         assert.equal(manager._run.characterId, FIGHTER_IDS.RAGE, "Run should use the current preview character");
-        assert.equal(advanced, true, "Stage selection start action should begin the run");
+        assert.equal(advanced, false, "Stage selection should not advance before the first move UI is painted");
+        assert.deepEqual(app.overlayShown, {
+            label: "사냥터",
+            text: "동굴 · 1층",
+            subtext: "원정 시작"
+        });
+        const firstFloorState = app.overlayStates.at(-1);
+        assert.equal(
+            firstFloorState.huntingChoiceVisible,
+            false,
+            "Start should not expose an advance choice before moving"
+        );
+        assert.equal(firstFloorState.huntingMoving, false, "Start should not move before the first move UI is emitted");
+        assert.equal(firstFloorState.huntingFloor, 1, "Start should render the first floor before advancing");
+        app.resolveFirstMoveUi();
+        await startPromise;
+        assert.equal(advanced, true, "Stage selection should advance only after the first move UI is painted");
     } finally {
         PopupService.setTestDialog(originalDialog);
         document.querySelectorAll = originalQuerySelectorAll;
@@ -6937,6 +7002,7 @@ testComponentBridgeCallsGameHandlers(app);
 testStartButtonReceivesRemainingStatPoints(app);
 testHuntingUiRouteDisplay();
 await testHuntingEarlyEventUi();
+await testHuntingFirstMoveUiPaintGate();
 testComponentBridgeEquipmentFunctions();
 await testBattleAppAdoptsPreExistingAlpineAllocation();
 await testAdjustRandomResetSyncPlayerStatAllocation(app);
@@ -10493,19 +10559,19 @@ async function testHuntingEndToEnd() {
 
     // Start run
     const run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, now: 1000 });
-    assert.equal(run.floor, 0, "Run starts at floor 0");
+    assert.equal(run.floor, 1, "Run starts at floor 1");
     assert.equal(run.status, "active", "New run should be active");
     assert.equal(run.characterId, FIGHTER_IDS.DASH, "Run should use correct character");
 
-    // Advance floor 0→1: empty outcome (rng=0.9 > 0.7 combat+event threshold)
+    // Advance floor 1→2: empty outcome (rng=0.9 > 0.7 combat+event threshold)
     const f1 = advanceHuntingRun(run, { rng: () => 0.9 });
-    assert.equal(f1.floor, 1, "Advance from 0→1");
-    assert.equal(f1.lastEncounter.type, HUNTING_FLOOR_OUTCOME_TYPES.EMPTY, "Floor 1: empty (rng=0.9)");
+    assert.equal(f1.floor, 2, "Advance from 1→2");
+    assert.equal(f1.lastEncounter.type, HUNTING_FLOOR_OUTCOME_TYPES.EMPTY, "Floor 2: empty (rng=0.9)");
 
-    // Advance floor 1→2: combat outcome (rng=0.3 < 0.4 combat threshold)
+    // Advance floor 2→3: combat outcome (rng=0.3 < 0.4 combat threshold)
     const f2 = advanceHuntingRun(f1, { rng: () => 0.3 });
-    assert.equal(f2.floor, 2, "Advance from 1→2");
-    assert.equal(f2.lastEncounter.type, HUNTING_FLOOR_OUTCOME_TYPES.COMBAT, "Floor 2: combat (rng=0.3)");
+    assert.equal(f2.floor, 3, "Advance from 2→3");
+    assert.equal(f2.lastEncounter.type, HUNTING_FLOOR_OUTCOME_TYPES.COMBAT, "Floor 3: combat (rng=0.3)");
 
     // Record floor result with loot
     const f2Done = recordHuntingFloorResult(f2, {
@@ -10517,18 +10583,18 @@ async function testHuntingEndToEnd() {
     assert.equal(f2Done.pendingLoot.shards, 20, "Shards should be pending");
     assert.equal(f2Done.pendingLoot.chests.length, 1, "Chests should be pending");
 
-    // Advance floor 2→3: event outcome (rng=0.5 → splits by event weights)
+    // Advance floor 3→4: event outcome (rng=0.5 → splits by event weights)
     const f3 = advanceHuntingRun(f2Done, { rng: () => 0.5 });
-    assert.equal(f3.floor, 3, "Advance from 2→3");
-    assert.equal(f3.lastEncounter.type, HUNTING_FLOOR_OUTCOME_TYPES.EVENT, "Floor 3: event (rng=0.5)");
+    assert.equal(f3.floor, 4, "Advance from 3→4");
+    assert.equal(f3.lastEncounter.type, HUNTING_FLOOR_OUTCOME_TYPES.EVENT, "Floor 4: event (rng=0.5)");
     assert.ok(f3.lastEvent, "Event floor should produce lastEvent data");
 
-    // Advance floor 3→4: combat outcome (rng=0.2)
+    // Advance floor 4→5: combat outcome (rng=0.2)
     const f4 = advanceHuntingRun(f3, { rng: () => 0.2 });
-    assert.equal(f4.floor, 4, "Advance from 3→4");
-    assert.equal(f4.lastEncounter.type, HUNTING_FLOOR_OUTCOME_TYPES.COMBAT, "Floor 4: combat (rng=0.2)");
+    assert.equal(f4.floor, 5, "Advance from 4→5");
+    assert.equal(f4.lastEncounter.type, HUNTING_FLOOR_OUTCOME_TYPES.COMBAT, "Floor 5: combat (rng=0.2)");
 
-    // Record floor 4 result then retreat
+    // Record floor 5 result then retreat
     const f4Done = recordHuntingFloorResult(f4, {
         hpRemain: 60,
         maxHp: 100,

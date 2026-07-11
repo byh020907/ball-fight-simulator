@@ -1,5 +1,10 @@
 # 결정 기록
 
+## [L1] 2026-07-12 — 사냥터는 내부 상태부터 1층 시작, 첫 이동 UI 페인트 뒤 진행
+- 맥락: 원정 런 내부가 0층에서 시작한 뒤 즉시 `advance()`를 호출해, 1층 이동 UI가 Alpine에 반영되기 전에 다음 층 이벤트·전투 상태가 덮어쓰는 경쟁 상태가 발생했다.
+- 결정: 원정 런 자체를 1층에서 시작한다. 원정 시작은 첫 이동 상태(`1F → 11F`, `1/10`)를 발행하고, UI 소유자인 `BattleApp`의 두 프레임 페인트 게이트가 완료된 뒤에만 층 판정을 진행한다. 이후 자동 10칸 전진은 유지한다.
+- 영향: 사냥터 시작 층 상태, 첫 이동 호출 시점, 이동 경로 표시, 100층 진행 회귀 테스트와 사냥터 흐름 문서.
+
 ## [L1] 2026-07-12 — 토너먼트 종료 버튼도 확인으로 통일
 - 맥락: 토너먼트 종료 동작은 이미 확인 뒤 초기 상태 복귀로 바뀌었지만 버튼 문구만 이전 `새 토너먼트 준비`로 남아 흐름을 잘못 안내했다.
 - 결정: 토너먼트 결과 버튼은 사냥터와 동일하게 `확인`으로 표시한다. 확인은 결과를 정리하고 프리뷰 캐릭터를 다시 선택할 수 있는 초기 화면으로 복귀한다.
@@ -533,7 +538,7 @@
 
 ## [L1] 2026-07-05 — 사냥터 100층 스테이지 원정 구조 구현
 - 맥락: Codex가 사냥터 패턴 강화 구현을 일부 진행하다 중단. partial diff를 읽고 이어서 완성.
-- 결정: (1) 사냥터 100층 구조 확정 — 시작 0층, 10층 전진 시 1층씩 이동, 전투/선택형이벤트/포탈/100층보스에서 정지, 빈층은 자동 진행. (2) `advance()`를 async 10-step 루프로 재작성, 층당 350ms 이동 애니메이션. (3) 포탈에서만 귀환 가능 (`canRetreatFromHuntingRun`), 포탈 지나치면 귀환 권한 소멸. (4) 새 이벤트 4종: portal(귀환 가능), wandering_merchant(정지), boon(파편 즉시), mishap(HP 손실). (5) 동굴/숲/사막 3스테이지, 100층 보스 처치 시 다음 스테이지 해금. (6) `rollHuntingFloorOutcome`으로 층 판정 (empty/combat/event/final_boss). (7) 테스트: 100층 구조, portal 전용 귀환, floor outcome, stage 해금, gameOverlay store 검증 완료.
+- 결정: (1) 사냥터 100층 구조 확정 — 시작 1층, 10층 전진 시 1층씩 이동, 전투/선택형이벤트/포탈/100층보스에서 정지, 빈층은 자동 진행. (2) `advance()`를 async 10-step 루프로 재작성, 층당 350ms 이동 애니메이션. (3) 포탈에서만 귀환 가능 (`canRetreatFromHuntingRun`), 포탈 지나치면 귀환 권한 소멸. (4) 새 이벤트 4종: portal(귀환 가능), wandering_merchant(정지), boon(파편 즉시), mishap(HP 손실). (5) 동굴/숲/사막 3스테이지, 100층 보스 처치 시 다음 스테이지 해금. (6) `rollHuntingFloorOutcome`으로 층 판정 (empty/combat/event/final_boss). (7) 테스트: 100층 구조, portal 전용 귀환, floor outcome, stage 해금, gameOverlay store 검증 완료.
 - 영향: `src/hunting/huntingManager.js`(advance async 루프), `src/hunting/huntingState.js`(stage/portal), `src/hunting/huntingEncounters.js`(rollHuntingFloorOutcome), `src/hunting/huntingConfig.js`(100층/스테이지/이벤트), `src/components/game-overlay.html`(이동 UI/포탈 버튼), `src/playerProfile.js`(stage 해금), `src/ui.js`(store 초기값), `index.html`(V=0.24.5), `src/patchNotes.js`(v0.24.5), `tests/regression.mjs`(신규 100층 테스트), `scripts/huntingUserScenario.mjs`(12층 시나리오)
 - 검증: `npm test`, `npm run check`, `npm run format:check`, `node scripts/huntingUserScenario.mjs` 통과
 
@@ -588,7 +593,7 @@
 
 ## 현재 기준 요약 (2026-07-07)
 - 컴포넌트 파일 구조: `src/components/<name>.html` (플랫, 폴더 없음), 9개 컴포넌트
-- **사냥터 100층 구조**: 시작 0층, 10층 전진 루프, 전투/포탈/상인/챔피언에서 정지, 빈층/축복/함정/휴식/상자/제단은 자동 진행
+- **사냥터 100층 구조**: 시작 1층, 10층 전진 루프, 전투/포탈/상인/챔피언에서 정지, 빈층/축복/함정/휴식/상자/제단은 자동 진행
 - **3스테이지**: 동굴→숲→사막, 100층 보스 처치 시 해금
 - **포탈 귀환**: 포탈 이벤트에서만 귀환 가능, 포탈 지나치면 권한 소멸
 - 컴포넌트 목록: `<xp-reward-panel>`, `<xp-progress-bar>`, `<popup-dialog>`, `<toast-notification>`, `<action-picker>`, `<patch-notes>`, `<collection-hub>`, `<player-panel>`, `<tournament-bracket>`

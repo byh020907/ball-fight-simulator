@@ -1545,4 +1545,9 @@ export class BattleApp {
     wait(ms) {
         return new Promise((resolve) => window.setTimeout(resolve, ms));
     }
+
+    waitForHuntingMoveUiPaint() {
+        const nextFrame = window.requestAnimationFrame ?? ((callback) => window.setTimeout(callback, 0));
+        return new Promise((resolve) => nextFrame(() => nextFrame(resolve)));
+    }
 }

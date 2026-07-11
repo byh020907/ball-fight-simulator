@@ -122,10 +122,27 @@ export class HuntingManager {
         this.app._syncPlayerStatAllocationFromUi();
         this.app.refreshPlayerSetup();
         this.app.setHuntingActive(true);
-        this.app.setHuntingOverlayState({ huntingChoiceVisible: false });
         const stage = getHuntingStage(stageId);
         this.app.addLog(`[Hunting] ${stage.name} 원정 시작`);
-        await this.advance();
+        this._showStartingMove(stage);
+        await this.advance({ waitForFirstMoveUi: true });
+    }
+
+    _showStartingMove(stage) {
+        const app = this.app;
+        const floor = this._run?.floor ?? 1;
+        app.showOverlay("사냥터", `${stage.name} · ${floor}층`, "원정 시작");
+        app.setHuntingOverlayState({
+            huntingChoiceVisible: false,
+            huntingMerchantActive: false,
+            huntingMerchantOffers: null,
+            huntingMoving: false,
+            huntingMoveFrom: 0,
+            huntingMoveTo: 0,
+            huntingMoveStep: 0,
+            huntingMoveMax: HUNTING_ADVANCE_STEPS,
+            huntingFloor: floor
+        });
     }
 
     _startFloorBattle() {
@@ -386,7 +403,7 @@ export class HuntingManager {
         this._run = null;
     }
 
-    async advance() {
+    async advance({ waitForFirstMoveUi = false } = {}) {
         const app = this.app;
         const run = this._run;
         if (!run || run.status !== "active" || this._moving) return;
@@ -404,8 +421,8 @@ export class HuntingManager {
 
         try {
             const routeStartFloor = this._run.floor;
-            const routeEndFloor = Math.min(this._run.maxFloor, routeStartFloor + HUNTING_ADVANCE_STEPS);
-            const routeMaxSteps = Math.max(1, routeEndFloor - routeStartFloor);
+            const routeEndFloor = Math.min(this._run.maxFloor, this._run.floor + HUNTING_ADVANCE_STEPS);
+            const routeMaxSteps = Math.max(1, routeEndFloor - this._run.floor);
             const FLOOR_STEP_MS = 350;
 
             for (let step = 0; step < routeMaxSteps; step++) {
@@ -419,6 +436,14 @@ export class HuntingManager {
                     routeEndFloor,
                     message: `${targetFloor}층으로 이동 중…`
                 });
+
+                if (waitForFirstMoveUi && step === 0) {
+                    await app.waitForHuntingMoveUiPaint();
+                    if (!this._run || this._run.status !== "active" || !this._moving) {
+                        this._moving = false;
+                        return;
+                    }
+                }
 
                 await new Promise((resolve) => setTimeout(resolve, FLOOR_STEP_MS));
 

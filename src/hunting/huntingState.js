@@ -50,7 +50,7 @@ export function createHuntingRun({
             bonuses: { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 },
             carryover: { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 }
         },
-        floor: 0,
+        floor: 1,
         maxFloor,
         carriedHp: null,
         statModifiers: [],
