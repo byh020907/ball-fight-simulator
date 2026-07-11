@@ -1,4 +1,5 @@
 import { Vector2 } from "../core.js";
+import { Ability } from "../abilities/ability.js";
 import { applyRotationalContactDamage } from "../physics/contactDamage.js";
 import {
     ArcherAbility,
@@ -21,6 +22,7 @@ import { FighterPhysicsSimulation } from "./fighterPhysicsSimulation.js";
 import { AIActionController } from "./aiActionController.js";
 
 const ABILITY_TYPES = {
+    none: Ability,
     archer: ArcherAbility,
     orbit: OrbitAbility,
     trickster: TricksterAbility,

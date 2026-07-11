@@ -6554,7 +6554,33 @@ function testRewardBalanceConfig() {
     console.log("[reward-balance-config] ok");
 }
 
+function testNoAbilityStandardBallSupport() {
+    const spec = {
+        id: "standard-no-ability",
+        name: "Standard Ball",
+        title: "",
+        description: "",
+        color: "#888888",
+        face: "default",
+        ability: "none",
+        stats: { hp: 100, damage: 10, defense: 1, speed: 300, radius: 50, mass: 1 },
+        appearance: { sides: 0, face: "default" }
+    };
+    const sim = new BattleSimulation([spec, { ...spec, id: "standard-no-ability-opponent" }], {
+        onLog() {},
+        onSound() {}
+    });
+    assert.equal(
+        sim.fighters[0].ability.constructor.name,
+        "Ability",
+        "none ability should bind the neutral Ability base class"
+    );
+    assert.equal(sim.fighters[0].ability.getUiState().label, "Passive", "none ability should not add active behavior");
+    console.log("[standard-no-ability] ok");
+}
+
 testRewardBalanceConfig();
+testNoAbilityStandardBallSupport();
 testShuffledUtility();
 testStatAllocationRules(app);
 testComponentBridgeCallsGameHandlers(app);
