@@ -11,6 +11,7 @@ import {
 import { getFaceTemplate } from "./mobAppearance.js";
 import { drawEquipmentItems } from "./equipmentVisuals.js";
 import { applyHeroOrbCarryoverToBattleBall, mergeHeroOrbCarryover, HERO_ORB_CARRYOVER_RATE } from "./heroOrb.js";
+import { createEquipmentCombatEffects } from "../hunting/equipmentEffects.js";
 
 export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMaterialBody]) {
     constructor(spec, position) {
@@ -76,6 +77,8 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         this.equipment = {
             items: Array.isArray(spec.equipment?.equippedItems) ? spec.equipment.equippedItems : []
         };
+        this.equipmentEffects = createEquipmentCombatEffects(this.equipment.items);
+        this._equipmentEffectCooldowns = { hpSteal: 0 };
         this.mastery = {
             physics: spec.mastery?.physics ?? {
                 incomingKnockbackReduce: 0,
@@ -270,7 +273,19 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
     }
 
     heal(amount) {
-        this.hp = Math.min(this.maxHp, this.hp + amount);
+        const restored = Math.min(Math.max(0, Math.round(amount)), this.maxHp - this.hp);
+        if (restored <= 0) return 0;
+        this.hp += restored;
+        this.simulation?.hooks?.onHpChanged?.(this.id, this.hp, this.maxHp);
+        return restored;
+    }
+
+    isEquipmentEffectReady(type) {
+        return (this._equipmentEffectCooldowns[type] ?? 0) <= 0;
+    }
+
+    triggerEquipmentEffectCooldown(type, duration) {
+        this._equipmentEffectCooldowns[type] = Math.max(0, duration);
     }
 
     getAbilityUiState() {
@@ -387,6 +402,9 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
                 this.state.wallSlam = null;
             }
         }
+        for (const type of Object.keys(this._equipmentEffectCooldowns)) {
+            this._equipmentEffectCooldowns[type] = Math.max(0, this._equipmentEffectCooldowns[type] - delta);
+        }
         this.actionContext.tickTimers(this, delta);
     }
 
@@ -397,6 +415,8 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
 
     takeDamage(amount, source, label = "Hit") {
         if (this.flags.defeated) return { actualDamage: 0 };
+        const sim = source?.simulation ?? this.simulation;
+        amount = sim?.modifyFighterCollisionDamage?.(amount, source, this, label) ?? amount;
         amount = this.actionContext.onDamageTaken(amount, source, label);
         const abilityDefMult = this.getStatModifiers().defense;
         const totalDefense = Math.round(this.stats.baseDefense * abilityDefMult);
@@ -405,11 +425,11 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         const actual = Math.min(rawActual, hpBefore);
         this.hp = Math.max(0, this.hp - actual);
         const actualDamage = hpBefore - this.hp;
-        const sim = source?.simulation ?? this.simulation;
         if (sim && actualDamage > 0) {
             sim.hooks?.onDamageTaken?.(this.id, actualDamage);
             if (source) sim.hooks?.onDamageDealt?.(source.id, actualDamage);
             sim.hooks?.onHpChanged?.(this.id, this.hp, this.maxHp);
+            sim.recordFighterCollisionDamage?.(source, this, actualDamage);
         }
         if (label !== "Wall Slam") {
             sim?.shakeScreen?.(0.16, Math.min(18, 7 + actual * 0.55));

@@ -121,7 +121,8 @@ export const REWARD_BALANCE = deepFreeze({
             crashDamage: { min: 5, max: 15 },
             cooldown: { min: 3, max: 10 },
             hpSteal: { min: 2, max: 8 }
-        }
+        },
+        hpStealCooldown: 2.5
     },
     progression: {
         masteryThresholds: [1, 5, 15],

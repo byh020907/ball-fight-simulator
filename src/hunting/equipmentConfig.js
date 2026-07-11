@@ -22,6 +22,12 @@ export const SPECIAL_OPTION_CHANCES = Object.freeze(
     )
 );
 export const SPECIAL_OPTION_POOL = EQUIPMENT.SPECIALS.POOL;
+export const EQUIPMENT_SPECIAL_OPTION_LABELS = Object.freeze(
+    Object.fromEntries(SPECIAL_OPTION_POOL.map((option) => [option.type, option.label]))
+);
+export const EQUIPMENT_SPECIAL_OPTION_SUFFIXES = Object.freeze(
+    Object.fromEntries(SPECIAL_OPTION_POOL.map((option) => [option.type, option.nameSuffix]))
+);
 export const STAT_TYPES = EQUIPMENT.STAT_TYPES;
 export const EQUIPMENT_STAT_VALUE_UNITS = EQUIPMENT.STAT_VALUE_UNITS;
 export const EQUIPMENT_NAME_PREFIXES = EQUIPMENT.NAME_PREFIXES;
@@ -116,10 +122,11 @@ export function createEquipmentInstance({ rarity = "common", slot = null, rng = 
         specialOptions = [{ type: option.type, value }];
     }
 
-    // Special options are intentionally excluded until their combat effects are implemented.
-    const { name, primaryStatType } = createEquipmentName(baseName, stats, {
+    const { name, primaryStatType, specialOptionType } = createEquipmentName(baseName, stats, {
         statValueUnits: EQUIPMENT_STAT_VALUE_UNITS,
         prefixes: EQUIPMENT_NAME_PREFIXES,
+        specialOptions: specialOptions ?? [],
+        specialSuffixes: EQUIPMENT_SPECIAL_OPTION_SUFFIXES,
         rng
     });
 
@@ -131,12 +138,17 @@ export function createEquipmentInstance({ rarity = "common", slot = null, rng = 
         name,
         baseName,
         primaryStatType,
+        specialOptionType,
         description,
         stats,
         specialOptions,
         enhanceLevel: 0,
         draw: EQUIPMENT_DRAW_KEYS[assignedSlot] ?? assignedSlot
     };
+}
+
+export function getEquipmentSpecialOptionLabel(type) {
+    return EQUIPMENT_SPECIAL_OPTION_LABELS[type] ?? type;
 }
 
 export function generateEquipmentFromRarity(rarity, rng = defaultRng) {

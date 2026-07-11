@@ -14,11 +14,26 @@ export function getDominantEquipmentStat(stats = [], statValueUnits = {}) {
     return dominant;
 }
 
-export function createEquipmentName(baseName, stats, { statValueUnits, prefixes, rng = Math.random } = {}) {
+export function createEquipmentName(
+    baseName,
+    stats,
+    { statValueUnits, prefixes, specialOptions = [], specialSuffixes = {}, rng = Math.random } = {}
+) {
     const primaryStatType = getDominantEquipmentStat(stats, statValueUnits);
     const candidates = prefixes?.[primaryStatType] ?? [];
-    if (!baseName || candidates.length === 0) return { name: baseName, primaryStatType };
+    const specialOptionType = specialOptions[0]?.type ?? null;
+    const specialSuffix = specialSuffixes[specialOptionType] ?? "";
+    if (!baseName || candidates.length === 0) {
+        const result = { name: specialSuffix ? `${baseName} ${specialSuffix}` : baseName, primaryStatType };
+        if (specialOptionType) result.specialOptionType = specialOptionType;
+        return result;
+    }
 
     const prefix = candidates[Math.floor(rng() * candidates.length)];
-    return { name: `${prefix} ${baseName}`, primaryStatType };
+    const result = {
+        name: `${prefix} ${baseName}${specialSuffix ? ` ${specialSuffix}` : ""}`,
+        primaryStatType
+    };
+    if (specialOptionType) result.specialOptionType = specialOptionType;
+    return result;
 }

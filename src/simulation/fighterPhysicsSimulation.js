@@ -76,13 +76,18 @@ export class FighterPhysicsSimulation extends Simulation {
         this.resolveFighterOverlap(a, b, result);
 
         const context = this.createFighterCollisionContext(a, b, result);
-        this.beforeFighterPhysicsCollision(context);
+        this.beginFighterPhysicsCollision(context);
+        try {
+            this.beforeFighterPhysicsCollision(context);
 
-        if (!context.skipPhysics) {
-            this.applyFighterRigidBodyCollision(context);
+            if (!context.skipPhysics) {
+                this.applyFighterRigidBodyCollision(context);
+            }
+
+            this.afterFighterPhysicsCollision(context);
+        } finally {
+            this.finalizeFighterPhysicsCollision(context);
         }
-
-        this.afterFighterPhysicsCollision(context);
 
         if (this.shouldEmitFighterCollisionFeedback(context)) {
             this.emitFighterCollisionFeedback(context);
@@ -136,6 +141,10 @@ export class FighterPhysicsSimulation extends Simulation {
     beforeFighterPhysicsCollision(_context) {}
 
     afterFighterPhysicsCollision(_context) {}
+
+    beginFighterPhysicsCollision(_context) {}
+
+    finalizeFighterPhysicsCollision(_context) {}
 
     getFighterCollisionImpactOptions(_context) {
         return { impactA: 1, impactB: 1 };

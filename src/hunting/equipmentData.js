@@ -80,19 +80,22 @@ export const EQUIPMENT = Object.freeze({
         POOL: Object.freeze([
             Object.freeze({
                 type: "crashDamage",
-                label: "충돌 피해",
+                label: "파쇄",
+                nameSuffix: "파쇄",
                 ...EQUIPMENT_BALANCE.specialRanges.crashDamage,
                 suffix: "%"
             }),
             Object.freeze({
                 type: "cooldown",
-                label: "쿨다운",
+                label: "순환",
+                nameSuffix: "순환",
                 ...EQUIPMENT_BALANCE.specialRanges.cooldown,
                 suffix: "%"
             }),
             Object.freeze({
                 type: "hpSteal",
-                label: "HP 흡혈",
+                label: "갈망",
+                nameSuffix: "갈망",
                 ...EQUIPMENT_BALANCE.specialRanges.hpSteal,
                 suffix: "%"
             })

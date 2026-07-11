@@ -10,11 +10,13 @@ export class Ability extends mixins([Cooldown]) {
         this._cooldownRemaining = this.cooldown;
     }
 
-    /** Effective cooldown after skill stat reduction. */
+    /** Effective cooldown after stat, mastery, and equipment reductions. */
     get cooldown() {
         const skill = this.owner.stats?.allocation?.skill ?? 0;
-        const factor = 100 / (100 + skill);
-        return this._baseCooldown * factor;
+        const skillMultiplier = 100 / (100 + skill);
+        const masteryMultiplier = Math.max(0.1, 1 - (this.owner.mastery?.action?.cooldownPercent ?? 0));
+        const equipmentMultiplier = this.owner.equipmentEffects?.abilityCooldownMultiplier ?? 1;
+        return this._baseCooldown * skillMultiplier * masteryMultiplier * equipmentMultiplier;
     }
 
     set cooldown(val) {

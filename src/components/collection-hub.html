@@ -17,7 +17,9 @@
             <span class="ch-summary">
                 <span>숙련도 <b x-text="state.summary.cumulativeLevels + '/' + state.summary.maxLevels"></b></span>
                 <span>·</span>
-                <span>업적 <b x-text="state.summary.unlockedAchievements + '/' + state.summary.totalAchievements"></b></span>
+                <span
+                    >업적 <b x-text="state.summary.unlockedAchievements + '/' + state.summary.totalAchievements"></b
+                ></span>
                 <span>·</span>
                 <span>숙련도 합계 <b x-text="state.summary.masteryTotal"></b></span>
             </span>
@@ -75,7 +77,10 @@
                                 <span class="ch-card-icon" x-text="item.name.charAt(0)"></span>
                                 <div class="ch-card-head-text">
                                     <span class="ch-card-name" x-text="item.name"></span>
-                                    <span class="ch-card-mastery" x-text="['-','☆','☆☆','☆☆☆'][item.masteryLevel]"></span>
+                                    <span
+                                        class="ch-card-mastery"
+                                        x-text="['-','☆','☆☆','☆☆☆'][item.masteryLevel]"
+                                    ></span>
                                 </div>
                             </div>
                             <div class="ch-card-body" x-bind:class="{ unplayed: !item.hasRecord }">
@@ -124,7 +129,9 @@
                             <span>토너먼트 완료 <b x-text="item.tournamentsCompleted"></b></span>
                             <span>토너먼트 우승 <b x-text="item.tournamentWins"></b></span>
                             <span>매치 승리 <b x-text="item.matchWins"></b></span>
-                            <span x-show="item.bestPlacement">최고 등수 <b x-text="item.bestPlacement + '위'"></b></span>
+                            <span x-show="item.bestPlacement"
+                                >최고 등수 <b x-text="item.bestPlacement + '위'"></b
+                            ></span>
                             <span>누적 피해 <b x-text="Number(item.totalDamageDealt || 0).toLocaleString()"></b></span>
                             <span x-show="item.comebackMatchWins">역전승 <b x-text="item.comebackMatchWins"></b></span>
                             <span>
@@ -156,7 +163,10 @@
                             <div class="ch-mast-source" x-text="item.sourceName"></div>
                             <div class="ch-mast-info">
                                 <strong x-text="item.name"></strong>
-                                <span class="ch-mast-tier" x-text="['미해금','BRONZE','SILVER','GOLD'][item.level]"></span>
+                                <span
+                                    class="ch-mast-tier"
+                                    x-text="['미해금','BRONZE','SILVER','GOLD'][item.level]"
+                                ></span>
                                 <span
                                     class="ch-mast-desc"
                                     x-text="item.level > 0 ? item.description.replace('{value}', item.formatValue(item.tierValues[item.level])) : (item.description.replace('{value}', item.formatValue(item.tierValues[1])) + ' · 미해금')"
@@ -203,10 +213,18 @@
                             <div class="ch-ach-info">
                                 <strong x-text="item.name"></strong>
                                 <span class="ch-ach-desc" x-text="item.description"></span>
-                                <span class="ch-ach-reward" x-show="item.rewardText" x-text="'보상: ' + item.rewardText"></span>
+                                <span
+                                    class="ch-ach-reward"
+                                    x-show="item.rewardText"
+                                    x-text="'보상: ' + item.rewardText"
+                                ></span>
                             </div>
                             <div class="ch-ach-status">
-                                <span class="ch-ach-tier-label" x-text="item.tier" x-bind:class="'ch-tier--' + item.tier"></span>
+                                <span
+                                    class="ch-ach-tier-label"
+                                    x-text="item.tier"
+                                    x-bind:class="'ch-tier--' + item.tier"
+                                ></span>
                             </div>
                         </div>
                     </template>
@@ -261,7 +279,9 @@
                             </div>
                         </div>
                     </template>
-                    <div class="ch-empty" x-show="state.filteredStorageItems.length === 0">보관 중인 상자가 없습니다</div>
+                    <div class="ch-empty" x-show="state.filteredStorageItems.length === 0">
+                        보관 중인 상자가 없습니다
+                    </div>
                 </div>
             </div>
         </div>
@@ -274,22 +294,32 @@
             <div class="ch-equip-slots">
                 <h4>장착 슬롯</h4>
                 <div class="ch-equip-slot-grid">
-                    <template x-for="(slotName, slotId) in { weapon: '무기', armor: '방어구', accessory1: '장신구1', accessory2: '장신구2' }">
+                    <template
+                        x-for="(slotName, slotId) in { weapon: '무기', armor: '방어구', accessory1: '장신구1', accessory2: '장신구2' }"
+                    >
                         <div class="ch-equip-slot-card">
                             <div class="ch-equip-slot-label" x-text="slotName"></div>
                             <div class="ch-equip-slot-item" x-text="state.equipment.equippedSlots[slotId] || '—'"></div>
                         </div>
                     </template>
                 </div>
-                <div style="margin-top:10px;display:flex;align-items:center;gap:8px;font-size:0.8rem">
-                    <span>인벤토리 <b x-text="state.equipment.inventoryUsed"></b>/<b x-text="state.equipment.inventorySlots"></b></span>
+                <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px; font-size: 0.8rem">
+                    <span
+                        >인벤토리 <b x-text="state.equipment.inventoryUsed"></b>/<b
+                            x-text="state.equipment.inventorySlots"
+                        ></b
+                    ></span>
                     <button
                         class="ch-btn"
                         x-show="state.equipment.canExpand"
                         @click="bridge.expandInventory()"
                         x-text="`확장 (파편 ${state.equipment.expandCost} · +${state.equipment.expandGain}칸)`"
                     ></button>
-                    <span x-show="!state.equipment.canExpand && state.equipment.inventoryUsed >= state.equipment.inventorySlots" style="color:#dc2626;font-size:0.72rem">가득 참 — 장비를 분해하거나 확장하세요</span>
+                    <span
+                        x-show="!state.equipment.canExpand && state.equipment.inventoryUsed >= state.equipment.inventorySlots"
+                        style="color: #dc2626; font-size: 0.72rem"
+                        >가득 참 — 장비를 분해하거나 확장하세요</span
+                    >
                 </div>
             </div>
             <div class="ch-equip-list">
@@ -301,14 +331,21 @@
                             <span class="ch-equip-rarity" x-text="item.rarity"></span>
                             <span class="ch-equip-slot-badge" x-text="'Lv.' + item.requiredLevel"></span>
                             <span class="ch-equip-slot-badge" x-text="item.slot"></span>
-                            <span class="ch-equip-enhance" x-show="item.enhanceLevel > 0" x-text="'+' + item.enhanceLevel"></span>
+                            <span
+                                class="ch-equip-enhance"
+                                x-show="item.enhanceLevel > 0"
+                                x-text="'+' + item.enhanceLevel"
+                            ></span>
                         </div>
                         <div class="ch-equip-card-stats">
                             <template x-for="stat in item.stats">
                                 <span class="ch-equip-stat" x-text="stat.type + ' +' + stat.value"></span>
                             </template>
-                            <template x-if="item.specialOptions">
-                                <span class="ch-equip-stat ch-equip-stat--special" x-text="'특수: ' + item.specialOptions.map(o => o.type + ' +' + o.value + '%').join(', ')"></span>
+                            <template x-if="item.specialOptions.length > 0">
+                                <span
+                                    class="ch-equip-stat ch-equip-stat--special"
+                                    x-text="'특수: ' + item.specialOptions.map(o => o.label + ' +' + o.value + '%').join(', ')"
+                                ></span>
                             </template>
                         </div>
                         <div class="ch-equip-card-actions">
@@ -495,644 +532,644 @@
 </script>
 
 <style scoped>
-:scope {
-    position: fixed;
-    inset: 0;
-    z-index: 800;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.55);
-}
+    :scope {
+        position: fixed;
+        inset: 0;
+        z-index: 800;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.55);
+    }
 
-.ch-frame {
-    background: #ffffff;
-    color: #202020;
-    border-radius: 16px;
-    width: min(920px, 90vw);
-    max-height: 85vh;
-    border: 2px solid #202020;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-@media (max-width: 600px) {
     .ch-frame {
-        width: min(760px, 96vw);
-        border-radius: 10px;
+        background: #ffffff;
+        color: #202020;
+        border-radius: 16px;
+        width: min(920px, 90vw);
+        max-height: 85vh;
+        border: 2px solid #202020;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
     }
-}
 
-.ch-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 16px;
-    border-bottom: 2px solid #202020;
-    flex-shrink: 0;
-}
+    @media (max-width: 600px) {
+        .ch-frame {
+            width: min(760px, 96vw);
+            border-radius: 10px;
+        }
+    }
 
-.ch-title {
-    font-size: 1.1rem;
-    font-weight: 900;
-}
+    .ch-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 16px;
+        border-bottom: 2px solid #202020;
+        flex-shrink: 0;
+    }
 
-.ch-summary {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.75rem;
-    color: #333333;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
+    .ch-title {
+        font-size: 1.1rem;
+        font-weight: 900;
+    }
 
-.ch-close {
-    margin-left: auto;
-    width: 32px;
-    height: 32px;
-    border: 2px solid #202020;
-    border-radius: 8px;
-    background: none;
-    cursor: pointer;
-    flex-shrink: 0;
-    font-size: 0.85rem;
-}
+    .ch-summary {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.75rem;
+        color: #333333;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
 
-.ch-tabs {
-    display: flex;
-    border-bottom: 2px solid #202020;
-    overflow-x: auto;
-    flex-shrink: 0;
-}
+    .ch-close {
+        margin-left: auto;
+        width: 32px;
+        height: 32px;
+        border: 2px solid #202020;
+        border-radius: 8px;
+        background: none;
+        cursor: pointer;
+        flex-shrink: 0;
+        font-size: 0.85rem;
+    }
 
-.ch-tab {
-    padding: 10px 20px;
-    border: none;
-    border-bottom: 3px solid transparent;
-    background: #eeeeee;
-    cursor: pointer;
-    font-size: 0.85rem;
-    font-weight: 700;
-    transition: background 0.1s, border-color 0.1s;
-    flex-shrink: 0;
-}
+    .ch-tabs {
+        display: flex;
+        border-bottom: 2px solid #202020;
+        overflow-x: auto;
+        flex-shrink: 0;
+    }
 
-.ch-tab.active {
-    background: #ffffff;
-    border-bottom-color: #202020;
-}
+    .ch-tab {
+        padding: 10px 20px;
+        border: none;
+        border-bottom: 3px solid transparent;
+        background: #eeeeee;
+        cursor: pointer;
+        font-size: 0.85rem;
+        font-weight: 700;
+        transition: background 0.1s, border-color 0.1s;
+        flex-shrink: 0;
+    }
 
-.ch-toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    padding: 8px;
-    border-bottom: 1px solid #e0e0e0;
-    flex-shrink: 0;
-}
+    .ch-tab.active {
+        background: #ffffff;
+        border-bottom-color: #202020;
+    }
 
-.ch-search {
-    flex: 1;
-    min-width: 120px;
-    padding: 6px 8px;
-    border: 2px solid #202020;
-    border-radius: 6px;
-    font-size: 0.8rem;
-    font-family: inherit;
-}
+    .ch-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 8px;
+        border-bottom: 1px solid #e0e0e0;
+        flex-shrink: 0;
+    }
 
-.ch-select {
-    padding: 6px 8px;
-    border: 2px solid #202020;
-    border-radius: 6px;
-    font-size: 0.8rem;
-    min-height: 36px;
-    background: #ffffff;
-    font-family: inherit;
-}
+    .ch-search {
+        flex: 1;
+        min-width: 120px;
+        padding: 6px 8px;
+        border: 2px solid #202020;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-family: inherit;
+    }
 
-.ch-storage-currency {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 10px;
-    border: 2px solid #202020;
-    border-radius: 6px;
-    font-size: 0.75rem;
-    font-weight: 700;
-    background: #ffffff;
-}
+    .ch-select {
+        padding: 6px 8px;
+        border: 2px solid #202020;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        min-height: 36px;
+        background: #ffffff;
+        font-family: inherit;
+    }
 
-.ch-content {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-height: 400px;
-    overflow: hidden;
-}
+    .ch-storage-currency {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 10px;
+        border: 2px solid #202020;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        background: #ffffff;
+    }
 
-.ch-scroll-region {
-    flex: 1;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding: 8px;
-}
+    .ch-content {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 400px;
+        overflow: hidden;
+    }
 
-.ch-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-}
+    .ch-scroll-region {
+        flex: 1;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding: 8px;
+    }
 
-@media (max-width: 360px) {
     .ch-grid {
-        grid-template-columns: 1fr;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
     }
-}
-
-.ch-card {
-    border: 2px solid #202020;
-    border-radius: 8px;
-    cursor: pointer;
-    overflow: hidden;
-    transition: box-shadow 0.12s;
-}
-
-.ch-card.selected {
-    box-shadow: 0 0 0 3px #006bb8;
-}
-
-.ch-card-head {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 10px;
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: #ffffff;
-}
-
-.ch-card-head.unplayed {
-    opacity: 0.55;
-}
-
-.ch-card-icon {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: rgba(0, 0, 0, 0.2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    font-size: 0.85rem;
-    font-weight: 900;
-}
-
-.ch-card-head-text {
-    display: flex;
-    flex: 1;
-    justify-content: space-between;
-    align-items: center;
-    min-width: 0;
-}
-
-.ch-card-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.ch-card-mastery {
-    font-size: 0.7rem;
-    flex-shrink: 0;
-}
-
-.ch-card-body {
-    padding: 6px 10px 8px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 8px;
-    font-size: 0.72rem;
-    color: #333333;
-}
-
-.ch-xp-chip {
-    color: #006bb8;
-    font-weight: 700;
-}
-
-.ch-empty-badge {
-    color: #777777;
-    font-style: italic;
-}
-
-.ch-mast-badge {
-    color: #1a7d3a;
-    font-weight: 700;
-}
-
-.ch-current-badge {
-    color: #006bb8;
-    font-weight: 700;
-}
-
-.ch-empty {
-    grid-column: 1 / -1;
-    text-align: center;
-    padding: 32px 16px;
-    color: #888888;
-    font-size: 0.82rem;
-}
-
-.ch-detail {
-    border-top: 2px solid #e0e0e0;
-    padding: 12px 16px;
-}
-
-.ch-detail-close {
-    margin-bottom: 10px;
-}
-
-.ch-detail-close button {
-    background: none;
-    border: none;
-    color: #006bb8;
-    cursor: pointer;
-    font-size: 0.82rem;
-    font-weight: 700;
-    padding: 0;
-    font-family: inherit;
-}
-
-.ch-detail-body {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    font-size: 0.8rem;
-    color: #333333;
-}
-
-
-
-.ch-detail-xp {
-    border: 2px solid #202020;
-    border-radius: 8px;
-    padding: 10px 12px;
-    background: #ffffff;
-    display: grid;
-    gap: 6px;
-}
-
-.ch-detail-xp-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 0.82rem;
-}
-
-.ch-detail-xp-bar {
-    height: 10px;
-    border: 2px solid #202020;
-    background: #eeeeee;
-    overflow: hidden;
-}
-
-.ch-detail-xp-fill {
-    height: 100%;
-    transition: width 0.3s;
-}
-
-.ch-detail-xp-foot {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.72rem;
-    color: #555555;
-}
-
-.ch-detail-xp-reward {
-    font-size: 0.7rem;
-    color: #1a7d3a;
-    font-weight: 700;
-}
-
-.ch-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.ch-mast-card {
-    display: flex;
-    gap: 10px;
-    padding: 12px;
-    border: 1px solid #dddddd;
-    border-radius: 8px;
-    background: #fafafa;
-}
-
-.ch-mast-card.unlocked {
-    border: 2px solid #202020;
-    background: #ffffff;
-}
-
-.ch-mast-card.active {
-    border-color: #1a7d3a;
-}
-
-.ch-mast-source {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    background: #202020;
-    color: #ffffff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.65rem;
-    font-weight: 700;
-    text-align: center;
-    flex-shrink: 0;
-}
-
-}
-
-.ch-mast-tier {
-    font-size: 0.7rem;
-    color: #888888;
-    font-weight: 700;
-}
-
-.ch-mast-desc {
-    font-size: 0.78rem;
-    color: #333333;
-    line-height: 1.4;
-}
-
-.ch-mast-next {
-    font-size: 0.72rem;
-    color: #888888;
-}
-
-.ch-mast-status {
-    flex-shrink: 0;
-    align-self: center;
-}
-
-.ch-mast-badge--self {
-    color: #777777;
-}
-
-.ch-mast-badge--locked {
-    color: #999999;
-}
-
-.ch-ach-card {
-    display: flex;
-    gap: 10px;
-    padding: 12px;
-    border: 1px solid #dddddd;
-    border-radius: 8px;
-    background: #fafafa;
-}
-
-.ch-ach-card.unlocked {
-    border: 2px solid #202020;
-    background: #ffffff;
-}
-
-}
-
-.ch-ach-desc {
-    font-size: 0.78rem;
-    color: #333333;
-    line-height: 1.4;
-}
-
-.ch-ach-reward {
-    font-size: 0.7rem;
-    color: #777777;
-}
-
-.ch-ach-status {
-    flex-shrink: 0;
-    align-self: center;
-}
-
-.ch-ach-tier-label {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 0.68rem;
-    font-weight: 700;
-    text-align: center;
-    background: #eeeeee;
-    color: #555555;
-}
-
-.ch-ach-tier-label.unlocked {
-    background: #202020;
-    color: #ffffff;
-}
-
-.ch-tier--bronze {
-    background: #cd7f32;
-    color: #ffffff;
-}
-
-.ch-tier--silver {
-    background: #9ca3af;
-    color: #ffffff;
-}
-
-.ch-tier--gold {
-    background: #d4a017;
-    color: #ffffff;
-}
-
-.ch-ach-tier--bronze.unlocked {
-    border-color: #cd7f32;
-}
-
-.ch-ach-tier--silver.unlocked {
-    border-color: #9ca3af;
-}
-
-.ch-ach-tier--gold.unlocked {
-    border-color: #d4a017;
-}
-
-.ch-chest--common {
-    border-left: 4px solid #9ca3af;
-}
-
-.ch-chest--uncommon {
-    border-left: 4px solid #28a447;
-}
-
-.ch-chest--rare {
-    border-left: 4px solid #d4a017;
-}
-
-.ch-chest--epic {
-    border-left: 4px solid #a855f7;
-}
-
-.ch-chest--legendary {
-    border-left: 4px solid #f59e0b;
-    box-shadow: 0 0 6px rgba(245, 158, 11, 0.3);
-}
-
-.ch-equip-slots {
-    margin-bottom: 16px;
-    padding: 8px 8px 0;
-    flex-shrink: 0;
-}
-
-.ch-equip-list {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 0 8px 8px;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-}
-
-.ch-equip-slot-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 8px;
-}
-
-.ch-equip-slot-card {
-    border: 2px solid #202020;
-    border-radius: 8px;
-    padding: 8px 10px;
-    background: #fafafa;
-}
-
-.ch-equip-slot-label {
-    font-size: 0.7rem;
-    color: #777777;
-    margin-bottom: 2px;
-}
-
-}
-
-}
-
-.ch-equip-card {
-    border: 2px solid #202020;
-    border-radius: 8px;
-    padding: 10px 12px;
-    background: #ffffff;
-}
-
-.ch-equip-card-header {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 6px;
-}
-
-.ch-equip-rarity {
-    font-size: 0.65rem;
-    padding: 1px 6px;
-    border-radius: 4px;
-    background: #eeeeee;
-    color: #555555;
-    text-transform: uppercase;
-}
-
-.ch-equip-slot-badge {
-    font-size: 0.65rem;
-    padding: 1px 6px;
-    border-radius: 4px;
-    background: #e0e0e0;
-    color: #555555;
-}
-
-.ch-equip-card-stats {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-bottom: 6px;
-}
-
-.ch-equip-stat {
-    font-size: 0.72rem;
-    padding: 2px 6px;
-    border-radius: 4px;
-    background: #eef2ff;
-    color: #4338ca;
-}
-
-.ch-equip-stat--special {
-    background: #fef3c7;
-    color: #92400e;
-}
-
-.ch-equip-enhance {
-    font-size: 0.7rem;
-    padding: 1px 6px;
-    border-radius: 4px;
-    background: #fbbf24;
-    color: #92400e;
-    font-weight: 800;
-    margin-left: auto;
-}
-
-.ch-equip-card-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-}
-
-.ch-btn {
-    padding: 4px 12px;
-    border: 2px solid #202020;
-    border-radius: 6px;
-    background: #ffffff;
-    font-size: 0.72rem;
-    font-weight: 700;
-    cursor: pointer;
-}
-
-.ch-btn:disabled {
-    border-color: #cccccc;
-    color: #999999;
-    cursor: not-allowed;
-}
-
-.ch-btn--danger {
-    border-color: #dc2626;
-    color: #dc2626;
-}
-
-.ch-equip--common {
-    border-left: 4px solid #9ca3af;
-}
-
-.ch-equip--uncommon {
-    border-left: 4px solid #28a447;
-}
-
-.ch-equip--rare {
-    border-left: 4px solid #d4a017;
-}
-
-.ch-equip--epic {
-    border-left: 4px solid #a855f7;
-}
-
-.ch-equip--legendary {
-    border-left: 4px solid #f59e0b;
-    box-shadow: 0 0 6px rgba(245, 158, 11, 0.3);
-}
+
+    @media (max-width: 360px) {
+        .ch-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .ch-card {
+        border: 2px solid #202020;
+        border-radius: 8px;
+        cursor: pointer;
+        overflow: hidden;
+        transition: box-shadow 0.12s;
+    }
+
+    .ch-card.selected {
+        box-shadow: 0 0 0 3px #006bb8;
+    }
+
+    .ch-card-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #ffffff;
+    }
+
+    .ch-card-head.unplayed {
+        opacity: 0.55;
+    }
+
+    .ch-card-icon {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 0.85rem;
+        font-weight: 900;
+    }
+
+    .ch-card-head-text {
+        display: flex;
+        flex: 1;
+        justify-content: space-between;
+        align-items: center;
+        min-width: 0;
+    }
+
+    .ch-card-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .ch-card-mastery {
+        font-size: 0.7rem;
+        flex-shrink: 0;
+    }
+
+    .ch-card-body {
+        padding: 6px 10px 8px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 8px;
+        font-size: 0.72rem;
+        color: #333333;
+    }
+
+    .ch-xp-chip {
+        color: #006bb8;
+        font-weight: 700;
+    }
+
+    .ch-empty-badge {
+        color: #777777;
+        font-style: italic;
+    }
+
+    .ch-mast-badge {
+        color: #1a7d3a;
+        font-weight: 700;
+    }
+
+    .ch-current-badge {
+        color: #006bb8;
+        font-weight: 700;
+    }
+
+    .ch-empty {
+        grid-column: 1 / -1;
+        text-align: center;
+        padding: 32px 16px;
+        color: #888888;
+        font-size: 0.82rem;
+    }
+
+    .ch-detail {
+        border-top: 2px solid #e0e0e0;
+        padding: 12px 16px;
+    }
+
+    .ch-detail-close {
+        margin-bottom: 10px;
+    }
+
+    .ch-detail-close button {
+        background: none;
+        border: none;
+        color: #006bb8;
+        cursor: pointer;
+        font-size: 0.82rem;
+        font-weight: 700;
+        padding: 0;
+        font-family: inherit;
+    }
+
+    .ch-detail-body {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 0.8rem;
+        color: #333333;
+    }
+
+
+
+    .ch-detail-xp {
+        border: 2px solid #202020;
+        border-radius: 8px;
+        padding: 10px 12px;
+        background: #ffffff;
+        display: grid;
+        gap: 6px;
+    }
+
+    .ch-detail-xp-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.82rem;
+    }
+
+    .ch-detail-xp-bar {
+        height: 10px;
+        border: 2px solid #202020;
+        background: #eeeeee;
+        overflow: hidden;
+    }
+
+    .ch-detail-xp-fill {
+        height: 100%;
+        transition: width 0.3s;
+    }
+
+    .ch-detail-xp-foot {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.72rem;
+        color: #555555;
+    }
+
+    .ch-detail-xp-reward {
+        font-size: 0.7rem;
+        color: #1a7d3a;
+        font-weight: 700;
+    }
+
+    .ch-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .ch-mast-card {
+        display: flex;
+        gap: 10px;
+        padding: 12px;
+        border: 1px solid #dddddd;
+        border-radius: 8px;
+        background: #fafafa;
+    }
+
+    .ch-mast-card.unlocked {
+        border: 2px solid #202020;
+        background: #ffffff;
+    }
+
+    .ch-mast-card.active {
+        border-color: #1a7d3a;
+    }
+
+    .ch-mast-source {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: #202020;
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.65rem;
+        font-weight: 700;
+        text-align: center;
+        flex-shrink: 0;
+    }
+
+    }
+
+    .ch-mast-tier {
+        font-size: 0.7rem;
+        color: #888888;
+        font-weight: 700;
+    }
+
+    .ch-mast-desc {
+        font-size: 0.78rem;
+        color: #333333;
+        line-height: 1.4;
+    }
+
+    .ch-mast-next {
+        font-size: 0.72rem;
+        color: #888888;
+    }
+
+    .ch-mast-status {
+        flex-shrink: 0;
+        align-self: center;
+    }
+
+    .ch-mast-badge--self {
+        color: #777777;
+    }
+
+    .ch-mast-badge--locked {
+        color: #999999;
+    }
+
+    .ch-ach-card {
+        display: flex;
+        gap: 10px;
+        padding: 12px;
+        border: 1px solid #dddddd;
+        border-radius: 8px;
+        background: #fafafa;
+    }
+
+    .ch-ach-card.unlocked {
+        border: 2px solid #202020;
+        background: #ffffff;
+    }
+
+    }
+
+    .ch-ach-desc {
+        font-size: 0.78rem;
+        color: #333333;
+        line-height: 1.4;
+    }
+
+    .ch-ach-reward {
+        font-size: 0.7rem;
+        color: #777777;
+    }
+
+    .ch-ach-status {
+        flex-shrink: 0;
+        align-self: center;
+    }
+
+    .ch-ach-tier-label {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-align: center;
+        background: #eeeeee;
+        color: #555555;
+    }
+
+    .ch-ach-tier-label.unlocked {
+        background: #202020;
+        color: #ffffff;
+    }
+
+    .ch-tier--bronze {
+        background: #cd7f32;
+        color: #ffffff;
+    }
+
+    .ch-tier--silver {
+        background: #9ca3af;
+        color: #ffffff;
+    }
+
+    .ch-tier--gold {
+        background: #d4a017;
+        color: #ffffff;
+    }
+
+    .ch-ach-tier--bronze.unlocked {
+        border-color: #cd7f32;
+    }
+
+    .ch-ach-tier--silver.unlocked {
+        border-color: #9ca3af;
+    }
+
+    .ch-ach-tier--gold.unlocked {
+        border-color: #d4a017;
+    }
+
+    .ch-chest--common {
+        border-left: 4px solid #9ca3af;
+    }
+
+    .ch-chest--uncommon {
+        border-left: 4px solid #28a447;
+    }
+
+    .ch-chest--rare {
+        border-left: 4px solid #d4a017;
+    }
+
+    .ch-chest--epic {
+        border-left: 4px solid #a855f7;
+    }
+
+    .ch-chest--legendary {
+        border-left: 4px solid #f59e0b;
+        box-shadow: 0 0 6px rgba(245, 158, 11, 0.3);
+    }
+
+    .ch-equip-slots {
+        margin-bottom: 16px;
+        padding: 8px 8px 0;
+        flex-shrink: 0;
+    }
+
+    .ch-equip-list {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 0 8px 8px;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    .ch-equip-slot-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 8px;
+    }
+
+    .ch-equip-slot-card {
+        border: 2px solid #202020;
+        border-radius: 8px;
+        padding: 8px 10px;
+        background: #fafafa;
+    }
+
+    .ch-equip-slot-label {
+        font-size: 0.7rem;
+        color: #777777;
+        margin-bottom: 2px;
+    }
+
+    }
+
+    }
+
+    .ch-equip-card {
+        border: 2px solid #202020;
+        border-radius: 8px;
+        padding: 10px 12px;
+        background: #ffffff;
+    }
+
+    .ch-equip-card-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 6px;
+    }
+
+    .ch-equip-rarity {
+        font-size: 0.65rem;
+        padding: 1px 6px;
+        border-radius: 4px;
+        background: #eeeeee;
+        color: #555555;
+        text-transform: uppercase;
+    }
+
+    .ch-equip-slot-badge {
+        font-size: 0.65rem;
+        padding: 1px 6px;
+        border-radius: 4px;
+        background: #e0e0e0;
+        color: #555555;
+    }
+
+    .ch-equip-card-stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-bottom: 6px;
+    }
+
+    .ch-equip-stat {
+        font-size: 0.72rem;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: #eef2ff;
+        color: #4338ca;
+    }
+
+    .ch-equip-stat--special {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .ch-equip-enhance {
+        font-size: 0.7rem;
+        padding: 1px 6px;
+        border-radius: 4px;
+        background: #fbbf24;
+        color: #92400e;
+        font-weight: 800;
+        margin-left: auto;
+    }
+
+    .ch-equip-card-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .ch-btn {
+        padding: 4px 12px;
+        border: 2px solid #202020;
+        border-radius: 6px;
+        background: #ffffff;
+        font-size: 0.72rem;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .ch-btn:disabled {
+        border-color: #cccccc;
+        color: #999999;
+        cursor: not-allowed;
+    }
+
+    .ch-btn--danger {
+        border-color: #dc2626;
+        color: #dc2626;
+    }
+
+    .ch-equip--common {
+        border-left: 4px solid #9ca3af;
+    }
+
+    .ch-equip--uncommon {
+        border-left: 4px solid #28a447;
+    }
+
+    .ch-equip--rare {
+        border-left: 4px solid #d4a017;
+    }
+
+    .ch-equip--epic {
+        border-left: 4px solid #a855f7;
+    }
+
+    .ch-equip--legendary {
+        border-left: 4px solid #f59e0b;
+        box-shadow: 0 0 6px rgba(245, 158, 11, 0.3);
+    }
 </style>

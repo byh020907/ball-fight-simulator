@@ -289,11 +289,62 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         damageFromBToA = bCollision.outgoingDamage;
         damageFromAToB = bCollision.incomingDamage;
 
-        if (damageFromBToA > 0) a.takeDamage(damageFromBToA, b, "Crash");
-        if (damageFromAToB > 0) b.takeDamage(damageFromAToB, a, "Crash");
+        const damageToA = damageFromBToA > 0 ? a.takeDamage(damageFromBToA, b, "Crash").actualDamage : 0;
+        const damageToB = damageFromAToB > 0 ? b.takeDamage(damageFromAToB, a, "Crash").actualDamage : 0;
 
-        context.damageFromAToB = damageFromAToB;
-        context.damageFromBToA = damageFromBToA;
+        context.damageFromAToB = damageToB;
+        context.damageFromBToA = damageToA;
+    }
+
+    beginFighterPhysicsCollision(context) {
+        if (!context.hostile) return;
+        context.damageByAttacker = new Map([
+            [context.a, 0],
+            [context.b, 0]
+        ]);
+        this._activeFighterCollisionContext = context;
+    }
+
+    finalizeFighterPhysicsCollision(context) {
+        try {
+            if (context.hostile) this._applyCollisionHpSteal(context);
+        } finally {
+            if (this._activeFighterCollisionContext === context) {
+                this._activeFighterCollisionContext = null;
+            }
+        }
+    }
+
+    modifyFighterCollisionDamage(amount, source, target) {
+        const context = this._activeFighterCollisionContext;
+        if (!context || !this._isFighterCollisionPair(context, source, target)) return amount;
+        return amount * (source.equipmentEffects?.crashDamageMultiplier ?? 1);
+    }
+
+    recordFighterCollisionDamage(source, target, actualDamage) {
+        const context = this._activeFighterCollisionContext;
+        if (!context || !this._isFighterCollisionPair(context, source, target) || actualDamage <= 0) return;
+        context.damageByAttacker.set(source, (context.damageByAttacker.get(source) ?? 0) + actualDamage);
+    }
+
+    _isFighterCollisionPair(context, source, target) {
+        return (source === context.a && target === context.b) || (source === context.b && target === context.a);
+    }
+
+    _applyCollisionHpSteal(context) {
+        for (const attacker of [context.a, context.b]) {
+            const totalActualDamage = context.damageByAttacker.get(attacker) ?? 0;
+            const effects = attacker.equipmentEffects;
+            if (totalActualDamage <= 0 || effects.hpStealRatio <= 0 || attacker.hp >= attacker.maxHp) continue;
+            if (!attacker.isEquipmentEffectReady("hpSteal")) continue;
+
+            const restored = attacker.heal(totalActualDamage * effects.hpStealRatio);
+            if (restored <= 0) continue;
+
+            attacker.triggerEquipmentEffectCooldown("hpSteal", effects.hpStealCooldown);
+            this.spawnActionText(attacker.position.clone(), `갈망 +${restored} HP`, "#44cc66");
+            this.addLog(`${attacker.name} restores ${restored} HP with 갈망.`);
+        }
     }
 
     getFighterCollisionImpactOptions(context) {

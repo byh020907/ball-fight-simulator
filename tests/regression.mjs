@@ -107,8 +107,10 @@ import {
     getEquipmentRequiredLevel,
     EQUIPMENT_STAT_VALUE_UNITS,
     EQUIPMENT_NAME_PREFIXES,
+    EQUIPMENT_SPECIAL_OPTION_SUFFIXES,
     ENHANCE_MAX_LEVEL
 } from "../src/hunting/equipmentConfig.js";
+import { createEquipmentCombatEffects } from "../src/hunting/equipmentEffects.js";
 import { EQUIPMENT } from "../src/hunting/equipmentData.js";
 import { createEquipmentName, getDominantEquipmentStat } from "../src/hunting/equipmentNaming.js";
 import { createHuntingTerrain } from "../src/terrain/terrainFactory.js";
@@ -2758,7 +2760,97 @@ function testEquipmentNaming() {
     assert.equal(item.baseName, "녹슨 검", "Generated equipment should retain its base name");
     assert.equal(item.primaryStatType, "hp", "Generated equipment should store its primary stat type");
     assert.equal(item.name, "튼튼한 녹슨 검", "Generated equipment should show its primary-stat prefix");
+
+    assert.deepEqual(
+        createEquipmentName("철검", stats, {
+            statValueUnits: EQUIPMENT_STAT_VALUE_UNITS,
+            prefixes: EQUIPMENT_NAME_PREFIXES,
+            specialOptions: [{ type: "hpSteal", value: 8 }],
+            specialSuffixes: EQUIPMENT_SPECIAL_OPTION_SUFFIXES,
+            rng: () => 0
+        }),
+        { name: "질풍의 철검 갈망", primaryStatType: "speed", specialOptionType: "hpSteal" },
+        "Equipment special options should appear as a suffix"
+    );
     console.log("[equipment-naming] ok");
+}
+
+function testEquipmentSpecialCombatEffects() {
+    const effects = createEquipmentCombatEffects([
+        {
+            specialOptions: [
+                { type: "crashDamage", value: 5 },
+                { type: "hpSteal", value: 2 }
+            ]
+        },
+        {
+            specialOptions: [
+                { type: "crashDamage", value: 15 },
+                { type: "cooldown", value: 10 }
+            ]
+        },
+        { specialOptions: [{ type: "hpSteal", value: 8 }] }
+    ]);
+    assert.equal(effects.crashDamageMultiplier, 1.15, "Duplicate 파쇄 options should use only the highest value");
+    assert.equal(effects.abilityCooldownMultiplier, 0.9, "순환 should shorten ability cooldown by its percentage");
+    assert.equal(effects.hpStealRatio, 0.08, "Duplicate 갈망 options should use only the highest value");
+    assert.equal(effects.hpStealCooldown, 2.5, "갈망 should use the configured 2.5 second cooldown");
+
+    const logs = [];
+    const createSpec = (id, specialOptions = []) => ({
+        id,
+        teamId: id,
+        name: id,
+        title: "",
+        description: "",
+        color: "#777777",
+        face: "default",
+        ability: "dash",
+        stats: { hp: 100, damage: 10, defense: 1, speed: 300, radius: 50, mass: 1 },
+        equipment: { equippedItems: [{ instanceId: `${id}-equipment`, specialOptions }] }
+    });
+    const sim = new BattleSimulation(
+        [
+            createSpec("attacker", [
+                { type: "crashDamage", value: 15 },
+                { type: "cooldown", value: 10 },
+                { type: "hpSteal", value: 8 }
+            ]),
+            createSpec("defender")
+        ],
+        { onLog: (message) => logs.push(message), onSound() {} },
+        null,
+        { assignActions: false }
+    );
+    const [attacker, defender] = sim.fighters;
+    assert.equal(attacker.ability.cooldown, 2.7, "순환 should affect the equipped fighter's ability cooldown");
+
+    attacker.hp = 60;
+    attacker.position = new Vector2(400, 480);
+    defender.position = new Vector2(480, 480);
+    attacker.velocity = new Vector2(520, 0);
+    defender.velocity = new Vector2(-120, 0);
+    attacker.state.movement = new DashEffect({
+        duration: 1,
+        multiplier: 1,
+        color: attacker.color,
+        collisionDamage: 24,
+        collisionLabel: "Dash Contact",
+        untilImpact: true
+    });
+
+    const context = sim.handleFighterCollision(attacker, defender);
+    assert.ok(context, "Overlapping fighters should produce a collision transaction");
+    assert.ok(
+        context.damageByAttacker.get(attacker) > context.damageFromAToB,
+        "갈망 damage ledger should include dash contact damage after base collision damage"
+    );
+    assert.ok(
+        logs.some((message) => message.includes("갈망")),
+        "갈망 should restore after a hostile collision transaction"
+    );
+    assert.equal(attacker._equipmentEffectCooldowns.hpSteal, 2.5, "갈망 should enter its own cooldown after restoring");
+    console.log("[equipment-special-combat-effects] ok");
 }
 
 function testEquipmentLevelRequirement() {
@@ -6674,6 +6766,7 @@ testHuntingTerrain();
 testEquipmentEnhancement();
 testEquipmentStatValueUnits();
 testEquipmentNaming();
+testEquipmentSpecialCombatEffects();
 testEquipmentLevelRequirement();
 testEquipmentDraw();
 testAlpineTemplateComponentSystem();
