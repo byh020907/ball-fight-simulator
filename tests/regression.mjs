@@ -34,7 +34,8 @@ import {
     sanitizePlayerProfile
 } from "../src/playerProfile.js";
 import { completeChallengeTournament, formatBonusSummary } from "../src/progression/progressionState.js";
-import { HUNTING_EVENT_HANDLERS, HuntingManager } from "../src/hunting/huntingManager.js";
+import { HuntingManager } from "../src/hunting/huntingManager.js";
+import { HUNTING_EVENT_TRANSITIONS, HuntingEvent } from "../src/hunting/huntingEvents.js";
 import {
     advanceHuntingRun,
     canEnterHunting,
@@ -71,6 +72,7 @@ import {
     HUNTING_FLOOR_OUTCOME_TYPES,
     HUNTING_MONSTER_TYPES,
     HUNTING_PORTAL_DECLINE,
+    HUNTING_RUN_PHASES,
     HUNTING_STAGE_IDS,
     HUNTING_STAGES,
     HUNTING_TEAMS,
@@ -1441,10 +1443,15 @@ function testHuntingChestEventStopsAndResumes() {
     manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE });
     const chestEvent = { type: HUNTING_EVENT_TYPES.CHEST_ROOM, chestRarity: "rare" };
     manager._run = { ...manager._run, lastEvent: chestEvent };
-    manager._handleAdvanceEvent(chestEvent, mockApp);
+    manager._handleEventFloor({ app: mockApp, event: chestEvent });
 
     const chestState = overlayCalls.at(-1);
     assert.equal(manager._moving, false, "Chest event should stop the auto-advance loop");
+    assert.equal(
+        manager._run.phase,
+        HUNTING_RUN_PHASES.AWAITING_CHEST,
+        "Chest event should enter its explicit waiting phase"
+    );
     assert.equal(chestState.huntingChestEventActive, true, "Chest event should open the chest reward UI");
     assert.equal(chestState.huntingChestRarity, "rare", "Chest event should pass its rarity to the UI");
     assert.equal(chestState.huntingChestTitle, "희귀 상자 확보", "Chest event should use the localized rarity title");
@@ -1504,18 +1511,28 @@ async function testHuntingChestEventStopsAdvanceLoop() {
 }
 
 function testHuntingAdvanceDispatchContract() {
-    const manager = new HuntingManager({});
-    const configuredEvents = Object.keys(HUNTING_EVENT_HANDLERS).sort();
+    const configuredEvents = HuntingEvent.POOL.map((event) => event.type).sort();
     const knownEvents = Object.values(HUNTING_EVENT_TYPES).sort();
-    assert.deepEqual(configuredEvents, knownEvents, "Every hunting event type should declare one route handler");
+    assert.deepEqual(configuredEvents, knownEvents, "Every hunting event type should declare one event class");
     assert.ok(
-        Object.values(HUNTING_EVENT_HANDLERS).every((handlerName) => typeof manager[handlerName] === "function"),
-        "Every configured hunting event handler should exist on HuntingManager"
+        HuntingEvent.POOL.every((event) => HuntingEvent.get(event.type) === event),
+        "Every hunting event class should be available from the type registry"
+    );
+    assert.ok(
+        HuntingEvent.POOL.every(
+            (event) => typeof event.createPayload === "function" && typeof event.resolve === "function"
+        ),
+        "Every hunting event class should define payload creation and run transition behavior"
+    );
+    assert.equal(
+        Object.values(HUNTING_EVENT_TRANSITIONS).length,
+        5,
+        "Event transitions should explicitly cover continue, choice, merchant, chest, and battle"
     );
 
     const source = readFileSync(new URL("../src/hunting/huntingManager.js", import.meta.url), "utf8");
     const advanceStart = source.indexOf("    async advance(");
-    const advanceEnd = source.indexOf("    _applyPortalDeclineOnAdvance", advanceStart);
+    const advanceEnd = source.indexOf("    _prepareAdvanceFromPreviousEvent", advanceStart);
     const advanceSource = source.slice(advanceStart, advanceEnd);
     assert.ok(
         advanceSource.includes("_advanceOneFloor"),
@@ -1525,6 +1542,16 @@ function testHuntingAdvanceDispatchContract() {
         /HUNTING_(?:FLOOR_OUTCOME|EVENT)_TYPES/.test(advanceSource),
         false,
         "advance should not branch on individual floor or event types"
+    );
+    assert.equal(
+        source.includes("_handleBoonEvent"),
+        false,
+        "HuntingManager should not retain individual event behavior methods"
+    );
+    const encountersSource = readFileSync(new URL("../src/hunting/huntingEncounters.js", import.meta.url), "utf8");
+    assert.ok(
+        encountersSource.includes("HuntingEvent.POOL"),
+        "Encounter rolls should use the event class pool as the single candidate list"
     );
     console.log("[hunting-advance-dispatch] ok");
 }

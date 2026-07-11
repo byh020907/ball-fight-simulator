@@ -6,8 +6,17 @@ import {
     HUNTING_COMBAT_RELIEF
 } from "./huntingConfig.js";
 import { applyDefeatPreservation, createEmptyHuntingLoot, mergeHuntingLoot } from "./huntingRewards.js";
-import { getNextHuntingStageId, rollHuntingFloorOutcome } from "./huntingEncounters.js";
 import { HUNTING_EVENT_TYPES } from "./huntingConfig.js";
+
+export const HUNTING_RUN_PHASES = Object.freeze({
+    READY: "ready",
+    MOVING: "moving",
+    AWAITING_CHOICE: "awaiting_choice",
+    AWAITING_MERCHANT: "awaiting_merchant",
+    AWAITING_CHEST: "awaiting_chest",
+    COMBAT: "combat",
+    FINISHED: "finished"
+});
 
 function cloneLoot(loot = createEmptyHuntingLoot()) {
     return {
@@ -44,6 +53,7 @@ export function createHuntingRun({
         id: createRunId(characterId, now),
         mode: "hunting",
         status: "active",
+        phase: HUNTING_RUN_PHASES.READY,
         characterId,
         stageId,
         hero: {
@@ -84,18 +94,9 @@ export function canRetreatFromHuntingRun(run) {
     return run?.status === "active" && run.lastEvent?.type === HUNTING_EVENT_TYPES.PORTAL;
 }
 
-export function completeHuntingStage(profile, stageId = HUNTING_STAGE_IDS.CAVE) {
-    if (!profile?.hunting) return { unlockedStageId: null };
-    const unlocked = getUnlockedHuntingStageIds(profile);
-    const nextStageId = getNextHuntingStageId(stageId);
-    if (nextStageId && !unlocked.includes(nextStageId)) {
-        profile.hunting.unlockedStageIds = [...unlocked, nextStageId];
-        profile.hunting.selectedStageId = nextStageId;
-        return { unlockedStageId: nextStageId };
-    }
-    profile.hunting.unlockedStageIds = unlocked;
-    profile.hunting.selectedStageId = stageId;
-    return { unlockedStageId: null };
+export function setHuntingRunPhase(run, phase) {
+    if (!run || !Object.values(HUNTING_RUN_PHASES).includes(phase)) return run;
+    return { ...run, phase };
 }
 
 function sanitizeStatMultiplier(value, fallback) {
@@ -189,40 +190,6 @@ export function recordHuntingFloorResult(
     };
 }
 
-export function advanceHuntingRun(run, { rng = Math.random } = {}) {
-    if (!run || run.status !== "active") return run;
-    if (run.floor >= run.maxFloor) {
-        return retreatHuntingRun(run, { reason: "max_floor_clear" });
-    }
-
-    const nextFloor = Math.min(run.maxFloor, run.floor + 1);
-    const reliefForRoll = Math.max(0, run.combatReliefFloors ?? 0);
-    const nextRelief = Math.max(0, reliefForRoll - 1);
-    const nextPortalDecline = Math.max(0, (run.portalDeclineFloors ?? 0) - 1);
-    const hpRatio = run.carriedMaxHp > 0 ? (run.carriedHp ?? run.carriedMaxHp) / run.carriedMaxHp : 1.0;
-    const encounter = rollHuntingFloorOutcome(nextFloor, rng, reliefForRoll, {
-        hpRatio,
-        portalDeclineFloors: run.portalDeclineFloors ?? 0
-    });
-    const event = encounter.type === "event" ? encounter.event : null;
-    return {
-        ...run,
-        floor: nextFloor,
-        combatReliefFloors: nextRelief,
-        portalDeclineFloors: nextPortalDecline,
-        lastEvent: event,
-        lastEncounter: encounter,
-        history: [
-            ...run.history,
-            {
-                type: "advance",
-                floor: nextFloor,
-                encounter
-            }
-        ]
-    };
-}
-
 export function applyHuntingEventRecovery(run, { amount = 0 } = {}) {
     if (!run || run.status !== "active") return run;
     const maxHp = run.carriedMaxHp ?? run.carriedHp ?? 0;
@@ -284,6 +251,7 @@ export function retreatHuntingRun(run, { reason = "retreat", now = Date.now() } 
     return {
         ...run,
         status: "retreated",
+        phase: HUNTING_RUN_PHASES.FINISHED,
         securedLoot: mergeHuntingLoot(run.securedLoot, run.pendingLoot),
         pendingLoot: createEmptyHuntingLoot(),
         endedAt: now,
@@ -304,6 +272,7 @@ export function defeatHuntingRun(run, { rng = Math.random, now = Date.now() } = 
     return {
         ...run,
         status: "defeated",
+        phase: HUNTING_RUN_PHASES.FINISHED,
         securedLoot: mergeHuntingLoot(run.securedLoot, preservation.preservedLoot),
         pendingLoot: createEmptyHuntingLoot(),
         defeatLosses: preservation.lostLoot,

@@ -1,27 +1,19 @@
 import {
     createHuntingRun,
     recordHuntingFloorResult,
-    advanceHuntingRun,
     retreatHuntingRun,
     defeatHuntingRun,
     canRetreatFromHuntingRun,
-    completeHuntingStage,
     canEnterHunting,
     getSelectedHuntingStageId,
     getUnlockedHuntingStageIds,
-    applyHuntingEventRecovery,
-    applyHuntingCursedAltar,
-    applyHuntingStatModifiersToSpec
+    applyHuntingStatModifiersToSpec,
+    setHuntingRunPhase,
+    HUNTING_RUN_PHASES
 } from "./huntingState.js";
-import { rollShardReward, createHuntingChest, createEmptyHuntingLoot } from "./huntingRewards.js";
+import { rollShardReward, createHuntingChest } from "./huntingRewards.js";
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
-import {
-    HUNTING_ADVANCE_STEPS,
-    HUNTING_ENEMY_TYPES,
-    HUNTING_EVENT_TYPES,
-    HUNTING_FLOOR_OUTCOME_TYPES,
-    HUNTING_PORTAL_DECLINE
-} from "./huntingConfig.js";
+import { HUNTING_ADVANCE_STEPS, HUNTING_ENEMY_TYPES, HUNTING_FLOOR_OUTCOME_TYPES } from "./huntingConfig.js";
 import { getHuntingStage, getHuntingStageArena, getNextHuntingStageId } from "./huntingEncounters.js";
 import { applyEquipmentStats } from "./equipmentConfig.js";
 import { createHuntingTerrain } from "../terrain/index.js";
@@ -32,13 +24,15 @@ import {
     shouldUseRosterMiniboss,
     getHuntingMobCount
 } from "./huntingMonsters.js";
-import { createMerchantOffers, applyMerchantOffer, formatOfferResultToast } from "./huntingMerchant.js";
+import { applyMerchantOffer, formatOfferResultToast } from "./huntingMerchant.js";
 import { formatPendingLootSummary, formatDefeatLossText } from "./huntingFormat.js";
 import { createMatchReport, recordLowestHp } from "../collection/index.js";
 import { grantExperienceFromMatchReport } from "../experience/experienceService.js";
 import { applyStatAllocation } from "../statAllocation.js";
 import { savePlayerProfile } from "../playerProfile.js";
 import { PopupService } from "../popup.js";
+import { advanceHuntingRun, completeHuntingStage } from "./huntingRunProgression.js";
+import { HUNTING_EVENT_TRANSITIONS, HuntingEvent } from "./huntingEvents.js";
 
 const CHEST_RARITY_LABELS = Object.freeze({
     common: "일반",
@@ -60,15 +54,12 @@ const HUNTING_FLOOR_OUTCOME_HANDLERS = Object.freeze({
     [HUNTING_FLOOR_OUTCOME_TYPES.EVENT]: "_handleEventFloor"
 });
 
-export const HUNTING_EVENT_HANDLERS = Object.freeze({
-    [HUNTING_EVENT_TYPES.PORTAL]: "_handlePortalEvent",
-    [HUNTING_EVENT_TYPES.WANDERING_MERCHANT]: "_handleMerchantEvent",
-    [HUNTING_EVENT_TYPES.BOON]: "_handleBoonEvent",
-    [HUNTING_EVENT_TYPES.MISHAP]: "_handleMishapEvent",
-    [HUNTING_EVENT_TYPES.CHEST_ROOM]: "_handleChestRoomEvent",
-    [HUNTING_EVENT_TYPES.REST_SITE]: "_handleRestSiteEvent",
-    [HUNTING_EVENT_TYPES.CURSED_ALTAR]: "_handleCursedAltarEvent",
-    [HUNTING_EVENT_TYPES.CHAMPION_INTRUSION]: "_handleChampionIntrusionEvent"
+const HUNTING_EVENT_PRESENTATION_HANDLERS = Object.freeze({
+    [HUNTING_EVENT_TRANSITIONS.CONTINUE]: "_presentContinueEvent",
+    [HUNTING_EVENT_TRANSITIONS.CHOICE]: "_presentChoiceEvent",
+    [HUNTING_EVENT_TRANSITIONS.MERCHANT]: "_presentMerchantEvent",
+    [HUNTING_EVENT_TRANSITIONS.CHEST]: "_presentChestEvent",
+    [HUNTING_EVENT_TRANSITIONS.BATTLE]: "_presentBattleEvent"
 });
 
 export class HuntingManager {
@@ -191,7 +182,7 @@ export class HuntingManager {
         const isFinalBoss = run.lastEncounter?.type === HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS;
         const encounterEnemyType = run.lastEncounter?.enemyType;
         const minibossType =
-            isFinalBoss || run.lastEvent?.type === HUNTING_EVENT_TYPES.CHAMPION_INTRUSION
+            isFinalBoss || run.lastEvent?.enemyType === HUNTING_ENEMY_TYPES.CHAMPION
                 ? HUNTING_ENEMY_TYPES.CHAMPION
                 : encounterEnemyType === HUNTING_ENEMY_TYPES.ELITE
                   ? HUNTING_ENEMY_TYPES.ELITE
@@ -295,14 +286,14 @@ export class HuntingManager {
             const isFinalBoss = run.lastEncounter?.type === HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS;
             const rewardMultiplier = isFinalBoss
                 ? REWARD_BALANCE.hunting.shards.combatMultipliers.finalBoss
-                : run.lastEvent?.type === HUNTING_EVENT_TYPES.CHAMPION_INTRUSION
+                : run.lastEvent?.enemyType === HUNTING_ENEMY_TYPES.CHAMPION
                   ? (run.lastEvent.rewardMultiplier ??
                     REWARD_BALANCE.hunting.shards.combatMultipliers.championIntrusion)
                   : run.floor % 3 === 0
                     ? REWARD_BALANCE.hunting.shards.combatMultipliers.eliteFloor
                     : 1;
             const rewardEnemyType =
-                isFinalBoss || run.lastEvent?.type === HUNTING_EVENT_TYPES.CHAMPION_INTRUSION
+                isFinalBoss || run.lastEvent?.enemyType === HUNTING_ENEMY_TYPES.CHAMPION
                     ? HUNTING_ENEMY_TYPES.CHAMPION
                     : run.floor % 3 === 0
                       ? HUNTING_ENEMY_TYPES.ELITE
@@ -367,6 +358,7 @@ export class HuntingManager {
                 return;
             }
 
+            this._run = setHuntingRunPhase(this._run, HUNTING_RUN_PHASES.AWAITING_CHOICE);
             app.refreshPlayerSetup();
             app.showOverlay("사냥터", `${name} 승리!`, subtext);
             const hud = this._getLootHudState();
@@ -443,7 +435,8 @@ export class HuntingManager {
         const run = this._run;
         if (!run || run.status !== "active" || this._moving) return;
 
-        this._applyPortalDeclineOnAdvance(run);
+        this._prepareAdvanceFromPreviousEvent(run);
+        this._run = setHuntingRunPhase(this._run, HUNTING_RUN_PHASES.MOVING);
         this._moving = true;
         app.setHuntingOverlayState({ huntingChoiceVisible: false });
 
@@ -459,12 +452,8 @@ export class HuntingManager {
         }
     }
 
-    _applyPortalDeclineOnAdvance(run) {
-        if (run.lastEvent?.type !== HUNTING_EVENT_TYPES.PORTAL) return;
-        this._run = {
-            ...this._run,
-            portalDeclineFloors: HUNTING_PORTAL_DECLINE.INITIAL_FLOORS
-        };
+    _prepareAdvanceFromPreviousEvent(run) {
+        this._run = HuntingEvent.prepareNextAdvance(run);
     }
 
     _createAdvanceRoute() {
@@ -542,9 +531,11 @@ export class HuntingManager {
         return HUNTING_ROUTE_ACTIONS.STOP;
     }
 
-    _handleEventFloor({ app, event, floor }) {
+    _handleEventFloor({ app, event }) {
         if (!event) return HUNTING_ROUTE_ACTIONS.CONTINUE;
-        return this._handleAdvanceEvent(event, app, floor);
+        const resolution = this._resolveHuntingEvent(event, app);
+        this._run = resolution.run;
+        return this._presentEventResolution(app, resolution);
     }
 
     _finishAdvanceRoute(route) {
@@ -595,6 +586,7 @@ export class HuntingManager {
     }
 
     _stopHuntingMoveForBattle(app, message) {
+        this._run = setHuntingRunPhase(this._run, HUNTING_RUN_PHASES.COMBAT);
         const hud = this._getLootHudState();
         app.setHuntingOverlayState({
             huntingMoving: false,
@@ -606,6 +598,7 @@ export class HuntingManager {
     }
 
     _stopHuntingMoveForChoice(app, { message, canRetreat, floor, summary = "" }) {
+        this._run = setHuntingRunPhase(this._run, HUNTING_RUN_PHASES.AWAITING_CHOICE);
         const pendingText = this._run ? formatPendingLootSummary(this._run.pendingLoot) : "";
         const baseSummary = summary || `현재 ${floor}층 · 10층 전진 가능`;
         const displaySummary = pendingText ? `${baseSummary} · ${pendingText}` : baseSummary;
@@ -627,6 +620,7 @@ export class HuntingManager {
     }
 
     _stopHuntingMoveForMerchant(app, { message, floor, offers, summary }) {
+        this._run = setHuntingRunPhase(this._run, HUNTING_RUN_PHASES.AWAITING_MERCHANT);
         const hud = this._getLootHudState();
         app.setHuntingOverlayState({
             huntingMoving: false,
@@ -648,6 +642,7 @@ export class HuntingManager {
     }
 
     _stopHuntingMoveForChest(app, { chest, floor }) {
+        this._run = setHuntingRunPhase(this._run, HUNTING_RUN_PHASES.AWAITING_CHEST);
         const pendingText = formatPendingLootSummary(this._run?.pendingLoot);
         const rarityLabel = CHEST_RARITY_LABELS[chest.rarity] ?? chest.rarity;
         const hud = this._getLootHudState();
@@ -715,14 +710,14 @@ export class HuntingManager {
             huntingMerchantActive: false,
             huntingMerchantOffers: null
         });
-        this._run = { ...this._run, merchantOffers: null };
+        this._run = { ...setHuntingRunPhase(this._run, HUNTING_RUN_PHASES.READY), merchantOffers: null };
         this.advance();
     }
 
     chestContinue() {
         const app = this.app;
         const run = this._run;
-        if (!run || run.status !== "active" || run.lastEvent?.type !== HUNTING_EVENT_TYPES.CHEST_ROOM) return;
+        if (!run || run.status !== "active" || run.phase !== HUNTING_RUN_PHASES.AWAITING_CHEST) return;
         app.setHuntingOverlayState({
             huntingChestEventActive: false,
             huntingChestRarity: "common",
@@ -732,102 +727,58 @@ export class HuntingManager {
         this.advance();
     }
 
-    _handleAdvanceEvent(event, app, floor = this._run?.floor) {
-        const handlerName = HUNTING_EVENT_HANDLERS[event?.type];
-        if (!handlerName || typeof this[handlerName] !== "function") {
-            throw new Error(`Unsupported hunting event: ${event?.type ?? "missing"}`);
-        }
-        return this[handlerName]({ app, event, floor });
+    _resolveHuntingEvent(event, app) {
+        return HuntingEvent.resolve(event, {
+            run: this._run,
+            playerProfile: app.playerProfile,
+            roster: app.roster
+        });
     }
 
-    _handlePortalEvent({ app, floor }) {
-        app.addLog(`[사냥터] ${floor}층 — 포탈 발견, 귀환하거나 계속 전진할 수 있습니다.`);
+    _presentEventResolution(app, resolution) {
+        const handlerName = HUNTING_EVENT_PRESENTATION_HANDLERS[resolution.transition];
+        if (!handlerName || typeof this[handlerName] !== "function") {
+            throw new Error(`Unsupported hunting event transition: ${resolution.transition ?? "missing"}`);
+        }
+        return this[handlerName](app, resolution);
+    }
+
+    _presentContinueEvent(app, resolution) {
+        if (resolution.logMessage) app.addLog(resolution.logMessage);
+        if (resolution.toastMessage) app.showToast(resolution.toastMessage);
+        return HUNTING_ROUTE_ACTIONS.CONTINUE;
+    }
+
+    _presentChoiceEvent(app, resolution) {
+        if (resolution.logMessage) app.addLog(resolution.logMessage);
         this._stopHuntingMoveForChoice(app, {
-            message: `${floor}층 — 포탈 발견!`,
-            canRetreat: true,
-            floor,
-            summary: `포탈 발견 · 현재 ${floor}층 · 귀환 또는 10층 전진`
+            message: resolution.message,
+            canRetreat: resolution.canRetreat,
+            floor: this._run.floor,
+            summary: resolution.summary
         });
         return HUNTING_ROUTE_ACTIONS.STOP;
     }
 
-    _handleMerchantEvent({ app, event, floor }) {
-        app.addLog(`[사냥터] ${floor}층 — 방랑 상인 발견`);
-        const offers = createMerchantOffers(this._run, event, app.playerProfile);
-        this._run = { ...this._run, merchantOffers: offers };
+    _presentMerchantEvent(app, resolution) {
+        if (resolution.logMessage) app.addLog(resolution.logMessage);
         this._stopHuntingMoveForMerchant(app, {
-            message: `${floor}층 — 방랑 상인`,
-            floor,
-            offers,
+            message: resolution.message,
+            floor: this._run.floor,
+            offers: resolution.offers,
             summary: formatPendingLootSummary(this._run.pendingLoot)
         });
         return HUNTING_ROUTE_ACTIONS.STOP;
     }
 
-    _handleBoonEvent({ app, event }) {
-        const run = this._run;
-        const shards = event.shards ?? 8;
-        this._run = recordHuntingFloorResult(run, {
-            hpRemain: run.carriedHp,
-            maxHp: run.carriedMaxHp,
-            loot: { shards, chests: [], xp: 0 },
-            consumeStatModifiers: false
-        });
-        app.addLog(`[사냥터] 축복: 파편 +${shards}`);
-        app.showToast(`축복: 파편 +${shards}`);
-        return HUNTING_ROUTE_ACTIONS.CONTINUE;
-    }
-
-    _handleMishapEvent({ app, event }) {
-        const run = this._run;
-        const currentHp = run.carriedHp ?? run.carriedMaxHp ?? 100;
-        const damage = Math.max(1, Math.floor(currentHp * (event.damageRatio ?? 0.1)));
-        this._run = recordHuntingFloorResult(run, {
-            hpRemain: Math.max(1, currentHp - damage),
-            maxHp: run.carriedMaxHp,
-            loot: { shards: 0, chests: [], xp: 0 },
-            consumeStatModifiers: false
-        });
-        app.addLog(`[사냥터] 함정: HP -${damage}`);
-        app.showToast(`함정: HP -${damage}`);
-        return HUNTING_ROUTE_ACTIONS.CONTINUE;
-    }
-
-    _handleChestRoomEvent({ app, event, floor }) {
-        const run = this._run;
-        const chest = createHuntingChest({ rarity: event.chestRarity ?? "common" });
-        this._run = recordHuntingFloorResult(run, {
-            hpRemain: run.carriedHp,
-            maxHp: run.carriedMaxHp,
-            loot: { shards: 0, chests: [chest], xp: 0 },
-            consumeStatModifiers: false
-        });
-        app.addLog(`[사냥터] 상자방: ${chest.rarity} 상자 획득`);
-        this._stopHuntingMoveForChest(app, { chest, floor });
+    _presentChestEvent(app, resolution) {
+        if (resolution.logMessage) app.addLog(resolution.logMessage);
+        this._stopHuntingMoveForChest(app, { chest: resolution.chest, floor: this._run.floor });
         return HUNTING_ROUTE_ACTIONS.STOP;
     }
 
-    _handleRestSiteEvent({ app, event }) {
-        const run = this._run;
-        const healAmount = Math.floor((run.carriedMaxHp ?? run.carriedHp ?? 100) * (event.recoveryRatio ?? 0.25));
-        this._run = applyHuntingEventRecovery(run, { amount: healAmount });
-        const name = app.roster.find((fighter) => fighter.id === run.characterId)?.name ?? run.characterId;
-        app.addLog(`[사냥터] 휴식: ${name} HP +${healAmount}`);
-        app.showToast(`휴식: HP +${healAmount}`);
-        return HUNTING_ROUTE_ACTIONS.CONTINUE;
-    }
-
-    _handleCursedAltarEvent({ app, event }) {
-        this._run = applyHuntingCursedAltar(this._run, { trade: event.trade });
-        app.addLog(
-            `[사냥터] 저주받은 제단: ${event.trade?.gainStat} x${event.trade?.gainMultiplier} / ${event.trade?.loseStat} x${event.trade?.loseMultiplier}`
-        );
-        app.showToast("저주받은 제단: 스탯 교환");
-        return HUNTING_ROUTE_ACTIONS.CONTINUE;
-    }
-
-    _handleChampionIntrusionEvent({ app, floor }) {
-        this._stopHuntingMoveForBattle(app, `${floor}층 — 챔피언 난입!`);
+    _presentBattleEvent(app, resolution) {
+        this._stopHuntingMoveForBattle(app, resolution.message);
         return HUNTING_ROUTE_ACTIONS.STOP;
     }
 

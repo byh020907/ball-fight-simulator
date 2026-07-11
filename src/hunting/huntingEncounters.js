@@ -2,7 +2,6 @@ import {
     HUNTING_ENEMY_TYPES,
     HUNTING_EVENT_CHANCE,
     HUNTING_FLOOR_OUTCOME_TYPES,
-    HUNTING_MVP_EVENT_TYPES,
     HUNTING_EVENT_TYPES,
     HUNTING_SCALING,
     HUNTING_MAX_FLOOR,
@@ -11,7 +10,7 @@ import {
     HUNTING_COMBAT_RELIEF,
     HUNTING_PORTAL_DECLINE
 } from "./huntingConfig.js";
-import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
+import { createHuntingEvent, HuntingEvent } from "./huntingEvents.js";
 
 const DEFAULT_RNG = () => Math.random();
 
@@ -64,7 +63,7 @@ function rollIndex(length, rng = DEFAULT_RNG) {
 }
 
 function rollWeightedEventType(rng, portalMultiplier = 1.0) {
-    const types = HUNTING_MVP_EVENT_TYPES;
+    const types = HuntingEvent.POOL.map((event) => event.type);
     const weights = types.map((type) => (type === HUNTING_EVENT_TYPES.PORTAL ? portalMultiplier : 1.0));
     const totalWeight = weights.reduce((sum, w) => sum + w, 0);
     const roll = rng() * totalWeight;
@@ -126,104 +125,11 @@ export function getHuntingCombatEnemyType(floor, rng = DEFAULT_RNG) {
     return rng() < eliteChance ? HUNTING_ENEMY_TYPES.ELITE : HUNTING_ENEMY_TYPES.NORMAL;
 }
 
-export function rollHuntingChestRoomRarity(floor, rng = DEFAULT_RNG) {
-    const depth = safeFloor(floor);
-    const roll = rng();
-    const chances = REWARD_BALANCE.hunting.events.chestRoom;
-    if (depth >= chances.legendary.minimumFloor && roll < chances.legendary.chance) return "legendary";
-    if (depth >= chances.epic.minimumFloor && roll < chances.epic.chance) return "epic";
-    if (depth >= chances.rare.minimumFloor && roll < chances.rare.chance) return "rare";
-    if (roll < chances.uncommonChance) return "uncommon";
-    return "common";
-}
-
-export function rollCursedAltarTrade(floor, rng = DEFAULT_RNG) {
-    const altar = REWARD_BALANCE.hunting.events.cursedAltar;
-    const trades = altar.trades;
-    const trade = trades[rollIndex(trades.length, rng)];
-    return {
-        ...trade,
-        floors: Math.min(altar.maxDurationFloors, 1 + Math.floor(safeFloor(floor) / altar.durationFloorDivisor))
-    };
-}
-
-export function createHuntingEvent(type, floor, rng = DEFAULT_RNG) {
-    const safe = safeFloor(floor);
-    if (type === HUNTING_EVENT_TYPES.PORTAL) {
-        return {
-            type,
-            floor: safe
-        };
-    }
-    if (type === HUNTING_EVENT_TYPES.WANDERING_MERCHANT) {
-        return {
-            type,
-            floor: safe,
-            discountRatio:
-                safe >= REWARD_BALANCE.hunting.events.merchant.discount.deepFloor
-                    ? REWARD_BALANCE.hunting.events.merchant.discount.deepFloorValue
-                    : REWARD_BALANCE.hunting.events.merchant.discount.default
-        };
-    }
-    if (type === HUNTING_EVENT_TYPES.BOON) {
-        return {
-            type,
-            floor: safe,
-            shards:
-                REWARD_BALANCE.hunting.events.boon.baseShards +
-                Math.floor(safe / 10) * REWARD_BALANCE.hunting.events.boon.shardsPerTenFloors
-        };
-    }
-    if (type === HUNTING_EVENT_TYPES.MISHAP) {
-        return {
-            type,
-            floor: safe,
-            damageRatio:
-                safe >= REWARD_BALANCE.hunting.events.mishap.deepFloor
-                    ? REWARD_BALANCE.hunting.events.mishap.deepFloorDamageRatio
-                    : REWARD_BALANCE.hunting.events.mishap.defaultDamageRatio
-        };
-    }
-    if (type === HUNTING_EVENT_TYPES.REST_SITE) {
-        return {
-            type,
-            floor: safe,
-            recoveryRatio: REWARD_BALANCE.hunting.events.restRecoveryRatio
-        };
-    }
-    if (type === HUNTING_EVENT_TYPES.CHEST_ROOM) {
-        return {
-            type,
-            floor: safe,
-            chestRarity: rollHuntingChestRoomRarity(safe, rng)
-        };
-    }
-    if (type === HUNTING_EVENT_TYPES.CURSED_ALTAR) {
-        return {
-            type,
-            floor: safe,
-            trade: rollCursedAltarTrade(safe, rng)
-        };
-    }
-    if (type === HUNTING_EVENT_TYPES.CHAMPION_INTRUSION) {
-        return {
-            type,
-            floor: safe,
-            enemyType: HUNTING_ENEMY_TYPES.CHAMPION,
-            rewardMultiplier: REWARD_BALANCE.hunting.shards.combatMultipliers.championIntrusion
-        };
-    }
-    return {
-        type,
-        floor: safe
-    };
-}
-
 export function rollHuntingEvent(floor, rng = DEFAULT_RNG) {
     if (!shouldRollHuntingEvent(floor, rng)) return null;
     const safe = safeFloor(floor);
-    const index = rollIndex(HUNTING_MVP_EVENT_TYPES.length, rng);
-    return createHuntingEvent(HUNTING_MVP_EVENT_TYPES[index], safe, rng);
+    const event = HuntingEvent.POOL[rollIndex(HuntingEvent.POOL.length, rng)];
+    return createHuntingEvent(event.type, safe, rng);
 }
 
 export function rollHuntingFloorOutcome(floor, rng = DEFAULT_RNG, combatReliefFloors = 0, context = {}) {

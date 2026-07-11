@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.24.37",
+        date: "2026-07-12",
+        title: "v0.24.37 사냥터 이벤트를 상태 전이로 분리합니다",
+        changes: [
+            {
+                type: "refactor",
+                text: "사냥터 이벤트는 클래스별 payload와 런 전이를 소유하고, 원정 상태는 명시적인 phase로 현재 상호작용 단계를 기록하도록 정리했습니다."
+            }
+        ]
+    },
+    {
         version: "0.24.36",
         date: "2026-07-12",
         title: "v0.24.36 사냥터 이동 처리를 분리합니다",
