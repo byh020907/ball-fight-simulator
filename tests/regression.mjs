@@ -8778,6 +8778,39 @@ function testHuntingMerchantOffers() {
     console.log("[hunting-merchant] ok");
 }
 
+function testHuntingMerchantPurchaseRefreshesUiState() {
+    const profile = createDefaultPlayerProfile();
+    profile.hunting.shards = 100;
+    const overlayStates = [];
+    const app = {
+        playerProfile: profile,
+        setHuntingOverlayState(data) {
+            overlayStates.push(data);
+        },
+        showToast() {}
+    };
+    const manager = new HuntingManager(app);
+    const run = createHuntingRun({ characterId: FIGHTER_IDS.RAGE, stageId: HUNTING_STAGE_IDS.CAVE });
+    const offers = createMerchantOffers(run, { type: HUNTING_EVENT_TYPES.WANDERING_MERCHANT }, profile);
+    manager._run = { ...run, merchantOffers: offers };
+
+    manager.merchantChoose(1);
+
+    assert.notEqual(manager._run.merchantOffers, offers, "Purchased merchant offers should use a new array reference");
+    assert.equal(manager._run.merchantOffers[1].purchased, true, "Purchased merchant offer should be marked complete");
+    assert.equal(
+        overlayStates.at(-1).huntingMerchantOffers[1].purchased,
+        true,
+        "Merchant overlay should receive the purchased state for immediate button refresh"
+    );
+    assert.equal(
+        manager._run.pendingLoot.chests.length,
+        1,
+        "Merchant chest purchase should still add exactly one unsecured chest"
+    );
+    console.log("[hunting-merchant-ui-refresh] ok");
+}
+
 function testHuntingFormatHelpers() {
     // ── formatChestRarityCounts ──
     assert.equal(formatChestRarityCounts([]), "", "Empty chests should produce empty string");
@@ -9221,6 +9254,28 @@ function testHuntingStartFloorBattleAppliesStatAllocation(app) {
     console.log("[hunting-stat-allocation] ok");
 }
 
+function testHuntingActiveLocksSetupUi(app) {
+    const previousRun = app.hunting._run;
+    const previousTournament = app.tournament;
+
+    try {
+        app.tournament = null;
+        app.hunting._run = { status: "active" };
+        app.refreshPlayerSetup();
+
+        assert.equal(app._modeSegment.visible, false, "Hunting in progress should hide the mode selector");
+        assert.equal(app._modeSegment.locked, true, "Hunting in progress should lock the mode selector");
+        assert.equal(app._panel.locked, true, "Hunting in progress should lock stat allocation");
+        assert.equal(app._startBtn.hidden, true, "Hunting in progress should hide the start button");
+    } finally {
+        app.tournament = previousTournament;
+        app.hunting._run = previousRun;
+        app.refreshPlayerSetup();
+    }
+
+    console.log("[hunting-active-locks-setup-ui] ok");
+}
+
 // ── Preview reselect tests ─────────────────────────────────────────────────────
 
 function testFighterPhysicsSimulationHierarchy(app) {
@@ -9554,6 +9609,7 @@ function testPreviewReselectTransitionFinalizes(app) {
 }
 
 testHuntingMerchantOffers();
+testHuntingMerchantPurchaseRefreshesUiState();
 testHuntingFormatHelpers();
 testHuntingCombatText();
 testHuntingLootHud();
@@ -9564,6 +9620,7 @@ testBattleBallMergeHeroOrbCarryoverInto(app);
 testHuntingHeroCarryoverInStartFloorBattle(app);
 testHuntingHeroCarryoverInHandleFinish(app);
 testHuntingStartFloorBattleAppliesStatAllocation(app);
+testHuntingActiveLocksSetupUi(app);
 testFighterPhysicsSimulationHierarchy(app);
 testPreviewReselectChangesCharacter(app);
 testPreviewReselectHeavyKnockAway(app);

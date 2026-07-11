@@ -533,7 +533,8 @@ export class BattleApp {
         this._panel.totalPoints = effectiveTotal;
         this._panel.bonusPoints = bonusCtx.extraStatPoints;
         this._panel.remainingPoints = remaining;
-        this._panel.locked = Boolean(this.tournament && !this.tournament.champion);
+        const gameInProgress = Boolean((this.tournament && !this.tournament.champion) || this.hunting.isActive);
+        this._panel.locked = gameInProgress;
         this._panel.challengeLevel = cl?.selectedLevel ?? 0;
         this._panel.highestUnlockedLevel = cl?.highestUnlockedLevel ?? 0;
         this._panel.progressionBonusSummary = bonusSummary;
@@ -549,12 +550,13 @@ export class BattleApp {
 
         // 모드 세그먼트 동기화
         const canHunt = getEligibleHuntingCharacters(this.playerProfile, this.roster).length > 0;
-        this._modeSegment.visible = !Boolean(this.tournament && !this.tournament?.champion);
+        this._modeSegment.visible = !gameInProgress;
         this._modeSegment.mode = this._gameMode;
         this._modeSegment.canHunt = canHunt;
-        this._modeSegment.locked = Boolean(this.tournament && !this.tournament?.champion);
+        this._modeSegment.locked = gameInProgress;
+        this._startBtn.setState({ hidden: gameInProgress });
 
-        if (!this.tournament || this.tournament.champion) {
+        if (!gameInProgress) {
             this._syncStartButton();
             this.startPlayerPreviewLoop();
         }

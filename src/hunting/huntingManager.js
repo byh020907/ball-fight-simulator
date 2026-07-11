@@ -48,6 +48,10 @@ export class HuntingManager {
         this._moving = false;
     }
 
+    get isActive() {
+        return this._run?.status === "active";
+    }
+
     showCharacterSelect() {
         const app = this.app;
         // 사냥터 진입 시 기존 캐릭터 프리뷰 중지 및 캔버스 초기화
@@ -619,8 +623,10 @@ export class HuntingManager {
             return;
         }
 
-        this._run = result.run;
-        offer.purchased = true;
+        const refreshedOffers = offers.map((currentOffer, index) =>
+            index === offerIndex ? { ...currentOffer, purchased: true } : currentOffer
+        );
+        this._run = { ...result.run, merchantOffers: refreshedOffers };
         savePlayerProfile(app.playerProfile);
 
         const toastMsg = formatOfferResultToast(result.result);
@@ -630,7 +636,7 @@ export class HuntingManager {
         const pendingText = formatPendingLootSummary(this._run.pendingLoot);
         const hud = this._getLootHudState();
         app.setHuntingOverlayState({
-            huntingMerchantOffers: [...offers],
+            huntingMerchantOffers: refreshedOffers,
             huntingLootSummary: pendingText,
             ...hud
         });
