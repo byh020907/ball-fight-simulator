@@ -43,8 +43,8 @@ export function createComponentBridge(app) {
         startTournament() {
             return app.startTournament();
         },
-        showGameModeSelect() {
-            return app.showGameModeSelect();
+        setGameMode(mode) {
+            return app.setGameMode(mode);
         },
         adjustStat(key, delta) {
             return app.adjustStat(key, delta);

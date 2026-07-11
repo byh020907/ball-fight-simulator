@@ -12,38 +12,10 @@
     x-bind:class="{ transient: transient }"
 >
     <div class="overlay-card">
-        <span x-show="!gameModeSelectVisible" x-text="label">Waiting Room</span>
-        <strong x-show="!gameModeSelectVisible" x-text="text">START THE FIGHT</strong>
-        <p x-show="subtext && !gameModeSelectVisible" x-text="subtext"></p>
+        <span x-text="label">Waiting Room</span>
+        <strong x-text="text">START THE FIGHT</strong>
+        <p x-show="subtext" x-text="subtext"></p>
         <xp-reward-panel class="xp-reward"></xp-reward-panel>
-        <div
-            class="game-mode-select"
-            x-show="gameModeSelectVisible"
-        >
-            <p class="game-mode-hint">모드를 선택하세요</p>
-            <div class="game-mode-cards">
-                <button
-                    class="game-mode-card"
-                    type="button"
-                    @click="selectTournament()"
-                >
-                    <span class="game-mode-icon">&#x2694;</span>
-                    <strong>토너먼트</strong>
-                    <span class="game-mode-desc">랜덤 대진 8강 · 우승 도전</span>
-                </button>
-                <button
-                    class="game-mode-card"
-                    type="button"
-                    x-bind:disabled="!canHunt"
-                    x-bind:class="{ disabled: !canHunt }"
-                    @click="selectHunting()"
-                >
-                    <span class="game-mode-icon">&#x1F3F9;</span>
-                    <strong>사냥터</strong>
-                    <span class="game-mode-desc" x-text="canHunt ? '전리품 &amp; 장비 · 최대 10층' : '토너먼트 우승 후 해금'"></span>
-                </button>
-            </div>
-        </div>
         <div class="hunting-route" x-show="huntingMoving">
             <div class="hunting-route-head">
                 <span x-text="huntingMoveFrom + 'F'"></span>
@@ -129,8 +101,6 @@
         label: "",
         text: "",
         subtext: "",
-        gameModeSelectVisible: false,
-        canHunt: false,
         huntingChoiceVisible: false,
         huntingFloor: 1,
         huntingCharacterName: "",
@@ -160,38 +130,12 @@
         huntingMerchantPass() {
             window.requireGameActionBridge("huntingMerchantPass").huntingMerchantPass();
         },
-        selectTournament() {
-            this.gameModeSelectVisible = false;
-            this.hide();
-            window.requireGameActionBridge("startTournament").startTournament();
-        },
-        selectHunting() {
-            if (!this.canHunt) return;
-            this.gameModeSelectVisible = false;
-            this.hide();
-            window.requireGameActionBridge("openHuntingLobby").openHuntingLobby();
-        },
-        showGameModeSelect({ canHunt = false } = {}) {
-            this.visible = true;
-            this.transient = false;
-            this.label = "";
-            this.text = "";
-            this.subtext = "";
-            this.gameModeSelectVisible = true;
-            this.canHunt = canHunt;
-            this.huntingChoiceVisible = false;
-            this.huntingMerchantActive = false;
-            this.huntingMoving = false;
-            const rp = Alpine.store("uiManager").getComponent("xpRewardPanel");
-            if (rp) rp.hide();
-        },
         show({ label, text, subtext = "", transient = false, xpReward = null } = {}) {
             this.visible = true;
             this.transient = transient;
             this.label = label ?? "";
             this.text = text ?? "";
             this.subtext = subtext;
-            this.gameModeSelectVisible = false;
             if (xpReward) {
                 const rp = Alpine.store("uiManager").getComponent("xpRewardPanel");
                 if (rp) rp.animate(xpReward);
@@ -206,8 +150,6 @@
             this.label = "";
             this.text = "";
             this.subtext = "";
-            this.gameModeSelectVisible = false;
-            this.canHunt = false;
             this.huntingChoiceVisible = false;
             this.huntingCanRetreat = false;
             this.huntingMoving = false;
@@ -338,72 +280,6 @@
     .overlay-card p {
         margin: 12px 0 0;
         color: #202020;
-    }
-
-    .game-mode-select {
-        margin-top: 14px;
-        padding-top: 12px;
-        border-top: 1px solid #e0e0e0;
-        pointer-events: auto;
-    }
-
-    .game-mode-hint {
-        margin: 0 0 12px;
-        font-size: 0.82rem;
-        font-weight: 700;
-        color: #555555;
-        text-align: center;
-    }
-
-    .game-mode-cards {
-        display: flex;
-        gap: 12px;
-        justify-content: center;
-    }
-
-    .game-mode-card {
-        flex: 1;
-        max-width: 200px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 6px;
-        padding: 20px 16px;
-        border: 2px solid #202020;
-        border-radius: 12px;
-        background: #ffffff;
-        cursor: pointer;
-        font-family: inherit;
-        transition: background 0.15s;
-    }
-
-    .game-mode-card:hover:not(:disabled) {
-        background: #f0f0f0;
-    }
-
-    .game-mode-card.disabled {
-        opacity: 0.45;
-        cursor: default;
-        border-color: #cccccc;
-    }
-
-    .game-mode-icon {
-        font-size: 2rem;
-        line-height: 1;
-    }
-
-    .game-mode-card strong {
-        display: block;
-        font-size: 0.95rem;
-        letter-spacing: 0;
-        color: #111111;
-    }
-
-    .game-mode-desc {
-        font-size: 0.7rem;
-        color: #666666;
-        text-align: center;
-        line-height: 1.35;
     }
 
     .hunting-btn {

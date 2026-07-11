@@ -551,6 +551,12 @@ async function loadModuleApp() {
     uiManager.register("toastNotification", {
         show() {}
     });
+    uiManager.register("modeSegment", {
+        visible: false,
+        mode: "tournament",
+        canHunt: false,
+        locked: false
+    });
     uiManager.register("collectionHub", {
         visible: false,
         render() {},
@@ -708,6 +714,12 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
     });
     uiManager.register("toastNotification", {
         show() {}
+    });
+    uiManager.register("modeSegment", {
+        visible: false,
+        mode: "tournament",
+        canHunt: false,
+        locked: false
     });
     const alpineState = { allocation, remainingPoints: 0 };
     alpineState.allocation = { ...allocation };
@@ -10219,6 +10231,7 @@ async function testUiManagerRequireComponentResolvesAll() {
     resolved.strip = app._strip !== undefined && app._strip !== null;
     resolved.root = app._root !== undefined && app._root !== null;
     resolved.toast = app._toast !== undefined && app._toast !== null;
+    resolved.modeSegment = app._modeSegment !== undefined && app._modeSegment !== null;
 
     const allResolved = Object.values(resolved).every(Boolean);
     if (!allResolved) {
@@ -10227,7 +10240,7 @@ async function testUiManagerRequireComponentResolvesAll() {
             .map(([key]) => key);
         console.log(`[ui-manager-require-resolves-all] FAIL: missing ${missing.join(", ")}`);
     }
-    assert.ok(allResolved, "All 8 required UI components must be resolved at startup via uiManager.requireComponent");
+    assert.ok(allResolved, "All 9 required UI components must be resolved at startup via uiManager.requireComponent");
     console.log("[ui-manager-require-resolves-all] ok");
 }
 
@@ -10284,10 +10297,10 @@ async function testUiManagerRequireComponentNoRemainingGuards() {
     const productionLineErrors = [];
 
     const forbiddenPatterns = [
-        /if\s*\(\s*this\._(bracket|overlay|startBtn|log|strip|root|toast)\b/,
-        /if\s*\(\s*!this\._(bracket|overlay|startBtn|log|strip|root|toast)\b/,
+        /if\s*\(\s*this\._(bracket|overlay|startBtn|log|strip|root|toast|modeSegment)\b/,
+        /if\s*\(\s*!this\._(bracket|overlay|startBtn|log|strip|root|toast|modeSegment)\b/,
         /this\._panel\?\./,
-        /this\._(bracket|overlay|startBtn|log|strip|root|toast)\s*\?\./
+        /this\._(bracket|overlay|startBtn|log|strip|root|toast|modeSegment)\s*\?\./
     ];
 
     for (const pattern of forbiddenPatterns) {

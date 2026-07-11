@@ -17,12 +17,15 @@
         textOverride: null,
         remainingPoints: 0,
         locked: false,
+        gameMode: "tournament",
         handleClick() {
             if (this.textOverride !== null) {
                 // 특수 상태(확인/다시 시작 등) — 기존 startTournament 흐름
                 window.requireGameActionBridge("startTournament").startTournament();
+            } else if (this.gameMode === "hunting") {
+                window.requireGameActionBridge("openHuntingLobby").openHuntingLobby();
             } else {
-                window.requireGameActionBridge("showGameModeSelect").showGameModeSelect();
+                window.requireGameActionBridge("startTournament").startTournament();
             }
         },
         setState({ disabled, text, hidden } = {}) {

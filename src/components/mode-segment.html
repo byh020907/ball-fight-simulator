@@ -1,0 +1,88 @@
+<div
+    class="mode-segment"
+    x-data="modeSegment"
+    x-show="visible"
+>
+    <button
+        class="mode-segment__btn"
+        type="button"
+        x-bind:class="{ active: mode === 'tournament' }"
+        x-bind:disabled="locked"
+        @click="setMode('tournament')"
+    >
+        토너먼트
+    </button>
+    <button
+        class="mode-segment__btn"
+        type="button"
+        x-bind:class="{ active: mode === 'hunting' }"
+        x-bind:disabled="locked || !canHunt"
+        x-bind:title="!canHunt ? '토너먼트 우승 후 해금' : ''"
+        @click="setMode('hunting')"
+    >
+        사냥터
+    </button>
+</div>
+<script>
+    window.createGameUI("modeSegment", () => ({
+        visible: false,
+        mode: "tournament",
+        canHunt: false,
+        locked: false,
+        setMode(mode) {
+            if (this.locked) return;
+            this.mode = mode;
+            window.requireGameActionBridge("setGameMode").setGameMode(mode);
+        }
+    }));
+</script>
+<style scoped>
+    :scope {
+        position: absolute;
+        left: 50%;
+        bottom: 88px;
+        transform: translateX(-50%);
+        display: inline-flex;
+        border: 2px solid #202020;
+        border-radius: 8px;
+        overflow: hidden;
+        z-index: 2;
+    }
+
+    .mode-segment__btn {
+        font-family: inherit;
+        font-size: 0.78rem;
+        font-weight: 700;
+        padding: 6px 16px;
+        border: none;
+        background: #ffffff;
+        color: #555555;
+        cursor: pointer;
+        transition: background 0.12s;
+    }
+
+    .mode-segment__btn:not(:last-child) {
+        border-right: 2px solid #202020;
+    }
+
+    .mode-segment__btn.active {
+        background: #202020;
+        color: #ffffff;
+    }
+
+    .mode-segment__btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+
+    @media (max-width: 760px) {
+        :scope {
+            bottom: 70px;
+        }
+
+        .mode-segment__btn {
+            padding: 6px 14px;
+            font-size: 0.72rem;
+        }
+    }
+</style>

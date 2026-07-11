@@ -142,6 +142,8 @@ export class BattleApp {
         this._strip = Alpine.store("uiManager").requireComponent("fighterStrip");
         this._root = Alpine.store("uiManager").requireComponent("appRoot");
         this._toast = Alpine.store("uiManager").requireComponent("toastNotification");
+        this._modeSegment = Alpine.store("uiManager").requireComponent("modeSegment");
+        this._gameMode = "tournament";
         this.ui = {
             get logItems() {
                 return self._log.items;
@@ -220,9 +222,28 @@ export class BattleApp {
         this._toast.show(message);
     }
 
-    showGameModeSelect() {
-        const canHunt = getEligibleHuntingCharacters(this.playerProfile, this.roster).length > 0;
-        this._overlay.showGameModeSelect({ canHunt });
+    setGameMode(mode) {
+        if (mode !== "tournament" && mode !== "hunting") return;
+        this._gameMode = mode;
+        this._modeSegment.mode = mode;
+        // 모드 전환 시 새 캐릭터로 랜덤 변경
+        if (mode === "hunting") {
+            const eligible = getEligibleHuntingCharacters(this.playerProfile, this.roster);
+            if (eligible.length > 0) {
+                this.playerFighterId = eligible[Math.floor(Math.random() * eligible.length)].id;
+            }
+        } else {
+            const others = this.roster.filter((f) => f.id !== this.playerFighterId);
+            if (others.length > 0) {
+                this.playerFighterId = others[Math.floor(Math.random() * others.length)].id;
+            } else {
+                this.playerFighterId = this.roster[Math.floor(Math.random() * this.roster.length)].id;
+            }
+        }
+        this.playerStatAllocation = createEmptyStatAllocation();
+        this._previewBall = null;
+        this._selectionAnimTime = 0;
+        this.refreshPlayerSetup();
     }
 
     pickPlayerFighterId() {
@@ -241,6 +262,14 @@ export class BattleApp {
     }
 
     _pickDifferentPlayerFighterId() {
+        if (this._gameMode === "hunting") {
+            // 사냥터 모드: 우승 캐릭터만 순환 (로테이션)
+            const eligible = getEligibleHuntingCharacters(this.playerProfile, this.roster);
+            if (eligible.length === 0) return this.playerFighterId;
+            const currentIdx = eligible.findIndex((c) => c.id === this.playerFighterId);
+            const nextIdx = currentIdx < 0 ? 0 : (currentIdx + 1) % eligible.length;
+            return eligible[nextIdx].id;
+        }
         const others = this.roster.filter((f) => f.id !== this.playerFighterId);
         if (others.length === 0) return this.playerFighterId;
         return others[Math.floor(Math.random() * others.length)].id;
@@ -252,6 +281,12 @@ export class BattleApp {
             return true;
         }
         if (!this.canReselectPreviewCharacter()) return false;
+
+        // 사냥터 모드: eligible 체크
+        if (this._gameMode === "hunting") {
+            const eligible = getEligibleHuntingCharacters(this.playerProfile, this.roster);
+            if (eligible.length === 0) return false;
+        }
 
         const newId = this._pickDifferentPlayerFighterId();
         if (newId === this.playerFighterId) return false;
@@ -454,11 +489,14 @@ export class BattleApp {
 
     _syncStartButton() {
         const remaining = this._panel.remainingPoints ?? 0;
+        const isChampion = Boolean(this.tournament?.champion);
+        const modeText = this._gameMode === "hunting" ? "사냥터 입장" : "토너먼트 시작";
         this._startBtn.setState({
             disabled: remaining > 0,
-            text: this.tournament?.champion ? "다시 시작" : undefined,
+            text: isChampion ? "다시 시작" : undefined,
             hidden: false
         });
+        this._startBtn.gameMode = this._gameMode;
     }
 
     adjustStat(key, delta) {
@@ -529,6 +567,13 @@ export class BattleApp {
         this._panel.equipmentSummary = { ...equipmentSummary };
         this._updatePlayerPanelSummary();
         this._drawPlayerFace(player);
+
+        // 모드 세그먼트 동기화
+        const canHunt = getEligibleHuntingCharacters(this.playerProfile, this.roster).length > 0;
+        this._modeSegment.visible = !Boolean(this.tournament && !this.tournament?.champion);
+        this._modeSegment.mode = this._gameMode;
+        this._modeSegment.canHunt = canHunt;
+        this._modeSegment.locked = Boolean(this.tournament && !this.tournament?.champion);
 
         if (!this.tournament || this.tournament.champion) {
             this._syncStartButton();
@@ -680,6 +725,24 @@ export class BattleApp {
         if (this._previewSim) {
             this.renderer.renderPlayerPreviewSwap(this._previewSim, this._previewSim.pendingFighter);
             return;
+        }
+
+        // 사냥터 모드: 우승 캐릭터만 표시
+        if (this._gameMode === "hunting") {
+            const eligible = getEligibleHuntingCharacters(this.playerProfile, this.roster);
+            if (eligible.length === 0) {
+                this.renderer.clear();
+                return;
+            }
+            // 현재 선택된 캐릭터가 eligible 목록에 없으면 첫 번째로 변경
+            const inEligible = eligible.find((c) => c.id === this.playerFighterId);
+            if (!inEligible) {
+                this.playerFighterId = eligible[0].id;
+                this.playerStatAllocation = createEmptyStatAllocation();
+                this._previewBall = null;
+                this.refreshPlayerSetup();
+                return;
+            }
         }
 
         const player = this.roster.find((fighter) => fighter.id === this.playerFighterId);
