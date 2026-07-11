@@ -23,7 +23,7 @@
                 // 특수 상태(확인/다시 시작 등) — 기존 startTournament 흐름
                 window.requireGameActionBridge("startTournament").startTournament();
             } else if (this.gameMode === "hunting") {
-                window.requireGameActionBridge("openHuntingLobby").openHuntingLobby();
+                window.requireGameActionBridge("openHuntingStageSelect").openHuntingStageSelect();
             } else {
                 window.requireGameActionBridge("startTournament").startTournament();
             }

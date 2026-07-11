@@ -6,7 +6,6 @@ import {
     defeatHuntingRun,
     canRetreatFromHuntingRun,
     completeHuntingStage,
-    getEligibleHuntingCharacters,
     canEnterHunting,
     getSelectedHuntingStageId,
     getUnlockedHuntingStageIds,
@@ -52,14 +51,14 @@ export class HuntingManager {
         return this._run?.status === "active";
     }
 
-    showCharacterSelect() {
+    async showStageSelect() {
         const app = this.app;
         // 사냥터 진입 시 기존 캐릭터 프리뷰 중지 및 캔버스 초기화
         app.stopPlayerPreviewLoop();
         app.renderer.clear();
 
-        const eligible = getEligibleHuntingCharacters(app.playerProfile, app.roster);
-        if (eligible.length === 0) {
+        const characterId = app.playerFighterId;
+        if (!canEnterHunting(app.playerProfile, characterId)) {
             PopupService.show({
                 title: "사냥터",
                 bodyHtml:
@@ -93,40 +92,32 @@ export class HuntingManager {
                 <div class="hunting-stage-grid">${stageButtons}</div>
                 ${stageDesc}
             </div>
-            <div class="hunting-section-divider"></div>
-            <div class="hunting-char-grid">
-                ${eligible
-                    .map(
-                        (c) => `
-                    <button class="hunting-char-btn" data-char="${c.id}" style="border-color:${c.color}">
-                        <strong>${c.name}</strong>
-                        <span>${c.title}</span>
-                    </button>
-                `
-                    )
-                    .join("")}
-            </div>
-            <p style="margin-top:8px;font-size:0.75rem;color:#888">우승 경험 캐릭터만 입장 가능</p>
         `;
 
-        PopupService.show({ title: "사냥터 — 원정 준비", bodyHtml });
+        const selectionPromise = PopupService.show({
+            title: "사냥터 — 맵 선택",
+            bodyHtml,
+            buttons: [
+                { text: "취소", value: "cancel" },
+                { text: "원정 시작", value: "start", primary: true }
+            ]
+        });
+
         setTimeout(() => {
             document.querySelectorAll(".hunting-stage-btn").forEach((btn) => {
                 btn.addEventListener("click", () => {
                     const stageId = btn.dataset.stage;
                     app.playerProfile.hunting.selectedStageId = stageId;
                     savePlayerProfile(app.playerProfile);
-                    // Refresh popup with updated selection
-                    this.showCharacterSelect();
-                });
-            });
-            document.querySelectorAll(".hunting-char-btn").forEach((btn) => {
-                btn.addEventListener("click", () => {
-                    const charId = btn.dataset.char;
-                    this.startRun(charId);
+                    this.showStageSelect();
                 });
             });
         }, 50);
+
+        const selection = await selectionPromise;
+        if (selection === "start") {
+            await this.startRun(characterId);
+        }
     }
 
     async startRun(characterId) {

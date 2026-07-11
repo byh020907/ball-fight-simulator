@@ -1190,11 +1190,11 @@ function testStatAllocationRules(app) {
 
 function testComponentBridgeCallsGameHandlers(app) {
     let started = false;
-    let openedLobby = false;
+    let openedStageSelect = false;
     let retreated = false;
     let advanced = false;
     const originalStartTournament = app.startTournament;
-    const originalShowCharacterSelect = app.hunting.showCharacterSelect;
+    const originalShowStageSelect = app.hunting.showStageSelect;
     const originalRetreat = app.hunting.retreat;
     const originalAdvance = app.hunting.advance;
 
@@ -1202,8 +1202,8 @@ function testComponentBridgeCallsGameHandlers(app) {
         app.startTournament = () => {
             started = true;
         };
-        app.hunting.showCharacterSelect = () => {
-            openedLobby = true;
+        app.hunting.showStageSelect = () => {
+            openedStageSelect = true;
         };
         app.hunting.retreat = () => {
             retreated = true;
@@ -1214,18 +1214,18 @@ function testComponentBridgeCallsGameHandlers(app) {
         const bridge = createAppComponentBridge(app);
 
         bridge.startTournament();
-        bridge.openHuntingLobby();
+        bridge.openHuntingStageSelect();
         bridge.huntingRetreat();
         bridge.huntingAdvance();
     } finally {
         app.startTournament = originalStartTournament;
-        app.hunting.showCharacterSelect = originalShowCharacterSelect;
+        app.hunting.showStageSelect = originalShowStageSelect;
         app.hunting.retreat = originalRetreat;
         app.hunting.advance = originalAdvance;
     }
 
     assert.equal(started, true, "Start button bridge action should call BattleApp.startTournament");
-    assert.equal(openedLobby, true, "Hunting button bridge action should open the hunting lobby");
+    assert.equal(openedStageSelect, true, "Hunting button bridge action should open stage selection");
     assert.equal(retreated, true, "Overlay retreat action should call HuntingManager.retreat");
     assert.equal(advanced, true, "Overlay advance action should call HuntingManager.advance");
 }
@@ -2294,6 +2294,63 @@ function testHuntingStageSelectionAndArenaTheme() {
     assert.ok(defaultCalls.length >= 1, "Unknown theme should fall back to default fill");
 
     console.log("[hunting-stage] ok");
+}
+
+async function testHuntingStageSelectUsesPreviewCharacter() {
+    const profile = createDefaultPlayerProfile();
+    profile.collection.characters[FIGHTER_IDS.RAGE] = { tournamentWins: 1 };
+    const app = {
+        playerProfile: profile,
+        playerFighterId: FIGHTER_IDS.RAGE,
+        roster: [{ id: FIGHTER_IDS.RAGE, name: "Rage", title: "Test", color: "#f00" }],
+        renderer: { clear() {} },
+        stopPlayerPreviewLoop() {},
+        _syncPlayerStatAllocationFromUi() {},
+        refreshPlayerSetup() {},
+        setHuntingActive() {},
+        setHuntingOverlayState() {},
+        addLog() {}
+    };
+    const manager = new HuntingManager(app);
+    let popupOptions = null;
+    let advanced = false;
+    const originalDialog = PopupService._testDialog;
+    const originalQuerySelectorAll = document.querySelectorAll;
+
+    PopupService.setTestDialog({
+        show(options) {
+            popupOptions = options;
+            return Promise.resolve("start");
+        },
+        close() {}
+    });
+    document.querySelectorAll = () => [];
+    manager.advance = async () => {
+        advanced = true;
+    };
+
+    try {
+        await manager.showStageSelect();
+
+        assert.ok(popupOptions.bodyHtml.includes("hunting-stage-btn"), "Stage selection should render map cards");
+        assert.equal(
+            popupOptions.bodyHtml.includes("hunting-char-btn"),
+            false,
+            "Stage selection should not render character selection cards"
+        );
+        assert.deepEqual(
+            popupOptions.buttons.map((button) => button.value),
+            ["cancel", "start"],
+            "Stage selection should provide cancel and start actions"
+        );
+        assert.equal(manager._run.characterId, FIGHTER_IDS.RAGE, "Run should use the current preview character");
+        assert.equal(advanced, true, "Stage selection start action should begin the run");
+    } finally {
+        PopupService.setTestDialog(originalDialog);
+        document.querySelectorAll = originalQuerySelectorAll;
+    }
+
+    console.log("[hunting-stage-select-preview-character] ok");
 }
 
 function testHuntingTerrain() {
@@ -6862,6 +6919,7 @@ testHunting100FloorStructure();
 testHuntingCombatRelief();
 testHuntingPortalDecline();
 testHuntingStageSelectionAndArenaTheme();
+await testHuntingStageSelectUsesPreviewCharacter();
 testHuntingTerrain();
 testEquipmentEnhancement();
 testEquipmentStatValueUnits();

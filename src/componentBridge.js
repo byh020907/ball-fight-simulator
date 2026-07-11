@@ -60,8 +60,8 @@ export function createComponentBridge(app) {
         },
 
         // ── Hunting actions ──
-        openHuntingLobby() {
-            return app.hunting.showCharacterSelect();
+        openHuntingStageSelect() {
+            return app.hunting.showStageSelect();
         },
         huntingRetreat() {
             return app.hunting.retreat();
