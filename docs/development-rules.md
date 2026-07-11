@@ -82,6 +82,7 @@ Boids 알고리즘이 눈에 보이지 않는다는 피드백을 받았을 때:
 - **한 파일 = 한 개념.** 클래스 하나면 파일 하나. 여러 관련 함수를 모아 내보낼 때는 `index.js` barrel로.
 - **폴더링 기준:** 200줄 이상이거나 자연스러운 분리점(예: Ability 클래스들)이 있으면 폴더로 분리.
 - **`index.js`**는 폴더 내부의 exports를 모아서 외부에 공개하는 barrel 파일로만 사용. 자체 로직 금지.
+- **매핑/레지스트리는 대표 클래스의 static에**: `ABILITY_MAP` 같은 상수 매핑은 별도 barrel이나 모듈 레벨 변수 대신, 대표 클래스(예: `Ability.MAP`)의 static 프로퍼티로 관리합니다. `index.js`에서 초기화 책임을 지고, 외부에서는 `Ability.MAP`으로 접근합니다. (참조: `src/abilities/index.js` → `Ability.MAP`)
 - **디렉토리명은 `kebab-case`**, 파일명은 `camelCase` (예외: `index.js`).
 
 ### 계층 구조 (Namespace)

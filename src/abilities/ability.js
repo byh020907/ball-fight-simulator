@@ -1,6 +1,9 @@
 import { mixins, Cooldown } from "../physics/index.js";
 
 export class Ability extends mixins([Cooldown]) {
+    /** @type {Record<string, typeof Ability>} */
+    static MAP = {};
+
     constructor(owner, simulation, baseCooldown = 0) {
         super();
         this.owner = owner;

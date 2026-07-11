@@ -1,6 +1,7 @@
 import { BattleBall } from "../entities/battleBall.js";
 import { Vector2 } from "../core.js";
 import { FighterPhysicsSimulation } from "../simulation/fighterPhysicsSimulation.js";
+import { Ability } from "../abilities/ability.js";
 
 const PREVIEW_COLLISION_COOLDOWN = 0.15;
 const PREVIEW_HEAVY_IMPACT = 10;
@@ -28,6 +29,8 @@ export class PreviewReselectSimulation extends FighterPhysicsSimulation {
         ball.teamId = fighter.id;
         ball.simulation = this;
         ball.applyImpulse(ball.velocity.clone().scale(-1));
+        const AbilityClass = Ability.MAP[fighter.ability];
+        if (AbilityClass) ball.bindAbility(new AbilityClass(ball, {}));
         return ball;
     }
 

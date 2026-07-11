@@ -74,35 +74,7 @@ import {
 } from "./hunting/equipmentConfig.js";
 import { FIGHTER_IDS, Vector2 } from "./core.js";
 import { formatHeroStatLine, formatHeroStatParts, mergeOrbBonuses } from "./entities/heroOrb.js";
-import {
-    ArcherAbility,
-    OrbitAbility,
-    TricksterAbility,
-    GrenadeAbility,
-    DashAbility,
-    RageAbility,
-    EaterAbility,
-    BatBallAbility,
-    HeroAbility,
-    VampireAbility,
-    GunnerAbility,
-    PhantomAbility
-} from "./abilities/index.js";
-
-const ABILITY_MAP = {
-    archer: ArcherAbility,
-    orbit: OrbitAbility,
-    trickster: TricksterAbility,
-    grenade: GrenadeAbility,
-    dash: DashAbility,
-    rage: RageAbility,
-    eater: EaterAbility,
-    bat_ball: BatBallAbility,
-    hero: HeroAbility,
-    vampire: VampireAbility,
-    gunner: GunnerAbility,
-    phantom: PhantomAbility
-};
+import { Ability } from "./abilities/index.js";
 
 export class BattleApp {
     constructor() {
@@ -354,6 +326,13 @@ export class BattleApp {
             migrateLegacyExperienceToCharacter(this.playerProfile, this.playerFighterId);
 
             this._previewBall = sim.incoming;
+            // PreviewReselectSimulation에서 ability 바인딩 누락 보정
+            if (!this._previewBall.ability) {
+                const incomingAbilityClass = Ability.MAP[sim.pendingFighter.ability];
+                if (incomingAbilityClass) {
+                    this._previewBall.bindAbility(new incomingAbilityClass(this._previewBall, {}));
+                }
+            }
             this._selectionAnimTime = 0;
             this._previewSim = null;
 
@@ -595,7 +574,7 @@ export class BattleApp {
         ctx.fillStyle = fighter.color;
         ctx.fillRect(0, 0, size, size);
         const fakeBall = { radius: size / 2 - 2, position: { x: size / 2, y: size / 2 } };
-        const AbilityClass = ABILITY_MAP[fighter.ability];
+        const AbilityClass = Ability.MAP[fighter.ability];
         if (AbilityClass) {
             const fakeOwner = {
                 color: fighter.color,
@@ -710,7 +689,7 @@ export class BattleApp {
         );
         ball.applyImpulse(ball.velocity.clone().scale(-1));
         ball.radius = Math.round(ball.stats.baseRadius * 1.35);
-        const AbilityClass = ABILITY_MAP[fighter.ability];
+        const AbilityClass = Ability.MAP[fighter.ability];
         if (AbilityClass) ball.bindAbility(new AbilityClass(ball, {}));
         this._previewBall = ball;
         this._selectionAnimTime = 0;
