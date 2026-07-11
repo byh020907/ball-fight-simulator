@@ -8906,10 +8906,14 @@ function testHuntingMerchantMobileScrollContract() {
         "Merchant overlay card should have a dedicated bounded layout"
     );
     assert.ok(
-        content.includes("overflow-y: auto"),
-        "Merchant overlay should scroll when its choices exceed arena height"
+        content.includes(".hunting-merchant-offers") && content.includes("overflow-y: auto"),
+        "Merchant offers should scroll when their choices exceed arena height"
     );
     assert.ok(content.includes("touch-action: pan-y"), "Merchant overlay should accept vertical touch scrolling");
+    assert.ok(
+        content.includes(".hunting-merchant-pass") && content.includes("flex: 0 0 auto"),
+        "Advance button should stay fixed"
+    );
     console.log("[hunting-merchant-mobile-scroll] ok");
 }
 

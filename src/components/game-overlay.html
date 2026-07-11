@@ -396,15 +396,21 @@
         border-top: 1px solid #e0e0e0;
     }
 
+    :scope.hunting-merchant-active .hunting-merchant {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        min-height: 0;
+    }
+
     :scope.hunting-merchant-active .overlay-card {
         width: min(360px, calc(100% - 24px));
         max-height: calc(100% - 20px);
         padding: 16px 20px;
-        overflow-y: auto;
-        overscroll-behavior: contain;
-        -webkit-overflow-scrolling: touch;
+        overflow: hidden;
         pointer-events: auto;
-        touch-action: pan-y;
+        display: flex;
+        flex-direction: column;
     }
 
     :scope.hunting-merchant-active .overlay-card > strong {
@@ -421,10 +427,16 @@
 
     .hunting-merchant-offers {
         display: flex;
+        flex: 1 1 auto;
         flex-direction: column;
         gap: 6px;
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
         pointer-events: auto;
         margin-top: 8px;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-y;
     }
 
     .hunting-merchant-offer {
@@ -473,6 +485,7 @@
     }
 
     .hunting-merchant-pass {
+        flex: 0 0 auto;
         margin-top: 8px;
         pointer-events: auto;
         text-align: center;
