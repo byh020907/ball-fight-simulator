@@ -7217,6 +7217,25 @@ function testGrenadeProximityTrigger() {
     assert.ok(g.timer < timerAfter, "Timer should decrease even when target moves away");
 }
 
+function testGrenadeHighSpeedProximityTrigger() {
+    const grenadeFighter = app.roster.find((fighter) => fighter.ability === "grenade");
+    const archer = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
+    const sim = new BattleSimulation([grenadeFighter, archer], { onLog() {}, onSound() {} });
+    const owner = sim.fighters.find((fighter) => fighter.id === grenadeFighter.id);
+    const target = sim.fighters.find((fighter) => fighter.id === archer.id);
+
+    owner.position = new Vector2(100, 480);
+    target.position = new Vector2(400, 480);
+    const grenade = new Grenade(owner, new Vector2(900, 480), 1);
+    grenade.position = new Vector2(100, 480);
+    grenade.velocity = new Vector2(6000, 0);
+
+    grenade.update(0.08, sim);
+
+    assert.ok(grenade._proximityTriggered, "High-speed grenade should trigger while crossing the explosion range");
+    assert.ok(grenade.timer < 0.2, "High-speed grenade should shorten its fuse more than the reference speed");
+}
+
 async function testPpoActorCriticUtilities() {
     const { createActorCriticNetworks, deterministicAction, prepareTensorflowBackend, sampleAction, trainPpoEpochs } =
         await import("../scripts/rl/policyNetwork.js");
@@ -7262,6 +7281,7 @@ async function testPpoActorCriticUtilities() {
 testCompleteChallengeTournament();
 testFormatBonusSummary();
 testGrenadeProximityTrigger();
+testGrenadeHighSpeedProximityTrigger();
 await testPpoActorCriticUtilities();
 await testNewCharactersRegistered(app);
 await testVampireBatsSpawn(app);

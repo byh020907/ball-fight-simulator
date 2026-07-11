@@ -1,5 +1,10 @@
 import { CombatEntity, dealProjectileDamage, Vector2 } from "../core.js";
 
+const PROXIMITY_REFERENCE_SPEED = 800;
+const PROXIMITY_MIN_FUSE_REDUCTION = 0.2;
+const PROXIMITY_FUSE_REDUCTION_AT_REFERENCE_SPEED = 0.4;
+const PROXIMITY_MAX_FUSE_REDUCTION = 0.85;
+
 export class Grenade extends CombatEntity {
     constructor(owner, targetPosition, fuseTime = 1.08) {
         const start = owner.position.clone();
@@ -17,6 +22,8 @@ export class Grenade extends CombatEntity {
     }
 
     update(delta, simulation) {
+        const previousPosition = this.position.clone();
+        const travelSpeed = this.velocity.length();
         this.integrate(delta);
 
         if (this.bounces < this.maxBounces) {
@@ -29,15 +36,11 @@ export class Grenade extends CombatEntity {
             }
         }
 
-        // 상대가 폭발 범위 내에 들어오면 남은 퓨즈 시간 2배 단축 (1회)
+        // 이동 경로가 상대 폭발권을 스치면 탄속에 비례해 퓨즈를 단축한다.
         if (!this._proximityTriggered) {
             const target = simulation.getOpponent(this.owner);
-            if (target && !target.flags.defeated) {
-                const dist = Vector2.subtract(this.position, target.position).length();
-                if (dist <= this.explosionRadius) {
-                    this.timer *= 0.6;
-                    this._proximityTriggered = true;
-                }
+            if (target && !target.flags.defeated && this._crossedExplosionRange(previousPosition, target.position)) {
+                this._reduceFuseForProximity(travelSpeed);
             }
         }
 
@@ -47,6 +50,28 @@ export class Grenade extends CombatEntity {
         }
 
         this._detonate(simulation);
+    }
+
+    _crossedExplosionRange(startPosition, targetPosition) {
+        const path = Vector2.subtract(this.position, startPosition);
+        const targetOffset = Vector2.subtract(targetPosition, startPosition);
+        const pathLengthSquared = path.x * path.x + path.y * path.y;
+        const pathProgress =
+            pathLengthSquared > 0
+                ? Math.max(0, Math.min(1, (targetOffset.x * path.x + targetOffset.y * path.y) / pathLengthSquared))
+                : 0;
+        const closestPoint = Vector2.add(startPosition, path.scale(pathProgress));
+        return Vector2.subtract(targetPosition, closestPoint).length() <= this.explosionRadius;
+    }
+
+    _reduceFuseForProximity(travelSpeed) {
+        const speedRatio = travelSpeed / PROXIMITY_REFERENCE_SPEED;
+        const reduction = Math.max(
+            PROXIMITY_MIN_FUSE_REDUCTION,
+            Math.min(PROXIMITY_MAX_FUSE_REDUCTION, PROXIMITY_FUSE_REDUCTION_AT_REFERENCE_SPEED * speedRatio)
+        );
+        this.timer *= 1 - reduction;
+        this._proximityTriggered = true;
     }
 
     _detonate(simulation) {
