@@ -428,10 +428,15 @@ export class BattleApp {
     }
 
     _syncPlayerStatAllocationFromUi() {
-        if (!this._panel.allocation) return;
+        const alloc = this._panel.allocation;
+        if (alloc === null || typeof alloc !== "object" || Array.isArray(alloc)) {
+            throw new Error(
+                `[BattleApp] playerPanel.allocation(${typeof alloc})이(가) 유효하지 않습니다. playerPanel 컴포넌트는 반드시 객체 형태의 allocation을 초기 상태로 제공해야 합니다.`
+            );
+        }
         this.playerStatAllocation = {
             ...createEmptyStatAllocation(),
-            ...this._panel.allocation
+            ...alloc
         };
     }
 
@@ -735,7 +740,7 @@ export class BattleApp {
         }
 
         // Sync allocation from Alpine (user may have clicked +/- buttons there)
-        this.playerStatAllocation = { ...this._panel.allocation };
+        this._syncPlayerStatAllocationFromUi();
 
         const bonusCtx = this._getStatBonusContext();
         const effectiveTotal = PLAYER_STAT_POINTS + bonusCtx.extraStatPoints;

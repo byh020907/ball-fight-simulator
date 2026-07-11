@@ -9133,6 +9133,13 @@ function testPreviewReselectQueuesDuringSwap(app) {
     // After first swap finalizes, the queued reselect should have started a second swap
     assert.ok(app._previewSim !== null, "queued reselect should have started a second swap");
     assert.notEqual(app.playerFighterId, initialId, "playerFighterId should have changed after first swap finalizes");
+    // 두 번째 스왑의 대상은 _pickDifferentPlayerFighterId에 의해 현재와 다른 ID가 보장됨
+    const secondSwapPendingId = app._previewSim.pendingId;
+    assert.notEqual(
+        secondSwapPendingId,
+        app.playerFighterId,
+        "second swap pendingId must differ from current playerFighterId"
+    );
 
     // Complete the second swap
     const duration2 = app._previewSim.duration;
@@ -9145,7 +9152,11 @@ function testPreviewReselectQueuesDuringSwap(app) {
     assert.ok(app._previewSim === null, "_previewSim should be null after both swaps complete");
     assert.ok(app._previewBall !== null, "_previewBall should be set after both swaps");
     assert.equal(app._previewBall.id, app.playerFighterId, "final preview ball should match playerFighterId");
-    assert.notEqual(app.playerFighterId, initialId, "playerFighterId should differ from initial after two swaps");
+    assert.equal(
+        app.playerFighterId,
+        secondSwapPendingId,
+        "playerFighterId should match the deterministic second-swap target"
+    );
     assert.ok(
         app.canReselectPreviewCharacter(),
         "canReselectPreviewCharacter should return true after all swaps complete"
@@ -10044,11 +10055,93 @@ async function testPatchNotesServiceUsesRequire() {
     console.log("[patchNotesService-uses-require] ok");
 }
 
+async function testPlayerPanelAllocationContract(app) {
+    // 플레이어 패널 allocation은 필수이므로 _syncPlayerStatAllocationFromUi가
+    // 조용히 무시하지 않고 항상 동기화해야 함
+
+    // 1. 소스 코드에 silent guard가 남아 있는지 확인
+    const appJs = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
+    assert.ok(
+        !appJs.includes("!this._panel.allocation"),
+        "app.js must not contain silent `if (!this._panel.allocation) return` guard anywhere"
+    );
+
+    // 1b. 명시적 계약 위반 검증(throw Error)이 존재하는지 확인
+    assert.ok(
+        appJs.includes("Array.isArray(alloc)"),
+        "_syncPlayerStatAllocationFromUi must have explicit allocation type assertion"
+    );
+    assert.ok(appJs.includes("playerPanel.allocation"), "error message must name playerPanel.allocation");
+
+    // 2. 정상 경로: allocation이 {}일 때 동기화가 동작하는지 확인
+    const saved = { ...app.playerStatAllocation };
+    const testAlloc = { hp: 10, damage: 10, speed: 10, skill: 10, defense: 10 };
+    app._panel.allocation = { ...testAlloc };
+    app._syncPlayerStatAllocationFromUi();
+    assert.deepEqual(
+        app.playerStatAllocation,
+        { ...createEmptyStatAllocation(), ...testAlloc },
+        "playerStatAllocation should be synced from _panel.allocation"
+    );
+
+    // 3. 복원
+    app.playerStatAllocation = saved;
+    app._panel.allocation = {};
+
+    console.log("[player-panel-allocation-contract] ok");
+}
+
+async function testPlayerPanelAllocationContractBoundary(app) {
+    // 경계 검증: _panel.allocation이 null/undefined/비객체인 경우
+    // _syncPlayerStatAllocationFromUi가 명시적 Error를 throw해야 함
+
+    const savedAlloc = app._panel.allocation;
+    const savedPlayer = { ...app.playerStatAllocation };
+
+    function expectAllocationError(fn, label) {
+        try {
+            fn();
+            assert.fail(`${label}: Error가 발생하지 않음`);
+        } catch (e) {
+            assert.ok(e instanceof Error, `${label}: throw된 값은 Error여야 함`);
+            assert.ok(
+                e.message.includes("playerPanel.allocation"),
+                `${label}: 오류 메시지에 "playerPanel.allocation"이 포함되어야 함`
+            );
+            assert.ok(e.message.includes("객체"), `${label}: 오류 메시지에 "객체"가 포함되어야 함`);
+        }
+    }
+
+    // undefined 경로 → Error
+    app._panel.allocation = undefined;
+    expectAllocationError(() => app._syncPlayerStatAllocationFromUi(), "undefined allocation");
+
+    // null 경로 → Error
+    app._panel.allocation = null;
+    expectAllocationError(() => app._syncPlayerStatAllocationFromUi(), "null allocation");
+
+    // 비객체 타입(문자열) → Error
+    app._panel.allocation = "not-an-object";
+    expectAllocationError(() => app._syncPlayerStatAllocationFromUi(), "string allocation");
+
+    // 배열 → Error (배열은 객체 타입이지만 유효한 allocation이 아님)
+    app._panel.allocation = [];
+    expectAllocationError(() => app._syncPlayerStatAllocationFromUi(), "array allocation");
+
+    // 복원 — playerStatAllocation은 변경되지 않아야 함
+    assert.deepEqual(app.playerStatAllocation, savedPlayer, "호출 실패 후 playerStatAllocation이 변경되지 않아야 함");
+    app._panel.allocation = savedAlloc;
+
+    console.log("[player-panel-allocation-contract-boundary] ok");
+}
+
 await testRequireGameUIComponentResolvesAll();
 await testRequireGameUIComponentMissingFails();
 await testRequireGameUIComponentNoRemainingGuards();
 await testCollectionHubServiceUsesRequire();
 await testPatchNotesServiceUsesRequire();
+await testPlayerPanelAllocationContract(app);
+await testPlayerPanelAllocationContractBoundary(app);
 
 await testHuntingButtonInitialHidden();
 await testHuntingButtonShowsWithEligible();

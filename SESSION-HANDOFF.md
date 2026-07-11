@@ -1,5 +1,18 @@
 # 결정 기록
 
+## [L1] 2026-07-12 — 필수 playerPanel.allocation 계약 강화: 무음 무시 대신 명시적 Error throw
+
+- 맥락: 9c6e9ff(requireGameUIComponent) 이후에도 `_syncPlayerStatAllocationFromUi`에서 `if (!this._panel.allocation) return` 실런트 가드가 남아 필수 컴포넌트 상태 위반을 조용히 무시함. 더 심각한 문제는 object spread가 `null`/`undefined`를 무음 허용해 계약 위반이 감지되지 않음.
+- 결정:
+  (1) `_syncPlayerStatAllocationFromUi`에 `alloc === null || typeof alloc !== "object" || Array.isArray(alloc)` 검증 추가 — 위반 시 `[BattleApp] playerPanel.allocation(...)이(가) 유효하지 않습니다. playerPanel 컴포넌트는 반드시 객체 형태의 allocation을 초기 상태로 제공해야 합니다.` 명시적 Error throw. 무음 `return` 또는 빈 allocation으로의 fallback 금지.
+  (2) `startTournament`에서 직접 `{ ...this._panel.allocation }` 대신 `this._syncPlayerStatAllocationFromUi()`로 동기화하여 동일 검증 경로 사용.
+  (3) `testPreviewReselectQueuesDuringSwap` 마지막 어서션을 `assert.notEqual(initialId)`→`assert.equal(secondSwapPendingId)`로 변경 — `_previewSim.pendingId` 캡처로 결정론적 검증.
+  (4) `testPlayerPanelAllocationContract` — silent guard 부재 + 명시적 assertion 존재 확인(Array.isArray/playerPanel.allocation 문자열 검증) + 정상 경로 동기화 검증.
+  (5) `testPlayerPanelAllocationContractBoundary` — `undefined`/`null`/문자열/배열 경로에서 각각 한국어 Error throw 검증, 성공 후 `playerStatAllocation` 불변 확인.
+- 영향: `src/app.js`(1줄 assertion+throw 추가, 1줄 위임 변경), `tests/regression.mjs`(기존 테스트 20줄 갱신 + boundary 60줄 재작성), `SESSION-HANDOFF.md`
+- 검증: `npm test` 3회 연속 통과 (플레이크 없음), `npm run check`, `npm run format:check`, `node scripts/huntingUserScenario.mjs`, `git diff --check` 통과.
+- 보존: `this._panel.locked` gameplay state guard는 유지 (요청 범위 외).
+
 ## [L1] 2026-07-12 — 필수 UI 컴포넌트 강제 계약 도입 (requireGameUIComponent)
 
 - 맥락: BattleApp이 `gameBridge.get()`으로 조회한 UI 컴포넌트를 `if (this._overlay)` 같은 optional guard로 감싸 누락 시 조용히 무시함. User는 구조적 원인 고침 없이 개별 패턴 추적에 지쳐, 필수 의존성은 생성 시점에 명시적 Error로 실패하도록 요구.
