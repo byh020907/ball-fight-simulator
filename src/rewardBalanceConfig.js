@@ -120,7 +120,10 @@ export const REWARD_BALANCE = deepFreeze({
         specialRanges: {
             crashDamage: { min: 5, max: 15 },
             cooldown: { min: 3, max: 10 },
-            hpSteal: { min: 2, max: 8 }
+            hpSteal: { min: 2, max: 8 },
+            mass: { min: 5, max: 15 },
+            wallBounce: { min: 5, max: 15 },
+            angularImpulse: { min: 5, max: 15 }
         },
         hpStealCooldown: 2.5
     },

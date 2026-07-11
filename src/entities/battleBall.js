@@ -78,6 +78,8 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             items: Array.isArray(spec.equipment?.equippedItems) ? spec.equipment.equippedItems : []
         };
         this.equipmentEffects = createEquipmentCombatEffects(this.equipment.items);
+        this.mass *= this.equipmentEffects.massMultiplier;
+        this.stats.mass = this.mass;
         this._equipmentEffectCooldowns = { hpSteal: 0 };
         this.mastery = {
             physics: spec.mastery?.physics ?? {
@@ -286,6 +288,19 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
 
     triggerEquipmentEffectCooldown(type, duration) {
         this._equipmentEffectCooldowns[type] = Math.max(0, duration);
+    }
+
+    applyEquipmentWallBounce(xNormal, yNormal) {
+        const multiplier = this.equipmentEffects.wallBounceMultiplier;
+        if (multiplier <= 1) return;
+
+        const normal = (xNormal ?? yNormal)?.clone();
+        if (!normal) return;
+        if (xNormal && yNormal) normal.add(yNormal).normalize();
+
+        const outgoingSpeed = Math.max(0, this.velocity.dot(normal));
+        if (!Number.isFinite(outgoingSpeed) || outgoingSpeed <= 0) return;
+        this.applyImpulse(normal.scale(outgoingSpeed * (multiplier - 1)));
     }
 
     getAbilityUiState() {

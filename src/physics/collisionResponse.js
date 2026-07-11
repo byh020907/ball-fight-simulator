@@ -316,6 +316,8 @@ export function applyCollisionResponse(body, normal, contactPoint, preCollisionV
  * @param {number} [options.tangentialFriction] — 재질 조합 덮어쓰기
  * @param {number} [options.impactA=1] — bodyB에 적용할 impulse 배율
  * @param {number} [options.impactB=1] — bodyA에 적용할 impulse 배율
+ * @param {number} [options.angularScaleA] — bodyA에 적용할 최종 각충격 배율
+ * @param {number} [options.angularScaleB] — bodyB에 적용할 최종 각충격 배율
  * @param {{x:number,y:number}} [options.preCollisionVel]
  */
 export function applyDynamicCollisionResponse(bodyA, bodyB, normal, contactPoint, approachSpeed, options = {}) {
@@ -329,6 +331,8 @@ export function applyDynamicCollisionResponse(bodyA, bodyB, normal, contactPoint
     const tangentialFriction = options.tangentialFriction ?? combined.friction;
     const impactA = options.impactA ?? 1;
     const impactB = options.impactB ?? 1;
+    const angularScaleA = options.angularScaleA ?? angularFactor * impactB;
+    const angularScaleB = options.angularScaleB ?? angularFactor * impactA;
 
     // impact 의미: impactA는 bodyA의 outgoing → bodyB에 적용
     //               impactB는 bodyB의 outgoing → bodyA에 적용
@@ -337,8 +341,8 @@ export function applyDynamicCollisionResponse(bodyA, bodyB, normal, contactPoint
         tangentialFriction,
         linearScaleA: impactB,
         linearScaleB: impactA,
-        angularScaleA: angularFactor * impactB,
-        angularScaleB: angularFactor * impactA
+        angularScaleA,
+        angularScaleB
     });
 }
 

@@ -98,6 +98,27 @@ export const EQUIPMENT = Object.freeze({
                 nameSuffix: "갈망",
                 ...EQUIPMENT_BALANCE.specialRanges.hpSteal,
                 suffix: "%"
+            }),
+            Object.freeze({
+                type: "mass",
+                label: "중량",
+                nameSuffix: "중량",
+                ...EQUIPMENT_BALANCE.specialRanges.mass,
+                suffix: "%"
+            }),
+            Object.freeze({
+                type: "wallBounce",
+                label: "반향",
+                nameSuffix: "반향",
+                ...EQUIPMENT_BALANCE.specialRanges.wallBounce,
+                suffix: "%"
+            }),
+            Object.freeze({
+                type: "angularImpulse",
+                label: "소용돌이",
+                nameSuffix: "소용돌이",
+                ...EQUIPMENT_BALANCE.specialRanges.angularImpulse,
+                suffix: "%"
             })
         ])
     }),

@@ -66,14 +66,14 @@ export class PreviewReselectSimulation extends FighterPhysicsSimulation {
         }
     }
 
-    getFighterCollisionImpactOptions(context) {
+    getFighterCollisionResponseOptions(context) {
         if (context.a === this.outgoing && context.b === this.incoming) {
             return { impactA: 1, impactB: PREVIEW_HEAVY_IMPACT, restitution: 0.92 };
         }
         if (context.a === this.incoming && context.b === this.outgoing) {
             return { impactA: PREVIEW_HEAVY_IMPACT, impactB: 1, restitution: 0.92 };
         }
-        return super.getFighterCollisionImpactOptions(context);
+        return super.getFighterCollisionResponseOptions(context);
     }
 
     shouldEmitFighterCollisionFeedback(context) {

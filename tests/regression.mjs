@@ -2853,6 +2853,94 @@ function testEquipmentSpecialCombatEffects() {
     console.log("[equipment-special-combat-effects] ok");
 }
 
+function testEquipmentPhysicalSpecialEffects() {
+    const effects = createEquipmentCombatEffects([
+        {
+            specialOptions: [
+                { type: "mass", value: 5 },
+                { type: "wallBounce", value: 15 }
+            ]
+        },
+        {
+            specialOptions: [
+                { type: "mass", value: 15 },
+                { type: "angularImpulse", value: 15 }
+            ]
+        }
+    ]);
+    assert.equal(effects.massMultiplier, 1.15, "Duplicate 중량 options should use only the highest value");
+    assert.equal(effects.wallBounceMultiplier, 1.15, "반향 should amplify post-wall normal speed");
+    assert.equal(effects.collisionAngularMultiplier, 1.15, "소용돌이 should amplify solver angular impulse");
+
+    const createSpec = (id, specialOptions = []) => ({
+        id,
+        teamId: id,
+        name: id,
+        title: "",
+        description: "",
+        color: "#777777",
+        face: "default",
+        ability: "none",
+        appearance: { sides: 4, face: "default", angle: 0, angularVelocity: 0 },
+        stats: { hp: 100, damage: 10, defense: 1, speed: 300, radius: 50, mass: 1 },
+        equipment: { equippedItems: [{ instanceId: `${id}-equipment`, specialOptions }] }
+    });
+    const createSimulation = (specialOptions = []) =>
+        new BattleSimulation(
+            [createSpec("equipped", specialOptions), createSpec("baseline")],
+            { onLog() {}, onSound() {} },
+            null,
+            { assignActions: false }
+        );
+    const arrangeCollision = (sim) => {
+        const [a, b] = sim.fighters;
+        a.position = new Vector2(450, 480);
+        b.position = new Vector2(500, 480);
+        a.velocity = new Vector2(500, 0);
+        b.velocity = new Vector2(-120, 0);
+        return [a, b];
+    };
+
+    const baselineMassSim = createSimulation();
+    const [, baselineMassTarget] = arrangeCollision(baselineMassSim);
+    baselineMassSim.handleFighterCollision(...baselineMassSim.fighters);
+
+    const massSim = createSimulation([{ type: "mass", value: 15 }]);
+    const [heavy, heavyTarget] = arrangeCollision(massSim);
+    massSim.handleFighterCollision(heavy, heavyTarget);
+    assert.equal(heavy.mass, 1.15, "중량 should change the fighter's actual rigid-body mass");
+    assert.ok(
+        heavyTarget.velocity.x > baselineMassTarget.velocity.x,
+        "중량 should change shared rigid-body collision momentum without a separate knockback effect"
+    );
+
+    const echoSim = createSimulation([{ type: "wallBounce", value: 15 }]);
+    const [echoBall] = echoSim.fighters;
+    echoBall.position = new Vector2(echoBall.radius, 480);
+    echoBall.velocity = new Vector2(-500, 0);
+    echoSim.keepInsideArena(echoBall);
+    assert.equal(echoBall.velocity.x, 575, "반향 should increase the reflected wall-normal velocity by its percentage");
+
+    const baselineVortexSim = createSimulation();
+    const [baselineSpinner, baselineTarget] = arrangeCollision(baselineVortexSim);
+    baselineSpinner.velocity = new Vector2(460, 130);
+    baselineTarget.velocity = new Vector2(-150, -90);
+    baselineVortexSim.handleFighterCollision(baselineSpinner, baselineTarget);
+    baselineSpinner.integrateRotation(1 / 60);
+
+    const vortexSim = createSimulation([{ type: "angularImpulse", value: 15 }]);
+    const [vortexSpinner, vortexTarget] = arrangeCollision(vortexSim);
+    vortexSpinner.velocity = new Vector2(460, 130);
+    vortexTarget.velocity = new Vector2(-150, -90);
+    vortexSim.handleFighterCollision(vortexSpinner, vortexTarget);
+    vortexSpinner.integrateRotation(1 / 60);
+    assert.ok(
+        Math.abs(vortexSpinner.angularVelocity) > Math.abs(baselineSpinner.angularVelocity) * 1.14,
+        "소용돌이 should amplify the solver angular impulse instead of assigning angular velocity directly"
+    );
+    console.log("[equipment-physical-special-effects] ok");
+}
+
 function testEquipmentLevelRequirement() {
     const profile = createDefaultPlayerProfile();
     const characterId = FIGHTER_IDS.DASH;
@@ -6767,6 +6855,7 @@ testEquipmentEnhancement();
 testEquipmentStatValueUnits();
 testEquipmentNaming();
 testEquipmentSpecialCombatEffects();
+testEquipmentPhysicalSpecialEffects();
 testEquipmentLevelRequirement();
 testEquipmentDraw();
 testAlpineTemplateComponentSystem();

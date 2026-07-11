@@ -146,14 +146,14 @@ export class FighterPhysicsSimulation extends Simulation {
 
     finalizeFighterPhysicsCollision(_context) {}
 
-    getFighterCollisionImpactOptions(_context) {
+    getFighterCollisionResponseOptions(_context) {
         return { impactA: 1, impactB: 1 };
     }
 
     applyFighterRigidBodyCollision(context) {
         const { a, b, normal, contactPoint, approachSpeed } = context;
         applyDynamicCollisionResponse(a, b, normal, contactPoint, approachSpeed, {
-            ...this.getFighterCollisionImpactOptions(context)
+            ...this.getFighterCollisionResponseOptions(context)
         });
     }
 

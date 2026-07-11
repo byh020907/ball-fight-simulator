@@ -347,16 +347,20 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         }
     }
 
-    getFighterCollisionImpactOptions(context) {
+    getFighterCollisionResponseOptions(context) {
         const { a, b, aModifiers, bModifiers } = context;
         const aOutgoingBonus = 1 + (a.mastery.physics?.outgoingImpactBonus ?? 0);
         const bOutgoingBonus = 1 + (b.mastery.physics?.outgoingImpactBonus ?? 0);
         const aIncomingReduce = 1 - (a.mastery.physics?.incomingKnockbackReduce ?? 0);
         const bIncomingReduce = 1 - (b.mastery.physics?.incomingKnockbackReduce ?? 0);
 
+        const impactA = (aModifiers.impact ?? 1) * aOutgoingBonus * bIncomingReduce;
+        const impactB = (bModifiers.impact ?? 1) * bOutgoingBonus * aIncomingReduce;
         return {
-            impactA: (aModifiers.impact ?? 1) * aOutgoingBonus * bIncomingReduce,
-            impactB: (bModifiers.impact ?? 1) * bOutgoingBonus * aIncomingReduce
+            impactA,
+            impactB,
+            angularScaleA: impactB * a.equipmentEffects.collisionAngularMultiplier,
+            angularScaleB: impactA * b.equipmentEffects.collisionAngularMultiplier
         };
     }
 

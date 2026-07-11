@@ -66,6 +66,7 @@ export class Simulation {
         if (!xBounce && !yBounce) return;
 
         ball.bounced = true;
+        ball.applyEquipmentWallBounce?.(xBounce, yBounce);
         ball.state.wallSlam?.onWallBounce(ball, xBounce ?? yBounce, this);
     }
 
