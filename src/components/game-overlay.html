@@ -410,9 +410,9 @@
     }
 
     :scope.hunting-merchant-active .overlay-card {
-        width: min(360px, calc(100% - 24px));
-        max-height: calc(100% - 20px);
-        padding: 16px 20px;
+        width: min(420px, calc(100% - 16px));
+        max-height: calc(100% - 12px);
+        padding: 12px 14px;
         overflow: hidden;
         pointer-events: auto;
         display: flex;
@@ -447,8 +447,10 @@
 
     .hunting-merchant-offer {
         display: flex;
+        flex: 0 0 auto;
         flex-direction: column;
         align-items: center;
+        justify-content: center;
         gap: 2px;
         font-family: inherit;
         border: 2px solid #202020;
@@ -459,6 +461,7 @@
         background: #ffffff;
         transition: background 0.1s;
         width: 100%;
+        min-height: 76px;
     }
 
     .hunting-merchant-offer:hover {
@@ -478,6 +481,7 @@
     .hunting-merchant-offer .offer-desc {
         font-size: 0.72rem;
         color: #555555;
+        overflow-wrap: anywhere;
     }
 
     .hunting-merchant-offer .offer-cost {

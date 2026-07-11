@@ -8993,6 +8993,11 @@ function testHuntingMerchantMobileScrollContract() {
     );
     assert.ok(content.includes("touch-action: pan-y"), "Merchant overlay should accept vertical touch scrolling");
     assert.ok(
+        content.includes(".hunting-merchant-offer") && content.includes("flex: 0 0 auto"),
+        "Merchant offers should not shrink their contents before the list scrolls"
+    );
+    assert.ok(content.includes("min-height: 76px"), "Merchant offers should retain a readable minimum height");
+    assert.ok(
         content.includes(".hunting-merchant-pass") && content.includes("flex: 0 0 auto"),
         "Advance button should stay fixed"
     );
