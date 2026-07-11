@@ -1,18 +1,18 @@
 /**
- * gameBridge 기반 Promise 팝업 서비스.
+ * uiManager 기반 Promise 팝업 서비스.
  *
  * 사용법:
  *   const result = await PopupService.show({ title, bodyHtml, buttons });
  *   // result === button.value (기본 버튼은 "ok")
  *
  * 설계 계약:
- * - PopupService는 gameBridge를 통해 popupDialog를 조회하는 유일한 모듈입니다.
+ * - PopupService는 uiManager.getComponent를 통해 popupDialog를 조회합니다.
  * - show()는 popupDialog가 등록되지 않은 상태에서 호출되면
  *   명확한 Error와 함께 Promise를 reject합니다 (조용한 cancel 반환 없음).
  * - resolve()/close()는 활성 다이얼로그가 없으면 무시됩니다.
  *   이는 닫힌 후 호출될 수 있는 resolve를 안전하게 처리하기 위함입니다.
  * - _testDialog는 테스트 전용 주입 경로입니다. 프로덕션 코드는
- *   window.gameBridge.get("popupDialog")를 통해 조회합니다.
+ *   window.uiManager.getComponent("popupDialog")를 통해 조회합니다.
  */
 
 /**
@@ -35,8 +35,8 @@ export class PopupService {
     /** @internal popupDialog 컴포넌트를 resolve합니다. */
     static _getPopupDialog() {
         if (PopupService._testDialog) return PopupService._testDialog;
-        if (typeof window !== "undefined" && window.gameBridge) {
-            return window.gameBridge.get("popupDialog") ?? null;
+        if (typeof window !== "undefined" && window.uiManager) {
+            return window.uiManager.getComponent("popupDialog") ?? null;
         }
         return null;
     }
@@ -51,7 +51,7 @@ export class PopupService {
         if (!popup) {
             return Promise.reject(
                 new Error(
-                    "PopupService.show: popupDialog가 gameBridge에 등록되지 않았습니다. " +
+                    "PopupService.show: popupDialog가 uiManager에 등록되지 않았습니다. " +
                         "Alpine 컴포넌트 popup-dialog가 로드되었는지 확인하세요."
                 )
             );

@@ -1,5 +1,22 @@
 # 결정 기록
 
+## [L1] 2026-07-12 — gameBridge/requireGameUIComponent를 uiManager.getComponent/requireComponent로 전면 교체
+
+- 맥락: `window.requireGameUIComponent → window.gameBridge.get → Alpine.store(uiManager)` 체인이 UI 컴포넌트가 `uiManager` store 소유임을 감춤. 게이트웨이 이름이 실제 소유자(`uiManager`)와 불일치.
+- 결정:
+  (1) `Alpine.store("uiManager")`가 직접 `getComponent(componentId)`와 `requireComponent(componentId)`를 노출. 기존 Proxy 바인딩/제어 흐름 유지.
+  (2) `window.uiManager = Alpine.store("uiManager")` 신설 — 다른 모듈/스크립트에서 직접 접근 가능.
+  (3) `index.html`에서 `window.gameBridge` 및 `window.requireGameUIComponent` 완전 제거. 대체 API로만 동작.
+  (4) `src/app.js`의 9개 `requireGameUIComponent` 호출 → `window.uiManager.requireComponent`로 마이그레이션.
+  (5) `src/popup.js` — `window.gameBridge.get("popupDialog")` → `window.uiManager.getComponent("popupDialog")`. PopupService의 `getComponent` 사용으로 명시적 null → Error reject 생애주기 유지.
+  (6) `src/collectionHubService.js`, `src/patchNotesService.js` — `requireGameUIComponent` → `window.uiManager.requireComponent`.
+  (7) `src/actionPicker.js` — `window.gameBridge?.get("actionPicker")` → `window.uiManager?.getComponent("actionPicker")`.
+  (8) `src/components/game-overlay.html`, `src/components/xp-progress-bar.html` — `window.gameBridge?.get` → `window.uiManager?.getComponent`.
+  (9) 테스트 하네스 — `gameBridge`/`requireGameUIComponent` 제거, `uiManager.getComponent`/`requireComponent` 계약 사용. 신규 회귀 `testNoGameBridgeInProduction` 추가.
+- 영향: `index.html`, `src/app.js`, `src/popup.js`, `src/collectionHubService.js`, `src/patchNotesService.js`, `src/actionPicker.js`, `src/components/game-overlay.html`, `src/components/xp-progress-bar.html`, `tests/regression.mjs`, `SESSION-HANDOFF.md`
+- 검증: `npm test` 2회 연속, `npm run check`, `npm run format:check`, `node scripts/huntingUserScenario.mjs`, `git diff --check`, `rg "window\.gameBridge|requireGameUIComponent" src/` 결과 0.
+- 보존: `requireGameActionBridge`(actionGateway.js)는 action gateway로서 별도 책임으로 유지. PopupService `_getPopupDialog` 생애주기(optional getComponent → null → 명시적 reject) 유지.
+
 ## [L1] 2026-07-12 — 필수 playerPanel.allocation 계약 강화: 무음 무시 대신 명시적 Error throw
 
 - 맥락: 9c6e9ff(requireGameUIComponent) 이후에도 `_syncPlayerStatAllocationFromUi`에서 `if (!this._panel.allocation) return` 실런트 가드가 남아 필수 컴포넌트 상태 위반을 조용히 무시함. 더 심각한 문제는 object spread가 `null`/`undefined`를 무음 허용해 계약 위반이 감지되지 않음.

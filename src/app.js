@@ -134,15 +134,15 @@ export class BattleApp {
         this.hunting = new HuntingManager(this);
         this.renderer = new ArenaRenderer(this.elements.canvas);
         const self = this;
-        this._bracket = requireGameUIComponent("tournamentBracket");
-        this._overlay = requireGameUIComponent("gameOverlay");
-        this._panel = requireGameUIComponent("playerPanel");
-        this._startBtn = requireGameUIComponent("startButton");
-        this._log = requireGameUIComponent("battleLog");
-        this._strip = requireGameUIComponent("fighterStrip");
-        this._root = requireGameUIComponent("appRoot");
-        this._toast = requireGameUIComponent("toastNotification");
-        this._huntingBtn = requireGameUIComponent("huntingButton");
+        this._bracket = window.uiManager.requireComponent("tournamentBracket");
+        this._overlay = window.uiManager.requireComponent("gameOverlay");
+        this._panel = window.uiManager.requireComponent("playerPanel");
+        this._startBtn = window.uiManager.requireComponent("startButton");
+        this._log = window.uiManager.requireComponent("battleLog");
+        this._strip = window.uiManager.requireComponent("fighterStrip");
+        this._root = window.uiManager.requireComponent("appRoot");
+        this._toast = window.uiManager.requireComponent("toastNotification");
+        this._huntingBtn = window.uiManager.requireComponent("huntingButton");
         this.ui = {
             get logItems() {
                 return self._log.items;

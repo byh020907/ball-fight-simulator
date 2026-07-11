@@ -366,10 +366,16 @@ function makeHarness() {
             return value;
         }
     };
-    context.gameBridge = {
-        get(componentId) {
-            const manager = context.Alpine.store("uiManager");
-            const instance = manager.components[componentId];
+    const uiManagerStore = {
+        components: {},
+        register(id, instance) {
+            this.components[id] = instance;
+        },
+        unregister(id) {
+            delete this.components[id];
+        },
+        getComponent(componentId) {
+            const instance = this.components[componentId];
             if (!instance) return null;
             return new Proxy(instance, {
                 get(target, prop) {
@@ -381,27 +387,20 @@ function makeHarness() {
                     return true;
                 }
             });
+        },
+        requireComponent(componentId) {
+            const component = this.getComponent(componentId);
+            if (!component) {
+                throw new Error(`[Test] 필수 UI 컴포넌트 '${componentId}'가 uiManager에 등록되지 않았습니다.`);
+            }
+            return component;
         }
     };
-    context.requireGameUIComponent = (componentId) => {
-        const component = context.gameBridge.get(componentId);
-        if (!component) {
-            throw new Error(`[Test] 필수 UI 컴포넌트 '${componentId}'가 uiManager에 등록되지 않았습니다.`);
-        }
-        return component;
-    };
+    context.Alpine.store("uiManager", uiManagerStore);
+    context.uiManager = uiManagerStore;
     context.createGameUI = (name, factory) => {
         context.Alpine.data(name, () => factory());
     };
-    context.Alpine.store("uiManager", {
-        components: {},
-        register(id, instance) {
-            this.components[id] = instance;
-        },
-        unregister(id) {
-            delete this.components[id];
-        }
-    });
     context.window = context;
     return { context, elements };
 }
@@ -447,10 +446,10 @@ async function loadModuleApp() {
             if (st !== undefined) this.subtext = st;
             if (xpReward) {
                 this.xpReward = xpReward;
-                const rp = gameBridge?.get("xpRewardPanel");
+                const rp = window.uiManager?.getComponent("xpRewardPanel");
                 if (rp) rp.animate(xpReward);
             } else {
-                const rp = gameBridge?.get("xpRewardPanel");
+                const rp = window.uiManager?.getComponent("xpRewardPanel");
                 if (rp) rp.hide();
             }
             this.visible = true;
@@ -608,10 +607,10 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
             if (st !== undefined) this.subtext = st;
             if (xpReward) {
                 this.xpReward = xpReward;
-                const rp = gameBridge?.get("xpRewardPanel");
+                const rp = window.uiManager?.getComponent("xpRewardPanel");
                 if (rp) rp.animate(xpReward);
             } else {
-                const rp = gameBridge?.get("xpRewardPanel");
+                const rp = window.uiManager?.getComponent("xpRewardPanel");
                 if (rp) rp.hide();
             }
             this.visible = true;
@@ -713,7 +712,8 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
     alpineState.remainingPoints = 0;
     const baseAlpine = harness.context.Alpine;
     const savedAlpine = globalThis.Alpine;
-    const savedGameBridge = globalThis.gameBridge;
+    const savedUiManager = globalThis.uiManager;
+    const savedWindow = globalThis.window;
     harness.context.Alpine = {
         ...baseAlpine,
         $data: (root) => (root === appRoot ? alpineState : null)
@@ -725,7 +725,8 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
     const { BattleApp } = await import(moduleUrl);
     const app = new BattleApp();
     globalThis.Alpine = savedAlpine;
-    globalThis.gameBridge = savedGameBridge;
+    globalThis.uiManager = savedUiManager;
+    globalThis.window = savedWindow;
     return { app, alpineState };
 }
 
@@ -9297,15 +9298,15 @@ function testActionPickerServiceIdAndConcurrency() {
     const docOrig = globalThis.document;
     globalThis.document = { addEventListener() {} };
 
-    // Mock gameBridge with actionPicker
-    const origGet = window.gameBridge?.get;
-    if (!window.gameBridge) window.gameBridge = { get: () => null };
+    // Mock uiManager with actionPicker
+    const origGetComponent = window.uiManager?.getComponent;
+    if (!window.uiManager) window.uiManager = { getComponent: () => null, requireComponent: () => null };
 
     let resolvePromise = null;
     let pickerVisible = false;
     let pickerCards = [];
 
-    window.gameBridge.get = (id) => {
+    window.uiManager.getComponent = (id) => {
         if (id === "actionPicker") {
             return {
                 show(cards) {
@@ -9317,7 +9318,7 @@ function testActionPickerServiceIdAndConcurrency() {
                 }
             };
         }
-        return origGet ? origGet.call(window.gameBridge, id) : null;
+        return origGetComponent ? origGetComponent.call(window.uiManager, id) : null;
     };
 
     // Start show and immediately resolve with index 1
@@ -9359,10 +9360,10 @@ function testActionPickerConcurrency() {
         }
     };
 
-    const origGet = window.gameBridge?.get;
-    window.gameBridge.get = (id) => {
+    const origGetComponent = window.uiManager?.getComponent;
+    window.uiManager.getComponent = (id) => {
         if (id === "actionPicker") return mockPicker;
-        return origGet ? origGet.call(window.gameBridge, id) : null;
+        return origGetComponent ? origGetComponent.call(window.uiManager, id) : null;
     };
 
     // First show
@@ -9454,15 +9455,19 @@ function testHuntingManagerStaticPopupServiceImport() {
 async function testPopupServiceShowFailsWithoutPopupDialog() {
     const origDialog = PopupService._testDialog;
     PopupService.setTestDialog(null);
+    const mgr = window.uiManager;
+    const savedPopup = mgr?.components?.["popupDialog"];
+    if (mgr) mgr.unregister("popupDialog");
     try {
         await assert.rejects(
             () => PopupService.show({ title: "test", bodyHtml: "<p>test</p>" }),
-            /popupDialog가 gameBridge에 등록되지 않았습니다/,
+            /popupDialog가 uiManager에 등록되지 않았습니다/,
             "PopupService.show should reject with clear error when popupDialog is unavailable"
         );
         console.log("[popup-service-show-fails-without-dialog] ok");
     } finally {
         PopupService.setTestDialog(origDialog);
+        if (mgr && savedPopup) mgr.register("popupDialog", savedPopup);
     }
 }
 
@@ -9532,8 +9537,8 @@ function testCollectionHubServiceNoBlacklistedRefs() {
         "ballFightApp",
         "openHuntingChest",
         "savePlayerProfile",
-        'gameBridge?.get("popupDialog")',
-        "gameBridge?.get('popupDialog')"
+        "gameBridge",
+        "requireGameUIComponent"
     ];
     for (const term of blacklisted) {
         assert.ok(!src.includes(term), `collectionHubService.js should not reference "${term}"`);
@@ -9930,12 +9935,11 @@ async function testHuntingButtonHiddenDuringTournament() {
     console.log("[hunting-button-hidden-tournament] ok");
 }
 
-// ── Stict UI component contract regression ──
+// ── Strict UI component contract regression ──
 
-async function testRequireGameUIComponentResolvesAll() {
+async function testUiManagerRequireComponentResolvesAll() {
     const resolved = {};
 
-    // 검증: loadModuleApp에서 9개 필수 컴포넌트 모두 resolve
     const app = await loadModuleApp();
     resolved.bracket = app._bracket !== undefined && app._bracket !== null;
     resolved.overlay = app._overlay !== undefined && app._overlay !== null;
@@ -9952,29 +9956,28 @@ async function testRequireGameUIComponentResolvesAll() {
         const missing = Object.entries(resolved)
             .filter(([, ok]) => !ok)
             .map(([key]) => key);
-        console.log(`[require-ui-resolves-all] FAIL: missing ${missing.join(", ")}`);
+        console.log(`[ui-manager-require-resolves-all] FAIL: missing ${missing.join(", ")}`);
     }
-    assert.ok(allResolved, "All 9 required UI components must be resolved at startup");
-    console.log("[require-ui-resolves-all] ok");
+    assert.ok(allResolved, "All 9 required UI components must be resolved at startup via uiManager.requireComponent");
+    console.log("[ui-manager-require-resolves-all] ok");
 }
 
-async function testRequireGameUIComponentMissingFails() {
-    // 검증: 누락된 컴포넌트가 있으면 Error throw
+async function testUiManagerRequireComponentMissingFails() {
     const harness = makeHarness();
     Object.assign(globalThis, harness.context);
-    const uiManager = globalThis.Alpine.store("uiManager");
-    uiManager.register("battleLog", { items: [], add() {}, reset() {} });
-    uiManager.register("gameOverlay", {
+    const uiManagerStore = globalThis.Alpine.store("uiManager");
+    uiManagerStore.register("battleLog", { items: [], add() {}, reset() {} });
+    uiManagerStore.register("gameOverlay", {
         visible: false,
         show() {},
         hide() {},
         showTransient() {},
         setHuntingState() {}
     });
-    uiManager.register("startButton", { hidden: true, setState() {} });
-    uiManager.register("huntingButton", { available: false, active: false, tournamentActive: false });
-    uiManager.register("fighterStrip", { fighters: [] });
-    uiManager.register("playerPanel", {
+    uiManagerStore.register("startButton", { hidden: true, setState() {} });
+    uiManagerStore.register("huntingButton", { available: false, active: false, tournamentActive: false });
+    uiManagerStore.register("fighterStrip", { fighters: [] });
+    uiManagerStore.register("playerPanel", {
         fighter: null,
         experience: {},
         equipmentSummary: { slots: [], statLine: "" },
@@ -9989,7 +9992,6 @@ async function testRequireGameUIComponentMissingFails() {
         progressionBonusSummary: "",
         allocationSummary: ""
     });
-    // tournamentBracket 등을 등록하지 않음 → 첫 번째 missing에서 throw 발생
 
     const moduleUrl = new URL(`../src/app.js?test=${Date.now()}`, import.meta.url).href;
     const { BattleApp } = await import(moduleUrl);
@@ -10006,14 +10008,13 @@ async function testRequireGameUIComponentMissingFails() {
             `Error message must mention a missing component name. Got: ${e.message}`
         );
     }
-    console.log("[require-ui-component-missing-fails] ok");
+    console.log("[ui-manager-require-component-missing-fails] ok");
 }
 
-async function testRequireGameUIComponentNoRemainingGuards() {
+async function testUiManagerRequireComponentNoRemainingGuards() {
     const appJs = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
     const productionLineErrors = [];
 
-    // 9개 필드 주변의 if (this._X) / if (!this._X) / this._X?. 패턴 검사
     const forbiddenPatterns = [
         /if\s*\(\s*this\._(bracket|overlay|startBtn|log|strip|root|toast|huntingBtn)\b/,
         /if\s*\(\s*!this\._(bracket|overlay|startBtn|log|strip|root|toast|huntingBtn)\b/,
@@ -10029,30 +10030,35 @@ async function testRequireGameUIComponentNoRemainingGuards() {
     }
 
     if (productionLineErrors.length > 0) {
-        console.log("[require-ui-no-remaining-guards] FAIL: " + productionLineErrors.join("; "));
+        console.log("[ui-manager-require-no-remaining-guards] FAIL: " + productionLineErrors.join("; "));
     }
     assert.equal(productionLineErrors.length, 0, "No remaining optional guards for required UI components in app.js");
-    console.log("[require-ui-no-remaining-guards] ok");
+    console.log("[ui-manager-require-no-remaining-guards] ok");
 }
 
-async function testCollectionHubServiceUsesRequire() {
+async function testCollectionHubServiceUsesUiManagerRequire() {
     const src = readFileSync(new URL("../src/collectionHubService.js", import.meta.url), "utf8");
-    assert.ok(!src.includes('window.gameBridge?.get("collectionHub")'), "collectionHubService must not use ?.get");
+    assert.ok(!src.includes("gameBridge"), "collectionHubService must not reference gameBridge");
     assert.ok(
-        src.includes('requireGameUIComponent("collectionHub")'),
-        "collectionHubService must use requireGameUIComponent"
+        !src.includes("requireGameUIComponent"),
+        "collectionHubService must not reference requireGameUIComponent"
     );
-    console.log("[collectionHubService-uses-require] ok");
+    assert.ok(
+        src.includes('window.uiManager.requireComponent("collectionHub")'),
+        "collectionHubService must use window.uiManager.requireComponent"
+    );
+    console.log("[collectionHubService-uses-uiManager-require] ok");
 }
 
-async function testPatchNotesServiceUsesRequire() {
+async function testPatchNotesServiceUsesUiManagerRequire() {
     const src = readFileSync(new URL("../src/patchNotesService.js", import.meta.url), "utf8");
-    assert.ok(!src.includes('window.gameBridge?.get("patchNotes")'), "patchNotesService must not use ?.get");
+    assert.ok(!src.includes("gameBridge"), "patchNotesService must not reference gameBridge");
+    assert.ok(!src.includes("requireGameUIComponent"), "patchNotesService must not reference requireGameUIComponent");
     assert.ok(
-        src.includes('requireGameUIComponent("patchNotes")'),
-        "patchNotesService must use requireGameUIComponent"
+        src.includes('window.uiManager.requireComponent("patchNotes")'),
+        "patchNotesService must use window.uiManager.requireComponent"
     );
-    console.log("[patchNotesService-uses-require] ok");
+    console.log("[patchNotesService-uses-uiManager-require] ok");
 }
 
 async function testPlayerPanelAllocationContract(app) {
@@ -10135,11 +10141,42 @@ async function testPlayerPanelAllocationContractBoundary(app) {
     console.log("[player-panel-allocation-contract-boundary] ok");
 }
 
-await testRequireGameUIComponentResolvesAll();
-await testRequireGameUIComponentMissingFails();
-await testRequireGameUIComponentNoRemainingGuards();
-await testCollectionHubServiceUsesRequire();
-await testPatchNotesServiceUsesRequire();
+function testNoGameBridgeInProduction() {
+    // Prove that production source files no longer reference legacy gameBridge/requireGameUIComponent
+    const srcDirs = ["src"];
+    const legacyRefs = ["window.gameBridge", "requireGameUIComponent"];
+    const offenders = [];
+    for (const dir of srcDirs) {
+        function scan(path) {
+            for (const name of readdirSync(path)) {
+                const full = `${path}/${name}`;
+                const stat = statSync(full);
+                if (stat.isDirectory()) {
+                    scan(full);
+                } else if (full.endsWith(".js") || full.endsWith(".html")) {
+                    const content = readFileSync(full, "utf8");
+                    for (const ref of legacyRefs) {
+                        if (content.includes(ref)) {
+                            offenders.push(`${full}: contains "${ref}"`);
+                        }
+                    }
+                }
+            }
+        }
+        scan(dir);
+    }
+    if (offenders.length > 0) {
+        console.log("[no-game-bridge-in-production] FAIL: " + offenders.join("; "));
+    }
+    assert.equal(offenders.length, 0, "No production files should reference legacy gameBridge/requireGameUIComponent");
+    console.log("[no-game-bridge-in-production] ok");
+}
+
+await testUiManagerRequireComponentResolvesAll();
+await testUiManagerRequireComponentMissingFails();
+await testUiManagerRequireComponentNoRemainingGuards();
+await testCollectionHubServiceUsesUiManagerRequire();
+await testPatchNotesServiceUsesUiManagerRequire();
 await testPlayerPanelAllocationContract(app);
 await testPlayerPanelAllocationContractBoundary(app);
 
@@ -10149,5 +10186,6 @@ await testHuntingButtonHiddenDuringActiveHunt();
 await testHuntingButtonHiddenDuringTournament();
 await testActionGateway();
 await testHuntingEndToEnd();
+await testNoGameBridgeInProduction();
 
 console.log("regression tests ok");

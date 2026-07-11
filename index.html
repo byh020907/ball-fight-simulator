@@ -130,18 +130,23 @@
             window.BFS_ASSET_VERSION = V;
             window.Alpine = Alpine;
 
-            // ── Core Infrastructure: gameBridge + createGameUI + uiManager ──
+            // ── Core Infrastructure: uiManager + createGameUI ──
 
-            window.gameBridge = {
-                get(componentId) {
-                    const manager = Alpine.store("uiManager");
-                    const instance = manager.components[componentId];
+            Alpine.store("uiManager", {
+                components: {},
+                register(id, instance) {
+                    this.components[id] = instance;
+                },
+                unregister(id) {
+                    delete this.components[id];
+                },
 
+                getComponent(componentId) {
+                    const instance = this.components[componentId];
                     if (!instance) {
-                        console.warn(`[gameBridge] '${componentId}' 컴포넌트를 찾을 수 없습니다.`);
+                        console.warn(`[uiManager] '${componentId}' 컴포넌트를 찾을 수 없습니다.`);
                         return null;
                     }
-
                     return new Proxy(instance, {
                         get(target, prop) {
                             if (typeof target[prop] === "function") {
@@ -154,19 +159,21 @@
                             return true;
                         }
                     });
-                }
-            };
+                },
 
-            window.requireGameUIComponent = function (componentId) {
-                const component = window.gameBridge.get(componentId);
-                if (!component) {
-                    throw new Error(
-                        `[BattleApp] 필수 UI 컴포넌트 '${componentId}'를 찾을 수 없습니다. ` +
-                            `createGameUI("${componentId}", ...)로 등록되었는지 확인하세요.`
-                    );
+                requireComponent(componentId) {
+                    const component = this.getComponent(componentId);
+                    if (!component) {
+                        throw new Error(
+                            `[BattleApp] 필수 UI 컴포넌트 '${componentId}'를 찾을 수 없습니다. ` +
+                                `createGameUI("${componentId}", ...)로 등록되었는지 확인하세요.`
+                        );
+                    }
+                    return component;
                 }
-                return component;
-            };
+            });
+
+            window.uiManager = Alpine.store("uiManager");
 
             window.createGameUI = function (componentName, componentFactory) {
                 Alpine.data(componentName, (customId) => {
@@ -189,16 +196,6 @@
                     return instance;
                 });
             };
-
-            Alpine.store("uiManager", {
-                components: {},
-                register(id, instance) {
-                    this.components[id] = instance;
-                },
-                unregister(id) {
-                    delete this.components[id];
-                }
-            });
 
             // ── Lightweight root component ──
 

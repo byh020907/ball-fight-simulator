@@ -2,11 +2,11 @@ import { dismissPatchNotes as _dismissPatchNotes } from "./utils.js";
 
 export class PatchNotesService {
     static show(entries) {
-        requireGameUIComponent("patchNotes").show(entries);
+        window.uiManager.requireComponent("patchNotes").show(entries);
     }
 
     static dismiss() {
-        requireGameUIComponent("patchNotes").dismissNotes();
+        window.uiManager.requireComponent("patchNotes").dismissNotes();
         _dismissPatchNotes();
     }
 }

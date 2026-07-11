@@ -137,10 +137,10 @@
             this.text = text ?? "";
             this.subtext = subtext;
             if (xpReward) {
-                const rp = window.gameBridge?.get("xpRewardPanel");
+                const rp = window.uiManager?.getComponent("xpRewardPanel");
                 if (rp) rp.animate(xpReward);
             } else {
-                const rp = window.gameBridge?.get("xpRewardPanel");
+                const rp = window.uiManager?.getComponent("xpRewardPanel");
                 if (rp) rp.hide();
             }
         },
@@ -163,7 +163,7 @@
             this.huntingLootHudVisible = false;
             this.huntingLootHudShards = 0;
             this.huntingLootHudChests = 0;
-            const rp = window.gameBridge?.get("xpRewardPanel");
+            const rp = window.uiManager?.getComponent("xpRewardPanel");
             if (rp) rp.hide();
         },
         showTransient(label, text) {

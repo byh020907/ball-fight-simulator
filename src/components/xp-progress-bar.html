@@ -1,5 +1,5 @@
 <div x-data="xpProgressBar" class="xp-bar" aria-hidden="true">
-    <div class="xp-bar-fill" x-bind:style="'width:' + (window.gameBridge?.get('xpRewardPanel')?.animatedProgressPct ?? 0) + '%'"
+    <div class="xp-bar-fill" x-bind:style="'width:' + (window.uiManager?.getComponent('xpRewardPanel')?.animatedProgressPct ?? 0) + '%'"
     ></div>
 </div>
 <script>
