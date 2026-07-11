@@ -1,5 +1,16 @@
 # 결정 기록
 
+## [L1] 2026-07-12 — 사냥 버튼 상태 동기화 복원 (_syncHuntingButton)
+
+- 맥락: UIController/appStore 제거 후 huntingButton의 `available`/`tournamentActive` 상태가 `refreshPlayerSetup()`에 계산되지만 `this._huntingBtn`에 전파되지 않는 회귀. `_syncHuntingButtonStore` 제거로 인한 누락.
+- 결정:
+  (1) `BattleApp._syncHuntingButton()` 신설 — `available`(getEligibleHuntingCharacters > 0), `tournamentActive`(tournament && !champion)를 `this._huntingBtn`에 동기.
+  (2) `refreshPlayerSetup()`에서 호출, 사냥터 active는 `setHuntingActive()`에서 유지.
+  (3) `setHuntingActive()`가 `active` 설정 후 `_syncHuntingButton()` 호출하도록 변경.
+  (4) `huntingAvailable` 지역변수 제거 (중복, `_syncHuntingButton`으로 대체).
+- 영향: `src/app.js`(_syncHuntingButton 신설 + refreshPlayerSetup/setHuntingActive 연동), `tests/regression.mjs`(4종 회귀 테스트: 초기 비가시, 우승 자격 시 가시, 사냥 중 비가시, 토너먼트 중 비가시), `SESSION-HANDOFF.md`
+- 검증: `npm test`, `npm run check`, `npm run format:check`, `node scripts/huntingUserScenario.mjs`, `git diff --check` 통과
+
 ## [L1] 2026-07-11 — Action Gateway 도입 + 전면 컴포넌트 리팩터 + 중복 게이트웨이 단일화
 
 - 맥락: Codex 리뷰 + 설계 요청에 따라 (A) 액션 등록 전/후/미등록 액션을 명시적 Error throw로 보호하는 게이트웨이, (B) 사냥터 전 구간 결정론적 회귀 테스트, (C) 11개 컴포넌트의 금지 패턴(`$store.*`, `Alpine.data`, `window.ballFightApp`, `?.`)을 `window.createGameUI` + 로컬 상태 + `window.requireGameActionBridge`로 전량 교체, (D) `index.html`의 인라인 `requireGameActionBridge` 중복 구현을 모듈 import로 단일화, (E) `src/ui.js`에서 `UIController`/`appStore` 665라인 제거.

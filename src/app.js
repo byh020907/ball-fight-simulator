@@ -206,8 +206,16 @@ export class BattleApp {
     }
 
     // ── HuntingManager backward-compat ──
+    _syncHuntingButton() {
+        if (!this._huntingBtn) return;
+        this._huntingBtn.available = getEligibleHuntingCharacters(this.playerProfile, this.roster).length > 0;
+        this._huntingBtn.tournamentActive = Boolean(this.tournament && !this.tournament.champion);
+    }
     setHuntingActive(active) {
-        if (this._huntingBtn) this._huntingBtn.active = Boolean(active);
+        if (this._huntingBtn) {
+            this._huntingBtn.active = Boolean(active);
+            this._syncHuntingButton();
+        }
     }
     setHuntingOverlayState(data) {
         if (this._overlay) this._overlay.setHuntingState(data);
@@ -514,7 +522,7 @@ export class BattleApp {
         });
         const experienceSummary = getCharacterExperienceSummary(this.playerProfile, this.playerFighterId);
         const equipmentSummary = this._getPlayerEquipmentSummary(this.playerFighterId);
-        const huntingAvailable = getEligibleHuntingCharacters(this.playerProfile, this.roster).length > 0;
+        this._syncHuntingButton();
         const panel = this._panel;
         if (panel) {
             panel.fighter = player ? { name: player.name, title: player.title, color: player.color } : null;

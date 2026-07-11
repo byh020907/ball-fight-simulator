@@ -9835,6 +9835,84 @@ async function testHuntingEndToEnd() {
     console.log("[hunting-end-to-end] ok");
 }
 
+// ── Hunting button state sync regression tests ──
+
+async function testHuntingButtonInitialHidden() {
+    const { app } = await loadModuleAppWithInitialAlpineAllocation({
+        hp: 10,
+        damage: 10,
+        speed: 10,
+        skill: 0,
+        defense: 0
+    });
+    assert.ok(app._huntingBtn != null, "huntingButton should be registered");
+    assert.equal(app._huntingBtn.available, false, "default profile has no wins -> not eligible");
+    assert.equal(app._huntingBtn.active, false, "no active hunt");
+    assert.equal(app._huntingBtn.tournamentActive, false, "no active tournament");
+    const visible = app._huntingBtn.available && !app._huntingBtn.tournamentActive && !app._huntingBtn.active;
+    assert.equal(visible, false, "button hidden with no eligible character");
+    console.log("[hunting-button-initial-hidden] ok");
+}
+
+async function testHuntingButtonShowsWithEligible() {
+    const { app } = await loadModuleAppWithInitialAlpineAllocation({
+        hp: 10,
+        damage: 10,
+        speed: 10,
+        skill: 0,
+        defense: 0
+    });
+    const fighterId = app.roster[0].id;
+    app.playerProfile.collection.characters[fighterId] = { tournamentWins: 1 };
+    app.refreshPlayerSetup();
+    assert.equal(app._huntingBtn.available, true, "character with win -> eligible");
+    assert.equal(app._huntingBtn.active, false, "no active hunt");
+    assert.equal(app._huntingBtn.tournamentActive, false, "no active tournament");
+    const visible = app._huntingBtn.available && !app._huntingBtn.tournamentActive && !app._huntingBtn.active;
+    assert.equal(visible, true, "button visible with eligible character");
+    console.log("[hunting-button-shows-eligible] ok");
+}
+
+async function testHuntingButtonHiddenDuringActiveHunt() {
+    const { app } = await loadModuleAppWithInitialAlpineAllocation({
+        hp: 10,
+        damage: 10,
+        speed: 10,
+        skill: 0,
+        defense: 0
+    });
+    app.setHuntingActive(true);
+    assert.equal(app._huntingBtn.active, true, "active hunt -> active true");
+    const visible = app._huntingBtn.available && !app._huntingBtn.tournamentActive && !app._huntingBtn.active;
+    assert.equal(visible, false, "button hidden during active hunt");
+    app.setHuntingActive(false);
+    assert.equal(app._huntingBtn.active, false, "after retreat -> active false");
+    console.log("[hunting-button-hidden-active-hunt] ok");
+}
+
+async function testHuntingButtonHiddenDuringTournament() {
+    const { app } = await loadModuleAppWithInitialAlpineAllocation({
+        hp: 10,
+        damage: 10,
+        speed: 10,
+        skill: 0,
+        defense: 0
+    });
+    app.tournament = { champion: null };
+    app.refreshPlayerSetup();
+    assert.equal(app._huntingBtn.tournamentActive, true, "tournament without champion -> tournamentActive true");
+    const visibleDuring = app._huntingBtn.available && !app._huntingBtn.tournamentActive && !app._huntingBtn.active;
+    assert.equal(visibleDuring, false, "button hidden during active tournament");
+    app.tournament = { champion: {} };
+    app.refreshPlayerSetup();
+    assert.equal(app._huntingBtn.tournamentActive, false, "tournament with champion -> tournamentActive false");
+    console.log("[hunting-button-hidden-tournament] ok");
+}
+
+await testHuntingButtonInitialHidden();
+await testHuntingButtonShowsWithEligible();
+await testHuntingButtonHiddenDuringActiveHunt();
+await testHuntingButtonHiddenDuringTournament();
 await testActionGateway();
 await testHuntingEndToEnd();
 
