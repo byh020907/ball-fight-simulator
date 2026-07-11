@@ -49,6 +49,10 @@ export class HuntingManager {
 
     showCharacterSelect() {
         const app = this.app;
+        // 사냥터 진입 시 기존 캐릭터 프리뷰 중지 및 캔버스 초기화
+        app.stopPlayerPreviewLoop();
+        app.renderer.clear();
+
         const eligible = getEligibleHuntingCharacters(app.playerProfile, app.roster);
         if (eligible.length === 0) {
             PopupService.show({

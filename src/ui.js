@@ -11,14 +11,19 @@ export class ArenaRenderer {
         this.camera = new ArenaCamera();
     }
 
-    renderPlayerPreview(previewBall, fighter, selectionAnimTime = 999) {
+    clear() {
         const ctx = this.ctx;
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         ctx.fillStyle = "#fafafa";
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+
+    renderPlayerPreview(previewBall, fighter, selectionAnimTime = 999) {
+        this.clear();
 
         if (!previewBall || !fighter) return;
 
+        const ctx = this.ctx;
         const cx = this.canvas.width / 2;
         const cy = previewBall.position.y;
         const progress = Math.min(selectionAnimTime / 0.5, 1);
@@ -56,13 +61,11 @@ export class ArenaRenderer {
     }
 
     renderPlayerPreviewSwap(previewSim, fighter) {
-        const ctx = this.ctx;
-        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        ctx.fillStyle = "#fafafa";
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        this.clear();
 
         if (!previewSim || !fighter) return;
 
+        const ctx = this.ctx;
         ctx.save();
         const shake = previewSim.screenShake;
         if (shake) {
@@ -76,9 +79,9 @@ export class ArenaRenderer {
     }
 
     render(simulation) {
-        const ctx = this.ctx;
-        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.clear();
 
+        const ctx = this.ctx;
         ctx.save();
         const shake = simulation.screenShake;
         if (shake) {
@@ -87,8 +90,6 @@ export class ArenaRenderer {
             ctx.translate((Math.random() - 0.5) * strength, (Math.random() - 0.5) * strength);
         }
 
-        ctx.fillStyle = "#fafafa";
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         const view = this.camera.getViewTransform(this.canvas, simulation);
         this.camera.apply(ctx, this.canvas, simulation);
         this._drawArenaBackground(ctx, simulation);
