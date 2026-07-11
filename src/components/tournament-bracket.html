@@ -1,10 +1,10 @@
 <div x-data="tournamentBracket" style="display: contents">
     <div class="tournament-title">
         <strong>Bracket</strong>
-        <span id="tournamentPhase" x-text="$store.tournamentBracket.phase">Ready</span>
+        <span id="tournamentPhase" x-text="phase">Ready</span>
     </div>
     <div class="bracket" id="tournamentBracket">
-        <template x-for="(round, rIndex) in $store.tournamentBracket.rounds" :key="rIndex">
+        <template x-for="(round, rIndex) in rounds" :key="rIndex">
             <div class="bracket-round">
                 <div class="round-title" x-text="['Round 1', 'Semi', 'Final'][rIndex]"></div>
                 <template x-for="match in round" :key="match.id">
@@ -43,7 +43,41 @@
     </div>
 </div>
 <script>
-    Alpine.data("tournamentBracket", () => ({}));
+    window.createGameUI("tournamentBracket", () => ({
+        visible: false,
+        phase: "Ready",
+        rounds: [],
+        render(tournament) {
+            if (!tournament) {
+                this.visible = false;
+                this.phase = "Ready";
+                this.rounds = [];
+                return;
+            }
+            this.visible = true;
+            this.phase = tournament.champion ? "Champion" : "Running";
+            this.rounds = tournament.rounds.map((round, roundIndex) =>
+                round.map((match) => ({
+                    id: match.id,
+                    status: match.status,
+                    winnerId: match.winner?.id ?? null,
+                    label: match.winner
+                        ? "WIN"
+                        : match.status === "active"
+                          ? "LIVE"
+                          : match.status === "bye"
+                            ? "BYE"
+                            : "WAIT",
+                    a: match.a
+                        ? { id: match.a.id, name: match.a.name, color: match.a.color, isPlayer: match.a.isPlayer }
+                        : null,
+                    b: match.b
+                        ? { id: match.b.id, name: match.b.name, color: match.b.color, isPlayer: match.b.isPlayer }
+                        : null
+                }))
+            );
+        }
+    }));
 </script>
 <style scoped>
     .tournament-title {

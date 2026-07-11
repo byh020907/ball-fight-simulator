@@ -13,8 +13,7 @@
         active: false,
         tournamentActive: false,
         openLobby() {
-            const b = window.gameActionBridge;
-            if (b) b.openHuntingLobby();
+            window.requireGameActionBridge("openHuntingLobby").openHuntingLobby();
         }
     }));
 </script>

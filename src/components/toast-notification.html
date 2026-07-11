@@ -1,43 +1,36 @@
 <div x-data="toastNotification" aria-live="polite">
     <div
         class="toast"
-        x-show="state.visible"
+        x-show="visible"
         x-transition:enter="toast-enter"
         x-transition:leave="toast-leave"
-        x-text="state.message"
+        x-text="message"
     ></div>
 </div>
 
 <script>
-    Alpine.data("toastNotification", () => {
-        const state = Alpine.reactive({
-            visible: false,
-            message: ""
-        });
-
+    window.createGameUI("toastNotification", () => {
         let _queue = [];
         let _timer = null;
 
         function processQueue() {
             if (_timer || _queue.length === 0) return;
             const item = _queue.shift();
-            state.message = item.message;
-            state.visible = true;
+            this.message = item.message;
+            this.visible = true;
             _timer = setTimeout(() => {
-                state.visible = false;
+                this.visible = false;
                 _timer = null;
-                processQueue();
+                processQueue.call(this);
             }, item.duration);
         }
 
         return {
-            state,
-            init() {
-                this.$watch("$store.toast", (val) => {
-                    if (!val || !val.message) return;
-                    _queue.push({ message: val.message, duration: val.duration ?? 3500 });
-                    processQueue();
-                }, { immediate: true });
+            visible: false,
+            message: "",
+            show(message, duration = 3500) {
+                _queue.push({ message, duration });
+                processQueue.call(this);
             }
         };
     });

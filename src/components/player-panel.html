@@ -215,30 +215,25 @@
         allocationSummary: "",
 
         adjustStat(key, delta) {
-            const b = window.gameActionBridge;
-            if (b) b.adjustStat(key, delta);
+            window.requireGameActionBridge("adjustStat").adjustStat(key, delta);
         },
         randomAllocation() {
-            const b = window.gameActionBridge;
-            if (b) b.randomAllocation();
+            window.requireGameActionBridge("randomAllocation").randomAllocation();
         },
         resetAllocation() {
-            const b = window.gameActionBridge;
-            if (b) b.resetAllocation();
+            window.requireGameActionBridge("resetAllocation").resetAllocation();
         },
         adjustChallengeLevel(delta) {
-            const b = window.gameActionBridge;
-            if (b) b.adjustChallengeLevel(delta);
+            window.requireGameActionBridge("adjustChallengeLevel").adjustChallengeLevel(delta);
         },
         openCollectionHub(tabId) {
-            window.CollectionHubService?.open?.(tabId || "roster");
+            window.requireGameActionBridge("openCollectionHub").openCollectionHub(tabId);
         },
         openEquipmentHub() {
-            window.CollectionHubService?.open?.("equipment");
+            window.requireGameActionBridge("openEquipmentHub").openEquipmentHub();
         },
         openHelp() {
-            const b = window.gameActionBridge;
-            if (b) b.openHelp();
+            window.requireGameActionBridge("openHelp").openHelp();
         }
     }));
 </script>

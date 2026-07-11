@@ -1,9 +1,9 @@
 <div x-data="xpProgressBar" class="xp-bar" aria-hidden="true">
-    <div class="xp-bar-fill" x-bind:style="'width:' + $store.xpReward?.animatedProgressPct + '%'"
+    <div class="xp-bar-fill" x-bind:style="'width:' + (window.gameBridge?.get('xpRewardPanel')?.animatedProgressPct ?? 0) + '%'"
     ></div>
 </div>
 <script>
-    Alpine.data("xpProgressBar", () => {
+    window.createGameUI("xpProgressBar", () => {
         return {};
     });
 </script>

@@ -1,5 +1,17 @@
 # 결정 기록
 
+## [L1] 2026-07-11 — Action Gateway 도입 + 전면 컴포넌트 리팩터 + 중복 게이트웨이 단일화
+
+- 맥락: Codex 리뷰 + 설계 요청에 따라 (A) 액션 등록 전/후/미등록 액션을 명시적 Error throw로 보호하는 게이트웨이, (B) 사냥터 전 구간 결정론적 회귀 테스트, (C) 11개 컴포넌트의 금지 패턴(`$store.*`, `Alpine.data`, `window.ballFightApp`, `?.`)을 `window.createGameUI` + 로컬 상태 + `window.requireGameActionBridge`로 전량 교체, (D) `index.html`의 인라인 `requireGameActionBridge` 중복 구현을 모듈 import로 단일화, (E) `src/ui.js`에서 `UIController`/`appStore` 665라인 제거.
+- 결정:
+  (A) `src/actionGateway.js` 신설 — `registerGameActionBridge(bridge)` + `requireGameActionBridge(actionName?)`. 등록 전 호출 및 미등록 액션 호출 시 Error throw. `main.js`에서 `createComponentBridge` 완료 후 `registerGameActionBridge(gameActionBridge)` 호출. `index.html` 모듈에서 `actionGateway.js` 동적 import로 `window.requireGameActionBridge` 할당.
+  (B) `tests/regression.mjs`에 hunting-end-to-end 결정론적 검증 + action gateway 등록 전/후/미등록 액션 회귀 테스트 추가. 테스트 하네스 정리: `appStore()`, `UIController`, 로컬 `createComponentBridge(Alpine)` 스텁 240라인 제거, stale 테스트 3종 제거.
+  (C) 11개 컴포넌트 마이그레이션: `player-panel`, `game-overlay`, `start-button`, `hunting-button`, `collection-hub`(기존 5종) + `battle-log`, `fighter-strip`, `patch-notes`, `toast-notification`, `tournament-bracket`, `xp-progress-bar`, `xp-reward-panel`(신규 7종). `$store.*` 읽기를 컴포넌트 로컬 상태 + `window.gameBridge?.get()` 호출로 교체. `Alpine.data` → `window.createGameUI`. `patchNotesService`도 `Alpine.store` 대신 `window.gameBridge?.get("patchNotes")` 사용.
+  (D) `src/ui.js` `UIController`/`appStore` 전량 제거 — 캔버스 전용 `ArenaRenderer`만 유지. 모든 UI 상태 책임을 Alpine 컴포넌트 + `componentBridge`로 이전.
+  (E) `componentBridge.js`에 `CollectionHubService.open` 위임 메서드(`openCollectionHub`/`openEquipmentHub`) 추가, `index.html`에서 `window.PopupService` 직접 할당 제거.
+- 영향: `src/actionGateway.js`(신규), `src/componentBridge.js`, `src/main.js`, `index.html`, `src/ui.js`, `src/componentLoader.js`, `src/patchNotesService.js`, `src/components/player-panel.html`, `src/components/game-overlay.html`, `src/components/start-button.html`, `src/components/hunting-button.html`, `src/components/collection-hub.html`, `src/components/battle-log.html`, `src/components/fighter-strip.html`, `src/components/patch-notes.html`, `src/components/toast-notification.html`, `src/components/tournament-bracket.html`, `src/components/xp-progress-bar.html`, `src/components/xp-reward-panel.html`, `tests/regression.mjs`, `SESSION-HANDOFF.md`
+- 검증: `npm test`, `npm run check`, `npm run format:check`, `node scripts/huntingUserScenario.mjs`, `rg` 금지 패턴 검사 통과
+
 ## [L1] 2026-07-12 — 상자 개봉 로직을 collectionHubService → componentBridge로 이동
 
 - 맥락: Codex 리뷰 결과 `CollectionHubService.openChest`가 `globalThis.ballFightApp` 직접 접근, `openHuntingChest`/`savePlayerProfile` 동적 import, `window.gameBridge.get("popupDialog")` 직접 호출로 단일 책임을 위반함. CollectionHubService는 UI 뷰 서비스로, 게임 액션은 componentBridge가, 팝업은 PopupService가 소유해야 함.

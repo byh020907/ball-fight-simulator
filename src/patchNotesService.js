@@ -1,15 +1,14 @@
-import { dismissPatchNotes } from "./utils.js";
-
-let _entries = null;
+import { dismissPatchNotes as _dismissPatchNotes } from "./utils.js";
 
 export class PatchNotesService {
     static show(entries) {
-        _entries = entries;
-        Alpine.store("patchNotes", { entries, visible: true });
+        const notes = window.gameBridge?.get("patchNotes");
+        if (notes) notes.show(entries);
     }
 
     static dismiss() {
-        Alpine.store("patchNotes", { visible: false, entries: [] });
-        dismissPatchNotes();
+        const notes = window.gameBridge?.get("patchNotes");
+        if (notes) notes.dismissNotes();
+        _dismissPatchNotes();
     }
 }

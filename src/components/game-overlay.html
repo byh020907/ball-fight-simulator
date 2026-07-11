@@ -119,20 +119,16 @@
         huntingLootHudChests: 0,
 
         huntingRetreat() {
-            const b = window.gameActionBridge;
-            if (b) b.huntingRetreat();
+            window.requireGameActionBridge("huntingRetreat").huntingRetreat();
         },
         huntingAdvance() {
-            const b = window.gameActionBridge;
-            if (b) b.huntingAdvance();
+            window.requireGameActionBridge("huntingAdvance").huntingAdvance();
         },
         huntingMerchantChoose(idx) {
-            const b = window.gameActionBridge;
-            if (b) b.huntingMerchantChoose(idx);
+            window.requireGameActionBridge("huntingMerchantChoose").huntingMerchantChoose(idx);
         },
         huntingMerchantPass() {
-            const b = window.gameActionBridge;
-            if (b) b.huntingMerchantPass();
+            window.requireGameActionBridge("huntingMerchantPass").huntingMerchantPass();
         },
         show({ label, text, subtext = "", transient = false, xpReward = null } = {}) {
             this.visible = true;

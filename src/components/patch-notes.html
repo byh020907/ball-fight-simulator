@@ -1,12 +1,12 @@
 <div
     x-data="patchNotes"
     class="patch-overlay"
-    x-show="state.visible"
+    x-show="visible"
     x-transition.opacity.duration.200ms
 >
     <div class="patch-card" @click.outside="dismissNotes()">
         <div class="patch-card-scroll">
-            <template x-for="(entry, eIdx) in state.entries" :key="entry.version">
+            <template x-for="(entry, eIdx) in entries" :key="entry.version">
                 <div>
                     <strong class="patch-title" x-text="entry.title"></strong>
                     <span class="patch-date" x-text="entry.date"></span>
@@ -22,7 +22,7 @@
                             </li>
                         </template>
                     </ul>
-                    <hr class="patch-divider" x-show="eIdx < state.entries.length - 1" />
+                    <hr class="patch-divider" x-show="eIdx < entries.length - 1" />
                 </div>
             </template>
         </div>
@@ -31,29 +31,21 @@
 </div>
 
 <script>
-    Alpine.data("patchNotes", () => {
-        const state = Alpine.reactive({
-            visible: false,
-            entries: []
-        });
-
+    window.createGameUI("patchNotes", () => {
         function dismissNotes() {
-            if (window.PatchNotesService) window.PatchNotesService.dismiss();
+            this.visible = false;
+            this.entries = [];
+            if (typeof window.__dismissPatchNotes === "function") window.__dismissPatchNotes();
         }
 
         return {
-            state,
-            init() {
-                this.$watch("$store.patchNotes", (val) => {
-                    if (!val || !val.visible) {
-                        state.visible = false;
-                        return;
-                    }
-                    state.entries = val.entries ?? [];
-                    state.visible = true;
-                }, { immediate: true });
-            },
-            dismissNotes
+            visible: false,
+            entries: [],
+            dismissNotes,
+            show(entries) {
+                this.entries = entries;
+                this.visible = true;
+            }
         };
     });
 </script>

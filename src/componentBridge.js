@@ -19,6 +19,7 @@ import { openHuntingChest } from "./hunting/chestRewards.js";
 import { savePlayerProfile } from "./playerProfile.js";
 import { PopupService } from "./popup.js";
 import { HELP_TITLE, HELP_CONTENT } from "./helpContent.js";
+import { CollectionHubService } from "./collectionHubService.js";
 
 export function createComponentBridge(app) {
     function showLevelLockPopup(item) {
@@ -186,6 +187,14 @@ export function createComponentBridge(app) {
             if (result) {
                 refreshCollectionAndProfile();
             }
+        },
+
+        // ── Collection navigation actions ──
+        openCollectionHub(tabId) {
+            CollectionHubService.open(tabId || "roster");
+        },
+        openEquipmentHub() {
+            CollectionHubService.open("equipment");
         },
 
         // ── Chest actions ──

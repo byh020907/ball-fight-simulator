@@ -1,10 +1,18 @@
 <div id="battleLog" x-data="battleLog">
-    <template x-for="(item, index) in $store.battleLog.items" :key="index">
+    <template x-for="(item, index) in items" :key="index">
         <li x-text="item"></li>
     </template>
 </div>
 <script>
-    Alpine.data("battleLog", () => ({}));
+    window.createGameUI("battleLog", () => ({
+        items: [],
+        add(text) {
+            this.items = [...this.items.slice(-8), text];
+        },
+        reset() {
+            this.items = [];
+        }
+    }));
 </script>
 <style scoped>
     :scope {

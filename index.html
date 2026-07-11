@@ -75,7 +75,7 @@
             </div>
         </div>
 
-        <main class="app" x-data="appStore" x-cloak>
+        <main class="app" x-data="appRoot" x-cloak>
             <section class="game-frame">
                 <section class="battle-stage">
                     <section class="arena-shell">
@@ -128,110 +128,98 @@
             const V = "0.24.15";
 
             window.BFS_ASSET_VERSION = V;
+            window.Alpine = Alpine;
+
+            // ── Core Infrastructure: gameBridge + createGameUI + uiManager ──
+
+            window.gameBridge = {
+                get(componentId) {
+                    const manager = Alpine.store("uiManager");
+                    const instance = manager.components[componentId];
+
+                    if (!instance) {
+                        console.warn(`[gameBridge] '${componentId}' 컴포넌트를 찾을 수 없습니다.`);
+                        return null;
+                    }
+
+                    return new Proxy(instance, {
+                        get(target, prop) {
+                            if (typeof target[prop] === "function") {
+                                return target[prop].bind(target);
+                            }
+                            return target[prop];
+                        },
+                        set(target, prop, value) {
+                            target[prop] = value;
+                            return true;
+                        }
+                    });
+                }
+            };
+
+            window.createGameUI = function (componentName, componentFactory) {
+                Alpine.data(componentName, (customId) => {
+                    const instance = componentFactory(customId);
+                    instance.id = customId || componentName;
+
+                    const originalInit = instance.init;
+                    const originalDestroy = instance.destroy;
+
+                    instance.init = function () {
+                        Alpine.store("uiManager").register(this.id, this);
+                        if (typeof originalInit === "function") originalInit.call(this);
+                    };
+
+                    instance.destroy = function () {
+                        if (typeof originalDestroy === "function") originalDestroy.call(this);
+                        Alpine.store("uiManager").unregister(this.id);
+                    };
+
+                    return instance;
+                });
+            };
+
+            Alpine.store("uiManager", {
+                components: {},
+                register(id, instance) {
+                    this.components[id] = instance;
+                },
+                unregister(id) {
+                    delete this.components[id];
+                }
+            });
+
+            // ── Lightweight root component ──
+
+            window.createGameUI("appRoot", () => ({
+                tournamentActive: false,
+                statusBadge: "Setup",
+                statusText: "내 캐릭터 스탯을 배분하세요",
+                statusSubtext: "랜덤 대진과 전투 결과가 여기에 갱신됩니다."
+            }));
+
+            // ── Pre-load shared modules for component scripts ──
+
+            const { requireGameActionBridge } = await import(`./src/actionGateway.js`);
+            window.requireGameActionBridge = requireGameActionBridge;
+            const { HELP_TITLE, HELP_CONTENT } = await import(`./src/helpContent.js?v=${V}`);
+            window.__helpTitle = HELP_TITLE;
+            window.__helpContent = HELP_CONTENT;
+            const { dismissPatchNotes } = await import(`./src/utils.js?v=${V}`);
+            window.__dismissPatchNotes = dismissPatchNotes;
+
+            // ── Component template loading ──
+
             const { loadTemplates } = await import(`./src/componentLoader.js?v=${V}`);
             const { registerAlpineComponentSystem } = await import(`./src/alpineTemplateComponents.js?v=${V}`);
-            const { createComponentBridge } = await import(`./src/componentBridge.js?v=${V}`);
-            const { appStore } = await import(`./src/ui.js?v=${V}`);
 
-            window.Alpine = Alpine;
-            window.BallFightComponentBridge = createComponentBridge(Alpine);
             await loadTemplates();
-            Alpine.store("startButton", {
-                hidden: true,
-                disabledOverride: null,
-                textOverride: null,
-                remainingPoints: 0,
-                locked: false
-            });
-            Alpine.store("fighterStrip", {
-                fighters: []
-            });
-            Alpine.store("battleLog", {
-                items: []
-            });
-            Alpine.store("huntingButton", {
-                available: false,
-                active: false,
-                tournamentActive: false
-            });
-            Alpine.store("gameOverlay", {
-                visible: false,
-                transient: false,
-                label: "",
-                text: "",
-                subtext: "",
-                huntingChoiceVisible: false,
-                huntingFloor: 1,
-                huntingCharacterName: "",
-                huntingLootSummary: "",
-                huntingCanRetreat: false,
-                huntingMoving: false,
-                huntingMoveFrom: 0,
-                huntingMoveTo: 0,
-                huntingMoveStep: 0,
-                huntingMoveMax: 10,
-                huntingMoveMessage: "",
-                huntingMerchantActive: false,
-                huntingMerchantOffers: null,
-                huntingLootHudVisible: false,
-                huntingLootHudShards: 0,
-                huntingLootHudChests: 0
-            });
-            Alpine.store("xpReward", {
-                visible: false,
-                characterName: "",
-                xpGained: 0,
-                levelLabel: "Lv.1",
-                levelUp: false,
-                animatedProgressPct: 0,
-                progressText: "",
-                nextText: "",
-                nextRewardText: ""
-            });
-            Alpine.store("playerPanel", {
-                fighter: null,
-                experience: {
-                    levelLabel: "Lv.1",
-                    totalXp: 0,
-                    progressPct: 0,
-                    progressText: "0/100 XP",
-                    nextText: "다음 레벨까지 100XP",
-                    nextRewardText: ""
-                },
-                equipmentSummary: {
-                    characterLevel: 1,
-                    inventoryUsed: 0,
-                    inventorySlots: 5,
-                    equippedCount: 0,
-                    activeCount: 0,
-                    slots: [],
-                    statLine: "적용 중인 장비 스탯 없음"
-                },
-                allocation: {},
-                totalPoints: 0,
-                bonusPoints: 0,
-                remainingPoints: 0,
-                locked: false,
-                statDefs: [],
-                challengeLevel: 0,
-                highestUnlockedLevel: 0,
-                progressionBonusSummary: "",
-                allocationSummary: ""
-            });
-            Alpine.store("tournamentBracket", {
-                visible: false,
-                phase: "Ready",
-                rounds: []
-            });
             registerAlpineComponentSystem(Alpine);
-            Alpine.data("appStore", appStore);
 
             Alpine.start();
             await Promise.resolve();
             await import(`./src/main.js?v=${V}`);
 
-            const { PopupService } = await import(`./src/popup.js?v=${V}`);
-            window.PopupService = PopupService;
             const { ActionPickerService } = await import(`./src/actionPicker.js?v=${V}`);
             window.ActionPickerService = ActionPickerService;
             const { PatchNotesService } = await import(`./src/patchNotesService.js?v=${V}`);

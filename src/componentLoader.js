@@ -192,12 +192,26 @@ function scanHtmlForComponentNames(html) {
     return names;
 }
 
-export async function loadTemplates() {
+function scanAll() {
     const names = scanHtmlForComponentNames(document.body.innerHTML);
-    const toLoad = [...names].filter((n) => !loaded.has(n));
-    if (toLoad.length === 0) return;
-    const results = await Promise.allSettled(toLoad.map((name) => loadSingle(name)));
-    for (const r of results) {
-        if (r.status === "rejected") console.warn("[componentLoader]", r.reason);
+    for (const name of loaded) {
+        const tpl = document.getElementById(`template-${name}`);
+        if (tpl) {
+            const nested = scanHtmlForComponentNames(tpl.innerHTML);
+            nested.forEach((n) => names.add(n));
+        }
+    }
+    return names;
+}
+
+export async function loadTemplates() {
+    while (true) {
+        const names = scanAll();
+        const toLoad = [...names].filter((n) => !loaded.has(n));
+        if (toLoad.length === 0) break;
+        const results = await Promise.allSettled(toLoad.map((name) => loadSingle(name)));
+        for (const r of results) {
+            if (r.status === "rejected") console.warn("[componentLoader]", r.reason);
+        }
     }
 }

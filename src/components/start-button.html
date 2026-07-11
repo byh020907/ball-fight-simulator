@@ -18,8 +18,7 @@
         remainingPoints: 0,
         locked: false,
         startTournament() {
-            const b = window.gameActionBridge;
-            if (b) b.startTournament();
+            window.requireGameActionBridge("startTournament").startTournament();
         },
         setState({ disabled, text, hidden } = {}) {
             if (hidden !== undefined) this.hidden = Boolean(hidden);

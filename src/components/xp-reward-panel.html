@@ -1,32 +1,21 @@
-<div x-data="xpRewardPanel" class="xp-reward" x-show="state.visible" x-bind:class="{ levelup: state.levelUp }">
+<div x-data="xpRewardPanel" class="xp-reward" x-show="visible" x-bind:class="{ levelup: levelUp }">
     <div class="xp-reward-head">
-        <span x-text="state.characterName"></span>
-        <b x-text="'+' + state.xpGained + ' XP'"></b>
+        <span x-text="characterName"></span>
+        <b x-text="'+' + xpGained + ' XP'"></b>
     </div>
     <div class="xp-reward-level">
-        <strong x-text="state.levelLabel"></strong>
-        <em x-show="state.levelUp">LEVEL UP</em>
+        <strong x-text="levelLabel"></strong>
+        <em x-show="levelUp">LEVEL UP</em>
     </div>
     <xp-progress-bar></xp-progress-bar>
     <div class="xp-reward-foot">
-        <span x-text="state.progressText"></span>
-        <span x-text="state.nextText"></span>
+        <span x-text="progressText"></span>
+        <span x-text="nextText"></span>
     </div>
-    <div class="xp-reward-next" x-show="state.nextRewardText" x-text="'다음 보상 · ' + state.nextRewardText"></div>
+    <div class="xp-reward-next" x-show="nextRewardText" x-text="'다음 보상 · ' + nextRewardText"></div>
 </div>
 <script>
-    Alpine.data("xpRewardPanel", () => {
-        const state = Alpine.reactive({
-            visible: false,
-            characterName: "",
-            xpGained: 0,
-            levelLabel: "Lv.1",
-            levelUp: false,
-            progressText: "",
-            nextText: "",
-            nextRewardText: ""
-        });
-
+    window.createGameUI("xpRewardPanel", () => {
         let _token = null;
 
         function startAnimation(val) {
@@ -34,45 +23,53 @@
             const endPct = Math.max(0, Math.min(100, val.progressAfterPct ?? 0));
             const token = `${Date.now()}-${Math.random()}`;
             _token = token;
-            Alpine.store("xpReward").animatedProgressPct = startPct;
+            this.animatedProgressPct = startPct;
 
             setTimeout(() => {
                 if (_token !== token) return;
-                Alpine.store("xpReward").animatedProgressPct = val.levelUp ? 100 : endPct;
+                this.animatedProgressPct = val.levelUp ? 100 : endPct;
             }, 16);
 
             if (val.levelUp) {
                 setTimeout(() => {
                     if (_token !== token) return;
-                    state.levelLabel = val.nextLevelLabel ?? `Lv.${val.level ?? 1}`;
-                    Alpine.store("xpReward").animatedProgressPct = 0;
+                    this.levelLabel = val.nextLevelLabel ?? `Lv.${val.level ?? 1}`;
+                    this.animatedProgressPct = 0;
                     setTimeout(() => {
                         if (_token !== token) return;
-                        Alpine.store("xpReward").animatedProgressPct = endPct;
+                        this.animatedProgressPct = endPct;
                     }, 40);
                 }, 760);
             }
         }
 
         return {
-            state,
-            init() {
-                this.$watch("$store.xpReward", (val) => {
-                    if (!val) return;
-                    if (!val.visible) {
-                        state.visible = false;
-                        return;
-                    }
-                    state.characterName = val.characterName ?? "";
-                    state.xpGained = val.xpGained ?? 0;
-                    state.levelLabel = val.levelLabel ?? "Lv.1";
-                    state.levelUp = Boolean(val.levelUp);
-                    state.progressText = val.progressText ?? "";
-                    state.nextText = val.nextText ?? "";
-                    state.nextRewardText = val.nextRewardText ?? "";
-                    state.visible = true;
-                    startAnimation(val);
-                }, { immediate: true });
+            visible: false,
+            characterName: "",
+            xpGained: 0,
+            levelLabel: "Lv.1",
+            levelUp: false,
+            animatedProgressPct: 0,
+            progressText: "",
+            nextText: "",
+            nextRewardText: "",
+            animate(val) {
+                if (!val) {
+                    this.visible = false;
+                    return;
+                }
+                this.characterName = val.characterName ?? "";
+                this.xpGained = val.xpGained ?? 0;
+                this.levelLabel = val.levelLabel ?? "Lv.1";
+                this.levelUp = Boolean(val.levelUp);
+                this.progressText = val.progressText ?? "";
+                this.nextText = val.nextText ?? "";
+                this.nextRewardText = val.nextRewardText ?? "";
+                this.visible = true;
+                startAnimation.call(this, val);
+            },
+            hide() {
+                this.visible = false;
             }
         };
     });

@@ -460,11 +460,11 @@
             selectCollectionCharacter,
             closeCollectionCharacterDetail,
             get bridge() {
-                return window.gameActionBridge || {};
+                return window.requireGameActionBridge();
             },
             async openChest(item) {
                 if (item.canOpen) {
-                    await this.bridge.openChest(item.id);
+                    await window.requireGameActionBridge("openChest").openChest(item.id);
                 }
             },
             render(vm) {

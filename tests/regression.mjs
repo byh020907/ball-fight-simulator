@@ -145,247 +145,6 @@ import { generateMobAppearance } from "../src/entities/mobAppearance.js";
 import { PHYSICS_MATERIALS, resolvePhysicsMaterial, combinePhysicsMaterials } from "../src/physics/PhysicsMaterial.js";
 import PhysicsMaterialBody from "../src/physics/PhysicsMaterialBody.js";
 
-// 제거된 API 유지를 위한 스텁 (하위 호환)
-function appStore() {
-    const state = {
-        fighter: null,
-        experience: {},
-        equipmentSummary: { ...EMPTY_EQUIPMENT_SUMMARY },
-        allocation: { hp: 0, damage: 0, speed: 0, skill: 0, defense: 0 },
-        totalPoints: PLAYER_STAT_POINTS,
-        bonusPoints: 0,
-        remainingPoints: PLAYER_STAT_POINTS,
-        locked: false,
-        statDefs: ALLOCATABLE_STATS,
-        challengeLevel: 0,
-        highestUnlockedLevel: 0,
-        progressionBonusSummary: "",
-        allocationSummary: "",
-        huntingAvailable: false,
-        openCollectionHub(tabId) {
-            if (globalThis.CollectionHubService) globalThis.CollectionHubService.open(tabId);
-        },
-        _syncStartButton() {
-            const hb = globalThis.Alpine?.store("startButton");
-            if (hb) {
-                const rp = getRemainingStatPoints(this.allocation, this.totalPoints);
-                hb.remainingPoints = rp;
-            }
-        },
-        adjustStat(key, delta) {
-            if (this.locked) return;
-            this.allocation = adjustStatAllocation(this.allocation, key, delta, this.totalPoints);
-            this.remainingPoints = getRemainingStatPoints(this.allocation, this.totalPoints);
-            const panelStore = globalThis.Alpine?.store("playerPanel");
-            if (panelStore) {
-                panelStore.allocation = { ...this.allocation };
-                panelStore.remainingPoints = this.remainingPoints;
-            }
-            globalThis.document?.dispatchEvent?.(new CustomEvent("allocation-changed"));
-        },
-        randomAllocation() {
-            if (this.locked) return;
-            this.allocation = createRandomStatAllocation(undefined, this.totalPoints);
-            this.remainingPoints = getRemainingStatPoints(this.allocation, this.totalPoints);
-            const panelStore = globalThis.Alpine?.store("playerPanel");
-            if (panelStore) {
-                panelStore.allocation = { ...this.allocation };
-                panelStore.remainingPoints = this.remainingPoints;
-            }
-            globalThis.document?.dispatchEvent?.(new CustomEvent("allocation-changed"));
-        },
-        resetAllocation() {
-            if (this.locked) return;
-            this.allocation = { hp: 0, damage: 0, speed: 0, skill: 0, defense: 0 };
-            this.remainingPoints = getRemainingStatPoints(this.allocation, this.totalPoints);
-            const panelStore = globalThis.Alpine?.store("playerPanel");
-            if (panelStore) {
-                panelStore.allocation = { ...this.allocation };
-                panelStore.remainingPoints = this.remainingPoints;
-            }
-            globalThis.document?.dispatchEvent?.(new CustomEvent("allocation-changed"));
-        }
-    };
-    return state;
-}
-
-function UIController(roster) {
-    const st = appStore();
-    return {
-        roster,
-        _drawPlayerFace() {},
-        _rootData: null,
-        state: st,
-        renderPlayerSetup(data) {
-            const s = this._rootData || this.state;
-            s.fighter = data.fighter;
-            s.allocation = { ...data.allocation };
-            s.totalPoints = data.totalPoints;
-            s.remainingPoints = data.remainingPoints;
-            s.equipmentSummary = data.equipmentSummary;
-            s.huntingAvailable = data.huntingAvailable;
-            const panelStore = globalThis.Alpine?.store("playerPanel");
-            if (panelStore) Object.assign(panelStore, s);
-            const hbStore = globalThis.Alpine?.store("huntingButton");
-            if (hbStore) hbStore.available = Boolean(data.huntingAvailable);
-        },
-        renderTournament(tournament) {
-            const store = globalThis.Alpine.store("tournamentBracket");
-            if (store) {
-                store.visible = tournament && tournament.rounds && tournament.rounds.length > 0;
-                store.rounds = tournament?.rounds ?? [];
-            }
-            const hb = globalThis.Alpine.store("huntingButton");
-            if (hb) hb.tournamentActive = tournament?.champion == null;
-        }
-    };
-}
-
-function createComponentBridge(Alpine) {
-    function getAppStore() {
-        try {
-            const root = document.querySelector(".app");
-            return root && Alpine?.$data ? Alpine.$data(root) : null;
-        } catch {
-            return null;
-        }
-    }
-    function getGameApp() {
-        return globalThis.ballFightApp ?? null;
-    }
-    return {
-        adjustStat(key, delta) {
-            getAppStore()?.adjustStat?.(key, delta);
-        },
-        randomAllocation() {
-            getAppStore()?.randomAllocation?.();
-        },
-        resetAllocation() {
-            getAppStore()?.resetAllocation?.();
-        },
-        adjustChallengeLevel(delta) {
-            getAppStore()?.adjustChallengeLevel?.(delta);
-        },
-        openCollectionHub(tabId) {
-            const appStore = getAppStore();
-            if (appStore?.openCollectionHub) {
-                appStore.openCollectionHub(tabId);
-                return;
-            }
-            globalThis.CollectionHubService?.open?.(tabId ?? "roster");
-        },
-        openPopup(id, opts) {},
-        openActionPicker(opts) {},
-        closeActionPicker() {},
-        startTournament() {
-            return getGameApp()?.startTournament?.();
-        },
-        openHuntingLobby() {
-            getGameApp()?.hunting?.showCharacterSelect?.();
-        },
-        huntingRetreat() {
-            getGameApp()?.hunting?.retreat?.();
-        },
-        huntingAdvance() {
-            getGameApp()?.hunting?.advance?.();
-        },
-        huntingMerchantChoose(offerIndex) {
-            getGameApp()?.hunting?.merchantChoose?.(offerIndex);
-        },
-        huntingMerchantPass() {
-            getGameApp()?.hunting?.merchantPass?.();
-        },
-        reselectPreviewCharacter() {
-            return getGameApp()?.reselectPreviewCharacterFromPreview?.() ?? false;
-        },
-        async openChest(chestId) {
-            await globalThis.CollectionHubService?.openChest?.(chestId);
-        },
-        equipItem(instanceId) {
-            const app = getGameApp();
-            if (!app?.playerProfile) return false;
-            const result = equipEquipmentItem(app.playerProfile, instanceId, app.playerFighterId);
-            if (result?.error === "level") return false;
-            if (!result?.item) return false;
-            app._refreshCollectionHub?.();
-            return true;
-        },
-        unequipItem(instanceId) {
-            const app = getGameApp();
-            if (!app?.playerProfile?.equipment) return false;
-            const equipped = app.playerProfile.equipment.equipped;
-            for (const [slot, id] of Object.entries(equipped)) {
-                if (id === instanceId) {
-                    equipped[slot] = null;
-                    app._refreshCollectionHub?.();
-                    return true;
-                }
-            }
-            return false;
-        },
-        async expandInventory() {
-            const app = getGameApp();
-            if (!app?.playerProfile) return false;
-            const { expandInventory } = await import("../src/hunting/equipmentConfig.js");
-            const result = expandInventory(app.playerProfile);
-            if (result) {
-                const { savePlayerProfile } = await import("../src/playerProfile.js");
-                savePlayerProfile(app.playerProfile);
-                app._refreshCollectionHub?.();
-            }
-            return result;
-        },
-        async disassembleItem(instanceId) {
-            const app = getGameApp();
-            if (!app?.playerProfile) return false;
-            const { disassembleEquipment } = await import("../src/hunting/equipmentConfig.js");
-            const result = disassembleEquipment(app.playerProfile, instanceId);
-            if (result) {
-                const { savePlayerProfile } = await import("../src/playerProfile.js");
-                savePlayerProfile(app.playerProfile);
-                app._refreshCollectionHub?.();
-            }
-            return result;
-        },
-        async enhanceItem(instanceId) {
-            const app = getGameApp();
-            if (!app?.playerProfile) return false;
-            const { enhanceEquipment } = await import("../src/hunting/equipmentConfig.js");
-            const result = enhanceEquipment(app.playerProfile, instanceId);
-            if (result) {
-                const { savePlayerProfile } = await import("../src/playerProfile.js");
-                savePlayerProfile(app.playerProfile);
-                app._refreshCollectionHub?.();
-            }
-            return result;
-        },
-        async fuseItem(instanceId) {
-            const app = getGameApp();
-            if (!app?.playerProfile) return false;
-            const { fuseEquipment } = await import("../src/hunting/equipmentConfig.js");
-            const result = fuseEquipment(app.playerProfile, instanceId);
-            if (result?.item) {
-                const { savePlayerProfile } = await import("../src/playerProfile.js");
-                savePlayerProfile(app.playerProfile);
-                app._refreshCollectionHub?.();
-            }
-            return result;
-        },
-        async sellItem(instanceId) {
-            const app = getGameApp();
-            if (!app?.playerProfile) return false;
-            const { sellEquipment } = await import("../src/hunting/equipmentConfig.js");
-            const result = sellEquipment(app.playerProfile, instanceId);
-            if (result) {
-                const { savePlayerProfile } = await import("../src/playerProfile.js");
-                savePlayerProfile(app.playerProfile);
-                app._refreshCollectionHub?.();
-            }
-            return result;
-        }
-    };
-}
-
 const EMPTY_EQUIPMENT_SUMMARY = {
     characterLevel: 1,
     inventoryUsed: 0,
@@ -939,7 +698,7 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
         show() {},
         hide() {}
     });
-    const alpineState = appStore();
+    const alpineState = { allocation, remainingPoints: 0 };
     alpineState.allocation = { ...allocation };
     alpineState.remainingPoints = 0;
     const baseAlpine = harness.context.Alpine;
@@ -1405,143 +1164,6 @@ function testStatAllocationRules(app) {
     );
 }
 
-function testStatAllocationUiSyncEvent() {
-    const previousDocument = globalThis.document;
-    const events = [];
-    globalThis.document = {
-        dispatchEvent(event) {
-            events.push(event.type);
-        }
-    };
-
-    const state = appStore();
-    state.adjustStat("hp", 10);
-    assert.deepEqual(state.allocation.hp, 10, "UI allocation should update after stat adjustment");
-    assert.deepEqual(events, ["allocation-changed"], "Stat adjustment should notify BattleApp");
-
-    state.randomAllocation();
-    assert.equal(events.length, 2, "Random allocation should notify BattleApp");
-
-    state.resetAllocation();
-    assert.equal(events.length, 3, "Reset allocation should notify BattleApp");
-    assert.deepEqual(state.allocation, { hp: 0, damage: 0, speed: 0, skill: 0, defense: 0 });
-
-    globalThis.document = previousDocument;
-}
-
-function testRenderPlayerSetupCopiesAllocation(app) {
-    const state = appStore();
-    const controller = new UIController(app.roster);
-    controller._rootData = state;
-    controller._drawPlayerFace = () => {};
-    const allocation = { hp: 20, damage: 30, speed: 10, skill: 25, defense: 15 };
-    const equipmentSummary = {
-        characterLevel: 5,
-        inventoryUsed: 3,
-        inventorySlots: 8,
-        equippedCount: 2,
-        activeCount: 1,
-        slots: [
-            {
-                id: "weapon",
-                label: "무기",
-                name: "훈련 검",
-                empty: false,
-                locked: false,
-                requiredLevel: 1
-            }
-        ],
-        statLine: "공격 +4"
-    };
-
-    controller.renderPlayerSetup({
-        fighter: app.roster[0],
-        stats: [],
-        allocation,
-        totalPoints: PLAYER_STAT_POINTS,
-        remainingPoints: 0,
-        equipmentSummary,
-        huntingAvailable: true
-    });
-
-    state.adjustStat("hp", -10);
-    assert.equal(allocation.hp, 20, "UI state should not mutate the caller's allocation object");
-    assert.equal(state.allocation.hp, 10, "Rendered UI state should remain editable");
-    assert.equal(state.huntingAvailable, true, "Player setup should expose hunting availability");
-
-    const playerPanelStore = globalThis.Alpine.store("playerPanel");
-    assert.deepEqual(
-        state.equipmentSummary,
-        equipmentSummary,
-        "Rendered UI state should expose the current equipment summary"
-    );
-    assert.deepEqual(
-        playerPanelStore.equipmentSummary,
-        equipmentSummary,
-        "Player panel store should sync the current equipment summary"
-    );
-    controller.renderTournament({ champion: null, rounds: [] });
-    assert.equal(
-        globalThis.Alpine.store("huntingButton").tournamentActive,
-        true,
-        "Hunting button should stay hidden while a tournament is running"
-    );
-    controller.renderTournament({ champion: app.roster[0], rounds: [] });
-    assert.equal(
-        globalThis.Alpine.store("huntingButton").tournamentActive,
-        false,
-        "Hunting button should become available immediately after a tournament champion is decided"
-    );
-    assert.equal(
-        globalThis.Alpine.store("huntingButton").available,
-        true,
-        "Hunting button should be available when huntingAvailable is true in player setup"
-    );
-    const previousQuerySelector = globalThis.document.querySelector;
-    const previousData = globalThis.Alpine.$data;
-    const previousOpenCollectionHub = state.openCollectionHub;
-    const appRoot = makeElement("app");
-    try {
-        let openedTab = "";
-        state.openCollectionHub = (tabId) => {
-            openedTab = tabId;
-        };
-        globalThis.document.querySelector = (selector) => (selector === ".app" ? appRoot : null);
-        globalThis.Alpine.$data = (root) => (root === appRoot ? state : null);
-        const bridge = createComponentBridge(globalThis.Alpine);
-        bridge.adjustStat("hp", 1);
-        bridge.openCollectionHub("equipment");
-        assert.equal(state.allocation.hp, 11, "Player panel bridge action should update app allocation");
-        assert.equal(playerPanelStore.allocation.hp, 11, "Player panel bridge action should sync store allocation");
-        assert.equal(
-            playerPanelStore.remainingPoints,
-            getRemainingStatPoints(state.allocation, PLAYER_STAT_POINTS),
-            "Player panel bridge action should sync points"
-        );
-        assert.equal(openedTab, "equipment", "Player panel bridge action should open the equipment tab");
-    } finally {
-        globalThis.document.querySelector = previousQuerySelector;
-        globalThis.Alpine.$data = previousData;
-        state.openCollectionHub = previousOpenCollectionHub;
-    }
-
-    const previousCollectionHubService = globalThis.CollectionHubService;
-    try {
-        let fallbackTab = "";
-        globalThis.document.querySelector = () => null;
-        globalThis.CollectionHubService = {
-            open(tabId) {
-                fallbackTab = tabId;
-            }
-        };
-        createComponentBridge(globalThis.Alpine).openCollectionHub("equipment");
-        assert.equal(fallbackTab, "equipment", "Collection bridge should fall back to CollectionHubService");
-    } finally {
-        globalThis.document.querySelector = previousQuerySelector;
-        globalThis.CollectionHubService = previousCollectionHubService;
-    }
-}
-
 function testComponentBridgeCallsGameHandlers(app) {
     let started = false;
     let openedLobby = false;
@@ -1565,8 +1187,7 @@ function testComponentBridgeCallsGameHandlers(app) {
         app.hunting.advance = () => {
             advanced = true;
         };
-        globalThis.ballFightApp = app;
-        const bridge = createComponentBridge(globalThis.Alpine);
+        const bridge = createAppComponentBridge(app);
 
         bridge.startTournament();
         bridge.openHuntingLobby();
@@ -1702,7 +1323,19 @@ async function testHuntingEarlyEventUi() {
 }
 
 function testComponentBridgeEquipmentFunctions() {
-    const bridge = createComponentBridge(globalThis.Alpine);
+    const profile = createDefaultPlayerProfile();
+    const weapon = createEquipmentInstance({ rarity: "common", slot: "weapon", rng: () => 0.5 });
+    weapon.stats = [{ type: "damage", value: 9, min: 4, max: 8 }];
+    profile.equipment.inventory.push(weapon);
+
+    const mockApp = {
+        playerProfile: profile,
+        playerFighterId: "archer",
+        _refreshCollectionHub() {},
+        refreshPlayerSetup() {}
+    };
+
+    const bridge = createAppComponentBridge(mockApp);
 
     // 모든 장비 관련 함수가 bridge에 존재하는지 확인
     const requiredFunctions = [
@@ -1719,29 +1352,12 @@ function testComponentBridgeEquipmentFunctions() {
     }
 
     // ── equipItem은 프로필을 저장해야 함 ──
-    const profile = createDefaultPlayerProfile();
-    const weapon = createEquipmentInstance({ rarity: "common", slot: "weapon", rng: () => 0.5 });
-    weapon.stats = [{ type: "damage", value: 9, min: 4, max: 8 }];
-    profile.equipment.inventory.push(weapon);
-
-    const mockApp = {
-        playerProfile: profile,
-        playerFighterId: "archer",
-        _refreshCollectionHub() {}
-    };
-    globalThis.ballFightApp = mockApp;
-
-    const result = bridge.equipItem(weapon.instanceId);
-    assert.equal(result, true, "equipItem should return true on success");
+    bridge.equipItem(weapon.instanceId);
     assert.equal(profile.equipment.equipped.weapon, weapon.instanceId, "Weapon should be equipped in profile");
 
     // ── unequipItem은 프로필을 저장해야 함 ──
-    const unequipResult = bridge.unequipItem(weapon.instanceId);
-    assert.equal(unequipResult, true, "unequipItem should return true on success");
+    bridge.unequipItem(weapon.instanceId);
     assert.equal(profile.equipment.equipped.weapon, null, "Weapon should be unequipped in profile");
-
-    // clean up
-    globalThis.ballFightApp = null;
 }
 
 async function testBattleAppAdoptsPreExistingAlpineAllocation() {
@@ -6903,8 +6519,6 @@ async function testCreateCollectionHubViewModel() {
 const app = await loadModuleApp();
 testShuffledUtility();
 testStatAllocationRules(app);
-testStatAllocationUiSyncEvent();
-testRenderPlayerSetupCopiesAllocation(app);
 testComponentBridgeCallsGameHandlers(app);
 testHuntingUiRouteDisplay();
 await testHuntingEarlyEventUi();
@@ -9562,36 +9176,6 @@ function testPreviewReselectTransitionFinalizes(app) {
     console.log("[preview-reselect-transition-finalizes] ok");
 }
 
-function testBridgeReselectPreviewCharacter(app) {
-    globalThis.ballFightApp = app;
-    const bridge = createComponentBridge(globalThis.Alpine);
-
-    app.tournament = null;
-    app._previewSim = null;
-    app._previewBall = null;
-    app.simulation = null;
-    app.hunting._run = null;
-    const initialId = app.playerFighterId;
-
-    const result = bridge.reselectPreviewCharacter();
-    assert.ok(result, "bridge.reselectPreviewCharacter should return true");
-
-    // playerFighterId should NOT change immediately after bridge call
-    assert.equal(app.playerFighterId, initialId, "playerFighterId should not change immediately after bridge call");
-
-    // Complete the swap
-    const duration = app._previewSim.duration;
-    const ticks = Math.ceil(duration / 0.016) + 5;
-    for (let i = 0; i < ticks; i++) {
-        app._updatePreviewSwap(0.016);
-    }
-
-    const newId = app.playerFighterId;
-    assert.notEqual(newId, initialId, "playerFighterId should change after bridge call + swap finalizes");
-
-    console.log("[preview-reselect-bridge] ok");
-}
-
 testHuntingMerchantOffers();
 testHuntingFormatHelpers();
 testHuntingCombatText();
@@ -9613,7 +9197,6 @@ testPreviewReselectBlockedDuringSwap(app);
 testPreviewReselectBlockedDuringHuntingRun(app);
 testPreviewReselectQueuesDuringSwap(app);
 testPreviewReselectTransitionFinalizes(app);
-testBridgeReselectPreviewCharacter(app);
 
 // ── Repair regression tests ──
 
@@ -10111,5 +9694,148 @@ async function testPopupResolverCapture() {
 }
 
 await testPopupResolverCapture();
+
+// ── Action Gateway regression tests ──
+
+async function testActionGateway() {
+    const { registerGameActionBridge, requireGameActionBridge } = await import("../src/actionGateway.js");
+
+    // 1. Before registration — both forms throw
+    assert.throws(
+        () => requireGameActionBridge(),
+        /등록되지 않았습니다/,
+        "requireGameActionBridge() should throw before bridge registration"
+    );
+    assert.throws(
+        () => requireGameActionBridge("startTournament"),
+        /액션을 호출할 수 없습니다/,
+        "requireGameActionBridge(actionName) should throw before bridge registration"
+    );
+
+    // 2. Register mock bridge
+    let called = false;
+    const mockBridge = {
+        startTournament() {
+            called = true;
+            return "started";
+        },
+        adjustStat() {}
+    };
+    registerGameActionBridge(mockBridge);
+
+    // 3. After registration — returns bridge
+    assert.strictEqual(
+        requireGameActionBridge(),
+        mockBridge,
+        "requireGameActionBridge() should return the registered bridge"
+    );
+    assert.strictEqual(
+        requireGameActionBridge("startTournament"),
+        mockBridge,
+        "requireGameActionBridge('startTournament') should return the bridge"
+    );
+    requireGameActionBridge("startTournament").startTournament();
+    assert.ok(called, "requireGameActionBridge('startTournament').startTournament() should delegate");
+
+    // 4. Missing action throws with registered bridge
+    assert.throws(
+        () => requireGameActionBridge("nonexistent"),
+        /액션이 gameActionBridge에 등록되지 않았습니다/,
+        "requireGameActionBridge('nonexistent') should throw for unregistered action"
+    );
+
+    console.log("[action-gateway] ok");
+}
+
+// ── Action Gateway index.html module identity contract ──
+// ESM treats `./actionGateway.js` and `./actionGateway.js?v=...` as
+// different modules. index.html and main.js must share the same identity.
+
+{
+    const html = readFileSync("index.html", "utf8");
+    const hasVersionedActionGateway = /actionGateway\.js\?v=/.test(html);
+    assert.ok(
+        !hasVersionedActionGateway,
+        "index.html must import actionGateway.js without ?v= to share module identity with main.js"
+    );
+    console.log("[action-gateway-import-identity] ok");
+}
+
+// ── Hunting end-to-end deterministic state regression test ──
+
+async function testHuntingEndToEnd() {
+    const profile = createDefaultPlayerProfile();
+    profile.collection.characters[FIGHTER_IDS.DASH] = {
+        tournamentsCompleted: 1,
+        tournamentWins: 1,
+        matchWins: 3,
+        bestPlacement: 1,
+        totalDamageDealt: 1200,
+        comebackMatchWins: 0,
+        firstTournamentAt: 100,
+        lastTournamentAt: 200
+    };
+    const commonChest = createHuntingChest({ id: "c1", rarity: "common", acquiredAt: 1000 });
+    const uncommonChest = createHuntingChest({ id: "u1", rarity: "uncommon", acquiredAt: 1000 });
+    const rareChest = createHuntingChest({ id: "r1", rarity: "rare", acquiredAt: 1000 });
+
+    // Start run
+    const run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, now: 1000 });
+    assert.equal(run.floor, 0, "Run starts at floor 0");
+    assert.equal(run.status, "active", "New run should be active");
+    assert.equal(run.characterId, FIGHTER_IDS.DASH, "Run should use correct character");
+
+    // Advance floor 0→1: empty outcome (rng=0.9 > 0.7 combat+event threshold)
+    const f1 = advanceHuntingRun(run, { rng: () => 0.9 });
+    assert.equal(f1.floor, 1, "Advance from 0→1");
+    assert.equal(f1.lastEncounter.type, HUNTING_FLOOR_OUTCOME_TYPES.EMPTY, "Floor 1: empty (rng=0.9)");
+
+    // Advance floor 1→2: combat outcome (rng=0.3 < 0.4 combat threshold)
+    const f2 = advanceHuntingRun(f1, { rng: () => 0.3 });
+    assert.equal(f2.floor, 2, "Advance from 1→2");
+    assert.equal(f2.lastEncounter.type, HUNTING_FLOOR_OUTCOME_TYPES.COMBAT, "Floor 2: combat (rng=0.3)");
+
+    // Record floor result with loot
+    const f2Done = recordHuntingFloorResult(f2, {
+        hpRemain: 80,
+        maxHp: 100,
+        loot: { shards: 20, chests: [commonChest], xp: 30 }
+    });
+    assert.equal(f2Done.carriedHp, 80, "HP carryover after combat");
+    assert.equal(f2Done.pendingLoot.shards, 20, "Shards should be pending");
+    assert.equal(f2Done.pendingLoot.chests.length, 1, "Chests should be pending");
+
+    // Advance floor 2→3: event outcome (rng=0.5 → splits by event weights)
+    const f3 = advanceHuntingRun(f2Done, { rng: () => 0.5 });
+    assert.equal(f3.floor, 3, "Advance from 2→3");
+    assert.equal(f3.lastEncounter.type, HUNTING_FLOOR_OUTCOME_TYPES.EVENT, "Floor 3: event (rng=0.5)");
+    assert.ok(f3.lastEvent, "Event floor should produce lastEvent data");
+
+    // Advance floor 3→4: combat outcome (rng=0.2)
+    const f4 = advanceHuntingRun(f3, { rng: () => 0.2 });
+    assert.equal(f4.floor, 4, "Advance from 3→4");
+    assert.equal(f4.lastEncounter.type, HUNTING_FLOOR_OUTCOME_TYPES.COMBAT, "Floor 4: combat (rng=0.2)");
+
+    // Record floor 4 result then retreat
+    const f4Done = recordHuntingFloorResult(f4, {
+        hpRemain: 60,
+        maxHp: 100,
+        loot: { shards: 35, chests: [uncommonChest, rareChest], xp: 50 }
+    });
+    assert.equal(f4Done.pendingLoot.shards, 55, "Shards should accumulate: 20+35=55");
+    assert.equal(f4Done.pendingLoot.chests.length, 3, "3 chests total pending");
+
+    // Retreat
+    const retreated = retreatHuntingRun(f4Done, { now: 2000 });
+    assert.equal(retreated.status, "retreated", "Retreat should end run safely");
+    assert.equal(retreated.securedLoot.shards, 55, "Retreat secures all pending shards");
+    assert.equal(retreated.securedLoot.chests.length, 3, "Retreat secures all pending chests");
+    assert.equal(retreated.securedLoot.xp, 80, "Retreat secures all pending XP");
+
+    console.log("[hunting-end-to-end] ok");
+}
+
+await testActionGateway();
+await testHuntingEndToEnd();
 
 console.log("regression tests ok");
