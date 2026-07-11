@@ -1537,8 +1537,8 @@ export class BattleApp {
         if (challengeMsg) {
             this._log.add(challengeMsg.replace(/\n/g, " — "));
         }
-        this._startBtn.setState({ text: "새 토너먼트 준비", hidden: false, disabled: false });
-        // 재선정 대기 상태
+        this._startBtn.setState({ text: "확인", hidden: false, disabled: false });
+        // 결과 확인 대기 상태
         this._pickPending = true;
     }
 

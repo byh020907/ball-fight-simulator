@@ -9021,6 +9021,17 @@ function testHuntingOverlayResetContract() {
 }
 
 function testResultConfirmationReturnsInitialState() {
+    const appSource = readFileSync("src/app.js", "utf8");
+    assert.ok(
+        appSource.includes('this._startBtn.setState({ text: "확인", hidden: false, disabled: false });'),
+        "Tournament completion should expose the same confirm button as other completed modes"
+    );
+    assert.equal(
+        appSource.includes('text: "새 토너먼트 준비"'),
+        false,
+        "Tournament completion should not retain the obsolete preparation button label"
+    );
+
     const calls = [];
     const resultApp = {
         rafId: 17,
