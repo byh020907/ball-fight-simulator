@@ -1348,10 +1348,10 @@ async function testHuntingEarlyEventUi() {
         setHuntingOverlayState(data) {
             overlayCalls.push({ ...data });
         },
+        showOverlay() {},
         addLog() {},
         showToast() {},
         setHuntingActive() {},
-        showOverlay() {},
         setStartButton() {},
         roster: app.roster,
         playerProfile: createDefaultPlayerProfile()
@@ -1431,9 +1431,13 @@ async function testHuntingFirstMoveUiPaintGate() {
 
 function testHuntingChestEventStopsAndResumes() {
     const overlayCalls = [];
+    const overlayMessages = [];
     const mockApp = {
         setHuntingOverlayState(data) {
             overlayCalls.push({ ...data });
+        },
+        showOverlay(label, text, subtext) {
+            overlayMessages.push({ label, text, subtext });
         },
         addLog() {},
         roster: app.roster,
@@ -1447,6 +1451,11 @@ function testHuntingChestEventStopsAndResumes() {
 
     const chestState = overlayCalls.at(-1);
     assert.equal(manager._moving, false, "Chest event should stop the auto-advance loop");
+    assert.deepEqual(
+        overlayMessages.at(-1),
+        { label: "사냥터", text: "1층 — 상자방", subtext: "전리품을 확인하세요" },
+        "Chest event should replace the previous battle result text with chest room context"
+    );
     assert.equal(
         manager._run.phase,
         HUNTING_RUN_PHASES.AWAITING_CHEST,
@@ -1478,6 +1487,7 @@ async function testHuntingChestEventStopsAdvanceLoop() {
         setHuntingOverlayState(data) {
             overlayCalls.push({ ...data });
         },
+        showOverlay() {},
         addLog() {},
         roster: app.roster,
         playerProfile: createDefaultPlayerProfile()

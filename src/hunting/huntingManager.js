@@ -773,6 +773,7 @@ export class HuntingManager {
 
     _presentChestEvent(app, resolution) {
         if (resolution.logMessage) app.addLog(resolution.logMessage);
+        app.showOverlay("사냥터", `${this._run.floor}층 — 상자방`, "전리품을 확인하세요");
         this._stopHuntingMoveForChest(app, { chest: resolution.chest, floor: this._run.floor });
         return HUNTING_ROUTE_ACTIONS.STOP;
     }
