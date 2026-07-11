@@ -184,6 +184,26 @@ export class BattleApp {
     resetHuntingUiState() {
         this._overlay.hide();
     }
+    returnToInitialState() {
+        cancelAnimationFrame(this.rafId);
+        this._huntingDone = false;
+        this._pickPending = false;
+        this._onSimulationResult = null;
+        this.matchFinalized = false;
+        this.simulation = null;
+        this.tournament = null;
+        this.currentTournamentMatch = null;
+        this._currentMatchReport = null;
+        this._currentTournamentReport = null;
+        this._matchReports = [];
+        this._root.tournamentActive = false;
+        this._bracket.render(null);
+        this.resetHuntingUiState();
+        this._root.statusText = "내 캐릭터를 선택하고 스탯을 배분하세요";
+        this._root.statusBadge = "Setup";
+        this.refreshPlayerSetup();
+        this.startPlayerPreviewLoop();
+    }
     addLog(message) {
         this._log.add(message);
     }
@@ -770,20 +790,12 @@ export class BattleApp {
     }
 
     async startTournament() {
-        if (this._huntingDone) {
-            this._huntingDone = false;
-            this.resetHuntingUiState();
-            this.refreshPlayerSetup();
+        if (this._huntingDone || this._pickPending) {
+            this.returnToInitialState();
             return;
         }
         // MAX_POINTS_PER_STAT 초기화 (이전 토너먼트에서 변경된 값 복원)
         updateEffectiveStatCap(0, 0);
-
-        // 재선정 대기 상태면 먼저 새 캐릭터 선정
-        if (this._pickPending) {
-            this.prepareNewTournament();
-            return;
-        }
 
         // Sync allocation from Alpine (user may have clicked +/- buttons there)
         this._syncPlayerStatAllocationFromUi();
@@ -1407,34 +1419,6 @@ export class BattleApp {
         if (this.playerResult.rankLabel === "2위") return 2;
         if (this.playerResult.rankLabel === "공동 3위") return 3;
         return 5;
-    }
-
-    /** 새 토너먼트 준비: 대표 캐릭터 재선정 */
-    prepareNewTournament() {
-        if (!this._pickPending) return;
-        this._pickPending = false;
-
-        // 직전 캐릭터 제외하고 랜덤 선정
-        const others = this.roster.filter((f) => f.id !== this.playerFighterId);
-        if (others.length > 0) {
-            const picked = others[Math.floor(Math.random() * others.length)];
-            this.playerFighterId = picked.id;
-        } else {
-            this.playerFighterId = this.roster[Math.floor(Math.random() * this.roster.length)].id;
-        }
-
-        // 스탯 배분 초기화
-        this.playerStatAllocation = createEmptyStatAllocation();
-        this.playerResult = null;
-        this.tournament = null;
-        this._root.tournamentActive = false;
-        this.currentTournamentMatch = null;
-
-        this._refreshCollectionHub();
-        this.refreshPlayerSetup();
-        this.resetHuntingUiState();
-        this.startPlayerPreviewLoop();
-        this._log.add(`새 대표 캐릭터: ${picked?.name ?? "무작위"}. 스탯을 배분하세요.`);
     }
 
     showTournamentChampion() {

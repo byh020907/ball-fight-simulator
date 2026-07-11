@@ -8953,6 +8953,56 @@ function testHuntingOverlayResetContract() {
     console.log("[hunting-overlay-reset] ok");
 }
 
+function testResultConfirmationReturnsInitialState() {
+    const calls = [];
+    const resultApp = {
+        rafId: 17,
+        _huntingDone: true,
+        _pickPending: true,
+        _onSimulationResult: () => {},
+        matchFinalized: true,
+        simulation: { finished: true },
+        tournament: { champion: { id: "archer" } },
+        currentTournamentMatch: { id: "final" },
+        _currentMatchReport: {},
+        _currentTournamentReport: {},
+        _matchReports: [{}],
+        _root: { tournamentActive: true, statusText: "결과", statusBadge: "Result" },
+        _bracket: {
+            render(value) {
+                calls.push(["bracket", value]);
+            }
+        },
+        resetHuntingUiState() {
+            calls.push(["overlay"]);
+        },
+        refreshPlayerSetup() {
+            calls.push(["setup"]);
+        },
+        startPlayerPreviewLoop() {
+            calls.push(["preview"]);
+        }
+    };
+    const savedCancelAnimationFrame = globalThis.cancelAnimationFrame;
+    globalThis.cancelAnimationFrame = (id) => calls.push(["cancel", id]);
+
+    try {
+        Object.setPrototypeOf(resultApp, Object.getPrototypeOf(app));
+        resultApp.returnToInitialState();
+    } finally {
+        globalThis.cancelAnimationFrame = savedCancelAnimationFrame;
+    }
+
+    assert.equal(resultApp._huntingDone, false, "Confirming a hunting result should clear its completion state");
+    assert.equal(resultApp._pickPending, false, "Confirming a tournament result should clear its completion state");
+    assert.equal(resultApp.tournament, null, "Confirming a result should discard the finished tournament");
+    assert.equal(resultApp.simulation, null, "Confirming a result should discard the finished simulation");
+    assert.equal(resultApp._root.tournamentActive, false, "Initial state should not remain tournament-locked");
+    assert.equal(resultApp._root.statusBadge, "Setup", "Initial state should restore the setup status");
+    assert.deepEqual(calls, [["cancel", 17], ["bracket", null], ["overlay"], ["setup"], ["preview"]]);
+    console.log("[result-confirmation-initial-state] ok");
+}
+
 function testHuntingFormatHelpers() {
     // ── formatChestRarityCounts ──
     assert.equal(formatChestRarityCounts([]), "", "Empty chests should produce empty string");
@@ -9754,6 +9804,7 @@ testHuntingMerchantOffers();
 testHuntingMerchantPurchaseRefreshesUiState();
 testHuntingMerchantMobileScrollContract();
 testHuntingOverlayResetContract();
+testResultConfirmationReturnsInitialState();
 testHuntingFormatHelpers();
 testHuntingCombatText();
 testHuntingLootHud();
