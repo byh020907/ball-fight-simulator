@@ -22,7 +22,14 @@ import { findActionById } from "../src/clickActions.js";
 import { calcMatchXp, getLevelFromXp, getXpForNextLevel, calcTournamentXp } from "../src/experience/experienceState.js";
 import { getLevelRequirement, LEVEL_REWARDS, XP_SCALE } from "../src/experience/experienceConfig.js";
 import { REWARD_BALANCE } from "../src/rewardBalanceConfig.js";
-import { getCharacterExperienceSummary, grantExperienceFromMatchReport } from "../src/experience/experienceService.js";
+import {
+    applyExperienceEffectsToBall,
+    collectActiveExperienceEffects,
+    getCharacterExperienceSummary,
+    getExperienceRewardsBetween,
+    grantExperienceFromMatchReport
+} from "../src/experience/experienceService.js";
+import { getLevelRewardEffectHandler } from "../src/experience/reward-effects/effectRegistry.js";
 import { DashEffect, WallSlamEffect } from "../src/combatEffects.js";
 import { shuffled } from "../src/random.js";
 import { BattleSimulation } from "../src/simulation/battleSimulation.js";
@@ -489,6 +496,7 @@ async function loadModuleApp() {
         animatedProgressPct: 0,
         progressText: "",
         nextText: "",
+        earnedRewardText: "",
         nextRewardText: "",
         animate(val) {
             if (!val) {
@@ -501,6 +509,7 @@ async function loadModuleApp() {
             this.levelUp = Boolean(val.levelUp);
             this.progressText = val.progressText ?? "";
             this.nextText = val.nextText ?? "";
+            this.earnedRewardText = val.earnedRewardText ?? "";
             this.nextRewardText = val.nextRewardText ?? "";
             this.visible = true;
         },
@@ -683,6 +692,7 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
         animatedProgressPct: 0,
         progressText: "",
         nextText: "",
+        earnedRewardText: "",
         nextRewardText: "",
         animate(val) {
             if (!val) {
@@ -695,6 +705,7 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
             this.levelUp = Boolean(val.levelUp);
             this.progressText = val.progressText ?? "";
             this.nextText = val.nextText ?? "";
+            this.earnedRewardText = val.earnedRewardText ?? "";
             this.nextRewardText = val.nextRewardText ?? "";
             this.visible = true;
         },
@@ -1785,7 +1796,58 @@ function testExperienceSystem() {
     assert.equal(levelUpResult.levelUp, true, "Crossing the level threshold should be reported");
     assert.equal(levelUpResult.previousLevel, 1, "Level-up result should expose the previous level");
     assert.equal(levelUpResult.level, 2, "Level-up result should expose the new level");
+    assert.deepEqual(
+        levelUpResult.earnedRewards.map((reward) => reward.text),
+        ["HP +2"]
+    );
     assert.equal(levelUpResult.nextRewardText, "공격 +1", "Level-up result should expose the next reward");
+
+    const allRewardEffects = LEVEL_REWARDS.filter(Boolean).map((reward) => reward.effect);
+    allRewardEffects.forEach((effect) => {
+        assert.doesNotThrow(() => getLevelRewardEffectHandler(effect), "Every configured level reward needs a handler");
+    });
+    assert.deepEqual(
+        getExperienceRewardsBetween(1, 3).map((reward) => reward.text),
+        ["HP +2", "공격 +1"],
+        "Level ranges should expose every earned reward in order"
+    );
+
+    profile.experience.byCharacter[FIGHTER_IDS.DASH].currentXp = getLevelRequirement(4);
+    const playerSpec = {
+        ...app.roster.find((fighter) => fighter.id === FIGHTER_IDS.DASH),
+        teamId: "xp-player"
+    };
+    const opponentSpec = {
+        ...app.roster.find((fighter) => fighter.id !== FIGHTER_IDS.DASH),
+        id: "xp-opponent",
+        teamId: "xp-opponent"
+    };
+    let preparedPlayer = null;
+    new BattleSimulation([playerSpec, opponentSpec], {
+        onBattleBallReady(ball) {
+            if (ball.id === playerSpec.id) {
+                applyExperienceEffectsToBall(ball, collectActiveExperienceEffects(profile, playerSpec.id));
+                preparedPlayer = ball;
+            }
+        }
+    });
+    assert.equal(preparedPlayer.maxHp, playerSpec.stats.hp + 2, "HP reward should be applied to the battle ball");
+    assert.equal(
+        preparedPlayer.stats.baseDamage,
+        playerSpec.stats.damage + 1,
+        "Damage reward should be applied to the battle ball"
+    );
+    assert.equal(preparedPlayer.stats.allocation.skill, 2, "Skill reward should be applied through ball stats");
+    applyExperienceEffectsToBall(preparedPlayer, [
+        {
+            type: "ability_modifier",
+            abilityId: preparedPlayer.abilityId,
+            modifierId: "impactMultiplier",
+            operation: "multiply",
+            value: 1.2
+        }
+    ]);
+    assert.equal(preparedPlayer.ability.getLevelRewardModifier("impactMultiplier"), 1.2);
 
     const legacyProfile = createDefaultPlayerProfile();
     legacyProfile.experience = { currentXp: 55, byCharacter: {} };

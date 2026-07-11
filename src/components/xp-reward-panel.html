@@ -12,6 +12,7 @@
         <span x-text="progressText"></span>
         <span x-text="nextText"></span>
     </div>
+    <div class="xp-reward-earned" x-show="earnedRewardText" x-text="'획득 보상 · ' + earnedRewardText"></div>
     <div class="xp-reward-next" x-show="nextRewardText" x-text="'다음 보상 · ' + nextRewardText"></div>
 </div>
 <script>
@@ -52,6 +53,7 @@
             animatedProgressPct: 0,
             progressText: "",
             nextText: "",
+            earnedRewardText: "",
             nextRewardText: "",
             animate(val) {
                 if (!val) {
@@ -64,6 +66,7 @@
                 this.levelUp = Boolean(val.levelUp);
                 this.progressText = val.progressText ?? "";
                 this.nextText = val.nextText ?? "";
+                this.earnedRewardText = val.earnedRewardText ?? "";
                 this.nextRewardText = val.nextRewardText ?? "";
                 this.visible = true;
                 startAnimation.call(this, val);
@@ -86,11 +89,16 @@
 
 .xp-reward-head span,
 .xp-reward-foot span,
+.xp-reward-earned,
 .xp-reward-next {
     min-width: 0;
     font-size: 0.76rem;
     font-weight: 800;
     color: #555555;
+}
+
+.xp-reward-earned {
+    color: #0a8d32;
 }
 
 .xp-reward-head b {

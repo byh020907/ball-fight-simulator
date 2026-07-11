@@ -37,7 +37,7 @@ import {
     grantExperienceFromMatchReport,
     getCharacterExperienceSummary,
     collectActiveExperienceEffects,
-    applyExperienceEffectsToSpec
+    applyExperienceEffectsToBall
 } from "./experience/experienceService.js";
 import { collectActiveEffects, MASTERY_EFFECT_DEFS, advanceCharacterMastery } from "./character-mastery/index.js";
 import { createCollectionHubViewModel } from "./collection/collectionViewModel.js";
@@ -874,12 +874,6 @@ export class BattleApp {
             playerSpec.mastery.passives = [...masteryCtx.combatPassives];
         }
 
-        // XP 레벨 보상 적용 (숙련도 효과 이후)
-        if (playerSpec) {
-            const xpEffects = collectActiveExperienceEffects(this.playerProfile, this.playerFighterId);
-            applyExperienceEffectsToSpec(playerSpec, xpEffects);
-        }
-
         if (playerSpec) {
             const equippedSpec = applyEquipmentStats(playerSpec, this.playerProfile);
             playerSpec.stats = equippedSpec.stats;
@@ -968,6 +962,9 @@ export class BattleApp {
 
         // 시뮬레이션 생성 (playerBall은 아직 null)
         this._currentMatchReport = createMatchReport();
+        const experienceEffectsByFighter = new Map([
+            [this.playerFighterId, collectActiveExperienceEffects(this.playerProfile, this.playerFighterId)]
+        ]);
         this.simulation = new BattleSimulation(
             match,
             {
@@ -998,6 +995,9 @@ export class BattleApp {
                     if (this._currentMatchReport) {
                         recordActionSuccess(this._currentMatchReport, actionId);
                     }
+                },
+                onBattleBallReady: (ball) => {
+                    applyExperienceEffectsToBall(ball, experienceEffectsByFighter.get(ball.id));
                 }
             },
             null,
@@ -1183,6 +1183,7 @@ export class BattleApp {
             progressAfterPct: result.progressAfterPct ?? 0,
             progressText: result.progressText ?? "",
             nextText: result.nextText ?? "",
+            earnedRewardText: (result.earnedRewards ?? []).map((reward) => reward.text).join(" · "),
             nextRewardText: result.nextRewardText ?? ""
         };
     }

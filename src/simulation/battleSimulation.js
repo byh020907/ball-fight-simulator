@@ -57,6 +57,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
             const fighter = new BattleBall(fighterSpec, spawnPoints[index]);
             fighter.simulation = this;
             fighter.bindAbility(this.createAbility(fighterSpec.ability, fighter));
+            this.hooks.onBattleBallReady?.(fighter, fighterSpec, this);
             return fighter;
         });
         this.entities = [...this.fighters];

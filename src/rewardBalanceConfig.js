@@ -17,15 +17,15 @@ export const REWARD_BALANCE = deepFreeze({
         levelRewards: [
             null,
             null,
-            { hp: 2 },
-            { damage: 1 },
-            { abilityCooldownPercent: -2 },
-            { signatureBonusPercent: 3 },
-            { hp: 2 },
-            { damage: 1 },
-            { actionHpCostPercent: -2 },
-            { abilityCooldownPercent: -2 },
-            { title: true }
+            { id: "level-2-hp", effect: { type: "stat", stat: "hp", value: 2 } },
+            { id: "level-3-damage", effect: { type: "stat", stat: "damage", value: 1 } },
+            { id: "level-4-skill", effect: { type: "stat", stat: "skill", value: 2 } },
+            { id: "level-5-speed", effect: { type: "stat", stat: "speed", value: 2 } },
+            { id: "level-6-hp", effect: { type: "stat", stat: "hp", value: 2 } },
+            { id: "level-7-damage", effect: { type: "stat", stat: "damage", value: 1 } },
+            { id: "level-8-defense", effect: { type: "stat", stat: "defense", value: 1 } },
+            { id: "level-9-skill", effect: { type: "stat", stat: "skill", value: 2 } },
+            { id: "level-10-speed", effect: { type: "stat", stat: "speed", value: 2 } }
         ]
     },
     hunting: {

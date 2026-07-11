@@ -26,7 +26,8 @@ export {
     getCharacterTotalXp,
     getCharacterExperienceSummary,
     getExperienceRewardText,
+    getExperienceRewardsBetween,
     matchReportToXpInput,
     collectActiveExperienceEffects,
-    applyExperienceEffectsToSpec
+    applyExperienceEffectsToBall
 } from "./experienceService.js";

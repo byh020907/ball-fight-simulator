@@ -1,6 +1,7 @@
 import { calcMatchXp, calcTournamentXp } from "./experienceState.js";
 import { getLevelFromXp, getXpForNextLevel, getXpProgressInLevel } from "./experienceState.js";
 import { LEVEL_REWARDS, MAX_LEVEL, getLevelRequirement } from "./experienceConfig.js";
+import { applyLevelRewardEffectsToBall, getLevelRewardEffectText } from "./reward-effects/effectRegistry.js";
 
 export function matchReportToXpInput(report) {
     return {
@@ -41,14 +42,14 @@ export function getCharacterTotalXp(profile, characterId) {
 }
 
 export function getExperienceRewardText(reward = {}) {
-    const parts = [];
-    if (reward.hp) parts.push(`HP +${reward.hp}`);
-    if (reward.damage) parts.push(`공격 +${reward.damage}`);
-    if (reward.abilityCooldownPercent) parts.push(`쿨타임 ${reward.abilityCooldownPercent}%`);
-    if (reward.signatureBonusPercent) parts.push(`대표 행동 +${reward.signatureBonusPercent}%`);
-    if (reward.actionHpCostPercent) parts.push(`액션 비용 ${reward.actionHpCostPercent}%`);
-    if (reward.title) parts.push("칭호 해금");
-    return parts.join(" · ");
+    return reward.effect ? getLevelRewardEffectText(reward.effect) : "";
+}
+
+export function getExperienceRewardsBetween(previousLevel, level) {
+    const startLevel = Math.max(2, previousLevel + 1);
+    return Array.from({ length: Math.max(0, level - startLevel + 1) }, (_, index) => LEVEL_REWARDS[startLevel + index])
+        .filter(Boolean)
+        .map((reward) => ({ ...reward, text: getExperienceRewardText(reward) }));
 }
 
 export function getCharacterExperienceSummary(profile, characterId) {
@@ -108,6 +109,7 @@ function grantExperience(profile, characterId, totalXp) {
         previousLevel: prevLevel,
         level: newLevel,
         levelUp: newLevel > prevLevel,
+        earnedRewards: getExperienceRewardsBetween(prevLevel, newLevel),
         progressBefore: before.progress,
         progressAfter: after.progress,
         progressBeforePct: before.progressPct,
@@ -122,54 +124,11 @@ function grantExperience(profile, characterId, totalXp) {
 
 export function collectActiveExperienceEffects(profile, characterId) {
     const level = getLevelFromXp(getCharacterTotalXp(profile, characterId));
-    const merged = {
-        hp: 0,
-        damage: 0,
-        actionHpCostPercent: 0,
-        abilityCooldownPercent: 0,
-        signatureBonusPercent: 0,
-        title: false
-    };
-    for (let lv = 2; lv <= level; lv++) {
-        const reward = LEVEL_REWARDS[lv];
-        if (!reward) continue;
-        for (const [key, value] of Object.entries(reward)) {
-            if (key === "title") {
-                merged.title = true;
-            } else if (typeof value === "number") {
-                merged[key] = (merged[key] ?? 0) + value;
-            }
-        }
-    }
-    return merged;
+    return getExperienceRewardsBetween(1, level).map((reward) => reward.effect);
 }
 
-/**
- * XP 레벨 보상을 playerSpec에 적용 (startTournament에서 호출).
- */
-export function applyExperienceEffectsToSpec(playerSpec, xpEffects) {
-    if (xpEffects.hp) playerSpec.stats.hp += xpEffects.hp;
-    if (xpEffects.damage) playerSpec.stats.damage += xpEffects.damage;
-    if (xpEffects.actionHpCostPercent) {
-        const reduction = Math.abs(xpEffects.actionHpCostPercent) / 100;
-        playerSpec.mastery ||= { physics: {}, action: {}, passives: [] };
-        playerSpec.mastery.action = {
-            ...(playerSpec.mastery.action || {}),
-            hpCostPercentReduction: (playerSpec.mastery.action?.hpCostPercentReduction ?? 0) + reduction
-        };
-    }
-    if (xpEffects.abilityCooldownPercent || xpEffects.signatureBonusPercent) {
-        playerSpec.mastery ||= { physics: {}, action: {}, passives: [] };
-        playerSpec.mastery.action ||= {};
-        if (xpEffects.abilityCooldownPercent) {
-            playerSpec.mastery.action.cooldownPercent =
-                (playerSpec.mastery.action?.cooldownPercent ?? 0) + xpEffects.abilityCooldownPercent;
-        }
-        if (xpEffects.signatureBonusPercent) {
-            playerSpec.mastery.action.signatureBonusPercent =
-                (playerSpec.mastery.action?.signatureBonusPercent ?? 0) + xpEffects.signatureBonusPercent;
-        }
-    }
+export function applyExperienceEffectsToBall(ball, effects) {
+    applyLevelRewardEffectsToBall(ball, effects);
 }
 
 export { calcMatchXp, calcTournamentXp, getLevelFromXp, getXpForNextLevel, getXpProgressInLevel };
