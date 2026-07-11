@@ -10188,4 +10188,46 @@ await testActionGateway();
 await testHuntingEndToEnd();
 await testNoGameBridgeInProduction();
 
+function testAlpineTemplatesNoWindowUiManager() {
+    // Prove that Alpine template directives use $store.uiManager, never window.uiManager
+    const offenders = [];
+    const directivePattern = /\bx-(?:data|bind|on|text|html|show|if|for|model|cloak|ref|effect|init|transition)\s*=/;
+    const componentDir = "src/components";
+    for (const name of readdirSync(componentDir)) {
+        if (!name.endsWith(".html")) continue;
+        const full = `${componentDir}/${name}`;
+        const lines = readFileSync(full, "utf8").split("\n");
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            if (directivePattern.test(line) && line.includes("window.uiManager")) {
+                offenders.push(`${full}:${i + 1} — "${line.trim()}"`);
+            }
+        }
+    }
+    if (offenders.length > 0) {
+        console.log("[alpine-no-window-uimanager] FAIL: " + offenders.join("; "));
+    }
+    assert.equal(offenders.length, 0, "No Alpine template directives should reference window.uiManager");
+    console.log("[alpine-no-window-uimanager] ok");
+}
+
+function testXpProgressBarUsesStoreUiManager() {
+    const content = readFileSync("src/components/xp-progress-bar.html", "utf8");
+    const directiveLine = content.split("\n").find((l) => l.includes("x-bind:style"));
+    assert.ok(directiveLine, "xp-progress-bar should have an x-bind:style directive");
+    assert.ok(
+        directiveLine.includes("$store.uiManager"),
+        `xp-progress-bar x-bind:style should use $store.uiManager, got: "${directiveLine.trim()}"`
+    );
+    assert.equal(
+        directiveLine.includes("window.uiManager"),
+        false,
+        `xp-progress-bar x-bind:style should not use window.uiManager, got: "${directiveLine.trim()}"`
+    );
+    console.log("[xp-progress-store-uimanager] ok");
+}
+
+await testAlpineTemplatesNoWindowUiManager();
+await testXpProgressBarUsesStoreUiManager();
+
 console.log("regression tests ok");

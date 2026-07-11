@@ -1032,3 +1032,14 @@
 
 ## 진행 중 이슈
 - 없음 (58개 스위트 전부 통과, 브라우저 콘솔 gameBridge 경고 3종 해결 완료)
+
+## [L1] 2026-07-12 — Alpine 템플릿 표현식 window.uiManager → $store.uiManager 전환
+- 맥락: `xp-progress-bar.html`의 `x-bind:style` 표현식이 `window.uiManager?.getComponent(...)`을 사용해 Alpine의 반응형 의존성 추적을 우회함. 동일 템플릿에서 `$store.uiManager.getComponent(...)`는 Alpine magic으로 반응형 의존성을 자동 추적하여 Store 변경 시 바인딩이 다시 평가됨.
+- 결정:
+  (1) `xp-progress-bar.html`의 `x-bind:style` 표현식을 `$store.uiManager.getComponent('xpRewardPanel')?.animatedProgressPct ?? 0`로 교체 — `$store` magic은 Alpine의 반응형 Proxy를 통해 읽어 Store 변경 시 바인딩 재평가 트리거.
+  (2) `src/components/*.html` 전수 감사 — `window.uiManager`가 Alpine directive 라인(`x-bind:`, `x-data`, `x-on`, `x-show` 등)에 있는지 확인. `game-overlay.html`의 3개 `window.uiManager`는 `<script>` 내부 컴포넌트 메서드로, Alpine 템플릿 표현식이 아니므로 보존(요구사항 #4).
+  (3) 회귀 테스트 2종 신설: `[alpine-no-window-uimanager]` — 모든 컴포넌트 HTML의 Alpine directive 라인에 `window.uiManager`가 없음을 증명. `[xp-progress-store-uimanager]` — `xp-progress-bar.html`의 `x-bind:style`이 `$store.uiManager`를 사용함을 단언.
+- 영향: `src/components/xp-progress-bar.html`, `tests/regression.mjs`, `SESSION-HANDOFF.md`
+- 검증: `npm test` (신규 2종 포함 60개 스위트 통과), `npm run check`(126파일), `npm run format:check`, `node scripts/huntingUserScenario.mjs`, `git diff --check`, `rg "window\\.uiManager" src/components/ -g "*.html"` 결과 3개 모두 `<script>` 내부 (game-overlay.html).
+
+## 진행 중 이슈
