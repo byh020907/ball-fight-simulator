@@ -1001,7 +1001,11 @@ async function testCollisionImpulsePersists(app) {
 
 async function testGrenadeScatterShot(app) {
     const grenadeBase = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.GRENADE);
-    const grenade = { ...grenadeBase, stats: { ...grenadeBase.stats, speed: 580 } };
+    const grenade = {
+        ...grenadeBase,
+        stats: { ...grenadeBase.stats, speed: 580 },
+        statAllocation: { skill: 100 }
+    };
     const opponent = app.roster.find((f) => f.id !== FIGHTER_IDS.GRENADE);
     const sim = new BattleSimulation([grenade, opponent], { onLog() {}, onSound() {} });
     const grenadeFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.GRENADE);
@@ -1030,6 +1034,11 @@ async function testGrenadeScatterShot(app) {
         );
         assert.ok(g.timer > 0, "Each grenade should have a fuse timer");
     }
+    const longestFuse = Math.max(...allGrenades().map((grenade) => grenade.maxTimer));
+    assert.ok(
+        Math.abs(longestFuse - grenadeFighter.ability.cooldown) < 0.001,
+        "The longest grenade fuse should match the effective grenade cooldown"
+    );
 }
 
 async function testDamageShake(app) {

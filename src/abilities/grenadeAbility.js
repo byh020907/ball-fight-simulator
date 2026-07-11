@@ -9,7 +9,6 @@ const BASE_GRENADE_SPEED = 290;
 const BASE_PROJECTILE_SPEED = 800;
 const PROJECTILE_SPEED_MULTIPLIER = BASE_PROJECTILE_SPEED / BASE_GRENADE_SPEED;
 const FUSE_FIRST = 0.6;
-const FUSE_LAST = 2.0;
 
 export class GrenadeAbility extends Ability {
     constructor(owner, simulation) {
@@ -49,7 +48,8 @@ export class GrenadeAbility extends Ability {
 
         const shotIndex = this._burstTotal - this._burstRemaining;
         const progress = this._burstTotal > 1 ? shotIndex / (this._burstTotal - 1) : 0.5;
-        const fuse = FUSE_FIRST + progress * (FUSE_LAST - FUSE_FIRST);
+        const firstFuse = Math.min(FUSE_FIRST, this.cooldown);
+        const fuse = firstFuse + progress * (this.cooldown - firstFuse);
 
         const angle = Math.random() * Math.PI * 2;
         const dir = Vector2.fromAngle(angle, 1);
