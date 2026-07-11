@@ -7236,6 +7236,25 @@ function testGrenadeHighSpeedProximityTrigger() {
     assert.ok(grenade.timer < 0.2, "High-speed grenade should shorten its fuse more than the reference speed");
 }
 
+function testGrenadeExplosionRangeMatchesVisualEffect() {
+    const grenadeFighter = app.roster.find((fighter) => fighter.ability === "grenade");
+    const archer = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
+    const sim = new BattleSimulation([grenadeFighter, archer], { onLog() {}, onSound() {} });
+    const owner = sim.fighters.find((fighter) => fighter.id === grenadeFighter.id);
+    const target = sim.fighters.find((fighter) => fighter.id === archer.id);
+
+    owner.position = new Vector2(400, 480);
+    target.position = new Vector2(570, 480);
+    const grenade = new Grenade(owner, owner.position, 1);
+    grenade.position = owner.position.clone();
+    const hpBefore = target.hp;
+
+    grenade._detonate(sim);
+
+    assert.equal(grenade.explosionRadius, 174, "Explosion hit range should match the visual burst outer radius");
+    assert.ok(target.hp < hpBefore, "A target inside the visual explosion outer radius should take damage");
+}
+
 async function testPpoActorCriticUtilities() {
     const { createActorCriticNetworks, deterministicAction, prepareTensorflowBackend, sampleAction, trainPpoEpochs } =
         await import("../scripts/rl/policyNetwork.js");
@@ -7282,6 +7301,7 @@ testCompleteChallengeTournament();
 testFormatBonusSummary();
 testGrenadeProximityTrigger();
 testGrenadeHighSpeedProximityTrigger();
+testGrenadeExplosionRangeMatchesVisualEffect();
 await testPpoActorCriticUtilities();
 await testNewCharactersRegistered(app);
 await testVampireBatsSpawn(app);

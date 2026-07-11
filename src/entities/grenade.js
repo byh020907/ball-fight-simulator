@@ -4,6 +4,8 @@ const PROXIMITY_REFERENCE_SPEED = 800;
 const PROXIMITY_MIN_FUSE_REDUCTION = 0.2;
 const PROXIMITY_FUSE_REDUCTION_AT_REFERENCE_SPEED = 0.4;
 const PROXIMITY_MAX_FUSE_REDUCTION = 0.85;
+const EXPLOSION_RADIUS = 174;
+const EXPLOSION_INNER_RADIUS = 72;
 
 export class Grenade extends CombatEntity {
     constructor(owner, targetPosition, fuseTime = 1.08) {
@@ -15,8 +17,8 @@ export class Grenade extends CombatEntity {
         this.ownerId = owner.id;
         this.timer = safeFuse;
         this.maxTimer = this.timer;
-        this.explosionRadius = 150;
-        this.innerRadius = 62;
+        this.explosionRadius = EXPLOSION_RADIUS;
+        this.innerRadius = EXPLOSION_INNER_RADIUS;
         this.bounces = 0;
         this.maxBounces = 4;
     }
