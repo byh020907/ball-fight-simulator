@@ -29,5 +29,6 @@ export {
     getExperienceRewardsBetween,
     matchReportToXpInput,
     collectActiveExperienceEffects,
-    applyExperienceEffectsToBall
+    applyExperienceEffectsToBall,
+    applyExperienceEffectsToBaseSpec
 } from "./experienceService.js";

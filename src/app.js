@@ -37,7 +37,8 @@ import {
     grantExperienceFromMatchReport,
     getCharacterExperienceSummary,
     collectActiveExperienceEffects,
-    applyExperienceEffectsToBall
+    applyExperienceEffectsToBall,
+    applyExperienceEffectsToBaseSpec
 } from "./experience/experienceService.js";
 import { collectActiveEffects, MASTERY_EFFECT_DEFS, advanceCharacterMastery } from "./character-mastery/index.js";
 import { createCollectionHubViewModel } from "./collection/collectionViewModel.js";
@@ -843,9 +844,15 @@ export class BattleApp {
         // adjustedAllocation: 사용자가 UI에서 직접 배분한 값 그대로 사용
         // (extraStatPoints는 이미 UI의 totalPoints에 포함되어 있으므로 별도 분배 불필요)
         const adjustedAllocation = { ...this.playerStatAllocation };
+        const experienceEffectsByFighter = new Map([
+            [this.playerFighterId, collectActiveExperienceEffects(this.playerProfile, this.playerFighterId)]
+        ]);
+        const rosterWithExperienceRewards = this.roster.map((fighter) =>
+            applyExperienceEffectsToBaseSpec(fighter, experienceEffectsByFighter.get(fighter.id))
+        );
 
         this.tournamentRoster = createTournamentRoster(
-            this.roster,
+            rosterWithExperienceRewards,
             this.playerFighterId,
             adjustedAllocation,
             undefined,

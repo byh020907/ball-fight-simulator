@@ -1,7 +1,11 @@
 import { calcMatchXp, calcTournamentXp } from "./experienceState.js";
 import { getLevelFromXp, getXpForNextLevel, getXpProgressInLevel } from "./experienceState.js";
 import { LEVEL_REWARDS, MAX_LEVEL, getLevelRequirement } from "./experienceConfig.js";
-import { applyLevelRewardEffectsToBall, getLevelRewardEffectText } from "./reward-effects/effectRegistry.js";
+import {
+    applyLevelRewardEffectsToBall,
+    applyLevelRewardEffectsToBaseSpec,
+    getLevelRewardEffectText
+} from "./reward-effects/effectRegistry.js";
 
 export function matchReportToXpInput(report) {
     return {
@@ -129,6 +133,10 @@ export function collectActiveExperienceEffects(profile, characterId) {
 
 export function applyExperienceEffectsToBall(ball, effects) {
     applyLevelRewardEffectsToBall(ball, effects);
+}
+
+export function applyExperienceEffectsToBaseSpec(spec, effects) {
+    return applyLevelRewardEffectsToBaseSpec(spec, effects);
 }
 
 export { calcMatchXp, calcTournamentXp, getLevelFromXp, getXpForNextLevel, getXpProgressInLevel };

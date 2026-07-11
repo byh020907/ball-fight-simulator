@@ -11,23 +11,21 @@ const STAT_LABELS = Object.freeze({
     defense: "방어력"
 });
 
-const STAT_MUTATORS = Object.freeze({
-    hp(ball, value) {
-        ball.maxHp += value;
-        ball.hp += value;
+const BASE_STAT_MUTATORS = Object.freeze({
+    hp(spec, value) {
+        spec.stats.hp += value;
     },
-    damage(ball, value) {
-        ball.stats.baseDamage += value;
+    damage(spec, value) {
+        spec.stats.damage += value;
     },
-    speed(ball, value) {
-        ball.stats.baseSpeed += value;
+    speed(spec, value) {
+        spec.stats.speed += value;
     },
-    skill(ball, value) {
-        ball.stats.allocation ||= {};
-        ball.stats.allocation.skill = (ball.stats.allocation.skill ?? 0) + value;
+    skill(spec, value) {
+        spec.stats.skill = (spec.stats.skill ?? 0) + value;
     },
-    defense(ball, value) {
-        ball.stats.baseDefense += value;
+    defense(spec, value) {
+        spec.stats.defense += value;
     }
 });
 
@@ -47,10 +45,10 @@ const EFFECT_HANDLERS = Object.freeze({
             if (!label || !Number.isFinite(effect.value)) throw new Error(`Invalid stat reward: ${effect.stat}`);
             return `${label} +${effect.value}`;
         },
-        applyToBall(ball, effect) {
-            const mutate = STAT_MUTATORS[effect.stat];
+        applyToBaseSpec(spec, effect) {
+            const mutate = BASE_STAT_MUTATORS[effect.stat];
             if (!mutate || !Number.isFinite(effect.value)) throw new Error(`Invalid stat reward: ${effect.stat}`);
-            mutate(ball, effect.value);
+            mutate(spec, effect.value);
         }
     },
     [LEVEL_REWARD_EFFECT_TYPES.ABILITY_MODIFIER]: {
@@ -87,5 +85,11 @@ export function getLevelRewardEffectText(effect) {
 }
 
 export function applyLevelRewardEffectsToBall(ball, effects = []) {
-    effects.forEach((effect) => getLevelRewardEffectHandler(effect).applyToBall(ball, effect));
+    effects.forEach((effect) => getLevelRewardEffectHandler(effect).applyToBall?.(ball, effect));
+}
+
+export function applyLevelRewardEffectsToBaseSpec(spec, effects = []) {
+    const nextSpec = { ...spec, stats: { ...spec.stats } };
+    effects.forEach((effect) => getLevelRewardEffectHandler(effect).applyToBaseSpec?.(nextSpec, effect));
+    return nextSpec;
 }

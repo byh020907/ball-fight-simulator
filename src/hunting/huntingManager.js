@@ -27,7 +27,11 @@ import {
 import { applyMerchantOffer, formatOfferResultToast } from "./huntingMerchant.js";
 import { formatPendingLootSummary, formatDefeatLossText } from "./huntingFormat.js";
 import { createMatchReport, recordLowestHp } from "../collection/index.js";
-import { grantExperienceFromMatchReport } from "../experience/experienceService.js";
+import {
+    applyExperienceEffectsToBaseSpec,
+    collectActiveExperienceEffects,
+    grantExperienceFromMatchReport
+} from "../experience/experienceService.js";
 import { applyStatAllocation } from "../statAllocation.js";
 import { savePlayerProfile } from "../playerProfile.js";
 import { PopupService } from "../popup.js";
@@ -201,7 +205,17 @@ export class HuntingManager {
 
         const appliedSpec = applyHuntingStatModifiersToSpec(
             applyEquipmentStats(
-                { ...applyStatAllocation(playerSpec, app.playerStatAllocation, true), teamId: HUNTING_TEAMS.PLAYER },
+                {
+                    ...applyStatAllocation(
+                        applyExperienceEffectsToBaseSpec(
+                            playerSpec,
+                            collectActiveExperienceEffects(app.playerProfile, run.characterId)
+                        ),
+                        app.playerStatAllocation,
+                        true
+                    ),
+                    teamId: HUNTING_TEAMS.PLAYER
+                },
                 app.playerProfile
             ),
             run.statModifiers

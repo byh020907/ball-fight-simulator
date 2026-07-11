@@ -24,6 +24,7 @@ import { getLevelRequirement, LEVEL_REWARDS, XP_SCALE } from "../src/experience/
 import { REWARD_BALANCE } from "../src/rewardBalanceConfig.js";
 import {
     applyExperienceEffectsToBall,
+    applyExperienceEffectsToBaseSpec,
     collectActiveExperienceEffects,
     getCharacterExperienceSummary,
     getExperienceRewardsBetween,
@@ -1815,29 +1816,72 @@ function testExperienceSystem() {
     profile.experience.byCharacter[FIGHTER_IDS.DASH].currentXp = getLevelRequirement(4);
     const playerSpec = {
         ...app.roster.find((fighter) => fighter.id === FIGHTER_IDS.DASH),
-        teamId: "xp-player"
+        teamId: "xp-player",
+        hero: null
     };
     const opponentSpec = {
         ...app.roster.find((fighter) => fighter.id !== FIGHTER_IDS.DASH),
         id: "xp-opponent",
         teamId: "xp-opponent"
     };
+    const levelEffects = collectActiveExperienceEffects(profile, playerSpec.id);
+    const allocation = { hp: 20, damage: 20, speed: 0, skill: 5, defense: 0 };
+    const baselineSpec = applyStatAllocation(playerSpec, allocation, true);
+    const rewardedSpec = applyStatAllocation(
+        applyExperienceEffectsToBaseSpec(playerSpec, levelEffects),
+        allocation,
+        true
+    );
+    const { multiplier } = calculateStatMultiplier(Object.values(allocation));
+    assert.equal(
+        rewardedSpec.stats.hp,
+        Number(((playerSpec.stats.hp + 2) * 1.2 * multiplier).toFixed(3)),
+        "HP reward should be included before the percentage stat multiplier"
+    );
+    assert.equal(
+        rewardedSpec.stats.damage,
+        Number(((playerSpec.stats.damage + 1) * 1.2 * multiplier).toFixed(3)),
+        "Damage reward should be included before the percentage stat multiplier"
+    );
+    assert.equal(rewardedSpec.stats.skill, 2, "Skill reward should add to the character base skill before allocation");
+    assert.ok(rewardedSpec.stats.hp - baselineSpec.stats.hp > 2, "Stat allocation should scale level-up HP rewards");
+    const equipmentProfile = createDefaultPlayerProfile();
+    equipmentProfile.experience.byCharacter[FIGHTER_IDS.DASH] = { currentXp: getLevelRequirement(4) };
+    const fixedDamageItem = {
+        instanceId: "experience-fixed-damage",
+        rarity: "common",
+        slot: "weapon",
+        stats: [{ type: "damage", value: 5 }]
+    };
+    equipmentProfile.equipment.inventory.push(fixedDamageItem);
+    equipmentProfile.equipment.equipped.weapon = fixedDamageItem.instanceId;
+    const equippedRewardedSpec = applyEquipmentStats(rewardedSpec, equipmentProfile);
+    assert.equal(
+        equippedRewardedSpec.stats.damage,
+        rewardedSpec.stats.damage + 5,
+        "Equipment should add a fixed stat after level rewards and percentage allocation"
+    );
+
     let preparedPlayer = null;
-    new BattleSimulation([playerSpec, opponentSpec], {
+    new BattleSimulation([equippedRewardedSpec, opponentSpec], {
         onBattleBallReady(ball) {
-            if (ball.id === playerSpec.id) {
-                applyExperienceEffectsToBall(ball, collectActiveExperienceEffects(profile, playerSpec.id));
+            if (ball.id === equippedRewardedSpec.id) {
+                applyExperienceEffectsToBall(ball, levelEffects);
                 preparedPlayer = ball;
             }
         }
     });
-    assert.equal(preparedPlayer.maxHp, playerSpec.stats.hp + 2, "HP reward should be applied to the battle ball");
+    assert.equal(
+        preparedPlayer.maxHp,
+        equippedRewardedSpec.stats.hp,
+        "Battle ball should receive the prepared HP base stat"
+    );
     assert.equal(
         preparedPlayer.stats.baseDamage,
-        playerSpec.stats.damage + 1,
-        "Damage reward should be applied to the battle ball"
+        equippedRewardedSpec.stats.damage,
+        "Battle ball should receive the prepared damage base stat"
     );
-    assert.equal(preparedPlayer.stats.allocation.skill, 2, "Skill reward should be applied through ball stats");
+    assert.equal(preparedPlayer.getSkillPoints(), 7, "Battle ball should combine base skill and allocated skill");
     applyExperienceEffectsToBall(preparedPlayer, [
         {
             type: "ability_modifier",

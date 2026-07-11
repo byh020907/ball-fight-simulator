@@ -30,6 +30,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             baseDamage: spec.stats.damage,
             baseDefense: spec.stats.defense,
             baseSpeed: spec.stats.speed,
+            baseSkill: spec.stats.skill ?? 0,
             baseRadius: spec.stats.radius,
             mass: spec.stats.mass,
             allocation: spec.statAllocation ?? null
@@ -135,6 +136,10 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
 
     getStatModifiers() {
         return this.ability ? this.ability.getStatModifiers() : { speed: 1, damage: 1, defense: 1, impact: 1 };
+    }
+
+    getSkillPoints() {
+        return this.stats.baseSkill + (this.stats.allocation?.skill ?? 0);
     }
 
     // ── 물리 디버그 래퍼 (원본 믹스인 메서드를 보존하고 기록 추가) ──

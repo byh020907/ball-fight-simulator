@@ -131,7 +131,7 @@ export function applyStatAllocation(fighter, allocation, isPlayer = false) {
         const pts = allocation[stat.key] ?? 0;
         if (!Number.isFinite(pts)) continue;
         if (stat.key === "skill") {
-            stats[stat.key] = pts;
+            stats[stat.key] = stats[stat.key] ?? 0;
         } else {
             stats[stat.key] = Number((stats[stat.key] * (1 + pts / 100) * multiplier).toFixed(3));
         }
