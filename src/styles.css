@@ -25,14 +25,6 @@ body {
     overflow-x: hidden;
 }
 
-body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    display: none;
-    pointer-events: none;
-}
-
 .app {
     width: min(1180px, calc(100vw - 32px));
     margin: 0 auto;
@@ -42,98 +34,6 @@ body::before {
     user-select: none;
     -webkit-user-select: none;
     caret-color: transparent;
-}
-
-.hero {
-    display: grid;
-    grid-template-columns: 1.2fr 0.8fr;
-    gap: 20px;
-    align-items: stretch;
-    margin-bottom: 20px;
-}
-
-.title-panel,
-.status-panel,
-.roster-panel,
-.log-panel {
-    border: 1px solid var(--panel-border);
-    background: var(--panel);
-    border-radius: 24px;
-}
-
-.title-panel {
-    padding: 28px;
-    position: relative;
-    overflow: hidden;
-}
-
-.title-panel::after {
-    content: "";
-    position: absolute;
-    inset: auto -10% -28% auto;
-    width: 220px;
-    height: 220px;
-    display: none;
-}
-
-.eyebrow {
-    font-size: 0.78rem;
-    letter-spacing: 0.28em;
-    text-transform: uppercase;
-    color: var(--accent-2);
-    margin-bottom: 10px;
-}
-
-h1 {
-    margin: 0;
-    font-size: clamp(2.3rem, 4vw, 4.3rem);
-    line-height: 0.94;
-    letter-spacing: -0.04em;
-    max-width: 10ch;
-}
-
-.subtitle {
-    margin: 18px 0 0;
-    max-width: 58ch;
-    color: var(--muted);
-    line-height: 1.55;
-    font-size: 1rem;
-}
-
-.status-panel {
-    padding: 24px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    gap: 18px;
-}
-
-.status-badge {
-    align-self: flex-start;
-    padding: 8px 14px;
-    border-radius: 999px;
-    background: #ffffff;
-    color: var(--success);
-    font-size: 0.82rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    border: 1px solid #28c84e;
-}
-
-.matchup {
-    font-size: clamp(1.8rem, 2vw, 2.6rem);
-    line-height: 1;
-    font-weight: 700;
-    letter-spacing: -0.03em;
-}
-
-.matchup small {
-    display: block;
-    margin-top: 10px;
-    font-size: 0.92rem;
-    color: var(--muted);
-    letter-spacing: 0.02em;
-    font-weight: 500;
 }
 
 .control-button {
@@ -161,28 +61,6 @@ h1 {
     opacity: 0.7;
 }
 
-.battle-layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 340px;
-    gap: 20px;
-}
-
-.arena-shell {
-    position: relative;
-    border-radius: 30px;
-    padding: 16px;
-    background: #ffffff;
-    border: 1px solid #202020;
-}
-
-.arena {
-    width: 100%;
-    display: block;
-    aspect-ratio: 16 / 9;
-    border-radius: 24px;
-    background: #ffffff;
-}
-
 .xp-reward {
     width: min(420px, 78vw);
     margin: 18px auto 0;
@@ -190,68 +68,6 @@ h1 {
     gap: 8px;
     text-align: left;
     color: #202020;
-}
-
-.roster-panel {
-    padding: 20px;
-    display: grid;
-    gap: 12px;
-    align-content: start;
-}
-
-.panel-title {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 8px;
-}
-
-.panel-title h2 {
-    margin: 0;
-    font-size: 1rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--muted);
-}
-
-.panel-title span {
-    font-size: 0.8rem;
-    color: var(--accent-2);
-    text-transform: uppercase;
-    letter-spacing: 0.18em;
-}
-
-.log-panel {
-    padding: 18px 20px 20px;
-    margin-top: 20px;
-}
-
-.legend {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    color: var(--muted);
-    font-size: 0.86rem;
-}
-
-.legend span {
-    padding: 8px 12px;
-    border-radius: 999px;
-    background: #ffffff;
-    border: 1px solid #202020;
-}
-
-@media (max-width: 940px) {
-    .hero,
-    .battle-layout {
-        grid-template-columns: 1fr;
-    }
-
-    .app {
-        width: min(100vw - 20px, 1180px);
-        padding-top: 18px;
-    }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -270,10 +86,6 @@ body {
     align-items: center;
     justify-content: center;
     padding: 8px;
-}
-
-body::before {
-    display: none;
 }
 
 .app {
@@ -306,6 +118,7 @@ body::before {
 }
 
 .arena-shell {
+    position: relative;
     padding: 0;
     border-radius: 0;
     background: #ffffff;
@@ -315,6 +128,8 @@ body::before {
 }
 
 .arena {
+    display: block;
+    width: 100%;
     aspect-ratio: 1 / 1;
     background: #ffffff;
     border-radius: 0;
@@ -385,16 +200,6 @@ body::before {
     display: none;
 }
 
-.debug-hidden {
-    display: block;
-}
-
-.hero,
-.roster-panel,
-.log-panel {
-    display: none !important;
-}
-
 @media (max-width: 760px) {
     body {
         overflow: hidden;
@@ -428,19 +233,6 @@ body::before {
         display: grid;
         grid-template-rows: minmax(0, 1fr) auto;
         gap: 6px;
-    }
-
-    .top-bar {
-        min-height: 48px;
-        padding: 6px 8px;
-    }
-
-    .top-bar .matchup {
-        font-size: 0.82rem;
-    }
-
-    .top-bar .matchup small {
-        font-size: 0.66rem;
     }
 
     .arena-shell {
@@ -523,71 +315,6 @@ body::before {
     }
 }
 
-.balance-badge {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex-shrink: 0;
-}
-
-.balance-badge__value {
-    font-size: 0.72rem;
-    color: #28c84e;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-}
-
-.balance-badge__info {
-    position: relative;
-    display: inline-flex;
-}
-
-.balance-badge__icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: #cccccc;
-    color: #ffffff;
-    font-size: 0.62rem;
-    font-weight: 700;
-    font-style: normal;
-    cursor: help;
-    line-height: 1;
-}
-
-.balance-badge__tooltip {
-    display: none;
-    position: absolute;
-    bottom: calc(100% + 8px);
-    right: 0;
-    width: 220px;
-    padding: 10px 12px;
-    border-radius: 8px;
-    background: #222222;
-    color: #eeeeee;
-    font-size: 0.72rem;
-    font-weight: 400;
-    line-height: 1.45;
-    text-align: left;
-    z-index: 100;
-    pointer-events: none;
-    white-space: normal;
-}
-
-.balance-badge__info:hover .balance-badge__tooltip,
-.balance-badge__info:focus-within .balance-badge__tooltip {
-    display: block;
-}
-
-@media (max-width: 420px) {
-    .balance-badge__tooltip {
-        width: 180px;
-        font-size: 0.68rem;
-    }
-}
 
 .help-section {
     margin-bottom: 14px;

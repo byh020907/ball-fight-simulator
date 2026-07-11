@@ -509,9 +509,6 @@ async function loadModuleApp() {
         locked: false,
         setState() {}
     });
-    const huntingBtnMock1 = { available: false, active: false, tournamentActive: false };
-    uiManager.register("huntingButton", huntingBtnMock1);
-    globalThis.Alpine.store("huntingButton", huntingBtnMock1);
     uiManager.register("fighterStrip", {
         fighters: []
     });
@@ -638,8 +635,6 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
         locked: false,
         setState() {}
     });
-    const huntingBtnMock2 = { available: false, active: false, tournamentActive: false };
-    uiManager.register("huntingButton", huntingBtnMock2);
     uiManager.register("fighterStrip", {
         fighters: []
     });
@@ -720,7 +715,6 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
     };
     Object.assign(globalThis, harness.context);
     globalThis.Alpine.store("gameOverlay", overlayMock2);
-    globalThis.Alpine.store("huntingButton", huntingBtnMock2);
     const moduleUrl = new URL(`../src/app.js?test=${Date.now()}`, import.meta.url).href;
     const { BattleApp } = await import(moduleUrl);
     const app = new BattleApp();
@@ -9862,80 +9856,6 @@ async function testHuntingEndToEnd() {
     console.log("[hunting-end-to-end] ok");
 }
 
-// ── Hunting button state sync regression tests ──
-
-async function testHuntingButtonInitialHidden() {
-    const { app } = await loadModuleAppWithInitialAlpineAllocation({
-        hp: 10,
-        damage: 10,
-        speed: 10,
-        skill: 0,
-        defense: 0
-    });
-    assert.ok(app._huntingBtn != null, "huntingButton should be registered");
-    assert.equal(app._huntingBtn.available, false, "default profile has no wins -> not eligible");
-    assert.equal(app._huntingBtn.active, false, "no active hunt");
-    assert.equal(app._huntingBtn.tournamentActive, false, "no active tournament");
-    const visible = app._huntingBtn.available && !app._huntingBtn.tournamentActive && !app._huntingBtn.active;
-    assert.equal(visible, false, "button hidden with no eligible character");
-    console.log("[hunting-button-initial-hidden] ok");
-}
-
-async function testHuntingButtonShowsWithEligible() {
-    const { app } = await loadModuleAppWithInitialAlpineAllocation({
-        hp: 10,
-        damage: 10,
-        speed: 10,
-        skill: 0,
-        defense: 0
-    });
-    const fighterId = app.roster[0].id;
-    app.playerProfile.collection.characters[fighterId] = { tournamentWins: 1 };
-    app.refreshPlayerSetup();
-    assert.equal(app._huntingBtn.available, true, "character with win -> eligible");
-    assert.equal(app._huntingBtn.active, false, "no active hunt");
-    assert.equal(app._huntingBtn.tournamentActive, false, "no active tournament");
-    const visible = app._huntingBtn.available && !app._huntingBtn.tournamentActive && !app._huntingBtn.active;
-    assert.equal(visible, true, "button visible with eligible character");
-    console.log("[hunting-button-shows-eligible] ok");
-}
-
-async function testHuntingButtonHiddenDuringActiveHunt() {
-    const { app } = await loadModuleAppWithInitialAlpineAllocation({
-        hp: 10,
-        damage: 10,
-        speed: 10,
-        skill: 0,
-        defense: 0
-    });
-    app.setHuntingActive(true);
-    assert.equal(app._huntingBtn.active, true, "active hunt -> active true");
-    const visible = app._huntingBtn.available && !app._huntingBtn.tournamentActive && !app._huntingBtn.active;
-    assert.equal(visible, false, "button hidden during active hunt");
-    app.setHuntingActive(false);
-    assert.equal(app._huntingBtn.active, false, "after retreat -> active false");
-    console.log("[hunting-button-hidden-active-hunt] ok");
-}
-
-async function testHuntingButtonHiddenDuringTournament() {
-    const { app } = await loadModuleAppWithInitialAlpineAllocation({
-        hp: 10,
-        damage: 10,
-        speed: 10,
-        skill: 0,
-        defense: 0
-    });
-    app.tournament = { champion: null };
-    app.refreshPlayerSetup();
-    assert.equal(app._huntingBtn.tournamentActive, true, "tournament without champion -> tournamentActive true");
-    const visibleDuring = app._huntingBtn.available && !app._huntingBtn.tournamentActive && !app._huntingBtn.active;
-    assert.equal(visibleDuring, false, "button hidden during active tournament");
-    app.tournament = { champion: {} };
-    app.refreshPlayerSetup();
-    assert.equal(app._huntingBtn.tournamentActive, false, "tournament with champion -> tournamentActive false");
-    console.log("[hunting-button-hidden-tournament] ok");
-}
-
 // ── Strict UI component contract regression ──
 
 async function testUiManagerRequireComponentResolvesAll() {
@@ -9950,7 +9870,6 @@ async function testUiManagerRequireComponentResolvesAll() {
     resolved.strip = app._strip !== undefined && app._strip !== null;
     resolved.root = app._root !== undefined && app._root !== null;
     resolved.toast = app._toast !== undefined && app._toast !== null;
-    resolved.huntingBtn = app._huntingBtn !== undefined && app._huntingBtn !== null;
 
     const allResolved = Object.values(resolved).every(Boolean);
     if (!allResolved) {
@@ -9959,7 +9878,7 @@ async function testUiManagerRequireComponentResolvesAll() {
             .map(([key]) => key);
         console.log(`[ui-manager-require-resolves-all] FAIL: missing ${missing.join(", ")}`);
     }
-    assert.ok(allResolved, "All 9 required UI components must be resolved at startup via uiManager.requireComponent");
+    assert.ok(allResolved, "All 8 required UI components must be resolved at startup via uiManager.requireComponent");
     console.log("[ui-manager-require-resolves-all] ok");
 }
 
@@ -9976,7 +9895,6 @@ async function testUiManagerRequireComponentMissingFails() {
         setHuntingState() {}
     });
     uiManagerStore.register("startButton", { hidden: true, setState() {} });
-    uiManagerStore.register("huntingButton", { available: false, active: false, tournamentActive: false });
     uiManagerStore.register("fighterStrip", { fighters: [] });
     uiManagerStore.register("playerPanel", {
         fighter: null,
@@ -10017,10 +9935,10 @@ async function testUiManagerRequireComponentNoRemainingGuards() {
     const productionLineErrors = [];
 
     const forbiddenPatterns = [
-        /if\s*\(\s*this\._(bracket|overlay|startBtn|log|strip|root|toast|huntingBtn)\b/,
-        /if\s*\(\s*!this\._(bracket|overlay|startBtn|log|strip|root|toast|huntingBtn)\b/,
+        /if\s*\(\s*this\._(bracket|overlay|startBtn|log|strip|root|toast)\b/,
+        /if\s*\(\s*!this\._(bracket|overlay|startBtn|log|strip|root|toast)\b/,
         /this\._panel\?\./,
-        /this\._(bracket|overlay|startBtn|log|strip|root|toast|huntingBtn)\s*\?\./
+        /this\._(bracket|overlay|startBtn|log|strip|root|toast)\s*\?\./
     ];
 
     for (const pattern of forbiddenPatterns) {
@@ -10213,10 +10131,6 @@ await testPatchNotesServiceUsesUiManagerRequire();
 await testPlayerPanelAllocationContract(app);
 await testPlayerPanelAllocationContractBoundary(app);
 
-await testHuntingButtonInitialHidden();
-await testHuntingButtonShowsWithEligible();
-await testHuntingButtonHiddenDuringActiveHunt();
-await testHuntingButtonHiddenDuringTournament();
 await testActionGateway();
 await testHuntingEndToEnd();
 await testNoGameBridgeInProduction();

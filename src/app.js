@@ -142,7 +142,6 @@ export class BattleApp {
         this._strip = Alpine.store("uiManager").requireComponent("fighterStrip");
         this._root = Alpine.store("uiManager").requireComponent("appRoot");
         this._toast = Alpine.store("uiManager").requireComponent("toastNotification");
-        this._huntingBtn = Alpine.store("uiManager").requireComponent("huntingButton");
         this.ui = {
             get logItems() {
                 return self._log.items;
@@ -202,13 +201,8 @@ export class BattleApp {
     }
 
     // ── HuntingManager backward-compat ──
-    _syncHuntingButton() {
-        this._huntingBtn.available = getEligibleHuntingCharacters(this.playerProfile, this.roster).length > 0;
-        this._huntingBtn.tournamentActive = Boolean(this.tournament && !this.tournament.champion);
-    }
     setHuntingActive(active) {
-        this._huntingBtn.active = Boolean(active);
-        this._syncHuntingButton();
+        // huntingButton 제거됨 — 게임 모드 선택 카드로 통합
     }
     setHuntingOverlayState(data) {
         this._overlay.setHuntingState(data);
@@ -224,6 +218,11 @@ export class BattleApp {
     }
     showToast(message) {
         this._toast.show(message);
+    }
+
+    showGameModeSelect() {
+        const canHunt = getEligibleHuntingCharacters(this.playerProfile, this.roster).length > 0;
+        this._overlay.showGameModeSelect({ canHunt });
     }
 
     pickPlayerFighterId() {
@@ -457,7 +456,7 @@ export class BattleApp {
         const remaining = this._panel.remainingPoints ?? 0;
         this._startBtn.setState({
             disabled: remaining > 0,
-            text: this.tournament?.champion ? "다시 시작" : remaining > 0 ? `스탯 ${remaining} 남음` : "토너먼트 시작",
+            text: this.tournament?.champion ? "다시 시작" : undefined,
             hidden: false
         });
     }
@@ -512,7 +511,6 @@ export class BattleApp {
         });
         const experienceSummary = getCharacterExperienceSummary(this.playerProfile, this.playerFighterId);
         const equipmentSummary = this._getPlayerEquipmentSummary(this.playerFighterId);
-        this._syncHuntingButton();
         this._panel.fighter = player ? { name: player.name, title: player.title, color: player.color } : null;
         this._panel.allocation = { ...this.playerStatAllocation };
         this._panel.totalPoints = effectiveTotal;

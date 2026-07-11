@@ -126,6 +126,9 @@ export class HuntingManager {
         const stageId = getSelectedHuntingStageId(this.app.playerProfile);
         this._run = createHuntingRun({ characterId, stageId });
         this.app.playerFighterId = characterId;
+        // UI에서 할당한 스탯을 게임 상태로 동기화 (토너먼트와 동일한 흐름)
+        this.app._syncPlayerStatAllocationFromUi();
+        this.app.refreshPlayerSetup();
         this.app.setHuntingActive(true);
         this.app.setHuntingOverlayState({ huntingChoiceVisible: false });
         const stage = getHuntingStage(stageId);
@@ -316,6 +319,7 @@ export class HuntingManager {
                 return;
             }
 
+            app.refreshPlayerSetup();
             app.showOverlay("사냥터", `${name} 승리!`, subtext);
             const hud = this._getLootHudState();
             app.setHuntingOverlayState({

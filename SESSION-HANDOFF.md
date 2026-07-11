@@ -1,5 +1,32 @@
 # 결정 기록
 
+## [L1] 2026-07-11 — 게임 시작 UI: 모드 선택 카드 도입 (토너먼트/사냥터)
+
+- 맥락: 사용자 요청으로 "토너먼트 시작" 단일 버튼 대신 "게임 시작" 버튼 → 모드 선택 카드(토너먼트/사냥터) 2단계 플로우로 개편. 사냥터 접근성을 높이고 신규 사용자에게 선택지를 명확히 제시.
+- 결정:
+  (1) `start-button.html` — 버튼 텍스트 "토너먼트 시작" → "게임 시작", 클릭 시 `showGameModeSelect()` 호출.
+  (2) `game-overlay.html` — 새 `gameModeSelectVisible` 상태 + 카드형 UI (⚔️토너먼트 / 🏹사냥터). 사냥터는 우승 캐릭터 없으면 비활성 + "토너먼트 우승 후 해금" 안내.
+  (3) `componentBridge.js` — `showGameModeSelect()` 액션 추가.
+  (4) `app.js` — `_syncStartButton()` 텍스트 "게임 시작"으로 변경, `showGameModeSelect()` 메서드 추가 (사냥터 가능 여부 전달).
+- 영향: `src/components/start-button.html`, `src/components/game-overlay.html`, `src/componentBridge.js`, `src/app.js`
+- 검증: `npm test`, `npm run format:check`, `npm run check` 통과
+
+## [L3] 2026-07-11 — styles.css 죽은 CSS 전면 제거 (구 레이아웃 잔재 정리)
+
+- 맥락: 이전 레이아웃(hero/status/matchup)에서 Alpine 컴포넌트로 마이그레이션된 후, 구 CSS 206줄이 `display: none !important`로 숨겨만 있고 제거되지 않음. 사용하지 않는 `.hero`, `.title-panel`, `.status-panel`, `.roster-panel`, `.log-panel`, `.eyebrow`, `h1`, `.subtitle`, `.status-badge`, `.matchup`, `.battle-layout`, `.panel-title`, `.legend`, `.top-bar`, `.debug-hidden`, `.balance-badge` 및 구 `.arena-shell`/`.arena` 정의, 죽은 `@media (max-width: 940px)` 블록, `body::before` 더미 등을 전량 제거.
+- 결정: styles.css에서 사용되지 않는 모든 CSS 규칙 제거. 588줄 → 382줄 (206줄 감소, 약 35%).
+- 영향: `src/styles.css`
+- 검증: `npm test`, `npm run format:check`, `npm run check` 통과
+
+## [L3] 2026-07-11 — 사냥터 진입/전투 후 패널 UI 동기화 누락 수정
+
+- 맥락: 사냥터 진입 시 `startRun()`이 `playerFighterId`를 변경하지만 `refreshPlayerSetup()`을 호출하지 않아 패널 UI가 이전 캐릭터/상태로 남음. 또한 `_syncPlayerStatAllocationFromUi()` 동기화가 누락되어 토너먼트 진입(`startTournament`)과 달리 UI→게임 상태 싱크가 보장되지 않음. 일반 전투 승리 후에도 `refreshPlayerSetup()`이 호출되지 않아 XP 등 패널 정보가 갱신되지 않음.
+- 결정:
+  (1) `huntingManager.startRun()`에서 `playerFighterId` 변경 직후 `_syncPlayerStatAllocationFromUi()` + `refreshPlayerSetup()` 호출하여 UI→게임 상태 동기화 및 패널 갱신.
+  (2) `_handleFinish` 일반 승리 경로에서 `showOverlay` 직전 `refreshPlayerSetup()` 호출하여 보스/패배 경로와 일관성 확보.
+- 영향: `src/hunting/huntingManager.js` (startRun 2줄 추가, _handleFinish 1줄 추가)
+- 검증: `npm test`, `npm run format:check`, `npm run check`, `node scripts/huntingUserScenario.mjs` 통과
+
 ## [L1] 2026-07-11 — UI 컴포넌트 접근을 Alpine store 소유권으로 통일
 - 맥락: `window.uiManager` 전역을 통해 UI 컴포넌트를 조회하면 Alpine store가 실제 소유자라는 사실이 가려지고, 템플릿 표현식도 전역 객체에 의존하게 됨.
 - 결정: Alpine 템플릿의 UI 컴포넌트 조회는 `$store.uiManager`만 사용한다. 컴포넌트 정의 스크립트와 일반 ES 모듈은 `Alpine.store("uiManager")`를 사용한다. `window.uiManager` 별칭은 제거한다.

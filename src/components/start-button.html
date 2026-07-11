@@ -5,10 +5,10 @@
     x-data="startButton"
     x-bind:class="{ hidden: hidden }"
     x-bind:disabled="disabledOverride !== null ? disabledOverride : (remainingPoints > 0 || locked)"
-    x-text="textOverride !== null ? textOverride : (remainingPoints > 0 ? '스탯 ' + remainingPoints + ' 남음' : '토너먼트 시작')"
-    @click="startTournament()"
+    x-text="textOverride !== null ? textOverride : (remainingPoints > 0 ? '스탯 ' + remainingPoints + ' 남음' : '게임 시작')"
+    @click="handleClick()"
 >
-    토너먼트 시작
+    게임 시작
 </button>
 <script>
     window.createGameUI("startButton", () => ({
@@ -17,8 +17,13 @@
         textOverride: null,
         remainingPoints: 0,
         locked: false,
-        startTournament() {
-            window.requireGameActionBridge("startTournament").startTournament();
+        handleClick() {
+            if (this.textOverride !== null) {
+                // 특수 상태(확인/다시 시작 등) — 기존 startTournament 흐름
+                window.requireGameActionBridge("startTournament").startTournament();
+            } else {
+                window.requireGameActionBridge("showGameModeSelect").showGameModeSelect();
+            }
         },
         setState({ disabled, text, hidden } = {}) {
             if (hidden !== undefined) this.hidden = Boolean(hidden);
