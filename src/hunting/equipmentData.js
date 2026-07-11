@@ -63,6 +63,12 @@ export const EQUIPMENT = Object.freeze({
         LEGENDARY: EQUIPMENT_BALANCE.statRanges.legendary
     }),
     STAT_VALUE_UNITS: EQUIPMENT_BALANCE.statValueUnits,
+    NAME_PREFIXES: Object.freeze({
+        hp: Object.freeze(["튼튼한", "활력의", "거인의"]),
+        damage: Object.freeze(["맹공의", "날카로운", "파괴의"]),
+        defense: Object.freeze(["수호자의", "견고한", "철벽의"]),
+        speed: Object.freeze(["질풍의", "신속의", "바람의"])
+    }),
     SPECIALS: Object.freeze({
         CHANCES: Object.freeze({
             COMMON: EQUIPMENT_BALANCE.specialChances.common,

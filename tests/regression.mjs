@@ -106,9 +106,11 @@ import {
     equipEquipmentItem,
     getEquipmentRequiredLevel,
     EQUIPMENT_STAT_VALUE_UNITS,
+    EQUIPMENT_NAME_PREFIXES,
     ENHANCE_MAX_LEVEL
 } from "../src/hunting/equipmentConfig.js";
 import { EQUIPMENT } from "../src/hunting/equipmentData.js";
+import { createEquipmentName, getDominantEquipmentStat } from "../src/hunting/equipmentNaming.js";
 import { createHuntingTerrain } from "../src/terrain/terrainFactory.js";
 import { TERRAIN_SHAPES } from "../src/terrain/terrainConfig.js";
 import { resolveTerrainCollision, resolveTerrainCollisions } from "../src/terrain/terrainCollision.js";
@@ -2730,6 +2732,33 @@ function testEquipmentStatValueUnits() {
         "Common speed rolls should convert one value unit into speed +5"
     );
     console.log("[equipment-stat-value-units] ok");
+}
+
+function testEquipmentNaming() {
+    const stats = [
+        { type: "hp", value: 20 },
+        { type: "speed", value: 15 }
+    ];
+    assert.equal(
+        getDominantEquipmentStat(stats, EQUIPMENT_STAT_VALUE_UNITS),
+        "speed",
+        "Equipment names should use the stat with the highest normalized combat value"
+    );
+    assert.deepEqual(
+        createEquipmentName("철검", stats, {
+            statValueUnits: EQUIPMENT_STAT_VALUE_UNITS,
+            prefixes: EQUIPMENT_NAME_PREFIXES,
+            rng: () => 0
+        }),
+        { name: "질풍의 철검", primaryStatType: "speed" },
+        "Equipment names should combine one primary-stat prefix with the base name"
+    );
+
+    const item = createEquipmentInstance({ rarity: "common", slot: "weapon", rng: () => 0 });
+    assert.equal(item.baseName, "녹슨 검", "Generated equipment should retain its base name");
+    assert.equal(item.primaryStatType, "hp", "Generated equipment should store its primary stat type");
+    assert.equal(item.name, "튼튼한 녹슨 검", "Generated equipment should show its primary-stat prefix");
+    console.log("[equipment-naming] ok");
 }
 
 function testEquipmentLevelRequirement() {
@@ -6644,6 +6673,7 @@ testHuntingStageSelectionAndArenaTheme();
 testHuntingTerrain();
 testEquipmentEnhancement();
 testEquipmentStatValueUnits();
+testEquipmentNaming();
 testEquipmentLevelRequirement();
 testEquipmentDraw();
 testAlpineTemplateComponentSystem();

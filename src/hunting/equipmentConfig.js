@@ -1,5 +1,6 @@
 import { EQUIPMENT } from "./equipmentData.js";
 import { getLevelFromXp } from "../experience/experienceState.js";
+import { createEquipmentName } from "./equipmentNaming.js";
 
 export const EQUIPMENT_SLOTS = Object.freeze(Object.values(EQUIPMENT.SLOTS));
 export const EQUIPMENT_RARITIES = EQUIPMENT.RARITIES;
@@ -23,6 +24,7 @@ export const SPECIAL_OPTION_CHANCES = Object.freeze(
 export const SPECIAL_OPTION_POOL = EQUIPMENT.SPECIALS.POOL;
 export const STAT_TYPES = EQUIPMENT.STAT_TYPES;
 export const EQUIPMENT_STAT_VALUE_UNITS = EQUIPMENT.STAT_VALUE_UNITS;
+export const EQUIPMENT_NAME_PREFIXES = EQUIPMENT.NAME_PREFIXES;
 export const EQUIPMENT_LEVEL_REQUIREMENTS = Object.freeze(
     Object.fromEntries(Object.entries(EQUIPMENT.LEVEL_REQUIREMENTS).map(([key, val]) => [key.toLowerCase(), val]))
 );
@@ -92,7 +94,7 @@ export function createEquipmentInstance({ rarity = "common", slot = null, rng = 
     const assignedSlot =
         slot && EQUIPMENT_SLOTS.some((s) => s.id === slot) ? slot : pickRandom(EQUIPMENT_SLOTS, rng).id;
 
-    const name = pickRandom(EQUIPMENT_NAMES[assignedSlot][safeRarity], rng);
+    const baseName = pickRandom(EQUIPMENT_NAMES[assignedSlot][safeRarity], rng);
     const description = EQUIPMENT_DESCRIPTIONS[assignedSlot][safeRarity];
 
     const statCount = rollInt(range.statCount.min, range.statCount.max, rng);
@@ -114,12 +116,21 @@ export function createEquipmentInstance({ rarity = "common", slot = null, rng = 
         specialOptions = [{ type: option.type, value }];
     }
 
+    // Special options are intentionally excluded until their combat effects are implemented.
+    const { name, primaryStatType } = createEquipmentName(baseName, stats, {
+        statValueUnits: EQUIPMENT_STAT_VALUE_UNITS,
+        prefixes: EQUIPMENT_NAME_PREFIXES,
+        rng
+    });
+
     _eqCounter++;
     return {
         instanceId: `eq-${Date.now()}-${_eqCounter}-${Math.floor(rng() * 1_000_000)}`,
         rarity: safeRarity,
         slot: assignedSlot,
         name,
+        baseName,
+        primaryStatType,
         description,
         stats,
         specialOptions,
