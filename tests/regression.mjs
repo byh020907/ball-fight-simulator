@@ -1035,6 +1035,11 @@ async function testGrenadeScatterShot(app) {
         assert.ok(g.timer > 0, "Each grenade should have a fuse timer");
     }
     const longestFuse = Math.max(...allGrenades().map((grenade) => grenade.maxTimer));
+    const shortestFuse = Math.min(...allGrenades().map((grenade) => grenade.maxTimer));
+    assert.ok(
+        Math.abs(shortestFuse - grenadeFighter.ability.cooldown * 0.2) < 0.001,
+        "The first grenade fuse should equal 20% of the effective grenade cooldown"
+    );
     assert.ok(
         Math.abs(longestFuse - grenadeFighter.ability.cooldown) < 0.001,
         "The longest grenade fuse should match the effective grenade cooldown"
