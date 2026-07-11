@@ -470,6 +470,7 @@ export class BattleApp {
         const remaining = this._panel.remainingPoints ?? 0;
         const isChampion = Boolean(this.tournament?.champion);
         const modeText = this._gameMode === "hunting" ? "사냥터 입장" : "토너먼트 시작";
+        this._startBtn.remainingPoints = remaining;
         this._startBtn.setState({
             disabled: remaining > 0,
             text: isChampion ? "다시 시작" : undefined,

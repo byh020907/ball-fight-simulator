@@ -1230,6 +1230,26 @@ function testComponentBridgeCallsGameHandlers(app) {
     assert.equal(advanced, true, "Overlay advance action should call HuntingManager.advance");
 }
 
+function testStartButtonReceivesRemainingStatPoints(app) {
+    const previousRemaining = app._panel.remainingPoints;
+
+    try {
+        app._panel.remainingPoints = 100;
+        app._syncStartButton();
+
+        assert.equal(
+            app._startBtn.remainingPoints,
+            100,
+            "Start button should receive remaining points so its disabled state explains the requirement"
+        );
+    } finally {
+        app._panel.remainingPoints = previousRemaining;
+        app._syncStartButton();
+    }
+
+    console.log("[start-button-remaining-points] ok");
+}
+
 function testHuntingUiRouteDisplay() {
     // HuntingManager._setHuntingMoveState가 route range를 올바르게 전달하는지 검증
     const recorded = { calls: [] };
@@ -6896,6 +6916,7 @@ testNoAbilityStandardBallSupport();
 testShuffledUtility();
 testStatAllocationRules(app);
 testComponentBridgeCallsGameHandlers(app);
+testStartButtonReceivesRemainingStatPoints(app);
 testHuntingUiRouteDisplay();
 await testHuntingEarlyEventUi();
 testComponentBridgeEquipmentFunctions();
