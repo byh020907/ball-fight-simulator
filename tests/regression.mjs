@@ -1000,7 +1000,8 @@ async function testCollisionImpulsePersists(app) {
 }
 
 async function testGrenadeScatterShot(app) {
-    const grenade = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.GRENADE);
+    const grenadeBase = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.GRENADE);
+    const grenade = { ...grenadeBase, stats: { ...grenadeBase.stats, speed: 580 } };
     const opponent = app.roster.find((f) => f.id !== FIGHTER_IDS.GRENADE);
     const sim = new BattleSimulation([grenade, opponent], { onLog() {}, onSound() {} });
     const grenadeFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.GRENADE);
@@ -1023,7 +1024,10 @@ async function testGrenadeScatterShot(app) {
     assert.ok(total >= 3, "Grenade should fire 3-5 grenades in burst");
     assert.ok(total <= 5, "Grenade should fire at most 5 grenades total");
     for (const g of allGrenades()) {
-        assert.ok(g.velocity.length() > 0, "Each grenade should have velocity");
+        assert.ok(
+            Math.abs(g.velocity.length() - 1600) < 0.001,
+            "Grenade speed should scale with the owner's base speed"
+        );
         assert.ok(g.timer > 0, "Each grenade should have a fuse timer");
     }
 }
@@ -7233,7 +7237,30 @@ function testGrenadeHighSpeedProximityTrigger() {
     grenade.update(0.08, sim);
 
     assert.ok(grenade._proximityTriggered, "High-speed grenade should trigger while crossing the explosion range");
-    assert.ok(grenade.timer < 0.2, "High-speed grenade should shorten its fuse more than the reference speed");
+    assert.equal(grenade._proximityFuseMultiplier, 6, "High-speed grenade should cap proximity fuse drain at 6x");
+    assert.ok(Math.abs(grenade.timer - 0.52) < 0.001, "High-speed grenade should drain its fuse at the capped 6x rate");
+}
+
+function testGrenadeProximityFuseMultiplier() {
+    const grenadeFighter = app.roster.find((fighter) => fighter.ability === "grenade");
+    const archer = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
+    const sim = new BattleSimulation([grenadeFighter, archer], { onLog() {}, onSound() {} });
+    const owner = sim.fighters.find((fighter) => fighter.id === grenadeFighter.id);
+    const target = sim.fighters.find((fighter) => fighter.id === archer.id);
+
+    owner.position = new Vector2(400, 480);
+    target.position = new Vector2(420, 480);
+    const grenade = new Grenade(owner, new Vector2(1200, 480), 1);
+    grenade.position = owner.position.clone();
+    grenade.velocity = new Vector2(800, 0);
+
+    grenade.update(0.1, sim);
+
+    assert.equal(grenade._proximityFuseMultiplier, 3, "Reference projectile speed should drain the fuse at 3x");
+    assert.ok(
+        Math.abs(grenade.timer - 0.7) < 0.001,
+        "Reference projectile speed should consume 0.3 seconds per 0.1 seconds"
+    );
 }
 
 function testGrenadeExplosionRangeMatchesVisualEffect() {
@@ -7301,6 +7328,7 @@ testCompleteChallengeTournament();
 testFormatBonusSummary();
 testGrenadeProximityTrigger();
 testGrenadeHighSpeedProximityTrigger();
+testGrenadeProximityFuseMultiplier();
 testGrenadeExplosionRangeMatchesVisualEffect();
 await testPpoActorCriticUtilities();
 await testNewCharactersRegistered(app);

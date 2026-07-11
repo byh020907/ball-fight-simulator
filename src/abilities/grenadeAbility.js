@@ -5,7 +5,9 @@ const GRENADE_COOLDOWN = 3.5;
 const BURST_COUNT_MIN = 3;
 const BURST_COUNT_MAX = 5;
 const BURST_INTERVAL = 0.12;
-const SCATTER_SPEED = 800;
+const BASE_GRENADE_SPEED = 290;
+const BASE_PROJECTILE_SPEED = 800;
+const PROJECTILE_SPEED_MULTIPLIER = BASE_PROJECTILE_SPEED / BASE_GRENADE_SPEED;
 const FUSE_FIRST = 0.6;
 const FUSE_LAST = 2.0;
 
@@ -51,7 +53,8 @@ export class GrenadeAbility extends Ability {
 
         const angle = Math.random() * Math.PI * 2;
         const dir = Vector2.fromAngle(angle, 1);
-        const targetPos = Vector2.add(this.owner.position, dir.clone().scale(SCATTER_SPEED * fuse));
+        const projectileSpeed = (this.owner.stats?.baseSpeed ?? BASE_GRENADE_SPEED) * PROJECTILE_SPEED_MULTIPLIER;
+        const targetPos = Vector2.add(this.owner.position, dir.clone().scale(projectileSpeed * fuse));
 
         this.simulation.spawnGrenade(this.owner, targetPos, fuse);
 

@@ -1,9 +1,7 @@
 import { CombatEntity, dealProjectileDamage, Vector2 } from "../core.js";
 
-const PROXIMITY_REFERENCE_SPEED = 800;
-const PROXIMITY_MIN_FUSE_REDUCTION = 0.2;
-const PROXIMITY_FUSE_REDUCTION_AT_REFERENCE_SPEED = 0.4;
-const PROXIMITY_MAX_FUSE_REDUCTION = 0.85;
+const PROXIMITY_FUSE_BASE_MULTIPLIER = 3;
+const PROXIMITY_FUSE_MAX_MULTIPLIER = 6;
 const EXPLOSION_RADIUS = 174;
 const EXPLOSION_INNER_RADIUS = 72;
 
@@ -17,6 +15,8 @@ export class Grenade extends CombatEntity {
         this.ownerId = owner.id;
         this.timer = safeFuse;
         this.maxTimer = this.timer;
+        this.launchSpeed = drift.length();
+        this._proximityFuseMultiplier = 1;
         this.explosionRadius = EXPLOSION_RADIUS;
         this.innerRadius = EXPLOSION_INNER_RADIUS;
         this.bounces = 0;
@@ -38,15 +38,15 @@ export class Grenade extends CombatEntity {
             }
         }
 
-        // 이동 경로가 상대 폭발권을 스치면 탄속에 비례해 퓨즈를 단축한다.
+        // 이동 경로가 상대 폭발권을 스치면 탄속 비례로 퓨즈 소모 속도를 높인다.
         if (!this._proximityTriggered) {
             const target = simulation.getOpponent(this.owner);
             if (target && !target.flags.defeated && this._crossedExplosionRange(previousPosition, target.position)) {
-                this._reduceFuseForProximity(travelSpeed);
+                this._activateProximityFuse(travelSpeed);
             }
         }
 
-        this.timer -= delta;
+        this.timer -= delta * this._proximityFuseMultiplier;
         if (this.timer > 0) {
             return;
         }
@@ -66,13 +66,12 @@ export class Grenade extends CombatEntity {
         return Vector2.subtract(targetPosition, closestPoint).length() <= this.explosionRadius;
     }
 
-    _reduceFuseForProximity(travelSpeed) {
-        const speedRatio = travelSpeed / PROXIMITY_REFERENCE_SPEED;
-        const reduction = Math.max(
-            PROXIMITY_MIN_FUSE_REDUCTION,
-            Math.min(PROXIMITY_MAX_FUSE_REDUCTION, PROXIMITY_FUSE_REDUCTION_AT_REFERENCE_SPEED * speedRatio)
+    _activateProximityFuse(travelSpeed) {
+        const speedRatio = travelSpeed / Math.max(1, this.launchSpeed);
+        this._proximityFuseMultiplier = Math.max(
+            PROXIMITY_FUSE_BASE_MULTIPLIER,
+            Math.min(PROXIMITY_FUSE_MAX_MULTIPLIER, PROXIMITY_FUSE_BASE_MULTIPLIER * speedRatio)
         );
-        this.timer *= 1 - reduction;
         this._proximityTriggered = true;
     }
 

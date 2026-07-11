@@ -39,7 +39,7 @@ export function createRoster() {
             name: "Grenade Ball",
             title: "Blast Arc",
             description:
-                "상대 방향 120° 범위에서 2~4개의 수류탄을 순차 발사합니다. 첫발 0.6초~마지막 2.0초로 지연 폭발하며 벽에 최대 4회 튕깁니다.",
+                "360도 무작위로 3~5개의 수류탄을 순차 발사합니다. 탄속은 현재 기본 속도의 2.76배이며, 첫발 0.6초~마지막 2.0초로 지연 폭발하고 벽에 최대 4회 튕깁니다.",
             color: "#ff7676",
             face: "grenade",
             ability: "grenade",
