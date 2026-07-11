@@ -446,10 +446,10 @@ async function loadModuleApp() {
             if (st !== undefined) this.subtext = st;
             if (xpReward) {
                 this.xpReward = xpReward;
-                const rp = window.uiManager?.getComponent("xpRewardPanel");
+                const rp = Alpine.store("uiManager").getComponent("xpRewardPanel");
                 if (rp) rp.animate(xpReward);
             } else {
-                const rp = window.uiManager?.getComponent("xpRewardPanel");
+                const rp = Alpine.store("uiManager").getComponent("xpRewardPanel");
                 if (rp) rp.hide();
             }
             this.visible = true;
@@ -607,10 +607,10 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
             if (st !== undefined) this.subtext = st;
             if (xpReward) {
                 this.xpReward = xpReward;
-                const rp = window.uiManager?.getComponent("xpRewardPanel");
+                const rp = Alpine.store("uiManager").getComponent("xpRewardPanel");
                 if (rp) rp.animate(xpReward);
             } else {
-                const rp = window.uiManager?.getComponent("xpRewardPanel");
+                const rp = Alpine.store("uiManager").getComponent("xpRewardPanel");
                 if (rp) rp.hide();
             }
             this.visible = true;
@@ -9299,14 +9299,14 @@ function testActionPickerServiceIdAndConcurrency() {
     globalThis.document = { addEventListener() {} };
 
     // Mock uiManager with actionPicker
-    const origGetComponent = window.uiManager?.getComponent;
-    if (!window.uiManager) window.uiManager = { getComponent: () => null, requireComponent: () => null };
+    const uiManager = Alpine.store("uiManager");
+    const origGetComponent = uiManager.getComponent.bind(uiManager);
 
     let resolvePromise = null;
     let pickerVisible = false;
     let pickerCards = [];
 
-    window.uiManager.getComponent = (id) => {
+    uiManager.getComponent = (id) => {
         if (id === "actionPicker") {
             return {
                 show(cards) {
@@ -9318,7 +9318,7 @@ function testActionPickerServiceIdAndConcurrency() {
                 }
             };
         }
-        return origGetComponent ? origGetComponent.call(window.uiManager, id) : null;
+        return origGetComponent ? origGetComponent(id) : null;
     };
 
     // Start show and immediately resolve with index 1
@@ -9360,10 +9360,11 @@ function testActionPickerConcurrency() {
         }
     };
 
-    const origGetComponent = window.uiManager?.getComponent;
-    window.uiManager.getComponent = (id) => {
+    const uiManager2 = Alpine.store("uiManager");
+    const origGetComponent = uiManager2.getComponent.bind(uiManager2);
+    uiManager2.getComponent = (id) => {
         if (id === "actionPicker") return mockPicker;
-        return origGetComponent ? origGetComponent.call(window.uiManager, id) : null;
+        return origGetComponent ? origGetComponent(id) : null;
     };
 
     // First show
@@ -9455,7 +9456,7 @@ function testHuntingManagerStaticPopupServiceImport() {
 async function testPopupServiceShowFailsWithoutPopupDialog() {
     const origDialog = PopupService._testDialog;
     PopupService.setTestDialog(null);
-    const mgr = window.uiManager;
+    const mgr = Alpine.store("uiManager");
     const savedPopup = mgr?.components?.["popupDialog"];
     if (mgr) mgr.unregister("popupDialog");
     try {
@@ -10044,8 +10045,8 @@ async function testCollectionHubServiceUsesUiManagerRequire() {
         "collectionHubService must not reference requireGameUIComponent"
     );
     assert.ok(
-        src.includes('window.uiManager.requireComponent("collectionHub")'),
-        "collectionHubService must use window.uiManager.requireComponent"
+        src.includes('Alpine.store("uiManager").requireComponent("collectionHub")'),
+        'collectionHubService must use Alpine.store("uiManager").requireComponent'
     );
     console.log("[collectionHubService-uses-uiManager-require] ok");
 }
@@ -10055,8 +10056,8 @@ async function testPatchNotesServiceUsesUiManagerRequire() {
     assert.ok(!src.includes("gameBridge"), "patchNotesService must not reference gameBridge");
     assert.ok(!src.includes("requireGameUIComponent"), "patchNotesService must not reference requireGameUIComponent");
     assert.ok(
-        src.includes('window.uiManager.requireComponent("patchNotes")'),
-        "patchNotesService must use window.uiManager.requireComponent"
+        src.includes('Alpine.store("uiManager").requireComponent("patchNotes")'),
+        'patchNotesService must use Alpine.store("uiManager").requireComponent'
     );
     console.log("[patchNotesService-uses-uiManager-require] ok");
 }
@@ -10172,6 +10173,38 @@ function testNoGameBridgeInProduction() {
     console.log("[no-game-bridge-in-production] ok");
 }
 
+function testNoWindowUiManagerInProduction() {
+    // Prove that production source files no longer reference window.uiManager
+    const srcDirs = ["src"];
+    const offenders = [];
+    for (const dir of srcDirs) {
+        function scan(path) {
+            for (const name of readdirSync(path)) {
+                const full = `${path}/${name}`;
+                const stat = statSync(full);
+                if (stat.isDirectory()) {
+                    scan(full);
+                } else if (full.endsWith(".js") || full.endsWith(".html")) {
+                    const content = readFileSync(full, "utf8");
+                    if (content.includes("window.uiManager")) {
+                        offenders.push(`${full}: contains "window.uiManager"`);
+                    }
+                }
+            }
+        }
+        scan(dir);
+    }
+    if (offenders.length > 0) {
+        console.log("[no-window-uimanager-in-production] FAIL: " + offenders.join("; "));
+    }
+    assert.equal(
+        offenders.length,
+        0,
+        "No production src/ files should reference window.uiManager — use Alpine.store('uiManager') or $store.uiManager"
+    );
+    console.log("[no-window-uimanager-in-production] ok");
+}
+
 await testUiManagerRequireComponentResolvesAll();
 await testUiManagerRequireComponentMissingFails();
 await testUiManagerRequireComponentNoRemainingGuards();
@@ -10187,6 +10220,7 @@ await testHuntingButtonHiddenDuringTournament();
 await testActionGateway();
 await testHuntingEndToEnd();
 await testNoGameBridgeInProduction();
+await testNoWindowUiManagerInProduction();
 
 function testAlpineTemplatesNoWindowUiManager() {
     // Prove that Alpine template directives use $store.uiManager, never window.uiManager

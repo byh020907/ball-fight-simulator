@@ -173,8 +173,6 @@
                 }
             });
 
-            window.uiManager = Alpine.store("uiManager");
-
             window.createGameUI = function (componentName, componentFactory) {
                 Alpine.data(componentName, (customId) => {
                     const instance = componentFactory(customId);

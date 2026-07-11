@@ -1,5 +1,11 @@
 # 결정 기록
 
+## [L1] 2026-07-11 — UI 컴포넌트 접근을 Alpine store 소유권으로 통일
+- 맥락: `window.uiManager` 전역을 통해 UI 컴포넌트를 조회하면 Alpine store가 실제 소유자라는 사실이 가려지고, 템플릿 표현식도 전역 객체에 의존하게 됨.
+- 결정: Alpine 템플릿의 UI 컴포넌트 조회는 `$store.uiManager`만 사용한다. 컴포넌트 정의 스크립트와 일반 ES 모듈은 `Alpine.store("uiManager")`를 사용한다. `window.uiManager` 별칭은 제거한다.
+- 영향: `index.html`, `src/app.js`, `src/actionPicker.js`, `src/collectionHubService.js`, `src/patchNotesService.js`, `src/popup.js`, `src/components/game-overlay.html`, `tests/regression.mjs`
+- 검증: 회귀 테스트, 브라우저 초기화/콘솔 확인, 문법 및 포맷 검사
+
 ## [L1] 2026-07-12 — gameBridge/requireGameUIComponent를 uiManager.getComponent/requireComponent로 전면 교체
 
 - 맥락: `window.requireGameUIComponent → window.gameBridge.get → Alpine.store(uiManager)` 체인이 UI 컴포넌트가 `uiManager` store 소유임을 감춤. 게이트웨이 이름이 실제 소유자(`uiManager`)와 불일치.

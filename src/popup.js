@@ -12,7 +12,7 @@
  * - resolve()/close()는 활성 다이얼로그가 없으면 무시됩니다.
  *   이는 닫힌 후 호출될 수 있는 resolve를 안전하게 처리하기 위함입니다.
  * - _testDialog는 테스트 전용 주입 경로입니다. 프로덕션 코드는
- *   window.uiManager.getComponent("popupDialog")를 통해 조회합니다.
+ *   Alpine.store("uiManager").getComponent("popupDialog")를 통해 조회합니다.
  */
 
 /**
@@ -35,8 +35,8 @@ export class PopupService {
     /** @internal popupDialog 컴포넌트를 resolve합니다. */
     static _getPopupDialog() {
         if (PopupService._testDialog) return PopupService._testDialog;
-        if (typeof window !== "undefined" && window.uiManager) {
-            return window.uiManager.getComponent("popupDialog") ?? null;
+        if (typeof Alpine !== "undefined") {
+            return Alpine.store("uiManager").getComponent("popupDialog") ?? null;
         }
         return null;
     }

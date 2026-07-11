@@ -134,15 +134,15 @@ export class BattleApp {
         this.hunting = new HuntingManager(this);
         this.renderer = new ArenaRenderer(this.elements.canvas);
         const self = this;
-        this._bracket = window.uiManager.requireComponent("tournamentBracket");
-        this._overlay = window.uiManager.requireComponent("gameOverlay");
-        this._panel = window.uiManager.requireComponent("playerPanel");
-        this._startBtn = window.uiManager.requireComponent("startButton");
-        this._log = window.uiManager.requireComponent("battleLog");
-        this._strip = window.uiManager.requireComponent("fighterStrip");
-        this._root = window.uiManager.requireComponent("appRoot");
-        this._toast = window.uiManager.requireComponent("toastNotification");
-        this._huntingBtn = window.uiManager.requireComponent("huntingButton");
+        this._bracket = Alpine.store("uiManager").requireComponent("tournamentBracket");
+        this._overlay = Alpine.store("uiManager").requireComponent("gameOverlay");
+        this._panel = Alpine.store("uiManager").requireComponent("playerPanel");
+        this._startBtn = Alpine.store("uiManager").requireComponent("startButton");
+        this._log = Alpine.store("uiManager").requireComponent("battleLog");
+        this._strip = Alpine.store("uiManager").requireComponent("fighterStrip");
+        this._root = Alpine.store("uiManager").requireComponent("appRoot");
+        this._toast = Alpine.store("uiManager").requireComponent("toastNotification");
+        this._huntingBtn = Alpine.store("uiManager").requireComponent("huntingButton");
         this.ui = {
             get logItems() {
                 return self._log.items;
