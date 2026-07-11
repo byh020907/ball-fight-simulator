@@ -21,3 +21,5 @@
 `scripts/equipmentStatBalance.mjs`는 능력이 없는 표준 볼(HP 100, 공격력 10, 방어력 1, 속도 300)로 장비형 고정 스탯의 상대 가치를 측정합니다. 같은 시드를 좌우 시작 위치에 교차 적용하고, 장비 없음 전투와의 승률 상승폭만 계산해 시작 위치 편향을 제거합니다. 제한 시간 안에 끝나지 않은 전투는 최대 HP 대비 남은 HP 비율로 판정해 표본에서 빠지지 않게 합니다.
 
 기본 실행은 `node scripts/equipmentStatBalance.mjs`입니다. 정밀 측정은 PowerShell에서 `$env:BALANCE_SAMPLES=120; node scripts/equipmentStatBalance.mjs`처럼 표본 수를 늘려 실행합니다.
+
+장비 기본 옵션은 등급별 `statRanges`의 숫자를 공통 가치 단위로 사용한다. 실제 고정 스탯은 `equipment.statValueUnits`를 곱해 생성하며, 현재 기준은 HP 10, 공격력 1, 방어력 1, 속도 5다. 따라서 일반 장비의 1~3단위 옵션은 HP +10~30, 공격 +1~3, 방어 +1~3, 속도 +5~15 중 하나가 된다.

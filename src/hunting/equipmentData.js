@@ -62,6 +62,7 @@ export const EQUIPMENT = Object.freeze({
         EPIC: EQUIPMENT_BALANCE.statRanges.epic,
         LEGENDARY: EQUIPMENT_BALANCE.statRanges.legendary
     }),
+    STAT_VALUE_UNITS: EQUIPMENT_BALANCE.statValueUnits,
     SPECIALS: Object.freeze({
         CHANCES: Object.freeze({
             COMMON: EQUIPMENT_BALANCE.specialChances.common,

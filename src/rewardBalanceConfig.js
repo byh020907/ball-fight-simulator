@@ -115,6 +115,7 @@ export const REWARD_BALANCE = deepFreeze({
             epic: { min: 6, max: 12, statCount: { min: 1, max: 2 } },
             legendary: { min: 10, max: 18, statCount: { min: 1, max: 2 } }
         },
+        statValueUnits: { hp: 10, damage: 1, defense: 1, speed: 5 },
         specialChances: { common: 0, uncommon: 0, rare: 0.25, epic: 0.5, legendary: 0.8 },
         specialRanges: {
             crashDamage: { min: 5, max: 15 },

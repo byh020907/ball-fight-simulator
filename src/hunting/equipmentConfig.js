@@ -22,6 +22,7 @@ export const SPECIAL_OPTION_CHANCES = Object.freeze(
 );
 export const SPECIAL_OPTION_POOL = EQUIPMENT.SPECIALS.POOL;
 export const STAT_TYPES = EQUIPMENT.STAT_TYPES;
+export const EQUIPMENT_STAT_VALUE_UNITS = EQUIPMENT.STAT_VALUE_UNITS;
 export const EQUIPMENT_LEVEL_REQUIREMENTS = Object.freeze(
     Object.fromEntries(Object.entries(EQUIPMENT.LEVEL_REQUIREMENTS).map(([key, val]) => [key.toLowerCase(), val]))
 );
@@ -100,8 +101,9 @@ export function createEquipmentInstance({ rarity = "common", slot = null, rng = 
     for (let i = 0; i < statCount && availableStats.length > 0; i++) {
         const statIndex = Math.floor(rng() * availableStats.length);
         const statType = availableStats.splice(statIndex, 1)[0];
-        const value = rollInt(range.min, range.max, rng);
-        stats.push({ type: statType, value, min: range.min, max: range.max });
+        const valueUnit = EQUIPMENT_STAT_VALUE_UNITS[statType] ?? 1;
+        const value = rollInt(range.min, range.max, rng) * valueUnit;
+        stats.push({ type: statType, value, min: range.min * valueUnit, max: range.max * valueUnit });
     }
 
     let specialOptions = null;

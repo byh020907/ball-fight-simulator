@@ -105,6 +105,7 @@ import {
     canCharacterEquipItem,
     equipEquipmentItem,
     getEquipmentRequiredLevel,
+    EQUIPMENT_STAT_VALUE_UNITS,
     ENHANCE_MAX_LEVEL
 } from "../src/hunting/equipmentConfig.js";
 import { EQUIPMENT } from "../src/hunting/equipmentData.js";
@@ -2701,6 +2702,34 @@ function testEquipmentEnhancement() {
     assert.equal(sellProfile.equipment.equipped.weapon, null, "Selling an equipped item should unequip it");
 
     console.log("[equipment] ok");
+}
+
+function testEquipmentStatValueUnits() {
+    assert.deepEqual(
+        EQUIPMENT_STAT_VALUE_UNITS,
+        { hp: 10, damage: 1, defense: 1, speed: 5 },
+        "Equipment stat value units should match the standard-ball win-rate reference"
+    );
+
+    const hpItem = createEquipmentInstance({ rarity: "common", slot: "weapon", rng: () => 0 });
+    assert.deepEqual(
+        hpItem.stats,
+        [{ type: "hp", value: 10, min: 10, max: 30 }],
+        "Common HP rolls should convert one value unit into HP +10"
+    );
+
+    const speedRolls = [0, 0, 0.999, 0];
+    const speedItem = createEquipmentInstance({
+        rarity: "common",
+        slot: "weapon",
+        rng: () => speedRolls.shift() ?? 0
+    });
+    assert.deepEqual(
+        speedItem.stats,
+        [{ type: "speed", value: 5, min: 5, max: 15 }],
+        "Common speed rolls should convert one value unit into speed +5"
+    );
+    console.log("[equipment-stat-value-units] ok");
 }
 
 function testEquipmentLevelRequirement() {
@@ -6614,6 +6643,7 @@ testHuntingPortalDecline();
 testHuntingStageSelectionAndArenaTheme();
 testHuntingTerrain();
 testEquipmentEnhancement();
+testEquipmentStatValueUnits();
 testEquipmentLevelRequirement();
 testEquipmentDraw();
 testAlpineTemplateComponentSystem();
