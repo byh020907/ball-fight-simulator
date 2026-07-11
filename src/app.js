@@ -828,6 +828,7 @@ export class BattleApp {
         this.matchmaker = new Matchmaker(this.tournamentRoster);
         this.playerResult = null;
         this.tournament = new TournamentManager(this.tournamentRoster, this.playerFighterId);
+        this._root.tournamentActive = true;
         this.currentTournamentMatch = null;
         this._action.selectedId = null;
         this.refreshPlayerSetup();
@@ -1378,6 +1379,7 @@ export class BattleApp {
         this.playerStatAllocation = createEmptyStatAllocation();
         this.playerResult = null;
         this.tournament = null;
+        this._root.tournamentActive = false;
         this.currentTournamentMatch = null;
 
         this._refreshCollectionHub();
@@ -1452,6 +1454,7 @@ export class BattleApp {
 
         this._matchReports = [];
         this._currentTournamentReport = null;
+        this._root.tournamentActive = false;
         this._refreshCollectionHub();
 
         // 승급 안내 메시지
