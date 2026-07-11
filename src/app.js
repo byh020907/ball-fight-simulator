@@ -169,7 +169,7 @@ export class BattleApp {
         this._refreshCollectionHub();
         this._root.statusText = "내 캐릭터 스탯을 배분하세요";
         this._root.statusBadge = "Setup";
-        this._overlay.hide();
+        this.resetHuntingUiState();
         this.startPlayerPreviewLoop();
         this._bindPreviewReselectInput();
     }
@@ -180,6 +180,9 @@ export class BattleApp {
     }
     setHuntingOverlayState(data) {
         this._overlay.setHuntingState(data);
+    }
+    resetHuntingUiState() {
+        this._overlay.hide();
     }
     addLog(message) {
         this._log.add(message);
@@ -769,7 +772,7 @@ export class BattleApp {
     async startTournament() {
         if (this._huntingDone) {
             this._huntingDone = false;
-            this._overlay.hide();
+            this.resetHuntingUiState();
             this.refreshPlayerSetup();
             return;
         }
@@ -1429,7 +1432,7 @@ export class BattleApp {
 
         this._refreshCollectionHub();
         this.refreshPlayerSetup();
-        this._overlay.hide();
+        this.resetHuntingUiState();
         this.startPlayerPreviewLoop();
         this._log.add(`새 대표 캐릭터: ${picked?.name ?? "무작위"}. 스탯을 배분하세요.`);
     }

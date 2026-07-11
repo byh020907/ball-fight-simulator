@@ -150,7 +150,15 @@
             this.label = "";
             this.text = "";
             this.subtext = "";
+            this.resetHuntingState();
+            const rp = Alpine.store("uiManager").getComponent("xpRewardPanel");
+            if (rp) rp.hide();
+        },
+        resetHuntingState() {
             this.huntingChoiceVisible = false;
+            this.huntingFloor = 1;
+            this.huntingCharacterName = "";
+            this.huntingLootSummary = "";
             this.huntingCanRetreat = false;
             this.huntingMoving = false;
             this.huntingMoveFrom = 0;
@@ -163,8 +171,6 @@
             this.huntingLootHudVisible = false;
             this.huntingLootHudShards = 0;
             this.huntingLootHudChests = 0;
-            const rp = Alpine.store("uiManager").getComponent("xpRewardPanel");
-            if (rp) rp.hide();
         },
         showTransient(label, text) {
             this.show({ label, text, transient: true });

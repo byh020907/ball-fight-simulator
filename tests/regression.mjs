@@ -8917,6 +8917,22 @@ function testHuntingMerchantMobileScrollContract() {
     console.log("[hunting-merchant-mobile-scroll] ok");
 }
 
+function testHuntingOverlayResetContract() {
+    const content = readFileSync("src/components/game-overlay.html", "utf8");
+    assert.ok(content.includes("resetHuntingState()"), "Game overlay should expose an explicit hunting state reset");
+    assert.ok(content.includes("this.huntingFloor = 1;"), "Hunting reset should restore the first floor");
+    assert.ok(content.includes('this.huntingCharacterName = "";'), "Hunting reset should clear the prior character");
+    assert.ok(content.includes('this.huntingLootSummary = "";'), "Hunting reset should clear prior loot summary");
+    assert.ok(content.includes("this.resetHuntingState();"), "Overlay hide should invoke the hunting reset");
+
+    const appSource = readFileSync("src/app.js", "utf8");
+    assert.ok(
+        appSource.includes("resetHuntingUiState()"),
+        "BattleApp should own an explicit hunting UI reset entry point"
+    );
+    console.log("[hunting-overlay-reset] ok");
+}
+
 function testHuntingFormatHelpers() {
     // ── formatChestRarityCounts ──
     assert.equal(formatChestRarityCounts([]), "", "Empty chests should produce empty string");
@@ -9717,6 +9733,7 @@ function testPreviewReselectTransitionFinalizes(app) {
 testHuntingMerchantOffers();
 testHuntingMerchantPurchaseRefreshesUiState();
 testHuntingMerchantMobileScrollContract();
+testHuntingOverlayResetContract();
 testHuntingFormatHelpers();
 testHuntingCombatText();
 testHuntingLootHud();
