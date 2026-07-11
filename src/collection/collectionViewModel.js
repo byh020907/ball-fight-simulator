@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { formatRewardDescription } from "../progression/progressionState.js";
+import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 import { getCharacterExperienceSummary } from "../experience/experienceService.js";
 import { canOpenHuntingChest, previewHuntingChest } from "../hunting/index.js";
 import {
@@ -26,7 +27,7 @@ import {
     ENHANCE_MAX_LEVEL
 } from "../hunting/equipmentConfig.js";
 
-export const MASTERY_THRESHOLDS = Object.freeze([1, 5, 15]);
+export const MASTERY_THRESHOLDS = REWARD_BALANCE.progression.masteryThresholds;
 export const COLLECTION_HUB_TABS = Object.freeze([
     { id: "roster", label: "도감" },
     { id: "mastery", label: "숙련도" },

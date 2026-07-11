@@ -1,3 +1,5 @@
+import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
+
 // ── 메타 성장 상태 — 보상 계산 ──────────────────────────────────────────────
 //
 // 업적 해금 상태(achievements.unlockedAt)만 저장하고, 보상 수치는 정의에서 동적 계산.
@@ -6,11 +8,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** 성장 보너스별 누적 상한 */
-export const PROGRESSION_BONUS_CAPS = Object.freeze({
-    extraStatPoints: 40,
-    balanceTolerance: 10,
-    perStatCapBonus: 50
-});
+export const PROGRESSION_BONUS_CAPS = REWARD_BALANCE.progression.bonusCaps;
 
 /**
  * 해금된 업적의 PROGRESSION_BONUS 보상을 합산하여 현재 유효 보너스를 계산한다.

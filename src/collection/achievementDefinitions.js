@@ -8,6 +8,9 @@
 
 import { getActionPool } from "../clickActions.js";
 import { MASTERY_THRESHOLDS } from "./collectionViewModel.js";
+import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
+
+const ACHIEVEMENT_REWARDS = REWARD_BALANCE.progression.achievementRewards;
 
 /**
  * 숙련도 계산 (collection-view-model.js와 동일한 로직)
@@ -42,7 +45,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         },
         reward: {
             type: "PROGRESSION_BONUS",
-            payload: { bonusKey: "extraStatPoints", amount: 5 }
+            payload: { bonusKey: "extraStatPoints", amount: ACHIEVEMENT_REWARDS.firstTournamentWin }
         }
     },
     {
@@ -56,7 +59,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         },
         reward: {
             type: "PROGRESSION_BONUS",
-            payload: { bonusKey: "perStatCapBonus", amount: 15 }
+            payload: { bonusKey: "perStatCapBonus", amount: ACHIEVEMENT_REWARDS.flawlessTournament }
         }
     },
     {
@@ -75,7 +78,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         },
         reward: {
             type: "PROGRESSION_BONUS",
-            payload: { bonusKey: "balanceTolerance", amount: 5 }
+            payload: { bonusKey: "balanceTolerance", amount: ACHIEVEMENT_REWARDS.comebackMatchWin }
         }
     },
     {
@@ -89,7 +92,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         },
         reward: {
             type: "PROGRESSION_BONUS",
-            payload: { bonusKey: "balanceTolerance", amount: 5 }
+            payload: { bonusKey: "balanceTolerance", amount: ACHIEVEMENT_REWARDS.counterExpert }
         }
     },
     {
@@ -104,7 +107,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         },
         reward: {
             type: "PROGRESSION_BONUS",
-            payload: { bonusKey: "extraStatPoints", amount: 10 }
+            payload: { bonusKey: "extraStatPoints", amount: ACHIEVEMENT_REWARDS.allActionsUsed }
         }
     },
     {
@@ -119,7 +122,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         },
         reward: {
             type: "PROGRESSION_BONUS",
-            payload: { bonusKey: "perStatCapBonus", amount: 15 }
+            payload: { bonusKey: "perStatCapBonus", amount: ACHIEVEMENT_REWARDS.rosterChampion }
         }
     },
     {
@@ -135,7 +138,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         },
         reward: {
             type: "PROGRESSION_BONUS",
-            payload: { bonusKey: "perStatCapBonus", amount: 20 }
+            payload: { bonusKey: "perStatCapBonus", amount: ACHIEVEMENT_REWARDS.masteryComplete }
         }
     },
     {
@@ -148,7 +151,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         },
         reward: {
             type: "PROGRESSION_BONUS",
-            payload: { bonusKey: "extraStatPoints", amount: 15 }
+            payload: { bonusKey: "extraStatPoints", amount: ACHIEVEMENT_REWARDS.marathon50 }
         }
     },
     {
@@ -161,7 +164,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         },
         reward: {
             type: "PROGRESSION_BONUS",
-            payload: { bonusKey: "extraStatPoints", amount: 15 }
+            payload: { bonusKey: "extraStatPoints", amount: ACHIEVEMENT_REWARDS.singleHitMonster }
         }
     },
     {
@@ -175,7 +178,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         },
         reward: {
             type: "PROGRESSION_BONUS",
-            payload: { bonusKey: "extraStatPoints", amount: 10 }
+            payload: { bonusKey: "extraStatPoints", amount: ACHIEVEMENT_REWARDS.tournamentStreak3 }
         }
     },
     {

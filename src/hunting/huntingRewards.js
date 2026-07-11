@@ -8,88 +8,13 @@ import {
     HUNTING_SHARD_REWARDS,
     HUNTING_SCALING
 } from "./huntingConfig.js";
+import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 
 const DEFAULT_RNG = () => Math.random();
 
-export const HUNTING_CHEST_REWARD_TABLE_VERSION = 1;
+export const HUNTING_CHEST_REWARD_TABLE_VERSION = REWARD_BALANCE.hunting.chest.rewardTableVersion;
 
-export const HUNTING_CHEST_REWARD_TABLE = Object.freeze({
-    common: Object.freeze([
-        Object.freeze({
-            id: "common-key-shards",
-            weight: 55,
-            type: HUNTING_CHEST_REWARD_TYPES.SHARDS,
-            amount: 18,
-            text: "파편 +18"
-        }),
-        Object.freeze({
-            id: "common-equipment",
-            weight: 45,
-            type: HUNTING_CHEST_REWARD_TYPES.EQUIPMENT,
-            text: "일반 장비"
-        })
-    ]),
-    uncommon: Object.freeze([
-        Object.freeze({
-            id: "uncommon-key-shards",
-            weight: 45,
-            type: HUNTING_CHEST_REWARD_TYPES.SHARDS,
-            amount: 45,
-            text: "파편 +45"
-        }),
-        Object.freeze({
-            id: "uncommon-equipment",
-            weight: 55,
-            type: HUNTING_CHEST_REWARD_TYPES.EQUIPMENT,
-            text: "고급 장비"
-        })
-    ]),
-    rare: Object.freeze([
-        Object.freeze({
-            id: "rare-key-shards",
-            weight: 35,
-            type: HUNTING_CHEST_REWARD_TYPES.SHARDS,
-            amount: 105,
-            text: "파편 +105"
-        }),
-        Object.freeze({
-            id: "rare-equipment",
-            weight: 65,
-            type: HUNTING_CHEST_REWARD_TYPES.EQUIPMENT,
-            text: "희귀 장비"
-        })
-    ]),
-    epic: Object.freeze([
-        Object.freeze({
-            id: "epic-key-shards",
-            weight: 30,
-            type: HUNTING_CHEST_REWARD_TYPES.SHARDS,
-            amount: 230,
-            text: "파편 +230"
-        }),
-        Object.freeze({
-            id: "epic-equipment",
-            weight: 70,
-            type: HUNTING_CHEST_REWARD_TYPES.EQUIPMENT,
-            text: "에픽 장비"
-        })
-    ]),
-    legendary: Object.freeze([
-        Object.freeze({
-            id: "legendary-key-shards",
-            weight: 25,
-            type: HUNTING_CHEST_REWARD_TYPES.SHARDS,
-            amount: 520,
-            text: "파편 +520"
-        }),
-        Object.freeze({
-            id: "legendary-equipment",
-            weight: 75,
-            type: HUNTING_CHEST_REWARD_TYPES.EQUIPMENT,
-            text: "전설 장비"
-        })
-    ])
-});
+export const HUNTING_CHEST_REWARD_TABLE = REWARD_BALANCE.hunting.chest.rewardTables;
 
 function clampFloor(floor) {
     if (!Number.isFinite(floor)) return 1;
@@ -149,7 +74,7 @@ export function rollHuntingChestReward(chestOrRarity = "common", { rng = DEFAULT
 export function rollShardReward({ floor = 1, enemyType = HUNTING_ENEMY_TYPES.NORMAL, rng = DEFAULT_RNG } = {}) {
     const range = HUNTING_SHARD_REWARDS[enemyType] ?? HUNTING_SHARD_REWARDS[HUNTING_ENEMY_TYPES.NORMAL];
     const base = rollInteger(range.min, range.max, rng);
-    const clearBonus = 10;
+    const clearBonus = REWARD_BALANCE.hunting.shards.clearBonus;
     const deepBonus = 1 + (clampFloor(floor) - 1) * HUNTING_SCALING.DEEP_FLOOR_BONUS;
     return Math.max(0, Math.round((base + clearBonus) * deepBonus));
 }

@@ -11,6 +11,7 @@ import {
     HUNTING_COMBAT_RELIEF,
     HUNTING_PORTAL_DECLINE
 } from "./huntingConfig.js";
+import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 
 const DEFAULT_RNG = () => Math.random();
 
@@ -128,24 +129,21 @@ export function getHuntingCombatEnemyType(floor, rng = DEFAULT_RNG) {
 export function rollHuntingChestRoomRarity(floor, rng = DEFAULT_RNG) {
     const depth = safeFloor(floor);
     const roll = rng();
-    if (depth >= 5 && roll < 0.03) return "legendary";
-    if (depth >= 4 && roll < 0.12) return "epic";
-    if (depth >= 3 && roll < 0.3) return "rare";
-    if (roll < 0.55) return "uncommon";
+    const chances = REWARD_BALANCE.hunting.events.chestRoom;
+    if (depth >= chances.legendary.minimumFloor && roll < chances.legendary.chance) return "legendary";
+    if (depth >= chances.epic.minimumFloor && roll < chances.epic.chance) return "epic";
+    if (depth >= chances.rare.minimumFloor && roll < chances.rare.chance) return "rare";
+    if (roll < chances.uncommonChance) return "uncommon";
     return "common";
 }
 
 export function rollCursedAltarTrade(floor, rng = DEFAULT_RNG) {
-    const trades = [
-        { gainStat: "damage", loseStat: "defense", gainMultiplier: 1.18, loseMultiplier: 0.9 },
-        { gainStat: "defense", loseStat: "speed", gainMultiplier: 1.18, loseMultiplier: 0.92 },
-        { gainStat: "speed", loseStat: "damage", gainMultiplier: 1.16, loseMultiplier: 0.92 },
-        { gainStat: "skill", loseStat: "hp", gainMultiplier: 1.14, loseMultiplier: 0.94 }
-    ];
+    const altar = REWARD_BALANCE.hunting.events.cursedAltar;
+    const trades = altar.trades;
     const trade = trades[rollIndex(trades.length, rng)];
     return {
         ...trade,
-        floors: Math.min(3, 1 + Math.floor(safeFloor(floor) / 3))
+        floors: Math.min(altar.maxDurationFloors, 1 + Math.floor(safeFloor(floor) / altar.durationFloorDivisor))
     };
 }
 
@@ -161,28 +159,36 @@ export function createHuntingEvent(type, floor, rng = DEFAULT_RNG) {
         return {
             type,
             floor: safe,
-            discountRatio: safe >= 70 ? 0.15 : 0.1
+            discountRatio:
+                safe >= REWARD_BALANCE.hunting.events.merchant.discount.deepFloor
+                    ? REWARD_BALANCE.hunting.events.merchant.discount.deepFloorValue
+                    : REWARD_BALANCE.hunting.events.merchant.discount.default
         };
     }
     if (type === HUNTING_EVENT_TYPES.BOON) {
         return {
             type,
             floor: safe,
-            shards: 8 + Math.floor(safe / 10) * 3
+            shards:
+                REWARD_BALANCE.hunting.events.boon.baseShards +
+                Math.floor(safe / 10) * REWARD_BALANCE.hunting.events.boon.shardsPerTenFloors
         };
     }
     if (type === HUNTING_EVENT_TYPES.MISHAP) {
         return {
             type,
             floor: safe,
-            damageRatio: safe >= 70 ? 0.14 : 0.1
+            damageRatio:
+                safe >= REWARD_BALANCE.hunting.events.mishap.deepFloor
+                    ? REWARD_BALANCE.hunting.events.mishap.deepFloorDamageRatio
+                    : REWARD_BALANCE.hunting.events.mishap.defaultDamageRatio
         };
     }
     if (type === HUNTING_EVENT_TYPES.REST_SITE) {
         return {
             type,
             floor: safe,
-            recoveryRatio: 0.25
+            recoveryRatio: REWARD_BALANCE.hunting.events.restRecoveryRatio
         };
     }
     if (type === HUNTING_EVENT_TYPES.CHEST_ROOM) {
@@ -204,7 +210,7 @@ export function createHuntingEvent(type, floor, rng = DEFAULT_RNG) {
             type,
             floor: safe,
             enemyType: HUNTING_ENEMY_TYPES.CHAMPION,
-            rewardMultiplier: 1.5
+            rewardMultiplier: REWARD_BALANCE.hunting.shards.combatMultipliers.championIntrusion
         };
     }
     return {

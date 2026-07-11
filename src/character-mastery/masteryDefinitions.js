@@ -1,3 +1,7 @@
+import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
+
+const MASTERY_TIERS = REWARD_BALANCE.progression.masteryTiers;
+
 // ── 캐릭터 숙련도 효과 정의 (등급별 수치) ──────────────────────────────────
 //
 // 각 정의는 tierValues[0..3]를 소유하며 apply(ctx, level)에서 사용한다.
@@ -11,7 +15,7 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         name: "정밀 훈련",
         kind: "stat_modifier",
         description: "공격력이 {value} 증가합니다.",
-        tierValues: Object.freeze([0, 0.03, 0.07, 0.12]),
+        tierValues: MASTERY_TIERS.damage,
         formatValue(v) {
             return (v * 100).toFixed(0) + "%";
         },
@@ -25,7 +29,7 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         name: "경량 구조",
         kind: "physics_modifier",
         description: "받는 명시적 넉백이 {value} 감소합니다.",
-        tierValues: Object.freeze([0, 0.04, 0.09, 0.15]),
+        tierValues: MASTERY_TIERS.incomingKnockbackReduce,
         formatValue(v) {
             return (v * 100).toFixed(0) + "%";
         },
@@ -39,7 +43,7 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         name: "다재다능",
         kind: "allocation_modifier",
         description: "스탯 밸런서 감도가 {value} 증가합니다.",
-        tierValues: Object.freeze([0, 1, 2, 3]),
+        tierValues: MASTERY_TIERS.balanceTolerance,
         formatValue(v) {
             return v.toFixed(1);
         },
@@ -53,7 +57,7 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         name: "중량 충격",
         kind: "physics_modifier",
         description: "볼 충돌 시 상대에게 가하는 충격량이 {value} 증가합니다.",
-        tierValues: Object.freeze([0, 0.03, 0.06, 0.1]),
+        tierValues: MASTERY_TIERS.outgoingImpactBonus,
         formatValue(v) {
             return (v * 100).toFixed(0) + "%";
         },
@@ -67,7 +71,7 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         name: "유선형",
         kind: "physics_modifier",
         description: "기본 속도 복귀율이 {value} 증가합니다.",
-        tierValues: Object.freeze([0, 0.03, 0.06, 0.1]),
+        tierValues: MASTERY_TIERS.velocityRecoveryBonus,
         formatValue(v) {
             return (v * 100).toFixed(0) + "%";
         },
@@ -81,7 +85,7 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         name: "전투 욕구",
         kind: "combat_passive",
         description: "12초마다 다음 충돌 피해가 {value} 증가합니다.",
-        tierValues: Object.freeze([0, 0.04, 0.08, 0.12]),
+        tierValues: MASTERY_TIERS.rageCollisionDamage,
         formatValue(v) {
             return (v * 100).toFixed(0) + "%";
         },
@@ -100,7 +104,7 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         name: "강한 소화력",
         kind: "stat_modifier",
         description: "최대 체력이 {value} 증가합니다.",
-        tierValues: Object.freeze([0, 0.03, 0.07, 0.12]),
+        tierValues: MASTERY_TIERS.hp,
         formatValue(v) {
             return (v * 100).toFixed(0) + "%";
         },
@@ -114,7 +118,7 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         name: "아껴 휘두르기",
         kind: "action_modifier",
         description: "클릭 액션 HP 비용이 {value} 감소합니다. (최저 0.1%)",
-        tierValues: Object.freeze([0, 0.003, 0.006, 0.01]),
+        tierValues: MASTERY_TIERS.actionHpCostReduction,
         formatValue(v) {
             return (v * 100).toFixed(1) + "%p";
         },
@@ -129,7 +133,7 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         name: "고무적인 존재감",
         kind: "allocation_modifier",
         description: "총 배분 포인트가 {value} 증가합니다.",
-        tierValues: Object.freeze([0, 3, 6, 10]),
+        tierValues: MASTERY_TIERS.extraStatPoints,
         formatValue(v) {
             return String(v);
         },
@@ -143,7 +147,7 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         name: "갈증",
         kind: "combat_passive",
         description: "8초마다 다음 충돌 흡혈률이 {value} 증가합니다.",
-        tierValues: Object.freeze([0, 0.05, 0.1, 0.15]),
+        tierValues: MASTERY_TIERS.vampireHpSteal,
         formatValue(v) {
             return (v * 100).toFixed(0) + "%";
         },
@@ -162,7 +166,7 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         name: "행운",
         kind: "stat_modifier",
         description: "공격력이 {value} 증가합니다.",
-        tierValues: Object.freeze([0, 0.03, 0.07, 0.12]),
+        tierValues: MASTERY_TIERS.damage,
         formatValue(v) {
             return (v * 100).toFixed(0) + "%";
         },
@@ -176,7 +180,7 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         name: "그림자 직조",
         kind: "physics_modifier",
         description: "받는 명시적 넉백이 {value} 감소합니다.",
-        tierValues: Object.freeze([0, 0.04, 0.09, 0.15]),
+        tierValues: MASTERY_TIERS.incomingKnockbackReduce,
         formatValue(v) {
             return (v * 100).toFixed(0) + "%";
         },

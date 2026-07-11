@@ -20,7 +20,8 @@ import {
 import { FIGHTER_IDS, Vector2, randomSpin } from "../src/core.js";
 import { findActionById } from "../src/clickActions.js";
 import { calcMatchXp, getLevelFromXp, getXpForNextLevel, calcTournamentXp } from "../src/experience/experienceState.js";
-import { getLevelRequirement } from "../src/experience/experienceConfig.js";
+import { getLevelRequirement, LEVEL_REWARDS, XP_SCALE } from "../src/experience/experienceConfig.js";
+import { REWARD_BALANCE } from "../src/rewardBalanceConfig.js";
 import { getCharacterExperienceSummary, grantExperienceFromMatchReport } from "../src/experience/experienceService.js";
 import { DashEffect, WallSlamEffect } from "../src/combatEffects.js";
 import { shuffled } from "../src/random.js";
@@ -106,6 +107,7 @@ import {
     getEquipmentRequiredLevel,
     ENHANCE_MAX_LEVEL
 } from "../src/hunting/equipmentConfig.js";
+import { EQUIPMENT } from "../src/hunting/equipmentData.js";
 import { createHuntingTerrain } from "../src/terrain/terrainFactory.js";
 import { TERRAIN_SHAPES } from "../src/terrain/terrainConfig.js";
 import { resolveTerrainCollision, resolveTerrainCollisions } from "../src/terrain/terrainCollision.js";
@@ -6522,6 +6524,36 @@ async function testCreateCollectionHubViewModel() {
 }
 
 const app = await loadModuleApp();
+
+function testRewardBalanceConfig() {
+    const balance = REWARD_BALANCE;
+    assert.ok(Object.isFrozen(balance), "Reward balance must be immutable at runtime");
+    assert.equal(XP_SCALE, balance.experience.xpScale, "XP scale must come from reward balance");
+    assert.equal(LEVEL_REWARDS, balance.experience.levelRewards, "Level rewards must come from reward balance");
+    assert.equal(
+        getChestOpenCost("epic"),
+        balance.hunting.chest.openCosts.epic,
+        "Chest cost must come from reward balance"
+    );
+    assert.equal(
+        rollShardReward({ floor: 1, enemyType: HUNTING_ENEMY_TYPES.NORMAL, rng: () => 0 }),
+        balance.hunting.shards.combatRanges.normal.min + balance.hunting.shards.clearBonus,
+        "Combat shards must use the centralized base range and clear bonus"
+    );
+    assert.equal(
+        getSellReward("legendary"),
+        balance.equipment.sellRewards.legendary,
+        "Equipment sell rewards must come from reward balance"
+    );
+    assert.equal(
+        EQUIPMENT.ENHANCE.COST,
+        balance.equipment.enhance.costs,
+        "Enhancement costs must come from reward balance"
+    );
+    console.log("[reward-balance-config] ok");
+}
+
+testRewardBalanceConfig();
 testShuffledUtility();
 testStatAllocationRules(app);
 testComponentBridgeCallsGameHandlers(app);

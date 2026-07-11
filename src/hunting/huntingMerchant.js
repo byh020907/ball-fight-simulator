@@ -1,4 +1,5 @@
 import { createHuntingChest } from "./huntingRewards.js";
+import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 
 export const MERCHANT_OFFER_TYPES = Object.freeze({
     REPAIR: "repair",
@@ -22,9 +23,9 @@ export function createMerchantOffers(run, event, profile) {
 function _createRepairOffer(run, discount) {
     const maxHp = run.carriedMaxHp ?? 100;
     const currentHp = run.carriedHp ?? maxHp;
-    const healPct = 0.35;
+    const healPct = REWARD_BALANCE.hunting.events.merchant.repair.recoveryRatio;
     const healAmount = Math.max(1, Math.floor(maxHp * healPct));
-    const cost = calcDiscount(50, discount);
+    const cost = calcDiscount(REWARD_BALANCE.hunting.events.merchant.repair.cost, discount);
     const atMax = currentHp >= maxHp;
     return {
         id: "repair",
@@ -41,7 +42,7 @@ function _createRepairOffer(run, discount) {
 }
 
 function _createBuyLootOffer(discount) {
-    const cost = calcDiscount(40, discount);
+    const cost = calcDiscount(REWARD_BALANCE.hunting.events.merchant.commonChestCost, discount);
     return {
         id: "buy_loot",
         type: MERCHANT_OFFER_TYPES.BUY_LOOT,
@@ -57,7 +58,7 @@ function _createBuyLootOffer(discount) {
 
 function _createSecureTransportOffer(run, discount) {
     const pendingChests = run.pendingLoot?.chests ?? [];
-    const cost = calcDiscount(30, discount);
+    const cost = calcDiscount(REWARD_BALANCE.hunting.events.merchant.secureTransportCost, discount);
     const hasPending = pendingChests.length > 0;
     return {
         id: "secure_transport",

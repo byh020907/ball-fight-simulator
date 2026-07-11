@@ -15,6 +15,7 @@ import {
     applyHuntingStatModifiersToSpec
 } from "./huntingState.js";
 import { rollShardReward, createHuntingChest, createEmptyHuntingLoot } from "./huntingRewards.js";
+import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 import {
     HUNTING_ADVANCE_STEPS,
     HUNTING_ENEMY_TYPES,
@@ -254,11 +255,12 @@ export class HuntingManager {
         if (playerWon) {
             const isFinalBoss = run.lastEncounter?.type === HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS;
             const rewardMultiplier = isFinalBoss
-                ? 2
+                ? REWARD_BALANCE.hunting.shards.combatMultipliers.finalBoss
                 : run.lastEvent?.type === HUNTING_EVENT_TYPES.CHAMPION_INTRUSION
-                  ? (run.lastEvent.rewardMultiplier ?? 1.5)
+                  ? (run.lastEvent.rewardMultiplier ??
+                    REWARD_BALANCE.hunting.shards.combatMultipliers.championIntrusion)
                   : run.floor % 3 === 0
-                    ? 1.25
+                    ? REWARD_BALANCE.hunting.shards.combatMultipliers.eliteFloor
                     : 1;
             const rewardEnemyType =
                 isFinalBoss || run.lastEvent?.type === HUNTING_EVENT_TYPES.CHAMPION_INTRUSION
@@ -270,7 +272,10 @@ export class HuntingManager {
                 shards: Math.round(
                     rollShardReward({ floor: run.floor, enemyType: rewardEnemyType }) * rewardMultiplier
                 ),
-                chests: Math.random() < 0.15 ? [createHuntingChest({ rarity: "common" })] : [],
+                chests:
+                    Math.random() < REWARD_BALANCE.hunting.shards.combatChestDropChance
+                        ? [createHuntingChest({ rarity: "common" })]
+                        : [],
                 xp: 0
             };
 

@@ -1,3 +1,7 @@
+import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
+
+const HUNTING_REWARDS = REWARD_BALANCE.hunting;
+
 export const HUNTING_MAX_FLOOR = 100;
 export const HUNTING_ADVANCE_STEPS = 10;
 
@@ -93,39 +97,23 @@ export const HUNTING_MVP_EVENT_TYPES = Object.freeze([
 
 export const HUNTING_CHEST_RARITIES = Object.freeze(["common", "uncommon", "rare", "epic", "legendary"]);
 
-export const HUNTING_CHEST_OPEN_COSTS = Object.freeze({
-    common: 20,
-    uncommon: 50,
-    rare: 120,
-    epic: 250,
-    legendary: 500
-});
+export const HUNTING_CHEST_OPEN_COSTS = HUNTING_REWARDS.chest.openCosts;
 
-export const HUNTING_CHEST_BREAK_WEIGHTS = Object.freeze({
-    common: 1,
-    uncommon: 2,
-    rare: 3,
-    epic: 4,
-    legendary: 5
-});
+export const HUNTING_CHEST_BREAK_WEIGHTS = HUNTING_REWARDS.chest.breakWeights;
 
-export const HUNTING_SHARD_REWARDS = Object.freeze({
-    [HUNTING_ENEMY_TYPES.NORMAL]: Object.freeze({ min: 5, max: 8 }),
-    [HUNTING_ENEMY_TYPES.ELITE]: Object.freeze({ min: 15, max: 25 }),
-    [HUNTING_ENEMY_TYPES.CHAMPION]: Object.freeze({ min: 40, max: 40 })
-});
+export const HUNTING_SHARD_REWARDS = HUNTING_REWARDS.shards.combatRanges;
 
 export const HUNTING_DEFEAT_PRESERVE = Object.freeze({
-    SHARDS: 0.5,
-    XP: 0.7
+    SHARDS: HUNTING_REWARDS.shards.defeatPreserve.shards,
+    XP: HUNTING_REWARDS.shards.defeatPreserve.xp
 });
 
 export const HUNTING_SCALING = Object.freeze({
     ENEMY_POWER_PER_FLOOR: 0.08,
     ELITE_POWER_BONUS: 0.12,
     CHAMPION_POWER_BONUS: 0.28,
-    REWARD_PER_FLOOR: 0.15,
-    DEEP_FLOOR_BONUS: 0.1
+    REWARD_PER_FLOOR: HUNTING_REWARDS.shards.rewardPerFloor,
+    DEEP_FLOOR_BONUS: HUNTING_REWARDS.shards.deepFloorBonus
 });
 
 export const HUNTING_CHEST_REWARD_TYPES = Object.freeze({

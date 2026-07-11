@@ -1,3 +1,7 @@
+import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
+
+const EQUIPMENT_BALANCE = REWARD_BALANCE.equipment;
+
 export const EQUIPMENT = Object.freeze({
     SLOTS: Object.freeze({
         WEAPON: Object.freeze({ id: "weapon", label: "무기", max: 1 }),
@@ -6,50 +10,44 @@ export const EQUIPMENT = Object.freeze({
     }),
     RARITIES: Object.freeze(["common", "uncommon", "rare", "epic", "legendary"]),
     LEVEL_REQUIREMENTS: Object.freeze({
-        COMMON: 1,
-        UNCOMMON: 3,
-        RARE: 5,
-        EPIC: 8,
-        LEGENDARY: 10
+        COMMON: EQUIPMENT_BALANCE.levelRequirements.common,
+        UNCOMMON: EQUIPMENT_BALANCE.levelRequirements.uncommon,
+        RARE: EQUIPMENT_BALANCE.levelRequirements.rare,
+        EPIC: EQUIPMENT_BALANCE.levelRequirements.epic,
+        LEGENDARY: EQUIPMENT_BALANCE.levelRequirements.legendary
     }),
     INVENTORY: Object.freeze({
-        DEFAULT_SLOTS: 5,
-        EXPAND_COST: 100,
-        EXPAND_GAIN: 3,
-        MAX_SLOTS: 100
+        DEFAULT_SLOTS: EQUIPMENT_BALANCE.inventory.defaultSlots,
+        EXPAND_COST: EQUIPMENT_BALANCE.inventory.expandCost,
+        EXPAND_GAIN: EQUIPMENT_BALANCE.inventory.expandGain,
+        MAX_SLOTS: EQUIPMENT_BALANCE.inventory.maxSlots
     }),
     ENHANCE: Object.freeze({
-        MAX_LEVEL: 5,
-        MAX_FAILURE_RATE: 0.8,
-        STAT_BONUS_PER_LEVEL: 0.2,
-        COST: Object.freeze([
-            Object.freeze({ stones: 2, shards: 10 }),
-            Object.freeze({ stones: 4, shards: 15 }),
-            Object.freeze({ stones: 8, shards: 25 }),
-            Object.freeze({ stones: 15, shards: 40 }),
-            Object.freeze({ stones: 25, shards: 60 })
-        ])
+        MAX_LEVEL: EQUIPMENT_BALANCE.enhance.maxLevel,
+        MAX_FAILURE_RATE: EQUIPMENT_BALANCE.enhance.maxFailureRate,
+        STAT_BONUS_PER_LEVEL: EQUIPMENT_BALANCE.enhance.statBonusPerLevel,
+        COST: EQUIPMENT_BALANCE.enhance.costs
     }),
     DISASSEMBLE: Object.freeze({
-        COMMON: 1,
-        UNCOMMON: 3,
-        RARE: 8,
-        EPIC: 20,
-        LEGENDARY: 50
+        COMMON: EQUIPMENT_BALANCE.disassembleRewards.common,
+        UNCOMMON: EQUIPMENT_BALANCE.disassembleRewards.uncommon,
+        RARE: EQUIPMENT_BALANCE.disassembleRewards.rare,
+        EPIC: EQUIPMENT_BALANCE.disassembleRewards.epic,
+        LEGENDARY: EQUIPMENT_BALANCE.disassembleRewards.legendary
     }),
     SELL: Object.freeze({
-        COMMON: 5,
-        UNCOMMON: 12,
-        RARE: 30,
-        EPIC: 80,
-        LEGENDARY: 200
+        COMMON: EQUIPMENT_BALANCE.sellRewards.common,
+        UNCOMMON: EQUIPMENT_BALANCE.sellRewards.uncommon,
+        RARE: EQUIPMENT_BALANCE.sellRewards.rare,
+        EPIC: EQUIPMENT_BALANCE.sellRewards.epic,
+        LEGENDARY: EQUIPMENT_BALANCE.sellRewards.legendary
     }),
     FUSION: Object.freeze({
         COST: Object.freeze({
-            COMMON: Object.freeze({ stones: 2, shards: 20 }),
-            UNCOMMON: Object.freeze({ stones: 5, shards: 40 }),
-            RARE: Object.freeze({ stones: 12, shards: 80 }),
-            EPIC: Object.freeze({ stones: 25, shards: 150 })
+            COMMON: EQUIPMENT_BALANCE.fusionCosts.common,
+            UNCOMMON: EQUIPMENT_BALANCE.fusionCosts.uncommon,
+            RARE: EQUIPMENT_BALANCE.fusionCosts.rare,
+            EPIC: EQUIPMENT_BALANCE.fusionCosts.epic
         })
     }),
     DRAW: Object.freeze({
@@ -58,24 +56,39 @@ export const EQUIPMENT = Object.freeze({
         ACCESSORY: "accessory"
     }),
     STAT_RANGES: Object.freeze({
-        COMMON: Object.freeze({ min: 1, max: 3, statCount: Object.freeze({ min: 1, max: 1 }) }),
-        UNCOMMON: Object.freeze({ min: 2, max: 5, statCount: Object.freeze({ min: 1, max: 1 }) }),
-        RARE: Object.freeze({ min: 4, max: 8, statCount: Object.freeze({ min: 1, max: 2 }) }),
-        EPIC: Object.freeze({ min: 6, max: 12, statCount: Object.freeze({ min: 1, max: 2 }) }),
-        LEGENDARY: Object.freeze({ min: 10, max: 18, statCount: Object.freeze({ min: 1, max: 2 }) })
+        COMMON: EQUIPMENT_BALANCE.statRanges.common,
+        UNCOMMON: EQUIPMENT_BALANCE.statRanges.uncommon,
+        RARE: EQUIPMENT_BALANCE.statRanges.rare,
+        EPIC: EQUIPMENT_BALANCE.statRanges.epic,
+        LEGENDARY: EQUIPMENT_BALANCE.statRanges.legendary
     }),
     SPECIALS: Object.freeze({
         CHANCES: Object.freeze({
-            COMMON: 0,
-            UNCOMMON: 0,
-            RARE: 0.25,
-            EPIC: 0.5,
-            LEGENDARY: 0.8
+            COMMON: EQUIPMENT_BALANCE.specialChances.common,
+            UNCOMMON: EQUIPMENT_BALANCE.specialChances.uncommon,
+            RARE: EQUIPMENT_BALANCE.specialChances.rare,
+            EPIC: EQUIPMENT_BALANCE.specialChances.epic,
+            LEGENDARY: EQUIPMENT_BALANCE.specialChances.legendary
         }),
         POOL: Object.freeze([
-            Object.freeze({ type: "crashDamage", label: "충돌 피해", min: 5, max: 15, suffix: "%" }),
-            Object.freeze({ type: "cooldown", label: "쿨다운", min: 3, max: 10, suffix: "%" }),
-            Object.freeze({ type: "hpSteal", label: "HP 흡혈", min: 2, max: 8, suffix: "%" })
+            Object.freeze({
+                type: "crashDamage",
+                label: "충돌 피해",
+                ...EQUIPMENT_BALANCE.specialRanges.crashDamage,
+                suffix: "%"
+            }),
+            Object.freeze({
+                type: "cooldown",
+                label: "쿨다운",
+                ...EQUIPMENT_BALANCE.specialRanges.cooldown,
+                suffix: "%"
+            }),
+            Object.freeze({
+                type: "hpSteal",
+                label: "HP 흡혈",
+                ...EQUIPMENT_BALANCE.specialRanges.hpSteal,
+                suffix: "%"
+            })
         ])
     }),
     STAT_TYPES: Object.freeze(["hp", "damage", "defense", "speed"]),
