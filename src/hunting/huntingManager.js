@@ -48,6 +48,29 @@ const CHEST_RARITY_LABELS = Object.freeze({
     legendary: "전설"
 });
 
+const HUNTING_ROUTE_ACTIONS = Object.freeze({
+    CONTINUE: "continue",
+    STOP: "stop"
+});
+
+const HUNTING_FLOOR_OUTCOME_HANDLERS = Object.freeze({
+    [HUNTING_FLOOR_OUTCOME_TYPES.EMPTY]: "_handleEmptyFloor",
+    [HUNTING_FLOOR_OUTCOME_TYPES.COMBAT]: "_handleCombatFloor",
+    [HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS]: "_handleFinalBossFloor",
+    [HUNTING_FLOOR_OUTCOME_TYPES.EVENT]: "_handleEventFloor"
+});
+
+export const HUNTING_EVENT_HANDLERS = Object.freeze({
+    [HUNTING_EVENT_TYPES.PORTAL]: "_handlePortalEvent",
+    [HUNTING_EVENT_TYPES.WANDERING_MERCHANT]: "_handleMerchantEvent",
+    [HUNTING_EVENT_TYPES.BOON]: "_handleBoonEvent",
+    [HUNTING_EVENT_TYPES.MISHAP]: "_handleMishapEvent",
+    [HUNTING_EVENT_TYPES.CHEST_ROOM]: "_handleChestRoomEvent",
+    [HUNTING_EVENT_TYPES.REST_SITE]: "_handleRestSiteEvent",
+    [HUNTING_EVENT_TYPES.CURSED_ALTAR]: "_handleCursedAltarEvent",
+    [HUNTING_EVENT_TYPES.CHAMPION_INTRUSION]: "_handleChampionIntrusionEvent"
+});
+
 export class HuntingManager {
     constructor(app) {
         this.app = app;
@@ -420,135 +443,126 @@ export class HuntingManager {
         const run = this._run;
         if (!run || run.status !== "active" || this._moving) return;
 
-        // 포탈에서 귀환하지 않고 전진을 선택한 경우, 거부 상태 설정
-        if (run.lastEvent?.type === HUNTING_EVENT_TYPES.PORTAL) {
-            this._run = {
-                ...this._run,
-                portalDeclineFloors: HUNTING_PORTAL_DECLINE.INITIAL_FLOORS
-            };
-        }
-
+        this._applyPortalDeclineOnAdvance(run);
         this._moving = true;
         app.setHuntingOverlayState({ huntingChoiceVisible: false });
 
         try {
-            const routeStartFloor = this._run.floor;
-            const routeEndFloor = Math.min(this._run.maxFloor, this._run.floor + HUNTING_ADVANCE_STEPS);
-            const routeMaxSteps = Math.max(1, routeEndFloor - this._run.floor);
-            const FLOOR_STEP_MS = 350;
-
-            for (let step = 0; step < routeMaxSteps; step++) {
-                const fromFloor = this._run.floor;
-                const targetFloor = Math.min(this._run.maxFloor, fromFloor + 1);
-                this._setHuntingMoveState({
-                    moving: true,
-                    step: step + 1,
-                    maxSteps: routeMaxSteps,
-                    routeStartFloor,
-                    routeEndFloor,
-                    message: `${targetFloor}층으로 이동 중…`
-                });
-
-                if (waitForFirstMoveUi && step === 0) {
-                    await app.waitForHuntingMoveUiPaint();
-                    if (!this._run || this._run.status !== "active" || !this._moving) {
-                        this._moving = false;
-                        return;
-                    }
-                }
-
-                await new Promise((resolve) => setTimeout(resolve, FLOOR_STEP_MS));
-
-                this._run = advanceHuntingRun(this._run);
-                if (this._run.status !== "active") {
-                    app.setHuntingOverlayState({ huntingMoving: false });
-                    this._moving = false;
-                    this.retreat();
-                    return;
-                }
-
-                const encounter = this._run.lastEncounter;
-                const currentFloor = this._run.floor;
-                const event = this._run.lastEvent;
-
-                if (encounter.type === HUNTING_FLOOR_OUTCOME_TYPES.EMPTY) {
-                    app.addLog(`[사냥터] ${currentFloor}층 — 빈 통로`);
-                    app.setHuntingOverlayState({
-                        huntingMoveMessage: `${currentFloor}층 — 빈 통로`
-                    });
-                    continue;
-                }
-
-                if (encounter.type === HUNTING_FLOOR_OUTCOME_TYPES.COMBAT) {
-                    const mobCount = getHuntingMobCount(currentFloor);
-                    app.addLog(`[사냥터] ${currentFloor}층 — 전투 발생 · 적 ${mobCount}명`);
-                    this._stopHuntingMoveForBattle(app, `${currentFloor}층 — 전투 발생 · 적 ${mobCount}명`);
-                    return;
-                }
-
-                if (encounter.type === HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS) {
-                    app.addLog(`[사냥터] ${currentFloor}층 — 최종 보스 등장!`);
-                    this._stopHuntingMoveForBattle(app, `${currentFloor}층 — 최종 보스!`);
-                    return;
-                }
-
-                if (encounter.type === HUNTING_FLOOR_OUTCOME_TYPES.EVENT && event) {
-                    this._handleAdvanceEvent(event, app);
-
-                    if (event.type === HUNTING_EVENT_TYPES.PORTAL) {
-                        app.addLog(`[사냥터] ${currentFloor}층 — 포탈 발견, 귀환하거나 계속 전진할 수 있습니다.`);
-                        this._stopHuntingMoveForChoice(app, {
-                            message: `${currentFloor}층 — 포탈 발견!`,
-                            canRetreat: true,
-                            floor: currentFloor,
-                            summary: `포탈 발견 · 현재 ${currentFloor}층 · 귀환 또는 10층 전진`
-                        });
-                        return;
-                    }
-
-                    if (event.type === HUNTING_EVENT_TYPES.WANDERING_MERCHANT) {
-                        app.addLog(`[사냥터] ${currentFloor}층 — 떠돌이 상인 발견`);
-                        const offers = createMerchantOffers(this._run, event, app.playerProfile);
-                        this._run = { ...this._run, merchantOffers: offers };
-                        const pendingText = formatPendingLootSummary(this._run.pendingLoot);
-                        this._stopHuntingMoveForMerchant(app, {
-                            message: `${currentFloor}층 — 떠돌이 상인`,
-                            floor: currentFloor,
-                            offers,
-                            summary: pendingText
-                        });
-                        return;
-                    }
-
-                    if (event.type === HUNTING_EVENT_TYPES.CHAMPION_INTRUSION) {
-                        this._stopHuntingMoveForBattle(app, `${currentFloor}층 — 챔피언 난입!`);
-                        return;
-                    }
-
-                    if (event.type === HUNTING_EVENT_TYPES.CHEST_ROOM) {
-                        return;
-                    }
-
-                    // boon / mishap / rest_site / cursed_altar: auto-continue
-                    continue;
-                }
+            const route = this._createAdvanceRoute();
+            for (let step = 0; step < route.maxSteps; step++) {
+                const action = await this._advanceOneFloor({ route, step, waitForFirstMoveUi });
+                if (action === HUNTING_ROUTE_ACTIONS.STOP) return;
             }
-
-            // 모든 이동 단계 소진 — 정지 없이 최대 10층 전진 완료
-            this._stopHuntingMoveForChoice(app, {
-                message: `${routeMaxSteps}층 전진 완료 — ${this._run.floor}층`,
-                canRetreat: false,
-                floor: this._run.floor,
-                summary: `현재 ${this._run.floor}층 · 포탈 없이는 귀환 불가`
-            });
+            this._finishAdvanceRoute(route);
         } catch (error) {
-            console.error("[Hunting] advance loop error:", error);
-            app.setHuntingOverlayState({
-                huntingMoving: false,
-                huntingMoveMessage: "이동 중 오류 발생 — 새로고침 후 다시 시도해주세요"
-            });
-            this._moving = false;
+            this._handleAdvanceError(error);
         }
+    }
+
+    _applyPortalDeclineOnAdvance(run) {
+        if (run.lastEvent?.type !== HUNTING_EVENT_TYPES.PORTAL) return;
+        this._run = {
+            ...this._run,
+            portalDeclineFloors: HUNTING_PORTAL_DECLINE.INITIAL_FLOORS
+        };
+    }
+
+    _createAdvanceRoute() {
+        const startFloor = this._run.floor;
+        const endFloor = Math.min(this._run.maxFloor, startFloor + HUNTING_ADVANCE_STEPS);
+        return {
+            startFloor,
+            endFloor,
+            maxSteps: Math.max(1, endFloor - startFloor)
+        };
+    }
+
+    async _advanceOneFloor({ route, step, waitForFirstMoveUi }) {
+        const app = this.app;
+        const targetFloor = Math.min(this._run.maxFloor, this._run.floor + 1);
+        this._setHuntingMoveState({
+            moving: true,
+            step: step + 1,
+            maxSteps: route.maxSteps,
+            routeStartFloor: route.startFloor,
+            routeEndFloor: route.endFloor,
+            message: `${targetFloor}층으로 이동 중…`
+        });
+
+        if (waitForFirstMoveUi && step === 0) {
+            await app.waitForHuntingMoveUiPaint();
+            if (!this._run || this._run.status !== "active" || !this._moving) {
+                this._moving = false;
+                return HUNTING_ROUTE_ACTIONS.STOP;
+            }
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 350));
+        if (!this._advanceRunOneFloor()) return HUNTING_ROUTE_ACTIONS.STOP;
+        return this._handleCurrentFloor(app);
+    }
+
+    _advanceRunOneFloor() {
+        this._run = advanceHuntingRun(this._run);
+        if (this._run.status === "active") return true;
+
+        this.app.setHuntingOverlayState({ huntingMoving: false });
+        this._moving = false;
+        this.retreat();
+        return false;
+    }
+
+    _handleCurrentFloor(app) {
+        const encounter = this._run.lastEncounter;
+        const handlerName = HUNTING_FLOOR_OUTCOME_HANDLERS[encounter?.type];
+        if (!handlerName || typeof this[handlerName] !== "function") {
+            throw new Error(`Unsupported hunting floor outcome: ${encounter?.type ?? "missing"}`);
+        }
+        return this[handlerName]({ app, event: this._run.lastEvent, floor: this._run.floor });
+    }
+
+    _handleEmptyFloor({ app, floor }) {
+        app.addLog(`[사냥터] ${floor}층 — 빈 통로`);
+        app.setHuntingOverlayState({ huntingMoveMessage: `${floor}층 — 빈 통로` });
+        return HUNTING_ROUTE_ACTIONS.CONTINUE;
+    }
+
+    _handleCombatFloor({ app, floor }) {
+        const mobCount = getHuntingMobCount(floor);
+        const message = `${floor}층 — 전투 발생 · 적 ${mobCount}명`;
+        app.addLog(`[사냥터] ${message}`);
+        this._stopHuntingMoveForBattle(app, message);
+        return HUNTING_ROUTE_ACTIONS.STOP;
+    }
+
+    _handleFinalBossFloor({ app, floor }) {
+        const message = `${floor}층 — 최종 보스!`;
+        app.addLog(`[사냥터] ${floor}층 — 최종 보스 등장!`);
+        this._stopHuntingMoveForBattle(app, message);
+        return HUNTING_ROUTE_ACTIONS.STOP;
+    }
+
+    _handleEventFloor({ app, event, floor }) {
+        if (!event) return HUNTING_ROUTE_ACTIONS.CONTINUE;
+        return this._handleAdvanceEvent(event, app, floor);
+    }
+
+    _finishAdvanceRoute(route) {
+        this._stopHuntingMoveForChoice(this.app, {
+            message: `${route.maxSteps}층 전진 완료 · ${this._run.floor}층`,
+            canRetreat: false,
+            floor: this._run.floor,
+            summary: `현재 ${this._run.floor}층 · 포탈 없이 귀환 불가`
+        });
+    }
+
+    _handleAdvanceError(error) {
+        console.error("[Hunting] advance loop error:", error);
+        this.app.setHuntingOverlayState({
+            huntingMoving: false,
+            huntingMoveMessage: "이동 중 오류 발생 · 로그를 확인 후 다시 시도해주세요"
+        });
+        this._moving = false;
     }
 
     _setHuntingMoveState({ moving, step, maxSteps, routeStartFloor, routeEndFloor, message }) {
@@ -718,68 +732,103 @@ export class HuntingManager {
         this.advance();
     }
 
-    _handleAdvanceEvent(event, app) {
+    _handleAdvanceEvent(event, app, floor = this._run?.floor) {
+        const handlerName = HUNTING_EVENT_HANDLERS[event?.type];
+        if (!handlerName || typeof this[handlerName] !== "function") {
+            throw new Error(`Unsupported hunting event: ${event?.type ?? "missing"}`);
+        }
+        return this[handlerName]({ app, event, floor });
+    }
+
+    _handlePortalEvent({ app, floor }) {
+        app.addLog(`[사냥터] ${floor}층 — 포탈 발견, 귀환하거나 계속 전진할 수 있습니다.`);
+        this._stopHuntingMoveForChoice(app, {
+            message: `${floor}층 — 포탈 발견!`,
+            canRetreat: true,
+            floor,
+            summary: `포탈 발견 · 현재 ${floor}층 · 귀환 또는 10층 전진`
+        });
+        return HUNTING_ROUTE_ACTIONS.STOP;
+    }
+
+    _handleMerchantEvent({ app, event, floor }) {
+        app.addLog(`[사냥터] ${floor}층 — 방랑 상인 발견`);
+        const offers = createMerchantOffers(this._run, event, app.playerProfile);
+        this._run = { ...this._run, merchantOffers: offers };
+        this._stopHuntingMoveForMerchant(app, {
+            message: `${floor}층 — 방랑 상인`,
+            floor,
+            offers,
+            summary: formatPendingLootSummary(this._run.pendingLoot)
+        });
+        return HUNTING_ROUTE_ACTIONS.STOP;
+    }
+
+    _handleBoonEvent({ app, event }) {
         const run = this._run;
-        if (event.type === HUNTING_EVENT_TYPES.BOON) {
-            this._run = recordHuntingFloorResult(this._run, {
-                hpRemain: run.carriedHp,
-                maxHp: run.carriedMaxHp,
-                loot: { shards: event.shards ?? 8, chests: [], xp: 0 },
-                consumeStatModifiers: false
-            });
-            app.addLog(`[사냥터] 축복: 파편 +${event.shards ?? 8}`);
-            app.showToast(`축복: 파편 +${event.shards ?? 8}`);
-            return;
-        }
+        const shards = event.shards ?? 8;
+        this._run = recordHuntingFloorResult(run, {
+            hpRemain: run.carriedHp,
+            maxHp: run.carriedMaxHp,
+            loot: { shards, chests: [], xp: 0 },
+            consumeStatModifiers: false
+        });
+        app.addLog(`[사냥터] 축복: 파편 +${shards}`);
+        app.showToast(`축복: 파편 +${shards}`);
+        return HUNTING_ROUTE_ACTIONS.CONTINUE;
+    }
 
-        if (event.type === HUNTING_EVENT_TYPES.MISHAP) {
-            const damageRatio = event.damageRatio ?? 0.1;
-            const currentHp = this._run.carriedHp ?? this._run.carriedMaxHp ?? 100;
-            const damage = Math.max(1, Math.floor(currentHp * damageRatio));
-            const newHp = Math.max(1, currentHp - damage);
-            this._run = recordHuntingFloorResult(this._run, {
-                hpRemain: newHp,
-                maxHp: run.carriedMaxHp,
-                loot: { shards: 0, chests: [], xp: 0 },
-                consumeStatModifiers: false
-            });
-            app.addLog(`[사냥터] 함정: HP -${damage}`);
-            app.showToast(`함정: HP -${damage}`);
-            return;
-        }
+    _handleMishapEvent({ app, event }) {
+        const run = this._run;
+        const currentHp = run.carriedHp ?? run.carriedMaxHp ?? 100;
+        const damage = Math.max(1, Math.floor(currentHp * (event.damageRatio ?? 0.1)));
+        this._run = recordHuntingFloorResult(run, {
+            hpRemain: Math.max(1, currentHp - damage),
+            maxHp: run.carriedMaxHp,
+            loot: { shards: 0, chests: [], xp: 0 },
+            consumeStatModifiers: false
+        });
+        app.addLog(`[사냥터] 함정: HP -${damage}`);
+        app.showToast(`함정: HP -${damage}`);
+        return HUNTING_ROUTE_ACTIONS.CONTINUE;
+    }
 
-        if (event.type === HUNTING_EVENT_TYPES.REST_SITE) {
-            const healAmount = Math.floor(
-                (this._run.carriedMaxHp ?? this._run.carriedHp ?? 100) * (event.recoveryRatio ?? 0.25)
-            );
-            this._run = applyHuntingEventRecovery(this._run, { amount: healAmount });
-            const name = app.roster.find((f) => f.id === run.characterId)?.name ?? run.characterId;
-            app.addLog(`[사냥터] 휴식: ${name} HP +${healAmount}`);
-            app.showToast(`휴식: HP +${healAmount}`);
-            return;
-        }
+    _handleChestRoomEvent({ app, event, floor }) {
+        const run = this._run;
+        const chest = createHuntingChest({ rarity: event.chestRarity ?? "common" });
+        this._run = recordHuntingFloorResult(run, {
+            hpRemain: run.carriedHp,
+            maxHp: run.carriedMaxHp,
+            loot: { shards: 0, chests: [chest], xp: 0 },
+            consumeStatModifiers: false
+        });
+        app.addLog(`[사냥터] 상자방: ${chest.rarity} 상자 획득`);
+        this._stopHuntingMoveForChest(app, { chest, floor });
+        return HUNTING_ROUTE_ACTIONS.STOP;
+    }
 
-        if (event.type === HUNTING_EVENT_TYPES.CHEST_ROOM) {
-            const chest = createHuntingChest({ rarity: event.chestRarity ?? "common" });
-            this._run = recordHuntingFloorResult(this._run, {
-                hpRemain: run.carriedHp,
-                maxHp: run.carriedMaxHp,
-                loot: { shards: 0, chests: [chest], xp: 0 },
-                consumeStatModifiers: false
-            });
-            app.addLog(`[사냥터] 상자방: ${chest.rarity} 상자 획득`);
-            this._stopHuntingMoveForChest(app, { chest, floor: this._run.floor });
-            return;
-        }
+    _handleRestSiteEvent({ app, event }) {
+        const run = this._run;
+        const healAmount = Math.floor((run.carriedMaxHp ?? run.carriedHp ?? 100) * (event.recoveryRatio ?? 0.25));
+        this._run = applyHuntingEventRecovery(run, { amount: healAmount });
+        const name = app.roster.find((fighter) => fighter.id === run.characterId)?.name ?? run.characterId;
+        app.addLog(`[사냥터] 휴식: ${name} HP +${healAmount}`);
+        app.showToast(`휴식: HP +${healAmount}`);
+        return HUNTING_ROUTE_ACTIONS.CONTINUE;
+    }
 
-        if (event.type === HUNTING_EVENT_TYPES.CURSED_ALTAR) {
-            this._run = applyHuntingCursedAltar(this._run, { trade: event.trade });
-            app.addLog(
-                `[사냥터] 저주받은 제단: ${event.trade?.gainStat} x${event.trade?.gainMultiplier} / ${event.trade?.loseStat} x${event.trade?.loseMultiplier}`
-            );
-            app.showToast("저주받은 제단: 스탯 교환");
-            return;
-        }
+    _handleCursedAltarEvent({ app, event }) {
+        this._run = applyHuntingCursedAltar(this._run, { trade: event.trade });
+        app.addLog(
+            `[사냥터] 저주받은 제단: ${event.trade?.gainStat} x${event.trade?.gainMultiplier} / ${event.trade?.loseStat} x${event.trade?.loseMultiplier}`
+        );
+        app.showToast("저주받은 제단: 스탯 교환");
+        return HUNTING_ROUTE_ACTIONS.CONTINUE;
+    }
+
+    _handleChampionIntrusionEvent({ app, floor }) {
+        this._stopHuntingMoveForBattle(app, `${floor}층 — 챔피언 난입!`);
+        return HUNTING_ROUTE_ACTIONS.STOP;
     }
 
     _mergeIntoSecured(app) {

@@ -34,7 +34,7 @@ import {
     sanitizePlayerProfile
 } from "../src/playerProfile.js";
 import { completeChallengeTournament, formatBonusSummary } from "../src/progression/progressionState.js";
-import { HuntingManager } from "../src/hunting/huntingManager.js";
+import { HUNTING_EVENT_HANDLERS, HuntingManager } from "../src/hunting/huntingManager.js";
 import {
     advanceHuntingRun,
     canEnterHunting,
@@ -1501,6 +1501,32 @@ async function testHuntingChestEventStopsAdvanceLoop() {
         "Chest room should remain visible after advance returns"
     );
     console.log("[hunting-chest-event-stops-advance] ok");
+}
+
+function testHuntingAdvanceDispatchContract() {
+    const manager = new HuntingManager({});
+    const configuredEvents = Object.keys(HUNTING_EVENT_HANDLERS).sort();
+    const knownEvents = Object.values(HUNTING_EVENT_TYPES).sort();
+    assert.deepEqual(configuredEvents, knownEvents, "Every hunting event type should declare one route handler");
+    assert.ok(
+        Object.values(HUNTING_EVENT_HANDLERS).every((handlerName) => typeof manager[handlerName] === "function"),
+        "Every configured hunting event handler should exist on HuntingManager"
+    );
+
+    const source = readFileSync(new URL("../src/hunting/huntingManager.js", import.meta.url), "utf8");
+    const advanceStart = source.indexOf("    async advance(");
+    const advanceEnd = source.indexOf("    _applyPortalDeclineOnAdvance", advanceStart);
+    const advanceSource = source.slice(advanceStart, advanceEnd);
+    assert.ok(
+        advanceSource.includes("_advanceOneFloor"),
+        "advance should delegate each floor to the route step handler"
+    );
+    assert.equal(
+        /HUNTING_(?:FLOOR_OUTCOME|EVENT)_TYPES/.test(advanceSource),
+        false,
+        "advance should not branch on individual floor or event types"
+    );
+    console.log("[hunting-advance-dispatch] ok");
 }
 
 function testComponentBridgeEquipmentFunctions() {
@@ -7089,6 +7115,7 @@ await testHuntingEarlyEventUi();
 await testHuntingFirstMoveUiPaintGate();
 testHuntingChestEventStopsAndResumes();
 await testHuntingChestEventStopsAdvanceLoop();
+testHuntingAdvanceDispatchContract();
 testComponentBridgeEquipmentFunctions();
 await testBattleAppAdoptsPreExistingAlpineAllocation();
 await testAdjustRandomResetSyncPlayerStatAllocation(app);
