@@ -1676,8 +1676,8 @@ function testHuntingSystem() {
         "Chest rewards should roll from the rarity reward table"
     );
     assert.ok(
-        previewHuntingChest(rare).rewardTable.some((reward) => reward.type === "SHARDS"),
-        "Chest preview should expose concrete possible reward effects"
+        previewHuntingChest(rare).rewardTable.every((reward) => reward.type === "equipment"),
+        "Rare and higher chests should guarantee equipment rewards"
     );
     const afterFloor = recordHuntingFloorResult(run, {
         hpRemain: 55,
@@ -1770,8 +1770,9 @@ function testHuntingSystem() {
     assert.equal(getChestOpenCost("uncommon"), 50, "Uncommon chest open cost should match design");
     const opened = openHuntingChest(profile, "u1", { rng: () => 0 });
     assert.equal(opened.opened, true, "Chest should open when enough key shards are available");
-    assert.equal(opened.reward.type, "SHARDS", "Opening a chest should produce a concrete reward");
-    assert.equal(profile.hunting.shards, 45, "Opening a shard reward chest should spend cost and apply reward");
+    assert.equal(opened.reward.type, "equipment", "Uncommon chests should guarantee equipment rewards");
+    assert.equal(profile.hunting.shards, 0, "Opening a guaranteed equipment chest should only spend its cost");
+    assert.equal(profile.equipment.inventory.length, 1, "Guaranteed equipment rewards should enter the inventory");
     assert.equal(profile.hunting.chests.length, 0, "Opened chest should leave storage");
 
     const sanitized = sanitizePlayerProfile({

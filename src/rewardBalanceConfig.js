@@ -38,22 +38,10 @@ export const REWARD_BALANCE = deepFreeze({
                     { id: "common-key-shards", weight: 55, type: "SHARDS", amount: 18, text: "파편 +18" },
                     { id: "common-equipment", weight: 45, type: "equipment", text: "일반 장비" }
                 ],
-                uncommon: [
-                    { id: "uncommon-key-shards", weight: 45, type: "SHARDS", amount: 45, text: "파편 +45" },
-                    { id: "uncommon-equipment", weight: 55, type: "equipment", text: "고급 장비" }
-                ],
-                rare: [
-                    { id: "rare-key-shards", weight: 35, type: "SHARDS", amount: 105, text: "파편 +105" },
-                    { id: "rare-equipment", weight: 65, type: "equipment", text: "희귀 장비" }
-                ],
-                epic: [
-                    { id: "epic-key-shards", weight: 30, type: "SHARDS", amount: 230, text: "파편 +230" },
-                    { id: "epic-equipment", weight: 70, type: "equipment", text: "에픽 장비" }
-                ],
-                legendary: [
-                    { id: "legendary-key-shards", weight: 25, type: "SHARDS", amount: 520, text: "파편 +520" },
-                    { id: "legendary-equipment", weight: 75, type: "equipment", text: "전설 장비" }
-                ]
+                uncommon: [{ id: "uncommon-equipment", weight: 100, type: "equipment", text: "고급 장비" }],
+                rare: [{ id: "rare-equipment", weight: 100, type: "equipment", text: "희귀 장비" }],
+                epic: [{ id: "epic-equipment", weight: 100, type: "equipment", text: "에픽 장비" }],
+                legendary: [{ id: "legendary-equipment", weight: 100, type: "equipment", text: "전설 장비" }]
             }
         },
         shards: {
