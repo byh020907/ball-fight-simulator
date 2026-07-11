@@ -148,7 +148,7 @@ import {
     resolveTemplateComponent
 } from "../src/alpineTemplateComponents.js";
 import { BattleBall, computeHeroOrbCarryover, STAT_ORB_KEYS } from "../src/entities/index.js";
-import { generateMobAppearance } from "../src/entities/mobAppearance.js";
+import { MobAppearance } from "../src/entities/mobAppearance.js";
 import { PHYSICS_MATERIALS, resolvePhysicsMaterial, combinePhysicsMaterials } from "../src/physics/PhysicsMaterial.js";
 import PhysicsMaterialBody from "../src/physics/PhysicsMaterialBody.js";
 
@@ -1629,7 +1629,7 @@ function testHuntingSystem() {
         floor: 3,
         rng: (() => {
             // [mob1 type, mob2 type, mob0 apperance×5, mob1 appearance×5, mob2 appearance×5]
-            // generateMobAppearance는 이제 randomSpin 헬퍼로 2회 rng 호출 (abs+sign)
+            // MobAppearance.generate는 이제 randomSpin 헬퍼로 2회 rng 호출 (abs+sign)
             const rolls = [0.9, 0, 0.1, 0.2, 0.3, 0.5, 0.6, 0.7, 0.8, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8];
             return () => rolls.shift() ?? 0;
         })()
@@ -3970,7 +3970,7 @@ function testMobAppearanceHasRotationData() {
         rng_calls.push(rng_calls.length);
         return rng_calls.length * 0.1;
     };
-    const app = generateMobAppearance(mockRng);
+    const app = MobAppearance.generate(mockRng);
     assert.ok(typeof app.angle === "number", "appearance should have angle");
     assert.ok(typeof app.angularVelocity === "number", "appearance should have angularVelocity");
     assert.ok(Number.isFinite(app.angle), "angle should be finite");
@@ -3982,7 +3982,7 @@ function testMobAppearanceHasRotationData() {
         rng_calls2.push(rng_calls2.length);
         return rng_calls2.length * 0.1;
     };
-    const app2 = generateMobAppearance(mockRng2);
+    const app2 = MobAppearance.generate(mockRng2);
     assert.equal(app2.angle, app.angle, "same rng sequence should produce same angle");
     assert.equal(app2.angularVelocity, app.angularVelocity, "same rng sequence should produce same angularVelocity");
 }

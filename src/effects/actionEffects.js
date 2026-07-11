@@ -1,20 +1,20 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
 
-const ACTION_WINDOW_COLORS = {
-    counter: "#ff8844",
-    projectile_guard: "#44ddff",
-    endure: "#44ff44",
-    time_warp: "#aa44ff",
-    rush: "#4488ff"
-};
-
 export class ActionWindowEffect extends CombatEntity {
+    static COLORS = {
+        counter: "#ff8844",
+        projectile_guard: "#44ddff",
+        endure: "#44ff44",
+        time_warp: "#aa44ff",
+        rush: "#4488ff"
+    };
+
     static renderLayer = RENDER_LAYERS.FOREGROUND;
 
     constructor(ball, actionId, duration) {
         super(ball.position.clone(), new Vector2(), 0);
         this.ball = ball;
-        this.color = ACTION_WINDOW_COLORS[actionId] ?? "#ffffff";
+        this.color = ActionWindowEffect.COLORS[actionId] ?? "#ffffff";
         this.life = duration;
         this.maxLife = this.life;
     }
@@ -49,7 +49,7 @@ export class ActionSuccessEffect extends CombatEntity {
 
     constructor(position, actionId) {
         super(position.clone(), new Vector2(), 0);
-        this.color = ACTION_WINDOW_COLORS[actionId] ?? "#ffffff";
+        this.color = ActionWindowEffect.COLORS[actionId] ?? "#ffffff";
         this.life = 0.3;
         this.maxLife = this.life;
     }

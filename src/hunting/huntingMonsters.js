@@ -1,6 +1,6 @@
 import { HUNTING_ENEMY_TYPES } from "./huntingConfig.js";
 import { scaleEnemySpecForHunting } from "./huntingEncounters.js";
-import { generateMobAppearance } from "../entities/mobAppearance.js";
+import { MobAppearance } from "../entities/mobAppearance.js";
 
 const DEFAULT_RNG = () => Math.random();
 
@@ -74,7 +74,7 @@ export function createHuntingMobSpec({
             monsterType: safeType,
             isMob: true
         },
-        appearance: generateMobAppearance(rng)
+        appearance: MobAppearance.generate(rng)
     };
 }
 

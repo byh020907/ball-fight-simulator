@@ -8,7 +8,7 @@ import {
     snapshotPhysicsState,
     validatePhysicsState
 } from "../physics/PhysicsDebugRingBuffer.js";
-import { getFaceTemplate } from "./mobAppearance.js";
+import { MobAppearance } from "./mobAppearance.js";
 import { drawEquipmentItems } from "./equipmentVisuals.js";
 import { applyHeroOrbCarryoverToBattleBall, mergeHeroOrbCarryover, HERO_ORB_CARRYOVER_RATE } from "./heroOrb.js";
 import { createEquipmentCombatEffects } from "../hunting/equipmentEffects.js";
@@ -594,7 +594,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
     }
 
     _drawAppearanceFace(ctx) {
-        const template = getFaceTemplate(this.appearance.face);
+        const template = MobAppearance.getTemplate(this.appearance.face);
         template.draw(ctx, this.radius);
     }
 }
