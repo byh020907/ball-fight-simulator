@@ -5,21 +5,16 @@ import {
     sellEquipment,
     fuseEquipment,
     enhanceEquipment,
-    canCharacterEquipItem,
     canFuseEquipment,
-    calculateEnhanceCost,
-    calculateEnhanceFailureRate,
-    ENHANCE_MAX_LEVEL,
-    getEquippedStatBonuses,
     getCharacterEquipmentLevel,
-    getEquipmentRequiredLevel,
-    getNextEquipmentRarity
+    getEquipmentRequiredLevel
 } from "./hunting/equipmentConfig.js";
 import { openHuntingChest } from "./hunting/chestRewards.js";
 import { savePlayerProfile } from "./playerProfile.js";
 import { PopupService } from "./popup.js";
 import { HELP_TITLE, HELP_CONTENT } from "./helpContent.js";
 import { CollectionHubService } from "./collectionHubService.js";
+import { createCollectionActionPopupOptions } from "./collection/collectionActionPopup.js";
 
 export function createComponentBridge(app) {
     function showLevelLockPopup(item) {
@@ -138,29 +133,13 @@ export function createComponentBridge(app) {
 
         enhanceItem(instanceId) {
             const profile = app.playerProfile;
-            const eq = profile?.equipment;
-            if (!eq || !Array.isArray(eq.inventory)) return;
-            const item = eq.inventory.find((i) => i.instanceId === instanceId);
-            if (!item) return;
-            const currentLevel = item.enhanceLevel ?? 0;
-            if (currentLevel >= ENHANCE_MAX_LEVEL) return;
-
-            const cost = calculateEnhanceCost(currentLevel);
-            if (
-                (eq.enhancementStones ?? 0) < (cost?.stones ?? 0) ||
-                (profile.hunting?.shards ?? 0) < (cost?.shards ?? 0)
-            ) {
-                PopupService.show({
-                    title: "강화 불가",
-                    bodyHtml: `<p>강화석 또는 파편이 부족합니다.</p>`,
-                    buttons: [{ text: "확인", value: "ok", primary: true }]
-                });
-                return;
-            }
             const result = enhanceEquipment(profile, instanceId);
-            if (result) {
+            if (!result) return;
+            if (!result.error) {
                 refreshCollectionAndProfile();
             }
+            PopupService.show(createCollectionActionPopupOptions("enhance", result));
+            return result;
         },
 
         fuseItem(instanceId) {
@@ -184,7 +163,9 @@ export function createComponentBridge(app) {
             const result = disassembleEquipment(profile, instanceId);
             if (result) {
                 refreshCollectionAndProfile();
+                PopupService.show(createCollectionActionPopupOptions("disassemble", result));
             }
+            return result;
         },
 
         sellItem(instanceId) {
@@ -192,7 +173,9 @@ export function createComponentBridge(app) {
             const result = sellEquipment(profile, instanceId);
             if (result) {
                 refreshCollectionAndProfile();
+                PopupService.show(createCollectionActionPopupOptions("sell", result));
             }
+            return result;
         },
 
         // ── Collection navigation actions ──
@@ -209,38 +192,11 @@ export function createComponentBridge(app) {
             if (!profile?.hunting) return false;
 
             const result = openHuntingChest(profile, chestId);
-            if (!result.opened) {
-                const msgs = {
-                    not_enough_shards: `파편이 부족합니다 (필요: ${result.cost})`,
-                    inventory_full: "장비 인벤토리가 가득 찼습니다. 장비를 분해하거나 인벤토리를 확장해주세요.",
-                    not_found: "상자를 찾을 수 없습니다.",
-                    missing_storage: "보관함 정보를 불러올 수 없습니다."
-                };
-                PopupService.show({
-                    title: "개봉 실패",
-                    bodyHtml: `<p>${msgs[result.reason] ?? "알 수 없는 오류"}</p>`
-                });
-                return false;
+            if (result.opened) {
+                refreshCollectionAndProfile();
             }
-
-            savePlayerProfile(profile);
-            app._refreshCollectionHub?.();
-
-            let bodyHtml = "";
-            if (result.applied.shards > 0) {
-                bodyHtml += `<p>파편 +${result.applied.shards} (보유: ${result.currentShards})</p>`;
-            }
-            if (result.applied.equipment) {
-                const eq = result.applied.equipment;
-                const statsText = eq.stats.map((s) => `${s.type} +${s.value}`).join(", ");
-                bodyHtml += `<p><strong>${eq.name}</strong> (${eq.rarity})<br><span style="font-size:0.8rem">${eq.description} · ${statsText}</span></p>`;
-            }
-
-            PopupService.show({
-                title: "상자 개봉 결과",
-                bodyHtml
-            });
-            return true;
+            PopupService.show(createCollectionActionPopupOptions("chest", result));
+            return result.opened;
         }
     };
 }

@@ -16,6 +16,10 @@ const HERO_ORB_SPECIAL_CHANCES = {
 };
 const COOLDOWN_BURST_DURATION = 1.0;
 const COOLDOWN_BURST_MULTIPLIER = 0.1;
+const HERO_STACK_GAIN_FLASH_DURATION = 0.16;
+const HERO_STACK_RELEASE_FLASH_DURATION = 0.28;
+const HERO_STACK_RING_OFFSET = 14;
+const HERO_STACK_RING_WIDTH = 4;
 
 /**
  * 확률 기반 Hero Orb effect type 선택.
@@ -46,7 +50,13 @@ export function computeOwnerCombatSpeed(owner) {
 export class HeroAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation, HERO_ORB_BASE_COOLDOWN);
-        this.state = { cooldownBurstTimer: 0, cooldownBurstMultiplier: 1, orbStacks: 0 };
+        this.state = {
+            cooldownBurstTimer: 0,
+            cooldownBurstMultiplier: 1,
+            orbStacks: 0,
+            stackGainFlash: 0,
+            stackReleaseFlash: 0
+        };
     }
 
     /** cooldown burst 상태에서 effective cooldown getter 오버라이드 */
@@ -69,6 +79,11 @@ export class HeroAbility extends Ability {
             this.state.cooldownBurstTimer = 0;
             this.state.cooldownBurstMultiplier = 1;
         }
+    }
+
+    _tickStackVisuals(delta) {
+        this.state.stackGainFlash = Math.max(0, this.state.stackGainFlash - delta);
+        this.state.stackReleaseFlash = Math.max(0, this.state.stackReleaseFlash - delta);
     }
 
     /** Hero Orb 발사 속도 계산 — owner의 실제 전투 속도 기준 */
@@ -121,7 +136,18 @@ export class HeroAbility extends Ability {
     onOrbCollected() {
         const stackCap = this.getLevelUpgrade().stackCap;
         if (!stackCap) return;
-        this.state.orbStacks = Math.min(stackCap, this.state.orbStacks + 1);
+        const nextStacks = Math.min(stackCap, this.state.orbStacks + 1);
+        if (nextStacks > this.state.orbStacks) {
+            this.state.stackGainFlash = HERO_STACK_GAIN_FLASH_DURATION;
+        }
+        this.state.orbStacks = nextStacks;
+    }
+
+    getOrbStackState() {
+        const rawStackCap = this.getLevelUpgrade().stackCap;
+        const stackCap = Number.isFinite(rawStackCap) ? Math.max(0, Math.floor(rawStackCap)) : 0;
+        const stacks = Math.min(stackCap, Math.max(0, this.state.orbStacks));
+        return { stacks, stackCap, progress: stackCap > 0 ? stacks / stackCap : 0 };
     }
 
     modifyOutgoingFighterCollisionDamage(amount) {
@@ -135,6 +161,7 @@ export class HeroAbility extends Ability {
 
         const consumedStacks = this.state.orbStacks;
         this.state.orbStacks = 0;
+        this.state.stackReleaseFlash = HERO_STACK_RELEASE_FLASH_DURATION;
         const releaseStackRatio = this.getLevelUpgrade().releaseStackRatio;
         if (!releaseStackRatio) return;
 
@@ -152,6 +179,7 @@ export class HeroAbility extends Ability {
 
     update(delta, target) {
         this._tickCooldownBurst(delta);
+        this._tickStackVisuals(delta);
         this.timer -= delta;
         if (this.timer > 0) return;
         this.timer = this.cooldown;
@@ -161,6 +189,54 @@ export class HeroAbility extends Ability {
         this._spawnOrb(effectType, direction);
         this.simulation.playSound("orb", 0.8);
         this.simulation.addLog(`${this.owner.name} launches a ${effectType} orb.`);
+    }
+
+    draw(ctx) {
+        this._drawStackReleaseFlash(ctx);
+        this._drawOrbStackBand(ctx);
+    }
+
+    _drawStackReleaseFlash(ctx) {
+        if (this.state.stackReleaseFlash <= 0) return;
+        const progress = 1 - this.state.stackReleaseFlash / HERO_STACK_RELEASE_FLASH_DURATION;
+        const radius = this.owner.radius + HERO_STACK_RING_OFFSET + progress * 22;
+        ctx.save();
+        ctx.globalAlpha = (1 - progress) * 0.8;
+        ctx.strokeStyle = "#fff0a8";
+        ctx.lineWidth = 6 - progress * 3;
+        ctx.beginPath();
+        ctx.arc(this.owner.position.x, this.owner.position.y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    _drawOrbStackBand(ctx) {
+        const { stacks, stackCap } = this.getOrbStackState();
+        if (stacks <= 0 || stackCap <= 0) return;
+
+        const segmentAngle = (Math.PI * 2) / stackCap;
+        const segmentGap = Math.min(segmentAngle * 0.25, 0.08);
+        const gainPulse = this.state.stackGainFlash / HERO_STACK_GAIN_FLASH_DURATION;
+        const radius = this.owner.radius + HERO_STACK_RING_OFFSET + gainPulse * 2;
+
+        ctx.save();
+        ctx.lineCap = "round";
+        ctx.lineWidth = HERO_STACK_RING_WIDTH + gainPulse * 2;
+        Array.from({ length: stacks }).forEach((_, index) => {
+            const startAngle = -Math.PI / 2 + index * segmentAngle + segmentGap / 2;
+            const endAngle = startAngle + segmentAngle - segmentGap;
+            ctx.globalAlpha = index === stacks - 1 ? 0.8 + gainPulse * 0.2 : 0.82;
+            ctx.strokeStyle = index === stacks - 1 && gainPulse > 0 ? "#fff4b8" : "#ffd84a";
+            ctx.beginPath();
+            ctx.arc(this.owner.position.x, this.owner.position.y, radius, startAngle, endAngle);
+            ctx.stroke();
+        });
+        ctx.globalAlpha = 0.94;
+        ctx.fillStyle = "#6d5200";
+        ctx.font = "800 12px Bahnschrift, Segoe UI, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(`x${stacks}`, this.owner.position.x, this.owner.position.y - radius - 8);
+        ctx.restore();
     }
 
     getUiState() {

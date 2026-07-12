@@ -1135,6 +1135,17 @@
 - 영향: `src/components/collection-hub.html`, `src/components/popup-dialog.html`, `src/components/patch-notes.html`, `src/components/action-picker.html`, `tests/regression.mjs`, `docs/alpine-component-system.md`, `docs/collection-hub-ui.md`, `src/patchNotes.js`, `index.html`
 - 검증: `npm test`, `npm run check`, `npm run format:check`, `git diff --check` 통과. 로컬 브라우저에서 컬렉션 열기와 `Escape` 닫기 확인.
 
+## [L1] 2026-07-12 — 장비·상자 액션 결과와 Hero 축적 상태의 전투 표현 개선 계획 검토
+- 맥락: 컬렉션의 강화·분해·판매와 보관함 상자 개봉은 실행 결과가 화면에 충분히 남지 않아 성공 여부를 즉시 판단하기 어렵습니다. Hero Ball도 축적량을 사용한다는 감각을 줄 지속 시각 표현이 없습니다.
+- 결정: 구현 전 현재 액션 결과 전달 경로와 Hero 축적 상태를 조사하고, 데이터 계약·표현 계층·접근성·회귀 검증을 포함한 구조 개선 계획을 사용자와 먼저 검토합니다.
+- 영향 예정: `src/componentBridge.js`, `src/components/collection-hub.html`, 관련 전투 렌더러/Hero Ability, `tests/regression.mjs`, 관련 설계 문서
+
+## [L2] 2026-07-12 — 결과 중요도에 따라 팝업과 토스트를 구분
+- 배경: 장비 관리 액션의 완료 여부를 분명히 보여야 하지만, 모든 결과를 같은 짧은 토스트로 처리하면 관심 높은 보상·재화 변동을 놓치기 쉽습니다.
+- 결정: 유저 관심도와 정보량이 높은 강화·분해·판매·상자 개봉 결과는 확인형 팝업으로 통일합니다. 정보량이 작고 즉시 지나가도 되는 상태 알림만 토스트로 사용합니다. Hero Ball은 20분할 축적 링과 소비 순간의 방출 표현을 전투 캔버스에 추가합니다.
+- 영향: `src/collection/collectionActionPopup.js`, `src/componentBridge.js`, `src/abilities/heroAbility.js`, `src/helpContent.js`, `tests/regression.mjs`, `docs/equipment-system.md`, `docs/game-rules.md`, `src/patchNotes.js`, `index.html`
+- 검증: `npm test`, `npm run check`, `npm run format:check`, `git diff --check` 통과. 강화 성공/실패, 분해, 판매, 상자 개봉 성공/실패의 공통 팝업 옵션과 실제 브리지 호출, Hero 축적 링의 조각 수·수량 표기·소비 플래시를 회귀 테스트로 고정. 로컬 서버가 `v0.24.57`을 응답하는 것도 확인.
+
 ## 진행 중 이슈
 - 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
 - Time Warp 패널티 인상은 재학습 후 반영

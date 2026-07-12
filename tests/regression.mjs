@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { createComponentBridge as createAppComponentBridge } from "../src/componentBridge.js";
 import { PopupService } from "../src/popup.js";
+import { createCollectionActionPopupOptions } from "../src/collection/collectionActionPopup.js";
 import { ActionPickerService } from "../src/actionPicker.js";
 import {
     ALLOCATABLE_STATS,
@@ -2498,6 +2499,29 @@ function testAbilityLevelUpgrades(app) {
         heroAbility.onOrbCollected();
     }
     assert.equal(heroAbility.state.orbStacks, 20, "Hero tier 2 should cap orb stacks at twenty");
+    assert.deepEqual(
+        heroAbility.getOrbStackState(),
+        { stacks: 20, stackCap: 20, progress: 1 },
+        "Hero should expose its capped orb stack progress for the battle visual"
+    );
+    heroAbility.state.orbStacks = 3;
+    const drawnStackArcs = [];
+    const drawnStackLabels = [];
+    heroAbility.draw({
+        save() {},
+        restore() {},
+        beginPath() {},
+        arc(...args) {
+            drawnStackArcs.push(args);
+        },
+        stroke() {},
+        fillText(...args) {
+            drawnStackLabels.push(args);
+        }
+    });
+    assert.equal(drawnStackArcs.length, 3, "Hero should draw one bright stack band segment per collected orb");
+    assert.equal(drawnStackLabels[0][0], "x3", "Hero stack band should show the current stack count");
+    heroAbility.state.orbStacks = 20;
     assert.equal(
         heroAbility.modifyOutgoingFighterCollisionDamage(10),
         16,
@@ -2556,6 +2580,7 @@ function testAbilityLevelUpgrades(app) {
         0,
         "Hero should consume stacks only after actual fighter collision damage"
     );
+    assert.ok(heroAbility.state.stackReleaseFlash > 0, "Hero stack consumption should trigger a visible release flash");
     assert.equal(
         heroRun.sim.entities.filter((entity) => entity.constructor?.name === "HeroOrb").length,
         10,
@@ -11529,6 +11554,118 @@ function testComponentBridgeEquipmentActionsReachProfile() {
     console.log("[component-bridge-equipment-actions] ok");
 }
 
+function testCollectionActionPopupOptions() {
+    const item = {
+        name: "테스트 검",
+        rarity: "rare",
+        description: "검증용 장비",
+        stats: [{ type: "damage", value: 7 }],
+        enhanceLevel: 3
+    };
+    const expectedConfirmButton = [{ text: "확인", value: "ok", primary: true }];
+
+    const enhanceSuccess = createCollectionActionPopupOptions("enhance", {
+        success: true,
+        item,
+        oldLevel: 2,
+        newLevel: 3,
+        cost: { stones: 4, shards: 30 },
+        failureRate: 0.48
+    });
+    assert.equal(enhanceSuccess.title, "강화 성공", "Successful enhancement should use the shared result popup");
+    assert.ok(enhanceSuccess.bodyHtml.includes("테스트 검"), "Enhancement popup should identify the affected item");
+    assert.ok(enhanceSuccess.bodyHtml.includes("+2 → +3"), "Enhancement popup should show the level change");
+    assert.deepEqual(enhanceSuccess.buttons, expectedConfirmButton, "Result popups should have one confirm action");
+
+    const enhanceFailure = createCollectionActionPopupOptions("enhance", {
+        success: false,
+        item,
+        oldLevel: 3,
+        newLevel: 2,
+        cost: { stones: 6, shards: 40 },
+        failureRate: 0.64
+    });
+    assert.equal(enhanceFailure.title, "강화 실패", "Failed enhancement should still describe the applied outcome");
+    assert.ok(enhanceFailure.bodyHtml.includes("+3 → +2"), "Failure popup should show the decreased level");
+
+    const disassemble = createCollectionActionPopupOptions("disassemble", { item, stones: 12 });
+    assert.equal(disassemble.title, "장비 분해 완료", "Disassembly should use the shared result popup");
+    assert.ok(disassemble.bodyHtml.includes("강화석 +12"), "Disassembly popup should show the gained stones");
+
+    const sale = createCollectionActionPopupOptions("sell", { item, shards: 30 });
+    assert.equal(sale.title, "장비 판매 완료", "Sale should use the shared result popup");
+    assert.ok(sale.bodyHtml.includes("파편 +30"), "Sale popup should show the gained shards");
+
+    const chest = createCollectionActionPopupOptions("chest", {
+        opened: true,
+        applied: { shards: 0, equipment: item },
+        currentShards: 70
+    });
+    assert.equal(chest.title, "상자 개봉 결과", "Chest reward should use the shared result popup");
+    assert.ok(chest.bodyHtml.includes("테스트 검"), "Chest popup should identify awarded equipment");
+
+    const chestFailure = createCollectionActionPopupOptions("chest", {
+        opened: false,
+        reason: "not_enough_shards",
+        cost: 80
+    });
+    assert.equal(chestFailure.title, "개봉 실패", "Chest failure should use the shared result popup");
+    assert.ok(chestFailure.bodyHtml.includes("80"), "Chest failure should include the required cost when known");
+    console.log("[collection-action-popup-options] ok");
+}
+
+function testComponentBridgeCollectionActionResultsUsePopupService() {
+    const profile = createDefaultPlayerProfile();
+    profile.hunting.shards = 999;
+    profile.equipment.enhancementStones = 999;
+    const enhanceTarget = createEquipmentInstance({ rarity: "common", rng: () => 0.5 });
+    const disassembleTarget = createEquipmentInstance({ rarity: "common", rng: () => 0.5 });
+    const saleTarget = createEquipmentInstance({ rarity: "common", rng: () => 0.5 });
+    profile.equipment.inventory.push(enhanceTarget, disassembleTarget, saleTarget);
+
+    let refreshCount = 0;
+    const app = {
+        playerProfile: profile,
+        playerFighterId: "archer",
+        roster: [{ id: "archer", name: "Archer", title: "Test", color: "#f00" }],
+        _refreshCollectionHub() {
+            refreshCount += 1;
+        },
+        refreshPlayerSetup() {}
+    };
+    const popupCalls = [];
+    const originalDialog = PopupService._testDialog;
+    PopupService.setTestDialog({
+        show(options) {
+            popupCalls.push(options);
+            return Promise.resolve("ok");
+        }
+    });
+
+    try {
+        const bridge = createAppComponentBridge(app);
+        bridge.enhanceItem(enhanceTarget.instanceId);
+        bridge.disassembleItem(disassembleTarget.instanceId);
+        bridge.sellItem(saleTarget.instanceId);
+
+        assert.equal(popupCalls.length, 3, "Each completed collection action should present one result popup");
+        assert.ok(
+            popupCalls[0].title.startsWith("강화"),
+            "Enhancement should report success or failure through PopupService"
+        );
+        assert.equal(popupCalls[1].title, "장비 분해 완료", "Disassembly should report through PopupService");
+        assert.equal(popupCalls[2].title, "장비 판매 완료", "Sale should report through PopupService");
+        assert.ok(
+            popupCalls.every((options) => options.buttons?.[0]?.text === "확인"),
+            "Collection action result popups should use an explicit confirmation button"
+        );
+        assert.equal(refreshCount, 3, "Completed collection actions should refresh the open collection hub");
+    } finally {
+        PopupService.setTestDialog(originalDialog);
+    }
+    console.log("[component-bridge-collection-action-results] ok");
+}
+
 function testActionPickerServiceIdAndConcurrency() {
     // Test that ActionPickerService.show returns card ID, not index
     const cards = [
@@ -11758,6 +11895,8 @@ function testComponentBridgePopupCallsThroughServiceSeam() {
 async function runNewBridgeTests() {
     testHuntingManagerNoAppUiMethods(app);
     testComponentBridgeEquipmentActionsReachProfile();
+    testCollectionActionPopupOptions();
+    testComponentBridgeCollectionActionResultsUsePopupService();
     testCollectionHubServiceNoBlacklistedRefs();
     testComponentBridgeOpenChestExists();
     testComponentBridgeOpenChestFailure();
