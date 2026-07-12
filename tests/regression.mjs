@@ -13083,6 +13083,10 @@ function testDailyShopPopupContract() {
         template.includes(".ch-btn:not(:disabled):active"),
         "Collection buttons should have an enabled pressed state"
     );
+    assert.ok(
+        template.includes(".ch-btn--danger:not(:disabled):hover"),
+        "Danger buttons should retain their red hover feedback"
+    );
     assert.ok(template.includes("shopRerolling"), "Shop rerolls should trigger a visible transition state");
     assert.ok(template.includes("ch-shop-chest"), "Shop offers should reuse the chest icon component");
     assert.ok(
