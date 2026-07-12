@@ -1055,8 +1055,7 @@ export class BattleApp {
         }
 
         const reduction = player.mastery.action?.hpCostPercentReduction ?? 0;
-        const minPct = (player.mastery.action?.minHpCostPercent ?? 0) * 100;
-        const effectivePct = Math.max(minPct, action.hpCostPercent - reduction * 100);
+        const effectivePct = Math.max(0, action.hpCostPercent - reduction * 100);
         const cost = Math.ceil((player.maxHp * effectivePct) / 100);
         const paidCost = player.actionContext.spendHpForAction(player, cost);
         if (paidCost <= 0) {

@@ -13,7 +13,7 @@ function createMasteryContext() {
         physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0, collisionAngularImpulse: 0 },
         combatModifiers: { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
         combatPassives: [],
-        actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0, minHpCostPercent: 0 }
+        actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0 }
     };
 }
 

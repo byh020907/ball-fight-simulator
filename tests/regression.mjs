@@ -7324,9 +7324,9 @@ async function testMasteryModifiersStoredOnBattleBall(app) {
         stats: { hp: 1000, damage: 50, speed: 200, defense: 5, radius: 16, mass: 10 },
         statAllocation: null,
         mastery: {
-            physics: { velocityRecoveryBonus: 0.02, wallBounce: 0.05, speed: 0.03, collisionAngularImpulse: 0.04 },
+            physics: { velocityRecoveryBonus: 0.02, wallBounce: 0.05, collisionAngularImpulse: 0.04 },
             combat: { incomingCollisionDamageReduce: 0.05, outgoingCollisionDamageBonus: 0.03 },
-            action: { hpCostPercentReduction: 0.0003, cooldownPercent: 0.02, minHpCostPercent: 0.001 },
+            action: { hpCostPercentReduction: 0.0003, cooldownPercent: 0.02 },
             passives: [{ id: "test_passive", type: "periodic_collision_bonus", cooldown: 12, damageBonus: 0.04 }]
         }
     };
@@ -7334,7 +7334,6 @@ async function testMasteryModifiersStoredOnBattleBall(app) {
     const ball = new BattleBall(spec, new Vector2(100, 100));
     assert.equal(ball.mastery.physics.velocityRecoveryBonus, 0.02, "velocityRecoveryBonus should be stored");
     assert.equal(ball.mastery.physics.wallBounce, 0.05, "wallBounce should be stored");
-    assert.equal(ball.mastery.physics.speed, 0.03, "speed should be stored");
     assert.equal(ball.mastery.physics.collisionAngularImpulse, 0.04, "collisionAngularImpulse should be stored");
     assert.equal(
         ball.mastery.combat.incomingCollisionDamageReduce,
@@ -7348,7 +7347,6 @@ async function testMasteryModifiersStoredOnBattleBall(app) {
     );
     assert.equal(ball.mastery.action.hpCostPercentReduction, 0.0003, "hpCostPercentReduction should be stored");
     assert.equal(ball.mastery.action.cooldownPercent, 0.02, "cooldownPercent should be stored");
-    assert.equal(ball.mastery.action.minHpCostPercent, 0.001, "minHpCostPercent should be stored");
     assert.equal(ball.mastery.passives.length, 1, "combat passives should be stored");
     assert.equal(ball.mastery.passives[0].id, "test_passive", "passive id should match");
 }
@@ -7365,10 +7363,10 @@ async function testStatModifierDamageIndependentOfHp() {
     // archer mastery의 apply는 damage에만 영향을 줌
     const ctx = {
         statModifiers: { hp: 0, damage: 0, defense: 0 },
-        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0, speed: 0, collisionAngularImpulse: 0 },
+        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0, collisionAngularImpulse: 0 },
         combatModifiers: { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
         combatPassives: [],
-        actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0, minHpCostPercent: 0 }
+        actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0 }
     };
 
     archerDef.apply(ctx, 1); // BRONZE level
@@ -7395,9 +7393,9 @@ async function testMasteryEffectsApplyAfterFixedStats() {
     };
     const mastery = {
         statModifiers: { hp: 0.06, damage: 0.06, defense: 0 },
-        physicsModifiers: { velocityRecoveryBonus: 0.1, wallBounce: 0, speed: 0, collisionAngularImpulse: 0 },
+        physicsModifiers: { velocityRecoveryBonus: 0.1, wallBounce: 0, collisionAngularImpulse: 0 },
         combatModifiers: { incomingCollisionDamageReduce: 0.06, outgoingCollisionDamageBonus: 0.06 },
-        actionModifiers: { hpCostPercentReduction: 0.001, cooldownPercent: 0.06, minHpCostPercent: 0.001 },
+        actionModifiers: { hpCostPercentReduction: 0.001, cooldownPercent: 0.06 },
         combatPassives: []
     };
 
@@ -7413,10 +7411,10 @@ async function testVampireMasteryRestoresCollisionDamage() {
     const vampire = MASTERY_EFFECT_DEFS.find((definition) => definition.sourceFighterId === "vampire");
     const ctx = {
         statModifiers: { hp: 0, damage: 0, defense: 0 },
-        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0, speed: 0, collisionAngularImpulse: 0 },
+        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0, collisionAngularImpulse: 0 },
         combatModifiers: { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
         combatPassives: [],
-        actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0, minHpCostPercent: 0 }
+        actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0 }
     };
     vampire.apply(ctx, 3);
 
@@ -7492,10 +7490,10 @@ async function testMasteryCombatAndCooldownDefinitions() {
     const { MASTERY_EFFECT_DEFS } = await import("../src/character-mastery/index.js");
     const ctx = {
         statModifiers: { hp: 0, damage: 0, defense: 0 },
-        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0, speed: 0, collisionAngularImpulse: 0 },
+        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0, collisionAngularImpulse: 0 },
         combatModifiers: { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
         combatPassives: [],
-        actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0, minHpCostPercent: 0 }
+        actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0 }
     };
 
     MASTERY_EFFECT_DEFS.find((definition) => definition.sourceFighterId === "grenade").apply(ctx, 3);
@@ -7544,7 +7542,7 @@ async function testDashMasterySpeedApplied() {
         statModifiers: { hp: 0, damage: 0, defense: 0, speed: 0.06 },
         physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0, collisionAngularImpulse: 0 },
         combatModifiers: { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
-        actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0, minHpCostPercent: 0 },
+        actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0 },
         combatPassives: []
     };
     const result = applyMasteryEffectsToFighterSpec(spec, mastery);
@@ -7659,32 +7657,52 @@ async function testGunnerAngularImpulseMultiplicative() {
     console.log("[gunner-angular-impulse-multiplicative] ok");
 }
 
-async function testHuntingMasteryPlayerOnly() {
-    const { createDefaultPlayerProfile } = await import("../src/playerProfile.js");
-    const { collectActiveEffects, applyMasteryEffectsToFighterSpec } =
-        await import("../src/character-mastery/index.js");
+async function testHuntingMasteryPlayerOnly(app) {
+    const playerId = FIGHTER_IDS.DASH;
+    const player = app.roster.find((f) => f.id === playerId);
+    const archer = app.roster.find((f) => f.id === FIGHTER_IDS.ARCHER);
 
-    const profile = createDefaultPlayerProfile();
+    const capturedSpecs = [];
+    const mockApp = {
+        roster: [player, archer],
+        playerProfile: createDefaultPlayerProfile(),
+        playerStatAllocation: createEmptyStatAllocation(),
+        ui: { setHuntingActive() {}, setHuntingOverlayState() {}, addLog() {} },
+        startMatch(specs) {
+            capturedSpecs.push(specs);
+        }
+    };
+
     // Player has archer mastery at GOLD
-    profile.characterMastery = { levels: { archer: 3 } };
+    mockApp.playerProfile.characterMastery = { levels: { archer: 3 } };
 
-    // Player uses character "dash" but has archer GOLD mastery cross-support
-    const masteryCtx = collectActiveEffects(profile, "dash");
-    assert.equal(masteryCtx.statModifiers.damage, 0.06, "Player with archer GOLD should get +6% damage cross-support");
+    const manager = new HuntingManager(mockApp);
+    manager._run = createHuntingRun({ characterId: playerId, stageId: HUNTING_STAGE_IDS.CAVE });
+    manager._startFloorBattle();
 
-    const playerSpec = {
-        id: "player",
-        stats: { hp: 100, damage: 10, defense: 1, speed: 300, radius: 50, mass: 1 }
-    };
-    const enemySpec = {
-        id: "enemy",
-        stats: { hp: 100, damage: 10, defense: 1, speed: 300, radius: 50, mass: 1 }
-    };
+    const specs = capturedSpecs[0];
+    const playerSpec = specs[0];
 
-    const masteredPlayer = applyMasteryEffectsToFighterSpec(playerSpec, masteryCtx);
-    // Enemy spec does NOT receive mastery effects
-    assert.equal(masteredPlayer.stats.damage, 10.6, "Player spec should receive archer GOLD +6% damage cross-support");
-    assert.equal(enemySpec.stats.damage, 10, "Enemy spec should NOT receive mastery effects");
+    // Player spec should have mastery (proving HuntingManager applied it)
+    assert.ok(playerSpec.mastery, "Player spec should have mastery from HuntingManager");
+    assert.equal(playerSpec.teamId, HUNTING_TEAMS.PLAYER, "Player spec should be on player team");
+
+    // Damage should include Archer GOLD +6% final multiplier (statModifiers.damage = 0.06)
+    const alloc = createEmptyStatAllocation();
+    const { multiplier } = calculateStatMultiplier(Object.values(alloc));
+    const baseDamage = player.stats.damage;
+    const expectedDamage = Number((baseDamage * multiplier * 1.06).toFixed(3));
+    assert.equal(
+        playerSpec.stats.damage,
+        expectedDamage,
+        `Player spec damage should get archer GOLD +6% final multiplier: base ${baseDamage} * ${multiplier} * 1.06 = ${expectedDamage}`
+    );
+
+    // Enemy specs should NOT have mastery effects from player profile
+    for (let i = 1; i < specs.length; i++) {
+        assert.equal(specs[i].mastery, undefined, `Enemy spec ${i} should NOT have player mastery effects`);
+    }
+
     console.log("[hunting-mastery-player-only] ok");
 }
 
@@ -8006,7 +8024,7 @@ await testCollectEffectsFromDefinitionsNoCap();
 await testDashMasterySpeedApplied();
 await testOrbitWallBounceMultiplicative();
 await testGunnerAngularImpulseMultiplicative();
-await testHuntingMasteryPlayerOnly();
+await testHuntingMasteryPlayerOnly(app);
 // Dynamic bonus computation test
 // ── New character tests ──────────────────────────────────────────────────────
 

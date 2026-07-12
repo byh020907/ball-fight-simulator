@@ -128,14 +128,13 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         sourceFighterId: "bat_ball",
         name: "아껴 휘두르기",
         kind: "action_modifier",
-        description: "클릭 액션 HP 비용이 {value} 감소합니다. (최저 0.1%)",
+        description: "클릭 액션 HP 비용이 {value} 감소합니다.",
         tierValues: MASTERY_TIERS.actionHpCostReduction,
         formatValue(v) {
             return (v * 100).toFixed(2) + "%p";
         },
         apply(ctx, level) {
             ctx.actionModifiers.hpCostPercentReduction += this.tierValues[level];
-            ctx.actionModifiers.minHpCostPercent = 0.001;
         }
     },
     {

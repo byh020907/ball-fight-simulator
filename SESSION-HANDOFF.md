@@ -1336,4 +1336,14 @@
   (5) 사냥터 원정 플레이어 스펙에 숙련도 적용 추가
 - 영향: `rewardBalanceConfig.js`, `masteryDefinitions.js`, `masteryModifiers.js`, `battleBall.js`(기본 mastery 키·wall bounce), `battleSimulation.js`(각충격 배율), `huntingManager.js`(사냥터 적용), `tests/regression.mjs`(기존 테스트 갱신 + 삭제), 문서 4종, `helpContent.js`, `patchNotes.js`, `SESSION-HANDOFF.md`
 
+## [L1] 2026-07-12 — 숙련도 누적 상한 제거: minHpCostPercent·physicsModifiers.speed 삭제, 테스트 실제 경로로 교체
+- 맥락: Bat 숙련도의 minHpCostPercent 하한이 누적 상한 금지 계약과 혼동됨. physicsModifiers.speed가 이미 statModifiers.speed로 이전되었으나 테스트 fixture에 잔여. testHuntingMasteryPlayerOnly가 HuntingManager를 우회하고 임의 spec 수동 호출로 잘못된 계약을 보장함.
+- 결정:
+  (1) minHpCostPercent 전면 제거: masteryDefinitions·masteryModifiers·battleBall·app.js. app.js는 Math.max(0, ...)로 음수만 방지.
+  (2) physicsModifiers.speed fixture/assertion 전량 제거. statModifiers fixture는 speed: 0 명시 유지.
+  (3) testHuntingMasteryPlayerOnly를 HuntingManager._startFloorBattle() 실제 경로로 교체, Dash+Archer GOLD로 player spec mastery 존재 + enemy에 전달 안 됨을 검증.
+  (4) docs/character-mastery-system.md: 'Orbit, Dash, Gunner → 일반 스탯 아닌 물리' 문장을 'Orbit·Gunner만 물리 경로, Dash는 stat modifier'로 정정.
+- 영향: `src/app.js`, `src/character-mastery/masteryDefinitions.js`, `src/character-mastery/masteryModifiers.js`, `src/entities/battleBall.js`, `tests/regression.mjs`, `docs/character-mastery-system.md`, `SESSION-HANDOFF.md`
+- 검증: `npm test`, `npm run check`, `npm run format:check`, `git diff --check`, `node scripts/huntingUserScenario.mjs` 통과
+
 ## 진행 중 이슈

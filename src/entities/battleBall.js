@@ -99,8 +99,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             combat: spec.mastery?.combat ?? { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
             action: spec.mastery?.action ?? {
                 hpCostPercentReduction: 0,
-                cooldownPercent: 0,
-                minHpCostPercent: 0
+                cooldownPercent: 0
             },
             passives: spec.mastery?.passives ?? [],
             _states: null
