@@ -78,7 +78,8 @@ export class AudioEngine {
             counter: () => this.playZap(880, 0.1, 0.07 * safeIntensity),
             projectile_guard: () => this.playZap(1100, 0.12, 0.06 * safeIntensity),
             guard: () => this.playThud(320, 0.08, 0.05 * safeIntensity),
-            whiff: () => this.playThud(180, 0.04, 0.025 * safeIntensity)
+            whiff: () => this.playThud(180, 0.04, 0.025 * safeIntensity),
+            shop_reroll: () => this.playShopReroll(safeIntensity)
         };
 
         voices[type]?.();
@@ -145,5 +146,31 @@ export class AudioEngine {
         source.buffer = buffer;
         source.connect(gain);
         source.start(this.context.currentTime);
+    }
+
+    playShopReroll(intensity) {
+        const now = this.context.currentTime;
+        const notes = [
+            { frequency: 420, startOffset: 0, duration: 0.1 },
+            { frequency: 580, startOffset: 0.11, duration: 0.1 },
+            { frequency: 820, startOffset: 0.23, duration: 0.16 }
+        ];
+
+        for (const note of notes) {
+            const oscillator = this.context.createOscillator();
+            const gain = this.context.createGain();
+            const startAt = now + note.startOffset;
+            const volume = 0.045 * intensity;
+            gain.gain.setValueAtTime(0.0001, startAt);
+            gain.gain.exponentialRampToValueAtTime(volume, startAt + 0.012);
+            gain.gain.exponentialRampToValueAtTime(0.0001, startAt + note.duration);
+            oscillator.type = "triangle";
+            oscillator.frequency.setValueAtTime(note.frequency, startAt);
+            oscillator.frequency.exponentialRampToValueAtTime(note.frequency * 1.2, startAt + note.duration);
+            oscillator.connect(gain);
+            gain.connect(this.context.destination);
+            oscillator.start(startAt);
+            oscillator.stop(startAt + note.duration + 0.02);
+        }
     }
 }

@@ -212,7 +212,10 @@ export function createComponentBridge(app) {
         },
         rerollDailyShop() {
             const result = refreshDailyShopOffer(app.playerProfile);
-            if (result) refreshCollectionAndProfile();
+            if (result) {
+                app.audio.play("shop_reroll");
+                refreshCollectionAndProfile();
+            }
             return result;
         }
     };

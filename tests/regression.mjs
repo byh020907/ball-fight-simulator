@@ -13045,6 +13045,31 @@ function testDailyShopPurchaseAndRerollCycles() {
 
 testDailyShopPurchaseAndRerollCycles();
 
+function testDailyShopBridgeOnlySoundsOnSuccessfulReroll() {
+    const profile = createDefaultPlayerProfile();
+    const sounds = [];
+    profile.hunting.shards = 100;
+    const bridge = createAppComponentBridge({
+        playerProfile: profile,
+        audio: {
+            play(type) {
+                sounds.push(type);
+            }
+        },
+        _refreshCollectionHub() {},
+        refreshPlayerSetup() {}
+    });
+
+    assert.ok(bridge.rerollDailyShop(), "A funded reroll should succeed");
+    assert.deepEqual(sounds, ["shop_reroll"], "A successful reroll should play its dedicated sound once");
+    profile.hunting.shards = 0;
+    assert.equal(bridge.rerollDailyShop(), null, "An unfunded reroll should fail");
+    assert.deepEqual(sounds, ["shop_reroll"], "A failed reroll must not play a sound");
+    console.log("[daily-shop-reroll-sound] ok");
+}
+
+testDailyShopBridgeOnlySoundsOnSuccessfulReroll();
+
 function testDailyShopPopupContract() {
     const template = readFileSync("src/components/collection-hub.html", "utf8");
     assert.ok(template.includes('@click="openShop()"'), "Equipment toolbar should open the shard shop popup");
