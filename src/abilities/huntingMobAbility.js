@@ -114,7 +114,12 @@ export class HuntingMobAbility extends Ability {
     _charge(target) {
         const direction = this._directionTo(target);
         if (!direction) return;
-        this.owner.initiateDash(direction, { speed: 560, duration: 0.52, color: "#ff8a65", collisionDamage: 1.2 });
+        this.owner.initiateDash(direction, {
+            speedOverride: 560,
+            duration: 0.52,
+            color: "#ff8a65",
+            collisionDamage: 1.2
+        });
         this.simulation.spawnPulse(this.owner.position.clone(), "#ff8a65");
     }
 
@@ -162,7 +167,12 @@ export class HuntingMobAbility extends Ability {
         this.state.jump = 0.55;
         const direction = this._directionTo(target);
         if (!direction) return;
-        this.owner.initiateDash(direction, { speed: 680, duration: 0.42, color: "#ffd166", collisionDamage: 1.1 });
+        this.owner.initiateDash(direction, {
+            speedOverride: 680,
+            duration: 0.42,
+            color: "#ffd166",
+            collisionDamage: 1.1
+        });
     }
 
     _tickLaser(delta, target) {

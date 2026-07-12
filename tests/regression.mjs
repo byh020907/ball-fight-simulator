@@ -12977,4 +12977,32 @@ function testHuntingMishapAvoidsLowHpRuns() {
 
 testHuntingMishapAvoidsLowHpRuns();
 
+function testHuntingMobActionsKeepPhysicsFinite() {
+    const player = {
+        id: "hunting-mob-test-player",
+        name: "Test Player",
+        teamId: "player",
+        ability: "none",
+        color: "#ffffff",
+        stats: { hp: 1000, damage: 1, speed: 240, radius: 40, mass: 1, defense: 0 }
+    };
+    for (const type of Object.keys(HUNTING_MONSTER_BASE_SPECS)) {
+        const simulation = new BattleSimulation(
+            [player, createHuntingMobSpec({ type, floor: 94 })],
+            { onLog() {}, onSound() {} },
+            null,
+            { assignActions: false }
+        );
+        for (let frame = 0; frame < 600; frame += 1) simulation.update(1 / 60);
+        const mob = simulation.fighters[1];
+        assert.ok(
+            [mob.position.x, mob.position.y, mob.velocity.x, mob.velocity.y].every(Number.isFinite),
+            `${type} should keep finite hunting physics state`
+        );
+    }
+    console.log("[hunting-mob-finite-physics] ok");
+}
+
+testHuntingMobActionsKeepPhysicsFinite();
+
 console.log("regression tests ok");
