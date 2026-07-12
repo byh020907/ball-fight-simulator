@@ -1,6 +1,6 @@
 export const LEVEL_REWARD_EFFECT_TYPES = Object.freeze({
     STAT: "stat",
-    ABILITY_MODIFIER: "ability_modifier"
+    ABILITY_TIER: "ability_tier"
 });
 
 const STAT_LABELS = Object.freeze({
@@ -29,14 +29,7 @@ const BASE_STAT_MUTATORS = Object.freeze({
     }
 });
 
-const ABILITY_MODIFIER_OPERATIONS = Object.freeze({
-    add(current, value) {
-        return current + value;
-    },
-    multiply(current, value) {
-        return current * value;
-    }
-});
+const ABILITY_TIER_LABELS = Object.freeze(["", "대표 행동 강화 I", "대표 행동 강화 II", "대표 행동 강화 III"]);
 
 const EFFECT_HANDLERS = Object.freeze({
     [LEVEL_REWARD_EFFECT_TYPES.STAT]: {
@@ -51,26 +44,19 @@ const EFFECT_HANDLERS = Object.freeze({
             mutate(spec, effect.value);
         }
     },
-    [LEVEL_REWARD_EFFECT_TYPES.ABILITY_MODIFIER]: {
+    [LEVEL_REWARD_EFFECT_TYPES.ABILITY_TIER]: {
         describe(effect) {
-            if (effect.label) return effect.label;
-            if (!effect.abilityId || !effect.modifierId || !Number.isFinite(effect.value)) {
-                throw new Error("Invalid ability modifier reward");
-            }
-            return `${effect.abilityId} · ${effect.modifierId} ${effect.operation === "multiply" ? "x" : "+"}${effect.value}`;
+            const label = ABILITY_TIER_LABELS[effect.tier];
+            if (!label) throw new Error(`Invalid ability tier reward: ${effect.tier}`);
+            return label;
         },
         applyToBall(ball, effect) {
-            const applyOperation = ABILITY_MODIFIER_OPERATIONS[effect.operation ?? "add"];
-            const abilityId = effect.abilityId === "self" ? ball.abilityId : effect.abilityId;
-            if (!applyOperation || !abilityId || !effect.modifierId || !Number.isFinite(effect.value)) {
-                throw new Error("Invalid ability modifier reward");
+            if (!ABILITY_TIER_LABELS[effect.tier]) {
+                throw new Error(`Invalid ability tier reward: ${effect.tier}`);
             }
-            ball.levelRewardModifiers ||= {};
-            const modifiers = ball.levelRewardModifiers[abilityId] ?? {};
-            const initialValue = effect.operation === "multiply" ? 1 : 0;
-            ball.levelRewardModifiers[abilityId] = {
-                ...modifiers,
-                [effect.modifierId]: applyOperation(modifiers[effect.modifierId] ?? initialValue, effect.value)
+            ball.progression = {
+                ...ball.progression,
+                abilityTier: Math.max(ball.progression?.abilityTier ?? 0, effect.tier)
             };
         }
     }

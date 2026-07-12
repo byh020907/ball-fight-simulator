@@ -34,5 +34,3 @@ export function getLevelRequirement(level) {
     if (level > MAX_LEVEL) return LEVEL_COSTS[MAX_LEVEL - 1] + 1;
     return LEVEL_COSTS[level - 1] ?? 0;
 }
-
-export const LEVEL_REWARDS = EXPERIENCE.levelRewards;

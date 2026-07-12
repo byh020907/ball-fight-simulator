@@ -57,7 +57,13 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             scale: 1
         };
         this.ability = null;
-        this.levelRewardModifiers = {};
+        this.progression = {
+            characterId: spec.id,
+            level: 1,
+            baseStatBonuses: {},
+            abilityTier: 0,
+            rewardIds: []
+        };
         this.hero = {
             bonuses: { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 },
             carryover: { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 }

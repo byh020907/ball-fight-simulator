@@ -7,8 +7,7 @@ export {
     MAX_LEVEL,
     LEVEL_COST_MULTIPLIER,
     LEVEL_COSTS,
-    getLevelRequirement,
-    LEVEL_REWARDS
+    getLevelRequirement
 } from "./experienceConfig.js";
 
 export {
@@ -28,7 +27,13 @@ export {
     getExperienceRewardText,
     getExperienceRewardsBetween,
     matchReportToXpInput,
-    collectActiveExperienceEffects,
-    applyExperienceEffectsToBall,
-    applyExperienceEffectsToBaseSpec
+    collectActiveExperienceProgression,
+    applyExperienceProgressionToBall,
+    applyExperienceProgressionToBaseSpec
 } from "./experienceService.js";
+
+export {
+    getCharacterLevelProgression,
+    getCharacterLevelRewardsBetween,
+    getNextCharacterLevelReward
+} from "./characterLevelProgression.js";

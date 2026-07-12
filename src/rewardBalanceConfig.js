@@ -14,49 +14,140 @@ export const REWARD_BALANCE = deepFreeze({
         maxDealRatio: 2,
         maxLevel: 10,
         levelCost: { first: 100, multiplier: 1.35 },
-        levelRewards: [
-            null,
-            null,
-            null,
-            {
-                id: "level-3-ability-tier",
-                effect: {
-                    type: "ability_modifier",
-                    abilityId: "self",
-                    modifierId: "tier",
-                    operation: "add",
-                    value: 1,
-                    label: "대표 행동 강화 I"
-                }
-            },
-            null,
-            null,
-            {
-                id: "level-6-ability-tier",
-                effect: {
-                    type: "ability_modifier",
-                    abilityId: "self",
-                    modifierId: "tier",
-                    operation: "add",
-                    value: 1,
-                    label: "대표 행동 강화 II"
-                }
-            },
-            null,
-            null,
-            {
-                id: "level-9-ability-tier",
-                effect: {
-                    type: "ability_modifier",
-                    abilityId: "self",
-                    modifierId: "tier",
-                    operation: "add",
-                    value: 1,
-                    label: "대표 행동 강화 III"
-                }
-            },
-            null
-        ],
+        characterLevelProgressions: {
+            archer: [
+                { level: 2, baseStats: { speed: 2 } },
+                { level: 3, baseStats: { damage: 1 }, abilityTier: 1 },
+                { level: 4, baseStats: { skill: 2 } },
+                { level: 5, baseStats: { speed: 2 } },
+                { level: 6, baseStats: { damage: 1 }, abilityTier: 2 },
+                { level: 7, baseStats: { hp: 2 } },
+                { level: 8, baseStats: { skill: 2 } },
+                { level: 9, baseStats: { defense: 1 }, abilityTier: 3 },
+                { level: 10, baseStats: { hp: 2 } }
+            ],
+            orbit: [
+                { level: 2, baseStats: { speed: 2 } },
+                { level: 3, baseStats: { defense: 1 }, abilityTier: 1 },
+                { level: 4, baseStats: { skill: 2 } },
+                { level: 5, baseStats: { hp: 2 } },
+                { level: 6, baseStats: { speed: 2 }, abilityTier: 2 },
+                { level: 7, baseStats: { defense: 1 } },
+                { level: 8, baseStats: { damage: 1 } },
+                { level: 9, baseStats: { skill: 2 }, abilityTier: 3 },
+                { level: 10, baseStats: { hp: 2 } }
+            ],
+            trickster: [
+                { level: 2, baseStats: { speed: 2 } },
+                { level: 3, baseStats: { skill: 2 }, abilityTier: 1 },
+                { level: 4, baseStats: { damage: 1 } },
+                { level: 5, baseStats: { speed: 2 } },
+                { level: 6, baseStats: { skill: 2 }, abilityTier: 2 },
+                { level: 7, baseStats: { hp: 2 } },
+                { level: 8, baseStats: { defense: 1 } },
+                { level: 9, baseStats: { skill: 2 }, abilityTier: 3 },
+                { level: 10, baseStats: { hp: 2 } }
+            ],
+            grenade: [
+                { level: 2, baseStats: { damage: 1 } },
+                { level: 3, baseStats: { skill: 2 }, abilityTier: 1 },
+                { level: 4, baseStats: { hp: 2 } },
+                { level: 5, baseStats: { damage: 1 } },
+                { level: 6, baseStats: { speed: 2 }, abilityTier: 2 },
+                { level: 7, baseStats: { defense: 1 } },
+                { level: 8, baseStats: { skill: 2 } },
+                { level: 9, baseStats: { hp: 2 }, abilityTier: 3 },
+                { level: 10, baseStats: { speed: 2 } }
+            ],
+            dash: [
+                { level: 2, baseStats: { speed: 2 } },
+                { level: 3, baseStats: { skill: 2 }, abilityTier: 1 },
+                { level: 4, baseStats: { damage: 1 } },
+                { level: 5, baseStats: { speed: 2 } },
+                { level: 6, baseStats: { hp: 2 }, abilityTier: 2 },
+                { level: 7, baseStats: { defense: 1 } },
+                { level: 8, baseStats: { skill: 2 } },
+                { level: 9, baseStats: { damage: 1 }, abilityTier: 3 },
+                { level: 10, baseStats: { hp: 2 } }
+            ],
+            rage: [
+                { level: 2, baseStats: { hp: 2 } },
+                { level: 3, baseStats: { damage: 1 }, abilityTier: 1 },
+                { level: 4, baseStats: { defense: 1 } },
+                { level: 5, baseStats: { hp: 2 } },
+                { level: 6, baseStats: { damage: 1 }, abilityTier: 2 },
+                { level: 7, baseStats: { speed: 2 } },
+                { level: 8, baseStats: { defense: 1 } },
+                { level: 9, baseStats: { skill: 2 }, abilityTier: 3 },
+                { level: 10, baseStats: { hp: 2 } }
+            ],
+            eater: [
+                { level: 2, baseStats: { hp: 2 } },
+                { level: 3, baseStats: { defense: 1 }, abilityTier: 1 },
+                { level: 4, baseStats: { skill: 2 } },
+                { level: 5, baseStats: { hp: 2 } },
+                { level: 6, baseStats: { damage: 1 }, abilityTier: 2 },
+                { level: 7, baseStats: { defense: 1 } },
+                { level: 8, baseStats: { hp: 2 } },
+                { level: 9, baseStats: { speed: 2 }, abilityTier: 3 },
+                { level: 10, baseStats: { skill: 2 } }
+            ],
+            bat_ball: [
+                { level: 2, baseStats: { speed: 2 } },
+                { level: 3, baseStats: { damage: 1 }, abilityTier: 1 },
+                { level: 4, baseStats: { skill: 2 } },
+                { level: 5, baseStats: { speed: 2 } },
+                { level: 6, baseStats: { damage: 1 }, abilityTier: 2 },
+                { level: 7, baseStats: { defense: 1 } },
+                { level: 8, baseStats: { skill: 2 } },
+                { level: 9, baseStats: { hp: 2 }, abilityTier: 3 },
+                { level: 10, baseStats: { hp: 2 } }
+            ],
+            vampire: [
+                { level: 2, baseStats: { hp: 2 } },
+                { level: 3, baseStats: { damage: 1 }, abilityTier: 1 },
+                { level: 4, baseStats: { skill: 2 } },
+                { level: 5, baseStats: { hp: 2 } },
+                { level: 6, baseStats: { defense: 1 }, abilityTier: 2 },
+                { level: 7, baseStats: { damage: 1 } },
+                { level: 8, baseStats: { hp: 2 } },
+                { level: 9, baseStats: { skill: 2 }, abilityTier: 3 },
+                { level: 10, baseStats: { speed: 2 } }
+            ],
+            gunner: [
+                { level: 2, baseStats: { damage: 1 } },
+                { level: 3, baseStats: { skill: 2 }, abilityTier: 1 },
+                { level: 4, baseStats: { speed: 2 } },
+                { level: 5, baseStats: { damage: 1 } },
+                { level: 6, baseStats: { skill: 2 }, abilityTier: 2 },
+                { level: 7, baseStats: { speed: 2 } },
+                { level: 8, baseStats: { defense: 1 } },
+                { level: 9, baseStats: { hp: 2 }, abilityTier: 3 },
+                { level: 10, baseStats: { hp: 2 } }
+            ],
+            phantom: [
+                { level: 2, baseStats: { speed: 2 } },
+                { level: 3, baseStats: { skill: 2 }, abilityTier: 1 },
+                { level: 4, baseStats: { damage: 1 } },
+                { level: 5, baseStats: { speed: 2 } },
+                { level: 6, baseStats: { skill: 2 }, abilityTier: 2 },
+                { level: 7, baseStats: { damage: 1 } },
+                { level: 8, baseStats: { hp: 2 } },
+                { level: 9, baseStats: { defense: 1 }, abilityTier: 3 },
+                { level: 10, baseStats: { speed: 2 } }
+            ],
+            hero: [
+                { level: 2, baseStats: { hp: 2 } },
+                { level: 3, baseStats: { speed: 2 }, abilityTier: 1 },
+                { level: 4, baseStats: { skill: 2 } },
+                { level: 5, baseStats: { damage: 1 } },
+                { level: 6, baseStats: { hp: 2 }, abilityTier: 2 },
+                { level: 7, baseStats: { defense: 1 } },
+                { level: 8, baseStats: { skill: 2 } },
+                { level: 9, baseStats: { speed: 2 }, abilityTier: 3 },
+                { level: 10, baseStats: { hp: 2 } }
+            ]
+        },
         abilityUpgrades: {
             archer: {
                 tiers: [

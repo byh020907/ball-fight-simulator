@@ -29,9 +29,9 @@ import {
 import {
     grantExperienceFromMatchReport,
     getCharacterExperienceSummary,
-    collectActiveExperienceEffects,
-    applyExperienceEffectsToBall,
-    applyExperienceEffectsToBaseSpec
+    collectActiveExperienceProgression,
+    applyExperienceProgressionToBall,
+    applyExperienceProgressionToBaseSpec
 } from "./experience/experienceService.js";
 import {
     collectActiveEffects,
@@ -771,15 +771,15 @@ export class BattleApp {
         // 연계 효과 계산: 해금된 ID 중 현재 캐릭터가 아닌 효과만 적용
         const masteryCtx = collectActiveEffects(this.playerProfile, this.playerFighterId);
         const adjustedAllocation = { ...this.playerStatAllocation };
-        const experienceEffectsByFighter = new Map([
-            [this.playerFighterId, collectActiveExperienceEffects(this.playerProfile, this.playerFighterId)]
+        this._experienceProgressionByFighter = new Map([
+            [this.playerFighterId, collectActiveExperienceProgression(this.playerProfile, this.playerFighterId)]
         ]);
-        const rosterWithExperienceRewards = this.roster.map((fighter) =>
-            applyExperienceEffectsToBaseSpec(fighter, experienceEffectsByFighter.get(fighter.id))
+        const rosterWithExperienceProgression = this.roster.map((fighter) =>
+            applyExperienceProgressionToBaseSpec(fighter, this._experienceProgressionByFighter.get(fighter.id))
         );
 
         this.tournamentRoster = createTournamentRoster(
-            rosterWithExperienceRewards,
+            rosterWithExperienceProgression,
             this.playerFighterId,
             adjustedAllocation,
             undefined,
@@ -876,9 +876,12 @@ export class BattleApp {
 
         // 시뮬레이션 생성 (playerBall은 아직 null)
         this._currentMatchReport = createMatchReport();
-        const experienceEffectsByFighter = new Map([
-            [this.playerFighterId, collectActiveExperienceEffects(this.playerProfile, this.playerFighterId)]
-        ]);
+        const experienceProgressionByFighter =
+            options.experienceProgressionByFighter ??
+            this._experienceProgressionByFighter ??
+            new Map([
+                [this.playerFighterId, collectActiveExperienceProgression(this.playerProfile, this.playerFighterId)]
+            ]);
         this.simulation = new BattleSimulation(
             match,
             {
@@ -912,7 +915,7 @@ export class BattleApp {
                     }
                 },
                 onBattleBallReady: (ball) => {
-                    applyExperienceEffectsToBall(ball, experienceEffectsByFighter.get(ball.id));
+                    applyExperienceProgressionToBall(ball, experienceProgressionByFighter.get(ball.id));
                 }
             },
             null,

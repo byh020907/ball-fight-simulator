@@ -18,9 +18,9 @@
 
 기존 도메인 모듈은 보상 지급과 표시만 담당하고 수치의 원본을 소유하지 않습니다. 수치 변경 후에는 `npm test`, `npm run check`, `npm run format:check`, `node scripts/huntingUserScenario.mjs`를 실행해 보상 결과와 순환을 함께 확인합니다.
 
-## 레벨 보상: 대표 행동 강화
+## 레벨 보상: 기본 스탯과 대표 행동 강화
 
-레벨 보상은 캐릭터 기본 수치가 아니라 대표 행동의 `ability_modifier`로 관리한다. 보상 구간은 Lv.3, Lv.6, Lv.9이며, 같은 캐릭터에만 적용한다. 수치형 강화는 기준값 대비 5% 단위로 두고, 개수처럼 정수가 필요한 결과는 `Math.round`를 사용한다. Lv.2·4·5·7·8·10은 직접 전투 보상을 주지 않고 장비 요구 레벨과 도전 관문의 진행도만 유지한다.
+레벨 보상은 캐릭터 ID별 `characterLevelProgressions` 표에서 관리한다. Lv.2~10의 모든 행은 해당 캐릭터 기본 스탯을 하나 이상 올리고, Lv.3·Lv.6·Lv.9 행은 대표 행동 tier를 추가한다. 기본 스탯은 사용자 스탯 배율보다 먼저 적용되며 장비 고정 수치는 그 뒤에 더한다. 수치형 행동 강화는 기준값 대비 5% 단위로 두고, 개수처럼 정수가 필요한 결과는 `Math.round`를 사용한다.
 
 | 구간 | 책임 |
 | --- | --- |
@@ -28,7 +28,26 @@
 | Lv.6 | 해당 행동이 전투 중 축적·선택·연계할 수 있는 중간 자원을 추가한다. |
 | Lv.9 | Lv.6 자원을 소비한 뒤 다음 교전으로 이어지는 제한된 후속 효과를 추가한다. |
 
-아래 표는 기존 공통 HP·공격력·쿨타임 보상을 대체할 구현 기준이다. `기준 → 결과`는 현재 능력의 기준값에서 강화 후 유효값을 함께 적는다. 아직 구현하지 않은 값은 이 표를 단일 수치 기준으로 삼아 `rewardBalanceConfig`와 각 Ability에 옮긴다.
+### 캐릭터별 기본 스탯 행
+
+표기: `HP` 체력, `ATK` 공격, `SPD` 속도, `SKL` 스킬, `DEF` 방어. `I`·`II`·`III`은 해당 행에서 함께 지급되는 대표 행동 강화 tier다.
+
+| 캐릭터 | Lv.2 | Lv.3 | Lv.4 | Lv.5 | Lv.6 | Lv.7 | Lv.8 | Lv.9 | Lv.10 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Archer | SPD+2 | ATK+1, I | SKL+2 | SPD+2 | ATK+1, II | HP+2 | SKL+2 | DEF+1, III | HP+2 |
+| Orbit | SPD+2 | DEF+1, I | SKL+2 | HP+2 | SPD+2, II | DEF+1 | ATK+1 | SKL+2, III | HP+2 |
+| Trickster | SPD+2 | SKL+2, I | ATK+1 | SPD+2 | SKL+2, II | HP+2 | DEF+1 | SKL+2, III | HP+2 |
+| Grenade | ATK+1 | SKL+2, I | HP+2 | ATK+1 | SPD+2, II | DEF+1 | SKL+2 | HP+2, III | SPD+2 |
+| Dash | SPD+2 | SKL+2, I | ATK+1 | SPD+2 | HP+2, II | DEF+1 | SKL+2 | ATK+1, III | HP+2 |
+| Rage | HP+2 | ATK+1, I | DEF+1 | HP+2 | ATK+1, II | SPD+2 | DEF+1 | SKL+2, III | HP+2 |
+| Eater | HP+2 | DEF+1, I | SKL+2 | HP+2 | ATK+1, II | DEF+1 | HP+2 | SPD+2, III | SKL+2 |
+| Bat Ball | SPD+2 | ATK+1, I | SKL+2 | SPD+2 | ATK+1, II | DEF+1 | SKL+2 | HP+2, III | HP+2 |
+| Vampire | HP+2 | ATK+1, I | SKL+2 | HP+2 | DEF+1, II | ATK+1 | HP+2 | SKL+2, III | SPD+2 |
+| Gunner | ATK+1 | SKL+2, I | SPD+2 | ATK+1 | SKL+2, II | SPD+2 | DEF+1 | HP+2, III | HP+2 |
+| Phantom | SPD+2 | SKL+2, I | ATK+1 | SPD+2 | SKL+2, II | ATK+1 | HP+2 | DEF+1, III | SPD+2 |
+| Hero | HP+2 | SPD+2, I | SKL+2 | ATK+1 | HP+2, II | DEF+1 | SKL+2 | SPD+2, III | HP+2 |
+
+아래 표는 Lv.3·Lv.6·Lv.9 대표 행동 tier의 구현 기준이다. `기준 → 결과`는 현재 능력의 기준값에서 강화 후 유효값을 함께 적는다. 기본 스탯 보상표와 행동 강화 세부값은 모두 `rewardBalanceConfig`를 단일 수치 원본으로 사용한다.
 
 Phantom은 표의 레벨 강화에 앞서 기본기를 단건 그림자 돌진으로 재구성한다. 기본 보정은 `속도 1.15×`, `공격 1.10×`, `방어 1.50×`, `충격 1.15×`이고, 기본 돌진의 추가 충돌 피해는 `12 → 18`이다.
 

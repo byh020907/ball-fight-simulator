@@ -1,11 +1,12 @@
 import { calcMatchXp, calcTournamentXp } from "./experienceState.js";
 import { getLevelFromXp, getXpForNextLevel, getXpProgressInLevel } from "./experienceState.js";
-import { LEVEL_REWARDS, MAX_LEVEL, getLevelRequirement } from "./experienceConfig.js";
+import { MAX_LEVEL, getLevelRequirement } from "./experienceConfig.js";
+import { applyLevelRewardEffectsToBall, applyLevelRewardEffectsToBaseSpec } from "./reward-effects/effectRegistry.js";
 import {
-    applyLevelRewardEffectsToBall,
-    applyLevelRewardEffectsToBaseSpec,
-    getLevelRewardEffectText
-} from "./reward-effects/effectRegistry.js";
+    getCharacterLevelProgression,
+    getCharacterLevelRewardsBetween,
+    getNextCharacterLevelReward
+} from "./characterLevelProgression.js";
 
 export function matchReportToXpInput(report) {
     return {
@@ -46,20 +47,16 @@ export function getCharacterTotalXp(profile, characterId) {
 }
 
 export function getExperienceRewardText(reward = {}) {
-    return reward?.effect ? getLevelRewardEffectText(reward.effect) : "";
+    return reward?.text ?? "";
 }
 
-function getNextRewardText(level) {
-    const nextRewardLevel = LEVEL_REWARDS.findIndex((reward, rewardLevel) => rewardLevel > level && Boolean(reward));
-    if (nextRewardLevel < 0) return "모든 대표 행동 강화 획득";
-    return `Lv.${nextRewardLevel} · ${getExperienceRewardText(LEVEL_REWARDS[nextRewardLevel])}`;
+function getNextRewardText(characterId, level) {
+    const reward = getNextCharacterLevelReward(characterId, level);
+    return reward ? `Lv.${reward.level} · ${getExperienceRewardText(reward)}` : "모든 레벨 보상 획득";
 }
 
-export function getExperienceRewardsBetween(previousLevel, level) {
-    const startLevel = Math.max(2, previousLevel + 1);
-    return Array.from({ length: Math.max(0, level - startLevel + 1) }, (_, index) => LEVEL_REWARDS[startLevel + index])
-        .filter(Boolean)
-        .map((reward) => ({ ...reward, text: getExperienceRewardText(reward) }));
+export function getExperienceRewardsBetween(characterId, previousLevel, level) {
+    return getCharacterLevelRewardsBetween(characterId, previousLevel, level);
 }
 
 export function getCharacterExperienceSummary(profile, characterId) {
@@ -72,7 +69,7 @@ export function getCharacterExperienceSummary(profile, characterId) {
     const xpInLevel = isMax ? levelSpan : Math.max(0, totalXp - levelStartXp);
     const remainingXp = isMax ? 0 : Math.max(0, nextLevelXp - totalXp);
     const progress = isMax ? 1 : getXpProgressInLevel(totalXp);
-    const nextRewardText = isMax ? "최대 레벨" : getNextRewardText(level);
+    const nextRewardText = isMax ? "최대 레벨" : getNextRewardText(characterId, level);
 
     return {
         characterId,
@@ -119,7 +116,7 @@ function grantExperience(profile, characterId, totalXp) {
         previousLevel: prevLevel,
         level: newLevel,
         levelUp: newLevel > prevLevel,
-        earnedRewards: getExperienceRewardsBetween(prevLevel, newLevel),
+        earnedRewards: getExperienceRewardsBetween(characterId, prevLevel, newLevel),
         progressBefore: before.progress,
         progressAfter: after.progress,
         progressBeforePct: before.progressPct,
@@ -132,17 +129,25 @@ function grantExperience(profile, characterId, totalXp) {
     };
 }
 
-export function collectActiveExperienceEffects(profile, characterId) {
+export function collectActiveExperienceProgression(profile, characterId) {
     const level = getLevelFromXp(getCharacterTotalXp(profile, characterId));
-    return getExperienceRewardsBetween(1, level).map((reward) => reward.effect);
+    return getCharacterLevelProgression(characterId, level);
 }
 
-export function applyExperienceEffectsToBall(ball, effects) {
-    applyLevelRewardEffectsToBall(ball, effects);
+export function applyExperienceProgressionToBall(ball, progression) {
+    if (!progression) return;
+    ball.progression = {
+        characterId: progression.characterId,
+        level: progression.level,
+        baseStatBonuses: { ...progression.baseStatBonuses },
+        abilityTier: 0,
+        rewardIds: [...progression.rewardIds]
+    };
+    applyLevelRewardEffectsToBall(ball, progression.effects);
 }
 
-export function applyExperienceEffectsToBaseSpec(spec, effects) {
-    return applyLevelRewardEffectsToBaseSpec(spec, effects);
+export function applyExperienceProgressionToBaseSpec(spec, progression) {
+    return applyLevelRewardEffectsToBaseSpec(spec, progression?.effects);
 }
 
 export { calcMatchXp, calcTournamentXp, getLevelFromXp, getXpForNextLevel, getXpProgressInLevel };

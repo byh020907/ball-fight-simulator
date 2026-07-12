@@ -23,12 +23,8 @@ export class Ability extends mixins([Cooldown]) {
         return this._baseCooldown * skillMultiplier * masteryMultiplier * equipmentMultiplier;
     }
 
-    getLevelRewardModifier(modifierId, fallback = 0) {
-        return this.owner.levelRewardModifiers?.[this.owner.abilityId]?.[modifierId] ?? fallback;
-    }
-
     getLevelUpgrade() {
-        return getAbilityUpgrade(this.owner.abilityId, this.getLevelRewardModifier("tier"));
+        return getAbilityUpgrade(this.owner.abilityId, this.owner.progression?.abilityTier ?? 0);
     }
 
     set cooldown(val) {

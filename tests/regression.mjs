@@ -20,16 +20,20 @@ import {
 import { calculateInterceptPoint, FIGHTER_IDS, Vector2, randomSpin } from "../src/core.js";
 import { findActionById } from "../src/clickActions.js";
 import { calcMatchXp, getLevelFromXp, getXpForNextLevel, calcTournamentXp } from "../src/experience/experienceState.js";
-import { getLevelRequirement, LEVEL_REWARDS, XP_SCALE } from "../src/experience/experienceConfig.js";
+import { getLevelRequirement, XP_SCALE } from "../src/experience/experienceConfig.js";
 import { REWARD_BALANCE } from "../src/rewardBalanceConfig.js";
 import {
-    applyExperienceEffectsToBall,
-    applyExperienceEffectsToBaseSpec,
-    collectActiveExperienceEffects,
+    applyExperienceProgressionToBall,
+    applyExperienceProgressionToBaseSpec,
+    collectActiveExperienceProgression,
     getCharacterExperienceSummary,
     getExperienceRewardsBetween,
     grantExperienceFromMatchReport
 } from "../src/experience/experienceService.js";
+import {
+    getCharacterLevelProgression,
+    getCharacterLevelRewardsBetween
+} from "../src/experience/characterLevelProgression.js";
 import { getLevelRewardEffectHandler } from "../src/experience/reward-effects/effectRegistry.js";
 import { DashEffect, WallSlamEffect } from "../src/combatEffects.js";
 import { shuffled } from "../src/random.js";
@@ -1861,27 +1865,32 @@ function testExperienceSystem() {
     assert.equal(levelUpResult.levelUp, true, "Crossing the level threshold should be reported");
     assert.equal(levelUpResult.previousLevel, 1, "Level-up result should expose the previous level");
     assert.equal(levelUpResult.level, 2, "Level-up result should expose the new level");
-    assert.deepEqual(levelUpResult.earnedRewards, [], "Non-tier levels should not grant a direct combat reward");
+    assert.deepEqual(
+        levelUpResult.earnedRewards.map((reward) => reward.text),
+        ["속도 +2"],
+        "Every level should grant the selected character a base stat reward"
+    );
     assert.equal(
         levelUpResult.nextRewardText,
-        "Lv.3 · 대표 행동 강화 I",
-        "Level-up result should expose the next ability tier and level"
+        "Lv.3 · 스킬 +2 · 대표 행동 강화 I",
+        "Tier levels should expose both the next base stat and ability reward"
     );
     profile.experience.byCharacter[FIGHTER_IDS.DASH].currentXp = getLevelRequirement(4);
     assert.equal(
         getCharacterExperienceSummary(profile, FIGHTER_IDS.DASH).nextRewardText,
-        "Lv.6 · 대표 행동 강화 II",
-        "Ability reward gaps should point to the next configured ability tier"
+        "Lv.5 · 속도 +2",
+        "Next reward UI should resolve the selected character's next level row"
     );
 
-    const allRewardEffects = LEVEL_REWARDS.filter(Boolean).map((reward) => reward.effect);
+    const dashLevelThree = getCharacterLevelProgression(FIGHTER_IDS.DASH, 3);
+    const allRewardEffects = dashLevelThree.effects;
     allRewardEffects.forEach((effect) => {
         assert.doesNotThrow(() => getLevelRewardEffectHandler(effect), "Every configured level reward needs a handler");
     });
     assert.deepEqual(
-        getExperienceRewardsBetween(1, 3).map((reward) => reward.text),
-        ["대표 행동 강화 I"],
-        "Level ranges should expose only the configured ability tier rewards"
+        getExperienceRewardsBetween(FIGHTER_IDS.DASH, 1, 3).map((reward) => reward.text),
+        ["속도 +2", "스킬 +2 · 대표 행동 강화 I"],
+        "Level ranges should expose every base stat reward and tier reward"
     );
 
     const playerSpec = {
@@ -1894,19 +1903,25 @@ function testExperienceSystem() {
         id: "xp-opponent",
         teamId: "xp-opponent"
     };
-    const levelEffects = collectActiveExperienceEffects(profile, playerSpec.id);
+    const progression = collectActiveExperienceProgression(profile, playerSpec.id);
     const allocation = { hp: 20, damage: 20, speed: 0, skill: 5, defense: 0 };
     const baselineSpec = applyStatAllocation(playerSpec, allocation, true);
     const rewardedSpec = applyStatAllocation(
-        applyExperienceEffectsToBaseSpec(playerSpec, levelEffects),
+        applyExperienceProgressionToBaseSpec(playerSpec, progression),
         allocation,
         true
     );
-    assert.deepEqual(
-        rewardedSpec.stats,
-        baselineSpec.stats,
-        "Ability tier rewards should not mutate base stats before the percentage stat multiplier"
+    assert.equal(
+        rewardedSpec.stats.damage,
+        Number((baselineSpec.stats.damage * 1.1).toFixed(3)),
+        "Level base damage should be increased before the percentage stat multiplier"
     );
+    assert.equal(
+        rewardedSpec.stats.speed,
+        Number((baselineSpec.stats.speed * (296 / 294)).toFixed(3)),
+        "Level base speed should be increased before the percentage stat multiplier"
+    );
+    assert.equal(rewardedSpec.stats.skill, 2, "Level skill should remain a direct base stat addition");
     const equipmentProfile = createDefaultPlayerProfile();
     equipmentProfile.experience.byCharacter[FIGHTER_IDS.DASH] = { currentXp: getLevelRequirement(4) };
     const fixedDamageItem = {
@@ -1928,7 +1943,7 @@ function testExperienceSystem() {
     new BattleSimulation([equippedRewardedSpec, opponentSpec], {
         onBattleBallReady(ball) {
             if (ball.id === equippedRewardedSpec.id) {
-                applyExperienceEffectsToBall(ball, levelEffects);
+                applyExperienceProgressionToBall(ball, progression);
                 preparedPlayer = ball;
             }
         }
@@ -1943,22 +1958,21 @@ function testExperienceSystem() {
         equippedRewardedSpec.stats.damage,
         "Battle ball should receive the prepared damage base stat"
     );
-    assert.equal(preparedPlayer.getSkillPoints(), 5, "Battle ball should retain only the allocated skill points");
     assert.equal(
-        preparedPlayer.ability.getLevelRewardModifier("tier"),
-        1,
-        "Self ability rewards should resolve to the ball's ability"
+        preparedPlayer.getSkillPoints(),
+        7,
+        "Battle ball should combine level base skill with the allocated skill points"
     );
-    applyExperienceEffectsToBall(preparedPlayer, [
-        {
-            type: "ability_modifier",
-            abilityId: preparedPlayer.abilityId,
-            modifierId: "impactMultiplier",
-            operation: "multiply",
-            value: 1.2
-        }
-    ]);
-    assert.equal(preparedPlayer.ability.getLevelRewardModifier("impactMultiplier"), 1.2);
+    assert.equal(
+        preparedPlayer.progression.abilityTier,
+        1,
+        "Tier rewards should be recorded on the ball progression snapshot"
+    );
+    assert.deepEqual(
+        preparedPlayer.progression.baseStatBonuses,
+        { speed: 2, skill: 2, damage: 1 },
+        "Ball progression should retain the accumulated base stat report"
+    );
 
     const legacyProfile = createDefaultPlayerProfile();
     legacyProfile.experience = { currentXp: 55, byCharacter: {} };
@@ -1981,8 +1995,57 @@ function testExperienceSystem() {
     console.log("[experience] ok");
 }
 
+function testCharacterLevelProgressions(app) {
+    const expectedLevels = [2, 3, 4, 5, 6, 7, 8, 9, 10];
+    const tierLevels = [3, 6, 9];
+
+    for (const fighter of app.roster) {
+        const entries = REWARD_BALANCE.experience.characterLevelProgressions[fighter.id];
+        assert.ok(entries, `${fighter.id} should define its own level progression`);
+        assert.deepEqual(
+            entries.map((entry) => entry.level),
+            expectedLevels,
+            `${fighter.id} should receive a base stat reward at every level-up`
+        );
+        assert.ok(
+            entries.every((entry) => Object.keys(entry.baseStats).length > 0),
+            `${fighter.id} should have a base stat reward on every level row`
+        );
+        assert.deepEqual(
+            entries.filter((entry) => entry.abilityTier).map((entry) => entry.level),
+            tierLevels,
+            `${fighter.id} should receive ability upgrades only at levels 3, 6, and 9`
+        );
+        assert.deepEqual(
+            entries.filter((entry) => entry.abilityTier).map((entry) => entry.abilityTier),
+            [1, 2, 3],
+            `${fighter.id} should apply ability tiers in order`
+        );
+
+        const progression = getCharacterLevelProgression(fighter.id, 10);
+        assert.equal(
+            progression.rewards.length,
+            expectedLevels.length,
+            `${fighter.id} should expose every level reward`
+        );
+        assert.equal(progression.effects.length, 12, `${fighter.id} should expose stat and tier effects together`);
+        assert.equal(progression.abilityTier, 3, `${fighter.id} should reach ability tier three at level 9`);
+
+        for (const level of expectedLevels) {
+            const [reward] = getCharacterLevelRewardsBetween(fighter.id, level - 1, level);
+            assert.equal(reward.level, level, `${fighter.id} should report level ${level} as a single reward row`);
+        }
+        assert.deepEqual(
+            getCharacterLevelRewardsBetween(fighter.id, 10, 10),
+            [],
+            `${fighter.id} should not receive a duplicate reward at the level cap`
+        );
+    }
+    console.log("[character-level-progression] ok");
+}
+
 function testAbilityLevelUpgrades(app) {
-    const tierEffects = [LEVEL_REWARDS[3], LEVEL_REWARDS[6], LEVEL_REWARDS[9]].map((reward) => reward.effect);
+    const TIER_LEVELS = [1, 3, 6, 9];
     const assertClose = (actual, expected, message) => {
         assert.ok(Math.abs(actual - expected) < 1e-9, `${message}: expected ${expected}, got ${actual}`);
     };
@@ -1999,7 +2062,7 @@ function testAbilityLevelUpgrades(app) {
             { assignActions: false }
         );
         const ball = sim.fighters[0];
-        applyExperienceEffectsToBall(ball, tierEffects.slice(0, tier));
+        applyExperienceProgressionToBall(ball, getCharacterLevelProgression(fighterId, TIER_LEVELS[tier]));
         return { sim, ball, target: sim.fighters[1] };
     };
 
@@ -2009,11 +2072,7 @@ function testAbilityLevelUpgrades(app) {
         const expectedUpgrade = definition.tiers.reduce((merged, tierUpgrade) => ({ ...merged, ...tierUpgrade }), {
             ...definition.base
         });
-        assert.equal(
-            ball.ability.getLevelRewardModifier("tier"),
-            3,
-            `${fighter.id} should receive all three ability tiers`
-        );
+        assert.equal(ball.progression.abilityTier, 3, `${fighter.id} should receive all three ability tiers`);
         assert.deepEqual(
             ball.ability.getLevelUpgrade(),
             expectedUpgrade,
@@ -2117,7 +2176,7 @@ function testAbilityLevelUpgrades(app) {
     );
     gunnerRun.ball.ability._fireBurstBullet();
     const bullet = gunnerRun.sim.entities.find((entity) => entity.constructor?.name === "BulletProjectile");
-    assert.equal(
+    assertClose(
         bullet.velocity.length(),
         gunnerRun.ball.stats.baseSpeed * 2 * 1.15,
         "Gunner tier 2 should increase bullet speed by 15%"
@@ -7629,7 +7688,10 @@ function testRewardBalanceConfig() {
     const balance = REWARD_BALANCE;
     assert.ok(Object.isFrozen(balance), "Reward balance must be immutable at runtime");
     assert.equal(XP_SCALE, balance.experience.xpScale, "XP scale must come from reward balance");
-    assert.equal(LEVEL_REWARDS, balance.experience.levelRewards, "Level rewards must come from reward balance");
+    assert.ok(
+        Object.isFrozen(balance.experience.characterLevelProgressions),
+        "Character level progressions must come from immutable reward balance"
+    );
     assert.equal(
         getChestOpenCost("epic"),
         balance.hunting.chest.openCosts.epic,
@@ -7711,6 +7773,7 @@ await testDashBallCooldownDash(app);
 await testCollisionImpulsePersists(app);
 await testGrenadeScatterShot(app);
 testExperienceSystem();
+testCharacterLevelProgressions(app);
 testAbilityLevelUpgrades(app);
 testHuntingSystem();
 testHunting100FloorStructure();
@@ -10343,23 +10406,31 @@ function testHuntingStartFloorBattleAppliesStatAllocation(app) {
     const opponent = app.roster.find((f) => f.id !== playerId);
 
     const allocation = { hp: 20, damage: 10, speed: 5, skill: 0, defense: 0 };
-    const expectedSpec = applyStatAllocation(player, allocation, true);
+    const profile = createDefaultPlayerProfile();
+    profile.experience.byCharacter[playerId] = { currentXp: getLevelRequirement(3) };
+    const progression = collectActiveExperienceProgression(profile, playerId);
+    const expectedSpec = applyStatAllocation(
+        applyExperienceProgressionToBaseSpec(player, progression),
+        allocation,
+        true
+    );
 
-    const capturedSpecs = [];
+    const capturedMatches = [];
     const mockApp = {
         roster: [player, opponent],
-        playerProfile: createDefaultPlayerProfile(),
+        playerProfile: profile,
         playerStatAllocation: { ...allocation },
         ui: { setHuntingActive() {}, setHuntingOverlayState() {}, addLog() {} },
-        startMatch(specs) {
-            capturedSpecs.push(specs);
+        startMatch(specs, options) {
+            capturedMatches.push({ specs, options });
         }
     };
     const manager = new HuntingManager(mockApp);
     manager._run = createHuntingRun({ characterId: playerId, stageId: HUNTING_STAGE_IDS.CAVE });
     manager._startFloorBattle();
 
-    const playerSpec = capturedSpecs[0][0];
+    const { specs, options } = capturedMatches[0];
+    const playerSpec = specs[0];
     assert.equal(playerSpec.stats.hp, expectedSpec.stats.hp, "Hunting spec hp should match applyStatAllocation");
     assert.equal(
         playerSpec.stats.damage,
@@ -10372,6 +10443,11 @@ function testHuntingStartFloorBattleAppliesStatAllocation(app) {
         "Hunting spec speed should match applyStatAllocation"
     );
     assert.equal(playerSpec.teamId, HUNTING_TEAMS.PLAYER, "Hunting spec should be on player team");
+    assert.equal(
+        options.experienceProgressionByFighter.get(playerId).abilityTier,
+        1,
+        "Hunting should pass the same progression snapshot to BattleSimulation"
+    );
     // 변경 전 roster와 공유되지 않아야 함 (spread clone)
     assert.notEqual(playerSpec, player, "Hunting spec should be a clone of the roster base spec");
 

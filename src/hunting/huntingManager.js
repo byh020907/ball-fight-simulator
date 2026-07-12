@@ -28,8 +28,8 @@ import { applyMerchantOffer, formatOfferResultToast } from "./huntingMerchant.js
 import { formatPendingLootSummary, formatDefeatLossText } from "./huntingFormat.js";
 import { createMatchReport, recordLowestHp } from "../collection/index.js";
 import {
-    applyExperienceEffectsToBaseSpec,
-    collectActiveExperienceEffects,
+    applyExperienceProgressionToBaseSpec,
+    collectActiveExperienceProgression,
     grantExperienceFromMatchReport
 } from "../experience/experienceService.js";
 import { applyStatAllocation } from "../statAllocation.js";
@@ -203,15 +203,13 @@ export class HuntingManager {
                   })
                 : null;
         const enemySpecs = miniboss ? [miniboss, ...mobSpecs.slice(0, Math.max(1, mobSpecs.length - 1))] : mobSpecs;
+        const playerProgression = collectActiveExperienceProgression(app.playerProfile, run.characterId);
 
         const appliedSpec = applyHuntingStatModifiersToSpec(
             applyEquipmentStats(
                 {
                     ...applyStatAllocation(
-                        applyExperienceEffectsToBaseSpec(
-                            playerSpec,
-                            collectActiveExperienceEffects(app.playerProfile, run.characterId)
-                        ),
+                        applyExperienceProgressionToBaseSpec(playerSpec, playerProgression),
                         app.playerStatAllocation,
                         true
                     ),
@@ -250,7 +248,8 @@ export class HuntingManager {
             arenaHeight: arena.HEIGHT,
             cameraZoom: 1,
             arenaTheme: stageTheme,
-            terrain
+            terrain,
+            experienceProgressionByFighter: new Map([[run.characterId, playerProgression]])
         });
 
         if (run.carriedHp !== null) {
