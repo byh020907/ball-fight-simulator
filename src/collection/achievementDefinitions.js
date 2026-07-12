@@ -32,7 +32,7 @@ function getMasteryLevel(tournamentWins) {
  * @property {string} playerFighterId - 현재 플레이어 캐릭터 ID
  */
 
-/** @type {ReadonlyArray<Readonly<{id:string,name:string,description:string,tier:string,evaluate:(ctx:AchievementContext)=>boolean,reward:object|null}>>} */
+/** @type {ReadonlyArray<Readonly<{id:string,name:string,description:string,tier:string,evaluate:(ctx:AchievementContext)=>boolean,reward:object|null,grant:(handler:object)=>object}>>} */
 export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
     {
         id: "first_tournament_win",
@@ -45,6 +45,9 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         },
         reward: {
             ...ACHIEVEMENT_REWARDS.firstTournamentWin
+        },
+        grant(handler) {
+            return handler.shards(ACHIEVEMENT_REWARDS.firstTournamentWin.amount);
         }
     },
     {
@@ -58,6 +61,9 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         },
         reward: {
             ...ACHIEVEMENT_REWARDS.flawlessTournament
+        },
+        grant(handler) {
+            return handler.equipment(ACHIEVEMENT_REWARDS.flawlessTournament.rarity);
         }
     },
     {
@@ -76,6 +82,9 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         },
         reward: {
             ...ACHIEVEMENT_REWARDS.comebackMatchWin
+        },
+        grant(handler) {
+            return handler.chest(ACHIEVEMENT_REWARDS.comebackMatchWin.rarity);
         }
     },
     {
@@ -89,6 +98,9 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         },
         reward: {
             ...ACHIEVEMENT_REWARDS.counterExpert
+        },
+        grant(handler) {
+            return handler.chest(ACHIEVEMENT_REWARDS.counterExpert.rarity);
         }
     },
     {
@@ -103,6 +115,9 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         },
         reward: {
             ...ACHIEVEMENT_REWARDS.allActionsUsed
+        },
+        grant(handler) {
+            return handler.chest(ACHIEVEMENT_REWARDS.allActionsUsed.rarity);
         }
     },
     {
@@ -117,6 +132,9 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         },
         reward: {
             ...ACHIEVEMENT_REWARDS.rosterChampion
+        },
+        grant(handler) {
+            return handler.equipment(ACHIEVEMENT_REWARDS.rosterChampion.rarity);
         }
     },
     {
@@ -132,6 +150,9 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         },
         reward: {
             ...ACHIEVEMENT_REWARDS.masteryComplete
+        },
+        grant(handler) {
+            return handler.equipment(ACHIEVEMENT_REWARDS.masteryComplete.rarity);
         }
     },
     {
@@ -144,6 +165,9 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         },
         reward: {
             ...ACHIEVEMENT_REWARDS.marathon50
+        },
+        grant(handler) {
+            return handler.chest(ACHIEVEMENT_REWARDS.marathon50.rarity);
         }
     },
     {
@@ -156,6 +180,9 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         },
         reward: {
             ...ACHIEVEMENT_REWARDS.singleHitMonster
+        },
+        grant(handler) {
+            return handler.equipment(ACHIEVEMENT_REWARDS.singleHitMonster.rarity);
         }
     },
     {
@@ -169,6 +196,9 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         },
         reward: {
             ...ACHIEVEMENT_REWARDS.tournamentStreak3
+        },
+        grant(handler) {
+            return handler.chest(ACHIEVEMENT_REWARDS.tournamentStreak3.rarity);
         }
     },
     {
@@ -183,6 +213,9 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         reward: {
             type: "FEATURE_UNLOCK",
             payload: { feature: "battle_speed_2x", description: "2배속 전투 관전 해금 (전투화면 상단 탭)" }
+        },
+        grant(handler) {
+            return handler.unlockFeature("battle_speed_2x");
         }
     },
     {
@@ -197,6 +230,9 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         reward: {
             type: "FEATURE_UNLOCK",
             payload: { feature: "battle_speed_4x", description: "4배속 전투 관전 해금 (전투화면 상단 탭)" }
+        },
+        grant(handler) {
+            return handler.unlockFeature("battle_speed_4x");
         }
     }
 ]);

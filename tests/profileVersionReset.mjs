@@ -7,6 +7,7 @@ import {
     SESSION_STORAGE_VERSION_KEY
 } from "../src/playerProfile.js";
 import { grantAchievementReward } from "../src/collection/achievementRewards.js";
+import { ACHIEVEMENT_DEFINITIONS } from "../src/collection/achievementDefinitions.js";
 
 function createSessionStorage(values = {}) {
     const data = new Map(Object.entries(values));
@@ -46,21 +47,30 @@ assert.deepEqual(migratePlayerProfile(staleProfile).equipment.inventory, []);
 const rewardProfile = createDefaultPlayerProfile();
 const shardReward = grantAchievementReward(rewardProfile, {
     id: "first_tournament_win",
-    reward: { type: "SHARDS", amount: 30 }
+    grant(handler) {
+        return handler.shards(30);
+    }
 });
 assert.equal(shardReward.shards, 30);
 assert.equal(rewardProfile.hunting.shards, 30);
 
 const chestReward = grantAchievementReward(rewardProfile, {
     id: "comeback_match_win",
-    reward: { type: "CHEST", rarity: "uncommon" }
+    grant(handler) {
+        return handler.chest("uncommon");
+    }
 });
 assert.equal(chestReward.chest.rarity, "uncommon");
 assert.equal(rewardProfile.hunting.chests.length, 1);
 
 const equipmentReward = grantAchievementReward(
     rewardProfile,
-    { id: "flawless_tournament", reward: { type: "EQUIPMENT", rarity: "rare" } },
+    {
+        id: "flawless_tournament",
+        grant(handler) {
+            return handler.equipment("rare");
+        }
+    },
     { rng: () => 0.5 }
 );
 assert.equal(equipmentReward.equipment.rarity, "rare");
@@ -71,9 +81,13 @@ rewardProfile.equipment.inventory = Array.from({ length: rewardProfile.equipment
 }));
 const overflowReward = grantAchievementReward(rewardProfile, {
     id: "roster_champion",
-    reward: { type: "EQUIPMENT", rarity: "epic" }
+    grant(handler) {
+        return handler.equipment("epic");
+    }
 });
 assert.equal(overflowReward.convertedToChest, true);
 assert.equal(overflowReward.chest.rarity, "epic");
+
+assert.ok(ACHIEVEMENT_DEFINITIONS.every((achievement) => typeof achievement.grant === "function"));
 
 console.log("[profile-version-reset] ok");
