@@ -93,6 +93,11 @@ function rollInt(min, max, rng = defaultRng) {
     return Math.floor(min + rng() * (max - min + 1));
 }
 
+function createEquipmentInstanceId(rng = defaultRng) {
+    _eqCounter += 1;
+    return `eq-${Date.now()}-${_eqCounter}-${Math.floor(rng() * 1_000_000)}`;
+}
+
 export function createEquipmentInstance({ rarity = "common", slot = null, rng = defaultRng } = {}) {
     const safeRarity = EQUIPMENT_RARITIES.includes(rarity) ? rarity : "common";
     const range = EQUIPMENT_STAT_RANGES[safeRarity];
@@ -130,9 +135,8 @@ export function createEquipmentInstance({ rarity = "common", slot = null, rng = 
         rng
     });
 
-    _eqCounter++;
     return {
-        instanceId: `eq-${Date.now()}-${_eqCounter}-${Math.floor(rng() * 1_000_000)}`,
+        instanceId: createEquipmentInstanceId(rng),
         rarity: safeRarity,
         slot: assignedSlot,
         name,
@@ -144,6 +148,51 @@ export function createEquipmentInstance({ rarity = "common", slot = null, rng = 
         specialOptions,
         enhanceLevel: 0,
         draw: EQUIPMENT_DRAW_KEYS[assignedSlot] ?? assignedSlot
+    };
+}
+
+export function createGuaranteedEquipmentInstance({
+    rarity,
+    slot,
+    name,
+    description,
+    stats,
+    specialOptions = []
+} = {}) {
+    if (!EQUIPMENT_RARITIES.includes(rarity)) throw new Error(`Invalid guaranteed equipment rarity: ${rarity}`);
+    if (!EQUIPMENT_SLOTS.some((candidate) => candidate.id === slot))
+        throw new Error(`Invalid guaranteed equipment slot: ${slot}`);
+    if (!name || !description || !Array.isArray(stats) || stats.length === 0) {
+        throw new Error("Guaranteed equipment requires name, description, and stats");
+    }
+
+    const fixedStats = stats.map(({ type, value }) => {
+        if (!STAT_TYPES.includes(type) || !Number.isFinite(value) || value <= 0) {
+            throw new Error(`Invalid guaranteed equipment stat: ${type}`);
+        }
+        return { type, value, min: value, max: value };
+    });
+    const fixedSpecialOptions = specialOptions.map(({ type, value }) => {
+        if (!SPECIAL_OPTION_POOL.some((option) => option.type === type) || !Number.isFinite(value) || value <= 0) {
+            throw new Error(`Invalid guaranteed equipment special option: ${type}`);
+        }
+        return { type, value };
+    });
+
+    return {
+        instanceId: createEquipmentInstanceId(),
+        rarity,
+        slot,
+        name,
+        baseName: name,
+        primaryStatType: fixedStats[0].type,
+        specialOptionType: fixedSpecialOptions[0]?.type ?? null,
+        description,
+        stats: fixedStats,
+        specialOptions: fixedSpecialOptions.length > 0 ? fixedSpecialOptions : null,
+        enhanceLevel: 0,
+        draw: EQUIPMENT_DRAW_KEYS[slot] ?? slot,
+        isGuaranteed: true
     };
 }
 

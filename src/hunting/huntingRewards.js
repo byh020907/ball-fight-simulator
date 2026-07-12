@@ -79,15 +79,23 @@ export function rollShardReward({ floor = 1, enemyType = HUNTING_ENEMY_TYPES.NOR
     return Math.max(0, Math.round((base + clearBonus) * deepBonus));
 }
 
-export function createHuntingChest({ rarity = "common", id = null, acquiredAt = Date.now() } = {}) {
+export function createHuntingChest({
+    rarity = "common",
+    id = null,
+    acquiredAt = Date.now(),
+    openCost = null,
+    rewardPreview = null,
+    guaranteedEquipment = null
+} = {}) {
     const safeRarity = HUNTING_CHEST_RARITIES.includes(rarity) ? rarity : "common";
     return {
         id: id ?? `chest-${safeRarity}-${acquiredAt}-${Math.floor(Math.random() * 1_000_000)}`,
         rarity: safeRarity,
         acquiredAt,
-        openCost: getChestOpenCost(safeRarity),
+        openCost: Number.isFinite(openCost) && openCost >= 0 ? openCost : getChestOpenCost(safeRarity),
         rewardTableVersion: HUNTING_CHEST_REWARD_TABLE_VERSION,
-        rewardPreview: describeHuntingChestRewards(safeRarity)
+        rewardPreview: rewardPreview ?? guaranteedEquipment?.name ?? describeHuntingChestRewards(safeRarity),
+        guaranteedEquipment
     };
 }
 

@@ -1,5 +1,5 @@
 import { createHuntingChest } from "../hunting/huntingRewards.js";
-import { generateEquipmentFromRarity, isInventoryFull } from "../hunting/equipmentConfig.js";
+import { createGuaranteedEquipmentInstance, isInventoryFull } from "../hunting/equipmentConfig.js";
 
 export const ACHIEVEMENT_REWARD_TYPES = Object.freeze({
     SHARDS: "SHARDS",
@@ -30,12 +30,18 @@ export class AchievementRewardHandler {
         return { applied: true, type: ACHIEVEMENT_REWARD_TYPES.CHEST, chest };
     }
 
-    equipment(rarity = "common") {
+    equipment(specification) {
+        const equipment = createGuaranteedEquipmentInstance(specification);
         if (isInventoryFull(this.profile)) {
-            const deferred = this.chest(rarity);
-            return { ...deferred, type: ACHIEVEMENT_REWARD_TYPES.EQUIPMENT, convertedToChest: true };
+            const chest = createHuntingChest({
+                rarity: equipment.rarity,
+                guaranteedEquipment: equipment,
+                openCost: 0,
+                rewardPreview: equipment.name
+            });
+            this.profile.hunting.chests.push(chest);
+            return { applied: true, type: ACHIEVEMENT_REWARD_TYPES.EQUIPMENT, chest, convertedToChest: true };
         }
-        const equipment = generateEquipmentFromRarity(rarity, this.rng);
         this.profile.equipment.inventory.push(equipment);
         return { applied: true, type: ACHIEVEMENT_REWARD_TYPES.EQUIPMENT, equipment };
     }

@@ -162,15 +162,61 @@ function sanitizeCharacterExperienceMap(obj) {
     return result;
 }
 
+function sanitizeGuaranteedEquipment(item) {
+    if (!item || typeof item !== "object" || typeof item.instanceId !== "string" || item.instanceId.length === 0) {
+        return null;
+    }
+    const rarity = ["common", "uncommon", "rare", "epic", "legendary"].includes(item.rarity) ? item.rarity : null;
+    const slot = ["weapon", "armor", "accessory"].includes(item.slot) ? item.slot : null;
+    const name = typeof item.name === "string" && item.name.length > 0 ? item.name : null;
+    const description = typeof item.description === "string" ? item.description : "";
+    const stats = Array.isArray(item.stats)
+        ? item.stats
+              .filter((stat) => ["hp", "damage", "defense", "speed"].includes(stat?.type))
+              .map((stat) => ({
+                  type: stat.type,
+                  value: sanitizeNumber(stat.value),
+                  min: sanitizeNumber(stat.min ?? stat.value),
+                  max: sanitizeNumber(stat.max ?? stat.value)
+              }))
+              .filter((stat) => stat.value > 0)
+        : [];
+    if (!rarity || !slot || !name || stats.length === 0) return null;
+    const specialOptions = Array.isArray(item.specialOptions)
+        ? item.specialOptions
+              .filter((option) => typeof option?.type === "string" && sanitizeNumber(option.value) > 0)
+              .map((option) => ({ type: option.type, value: sanitizeNumber(option.value) }))
+        : null;
+    return {
+        instanceId: item.instanceId,
+        rarity,
+        slot,
+        name,
+        baseName: typeof item.baseName === "string" ? item.baseName : name,
+        primaryStatType: stats[0].type,
+        specialOptionType: specialOptions?.[0]?.type ?? null,
+        description,
+        stats,
+        specialOptions,
+        enhanceLevel: Math.min(5, sanitizeNumber(item.enhanceLevel)),
+        draw: typeof item.draw === "string" ? item.draw : slot,
+        isGuaranteed: true
+    };
+}
+
 function sanitizeHuntingChest(chest) {
     if (!chest || typeof chest !== "object") return null;
     const rarity = ["common", "uncommon", "rare", "epic", "legendary"].includes(chest.rarity) ? chest.rarity : "common";
     const id = typeof chest.id === "string" && chest.id.length > 0 ? chest.id : null;
     if (!id) return null;
+    const guaranteedEquipment = sanitizeGuaranteedEquipment(chest.guaranteedEquipment);
     return {
         id,
         rarity,
-        acquiredAt: sanitizeTimestamp(chest.acquiredAt) ?? Date.now()
+        acquiredAt: sanitizeTimestamp(chest.acquiredAt) ?? Date.now(),
+        openCost: Number.isFinite(chest.openCost) && chest.openCost >= 0 ? sanitizeNumber(chest.openCost) : null,
+        rewardPreview: typeof chest.rewardPreview === "string" ? chest.rewardPreview : null,
+        guaranteedEquipment
     };
 }
 

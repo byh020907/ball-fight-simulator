@@ -63,7 +63,10 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
             ...ACHIEVEMENT_REWARDS.flawlessTournament
         },
         grant(handler) {
-            return handler.equipment(ACHIEVEMENT_REWARDS.flawlessTournament.rarity);
+            return handler.equipment({
+                rarity: ACHIEVEMENT_REWARDS.flawlessTournament.rarity,
+                ...ACHIEVEMENT_REWARDS.flawlessTournament.equipment
+            });
         }
     },
     {
@@ -134,7 +137,10 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
             ...ACHIEVEMENT_REWARDS.rosterChampion
         },
         grant(handler) {
-            return handler.equipment(ACHIEVEMENT_REWARDS.rosterChampion.rarity);
+            return handler.equipment({
+                rarity: ACHIEVEMENT_REWARDS.rosterChampion.rarity,
+                ...ACHIEVEMENT_REWARDS.rosterChampion.equipment
+            });
         }
     },
     {
@@ -152,7 +158,10 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
             ...ACHIEVEMENT_REWARDS.masteryComplete
         },
         grant(handler) {
-            return handler.equipment(ACHIEVEMENT_REWARDS.masteryComplete.rarity);
+            return handler.equipment({
+                rarity: ACHIEVEMENT_REWARDS.masteryComplete.rarity,
+                ...ACHIEVEMENT_REWARDS.masteryComplete.equipment
+            });
         }
     },
     {
@@ -182,7 +191,10 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
             ...ACHIEVEMENT_REWARDS.singleHitMonster
         },
         grant(handler) {
-            return handler.equipment(ACHIEVEMENT_REWARDS.singleHitMonster.rarity);
+            return handler.equipment({
+                rarity: ACHIEVEMENT_REWARDS.singleHitMonster.rarity,
+                ...ACHIEVEMENT_REWARDS.singleHitMonster.equipment
+            });
         }
     },
     {

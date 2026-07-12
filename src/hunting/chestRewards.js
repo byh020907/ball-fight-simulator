@@ -14,17 +14,30 @@ import {
 
 export function canOpenHuntingChest(profile, chest) {
     if (!profile?.hunting || !chest) return false;
-    return (profile.hunting.shards ?? 0) >= getChestOpenCost(chest.rarity);
+    return (profile.hunting.shards ?? 0) >= getChestOpenCostForChest(chest);
+}
+
+function getChestOpenCostForChest(chest) {
+    return Number.isFinite(chest?.openCost) && chest.openCost >= 0 ? chest.openCost : getChestOpenCost(chest?.rarity);
 }
 
 export function previewHuntingChest(chest) {
     const rarity = HUNTING_CHEST_RARITIES.includes(chest?.rarity) ? chest.rarity : "common";
-    const cost = getChestOpenCost(rarity);
+    const cost = getChestOpenCostForChest(chest);
+    const guaranteedEquipment = chest?.guaranteedEquipment ?? null;
     return {
         rarity,
         cost,
-        rewardText: describeHuntingChestRewards(rarity),
-        rewardTable: getHuntingChestRewardTable(rarity)
+        rewardText: guaranteedEquipment?.name ?? describeHuntingChestRewards(rarity),
+        rewardTable: guaranteedEquipment
+            ? [
+                  {
+                      type: HUNTING_CHEST_REWARD_TYPES.EQUIPMENT,
+                      equipment: guaranteedEquipment,
+                      text: guaranteedEquipment.name
+                  }
+              ]
+            : getHuntingChestRewardTable(rarity)
     };
 }
 
@@ -45,8 +58,7 @@ export function applyHuntingChestReward(profile, reward, { rng = Math.random } =
             profile.equipment = profile.equipment || {};
             profile.equipment.inventory = [];
         }
-        const rarity = reward.rarity ?? "common";
-        const equipment = generateEquipmentFromRarity(rarity, rng);
+        const equipment = reward.equipment ?? generateEquipmentFromRarity(reward.rarity ?? "common", rng);
         profile.equipment.inventory.push(equipment);
         applied.equipment = equipment;
         return applied;
@@ -67,7 +79,7 @@ export function openHuntingChest(profile, chestId, { rng = Math.random } = {}) {
     }
 
     const chest = chests[index];
-    const cost = getChestOpenCost(chest.rarity);
+    const cost = getChestOpenCostForChest(chest);
     if ((profile.hunting.shards ?? 0) < cost) {
         return { opened: false, reason: "not_enough_shards", cost };
     }
@@ -81,7 +93,9 @@ export function openHuntingChest(profile, chestId, { rng = Math.random } = {}) {
     profile.hunting.shards -= cost;
     profile.hunting.chests = chests.filter((item) => item.id !== chestId);
 
-    const reward = rollHuntingChestReward(chest, { rng });
+    const reward = chest.guaranteedEquipment
+        ? { type: HUNTING_CHEST_REWARD_TYPES.EQUIPMENT, equipment: chest.guaranteedEquipment, rarity: chest.rarity }
+        : rollHuntingChestReward(chest, { rng });
     if (reward.type === HUNTING_CHEST_REWARD_TYPES.EQUIPMENT) {
         reward.rarity = chest.rarity;
     }

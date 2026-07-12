@@ -132,14 +132,66 @@ export const REWARD_BALANCE = deepFreeze({
         masteryThresholds: [1, 5, 15],
         achievementRewards: {
             firstTournamentWin: { type: "SHARDS", amount: 30 },
-            flawlessTournament: { type: "EQUIPMENT", rarity: "rare" },
+            flawlessTournament: {
+                type: "EQUIPMENT",
+                rarity: "rare",
+                equipment: {
+                    slot: "armor",
+                    name: "무결점의 수정 방패",
+                    description: "흠집 하나 없이 승리한 자에게 주어지는 희귀 방어구.",
+                    stats: [
+                        { type: "defense", value: 8 },
+                        { type: "hp", value: 50 }
+                    ],
+                    specialOptions: [{ type: "wallBounce", value: 10 }]
+                }
+            },
             comebackMatchWin: { type: "CHEST", rarity: "uncommon" },
             counterExpert: { type: "CHEST", rarity: "uncommon" },
             allActionsUsed: { type: "CHEST", rarity: "common" },
-            rosterChampion: { type: "EQUIPMENT", rarity: "epic" },
-            masteryComplete: { type: "EQUIPMENT", rarity: "legendary" },
+            rosterChampion: {
+                type: "EQUIPMENT",
+                rarity: "epic",
+                equipment: {
+                    slot: "accessory",
+                    name: "개척자의 룬 귀걸이",
+                    description: "모든 캐릭터의 우승을 증명하는 에픽 장신구.",
+                    stats: [
+                        { type: "damage", value: 12 },
+                        { type: "speed", value: 60 }
+                    ],
+                    specialOptions: [{ type: "cooldown", value: 10 }]
+                }
+            },
+            masteryComplete: {
+                type: "EQUIPMENT",
+                rarity: "legendary",
+                equipment: {
+                    slot: "armor",
+                    name: "도감 완성의 영원한 망토",
+                    description: "모든 숙련을 모아 완성한 전설 방어구.",
+                    stats: [
+                        { type: "hp", value: 180 },
+                        { type: "defense", value: 18 }
+                    ],
+                    specialOptions: [{ type: "angularImpulse", value: 15 }]
+                }
+            },
             marathon50: { type: "CHEST", rarity: "common" },
-            singleHitMonster: { type: "EQUIPMENT", rarity: "rare" },
+            singleHitMonster: {
+                type: "EQUIPMENT",
+                rarity: "rare",
+                equipment: {
+                    slot: "weapon",
+                    name: "단죄의 수정 단검",
+                    description: "한 번의 압도적인 일격을 기록한 자의 희귀 무기.",
+                    stats: [
+                        { type: "damage", value: 8 },
+                        { type: "speed", value: 30 }
+                    ],
+                    specialOptions: [{ type: "crashDamage", value: 15 }]
+                }
+            },
             tournamentStreak3: { type: "CHEST", rarity: "uncommon" }
         },
         masteryTiers: {

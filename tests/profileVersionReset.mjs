@@ -8,6 +8,7 @@ import {
 } from "../src/playerProfile.js";
 import { grantAchievementReward } from "../src/collection/achievementRewards.js";
 import { ACHIEVEMENT_DEFINITIONS } from "../src/collection/achievementDefinitions.js";
+import { openHuntingChest } from "../src/hunting/chestRewards.js";
 
 function createSessionStorage(values = {}) {
     const data = new Map(Object.entries(values));
@@ -63,30 +64,31 @@ const chestReward = grantAchievementReward(rewardProfile, {
 assert.equal(chestReward.chest.rarity, "uncommon");
 assert.equal(rewardProfile.hunting.chests.length, 1);
 
-const equipmentReward = grantAchievementReward(
-    rewardProfile,
-    {
-        id: "flawless_tournament",
-        grant(handler) {
-            return handler.equipment("rare");
-        }
-    },
-    { rng: () => 0.5 }
-);
+const flawlessAchievement = ACHIEVEMENT_DEFINITIONS.find((achievement) => achievement.id === "flawless_tournament");
+const equipmentReward = grantAchievementReward(rewardProfile, flawlessAchievement);
 assert.equal(equipmentReward.equipment.rarity, "rare");
+assert.equal(equipmentReward.equipment.name, "무결점의 수정 방패");
+assert.deepEqual(equipmentReward.equipment.stats, [
+    { type: "defense", value: 8, min: 8, max: 8 },
+    { type: "hp", value: 50, min: 50, max: 50 }
+]);
 assert.equal(rewardProfile.equipment.inventory.length, 1);
 
 rewardProfile.equipment.inventory = Array.from({ length: rewardProfile.equipment.maxInventorySlots }, (_, index) => ({
     instanceId: `full-${index}`
 }));
-const overflowReward = grantAchievementReward(rewardProfile, {
-    id: "roster_champion",
-    grant(handler) {
-        return handler.equipment("epic");
-    }
-});
+const rosterChampion = ACHIEVEMENT_DEFINITIONS.find((achievement) => achievement.id === "roster_champion");
+const overflowReward = grantAchievementReward(rewardProfile, rosterChampion);
 assert.equal(overflowReward.convertedToChest, true);
 assert.equal(overflowReward.chest.rarity, "epic");
+assert.equal(overflowReward.chest.openCost, 0);
+assert.equal(overflowReward.chest.guaranteedEquipment.name, "개척자의 룬 귀걸이");
+
+rewardProfile.equipment.inventory = [];
+const openedGuaranteedChest = openHuntingChest(rewardProfile, overflowReward.chest.id);
+assert.equal(openedGuaranteedChest.opened, true);
+assert.equal(openedGuaranteedChest.cost, 0);
+assert.equal(openedGuaranteedChest.applied.equipment.name, "개척자의 룬 귀걸이");
 
 assert.ok(ACHIEVEMENT_DEFINITIONS.every((achievement) => typeof achievement.grant === "function"));
 
