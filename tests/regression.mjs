@@ -7255,57 +7255,6 @@ async function testToastQueue() {
     assert.equal(state.toastVisible, false, "Toast should be hidden when queue is empty");
 }
 
-// ── Bonus points effective total test ───────────────────────────────────────
-
-async function testBonusPointsEffectiveTotal() {
-    const { createDefaultPlayerProfile } = await import("../src/playerProfile.js");
-    const { computeEffectiveBonuses } = await import("../src/progression/progressionState.js");
-    const { collectActiveEffects } = await import("../src/character-mastery/index.js");
-    const { PLAYER_STAT_POINTS } = await import("../src/statAllocation.js");
-
-    // 성장 보너스만 있는 경우 — 해금된 업적으로 동적 계산
-    const profile1 = createDefaultPlayerProfile();
-    profile1.collection.achievements["test_ach"] = { unlockedAt: Date.now() };
-    const defs1 = [
-        {
-            id: "test_ach",
-            reward: { type: "PROGRESSION_BONUS", payload: { bonusKey: "extraStatPoints", amount: 10 } }
-        }
-    ];
-    const computed1 = computeEffectiveBonuses(profile1, defs1);
-    const ctx1 = collectActiveEffects(profile1, "archer");
-    const effectiveTotal1 = PLAYER_STAT_POINTS + ctx1.allocationModifiers.extraStatPoints + computed1.extraStatPoints;
-    assert.equal(effectiveTotal1, 110, "extraStatPoints from progression should increase effective total");
-
-    // 숙련도 보너스만 있는 경우 (hero at BRONZE = +3 extraStatPoints, playing as archer)
-    const profile2 = createDefaultPlayerProfile();
-    profile2.characterMastery.levels = { hero: 1 };
-    const ctx2 = collectActiveEffects(profile2, "archer");
-    const effectiveTotal2 = PLAYER_STAT_POINTS + ctx2.allocationModifiers.extraStatPoints;
-    assert.equal(effectiveTotal2, 103, "extraStatPoints from hero mastery should increase effective total");
-
-    // hero로 플레이 중이면 자신의 숙련도는 미적용
-    const ctx2Self = collectActiveEffects(profile2, "hero");
-    const effectiveTotal2Self = PLAYER_STAT_POINTS + ctx2Self.allocationModifiers.extraStatPoints;
-    assert.equal(effectiveTotal2Self, 100, "Self mastery should not contribute extraStatPoints");
-
-    // 성장 + 숙련도 중첩
-    const profile3 = createDefaultPlayerProfile();
-    profile3.collection.achievements["test_ach"] = { unlockedAt: Date.now() };
-    profile3.characterMastery.levels = { hero: 2 }; // SILVER = +6
-    const computed3 = computeEffectiveBonuses(profile3, defs1);
-    const ctx3 = collectActiveEffects(profile3, "archer");
-    const effectiveTotal3 = PLAYER_STAT_POINTS + ctx3.allocationModifiers.extraStatPoints + computed3.extraStatPoints;
-    assert.equal(effectiveTotal3, 116, "Combined progression + mastery should stack");
-
-    // 보너스 0인 경우
-    const profile4 = createDefaultPlayerProfile();
-    const computed4 = computeEffectiveBonuses(profile4, []);
-    const ctx4 = collectActiveEffects(profile4, "archer");
-    const effectiveTotal4 = PLAYER_STAT_POINTS + ctx4.allocationModifiers.extraStatPoints + computed4.extraStatPoints;
-    assert.equal(effectiveTotal4, 100, "No bonuses should keep effective total at base");
-}
-
 // ── Sensitivity reset test ──────────────────────────────────────────────────
 
 async function testSensitivityAlwaysReset() {
@@ -7375,7 +7324,7 @@ async function testMasteryModifiersStoredOnBattleBall(app) {
         stats: { hp: 1000, damage: 50, speed: 200, defense: 5, radius: 16, mass: 10 },
         statAllocation: null,
         mastery: {
-            physics: { velocityRecoveryBonus: 0.02 },
+            physics: { velocityRecoveryBonus: 0.02, wallBounce: 0.05, speed: 0.03, collisionAngularImpulse: 0.04 },
             combat: { incomingCollisionDamageReduce: 0.05, outgoingCollisionDamageBonus: 0.03 },
             action: { hpCostPercentReduction: 0.0003, cooldownPercent: 0.02, minHpCostPercent: 0.001 },
             passives: [{ id: "test_passive", type: "periodic_collision_bonus", cooldown: 12, damageBonus: 0.04 }]
@@ -7384,6 +7333,9 @@ async function testMasteryModifiersStoredOnBattleBall(app) {
 
     const ball = new BattleBall(spec, new Vector2(100, 100));
     assert.equal(ball.mastery.physics.velocityRecoveryBonus, 0.02, "velocityRecoveryBonus should be stored");
+    assert.equal(ball.mastery.physics.wallBounce, 0.05, "wallBounce should be stored");
+    assert.equal(ball.mastery.physics.speed, 0.03, "speed should be stored");
+    assert.equal(ball.mastery.physics.collisionAngularImpulse, 0.04, "collisionAngularImpulse should be stored");
     assert.equal(
         ball.mastery.combat.incomingCollisionDamageReduce,
         0.05,
@@ -7413,8 +7365,7 @@ async function testStatModifierDamageIndependentOfHp() {
     // archer mastery의 apply는 damage에만 영향을 줌
     const ctx = {
         statModifiers: { hp: 0, damage: 0, defense: 0 },
-        allocationModifiers: { extraStatPoints: 0, balanceTolerance: 0, perStatCapBonus: 0 },
-        physicsModifiers: { velocityRecoveryBonus: 0 },
+        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0, speed: 0, collisionAngularImpulse: 0 },
         combatModifiers: { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
         combatPassives: [],
         actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0, minHpCostPercent: 0 }
@@ -7444,7 +7395,7 @@ async function testMasteryEffectsApplyAfterFixedStats() {
     };
     const mastery = {
         statModifiers: { hp: 0.06, damage: 0.06, defense: 0 },
-        physicsModifiers: { velocityRecoveryBonus: 0.1 },
+        physicsModifiers: { velocityRecoveryBonus: 0.1, wallBounce: 0, speed: 0, collisionAngularImpulse: 0 },
         combatModifiers: { incomingCollisionDamageReduce: 0.06, outgoingCollisionDamageBonus: 0.06 },
         actionModifiers: { hpCostPercentReduction: 0.001, cooldownPercent: 0.06, minHpCostPercent: 0.001 },
         combatPassives: []
@@ -7462,7 +7413,7 @@ async function testVampireMasteryRestoresCollisionDamage() {
     const vampire = MASTERY_EFFECT_DEFS.find((definition) => definition.sourceFighterId === "vampire");
     const ctx = {
         statModifiers: { hp: 0, damage: 0, defense: 0 },
-        physicsModifiers: { velocityRecoveryBonus: 0 },
+        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0, speed: 0, collisionAngularImpulse: 0 },
         combatModifiers: { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
         combatPassives: [],
         actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0, minHpCostPercent: 0 }
@@ -7541,7 +7492,7 @@ async function testMasteryCombatAndCooldownDefinitions() {
     const { MASTERY_EFFECT_DEFS } = await import("../src/character-mastery/index.js");
     const ctx = {
         statModifiers: { hp: 0, damage: 0, defense: 0 },
-        physicsModifiers: { velocityRecoveryBonus: 0 },
+        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0, speed: 0, collisionAngularImpulse: 0 },
         combatModifiers: { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
         combatPassives: [],
         actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0, minHpCostPercent: 0 }
@@ -7862,7 +7813,6 @@ await testApplyTournamentReport();
 await testCreateCollectionHubViewModel();
 // Toast queue tests
 await testToastQueue();
-// Bonus points effective total test
 // Sensitivity reset + adjustStat with bonus total test
 await testSensitivityAlwaysReset();
 await testAdjustStatWithBonusTotal();

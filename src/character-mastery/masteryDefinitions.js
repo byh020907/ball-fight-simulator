@@ -25,17 +25,17 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         }
     },
     {
-        id: "orbit_lightweight",
+        id: "orbit_reflective_orbit",
         sourceFighterId: "orbit",
-        name: "경량 구조",
-        kind: "combat_modifier",
-        description: "받는 충돌 피해가 {value} 감소합니다.",
-        tierValues: MASTERY_TIERS.incomingCollisionDamageReduce,
+        name: "반사 궤도",
+        kind: "physics_modifier",
+        description: "벽 충돌 시 반사 속도가 {value} 증가합니다.",
+        tierValues: MASTERY_TIERS.wallBounce,
         formatValue(v) {
             return (v * 100).toFixed(0) + "%";
         },
         apply(ctx, level) {
-            ctx.combatModifiers.incomingCollisionDamageReduce += this.tierValues[level];
+            ctx.physicsModifiers.wallBounce += this.tierValues[level];
         }
     },
     {
@@ -67,17 +67,17 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         }
     },
     {
-        id: "dash_streamlined",
+        id: "dash_propulsion",
         sourceFighterId: "dash",
-        name: "유선형",
+        name: "추진력",
         kind: "physics_modifier",
-        description: "기본 속도 복귀율이 {value} 증가합니다.",
-        tierValues: MASTERY_TIERS.velocityRecoveryBonus,
+        description: "이동 속도가 {value} 증가합니다.",
+        tierValues: MASTERY_TIERS.speed,
         formatValue(v) {
             return (v * 100).toFixed(0) + "%";
         },
         apply(ctx, level) {
-            ctx.physicsModifiers.velocityRecoveryBonus += this.tierValues[level];
+            ctx.physicsModifiers.speed += this.tierValues[level];
         }
     },
     {
@@ -180,17 +180,17 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         }
     },
     {
-        id: "gunner_lucky_shot",
+        id: "gunner_recoil_amplification",
         sourceFighterId: "gunner",
-        name: "행운",
-        kind: "stat_modifier",
-        description: "공격력이 {value} 증가합니다.",
-        tierValues: MASTERY_TIERS.damage,
+        name: "반동 증폭",
+        kind: "physics_modifier",
+        description: "충돌 시 상대에게 전달하는 각충격이 {value} 증가합니다.",
+        tierValues: MASTERY_TIERS.collisionAngularImpulse,
         formatValue(v) {
             return (v * 100).toFixed(0) + "%";
         },
         apply(ctx, level) {
-            ctx.statModifiers.damage += this.tierValues[level];
+            ctx.physicsModifiers.collisionAngularImpulse += this.tierValues[level];
         }
     },
     {

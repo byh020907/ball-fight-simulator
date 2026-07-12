@@ -91,7 +91,12 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         this.stats.mass = this.mass;
         this._equipmentEffectCooldowns = { hpSteal: 0 };
         this.mastery = {
-            physics: spec.mastery?.physics ?? { velocityRecoveryBonus: 0 },
+            physics: spec.mastery?.physics ?? {
+                velocityRecoveryBonus: 0,
+                wallBounce: 0,
+                speed: 0,
+                collisionAngularImpulse: 0
+            },
             combat: spec.mastery?.combat ?? { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
             action: spec.mastery?.action ?? {
                 hpCostPercentReduction: 0,
@@ -302,8 +307,10 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
     }
 
     applyEquipmentWallBounce(xNormal, yNormal) {
-        const multiplier = this.equipmentEffects.wallBounceMultiplier;
-        if (multiplier <= 1) return;
+        const equipmentMultiplier = this.equipmentEffects.wallBounceMultiplier;
+        const masteryBonus = this.mastery.physics.wallBounce ?? 0;
+        const totalMultiplier = equipmentMultiplier + masteryBonus;
+        if (totalMultiplier <= 1) return;
 
         const normal = (xNormal ?? yNormal)?.clone();
         if (!normal) return;
@@ -311,7 +318,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
 
         const outgoingSpeed = Math.max(0, this.velocity.dot(normal));
         if (!Number.isFinite(outgoingSpeed) || outgoingSpeed <= 0) return;
-        this.applyImpulse(normal.scale(outgoingSpeed * (multiplier - 1)));
+        this.applyImpulse(normal.scale(outgoingSpeed * (totalMultiplier - 1)));
     }
 
     getAbilityUiState() {

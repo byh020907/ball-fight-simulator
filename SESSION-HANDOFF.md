@@ -1312,4 +1312,14 @@
 - 영향: `src/components/xp-progress-bar.html`, `tests/regression.mjs`, `SESSION-HANDOFF.md`
 - 검증: `npm test` (신규 2종 포함 60개 스위트 통과), `npm run check`(126파일), `npm run format:check`, `node scripts/huntingUserScenario.mjs`, `git diff --check`, `rg "window\\.uiManager" src/components/ -g "*.html"` 결과 3개 모두 `<script>` 내부 (game-overlay.html).
 
+## [L1] 2026-07-12 — 숙련도 물리 효과 전환과 무상한 합산 개편
+- 맥락: Orbit, Dash, Gunner가 중복되거나 특색 없는 효과(incomingCollisionDamageReduce, velocityRecoveryBonus, damage)를 제공했고, 누적 상한(masteryCaps)이 한 자리에서만 효과가 쌓이도록 제약해 캐릭터 수집의 동기를 약화시켰다.
+- 결정:
+  (1) Orbit → 반사 궤도(wallBounce, +5/10/15%), 장비 반향과 합산
+  (2) Dash → 추진력(speed, +2/4/6%)
+  (3) Gunner → 반동 증폭(collisionAngularImpulse, +5/10/15%), 장비 소용돌이와 합산
+  (4) masteryCaps 전면 제거, 동일 키 단순 가산
+  (5) 사냥터 원정 플레이어 스펙에 숙련도 적용 추가
+- 영향: `rewardBalanceConfig.js`, `masteryDefinitions.js`, `masteryModifiers.js`, `battleBall.js`(기본 mastery 키·wall bounce), `battleSimulation.js`(각충격 배율), `huntingManager.js`(사냥터 적용), `tests/regression.mjs`(기존 테스트 갱신 + 삭제), 문서 4종, `helpContent.js`, `patchNotes.js`, `SESSION-HANDOFF.md`
+
 ## 진행 중 이슈

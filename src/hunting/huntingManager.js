@@ -16,6 +16,7 @@ import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 import { HUNTING_ADVANCE_STEPS, HUNTING_ENEMY_TYPES, HUNTING_FLOOR_OUTCOME_TYPES } from "./huntingConfig.js";
 import { getHuntingStage, getHuntingStageArena, getNextHuntingStageId } from "./huntingEncounters.js";
 import { applyEquipmentStats } from "./equipmentConfig.js";
+import { collectActiveEffects, applyMasteryEffectsToFighterSpec } from "../character-mastery/index.js";
 import { createHuntingTerrain } from "../terrain/index.js";
 import {
     HUNTING_TEAMS,
@@ -205,20 +206,12 @@ export class HuntingManager {
         const enemySpecs = miniboss ? [miniboss, ...mobSpecs.slice(0, Math.max(1, mobSpecs.length - 1))] : mobSpecs;
         const playerProgression = collectActiveExperienceProgression(app.playerProfile, run.characterId);
 
-        const appliedSpec = applyHuntingStatModifiersToSpec(
-            applyEquipmentStats(
-                {
-                    ...applyStatAllocation(
-                        applyExperienceProgressionToBaseSpec(playerSpec, playerProgression),
-                        app.playerStatAllocation,
-                        true
-                    ),
-                    teamId: HUNTING_TEAMS.PLAYER
-                },
-                app.playerProfile
-            ),
-            run.statModifiers
-        );
+        const masteryCtx = collectActiveEffects(app.playerProfile, run.characterId);
+        const baseSpec = applyExperienceProgressionToBaseSpec(playerSpec, playerProgression);
+        const allocatedSpec = applyStatAllocation(baseSpec, app.playerStatAllocation, true);
+        const equippedSpec = applyEquipmentStats({ ...allocatedSpec, teamId: HUNTING_TEAMS.PLAYER }, app.playerProfile);
+        const huntingSpec = applyHuntingStatModifiersToSpec(equippedSpec, run.statModifiers);
+        const appliedSpec = applyMasteryEffectsToFighterSpec(huntingSpec, masteryCtx);
         if (playerSpec.ability === "hero" && run.hero?.carryover) {
             appliedSpec.hero = {
                 ...(appliedSpec.hero || {}),
