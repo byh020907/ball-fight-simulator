@@ -1669,7 +1669,19 @@ function testHuntingCombatRewardChestUi() {
 function testHuntingCombatRewardChestNormalContinue() {
     const overlayStates = [];
     const showOverlayCalls = [];
+    const playerBall = { id: FIGHTER_IDS.DASH, name: "Dash Ball", hp: 80, maxHp: 100 };
     const mockApp = {
+        _cleanupMatch() {},
+        matchFinalized: false,
+        _onSimulationResult: null,
+        simulation: {
+            fighters: [playerBall, { id: "enemy", name: "Enemy", hp: 0, maxHp: 100 }],
+            winner: playerBall,
+            isHostile() {
+                return true;
+            }
+        },
+        _currentMatchReport: null,
         setHuntingOverlayState(data) {
             overlayStates.push({ ...data });
         },
@@ -1680,58 +1692,81 @@ function testHuntingCombatRewardChestNormalContinue() {
         setStartButton() {},
         addLog() {},
         roster: app.roster,
-        playerProfile: createDefaultPlayerProfile(),
-        simulation: {
-            fighters: [{ id: FIGHTER_IDS.DASH, name: "Dash Ball", hp: 80, maxHp: 100 }]
-        }
+        playerProfile: createDefaultPlayerProfile()
     };
     const manager = new HuntingManager(mockApp);
-    const chest = createHuntingChest({ rarity: "common" });
     manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE });
-    manager._run = recordHuntingFloorResult(manager._run, {
-        hpRemain: 80,
-        maxHp: 100,
-        loot: { shards: 15, chests: [chest], xp: 0 },
-        combatCleared: true
-    });
 
-    // Show chest (simulate _handleFinish interception)
-    manager._presentCombatRewardChest(mockApp, chest);
-    assert.equal(
-        manager._run.phase,
-        HUNTING_RUN_PHASES.AWAITING_COMBAT_REWARD_CHEST,
-        "Phase must be combat reward chest before continue"
-    );
+    // Force chest drop via Math.random stub, always restore
+    const originalRandom = Math.random;
+    try {
+        Math.random = () => 0.0;
 
-    // Reset overlay state tracking for chestContinue
-    overlayStates.length = 0;
-    manager.chestContinue();
+        manager._handleFinish(mockApp);
 
-    // After continue: chest UI should close
-    const chestCloseState = overlayStates.find((s) => s.huntingChestEventActive === false);
-    assert.ok(chestCloseState, "chestContinue must close chest UI");
+        // Phase must be AWAITING_COMBAT_REWARD_CHEST (chest intercepted)
+        assert.equal(
+            manager._run.phase,
+            HUNTING_RUN_PHASES.AWAITING_COMBAT_REWARD_CHEST,
+            "Phase must be combat reward chest after _handleFinish with chest drop"
+        );
 
-    // Phase must now be AWAITING_CHOICE (normal combat victory)
-    assert.equal(
-        manager._run.phase,
-        HUNTING_RUN_PHASES.AWAITING_CHOICE,
-        "Normal combat reward chest continue must transition to AWAITING_CHOICE"
-    );
+        // Chest UI must be active with confirm label '확인'
+        const lastChest = overlayStates.at(-1);
+        assert.ok(lastChest, "_handleFinish must call setHuntingOverlayState");
+        assert.equal(lastChest.huntingChestEventActive, true, "Chest UI must be active");
+        assert.equal(lastChest.huntingChestConfirmLabel, "확인", "Combat reward chest button must say '확인'");
 
-    // Victory overlay should appear
-    const victoryOverlay = showOverlayCalls.find((c) => c.label === "사냥터" && c.text.includes("승리"));
-    assert.ok(victoryOverlay, "After combat reward chest confirm, victory overlay must appear");
-    assert.ok(victoryOverlay.text.includes("승리"), "Victory overlay must show win text");
+        // Victory overlay must NOT have appeared yet
+        const victoryBefore = showOverlayCalls.find((c) => c.label === "사냥터" && c.text.includes("승리"));
+        assert.equal(victoryBefore, undefined, "Victory overlay must NOT appear before chest confirm");
 
-    // Advance must NOT have been called implicitly
-    assert.equal(manager._moving, false, "Combat reward chest continue must not trigger advance automatically");
+        // Reset tracking for chestContinue
+        overlayStates.length = 0;
+        showOverlayCalls.length = 0;
+
+        manager.chestContinue();
+
+        // Chest UI must close
+        const chestClose = overlayStates.find((s) => s.huntingChestEventActive === false);
+        assert.ok(chestClose, "chestContinue must close chest UI");
+
+        // Phase must be AWAITING_CHOICE (normal combat victory)
+        assert.equal(
+            manager._run.phase,
+            HUNTING_RUN_PHASES.AWAITING_CHOICE,
+            "Normal combat reward chest continue must transition to AWAITING_CHOICE"
+        );
+
+        // Victory overlay must appear
+        const victoryAfter = showOverlayCalls.find((c) => c.label === "사냥터" && c.text.includes("승리"));
+        assert.ok(victoryAfter, "After combat reward chest confirm, victory overlay must appear");
+
+        // advance() must NOT have been called implicitly
+        assert.equal(manager._moving, false, "Combat reward chest continue must not trigger advance automatically");
+    } finally {
+        Math.random = originalRandom;
+    }
+
     console.log("[hunting-combat-reward-chest-normal-continue] ok");
 }
 
 function testHuntingCombatRewardChestFinalBossContinue() {
     const overlayStates = [];
     const showOverlayCalls = [];
+    const playerBall = { id: FIGHTER_IDS.DASH, name: "Dash Ball", hp: 80, maxHp: 100 };
     const mockApp = {
+        _cleanupMatch() {},
+        matchFinalized: false,
+        _onSimulationResult: null,
+        simulation: {
+            fighters: [playerBall, { id: "enemy", name: "Enemy", hp: 0, maxHp: 100 }],
+            winner: playerBall,
+            isHostile() {
+                return true;
+            }
+        },
+        _currentMatchReport: null,
         setHuntingOverlayState(data) {
             overlayStates.push({ ...data });
         },
@@ -1745,47 +1780,55 @@ function testHuntingCombatRewardChestFinalBossContinue() {
         beginResultConfirmation() {},
         addLog() {},
         roster: app.roster,
-        playerProfile: createDefaultPlayerProfile(),
-        simulation: {
-            fighters: [{ id: FIGHTER_IDS.DASH, name: "Dash Ball", hp: 80, maxHp: 100 }]
-        }
+        playerProfile: createDefaultPlayerProfile()
     };
     const manager = new HuntingManager(mockApp);
-    const chest = createHuntingChest({ rarity: "common" });
-
-    // Create a run at final boss floor
     manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE });
     manager._run = {
         ...manager._run,
         floor: 100,
         lastEncounter: { type: HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS }
     };
-    manager._run = recordHuntingFloorResult(manager._run, {
-        hpRemain: 80,
-        maxHp: 100,
-        loot: { shards: 100, chests: [chest], xp: 0 },
-        combatCleared: true
-    });
 
-    // Simulate _handleFinish interception: show chest first
-    manager._presentCombatRewardChest(mockApp, chest);
-    assert.equal(
-        manager._run.phase,
-        HUNTING_RUN_PHASES.AWAITING_COMBAT_REWARD_CHEST,
-        "Final boss: phase must be combat reward chest before continue"
-    );
+    // Force chest drop via Math.random stub, always restore
+    const originalRandom = Math.random;
+    try {
+        Math.random = () => 0.0;
 
-    // Reset and confirm chest
-    overlayStates.length = 0;
-    showOverlayCalls.length = 0;
-    manager.chestContinue();
+        manager._handleFinish(mockApp);
 
-    // After chest confirm, must enter stage clear flow (run null)
-    assert.equal(manager._run, null, "Final boss combat reward chest continue must set run to null (stage clear)");
+        // Phase must be AWAITING_COMBAT_REWARD_CHEST (chest intercepted)
+        assert.equal(
+            manager._run.phase,
+            HUNTING_RUN_PHASES.AWAITING_COMBAT_REWARD_CHEST,
+            "Final boss: phase must be combat reward chest after _handleFinish"
+        );
 
-    // Stage clear overlay must appear
-    const clearOverlay = showOverlayCalls.find((c) => c.label === "스테이지 클리어");
-    assert.ok(clearOverlay, "After final boss chest confirm, stage clear overlay must appear");
+        // Chest UI must be visible with confirm label '확인'
+        const chestState = overlayStates.find((s) => s.huntingChestEventActive === true);
+        assert.ok(chestState, "Chest UI must be visible after _handleFinish");
+        assert.equal(chestState.huntingChestConfirmLabel, "확인", "Chest confirm button must be '확인'");
+
+        // Stage clear / result confirmation must NOT have appeared yet
+        const clearBefore = showOverlayCalls.find((c) => c.label === "스테이지 클리어");
+        assert.equal(clearBefore, undefined, "Stage clear must NOT appear before chest confirm");
+
+        // Reset tracking for chestContinue
+        overlayStates.length = 0;
+        showOverlayCalls.length = 0;
+
+        manager.chestContinue();
+
+        // After chest confirm: run must be null (stage clear)
+        assert.equal(manager._run, null, "Final boss combat reward chest continue must set run to null (stage clear)");
+
+        // Stage clear overlay must appear
+        const clearAfter = showOverlayCalls.find((c) => c.label === "스테이지 클리어");
+        assert.ok(clearAfter, "After final boss chest confirm, stage clear overlay must appear");
+    } finally {
+        Math.random = originalRandom;
+    }
+
     console.log("[hunting-combat-reward-chest-finalboss-continue] ok");
 }
 
