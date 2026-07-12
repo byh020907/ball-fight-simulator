@@ -79,6 +79,7 @@
 | Vampire Ball | 4초마다 다음 충돌 피해 회복 (결손 HP 비례 1~2배) | 3% | 6% | 9% |
 | Gunner Ball | 질량 증가 | 2% | 4% | 6% |
 | Phantom Ball | 받는 충돌 피해 감소 | 2% | 4% | 6% |
+| Spin Ball | 충돌 각충격 | 5% | 10% | 15% |
 
 ## 5. 향상된 물리 효과
 
@@ -89,6 +90,8 @@ Orbit의 숙련도 효과는 일반 스탯이 아닌 전투 물리 길목에서 
 - Gunner의 **중량 장전**은 질량(mass) stat modifier로, `applyMasteryEffectsToFighterSpec`에서 spec stats에 퍼센트 보정되고, BattleBall 생성 시 장비 중량의 massMultiplier와 곱으로 결합된다. 즉, Gunner GOLD +6%와 장비 중량 +15%는 최종 질량이 `baseMass * 1.06 * 1.15`가 된다.
 
 분노와 갈증은 각각 하나의 원본만 제공하는 독립 주기 패시브다. 피해가 0이거나 HP가 가득 찬 경우에는 준비 상태를 소비하지 않는다.
+
+Spin의 **자이로 전달**은 충돌 solver가 각 전투원에게 전달하는 각충격을 `1 + mastery.physics.collisionAngularImpulse` 배로 만든다. 장비의 각충격 옵션과 곱으로 결합되며, 스핀볼 자신에게는 숙련도 효과가 적용되지 않는다.
 
 ## 6. 런타임 패시브
 

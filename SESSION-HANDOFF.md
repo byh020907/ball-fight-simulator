@@ -1152,6 +1152,13 @@
 - 영향: `src/hunting/events/*.js`, `src/hunting/huntingState.js`, `src/hunting/huntingManager.js`, `src/componentBridge.js`, `src/components/game-overlay.html`, `tests/regression.mjs`, `docs/hunting-grounds-system.md`, `src/patchNotes.js`, `index.html`
 - 검증: `npm test`, `npm run check`, `npm run format:check`, `git diff --check` 통과. 8종 이벤트가 이벤트명·보조 문구·구체적 결과를 반환하고, 자동 진행 이벤트와 챔피언 난입이 확인 전에는 각각 전진·전투를 시작하지 않는 경로를 회귀 테스트로 고정했다. 로컬 서버가 `v0.24.58`을 응답하는 것도 확인.
 
+## [L2] 2026-07-12 — 쿨타임 가속형 회전 공격 캐릭터 스핀볼 추가
+- 배경: 쿨타임마다 회전 관성을 높이고 충돌로 압박하는 캐릭터 제안에 사용자가 승인했다. Rage의 비충돌 충전·일격 구조와 구분하면서 기존 회전 물리와 충돌 피해 경로를 활용한다.
+- 결정: 스핀볼은 쿨타임마다 `applyTorque()`로 회전력을 올리고, 회전 단계에 따라 접촉 피해와 횡넉백이 강해진다. 충돌 뒤에는 회전 일부만 유지하며, 최고 회전의 다음 가속은 회전력을 소비하는 오버스핀으로 표현한다. Lv.3은 회전 안정화, Lv.6은 나선 충격, Lv.9는 오버스핀 강화로 구성한다. 축적 상태는 회전 세그먼트 링과 `회전력` UI로 표시한다.
+- 영향: `src/abilities/spinAbility.js`, 캐릭터·Ability 레지스트리, `BattleSimulation`의 충돌 각충격 경로, 스핀 숙련도, 레벨 보상, 프로필 유효 ID 레지스트리, 도움말·게임 규칙·밸런스·숙련도·시각 설계 문서, 패치 노트와 버전 표기, 회귀 테스트
+- 수치: 기본 쿨다운은 2.7초, 가속 토크는 50,000, 링 완성 기준은 3.0rad/s다. 20초 무충돌 계측에서 기본 스핀볼은 약 3.27rad/s와 접촉 피해 보정 +59%에 도달하며, Lv.9는 약 19초에 오버스핀 1회를 발동한다.
+- 검증: 임시 `scripts/spinballTorqueStudy.mjs`로 토크 후보와 실제 Ability 경로를 계측한 뒤 제거. `npm test`, `npm run check`, `npm run format:check`, `git diff --check` 통과. 로컬 서버가 `v0.24.59`를 응답하는 것도 확인.
+
 ## 진행 중 이슈
 - 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
 - Time Warp 패널티 인상은 재학습 후 반영

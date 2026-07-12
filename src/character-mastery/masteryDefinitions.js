@@ -193,6 +193,20 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         }
     },
     {
+        id: "spin_gyroscopic_transfer",
+        sourceFighterId: "spin",
+        name: "자이로 전달",
+        kind: "physics_modifier",
+        description: "충돌 각충격이 {value} 증가합니다.",
+        tierValues: MASTERY_TIERS.angularImpulse,
+        formatValue(v) {
+            return (v * 100).toFixed(0) + "%";
+        },
+        apply(ctx, level) {
+            ctx.physicsModifiers.collisionAngularImpulse += this.tierValues[level];
+        }
+    },
+    {
         id: "phantom_shadow_weave",
         sourceFighterId: "phantom",
         name: "그림자 직조",

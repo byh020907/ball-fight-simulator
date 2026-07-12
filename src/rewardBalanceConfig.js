@@ -86,6 +86,17 @@ export const REWARD_BALANCE = deepFreeze({
                 { level: 9, baseStats: { skill: 2 }, abilityTier: 3, gameText: "충돌 후 충전량 20% 유지" },
                 { level: 10, baseStats: { hp: 2 } }
             ],
+            spin: [
+                { level: 2, baseStats: { speed: 2 } },
+                { level: 3, baseStats: { defense: 1 }, abilityTier: 1, gameText: "충돌 후 회전력 82% 유지" },
+                { level: 4, baseStats: { skill: 2 } },
+                { level: 5, baseStats: { damage: 1 } },
+                { level: 6, baseStats: { speed: 2 }, abilityTier: 2, gameText: "고회전 충돌 나선 넉백" },
+                { level: 7, baseStats: { hp: 2 } },
+                { level: 8, baseStats: { skill: 2 } },
+                { level: 9, baseStats: { damage: 1 }, abilityTier: 3, gameText: "최고 회전 다음 가속 오버스핀" },
+                { level: 10, baseStats: { defense: 1 } }
+            ],
             eater: [
                 { level: 2, baseStats: { hp: 2 } },
                 { level: 3, baseStats: { defense: 1 }, abilityTier: 1, gameText: "삼킨 뒤 뱉기 대기 -25%" },
@@ -205,6 +216,14 @@ export const REWARD_BALANCE = deepFreeze({
                     { maxChargeTimeMultiplier: 0.85 },
                     { maxImpactMultiplier: 1.15 },
                     { chargeRetentionRatio: 0.2 }
+                ]
+            },
+            spin: {
+                tiers: [
+                    {},
+                    { collisionRetentionRatio: 0.82 },
+                    { spiralKnockback: 210 },
+                    { overspinRetentionRatio: 0.42, overspinDuration: 1.1, overspinDamageMultiplier: 1.45 }
                 ]
             },
             eater: {
@@ -435,7 +454,8 @@ export const REWARD_BALANCE = deepFreeze({
             vampireHpSteal: [0, 0.03, 0.06, 0.09],
             wallBounce: [0, 0.05, 0.1, 0.15],
             speed: [0, 0.02, 0.04, 0.06],
-            mass: [0, 0.02, 0.04, 0.06]
+            mass: [0, 0.02, 0.04, 0.06],
+            angularImpulse: [0, 0.05, 0.1, 0.15]
         },
         masteryRuntime: {
             vampire: {

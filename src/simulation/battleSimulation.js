@@ -7,6 +7,7 @@ import {
     GrenadeAbility,
     OrbitAbility,
     RageAbility,
+    SpinAbility,
     TricksterAbility,
     DashAbility,
     BatBallAbility,
@@ -29,6 +30,7 @@ const ABILITY_TYPES = {
     grenade: GrenadeAbility,
     dash: DashAbility,
     rage: RageAbility,
+    spin: SpinAbility,
     eater: EaterAbility,
     bat_ball: BatBallAbility,
     hero: HeroAbility,
@@ -383,11 +385,13 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         const { a, b, aModifiers, bModifiers } = context;
         const impactA = aModifiers.impact ?? 1;
         const impactB = bModifiers.impact ?? 1;
+        const angularMasteryA = 1 + (a.mastery.physics?.collisionAngularImpulse ?? 0);
+        const angularMasteryB = 1 + (b.mastery.physics?.collisionAngularImpulse ?? 0);
         return {
             impactA,
             impactB,
-            angularScaleA: impactB * a.equipmentEffects.collisionAngularMultiplier,
-            angularScaleB: impactA * b.equipmentEffects.collisionAngularMultiplier
+            angularScaleA: impactB * a.equipmentEffects.collisionAngularMultiplier * angularMasteryA,
+            angularScaleB: impactA * b.equipmentEffects.collisionAngularMultiplier * angularMasteryB
         };
     }
 

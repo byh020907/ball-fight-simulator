@@ -235,6 +235,7 @@ export const FIGHTER_IDS = Object.freeze({
     GRENADE: "grenade",
     DASH: "dash",
     RAGE: "rage",
+    SPIN: "spin",
     EATER: "eater",
     BAT_BALL: "bat_ball",
     VAMPIRE: "vampire",

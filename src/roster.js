@@ -67,6 +67,17 @@ export function createRoster() {
             stats: { hp: 124, damage: 10, speed: 238, radius: 51, mass: 1.28, defense: 2 }
         },
         {
+            id: FIGHTER_IDS.SPIN,
+            name: "Spin Ball",
+            title: "Gyro Drive",
+            description:
+                "쿨타임마다 회전력을 가속합니다. 회전력이 높을수록 충돌 접점의 피해가 강해지고, 최고 회전에서는 다음 가속이 오버스핀으로 바뀝니다.",
+            color: "#d95f2f",
+            face: "spin",
+            ability: "spin",
+            stats: { hp: 116, damage: 10, speed: 276, radius: 50, mass: 1.22, defense: 1 }
+        },
+        {
             id: FIGHTER_IDS.EATER,
             name: "Eater Ball",
             title: "Feast Bounce",

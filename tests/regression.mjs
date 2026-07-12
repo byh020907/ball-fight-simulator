@@ -2554,6 +2554,59 @@ function testAbilityLevelUpgrades(app) {
     rageRun.ball.ability.onCollision();
     assertClose(rageRun.ball.ability.state.timeWithoutCollision, 11.9 * 0.2, "Rage tier 3 should retain 20% charge");
 
+    const setSpinVelocity = (ability, value) => {
+        const ball = ability.owner;
+        ball._computeMomentOfInertia();
+        const targetAngularVelocity = ability._spinDirection * value;
+        ball.applyAngularImpulse((targetAngularVelocity - ball.angularVelocity) / ball._inverseMomentOfInertia);
+        ball.integrateRotation(1 / 60);
+    };
+
+    const spinBaseRun = createTierSimulation(FIGHTER_IDS.SPIN, 0);
+    const spinBase = spinBaseRun.ball.ability;
+    setSpinVelocity(spinBase, 0);
+    spinBase.timer = 0;
+    spinBase.update(0.01, spinBaseRun.target);
+    assert.ok(
+        Math.abs(spinBaseRun.ball._accumulatedTorque) > 0,
+        "Spin Ball should accelerate with torque instead of directly assigning angular velocity"
+    );
+    assert.equal(spinBase.getUiState().label, "회전력", "Spin Ball should expose its rotation state in the live UI");
+
+    const spinTierOneRun = createTierSimulation(FIGHTER_IDS.SPIN, 1);
+    assertClose(
+        spinTierOneRun.ball.ability.getCollisionRetention(),
+        0.82,
+        "Spin tier 1 should retain 82% of its rotation after a collision"
+    );
+
+    const spinTierTwoRun = createTierSimulation(FIGHTER_IDS.SPIN, 2);
+    const spinTierTwo = spinTierTwoRun.ball.ability;
+    setSpinVelocity(spinTierTwo, 2.4);
+    spinTierTwo.onCollision(spinTierTwoRun.target);
+    assert.equal(spinTierTwo.getSpiralKnockback(), 210, "Spin tier 2 should unlock spiral knockback");
+    assert.ok(
+        spinTierTwoRun.target.state.forcedHeading,
+        "Spin tier 2 should apply its lateral knockback through the existing physics API"
+    );
+
+    const spinTierThreeRun = createTierSimulation(FIGHTER_IDS.SPIN, 3);
+    const spinTierThree = spinTierThreeRun.ball.ability;
+    setSpinVelocity(spinTierThree, 3.5);
+    spinTierThree.timer = 0;
+    spinTierThree.update(0.01, spinTierThreeRun.target);
+    assert.ok(
+        spinTierThree.state.overspinRemaining > 0,
+        "Spin tier 3 should convert a full rotation pulse into overspin"
+    );
+    assert.equal(spinTierThree.getUiState().label, "오버스핀", "Active overspin should replace the rotation UI label");
+    assert.equal(
+        spinTierThree.modifyOutgoingFighterCollisionDamage(10),
+        15,
+        "Spin tier 3 should strengthen the next collision after consuming rotation"
+    );
+    assert.equal(spinTierThree.state.overspinRemaining, 0, "Overspin should be consumed by its collision bonus");
+
     const eaterRun = createTierSimulation(FIGHTER_IDS.EATER);
     assertClose(
         eaterRun.ball.ability._getSwallowHoldDuration(),
@@ -7857,7 +7910,7 @@ async function testStatModifierDamageIndependentOfHp() {
     // archer mastery의 apply는 damage에만 영향을 줌
     const ctx = {
         statModifiers: { hp: 0, damage: 0, defense: 0, speed: 0, mass: 0 },
-        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0 },
+        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0, collisionAngularImpulse: 0 },
         combatModifiers: { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
         combatPassives: [],
         actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0 }
@@ -7905,7 +7958,7 @@ async function testVampireMasteryRestoresCollisionDamage() {
     const vampire = MASTERY_EFFECT_DEFS.find((definition) => definition.sourceFighterId === "vampire");
     const ctx = {
         statModifiers: { hp: 0, damage: 0, defense: 0, speed: 0, mass: 0 },
-        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0 },
+        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0, collisionAngularImpulse: 0 },
         combatModifiers: { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
         combatPassives: [],
         actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0 }
@@ -8095,18 +8148,30 @@ async function testGunnerMassMultiplicative() {
 
     const ctx = {
         statModifiers: { hp: 0, damage: 0, defense: 0, speed: 0, mass: 0 },
-        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0 },
+        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0, collisionAngularImpulse: 0 },
         combatModifiers: { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
         combatPassives: [],
         actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0 }
     };
     gunnerDef.apply(ctx, 3);
     assert.equal(ctx.statModifiers.mass, 0.06, "Gunner GOLD should add 6% mass modifier");
-    assert.ok(
-        !("collisionAngularImpulse" in ctx.physicsModifiers),
+    assert.equal(
+        ctx.physicsModifiers.collisionAngularImpulse,
+        0,
         "Gunner mastery should not touch collisionAngularImpulse"
     );
     assert.equal(ctx.statModifiers.hp, 0, "Gunner mastery should not affect hp");
+
+    const spinDef = MASTERY_EFFECT_DEFS.find((d) => d.sourceFighterId === "spin");
+    assert.ok(spinDef, "Spin mastery definition should exist");
+    assert.equal(spinDef.kind, "physics_modifier", "Spin mastery should modify physics");
+    assert.equal(spinDef.id, "spin_gyroscopic_transfer", "Spin mastery should own collision angular impulse");
+    spinDef.apply(ctx, 3);
+    assert.equal(
+        ctx.physicsModifiers.collisionAngularImpulse,
+        0.15,
+        "Spin GOLD should add 15% collision angular impulse"
+    );
 
     // BattleBall에서 mastery(6%) + 장비 중량(15%)가 곱으로 결합되는지 확인
     const baseSpec = {
@@ -8129,7 +8194,7 @@ async function testGunnerMassMultiplicative() {
             ]
         },
         mastery: {
-            physics: { velocityRecoveryBonus: 0, wallBounce: 0 },
+            physics: { velocityRecoveryBonus: 0, wallBounce: 0, collisionAngularImpulse: 0 },
             combat: { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
             action: { hpCostPercentReduction: 0, cooldownPercent: 0 },
             passives: []
@@ -8138,7 +8203,7 @@ async function testGunnerMassMultiplicative() {
     };
     const masteryCtx = {
         statModifiers: { hp: 0, damage: 0, defense: 0, speed: 0, mass: 0.06 },
-        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0 },
+        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0, collisionAngularImpulse: 0 },
         combatModifiers: { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
         combatPassives: [],
         actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0 }
@@ -8152,6 +8217,33 @@ async function testGunnerMassMultiplicative() {
     // ball.mass: 10.6 * 1.15 = 12.19
     assert.equal(ball.mass, 12.19, "Equipment mass multiplier should apply after mastery: 10.6 * 1.15 = 12.19");
     assert.equal(ball.stats.mass, 12.19, "ball.stats.mass should match ball.mass after both multipliers");
+
+    const angularMasterySimulation = new BattleSimulation(
+        [
+            {
+                ...baseSpec,
+                id: "angular-mastery-a",
+                teamId: "angular-a",
+                mastery: {
+                    ...baseSpec.mastery,
+                    physics: { velocityRecoveryBonus: 0, wallBounce: 0, collisionAngularImpulse: 0.15 }
+                }
+            },
+            { ...baseSpec, id: "angular-mastery-b", teamId: "angular-b" }
+        ],
+        { onLog() {}, onSound() {} }
+    );
+    const angularContext = {
+        a: angularMasterySimulation.fighters[0],
+        b: angularMasterySimulation.fighters[1],
+        aModifiers: { impact: 1 },
+        bModifiers: { impact: 1 }
+    };
+    const angularOptions = angularMasterySimulation.getFighterCollisionResponseOptions(angularContext);
+    assert.ok(
+        Math.abs(angularOptions.angularScaleA - 1.15) < 1e-9,
+        "Spin mastery should multiply the owner's collision angular impulse in BattleSimulation"
+    );
     console.log("[gunner-mass-multiplicative] ok");
 }
 

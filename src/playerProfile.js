@@ -6,6 +6,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { HUNTING_STAGES } from "./hunting/huntingConfig.js";
+import { FIGHTER_IDS } from "./core.js";
 
 export const PLAYER_PROFILE_STORAGE_KEY = "bfs:player-profile:v1";
 export const SESSION_STORAGE_VERSION_KEY = "bfs:session-version";
@@ -78,20 +79,7 @@ export function createDefaultPlayerProfile() {
 // ── ID 레지스트리 ────────────────────────────────────────────────────────────
 // 실제 해금만 유효한 ID로 처리 (화이트리스트)
 
-export const VALID_CHARACTER_IDS = Object.freeze([
-    "archer",
-    "orbit",
-    "trickster",
-    "grenade",
-    "dash",
-    "rage",
-    "eater",
-    "bat_ball",
-    "hero",
-    "vampire",
-    "gunner",
-    "phantom"
-]);
+export const VALID_CHARACTER_IDS = Object.freeze(Object.values(FIGHTER_IDS));
 
 export const MASTERY_EFFECT_IDS = Object.freeze(VALID_CHARACTER_IDS);
 
