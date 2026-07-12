@@ -1,76 +1,143 @@
-import { Vector2, evadeTarget } from "../core.js";
+import { calculateInterceptPoint, Vector2, evadeTarget } from "../core.js";
 import { Ability } from "./ability.js";
 
 const WINDUP = 0.4;
-const SPREAD_ANGLE = 0.22;
 const EVADE_RANGE = 320;
 const EVADE_STRENGTH = 0.7;
 const ARROW_SPEED_MULT = 2;
 const MAX_MISS_STREAK = 5;
+const BURST_SHOT_COUNT = 3;
+const BURST_SHOT_INTERVAL = 0.12;
+const ARROW_START_OFFSET = 24;
 
 export class ArcherAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation, 3);
-        this.state = { windUp: 0, missStreak: 0, lastAimDir: new Vector2(1, 0) };
+        this.state = {
+            windUp: 0,
+            missStreak: 0,
+            lastAimDir: new Vector2(1, 0),
+            aimPoint: null,
+            burstShotsRemaining: 0,
+            burstShotTimer: 0
+        };
         this.arrowSpeedMult = ARROW_SPEED_MULT;
     }
 
     update(delta, target) {
         this._evade(target);
+        if (this._updateBurst(delta, target)) return;
+        if (this._updateWindUp(delta, target)) return;
 
-        // Wind-up phase — tracking target
-        if (this.state.windUp > 0) {
-            if (target) {
-                this.state.lastAimDir = Vector2.subtract(target.position, this.owner.position).normalize();
-            }
-            this.state.windUp -= delta;
-            if (this.state.windUp <= 0) {
-                this.state.windUp = 0;
-                this.release();
-            }
-            return;
+        this._updateCooldown(delta, target);
+    }
+
+    _updateBurst(delta, target) {
+        if (this.state.burstShotsRemaining <= 0) return false;
+        if (!target || target.flags.defeated) {
+            this._endBurst();
+            return false;
         }
 
+        this.state.burstShotTimer = Math.max(0, this.state.burstShotTimer - delta);
+        if (this.state.burstShotTimer > 0) return true;
+
+        this._fireBurstShot(target);
+        return this.state.burstShotsRemaining > 0;
+    }
+
+    _updateWindUp(delta, target) {
+        if (this.state.windUp <= 0) return false;
+        if (!target || target.flags.defeated) {
+            this.state.windUp = 0;
+            this.state.aimPoint = null;
+            return false;
+        }
+
+        this._updateAim(target);
+        this.state.windUp = Math.max(0, this.state.windUp - delta);
+        if (this.state.windUp <= 0) {
+            this.release(target);
+        }
+        return true;
+    }
+
+    _updateCooldown(delta, target) {
         this.timer -= delta;
         if (this.timer <= 0 && target) {
             this.timer = this.cooldown * (0.7 + Math.random() * 0.6);
-            this.state.lastAimDir = Vector2.subtract(target.position, this.owner.position).normalize();
+            this._updateAim(target);
             this.state.windUp = WINDUP;
         }
     }
 
-    /** Fire the arrow(s) after wind-up completes. */
-    release() {
-        const dir = this.state.lastAimDir;
-        const base = Vector2.add(this.owner.position, dir.clone().scale(this.owner.radius + 24));
+    _updateAim(target) {
+        const aimPoint = calculateInterceptPoint(
+            this.owner.position,
+            target.position,
+            target.velocity,
+            this._getArrowSpeed()
+        );
+        this.state.aimPoint = aimPoint;
+        this.state.lastAimDir = Vector2.subtract(aimPoint, this.owner.position).normalize();
+    }
 
+    _getArrowSpeed() {
+        return this.owner.stats.baseSpeed * this.arrowSpeedMult;
+    }
+
+    /** Fire after wind-up. Consecutive misses convert the next shot into a finite burst. */
+    release(target) {
         if (this.state.missStreak >= 2) {
-            // Triple shot
-            this.state.missStreak = 0;
-            const angles = [-SPREAD_ANGLE, 0, SPREAD_ANGLE];
-            for (const offset of angles) {
-                const a = Math.atan2(dir.y, dir.x) + offset;
-                const d = new Vector2(Math.cos(a), Math.sin(a));
-                const start = Vector2.add(this.owner.position, d.clone().scale(this.owner.radius + 24));
-                this.fireOne(start, d);
-            }
-            this.simulation.addLog(`${this.owner.name} fires a triple shot!`);
-        } else {
-            this.fireOne(base, dir);
+            this._startBurst(target);
+            return;
         }
 
+        this._firePredictedArrow(target, true);
         this.simulation.playSound("shoot");
     }
 
-    /** Spawn a single arrow with hit/miss callback. */
-    fireOne(start, dir) {
-        const arrow = this.simulation.spawnArrow(this.owner, start, dir.clone().scale(this.owner.stats.baseSpeed * 2));
-        arrow._abilityRef = this;
+    _startBurst(target) {
+        this.state.missStreak = 0;
+        this.state.burstShotsRemaining = BURST_SHOT_COUNT;
+        this.state.burstShotTimer = 0;
+        this._fireBurstShot(target);
+        this.simulation.playSound("shoot");
+        this.simulation.addLog(`${this.owner.name} begins a predictive three-shot volley.`);
+    }
+
+    _fireBurstShot(target) {
+        this._firePredictedArrow(target, false);
+        this.state.burstShotsRemaining = Math.max(0, this.state.burstShotsRemaining - 1);
+        this.state.burstShotTimer = this.state.burstShotsRemaining > 0 ? BURST_SHOT_INTERVAL : 0;
+        if (this.state.burstShotsRemaining === 0) {
+            this._endBurst();
+        }
+    }
+
+    _endBurst() {
+        this.state.burstShotsRemaining = 0;
+        this.state.burstShotTimer = 0;
+    }
+
+    _firePredictedArrow(target, countsForMissStreak) {
+        this._updateAim(target);
+        const direction = this.state.lastAimDir.clone();
+        const start = Vector2.add(this.owner.position, direction.clone().scale(this.owner.radius + ARROW_START_OFFSET));
+        this._fireOne(start, direction, countsForMissStreak);
+    }
+
+    /** Spawn a single arrow with a shot-local result callback. */
+    _fireOne(start, direction, countsForMissStreak) {
+        this.simulation.spawnArrow(this.owner, start, direction.clone().scale(this._getArrowSpeed()), {
+            onResult: (hit) => this.onArrowResult(hit, countsForMissStreak)
+        });
         this.simulation.spawnSlash(this.owner.position.clone(), start.clone(), this.owner.color);
     }
 
     /** Called by arrow when it hits or expires. */
-    onArrowResult(hit) {
+    onArrowResult(hit, countsForMissStreak = true) {
+        if (!countsForMissStreak) return;
         if (hit) {
             this.state.missStreak = 0;
         } else {
@@ -129,6 +196,22 @@ export class ArcherAbility extends Ability {
         ctx.stroke();
 
         ctx.restore();
+        this._drawPredictionMarker(ctx, progress);
+    }
+
+    _drawPredictionMarker(ctx, progress) {
+        const point = this.state.aimPoint;
+        if (!point) return;
+
+        ctx.save();
+        ctx.globalAlpha = 0.35 + progress * 0.35;
+        ctx.strokeStyle = this.owner.color;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 6 + progress * 5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
     }
 
     drawFace(ctx, rotation, ball) {
@@ -150,10 +233,14 @@ export class ArcherAbility extends Ability {
     }
 
     getUiState() {
+        if (this.state.burstShotsRemaining > 0) {
+            const fired = BURST_SHOT_COUNT - this.state.burstShotsRemaining;
+            return { label: `Burst ${fired}/${BURST_SHOT_COUNT}`, progress: fired / BURST_SHOT_COUNT };
+        }
         if (this.state.windUp > 0) {
             return { label: "Draw", progress: 1 - this.state.windUp / WINDUP };
         }
-        const label = this.state.missStreak >= 2 ? `Triple x${this.state.missStreak}` : "Arrow";
+        const label = this.state.missStreak >= 2 ? "Volley Ready" : "Arrow";
         return {
             label,
             progress: Math.max(0, Math.min(1, 1 - this.timer / this.cooldown))

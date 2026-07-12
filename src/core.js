@@ -54,6 +54,43 @@
     }
 }
 
+const INTERCEPT_EPSILON = 1e-6;
+
+/**
+ * 일정한 속도로 움직이는 목표를 향한 직선 투사체의 요격 지점을 계산한다.
+ * 해가 없거나 입력이 유효하지 않으면 현재 목표 위치를 반환한다.
+ */
+export function calculateInterceptPoint(origin, targetPosition, targetVelocity, projectileSpeed) {
+    const point = new Vector2(targetPosition?.x ?? 0, targetPosition?.y ?? 0);
+    const velocity = new Vector2(targetVelocity?.x ?? 0, targetVelocity?.y ?? 0);
+    const displacement = Vector2.subtract(point, new Vector2(origin?.x ?? 0, origin?.y ?? 0));
+    const speedSquared = projectileSpeed ** 2;
+
+    if (!Number.isFinite(speedSquared) || speedSquared <= INTERCEPT_EPSILON) {
+        return point;
+    }
+
+    const a = velocity.dot(velocity) - speedSquared;
+    const b = 2 * displacement.dot(velocity);
+    const c = displacement.dot(displacement);
+    const times = [];
+
+    if (Math.abs(a) <= INTERCEPT_EPSILON) {
+        if (Math.abs(b) > INTERCEPT_EPSILON) {
+            times.push(-c / b);
+        }
+    } else {
+        const discriminant = b ** 2 - 4 * a * c;
+        if (discriminant >= 0) {
+            const root = Math.sqrt(discriminant);
+            times.push((-b - root) / (2 * a), (-b + root) / (2 * a));
+        }
+    }
+
+    const time = Math.min(...times.filter((candidate) => Number.isFinite(candidate) && candidate > 0));
+    return Number.isFinite(time) ? point.add(velocity.scale(time)) : point;
+}
+
 /** Named render layers for ArenaRenderer ??lower values draw first. */
 import { LifeSpan, mixins, PhysicsBody } from "./physics/index.js";
 

@@ -17,7 +17,7 @@ import {
     getRemainingStatPoints,
     getSpentStatPoints
 } from "../src/statAllocation.js";
-import { FIGHTER_IDS, Vector2, randomSpin } from "../src/core.js";
+import { calculateInterceptPoint, FIGHTER_IDS, Vector2, randomSpin } from "../src/core.js";
 import { findActionById } from "../src/clickActions.js";
 import { calcMatchXp, getLevelFromXp, getXpForNextLevel, calcTournamentXp } from "../src/experience/experienceState.js";
 import { getLevelRequirement, LEVEL_REWARDS, XP_SCALE } from "../src/experience/experienceConfig.js";
@@ -1090,6 +1090,62 @@ async function testArrowBounceFacing(app) {
         Math.abs(arrow.angle - Math.atan2(arrow.velocity.y, arrow.velocity.x)) < 0.001,
         "Arrow facing should follow its reflected velocity"
     );
+}
+
+async function testArcherPredictiveBurst(app) {
+    const origin = new Vector2(240, 480);
+    const targetPosition = new Vector2(610, 480);
+    const upwardVelocity = new Vector2(0, -240);
+    const predictedPoint = calculateInterceptPoint(origin, targetPosition, upwardVelocity, 540);
+    const travelTime = Vector2.subtract(predictedPoint, origin).length() / 540;
+    const targetAtImpact = Vector2.add(targetPosition, upwardVelocity.clone().scale(travelTime));
+
+    assert.ok(predictedPoint.y < targetPosition.y, "Prediction should lead an upward-moving target");
+    assert.ok(
+        Vector2.subtract(predictedPoint, targetAtImpact).length() < 0.001,
+        "Predicted point should match the target position at projectile arrival"
+    );
+    assert.deepEqual(
+        calculateInterceptPoint(origin, targetPosition, new Vector2(800, 0), 540),
+        targetPosition,
+        "No valid interception should fall back to the target's current position"
+    );
+
+    await app.startMatch([
+        app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER),
+        app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ORBIT)
+    ]);
+    const [archer, target] = app.simulation.fighters;
+    const ability = archer.ability;
+    archer.position = origin.clone();
+    target.position = targetPosition.clone();
+    target.velocity = upwardVelocity.clone();
+    app.simulation.entities = app.simulation.fighters;
+
+    ability.state.missStreak = 2;
+    ability.release(target);
+    const burstArrows = app.simulation.entities.filter((entity) => entity.constructor?.name === "ArrowProjectile");
+    assert.equal(
+        burstArrows.length,
+        1,
+        "Burst should fire its first arrow immediately instead of a simultaneous scatter"
+    );
+    assert.ok(burstArrows[0].velocity.y < 0, "First burst arrow should lead the current upward movement");
+
+    target.velocity = new Vector2(0, 240);
+    ability.update(0.12, target);
+    target.velocity = new Vector2(0, -240);
+    ability.update(0.12, target);
+
+    const completedBurst = app.simulation.entities.filter((entity) => entity.constructor?.name === "ArrowProjectile");
+    assert.equal(completedBurst.length, 3, "Burst should contain exactly three sequential arrows");
+    assert.ok(completedBurst[1].velocity.y > 0, "Second burst arrow should re-predict the changed target movement");
+    assert.ok(completedBurst[2].velocity.y < 0, "Third burst arrow should independently re-predict again");
+    assert.equal(ability.state.burstShotsRemaining, 0, "Burst should end after its third arrow");
+
+    completedBurst.forEach((arrow) => arrow._onExpired(app.simulation));
+    assert.equal(ability.state.missStreak, 0, "Burst arrow misses should not prime another burst");
+    console.log("[archer-predictive-burst] ok");
 }
 
 async function testOrbitShardRecharge(app) {
@@ -7471,6 +7527,7 @@ testAlpineTemplateComponentSystem();
 await testMatchEndGrantsImmediateExperience(app);
 await testDamageShake(app);
 await testArrowBounceFacing(app);
+await testArcherPredictiveBurst(app);
 await testOrbitShardRecharge(app);
 await testTournament(app);
 await testHeroBallRegistered(app);

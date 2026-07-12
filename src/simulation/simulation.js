@@ -132,8 +132,8 @@ export class Simulation {
 
     // ── Spawn helpers ─────────────────────────────────────────────────────
 
-    spawnArrow(owner, position, velocity) {
-        const arrow = new ArrowProjectile(owner, position, velocity);
+    spawnArrow(owner, position, velocity, options = {}) {
+        const arrow = new ArrowProjectile(owner, position, velocity, options);
         this.entities.push(arrow);
         return arrow;
     }

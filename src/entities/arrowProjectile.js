@@ -1,10 +1,11 @@
 import { Projectile, Vector2 } from "../core.js";
 
 export class ArrowProjectile extends Projectile {
-    constructor(owner, position, velocity) {
+    constructor(owner, position, velocity, options = {}) {
         super(owner, position, velocity, 8);
         this.life = 1.55;
         this.angle = 0;
+        this.onResult = options.onResult ?? null;
         this.syncFacingToVelocity();
     }
 
@@ -37,11 +38,11 @@ export class ArrowProjectile extends Projectile {
         );
         simulation.addSparkBurst(this.position.clone(), this.owner.color);
         simulation.addLog(`${this.owner.name}'s arrow pierces ${target.name}.`);
-        this._abilityRef?.onArrowResult?.(true);
+        this.onResult?.(true);
     }
 
     _onExpired(simulation) {
-        this._abilityRef?.onArrowResult?.(false);
+        this.onResult?.(false);
     }
 
     draw(ctx) {
