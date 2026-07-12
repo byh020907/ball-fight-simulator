@@ -5,4 +5,8 @@ export {
     getTierText,
     advanceCharacterMastery
 } from "./masteryState.js";
-export { collectActiveEffects, applyMasteryEffectsToFighterSpec } from "./masteryModifiers.js";
+export {
+    collectActiveEffects,
+    collectEffectsFromDefinitions,
+    applyMasteryEffectsToFighterSpec
+} from "./masteryModifiers.js";

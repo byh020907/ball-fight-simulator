@@ -94,7 +94,6 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             physics: spec.mastery?.physics ?? {
                 velocityRecoveryBonus: 0,
                 wallBounce: 0,
-                speed: 0,
                 collisionAngularImpulse: 0
             },
             combat: spec.mastery?.combat ?? { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
@@ -306,10 +305,10 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         this._equipmentEffectCooldowns[type] = Math.max(0, duration);
     }
 
-    applyEquipmentWallBounce(xNormal, yNormal) {
+    applyWallBounceBoost(xNormal, yNormal) {
         const equipmentMultiplier = this.equipmentEffects.wallBounceMultiplier;
         const masteryBonus = this.mastery.physics.wallBounce ?? 0;
-        const totalMultiplier = equipmentMultiplier + masteryBonus;
+        const totalMultiplier = equipmentMultiplier * (1 + masteryBonus);
         if (totalMultiplier <= 1) return;
 
         const normal = (xNormal ?? yNormal)?.clone();

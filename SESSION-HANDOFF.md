@@ -23,7 +23,21 @@
 ## [L1] 2026-07-12 — 숙련도는 최종 수치에 퍼센트로 적용
 - 맥락: 숙련도 수치가 캐릭터 기본 수치나 충격량 계산 중간에 섞이면 장비 고정 수치와 액션 보정의 순서가 불명확해지고, 물리 충격 증가가 표준 전투에서 오히려 승률을 낮췄다.
 - 결정: 숙련도의 스탯형 효과는 기본 수치, 레벨, 스탯 배분, 장비 고정 수치가 모두 확정된 뒤 마지막에 퍼센트로 적용한다. 충돌 피해 증감도 장비와 액션 처리 뒤의 최종 피해 단계에서 적용한다. 역효과인 충격량 증가는 그레네이드의 최종 충돌 피해 증가로, 히어로의 효과는 모든 능력 쿨다운 감소로 교체한다.
-- 영향: 숙련도 수치 원본과 상한, fighter spec 적용 순서, 충돌 피해 경로, 주기형 갈증 회복, 숙련도 진행도/도감 완성 업적, 관련 문서와 회귀 테스트.
+- 영향: `src/rewardBalanceConfig.js`, `src/character-mastery/masteryModifiers.js`, `src/character-mastery/masteryDefinitions.js`, `src/entities/battleBall.js`, `src/hunting/huntingManager.js`, `src/simulation/battleSimulation.js`, `src/patchNotes.js`, `docs/character-mastery-system.md`, `docs/reward-balance.md`, `tests/regression.mjs`
+
+## [L1] 2026-07-12 — 숙련도 정정: 이동 속도 경로, 물리 곱셈 결합, Gunner 설명, 문서 정리, 회귀 테스트
+- 맥락: 직전 커밋(5f1a379)에서 Dash 숙련도의 speed 보정이 `physicsModifiers`에만 기록되어 `applyMasteryEffectsToFighterSpec`이 실제 speed에 적용하지 못함. Orbit wall bounce와 장비 반향이 덧셈 결합되어 설계(곱)와 불일치. Gunner 설명이 solver 경로(자신의 angularScale)와 달라 오해를 줌. helpContent에 숙련도 안내가 빠졌고 meta-progression-system.md가 폐기되지 않음. `applyEquipmentWallBounce` 이름이 장비 전용 인상을 줌. 문서·패치노트의 '합산'이 곱셈 결합을 덧셈으로 오해하게 함. SESSION-HANDOFF L1 영향에 helpContent가 잘못 포함됨.
+- 결정:
+  (1) Dash `physicsModifiers.speed` → `statModifiers.speed`로 이동, createMasteryContext statModifiers에 speed 키 추가. physicsModifiers.speed 제거.
+  (2) Orbit wall bounce: `equipmentMultiplier + masteryBonus` → `equipmentMultiplier * (1 + masteryBonus)` 곱셈 결합. 메서드명 `applyEquipmentWallBounce` → `applyWallBounceBoost`로 변경, 호출부·테스트 갱신.
+  (3) Gunner 설명 '충돌 시 상대에게 전달하는 각충격' → '전투원 충돌로 자신에게 전달되는 각충격이 {value} 증가합니다.'로 통일. (Gunner 각충격은 기존 `getFighterCollisionResponseOptions`의 `angularScaleA` 경로 유지)
+  (4) `collectEffectsFromDefinitions(definitions, levels, currentPlayerId)` 순수 집계 helper 추가. `collectActiveEffects`가 이 helper에 위임.
+  (5) helpContent.js에 숙련도 크로스 지원 섹션 추가.
+  (6) meta-progression-system.md를 폐기된 역사 문서로 축소, progression-responsibilities.md·character-mastery-system.md·collection-achievements-system.md 링크로 대체.
+  (7) character-mastery-system.md·reward-balance.md·patchNotes.js의 '합산'을 '곱으로 결합'으로 명시.
+  (8) SESSION-HANDOFF.md L1 영향 목록을 실제 변경 파일로 정정.
+  (9) 회귀 테스트: 두 fixture 정의 6%+6%=12% cap 없음 검증, Dash GOLD speed 1.06배, 장비 반향+Orbit GOLD 1.15*1.15 wall bounce, 장비 소용돌이+Gunner GOLD 1.15*1.15 angularScale, 사냥터 플레이어 전용 적용 증명. 기존 Rage/Vampire 계약 통과 유지.
+- 영향: `src/character-mastery/masteryModifiers.js`, `src/character-mastery/masteryDefinitions.js`, `src/character-mastery/index.js`, `src/entities/battleBall.js`, `src/simulation/simulation.js`, `src/helpContent.js`, `src/patchNotes.js`, `docs/meta-progression-system.md`, `docs/character-mastery-system.md`, `docs/reward-balance.md`, `SESSION-HANDOFF.md`, `tests/regression.mjs`
 
 ## [L1] 2026-07-12 — 관전 배속 해금 문구를 실제 조작에 맞춤
 - 맥락: 2배속·4배속 업적 보상이 전투 화면 상단 탭을 조작한다고 안내했지만, 실제 배속 전환은 플레이어가 참가하지 않은 관전 전투의 전투 화면을 터치해서 수행한다.

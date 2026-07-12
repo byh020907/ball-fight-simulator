@@ -7510,6 +7510,184 @@ async function testMasteryCombatAndCooldownDefinitions() {
     assert.equal(ctx.actionModifiers.hpCostPercentReduction, 0.001, "Bat mastery should reduce action cost by 0.10%p");
 }
 
+// ── Mastery regression correction tests ─────────────────────────────────────
+
+async function testCollectEffectsFromDefinitionsNoCap() {
+    const { collectEffectsFromDefinitions } = await import("../src/character-mastery/index.js");
+    const fixtureDefs = [
+        {
+            sourceFighterId: "fixture_a",
+            apply(ctx) {
+                ctx.statModifiers.hp += 0.06;
+            }
+        },
+        {
+            sourceFighterId: "fixture_b",
+            apply(ctx) {
+                ctx.statModifiers.hp += 0.06;
+            }
+        }
+    ];
+    const levels = { fixture_a: 3, fixture_b: 3 };
+    const ctx = collectEffectsFromDefinitions(fixtureDefs, levels, "irrelevant_self");
+    assert.equal(ctx.statModifiers.hp, 0.12, "Two fixture 6% hp should sum to 12% with no 8% cap re-introduced");
+    console.log("[collect-effects-no-cap] ok");
+}
+
+async function testDashMasterySpeedApplied() {
+    const { applyMasteryEffectsToFighterSpec } = await import("../src/character-mastery/index.js");
+    const spec = {
+        id: "dash_test",
+        stats: { hp: 100, damage: 10, defense: 1, speed: 300, radius: 50, mass: 1 }
+    };
+    const mastery = {
+        statModifiers: { hp: 0, damage: 0, defense: 0, speed: 0.06 },
+        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0, collisionAngularImpulse: 0 },
+        combatModifiers: { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
+        actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0, minHpCostPercent: 0 },
+        combatPassives: []
+    };
+    const result = applyMasteryEffectsToFighterSpec(spec, mastery);
+    assert.equal(result.stats.speed, 318, "Dash GOLD mastery should apply 6% speed boost: 300 * 1.06 = 318");
+    assert.equal(spec.stats.speed, 300, "Input spec should not be mutated by mastery application");
+    console.log("[dash-mastery-speed] ok");
+}
+
+async function testOrbitWallBounceMultiplicative() {
+    const { BattleBall } = await import("../src/entities/index.js");
+    const { Vector2 } = await import("../src/core.js");
+    const { BattleSimulation } = await import("../src/simulation/battleSimulation.js");
+
+    const spec = {
+        id: "orbit_test",
+        teamId: "a",
+        name: "Orbit",
+        title: "",
+        description: "",
+        color: "#ff0000",
+        face: "default",
+        ability: "none",
+        appearance: { sides: 0, face: "default", angle: 0, angularVelocity: 0 },
+        stats: { hp: 100, damage: 10, defense: 1, speed: 300, radius: 50, mass: 1 },
+        equipment: { equippedItems: [{ instanceId: "echo", specialOptions: [{ type: "wallBounce", value: 15 }] }] },
+        mastery: { physics: { velocityRecoveryBonus: 0, wallBounce: 0.15, collisionAngularImpulse: 0 } }
+    };
+    const sim = new BattleSimulation(
+        [spec, { ...spec, id: "other", teamId: "b", face: "default" }],
+        { onLog() {}, onSound() {} },
+        null,
+        { assignActions: false }
+    );
+    const ball = sim.fighters[0];
+    ball.position = new Vector2(0, 480);
+    ball.velocity = new Vector2(-500, 0);
+    sim.keepInsideArena(ball);
+    const expected = 500 + 500 * (1.15 * 1.15 - 1);
+    assert.ok(
+        Math.abs(ball.velocity.x - expected) < 0.01,
+        `Equipment wallBounce + Orbit mastery should multiply: expected ${expected}, got ${ball.velocity.x}`
+    );
+    console.log("[orbit-wall-bounce-multiplicative] ok");
+}
+
+async function testGunnerAngularImpulseMultiplicative() {
+    const { Vector2 } = await import("../src/core.js");
+    const { BattleSimulation } = await import("../src/simulation/battleSimulation.js");
+    const { createEquipmentCombatEffects } = await import("../src/hunting/equipmentEffects.js");
+
+    const makeSpec = (id, angularImpulseValue, masteryAngularBoost) => ({
+        id,
+        teamId: id,
+        name: id,
+        title: "",
+        description: "",
+        color: "#777777",
+        face: "default",
+        ability: "none",
+        appearance: { sides: 4, face: "default", angle: 0, angularVelocity: 0 },
+        stats: { hp: 100, damage: 10, defense: 1, speed: 300, radius: 50, mass: 1 },
+        equipment: {
+            equippedItems:
+                angularImpulseValue > 0
+                    ? [
+                          {
+                              instanceId: `${id}-eq`,
+                              specialOptions: [{ type: "angularImpulse", value: angularImpulseValue }]
+                          }
+                      ]
+                    : []
+        },
+        mastery: { physics: { velocityRecoveryBonus: 0, wallBounce: 0, collisionAngularImpulse: masteryAngularBoost } }
+    });
+
+    // Baseline: no equipment, no mastery
+    const baseSim = new BattleSimulation(
+        [makeSpec("a1", 0, 0), makeSpec("b1", 0, 0)],
+        { onLog() {}, onSound() {} },
+        null,
+        { assignActions: false }
+    );
+    const [a1, b1] = baseSim.fighters;
+    a1.position = new Vector2(450, 480);
+    b1.position = new Vector2(500, 480);
+    a1.velocity = new Vector2(460, 130);
+    b1.velocity = new Vector2(-150, -90);
+    baseSim.handleFighterCollision(a1, b1);
+    a1.integrateRotation(1 / 60);
+    const baseAV = a1.angularVelocity;
+
+    // With equipment 15% AND Gunner GOLD 15% mastery
+    const boostedSim = new BattleSimulation(
+        [makeSpec("a2", 15, 0.15), makeSpec("b2", 0, 0)],
+        { onLog() {}, onSound() {} },
+        null,
+        { assignActions: false }
+    );
+    const [a2, b2] = boostedSim.fighters;
+    a2.position = new Vector2(450, 480);
+    b2.position = new Vector2(500, 480);
+    a2.velocity = new Vector2(460, 130);
+    b2.velocity = new Vector2(-150, -90);
+    boostedSim.handleFighterCollision(a2, b2);
+    a2.integrateRotation(1 / 60);
+
+    // Equipment 1.15 * Mastery (1 + 0.15) = 1.3225x multiplier on base angular impulse
+    assert.ok(
+        Math.abs(a2.angularVelocity) > Math.abs(baseAV) * 1.32,
+        `Gunner mastery + equipment should multiply angular impulse: base ${baseAV}, boosted ${a2.angularVelocity}`
+    );
+    console.log("[gunner-angular-impulse-multiplicative] ok");
+}
+
+async function testHuntingMasteryPlayerOnly() {
+    const { createDefaultPlayerProfile } = await import("../src/playerProfile.js");
+    const { collectActiveEffects, applyMasteryEffectsToFighterSpec } =
+        await import("../src/character-mastery/index.js");
+
+    const profile = createDefaultPlayerProfile();
+    // Player has archer mastery at GOLD
+    profile.characterMastery = { levels: { archer: 3 } };
+
+    // Player uses character "dash" but has archer GOLD mastery cross-support
+    const masteryCtx = collectActiveEffects(profile, "dash");
+    assert.equal(masteryCtx.statModifiers.damage, 0.06, "Player with archer GOLD should get +6% damage cross-support");
+
+    const playerSpec = {
+        id: "player",
+        stats: { hp: 100, damage: 10, defense: 1, speed: 300, radius: 50, mass: 1 }
+    };
+    const enemySpec = {
+        id: "enemy",
+        stats: { hp: 100, damage: 10, defense: 1, speed: 300, radius: 50, mass: 1 }
+    };
+
+    const masteredPlayer = applyMasteryEffectsToFighterSpec(playerSpec, masteryCtx);
+    // Enemy spec does NOT receive mastery effects
+    assert.equal(masteredPlayer.stats.damage, 10.6, "Player spec should receive archer GOLD +6% damage cross-support");
+    assert.equal(enemySpec.stats.damage, 10, "Enemy spec should NOT receive mastery effects");
+    console.log("[hunting-mastery-player-only] ok");
+}
+
 // ── Dynamic bonus computation test ──────────────────────────────────────────
 
 async function testComputeEffectiveBonusesDynamic() {
@@ -7823,6 +8001,12 @@ await testMasteryEffectsApplyAfterFixedStats();
 await testVampireMasteryRestoresCollisionDamage();
 await testMasteryCombatModifiersApplyAtFinalDamageStage();
 await testMasteryCombatAndCooldownDefinitions();
+// Mastery regression correction tests
+await testCollectEffectsFromDefinitionsNoCap();
+await testDashMasterySpeedApplied();
+await testOrbitWallBounceMultiplicative();
+await testGunnerAngularImpulseMultiplicative();
+await testHuntingMasteryPlayerOnly();
 // Dynamic bonus computation test
 // ── New character tests ──────────────────────────────────────────────────────
 

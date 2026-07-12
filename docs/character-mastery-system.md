@@ -84,9 +84,9 @@
 
 Orbit, Dash, Gunner의 숙련도 효과는 일반 스탯이 아닌 전투 물리 길목에서 직접 적용된다.
 
-- Orbit의 **반사 궤도**는 `applyEquipmentWallBounce`에서 장비의 반향 배율과 합산된다. 즉, 장비 반향 +15%와 Orbit GOLD +15%가 같은 충돌에 함께 적용된다.
-- Dash의 **추진력**은 이동 속도(speed) modifier로, 현재 이동 속도에 비례한다.
-- Gunner의 **반동 증폭**은 `getFighterCollisionResponseOptions`에서 장비의 소용돌이 배율과 합산되어 충돌 solver에 전달된다.
+- Orbit의 **반사 궤도**는 `applyWallBounceBoost`에서 장비의 반향 배율과 곱으로 결합된다. 즉, 장비 반향 +15%와 Orbit GOLD +15%는 `1.15 * 1.15`로 함께 적용된다.
+- Dash의 **추진력**은 이동 속도(speed) modifier로, 다른 스탯 계열 숙련도와 함께 최종 퍼센트로 적용된다.
+- Gunner의 **반동 증폭**은 `getFighterCollisionResponseOptions`에서 장비의 소용돌이 배율과 곱으로 결합되어 충돌 solver에 전달된다.
 
 분노와 갈증은 각각 하나의 원본만 제공하는 독립 주기 패시브다. 피해가 0이거나 HP가 가득 찬 경우에는 준비 상태를 소비하지 않는다.
 

@@ -67,7 +67,7 @@ export class Simulation {
 
         ball.bounced = true;
         if (xBounce || yBounce) {
-            ball.applyEquipmentWallBounce?.(xBounce, yBounce);
+            ball.applyWallBounceBoost?.(xBounce, yBounce);
             ball.state.wallSlam?.onWallBounce(ball, xBounce ?? yBounce, this);
         }
         this.notifyFighterStaticCollision?.(ball, {

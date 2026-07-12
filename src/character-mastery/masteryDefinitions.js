@@ -70,14 +70,14 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         id: "dash_propulsion",
         sourceFighterId: "dash",
         name: "추진력",
-        kind: "physics_modifier",
+        kind: "stat_modifier",
         description: "이동 속도가 {value} 증가합니다.",
         tierValues: MASTERY_TIERS.speed,
         formatValue(v) {
             return (v * 100).toFixed(0) + "%";
         },
         apply(ctx, level) {
-            ctx.physicsModifiers.speed += this.tierValues[level];
+            ctx.statModifiers.speed += this.tierValues[level];
         }
     },
     {
@@ -184,7 +184,7 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         sourceFighterId: "gunner",
         name: "반동 증폭",
         kind: "physics_modifier",
-        description: "충돌 시 상대에게 전달하는 각충격이 {value} 증가합니다.",
+        description: "전투원 충돌로 자신에게 전달되는 각충격이 {value} 증가합니다.",
         tierValues: MASTERY_TIERS.collisionAngularImpulse,
         formatValue(v) {
             return (v * 100).toFixed(0) + "%";
