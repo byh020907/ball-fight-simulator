@@ -140,6 +140,7 @@ import {
 } from "../src/physics/collisionResponse.js";
 import {
     getContactPointVelocity,
+    getContactDamageSpeed,
     calculateRotationalContactDamageBonus,
     applyRotationalContactDamage
 } from "../src/physics/contactDamage.js";
@@ -2588,13 +2589,13 @@ function testAbilityLevelUpgrades(app) {
         "Spin Ball should reach a physical 10-revolutions-per-second charge target without changing collision damage rules"
     );
     setSpinVelocity(spinBase, spinBase.getTargetSpinVelocity());
-    const spinVisualSpeedBonus = calculateRotationalContactDamageBonus(spinBaseRun.ball, {
+    const spinDamageSpeed = getContactDamageSpeed(spinBaseRun.ball, {
         x: spinBaseRun.ball.position.x,
         y: spinBaseRun.ball.position.y + spinBaseRun.ball.radius
     });
     assert.ok(
-        spinVisualSpeedBonus > 0.58 && spinVisualSpeedBonus <= 0.6,
-        "Spin Ball's faster visual rotation should use the existing near-capped contact damage bonus"
+        spinDamageSpeed.rotationalSpeed > spinBaseRun.ball.stats.baseSpeed * 10,
+        "Spin Ball's actual rotation should convert into linear-equivalent collision damage speed"
     );
     spinBase.onCollision(spinBaseRun.target);
     spinBaseRun.ball.integrateRotation(1 / 60);
@@ -10046,6 +10047,25 @@ function testGetContactPointVelocity() {
     console.log("[contact-point-velocity] ok");
 }
 
+function testContactDamageSpeed() {
+    const body = {
+        position: { x: 400, y: 300 },
+        velocity: { x: 100, y: 0 },
+        angularVelocity: 2
+    };
+    const speed = getContactDamageSpeed(body, { x: 500, y: 350 });
+    assert.ok(Math.abs(speed.linearSpeed - 100) < 0.001, "contact damage speed should preserve linear speed");
+    assert.ok(
+        Math.abs(speed.rotationalSpeed - Math.sqrt(50000)) < 0.001,
+        "contact damage speed should convert omega cross r"
+    );
+    assert.ok(
+        Math.abs(speed.damageSpeed - (100 + Math.sqrt(50000))) < 0.001,
+        "contact damage speed should add rotational speed like linear speed"
+    );
+    console.log("[contact-damage-speed] ok");
+}
+
 function testRotationalContactDamageBonusZero() {
     // 중심 속도와 접촉점 속도가 같으면 보너스 0
     const body = {
@@ -10127,7 +10147,10 @@ async function testCrashDamageWithRotation() {
     const boostedDamage = sim.calculateCollisionDamageWithContact(a, b, normal, cp);
 
     assert.ok(boostedDamage > baseDamage, `rotation should boost crash damage: ${baseDamage} -> ${boostedDamage}`);
-    assert.ok(boostedDamage <= Math.round(baseDamage * 1.6), "rotation crash damage should respect +60% cap");
+    assert.ok(
+        boostedDamage > baseDamage * 2,
+        "rotation crash damage should use linear-equivalent rotational speed instead of the legacy +60% cap"
+    );
     console.log("[crash-rotation-damage] ok");
 }
 
@@ -10199,6 +10222,7 @@ async function testVampireRotationalBonus(app) {
 }
 
 testGetContactPointVelocity();
+testContactDamageSpeed();
 testRotationalContactDamageBonusZero();
 testRotationalContactDamageBonusPositive();
 testRotationalContactDamageApply();

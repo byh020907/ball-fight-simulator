@@ -1187,6 +1187,13 @@
 - 수치: 실제 Ability 경로는 만충 시 62.75rad/s에 도달했다. 220px/s 전투원 충돌 횡발사량은 380.9px/s, 정면 벽 반사각은 74.4도였다.
 - 검증: 임시 `scripts/spinballTenRpsStudy.mjs`로 실제 BattleSimulation 경로를 계측한 뒤 제거. `npm test`, `npm run check`, `npm run format:check`, `git diff --check` 통과. 로컬 서버의 `v0.24.63` 응답도 확인.
 
+## [L1] 2026-07-12 — 회전 접점 속도를 선형 속도처럼 충돌 피해로 환산
+- 맥락: 현재 충돌 피해식은 선형 속도를 `현재 속도 / 기본 속도`로 직접 환산하지만, 회전은 마지막에 최대 60%인 별도 보너스로만 더한다.
+- 결정: 접점 회전 속도를 선형 피해 속도와 같은 차원의 공통 충돌 피해 속도로 환산한다. 최종 피해 속도는 선형 속도와 접점 회전 속도의 합이며, 기존 회전 보너스는 중복 적용하지 않는다.
+- 영향: 접점 속도 물리 helper, BattleSimulation 일반 충돌 피해식, 회전 피해 회귀·시뮬레이션, 게임 규칙·밸런스·패치 노트와 버전 표기
+- 수치: 220px/s 선형 속도와 만충 접점 회전 속도 약 3140px/s는 피해 속도 3360px/s로 합산된다. 같은 스핀볼 기본 수치·방향 조건의 일반 충돌 피해는 기존 4→6에서 4→67로 바뀌었다.
+- 검증: 임시 `scripts/spinballDamageSpeedStudy.mjs`로 변경 전후 실제 BattleSimulation 계산을 계측한 뒤 제거. `npm test`, `npm run check`, `npm run format:check`, `git diff --check` 통과. 로컬 서버의 `v0.24.64` 응답도 확인.
+
 ## 진행 중 이슈
 - 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
 - Time Warp 패널티 인상은 재학습 후 반영

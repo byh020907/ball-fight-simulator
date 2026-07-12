@@ -1,6 +1,6 @@
 import { Vector2 } from "../core.js";
 import { Ability } from "../abilities/ability.js";
-import { applyRotationalContactDamage } from "../physics/contactDamage.js";
+import { getContactDamageSpeed } from "../physics/contactDamage.js";
 import {
     ArcherAbility,
     EaterAbility,
@@ -488,8 +488,8 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         }
     }
 
-    calculateCollisionDamage(attacker, defender, attackerToDefender) {
-        const attackerSpeed = attacker.velocity.length();
+    calculateCollisionDamage(attacker, defender, attackerToDefender, contactPoint = null) {
+        const { linearSpeed: attackerSpeed, damageSpeed } = getContactDamageSpeed(attacker, contactPoint);
         const defenderSpeed = defender.velocity.length();
         const attackerDirection =
             attackerSpeed > 0 ? attacker.velocity.clone().normalize() : attackerToDefender.clone();
@@ -509,7 +509,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         if (!Number.isFinite(attacker.stats.baseSpeed) || attacker.stats.baseSpeed <= 0) {
             this.addLog(`[오류] ${attacker.name} 스탯 이상 (baseSpeed=${attacker.stats.baseSpeed})`);
         }
-        const speedEff = attacker.stats.baseSpeed > 0 ? attackerSpeed / attacker.stats.baseSpeed : 1;
+        const speedEff = attacker.stats.baseSpeed > 0 ? damageSpeed / attacker.stats.baseSpeed : 1;
         // Direction efficiency: 0~1 (alignment + hitting from the side)
         const dirEff = aimAlignment * 0.55 + sideExposure * 0.45;
         // Glancing blow penalty
@@ -521,13 +521,11 @@ export class BattleSimulation extends FighterPhysicsSimulation {
     }
 
     /**
-     * 접촉점 정보를 포함한 충돌 대미지 계산 (회전 기여도 적용).
-     * contactPoint가 주어지면 접촉점 속도 기반 회전 손상 보너스를 추가합니다.
+     * 접촉점 정보를 포함한 충돌 대미지 계산.
+     * 접점 회전 속도는 선형 속도와 같은 차원으로 환산되어 피해 속도에 합산됩니다.
      */
     calculateCollisionDamageWithContact(attacker, defender, attackerToDefender, contactPoint) {
-        const baseDamage = this.calculateCollisionDamage(attacker, defender, attackerToDefender);
-        if (!contactPoint) return baseDamage;
-        return applyRotationalContactDamage(baseDamage, attacker, contactPoint);
+        return this.calculateCollisionDamage(attacker, defender, attackerToDefender, contactPoint);
     }
 
     _checkAntiStall(delta) {

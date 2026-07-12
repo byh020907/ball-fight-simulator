@@ -22,6 +22,7 @@ export {
 export { PHYSICS_MATERIALS, resolvePhysicsMaterial, combinePhysicsMaterials } from "./PhysicsMaterial.js";
 export {
     getContactPointVelocity,
+    getContactDamageSpeed,
     calculateRotationalContactDamageBonus,
     applyRotationalContactDamage
 } from "./contactDamage.js";

@@ -28,6 +28,29 @@ export function getContactPointVelocity(body, contactPoint) {
 }
 
 /**
+ * 충돌 피해에 사용할 물리 속도 구성값을 반환합니다.
+ *
+ * 선형 속도와 회전으로 생기는 접점 속도를 같은 px/s 차원으로 환산해
+ * 합칩니다. 호출자는 damageSpeed를 기존 선형 속도처럼 피해식에 사용하고,
+ * linearSpeed는 충돌 방향 판정에 그대로 사용할 수 있습니다.
+ *
+ * @param {{ position: {x:number,y:number}, velocity: {x:number,y:number}, angularVelocity: number }} body
+ * @param {{ x:number, y:number }|null} contactPoint
+ * @returns {{ linearSpeed: number, rotationalSpeed: number, damageSpeed: number }}
+ */
+export function getContactDamageSpeed(body, contactPoint) {
+    const velocity = body?.velocity ?? { x: 0, y: 0 };
+    const linearSpeed = Math.hypot(velocity.x ?? 0, velocity.y ?? 0);
+    if (!contactPoint || !body?.position) {
+        return { linearSpeed, rotationalSpeed: 0, damageSpeed: linearSpeed };
+    }
+
+    const contactVelocity = getContactPointVelocity(body, contactPoint);
+    const rotationalSpeed = Math.hypot(contactVelocity.x - (velocity.x ?? 0), contactVelocity.y - (velocity.y ?? 0));
+    return { linearSpeed, rotationalSpeed, damageSpeed: linearSpeed + rotationalSpeed };
+}
+
+/**
  * 접촉점 속도를 이용한 회전 손상 보너스 계수 (0 ~ 0.6) 를 반환합니다.
  *
  * 보너스 = clamp( (|v_contact| - |v_center|) / baseSpeed, 0, 0.6 )
