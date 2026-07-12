@@ -10,6 +10,10 @@ import {
     getEquipmentRequiredLevel
 } from "./hunting/equipmentConfig.js";
 import { openHuntingChest } from "./hunting/chestRewards.js";
+import {
+    buyDailyShopChest as purchaseDailyShopChest,
+    rerollDailyShop as refreshDailyShopOffer
+} from "./hunting/dailyShop.js";
 import { savePlayerProfile } from "./playerProfile.js";
 import { PopupService } from "./popup.js";
 import { HELP_TITLE, HELP_CONTENT } from "./helpContent.js";
@@ -200,6 +204,16 @@ export function createComponentBridge(app) {
             }
             PopupService.show(createCollectionActionPopupOptions("chest", result));
             return result.opened;
+        },
+        buyDailyShopChest() {
+            const chest = purchaseDailyShopChest(app.playerProfile);
+            if (chest) refreshCollectionAndProfile();
+            return chest;
+        },
+        rerollDailyShop() {
+            const result = refreshDailyShopOffer(app.playerProfile);
+            if (result) refreshCollectionAndProfile();
+            return result;
         }
     };
 }

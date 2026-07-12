@@ -328,6 +328,7 @@
             <div class="ch-toolbar">
                 <span class="ch-toolbar-title">장비 인벤토리</span>
                 <span class="ch-storage-currency">강화석 <b x-text="state.equipment.enhancementStones"></b></span>
+                <button class="ch-btn ch-shop-button" type="button" @click="openShop()">상점</button>
             </div>
             <div class="ch-equip-slots">
                 <h4>장착 슬롯</h4>
@@ -429,6 +430,57 @@
                 <div class="ch-empty" x-show="state.equipment.items.length === 0">보유한 장비가 없습니다</div>
             </div>
         </div>
+
+        <div
+            class="ch-shop-modal"
+            x-cloak
+            x-show="state.shopVisible"
+            x-transition.opacity.duration.150ms
+            @click.self="closeShop()"
+            @keydown.escape.stop="closeShop()"
+        >
+            <section class="ch-shop-dialog" role="dialog" aria-modal="true" aria-label="파편 상점">
+                <div class="ch-shop-header">
+                    <strong>파편 상점</strong>
+                    <button class="ch-close" type="button" aria-label="닫기" @click="closeShop()">×</button>
+                </div>
+                <template x-if="state.storage.dailyShop">
+                    <div class="ch-shop-body">
+                        <div class="ch-shop-offer" x-bind:class="'ch-chest--' + state.storage.dailyShop.rarity">
+                            <div>
+                                <span class="ch-shop-label">상점 상자</span>
+                                <strong x-text="state.storage.dailyShop.rarity.toUpperCase() + ' 상자'"></strong>
+                                <span x-text="'구매 ' + state.storage.dailyShop.purchases + '/' + state.storage.dailyShop.purchaseLimit"></span>
+                            </div>
+                            <button
+                                class="ch-btn"
+                                type="button"
+                                x-bind:disabled="state.storage.dailyShop.purchases >= state.storage.dailyShop.purchaseLimit || state.storage.shards < state.storage.dailyShop.chestCost"
+                                @click="buyDailyShopChest()"
+                                x-text="'구매 ' + state.storage.dailyShop.chestCost"
+                            ></button>
+                        </div>
+                        <div class="ch-shop-meta">
+                            <span x-text="'보유 파편 ' + Number(state.storage.shards || 0).toLocaleString()"></span>
+                            <span x-text="'구매 초기화 ' + formatShopTime(state.storage.dailyShop.purchaseResetAt)"></span>
+                        </div>
+                        <div class="ch-shop-reroll">
+                            <div>
+                                <strong>상자 리롤</strong>
+                                <span x-text="'리롤 초기화 ' + formatShopTime(state.storage.dailyShop.rerollResetAt)"></span>
+                            </div>
+                            <button
+                                class="ch-btn"
+                                type="button"
+                                x-bind:disabled="state.storage.shards < state.storage.dailyShop.rerollCost"
+                                @click="rerollDailyShop()"
+                                x-text="'리롤 ' + state.storage.dailyShop.rerollCost"
+                            ></button>
+                        </div>
+                    </div>
+                </template>
+            </section>
+        </div>
     </div>
 </div>
 
@@ -449,10 +501,12 @@
             sortModes: { roster: "roster", achievements: "default" },
             selectedCharacterId: null,
             characterDetailTab: "overview",
+            shopVisible: false,
             rosterItems: [],
             masteryItems: [],
             achievementItems: [],
             storage: { shards: 0, chests: [], stats: {} },
+            now: Date.now(),
             equipment: {
                 items: [],
                 enhancementStones: 0,
@@ -514,6 +568,15 @@
         function closeCollectionHub() {
             state.visible = false;
             state.selectedCharacterId = null;
+            state.shopVisible = false;
+        }
+
+        function openShop() {
+            state.shopVisible = true;
+        }
+
+        function closeShop() {
+            state.shopVisible = false;
         }
 
         function setCollectionTab(tabId) {
@@ -535,8 +598,20 @@
             state,
             init() {
                 dialogElement = this.$root;
+                this._shopTimer = setInterval(() => (state.now = Date.now()), 1000);
+            },
+            destroy() {
+                clearInterval(this._shopTimer);
+            },
+            formatShopTime(resetAt) {
+                const seconds = Math.max(0, Math.ceil(((resetAt ?? state.now) - state.now) / 1000));
+                return [Math.floor(seconds / 3600), Math.floor((seconds % 3600) / 60), seconds % 60]
+                    .map((v) => String(v).padStart(2, "0"))
+                    .join(":");
             },
             closeCollectionHub,
+            openShop,
+            closeShop,
             setCollectionTab,
             setCollectionFilter,
             selectCollectionCharacter,
@@ -547,6 +622,12 @@
                 if (item.canOpen) {
                     await window.requireGameActionBridge("openChest").openChest(item.id);
                 }
+            },
+            buyDailyShopChest() {
+                return this.bridge.buyDailyShopChest();
+            },
+            rerollDailyShop() {
+                return this.bridge.rerollDailyShop();
             },
             render(vm) {
                 state.rosterItems = vm.rosterItems ?? [];
@@ -1254,6 +1335,73 @@
     .ch-btn--danger {
         border-color: #dc2626;
         color: #dc2626;
+    }
+
+    .ch-shop-button {
+        margin-left: auto;
+    }
+
+    .ch-shop-modal {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        background: rgba(0, 0, 0, 0.4);
+    }
+
+    .ch-shop-dialog {
+        width: min(420px, 100%);
+        border: 2px solid #202020;
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.25);
+    }
+
+    .ch-shop-header {
+        display: flex;
+        align-items: center;
+        padding: 10px 12px;
+        border-bottom: 2px solid #202020;
+    }
+
+    .ch-shop-body {
+        display: grid;
+        gap: 10px;
+        padding: 12px;
+    }
+
+    .ch-shop-offer,
+    .ch-shop-reroll {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border: 2px solid #202020;
+        border-radius: 8px;
+        padding: 10px;
+    }
+
+    .ch-shop-offer > div,
+    .ch-shop-reroll > div,
+    .ch-shop-meta {
+        display: grid;
+        gap: 3px;
+    }
+
+    .ch-shop-label,
+    .ch-shop-offer span,
+    .ch-shop-reroll span,
+    .ch-shop-meta {
+        font-size: 0.72rem;
+        color: #555555;
+    }
+
+    .ch-shop-meta {
+        grid-template-columns: 1fr 1fr;
+        padding: 0 2px;
     }
 
     .ch-equip--common {

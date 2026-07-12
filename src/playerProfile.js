@@ -53,6 +53,7 @@ export function createDefaultPlayerProfile() {
             blueprints: {},
             unlockedStageIds: ["cave"],
             selectedStageId: "cave",
+            dailyShop: {},
             stats: {
                 runsStarted: 0,
                 runsRetreated: 0,
@@ -254,6 +255,7 @@ function sanitizeHunting(obj) {
         blueprints: sanitizeHuntingBlueprints(obj.blueprints),
         unlockedStageIds,
         selectedStageId,
+        dailyShop: typeof obj.dailyShop === "object" && obj.dailyShop ? obj.dailyShop : {},
         stats: {
             runsStarted: sanitizeNumber(obj.stats?.runsStarted),
             runsRetreated: sanitizeNumber(obj.stats?.runsRetreated),

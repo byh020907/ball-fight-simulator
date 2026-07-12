@@ -8,7 +8,7 @@ import { formatAchievementReward } from "./achievementRewards.js";
 import { getCharacterMasteryLevel } from "../character-mastery/index.js";
 import { getCharacterExperienceSummary } from "../experience/experienceService.js";
 import { getCharacterLevelRewards } from "../experience/characterLevelProgression.js";
-import { canOpenHuntingChest, previewHuntingChest } from "../hunting/index.js";
+import { canOpenHuntingChest, getDailyShop, previewHuntingChest } from "../hunting/index.js";
 import {
     getInventorySlots,
     getInventoryUsed,
@@ -246,6 +246,7 @@ export function createCollectionHubViewModel({
         },
         storage: {
             shards: hunting.shards ?? 0,
+            dailyShop: getDailyShop(profile),
             chests: storageItems,
             stats: {
                 runsStarted: hunting.stats?.runsStarted ?? 0,

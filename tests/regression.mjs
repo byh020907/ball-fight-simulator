@@ -53,6 +53,7 @@ import {
     advanceHuntingRun,
     canEnterHunting,
     canRetreatFromHuntingRun,
+    buyDailyShopChest,
     completeHuntingStage,
     createHuntingChest,
     createHuntingRun,
@@ -68,11 +69,13 @@ import {
     getNextHuntingStageId,
     getRewardMultiplier,
     getChestOpenCost,
+    getDailyShop,
     getSelectedHuntingStageId,
     getUnlockedHuntingStageIds,
     previewHuntingChest,
     openHuntingChest,
     recordHuntingFloorResult,
+    rerollDailyShop,
     retreatHuntingRun,
     setHuntingRunPhase,
     rollHuntingChestReward,
@@ -80,6 +83,7 @@ import {
     rollShardReward,
     scaleEnemySpecForHunting,
     HUNTING_ARENA,
+    DAILY_SHOP,
     HUNTING_COMBAT_RELIEF,
     HUNTING_ENEMY_TYPES,
     HUNTING_EVENT_TYPES,
@@ -13004,5 +13008,47 @@ function testHuntingMobActionsKeepPhysicsFinite() {
 }
 
 testHuntingMobActionsKeepPhysicsFinite();
+
+function testDailyShopPurchaseAndRerollCycles() {
+    const profile = createDefaultPlayerProfile();
+    profile.hunting.shards = 1_000;
+
+    const firstOffer = getDailyShop(profile, 0);
+    assert.equal(firstOffer.purchases, 0, "A new shop cycle should start with no purchases");
+    assert.equal(firstOffer.purchaseResetAt, DAILY_SHOP.purchaseResetMs, "Purchase reset should last six hours");
+    assert.equal(firstOffer.rerollResetAt, DAILY_SHOP.rerollResetMs, "Reroll reset should last ninety minutes");
+
+    const firstChest = buyDailyShopChest(profile, { now: 1, rng: () => 0.01 });
+    const secondChest = buyDailyShopChest(profile, { now: 1, rng: () => 0.01 });
+    const blockedChest = buyDailyShopChest(profile, { now: 1, rng: () => 0.01 });
+    assert.ok(firstChest && secondChest, "The shop should sell two chests per purchase cycle");
+    assert.equal(blockedChest, null, "The shop must enforce its purchase limit");
+    assert.equal(profile.hunting.shards, 700, "Two shop chests should cost 300 shards");
+
+    const rerolledOffer = rerollDailyShop(profile, { now: 2, rng: () => 0.96 });
+    assert.equal(rerolledOffer.rarity, "rare", "Rerolling should replace the offered chest rarity");
+    assert.equal(profile.hunting.shards, 670, "The first reroll should cost 30 shards");
+    rerollDailyShop(profile, { now: 2, rng: () => 0.01 });
+    assert.equal(profile.hunting.shards, 610, "The second reroll should cost 60 shards");
+
+    const nextRerollCycle = getDailyShop(profile, DAILY_SHOP.rerollResetMs + 1);
+    assert.equal(nextRerollCycle.rerolls, 0, "The reroll count should reset independently");
+    const nextPurchaseCycle = getDailyShop(profile, DAILY_SHOP.purchaseResetMs + 1);
+    assert.equal(nextPurchaseCycle.purchases, 0, "The purchase count should reset independently");
+    console.log("[daily-shop-purchase-reroll-cycles] ok");
+}
+
+testDailyShopPurchaseAndRerollCycles();
+
+function testDailyShopPopupContract() {
+    const template = readFileSync("src/components/collection-hub.html", "utf8");
+    assert.ok(template.includes('@click="openShop()"'), "Equipment toolbar should open the shard shop popup");
+    assert.ok(template.includes('class="ch-shop-modal"'), "Shard shop should use a dedicated popup layer");
+    assert.ok(template.includes('@click.self="closeShop()"'), "Shop backdrop should close only the shop popup");
+    assert.ok(!template.includes('class="ch-daily-shop"'), "Shard shop must not appear in an unrelated collection tab");
+    console.log("[daily-shop-popup-contract] ok");
+}
+
+testDailyShopPopupContract();
 
 console.log("regression tests ok");
