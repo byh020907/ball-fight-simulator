@@ -7521,63 +7521,73 @@ async function testApplyTournamentReport() {
 // ── Toast queue tests ───────────────────────────────────────────────────────
 
 async function testToastQueue() {
-    // UI의 showToast가 큐 기반으로 동작하는지 검증
-    // 실제로는 내부 _processToastQueue 동작으로, 동시 호출 시 덮어쓰기가 아닌 순차 표시
-    const { createDefaultPlayerProfile } = await import("../src/playerProfile.js");
-
-    // Alpine state를 흉내내는 가상 state 객체로 큐 동작 검증
     const state = {
-        toastVisible: false,
-        toastMessage: "",
-        toastTimer: null,
-        toastQueue: []
+        active: null,
+        departing: null,
+        queue: [],
+        nextId: 0
     };
 
-    // processToastQueue를 직접 시뮬레이션
-    function processToastQueue() {
-        if (state.toastTimer || state.toastQueue.length === 0) return;
-        const item = state.toastQueue.shift();
-        state.toastMessage = item.message;
-        state.toastVisible = true;
-        state.toastTimer = 1; // 가짜 타이머 (non-null)
+    function createToast(message) {
+        return { id: ++state.nextId, message, count: 1 };
     }
 
-    function finishCurrentToast() {
-        state.toastVisible = false;
-        state.toastTimer = null;
-        processToastQueue();
+    function promoteNextToast() {
+        const next = state.queue.shift();
+        if (!next) return;
+        state.departing = state.active;
+        state.active = next;
     }
 
-    // 첫 번째 토스트
-    state.toastQueue.push({ message: "업적1", duration: 3500 });
-    processToastQueue();
-    assert.equal(state.toastVisible, true, "First toast should be visible");
-    assert.equal(state.toastMessage, "업적1", "First toast message should match");
+    function showToast(message) {
+        if (state.active?.message === message) {
+            state.active.count += 1;
+            return;
+        }
 
-    // 두 번째 토스트 (첫 번째가 아직 표시 중)
-    state.toastQueue.push({ message: "업적2", duration: 3500 });
-    assert.equal(state.toastQueue.length, 1, "Second toast should be queued, not overwritten");
-    assert.equal(state.toastMessage, "업적1", "First toast should still be showing while second is queued");
+        const queued = state.queue.at(-1);
+        if (queued?.message === message) queued.count += 1;
+        else state.queue.push(createToast(message));
 
-    // 세 번째 토스트
-    state.toastQueue.push({ message: "업적3", duration: 3500 });
-    assert.equal(state.toastQueue.length, 2, "Third toast should also be queued");
+        if (!state.active) state.active = state.queue.shift();
+    }
 
-    // 첫 번째 토스트 종료 → 두 번째가 표시되어야 함
-    finishCurrentToast();
-    assert.equal(state.toastVisible, true, "Second toast should be visible after first ends");
-    assert.equal(state.toastMessage, "업적2", "Second toast message should match");
-    assert.equal(state.toastQueue.length, 1, "Queue should have one remaining");
+    showToast("업적1");
+    assert.equal(state.active.message, "업적1", "First toast should be displayed immediately");
 
-    // 두 번째 토스트 종료 → 세 번째가 표시되어야 함
-    finishCurrentToast();
-    assert.equal(state.toastVisible, true, "Third toast should be visible after second ends");
-    assert.equal(state.toastMessage, "업적3", "Third toast message should match");
-    assert.equal(state.toastQueue.length, 0, "Queue should be empty");
+    showToast("업적2");
+    assert.equal(state.active.message, "업적1", "Current toast should remain visible until its minimum display time");
+    assert.equal(state.queue.length, 1, "Different toast should wait for the minimum display time");
 
-    // 세 번째 토스트 종료 → 더 이상 표시할 것 없음
-    finishCurrentToast();
-    assert.equal(state.toastVisible, false, "Toast should be hidden when queue is empty");
+    promoteNextToast();
+    assert.equal(
+        state.active.message,
+        "업적2",
+        "Next toast should become the foreground toast after the minimum display time"
+    );
+    assert.equal(state.departing.message, "업적1", "Previous toast should leave behind the new foreground toast");
+
+    showToast("업적2");
+    assert.equal(
+        state.active.count,
+        2,
+        "Repeated current toast should merge into a count instead of creating another item"
+    );
+
+    showToast("업적3");
+    promoteNextToast();
+    assert.equal(state.active.message, "업적3", "Queued toast should replace the current toast in order");
+    assert.equal(state.departing.count, 2, "Merged toast count should remain visible while the prior toast exits");
+
+    const source = readFileSync("src/components/toast-notification.html", "utf8");
+    assert.ok(source.includes("MIN_VISIBLE_DURATION = 650"), "Toast should define a short minimum display duration");
+    assert.ok(source.includes("component.departing"), "Toast should retain a departing layer during replacement");
+    assert.ok(source.includes("queue.at(-1)"), "Toast should merge repeated queued messages");
+    assert.ok(
+        source.includes("toast--entering") && source.includes("toast--leaving"),
+        "Toast should animate both entry and exit"
+    );
+    assert.ok(!source.includes('x-show="visible"'), "Toast should not use a single visible flag for replacement");
 }
 
 // ── Sensitivity reset test ──────────────────────────────────────────────────

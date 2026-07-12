@@ -1,65 +1,237 @@
-<div x-data="toastNotification" aria-live="polite">
-    <div
-        class="toast"
-        x-show="visible"
-        x-transition:enter="toast-enter"
-        x-transition:leave="toast-leave"
-        x-text="message"
-    ></div>
+<div x-data="toastNotification" class="toast-region">
+    <div class="toast-stack">
+        <template x-for="toast in displayedToasts" :key="toast.id">
+            <div
+                class="toast"
+                x-bind:class="{
+                    'toast--entering': toast.phase === 'entering',
+                    'toast--active': toast.phase === 'active',
+                    'toast--leaving': toast.phase === 'leaving'
+                }"
+                x-bind:role="toast.phase === 'leaving' ? null : 'status'"
+                x-bind:aria-hidden="toast.phase === 'leaving'"
+                aria-live="polite"
+                aria-atomic="true"
+            >
+                <span class="toast-message" x-text="toast.message"></span>
+                <span class="toast-count" x-show="toast.count > 1" x-text="'×' + toast.count"></span>
+            </div>
+        </template>
+    </div>
 </div>
 
 <script>
     window.createGameUI("toastNotification", () => {
-        let _queue = [];
-        let _timer = null;
+        const DEFAULT_DURATION = 3500;
+        const MIN_VISIBLE_DURATION = 650;
+        const TRANSITION_DURATION = 180;
+        let queue = [];
+        let nextToastId = 0;
+        let activeStartedAt = 0;
+        let displayTimer = null;
+        let preemptTimer = null;
+        let departureTimer = null;
 
-        function processQueue() {
-            if (_timer || _queue.length === 0) return;
-            const item = _queue.shift();
-            this.message = item.message;
-            this.visible = true;
-            _timer = setTimeout(() => {
-                this.visible = false;
-                _timer = null;
-                processQueue.call(this);
-            }, item.duration);
+        function clearTimer(timer) {
+            if (timer) clearTimeout(timer);
+            return null;
+        }
+
+        function normalizeDuration(duration) {
+            return Math.max(MIN_VISIBLE_DURATION, Number.isFinite(duration) ? duration : DEFAULT_DURATION);
+        }
+
+        function createToast(message, duration) {
+            return { id: ++nextToastId, message, duration: normalizeDuration(duration), count: 1, phase: "entering" };
+        }
+
+        function markActive(component) {
+            const activeId = component.active?.id;
+            requestAnimationFrame(() => {
+                if (component.active?.id !== activeId) return;
+                component.active = { ...component.active, phase: "active" };
+            });
+        }
+
+        function clearActiveTimers() {
+            displayTimer = clearTimer(displayTimer);
+            preemptTimer = clearTimer(preemptTimer);
+        }
+
+        function clearDeparting(component, toastId) {
+            departureTimer = clearTimer(departureTimer);
+            departureTimer = setTimeout(() => {
+                if (component.departing?.id === toastId) component.departing = null;
+                departureTimer = null;
+            }, TRANSITION_DURATION);
+        }
+
+        function scheduleActiveTimers(component) {
+            clearActiveTimers();
+            if (!component.active) return;
+
+            displayTimer = setTimeout(() => {
+                displayTimer = null;
+                if (queue.length > 0) replaceActive(component, queue.shift());
+                else dismissActive(component);
+            }, component.active.duration);
+
+            if (queue.length === 0) return;
+            const remainingMinimum = Math.max(0, MIN_VISIBLE_DURATION - (Date.now() - activeStartedAt));
+            preemptTimer = setTimeout(() => {
+                preemptTimer = null;
+                if (component.active && queue.length > 0) replaceActive(component, queue.shift());
+            }, remainingMinimum);
+        }
+
+        function present(component, toast) {
+            component.active = toast;
+            activeStartedAt = Date.now();
+            markActive(component);
+            scheduleActiveTimers(component);
+        }
+
+        function replaceActive(component, nextToast) {
+            if (!component.active) {
+                present(component, nextToast);
+                return;
+            }
+
+            clearActiveTimers();
+            const departing = { ...component.active, phase: "leaving" };
+            component.departing = departing;
+            clearDeparting(component, departing.id);
+            present(component, nextToast);
+        }
+
+        function dismissActive(component) {
+            if (!component.active) return;
+
+            clearActiveTimers();
+            const departing = { ...component.active, phase: "leaving" };
+            component.active = null;
+            component.departing = departing;
+            clearDeparting(component, departing.id);
+        }
+
+        function refreshActive(component) {
+            component.active = { ...component.active, phase: "entering" };
+            activeStartedAt = Date.now();
+            markActive(component);
+            scheduleActiveTimers(component);
+        }
+
+        function enqueue(component, message, duration) {
+            if (component.active?.message === message) {
+                component.active = {
+                    ...component.active,
+                    count: component.active.count + 1,
+                    duration: normalizeDuration(duration)
+                };
+                refreshActive(component);
+                return;
+            }
+
+            const queuedToast = queue.at(-1);
+            if (queuedToast?.message === message) {
+                queuedToast.count += 1;
+                queuedToast.duration = normalizeDuration(duration);
+            } else {
+                queue.push(createToast(message, duration));
+            }
+
+            if (!component.active) present(component, queue.shift());
+            else scheduleActiveTimers(component);
         }
 
         return {
-            visible: false,
-            message: "",
-            show(message, duration = 3500) {
-                _queue.push({ message, duration });
-                processQueue.call(this);
+            active: null,
+            departing: null,
+            get displayedToasts() {
+                return [this.departing, this.active].filter(Boolean);
+            },
+            show(message, duration = DEFAULT_DURATION) {
+                if (typeof message !== "string" || !message.trim()) return;
+                enqueue(this, message, duration);
             }
         };
     });
 </script>
 
 <style scoped>
-.toast {
-    position: fixed;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #202020;
-    color: #fff;
-    padding: 12px 28px;
-    border-radius: 10px;
-    font-size: 0.95rem;
-    font-weight: 600;
-    z-index: 9999;
-    pointer-events: none;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-    white-space: nowrap;
-}
-.toast-enter {
-    opacity: 0;
-    transform: translateX(-50%) translateY(-20px);
-}
-.toast-leave {
-    opacity: 0;
-    transform: translateX(-50%) translateY(10px);
-    transition: all 300ms ease;
-}
+    .toast-region {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        pointer-events: none;
+    }
+
+    .toast-stack {
+        position: absolute;
+        top: 20px;
+        left: 50%;
+        width: min(440px, calc(100vw - 24px));
+        transform: translateX(-50%);
+    }
+
+    .toast {
+        position: absolute;
+        top: 0;
+        left: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        min-height: 48px;
+        padding: 11px 14px;
+        border: 2px solid #202020;
+        border-radius: 6px;
+        background: #202020;
+        color: #ffffff;
+        font-size: 0.9rem;
+        font-weight: 700;
+        line-height: 1.35;
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        transition:
+            opacity 180ms ease,
+            transform 180ms ease;
+    }
+
+    .toast--entering {
+        z-index: 2;
+        opacity: 0;
+        transform: translateY(-14px) scale(0.98);
+    }
+
+    .toast--active {
+        z-index: 2;
+    }
+
+    .toast--leaving {
+        z-index: 1;
+        opacity: 0;
+        transform: translateY(8px) scale(0.98);
+    }
+
+    .toast-message {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .toast-count {
+        flex: 0 0 auto;
+        min-width: 28px;
+        padding: 2px 5px;
+        border: 1px solid #ffffff;
+        border-radius: 4px;
+        font-size: 0.72rem;
+        text-align: center;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .toast {
+            transition-duration: 1ms;
+        }
+    }
 </style>
