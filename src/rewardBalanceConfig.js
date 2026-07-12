@@ -88,13 +88,13 @@ export const REWARD_BALANCE = deepFreeze({
             ],
             spin: [
                 { level: 2, baseStats: { speed: 2 } },
-                { level: 3, baseStats: { defense: 1 }, abilityTier: 1, gameText: "충돌 후 회전력 82% 유지" },
+                { level: 3, baseStats: { defense: 1 }, abilityTier: 1, gameText: "충돌 후 회전 충전 25% 유지" },
                 { level: 4, baseStats: { skill: 2 } },
                 { level: 5, baseStats: { damage: 1 } },
                 { level: 6, baseStats: { speed: 2 }, abilityTier: 2, gameText: "고회전 충돌 나선 넉백" },
                 { level: 7, baseStats: { hp: 2 } },
                 { level: 8, baseStats: { skill: 2 } },
-                { level: 9, baseStats: { damage: 1 }, abilityTier: 3, gameText: "최고 회전 다음 가속 오버스핀" },
+                { level: 9, baseStats: { damage: 1 }, abilityTier: 3, gameText: "만충 충돌 오버스핀" },
                 { level: 10, baseStats: { defense: 1 } }
             ],
             eater: [
@@ -221,9 +221,9 @@ export const REWARD_BALANCE = deepFreeze({
             spin: {
                 tiers: [
                     {},
-                    { collisionRetentionRatio: 0.82 },
+                    { chargeRetentionRatio: 0.25 },
                     { spiralKnockback: 210 },
-                    { overspinRetentionRatio: 0.42, overspinDuration: 1.1, overspinDamageMultiplier: 1.45 }
+                    { overspinDamageMultiplier: 1.45 }
                 ]
             },
             eater: {

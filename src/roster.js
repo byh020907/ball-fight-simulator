@@ -71,7 +71,7 @@ export function createRoster() {
             name: "Spin Ball",
             title: "Gyro Drive",
             description:
-                "쿨타임마다 회전력을 가속합니다. 회전력이 높을수록 충돌 접점의 피해가 강해지고, 최고 회전에서는 다음 가속이 오버스핀으로 바뀝니다.",
+                "충돌 없이 회전력을 충전해 접점 피해를 키웁니다. 충돌하면 회전력을 소비하며, 만충 충돌은 오버스핀이 됩니다.",
             color: "#d95f2f",
             face: "spin",
             ability: "spin",

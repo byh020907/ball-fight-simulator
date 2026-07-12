@@ -2565,24 +2565,37 @@ function testAbilityLevelUpgrades(app) {
     const spinBaseRun = createTierSimulation(FIGHTER_IDS.SPIN, 0);
     const spinBase = spinBaseRun.ball.ability;
     setSpinVelocity(spinBase, 0);
-    spinBase.timer = 0;
-    spinBase.update(0.01, spinBaseRun.target);
+    spinBase.update(spinBase.getMaxChargeTime() * 0.5, spinBaseRun.target);
     assert.ok(
         Math.abs(spinBaseRun.ball._accumulatedTorque) > 0,
-        "Spin Ball should accelerate with torque instead of directly assigning angular velocity"
+        "Spin Ball should make its charged target rotation through torque instead of directly assigning angular velocity"
+    );
+    assertClose(
+        spinBase.getChargeProgress(),
+        0.5,
+        "Spin Ball should build its rotation resource continuously while it avoids collisions"
     );
     assert.equal(spinBase.getUiState().label, "회전력", "Spin Ball should expose its rotation state in the live UI");
 
+    spinBase.state.timeWithoutCollision = spinBase.getMaxChargeTime();
+    setSpinVelocity(spinBase, spinBase.getTargetSpinVelocity());
+    spinBase.onCollision(spinBaseRun.target);
+    spinBaseRun.ball.integrateRotation(1 / 60);
+    assertClose(spinBase.getChargeProgress(), 0, "Base Spin Ball collisions should consume all rotation charge");
+    assertClose(spinBase.getSpinVelocity(), 0, "Base Spin Ball collisions should physically drain its rotation");
+
     const spinTierOneRun = createTierSimulation(FIGHTER_IDS.SPIN, 1);
+    spinTierOneRun.ball.ability.state.timeWithoutCollision = spinTierOneRun.ball.ability.getMaxChargeTime();
+    spinTierOneRun.ball.ability.onCollision(spinTierOneRun.target);
     assertClose(
-        spinTierOneRun.ball.ability.getCollisionRetention(),
-        0.82,
-        "Spin tier 1 should retain 82% of its rotation after a collision"
+        spinTierOneRun.ball.ability.getChargeProgress(),
+        0.25,
+        "Spin tier 1 should retain 25% of its rotation charge after a collision"
     );
 
     const spinTierTwoRun = createTierSimulation(FIGHTER_IDS.SPIN, 2);
     const spinTierTwo = spinTierTwoRun.ball.ability;
-    setSpinVelocity(spinTierTwo, 2.4);
+    spinTierTwo.state.timeWithoutCollision = spinTierTwo.getMaxChargeTime() * 0.6;
     spinTierTwo.onCollision(spinTierTwoRun.target);
     assert.equal(spinTierTwo.getSpiralKnockback(), 210, "Spin tier 2 should unlock spiral knockback");
     assert.ok(
@@ -2592,20 +2605,20 @@ function testAbilityLevelUpgrades(app) {
 
     const spinTierThreeRun = createTierSimulation(FIGHTER_IDS.SPIN, 3);
     const spinTierThree = spinTierThreeRun.ball.ability;
-    setSpinVelocity(spinTierThree, 3.5);
-    spinTierThree.timer = 0;
-    spinTierThree.update(0.01, spinTierThreeRun.target);
-    assert.ok(
-        spinTierThree.state.overspinRemaining > 0,
-        "Spin tier 3 should convert a full rotation pulse into overspin"
-    );
-    assert.equal(spinTierThree.getUiState().label, "오버스핀", "Active overspin should replace the rotation UI label");
+    spinTierThree.state.timeWithoutCollision = spinTierThree.getMaxChargeTime();
+    assert.equal(spinTierThree.getUiState().label, "오버스핀", "Full Spin charge should announce ready overspin");
     assert.equal(
         spinTierThree.modifyOutgoingFighterCollisionDamage(10),
         15,
-        "Spin tier 3 should strengthen the next collision after consuming rotation"
+        "Spin tier 3 should strengthen the full-charge collision that consumes rotation"
     );
-    assert.equal(spinTierThree.state.overspinRemaining, 0, "Overspin should be consumed by its collision bonus");
+    spinTierThree.onCollision(spinTierThreeRun.target);
+    assertClose(
+        spinTierThree.getChargeProgress(),
+        0.25,
+        "Spin tier 3 should consume its overspin collision while preserving the tier 1 charge retention"
+    );
+    assert.equal(spinTierThree.state.overspinHit, false, "Overspin should be consumed by its charged collision");
 
     const eaterRun = createTierSimulation(FIGHTER_IDS.EATER);
     assertClose(
