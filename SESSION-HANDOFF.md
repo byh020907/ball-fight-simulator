@@ -1346,4 +1346,9 @@
 - 영향: `src/app.js`, `src/character-mastery/masteryDefinitions.js`, `src/character-mastery/masteryModifiers.js`, `src/entities/battleBall.js`, `tests/regression.mjs`, `docs/character-mastery-system.md`, `SESSION-HANDOFF.md`
 - 검증: `npm test`, `npm run check`, `npm run format:check`, `git diff --check`, `node scripts/huntingUserScenario.mjs` 통과
 
+## [L1] 2026-07-12 — 0 비용 클릭 액션도 정상 발동한다
+- 맥락: Bat 숙련도의 비용 감소에서 누적 하한을 제거한 뒤, 비용이 0이면 `_tryFireAction()`이 기존 `paidCost <= 0` 조건에서 액션까지 취소했다.
+- 결정: HP 비용이 양수인데 지불에 실패한 경우만 취소한다. 0 비용은 유효한 액션으로 예약하며, 음수 비용은 기존처럼 0으로 정규화한다.
+- 영향: `src/app.js` 클릭 액션 발동 조건, 0 비용 액션 회귀 테스트
+
 ## 진행 중 이슈

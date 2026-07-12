@@ -1058,7 +1058,7 @@ export class BattleApp {
         const effectivePct = Math.max(0, action.hpCostPercent - reduction * 100);
         const cost = Math.ceil((player.maxHp * effectivePct) / 100);
         const paidCost = player.actionContext.spendHpForAction(player, cost);
-        if (paidCost <= 0) {
+        if (cost > 0 && paidCost <= 0) {
             return false;
         }
 

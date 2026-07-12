@@ -7706,6 +7706,46 @@ async function testHuntingMasteryPlayerOnly(app) {
     console.log("[hunting-mastery-player-only] ok");
 }
 
+function testZeroCostActionSchedulesWithoutHpSpend(app) {
+    const isolatedApp = Object.create(Object.getPrototypeOf(app));
+    const scheduled = [];
+    const action = {
+        id: "zero_cost_action",
+        hpCostPercent: 0.05,
+        getFailureReason() {
+            return null;
+        }
+    };
+    const player = {
+        flags: { defeated: false },
+        hp: 100,
+        maxHp: 100,
+        mastery: { action: { hpCostPercentReduction: 0.001 } },
+        actionContext: {
+            spendHpForAction(_, cost) {
+                return cost;
+            }
+        }
+    };
+
+    isolatedApp._action = {
+        ctx: {
+            action,
+            player,
+            sim: {
+                scheduleAction(...args) {
+                    scheduled.push(args);
+                }
+            }
+        }
+    };
+    isolatedApp._currentMatchReport = null;
+
+    assert.equal(isolatedApp._tryFireAction(), true, "Zero-cost action should remain usable after mastery reduction");
+    assert.deepEqual(scheduled, [[action, player, 0]], "Zero-cost action should be scheduled without HP spending");
+    console.log("[zero-cost-action-schedules] ok");
+}
+
 // ── Dynamic bonus computation test ──────────────────────────────────────────
 
 async function testComputeEffectiveBonusesDynamic() {
@@ -8025,6 +8065,7 @@ await testDashMasterySpeedApplied();
 await testOrbitWallBounceMultiplicative();
 await testGunnerAngularImpulseMultiplicative();
 await testHuntingMasteryPlayerOnly(app);
+testZeroCostActionSchedulesWithoutHpSpend(app);
 // Dynamic bonus computation test
 // ── New character tests ──────────────────────────────────────────────────────
 
