@@ -13085,6 +13085,14 @@ function testDailyShopPopupContract() {
         "Achievement rows should not repeat a chest icon for every achievement"
     );
     assert.ok(
+        !template.includes("flex-shrink: 0;\n    }\n\n    }\n\n    .ch-mast-tier"),
+        "Collection stylesheet should not contain a dangling mastery block terminator"
+    );
+    assert.ok(
+        !template.includes("min-width: 0;\n    }\n\n    }\n\n    .ch-ach-desc"),
+        "Collection stylesheet should not contain a dangling achievement block terminator"
+    );
+    assert.ok(
         template.includes(".ch-btn:not(:disabled):hover"),
         "Collection buttons should have an enabled hover state"
     );
