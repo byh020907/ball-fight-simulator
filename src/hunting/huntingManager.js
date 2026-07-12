@@ -144,6 +144,7 @@ export class HuntingManager {
         const stageId = getSelectedHuntingStageId(this.app.playerProfile);
         this._run = createHuntingRun({ characterId, stageId });
         this.app.playerFighterId = characterId;
+        this.app.beginGameSession();
         // UI에서 할당한 스탯을 게임 상태로 동기화 (토너먼트와 동일한 흐름)
         this.app._syncPlayerStatAllocationFromUi();
         this.app.refreshPlayerSetup();
@@ -349,6 +350,7 @@ export class HuntingManager {
                 const securedShards = this._run.securedLoot?.shards ?? 0;
                 this._mergeIntoSecured(app);
                 app._refreshCollectionHub();
+                app.beginResultConfirmation();
                 app.refreshPlayerSetup();
                 app.setHuntingActive(false);
                 app.setHuntingOverlayState({
@@ -359,7 +361,6 @@ export class HuntingManager {
                     huntingLootHudShards: 0,
                     huntingLootHudChests: 0
                 });
-                app._huntingDone = true;
                 app.showOverlay(
                     "스테이지 클리어",
                     `${stage.name} 보스 격파`,
@@ -397,6 +398,7 @@ export class HuntingManager {
 
             this._mergeIntoSecured(app);
             app._refreshCollectionHub();
+            app.beginResultConfirmation();
             app.refreshPlayerSetup();
 
             const lossDisplay = defeatLossText || `파편 ${lostShards} 손실`;
@@ -408,7 +410,6 @@ export class HuntingManager {
                 huntingLootHudShards: 0,
                 huntingLootHudChests: 0
             });
-            app._huntingDone = true;
             app.setStartButton({ text: "확인", hidden: false, disabled: false });
             this._run = null;
         }
@@ -428,6 +429,7 @@ export class HuntingManager {
 
         this._mergeIntoSecured(app);
         app._refreshCollectionHub();
+        app.beginResultConfirmation();
         app.refreshPlayerSetup();
 
         app.setHuntingActive(false);
@@ -438,7 +440,6 @@ export class HuntingManager {
             huntingLootHudChests: 0
         });
 
-        app._huntingDone = true;
         app.showOverlay("사냥터 종료", "귀환 완료", `파편 ${securedShards} 확보 · 최고 층 ${run.floor}`);
         app.setStartButton({ text: "확인", hidden: false, disabled: false });
         this._run = null;

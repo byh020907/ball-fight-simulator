@@ -160,6 +160,7 @@ import { BattleBall, computeHeroOrbCarryover, STAT_ORB_KEYS } from "../src/entit
 import { MobAppearance } from "../src/entities/mobAppearance.js";
 import { PHYSICS_MATERIALS, resolvePhysicsMaterial, combinePhysicsMaterials } from "../src/physics/PhysicsMaterial.js";
 import PhysicsMaterialBody from "../src/physics/PhysicsMaterialBody.js";
+import { AppLifecycle, APP_LIFECYCLE_STATES } from "../src/appLifecycle.js";
 
 const EMPTY_EQUIPMENT_SUMMARY = {
     characterLevel: 1,
@@ -1167,6 +1168,14 @@ async function testTournament(app) {
     assert.equal(matches, 7, "Eight-fighter tournament should play seven matches");
     assert.ok(app.tournament.champion, "Tournament should produce a champion");
     assert.ok(app.playerResult, "Tournament should record the user's final rank");
+    assert.equal(
+        app.lifecycle.isAwaitingResultConfirmation,
+        true,
+        "Tournament completion should enter the shared result confirmation state"
+    );
+    assert.equal(app._modeSegment.visible, false, "Tournament result should keep the mode selector hidden");
+    assert.equal(app._panel.locked, true, "Tournament result should keep stat allocation locked");
+    app.returnToInitialState();
 }
 
 function testStatAllocationRules(app) {
@@ -2630,6 +2639,7 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
         roster: [{ id: FIGHTER_IDS.RAGE, name: "Rage", title: "Test", color: "#f00" }],
         renderer: { clear() {} },
         stopPlayerPreviewLoop() {},
+        beginGameSession() {},
         _syncPlayerStatAllocationFromUi() {},
         refreshPlayerSetup() {},
         setHuntingActive() {},
@@ -9364,8 +9374,7 @@ function testResultConfirmationReturnsInitialState() {
     const calls = [];
     const resultApp = {
         rafId: 17,
-        _huntingDone: true,
-        _pickPending: true,
+        lifecycle: new AppLifecycle(),
         _onSimulationResult: () => {},
         matchFinalized: true,
         simulation: { finished: true },
@@ -9390,6 +9399,8 @@ function testResultConfirmationReturnsInitialState() {
             calls.push(["preview"]);
         }
     };
+    resultApp.lifecycle.beginGameplay();
+    resultApp.lifecycle.awaitResultConfirmation();
     const savedCancelAnimationFrame = globalThis.cancelAnimationFrame;
     globalThis.cancelAnimationFrame = (id) => calls.push(["cancel", id]);
 
@@ -9400,14 +9411,105 @@ function testResultConfirmationReturnsInitialState() {
         globalThis.cancelAnimationFrame = savedCancelAnimationFrame;
     }
 
-    assert.equal(resultApp._huntingDone, false, "Confirming a hunting result should clear its completion state");
-    assert.equal(resultApp._pickPending, false, "Confirming a tournament result should clear its completion state");
+    assert.equal(
+        resultApp.lifecycle.state,
+        APP_LIFECYCLE_STATES.SETUP,
+        "Confirming a result should restore the shared lifecycle to setup"
+    );
     assert.equal(resultApp.tournament, null, "Confirming a result should discard the finished tournament");
     assert.equal(resultApp.simulation, null, "Confirming a result should discard the finished simulation");
     assert.equal(resultApp._root.tournamentActive, false, "Initial state should not remain tournament-locked");
     assert.equal(resultApp._root.statusBadge, "Setup", "Initial state should restore the setup status");
     assert.deepEqual(calls, [["cancel", 17], ["bracket", null], ["overlay"], ["setup"], ["preview"]]);
     console.log("[result-confirmation-initial-state] ok");
+}
+
+function testAppLifecycleTransitions() {
+    const lifecycle = new AppLifecycle();
+    assert.equal(lifecycle.state, APP_LIFECYCLE_STATES.SETUP, "Lifecycle should begin in setup");
+    assert.equal(lifecycle.isSetupInteractionLocked, false, "Setup should leave configuration interactive");
+    const initialRevision = lifecycle.revision;
+    lifecycle.returnToSetup();
+    assert.equal(
+        lifecycle.isCurrentRevision(initialRevision),
+        false,
+        "Explicit reset should invalidate stale setup work"
+    );
+
+    lifecycle.beginGameplay();
+    const gameplayRevision = lifecycle.revision;
+    assert.equal(lifecycle.isGameplayActive, true, "Gameplay state should be explicit");
+    assert.equal(lifecycle.isSetupInteractionLocked, true, "Gameplay should lock configuration");
+
+    lifecycle.awaitResultConfirmation();
+    assert.equal(lifecycle.isAwaitingResultConfirmation, true, "Result state should wait for explicit confirmation");
+    assert.equal(lifecycle.isSetupInteractionLocked, true, "Result confirmation should keep configuration locked");
+    assert.equal(
+        lifecycle.isCurrentRevision(gameplayRevision),
+        false,
+        "Result transition should invalidate active match work"
+    );
+
+    lifecycle.returnToSetup();
+    assert.equal(lifecycle.isSetup, true, "Confirmation should return to setup");
+    assert.throws(
+        () => lifecycle.awaitResultConfirmation(),
+        /Invalid app lifecycle transition/,
+        "Lifecycle should reject result screens without an active game"
+    );
+    console.log("[app-lifecycle-transitions] ok");
+}
+
+function testHuntingRetreatAwaitsResultConfirmation() {
+    const source = readFileSync("src/hunting/huntingManager.js", "utf8");
+    const resultTransitions = source.match(/app\.beginResultConfirmation\(\);/g) ?? [];
+    assert.equal(
+        resultTransitions.length,
+        3,
+        "Stage clear, defeat, and portal retreat should all enter result confirmation"
+    );
+
+    const calls = [];
+    const app = {
+        playerProfile: createDefaultPlayerProfile(),
+        _refreshCollectionHub() {
+            calls.push("collection");
+        },
+        beginResultConfirmation() {
+            calls.push("result");
+        },
+        refreshPlayerSetup() {
+            calls.push("setup");
+        },
+        setHuntingActive() {
+            calls.push("active");
+        },
+        setHuntingOverlayState() {
+            calls.push("overlay-state");
+        },
+        showOverlay() {
+            calls.push("overlay");
+        },
+        setStartButton() {
+            calls.push("button");
+        },
+        showToast() {
+            calls.push("toast");
+        }
+    };
+    const manager = new HuntingManager(app);
+    const run = createHuntingRun({ characterId: FIGHTER_IDS.ARCHER });
+    run.lastEvent = { type: HUNTING_EVENT_TYPES.PORTAL };
+    manager._run = run;
+
+    manager.retreat();
+
+    assert.ok(
+        calls.indexOf("result") < calls.indexOf("setup"),
+        "Hunting must lock result state before refreshing setup UI"
+    );
+    assert.equal(manager._run, null, "Hunting retreat should release the finished run after showing its result");
+    console.log("[hunting-retreat-awaits-result-confirmation] ok");
 }
 
 function testHuntingFormatHelpers() {
@@ -9854,25 +9956,28 @@ function testHuntingStartFloorBattleAppliesStatAllocation(app) {
 }
 
 function testHuntingActiveLocksSetupUi(app) {
-    const previousRun = app.hunting._run;
-    const previousTournament = app.tournament;
-
     try {
-        app.tournament = null;
-        app.hunting._run = { status: "active" };
+        app.returnToInitialState();
+        app.beginGameSession();
         app.refreshPlayerSetup();
 
-        assert.equal(app._modeSegment.visible, false, "Hunting in progress should hide the mode selector");
-        assert.equal(app._modeSegment.locked, true, "Hunting in progress should lock the mode selector");
-        assert.equal(app._panel.locked, true, "Hunting in progress should lock stat allocation");
-        assert.equal(app._startBtn.hidden, true, "Hunting in progress should hide the start button");
-    } finally {
-        app.tournament = previousTournament;
-        app.hunting._run = previousRun;
+        assert.equal(app._modeSegment.visible, false, "Gameplay should hide the mode selector");
+        assert.equal(app._modeSegment.locked, true, "Gameplay should lock the mode selector");
+        assert.equal(app._panel.locked, true, "Gameplay should lock stat allocation");
+        assert.equal(app._startBtn.hidden, true, "Gameplay should hide the start button");
+
+        app.beginResultConfirmation();
+        app._startBtn.hidden = false;
         app.refreshPlayerSetup();
+        assert.equal(app._modeSegment.visible, false, "Result confirmation should keep the mode selector hidden");
+        assert.equal(app._modeSegment.locked, true, "Result confirmation should keep the mode selector locked");
+        assert.equal(app._panel.locked, true, "Result confirmation should keep stat allocation locked");
+        assert.equal(app._startBtn.hidden, false, "Result confirmation refresh should keep the confirm button visible");
+    } finally {
+        app.returnToInitialState();
     }
 
-    console.log("[hunting-active-locks-setup-ui] ok");
+    console.log("[game-lifecycle-locks-setup-ui] ok");
 }
 
 // ── Preview reselect tests ─────────────────────────────────────────────────────
@@ -10212,7 +10317,9 @@ testHuntingMerchantPurchaseRefreshesUiState();
 testHuntingMerchantMobileScrollContract();
 testHuntingChestIconReuseContract();
 testHuntingOverlayResetContract();
+testAppLifecycleTransitions();
 testResultConfirmationReturnsInitialState();
+testHuntingRetreatAwaitsResultConfirmation();
 testHuntingFormatHelpers();
 testHuntingCombatText();
 testHuntingLootHud();

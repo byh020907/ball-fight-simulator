@@ -70,6 +70,7 @@ import {
 import { FIGHTER_IDS, Vector2 } from "./core.js";
 import { formatHeroStatLine, formatHeroStatParts, mergeOrbBonuses } from "./entities/heroOrb.js";
 import { Ability } from "./abilities/index.js";
+import { AppLifecycle } from "./appLifecycle.js";
 
 export class BattleApp {
     constructor() {
@@ -95,9 +96,8 @@ export class BattleApp {
         this.playerResult = null;
         this._matchReports = [];
         this._currentTournamentReport = null;
-        this._pickPending = false;
         this._onSimulationResult = null;
-        this._huntingDone = false;
+        this.lifecycle = new AppLifecycle();
         this.hunting = new HuntingManager(this);
         this.renderer = new ArenaRenderer(this.elements.canvas);
         const self = this;
@@ -178,10 +178,15 @@ export class BattleApp {
     resetHuntingUiState() {
         this._overlay.hide();
     }
+    beginGameSession() {
+        this.lifecycle.beginGameplay();
+    }
+    beginResultConfirmation() {
+        this.lifecycle.awaitResultConfirmation();
+    }
     returnToInitialState() {
         cancelAnimationFrame(this.rafId);
-        this._huntingDone = false;
-        this._pickPending = false;
+        this.lifecycle.returnToSetup();
         this._onSimulationResult = null;
         this.matchFinalized = false;
         this.simulation = null;
@@ -213,6 +218,7 @@ export class BattleApp {
 
     setGameMode(mode) {
         if (mode !== "tournament" && mode !== "hunting") return;
+        if (!this.lifecycle.isSetup) return;
         this._gameMode = mode;
         this._modeSegment.mode = mode;
         // 모드 전환 시 새 캐릭터로 랜덤 변경
@@ -241,6 +247,7 @@ export class BattleApp {
     }
 
     canReselectPreviewCharacter() {
+        if (!this.lifecycle.isSetup) return false;
         if (this._previewSim) return false;
         if (this.tournament !== null) return false;
         if (this.simulation && !this.simulation.finished) return false;
@@ -459,13 +466,12 @@ export class BattleApp {
     }
 
     _syncStartButton() {
+        if (!this.lifecycle.isSetup) return;
         const remaining = this._panel.remainingPoints ?? 0;
-        const isChampion = Boolean(this.tournament?.champion);
-        const modeText = this._gameMode === "hunting" ? "사냥터 입장" : "토너먼트 시작";
         this._startBtn.remainingPoints = remaining;
         this._startBtn.setState({
             disabled: remaining > 0,
-            text: isChampion ? "다시 시작" : undefined,
+            text: undefined,
             hidden: false
         });
         this._startBtn.gameMode = this._gameMode;
@@ -509,8 +515,8 @@ export class BattleApp {
         this._panel.allocation = { ...this.playerStatAllocation };
         this._panel.totalPoints = PLAYER_STAT_POINTS;
         this._panel.remainingPoints = remaining;
-        const gameInProgress = Boolean((this.tournament && !this.tournament.champion) || this.hunting.isActive);
-        this._panel.locked = gameInProgress;
+        const setupLocked = this.lifecycle.isSetupInteractionLocked;
+        this._panel.locked = setupLocked;
         this._panel.statDefs = ALLOCATABLE_STATS.map((s) => ({
             key: s.key,
             label: s.label,
@@ -523,13 +529,13 @@ export class BattleApp {
 
         // 모드 세그먼트 동기화
         const canHunt = getEligibleHuntingCharacters(this.playerProfile, this.roster).length > 0;
-        this._modeSegment.visible = !gameInProgress;
+        this._modeSegment.visible = !setupLocked;
         this._modeSegment.mode = this._gameMode;
         this._modeSegment.canHunt = canHunt;
-        this._modeSegment.locked = gameInProgress;
-        this._startBtn.setState({ hidden: gameInProgress });
+        this._modeSegment.locked = setupLocked;
+        this._startBtn.setState({ hidden: this.lifecycle.isGameplayActive });
 
-        if (!gameInProgress) {
+        if (this.lifecycle.isSetup) {
             this._syncStartButton();
             this.startPlayerPreviewLoop();
         }
@@ -739,10 +745,11 @@ export class BattleApp {
     }
 
     async startTournament() {
-        if (this._huntingDone || this._pickPending) {
+        if (this.lifecycle.isAwaitingResultConfirmation) {
             this.returnToInitialState();
             return;
         }
+        if (!this.lifecycle.isSetup) return;
         // Sync allocation from Alpine (user may have clicked +/- buttons there)
         this._syncPlayerStatAllocationFromUi();
 
@@ -755,12 +762,11 @@ export class BattleApp {
         }
 
         this.audio.unlock();
+        this.beginGameSession();
         cancelAnimationFrame(this.rafId);
         this.stopPlayerPreviewLoop();
         this._log.reset();
         this._startBtn.setState({ disabled: true, hidden: true, text: "다시 시작" });
-        this._pickPending = false;
-
         // 연계 효과 계산: 해금된 ID 중 현재 캐릭터가 아닌 효과만 적용
         const masteryCtx = collectActiveEffects(this.playerProfile, this.playerFighterId);
         const adjustedAllocation = { ...this.playerStatAllocation };
@@ -820,7 +826,7 @@ export class BattleApp {
     }
 
     async runNextTournamentMatch() {
-        if (!this.tournament) {
+        if (!this.lifecycle.isGameplayActive || !this.tournament) {
             return;
         }
 
@@ -862,6 +868,7 @@ export class BattleApp {
     }
 
     async startMatch(customMatch = null, options = {}) {
+        const lifecycleRevision = this.lifecycle.revision;
         this.audio.unlock();
         this._startBtn.setState({ disabled: true, hidden: true });
         this._speed.level = 1;
@@ -947,6 +954,7 @@ export class BattleApp {
             const ctrl = fighter.aiController;
             if (ctrl?._chosenAction) {
                 await ctrl.loadRlPolicy(fighter.id);
+                if (!this.lifecycle.isCurrentRevision(lifecycleRevision)) return;
             }
         }
 
@@ -959,6 +967,7 @@ export class BattleApp {
         this._action.current = null;
         if (playerBall) {
             await this._resolveAction(playerBall);
+            if (!this.lifecycle.isCurrentRevision(lifecycleRevision)) return;
         }
 
         // 클릭 핸들러 바인딩
@@ -966,6 +975,7 @@ export class BattleApp {
 
         this.renderer.render(this.simulation);
         await this.wait(1350);
+        if (!this.lifecycle.isCurrentRevision(lifecycleRevision)) return;
 
         this._overlay.hide();
         this._updateStatus(label, "Fight");
@@ -1408,6 +1418,7 @@ export class BattleApp {
         this._matchReports = [];
         this._currentTournamentReport = null;
         this._root.tournamentActive = false;
+        this.beginResultConfirmation();
         this._refreshCollectionHub();
 
         // 승급 안내 메시지
@@ -1440,8 +1451,6 @@ export class BattleApp {
                 : `아쉽네요. 내 캐릭터 ${player.name}의 최종 성적은 ${this.playerResult?.rankLabel ?? "기록 없음"}입니다.`
         );
         this._startBtn.setState({ text: "확인", hidden: false, disabled: false });
-        // 결과 확인 대기 상태
-        this._pickPending = true;
     }
 
     wait(ms) {
