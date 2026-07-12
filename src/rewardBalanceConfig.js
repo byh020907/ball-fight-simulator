@@ -129,7 +129,6 @@ export const REWARD_BALANCE = deepFreeze({
         hpStealCooldown: 2.5
     },
     progression: {
-        masteryThresholds: [1, 5, 15],
         achievementRewards: {
             firstTournamentWin: { type: "SHARDS", amount: 30 },
             flawlessTournament: {
@@ -198,14 +197,26 @@ export const REWARD_BALANCE = deepFreeze({
             tournamentStreak3: { type: "CHEST", rarity: "uncommon" }
         },
         masteryTiers: {
-            damage: [0, 0.03, 0.07, 0.12],
-            incomingKnockbackReduce: [0, 0.04, 0.09, 0.15],
-            outgoingImpactBonus: [0, 0.03, 0.06, 0.1],
+            damage: [0, 0.02, 0.04, 0.06],
+            incomingCollisionDamageReduce: [0, 0.02, 0.04, 0.06],
+            outgoingCollisionDamageBonus: [0, 0.02, 0.04, 0.06],
             velocityRecoveryBonus: [0, 0.03, 0.06, 0.1],
-            rageCollisionDamage: [0, 0.04, 0.08, 0.12],
-            hp: [0, 0.03, 0.07, 0.12],
-            actionHpCostReduction: [0, 0.003, 0.006, 0.01],
-            vampireHpSteal: [0, 0.05, 0.1, 0.15]
+            rageCollisionDamage: [0, 0.03, 0.06, 0.09],
+            hp: [0, 0.02, 0.04, 0.06],
+            actionHpCostReduction: [0, 0.0003, 0.0006, 0.001],
+            abilityCooldownPercent: [0, 0.02, 0.04, 0.06],
+            vampireHpSteal: [0, 0.04, 0.08, 0.12]
+        },
+        masteryCaps: {
+            hp: 0.08,
+            damage: 0.08,
+            defense: 0.08,
+            incomingCollisionDamageReduce: 0.1,
+            outgoingCollisionDamageBonus: 0.08,
+            velocityRecoveryBonus: 0.1,
+            hpCostPercentReduction: 0.001,
+            cooldownPercent: 0.08,
+            minHpCostPercent: 0.001
         }
     }
 });

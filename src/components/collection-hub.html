@@ -432,7 +432,7 @@
                 if (filter === "unplayed") items = items.filter((i) => !i.hasRecord);
                 else if (filter === "played") items = items.filter((i) => i.hasRecord);
                 else if (filter === "won") items = items.filter((i) => i.tournamentWins > 0);
-                else if (filter === "master") items = items.filter((i) => i.mastery >= 3);
+                else if (filter === "master") items = items.filter((i) => i.masteryLevel >= 3);
                 if (sort === "wins") items = items.sort((a, b) => b.tournamentWins - a.tournamentWins);
                 else if (sort === "recent")
                     items = items.sort((a, b) => (b.lastTournamentAt ?? 0) - (a.lastTournamentAt ?? 0));

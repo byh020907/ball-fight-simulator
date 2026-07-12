@@ -27,14 +27,14 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         id: "orbit_lightweight",
         sourceFighterId: "orbit",
         name: "경량 구조",
-        kind: "physics_modifier",
-        description: "받는 명시적 넉백이 {value} 감소합니다.",
-        tierValues: MASTERY_TIERS.incomingKnockbackReduce,
+        kind: "combat_modifier",
+        description: "받는 충돌 피해가 {value} 감소합니다.",
+        tierValues: MASTERY_TIERS.incomingCollisionDamageReduce,
         formatValue(v) {
             return (v * 100).toFixed(0) + "%";
         },
         apply(ctx, level) {
-            ctx.physicsModifiers.incomingKnockbackReduce += this.tierValues[level];
+            ctx.combatModifiers.incomingCollisionDamageReduce += this.tierValues[level];
         }
     },
     {
@@ -55,14 +55,14 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         id: "grenade_heavy_impact",
         sourceFighterId: "grenade",
         name: "중량 충격",
-        kind: "physics_modifier",
-        description: "볼 충돌 시 상대에게 가하는 충격량이 {value} 증가합니다.",
-        tierValues: MASTERY_TIERS.outgoingImpactBonus,
+        kind: "combat_modifier",
+        description: "충돌로 가하는 피해가 {value} 증가합니다.",
+        tierValues: MASTERY_TIERS.outgoingCollisionDamageBonus,
         formatValue(v) {
             return (v * 100).toFixed(0) + "%";
         },
         apply(ctx, level) {
-            ctx.physicsModifiers.outgoingImpactBonus += this.tierValues[level];
+            ctx.combatModifiers.outgoingCollisionDamageBonus += this.tierValues[level];
         }
     },
     {
@@ -92,9 +92,19 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         apply(ctx, level) {
             ctx.combatPassives.push({
                 id: "rage_mastery_passive",
-                type: "periodic_collision_bonus",
                 cooldown: 12,
-                damageBonus: this.tierValues[level]
+                onBeforeFighterCollisionDamage: ({ simulation, attacker, outgoingDamage }) => {
+                    if (outgoingDamage <= 0) return { outgoingDamage, consumed: false };
+                    simulation.spawnActionText(
+                        attacker.position.clone(),
+                        `숙련도 +${(this.tierValues[level] * 100).toFixed(0)}%`,
+                        "#ff4444"
+                    );
+                    return {
+                        outgoingDamage: Math.round(outgoingDamage * (1 + this.tierValues[level])),
+                        consumed: true
+                    };
+                }
             });
         }
     },
@@ -120,7 +130,7 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         description: "클릭 액션 HP 비용이 {value} 감소합니다. (최저 0.1%)",
         tierValues: MASTERY_TIERS.actionHpCostReduction,
         formatValue(v) {
-            return (v * 100).toFixed(1) + "%p";
+            return (v * 100).toFixed(2) + "%p";
         },
         apply(ctx, level) {
             ctx.actionModifiers.hpCostPercentReduction += this.tierValues[level];
@@ -131,14 +141,14 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         id: "hero_inspiring_presence",
         sourceFighterId: "hero",
         name: "고무적인 존재감",
-        kind: "physics_modifier",
-        description: "상대에게 가하는 충격량이 {value} 증가합니다.",
-        tierValues: MASTERY_TIERS.outgoingImpactBonus,
+        kind: "action_modifier",
+        description: "스킬 쿨다운이 {value} 감소합니다.",
+        tierValues: MASTERY_TIERS.abilityCooldownPercent,
         formatValue(v) {
             return (v * 100).toFixed(0) + "%";
         },
         apply(ctx, level) {
-            ctx.physicsModifiers.outgoingImpactBonus += this.tierValues[level];
+            ctx.actionModifiers.cooldownPercent += this.tierValues[level];
         }
     },
     {
@@ -154,9 +164,14 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         apply(ctx, level) {
             ctx.combatPassives.push({
                 id: "vampire_mastery_passive",
-                type: "periodic_collision_bonus",
                 cooldown: 8,
-                damageBonus: 0
+                onAfterFighterCollisionDamage: ({ simulation, attacker, actualOutgoingDamage }) => {
+                    if (actualOutgoingDamage <= 0 || attacker.hp >= attacker.maxHp) return { consumed: false };
+                    const restored = attacker.heal(actualOutgoingDamage * this.tierValues[level]);
+                    if (restored <= 0) return { consumed: false };
+                    simulation.spawnActionText(attacker.position.clone(), `숙련도 +${restored} HP`, "#44cc66");
+                    return { consumed: true };
+                }
             });
         }
     },
@@ -178,14 +193,14 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         id: "phantom_shadow_weave",
         sourceFighterId: "phantom",
         name: "그림자 직조",
-        kind: "physics_modifier",
-        description: "받는 명시적 넉백이 {value} 감소합니다.",
-        tierValues: MASTERY_TIERS.incomingKnockbackReduce,
+        kind: "combat_modifier",
+        description: "받는 충돌 피해가 {value} 감소합니다.",
+        tierValues: MASTERY_TIERS.incomingCollisionDamageReduce,
         formatValue(v) {
             return (v * 100).toFixed(0) + "%";
         },
         apply(ctx, level) {
-            ctx.physicsModifiers.incomingKnockbackReduce += this.tierValues[level];
+            ctx.combatModifiers.incomingCollisionDamageReduce += this.tierValues[level];
         }
     }
 ]);

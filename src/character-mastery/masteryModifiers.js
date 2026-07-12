@@ -6,25 +6,40 @@
 
 import { MASTERY_EFFECT_DEFS } from "./masteryDefinitions.js";
 import { getCharacterMasteryLevel } from "./masteryState.js";
+import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
+
+const MASTERY_CAPS = REWARD_BALANCE.progression.masteryCaps;
 
 function createMasteryContext() {
     return {
         statModifiers: { hp: 0, damage: 0, defense: 0 },
-        physicsModifiers: { incomingKnockbackReduce: 0, outgoingImpactBonus: 0, velocityRecoveryBonus: 0 },
+        physicsModifiers: { velocityRecoveryBonus: 0 },
+        combatModifiers: { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
         combatPassives: [],
-        actionModifiers: { hpCostPercentReduction: 0, minHpCostPercent: 0 }
+        actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0, minHpCostPercent: 0 }
     };
 }
 
 function clampMasteryContext(ctx) {
     const clamp = (val, max) => Math.max(0, Math.min(val, max));
-    ctx.statModifiers.hp = clamp(ctx.statModifiers.hp, 0.12);
-    ctx.statModifiers.damage = clamp(ctx.statModifiers.damage, 0.12);
-    ctx.physicsModifiers.incomingKnockbackReduce = clamp(ctx.physicsModifiers.incomingKnockbackReduce, 0.15);
-    ctx.physicsModifiers.outgoingImpactBonus = clamp(ctx.physicsModifiers.outgoingImpactBonus, 0.1);
-    ctx.physicsModifiers.velocityRecoveryBonus = clamp(ctx.physicsModifiers.velocityRecoveryBonus, 0.1);
-    ctx.actionModifiers.hpCostPercentReduction = clamp(ctx.actionModifiers.hpCostPercentReduction, 0.01);
-    ctx.actionModifiers.minHpCostPercent = Math.max(0.001, ctx.actionModifiers.minHpCostPercent);
+    for (const [stat, value] of Object.entries(ctx.statModifiers)) {
+        ctx.statModifiers[stat] = clamp(value, MASTERY_CAPS[stat]);
+    }
+    for (const [stat, value] of Object.entries(ctx.physicsModifiers)) {
+        ctx.physicsModifiers[stat] = clamp(value, MASTERY_CAPS[stat]);
+    }
+    for (const [stat, value] of Object.entries(ctx.combatModifiers)) {
+        ctx.combatModifiers[stat] = clamp(value, MASTERY_CAPS[stat]);
+    }
+    ctx.actionModifiers.hpCostPercentReduction = clamp(
+        ctx.actionModifiers.hpCostPercentReduction,
+        MASTERY_CAPS.hpCostPercentReduction
+    );
+    ctx.actionModifiers.cooldownPercent = clamp(ctx.actionModifiers.cooldownPercent, MASTERY_CAPS.cooldownPercent);
+    ctx.actionModifiers.minHpCostPercent = Math.max(
+        MASTERY_CAPS.minHpCostPercent,
+        ctx.actionModifiers.minHpCostPercent
+    );
     return ctx;
 }
 
@@ -42,4 +57,25 @@ export function collectActiveEffects(profile, currentPlayerId) {
         def.apply(ctx, level);
     }
     return clampMasteryContext(ctx);
+}
+
+/** 숙련도 합산 결과를 전투용 fighter spec에 적용한다. */
+export function applyMasteryEffectsToFighterSpec(spec, masteryContext) {
+    const statModifiers = masteryContext?.statModifiers ?? {};
+    const stats = Object.fromEntries(
+        Object.entries(spec.stats).map(([stat, value]) => [
+            stat,
+            Number((value * (1 + (statModifiers[stat] ?? 0))).toFixed(3))
+        ])
+    );
+    return {
+        ...spec,
+        stats,
+        mastery: {
+            physics: { ...(masteryContext?.physicsModifiers ?? {}) },
+            combat: { ...(masteryContext?.combatModifiers ?? {}) },
+            action: { ...(masteryContext?.actionModifiers ?? {}) },
+            passives: [...(masteryContext?.combatPassives ?? [])]
+        }
+    };
 }

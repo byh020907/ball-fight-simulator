@@ -35,6 +35,7 @@ import {
 } from "./experience/experienceService.js";
 import {
     collectActiveEffects,
+    applyMasteryEffectsToFighterSpec,
     MASTERY_EFFECT_DEFS,
     advanceCharacterMastery,
     getCharacterChallengeLevel
@@ -784,32 +785,12 @@ export class BattleApp {
             undefined,
             undefined
         );
-        // 플레이어 fighter spec에 숙련도 스탯 보정 적용
+        // 장비 고정 수치를 더한 뒤 숙련도 퍼센트 보정을 마지막으로 적용한다.
         const playerSpec = this.tournamentRoster.find((f) => f.id === this.playerFighterId);
         if (playerSpec) {
-            if (masteryCtx.statModifiers.hp > 0) {
-                const hpBonus = 1 + masteryCtx.statModifiers.hp;
-                playerSpec.stats.hp = Math.round(playerSpec.stats.hp * hpBonus);
-            }
-            if (masteryCtx.statModifiers.damage > 0) {
-                playerSpec.stats.damage = Math.round(playerSpec.stats.damage * (1 + masteryCtx.statModifiers.damage));
-            }
-            if (masteryCtx.statModifiers.defense > 0) {
-                playerSpec.stats.defense = Number(
-                    (playerSpec.stats.defense * (1 + masteryCtx.statModifiers.defense)).toFixed(3)
-                );
-            }
-            // 전투 시 physics/action modifier 전달
-            playerSpec.mastery = {};
-            playerSpec.mastery.physics = { ...masteryCtx.physicsModifiers };
-            playerSpec.mastery.action = { ...masteryCtx.actionModifiers };
-            playerSpec.mastery.passives = [...masteryCtx.combatPassives];
-        }
-
-        if (playerSpec) {
             const equippedSpec = applyEquipmentStats(playerSpec, this.playerProfile);
-            playerSpec.stats = equippedSpec.stats;
-            playerSpec.equipment = equippedSpec.equipment;
+            const masteredSpec = applyMasteryEffectsToFighterSpec(equippedSpec, masteryCtx);
+            Object.assign(playerSpec, masteredSpec);
         }
         this.matchmaker = new Matchmaker(this.tournamentRoster);
         this.playerResult = null;

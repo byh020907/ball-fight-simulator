@@ -276,11 +276,26 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         const { a, b, normal, contactPoint, aModifiers, bModifiers } = context;
         this._resetAntiStallTimerForFighterCollision();
 
+        const aCollisionEffects = a.getActiveMasteryCollisionEffects?.() ?? [];
+        const bCollisionEffects = b.getActiveMasteryCollisionEffects?.() ?? [];
+        context.masteryEffectsByAttacker = new Map([
+            [a, aCollisionEffects],
+            [b, bCollisionEffects]
+        ]);
+
         let damageFromAToB = this.calculateCollisionDamageWithContact(a, b, normal, contactPoint) * aModifiers.damage;
         let damageFromBToA =
             this.calculateCollisionDamageWithContact(b, a, normal.clone().scale(-1), contactPoint) * bModifiers.damage;
-
-        [damageFromAToB, damageFromBToA] = this._applyMasteryCollisionPassives(a, b, damageFromAToB, damageFromBToA);
+        damageFromAToB = this._applyMasteryBeforeCollisionDamageEffects(aCollisionEffects, {
+            attacker: a,
+            defender: b,
+            outgoingDamage: damageFromAToB
+        });
+        damageFromBToA = this._applyMasteryBeforeCollisionDamageEffects(bCollisionEffects, {
+            attacker: b,
+            defender: a,
+            outgoingDamage: damageFromBToA
+        });
 
         const aCollision = a.actionContext.onFighterCollision(a, b, damageFromAToB, damageFromBToA, this);
         damageFromAToB = aCollision.outgoingDamage;
@@ -308,7 +323,10 @@ export class BattleSimulation extends FighterPhysicsSimulation {
 
     finalizeFighterPhysicsCollision(context) {
         try {
-            if (context.hostile) this._applyCollisionHpSteal(context);
+            if (context.hostile) {
+                this._applyMasteryAfterCollisionDamageEffects(context);
+                this._applyCollisionHpSteal(context);
+            }
         } finally {
             if (this._activeFighterCollisionContext === context) {
                 this._activeFighterCollisionContext = null;
@@ -319,7 +337,15 @@ export class BattleSimulation extends FighterPhysicsSimulation {
     modifyFighterCollisionDamage(amount, source, target) {
         const context = this._activeFighterCollisionContext;
         if (!context || !this._isFighterCollisionPair(context, source, target)) return amount;
-        return amount * (source.equipmentEffects?.crashDamageMultiplier ?? 1);
+        const equipmentMultiplier = source.equipmentEffects?.crashDamageMultiplier ?? 1;
+        const masteryMultiplier = 1 + (source.mastery.combat?.outgoingCollisionDamageBonus ?? 0);
+        return amount * equipmentMultiplier * masteryMultiplier;
+    }
+
+    modifyIncomingFighterCollisionDamage(amount, source, target) {
+        const context = this._activeFighterCollisionContext;
+        if (!context || !this._isFighterCollisionPair(context, source, target)) return amount;
+        return amount * (1 - (target.mastery.combat?.incomingCollisionDamageReduce ?? 0));
     }
 
     recordFighterCollisionDamage(source, target, actualDamage) {
@@ -350,13 +376,8 @@ export class BattleSimulation extends FighterPhysicsSimulation {
 
     getFighterCollisionResponseOptions(context) {
         const { a, b, aModifiers, bModifiers } = context;
-        const aOutgoingBonus = 1 + (a.mastery.physics?.outgoingImpactBonus ?? 0);
-        const bOutgoingBonus = 1 + (b.mastery.physics?.outgoingImpactBonus ?? 0);
-        const aIncomingReduce = 1 - (a.mastery.physics?.incomingKnockbackReduce ?? 0);
-        const bIncomingReduce = 1 - (b.mastery.physics?.incomingKnockbackReduce ?? 0);
-
-        const impactA = (aModifiers.impact ?? 1) * aOutgoingBonus * bIncomingReduce;
-        const impactB = (bModifiers.impact ?? 1) * bOutgoingBonus * aIncomingReduce;
+        const impactA = aModifiers.impact ?? 1;
+        const impactB = bModifiers.impact ?? 1;
         return {
             impactA,
             impactB,
@@ -408,19 +429,29 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         }
     }
 
-    /** 숙련도 충돌 패시브: 주기적 충돌 피해 보너스 적용 */
-    _applyMasteryCollisionPassives(a, b, damageFromAToB, damageFromBToA) {
-        const aPassiveBonus = a.consumeMasteryCollisionBonus?.() ?? 0;
-        const bPassiveBonus = b.consumeMasteryCollisionBonus?.() ?? 0;
-        if (aPassiveBonus > 0) {
-            damageFromAToB = Math.round(damageFromAToB * (1 + aPassiveBonus));
-            this.spawnActionText(a.position.clone(), `숙련도 +${(aPassiveBonus * 100).toFixed(0)}%`, "#ff4444");
+    _applyMasteryBeforeCollisionDamageEffects(effects, payload) {
+        return effects.reduce((outgoingDamage, effect) => {
+            if (typeof effect.onBeforeFighterCollisionDamage !== "function") return outgoingDamage;
+            const result = effect.onBeforeFighterCollisionDamage({ ...payload, simulation: this, outgoingDamage });
+            if (result?.consumed) effect.active = false;
+            return result?.outgoingDamage ?? outgoingDamage;
+        }, payload.outgoingDamage);
+    }
+
+    _applyMasteryAfterCollisionDamageEffects(context) {
+        for (const attacker of [context.a, context.b]) {
+            const actualOutgoingDamage = context.damageByAttacker.get(attacker) ?? 0;
+            const effects = context.masteryEffectsByAttacker?.get(attacker) ?? [];
+            for (const effect of effects) {
+                if (typeof effect.onAfterFighterCollisionDamage !== "function") continue;
+                const result = effect.onAfterFighterCollisionDamage({
+                    simulation: this,
+                    attacker,
+                    actualOutgoingDamage
+                });
+                if (result?.consumed) effect.active = false;
+            }
         }
-        if (bPassiveBonus > 0) {
-            damageFromBToA = Math.round(damageFromBToA * (1 + bPassiveBonus));
-            this.spawnActionText(b.position.clone(), `숙련도 +${(bPassiveBonus * 100).toFixed(0)}%`, "#ff4444");
-        }
-        return [damageFromAToB, damageFromBToA];
     }
 
     _handleDashCollisions(a, b, contactPoint) {

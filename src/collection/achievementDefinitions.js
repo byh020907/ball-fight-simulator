@@ -7,22 +7,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { getActionPool } from "../clickActions.js";
-import { MASTERY_THRESHOLDS } from "./collectionViewModel.js";
+import { getCharacterMasteryLevel } from "../character-mastery/index.js";
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 
 const ACHIEVEMENT_REWARDS = REWARD_BALANCE.progression.achievementRewards;
-
-/**
- * 숙련도 계산 (collection-view-model.js와 동일한 로직)
- * @param {number} tournamentWins
- * @returns {number} 0-3
- */
-function getMasteryLevel(tournamentWins) {
-    if (tournamentWins >= MASTERY_THRESHOLDS[2]) return 3;
-    if (tournamentWins >= MASTERY_THRESHOLDS[1]) return 2;
-    if (tournamentWins >= MASTERY_THRESHOLDS[0]) return 1;
-    return 0;
-}
 
 /**
  * @typedef {object} AchievementContext
@@ -149,10 +137,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         description: "모든 캐릭터의 숙련도를 3단계까지 달성하세요.",
         tier: "gold",
         evaluate(context) {
-            return context.roster.every((fighter) => {
-                const wins = context.profile.collection.characters[fighter.id]?.tournamentWins ?? 0;
-                return getMasteryLevel(wins) >= 3;
-            });
+            return context.roster.every((fighter) => getCharacterMasteryLevel(context.profile, fighter.id) >= 3);
         },
         reward: {
             ...ACHIEVEMENT_REWARDS.masteryComplete

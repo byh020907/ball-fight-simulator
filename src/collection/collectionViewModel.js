@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { formatAchievementReward } from "./achievementRewards.js";
-import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
+import { getCharacterMasteryLevel } from "../character-mastery/index.js";
 import { getCharacterExperienceSummary } from "../experience/experienceService.js";
 import { canOpenHuntingChest, previewHuntingChest } from "../hunting/index.js";
 import {
@@ -28,7 +28,6 @@ import {
     ENHANCE_MAX_LEVEL
 } from "../hunting/equipmentConfig.js";
 
-export const MASTERY_THRESHOLDS = REWARD_BALANCE.progression.masteryThresholds;
 export const COLLECTION_HUB_TABS = Object.freeze([
     { id: "roster", label: "도감" },
     { id: "mastery", label: "숙련도" },
@@ -36,28 +35,6 @@ export const COLLECTION_HUB_TABS = Object.freeze([
     { id: "storage", label: "보관함" },
     { id: "equipment", label: "장비" }
 ]);
-
-/** 숙련도 계산 */
-export function getMasteryLevel(tournamentWins) {
-    if (tournamentWins >= MASTERY_THRESHOLDS[2]) return 3;
-    if (tournamentWins >= MASTERY_THRESHOLDS[1]) return 2;
-    if (tournamentWins >= MASTERY_THRESHOLDS[0]) return 1;
-    return 0;
-}
-
-export function getNextMasteryThreshold(currentLevel) {
-    if (currentLevel >= 3) return null;
-    return MASTERY_THRESHOLDS[currentLevel];
-}
-
-export function getMasteryProgress(tournamentWins) {
-    const level = getMasteryLevel(tournamentWins);
-    if (level >= 3) return 1;
-    const nextThreshold = MASTERY_THRESHOLDS[level];
-    if (level === 0) return Math.min(1, tournamentWins / nextThreshold);
-    const prevThreshold = MASTERY_THRESHOLDS[level - 1];
-    return (tournamentWins - prevThreshold) / (nextThreshold - prevThreshold);
-}
 
 /**
  * 컬렉션 허브 ViewModel 생성.
@@ -71,7 +48,6 @@ export function createCollectionHubViewModel({
     currentPlayerFighterId = null
 } = {}) {
     const rosterSize = roster.length;
-    const masteryLevels = profile?.characterMastery?.levels ?? {};
     const characters = profile?.collection?.characters ?? {};
     const careerStats = profile?.collection?.careerStats ?? {};
     const hunting = profile?.hunting ?? {};
@@ -80,9 +56,8 @@ export function createCollectionHubViewModel({
     const rosterItems = roster.map((fighter) => {
         const record = characters[fighter.id] || {};
         const tournamentWins = record.tournamentWins ?? 0;
-        const mastery = getMasteryLevel(tournamentWins);
         const hasRecord = record.tournamentsCompleted > 0;
-        const masteryLevel = masteryLevels[fighter.id] ?? 0;
+        const masteryLevel = getCharacterMasteryLevel(profile, fighter.id);
         const masteryUnlocked = masteryLevel > 0;
         const masteryActive = masteryUnlocked && fighter.id !== currentPlayerFighterId;
         const isCurrent = fighter.id === currentPlayerFighterId;
@@ -102,9 +77,6 @@ export function createCollectionHubViewModel({
             comebackMatchWins: record.comebackMatchWins ?? 0,
             firstTournamentAt: record.firstTournamentAt ?? null,
             lastTournamentAt: record.lastTournamentAt ?? null,
-            mastery,
-            masteryProgress: getMasteryProgress(tournamentWins),
-            nextMasteryThreshold: getNextMasteryThreshold(mastery),
             isCurrent,
             masteryLevel,
             masteryUnlocked,
@@ -122,7 +94,7 @@ export function createCollectionHubViewModel({
 
     // 숙련도 항목
     const masteryItems = masteryDefinitions.map((def) => {
-        const level = masteryLevels[def.sourceFighterId] ?? 0;
+        const level = getCharacterMasteryLevel(profile, def.sourceFighterId);
         const unlocked = level > 0;
         const isSelf = def.sourceFighterId === currentPlayerFighterId;
         const active = unlocked && !isSelf;
@@ -136,7 +108,7 @@ export function createCollectionHubViewModel({
             description: def.description,
             tierValues: def.tierValues,
             formatValue: def.formatValue,
-            level: masteryLevels[def.sourceFighterId] ?? 0,
+            level,
             unlocked,
             isSelf,
             active,
@@ -224,7 +196,7 @@ export function createCollectionHubViewModel({
     const maxLevels = rosterItems.length * 3;
     const unlockedMastery = masteryItems.filter((item) => item.unlocked).length;
     const unlockedAchievements = achievementItems.filter((item) => item.unlocked).length;
-    const masteryTotal = rosterItems.reduce((sum, item) => sum + item.mastery, 0);
+    const masteryTotal = cumulativeLevels;
 
     return {
         rosterSize,

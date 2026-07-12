@@ -85,13 +85,11 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         this.stats.mass = this.mass;
         this._equipmentEffectCooldowns = { hpSteal: 0 };
         this.mastery = {
-            physics: spec.mastery?.physics ?? {
-                incomingKnockbackReduce: 0,
-                outgoingImpactBonus: 0,
-                velocityRecoveryBonus: 0
-            },
+            physics: spec.mastery?.physics ?? { velocityRecoveryBonus: 0 },
+            combat: spec.mastery?.combat ?? { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
             action: spec.mastery?.action ?? {
                 hpCostPercentReduction: 0,
+                cooldownPercent: 0,
                 minHpCostPercent: 0
             },
             passives: spec.mastery?.passives ?? [],
@@ -372,17 +370,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
     }
 
     _tickMasteryPassives(delta) {
-        if (!this.mastery._states) {
-            this.mastery._states = this.mastery.passives.map((def) => ({
-                id: def.id,
-                type: def.type,
-                damageBonus: def.damageBonus ?? 0,
-                cooldownRemaining: 0,
-                cooldownDuration: def.cooldown ?? 0,
-                active: false
-            }));
-        }
-        for (const state of this.mastery._states) {
+        for (const state of this._getMasteryPassiveStates()) {
             if (state.active) continue;
             state.cooldownRemaining -= delta;
             if (state.cooldownRemaining <= 0) {
@@ -392,15 +380,21 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         }
     }
 
-    /** 충돌 시 숙련도 패시브 적용. 충돌 핸들러에서 호출. */
-    consumeMasteryCollisionBonus() {
-        let bonus = 0;
-        for (const state of this.mastery._states ?? []) {
-            if (!state.active || state.type !== "periodic_collision_bonus") continue;
-            bonus += state.damageBonus;
-            state.active = false;
+    _getMasteryPassiveStates() {
+        if (!this.mastery._states) {
+            this.mastery._states = this.mastery.passives.map((effect) => ({
+                ...effect,
+                cooldownRemaining: 0,
+                cooldownDuration: effect.cooldown ?? 0,
+                active: false
+            }));
         }
-        return bonus;
+        return this.mastery._states;
+    }
+
+    /** 다음 적대 전투원 충돌에 사용할 준비된 숙련도 효과를 반환한다. */
+    getActiveMasteryCollisionEffects() {
+        return this._getMasteryPassiveStates().filter((effect) => effect.active);
     }
 
     _tickTimers(delta) {
@@ -440,6 +434,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         const sim = source?.simulation ?? this.simulation;
         amount = sim?.modifyFighterCollisionDamage?.(amount, source, this, label) ?? amount;
         amount = this.actionContext.onDamageTaken(amount, source, label);
+        amount = sim?.modifyIncomingFighterCollisionDamage?.(amount, source, this, label) ?? amount;
         const abilityDefMult = this.getStatModifiers().defense;
         const totalDefense = Math.round(this.stats.baseDefense * abilityDefMult);
         const hpBefore = this.hp;

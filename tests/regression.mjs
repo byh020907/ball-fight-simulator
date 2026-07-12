@@ -6671,6 +6671,23 @@ async function testEvaluateAchievements() {
         results8.some((r) => r.id === "single_hit_monster"),
         "single_hit_monster should unlock at 150 maxHitDamage"
     );
+
+    const masteryComplete = ACHIEVEMENT_DEFINITIONS.find((achievement) => achievement.id === "mastery_complete");
+    const masteryProfile = createDefaultPlayerProfile();
+    for (const fighter of roster) {
+        masteryProfile.collection.characters[fighter.id] = { tournamentWins: 99 };
+    }
+    assert.equal(
+        masteryComplete.evaluate({ profile: masteryProfile, roster }),
+        false,
+        "mastery_complete should not use obsolete tournament win thresholds"
+    );
+    masteryProfile.characterMastery.levels = Object.fromEntries(roster.map((fighter) => [fighter.id, 3]));
+    assert.equal(
+        masteryComplete.evaluate({ profile: masteryProfile, roster }),
+        true,
+        "mastery_complete should require every stored mastery tier to be GOLD"
+    );
 }
 
 async function testApplyAchievementRewards() {
@@ -7041,21 +7058,27 @@ async function testMasteryModifiersStoredOnBattleBall(app) {
         stats: { hp: 1000, damage: 50, speed: 200, defense: 5, radius: 16, mass: 10 },
         statAllocation: null,
         mastery: {
-            physics: {
-                incomingKnockbackReduce: 0.05,
-                outgoingImpactBonus: 0.03,
-                velocityRecoveryBonus: 0.02
-            },
-            action: { hpCostPercentReduction: 0.003, minHpCostPercent: 0.001 },
+            physics: { velocityRecoveryBonus: 0.02 },
+            combat: { incomingCollisionDamageReduce: 0.05, outgoingCollisionDamageBonus: 0.03 },
+            action: { hpCostPercentReduction: 0.0003, cooldownPercent: 0.02, minHpCostPercent: 0.001 },
             passives: [{ id: "test_passive", type: "periodic_collision_bonus", cooldown: 12, damageBonus: 0.04 }]
         }
     };
 
     const ball = new BattleBall(spec, new Vector2(100, 100));
-    assert.equal(ball.mastery.physics.incomingKnockbackReduce, 0.05, "incomingKnockbackReduce should be stored");
-    assert.equal(ball.mastery.physics.outgoingImpactBonus, 0.03, "outgoingImpactBonus should be stored");
     assert.equal(ball.mastery.physics.velocityRecoveryBonus, 0.02, "velocityRecoveryBonus should be stored");
-    assert.equal(ball.mastery.action.hpCostPercentReduction, 0.003, "hpCostPercentReduction should be stored");
+    assert.equal(
+        ball.mastery.combat.incomingCollisionDamageReduce,
+        0.05,
+        "incomingCollisionDamageReduce should be stored"
+    );
+    assert.equal(
+        ball.mastery.combat.outgoingCollisionDamageBonus,
+        0.03,
+        "outgoingCollisionDamageBonus should be stored"
+    );
+    assert.equal(ball.mastery.action.hpCostPercentReduction, 0.0003, "hpCostPercentReduction should be stored");
+    assert.equal(ball.mastery.action.cooldownPercent, 0.02, "cooldownPercent should be stored");
     assert.equal(ball.mastery.action.minHpCostPercent, 0.001, "minHpCostPercent should be stored");
     assert.equal(ball.mastery.passives.length, 1, "combat passives should be stored");
     assert.equal(ball.mastery.passives[0].id, "test_passive", "passive id should match");
@@ -7074,9 +7097,10 @@ async function testStatModifierDamageIndependentOfHp() {
     const ctx = {
         statModifiers: { hp: 0, damage: 0, defense: 0 },
         allocationModifiers: { extraStatPoints: 0, balanceTolerance: 0, perStatCapBonus: 0 },
-        physicsModifiers: { incomingKnockbackReduce: 0, outgoingImpactBonus: 0, velocityRecoveryBonus: 0 },
+        physicsModifiers: { velocityRecoveryBonus: 0 },
+        combatModifiers: { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
         combatPassives: [],
-        actionModifiers: { hpCostPercentReduction: 0, minHpCostPercent: 0 }
+        actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0, minHpCostPercent: 0 }
     };
 
     archerDef.apply(ctx, 1); // BRONZE level
@@ -7093,6 +7117,120 @@ async function testStatModifierDamageIndependentOfHp() {
     const damageAfterEater = ctx.statModifiers.damage;
     eaterDef.apply(ctx, 1); // 두 번 호출해도 damage는 eater가 올리지 않음
     assert.equal(ctx.statModifiers.damage, damageAfterEater, "Eater mastery should NOT increase damage");
+}
+
+async function testMasteryEffectsApplyAfterFixedStats() {
+    const { applyMasteryEffectsToFighterSpec } = await import("../src/character-mastery/index.js");
+    const spec = {
+        id: "standard",
+        stats: { hp: 120, damage: 11, defense: 2, speed: 300, radius: 50, mass: 1 }
+    };
+    const mastery = {
+        statModifiers: { hp: 0.06, damage: 0.06, defense: 0 },
+        physicsModifiers: { velocityRecoveryBonus: 0.1 },
+        combatModifiers: { incomingCollisionDamageReduce: 0.06, outgoingCollisionDamageBonus: 0.06 },
+        actionModifiers: { hpCostPercentReduction: 0.001, cooldownPercent: 0.06, minHpCostPercent: 0.001 },
+        combatPassives: []
+    };
+
+    const result = applyMasteryEffectsToFighterSpec(spec, mastery);
+    assert.equal(result.stats.hp, 127.2, "Mastery HP percent should apply to the completed fixed-stat value");
+    assert.equal(result.stats.damage, 11.66, "Mastery damage percent should preserve fractional final values");
+    assert.equal(spec.stats.damage, 11, "Mastery application should not mutate the input spec");
+    assert.equal(result.mastery.combat.incomingCollisionDamageReduce, 0.06, "Combat modifier should reach the spec");
+}
+
+async function testVampireMasteryRestoresCollisionDamage() {
+    const { MASTERY_EFFECT_DEFS } = await import("../src/character-mastery/index.js");
+    const vampire = MASTERY_EFFECT_DEFS.find((definition) => definition.sourceFighterId === "vampire");
+    const ctx = {
+        statModifiers: { hp: 0, damage: 0, defense: 0 },
+        physicsModifiers: { velocityRecoveryBonus: 0 },
+        combatModifiers: { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
+        combatPassives: [],
+        actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0, minHpCostPercent: 0 }
+    };
+    vampire.apply(ctx, 3);
+
+    const effect = ctx.combatPassives[0];
+    const attacker = {
+        hp: 50,
+        maxHp: 100,
+        position: { clone: () => ({}) },
+        heal(amount) {
+            const restored = Math.min(amount, this.maxHp - this.hp);
+            this.hp += restored;
+            return restored;
+        }
+    };
+    const result = effect.onAfterFighterCollisionDamage({
+        simulation: { spawnActionText() {} },
+        attacker,
+        actualOutgoingDamage: 25
+    });
+    assert.equal(attacker.hp, 53, "GOLD vampire mastery should restore 12% of actual collision damage");
+    assert.ok(result.consumed, "Successful collision restoration should consume the ready mastery effect");
+}
+
+async function testMasteryCombatModifiersApplyAtFinalDamageStage() {
+    const { BattleBall } = await import("../src/entities/index.js");
+    const { Vector2 } = await import("../src/core.js");
+    const calls = [];
+    const target = new BattleBall(
+        {
+            id: "target",
+            teamId: "target",
+            name: "Target",
+            title: "",
+            description: "",
+            color: "#ffffff",
+            face: "default",
+            ability: "none",
+            stats: { hp: 500, damage: 10, speed: 300, defense: 0, radius: 50, mass: 1 },
+            mastery: {
+                combat: { incomingCollisionDamageReduce: 0.1, outgoingCollisionDamageBonus: 0 }
+            }
+        },
+        new Vector2(100, 100)
+    );
+    const simulation = {
+        modifyFighterCollisionDamage(amount) {
+            calls.push("equipment");
+            return amount * 1.2;
+        },
+        modifyIncomingFighterCollisionDamage(amount) {
+            calls.push("mastery");
+            return amount * 0.9;
+        },
+        spawnDamageNumber() {},
+        recordFighterCollisionDamage() {}
+    };
+
+    const result = target.takeDamage(100, { id: "source", simulation }, "Crash");
+    assert.deepEqual(calls, ["equipment", "mastery"], "Mastery reduction should follow equipment collision damage");
+    assert.equal(result.actualDamage, 108, "Mastery reduction should apply to the completed collision damage amount");
+}
+
+async function testMasteryCombatAndCooldownDefinitions() {
+    const { MASTERY_EFFECT_DEFS } = await import("../src/character-mastery/index.js");
+    const ctx = {
+        statModifiers: { hp: 0, damage: 0, defense: 0 },
+        physicsModifiers: { velocityRecoveryBonus: 0 },
+        combatModifiers: { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
+        combatPassives: [],
+        actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0, minHpCostPercent: 0 }
+    };
+
+    MASTERY_EFFECT_DEFS.find((definition) => definition.sourceFighterId === "grenade").apply(ctx, 3);
+    MASTERY_EFFECT_DEFS.find((definition) => definition.sourceFighterId === "hero").apply(ctx, 3);
+    MASTERY_EFFECT_DEFS.find((definition) => definition.sourceFighterId === "bat_ball").apply(ctx, 3);
+    assert.equal(
+        ctx.combatModifiers.outgoingCollisionDamageBonus,
+        0.06,
+        "Grenade mastery should add final collision damage"
+    );
+    assert.equal(ctx.actionModifiers.cooldownPercent, 0.06, "Hero mastery should reduce ability cooldowns");
+    assert.equal(ctx.actionModifiers.hpCostPercentReduction, 0.001, "Bat mastery should reduce action cost by 0.10%p");
 }
 
 // ── Dynamic bonus computation test ──────────────────────────────────────────
@@ -7196,6 +7334,7 @@ async function testCreateCollectionHubViewModel() {
     assert.equal(archerItem.experienceTotalXp, 135, "Roster item should expose character XP");
     assert.equal(archerItem.experienceLevel, 2, "Roster item should expose character XP level");
     assert.ok(archerItem.experienceProgressPct > 0, "Roster item should expose XP progress");
+    assert.equal(archerItem.masteryLevel, 0, "Tournament wins alone should not advance mastery UI progress");
     assert.equal(vm2.storage.shards, 50, "Collection hub should expose hunting key shards");
     assert.equal(vm2.storage.chests.length, 1, "Collection hub should expose hunting chests");
     assert.equal(vm2.storage.chests[0].canOpen, true, "Collection hub should mark openable chests");
@@ -7214,6 +7353,7 @@ async function testCreateCollectionHubViewModel() {
     assert.ok(arcMastery.unlocked, "Archer mastery should be unlocked");
     assert.ok(arcMastery.isSelf, "Archer mastery should be marked as self");
     assert.equal(arcMastery.level, 1, "Archer mastery level should be 1");
+    assert.equal(vm3.summary.masteryTotal, 6, "Mastery total should sum stored mastery tiers");
 }
 
 const app = await loadModuleApp();
@@ -7397,6 +7537,10 @@ await testAdjustStatWithBonusTotal();
 // Mastery modifier tests
 await testMasteryModifiersStoredOnBattleBall(app);
 await testStatModifierDamageIndependentOfHp();
+await testMasteryEffectsApplyAfterFixedStats();
+await testVampireMasteryRestoresCollisionDamage();
+await testMasteryCombatModifiersApplyAtFinalDamageStage();
+await testMasteryCombatAndCooldownDefinitions();
 // Dynamic bonus computation test
 // ── New character tests ──────────────────────────────────────────────────────
 
