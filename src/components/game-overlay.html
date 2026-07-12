@@ -84,7 +84,7 @@
             <strong x-text="huntingChestTitle"></strong>
             <span x-text="huntingChestSubtext"></span>
             <span class="hunting-chest-loot" x-text="huntingLootSummary"></span>
-            <button class="hunting-btn advance" type="button" @click="huntingChestContinue()">계속 전진</button>
+            <button class="hunting-btn advance" type="button" @click="huntingChestContinue()" x-text="huntingChestConfirmLabel || '계속 전진'"></button>
         </div>
     </div>
     <div
@@ -125,6 +125,7 @@
         huntingChestRarity: "common",
         huntingChestTitle: "",
         huntingChestSubtext: "",
+        huntingChestConfirmLabel: "",
         huntingLootHudVisible: false,
         huntingLootHudShards: 0,
         huntingLootHudChests: 0,
@@ -186,6 +187,7 @@
             this.huntingChestRarity = "common";
             this.huntingChestTitle = "";
             this.huntingChestSubtext = "";
+            this.huntingChestConfirmLabel = "";
             this.huntingLootHudVisible = false;
             this.huntingLootHudShards = 0;
             this.huntingLootHudChests = 0;
@@ -216,6 +218,7 @@
             if (data.huntingChestRarity !== undefined) this.huntingChestRarity = data.huntingChestRarity;
             if (data.huntingChestTitle !== undefined) this.huntingChestTitle = data.huntingChestTitle;
             if (data.huntingChestSubtext !== undefined) this.huntingChestSubtext = data.huntingChestSubtext;
+            if (data.huntingChestConfirmLabel !== undefined) this.huntingChestConfirmLabel = data.huntingChestConfirmLabel;
             if (data.huntingLootHudVisible !== undefined) this.huntingLootHudVisible = data.huntingLootHudVisible;
             if (data.huntingLootHudShards !== undefined) this.huntingLootHudShards = data.huntingLootHudShards;
             if (data.huntingLootHudChests !== undefined) this.huntingLootHudChests = data.huntingLootHudChests;

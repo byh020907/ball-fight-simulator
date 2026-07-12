@@ -1,5 +1,17 @@
 # 결정 기록
 
+## [L1] 2026-07-12 — 전투 보상 상자는 확인 후 승리 결과로 전이
+- 맥락: 전투 승리 시 상자가 드롭되면 텍스트 전리품 요약만 보여서 사용자가 상자 획득을 인지하기 어려웠음.
+- 결정:
+  (1) `HUNTING_RUN_PHASES`에 `AWAITING_COMBAT_REWARD_CHEST` 추가 — 상자방 `AWAITING_CHEST`와 구별.
+  (2) `_handleFinish`에서 상자 드롭 시 승리 화면 대신 `_presentCombatRewardChest`로 상자 UI 먼저 표시.
+  (3) `HUNTING_CHEST_CONTINUE_HANDLERS` 매핑으로 phase별 handler 분리: `AWAITING_CHEST` → `_continueChestRoom`(advance), `AWAITING_COMBAT_REWARD_CHEST` → `_continueCombatRewardChest`(승리/스테이지 클리어).
+  (4) 승리 표현 `_presentNormalCombatWin`, `_presentFinalBossClear`로 분리.
+  (5) `huntingChestConfirmLabel` 상태 추가, 버튼은 `x-text`로 동적 표시. 상자방은 `계속 전진`, 전투 보상은 `확인`.
+  (6) 기존 `chestContinue()`에서 조건문 대신 phase 매핑으로 dispatch.
+- 영향: `huntingState.js`, `huntingManager.js`, `game-overlay.html`, `tests/regression.mjs`, `docs/hunting-grounds-system.md`, `src/patchNotes.js`, `index.html`, `SESSION-HANDOFF.md`
+- 검증: `npm test`, `npm run format:check`, `git diff --check`, `node scripts/huntingUserScenario.mjs`
+
 ## [L1] 2026-07-12 — 거너 숙련도 각충격→중량 장전 교체, 각충격은 스피너 볼 전용으로 비움
 - 맥락: Codex 요청으로 미래 추가 캐릭터 Spinner Ball이 유일하게 충돌 각충격 보정을 소유하도록 결정. 거너용 각충격 숙련도와 동일 보정이 겹쳐 정체성 충돌 발생.
 - 결정: 거너 숙련도를 `반동 증폭`(충돌 각충격 +5/10/15%)에서 `중량 장전`(질량 +2/4/6%)으로 교체. 질량 보정은 `statModifiers.mass`로 fighter spec에 최종 퍼센트 보정. BattleBall에서 장비 중량의 massMultiplier와 곱으로 결합(`baseMass * masteryMultiplier * equipmentMultiplier`). 충돌 각충격 숙련도 키(collisionAngularImpulse)와 거너 전용 각충격 코드 제거. 장비 angularImpulse/collisionAngularMultiplier는 기존 장비 효과로 유지.

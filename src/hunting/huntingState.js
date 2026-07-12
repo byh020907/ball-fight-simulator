@@ -14,6 +14,7 @@ export const HUNTING_RUN_PHASES = Object.freeze({
     AWAITING_CHOICE: "awaiting_choice",
     AWAITING_MERCHANT: "awaiting_merchant",
     AWAITING_CHEST: "awaiting_chest",
+    AWAITING_COMBAT_REWARD_CHEST: "awaiting_combat_reward_chest",
     COMBAT: "combat",
     FINISHED: "finished"
 });

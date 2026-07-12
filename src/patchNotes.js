@@ -19,6 +19,25 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.24.49",
+        date: "2026-07-12",
+        title: "v0.24.49 전투 보상 상자를 확인한 뒤 승리 결과로 넘어갑니다",
+        changes: [
+            {
+                type: "feature",
+                text: "전투 승리로 상자가 드롭되면 승리 화면 대신 먼저 상자 UI를 표시합니다. 확인을 누른 뒤에야 일반 승리 또는 스테이지 클리어 결과로 진행됩니다."
+            },
+            {
+                type: "refactor",
+                text: "전투 승리 표현과 보스 클리어 처리를 각각 `_presentNormalCombatWin`, `_presentFinalBossClear` 메서드로 분리했습니다. 상자 확인 후속 흐름은 `HUNTING_CHEST_CONTINUE_HANDLERS` phase→handler 매핑으로 분기합니다."
+            },
+            {
+                type: "refactor",
+                text: "상자 버튼 문구를 `huntingChestConfirmLabel` 상태로 동적 제어합니다. 상자방은 `계속 전진`, 전투 보상 상자는 `확인`을 표시합니다."
+            }
+        ]
+    },
+    {
         version: "0.24.48",
         date: "2026-07-12",
         title: "v0.24.48 거너 중량 장전으로 교체, 각충격 숙련도는 스피너 전용으로 비움",

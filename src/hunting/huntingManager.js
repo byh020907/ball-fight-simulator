@@ -59,6 +59,11 @@ const HUNTING_FLOOR_OUTCOME_HANDLERS = Object.freeze({
     [HUNTING_FLOOR_OUTCOME_TYPES.EVENT]: "_handleEventFloor"
 });
 
+const HUNTING_CHEST_CONTINUE_HANDLERS = Object.freeze({
+    [HUNTING_RUN_PHASES.AWAITING_CHEST]: "_continueChestRoom",
+    [HUNTING_RUN_PHASES.AWAITING_COMBAT_REWARD_CHEST]: "_continueCombatRewardChest"
+});
+
 const HUNTING_EVENT_PRESENTATION_HANDLERS = Object.freeze({
     [HUNTING_EVENT_TRANSITIONS.CONTINUE]: "_presentContinueEvent",
     [HUNTING_EVENT_TRANSITIONS.CHOICE]: "_presentChoiceEvent",
@@ -168,6 +173,7 @@ export class HuntingManager {
             huntingChestRarity: "common",
             huntingChestTitle: "",
             huntingChestSubtext: "",
+            huntingChestConfirmLabel: "",
             huntingMoving: false,
             huntingMoveFrom: 0,
             huntingMoveTo: 0,
@@ -329,57 +335,19 @@ export class HuntingManager {
                 combatCleared: true
             });
 
-            const name = playerBall?.name ?? run.characterId;
-            const shardsText = `파편 +${floorLoot.shards}`;
-            const pendingText = formatPendingLootSummary(this._run.pendingLoot);
-            const subtext = `층 ${run.floor} 완료 · ${shardsText}`;
-
-            if (isFinalBoss) {
-                const stage = getHuntingStage(run.stageId);
-                const nextStageId = getNextHuntingStageId(run.stageId);
-                const stageResult = completeHuntingStage(app.playerProfile, run.stageId);
-                this._run = retreatHuntingRun(this._run, { reason: "stage_clear" });
-                const securedShards = this._run.securedLoot?.shards ?? 0;
-                this._mergeIntoSecured(app);
-                app._refreshCollectionHub();
-                app.beginResultConfirmation();
-                app.refreshPlayerSetup();
-                app.setHuntingActive(false);
-                app.setHuntingOverlayState({
-                    huntingChoiceVisible: false,
-                    huntingCanRetreat: false,
-                    huntingMoving: false,
-                    huntingLootHudVisible: false,
-                    huntingLootHudShards: 0,
-                    huntingLootHudChests: 0
-                });
-                app.showOverlay(
-                    "스테이지 클리어",
-                    `${stage.name} 보스 격파`,
-                    stageResult.unlockedStageId
-                        ? `${getHuntingStage(nextStageId).name} 해금 · 파편 ${securedShards} 확보`
-                        : `파편 ${securedShards} 확보`
-                );
-                app.setStartButton({ text: "확인", hidden: false, disabled: false });
-                this._run = null;
+            // 전투 승리로 상자가 드롭되면 상자 UI를 먼저 표시
+            if (floorLoot.chests.length > 0) {
+                this._presentCombatRewardChest(app, floorLoot.chests[0]);
+                savePlayerProfile(app.playerProfile);
                 return;
             }
 
-            this._run = setHuntingRunPhase(this._run, HUNTING_RUN_PHASES.AWAITING_CHOICE);
-            app.refreshPlayerSetup();
-            app.showOverlay("사냥터", `${name} 승리!`, subtext);
-            const hud = this._getLootHudState();
-            app.setHuntingOverlayState({
-                huntingChoiceVisible: true,
-                huntingCanRetreat: false,
-                huntingMoving: false,
-                huntingFloor: run.floor,
-                huntingCharacterName: name,
-                huntingLootSummary: pendingText,
-                huntingMoveMessage: `${run.floor}층 전투 승리 · 10층 전진 가능`,
-                ...hud
-            });
-            app.setStartButton({ hidden: true, disabled: true, text: "" });
+            if (isFinalBoss) {
+                this._presentFinalBossClear(app);
+                return;
+            }
+
+            this._presentNormalCombatWin(app, playerBall?.name ?? run.characterId);
             savePlayerProfile(app.playerProfile);
         } else {
             this._run = defeatHuntingRun(run);
@@ -648,7 +616,7 @@ export class HuntingManager {
         this._moving = false;
     }
 
-    _stopHuntingMoveForChest(app, { chest, floor }) {
+    _stopHuntingMoveForChest(app, { chest, floor, confirmLabel = "계속 전진" }) {
         this._run = setHuntingRunPhase(this._run, HUNTING_RUN_PHASES.AWAITING_CHEST);
         const pendingText = formatPendingLootSummary(this._run?.pendingLoot);
         const rarityLabel = CHEST_RARITY_LABELS[chest.rarity] ?? chest.rarity;
@@ -670,6 +638,7 @@ export class HuntingManager {
             huntingChestRarity: chest.rarity,
             huntingChestTitle: `${rarityLabel} 상자 확보`,
             huntingChestSubtext: "미확보 전리품에 보관됩니다",
+            huntingChestConfirmLabel: confirmLabel,
             ...hud
         });
         this._moving = false;
@@ -724,14 +693,36 @@ export class HuntingManager {
     chestContinue() {
         const app = this.app;
         const run = this._run;
-        if (!run || run.status !== "active" || run.phase !== HUNTING_RUN_PHASES.AWAITING_CHEST) return;
+        if (!run || run.status !== "active") return;
+        const handlerName = HUNTING_CHEST_CONTINUE_HANDLERS[run.phase];
+        if (!handlerName || typeof this[handlerName] !== "function") {
+            throw new Error(`Unsupported hunting chest continue phase: ${run.phase}`);
+        }
         app.setHuntingOverlayState({
             huntingChestEventActive: false,
             huntingChestRarity: "common",
             huntingChestTitle: "",
-            huntingChestSubtext: ""
+            huntingChestSubtext: "",
+            huntingChestConfirmLabel: ""
         });
+        return this[handlerName]();
+    }
+
+    _continueChestRoom() {
         this.advance();
+    }
+
+    _continueCombatRewardChest() {
+        const app = this.app;
+        const run = this._run;
+        const playerSpec = app.roster.find((f) => f.id === run.characterId);
+        const name = playerSpec?.name ?? run.characterId;
+        const isFinalBoss = run.lastEncounter?.type === HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS;
+        if (isFinalBoss) {
+            this._presentFinalBossClear(app);
+        } else {
+            this._presentNormalCombatWin(app, name);
+        }
     }
 
     _resolveHuntingEvent(event, app) {
@@ -788,6 +779,86 @@ export class HuntingManager {
     _presentBattleEvent(app, resolution) {
         this._stopHuntingMoveForBattle(app, resolution.message);
         return HUNTING_ROUTE_ACTIONS.STOP;
+    }
+
+    _presentCombatRewardChest(app, chest) {
+        const run = this._run;
+        this._run = setHuntingRunPhase(run, HUNTING_RUN_PHASES.AWAITING_COMBAT_REWARD_CHEST);
+        const rarityLabel = CHEST_RARITY_LABELS[chest.rarity] ?? chest.rarity;
+        const pendingText = formatPendingLootSummary(run.pendingLoot);
+        const hud = this._getLootHudState();
+        app.showOverlay("사냥터", `${rarityLabel} 상자 확보`, "전투 보상 상자입니다");
+        app.setHuntingOverlayState({
+            huntingChoiceVisible: false,
+            huntingCanRetreat: false,
+            huntingMoving: false,
+            huntingFloor: run.floor,
+            huntingMoveFrom: 0,
+            huntingMoveTo: 0,
+            huntingMoveStep: 0,
+            huntingMoveMax: HUNTING_ADVANCE_STEPS,
+            huntingMoveMessage: `${run.floor}층 — ${rarityLabel} 상자 확보`,
+            huntingLootSummary: pendingText,
+            huntingMerchantActive: false,
+            huntingMerchantOffers: null,
+            huntingChestEventActive: true,
+            huntingChestRarity: chest.rarity,
+            huntingChestTitle: `${rarityLabel} 상자 확보`,
+            huntingChestSubtext: "전투 보상 · 미확보 전리품에 보관됩니다",
+            huntingChestConfirmLabel: "확인",
+            ...hud
+        });
+    }
+
+    _presentNormalCombatWin(app, name) {
+        const run = this._run;
+        const pendingText = formatPendingLootSummary(run.pendingLoot);
+        const hud = this._getLootHudState();
+        this._run = setHuntingRunPhase(run, HUNTING_RUN_PHASES.AWAITING_CHOICE);
+        app.refreshPlayerSetup();
+        app.showOverlay("사냥터", `${name} 승리!`, `층 ${run.floor} 완료`);
+        app.setHuntingOverlayState({
+            huntingChoiceVisible: true,
+            huntingCanRetreat: false,
+            huntingMoving: false,
+            huntingFloor: run.floor,
+            huntingCharacterName: name,
+            huntingLootSummary: pendingText,
+            huntingMoveMessage: `${run.floor}층 전투 승리 · 10층 전진 가능`,
+            ...hud
+        });
+        app.setStartButton({ hidden: true, disabled: true, text: "" });
+    }
+
+    _presentFinalBossClear(app) {
+        const run = this._run;
+        const stage = getHuntingStage(run.stageId);
+        const nextStageId = getNextHuntingStageId(run.stageId);
+        const stageResult = completeHuntingStage(app.playerProfile, run.stageId);
+        this._run = retreatHuntingRun(run, { reason: "stage_clear" });
+        const securedShards = this._run.securedLoot?.shards ?? 0;
+        this._mergeIntoSecured(app);
+        app._refreshCollectionHub();
+        app.beginResultConfirmation();
+        app.refreshPlayerSetup();
+        app.setHuntingActive(false);
+        app.setHuntingOverlayState({
+            huntingChoiceVisible: false,
+            huntingCanRetreat: false,
+            huntingMoving: false,
+            huntingLootHudVisible: false,
+            huntingLootHudShards: 0,
+            huntingLootHudChests: 0
+        });
+        app.showOverlay(
+            "스테이지 클리어",
+            `${stage.name} 보스 격파`,
+            stageResult.unlockedStageId
+                ? `${getHuntingStage(nextStageId).name} 해금 · 파편 ${securedShards} 확보`
+                : `파편 ${securedShards} 확보`
+        );
+        app.setStartButton({ text: "확인", hidden: false, disabled: false });
+        this._run = null;
     }
 
     _mergeIntoSecured(app) {

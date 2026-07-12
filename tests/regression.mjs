@@ -72,6 +72,7 @@ import {
     openHuntingChest,
     recordHuntingFloorResult,
     retreatHuntingRun,
+    setHuntingRunPhase,
     rollHuntingChestReward,
     rollHuntingFloorOutcome,
     rollShardReward,
@@ -1598,6 +1599,232 @@ async function testHuntingChestEventStopsAdvanceLoop() {
         "Chest room should remain visible after advance returns"
     );
     console.log("[hunting-chest-event-stops-advance] ok");
+}
+
+function testHuntingChestContinueHandlersContract() {
+    const managerSource = readFileSync(new URL("../src/hunting/huntingManager.js", import.meta.url), "utf8");
+    const handlerDefStart = managerSource.indexOf("HUNTING_CHEST_CONTINUE_HANDLERS");
+    const handlerDefEnd = managerSource.indexOf("});", handlerDefStart);
+    const defBlock = managerSource.slice(handlerDefStart, handlerDefEnd);
+    assert.ok(defBlock.includes("AWAITING_CHEST"), "Chest room phase must have a handler");
+    assert.ok(defBlock.includes("AWAITING_COMBAT_REWARD_CHEST"), "Combat reward chest phase must have a handler");
+    const handledPhases = [...defBlock.matchAll(/AWAITING_\w+/g)].map((m) => m[0]);
+    const knownChestPhases = ["AWAITING_CHEST", "AWAITING_COMBAT_REWARD_CHEST"];
+    assert.equal(
+        handledPhases.length,
+        knownChestPhases.length,
+        "HUNTING_CHEST_CONTINUE_HANDLERS should cover exactly 2 phases: chest room and combat reward"
+    );
+    assert.ok(
+        managerSource.includes('"_continueChestRoom"'),
+        "HUNTING_CHEST_CONTINUE_HANDLERS must dispatch chest room to _continueChestRoom"
+    );
+    assert.ok(
+        managerSource.includes('"_continueCombatRewardChest"'),
+        "HUNTING_CHEST_CONTINUE_HANDLERS must dispatch combat reward to _continueCombatRewardChest"
+    );
+    assert.ok(managerSource.includes("_continueChestRoom()"), "_continueChestRoom must be implemented as a method");
+    assert.ok(
+        managerSource.includes("_continueCombatRewardChest()"),
+        "_continueCombatRewardChest must be implemented as a method"
+    );
+    console.log("[hunting-chest-continue-handlers] ok");
+}
+
+function testHuntingCombatRewardChestUi() {
+    const overlayCalls = [];
+    const mockApp = {
+        setHuntingOverlayState(data) {
+            overlayCalls.push({ ...data });
+        },
+        showOverlay() {},
+        addLog() {},
+        roster: app.roster,
+        playerProfile: createDefaultPlayerProfile()
+    };
+    const manager = new HuntingManager(mockApp);
+    const chest = createHuntingChest({ rarity: "common" });
+    manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE });
+    manager._run = recordHuntingFloorResult(manager._run, {
+        hpRemain: 80,
+        maxHp: 100,
+        loot: { shards: 15, chests: [chest], xp: 0 },
+        combatCleared: true
+    });
+    manager._presentCombatRewardChest(mockApp, chest);
+
+    const last = overlayCalls.at(-1);
+    assert.ok(last, "Combat reward chest must call setHuntingOverlayState");
+    assert.equal(last.huntingChestEventActive, true, "Combat reward chest must show chest UI");
+    assert.equal(last.huntingChestRarity, "common", "Combat reward chest must pass chest rarity");
+    assert.equal(last.huntingChestConfirmLabel, "확인", "Combat reward chest button must say '확인'");
+    assert.equal(
+        manager._run.phase,
+        HUNTING_RUN_PHASES.AWAITING_COMBAT_REWARD_CHEST,
+        "Combat reward chest must set phase to AWAITING_COMBAT_REWARD_CHEST"
+    );
+    console.log("[hunting-combat-reward-chest-ui] ok");
+}
+
+function testHuntingCombatRewardChestNormalContinue() {
+    const overlayStates = [];
+    const showOverlayCalls = [];
+    const mockApp = {
+        setHuntingOverlayState(data) {
+            overlayStates.push({ ...data });
+        },
+        showOverlay(label, text, subtext) {
+            showOverlayCalls.push({ label, text, subtext });
+        },
+        refreshPlayerSetup() {},
+        setStartButton() {},
+        addLog() {},
+        roster: app.roster,
+        playerProfile: createDefaultPlayerProfile(),
+        simulation: {
+            fighters: [{ id: FIGHTER_IDS.DASH, name: "Dash Ball", hp: 80, maxHp: 100 }]
+        }
+    };
+    const manager = new HuntingManager(mockApp);
+    const chest = createHuntingChest({ rarity: "common" });
+    manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE });
+    manager._run = recordHuntingFloorResult(manager._run, {
+        hpRemain: 80,
+        maxHp: 100,
+        loot: { shards: 15, chests: [chest], xp: 0 },
+        combatCleared: true
+    });
+
+    // Show chest (simulate _handleFinish interception)
+    manager._presentCombatRewardChest(mockApp, chest);
+    assert.equal(
+        manager._run.phase,
+        HUNTING_RUN_PHASES.AWAITING_COMBAT_REWARD_CHEST,
+        "Phase must be combat reward chest before continue"
+    );
+
+    // Reset overlay state tracking for chestContinue
+    overlayStates.length = 0;
+    manager.chestContinue();
+
+    // After continue: chest UI should close
+    const chestCloseState = overlayStates.find((s) => s.huntingChestEventActive === false);
+    assert.ok(chestCloseState, "chestContinue must close chest UI");
+
+    // Phase must now be AWAITING_CHOICE (normal combat victory)
+    assert.equal(
+        manager._run.phase,
+        HUNTING_RUN_PHASES.AWAITING_CHOICE,
+        "Normal combat reward chest continue must transition to AWAITING_CHOICE"
+    );
+
+    // Victory overlay should appear
+    const victoryOverlay = showOverlayCalls.find((c) => c.label === "사냥터" && c.text.includes("승리"));
+    assert.ok(victoryOverlay, "After combat reward chest confirm, victory overlay must appear");
+    assert.ok(victoryOverlay.text.includes("승리"), "Victory overlay must show win text");
+
+    // Advance must NOT have been called implicitly
+    assert.equal(manager._moving, false, "Combat reward chest continue must not trigger advance automatically");
+    console.log("[hunting-combat-reward-chest-normal-continue] ok");
+}
+
+function testHuntingCombatRewardChestFinalBossContinue() {
+    const overlayStates = [];
+    const showOverlayCalls = [];
+    const mockApp = {
+        setHuntingOverlayState(data) {
+            overlayStates.push({ ...data });
+        },
+        showOverlay(label, text, subtext) {
+            showOverlayCalls.push({ label, text, subtext });
+        },
+        refreshPlayerSetup() {},
+        setStartButton() {},
+        setHuntingActive() {},
+        _refreshCollectionHub() {},
+        beginResultConfirmation() {},
+        addLog() {},
+        roster: app.roster,
+        playerProfile: createDefaultPlayerProfile(),
+        simulation: {
+            fighters: [{ id: FIGHTER_IDS.DASH, name: "Dash Ball", hp: 80, maxHp: 100 }]
+        }
+    };
+    const manager = new HuntingManager(mockApp);
+    const chest = createHuntingChest({ rarity: "common" });
+
+    // Create a run at final boss floor
+    manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE });
+    manager._run = {
+        ...manager._run,
+        floor: 100,
+        lastEncounter: { type: HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS }
+    };
+    manager._run = recordHuntingFloorResult(manager._run, {
+        hpRemain: 80,
+        maxHp: 100,
+        loot: { shards: 100, chests: [chest], xp: 0 },
+        combatCleared: true
+    });
+
+    // Simulate _handleFinish interception: show chest first
+    manager._presentCombatRewardChest(mockApp, chest);
+    assert.equal(
+        manager._run.phase,
+        HUNTING_RUN_PHASES.AWAITING_COMBAT_REWARD_CHEST,
+        "Final boss: phase must be combat reward chest before continue"
+    );
+
+    // Reset and confirm chest
+    overlayStates.length = 0;
+    showOverlayCalls.length = 0;
+    manager.chestContinue();
+
+    // After chest confirm, must enter stage clear flow (run null)
+    assert.equal(manager._run, null, "Final boss combat reward chest continue must set run to null (stage clear)");
+
+    // Stage clear overlay must appear
+    const clearOverlay = showOverlayCalls.find((c) => c.label === "스테이지 클리어");
+    assert.ok(clearOverlay, "After final boss chest confirm, stage clear overlay must appear");
+    console.log("[hunting-combat-reward-chest-finalboss-continue] ok");
+}
+
+function testHuntingChestRoomContinueStillWorks() {
+    const overlayStates = [];
+    const mockApp = {
+        setHuntingOverlayState(data) {
+            overlayStates.push({ ...data });
+        },
+        showOverlay() {},
+        addLog() {},
+        roster: app.roster,
+        playerProfile: createDefaultPlayerProfile()
+    };
+    const manager = new HuntingManager(mockApp);
+    manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE });
+    manager._run = setHuntingRunPhase(manager._run, HUNTING_RUN_PHASES.AWAITING_CHEST);
+
+    // Spy on the advance method
+    let advancedCalled = false;
+    const originalAdvance = manager.advance;
+    manager.advance = () => {
+        advancedCalled = true;
+    };
+
+    try {
+        overlayStates.length = 0;
+        manager.chestContinue();
+    } finally {
+        manager.advance = originalAdvance;
+    }
+
+    assert.ok(advancedCalled, "Chest room chestContinue must call advance()");
+    assert.equal(
+        manager._run.phase,
+        HUNTING_RUN_PHASES.AWAITING_CHEST,
+        "Chest room continue must not change phase (advance handles it)"
+    );
+    console.log("[hunting-chest-room-continue-still-works] ok");
 }
 
 function testHuntingAdvanceDispatchContract() {
@@ -11957,6 +12184,11 @@ await testPlayerPanelAllocationContractBoundary(app);
 
 await testActionGateway();
 await testHuntingEndToEnd();
+await testHuntingChestContinueHandlersContract();
+testHuntingCombatRewardChestUi();
+testHuntingCombatRewardChestNormalContinue();
+testHuntingCombatRewardChestFinalBossContinue();
+testHuntingChestRoomContinueStillWorks();
 await testNoGameBridgeInProduction();
 await testNoWindowUiManagerInProduction();
 
@@ -12001,5 +12233,29 @@ function testXpProgressBarUsesStoreUiManager() {
 
 await testAlpineTemplatesNoWindowUiManager();
 await testXpProgressBarUsesStoreUiManager();
+
+function testGameOverlayChestConfirmLabelContract() {
+    const content = readFileSync("src/components/game-overlay.html", "utf8");
+    assert.ok(content.includes("huntingChestConfirmLabel"), "game-overlay must define huntingChestConfirmLabel state");
+    assert.ok(
+        content.includes('huntingChestConfirmLabel: ""'),
+        "game-overlay must initialize huntingChestConfirmLabel to empty string"
+    );
+    assert.ok(
+        content.includes('this.huntingChestConfirmLabel = ""'),
+        "resetHuntingState must clear huntingChestConfirmLabel"
+    );
+    assert.ok(
+        content.includes("data.huntingChestConfirmLabel !== undefined"),
+        "setHuntingState must accept huntingChestConfirmLabel"
+    );
+    assert.ok(
+        content.includes("huntingChestConfirmLabel || '계속 전진'"),
+        "Chest button must use x-text with fallback to '계속 전진'"
+    );
+    console.log("[game-overlay-chest-confirm-label] ok");
+}
+
+await testGameOverlayChestConfirmLabelContract();
 
 console.log("regression tests ok");
