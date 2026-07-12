@@ -29,7 +29,11 @@ const BASE_STAT_MUTATORS = Object.freeze({
     }
 });
 
-const ABILITY_TIER_LABELS = Object.freeze(["", "대표 행동 강화 I", "대표 행동 강화 II", "대표 행동 강화 III"]);
+const MAX_ABILITY_TIER = 3;
+
+function isValidAbilityTier(tier) {
+    return Number.isInteger(tier) && tier >= 1 && tier <= MAX_ABILITY_TIER;
+}
 
 const EFFECT_HANDLERS = Object.freeze({
     [LEVEL_REWARD_EFFECT_TYPES.STAT]: {
@@ -46,12 +50,14 @@ const EFFECT_HANDLERS = Object.freeze({
     },
     [LEVEL_REWARD_EFFECT_TYPES.ABILITY_TIER]: {
         describe(effect) {
-            const label = ABILITY_TIER_LABELS[effect.tier];
-            if (!label) throw new Error(`Invalid ability tier reward: ${effect.tier}`);
-            return label;
+            if (!isValidAbilityTier(effect.tier)) throw new Error(`Invalid ability tier reward: ${effect.tier}`);
+            if (typeof effect.gameText !== "string" || !effect.gameText.trim()) {
+                throw new Error(`Missing game text for ability tier reward: ${effect.tier}`);
+            }
+            return effect.gameText;
         },
         applyToBall(ball, effect) {
-            if (!ABILITY_TIER_LABELS[effect.tier]) {
+            if (!isValidAbilityTier(effect.tier)) {
                 throw new Error(`Invalid ability tier reward: ${effect.tier}`);
             }
             ball.progression = {

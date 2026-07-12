@@ -19,13 +19,16 @@ function createBaseStatEffects(baseStats) {
     );
 }
 
-function createAbilityTierEffect(abilityTier) {
+function createAbilityTierEffect(abilityTier, gameText) {
     if (!Number.isInteger(abilityTier) || abilityTier <= 0) return null;
-    return Object.freeze({ type: LEVEL_REWARD_EFFECT_TYPES.ABILITY_TIER, tier: abilityTier });
+    if (typeof gameText !== "string" || !gameText.trim()) {
+        throw new Error(`Missing game text for ability tier reward: ${abilityTier}`);
+    }
+    return Object.freeze({ type: LEVEL_REWARD_EFFECT_TYPES.ABILITY_TIER, tier: abilityTier, gameText });
 }
 
 function createReward(characterId, entry) {
-    const abilityTierEffect = createAbilityTierEffect(entry.abilityTier);
+    const abilityTierEffect = createAbilityTierEffect(entry.abilityTier, entry.gameText);
     const effects = [...createBaseStatEffects(entry.baseStats), abilityTierEffect].filter(Boolean);
     return Object.freeze({
         id: `${characterId}-level-${entry.level}`,

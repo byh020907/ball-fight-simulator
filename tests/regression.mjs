@@ -2150,8 +2150,8 @@ function testExperienceSystem() {
     );
     assert.equal(
         levelUpResult.nextRewardText,
-        "Lv.3 · 스킬 +2 · 대표 행동 강화 I",
-        "Tier levels should expose both the next base stat and ability reward"
+        "Lv.3 · 스킬 +2 · 대시 배율 +5%",
+        "Tier levels should expose both the next base stat and player-facing ability reward"
     );
     profile.experience.byCharacter[FIGHTER_IDS.DASH].currentXp = getLevelRequirement(4);
     assert.equal(
@@ -2167,8 +2167,13 @@ function testExperienceSystem() {
     });
     assert.deepEqual(
         getExperienceRewardsBetween(FIGHTER_IDS.DASH, 1, 3).map((reward) => reward.text),
-        ["속도 +2", "스킬 +2 · 대표 행동 강화 I"],
-        "Level ranges should expose every base stat reward and tier reward"
+        ["속도 +2", "스킬 +2 · 대시 배율 +5%"],
+        "Level ranges should expose every base stat reward and player-facing tier reward"
+    );
+    assert.equal(
+        allRewardEffects.find((effect) => effect.type === "ability_tier")?.gameText,
+        "대시 배율 +5%",
+        "Ability tier effects should preserve the configured game text"
     );
 
     const playerSpec = {
@@ -2298,6 +2303,12 @@ function testCharacterLevelProgressions(app) {
             entries.filter((entry) => entry.abilityTier).map((entry) => entry.abilityTier),
             [1, 2, 3],
             `${fighter.id} should apply ability tiers in order`
+        );
+        assert.ok(
+            entries
+                .filter((entry) => entry.abilityTier)
+                .every((entry) => typeof entry.gameText === "string" && entry.gameText.trim()),
+            `${fighter.id} should define player-facing game text for every ability tier reward`
         );
 
         const progression = getCharacterLevelProgression(fighter.id, 10);
@@ -8095,6 +8106,14 @@ async function testCreateCollectionHubViewModel() {
 
     const allHaveIds = vm.rosterItems.every((item) => item.id);
     assert.ok(allHaveIds, "Every roster item should have an id");
+    assert.ok(
+        vm.rosterItems.every((item) =>
+            item.levelRewards
+                .filter((reward) => [3, 6, 9].includes(reward.level))
+                .every((reward) => !reward.text.includes("대표 행동 강화"))
+        ),
+        "Collection rewards should show character-specific ability text instead of generic tier labels"
+    );
 
     // 숙련도 항목에 sourceName과 unlockCondition이 있는지
     const firstMastery = vm.masteryItems[0];
