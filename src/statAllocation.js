@@ -173,8 +173,6 @@ export function createTournamentRoster(
     // AI 강화 — challengeLevel이 0보다 클 때만 적용
     const powerMult = challengeLevel > 0 ? 1 + challengeLevel * 0.025 : 1;
     const aiTotalPoints = challengeLevel > 0 ? 100 + Math.min(challengeLevel * 4, 100) : 100;
-    const balancedWeight = challengeLevel > 4 ? Math.min((challengeLevel - 4) * 0.1, 0.8) : 0;
-
     function makeAiFighter(fighter) {
         const alloc = createRandomStatAllocation(rng, aiTotalPoints);
         const spec = applyStatAllocation(fighter, alloc, false);
