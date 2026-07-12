@@ -13075,6 +13075,8 @@ function testDailyShopPopupContract() {
     assert.ok(template.includes('@click="openShop()"'), "Equipment toolbar should open the shard shop popup");
     assert.ok(template.includes('class="ch-shop-modal"'), "Shard shop should use a dedicated popup layer");
     assert.ok(template.includes('@click.self="closeShop()"'), "Shop backdrop should close only the shop popup");
+    assert.ok(template.includes(".ch-ach-info {"), "Collection cards should define their shared info layout");
+    assert.ok(template.includes("flex: 1;"), "Collection card info should occupy remaining horizontal space");
     assert.ok(
         template.includes(".ch-btn:not(:disabled):hover"),
         "Collection buttons should have an enabled hover state"
