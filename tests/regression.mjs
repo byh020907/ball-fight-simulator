@@ -48,6 +48,7 @@ import {
 } from "../src/playerProfile.js";
 import { HuntingManager } from "../src/hunting/huntingManager.js";
 import { HUNTING_EVENT_TRANSITIONS, HuntingEvent } from "../src/hunting/huntingEvents.js";
+import { MishapEvent } from "../src/hunting/events/mishapEvent.js";
 import {
     advanceHuntingRun,
     canEnterHunting,
@@ -12936,5 +12937,15 @@ function testHuntingEventResultOverlayContract() {
 
 await testGameOverlayChestConfirmLabelContract();
 testHuntingEventResultOverlayContract();
+
+function testHuntingMishapPreservesRecoveryWindow() {
+    const event = new MishapEvent(HUNTING_EVENT_TYPES.MISHAP);
+    const run = { ...createHuntingRun({ characterId: FIGHTER_IDS.DASH }), floor: 70, carriedHp: 1, carriedMaxHp: 100 };
+    const result = event.resolve(event.createPayload(70), { run });
+    assert.equal(result.run.carriedHp, 20, "A mishap should preserve the 20% max-HP recovery window");
+    console.log("[hunting-mishap-survival-floor] ok");
+}
+
+testHuntingMishapPreservesRecoveryWindow();
 
 console.log("regression tests ok");
