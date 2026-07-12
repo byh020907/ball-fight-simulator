@@ -1,11 +1,14 @@
 <div
     x-data="popupDialog"
     class="bf-popup-overlay"
-    data-modal-layer="popup-dialog"
     x-show="visible"
     x-transition.opacity.duration.200ms
+    role="dialog"
+    aria-modal="true"
+    aria-label="알림"
+    tabindex="-1"
     @click.self="closeOnOutside === false || closePopup('close')"
-    @keydown.escape.window="visible && closePopup('close')"
+    @keydown.escape="closePopup('close')"
 >
     <div class="bf-popup-card">
         <div class="bf-popup-scroll">
@@ -29,6 +32,11 @@
 <script>
     window.createGameUI("popupDialog", () => {
         let _resolve = null;
+        let dialogElement = null;
+
+        function focusDialog() {
+            requestAnimationFrame(() => dialogElement.focus());
+        }
 
         function closePopup(value) {
             const captured = _resolve;
@@ -47,6 +55,9 @@
             bodyHtml: "",
             buttons: [],
             closeOnOutside: true,
+            init() {
+                dialogElement = this.$root;
+            },
             closePopup,
             show(options = {}) {
                 if (_resolve) {
@@ -61,6 +72,7 @@
                     this.buttons = options.buttons ?? [{ text: "닫기", value: "ok", primary: true }];
                     this.closeOnOutside = options.closeOnOutside !== false;
                     this.visible = true;
+                    focusDialog();
                 });
             },
             close() {

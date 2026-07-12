@@ -3,6 +3,11 @@
     class="bf-popup-overlay"
     x-show="visible"
     x-transition.opacity.duration.200ms
+    role="dialog"
+    aria-modal="true"
+    aria-label="매치 액션 선택"
+    tabindex="-1"
+    @keydown.escape.stop
     @pick-action="handlePickAction($event.detail.index)"
 >
     <div class="bf-popup-card">
@@ -25,10 +30,18 @@
 <script>
     window.createGameUI("actionPicker", () => {
         let _resolve = null;
+        let dialogElement = null;
+
+        function focusDialog() {
+            requestAnimationFrame(() => dialogElement.focus());
+        }
 
         return {
             visible: false,
             cards: [],
+            init() {
+                dialogElement = this.$root;
+            },
             handlePickAction(index) {
                 this.visible = false;
                 const cards = this.cards;
@@ -54,6 +67,7 @@
                         hpCost: c.hpCostPercent
                     }));
                     this.visible = this.cards.length > 0;
+                    if (this.visible) focusDialog();
                 });
             }
         };

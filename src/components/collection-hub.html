@@ -6,12 +6,13 @@
     role="dialog"
     aria-modal="true"
     aria-label="컬렉션"
-    @keydown.escape="closeCollectionHubIfNoNestedModal()"
+    @click.self="closeCollectionHub()"
+    @keydown.escape="closeCollectionHub()"
     @keydown.left.prevent="setCollectionTab(state.tabs[Math.max(0, state.tabs.findIndex(t => t.id === state.activeTab) - 1)]?.id)"
     @keydown.right.prevent="setCollectionTab(state.tabs[Math.min(state.tabs.length - 1, state.tabs.findIndex(t => t.id === state.activeTab) + 1)]?.id)"
     tabindex="-1"
 >
-    <div class="ch-frame" @click.outside="closeCollectionHubIfOutsideModal($event)">
+    <div class="ch-frame">
         <div class="ch-header">
             <strong class="ch-title">컬렉션</strong>
             <span class="ch-summary">
@@ -433,6 +434,12 @@
 
 <script>
     window.createGameUI("collectionHub", () => {
+        let dialogElement = null;
+
+        function focusDialog() {
+            requestAnimationFrame(() => dialogElement.focus());
+        }
+
         const state = Alpine.reactive({
             visible: false,
             activeTab: "roster",
@@ -509,18 +516,6 @@
             state.selectedCharacterId = null;
         }
 
-        function hasVisiblePopupDialog() {
-            return Alpine.store("uiManager").requireComponent("popupDialog").visible;
-        }
-
-        function closeCollectionHubIfNoNestedModal() {
-            if (!hasVisiblePopupDialog()) closeCollectionHub();
-        }
-
-        function closeCollectionHubIfOutsideModal(event) {
-            if (!event.target.closest("[data-modal-layer]")) closeCollectionHub();
-        }
-
         function setCollectionTab(tabId) {
             const validTabs = state.tabs.length > 0 ? state.tabs.map((t) => t.id) : ["roster"];
             if (validTabs.includes(tabId)) state.activeTab = tabId;
@@ -538,9 +533,10 @@
 
         return {
             state,
+            init() {
+                dialogElement = this.$root;
+            },
             closeCollectionHub,
-            closeCollectionHubIfNoNestedModal,
-            closeCollectionHubIfOutsideModal,
             setCollectionTab,
             setCollectionFilter,
             selectCollectionCharacter,
@@ -570,6 +566,7 @@
             open(tabId) {
                 state.visible = true;
                 state.activeTab = tabId || "roster";
+                focusDialog();
             },
             close() {
                 state.visible = false;

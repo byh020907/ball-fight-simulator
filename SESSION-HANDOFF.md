@@ -1129,6 +1129,12 @@
 - 영향: `src/components/collection-hub.html`, `src/components/popup-dialog.html`, `tests/regression.mjs`, `docs/collection-hub-ui.md`, `src/patchNotes.js`, `index.html`
 - 검증: `npm test`, `npm run check`, `npm run format:check`, `git diff --check` 통과. 로컬 브라우저에서 컬렉션 오버레이와 패치 노트 정상 표시 확인.
 
+## [L1] 2026-07-12 — 중첩 팝업은 각자 배경과 입력만 처리하도록 구조화
+- 맥락: 직전 상자 결과 수정은 `data-modal-layer`를 컬렉션의 `@click.outside` 예외로 처리해 증상은 막았지만, 상위 팝업이 하위 팝업의 존재를 알아야 하는 구조를 남겼습니다. 사용자는 중첩 팝업에서 각 팝업이 자기 배경 클릭과 키 입력만 소유하는 공통 구조 개선을 요구했습니다.
+- 결정: 컬렉션 허브를 포함한 오버레이는 전역 `@click.outside` 대신 자기 backdrop의 `@click.self`만 사용합니다. 공통 `popupDialog`는 열릴 때 포커스를 소유하고 로컬 `Escape`만 처리해, sibling 오버레이로 렌더링된 하위 팝업의 입력이 상위로 전달되지 않게 합니다.
+- 영향: `src/components/collection-hub.html`, `src/components/popup-dialog.html`, `src/components/patch-notes.html`, `src/components/action-picker.html`, `tests/regression.mjs`, `docs/alpine-component-system.md`, `docs/collection-hub-ui.md`, `src/patchNotes.js`, `index.html`
+- 검증: `npm test`, `npm run check`, `npm run format:check`, `git diff --check` 통과. 로컬 브라우저에서 컬렉션 열기와 `Escape` 닫기 확인.
+
 ## 진행 중 이슈
 - 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
 - Time Warp 패널티 인상은 재학습 후 반영

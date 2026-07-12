@@ -3,8 +3,14 @@
     class="patch-overlay"
     x-show="visible"
     x-transition.opacity.duration.200ms
+    role="dialog"
+    aria-modal="true"
+    aria-label="패치노트"
+    tabindex="-1"
+    @click.self="dismissNotes()"
+    @keydown.escape="dismissNotes()"
 >
-    <div class="patch-card" @click.outside="dismissNotes()">
+    <div class="patch-card">
         <div class="patch-card-scroll">
             <template x-for="(entry, eIdx) in entries" :key="entry.version">
                 <div>
@@ -32,6 +38,12 @@
 
 <script>
     window.createGameUI("patchNotes", () => {
+        let dialogElement = null;
+
+        function focusDialog() {
+            requestAnimationFrame(() => dialogElement.focus());
+        }
+
         function dismissNotes() {
             this.visible = false;
             this.entries = [];
@@ -41,10 +53,14 @@
         return {
             visible: false,
             entries: [],
+            init() {
+                dialogElement = this.$root;
+            },
             dismissNotes,
             show(entries) {
                 this.entries = entries;
                 this.visible = true;
+                focusDialog();
             }
         };
     });

@@ -217,6 +217,16 @@ await loadTemplates();
 - **로직 소유**: 애니메이션, 표시 전환 등은 컴포넌트가 자체 소유
 - **스코프 격리**: 템플릿에서 `xpReward.xxx`처럼 부모 스코프를 직접 참조하지 않음
 
+### 7.1 모달 닫기 소유권
+
+전체 화면을 덮는 모달은 다른 컴포넌트의 바깥 클릭 상태를 검사하지 않고, 자기 backdrop과 포커스 안의 입력만 처리합니다.
+
+- 모달 루트는 `role="dialog"`, `aria-modal="true"`, `tabindex="-1"`을 선언합니다.
+- 닫을 수 있는 모달은 루트에 `@click.self="close()"`와 `@keydown.escape="close()"`를 둡니다. 카드 내부의 `@click.outside`는 사용하지 않습니다.
+- `init()`에서 `this.$root`를 컴포넌트 전용 참조로 확보하고, 모달을 열 때 `requestAnimationFrame`으로 그 루트에 포커스를 둡니다. uiManager를 거친 메서드 호출에서는 Alpine magic이 아닌 이 참조를 사용해야 합니다. 그러면 sibling으로 렌더링된 하위 모달의 `Escape`가 상위 모달로 전달되지 않습니다.
+- 닫을 수 없는 필수 선택 모달은 `@keydown.escape.stop`으로 Escape를 자신이 소비하고, 명시된 선택 동작으로만 닫습니다.
+- 이 규칙으로 상위 모달은 하위 모달의 식별자·가시 상태·z-index를 알 필요가 없습니다.
+
 ## 8. 초기화 순서 (index.html)
 
 ```js

@@ -10392,35 +10392,61 @@ function testCollectionCharacterDetailTabsContract() {
     console.log("[collection-character-detail-tabs] ok");
 }
 
-function testCollectionHubNestedPopupCloseContract() {
+function testPopupCloseOwnershipContract() {
     const collectionHub = readFileSync("src/components/collection-hub.html", "utf8");
     const popupDialog = readFileSync("src/components/popup-dialog.html", "utf8");
+    const patchNotes = readFileSync("src/components/patch-notes.html", "utf8");
+    const actionPicker = readFileSync("src/components/action-picker.html", "utf8");
 
     assert.ok(
-        collectionHub.includes('@click.outside="closeCollectionHubIfOutsideModal($event)"'),
-        "Collection hub should delegate outside clicks through the nested modal boundary"
+        collectionHub.includes('@click.self="closeCollectionHub()"'),
+        "Collection hub should close only when its own backdrop receives the click"
     );
     assert.ok(
-        collectionHub.includes('event.target.closest("[data-modal-layer]")'),
-        "Collection hub should ignore clicks originating from a nested modal layer"
+        collectionHub.includes('@keydown.escape="closeCollectionHub()"'),
+        "Collection hub should own its local Escape handling"
     );
     assert.ok(
-        collectionHub.includes('@keydown.escape="closeCollectionHubIfNoNestedModal()"'),
-        "Collection hub should not close itself while a nested popup handles Escape"
+        collectionHub.includes("dialogElement = this.$root") &&
+            collectionHub.includes("requestAnimationFrame(() => dialogElement.focus())"),
+        "Collection hub should capture its Alpine root before focus is requested through uiManager"
     );
     assert.ok(
-        collectionHub.includes('return Alpine.store("uiManager").requireComponent("popupDialog").visible;'),
-        "Collection hub should read nested popup visibility through uiManager"
+        !collectionHub.includes("@click.outside") && !collectionHub.includes("hasVisiblePopupDialog"),
+        "Collection hub should not need knowledge of child popup visibility"
     );
     assert.ok(
-        popupDialog.includes('data-modal-layer="popup-dialog"'),
-        "Popup dialog should expose its modal layer boundary"
+        popupDialog.includes("@keydown.escape=\"closePopup('close')\""),
+        "Popup dialog should own Escape on its own root"
     );
     assert.ok(
-        popupDialog.includes("@keydown.escape.window=\"visible && closePopup('close')\""),
-        "Popup dialog should own Escape while it is visible"
+        popupDialog.includes("dialogElement = this.$root") &&
+            popupDialog.includes("requestAnimationFrame(() => dialogElement.focus())") &&
+            popupDialog.includes('role="dialog"') &&
+            popupDialog.includes('aria-modal="true"') &&
+            !popupDialog.includes("@keydown.escape.window") &&
+            !popupDialog.includes("data-modal-layer"),
+        "Popup dialog should focus itself without a global key listener or parent marker"
     );
-    console.log("[collection-hub-nested-popup-close-contract] ok");
+    assert.ok(
+        patchNotes.includes('@click.self="dismissNotes()"') &&
+            patchNotes.includes('@keydown.escape="dismissNotes()"') &&
+            patchNotes.includes("dialogElement = this.$root") &&
+            patchNotes.includes("requestAnimationFrame(() => dialogElement.focus())") &&
+            !patchNotes.includes("@click.outside"),
+        "Patch notes should use the same backdrop-owned close and focus contract"
+    );
+    assert.ok(
+        actionPicker.includes("@keydown.escape.stop") &&
+            actionPicker.includes("dialogElement = this.$root") &&
+            actionPicker.includes("requestAnimationFrame(() => dialogElement.focus())"),
+        "Action picker should capture its root and consume Escape while a choice is required"
+    );
+    assert.ok(
+        [collectionHub, popupDialog, patchNotes, actionPicker].every((source) => !source.includes("@click.outside")),
+        "Fullscreen overlays should never delegate their close behavior to a document-level outside listener"
+    );
+    console.log("[popup-close-ownership-contract] ok");
 }
 
 function testHuntingOverlayResetContract() {
@@ -11410,7 +11436,7 @@ testHuntingMerchantPurchaseRefreshesUiState();
 testHuntingMerchantMobileScrollContract();
 testHuntingChestIconReuseContract();
 testCollectionCharacterDetailTabsContract();
-testCollectionHubNestedPopupCloseContract();
+testPopupCloseOwnershipContract();
 testHuntingOverlayResetContract();
 testAppLifecycleTransitions();
 testResultConfirmationReturnsInitialState();
