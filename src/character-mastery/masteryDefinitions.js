@@ -1,6 +1,7 @@
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 
 const MASTERY_TIERS = REWARD_BALANCE.progression.masteryTiers;
+const MASTERY_RUNTIME = REWARD_BALANCE.progression.masteryRuntime;
 
 // ── 캐릭터 숙련도 효과 정의 (등급별 수치) ──────────────────────────────────
 //
@@ -156,7 +157,7 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         sourceFighterId: "vampire",
         name: "갈증",
         kind: "combat_passive",
-        description: "8초마다 다음 충돌 흡혈률이 {value} 증가합니다.",
+        description: "4초마다 다음 충돌에서 준 피해의 {value}를 회복합니다. 잃은 HP에 따라 최대 2배가 됩니다.",
         tierValues: MASTERY_TIERS.vampireHpSteal,
         formatValue(v) {
             return (v * 100).toFixed(0) + "%";
@@ -164,10 +165,13 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         apply(ctx, level) {
             ctx.combatPassives.push({
                 id: "vampire_mastery_passive",
-                cooldown: 8,
+                cooldown: MASTERY_RUNTIME.vampire.cooldown,
                 onAfterFighterCollisionDamage: ({ simulation, attacker, actualOutgoingDamage }) => {
-                    if (actualOutgoingDamage <= 0 || attacker.hp >= attacker.maxHp) return { consumed: false };
-                    const restored = attacker.heal(actualOutgoingDamage * this.tierValues[level]);
+                    const missingHp = Math.max(0, attacker.maxHp - attacker.hp);
+                    if (actualOutgoingDamage <= 0 || missingHp <= 0) return { consumed: false };
+                    const missingHpRatio = missingHp / Math.max(1, attacker.maxHp);
+                    const restoreMultiplier = 1 + missingHpRatio * (MASTERY_RUNTIME.vampire.missingHpMultiplierMax - 1);
+                    const restored = attacker.heal(actualOutgoingDamage * this.tierValues[level] * restoreMultiplier);
                     if (restored <= 0) return { consumed: false };
                     simulation.spawnActionText(attacker.position.clone(), `숙련도 +${restored} HP`, "#44cc66");
                     return { consumed: true };

@@ -205,7 +205,7 @@ export const REWARD_BALANCE = deepFreeze({
             hp: [0, 0.02, 0.04, 0.06],
             actionHpCostReduction: [0, 0.0003, 0.0006, 0.001],
             abilityCooldownPercent: [0, 0.02, 0.04, 0.06],
-            vampireHpSteal: [0, 0.04, 0.08, 0.12]
+            vampireHpSteal: [0, 0.03, 0.06, 0.09]
         },
         masteryCaps: {
             hp: 0.08,
@@ -217,6 +217,12 @@ export const REWARD_BALANCE = deepFreeze({
             hpCostPercentReduction: 0.001,
             cooldownPercent: 0.08,
             minHpCostPercent: 0.001
+        },
+        masteryRuntime: {
+            vampire: {
+                cooldown: 4,
+                missingHpMultiplierMax: 2
+            }
         }
     }
 });

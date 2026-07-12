@@ -7158,7 +7158,7 @@ async function testVampireMasteryRestoresCollisionDamage() {
         maxHp: 100,
         position: { clone: () => ({}) },
         heal(amount) {
-            const restored = Math.min(amount, this.maxHp - this.hp);
+            const restored = Math.min(Math.round(amount), this.maxHp - this.hp);
             this.hp += restored;
             return restored;
         }
@@ -7166,10 +7166,19 @@ async function testVampireMasteryRestoresCollisionDamage() {
     const result = effect.onAfterFighterCollisionDamage({
         simulation: { spawnActionText() {} },
         attacker,
-        actualOutgoingDamage: 25
+        actualOutgoingDamage: 40
     });
-    assert.equal(attacker.hp, 53, "GOLD vampire mastery should restore 12% of actual collision damage");
+    assert.equal(effect.cooldown, 4, "Vampire mastery should prepare every four seconds");
+    assert.equal(attacker.hp, 55, "GOLD vampire mastery should use 9% damage and the missing-HP multiplier");
     assert.ok(result.consumed, "Successful collision restoration should consume the ready mastery effect");
+
+    attacker.hp = attacker.maxHp;
+    const fullHpResult = effect.onAfterFighterCollisionDamage({
+        simulation: { spawnActionText() {} },
+        attacker,
+        actualOutgoingDamage: 40
+    });
+    assert.ok(!fullHpResult.consumed, "Full-health vampire mastery should keep its ready state");
 }
 
 async function testMasteryCombatModifiersApplyAtFinalDamageStage() {

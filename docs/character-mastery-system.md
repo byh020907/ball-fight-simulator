@@ -76,7 +76,7 @@
 | Eater Ball | 최대 체력 | 2% | 4% | 6% |
 | Bat Ball | 클릭 액션 HP 비용 감소 | 0.03%p | 0.06%p | 0.10%p |
 | Hero Ball | 스킬 쿨다운 감소 | 2% | 4% | 6% |
-| Vampire Ball | 8초마다 다음 충돌 피해 기준 회복 | 4% | 8% | 12% |
+| Vampire Ball | 4초마다 다음 충돌 피해 회복 (결손 HP 비례 1~2배) | 3% | 6% | 9% |
 | Gunner Ball | 다른 캐릭터 공격력 | 2% | 4% | 6% |
 | Phantom Ball | 받는 충돌 피해 감소 | 2% | 4% | 6% |
 
@@ -100,7 +100,7 @@
 정의는 단순 ID 분기 대신 자신의 충돌 훅을 직접 만든다.
 
 - Rage의 `onBeforeFighterCollisionDamage`는 준비된 다음 충돌 피해를 높이고 성공 시에만 소비한다.
-- Vampire의 `onAfterFighterCollisionDamage`는 실제로 준 충돌 피해를 기준으로 회복하고, 실제 회복이 발생한 경우에만 소비한다.
+- Vampire의 `onAfterFighterCollisionDamage`는 4초마다 준비된다. `실제 충돌 피해 × 등급 흡혈률 × (1 + 결손 HP 비율)`을 회복하며, 결손 HP 비율 배율은 1배에서 2배 사이로 제한한다. 실제 회복이 발생한 경우에만 소비한다.
 - `BattleBall`은 효과의 준비 시간과 활성 상태만 보관한다.
 - `BattleSimulation`은 충돌 전후 훅을 순서대로 호출할 뿐 캐릭터 ID나 효과 ID를 분기하지 않는다.
 
