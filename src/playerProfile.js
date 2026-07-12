@@ -8,13 +8,25 @@
 import { HUNTING_STAGES } from "./hunting/huntingConfig.js";
 
 export const PLAYER_PROFILE_STORAGE_KEY = "bfs:player-profile:v1";
+export const SESSION_STORAGE_VERSION_KEY = "bfs:session-version";
 
 export const PROFILE_LIMITS = Object.freeze({
     MAX_COUNTER: 1_000_000_000,
     MAX_TIMESTAMP: 8_640_000_000_000_000
 });
 
-export const PROFILE_VERSION = 6;
+export const PROFILE_VERSION = 7;
+
+export function resetStaleSessionStorage(storage = globalThis.sessionStorage) {
+    if (!storage || storage.getItem(SESSION_STORAGE_VERSION_KEY) === String(PROFILE_VERSION)) return false;
+
+    for (let index = storage.length - 1; index >= 0; index -= 1) {
+        const key = storage.key(index);
+        if (key?.startsWith("bfs:")) storage.removeItem(key);
+    }
+    storage.setItem(SESSION_STORAGE_VERSION_KEY, String(PROFILE_VERSION));
+    return true;
+}
 
 // ── 기본 프로필 ─────────────────────────────────────────────────────────────
 
@@ -45,12 +57,6 @@ export function createDefaultPlayerProfile() {
                 runsRetreated: 0,
                 runsDefeated: 0,
                 deepestFloor: 0
-            }
-        },
-        progression: {
-            challenge: {
-                highestUnlockedLevel: 0,
-                selectedLevel: 0
             }
         },
         collection: {
@@ -100,13 +106,6 @@ function sanitizeTimestamp(value) {
     if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return null;
     if (value > PROFILE_LIMITS.MAX_TIMESTAMP) return null;
     return value;
-}
-
-function sanitizeChallenge(obj) {
-    if (!obj || typeof obj !== "object") return { highestUnlockedLevel: 0, selectedLevel: 0 };
-    const highest = Math.max(0, sanitizeNumber(obj.highestUnlockedLevel));
-    const sel = Math.max(0, Math.min(sanitizeNumber(obj.selectedLevel), highest));
-    return { highestUnlockedLevel: highest, selectedLevel: sel };
 }
 
 function sanitizeCharacterRecord(record) {
@@ -319,9 +318,6 @@ export function sanitizePlayerProfile(raw) {
         experience: sanitizeExperience(raw.experience),
         equipment: sanitizeEquipment(raw.equipment),
         hunting: sanitizeHunting(raw.hunting),
-        progression: {
-            challenge: sanitizeChallenge(raw.progression?.challenge)
-        },
         collection: {
             characters: sanitizeCharacters(raw.collection?.characters),
             achievements: sanitizeAchievements(raw.collection?.achievements),
@@ -334,7 +330,7 @@ export function sanitizePlayerProfile(raw) {
 
 export function migratePlayerProfile(raw) {
     if (!raw || typeof raw !== "object") return createDefaultPlayerProfile();
-    // v1 (unlockedIds) → v2 (levels)는 sanitizeCharacterMastery에서 처리
+    if (raw.version !== PROFILE_VERSION) return createDefaultPlayerProfile();
     return sanitizePlayerProfile(raw);
 }
 
@@ -373,10 +369,13 @@ export function migrateLegacyExperienceToCharacter(profile, preferredCharacterId
 
 export function loadPlayerProfile() {
     try {
+        resetStaleSessionStorage();
         const raw = localStorage.getItem(PLAYER_PROFILE_STORAGE_KEY);
         if (!raw) return createDefaultPlayerProfile();
         const parsed = JSON.parse(raw);
-        return migratePlayerProfile(parsed);
+        const profile = migratePlayerProfile(parsed);
+        if (parsed.version !== PROFILE_VERSION) savePlayerProfile(profile);
+        return profile;
     } catch {
         // 파싱 실패, 접근 거부 등 → 기본 프로필로 복구
         return createDefaultPlayerProfile();

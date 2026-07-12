@@ -41,7 +41,6 @@ import {
     migrateLegacyExperienceToCharacter,
     sanitizePlayerProfile
 } from "../src/playerProfile.js";
-import { completeChallengeTournament, formatBonusSummary } from "../src/progression/progressionState.js";
 import { HuntingManager } from "../src/hunting/huntingManager.js";
 import { HUNTING_EVENT_TRANSITIONS, HuntingEvent } from "../src/hunting/huntingEvents.js";
 import {
@@ -7361,9 +7360,6 @@ await testTournamentRosterUnderEight();
 await testTournamentRosterNoExcessMultipleRuns();
 // Achievement system tests
 await testEvaluateAchievements();
-await testApplyAchievementRewards();
-await testFormatRewardDescription();
-await testProgressionBonusCapClamp();
 // Mastery system tests
 await testAdvanceCharacterMastery();
 await testGetCharacterMasteryLevel();
@@ -7375,7 +7371,6 @@ await testCreateCollectionHubViewModel();
 // Toast queue tests
 await testToastQueue();
 // Bonus points effective total test
-await testBonusPointsEffectiveTotal();
 // Sensitivity reset + adjustStat with bonus total test
 await testSensitivityAlwaysReset();
 await testAdjustStatWithBonusTotal();
@@ -7383,7 +7378,6 @@ await testAdjustStatWithBonusTotal();
 await testMasteryModifiersStoredOnBattleBall(app);
 await testStatModifierDamageIndependentOfHp();
 // Dynamic bonus computation test
-await testComputeEffectiveBonusesDynamic();
 // ── New character tests ──────────────────────────────────────────────────────
 
 async function testNewCharactersRegistered(app) {
@@ -7665,8 +7659,6 @@ async function testPpoActorCriticUtilities() {
     optimizer.dispose?.();
 }
 
-testCompleteChallengeTournament();
-testFormatBonusSummary();
 testGrenadeProximityTrigger();
 testGrenadeHighSpeedProximityTrigger();
 testGrenadeProximityFuseMultiplier();

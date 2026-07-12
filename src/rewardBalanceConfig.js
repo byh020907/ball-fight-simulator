@@ -130,29 +130,26 @@ export const REWARD_BALANCE = deepFreeze({
     },
     progression: {
         masteryThresholds: [1, 5, 15],
-        bonusCaps: { extraStatPoints: 40, balanceTolerance: 10, perStatCapBonus: 50 },
         achievementRewards: {
-            firstTournamentWin: 5,
-            flawlessTournament: 15,
-            comebackMatchWin: 5,
-            counterExpert: 5,
-            allActionsUsed: 10,
-            rosterChampion: 15,
-            masteryComplete: 20,
-            marathon50: 15,
-            singleHitMonster: 15,
-            tournamentStreak3: 10
+            firstTournamentWin: { type: "SHARDS", amount: 30 },
+            flawlessTournament: { type: "EQUIPMENT", rarity: "rare" },
+            comebackMatchWin: { type: "CHEST", rarity: "uncommon" },
+            counterExpert: { type: "CHEST", rarity: "uncommon" },
+            allActionsUsed: { type: "CHEST", rarity: "common" },
+            rosterChampion: { type: "EQUIPMENT", rarity: "epic" },
+            masteryComplete: { type: "EQUIPMENT", rarity: "legendary" },
+            marathon50: { type: "CHEST", rarity: "common" },
+            singleHitMonster: { type: "EQUIPMENT", rarity: "rare" },
+            tournamentStreak3: { type: "CHEST", rarity: "uncommon" }
         },
         masteryTiers: {
             damage: [0, 0.03, 0.07, 0.12],
             incomingKnockbackReduce: [0, 0.04, 0.09, 0.15],
-            balanceTolerance: [0, 1, 2, 3],
             outgoingImpactBonus: [0, 0.03, 0.06, 0.1],
             velocityRecoveryBonus: [0, 0.03, 0.06, 0.1],
             rageCollisionDamage: [0, 0.04, 0.08, 0.12],
             hp: [0, 0.03, 0.07, 0.12],
             actionHpCostReduction: [0, 0.003, 0.006, 0.01],
-            extraStatPoints: [0, 3, 6, 10],
             vampireHpSteal: [0, 0.05, 0.1, 0.15]
         }
     }

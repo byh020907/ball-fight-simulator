@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node scripts/serve.mjs",
-    "test": "node tests/regression.mjs",
+    "test": "node tests/regression.mjs && node tests/profileVersionReset.mjs",
     "check": "node scripts/checkSyntax.mjs",
     "train": "node scripts/rl/train.mjs",
     "benchmark": "node scripts/benchmark.mjs",

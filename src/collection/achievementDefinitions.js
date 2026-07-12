@@ -44,8 +44,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
             return career.playerTournamentsCompleted >= 1 && context.report?.playerWon === true;
         },
         reward: {
-            type: "PROGRESSION_BONUS",
-            payload: { bonusKey: "extraStatPoints", amount: ACHIEVEMENT_REWARDS.firstTournamentWin }
+            ...ACHIEVEMENT_REWARDS.firstTournamentWin
         }
     },
     {
@@ -58,8 +57,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
             return context.report.matchReports.every((m) => m.combatDamageTaken === 0);
         },
         reward: {
-            type: "PROGRESSION_BONUS",
-            payload: { bonusKey: "perStatCapBonus", amount: ACHIEVEMENT_REWARDS.flawlessTournament }
+            ...ACHIEVEMENT_REWARDS.flawlessTournament
         }
     },
     {
@@ -77,8 +75,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
             return Object.values(characters).some((record) => (record.comebackMatchWins ?? 0) > 0);
         },
         reward: {
-            type: "PROGRESSION_BONUS",
-            payload: { bonusKey: "balanceTolerance", amount: ACHIEVEMENT_REWARDS.comebackMatchWin }
+            ...ACHIEVEMENT_REWARDS.comebackMatchWin
         }
     },
     {
@@ -91,8 +88,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
             return (successCounts.counter ?? 0) >= 10;
         },
         reward: {
-            type: "PROGRESSION_BONUS",
-            payload: { bonusKey: "balanceTolerance", amount: ACHIEVEMENT_REWARDS.counterExpert }
+            ...ACHIEVEMENT_REWARDS.counterExpert
         }
     },
     {
@@ -106,8 +102,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
             return allActionIds.every((id) => usedIds.includes(id));
         },
         reward: {
-            type: "PROGRESSION_BONUS",
-            payload: { bonusKey: "extraStatPoints", amount: ACHIEVEMENT_REWARDS.allActionsUsed }
+            ...ACHIEVEMENT_REWARDS.allActionsUsed
         }
     },
     {
@@ -121,8 +116,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
             );
         },
         reward: {
-            type: "PROGRESSION_BONUS",
-            payload: { bonusKey: "perStatCapBonus", amount: ACHIEVEMENT_REWARDS.rosterChampion }
+            ...ACHIEVEMENT_REWARDS.rosterChampion
         }
     },
     {
@@ -137,8 +131,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
             });
         },
         reward: {
-            type: "PROGRESSION_BONUS",
-            payload: { bonusKey: "perStatCapBonus", amount: ACHIEVEMENT_REWARDS.masteryComplete }
+            ...ACHIEVEMENT_REWARDS.masteryComplete
         }
     },
     {
@@ -150,8 +143,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
             return (context.profile.collection.careerStats.playerMatchesCompleted ?? 0) >= 50;
         },
         reward: {
-            type: "PROGRESSION_BONUS",
-            payload: { bonusKey: "extraStatPoints", amount: ACHIEVEMENT_REWARDS.marathon50 }
+            ...ACHIEVEMENT_REWARDS.marathon50
         }
     },
     {
@@ -163,8 +155,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
             return context.report.matchReports.some((m) => (m.maxHitDamage ?? 0) >= 150);
         },
         reward: {
-            type: "PROGRESSION_BONUS",
-            payload: { bonusKey: "extraStatPoints", amount: ACHIEVEMENT_REWARDS.singleHitMonster }
+            ...ACHIEVEMENT_REWARDS.singleHitMonster
         }
     },
     {
@@ -177,8 +168,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
             return (career.bestTournamentWinStreak ?? 0) >= 3;
         },
         reward: {
-            type: "PROGRESSION_BONUS",
-            payload: { bonusKey: "extraStatPoints", amount: ACHIEVEMENT_REWARDS.tournamentStreak3 }
+            ...ACHIEVEMENT_REWARDS.tournamentStreak3
         }
     },
     {

@@ -41,14 +41,14 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         id: "trickster_versatility",
         sourceFighterId: "trickster",
         name: "다재다능",
-        kind: "allocation_modifier",
-        description: "스탯 밸런서 감도가 {value} 증가합니다.",
-        tierValues: MASTERY_TIERS.balanceTolerance,
+        kind: "physics_modifier",
+        description: "기본 속도 복원률이 {value} 증가합니다.",
+        tierValues: MASTERY_TIERS.velocityRecoveryBonus,
         formatValue(v) {
-            return v.toFixed(1);
+            return (v * 100).toFixed(0) + "%";
         },
         apply(ctx, level) {
-            ctx.allocationModifiers.balanceTolerance += this.tierValues[level];
+            ctx.physicsModifiers.velocityRecoveryBonus += this.tierValues[level];
         }
     },
     {
@@ -131,14 +131,14 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         id: "hero_inspiring_presence",
         sourceFighterId: "hero",
         name: "고무적인 존재감",
-        kind: "allocation_modifier",
-        description: "총 배분 포인트가 {value} 증가합니다.",
-        tierValues: MASTERY_TIERS.extraStatPoints,
+        kind: "physics_modifier",
+        description: "상대에게 가하는 충격량이 {value} 증가합니다.",
+        tierValues: MASTERY_TIERS.outgoingImpactBonus,
         formatValue(v) {
-            return String(v);
+            return (v * 100).toFixed(0) + "%";
         },
         apply(ctx, level) {
-            ctx.allocationModifiers.extraStatPoints += this.tierValues[level];
+            ctx.physicsModifiers.outgoingImpactBonus += this.tierValues[level];
         }
     },
     {

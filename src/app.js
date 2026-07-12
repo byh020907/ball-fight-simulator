@@ -10,17 +10,10 @@ import {
     createRandomStatAllocation,
     createTournamentRoster,
     getRemainingStatPoints,
-    updateEffectiveStatCap,
     adjustStatAllocation,
     formatStatAllocation,
     calculateStatMultiplier
 } from "./statAllocation.js";
-import { STAT_BALANCER_CONFIG as _STAT_BALANCER_CONFIG } from "./statAllocation.js";
-
-// 동적 import 헬퍼 (순환 참조 방지)
-function requireStatAllocation() {
-    return { STAT_BALANCER_CONFIG: _STAT_BALANCER_CONFIG };
-}
 import { ActionPickerService } from "./actionPicker.js";
 import { CollectionHubService } from "./collectionHubService.js";
 import { pickRandomActions, findActionById, showActionFailure } from "./clickActions.js";
@@ -40,7 +33,12 @@ import {
     applyExperienceEffectsToBall,
     applyExperienceEffectsToBaseSpec
 } from "./experience/experienceService.js";
-import { collectActiveEffects, MASTERY_EFFECT_DEFS, advanceCharacterMastery } from "./character-mastery/index.js";
+import {
+    collectActiveEffects,
+    MASTERY_EFFECT_DEFS,
+    advanceCharacterMastery,
+    getCharacterChallengeLevel
+} from "./character-mastery/index.js";
 import { createCollectionHubViewModel } from "./collection/collectionViewModel.js";
 import {
     createMatchReport,
@@ -54,14 +52,10 @@ import {
     recordActionHpCost,
     recordActionSuccess,
     ACHIEVEMENT_DEFINITIONS,
-    evaluateAchievements
+    evaluateAchievements,
+    grantAchievementReward,
+    formatAchievementReward
 } from "./collection/index.js";
-import {
-    computeEffectiveBonuses,
-    formatRewardDescription,
-    completeChallengeTournament,
-    formatBonusSummary
-} from "./progression/progressionState.js";
 import { getEligibleHuntingCharacters } from "./hunting/huntingState.js";
 import { HuntingManager } from "./hunting/huntingManager.js";
 import {
@@ -151,7 +145,6 @@ export class BattleApp {
         this.matchFinalized = false;
         this.transientOverlayToken = 0;
         this._previewBall = null;
-        this._currentChallengeLevel = 0;
         this._lastMasteryResult = null;
         this._lastXpResult = null;
         this._lastMatchXpResult = null;
@@ -383,31 +376,6 @@ export class BattleApp {
         CollectionHubService.render(vm);
     }
 
-    /** 스탯 배분 UI용 MAX_POINTS_PER_STAT 업데이트 및 유효 총 포인트 계산 */
-    _getStatBonusContext() {
-        const masteryCtx = this.playerProfile?.characterMastery?.levels
-            ? collectActiveEffects(this.playerProfile, this.playerFighterId)
-            : {
-                  allocationModifiers: { perStatCapBonus: 0, extraStatPoints: 0, balanceTolerance: 0 }
-              };
-        const computed = computeEffectiveBonuses(this.playerProfile, ACHIEVEMENT_DEFINITIONS);
-        const masteryPerStatCap = masteryCtx.allocationModifiers?.perStatCapBonus ?? 0;
-        const masteryExtra = masteryCtx.allocationModifiers?.extraStatPoints ?? 0;
-        return {
-            progressionPerStatCapBonus: computed.perStatCapBonus,
-            masteryPerStatCapBonus: masteryPerStatCap,
-            perStatCapBonus: computed.perStatCapBonus + masteryPerStatCap,
-            progressionExtraStatPoints: computed.extraStatPoints,
-            masteryExtraStatPoints: masteryExtra,
-            extraStatPoints: computed.extraStatPoints + masteryExtra
-        };
-    }
-
-    _updateStatCapForUI() {
-        const ctx = this._getStatBonusContext();
-        updateEffectiveStatCap(ctx.progressionPerStatCapBonus, ctx.masteryPerStatCapBonus);
-    }
-
     _getPlayerEquipmentSummary(characterId = this.playerFighterId) {
         const equipment = this.playerProfile?.equipment ?? {};
         const inventory = equipment.inventory ?? [];
@@ -532,37 +500,17 @@ export class BattleApp {
         this._syncPlayerStatAllocationFromUi();
     }
 
-    adjustChallengeLevel(delta) {
-        const next = this._panel.challengeLevel + delta;
-        if (next < 0 || next > this._panel.highestUnlockedLevel) return;
-        this._panel.challengeLevel = next;
-    }
-
     refreshPlayerSetup() {
-        this._updateStatCapForUI();
-        const bonusCtx = this._getStatBonusContext();
-        const effectiveTotal = PLAYER_STAT_POINTS + bonusCtx.extraStatPoints;
-        const remaining = getRemainingStatPoints(this.playerStatAllocation, effectiveTotal);
+        const remaining = getRemainingStatPoints(this.playerStatAllocation);
         const player = this.roster.find((fighter) => fighter.id === this.playerFighterId);
-        const cl = this.playerProfile?.progression?.challenge;
-        const balanceTol = computeEffectiveBonuses(this.playerProfile, ACHIEVEMENT_DEFINITIONS).balanceTolerance;
-        const bonusSummary = formatBonusSummary({
-            extraStatPoints: bonusCtx.extraStatPoints,
-            balanceTolerance: balanceTol,
-            perStatCapBonus: bonusCtx.perStatCapBonus
-        });
         const experienceSummary = getCharacterExperienceSummary(this.playerProfile, this.playerFighterId);
         const equipmentSummary = this._getPlayerEquipmentSummary(this.playerFighterId);
         this._panel.fighter = player ? { name: player.name, title: player.title, color: player.color } : null;
         this._panel.allocation = { ...this.playerStatAllocation };
-        this._panel.totalPoints = effectiveTotal;
-        this._panel.bonusPoints = bonusCtx.extraStatPoints;
+        this._panel.totalPoints = PLAYER_STAT_POINTS;
         this._panel.remainingPoints = remaining;
         const gameInProgress = Boolean((this.tournament && !this.tournament.champion) || this.hunting.isActive);
         this._panel.locked = gameInProgress;
-        this._panel.challengeLevel = cl?.selectedLevel ?? 0;
-        this._panel.highestUnlockedLevel = cl?.highestUnlockedLevel ?? 0;
-        this._panel.progressionBonusSummary = bonusSummary;
         this._panel.statDefs = ALLOCATABLE_STATS.map((s) => ({
             key: s.key,
             label: s.label,
@@ -795,15 +743,9 @@ export class BattleApp {
             this.returnToInitialState();
             return;
         }
-        // MAX_POINTS_PER_STAT 초기화 (이전 토너먼트에서 변경된 값 복원)
-        updateEffectiveStatCap(0, 0);
-
         // Sync allocation from Alpine (user may have clicked +/- buttons there)
         this._syncPlayerStatAllocationFromUi();
 
-        const bonusCtx = this._getStatBonusContext();
-        const effectiveTotal = PLAYER_STAT_POINTS + bonusCtx.extraStatPoints;
-        // 플레이어는 기본 100 포인트 이상을 반드시 배분해야 함 (보너스는 선택)
         const baseRemaining = getRemainingStatPoints(this.playerStatAllocation);
         if (baseRemaining > 0) {
             this._overlay.show({ label: "스탯 배분 필요", text: `${baseRemaining} 포인트 남음` });
@@ -821,28 +763,6 @@ export class BattleApp {
 
         // 연계 효과 계산: 해금된 ID 중 현재 캐릭터가 아닌 효과만 적용
         const masteryCtx = collectActiveEffects(this.playerProfile, this.playerFighterId);
-        // Alpine 상태에서 사용자 선택 반영 (프로필보다 우선)
-        const alpineChallengeLevel = this._panel.challengeLevel;
-        this._currentChallengeLevel =
-            alpineChallengeLevel ?? this.playerProfile?.progression?.challenge?.selectedLevel ?? 0;
-        // 프로필도 동기화
-        if (this.playerProfile?.progression?.challenge && alpineChallengeLevel !== undefined) {
-            this.playerProfile.progression.challenge.selectedLevel = alpineChallengeLevel;
-        }
-
-        // 숙련도 + 업적 보너스의 balanceTolerance를 SENSITIVITY에 반영 (동적 계산)
-        const computedBonuses = computeEffectiveBonuses(this.playerProfile, ACHIEVEMENT_DEFINITIONS);
-        const totalBalanceTol = masteryCtx.allocationModifiers.balanceTolerance + computedBonuses.balanceTolerance;
-        _STAT_BALANCER_CONFIG.SENSITIVITY = 20 + totalBalanceTol;
-
-        // 집중 투자 한도 업데이트 (업적 보너스 + 숙련도, 동적 계산)
-        const perStatCapBonus = computedBonuses.perStatCapBonus + masteryCtx.allocationModifiers.perStatCapBonus;
-        if (perStatCapBonus > 0) {
-            updateEffectiveStatCap(computedBonuses.perStatCapBonus, masteryCtx.allocationModifiers.perStatCapBonus);
-        }
-
-        // adjustedAllocation: 사용자가 UI에서 직접 배분한 값 그대로 사용
-        // (extraStatPoints는 이미 UI의 totalPoints에 포함되어 있으므로 별도 분배 불필요)
         const adjustedAllocation = { ...this.playerStatAllocation };
         const experienceEffectsByFighter = new Map([
             [this.playerFighterId, collectActiveExperienceEffects(this.playerProfile, this.playerFighterId)]
@@ -856,8 +776,7 @@ export class BattleApp {
             this.playerFighterId,
             adjustedAllocation,
             undefined,
-            undefined,
-            this._currentChallengeLevel
+            undefined
         );
         // 플레이어 fighter spec에 숙련도 스탯 보정 적용
         const playerSpec = this.tournamentRoster.find((f) => f.id === this.playerFighterId);
@@ -975,7 +894,8 @@ export class BattleApp {
         this.simulation = new BattleSimulation(
             match,
             {
-                assignActions: this.debug.aiEnabled || this._currentChallengeLevel > 0,
+                assignActions:
+                    this.debug.aiEnabled || getCharacterChallengeLevel(this.playerProfile, this.playerFighterId) > 0,
                 onLog: (message) => this._log.add(message),
                 onOvertime: () => {
                     this._updateStatus(label, "Overtime");
@@ -1459,7 +1379,8 @@ export class BattleApp {
                     const def = ACHIEVEMENT_DEFINITIONS.find((d) => d.id === result.id);
                     if (!def) continue;
 
-                    const rewardDesc = formatRewardDescription(def.reward);
+                    grantAchievementReward(this.playerProfile, def.reward);
+                    const rewardDesc = formatAchievementReward(def.reward);
                     let msg = `[업적 해금] ${def.name} (${def.tier})`;
                     if (rewardDesc) msg += ` — ${rewardDesc}`;
                     this._log.add(msg);
@@ -1470,7 +1391,7 @@ export class BattleApp {
             // 숙련도 승급 처리 (등급 기반)
             const masteryResult = advanceCharacterMastery(this.playerProfile, {
                 characterId: this.playerFighterId,
-                challengeLevel: this._currentChallengeLevel ?? 0,
+                challengeLevel: getCharacterChallengeLevel(this.playerProfile, this.playerFighterId),
                 playerWon
             });
             if (masteryResult.changed) {
@@ -1483,14 +1404,6 @@ export class BattleApp {
             savePlayerProfile(this.playerProfile);
             this._lastMasteryResult = masteryResult;
         }
-
-        // 도전 단계 해금 처리 (리포트 블록 밖에서도 접근 가능)
-        const challengeResult = this._currentTournamentReport
-            ? completeChallengeTournament(this.playerProfile, {
-                  selectedLevel: this._currentChallengeLevel,
-                  playerWon
-              })
-            : null;
 
         this._matchReports = [];
         this._currentTournamentReport = null;
@@ -1506,22 +1419,6 @@ export class BattleApp {
         // 경험치 요약
         const xpMsg = this._formatXpResult(this._lastMatchXpResult);
 
-        // 도전 단계 해금 메시지
-        let challengeMsg = "";
-        if (playerWon) {
-            const cl = this._currentChallengeLevel;
-            if (cl > 0) {
-                challengeMsg = `도전 단계 ${cl} 클리어`;
-            }
-            if (challengeResult?.unlocked) {
-                challengeMsg += `\n새로운 도전 단계 ${challengeResult.unlockedLevel} 해금!`;
-            } else if (cl > 0) {
-                challengeMsg += `\n최고 해금 단계 ${this.playerProfile?.progression?.challenge?.highestUnlockedLevel ?? cl}`;
-            }
-        } else {
-            challengeMsg = `도전 단계 ${this._currentChallengeLevel} 도전 실패\n해금 단계는 유지됩니다`;
-        }
-
         this._bracket.render(this.tournament);
         this.refreshPlayerSetup();
         this._overlay.show({
@@ -1529,7 +1426,7 @@ export class BattleApp {
             text: playerWon
                 ? `${champion.name} 우승${masteryMsg}`
                 : `${player.name} ${this.playerResult?.rankLabel ?? "결과 확정"}`,
-            subtext: [xpMsg, challengeMsg.replace(/\n/g, " | ")].filter(Boolean).join(" | "),
+            subtext: xpMsg,
             xpReward: this._createXpRewardView(this._lastMatchXpResult)
         });
         this._root.statusText = playerWon
@@ -1542,9 +1439,6 @@ export class BattleApp {
                 ? `축하합니다! 내 캐릭터 ${champion.name}가 토너먼트에서 우승했습니다.${masteryMsg}`
                 : `아쉽네요. 내 캐릭터 ${player.name}의 최종 성적은 ${this.playerResult?.rankLabel ?? "기록 없음"}입니다.`
         );
-        if (challengeMsg) {
-            this._log.add(challengeMsg.replace(/\n/g, " — "));
-        }
         this._startBtn.setState({ text: "확인", hidden: false, disabled: false });
         // 결과 확인 대기 상태
         this._pickPending = true;

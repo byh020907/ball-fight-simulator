@@ -4,7 +4,7 @@
 // Alpine 템플릿과 UIController는 이 ViewModel을 통해 데이터를 표시한다.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { formatRewardDescription } from "../progression/progressionState.js";
+import { formatAchievementReward } from "./achievementRewards.js";
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 import { getCharacterExperienceSummary } from "../experience/experienceService.js";
 import { canOpenHuntingChest, previewHuntingChest } from "../hunting/index.js";
@@ -149,7 +149,7 @@ export function createCollectionHubViewModel({
     const achievementItems = achievementDefinitions.map((def) => {
         const state = profile?.collection?.achievements?.[def.id];
         const unlocked = !!state?.unlockedAt;
-        const rewardDesc = formatRewardDescription(def.reward);
+        const rewardDesc = formatAchievementReward(def.reward);
         return {
             id: def.id,
             name: def.name,

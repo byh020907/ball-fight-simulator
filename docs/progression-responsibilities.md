@@ -1,6 +1,6 @@
 # 성장 책임 기준
 
-> 상태: 합의된 리팩터링 기준. 기존 구현은 이 문서로 단계적으로 정렬한다.
+> 상태: 업적 전투 보정, 숫자 도전 단계, 가변 스탯 배분 보정은 제거 완료. 구간별 상대 레벨 생성은 다음 단계에서 정렬한다.
 > 관련 문서: [experience-system.md](experience-system.md), [character-mastery-system.md](character-mastery-system.md), [collection-achievements-system.md](collection-achievements-system.md), [reward-balance.md](reward-balance.md)
 
 ## 1. 성장 축

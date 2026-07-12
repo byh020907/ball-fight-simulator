@@ -1,10 +1,5 @@
 export const PLAYER_STAT_POINTS = 100;
-export let MAX_POINTS_PER_STAT = 50;
-
-/** 성장 보너스 + 숙련도 보너스를 반영하여 MAX_POINTS_PER_STAT 업데이트 */
-export function updateEffectiveStatCap(progressionBonus = 0, masteryBonus = 0) {
-    MAX_POINTS_PER_STAT = 50 + progressionBonus + masteryBonus;
-}
+export const MAX_POINTS_PER_STAT = 50;
 
 export const ALLOCATABLE_STATS = [
     {
@@ -155,14 +150,7 @@ export function formatStatAllocation(allocation) {
  * - 전체 roster가 size 미만이면 → 가능한 모든 캐릭터 참가 (기존 부전승 로직 유지)
  * - 원본 roster 배열을 직접 변형하지 않음
  */
-export function createTournamentRoster(
-    roster,
-    playerId,
-    playerAllocation,
-    rng = Math.random,
-    size = 8,
-    challengeLevel = 0
-) {
+export function createTournamentRoster(roster, playerId, playerAllocation, rng = Math.random, size = 8) {
     // player 캐릭터에 statAllocation 적용
     const playerSpec = roster.find((f) => f.id === playerId);
     if (!playerSpec) return [];
@@ -170,18 +158,8 @@ export function createTournamentRoster(
     const player = applyStatAllocation(playerSpec, playerAllocation, true);
     const others = roster.filter((f) => f.id !== playerId);
 
-    // AI 강화 — challengeLevel이 0보다 클 때만 적용
-    const powerMult = challengeLevel > 0 ? 1 + challengeLevel * 0.025 : 1;
-    const aiTotalPoints = challengeLevel > 0 ? 100 + Math.min(challengeLevel * 4, 100) : 100;
     function makeAiFighter(fighter) {
-        const alloc = createRandomStatAllocation(rng, aiTotalPoints);
-        const spec = applyStatAllocation(fighter, alloc, false);
-        if (powerMult > 1) {
-            spec.stats.hp = Math.round(spec.stats.hp * powerMult);
-            spec.stats.damage = Math.round(spec.stats.damage * powerMult);
-            spec.stats.defense = Number((spec.stats.defense * powerMult).toFixed(2));
-        }
-        return spec;
+        return applyStatAllocation(fighter, createRandomStatAllocation(rng), false);
     }
 
     // 전체 roster가 size 미만이면 모두 참가 (기존 부전승 유지)

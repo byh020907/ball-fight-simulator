@@ -40,11 +40,6 @@
             x-show="!locked"
             x-text="' \u00B7 시작 전 ' + totalPoints + ' 포인트를 배분하세요.'"
         ></span>
-        <span
-            x-show="!locked && bonusPoints > 0"
-            class="bonus-points-badge"
-            x-text="' (+' + bonusPoints + ' 보너스)'"
-        ></span>
     </p>
     <div class="player-xp-meter">
         <div class="player-xp-head">
@@ -138,32 +133,6 @@
             </div>
         </template>
     </div>
-    <div class="challenge-level-row" x-show="!locked">
-        <span class="challenge-label">도전 단계</span>
-        <button
-            type="button"
-            class="challenge-btn"
-            @click="adjustChallengeLevel(-1)"
-            x-bind:disabled="challengeLevel <= 0"
-        >
-            -
-        </button>
-        <em class="challenge-value" x-text="challengeLevel"></em>
-        <button
-            type="button"
-            class="challenge-btn"
-            @click="adjustChallengeLevel(1)"
-            x-bind:disabled="challengeLevel >= highestUnlockedLevel"
-        >
-            +
-        </button>
-        <span class="challenge-max" x-text="'/ ' + highestUnlockedLevel"></span>
-    </div>
-    <div
-        class="bonus-summary"
-        x-show="progressionBonusSummary"
-        x-text="progressionBonusSummary"
-    ></div>
     <div class="player-actions" data-player-actions>
         <button
             class="action-btn"
@@ -205,13 +174,9 @@
         },
         allocation: {},
         totalPoints: 0,
-        bonusPoints: 0,
         remainingPoints: 0,
         locked: false,
         statDefs: [],
-        challengeLevel: 0,
-        highestUnlockedLevel: 0,
-        progressionBonusSummary: "",
         allocationSummary: "",
 
         adjustStat(key, delta) {

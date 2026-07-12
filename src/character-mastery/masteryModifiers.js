@@ -10,7 +10,6 @@ import { getCharacterMasteryLevel } from "./masteryState.js";
 function createMasteryContext() {
     return {
         statModifiers: { hp: 0, damage: 0, defense: 0 },
-        allocationModifiers: { extraStatPoints: 0, balanceTolerance: 0, perStatCapBonus: 0 },
         physicsModifiers: { incomingKnockbackReduce: 0, outgoingImpactBonus: 0, velocityRecoveryBonus: 0 },
         combatPassives: [],
         actionModifiers: { hpCostPercentReduction: 0, minHpCostPercent: 0 }
@@ -21,8 +20,6 @@ function clampMasteryContext(ctx) {
     const clamp = (val, max) => Math.max(0, Math.min(val, max));
     ctx.statModifiers.hp = clamp(ctx.statModifiers.hp, 0.12);
     ctx.statModifiers.damage = clamp(ctx.statModifiers.damage, 0.12);
-    ctx.allocationModifiers.extraStatPoints = clamp(ctx.allocationModifiers.extraStatPoints, 10);
-    ctx.allocationModifiers.balanceTolerance = clamp(ctx.allocationModifiers.balanceTolerance, 3);
     ctx.physicsModifiers.incomingKnockbackReduce = clamp(ctx.physicsModifiers.incomingKnockbackReduce, 0.15);
     ctx.physicsModifiers.outgoingImpactBonus = clamp(ctx.physicsModifiers.outgoingImpactBonus, 0.1);
     ctx.physicsModifiers.velocityRecoveryBonus = clamp(ctx.physicsModifiers.velocityRecoveryBonus, 0.1);
