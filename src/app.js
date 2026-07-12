@@ -1379,7 +1379,7 @@ export class BattleApp {
                     const def = ACHIEVEMENT_DEFINITIONS.find((d) => d.id === result.id);
                     if (!def) continue;
 
-                    grantAchievementReward(this.playerProfile, def.reward);
+                    grantAchievementReward(this.playerProfile, def);
                     const rewardDesc = formatAchievementReward(def.reward);
                     let msg = `[업적 해금] ${def.name} (${def.tier})`;
                     if (rewardDesc) msg += ` — ${rewardDesc}`;
