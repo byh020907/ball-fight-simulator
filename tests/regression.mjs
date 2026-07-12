@@ -13053,6 +13053,10 @@ function testDailyShopPopupContract() {
     assert.ok(template.includes("shopRerolling"), "Shop rerolls should trigger a visible transition state");
     assert.ok(template.includes("ch-shop-chest"), "Shop offers should reuse the chest icon component");
     assert.ok(
+        template.includes("x-component=\"'chest-icon'\""),
+        "Dynamically shown shop chest must mount its template"
+    );
+    assert.ok(
         template.includes("ch-shop-chest-reroll"),
         "Shop rerolls should animate the chest even at the same rarity"
     );
