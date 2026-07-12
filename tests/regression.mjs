@@ -2584,8 +2584,8 @@ function testAbilityLevelUpgrades(app) {
     spinBase.state.timeWithoutCollision = spinBase.getMaxChargeTime();
     assertClose(
         spinBase.getTargetSpinVelocity(),
-        20,
-        "Spin Ball should reach a visibly fast 20rad/s charge target without changing collision damage rules"
+        Math.PI * 20,
+        "Spin Ball should reach a physical 10-revolutions-per-second charge target without changing collision damage rules"
     );
     setSpinVelocity(spinBase, spinBase.getTargetSpinVelocity());
     const spinVisualSpeedBonus = calculateRotationalContactDamageBonus(spinBaseRun.ball, {
@@ -2610,7 +2610,7 @@ function testAbilityLevelUpgrades(app) {
     );
     spinGripRun.ball.position = new Vector2(420, 360);
     spinGripRun.target.position = new Vector2(420 + spinGripRun.ball.radius + spinGripRun.target.radius - 1, 360);
-    setBallVelocity(spinGripRun.ball, new Vector2(80, 0));
+    setBallVelocity(spinGripRun.ball, new Vector2(220, 0));
     setBallVelocity(spinGripRun.target, new Vector2(0, 0));
     setBallAngularVelocity(spinGripRun.target, 0);
     spinGrip.state.timeWithoutCollision = spinGrip.getMaxChargeTime();
@@ -2618,7 +2618,7 @@ function testAbilityLevelUpgrades(app) {
     const targetLateralVelocityBefore = spinGripRun.target.velocity.y;
     spinGripRun.sim.handleCollision();
     assert.ok(
-        Math.abs(spinGripRun.target.velocity.y - targetLateralVelocityBefore) > 120,
+        Math.abs(spinGripRun.target.velocity.y - targetLateralVelocityBefore) > 300,
         "Spin Ball should transfer its actual rotation through high-friction tangential physics"
     );
 

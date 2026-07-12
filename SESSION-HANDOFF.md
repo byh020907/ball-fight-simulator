@@ -1180,6 +1180,13 @@
 - 수치: `spinGrip` 마찰 16은 기본 러버와 조합 시 약 1.789다. 실제 Ability 경로는 19.97rad/s까지 도달한다. 20rad/s·80px/s 정면 충돌에서 상대 횡발사량은 기본 15.5px/s에서 138.5px/s로, 220px/s 충돌에서는 42.6px/s에서 167.7px/s로 증가했다.
 - 검증: 임시 `scripts/spinballGripStudy.mjs`로 실제 BattleSimulation 충돌을 계측한 뒤 제거. `npm test`, `npm run check`, `npm run format:check`, `git diff --check` 통과. 로컬 서버의 `v0.24.62` 응답도 확인.
 
+## [L1] 2026-07-12 — 스핀볼의 만충 회전을 초당 10회로 올린다
+- 맥락: 고마찰 재질로 실제 회전 전달을 강화한 뒤, 사용자가 만충 회전 자체를 초당 10회로 높이도록 요청했다.
+- 결정: 최대 실제 각속도를 `20πrad/s`로 설정한다. 각속도는 기존 토크 추종으로 만들고, 충돌 전달은 기존 `spinGrip`과 공통 접선 충격 solver를 그대로 사용한다.
+- 영향: Spin Ability, 회전·충돌 회귀와 물리 시뮬레이션, 게임 규칙·밸런스·패치 노트와 버전 표기
+- 수치: 실제 Ability 경로는 만충 시 62.75rad/s에 도달했다. 220px/s 전투원 충돌 횡발사량은 380.9px/s, 정면 벽 반사각은 74.4도였다.
+- 검증: 임시 `scripts/spinballTenRpsStudy.mjs`로 실제 BattleSimulation 경로를 계측한 뒤 제거. `npm test`, `npm run check`, `npm run format:check`, `git diff --check` 통과. 로컬 서버의 `v0.24.63` 응답도 확인.
+
 ## 진행 중 이슈
 - 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
 - Time Warp 패널티 인상은 재학습 후 반영
