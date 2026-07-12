@@ -10392,6 +10392,37 @@ function testCollectionCharacterDetailTabsContract() {
     console.log("[collection-character-detail-tabs] ok");
 }
 
+function testCollectionHubNestedPopupCloseContract() {
+    const collectionHub = readFileSync("src/components/collection-hub.html", "utf8");
+    const popupDialog = readFileSync("src/components/popup-dialog.html", "utf8");
+
+    assert.ok(
+        collectionHub.includes('@click.outside="closeCollectionHubIfOutsideModal($event)"'),
+        "Collection hub should delegate outside clicks through the nested modal boundary"
+    );
+    assert.ok(
+        collectionHub.includes('event.target.closest("[data-modal-layer]")'),
+        "Collection hub should ignore clicks originating from a nested modal layer"
+    );
+    assert.ok(
+        collectionHub.includes('@keydown.escape="closeCollectionHubIfNoNestedModal()"'),
+        "Collection hub should not close itself while a nested popup handles Escape"
+    );
+    assert.ok(
+        collectionHub.includes('return Alpine.store("uiManager").requireComponent("popupDialog").visible;'),
+        "Collection hub should read nested popup visibility through uiManager"
+    );
+    assert.ok(
+        popupDialog.includes('data-modal-layer="popup-dialog"'),
+        "Popup dialog should expose its modal layer boundary"
+    );
+    assert.ok(
+        popupDialog.includes("@keydown.escape.window=\"visible && closePopup('close')\""),
+        "Popup dialog should own Escape while it is visible"
+    );
+    console.log("[collection-hub-nested-popup-close-contract] ok");
+}
+
 function testHuntingOverlayResetContract() {
     const content = readFileSync("src/components/game-overlay.html", "utf8");
     assert.ok(content.includes("resetHuntingState()"), "Game overlay should expose an explicit hunting state reset");
@@ -11379,6 +11410,7 @@ testHuntingMerchantPurchaseRefreshesUiState();
 testHuntingMerchantMobileScrollContract();
 testHuntingChestIconReuseContract();
 testCollectionCharacterDetailTabsContract();
+testCollectionHubNestedPopupCloseContract();
 testHuntingOverlayResetContract();
 testAppLifecycleTransitions();
 testResultConfirmationReturnsInitialState();

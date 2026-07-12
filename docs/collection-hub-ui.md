@@ -331,6 +331,7 @@ clearCollectionSearch(tabId);
 - 탭: `role="tab"`, `aria-selected`, `aria-controls`
 - 탭 콘텐츠: `role="tabpanel"`
 - `Escape`: 팝업 닫기
+- 보관함에서 연 상자 결과처럼 하위 모달이 보이면, 클릭과 `Escape`는 하위 모달만 닫고 컬렉션 허브는 유지합니다.
 - 좌우 방향키: 탭 이동
 - 팝업이 열리면 닫기 버튼 또는 활성 탭으로 포커스 이동
 - 닫으면 컬렉션 진입 버튼으로 포커스 복귀
@@ -368,6 +369,10 @@ clearCollectionSearch(tabId);
     </section>
 </div>
 ```
+
+### 중첩 결과 모달
+
+컬렉션 허브 자체는 독립 Alpine 오버레이이지만, 보관함 상자 개봉 결과처럼 짧은 하위 결과는 `PopupService`를 사용합니다. 하위 결과 오버레이는 `data-modal-layer`를 선언하고, 컬렉션 허브의 바깥 클릭 처리와 `Escape` 처리는 이 레이어가 열린 동안 상위 닫기로 전파하지 않습니다. 따라서 결과를 닫아도 보관함 탭과 현재 상태는 유지됩니다.
 
 데이터 흐름:
 

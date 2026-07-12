@@ -6,12 +6,12 @@
     role="dialog"
     aria-modal="true"
     aria-label="컬렉션"
-    @keydown.escape="closeCollectionHub()"
+    @keydown.escape="closeCollectionHubIfNoNestedModal()"
     @keydown.left.prevent="setCollectionTab(state.tabs[Math.max(0, state.tabs.findIndex(t => t.id === state.activeTab) - 1)]?.id)"
     @keydown.right.prevent="setCollectionTab(state.tabs[Math.min(state.tabs.length - 1, state.tabs.findIndex(t => t.id === state.activeTab) + 1)]?.id)"
     tabindex="-1"
 >
-    <div class="ch-frame" @click.outside="closeCollectionHub()">
+    <div class="ch-frame" @click.outside="closeCollectionHubIfOutsideModal($event)">
         <div class="ch-header">
             <strong class="ch-title">컬렉션</strong>
             <span class="ch-summary">
@@ -509,6 +509,18 @@
             state.selectedCharacterId = null;
         }
 
+        function hasVisiblePopupDialog() {
+            return Alpine.store("uiManager").requireComponent("popupDialog").visible;
+        }
+
+        function closeCollectionHubIfNoNestedModal() {
+            if (!hasVisiblePopupDialog()) closeCollectionHub();
+        }
+
+        function closeCollectionHubIfOutsideModal(event) {
+            if (!event.target.closest("[data-modal-layer]")) closeCollectionHub();
+        }
+
         function setCollectionTab(tabId) {
             const validTabs = state.tabs.length > 0 ? state.tabs.map((t) => t.id) : ["roster"];
             if (validTabs.includes(tabId)) state.activeTab = tabId;
@@ -527,6 +539,8 @@
         return {
             state,
             closeCollectionHub,
+            closeCollectionHubIfNoNestedModal,
+            closeCollectionHubIfOutsideModal,
             setCollectionTab,
             setCollectionFilter,
             selectCollectionCharacter,

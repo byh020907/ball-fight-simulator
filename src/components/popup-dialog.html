@@ -1,9 +1,11 @@
 <div
     x-data="popupDialog"
     class="bf-popup-overlay"
+    data-modal-layer="popup-dialog"
     x-show="visible"
     x-transition.opacity.duration.200ms
     @click.self="closeOnOutside === false || closePopup('close')"
+    @keydown.escape.window="visible && closePopup('close')"
 >
     <div class="bf-popup-card">
         <div class="bf-popup-scroll">

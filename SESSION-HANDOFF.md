@@ -1123,6 +1123,12 @@
 - 영향: `src/hunting/huntingConfig.js`, `src/hunting/huntingRewards.js`, `src/hunting/chestRewards.js`, `src/hunting/huntingEncounters.js`, `src/hunting/huntingState.js`, `src/hunting/huntingManager.js`, `tests/regression.mjs`, `docs/hunting-grounds-system.md`, `SESSION-HANDOFF.md`
 - 검증: `npm test`, `npm run check`, `npm run format:check` 통과
 
+## [L1] 2026-07-12 — 상자 결과를 닫아도 보관함을 유지
+- 맥락: 컬렉션 보관함에서 장비 상자를 열면 결과 팝업은 컬렉션 프레임 밖의 별도 오버레이로 렌더링됩니다. 결과의 확인 또는 배경 닫기 클릭이 컬렉션의 `@click.outside`에 바깥 클릭으로 잡혀, 결과를 닫을 때 보관함도 함께 닫혔습니다.
+- 결정: `PopupService` 결과 오버레이에 `data-modal-layer` 경계를 선언하고, 컬렉션 허브는 이 경계에서 발생한 클릭을 상위 닫기로 처리하지 않습니다. 하위 결과가 보이는 동안 `Escape`도 결과 팝업만 닫도록 합니다.
+- 영향: `src/components/collection-hub.html`, `src/components/popup-dialog.html`, `tests/regression.mjs`, `docs/collection-hub-ui.md`, `src/patchNotes.js`, `index.html`
+- 검증: `npm test`, `npm run check`, `npm run format:check`, `git diff --check` 통과. 로컬 브라우저에서 컬렉션 오버레이와 패치 노트 정상 표시 확인.
+
 ## 진행 중 이슈
 - 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
 - Time Warp 패널티 인상은 재학습 후 반영
