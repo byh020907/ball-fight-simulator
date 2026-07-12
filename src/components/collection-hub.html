@@ -247,7 +247,6 @@
                             class="ch-ach-card"
                             x-bind:class="'ch-ach-tier--' + item.tier + (item.unlocked ? ' unlocked' : '')"
                         >
-                            <chest-icon x-bind:data-rarity="item.rarity"></chest-icon>
                             <div class="ch-ach-info">
                                 <strong x-text="item.name"></strong>
                                 <span class="ch-ach-desc" x-text="item.description"></span>
@@ -1128,12 +1127,6 @@
         border: 1px solid #dddddd;
         border-radius: 8px;
         background: #fafafa;
-    }
-
-    .ch-ach-card chest-icon {
-        --chest-icon-scale: 0.55;
-        flex: 0 0 auto;
-        align-self: center;
     }
 
     .ch-ach-card.unlocked {

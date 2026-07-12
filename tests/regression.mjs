@@ -10722,7 +10722,10 @@ function testHuntingChestIconReuseContract() {
     const collectionHub = readFileSync("src/components/collection-hub.html", "utf8");
     assert.ok(chestIcon.includes('chest-icon[data-rarity="rare"]'), "Chest icon should own rarity color variants");
     assert.ok(overlay.includes("<chest-icon"), "Hunting chest event should render the shared chest icon");
-    assert.ok(collectionHub.includes("<chest-icon"), "Collection storage should render the shared chest icon");
+    assert.ok(
+        collectionHub.includes("ch-shop-chest"),
+        "The shop should render the shared chest icon for its chest offer"
+    );
     console.log("[hunting-chest-icon-reuse] ok");
 }
 
@@ -13077,6 +13080,10 @@ function testDailyShopPopupContract() {
     assert.ok(template.includes('@click.self="closeShop()"'), "Shop backdrop should close only the shop popup");
     assert.ok(template.includes(".ch-ach-info {"), "Collection cards should define their shared info layout");
     assert.ok(template.includes("flex: 1;"), "Collection card info should occupy remaining horizontal space");
+    assert.ok(
+        !template.includes('<chest-icon x-bind:data-rarity="item.rarity">'),
+        "Achievement rows should not repeat a chest icon for every achievement"
+    );
     assert.ok(
         template.includes(".ch-btn:not(:disabled):hover"),
         "Collection buttons should have an enabled hover state"
