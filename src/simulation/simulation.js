@@ -62,12 +62,19 @@ export class Simulation {
     keepInsideArena(ball) {
         const xBounce = this._reflectX(ball);
         const yBounce = this._reflectY(ball);
-        resolveTerrainCollisions(ball, this.terrain);
-        if (!xBounce && !yBounce) return;
+        const terrainCollision = resolveTerrainCollisions(ball, this.terrain);
+        if (!xBounce && !yBounce && !terrainCollision) return;
 
         ball.bounced = true;
-        ball.applyEquipmentWallBounce?.(xBounce, yBounce);
-        ball.state.wallSlam?.onWallBounce(ball, xBounce ?? yBounce, this);
+        if (xBounce || yBounce) {
+            ball.applyEquipmentWallBounce?.(xBounce, yBounce);
+            ball.state.wallSlam?.onWallBounce(ball, xBounce ?? yBounce, this);
+        }
+        this.notifyFighterStaticCollision?.(ball, {
+            wall: Boolean(xBounce || yBounce),
+            terrain: terrainCollision,
+            normal: xBounce ?? yBounce ?? null
+        });
     }
 
     keepEntityInsideArena(entity) {
@@ -142,8 +149,8 @@ export class Simulation {
         this.entities.push(new SeedOrb(owner, position, velocity, life));
     }
 
-    spawnGrenade(owner, targetPosition, fuseTime) {
-        this.entities.push(new Grenade(owner, targetPosition, fuseTime));
+    spawnGrenade(owner, targetPosition, fuseTime, options = {}) {
+        this.entities.push(new Grenade(owner, targetPosition, fuseTime, options));
     }
 
     spawnOrbitShot(owner, position, direction, size) {

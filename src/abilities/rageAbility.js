@@ -24,7 +24,7 @@ export class RageAbility extends Ability {
     getMaxChargeTime() {
         const skill = this.owner.getSkillPoints?.() ?? this.owner.stats?.allocation?.skill ?? 0;
         const factor = 100 / (100 + skill);
-        return this._baseMaxChargeTime * factor;
+        return this._baseMaxChargeTime * factor * (this.getLevelUpgrade().maxChargeTimeMultiplier ?? 1);
     }
 
     update(delta) {
@@ -52,7 +52,7 @@ export class RageAbility extends Ability {
             this.simulation.playSound("rage", 0.75);
             this.simulation.addLog(`${this.owner.name}'s momentum resets on impact.`);
         }
-        this.state.timeWithoutCollision = 0;
+        this.state.timeWithoutCollision = this.getMaxChargeTime() * (this.getLevelUpgrade().chargeRetentionRatio ?? 0);
     }
 
     getChargeProgress() {
@@ -65,11 +65,12 @@ export class RageAbility extends Ability {
 
     getStatModifiers() {
         const charge = this.getChargeProgress();
+        const maxImpact = 1.52 * (this.getLevelUpgrade().maxImpactMultiplier ?? 1);
         return {
             speed: 0.78 + charge * 4.22,
             damage: 0.96 + charge * 0.34,
             defense: 1,
-            impact: 0.9 + charge * 0.62
+            impact: 0.9 + charge * (maxImpact - 0.9)
         };
     }
 

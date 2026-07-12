@@ -6,7 +6,7 @@ const EXPLOSION_RADIUS = 174;
 const EXPLOSION_INNER_RADIUS = 72;
 
 export class Grenade extends CombatEntity {
-    constructor(owner, targetPosition, fuseTime = 1.08) {
+    constructor(owner, targetPosition, fuseTime = 1.08, options = {}) {
         const start = owner.position.clone();
         const safeFuse = Math.max(0.32, fuseTime);
         const drift = Vector2.subtract(targetPosition, start).scale(1 / safeFuse);
@@ -17,8 +17,9 @@ export class Grenade extends CombatEntity {
         this.maxTimer = this.timer;
         this.launchSpeed = drift.length();
         this._proximityFuseMultiplier = 1;
-        this.explosionRadius = EXPLOSION_RADIUS;
-        this.innerRadius = EXPLOSION_INNER_RADIUS;
+        this.explosionRadius = EXPLOSION_RADIUS * (options.explosionRadiusMultiplier ?? 1);
+        this.innerRadius = EXPLOSION_INNER_RADIUS * (options.explosionRadiusMultiplier ?? 1);
+        this.damageMultiplier = options.damageMultiplier ?? 1;
         this.bounces = 0;
         this.maxBounces = 4;
     }
@@ -84,7 +85,9 @@ export class Grenade extends CombatEntity {
                     0,
                     Math.min(1, (distance - this.innerRadius) / (this.explosionRadius - this.innerRadius))
                 );
-                const raw = Math.round(this.owner.stats.baseDamage * (2.5 - edgeProgress * 1.0));
+                const raw = Math.round(
+                    this.owner.stats.baseDamage * (2.5 - edgeProgress * 1.0) * this.damageMultiplier
+                );
                 dealProjectileDamage(target, raw, this.owner, "Grenade", simulation);
                 const kbDir = Vector2.subtract(target.position, this.position).normalize();
                 target.applyKnockback(kbDir.scale(900), 1.3);

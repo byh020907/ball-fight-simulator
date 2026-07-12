@@ -102,7 +102,7 @@ export class EaterAbility extends Ability {
         this.state.hasEatenThisFeast = true;
         this.state.feastTimer = 0;
         this.state.swallowedTarget = target;
-        this.state.swallowTimer = SWALLOW_HOLD_DURATION;
+        this.state.swallowTimer = this._getSwallowHoldDuration();
         this.state.spitDirection =
             this.owner.velocity.length() > 0
                 ? this.owner.velocity.clone().normalize()
@@ -156,14 +156,40 @@ export class EaterAbility extends Ability {
         target.state.wallSlam = new WallSlamEffect({
             source: this.owner,
             damage: WALL_SLAM_DAMAGE,
-            duration: SPIT_MAX_DURATION
+            duration: SPIT_MAX_DURATION * (this.getLevelUpgrade().wallSlamDurationMultiplier ?? 1)
         });
+        this._applySpitAngularImpulse(target, direction);
         this.simulation.keepInsideArena(target);
         this.simulation.playSound("spit", 1.2);
         this.simulation.spawnSlash(this.owner.position.clone(), target.position.clone(), this.owner.color);
         this.simulation.addSparkBurst(target.position.clone(), this.owner.color);
         this.simulation.addLog(`${this.owner.name} spits ${target.name} into the walls.`);
         this.state.swallowedTarget = null;
+    }
+
+    _getSwallowHoldDuration() {
+        return SWALLOW_HOLD_DURATION * (this.getLevelUpgrade().swallowHoldDurationMultiplier ?? 1);
+    }
+
+    _applySpitAngularImpulse(target, direction) {
+        const multiplier = this.getLevelUpgrade().spitAngularVelocityMultiplier ?? 1;
+        if (multiplier <= 1 || target.rotationEnabled === false || typeof target.applyAngularImpulse !== "function")
+            return;
+
+        const radius = Math.max(1, target.radius ?? 1);
+        const currentAngularVelocity = target.angularVelocity ?? 0;
+        const fallbackAngularVelocity = (target.stats.baseSpeed * SPIT_SPEED_MULTIPLIER) / radius;
+        const directionSign = direction.x >= 0 ? 1 : -1;
+        const sourceAngularVelocity =
+            Math.abs(currentAngularVelocity) > 0.01 ? currentAngularVelocity : fallbackAngularVelocity * directionSign;
+        const angularVelocityDelta = sourceAngularVelocity * (multiplier - 1);
+        const inverseMoment = target._inverseMomentOfInertia;
+        const impulse =
+            Number.isFinite(inverseMoment) && inverseMoment > 0
+                ? angularVelocityDelta / inverseMoment
+                : angularVelocityDelta * 0.5 * (target.mass ?? 1) * radius ** 2;
+
+        target.applyAngularImpulse(impulse);
     }
 
     draw(ctx) {
@@ -230,7 +256,10 @@ export class EaterAbility extends Ability {
 
     getUiState() {
         if (this.state.swallowedTarget) {
-            return { label: "Eating", progress: Math.max(0, Math.min(1, this.state.swallowTimer / 0.72)) };
+            return {
+                label: "Eating",
+                progress: Math.max(0, Math.min(1, this.state.swallowTimer / this._getSwallowHoldDuration()))
+            };
         }
         if (this.state.feastTimer > 0) {
             return { label: "Feast", progress: Math.max(0, Math.min(1, this.state.feastTimer / this.feastDuration)) };

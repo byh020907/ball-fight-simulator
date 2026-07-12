@@ -305,6 +305,11 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         damageFromBToA = bCollision.outgoingDamage;
         damageFromAToB = bCollision.incomingDamage;
 
+        damageFromAToB =
+            a.ability?.modifyOutgoingFighterCollisionDamage?.(damageFromAToB, b, context) ?? damageFromAToB;
+        damageFromBToA =
+            b.ability?.modifyOutgoingFighterCollisionDamage?.(damageFromBToA, a, context) ?? damageFromBToA;
+
         const damageToA = damageFromBToA > 0 ? a.takeDamage(damageFromBToA, b, "Crash").actualDamage : 0;
         const damageToB = damageFromAToB > 0 ? b.takeDamage(damageFromAToB, a, "Crash").actualDamage : 0;
 
@@ -390,6 +395,8 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         if (!context.hostile) return;
 
         const { a, b, contactPoint } = context;
+        a.ability?.onFighterCollisionDamageResolved?.(b, context.damageFromAToB, context);
+        b.ability?.onFighterCollisionDamageResolved?.(a, context.damageFromBToA, context);
         this._handleDashCollisions(a, b, contactPoint);
 
         a.ability?.onCollision(b, { contactPoint });
@@ -399,6 +406,12 @@ export class BattleSimulation extends FighterPhysicsSimulation {
 
     shouldEmitFighterCollisionFeedback(context) {
         return context.hostile && context.approachSpeed < 0;
+    }
+
+    notifyFighterStaticCollision(fighter, context) {
+        for (const observer of this.fighters) {
+            observer.ability?.onFighterStaticCollision?.(fighter, context);
+        }
     }
 
     emitFighterCollisionFeedback(context) {

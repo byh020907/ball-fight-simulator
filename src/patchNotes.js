@@ -19,6 +19,21 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.24.45",
+        date: "2026-07-12",
+        title: "v0.24.45 레벨업이 대표 행동을 강화합니다",
+        changes: [
+            {
+                type: "feature",
+                text: "Lv.3, Lv.6, Lv.9에 각 캐릭터의 대표 행동을 강화하는 보상을 추가했습니다. 공통 스탯 보상은 제거됩니다."
+            },
+            {
+                type: "feature",
+                text: "Hero의 축적·방출과 Phantom의 표식 연계를 포함한 12개 캐릭터 강화가 토너먼트와 사냥터에 적용됩니다."
+            }
+        ]
+    },
+    {
         version: "0.24.44",
         date: "2026-07-12",
         title: "v0.24.44 아처가 이동을 예측해 쏩니다",

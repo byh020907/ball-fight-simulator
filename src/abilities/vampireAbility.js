@@ -26,18 +26,21 @@ export class VampireAbility extends Ability {
 
     _spawnBats(target) {
         const owner = this.owner;
+        const upgrade = this.getLevelUpgrade();
         const baseAngle = Math.atan2(target.position.y - owner.position.y, target.position.x - owner.position.x);
         const spreadRad = (BAT_SPREAD_DEG * Math.PI) / 180;
-        const speed = owner.stats.baseSpeed * BAT_SPEED_MULT;
+        const speed = owner.stats.baseSpeed * BAT_SPEED_MULT * (upgrade.batSpeedMultiplier ?? 1);
 
         const bats = [];
-        const total = BAT_COUNT;
+        const total = Math.round(BAT_COUNT * (upgrade.batCountMultiplier ?? 1));
         for (let i = 0; i < total; i++) {
             const t = total > 1 ? i / (total - 1) - 0.5 : 0;
             const angle = baseAngle + t * spreadRad;
             const dir = new Vector2(Math.cos(angle), Math.sin(angle));
             const start = Vector2.add(owner.position, dir.clone().scale(owner.radius + 16));
-            const bat = new BatProjectile(owner, start, dir.clone().scale(speed), bats);
+            const bat = new BatProjectile(owner, start, dir.clone().scale(speed), bats, {
+                lifeMultiplier: upgrade.batLifeMultiplier ?? 1
+            });
             bats.push(bat);
             this.simulation.entities.push(bat);
         }

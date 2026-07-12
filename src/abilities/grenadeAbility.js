@@ -37,7 +37,10 @@ export class GrenadeAbility extends Ability {
     }
 
     _startBurst(target) {
-        this._burstTotal = BURST_COUNT_MIN + Math.floor(Math.random() * (BURST_COUNT_MAX - BURST_COUNT_MIN + 1));
+        const burstCountMultiplier = this.getLevelUpgrade().burstCountMultiplier ?? 1;
+        const minCount = Math.round(BURST_COUNT_MIN * burstCountMultiplier);
+        const maxCount = Math.round(BURST_COUNT_MAX * burstCountMultiplier);
+        this._burstTotal = minCount + Math.floor(Math.random() * (maxCount - minCount + 1));
         this._burstRemaining = this._burstTotal;
         this._burstTimer = BURST_INTERVAL;
         this._fireNext(target);
@@ -56,7 +59,11 @@ export class GrenadeAbility extends Ability {
         const projectileSpeed = (this.owner.stats?.baseSpeed ?? BASE_GRENADE_SPEED) * PROJECTILE_SPEED_MULTIPLIER;
         const targetPos = Vector2.add(this.owner.position, dir.clone().scale(projectileSpeed * fuse));
 
-        this.simulation.spawnGrenade(this.owner, targetPos, fuse);
+        const upgrade = this.getLevelUpgrade();
+        this.simulation.spawnGrenade(this.owner, targetPos, fuse, {
+            explosionRadiusMultiplier: upgrade.explosionRadiusMultiplier ?? 1,
+            damageMultiplier: upgrade.damageMultiplier ?? 1
+        });
 
         this._burstRemaining--;
         this._burstTimer = BURST_INTERVAL;

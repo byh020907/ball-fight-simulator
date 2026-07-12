@@ -1,4 +1,5 @@
 import { mixins, Cooldown } from "../physics/index.js";
+import { getAbilityUpgrade } from "../experience/abilityUpgradeConfig.js";
 
 export class Ability extends mixins([Cooldown]) {
     /** @type {Record<string, typeof Ability>} */
@@ -24,6 +25,10 @@ export class Ability extends mixins([Cooldown]) {
 
     getLevelRewardModifier(modifierId, fallback = 0) {
         return this.owner.levelRewardModifiers?.[this.owner.abilityId]?.[modifierId] ?? fallback;
+    }
+
+    getLevelUpgrade() {
+        return getAbilityUpgrade(this.owner.abilityId, this.getLevelRewardModifier("tier"));
     }
 
     set cooldown(val) {

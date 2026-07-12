@@ -156,7 +156,7 @@ import {
     registerAlpineComponentSystem,
     resolveTemplateComponent
 } from "../src/alpineTemplateComponents.js";
-import { BattleBall, computeHeroOrbCarryover, STAT_ORB_KEYS } from "../src/entities/index.js";
+import { BattleBall, computeHeroOrbCarryover, HeroOrb, STAT_ORB_KEYS } from "../src/entities/index.js";
 import { MobAppearance } from "../src/entities/mobAppearance.js";
 import { PHYSICS_MATERIALS, resolvePhysicsMaterial, combinePhysicsMaterials } from "../src/physics/PhysicsMaterial.js";
 import PhysicsMaterialBody from "../src/physics/PhysicsMaterialBody.js";
@@ -1861,11 +1861,18 @@ function testExperienceSystem() {
     assert.equal(levelUpResult.levelUp, true, "Crossing the level threshold should be reported");
     assert.equal(levelUpResult.previousLevel, 1, "Level-up result should expose the previous level");
     assert.equal(levelUpResult.level, 2, "Level-up result should expose the new level");
-    assert.deepEqual(
-        levelUpResult.earnedRewards.map((reward) => reward.text),
-        ["HP +2"]
+    assert.deepEqual(levelUpResult.earnedRewards, [], "Non-tier levels should not grant a direct combat reward");
+    assert.equal(
+        levelUpResult.nextRewardText,
+        "Lv.3 · 대표 행동 강화 I",
+        "Level-up result should expose the next ability tier and level"
     );
-    assert.equal(levelUpResult.nextRewardText, "공격 +1", "Level-up result should expose the next reward");
+    profile.experience.byCharacter[FIGHTER_IDS.DASH].currentXp = getLevelRequirement(4);
+    assert.equal(
+        getCharacterExperienceSummary(profile, FIGHTER_IDS.DASH).nextRewardText,
+        "Lv.6 · 대표 행동 강화 II",
+        "Ability reward gaps should point to the next configured ability tier"
+    );
 
     const allRewardEffects = LEVEL_REWARDS.filter(Boolean).map((reward) => reward.effect);
     allRewardEffects.forEach((effect) => {
@@ -1873,11 +1880,10 @@ function testExperienceSystem() {
     });
     assert.deepEqual(
         getExperienceRewardsBetween(1, 3).map((reward) => reward.text),
-        ["HP +2", "공격 +1"],
-        "Level ranges should expose every earned reward in order"
+        ["대표 행동 강화 I"],
+        "Level ranges should expose only the configured ability tier rewards"
     );
 
-    profile.experience.byCharacter[FIGHTER_IDS.DASH].currentXp = getLevelRequirement(4);
     const playerSpec = {
         ...app.roster.find((fighter) => fighter.id === FIGHTER_IDS.DASH),
         teamId: "xp-player",
@@ -1896,19 +1902,11 @@ function testExperienceSystem() {
         allocation,
         true
     );
-    const { multiplier } = calculateStatMultiplier(Object.values(allocation));
-    assert.equal(
-        rewardedSpec.stats.hp,
-        Number(((playerSpec.stats.hp + 2) * 1.2 * multiplier).toFixed(3)),
-        "HP reward should be included before the percentage stat multiplier"
+    assert.deepEqual(
+        rewardedSpec.stats,
+        baselineSpec.stats,
+        "Ability tier rewards should not mutate base stats before the percentage stat multiplier"
     );
-    assert.equal(
-        rewardedSpec.stats.damage,
-        Number(((playerSpec.stats.damage + 1) * 1.2 * multiplier).toFixed(3)),
-        "Damage reward should be included before the percentage stat multiplier"
-    );
-    assert.equal(rewardedSpec.stats.skill, 2, "Skill reward should add to the character base skill before allocation");
-    assert.ok(rewardedSpec.stats.hp - baselineSpec.stats.hp > 2, "Stat allocation should scale level-up HP rewards");
     const equipmentProfile = createDefaultPlayerProfile();
     equipmentProfile.experience.byCharacter[FIGHTER_IDS.DASH] = { currentXp: getLevelRequirement(4) };
     const fixedDamageItem = {
@@ -1945,7 +1943,12 @@ function testExperienceSystem() {
         equippedRewardedSpec.stats.damage,
         "Battle ball should receive the prepared damage base stat"
     );
-    assert.equal(preparedPlayer.getSkillPoints(), 7, "Battle ball should combine base skill and allocated skill");
+    assert.equal(preparedPlayer.getSkillPoints(), 5, "Battle ball should retain only the allocated skill points");
+    assert.equal(
+        preparedPlayer.ability.getLevelRewardModifier("tier"),
+        1,
+        "Self ability rewards should resolve to the ball's ability"
+    );
     applyExperienceEffectsToBall(preparedPlayer, [
         {
             type: "ability_modifier",
@@ -1976,6 +1979,205 @@ function testExperienceSystem() {
     );
     assert.equal(legacyProfile.experience.byCharacter.archer.currentXp, 55);
     console.log("[experience] ok");
+}
+
+function testAbilityLevelUpgrades(app) {
+    const tierEffects = [LEVEL_REWARDS[3], LEVEL_REWARDS[6], LEVEL_REWARDS[9]].map((reward) => reward.effect);
+    const assertClose = (actual, expected, message) => {
+        assert.ok(Math.abs(actual - expected) < 1e-9, `${message}: expected ${expected}, got ${actual}`);
+    };
+    const createTierSimulation = (fighterId, tier = 3) => {
+        const fighterSpec = app.roster.find((fighter) => fighter.id === fighterId);
+        const opponentSpec = app.roster.find((fighter) => fighter.id !== fighterId);
+        const sim = new BattleSimulation(
+            [
+                { ...fighterSpec, teamId: "tier-player" },
+                { ...opponentSpec, id: `tier-opponent-${fighterId}`, teamId: "tier-opponent" }
+            ],
+            { onLog() {}, onSound() {} },
+            null,
+            { assignActions: false }
+        );
+        const ball = sim.fighters[0];
+        applyExperienceEffectsToBall(ball, tierEffects.slice(0, tier));
+        return { sim, ball, target: sim.fighters[1] };
+    };
+
+    for (const fighter of app.roster) {
+        const { ball } = createTierSimulation(fighter.id);
+        const definition = REWARD_BALANCE.experience.abilityUpgrades[fighter.ability];
+        const expectedUpgrade = definition.tiers.reduce((merged, tierUpgrade) => ({ ...merged, ...tierUpgrade }), {
+            ...definition.base
+        });
+        assert.equal(
+            ball.ability.getLevelRewardModifier("tier"),
+            3,
+            `${fighter.id} should receive all three ability tiers`
+        );
+        assert.deepEqual(
+            ball.ability.getLevelUpgrade(),
+            expectedUpgrade,
+            `${fighter.id} should consume its own upgrade data`
+        );
+    }
+
+    const archer = createTierSimulation(FIGHTER_IDS.ARCHER).ball.ability;
+    assertClose(archer._getArrowSpeed(), 270 * 2 * 1.15, "Archer tier 1 should increase arrow speed by 15%");
+    assertClose(archer._getWindupDuration(), 0.32, "Archer tier 2 should reduce windup by 20%");
+    assert.equal(archer._getBurstShotCount(), 4, "Archer tier 3 should round the burst to four arrows");
+
+    const orbitRun = createTierSimulation(FIGHTER_IDS.ORBIT);
+    orbitRun.ball.ability.update(0, orbitRun.target);
+    assert.equal(orbitRun.ball.ability.shardCount, 6, "Orbit tier 1 should add a sixth shard");
+    assertClose(orbitRun.ball.ability.rechargeDuration, 1 / 1.15, "Orbit tier 2 should increase recharge speed by 15%");
+    assertClose(orbitRun.ball.ability.getVolleyDelay(), 0.18 * 0.65, "Orbit tier 3 should shorten volley delay by 35%");
+
+    const tricksterRun = createTierSimulation(FIGHTER_IDS.TRICKSTER);
+    tricksterRun.ball.ability.timer = 0;
+    tricksterRun.ball.ability.update(0.01, tricksterRun.target);
+    const tierSeeds = tricksterRun.sim.entities.filter((entity) => entity.constructor?.name === "SeedOrb");
+    assert.equal(tierSeeds.length, 4, "Trickster tier 1 should launch four seeds");
+    assertClose(tierSeeds[0].life, 18.9, "Trickster tier 2 should extend seed life by 35%");
+
+    const grenadeRun = createTierSimulation(FIGHTER_IDS.GRENADE);
+    const originalRandom = Math.random;
+    Math.random = () => 0;
+    try {
+        grenadeRun.ball.ability._startBurst(grenadeRun.target);
+        assert.equal(grenadeRun.ball.ability._burstTotal, 4, "Grenade tier 1 should raise the minimum burst to four");
+    } finally {
+        Math.random = originalRandom;
+    }
+    const grenade = grenadeRun.sim.entities.find((entity) => entity.constructor?.name === "Grenade");
+    assertClose(grenade.explosionRadius, 174 * 1.15, "Grenade tier 2 should expand the explosion radius by 15%");
+    assertClose(grenade.damageMultiplier, 1.1, "Grenade tier 3 should increase explosion damage by 10%");
+
+    const dashRun = createTierSimulation(FIGHTER_IDS.DASH);
+    dashRun.ball.ability.state.cooldownLevel = 2;
+    dashRun.ball.ability.onDashWall();
+    assertClose(dashRun.ball.ability.getDashMultiplier(), 2.15 * 1.05, "Dash tier 1 should increase dash speed");
+    assertClose(dashRun.ball.ability.getHomingTurnRate(), 2.4 * 1.3, "Dash tier 2 should increase turn rate");
+    assert.equal(dashRun.ball.ability.state.cooldownLevel, 1, "Dash tier 3 should retain half of a two-stage cooldown");
+
+    const rageRun = createTierSimulation(FIGHTER_IDS.RAGE);
+    rageRun.ball.ability.state.timeWithoutCollision = rageRun.ball.ability.getMaxChargeTime();
+    assertClose(rageRun.ball.ability.getMaxChargeTime(), 11.9, "Rage tier 1 should reduce max charge time by 15%");
+    assertClose(
+        rageRun.ball.ability.getStatModifiers().impact,
+        1.52 * 1.15,
+        "Rage tier 2 should increase maximum impact by 15%"
+    );
+    rageRun.ball.ability.onCollision();
+    assertClose(rageRun.ball.ability.state.timeWithoutCollision, 11.9 * 0.2, "Rage tier 3 should retain 20% charge");
+
+    const eaterRun = createTierSimulation(FIGHTER_IDS.EATER);
+    assertClose(
+        eaterRun.ball.ability._getSwallowHoldDuration(),
+        0.54,
+        "Eater tier 1 should shorten swallow hold by 25%"
+    );
+    eaterRun.target.angularVelocity = 2;
+    eaterRun.ball.ability._applySpitAngularImpulse(eaterRun.target, new Vector2(1, 0));
+    assert.ok(
+        eaterRun.target._accumulatedAngularImpulse > 0,
+        "Eater tier 2 should add angular impulse instead of assigning spin"
+    );
+
+    const batRun = createTierSimulation(FIGHTER_IDS.BAT_BALL);
+    assert.equal(batRun.ball.ability.getArcRange(), 184, "Bat tier 1 should extend arc range by 15%");
+    assertClose(
+        batRun.ball.ability.getArcAngle(),
+        (Math.PI * 2 * 1.15) / 3,
+        "Bat tier 2 should extend arc angle by 15%"
+    );
+    assertClose(batRun.ball.ability.getWallSlamDuration(), 1.3, "Bat tier 3 should extend wall slam duration by 30%");
+
+    const vampireRun = createTierSimulation(FIGHTER_IDS.VAMPIRE);
+    vampireRun.ball.ability._spawnBats(vampireRun.target);
+    const tierBats = vampireRun.sim.entities.filter((entity) => entity.constructor?.name === "BatProjectile");
+    assert.equal(tierBats.length, 8, "Vampire tier 1 should launch eight bats");
+    assertClose(tierBats[0].life, 4.8, "Vampire tier 3 should extend bat life by 20%");
+    assertClose(
+        tierBats[0].velocity.length(),
+        vampireRun.ball.stats.baseSpeed * 0.5 * 1.15,
+        "Vampire tier 2 should increase bat speed by 15%"
+    );
+
+    const gunnerRun = createTierSimulation(FIGHTER_IDS.GUNNER);
+    Math.random = () => 0;
+    try {
+        gunnerRun.ball.ability._startBurst();
+    } finally {
+        Math.random = originalRandom;
+    }
+    assert.equal(
+        gunnerRun.ball.ability.state.burstBulletCount,
+        7,
+        "Gunner tier 1 should raise the minimum bullet count to seven"
+    );
+    gunnerRun.ball.ability._fireBurstBullet();
+    const bullet = gunnerRun.sim.entities.find((entity) => entity.constructor?.name === "BulletProjectile");
+    assert.equal(
+        bullet.velocity.length(),
+        gunnerRun.ball.stats.baseSpeed * 2 * 1.15,
+        "Gunner tier 2 should increase bullet speed by 15%"
+    );
+
+    const phantomRun = createTierSimulation(FIGHTER_IDS.PHANTOM);
+    assert.deepEqual(
+        phantomRun.ball.ability.getStatModifiers(),
+        { speed: 1.15, damage: 1.1, defense: 1.5, impact: 1.15 },
+        "Phantom should use its rebalanced base stats"
+    );
+    phantomRun.ball.ability._markTarget(phantomRun.target);
+    phantomRun.ball.ability.onFighterStaticCollision(phantomRun.target, { wall: true, terrain: false });
+    assert.equal(
+        phantomRun.ball.ability.state.pendingStrikeStage,
+        "echo",
+        "Phantom tier 2 should trigger echo from a wall collision"
+    );
+    phantomRun.ball.ability.state.activeDashStage = "echo";
+    phantomRun.ball.ability.onDashHit(phantomRun.target, {});
+    assert.equal(
+        phantomRun.ball.ability.state.pendingStrikeStage,
+        "terminal",
+        "Phantom tier 3 should allow one terminal dash"
+    );
+
+    const heroRun = createTierSimulation(FIGHTER_IDS.HERO);
+    const heroAbility = heroRun.ball.ability;
+    for (const _ of Array.from({ length: 24 })) {
+        heroAbility.onOrbCollected();
+    }
+    assert.equal(heroAbility.state.orbStacks, 20, "Hero tier 2 should cap orb stacks at twenty");
+    assert.equal(
+        heroAbility.modifyOutgoingFighterCollisionDamage(10),
+        16,
+        "Hero stacks should add 3% collision damage each"
+    );
+    const heroOrb = new HeroOrb(
+        heroRun.ball,
+        Vector2.add(heroRun.ball.position, new Vector2(150, 0)),
+        new Vector2(120, 0),
+        "hp"
+    );
+    heroOrb.update(0.1, heroRun.sim);
+    assert.ok(
+        heroOrb.velocity.x < 120,
+        "Hero tier 1 should physically pull owned orbs from inside the influence radius"
+    );
+    heroAbility.onFighterCollisionDamageResolved(heroRun.target, 1);
+    assert.equal(
+        heroAbility.state.orbStacks,
+        0,
+        "Hero should consume stacks only after actual fighter collision damage"
+    );
+    assert.equal(
+        heroRun.sim.entities.filter((entity) => entity.constructor?.name === "HeroOrb").length,
+        10,
+        "Hero tier 3 should release half of twenty consumed stacks as normal orbs"
+    );
+    console.log("[ability-level-upgrades] ok");
 }
 
 function testHuntingSystem() {
@@ -7509,6 +7711,7 @@ await testDashBallCooldownDash(app);
 await testCollisionImpulsePersists(app);
 await testGrenadeScatterShot(app);
 testExperienceSystem();
+testAbilityLevelUpgrades(app);
 testHuntingSystem();
 testHunting100FloorStructure();
 testHuntingCombatRelief();

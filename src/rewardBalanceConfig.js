@@ -17,16 +17,137 @@ export const REWARD_BALANCE = deepFreeze({
         levelRewards: [
             null,
             null,
-            { id: "level-2-hp", effect: { type: "stat", stat: "hp", value: 2 } },
-            { id: "level-3-damage", effect: { type: "stat", stat: "damage", value: 1 } },
-            { id: "level-4-skill", effect: { type: "stat", stat: "skill", value: 2 } },
-            { id: "level-5-speed", effect: { type: "stat", stat: "speed", value: 2 } },
-            { id: "level-6-hp", effect: { type: "stat", stat: "hp", value: 2 } },
-            { id: "level-7-damage", effect: { type: "stat", stat: "damage", value: 1 } },
-            { id: "level-8-defense", effect: { type: "stat", stat: "defense", value: 1 } },
-            { id: "level-9-skill", effect: { type: "stat", stat: "skill", value: 2 } },
-            { id: "level-10-speed", effect: { type: "stat", stat: "speed", value: 2 } }
-        ]
+            null,
+            {
+                id: "level-3-ability-tier",
+                effect: {
+                    type: "ability_modifier",
+                    abilityId: "self",
+                    modifierId: "tier",
+                    operation: "add",
+                    value: 1,
+                    label: "대표 행동 강화 I"
+                }
+            },
+            null,
+            null,
+            {
+                id: "level-6-ability-tier",
+                effect: {
+                    type: "ability_modifier",
+                    abilityId: "self",
+                    modifierId: "tier",
+                    operation: "add",
+                    value: 1,
+                    label: "대표 행동 강화 II"
+                }
+            },
+            null,
+            null,
+            {
+                id: "level-9-ability-tier",
+                effect: {
+                    type: "ability_modifier",
+                    abilityId: "self",
+                    modifierId: "tier",
+                    operation: "add",
+                    value: 1,
+                    label: "대표 행동 강화 III"
+                }
+            },
+            null
+        ],
+        abilityUpgrades: {
+            archer: {
+                tiers: [
+                    {},
+                    { arrowSpeedMultiplier: 1.15 },
+                    { windupMultiplier: 0.8 },
+                    { burstShotCountMultiplier: 1.35 }
+                ]
+            },
+            orbit: {
+                tiers: [
+                    {},
+                    { shardCountMultiplier: 1.2 },
+                    { rechargeSpeedMultiplier: 1.15 },
+                    { volleyDelayMultiplier: 0.65 }
+                ]
+            },
+            trickster: {
+                tiers: [{}, { seedCountMultiplier: 1.35 }, { seedLifeMultiplier: 1.35 }, { seedSpeedMultiplier: 1.15 }]
+            },
+            grenade: {
+                tiers: [
+                    {},
+                    { burstCountMultiplier: 1.25 },
+                    { explosionRadiusMultiplier: 1.15 },
+                    { damageMultiplier: 1.1 }
+                ]
+            },
+            dash: {
+                tiers: [
+                    {},
+                    { dashMultiplier: 1.05 },
+                    { homingTurnRateMultiplier: 1.3 },
+                    { wallCooldownLevelRetention: 0.5 }
+                ]
+            },
+            rage: {
+                tiers: [
+                    {},
+                    { maxChargeTimeMultiplier: 0.85 },
+                    { maxImpactMultiplier: 1.15 },
+                    { chargeRetentionRatio: 0.2 }
+                ]
+            },
+            eater: {
+                tiers: [
+                    {},
+                    { swallowHoldDurationMultiplier: 0.75 },
+                    { spitAngularVelocityMultiplier: 1.5 },
+                    { wallSlamDurationMultiplier: 1.15 }
+                ]
+            },
+            bat_ball: {
+                tiers: [
+                    {},
+                    { arcRangeMultiplier: 1.15 },
+                    { arcAngleMultiplier: 1.15 },
+                    { wallSlamDurationMultiplier: 1.3 }
+                ]
+            },
+            vampire: {
+                tiers: [{}, { batCountMultiplier: 1.15 }, { batSpeedMultiplier: 1.15 }, { batLifeMultiplier: 1.2 }]
+            },
+            gunner: {
+                tiers: [
+                    {},
+                    { minBulletCountMultiplier: 1.15 },
+                    { bulletSpeedMultiplier: 1.15 },
+                    { finisherMinimum: 11 }
+                ]
+            },
+            phantom: {
+                base: {
+                    speedMultiplier: 1.15,
+                    damageMultiplier: 1.1,
+                    defenseMultiplier: 1.5,
+                    impactMultiplier: 1.15,
+                    bonusDamage: 18,
+                    markDuration: 2.5
+                },
+                tiers: [{}, { echoOnNaturalCollision: true }, { echoOnStaticCollision: true }, { terminalDash: true }]
+            },
+            hero: {
+                tiers: [
+                    {},
+                    { magnetRadiusMultiplier: 3, magnetResponseRate: 5 },
+                    { stackCap: 20, damagePerStack: 0.03 },
+                    { releaseStackRatio: 0.5 }
+                ]
+            }
+        }
     },
     hunting: {
         chest: {

@@ -46,7 +46,7 @@ export function computeOwnerCombatSpeed(owner) {
 export class HeroAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation, HERO_ORB_BASE_COOLDOWN);
-        this.state = { cooldownBurstTimer: 0, cooldownBurstMultiplier: 1 };
+        this.state = { cooldownBurstTimer: 0, cooldownBurstMultiplier: 1, orbStacks: 0 };
     }
 
     /** cooldown burst 상태에서 effective cooldown getter 오버라이드 */
@@ -95,6 +95,54 @@ export class HeroAbility extends Ability {
         }
     }
 
+    _spawnOrb(effectType, direction) {
+        const start = Vector2.add(this.owner.position, direction.clone().scale(this.owner.radius + 20));
+        this._enforceOwnerOrbLimit();
+        this.simulation.spawnHeroOrb(this.owner, start, direction.scale(this._computeOrbSpeed()), effectType);
+    }
+
+    getOrbAttraction(orb) {
+        const upgrade = this.getLevelUpgrade();
+        const radiusMultiplier = upgrade.magnetRadiusMultiplier ?? 1;
+        if (radiusMultiplier <= 1) return null;
+        return {
+            radius: (this.owner.radius + orb.radius) * radiusMultiplier,
+            responseRate: upgrade.magnetResponseRate
+        };
+    }
+
+    onOrbCollected() {
+        const stackCap = this.getLevelUpgrade().stackCap;
+        if (!stackCap) return;
+        this.state.orbStacks = Math.min(stackCap, this.state.orbStacks + 1);
+    }
+
+    modifyOutgoingFighterCollisionDamage(amount) {
+        const stacks = this.state.orbStacks;
+        const damagePerStack = this.getLevelUpgrade().damagePerStack;
+        return stacks > 0 && damagePerStack ? amount * (1 + stacks * damagePerStack) : amount;
+    }
+
+    onFighterCollisionDamageResolved(target, actualDamage) {
+        if (actualDamage <= 0 || this.state.orbStacks <= 0) return;
+
+        const consumedStacks = this.state.orbStacks;
+        this.state.orbStacks = 0;
+        const releaseStackRatio = this.getLevelUpgrade().releaseStackRatio;
+        if (!releaseStackRatio) return;
+
+        const releaseCount = Math.round(consumedStacks * releaseStackRatio);
+        for (const _ of Array.from({ length: releaseCount })) {
+            const effectType = pickHeroOrbEffectType(Math.random);
+            const direction = Vector2.fromAngle(Math.random() * Math.PI * 2, 1);
+            this._spawnOrb(effectType, direction);
+        }
+        this.simulation.spawnPulse(this.owner.position.clone(), this.owner.color);
+        this.simulation.addLog(
+            `${this.owner.name} releases ${releaseCount} stacked orbs after colliding with ${target.name}.`
+        );
+    }
+
     update(delta, target) {
         this._tickCooldownBurst(delta);
         this.timer -= delta;
@@ -102,21 +150,20 @@ export class HeroAbility extends Ability {
         this.timer = this.cooldown;
 
         const effectType = pickHeroOrbEffectType(Math.random);
-        const angle = Math.random() * Math.PI * 2;
-        const direction = Vector2.fromAngle(angle, 1);
-        const start = Vector2.add(this.owner.position, direction.clone().scale(this.owner.radius + 20));
-
-        this._enforceOwnerOrbLimit();
-
-        const orbSpeed = this._computeOrbSpeed();
-        this.simulation.spawnHeroOrb(this.owner, start, direction.scale(orbSpeed), effectType);
+        const direction = Vector2.fromAngle(Math.random() * Math.PI * 2, 1);
+        this._spawnOrb(effectType, direction);
         this.simulation.playSound("orb", 0.8);
         this.simulation.addLog(`${this.owner.name} launches a ${effectType} orb.`);
     }
 
     getUiState() {
         const progress = Math.max(0, Math.min(1, 1 - this.timer / this.cooldown));
-        const label = this.state.cooldownBurstTimer > 0 ? "Burst" : "Orbs";
+        const label =
+            this.state.orbStacks > 0
+                ? `Stacks ${this.state.orbStacks}`
+                : this.state.cooldownBurstTimer > 0
+                  ? "Burst"
+                  : "Orbs";
         return { label, progress };
     }
 

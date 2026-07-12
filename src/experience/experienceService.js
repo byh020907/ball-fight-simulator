@@ -46,7 +46,13 @@ export function getCharacterTotalXp(profile, characterId) {
 }
 
 export function getExperienceRewardText(reward = {}) {
-    return reward.effect ? getLevelRewardEffectText(reward.effect) : "";
+    return reward?.effect ? getLevelRewardEffectText(reward.effect) : "";
+}
+
+function getNextRewardText(level) {
+    const nextRewardLevel = LEVEL_REWARDS.findIndex((reward, rewardLevel) => rewardLevel > level && Boolean(reward));
+    if (nextRewardLevel < 0) return "모든 대표 행동 강화 획득";
+    return `Lv.${nextRewardLevel} · ${getExperienceRewardText(LEVEL_REWARDS[nextRewardLevel])}`;
 }
 
 export function getExperienceRewardsBetween(previousLevel, level) {
@@ -66,7 +72,7 @@ export function getCharacterExperienceSummary(profile, characterId) {
     const xpInLevel = isMax ? levelSpan : Math.max(0, totalXp - levelStartXp);
     const remainingXp = isMax ? 0 : Math.max(0, nextLevelXp - totalXp);
     const progress = isMax ? 1 : getXpProgressInLevel(totalXp);
-    const nextRewardText = isMax ? "최대 레벨" : getExperienceRewardText(LEVEL_REWARDS[level + 1]) || "보상 없음";
+    const nextRewardText = isMax ? "최대 레벨" : getNextRewardText(level);
 
     return {
         characterId,

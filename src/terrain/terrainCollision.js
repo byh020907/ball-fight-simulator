@@ -51,8 +51,10 @@ export function resolveTerrainCollision(entity, terrain) {
 }
 
 export function resolveTerrainCollisions(entity, terrainList) {
-    if (!terrainList || terrainList.length === 0) return;
+    if (!terrainList || terrainList.length === 0) return false;
+    let collided = false;
     for (const terrain of terrainList) {
-        resolveTerrainCollision(entity, terrain);
+        collided = resolveTerrainCollision(entity, terrain) || collided;
     }
+    return collided;
 }

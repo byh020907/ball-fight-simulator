@@ -37,7 +37,7 @@ export class DashAbility extends Ability {
         const direction = Vector2.subtract(target.position, this.owner.position).normalize();
         this.owner.initiateDash(direction, {
             duration: MAX_DASH_DURATION,
-            multiplier: this.dashMultiplier,
+            multiplier: this.getDashMultiplier(),
             collisionDamage: Math.round(this.owner.stats.baseDamage * 0.4),
             collisionLabel: "Dash Contact"
         });
@@ -51,7 +51,7 @@ export class DashAbility extends Ability {
     }
 
     steerDash(delta, target) {
-        steerBallToward(this.owner, target, delta, { turnRate: this.homingTurnRate, persist: true });
+        steerBallToward(this.owner, target, delta, { turnRate: this.getHomingTurnRate(), persist: true });
     }
 
     onDashHit() {
@@ -62,10 +62,25 @@ export class DashAbility extends Ability {
     }
 
     onDashWall() {
-        this.state.cooldownLevel = 0;
+        const retention = this.getLevelUpgrade().wallCooldownLevelRetention;
+        const previousLevel = this.state.cooldownLevel;
+        this.state.cooldownLevel =
+            retention == null || this.state.cooldownLevel === 0
+                ? 0
+                : Math.max(1, Math.round(this.state.cooldownLevel * retention));
         this._baseCooldown = this.getCooldownForLevel();
         this.timer = this.cooldown;
-        this.simulation.addLog(`${this.owner.name} hits a wall and resets dash cooldown.`);
+        this.simulation.addLog(
+            `${this.owner.name} hits a wall and ${this.state.cooldownLevel < previousLevel ? "drops" : "keeps"} dash cooldown stage.`
+        );
+    }
+
+    getDashMultiplier() {
+        return this.dashMultiplier * (this.getLevelUpgrade().dashMultiplier ?? 1);
+    }
+
+    getHomingTurnRate() {
+        return this.homingTurnRate * (this.getLevelUpgrade().homingTurnRateMultiplier ?? 1);
     }
 
     getCooldownForLevel() {

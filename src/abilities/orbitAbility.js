@@ -39,10 +39,11 @@ export class OrbitAbility extends Ability {
     get rechargeDuration() {
         const skill = this.owner.getSkillPoints?.() ?? this.owner.stats?.allocation?.skill ?? 0;
         const factor = 100 / (100 + skill);
-        return this._baseRechargeDuration * factor;
+        return (this._baseRechargeDuration * factor) / (this.getLevelUpgrade().rechargeSpeedMultiplier ?? 1);
     }
 
     update(delta, target) {
+        this._syncShardCount();
         if (this.state.spinBurst > 0) {
             this.state.spinBurst = Math.max(0, this.state.spinBurst - delta);
         }
@@ -78,6 +79,28 @@ export class OrbitAbility extends Ability {
             });
             this.simulation.addLog(`${this.owner.name}'s orbit shard breaks after clipping ${target.name}.`);
         }
+    }
+
+    _syncShardCount() {
+        const nextShardCount = Math.round(5 * (this.getLevelUpgrade().shardCountMultiplier ?? 1));
+        if (nextShardCount === this.shardCount) return;
+
+        if (nextShardCount < this.state.shards.length) {
+            this.state.shards = this.state.shards.slice(0, nextShardCount);
+        } else {
+            this.state.shards.push(
+                ...Array.from({ length: nextShardCount - this.state.shards.length }, () => ({
+                    active: true,
+                    refilling: false,
+                    refillProgress: 1
+                }))
+            );
+        }
+        this.shardCount = nextShardCount;
+    }
+
+    getVolleyDelay() {
+        return VOLLEY_DELAY * (this.getLevelUpgrade().volleyDelayMultiplier ?? 1);
     }
 
     consumeShard(index) {
@@ -158,7 +181,7 @@ export class OrbitAbility extends Ability {
             if (this.state.volleyStartTime <= 0 && this.state.volleyIndex < this.shardCount) {
                 this.fireShardAt(target);
                 this.state.volleyIndex++;
-                this.state.volleyStartTime = VOLLEY_DELAY;
+                this.state.volleyStartTime = this.getVolleyDelay();
             }
             if (this.state.volleyIndex >= this.shardCount) {
                 this.state.volleyActive = false;

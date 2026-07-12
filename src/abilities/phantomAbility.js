@@ -23,13 +23,24 @@ export class PhantomAbility extends Ability {
             teleportTimer: 0,
             vanishPos: null,
             appearPos: null,
-            teleportTargetId: null
+            teleportTargetId: null,
+            pendingStrikeStage: null,
+            activeDashStage: null,
+            markedTargetId: null,
+            markTimer: 0,
+            echoAvailable: false,
+            terminalAvailable: false,
+            skipMarkedCollisionTargetId: null
         };
         this.timer = this.cooldown;
     }
 
     update(delta, target) {
         const owner = this.owner;
+        this._tickMark(delta);
+        if (this.state.activeDashStage && !owner.state.movement) {
+            this.state.activeDashStage = null;
+        }
 
         // animation phases
         if (this.state.teleportPhase > 0) {
@@ -97,17 +108,40 @@ export class PhantomAbility extends Ability {
 
         if (this.state.primed) {
             this.state.primed = false;
-            this._triggerShadowStrike(target);
+            this._triggerShadowStrike(target, "base");
+            return;
         }
+
+        if (this.state.skipMarkedCollisionTargetId === target.id) {
+            this.state.skipMarkedCollisionTargetId = null;
+            return;
+        }
+        if (this.state.activeDashStage || !this._isMarkedTarget(target) || !this.state.echoAvailable) return;
+        this._triggerEchoStrike(target);
     }
 
-    _triggerShadowStrike(target) {
+    onFighterStaticCollision(fighter, context) {
+        if (
+            !this.getLevelUpgrade().echoOnStaticCollision ||
+            !this._isMarkedTarget(fighter) ||
+            !this.state.echoAvailable
+        ) {
+            return;
+        }
+        if (!context.wall && !context.terrain) return;
+        this._triggerEchoStrike(fighter);
+    }
+
+    _triggerShadowStrike(target, stage) {
         const owner = this.owner;
         const sim = this.simulation;
-        this.timer = this.cooldown;
+        if (stage === "base") {
+            this.timer = this.cooldown;
+        }
 
         this.state.vanishPos = owner.position.clone();
         this.state.teleportTargetId = target.id;
+        this.state.pendingStrikeStage = stage;
 
         const toTarget = Vector2.subtract(target.position, owner.position).normalize();
         const behindAngle = (Math.random() - 0.5) * Math.PI;
@@ -151,24 +185,25 @@ export class PhantomAbility extends Ability {
         const sim = this.simulation;
         const target = sim.fighters.find((f) => f.id === this.state.teleportTargetId);
         if (!target) return;
+        const stage = this.state.pendingStrikeStage ?? "base";
 
         const dashDir = Vector2.subtract(target.position, owner.position).normalize();
         const trailEnd = Vector2.add(owner.position, dashDir.clone().scale(TELEPORT_BEHIND_DIST * 0.6));
         sim.spawnSlash(owner.position.clone(), trailEnd, "#55bbdd");
         sim.spawnPulse(target.position.clone(), "#ff88cc");
 
-        const dashSpeed = owner.stats.baseSpeed * DASH_MULTIPLIER;
-
         owner.initiateDash(dashDir, {
             duration: DASH_DURATION,
             multiplier: DASH_MULTIPLIER,
-            collisionDamage: BONUS_DAMAGE,
-            collisionLabel: "Shadow Strike",
+            collisionDamage: stage === "base" ? this.getLevelUpgrade().bonusDamage : 0,
+            collisionLabel: stage === "base" ? "Shadow Strike" : "Shadow Echo",
             showRing: false
         });
+        this.state.activeDashStage = stage;
+        this.state.pendingStrikeStage = null;
 
         sim.playSound("dash", 0.9);
-        sim.addLog(`${owner.name} vanishes and strikes from the shadows!`);
+        sim.addLog(`${owner.name} vanishes for a ${stage} shadow strike.`);
     }
 
     _randomTeleport() {
@@ -208,13 +243,66 @@ export class PhantomAbility extends Ability {
     }
 
     onDashHit(target, effect) {
-        this.timer = 0;
-        this.state.primed = true;
-        this.state.primedTimer = PRIMED_DURATION;
+        if (effect._phantomStrikeHandled) return;
+        effect._phantomStrikeHandled = true;
+
+        const stage = this.state.activeDashStage;
+        this.state.activeDashStage = null;
+        if (stage === "base" && this.getLevelUpgrade().echoOnNaturalCollision) {
+            this._markTarget(target);
+            this.state.skipMarkedCollisionTargetId = target.id;
+            return;
+        }
+        if (stage === "echo" && this.getLevelUpgrade().terminalDash && this.state.terminalAvailable) {
+            this.state.terminalAvailable = false;
+            this._triggerShadowStrike(target, "terminal");
+            return;
+        }
+        if (stage === "terminal") {
+            this._clearMark();
+        }
+    }
+
+    _markTarget(target) {
+        this.state.markedTargetId = target.id;
+        this.state.markTimer = this.getLevelUpgrade().markDuration;
+        this.state.echoAvailable = true;
+        this.state.terminalAvailable = true;
+    }
+
+    _tickMark(delta) {
+        if (!this.state.markedTargetId) return;
+        this.state.markTimer = Math.max(0, this.state.markTimer - delta);
+        if (this.state.markTimer <= 0) {
+            this._clearMark();
+        }
+    }
+
+    _isMarkedTarget(target) {
+        return target?.id === this.state.markedTargetId && this.state.markTimer > 0;
+    }
+
+    _triggerEchoStrike(target) {
+        this.state.echoAvailable = false;
+        this._triggerShadowStrike(target, "echo");
+    }
+
+    _clearMark() {
+        this.state.markedTargetId = null;
+        this.state.markTimer = 0;
+        this.state.echoAvailable = false;
+        this.state.terminalAvailable = false;
+        this.state.skipMarkedCollisionTargetId = null;
     }
 
     getStatModifiers() {
-        return { speed: 1.1, damage: 1, defense: 1.5, impact: 1.1 };
+        const upgrade = this.getLevelUpgrade();
+        return {
+            speed: upgrade.speedMultiplier ?? 1.1,
+            damage: upgrade.damageMultiplier ?? 1,
+            defense: upgrade.defenseMultiplier ?? 1.5,
+            impact: upgrade.impactMultiplier ?? 1.1
+        };
     }
 
     draw(ctx) {

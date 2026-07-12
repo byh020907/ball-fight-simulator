@@ -58,11 +58,11 @@ export class BatBallAbility extends Ability {
         const toTarget = Vector2.subtract(target.position, this.owner.position);
         const dist = toTarget.length();
         // 시야 거리는 공 표면 기준: 중심거리 - 내 반지름 > ARC_RANGE 이면 범위 밖
-        if (dist - this.owner.radius > ARC_RANGE) return;
+        if (dist - this.owner.radius > this.getArcRange()) return;
 
         const targetAngle = Math.atan2(toTarget.y, toTarget.x);
         const diff = Math.abs(normalizeAngle(targetAngle - this.state.arcAngle));
-        if (diff > ARC_ANGLE / 2) return;
+        if (diff > this.getArcAngle() / 2) return;
 
         // 범위 안에 들어왔다 — 휘두르기!
         this.performSlash(target);
@@ -79,13 +79,13 @@ export class BatBallAbility extends Ability {
         target.state.wallSlam = new WallSlamEffect({
             source: this.owner,
             damage: Math.round(this.owner.stats.baseDamage * WALL_SLAM_DAMAGE_MULT),
-            duration: WALL_SLAM_EFFECT_DURATION
+            duration: this.getWallSlamDuration()
         });
 
         // Slash 애니메이션 설정 — arcAngle 기준으로 ±60도 휘두르기
         this.state.slashTimer = SLASH_DURATION;
-        this.state.slashStartAngle = this.state.arcAngle - ARC_ANGLE / 2;
-        this.state.slashEndAngle = this.state.arcAngle + ARC_ANGLE / 2;
+        this.state.slashStartAngle = this.state.arcAngle - this.getArcAngle() / 2;
+        this.state.slashEndAngle = this.state.arcAngle + this.getArcAngle() / 2;
 
         // 시각 효과 — 스윙 아크 + 충돌 스파크
         this.simulation.addSparkBurst(this.owner.position.clone(), this.owner.color);
@@ -96,6 +96,18 @@ export class BatBallAbility extends Ability {
 
     getStatModifiers() {
         return { speed: 0.95, damage: 1, defense: 1, impact: 1 };
+    }
+
+    getArcRange() {
+        return ARC_RANGE * (this.getLevelUpgrade().arcRangeMultiplier ?? 1);
+    }
+
+    getArcAngle() {
+        return ARC_ANGLE * (this.getLevelUpgrade().arcAngleMultiplier ?? 1);
+    }
+
+    getWallSlamDuration() {
+        return WALL_SLAM_EFFECT_DURATION * (this.getLevelUpgrade().wallSlamDurationMultiplier ?? 1);
     }
 
     draw(ctx) {
@@ -128,7 +140,7 @@ export class BatBallAbility extends Ability {
         ctx.lineWidth = 10 - progress * 6;
         ctx.globalAlpha = glowAlpha * 0.6;
         ctx.beginPath();
-        ctx.arc(pos.x, pos.y, ARC_RANGE * VISION_ARC_RADIUS_SCALE, this.state.slashStartAngle, currentEnd);
+        ctx.arc(pos.x, pos.y, this.getArcRange() * VISION_ARC_RADIUS_SCALE, this.state.slashStartAngle, currentEnd);
         ctx.stroke();
 
         // 메인 스윙 선
@@ -136,7 +148,7 @@ export class BatBallAbility extends Ability {
         ctx.lineWidth = 5 - progress * 3;
         ctx.globalAlpha = glowAlpha * 0.9;
         ctx.beginPath();
-        ctx.arc(pos.x, pos.y, ARC_RANGE * VISION_ARC_RADIUS_SCALE, this.state.slashStartAngle, currentEnd);
+        ctx.arc(pos.x, pos.y, this.getArcRange() * VISION_ARC_RADIUS_SCALE, this.state.slashStartAngle, currentEnd);
         ctx.stroke();
 
         // 잔상 (trail) — 여러 겹
@@ -149,7 +161,13 @@ export class BatBallAbility extends Ability {
             ctx.lineWidth = 3 - i * 0.6;
             ctx.globalAlpha = glowAlpha * 0.3 * (1 - i * 0.25);
             ctx.beginPath();
-            ctx.arc(pos.x, pos.y, ARC_RANGE * VISION_ARC_RADIUS_SCALE - i * 8, this.state.slashStartAngle, trailEnd);
+            ctx.arc(
+                pos.x,
+                pos.y,
+                this.getArcRange() * VISION_ARC_RADIUS_SCALE - i * 8,
+                this.state.slashStartAngle,
+                trailEnd
+            );
             ctx.stroke();
         }
 
@@ -158,9 +176,9 @@ export class BatBallAbility extends Ability {
 
     /** 120도 시야 범위 표시 (공 표면 기준 거리) */
     _drawVisionArc(ctx, pos) {
-        const arcStart = this.state.arcAngle - ARC_ANGLE / 2;
-        const arcEnd = this.state.arcAngle + ARC_ANGLE / 2;
-        const range = ARC_RANGE + this.owner.radius;
+        const arcStart = this.state.arcAngle - this.getArcAngle() / 2;
+        const arcEnd = this.state.arcAngle + this.getArcAngle() / 2;
+        const range = this.getArcRange() + this.owner.radius;
 
         // 평소에는 진하게, slash 중에는 약간 흐리게
         ctx.save();

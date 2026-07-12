@@ -19,7 +19,8 @@ export class ArcherAbility extends Ability {
             lastAimDir: new Vector2(1, 0),
             aimPoint: null,
             burstShotsRemaining: 0,
-            burstShotTimer: 0
+            burstShotTimer: 0,
+            burstShotCount: 0
         };
         this.arrowSpeedMult = ARROW_SPEED_MULT;
     }
@@ -67,7 +68,7 @@ export class ArcherAbility extends Ability {
         if (this.timer <= 0 && target) {
             this.timer = this.cooldown * (0.7 + Math.random() * 0.6);
             this._updateAim(target);
-            this.state.windUp = WINDUP;
+            this.state.windUp = this._getWindupDuration();
         }
     }
 
@@ -83,7 +84,15 @@ export class ArcherAbility extends Ability {
     }
 
     _getArrowSpeed() {
-        return this.owner.stats.baseSpeed * this.arrowSpeedMult;
+        return this.owner.stats.baseSpeed * this.arrowSpeedMult * (this.getLevelUpgrade().arrowSpeedMultiplier ?? 1);
+    }
+
+    _getWindupDuration() {
+        return WINDUP * (this.getLevelUpgrade().windupMultiplier ?? 1);
+    }
+
+    _getBurstShotCount() {
+        return Math.round(BURST_SHOT_COUNT * (this.getLevelUpgrade().burstShotCountMultiplier ?? 1));
     }
 
     /** Fire after wind-up. Consecutive misses convert the next shot into a finite burst. */
@@ -99,7 +108,8 @@ export class ArcherAbility extends Ability {
 
     _startBurst(target) {
         this.state.missStreak = 0;
-        this.state.burstShotsRemaining = BURST_SHOT_COUNT;
+        this.state.burstShotCount = this._getBurstShotCount();
+        this.state.burstShotsRemaining = this.state.burstShotCount;
         this.state.burstShotTimer = 0;
         this._fireBurstShot(target);
         this.simulation.playSound("shoot");
@@ -159,7 +169,7 @@ export class ArcherAbility extends Ability {
     draw(ctx) {
         if (this.state.windUp <= 0) return;
 
-        const progress = 1 - this.state.windUp / WINDUP; // 0→1 during wind-up
+        const progress = 1 - this.state.windUp / this._getWindupDuration(); // 0→1 during wind-up
         const dir = this.state.lastAimDir;
         const pos = this.owner.position;
         const r = this.owner.radius;
@@ -234,11 +244,14 @@ export class ArcherAbility extends Ability {
 
     getUiState() {
         if (this.state.burstShotsRemaining > 0) {
-            const fired = BURST_SHOT_COUNT - this.state.burstShotsRemaining;
-            return { label: `Burst ${fired}/${BURST_SHOT_COUNT}`, progress: fired / BURST_SHOT_COUNT };
+            const fired = this.state.burstShotCount - this.state.burstShotsRemaining;
+            return {
+                label: `Burst ${fired}/${this.state.burstShotCount}`,
+                progress: fired / this.state.burstShotCount
+            };
         }
         if (this.state.windUp > 0) {
-            return { label: "Draw", progress: 1 - this.state.windUp / WINDUP };
+            return { label: "Draw", progress: 1 - this.state.windUp / this._getWindupDuration() };
         }
         const label = this.state.missStreak >= 2 ? "Volley Ready" : "Arrow";
         return {

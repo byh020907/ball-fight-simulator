@@ -16,9 +16,9 @@ const FLUTTER_FREQ = 28;
 const FLUTTER_AMP = 6;
 
 export class BatProjectile extends Projectile {
-    constructor(owner, position, velocity, flock) {
+    constructor(owner, position, velocity, flock, options = {}) {
         super(owner, position, velocity, BAT_RADIUS);
-        this.life = BAT_LIFE;
+        this.life = BAT_LIFE * (options.lifeMultiplier ?? 1);
         this.angle = Math.atan2(velocity.y, velocity.x);
         this.time = 0;
         this._flock = flock;

@@ -271,6 +271,7 @@ export class HeroOrb extends CombatEntity {
 
     update(delta, simulation) {
         this.tickLife(delta);
+        this._applyOwnerMagnet(delta);
         this.integrate(delta);
         simulation.keepEntityInsideArena(this);
         if (Number.isFinite(this.life) && this.life <= 0) {
@@ -297,6 +298,7 @@ export class HeroOrb extends CombatEntity {
                     });
                     simulation.spawnPulse(this.position.clone(), effectDef.color);
                     if (result?.applied) {
+                        fighter.ability?.onOrbCollected?.(this, result);
                         simulation.spawnActionText(
                             this.position.clone(),
                             `${effectDef.label} +${result.amount}`,
@@ -316,6 +318,20 @@ export class HeroOrb extends CombatEntity {
             simulation.playSound("bounce", 0.3);
             return;
         }
+    }
+
+    _applyOwnerMagnet(delta) {
+        const attraction = this.owner.ability?.getOrbAttraction?.(this);
+        if (!attraction || this.owner.flags.defeated) return;
+
+        const toOwner = Vector2.subtract(this.owner.position, this.position);
+        const distance = toOwner.length();
+        const pickupRadius = this.owner.radius + this.radius;
+        if (distance <= pickupRadius || distance > attraction.radius) return;
+
+        const desiredVelocity = toOwner.normalize().scale(computeOwnerCombatSpeed(this.owner) * 1.35);
+        const correction = 1 - Math.exp(-(attraction.responseRate ?? 0) * delta);
+        this.applyImpulse(Vector2.subtract(desiredVelocity, this.velocity).scale(correction));
     }
 
     get _isSpecial() {

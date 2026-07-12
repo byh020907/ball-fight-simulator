@@ -46,7 +46,8 @@ export class GunnerAbility extends Ability {
     }
 
     _startBurst() {
-        this.state.burstBulletCount = MIN_BULLETS + Math.floor(Math.random() * (MAX_BULLETS - MIN_BULLETS + 1));
+        const minBulletCount = Math.round(MIN_BULLETS * (this.getLevelUpgrade().minBulletCountMultiplier ?? 1));
+        this.state.burstBulletCount = minBulletCount + Math.floor(Math.random() * (MAX_BULLETS - minBulletCount + 1));
         this.state.burstIndex = 0;
         this.state.gunHand = 0;
         this._burstRemaining = this.state.burstBulletCount;
@@ -72,10 +73,11 @@ export class GunnerAbility extends Ability {
         const bulletCount = this.state.burstBulletCount;
         const dmgMult = 0.2 + (bulletCount / MAX_BULLETS) * 0.8;
         const isLast = this.state.burstIndex === bulletCount - 1;
-        const isFinisher = isLast && bulletCount === MAX_BULLETS;
+        const finisherMinimum = this.getLevelUpgrade().finisherMinimum ?? MAX_BULLETS;
+        const isFinisher = isLast && bulletCount >= finisherMinimum;
         const finalMult = isFinisher ? dmgMult * 2 : dmgMult;
 
-        const speed = owner.stats.baseSpeed * BULLET_SPEED_MULT;
+        const speed = owner.stats.baseSpeed * BULLET_SPEED_MULT * (this.getLevelUpgrade().bulletSpeedMultiplier ?? 1);
         const cdReduction = GUNNER_COOLDOWN / 2 / MAX_BULLETS;
         const bullet = new BulletProjectile(
             owner,
@@ -112,7 +114,7 @@ export class GunnerAbility extends Ability {
         this._burstTimer = BULLET_INTERVAL;
         this.state.gunHand = 1 - this.state.gunHand;
 
-        if (isLast && bulletCount === MAX_BULLETS) {
+        if (isFinisher) {
             this.simulation.addLog(`${owner.name} lands a full burst!`);
         }
     }

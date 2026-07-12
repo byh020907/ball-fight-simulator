@@ -53,6 +53,7 @@ const EFFECT_HANDLERS = Object.freeze({
     },
     [LEVEL_REWARD_EFFECT_TYPES.ABILITY_MODIFIER]: {
         describe(effect) {
+            if (effect.label) return effect.label;
             if (!effect.abilityId || !effect.modifierId || !Number.isFinite(effect.value)) {
                 throw new Error("Invalid ability modifier reward");
             }
@@ -60,13 +61,14 @@ const EFFECT_HANDLERS = Object.freeze({
         },
         applyToBall(ball, effect) {
             const applyOperation = ABILITY_MODIFIER_OPERATIONS[effect.operation ?? "add"];
-            if (!applyOperation || !effect.abilityId || !effect.modifierId || !Number.isFinite(effect.value)) {
+            const abilityId = effect.abilityId === "self" ? ball.abilityId : effect.abilityId;
+            if (!applyOperation || !abilityId || !effect.modifierId || !Number.isFinite(effect.value)) {
                 throw new Error("Invalid ability modifier reward");
             }
             ball.levelRewardModifiers ||= {};
-            const modifiers = ball.levelRewardModifiers[effect.abilityId] ?? {};
+            const modifiers = ball.levelRewardModifiers[abilityId] ?? {};
             const initialValue = effect.operation === "multiply" ? 1 : 0;
-            ball.levelRewardModifiers[effect.abilityId] = {
+            ball.levelRewardModifiers[abilityId] = {
                 ...modifiers,
                 [effect.modifierId]: applyOperation(modifiers[effect.modifierId] ?? initialValue, effect.value)
             };

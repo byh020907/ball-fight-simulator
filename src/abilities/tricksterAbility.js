@@ -19,19 +19,22 @@ export class TricksterAbility extends Ability {
         }
 
         this.timer = this.cooldown;
-        const seedLife = this.cooldown * 2;
+        const upgrade = this.getLevelUpgrade();
+        const seedCount = Math.round(SEED_COUNT * (upgrade.seedCountMultiplier ?? 1));
+        const seedLife = this.cooldown * 2 * (upgrade.seedLifeMultiplier ?? 1);
         const baseAngle = Math.random() * Math.PI * 2;
         const ownerSpeed = computeOwnerCombatSpeed(this.owner);
-        for (let index = 0; index < SEED_COUNT; index += 1) {
-            const angle = baseAngle + (Math.PI * 2 * index) / SEED_COUNT;
+        for (const index of Array.from({ length: seedCount }, (_, value) => value)) {
+            const angle = baseAngle + (Math.PI * 2 * index) / seedCount;
             const direction = Vector2.fromAngle(angle, 1);
             const start = Vector2.add(this.owner.position, direction.clone().scale(this.owner.radius + SPAWN_OFFSET));
             const speedMult =
-                SEED_SPEED_MIN_MULTIPLIER + Math.random() * (SEED_SPEED_MAX_MULTIPLIER - SEED_SPEED_MIN_MULTIPLIER);
+                (SEED_SPEED_MIN_MULTIPLIER + Math.random() * (SEED_SPEED_MAX_MULTIPLIER - SEED_SPEED_MIN_MULTIPLIER)) *
+                (upgrade.seedSpeedMultiplier ?? 1);
             this.simulation.spawnSeedOrb(this.owner, start, direction.scale(ownerSpeed * speedMult), seedLife);
         }
         this.simulation.playSound("seed");
-        this.simulation.addLog(`${this.owner.name} launches three dash seeds.`);
+        this.simulation.addLog(`${this.owner.name} launches ${seedCount} dash seeds.`);
     }
 
     drawFace(ctx, rotation, ball) {
