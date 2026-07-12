@@ -1666,7 +1666,7 @@ function testHuntingCombatRewardChestUi() {
     console.log("[hunting-combat-reward-chest-ui] ok");
 }
 
-function testHuntingCombatRewardChestNormalContinue() {
+function createCombatRewardChestTestEnv({ isFinalBoss = false } = {}) {
     const overlayStates = [];
     const showOverlayCalls = [];
     const playerBall = { id: FIGHTER_IDS.DASH, name: "Dash Ball", hp: 80, maxHp: 100 };
@@ -1694,10 +1694,29 @@ function testHuntingCombatRewardChestNormalContinue() {
         roster: app.roster,
         playerProfile: createDefaultPlayerProfile()
     };
+    if (isFinalBoss) {
+        mockApp.beginResultConfirmation = () => {};
+        mockApp._refreshCollectionHub = () => {};
+        mockApp.setHuntingActive = () => {};
+    }
     const manager = new HuntingManager(mockApp);
-    manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE });
+    const run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE });
+    manager._run = isFinalBoss
+        ? { ...run, floor: 100, lastEncounter: { type: HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS } }
+        : run;
+    return { overlayStates, showOverlayCalls, playerBall, mockApp, manager };
+}
 
-    // Force chest drop via Math.random stub, always restore
+function testHuntingCombatRewardChestNormalContinue() {
+    const { overlayStates, showOverlayCalls, mockApp, manager } = createCombatRewardChestTestEnv();
+
+    // Spy on advance() to prove it is never called implicitly
+    let advanceCallCount = 0;
+    const originalAdvance = manager.advance;
+    manager.advance = () => {
+        advanceCallCount++;
+    };
+
     const originalRandom = Math.random;
     try {
         Math.random = () => 0.0;
@@ -1724,6 +1743,7 @@ function testHuntingCombatRewardChestNormalContinue() {
         // Reset tracking for chestContinue
         overlayStates.length = 0;
         showOverlayCalls.length = 0;
+        advanceCallCount = 0;
 
         manager.chestContinue();
 
@@ -1743,54 +1763,26 @@ function testHuntingCombatRewardChestNormalContinue() {
         assert.ok(victoryAfter, "After combat reward chest confirm, victory overlay must appear");
 
         // advance() must NOT have been called implicitly
+        assert.equal(advanceCallCount, 0, "chestContinue must NOT implicitly call advance()");
         assert.equal(manager._moving, false, "Combat reward chest continue must not trigger advance automatically");
     } finally {
         Math.random = originalRandom;
+        manager.advance = originalAdvance;
     }
 
     console.log("[hunting-combat-reward-chest-normal-continue] ok");
 }
 
 function testHuntingCombatRewardChestFinalBossContinue() {
-    const overlayStates = [];
-    const showOverlayCalls = [];
-    const playerBall = { id: FIGHTER_IDS.DASH, name: "Dash Ball", hp: 80, maxHp: 100 };
-    const mockApp = {
-        _cleanupMatch() {},
-        matchFinalized: false,
-        _onSimulationResult: null,
-        simulation: {
-            fighters: [playerBall, { id: "enemy", name: "Enemy", hp: 0, maxHp: 100 }],
-            winner: playerBall,
-            isHostile() {
-                return true;
-            }
-        },
-        _currentMatchReport: null,
-        setHuntingOverlayState(data) {
-            overlayStates.push({ ...data });
-        },
-        showOverlay(label, text, subtext) {
-            showOverlayCalls.push({ label, text, subtext });
-        },
-        refreshPlayerSetup() {},
-        setStartButton() {},
-        setHuntingActive() {},
-        _refreshCollectionHub() {},
-        beginResultConfirmation() {},
-        addLog() {},
-        roster: app.roster,
-        playerProfile: createDefaultPlayerProfile()
-    };
-    const manager = new HuntingManager(mockApp);
-    manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE });
-    manager._run = {
-        ...manager._run,
-        floor: 100,
-        lastEncounter: { type: HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS }
+    const { overlayStates, showOverlayCalls, mockApp, manager } = createCombatRewardChestTestEnv({ isFinalBoss: true });
+
+    // Spy on beginResultConfirmation() to prove lifecycle
+    let beginResultConfirmationCallCount = 0;
+    const originalBeginResultConfirmation = mockApp.beginResultConfirmation;
+    mockApp.beginResultConfirmation = () => {
+        beginResultConfirmationCallCount++;
     };
 
-    // Force chest drop via Math.random stub, always restore
     const originalRandom = Math.random;
     try {
         Math.random = () => 0.0;
@@ -1809,13 +1801,21 @@ function testHuntingCombatRewardChestFinalBossContinue() {
         assert.ok(chestState, "Chest UI must be visible after _handleFinish");
         assert.equal(chestState.huntingChestConfirmLabel, "확인", "Chest confirm button must be '확인'");
 
-        // Stage clear / result confirmation must NOT have appeared yet
+        // beginResultConfirmation must NOT be called before chest confirm
+        assert.equal(
+            beginResultConfirmationCallCount,
+            0,
+            "beginResultConfirmation must NOT be called before chest confirm"
+        );
+
+        // Stage clear must NOT have appeared yet
         const clearBefore = showOverlayCalls.find((c) => c.label === "스테이지 클리어");
         assert.equal(clearBefore, undefined, "Stage clear must NOT appear before chest confirm");
 
         // Reset tracking for chestContinue
         overlayStates.length = 0;
         showOverlayCalls.length = 0;
+        beginResultConfirmationCallCount = 0;
 
         manager.chestContinue();
 
@@ -1825,8 +1825,16 @@ function testHuntingCombatRewardChestFinalBossContinue() {
         // Stage clear overlay must appear
         const clearAfter = showOverlayCalls.find((c) => c.label === "스테이지 클리어");
         assert.ok(clearAfter, "After final boss chest confirm, stage clear overlay must appear");
+
+        // beginResultConfirmation must be called exactly once after chest confirm
+        assert.equal(
+            beginResultConfirmationCallCount,
+            1,
+            "beginResultConfirmation must be called exactly once after chest confirm"
+        );
     } finally {
         Math.random = originalRandom;
+        mockApp.beginResultConfirmation = originalBeginResultConfirmation;
     }
 
     console.log("[hunting-combat-reward-chest-finalboss-continue] ok");

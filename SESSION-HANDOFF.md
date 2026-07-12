@@ -11,7 +11,7 @@
   (6) 기존 `chestContinue()`에서 조건문 대신 phase 매핑으로 dispatch.
 - 영향: `huntingState.js`, `huntingManager.js`, `game-overlay.html`, `tests/regression.mjs`, `docs/hunting-grounds-system.md`, `src/patchNotes.js`, `index.html`, `SESSION-HANDOFF.md`
 - 검증: `npm test`, `npm run format:check`, `git diff --check`, `node scripts/huntingUserScenario.mjs`
-- 추후 수정(L3): 두 회귀 테스트(`testHuntingCombatRewardChestNormalContinue`, `testHuntingCombatRewardChestFinalBossContinue`)가 `_presentCombatRewardChest` 직접 호출 대신 `manager._handleFinish()`를 통해 실제 chest drop 판정 경로를 검증하도록 강화. `Math.random` 스텁 + `try/finally` 복원. mock app에 `_cleanupMatch`, `simulation.winner`, `_currentMatchReport=null` 등 `_handleFinish`가 접근하는 필드 추가. 커밋 `2c31b52`.
+- 추후 수정(L3): 두 회귀 테스트(`testHuntingCombatRewardChestNormalContinue`, `testHuntingCombatRewardChestFinalBossContinue`)가 `_presentCombatRewardChest` 직접 호출 대신 `manager._handleFinish()`를 통해 실제 chest drop 판정 경로를 검증하도록 강화. `Math.random` 스텁 + `try/finally` 복원. mock app에 `_cleanupMatch`, `simulation.winner`, `_currentMatchReport=null` 등 `_handleFinish`가 접근하는 필드 추가. 커밋 `2c31b52`. 이후 `createCombatRewardChestTestEnv` helper 추출, normal 테스트 `advance()` spy로 호출 0회 증명, final-boss 테스트 `beginResultConfirmation()` spy로 0→1회 생애주기 증명 추가.
 
 ## [L1] 2026-07-12 — 거너 숙련도 각충격→중량 장전 교체, 각충격은 스피너 볼 전용으로 비움
 - 맥락: Codex 요청으로 미래 추가 캐릭터 Spinner Ball이 유일하게 충돌 각충격 보정을 소유하도록 결정. 거너용 각충격 숙련도와 동일 보정이 겹쳐 정체성 충돌 발생.
