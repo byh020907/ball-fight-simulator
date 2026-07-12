@@ -2554,12 +2554,16 @@ function testAbilityLevelUpgrades(app) {
     rageRun.ball.ability.onCollision();
     assertClose(rageRun.ball.ability.state.timeWithoutCollision, 11.9 * 0.2, "Rage tier 3 should retain 20% charge");
 
-    const setSpinVelocity = (ability, value) => {
-        const ball = ability.owner;
+    const setBallAngularVelocity = (ball, value) => {
         ball._computeMomentOfInertia();
-        const targetAngularVelocity = ability._spinDirection * value;
-        ball.applyAngularImpulse((targetAngularVelocity - ball.angularVelocity) / ball._inverseMomentOfInertia);
+        ball.applyAngularImpulse((value - ball.angularVelocity) / ball._inverseMomentOfInertia);
         ball.integrateRotation(1 / 60);
+    };
+    const setSpinVelocity = (ability, value) => {
+        setBallAngularVelocity(ability.owner, ability._spinDirection * value);
+    };
+    const setBallVelocity = (ball, value) => {
+        ball.applyImpulse(Vector2.subtract(value, ball.velocity));
     };
 
     const spinBaseRun = createTierSimulation(FIGHTER_IDS.SPIN, 0);
@@ -2580,8 +2584,8 @@ function testAbilityLevelUpgrades(app) {
     spinBase.state.timeWithoutCollision = spinBase.getMaxChargeTime();
     assertClose(
         spinBase.getTargetSpinVelocity(),
-        10,
-        "Spin Ball should reach a visibly fast 10rad/s charge target without changing collision damage rules"
+        20,
+        "Spin Ball should reach a visibly fast 20rad/s charge target without changing collision damage rules"
     );
     setSpinVelocity(spinBase, spinBase.getTargetSpinVelocity());
     const spinVisualSpeedBonus = calculateRotationalContactDamageBonus(spinBaseRun.ball, {
@@ -2596,6 +2600,27 @@ function testAbilityLevelUpgrades(app) {
     spinBaseRun.ball.integrateRotation(1 / 60);
     assertClose(spinBase.getChargeProgress(), 0, "Base Spin Ball collisions should consume all rotation charge");
     assertClose(spinBase.getSpinVelocity(), 0, "Base Spin Ball collisions should physically drain its rotation");
+
+    const spinGripRun = createTierSimulation(FIGHTER_IDS.SPIN, 0);
+    const spinGrip = spinGripRun.ball.ability;
+    assert.equal(
+        spinGripRun.ball.physicsMaterial,
+        "spinGrip",
+        "Spin Ball should use its dedicated high-friction material"
+    );
+    spinGripRun.ball.position = new Vector2(420, 360);
+    spinGripRun.target.position = new Vector2(420 + spinGripRun.ball.radius + spinGripRun.target.radius - 1, 360);
+    setBallVelocity(spinGripRun.ball, new Vector2(80, 0));
+    setBallVelocity(spinGripRun.target, new Vector2(0, 0));
+    setBallAngularVelocity(spinGripRun.target, 0);
+    spinGrip.state.timeWithoutCollision = spinGrip.getMaxChargeTime();
+    setSpinVelocity(spinGrip, spinGrip.getTargetSpinVelocity());
+    const targetLateralVelocityBefore = spinGripRun.target.velocity.y;
+    spinGripRun.sim.handleCollision();
+    assert.ok(
+        Math.abs(spinGripRun.target.velocity.y - targetLateralVelocityBefore) > 120,
+        "Spin Ball should transfer its actual rotation through high-friction tangential physics"
+    );
 
     const spinTierOneRun = createTierSimulation(FIGHTER_IDS.SPIN, 1);
     spinTierOneRun.ball.ability.state.timeWithoutCollision = spinTierOneRun.ball.ability.getMaxChargeTime();

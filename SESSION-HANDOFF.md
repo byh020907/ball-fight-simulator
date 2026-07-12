@@ -1173,6 +1173,13 @@
 - 수치: 변경 전 3.2rad/s는 0.51회/초와 접점 피해 +58%였다. 변경 후 실제 경로는 9.99rad/s, 1.59회/초, 기존 접점 피해 상한 +60%를 확인했다.
 - 검증: 임시 `scripts/spinballVisualSpeedStudy.mjs`로 후보 3.2/8/10/12rad/s를 비교한 뒤 제거. `npm test`, `npm run check`, `npm run format:check`, `git diff --check` 통과. 로컬 서버의 `v0.24.61` 응답도 확인.
 
+## [L1] 2026-07-12 — 스핀볼이 실제 회전 마찰로 상대를 튕기게 한다
+- 맥락: 만충 각속도를 높였지만 스핀볼은 공통 재질의 접선 마찰을 그대로 사용해, 높은 실제 회전이 상대에게 충분한 횡방향 충격으로 전달되지 않았다. 이어서 사용자는 최대 실제 회전도 기존 10rad/s의 두 배로 요청했다.
+- 결정: 스핀볼에만 높은 마찰 재질을 부여하고, 최대 실제 회전은 20rad/s로 올린다. 동적 충돌 응답이 실제 각속도와 접점 속도를 사용해 접선 충격을 계산하는 경로를 계측·검증한다. 별도 넉백이나 직접 velocity 수정은 추가하지 않는다.
+- 영향: `PhysicsMaterial`의 `spinGrip`, Spin Ball fighter spec·Ability, 충돌 응답 회귀 및 물리 시뮬레이션, 밸런스·게임 규칙·패치 노트와 버전 표기
+- 수치: `spinGrip` 마찰 16은 기본 러버와 조합 시 약 1.789다. 실제 Ability 경로는 19.97rad/s까지 도달한다. 20rad/s·80px/s 정면 충돌에서 상대 횡발사량은 기본 15.5px/s에서 138.5px/s로, 220px/s 충돌에서는 42.6px/s에서 167.7px/s로 증가했다.
+- 검증: 임시 `scripts/spinballGripStudy.mjs`로 실제 BattleSimulation 충돌을 계측한 뒤 제거. `npm test`, `npm run check`, `npm run format:check`, `git diff --check` 통과. 로컬 서버의 `v0.24.62` 응답도 확인.
+
 ## 진행 중 이슈
 - 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
 - Time Warp 패널티 인상은 재학습 후 반영

@@ -17,6 +17,7 @@
 
 export const PHYSICS_MATERIALS = {
     rubberBall: { restitution: 0.92, friction: 0.2 },
+    spinGrip: { restitution: 0.92, friction: 16 },
     wall: { restitution: 1.0, friction: 0.2 },
     wood: { restitution: 0.92, friction: 0.2 },
     stone: { restitution: 0.5, friction: 0.35 },

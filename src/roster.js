@@ -75,6 +75,7 @@ export function createRoster() {
             color: "#d95f2f",
             face: "spin",
             ability: "spin",
+            physicsMaterial: "spinGrip",
             stats: { hp: 116, damage: 10, speed: 276, radius: 50, mass: 1.22, defense: 1 }
         },
         {
