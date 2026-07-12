@@ -9,8 +9,8 @@ import { MASTERY_EFFECT_DEFS } from "./masteryDefinitions.js";
 
 function createMasteryContext() {
     return {
-        statModifiers: { hp: 0, damage: 0, defense: 0, speed: 0 },
-        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0, collisionAngularImpulse: 0 },
+        statModifiers: { hp: 0, damage: 0, defense: 0, speed: 0, mass: 0 },
+        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0 },
         combatModifiers: { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
         combatPassives: [],
         actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0 }

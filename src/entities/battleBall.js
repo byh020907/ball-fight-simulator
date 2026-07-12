@@ -93,8 +93,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         this.mastery = {
             physics: spec.mastery?.physics ?? {
                 velocityRecoveryBonus: 0,
-                wallBounce: 0,
-                collisionAngularImpulse: 0
+                wallBounce: 0
             },
             combat: spec.mastery?.combat ?? { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
             action: spec.mastery?.action ?? {

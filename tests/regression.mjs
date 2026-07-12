@@ -7324,7 +7324,7 @@ async function testMasteryModifiersStoredOnBattleBall(app) {
         stats: { hp: 1000, damage: 50, speed: 200, defense: 5, radius: 16, mass: 10 },
         statAllocation: null,
         mastery: {
-            physics: { velocityRecoveryBonus: 0.02, wallBounce: 0.05, collisionAngularImpulse: 0.04 },
+            physics: { velocityRecoveryBonus: 0.02, wallBounce: 0.05 },
             combat: { incomingCollisionDamageReduce: 0.05, outgoingCollisionDamageBonus: 0.03 },
             action: { hpCostPercentReduction: 0.0003, cooldownPercent: 0.02 },
             passives: [{ id: "test_passive", type: "periodic_collision_bonus", cooldown: 12, damageBonus: 0.04 }]
@@ -7334,7 +7334,6 @@ async function testMasteryModifiersStoredOnBattleBall(app) {
     const ball = new BattleBall(spec, new Vector2(100, 100));
     assert.equal(ball.mastery.physics.velocityRecoveryBonus, 0.02, "velocityRecoveryBonus should be stored");
     assert.equal(ball.mastery.physics.wallBounce, 0.05, "wallBounce should be stored");
-    assert.equal(ball.mastery.physics.collisionAngularImpulse, 0.04, "collisionAngularImpulse should be stored");
     assert.equal(
         ball.mastery.combat.incomingCollisionDamageReduce,
         0.05,
@@ -7362,8 +7361,8 @@ async function testStatModifierDamageIndependentOfHp() {
 
     // archer mastery의 apply는 damage에만 영향을 줌
     const ctx = {
-        statModifiers: { hp: 0, damage: 0, defense: 0 },
-        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0, collisionAngularImpulse: 0 },
+        statModifiers: { hp: 0, damage: 0, defense: 0, speed: 0, mass: 0 },
+        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0 },
         combatModifiers: { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
         combatPassives: [],
         actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0 }
@@ -7393,7 +7392,7 @@ async function testMasteryEffectsApplyAfterFixedStats() {
     };
     const mastery = {
         statModifiers: { hp: 0.06, damage: 0.06, defense: 0 },
-        physicsModifiers: { velocityRecoveryBonus: 0.1, wallBounce: 0, collisionAngularImpulse: 0 },
+        physicsModifiers: { velocityRecoveryBonus: 0.1, wallBounce: 0 },
         combatModifiers: { incomingCollisionDamageReduce: 0.06, outgoingCollisionDamageBonus: 0.06 },
         actionModifiers: { hpCostPercentReduction: 0.001, cooldownPercent: 0.06 },
         combatPassives: []
@@ -7410,8 +7409,8 @@ async function testVampireMasteryRestoresCollisionDamage() {
     const { MASTERY_EFFECT_DEFS } = await import("../src/character-mastery/index.js");
     const vampire = MASTERY_EFFECT_DEFS.find((definition) => definition.sourceFighterId === "vampire");
     const ctx = {
-        statModifiers: { hp: 0, damage: 0, defense: 0 },
-        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0, collisionAngularImpulse: 0 },
+        statModifiers: { hp: 0, damage: 0, defense: 0, speed: 0, mass: 0 },
+        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0 },
         combatModifiers: { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
         combatPassives: [],
         actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0 }
@@ -7489,8 +7488,8 @@ async function testMasteryCombatModifiersApplyAtFinalDamageStage() {
 async function testMasteryCombatAndCooldownDefinitions() {
     const { MASTERY_EFFECT_DEFS } = await import("../src/character-mastery/index.js");
     const ctx = {
-        statModifiers: { hp: 0, damage: 0, defense: 0 },
-        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0, collisionAngularImpulse: 0 },
+        statModifiers: { hp: 0, damage: 0, defense: 0, speed: 0, mass: 0 },
+        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0 },
         combatModifiers: { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
         combatPassives: [],
         actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0 }
@@ -7540,7 +7539,7 @@ async function testDashMasterySpeedApplied() {
     };
     const mastery = {
         statModifiers: { hp: 0, damage: 0, defense: 0, speed: 0.06 },
-        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0, collisionAngularImpulse: 0 },
+        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0 },
         combatModifiers: { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
         actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0 },
         combatPassives: []
@@ -7568,7 +7567,7 @@ async function testOrbitWallBounceMultiplicative() {
         appearance: { sides: 0, face: "default", angle: 0, angularVelocity: 0 },
         stats: { hp: 100, damage: 10, defense: 1, speed: 300, radius: 50, mass: 1 },
         equipment: { equippedItems: [{ instanceId: "echo", specialOptions: [{ type: "wallBounce", value: 15 }] }] },
-        mastery: { physics: { velocityRecoveryBonus: 0, wallBounce: 0.15, collisionAngularImpulse: 0 } }
+        mastery: { physics: { velocityRecoveryBonus: 0, wallBounce: 0.15 } }
     };
     const sim = new BattleSimulation(
         [spec, { ...spec, id: "other", teamId: "b", face: "default" }],
@@ -7588,73 +7587,77 @@ async function testOrbitWallBounceMultiplicative() {
     console.log("[orbit-wall-bounce-multiplicative] ok");
 }
 
-async function testGunnerAngularImpulseMultiplicative() {
+async function testGunnerMassMultiplicative() {
+    const { applyMasteryEffectsToFighterSpec, MASTERY_EFFECT_DEFS } = await import("../src/character-mastery/index.js");
+    const { BattleBall } = await import("../src/entities/index.js");
     const { Vector2 } = await import("../src/core.js");
-    const { BattleSimulation } = await import("../src/simulation/battleSimulation.js");
-    const { createEquipmentCombatEffects } = await import("../src/hunting/equipmentEffects.js");
 
-    const makeSpec = (id, angularImpulseValue, masteryAngularBoost) => ({
-        id,
-        teamId: id,
-        name: id,
+    // Gunner 정의가 statModifiers.mass를 올리고 collisionAngularImpulse를 참조하지 않는지 확인
+    const gunnerDef = MASTERY_EFFECT_DEFS.find((d) => d.sourceFighterId === "gunner");
+    assert.ok(gunnerDef, "Gunner mastery definition should exist");
+    assert.equal(gunnerDef.kind, "stat_modifier", "Gunner mastery should be stat_modifier");
+    assert.equal(gunnerDef.id, "gunner_mass_loading", "Gunner mastery id should be gunner_mass_loading");
+
+    const ctx = {
+        statModifiers: { hp: 0, damage: 0, defense: 0, speed: 0, mass: 0 },
+        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0 },
+        combatModifiers: { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
+        combatPassives: [],
+        actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0 }
+    };
+    gunnerDef.apply(ctx, 3);
+    assert.equal(ctx.statModifiers.mass, 0.06, "Gunner GOLD should add 6% mass modifier");
+    assert.ok(
+        !("collisionAngularImpulse" in ctx.physicsModifiers),
+        "Gunner mastery should not touch collisionAngularImpulse"
+    );
+    assert.equal(ctx.statModifiers.hp, 0, "Gunner mastery should not affect hp");
+
+    // BattleBall에서 mastery(6%) + 장비 중량(15%)가 곱으로 결합되는지 확인
+    const baseSpec = {
+        id: "gunner_test",
+        teamId: "a",
+        name: "Gunner Test",
         title: "",
         description: "",
         color: "#777777",
         face: "default",
         ability: "none",
-        appearance: { sides: 4, face: "default", angle: 0, angularVelocity: 0 },
-        stats: { hp: 100, damage: 10, defense: 1, speed: 300, radius: 50, mass: 1 },
+        appearance: { sides: 0, face: "default" },
+        stats: { hp: 100, damage: 10, defense: 1, speed: 300, radius: 50, mass: 10 },
         equipment: {
-            equippedItems:
-                angularImpulseValue > 0
-                    ? [
-                          {
-                              instanceId: `${id}-eq`,
-                              specialOptions: [{ type: "angularImpulse", value: angularImpulseValue }]
-                          }
-                      ]
-                    : []
+            equippedItems: [
+                {
+                    instanceId: "mass-eq",
+                    specialOptions: [{ type: "mass", value: 15 }]
+                }
+            ]
         },
-        mastery: { physics: { velocityRecoveryBonus: 0, wallBounce: 0, collisionAngularImpulse: masteryAngularBoost } }
-    });
+        mastery: {
+            physics: { velocityRecoveryBonus: 0, wallBounce: 0 },
+            combat: { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
+            action: { hpCostPercentReduction: 0, cooldownPercent: 0 },
+            passives: []
+        },
+        statAllocation: null
+    };
+    const masteryCtx = {
+        statModifiers: { hp: 0, damage: 0, defense: 0, speed: 0, mass: 0.06 },
+        physicsModifiers: { velocityRecoveryBonus: 0, wallBounce: 0 },
+        combatModifiers: { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
+        combatPassives: [],
+        actionModifiers: { hpCostPercentReduction: 0, cooldownPercent: 0 }
+    };
+    const spec = applyMasteryEffectsToFighterSpec(baseSpec, masteryCtx);
+    // Spec mass after mastery: 10 * 1.06 = 10.6
+    assert.equal(spec.stats.mass, 10.6, "Mastery should multiply base mass by 1.06: 10 * 1.06 = 10.6");
 
-    // Baseline: no equipment, no mastery
-    const baseSim = new BattleSimulation(
-        [makeSpec("a1", 0, 0), makeSpec("b1", 0, 0)],
-        { onLog() {}, onSound() {} },
-        null,
-        { assignActions: false }
-    );
-    const [a1, b1] = baseSim.fighters;
-    a1.position = new Vector2(450, 480);
-    b1.position = new Vector2(500, 480);
-    a1.velocity = new Vector2(460, 130);
-    b1.velocity = new Vector2(-150, -90);
-    baseSim.handleFighterCollision(a1, b1);
-    a1.integrateRotation(1 / 60);
-    const baseAV = a1.angularVelocity;
-
-    // With equipment 15% AND Gunner GOLD 15% mastery
-    const boostedSim = new BattleSimulation(
-        [makeSpec("a2", 15, 0.15), makeSpec("b2", 0, 0)],
-        { onLog() {}, onSound() {} },
-        null,
-        { assignActions: false }
-    );
-    const [a2, b2] = boostedSim.fighters;
-    a2.position = new Vector2(450, 480);
-    b2.position = new Vector2(500, 480);
-    a2.velocity = new Vector2(460, 130);
-    b2.velocity = new Vector2(-150, -90);
-    boostedSim.handleFighterCollision(a2, b2);
-    a2.integrateRotation(1 / 60);
-
-    // Equipment 1.15 * Mastery (1 + 0.15) = 1.3225x multiplier on base angular impulse
-    assert.ok(
-        Math.abs(a2.angularVelocity) > Math.abs(baseAV) * 1.32,
-        `Gunner mastery + equipment should multiply angular impulse: base ${baseAV}, boosted ${a2.angularVelocity}`
-    );
-    console.log("[gunner-angular-impulse-multiplicative] ok");
+    // BattleBall 생성 시 equipment massMultiplier 적용
+    const ball = new BattleBall(spec, new Vector2(100, 100));
+    // ball.mass: 10.6 * 1.15 = 12.19
+    assert.equal(ball.mass, 12.19, "Equipment mass multiplier should apply after mastery: 10.6 * 1.15 = 12.19");
+    assert.equal(ball.stats.mass, 12.19, "ball.stats.mass should match ball.mass after both multipliers");
+    console.log("[gunner-mass-multiplicative] ok");
 }
 
 async function testHuntingMasteryPlayerOnly(app) {
@@ -8063,7 +8066,7 @@ await testMasteryCombatAndCooldownDefinitions();
 await testCollectEffectsFromDefinitionsNoCap();
 await testDashMasterySpeedApplied();
 await testOrbitWallBounceMultiplicative();
-await testGunnerAngularImpulseMultiplicative();
+await testGunnerMassMultiplicative();
 await testHuntingMasteryPlayerOnly(app);
 testZeroCostActionSchedulesWithoutHpSpend(app);
 // Dynamic bonus computation test

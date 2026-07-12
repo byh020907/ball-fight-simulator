@@ -88,7 +88,7 @@ export const HELP_CONTENT = `
     <li><b>Bat Ball</b> — 액션 HP 비용 -0.03/0.06/0.10%p</li>
     <li><b>Hero Ball</b> — 스킬 쿨다운 -2/4/6%</li>
     <li><b>Vampire Ball</b> — 4초마다 충돌 피해의 3/6/9% 회복 (잃은 HP 비례 최대 2배)</li>
-    <li><b>Gunner</b> — 자신에게 전달되는 각충격 +5/10/15% (장비 소용돌이와 곱)</li>
+    <li><b>Gunner</b> — 질량 +2/4/6% (장비 중량과 곱)</li>
     <li><b>Phantom</b> — 받는 충돌 피해 -2/4/6%</li>
   </ul>
 </div>

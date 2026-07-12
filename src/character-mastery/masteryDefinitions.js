@@ -179,17 +179,17 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         }
     },
     {
-        id: "gunner_recoil_amplification",
+        id: "gunner_mass_loading",
         sourceFighterId: "gunner",
-        name: "반동 증폭",
-        kind: "physics_modifier",
-        description: "전투원 충돌로 자신에게 전달되는 각충격이 {value} 증가합니다.",
-        tierValues: MASTERY_TIERS.collisionAngularImpulse,
+        name: "중량 장전",
+        kind: "stat_modifier",
+        description: "질량이 {value} 증가합니다.",
+        tierValues: MASTERY_TIERS.mass,
         formatValue(v) {
             return (v * 100).toFixed(0) + "%";
         },
         apply(ctx, level) {
-            ctx.physicsModifiers.collisionAngularImpulse += this.tierValues[level];
+            ctx.statModifiers.mass += this.tierValues[level];
         }
     },
     {

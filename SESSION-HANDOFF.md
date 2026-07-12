@@ -1,5 +1,11 @@
 # 결정 기록
 
+## [L1] 2026-07-12 — 거너 숙련도 각충격→중량 장전 교체, 각충격은 스피너 볼 전용으로 비움
+- 맥락: Codex 요청으로 미래 추가 캐릭터 Spinner Ball이 유일하게 충돌 각충격 보정을 소유하도록 결정. 거너용 각충격 숙련도와 동일 보정이 겹쳐 정체성 충돌 발생.
+- 결정: 거너 숙련도를 `반동 증폭`(충돌 각충격 +5/10/15%)에서 `중량 장전`(질량 +2/4/6%)으로 교체. 질량 보정은 `statModifiers.mass`로 fighter spec에 최종 퍼센트 보정. BattleBall에서 장비 중량의 massMultiplier와 곱으로 결합(`baseMass * masteryMultiplier * equipmentMultiplier`). 충돌 각충격 숙련도 키(collisionAngularImpulse)와 거너 전용 각충격 코드 제거. 장비 angularImpulse/collisionAngularMultiplier는 기존 장비 효과로 유지.
+- 영향: `src/rewardBalanceConfig.js`, `src/character-mastery/masteryDefinitions.js`, `src/character-mastery/masteryModifiers.js`, `src/entities/battleBall.js`, `src/simulation/battleSimulation.js`, `src/helpContent.js`, `src/patchNotes.js`, `index.html`, `docs/character-mastery-system.md`, `docs/reward-balance.md`, `tests/regression.mjs`, `SESSION-HANDOFF.md`
+- 검증: `npm test`, `npm run check`, `npm run format:check`, `git diff --check`, `node scripts/huntingUserScenario.mjs`
+
 ## [L1] 2026-07-12 — 레벨업은 매 레벨 기본 스탯과 3·6·9 행동 강화를 함께 준다
 - 맥락: 직전 구현이 Lv.3/Lv.6/Lv.9 대표 행동 강화만 남기면서, 캐릭터 성향에 맞는 매 레벨 기본 수치 성장을 잘못 제거했다.
 - 결정: Lv.2~Lv.10의 모든 레벨 보상 행은 캐릭터 ID별 기본 스탯 보상을 가진다. Lv.3/Lv.6/Lv.9 행은 같은 행에서 대표 행동 tier I/II/III를 추가한다. 적용 순서는 `캐릭터 기본 수치 + 레벨 기본 스탯 → 사용자 스탯 배율 → 장비 고정 수치 → 숙련도 최종 보정`으로 고정한다. 보상 행, 누적 기본 스탯, 능력 tier, 보상 ID는 하나의 불변 진행 스냅샷으로 파생해 토너먼트와 사냥터에 전달한다.

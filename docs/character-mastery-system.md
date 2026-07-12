@@ -77,16 +77,16 @@
 | Bat Ball | 클릭 액션 HP 비용 감소 | 0.03%p | 0.06%p | 0.10%p |
 | Hero Ball | 스킬 쿨다운 감소 | 2% | 4% | 6% |
 | Vampire Ball | 4초마다 다음 충돌 피해 회복 (결손 HP 비례 1~2배) | 3% | 6% | 9% |
-| Gunner Ball | 충돌 각충격 배율 | 5% | 10% | 15% |
+| Gunner Ball | 질량 증가 | 2% | 4% | 6% |
 | Phantom Ball | 받는 충돌 피해 감소 | 2% | 4% | 6% |
 
 ## 5. 향상된 물리 효과
 
-Orbit과 Gunner의 숙련도 효과는 일반 스탯이 아닌 전투 물리 길목에서 직접 적용된다. Dash의 추진력은 일반 스탯 최종 multiplier로, 다른 스탯 계열 숙련도와 함께 처리된다.
+Orbit의 숙련도 효과는 일반 스탯이 아닌 전투 물리 길목에서 직접 적용된다. Dash의 추진력과 Gunner의 중량 장전은 일반 스탯 최종 multiplier로, 다른 statModifiers 계열 숙련도와 함께 처리된다.
 
 - Orbit의 **반사 궤도**는 `applyWallBounceBoost`에서 장비의 반향 배율과 곱으로 결합된다. 즉, 장비 반향 +15%와 Orbit GOLD +15%는 `1.15 * 1.15`로 함께 적용된다.
 - Dash의 **추진력**은 이동 속도(speed) stat modifier로, 다른 statModifiers 계열 숙련도와 함께 최종 퍼센트로 적용된다.
-- Gunner의 **반동 증폭**은 `getFighterCollisionResponseOptions`에서 장비의 소용돌이 배율과 곱으로 결합되어 충돌 solver에 전달된다.
+- Gunner의 **중량 장전**은 질량(mass) stat modifier로, `applyMasteryEffectsToFighterSpec`에서 spec stats에 퍼센트 보정되고, BattleBall 생성 시 장비 중량의 massMultiplier와 곱으로 결합된다. 즉, Gunner GOLD +6%와 장비 중량 +15%는 최종 질량이 `baseMass * 1.06 * 1.15`가 된다.
 
 분노와 갈증은 각각 하나의 원본만 제공하는 독립 주기 패시브다. 피해가 0이거나 HP가 가득 찬 경우에는 준비 상태를 소비하지 않는다.
 
@@ -120,5 +120,5 @@ Orbit과 Gunner의 숙련도 효과는 일반 스탯이 아닌 전투 물리 길
 - 숙련도 퍼센트는 장비 고정 수치까지 합친 뒤 적용된다.
 - 도감, 숙련도 탭, `도감 완성` 업적은 같은 `characterMastery.levels`를 기준으로 한다.
 - 주기형 효과는 실제 적대 전투원 충돌에서만 소비된다.
-- 물리 계열 효과(반사 궤도, 반동 증폭)는 장비의 동일 계열 효과와 곱으로 결합된다. Dash의 추진력은 stat modifier로서 다른 스탯 계열 숙련도와 함께 최종 퍼센트로 적용된다.
+- Orbit의 반사 궤도는 장비 반향과 곱으로 결합된다. Gunner의 중량 장전은 장비 중량과 곱으로 결합하며, Dash의 추진력은 다른 스탯 계열 숙련도와 함께 최종 퍼센트로 적용된다.
 - 표준 무능력 볼 기준 GOLD 단일 효과의 승률 변화는 대체로 `+3~5%p` 범위이며, 속도 복귀와 쿨다운은 별도의 조작감·능력 회전율 보정으로 검증한다.

@@ -420,7 +420,7 @@ export const REWARD_BALANCE = deepFreeze({
             vampireHpSteal: [0, 0.03, 0.06, 0.09],
             wallBounce: [0, 0.05, 0.1, 0.15],
             speed: [0, 0.02, 0.04, 0.06],
-            collisionAngularImpulse: [0, 0.05, 0.1, 0.15]
+            mass: [0, 0.02, 0.04, 0.06]
         },
         masteryRuntime: {
             vampire: {
