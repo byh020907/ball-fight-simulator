@@ -12938,14 +12938,43 @@ function testHuntingEventResultOverlayContract() {
 await testGameOverlayChestConfirmLabelContract();
 testHuntingEventResultOverlayContract();
 
-function testHuntingMishapPreservesRecoveryWindow() {
+function testHuntingMishapAvoidsLowHpRuns() {
     const event = new MishapEvent(HUNTING_EVENT_TYPES.MISHAP);
-    const run = { ...createHuntingRun({ characterId: FIGHTER_IDS.DASH }), floor: 70, carriedHp: 1, carriedMaxHp: 100 };
+    const run = {
+        ...createHuntingRun({ characterId: FIGHTER_IDS.DASH }),
+        floor: 70,
+        carriedHp: 100,
+        carriedMaxHp: 100
+    };
     const result = event.resolve(event.createPayload(70), { run });
-    assert.equal(result.run.carriedHp, 20, "A mishap should preserve the 20% max-HP recovery window");
-    console.log("[hunting-mishap-survival-floor] ok");
+    assert.equal(result.run.carriedHp, 90, "Deep mishaps should remove 10% of current HP");
+    const highHp = rollHuntingFloorOutcome(
+        10,
+        (() => {
+            const rolls = [0.5, 0.45];
+            return () => rolls.shift() ?? 0;
+        })(),
+        0,
+        { hpRatio: 0.5 }
+    );
+    const lowHp = rollHuntingFloorOutcome(
+        10,
+        (() => {
+            const rolls = [0.5, 0.45];
+            return () => rolls.shift() ?? 0;
+        })(),
+        0,
+        { hpRatio: 0.2 }
+    );
+    assert.equal(
+        highHp.event.type,
+        HUNTING_EVENT_TYPES.MISHAP,
+        "Mishaps should remain available above the low-HP threshold"
+    );
+    assert.notEqual(lowHp.event.type, HUNTING_EVENT_TYPES.MISHAP, "Mishaps should not roll at or below 20% HP");
+    console.log("[hunting-mishap-low-hp-exclusion] ok");
 }
 
-testHuntingMishapPreservesRecoveryWindow();
+testHuntingMishapAvoidsLowHpRuns();
 
 console.log("regression tests ok");

@@ -311,7 +311,7 @@ export const REWARD_BALANCE = deepFreeze({
                 commonChestCost: 40,
                 secureTransportCost: 30
             },
-            mishap: { defaultDamageRatio: 0.1, deepFloor: 70, deepFloorDamageRatio: 0.14 },
+            mishap: { defaultDamageRatio: 0.05, deepFloor: 70, deepFloorDamageRatio: 0.1 },
             restRecoveryRatio: 0.25,
             chestRoom: {
                 legendary: { minimumFloor: 5, chance: 0.03 },
