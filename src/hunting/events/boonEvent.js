@@ -26,7 +26,11 @@ export class BoonEvent extends HuntingEvent {
             }),
             transition: HUNTING_EVENT_TRANSITIONS.CONTINUE,
             logMessage: `[사냥터] 축복: 파편 +${shards}`,
-            toastMessage: `축복: 파편 +${shards}`
+            presentation: {
+                title: "축복",
+                subtext: "전리품에 파편을 추가했습니다.",
+                detail: `파편 +${shards}`
+            }
         };
     }
 }

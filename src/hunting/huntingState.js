@@ -11,6 +11,7 @@ import { HUNTING_EVENT_TYPES } from "./huntingConfig.js";
 export const HUNTING_RUN_PHASES = Object.freeze({
     READY: "ready",
     MOVING: "moving",
+    AWAITING_EVENT: "awaiting_event",
     AWAITING_CHOICE: "awaiting_choice",
     AWAITING_MERCHANT: "awaiting_merchant",
     AWAITING_CHEST: "awaiting_chest",

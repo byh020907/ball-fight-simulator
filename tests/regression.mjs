@@ -1426,11 +1426,14 @@ function testHuntingUiRouteDisplay() {
 async function testHuntingEarlyEventUi() {
     // 첫 층에서 포탈 이벤트 발생 시 choice UI가 정상 표시되고 route가 숨겨지는지 검증
     const overlayCalls = [];
+    const overlayMessages = [];
     const mockApp = {
         setHuntingOverlayState(data) {
             overlayCalls.push({ ...data });
         },
-        showOverlay() {},
+        showOverlay(label, text, subtext) {
+            overlayMessages.push({ label, text, subtext });
+        },
         addLog() {},
         showToast() {},
         setHuntingActive() {},
@@ -1470,6 +1473,11 @@ async function testHuntingEarlyEventUi() {
         assert.equal(lastState.huntingMoveStep, 0, "선택 이벤트 후 huntingMoveStep은 0으로 초기화되어야 함");
         assert.equal(manager._moving, false, "선택 이벤트 후 _moving은 false로 풀려야 함");
         assert.equal(manager._run.lastEvent?.type, HUNTING_EVENT_TYPES.PORTAL, "첫 층에서 포탈 이벤트가 발생해야 함");
+        assert.deepEqual(
+            overlayMessages.at(-1),
+            { label: "사냥터 이벤트", text: "귀환 포탈 발견", subtext: "지금 귀환하거나 더 깊이 전진할 수 있습니다." },
+            "Portal should use the same event-result header as every hunting event"
+        );
     } finally {
         Math.random = origRandom;
         globalThis.setTimeout = origSetTimeout;
@@ -1535,8 +1543,8 @@ function testHuntingChestEventStopsAndResumes() {
     assert.equal(manager._moving, false, "Chest event should stop the auto-advance loop");
     assert.deepEqual(
         overlayMessages.at(-1),
-        { label: "사냥터", text: "1층 — 상자방", subtext: "전리품을 확인하세요" },
-        "Chest event should replace the previous battle result text with chest room context"
+        { label: "사냥터 이벤트", text: "상자방 발견", subtext: "상자를 미확보 전리품에 보관했습니다." },
+        "Chest event should show its own event title and concrete result"
     );
     assert.equal(
         manager._run.phase,
@@ -1561,6 +1569,133 @@ function testHuntingChestEventStopsAndResumes() {
     assert.equal(advanceCalls, 1, "Chest continue should resume the advance loop");
     assert.equal(overlayCalls.at(-1).huntingChestEventActive, false, "Chest continue should close the chest reward UI");
     console.log("[hunting-chest-event] ok");
+}
+
+function testHuntingEventPresentationContracts() {
+    const profile = createDefaultPlayerProfile();
+    const run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE });
+    const expectedTitles = {
+        [HUNTING_EVENT_TYPES.PORTAL]: "귀환 포탈 발견",
+        [HUNTING_EVENT_TYPES.WANDERING_MERCHANT]: "방랑 상인 발견",
+        [HUNTING_EVENT_TYPES.BOON]: "축복",
+        [HUNTING_EVENT_TYPES.MISHAP]: "함정 발동",
+        [HUNTING_EVENT_TYPES.CHEST_ROOM]: "상자방 발견",
+        [HUNTING_EVENT_TYPES.REST_SITE]: "휴식지",
+        [HUNTING_EVENT_TYPES.CURSED_ALTAR]: "저주받은 제단",
+        [HUNTING_EVENT_TYPES.CHAMPION_INTRUSION]: "챔피언 난입"
+    };
+
+    for (const event of HuntingEvent.POOL) {
+        const payload = event.createPayload(6, () => 0);
+        const resolution = event.resolve(payload, { run, playerProfile: profile, roster: app.roster });
+        assert.equal(
+            resolution.presentation?.title,
+            expectedTitles[event.type],
+            `${event.type} should provide its own result-screen title`
+        );
+        assert.ok(
+            resolution.presentation?.subtext,
+            `${event.type} should explain its result instead of relying on a toast`
+        );
+        assert.ok(
+            resolution.presentation?.detail,
+            `${event.type} should expose the concrete effect for the result screen`
+        );
+    }
+    console.log("[hunting-event-presentation-contracts] ok");
+}
+
+function testHuntingAutoEventRequiresConfirmation() {
+    const overlayCalls = [];
+    const overlayMessages = [];
+    const mockApp = {
+        setHuntingOverlayState(data) {
+            overlayCalls.push({ ...data });
+        },
+        showOverlay(label, text, subtext) {
+            overlayMessages.push({ label, text, subtext });
+        },
+        addLog() {},
+        roster: app.roster,
+        playerProfile: createDefaultPlayerProfile()
+    };
+    const manager = new HuntingManager(mockApp);
+    const boonEvent = HuntingEvent.createPayload(HUNTING_EVENT_TYPES.BOON, 2);
+    manager._run = {
+        ...createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE }),
+        lastEvent: boonEvent
+    };
+
+    const action = manager._handleEventFloor({ app: mockApp, event: boonEvent });
+    assert.equal(action, "stop", "Auto-resolved events should stop the route for their result screen");
+    assert.equal(
+        manager._run.phase,
+        HUNTING_RUN_PHASES.AWAITING_EVENT,
+        "Auto-resolved events should wait for acknowledgement"
+    );
+    assert.deepEqual(
+        overlayMessages.at(-1),
+        { label: "사냥터 이벤트", text: "축복", subtext: "전리품에 파편을 추가했습니다." },
+        "Auto-resolved events should present their event title and result in the overlay"
+    );
+    assert.equal(
+        overlayCalls.at(-1).huntingEventActive,
+        true,
+        "Event result UI should stay visible until confirmation"
+    );
+    assert.equal(overlayCalls.at(-1).huntingEventDetail, "파편 +8", "Event result UI should show the concrete gain");
+
+    let advanceCalls = 0;
+    manager.advance = () => {
+        advanceCalls += 1;
+    };
+    manager.eventContinue();
+
+    assert.equal(advanceCalls, 1, "Confirming an auto event should resume the route exactly once");
+    assert.equal(
+        overlayCalls.at(-1).huntingEventActive,
+        false,
+        "Event confirmation should close only the event result UI"
+    );
+    console.log("[hunting-auto-event-requires-confirmation] ok");
+}
+
+function testHuntingChampionEventRequiresBattleConfirmation() {
+    const overlayCalls = [];
+    const mockApp = {
+        setHuntingOverlayState(data) {
+            overlayCalls.push({ ...data });
+        },
+        showOverlay() {},
+        addLog() {},
+        roster: app.roster,
+        playerProfile: createDefaultPlayerProfile()
+    };
+    const manager = new HuntingManager(mockApp);
+    const championEvent = HuntingEvent.createPayload(HUNTING_EVENT_TYPES.CHAMPION_INTRUSION, 4);
+    manager._run = {
+        ...createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE }),
+        lastEvent: championEvent
+    };
+
+    const action = manager._handleEventFloor({ app: mockApp, event: championEvent });
+    assert.equal(action, "stop", "Champion intrusion should stop for its result screen before combat");
+    assert.equal(manager._run.phase, HUNTING_RUN_PHASES.AWAITING_EVENT, "Champion should wait for confirmation");
+    assert.equal(
+        overlayCalls.at(-1).huntingEventConfirmLabel,
+        "전투 시작",
+        "Champion event should make the next action explicit"
+    );
+
+    let battleStarts = 0;
+    manager._startFloorBattle = () => {
+        battleStarts += 1;
+    };
+    manager.eventContinue();
+
+    assert.equal(battleStarts, 1, "Champion combat should start only after event confirmation");
+    assert.equal(manager._run.phase, HUNTING_RUN_PHASES.COMBAT, "Champion confirmation should enter combat phase");
+    console.log("[hunting-champion-event-requires-confirmation] ok");
 }
 
 async function testHuntingChestEventStopsAdvanceLoop() {
@@ -8316,6 +8451,9 @@ testHuntingUiRouteDisplay();
 await testHuntingEarlyEventUi();
 await testHuntingFirstMoveUiPaintGate();
 testHuntingChestEventStopsAndResumes();
+testHuntingEventPresentationContracts();
+testHuntingAutoEventRequiresConfirmation();
+testHuntingChampionEventRequiresBattleConfirmation();
 await testHuntingChestEventStopsAdvanceLoop();
 testHuntingAdvanceDispatchContract();
 testComponentBridgeEquipmentFunctions();
@@ -10335,12 +10473,15 @@ function testHuntingMerchantPurchaseRefreshesUiState() {
     const profile = createDefaultPlayerProfile();
     profile.hunting.shards = 100;
     const overlayStates = [];
+    let toastCalls = 0;
     const app = {
         playerProfile: profile,
         setHuntingOverlayState(data) {
             overlayStates.push(data);
         },
-        showToast() {}
+        showToast() {
+            toastCalls += 1;
+        }
     };
     const manager = new HuntingManager(app);
     const run = createHuntingRun({ characterId: FIGHTER_IDS.RAGE, stageId: HUNTING_STAGE_IDS.CAVE });
@@ -10360,6 +10501,11 @@ function testHuntingMerchantPurchaseRefreshesUiState() {
         manager._run.pendingLoot.chests.length,
         1,
         "Merchant chest purchase should still add exactly one unsecured chest"
+    );
+    assert.equal(toastCalls, 0, "Merchant purchases should report their result in the merchant screen, not a toast");
+    assert.ok(
+        overlayStates.at(-1).huntingMerchantResult,
+        "Merchant overlay should receive a textual result for the completed purchase"
     );
     console.log("[hunting-merchant-ui-refresh] ok");
 }
@@ -12594,6 +12740,27 @@ function testGameOverlayChestConfirmLabelContract() {
     console.log("[game-overlay-chest-confirm-label] ok");
 }
 
+function testHuntingEventResultOverlayContract() {
+    const overlay = readFileSync("src/components/game-overlay.html", "utf8");
+    const bridge = readFileSync("src/componentBridge.js", "utf8");
+    assert.ok(overlay.includes("huntingEventActive: false"), "game-overlay must initialize the event result state");
+    assert.ok(overlay.includes("this.huntingEventActive = false"), "event result state must reset with hunting UI");
+    assert.ok(
+        overlay.includes("data.huntingEventDetail !== undefined"),
+        "event result detail must accept manager updates"
+    );
+    assert.ok(
+        overlay.includes('@click="huntingEventContinue()"'),
+        "Event result confirmation must stay inside the hunting overlay"
+    );
+    assert.ok(
+        bridge.includes("huntingEventContinue()"),
+        "Component bridge must expose hunting event confirmation to the overlay"
+    );
+    console.log("[hunting-event-result-overlay] ok");
+}
+
 await testGameOverlayChestConfirmLabelContract();
+testHuntingEventResultOverlayContract();
 
 console.log("regression tests ok");

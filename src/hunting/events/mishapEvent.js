@@ -19,16 +19,21 @@ export class MishapEvent extends HuntingEvent {
     resolve(event, { run }) {
         const currentHp = run.carriedHp ?? run.carriedMaxHp ?? 100;
         const damage = Math.max(1, Math.floor(currentHp * (event.damageRatio ?? 0.1)));
+        const remainingHp = Math.max(1, currentHp - damage);
         return {
             run: recordHuntingFloorResult(run, {
-                hpRemain: Math.max(1, currentHp - damage),
+                hpRemain: remainingHp,
                 maxHp: run.carriedMaxHp,
                 loot: { shards: 0, chests: [], xp: 0 },
                 consumeStatModifiers: false
             }),
             transition: HUNTING_EVENT_TRANSITIONS.CONTINUE,
             logMessage: `[사냥터] 함정: HP -${damage}`,
-            toastMessage: `함정: HP -${damage}`
+            presentation: {
+                title: "함정 발동",
+                subtext: "함정에 걸려 현재 체력을 잃었습니다.",
+                detail: `HP -${damage} · 현재 ${remainingHp} / ${run.carriedMaxHp ?? currentHp}`
+            }
         };
     }
 }

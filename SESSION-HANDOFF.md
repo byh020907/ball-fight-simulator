@@ -1146,6 +1146,12 @@
 - 영향: `src/collection/collectionActionPopup.js`, `src/componentBridge.js`, `src/abilities/heroAbility.js`, `src/helpContent.js`, `tests/regression.mjs`, `docs/equipment-system.md`, `docs/game-rules.md`, `src/patchNotes.js`, `index.html`
 - 검증: `npm test`, `npm run check`, `npm run format:check`, `git diff --check` 통과. 강화 성공/실패, 분해, 판매, 상자 개봉 성공/실패의 공통 팝업 옵션과 실제 브리지 호출, Hero 축적 링의 조각 수·수량 표기·소비 플래시를 회귀 테스트로 고정. 로컬 서버가 `v0.24.57`을 응답하는 것도 확인.
 
+## [L1] 2026-07-12 — 모든 사냥터 이벤트를 확인형 결과 화면으로 표현
+- 맥락: 축복·함정·휴식지·저주받은 제단 등 자동 진행 이벤트가 토스트만 띄운 채 지나가 실제 효과를 체감하기 어려웠다. 챔피언 난입도 전투가 즉시 시작되어 이벤트의 보상·위험을 읽을 시간이 없었다.
+- 결정: 모든 사냥터 이벤트는 오버레이에서 이벤트명과 구체적 결과를 표시한다. 자동 진행 이벤트는 확인 뒤 전진하고, 챔피언 난입은 `전투 시작` 확인 뒤 전투를 개시한다. 포탈·상인·상자방은 기존 전용 인터랙션을 유지하되 이벤트명·효과를 같은 오버레이 헤더에서 명확히 표시한다.
+- 영향: `src/hunting/events/*.js`, `src/hunting/huntingState.js`, `src/hunting/huntingManager.js`, `src/componentBridge.js`, `src/components/game-overlay.html`, `tests/regression.mjs`, `docs/hunting-grounds-system.md`, `src/patchNotes.js`, `index.html`
+- 검증: `npm test`, `npm run check`, `npm run format:check`, `git diff --check` 통과. 8종 이벤트가 이벤트명·보조 문구·구체적 결과를 반환하고, 자동 진행 이벤트와 챔피언 난입이 확인 전에는 각각 전진·전투를 시작하지 않는 경로를 회귀 테스트로 고정했다. 로컬 서버가 `v0.24.58`을 응답하는 것도 확인.
+
 ## 진행 중 이슈
 - 밸런스 안정화됨 (±20% 이상 극단치 없음). Dash +27% 강세, 일부 캐릭터 약하락
 - Time Warp 패널티 인상은 재학습 후 반영

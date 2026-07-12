@@ -14,7 +14,12 @@ export class PortalEvent extends HuntingEvent {
             message: `${event.floor}층 — 포탈 발견!`,
             summary: `포탈 발견 · 현재 ${event.floor}층 · 귀환 또는 10층 전진`,
             canRetreat: true,
-            logMessage: `[사냥터] ${event.floor}층 — 포탈 발견, 귀환하거나 계속 전진할 수 있습니다.`
+            logMessage: `[사냥터] ${event.floor}층 — 포탈 발견, 귀환하거나 계속 전진할 수 있습니다.`,
+            presentation: {
+                title: "귀환 포탈 발견",
+                subtext: "지금 귀환하거나 더 깊이 전진할 수 있습니다.",
+                detail: `현재 ${event.floor}층 · 다음 10층 전진 가능`
+            }
         };
     }
 }

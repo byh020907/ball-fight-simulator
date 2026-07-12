@@ -15,11 +15,16 @@ export class RestSiteEvent extends HuntingEvent {
     resolve(event, { run, roster }) {
         const healAmount = Math.floor((run.carriedMaxHp ?? run.carriedHp ?? 100) * (event.recoveryRatio ?? 0.25));
         const name = roster.find((fighter) => fighter.id === run.characterId)?.name ?? run.characterId;
+        const nextRun = applyHuntingEventRecovery(run, { amount: healAmount });
         return {
-            run: applyHuntingEventRecovery(run, { amount: healAmount }),
+            run: nextRun,
             transition: HUNTING_EVENT_TRANSITIONS.CONTINUE,
             logMessage: `[사냥터] 휴식: ${name} HP +${healAmount}`,
-            toastMessage: `휴식: HP +${healAmount}`
+            presentation: {
+                title: "휴식지",
+                subtext: `${name}이(가) 숨을 고릅니다.`,
+                detail: `HP +${healAmount} · 현재 ${nextRun.carriedHp} / ${nextRun.carriedMaxHp}`
+            }
         };
     }
 }

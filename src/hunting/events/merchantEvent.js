@@ -24,7 +24,12 @@ export class MerchantEvent extends HuntingEvent {
             transition: HUNTING_EVENT_TRANSITIONS.MERCHANT,
             message: `${event.floor}층 — 방랑 상인`,
             offers,
-            logMessage: `[사냥터] ${event.floor}층 — 방랑 상인 발견`
+            logMessage: `[사냥터] ${event.floor}층 — 방랑 상인 발견`,
+            presentation: {
+                title: "방랑 상인 발견",
+                subtext: "파편으로 장비와 강화석을 교환할 수 있습니다.",
+                detail: `현재 ${event.floor}층 · 상품 ${offers.length}개`
+            }
         };
     }
 }

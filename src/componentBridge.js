@@ -73,6 +73,9 @@ export function createComponentBridge(app) {
         huntingChestContinue() {
             return app.hunting.chestContinue();
         },
+        huntingEventContinue() {
+            return app.hunting.eventContinue();
+        },
 
         // ── Help action ──
         openHelp() {

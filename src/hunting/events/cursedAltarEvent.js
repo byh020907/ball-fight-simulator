@@ -3,6 +3,19 @@ import { HUNTING_EVENT_TRANSITIONS, HuntingEvent } from "./huntingEvent.js";
 import { rollIndex, safeFloor } from "./eventHelpers.js";
 import { applyHuntingCursedAltar } from "../huntingState.js";
 
+const STAT_LABELS = Object.freeze({
+    hp: "체력",
+    damage: "공격력",
+    defense: "방어력",
+    speed: "속도",
+    skill: "스킬"
+});
+
+function formatPercentDelta(multiplier, direction) {
+    const percent = Math.round(Math.abs((multiplier ?? 1) - 1) * 100);
+    return `${direction}${percent}%`;
+}
+
 function rollTrade(floor, rng) {
     const altar = REWARD_BALANCE.hunting.events.cursedAltar;
     return {
@@ -22,7 +35,11 @@ export class CursedAltarEvent extends HuntingEvent {
             run: applyHuntingCursedAltar(run, { trade: event.trade }),
             transition: HUNTING_EVENT_TRANSITIONS.CONTINUE,
             logMessage: `[사냥터] 저주받은 제단: ${event.trade?.gainStat} x${event.trade?.gainMultiplier} / ${event.trade?.loseStat} x${event.trade?.loseMultiplier}`,
-            toastMessage: "저주받은 제단: 스탯 교환"
+            presentation: {
+                title: "저주받은 제단",
+                subtext: "다음 전투들에 스탯 교환이 적용됩니다.",
+                detail: `${STAT_LABELS[event.trade?.gainStat] ?? event.trade?.gainStat} ${formatPercentDelta(event.trade?.gainMultiplier, "+")} / ${STAT_LABELS[event.trade?.loseStat] ?? event.trade?.loseStat} ${formatPercentDelta(event.trade?.loseMultiplier, "-")} · ${event.trade?.floors ?? 1}회 전투`
+            }
         };
     }
 }

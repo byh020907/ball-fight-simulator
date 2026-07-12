@@ -18,7 +18,12 @@ export class ChampionIntrusionEvent extends HuntingEvent {
         return {
             run: setHuntingRunPhase(run, HUNTING_RUN_PHASES.COMBAT),
             transition: HUNTING_EVENT_TRANSITIONS.BATTLE,
-            message: `${event.floor}층 — 챔피언 난입!`
+            message: `${event.floor}층 — 챔피언 난입!`,
+            presentation: {
+                title: "챔피언 난입",
+                subtext: "강화된 적이 길을 막아섰습니다.",
+                detail: `파편 보상 x${event.rewardMultiplier ?? 1}`
+            }
         };
     }
 }

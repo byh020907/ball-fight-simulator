@@ -31,7 +31,12 @@ export class ChestRoomEvent extends HuntingEvent {
             run: setHuntingRunPhase(nextRun, HUNTING_RUN_PHASES.AWAITING_CHEST),
             transition: HUNTING_EVENT_TRANSITIONS.CHEST,
             chest,
-            logMessage: `[사냥터] 상자방: ${chest.rarity} 상자 획득`
+            logMessage: `[사냥터] 상자방: ${chest.rarity} 상자 획득`,
+            presentation: {
+                title: "상자방 발견",
+                subtext: "상자를 미확보 전리품에 보관했습니다.",
+                detail: "상자 1개 획득"
+            }
         };
     }
 }

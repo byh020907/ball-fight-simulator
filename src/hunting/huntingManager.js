@@ -13,7 +13,12 @@ import {
 } from "./huntingState.js";
 import { rollShardReward, createHuntingChest } from "./huntingRewards.js";
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
-import { HUNTING_ADVANCE_STEPS, HUNTING_ENEMY_TYPES, HUNTING_FLOOR_OUTCOME_TYPES } from "./huntingConfig.js";
+import {
+    HUNTING_ADVANCE_STEPS,
+    HUNTING_ENEMY_TYPES,
+    HUNTING_EVENT_TYPES,
+    HUNTING_FLOOR_OUTCOME_TYPES
+} from "./huntingConfig.js";
 import { getHuntingStage, getHuntingStageArena, getNextHuntingStageId } from "./huntingEncounters.js";
 import { applyEquipmentStats } from "./equipmentConfig.js";
 import { collectActiveEffects, applyMasteryEffectsToFighterSpec } from "../character-mastery/index.js";
@@ -62,6 +67,14 @@ const HUNTING_FLOOR_OUTCOME_HANDLERS = Object.freeze({
 const HUNTING_CHEST_CONTINUE_HANDLERS = Object.freeze({
     [HUNTING_RUN_PHASES.AWAITING_CHEST]: "_continueChestRoom",
     [HUNTING_RUN_PHASES.AWAITING_COMBAT_REWARD_CHEST]: "_continueCombatRewardChest"
+});
+
+const HUNTING_EVENT_CONTINUE_HANDLERS = Object.freeze({
+    [HUNTING_EVENT_TYPES.BOON]: "_continueEventAdvance",
+    [HUNTING_EVENT_TYPES.MISHAP]: "_continueEventAdvance",
+    [HUNTING_EVENT_TYPES.REST_SITE]: "_continueEventAdvance",
+    [HUNTING_EVENT_TYPES.CURSED_ALTAR]: "_continueEventAdvance",
+    [HUNTING_EVENT_TYPES.CHAMPION_INTRUSION]: "_continueChampionIntrusion"
 });
 
 const HUNTING_EVENT_PRESENTATION_HANDLERS = Object.freeze({
@@ -565,6 +578,7 @@ export class HuntingManager {
         const hud = this._getLootHudState();
         app.setHuntingOverlayState({
             huntingMoving: false,
+            huntingEventActive: false,
             huntingMoveMessage: message,
             ...hud
         });
@@ -580,6 +594,7 @@ export class HuntingManager {
         const hud = this._getLootHudState();
         app.setHuntingOverlayState({
             huntingMoving: false,
+            huntingEventActive: false,
             huntingChoiceVisible: true,
             huntingCanRetreat: canRetreat,
             huntingFloor: floor,
@@ -599,6 +614,7 @@ export class HuntingManager {
         const hud = this._getLootHudState();
         app.setHuntingOverlayState({
             huntingMoving: false,
+            huntingEventActive: false,
             huntingChoiceVisible: false,
             huntingCanRetreat: false,
             huntingFloor: floor,
@@ -610,6 +626,7 @@ export class HuntingManager {
             huntingLootSummary: summary || "",
             huntingMerchantActive: true,
             huntingMerchantOffers: offers,
+            huntingMerchantResult: "",
             huntingChestEventActive: false,
             ...hud
         });
@@ -623,6 +640,7 @@ export class HuntingManager {
         const hud = this._getLootHudState();
         app.setHuntingOverlayState({
             huntingMoving: false,
+            huntingEventActive: false,
             huntingChoiceVisible: false,
             huntingCanRetreat: false,
             huntingFloor: floor,
@@ -644,6 +662,32 @@ export class HuntingManager {
         this._moving = false;
     }
 
+    _stopHuntingMoveForEvent(app, presentation, confirmLabel = "계속 전진") {
+        this._run = setHuntingRunPhase(this._run, HUNTING_RUN_PHASES.AWAITING_EVENT);
+        const hud = this._getLootHudState();
+        app.showOverlay("사냥터 이벤트", presentation.title, presentation.subtext);
+        app.setHuntingOverlayState({
+            huntingMoving: false,
+            huntingChoiceVisible: false,
+            huntingCanRetreat: false,
+            huntingFloor: this._run.floor,
+            huntingMoveFrom: 0,
+            huntingMoveTo: 0,
+            huntingMoveStep: 0,
+            huntingMoveMax: HUNTING_ADVANCE_STEPS,
+            huntingMoveMessage: presentation.title,
+            huntingMerchantActive: false,
+            huntingMerchantOffers: null,
+            huntingMerchantResult: "",
+            huntingChestEventActive: false,
+            huntingEventActive: true,
+            huntingEventDetail: presentation.detail,
+            huntingEventConfirmLabel: confirmLabel,
+            ...hud
+        });
+        this._moving = false;
+    }
+
     merchantChoose(offerIndex) {
         const app = this.app;
         const run = this._run;
@@ -655,7 +699,7 @@ export class HuntingManager {
 
         const result = applyMerchantOffer(run, app.playerProfile, offer);
         if (!result) {
-            app.showToast("파편이 부족합니다.");
+            app.setHuntingOverlayState({ huntingMerchantResult: "파편이 부족합니다." });
             return;
         }
 
@@ -665,8 +709,7 @@ export class HuntingManager {
         this._run = { ...result.run, merchantOffers: refreshedOffers };
         savePlayerProfile(app.playerProfile);
 
-        const toastMsg = formatOfferResultToast(result.result);
-        if (toastMsg) app.showToast(`[상인] ${toastMsg}`);
+        const merchantResult = formatOfferResultToast(result.result);
 
         // Refresh merchant overlay with updated state
         const pendingText = formatPendingLootSummary(this._run.pendingLoot);
@@ -674,6 +717,7 @@ export class HuntingManager {
         app.setHuntingOverlayState({
             huntingMerchantOffers: refreshedOffers,
             huntingLootSummary: pendingText,
+            huntingMerchantResult: merchantResult,
             ...hud
         });
     }
@@ -684,7 +728,8 @@ export class HuntingManager {
         if (!run || run.status !== "active") return;
         app.setHuntingOverlayState({
             huntingMerchantActive: false,
-            huntingMerchantOffers: null
+            huntingMerchantOffers: null,
+            huntingMerchantResult: ""
         });
         this._run = { ...setHuntingRunPhase(this._run, HUNTING_RUN_PHASES.READY), merchantOffers: null };
         this.advance();
@@ -706,6 +751,32 @@ export class HuntingManager {
             huntingChestConfirmLabel: ""
         });
         return this[handlerName]();
+    }
+
+    eventContinue() {
+        const app = this.app;
+        const run = this._run;
+        if (!run || run.status !== "active" || run.phase !== HUNTING_RUN_PHASES.AWAITING_EVENT) return;
+        const handlerName = HUNTING_EVENT_CONTINUE_HANDLERS[run.lastEvent?.type];
+        if (!handlerName || typeof this[handlerName] !== "function") {
+            throw new Error(`Unsupported hunting event continue type: ${run.lastEvent?.type ?? "missing"}`);
+        }
+        app.setHuntingOverlayState({
+            huntingEventActive: false,
+            huntingEventDetail: "",
+            huntingEventConfirmLabel: ""
+        });
+        return this[handlerName]();
+    }
+
+    _continueEventAdvance() {
+        this._run = setHuntingRunPhase(this._run, HUNTING_RUN_PHASES.READY);
+        this.advance();
+    }
+
+    _continueChampionIntrusion() {
+        const event = this._run.lastEvent;
+        this._stopHuntingMoveForBattle(this.app, `${event.floor}층 — 챔피언 난입!`);
     }
 
     _continueChestRoom() {
@@ -743,12 +814,13 @@ export class HuntingManager {
 
     _presentContinueEvent(app, resolution) {
         if (resolution.logMessage) app.addLog(resolution.logMessage);
-        if (resolution.toastMessage) app.showToast(resolution.toastMessage);
-        return HUNTING_ROUTE_ACTIONS.CONTINUE;
+        this._stopHuntingMoveForEvent(app, resolution.presentation);
+        return HUNTING_ROUTE_ACTIONS.STOP;
     }
 
     _presentChoiceEvent(app, resolution) {
         if (resolution.logMessage) app.addLog(resolution.logMessage);
+        app.showOverlay("사냥터 이벤트", resolution.presentation.title, resolution.presentation.subtext);
         this._stopHuntingMoveForChoice(app, {
             message: resolution.message,
             canRetreat: resolution.canRetreat,
@@ -760,6 +832,7 @@ export class HuntingManager {
 
     _presentMerchantEvent(app, resolution) {
         if (resolution.logMessage) app.addLog(resolution.logMessage);
+        app.showOverlay("사냥터 이벤트", resolution.presentation.title, resolution.presentation.subtext);
         this._stopHuntingMoveForMerchant(app, {
             message: resolution.message,
             floor: this._run.floor,
@@ -771,13 +844,13 @@ export class HuntingManager {
 
     _presentChestEvent(app, resolution) {
         if (resolution.logMessage) app.addLog(resolution.logMessage);
-        app.showOverlay("사냥터", `${this._run.floor}층 — 상자방`, "전리품을 확인하세요");
+        app.showOverlay("사냥터 이벤트", resolution.presentation.title, resolution.presentation.subtext);
         this._stopHuntingMoveForChest(app, { chest: resolution.chest, floor: this._run.floor });
         return HUNTING_ROUTE_ACTIONS.STOP;
     }
 
     _presentBattleEvent(app, resolution) {
-        this._stopHuntingMoveForBattle(app, resolution.message);
+        this._stopHuntingMoveForEvent(app, resolution.presentation, "전투 시작");
         return HUNTING_ROUTE_ACTIONS.STOP;
     }
 
