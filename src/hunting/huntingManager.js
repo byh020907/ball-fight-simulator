@@ -212,7 +212,7 @@ export class HuntingManager {
                 : encounterEnemyType === HUNTING_ENEMY_TYPES.ELITE
                   ? HUNTING_ENEMY_TYPES.ELITE
                   : HUNTING_ENEMY_TYPES.ELITE;
-        const mobSpecs = createHuntingMobEncounter({ floor: run.floor });
+        const mobSpecs = createHuntingMobEncounter({ floor: run.floor, stageId: run.stageId });
         const miniboss =
             isFinalBoss || shouldUseRosterMiniboss(run.floor, run.lastEvent)
                 ? createHuntingMinibossSpec({

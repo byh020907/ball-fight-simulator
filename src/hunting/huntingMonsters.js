@@ -1,55 +1,104 @@
-import { HUNTING_ENEMY_TYPES } from "./huntingConfig.js";
+import { HUNTING_ENEMY_TYPES, HUNTING_STAGE_IDS } from "./huntingConfig.js";
 import { scaleEnemySpecForHunting } from "./huntingEncounters.js";
-import { MobAppearance } from "../entities/mobAppearance.js";
 
 const DEFAULT_RNG = () => Math.random();
 
-export const HUNTING_TEAMS = Object.freeze({
-    PLAYER: "hunting-player",
-    ENEMY: "hunting-enemy"
-});
-
+export const HUNTING_TEAMS = Object.freeze({ PLAYER: "hunting-player", ENEMY: "hunting-enemy" });
 export const HUNTING_MONSTER_TYPES = Object.freeze({
-    MELEE: "melee",
-    RANGED: "ranged"
+    MELEE: "pursuer",
+    RANGED: "shooter",
+    PURSUER: "pursuer",
+    CHARGER: "charger",
+    SHOOTER: "shooter",
+    ELECTRIC: "electric",
+    HEALER: "healer",
+    CHAIN: "chain",
+    SHOCKWAVE: "shockwave",
+    BARRIER: "barrier",
+    SIPHON: "siphon",
+    SHARD: "shard",
+    BOOMERANG: "boomerang",
+    SPLITTER: "splitter",
+    JUMPER: "jumper",
+    LASER: "laser"
 });
 
-export const HUNTING_MONSTER_BASE_SPECS = Object.freeze({
-    [HUNTING_MONSTER_TYPES.MELEE]: Object.freeze({
-        id: "hunting-mob-melee",
-        name: "하수인",
-        title: "사냥터 하수인",
-        description: "사냥터에서 무리로 달려드는 하수인입니다.",
-        color: "#9b5d3f",
-        face: "dash",
-        ability: "hunting_melee",
-        stats: Object.freeze({ hp: 74, damage: 8, speed: 305, radius: 34, mass: 0.95, defense: 1 })
-    }),
-    [HUNTING_MONSTER_TYPES.RANGED]: Object.freeze({
-        id: "hunting-mob-ranged",
-        name: "하수인",
-        title: "원정지 하수인",
-        description: "사냥터에서 뒤쪽에서 화살로 견제하는 하수인입니다.",
-        color: "#426f9e",
-        face: "archer",
-        ability: "archer",
-        stats: Object.freeze({ hp: 56, damage: 7, speed: 260, radius: 30, mass: 0.82, defense: 0.6 })
-    })
-});
+const CAVE_MONSTERS = Object.freeze(
+    [
+        ["pursuer", 1, 1.0, "#9b5d3f", "angry", { hp: 74, damage: 8, speed: 305, radius: 34, mass: 0.95, defense: 1 }],
+        ["charger", 10, 1.7, "#e66b4f", "dash", { hp: 86, damage: 10, speed: 286, radius: 37, mass: 1.08, defense: 1 }],
+        [
+            "shooter",
+            20,
+            1.7,
+            "#426f9e",
+            "cyclops",
+            { hp: 62, damage: 8, speed: 258, radius: 31, mass: 0.82, defense: 0.6 }
+        ],
+        ["electric", 30, 1.8, "#5e8ee6", "ooo", { hp: 68, damage: 9, speed: 252, radius: 34, mass: 0.9, defense: 0.8 }],
+        ["healer", 40, 1.8, "#65b87a", "happy", { hp: 110, damage: 5, speed: 268, radius: 35, mass: 1, defense: 1 }],
+        ["chain", 50, 1.9, "#b85065", "angry", { hp: 88, damage: 9, speed: 278, radius: 35, mass: 1.05, defense: 1 }],
+        [
+            "shockwave",
+            60,
+            1.9,
+            "#e1a94e",
+            "ooo",
+            { hp: 106, damage: 11, speed: 240, radius: 40, mass: 1.22, defense: 1.3 }
+        ],
+        [
+            "barrier",
+            70,
+            2.0,
+            "#5dbaeb",
+            "default",
+            { hp: 104, damage: 7, speed: 250, radius: 39, mass: 1.18, defense: 1.5 }
+        ],
+        ["siphon", 80, 2.0, "#9b69be", "xeye", { hp: 92, damage: 10, speed: 272, radius: 35, mass: 0.98, defense: 1 }],
+        [
+            "shard",
+            90,
+            2.1,
+            "#e0d05b",
+            "cyclops",
+            { hp: 82, damage: 10, speed: 260, radius: 35, mass: 0.95, defense: 1 }
+        ],
+        [
+            "boomerang",
+            91,
+            2.1,
+            "#e58a52",
+            "happy",
+            { hp: 84, damage: 10, speed: 270, radius: 35, mass: 0.95, defense: 1 }
+        ],
+        ["splitter", 92, 2.2, "#c56bd5", "ooo", { hp: 94, damage: 9, speed: 262, radius: 37, mass: 1.02, defense: 1 }],
+        ["jumper", 93, 2.2, "#e9c45d", "dash", { hp: 90, damage: 11, speed: 276, radius: 36, mass: 1, defense: 1 }],
+        ["laser", 94, 2.3, "#ef5b5b", "cyclops", { hp: 92, damage: 11, speed: 248, radius: 36, mass: 1.04, defense: 1 }]
+    ].map(([type, unlockFloor, weight, color, face, stats]) =>
+        Object.freeze({ type, unlockFloor, weight, color, face, stats: Object.freeze(stats) })
+    )
+);
 
-function safeFloor(floor) {
-    if (!Number.isFinite(floor)) return 1;
-    return Math.max(1, Math.floor(floor));
+export const HUNTING_MONSTER_BASE_SPECS = Object.freeze(
+    Object.fromEntries(CAVE_MONSTERS.map((monster) => [monster.type, monster]))
+);
+const safeFloor = (floor) => Math.max(1, Math.floor(Number.isFinite(floor) ? floor : 1));
+
+export function getHuntingMonsterPool(floor, stageId = HUNTING_STAGE_IDS.CAVE) {
+    const safe = safeFloor(floor);
+    const definitions = stageId === HUNTING_STAGE_IDS.CAVE ? CAVE_MONSTERS : CAVE_MONSTERS;
+    return definitions.filter((monster) => monster.unlockFloor <= safe);
 }
 
-function rollIndex(length, rng = DEFAULT_RNG) {
-    return Math.floor(Math.max(0, Math.min(0.999999, rng())) * length);
-}
-
-function getMonsterTypeForSlot(floor, index, rng = DEFAULT_RNG) {
-    if (index === 0) return HUNTING_MONSTER_TYPES.MELEE;
-    if (safeFloor(floor) === 1 && index === 1) return HUNTING_MONSTER_TYPES.RANGED;
-    return rollIndex(2, rng) === 0 ? HUNTING_MONSTER_TYPES.MELEE : HUNTING_MONSTER_TYPES.RANGED;
+function rollMonster(floor, rng) {
+    const pool = getHuntingMonsterPool(floor);
+    const total = pool.reduce((sum, monster) => sum + monster.weight, 0);
+    let roll = rng() * total;
+    for (const monster of pool) {
+        roll -= monster.weight;
+        if (roll < 0) return monster;
+    }
+    return pool.at(-1);
 }
 
 export function getHuntingMobCount(floor) {
@@ -62,30 +111,30 @@ export function createHuntingMobSpec({
     index = 0,
     rng = DEFAULT_RNG
 } = {}) {
-    const safeType = HUNTING_MONSTER_BASE_SPECS[type] ? type : HUNTING_MONSTER_TYPES.MELEE;
-    const base = HUNTING_MONSTER_BASE_SPECS[safeType];
+    const base = HUNTING_MONSTER_BASE_SPECS[type] ?? HUNTING_MONSTER_BASE_SPECS[HUNTING_MONSTER_TYPES.MELEE];
     return {
-        ...base,
-        id: `${base.id}-f${safeFloor(floor)}-${index}`,
-        name: `${base.name} ${index + 1}`,
+        id: `hunting-mob-${base.type}-f${safeFloor(floor)}-${index}`,
+        name: "사냥터 몬스터",
+        title: base.type,
+        description: `${base.type} 행동을 사용하는 사냥터 몬스터`,
+        color: base.color,
+        face: base.face,
+        ability: "hunting_mob",
         teamId: HUNTING_TEAMS.ENEMY,
         stats: { ...base.stats },
-        hunting: {
-            monsterType: safeType,
-            isMob: true
-        },
-        appearance: MobAppearance.generate(rng)
+        appearance: { sides: 6 + (index % 4), face: base.face, angle: rng() * Math.PI * 2, angularVelocity: 1.2 },
+        hunting: { monsterType: base.type, behavior: base.type, isMob: true, stageSkin: "cave" }
     };
 }
 
-export function createHuntingMobEncounter({ floor = 1, rng = DEFAULT_RNG } = {}) {
-    const count = getHuntingMobCount(floor);
-    return Array.from({ length: count }, (_, index) => {
-        const type = getMonsterTypeForSlot(floor, index, rng);
-        return scaleEnemySpecForHunting(createHuntingMobSpec({ type, floor, index, rng }), floor, {
-            enemyType: HUNTING_ENEMY_TYPES.NORMAL
-        });
-    });
+export function createHuntingMobEncounter({ floor = 1, stageId = HUNTING_STAGE_IDS.CAVE, rng = DEFAULT_RNG } = {}) {
+    return Array.from({ length: getHuntingMobCount(floor) }, (_, index) =>
+        scaleEnemySpecForHunting(
+            createHuntingMobSpec({ type: rollMonster(floor, rng).type, floor, index, rng }),
+            floor,
+            { enemyType: HUNTING_ENEMY_TYPES.NORMAL }
+        )
+    );
 }
 
 export function shouldUseRosterMiniboss(floor, lastEvent = null) {
@@ -100,25 +149,18 @@ export function createHuntingMinibossSpec({
     rng = DEFAULT_RNG
 } = {}) {
     const candidates = roster.filter((fighter) => fighter.id !== characterId);
-    if (candidates.length === 0) return null;
-
-    const base = candidates[rollIndex(candidates.length, rng)];
-    const scaled = scaleEnemySpecForHunting(
+    if (!candidates.length) return null;
+    const base = candidates[Math.floor(rng() * candidates.length)];
+    return scaleEnemySpecForHunting(
         {
             ...base,
             id: `hunting-miniboss-${base.id}-f${safeFloor(floor)}`,
             name: `${base.name} 중간 보스`,
             teamId: HUNTING_TEAMS.ENEMY,
             stats: { ...base.stats },
-            hunting: {
-                ...(base.hunting ?? {}),
-                isMiniboss: true,
-                sourceFighterId: base.id
-            }
+            hunting: { ...(base.hunting ?? {}), isMiniboss: true, sourceFighterId: base.id }
         },
         floor,
         { enemyType }
     );
-
-    return scaled;
 }

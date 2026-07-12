@@ -15,7 +15,8 @@ import {
     VampireAbility,
     GunnerAbility,
     PhantomAbility,
-    HuntingMeleeAbility
+    HuntingMeleeAbility,
+    HuntingMobAbility
 } from "../abilities/index.js";
 import { BattleBall } from "../entities/index.js";
 import { GravityParticle } from "../effects/index.js";
@@ -37,7 +38,8 @@ const ABILITY_TYPES = {
     vampire: VampireAbility,
     gunner: GunnerAbility,
     phantom: PhantomAbility,
-    hunting_melee: HuntingMeleeAbility
+    hunting_melee: HuntingMeleeAbility,
+    hunting_mob: HuntingMobAbility
 };
 
 const ANTI_STALL_INTERVAL = 8;

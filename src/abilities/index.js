@@ -13,6 +13,7 @@ export { VampireAbility } from "./vampireAbility.js";
 export { GunnerAbility } from "./gunnerAbility.js";
 export { PhantomAbility } from "./phantomAbility.js";
 export { HuntingMeleeAbility } from "./huntingMeleeAbility.js";
+export { HuntingMobAbility } from "./huntingMobAbility.js";
 
 import { Ability } from "./ability.js";
 import { ArcherAbility } from "./archerAbility.js";

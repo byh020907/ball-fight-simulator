@@ -84,6 +84,7 @@ import {
     HUNTING_EVENT_TYPES,
     HUNTING_FLOOR_OUTCOME_TYPES,
     HUNTING_MONSTER_TYPES,
+    HUNTING_MONSTER_BASE_SPECS,
     HUNTING_PORTAL_DECLINE,
     HUNTING_RUN_PHASES,
     HUNTING_STAGE_IDS,
@@ -93,6 +94,7 @@ import {
     createHuntingMobSpec,
     createHuntingMobEncounter,
     getHuntingMobCount,
+    getHuntingMonsterPool,
     shouldUseRosterMiniboss,
     createMerchantOffers,
     applyMerchantOffer,
@@ -2882,14 +2884,19 @@ function testHuntingSystem() {
         "Hunting mobs should all be assigned to the enemy team"
     );
     assert.ok(
-        mobs.some((mob) => mob.hunting.monsterType === HUNTING_MONSTER_TYPES.MELEE) &&
-            mobs.some((mob) => mob.hunting.monsterType === HUNTING_MONSTER_TYPES.RANGED),
-        "Hunting mob encounters should include melee and ranged monster archetypes"
+        mobs.every((mob) => mob.hunting.monsterType === HUNTING_MONSTER_TYPES.PURSUER),
+        "Early floors should only use the first unlocked monster"
     );
+    assert.ok(
+        mobs.every((mob) => mob.ability === "hunting_mob"),
+        "Hunting mobs should use the dedicated monster ability"
+    );
+    assert.equal(getHuntingMonsterPool(90).length, 10, "Floor 90 should have the first ten cave monsters unlocked");
+    assert.equal(getHuntingMonsterPool(94).length, 14, "Floor 94 should unlock all fourteen cave monsters");
     assert.equal(
-        mobs.find((mob) => mob.hunting.monsterType === HUNTING_MONSTER_TYPES.MELEE).ability,
-        "hunting_melee",
-        "Hunting melee mobs should use the chase-focused monster ability"
+        Object.keys(HUNTING_MONSTER_BASE_SPECS).length,
+        14,
+        "Cave should define fourteen data-driven monster types"
     );
     assert.equal(shouldUseRosterMiniboss(3), true, "Every third hunting floor should add a roster miniboss");
     const miniboss = createHuntingMinibossSpec({
@@ -5955,8 +5962,8 @@ function testHuntingMeleeMobChasesTarget(app) {
 
     assert.equal(
         melee.ability.constructor.name,
-        "HuntingMeleeAbility",
-        "Melee hunting mobs should bind the dedicated chase ability"
+        "HuntingMobAbility",
+        "Pursuer hunting mobs should bind the shared monster ability"
     );
     assert.ok(after < before - 20, "Melee hunting mobs should close distance toward the player");
     assert.ok(melee.velocity.x < 0, "Melee hunting mobs should move horizontally toward the player");
@@ -11035,13 +11042,13 @@ function testHuntingCombatText() {
         HUNTING_MONSTER_TYPES.MELEE,
         "Melee mob should retain internal monsterType"
     );
-    assert.equal(meleeSpec.ability, "hunting_melee", "Melee mob should retain chase ability");
+    assert.equal(meleeSpec.ability, "hunting_mob", "Pursuer mob should use the shared monster ability");
     assert.equal(
         rangedSpec.hunting.monsterType,
         HUNTING_MONSTER_TYPES.RANGED,
         "Ranged mob should retain internal monsterType"
     );
-    assert.equal(rangedSpec.ability, "archer", "Ranged mob should retain archer ability");
+    assert.equal(rangedSpec.ability, "hunting_mob", "Shooter mob should use the shared monster ability");
 
     // ── createHuntingMobEncounter does not use melee/ranged in UI-visible text ──
     const mobs = createHuntingMobEncounter({ floor: 5, rng: () => 0.5 });
