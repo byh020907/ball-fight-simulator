@@ -2503,16 +2503,52 @@ function testAbilityLevelUpgrades(app) {
         16,
         "Hero stacks should add 3% collision damage each"
     );
+    const attractionOrb = new HeroOrb(heroRun.ball, heroRun.ball.position.clone(), new Vector2(0, 0), "hp");
+    const heroAttraction = heroAbility.getOrbAttraction(attractionOrb);
+    assert.equal(
+        heroAttraction.radius,
+        heroRun.ball.radius * 2 + attractionOrb.radius,
+        "Hero tier 1 should use twice the Hero radius plus the Orb radius as magnet range"
+    );
+
+    heroRun.sim.width = 10_000;
+    heroRun.target.position = new Vector2(9_000, 9_000);
+    heroAbility._spawnOrb("hp", new Vector2(1, 0));
+    const launchedOrb = heroRun.sim.entities.find((entity) => entity.constructor?.name === "HeroOrb");
+    const launchVelocity = launchedOrb.velocity.clone();
+    assert.equal(
+        launchedOrb.magnetGraceRemaining,
+        1,
+        "Hero tier 1 should give launched orbs a one-second magnet grace period"
+    );
+    for (const _ of Array.from({ length: 10 })) {
+        launchedOrb.update(0.1, heroRun.sim);
+    }
+    assertClose(
+        launchedOrb.velocity.length(),
+        launchVelocity.length(),
+        "Hero magnet should not reduce launch speed during the first second"
+    );
+    heroRun.sim.entities = heroRun.sim.entities.filter((entity) => entity !== launchedOrb);
+
     const heroOrb = new HeroOrb(
         heroRun.ball,
-        Vector2.add(heroRun.ball.position, new Vector2(150, 0)),
-        new Vector2(120, 0),
-        "hp"
+        Vector2.add(heroRun.ball.position, new Vector2(heroRun.ball.radius + 20, 0)),
+        new Vector2(0, 0),
+        "hp",
+        undefined,
+        { magnetGraceDuration: 1 }
+    );
+    heroOrb.update(1, heroRun.sim);
+    assert.equal(
+        heroOrb.velocity.length(),
+        0,
+        "Hero magnet should ignore an orb until its one-second grace period ends"
     );
     heroOrb.update(0.1, heroRun.sim);
     assert.ok(
-        heroOrb.velocity.x < 120,
-        "Hero tier 1 should physically pull owned orbs from inside the influence radius"
+        heroOrb.velocity.x < 0,
+        "Hero tier 1 should physically pull owned orbs after the grace period inside the Hero-radius range"
     );
     heroAbility.onFighterCollisionDamageResolved(heroRun.target, 1);
     assert.equal(

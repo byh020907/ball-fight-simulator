@@ -98,7 +98,14 @@ export class HeroAbility extends Ability {
     _spawnOrb(effectType, direction) {
         const start = Vector2.add(this.owner.position, direction.clone().scale(this.owner.radius + 20));
         this._enforceOwnerOrbLimit();
-        this.simulation.spawnHeroOrb(this.owner, start, direction.scale(this._computeOrbSpeed()), effectType);
+        this.simulation.spawnHeroOrb(
+            this.owner,
+            start,
+            direction.scale(this._computeOrbSpeed()),
+            effectType,
+            undefined,
+            { magnetGraceDuration: this.getLevelUpgrade().magnetGraceDuration ?? 0 }
+        );
     }
 
     getOrbAttraction(orb) {
@@ -106,7 +113,7 @@ export class HeroAbility extends Ability {
         const radiusMultiplier = upgrade.magnetRadiusMultiplier ?? 1;
         if (radiusMultiplier <= 1) return null;
         return {
-            radius: (this.owner.radius + orb.radius) * radiusMultiplier,
+            radius: this.owner.radius * radiusMultiplier + orb.radius,
             responseRate: upgrade.magnetResponseRate
         };
     }

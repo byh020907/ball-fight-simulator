@@ -153,7 +153,7 @@ export const REWARD_BALANCE = deepFreeze({
             ],
             hero: [
                 { level: 2, baseStats: { hp: 2 } },
-                { level: 3, baseStats: { speed: 2 }, abilityTier: 1, gameText: "내 오브 귀환 자석" },
+                { level: 3, baseStats: { speed: 2 }, abilityTier: 1, gameText: "발사 1초 후 오브 귀환 자석" },
                 { level: 4, baseStats: { skill: 2 } },
                 { level: 5, baseStats: { damage: 1 } },
                 { level: 6, baseStats: { hp: 2 }, abilityTier: 2, gameText: "오브 획득 축적 충돌 강화" },
@@ -248,7 +248,7 @@ export const REWARD_BALANCE = deepFreeze({
             hero: {
                 tiers: [
                     {},
-                    { magnetRadiusMultiplier: 3, magnetResponseRate: 5 },
+                    { magnetRadiusMultiplier: 2, magnetResponseRate: 5, magnetGraceDuration: 1 },
                     { stackCap: 20, damagePerStack: 0.03 },
                     { releaseStackRatio: 0.5 }
                 ]

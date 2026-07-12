@@ -256,13 +256,14 @@ export function applyHeroOrbCarryoverToBattleBall(ball, carryover) {
 // ── Hero Orb entity ──────────────────────────────────────────────────────────
 
 export class HeroOrb extends CombatEntity {
-    constructor(owner, position, velocity, effectType, life) {
+    constructor(owner, position, velocity, effectType, life, { magnetGraceDuration = 0 } = {}) {
         super(position, velocity, 12);
         this.owner = owner;
         this.ownerId = owner.id;
         this.effectType = effectType;
         this.life = life ?? Infinity;
         this.mass = 2;
+        this.magnetGraceRemaining = Math.max(0, magnetGraceDuration);
     }
 
     get renderLayer() {
@@ -321,6 +322,11 @@ export class HeroOrb extends CombatEntity {
     }
 
     _applyOwnerMagnet(delta) {
+        if (this.magnetGraceRemaining > 0) {
+            this.magnetGraceRemaining = Math.max(0, this.magnetGraceRemaining - delta);
+            return;
+        }
+
         const attraction = this.owner.ability?.getOrbAttraction?.(this);
         if (!attraction || this.owner.flags.defeated) return;
 

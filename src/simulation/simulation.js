@@ -157,8 +157,10 @@ export class Simulation {
         this.entities.push(new OrbitProjectile(owner, position, direction, size));
     }
 
-    spawnHeroOrb(owner, position, velocity, effectType, life) {
-        this.entities.push(new HeroOrb(owner, position, velocity, effectType, life));
+    spawnHeroOrb(owner, position, velocity, effectType, life, options) {
+        const orb = new HeroOrb(owner, position, velocity, effectType, life, options);
+        this.entities.push(orb);
+        return orb;
     }
 
     spawnPulse(position, color) {

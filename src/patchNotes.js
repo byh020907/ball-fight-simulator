@@ -19,6 +19,21 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.24.52",
+        date: "2026-07-12",
+        title: "v0.24.52 Hero Orb가 발사 속도를 유지합니다",
+        changes: [
+            {
+                type: "fix",
+                text: "Hero Lv.3 귀환 자석은 오브가 발사되거나 방출된 뒤 1초 동안 적용되지 않아 초기 투사 속도를 유지합니다."
+            },
+            {
+                type: "refactor",
+                text: "자석 영향 반경을 `Hero 반지름 × 2 + Orb 반지름`으로 조정해 Hero 크기와 오브 크기를 함께 반영합니다."
+            }
+        ]
+    },
+    {
         version: "0.24.51",
         date: "2026-07-12",
         title: "v0.24.51 레벨 행동 강화가 실제 효과 이름으로 표시됩니다",
