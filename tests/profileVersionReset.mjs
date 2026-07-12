@@ -69,9 +69,10 @@ const equipmentReward = grantAchievementReward(rewardProfile, flawlessAchievemen
 assert.equal(equipmentReward.equipment.rarity, "rare");
 assert.equal(equipmentReward.equipment.name, "무결점의 수정 방패");
 assert.deepEqual(equipmentReward.equipment.stats, [
-    { type: "defense", value: 8, min: 8, max: 8 },
-    { type: "hp", value: 50, min: 50, max: 50 }
+    { type: "defense", value: 2, min: 2, max: 2 },
+    { type: "hp", value: 20, min: 20, max: 20 }
 ]);
+assert.deepEqual(equipmentReward.equipment.specialOptions, [{ type: "wallBounce", value: 15 }]);
 assert.equal(rewardProfile.equipment.inventory.length, 1);
 
 rewardProfile.equipment.inventory = Array.from({ length: rewardProfile.equipment.maxInventorySlots }, (_, index) => ({
@@ -83,12 +84,71 @@ assert.equal(overflowReward.convertedToChest, true);
 assert.equal(overflowReward.chest.rarity, "epic");
 assert.equal(overflowReward.chest.openCost, 0);
 assert.equal(overflowReward.chest.guaranteedEquipment.name, "개척자의 룬 귀걸이");
+assert.deepEqual(overflowReward.chest.guaranteedEquipment.specialOptions, [
+    { type: "cooldown", value: 10 },
+    { type: "hpSteal", value: 8 }
+]);
 
 rewardProfile.equipment.inventory = [];
 const openedGuaranteedChest = openHuntingChest(rewardProfile, overflowReward.chest.id);
 assert.equal(openedGuaranteedChest.opened, true);
 assert.equal(openedGuaranteedChest.cost, 0);
 assert.equal(openedGuaranteedChest.applied.equipment.name, "개척자의 룬 귀걸이");
+assert.deepEqual(openedGuaranteedChest.applied.equipment.specialOptions, [
+    { type: "cooldown", value: 10 },
+    { type: "hpSteal", value: 8 }
+]);
+
+const guaranteedEquipmentExpectations = [
+    {
+        achievementId: "flawless_tournament",
+        name: "무결점의 수정 방패",
+        stats: [
+            { type: "defense", value: 2, min: 2, max: 2 },
+            { type: "hp", value: 20, min: 20, max: 20 }
+        ],
+        specialOptions: [{ type: "wallBounce", value: 15 }]
+    },
+    {
+        achievementId: "roster_champion",
+        name: "개척자의 룬 귀걸이",
+        stats: [
+            { type: "damage", value: 3, min: 3, max: 3 },
+            { type: "speed", value: 15, min: 15, max: 15 }
+        ],
+        specialOptions: [
+            { type: "cooldown", value: 10 },
+            { type: "hpSteal", value: 8 }
+        ]
+    },
+    {
+        achievementId: "mastery_complete",
+        name: "도감 완성의 영원한 망토",
+        stats: [
+            { type: "hp", value: 40, min: 40, max: 40 },
+            { type: "defense", value: 4, min: 4, max: 4 }
+        ],
+        specialOptions: [{ type: "angularImpulse", value: 15 }]
+    },
+    {
+        achievementId: "single_hit_monster",
+        name: "단죄의 수정 단검",
+        stats: [
+            { type: "damage", value: 3, min: 3, max: 3 },
+            { type: "speed", value: 10, min: 10, max: 10 }
+        ],
+        specialOptions: [{ type: "crashDamage", value: 15 }]
+    }
+];
+
+for (const expectation of guaranteedEquipmentExpectations) {
+    const profile = createDefaultPlayerProfile();
+    const achievement = ACHIEVEMENT_DEFINITIONS.find(({ id }) => id === expectation.achievementId);
+    const granted = grantAchievementReward(profile, achievement);
+    assert.equal(granted.equipment.name, expectation.name);
+    assert.deepEqual(granted.equipment.stats, expectation.stats);
+    assert.deepEqual(granted.equipment.specialOptions, expectation.specialOptions);
+}
 
 assert.ok(ACHIEVEMENT_DEFINITIONS.every((achievement) => typeof achievement.grant === "function"));
 
