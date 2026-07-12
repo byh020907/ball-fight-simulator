@@ -446,8 +446,16 @@
                 </div>
                 <template x-if="state.storage.dailyShop">
                     <div class="ch-shop-body">
-                        <div class="ch-shop-offer" x-bind:class="'ch-chest--' + state.storage.dailyShop.rarity">
-                            <div>
+                        <div
+                            class="ch-shop-offer"
+                            x-bind:class="['ch-shop-offer--' + state.storage.dailyShop.rarity, { 'is-rerolling': state.shopRerolling }]"
+                        >
+                            <div class="ch-shop-offer-info">
+                                <span
+                                    class="ch-shop-rarity-swatch"
+                                    x-bind:class="'ch-shop-rarity-swatch--' + state.storage.dailyShop.rarity"
+                                    aria-hidden="true"
+                                ></span>
                                 <span class="ch-shop-label">상점 상자</span>
                                 <strong x-text="state.storage.dailyShop.rarity.toUpperCase() + ' 상자'"></strong>
                                 <span x-text="'구매 ' + state.storage.dailyShop.purchases + '/' + state.storage.dailyShop.purchaseLimit"></span>
@@ -502,6 +510,7 @@
             selectedCharacterId: null,
             characterDetailTab: "overview",
             shopVisible: false,
+            shopRerolling: false,
             rosterItems: [],
             masteryItems: [],
             achievementItems: [],
@@ -577,6 +586,7 @@
 
         function closeShop() {
             state.shopVisible = false;
+            state.shopRerolling = false;
         }
 
         function setCollectionTab(tabId) {
@@ -627,7 +637,12 @@
                 return this.bridge.buyDailyShopChest();
             },
             rerollDailyShop() {
-                return this.bridge.rerollDailyShop();
+                const result = this.bridge.rerollDailyShop();
+                if (!result) return result;
+                state.shopRerolling = false;
+                requestAnimationFrame(() => (state.shopRerolling = true));
+                setTimeout(() => (state.shopRerolling = false), 420);
+                return result;
             },
             render(vm) {
                 state.rosterItems = vm.rosterItems ?? [];
@@ -1384,11 +1399,104 @@
         padding: 10px;
     }
 
-    .ch-shop-offer > div,
+    .ch-shop-offer-info,
     .ch-shop-reroll > div,
     .ch-shop-meta {
         display: grid;
         gap: 3px;
+    }
+
+    .ch-shop-offer {
+        position: relative;
+        overflow: hidden;
+        perspective: 500px;
+    }
+
+    .ch-shop-offer::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0;
+    }
+
+    .ch-shop-offer.is-rerolling::after {
+        animation: ch-shop-reroll-flash 420ms ease-out;
+    }
+
+    .ch-shop-offer.is-rerolling .ch-shop-offer-info {
+        animation: ch-shop-reroll-turn 420ms ease-out;
+    }
+
+    .ch-shop-rarity-swatch {
+        grid-row: span 3;
+        width: 10px;
+        min-height: 38px;
+        border: 2px solid #202020;
+        border-radius: 4px;
+    }
+
+    .ch-shop-offer--common {
+        border-color: #9ca3af;
+        background: #f3f4f6;
+    }
+
+    .ch-shop-offer--uncommon {
+        border-color: #28a447;
+        background: #ecfdf3;
+    }
+
+    .ch-shop-offer--rare {
+        border-color: #d4a017;
+        background: #fffbeb;
+    }
+
+    .ch-shop-rarity-swatch--common {
+        background: #9ca3af;
+    }
+
+    .ch-shop-rarity-swatch--uncommon {
+        background: #28a447;
+    }
+
+    .ch-shop-rarity-swatch--rare {
+        background: #d4a017;
+    }
+
+    .ch-shop-offer--common::after {
+        background: rgba(156, 163, 175, 0.75);
+    }
+
+    .ch-shop-offer--uncommon::after {
+        background: rgba(40, 164, 71, 0.65);
+    }
+
+    .ch-shop-offer--rare::after {
+        background: rgba(212, 160, 23, 0.65);
+    }
+
+    @keyframes ch-shop-reroll-flash {
+        0% {
+            opacity: 0;
+        }
+        35% {
+            opacity: 0.7;
+        }
+        100% {
+            opacity: 0;
+        }
+    }
+
+    @keyframes ch-shop-reroll-turn {
+        0% {
+            transform: rotateY(0deg) scale(1);
+        }
+        45% {
+            transform: rotateY(80deg) scale(0.94);
+        }
+        100% {
+            transform: rotateY(0deg) scale(1);
+        }
     }
 
     .ch-shop-label,

@@ -5,7 +5,8 @@ export const DAILY_SHOP = Object.freeze({
     purchaseLimit: 2,
     purchaseResetMs: 6 * 60 * 60 * 1000,
     rerollResetMs: 90 * 60 * 1000,
-    rerollCosts: [30, 60, 90]
+    rerollBaseCost: 30,
+    rerollMaxCostMultiplier: 10
 });
 
 const SHOP_RARITY_WEIGHTS = Object.freeze([
@@ -21,6 +22,11 @@ function rollShopRarity(rng) {
         if (roll < 0) return rarity;
     }
     return "rare";
+}
+
+function getRerollCost(rerolls) {
+    const multiplier = Math.min(Math.max(0, rerolls) + 1, DAILY_SHOP.rerollMaxCostMultiplier);
+    return DAILY_SHOP.rerollBaseCost * multiplier;
 }
 
 function getShopState(profile, now, rng = Math.random) {
@@ -53,7 +59,7 @@ function createDailyShopView(shop) {
         purchaseLimit: DAILY_SHOP.purchaseLimit,
         purchaseResetAt: shop.purchaseResetAt,
         rerolls: shop.rerolls,
-        rerollCost: DAILY_SHOP.rerollCosts[Math.min(shop.rerolls, DAILY_SHOP.rerollCosts.length - 1)],
+        rerollCost: getRerollCost(shop.rerolls),
         rerollResetAt: shop.rerollResetAt,
         chestCost: DAILY_SHOP.chestCost
     };
@@ -80,7 +86,7 @@ export function rerollDailyShop(profile, { now = Date.now(), rng = Math.random }
     const shop = getShopState(profile, now, rng);
     if (!shop) return null;
 
-    const cost = DAILY_SHOP.rerollCosts[Math.min(shop.rerolls, DAILY_SHOP.rerollCosts.length - 1)];
+    const cost = getRerollCost(shop.rerolls);
     if (profile.hunting.shards < cost) return null;
 
     profile.hunting.shards -= cost;
