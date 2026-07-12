@@ -248,7 +248,7 @@ export const REWARD_BALANCE = deepFreeze({
             hero: {
                 tiers: [
                     {},
-                    { magnetRadiusMultiplier: 2, magnetResponseRate: 5, magnetGraceDuration: 1 },
+                    { magnetRadiusMultiplier: 2.5, magnetResponseRate: 5, magnetGraceDuration: 1 },
                     { stackCap: 20, damagePerStack: 0.03 },
                     { releaseStackRatio: 0.5 }
                 ]

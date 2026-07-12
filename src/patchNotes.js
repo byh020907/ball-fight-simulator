@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.24.53",
+        date: "2026-07-12",
+        title: "v0.24.53 Hero Orb 귀환 범위를 조금 넓힙니다",
+        changes: [
+            {
+                type: "style",
+                text: "Hero Lv.3 귀환 자석의 영향 반경을 `Hero 반지름 × 2.5 + Orb 반지름`으로 넓혔습니다. 발사 뒤 1초 유예는 유지됩니다."
+            }
+        ]
+    },
+    {
         version: "0.24.52",
         date: "2026-07-12",
         title: "v0.24.52 Hero Orb가 발사 속도를 유지합니다",

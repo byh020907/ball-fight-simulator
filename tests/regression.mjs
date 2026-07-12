@@ -2507,8 +2507,8 @@ function testAbilityLevelUpgrades(app) {
     const heroAttraction = heroAbility.getOrbAttraction(attractionOrb);
     assert.equal(
         heroAttraction.radius,
-        heroRun.ball.radius * 2 + attractionOrb.radius,
-        "Hero tier 1 should use twice the Hero radius plus the Orb radius as magnet range"
+        heroRun.ball.radius * 2.5 + attractionOrb.radius,
+        "Hero tier 1 should use two-and-a-half times the Hero radius plus the Orb radius as magnet range"
     );
 
     heroRun.sim.width = 10_000;
