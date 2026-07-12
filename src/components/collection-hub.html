@@ -1338,6 +1338,21 @@
         font-size: 0.72rem;
         font-weight: 700;
         cursor: pointer;
+        transition:
+            transform 120ms ease,
+            box-shadow 120ms ease,
+            background-color 120ms ease;
+    }
+
+    .ch-btn:not(:disabled):hover {
+        background: #f3f4f6;
+        box-shadow: 2px 2px 0 #202020;
+        transform: translate(-1px, -1px);
+    }
+
+    .ch-btn:not(:disabled):active {
+        box-shadow: none;
+        transform: translate(1px, 1px);
     }
 
     .ch-btn:disabled {

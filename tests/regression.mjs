@@ -13075,6 +13075,14 @@ function testDailyShopPopupContract() {
     assert.ok(template.includes('@click="openShop()"'), "Equipment toolbar should open the shard shop popup");
     assert.ok(template.includes('class="ch-shop-modal"'), "Shard shop should use a dedicated popup layer");
     assert.ok(template.includes('@click.self="closeShop()"'), "Shop backdrop should close only the shop popup");
+    assert.ok(
+        template.includes(".ch-btn:not(:disabled):hover"),
+        "Collection buttons should have an enabled hover state"
+    );
+    assert.ok(
+        template.includes(".ch-btn:not(:disabled):active"),
+        "Collection buttons should have an enabled pressed state"
+    );
     assert.ok(template.includes("shopRerolling"), "Shop rerolls should trigger a visible transition state");
     assert.ok(template.includes("ch-shop-chest"), "Shop offers should reuse the chest icon component");
     assert.ok(
