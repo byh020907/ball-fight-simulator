@@ -802,7 +802,7 @@ export const PATCH_NOTES = [
         changes: [
             {
                 type: "feature",
-                text: "전투 배속 시스템 — x2/x4 배속, 업적 해금 시 사용 가능."
+                text: "전투 배속 시스템 — 관전 전투 화면을 터치해 x2/x4 배속 전환, 업적 해금 시 사용 가능."
             },
             {
                 type: "feature",

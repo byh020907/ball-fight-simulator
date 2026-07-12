@@ -6627,6 +6627,11 @@ async function testEvaluateAchievements() {
         results.some((r) => r.id === "speed_2x"),
         "speed_2x should unlock with first win"
     );
+    assert.equal(
+        ACHIEVEMENT_DEFINITIONS.find((achievement) => achievement.id === "speed_2x").reward.payload.description,
+        "2배속 관전 전환 해금 (관전 전투 화면 터치)",
+        "speed_2x reward should explain the spectator canvas interaction"
+    );
 
     // speed_4x: bestTournamentWinStreak >= 3
     const profile7 = createDefaultPlayerProfile();
@@ -6642,6 +6647,11 @@ async function testEvaluateAchievements() {
     assert.ok(
         results7.some((r) => r.id === "speed_4x"),
         "speed_4x should unlock at 3-win streak"
+    );
+    assert.equal(
+        ACHIEVEMENT_DEFINITIONS.find((achievement) => achievement.id === "speed_4x").reward.payload.description,
+        "4배속 관전 전환 해금 (관전 전투 화면 터치)",
+        "speed_4x reward should explain the spectator canvas interaction"
     );
 
     // single_hit_monster: maxHitDamage >= 150

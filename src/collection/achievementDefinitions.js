@@ -224,7 +224,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         },
         reward: {
             type: "FEATURE_UNLOCK",
-            payload: { feature: "battle_speed_2x", description: "2배속 전투 관전 해금 (전투화면 상단 탭)" }
+            payload: { feature: "battle_speed_2x", description: "2배속 관전 전환 해금 (관전 전투 화면 터치)" }
         },
         grant(handler) {
             return handler.unlockFeature("battle_speed_2x");
@@ -241,7 +241,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         },
         reward: {
             type: "FEATURE_UNLOCK",
-            payload: { feature: "battle_speed_4x", description: "4배속 전투 관전 해금 (전투화면 상단 탭)" }
+            payload: { feature: "battle_speed_4x", description: "4배속 관전 전환 해금 (관전 전투 화면 터치)" }
         },
         grant(handler) {
             return handler.unlockFeature("battle_speed_4x");
