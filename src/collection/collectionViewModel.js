@@ -7,6 +7,7 @@
 import { formatAchievementReward } from "./achievementRewards.js";
 import { getCharacterMasteryLevel } from "../character-mastery/index.js";
 import { getCharacterExperienceSummary } from "../experience/experienceService.js";
+import { getCharacterLevelRewards } from "../experience/characterLevelProgression.js";
 import { canOpenHuntingChest, previewHuntingChest } from "../hunting/index.js";
 import {
     getInventorySlots,
@@ -62,6 +63,13 @@ export function createCollectionHubViewModel({
         const masteryActive = masteryUnlocked && fighter.id !== currentPlayerFighterId;
         const isCurrent = fighter.id === currentPlayerFighterId;
         const experience = getCharacterExperienceSummary(profile, fighter.id);
+        const levelRewards = getCharacterLevelRewards(fighter.id).map((reward) => ({
+            id: reward.id,
+            level: reward.level,
+            text: reward.text,
+            earned: reward.level <= experience.level,
+            statusLabel: reward.level <= experience.level ? "획득" : "예정"
+        }));
 
         return {
             id: fighter.id,
@@ -88,7 +96,8 @@ export function createCollectionHubViewModel({
             experienceProgressPct: experience.progressPct,
             experienceProgressText: experience.progressText,
             experienceNextText: experience.nextText,
-            experienceNextRewardText: experience.nextRewardText
+            experienceNextRewardText: experience.nextRewardText,
+            levelRewards
         };
     });
 

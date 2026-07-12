@@ -102,10 +102,29 @@
             <div class="ch-detail" x-show="state.selectedCharacterId">
                 <template x-for="item in state.filteredRosterItems" :key="item.id">
                     <div x-show="item.id === state.selectedCharacterId">
-                        <div class="ch-detail-close">
-                            <button type="button" @click="closeCollectionCharacterDetail()">← 목록으로</button>
+                        <div class="ch-detail-tabs" role="tablist" aria-label="캐릭터 상세">
+                            <button
+                                class="ch-detail-tab"
+                                type="button"
+                                role="tab"
+                                x-bind:aria-selected="state.characterDetailTab === 'overview'"
+                                x-bind:class="{ active: state.characterDetailTab === 'overview' }"
+                                @click="state.characterDetailTab = 'overview'"
+                            >
+                                상세 정보
+                            </button>
+                            <button
+                                class="ch-detail-tab"
+                                type="button"
+                                role="tab"
+                                x-bind:aria-selected="state.characterDetailTab === 'levelRewards'"
+                                x-bind:class="{ active: state.characterDetailTab === 'levelRewards' }"
+                                @click="state.characterDetailTab = 'levelRewards'"
+                            >
+                                레벨 보상
+                            </button>
                         </div>
-                        <div class="ch-detail-body">
+                        <div class="ch-detail-body" x-show="state.characterDetailTab === 'overview'" role="tabpanel">
                             <div class="ch-detail-xp">
                                 <div class="ch-detail-xp-head">
                                     <strong x-text="item.experienceLevelLabel"></strong>
@@ -141,6 +160,23 @@
                                 <span x-show="item.masteryLevel === 2">· 다음: GOLD (난도 2)</span>
                                 <span x-show="item.masteryLevel === 3">· MAX</span>
                             </span>
+                        </div>
+                        <div
+                            class="ch-level-reward-list"
+                            x-show="state.characterDetailTab === 'levelRewards'"
+                            role="tabpanel"
+                        >
+                            <template x-for="reward in item.levelRewards" :key="reward.id">
+                                <div class="ch-level-reward" x-bind:class="{ earned: reward.earned }">
+                                    <strong x-text="'Lv.' + reward.level"></strong>
+                                    <span class="ch-level-reward-text" x-text="reward.text"></span>
+                                    <span
+                                        class="ch-level-reward-status"
+                                        x-bind:class="{ earned: reward.earned }"
+                                        x-text="reward.statusLabel"
+                                    ></span>
+                                </div>
+                            </template>
                         </div>
                     </div>
                 </template>
@@ -405,6 +441,7 @@
             searchQueries: { roster: "", mastery: "", achievements: "", storage: "" },
             sortModes: { roster: "roster", achievements: "default" },
             selectedCharacterId: null,
+            characterDetailTab: "overview",
             rosterItems: [],
             masteryItems: [],
             achievementItems: [],
@@ -483,11 +520,8 @@
         }
 
         function selectCollectionCharacter(characterId) {
-            state.selectedCharacterId = state.selectedCharacterId === characterId ? null : characterId;
-        }
-
-        function closeCollectionCharacterDetail() {
-            state.selectedCharacterId = null;
+            if (state.selectedCharacterId !== characterId) state.characterDetailTab = "overview";
+            state.selectedCharacterId = characterId;
         }
 
         return {
@@ -496,7 +530,6 @@
             setCollectionTab,
             setCollectionFilter,
             selectCollectionCharacter,
-            closeCollectionCharacterDetail,
             get bridge() {
                 return window.requireGameActionBridge();
             },
@@ -792,19 +825,28 @@
         padding: 12px 16px;
     }
 
-    .ch-detail-close {
+    .ch-detail-tabs {
+        display: flex;
+        gap: 4px;
         margin-bottom: 10px;
+        border-bottom: 1px solid #cccccc;
     }
 
-    .ch-detail-close button {
-        background: none;
+    .ch-detail-tab {
+        min-height: 34px;
+        padding: 6px 12px;
         border: none;
-        color: #006bb8;
+        border-bottom: 3px solid transparent;
+        background: transparent;
         cursor: pointer;
-        font-size: 0.82rem;
+        font-size: 0.78rem;
         font-weight: 700;
-        padding: 0;
         font-family: inherit;
+    }
+
+    .ch-detail-tab.active {
+        border-bottom-color: #006bb8;
+        color: #006bb8;
     }
 
     .ch-detail-body {
@@ -856,6 +898,50 @@
         font-size: 0.7rem;
         color: #1a7d3a;
         font-weight: 700;
+    }
+
+    .ch-level-reward-list {
+        display: grid;
+        gap: 6px;
+        max-height: 210px;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    .ch-level-reward {
+        display: grid;
+        grid-template-columns: 42px minmax(0, 1fr) 36px;
+        align-items: center;
+        gap: 8px;
+        min-height: 34px;
+        padding: 6px 8px;
+        border: 1px solid #dddddd;
+        border-radius: 6px;
+        color: #777777;
+        background: #f5f5f5;
+        font-size: 0.75rem;
+    }
+
+    .ch-level-reward.earned {
+        border-color: #9ac9a8;
+        color: #202020;
+        background: #f2fbf4;
+    }
+
+    .ch-level-reward-text {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .ch-level-reward-status {
+        color: #777777;
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-align: right;
+    }
+
+    .ch-level-reward-status.earned {
+        color: #1a7d3a;
     }
 
     .ch-list {

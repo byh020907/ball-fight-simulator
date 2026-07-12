@@ -8128,6 +8128,14 @@ async function testCreateCollectionHubViewModel() {
     assert.equal(archerItem.experienceTotalXp, 135, "Roster item should expose character XP");
     assert.equal(archerItem.experienceLevel, 2, "Roster item should expose character XP level");
     assert.ok(archerItem.experienceProgressPct > 0, "Roster item should expose XP progress");
+    assert.equal(archerItem.levelRewards.length, 9, "Roster detail should expose every level reward");
+    assert.equal(archerItem.levelRewards[0].level, 2, "Level reward history should start at level 2");
+    assert.equal(archerItem.levelRewards[0].earned, true, "Current-level rewards should be marked earned");
+    assert.equal(archerItem.levelRewards[1].earned, false, "Future rewards should be marked upcoming");
+    assert.ok(
+        archerItem.levelRewards.every((reward) => reward.text),
+        "Every level reward should have display text"
+    );
     assert.equal(archerItem.masteryLevel, 0, "Tournament wins alone should not advance mastery UI progress");
     assert.equal(vm2.storage.shards, 50, "Collection hub should expose hunting key shards");
     assert.equal(vm2.storage.chests.length, 1, "Collection hub should expose hunting chests");
@@ -10303,6 +10311,22 @@ function testHuntingChestIconReuseContract() {
     console.log("[hunting-chest-icon-reuse] ok");
 }
 
+function testCollectionCharacterDetailTabsContract() {
+    const collectionHub = readFileSync("src/components/collection-hub.html", "utf8");
+    assert.ok(collectionHub.includes("상세 정보"), "Character detail should expose an overview tab");
+    assert.ok(collectionHub.includes("레벨 보상"), "Character detail should expose a level rewards tab");
+    assert.ok(collectionHub.includes("reward.statusLabel"), "Level reward rows should expose earned status");
+    assert.ok(
+        !collectionHub.includes("목록으로"),
+        "Character detail should not duplicate the always-visible roster navigation"
+    );
+    assert.ok(
+        !collectionHub.includes("closeCollectionCharacterDetail"),
+        "Character detail should stay selected until another character or hub close"
+    );
+    console.log("[collection-character-detail-tabs] ok");
+}
+
 function testHuntingOverlayResetContract() {
     const content = readFileSync("src/components/game-overlay.html", "utf8");
     assert.ok(content.includes("resetHuntingState()"), "Game overlay should expose an explicit hunting state reset");
@@ -11289,6 +11313,7 @@ testHuntingMerchantOffers();
 testHuntingMerchantPurchaseRefreshesUiState();
 testHuntingMerchantMobileScrollContract();
 testHuntingChestIconReuseContract();
+testCollectionCharacterDetailTabsContract();
 testHuntingOverlayResetContract();
 testAppLifecycleTransitions();
 testResultConfirmationReturnsInitialState();

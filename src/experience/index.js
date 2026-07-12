@@ -34,6 +34,7 @@ export {
 
 export {
     getCharacterLevelProgression,
+    getCharacterLevelRewards,
     getCharacterLevelRewardsBetween,
     getNextCharacterLevelReward
 } from "./characterLevelProgression.js";

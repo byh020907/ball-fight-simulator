@@ -86,6 +86,10 @@ export function getCharacterLevelRewardsBetween(characterId, previousLevel, leve
         .map((entry) => createReward(characterId, entry));
 }
 
+export function getCharacterLevelRewards(characterId) {
+    return getEntries(characterId).map((entry) => createReward(characterId, entry));
+}
+
 export function getNextCharacterLevelReward(characterId, level) {
     const normalizedLevel = normalizeLevel(level);
     const entry = getEntries(characterId).find((candidate) => candidate.level > normalizedLevel);
