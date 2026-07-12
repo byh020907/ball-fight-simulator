@@ -2,7 +2,7 @@ import { Vector2 } from "../core.js";
 import { Ability } from "./ability.js";
 
 const BASE_CHARGE_TIME = 4.5;
-const MAX_SPIN_VELOCITY = 3.2;
+const MAX_SPIN_VELOCITY = 10;
 const SPIN_RESPONSE_RATE = 15;
 const BASE_COLLISION_RETENTION = 0;
 const SPIRAL_KNOCKBACK_THRESHOLD = 0.5;

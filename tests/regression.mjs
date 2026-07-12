@@ -2578,7 +2578,20 @@ function testAbilityLevelUpgrades(app) {
     assert.equal(spinBase.getUiState().label, "회전력", "Spin Ball should expose its rotation state in the live UI");
 
     spinBase.state.timeWithoutCollision = spinBase.getMaxChargeTime();
+    assertClose(
+        spinBase.getTargetSpinVelocity(),
+        10,
+        "Spin Ball should reach a visibly fast 10rad/s charge target without changing collision damage rules"
+    );
     setSpinVelocity(spinBase, spinBase.getTargetSpinVelocity());
+    const spinVisualSpeedBonus = calculateRotationalContactDamageBonus(spinBaseRun.ball, {
+        x: spinBaseRun.ball.position.x,
+        y: spinBaseRun.ball.position.y + spinBaseRun.ball.radius
+    });
+    assert.ok(
+        spinVisualSpeedBonus > 0.58 && spinVisualSpeedBonus <= 0.6,
+        "Spin Ball's faster visual rotation should use the existing near-capped contact damage bonus"
+    );
     spinBase.onCollision(spinBaseRun.target);
     spinBaseRun.ball.integrateRotation(1 / 60);
     assertClose(spinBase.getChargeProgress(), 0, "Base Spin Ball collisions should consume all rotation charge");
