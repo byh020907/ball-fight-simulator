@@ -1,5 +1,7 @@
 # 경험치 및 캐릭터 레벨 시스템
 
+> 현재 책임 기준: 레벨은 해당 캐릭터 자신의 기본 수치와 대표 행동을 강화한다. 캐릭터 간 지원 효과는 마스터리, 계정 수집 보상은 업적이 소유한다. 상세 기준은 [성장 책임 기준](progression-responsibilities.md)을 따른다.
+
 > 상태: 설계 초안, 구현 전
 > 기준 코드: 2026-06-28 `main`
 > 관련 문서: [`meta-progression-system.md`](meta-progression-system.md), [`collection-achievements-system.md`](collection-achievements-system.md), [`character-mastery-system.md`](character-mastery-system.md), [`collection-hub-ui.md`](collection-hub-ui.md), [`player-data-storage-security.md`](player-data-storage-security.md)

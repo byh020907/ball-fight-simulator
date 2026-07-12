@@ -1,5 +1,7 @@
 # 캐릭터 연계 시스템
 
+> 현재 명칭과 책임: 이 문서는 마스터리의 캐릭터 간 지원 효과를 설명한다. 캐릭터 A의 마스터리는 A 자신이 아닌 다른 캐릭터에 적용되어 수집 동기를 만든다. A 자신의 대표 행동 강화는 레벨 보상 체계가 소유한다. 상세 기준은 [성장 책임 기준](progression-responsibilities.md)을 따른다.
+
 > 상태: 설계 확정 전 초안, 구현 전
 > 기준 코드: 2026-06-24 `main`
 > 관련 문서: [`experience-system.md`](experience-system.md), [`meta-progression-system.md`](meta-progression-system.md), [`collection-achievements-system.md`](collection-achievements-system.md), [`player-data-storage-security.md`](player-data-storage-security.md), [`development-rules.md`](development-rules.md)

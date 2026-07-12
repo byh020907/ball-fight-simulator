@@ -1,5 +1,9 @@
 # 메타 성장 및 도전 단계 시스템
 
+> 상태: 이전 설계 초안. 현재 기준은 [성장 책임 기준](progression-responsibilities.md)이다.
+>
+> 이 문서의 무한 도전 단계, AI 추가 포인트, AI 전력 배율, 균형 배분 가중치, 업적 직접 스탯 보상은 채택하지 않는다. 브론즈 Lv.3·실버 Lv.6·골드 Lv.10 관문과 수집형 업적 보상으로 대체한다.
+
 > 상태: 설계 확정 전 초안 — 업적 시스템(v0.12.0) 구현 완료, 보상 지급 구현 완료
 > 기준 코드: 2026-06-24 `main`
 > 관련 문서: [`experience-system.md`](experience-system.md), [`character-mastery-system.md`](character-mastery-system.md), [`collection-achievements-system.md`](collection-achievements-system.md), [`player-data-storage-security.md`](player-data-storage-security.md), [`development-rules.md`](development-rules.md), [`game-rules.md`](game-rules.md)

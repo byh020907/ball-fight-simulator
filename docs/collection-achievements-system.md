@@ -1,5 +1,7 @@
 # 도감 및 업적 시스템
 
+> 보상 정책: 업적은 파편, 상자, 확정 장비, 기능 해금, 칭호 같은 수집 보상만 제공한다. `extraStatPoints`, `balanceTolerance`, `perStatCapBonus` 같은 직접 전투 스탯 보상은 제거 대상으로 둔다. 상세 기준은 [성장 책임 기준](progression-responsibilities.md)을 따른다.
+
 > 상태: 구현 완료 (`v0.12.0`)
 > 기준 코드: 2026-06-24 `main`
 > 관련 문서: [`experience-system.md`](experience-system.md), [`character-mastery-system.md`](character-mastery-system.md), [`meta-progression-system.md`](meta-progression-system.md), [`player-data-storage-security.md`](player-data-storage-security.md), [`development-rules.md`](development-rules.md)
