@@ -5,6 +5,29 @@ import { Ability } from "./ability.js";
 
 const BARRIER_DURATION = 1.5;
 const BARRIER_SWAP_EFFECT_DURATION = 0.36;
+const ELECTRIC_CHANNEL_DURATION = 0.5;
+const ELECTRIC_COOLDOWN_DURATION = 3;
+const ELECTRIC_RANGE = 330;
+const ELECTRIC_DAMAGE_PER_TICK = 8;
+const ELECTRIC_COLOR = "#a8e6ff";
+const ELECTRIC_TIMING_EPSILON = 1e-9;
+const BOOMERANG_CONFIG = Object.freeze({
+    radius: 14,
+    outboundSpeed: 720,
+    returnSpeed: 820,
+    maximumOutboundDistance: 680,
+    wallPadding: 20,
+    returnTurnRate: 5.4,
+    rotationSpeed: 18
+});
+
+function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+}
+
+function normalizeAngle(angle) {
+    return Math.atan2(Math.sin(angle), Math.cos(angle));
+}
 
 const BEHAVIOR_CONFIG = Object.freeze({
     pursuer: { cooldown: 0, face: "angry" },
@@ -53,13 +76,17 @@ export class HuntingMobAbility extends Ability {
             barrierSwapTime: 0,
             laser: null,
             boomerang: null,
+            electric: { channelRemaining: 0, cooldownRemaining: 0 },
             jump: 0
         };
     }
 
     update(delta, target) {
         this._clearInvalidConnectionTargets();
-        if (!this._isActiveConnectionTarget(target)) return;
+        if (!this._isActiveConnectionTarget(target)) {
+            if (this.behavior === "boomerang" && this.state.boomerang) this._tickBoomerang(delta, null);
+            return;
+        }
         this.state.timer += delta;
         this.state.linkTime += delta;
         this.state.ring = Math.max(0, this.state.ring - delta);
@@ -85,7 +112,7 @@ export class HuntingMobAbility extends Ability {
     }
 
     _tickBehavior(delta, target) {
-        if (this.behavior === "electric") return this._tickLinkDamage(delta, target, 330, 8, "#a8e6ff");
+        if (this.behavior === "electric") return this._tickElectric(delta, target);
         if (this.behavior === "healer") return this._tickHeal(delta);
         if (this.behavior === "chain") return this._tickChain(delta, target);
         if (this.behavior === "siphon") return this._tickSiphon(delta, target);
@@ -102,10 +129,35 @@ export class HuntingMobAbility extends Ability {
         else if (this.behavior === "jumper") this._jump(target);
     }
 
-    _tickLinkDamage(delta, target, range, dps, color) {
+    _tickElectric(delta, target) {
+        const electric = this.state.electric;
+        if (electric.cooldownRemaining > ELECTRIC_TIMING_EPSILON) {
+            electric.cooldownRemaining = Math.max(0, electric.cooldownRemaining - delta);
+            this.state.link = null;
+            if (electric.cooldownRemaining > ELECTRIC_TIMING_EPSILON) return;
+            electric.cooldownRemaining = 0;
+        }
+
         const distance = Vector2.subtract(target.position, this.owner.position).length();
-        this.state.link = distance <= range ? { target, color, style: "electric" } : null;
-        if (this.state.link) target.takeDamage(dps * delta, this.owner, "Electric Arc");
+        if (distance > ELECTRIC_RANGE) {
+            this.state.link = null;
+            if (electric.channelRemaining > 0) this._startElectricCooldown();
+            return;
+        }
+
+        if (electric.channelRemaining <= ELECTRIC_TIMING_EPSILON) electric.channelRemaining = ELECTRIC_CHANNEL_DURATION;
+        const channelDelta = Math.min(delta, electric.channelRemaining);
+        this.state.link = { target, color: ELECTRIC_COLOR, style: "electric" };
+        target.takeDamage(ELECTRIC_DAMAGE_PER_TICK * channelDelta, this.owner, "Electric Arc");
+        electric.channelRemaining = Math.max(0, electric.channelRemaining - channelDelta);
+
+        if (electric.channelRemaining <= ELECTRIC_TIMING_EPSILON) this._startElectricCooldown(delta - channelDelta);
+    }
+
+    _startElectricCooldown(elapsed = 0) {
+        this.state.electric.channelRemaining = 0;
+        this.state.electric.cooldownRemaining = Math.max(0, ELECTRIC_COOLDOWN_DURATION - elapsed);
+        this.state.link = null;
     }
 
     _tickHeal(delta) {
@@ -275,30 +327,150 @@ export class HuntingMobAbility extends Ability {
     }
 
     _tickBoomerang(delta, target) {
-        if (!this.state.boomerang && this.state.timer >= this.cooldown) {
+        if (!this.state.boomerang && this.state.timer >= this.cooldown && target) {
             this.state.timer = 0;
-            this.state.boomerang = {
-                position: this.owner.position.clone(),
-                velocity: Vector2.subtract(target.position, this.owner.position).normalize().scale(390),
-                outbound: 0.65,
-                hit: false
-            };
+            this.state.boomerang = this._createBoomerang(target);
         }
         const boom = this.state.boomerang;
         if (!boom) return;
-        boom.outbound -= delta;
-        if (boom.outbound <= 0)
-            boom.velocity = Vector2.subtract(this.owner.position, boom.position).normalize().scale(440);
-        boom.position.add(boom.velocity.clone().scale(delta));
-        if (!boom.hit && Vector2.subtract(target.position, boom.position).length() < target.radius + 14) {
-            target.takeDamage(this.owner.stats.baseDamage * 1.1, this.owner, "Boomerang");
-            boom.hit = true;
+
+        if (boom.phase === "outbound") {
+            this._advanceBoomerangOutbound(boom, delta, target);
+        } else {
+            this._advanceBoomerangReturn(boom, delta, target);
         }
-        if (
-            boom.outbound <= 0 &&
-            Vector2.subtract(this.owner.position, boom.position).length() < this.owner.radius + 12
-        )
+    }
+
+    _createBoomerang(target) {
+        const launchDirection = Vector2.subtract(target.position, this.owner.position);
+        if (launchDirection.length() <= 0.001) return null;
+        launchDirection.normalize();
+        const launchAngle = Math.atan2(launchDirection.y, launchDirection.x);
+        const outboundLimit = this._getBoomerangOutboundLimit(launchAngle);
+        if (outboundLimit <= 0) return null;
+
+        return {
+            position: this.owner.position.clone(),
+            velocity: launchDirection.clone().scale(BOOMERANG_CONFIG.outboundSpeed),
+            launchDirection,
+            launchPosition: this.owner.position.clone(),
+            headingAngle: launchAngle,
+            phase: "outbound",
+            outboundDistance: 0,
+            travelDistance: 0,
+            outboundLimit,
+            hit: false,
+            rotationAngle: launchAngle,
+            rotationDirection: this._getBoomerangRotationDirection(launchDirection),
+            elapsed: 0
+        };
+    }
+
+    _getBoomerangOutboundLimit(launchAngle) {
+        const wallRay = getArenaWallRay(
+            this.owner.position,
+            launchAngle,
+            this.simulation.width,
+            this.simulation.height
+        );
+        return Math.max(
+            0,
+            Math.min(BOOMERANG_CONFIG.maximumOutboundDistance, wallRay.length - BOOMERANG_CONFIG.wallPadding)
+        );
+    }
+
+    _getBoomerangRotationDirection(launchDirection) {
+        const leftNormal = new Vector2(-launchDirection.y, launchDirection.x);
+        const towardArenaCenter = new Vector2(
+            this.simulation.width / 2 - this.owner.position.x,
+            this.simulation.height / 2 - this.owner.position.y
+        );
+        return Math.sign(leftNormal.dot(towardArenaCenter)) || 1;
+    }
+
+    _advanceBoomerangOutbound(boom, delta, target) {
+        const availableDistance = Math.max(0, boom.outboundLimit - boom.outboundDistance);
+        const movedDistance = this._moveBoomerang(boom, BOOMERANG_CONFIG.outboundSpeed, delta, availableDistance);
+        boom.outboundDistance += movedDistance;
+
+        if (this._tryBoomerangHit(boom, target) || boom.outboundDistance >= boom.outboundLimit) {
+            this._startBoomerangReturn(boom);
+        }
+    }
+
+    _advanceBoomerangReturn(boom, delta, target) {
+        if (this._hasBoomerangReachedOwner(boom)) {
             this.state.boomerang = null;
+            return;
+        }
+
+        const desiredDirection = Vector2.subtract(this.owner.position, boom.position);
+        if (desiredDirection.length() <= 0.001) {
+            this.state.boomerang = null;
+            return;
+        }
+        const desiredAngle = Math.atan2(desiredDirection.y, desiredDirection.x);
+        boom.headingAngle = this._rotateBoomerangToward(boom, desiredAngle, delta);
+        this._moveBoomerang(boom, BOOMERANG_CONFIG.returnSpeed, delta);
+        this._tryBoomerangHit(boom, target);
+
+        if (this._hasBoomerangReachedOwner(boom)) this.state.boomerang = null;
+    }
+
+    _rotateBoomerangToward(boom, desiredAngle, delta) {
+        let angleDifference = normalizeAngle(desiredAngle - boom.headingAngle);
+        if (Math.abs(Math.abs(angleDifference) - Math.PI) < 0.001) {
+            angleDifference = Math.PI * boom.rotationDirection;
+        }
+        const maximumTurn = BOOMERANG_CONFIG.returnTurnRate * delta;
+        if (Math.abs(angleDifference) <= maximumTurn) return desiredAngle;
+        return boom.headingAngle + Math.sign(angleDifference) * maximumTurn;
+    }
+
+    _moveBoomerang(boom, speed, delta, maximumDistance = Infinity) {
+        const movedDistance = Math.min(speed * delta, maximumDistance);
+        boom.velocity = Vector2.fromAngle(boom.headingAngle, speed);
+        boom.position.add(boom.velocity.clone().scale(movedDistance / speed));
+        boom.travelDistance += movedDistance;
+        boom.elapsed += delta;
+        boom.rotationAngle = normalizeAngle(
+            boom.rotationAngle + boom.rotationDirection * BOOMERANG_CONFIG.rotationSpeed * delta
+        );
+        this._keepBoomerangInsideArena(boom);
+        return movedDistance;
+    }
+
+    _keepBoomerangInsideArena(boom) {
+        boom.position.x = clamp(
+            boom.position.x,
+            BOOMERANG_CONFIG.radius,
+            this.simulation.width - BOOMERANG_CONFIG.radius
+        );
+        boom.position.y = clamp(
+            boom.position.y,
+            BOOMERANG_CONFIG.radius,
+            this.simulation.height - BOOMERANG_CONFIG.radius
+        );
+    }
+
+    _tryBoomerangHit(boom, target) {
+        if (boom.hit || !this._isActiveConnectionTarget(target)) return false;
+        if (Vector2.subtract(target.position, boom.position).length() >= target.radius + BOOMERANG_CONFIG.radius)
+            return false;
+        target.takeDamage(this.owner.stats.baseDamage * 1.1, this.owner, "Boomerang");
+        boom.hit = true;
+        this._startBoomerangReturn(boom);
+        return true;
+    }
+
+    _startBoomerangReturn(boom) {
+        boom.phase = "return";
+    }
+
+    _hasBoomerangReachedOwner(boom) {
+        return (
+            Vector2.subtract(this.owner.position, boom.position).length() < this.owner.radius + BOOMERANG_CONFIG.radius
+        );
     }
 
     getRadiusScale() {
@@ -351,12 +523,30 @@ export class HuntingMobAbility extends Ability {
             ctx.stroke();
         }
         if (this.state.laser) this._drawLaser(ctx, this.state.laser);
-        if (this.state.boomerang) {
-            ctx.fillStyle = "#f7b955";
-            ctx.beginPath();
-            ctx.arc(this.state.boomerang.position.x, this.state.boomerang.position.y, 11, 0, Math.PI * 2);
-            ctx.fill();
-        }
+        if (this.state.boomerang) this._drawBoomerang(ctx, this.state.boomerang);
+        ctx.restore();
+    }
+
+    _drawBoomerang(ctx, boom) {
+        ctx.save();
+        ctx.translate(boom.position.x, boom.position.y);
+        ctx.rotate(boom.rotationAngle);
+        ctx.fillStyle = boom.phase === "return" ? "#ffd36e" : "#f7b955";
+        ctx.strokeStyle = "#7a3e1d";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-14, 0);
+        ctx.quadraticCurveTo(-8, -12, 4, -9);
+        ctx.lineTo(14, 0);
+        ctx.lineTo(4, 9);
+        ctx.quadraticCurveTo(-8, 12, -14, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "#fff4c9";
+        ctx.beginPath();
+        ctx.arc(0, 0, 4, 0, Math.PI * 2);
+        ctx.fill();
         ctx.restore();
     }
 

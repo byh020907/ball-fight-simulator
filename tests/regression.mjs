@@ -7095,6 +7095,151 @@ function testHuntingLaserReachesArenaWall(app) {
     console.log("[hunting-laser-wall-range] ok");
 }
 
+function testHuntingBoomerangReachAndReturnArc(app) {
+    const createScenario = (targetX) => {
+        let hitCount = 0;
+        const targetSpec = {
+            ...app.roster.find((fighter) => fighter.id === FIGHTER_IDS.DASH),
+            id: `boomerang-target-${targetX}`,
+            teamId: HUNTING_TEAMS.PLAYER
+        };
+        const boomerangSpec = createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.BOOMERANG, floor: 91, index: 0 });
+        const simulation = new BattleSimulation(
+            [boomerangSpec, targetSpec],
+            {
+                onLog() {},
+                onSound() {},
+                onDamageTaken(fighterId) {
+                    if (fighterId === targetSpec.id) hitCount += 1;
+                }
+            },
+            null,
+            { arenaWidth: 1200, arenaHeight: 960, assignActions: false }
+        );
+        const [owner, target] = simulation.fighters;
+        owner.position = new Vector2(200, 480);
+        owner.velocity = new Vector2();
+        target.position = new Vector2(targetX, 480);
+        target.velocity = new Vector2();
+        owner.ability.state.timer = owner.ability.cooldown;
+
+        const damageCalls = [];
+        const takeDamage = target.takeDamage.bind(target);
+        target.takeDamage = (...args) => {
+            damageCalls.push(args);
+            return takeDamage(...args);
+        };
+
+        const samples = [];
+        const drawState = { saves: 0, restores: 0, rotations: [] };
+        const drawContext = {
+            save() {
+                drawState.saves += 1;
+            },
+            restore() {
+                drawState.restores += 1;
+            },
+            translate() {},
+            rotate(angle) {
+                drawState.rotations.push(angle);
+            },
+            beginPath() {},
+            moveTo() {},
+            lineTo() {},
+            quadraticCurveTo() {},
+            closePath() {},
+            fill() {},
+            stroke() {},
+            arc() {}
+        };
+
+        let launched = false;
+        let returned = false;
+        let rendered = false;
+        for (let step = 0; step < 300; step += 1) {
+            owner.ability.update(1 / 60, target);
+            const boom = owner.ability.state.boomerang;
+            if (!boom) {
+                if (launched) {
+                    returned = true;
+                    break;
+                }
+                continue;
+            }
+
+            launched = true;
+            samples.push({
+                phase: boom.phase,
+                position: boom.position.clone(),
+                velocity: boom.velocity.clone(),
+                rotationAngle: boom.rotationAngle,
+                outboundDistance: boom.outboundDistance
+            });
+            if (!rendered) {
+                owner.ability.draw(drawContext);
+                rendered = true;
+            }
+        }
+
+        return { owner, target, samples, hitCount, damageCalls, returned, drawState };
+    };
+
+    const hitScenario = createScenario(760);
+    const hitReturnSamples = hitScenario.samples.filter((sample) => sample.phase === "return");
+    assert.equal(hitScenario.hitCount, 1, "A 560px target should be struck exactly once before the boomerang returns");
+    assert.equal(hitScenario.owner.ability.cooldown, 3.1, "Boomerang cooldown should remain 3.1 seconds");
+    assert.equal(
+        hitScenario.damageCalls[0]?.[0],
+        hitScenario.owner.stats.baseDamage * 1.1,
+        "Boomerang damage should remain baseDamage * 1.1"
+    );
+    assert.equal(hitScenario.damageCalls[0]?.[2], "Boomerang", "Boomerang damage should preserve its log label");
+    assert.ok(hitScenario.returned, "A hit boomerang should clean up after returning to its owner");
+    assert.ok(hitReturnSamples.length > 0, "A hit should immediately enter the return phase");
+    assert.ok(
+        Math.max(...hitReturnSamples.map((sample) => Math.abs(sample.position.y - 480))) >= 30,
+        "The return path should visibly curve at least 30px away from the outbound line"
+    );
+    assert.ok(
+        hitScenario.samples.every((sample) =>
+            [sample.position.x, sample.position.y, sample.velocity.x, sample.velocity.y, sample.rotationAngle].every(
+                Number.isFinite
+            )
+        ),
+        "Boomerang positions, velocity, and rotation should remain finite throughout the flight"
+    );
+    assert.ok(
+        hitScenario.samples.every(
+            (sample) =>
+                sample.position.x >= 14 &&
+                sample.position.x <= 1186 &&
+                sample.position.y >= 14 &&
+                sample.position.y <= 946
+        ),
+        "Boomerang flight should stay inside the arena bounds"
+    );
+    assert.equal(
+        hitScenario.drawState.saves,
+        hitScenario.drawState.restores,
+        "Boomerang rendering should restore every saved canvas state"
+    );
+    assert.ok(hitScenario.drawState.rotations.length > 0, "Boomerang rendering should consume its rotation state");
+
+    const missScenario = createScenario(1100);
+    const missReturnStart = missScenario.samples.find((sample) => sample.phase === "return");
+    assert.equal(
+        missScenario.hitCount,
+        0,
+        "A target beyond the outbound limit should not receive phantom boomerang damage"
+    );
+    assert.ok(
+        missReturnStart?.outboundDistance >= 650,
+        "A missed boomerang should travel at least 650px before beginning its return"
+    );
+    assert.ok(missScenario.returned, "A missed boomerang should return and clear its state at the owner");
+    console.log("[hunting-boomerang-range-return-arc] ok");
+}
+
 function testElectricArcPathAndHuntingRender(app) {
     const from = new Vector2(120, 180);
     const to = new Vector2(360, 240);
@@ -7167,6 +7312,118 @@ function testElectricArcPathAndHuntingRender(app) {
         "Electric mage rendering should draw every glow layer as a multi-segment arc"
     );
     console.log("[electric-arc] ok");
+}
+
+function testHuntingElectricChannelCooldown(app) {
+    const createScenario = () => {
+        const casterSpec = createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.ELECTRIC, floor: 20, index: 0 });
+        const targetSpec = {
+            ...casterSpec,
+            id: "electric-channel-target",
+            teamId: HUNTING_TEAMS.PLAYER,
+            stats: { ...casterSpec.stats, hp: 1000, defense: 0 }
+        };
+        const simulation = new BattleSimulation([casterSpec, targetSpec], { onLog() {}, onSound() {} }, null, {
+            assignActions: false
+        });
+        const [caster, target] = simulation.fighters;
+        caster.position = new Vector2(340, 480);
+        caster.velocity = new Vector2();
+        target.position = new Vector2(580, 480);
+        target.velocity = new Vector2();
+        return { caster, target };
+    };
+    const updateFrames = ({ caster, target }, frames) => {
+        for (let frame = 0; frame < frames; frame += 1) caster.ability.update(1 / 60, target);
+    };
+
+    const channelScenario = createScenario();
+    const channelHpBefore = channelScenario.target.hp;
+    updateFrames(channelScenario, 30);
+    assert.equal(
+        channelHpBefore - channelScenario.target.hp,
+        30,
+        "Electric channel should deal exactly 30 minimum-damage hits across 0.5 seconds"
+    );
+    assert.equal(
+        channelScenario.caster.ability.state.link,
+        null,
+        "Electric link should clear as the 0.5-second channel ends"
+    );
+
+    const hpAfterChannel = channelScenario.target.hp;
+    updateFrames(channelScenario, 179);
+    assert.equal(
+        channelScenario.target.hp,
+        hpAfterChannel,
+        "Electric cooldown should deal no additional damage for 179 frames"
+    );
+    assert.equal(channelScenario.caster.ability.state.link, null, "Electric cooldown should not render a link");
+    channelScenario.caster.ability.update(1 / 60, channelScenario.target);
+    assert.equal(
+        channelScenario.target.hp,
+        hpAfterChannel - 1,
+        "Electric channel should restart after its 3-second cooldown"
+    );
+    assert.equal(
+        channelScenario.caster.ability.state.link?.style,
+        "electric",
+        "A restarted electric channel should restore its arc link"
+    );
+
+    const rangeExitScenario = createScenario();
+    rangeExitScenario.caster.ability.update(1 / 60, rangeExitScenario.target);
+    const hpBeforeRangeExit = rangeExitScenario.target.hp;
+    rangeExitScenario.target.position.x = rangeExitScenario.caster.position.x + 331;
+    rangeExitScenario.caster.ability.update(1 / 60, rangeExitScenario.target);
+    assert.equal(
+        rangeExitScenario.target.hp,
+        hpBeforeRangeExit,
+        "Leaving range should stop electric damage in the same frame"
+    );
+    assert.equal(
+        rangeExitScenario.caster.ability.state.link,
+        null,
+        "Leaving range should immediately hide the electric link"
+    );
+
+    rangeExitScenario.target.position.x = rangeExitScenario.caster.position.x + 240;
+    updateFrames(rangeExitScenario, 179);
+    assert.equal(
+        rangeExitScenario.target.hp,
+        hpBeforeRangeExit,
+        "Re-entering range should not bypass electric cooldown"
+    );
+    assert.equal(
+        rangeExitScenario.caster.ability.state.link,
+        null,
+        "Cooldown should stay visually inactive after range re-entry"
+    );
+    rangeExitScenario.caster.ability.update(1 / 60, rangeExitScenario.target);
+    assert.equal(
+        rangeExitScenario.target.hp,
+        hpBeforeRangeExit - 1,
+        "Electric channel should resume only after its cooldown expires"
+    );
+
+    const largeDeltaScenario = createScenario();
+    const largeDeltaHpBefore = largeDeltaScenario.target.hp;
+    largeDeltaScenario.caster.ability.update(0.6, largeDeltaScenario.target);
+    assert.equal(
+        largeDeltaHpBefore - largeDeltaScenario.target.hp,
+        4,
+        "Electric damage should clamp a large update to its remaining 0.5-second channel time"
+    );
+    assert.equal(
+        largeDeltaScenario.caster.ability.state.link,
+        null,
+        "A large update should still clear the link after channel completion"
+    );
+    assert.ok(
+        Math.abs(largeDeltaScenario.caster.ability.state.electric.cooldownRemaining - 2.9) < 1e-9,
+        "Time beyond a completed channel should count toward electric cooldown"
+    );
+    console.log("[hunting-electric-channel-cooldown] ok");
 }
 
 function testHuntingConnectionEffectsClearDefeatedTargets(app) {
@@ -9925,7 +10182,9 @@ testMultiFighterSimulationSetup(app);
 testArenaCameraZoom();
 testHuntingMeleeMobChasesTarget(app);
 testHuntingLaserReachesArenaWall(app);
+testHuntingBoomerangReachAndReturnArc(app);
 testElectricArcPathAndHuntingRender(app);
+testHuntingElectricChannelCooldown(app);
 testHuntingConnectionEffectsClearDefeatedTargets(app);
 testTeamTargetingAndFriendlyCollision(app);
 testTeamsResolveByRemainingHostileTeams(app);
