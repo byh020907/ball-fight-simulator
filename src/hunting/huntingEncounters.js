@@ -5,6 +5,7 @@ import {
     HUNTING_EVENT_TYPES,
     HUNTING_SCALING,
     HUNTING_MAX_FLOOR,
+    HUNTING_MOB_COMPOSITION,
     HUNTING_STAGES,
     HUNTING_STAGE_IDS,
     HUNTING_COMBAT_RELIEF,
@@ -98,6 +99,26 @@ export function getNextHuntingStageId(stageId = HUNTING_STAGE_IDS.CAVE) {
 
 export function getHuntingStageArena(stageId = HUNTING_STAGE_IDS.CAVE) {
     return getHuntingStage(stageId).arena;
+}
+
+export function getHuntingBattleArena(
+    stageId = HUNTING_STAGE_IDS.CAVE,
+    enemyCount = HUNTING_MOB_COMPOSITION.MIN_COUNT
+) {
+    const baseArena = getHuntingStageArena(stageId);
+    const safeEnemyCount = Math.min(
+        HUNTING_MOB_COMPOSITION.MAX_COUNT,
+        Math.max(HUNTING_MOB_COMPOSITION.MIN_COUNT, Math.floor(enemyCount) || 0)
+    );
+    const countRatio =
+        (safeEnemyCount - HUNTING_MOB_COMPOSITION.MIN_COUNT) /
+        (HUNTING_MOB_COMPOSITION.MAX_COUNT - HUNTING_MOB_COMPOSITION.MIN_COUNT);
+    const areaScale = 1 + countRatio * (HUNTING_MOB_COMPOSITION.MAX_AREA_MULTIPLIER - 1);
+    const sideScale = Math.sqrt(areaScale);
+    return Object.freeze({
+        WIDTH: Math.round(baseArena.WIDTH * sideScale),
+        HEIGHT: Math.round(baseArena.HEIGHT * sideScale)
+    });
 }
 
 export function getHuntingFloorChances(floor, combatReliefFloors = 0) {

@@ -1,4 +1,4 @@
-import { HUNTING_ENEMY_TYPES, HUNTING_STAGE_IDS } from "./huntingConfig.js";
+import { HUNTING_ENEMY_TYPES, HUNTING_MOB_COMPOSITION, HUNTING_STAGE_IDS } from "./huntingConfig.js";
 import { scaleEnemySpecForHunting } from "./huntingEncounters.js";
 
 const DEFAULT_RNG = () => Math.random();
@@ -131,8 +131,38 @@ function rollMonster(floor, stageId, rng, excludedTypes = []) {
     return pool.at(-1);
 }
 
-export function getHuntingMobCount(floor) {
-    return Math.min(4, 2 + Math.floor((safeFloor(floor) - 1) / 2));
+export function getHuntingMobCountWeights(floor) {
+    const depth = Math.min(1, (safeFloor(floor) - 1) / 99);
+    const target =
+        HUNTING_MOB_COMPOSITION.MIN_COUNT +
+        (HUNTING_MOB_COMPOSITION.MAX_COUNT - HUNTING_MOB_COMPOSITION.MIN_COUNT) *
+            depth *
+            HUNTING_MOB_COMPOSITION.TARGET_DEPTH_RATIO;
+    const spread =
+        HUNTING_MOB_COMPOSITION.MIN_SPREAD +
+        (HUNTING_MOB_COMPOSITION.MAX_SPREAD - HUNTING_MOB_COMPOSITION.MIN_SPREAD) * depth;
+    return Array.from(
+        { length: HUNTING_MOB_COMPOSITION.MAX_COUNT - HUNTING_MOB_COMPOSITION.MIN_COUNT + 1 },
+        (_, index) => {
+            const count = HUNTING_MOB_COMPOSITION.MIN_COUNT + index;
+            const distance = (count - target) / spread;
+            return {
+                count,
+                weight: HUNTING_MOB_COMPOSITION.BASE_WEIGHT + Math.exp((-distance * distance) / 2)
+            };
+        }
+    );
+}
+
+export function getHuntingMobCount(floor, rng = DEFAULT_RNG) {
+    const weights = getHuntingMobCountWeights(floor);
+    const totalWeight = weights.reduce((sum, entry) => sum + entry.weight, 0);
+    let roll = rng() * totalWeight;
+    for (const entry of weights) {
+        roll -= entry.weight;
+        if (roll < 0) return entry.count;
+    }
+    return HUNTING_MOB_COMPOSITION.MAX_COUNT;
 }
 
 export function createHuntingMobSpec({
@@ -159,7 +189,7 @@ export function createHuntingMobSpec({
 
 export function createHuntingMobEncounter({ floor = 1, stageId = HUNTING_STAGE_IDS.CAVE, rng = DEFAULT_RNG } = {}) {
     const monsterTypes = [];
-    Array.from({ length: getHuntingMobCount(floor) }).forEach((_, index) => {
+    Array.from({ length: getHuntingMobCount(floor, rng) }).forEach((_, index) => {
         const forceDifferentSecondType = index === 1 && getHuntingMonsterPool(floor, stageId).length > 1;
         monsterTypes.push(rollMonster(floor, stageId, rng, forceDifferentSecondType ? [monsterTypes[0]] : []).type);
     });

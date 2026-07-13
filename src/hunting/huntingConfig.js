@@ -16,7 +16,7 @@ export const HUNTING_STAGES = Object.freeze([
         id: HUNTING_STAGE_IDS.CAVE,
         name: "동굴",
         description: "좁은 암벽 통로가 이어지는 첫 원정지",
-        arena: Object.freeze({ WIDTH: 1120, HEIGHT: 1120 }),
+        arena: Object.freeze({ WIDTH: 1000, HEIGHT: 1000 }),
         theme: "cave"
     }),
     Object.freeze({
@@ -38,6 +38,16 @@ export const HUNTING_STAGES = Object.freeze([
 export const HUNTING_ARENA = Object.freeze({
     WIDTH: 1280,
     HEIGHT: 1280
+});
+
+export const HUNTING_MOB_COMPOSITION = Object.freeze({
+    MIN_COUNT: 2,
+    MAX_COUNT: 10,
+    MAX_AREA_MULTIPLIER: 2,
+    BASE_WEIGHT: 0.015,
+    TARGET_DEPTH_RATIO: 0.75,
+    MIN_SPREAD: 1.15,
+    MAX_SPREAD: 2.25
 });
 
 export const HUNTING_EVENT_CHANCE = Object.freeze({

@@ -64,6 +64,7 @@ import {
     getEnemyPowerMultiplier,
     getHuntingFloorChances,
     getHuntingPortalWeightMultiplier,
+    getHuntingBattleArena,
     getHuntingStage,
     getHuntingStageArena,
     getNextHuntingStageId,
@@ -99,6 +100,7 @@ import {
     createHuntingMobSpec,
     createHuntingMobEncounter,
     getHuntingMobCount,
+    getHuntingMobCountWeights,
     getHuntingMonsterPool,
     shouldUseRosterMiniboss,
     createMerchantOffers,
@@ -2871,18 +2873,38 @@ function testHuntingSystem() {
     assert.equal(scaled.stats.speed, 300, "Hunting scaling should not affect speed");
     assert.equal(scaled.stats.skill, 4, "Hunting scaling should not affect skill");
 
-    assert.equal(getHuntingMobCount(1), 2, "Early hunting floors should start as 1v2 mob fights");
-    assert.equal(getHuntingMobCount(5), 4, "Deep hunting floors should add more mobs without exceeding MVP cap");
+    const floor1MobWeights = getHuntingMobCountWeights(1);
+    const floor100MobWeights = getHuntingMobCountWeights(100);
+    assert.equal(
+        getHuntingMobCount(1, () => 0),
+        2,
+        "The lowest weighted roll should create two early enemies"
+    );
+    assert.equal(
+        getHuntingMobCount(1, () => 0.999999),
+        10,
+        "All mob counts should remain possible from the first floor"
+    );
+    assert.ok(
+        floor1MobWeights.find((entry) => entry.count === 2).weight >
+            floor1MobWeights.find((entry) => entry.count === 10).weight,
+        "Early floors should weight small encounters more heavily"
+    );
+    assert.ok(
+        floor100MobWeights.find((entry) => entry.count === 10).weight >
+            floor100MobWeights.find((entry) => entry.count === 2).weight,
+        "Deep floors should weight large encounters more heavily"
+    );
     const mobs = createHuntingMobEncounter({
         floor: 3,
         rng: (() => {
             // [mob0 type, mob1 forced-different type, mob2 type, mob0 appearance×5, mob1 appearance×5, mob2 appearance×5]
             // MobAppearance.generate는 이제 randomSpin 헬퍼로 2회 rng 호출 (abs+sign)
-            const rolls = [0.9, 0, 0.1, 0.2, 0.3, 0.5, 0.6, 0.7, 0.8, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8];
+            const rolls = [0, 0.9, 0, 0.1, 0.2, 0.3, 0.5, 0.6, 0.7, 0.8, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8];
             return () => rolls.shift() ?? 0;
         })()
     });
-    assert.equal(mobs.length, 3, "Hunting mob encounters should create multiple enemies");
+    assert.equal(mobs.length, 2, "Early hunting encounters should create their configured enemy count");
     assert.equal(new Set(mobs.map((mob) => mob.id)).size, mobs.length, "Hunting mob IDs should be unique per fight");
     assert.ok(
         mobs.every((mob) => mob.teamId === HUNTING_TEAMS.ENEMY),
@@ -3225,7 +3247,17 @@ function testHunting100FloorStructure() {
     // ── Stage helpers ──
     const caveStage = getHuntingStage(HUNTING_STAGE_IDS.CAVE);
     assert.equal(caveStage.name, "동굴", "Cave stage should have correct name");
-    assert.equal(getHuntingStageArena(HUNTING_STAGE_IDS.CAVE).WIDTH, 1120, "Cave arena should be 1120 wide");
+    assert.equal(getHuntingStageArena(HUNTING_STAGE_IDS.CAVE).WIDTH, 1000, "Cave arena should start at 1000 wide");
+    assert.deepEqual(
+        getHuntingBattleArena(HUNTING_STAGE_IDS.CAVE, 2),
+        { WIDTH: 1000, HEIGHT: 1000 },
+        "Two-mob cave fights should use the initial arena size"
+    );
+    assert.deepEqual(
+        getHuntingBattleArena(HUNTING_STAGE_IDS.CAVE, 10),
+        { WIDTH: 1414, HEIGHT: 1414 },
+        "Ten enemies should cap arena area growth at twice the base"
+    );
 
     const nextAfterCave = getNextHuntingStageId(HUNTING_STAGE_IDS.CAVE);
     assert.equal(nextAfterCave, HUNTING_STAGE_IDS.FOREST, "Next after cave should be forest");
@@ -11043,11 +11075,11 @@ function testHuntingFormatHelpers() {
 
 function testHuntingCombatText() {
     // ── getHuntingMobCount uses generic count, no melee/ranged labels ──
-    const countFloor1 = getHuntingMobCount(1);
-    const countFloor10 = getHuntingMobCount(10);
+    const countFloor1 = getHuntingMobCount(1, () => 0.5);
+    const countFloor10 = getHuntingMobCount(10, () => 0.5);
 
-    assert.ok(Number.isFinite(countFloor1) && countFloor1 >= 1, "Floor 1 should have at least 1 enemy");
-    assert.ok(countFloor10 >= countFloor1, "Deeper floors should have more or equal enemies");
+    assert.ok(Number.isFinite(countFloor1) && countFloor1 >= 2, "Floor 1 should have at least two enemies");
+    assert.ok(countFloor10 >= 2 && countFloor10 <= 10, "Mob counts should remain within the configured random range");
 
     // ── Individual mob specs should not expose melee/ranged labels ──
     const forbiddenLabels = ["근접", "원거리", "melee", "ranged"];
@@ -11082,7 +11114,11 @@ function testHuntingCombatText() {
 
     // ── createHuntingMobEncounter does not use melee/ranged in UI-visible text ──
     const mobs = createHuntingMobEncounter({ floor: 5, rng: () => 0.5 });
-    assert.equal(mobs.length, getHuntingMobCount(5), "Encounter count matches getHuntingMobCount");
+    assert.equal(
+        mobs.length,
+        getHuntingMobCount(5, () => 0.5),
+        "Encounter count matches getHuntingMobCount"
+    );
     for (const mob of mobs) {
         assert.ok(typeof mob.name === "string", "Mob should have a name");
         assert.ok(typeof mob.title === "string", "Mob should have a title");

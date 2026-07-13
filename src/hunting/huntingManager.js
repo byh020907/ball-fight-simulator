@@ -19,7 +19,7 @@ import {
     HUNTING_EVENT_TYPES,
     HUNTING_FLOOR_OUTCOME_TYPES
 } from "./huntingConfig.js";
-import { getHuntingStage, getHuntingStageArena, getNextHuntingStageId } from "./huntingEncounters.js";
+import { getHuntingBattleArena, getHuntingStage, getNextHuntingStageId } from "./huntingEncounters.js";
 import { applyEquipmentStats } from "./equipmentConfig.js";
 import { collectActiveEffects, applyMasteryEffectsToFighterSpec } from "../character-mastery/index.js";
 import { createHuntingTerrain } from "../terrain/index.js";
@@ -27,8 +27,7 @@ import {
     HUNTING_TEAMS,
     createHuntingMinibossSpec,
     createHuntingMobEncounter,
-    shouldUseRosterMiniboss,
-    getHuntingMobCount
+    shouldUseRosterMiniboss
 } from "./huntingMonsters.js";
 import { applyMerchantOffer, formatOfferResultToast } from "./huntingMerchant.js";
 import { formatPendingLootSummary, formatDefeatLossText } from "./huntingFormat.js";
@@ -122,13 +121,13 @@ export class HuntingManager {
                 (stage) => `
                 <button class="hunting-stage-btn${stage.id === selectedId ? " active" : ""}" data-stage="${stage.id}">
                     <strong>${stage.name}</strong>
-                    <span>${stage.arena.WIDTH}×${stage.arena.HEIGHT}</span>
+                    <span>기준 ${stage.arena.WIDTH}×${stage.arena.HEIGHT}</span>
                 </button>`
             )
             .join("");
 
         const stageDesc = selectedStage
-            ? `<p class="hunting-stage-desc">${selectedStage.description}<br>전장 ${selectedStage.arena.WIDTH}×${selectedStage.arena.HEIGHT}</p>`
+            ? `<p class="hunting-stage-desc">${selectedStage.description}<br>기준 전장 ${selectedStage.arena.WIDTH}×${selectedStage.arena.HEIGHT} · 적 수에 따라 확장</p>`
             : "";
 
         const bodyHtml = `
@@ -245,7 +244,7 @@ export class HuntingManager {
 
         app.playerFighterId = run.characterId;
 
-        const arena = getHuntingStageArena(run.stageId);
+        const arena = getHuntingBattleArena(run.stageId, enemySpecs.length);
         const stageTheme = getHuntingStage(run.stageId).theme;
         const terrain = createHuntingTerrain({
             stageId: run.stageId,
@@ -505,8 +504,7 @@ export class HuntingManager {
     }
 
     _handleCombatFloor({ app, floor }) {
-        const mobCount = getHuntingMobCount(floor);
-        const message = `${floor}층 — 전투 발생 · 적 ${mobCount}명`;
+        const message = `${floor}층 — 전투 발생`;
         app.addLog(`[사냥터] ${message}`);
         this._stopHuntingMoveForBattle(app, message);
         return HUNTING_ROUTE_ACTIONS.STOP;
