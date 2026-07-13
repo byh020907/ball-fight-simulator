@@ -155,6 +155,16 @@ body {
     pointer-events: none;
 }
 
+game-overlay:has(~ start-button #startButton:not(.hidden)) #overlay {
+    padding: 20px 16px calc(104px + env(safe-area-inset-bottom));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+game-overlay:has(~ start-button #startButton:not(.hidden)) #overlay .overlay-card {
+    margin: auto 0;
+}
+
 .player-panel .control-button {
     position: static;
     left: auto;
@@ -256,6 +266,10 @@ body {
         min-height: 48px;
         padding: 14px 18px;
         font-size: 1rem;
+    }
+
+    game-overlay:has(~ start-button #startButton:not(.hidden)) #overlay {
+        padding: 12px 12px calc(92px + env(safe-area-inset-bottom));
     }
 
 }

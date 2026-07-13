@@ -13043,6 +13043,28 @@ function testGameOverlayChestConfirmLabelContract() {
     console.log("[game-overlay-chest-confirm-label] ok");
 }
 
+function testResultOverlayReservesConfirmActionSpace() {
+    const styles = readFileSync("src/styles.css", "utf8");
+    const confirmActionSelector = "game-overlay:has(~ start-button #startButton:not(.hidden)) #overlay";
+    assert.ok(
+        styles.includes(confirmActionSelector),
+        "Visible result confirmation buttons must reserve vertical space in the game overlay"
+    );
+    assert.ok(
+        styles.includes("padding: 20px 16px calc(104px + env(safe-area-inset-bottom));"),
+        "Desktop result overlays must keep content above the confirm button"
+    );
+    assert.ok(
+        styles.includes("padding: 12px 12px calc(92px + env(safe-area-inset-bottom));"),
+        "Mobile result overlays must keep content above the confirm button"
+    );
+    assert.ok(
+        styles.includes("overflow-y: auto;"),
+        "Long result content must remain scrollable above the confirm button"
+    );
+    console.log("[result-overlay-confirm-action-safe-area] ok");
+}
+
 function testHuntingEventResultOverlayContract() {
     const overlay = readFileSync("src/components/game-overlay.html", "utf8");
     const bridge = readFileSync("src/componentBridge.js", "utf8");
@@ -13064,6 +13086,7 @@ function testHuntingEventResultOverlayContract() {
 }
 
 await testGameOverlayChestConfirmLabelContract();
+testResultOverlayReservesConfirmActionSpace();
 testHuntingEventResultOverlayContract();
 
 function testHuntingMishapAvoidsLowHpRuns() {
