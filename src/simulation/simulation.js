@@ -77,9 +77,10 @@ export class Simulation {
         });
     }
 
-    keepEntityInsideArena(entity) {
+    keepEntityInsideArena(entity, { resolveTerrain = false } = {}) {
         this._reflectX(entity);
         this._reflectY(entity);
+        if (resolveTerrain) resolveTerrainCollisions(entity, this.terrain);
     }
 
     /** X축 벽 반사. bounce 발생 시 normal 반환. */

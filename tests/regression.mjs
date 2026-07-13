@@ -2465,6 +2465,17 @@ function testHuntingLootItemsAndDropController(app) {
         "Loot should use the supplied full-circle launch direction"
     );
     assert.equal(session.getCollectedLoot().shards, 0, "A dropped shard must not enter battle loot before collection");
+    droppedShards.forEach((shard) => shard.update(1 / 60, simulation));
+    assert.equal(session.getCollectedLoot().shards, 0, "New loot must not be collected during its magnet grace period");
+    assert.ok(
+        droppedShards.every((shard) => shard.magnetGraceRemaining > 0),
+        "Every common loot item must begin with the shared magnet grace duration"
+    );
+    droppedShards.forEach((shard) => {
+        shard.magnetGraceRemaining = 0;
+        shard.position = player.position.clone();
+        shard.velocity = new Vector2();
+    });
     const entitiesBeforeShardCollection = simulation.entities.length;
     droppedShards.forEach((shard) => shard.update(1 / 60, simulation));
     assert.equal(
@@ -2513,8 +2524,71 @@ function testHuntingLootItemsAndDropController(app) {
         velocity: new Vector2(),
         collectorId: player.id
     });
+    magnetShard.update(0.5, simulation);
+    assert.equal(magnetShard.velocity.x, 0, "Loot must ignore the collector magnet during its grace period");
+    magnetShard.update(0.5, simulation);
     magnetShard.update(0.1, simulation);
     assert.ok(magnetShard.velocity.x < 0, "Loot inside four player radii must receive a physical magnet impulse");
+
+    const collisionTerrain = [{ shape: "circle", blocking: true, x: 520, y: 620, radius: 48 }];
+    const collisionSimulation = new BattleSimulation([playerSpec, mobSpec], { onLog() {}, onSound() {} }, null, {
+        assignActions: false,
+        terrain: collisionTerrain
+    });
+    const [lootCollector, collisionMob] = collisionSimulation.fighters;
+    lootCollector.position = new Vector2(120, 120);
+    collisionMob.position = new Vector2(400, 300);
+    lootCollector.velocity = new Vector2();
+    collisionMob.velocity = new Vector2();
+
+    const fighterCollisionShard = new ShardDrop({
+        position: new Vector2(340, 300),
+        velocity: new Vector2(200, 0),
+        collectorId: lootCollector.id,
+        amount: 1
+    });
+    fighterCollisionShard.update(0.1, collisionSimulation);
+    assert.ok(
+        Vector2.subtract(fighterCollisionShard.position, collisionMob.position).length() >=
+            fighterCollisionShard.radius + collisionMob.radius,
+        "Loot must separate from a non-collector fighter instead of passing through it"
+    );
+    assert.ok(
+        fighterCollisionShard.velocity.x < 200 && collisionMob.velocity.x === 0,
+        "Loot must use Hero Orb bounce behavior without pushing the fighter"
+    );
+
+    const terrainCollisionShard = new ShardDrop({
+        position: new Vector2(collisionTerrain[0].x, collisionTerrain[0].y),
+        velocity: new Vector2(),
+        collectorId: lootCollector.id,
+        amount: 1
+    });
+    terrainCollisionShard.update(0.1, collisionSimulation);
+    assert.ok(
+        Vector2.subtract(terrainCollisionShard.position, collisionTerrain[0]).length() >=
+            terrainCollisionShard.radius + collisionTerrain[0].radius,
+        "Loot must separate from blocking terrain instead of remaining inside it"
+    );
+
+    const directCollectionGraceShard = new ShardDrop({
+        position: lootCollector.position,
+        velocity: new Vector2(),
+        collectorId: lootCollector.id,
+        amount: 1
+    });
+    directCollectionGraceShard.update(1, collisionSimulation);
+    assert.equal(
+        directCollectionGraceShard.isExpired,
+        false,
+        "Loot overlapping its collector must remain visible until the initial grace period ends"
+    );
+    directCollectionGraceShard.update(1 / 60, collisionSimulation);
+    assert.equal(
+        directCollectionGraceShard.isExpired,
+        true,
+        "Loot must remain collectible once the initial grace period ends"
+    );
 
     const healResults = [];
     const healPack = new SmallHealPack({
@@ -2528,6 +2602,7 @@ function testHuntingLootItemsAndDropController(app) {
     healPack.update(1 / 60, simulation);
     assert.equal(healPack.isExpired, false, "Full-HP players must leave a small heal pack on the floor");
     player.hp = 50;
+    healPack.magnetGraceRemaining = 0;
     healPack.update(1 / 60, simulation);
     assert.equal(player.hp, 65, "A collected small heal pack must restore its stored amount");
     assert.equal(
@@ -2545,6 +2620,7 @@ function testHuntingLootItemsAndDropController(app) {
         onCollected: (reward) => session.recordCollection(reward)
     });
     assert.equal(chestDrop.radius, 20, "Chest drops should use the enlarged loot size");
+    chestDrop.magnetGraceRemaining = 0;
     chestDrop.update(1 / 60, simulation);
     assert.equal(
         session.getCollectedLoot().chests[0]?.id,
