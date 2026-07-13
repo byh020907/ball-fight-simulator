@@ -58,7 +58,8 @@ export class HuntingMobAbility extends Ability {
     }
 
     update(delta, target) {
-        if (!target || target.flags.defeated) return;
+        this._clearInvalidConnectionTargets();
+        if (!this._isActiveConnectionTarget(target)) return;
         this.state.timer += delta;
         this.state.linkTime += delta;
         this.state.ring = Math.max(0, this.state.ring - delta);
@@ -111,7 +112,7 @@ export class HuntingMobAbility extends Ability {
         const ally = this.simulation.fighters.find(
             (fighter) =>
                 fighter !== this.owner &&
-                !fighter.flags.defeated &&
+                this._isActiveConnectionTarget(fighter) &&
                 !this.simulation.isHostile(this.owner, fighter) &&
                 Vector2.subtract(fighter.position, this.owner.position).length() <= 260 &&
                 fighter.hp < fighter.maxHp
@@ -308,11 +309,33 @@ export class HuntingMobAbility extends Ability {
         return { speed: 1, damage: 1, defense: this.state.barrier > 0 ? 1.6 : 1, impact: 1 };
     }
 
+    _isActiveConnectionTarget(target) {
+        return Boolean(target && !target.flags.defeated && !target.flags.destroyed && !target.state.swallowed);
+    }
+
+    _clearInvalidConnectionTargets() {
+        if (this.state.link && !this._isActiveConnectionTarget(this.state.link.target)) this.state.link = null;
+        if (this.state.barrierSwapTarget && !this._isActiveConnectionTarget(this.state.barrierSwapTarget)) {
+            this.state.barrierSwapTarget = null;
+            this.state.barrierSwapTime = 0;
+        }
+    }
+
+    _getActiveLink() {
+        return this.state.link && this._isActiveConnectionTarget(this.state.link.target) ? this.state.link : null;
+    }
+
+    _getActiveBarrierSwapTarget() {
+        return this._isActiveConnectionTarget(this.state.barrierSwapTarget) ? this.state.barrierSwapTarget : null;
+    }
+
     draw(ctx) {
         const { position, radius } = this.owner;
+        const link = this._getActiveLink();
+        const barrierSwapTarget = this._getActiveBarrierSwapTarget();
         ctx.save();
-        if (this.state.link) this._drawActiveLink(ctx, position, this.state.link);
-        if (this.state.barrierSwapTarget) this._drawBarrierSwap(ctx, position, this.state.barrierSwapTarget.position);
+        if (link) this._drawActiveLink(ctx, position, link);
+        if (barrierSwapTarget) this._drawBarrierSwap(ctx, position, barrierSwapTarget.position);
         if (this.state.ring > 0) {
             ctx.strokeStyle = "#ffd166";
             ctx.lineWidth = 4;

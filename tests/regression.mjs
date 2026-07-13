@@ -6853,6 +6853,95 @@ function testElectricArcPathAndHuntingRender(app) {
     console.log("[electric-arc] ok");
 }
 
+function testHuntingConnectionEffectsClearDefeatedTargets(app) {
+    const createLinkDrawContext = () => {
+        let strokes = 0;
+        return {
+            get strokes() {
+                return strokes;
+            },
+            save() {},
+            restore() {},
+            beginPath() {},
+            moveTo() {},
+            lineTo() {},
+            stroke() {
+                strokes += 1;
+            }
+        };
+    };
+    const createPlayerSpec = () => ({
+        ...app.roster.find((fighter) => fighter.id === FIGHTER_IDS.DASH),
+        teamId: HUNTING_TEAMS.PLAYER
+    });
+    const assertDefeatedTargetLinkClears = ({ owner, target, label }) => {
+        const context = createLinkDrawContext();
+        target.takeDamage(100000, owner, "Test Defeat");
+        assert.equal(target.flags.defeated, true, `${label} test target should be defeated`);
+        owner.ability.draw(context);
+        assert.equal(context.strokes, 0, `${label} should not render toward a defeated target in the same frame`);
+        owner.ability.update(1 / 60, target);
+        assert.equal(owner.ability.state.link, null, `${label} should clear its stored link on the next update`);
+    };
+
+    [HUNTING_MONSTER_TYPES.ELECTRIC, HUNTING_MONSTER_TYPES.CHAIN, HUNTING_MONSTER_TYPES.SIPHON].forEach((type) => {
+        const simulation = new BattleSimulation(
+            [createHuntingMobSpec({ type, floor: 100 }), createPlayerSpec()],
+            { onLog() {}, onSound() {} },
+            null,
+            { assignActions: false }
+        );
+        const [owner, target] = simulation.fighters;
+        owner.position = new Vector2(300, 480);
+        target.position = new Vector2(480, 480);
+        owner.ability.update(1 / 60, target);
+        assert.ok(owner.ability.state.link, `${type} should establish a link before the target is defeated`);
+        assertDefeatedTargetLinkClears({ owner, target, label: type });
+    });
+
+    const healerSimulation = new BattleSimulation(
+        [
+            createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.HEALER, floor: 100, index: 0 }),
+            createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.PURSUER, floor: 100, index: 1 }),
+            createPlayerSpec()
+        ],
+        { onLog() {}, onSound() {} },
+        null,
+        { assignActions: false }
+    );
+    const [healer, ally, healerTarget] = healerSimulation.fighters;
+    healer.position = new Vector2(300, 480);
+    ally.position = new Vector2(460, 480);
+    healerTarget.position = new Vector2(700, 480);
+    ally.takeDamage(ally.hp / 2, healerTarget, "Test Setup");
+    healer.ability.update(1 / 60, healerTarget);
+    assert.equal(healer.ability.state.link?.target, ally, "Healers should link to injured allies");
+    assertDefeatedTargetLinkClears({ owner: healer, target: ally, label: "healer" });
+
+    const barrierSimulation = new BattleSimulation(
+        [
+            createPlayerSpec(),
+            createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.BARRIER, floor: 100, index: 0 }),
+            createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.PURSUER, floor: 100, index: 1 })
+        ],
+        { onLog() {}, onSound() {} },
+        null,
+        { assignActions: false }
+    );
+    const [barrierTarget, barrier, barrierAlly] = barrierSimulation.fighters;
+    barrier.ability.state.barrierSwapTarget = barrierAlly;
+    barrier.ability.state.barrierSwapTime = 0.36;
+    barrierAlly.takeDamage(100000, barrierTarget, "Test Defeat");
+    assert.equal(barrierAlly.flags.defeated, true, "Barrier test ally should be defeated");
+    const barrierContext = createLinkDrawContext();
+    barrier.ability.draw(barrierContext);
+    assert.equal(barrierContext.strokes, 0, "Barrier swaps should not render toward defeated allies");
+    barrier.ability.update(1 / 60, barrierTarget);
+    assert.equal(barrier.ability.state.barrierSwapTarget, null, "Barrier swaps should clear defeated allies");
+    assert.equal(barrier.ability.state.barrierSwapTime, 0, "Barrier swaps should clear their visual lifetime");
+    console.log("[hunting-connection-target-lifecycle] ok");
+}
+
 function testTeamTargetingAndFriendlyCollision(app) {
     const archer = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
     const orbit = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ORBIT);
@@ -9521,6 +9610,7 @@ testArenaCameraZoom();
 testHuntingMeleeMobChasesTarget(app);
 testHuntingLaserReachesArenaWall(app);
 testElectricArcPathAndHuntingRender(app);
+testHuntingConnectionEffectsClearDefeatedTargets(app);
 testTeamTargetingAndFriendlyCollision(app);
 testTeamsResolveByRemainingHostileTeams(app);
 testProjectileIgnoresAllies(app);
