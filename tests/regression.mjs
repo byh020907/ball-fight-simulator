@@ -2911,6 +2911,15 @@ function testHuntingSystem() {
         "Hunting mobs should all be assigned to the enemy team"
     );
     assert.ok(
+        mobs.every((mob) => mob.name !== "사냥터 몬스터"),
+        "Hunting mobs should expose their own type through their nameplates"
+    );
+    assert.equal(
+        createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.ELECTRIC }).name,
+        "전기 마법사",
+        "Electric mobs should use their unique display name"
+    );
+    assert.ok(
         new Set(mobs.map((mob) => mob.hunting.monsterType)).size >= 2,
         "Early floors should combine at least two monster types"
     );

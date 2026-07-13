@@ -31,21 +31,63 @@ export const HUNTING_MONSTER_TYPES = Object.freeze({
 
 const CAVE_MONSTERS = Object.freeze(
     [
-        ["pursuer", 1, 1.0, "#9b5d3f", "angry", { hp: 74, damage: 8, speed: 305, radius: 34, mass: 0.95, defense: 1 }],
-        ["charger", 1, 1.7, "#e66b4f", "dash", { hp: 86, damage: 10, speed: 286, radius: 37, mass: 1.08, defense: 1 }],
+        [
+            "pursuer",
+            "추적 볼",
+            1,
+            1.0,
+            "#9b5d3f",
+            "angry",
+            { hp: 74, damage: 8, speed: 305, radius: 34, mass: 0.95, defense: 1 }
+        ],
+        [
+            "charger",
+            "돌진 볼",
+            1,
+            1.7,
+            "#e66b4f",
+            "dash",
+            { hp: 86, damage: 10, speed: 286, radius: 37, mass: 1.08, defense: 1 }
+        ],
         [
             "shooter",
+            "사수 볼",
             10,
             1.7,
             "#426f9e",
             "cyclops",
             { hp: 62, damage: 8, speed: 258, radius: 31, mass: 0.82, defense: 0.6 }
         ],
-        ["electric", 20, 1.8, "#5e8ee6", "ooo", { hp: 68, damage: 9, speed: 252, radius: 34, mass: 0.9, defense: 0.8 }],
-        ["healer", 30, 1.8, "#65b87a", "happy", { hp: 110, damage: 5, speed: 268, radius: 35, mass: 1, defense: 1 }],
-        ["chain", 40, 1.9, "#b85065", "angry", { hp: 88, damage: 9, speed: 278, radius: 35, mass: 1.05, defense: 1 }],
+        [
+            "electric",
+            "전기 마법사",
+            20,
+            1.8,
+            "#5e8ee6",
+            "ooo",
+            { hp: 68, damage: 9, speed: 252, radius: 34, mass: 0.9, defense: 0.8 }
+        ],
+        [
+            "healer",
+            "힐러 볼",
+            30,
+            1.8,
+            "#65b87a",
+            "happy",
+            { hp: 110, damage: 5, speed: 268, radius: 35, mass: 1, defense: 1 }
+        ],
+        [
+            "chain",
+            "사슬 볼",
+            40,
+            1.9,
+            "#b85065",
+            "angry",
+            { hp: 88, damage: 9, speed: 278, radius: 35, mass: 1.05, defense: 1 }
+        ],
         [
             "shockwave",
+            "충격파 볼",
             50,
             1.9,
             "#e1a94e",
@@ -54,15 +96,25 @@ const CAVE_MONSTERS = Object.freeze(
         ],
         [
             "barrier",
+            "방벽 볼",
             60,
             2.0,
             "#5dbaeb",
             "default",
             { hp: 104, damage: 7, speed: 250, radius: 39, mass: 1.18, defense: 1.5 }
         ],
-        ["siphon", 70, 2.0, "#9b69be", "xeye", { hp: 92, damage: 10, speed: 272, radius: 35, mass: 0.98, defense: 1 }],
+        [
+            "siphon",
+            "흡수 볼",
+            70,
+            2.0,
+            "#9b69be",
+            "xeye",
+            { hp: 92, damage: 10, speed: 272, radius: 35, mass: 0.98, defense: 1 }
+        ],
         [
             "shard",
+            "파편 볼",
             80,
             2.1,
             "#e0d05b",
@@ -71,17 +123,42 @@ const CAVE_MONSTERS = Object.freeze(
         ],
         [
             "boomerang",
+            "부메랑 볼",
             91,
             2.1,
             "#e58a52",
             "happy",
             { hp: 84, damage: 10, speed: 270, radius: 35, mass: 0.95, defense: 1 }
         ],
-        ["splitter", 92, 2.2, "#c56bd5", "ooo", { hp: 94, damage: 9, speed: 262, radius: 37, mass: 1.02, defense: 1 }],
-        ["jumper", 93, 2.2, "#e9c45d", "dash", { hp: 90, damage: 11, speed: 276, radius: 36, mass: 1, defense: 1 }],
-        ["laser", 94, 2.3, "#ef5b5b", "cyclops", { hp: 92, damage: 11, speed: 248, radius: 36, mass: 1.04, defense: 1 }]
-    ].map(([type, focusFloor, weight, color, face, stats]) =>
-        Object.freeze({ type, focusFloor, weight, color, face, stats: Object.freeze(stats) })
+        [
+            "splitter",
+            "분열 볼",
+            92,
+            2.2,
+            "#c56bd5",
+            "ooo",
+            { hp: 94, damage: 9, speed: 262, radius: 37, mass: 1.02, defense: 1 }
+        ],
+        [
+            "jumper",
+            "도약 볼",
+            93,
+            2.2,
+            "#e9c45d",
+            "dash",
+            { hp: 90, damage: 11, speed: 276, radius: 36, mass: 1, defense: 1 }
+        ],
+        [
+            "laser",
+            "레이저 볼",
+            94,
+            2.3,
+            "#ef5b5b",
+            "cyclops",
+            { hp: 92, damage: 11, speed: 248, radius: 36, mass: 1.04, defense: 1 }
+        ]
+    ].map(([type, displayName, focusFloor, weight, color, face, stats]) =>
+        Object.freeze({ type, displayName, focusFloor, weight, color, face, stats: Object.freeze(stats) })
     )
 );
 
@@ -174,9 +251,9 @@ export function createHuntingMobSpec({
     const base = HUNTING_MONSTER_BASE_SPECS[type] ?? HUNTING_MONSTER_BASE_SPECS[HUNTING_MONSTER_TYPES.MELEE];
     return {
         id: `hunting-mob-${base.type}-f${safeFloor(floor)}-${index}`,
-        name: "사냥터 몬스터",
-        title: base.type,
-        description: `${base.type} 행동을 사용하는 사냥터 몬스터`,
+        name: base.displayName,
+        title: base.displayName,
+        description: `${base.displayName} 전용 행동을 사용하는 사냥터 몬스터`,
         color: base.color,
         face: base.face,
         ability: "hunting_mob",
