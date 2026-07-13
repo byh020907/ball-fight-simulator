@@ -119,12 +119,12 @@ import {
     HUNTING_LOOT_ITEM_TYPES,
     HuntingBattleLootSession,
     HuntingLootDropController,
+    getHuntingBonusLootWeights,
     getHuntingLootDropChance,
-    getHuntingLootWeights,
     getHuntingShardDropAmount,
     getSmallHealPackAmount,
     rollHighChestRarity,
-    rollHuntingLootItemType,
+    rollHuntingBonusLootItemType,
     rollHuntingShardBundleAmount
 } from "../src/hunting/index.js";
 import { Grenade } from "../src/entities/grenade.js";
@@ -2287,13 +2287,40 @@ function testHuntingLootBalanceRules() {
 
     assert.ok(
         Math.abs(getHuntingLootDropChance(fullHp) - 0.15) < 1e-9,
-        "Full HP must use the 15% loot drop base chance"
+        "Full HP must use the 15% bonus-loot base chance"
     );
     assert.ok(
         Math.abs(getHuntingLootDropChance(halfHp) - 0.225) < 1e-9,
-        "Half missing HP must raise loot drops halfway to double"
+        "Half missing HP must raise bonus loot halfway to double"
     );
-    assert.ok(Math.abs(getHuntingLootDropChance(emptyHp) - 0.3) < 1e-9, "Empty HP must double loot drops to 30%");
+    assert.ok(Math.abs(getHuntingLootDropChance(emptyHp) - 0.3) < 1e-9, "Empty HP must double bonus loot to 30%");
+    assert.equal(
+        rollHuntingBonusLootItemType({
+            collector: fullHp,
+            rng: (() => {
+                const rolls = [0.149999, 0.8];
+                return () => rolls.shift() ?? 0;
+            })()
+        }),
+        HUNTING_LOOT_ITEM_TYPES.CHEST,
+        "A full-HP bonus roll below 15% must create an additional loot item"
+    );
+    assert.equal(
+        rollHuntingBonusLootItemType({
+            collector: fullHp,
+            rng: () => 0.15
+        }),
+        null,
+        "A full-HP bonus roll at the 15% boundary must not create additional loot"
+    );
+    assert.notEqual(
+        rollHuntingBonusLootItemType({
+            collector: emptyHp,
+            rng: () => 0.299999
+        }),
+        null,
+        "A critical-HP bonus roll below 30% must create additional loot"
+    );
     assert.equal(getSmallHealPackAmount(fullHp), 0, "A full-HP collector should not need a heal pack");
     assert.equal(getSmallHealPackAmount(halfHp), 15, "Heal packs should restore 25% of missing HP in five-point steps");
     assert.equal(getSmallHealPackAmount(emptyHp), 25, "Empty HP should receive a quarter of its missing HP");
@@ -2318,22 +2345,22 @@ function testHuntingLootBalanceRules() {
         "Deep floors should preserve the shifted upper shard roll"
     );
     assert.deepEqual(
-        getHuntingLootWeights({ collector: fullHp, rarity: "common" }),
-        { small_heal_pack: 20, shard: 70, chest: 10, shard_bundle: 0, high_chest: 0 },
-        "Common monsters should use only the ordinary weighted loot table"
+        getHuntingBonusLootWeights({ collector: fullHp, rarity: "common" }),
+        { small_heal_pack: 20, chest: 10, shard_bundle: 0, high_chest: 0 },
+        "Common monsters should use only the ordinary bonus-loot table"
     );
     assert.deepEqual(
-        getHuntingLootWeights({ collector: halfHp, rarity: "rare" }),
-        { small_heal_pack: 24, shard: 48, chest: 8, shard_bundle: 15, high_chest: 5 },
-        "Rare monsters should reserve 20% of a successful loot roll for special rewards"
+        getHuntingBonusLootWeights({ collector: halfHp, rarity: "rare" }),
+        { small_heal_pack: 24, chest: 8, shard_bundle: 15, high_chest: 5 },
+        "Rare monsters should preserve special rewards in the bonus-loot table"
     );
     assert.equal(
-        getHuntingLootWeights({ collector: emptyHp, rarity: "epic" }).small_heal_pack,
+        getHuntingBonusLootWeights({ collector: emptyHp, rarity: "epic" }).small_heal_pack,
         14,
         "Missing HP should raise the heal-pack weight before rarity rewards reserve their share"
     );
     assert.equal(
-        rollHuntingLootItemType({
+        rollHuntingBonusLootItemType({
             collector: fullHp,
             rng: (() => {
                 const rolls = [0, 0];
@@ -2344,7 +2371,7 @@ function testHuntingLootBalanceRules() {
         "A full-HP player may leave a rare heal pack behind instead of converting it to shards"
     );
     assert.equal(
-        rollHuntingLootItemType({
+        rollHuntingBonusLootItemType({
             collector: emptyHp,
             rng: (() => {
                 const rolls = [0, 0.39];
@@ -2384,7 +2411,7 @@ function testHuntingLootItemsAndDropController(app) {
     };
     const mobSpec = createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.PURSUER, floor: 1, index: 0 });
     const session = new HuntingBattleLootSession({ playerId: playerSpec.id, floor: 1 });
-    const rolls = [0, 0.2, 0, 0.25, 0];
+    const rolls = [0, 0.25, 0, 0.9];
     const soundCalls = [];
     const controller = new HuntingLootDropController({ session, rng: () => rolls.shift() ?? 0 });
     const simulation = new BattleSimulation(
@@ -2406,6 +2433,11 @@ function testHuntingLootItemsAndDropController(app) {
     mob.takeDamage(100000, player, "Loot Hook Test");
     const droppedShard = simulation.entities.find((entity) => entity instanceof ShardDrop);
     assert.ok(droppedShard, "Defeating a hunting mob must create a configured floor-loot item");
+    assert.equal(
+        simulation.entities.filter((entity) => entity instanceof ShardDrop).length,
+        1,
+        "Every normal monster defeat must spawn one guaranteed standard-shard drop even when bonus loot fails"
+    );
     assert.equal(droppedShard.radius, 16, "Standard shard drops should be visibly larger than hero orbs");
     assert.ok(
         Math.abs(droppedShard.velocity.length() - mob.stats.baseSpeed * 1.2) < 1e-9,
@@ -2432,6 +2464,26 @@ function testHuntingLootItemsAndDropController(app) {
         soundCalls.at(-1),
         { type: "loot", intensity: 1 },
         "Loot collection should request its audible collect chime"
+    );
+
+    const bonusSession = new HuntingBattleLootSession({ playerId: player.id, floor: 1 });
+    const bonusRolls = [0, 0, 0, 0.1, 0.8, 0, 0];
+    const bonusController = new HuntingLootDropController({
+        session: bonusSession,
+        rng: () => bonusRolls.shift() ?? 0
+    });
+    const bonusEntityCount = simulation.entities.length;
+    bonusController.onFighterDefeated(mob, { simulation });
+    const bonusDrops = simulation.entities.slice(bonusEntityCount);
+    assert.equal(
+        bonusDrops.filter((entity) => entity instanceof ShardDrop).length,
+        1,
+        "A successful bonus roll must not replace the guaranteed random shard drop"
+    );
+    assert.equal(
+        bonusDrops.filter((entity) => entity instanceof ChestDrop).length,
+        1,
+        "A successful common bonus roll must add its chest beside the guaranteed shard"
     );
     assert.equal(
         controller.onFighterDefeated({ hunting: null }, { simulation }),

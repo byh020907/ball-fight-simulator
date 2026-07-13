@@ -84,19 +84,17 @@ function createLootLaunchVelocity(fighter, rng) {
     return Vector2.fromAngle(rng() * Math.PI * 2, getCombatMovementSpeed(fighter) * speedMultiplier);
 }
 
-export function getHuntingLootWeights({ collector, rarity = "common" } = {}) {
+export function getHuntingBonusLootWeights({ collector, rarity = "common" } = {}) {
     const missingHpRatio = getMissingHpRatio(collector);
     const normalWeights = LOOT_CONFIG.normalWeights;
     const healWeight =
         normalWeights.small_heal_pack.minimum +
         (normalWeights.small_heal_pack.maximum - normalWeights.small_heal_pack.minimum) * missingHpRatio;
     const chestWeight = normalWeights.chest;
-    const shardWeight = 100 - healWeight - chestWeight;
     const rewardWeights = LOOT_CONFIG.rarityRewards[rarity] ?? LOOT_CONFIG.rarityRewards.common;
     const remainingWeight = 100 - rewardWeights.shard_bundle - rewardWeights.high_chest;
     return {
         [HUNTING_LOOT_ITEM_TYPES.SMALL_HEAL_PACK]: (healWeight * remainingWeight) / 100,
-        [HUNTING_LOOT_ITEM_TYPES.SHARD]: (shardWeight * remainingWeight) / 100,
         [HUNTING_LOOT_ITEM_TYPES.CHEST]: (chestWeight * remainingWeight) / 100,
         [HUNTING_LOOT_ITEM_TYPES.SHARD_BUNDLE]: rewardWeights.shard_bundle,
         [HUNTING_LOOT_ITEM_TYPES.HIGH_CHEST]: rewardWeights.high_chest
@@ -120,9 +118,37 @@ export function rollHighChestRarity({ rarity = "rare", rng = Math.random } = {})
     );
 }
 
-export function rollHuntingLootItemType({ collector, rarity = "common", rng = Math.random } = {}) {
+export function rollHuntingBonusLootItemType({ collector, rarity = "common", rng = Math.random } = {}) {
     if (!collector || rng() >= getHuntingLootDropChance(collector)) return null;
-    return rollWeightedType(getHuntingLootWeights({ collector, rarity }), rng);
+    return rollWeightedType(getHuntingBonusLootWeights({ collector, rarity }), rng);
+}
+
+function getLootAmount(type, { collector, floor, rarity, rng }) {
+    if (type === HUNTING_LOOT_ITEM_TYPES.SMALL_HEAL_PACK) return getSmallHealPackAmount(collector);
+    if (type === HUNTING_LOOT_ITEM_TYPES.SHARD_BUNDLE) return rollHuntingShardBundleAmount({ floor, rarity, rng });
+    if (type === HUNTING_LOOT_ITEM_TYPES.SHARD) return getHuntingShardDropAmount(floor, rng);
+    return undefined;
+}
+
+function createLootChest(type, rarity, rng) {
+    if (type !== HUNTING_LOOT_ITEM_TYPES.CHEST && type !== HUNTING_LOOT_ITEM_TYPES.HIGH_CHEST) return null;
+    const chestRarity = type === HUNTING_LOOT_ITEM_TYPES.HIGH_CHEST ? rollHighChestRarity({ rarity, rng }) : "common";
+    return createHuntingChest({ rarity: chestRarity });
+}
+
+function createHuntingLootEntity({ type, fighter, collector, floor, rarity, rng, onCollected }) {
+    return createHuntingLootItem(type, {
+        position: fighter.position,
+        velocity: createLootLaunchVelocity(fighter, rng),
+        collectorId: collector.id,
+        magnetRadiusMultiplier: LOOT_CONFIG.magnet.radiusMultiplier,
+        magnetResponseRate: LOOT_CONFIG.magnet.responseRate,
+        magnetSpeedMultiplier: LOOT_CONFIG.magnet.speedMultiplier,
+        life: LOOT_CONFIG.itemLife,
+        amount: getLootAmount(type, { collector, floor, rarity, rng }),
+        chest: createLootChest(type, rarity, rng),
+        onCollected
+    });
 }
 
 export class HuntingBattleLootSession {
@@ -167,29 +193,20 @@ export class HuntingLootDropController {
         if (!collector) return null;
 
         const rarity = getLootRarity(fighter);
-        const type = rollHuntingLootItemType({ collector, rarity, rng: this.rng });
-        if (!type) return null;
+        const shard = this._spawnLootItem(HUNTING_LOOT_ITEM_TYPES.SHARD, fighter, collector, rarity, simulation);
+        const bonusType = rollHuntingBonusLootItemType({ collector, rarity, rng: this.rng });
+        if (bonusType) this._spawnLootItem(bonusType, fighter, collector, rarity, simulation);
+        return shard;
+    }
 
-        const isShardBundle = type === HUNTING_LOOT_ITEM_TYPES.SHARD_BUNDLE;
-        const isChest = type === HUNTING_LOOT_ITEM_TYPES.CHEST || type === HUNTING_LOOT_ITEM_TYPES.HIGH_CHEST;
-        const chestRarity =
-            type === HUNTING_LOOT_ITEM_TYPES.HIGH_CHEST ? rollHighChestRarity({ rarity, rng: this.rng }) : "common";
-
-        const item = createHuntingLootItem(type, {
-            position: fighter.position,
-            velocity: createLootLaunchVelocity(fighter, this.rng),
-            collectorId: this.session.playerId,
-            magnetRadiusMultiplier: LOOT_CONFIG.magnet.radiusMultiplier,
-            magnetResponseRate: LOOT_CONFIG.magnet.responseRate,
-            magnetSpeedMultiplier: LOOT_CONFIG.magnet.speedMultiplier,
-            life: LOOT_CONFIG.itemLife,
-            amount:
-                type === HUNTING_LOOT_ITEM_TYPES.SMALL_HEAL_PACK
-                    ? getSmallHealPackAmount(collector)
-                    : isShardBundle
-                      ? rollHuntingShardBundleAmount({ floor: this.session.floor, rarity, rng: this.rng })
-                      : getHuntingShardDropAmount(this.session.floor, this.rng),
-            chest: isChest ? createHuntingChest({ rarity: chestRarity }) : null,
+    _spawnLootItem(type, fighter, collector, rarity, simulation) {
+        const item = createHuntingLootEntity({
+            type,
+            fighter,
+            collector,
+            floor: this.session.floor,
+            rarity,
+            rng: this.rng,
             onCollected: (reward) => this.session.recordCollection(reward)
         });
         simulation.entities.push(item);
