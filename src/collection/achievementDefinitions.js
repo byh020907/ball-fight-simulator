@@ -37,7 +37,9 @@ function createHuntingCounterAchievement({ id, name, description, tier, target, 
         },
         reward: { ...reward },
         grant(handler) {
-            return reward.type === "SHARDS" ? handler.shards(reward.amount) : handler.chest(reward.rarity);
+            if (reward.type === "SHARDS") return handler.shards(reward.amount);
+            if (reward.type === "EQUIPMENT") return handler.equipment({ rarity: reward.rarity, ...reward.equipment });
+            return handler.chest(reward.rarity);
         }
     };
 }
@@ -301,10 +303,10 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
     }),
     createHuntingCounterAchievement({
         id: "hunting_secured_chests_10",
-        name: "보관 전문가",
-        description: "사냥터에서 상자 10개를 확보하세요.",
-        tier: "bronze",
-        target: 10,
+        name: "전리품 회수",
+        description: "사냥터에서 얻은 상자 2개를 보관함으로 무사히 가져오세요.",
+        tier: "silver",
+        target: 2,
         rewardKey: "huntingSecuredChests",
         getCurrent: (context) => getHuntingStats(context).securedChestCount ?? 0
     }),

@@ -3516,6 +3516,7 @@ function testHuntingSystem() {
 async function testHuntingAchievementProgress() {
     const { ACHIEVEMENT_DEFINITIONS } = await import("../src/collection/achievementDefinitions.js");
     const { evaluateAchievements } = await import("../src/collection/achievementRules.js");
+    const { grantAchievementReward } = await import("../src/collection/achievementRewards.js");
 
     for (const monster of Object.values(HUNTING_MONSTER_BASE_SPECS)) {
         assert.ok(
@@ -3592,7 +3593,7 @@ async function testHuntingAchievementProgress() {
     profile.hunting.stats = {
         ...stageClearStats,
         deepestFloor: 30,
-        securedChestCount: 10,
+        securedChestCount: 2,
         clearedStageIds: Object.values(HUNTING_STAGE_IDS),
         monsterKillsByTag: {
             [HUNTING_MONSTER_TAGS.MONSTER]: 300,
@@ -3629,6 +3630,41 @@ async function testHuntingAchievementProgress() {
         championAchievement.reward.rarity,
         "common",
         "Champion intrusion should not bypass its existing shard multiplier with a high-rarity chest"
+    );
+    const securedChestAchievement = ACHIEVEMENT_DEFINITIONS.find(
+        (achievement) => achievement.id === "hunting_secured_chests_10"
+    );
+    assert.equal(
+        securedChestAchievement.name,
+        "전리품 회수",
+        "The achievement name should explain its safe-return goal"
+    );
+    assert.equal(
+        securedChestAchievement.description,
+        "사냥터에서 얻은 상자 2개를 보관함으로 무사히 가져오세요.",
+        "The achievement description should say that chests must reach storage"
+    );
+    assert.deepEqual(
+        securedChestAchievement.getProgress({ profile, roster: [] }),
+        { current: 2, target: 2 },
+        "Two secured chests should complete the early safe-return milestone"
+    );
+    const rewardProfile = createDefaultPlayerProfile();
+    const rewardResult = grantAchievementReward(rewardProfile, securedChestAchievement);
+    assert.equal(rewardResult.type, "EQUIPMENT", "Safe-return achievement should grant ready-to-use equipment");
+    assert.equal(
+        rewardProfile.equipment.inventory.length,
+        1,
+        "Safe-return equipment should enter the inventory directly"
+    );
+    assert.equal(rewardProfile.equipment.inventory[0].rarity, "uncommon", "Safe-return equipment should be uncommon");
+    assert.deepEqual(
+        rewardProfile.equipment.inventory[0].stats,
+        [
+            { type: "hp", value: 20, min: 20, max: 20 },
+            { type: "defense", value: 1, min: 1, max: 1 }
+        ],
+        "Safe-return equipment should provide the documented early-survival stats"
     );
 
     const sanitized = sanitizePlayerProfile({

@@ -430,7 +430,20 @@ export const REWARD_BALANCE = deepFreeze({
             huntingCriticalHpWin: { type: "CHEST", rarity: "uncommon" },
             huntingPortalRetreat40: { type: "CHEST", rarity: "uncommon" },
             huntingChampionVictory: { type: "CHEST", rarity: "common" },
-            huntingSecuredChests: { type: "SHARDS", amount: 50 },
+            huntingSecuredChests: {
+                type: "EQUIPMENT",
+                rarity: "uncommon",
+                equipment: {
+                    slot: "armor",
+                    name: "귀환자의 완충 갑옷",
+                    description: "전리품을 지키고 돌아온 탐사자에게 주어지는 실용적인 방어구.",
+                    stats: [
+                        { type: "hp", value: 20 },
+                        { type: "defense", value: 1 }
+                    ],
+                    specialOptions: []
+                }
+            },
             huntingAllStagesClear: { type: "CHEST", rarity: "epic" },
             huntingMonsterSlayer: { type: "CHEST", rarity: "common" },
             huntingRareMonsterSlayer: { type: "CHEST", rarity: "uncommon" },
