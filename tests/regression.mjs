@@ -2876,7 +2876,7 @@ function testHuntingSystem() {
     const mobs = createHuntingMobEncounter({
         floor: 3,
         rng: (() => {
-            // [mob1 type, mob2 type, mob0 apperance×5, mob1 appearance×5, mob2 appearance×5]
+            // [mob0 type, mob1 forced-different type, mob2 type, mob0 appearance×5, mob1 appearance×5, mob2 appearance×5]
             // MobAppearance.generate는 이제 randomSpin 헬퍼로 2회 rng 호출 (abs+sign)
             const rolls = [0.9, 0, 0.1, 0.2, 0.3, 0.5, 0.6, 0.7, 0.8, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8];
             return () => rolls.shift() ?? 0;
@@ -2889,8 +2889,13 @@ function testHuntingSystem() {
         "Hunting mobs should all be assigned to the enemy team"
     );
     assert.ok(
-        mobs.every((mob) => mob.hunting.monsterType === HUNTING_MONSTER_TYPES.PURSUER),
-        "Early floors should only use the first unlocked monster"
+        new Set(mobs.map((mob) => mob.hunting.monsterType)).size >= 2,
+        "Early floors should combine at least two monster types"
+    );
+    assert.deepEqual(
+        getHuntingMonsterPool(1).map((monster) => monster.type),
+        [HUNTING_MONSTER_TYPES.PURSUER, HUNTING_MONSTER_TYPES.CHARGER],
+        "Floor 1 should start with two base monster types"
     );
     assert.ok(
         mobs.every((mob) => mob.ability === "hunting_mob"),

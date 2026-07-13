@@ -26,21 +26,21 @@ export const HUNTING_MONSTER_TYPES = Object.freeze({
 const CAVE_MONSTERS = Object.freeze(
     [
         ["pursuer", 1, 1.0, "#9b5d3f", "angry", { hp: 74, damage: 8, speed: 305, radius: 34, mass: 0.95, defense: 1 }],
-        ["charger", 10, 1.7, "#e66b4f", "dash", { hp: 86, damage: 10, speed: 286, radius: 37, mass: 1.08, defense: 1 }],
+        ["charger", 1, 1.7, "#e66b4f", "dash", { hp: 86, damage: 10, speed: 286, radius: 37, mass: 1.08, defense: 1 }],
         [
             "shooter",
-            20,
+            10,
             1.7,
             "#426f9e",
             "cyclops",
             { hp: 62, damage: 8, speed: 258, radius: 31, mass: 0.82, defense: 0.6 }
         ],
-        ["electric", 30, 1.8, "#5e8ee6", "ooo", { hp: 68, damage: 9, speed: 252, radius: 34, mass: 0.9, defense: 0.8 }],
-        ["healer", 40, 1.8, "#65b87a", "happy", { hp: 110, damage: 5, speed: 268, radius: 35, mass: 1, defense: 1 }],
-        ["chain", 50, 1.9, "#b85065", "angry", { hp: 88, damage: 9, speed: 278, radius: 35, mass: 1.05, defense: 1 }],
+        ["electric", 20, 1.8, "#5e8ee6", "ooo", { hp: 68, damage: 9, speed: 252, radius: 34, mass: 0.9, defense: 0.8 }],
+        ["healer", 30, 1.8, "#65b87a", "happy", { hp: 110, damage: 5, speed: 268, radius: 35, mass: 1, defense: 1 }],
+        ["chain", 40, 1.9, "#b85065", "angry", { hp: 88, damage: 9, speed: 278, radius: 35, mass: 1.05, defense: 1 }],
         [
             "shockwave",
-            60,
+            50,
             1.9,
             "#e1a94e",
             "ooo",
@@ -48,16 +48,16 @@ const CAVE_MONSTERS = Object.freeze(
         ],
         [
             "barrier",
-            70,
+            60,
             2.0,
             "#5dbaeb",
             "default",
             { hp: 104, damage: 7, speed: 250, radius: 39, mass: 1.18, defense: 1.5 }
         ],
-        ["siphon", 80, 2.0, "#9b69be", "xeye", { hp: 92, damage: 10, speed: 272, radius: 35, mass: 0.98, defense: 1 }],
+        ["siphon", 70, 2.0, "#9b69be", "xeye", { hp: 92, damage: 10, speed: 272, radius: 35, mass: 0.98, defense: 1 }],
         [
             "shard",
-            90,
+            80,
             2.1,
             "#e0d05b",
             "cyclops",
@@ -90,8 +90,8 @@ export function getHuntingMonsterPool(floor, stageId = HUNTING_STAGE_IDS.CAVE) {
     return definitions.filter((monster) => monster.unlockFloor <= safe);
 }
 
-function rollMonster(floor, rng) {
-    const pool = getHuntingMonsterPool(floor);
+function rollMonster(floor, stageId, rng, excludedTypes = []) {
+    const pool = getHuntingMonsterPool(floor, stageId).filter((monster) => !excludedTypes.includes(monster.type));
     const total = pool.reduce((sum, monster) => sum + monster.weight, 0);
     let roll = rng() * total;
     for (const monster of pool) {
@@ -128,12 +128,15 @@ export function createHuntingMobSpec({
 }
 
 export function createHuntingMobEncounter({ floor = 1, stageId = HUNTING_STAGE_IDS.CAVE, rng = DEFAULT_RNG } = {}) {
-    return Array.from({ length: getHuntingMobCount(floor) }, (_, index) =>
-        scaleEnemySpecForHunting(
-            createHuntingMobSpec({ type: rollMonster(floor, rng).type, floor, index, rng }),
-            floor,
-            { enemyType: HUNTING_ENEMY_TYPES.NORMAL }
-        )
+    const monsterTypes = [];
+    Array.from({ length: getHuntingMobCount(floor) }).forEach((_, index) => {
+        const forceDifferentSecondType = index === 1 && getHuntingMonsterPool(floor, stageId).length > 1;
+        monsterTypes.push(rollMonster(floor, stageId, rng, forceDifferentSecondType ? [monsterTypes[0]] : []).type);
+    });
+    return monsterTypes.map((type, index) =>
+        scaleEnemySpecForHunting(createHuntingMobSpec({ type, floor, index, rng }), floor, {
+            enemyType: HUNTING_ENEMY_TYPES.NORMAL
+        })
     );
 }
 
