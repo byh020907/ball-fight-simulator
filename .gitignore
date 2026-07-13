@@ -1,4 +1,5 @@
 .omx/
+.handoffs/
 node_modules/
 npm-debug.log*
 yarn-debug.log*
@@ -8,4 +9,3 @@ Thumbs.db
 .vscode/
 scripts/rl/report_*.json
 models/
-
