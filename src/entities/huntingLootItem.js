@@ -1,4 +1,5 @@
 import { applyCollisionImpulse, CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
+import CollectionGrace from "../physics/CollectionGrace.js";
 import { applyMagneticAttraction, getCombatMovementSpeed } from "../physics/magneticAttraction.js";
 
 const DEFAULT_LIFE = 18;
@@ -6,7 +7,7 @@ const DEFAULT_MAGNET_RESPONSE_RATE = 5;
 const DEFAULT_MAGNET_SPEED_MULTIPLIER = 1.35;
 const DEFAULT_MAGNET_GRACE_DURATION = 1;
 
-export class HuntingLootItem extends CombatEntity {
+export class HuntingLootItem extends CollectionGrace(CombatEntity) {
     static renderLayer = RENDER_LAYERS.FOREGROUND;
 
     constructor({
@@ -29,7 +30,7 @@ export class HuntingLootItem extends CombatEntity {
         this.magnetRadiusMultiplier = Math.max(1, magnetRadiusMultiplier);
         this.magnetResponseRate = Math.max(0, magnetResponseRate);
         this.magnetSpeedMultiplier = Math.max(0, magnetSpeedMultiplier);
-        this.magnetGraceRemaining = Math.max(0, magnetGraceDuration);
+        this.initializeCollectionGrace(magnetGraceDuration);
         this.onCollected = onCollected;
         this.victoryCollectionRemaining = 0;
         this.victoryCollectionResponseRate = 0;
@@ -40,11 +41,11 @@ export class HuntingLootItem extends CombatEntity {
 
         const collector = this._findCollector(simulation);
         const canCollect = collector && this.canCollect(collector, simulation);
-        const isMagnetGraceActive = this._tickMagnetGrace(delta);
+        const isCollectionGraceActive = this.tickCollectionGrace(delta);
         if (canCollect) {
             if (this.victoryCollectionRemaining > 0) {
                 this._applyVictoryCollectionMagnet(collector, delta, simulation);
-            } else if (!isMagnetGraceActive) {
+            } else if (!isCollectionGraceActive) {
                 this._applyCollectorMagnet(collector, delta);
             }
         }
@@ -52,7 +53,7 @@ export class HuntingLootItem extends CombatEntity {
         this.integrate(delta);
         simulation.keepEntityInsideArena(this, { resolveTerrain: true });
 
-        const canCollectNow = canCollect && (this.victoryCollectionRemaining > 0 || !isMagnetGraceActive);
+        const canCollectNow = canCollect && (this.victoryCollectionRemaining > 0 || !isCollectionGraceActive);
         if (canCollectNow && this._tryCollect(collector, simulation)) return;
         this._resolveFighterCollision(simulation, collector?.id);
         this.victoryCollectionRemaining = Math.max(0, this.victoryCollectionRemaining - delta);
@@ -91,12 +92,6 @@ export class HuntingLootItem extends CombatEntity {
             responseRate: this.magnetResponseRate,
             attractionSpeed: getCombatMovementSpeed(collector) * this.magnetSpeedMultiplier
         });
-    }
-
-    _tickMagnetGrace(delta) {
-        if (this.magnetGraceRemaining <= 0) return false;
-        this.magnetGraceRemaining = Math.max(0, this.magnetGraceRemaining - delta);
-        return true;
     }
 
     _applyVictoryCollectionMagnet(collector, delta, simulation) {

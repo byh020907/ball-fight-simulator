@@ -2471,6 +2471,10 @@ function testHuntingLootItemsAndDropController(app) {
         droppedShards.every((shard) => shard.magnetGraceRemaining > 0),
         "Every common loot item must begin with the shared magnet grace duration"
     );
+    assert.ok(
+        droppedShards.every((shard) => shard.collectionGraceRemaining > 0),
+        "Loot items must expose the shared collection-grace state"
+    );
     droppedShards.forEach((shard) => {
         shard.magnetGraceRemaining = 0;
         shard.position = player.position.clone();
@@ -8031,6 +8035,35 @@ async function testHeroOrbOwnerCollects(app) {
     }
 }
 
+async function testHeroOrbCollectionGraceDefersOwnerPickup(app) {
+    const hero = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.HERO);
+    const opponent = app.roster.find((fighter) => fighter.id !== FIGHTER_IDS.HERO);
+    const sim = new BattleSimulation([hero, opponent], {
+        onLog() {},
+        onSound() {}
+    });
+    const heroFighter = sim.fighters.find((fighter) => fighter.id === FIGHTER_IDS.HERO);
+    const bonusesBefore = { ...heroFighter.hero.bonuses };
+    const orb = new HeroOrb(heroFighter, heroFighter.position.clone(), new Vector2(), "hp", 10, {
+        magnetGraceDuration: 1
+    });
+
+    orb.update(0.1, sim);
+    assert.equal(orb.isExpired, false, "Hero Orb must remain on the field while collection grace is active");
+    assert.deepEqual(heroFighter.hero.bonuses, bonusesBefore, "Collection grace must defer the Hero Orb reward");
+    assert.equal(orb.collectionGraceRemaining, 0.9, "Hero Orb must use the shared collection-grace state");
+    assert.equal(orb.magnetGraceRemaining, 0.9, "Legacy magnet-grace access must mirror shared collection grace");
+
+    orb.update(0.9, sim);
+    assert.equal(orb.isExpired, false, "The update that consumes the final grace duration must still defer collection");
+    orb.update(1 / 60, sim);
+    assert.equal(orb.isExpired, true, "Hero Orb must collect normally on the update after grace expires");
+    assert.ok(
+        heroFighter.hero.bonuses.hp > bonusesBefore.hp,
+        "Hero Orb reward must apply after collection grace expires"
+    );
+}
+
 async function testHeroOrbOpponentCollects(app) {
     const hero = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.HERO);
     const opponent = app.roster.find((f) => f.id !== FIGHTER_IDS.HERO);
@@ -10427,6 +10460,7 @@ await testHeroBallRegistered(app);
 await testHeroAbilitySpawnsOrb(app);
 await testHeroOrbEffectType(app);
 await testHeroOrbOwnerCollects(app);
+await testHeroOrbCollectionGraceDefersOwnerPickup(app);
 await testHeroOrbOpponentCollects(app);
 await testHeroOrbMaxActivePerOwner(app);
 await testHeroOrbDoesNotExpireFromCooldown(app);

@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.25.11",
+        date: "2026-07-14",
+        title: "v0.25.11 Hero Orb도 바로 되돌아오지 않습니다.",
+        changes: [
+            {
+                type: "fix",
+                text: "Hero Orb와 전리품이 같은 초기 회수 유예를 써서, 발사·드롭 뒤 1초 동안은 자석과 겹침 회수가 모두 기다립니다."
+            }
+        ]
+    },
+    {
         version: "0.25.10",
         date: "2026-07-14",
         title: "v0.25.10 전리품이 전장을 관통하지 않습니다.",

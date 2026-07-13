@@ -123,6 +123,7 @@ this.debug = {
 |---|---|---|
 | `PhysicsBody` | 움직일 수 있다 (pos, velocity, mass, radius, integrate, applyImpulse) | BattleBall, 모든 CombatEntity |
 | `LifeSpan` | 시간이 지나면 사라진다 (life, tickLife, lifeProgress) | 모든 이펙트, 모든 투사체 |
+| `CollectionGrace` | 생성 직후 자석·직접 회수를 유예한다 (collectionGraceRemaining, tickCollectionGrace) | HeroOrb, HuntingLootItem |
 | `Cooldown` | 쿨다운이 있다 (tickCooldown, cooldownReady) | 모든 Ability, AIActionController |
 | `ProjectileBehavior` | 발사체다 (owner, updateProjectile, hit 판정) | Arrow/Bat/Bullet/Orbit/Grenade/Seed |
 | `BurstSequencer` | 연발 발사한다 (startBurst, tickBurst) | 필요 시 선택 적용 |

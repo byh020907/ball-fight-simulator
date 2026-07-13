@@ -1,6 +1,7 @@
 import { applyCollisionImpulse, CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
 import { DashEffect } from "../combatEffects.js";
 import { computeOwnerCombatSpeed } from "../abilities/heroAbility.js";
+import CollectionGrace from "../physics/CollectionGrace.js";
 import { applyMagneticAttraction } from "../physics/magneticAttraction.js";
 
 // ── Hero Orb stat cap ────────────────────────────────────────────────────────
@@ -257,7 +258,7 @@ export function applyHeroOrbCarryoverToBattleBall(ball, carryover) {
 
 // ── Hero Orb entity ──────────────────────────────────────────────────────────
 
-export class HeroOrb extends CombatEntity {
+export class HeroOrb extends CollectionGrace(CombatEntity) {
     constructor(owner, position, velocity, effectType, life, { magnetGraceDuration = 0 } = {}) {
         super(position, velocity, 12);
         this.owner = owner;
@@ -265,7 +266,7 @@ export class HeroOrb extends CombatEntity {
         this.effectType = effectType;
         this.life = life ?? Infinity;
         this.mass = 2;
-        this.magnetGraceRemaining = Math.max(0, magnetGraceDuration);
+        this.initializeCollectionGrace(magnetGraceDuration);
     }
 
     get renderLayer() {
@@ -274,7 +275,8 @@ export class HeroOrb extends CombatEntity {
 
     update(delta, simulation) {
         this.tickLife(delta);
-        this._applyOwnerMagnet(delta);
+        const isCollectionGraceActive = this.tickCollectionGrace(delta);
+        if (!isCollectionGraceActive) this._applyOwnerMagnet(delta);
         this.integrate(delta);
         simulation.keepEntityInsideArena(this);
         if (Number.isFinite(this.life) && this.life <= 0) {
@@ -292,6 +294,7 @@ export class HeroOrb extends CombatEntity {
             const normal = dist > 0 ? difference.normalize() : new Vector2(1, 0);
 
             if (fighter.id === this.ownerId) {
+                if (isCollectionGraceActive) continue;
                 const effectDef = HERO_ORB_EFFECTS[this.effectType];
                 if (effectDef) {
                     const result = effectDef.apply(fighter, {
@@ -324,11 +327,6 @@ export class HeroOrb extends CombatEntity {
     }
 
     _applyOwnerMagnet(delta) {
-        if (this.magnetGraceRemaining > 0) {
-            this.magnetGraceRemaining = Math.max(0, this.magnetGraceRemaining - delta);
-            return;
-        }
-
         const attraction = this.owner.ability?.getOrbAttraction?.(this);
         if (!attraction || this.owner.flags.defeated) return;
 
