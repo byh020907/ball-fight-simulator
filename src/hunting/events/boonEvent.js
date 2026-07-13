@@ -1,17 +1,24 @@
 import { REWARD_BALANCE } from "../../rewardBalanceConfig.js";
 import { HUNTING_EVENT_TRANSITIONS, HuntingEvent } from "./huntingEvent.js";
-import { safeFloor } from "./eventHelpers.js";
+import { rollIndex, safeFloor } from "./eventHelpers.js";
 import { recordHuntingFloorResult } from "../huntingState.js";
 
+function rollBoonShards(floor, rng) {
+    const boon = REWARD_BALANCE.hunting.events.boon;
+    const baseRangeSize = boon.baseShardVariance * 2 + 1;
+    const baseShards = boon.baseShards - boon.baseShardVariance + rollIndex(baseRangeSize, rng);
+    const floorProgress = Math.min(1, (floor - 1) / (boon.maxMultiplierFloor - 1));
+    const multiplier = 1 + floorProgress * (boon.maxMultiplier - 1);
+    return Math.round(baseShards * multiplier);
+}
+
 export class BoonEvent extends HuntingEvent {
-    createPayload(floor) {
+    createPayload(floor, rng = Math.random) {
         const safe = safeFloor(floor);
         return {
             type: this.type,
             floor: safe,
-            shards:
-                REWARD_BALANCE.hunting.events.boon.baseShards +
-                Math.floor(safe / 10) * REWARD_BALANCE.hunting.events.boon.shardsPerTenFloors
+            shards: rollBoonShards(safe, rng)
         };
     }
 

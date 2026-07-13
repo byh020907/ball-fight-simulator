@@ -1835,6 +1835,25 @@ function testHuntingEventPresentationContracts() {
     console.log("[hunting-event-presentation-contracts] ok");
 }
 
+function testHuntingBoonShardRewardsScaleWithFloor() {
+    const floorOneLow = HuntingEvent.createPayload(HUNTING_EVENT_TYPES.BOON, 1, () => 0);
+    const floorOneHigh = HuntingEvent.createPayload(HUNTING_EVENT_TYPES.BOON, 1, () => 0.999999);
+    const floorHundredLow = HuntingEvent.createPayload(HUNTING_EVENT_TYPES.BOON, 100, () => 0);
+    const floorHundredHigh = HuntingEvent.createPayload(HUNTING_EVENT_TYPES.BOON, 100, () => 0.999999);
+    const floorBeyondCap = HuntingEvent.createPayload(HUNTING_EVENT_TYPES.BOON, 500, () => 0.999999);
+
+    assert.equal(floorOneLow.shards, 6, "Floor 1 boon rewards should start at 6 shards");
+    assert.equal(floorOneHigh.shards, 10, "Floor 1 boon rewards should reach 10 shards");
+    assert.equal(floorHundredLow.shards, 30, "Floor 100 boon rewards should scale the low roll to five times its base");
+    assert.equal(
+        floorHundredHigh.shards,
+        50,
+        "Floor 100 boon rewards should scale the high roll to five times its base"
+    );
+    assert.equal(floorBeyondCap.shards, 50, "Boon rewards should stop scaling beyond the five-times cap");
+    console.log("[hunting-boon-shard-scaling] ok");
+}
+
 function testHuntingEventHealthInitialization() {
     const mockApp = {
         roster: app.roster,
@@ -1893,7 +1912,7 @@ function testHuntingAutoEventRequiresConfirmation() {
         playerProfile: createDefaultPlayerProfile()
     };
     const manager = new HuntingManager(mockApp);
-    const boonEvent = HuntingEvent.createPayload(HUNTING_EVENT_TYPES.BOON, 2);
+    const boonEvent = HuntingEvent.createPayload(HUNTING_EVENT_TYPES.BOON, 2, () => 0.5);
     manager._run = {
         ...createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE }),
         lastEvent: boonEvent
@@ -9483,6 +9502,7 @@ await testHuntingEarlyEventUi();
 await testHuntingFirstMoveUiPaintGate();
 testHuntingChestEventStopsAndResumes();
 testHuntingEventPresentationContracts();
+testHuntingBoonShardRewardsScaleWithFloor();
 testHuntingEventHealthInitialization();
 testHuntingAutoEventRequiresConfirmation();
 testHuntingChampionEventRequiresBattleConfirmation();

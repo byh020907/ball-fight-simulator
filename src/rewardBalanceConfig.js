@@ -304,7 +304,7 @@ export const REWARD_BALANCE = deepFreeze({
             combatMultipliers: { finalBoss: 2, eliteFloor: 1.25, championIntrusion: 1.5 }
         },
         events: {
-            boon: { baseShards: 8, shardsPerTenFloors: 3 },
+            boon: { baseShards: 8, baseShardVariance: 2, maxMultiplier: 5, maxMultiplierFloor: 100 },
             merchant: {
                 discount: { default: 0.1, deepFloor: 70, deepFloorValue: 0.15 },
                 repair: { cost: 50, recoveryRatio: 0.35 },
