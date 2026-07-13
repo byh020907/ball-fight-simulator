@@ -5,6 +5,7 @@ export { default as Cooldown } from "./Cooldown.js";
 export { default as BurstSequencer } from "./BurstSequencer.js";
 export { default as RotationalBody } from "./RotationalBody.js";
 export { default as PhysicsMaterialBody } from "./PhysicsMaterialBody.js";
+export { applyMagneticAttraction, getCombatMovementSpeed } from "./magneticAttraction.js";
 export { PhysicsDebugRingBuffer, snapshotPhysicsState, validatePhysicsState } from "./PhysicsDebugRingBuffer.js";
 export {
     getWorldPolygonPoints,

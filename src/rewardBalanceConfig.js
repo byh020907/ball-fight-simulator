@@ -299,9 +299,18 @@ export const REWARD_BALANCE = deepFreeze({
             clearBonus: 10,
             rewardPerFloor: 0.15,
             deepFloorBonus: 0.1,
-            combatChestDropChance: 0.15,
             defeatPreserve: { shards: 0.5, xp: 0.7 },
             combatMultipliers: { finalBoss: 2, eliteFloor: 1.25, championIntrusion: 1.5 }
+        },
+        loot: {
+            baseDropChance: 0.15,
+            missingHpMaxMultiplier: 2,
+            valueStep: 5,
+            itemLife: 18,
+            magnet: { radiusMultiplier: 4, responseRate: 5, speedMultiplier: 1.35 },
+            smallHealPack: { missingHpRecoveryRatio: 0.25 },
+            shard: { baseAmount: 5, floorStep: 25, maximumAmount: 20 },
+            weights: { small_heal_pack: 50, shard: 40, chest: 10 }
         },
         events: {
             boon: { baseShards: 8, baseShardVariance: 2, maxMultiplier: 5, maxMultiplierFloor: 100 },

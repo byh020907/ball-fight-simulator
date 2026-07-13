@@ -483,6 +483,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             if (s) {
                 s.spawnDeathExplosion(this.position.clone(), this.color);
                 s.addLog(`${this.name} has been defeated.`);
+                s.hooks?.onFighterDefeated?.(this, { source, label, simulation: s });
             }
         }
         return { actualDamage };

@@ -117,7 +117,14 @@ import {
     canAffordOffer,
     formatChestRarityCounts,
     formatPendingLootSummary,
-    formatDefeatLossText
+    formatDefeatLossText,
+    HUNTING_LOOT_ITEM_TYPES,
+    HuntingBattleLootSession,
+    HuntingLootDropController,
+    getHuntingLootDropChance,
+    getHuntingShardDropAmount,
+    getSmallHealPackAmount,
+    rollHuntingLootItemType
 } from "../src/hunting/index.js";
 import { Grenade } from "../src/entities/grenade.js";
 import { getArenaWallRay } from "../src/abilities/huntingMobAbility.js";
@@ -200,7 +207,16 @@ import {
     registerAlpineComponentSystem,
     resolveTemplateComponent
 } from "../src/alpineTemplateComponents.js";
-import { BattleBall, computeHeroOrbCarryover, HeroOrb, STAT_ORB_KEYS } from "../src/entities/index.js";
+import {
+    BattleBall,
+    ChestDrop,
+    computeHeroOrbCarryover,
+    createHuntingLootItem,
+    HeroOrb,
+    ShardDrop,
+    SmallHealPack,
+    STAT_ORB_KEYS
+} from "../src/entities/index.js";
 import { MobAppearance } from "../src/entities/mobAppearance.js";
 import { PHYSICS_MATERIALS, resolvePhysicsMaterial, combinePhysicsMaterials } from "../src/physics/PhysicsMaterial.js";
 import PhysicsMaterialBody from "../src/physics/PhysicsMaterialBody.js";
@@ -2263,6 +2279,179 @@ function testHuntingChestContinueHandlersContract() {
     console.log("[hunting-chest-continue-handlers] ok");
 }
 
+function testHuntingLootBalanceRules() {
+    const fullHp = { hp: 100, maxHp: 100 };
+    const halfHp = { hp: 50, maxHp: 100 };
+    const emptyHp = { hp: 0, maxHp: 100 };
+
+    assert.ok(
+        Math.abs(getHuntingLootDropChance(fullHp) - 0.15) < 1e-9,
+        "Full HP must use the 15% loot drop base chance"
+    );
+    assert.ok(
+        Math.abs(getHuntingLootDropChance(halfHp) - 0.225) < 1e-9,
+        "Half missing HP must raise loot drops halfway to double"
+    );
+    assert.ok(Math.abs(getHuntingLootDropChance(emptyHp) - 0.3) < 1e-9, "Empty HP must double loot drops to 30%");
+    assert.equal(getSmallHealPackAmount(fullHp), 0, "A full-HP collector should not need a heal pack");
+    assert.equal(getSmallHealPackAmount(halfHp), 15, "Heal packs should restore 25% of missing HP in five-point steps");
+    assert.equal(getSmallHealPackAmount(emptyHp), 25, "Empty HP should receive a quarter of its missing HP");
+    assert.equal(getHuntingShardDropAmount(1), 5, "Early shard drops should start at five shards");
+    assert.equal(getHuntingShardDropAmount(26), 10, "Shard drops should grow in five-shard steps");
+    assert.equal(getHuntingShardDropAmount(100), 20, "Shard drops should respect the configured maximum");
+    assert.equal(
+        rollHuntingLootItemType({ collector: fullHp, rng: () => 0 }),
+        HUNTING_LOOT_ITEM_TYPES.SHARD,
+        "Full HP must replace a heal-pack roll with a collectible shard drop"
+    );
+    assert.equal(
+        rollHuntingLootItemType({
+            collector: emptyHp,
+            rng: (() => {
+                const rolls = [0, 0.49];
+                return () => rolls.shift();
+            })()
+        }),
+        HUNTING_LOOT_ITEM_TYPES.SMALL_HEAL_PACK,
+        "A wounded player should retain heal-pack entries in the drop table"
+    );
+    console.log("[hunting-loot-balance-rules] ok");
+}
+
+function testHuntingLootItemsAndDropController(app) {
+    const playerSpec = {
+        ...app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER),
+        teamId: HUNTING_TEAMS.PLAYER
+    };
+    const mobSpec = createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.PURSUER, floor: 1, index: 0 });
+    const session = new HuntingBattleLootSession({ playerId: playerSpec.id, floor: 1 });
+    const rolls = [0, 0, 0, 0];
+    const controller = new HuntingLootDropController({ session, rng: () => rolls.shift() ?? 0 });
+    const simulation = new BattleSimulation(
+        [playerSpec, mobSpec],
+        {
+            onLog() {},
+            onSound() {},
+            onFighterDefeated: (fighter, context) => controller.onFighterDefeated(fighter, context)
+        },
+        null,
+        { assignActions: false }
+    );
+    const [player, mob] = simulation.fighters;
+    player.position = new Vector2(300, 480);
+    mob.position = player.position.clone();
+    player.hp = player.maxHp;
+
+    mob.takeDamage(100000, player, "Loot Hook Test");
+    const droppedShard = simulation.entities.find((entity) => entity instanceof ShardDrop);
+    assert.ok(droppedShard, "Defeating a hunting mob must create a configured floor-loot item");
+    assert.equal(session.getCollectedLoot().shards, 0, "A dropped shard must not enter battle loot before collection");
+    droppedShard.update(1 / 60, simulation);
+    assert.equal(session.getCollectedLoot().shards, 5, "Collecting a shard must add it to the battle loot session");
+    assert.equal(
+        controller.onFighterDefeated({ hunting: null }, { simulation }),
+        null,
+        "Non-mob defeats must not create hunting floor loot"
+    );
+
+    const magnetShard = new ShardDrop({
+        position: new Vector2(player.position.x + player.radius * 4 + 11, player.position.y),
+        velocity: new Vector2(),
+        collectorId: player.id
+    });
+    magnetShard.update(0.1, simulation);
+    assert.ok(magnetShard.velocity.x < 0, "Loot inside four player radii must receive a physical magnet impulse");
+
+    const healResults = [];
+    const healPack = new SmallHealPack({
+        position: player.position,
+        velocity: new Vector2(),
+        collectorId: player.id,
+        amount: 15,
+        onCollected: (reward) => healResults.push(reward)
+    });
+    healPack.update(1 / 60, simulation);
+    assert.equal(healPack.isExpired, false, "Full-HP players must leave a small heal pack on the floor");
+    player.hp = 50;
+    healPack.update(1 / 60, simulation);
+    assert.equal(player.hp, 65, "A collected small heal pack must restore its stored amount");
+    assert.equal(
+        healResults[0]?.type,
+        HUNTING_LOOT_ITEM_TYPES.SMALL_HEAL_PACK,
+        "Heal-pack feedback must identify the item"
+    );
+
+    const chest = createHuntingChest({ id: "loot-test-chest", rarity: "common" });
+    const chestDrop = new ChestDrop({
+        position: player.position,
+        velocity: new Vector2(),
+        collectorId: player.id,
+        chest,
+        onCollected: (reward) => session.recordCollection(reward)
+    });
+    chestDrop.update(1 / 60, simulation);
+    assert.equal(
+        session.getCollectedLoot().chests[0]?.id,
+        chest.id,
+        "Collected chest drops must enter the battle loot session"
+    );
+    assert.ok(
+        createHuntingLootItem(HUNTING_LOOT_ITEM_TYPES.CHEST, {
+            position: player.position,
+            velocity: new Vector2(),
+            collectorId: player.id,
+            chest
+        }) instanceof ChestDrop,
+        "The loot registry must construct the subclass registered for each item type"
+    );
+    console.log("[hunting-loot-items-and-drop-controller] ok");
+}
+
+function testHuntingLootSessionIsDiscardedOnDefeat(app) {
+    const profile = createDefaultPlayerProfile();
+    const playerBall = { id: FIGHTER_IDS.DASH, name: "Dash Ball", hp: 0, maxHp: 100 };
+    const enemyBall = { id: "enemy", name: "Enemy", hp: 80, maxHp: 100 };
+    const mockApp = {
+        _cleanupMatch() {},
+        matchFinalized: false,
+        _onSimulationResult: null,
+        simulation: {
+            fighters: [playerBall, enemyBall],
+            winner: enemyBall,
+            isHostile(a, b) {
+                return a !== b;
+            }
+        },
+        _currentMatchReport: null,
+        setHuntingOverlayState() {},
+        showOverlay() {},
+        refreshPlayerSetup() {},
+        setStartButton() {},
+        addLog() {},
+        _settleHuntingAchievements() {},
+        _refreshCollectionHub() {},
+        beginResultConfirmation() {},
+        setHuntingActive() {},
+        roster: app.roster,
+        playerProfile: profile
+    };
+    const manager = new HuntingManager(mockApp);
+    manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE });
+    manager._battleLootSession = new HuntingBattleLootSession({ playerId: FIGHTER_IDS.DASH, floor: 1 });
+    manager._battleLootSession.recordCollection({ type: HUNTING_LOOT_ITEM_TYPES.SHARD, amount: 20 });
+    manager._battleLootSession.recordCollection({
+        type: HUNTING_LOOT_ITEM_TYPES.CHEST,
+        chest: createHuntingChest({ id: "defeat-discard-chest", rarity: "common" })
+    });
+
+    manager._handleFinish(mockApp);
+
+    assert.equal(profile.hunting.shards, 0, "Collected battle loot must not be secured after a defeat");
+    assert.equal(profile.hunting.chests.length, 0, "Collected battle chests must not be secured after a defeat");
+    assert.equal(manager._battleLootSession, null, "Defeat must discard the transient battle loot session");
+    console.log("[hunting-loot-defeat-discard] ok");
+}
+
 function testHuntingCombatRewardChestUi() {
     const overlayCalls = [];
     const mockApp = {
@@ -2298,7 +2487,7 @@ function testHuntingCombatRewardChestUi() {
     console.log("[hunting-combat-reward-chest-ui] ok");
 }
 
-function createCombatRewardChestTestEnv({ isFinalBoss = false } = {}) {
+function createCombatRewardChestTestEnv({ isFinalBoss = false, collectedChestCount = 1 } = {}) {
     const overlayStates = [];
     const showOverlayCalls = [];
     const playerBall = { id: FIGHTER_IDS.DASH, name: "Dash Ball", hp: 80, maxHp: 100 };
@@ -2337,7 +2526,68 @@ function createCombatRewardChestTestEnv({ isFinalBoss = false } = {}) {
     manager._run = isFinalBoss
         ? { ...run, floor: 100, lastEncounter: { type: HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS } }
         : run;
+    manager._battleLootSession = new HuntingBattleLootSession({
+        playerId: FIGHTER_IDS.DASH,
+        floor: manager._run.floor
+    });
+    Array.from({ length: collectedChestCount }).forEach((_, index) => {
+        manager._battleLootSession.recordCollection({
+            type: HUNTING_LOOT_ITEM_TYPES.CHEST,
+            chest: createHuntingChest({
+                id: `combat-reward-chest-${isFinalBoss ? "boss" : "normal"}-${index}`,
+                rarity: "common"
+            })
+        });
+    });
     return { overlayStates, showOverlayCalls, playerBall, mockApp, manager };
+}
+
+function testHuntingCombatWithoutCollectedChestSkipsChestUi() {
+    const { overlayStates, mockApp, manager } = createCombatRewardChestTestEnv({ collectedChestCount: 0 });
+    const originalRandom = Math.random;
+    try {
+        Math.random = () => 0;
+        manager._handleFinish(mockApp);
+    } finally {
+        Math.random = originalRandom;
+    }
+
+    assert.equal(
+        manager._run.phase,
+        HUNTING_RUN_PHASES.AWAITING_CHOICE,
+        "A monster defeat roll must not synthesize an uncollected chest after combat"
+    );
+    assert.equal(
+        overlayStates.some((state) => state.huntingChestEventActive === true),
+        false,
+        "Only chests collected on the battlefield may open the combat chest UI"
+    );
+    console.log("[hunting-combat-uncollected-chest-skipped] ok");
+}
+
+function testHuntingCombatRewardChestQueue() {
+    const { overlayStates, mockApp, manager } = createCombatRewardChestTestEnv({ collectedChestCount: 2 });
+    manager._handleFinish(mockApp);
+
+    manager.chestContinue();
+    assert.equal(
+        manager._run.phase,
+        HUNTING_RUN_PHASES.AWAITING_COMBAT_REWARD_CHEST,
+        "A second collected chest must remain in the combat chest flow"
+    );
+    assert.equal(
+        overlayStates.filter((state) => state.huntingChestEventActive === true).length,
+        2,
+        "Each collected chest must present its own confirmation UI"
+    );
+
+    manager.chestContinue();
+    assert.equal(
+        manager._run.phase,
+        HUNTING_RUN_PHASES.AWAITING_CHOICE,
+        "Combat victory UI must appear after the final collected chest"
+    );
+    console.log("[hunting-combat-reward-chest-queue] ok");
 }
 
 function testHuntingCombatRewardChestNormalContinue() {
@@ -14045,7 +14295,12 @@ await testPlayerPanelAllocationContractBoundary(app);
 await testActionGateway();
 await testHuntingEndToEnd();
 await testHuntingChestContinueHandlersContract();
+testHuntingLootBalanceRules();
+testHuntingLootItemsAndDropController(app);
+testHuntingLootSessionIsDiscardedOnDefeat(app);
 testHuntingCombatRewardChestUi();
+testHuntingCombatWithoutCollectedChestSkipsChestUi();
+testHuntingCombatRewardChestQueue();
 testHuntingCombatRewardChestNormalContinue();
 testHuntingCombatRewardChestFinalBossContinue();
 testHuntingChestRoomContinueStillWorks();

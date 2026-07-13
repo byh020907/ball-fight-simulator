@@ -137,7 +137,19 @@ advance() 루프:
 실제 이동할 층 수에 맞춰진다(95층 시작 시 5).
 ```
 
-### 4.4 경험치 지급
+### 4.4 전장 루팅
+
+일반 사냥터 몬스터가 처치되면 전장에 `소형 힐팩`, `파편`, `상자` 중 하나를 떨어뜨릴 수 있다. 아이템은 처치 즉시 보상으로 합산하지 않으며, 플레이어가 전장에서 실제로 닿아 회수한 뒤에만 이번 전투의 임시 보상에 기록한다. 패배하면 이 임시 보상은 폐기되고, 승리하면 기존 층 보상과 함께 사냥터 런의 pending loot으로 병합한다.
+
+- 기본 드롭 판정은 몬스터마다 15%다. 플레이어의 잃은 체력 비율에 따라 선형으로 증가해 체력이 0에 가까울수록 최대 30%(기본의 2배)가 된다.
+- 드롭 판정을 통과하면 소형 힐팩 50, 파편 40, 상자 10의 가중치로 종류를 선택한다. 체력이 가득 찬 플레이어에게는 새 힐팩을 떨어뜨리지 않고 그 가중치를 파편에 합산한다.
+- 소형 힐팩은 회수 순간의 잃은 체력 25%를 회복한다. 파편 드롭은 1층부터 25층마다 5씩 증가하며 5~20 범위다. 모든 루팅 수치는 5 단위로 반올림한다.
+- 상자는 기존 전투 보상 상자 UI를 재사용한다. 전장에서 실제로 회수한 상자만 승리/최종 보스 결과보다 먼저 `확인` 흐름으로 표시하며, 여러 개면 회수 순서대로 모두 확인한다.
+- 루팅 아이템은 플레이어 반지름의 4배 범위 안에서 자석으로 끌려온다. 이 물리 보정은 Hero Orb의 자석 효과와 같은 공통 유틸리티를 쓰며, Hero Orb만 보유자의 초기 발사 유예와 능력 기반 범위 배율을 추가로 적용한다.
+
+`HuntingLootItem`이 수명, 이동, 자석, 회수 피드백과 임시 보상 기록을 소유한다. `SmallHealPack`, `ShardDrop`, `ChestDrop`은 각 보상 적용과 렌더링만 구현하고, `HuntingLootDropController`가 몬스터 처치 hook에서 아이템을 생성한다. 새 루팅 종류는 이 공통 기반 클래스를 상속해 등록한다.
+
+### 4.5 경험치 지급
 
 사냥터 전투에서도 매치 XP 공식이 동일하게 적용됩니다. 단, 사냥터 전투는 토너먼트 단계가 없으므로 `stageMultiplier = 1.0` 고정입니다. Lv.3·Lv.6·Lv.9의 대표 행동 강화도 사냥터 전투에 동일하게 적용되어, 토너먼트보다 느리지만 꾸준히 캐릭터가 성장합니다.
 
@@ -350,7 +362,7 @@ HUNTING_PORTAL_DECLINE.HP_MULT:
 
 상자는 사냥터 중 획득하지만, 개봉은 보관함에서 열쇠 조각을 써서 진행합니다. 상자방에서는 등급별 색상과 공통 상자 도형을 보여 준 뒤 `계속 전진`을 눌러 다음 층 이동을 재개합니다. 상자 도형은 보관함 카드에서도 같은 컴포넌트를 사용해 등급 표현을 일치시킵니다.
 
-전투 승리 시 확률로 상자가 드롭되면, 승리 결과 화면 대신 먼저 상자 UI(`확인` 버튼)를 표시합니다. 확인을 누른 후에야 일반 전투 승리 선택(10층 전진) 또는 최종 보스 스테이지 클리어 결과로 진행됩니다. 이 전투 보상 상자는 상자방과 동일한 `<chest-icon>` 컴포넌트를 재사용하지만, `huntingChestConfirmLabel` 상태로 버튼 문구를 구분(`확인` vs `계속 전진`)하고, `HUNTING_CHEST_CONTINUE_HANDLERS` 매핑으로 phase별 후속 handler(`_continueChestRoom` / `_continueCombatRewardChest`)를 분리합니다.
+전장에서 상자를 실제로 회수한 전투는 승리 결과 화면 대신 먼저 상자 UI(`확인` 버튼)를 표시합니다. 확인을 누른 후에야 일반 전투 승리 선택(10층 전진) 또는 최종 보스 스테이지 클리어 결과로 진행됩니다. 회수한 상자가 여러 개면 모두 순서대로 확인한 뒤 결과 흐름으로 넘어갑니다. 이 전투 보상 상자는 상자방과 동일한 `<chest-icon>` 컴포넌트를 재사용하지만, `huntingChestConfirmLabel` 상태로 버튼 문구를 구분(`확인` vs `계속 전진`)하고, `HUNTING_CHEST_CONTINUE_HANDLERS` 매핑으로 phase별 후속 handler(`_continueChestRoom` / `_continueCombatRewardChest`)를 분리합니다.
 
 | 등급 | 코드 | 개봉 비용 | 주요 보상 |
 | --- | --- | ---: | --- |
@@ -517,6 +529,7 @@ src/
     huntingState.js
     huntingEncounters.js
     huntingRewards.js
+    huntingLoot.js
     chestRewards.js
     index.js
 ```
@@ -527,6 +540,7 @@ src/
 | `huntingState.js` | 사냥터 런 상태, 귀환/전진/패배 처리 |
 | `huntingEncounters.js` | 전투/이벤트/상자방 조우 생성 |
 | `huntingRewards.js` | 처치 보상, 층 보너스, pending/secured 계산 |
+| `huntingLoot.js` | 전장 루팅 확률, 5단위 보상 계산, 전투 임시 루팅 세션, 드롭 controller |
 | `chestRewards.js` | 상자 개봉, 설계도 발견/해금 |
 | `consumables.js` | 소모품 정의, 보유 수량 정규화, 상점 구매, 전투 전 사용 한도와 효과 |
 | `playerProfile.js` | 보관함/재화/설계도 저장과 마이그레이션 |
@@ -630,6 +644,7 @@ src/
 
 - `src/hunting/huntingConfig.js`: 최대 5층, 이벤트 확률, 상자 등급/개봉 비용, 파손 가중치, 해조각 범위, 패배 보존율 정의
 - `src/hunting/huntingRewards.js`: 층별 보상 배율, 해조각 보상, 상자 생성, pending/secured loot 병합, 패배 시 상자 연쇄 파손과 50%/70% 보존
+- `src/hunting/huntingLoot.js`: 몬스터 처치 시 전장에 남는 루팅 아이템의 확률, 체력 연동 보상값, 회수 세션과 드롭 controller
 - `src/hunting/huntingEncounters.js`: 층별 적 스케일링, 이벤트 발생/선택
 - `src/hunting/huntingState.js`: 우승 캐릭터 입장 조건, 사냥터 런 생성, 층 클리어, 전진, 이벤트 회복, 귀환, 패배 처리
 - `src/hunting/chestRewards.js`: 보관함 상자 개봉 가능 여부, 개봉 비용, 임시 보상 미리보기, 상자 제거/해조각 차감

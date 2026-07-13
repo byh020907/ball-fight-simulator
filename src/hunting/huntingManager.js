@@ -11,7 +11,7 @@ import {
     setHuntingRunPhase,
     HUNTING_RUN_PHASES
 } from "./huntingState.js";
-import { rollShardReward, createHuntingChest } from "./huntingRewards.js";
+import { createEmptyHuntingLoot, mergeHuntingLoot, rollShardReward } from "./huntingRewards.js";
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 import {
     HUNTING_ADVANCE_STEPS,
@@ -50,6 +50,7 @@ import {
     recordHuntingBattleStart,
     recordHuntingBattleVictory
 } from "./huntingAchievementProgress.js";
+import { HuntingBattleLootSession, HuntingLootDropController } from "./huntingLoot.js";
 
 const CHEST_RARITY_LABELS = Object.freeze({
     common: "일반",
@@ -96,6 +97,8 @@ export class HuntingManager {
         this.app = app;
         this._run = null;
         this._moving = false;
+        this._battleLootSession = null;
+        this._combatRewardChestQueue = [];
     }
 
     get isActive() {
@@ -285,6 +288,10 @@ export class HuntingManager {
         });
         run = this._run;
         const matchSpecs = [appliedSpec, ...enemySpecs];
+        const battleLootSession = new HuntingBattleLootSession({ playerId: run.characterId, floor: run.floor });
+        const lootDropController = new HuntingLootDropController({ session: battleLootSession });
+        this._battleLootSession = battleLootSession;
+        this._combatRewardChestQueue = [];
         app._currentMatchReport = createMatchReport();
         app._currentMatchReport.playerFighterId = run.characterId;
 
@@ -308,7 +315,8 @@ export class HuntingManager {
             cameraZoom: 1,
             arenaTheme: stageTheme,
             terrain,
-            experienceProgressionByFighter: new Map([[run.characterId, playerProgression]])
+            experienceProgressionByFighter: new Map([[run.characterId, playerProgression]]),
+            onFighterDefeated: (fighter, context) => lootDropController.onFighterDefeated(fighter, context)
         });
 
         if (Number.isFinite(run.carriedHp)) {
@@ -356,6 +364,8 @@ export class HuntingManager {
         }
 
         if (playerWon) {
+            const collectedBattleLoot = this._battleLootSession?.getCollectedLoot() ?? createEmptyHuntingLoot();
+            this._battleLootSession = null;
             const isFinalBoss = run.lastEncounter?.type === HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS;
             const rewardMultiplier = isFinalBoss
                 ? REWARD_BALANCE.hunting.shards.combatMultipliers.finalBoss
@@ -371,16 +381,16 @@ export class HuntingManager {
                     : run.floor % 3 === 0
                       ? HUNTING_ENEMY_TYPES.ELITE
                       : HUNTING_ENEMY_TYPES.NORMAL;
-            const floorLoot = {
-                shards: Math.round(
-                    rollShardReward({ floor: run.floor, enemyType: rewardEnemyType }) * rewardMultiplier
-                ),
-                chests:
-                    Math.random() < REWARD_BALANCE.hunting.shards.combatChestDropChance
-                        ? [createHuntingChest({ rarity: "common" })]
-                        : [],
-                xp: 0
-            };
+            const floorLoot = mergeHuntingLoot(
+                {
+                    shards: Math.round(
+                        rollShardReward({ floor: run.floor, enemyType: rewardEnemyType }) * rewardMultiplier
+                    ),
+                    chests: [],
+                    xp: 0
+                },
+                collectedBattleLoot
+            );
 
             // Hero Orb carryover — Hero Ball만 전투 중 획득한 bonuses를 run에 반영
             const playerSpec = app.roster.find((f) => f.id === run.characterId);
@@ -397,7 +407,8 @@ export class HuntingManager {
 
             // 전투 승리로 상자가 드롭되면 상자 UI를 먼저 표시
             if (floorLoot.chests.length > 0) {
-                this._presentCombatRewardChest(app, floorLoot.chests[0]);
+                this._combatRewardChestQueue = [...floorLoot.chests];
+                this._presentCombatRewardChest(app, this._combatRewardChestQueue[0]);
                 savePlayerProfile(app.playerProfile);
                 return;
             }
@@ -410,6 +421,8 @@ export class HuntingManager {
             this._presentNormalCombatWin(app, playerBall?.name ?? run.characterId);
             savePlayerProfile(app.playerProfile);
         } else {
+            this._battleLootSession = null;
+            this._combatRewardChestQueue = [];
             this._run = defeatHuntingRun(run);
             const name = playerBall?.name ?? run.characterId;
             const securedShards = this._run.securedLoot?.shards ?? 0;
@@ -895,6 +908,11 @@ export class HuntingManager {
     _continueCombatRewardChest() {
         const app = this.app;
         const run = this._run;
+        this._combatRewardChestQueue.shift();
+        if (this._combatRewardChestQueue.length > 0) {
+            this._presentCombatRewardChest(app, this._combatRewardChestQueue[0]);
+            return;
+        }
         const playerSpec = app.roster.find((f) => f.id === run.characterId);
         const name = playerSpec?.name ?? run.characterId;
         const isFinalBoss = run.lastEncounter?.type === HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS;

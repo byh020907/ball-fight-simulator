@@ -1,6 +1,7 @@
 import { applyCollisionImpulse, CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
 import { DashEffect } from "../combatEffects.js";
 import { computeOwnerCombatSpeed } from "../abilities/heroAbility.js";
+import { applyMagneticAttraction } from "../physics/magneticAttraction.js";
 
 // ── Hero Orb stat cap ────────────────────────────────────────────────────────
 
@@ -331,14 +332,11 @@ export class HeroOrb extends CombatEntity {
         const attraction = this.owner.ability?.getOrbAttraction?.(this);
         if (!attraction || this.owner.flags.defeated) return;
 
-        const toOwner = Vector2.subtract(this.owner.position, this.position);
-        const distance = toOwner.length();
-        const pickupRadius = this.owner.radius + this.radius;
-        if (distance <= pickupRadius || distance > attraction.radius) return;
-
-        const desiredVelocity = toOwner.normalize().scale(computeOwnerCombatSpeed(this.owner) * 1.35);
-        const correction = 1 - Math.exp(-(attraction.responseRate ?? 0) * delta);
-        this.applyImpulse(Vector2.subtract(desiredVelocity, this.velocity).scale(correction));
+        applyMagneticAttraction(this, this.owner, delta, {
+            radius: attraction.radius,
+            responseRate: attraction.responseRate,
+            attractionSpeed: computeOwnerCombatSpeed(this.owner) * 1.35
+        });
     }
 
     get _isSpecial() {

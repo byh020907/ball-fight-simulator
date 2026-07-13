@@ -944,6 +944,9 @@ export class BattleApp {
                 },
                 onBattleBallReady: (ball) => {
                     applyExperienceProgressionToBall(ball, experienceProgressionByFighter.get(ball.id));
+                },
+                onFighterDefeated: (fighter, context) => {
+                    options.onFighterDefeated?.(fighter, context);
                 }
             },
             null,

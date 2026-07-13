@@ -12,4 +12,5 @@ export * from "./equipmentConfig.js";
 export * from "./equipmentEffects.js";
 export * from "./huntingMerchant.js";
 export * from "./huntingFormat.js";
+export * from "./huntingLoot.js";
 export * from "./dailyShop.js";
