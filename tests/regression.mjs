@@ -14162,6 +14162,28 @@ function testHuntingBarrierSwapsOnlyBlockingFrontlineAlly() {
     );
     assert.equal(barrier.ability.state.barrier, 1.5, "Barrier defense window should stay active after swapping");
     assert.equal(barrier.ability.state.barrierSwapTarget, frontline, "Swap effect should track the blocking ally");
+    assert.ok(
+        barrier.ability.state.barrierSwapTargetIds.has(frontline.id),
+        "The blocking ally should be unavailable for another swap during this barrier turn"
+    );
+
+    barrier.position = new Vector2(180, 500);
+    frontline.position = new Vector2(230, 500);
+    simulation.handleCollision();
+    assert.ok(
+        barrier.position.x < frontline.position.x,
+        "The same ally should not trigger another swap during the active barrier turn"
+    );
+
+    barrier.position = new Vector2(180, 500);
+    frontline.position = new Vector2(230, 500);
+    barrier.ability.state.timer = barrier.ability.cooldown;
+    barrier.ability.update(0, player);
+    simulation.handleCollision();
+    assert.ok(
+        barrier.position.x > frontline.position.x,
+        "The same ally should become eligible again when the next barrier turn starts"
+    );
 
     const rearAllySimulation = new BattleSimulation(
         [playerSpec, barrierSpec, frontlineSpec],
@@ -14184,6 +14206,25 @@ function testHuntingBarrierSwapsOnlyBlockingFrontlineAlly() {
         null,
         "Only the closer ally should become a swap target"
     );
+
+    const barrierAllySpec = createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.BARRIER, floor: 60, index: 2 });
+    const barrierAllySimulation = new BattleSimulation(
+        [playerSpec, barrierSpec, barrierAllySpec],
+        { onLog() {}, onSound() {} },
+        null,
+        { assignActions: false }
+    );
+    const barrierAllyPlayer = barrierAllySimulation.fighters.find((fighter) => fighter.id === playerSpec.id);
+    const firstBarrier = barrierAllySimulation.fighters.find((fighter) => fighter.id === barrierSpec.id);
+    const secondBarrier = barrierAllySimulation.fighters.find((fighter) => fighter.id === barrierAllySpec.id);
+    firstBarrier.position = new Vector2(180, 500);
+    secondBarrier.position = new Vector2(230, 500);
+    barrierAllyPlayer.position = new Vector2(820, 500);
+    firstBarrier.ability.state.timer = firstBarrier.ability.cooldown;
+    firstBarrier.ability.update(0, barrierAllyPlayer);
+    barrierAllySimulation.handleCollision();
+    assert.ok(firstBarrier.position.x < secondBarrier.position.x, "Barrier balls should not swap with each other");
+    assert.equal(firstBarrier.ability.state.barrierSwapTarget, null, "A barrier ball should not become a swap target");
     console.log("[hunting-barrier-blocking-swap] ok");
 }
 

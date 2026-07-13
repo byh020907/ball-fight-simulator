@@ -49,6 +49,7 @@ export class HuntingMobAbility extends Ability {
             ring: 0,
             barrier: 0,
             barrierSwapTarget: null,
+            barrierSwapTargetIds: new Set(),
             barrierSwapTime: 0,
             laser: null,
             boomerang: null,
@@ -174,6 +175,7 @@ export class HuntingMobAbility extends Ability {
 
     _activateBarrier() {
         this.state.barrier = BARRIER_DURATION;
+        this.state.barrierSwapTargetIds.clear();
     }
 
     onAllyCollision(ally, context) {
@@ -182,7 +184,9 @@ export class HuntingMobAbility extends Ability {
             this.state.barrier <= 0 ||
             context?.allyPositionSwapped ||
             ally.flags.defeated ||
-            this.simulation.isHostile(this.owner, ally)
+            this.simulation.isHostile(this.owner, ally) ||
+            ally.hunting?.behavior === "barrier" ||
+            this.state.barrierSwapTargetIds.has(ally.id)
         ) {
             return;
         }
@@ -196,6 +200,7 @@ export class HuntingMobAbility extends Ability {
 
         this.owner.swapPositionWith(ally);
         this.state.barrierSwapTarget = ally;
+        this.state.barrierSwapTargetIds.add(ally.id);
         this.state.barrierSwapTime = BARRIER_SWAP_EFFECT_DURATION;
         this.simulation.spawnPulse(this.owner.position.clone(), "#67c8ff");
         this.simulation.spawnPulse(ally.position.clone(), "#67c8ff");
