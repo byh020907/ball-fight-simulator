@@ -8,7 +8,7 @@
         <meta name="theme-color" content="#222222" />
         <title>Ball Fight Simulator</title>
         <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-        <link rel="manifest" href="site.webmanifest?v=0.24.83" />
+        <link rel="manifest" href="site.webmanifest?v=0.24.84" />
         <link rel="stylesheet" href="src/styles.css" />
         <style>
             /* Hide Alpine components until compiled */
@@ -125,7 +125,7 @@
             import Alpine from "https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/module.esm.js";
 
             // GitHub Pages 캐시 방지용 버전 파라미터
-            const V = "0.24.83";
+            const V = "0.24.84";
 
             window.BFS_ASSET_VERSION = V;
             window.Alpine = Alpine;
@@ -201,7 +201,13 @@
                 tournamentActive: false,
                 statusBadge: "Setup",
                 statusText: "내 캐릭터 스탯을 배분하세요",
-                statusSubtext: "랜덤 대진과 전투 결과가 여기에 갱신됩니다."
+                statusSubtext: "랜덤 대진과 전투 결과가 여기에 갱신됩니다.",
+                reset() {
+                    this.tournamentActive = false;
+                    this.statusBadge = "Setup";
+                    this.statusText = "내 캐릭터 스탯을 배분하세요";
+                    this.statusSubtext = "랜덤 대진과 전투 결과가 여기에 갱신됩니다.";
+                }
             }));
 
             // ── Pre-load shared modules for component scripts ──

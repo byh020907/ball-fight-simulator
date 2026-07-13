@@ -49,9 +49,7 @@
         rounds: [],
         render(tournament) {
             if (!tournament) {
-                this.visible = false;
-                this.phase = "Ready";
-                this.rounds = [];
+                this.reset();
                 return;
             }
             this.visible = true;
@@ -76,6 +74,11 @@
                         : null
                 }))
             );
+        },
+        reset() {
+            this.visible = false;
+            this.phase = "Ready";
+            this.rounds = [];
         }
     }));
 </script>

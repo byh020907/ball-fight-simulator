@@ -199,6 +199,32 @@
         },
         openHelp() {
             window.requireGameActionBridge("openHelp").openHelp();
+        },
+        reset() {
+            this.fighter = null;
+            this.experience = {
+                levelLabel: "Lv.1",
+                totalXp: 0,
+                progressPct: 0,
+                progressText: "0/100 XP",
+                nextText: "다음 레벨까지 100XP",
+                nextRewardText: ""
+            };
+            this.equipmentSummary = {
+                characterLevel: 1,
+                inventoryUsed: 0,
+                inventorySlots: 5,
+                equippedCount: 0,
+                activeCount: 0,
+                slots: [],
+                statLine: "적용 중인 장비 스탯 없음"
+            };
+            this.allocation = {};
+            this.totalPoints = 0;
+            this.remainingPoints = 0;
+            this.locked = false;
+            this.statDefs = [];
+            this.allocationSummary = "";
         }
     }));
 </script>

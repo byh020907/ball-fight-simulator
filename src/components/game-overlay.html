@@ -173,14 +173,16 @@
             }
         },
         hide() {
+            this.reset();
+        },
+        reset() {
             this.visible = false;
             this.transient = false;
             this.label = "";
             this.text = "";
             this.subtext = "";
             this.resetHuntingState();
-            const rp = Alpine.store("uiManager").getComponent("xpRewardPanel");
-            if (rp) rp.hide();
+            Alpine.store("uiManager").requireComponent("xpRewardPanel").reset();
         },
         resetHuntingState() {
             this.huntingChoiceVisible = false;

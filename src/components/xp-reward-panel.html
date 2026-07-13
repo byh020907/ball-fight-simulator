@@ -57,7 +57,7 @@
             nextRewardText: "",
             animate(val) {
                 if (!val) {
-                    this.visible = false;
+                    this.reset();
                     return;
                 }
                 this.characterName = val.characterName ?? "";
@@ -72,7 +72,20 @@
                 startAnimation.call(this, val);
             },
             hide() {
+                this.reset();
+            },
+            reset() {
+                _token = null;
                 this.visible = false;
+                this.characterName = "";
+                this.xpGained = 0;
+                this.levelLabel = "Lv.1";
+                this.levelUp = false;
+                this.animatedProgressPct = 0;
+                this.progressText = "";
+                this.nextText = "";
+                this.earnedRewardText = "";
+                this.nextRewardText = "";
             }
         };
     });

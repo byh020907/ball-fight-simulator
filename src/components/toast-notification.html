@@ -153,6 +153,14 @@
             show(message, duration = DEFAULT_DURATION) {
                 if (typeof message !== "string" || !message.trim()) return;
                 enqueue(this, message, duration);
+            },
+            reset() {
+                queue = [];
+                activeStartedAt = 0;
+                clearActiveTimers();
+                departureTimer = clearTimer(departureTimer);
+                this.active = null;
+                this.departing = null;
             }
         };
     });

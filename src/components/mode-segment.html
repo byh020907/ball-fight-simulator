@@ -33,6 +33,12 @@
             if (this.locked) return;
             this.mode = mode;
             window.requireGameActionBridge("setGameMode").setGameMode(mode);
+        },
+        reset() {
+            this.visible = false;
+            this.mode = "tournament";
+            this.canHunt = false;
+            this.locked = false;
         }
     }));
 </script>

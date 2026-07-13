@@ -32,6 +32,14 @@
             if (hidden !== undefined) this.hidden = Boolean(hidden);
             this.disabledOverride = disabled !== undefined ? disabled : null;
             this.textOverride = text !== undefined ? text : null;
+        },
+        reset() {
+            this.hidden = true;
+            this.disabledOverride = null;
+            this.textOverride = null;
+            this.remainingPoints = 0;
+            this.locked = false;
+            this.gameMode = "tournament";
         }
     }));
 </script>

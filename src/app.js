@@ -177,7 +177,18 @@ export class BattleApp {
         this._overlay.setHuntingState(data);
     }
     resetHuntingUiState() {
-        this._overlay.hide();
+        this._overlay.reset();
+    }
+    resetGameplayUiState() {
+        this._root.reset();
+        this._panel.reset();
+        this._modeSegment.reset();
+        this._startBtn.reset();
+        this._log.reset();
+        this._strip.reset();
+        this._bracket.reset();
+        this.resetHuntingUiState();
+        this._toast.reset();
     }
     beginGameSession() {
         this.lifecycle.beginGameplay();
@@ -196,11 +207,14 @@ export class BattleApp {
         this._currentMatchReport = null;
         this._currentTournamentReport = null;
         this._matchReports = [];
-        this._root.tournamentActive = false;
-        this._bracket.render(null);
-        this.resetHuntingUiState();
-        this._root.statusText = "내 캐릭터를 선택하고 스탯을 배분하세요";
-        this._root.statusBadge = "Setup";
+        this.playerResult = null;
+        this._lastMasteryResult = null;
+        this._lastXpResult = null;
+        this._lastMatchXpResult = null;
+        this._action = { selectedId: null, current: null, pickEveryMatch: false, ctx: null };
+        this._speed = { level: 1, indicatorTimer: 0, indicatorText: "" };
+        this.ui.lastOverlayState = null;
+        this.resetGameplayUiState();
         this.refreshPlayerSetup();
         this.startPlayerPreviewLoop();
     }

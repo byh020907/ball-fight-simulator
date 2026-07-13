@@ -491,6 +491,18 @@ async function loadModuleApp() {
             this.visible = false;
             this.transient = false;
         },
+        reset() {
+            this.visible = false;
+            this.transient = false;
+            this.label = "";
+            this.text = "";
+            this.subtext = "";
+            this.huntingChoiceVisible = false;
+            this.huntingMoving = false;
+            this.huntingMerchantActive = false;
+            this.huntingMerchantOffers = null;
+            this.huntingLootHudVisible = false;
+        },
         showTransient(label, text) {
             this.label = label;
             this.text = text;
@@ -532,6 +544,18 @@ async function loadModuleApp() {
         },
         hide() {
             this.visible = false;
+        },
+        reset() {
+            this.visible = false;
+            this.characterName = "";
+            this.xpGained = 0;
+            this.levelLabel = "Lv.1";
+            this.levelUp = false;
+            this.animatedProgressPct = 0;
+            this.progressText = "";
+            this.nextText = "";
+            this.earnedRewardText = "";
+            this.nextRewardText = "";
         }
     };
     uiManager.register("xpRewardPanel", xpRewardMock);
@@ -542,10 +566,20 @@ async function loadModuleApp() {
         textOverride: null,
         remainingPoints: 0,
         locked: false,
-        setState() {}
+        setState() {},
+        reset() {
+            this.hidden = true;
+            this.disabledOverride = null;
+            this.textOverride = null;
+            this.remainingPoints = 0;
+            this.locked = false;
+        }
     });
     uiManager.register("fighterStrip", {
-        fighters: []
+        fighters: [],
+        reset() {
+            this.fighters = [];
+        }
     });
     const playerPanelMock = {
         fighter: null,
@@ -560,7 +594,18 @@ async function loadModuleApp() {
         challengeLevel: 0,
         highestUnlockedLevel: 0,
         progressionBonusSummary: "",
-        allocationSummary: ""
+        allocationSummary: "",
+        reset() {
+            this.fighter = null;
+            this.experience = {};
+            this.equipmentSummary = { ...EMPTY_EQUIPMENT_SUMMARY };
+            this.allocation = {};
+            this.totalPoints = 0;
+            this.remainingPoints = 0;
+            this.locked = false;
+            this.statDefs = [];
+            this.allocationSummary = "";
+        }
     };
     uiManager.register("playerPanel", playerPanelMock);
     globalThis.Alpine.store("playerPanel", playerPanelMock);
@@ -568,22 +613,40 @@ async function loadModuleApp() {
         visible: false,
         phase: "Ready",
         rounds: [],
-        render() {}
+        render() {},
+        reset() {
+            this.visible = false;
+            this.phase = "Ready";
+            this.rounds = [];
+        }
     });
     uiManager.register("appRoot", {
         tournamentActive: false,
         statusBadge: "Setup",
         statusText: "",
-        statusSubtext: ""
+        statusSubtext: "",
+        reset() {
+            this.tournamentActive = false;
+            this.statusBadge = "Setup";
+            this.statusText = "내 캐릭터 스탯을 배분하세요";
+            this.statusSubtext = "랜덤 대진과 전투 결과가 여기에 갱신됩니다.";
+        }
     });
     uiManager.register("toastNotification", {
-        show() {}
+        show() {},
+        reset() {}
     });
     uiManager.register("modeSegment", {
         visible: false,
         mode: "tournament",
         canHunt: false,
-        locked: false
+        locked: false,
+        reset() {
+            this.visible = false;
+            this.mode = "tournament";
+            this.canHunt = false;
+            this.locked = false;
+        }
     });
     uiManager.register("collectionHub", {
         visible: false,
@@ -657,6 +720,18 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
             this.visible = false;
             this.transient = false;
         },
+        reset() {
+            this.visible = false;
+            this.transient = false;
+            this.label = "";
+            this.text = "";
+            this.subtext = "";
+            this.huntingChoiceVisible = false;
+            this.huntingMoving = false;
+            this.huntingMerchantActive = false;
+            this.huntingMerchantOffers = null;
+            this.huntingLootHudVisible = false;
+        },
         showTransient(label, text) {
             this.label = label;
             this.text = text;
@@ -674,10 +749,20 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
         textOverride: null,
         remainingPoints: 0,
         locked: false,
-        setState() {}
+        setState() {},
+        reset() {
+            this.hidden = true;
+            this.disabledOverride = null;
+            this.textOverride = null;
+            this.remainingPoints = 0;
+            this.locked = false;
+        }
     });
     uiManager.register("fighterStrip", {
-        fighters: []
+        fighters: [],
+        reset() {
+            this.fighters = [];
+        }
     });
     uiManager.register("playerPanel", {
         fighter: null,
@@ -692,13 +777,29 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
         challengeLevel: 0,
         highestUnlockedLevel: 0,
         progressionBonusSummary: "",
-        allocationSummary: ""
+        allocationSummary: "",
+        reset() {
+            this.fighter = null;
+            this.experience = {};
+            this.equipmentSummary = { ...EMPTY_EQUIPMENT_SUMMARY };
+            this.allocation = {};
+            this.totalPoints = 0;
+            this.remainingPoints = 0;
+            this.locked = false;
+            this.statDefs = [];
+            this.allocationSummary = "";
+        }
     });
     uiManager.register("tournamentBracket", {
         visible: false,
         phase: "Ready",
         rounds: [],
-        render() {}
+        render() {},
+        reset() {
+            this.visible = false;
+            this.phase = "Ready";
+            this.rounds = [];
+        }
     });
     uiManager.register("xpRewardPanel", {
         visible: false,
@@ -726,13 +827,31 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
             this.nextRewardText = val.nextRewardText ?? "";
             this.visible = true;
         },
-        hide() {}
+        hide() {},
+        reset() {
+            this.visible = false;
+            this.characterName = "";
+            this.xpGained = 0;
+            this.levelLabel = "Lv.1";
+            this.levelUp = false;
+            this.animatedProgressPct = 0;
+            this.progressText = "";
+            this.nextText = "";
+            this.earnedRewardText = "";
+            this.nextRewardText = "";
+        }
     });
     uiManager.register("appRoot", {
         tournamentActive: false,
         statusBadge: "Setup",
         statusText: "",
-        statusSubtext: ""
+        statusSubtext: "",
+        reset() {
+            this.tournamentActive = false;
+            this.statusBadge = "Setup";
+            this.statusText = "내 캐릭터 스탯을 배분하세요";
+            this.statusSubtext = "랜덤 대진과 전투 결과가 여기에 갱신됩니다.";
+        }
     });
     uiManager.register("collectionHub", {
         visible: false,
@@ -743,13 +862,20 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
         hide() {}
     });
     uiManager.register("toastNotification", {
-        show() {}
+        show() {},
+        reset() {}
     });
     uiManager.register("modeSegment", {
         visible: false,
         mode: "tournament",
         canHunt: false,
-        locked: false
+        locked: false,
+        reset() {
+            this.visible = false;
+            this.mode = "tournament";
+            this.canHunt = false;
+            this.locked = false;
+        }
     });
     const alpineState = { allocation, remainingPoints: 0 };
     alpineState.allocation = { ...allocation };
@@ -10935,6 +11061,31 @@ function testHuntingOverlayResetContract() {
     console.log("[hunting-overlay-reset] ok");
 }
 
+function testGameplayUiResetContracts() {
+    const components = [
+        ["src/components/game-overlay.html", "game overlay"],
+        ["src/components/xp-reward-panel.html", "XP reward panel"],
+        ["src/components/fighter-strip.html", "fighter strip"],
+        ["src/components/tournament-bracket.html", "tournament bracket"],
+        ["src/components/player-panel.html", "player panel"],
+        ["src/components/mode-segment.html", "mode segment"],
+        ["src/components/start-button.html", "start button"],
+        ["src/components/toast-notification.html", "toast notification"]
+    ];
+
+    components.forEach(([path, name]) => {
+        const source = readFileSync(path, "utf8");
+        assert.ok(source.includes("reset()"), `${name} should expose an explicit reset interface`);
+    });
+
+    const appSource = readFileSync("src/app.js", "utf8");
+    assert.ok(
+        appSource.includes("resetGameplayUiState()"),
+        "BattleApp should own the result-confirmation UI reset entry point"
+    );
+    console.log("[gameplay-ui-reset-contract] ok");
+}
+
 function testResultConfirmationReturnsInitialState() {
     const appSource = readFileSync("src/app.js", "utf8");
     assert.ok(
@@ -10959,14 +11110,60 @@ function testResultConfirmationReturnsInitialState() {
         _currentMatchReport: {},
         _currentTournamentReport: {},
         _matchReports: [{}],
-        _root: { tournamentActive: true, statusText: "결과", statusBadge: "Result" },
+        ui: {
+            lastOverlayState: { label: "결과" }
+        },
+        _root: {
+            tournamentActive: true,
+            statusText: "결과",
+            statusBadge: "Result",
+            reset() {
+                this.tournamentActive = false;
+                this.statusText = "내 캐릭터 스탯을 배분하세요";
+                this.statusBadge = "Setup";
+                calls.push(["root"]);
+            }
+        },
+        _panel: {
+            reset() {
+                calls.push(["panel"]);
+            }
+        },
+        _modeSegment: {
+            reset() {
+                calls.push(["mode"]);
+            }
+        },
+        _startBtn: {
+            reset() {
+                calls.push(["start"]);
+            }
+        },
+        _log: {
+            reset() {
+                calls.push(["log"]);
+            }
+        },
+        _strip: {
+            reset() {
+                calls.push(["strip"]);
+            }
+        },
         _bracket: {
             render(value) {
                 calls.push(["bracket", value]);
+            },
+            reset() {
+                calls.push(["bracket-reset"]);
             }
         },
         resetHuntingUiState() {
             calls.push(["overlay"]);
+        },
+        _toast: {
+            reset() {
+                calls.push(["toast"]);
+            }
         },
         refreshPlayerSetup() {
             calls.push(["setup"]);
@@ -10994,9 +11191,23 @@ function testResultConfirmationReturnsInitialState() {
     );
     assert.equal(resultApp.tournament, null, "Confirming a result should discard the finished tournament");
     assert.equal(resultApp.simulation, null, "Confirming a result should discard the finished simulation");
+    assert.equal(resultApp.ui.lastOverlayState, null, "Initial state should clear transient overlay data");
     assert.equal(resultApp._root.tournamentActive, false, "Initial state should not remain tournament-locked");
     assert.equal(resultApp._root.statusBadge, "Setup", "Initial state should restore the setup status");
-    assert.deepEqual(calls, [["cancel", 17], ["bracket", null], ["overlay"], ["setup"], ["preview"]]);
+    assert.deepEqual(calls, [
+        ["cancel", 17],
+        ["root"],
+        ["panel"],
+        ["mode"],
+        ["start"],
+        ["log"],
+        ["strip"],
+        ["bracket-reset"],
+        ["overlay"],
+        ["toast"],
+        ["setup"],
+        ["preview"]
+    ]);
     console.log("[result-confirmation-initial-state] ok");
 }
 
@@ -11912,6 +12123,7 @@ testHuntingChestIconReuseContract();
 testCollectionCharacterDetailTabsContract();
 testPopupCloseOwnershipContract();
 testHuntingOverlayResetContract();
+testGameplayUiResetContracts();
 testAppLifecycleTransitions();
 testResultConfirmationReturnsInitialState();
 testHuntingRetreatAwaitsResultConfirmation();

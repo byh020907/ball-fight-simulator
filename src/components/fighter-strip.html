@@ -52,7 +52,10 @@
 </footer>
 <script>
     window.createGameUI("fighterStrip", () => ({
-        fighters: []
+        fighters: [],
+        reset() {
+            this.fighters = [];
+        }
     }));
 </script>
 <style scoped>
