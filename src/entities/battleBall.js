@@ -219,6 +219,12 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         this.applyImpulse(velocity);
     }
 
+    swapPositionWith(other) {
+        const ownPosition = this.position.clone();
+        this.position = other.position.clone();
+        other.position = ownPosition;
+    }
+
     /**
      * 대시 발동 — setMovementEffect + forceHeading + applyImpulse를 한 번에 처리합니다.
      * @param {Vector2} direction - 대시 방향

@@ -398,9 +398,13 @@ export class BattleSimulation extends FighterPhysicsSimulation {
     }
 
     afterFighterPhysicsCollision(context) {
-        if (!context.hostile) return;
-
         const { a, b, contactPoint } = context;
+        if (!context.hostile) {
+            a.ability?.onAllyCollision?.(b, context);
+            b.ability?.onAllyCollision?.(a, context);
+            return;
+        }
+
         a.ability?.onFighterCollisionDamageResolved?.(b, context.damageFromAToB, context);
         b.ability?.onFighterCollisionDamageResolved?.(a, context.damageFromBToA, context);
         this._handleDashCollisions(a, b, contactPoint);

@@ -3,6 +3,9 @@ import { ArrowProjectile } from "../entities/arrowProjectile.js";
 import { drawElectricArc } from "../effects/electricArc.js";
 import { Ability } from "./ability.js";
 
+const BARRIER_DURATION = 1.5;
+const BARRIER_SWAP_EFFECT_DURATION = 0.36;
+
 const BEHAVIOR_CONFIG = Object.freeze({
     pursuer: { cooldown: 0, face: "angry" },
     charger: { cooldown: 3.2, face: "dash" },
@@ -45,6 +48,8 @@ export class HuntingMobAbility extends Ability {
             linkTime: 0,
             ring: 0,
             barrier: 0,
+            barrierSwapTarget: null,
+            barrierSwapTime: 0,
             laser: null,
             boomerang: null,
             jump: 0
@@ -57,6 +62,8 @@ export class HuntingMobAbility extends Ability {
         this.state.linkTime += delta;
         this.state.ring = Math.max(0, this.state.ring - delta);
         this.state.barrier = Math.max(0, this.state.barrier - delta);
+        this.state.barrierSwapTime = Math.max(0, this.state.barrierSwapTime - delta);
+        if (this.state.barrierSwapTime <= 0) this.state.barrierSwapTarget = null;
         this.state.jump = Math.max(0, this.state.jump - delta);
         this._steer(delta, target);
         this._tickNaturalHeal(delta);
@@ -87,7 +94,7 @@ export class HuntingMobAbility extends Ability {
         if (this.behavior === "charger") this._charge(target);
         else if (this.behavior === "shooter") this._shoot(target);
         else if (this.behavior === "shockwave") this._shockwave();
-        else if (this.behavior === "barrier") this.state.barrier = 1.5;
+        else if (this.behavior === "barrier") this._activateBarrier();
         else if (this.behavior === "shard") this._shardVolley(target);
         else if (this.behavior === "splitter") this._splitBurst(target);
         else if (this.behavior === "jumper") this._jump(target);
@@ -163,6 +170,37 @@ export class HuntingMobAbility extends Ability {
             target.takeDamage(this.owner.stats.baseDamage * 0.8, this.owner, "Shockwave");
             target.applyKnockback(delta.normalize().scale(280), 0.16);
         }
+    }
+
+    _activateBarrier() {
+        this.state.barrier = BARRIER_DURATION;
+    }
+
+    onAllyCollision(ally, context) {
+        if (
+            this.behavior !== "barrier" ||
+            this.state.barrier <= 0 ||
+            context?.allyPositionSwapped ||
+            ally.flags.defeated ||
+            this.simulation.isHostile(this.owner, ally)
+        ) {
+            return;
+        }
+
+        const target = this.simulation.getOpponent(this.owner);
+        if (!target || target.flags.defeated) return;
+
+        const ownDistance = Vector2.subtract(target.position, this.owner.position).length();
+        const allyDistance = Vector2.subtract(target.position, ally.position).length();
+        if (allyDistance >= ownDistance) return;
+
+        this.owner.swapPositionWith(ally);
+        this.state.barrierSwapTarget = ally;
+        this.state.barrierSwapTime = BARRIER_SWAP_EFFECT_DURATION;
+        this.simulation.spawnPulse(this.owner.position.clone(), "#67c8ff");
+        this.simulation.spawnPulse(ally.position.clone(), "#67c8ff");
+        this.simulation.playSound("guard");
+        if (context) context.allyPositionSwapped = true;
     }
 
     _shardVolley(target) {
@@ -269,6 +307,7 @@ export class HuntingMobAbility extends Ability {
         const { position, radius } = this.owner;
         ctx.save();
         if (this.state.link) this._drawActiveLink(ctx, position, this.state.link);
+        if (this.state.barrierSwapTarget) this._drawBarrierSwap(ctx, position, this.state.barrierSwapTarget.position);
         if (this.state.ring > 0) {
             ctx.strokeStyle = "#ffd166";
             ctx.lineWidth = 4;
@@ -323,6 +362,18 @@ export class HuntingMobAbility extends Ability {
         ctx.moveTo(this.owner.position.x, this.owner.position.y);
         ctx.lineTo(ray.end.x, ray.end.y);
         ctx.stroke();
+    }
+
+    _drawBarrierSwap(ctx, from, to) {
+        const alpha = this.state.barrierSwapTime / BARRIER_SWAP_EFFECT_DURATION;
+        ctx.strokeStyle = `rgba(103, 200, 255, ${Math.max(0, alpha)})`;
+        ctx.lineWidth = 4;
+        ctx.setLineDash([10, 8]);
+        ctx.beginPath();
+        ctx.moveTo(from.x, from.y);
+        ctx.lineTo(to.x, to.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
     }
 
     _directionTo(target) {

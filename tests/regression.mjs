@@ -14126,6 +14126,69 @@ function testHuntingMishapAvoidsLowHpRuns() {
 
 testHuntingMishapAvoidsLowHpRuns();
 
+function testHuntingBarrierSwapsOnlyBlockingFrontlineAlly() {
+    const playerSpec = {
+        id: "barrier-swap-player",
+        name: "Barrier Swap Player",
+        teamId: HUNTING_TEAMS.PLAYER,
+        ability: "none",
+        color: "#ffffff",
+        stats: { hp: 100, damage: 10, defense: 1, speed: 250, radius: 36, mass: 1 }
+    };
+    const barrierSpec = createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.BARRIER, floor: 60, index: 0 });
+    const frontlineSpec = createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.PURSUER, floor: 60, index: 1 });
+    const simulation = new BattleSimulation(
+        [playerSpec, barrierSpec, frontlineSpec],
+        { onLog() {}, onSound() {} },
+        null,
+        { assignActions: false }
+    );
+    const player = simulation.fighters.find((fighter) => fighter.id === playerSpec.id);
+    const barrier = simulation.fighters.find((fighter) => fighter.id === barrierSpec.id);
+    const frontline = simulation.fighters.find((fighter) => fighter.id === frontlineSpec.id);
+
+    barrier.position = new Vector2(180, 500);
+    frontline.position = new Vector2(230, 500);
+    player.position = new Vector2(820, 500);
+    barrier.ability.state.timer = barrier.ability.cooldown;
+    barrier.ability.update(0, player);
+
+    assert.equal(barrier.position.x, 180, "Barrier activation alone should not move through an ally");
+    assert.equal(frontline.position.x, 230, "The ally should stay in place until it physically blocks the barrier");
+    simulation.handleCollision();
+    assert.ok(
+        barrier.position.x > frontline.position.x,
+        "Barrier should take the closer ally's blocking position after collision"
+    );
+    assert.equal(barrier.ability.state.barrier, 1.5, "Barrier defense window should stay active after swapping");
+    assert.equal(barrier.ability.state.barrierSwapTarget, frontline, "Swap effect should track the blocking ally");
+
+    const rearAllySimulation = new BattleSimulation(
+        [playerSpec, barrierSpec, frontlineSpec],
+        { onLog() {}, onSound() {} },
+        null,
+        { assignActions: false }
+    );
+    const rearAllyPlayer = rearAllySimulation.fighters.find((fighter) => fighter.id === playerSpec.id);
+    const rearAllyBarrier = rearAllySimulation.fighters.find((fighter) => fighter.id === barrierSpec.id);
+    const rearAlly = rearAllySimulation.fighters.find((fighter) => fighter.id === frontlineSpec.id);
+    rearAllyBarrier.position = new Vector2(250, 500);
+    rearAlly.position = new Vector2(200, 500);
+    rearAllyPlayer.position = new Vector2(820, 500);
+    rearAllyBarrier.ability.state.timer = rearAllyBarrier.ability.cooldown;
+    rearAllyBarrier.ability.update(0, rearAllyPlayer);
+    rearAllySimulation.handleCollision();
+    assert.ok(rearAllyBarrier.position.x > rearAlly.position.x, "An ally behind the barrier should not trigger a swap");
+    assert.equal(
+        rearAllyBarrier.ability.state.barrierSwapTarget,
+        null,
+        "Only the closer ally should become a swap target"
+    );
+    console.log("[hunting-barrier-blocking-swap] ok");
+}
+
+testHuntingBarrierSwapsOnlyBlockingFrontlineAlly();
+
 function testHuntingMobActionsKeepPhysicsFinite() {
     const player = {
         id: "hunting-mob-test-player",
