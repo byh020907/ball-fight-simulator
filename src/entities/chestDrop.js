@@ -15,7 +15,7 @@ export class ChestDrop extends HuntingLootItem {
     static highLootType = "high_chest";
 
     constructor({ chest, ...options } = {}) {
-        super({ ...options, radius: 16 });
+        super({ ...options, radius: 20 });
         this.chest = chest;
     }
 

@@ -5,7 +5,7 @@ const SHARD_COLOR = "#48a9ff";
 export class ShardDrop extends HuntingLootItem {
     static lootType = "shard";
 
-    constructor({ amount = 5, radius = 12, ...options } = {}) {
+    constructor({ amount = 5, radius = 16, ...options } = {}) {
         super({ ...options, radius });
         this.amount = Math.max(1, Math.round(amount));
     }

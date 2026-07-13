@@ -6,7 +6,7 @@ export class SmallHealPack extends HuntingLootItem {
     static lootType = "small_heal_pack";
 
     constructor({ amount = 5, ...options } = {}) {
-        super({ ...options, radius: 14 });
+        super({ ...options, radius: 18 });
         this.amount = Math.max(1, Math.round(amount));
     }
 

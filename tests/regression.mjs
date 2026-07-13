@@ -2368,12 +2368,13 @@ function testHuntingLootItemsAndDropController(app) {
     const mobSpec = createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.PURSUER, floor: 1, index: 0 });
     const session = new HuntingBattleLootSession({ playerId: playerSpec.id, floor: 1 });
     const rolls = [0, 0.2, 0, 0];
+    const soundCalls = [];
     const controller = new HuntingLootDropController({ session, rng: () => rolls.shift() ?? 0 });
     const simulation = new BattleSimulation(
         [playerSpec, mobSpec],
         {
             onLog() {},
-            onSound() {},
+            onSound: (type, intensity) => soundCalls.push({ type, intensity }),
             onFighterDefeated: (fighter, context) => controller.onFighterDefeated(fighter, context),
             onResultResolved: (winner, context) => controller.onResultResolved(winner, context)
         },
@@ -2388,9 +2389,21 @@ function testHuntingLootItemsAndDropController(app) {
     mob.takeDamage(100000, player, "Loot Hook Test");
     const droppedShard = simulation.entities.find((entity) => entity instanceof ShardDrop);
     assert.ok(droppedShard, "Defeating a hunting mob must create a configured floor-loot item");
+    assert.equal(droppedShard.radius, 16, "Standard shard drops should be visibly larger than hero orbs");
     assert.equal(session.getCollectedLoot().shards, 0, "A dropped shard must not enter battle loot before collection");
+    const entitiesBeforeShardCollection = simulation.entities.length;
     droppedShard.update(1 / 60, simulation);
     assert.equal(session.getCollectedLoot().shards, 5, "Collecting a shard must add it to the battle loot session");
+    assert.equal(
+        simulation.entities.length - entitiesBeforeShardCollection,
+        26,
+        "Loot collection should create a larger burst, 24 particles, and a reward label"
+    );
+    assert.deepEqual(
+        soundCalls.at(-1),
+        { type: "loot", intensity: 1 },
+        "Loot collection should request its audible collect chime"
+    );
     assert.equal(
         controller.onFighterDefeated({ hunting: null }, { simulation }),
         null,
@@ -2413,6 +2426,7 @@ function testHuntingLootItemsAndDropController(app) {
         amount: 15,
         onCollected: (reward) => healResults.push(reward)
     });
+    assert.equal(healPack.radius, 18, "Heal packs should use the enlarged loot size");
     healPack.update(1 / 60, simulation);
     assert.equal(healPack.isExpired, false, "Full-HP players must leave a small heal pack on the floor");
     player.hp = 50;
@@ -2432,6 +2446,7 @@ function testHuntingLootItemsAndDropController(app) {
         chest,
         onCollected: (reward) => session.recordCollection(reward)
     });
+    assert.equal(chestDrop.radius, 20, "Chest drops should use the enlarged loot size");
     chestDrop.update(1 / 60, simulation);
     assert.equal(
         session.getCollectedLoot().chests[0]?.id,
@@ -2455,6 +2470,16 @@ function testHuntingLootItemsAndDropController(app) {
             chest: createHuntingChest({ id: "loot-test-high-chest", rarity: "rare" })
         }) instanceof ChestDrop,
         "High-chest rolls should reuse the chest drop renderer with their rolled rarity"
+    );
+    assert.equal(
+        createHuntingLootItem(HUNTING_LOOT_ITEM_TYPES.SHARD_BUNDLE, {
+            position: player.position,
+            velocity: new Vector2(),
+            collectorId: player.id,
+            amount: 10
+        }).radius,
+        22,
+        "Shard bundles should remain the largest standard loot item"
     );
 
     const victorySweepShard = new ShardDrop({

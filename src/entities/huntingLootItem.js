@@ -12,7 +12,7 @@ export class HuntingLootItem extends CombatEntity {
         position,
         velocity,
         collectorId,
-        radius = 14,
+        radius = 16,
         life = DEFAULT_LIFE,
         magnetRadiusMultiplier = 4,
         magnetResponseRate = DEFAULT_MAGNET_RESPONSE_RATE,
@@ -109,9 +109,8 @@ export class HuntingLootItem extends CombatEntity {
         if (!reward) return;
 
         this.onCollected?.(reward, this, collector, simulation);
-        simulation.spawnPulse(this.position.clone(), reward.color);
-        simulation.spawnActionText(this.position.clone(), reward.label, reward.color);
-        simulation.playSound(reward.sound ?? "powerup", reward.soundIntensity ?? 0.8);
+        simulation.spawnLootCollection(this.position.clone(), reward.color, reward.label);
+        simulation.playSound(reward.sound ?? "loot", reward.soundIntensity ?? 1);
         if (reward.logMessage) simulation.addLog(reward.logMessage);
         this.isExpired = true;
     }

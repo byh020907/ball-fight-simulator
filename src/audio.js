@@ -38,7 +38,7 @@ export class AudioEngine {
         const now = this.context.currentTime;
         const throttleKey = type;
         const last = this.lastPlayed.get(throttleKey) ?? -1;
-        const throttle = type === "hit" || type === "crash" ? 0.055 : 0.025;
+        const throttle = type === "hit" || type === "crash" || type === "loot" ? 0.055 : 0.025;
         if (now - last < throttle) {
             return;
         }
@@ -79,6 +79,7 @@ export class AudioEngine {
             projectile_guard: () => this.playZap(1100, 0.12, 0.06 * safeIntensity),
             guard: () => this.playThud(320, 0.08, 0.05 * safeIntensity),
             whiff: () => this.playThud(180, 0.04, 0.025 * safeIntensity),
+            loot: () => this.playLootCollect(safeIntensity),
             shop_reroll: () => this.playShopReroll(safeIntensity)
         };
 
@@ -167,6 +168,31 @@ export class AudioEngine {
             oscillator.type = "triangle";
             oscillator.frequency.setValueAtTime(note.frequency, startAt);
             oscillator.frequency.exponentialRampToValueAtTime(note.frequency * 1.2, startAt + note.duration);
+            oscillator.connect(gain);
+            gain.connect(this.context.destination);
+            oscillator.start(startAt);
+            oscillator.stop(startAt + note.duration + 0.02);
+        }
+    }
+
+    playLootCollect(intensity) {
+        const now = this.context.currentTime;
+        const notes = [
+            { frequency: 620, startOffset: 0, duration: 0.08 },
+            { frequency: 900, startOffset: 0.07, duration: 0.14 }
+        ];
+
+        for (const note of notes) {
+            const oscillator = this.context.createOscillator();
+            const gain = this.context.createGain();
+            const startAt = now + note.startOffset;
+            const volume = 0.052 * intensity;
+            gain.gain.setValueAtTime(0.0001, startAt);
+            gain.gain.exponentialRampToValueAtTime(volume, startAt + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.0001, startAt + note.duration);
+            oscillator.type = "triangle";
+            oscillator.frequency.setValueAtTime(note.frequency, startAt);
+            oscillator.frequency.exponentialRampToValueAtTime(note.frequency * 1.16, startAt + note.duration);
             oscillator.connect(gain);
             gain.connect(this.context.destination);
             oscillator.start(startAt);
