@@ -3130,7 +3130,7 @@ function testComponentBridgeEquipmentFunctions() {
         "equipItem",
         "unequipItem",
         "enhanceItem",
-        "fuseItem",
+        "fuseEquipmentItems",
         "disassembleItem",
         "sellItem",
         "expandInventory"
@@ -5320,15 +5320,37 @@ function testEquipmentEnhancement() {
     craftProfile.equipment.enhancementStones = 100;
     const fuseA = createEquipmentInstance({ rarity: "common", slot: "weapon", rng: () => 0.5 });
     const fuseB = createEquipmentInstance({ rarity: "common", slot: "armor", rng: () => 0.5 });
-    craftProfile.equipment.inventory.push(fuseA, fuseB);
+    const fuseC = createEquipmentInstance({ rarity: "common", slot: "accessory", rng: () => 0.5 });
+    fuseA.enhanceLevel = 5;
+    craftProfile.equipment.inventory.push(fuseA, fuseB, fuseC);
     craftProfile.equipment.equipped.weapon = fuseA.instanceId;
 
     const fusionCost = getFusionCost("common");
-    const fused = fuseEquipment(craftProfile, fuseA.instanceId, fuseB.instanceId, () => 0.5);
+    const fusionSourceIds = [fuseA.instanceId, fuseB.instanceId, fuseC.instanceId];
+    assert.equal(
+        canFuseEquipment(craftProfile, fusionSourceIds),
+        true,
+        "Fusion should accept exactly three same-rarity selected sources"
+    );
+    assert.deepEqual(
+        fusionCost,
+        { stones: 10, shards: 50 },
+        "Fusion cost should be 10 times the source rarity disassembly and sale rewards"
+    );
+    assert.deepEqual(
+        getFusionCost("uncommon"),
+        { stones: 30, shards: 120 },
+        "Uncommon fusion cost should use 10x rewards"
+    );
+    assert.deepEqual(getFusionCost("rare"), { stones: 80, shards: 300 }, "Rare fusion cost should use 10x rewards");
+    assert.deepEqual(getFusionCost("epic"), { stones: 200, shards: 800 }, "Epic fusion cost should use 10x rewards");
+    assert.equal(getFusionCost("legendary"), null, "Legendary should not have a fusion recipe");
+    const fused = fuseEquipment(craftProfile, fusionSourceIds, () => 0.5);
     assert.equal(fused.toRarity, "uncommon", "Fusion should upgrade common equipment to uncommon");
-    assert.equal(fused.consumed.length, 2, "Fusion should consume two source items");
-    assert.equal(craftProfile.equipment.inventory.length, 1, "Fusion should replace two items with one item");
+    assert.equal(fused.consumed.length, 3, "Fusion should consume three selected source items");
+    assert.equal(craftProfile.equipment.inventory.length, 1, "Fusion should replace three items with one item");
     assert.equal(craftProfile.equipment.inventory[0].rarity, "uncommon", "Fusion result should be the next rarity");
+    assert.equal(craftProfile.equipment.inventory[0].enhanceLevel, 0, "Fusion should create a fresh +0 item");
     assert.equal(craftProfile.equipment.equipped.weapon, null, "Fusing an equipped item should unequip it");
     assert.equal(
         craftProfile.equipment.enhancementStones,
@@ -5339,13 +5361,25 @@ function testEquipmentEnhancement() {
 
     const lonely = createEquipmentInstance({ rarity: "rare", slot: "weapon", rng: () => 0.5 });
     craftProfile.equipment.inventory.push(lonely);
-    const noPartner = fuseEquipment(craftProfile, lonely.instanceId, null, () => 0.5);
-    assert.equal(noPartner.error, "partner", "Fusion should require a same-rarity partner");
+    const insufficientSources = fuseEquipment(craftProfile, [lonely.instanceId], () => 0.5);
+    assert.equal(insufficientSources.error, "sources", "Fusion should require exactly three selected sources");
+
+    const duplicateSources = fuseEquipment(
+        craftProfile,
+        [lonely.instanceId, lonely.instanceId, lonely.instanceId],
+        () => 0.5
+    );
+    assert.equal(duplicateSources.error, "sources", "Fusion should reject duplicate source selections");
 
     const legendA = createEquipmentInstance({ rarity: "legendary", slot: "weapon", rng: () => 0.5 });
     const legendB = createEquipmentInstance({ rarity: "legendary", slot: "armor", rng: () => 0.5 });
-    craftProfile.equipment.inventory.push(legendA, legendB);
-    const maxFusion = fuseEquipment(craftProfile, legendA.instanceId, legendB.instanceId, () => 0.5);
+    const legendC = createEquipmentInstance({ rarity: "legendary", slot: "accessory", rng: () => 0.5 });
+    craftProfile.equipment.inventory.push(legendA, legendB, legendC);
+    const maxFusion = fuseEquipment(
+        craftProfile,
+        [legendA.instanceId, legendB.instanceId, legendC.instanceId],
+        () => 0.5
+    );
     assert.equal(maxFusion.error, "max_rarity", "Legendary equipment should not fuse beyond max rarity");
 
     const sellProfile = createDefaultPlayerProfile();
@@ -10452,6 +10486,27 @@ async function testCreateCollectionHubViewModel() {
     assert.equal(vm2.storage.chests[0].canOpen, true, "Collection hub should mark openable chests");
     assert.equal(vm2.summary.storageChestCount, 1, "Collection summary should count storage chests");
 
+    profile.equipment.inventory.push(
+        ...["weapon", "armor", "accessory"].map((slot) =>
+            createEquipmentInstance({ rarity: "common", slot, rng: () => 0.5 })
+        )
+    );
+    const fusionVm = createCollectionHubViewModel({
+        profile,
+        roster,
+        masteryDefinitions: MASTERY_EFFECT_DEFS,
+        achievementDefinitions: [],
+        currentPlayerFighterId: "archer"
+    });
+    const commonFusionRecipe = fusionVm.equipment.fusion.recipes.find((recipe) => recipe.rarity === "common");
+    assert.equal(fusionVm.equipment.fusion.sourceItemCount, 3, "Fusion UI should require three selected sources");
+    assert.equal(commonFusionRecipe.items.length, 3, "Fusion UI should expose every selectable same-rarity item");
+    assert.deepEqual(
+        commonFusionRecipe.cost,
+        { stones: 10, shards: 50 },
+        "Fusion UI should display the derived material cost"
+    );
+
     // 숙련도 레벨이 있으면 masteryItems에 반영
     profile.characterMastery.levels = { archer: 1, orbit: 2, eater: 3 };
     const vm3 = createCollectionHubViewModel({
@@ -14006,7 +14061,7 @@ function testComponentBridgeEquipmentActionsReachProfile() {
     assert.ok(typeof bridge.equipItem === "function", "bridge.equipItem should be a function");
     assert.ok(typeof bridge.unequipItem === "function", "bridge.unequipItem should be a function");
     assert.ok(typeof bridge.enhanceItem === "function", "bridge.enhanceItem should be a function");
-    assert.ok(typeof bridge.fuseItem === "function", "bridge.fuseItem should be a function");
+    assert.ok(typeof bridge.fuseEquipmentItems === "function", "bridge.fuseEquipmentItems should be a function");
     assert.ok(typeof bridge.disassembleItem === "function", "bridge.disassembleItem should be a function");
     assert.ok(typeof bridge.sellItem === "function", "bridge.sellItem should be a function");
     assert.ok(typeof bridge.expandInventory === "function", "bridge.expandInventory should be a function");
@@ -14081,6 +14136,16 @@ function testCollectionActionPopupOptions() {
     assert.equal(sale.title, "장비 판매 완료", "Sale should use the shared result popup");
     assert.ok(sale.bodyHtml.includes("파편 +30"), "Sale popup should show the gained shards");
 
+    const fusion = createCollectionActionPopupOptions("fusion", {
+        item: { ...item, name: "새 장비", rarity: "epic", enhanceLevel: 0 },
+        consumed: [item, { ...item, name: "재료 방패" }, { ...item, name: "재료 반지" }],
+        cost: { stones: 80, shards: 300 }
+    });
+    assert.equal(fusion.title, "장비 합성 완료", "Fusion should use the shared result popup");
+    assert.ok(fusion.bodyHtml.includes("테스트 검"), "Fusion popup should list consumed equipment");
+    assert.ok(fusion.bodyHtml.includes("새 장비"), "Fusion popup should identify the new equipment");
+    assert.ok(fusion.bodyHtml.includes("강화석 80"), "Fusion popup should show the consumed materials");
+
     const chest = createCollectionActionPopupOptions("chest", {
         opened: true,
         applied: { shards: 0, equipment: item },
@@ -14106,7 +14171,10 @@ function testComponentBridgeCollectionActionResultsUsePopupService() {
     const enhanceTarget = createEquipmentInstance({ rarity: "common", rng: () => 0.5 });
     const disassembleTarget = createEquipmentInstance({ rarity: "common", rng: () => 0.5 });
     const saleTarget = createEquipmentInstance({ rarity: "common", rng: () => 0.5 });
-    profile.equipment.inventory.push(enhanceTarget, disassembleTarget, saleTarget);
+    const fusionTargets = ["weapon", "armor", "accessory"].map((slot) =>
+        createEquipmentInstance({ rarity: "common", slot, rng: () => 0.5 })
+    );
+    profile.equipment.inventory.push(enhanceTarget, disassembleTarget, saleTarget, ...fusionTargets);
 
     let refreshCount = 0;
     const app = {
@@ -14132,19 +14200,21 @@ function testComponentBridgeCollectionActionResultsUsePopupService() {
         bridge.enhanceItem(enhanceTarget.instanceId);
         bridge.disassembleItem(disassembleTarget.instanceId);
         bridge.sellItem(saleTarget.instanceId);
+        bridge.fuseEquipmentItems(fusionTargets.map((item) => item.instanceId));
 
-        assert.equal(popupCalls.length, 3, "Each completed collection action should present one result popup");
+        assert.equal(popupCalls.length, 4, "Each completed collection action should present one result popup");
         assert.ok(
             popupCalls[0].title.startsWith("강화"),
             "Enhancement should report success or failure through PopupService"
         );
         assert.equal(popupCalls[1].title, "장비 분해 완료", "Disassembly should report through PopupService");
         assert.equal(popupCalls[2].title, "장비 판매 완료", "Sale should report through PopupService");
+        assert.equal(popupCalls[3].title, "장비 합성 완료", "Fusion should report through PopupService");
         assert.ok(
             popupCalls.every((options) => options.buttons?.[0]?.text === "확인"),
             "Collection action result popups should use an explicit confirmation button"
         );
-        assert.equal(refreshCount, 3, "Completed collection actions should refresh the open collection hub");
+        assert.equal(refreshCount, 4, "Completed collection actions should refresh the open collection hub");
     } finally {
         PopupService.setTestDialog(originalDialog);
     }

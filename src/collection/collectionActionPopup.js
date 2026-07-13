@@ -96,6 +96,28 @@ function createChestPopup(result) {
     return createPopup("상자 개봉 결과", rewardLines.join(""));
 }
 
+function createFusionPopup(result) {
+    if (result?.error) {
+        const failureMessages = {
+            profile: "합성 정보를 불러올 수 없습니다.",
+            sources: "같은 등급 장비 3개를 선택해 주세요.",
+            rarity: "선택한 장비의 등급이 서로 다릅니다.",
+            max_rarity: "전설 장비는 더 이상 합성할 수 없습니다.",
+            stones: "강화석이 부족합니다.",
+            shards: "파편이 부족합니다.",
+            cost: "이 등급의 합성 비용을 찾을 수 없습니다."
+        };
+        return createPopup("합성 불가", `<p>${failureMessages[result.error] ?? "합성할 수 없습니다."}</p>`);
+    }
+
+    const consumedNames = (result?.consumed ?? []).map(formatEquipmentName).join(" · ");
+    const cost = result?.cost ?? {};
+    return createPopup(
+        "장비 합성 완료",
+        `<p>소모 장비: ${consumedNames}</p><p>소모: 강화석 ${cost.stones ?? 0} · 파편 ${cost.shards ?? 0}</p>${formatEquipmentReward(result?.item)}`
+    );
+}
+
 export function createCollectionActionPopupOptions(action, result) {
     if (action === "enhance") {
         return createEnhancePopup(result);
@@ -114,6 +136,9 @@ export function createCollectionActionPopupOptions(action, result) {
     }
     if (action === "chest") {
         return createChestPopup(result);
+    }
+    if (action === "fusion") {
+        return createFusionPopup(result);
     }
     throw new Error(`Unknown collection action popup: ${action}`);
 }

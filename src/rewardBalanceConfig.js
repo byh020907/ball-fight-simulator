@@ -391,11 +391,9 @@ export const REWARD_BALANCE = deepFreeze({
         },
         disassembleRewards: { common: 1, uncommon: 3, rare: 8, epic: 20, legendary: 50 },
         sellRewards: { common: 5, uncommon: 12, rare: 30, epic: 80, legendary: 200 },
-        fusionCosts: {
-            common: { stones: 2, shards: 20 },
-            uncommon: { stones: 5, shards: 40 },
-            rare: { stones: 12, shards: 80 },
-            epic: { stones: 25, shards: 150 }
+        fusion: {
+            sourceItemCount: 3,
+            costMultiplier: 10
         },
         statRanges: {
             common: { min: 1, max: 3, statCount: { min: 1, max: 1 } },

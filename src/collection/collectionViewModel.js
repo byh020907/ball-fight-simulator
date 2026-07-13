@@ -20,7 +20,8 @@ import {
     getSellReward,
     getFusionCost,
     getNextEquipmentRarity,
-    canFuseEquipment,
+    EQUIPMENT_RARITIES,
+    FUSION_SOURCE_ITEM_COUNT,
     canCharacterEquipItem,
     getCharacterEquipmentLevel,
     getEquipmentRequiredLevel,
@@ -29,6 +30,14 @@ import {
     calculateEnhanceFailureRate,
     ENHANCE_MAX_LEVEL
 } from "../hunting/equipmentConfig.js";
+
+const EQUIPMENT_RARITY_LABELS = Object.freeze({
+    common: "일반",
+    uncommon: "고급",
+    rare: "희귀",
+    epic: "영웅",
+    legendary: "전설"
+});
 
 export const COLLECTION_HUB_TABS = Object.freeze([
     { id: "roster", label: "도감" },
@@ -182,16 +191,26 @@ export function createCollectionHubViewModel({
             canEquip,
             disassembleReward: getDisassembleReward(item.rarity),
             sellReward: getSellReward(item.rarity),
-            fusionCost: getFusionCost(item.rarity),
-            nextRarity: getNextEquipmentRarity(item.rarity),
-            fusionPartnerCount: inventory.filter(
-                (candidate) => candidate.instanceId !== item.instanceId && candidate.rarity === item.rarity
-            ).length,
-            canFuse: canFuseEquipment(profile, item.instanceId),
             canEnhance: level < ENHANCE_MAX_LEVEL && stones >= cost.stones && shards >= cost.shards,
             enhanceCost: cost,
             enhanceFailureRate: calculateEnhanceFailureRate(level)
         };
+    });
+    const fusionRecipes = EQUIPMENT_RARITIES.flatMap((rarity) => {
+        const nextRarity = getNextEquipmentRarity(rarity);
+        const cost = getFusionCost(rarity);
+        if (!nextRarity || !cost) return [];
+
+        return [
+            {
+                rarity,
+                rarityLabel: EQUIPMENT_RARITY_LABELS[rarity] ?? rarity,
+                nextRarity,
+                nextRarityLabel: EQUIPMENT_RARITY_LABELS[nextRarity] ?? nextRarity,
+                cost,
+                items: equipmentItems.filter((item) => item.rarity === rarity)
+            }
+        ];
     });
 
     const storageItems = (hunting.chests ?? []).map((chest) => {
@@ -242,6 +261,10 @@ export function createCollectionHubViewModel({
             canExpand: canExpandInventory(profile),
             expandCost: INVENTORY_EXPAND_COST,
             expandGain: INVENTORY_EXPAND_GAIN,
+            fusion: {
+                sourceItemCount: FUSION_SOURCE_ITEM_COUNT,
+                recipes: fusionRecipes
+            },
             equippedSlots: {
                 weapon: equipped.weapon ? (inventory.find((i) => i.instanceId === equipped.weapon)?.name ?? "—") : "—",
                 armor: equipped.armor ? (inventory.find((i) => i.instanceId === equipped.armor)?.name ?? "—") : "—",

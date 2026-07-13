@@ -43,12 +43,8 @@ export const EQUIPMENT = Object.freeze({
         LEGENDARY: EQUIPMENT_BALANCE.sellRewards.legendary
     }),
     FUSION: Object.freeze({
-        COST: Object.freeze({
-            COMMON: EQUIPMENT_BALANCE.fusionCosts.common,
-            UNCOMMON: EQUIPMENT_BALANCE.fusionCosts.uncommon,
-            RARE: EQUIPMENT_BALANCE.fusionCosts.rare,
-            EPIC: EQUIPMENT_BALANCE.fusionCosts.epic
-        })
+        SOURCE_ITEM_COUNT: EQUIPMENT_BALANCE.fusion.sourceItemCount,
+        COST_MULTIPLIER: EQUIPMENT_BALANCE.fusion.costMultiplier
     }),
     DRAW: Object.freeze({
         WEAPON: "weapon",

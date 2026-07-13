@@ -5,7 +5,6 @@ import {
     sellEquipment,
     fuseEquipment,
     enhanceEquipment,
-    canFuseEquipment,
     getCharacterEquipmentLevel,
     getEquipmentRequiredLevel
 } from "./hunting/equipmentConfig.js";
@@ -159,20 +158,16 @@ export function createComponentBridge(app) {
             return result;
         },
 
-        fuseItem(instanceId) {
+        fuseEquipmentItems(sourceInstanceIds) {
             const profile = app.playerProfile;
-            if (!canFuseEquipment(profile, instanceId)) {
-                PopupService.show({
-                    title: "합성 불가",
-                    bodyHtml: `<p>파편, 강화석 부족 또는 같은 등급의 파트너 장비가 없습니다.</p>`,
-                    buttons: [{ text: "확인", value: "ok", primary: true }]
-                });
-                return;
-            }
-            const result = fuseEquipment(profile, instanceId);
+            const result = fuseEquipment(profile, sourceInstanceIds);
             if (result && !result.error) {
                 refreshCollectionAndProfile();
             }
+            if (result) {
+                PopupService.show(createCollectionActionPopupOptions("fusion", result));
+            }
+            return result;
         },
 
         disassembleItem(instanceId) {

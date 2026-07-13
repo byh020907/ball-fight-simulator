@@ -50,9 +50,8 @@ export const DISASSEMBLE_REWARDS = Object.freeze(
 export const SELL_REWARDS = Object.freeze(
     Object.fromEntries(Object.entries(EQUIPMENT.SELL).map(([key, val]) => [key.toLowerCase(), val]))
 );
-export const FUSION_COSTS = Object.freeze(
-    Object.fromEntries(Object.entries(EQUIPMENT.FUSION.COST).map(([key, val]) => [key.toLowerCase(), val]))
-);
+export const FUSION_SOURCE_ITEM_COUNT = EQUIPMENT.FUSION.SOURCE_ITEM_COUNT;
+export const FUSION_COST_MULTIPLIER = EQUIPMENT.FUSION.COST_MULTIPLIER;
 export const EQUIPMENT_DRAW_KEYS = Object.freeze(
     Object.fromEntries(Object.entries(EQUIPMENT.DRAW).map(([key, val]) => [key.toLowerCase(), val]))
 );
@@ -351,7 +350,11 @@ export function getSellReward(rarity) {
 }
 
 export function getFusionCost(rarity) {
-    return FUSION_COSTS[rarity] ?? null;
+    if (!getNextEquipmentRarity(rarity)) return null;
+    return {
+        stones: getDisassembleReward(rarity) * FUSION_COST_MULTIPLIER,
+        shards: getSellReward(rarity) * FUSION_COST_MULTIPLIER
+    };
 }
 
 export function getNextEquipmentRarity(rarity) {
@@ -407,66 +410,58 @@ export function sellEquipment(profile, instanceId) {
     return { item, shards };
 }
 
-export function findFusionPartner(profile, instanceId) {
+function validateFusionSources(profile, sourceInstanceIds) {
     const eq = profile?.equipment;
-    if (!eq || !Array.isArray(eq.inventory)) return null;
-    const item = eq.inventory.find((i) => i.instanceId === instanceId);
-    if (!item || !getNextEquipmentRarity(item.rarity)) return null;
-    return (
-        eq.inventory.find((candidate) => candidate.instanceId !== instanceId && candidate.rarity === item.rarity) ??
-        null
-    );
-}
+    if (!eq || !Array.isArray(eq.inventory) || !profile?.hunting) return { error: "profile" };
+    if (!Array.isArray(sourceInstanceIds) || sourceInstanceIds.length !== FUSION_SOURCE_ITEM_COUNT) {
+        return { error: "sources" };
+    }
 
-export function canFuseEquipment(profile, instanceId) {
-    const eq = profile?.equipment;
-    if (!eq || !Array.isArray(eq.inventory) || !profile?.hunting) return false;
-    const item = eq.inventory.find((i) => i.instanceId === instanceId);
-    const partner = findFusionPartner(profile, instanceId);
-    if (!item || !partner) return false;
-    const cost = getFusionCost(item.rarity);
-    if (!cost) return false;
-    if ((eq.enhancementStones ?? 0) < cost.stones) return false;
-    return (profile.hunting.shards ?? 0) >= cost.shards;
-}
+    const uniqueSourceIds = new Set(sourceInstanceIds);
+    if (uniqueSourceIds.size !== FUSION_SOURCE_ITEM_COUNT) return { error: "sources" };
 
-export function fuseEquipment(profile, instanceId, partnerInstanceId = null, rng = defaultRng) {
-    const eq = profile?.equipment;
-    if (!eq || !Array.isArray(eq.inventory) || !profile?.hunting) return null;
+    const sources = sourceInstanceIds.map((instanceId) => eq.inventory.find((item) => item.instanceId === instanceId));
+    if (sources.some((item) => !item)) return { error: "sources" };
 
-    const item = eq.inventory.find((i) => i.instanceId === instanceId);
-    if (!item) return null;
+    const fromRarity = sources[0].rarity;
+    if (sources.some((item) => item.rarity !== fromRarity)) return { error: "rarity" };
 
-    const partner = partnerInstanceId
-        ? eq.inventory.find((candidate) => candidate.instanceId === partnerInstanceId)
-        : findFusionPartner(profile, instanceId);
-    if (!partner || partner.instanceId === item.instanceId) return { error: "partner" };
-    if (partner.rarity !== item.rarity) return { error: "rarity" };
+    const toRarity = getNextEquipmentRarity(fromRarity);
+    if (!toRarity) return { error: "max_rarity" };
 
-    const nextRarity = getNextEquipmentRarity(item.rarity);
-    if (!nextRarity) return { error: "max_rarity" };
-
-    const cost = getFusionCost(item.rarity);
+    const cost = getFusionCost(fromRarity);
     if (!cost) return { error: "cost" };
     if ((eq.enhancementStones ?? 0) < cost.stones) return { error: "stones" };
     if ((profile.hunting.shards ?? 0) < cost.shards) return { error: "shards" };
 
-    eq.enhancementStones -= cost.stones;
-    profile.hunting.shards -= cost.shards;
-    const consumedIds = [item.instanceId, partner.instanceId];
-    for (const id of consumedIds) {
-        removeEquipmentItem(eq, id);
+    return { sources, fromRarity, toRarity, cost };
+}
+
+export function canFuseEquipment(profile, sourceInstanceIds) {
+    return !validateFusionSources(profile, sourceInstanceIds).error;
+}
+
+export function fuseEquipment(profile, sourceInstanceIds, rng = defaultRng) {
+    const eq = profile?.equipment;
+    const validation = validateFusionSources(profile, sourceInstanceIds);
+    if (validation.error) return { error: validation.error };
+    if (!eq) return null;
+
+    eq.enhancementStones -= validation.cost.stones;
+    profile.hunting.shards -= validation.cost.shards;
+    for (const source of validation.sources) {
+        removeEquipmentItem(eq, source.instanceId);
     }
 
-    const resultItem = createEquipmentInstance({ rarity: nextRarity, rng });
+    const resultItem = createEquipmentInstance({ rarity: validation.toRarity, rng });
     eq.inventory.push(resultItem);
 
     return {
         item: resultItem,
-        consumed: [item, partner],
-        cost,
-        fromRarity: item.rarity,
-        toRarity: nextRarity
+        consumed: validation.sources,
+        cost: validation.cost,
+        fromRarity: validation.fromRarity,
+        toRarity: validation.toRarity
     };
 }
 

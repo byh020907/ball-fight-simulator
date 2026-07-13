@@ -101,7 +101,7 @@ function runScenario(config) {
         shardSource: { enemy: 0, chest: 0 }
     };
 
-    function findFusionPair() {
+    function findFusionSources() {
         const byRarity = new Map();
         for (const item of profile.equipment.inventory) {
             if (item.rarity === "legendary") continue;
@@ -109,7 +109,7 @@ function runScenario(config) {
             items.push(item);
             byRarity.set(item.rarity, items);
         }
-        return [...byRarity.values()].find((items) => items.length >= 2)?.slice(0, 2) ?? null;
+        return [...byRarity.values()].find((items) => items.length >= 3)?.slice(0, 3) ?? null;
     }
 
     for (let run = 0; run < config.RUNS; run++) {
@@ -176,12 +176,15 @@ function runScenario(config) {
                     expandInventory(profile);
                     stats.expansions++;
                     addLog(`  [관리] 인벤토리 확장 (+${INVENTORY_EXPAND_GAIN}칸, -${INVENTORY_EXPAND_COST}파편)`);
-                } else if (findFusionPair()) {
-                    const [first, second] = findFusionPair();
-                    const fResult = fuseEquipment(profile, first.instanceId, second.instanceId);
+                } else if (findFusionSources()) {
+                    const sources = findFusionSources();
+                    const fResult = fuseEquipment(
+                        profile,
+                        sources.map((item) => item.instanceId)
+                    );
                     if (fResult?.item) {
                         stats.fused++;
-                        addLog(`  [관리] ${first.rarity} 장비 2개 합성 → ${fResult.item.rarity}`);
+                        addLog(`  [관리] ${sources[0].rarity} 장비 3개 합성 → ${fResult.item.rarity}`);
                     } else {
                         break;
                     }
