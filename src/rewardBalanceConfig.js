@@ -267,7 +267,7 @@ export const REWARD_BALANCE = deepFreeze({
             hero: {
                 tiers: [
                     {},
-                    { magnetRadiusMultiplier: 2.5, magnetResponseRate: 5, magnetGraceDuration: 1 },
+                    { magnetRadiusMultiplier: 2.5, magnetResponseRate: 5, collectionGraceDuration: 1 },
                     { stackCap: 20, damagePerStack: 0.03 },
                     { releaseStackRatio: 0.5 }
                 ]
@@ -298,7 +298,7 @@ export const REWARD_BALANCE = deepFreeze({
             missingHpMaxMultiplier: 2,
             valueStep: 5,
             itemLife: 18,
-            magnet: { radiusMultiplier: 4, responseRate: 5, speedMultiplier: 1.35, magnetGraceDuration: 1 },
+            magnet: { radiusMultiplier: 4, responseRate: 5, speedMultiplier: 1.35, collectionGraceDuration: 1 },
             victoryCollection: { duration: 1, responseRate: 180 },
             smallHealPack: { missingHpRecoveryRatio: 0.25 },
             shard: { baseAmount: 5, floorStep: 25, maximumAmount: 20, physicalDropCount: { minimum: 3, maximum: 7 } },

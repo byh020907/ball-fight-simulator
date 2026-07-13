@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.25.12",
+        date: "2026-07-14",
+        title: "v0.25.12 회수 유예의 이름을 하나로 정리합니다.",
+        changes: [
+            {
+                type: "refactor",
+                text: "Hero Orb와 전리품의 자석·직접 회수 유예 설정을 `CollectionGrace` 공통 이름으로 통일했습니다."
+            }
+        ]
+    },
+    {
         version: "0.25.11",
         date: "2026-07-14",
         title: "v0.25.11 Hero Orb도 바로 되돌아오지 않습니다.",

@@ -119,7 +119,7 @@ export class HeroAbility extends Ability {
             direction.scale(this._computeOrbSpeed()),
             effectType,
             undefined,
-            { magnetGraceDuration: this.getLevelUpgrade().magnetGraceDuration ?? 0 }
+            { collectionGraceDuration: this.getLevelUpgrade().collectionGraceDuration ?? 0 }
         );
     }
 

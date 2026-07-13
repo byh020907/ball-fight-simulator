@@ -1,8 +1,13 @@
 # 결정 기록
 
+## [L1] 2026-07-14 — 회수 유예 이름을 자석 전용으로 남기지 않는다
+- 맥락: `CollectionGrace`가 자석뿐 아니라 직접 회수까지 유예하는 공통 상태가 되었는데, `magnetGraceRemaining` 호환 별칭과 생성 설정 이름이 남아 실제 책임보다 좁게 읽힌다.
+- 결정: 상태·생성 옵션·밸런스 설정·테스트를 모두 `collectionGrace...`로 통일하고 `magnetGraceRemaining` 별칭을 제거한다.
+- 영향: Hero Orb, 사냥터 전리품, Hero/전리품 밸런스 설정, 회귀 테스트, 패치 기록.
+
 ## [L1] 2026-07-14 — Hero Orb와 전리품의 초기 회수 유예를 공통 능력으로 통합
 - 맥락: 전리품은 자석과 직접 회수를 모두 1초 유예하지만 Hero Orb는 자석만 유예해, 소유자와 겹친 직후에는 즉시 회수된다. 같은 생성 직후 보호 규칙이 엔티티마다 따로 구현되어 다시 어긋날 여지가 있다.
-- 결정: `CollectionGrace` 믹스인으로 남은 유예 시간과 갱신을 공통화하고, Hero Orb와 모든 `HuntingLootItem`이 이를 사용한다. Hero Orb도 유예 중에는 소유자 자석과 직접 회수를 모두 하지 않으며, 기존 `magnetGraceRemaining`은 호환용 별칭으로 유지한다.
+- 결정: `CollectionGrace` 믹스인으로 남은 유예 시간과 갱신을 공통화하고, Hero Orb와 모든 `HuntingLootItem`이 이를 사용한다. Hero Orb도 유예 중에는 소유자 자석과 직접 회수를 모두 하지 않으며, 남은 시간은 `collectionGraceRemaining` 하나로 관리한다.
 - 영향: 물리 믹스인, Hero Orb/전리품 갱신 경로, 회귀 테스트, 개발 규칙과 패치 기록.
 
 ## [L1] 2026-07-14 — 전장 루팅은 Hero Orb와 같은 충돌·초기 유예 경로를 사용한다

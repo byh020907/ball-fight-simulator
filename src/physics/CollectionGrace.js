@@ -17,14 +17,5 @@ export default function CollectionGrace(Base) {
             );
             return true;
         }
-
-        // 기존 회수 설정과 테스트가 사용하는 이름을 유지한다.
-        get magnetGraceRemaining() {
-            return this.collectionGraceRemaining;
-        }
-
-        set magnetGraceRemaining(value) {
-            this.collectionGraceRemaining = Math.max(0, Number.isFinite(value) ? value : 0);
-        }
     };
 }

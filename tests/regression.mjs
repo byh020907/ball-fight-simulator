@@ -2466,17 +2466,17 @@ function testHuntingLootItemsAndDropController(app) {
     );
     assert.equal(session.getCollectedLoot().shards, 0, "A dropped shard must not enter battle loot before collection");
     droppedShards.forEach((shard) => shard.update(1 / 60, simulation));
-    assert.equal(session.getCollectedLoot().shards, 0, "New loot must not be collected during its magnet grace period");
-    assert.ok(
-        droppedShards.every((shard) => shard.magnetGraceRemaining > 0),
-        "Every common loot item must begin with the shared magnet grace duration"
+    assert.equal(
+        session.getCollectedLoot().shards,
+        0,
+        "New loot must not be collected during its collection grace period"
     );
     assert.ok(
         droppedShards.every((shard) => shard.collectionGraceRemaining > 0),
-        "Loot items must expose the shared collection-grace state"
+        "Every common loot item must begin with the shared collection grace duration"
     );
     droppedShards.forEach((shard) => {
-        shard.magnetGraceRemaining = 0;
+        shard.collectionGraceRemaining = 0;
         shard.position = player.position.clone();
         shard.velocity = new Vector2();
     });
@@ -2606,7 +2606,7 @@ function testHuntingLootItemsAndDropController(app) {
     healPack.update(1 / 60, simulation);
     assert.equal(healPack.isExpired, false, "Full-HP players must leave a small heal pack on the floor");
     player.hp = 50;
-    healPack.magnetGraceRemaining = 0;
+    healPack.collectionGraceRemaining = 0;
     healPack.update(1 / 60, simulation);
     assert.equal(player.hp, 65, "A collected small heal pack must restore its stored amount");
     assert.equal(
@@ -2624,7 +2624,7 @@ function testHuntingLootItemsAndDropController(app) {
         onCollected: (reward) => session.recordCollection(reward)
     });
     assert.equal(chestDrop.radius, 20, "Chest drops should use the enlarged loot size");
-    chestDrop.magnetGraceRemaining = 0;
+    chestDrop.collectionGraceRemaining = 0;
     chestDrop.update(1 / 60, simulation);
     assert.equal(
         session.getCollectedLoot().chests[0]?.id,
@@ -3816,9 +3816,9 @@ function testAbilityLevelUpgrades(app) {
     const launchedOrb = heroRun.sim.entities.find((entity) => entity.constructor?.name === "HeroOrb");
     const launchVelocity = launchedOrb.velocity.clone();
     assert.equal(
-        launchedOrb.magnetGraceRemaining,
+        launchedOrb.collectionGraceRemaining,
         1,
-        "Hero tier 1 should give launched orbs a one-second magnet grace period"
+        "Hero tier 1 should give launched orbs a one-second collection grace period"
     );
     for (const _ of Array.from({ length: 10 })) {
         launchedOrb.update(0.1, heroRun.sim);
@@ -3836,7 +3836,7 @@ function testAbilityLevelUpgrades(app) {
         new Vector2(0, 0),
         "hp",
         undefined,
-        { magnetGraceDuration: 1 }
+        { collectionGraceDuration: 1 }
     );
     heroOrb.update(1, heroRun.sim);
     assert.equal(
@@ -8045,15 +8045,13 @@ async function testHeroOrbCollectionGraceDefersOwnerPickup(app) {
     const heroFighter = sim.fighters.find((fighter) => fighter.id === FIGHTER_IDS.HERO);
     const bonusesBefore = { ...heroFighter.hero.bonuses };
     const orb = new HeroOrb(heroFighter, heroFighter.position.clone(), new Vector2(), "hp", 10, {
-        magnetGraceDuration: 1
+        collectionGraceDuration: 1
     });
 
     orb.update(0.1, sim);
     assert.equal(orb.isExpired, false, "Hero Orb must remain on the field while collection grace is active");
     assert.deepEqual(heroFighter.hero.bonuses, bonusesBefore, "Collection grace must defer the Hero Orb reward");
     assert.equal(orb.collectionGraceRemaining, 0.9, "Hero Orb must use the shared collection-grace state");
-    assert.equal(orb.magnetGraceRemaining, 0.9, "Legacy magnet-grace access must mirror shared collection grace");
-
     orb.update(0.9, sim);
     assert.equal(orb.isExpired, false, "The update that consumes the final grace duration must still defer collection");
     orb.update(1 / 60, sim);

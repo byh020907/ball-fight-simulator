@@ -259,14 +259,14 @@ export function applyHeroOrbCarryoverToBattleBall(ball, carryover) {
 // ── Hero Orb entity ──────────────────────────────────────────────────────────
 
 export class HeroOrb extends CollectionGrace(CombatEntity) {
-    constructor(owner, position, velocity, effectType, life, { magnetGraceDuration = 0 } = {}) {
+    constructor(owner, position, velocity, effectType, life, { collectionGraceDuration = 0 } = {}) {
         super(position, velocity, 12);
         this.owner = owner;
         this.ownerId = owner.id;
         this.effectType = effectType;
         this.life = life ?? Infinity;
         this.mass = 2;
-        this.initializeCollectionGrace(magnetGraceDuration);
+        this.initializeCollectionGrace(collectionGraceDuration);
     }
 
     get renderLayer() {

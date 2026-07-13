@@ -5,7 +5,7 @@ import { applyMagneticAttraction, getCombatMovementSpeed } from "../physics/magn
 const DEFAULT_LIFE = 18;
 const DEFAULT_MAGNET_RESPONSE_RATE = 5;
 const DEFAULT_MAGNET_SPEED_MULTIPLIER = 1.35;
-const DEFAULT_MAGNET_GRACE_DURATION = 1;
+const DEFAULT_COLLECTION_GRACE_DURATION = 1;
 
 export class HuntingLootItem extends CollectionGrace(CombatEntity) {
     static renderLayer = RENDER_LAYERS.FOREGROUND;
@@ -19,7 +19,7 @@ export class HuntingLootItem extends CollectionGrace(CombatEntity) {
         magnetRadiusMultiplier = 4,
         magnetResponseRate = DEFAULT_MAGNET_RESPONSE_RATE,
         magnetSpeedMultiplier = DEFAULT_MAGNET_SPEED_MULTIPLIER,
-        magnetGraceDuration = DEFAULT_MAGNET_GRACE_DURATION,
+        collectionGraceDuration = DEFAULT_COLLECTION_GRACE_DURATION,
         onCollected = null
     } = {}) {
         super(position?.clone?.() ?? new Vector2(), velocity?.clone?.() ?? new Vector2(), radius);
@@ -30,7 +30,7 @@ export class HuntingLootItem extends CollectionGrace(CombatEntity) {
         this.magnetRadiusMultiplier = Math.max(1, magnetRadiusMultiplier);
         this.magnetResponseRate = Math.max(0, magnetResponseRate);
         this.magnetSpeedMultiplier = Math.max(0, magnetSpeedMultiplier);
-        this.initializeCollectionGrace(magnetGraceDuration);
+        this.initializeCollectionGrace(collectionGraceDuration);
         this.onCollected = onCollected;
         this.victoryCollectionRemaining = 0;
         this.victoryCollectionResponseRate = 0;
