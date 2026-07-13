@@ -301,7 +301,7 @@ export const REWARD_BALANCE = deepFreeze({
             magnet: { radiusMultiplier: 4, responseRate: 5, speedMultiplier: 1.35 },
             victoryCollection: { duration: 1, responseRate: 180 },
             smallHealPack: { missingHpRecoveryRatio: 0.25 },
-            shard: { baseAmount: 5, floorStep: 25, maximumAmount: 20 },
+            shard: { baseAmount: 5, floorStep: 25, maximumAmount: 20, physicalDropCount: { minimum: 3, maximum: 7 } },
             normalWeights: { small_heal_pack: { minimum: 20, maximum: 40 }, chest: 10 },
             rarityRewards: {
                 common: { shard_bundle: 0, high_chest: 0 },

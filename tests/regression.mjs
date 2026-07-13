@@ -122,6 +122,7 @@ import {
     getHuntingBonusLootWeights,
     getHuntingLootDropChance,
     getHuntingShardDropAmount,
+    getHuntingShardPhysicalDropCount,
     getSmallHealPackAmount,
     rollHighChestRarity,
     rollHuntingBonusLootItemType,
@@ -2344,6 +2345,16 @@ function testHuntingLootBalanceRules() {
         22,
         "Deep floors should preserve the shifted upper shard roll"
     );
+    assert.equal(
+        getHuntingShardPhysicalDropCount(() => 0),
+        3,
+        "Physical shard-drop count should begin at three regardless of the hunting floor"
+    );
+    assert.equal(
+        getHuntingShardPhysicalDropCount(() => 0.999999),
+        7,
+        "Physical shard-drop count should reach seven regardless of the hunting floor"
+    );
     assert.deepEqual(
         getHuntingBonusLootWeights({ collector: fullHp, rarity: "common" }),
         { small_heal_pack: 20, chest: 10, shard_bundle: 0, high_chest: 0 },
@@ -2411,7 +2422,7 @@ function testHuntingLootItemsAndDropController(app) {
     };
     const mobSpec = createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.PURSUER, floor: 1, index: 0 });
     const session = new HuntingBattleLootSession({ playerId: playerSpec.id, floor: 1 });
-    const rolls = [0, 0.25, 0, 0.9];
+    const rolls = [0, 0, 0, 0.25, 0.5, 0, 0.25, 0.999999, 0, 0.25, 0.9];
     const soundCalls = [];
     const controller = new HuntingLootDropController({ session, rng: () => rolls.shift() ?? 0 });
     const simulation = new BattleSimulation(
@@ -2431,12 +2442,18 @@ function testHuntingLootItemsAndDropController(app) {
     player.hp = player.maxHp;
 
     mob.takeDamage(100000, player, "Loot Hook Test");
-    const droppedShard = simulation.entities.find((entity) => entity instanceof ShardDrop);
-    assert.ok(droppedShard, "Defeating a hunting mob must create a configured floor-loot item");
+    const droppedShards = simulation.entities.filter((entity) => entity instanceof ShardDrop);
+    const droppedShard = droppedShards[0];
+    assert.ok(droppedShard, "Defeating a hunting mob must create configured floor-loot items");
     assert.equal(
-        simulation.entities.filter((entity) => entity instanceof ShardDrop).length,
-        1,
-        "Every normal monster defeat must spawn one guaranteed standard-shard drop even when bonus loot fails"
+        droppedShards.length,
+        3,
+        "A floor-one three-shard roll must create three physical standard-shard drops when bonus loot fails"
+    );
+    assert.deepEqual(
+        droppedShards.map((shard) => shard.amount),
+        [3, 5, 7],
+        "Each physical standard shard must roll its own floor-scaled reward value"
     );
     assert.equal(droppedShard.radius, 16, "Standard shard drops should be visibly larger than hero orbs");
     assert.ok(
@@ -2449,16 +2466,16 @@ function testHuntingLootItemsAndDropController(app) {
     );
     assert.equal(session.getCollectedLoot().shards, 0, "A dropped shard must not enter battle loot before collection");
     const entitiesBeforeShardCollection = simulation.entities.length;
-    droppedShard.update(1 / 60, simulation);
+    droppedShards.forEach((shard) => shard.update(1 / 60, simulation));
     assert.equal(
         session.getCollectedLoot().shards,
-        3,
-        "Collecting a shard must add its rolled amount to the battle loot session"
+        15,
+        "Collecting physical shards must add every independently rolled shard value to the battle loot session"
     );
     assert.equal(
         simulation.entities.length - entitiesBeforeShardCollection,
-        26,
-        "Loot collection should create a larger burst, 24 particles, and a reward label"
+        78,
+        "Each collected physical shard should create its own burst, particles, and reward label"
     );
     assert.deepEqual(
         soundCalls.at(-1),
@@ -2467,7 +2484,7 @@ function testHuntingLootItemsAndDropController(app) {
     );
 
     const bonusSession = new HuntingBattleLootSession({ playerId: player.id, floor: 1 });
-    const bonusRolls = [0, 0, 0, 0.1, 0.8, 0, 0];
+    const bonusRolls = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.1, 0.8, 0, 0];
     const bonusController = new HuntingLootDropController({
         session: bonusSession,
         rng: () => bonusRolls.shift() ?? 0
@@ -2477,8 +2494,8 @@ function testHuntingLootItemsAndDropController(app) {
     const bonusDrops = simulation.entities.slice(bonusEntityCount);
     assert.equal(
         bonusDrops.filter((entity) => entity instanceof ShardDrop).length,
-        1,
-        "A successful bonus roll must not replace the guaranteed random shard drop"
+        3,
+        "A successful bonus roll must not replace the guaranteed physical shard drops"
     );
     assert.equal(
         bonusDrops.filter((entity) => entity instanceof ChestDrop).length,
