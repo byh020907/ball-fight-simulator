@@ -11,6 +11,7 @@ const ELECTRIC_RANGE = 330;
 const ELECTRIC_DAMAGE_PER_TICK = 8;
 const ELECTRIC_COLOR = "#a8e6ff";
 const ELECTRIC_TIMING_EPSILON = 1e-9;
+export const LASER_CHARGE_TURN_RATE = 4;
 const SPLIT_FRAGMENT_CONFIG = Object.freeze({
     maximumCount: 4,
     radiusMultiplier: 0.54,
@@ -391,7 +392,10 @@ export class HuntingMobAbility extends Ability {
             };
         }
         const laser = this.state.laser;
-        laser.charge -= delta;
+        if (laser.charge > 0) {
+            this._trackLaserCharge(laser, target, delta);
+            laser.charge -= delta;
+        }
         if (laser.charge <= 0) {
             laser.fire += delta;
             const direction = Vector2.fromAngle(laser.angle, 1);
@@ -408,6 +412,16 @@ export class HuntingMobAbility extends Ability {
                 target.takeDamage(20 * delta, this.owner, "Laser Beam");
         }
         if (laser.fire >= 0.55) this.state.laser = null;
+    }
+
+    _trackLaserCharge(laser, target, delta) {
+        const targetAngle = Math.atan2(
+            target.position.y - this.owner.position.y,
+            target.position.x - this.owner.position.x
+        );
+        const angleDifference = normalizeAngle(targetAngle - laser.angle);
+        const maximumTurn = LASER_CHARGE_TURN_RATE * delta;
+        laser.angle = normalizeAngle(laser.angle + clamp(angleDifference, -maximumTurn, maximumTurn));
     }
 
     _tickBoomerang(delta, target) {

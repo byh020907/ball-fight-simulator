@@ -129,7 +129,7 @@ import {
     rollHuntingShardBundleAmount
 } from "../src/hunting/index.js";
 import { Grenade } from "../src/entities/grenade.js";
-import { getArenaWallRay } from "../src/abilities/huntingMobAbility.js";
+import { getArenaWallRay, LASER_CHARGE_TURN_RATE } from "../src/abilities/huntingMobAbility.js";
 import { createElectricArcPath } from "../src/effects/electricArc.js";
 import {
     CONSUMABLE_IDS,
@@ -7325,6 +7325,54 @@ function testHuntingLaserReachesArenaWall(app) {
     const hpBefore = target.hp;
     laserBall.ability._tickLaser(0.76, target);
     assert.ok(target.hp < hpBefore, "Laser should damage a target beyond the former 520px fixed range");
+
+    const startCharge = (position) => {
+        target.position = position;
+        laserBall.ability.state.laser = null;
+        laserBall.ability.state.timer = laserBall.ability.cooldown;
+        laserBall.ability._tickLaser(0, target);
+        return laserBall.ability.state.laser;
+    };
+    const normalizeAngle = (angle) => Math.atan2(Math.sin(angle), Math.cos(angle));
+    const chargingLaser = startCharge(new Vector2(900, 400));
+    const initialAngle = chargingLaser.angle;
+    target.position = new Vector2(200, 800);
+    laserBall.ability._tickLaser(0.1, target);
+    const desiredAngle = Math.atan2(target.position.y - laserBall.position.y, target.position.x - laserBall.position.x);
+    const chargeTurn = normalizeAngle(chargingLaser.angle - initialAngle);
+    assert.ok(chargeTurn > 0, "Laser charge aim should turn toward a moving target");
+    assert.ok(
+        Math.abs(chargeTurn) <= LASER_CHARGE_TURN_RATE * 0.1 + 1e-9,
+        "Laser charge aim should not turn farther than its per-frame speed limit"
+    );
+    assert.ok(
+        Math.abs(normalizeAngle(desiredAngle - chargingLaser.angle)) <
+            Math.abs(normalizeAngle(desiredAngle - initialAngle)),
+        "Laser charge aim should close the angular gap without snapping directly to the target"
+    );
+
+    laserBall.ability.state.laser = { angle: Math.PI - 0.05, charge: 0.5, fire: 0 };
+    target.position = new Vector2(100, 395);
+    const boundaryAngle = laserBall.ability.state.laser.angle;
+    laserBall.ability._tickLaser(0.1, target);
+    const boundaryTurn = normalizeAngle(laserBall.ability.state.laser.angle - boundaryAngle);
+    assert.ok(boundaryTurn > 0, "Laser charge aim should cross the -pi/pi boundary by the shortest direction");
+    assert.ok(
+        Math.abs(boundaryTurn) <= LASER_CHARGE_TURN_RATE * 0.1 + 1e-9,
+        "Laser charge aim should retain its speed limit across the -pi/pi boundary"
+    );
+
+    laserBall.ability.state.laser = { angle: 0.35, charge: 0.01, fire: 0 };
+    target.position = new Vector2(200, 800);
+    laserBall.ability._tickLaser(0.02, target);
+    const firingAngle = laserBall.ability.state.laser.angle;
+    target.position = new Vector2(1000, 400);
+    laserBall.ability._tickLaser(0.1, target);
+    assert.equal(
+        laserBall.ability.state.laser.angle,
+        firingAngle,
+        "Laser firing should keep the angle locked after charge completes"
+    );
     console.log("[hunting-laser-wall-range] ok");
 }
 
