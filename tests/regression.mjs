@@ -3621,6 +3621,15 @@ async function testHuntingAchievementProgress() {
         ]),
         "All hunting achievement definitions should evaluate from their persistent hunting statistics"
     );
+    const championAchievement = ACHIEVEMENT_DEFINITIONS.find(
+        (achievement) => achievement.id === "hunting_champion_victory"
+    );
+    assert.equal(championAchievement.tier, "bronze", "Champion intrusion should remain an introductory achievement");
+    assert.equal(
+        championAchievement.reward.rarity,
+        "common",
+        "Champion intrusion should not bypass its existing shard multiplier with a high-rarity chest"
+    );
 
     const sanitized = sanitizePlayerProfile({
         hunting: {

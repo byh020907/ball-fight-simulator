@@ -294,7 +294,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         id: "hunting_champion_victory",
         name: "난입 저지",
         description: "챔피언 난입 전투에서 승리하세요.",
-        tier: "gold",
+        tier: "bronze",
         target: 1,
         rewardKey: "huntingChampionVictory",
         getCurrent: (context) => getHuntingStats(context).championVictories ?? 0

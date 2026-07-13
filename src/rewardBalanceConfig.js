@@ -429,7 +429,7 @@ export const REWARD_BALANCE = deepFreeze({
             huntingDepth30: { type: "CHEST", rarity: "common" },
             huntingCriticalHpWin: { type: "CHEST", rarity: "uncommon" },
             huntingPortalRetreat40: { type: "CHEST", rarity: "uncommon" },
-            huntingChampionVictory: { type: "CHEST", rarity: "rare" },
+            huntingChampionVictory: { type: "CHEST", rarity: "common" },
             huntingSecuredChests: { type: "SHARDS", amount: 50 },
             huntingAllStagesClear: { type: "CHEST", rarity: "epic" },
             huntingMonsterSlayer: { type: "CHEST", rarity: "common" },
