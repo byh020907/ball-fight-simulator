@@ -1807,6 +1807,49 @@ function testHuntingEventPresentationContracts() {
     console.log("[hunting-event-presentation-contracts] ok");
 }
 
+function testHuntingEventHealthInitialization() {
+    const mockApp = {
+        roster: app.roster,
+        playerProfile: createDefaultPlayerProfile(),
+        playerStatAllocation: {}
+    };
+    const manager = new HuntingManager(mockApp);
+    const restEvent = HuntingEvent.createPayload(HUNTING_EVENT_TYPES.REST_SITE, 2);
+    const mishapEvent = HuntingEvent.createPayload(HUNTING_EVENT_TYPES.MISHAP, 2);
+
+    manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE });
+    const restResolution = manager._resolveHuntingEvent(restEvent, mockApp);
+    const maxHp = restResolution.run.carriedMaxHp;
+    assert.ok(maxHp > 0, "A first hunting event should initialize the player's actual maximum HP");
+    assert.equal(restResolution.run.carriedHp, maxHp, "A rest site should not turn a fresh run into low HP");
+    assert.ok(
+        !restResolution.presentation.detail.includes("undefined"),
+        "Rest site UI should always show a maximum HP"
+    );
+
+    manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE });
+    const mishapResolution = manager._resolveHuntingEvent(mishapEvent, mockApp);
+    assert.equal(
+        mishapResolution.run.carriedMaxHp,
+        maxHp,
+        "Mishaps should use the same initialized maximum HP as rest sites"
+    );
+    assert.ok(
+        mishapResolution.run.carriedHp > 0 && mishapResolution.run.carriedHp < maxHp,
+        "A first mishap should deal damage from the player's actual HP without causing defeat"
+    );
+
+    manager._run = createHuntingRun({ characterId: FIGHTER_IDS.HERO, stageId: HUNTING_STAGE_IDS.CAVE });
+    const heroBase = manager._resolveHuntingEvent(restEvent, mockApp).run.carriedMaxHp;
+    manager._run = {
+        ...createHuntingRun({ characterId: FIGHTER_IDS.HERO, stageId: HUNTING_STAGE_IDS.CAVE }),
+        hero: { bonuses: {}, carryover: { hp: 3, damage: 0, speed: 0, defense: 0, skill: 0 } }
+    };
+    const heroCarryover = manager._resolveHuntingEvent(restEvent, mockApp).run.carriedMaxHp;
+    assert.equal(heroCarryover - heroBase, 15, "Event HP should include Hero Ball's carried HP bonuses");
+    console.log("[hunting-event-health-initialization] ok");
+}
+
 function testHuntingAutoEventRequiresConfirmation() {
     const overlayCalls = [];
     const overlayMessages = [];
@@ -8895,6 +8938,7 @@ await testHuntingEarlyEventUi();
 await testHuntingFirstMoveUiPaintGate();
 testHuntingChestEventStopsAndResumes();
 testHuntingEventPresentationContracts();
+testHuntingEventHealthInitialization();
 testHuntingAutoEventRequiresConfirmation();
 testHuntingChampionEventRequiresBattleConfirmation();
 await testHuntingChestEventStopsAdvanceLoop();

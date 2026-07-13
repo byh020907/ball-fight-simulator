@@ -11,6 +11,7 @@ export function setHeroOrbStatCap(value) {
 
 const HERO_ORB_STAT_GAIN_MIN = 1;
 const HERO_ORB_STAT_GAIN_MAX = 5;
+export const HERO_ORB_HP_PER_POINT = 5;
 
 export function rollHeroOrbStatGain(rng = Math.random) {
     return HERO_ORB_STAT_GAIN_MIN + Math.floor(rng() * (HERO_ORB_STAT_GAIN_MAX - HERO_ORB_STAT_GAIN_MIN + 1));
@@ -39,8 +40,8 @@ export const HERO_ORB_EFFECTS = {
             if (!clamped.applied) return { applied: false };
             const amount = clamped.amount;
             owner.hero.bonuses.hp += amount;
-            owner.maxHp += 5 * amount;
-            owner.hp = Math.min(owner.hp + 5 * amount, owner.maxHp);
+            owner.maxHp += HERO_ORB_HP_PER_POINT * amount;
+            owner.hp = Math.min(owner.hp + HERO_ORB_HP_PER_POINT * amount, owner.maxHp);
             return { applied: true, amount };
         }
     },
@@ -199,8 +200,8 @@ export function applyHeroOrbStatAmount(owner, statKey, amount, opts = {}) {
     }
     switch (statKey) {
         case "hp":
-            owner.maxHp += 5 * amount;
-            owner.hp = Math.min(owner.hp + 5 * amount, owner.maxHp);
+            owner.maxHp += HERO_ORB_HP_PER_POINT * amount;
+            owner.hp = Math.min(owner.hp + HERO_ORB_HP_PER_POINT * amount, owner.maxHp);
             break;
         case "damage":
             owner.stats.baseDamage = Number((owner.stats.baseDamage * Math.pow(1.02, amount)).toFixed(1));

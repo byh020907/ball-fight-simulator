@@ -32,6 +32,7 @@ import {
 import { applyMerchantOffer, formatOfferResultToast } from "./huntingMerchant.js";
 import { formatPendingLootSummary, formatDefeatLossText } from "./huntingFormat.js";
 import { createMatchReport, recordLowestHp } from "../collection/index.js";
+import { HERO_ORB_HP_PER_POINT } from "../entities/heroOrb.js";
 import {
     applyExperienceProgressionToBaseSpec,
     collectActiveExperienceProgression,
@@ -195,13 +196,56 @@ export class HuntingManager {
         });
     }
 
+    _createPlayerHuntingSpec(run) {
+        const app = this.app;
+        const playerSpec = app.roster.find((fighter) => fighter.id === run.characterId);
+        if (!playerSpec) return null;
+
+        const playerProgression = collectActiveExperienceProgression(app.playerProfile, run.characterId);
+        const masteryCtx = collectActiveEffects(app.playerProfile, run.characterId);
+        const baseSpec = applyExperienceProgressionToBaseSpec(playerSpec, playerProgression);
+        const allocatedSpec = applyStatAllocation(baseSpec, app.playerStatAllocation ?? {}, true);
+        const equippedSpec = applyEquipmentStats({ ...allocatedSpec, teamId: HUNTING_TEAMS.PLAYER }, app.playerProfile);
+        const huntingSpec = applyHuntingStatModifiersToSpec(equippedSpec, run.statModifiers);
+        const appliedSpec = applyMasteryEffectsToFighterSpec(huntingSpec, masteryCtx);
+        if (playerSpec.ability === "hero" && run.hero?.carryover) {
+            appliedSpec.hero = {
+                ...(appliedSpec.hero || {}),
+                carryover: { ...run.hero.carryover }
+            };
+        }
+
+        return { playerSpec, playerProgression, appliedSpec };
+    }
+
+    _getHuntingMaxHp(spec) {
+        const baseHp = spec?.stats?.hp;
+        if (!Number.isFinite(baseHp) || baseHp <= 0) return null;
+        const heroHp = spec.ability === "hero" ? Math.max(0, spec.hero?.carryover?.hp ?? 0) : 0;
+        return baseHp + heroHp * HERO_ORB_HP_PER_POINT;
+    }
+
+    _syncRunHealth(run, spec) {
+        const maxHp = this._getHuntingMaxHp(spec);
+        if (maxHp === null) return run;
+        const carriedHp = Number.isFinite(run.carriedHp) ? run.carriedHp : maxHp;
+        return {
+            ...run,
+            carriedHp: Math.min(maxHp, Math.max(1, carriedHp)),
+            carriedMaxHp: maxHp
+        };
+    }
+
     _startFloorBattle() {
         const app = this.app;
-        const run = this._run;
+        let run = this._run;
         if (!run || run.status !== "active") return;
 
-        const playerSpec = app.roster.find((f) => f.id === run.characterId);
-        if (!playerSpec) return;
+        const player = this._createPlayerHuntingSpec(run);
+        if (!player) return;
+        this._run = this._syncRunHealth(run, player.appliedSpec);
+        run = this._run;
+        const { playerProgression, appliedSpec } = player;
 
         const isFinalBoss = run.lastEncounter?.type === HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS;
         const encounterEnemyType = run.lastEncounter?.enemyType;
@@ -222,20 +266,6 @@ export class HuntingManager {
                   })
                 : null;
         const enemySpecs = miniboss ? [miniboss, ...mobSpecs.slice(0, Math.max(1, mobSpecs.length - 1))] : mobSpecs;
-        const playerProgression = collectActiveExperienceProgression(app.playerProfile, run.characterId);
-
-        const masteryCtx = collectActiveEffects(app.playerProfile, run.characterId);
-        const baseSpec = applyExperienceProgressionToBaseSpec(playerSpec, playerProgression);
-        const allocatedSpec = applyStatAllocation(baseSpec, app.playerStatAllocation, true);
-        const equippedSpec = applyEquipmentStats({ ...allocatedSpec, teamId: HUNTING_TEAMS.PLAYER }, app.playerProfile);
-        const huntingSpec = applyHuntingStatModifiersToSpec(equippedSpec, run.statModifiers);
-        const appliedSpec = applyMasteryEffectsToFighterSpec(huntingSpec, masteryCtx);
-        if (playerSpec.ability === "hero" && run.hero?.carryover) {
-            appliedSpec.hero = {
-                ...(appliedSpec.hero || {}),
-                carryover: { ...run.hero.carryover }
-            };
-        }
         const matchSpecs = [appliedSpec, ...enemySpecs];
         app._currentMatchReport = createMatchReport();
         app._currentMatchReport.playerFighterId = run.characterId;
@@ -263,7 +293,7 @@ export class HuntingManager {
             experienceProgressionByFighter: new Map([[run.characterId, playerProgression]])
         });
 
-        if (run.carriedHp !== null) {
+        if (Number.isFinite(run.carriedHp)) {
             const ball = app.simulation?.fighters?.find((f) => f.id === run.characterId);
             if (ball) {
                 ball.hp = Math.min(ball.maxHp, Math.max(1, run.carriedHp));
@@ -479,6 +509,10 @@ export class HuntingManager {
     }
 
     _advanceRunOneFloor() {
+        const player = this._createPlayerHuntingSpec(this._run);
+        if (player) {
+            this._run = this._syncRunHealth(this._run, player.appliedSpec);
+        }
         this._run = advanceHuntingRun(this._run);
         if (this._run.status === "active") return true;
 
@@ -795,6 +829,10 @@ export class HuntingManager {
     }
 
     _resolveHuntingEvent(event, app) {
+        const player = this._createPlayerHuntingSpec(this._run);
+        if (player) {
+            this._run = this._syncRunHealth(this._run, player.appliedSpec);
+        }
         return HuntingEvent.resolve(event, {
             run: this._run,
             playerProfile: app.playerProfile,

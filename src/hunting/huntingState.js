@@ -65,6 +65,7 @@ export function createHuntingRun({
         floor: 1,
         maxFloor,
         carriedHp: null,
+        carriedMaxHp: null,
         statModifiers: [],
         pendingLoot: createEmptyHuntingLoot(),
         securedLoot: createEmptyHuntingLoot(),
@@ -194,7 +195,8 @@ export function recordHuntingFloorResult(
 
 export function applyHuntingEventRecovery(run, { amount = 0 } = {}) {
     if (!run || run.status !== "active") return run;
-    const maxHp = run.carriedMaxHp ?? run.carriedHp ?? 0;
+    const maxHp = Number.isFinite(run.carriedMaxHp) && run.carriedMaxHp > 0 ? run.carriedMaxHp : null;
+    if (maxHp === null) return run;
     const recoveredHp = Math.min(maxHp, Math.max(0, (run.carriedHp ?? maxHp) + Math.max(0, amount)));
     return {
         ...run,
