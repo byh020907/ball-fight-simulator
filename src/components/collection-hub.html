@@ -456,31 +456,37 @@
                             ></chest-icon>
                             <div class="ch-shop-offer-info">
                                 <strong>상점 상자</strong>
-                                <span x-text="'구매 ' + state.storage.dailyShop.purchases + '/' + state.storage.dailyShop.purchaseLimit"></span>
+                                <span x-text="'구매 ' + getShopPurchaseCount(state.storage.dailyShop) + '/' + state.storage.dailyShop.purchaseLimit"></span>
                             </div>
                             <button
                                 class="ch-btn"
                                 type="button"
-                                x-bind:disabled="state.storage.dailyShop.purchases >= state.storage.dailyShop.purchaseLimit || state.storage.shards < state.storage.dailyShop.chestCost"
+                                x-bind:disabled="getShopPurchaseCount(state.storage.dailyShop) >= state.storage.dailyShop.purchaseLimit || state.storage.shards < state.storage.dailyShop.chestCost"
                                 @click="buyDailyShopChest()"
                                 x-text="'구매 ' + state.storage.dailyShop.chestCost"
                             ></button>
                         </div>
                         <div class="ch-shop-meta">
                             <span x-text="'보유 파편 ' + Number(state.storage.shards || 0).toLocaleString()"></span>
-                            <span x-text="'구매 초기화 ' + formatShopTime(state.storage.dailyShop.purchaseResetAt)"></span>
+                            <span
+                                x-show="isShopResetPending(state.storage.dailyShop.purchaseResetAt)"
+                                x-text="'구매 초기화 ' + formatShopTime(state.storage.dailyShop.purchaseResetAt)"
+                            ></span>
                         </div>
                         <div class="ch-shop-reroll">
                             <div>
                                 <strong>상자 리롤</strong>
-                                <span x-text="'리롤 초기화 ' + formatShopTime(state.storage.dailyShop.rerollResetAt)"></span>
+                                <span
+                                    x-show="isShopResetPending(state.storage.dailyShop.rerollResetAt)"
+                                    x-text="'리롤 초기화 ' + formatShopTime(state.storage.dailyShop.rerollResetAt)"
+                                ></span>
                             </div>
                             <button
                                 class="ch-btn"
                                 type="button"
-                                x-bind:disabled="state.storage.shards < state.storage.dailyShop.rerollCost"
+                                x-bind:disabled="state.storage.shards < getShopRerollCost(state.storage.dailyShop)"
                                 @click="rerollDailyShop()"
-                                x-text="'리롤 ' + state.storage.dailyShop.rerollCost"
+                                x-text="'리롤 ' + getShopRerollCost(state.storage.dailyShop)"
                             ></button>
                         </div>
                     </div>
@@ -616,6 +622,15 @@
                 return [Math.floor(seconds / 3600), Math.floor((seconds % 3600) / 60), seconds % 60]
                     .map((v) => String(v).padStart(2, "0"))
                     .join(":");
+            },
+            isShopResetPending(resetAt) {
+                return Number.isFinite(resetAt) && resetAt > state.now;
+            },
+            getShopPurchaseCount(shop) {
+                return this.isShopResetPending(shop.purchaseResetAt) ? shop.purchases : 0;
+            },
+            getShopRerollCost(shop) {
+                return this.isShopResetPending(shop.rerollResetAt) ? shop.rerollCost : shop.rerollBaseCost;
             },
             closeCollectionHub,
             openShop,

@@ -29,23 +29,35 @@ function getRerollCost(rerolls) {
     return DAILY_SHOP.rerollBaseCost * multiplier;
 }
 
+function getLegacyLastActionAt(shop, countKey, lastActionAtKey, resetAtKey, resetMs) {
+    if (Number.isFinite(shop[lastActionAtKey])) return shop[lastActionAtKey];
+    if (shop[countKey] <= 0 || !Number.isFinite(shop[resetAtKey])) return null;
+    return shop[resetAtKey] - resetMs;
+}
+
+function normalizeTimedShopCounter(shop, countKey, lastActionAtKey, resetAtKey, resetMs, now) {
+    shop[countKey] = Number.isFinite(shop[countKey]) ? Math.max(0, shop[countKey]) : 0;
+    const lastActionAt = getLegacyLastActionAt(shop, countKey, lastActionAtKey, resetAtKey, resetMs);
+
+    if (shop[countKey] === 0 || lastActionAt === null || lastActionAt + resetMs <= now) {
+        shop[countKey] = 0;
+        shop[lastActionAtKey] = null;
+    } else {
+        shop[lastActionAtKey] = lastActionAt;
+    }
+    delete shop[resetAtKey];
+}
+
+function getResetAt(lastActionAt, resetMs) {
+    return Number.isFinite(lastActionAt) ? lastActionAt + resetMs : null;
+}
+
 function getShopState(profile, now, rng = Math.random) {
     if (!profile?.hunting) return null;
 
     const shop = profile.hunting.dailyShop ?? {};
-    const purchases = Number.isFinite(shop.purchases) ? shop.purchases : 0;
-    const rerolls = Number.isFinite(shop.rerolls) ? shop.rerolls : 0;
-    shop.purchases = purchases;
-    shop.rerolls = rerolls;
-
-    if (!Number.isFinite(shop.purchaseResetAt) || shop.purchaseResetAt <= now) {
-        shop.purchases = 0;
-        shop.purchaseResetAt = now + DAILY_SHOP.purchaseResetMs;
-    }
-    if (!Number.isFinite(shop.rerollResetAt) || shop.rerollResetAt <= now) {
-        shop.rerolls = 0;
-        shop.rerollResetAt = now + DAILY_SHOP.rerollResetMs;
-    }
+    normalizeTimedShopCounter(shop, "purchases", "lastPurchaseAt", "purchaseResetAt", DAILY_SHOP.purchaseResetMs, now);
+    normalizeTimedShopCounter(shop, "rerolls", "lastRerollAt", "rerollResetAt", DAILY_SHOP.rerollResetMs, now);
     if (!SHOP_RARITY_WEIGHTS.some(([rarity]) => rarity === shop.rarity)) shop.rarity = rollShopRarity(rng);
 
     profile.hunting.dailyShop = shop;
@@ -57,10 +69,11 @@ function createDailyShopView(shop) {
         rarity: shop.rarity,
         purchases: shop.purchases,
         purchaseLimit: DAILY_SHOP.purchaseLimit,
-        purchaseResetAt: shop.purchaseResetAt,
+        purchaseResetAt: getResetAt(shop.lastPurchaseAt, DAILY_SHOP.purchaseResetMs),
         rerolls: shop.rerolls,
         rerollCost: getRerollCost(shop.rerolls),
-        rerollResetAt: shop.rerollResetAt,
+        rerollBaseCost: DAILY_SHOP.rerollBaseCost,
+        rerollResetAt: getResetAt(shop.lastRerollAt, DAILY_SHOP.rerollResetMs),
         chestCost: DAILY_SHOP.chestCost
     };
 }
@@ -77,6 +90,7 @@ export function buyDailyShopChest(profile, { now = Date.now(), rng = Math.random
 
     profile.hunting.shards -= DAILY_SHOP.chestCost;
     shop.purchases += 1;
+    shop.lastPurchaseAt = now;
     const chest = createHuntingChest({ rarity: shop.rarity, acquiredAt: now });
     profile.hunting.chests.push(chest);
     return chest;
@@ -91,6 +105,7 @@ export function rerollDailyShop(profile, { now = Date.now(), rng = Math.random }
 
     profile.hunting.shards -= cost;
     shop.rerolls += 1;
+    shop.lastRerollAt = now;
     shop.rarity = rollShopRarity(rng);
     return createDailyShopView(shop);
 }

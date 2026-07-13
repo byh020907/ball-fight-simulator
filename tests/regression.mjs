@@ -13477,31 +13477,81 @@ function testDailyShopPurchaseAndRerollCycles() {
 
     const firstOffer = getDailyShop(profile, 0);
     assert.equal(firstOffer.purchases, 0, "A new shop cycle should start with no purchases");
-    assert.equal(firstOffer.purchaseResetAt, DAILY_SHOP.purchaseResetMs, "Purchase reset should last six hours");
-    assert.equal(firstOffer.rerollResetAt, DAILY_SHOP.rerollResetMs, "Reroll reset should last ninety minutes");
+    assert.equal(firstOffer.purchaseResetAt, null, "Unused purchase limits should not start a reset timer");
+    assert.equal(firstOffer.rerollResetAt, null, "Unused rerolls should not start a reset timer");
 
     const firstChest = buyDailyShopChest(profile, { now: 1, rng: () => 0.01 });
-    const secondChest = buyDailyShopChest(profile, { now: 1, rng: () => 0.01 });
-    const blockedChest = buyDailyShopChest(profile, { now: 1, rng: () => 0.01 });
+    const secondChest = buyDailyShopChest(profile, { now: 4, rng: () => 0.01 });
+    const blockedChest = buyDailyShopChest(profile, { now: 4, rng: () => 0.01 });
     assert.ok(firstChest && secondChest, "The shop should sell two chests per purchase cycle");
     assert.equal(blockedChest, null, "The shop must enforce its purchase limit");
     assert.equal(profile.hunting.shards, 9_700, "Two shop chests should cost 300 shards");
+    assert.equal(profile.hunting.dailyShop.lastPurchaseAt, 4, "Purchases should save their latest successful time");
+    assert.equal(
+        getDailyShop(profile, 4).purchaseResetAt,
+        DAILY_SHOP.purchaseResetMs + 4,
+        "Purchase reset should count from the latest successful purchase"
+    );
 
-    const rerolledOffer = rerollDailyShop(profile, { now: 2, rng: () => 0.96 });
+    const rerolledOffer = rerollDailyShop(profile, { now: 5, rng: () => 0.96 });
     assert.equal(rerolledOffer.rarity, "rare", "Rerolling should replace the offered chest rarity");
     assert.equal(profile.hunting.shards, 9_670, "The first reroll should cost 30 shards");
-    rerollDailyShop(profile, { now: 2, rng: () => 0.01 });
+    assert.equal(profile.hunting.dailyShop.lastRerollAt, 5, "Rerolls should save their latest successful time");
+    assert.equal(
+        rerolledOffer.rerollResetAt,
+        DAILY_SHOP.rerollResetMs + 5,
+        "Reroll reset should count from the latest successful reroll"
+    );
+    rerollDailyShop(profile, { now: 8, rng: () => 0.01 });
+    assert.equal(profile.hunting.dailyShop.lastRerollAt, 8, "Later rerolls should refresh their reset time");
     assert.equal(profile.hunting.shards, 9_610, "The second reroll should cost 60 shards");
-    for (let attempt = 0; attempt < 8; attempt += 1) rerollDailyShop(profile, { now: 2, rng: () => 0.01 });
+    for (let attempt = 0; attempt < 8; attempt += 1) rerollDailyShop(profile, { now: 8, rng: () => 0.01 });
     assert.equal(profile.hunting.shards, 8_050, "Reroll costs should continue rising through 300 shards");
-    const cappedOffer = rerollDailyShop(profile, { now: 2, rng: () => 0.01 });
+    const cappedOffer = rerollDailyShop(profile, { now: 8, rng: () => 0.01 });
     assert.equal(cappedOffer.rerollCost, 300, "Reroll cost should stop at ten times the base price");
     assert.equal(profile.hunting.shards, 7_750, "The capped reroll should still cost 300 shards");
 
-    const nextRerollCycle = getDailyShop(profile, DAILY_SHOP.rerollResetMs + 1);
+    const nextRerollCycle = getDailyShop(profile, DAILY_SHOP.rerollResetMs + 9);
     assert.equal(nextRerollCycle.rerolls, 0, "The reroll count should reset independently");
-    const nextPurchaseCycle = getDailyShop(profile, DAILY_SHOP.purchaseResetMs + 1);
+    assert.equal(nextRerollCycle.rerollResetAt, null, "Reset rerolls should stop their countdown");
+    const nextPurchaseCycle = getDailyShop(profile, DAILY_SHOP.purchaseResetMs + 5);
     assert.equal(nextPurchaseCycle.purchases, 0, "The purchase count should reset independently");
+    assert.equal(nextPurchaseCycle.purchaseResetAt, null, "Reset purchases should stop their countdown");
+
+    const legacyUnusedProfile = createDefaultPlayerProfile();
+    legacyUnusedProfile.hunting.dailyShop = {
+        purchases: 0,
+        rerolls: 0,
+        purchaseResetAt: DAILY_SHOP.purchaseResetMs,
+        rerollResetAt: DAILY_SHOP.rerollResetMs
+    };
+    const migratedView = getDailyShop(legacyUnusedProfile, 1);
+    assert.equal(migratedView.purchaseResetAt, null, "Legacy unused purchase timers should be removed");
+    assert.equal(migratedView.rerollResetAt, null, "Legacy unused reroll timers should be removed");
+    assert.equal(
+        "purchaseResetAt" in legacyUnusedProfile.hunting.dailyShop,
+        false,
+        "Legacy reset timestamps should not remain persisted"
+    );
+
+    const legacyActiveProfile = createDefaultPlayerProfile();
+    legacyActiveProfile.hunting.dailyShop = {
+        purchases: 1,
+        rerolls: 2,
+        purchaseResetAt: DAILY_SHOP.purchaseResetMs + 10,
+        rerollResetAt: DAILY_SHOP.rerollResetMs + 10
+    };
+    getDailyShop(legacyActiveProfile, 10);
+    assert.equal(
+        legacyActiveProfile.hunting.dailyShop.lastPurchaseAt,
+        10,
+        "Active legacy purchases should retain their reset deadline"
+    );
+    assert.equal(
+        legacyActiveProfile.hunting.dailyShop.lastRerollAt,
+        10,
+        "Active legacy rerolls should retain their reset deadline"
+    );
     console.log("[daily-shop-purchase-reroll-cycles] ok");
 }
 
@@ -13565,6 +13615,18 @@ function testDailyShopPopupContract() {
     );
     assert.ok(template.includes("shopRerolling"), "Shop rerolls should trigger a visible transition state");
     assert.ok(template.includes("ch-shop-chest"), "Shop offers should reuse the chest icon component");
+    assert.ok(
+        template.includes("isShopResetPending"),
+        "Shop reset timers should be shown only while a reset is pending"
+    );
+    assert.ok(
+        template.includes("getShopPurchaseCount"),
+        "Expired purchase limits should become available without reopening the shop"
+    );
+    assert.ok(
+        template.includes("getShopRerollCost"),
+        "Expired rerolls should return to their base cost without reopening the shop"
+    );
     assert.ok(
         template.includes("x-component=\"'chest-icon'\""),
         "Dynamically shown shop chest must mount its template"
