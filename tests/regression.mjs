@@ -113,6 +113,7 @@ import {
 } from "../src/hunting/index.js";
 import { Grenade } from "../src/entities/grenade.js";
 import { getArenaWallRay } from "../src/abilities/huntingMobAbility.js";
+import { createElectricArcPath } from "../src/effects/electricArc.js";
 import {
     createEquipmentInstance,
     enhanceEquipment,
@@ -6339,6 +6340,80 @@ function testHuntingLaserReachesArenaWall(app) {
     console.log("[hunting-laser-wall-range] ok");
 }
 
+function testElectricArcPathAndHuntingRender(app) {
+    const from = new Vector2(120, 180);
+    const to = new Vector2(360, 240);
+    const initialPath = createElectricArcPath(from, to, { time: 0 });
+    const animatedPath = createElectricArcPath(from, to, { time: 0.12 });
+    const straightDirection = Vector2.subtract(to, from);
+
+    assert.ok(initialPath.length > 4, "Electric arcs should divide a link into multiple segments");
+    assert.deepEqual(initialPath[0], from, "Electric arcs should begin exactly at the caster");
+    assert.deepEqual(initialPath.at(-1), to, "Electric arcs should end exactly at the target");
+    assert.ok(
+        initialPath.every((point) => Number.isFinite(point.x) && Number.isFinite(point.y)),
+        "Electric arc points should remain finite"
+    );
+    assert.ok(
+        initialPath.slice(1, -1).some((point) => {
+            const offset = Vector2.subtract(point, from);
+            return Math.abs(offset.x * straightDirection.y - offset.y * straightDirection.x) > 0.001;
+        }),
+        "Electric arc intermediate points should bend away from a straight link"
+    );
+    assert.ok(
+        initialPath.slice(1, -1).some((point, index) => {
+            const next = animatedPath[index + 1];
+            return Math.abs(point.x - next.x) > 0.001 || Math.abs(point.y - next.y) > 0.001;
+        }),
+        "Electric arc intermediate points should move over time"
+    );
+
+    const playerSpec = {
+        ...app.roster.find((fighter) => fighter.id === FIGHTER_IDS.DASH),
+        teamId: HUNTING_TEAMS.PLAYER
+    };
+    const electricSpec = createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.ELECTRIC, floor: 20, index: 0 });
+    const simulation = new BattleSimulation([electricSpec, playerSpec], { onLog() {}, onSound() {} }, null, {
+        assignActions: false
+    });
+    const [electricMage, target] = simulation.fighters;
+    electricMage.position = new Vector2(340, 480);
+    target.position = new Vector2(580, 480);
+    electricMage.ability.update(1 / 60, target);
+
+    const paths = [];
+    let path = [];
+    const ctx = {
+        save() {},
+        restore() {},
+        beginPath() {
+            path = [];
+        },
+        moveTo(x, y) {
+            path.push({ command: "move", x, y });
+        },
+        lineTo(x, y) {
+            path.push({ command: "line", x, y });
+        },
+        stroke() {
+            paths.push(path);
+        }
+    };
+    electricMage.ability.draw(ctx);
+
+    assert.equal(
+        electricMage.ability.state.link.style,
+        "electric",
+        "Electric mages should opt into the arc link style"
+    );
+    assert.ok(
+        paths.every((drawnPath) => drawnPath.filter((point) => point.command === "line").length > 1),
+        "Electric mage rendering should draw every glow layer as a multi-segment arc"
+    );
+    console.log("[electric-arc] ok");
+}
+
 function testTeamTargetingAndFriendlyCollision(app) {
     const archer = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
     const orbit = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ORBIT);
@@ -8987,6 +9062,7 @@ testMultiFighterSimulationSetup(app);
 testArenaCameraZoom();
 testHuntingMeleeMobChasesTarget(app);
 testHuntingLaserReachesArenaWall(app);
+testElectricArcPathAndHuntingRender(app);
 testTeamTargetingAndFriendlyCollision(app);
 testTeamsResolveByRemainingHostileTeams(app);
 testProjectileIgnoresAllies(app);

@@ -7,5 +7,6 @@ export { OrbitHitEffect } from "./orbitHitEffect.js";
 export { DeathBurstEffect } from "./deathBurstEffect.js";
 export { GravityParticle } from "./gravityParticle.js";
 export { SlashTrail } from "./slashTrail.js";
+export { createElectricArcPath, drawElectricArc } from "./electricArc.js";
 export { DamageNumber, ActionText } from "./floatingText.js";
 export { ActionWindowEffect, ActionSuccessEffect, ActionWhiffEffect } from "./actionEffects.js";

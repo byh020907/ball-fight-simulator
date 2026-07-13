@@ -1,5 +1,6 @@
 import { steerBallToward, Vector2 } from "../core.js";
 import { ArrowProjectile } from "../entities/arrowProjectile.js";
+import { drawElectricArc } from "../effects/electricArc.js";
 import { Ability } from "./ability.js";
 
 const BEHAVIOR_CONFIG = Object.freeze({
@@ -38,12 +39,22 @@ export class HuntingMobAbility extends Ability {
         const behavior = owner.hunting?.behavior ?? "pursuer";
         super(owner, simulation, BEHAVIOR_CONFIG[behavior]?.cooldown ?? 0);
         this.behavior = behavior;
-        this.state = { timer: 0, link: null, ring: 0, barrier: 0, laser: null, boomerang: null, jump: 0 };
+        this.state = {
+            timer: 0,
+            link: null,
+            linkTime: 0,
+            ring: 0,
+            barrier: 0,
+            laser: null,
+            boomerang: null,
+            jump: 0
+        };
     }
 
     update(delta, target) {
         if (!target || target.flags.defeated) return;
         this.state.timer += delta;
+        this.state.linkTime += delta;
         this.state.ring = Math.max(0, this.state.ring - delta);
         this.state.barrier = Math.max(0, this.state.barrier - delta);
         this.state.jump = Math.max(0, this.state.jump - delta);
@@ -84,7 +95,7 @@ export class HuntingMobAbility extends Ability {
 
     _tickLinkDamage(delta, target, range, dps, color) {
         const distance = Vector2.subtract(target.position, this.owner.position).length();
-        this.state.link = distance <= range ? { target, color } : null;
+        this.state.link = distance <= range ? { target, color, style: "electric" } : null;
         if (this.state.link) target.takeDamage(dps * delta, this.owner, "Electric Arc");
     }
 
@@ -257,7 +268,7 @@ export class HuntingMobAbility extends Ability {
     draw(ctx) {
         const { position, radius } = this.owner;
         ctx.save();
-        if (this.state.link) this._drawLink(ctx, position, this.state.link.target.position, this.state.link.color);
+        if (this.state.link) this._drawActiveLink(ctx, position, this.state.link);
         if (this.state.ring > 0) {
             ctx.strokeStyle = "#ffd166";
             ctx.lineWidth = 4;
@@ -280,6 +291,19 @@ export class HuntingMobAbility extends Ability {
             ctx.fill();
         }
         ctx.restore();
+    }
+
+    _drawActiveLink(ctx, from, link) {
+        const to = link.target.position;
+        if (link.style === "electric") {
+            this._drawElectricLink(ctx, from, to, link.color);
+            return;
+        }
+        this._drawLink(ctx, from, to, link.color);
+    }
+
+    _drawElectricLink(ctx, from, to, color) {
+        drawElectricArc(ctx, from, to, { time: this.state.linkTime, color });
     }
 
     _drawLink(ctx, from, to, color) {
