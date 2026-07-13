@@ -43,6 +43,7 @@ import { savePlayerProfile } from "../playerProfile.js";
 import { PopupService } from "../popup.js";
 import { advanceHuntingRun, completeHuntingStage } from "./huntingRunProgression.js";
 import { HUNTING_EVENT_TRANSITIONS, HuntingEvent } from "./huntingEvents.js";
+import { getHuntingDisplayHealth, getHuntingDisplayHp } from "./huntingHealth.js";
 import { getHuntingPreparationConsumables, useHuntingPreparationConsumable } from "../consumables.js";
 import {
     applyHuntingRunAchievementProgress,
@@ -388,7 +389,7 @@ export class HuntingManager {
             }
 
             this._run = recordHuntingFloorResult(recordHuntingBattleVictory(run), {
-                hpRemain: Math.ceil(playerBall?.hp ?? run.carriedHp ?? 0),
+                hpRemain: playerBall?.hp ?? run.carriedHp ?? 0,
                 maxHp: playerBall?.maxHp ?? run.carriedMaxHp,
                 loot: floorLoot,
                 combatCleared: true
@@ -653,11 +654,12 @@ export class HuntingManager {
 
     _getBattlePreparationState(notice = "") {
         const run = this._run;
+        const health = getHuntingDisplayHealth(run);
         return {
             huntingBattlePreparationActive: true,
             huntingBattlePreparationItems: getHuntingPreparationConsumables(this.app.playerProfile, run),
-            huntingBattlePreparationHp: run?.carriedHp ?? 0,
-            huntingBattlePreparationMaxHp: run?.carriedMaxHp ?? 0,
+            huntingBattlePreparationHp: health.hp,
+            huntingBattlePreparationMaxHp: health.maxHp,
             huntingBattlePreparationNotice: notice
         };
     }
@@ -673,9 +675,10 @@ export class HuntingManager {
 
         this._run = applied.run;
         savePlayerProfile(app.playerProfile);
+        const health = getHuntingDisplayHealth(this._run);
         app.setHuntingOverlayState(
             this._getBattlePreparationState(
-                `${applied.result.label} +${applied.result.healed} HP · ${applied.result.hpRemain}/${applied.result.maxHp}`
+                `${applied.result.label} +${getHuntingDisplayHp(applied.result.healed)} HP · ${health.hp}/${health.maxHp}`
             )
         );
         return applied.result;

@@ -4,6 +4,7 @@ export * from "./huntingEncounters.js";
 export * from "./huntingMonsters.js";
 export * from "./huntingAchievementProgress.js";
 export * from "./huntingState.js";
+export * from "./huntingHealth.js";
 export * from "./huntingRunProgression.js";
 export * from "./huntingEvents.js";
 export * from "./chestRewards.js";

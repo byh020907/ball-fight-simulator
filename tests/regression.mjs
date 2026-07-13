@@ -49,6 +49,7 @@ import {
 import { HuntingManager } from "../src/hunting/huntingManager.js";
 import { HUNTING_EVENT_TRANSITIONS, HuntingEvent } from "../src/hunting/huntingEvents.js";
 import { MishapEvent } from "../src/hunting/events/mishapEvent.js";
+import { RestSiteEvent } from "../src/hunting/events/restSiteEvent.js";
 import {
     advanceHuntingRun,
     canEnterHunting,
@@ -97,6 +98,8 @@ import {
     HUNTING_STAGE_IDS,
     HUNTING_STAGES,
     HUNTING_TEAMS,
+    getHuntingDisplayHealth,
+    getHuntingDisplayHp,
     createHuntingMinibossSpec,
     createHuntingMobSpec,
     createHuntingMobEncounter,
@@ -2058,7 +2061,7 @@ function testHuntingBattlePreparationUsesActualBattleHp() {
     const manager = new HuntingManager(mockApp);
     manager._run = {
         ...createHuntingRun({ characterId: FIGHTER_IDS.ARCHER }),
-        carriedHp: 28,
+        carriedHp: 28.4,
         lastEncounter: { type: HUNTING_FLOOR_OUTCOME_TYPES.COMBAT }
     };
 
@@ -2079,10 +2082,30 @@ function testHuntingBattlePreparationUsesActualBattleHp() {
         56,
         "Preparation UI should calculate healing from the actual 224 maximum HP"
     );
+    assert.equal(
+        overlayStates.at(-1).huntingBattlePreparationHp,
+        29,
+        "Preparation UI should show a fractional current HP as an integer"
+    );
+    assert.equal(
+        overlayStates.at(-1).huntingBattlePreparationMaxHp,
+        224,
+        "Preparation UI should expose an integer maximum HP"
+    );
 
     const useResult = manager.usePreparationConsumable(CONSUMABLE_IDS.HP_POTION);
-    assert.equal(useResult.healed, 56, "Preparation potion use should report the actual healed amount");
-    assert.equal(manager._run.carriedHp, 84, "Preparation potion use should update carried HP before battle start");
+    assert.ok(Math.abs(useResult.healed - 56) < 1e-9, "Preparation potion use should report the actual healed amount");
+    assert.equal(manager._run.carriedHp, 84.4, "Preparation potion use should preserve raw HP before battle start");
+    assert.equal(
+        overlayStates.at(-1).huntingBattlePreparationHp,
+        85,
+        "Potion feedback should refresh the displayed HP through the shared integer getter"
+    );
+    assert.match(
+        overlayStates.at(-1).huntingBattlePreparationNotice,
+        /85\/224$/,
+        "Potion feedback should not expose a fractional current HP"
+    );
     assert.equal(
         profile.consumables.owned[CONSUMABLE_IDS.HP_POTION],
         0,
@@ -2092,8 +2115,64 @@ function testHuntingBattlePreparationUsesActualBattleHp() {
     manager.startPreparedBattle();
     const player = mockApp.simulation.fighters.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
     assert.equal(startedMatches, 1, "BattleSimulation should start only after the preparation start action");
-    assert.equal(player.hp, 84, "BattleSimulation should receive the potion-adjusted carried HP");
+    assert.equal(player.hp, 84.4, "BattleSimulation should receive the raw potion-adjusted carried HP");
     console.log("[hunting-battle-preparation-actual-hp] ok");
+}
+
+function testHuntingHealthDisplayUsesSharedIntegerGetter() {
+    const run = {
+        ...createHuntingRun({ characterId: FIGHTER_IDS.DASH }),
+        carriedHp: 42.1,
+        carriedMaxHp: 101.5
+    };
+    assert.deepEqual(
+        getHuntingDisplayHealth(run),
+        { hp: 43, maxHp: 102 },
+        "Hunting HP display should round the current and maximum values together"
+    );
+    assert.equal(getHuntingDisplayHp(0.1), 1, "A living fractional HP should not display as zero");
+    assert.equal(
+        getHuntingDisplayHp(56.00000000000001),
+        56,
+        "Display HP should absorb floating-point noise around an integer"
+    );
+    assert.equal(getHuntingDisplayHp(-1), 0, "Display HP should not become negative");
+
+    const restEvent = new RestSiteEvent(HUNTING_EVENT_TYPES.REST_SITE);
+    const restResolution = restEvent.resolve(restEvent.createPayload(1), { run, roster: [] });
+    assert.ok(
+        restResolution.presentation.detail.includes("68 / 102"),
+        "Rest-site presentation should use the shared integer HP display"
+    );
+
+    const mishapEvent = new MishapEvent(HUNTING_EVENT_TYPES.MISHAP);
+    const mishapResolution = mishapEvent.resolve(mishapEvent.createPayload(1), { run });
+    assert.match(
+        mishapResolution.presentation.detail,
+        /\d+ \/ \d+$/,
+        "Mishap presentation should end with integer current and maximum HP"
+    );
+    assert.ok(
+        !mishapResolution.presentation.detail.includes(".1"),
+        "Mishap presentation should not expose the raw fractional HP"
+    );
+
+    const profile = createDefaultPlayerProfile();
+    profile.hunting.shards = 200;
+    const repairOffer = createMerchantOffers(
+        run,
+        { type: HUNTING_EVENT_TYPES.WANDERING_MERCHANT, discountRatio: 0 },
+        profile
+    )[0];
+    assert.match(repairOffer.description, /102\)$/, "Merchant repair offer should display an integer maximum HP");
+    const repair = applyMerchantOffer(run, profile, repairOffer);
+    assert.equal(repair.run.carriedHp, 77.1, "Merchant repair should preserve the raw fractional HP state");
+    assert.match(
+        formatOfferResultToast(repair.result),
+        /\(78\)$/,
+        "Merchant repair result should display an integer current HP"
+    );
+    console.log("[hunting-health-display-integers] ok");
 }
 
 async function testHuntingChestEventStopsAdvanceLoop() {
@@ -9409,6 +9488,7 @@ testHuntingAutoEventRequiresConfirmation();
 testHuntingChampionEventRequiresBattleConfirmation();
 testHuntingConsumableInventoryAndUseLimits();
 testHuntingBattlePreparationUsesActualBattleHp();
+testHuntingHealthDisplayUsesSharedIntegerGetter();
 await testHuntingChestEventStopsAdvanceLoop();
 testHuntingAdvanceDispatchContract();
 testComponentBridgeEquipmentFunctions();

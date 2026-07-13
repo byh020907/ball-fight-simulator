@@ -2,6 +2,7 @@ import { REWARD_BALANCE } from "../../rewardBalanceConfig.js";
 import { HUNTING_EVENT_TRANSITIONS, HuntingEvent } from "./huntingEvent.js";
 import { safeFloor } from "./eventHelpers.js";
 import { recordHuntingFloorResult } from "../huntingState.js";
+import { getHuntingDisplayHealth, getHuntingDisplayHp } from "../huntingHealth.js";
 
 export class MishapEvent extends HuntingEvent {
     createPayload(floor) {
@@ -21,6 +22,7 @@ export class MishapEvent extends HuntingEvent {
         const maxHp = run.carriedMaxHp ?? currentHp;
         const damage = Math.max(1, Math.floor(currentHp * (event.damageRatio ?? 0.1)));
         const remainingHp = Math.max(1, currentHp - damage);
+        const health = getHuntingDisplayHealth({ carriedHp: remainingHp, carriedMaxHp: maxHp });
         return {
             run: recordHuntingFloorResult(run, {
                 hpRemain: remainingHp,
@@ -33,7 +35,7 @@ export class MishapEvent extends HuntingEvent {
             presentation: {
                 title: "함정 발동",
                 subtext: "함정에 걸려 현재 체력을 잃었습니다.",
-                detail: `HP -${damage} · 현재 ${remainingHp} / ${maxHp}`
+                detail: `HP -${getHuntingDisplayHp(damage)} · 현재 ${health.hp} / ${health.maxHp}`
             }
         };
     }

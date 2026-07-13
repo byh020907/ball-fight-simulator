@@ -1,6 +1,7 @@
 import { createHuntingChest } from "./huntingRewards.js";
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 import { buyConsumable, getConsumableDefinition, getConsumableOwnedCount } from "../consumables.js";
+import { getHuntingDisplayHealth, getHuntingDisplayHp } from "./huntingHealth.js";
 
 export const MERCHANT_OFFER_TYPES = Object.freeze({
     REPAIR: "repair",
@@ -25,6 +26,7 @@ export function createMerchantOffers(run, event, profile) {
 function _createRepairOffer(run, discount) {
     const maxHp = run.carriedMaxHp ?? 100;
     const currentHp = run.carriedHp ?? maxHp;
+    const displayHealth = getHuntingDisplayHealth(run);
     const healPct = REWARD_BALANCE.hunting.events.merchant.repair.recoveryRatio;
     const healAmount = Math.max(1, Math.floor(maxHp * healPct));
     const cost = calcDiscount(REWARD_BALANCE.hunting.events.merchant.repair.cost, discount);
@@ -33,7 +35,7 @@ function _createRepairOffer(run, discount) {
         id: "repair",
         type: MERCHANT_OFFER_TYPES.REPAIR,
         label: "회복",
-        description: `HP +${healAmount} (최대 ${maxHp})`,
+        description: `HP +${getHuntingDisplayHp(healAmount)} (최대 ${displayHealth.maxHp})`,
         detail: `${Math.round(healPct * 100)}% 회복`,
         cost,
         healAmount,
@@ -156,7 +158,9 @@ export function applyMerchantOffer(run, profile, offer) {
 
 export function formatOfferResultToast(result) {
     if (!result) return "";
-    if (result.type === "repair") return `HP +${result.healed} 회복 (${result.newHp})`;
+    if (result.type === "repair") {
+        return `HP +${getHuntingDisplayHp(result.healed)} 회복 (${getHuntingDisplayHp(result.newHp)})`;
+    }
     if (result.type === "buy_loot") return `${result.chest.rarity} 상자 1개 구매 (미확보)`;
     if (result.type === "secure_transport") return `${result.chest.rarity} 상자 1개 안전 확보`;
     if (result.type === "consumable") return `${result.purchase.label} 구매 · 보유 ${result.purchase.owned}`;
