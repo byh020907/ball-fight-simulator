@@ -1250,6 +1250,59 @@ async function testTournament(app) {
     app.returnToInitialState();
 }
 
+async function testTournamentEliminationAwaitsConfirmation(app) {
+    app.playerProfile = createDefaultPlayerProfile();
+    app.playerStatAllocation = createRandomStatAllocation(() => 0);
+    const startButtonStates = [];
+    const originalSetState = app._startBtn.setState;
+    app._startBtn.setState = (state) => {
+        startButtonStates.push(state);
+        originalSetState.call(app._startBtn, state);
+    };
+
+    try {
+        await app.startTournament();
+        const match = app.currentTournamentMatch;
+        assert.ok(match, "Tournament elimination test should begin with an active match");
+        assert.ok(
+            [match.a, match.b].some((fighter) => fighter?.id === app.playerFighterId),
+            "The first forced tournament match should include the player"
+        );
+
+        const playerBall = app.simulation.fighters.find((fighter) => fighter.id === app.playerFighterId);
+        const opponentBall = app.simulation.fighters.find((fighter) => fighter.id !== app.playerFighterId);
+        playerBall.takeDamage(999, opponentBall, "Forced Tournament Elimination");
+        app.simulation.checkResult();
+        app.simulation.update(2.3);
+        app.finishMatch();
+
+        assert.equal(
+            app.lifecycle.isAwaitingResultConfirmation,
+            true,
+            "Player elimination should immediately enter the shared result confirmation state"
+        );
+        assert.equal(app.currentTournamentMatch, null, "Elimination should not leave an active tournament match");
+        assert.equal(app.tournament.champion, null, "Elimination should not continue AI matches to a champion");
+        assert.equal(app._root.tournamentActive, false, "Result confirmation should unlock the tournament session");
+        assert.equal(app._overlay.label, "아쉽네요", "Elimination should show the dedicated loss result presentation");
+        assert.ok(
+            startButtonStates.some((state) => state.text === "확인"),
+            "Elimination should reuse the shared confirmation button"
+        );
+
+        await app.startTournament();
+        assert.equal(
+            app.lifecycle.isSetup,
+            true,
+            "Confirming an elimination result should reuse returnToInitialState before another tournament can start"
+        );
+    } finally {
+        app._startBtn.setState = originalSetState;
+        app.returnToInitialState();
+    }
+    console.log("[tournament-elimination-result-confirmation] ok");
+}
+
 function testStatAllocationRules(app) {
     // Stat allocation logic is tested below via adjustStatAllocation / applyStatAllocation
     const archer = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
@@ -8719,6 +8772,7 @@ await testArrowBounceFacing(app);
 await testArcherPredictiveBurst(app);
 await testOrbitShardRecharge(app);
 await testTournament(app);
+await testTournamentEliminationAwaitsConfirmation(app);
 await testHeroBallRegistered(app);
 await testHeroAbilitySpawnsOrb(app);
 await testHeroOrbEffectType(app);

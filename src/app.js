@@ -1305,6 +1305,11 @@ export class BattleApp {
             }
             this.currentTournamentMatch = null;
 
+            if (playerLost) {
+                this.showTournamentElimination();
+                return;
+            }
+
             if (this.tournament.champion) {
                 this.showTournamentChampion();
                 return;
@@ -1343,91 +1348,90 @@ export class BattleApp {
     }
 
     showTournamentChampion() {
-        if (!this.tournament?.champion) {
-            return;
-        }
-
-        const champion = this.tournament.champion;
-        const player = this.tournamentRoster.find((fighter) => fighter.id === this.playerFighterId);
+        const champion = this.tournament?.champion;
+        if (!champion) return;
         const playerWon = champion.id === this.playerFighterId;
-        if (playerWon) {
-            this.playerResult = { rankLabel: "1위", fighterName: champion.name };
-        }
+        this._finalizeTournamentResult({ playerWon, champion });
+    }
 
-        // 토너먼트 리포트 생성 및 프로필 저장
-        if (this._currentTournamentReport) {
-            this._currentTournamentReport.playerWon = playerWon;
-            this._currentTournamentReport.placement = playerWon ? 1 : this.playerResultToPlacement();
-            applyTournamentReport(this.playerProfile, this._currentTournamentReport);
+    showTournamentElimination() {
+        this._finalizeTournamentResult({ playerWon: false });
+    }
 
-            // 업적 판정 (applyTournamentReport 후, 프로필에 최신 데이터 반영됨)
-            const achievementResults = evaluateAchievements(this.playerProfile, ACHIEVEMENT_DEFINITIONS, {
-                profile: this.playerProfile,
-                report: this._currentTournamentReport,
-                roster: this.roster,
-                playerFighterId: this.playerFighterId
-            });
-            if (achievementResults.length > 0) {
-                for (const result of achievementResults) {
-                    const def = ACHIEVEMENT_DEFINITIONS.find((d) => d.id === result.id);
-                    if (!def) continue;
+    _finalizeTournamentResult({ playerWon, champion = null }) {
+        const player = this.tournamentRoster.find((fighter) => fighter.id === this.playerFighterId);
+        if (playerWon && champion) this.playerResult = { rankLabel: "1위", fighterName: champion.name };
 
-                    grantAchievementReward(this.playerProfile, def);
-                    const rewardDesc = formatAchievementReward(def.reward);
-                    let msg = `[업적 해금] ${def.name} (${def.tier})`;
-                    if (rewardDesc) msg += ` — ${rewardDesc}`;
-                    this._log.add(msg);
-                    this._toast.show(msg);
-                }
-            }
-
-            // 숙련도 승급 처리 (등급 기반)
-            const masteryResult = advanceCharacterMastery(this.playerProfile, {
-                characterId: this.playerFighterId,
-                challengeLevel: getCharacterChallengeLevel(this.playerProfile, this.playerFighterId),
-                playerWon
-            });
-            if (masteryResult.changed) {
-                const sourceName = this.roster.find((f) => f.id === this.playerFighterId)?.name ?? this.playerFighterId;
-                this._toast.show(
-                    `[숙련도 승급] ${sourceName} ${masteryResult.previousTier} → ${masteryResult.newTier}`
-                );
-                this._log.add(`[숙련도 승급] ${sourceName} ${masteryResult.previousTier} → ${masteryResult.newTier}`);
-            }
-            savePlayerProfile(this.playerProfile);
-            this._lastMasteryResult = masteryResult;
-        }
-
+        this._settleTournamentProgression(playerWon);
         this._matchReports = [];
         this._currentTournamentReport = null;
         this._root.tournamentActive = false;
         this.beginResultConfirmation();
         this._refreshCollectionHub();
+        this._presentTournamentResult({ playerWon, champion, player });
+    }
 
-        // 승급 안내 메시지
+    _settleTournamentProgression(playerWon) {
+        if (!this._currentTournamentReport) return;
+
+        this._currentTournamentReport.playerWon = playerWon;
+        this._currentTournamentReport.placement = playerWon ? 1 : this.playerResultToPlacement();
+        applyTournamentReport(this.playerProfile, this._currentTournamentReport);
+
+        const achievementResults = evaluateAchievements(this.playerProfile, ACHIEVEMENT_DEFINITIONS, {
+            profile: this.playerProfile,
+            report: this._currentTournamentReport,
+            roster: this.roster,
+            playerFighterId: this.playerFighterId
+        });
+        for (const result of achievementResults) {
+            const def = ACHIEVEMENT_DEFINITIONS.find((d) => d.id === result.id);
+            if (!def) continue;
+
+            grantAchievementReward(this.playerProfile, def);
+            const rewardDesc = formatAchievementReward(def.reward);
+            let msg = `[업적 해금] ${def.name} (${def.tier})`;
+            if (rewardDesc) msg += ` — ${rewardDesc}`;
+            this._log.add(msg);
+            this._toast.show(msg);
+        }
+
+        const masteryResult = advanceCharacterMastery(this.playerProfile, {
+            characterId: this.playerFighterId,
+            challengeLevel: getCharacterChallengeLevel(this.playerProfile, this.playerFighterId),
+            playerWon
+        });
+        if (masteryResult.changed) {
+            const sourceName =
+                this.roster.find((fighter) => fighter.id === this.playerFighterId)?.name ?? this.playerFighterId;
+            this._toast.show(`[숙련도 승급] ${sourceName} ${masteryResult.previousTier} → ${masteryResult.newTier}`);
+            this._log.add(`[숙련도 승급] ${sourceName} ${masteryResult.previousTier} → ${masteryResult.newTier}`);
+        }
+        savePlayerProfile(this.playerProfile);
+        this._lastMasteryResult = masteryResult;
+    }
+
+    _presentTournamentResult({ playerWon, champion, player }) {
         let masteryMsg = "";
         if (this._lastMasteryResult?.changed) {
             masteryMsg = ` ${this._lastMasteryResult.previousTier} → ${this._lastMasteryResult.newTier}`;
         }
-
-        // 경험치 요약
         const xpMsg = this._formatXpResult(this._lastMatchXpResult);
+        const playerResultText = `${player.name} ${this.playerResult?.rankLabel ?? "결과 확정"}`;
 
         this._bracket.render(this.tournament);
         this.refreshPlayerSetup();
         this._overlay.show({
-            label: playerWon ? "축하합니다!" : "토너먼트 종료",
-            text: playerWon
-                ? `${champion.name} 우승${masteryMsg}`
-                : `${player.name} ${this.playerResult?.rankLabel ?? "결과 확정"}`,
+            label: playerWon ? "축하합니다!" : champion ? "토너먼트 종료" : "아쉽네요",
+            text: playerWon ? `${champion.name} 우승${masteryMsg}` : playerResultText,
             subtext: xpMsg,
             xpReward: this._createXpRewardView(this._lastMatchXpResult)
         });
         this._root.statusText = playerWon
             ? `내 캐릭터 ${champion.name} 우승${masteryMsg}`
-            : `내 캐릭터 ${player.name} ${this.playerResult?.rankLabel ?? ""}`;
+            : `내 캐릭터 ${playerResultText}`;
         this._root.statusBadge = "Result";
-        this._log.add(`${champion.name} takes the whole bracket.`);
+        if (champion) this._log.add(`${champion.name} takes the whole bracket.`);
         this._log.add(
             playerWon
                 ? `축하합니다! 내 캐릭터 ${champion.name}가 토너먼트에서 우승했습니다.${masteryMsg}`
