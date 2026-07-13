@@ -18,7 +18,7 @@ import { ActionPickerService } from "./actionPicker.js";
 import { CollectionHubService } from "./collectionHubService.js";
 import { pickRandomActions, findActionById, showActionFailure } from "./clickActions.js";
 import { BattleBall } from "./entities/index.js";
-import { drawEquipmentItems } from "./entities/equipmentVisuals.js";
+import { drawEquipmentItems, getCharacterOutlineWidth } from "./entities/equipmentVisuals.js";
 import { PreviewReselectSimulation } from "./preview/previewReselectSimulation.js";
 import {
     loadPlayerProfile,
@@ -580,7 +580,8 @@ export class BattleApp {
         ctx.fillStyle = fighter.color;
         ctx.fillRect(0, 0, size, size);
         const fakeBall = { radius: size / 2 - 2, position: { x: size / 2, y: size / 2 } };
-        drawEquipmentItems(ctx, fakeBall, getEquippedItems(this.playerProfile, fighter.id));
+        const outlineWidth = getCharacterOutlineWidth(fakeBall.radius);
+        drawEquipmentItems(ctx, fakeBall, getEquippedItems(this.playerProfile, fighter.id), outlineWidth);
         const AbilityClass = Ability.MAP[fighter.ability];
         if (AbilityClass) {
             const fakeOwner = {
@@ -604,7 +605,7 @@ export class BattleApp {
         ctx.beginPath();
         ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
         ctx.strokeStyle = "#202020";
-        ctx.lineWidth = 2;
+        ctx.lineWidth = outlineWidth;
         ctx.stroke();
         canvas.classList.remove("face-pop");
         void canvas.offsetWidth;

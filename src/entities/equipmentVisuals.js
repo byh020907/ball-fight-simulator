@@ -7,11 +7,26 @@ const RARITY_COLORS = Object.freeze({
 });
 
 const DASH_COUNT_BY_EQUIPMENT_COUNT = Object.freeze([0, 6, 12, 18, 24]);
-const RING_RADIUS_RATIO = 0.68;
 const DASH_FILL_RATIO = 0.56;
 const BASE_DASH_ALPHA = 0.86;
 const ENHANCE_ALPHA_STEP = 0.025;
 const MAX_ENHANCE_LEVEL = 5;
+const EQUIPMENT_RING_INSET = 0.6;
+
+export function getCharacterOutlineWidth(ballRadius) {
+    return Math.max(3, ballRadius * 0.07);
+}
+
+export function getEquipmentRingLineWidth(ballRadius) {
+    return Math.max(1.4, Math.min(3.2, ballRadius * 0.065));
+}
+
+export function getEquipmentRingRadius(ballRadius, outlineWidth = getCharacterOutlineWidth(ballRadius)) {
+    return Math.max(
+        0,
+        ballRadius - outlineWidth / 2 - getEquipmentRingLineWidth(ballRadius) / 2 - EQUIPMENT_RING_INSET
+    );
+}
 
 function getDashAlpha(item) {
     const enhanceLevel = Math.min(MAX_ENHANCE_LEVEL, Math.max(0, item?.enhanceLevel ?? 0));
@@ -23,14 +38,18 @@ function getDashCount(itemCount) {
     return DASH_COUNT_BY_EQUIPMENT_COUNT[clampedCount];
 }
 
-export function getEquipmentRingDashes(items = [], ballRadius = 0) {
+export function getEquipmentRingDashes(
+    items = [],
+    ballRadius = 0,
+    outlineWidth = getCharacterOutlineWidth(ballRadius)
+) {
     const activeItems = Array.isArray(items) ? items.filter(Boolean).slice(0, 4) : [];
     const dashCount = getDashCount(activeItems.length);
     if (dashCount === 0 || ballRadius <= 0) return [];
 
     const step = (Math.PI * 2) / dashCount;
     const dashOffset = (step * (1 - DASH_FILL_RATIO)) / 2;
-    const ringRadius = ballRadius * RING_RADIUS_RATIO;
+    const ringRadius = getEquipmentRingRadius(ballRadius, outlineWidth);
 
     return Array.from({ length: dashCount }, (_, index) => {
         const item = activeItems[index % activeItems.length];
@@ -45,16 +64,16 @@ export function getEquipmentRingDashes(items = [], ballRadius = 0) {
     });
 }
 
-export function drawEquipmentItems(ctx, ball, items = []) {
+export function drawEquipmentItems(ctx, ball, items = [], outlineWidth = getCharacterOutlineWidth(ball?.radius ?? 0)) {
     if (!ball) return;
-    const dashes = getEquipmentRingDashes(items, ball.radius);
+    const dashes = getEquipmentRingDashes(items, ball.radius, outlineWidth);
     if (dashes.length === 0) return;
 
     ctx.save();
     try {
         ctx.translate(ball.position.x, ball.position.y);
         ctx.lineCap = "round";
-        ctx.lineWidth = Math.max(1.4, Math.min(3.2, ball.radius * 0.065));
+        ctx.lineWidth = getEquipmentRingLineWidth(ball.radius);
 
         for (const dash of dashes) {
             ctx.globalAlpha = dash.alpha;

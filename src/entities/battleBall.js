@@ -9,7 +9,7 @@ import {
     validatePhysicsState
 } from "../physics/PhysicsDebugRingBuffer.js";
 import { MobAppearance } from "./mobAppearance.js";
-import { drawEquipmentItems } from "./equipmentVisuals.js";
+import { drawEquipmentItems, getCharacterOutlineWidth } from "./equipmentVisuals.js";
 import { applyHeroOrbCarryoverToBattleBall, mergeHeroOrbCarryover, HERO_ORB_CARRYOVER_RATE } from "./heroOrb.js";
 import { createEquipmentCombatEffects } from "../hunting/equipmentEffects.js";
 
@@ -500,9 +500,10 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             ctx.arc(this.position.x, this.position.y, this.radius, 0, Math.PI * 2);
             ctx.fill();
             ctx.strokeStyle = "#202020";
-            ctx.lineWidth = Math.max(3, this.radius * 0.07);
+            ctx.lineWidth = getCharacterOutlineWidth(this.radius);
             ctx.stroke();
         }
+        const outlineWidth = getCharacterOutlineWidth(this.radius);
         // 장비 회전: 원형 + rotationEnabled 시 body angle 기준
         if (this.appearance.sides === 0 && this.rotationEnabled) {
             ctx.save();
@@ -510,10 +511,10 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             ctx.rotate(this.angle);
             const rotatedBall = Object.create(this);
             rotatedBall.position = { x: 0, y: 0 };
-            drawEquipmentItems(ctx, rotatedBall, this.equipment.items);
+            drawEquipmentItems(ctx, rotatedBall, this.equipment.items, outlineWidth);
             ctx.restore();
         } else {
-            drawEquipmentItems(ctx, this, this.equipment.items);
+            drawEquipmentItems(ctx, this, this.equipment.items, outlineWidth);
         }
         // 얼굴 회전: polygon은 항상 this.angle, 원형은 rotationEnabled에 따라 적용
         const faceRotation = this.appearance.sides > 0 ? this.angle : this.rotationEnabled ? this.angle : 0;

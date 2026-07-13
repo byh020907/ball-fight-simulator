@@ -174,7 +174,13 @@ import {
     applyRotationalContactDamage
 } from "../src/physics/contactDamage.js";
 import RotationalBody from "../src/physics/RotationalBody.js";
-import { drawEquipmentItems, getEquipmentRingDashes } from "../src/entities/equipmentVisuals.js";
+import {
+    drawEquipmentItems,
+    getCharacterOutlineWidth,
+    getEquipmentRingDashes,
+    getEquipmentRingLineWidth,
+    getEquipmentRingRadius
+} from "../src/entities/equipmentVisuals.js";
 import { ArenaRenderer } from "../src/ui.js";
 import { ArenaCamera } from "../src/camera.js";
 import { PATCH_NOTES } from "../src/patchNotes.js";
@@ -5018,12 +5024,19 @@ function testEquipmentDraw() {
     const oneItemDashes = getEquipmentRingDashes([weapon], 42);
     const fullSetDashes = getEquipmentRingDashes(equippedItems, 42);
     const previewDashes = getEquipmentRingDashes(equippedItems, 23);
+    const outlineWidth = getCharacterOutlineWidth(42);
+    const ringLineWidth = getEquipmentRingLineWidth(42);
+    const ringRadius = getEquipmentRingRadius(42);
     assert.equal(oneItemDashes.length, 6, "One equipped item should use a sparse six-dash ring");
     assert.equal(fullSetDashes.length, 24, "Four equipped items should use a dense twenty-four-dash ring");
     assert.equal(previewDashes.length, 24, "A 46px preview should retain the full ring density");
     assert.ok(
-        fullSetDashes.every((dash) => dash.radius === 42 * 0.68),
-        "Equipment dashes should stay inside the ball body"
+        fullSetDashes.every((dash) => dash.radius === ringRadius),
+        "Equipment dashes should use the shared outline-relative radius"
+    );
+    assert.ok(
+        Math.abs(42 - outlineWidth / 2 - (ringRadius + ringLineWidth / 2) - 0.6) < 1e-9,
+        "The outside edge of each dash should sit directly inside the character outline"
     );
     assert.deepEqual(
         fullSetDashes.slice(0, 4).map((dash) => dash.color),
@@ -5062,7 +5075,7 @@ function testEquipmentDraw() {
     const ballCtx = makeRecordingCanvasContext();
     ball.draw(ballCtx);
     assert.equal(
-        ballCtx.calls.filter(([name, , , radius]) => name === "arc" && radius === 42 * 0.68).length,
+        ballCtx.calls.filter(([name, , , radius]) => name === "arc" && radius === ringRadius).length,
         24,
         "BattleBall should render the shared inner equipment ring before the face"
     );
@@ -5086,8 +5099,10 @@ function testEquipmentDraw() {
 
     const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
     assert.ok(
-        appSource.includes("drawEquipmentItems(ctx, fakeBall, getEquippedItems(this.playerProfile, fighter.id));"),
-        "The setup face preview should use the shared equipment renderer"
+        appSource.includes(
+            "drawEquipmentItems(ctx, fakeBall, getEquippedItems(this.playerProfile, fighter.id), outlineWidth);"
+        ),
+        "The setup face preview should use the shared renderer with the matching outline width"
     );
 }
 
