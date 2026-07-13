@@ -56,6 +56,11 @@ Boids 알고리즘이 눈에 보이지 않는다는 피드백을 받았을 때:
 - **모든 fighter는 `teamId`를 기준으로 적/아군을 구분합니다.**
     - `BattleSimulation`은 명시적 `teamId`가 없으면 `fighter-0`, `fighter-1`처럼 서로 다른 기본 팀을 부여해 기존 토너먼트와 개인전 동작을 유지합니다.
     - 같은 `teamId`의 fighter끼리는 충돌 밀어내기 같은 물리는 유지할 수 있지만, 피해와 적대 효과를 주면 안 됩니다.
+- **아군 충돌 행동은 적대 충돌과 분리합니다.**
+    - `BattleSimulation.afterFighterPhysicsCollision(context)`은 비적대 충돌에서만 선택적 `ability.onAllyCollision(other, context)`을 양쪽 Ability에 전달합니다. 기존 `onCollision()`은 적대 충돌의 피해·전투 효과 전용 계약으로 유지합니다.
+    - 한 충돌 쌍에서 위치 교환처럼 한 번만 실행할 행동은 처리한 Ability가 `context.allyPositionSwapped = true`를 설정해 반대편 콜백의 되바뀜을 막습니다.
+    - 위치만 맞바꿔야 할 때는 `BattleBall.swapPositionWith(other)`를 사용합니다. 이 메서드는 위치만 교환하므로 속도·각속도·물리 적분값을 직접 수정하지 않습니다.
+    - 능력이 한 활성화 턴 안에서 같은 아군을 다시 처리하면 안 되면 Ability가 대상 ID `Set`을 소유하고, 해당 활성화가 시작될 때만 비웁니다. 공통 시간 쿨다운으로 다른 행동까지 지연시키지 않습니다.
 - **코드는 현재 1대1 구조에 의존하지 않도록 작성합니다.**
     - 각 Ball(엔티티)은 자신의 상태와 로직을 기준으로 동작해야 하며, 항상 `fighters[0]`/`fighters[1]` 같은 고정 인덱스를 참조하지 않습니다.
     - 적대 여부가 필요한 경우 `simulation.isHostile(a, b)`를 사용합니다.
