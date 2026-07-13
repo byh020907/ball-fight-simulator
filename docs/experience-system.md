@@ -2,8 +2,8 @@
 
 > 현재 책임 기준: 레벨은 해당 캐릭터 자신의 기본 수치와 대표 행동을 강화한다. 캐릭터 간 지원 효과는 마스터리, 계정 수집 보상은 업적이 소유한다. 상세 기준은 [성장 책임 기준](progression-responsibilities.md)을 따른다.
 
-> 상태: 설계 초안, 구현 전
-> 기준 코드: 2026-06-28 `main`
+> 상태: 구현 완료
+> 기준 코드: 2026-07-13 `main`
 > 관련 문서: [`meta-progression-system.md`](meta-progression-system.md), [`collection-achievements-system.md`](collection-achievements-system.md), [`character-mastery-system.md`](character-mastery-system.md), [`collection-hub-ui.md`](collection-hub-ui.md), [`player-data-storage-security.md`](player-data-storage-security.md)
 
 ## 1. 시스템 정의
@@ -73,7 +73,13 @@
 6. AI 우승자를 디펜딩 챔피언으로 표시하고 격파 보상 지급
 7. 컬렉션 허브 도감 카드에 레벨과 다음 레벨 진행도 표시
 
-계정 경험치, 스킨, 칭호, 레벨업 연출 강화는 2차 범위로 둡니다.
+### 4.1 결과 경험치 패널
+
+직접 참여한 매치의 결과 화면은 XP 문장을 반복하지 않고 공통 `xp-reward-panel`로 보상을 표시합니다. 패널은 획득 XP, 현재 레벨, 구간 게이지, 다음 레벨까지 남은 XP와 레벨 보상을 한곳에 표시합니다.
+
+레벨업이면 이전 레벨의 진행도에서 게이지가 먼저 끝까지 차고, 새 레벨 라벨과 `LEVEL UP` 표시로 전환한 뒤 다음 레벨 구간의 진행도를 채웁니다. 따라서 최종 레벨을 처음부터 보여 주지 않고 실제 반영 순서를 읽을 수 있습니다.
+
+계정 경험치, 스킨, 칭호는 2차 범위로 둡니다.
 
 ## 5. XP 지급 규칙
 

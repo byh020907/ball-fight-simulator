@@ -1115,11 +1115,15 @@ export class BattleApp {
             characterName: fighter?.name ?? result.characterId,
             xpGained: result.xpGained,
             previousLevel: result.previousLevel,
+            previousLevelLabel: result.previousLevelLabel ?? `Lv.${result.previousLevel ?? 1}`,
             level: result.level,
             levelLabel: result.levelLabel ?? `Lv.${result.level}`,
             levelUp: result.levelUp,
             progressBeforePct: result.progressBeforePct ?? 0,
             progressAfterPct: result.progressAfterPct ?? 0,
+            previousProgressText: result.previousProgressText ?? "",
+            previousNextText: result.previousNextText ?? "",
+            previousNextRewardText: result.previousNextRewardText ?? "",
             progressText: result.progressText ?? "",
             nextText: result.nextText ?? "",
             earnedRewardText: (result.earnedRewards ?? []).map((reward) => reward.text).join(" · "),
@@ -1305,7 +1309,7 @@ export class BattleApp {
             this._overlay.show({
                 label: playerLost ? "아쉽네요" : this.tournament.champion ? "Champion" : "Advances",
                 text: playerLost ? `${this.playerResult.fighterName} ${this.playerResult.rankLabel}` : winner.name,
-                subtext: xpSubtext,
+                subtext: xpReward ? "" : xpSubtext,
                 xpReward
             });
             this._updateStatus(
@@ -1338,7 +1342,7 @@ export class BattleApp {
             return;
         }
 
-        this._overlay.show({ label: "Winner", text: winner.name, subtext: xpSubtext, xpReward });
+        this._overlay.show({ label: "Winner", text: winner.name, subtext: xpReward ? "" : xpSubtext, xpReward });
         this._updateStatus(`${winner.name} wins`, "Result");
         this._log.add(`${winner.name} defeats ${loser.name}.`);
         this._log.add("Press the button again for another random matchup.");
@@ -1436,6 +1440,7 @@ export class BattleApp {
             masteryMsg = ` ${this._lastMasteryResult.previousTier} → ${this._lastMasteryResult.newTier}`;
         }
         const xpMsg = this._formatXpResult(this._lastMatchXpResult);
+        const xpReward = this._createXpRewardView(this._lastMatchXpResult);
         const playerResultText = `${player.name} ${this.playerResult?.rankLabel ?? "결과 확정"}`;
 
         this._bracket.render(this.tournament);
@@ -1443,8 +1448,8 @@ export class BattleApp {
         this._overlay.show({
             label: playerWon ? "축하합니다!" : champion ? "토너먼트 종료" : "아쉽네요",
             text: playerWon ? `${champion.name} 우승${masteryMsg}` : playerResultText,
-            subtext: xpMsg,
-            xpReward: this._createXpRewardView(this._lastMatchXpResult)
+            subtext: xpReward ? "" : xpMsg,
+            xpReward
         });
         this._root.statusText = playerWon
             ? `내 캐릭터 ${champion.name} 우승${masteryMsg}`

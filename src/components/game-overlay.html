@@ -164,12 +164,11 @@
             this.label = label ?? "";
             this.text = text ?? "";
             this.subtext = subtext;
+            const xpRewardPanel = Alpine.store("uiManager").requireComponent("xpRewardPanel");
             if (xpReward) {
-                const rp = Alpine.store("uiManager").getComponent("xpRewardPanel");
-                if (rp) rp.animate(xpReward);
+                xpRewardPanel.animate(xpReward);
             } else {
-                const rp = Alpine.store("uiManager").getComponent("xpRewardPanel");
-                if (rp) rp.hide();
+                xpRewardPanel.hide();
             }
         },
         hide() {

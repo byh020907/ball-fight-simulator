@@ -1,5 +1,7 @@
 <div x-data="xpProgressBar" class="xp-bar" aria-hidden="true">
-    <div class="xp-bar-fill" x-bind:style="'width:' + ($store.uiManager.getComponent('xpRewardPanel')?.animatedProgressPct ?? 0) + '%'"
+    <div
+        class="xp-bar-fill"
+        x-bind:style="'width:' + $store.uiManager.requireComponent('xpRewardPanel').animatedProgressPct + '%'"
     ></div>
 </div>
 <script>

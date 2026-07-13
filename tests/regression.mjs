@@ -521,8 +521,10 @@ async function loadModuleApp() {
         visible: false,
         characterName: "",
         xpGained: 0,
+        previousLevelLabel: "Lv.1",
         levelLabel: "Lv.1",
         levelUp: false,
+        barResetting: false,
         animatedProgressPct: 0,
         progressText: "",
         nextText: "",
@@ -535,8 +537,10 @@ async function loadModuleApp() {
             }
             this.characterName = val.characterName ?? "";
             this.xpGained = val.xpGained ?? 0;
+            this.previousLevelLabel = val.previousLevelLabel ?? "Lv.1";
             this.levelLabel = val.levelLabel ?? "Lv.1";
             this.levelUp = Boolean(val.levelUp);
+            this.barResetting = false;
             this.progressText = val.progressText ?? "";
             this.nextText = val.nextText ?? "";
             this.earnedRewardText = val.earnedRewardText ?? "";
@@ -550,8 +554,10 @@ async function loadModuleApp() {
             this.visible = false;
             this.characterName = "";
             this.xpGained = 0;
+            this.previousLevelLabel = "Lv.1";
             this.levelLabel = "Lv.1";
             this.levelUp = false;
+            this.barResetting = false;
             this.animatedProgressPct = 0;
             this.progressText = "";
             this.nextText = "";
@@ -806,8 +812,10 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
         visible: false,
         characterName: "",
         xpGained: 0,
+        previousLevelLabel: "Lv.1",
         levelLabel: "Lv.1",
         levelUp: false,
+        barResetting: false,
         animatedProgressPct: 0,
         progressText: "",
         nextText: "",
@@ -820,8 +828,10 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
             }
             this.characterName = val.characterName ?? "";
             this.xpGained = val.xpGained ?? 0;
+            this.previousLevelLabel = val.previousLevelLabel ?? "Lv.1";
             this.levelLabel = val.levelLabel ?? "Lv.1";
             this.levelUp = Boolean(val.levelUp);
+            this.barResetting = false;
             this.progressText = val.progressText ?? "";
             this.nextText = val.nextText ?? "";
             this.earnedRewardText = val.earnedRewardText ?? "";
@@ -833,8 +843,10 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
             this.visible = false;
             this.characterName = "";
             this.xpGained = 0;
+            this.previousLevelLabel = "Lv.1";
             this.levelLabel = "Lv.1";
             this.levelUp = false;
+            this.barResetting = false;
             this.animatedProgressPct = 0;
             this.progressText = "";
             this.nextText = "";
@@ -2468,6 +2480,22 @@ function testExperienceSystem() {
     });
     assert.equal(levelUpResult.levelUp, true, "Crossing the level threshold should be reported");
     assert.equal(levelUpResult.previousLevel, 1, "Level-up result should expose the previous level");
+    assert.equal(levelUpResult.previousLevelLabel, "Lv.1", "Level-up result should expose the previous level label");
+    assert.equal(
+        levelUpResult.previousProgressText,
+        "90/100 XP",
+        "Level-up result should retain the previous level progress for the animation"
+    );
+    assert.equal(
+        levelUpResult.previousNextText,
+        "다음 레벨까지 10XP",
+        "Level-up result should retain the previous level remaining XP for the animation"
+    );
+    assert.equal(
+        levelUpResult.previousNextRewardText,
+        "Lv.2 · 속도 +2",
+        "Level-up result should retain the reward reached by the animation"
+    );
     assert.equal(levelUpResult.level, 2, "Level-up result should expose the new level");
     assert.deepEqual(
         levelUpResult.earnedRewards.map((reward) => reward.text),
@@ -4715,6 +4743,21 @@ function testAlpineTemplateComponentSystem() {
         rewardTemplateHtml.includes("<xp-progress-bar"),
         "Reward panel template should include nested xp-progress-bar"
     );
+    assert.ok(
+        rewardTemplateHtml.includes("previousLevelLabel") && rewardTemplateHtml.includes("bar-resetting"),
+        "Reward panel should preserve the previous level while its level-up animation changes stages"
+    );
+    assert.ok(
+        rewardTemplateHtml.indexOf("this.levelLabel = val.levelUp") <
+            rewardTemplateHtml.indexOf("this.levelLabel = val.nextLevelLabel"),
+        "Reward panel should finish the previous level before displaying the new level"
+    );
+    assert.ok(
+        readFileSync(new URL("../src/components/game-overlay.html", import.meta.url), "utf8").includes(
+            'requireComponent("xpRewardPanel")'
+        ),
+        "Result overlay should require the shared XP reward panel it owns"
+    );
 
     assert.equal(normalizeTemplateComponentName("pull-request"), "pull-request");
     assert.equal(normalizeTemplateComponentName("'pull-request'"), "pull-request");
@@ -6088,17 +6131,18 @@ async function testMatchEndGrantsImmediateExperience(app) {
         app._lastMatchXpResult.xpGained,
         "Player setup XP meter should update after match XP is granted"
     );
-    assert.match(
-        globalThis.Alpine.store("gameOverlay").subtext,
-        /^\+\d+XP \(Lv\.\d+\)/,
-        "Match result overlay should show XP"
-    );
+    assert.equal(globalThis.Alpine.store("gameOverlay").subtext, "", "XP should use the structured reward panel");
     assert.equal(
         globalThis.Alpine.store("xpReward").visible,
         true,
         "Match result overlay should show the XP reward panel"
     );
     assert.equal(globalThis.Alpine.store("xpReward").xpGained, app._lastMatchXpResult.xpGained);
+    assert.equal(
+        globalThis.Alpine.store("xpReward").previousLevelLabel,
+        `Lv.${app._lastMatchXpResult.previousLevel}`,
+        "XP reward panel should begin from the level before the reward"
+    );
     assert.ok(
         app.ui.logItems.some((item) => item.includes("[경험치]")),
         "Match end should write an XP log entry immediately"
