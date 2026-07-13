@@ -18,6 +18,7 @@ import { ActionPickerService } from "./actionPicker.js";
 import { CollectionHubService } from "./collectionHubService.js";
 import { pickRandomActions, findActionById, showActionFailure } from "./clickActions.js";
 import { BattleBall } from "./entities/index.js";
+import { drawEquipmentItems } from "./entities/equipmentVisuals.js";
 import { PreviewReselectSimulation } from "./preview/previewReselectSimulation.js";
 import {
     loadPlayerProfile,
@@ -61,8 +62,10 @@ import { getEligibleHuntingCharacters } from "./hunting/huntingState.js";
 import { HuntingManager } from "./hunting/huntingManager.js";
 import {
     applyEquipmentStats,
+    applyEquipmentVisuals,
     canCharacterEquipItem,
     getCharacterEquipmentLevel,
+    getEquippedItems,
     getEquipmentRequiredLevel,
     getEquippedStatBonuses,
     getInventorySlots,
@@ -313,11 +316,13 @@ export class BattleApp {
 
         const canvas = this.renderer.canvas;
         const center = new Vector2(canvas.width / 2, canvas.height / 2 - 28);
+        const oldPreviewFighter = applyEquipmentVisuals(oldFighter, this.playerProfile);
+        const newPreviewFighter = applyEquipmentVisuals(newFighter, this.playerProfile);
 
         this._previewBall = this._previewBall || this._ensurePreviewBall(oldFighter);
         this._previewSim = new PreviewReselectSimulation({
-            oldFighter,
-            newFighter,
+            oldFighter: oldPreviewFighter,
+            newFighter: newPreviewFighter,
             center,
             canvasWidth: canvas.width
         });
@@ -575,6 +580,7 @@ export class BattleApp {
         ctx.fillStyle = fighter.color;
         ctx.fillRect(0, 0, size, size);
         const fakeBall = { radius: size / 2 - 2, position: { x: size / 2, y: size / 2 } };
+        drawEquipmentItems(ctx, fakeBall, getEquippedItems(this.playerProfile, fighter.id));
         const AbilityClass = Ability.MAP[fighter.ability];
         if (AbilityClass) {
             const fakeOwner = {
@@ -681,11 +687,13 @@ export class BattleApp {
             this._previewBall = null;
             return null;
         }
+        const visualFighter = applyEquipmentVisuals(fighter, this.playerProfile);
         if (this._previewBall && this._previewBall.id === fighter.id) {
+            this._previewBall.equipment.items = visualFighter.equipment.equippedItems;
             return this._previewBall;
         }
         const ball = new BattleBall(
-            fighter,
+            visualFighter,
             new Vector2(this.renderer.canvas.width / 2, this.renderer.canvas.height / 2 - 28)
         );
         ball.applyImpulse(ball.velocity.clone().scale(-1));

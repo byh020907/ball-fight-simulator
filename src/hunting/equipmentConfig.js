@@ -2,6 +2,8 @@ import { EQUIPMENT } from "./equipmentData.js";
 import { getLevelFromXp } from "../experience/experienceState.js";
 import { createEquipmentName } from "./equipmentNaming.js";
 
+const EQUIPPED_SLOT_KEYS = Object.freeze(["weapon", "armor", "accessory1", "accessory2"]);
+
 export const EQUIPMENT_SLOTS = Object.freeze(Object.values(EQUIPMENT.SLOTS));
 export const EQUIPMENT_RARITIES = EQUIPMENT.RARITIES;
 export const EQUIPMENT_STAT_RANGES = Object.freeze(
@@ -245,7 +247,7 @@ export function getEquippedItems(profile, characterId = null) {
     const equipment = profile?.equipment;
     if (!equipment || !Array.isArray(equipment.inventory)) return [];
 
-    const equippedIds = Object.values(equipment.equipped ?? {}).filter(Boolean);
+    const equippedIds = EQUIPPED_SLOT_KEYS.map((slotKey) => equipment.equipped?.[slotKey]).filter(Boolean);
     if (equippedIds.length === 0) return [];
 
     return equippedIds
@@ -258,22 +260,30 @@ export function getEquippedItems(profile, characterId = null) {
         }));
 }
 
+export function applyEquipmentVisuals(spec, profile) {
+    const characterId = spec?.id ?? null;
+    return {
+        ...spec,
+        equipment: {
+            ...(spec.equipment ?? {}),
+            equippedItems: getEquippedItems(profile, characterId)
+        }
+    };
+}
+
 export function applyEquipmentStats(spec, profile) {
     const characterId = spec?.id ?? null;
     const bonuses = getEquippedStatBonuses(profile, characterId);
-    const stats = { ...spec.stats };
+    const visualSpec = applyEquipmentVisuals(spec, profile);
+    const stats = { ...visualSpec.stats };
     for (const [key, value] of Object.entries(bonuses)) {
         if (value !== 0 && key in stats) {
             stats[key] = Number((stats[key] + value).toFixed(3));
         }
     }
     return {
-        ...spec,
-        stats,
-        equipment: {
-            ...(spec.equipment ?? {}),
-            equippedItems: getEquippedItems(profile, characterId)
-        }
+        ...visualSpec,
+        stats
     };
 }
 

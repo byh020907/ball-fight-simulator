@@ -144,6 +144,8 @@ import {
     calculateEnhanceFailureRate,
     getEquippedStatBonuses,
     applyEquipmentStats,
+    applyEquipmentVisuals,
+    getEquippedItems,
     canCharacterEquipItem,
     equipEquipmentItem,
     getEquipmentRequiredLevel,
@@ -172,8 +174,7 @@ import {
     applyRotationalContactDamage
 } from "../src/physics/contactDamage.js";
 import RotationalBody from "../src/physics/RotationalBody.js";
-import { inferArmorVariant } from "../src/entities/equipmentVisuals.js";
-import { drawEquipmentItems } from "../src/entities/equipmentVisuals.js";
+import { drawEquipmentItems, getEquipmentRingDashes } from "../src/entities/equipmentVisuals.js";
 import { ArenaRenderer } from "../src/ui.js";
 import { ArenaCamera } from "../src/camera.js";
 import { PATCH_NOTES } from "../src/patchNotes.js";
@@ -4987,7 +4988,7 @@ function testEquipmentLevelRequirement() {
 function testEquipmentDraw() {
     const profile = createDefaultPlayerProfile();
     profile.experience.byCharacter["equipment-test"] = { currentXp: getLevelRequirement(10) };
-    // 전체 장비 세트: weapon + plate armor + accessory 2개
+    // 전체 장비 세트: weapon + armor + accessory 2개
     const weapon = createEquipmentInstance({ rarity: "rare", slot: "weapon", rng: () => 0.5 });
     const armor = createEquipmentInstance({ rarity: "epic", slot: "armor", rng: () => 0.5 });
     const accessory1 = createEquipmentInstance({ rarity: "uncommon", slot: "accessory", rng: () => 0.5 });
@@ -5007,86 +5008,86 @@ function testEquipmentDraw() {
         stats: { hp: 100, damage: 10, defense: 2, speed: 260, radius: 42, mass: 1 },
         statAllocation: { hp: 0, damage: 0, speed: 0, skill: 0, defense: 0 }
     };
-    const spec = applyEquipmentStats(baseSpec, profile);
-    const ball = new BattleBall(spec, new Vector2(120, 120));
-    const ctx = makeRecordingCanvasContext();
-    ball.draw(ctx);
-
-    const lineCalls = ctx.calls.filter(([name]) => name === "lineTo").length;
-    const arcCalls = ctx.calls.filter(([name]) => name === "arc").length;
-    const ellipseCalls = ctx.calls.filter(([name]) => name === "ellipse").length;
-    assert.ok(lineCalls >= 8, "Weapon + armor draw should produce line calls");
-    assert.ok(arcCalls >= 5, "Accessory circles should produce arc calls");
-    assert.ok(ellipseCalls >= 0, "Armor may or may not have shield ellipse depending on variant");
-
-    // ── 천 갑옷: 방패 없음 ──
-    // 먼저 장비 없는 기준선 확인
-    const bareBall = new BattleBall(baseSpec, new Vector2(120, 120));
-    const bareCtx = makeRecordingCanvasContext();
-    bareBall.draw(bareCtx);
-    const bareEllipse = bareCtx.calls.filter(([name]) => name === "ellipse").length;
-    const bareArc = bareCtx.calls.filter(([name]) => name === "arc").length;
-
-    const clothArmor = {
-        instanceId: "cloth-1",
-        name: "천 갑옷",
-        rarity: "common",
-        slot: "armor",
-        draw: "armor",
-        stats: [{ type: "defense", value: 2, min: 1, max: 3 }]
-    };
-    const clothBall = new BattleBall(
-        { ...baseSpec, equipment: { items: [clothArmor], equippedItems: [clothArmor] } },
-        new Vector2(120, 120)
+    const equippedItems = getEquippedItems(profile, baseSpec.id);
+    assert.deepEqual(
+        equippedItems.map((item) => item.instanceId),
+        [weapon.instanceId, armor.instanceId, accessory1.instanceId, accessory2.instanceId],
+        "Active visual items should keep the equipment slot order"
     );
-    const clothCtx = makeRecordingCanvasContext();
-    clothBall.draw(clothCtx);
-    const clothEllipse = clothCtx.calls.filter(([name]) => name === "ellipse").length;
-    // 기준선 대비 추가된 ellipse만 equipment에서 온 것
-    assert.equal(clothEllipse, bareEllipse, "천 갑옷은 추가 ellipse를 만들면 안 된다 (기준선과 동일해야 함)");
-    const clothArc = clothCtx.calls.filter(([name]) => name === "arc").length;
-    assert.ok(clothArc > bareArc, "천 갑옷은 기준선보다 더 많은 arc 호출이 있어야 한다");
 
-    // ── 직접 drawEquipmentItems 호출로 variant 확인 ──
+    const oneItemDashes = getEquipmentRingDashes([weapon], 42);
+    const fullSetDashes = getEquipmentRingDashes(equippedItems, 42);
+    const previewDashes = getEquipmentRingDashes(equippedItems, 23);
+    assert.equal(oneItemDashes.length, 6, "One equipped item should use a sparse six-dash ring");
+    assert.equal(fullSetDashes.length, 24, "Four equipped items should use a dense twenty-four-dash ring");
+    assert.equal(previewDashes.length, 24, "A 46px preview should retain the full ring density");
+    assert.ok(
+        fullSetDashes.every((dash) => dash.radius === 42 * 0.68),
+        "Equipment dashes should stay inside the ball body"
+    );
+    assert.deepEqual(
+        fullSetDashes.slice(0, 4).map((dash) => dash.color),
+        ["#fbbf24", "#c084fc", "#4ade80", "#fb7185"],
+        "Equipment rarity colors should rotate in stable slot order"
+    );
+
+    const normalDash = getEquipmentRingDashes([weapon], 42)[0];
+    const enhancedDash = getEquipmentRingDashes([{ ...weapon, enhanceLevel: 5 }], 42)[0];
+    assert.equal(enhancedDash.startAngle, normalDash.startAngle, "Enhancement should not move equipment dashes");
+    assert.equal(enhancedDash.endAngle, normalDash.endAngle, "Enhancement should not resize equipment dashes");
+    assert.equal(enhancedDash.color, normalDash.color, "Enhancement should not replace the rarity color");
+    assert.ok(enhancedDash.alpha > normalDash.alpha, "Enhancement should only brighten its equipment dashes");
+
     const directCtx = makeRecordingCanvasContext();
     const mockBall = { radius: 42, position: { x: 120, y: 120 } };
-    drawEquipmentItems(directCtx, mockBall, [clothArmor]);
-    const directArc = directCtx.calls.filter(([name]) => name === "arc").length;
-    const directEllipse = directCtx.calls.filter(([name]) => name === "ellipse").length;
-    assert.ok(directArc >= 1, "drawEquipmentItems는 cloth armor에 arc 호출을 해야 한다");
-    assert.equal(directEllipse, 0, "drawEquipmentItems는 cloth armor에 ellipse를 그리면 안 된다");
-
-    // ── 나무 방패: ellipse 있음 ──
-    const shieldArmor = {
-        instanceId: "shield-1",
-        name: "나무 방패",
-        rarity: "common",
-        slot: "armor",
-        draw: "armor",
-        stats: [{ type: "defense", value: 3, min: 2, max: 4 }]
-    };
-    const shieldBall = new BattleBall(
-        { ...baseSpec, equipment: { items: [shieldArmor], equippedItems: [shieldArmor] } },
-        new Vector2(120, 120)
-    );
-    const shieldCtx = makeRecordingCanvasContext();
-    shieldBall.draw(shieldCtx);
-    const shieldEllipse = shieldCtx.calls.filter(([name]) => name === "ellipse").length;
-    assert.ok(shieldEllipse >= 2, "방패 계열 armor는 shield ellipse가 있어야 한다");
-
-    // ── variant 추론 ──
-    assert.equal(inferArmorVariant({ name: "천 갑옷" }), "cloth", "천 갑옷은 cloth variant");
-    assert.equal(inferArmorVariant({ name: "헝겊 망토" }), "cloth", "헝겊 망토는 cloth variant");
-    assert.equal(inferArmorVariant({ name: "정령 로브" }), "cloth", "정령 로브는 cloth variant");
-    assert.equal(inferArmorVariant({ name: "가죽 조끼" }), "vest", "가죽 조끼는 vest variant");
-    assert.equal(inferArmorVariant({ name: "나무 방패" }), "shield", "나무 방패는 shield variant");
-    assert.equal(inferArmorVariant({ name: "룬 방패" }), "shield", "룬 방패는 shield variant");
-    assert.equal(inferArmorVariant({ name: "강철 갑옷" }), "plate", "강철 갑옷은 plate variant");
-    // visualVariant가 명시되면 이름보다 우선
+    drawEquipmentItems(directCtx, mockBall, equippedItems);
     assert.equal(
-        inferArmorVariant({ name: "천 갑옷", visualVariant: "plate" }),
-        "plate",
-        "명시된 visualVariant가 우선"
+        directCtx.calls.filter(([name]) => name === "arc").length,
+        24,
+        "The shared equipment renderer should draw one arc per dense-ring dash"
+    );
+    assert.equal(
+        directCtx.calls.filter(([name]) => name === "ellipse").length,
+        0,
+        "The shared equipment renderer should not draw external armor shapes"
+    );
+    assert.equal(
+        directCtx.calls.filter(([name]) => name === "lineTo").length,
+        0,
+        "The shared equipment renderer should not draw external weapon shapes"
+    );
+
+    const visualSpec = applyEquipmentVisuals(baseSpec, profile);
+    const ball = new BattleBall(visualSpec, new Vector2(120, 120));
+    const ballCtx = makeRecordingCanvasContext();
+    ball.draw(ballCtx);
+    assert.equal(
+        ballCtx.calls.filter(([name, , , radius]) => name === "arc" && radius === 42 * 0.68).length,
+        24,
+        "BattleBall should render the shared inner equipment ring before the face"
+    );
+
+    const preview = new PreviewReselectSimulation({
+        oldFighter: visualSpec,
+        newFighter: visualSpec,
+        center: new Vector2(480, 452),
+        canvasWidth: 960
+    });
+    assert.equal(
+        preview.outgoing.equipment.items.length,
+        4,
+        "Outgoing reselect previews should receive active equipment"
+    );
+    assert.equal(
+        preview.incoming.equipment.items.length,
+        4,
+        "Incoming reselect previews should receive active equipment"
+    );
+
+    const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
+    assert.ok(
+        appSource.includes("drawEquipmentItems(ctx, fakeBall, getEquippedItems(this.playerProfile, fighter.id));"),
+        "The setup face preview should use the shared equipment renderer"
     );
 }
 
