@@ -1,5 +1,6 @@
 import { Vector2 } from "../core.js";
 import { createHuntingLootItem } from "../entities/huntingLootRegistry.js";
+import { getCombatMovementSpeed } from "../physics/magneticAttraction.js";
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 import { createEmptyHuntingLoot, createHuntingChest } from "./huntingRewards.js";
 
@@ -14,6 +15,8 @@ export const HUNTING_LOOT_ITEM_TYPES = Object.freeze({
 export const HUNTING_LOOT_RARITIES = Object.freeze(["common", "rare", "unique", "epic"]);
 
 const LOOT_CONFIG = REWARD_BALANCE.hunting.loot;
+const LOOT_LAUNCH_SPEED_MIN_MULTIPLIER = 1.2;
+const LOOT_LAUNCH_SPEED_MAX_MULTIPLIER = 1.5;
 
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
@@ -62,11 +65,23 @@ export function getSmallHealPackAmount(collector) {
     return Math.min(missingHp, roundHuntingLootValue(missingHp * LOOT_CONFIG.smallHealPack.missingHpRecoveryRatio));
 }
 
-export function getHuntingShardDropAmount(floor = 1) {
+function getHuntingShardBaseAmount(floor = 1) {
     const safeFloor = Math.max(1, Math.floor(floor) || 1);
     const steps = Math.floor((safeFloor - 1) / LOOT_CONFIG.shard.floorStep);
     const amount = LOOT_CONFIG.shard.baseAmount + steps * LOOT_CONFIG.valueStep;
     return Math.min(LOOT_CONFIG.shard.maximumAmount, roundHuntingLootValue(amount));
+}
+
+export function getHuntingShardDropAmount(floor = 1, rng = Math.random) {
+    const variation = Math.floor(clamp(rng(), 0, 0.999999) * 5) - 2;
+    return Math.max(1, getHuntingShardBaseAmount(floor) + variation);
+}
+
+function createLootLaunchVelocity(fighter, rng) {
+    const speedMultiplier =
+        LOOT_LAUNCH_SPEED_MIN_MULTIPLIER +
+        rng() * (LOOT_LAUNCH_SPEED_MAX_MULTIPLIER - LOOT_LAUNCH_SPEED_MIN_MULTIPLIER);
+    return Vector2.fromAngle(rng() * Math.PI * 2, getCombatMovementSpeed(fighter) * speedMultiplier);
 }
 
 export function getHuntingLootWeights({ collector, rarity = "common" } = {}) {
@@ -94,7 +109,7 @@ export function rollHuntingShardBundleAmount({ floor = 1, rarity = "rare", rng =
         multipliers.map(({ value, weight }) => [value, weight]),
         rng
     );
-    return roundHuntingLootValue(getHuntingShardDropAmount(floor) * Number(multiplier));
+    return roundHuntingLootValue(getHuntingShardBaseAmount(floor) * Number(multiplier));
 }
 
 export function rollHighChestRarity({ rarity = "rare", rng = Math.random } = {}) {
@@ -162,7 +177,7 @@ export class HuntingLootDropController {
 
         const item = createHuntingLootItem(type, {
             position: fighter.position,
-            velocity: Vector2.fromAngle(this.rng() * Math.PI * 2, 120 + this.rng() * 80),
+            velocity: createLootLaunchVelocity(fighter, this.rng),
             collectorId: this.session.playerId,
             magnetRadiusMultiplier: LOOT_CONFIG.magnet.radiusMultiplier,
             magnetResponseRate: LOOT_CONFIG.magnet.responseRate,
@@ -173,7 +188,7 @@ export class HuntingLootDropController {
                     ? getSmallHealPackAmount(collector)
                     : isShardBundle
                       ? rollHuntingShardBundleAmount({ floor: this.session.floor, rarity, rng: this.rng })
-                      : getHuntingShardDropAmount(this.session.floor),
+                      : getHuntingShardDropAmount(this.session.floor, this.rng),
             chest: isChest ? createHuntingChest({ rarity: chestRarity }) : null,
             onCollected: (reward) => this.session.recordCollection(reward)
         });

@@ -2297,9 +2297,26 @@ function testHuntingLootBalanceRules() {
     assert.equal(getSmallHealPackAmount(fullHp), 0, "A full-HP collector should not need a heal pack");
     assert.equal(getSmallHealPackAmount(halfHp), 15, "Heal packs should restore 25% of missing HP in five-point steps");
     assert.equal(getSmallHealPackAmount(emptyHp), 25, "Empty HP should receive a quarter of its missing HP");
-    assert.equal(getHuntingShardDropAmount(1), 5, "Early shard drops should start at five shards");
-    assert.equal(getHuntingShardDropAmount(26), 10, "Shard drops should grow in five-shard steps");
-    assert.equal(getHuntingShardDropAmount(100), 20, "Shard drops should respect the configured maximum");
+    assert.equal(
+        getHuntingShardDropAmount(1, () => 0),
+        3,
+        "Floor-one shard drops should begin at the three-shard roll"
+    );
+    assert.equal(
+        getHuntingShardDropAmount(1, () => 0.999999),
+        7,
+        "Floor-one shard drops should reach the seven-shard roll"
+    );
+    assert.equal(
+        getHuntingShardDropAmount(26, () => 0),
+        8,
+        "Each depth bracket should shift the shard range upward by five"
+    );
+    assert.equal(
+        getHuntingShardDropAmount(100, () => 0.999999),
+        22,
+        "Deep floors should preserve the shifted upper shard roll"
+    );
     assert.deepEqual(
         getHuntingLootWeights({ collector: fullHp, rarity: "common" }),
         { small_heal_pack: 20, shard: 70, chest: 10, shard_bundle: 0, high_chest: 0 },
@@ -2367,7 +2384,7 @@ function testHuntingLootItemsAndDropController(app) {
     };
     const mobSpec = createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.PURSUER, floor: 1, index: 0 });
     const session = new HuntingBattleLootSession({ playerId: playerSpec.id, floor: 1 });
-    const rolls = [0, 0.2, 0, 0];
+    const rolls = [0, 0.2, 0, 0.25, 0];
     const soundCalls = [];
     const controller = new HuntingLootDropController({ session, rng: () => rolls.shift() ?? 0 });
     const simulation = new BattleSimulation(
@@ -2390,10 +2407,22 @@ function testHuntingLootItemsAndDropController(app) {
     const droppedShard = simulation.entities.find((entity) => entity instanceof ShardDrop);
     assert.ok(droppedShard, "Defeating a hunting mob must create a configured floor-loot item");
     assert.equal(droppedShard.radius, 16, "Standard shard drops should be visibly larger than hero orbs");
+    assert.ok(
+        Math.abs(droppedShard.velocity.length() - mob.stats.baseSpeed * 1.2) < 1e-9,
+        "Loot should launch at least as quickly as its defeated monster, using the Hero Orb speed floor"
+    );
+    assert.ok(
+        droppedShard.velocity.y > 0 && Math.abs(droppedShard.velocity.x) < 1e-8,
+        "Loot should use the supplied full-circle launch direction"
+    );
     assert.equal(session.getCollectedLoot().shards, 0, "A dropped shard must not enter battle loot before collection");
     const entitiesBeforeShardCollection = simulation.entities.length;
     droppedShard.update(1 / 60, simulation);
-    assert.equal(session.getCollectedLoot().shards, 5, "Collecting a shard must add it to the battle loot session");
+    assert.equal(
+        session.getCollectedLoot().shards,
+        3,
+        "Collecting a shard must add its rolled amount to the battle loot session"
+    );
     assert.equal(
         simulation.entities.length - entitiesBeforeShardCollection,
         26,
