@@ -9,7 +9,7 @@
     x-transition:leave="overlay-leave"
     x-transition:leave-start="overlay-leave-start"
     x-transition:leave-end="overlay-leave-end"
-    x-bind:class="{ transient: transient, 'hunting-merchant-active': huntingMerchantActive, 'hunting-chest-active': huntingChestEventActive, 'hunting-event-active': huntingEventActive }"
+    x-bind:class="{ transient: transient, 'hunting-merchant-active': huntingMerchantActive, 'hunting-chest-active': huntingChestEventActive, 'hunting-event-active': huntingEventActive, 'hunting-battle-preparation-active': huntingBattlePreparationActive }"
 >
     <div class="overlay-card">
         <span x-text="label">Waiting Room</span>
@@ -92,6 +92,42 @@
             <strong x-text="huntingEventDetail"></strong>
             <button class="hunting-btn advance" type="button" @click="huntingEventContinue()" x-text="huntingEventConfirmLabel || '계속 전진'"></button>
         </div>
+        <div class="hunting-battle-preparation" x-show="huntingBattlePreparationActive">
+            <div class="hunting-battle-preparation-hp">
+                <div class="hunting-battle-preparation-hp-head">
+                    <span>현재 HP</span>
+                    <strong x-text="huntingBattlePreparationHp + ' / ' + huntingBattlePreparationMaxHp"></strong>
+                </div>
+                <div class="hunting-battle-preparation-hp-track" aria-hidden="true">
+                    <i
+                        x-bind:style="'width:' + Math.min(100, Math.round(((huntingBattlePreparationHp || 0) / Math.max(1, huntingBattlePreparationMaxHp || 1)) * 100)) + '%'"
+                    ></i>
+                </div>
+            </div>
+            <p
+                class="hunting-battle-preparation-notice"
+                x-show="huntingBattlePreparationNotice"
+                x-text="huntingBattlePreparationNotice"
+            ></p>
+            <div class="hunting-battle-preparation-items">
+                <template x-for="item in (huntingBattlePreparationItems || [])" :key="item.id">
+                    <div class="hunting-battle-preparation-item">
+                        <div>
+                            <strong x-text="item.label"></strong>
+                            <span x-text="'보유 ' + item.owned + ' · 원정 ' + item.usedInRun + '/' + item.useLimit"></span>
+                        </div>
+                        <button
+                            class="hunting-btn potion"
+                            type="button"
+                            x-bind:disabled="!item.canUse"
+                            @click="huntingUsePreparationConsumable(item.id)"
+                            x-text="item.label + ' +' + item.healPercent + '%'"
+                        ></button>
+                    </div>
+                </template>
+            </div>
+            <button class="hunting-btn advance hunting-battle-start" type="button" @click="huntingStartPreparedBattle()">전투 시작</button>
+        </div>
     </div>
     <div
         class="hunting-loot-hud"
@@ -136,6 +172,11 @@
         huntingEventActive: false,
         huntingEventDetail: "",
         huntingEventConfirmLabel: "",
+        huntingBattlePreparationActive: false,
+        huntingBattlePreparationItems: [],
+        huntingBattlePreparationHp: 0,
+        huntingBattlePreparationMaxHp: 0,
+        huntingBattlePreparationNotice: "",
         huntingLootHudVisible: false,
         huntingLootHudShards: 0,
         huntingLootHudChests: 0,
@@ -157,6 +198,12 @@
         },
         huntingEventContinue() {
             window.requireGameActionBridge("huntingEventContinue").huntingEventContinue();
+        },
+        huntingUsePreparationConsumable(consumableId) {
+            window.requireGameActionBridge("huntingUsePreparationConsumable").huntingUsePreparationConsumable(consumableId);
+        },
+        huntingStartPreparedBattle() {
+            window.requireGameActionBridge("huntingStartPreparedBattle").huntingStartPreparedBattle();
         },
         show({ label, text, subtext = "", transient = false, xpReward = null } = {}) {
             this.visible = true;
@@ -206,6 +253,11 @@
             this.huntingEventActive = false;
             this.huntingEventDetail = "";
             this.huntingEventConfirmLabel = "";
+            this.huntingBattlePreparationActive = false;
+            this.huntingBattlePreparationItems = [];
+            this.huntingBattlePreparationHp = 0;
+            this.huntingBattlePreparationMaxHp = 0;
+            this.huntingBattlePreparationNotice = "";
             this.huntingLootHudVisible = false;
             this.huntingLootHudShards = 0;
             this.huntingLootHudChests = 0;
@@ -241,6 +293,11 @@
             if (data.huntingEventActive !== undefined) this.huntingEventActive = data.huntingEventActive;
             if (data.huntingEventDetail !== undefined) this.huntingEventDetail = data.huntingEventDetail;
             if (data.huntingEventConfirmLabel !== undefined) this.huntingEventConfirmLabel = data.huntingEventConfirmLabel;
+            if (data.huntingBattlePreparationActive !== undefined) this.huntingBattlePreparationActive = data.huntingBattlePreparationActive;
+            if (data.huntingBattlePreparationItems !== undefined) this.huntingBattlePreparationItems = data.huntingBattlePreparationItems;
+            if (data.huntingBattlePreparationHp !== undefined) this.huntingBattlePreparationHp = data.huntingBattlePreparationHp;
+            if (data.huntingBattlePreparationMaxHp !== undefined) this.huntingBattlePreparationMaxHp = data.huntingBattlePreparationMaxHp;
+            if (data.huntingBattlePreparationNotice !== undefined) this.huntingBattlePreparationNotice = data.huntingBattlePreparationNotice;
             if (data.huntingLootHudVisible !== undefined) this.huntingLootHudVisible = data.huntingLootHudVisible;
             if (data.huntingLootHudShards !== undefined) this.huntingLootHudShards = data.huntingLootHudShards;
             if (data.huntingLootHudChests !== undefined) this.huntingLootHudChests = data.huntingLootHudChests;
@@ -482,6 +539,12 @@
         pointer-events: auto;
     }
 
+    :scope.hunting-battle-preparation-active .overlay-card {
+        width: min(390px, calc(100% - 24px));
+        padding: 18px 22px;
+        pointer-events: auto;
+    }
+
     .hunting-chest-event {
         display: flex;
         flex-direction: column;
@@ -534,6 +597,94 @@
         color: #202020;
         font-size: 1.1rem;
         letter-spacing: 0;
+    }
+
+    .hunting-battle-preparation {
+        display: grid;
+        gap: 10px;
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 1px solid #e0e0e0;
+        pointer-events: auto;
+    }
+
+    .hunting-battle-preparation-hp-head,
+    .hunting-battle-preparation-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+    }
+
+    .hunting-battle-preparation-hp-head span,
+    .hunting-battle-preparation-item span {
+        margin: 0;
+        color: #555555;
+        font-size: 0.72rem;
+        letter-spacing: 0;
+        text-transform: none;
+    }
+
+    .hunting-battle-preparation-hp-head strong,
+    .hunting-battle-preparation-item strong {
+        color: #202020;
+        font-size: 0.9rem;
+        letter-spacing: 0;
+    }
+
+    .hunting-battle-preparation-hp-track {
+        height: 10px;
+        margin-top: 6px;
+        overflow: hidden;
+        border: 2px solid #202020;
+        background: #ffffff;
+    }
+
+    .hunting-battle-preparation-hp-track i {
+        display: block;
+        width: 0;
+        height: 100%;
+        background: #38a169;
+        transition: width 260ms ease;
+    }
+
+    .hunting-battle-preparation-notice {
+        margin: 0;
+        color: #16803d;
+        font-size: 0.76rem;
+        font-weight: 700;
+    }
+
+    .hunting-battle-preparation-items {
+        display: grid;
+        gap: 8px;
+    }
+
+    .hunting-battle-preparation-item {
+        padding: 10px;
+        border: 2px solid #202020;
+        border-radius: 8px;
+        text-align: left;
+    }
+
+    .hunting-battle-preparation-item > div {
+        display: grid;
+        gap: 3px;
+    }
+
+    .hunting-btn.potion {
+        border-color: #38a169;
+        color: #176b38;
+    }
+
+    .hunting-btn.potion:disabled {
+        cursor: not-allowed;
+        border-color: #aaaaaa;
+        color: #888888;
+    }
+
+    .hunting-battle-start {
+        width: 100%;
     }
 
     .hunting-chest-token {

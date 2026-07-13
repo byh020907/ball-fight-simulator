@@ -1,10 +1,12 @@
 import { createHuntingChest } from "./huntingRewards.js";
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
+import { buyConsumable, getConsumableDefinition, getConsumableOwnedCount } from "../consumables.js";
 
 export const MERCHANT_OFFER_TYPES = Object.freeze({
     REPAIR: "repair",
     BUY_LOOT: "buy_loot",
-    SECURE_TRANSPORT: "secure_transport"
+    SECURE_TRANSPORT: "secure_transport",
+    CONSUMABLE: "consumable"
 });
 
 function calcDiscount(cost, discountRatio) {
@@ -73,6 +75,25 @@ function _createSecureTransportOffer(run, discount) {
     };
 }
 
+export function createConsumableMerchantOffer(consumableId, profile, discountRatio = 0) {
+    const definition = getConsumableDefinition(consumableId);
+    if (!definition) return null;
+    const owned = getConsumableOwnedCount(profile, consumableId);
+    const atMax = owned >= definition.maxOwned;
+    return {
+        id: `consumable:${consumableId}`,
+        type: MERCHANT_OFFER_TYPES.CONSUMABLE,
+        consumableId,
+        label: definition.label,
+        description: definition.description,
+        detail: `보유 ${owned}/${definition.maxOwned}`,
+        cost: calcDiscount(definition.purchaseCost, discountRatio),
+        disabled: atMax,
+        disabledReason: atMax ? "보유 수량이 최대입니다" : "",
+        purchased: false
+    };
+}
+
 export function canAffordOffer(offer, profile) {
     if (offer.purchased || offer.disabled) return false;
     return (profile.hunting?.shards ?? 0) >= offer.cost;
@@ -80,6 +101,10 @@ export function canAffordOffer(offer, profile) {
 
 export function applyMerchantOffer(run, profile, offer) {
     if (offer.purchased || offer.disabled) return null;
+    if (offer.type === MERCHANT_OFFER_TYPES.CONSUMABLE) {
+        const purchase = buyConsumable(profile, offer.consumableId, { cost: offer.cost });
+        return purchase ? { run: { ...run }, result: { type: "consumable", purchase } } : null;
+    }
     if (
         offer.type === MERCHANT_OFFER_TYPES.REPAIR &&
         (run.carriedHp ?? run.carriedMaxHp ?? 100) >= (run.carriedMaxHp ?? 100)
@@ -134,5 +159,6 @@ export function formatOfferResultToast(result) {
     if (result.type === "repair") return `HP +${result.healed} 회복 (${result.newHp})`;
     if (result.type === "buy_loot") return `${result.chest.rarity} 상자 1개 구매 (미확보)`;
     if (result.type === "secure_transport") return `${result.chest.rarity} 상자 1개 안전 확보`;
+    if (result.type === "consumable") return `${result.purchase.label} 구매 · 보유 ${result.purchase.owned}`;
     return "";
 }

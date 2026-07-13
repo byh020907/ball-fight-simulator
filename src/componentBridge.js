@@ -14,6 +14,10 @@ import {
     buyDailyShopChest as purchaseDailyShopChest,
     rerollDailyShop as refreshDailyShopOffer
 } from "./hunting/dailyShop.js";
+import {
+    buyConsumable as purchaseConsumable,
+    upgradeHuntingConsumableUseLimit as upgradeConsumableUseLimit
+} from "./consumables.js";
 import { savePlayerProfile } from "./playerProfile.js";
 import { PopupService } from "./popup.js";
 import { HELP_TITLE, HELP_CONTENT } from "./helpContent.js";
@@ -79,6 +83,12 @@ export function createComponentBridge(app) {
         },
         huntingEventContinue() {
             return app.hunting.eventContinue();
+        },
+        huntingUsePreparationConsumable(consumableId) {
+            return app.hunting.usePreparationConsumable(consumableId);
+        },
+        huntingStartPreparedBattle() {
+            return app.hunting.startPreparedBattle();
         },
 
         // ── Help action ──
@@ -216,6 +226,16 @@ export function createComponentBridge(app) {
                 app.audio.play("shop_reroll");
                 refreshCollectionAndProfile();
             }
+            return result;
+        },
+        buyConsumable(consumableId) {
+            const result = purchaseConsumable(app.playerProfile, consumableId);
+            if (result) refreshCollectionAndProfile();
+            return result;
+        },
+        upgradeHuntingConsumableUseLimit() {
+            const result = upgradeConsumableUseLimit(app.playerProfile);
+            if (result) refreshCollectionAndProfile();
             return result;
         }
     };

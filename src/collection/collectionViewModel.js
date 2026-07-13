@@ -9,6 +9,7 @@ import { getCharacterMasteryLevel } from "../character-mastery/index.js";
 import { getCharacterExperienceSummary } from "../experience/experienceService.js";
 import { getCharacterLevelRewards } from "../experience/characterLevelProgression.js";
 import { canOpenHuntingChest, getDailyShop, previewHuntingChest } from "../hunting/index.js";
+import { getConsumableShopItems, getHuntingConsumableUseLimitUpgrade } from "../consumables.js";
 import {
     getInventorySlots,
     getInventoryUsed,
@@ -198,6 +199,8 @@ export function createCollectionHubViewModel({
             canOpen: canOpenHuntingChest(profile, chest)
         };
     });
+    const consumableShopItems = getConsumableShopItems(profile);
+    const huntingConsumableUseLimitUpgrade = getHuntingConsumableUseLimitUpgrade(profile);
 
     // 요약
     const playedCharacters = rosterItems.filter((item) => item.hasRecord).length;
@@ -247,6 +250,8 @@ export function createCollectionHubViewModel({
         storage: {
             shards: hunting.shards ?? 0,
             dailyShop: getDailyShop(profile),
+            consumables: consumableShopItems,
+            huntingConsumableUseLimitUpgrade,
             chests: storageItems,
             stats: {
                 runsStarted: hunting.stats?.runsStarted ?? 0,

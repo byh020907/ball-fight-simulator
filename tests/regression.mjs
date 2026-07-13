@@ -104,6 +104,7 @@ import {
     getHuntingMonsterPool,
     shouldUseRosterMiniboss,
     createMerchantOffers,
+    createConsumableMerchantOffer,
     applyMerchantOffer,
     formatOfferResultToast,
     canAffordOffer,
@@ -114,6 +115,17 @@ import {
 import { Grenade } from "../src/entities/grenade.js";
 import { getArenaWallRay } from "../src/abilities/huntingMobAbility.js";
 import { createElectricArcPath } from "../src/effects/electricArc.js";
+import {
+    CONSUMABLE_IDS,
+    HUNTING_CONSUMABLE_USE_LIMIT,
+    buyConsumable,
+    getConsumableShopItems,
+    getHuntingConsumableUseLimit,
+    getHuntingConsumableUseLimitUpgrade,
+    getHuntingPreparationConsumables,
+    upgradeHuntingConsumableUseLimit,
+    useHuntingPreparationConsumable
+} from "../src/consumables.js";
 import {
     createEquipmentInstance,
     enhanceEquipment,
@@ -1916,7 +1928,8 @@ function testHuntingChampionEventRequiresBattleConfirmation() {
         showOverlay() {},
         addLog() {},
         roster: app.roster,
-        playerProfile: createDefaultPlayerProfile()
+        playerProfile: createDefaultPlayerProfile(),
+        playerStatAllocation: {}
     };
     const manager = new HuntingManager(mockApp);
     const championEvent = HuntingEvent.createPayload(HUNTING_EVENT_TYPES.CHAMPION_INTRUSION, 4);
@@ -1926,23 +1939,150 @@ function testHuntingChampionEventRequiresBattleConfirmation() {
     };
 
     const action = manager._handleEventFloor({ app: mockApp, event: championEvent });
-    assert.equal(action, "stop", "Champion intrusion should stop for its result screen before combat");
-    assert.equal(manager._run.phase, HUNTING_RUN_PHASES.AWAITING_EVENT, "Champion should wait for confirmation");
+    assert.equal(action, "stop", "Champion intrusion should stop for battle preparation before combat");
     assert.equal(
-        overlayCalls.at(-1).huntingEventConfirmLabel,
-        "전투 시작",
-        "Champion event should make the next action explicit"
+        manager._run.phase,
+        HUNTING_RUN_PHASES.AWAITING_BATTLE_PREPARATION,
+        "Champion should use the shared battle preparation phase"
+    );
+    assert.equal(
+        overlayCalls.at(-1).huntingBattlePreparationActive,
+        true,
+        "Champion event should expose the shared battle preparation UI"
     );
 
     let battleStarts = 0;
     manager._startFloorBattle = () => {
         battleStarts += 1;
     };
-    manager.eventContinue();
+    manager.startPreparedBattle();
 
-    assert.equal(battleStarts, 1, "Champion combat should start only after event confirmation");
+    assert.equal(battleStarts, 1, "Champion combat should start only after battle preparation confirmation");
     assert.equal(manager._run.phase, HUNTING_RUN_PHASES.COMBAT, "Champion confirmation should enter combat phase");
     console.log("[hunting-champion-event-requires-confirmation] ok");
+}
+
+function testHuntingConsumableInventoryAndUseLimits() {
+    const profile = createDefaultPlayerProfile();
+    profile.hunting.shards = 10_000;
+
+    const initialShopItem = getConsumableShopItems(profile).find((item) => item.id === CONSUMABLE_IDS.HP_POTION);
+    assert.equal(initialShopItem.owned, 0, "New profiles should start with no HP potions");
+    assert.equal(initialShopItem.cost, 100, "HP potion price should remain 100 shards");
+    assert.equal(initialShopItem.maxOwned, 10, "HP potion inventory should cap at ten");
+
+    for (let count = 0; count < 10; count += 1) {
+        assert.ok(
+            buyConsumable(profile, CONSUMABLE_IDS.HP_POTION),
+            "A funded potion purchase below the cap should succeed"
+        );
+    }
+    assert.equal(getConsumableShopItems(profile)[0].owned, 10, "Potion purchases should reach the owned cap");
+    assert.equal(buyConsumable(profile, CONSUMABLE_IDS.HP_POTION), null, "Potion purchases must stop at the owned cap");
+    assert.equal(profile.hunting.shards, 9_000, "Ten potions should cost exactly 1,000 shards");
+
+    const upgradeCosts = [];
+    while (getHuntingConsumableUseLimitUpgrade(profile).canUpgrade) {
+        const result = upgradeHuntingConsumableUseLimit(profile);
+        upgradeCosts.push(result.cost);
+    }
+    assert.deepEqual(upgradeCosts, [100, 200, 400, 800], "Potion use limit upgrades should double from 100 shards");
+    assert.equal(
+        getHuntingConsumableUseLimit(profile),
+        HUNTING_CONSUMABLE_USE_LIMIT.max,
+        "Potion use limit should cap at five per hunting run"
+    );
+
+    const run = {
+        ...createHuntingRun({ characterId: FIGHTER_IDS.ARCHER }),
+        carriedHp: 56,
+        carriedMaxHp: 224
+    };
+    const preparationItems = getHuntingPreparationConsumables(profile, run);
+    assert.equal(preparationItems[0].healAmount, 56, "Potion healing should be 25% of the actual run maximum HP");
+    assert.equal(preparationItems[0].canUse, true, "A wounded player with stock and run allowance should use a potion");
+
+    const firstUse = useHuntingPreparationConsumable(profile, run, CONSUMABLE_IDS.HP_POTION);
+    assert.ok(firstUse, "The first potion use should succeed");
+    assert.equal(firstUse.run.carriedHp, 112, "Potion use should restore 25% of maximum HP");
+    assert.equal(firstUse.run.consumableUses[CONSUMABLE_IDS.HP_POTION], 1, "Run should record only used potions");
+    assert.equal(profile.consumables.owned[CONSUMABLE_IDS.HP_POTION], 9, "Potion stock should decrease only when used");
+    assert.equal(
+        useHuntingPreparationConsumable(profile, firstUse.run, CONSUMABLE_IDS.HP_POTION),
+        null,
+        "A battle should allow only one potion even when the run allowance remains"
+    );
+
+    const nextBattleRun = { ...firstUse.run, battleConsumableUses: {} };
+    const secondUse = useHuntingPreparationConsumable(profile, nextBattleRun, CONSUMABLE_IDS.HP_POTION);
+    assert.ok(secondUse, "A later battle should allow another potion while the run allowance remains");
+    const fullHpRun = { ...secondUse.run, carriedHp: secondUse.run.carriedMaxHp, battleConsumableUses: {} };
+    assert.equal(
+        useHuntingPreparationConsumable(profile, fullHpRun, CONSUMABLE_IDS.HP_POTION),
+        null,
+        "A full-HP player should not consume a potion"
+    );
+    console.log("[hunting-consumable-inventory-and-use-limits] ok");
+}
+
+function testHuntingBattlePreparationUsesActualBattleHp() {
+    const profile = createDefaultPlayerProfile();
+    profile.consumables.owned[CONSUMABLE_IDS.HP_POTION] = 1;
+    const overlayStates = [];
+    let startedMatches = 0;
+    const mockApp = {
+        roster: app.roster,
+        playerProfile: profile,
+        playerStatAllocation: {},
+        setHuntingOverlayState(data) {
+            overlayStates.push({ ...data });
+        },
+        showOverlay() {},
+        addLog() {},
+        startMatch(specs, options) {
+            startedMatches += 1;
+            this.simulation = new BattleSimulation(specs, { onLog() {}, onSound() {} }, null, options);
+        }
+    };
+    const manager = new HuntingManager(mockApp);
+    manager._run = {
+        ...createHuntingRun({ characterId: FIGHTER_IDS.ARCHER }),
+        carriedHp: 28,
+        lastEncounter: { type: HUNTING_FLOOR_OUTCOME_TYPES.COMBAT }
+    };
+
+    manager._stopHuntingMoveForBattle(mockApp, "1층 — 전투 발생");
+
+    assert.equal(
+        startedMatches,
+        0,
+        "Normal combat should wait in battle preparation before constructing BattleSimulation"
+    );
+    assert.equal(
+        manager._run.phase,
+        HUNTING_RUN_PHASES.AWAITING_BATTLE_PREPARATION,
+        "Normal combat should enter the dedicated preparation phase"
+    );
+    assert.equal(
+        overlayStates.at(-1).huntingBattlePreparationItems[0].healAmount,
+        56,
+        "Preparation UI should calculate healing from the actual 224 maximum HP"
+    );
+
+    const useResult = manager.usePreparationConsumable(CONSUMABLE_IDS.HP_POTION);
+    assert.equal(useResult.healed, 56, "Preparation potion use should report the actual healed amount");
+    assert.equal(manager._run.carriedHp, 84, "Preparation potion use should update carried HP before battle start");
+    assert.equal(
+        profile.consumables.owned[CONSUMABLE_IDS.HP_POTION],
+        0,
+        "Preparation potion use should consume the persistent stock"
+    );
+
+    manager.startPreparedBattle();
+    const player = mockApp.simulation.fighters.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
+    assert.equal(startedMatches, 1, "BattleSimulation should start only after the preparation start action");
+    assert.equal(player.hp, 84, "BattleSimulation should receive the potion-adjusted carried HP");
+    console.log("[hunting-battle-preparation-actual-hp] ok");
 }
 
 async function testHuntingChestEventStopsAdvanceLoop() {
@@ -9051,6 +9191,8 @@ testHuntingEventPresentationContracts();
 testHuntingEventHealthInitialization();
 testHuntingAutoEventRequiresConfirmation();
 testHuntingChampionEventRequiresBattleConfirmation();
+testHuntingConsumableInventoryAndUseLimits();
+testHuntingBattlePreparationUsesActualBattleHp();
 await testHuntingChestEventStopsAdvanceLoop();
 testHuntingAdvanceDispatchContract();
 testComponentBridgeEquipmentFunctions();
@@ -11011,6 +11153,19 @@ function testHuntingMerchantOffers() {
     const eventDiscounted = { ...event, discountRatio: 0.2 };
     const discountedOffers = createMerchantOffers(runWithHp, eventDiscounted, profile);
     assert.ok(discountedOffers[0].cost <= offers[0].cost, "Discount should reduce prices");
+
+    // ── Future consumable merchant offer reuses the persistent inventory definition ──
+    const potionOffer = createConsumableMerchantOffer(CONSUMABLE_IDS.HP_POTION, profile, 0.2);
+    assert.equal(potionOffer.type, "consumable", "Consumables should use a distinct merchant offer type");
+    assert.equal(potionOffer.cost, 80, "Consumable merchant discounts should reuse the definition purchase cost");
+    const potionPurchase = applyMerchantOffer(runWithHp, profile, potionOffer);
+    assert.ok(potionPurchase, "A future consumable merchant offer should be purchasable through the shared path");
+    assert.equal(
+        profile.consumables.owned[CONSUMABLE_IDS.HP_POTION],
+        1,
+        "Merchant purchase should add persistent stock"
+    );
+    assert.equal(potionPurchase.result.type, "consumable", "Merchant result should retain the consumable type");
 
     // ── Secure transport disabled when no pending chests ──
     const runNoPending = { ...runWithHp, pendingLoot: { shards: 0, chests: [], xp: 0 } };
@@ -13600,9 +13755,37 @@ function testHuntingEventResultOverlayContract() {
     console.log("[hunting-event-result-overlay] ok");
 }
 
+function testHuntingBattlePreparationOverlayContract() {
+    const overlay = readFileSync("src/components/game-overlay.html", "utf8");
+    const bridge = readFileSync("src/componentBridge.js", "utf8");
+    assert.ok(
+        overlay.includes("huntingBattlePreparationActive: false"),
+        "game-overlay must initialize battle preparation state"
+    );
+    assert.ok(
+        overlay.includes('class="hunting-battle-preparation"'),
+        "Battle preparation should be rendered inside the hunting overlay"
+    );
+    assert.ok(
+        overlay.includes('@click="huntingUsePreparationConsumable(item.id)"'),
+        "Preparation consumables should remain explicit overlay actions"
+    );
+    assert.ok(
+        overlay.includes('@click="huntingStartPreparedBattle()"'),
+        "Preparation should expose a separate battle start action"
+    );
+    assert.ok(
+        bridge.includes("huntingUsePreparationConsumable(consumableId)"),
+        "Component bridge must expose pre-battle consumable use"
+    );
+    assert.ok(bridge.includes("huntingStartPreparedBattle()"), "Component bridge must expose prepared battle start");
+    console.log("[hunting-battle-preparation-overlay] ok");
+}
+
 await testGameOverlayChestConfirmLabelContract();
 testResultOverlayReservesConfirmActionSpace();
 testHuntingEventResultOverlayContract();
+testHuntingBattlePreparationOverlayContract();
 
 function testHuntingMishapAvoidsLowHpRuns() {
     const event = new MishapEvent(HUNTING_EVENT_TYPES.MISHAP);
@@ -13834,6 +14017,12 @@ function testDailyShopPopupContract() {
     assert.ok(
         template.includes("ch-shop-chest-reroll"),
         "Shop rerolls should animate the chest even at the same rarity"
+    );
+    assert.ok(template.includes("state.storage.consumables"), "Shop should render definition-driven consumable rows");
+    assert.ok(template.includes("buyConsumable(item.id)"), "Consumable rows should purchase the selected definition");
+    assert.ok(
+        template.includes("upgradeHuntingConsumableUseLimit"),
+        "Shop should expose the permanent hunting consumable use-limit upgrade"
     );
     assert.ok(!template.includes('class="ch-daily-shop"'), "Shard shop must not appear in an unrelated collection tab");
     console.log("[daily-shop-popup-contract] ok");

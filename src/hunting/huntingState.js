@@ -16,6 +16,7 @@ export const HUNTING_RUN_PHASES = Object.freeze({
     AWAITING_MERCHANT: "awaiting_merchant",
     AWAITING_CHEST: "awaiting_chest",
     AWAITING_COMBAT_REWARD_CHEST: "awaiting_combat_reward_chest",
+    AWAITING_BATTLE_PREPARATION: "awaiting_battle_preparation",
     COMBAT: "combat",
     FINISHED: "finished"
 });
@@ -66,6 +67,8 @@ export function createHuntingRun({
         maxFloor,
         carriedHp: null,
         carriedMaxHp: null,
+        consumableUses: {},
+        battleConsumableUses: {},
         statModifiers: [],
         pendingLoot: createEmptyHuntingLoot(),
         securedLoot: createEmptyHuntingLoot(),

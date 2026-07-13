@@ -43,6 +43,7 @@ import { savePlayerProfile } from "../playerProfile.js";
 import { PopupService } from "../popup.js";
 import { advanceHuntingRun, completeHuntingStage } from "./huntingRunProgression.js";
 import { HUNTING_EVENT_TRANSITIONS, HuntingEvent } from "./huntingEvents.js";
+import { getHuntingPreparationConsumables, useHuntingPreparationConsumable } from "../consumables.js";
 
 const CHEST_RARITY_LABELS = Object.freeze({
     common: "일반",
@@ -73,8 +74,7 @@ const HUNTING_EVENT_CONTINUE_HANDLERS = Object.freeze({
     [HUNTING_EVENT_TYPES.BOON]: "_continueEventAdvance",
     [HUNTING_EVENT_TYPES.MISHAP]: "_continueEventAdvance",
     [HUNTING_EVENT_TYPES.REST_SITE]: "_continueEventAdvance",
-    [HUNTING_EVENT_TYPES.CURSED_ALTAR]: "_continueEventAdvance",
-    [HUNTING_EVENT_TYPES.CHAMPION_INTRUSION]: "_continueChampionIntrusion"
+    [HUNTING_EVENT_TYPES.CURSED_ALTAR]: "_continueEventAdvance"
 });
 
 const HUNTING_EVENT_PRESENTATION_HANDLERS = Object.freeze({
@@ -187,6 +187,11 @@ export class HuntingManager {
             huntingChestTitle: "",
             huntingChestSubtext: "",
             huntingChestConfirmLabel: "",
+            huntingBattlePreparationActive: false,
+            huntingBattlePreparationItems: [],
+            huntingBattlePreparationHp: 0,
+            huntingBattlePreparationMaxHp: 0,
+            huntingBattlePreparationNotice: "",
             huntingMoving: false,
             huntingMoveFrom: 0,
             huntingMoveTo: 0,
@@ -605,16 +610,78 @@ export class HuntingManager {
         };
     }
 
-    _stopHuntingMoveForBattle(app, message) {
-        this._run = setHuntingRunPhase(this._run, HUNTING_RUN_PHASES.COMBAT);
+    _stopHuntingMoveForBattle(
+        app,
+        message,
+        { label = "전투 준비", subtext = "물약을 준비하거나 전투를 시작하세요." } = {}
+    ) {
+        const player = this._createPlayerHuntingSpec(this._run);
+        if (player) {
+            this._run = this._syncRunHealth(this._run, player.appliedSpec);
+        }
+        this._run = {
+            ...setHuntingRunPhase(this._run, HUNTING_RUN_PHASES.AWAITING_BATTLE_PREPARATION),
+            battleConsumableUses: {}
+        };
         const hud = this._getLootHudState();
+        const preparation = this._getBattlePreparationState();
+        app.showOverlay(label, message, subtext);
         app.setHuntingOverlayState({
             huntingMoving: false,
             huntingEventActive: false,
+            huntingChoiceVisible: false,
+            huntingMerchantActive: false,
+            huntingChestEventActive: false,
             huntingMoveMessage: message,
+            ...preparation,
             ...hud
         });
         this._moving = false;
+    }
+
+    _getBattlePreparationState(notice = "") {
+        const run = this._run;
+        return {
+            huntingBattlePreparationActive: true,
+            huntingBattlePreparationItems: getHuntingPreparationConsumables(this.app.playerProfile, run),
+            huntingBattlePreparationHp: run?.carriedHp ?? 0,
+            huntingBattlePreparationMaxHp: run?.carriedMaxHp ?? 0,
+            huntingBattlePreparationNotice: notice
+        };
+    }
+
+    usePreparationConsumable(consumableId) {
+        const app = this.app;
+        const run = this._run;
+        if (!run || run.status !== "active" || run.phase !== HUNTING_RUN_PHASES.AWAITING_BATTLE_PREPARATION)
+            return null;
+
+        const applied = useHuntingPreparationConsumable(app.playerProfile, run, consumableId);
+        if (!applied) return null;
+
+        this._run = applied.run;
+        savePlayerProfile(app.playerProfile);
+        app.setHuntingOverlayState(
+            this._getBattlePreparationState(
+                `${applied.result.label} +${applied.result.healed} HP · ${applied.result.hpRemain}/${applied.result.maxHp}`
+            )
+        );
+        return applied.result;
+    }
+
+    startPreparedBattle() {
+        const app = this.app;
+        const run = this._run;
+        if (!run || run.status !== "active" || run.phase !== HUNTING_RUN_PHASES.AWAITING_BATTLE_PREPARATION) return;
+
+        this._run = setHuntingRunPhase(run, HUNTING_RUN_PHASES.COMBAT);
+        app.setHuntingOverlayState({
+            huntingBattlePreparationActive: false,
+            huntingBattlePreparationItems: [],
+            huntingBattlePreparationHp: 0,
+            huntingBattlePreparationMaxHp: 0,
+            huntingBattlePreparationNotice: ""
+        });
         this._startFloorBattle();
     }
 
@@ -806,11 +873,6 @@ export class HuntingManager {
         this.advance();
     }
 
-    _continueChampionIntrusion() {
-        const event = this._run.lastEvent;
-        this._stopHuntingMoveForBattle(this.app, `${event.floor}층 — 챔피언 난입!`);
-    }
-
     _continueChestRoom() {
         this.advance();
     }
@@ -886,7 +948,11 @@ export class HuntingManager {
     }
 
     _presentBattleEvent(app, resolution) {
-        this._stopHuntingMoveForEvent(app, resolution.presentation, "전투 시작");
+        if (resolution.logMessage) app.addLog(resolution.logMessage);
+        this._stopHuntingMoveForBattle(app, resolution.message ?? resolution.presentation.title, {
+            label: resolution.presentation.title,
+            subtext: resolution.presentation.subtext
+        });
         return HUNTING_ROUTE_ACTIONS.STOP;
     }
 

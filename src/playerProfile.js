@@ -7,6 +7,7 @@
 
 import { HUNTING_STAGES } from "./hunting/huntingConfig.js";
 import { FIGHTER_IDS } from "./core.js";
+import { createDefaultConsumables, sanitizeConsumables } from "./consumables.js";
 
 export const PLAYER_PROFILE_STORAGE_KEY = "bfs:player-profile:v1";
 export const SESSION_STORAGE_VERSION_KEY = "bfs:session-version";
@@ -41,6 +42,7 @@ export function createDefaultPlayerProfile() {
             currentXp: 0,
             byCharacter: {}
         },
+        consumables: createDefaultConsumables(),
         equipment: {
             inventory: [],
             equipped: { weapon: null, armor: null, accessory1: null, accessory2: null },
@@ -352,6 +354,7 @@ export function sanitizePlayerProfile(raw) {
         version: PROFILE_VERSION,
         characterMastery: sanitizeCharacterMastery(raw.characterMastery ?? raw.characterLinks),
         experience: sanitizeExperience(raw.experience),
+        consumables: sanitizeConsumables(raw.consumables),
         equipment: sanitizeEquipment(raw.equipment),
         hunting: sanitizeHunting(raw.hunting),
         collection: {

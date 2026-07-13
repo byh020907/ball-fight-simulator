@@ -489,6 +489,35 @@
                                 x-text="'리롤 ' + getShopRerollCost(state.storage.dailyShop)"
                             ></button>
                         </div>
+                        <template x-for="item in (state.storage.consumables || [])" :key="item.id">
+                            <div class="ch-shop-consumable">
+                                <div>
+                                    <strong x-text="item.label"></strong>
+                                    <span x-text="item.description"></span>
+                                    <span x-text="'보유 ' + item.owned + '/' + item.maxOwned"></span>
+                                </div>
+                                <button
+                                    class="ch-btn"
+                                    type="button"
+                                    x-bind:disabled="!item.canPurchase"
+                                    @click="buyConsumable(item.id)"
+                                    x-text="'구매 ' + item.cost"
+                                ></button>
+                            </div>
+                        </template>
+                        <div class="ch-shop-upgrade" x-show="state.storage.huntingConsumableUseLimitUpgrade">
+                            <div>
+                                <strong>원정 물약 사용 한도</strong>
+                                <span x-text="(state.storage.huntingConsumableUseLimitUpgrade?.currentLimit || 1) + '/' + (state.storage.huntingConsumableUseLimitUpgrade?.maxLimit || 5)"></span>
+                            </div>
+                            <button
+                                class="ch-btn"
+                                type="button"
+                                x-bind:disabled="!state.storage.huntingConsumableUseLimitUpgrade?.canUpgrade"
+                                @click="upgradeHuntingConsumableUseLimit()"
+                                x-text="state.storage.huntingConsumableUseLimitUpgrade?.cost ? '+1 확장 ' + state.storage.huntingConsumableUseLimitUpgrade.cost : '최대'"
+                            ></button>
+                        </div>
                     </div>
                 </template>
             </section>
@@ -518,7 +547,7 @@
             rosterItems: [],
             masteryItems: [],
             achievementItems: [],
-            storage: { shards: 0, chests: [], stats: {} },
+            storage: { shards: 0, chests: [], stats: {}, consumables: [], huntingConsumableUseLimitUpgrade: null },
             now: Date.now(),
             equipment: {
                 items: [],
@@ -657,6 +686,12 @@
                 setTimeout(() => (state.shopRerolling = false), 650);
                 return result;
             },
+            buyConsumable(consumableId) {
+                return this.bridge.buyConsumable(consumableId);
+            },
+            upgradeHuntingConsumableUseLimit() {
+                return this.bridge.upgradeHuntingConsumableUseLimit();
+            },
             render(vm) {
                 state.rosterItems = vm.rosterItems ?? [];
                 state.masteryItems = vm.masteryItems ?? [];
@@ -668,7 +703,13 @@
                     inventorySlots: 5,
                     equippedSlots: {}
                 };
-                state.storage = vm.storage ?? { shards: 0, chests: [], stats: {} };
+                state.storage = vm.storage ?? {
+                    shards: 0,
+                    chests: [],
+                    stats: {},
+                    consumables: [],
+                    huntingConsumableUseLimitUpgrade: null
+                };
                 state.summary = vm.summary ?? {};
                 state.tabs = vm.tabs ?? [];
             },
@@ -1412,7 +1453,9 @@
     }
 
     .ch-shop-offer,
-    .ch-shop-reroll {
+    .ch-shop-reroll,
+    .ch-shop-consumable,
+    .ch-shop-upgrade {
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -1424,6 +1467,8 @@
 
     .ch-shop-offer-info,
     .ch-shop-reroll > div,
+    .ch-shop-consumable > div,
+    .ch-shop-upgrade > div,
     .ch-shop-meta {
         display: grid;
         gap: 3px;
@@ -1476,6 +1521,8 @@
     .ch-shop-label,
     .ch-shop-offer span,
     .ch-shop-reroll span,
+    .ch-shop-consumable span,
+    .ch-shop-upgrade span,
     .ch-shop-meta {
         font-size: 0.72rem;
         color: #555555;
