@@ -177,6 +177,7 @@ import { MobAppearance } from "../src/entities/mobAppearance.js";
 import { PHYSICS_MATERIALS, resolvePhysicsMaterial, combinePhysicsMaterials } from "../src/physics/PhysicsMaterial.js";
 import PhysicsMaterialBody from "../src/physics/PhysicsMaterialBody.js";
 import { AppLifecycle, APP_LIFECYCLE_STATES } from "../src/appLifecycle.js";
+import { ScreenWakeLock } from "../src/screenWakeLock.js";
 
 const EMPTY_EQUIPMENT_SUMMARY = {
     characterLevel: 1,
@@ -11102,6 +11103,11 @@ function testResultConfirmationReturnsInitialState() {
     const resultApp = {
         rafId: 17,
         lifecycle: new AppLifecycle(),
+        _screenWakeLock: {
+            deactivate() {
+                calls.push(["wake-release"]);
+            }
+        },
         _onSimulationResult: () => {},
         matchFinalized: true,
         simulation: { finished: true },
@@ -11196,6 +11202,7 @@ function testResultConfirmationReturnsInitialState() {
     assert.equal(resultApp._root.statusBadge, "Setup", "Initial state should restore the setup status");
     assert.deepEqual(calls, [
         ["cancel", 17],
+        ["wake-release"],
         ["root"],
         ["panel"],
         ["mode"],
@@ -11245,6 +11252,93 @@ function testAppLifecycleTransitions() {
         "Lifecycle should reject result screens without an active game"
     );
     console.log("[app-lifecycle-transitions] ok");
+}
+
+async function testScreenWakeLock() {
+    const visibilityListeners = [];
+    const documentRef = {
+        visibilityState: "visible",
+        addEventListener(type, listener) {
+            if (type === "visibilitychange") visibilityListeners.push(listener);
+        }
+    };
+    const createSentinel = () => {
+        let releaseListener = null;
+        return {
+            released: false,
+            addEventListener(type, listener) {
+                if (type === "release") releaseListener = listener;
+            },
+            async release() {
+                this.released = true;
+                releaseListener?.();
+            }
+        };
+    };
+    const sentinels = [createSentinel(), createSentinel(), createSentinel()];
+    const requests = [];
+    const wakeLock = new ScreenWakeLock({
+        navigatorRef: {
+            wakeLock: {
+                request(type) {
+                    requests.push(type);
+                    return Promise.resolve(sentinels.shift());
+                }
+            }
+        },
+        documentRef
+    });
+
+    await wakeLock.activate();
+    assert.deepEqual(requests, ["screen"], "Gameplay should request a screen wake lock");
+    await wakeLock.deactivate();
+    assert.equal(sentinels.length, 2, "Only the requested sentinel should be consumed");
+
+    await wakeLock.activate();
+    documentRef.visibilityState = "hidden";
+    await wakeLock._sentinel.release();
+    assert.deepEqual(requests, ["screen", "screen"], "Hidden documents must not reacquire a released wake lock");
+
+    documentRef.visibilityState = "visible";
+    visibilityListeners.forEach((listener) => listener());
+    await Promise.resolve();
+    assert.deepEqual(
+        requests,
+        ["screen", "screen", "screen"],
+        "Visible gameplay should reacquire a released wake lock"
+    );
+    await wakeLock.deactivate();
+
+    const unsupportedWakeLock = new ScreenWakeLock({ navigatorRef: {}, documentRef });
+    await unsupportedWakeLock.activate();
+    await unsupportedWakeLock.deactivate();
+    console.log("[screen-wake-lock] ok");
+}
+
+function testBattleAppControlsScreenWakeLock() {
+    const calls = [];
+    const lifecycleApp = {
+        lifecycle: new AppLifecycle(),
+        _screenWakeLock: {
+            activate() {
+                calls.push("activate");
+            },
+            deactivate() {
+                calls.push("deactivate");
+            }
+        }
+    };
+    Object.setPrototypeOf(lifecycleApp, Object.getPrototypeOf(app));
+
+    lifecycleApp.beginGameSession();
+    lifecycleApp.beginResultConfirmation();
+
+    assert.deepEqual(
+        calls,
+        ["activate", "deactivate"],
+        "Battle lifecycle should hold the screen awake only while playing"
+    );
+    console.log("[battle-app-screen-wake-lock-lifecycle] ok");
 }
 
 function testHuntingRetreatAwaitsResultConfirmation() {
@@ -12125,6 +12219,8 @@ testPopupCloseOwnershipContract();
 testHuntingOverlayResetContract();
 testGameplayUiResetContracts();
 testAppLifecycleTransitions();
+await testScreenWakeLock();
+testBattleAppControlsScreenWakeLock();
 testResultConfirmationReturnsInitialState();
 testHuntingRetreatAwaitsResultConfirmation();
 testHuntingFormatHelpers();

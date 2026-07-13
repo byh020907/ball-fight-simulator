@@ -72,6 +72,7 @@ import { FIGHTER_IDS, Vector2 } from "./core.js";
 import { formatHeroStatLine, formatHeroStatParts, mergeOrbBonuses } from "./entities/heroOrb.js";
 import { Ability } from "./abilities/index.js";
 import { AppLifecycle } from "./appLifecycle.js";
+import { ScreenWakeLock } from "./screenWakeLock.js";
 
 export class BattleApp {
     constructor() {
@@ -136,6 +137,7 @@ export class BattleApp {
         this._bracket.render(null);
         this.matchmaker = new Matchmaker(this.roster);
         this.audio = new AudioEngine();
+        this._screenWakeLock = new ScreenWakeLock();
         this.tournament = null;
         this.currentTournamentMatch = null;
         this.simulation = null;
@@ -192,13 +194,16 @@ export class BattleApp {
     }
     beginGameSession() {
         this.lifecycle.beginGameplay();
+        this._screenWakeLock.activate();
     }
     beginResultConfirmation() {
         this.lifecycle.awaitResultConfirmation();
+        this._screenWakeLock.deactivate();
     }
     returnToInitialState() {
         cancelAnimationFrame(this.rafId);
         this.lifecycle.returnToSetup();
+        this._screenWakeLock.deactivate();
         this._onSimulationResult = null;
         this.matchFinalized = false;
         this.simulation = null;
