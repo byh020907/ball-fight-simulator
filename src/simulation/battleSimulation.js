@@ -188,6 +188,28 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         return new AbilityType(owner, this);
     }
 
+    spawnFighter(spec, position) {
+        const fighter = new BattleBall(spec, position.clone());
+        fighter.simulation = this;
+        fighter.bindAbility(this.createAbility(spec.ability, fighter));
+        this.hooks.onBattleBallReady?.(fighter, spec, this);
+        this.fighters.push(fighter);
+        this.entities.push(fighter);
+        return fighter;
+    }
+
+    replaceFighter(fighter, replacements) {
+        if (!Array.isArray(replacements) || replacements.length === 0) return [];
+        const fighterIndex = this.fighters.indexOf(fighter);
+        if (fighterIndex < 0 || fighter.flags.defeated) return [];
+
+        fighter.flags.defeated = true;
+        fighter.flags.destroyed = true;
+        fighter.isExpired = true;
+        this.fighters.splice(fighterIndex, 1);
+        return replacements.map(({ spec, position }) => this.spawnFighter(spec, position));
+    }
+
     isOvertime() {
         return this.elapsed >= this.overtimeStartsAt;
     }

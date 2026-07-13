@@ -190,7 +190,7 @@ export class HuntingLootDropController {
     }
 
     onFighterDefeated(fighter, { simulation } = {}) {
-        if (!fighter?.hunting?.isMob || !simulation || !this.session) return null;
+        if (!fighter?.hunting?.isMob || fighter.hunting.suppressLootDrop || !simulation || !this.session) return null;
 
         const collector = simulation.fighters.find(
             (candidate) => candidate.id === this.session.playerId && !candidate.flags.defeated

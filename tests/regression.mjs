@@ -7473,6 +7473,85 @@ function testHuntingBoomerangReachAndReturnArc(app) {
     console.log("[hunting-boomerang-range-return-arc] ok");
 }
 
+function testHuntingSplitterMobActuallySplits(app) {
+    const playerSpec = {
+        ...app.roster.find((fighter) => fighter.id === FIGHTER_IDS.DASH),
+        teamId: HUNTING_TEAMS.PLAYER
+    };
+    const splitterSpec = createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.SPLITTER, floor: 92, index: 0 });
+    const simulation = new BattleSimulation([splitterSpec, playerSpec], { onLog() {}, onSound() {} }, null, {
+        assignActions: false
+    });
+    const [splitter, target] = simulation.fighters;
+    splitter.position = new Vector2(300, 480);
+    splitter.velocity = new Vector2();
+    target.position = new Vector2(700, 480);
+    target.velocity = new Vector2();
+    splitter.takeDamage(17, target, "Test Setup");
+    const originalHp = splitter.hp;
+    const originalMaxHp = splitter.maxHp;
+
+    splitter.ability.state.timer = splitter.ability.cooldown;
+    splitter.ability.update(0, target);
+
+    const fragments = simulation.fighters.filter((fighter) => fighter.hunting?.isSplitFragment);
+    assert.equal(fragments.length, 4, "Splitter mobs should replace themselves with four physical fragments");
+    assert.equal(
+        simulation.fighters.includes(splitter),
+        false,
+        "The original splitter should leave the active fighter roster"
+    );
+    assert.equal(
+        splitter.isExpired,
+        true,
+        "The replaced splitter should leave the entity list after the current update"
+    );
+    assert.equal(
+        fragments.reduce((sum, fragment) => sum + fragment.maxHp, 0),
+        originalMaxHp,
+        "Split fragments should preserve the original total maximum health"
+    );
+    assert.equal(
+        fragments.reduce((sum, fragment) => sum + fragment.hp, 0),
+        originalHp,
+        "Split fragments should preserve the original remaining health"
+    );
+    assert.ok(
+        fragments.every(
+            (fragment) =>
+                fragment.hunting.behavior === HUNTING_MONSTER_TYPES.PURSUER && fragment.teamId === splitter.teamId
+        ),
+        "Split fragments should remain hostile pursuers without recursively splitting"
+    );
+    assert.equal(
+        fragments.filter((fragment) => !fragment.hunting.suppressLootDrop).length,
+        1,
+        "Only one fragment should carry the original monster's loot budget"
+    );
+    assert.ok(
+        fragments.every((fragment, index) =>
+            fragments.slice(index + 1).every((other) => {
+                const distance = Vector2.subtract(fragment.position, other.position).length();
+                return distance >= fragment.radius + other.radius;
+            })
+        ),
+        "Split fragments should begin physically separated instead of relying on a later collision correction"
+    );
+    assert.equal(
+        simulation.entities.filter((entity) => entity.constructor.name === "ArrowProjectile").length,
+        0,
+        "Splitter mobs should no longer substitute projectile volleys for physical splitting"
+    );
+
+    simulation.update(1 / 60);
+    assert.equal(
+        simulation.entities.includes(splitter),
+        false,
+        "The replaced splitter should be removed from entities after the update completes"
+    );
+    console.log("[hunting-splitter-physical-fragments] ok");
+}
+
 function testElectricArcPathAndHuntingRender(app) {
     const from = new Vector2(120, 180);
     const to = new Vector2(360, 240);
@@ -14882,6 +14961,7 @@ await testActionGateway();
 await testHuntingEndToEnd();
 await testHuntingChestContinueHandlersContract();
 testHuntingLootBalanceRules();
+testHuntingSplitterMobActuallySplits(app);
 testHuntingLootItemsRotate();
 testHuntingLootItemsAndDropController(app);
 testHuntingLootSessionIsDiscardedOnDefeat(app);

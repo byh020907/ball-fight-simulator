@@ -25,7 +25,9 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         this.color = spec.color;
         this.face = spec.face ?? spec.id;
         this.maxHp = spec.stats.hp;
-        this.hp = spec.stats.hp;
+        this.hp = Number.isFinite(spec.initialHp)
+            ? Math.max(0, Math.min(this.maxHp, Math.round(spec.initialHp)))
+            : spec.stats.hp;
         this.stats = {
             baseDamage: spec.stats.damage,
             baseDefense: spec.stats.defense,
