@@ -112,6 +112,7 @@ import {
     formatDefeatLossText
 } from "../src/hunting/index.js";
 import { Grenade } from "../src/entities/grenade.js";
+import { getArenaWallRay } from "../src/abilities/huntingMobAbility.js";
 import {
     createEquipmentInstance,
     enhanceEquipment,
@@ -6304,6 +6305,40 @@ function testHuntingMeleeMobChasesTarget(app) {
     assert.ok(melee.velocity.x < 0, "Melee hunting mobs should move horizontally toward the player");
 }
 
+function testHuntingLaserReachesArenaWall(app) {
+    const playerSpec = {
+        ...app.roster.find((fighter) => fighter.id === FIGHTER_IDS.DASH),
+        teamId: HUNTING_TEAMS.PLAYER
+    };
+    const laserSpec = createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.LASER, floor: 94, index: 0 });
+    const simulation = new BattleSimulation([laserSpec, playerSpec], { onLog() {}, onSound() {} }, null, {
+        arenaWidth: 1200,
+        arenaHeight: 960,
+        assignActions: false
+    });
+    const [laserBall, target] = simulation.fighters;
+    laserBall.position = new Vector2(200, 400);
+    laserBall.velocity = new Vector2(0, 0);
+    target.position = new Vector2(900, 400);
+    target.velocity = new Vector2(0, 0);
+
+    const rightWallRay = getArenaWallRay(laserBall.position, 0, simulation.width, simulation.height);
+    assert.equal(rightWallRay.length, 1000, "Laser range should extend from the caster to the right arena wall");
+    assert.equal(rightWallRay.end.x, 1200, "Horizontal laser should stop at the right arena wall");
+    assert.equal(rightWallRay.end.y, 400, "Horizontal laser should preserve its locked aim height");
+
+    const diagonalRay = getArenaWallRay(new Vector2(300, 200), Math.PI / 4, simulation.width, simulation.height);
+    assert.ok(Math.abs(diagonalRay.end.x - 1060) < 0.001, "Diagonal laser should stop where it first meets a wall");
+    assert.ok(Math.abs(diagonalRay.end.y - 960) < 0.001, "Diagonal laser should reach the bottom arena wall");
+
+    laserBall.ability.state.timer = laserBall.ability.cooldown;
+    laserBall.ability._tickLaser(0, target);
+    const hpBefore = target.hp;
+    laserBall.ability._tickLaser(0.76, target);
+    assert.ok(target.hp < hpBefore, "Laser should damage a target beyond the former 520px fixed range");
+    console.log("[hunting-laser-wall-range] ok");
+}
+
 function testTeamTargetingAndFriendlyCollision(app) {
     const archer = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
     const orbit = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ORBIT);
@@ -8951,6 +8986,7 @@ testStatBalanceSystem();
 testMultiFighterSimulationSetup(app);
 testArenaCameraZoom();
 testHuntingMeleeMobChasesTarget(app);
+testHuntingLaserReachesArenaWall(app);
 testTeamTargetingAndFriendlyCollision(app);
 testTeamsResolveByRemainingHostileTeams(app);
 testProjectileIgnoresAllies(app);

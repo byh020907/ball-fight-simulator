@@ -19,6 +19,20 @@ const BEHAVIOR_CONFIG = Object.freeze({
     laser: { cooldown: 4.2, face: "cyclops" }
 });
 
+export function getArenaWallRay(origin, angle, width, height) {
+    const direction = Vector2.fromAngle(angle, 1);
+    const distances = [];
+    if (direction.x > 0) distances.push((width - origin.x) / direction.x);
+    if (direction.x < 0) distances.push(-origin.x / direction.x);
+    if (direction.y > 0) distances.push((height - origin.y) / direction.y);
+    if (direction.y < 0) distances.push(-origin.y / direction.y);
+    const length = Math.max(0, Math.min(...distances));
+    return {
+        length,
+        end: Vector2.add(origin, direction.scale(length))
+    };
+}
+
 export class HuntingMobAbility extends Ability {
     constructor(owner, simulation) {
         const behavior = owner.hunting?.behavior ?? "pursuer";
@@ -190,10 +204,16 @@ export class HuntingMobAbility extends Ability {
         if (laser.charge <= 0) {
             laser.fire += delta;
             const direction = Vector2.fromAngle(laser.angle, 1);
+            const ray = getArenaWallRay(
+                this.owner.position,
+                laser.angle,
+                this.simulation.width,
+                this.simulation.height
+            );
             const relative = Vector2.subtract(target.position, this.owner.position);
             const along = relative.dot(direction);
             const offLine = Math.abs(relative.x * direction.y - relative.y * direction.x);
-            if (along > 0 && along < 520 && offLine < target.radius + 15)
+            if (along > 0 && along < ray.length && offLine < target.radius + 15)
                 target.takeDamage(20 * delta, this.owner, "Laser Beam");
         }
         if (laser.fire >= 0.55) this.state.laser = null;
@@ -272,13 +292,12 @@ export class HuntingMobAbility extends Ability {
     }
 
     _drawLaser(ctx, laser) {
-        const length = 520;
-        const end = Vector2.add(this.owner.position, Vector2.fromAngle(laser.angle, length));
+        const ray = getArenaWallRay(this.owner.position, laser.angle, this.simulation.width, this.simulation.height);
         ctx.strokeStyle = laser.charge > 0 ? "rgba(255, 90, 90, 0.45)" : "#ff5656";
         ctx.lineWidth = laser.charge > 0 ? 2 : 7;
         ctx.beginPath();
         ctx.moveTo(this.owner.position.x, this.owner.position.y);
-        ctx.lineTo(end.x, end.y);
+        ctx.lineTo(ray.end.x, ray.end.y);
         ctx.stroke();
     }
 
