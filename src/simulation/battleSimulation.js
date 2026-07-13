@@ -659,6 +659,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
             this.spawnDeathExplosion(pos, color);
             this.addLog(`${loser.name} bursts apart in the arena.`);
         }
+        this.hooks.onResultResolved?.(winner, { simulation: this });
     }
 
     updateResultEffects(delta) {

@@ -2,9 +2,17 @@ import { HuntingLootItem } from "./huntingLootItem.js";
 
 const CHEST_COLOR = "#c98134";
 const CHEST_METAL_COLOR = "#ffd45b";
+const CHEST_RARITY_COLORS = Object.freeze({
+    common: { body: CHEST_COLOR, metal: CHEST_METAL_COLOR },
+    uncommon: { body: "#4ca765", metal: "#b8ff81" },
+    rare: { body: "#bf8a2b", metal: "#fff07a" },
+    epic: { body: "#8552c9", metal: "#ffc4ff" },
+    legendary: { body: "#c24c3e", metal: "#fff0bd" }
+});
 
 export class ChestDrop extends HuntingLootItem {
     static lootType = "chest";
+    static highLootType = "high_chest";
 
     constructor({ chest, ...options } = {}) {
         super({ ...options, radius: 16 });
@@ -16,7 +24,7 @@ export class ChestDrop extends HuntingLootItem {
         return {
             type: ChestDrop.lootType,
             chest: this.chest,
-            color: CHEST_METAL_COLOR,
+            color: (CHEST_RARITY_COLORS[this.chest.rarity] ?? CHEST_RARITY_COLORS.common).metal,
             label: "상자 획득",
             soundIntensity: 1,
             logMessage: `${collector.name} collects a ${this.chest.rarity} hunting chest.`
@@ -26,7 +34,8 @@ export class ChestDrop extends HuntingLootItem {
     drawItem(ctx) {
         const { x, y } = this.position;
         const r = this.radius;
-        ctx.fillStyle = CHEST_COLOR;
+        const colors = CHEST_RARITY_COLORS[this.chest?.rarity] ?? CHEST_RARITY_COLORS.common;
+        ctx.fillStyle = colors.body;
         ctx.strokeStyle = "#754119";
         ctx.lineWidth = 3;
         ctx.fillRect(x - r, y - r * 0.2, r * 2, r * 1.05);
@@ -38,7 +47,7 @@ export class ChestDrop extends HuntingLootItem {
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
-        ctx.fillStyle = CHEST_METAL_COLOR;
+        ctx.fillStyle = colors.metal;
         ctx.fillRect(x - r * 0.14, y - r * 0.12, r * 0.28, r * 0.72);
     }
 }

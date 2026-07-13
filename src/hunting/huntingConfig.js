@@ -100,8 +100,6 @@ export const HUNTING_CHEST_OPEN_COSTS = HUNTING_REWARDS.chest.openCosts;
 
 export const HUNTING_CHEST_BREAK_WEIGHTS = HUNTING_REWARDS.chest.breakWeights;
 
-export const HUNTING_SHARD_REWARDS = HUNTING_REWARDS.shards.combatRanges;
-
 export const HUNTING_DEFEAT_PRESERVE = Object.freeze({
     SHARDS: HUNTING_REWARDS.shards.defeatPreserve.shards,
     XP: HUNTING_REWARDS.shards.defeatPreserve.xp
@@ -110,9 +108,7 @@ export const HUNTING_DEFEAT_PRESERVE = Object.freeze({
 export const HUNTING_SCALING = Object.freeze({
     ENEMY_POWER_PER_FLOOR: 0.08,
     ELITE_POWER_BONUS: 0.12,
-    CHAMPION_POWER_BONUS: 0.28,
-    REWARD_PER_FLOOR: HUNTING_REWARDS.shards.rewardPerFloor,
-    DEEP_FLOOR_BONUS: HUNTING_REWARDS.shards.deepFloorBonus
+    CHAMPION_POWER_BONUS: 0.28
 });
 
 export const HUNTING_CHEST_REWARD_TYPES = Object.freeze({

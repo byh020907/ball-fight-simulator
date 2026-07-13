@@ -291,16 +291,7 @@ export const REWARD_BALANCE = deepFreeze({
             }
         },
         shards: {
-            combatRanges: {
-                normal: { min: 5, max: 8 },
-                elite: { min: 15, max: 25 },
-                champion: { min: 40, max: 40 }
-            },
-            clearBonus: 10,
-            rewardPerFloor: 0.15,
-            deepFloorBonus: 0.1,
-            defeatPreserve: { shards: 0.5, xp: 0.7 },
-            combatMultipliers: { finalBoss: 2, eliteFloor: 1.25, championIntrusion: 1.5 }
+            defeatPreserve: { shards: 0.5, xp: 0.7 }
         },
         loot: {
             baseDropChance: 0.15,
@@ -308,9 +299,52 @@ export const REWARD_BALANCE = deepFreeze({
             valueStep: 5,
             itemLife: 18,
             magnet: { radiusMultiplier: 4, responseRate: 5, speedMultiplier: 1.35 },
+            victoryCollection: { duration: 1, responseRate: 180 },
             smallHealPack: { missingHpRecoveryRatio: 0.25 },
             shard: { baseAmount: 5, floorStep: 25, maximumAmount: 20 },
-            weights: { small_heal_pack: 50, shard: 40, chest: 10 }
+            normalWeights: { small_heal_pack: { minimum: 20, maximum: 40 }, chest: 10 },
+            rarityRewards: {
+                common: { shard_bundle: 0, high_chest: 0 },
+                rare: { shard_bundle: 15, high_chest: 5 },
+                unique: { shard_bundle: 30, high_chest: 10 },
+                epic: { shard_bundle: 45, high_chest: 20 }
+            },
+            shardBundle: {
+                multipliers: {
+                    rare: [
+                        { value: 1, weight: 25 },
+                        { value: 1.5, weight: 50 },
+                        { value: 2, weight: 25 }
+                    ],
+                    unique: [
+                        { value: 1, weight: 15 },
+                        { value: 1.5, weight: 35 },
+                        { value: 2, weight: 35 },
+                        { value: 2.5, weight: 15 }
+                    ],
+                    epic: [
+                        { value: 1, weight: 5 },
+                        { value: 1.5, weight: 15 },
+                        { value: 2, weight: 30 },
+                        { value: 2.5, weight: 30 },
+                        { value: 3, weight: 15 },
+                        { value: 3.5, weight: 5 }
+                    ]
+                }
+            },
+            highChest: {
+                rarities: {
+                    rare: [{ rarity: "uncommon", weight: 100 }],
+                    unique: [
+                        { rarity: "uncommon", weight: 70 },
+                        { rarity: "rare", weight: 30 }
+                    ],
+                    epic: [
+                        { rarity: "rare", weight: 70 },
+                        { rarity: "epic", weight: 30 }
+                    ]
+                }
+            }
         },
         events: {
             boon: { baseShards: 8, baseShardVariance: 2, maxMultiplier: 5, maxMultiplierFloor: 100 },

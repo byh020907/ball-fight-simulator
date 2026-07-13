@@ -11,8 +11,7 @@ import {
     setHuntingRunPhase,
     HUNTING_RUN_PHASES
 } from "./huntingState.js";
-import { createEmptyHuntingLoot, mergeHuntingLoot, rollShardReward } from "./huntingRewards.js";
-import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
+import { createEmptyHuntingLoot } from "./huntingRewards.js";
 import {
     HUNTING_ADVANCE_STEPS,
     HUNTING_ENEMY_TYPES,
@@ -316,7 +315,8 @@ export class HuntingManager {
             arenaTheme: stageTheme,
             terrain,
             experienceProgressionByFighter: new Map([[run.characterId, playerProgression]]),
-            onFighterDefeated: (fighter, context) => lootDropController.onFighterDefeated(fighter, context)
+            onFighterDefeated: (fighter, context) => lootDropController.onFighterDefeated(fighter, context),
+            onResultResolved: (winner, context) => lootDropController.onResultResolved(winner, context)
         });
 
         if (Number.isFinite(run.carriedHp)) {
@@ -367,30 +367,7 @@ export class HuntingManager {
             const collectedBattleLoot = this._battleLootSession?.getCollectedLoot() ?? createEmptyHuntingLoot();
             this._battleLootSession = null;
             const isFinalBoss = run.lastEncounter?.type === HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS;
-            const rewardMultiplier = isFinalBoss
-                ? REWARD_BALANCE.hunting.shards.combatMultipliers.finalBoss
-                : run.lastEvent?.enemyType === HUNTING_ENEMY_TYPES.CHAMPION
-                  ? (run.lastEvent.rewardMultiplier ??
-                    REWARD_BALANCE.hunting.shards.combatMultipliers.championIntrusion)
-                  : run.floor % 3 === 0
-                    ? REWARD_BALANCE.hunting.shards.combatMultipliers.eliteFloor
-                    : 1;
-            const rewardEnemyType =
-                isFinalBoss || run.lastEvent?.enemyType === HUNTING_ENEMY_TYPES.CHAMPION
-                    ? HUNTING_ENEMY_TYPES.CHAMPION
-                    : run.floor % 3 === 0
-                      ? HUNTING_ENEMY_TYPES.ELITE
-                      : HUNTING_ENEMY_TYPES.NORMAL;
-            const floorLoot = mergeHuntingLoot(
-                {
-                    shards: Math.round(
-                        rollShardReward({ floor: run.floor, enemyType: rewardEnemyType }) * rewardMultiplier
-                    ),
-                    chests: [],
-                    xp: 0
-                },
-                collectedBattleLoot
-            );
+            const floorLoot = collectedBattleLoot;
 
             // Hero Orb carryover — Hero Ball만 전투 중 획득한 bonuses를 run에 반영
             const playerSpec = app.roster.find((f) => f.id === run.characterId);

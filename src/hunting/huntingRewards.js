@@ -3,10 +3,7 @@ import {
     HUNTING_CHEST_OPEN_COSTS,
     HUNTING_CHEST_RARITIES,
     HUNTING_CHEST_REWARD_TYPES,
-    HUNTING_DEFEAT_PRESERVE,
-    HUNTING_ENEMY_TYPES,
-    HUNTING_SHARD_REWARDS,
-    HUNTING_SCALING
+    HUNTING_DEFEAT_PRESERVE
 } from "./huntingConfig.js";
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 
@@ -15,21 +12,6 @@ const DEFAULT_RNG = () => Math.random();
 export const HUNTING_CHEST_REWARD_TABLE_VERSION = REWARD_BALANCE.hunting.chest.rewardTableVersion;
 
 export const HUNTING_CHEST_REWARD_TABLE = REWARD_BALANCE.hunting.chest.rewardTables;
-
-function clampFloor(floor) {
-    if (!Number.isFinite(floor)) return 1;
-    return Math.max(1, Math.floor(floor));
-}
-
-function rollInteger(min, max, rng = DEFAULT_RNG) {
-    const lo = Math.ceil(min);
-    const hi = Math.floor(max);
-    return lo + Math.floor(Math.max(0, Math.min(0.999999, rng())) * (hi - lo + 1));
-}
-
-export function getRewardMultiplier(floor) {
-    return 1 + (clampFloor(floor) - 1) * HUNTING_SCALING.REWARD_PER_FLOOR;
-}
 
 function cloneRewardDefinition(reward) {
     return { ...reward };
@@ -69,14 +51,6 @@ export function rollHuntingChestReward(chestOrRarity = "common", { rng = DEFAULT
         rarity: HUNTING_CHEST_RARITIES.includes(rarity) ? rarity : "common",
         tableVersion: HUNTING_CHEST_REWARD_TABLE_VERSION
     };
-}
-
-export function rollShardReward({ floor = 1, enemyType = HUNTING_ENEMY_TYPES.NORMAL, rng = DEFAULT_RNG } = {}) {
-    const range = HUNTING_SHARD_REWARDS[enemyType] ?? HUNTING_SHARD_REWARDS[HUNTING_ENEMY_TYPES.NORMAL];
-    const base = rollInteger(range.min, range.max, rng);
-    const clearBonus = REWARD_BALANCE.hunting.shards.clearBonus;
-    const deepBonus = 1 + (clampFloor(floor) - 1) * HUNTING_SCALING.DEEP_FLOOR_BONUS;
-    return Math.max(0, Math.round((base + clearBonus) * deepBonus));
 }
 
 export function createHuntingChest({

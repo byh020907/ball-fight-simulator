@@ -69,7 +69,6 @@ import {
     getHuntingStage,
     getHuntingStageArena,
     getNextHuntingStageId,
-    getRewardMultiplier,
     getChestOpenCost,
     getDailyShop,
     getSelectedHuntingStageId,
@@ -82,7 +81,6 @@ import {
     setHuntingRunPhase,
     rollHuntingChestReward,
     rollHuntingFloorOutcome,
-    rollShardReward,
     scaleEnemySpecForHunting,
     HUNTING_ARENA,
     DAILY_SHOP,
@@ -122,9 +120,12 @@ import {
     HuntingBattleLootSession,
     HuntingLootDropController,
     getHuntingLootDropChance,
+    getHuntingLootWeights,
     getHuntingShardDropAmount,
     getSmallHealPackAmount,
-    rollHuntingLootItemType
+    rollHighChestRarity,
+    rollHuntingLootItemType,
+    rollHuntingShardBundleAmount
 } from "../src/hunting/index.js";
 import { Grenade } from "../src/entities/grenade.js";
 import { getArenaWallRay } from "../src/abilities/huntingMobAbility.js";
@@ -2299,21 +2300,62 @@ function testHuntingLootBalanceRules() {
     assert.equal(getHuntingShardDropAmount(1), 5, "Early shard drops should start at five shards");
     assert.equal(getHuntingShardDropAmount(26), 10, "Shard drops should grow in five-shard steps");
     assert.equal(getHuntingShardDropAmount(100), 20, "Shard drops should respect the configured maximum");
+    assert.deepEqual(
+        getHuntingLootWeights({ collector: fullHp, rarity: "common" }),
+        { small_heal_pack: 20, shard: 70, chest: 10, shard_bundle: 0, high_chest: 0 },
+        "Common monsters should use only the ordinary weighted loot table"
+    );
+    assert.deepEqual(
+        getHuntingLootWeights({ collector: halfHp, rarity: "rare" }),
+        { small_heal_pack: 24, shard: 48, chest: 8, shard_bundle: 15, high_chest: 5 },
+        "Rare monsters should reserve 20% of a successful loot roll for special rewards"
+    );
     assert.equal(
-        rollHuntingLootItemType({ collector: fullHp, rng: () => 0 }),
-        HUNTING_LOOT_ITEM_TYPES.SHARD,
-        "Full HP must replace a heal-pack roll with a collectible shard drop"
+        getHuntingLootWeights({ collector: emptyHp, rarity: "epic" }).small_heal_pack,
+        14,
+        "Missing HP should raise the heal-pack weight before rarity rewards reserve their share"
+    );
+    assert.equal(
+        rollHuntingLootItemType({
+            collector: fullHp,
+            rng: (() => {
+                const rolls = [0, 0];
+                return () => rolls.shift() ?? 0;
+            })()
+        }),
+        HUNTING_LOOT_ITEM_TYPES.SMALL_HEAL_PACK,
+        "A full-HP player may leave a rare heal pack behind instead of converting it to shards"
     );
     assert.equal(
         rollHuntingLootItemType({
             collector: emptyHp,
             rng: (() => {
-                const rolls = [0, 0.49];
+                const rolls = [0, 0.39];
                 return () => rolls.shift();
             })()
         }),
         HUNTING_LOOT_ITEM_TYPES.SMALL_HEAL_PACK,
         "A wounded player should retain heal-pack entries in the drop table"
+    );
+    assert.equal(
+        rollHuntingShardBundleAmount({ floor: 1, rarity: "rare", rng: () => 0.3 }),
+        10,
+        "Rare bundle multipliers must preserve the configured decimal-weight order"
+    );
+    assert.equal(
+        rollHuntingShardBundleAmount({ floor: 100, rarity: "epic", rng: () => 0.99 }),
+        70,
+        "Epic bundles should retain the 3.5x high-end roll on the deep-floor base amount"
+    );
+    assert.equal(
+        rollHighChestRarity({ rarity: "rare", rng: () => 0.99 }),
+        "uncommon",
+        "Rare monsters should always produce an uncommon high chest"
+    );
+    assert.equal(
+        rollHighChestRarity({ rarity: "unique", rng: () => 0.8 }),
+        "rare",
+        "Unique high chests should retain the 30% rare branch"
     );
     console.log("[hunting-loot-balance-rules] ok");
 }
@@ -2325,14 +2367,15 @@ function testHuntingLootItemsAndDropController(app) {
     };
     const mobSpec = createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.PURSUER, floor: 1, index: 0 });
     const session = new HuntingBattleLootSession({ playerId: playerSpec.id, floor: 1 });
-    const rolls = [0, 0, 0, 0];
+    const rolls = [0, 0.2, 0, 0];
     const controller = new HuntingLootDropController({ session, rng: () => rolls.shift() ?? 0 });
     const simulation = new BattleSimulation(
         [playerSpec, mobSpec],
         {
             onLog() {},
             onSound() {},
-            onFighterDefeated: (fighter, context) => controller.onFighterDefeated(fighter, context)
+            onFighterDefeated: (fighter, context) => controller.onFighterDefeated(fighter, context),
+            onResultResolved: (winner, context) => controller.onResultResolved(winner, context)
         },
         null,
         { assignActions: false }
@@ -2403,6 +2446,28 @@ function testHuntingLootItemsAndDropController(app) {
             chest
         }) instanceof ChestDrop,
         "The loot registry must construct the subclass registered for each item type"
+    );
+    assert.ok(
+        createHuntingLootItem(HUNTING_LOOT_ITEM_TYPES.HIGH_CHEST, {
+            position: player.position,
+            velocity: new Vector2(),
+            collectorId: player.id,
+            chest: createHuntingChest({ id: "loot-test-high-chest", rarity: "rare" })
+        }) instanceof ChestDrop,
+        "High-chest rolls should reuse the chest drop renderer with their rolled rarity"
+    );
+
+    const victorySweepShard = new ShardDrop({
+        position: new Vector2(player.position.x + 300, player.position.y),
+        velocity: new Vector2(),
+        collectorId: player.id
+    });
+    simulation.entities.push(victorySweepShard);
+    simulation.resolveResult(player);
+    victorySweepShard.update(1 / 60, simulation);
+    assert.ok(
+        victorySweepShard.velocity.x < 0,
+        "Winning a hunting battle should pull remaining collectible loot across the whole arena"
     );
     console.log("[hunting-loot-items-and-drop-controller] ok");
 }
@@ -2561,6 +2626,11 @@ function testHuntingCombatWithoutCollectedChestSkipsChestUi() {
         overlayStates.some((state) => state.huntingChestEventActive === true),
         false,
         "Only chests collected on the battlefield may open the combat chest UI"
+    );
+    assert.equal(
+        manager._run.pendingLoot.shards,
+        0,
+        "Winning without collected drops must not synthesize the former static combat shard reward"
     );
     console.log("[hunting-combat-uncollected-chest-skipped] ok");
 }
@@ -3614,7 +3684,6 @@ function testHuntingSystem() {
     assert.equal(getEnemyPowerMultiplier(1), 1, "Floor 1 enemy power should be base");
     assert.equal(getEnemyPowerMultiplier(3), 1.16, "Enemy power should scale by 8% per floor");
     assert.equal(getEnemyPowerMultiplier(3, { enemyType: "champion" }), 1.44, "Champion intrusions should be stronger");
-    assert.equal(getRewardMultiplier(3), 1.3, "Rewards should scale by 15% per floor");
     const baseSpec = {
         id: "enemy",
         stats: { hp: 100, damage: 10, defense: 2, speed: 300, skill: 4, radius: 24 }
@@ -3734,9 +3803,6 @@ function testHuntingSystem() {
     assert.equal(miniboss.hunting.isMiniboss, true, "Roster enemies should be marked as minibosses");
     assert.equal(miniboss.hunting.sourceFighterId, FIGHTER_IDS.ARCHER, "Minibosses should not copy the player");
     assert.equal(miniboss.teamId, HUNTING_TEAMS.ENEMY, "Minibosses should fight on the enemy team");
-
-    const shards = rollShardReward({ floor: 2, rng: () => 0 });
-    assert.equal(shards, 17, "Key shards should include clear and deep-floor bonuses");
 
     const run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, now: 1000 });
     assert.equal(run.floor, 1, "Hunting run should start at floor 1");
@@ -9788,9 +9854,9 @@ function testRewardBalanceConfig() {
         "Chest cost must come from reward balance"
     );
     assert.equal(
-        rollShardReward({ floor: 1, enemyType: HUNTING_ENEMY_TYPES.NORMAL, rng: () => 0 }),
-        balance.hunting.shards.combatRanges.normal.min + balance.hunting.shards.clearBonus,
-        "Combat shards must use the centralized base range and clear bonus"
+        balance.hunting.loot.rarityRewards.epic.high_chest,
+        20,
+        "Epic monster special-reward weight must come from centralized reward balance"
     );
     assert.equal(
         getSellReward("legendary"),

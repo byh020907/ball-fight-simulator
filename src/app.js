@@ -947,6 +947,9 @@ export class BattleApp {
                 },
                 onFighterDefeated: (fighter, context) => {
                     options.onFighterDefeated?.(fighter, context);
+                },
+                onResultResolved: (winner, context) => {
+                    options.onResultResolved?.(winner, context);
                 }
             },
             null,

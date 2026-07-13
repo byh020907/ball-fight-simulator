@@ -29,5 +29,6 @@ export { MobAppearance } from "./mobAppearance.js";
 export { HuntingLootItem } from "./huntingLootItem.js";
 export { SmallHealPack } from "./smallHealPack.js";
 export { ShardDrop } from "./shardDrop.js";
+export { ShardBundleDrop } from "./shardBundleDrop.js";
 export { ChestDrop } from "./chestDrop.js";
 export { createHuntingLootItem, getHuntingLootItemClass } from "./huntingLootRegistry.js";

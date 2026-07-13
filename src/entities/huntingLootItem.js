@@ -28,6 +28,8 @@ export class HuntingLootItem extends CombatEntity {
         this.magnetResponseRate = Math.max(0, magnetResponseRate);
         this.magnetSpeedMultiplier = Math.max(0, magnetSpeedMultiplier);
         this.onCollected = onCollected;
+        this.victoryCollectionRemaining = 0;
+        this.victoryCollectionResponseRate = 0;
     }
 
     update(delta, simulation) {
@@ -35,12 +37,19 @@ export class HuntingLootItem extends CombatEntity {
 
         const collector = this._findCollector(simulation);
         const canCollect = collector && this.canCollect(collector, simulation);
-        if (canCollect) this._applyCollectorMagnet(collector, delta);
+        if (canCollect) {
+            if (this.victoryCollectionRemaining > 0) {
+                this._applyVictoryCollectionMagnet(collector, delta, simulation);
+            } else {
+                this._applyCollectorMagnet(collector, delta);
+            }
+        }
 
         this.integrate(delta);
         simulation.keepEntityInsideArena(this);
 
         if (canCollect) this._tryCollect(collector, simulation);
+        this.victoryCollectionRemaining = Math.max(0, this.victoryCollectionRemaining - delta);
     }
 
     canCollect() {
@@ -59,6 +68,11 @@ export class HuntingLootItem extends CombatEntity {
 
     drawItem() {}
 
+    beginVictoryCollection({ duration = 1, responseRate = 180 } = {}) {
+        this.victoryCollectionRemaining = Math.max(this.victoryCollectionRemaining, duration);
+        this.victoryCollectionResponseRate = Math.max(0, responseRate);
+    }
+
     _findCollector(simulation) {
         return simulation.fighters.find(
             (fighter) => fighter.id === this.collectorId && !fighter.flags.defeated && !fighter.state.swallowed
@@ -70,6 +84,20 @@ export class HuntingLootItem extends CombatEntity {
             radius: collector.radius * this.magnetRadiusMultiplier + this.radius,
             responseRate: this.magnetResponseRate,
             attractionSpeed: getCombatMovementSpeed(collector) * this.magnetSpeedMultiplier
+        });
+    }
+
+    _applyVictoryCollectionMagnet(collector, delta, simulation) {
+        const toCollector = Vector2.subtract(collector.position, this.position);
+        const remaining = Math.max(this.victoryCollectionRemaining, delta);
+        const arenaRadius = Math.hypot(simulation.width, simulation.height) + collector.radius + this.radius;
+        applyMagneticAttraction(this, collector, delta, {
+            radius: arenaRadius,
+            responseRate: this.victoryCollectionResponseRate,
+            attractionSpeed: Math.max(
+                getCombatMovementSpeed(collector) * this.magnetSpeedMultiplier,
+                toCollector.length() / remaining
+            )
         });
     }
 
