@@ -2892,17 +2892,34 @@ function testHuntingSystem() {
         new Set(mobs.map((mob) => mob.hunting.monsterType)).size >= 2,
         "Early floors should combine at least two monster types"
     );
-    assert.deepEqual(
-        getHuntingMonsterPool(1).map((monster) => monster.type),
-        [HUNTING_MONSTER_TYPES.PURSUER, HUNTING_MONSTER_TYPES.CHARGER],
-        "Floor 1 should start with two base monster types"
+    const floor1Pool = getHuntingMonsterPool(1);
+    const floor10Pool = getHuntingMonsterPool(10);
+    const floor90Pool = getHuntingMonsterPool(90);
+    const floor94Pool = getHuntingMonsterPool(94);
+    assert.equal(floor1Pool.length, 14, "All monster types should have a small chance from floor 1");
+    assert.ok(
+        floor1Pool.find((monster) => monster.type === HUNTING_MONSTER_TYPES.LASER).weight > 0,
+        "Late monsters should remain rare but possible in early floors"
+    );
+    assert.ok(
+        floor10Pool.find((monster) => monster.type === HUNTING_MONSTER_TYPES.SHOOTER).weight >
+            floor10Pool.find((monster) => monster.type === HUNTING_MONSTER_TYPES.PURSUER).weight,
+        "A monster should become the main encounter after its focus floor"
     );
     assert.ok(
         mobs.every((mob) => mob.ability === "hunting_mob"),
         "Hunting mobs should use the dedicated monster ability"
     );
-    assert.equal(getHuntingMonsterPool(90).length, 10, "Floor 90 should have the first ten cave monsters unlocked");
-    assert.equal(getHuntingMonsterPool(94).length, 14, "Floor 94 should unlock all fourteen cave monsters");
+    assert.ok(
+        floor90Pool.find((monster) => monster.type === HUNTING_MONSTER_TYPES.SHARD).weight >
+            floor90Pool.find((monster) => monster.type === HUNTING_MONSTER_TYPES.SIPHON).weight,
+        "Floor 90 should make shard monsters the main encounter"
+    );
+    assert.ok(
+        floor94Pool.find((monster) => monster.type === HUNTING_MONSTER_TYPES.LASER).weight >
+            floor94Pool.find((monster) => monster.type === HUNTING_MONSTER_TYPES.SHARD).weight,
+        "Floor 94 should make laser monsters the main encounter"
+    );
     assert.equal(
         Object.keys(HUNTING_MONSTER_BASE_SPECS).length,
         14,

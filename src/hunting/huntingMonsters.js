@@ -2,6 +2,12 @@ import { HUNTING_ENEMY_TYPES, HUNTING_STAGE_IDS } from "./huntingConfig.js";
 import { scaleEnemySpecForHunting } from "./huntingEncounters.js";
 
 const DEFAULT_RNG = () => Math.random();
+const MONSTER_PROBABILITY = Object.freeze({
+    preFocusWeightRatio: 0.08,
+    establishedWeightRatio: 0.35,
+    primaryWeightMultiplier: 3,
+    focusLeadInFloors: 10
+});
 
 export const HUNTING_TEAMS = Object.freeze({ PLAYER: "hunting-player", ENEMY: "hunting-enemy" });
 export const HUNTING_MONSTER_TYPES = Object.freeze({
@@ -74,8 +80,8 @@ const CAVE_MONSTERS = Object.freeze(
         ["splitter", 92, 2.2, "#c56bd5", "ooo", { hp: 94, damage: 9, speed: 262, radius: 37, mass: 1.02, defense: 1 }],
         ["jumper", 93, 2.2, "#e9c45d", "dash", { hp: 90, damage: 11, speed: 276, radius: 36, mass: 1, defense: 1 }],
         ["laser", 94, 2.3, "#ef5b5b", "cyclops", { hp: 92, damage: 11, speed: 248, radius: 36, mass: 1.04, defense: 1 }]
-    ].map(([type, unlockFloor, weight, color, face, stats]) =>
-        Object.freeze({ type, unlockFloor, weight, color, face, stats: Object.freeze(stats) })
+    ].map(([type, focusFloor, weight, color, face, stats]) =>
+        Object.freeze({ type, focusFloor, weight, color, face, stats: Object.freeze(stats) })
     )
 );
 
@@ -87,7 +93,31 @@ const safeFloor = (floor) => Math.max(1, Math.floor(Number.isFinite(floor) ? flo
 export function getHuntingMonsterPool(floor, stageId = HUNTING_STAGE_IDS.CAVE) {
     const safe = safeFloor(floor);
     const definitions = stageId === HUNTING_STAGE_IDS.CAVE ? CAVE_MONSTERS : CAVE_MONSTERS;
-    return definitions.filter((monster) => monster.unlockFloor <= safe);
+    const latestFocusFloor = definitions.reduce(
+        (latest, monster) => (monster.focusFloor <= safe ? Math.max(latest, monster.focusFloor) : latest),
+        1
+    );
+    return definitions.map((monster) => ({
+        ...monster,
+        weight: getMonsterProbabilityWeight(monster, safe, latestFocusFloor)
+    }));
+}
+
+function getMonsterProbabilityWeight(monster, floor, latestFocusFloor) {
+    if (monster.focusFloor === latestFocusFloor) return monster.weight * MONSTER_PROBABILITY.primaryWeightMultiplier;
+    if (monster.focusFloor < latestFocusFloor) return monster.weight * MONSTER_PROBABILITY.establishedWeightRatio;
+    const focusProgress = Math.max(
+        0,
+        Math.min(
+            1,
+            (floor - (monster.focusFloor - MONSTER_PROBABILITY.focusLeadInFloors)) /
+                MONSTER_PROBABILITY.focusLeadInFloors
+        )
+    );
+    return (
+        monster.weight *
+        (MONSTER_PROBABILITY.preFocusWeightRatio + (1 - MONSTER_PROBABILITY.preFocusWeightRatio) * focusProgress)
+    );
 }
 
 function rollMonster(floor, stageId, rng, excludedTypes = []) {
