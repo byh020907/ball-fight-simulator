@@ -157,12 +157,22 @@ body {
 
 game-overlay:has(~ start-button #startButton:not(.hidden)) #overlay {
     padding: 20px 16px calc(104px + env(safe-area-inset-bottom));
-    overflow-y: auto;
-    overscroll-behavior: contain;
+    overflow: hidden;
 }
 
 game-overlay:has(~ start-button #startButton:not(.hidden)) #overlay .overlay-card {
     margin: auto 0;
+    max-height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    pointer-events: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+}
+
+game-overlay:has(~ start-button #startButton:not(.hidden)) #overlay .overlay-card .xp-reward {
+    width: min(420px, 100%);
 }
 
 .player-panel .control-button {

@@ -13258,6 +13258,7 @@ function testGameOverlayChestConfirmLabelContract() {
 function testResultOverlayReservesConfirmActionSpace() {
     const styles = readFileSync("src/styles.css", "utf8");
     const confirmActionSelector = "game-overlay:has(~ start-button #startButton:not(.hidden)) #overlay";
+    const confirmCardSelector = `${confirmActionSelector} .overlay-card`;
     assert.ok(
         styles.includes(confirmActionSelector),
         "Visible result confirmation buttons must reserve vertical space in the game overlay"
@@ -13271,8 +13272,14 @@ function testResultOverlayReservesConfirmActionSpace() {
         "Mobile result overlays must keep content above the confirm button"
     );
     assert.ok(
-        styles.includes("overflow-y: auto;"),
-        "Long result content must remain scrollable above the confirm button"
+        styles.includes(
+            `${confirmCardSelector} {\n    margin: auto 0;\n    max-height: 100%;\n    min-height: 0;\n    overflow-y: auto;\n    overscroll-behavior: contain;\n    pointer-events: auto;`
+        ),
+        "The result card must stay inside the safe area and receive its own touch scroll input"
+    );
+    assert.ok(
+        styles.includes(`${confirmCardSelector} .xp-reward {\n    width: min(420px, 100%);`),
+        "Result XP rewards must fit the scrollable card without horizontal overflow"
     );
     console.log("[result-overlay-confirm-action-safe-area] ok");
 }
