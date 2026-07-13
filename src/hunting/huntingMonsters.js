@@ -29,6 +29,14 @@ export const HUNTING_MONSTER_TYPES = Object.freeze({
     LASER: "laser"
 });
 
+export const HUNTING_MONSTER_TAGS = Object.freeze({
+    MONSTER: "monster",
+    RARITY_COMMON: "rarity:common",
+    RARITY_RARE: "rarity:rare",
+    RARITY_UNIQUE: "rarity:unique",
+    RARITY_EPIC: "rarity:epic"
+});
+
 const CAVE_MONSTERS = Object.freeze(
     [
         [
@@ -38,7 +46,8 @@ const CAVE_MONSTERS = Object.freeze(
             1.0,
             "#9b5d3f",
             "angry",
-            { hp: 74, damage: 8, speed: 305, radius: 34, mass: 0.95, defense: 1 }
+            { hp: 74, damage: 8, speed: 305, radius: 34, mass: 0.95, defense: 1 },
+            [HUNTING_MONSTER_TAGS.MONSTER, HUNTING_MONSTER_TAGS.RARITY_COMMON]
         ],
         [
             "charger",
@@ -47,7 +56,8 @@ const CAVE_MONSTERS = Object.freeze(
             1.7,
             "#e66b4f",
             "dash",
-            { hp: 86, damage: 10, speed: 286, radius: 37, mass: 1.08, defense: 1 }
+            { hp: 86, damage: 10, speed: 286, radius: 37, mass: 1.08, defense: 1 },
+            [HUNTING_MONSTER_TAGS.MONSTER, HUNTING_MONSTER_TAGS.RARITY_COMMON]
         ],
         [
             "shooter",
@@ -56,7 +66,8 @@ const CAVE_MONSTERS = Object.freeze(
             1.7,
             "#426f9e",
             "cyclops",
-            { hp: 62, damage: 8, speed: 258, radius: 31, mass: 0.82, defense: 0.6 }
+            { hp: 62, damage: 8, speed: 258, radius: 31, mass: 0.82, defense: 0.6 },
+            [HUNTING_MONSTER_TAGS.MONSTER, HUNTING_MONSTER_TAGS.RARITY_COMMON]
         ],
         [
             "electric",
@@ -65,7 +76,8 @@ const CAVE_MONSTERS = Object.freeze(
             1.8,
             "#5e8ee6",
             "ooo",
-            { hp: 68, damage: 9, speed: 252, radius: 34, mass: 0.9, defense: 0.8 }
+            { hp: 68, damage: 9, speed: 252, radius: 34, mass: 0.9, defense: 0.8 },
+            [HUNTING_MONSTER_TAGS.MONSTER, HUNTING_MONSTER_TAGS.RARITY_RARE]
         ],
         [
             "healer",
@@ -74,7 +86,8 @@ const CAVE_MONSTERS = Object.freeze(
             1.8,
             "#65b87a",
             "happy",
-            { hp: 110, damage: 5, speed: 268, radius: 35, mass: 1, defense: 1 }
+            { hp: 110, damage: 5, speed: 268, radius: 35, mass: 1, defense: 1 },
+            [HUNTING_MONSTER_TAGS.MONSTER, HUNTING_MONSTER_TAGS.RARITY_RARE]
         ],
         [
             "chain",
@@ -83,7 +96,8 @@ const CAVE_MONSTERS = Object.freeze(
             1.9,
             "#b85065",
             "angry",
-            { hp: 88, damage: 9, speed: 278, radius: 35, mass: 1.05, defense: 1 }
+            { hp: 88, damage: 9, speed: 278, radius: 35, mass: 1.05, defense: 1 },
+            [HUNTING_MONSTER_TAGS.MONSTER, HUNTING_MONSTER_TAGS.RARITY_RARE]
         ],
         [
             "shockwave",
@@ -92,7 +106,8 @@ const CAVE_MONSTERS = Object.freeze(
             1.9,
             "#e1a94e",
             "ooo",
-            { hp: 106, damage: 11, speed: 240, radius: 40, mass: 1.22, defense: 1.3 }
+            { hp: 106, damage: 11, speed: 240, radius: 40, mass: 1.22, defense: 1.3 },
+            [HUNTING_MONSTER_TAGS.MONSTER, HUNTING_MONSTER_TAGS.RARITY_RARE]
         ],
         [
             "barrier",
@@ -101,7 +116,8 @@ const CAVE_MONSTERS = Object.freeze(
             2.0,
             "#5dbaeb",
             "default",
-            { hp: 104, damage: 7, speed: 250, radius: 39, mass: 1.18, defense: 1.5 }
+            { hp: 104, damage: 7, speed: 250, radius: 39, mass: 1.18, defense: 1.5 },
+            [HUNTING_MONSTER_TAGS.MONSTER, HUNTING_MONSTER_TAGS.RARITY_UNIQUE]
         ],
         [
             "siphon",
@@ -110,7 +126,8 @@ const CAVE_MONSTERS = Object.freeze(
             2.0,
             "#9b69be",
             "xeye",
-            { hp: 92, damage: 10, speed: 272, radius: 35, mass: 0.98, defense: 1 }
+            { hp: 92, damage: 10, speed: 272, radius: 35, mass: 0.98, defense: 1 },
+            [HUNTING_MONSTER_TAGS.MONSTER, HUNTING_MONSTER_TAGS.RARITY_UNIQUE]
         ],
         [
             "shard",
@@ -119,7 +136,8 @@ const CAVE_MONSTERS = Object.freeze(
             2.1,
             "#e0d05b",
             "cyclops",
-            { hp: 82, damage: 10, speed: 260, radius: 35, mass: 0.95, defense: 1 }
+            { hp: 82, damage: 10, speed: 260, radius: 35, mass: 0.95, defense: 1 },
+            [HUNTING_MONSTER_TAGS.MONSTER, HUNTING_MONSTER_TAGS.RARITY_UNIQUE]
         ],
         [
             "boomerang",
@@ -128,7 +146,8 @@ const CAVE_MONSTERS = Object.freeze(
             2.1,
             "#e58a52",
             "happy",
-            { hp: 84, damage: 10, speed: 270, radius: 35, mass: 0.95, defense: 1 }
+            { hp: 84, damage: 10, speed: 270, radius: 35, mass: 0.95, defense: 1 },
+            [HUNTING_MONSTER_TAGS.MONSTER, HUNTING_MONSTER_TAGS.RARITY_EPIC]
         ],
         [
             "splitter",
@@ -137,7 +156,8 @@ const CAVE_MONSTERS = Object.freeze(
             2.2,
             "#c56bd5",
             "ooo",
-            { hp: 94, damage: 9, speed: 262, radius: 37, mass: 1.02, defense: 1 }
+            { hp: 94, damage: 9, speed: 262, radius: 37, mass: 1.02, defense: 1 },
+            [HUNTING_MONSTER_TAGS.MONSTER, HUNTING_MONSTER_TAGS.RARITY_EPIC]
         ],
         [
             "jumper",
@@ -146,7 +166,8 @@ const CAVE_MONSTERS = Object.freeze(
             2.2,
             "#e9c45d",
             "dash",
-            { hp: 90, damage: 11, speed: 276, radius: 36, mass: 1, defense: 1 }
+            { hp: 90, damage: 11, speed: 276, radius: 36, mass: 1, defense: 1 },
+            [HUNTING_MONSTER_TAGS.MONSTER, HUNTING_MONSTER_TAGS.RARITY_EPIC]
         ],
         [
             "laser",
@@ -155,10 +176,20 @@ const CAVE_MONSTERS = Object.freeze(
             2.3,
             "#ef5b5b",
             "cyclops",
-            { hp: 92, damage: 11, speed: 248, radius: 36, mass: 1.04, defense: 1 }
+            { hp: 92, damage: 11, speed: 248, radius: 36, mass: 1.04, defense: 1 },
+            [HUNTING_MONSTER_TAGS.MONSTER, HUNTING_MONSTER_TAGS.RARITY_EPIC]
         ]
-    ].map(([type, displayName, focusFloor, weight, color, face, stats]) =>
-        Object.freeze({ type, displayName, focusFloor, weight, color, face, stats: Object.freeze(stats) })
+    ].map(([type, displayName, focusFloor, weight, color, face, stats, monsterTags]) =>
+        Object.freeze({
+            type,
+            displayName,
+            focusFloor,
+            weight,
+            color,
+            face,
+            stats: Object.freeze(stats),
+            monsterTags: Object.freeze([...monsterTags])
+        })
     )
 );
 
@@ -260,7 +291,13 @@ export function createHuntingMobSpec({
         teamId: HUNTING_TEAMS.ENEMY,
         stats: { ...base.stats },
         appearance: { sides: 6 + (index % 4), face: base.face, angle: rng() * Math.PI * 2, angularVelocity: 1.2 },
-        hunting: { monsterType: base.type, behavior: base.type, isMob: true, stageSkin: "cave" }
+        hunting: {
+            monsterType: base.type,
+            monsterTags: base.monsterTags,
+            behavior: base.type,
+            isMob: true,
+            stageSkin: "cave"
+        }
     };
 }
 

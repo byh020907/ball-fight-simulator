@@ -6,6 +6,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { HUNTING_STAGES } from "./hunting/huntingConfig.js";
+import { createDefaultHuntingStats, sanitizeHuntingStats } from "./hunting/huntingAchievementProgress.js";
 import { FIGHTER_IDS } from "./core.js";
 import { createDefaultConsumables, sanitizeConsumables } from "./consumables.js";
 
@@ -56,12 +57,7 @@ export function createDefaultPlayerProfile() {
             unlockedStageIds: ["cave"],
             selectedStageId: "cave",
             dailyShop: {},
-            stats: {
-                runsStarted: 0,
-                runsRetreated: 0,
-                runsDefeated: 0,
-                deepestFloor: 0
-            }
+            stats: createDefaultHuntingStats()
         },
         collection: {
             characters: {},
@@ -258,12 +254,7 @@ function sanitizeHunting(obj) {
         unlockedStageIds,
         selectedStageId,
         dailyShop: typeof obj.dailyShop === "object" && obj.dailyShop ? obj.dailyShop : {},
-        stats: {
-            runsStarted: sanitizeNumber(obj.stats?.runsStarted),
-            runsRetreated: sanitizeNumber(obj.stats?.runsRetreated),
-            runsDefeated: sanitizeNumber(obj.stats?.runsDefeated),
-            deepestFloor: sanitizeNumber(obj.stats?.deepestFloor)
-        }
+        stats: sanitizeHuntingStats(obj.stats)
     };
 }
 

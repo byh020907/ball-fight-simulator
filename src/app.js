@@ -1401,23 +1401,12 @@ export class BattleApp {
         this._currentTournamentReport.placement = playerWon ? 1 : this.playerResultToPlacement();
         applyTournamentReport(this.playerProfile, this._currentTournamentReport);
 
-        const achievementResults = evaluateAchievements(this.playerProfile, ACHIEVEMENT_DEFINITIONS, {
+        this._settleAchievements({
             profile: this.playerProfile,
             report: this._currentTournamentReport,
             roster: this.roster,
             playerFighterId: this.playerFighterId
         });
-        for (const result of achievementResults) {
-            const def = ACHIEVEMENT_DEFINITIONS.find((d) => d.id === result.id);
-            if (!def) continue;
-
-            grantAchievementReward(this.playerProfile, def);
-            const rewardDesc = formatAchievementReward(def.reward);
-            let msg = `[업적 해금] ${def.name} (${def.tier})`;
-            if (rewardDesc) msg += ` — ${rewardDesc}`;
-            this._log.add(msg);
-            this._toast.show(msg);
-        }
 
         const masteryResult = advanceCharacterMastery(this.playerProfile, {
             characterId: this.playerFighterId,
@@ -1432,6 +1421,31 @@ export class BattleApp {
         }
         savePlayerProfile(this.playerProfile);
         this._lastMasteryResult = masteryResult;
+    }
+
+    _settleHuntingAchievements(huntingRun) {
+        return this._settleAchievements({
+            profile: this.playerProfile,
+            roster: this.roster,
+            playerFighterId: this.playerFighterId,
+            huntingRun
+        });
+    }
+
+    _settleAchievements(context) {
+        const achievementResults = evaluateAchievements(this.playerProfile, ACHIEVEMENT_DEFINITIONS, context);
+        for (const result of achievementResults) {
+            const def = ACHIEVEMENT_DEFINITIONS.find((d) => d.id === result.id);
+            if (!def) continue;
+
+            grantAchievementReward(this.playerProfile, def);
+            const rewardDesc = formatAchievementReward(def.reward);
+            let msg = `[업적 해금] ${def.name} (${def.tier})`;
+            if (rewardDesc) msg += ` — ${rewardDesc}`;
+            this._log.add(msg);
+            this._toast.show(msg);
+        }
+        return achievementResults;
     }
 
     _presentTournamentResult({ playerWon, champion, player }) {

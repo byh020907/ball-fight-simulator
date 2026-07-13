@@ -91,6 +91,7 @@ import {
     HUNTING_FLOOR_OUTCOME_TYPES,
     HUNTING_MONSTER_TYPES,
     HUNTING_MONSTER_BASE_SPECS,
+    HUNTING_MONSTER_TAGS,
     HUNTING_PORTAL_DECLINE,
     HUNTING_RUN_PHASES,
     HUNTING_STAGE_IDS,
@@ -99,6 +100,9 @@ import {
     createHuntingMinibossSpec,
     createHuntingMobSpec,
     createHuntingMobEncounter,
+    applyHuntingRunAchievementProgress,
+    recordHuntingBattleStart,
+    recordHuntingBattleVictory,
     getHuntingMobCount,
     getHuntingMobCountWeights,
     getHuntingMonsterPool,
@@ -2214,6 +2218,7 @@ function createCombatRewardChestTestEnv({ isFinalBoss = false } = {}) {
         refreshPlayerSetup() {},
         setStartButton() {},
         addLog() {},
+        _settleHuntingAchievements() {},
         roster: app.roster,
         playerProfile: createDefaultPlayerProfile()
     };
@@ -3506,6 +3511,141 @@ function testHuntingSystem() {
     assert.equal(sanitized.hunting.chests.length, 1, "Sanitized profile should dedupe and discard invalid chests");
     assert.equal(sanitized.hunting.stats.deepestFloor, 4, "Sanitized profile should keep hunting stats");
     console.log("[hunting] ok");
+}
+
+async function testHuntingAchievementProgress() {
+    const { ACHIEVEMENT_DEFINITIONS } = await import("../src/collection/achievementDefinitions.js");
+    const { evaluateAchievements } = await import("../src/collection/achievementRules.js");
+
+    for (const monster of Object.values(HUNTING_MONSTER_BASE_SPECS)) {
+        assert.ok(
+            monster.monsterTags.includes(HUNTING_MONSTER_TAGS.MONSTER),
+            `${monster.type} should be identified as a normal monster`
+        );
+        assert.equal(
+            monster.monsterTags.filter((tag) => tag.startsWith("rarity:")).length,
+            1,
+            `${monster.type} should have exactly one rarity tag`
+        );
+    }
+
+    const rareMonster = createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.ELECTRIC, floor: 20 });
+    const epicMonster = createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.LASER, floor: 94 });
+    let run = createHuntingRun({ characterId: FIGHTER_IDS.DASH });
+    run = recordHuntingBattleStart(run, {
+        enemySpecs: [rareMonster, epicMonster, { hunting: { isMiniboss: true } }],
+        hpRemain: 20,
+        maxHp: 100,
+        isChampion: true
+    });
+    run = recordHuntingBattleVictory(run);
+    const repeatedVictory = recordHuntingBattleVictory(run);
+    assert.equal(
+        repeatedVictory.achievementProgress.monsterKillsByTag[HUNTING_MONSTER_TAGS.MONSTER],
+        2,
+        "A completed battle must not count its monster tags twice"
+    );
+    assert.equal(
+        repeatedVictory.achievementProgress.monsterKillsByTag[HUNTING_MONSTER_TAGS.RARITY_RARE],
+        1,
+        "Rare monster tags should count from the actual encounter"
+    );
+    assert.equal(
+        repeatedVictory.achievementProgress.monsterKillsByTag[HUNTING_MONSTER_TAGS.RARITY_EPIC],
+        1,
+        "Epic monster tags should count from the actual encounter"
+    );
+    assert.equal(
+        repeatedVictory.achievementProgress.monsterKillsByTag["isMiniboss"],
+        undefined,
+        "Miniboss metadata must not be treated as a normal monster tag"
+    );
+
+    const returnedRun = retreatHuntingRun(
+        {
+            ...repeatedVictory,
+            floor: 45,
+            lastEvent: { type: HUNTING_EVENT_TYPES.PORTAL },
+            pendingLoot: { shards: 0, chests: [createHuntingChest({ rarity: "common" })], xp: 0 }
+        },
+        { reason: "retreat" }
+    );
+    const stats = applyHuntingRunAchievementProgress(createDefaultPlayerProfile().hunting.stats, returnedRun);
+    assert.equal(stats.monsterKillsByTag[HUNTING_MONSTER_TAGS.MONSTER], 2, "Normal monster kills should persist");
+    assert.equal(stats.criticalHpCombatWins, 1, "A battle won from 20% starting HP should persist");
+    assert.equal(stats.championVictories, 1, "Champion intrusion victories should persist separately");
+    assert.equal(stats.securedChestCount, 1, "Only secured run chests should count toward the storage achievement");
+    assert.equal(stats.bestPortalRetreatFloor, 45, "Portal retreats should keep their highest floor");
+
+    const stageClearStats = applyHuntingRunAchievementProgress(stats, {
+        ...returnedRun,
+        stageId: HUNTING_STAGE_IDS.CAVE,
+        endedReason: "stage_clear"
+    });
+    assert.deepEqual(
+        stageClearStats.clearedStageIds,
+        [HUNTING_STAGE_IDS.CAVE],
+        "Stage clears should persist by stage ID"
+    );
+
+    const profile = createDefaultPlayerProfile();
+    profile.hunting.stats = {
+        ...stageClearStats,
+        deepestFloor: 30,
+        securedChestCount: 10,
+        clearedStageIds: Object.values(HUNTING_STAGE_IDS),
+        monsterKillsByTag: {
+            [HUNTING_MONSTER_TAGS.MONSTER]: 300,
+            [HUNTING_MONSTER_TAGS.RARITY_RARE]: 100,
+            [HUNTING_MONSTER_TAGS.RARITY_UNIQUE]: 75,
+            [HUNTING_MONSTER_TAGS.RARITY_EPIC]: 50
+        }
+    };
+    const unlocked = evaluateAchievements(profile, ACHIEVEMENT_DEFINITIONS, { profile, roster: [] });
+    const huntingAchievementIds = new Set(
+        unlocked.filter((result) => result.id.startsWith("hunting_")).map((result) => result.id)
+    );
+    assert.deepEqual(
+        huntingAchievementIds,
+        new Set([
+            "hunting_depth_30",
+            "hunting_critical_hp_win",
+            "hunting_portal_retreat_40",
+            "hunting_champion_victory",
+            "hunting_secured_chests_10",
+            "hunting_all_stages_clear",
+            "hunting_monster_slayer",
+            "hunting_rare_monster_slayer",
+            "hunting_unique_monster_slayer",
+            "hunting_epic_monster_slayer"
+        ]),
+        "All hunting achievement definitions should evaluate from their persistent hunting statistics"
+    );
+
+    const sanitized = sanitizePlayerProfile({
+        hunting: {
+            stats: {
+                monsterKillsByTag: { [HUNTING_MONSTER_TAGS.RARITY_RARE]: 3, "invalid tag": 99 },
+                clearedStageIds: [HUNTING_STAGE_IDS.CAVE, "unknown-stage"]
+            }
+        }
+    });
+    assert.equal(
+        sanitized.hunting.stats.monsterKillsByTag[HUNTING_MONSTER_TAGS.RARITY_RARE],
+        3,
+        "Profile sanitization should keep known tag counters"
+    );
+    assert.equal(
+        sanitized.hunting.stats.monsterKillsByTag["invalid tag"],
+        undefined,
+        "Profile sanitization should reject malformed monster tags"
+    );
+    assert.deepEqual(
+        sanitized.hunting.stats.clearedStageIds,
+        [HUNTING_STAGE_IDS.CAVE],
+        "Profile sanitization should reject unknown cleared stage IDs"
+    );
+    console.log("[hunting-achievement-progress] ok");
 }
 
 function testHunting100FloorStructure() {
@@ -9030,6 +9170,7 @@ async function testCreateCollectionHubViewModel() {
     const { MASTERY_EFFECT_DEFS } = await import("../src/character-mastery/index.js");
     const { createDefaultPlayerProfile } = await import("../src/playerProfile.js");
     const { createRoster } = await import("../src/roster.js");
+    const { ACHIEVEMENT_DEFINITIONS } = await import("../src/collection/achievementDefinitions.js");
 
     const roster = createRoster();
     const profile = createDefaultPlayerProfile();
@@ -9117,6 +9258,20 @@ async function testCreateCollectionHubViewModel() {
     assert.ok(arcMastery.isSelf, "Archer mastery should be marked as self");
     assert.equal(arcMastery.level, 1, "Archer mastery level should be 1");
     assert.equal(vm3.summary.masteryTotal, 6, "Mastery total should sum stored mastery tiers");
+
+    profile.hunting.stats.monsterKillsByTag = { [HUNTING_MONSTER_TAGS.MONSTER]: 12 };
+    const vm4 = createCollectionHubViewModel({
+        profile,
+        roster,
+        masteryDefinitions: MASTERY_EFFECT_DEFS,
+        achievementDefinitions: ACHIEVEMENT_DEFINITIONS,
+        currentPlayerFighterId: "archer"
+    });
+    assert.equal(
+        vm4.achievementItems.find((item) => item.id === "hunting_monster_slayer").progressText,
+        "12 / 300",
+        "Collection achievement cards should expose tagged hunting progress"
+    );
 }
 
 const app = await loadModuleApp();
@@ -9221,6 +9376,7 @@ testExperienceSystem();
 testCharacterLevelProgressions(app);
 testAbilityLevelUpgrades(app);
 testHuntingSystem();
+await testHuntingAchievementProgress();
 testHunting100FloorStructure();
 testHuntingCombatRelief();
 testHuntingPortalDecline();
@@ -11731,6 +11887,9 @@ function testHuntingRetreatAwaitsResultConfirmation() {
         },
         showToast() {
             calls.push("toast");
+        },
+        _settleHuntingAchievements() {
+            calls.push("achievements");
         }
     };
     const manager = new HuntingManager(app);

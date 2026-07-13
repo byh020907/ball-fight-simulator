@@ -44,6 +44,11 @@ import { PopupService } from "../popup.js";
 import { advanceHuntingRun, completeHuntingStage } from "./huntingRunProgression.js";
 import { HUNTING_EVENT_TRANSITIONS, HuntingEvent } from "./huntingEvents.js";
 import { getHuntingPreparationConsumables, useHuntingPreparationConsumable } from "../consumables.js";
+import {
+    applyHuntingRunAchievementProgress,
+    recordHuntingBattleStart,
+    recordHuntingBattleVictory
+} from "./huntingAchievementProgress.js";
 
 const CHEST_RARITY_LABELS = Object.freeze({
     common: "일반",
@@ -271,6 +276,13 @@ export class HuntingManager {
                   })
                 : null;
         const enemySpecs = miniboss ? [miniboss, ...mobSpecs.slice(0, Math.max(1, mobSpecs.length - 1))] : mobSpecs;
+        this._run = recordHuntingBattleStart(run, {
+            enemySpecs,
+            hpRemain: run.carriedHp,
+            maxHp: run.carriedMaxHp,
+            isChampion: !isFinalBoss && run.lastEvent?.enemyType === HUNTING_ENEMY_TYPES.CHAMPION
+        });
+        run = this._run;
         const matchSpecs = [appliedSpec, ...enemySpecs];
         app._currentMatchReport = createMatchReport();
         app._currentMatchReport.playerFighterId = run.characterId;
@@ -375,7 +387,7 @@ export class HuntingManager {
                 playerBall.mergeHeroOrbCarryoverInto(run);
             }
 
-            this._run = recordHuntingFloorResult(run, {
+            this._run = recordHuntingFloorResult(recordHuntingBattleVictory(run), {
                 hpRemain: Math.ceil(playerBall?.hp ?? run.carriedHp ?? 0),
                 maxHp: playerBall?.maxHp ?? run.carriedMaxHp,
                 loot: floorLoot,
@@ -1045,15 +1057,16 @@ export class HuntingManager {
             if (run.securedLoot?.chests?.length > 0) {
                 profile.hunting.chests.push(...run.securedLoot.chests);
             }
-            profile.hunting.stats = profile.hunting.stats || {};
-            profile.hunting.stats.runsStarted = (profile.hunting.stats.runsStarted ?? 0) + 1;
-            if (run.status === "retreated") {
-                profile.hunting.stats.runsRetreated = (profile.hunting.stats.runsRetreated ?? 0) + 1;
-            } else if (run.status === "defeated") {
-                profile.hunting.stats.runsDefeated = (profile.hunting.stats.runsDefeated ?? 0) + 1;
-            }
-            profile.hunting.stats.deepestFloor = Math.max(profile.hunting.stats.deepestFloor ?? 0, run.floor);
+            const stats = applyHuntingRunAchievementProgress(profile.hunting.stats, run);
+            profile.hunting.stats = {
+                ...stats,
+                runsStarted: stats.runsStarted + 1,
+                runsRetreated: stats.runsRetreated + (run.status === "retreated" ? 1 : 0),
+                runsDefeated: stats.runsDefeated + (run.status === "defeated" ? 1 : 0),
+                deepestFloor: Math.max(stats.deepestFloor, run.floor)
+            };
         }
+        app._settleHuntingAchievements(run);
         savePlayerProfile(profile);
     }
 }

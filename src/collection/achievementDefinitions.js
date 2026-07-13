@@ -9,8 +9,38 @@
 import { getActionPool } from "../clickActions.js";
 import { getCharacterMasteryLevel } from "../character-mastery/index.js";
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
+import { HUNTING_MONSTER_TAGS } from "../hunting/huntingMonsters.js";
+import { HUNTING_STAGE_IDS } from "../hunting/huntingConfig.js";
 
 const ACHIEVEMENT_REWARDS = REWARD_BALANCE.progression.achievementRewards;
+
+function getHuntingStats(context) {
+    return context.profile?.hunting?.stats ?? {};
+}
+
+function getMonsterKillCount(context, tag) {
+    return getHuntingStats(context).monsterKillsByTag?.[tag] ?? 0;
+}
+
+function createHuntingCounterAchievement({ id, name, description, tier, target, rewardKey, getCurrent }) {
+    const reward = ACHIEVEMENT_REWARDS[rewardKey];
+    return {
+        id,
+        name,
+        description,
+        tier,
+        evaluate(context) {
+            return getCurrent(context) >= target;
+        },
+        getProgress(context) {
+            return { current: getCurrent(context), target };
+        },
+        reward: { ...reward },
+        grant(handler) {
+            return reward.type === "SHARDS" ? handler.shards(reward.amount) : handler.chest(reward.rarity);
+        }
+    };
+}
 
 /**
  * @typedef {object} AchievementContext
@@ -45,7 +75,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         tier: "gold",
         evaluate(context) {
             if (!context.report?.playerWon) return false;
-            return context.report.matchReports.every((m) => m.combatDamageTaken === 0);
+            return context.report.matchReports?.every((m) => m.combatDamageTaken === 0) ?? false;
         },
         reward: {
             ...ACHIEVEMENT_REWARDS.flawlessTournament
@@ -64,7 +94,8 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         tier: "silver",
         evaluate(context) {
             // 현재 토너먼트 리포트에서 역전승 매치 확인
-            const hasComeback = context.report.matchReports.some((m) => m.playerWon && m.lowestHpRatio < 0.15);
+            const hasComeback =
+                context.report?.matchReports?.some((m) => m.playerWon && m.lowestHpRatio < 0.15) ?? false;
             if (hasComeback) return true;
 
             // 이미 누적된 역전승 기록도 확인 (캐릭터 전체 합산)
@@ -170,7 +201,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         description: "한 번의 공격으로 150 이상의 피해를 주세요.",
         tier: "gold",
         evaluate(context) {
-            return context.report.matchReports.some((m) => (m.maxHitDamage ?? 0) >= 150);
+            return context.report?.matchReports?.some((m) => (m.maxHitDamage ?? 0) >= 150) ?? false;
         },
         reward: {
             ...ACHIEVEMENT_REWARDS.singleHitMonster
@@ -231,5 +262,95 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         grant(handler) {
             return handler.unlockFeature("battle_speed_4x");
         }
-    }
+    },
+    createHuntingCounterAchievement({
+        id: "hunting_depth_30",
+        name: "심층 탐사자",
+        description: "사냥터 30층에 도달하세요.",
+        tier: "bronze",
+        target: 30,
+        rewardKey: "huntingDepth30",
+        getCurrent: (context) => getHuntingStats(context).deepestFloor ?? 0
+    }),
+    createHuntingCounterAchievement({
+        id: "hunting_critical_hp_win",
+        name: "위기 돌파",
+        description: "전투 시작 시 HP 20% 이하인 상태로 사냥터 전투에서 승리하세요.",
+        tier: "silver",
+        target: 1,
+        rewardKey: "huntingCriticalHpWin",
+        getCurrent: (context) => getHuntingStats(context).criticalHpCombatWins ?? 0
+    }),
+    createHuntingCounterAchievement({
+        id: "hunting_portal_retreat_40",
+        name: "무사 귀환",
+        description: "40층 이상에서 포탈로 귀환하세요.",
+        tier: "silver",
+        target: 40,
+        rewardKey: "huntingPortalRetreat40",
+        getCurrent: (context) => getHuntingStats(context).bestPortalRetreatFloor ?? 0
+    }),
+    createHuntingCounterAchievement({
+        id: "hunting_champion_victory",
+        name: "난입 저지",
+        description: "챔피언 난입 전투에서 승리하세요.",
+        tier: "gold",
+        target: 1,
+        rewardKey: "huntingChampionVictory",
+        getCurrent: (context) => getHuntingStats(context).championVictories ?? 0
+    }),
+    createHuntingCounterAchievement({
+        id: "hunting_secured_chests_10",
+        name: "보관 전문가",
+        description: "사냥터에서 상자 10개를 확보하세요.",
+        tier: "bronze",
+        target: 10,
+        rewardKey: "huntingSecuredChests",
+        getCurrent: (context) => getHuntingStats(context).securedChestCount ?? 0
+    }),
+    createHuntingCounterAchievement({
+        id: "hunting_all_stages_clear",
+        name: "전 지역 제패",
+        description: "동굴, 숲, 사막의 최종 보스를 모두 처치하세요.",
+        tier: "gold",
+        target: Object.values(HUNTING_STAGE_IDS).length,
+        rewardKey: "huntingAllStagesClear",
+        getCurrent: (context) => getHuntingStats(context).clearedStageIds?.length ?? 0
+    }),
+    createHuntingCounterAchievement({
+        id: "hunting_monster_slayer",
+        name: "몹 학살자",
+        description: "일반 몬스터를 300마리 처치하세요.",
+        tier: "bronze",
+        target: 300,
+        rewardKey: "huntingMonsterSlayer",
+        getCurrent: (context) => getMonsterKillCount(context, HUNTING_MONSTER_TAGS.MONSTER)
+    }),
+    createHuntingCounterAchievement({
+        id: "hunting_rare_monster_slayer",
+        name: "레어 몹 학살자",
+        description: "레어 몬스터를 100마리 처치하세요.",
+        tier: "silver",
+        target: 100,
+        rewardKey: "huntingRareMonsterSlayer",
+        getCurrent: (context) => getMonsterKillCount(context, HUNTING_MONSTER_TAGS.RARITY_RARE)
+    }),
+    createHuntingCounterAchievement({
+        id: "hunting_unique_monster_slayer",
+        name: "유니크 몹 학살자",
+        description: "유니크 몬스터를 75마리 처치하세요.",
+        tier: "gold",
+        target: 75,
+        rewardKey: "huntingUniqueMonsterSlayer",
+        getCurrent: (context) => getMonsterKillCount(context, HUNTING_MONSTER_TAGS.RARITY_UNIQUE)
+    }),
+    createHuntingCounterAchievement({
+        id: "hunting_epic_monster_slayer",
+        name: "에픽 몹 학살자",
+        description: "에픽 몬스터를 50마리 처치하세요.",
+        tier: "gold",
+        target: 50,
+        rewardKey: "huntingEpicMonsterSlayer",
+        getCurrent: (context) => getMonsterKillCount(context, HUNTING_MONSTER_TAGS.RARITY_EPIC)
+    })
 ]);

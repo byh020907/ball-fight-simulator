@@ -132,6 +132,11 @@ export function createCollectionHubViewModel({
         const state = profile?.collection?.achievements?.[def.id];
         const unlocked = !!state?.unlockedAt;
         const rewardDesc = formatAchievementReward(def.reward);
+        const progress = typeof def.getProgress === "function" ? def.getProgress({ profile, roster }) : null;
+        const progressText =
+            progress && Number.isFinite(progress.target)
+                ? `${Math.min(progress.current ?? 0, progress.target)} / ${progress.target}`
+                : "";
         return {
             id: def.id,
             name: def.name,
@@ -140,7 +145,8 @@ export function createCollectionHubViewModel({
             unlocked,
             unlockedAt: state?.unlockedAt ?? null,
             reward: def.reward ?? null,
-            rewardText: rewardDesc
+            rewardText: rewardDesc,
+            progressText
         };
     });
 

@@ -7,6 +7,7 @@ import {
 } from "./huntingConfig.js";
 import { applyDefeatPreservation, createEmptyHuntingLoot, mergeHuntingLoot } from "./huntingRewards.js";
 import { HUNTING_EVENT_TYPES } from "./huntingConfig.js";
+import { createHuntingAchievementProgress } from "./huntingAchievementProgress.js";
 
 export const HUNTING_RUN_PHASES = Object.freeze({
     READY: "ready",
@@ -76,9 +77,12 @@ export function createHuntingRun({
         lastEncounter: null,
         combatReliefFloors: 0,
         portalDeclineFloors: 0,
+        achievementProgress: createHuntingAchievementProgress(),
+        currentBattleAchievement: null,
         history: [],
         startedAt: now,
-        endedAt: null
+        endedAt: null,
+        endedReason: null
     };
 }
 
@@ -262,6 +266,7 @@ export function retreatHuntingRun(run, { reason = "retreat", now = Date.now() } 
         securedLoot: mergeHuntingLoot(run.securedLoot, run.pendingLoot),
         pendingLoot: createEmptyHuntingLoot(),
         endedAt: now,
+        endedReason: reason,
         history: [
             ...run.history,
             {
@@ -284,6 +289,7 @@ export function defeatHuntingRun(run, { rng = Math.random, now = Date.now() } = 
         pendingLoot: createEmptyHuntingLoot(),
         defeatLosses: preservation.lostLoot,
         endedAt: now,
+        endedReason: "defeat",
         history: [
             ...run.history,
             {
