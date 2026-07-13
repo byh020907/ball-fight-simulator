@@ -127,7 +127,7 @@ this.debug = {
 | `Cooldown` | 쿨다운이 있다 (tickCooldown, cooldownReady) | 모든 Ability, AIActionController |
 | `ProjectileBehavior` | 발사체다 (owner, updateProjectile, hit 판정) | Arrow/Bat/Bullet/Orbit/Grenade/Seed |
 | `BurstSequencer` | 연발 발사한다 (startBurst, tickBurst) | 필요 시 선택 적용 |
-| `RotationalBody` | 회전한다 (angle, angularVelocity, applyAngularImpulse, integrateRotation) | BattleBall (전체), 회전 가능한 지형/캐릭터/투사체 확장용 |
+| `RotationalBody` | 회전한다 (angle, angularVelocity, applyAngularImpulse, integrateRotation) | BattleBall (전체), 모든 사냥터 전리품, 회전 가능한 지형/캐릭터/투사체 확장용 |
 | `PhysicsMaterialBody` | 물리 재질을 소유한다 (physicsMaterial, setPhysicsMaterial, getResolvedPhysicsMaterial) | 물리 재질이 필요한 모든 body |
 | `CollisionShape` (helper) | polygon world points 변환, SAT 기반 circle-polygon/polygon-polygon 충돌, fighter shape collision resolver | terrain collision, fighter-vs-fighter 충돌 |
 | `PhysicsDebugRingBuffer` (helper) | 고정 길이 ring buffer로 물리 이벤트 기록. NaN/Infinity 감지 시 buffer dump 출력 | 디버깅/트러블슈팅 |

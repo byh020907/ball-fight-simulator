@@ -28,8 +28,8 @@
  */
 export default function RotationalBody(Base) {
     return class extends Base {
-        constructor() {
-            super();
+        constructor(...args) {
+            super(...args);
             this.angle = 0;
             this.angularVelocity = 0;
             this._accumulatedTorque = 0;

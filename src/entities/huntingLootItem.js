@@ -1,13 +1,14 @@
-import { applyCollisionImpulse, CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
+import { applyCollisionImpulse, CombatEntity, randomSpin, RENDER_LAYERS, Vector2 } from "../core.js";
 import CollectionGrace from "../physics/CollectionGrace.js";
 import { applyMagneticAttraction, getCombatMovementSpeed } from "../physics/magneticAttraction.js";
+import RotationalBody from "../physics/RotationalBody.js";
 
 const DEFAULT_LIFE = 18;
 const DEFAULT_MAGNET_RESPONSE_RATE = 5;
 const DEFAULT_MAGNET_SPEED_MULTIPLIER = 1.35;
 const DEFAULT_COLLECTION_GRACE_DURATION = 1;
 
-export class HuntingLootItem extends CollectionGrace(CombatEntity) {
+export class HuntingLootItem extends RotationalBody(CollectionGrace(CombatEntity)) {
     static renderLayer = RENDER_LAYERS.FOREGROUND;
 
     constructor({
@@ -27,6 +28,7 @@ export class HuntingLootItem extends CollectionGrace(CombatEntity) {
         this.life = Math.max(0.1, life);
         this.maxLife = this.life;
         this.mass = 2;
+        this.angularVelocity = randomSpin();
         this.magnetRadiusMultiplier = Math.max(1, magnetRadiusMultiplier);
         this.magnetResponseRate = Math.max(0, magnetResponseRate);
         this.magnetSpeedMultiplier = Math.max(0, magnetSpeedMultiplier);
@@ -51,6 +53,7 @@ export class HuntingLootItem extends CollectionGrace(CombatEntity) {
         }
 
         this.integrate(delta);
+        this.integrateRotation(delta);
         simulation.keepEntityInsideArena(this, { resolveTerrain: true });
 
         const canCollectNow = canCollect && (this.victoryCollectionRemaining > 0 || !isCollectionGraceActive);
@@ -69,6 +72,9 @@ export class HuntingLootItem extends CollectionGrace(CombatEntity) {
 
     draw(ctx) {
         ctx.save();
+        ctx.translate(this.position.x, this.position.y);
+        ctx.rotate(this.angle);
+        ctx.translate(-this.position.x, -this.position.y);
         this.drawItem(ctx);
         ctx.restore();
     }

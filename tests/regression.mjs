@@ -216,6 +216,7 @@ import {
     createHuntingLootItem,
     HeroOrb,
     ShardDrop,
+    ShardBundleDrop,
     SmallHealPack,
     STAT_ORB_KEYS
 } from "../src/entities/index.js";
@@ -297,6 +298,7 @@ function makeRecordingCanvasContext() {
         "stroke",
         "fillRect",
         "strokeRect",
+        "roundRect",
         "moveTo",
         "lineTo",
         "closePath",
@@ -2673,6 +2675,34 @@ function testHuntingLootItemsAndDropController(app) {
         "Winning a hunting battle should pull remaining collectible loot across the whole arena"
     );
     console.log("[hunting-loot-items-and-drop-controller] ok");
+}
+
+function testHuntingLootItemsRotate() {
+    const lootItems = [
+        new ShardDrop({ position: new Vector2(200, 200), velocity: new Vector2(), collectorId: "collector" }),
+        new ShardBundleDrop({ position: new Vector2(240, 200), velocity: new Vector2(), collectorId: "collector" }),
+        new SmallHealPack({ position: new Vector2(280, 200), velocity: new Vector2(), collectorId: "collector" }),
+        new ChestDrop({ position: new Vector2(320, 200), velocity: new Vector2(), collectorId: "collector" })
+    ];
+    const simulation = { fighters: [], keepEntityInsideArena() {} };
+
+    lootItems.forEach((item) => item.update(0.5, simulation));
+    lootItems.forEach((item) => {
+        assert.ok(Number.isFinite(item.angle) && item.angle !== 0, "All loot items must advance a rotation angle");
+        assert.ok(
+            Number.isFinite(item.angularVelocity) && Math.abs(item.angularVelocity) >= 0.9,
+            "All loot items must receive the shared random initial spin"
+        );
+    });
+
+    const ctx = makeRecordingCanvasContext();
+    lootItems.forEach((item) => item.draw(ctx));
+    assert.equal(
+        ctx.calls.filter(([method]) => method === "rotate").length,
+        lootItems.length,
+        "All loot renderers must apply their shared rotation transform"
+    );
+    console.log("[hunting-loot-rotation] ok");
 }
 
 function testHuntingLootSessionIsDiscardedOnDefeat(app) {
@@ -14852,6 +14882,7 @@ await testActionGateway();
 await testHuntingEndToEnd();
 await testHuntingChestContinueHandlersContract();
 testHuntingLootBalanceRules();
+testHuntingLootItemsRotate();
 testHuntingLootItemsAndDropController(app);
 testHuntingLootSessionIsDiscardedOnDefeat(app);
 testHuntingCombatRewardChestUi();
