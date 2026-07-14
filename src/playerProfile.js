@@ -28,6 +28,12 @@ export const PROFILE_LIMITS = Object.freeze({
 
 export const PROFILE_VERSION = 8;
 
+const debugProfileSession = {
+    active: false,
+    profile: null,
+    persistentProfile: null
+};
+
 export function resetStaleSessionStorage(storage = globalThis.sessionStorage) {
     if (!storage || storage.getItem(SESSION_STORAGE_VERSION_KEY) === String(PROFILE_VERSION)) return false;
 
@@ -37,6 +43,38 @@ export function resetStaleSessionStorage(storage = globalThis.sessionStorage) {
     }
     storage.setItem(SESSION_STORAGE_VERSION_KEY, String(PROFILE_VERSION));
     return true;
+}
+
+function cloneSanitizedProfile(profile) {
+    return sanitizePlayerProfile(profile);
+}
+
+function replaceProfileContents(target, source) {
+    for (const key of Object.keys(target)) delete target[key];
+    Object.assign(target, source);
+    return target;
+}
+
+export function isDebugProfileSessionActive() {
+    return debugProfileSession.active;
+}
+
+export function beginDebugProfileSession(profile) {
+    if (debugProfileSession.active && debugProfileSession.profile) return debugProfileSession.profile;
+    debugProfileSession.persistentProfile = cloneSanitizedProfile(profile);
+    debugProfileSession.profile = cloneSanitizedProfile(debugProfileSession.persistentProfile);
+    debugProfileSession.active = true;
+    return debugProfileSession.profile;
+}
+
+export function endDebugProfileSession() {
+    const persistentProfile = debugProfileSession.persistentProfile
+        ? cloneSanitizedProfile(debugProfileSession.persistentProfile)
+        : createDefaultPlayerProfile();
+    debugProfileSession.active = false;
+    debugProfileSession.profile = null;
+    debugProfileSession.persistentProfile = null;
+    return persistentProfile;
 }
 
 // ── 기본 프로필 ─────────────────────────────────────────────────────────────
@@ -456,6 +494,7 @@ export function migrateLegacyExperienceToCharacter(profile, preferredCharacterId
 // ── 저장/로드 ────────────────────────────────────────────────────────────────
 
 export function loadPlayerProfile() {
+    if (debugProfileSession.active && debugProfileSession.profile) return debugProfileSession.profile;
     try {
         resetStaleSessionStorage();
         const raw = localStorage.getItem(PLAYER_PROFILE_STORAGE_KEY);
@@ -473,6 +512,11 @@ export function loadPlayerProfile() {
 export function savePlayerProfile(profile) {
     try {
         const cleaned = sanitizePlayerProfile(profile);
+        if (debugProfileSession.active) {
+            const sessionProfile = debugProfileSession.profile ?? profile;
+            debugProfileSession.profile = replaceProfileContents(sessionProfile, cleaned);
+            return true;
+        }
         localStorage.setItem(PLAYER_PROFILE_STORAGE_KEY, JSON.stringify(cleaned));
         return true;
     } catch {

@@ -103,6 +103,7 @@ import {
     HUNTING_ENEMY_TYPES,
     HUNTING_EVENT_TYPES,
     HUNTING_FLOOR_OUTCOME_TYPES,
+    HUNTING_MAX_FLOOR,
     HUNTING_MINIBOSS,
     HUNTING_MONSTER_TYPES,
     HUNTING_MONSTER_BASE_SPECS,
@@ -5522,6 +5523,65 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
     }
 
     console.log("[hunting-stage-select-preview-character] ok");
+}
+
+async function testDebugHuntingStartsRequestedFloor() {
+    const profile = createDefaultPlayerProfile();
+    const overlayStates = [];
+    const overlayMessages = [];
+    const app = {
+        playerProfile: profile,
+        playerFighterId: FIGHTER_IDS.RAGE,
+        playerStatAllocation: createEmptyStatAllocation(),
+        roster: createRoster(),
+        renderer: { clear() {} },
+        stopPlayerPreviewLoop() {},
+        beginGameSession() {},
+        _refreshCollectionHub() {},
+        _syncPlayerStatAllocationFromUi() {},
+        refreshPlayerSetup() {},
+        setHuntingActive() {},
+        setHuntingOverlayState(data) {
+            overlayStates.push({ ...data });
+        },
+        showOverlay(label, text, subtext) {
+            overlayMessages.push({ label, text, subtext });
+        },
+        addLog(message) {
+            this.lastLog = message;
+        }
+    };
+    const manager = new HuntingManager(app);
+    let advanceOptions = null;
+    manager.advance = async (options) => {
+        advanceOptions = options;
+    };
+
+    const originalDialog = PopupService._testDialog;
+    PopupService.setTestDialog({ close() {} });
+    try {
+        await manager.startDebugRun(FIGHTER_IDS.RAGE, {
+            stageId: HUNTING_STAGE_IDS.FOREST,
+            encounterFloor: HUNTING_MAX_FLOOR + 30
+        });
+
+        assert.equal(
+            manager._run.floor,
+            HUNTING_MAX_FLOOR - 1,
+            "Debug start should prepare the requested encounter floor"
+        );
+        assert.deepEqual(overlayMessages.at(-1), {
+            label: "사냥터",
+            text: `숲 · ${HUNTING_MAX_FLOOR}층`,
+            subtext: "원정 시작"
+        });
+        assert.equal(overlayStates.at(-1).huntingFloor, HUNTING_MAX_FLOOR);
+        assert.deepEqual(advanceOptions, { waitForFirstMoveUi: true });
+        assert.match(app.lastLog, /디버그/, "Debug hunting logs should distinguish development runs");
+    } finally {
+        PopupService.setTestDialog(originalDialog);
+    }
+    console.log("[debug-hunting-requested-floor] ok");
 }
 
 function testHuntingTerrain() {
@@ -11599,6 +11659,7 @@ testHuntingCombatRelief();
 testHuntingPortalDecline();
 testHuntingStageSelectionAndArenaTheme();
 await testHuntingStageSelectUsesPreviewCharacter();
+await testDebugHuntingStartsRequestedFloor();
 testHuntingTerrain();
 testEquipmentEnhancement();
 testEquipmentStatValueRatios();
@@ -16841,6 +16902,7 @@ function testRebirthSubAbilityMatrix() {
                 ]
             };
             const sim = new BattleSimulation([source, opponent], {
+                onLog() {},
                 onBattleBallReady(ball, spec, simulation) {
                     if (spec.id === source.id) applyRebirthLoadoutToBattleBall(ball, simulation, loadout);
                 }

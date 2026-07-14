@@ -23,6 +23,7 @@ import { HELP_TITLE, HELP_CONTENT } from "./helpContent.js";
 import { CollectionHubService } from "./collectionHubService.js";
 import { createCollectionActionPopupOptions } from "./collection/collectionActionPopup.js";
 import { beginRebirth, completeRebirth, toggleRebirthCardEquip } from "./rebirth/rebirthService.js";
+import { setDeveloperCharacterToMaxLevel, setDeveloperRebirthCount } from "./developer/developerTools.js";
 
 export function createComponentBridge(app) {
     function showLevelLockPopup(item) {
@@ -197,6 +198,31 @@ export function createComponentBridge(app) {
         },
         openEquipmentHub() {
             CollectionHubService.open("equipment");
+        },
+        enterDebugMode() {
+            if (!app.enableDebugMode()) return { ok: false, error: "not_setup" };
+            return { ok: true };
+        },
+        exitDebugMode() {
+            if (!app.disableDebugMode()) return { ok: false, error: "debug_disabled" };
+            return { ok: true };
+        },
+        setDebugCharacterToMaxLevel(characterId) {
+            if (!app.isDebugModeActive()) return { ok: false, error: "debug_disabled" };
+            const result = setDeveloperCharacterToMaxLevel(app.playerProfile, characterId);
+            if (result.ok) refreshCollectionAndProfile();
+            return result;
+        },
+        setDebugRebirthCount(characterId, rebirthCount) {
+            if (!app.isDebugModeActive()) return { ok: false, error: "debug_disabled" };
+            const result = setDeveloperRebirthCount(app.playerProfile, characterId, rebirthCount);
+            if (result.ok) refreshCollectionAndProfile();
+            return result;
+        },
+        startDebugHunting(characterId, stageId, encounterFloor) {
+            if (!app.isDebugModeActive() || !app.lifecycle.isSetup) return { ok: false, error: "debug_disabled" };
+            CollectionHubService.close();
+            return app.hunting.startDebugRun(characterId, { stageId, encounterFloor });
         },
         beginRebirth(characterId) {
             if (!app.lifecycle.isSetup) {

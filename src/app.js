@@ -21,6 +21,9 @@ import { BattleBall } from "./entities/index.js";
 import { drawEquipmentItems, getCharacterOutlineWidth } from "./entities/equipmentVisuals.js";
 import { PreviewReselectSimulation } from "./preview/previewReselectSimulation.js";
 import {
+    beginDebugProfileSession,
+    endDebugProfileSession,
+    isDebugProfileSessionActive,
     loadPlayerProfile,
     savePlayerProfile,
     ensureCharacterRecords,
@@ -405,9 +408,30 @@ export class BattleApp {
             roster: this.roster,
             masteryDefinitions: MASTERY_EFFECT_DEFS,
             achievementDefinitions: ACHIEVEMENT_DEFINITIONS,
-            currentPlayerFighterId: this.playerFighterId
+            currentPlayerFighterId: this.playerFighterId,
+            developerMode: isDebugProfileSessionActive()
         });
         CollectionHubService.render(vm);
+    }
+
+    isDebugModeActive() {
+        return isDebugProfileSessionActive();
+    }
+
+    enableDebugMode() {
+        if (!this.lifecycle.isSetup) return false;
+        this.playerProfile = beginDebugProfileSession(this.playerProfile);
+        this._refreshCollectionHub();
+        this.refreshPlayerSetup();
+        return true;
+    }
+
+    disableDebugMode() {
+        if (!isDebugProfileSessionActive()) return false;
+        this.playerProfile = endDebugProfileSession();
+        this._refreshCollectionHub();
+        this.refreshPlayerSetup();
+        return true;
     }
 
     _getPlayerEquipmentSummary(characterId = this.playerFighterId) {

@@ -71,6 +71,7 @@
                         type="search"
                         placeholder="캐릭터 검색..."
                         x-model="state.searchQueries.roster"
+                        @input="syncDebugModeFromSearch()"
                     />
                     <select class="ch-select" x-model="state.filters.roster" @change="setCollectionFilter($el.value)">
                         <option value="all">전체</option>
@@ -426,6 +427,53 @@
                     </template>
                 </div>
             </section>
+        </div>
+
+        <div class="ch-content ch-developer" x-show="state.activeTab === 'developer'" role="tabpanel">
+            <div class="ch-developer-grid">
+                <label class="ch-developer-field">
+                    <span>캐릭터</span>
+                    <select class="ch-select" x-model="state.developer.targetCharacterId" @change="syncDeveloperTarget()">
+                        <template x-for="item in state.rosterItems" :key="item.id">
+                            <option x-bind:value="item.id" x-text="item.name"></option>
+                        </template>
+                    </select>
+                </label>
+                <div class="ch-developer-field ch-developer-field--action">
+                    <span>레벨</span>
+                    <button class="ch-btn" type="button" @click="setDebugCharacterToMaxLevel()">Lv.10 적용</button>
+                </div>
+                <label class="ch-developer-field">
+                    <span>환생 횟수</span>
+                    <input class="ch-search" type="number" min="0" max="999" x-model.number="state.developer.rebirthCount" />
+                </label>
+                <div class="ch-developer-field ch-developer-field--action">
+                    <span>환생</span>
+                    <button class="ch-btn" type="button" @click="setDebugRebirthCount()">적용</button>
+                </div>
+                <label class="ch-developer-field">
+                    <span>사냥터 지역</span>
+                    <select class="ch-select" x-model="state.developer.huntingStageId">
+                        <template x-for="stage in state.developer.stages" :key="stage.id">
+                            <option x-bind:value="stage.id" x-text="stage.name"></option>
+                        </template>
+                    </select>
+                </label>
+                <label class="ch-developer-field">
+                    <span>시작 층</span>
+                    <input
+                        class="ch-search"
+                        type="number"
+                        min="1"
+                        x-bind:max="state.developer.maxFloor"
+                        x-model.number="state.developer.huntingFloor"
+                    />
+                </label>
+            </div>
+            <div class="ch-developer-actions">
+                <button class="ch-btn" type="button" @click="startDebugHunting()">사냥터 시작</button>
+                <button class="ch-btn ch-btn--danger" type="button" @click="exitDebugMode()">디버그 종료</button>
+            </div>
         </div>
 
         <div class="ch-content" x-show="state.activeTab === 'mastery'" role="tabpanel">
@@ -917,6 +965,16 @@
                 fusion: { sourceItemCount: 3, recipes: [] },
                 equippedSlots: {}
             },
+            developer: {
+                active: false,
+                currentCharacterId: null,
+                targetCharacterId: null,
+                rebirthCount: 0,
+                huntingStageId: "cave",
+                huntingFloor: 1,
+                maxFloor: 100,
+                stages: []
+            },
             summary: {},
 
             get filteredRosterItems() {
@@ -1066,7 +1124,9 @@
 
         function setCollectionTab(tabId) {
             const validTabs = state.tabs.length > 0 ? state.tabs.map((t) => t.id) : ["roster"];
-            if (validTabs.includes(tabId)) state.activeTab = tabId;
+            if (!validTabs.includes(tabId)) return;
+            state.activeTab = tabId;
+            revealActiveTab();
         }
 
         function setCodexSection(section) {
@@ -1120,6 +1180,18 @@
             );
         }
 
+        function revealActiveTab() {
+            requestAnimationFrame(() => {
+                const activeTab = dialogElement.querySelector(".ch-tab.active");
+                if (activeTab) activeTab.scrollIntoView({ block: "nearest", inline: "nearest" });
+            });
+        }
+
+        function syncDeveloperTarget() {
+            const target = state.rosterItems.find((item) => item.id === state.developer.targetCharacterId);
+            state.developer.rebirthCount = target?.rebirth?.rebirthCount ?? 0;
+        }
+
         return {
             state,
             init() {
@@ -1168,6 +1240,8 @@
             selectCollectionMonster,
             closeCollectionMonsterDetail,
             selectedMonsterRegion,
+            syncDeveloperTarget,
+            revealActiveTab,
             get bridge() {
                 return window.requireGameActionBridge();
             },
@@ -1202,6 +1276,32 @@
             toggleRebirthCardEquip(characterId, cardId) {
                 return this.bridge.toggleRebirthCardEquip(characterId, cardId);
             },
+            syncDebugModeFromSearch() {
+                if ((state.searchQueries.roster || "").trim() !== "디버그") return;
+                const result = this.bridge.enterDebugMode();
+                if (result.ok) setCollectionTab("developer");
+            },
+            setDebugCharacterToMaxLevel() {
+                return this.bridge.setDebugCharacterToMaxLevel(state.developer.targetCharacterId);
+            },
+            setDebugRebirthCount() {
+                return this.bridge.setDebugRebirthCount(state.developer.targetCharacterId, state.developer.rebirthCount);
+            },
+            startDebugHunting() {
+                return this.bridge.startDebugHunting(
+                    state.developer.targetCharacterId,
+                    state.developer.huntingStageId,
+                    state.developer.huntingFloor
+                );
+            },
+            exitDebugMode() {
+                const result = this.bridge.exitDebugMode();
+                if (result.ok) {
+                    state.searchQueries.roster = "";
+                    state.activeTab = "roster";
+                }
+                return result;
+            },
             render(vm) {
                 state.rosterItems = vm.rosterItems ?? [];
                 state.monsterCodexItems = vm.monsterCodexItems ?? [];
@@ -1223,7 +1323,23 @@
                     huntingConsumableUseLimitUpgrade: null
                 };
                 state.summary = vm.summary ?? {};
+                const developer = vm.developer ?? {};
+                const targetCharacterId = state.rosterItems.some((item) => item.id === state.developer.targetCharacterId)
+                    ? state.developer.targetCharacterId
+                    : developer.currentCharacterId ?? state.rosterItems[0]?.id ?? null;
+                const target = state.rosterItems.find((item) => item.id === targetCharacterId);
+                state.developer = {
+                    active: Boolean(developer.active),
+                    currentCharacterId: developer.currentCharacterId ?? null,
+                    targetCharacterId,
+                    rebirthCount: target?.rebirth?.rebirthCount ?? 0,
+                    huntingStageId: state.developer.huntingStageId ?? developer.stages?.[0]?.id ?? "cave",
+                    huntingFloor: state.developer.huntingFloor ?? 1,
+                    maxFloor: developer.maxFloor ?? 100,
+                    stages: developer.stages ?? []
+                };
                 state.tabs = vm.tabs ?? [];
+                if (!state.tabs.some((tab) => tab.id === state.activeTab)) setCollectionTab("roster");
             },
             open(tabId) {
                 state.visible = true;
@@ -1269,6 +1385,10 @@
         .ch-frame {
             width: min(760px, 96vw);
             border-radius: 10px;
+        }
+
+        .ch-developer-grid {
+            grid-template-columns: 1fr;
         }
     }
 
@@ -1411,6 +1531,44 @@
         flex: 1;
         min-height: 400px;
         overflow: hidden;
+    }
+
+    .ch-developer {
+        gap: 12px;
+        padding: 12px;
+        overflow: auto;
+    }
+
+    .ch-developer-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .ch-developer-field {
+        display: grid;
+        gap: 5px;
+        min-width: 0;
+        font-size: 0.78rem;
+        font-weight: 700;
+    }
+
+    .ch-developer-field .ch-search,
+    .ch-developer-field .ch-select,
+    .ch-developer-field .ch-btn {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .ch-developer-field--action {
+        align-content: start;
+    }
+
+    .ch-developer-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
     }
 
     .ch-codex-panel {

@@ -2,11 +2,12 @@ import { COLLECTION_HUB_TABS } from "./collection/collectionViewModel.js";
 
 export class CollectionHubService {
     static render(vm) {
+        const tabs = [...COLLECTION_HUB_TABS, ...(vm.developer?.active ? [{ id: "developer", label: "개발자" }] : [])];
         Alpine.store("uiManager")
             .requireComponent("collectionHub")
             .render({
                 ...vm,
-                tabs: [...COLLECTION_HUB_TABS]
+                tabs
             });
     }
 

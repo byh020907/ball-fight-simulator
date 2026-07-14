@@ -1,9 +1,15 @@
 import assert from "node:assert/strict";
 import {
+    beginDebugProfileSession,
     createDefaultPlayerProfile,
+    endDebugProfileSession,
+    isDebugProfileSessionActive,
+    loadPlayerProfile,
     migratePlayerProfile,
+    PLAYER_PROFILE_STORAGE_KEY,
     PROFILE_VERSION,
     resetStaleSessionStorage,
+    savePlayerProfile,
     SESSION_STORAGE_VERSION_KEY
 } from "../src/playerProfile.js";
 import { grantAchievementReward } from "../src/collection/achievementRewards.js";
@@ -11,6 +17,8 @@ import { ACHIEVEMENT_DEFINITIONS } from "../src/collection/achievementDefinition
 import { openHuntingChest } from "../src/hunting/chestRewards.js";
 import { EQUIPMENT_SPECIAL_OPTION_SUFFIXES } from "../src/hunting/equipmentConfig.js";
 import { getLevelRequirement } from "../src/experience/experienceConfig.js";
+import { getCharacterExperienceSummary } from "../src/experience/experienceService.js";
+import { setDeveloperCharacterToMaxLevel, setDeveloperRebirthCount } from "../src/developer/developerTools.js";
 
 function createSessionStorage(values = {}) {
     const data = new Map(Object.entries(values));
@@ -32,6 +40,48 @@ function createSessionStorage(values = {}) {
         }
     };
 }
+
+const originalLocalStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+const profileStorage = createSessionStorage();
+Object.defineProperty(globalThis, "localStorage", { configurable: true, value: profileStorage });
+
+const persistentProfile = createDefaultPlayerProfile();
+persistentProfile.hunting.shards = 120;
+assert.equal(savePlayerProfile(persistentProfile), true);
+const persistedBeforeDebug = profileStorage.getItem(PLAYER_PROFILE_STORAGE_KEY);
+const debugProfile = beginDebugProfileSession(persistentProfile);
+assert.equal(isDebugProfileSessionActive(), true);
+assert.notEqual(debugProfile, persistentProfile, "Debug mode should work on a cloned profile");
+debugProfile.hunting.shards = 999;
+assert.equal(savePlayerProfile(debugProfile), true);
+assert.equal(
+    profileStorage.getItem(PLAYER_PROFILE_STORAGE_KEY),
+    persistedBeforeDebug,
+    "Debug profile saves must not write to localStorage"
+);
+assert.equal(loadPlayerProfile().hunting.shards, 999, "Debug reads should stay in the memory-only profile");
+const restoredProfile = endDebugProfileSession();
+assert.equal(isDebugProfileSessionActive(), false);
+assert.equal(restoredProfile.hunting.shards, 120, "Ending debug mode should restore the persistent profile snapshot");
+assert.equal(
+    loadPlayerProfile().hunting.shards,
+    120,
+    "Persistent localStorage should remain untouched after debug mode"
+);
+
+const developerProfile = createDefaultPlayerProfile();
+const developerCharacterId = "rage";
+const maxLevelResult = setDeveloperCharacterToMaxLevel(developerProfile, developerCharacterId);
+assert.equal(maxLevelResult.ok, true);
+assert.equal(getCharacterExperienceSummary(developerProfile, developerCharacterId).level, 10);
+assert.equal(developerProfile.experience.currentXp, getLevelRequirement(10));
+const rebirthResult = setDeveloperRebirthCount(developerProfile, developerCharacterId, 1_200);
+assert.equal(rebirthResult.rebirthCount, 999, "Debug rebirth input should keep a finite upper boundary");
+assert.deepEqual(developerProfile.rebirth.byCharacter[developerCharacterId].equippedCardIds, []);
+assert.equal(setDeveloperRebirthCount(developerProfile, "unknown", 2).error, "unknown_character");
+
+if (originalLocalStorage) Object.defineProperty(globalThis, "localStorage", originalLocalStorage);
+else delete globalThis.localStorage;
 
 const staleStorage = createSessionStorage({
     "bfs:old-overlay": "stale",

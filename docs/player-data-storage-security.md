@@ -245,7 +245,16 @@ const PROFILE_LIMITS = Object.freeze({
 - 프로필 키에 `bfs` 프로젝트 접두사가 포함되어야 합니다.
 - 체크섬이 존재하더라도 보안 서명으로 취급하지 않아야 합니다.
 
-## 12. 참고 근거
+## 12. 메모리 전용 개발 세션
+
+고층 사냥터와 환생 상태를 재현하는 개발 세션은 영구 프로필의 복제본만 사용한다.
+
+- 세션을 시작하면 현재 보정 프로필을 복제하고, 이후 `loadPlayerProfile()`은 복제본을 반환한다.
+- 기존 모든 저장 호출은 `savePlayerProfile()` 한 곳을 통과하므로, 개발 세션 중에는 `localStorage`를 쓰지 않고 복제본만 보정·갱신한다.
+- 세션을 종료하거나 페이지를 다시 열면 진입 전의 영구 프로필을 다시 사용한다. 개발 세션에서 얻은 재화, 상자, 사냥터 진행도는 영구 데이터에 합쳐지지 않는다.
+- 이 경계는 별도 저장 호출을 각 기능에 예외 처리로 추가하지 않기 위한 소유권 규칙이다.
+
+## 13. 참고 근거
 
 - [MDN Web Storage API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API): localStorage는 origin 기준으로 공유되며 브라우저를 닫았다 열어도 유지됩니다.
 - [MDN HTTP Cookies](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies): `HttpOnly`와 `Secure`는 서버 세션 쿠키 보호에 사용합니다.

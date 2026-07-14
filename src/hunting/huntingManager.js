@@ -16,7 +16,9 @@ import {
     HUNTING_ADVANCE_STEPS,
     HUNTING_ENEMY_TYPES,
     HUNTING_EVENT_TYPES,
-    HUNTING_FLOOR_OUTCOME_TYPES
+    HUNTING_FLOOR_OUTCOME_TYPES,
+    HUNTING_MAX_FLOOR,
+    HUNTING_STAGES
 } from "./huntingConfig.js";
 import { getHuntingBattleArena, getHuntingStage, getNextHuntingStageId } from "./huntingEncounters.js";
 import { applyEquipmentStats } from "./equipmentConfig.js";
@@ -164,10 +166,29 @@ export class HuntingManager {
         PopupService.close();
         if (!canEnterHunting(this.app.playerProfile, characterId)) return;
         const stageId = getSelectedHuntingStageId(this.app.playerProfile);
+        return this._startRun(characterId, { stageId, encounterFloor: 2, displayFloor: 1, debug: false });
+    }
+
+    async startDebugRun(characterId, { stageId = HUNTING_STAGE_IDS.CAVE, encounterFloor = 1 } = {}) {
+        PopupService.close();
+        const validStageId = HUNTING_STAGES.some((stage) => stage.id === stageId) ? stageId : HUNTING_STAGE_IDS.CAVE;
+        const validFloor = Math.max(1, Math.min(HUNTING_MAX_FLOOR, Math.floor(encounterFloor) || 1));
+        return this._startRun(characterId, {
+            stageId: validStageId,
+            encounterFloor: validFloor,
+            displayFloor: validFloor,
+            debug: true
+        });
+    }
+
+    async _startRun(characterId, { stageId, encounterFloor, displayFloor, debug }) {
         this.app.playerProfile.hunting.stats = recordHuntingStageVisit(this.app.playerProfile.hunting.stats, stageId);
         savePlayerProfile(this.app.playerProfile);
         this.app._refreshCollectionHub();
-        this._run = createHuntingRun({ characterId, stageId });
+        this._run = {
+            ...createHuntingRun({ characterId, stageId }),
+            floor: Math.max(0, encounterFloor - 1)
+        };
         this.app.playerFighterId = characterId;
         this.app.beginGameSession();
         // UI에서 할당한 스탯을 게임 상태로 동기화 (토너먼트와 동일한 흐름)
@@ -175,14 +196,13 @@ export class HuntingManager {
         this.app.refreshPlayerSetup();
         this.app.setHuntingActive(true);
         const stage = getHuntingStage(stageId);
-        this.app.addLog(`[Hunting] ${stage.name} 원정 시작`);
-        this._showStartingMove(stage);
+        this.app.addLog(`[Hunting] ${stage.name} ${encounterFloor}층${debug ? " 디버그" : ""} 원정 시작`);
+        this._showStartingMove(stage, displayFloor);
         await this.advance({ waitForFirstMoveUi: true });
     }
 
-    _showStartingMove(stage) {
+    _showStartingMove(stage, floor = this._run?.floor ?? 1) {
         const app = this.app;
-        const floor = this._run?.floor ?? 1;
         app.showOverlay("사냥터", `${stage.name} · ${floor}층`, "원정 시작");
         app.setHuntingOverlayState({
             huntingChoiceVisible: false,

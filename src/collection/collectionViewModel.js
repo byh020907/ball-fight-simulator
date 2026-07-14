@@ -14,7 +14,7 @@ import {
     getHuntingMonsterDefinitions,
     previewHuntingChest
 } from "../hunting/index.js";
-import { HUNTING_STAGES } from "../hunting/huntingConfig.js";
+import { HUNTING_MAX_FLOOR, HUNTING_STAGES } from "../hunting/huntingConfig.js";
 import { getConsumableShopItems, getHuntingConsumableUseLimitUpgrade } from "../consumables.js";
 import { getRarityLabel } from "../hunting/rarityPresentation.js";
 import {
@@ -114,7 +114,8 @@ export function createCollectionHubViewModel({
     roster,
     masteryDefinitions = [],
     achievementDefinitions = [],
-    currentPlayerFighterId = null
+    currentPlayerFighterId = null,
+    developerMode = false
 } = {}) {
     const rosterSize = roster.length;
     const characters = profile?.collection?.characters ?? {};
@@ -356,6 +357,12 @@ export function createCollectionHubViewModel({
                 runsDefeated: hunting.stats?.runsDefeated ?? 0,
                 deepestFloor: hunting.stats?.deepestFloor ?? 0
             }
+        },
+        developer: {
+            active: developerMode,
+            currentCharacterId: currentPlayerFighterId,
+            maxFloor: HUNTING_MAX_FLOOR,
+            stages: HUNTING_STAGES.map((stage) => ({ id: stage.id, name: stage.name }))
         }
     };
 }
