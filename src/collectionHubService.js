@@ -15,6 +15,10 @@ export class CollectionHubService {
         Alpine.store("uiManager").requireComponent("collectionHub").open(tabId);
     }
 
+    static openCharacterRebirth(characterId) {
+        Alpine.store("uiManager").requireComponent("collectionHub").openCharacterRebirth(characterId);
+    }
+
     static close() {
         Alpine.store("uiManager").requireComponent("collectionHub").close();
     }

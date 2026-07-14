@@ -16,6 +16,7 @@ import {
 } from "./statAllocation.js";
 import { ActionPickerService } from "./actionPicker.js";
 import { CollectionHubService } from "./collectionHubService.js";
+import { PopupService } from "./popup.js";
 import { pickRandomActions, findActionById, showActionFailure } from "./clickActions.js";
 import { BattleBall } from "./entities/index.js";
 import { drawEquipmentItems, getCharacterOutlineWidth } from "./entities/equipmentVisuals.js";
@@ -159,6 +160,7 @@ export class BattleApp {
         this._lastMasteryResult = null;
         this._lastXpResult = null;
         this._lastMatchXpResult = null;
+        this._pendingRebirthPromptCharacterId = null;
         this._selectionAnimTime = 999;
         this._previewSim = null;
         this._queuedPreviewReselect = false;
@@ -230,6 +232,7 @@ export class BattleApp {
         this.resetGameplayUiState();
         this.refreshPlayerSetup();
         this.startPlayerPreviewLoop();
+        this._presentPendingRebirthPrompt();
     }
     addLog(message) {
         this._log.add(message);
@@ -1227,9 +1230,7 @@ export class BattleApp {
             this._log.add(`[경험치] ${this._formatXpResult(result)}`);
             if (result.levelUp) {
                 this._toast.show(`레벨업! Lv.${result.level}`);
-                if (getCharacterExperienceSummary(this.playerProfile, result.characterId).isMax) {
-                    this._toast.show("Lv.10 도달! 도감 상세에서 환생할 수 있습니다.");
-                }
+                this._queueRebirthPrompt(result);
             }
             savePlayerProfile(this.playerProfile);
             this._refreshCollectionHub();
@@ -1237,6 +1238,36 @@ export class BattleApp {
         }
 
         return result;
+    }
+
+    _queueRebirthPrompt(result) {
+        const summary = getCharacterExperienceSummary(this.playerProfile, result.characterId);
+        if (result.levelUp && result.previousLevel < 10 && summary.isMax) {
+            this._pendingRebirthPromptCharacterId = result.characterId;
+        }
+    }
+
+    _presentPendingRebirthPrompt() {
+        const characterId = this._pendingRebirthPromptCharacterId;
+        this._pendingRebirthPromptCharacterId = null;
+        if (!characterId || !this.lifecycle.isSetup) return;
+
+        const fighter = this.roster.find((item) => item.id === characterId);
+        PopupService.show({
+            title: "환생 가능",
+            bodyHtml: `<p>${fighter?.name ?? "캐릭터"}이(가) Lv.10에 도달했습니다.</p><p>도감 환생 탭에서 보상 후보를 확인하세요.</p>`,
+            buttons: [
+                { text: "나중에", value: "later" },
+                { text: "환생 보상 보기", value: "open", primary: true }
+            ]
+        })
+            .then((action) => {
+                if (action === "open") {
+                    this._refreshCollectionHub();
+                    CollectionHubService.openCharacterRebirth(characterId);
+                }
+            })
+            .catch((error) => console.error(error));
     }
 
     showTransientOverlay(label, text, duration = 1200) {

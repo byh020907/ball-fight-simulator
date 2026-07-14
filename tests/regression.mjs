@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { createComponentBridge as createAppComponentBridge } from "../src/componentBridge.js";
 import { PopupService } from "../src/popup.js";
+import { CollectionHubService } from "../src/collectionHubService.js";
 import { createCollectionActionPopupOptions } from "../src/collection/collectionActionPopup.js";
 import { ActionPickerService } from "../src/actionPicker.js";
-import { RebirthPickerService } from "../src/rebirth/rebirthPicker.js";
 import {
     ALLOCATABLE_STATS,
     PLAYER_STAT_POINTS,
@@ -14576,6 +14576,92 @@ function testResultConfirmationReturnsInitialState() {
     console.log("[result-confirmation-initial-state] ok");
 }
 
+async function testRebirthPromptWaitsForResultConfirmation(app) {
+    const originalProfile = app.playerProfile;
+    const originalCharacterId = app.playerFighterId;
+    const originalDialog = PopupService._testDialog;
+    const originalOpenCharacterRebirth = CollectionHubService.openCharacterRebirth;
+    const promptCalls = [];
+    const openedCharacterIds = [];
+    const characterId = FIGHTER_IDS.ARCHER;
+
+    app.playerProfile = createDefaultPlayerProfile();
+    setCharacterXp(app.playerProfile, characterId, getLevelRequirement(10));
+    app.playerFighterId = characterId;
+    PopupService.setTestDialog({
+        show(options) {
+            promptCalls.push(options);
+            return Promise.resolve("open");
+        }
+    });
+    CollectionHubService.openCharacterRebirth = (openedCharacterId) => openedCharacterIds.push(openedCharacterId);
+
+    try {
+        for (const resultKind of ["tournament_win", "tournament_elimination"]) {
+            const promptCountBefore = promptCalls.length;
+            app._queueRebirthPrompt({
+                characterId,
+                levelUp: true,
+                previousLevel: 9,
+                level: 10
+            });
+            assert.equal(
+                app._pendingRebirthPromptCharacterId,
+                characterId,
+                `${resultKind} should retain a newly reached Lv.10 prompt until confirmation`
+            );
+
+            app.beginGameSession();
+            app.beginResultConfirmation();
+            assert.equal(
+                promptCalls.length,
+                promptCountBefore,
+                `${resultKind} should not show the rebirth popup while result confirmation is active`
+            );
+
+            app.returnToInitialState();
+            assert.equal(app.lifecycle.isSetup, true, `${resultKind} should restore setup before prompting`);
+            assert.equal(
+                promptCalls.length,
+                promptCountBefore + 1,
+                `${resultKind} should show exactly one rebirth popup`
+            );
+            assert.equal(
+                app._pendingRebirthPromptCharacterId,
+                null,
+                "Showing the popup must consume only the notification"
+            );
+            await Promise.resolve();
+            assert.equal(
+                openedCharacterIds.at(-1),
+                characterId,
+                "The rebirth popup primary action must open the eligible character's rebirth tab"
+            );
+        }
+
+        app._queueRebirthPrompt({
+            characterId,
+            levelUp: false,
+            previousLevel: 10,
+            level: 10
+        });
+        assert.equal(
+            app._pendingRebirthPromptCharacterId,
+            null,
+            "Entering setup with an already max-level character must not create another prompt"
+        );
+    } finally {
+        app.playerProfile = originalProfile;
+        app.playerFighterId = originalCharacterId;
+        app._pendingRebirthPromptCharacterId = null;
+        CollectionHubService.openCharacterRebirth = originalOpenCharacterRebirth;
+        PopupService.setTestDialog(originalDialog);
+        app.refreshPlayerSetup();
+        app._refreshCollectionHub();
+    }
+    console.log("[rebirth-result-confirmation-prompt] ok");
+}
+
 function testAppLifecycleTransitions() {
     const lifecycle = new AppLifecycle();
     assert.equal(lifecycle.state, APP_LIFECYCLE_STATES.SETUP, "Lifecycle should begin in setup");
@@ -15611,6 +15697,7 @@ testAppLifecycleTransitions();
 await testScreenWakeLock();
 testBattleAppControlsScreenWakeLock();
 testResultConfirmationReturnsInitialState();
+await testRebirthPromptWaitsForResultConfirmation(app);
 testHuntingRetreatAwaitsResultConfirmation();
 testHuntingFormatHelpers();
 testHuntingCombatText();
@@ -17465,7 +17552,7 @@ function testRebirthDomainContracts() {
 
 testRebirthDomainContracts();
 
-async function testRebirthPickerKeepsPendingOfferUntilSelection() {
+function testRebirthOfferPersistsUntilInlineSelection() {
     const profile = createDefaultPlayerProfile();
     const characterId = FIGHTER_IDS.ARCHER;
     setCharacterXp(profile, characterId, getLevelRequirement(10));
@@ -17475,30 +17562,18 @@ async function testRebirthPickerKeepsPendingOfferUntilSelection() {
         _refreshCollectionHub() {},
         refreshPlayerSetup() {}
     };
-    const originalPicker = RebirthPickerService._testPicker;
     const originalDialog = PopupService._testDialog;
-    let persistedOfferIds = [];
     PopupService.setTestDialog({ show: () => Promise.resolve("ok") });
 
     try {
-        RebirthPickerService.setTestPicker({
-            show(cards) {
-                persistedOfferIds = getRebirthState(profile, characterId).pendingOfferCardIds;
-                assert.deepEqual(
-                    persistedOfferIds,
-                    cards.map((card) => card.id),
-                    "Rebirth candidates must be saved before the selection popup opens"
-                );
-                return Promise.resolve(-1);
-            }
-        });
         const bridge = createAppComponentBridge(app);
-        const deferred = await bridge.beginRebirth(characterId);
-        assert.equal(deferred.error, "selection_deferred", "Closing an active picker must not consume its offer");
+        const opened = bridge.beginRebirth(characterId);
+        assert.equal(opened.ok, true, "Opening the rebirth tab should create an inline offer");
+        const persistedOfferIds = [...getRebirthState(profile, characterId).pendingOfferCardIds];
         assert.deepEqual(
-            getRebirthState(profile, characterId).pendingOfferCardIds,
             persistedOfferIds,
-            "An unselected rebirth offer must survive the picker closing"
+            opened.cards.map((card) => card.id),
+            "Rebirth candidates must be saved before inline selection begins"
         );
         assert.equal(
             getCharacterExperienceSummary(profile, characterId).level,
@@ -17506,17 +17581,22 @@ async function testRebirthPickerKeepsPendingOfferUntilSelection() {
             "An unselected rebirth offer must not reset character XP"
         );
 
-        RebirthPickerService.setTestPicker({
-            show(cards) {
-                assert.deepEqual(
-                    cards.map((card) => card.id),
-                    persistedOfferIds,
-                    "Reopening the picker must use the original pending candidates"
-                );
-                return Promise.resolve(1);
-            }
-        });
-        const completed = await bridge.beginRebirth(characterId);
+        const reopened = bridge.beginRebirth(characterId);
+        assert.deepEqual(
+            reopened.cards.map((card) => card.id),
+            persistedOfferIds,
+            "Reopening the rebirth tab must reuse the original pending candidates"
+        );
+
+        const reloadedProfile = sanitizePlayerProfile(profile);
+        const reloadedOffer = beginRebirth(reloadedProfile, characterId);
+        assert.deepEqual(
+            reloadedOffer.cards.map((card) => card.id),
+            persistedOfferIds,
+            "Saved candidates must survive a profile reload before selection"
+        );
+
+        const completed = bridge.completeRebirth(characterId, persistedOfferIds[1]);
         assert.equal(completed.ok, true, "Selecting a pending rebirth card should complete the rebirth");
         assert.deepEqual(
             getRebirthState(profile, characterId).pendingOfferCardIds,
@@ -17525,13 +17605,12 @@ async function testRebirthPickerKeepsPendingOfferUntilSelection() {
         );
         assert.equal(getCharacterExperienceSummary(profile, characterId).level, 1);
     } finally {
-        RebirthPickerService.setTestPicker(originalPicker);
         PopupService.setTestDialog(originalDialog);
     }
-    console.log("[rebirth-picker-pending-offer] ok");
+    console.log("[rebirth-inline-pending-offer] ok");
 }
 
-await testRebirthPickerKeepsPendingOfferUntilSelection();
+testRebirthOfferPersistsUntilInlineSelection();
 
 function testHuntingRebirthLoadoutIntegration() {
     const playerId = FIGHTER_IDS.DASH;
@@ -17841,8 +17920,12 @@ function testRebirthCollectionTemplateContract() {
     assert.ok(template.includes("환생 보상 선택"), "Character detail should expose the rebirth action");
     assert.ok(template.includes("진행 중인 보상 선택"), "Character detail should reopen an existing rebirth offer");
     assert.ok(
-        !template.includes("completeRebirth(item.id, card.id)"),
-        "Character detail should not bypass the rebirth reward picker with inline selection"
+        template.includes("item.rebirth.pendingOfferCards"),
+        "Character detail should render pending rebirth candidates inline"
+    );
+    assert.ok(
+        template.includes("completeRebirth(item.id, card.id)"),
+        "Inline candidate selection must use the guarded rebirth completion bridge"
     );
     assert.ok(template.includes("toggleRebirthCardEquip"), "Character detail should expose card equip controls");
     assert.ok(template.includes("maxEquippedCards"), "Character detail should display the three-card loadout limit");
@@ -17852,16 +17935,17 @@ function testRebirthCollectionTemplateContract() {
         "Character detail should format base-stat totals by stat key"
     );
 
-    const pickerTemplate = readFileSync("src/components/rebirth-picker.html", "utf8");
-    assert.ok(
-        pickerTemplate.includes('x-data="rebirthPicker"'),
-        "Rebirth choices should use a dedicated picker component"
+    assert.equal(existsSync("src/rebirth/rebirthPicker.js"), false, "Legacy rebirth picker service must be removed");
+    assert.equal(
+        existsSync("src/components/rebirth-picker.html"),
+        false,
+        "Legacy rebirth picker component must be removed"
     );
+    assert.ok(!readFileSync("index.html", "utf8").includes("rebirth-picker"), "Index must not mount the legacy picker");
     assert.ok(
-        pickerTemplate.includes("@keydown.escape.stop"),
-        "Rebirth picker should require a deliberate reward selection"
+        !readFileSync("src/componentBridge.js", "utf8").includes("RebirthPicker"),
+        "Production rebirth flow must not reference the legacy picker"
     );
-    assert.ok(!pickerTemplate.includes("@click.self"), "Rebirth picker should not dismiss through its backdrop");
     console.log("[rebirth-collection-template] ok");
 }
 

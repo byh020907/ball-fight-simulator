@@ -23,7 +23,6 @@ import { HELP_TITLE, HELP_CONTENT } from "./helpContent.js";
 import { CollectionHubService } from "./collectionHubService.js";
 import { createCollectionActionPopupOptions } from "./collection/collectionActionPopup.js";
 import { beginRebirth, completeRebirth, toggleRebirthCardEquip } from "./rebirth/rebirthService.js";
-import { RebirthPickerService } from "./rebirth/rebirthPicker.js";
 import {
     recordDeveloperTournamentWin,
     setDeveloperCharacterToMaxLevel,
@@ -248,7 +247,7 @@ export function createComponentBridge(app) {
             CollectionHubService.close();
             return app.hunting.startDebugRun(characterId, { stageId, encounterFloor });
         },
-        async beginRebirth(characterId) {
+        beginRebirth(characterId) {
             if (!app.lifecycle.isSetup) {
                 PopupService.show({
                     title: "환생 대기",
@@ -267,20 +266,7 @@ export function createComponentBridge(app) {
                 return result;
             }
             refreshCollectionAndProfile();
-            let cardId = null;
-            try {
-                cardId = await RebirthPickerService.show(result.cards);
-            } catch (error) {
-                console.error(error);
-                PopupService.show({
-                    title: "환생 보상 대기",
-                    bodyHtml: "<p>저장된 환생 후보는 유지됩니다. 도감 환생 탭에서 다시 선택해 주세요.</p>",
-                    buttons: [{ text: "확인", value: "ok", primary: true }]
-                });
-                return { ok: false, error: "picker_unavailable" };
-            }
-            if (!cardId) return { ok: false, error: "selection_deferred" };
-            return finishRebirth(characterId, cardId);
+            return result;
         },
         completeRebirth(characterId, cardId) {
             return finishRebirth(characterId, cardId);

@@ -263,6 +263,23 @@
                                 >
                                     환생 보상 선택
                                 </button>
+                                <div class="ch-rebirth-offers" x-show="item.rebirth.pendingOfferCards.length">
+                                    <span class="ch-rebirth-label">진행 중인 보상 후보</span>
+                                    <template x-for="card in item.rebirth.pendingOfferCards" :key="card.id">
+                                        <div class="ch-rebirth-card ch-rebirth-offer">
+                                            <span class="ch-rebirth-kind" x-text="card.categoryLabel"></span>
+                                            <strong x-text="card.name"></strong>
+                                            <span x-text="formatRebirthCardEffect(card)"></span>
+                                            <button
+                                                class="ch-btn"
+                                                type="button"
+                                                @click="completeRebirth(item.id, card.id)"
+                                            >
+                                                선택
+                                            </button>
+                                        </div>
+                                    </template>
+                                </div>
                                 <div class="ch-rebirth-stats">
                                     <span class="ch-rebirth-label">누적 기초 수치</span>
                                     <div class="ch-rebirth-stat-grid">
@@ -1148,6 +1165,17 @@
             state.characterDetailTab = "overview";
         }
 
+        function openCharacterRebirth(characterId) {
+            if (!state.rosterItems.some((item) => item.id === characterId)) return false;
+            state.visible = true;
+            state.activeTab = "roster";
+            state.codexSection = "characters";
+            state.selectedCharacterId = characterId;
+            state.characterDetailTab = "rebirth";
+            focusDialog();
+            return true;
+        }
+
         function formatRebirthCardEffect(card) {
             const statLabels = { hp: "HP", damage: "공격", speed: "속도", defense: "방어력" };
             const stats = Object.entries(card?.stats ?? {})
@@ -1240,6 +1268,7 @@
             setCollectionFilter,
             selectCollectionCharacter,
             closeCollectionCharacterDetail,
+            openCharacterRebirth,
             formatRebirthCardEffect,
             formatRebirthStatBonus,
             setMonsterFilter,
@@ -1820,6 +1849,7 @@
         justify-self: start;
     }
 
+    .ch-rebirth-offers,
     .ch-rebirth-owned {
         display: grid;
         gap: 6px;
