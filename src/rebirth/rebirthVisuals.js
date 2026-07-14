@@ -5,9 +5,13 @@ const FLAME_MOVEMENT_THRESHOLD = 8;
 const MIN_FLAME_PARTICLE_COUNT = 56;
 const MAX_FLAME_PARTICLE_COUNT = 92;
 const MAX_FLAME_REBIRTH_COUNT = 10;
-const FLAME_PARTICLE_THRUST = 220;
+const FLAME_PARTICLE_BUOYANCY_INITIAL = 180;
+const FLAME_PARTICLE_BUOYANCY_GROWTH = 1900;
 const FLAME_PARTICLE_DRAG = 3.6;
 const FLAME_PARTICLE_TURBULENCE = 104;
+const FLAME_PARTICLE_LAUNCH_SPEED_MIN = 2.4;
+const FLAME_PARTICLE_LAUNCH_SPEED_RANGE = 0.8;
+const FLAME_PARTICLE_TANGENTIAL_VARIATION = 0.18;
 const FLAME_PARTICLE_ATTACHMENT_POWER = 1.8;
 const FLAME_PARTICLE_ROTATION_FOLLOW = 12;
 const FLAME_PARTICLE_ROTATION_DAMPING = 8;
@@ -85,13 +89,8 @@ function getFlameParticleEmitter(ball, anchorAngle) {
     };
 }
 
-function getRisingFlameParticleDirection(anchorAngle, ageProgress) {
-    const surfaceWeight = (1 - ageProgress) ** 1.6 * 0.56;
-    const riseWeight = 0.72 + ageProgress * 0.72;
-    return normalizeDirection({
-        x: Math.cos(anchorAngle) * surfaceWeight,
-        y: Math.sin(anchorAngle) * surfaceWeight - riseWeight
-    });
+function getFlameParticleEmissionDirection(anchorAngle) {
+    return { x: Math.cos(anchorAngle), y: Math.sin(anchorAngle) };
 }
 
 function getParticleLifetime(seed) {
@@ -101,21 +100,25 @@ function getParticleLifetime(seed) {
 function createFlameParticle(ball, seed, ageProgress = 0) {
     const anchorAngle = (hashNoise(seed, 251) + 1) * Math.PI;
     const emitter = getFlameParticleEmitter(ball, anchorAngle);
-    const flowDirection = getRisingFlameParticleDirection(anchorAngle, ageProgress);
-    const perpendicular = { x: -flowDirection.y, y: flowDirection.x };
+    const emissionDirection = getFlameParticleEmissionDirection(anchorAngle);
+    const perpendicular = { x: -emissionDirection.y, y: emissionDirection.x };
     const lateralNoise = hashNoise(seed, 71);
     const forwardNoise = (hashNoise(seed, 89) + 1) * 0.5;
     const lifetime = getParticleLifetime(seed);
     const age = lifetime * clamp(ageProgress, 0, 0.96);
     const initialForward = ball.radius * (0.08 + ageProgress * (1.28 + forwardNoise * 0.3));
     const lateral = ball.radius * lateralNoise * (0.06 + (1 - ageProgress) ** 0.78 * 0.2);
-    const speed = ball.radius * (1.9 + forwardNoise * 0.7);
-    const velocityX = flowDirection.x * speed + perpendicular.x * lateralNoise * ball.radius * 0.4;
-    const velocityY = flowDirection.y * speed + perpendicular.y * lateralNoise * ball.radius * 0.4;
+    const speed = ball.radius * (FLAME_PARTICLE_LAUNCH_SPEED_MIN + forwardNoise * FLAME_PARTICLE_LAUNCH_SPEED_RANGE);
+    const velocityX =
+        emissionDirection.x * speed +
+        perpendicular.x * lateralNoise * ball.radius * FLAME_PARTICLE_TANGENTIAL_VARIATION;
+    const velocityY =
+        emissionDirection.y * speed +
+        perpendicular.y * lateralNoise * ball.radius * FLAME_PARTICLE_TANGENTIAL_VARIATION;
     const size = ball.radius * (0.1 + forwardNoise * 0.05);
     return {
-        x: emitter.x + flowDirection.x * initialForward + perpendicular.x * lateral,
-        y: emitter.y + flowDirection.y * initialForward + perpendicular.y * lateral,
+        x: emitter.x + emissionDirection.x * initialForward + perpendicular.x * lateral,
+        y: emitter.y + emissionDirection.y * initialForward + perpendicular.y * lateral,
         velocityX,
         velocityY,
         size,
@@ -168,8 +171,9 @@ function updateFlameParticle(particle, state, ball, visual, elapsed) {
         FLAME_PARTICLE_TURBULENCE *
         (1 + flickerStrength * 0.35) *
         (0.45 + ageProgress * 0.55);
+    const buoyancy = FLAME_PARTICLE_BUOYANCY_INITIAL + FLAME_PARTICLE_BUOYANCY_GROWTH * ageProgress;
     particle.velocityX += turbulence * elapsed;
-    particle.velocityY -= FLAME_PARTICLE_THRUST * elapsed;
+    particle.velocityY -= buoyancy * elapsed;
     const drag = Math.exp(-FLAME_PARTICLE_DRAG * elapsed);
     particle.velocityX *= drag;
     particle.velocityY *= drag;
