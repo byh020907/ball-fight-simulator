@@ -15641,6 +15641,47 @@ function testDailyShopPurchaseAndRerollCycles() {
     assert.equal(firstOffer.purchaseResetAt, null, "Unused purchase limits should not start a reset timer");
     assert.equal(firstOffer.rerollResetAt, null, "Unused rerolls should not start a reset timer");
 
+    const autoRerollProfile = createDefaultPlayerProfile();
+    autoRerollProfile.hunting.shards = 500;
+    autoRerollProfile.hunting.dailyShop = {
+        rarity: "rare",
+        purchases: 0,
+        lastPurchaseAt: null,
+        rerolls: 2,
+        lastRerollAt: 40
+    };
+    const rareChest = buyDailyShopChest(autoRerollProfile, { now: 100, rng: () => 0.71 });
+    assert.equal(rareChest.rarity, "rare", "Buying should grant the rarity that was displayed before the refresh");
+    assert.equal(
+        autoRerollProfile.hunting.dailyShop.rarity,
+        "uncommon",
+        "Buying should immediately roll the next offer"
+    );
+    assert.equal(autoRerollProfile.hunting.shards, 350, "Buying should deduct only the chest price");
+    assert.equal(autoRerollProfile.hunting.dailyShop.rerolls, 2, "Buying must not consume a manual reroll");
+    assert.equal(autoRerollProfile.hunting.dailyShop.lastRerollAt, 40, "Buying must not change manual reroll timing");
+
+    const uncommonChest = buyDailyShopChest(autoRerollProfile, { now: 101, rng: () => 0.01 });
+    assert.equal(uncommonChest.rarity, "uncommon", "The second purchase should use the rerolled offer");
+    assert.equal(
+        autoRerollProfile.hunting.dailyShop.rarity,
+        "common",
+        "Each successful purchase should prepare one next offer"
+    );
+    assert.equal(autoRerollProfile.hunting.dailyShop.purchases, 2, "Auto rerolls must preserve the purchase limit");
+    assert.equal(
+        autoRerollProfile.hunting.dailyShop.lastPurchaseAt,
+        101,
+        "The second purchase should refresh only its timer"
+    );
+
+    const blockedAutoReroll = buyDailyShopChest(autoRerollProfile, { now: 102, rng: () => 0.96 });
+    assert.equal(blockedAutoReroll, null, "A capped purchase must fail");
+    assert.equal(autoRerollProfile.hunting.dailyShop.rarity, "common", "A failed purchase must not replace the offer");
+    assert.equal(autoRerollProfile.hunting.shards, 200, "A failed purchase must not deduct shards");
+    assert.equal(autoRerollProfile.hunting.dailyShop.rerolls, 2, "A failed purchase must preserve manual rerolls");
+    assert.equal(autoRerollProfile.hunting.dailyShop.lastRerollAt, 40, "A failed purchase must preserve reroll timing");
+
     const firstChest = buyDailyShopChest(profile, { now: 1, rng: () => 0.01 });
     const secondChest = buyDailyShopChest(profile, { now: 4, rng: () => 0.01 });
     const blockedChest = buyDailyShopChest(profile, { now: 4, rng: () => 0.01 });

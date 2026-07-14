@@ -93,6 +93,7 @@ export function buyDailyShopChest(profile, { now = Date.now(), rng = Math.random
     shop.lastPurchaseAt = now;
     const chest = createHuntingChest({ rarity: shop.rarity, acquiredAt: now });
     profile.hunting.chests.push(chest);
+    shop.rarity = rollShopRarity(rng);
     return chest;
 }
 
