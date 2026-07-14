@@ -40,6 +40,7 @@ import {
     createRebirthOffer,
     getRebirthCardDefinition,
     getRebirthLoadout,
+    getRebirthOfferDefinition,
     getRebirthState,
     getSubAbilityIds,
     toggleRebirthCardEquip
@@ -3821,26 +3822,29 @@ function testExperienceSystem() {
         "다음 레벨까지 10XP",
         "Level-up result should retain the previous level remaining XP for the animation"
     );
+    const dashLevelTwoReward = getExperienceRewardsBetween(FIGHTER_IDS.DASH, 1, 2)[0];
+    const dashLevelThreeReward = getExperienceRewardsBetween(FIGHTER_IDS.DASH, 2, 3)[0];
+    const dashLevelFiveReward = getExperienceRewardsBetween(FIGHTER_IDS.DASH, 4, 5)[0];
     assert.equal(
         levelUpResult.previousNextRewardText,
-        "Lv.2 · 속도 +2",
+        `Lv.2 · ${dashLevelTwoReward.text}`,
         "Level-up result should retain the reward reached by the animation"
     );
     assert.equal(levelUpResult.level, 2, "Level-up result should expose the new level");
     assert.deepEqual(
         levelUpResult.earnedRewards.map((reward) => reward.text),
-        ["속도 +2"],
-        "Every level should grant the selected character a base stat reward"
+        [dashLevelTwoReward.text],
+        "Every level should grant the configured permanent base-stat reward"
     );
     assert.equal(
         levelUpResult.nextRewardText,
-        "Lv.3 · 스킬 +2 · 대시 배율 +5%",
+        `Lv.3 · ${dashLevelThreeReward.text}`,
         "Tier levels should expose both the next base stat and player-facing ability reward"
     );
     profile.experience.byCharacter[FIGHTER_IDS.DASH].currentXp = getLevelRequirement(4);
     assert.equal(
         getCharacterExperienceSummary(profile, FIGHTER_IDS.DASH).nextRewardText,
-        "Lv.5 · 속도 +2",
+        `Lv.5 · ${dashLevelFiveReward.text}`,
         "Next reward UI should resolve the selected character's next level row"
     );
 
@@ -3851,7 +3855,7 @@ function testExperienceSystem() {
     });
     assert.deepEqual(
         getExperienceRewardsBetween(FIGHTER_IDS.DASH, 1, 3).map((reward) => reward.text),
-        ["속도 +2", "스킬 +2 · 대시 배율 +5%"],
+        [dashLevelTwoReward.text, dashLevelThreeReward.text],
         "Level ranges should expose every base stat reward and player-facing tier reward"
     );
     assert.equal(
@@ -3878,17 +3882,23 @@ function testExperienceSystem() {
         allocation,
         true
     );
+    const expectedDamageMultiplier = baselineSpec.stats.damage / playerSpec.stats.damage;
+    const expectedSpeedMultiplier = baselineSpec.stats.speed / playerSpec.stats.speed;
     assert.equal(
         rewardedSpec.stats.damage,
-        Number((baselineSpec.stats.damage * 1.1).toFixed(3)),
+        Number(((playerSpec.stats.damage + progression.baseStatBonuses.damage) * expectedDamageMultiplier).toFixed(3)),
         "Level base damage should be increased before the percentage stat multiplier"
     );
     assert.equal(
         rewardedSpec.stats.speed,
-        Number((baselineSpec.stats.speed * (296 / 294)).toFixed(3)),
+        Number(((playerSpec.stats.speed + progression.baseStatBonuses.speed) * expectedSpeedMultiplier).toFixed(3)),
         "Level base speed should be increased before the percentage stat multiplier"
     );
-    assert.equal(rewardedSpec.stats.skill, 2, "Level skill should remain a direct base stat addition");
+    assert.equal(
+        rewardedSpec.stats.skill,
+        baselineSpec.stats.skill,
+        "Level rewards must not add cooldown as a base stat"
+    );
     const equipmentProfile = createDefaultPlayerProfile();
     equipmentProfile.experience.byCharacter[FIGHTER_IDS.DASH] = { currentXp: getLevelRequirement(4) };
     const fixedDamageItem = {
@@ -3927,8 +3937,8 @@ function testExperienceSystem() {
     );
     assert.equal(
         preparedPlayer.getSkillPoints(),
-        7,
-        "Battle ball should combine level base skill with the allocated skill points"
+        allocation.skill,
+        "Battle ball should keep cooldown points separate from level base-stat rewards"
     );
     assert.equal(
         preparedPlayer.progression.abilityTier,
@@ -3937,8 +3947,13 @@ function testExperienceSystem() {
     );
     assert.deepEqual(
         preparedPlayer.progression.baseStatBonuses,
-        { speed: 2, skill: 2, damage: 1 },
-        "Ball progression should retain the accumulated base stat report"
+        progression.baseStatBonuses,
+        "Ball progression should retain the accumulated permanent base-stat report"
+    );
+    assert.equal(
+        "skill" in preparedPlayer.progression.baseStatBonuses,
+        false,
+        "Ball progression must not treat cooldown as a permanent base stat"
     );
 
     const legacyProfile = createDefaultPlayerProfile();
@@ -3975,8 +3990,11 @@ function testCharacterLevelProgressions(app) {
             `${fighter.id} should receive a base stat reward at every level-up`
         );
         assert.ok(
-            entries.every((entry) => Object.keys(entry.baseStats).length > 0),
-            `${fighter.id} should have a base stat reward on every level row`
+            entries.every((entry) => {
+                const [reward] = getCharacterLevelRewardsBetween(fighter.id, entry.level - 1, entry.level);
+                return reward.effects.some((effect) => effect.type === "stat" && effect.value > 0);
+            }),
+            `${fighter.id} should expose a positive permanent base-stat reward on every level row`
         );
         assert.deepEqual(
             entries.filter((entry) => entry.abilityTier).map((entry) => entry.level),
@@ -4001,7 +4019,10 @@ function testCharacterLevelProgressions(app) {
             expectedLevels.length,
             `${fighter.id} should expose every level reward`
         );
-        assert.equal(progression.effects.length, 12, `${fighter.id} should expose stat and tier effects together`);
+        assert.ok(
+            progression.effects.filter((effect) => effect.type === "stat").length >= expectedLevels.length,
+            `${fighter.id} should expose each level's generated base-stat effects together`
+        );
         assert.equal(progression.abilityTier, 3, `${fighter.id} should reach ability tier three at level 9`);
 
         for (const level of expectedLevels) {
@@ -17244,6 +17265,29 @@ function setCharacterXp(profile, characterId, totalXp) {
     );
 }
 
+function testLevelTenBaseStatTarget() {
+    const baseStatKeys = ["hp", "damage", "speed", "defense"];
+    for (const fighter of createRoster()) {
+        const progression = getCharacterLevelProgression(fighter.id, 10);
+        const levelTenSpec = applyExperienceProgressionToBaseSpec(fighter, progression);
+        for (const stat of baseStatKeys) {
+            assert.equal(
+                levelTenSpec.stats[stat],
+                fighter.stats[stat] * 1.5,
+                `${fighter.id} Lv.10 ${stat} must be exactly 150% of Lv.1`
+            );
+        }
+        assert.equal(
+            "skill" in progression.baseStatBonuses,
+            false,
+            `${fighter.id} level rewards must not treat cooldown as a permanent base stat`
+        );
+    }
+    console.log("[level-ten-base-stat-target] ok");
+}
+
+testLevelTenBaseStatTarget();
+
 function testRebirthDomainContracts() {
     const profile = createDefaultPlayerProfile();
     const sourceId = FIGHTER_IDS.ARCHER;
@@ -17261,16 +17305,36 @@ function testRebirthDomainContracts() {
     );
     assert.equal(new Set(firstOffer.map((card) => card.id)).size, 3, "A rebirth offer must not duplicate card ids");
     assert.ok(
-        firstOffer.every((card) => card.abilityId !== "archer"),
+        firstOffer.filter((card) => card.type === "action").every((card) => card.abilityId !== "archer"),
         "A fighter must never receive its own primary ability as a sub card"
     );
 
-    const begun = beginRebirth(profile, sourceId, createSeededRandom(20260714));
-    assert.equal(begun.ok, true, "Lv.10 character should begin a rebirth offer");
-    const chosenCard = begun.cards[0];
-    const firstCompletion = completeRebirth(profile, sourceId, chosenCard.id);
+    const statReward = getRebirthOfferDefinition(sourceId, `rebirth-stat:${sourceId}:balanced`);
+    assert.deepEqual(
+        statReward.stats,
+        { damage: 1, speed: 1 },
+        "Rebirth stat rewards must contain only the character's permanent base-stat pair"
+    );
+    profile.rebirth.byCharacter[sourceId] = {
+        rebirthCount: 0,
+        statBonuses: { hp: 0, damage: 0, speed: 0, defense: 0 },
+        cardRanks: {},
+        equippedCardIds: [],
+        pendingOfferCardIds: [statReward.id]
+    };
+    const firstCompletion = completeRebirth(profile, sourceId, statReward.id);
     assert.equal(firstCompletion.ok, true);
-    assert.equal(firstCompletion.rank, 1);
+    assert.equal(firstCompletion.rank, 0, "Permanent base-stat rewards must not receive a card rank");
+    assert.deepEqual(
+        getRebirthState(profile, sourceId).statBonuses,
+        { hp: 0, damage: 1, speed: 1, defense: 0 },
+        "A chosen stat reward must immediately accumulate in the permanent base-stat record"
+    );
+    assert.equal(
+        getRebirthState(profile, sourceId).cardRanks[statReward.id],
+        undefined,
+        "Permanent base-stat rewards must not become equippable cards"
+    );
     assert.equal(
         getCharacterExperienceSummary(profile, sourceId).level,
         1,
@@ -17284,15 +17348,22 @@ function testRebirthDomainContracts() {
     assert.equal(getRebirthState(profile, sourceId).rebirthCount, 1);
 
     setCharacterXp(profile, sourceId, maxXp);
-    profile.rebirth.byCharacter[sourceId].pendingOfferCardIds = [chosenCard.id];
-    const duplicateCompletion = completeRebirth(profile, sourceId, chosenCard.id);
+    const actionCardId = `ability:${getSubAbilityIds(sourceId)[0]}`;
+    profile.rebirth.byCharacter[sourceId].pendingOfferCardIds = [actionCardId];
+    const firstActionCompletion = completeRebirth(profile, sourceId, actionCardId);
+    assert.equal(firstActionCompletion.rank, 1, "Action cards should begin at rank 1");
+
+    setCharacterXp(profile, sourceId, maxXp);
+    profile.rebirth.byCharacter[sourceId].pendingOfferCardIds = [actionCardId];
+    const duplicateCompletion = completeRebirth(profile, sourceId, actionCardId);
     assert.equal(duplicateCompletion.rank, 2, "Duplicate cards should increase rank instead of creating a copy");
 
     const state = profile.rebirth.byCharacter[sourceId];
     const equipIds = [
-        chosenCard.id,
+        actionCardId,
+        "passive:global-cooldown",
         ...getSubAbilityIds(sourceId)
-            .slice(0, 3)
+            .slice(1, 3)
             .map((abilityId) => `ability:${abilityId}`)
     ];
     equipIds.forEach((cardId) => (state.cardRanks[cardId] = 1));
@@ -17301,15 +17372,67 @@ function testRebirthDomainContracts() {
     assert.equal(toggleRebirthCardEquip(profile, sourceId, equipIds[1]).ok, true);
     assert.equal(toggleRebirthCardEquip(profile, sourceId, equipIds[2]).ok, true);
     assert.equal(toggleRebirthCardEquip(profile, sourceId, equipIds[3]).error, "equip_limit");
+    assert.equal(
+        toggleRebirthCardEquip(profile, sourceId, statReward.id).error,
+        "not_owned",
+        "Permanent base-stat rewards must never enter the equipment loadout"
+    );
 
     const loadout = getRebirthLoadout(profile, sourceId);
     const rebornSpec = applyRebirthLoadoutToBaseSpec(
         createRoster().find((fighter) => fighter.id === sourceId),
         loadout
     );
-    assert.equal(rebornSpec.stats.radius, 50, "Rebirth stat cards must not change collision radius");
-    assert.equal(rebornSpec.stats.mass, 1.2, "Rebirth stat cards must not change mass");
-    assert.ok(loadout.subAbilities.length > 0, "Equipped sub cards should become an explicit combat loadout");
+    assert.equal(rebornSpec.stats.damage, createRoster().find((fighter) => fighter.id === sourceId).stats.damage + 1);
+    assert.equal(rebornSpec.stats.speed, createRoster().find((fighter) => fighter.id === sourceId).stats.speed + 1);
+    assert.equal(rebornSpec.stats.radius, 50, "Rebirth base stats must not change collision radius");
+    assert.equal(rebornSpec.stats.mass, 1.2, "Rebirth base stats must not change mass");
+    assert.ok(loadout.subAbilities.length > 0, "Equipped action cards should become an explicit combat loadout");
+    assert.equal(
+        loadout.passiveModifiers.abilityCooldownMultiplier,
+        0.7,
+        "The rank-one passive card should reduce all ability cooldowns by 30%"
+    );
+
+    const opponent = createRoster().find((fighter) => fighter.id !== sourceId);
+    const baselineSimulation = new BattleSimulation(
+        [createRoster().find((fighter) => fighter.id === sourceId), opponent],
+        {}
+    );
+    const baselineCooldown = baselineSimulation.fighters.find((fighter) => fighter.id === sourceId).ability.cooldown;
+    const rebirthSimulation = new BattleSimulation(
+        [createRoster().find((fighter) => fighter.id === sourceId), opponent],
+        {
+            onBattleBallReady(ball, spec, simulation) {
+                if (spec.id === sourceId) applyRebirthLoadoutToBattleBall(ball, simulation, loadout);
+            }
+        }
+    );
+    assert.equal(
+        rebirthSimulation.fighters.find((fighter) => fighter.id === sourceId).ability.cooldown,
+        baselineCooldown * 0.7,
+        "The equipped passive must change the actual primary ability cooldown"
+    );
+
+    const sanitizedLegacyProfile = sanitizePlayerProfile({
+        ...createDefaultPlayerProfile(),
+        rebirth: {
+            byCharacter: {
+                [sourceId]: {
+                    rebirthCount: 4,
+                    cardRanks: { [`stat:${sourceId}:balanced`]: 4 },
+                    equippedCardIds: [`stat:${sourceId}:balanced`],
+                    pendingOfferCardIds: [`stat:${sourceId}:balanced`]
+                }
+            }
+        }
+    });
+    assert.deepEqual(
+        sanitizedLegacyProfile.rebirth.byCharacter[sourceId].cardRanks,
+        {},
+        "Removed legacy stat cards must not be migrated into the new permanent-stat model"
+    );
+    assert.deepEqual(sanitizedLegacyProfile.rebirth.byCharacter[sourceId].pendingOfferCardIds, []);
     console.log("[rebirth-domain-contracts] ok");
 }
 
@@ -17385,7 +17508,7 @@ await testRebirthPickerKeepsPendingOfferUntilSelection();
 
 function testHuntingRebirthLoadoutIntegration() {
     const playerId = FIGHTER_IDS.DASH;
-    const cardId = `stat:${playerId}:balanced`;
+    const statBonuses = { hp: 0, damage: 2, speed: 2, defense: 0 };
     const createHuntingTestApp = (profile) => ({
         roster: createRoster(),
         playerProfile: profile,
@@ -17395,8 +17518,9 @@ function testHuntingRebirthLoadoutIntegration() {
     const rebornProfile = createDefaultPlayerProfile();
     rebornProfile.rebirth.byCharacter[playerId] = {
         rebirthCount: 1,
-        cardRanks: { [cardId]: 1 },
-        equippedCardIds: [cardId],
+        statBonuses,
+        cardRanks: {},
+        equippedCardIds: [],
         pendingOfferCardIds: []
     };
     const run = createHuntingRun({ characterId: playerId, stageId: HUNTING_STAGE_IDS.CAVE });
@@ -17406,18 +17530,17 @@ function testHuntingRebirthLoadoutIntegration() {
     const rebornApp = createHuntingTestApp(rebornProfile);
     const rebornManager = new HuntingManager(rebornApp);
     const rebornPlayer = rebornManager._createPlayerHuntingSpec(run);
-    const cardEffect = getRebirthCardDefinition(playerId, cardId).getRankEffect(1).stats;
     const allocationMultiplier = calculateStatMultiplier(Object.values(createEmptyStatAllocation())).multiplier;
 
     assert.equal(
         rebornPlayer.appliedSpec.stats.damage,
-        baselineSpec.stats.damage + cardEffect.damage * allocationMultiplier,
-        "Hunting player specs must apply rebirth stat cards before the stat-allocation multiplier"
+        baselineSpec.stats.damage + statBonuses.damage * allocationMultiplier,
+        "Hunting player specs must apply permanent rebirth stats before the stat-allocation multiplier"
     );
     assert.equal(
         rebornPlayer.appliedSpec.stats.speed,
-        baselineSpec.stats.speed + cardEffect.speed * allocationMultiplier,
-        "Hunting player specs must preserve both rebirth stats through the stat-allocation multiplier"
+        baselineSpec.stats.speed + statBonuses.speed * allocationMultiplier,
+        "Hunting player specs must preserve permanent rebirth stats through the stat-allocation multiplier"
     );
 
     let capturedOptions = null;
@@ -17445,7 +17568,8 @@ function testRebirthSubAbilityMatrix() {
             const opponent = roster.find((fighter) => fighter.id !== source.id);
             const loadout = {
                 rebirthCount: 1,
-                statBonuses: { hp: 0, damage: 0, speed: 0, skill: 0, defense: 0 },
+                statBonuses: { hp: 0, damage: 0, speed: 0, defense: 0 },
+                passiveModifiers: { abilityCooldownMultiplier: 1 },
                 subAbilities: [
                     {
                         cardId: card.id,
@@ -17687,14 +17811,19 @@ testAbilitySetForwardsDashEffect();
 
 function testRebirthCollectionTemplateContract() {
     const template = readFileSync("src/components/collection-hub.html", "utf8");
-    assert.ok(template.includes("환생 카드 선택"), "Character detail should expose the rebirth action");
-    assert.ok(template.includes("진행 중인 카드 선택"), "Character detail should reopen an existing rebirth offer");
+    assert.ok(template.includes("환생 보상 선택"), "Character detail should expose the rebirth action");
+    assert.ok(template.includes("진행 중인 보상 선택"), "Character detail should reopen an existing rebirth offer");
     assert.ok(
         !template.includes("completeRebirth(item.id, card.id)"),
-        "Character detail should not bypass the rebirth card picker with inline selection"
+        "Character detail should not bypass the rebirth reward picker with inline selection"
     );
     assert.ok(template.includes("toggleRebirthCardEquip"), "Character detail should expose card equip controls");
     assert.ok(template.includes("maxEquippedCards"), "Character detail should display the three-card loadout limit");
+    assert.ok(template.includes("누적 기초 수치"), "Character detail should show accumulated permanent rebirth stats");
+    assert.ok(
+        template.includes("formatRebirthStatBonus"),
+        "Character detail should format base-stat totals by stat key"
+    );
 
     const pickerTemplate = readFileSync("src/components/rebirth-picker.html", "utf8");
     assert.ok(
@@ -17703,7 +17832,7 @@ function testRebirthCollectionTemplateContract() {
     );
     assert.ok(
         pickerTemplate.includes("@keydown.escape.stop"),
-        "Rebirth picker should require a deliberate card selection"
+        "Rebirth picker should require a deliberate reward selection"
     );
     assert.ok(!pickerTemplate.includes("@click.self"), "Rebirth picker should not dismiss through its backdrop");
     console.log("[rebirth-collection-template] ok");

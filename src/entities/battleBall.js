@@ -112,6 +112,9 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             passives: spec.mastery?.passives ?? [],
             _states: null
         };
+        this.rebirthEffects = {
+            abilityCooldownMultiplier: 1
+        };
         this.setPhysicsMaterial(spec.physicsMaterial ?? "rubberBall");
         this.actionContext = new ActionContext();
         this.aiController = null;

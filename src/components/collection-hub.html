@@ -252,17 +252,25 @@
                                     ></span>
                                 </div>
                                 <p class="ch-rebirth-note" x-show="!item.rebirth.canRebirth">
-                                    Lv.10에 도달하면 여기서 환생 카드를 고를 수 있습니다.
+                                    Lv.10에 도달하면 여기서 환생 보상을 고를 수 있습니다.
                                 </p>
                                 <button
                                     class="ch-btn ch-rebirth-start"
                                     type="button"
                                     x-show="item.rebirth.canRebirth"
                                     @click="beginRebirth(item.id)"
-                                    x-text="item.rebirth.pendingOfferCards.length ? '진행 중인 카드 선택' : '환생 카드 선택'"
+                                    x-text="item.rebirth.pendingOfferCards.length ? '진행 중인 보상 선택' : '환생 보상 선택'"
                                 >
-                                    환생 카드 선택
+                                    환생 보상 선택
                                 </button>
+                                <div class="ch-rebirth-stats">
+                                    <span class="ch-rebirth-label">누적 기초 수치</span>
+                                    <div class="ch-rebirth-stat-grid">
+                                        <template x-for="[stat, value] in Object.entries(item.rebirth.statBonuses)" :key="stat">
+                                            <span x-text="formatRebirthStatBonus(stat, value)"></span>
+                                        </template>
+                                    </div>
+                                </div>
                                 <div class="ch-rebirth-owned" x-show="item.rebirth.ownedCards.length">
                                     <span class="ch-rebirth-label">보유 카드</span>
                                     <template x-for="card in item.rebirth.ownedCards" :key="card.id">
@@ -1141,11 +1149,16 @@
         }
 
         function formatRebirthCardEffect(card) {
-            const statLabels = { hp: "HP", damage: "공격", speed: "속도", skill: "스킬", defense: "방어력" };
+            const statLabels = { hp: "HP", damage: "공격", speed: "속도", defense: "방어력" };
             const stats = Object.entries(card?.stats ?? {})
                 .filter(([, value]) => Number(value) > 0)
                 .map(([stat, value]) => `${statLabels[stat] ?? stat} +${value}`);
             return stats.length ? stats.join(" · ") : `등급 ${card?.rank ?? 1} · ${card?.effectText ?? "능력 수치 강화"}`;
+        }
+
+        function formatRebirthStatBonus(stat, value) {
+            const statLabels = { hp: "HP", damage: "공격", speed: "속도", defense: "방어력" };
+            return `${statLabels[stat] ?? stat} +${value}`;
         }
 
         function setMonsterFilter(filterId) {
@@ -1228,6 +1241,7 @@
             selectCollectionCharacter,
             closeCollectionCharacterDetail,
             formatRebirthCardEffect,
+            formatRebirthStatBonus,
             setMonsterFilter,
             selectCollectionMonster,
             closeCollectionMonsterDetail,
@@ -1809,6 +1823,27 @@
     .ch-rebirth-owned {
         display: grid;
         gap: 6px;
+    }
+
+    .ch-rebirth-stats {
+        display: grid;
+        gap: 6px;
+    }
+
+    .ch-rebirth-stat-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 4px;
+    }
+
+    .ch-rebirth-stat-grid span {
+        padding: 5px 7px;
+        border: 1px solid #d5d5d5;
+        border-radius: 4px;
+        background: #f7f7f7;
+        color: #555555;
+        font-size: 0.72rem;
+        font-weight: 700;
     }
 
     .ch-rebirth-label {

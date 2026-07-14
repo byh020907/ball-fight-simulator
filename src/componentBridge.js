@@ -54,7 +54,7 @@ export function createComponentBridge(app) {
         refreshCollectionAndProfile();
         PopupService.show({
             title: "환생 완료",
-            bodyHtml: `<p>${result.card.name}을(를) 얻었습니다.</p><p>해당 캐릭터의 XP는 Lv.1부터 다시 시작합니다.</p>`,
+            bodyHtml: `<p>${result.reward.name} 보상을 얻었습니다.</p><p>해당 캐릭터의 XP는 Lv.1부터 다시 시작합니다.</p>`,
             buttons: [{ text: "확인", value: "ok", primary: true }]
         });
         return result;
@@ -273,7 +273,7 @@ export function createComponentBridge(app) {
             } catch (error) {
                 console.error(error);
                 PopupService.show({
-                    title: "환생 카드 대기",
+                    title: "환생 보상 대기",
                     bodyHtml: "<p>저장된 환생 후보는 유지됩니다. 도감 환생 탭에서 다시 선택해 주세요.</p>",
                     buttons: [{ text: "확인", value: "ok", primary: true }]
                 });

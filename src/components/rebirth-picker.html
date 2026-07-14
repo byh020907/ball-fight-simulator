@@ -5,13 +5,13 @@
     x-transition.opacity.duration.200ms
     role="dialog"
     aria-modal="true"
-    aria-label="환생 카드 선택"
+    aria-label="환생 보상 선택"
     tabindex="-1"
     @keydown.escape.stop
 >
     <div class="bf-popup-card">
         <div class="bf-popup-scroll">
-            <strong class="bf-popup-title">환생 카드 선택</strong>
+            <strong class="bf-popup-title">환생 보상 선택</strong>
             <div class="rebirth-picker-cards">
                 <template x-for="(card, index) in cards" :key="card.id">
                     <button class="rebirth-picker-card" type="button" @click="pickCard(index)">

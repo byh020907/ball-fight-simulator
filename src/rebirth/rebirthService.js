@@ -1,18 +1,24 @@
 import { MAX_LEVEL } from "../experience/experienceConfig.js";
 import { getCharacterExperienceSummary, resetCharacterExperience } from "../experience/experienceService.js";
 import {
-    getRebirthCardCatalog,
+    REBIRTH_BASE_STAT_KEYS,
     getRebirthCardDefinition,
     getRebirthCardView,
     getRebirthFighter,
+    getRebirthOfferCatalog,
+    getRebirthOfferDefinition,
+    getRebirthOfferView,
+    isValidRebirthOfferId,
     REBIRTH_MAX_CARD_RANK,
     REBIRTH_MAX_EQUIPPED_CARDS,
     REBIRTH_OFFER_SIZE
 } from "./rebirthCards.js";
 import { getRebirthVisualProfile } from "./rebirthVisuals.js";
 
+const EMPTY_STAT_BONUSES = Object.freeze(Object.fromEntries(REBIRTH_BASE_STAT_KEYS.map((stat) => [stat, 0])));
 const EMPTY_REBIRTH_STATE = Object.freeze({
     rebirthCount: 0,
+    statBonuses: EMPTY_STAT_BONUSES,
     cardRanks: {},
     equippedCardIds: [],
     pendingOfferCardIds: []
@@ -26,12 +32,26 @@ function getStateRecord(profile, characterId) {
     return profile?.rebirth?.byCharacter?.[characterId] ?? EMPTY_REBIRTH_STATE;
 }
 
+function normalizeStatBonuses(statBonuses) {
+    return Object.fromEntries(
+        REBIRTH_BASE_STAT_KEYS.map((stat) => [
+            stat,
+            Math.max(0, Number.isFinite(statBonuses?.[stat]) ? statBonuses[stat] : 0)
+        ])
+    );
+}
+
+function hasStatBonuses(statBonuses) {
+    return Object.values(statBonuses).some((value) => value > 0);
+}
+
 function ensureRebirthState(profile, characterId) {
     profile.rebirth ||= { byCharacter: {} };
     profile.rebirth.byCharacter ||= {};
     const current = getStateRecord(profile, characterId);
     const next = {
         rebirthCount: Math.max(0, Math.floor(current.rebirthCount ?? 0)),
+        statBonuses: normalizeStatBonuses(current.statBonuses),
         cardRanks: { ...(current.cardRanks ?? {}) },
         equippedCardIds: [...(current.equippedCardIds ?? [])],
         pendingOfferCardIds: [...(current.pendingOfferCardIds ?? [])]
@@ -51,7 +71,7 @@ function weightedPick(cards, rng) {
 }
 
 export function createRebirthOffer(characterId, rng = Math.random) {
-    const catalog = getRebirthCardCatalog(characterId);
+    const catalog = getRebirthOfferCatalog(characterId);
     const pool = [...catalog];
     const offer = [];
     while (pool.length > 0 && offer.length < REBIRTH_OFFER_SIZE) {
@@ -73,10 +93,11 @@ export function getRebirthState(profile, characterId) {
         .filter((cardId) => cardRanks[cardId] && getRebirthCardDefinition(characterId, cardId))
         .slice(0, REBIRTH_MAX_EQUIPPED_CARDS);
     const pendingOfferCardIds = [...new Set(state.pendingOfferCardIds ?? [])]
-        .filter((cardId) => getRebirthCardDefinition(characterId, cardId))
+        .filter((cardId) => isValidRebirthOfferId(characterId, cardId))
         .slice(0, REBIRTH_OFFER_SIZE);
     return {
         rebirthCount: Math.max(0, Math.floor(state.rebirthCount ?? 0)),
+        statBonuses: normalizeStatBonuses(state.statBonuses),
         cardRanks,
         equippedCardIds,
         pendingOfferCardIds
@@ -93,13 +114,13 @@ export function beginRebirth(profile, characterId, rng = Math.random) {
     if (!canRebirth(profile, characterId)) return { ok: false, error: "not_eligible", cards: [] };
     const state = ensureRebirthState(profile, characterId);
     const validPending = state.pendingOfferCardIds
-        .map((cardId) => getRebirthCardDefinition(characterId, cardId))
+        .map((cardId) => getRebirthOfferDefinition(characterId, cardId))
         .filter(Boolean);
-    const cards = validPending.length === REBIRTH_OFFER_SIZE ? validPending : createRebirthOffer(characterId, rng);
-    state.pendingOfferCardIds = cards.map((card) => card.id);
+    const offers = validPending.length === REBIRTH_OFFER_SIZE ? validPending : createRebirthOffer(characterId, rng);
+    state.pendingOfferCardIds = offers.map((offer) => offer.id);
     return {
         ok: true,
-        cards: state.pendingOfferCardIds.map((cardId) => getRebirthCardDefinition(characterId, cardId))
+        cards: state.pendingOfferCardIds.map((cardId) => getRebirthOfferDefinition(characterId, cardId))
     };
 }
 
@@ -107,16 +128,29 @@ export function completeRebirth(profile, characterId, cardId) {
     if (!canRebirth(profile, characterId)) return { ok: false, error: "not_eligible" };
     const state = ensureRebirthState(profile, characterId);
     if (!state.pendingOfferCardIds.includes(cardId)) return { ok: false, error: "invalid_offer" };
-    const card = getRebirthCardDefinition(characterId, cardId);
-    if (!card) return { ok: false, error: "invalid_card" };
+    const reward = getRebirthOfferDefinition(characterId, cardId);
+    if (!reward) return { ok: false, error: "invalid_offer" };
 
     const previousRank = normalizeRank(state.cardRanks[cardId]);
-    const rank = Math.min(REBIRTH_MAX_CARD_RANK, previousRank + 1);
-    state.cardRanks[cardId] = rank;
+    const isStatReward = reward.type === "statReward";
+    const rank = isStatReward ? 0 : Math.min(REBIRTH_MAX_CARD_RANK, previousRank + 1);
+    if (isStatReward) {
+        for (const [stat, value] of Object.entries(reward.stats)) state.statBonuses[stat] += value;
+    } else {
+        state.cardRanks[cardId] = rank;
+    }
     state.rebirthCount += 1;
     state.pendingOfferCardIds = [];
     const experience = resetCharacterExperience(profile, characterId);
-    return { ok: true, card, rank, duplicate: previousRank > 0, rebirthCount: state.rebirthCount, experience };
+    return {
+        ok: true,
+        reward,
+        rank,
+        duplicate: !isStatReward && previousRank > 0,
+        rebirthCount: state.rebirthCount,
+        statBonuses: { ...state.statBonuses },
+        experience
+    };
 }
 
 export function toggleRebirthCardEquip(profile, characterId, cardId) {
@@ -135,15 +169,15 @@ export function toggleRebirthCardEquip(profile, characterId, cardId) {
 
 export function getRebirthLoadout(profile, characterId) {
     const state = getRebirthState(profile, characterId);
-    const statBonuses = { hp: 0, damage: 0, speed: 0, skill: 0, defense: 0 };
+    const statBonuses = { ...state.statBonuses };
     const subAbilities = [];
+    const passiveModifiers = { abilityCooldownMultiplier: 1 };
     for (const cardId of state.equippedCardIds) {
         const card = getRebirthCardDefinition(characterId, cardId);
         const rank = state.cardRanks[cardId];
         if (!card || rank <= 0) continue;
         const effect = card.getRankEffect(rank);
-        for (const [stat, value] of Object.entries(effect.stats)) statBonuses[stat] += value;
-        if (card.type === "subAbility") {
+        if (card.type === "action") {
             subAbilities.push({
                 cardId,
                 abilityId: card.abilityId,
@@ -152,12 +186,16 @@ export function getRebirthLoadout(profile, characterId) {
                 modifiers: effect.modifiers
             });
         }
+        if (card.type === "passive") {
+            passiveModifiers.abilityCooldownMultiplier *= effect.passiveModifiers?.abilityCooldownMultiplier ?? 1;
+        }
     }
     return {
         characterId,
         rebirthCount: state.rebirthCount,
         statBonuses,
         subAbilities,
+        passiveModifiers,
         visual: getRebirthVisualProfile(state.rebirthCount)
     };
 }
@@ -174,6 +212,10 @@ export function applyRebirthLoadoutToBaseSpec(spec, loadout) {
 export function applyRebirthLoadoutToBattleBall(ball, simulation, loadout) {
     if (!ball || !simulation || !loadout) return;
     ball.rebirthCount = loadout.rebirthCount;
+    ball.rebirthEffects = {
+        ...ball.rebirthEffects,
+        abilityCooldownMultiplier: loadout.passiveModifiers?.abilityCooldownMultiplier ?? 1
+    };
     for (const subAbility of loadout.subAbilities) {
         const ability = simulation.createAbility(subAbility.abilityId, ball, {
             role: "sub",
@@ -195,12 +237,14 @@ export function getRebirthPresentation(profile, characterId) {
         .filter(Boolean)
         .sort((left, right) => left.name.localeCompare(right.name));
     const pendingOfferCards = state.pendingOfferCardIds
-        .map((cardId) => getRebirthCardView(characterId, cardId, state.cardRanks[cardId] ?? 0, state.equippedCardIds))
+        .map((cardId) => getRebirthOfferView(characterId, cardId, state.cardRanks[cardId] ?? 0, state.equippedCardIds))
         .filter(Boolean);
     return {
-        visible: experience.isMax || state.rebirthCount > 0 || ownedCards.length > 0,
+        visible:
+            experience.isMax || state.rebirthCount > 0 || ownedCards.length > 0 || hasStatBonuses(state.statBonuses),
         canRebirth: canRebirth(profile, characterId),
         rebirthCount: state.rebirthCount,
+        statBonuses: state.statBonuses,
         equippedCount: state.equippedCardIds.length,
         maxEquippedCards: REBIRTH_MAX_EQUIPPED_CARDS,
         ownedCards,

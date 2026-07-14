@@ -29,7 +29,8 @@ export class Ability extends mixins([Cooldown]) {
         const skillMultiplier = 100 / (100 + skill);
         const masteryMultiplier = Math.max(0.1, 1 - (this.owner.mastery?.action?.cooldownPercent ?? 0));
         const equipmentMultiplier = this.owner.equipmentEffects?.abilityCooldownMultiplier ?? 1;
-        return this._baseCooldown * skillMultiplier * masteryMultiplier * equipmentMultiplier;
+        const rebirthMultiplier = this.owner.rebirthEffects?.abilityCooldownMultiplier ?? 1;
+        return this._baseCooldown * skillMultiplier * masteryMultiplier * equipmentMultiplier * rebirthMultiplier;
     }
 
     get abilityId() {

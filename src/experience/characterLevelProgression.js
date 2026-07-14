@@ -1,8 +1,12 @@
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
+import { createRoster } from "../roster.js";
 import { getLevelRewardEffectText, LEVEL_REWARD_EFFECT_TYPES } from "./reward-effects/effectRegistry.js";
 
 const EMPTY_REWARDS = Object.freeze([]);
 const progressionCache = new Map();
+const LEVEL_STAT_KEYS = Object.freeze(["hp", "damage", "speed", "defense"]);
+const LEVEL_STAT_UNIT_SCALE = 2;
+const ROSTER_BY_ID = new Map(createRoster().map((fighter) => [fighter.id, fighter]));
 
 function normalizeLevel(level) {
     const maxLevel = REWARD_BALANCE.experience.maxLevel;
@@ -13,10 +17,30 @@ function getEntries(characterId) {
     return REWARD_BALANCE.experience.characterLevelProgressions[characterId] ?? EMPTY_REWARDS;
 }
 
-function createBaseStatEffects(baseStats) {
-    return Object.entries(baseStats ?? {}).map(([stat, value]) =>
-        Object.freeze({ type: LEVEL_REWARD_EFFECT_TYPES.STAT, stat, value })
+function getLevelStatBonus(characterId, level) {
+    const fighter = ROSTER_BY_ID.get(characterId);
+    const maxLevel = REWARD_BALANCE.experience.maxLevel;
+    const targetMultiplier = REWARD_BALANCE.experience.levelStatTargetMultiplier;
+    if (!fighter || level < 2 || level > maxLevel) return {};
+
+    const completedSteps = level - 1;
+    const previousSteps = completedSteps - 1;
+    return Object.fromEntries(
+        LEVEL_STAT_KEYS.map((stat) => {
+            const base = fighter.stats[stat];
+            const totalUnits = Math.round(base * (targetMultiplier - 1) * LEVEL_STAT_UNIT_SCALE);
+            const currentUnits = Math.floor((totalUnits * completedSteps) / (maxLevel - 1));
+            const previousUnits = Math.floor((totalUnits * previousSteps) / (maxLevel - 1));
+            return [stat, (currentUnits - previousUnits) / LEVEL_STAT_UNIT_SCALE];
+        })
     );
+}
+
+function createBaseStatEffects(characterId, level) {
+    const baseStats = getLevelStatBonus(characterId, level);
+    return Object.entries(baseStats ?? {})
+        .filter(([, value]) => value > 0)
+        .map(([stat, value]) => Object.freeze({ type: LEVEL_REWARD_EFFECT_TYPES.STAT, stat, value }));
 }
 
 function createAbilityTierEffect(abilityTier, gameText) {
@@ -29,11 +53,12 @@ function createAbilityTierEffect(abilityTier, gameText) {
 
 function createReward(characterId, entry) {
     const abilityTierEffect = createAbilityTierEffect(entry.abilityTier, entry.gameText);
-    const effects = [...createBaseStatEffects(entry.baseStats), abilityTierEffect].filter(Boolean);
+    const baseStats = getLevelStatBonus(characterId, entry.level);
+    const effects = [...createBaseStatEffects(characterId, entry.level), abilityTierEffect].filter(Boolean);
     return Object.freeze({
         id: `${characterId}-level-${entry.level}`,
         level: entry.level,
-        baseStats: Object.freeze({ ...(entry.baseStats ?? {}) }),
+        baseStats: Object.freeze(baseStats),
         abilityTier: entry.abilityTier ?? 0,
         effects: Object.freeze(effects),
         text: effects.map(getLevelRewardEffectText).join(" · ")

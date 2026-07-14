@@ -12,7 +12,9 @@ import { createDefaultConsumables, sanitizeConsumables } from "./consumables.js"
 import { EQUIPMENT_SPECIAL_OPTION_SUFFIXES } from "./hunting/equipmentConfig.js";
 import { formatEquipmentSpecialName } from "./hunting/equipmentNaming.js";
 import {
+    REBIRTH_BASE_STAT_KEYS,
     isValidRebirthCardId,
+    isValidRebirthOfferId,
     REBIRTH_MAX_CARD_RANK,
     REBIRTH_MAX_EQUIPPED_CARDS,
     REBIRTH_OFFER_SIZE
@@ -401,6 +403,9 @@ function sanitizeEquipment(obj) {
 
 function sanitizeRebirthCharacterState(characterId, value) {
     if (!value || typeof value !== "object") return null;
+    const statBonuses = Object.fromEntries(
+        REBIRTH_BASE_STAT_KEYS.map((stat) => [stat, sanitizeNumber(value.statBonuses?.[stat])])
+    );
     const cardRanks = Object.fromEntries(
         Object.entries(value.cardRanks ?? {})
             .filter(([cardId]) => isValidRebirthCardId(characterId, cardId))
@@ -414,10 +419,11 @@ function sanitizeRebirthCharacterState(characterId, value) {
         .filter((cardId) => cardRanks[cardId] > 0)
         .slice(0, REBIRTH_MAX_EQUIPPED_CARDS);
     const pendingOfferCardIds = [...new Set(value.pendingOfferCardIds ?? [])]
-        .filter((cardId) => isValidRebirthCardId(characterId, cardId))
+        .filter((cardId) => isValidRebirthOfferId(characterId, cardId))
         .slice(0, REBIRTH_OFFER_SIZE);
     return {
         rebirthCount: Math.floor(sanitizeNumber(value.rebirthCount)),
+        statBonuses,
         cardRanks,
         equippedCardIds,
         pendingOfferCardIds
