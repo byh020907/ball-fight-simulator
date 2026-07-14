@@ -17095,6 +17095,7 @@ function testRebirthVisualProfileContract() {
     const turningBall = createBall(new Vector2());
     const initialFlameDirection = getRebirthFlameDirection(turningBall, 0);
     turningBall.velocity = new Vector2(420, 0);
+    turningBall.position.x += turningBall.velocity.x / 60;
     const earlyTurnDirection = getRebirthFlameDirection(turningBall, 1 / 60);
     const initialDirectionDot =
         initialFlameDirection.x * earlyTurnDirection.x + initialFlameDirection.y * earlyTurnDirection.y;
@@ -17102,29 +17103,49 @@ function testRebirthVisualProfileContract() {
         initialDirectionDot > 0.9,
         "Flame direction should retain most of its previous heading on the first turn frame"
     );
-    const settledTurnDirection = Array.from({ length: 45 }, (_, index) =>
-        getRebirthFlameDirection(turningBall, (index + 2) / 60)
-    ).at(-1);
+    const settledTurnDirection = Array.from({ length: 45 }, (_, index) => {
+        turningBall.position.x += turningBall.velocity.x / 60;
+        return getRebirthFlameDirection(turningBall, (index + 2) / 60);
+    }).at(-1);
     assert.ok(
-        settledTurnDirection.x < -0.95,
-        "Flame direction should finish following sustained movement after its visual delay"
+        settledTurnDirection.x < -0.7 && settledTurnDirection.y < -0.2,
+        "Rising particles should leave a natural diagonal trail behind sustained movement"
     );
 
     const statlessMovingBall = { ...createBall(new Vector2(420, 0)), stats: undefined };
+    getRebirthFlameDirection(statlessMovingBall, 0);
+    statlessMovingBall.position.x += statlessMovingBall.velocity.x * 0.1;
     const statlessDirection = getRebirthFlameDirection(statlessMovingBall, 0.1);
     assert.ok(
-        Number.isFinite(statlessDirection.x) && statlessDirection.x < -0.85,
-        "Square particle preview should keep a finite movement direction without combat stats"
+        Number.isFinite(statlessDirection.x) && statlessDirection.x < -0.3 && statlessDirection.y < -0.3,
+        "Rising square particles should keep a finite natural trail without combat stats"
     );
 
     const baseParticleCtx = makeRecordingCanvasContext();
     drawRebirthVisualOverlay(baseParticleCtx, createBall(new Vector2()), getRebirthVisualProfile(1), 0.1);
+    const nextRebirthParticleCtx = makeRecordingCanvasContext();
+    drawRebirthVisualOverlay(nextRebirthParticleCtx, createBall(new Vector2()), getRebirthVisualProfile(2), 0.1);
+    const middleRebirthParticleCtx = makeRecordingCanvasContext();
+    drawRebirthVisualOverlay(middleRebirthParticleCtx, createBall(new Vector2()), getRebirthVisualProfile(5), 0.1);
+    const maxRebirthParticleCtx = makeRecordingCanvasContext();
+    drawRebirthVisualOverlay(maxRebirthParticleCtx, createBall(new Vector2()), getRebirthVisualProfile(10), 0.1);
     const canvasCtx = makeRecordingCanvasContext();
     drawRebirthVisualOverlay(canvasCtx, createBall(new Vector2()), visual, 0.1);
     assert.ok(
-        baseParticleCtx.calls.filter((call) => call[0] === "fillRect").length >= 44,
+        baseParticleCtx.calls.filter((call) => call[0] === "fillRect").length >= 56,
         "Base rebirth should render a bounded set of square flame particles"
     );
+    const baseParticleCount = baseParticleCtx.calls.filter((call) => call[0] === "fillRect").length;
+    const nextParticleCount = nextRebirthParticleCtx.calls.filter((call) => call[0] === "fillRect").length;
+    const middleParticleCount = middleRebirthParticleCtx.calls.filter((call) => call[0] === "fillRect").length;
+    const maxParticleCount = maxRebirthParticleCtx.calls.filter((call) => call[0] === "fillRect").length;
+    assert.ok(nextParticleCount > baseParticleCount, "Every rebirth should increase square flame particle density");
+    assert.equal(
+        middleParticleCount,
+        Math.round(baseParticleCount + (maxParticleCount - baseParticleCount) * (4 / 9)),
+        "Intermediate rebirths should linearly interpolate the integer particle density"
+    );
+    assert.equal(maxParticleCount, 92, "Tenth rebirth should reach the linear 92-particle ceiling");
     const wrappedSectors = new Set(
         baseParticleCtx.calls
             .filter((call) => call[0] === "translate")
@@ -17134,12 +17155,25 @@ function testRebirthVisualProfileContract() {
         wrappedSectors.size >= 6,
         "Square flame particles should occupy most of the ball perimeter before they join the trailing plume"
     );
+    const risingParticleCtx = makeRecordingCanvasContext();
+    const risingBall = createBall(new Vector2());
+    drawRebirthVisualOverlay(risingParticleCtx, risingBall, visual, 0);
+    Array.from({ length: 30 }, (_, index) => {
+        risingParticleCtx.calls.length = 0;
+        drawRebirthVisualOverlay(risingParticleCtx, risingBall, visual, (index + 1) / 60);
+    });
+    const averageRise =
+        risingParticleCtx.calls
+            .filter((call) => call[0] === "translate")
+            .reduce((total, [, , y]) => total + y - risingBall.position.y, 0) /
+        risingParticleCtx.calls.filter((call) => call[0] === "translate").length;
+    assert.ok(averageRise < -18, "Detached square flame particles should rise above a stationary character");
     assert.ok(
-        canvasCtx.calls.filter((call) => call[0] === "fillRect").length >= 63,
-        "Higher rebirth stages should increase the square flame particle density"
+        canvasCtx.calls.filter((call) => call[0] === "fillRect").length >= 76,
+        "Higher rebirth counts should linearly increase square flame particle density"
     );
     assert.ok(
-        canvasCtx.calls.filter((call) => call[0] === "rotate").length >= 63,
+        canvasCtx.calls.filter((call) => call[0] === "rotate").length >= 76,
         "Square flame particles should rotate with their physical flow"
     );
     assert.equal(

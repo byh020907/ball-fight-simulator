@@ -2,8 +2,9 @@ import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 
 const MAX_FLAME_COUNT = Math.max(...REWARD_BALANCE.rebirth.visualStages.map((stage) => stage.flameCount));
 const FLAME_MOVEMENT_THRESHOLD = 8;
-const MIN_FLAME_PARTICLE_COUNT = 34;
-const MAX_FLAME_PARTICLE_COUNT = 76;
+const MIN_FLAME_PARTICLE_COUNT = 56;
+const MAX_FLAME_PARTICLE_COUNT = 92;
+const MAX_FLAME_REBIRTH_COUNT = 10;
 const FLAME_PARTICLE_THRUST = 220;
 const FLAME_PARTICLE_DRAG = 3.6;
 const FLAME_PARTICLE_TURBULENCE = 104;
@@ -64,11 +65,17 @@ function getFlameTargetDirection(ball) {
 }
 
 function getFlameParticleCount(visual) {
-    return clamp(
-        Math.round(MIN_FLAME_PARTICLE_COUNT + visual.flameCount * 4.75),
-        MIN_FLAME_PARTICLE_COUNT,
-        MAX_FLAME_PARTICLE_COUNT
+    return Math.round(
+        MIN_FLAME_PARTICLE_COUNT + (MAX_FLAME_PARTICLE_COUNT - MIN_FLAME_PARTICLE_COUNT) * getFlameGrowth(visual)
     );
+}
+
+function getFlameGrowth(visual) {
+    return clamp((Math.floor(visual.rebirthCount) - 1) / (MAX_FLAME_REBIRTH_COUNT - 1), 0, 1);
+}
+
+function getFlameFlickerStrength(visual) {
+    return 0.4 + getFlameGrowth(visual) * 0.36;
 }
 
 function getFlameParticleEmitter(ball, anchorAngle) {
@@ -78,12 +85,12 @@ function getFlameParticleEmitter(ball, anchorAngle) {
     };
 }
 
-function getFlameParticleFlowDirection(anchorAngle, direction, ageProgress) {
-    const surfaceWeight = 0.12 + (1 - ageProgress) * 0.72;
-    const trailWeight = 0.38 + ageProgress * 0.78;
+function getRisingFlameParticleDirection(anchorAngle, ageProgress) {
+    const surfaceWeight = (1 - ageProgress) ** 1.6 * 0.56;
+    const riseWeight = 0.72 + ageProgress * 0.72;
     return normalizeDirection({
-        x: Math.cos(anchorAngle) * surfaceWeight + direction.x * trailWeight,
-        y: Math.sin(anchorAngle) * surfaceWeight + direction.y * trailWeight
+        x: Math.cos(anchorAngle) * surfaceWeight,
+        y: Math.sin(anchorAngle) * surfaceWeight - riseWeight
     });
 }
 
@@ -91,10 +98,10 @@ function getParticleLifetime(seed) {
     return 0.38 + (hashNoise(seed, 41) + 1) * 0.5 * 0.24;
 }
 
-function createFlameParticle(ball, direction, seed, ageProgress = 0) {
+function createFlameParticle(ball, seed, ageProgress = 0) {
     const anchorAngle = (hashNoise(seed, 251) + 1) * Math.PI;
     const emitter = getFlameParticleEmitter(ball, anchorAngle);
-    const flowDirection = getFlameParticleFlowDirection(anchorAngle, direction, ageProgress);
+    const flowDirection = getRisingFlameParticleDirection(anchorAngle, ageProgress);
     const perpendicular = { x: -flowDirection.y, y: flowDirection.x };
     const lateralNoise = hashNoise(seed, 71);
     const forwardNoise = (hashNoise(seed, 89) + 1) * 0.5;
@@ -123,7 +130,7 @@ function createFlameParticle(ball, direction, seed, ageProgress = 0) {
     };
 }
 
-function createFlamePlumeState(ball, visual, direction, time) {
+function createFlamePlumeState(ball, visual, time) {
     const seed = getBallSeed(ball);
     const particleCount = getFlameParticleCount(visual);
     return {
@@ -131,12 +138,12 @@ function createFlamePlumeState(ball, visual, direction, time) {
         time,
         nextSeed: seed + particleCount * 19,
         particles: Array.from({ length: particleCount }, (_, index) =>
-            createFlameParticle(ball, direction, seed + index * 19, (index + 0.35) / particleCount)
+            createFlameParticle(ball, seed + index * 19, (index + 0.35) / particleCount)
         )
     };
 }
 
-function reconcileFlameParticleCount(state, ball, visual, direction) {
+function reconcileFlameParticleCount(state, ball, visual) {
     const particleCount = getFlameParticleCount(visual);
     if (state.particles.length > particleCount) {
         state.particles.length = particleCount;
@@ -144,25 +151,25 @@ function reconcileFlameParticleCount(state, ball, visual, direction) {
     }
     while (state.particles.length < particleCount) {
         const progress = (state.particles.length + 0.35) / particleCount;
-        state.particles.push(createFlameParticle(ball, direction, state.nextSeed++, progress));
+        state.particles.push(createFlameParticle(ball, state.nextSeed++, progress));
     }
 }
 
-function respawnFlameParticle(state, particle, ball, direction) {
-    const nextParticle = createFlameParticle(ball, direction, state.nextSeed++);
+function respawnFlameParticle(state, particle, ball) {
+    const nextParticle = createFlameParticle(ball, state.nextSeed++);
     Object.assign(particle, nextParticle);
 }
 
-function updateFlameParticle(particle, state, ball, direction, visual, elapsed) {
+function updateFlameParticle(particle, state, ball, visual, elapsed) {
     const ageProgress = clamp(particle.age / particle.lifetime, 0, 1);
-    const perpendicular = { x: -direction.y, y: direction.x };
+    const flickerStrength = getFlameFlickerStrength(visual);
     const turbulence =
         smoothNoise(state.time * 4.2 + particle.age * 3.4, particle.seed + 113) *
         FLAME_PARTICLE_TURBULENCE *
-        (1 + visual.flickerStrength * 0.35) *
+        (1 + flickerStrength * 0.35) *
         (0.45 + ageProgress * 0.55);
-    particle.velocityX += (direction.x * FLAME_PARTICLE_THRUST + perpendicular.x * turbulence) * elapsed;
-    particle.velocityY += (direction.y * FLAME_PARTICLE_THRUST + perpendicular.y * turbulence) * elapsed;
+    particle.velocityX += turbulence * elapsed;
+    particle.velocityY -= FLAME_PARTICLE_THRUST * elapsed;
     const drag = Math.exp(-FLAME_PARTICLE_DRAG * elapsed);
     particle.velocityX *= drag;
     particle.velocityY *= drag;
@@ -178,7 +185,7 @@ function updateFlameParticle(particle, state, ball, direction, visual, elapsed) 
     particle.rotation += particle.angularVelocity * elapsed;
     particle.age += elapsed;
     if (particle.age >= particle.lifetime) {
-        respawnFlameParticle(state, particle, ball, direction);
+        respawnFlameParticle(state, particle, ball);
     }
 }
 
@@ -202,18 +209,18 @@ function getRebirthFlamePlume(ball, visual, time) {
     const direction = getFlameTargetDirection(ball);
     const previousState = flamePlumeStates.get(ball);
     if (!previousState || time < previousState.time) {
-        const state = createFlamePlumeState(ball, visual, direction, time);
+        const state = createFlamePlumeState(ball, visual, time);
         flamePlumeStates.set(ball, state);
         return { direction: getFlamePlumeDirection(state, ball, direction), particles: state.particles };
     }
 
     const state = previousState;
-    reconcileFlameParticleCount(state, ball, visual, direction);
+    reconcileFlameParticleCount(state, ball, visual);
     const elapsed = Math.min(MAX_FLAME_PLUME_ELAPSED, Math.max(0, time - state.time));
     const ballShift = { x: ball.position.x - state.position.x, y: ball.position.y - state.position.y };
     const ballShiftDistance = Math.hypot(ballShift.x, ballShift.y);
     if (ballShiftDistance > Math.max(1, ball.radius * 3)) {
-        const resetState = createFlamePlumeState(ball, visual, direction, time);
+        const resetState = createFlamePlumeState(ball, visual, time);
         flamePlumeStates.set(ball, resetState);
         return { direction: getFlamePlumeDirection(resetState, ball, direction), particles: resetState.particles };
     }
@@ -231,7 +238,7 @@ function getRebirthFlamePlume(ball, visual, time) {
     let remaining = elapsed;
     while (remaining > 0) {
         const step = Math.min(MAX_FLAME_PLUME_STEP, remaining);
-        state.particles.forEach((particle) => updateFlameParticle(particle, state, ball, direction, visual, step));
+        state.particles.forEach((particle) => updateFlameParticle(particle, state, ball, visual, step));
         state.time += step;
         remaining -= step;
     }
@@ -252,11 +259,11 @@ function getFlameParticleColor(ageProgress) {
 
 function getFlameParticleStyle(particle, visual) {
     const ageProgress = clamp(particle.age / particle.lifetime, 0, 1);
-    const stageScale = 1.1 + visual.stage * 0.07;
-    const flicker = 1 + smoothNoise(particle.age * 8.4, particle.seed + 197) * visual.flickerStrength * 0.09;
+    const growth = getFlameGrowth(visual);
+    const flicker = 1 + smoothNoise(particle.age * 8.4, particle.seed + 197) * getFlameFlickerStrength(visual) * 0.09;
     return {
-        size: particle.size * stageScale * (1.16 - ageProgress * 0.3) * flicker,
-        alpha: clamp((0.54 + (1 - ageProgress) * 0.36) * (0.9 + visual.stage * 0.025), 0.48, 0.96)
+        size: particle.size * (1.1 + growth * 0.21) * (1.16 - ageProgress * 0.3) * flicker,
+        alpha: clamp((0.54 + (1 - ageProgress) * 0.36) * (0.9 + growth * 0.1), 0.48, 0.96)
     };
 }
 
