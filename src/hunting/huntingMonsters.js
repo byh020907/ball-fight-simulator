@@ -45,9 +45,9 @@ const MONSTER_BEHAVIOR_DESCRIPTIONS = Object.freeze({
 });
 
 const RANGED_REPOSITION_PROFILE = Object.freeze({
-    cooldown: 2.8,
-    proximityGap: 88,
-    impulse: 300,
+    cooldown: 3,
+    proximityGap: 90,
+    impulse: 900,
     allyAwareness: 180
 });
 
