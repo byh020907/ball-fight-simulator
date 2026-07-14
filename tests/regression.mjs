@@ -47,6 +47,7 @@ import {
 import {
     createRebirthFlameContour,
     drawRebirthVisualOverlay,
+    getRebirthFlameDirection,
     getRebirthVisualProfile
 } from "../src/rebirth/rebirthVisuals.js";
 import {
@@ -17131,6 +17132,25 @@ function testRebirthVisualProfileContract() {
     assert.ok(movingRightContour.direction.x < -0.85, "Moving right should push the flame silhouette behind the ball");
     const movingDownContour = createRebirthFlameContour(createBall(new Vector2(0, 420)), visual, { time: 0.1 });
     assert.ok(movingDownContour.direction.y < -0.85, "Moving down should keep the flame silhouette behind the ball");
+
+    const turningBall = createBall(new Vector2());
+    const initialFlameDirection = getRebirthFlameDirection(turningBall, 0);
+    turningBall.velocity = new Vector2(420, 0);
+    const earlyTurnDirection = getRebirthFlameDirection(turningBall, 1 / 60);
+    const initialDirectionDot =
+        initialFlameDirection.x * earlyTurnDirection.x + initialFlameDirection.y * earlyTurnDirection.y;
+    assert.ok(
+        initialDirectionDot > 0.9,
+        "Flame direction should retain most of its previous heading on the first turn frame"
+    );
+    const settledTurnDirection = Array.from({ length: 45 }, (_, index) =>
+        getRebirthFlameDirection(turningBall, (index + 2) / 60)
+    ).at(-1);
+    assert.ok(
+        settledTurnDirection.x < -0.95,
+        "Flame direction should finish following sustained movement after its visual delay"
+    );
+
     const statlessMovingBall = { ...createBall(new Vector2(420, 0)), stats: undefined };
     const statlessMovingContour = createRebirthFlameContour(statlessMovingBall, visual, { time: 0.1 });
     assert.ok(

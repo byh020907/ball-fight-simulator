@@ -3,6 +3,8 @@ import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 const MAX_FLAME_COUNT = Math.max(...REWARD_BALANCE.rebirth.visualStages.map((stage) => stage.flameCount));
 const MAX_CONTOUR_POINT_COUNT = 13;
 const FLAME_MOVEMENT_THRESHOLD = 8;
+const FLAME_DIRECTION_FOLLOW_RATE = 6;
+const flameDirectionStates = new WeakMap();
 
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
@@ -40,7 +42,7 @@ function getBallSpeed(ball) {
     return typeof velocity.length === "function" ? velocity.length() : Math.hypot(velocity.x, velocity.y);
 }
 
-function getFlameDirection(ball) {
+function getFlameTargetDirection(ball) {
     const velocity = ball.velocity ?? { x: 0, y: 0 };
     const speed = getBallSpeed(ball);
     if (speed < FLAME_MOVEMENT_THRESHOLD) return { x: 0, y: -1 };
@@ -51,6 +53,25 @@ function getFlameDirection(ball) {
         x: movementDirection.x * movementBlend,
         y: -1 * (1 - movementBlend) + movementDirection.y * movementBlend
     });
+}
+
+export function getRebirthFlameDirection(ball, time = 0) {
+    const targetDirection = getFlameTargetDirection(ball);
+    const previousState = flameDirectionStates.get(ball);
+    if (!previousState) {
+        flameDirectionStates.set(ball, { direction: targetDirection, time });
+        return targetDirection;
+    }
+
+    const elapsed = Math.min(0.25, Math.max(0, time - previousState.time));
+    if (elapsed === 0) return previousState.direction;
+    const blend = 1 - Math.exp(-FLAME_DIRECTION_FOLLOW_RATE * elapsed);
+    const direction = normalizeDirection({
+        x: previousState.direction.x + (targetDirection.x - previousState.direction.x) * blend,
+        y: previousState.direction.y + (targetDirection.y - previousState.direction.y) * blend
+    });
+    flameDirectionStates.set(ball, { direction, time });
+    return direction;
 }
 
 function getFlameContourPointCount(stage) {
@@ -113,11 +134,10 @@ function drawFlameLayer(ctx, contour, { extensionRatio, color, alpha, strokeColo
  * 공 표면에 붙은 하나의 화염 실루엣을 만든다.
  * 정지 시에는 상단 외곽이, 이동 중에는 속도 반대쪽 외곽이 불꽃으로 밀려난다.
  */
-export function createRebirthFlameContour(ball, visual, { time = 0 } = {}) {
+export function createRebirthFlameContour(ball, visual, { time = 0, direction = getFlameTargetDirection(ball) } = {}) {
     if (!visual || visual.rebirthCount <= 0) return null;
     const speed = getBallSpeed(ball);
     const speedRatio = Math.min(1, speed / Math.max(1, ball.stats?.baseSpeed ?? 1));
-    const direction = getFlameDirection(ball);
     const perpendicular = { x: -direction.y, y: direction.x };
     const rootHalfWidth = Math.max(4, Math.min(ball.radius - 3, ball.radius * 0.92));
     const pointCount = getFlameContourPointCount(visual.stage);
@@ -202,7 +222,7 @@ export function drawRebirthVisualOverlay(ctx, ball, visual, time = performance.n
     if (!visual || visual.rebirthCount <= 0) return;
     const { x, y } = ball.position;
     const speedRatio = Math.min(1, getBallSpeed(ball) / Math.max(1, ball.stats?.baseSpeed ?? 1));
-    const contour = createRebirthFlameContour(ball, visual, { time });
+    const contour = createRebirthFlameContour(ball, visual, { time, direction: getRebirthFlameDirection(ball, time) });
     ctx.save();
     ctx.strokeStyle = visual.color;
     ctx.lineWidth = 1.5 + visual.outlineWidth;
