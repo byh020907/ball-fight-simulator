@@ -8029,7 +8029,7 @@ function testHuntingAdaptiveRangedReposition() {
     repositionTypes.forEach((type) => {
         const spec = createHuntingMobSpec({ type, floor: 100, index: 0 });
         assert.ok(spec.hunting.reposition, `${type} should opt into proximity repositioning`);
-        assert.equal(spec.hunting.reposition.impulse, 900, `${type} should use a visible relocation impulse`);
+        assert.equal(spec.hunting.reposition.impulse, 1500, `${type} should use a visible relocation impulse`);
         assert.equal(spec.hunting.reposition.cooldown, 3, `${type} should wait a clear 3 seconds between relocations`);
     });
     [HUNTING_MONSTER_TYPES.ELECTRIC, HUNTING_MONSTER_TYPES.CHAIN, HUNTING_MONSTER_TYPES.SIPHON].forEach((type) => {
@@ -8051,7 +8051,7 @@ function testHuntingAdaptiveRangedReposition() {
     const velocityAfterFirstReposition = positiveSide.owner.velocity.length();
     assert.equal(
         velocityAfterFirstReposition,
-        900,
+        1500,
         "The initial reposition impulse should be visibly stronger than normal chase"
     );
     assert.ok(cooldown > 0, "Repositioning should begin an independent cooldown");
