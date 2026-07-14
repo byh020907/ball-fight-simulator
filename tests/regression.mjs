@@ -113,6 +113,7 @@ import {
     HUNTING_MONSTER_TYPES,
     HUNTING_MONSTER_BASE_SPECS,
     HUNTING_MONSTER_TAGS,
+    HUNTING_PRESSURE_BEHAVIORS,
     HUNTING_PORTAL_DECLINE,
     HUNTING_RUN_PHASES,
     HUNTING_STAGE_IDS,
@@ -7983,6 +7984,137 @@ function testHuntingMeleeMobChasesTarget(app) {
     assert.ok(melee.velocity.x < 0, "Melee hunting mobs should move horizontally toward the player");
 }
 
+function testHuntingAdaptiveRangedReposition() {
+    const createScenario = (type, allyOffsets = []) => {
+        const playerSpec = {
+            id: `reposition-player-${type}`,
+            name: "Reposition Target",
+            ability: "none",
+            teamId: HUNTING_TEAMS.PLAYER,
+            color: "#ffffff",
+            face: "default",
+            stats: { hp: 1000, damage: 1, defense: 1000, speed: 0, radius: 36, mass: 1 }
+        };
+        const ownerSpec = createHuntingMobSpec({ type, floor: 100, index: 0 });
+        const allySpecs = allyOffsets.map((_, index) =>
+            createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.PURSUER, floor: 100, index: index + 1 })
+        );
+        const simulation = new BattleSimulation(
+            [playerSpec, ownerSpec, ...allySpecs],
+            { onLog() {}, onSound() {} },
+            null,
+            {
+                assignActions: false
+            }
+        );
+        const [target, owner, ...allies] = simulation.fighters;
+        target.position = new Vector2(650, 480);
+        target.velocity = new Vector2();
+        owner.position = new Vector2(500, 480);
+        owner.velocity = new Vector2();
+        allies.forEach((ally, index) => {
+            const offset = allyOffsets[index];
+            ally.position = Vector2.add(owner.position, new Vector2(offset.x, offset.y));
+            ally.velocity = new Vector2();
+        });
+        return { simulation, target, owner };
+    };
+
+    const repositionTypes = [
+        HUNTING_MONSTER_TYPES.SHOOTER,
+        HUNTING_MONSTER_TYPES.SHARD,
+        HUNTING_MONSTER_TYPES.BOOMERANG,
+        HUNTING_MONSTER_TYPES.LASER
+    ];
+    repositionTypes.forEach((type) => {
+        const spec = createHuntingMobSpec({ type, floor: 100, index: 0 });
+        assert.ok(spec.hunting.reposition, `${type} should opt into proximity repositioning`);
+    });
+    [HUNTING_MONSTER_TYPES.ELECTRIC, HUNTING_MONSTER_TYPES.CHAIN, HUNTING_MONSTER_TYPES.SIPHON].forEach((type) => {
+        const spec = createHuntingMobSpec({ type, floor: 100, index: 0 });
+        assert.equal(spec.hunting.reposition, undefined, `${type} should keep its direct pressure movement`);
+    });
+
+    const positiveSide = createScenario(HUNTING_MONSTER_TYPES.SHOOTER, [{ x: 0, y: 100 }]);
+    assert.equal(
+        positiveSide.owner.ability._tickProximityReposition(positiveSide.target),
+        true,
+        "A close shooter should reposition when its cooldown is ready"
+    );
+    assert.ok(
+        positiveSide.owner.velocity.y < 0,
+        "An ally on one side should push the shooter toward the open opposite side"
+    );
+    const cooldown = positiveSide.owner.ability.state.repositionCooldown;
+    const velocityAfterFirstReposition = positiveSide.owner.velocity.length();
+    assert.ok(cooldown > 0, "Repositioning should begin an independent cooldown");
+    assert.equal(
+        positiveSide.owner.ability._tickProximityReposition(positiveSide.target),
+        false,
+        "Cooldown should prevent repeated immediate repositioning"
+    );
+    assert.equal(
+        positiveSide.owner.velocity.length(),
+        velocityAfterFirstReposition,
+        "A blocked repeat should not add another impulse"
+    );
+
+    const negativeSide = createScenario(HUNTING_MONSTER_TYPES.SHARD, [{ x: 0, y: -100 }]);
+    negativeSide.owner.ability._tickProximityReposition(negativeSide.target);
+    assert.ok(negativeSide.owner.velocity.y > 0, "The open side should reverse when the nearby ally reverses sides");
+
+    const bothSides = createScenario(HUNTING_MONSTER_TYPES.BOOMERANG, [
+        { x: 0, y: 100 },
+        { x: 0, y: -100 }
+    ]);
+    bothSides.owner.ability._tickProximityReposition(bothSides.target);
+    assert.ok(bothSides.owner.velocity.x < 0, "Allies on both sides should make the monster fall back from the target");
+
+    const laserCharge = createScenario(HUNTING_MONSTER_TYPES.LASER);
+    laserCharge.owner.ability.state.laser = { angle: 0, charge: 0.75, fire: 0 };
+    assert.equal(
+        laserCharge.owner.ability._tickProximityReposition(laserCharge.target),
+        false,
+        "Laser charge should keep its position rather than stacking a relocation impulse"
+    );
+    assert.equal(laserCharge.owner.velocity.length(), 0, "Blocked laser relocation should not change its velocity");
+
+    const activeBoomerang = createScenario(HUNTING_MONSTER_TYPES.BOOMERANG);
+    activeBoomerang.owner.ability.state.boomerang = { phase: "outbound" };
+    assert.equal(
+        activeBoomerang.owner.ability._tickProximityReposition(activeBoomerang.target),
+        true,
+        "Boomerang flight should continue tracking its owner while the owner can reposition"
+    );
+
+    const midpointRoll = (pool, predicate) => {
+        const total = pool.reduce((sum, entry) => sum + entry.weight, 0);
+        let consumed = 0;
+        for (const entry of pool) {
+            if (predicate(entry)) return (consumed + entry.weight / 2) / total;
+            consumed += entry.weight;
+        }
+        throw new Error("Expected weighted test entry to exist");
+    };
+    const floor = 100;
+    const allMonsters = getHuntingMonsterPool(floor);
+    const shooterRoll = midpointRoll(allMonsters, (monster) => monster.type === HUNTING_MONSTER_TYPES.SHOOTER);
+    const shardRoll = midpointRoll(
+        allMonsters.filter((monster) => monster.type !== HUNTING_MONSTER_TYPES.SHOOTER),
+        (monster) => monster.type === HUNTING_MONSTER_TYPES.SHARD
+    );
+    const boomerangRoll = midpointRoll(allMonsters, (monster) => monster.type === HUNTING_MONSTER_TYPES.BOOMERANG);
+    const pressureRoll = midpointRoll(allMonsters, (monster) => monster.type === HUNTING_MONSTER_TYPES.PURSUER);
+    const countRoll = midpointRoll(getHuntingMobCountWeights(floor), (entry) => entry.count === 3);
+    const rolls = [countRoll, shooterRoll, shardRoll, boomerangRoll, pressureRoll];
+    const forcedRangedEncounter = createHuntingMobEncounter({ floor, rng: () => rolls.shift() ?? 0 });
+    assert.ok(
+        forcedRangedEncounter.some((mob) => HUNTING_PRESSURE_BEHAVIORS.includes(mob.hunting.behavior)),
+        "Every normal encounter should retain at least one pressure monster when ranged picks dominate"
+    );
+    console.log("[hunting-adaptive-ranged-reposition] ok");
+}
+
 function testHuntingLaserReachesArenaWall(app) {
     const playerSpec = {
         ...app.roster.find((fighter) => fighter.id === FIGHTER_IDS.DASH),
@@ -11797,6 +11929,7 @@ testStatBalanceSystem();
 testMultiFighterSimulationSetup(app);
 testArenaCameraZoom();
 testHuntingMeleeMobChasesTarget(app);
+testHuntingAdaptiveRangedReposition();
 testHuntingLaserReachesArenaWall(app);
 testHuntingBoomerangReachAndReturnArc(app);
 testElectricArcPathAndHuntingRender(app);

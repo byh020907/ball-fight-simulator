@@ -44,6 +44,31 @@ const MONSTER_BEHAVIOR_DESCRIPTIONS = Object.freeze({
     laser: "충전한 방향으로 벽 끝까지 레이저를 발사합니다."
 });
 
+const RANGED_REPOSITION_PROFILE = Object.freeze({
+    cooldown: 2.8,
+    proximityGap: 88,
+    impulse: 300,
+    allyAwareness: 180
+});
+
+const HUNTING_REPOSITION_PROFILES = Object.freeze({
+    shooter: RANGED_REPOSITION_PROFILE,
+    shard: RANGED_REPOSITION_PROFILE,
+    boomerang: RANGED_REPOSITION_PROFILE,
+    laser: RANGED_REPOSITION_PROFILE
+});
+
+export const HUNTING_PRESSURE_BEHAVIORS = Object.freeze([
+    "pursuer",
+    "charger",
+    "electric",
+    "chain",
+    "shockwave",
+    "barrier",
+    "siphon",
+    "jumper"
+]);
+
 const CAVE_MONSTERS = Object.freeze(
     [
         [
@@ -196,7 +221,8 @@ const CAVE_MONSTERS = Object.freeze(
             face,
             stats: Object.freeze(stats),
             monsterTags: Object.freeze([...monsterTags]),
-            behaviorDescription: MONSTER_BEHAVIOR_DESCRIPTIONS[type]
+            behaviorDescription: MONSTER_BEHAVIOR_DESCRIPTIONS[type],
+            reposition: HUNTING_REPOSITION_PROFILES[type] ?? null
         })
     )
 );
@@ -274,12 +300,7 @@ function getMonsterRarity(monster) {
     return monster.monsterTags.find((tag) => tag.startsWith("rarity:"))?.slice("rarity:".length) ?? "common";
 }
 
-function rollMonster(floor, stageId, rng, excludedTypes = [], allowedRarities = null) {
-    const pool = getHuntingMonsterPool(floor, stageId).filter(
-        (monster) =>
-            !excludedTypes.includes(monster.type) &&
-            (!allowedRarities || allowedRarities.includes(getMonsterRarity(monster)))
-    );
+function rollWeightedMonster(pool, rng) {
     const total = pool.reduce((sum, monster) => sum + monster.weight, 0);
     let roll = rng() * total;
     for (const monster of pool) {
@@ -287,6 +308,25 @@ function rollMonster(floor, stageId, rng, excludedTypes = [], allowedRarities = 
         if (roll < 0) return monster;
     }
     return pool.at(-1);
+}
+
+function rollMonster(floor, stageId, rng, excludedTypes = [], allowedRarities = null) {
+    const pool = getHuntingMonsterPool(floor, stageId).filter(
+        (monster) =>
+            !excludedTypes.includes(monster.type) &&
+            (!allowedRarities || allowedRarities.includes(getMonsterRarity(monster)))
+    );
+    return rollWeightedMonster(pool, rng);
+}
+
+function ensurePressureBehavior(monsterTypes, floor, stageId, rng) {
+    if (monsterTypes.some((type) => HUNTING_PRESSURE_BEHAVIORS.includes(type))) return monsterTypes;
+    const pressureMonster = rollWeightedMonster(
+        getHuntingMonsterPool(floor, stageId).filter((monster) => HUNTING_PRESSURE_BEHAVIORS.includes(monster.type)),
+        rng
+    );
+    if (!pressureMonster) return monsterTypes;
+    return monsterTypes.map((type, index) => (index === monsterTypes.length - 1 ? pressureMonster.type : type));
 }
 
 export function getHuntingMobCountWeights(floor) {
@@ -367,6 +407,7 @@ export function createHuntingMobSpec({
             behavior: base.type,
             isMob: true,
             stageSkin: base.stageId,
+            ...(base.reposition ? { reposition: base.reposition } : {}),
             ...(splitConfig ?? {})
         }
     };
@@ -378,7 +419,7 @@ export function createHuntingMobEncounter({ floor = 1, stageId = HUNTING_STAGE_I
         const forceDifferentSecondType = index === 1 && getHuntingMonsterPool(floor, stageId).length > 1;
         monsterTypes.push(rollMonster(floor, stageId, rng, forceDifferentSecondType ? [monsterTypes[0]] : []).type);
     });
-    return monsterTypes.map((type, index) =>
+    return ensurePressureBehavior(monsterTypes, floor, stageId, rng).map((type, index) =>
         scaleEnemySpecForHunting(createHuntingMobSpec({ type, floor, index, stageId, rng }), floor, {
             enemyType: HUNTING_ENEMY_TYPES.NORMAL
         })

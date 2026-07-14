@@ -126,7 +126,8 @@ export class HuntingMobAbility extends Ability {
             boomerang: null,
             electric: { channelRemaining: 0, cooldownRemaining: 0 },
             linkChannel: { activeRemaining: 0, cooldownRemaining: 0 },
-            jump: 0
+            jump: 0,
+            repositionCooldown: 0
         };
     }
 
@@ -143,7 +144,9 @@ export class HuntingMobAbility extends Ability {
         this.state.barrierSwapTime = Math.max(0, this.state.barrierSwapTime - delta);
         if (this.state.barrierSwapTime <= 0) this.state.barrierSwapTarget = null;
         this.state.jump = Math.max(0, this.state.jump - delta);
+        this.state.repositionCooldown = Math.max(0, this.state.repositionCooldown - delta);
         this._steer(delta, target);
+        this._tickProximityReposition(target);
         this._tickNaturalHeal(delta);
         this._tickBehavior(delta, target);
     }
@@ -158,6 +161,50 @@ export class HuntingMobAbility extends Ability {
 
     _tickNaturalHeal(delta) {
         if (this.behavior === "healer") this.owner.heal((this.owner.maxHp / 20) * delta);
+    }
+
+    _tickProximityReposition(target) {
+        const config = this.owner.hunting?.reposition;
+        if (!config || this.state.repositionCooldown > 0 || this._hasRepositionBlocker()) return false;
+        const directionToTarget = this._directionTo(target);
+        if (!directionToTarget) return false;
+        const distance = Vector2.subtract(target.position, this.owner.position).length();
+        const triggerDistance = this.owner.radius + target.radius + config.proximityGap;
+        if (distance > triggerDistance) return false;
+
+        const direction = this._getAdaptiveRepositionDirection(directionToTarget, config);
+        this.owner.applyImpulse(direction.scale(config.impulse));
+        this.state.repositionCooldown = config.cooldown;
+        this.simulation.spawnPulse(this.owner.position.clone(), this.owner.color);
+        return true;
+    }
+
+    _hasRepositionBlocker() {
+        return Boolean(this.owner.state.movement || this.state.laser || this.state.link);
+    }
+
+    _getAdaptiveRepositionDirection(directionToTarget, config) {
+        const positiveSide = new Vector2(-directionToTarget.y, directionToTarget.x);
+        const negativeSide = positiveSide.clone().scale(-1);
+        const allies = this.simulation.fighters.filter(
+            (fighter) =>
+                fighter !== this.owner &&
+                !fighter.flags.defeated &&
+                !fighter.flags.destroyed &&
+                !fighter.state.swallowed &&
+                !this.simulation.isHostile(this.owner, fighter) &&
+                Vector2.subtract(fighter.position, this.owner.position).length() <=
+                    config.allyAwareness + this.owner.radius + fighter.radius
+        );
+        const hasPositiveSideAlly = allies.some(
+            (ally) => Vector2.subtract(ally.position, this.owner.position).dot(positiveSide) > 0.001
+        );
+        const hasNegativeSideAlly = allies.some(
+            (ally) => Vector2.subtract(ally.position, this.owner.position).dot(negativeSide) > 0.001
+        );
+        if (hasPositiveSideAlly && !hasNegativeSideAlly) return negativeSide;
+        if (hasNegativeSideAlly && !hasPositiveSideAlly) return positiveSide;
+        return directionToTarget.scale(-1);
     }
 
     _tickBehavior(delta, target) {
