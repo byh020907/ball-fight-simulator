@@ -89,6 +89,17 @@ export function createHuntingRun({
     };
 }
 
+export function getHuntingResumeStartFloor(stats, stageId) {
+    const hasKnownStage = HUNTING_STAGES.some((stage) => stage.id === stageId);
+    if (!hasKnownStage) return 1;
+
+    const lastReachedFloor = stats?.lastReachedFloorByStage?.[stageId];
+    if (!Number.isFinite(lastReachedFloor) || lastReachedFloor < 1) return 1;
+
+    const safeLastReachedFloor = Math.min(HUNTING_MAX_FLOOR, Math.floor(lastReachedFloor));
+    return Math.max(1, Math.floor(safeLastReachedFloor / 2));
+}
+
 export function getUnlockedHuntingStageIds(profile) {
     const knownIds = new Set(HUNTING_STAGES.map((stage) => stage.id));
     const unlocked = Array.isArray(profile?.hunting?.unlockedStageIds)

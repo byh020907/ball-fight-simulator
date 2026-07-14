@@ -82,6 +82,7 @@ import {
     defeatHuntingRun,
     applyHuntingCursedAltar,
     applyHuntingStatModifiersToSpec,
+    getHuntingResumeStartFloor,
     getEligibleHuntingCharacters,
     getEnemyPowerMultiplier,
     getHuntingFloorChances,
@@ -5852,6 +5853,7 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
 
 async function testDebugHuntingStartsRequestedFloor() {
     const profile = createDefaultPlayerProfile();
+    profile.hunting.stats.lastReachedFloorByStage = { [HUNTING_STAGE_IDS.FOREST]: 100 };
     const overlayStates = [];
     const overlayMessages = [];
     const app = {
@@ -5907,6 +5909,162 @@ async function testDebugHuntingStartsRequestedFloor() {
         PopupService.setTestDialog(originalDialog);
     }
     console.log("[debug-hunting-requested-floor] ok");
+}
+
+async function testHuntingResumeStartsAtHalfLatestStageFloor() {
+    const sanitized = sanitizePlayerProfile({
+        version: 8,
+        hunting: {
+            stats: {
+                lastReachedFloorByStage: {
+                    [HUNTING_STAGE_IDS.CAVE]: 47.9,
+                    [HUNTING_STAGE_IDS.FOREST]: 999,
+                    [HUNTING_STAGE_IDS.DESERT]: -3,
+                    invalid_stage: 50
+                }
+            }
+        }
+    });
+    assert.deepEqual(
+        sanitized.hunting.stats.lastReachedFloorByStage,
+        {
+            [HUNTING_STAGE_IDS.CAVE]: 47,
+            [HUNTING_STAGE_IDS.FOREST]: HUNTING_MAX_FLOOR
+        },
+        "Stored resume floors must keep only valid stages and safe integer floors"
+    );
+    assert.equal(getHuntingResumeStartFloor({}, HUNTING_STAGE_IDS.CAVE), 1, "Missing progress should start at floor 1");
+    assert.equal(
+        getHuntingResumeStartFloor(
+            { lastReachedFloorByStage: { [HUNTING_STAGE_IDS.CAVE]: 1 } },
+            HUNTING_STAGE_IDS.CAVE
+        ),
+        1,
+        "Floor 1 should restart from floor 1"
+    );
+    assert.equal(
+        getHuntingResumeStartFloor(
+            { lastReachedFloorByStage: { [HUNTING_STAGE_IDS.CAVE]: 2 } },
+            HUNTING_STAGE_IDS.CAVE
+        ),
+        1,
+        "Floor 2 should restart from floor 1"
+    );
+    assert.equal(
+        getHuntingResumeStartFloor(
+            { lastReachedFloorByStage: { [HUNTING_STAGE_IDS.CAVE]: 47 } },
+            HUNTING_STAGE_IDS.CAVE
+        ),
+        23,
+        "Floor 47 should restart from floor 23"
+    );
+    assert.equal(
+        getHuntingResumeStartFloor(
+            { lastReachedFloorByStage: { [HUNTING_STAGE_IDS.CAVE]: 100 } },
+            HUNTING_STAGE_IDS.CAVE
+        ),
+        50,
+        "Floor 100 should restart from floor 50"
+    );
+
+    const profile = createDefaultPlayerProfile();
+    profile.collection.characters[FIGHTER_IDS.RAGE] = { tournamentWins: 1 };
+    profile.hunting.unlockedStageIds = [HUNTING_STAGE_IDS.CAVE, HUNTING_STAGE_IDS.FOREST, HUNTING_STAGE_IDS.DESERT];
+    profile.hunting.selectedStageId = HUNTING_STAGE_IDS.FOREST;
+    profile.hunting.stats.lastReachedFloorByStage = {
+        [HUNTING_STAGE_IDS.CAVE]: 100,
+        [HUNTING_STAGE_IDS.FOREST]: 47,
+        [HUNTING_STAGE_IDS.DESERT]: 2
+    };
+    const overlayMessages = [];
+    const app = {
+        playerProfile: profile,
+        playerFighterId: FIGHTER_IDS.RAGE,
+        playerStatAllocation: createEmptyStatAllocation(),
+        roster: createRoster(),
+        renderer: { clear() {} },
+        stopPlayerPreviewLoop() {},
+        beginGameSession() {},
+        _refreshCollectionHub() {},
+        _syncPlayerStatAllocationFromUi() {},
+        refreshPlayerSetup() {},
+        setHuntingActive() {},
+        setHuntingOverlayState() {},
+        showOverlay(label, text, subtext) {
+            overlayMessages.push({ label, text, subtext });
+        },
+        addLog() {}
+    };
+    const manager = new HuntingManager(app);
+    manager.advance = async () => {};
+    const originalDialog = PopupService._testDialog;
+    PopupService.setTestDialog({ close() {} });
+    try {
+        await manager.startRun(FIGHTER_IDS.RAGE);
+        assert.equal(manager._run.floor, 23, "Normal restart should preserve the displayed starting floor internally");
+        assert.deepEqual(overlayMessages.at(-1), {
+            label: "사냥터",
+            text: "숲 · 23층",
+            subtext: "원정 시작"
+        });
+        assert.equal(manager._run.floor + 1, 24, "The first encounter must remain one floor after the displayed start");
+
+        await manager.startDebugRun(FIGHTER_IDS.RAGE, {
+            stageId: HUNTING_STAGE_IDS.FOREST,
+            encounterFloor: 47
+        });
+        assert.equal(
+            manager._run.floor,
+            46,
+            "Debug start must retain the requested encounter floor without resume offset"
+        );
+        assert.equal(overlayMessages.at(-1).text, "숲 · 47층", "Debug start display must remain exact");
+    } finally {
+        PopupService.setTestDialog(originalDialog);
+    }
+
+    const finalizationProfile = createDefaultPlayerProfile();
+    finalizationProfile.hunting.stats.deepestFloor = 100;
+    finalizationProfile.hunting.stats.lastReachedFloorByStage = { [HUNTING_STAGE_IDS.CAVE]: 100 };
+    const finalizationApp = {
+        playerProfile: finalizationProfile,
+        _settleHuntingAchievements() {}
+    };
+    const finalizationManager = new HuntingManager(finalizationApp);
+    const endedRuns = [
+        defeatHuntingRun(
+            { ...createHuntingRun({ characterId: FIGHTER_IDS.RAGE, stageId: HUNTING_STAGE_IDS.CAVE }), floor: 47 },
+            { rng: () => 1 }
+        ),
+        retreatHuntingRun({
+            ...createHuntingRun({ characterId: FIGHTER_IDS.RAGE, stageId: HUNTING_STAGE_IDS.FOREST }),
+            floor: 42,
+            lastEvent: { type: HUNTING_EVENT_TYPES.PORTAL }
+        }),
+        retreatHuntingRun(
+            { ...createHuntingRun({ characterId: FIGHTER_IDS.RAGE, stageId: HUNTING_STAGE_IDS.DESERT }), floor: 100 },
+            { reason: "stage_clear" }
+        )
+    ];
+    for (const endedRun of endedRuns) {
+        finalizationManager._run = endedRun;
+        finalizationManager._mergeIntoSecured(finalizationApp);
+    }
+    assert.deepEqual(
+        finalizationProfile.hunting.stats.lastReachedFloorByStage,
+        {
+            [HUNTING_STAGE_IDS.CAVE]: 47,
+            [HUNTING_STAGE_IDS.FOREST]: 42,
+            [HUNTING_STAGE_IDS.DESERT]: 100
+        },
+        "Defeat, portal retreat, and stage clear must each overwrite only their stage's latest floor"
+    );
+    assert.equal(
+        finalizationProfile.hunting.stats.deepestFloor,
+        100,
+        "Achievement maximum must remain independent of resume state"
+    );
+    console.log("[hunting-resume-half-floor] ok");
 }
 
 function testHuntingTerrain() {
@@ -12311,6 +12469,7 @@ testHuntingPortalDecline();
 testHuntingStageSelectionAndArenaTheme();
 await testHuntingStageSelectUsesPreviewCharacter();
 await testDebugHuntingStartsRequestedFloor();
+await testHuntingResumeStartsAtHalfLatestStageFloor();
 testHuntingTerrain();
 testEquipmentEnhancement();
 testEquipmentStatValueRatios();

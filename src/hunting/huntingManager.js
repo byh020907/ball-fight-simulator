@@ -5,6 +5,7 @@ import {
     defeatHuntingRun,
     canRetreatFromHuntingRun,
     canEnterHunting,
+    getHuntingResumeStartFloor,
     getSelectedHuntingStageId,
     getUnlockedHuntingStageIds,
     applyHuntingStatModifiersToSpec,
@@ -167,7 +168,13 @@ export class HuntingManager {
         PopupService.close();
         if (!canEnterHunting(this.app.playerProfile, characterId)) return;
         const stageId = getSelectedHuntingStageId(this.app.playerProfile);
-        return this._startRun(characterId, { stageId, encounterFloor: 2, displayFloor: 1, debug: false });
+        const displayFloor = getHuntingResumeStartFloor(this.app.playerProfile.hunting.stats, stageId);
+        return this._startRun(characterId, {
+            stageId,
+            encounterFloor: displayFloor + 1,
+            displayFloor,
+            debug: false
+        });
     }
 
     async startDebugRun(characterId, { stageId = HUNTING_STAGE_IDS.CAVE, encounterFloor = 1 } = {}) {
@@ -1098,12 +1105,17 @@ export class HuntingManager {
             profile.equipment.enhancementStones =
                 (profile.equipment.enhancementStones ?? 0) + (run.securedLoot?.enhancementStones ?? 0);
             const stats = applyHuntingRunAchievementProgress(profile.hunting.stats, run);
+            const completedFloor = Math.max(1, Math.min(HUNTING_MAX_FLOOR, Math.floor(run.floor ?? 1)));
+            const hasKnownStage = HUNTING_STAGES.some((stage) => stage.id === run.stageId);
             profile.hunting.stats = {
                 ...stats,
                 runsStarted: stats.runsStarted + 1,
                 runsRetreated: stats.runsRetreated + (run.status === "retreated" ? 1 : 0),
                 runsDefeated: stats.runsDefeated + (run.status === "defeated" ? 1 : 0),
-                deepestFloor: Math.max(stats.deepestFloor, run.floor)
+                deepestFloor: Math.max(stats.deepestFloor, completedFloor),
+                lastReachedFloorByStage: hasKnownStage
+                    ? { ...stats.lastReachedFloorByStage, [run.stageId]: completedFloor }
+                    : stats.lastReachedFloorByStage
             };
         }
         app._settleHuntingAchievements(run);

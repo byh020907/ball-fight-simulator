@@ -1,4 +1,4 @@
-import { HUNTING_EVENT_TYPES, HUNTING_MONSTER_TYPES, HUNTING_STAGE_IDS } from "./huntingConfig.js";
+import { HUNTING_EVENT_TYPES, HUNTING_MAX_FLOOR, HUNTING_MONSTER_TYPES, HUNTING_STAGE_IDS } from "./huntingConfig.js";
 
 const HUNTING_STAT_TAG_PATTERN = /^[a-z][a-z0-9:_-]{0,63}$/;
 const MAX_TRACKED_MONSTER_TAGS = 64;
@@ -32,6 +32,21 @@ function sanitizeStageIds(value) {
 
 function sanitizeFloor(value) {
     return Math.max(1, sanitizeCounter(value));
+}
+
+function sanitizeLastReachedFloor(value) {
+    if (!Number.isFinite(value) || value < 1) return null;
+    return Math.min(HUNTING_MAX_FLOOR, Math.floor(value));
+}
+
+function sanitizeLastReachedFloorByStage(value) {
+    if (!value || typeof value !== "object") return {};
+    return Object.fromEntries(
+        Object.entries(value)
+            .filter(([stageId]) => TRACKED_STAGE_IDS.has(stageId))
+            .map(([stageId, floor]) => [stageId, sanitizeLastReachedFloor(floor)])
+            .filter(([, floor]) => floor !== null)
+    );
 }
 
 function createMonsterCodexRecord() {
@@ -200,6 +215,7 @@ export function createDefaultHuntingStats() {
         runsRetreated: 0,
         runsDefeated: 0,
         deepestFloor: 0,
+        lastReachedFloorByStage: {},
         visitedStageIds: [],
         monsterKillsByTag: {},
         monsterCodexByType: {},
@@ -221,6 +237,7 @@ export function sanitizeHuntingStats(value) {
         runsRetreated: sanitizeCounter(value.runsRetreated),
         runsDefeated: sanitizeCounter(value.runsDefeated),
         deepestFloor: sanitizeCounter(value.deepestFloor),
+        lastReachedFloorByStage: sanitizeLastReachedFloorByStage(value.lastReachedFloorByStage),
         visitedStageIds: sanitizeStageIds(value.visitedStageIds),
         monsterKillsByTag: sanitizeMonsterKillsByTag(value.monsterKillsByTag),
         monsterCodexByType: sanitizeMonsterCodexByType(value.monsterCodexByType),
