@@ -17076,6 +17076,10 @@ function testRebirthVisualProfileContract() {
     assert.ok(stages.every((visual, index) => index === 0 || visual.auraRadius >= stages[index - 1].auraRadius));
     assert.ok(stages.every((visual, index) => index === 0 || visual.stage >= stages[index - 1].stage));
     assert.ok(
+        stages.every((visual, index) => index === 0 || visual.flickerStrength >= stages[index - 1].flickerStrength),
+        "Higher rebirth stages should not reduce flame flicker strength"
+    );
+    assert.ok(
         stages.every((visual) => !("radius" in visual) && !("mass" in visual) && !("speed" in visual)),
         "Visual profile must not expose physics modifiers"
     );
@@ -17126,6 +17130,26 @@ function testRebirthVisualProfileContract() {
             return displacement > 0.01 && displacement < 5;
         }),
         "Flame contour should animate continuously instead of jumping between random shapes"
+    );
+    const getTemporalFlickerRange = (rebirthCount) => {
+        const samples = Array.from({ length: 31 }, (_, index) =>
+            createRebirthFlameContour(createBall(new Vector2()), getRebirthVisualProfile(rebirthCount), {
+                time: index / 30
+            })
+        );
+        return Math.max(
+            ...samples[0].outerPoints.map((_, pointIndex) => {
+                const pointPositions = samples.map((sample) => sample.outerPoints[pointIndex]);
+                const origin = pointPositions[0];
+                return Math.max(...pointPositions.map((point) => Math.hypot(point.x - origin.x, point.y - origin.y)));
+            })
+        );
+    };
+    const flickerRanges = [1, 3, 6, 10].map(getTemporalFlickerRange);
+    assert.ok(flickerRanges[0] >= 14, "Base rebirth flame should visibly flicker over one second");
+    assert.ok(
+        flickerRanges.every((range, index) => index === 0 || range >= flickerRanges[index - 1]),
+        "Higher rebirth stages should visibly flicker at least as much as lower stages"
     );
 
     const movingRightContour = createRebirthFlameContour(createBall(new Vector2(420, 0)), visual, { time: 0.1 });

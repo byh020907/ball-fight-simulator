@@ -47,15 +47,32 @@ export const REWARD_BALANCE = deepFreeze({
             hero: { key: "magnetRadiusMultiplier", base: 1, perRank: 0.2 }
         },
         visualStages: [
-            { minimumCount: 0, color: "#ff7b32", outlineWidth: 0, auraRadius: 0, flameCount: 0, afterimageAlpha: 0 },
-            { minimumCount: 1, color: "#ff983d", outlineWidth: 1, auraRadius: 7, flameCount: 2, afterimageAlpha: 0.1 },
+            {
+                minimumCount: 0,
+                color: "#ff7b32",
+                outlineWidth: 0,
+                auraRadius: 0,
+                flameCount: 0,
+                afterimageAlpha: 0,
+                flickerStrength: 0
+            },
+            {
+                minimumCount: 1,
+                color: "#ff983d",
+                outlineWidth: 1,
+                auraRadius: 7,
+                flameCount: 2,
+                afterimageAlpha: 0.1,
+                flickerStrength: 0.4
+            },
             {
                 minimumCount: 3,
                 color: "#ffc44d",
                 outlineWidth: 2,
                 auraRadius: 12,
                 flameCount: 4,
-                afterimageAlpha: 0.16
+                afterimageAlpha: 0.16,
+                flickerStrength: 0.52
             },
             {
                 minimumCount: 6,
@@ -63,7 +80,8 @@ export const REWARD_BALANCE = deepFreeze({
                 outlineWidth: 3,
                 auraRadius: 18,
                 flameCount: 6,
-                afterimageAlpha: 0.22
+                afterimageAlpha: 0.22,
+                flickerStrength: 0.64
             },
             {
                 minimumCount: 10,
@@ -71,7 +89,8 @@ export const REWARD_BALANCE = deepFreeze({
                 outlineWidth: 4,
                 auraRadius: 24,
                 flameCount: 8,
-                afterimageAlpha: 0.28
+                afterimageAlpha: 0.28,
+                flickerStrength: 0.76
             }
         ]
     },

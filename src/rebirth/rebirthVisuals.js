@@ -78,12 +78,22 @@ function getFlameContourPointCount(stage) {
     return Math.min(MAX_CONTOUR_POINT_COUNT, 9 + Math.max(0, stage));
 }
 
-function getFlameTongueIntensity(progress, tongueCount, time, seed) {
+function getFlameTongueIntensity(progress, tongueCount, time, seed, flickerStrength) {
     const mainCrown = Math.sin(progress * Math.PI) ** 1.1;
     const secondaryTongues = Math.abs(Math.sin(progress * tongueCount * Math.PI));
-    const broadFlow = smoothNoise(time * 0.88 + progress * 2.4, seed);
-    const fineFlow = smoothNoise(time * 1.65 + progress * 5.8, seed + 29);
-    return clamp(0.54 + mainCrown * 0.3 + secondaryTongues * 0.18 + broadFlow * 0.2 + fineFlow * 0.06, 0.32, 1.18);
+    const broadFlow = smoothNoise(time * (2 + flickerStrength * 1.4) + progress * 2.4, seed);
+    const fineFlow = smoothNoise(time * (4.6 + flickerStrength * 2.2) + progress * 5.8, seed + 29);
+    return clamp(
+        0.54 + mainCrown * 0.3 + secondaryTongues * 0.18 + (broadFlow * 0.68 + fineFlow * 0.32) * flickerStrength,
+        0.2,
+        1.42
+    );
+}
+
+function getFlameLateralFlicker(progress, time, seed, flickerStrength) {
+    const broadSway = smoothNoise(time * (1.6 + flickerStrength * 1.8) + progress * 3.2, seed + 53);
+    const fineSway = smoothNoise(time * (4.1 + flickerStrength * 2.6) + progress * 7.6, seed + 79);
+    return (broadSway * 0.7 + fineSway * 0.3) * flickerStrength;
 }
 
 function createFlamePoint(ball, direction, perpendicular, lateral, forward) {
@@ -142,6 +152,7 @@ export function createRebirthFlameContour(ball, visual, { time = 0, direction = 
     const rootHalfWidth = Math.max(4, Math.min(ball.radius - 3, ball.radius * 0.92));
     const pointCount = getFlameContourPointCount(visual.stage);
     const tongueCount = Math.max(1, Math.min(4, Math.ceil(visual.flameCount / 2)));
+    const flickerStrength = visual.flickerStrength;
     const baseLength = ball.radius * (0.72 + visual.stage * 0.11) + 8 + speedRatio * ball.radius * 0.45;
     const seed = getBallSeed(ball);
     const basePoints = [];
@@ -154,9 +165,18 @@ export function createRebirthFlameContour(ball, visual, { time = 0, direction = 
         const root = createFlamePoint(ball, direction, perpendicular, lateral, surfaceForward);
         const rootWeight = index === 0 || index === pointCount - 1 ? 0 : Math.sin(progress * Math.PI) ** 0.58;
         const extension =
-            baseLength * rootWeight * getFlameTongueIntensity(progress, tongueCount, time, seed + index * 7);
+            baseLength *
+            rootWeight *
+            getFlameTongueIntensity(progress, tongueCount, time, seed + index * 7, flickerStrength);
+        const lateralFlicker =
+            ball.radius *
+            rootWeight *
+            (0.04 + flickerStrength * 0.1) *
+            getFlameLateralFlicker(progress, time, seed + index * 11, flickerStrength);
         basePoints.push(root);
-        outerPoints.push(createFlamePoint(ball, direction, perpendicular, lateral, surfaceForward + extension));
+        outerPoints.push(
+            createFlamePoint(ball, direction, perpendicular, lateral + lateralFlicker, surfaceForward + extension)
+        );
     }
 
     return {
@@ -202,6 +222,7 @@ export function getRebirthVisualProfile(rebirthCount = 0) {
         outlineWidth: stage.outlineWidth,
         auraRadius: stage.auraRadius,
         flameCount: Math.min(MAX_FLAME_COUNT, stage.flameCount),
+        flickerStrength: stage.flickerStrength,
         afterimageAlpha: Math.min(0.3, stage.afterimageAlpha)
     });
 }
