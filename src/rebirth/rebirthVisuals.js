@@ -1,14 +1,15 @@
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 
 const MAX_FLAME_COUNT = Math.max(...REWARD_BALANCE.rebirth.visualStages.map((stage) => stage.flameCount));
-const MAX_CONTOUR_POINT_COUNT = 13;
 const FLAME_MOVEMENT_THRESHOLD = 8;
-const MIN_FLAME_PARTICLE_COUNT = 6;
-const MAX_FLAME_PARTICLE_COUNT = 12;
-const FLAME_PARTICLE_THRUST = 340;
+const MIN_FLAME_PARTICLE_COUNT = 34;
+const MAX_FLAME_PARTICLE_COUNT = 76;
+const FLAME_PARTICLE_THRUST = 220;
 const FLAME_PARTICLE_DRAG = 3.6;
-const FLAME_PARTICLE_TURBULENCE = 140;
+const FLAME_PARTICLE_TURBULENCE = 104;
 const FLAME_PARTICLE_ATTACHMENT_POWER = 1.8;
+const FLAME_PARTICLE_ROTATION_FOLLOW = 12;
+const FLAME_PARTICLE_ROTATION_DAMPING = 8;
 const MAX_FLAME_PLUME_ELAPSED = 0.25;
 const MAX_FLAME_PLUME_STEP = 1 / 60;
 const flamePlumeStates = new WeakMap();
@@ -63,7 +64,11 @@ function getFlameTargetDirection(ball) {
 }
 
 function getFlameParticleCount(visual) {
-    return clamp(MIN_FLAME_PARTICLE_COUNT + visual.flameCount, MIN_FLAME_PARTICLE_COUNT, MAX_FLAME_PARTICLE_COUNT);
+    return clamp(
+        Math.round(MIN_FLAME_PARTICLE_COUNT + visual.flameCount * 4.75),
+        MIN_FLAME_PARTICLE_COUNT,
+        MAX_FLAME_PARTICLE_COUNT
+    );
 }
 
 function getFlameEmitter(ball, direction) {
@@ -83,14 +88,20 @@ function createFlameParticle(ball, emitter, direction, seed, ageProgress = 0) {
     const forwardNoise = (hashNoise(seed, 89) + 1) * 0.5;
     const lifetime = getParticleLifetime(seed);
     const age = lifetime * clamp(ageProgress, 0, 0.96);
-    const initialForward = ball.radius * (0.06 + ageProgress * (0.68 + forwardNoise * 0.25));
-    const lateral = ball.radius * lateralNoise * (0.08 + ageProgress * 0.16);
-    const speed = ball.radius * (2.1 + forwardNoise * 0.95);
+    const initialForward = ball.radius * (0.08 + ageProgress * (1.28 + forwardNoise * 0.3));
+    const lateral = ball.radius * lateralNoise * (0.06 + (1 - ageProgress) ** 0.78 * 0.2);
+    const speed = ball.radius * (1.9 + forwardNoise * 0.7);
+    const velocityX = direction.x * speed + perpendicular.x * lateralNoise * ball.radius * 0.4;
+    const velocityY = direction.y * speed + perpendicular.y * lateralNoise * ball.radius * 0.4;
+    const size = ball.radius * (0.1 + forwardNoise * 0.05);
     return {
         x: emitter.x + direction.x * initialForward + perpendicular.x * lateral,
         y: emitter.y + direction.y * initialForward + perpendicular.y * lateral,
-        velocityX: direction.x * speed + perpendicular.x * lateralNoise * ball.radius * 0.4,
-        velocityY: direction.y * speed + perpendicular.y * lateralNoise * ball.radius * 0.4,
+        velocityX,
+        velocityY,
+        size,
+        rotation: Math.atan2(velocityY, velocityX) - Math.PI / 2,
+        angularVelocity: hashNoise(seed, 163) * 1.2,
         age,
         lifetime,
         seed
@@ -128,12 +139,13 @@ function respawnFlameParticle(state, particle, ball, emitter, direction) {
     Object.assign(particle, nextParticle);
 }
 
-function updateFlameParticle(particle, state, ball, emitter, direction, elapsed) {
+function updateFlameParticle(particle, state, ball, emitter, direction, visual, elapsed) {
     const ageProgress = clamp(particle.age / particle.lifetime, 0, 1);
     const perpendicular = { x: -direction.y, y: direction.x };
     const turbulence =
         smoothNoise(state.time * 4.2 + particle.age * 3.4, particle.seed + 113) *
         FLAME_PARTICLE_TURBULENCE *
+        (1 + visual.flickerStrength * 0.35) *
         (0.45 + ageProgress * 0.55);
     particle.velocityX += (direction.x * FLAME_PARTICLE_THRUST + perpendicular.x * turbulence) * elapsed;
     particle.velocityY += (direction.y * FLAME_PARTICLE_THRUST + perpendicular.y * turbulence) * elapsed;
@@ -142,6 +154,14 @@ function updateFlameParticle(particle, state, ball, emitter, direction, elapsed)
     particle.velocityY *= drag;
     particle.x += particle.velocityX * elapsed;
     particle.y += particle.velocityY * elapsed;
+    const flowRotation = Math.atan2(particle.velocityY, particle.velocityX) - Math.PI / 2;
+    const rotationDifference = Math.atan2(
+        Math.sin(flowRotation - particle.rotation),
+        Math.cos(flowRotation - particle.rotation)
+    );
+    particle.angularVelocity += rotationDifference * FLAME_PARTICLE_ROTATION_FOLLOW * elapsed;
+    particle.angularVelocity *= Math.exp(-FLAME_PARTICLE_ROTATION_DAMPING * elapsed);
+    particle.rotation += particle.angularVelocity * elapsed;
     particle.age += elapsed;
     if (particle.age >= particle.lifetime) {
         respawnFlameParticle(state, particle, ball, emitter, direction);
@@ -195,7 +215,9 @@ function getRebirthFlamePlume(ball, visual, time) {
     let remaining = elapsed;
     while (remaining > 0) {
         const step = Math.min(MAX_FLAME_PLUME_STEP, remaining);
-        state.particles.forEach((particle) => updateFlameParticle(particle, state, ball, emitter, direction, step));
+        state.particles.forEach((particle) =>
+            updateFlameParticle(particle, state, ball, emitter, direction, visual, step)
+        );
         state.time += step;
         remaining -= step;
     }
@@ -208,216 +230,39 @@ export function getRebirthFlameDirection(ball, time = 0) {
     return getRebirthFlamePlume(ball, getRebirthVisualProfile(1), time).direction;
 }
 
-function getFlameContourPointCount(stage) {
-    return Math.min(MAX_CONTOUR_POINT_COUNT, 9 + Math.max(0, stage));
+function getFlameParticleColor(ageProgress) {
+    if (ageProgress < 0.24) return "#fff2b0";
+    if (ageProgress < 0.58) return "#ff942b";
+    return "#e74716";
 }
 
-function getFlameTongueIntensity(progress, tongueCount, time, seed, flickerStrength) {
-    const mainCrown = Math.sin(progress * Math.PI) ** 1.1;
-    const secondaryTongues = Math.abs(Math.sin(progress * tongueCount * Math.PI));
-    const broadFlow = smoothNoise(time * (2 + flickerStrength * 1.4) + progress * 2.4, seed);
-    const fineFlow = smoothNoise(time * (4.6 + flickerStrength * 2.2) + progress * 5.8, seed + 29);
-    return clamp(
-        0.54 + mainCrown * 0.3 + secondaryTongues * 0.18 + (broadFlow * 0.68 + fineFlow * 0.32) * flickerStrength,
-        0.2,
-        1.42
-    );
-}
-
-function getFlameLateralFlicker(progress, time, seed, flickerStrength) {
-    const broadSway = smoothNoise(time * (1.6 + flickerStrength * 1.8) + progress * 3.2, seed + 53);
-    const fineSway = smoothNoise(time * (4.1 + flickerStrength * 2.6) + progress * 7.6, seed + 79);
-    return (broadSway * 0.7 + fineSway * 0.3) * flickerStrength;
-}
-
-function createFlamePoint(ball, direction, perpendicular, lateral, forward) {
+function getFlameParticleStyle(particle, visual) {
+    const ageProgress = clamp(particle.age / particle.lifetime, 0, 1);
+    const stageScale = 1.1 + visual.stage * 0.07;
+    const flicker = 1 + smoothNoise(particle.age * 8.4, particle.seed + 197) * visual.flickerStrength * 0.09;
     return {
-        x: ball.position.x + perpendicular.x * lateral + direction.x * forward,
-        y: ball.position.y + perpendicular.y * lateral + direction.y * forward
+        size: particle.size * stageScale * (1.16 - ageProgress * 0.3) * flicker,
+        alpha: clamp((0.54 + (1 - ageProgress) * 0.36) * (0.9 + visual.stage * 0.025), 0.48, 0.96)
     };
 }
 
-function getQuadraticPoint(start, control, end, progress) {
-    const inverseProgress = 1 - progress;
-    return {
-        x: inverseProgress ** 2 * start.x + 2 * inverseProgress * progress * control.x + progress ** 2 * end.x,
-        y: inverseProgress ** 2 * start.y + 2 * inverseProgress * progress * control.y + progress ** 2 * end.y
-    };
-}
-
-function getQuadraticDirection(start, control, end, progress) {
-    return normalizeDirection({
-        x: 2 * (1 - progress) * (control.x - start.x) + 2 * progress * (end.x - control.x),
-        y: 2 * (1 - progress) * (control.y - start.y) + 2 * progress * (end.y - control.y)
-    });
-}
-
-function getFlameLayerPoints(contour, extensionRatio) {
-    return contour.outerPoints.map((point, index) => {
-        const root = contour.basePoints[index];
-        return {
-            x: root.x + (point.x - root.x) * extensionRatio,
-            y: root.y + (point.y - root.y) * extensionRatio
-        };
-    });
-}
-
-function traceSmoothPath(ctx, points, shouldMoveTo = true) {
-    if (shouldMoveTo) ctx.moveTo(points[0].x, points[0].y);
-    points.slice(1, -1).forEach((point, index) => {
-        const next = points[index + 2];
-        ctx.quadraticCurveTo(point.x, point.y, (point.x + next.x) * 0.5, (point.y + next.y) * 0.5);
-    });
-    const last = points.at(-1);
-    ctx.lineTo(last.x, last.y);
-}
-
-function drawFlameLayer(ctx, contour, { extensionRatio, color, alpha, strokeColor = null, lineWidth = 0 }) {
-    const outerPoints = getFlameLayerPoints(contour, extensionRatio);
-    const basePoints = [...contour.basePoints].reverse();
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    traceSmoothPath(ctx, outerPoints);
-    traceSmoothPath(ctx, basePoints, false);
-    ctx.closePath();
-    ctx.fill();
-    if (strokeColor && lineWidth > 0) {
-        ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = lineWidth;
-        ctx.stroke();
-    }
-}
-
-function drawFlamePlumeParticles(ctx, particles, visual, ball) {
+function drawFlameQuadParticles(ctx, particles, visual) {
     ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    particles.forEach((particle) => {
-        const ageProgress = clamp(particle.age / particle.lifetime, 0, 1);
-        const heat = 1 - ageProgress;
-        const radius = Math.max(1.7, ball.radius * (0.038 + heat * 0.038));
-        const alpha = (0.14 + heat * 0.27) * (0.8 + visual.stage * 0.05);
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = "#e74716";
-        ctx.beginPath();
-        ctx.arc(particle.x, particle.y, radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = alpha * 0.82;
-        ctx.fillStyle = "#ffad3c";
-        ctx.beginPath();
-        ctx.arc(particle.x, particle.y, radius * 0.56, 0, Math.PI * 2);
-        ctx.fill();
-    });
+    ctx.globalCompositeOperation = "source-over";
+    [...particles]
+        .sort((left, right) => right.age - left.age)
+        .forEach((particle) => {
+            const ageProgress = clamp(particle.age / particle.lifetime, 0, 1);
+            const { size, alpha } = getFlameParticleStyle(particle, visual);
+            ctx.save();
+            ctx.translate(particle.x, particle.y);
+            ctx.rotate(particle.rotation);
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = getFlameParticleColor(ageProgress);
+            ctx.fillRect(-size * 0.5, -size * 0.5, size, size);
+            ctx.restore();
+        });
     ctx.restore();
-}
-
-/**
- * 공 표면에 붙은 하나의 화염 실루엣을 만든다.
- * 정지 시에는 상단 외곽이, 이동 중에는 속도 반대쪽 외곽이 불꽃으로 밀려난다.
- */
-export function createRebirthFlameContour(
-    ball,
-    visual,
-    { time = 0, direction = getFlameTargetDirection(ball), trailDirection = direction } = {}
-) {
-    if (!visual || visual.rebirthCount <= 0) return null;
-    const speed = getBallSpeed(ball);
-    const speedRatio = Math.min(1, speed / Math.max(1, ball.stats?.baseSpeed ?? 1));
-    const perpendicular = { x: -direction.y, y: direction.x };
-    const rootHalfWidth = Math.max(4, Math.min(ball.radius - 3, ball.radius * 0.92));
-    const pointCount = getFlameContourPointCount(visual.stage);
-    const tongueCount = Math.max(1, Math.min(4, Math.ceil(visual.flameCount / 2)));
-    const flickerStrength = visual.flickerStrength;
-    const baseLength = ball.radius * (0.72 + visual.stage * 0.11) + 8 + speedRatio * ball.radius * 0.45;
-    const seed = getBallSeed(ball);
-    const samples = Array.from({ length: pointCount }, (_, index) => {
-        const progress = index / (pointCount - 1);
-        const lateral = -rootHalfWidth + rootHalfWidth * 2 * progress;
-        return {
-            index,
-            progress,
-            lateral,
-            surfaceForward: Math.sqrt(Math.max(0, ball.radius ** 2 - lateral ** 2)) - 1.5,
-            rootWeight: index === 0 || index === pointCount - 1 ? 0 : Math.sin(progress * Math.PI) ** 0.58
-        };
-    });
-    const basePoints = samples.map(({ lateral, surfaceForward }) =>
-        createFlamePoint(ball, direction, perpendicular, lateral, surfaceForward)
-    );
-    const rootCenter = createFlamePoint(ball, direction, perpendicular, 0, ball.radius - 1.5);
-    const tipIntensity = getFlameTongueIntensity(0.5, tongueCount, time, seed + pointCount * 7, flickerStrength);
-    const tipLength = baseLength * tipIntensity;
-    const tip = {
-        x: rootCenter.x + direction.x * tipLength * 0.34 + trailDirection.x * tipLength * 0.66,
-        y: rootCenter.y + direction.y * tipLength * 0.34 + trailDirection.y * tipLength * 0.66
-    };
-    const turnDifference = 1 - (direction.x * trailDirection.x + direction.y * trailDirection.y);
-    const curveBlend = smoothStep(0.03, 0.35, turnDifference);
-    const outerPoints = samples.map(({ index, progress, lateral, surfaceForward, rootWeight }) => {
-        const localIntensity = getFlameTongueIntensity(progress, tongueCount, time, seed + index * 7, flickerStrength);
-        const extension = baseLength * rootWeight * localIntensity;
-        const lateralFlicker =
-            ball.radius *
-            rootWeight *
-            (0.04 + flickerStrength * 0.1) *
-            getFlameLateralFlicker(progress, time, seed + index * 11, flickerStrength);
-        const alignedPoint = createFlamePoint(
-            ball,
-            direction,
-            perpendicular,
-            lateral + lateralFlicker,
-            surfaceForward + extension
-        );
-        const isLeftEdge = progress <= 0.5;
-        const start = isLeftEdge ? basePoints[0] : basePoints.at(-1);
-        const edgeSign = isLeftEdge ? -1 : 1;
-        const control = {
-            x: start.x + direction.x * tipLength * 0.46 + perpendicular.x * edgeSign * rootHalfWidth * 0.18,
-            y: start.y + direction.y * tipLength * 0.46 + perpendicular.y * edgeSign * rootHalfWidth * 0.18
-        };
-        const edgeProgress = isLeftEdge ? progress * 2 : (1 - progress) * 2;
-        const point = getQuadraticPoint(start, control, tip, edgeProgress);
-        const tangent = getQuadraticDirection(start, control, tip, edgeProgress);
-        const normal = { x: -tangent.y, y: tangent.x };
-        const edgeFlicker = rootWeight * (localIntensity - tipIntensity) * baseLength * 0.28;
-        point.x += tangent.x * edgeFlicker + normal.x * edgeSign * lateralFlicker;
-        point.y += tangent.y * edgeFlicker + normal.y * edgeSign * lateralFlicker;
-        return {
-            x: alignedPoint.x * (1 - curveBlend) + point.x * curveBlend,
-            y: alignedPoint.y * (1 - curveBlend) + point.y * curveBlend
-        };
-    });
-
-    return {
-        direction,
-        trailDirection,
-        basePoints,
-        outerPoints,
-        tongueCount,
-        pointCount,
-        maxExtension: Math.max(
-            ...outerPoints.map((point, index) =>
-                Math.hypot(point.x - basePoints[index].x, point.y - basePoints[index].y)
-            )
-        )
-    };
-}
-
-/**
- * 이전 경로 조회 API 호환용. 독립 가닥 대신 단일 실루엣 경계만 반환한다.
- */
-export function createRebirthFlamePaths(ball, visual, options) {
-    const contour = createRebirthFlameContour(ball, visual, options);
-    if (!contour) return [];
-    return [
-        {
-            points: contour.outerPoints,
-            root: contour.basePoints[0],
-            direction: contour.direction,
-            alpha: 1,
-            basePoints: contour.basePoints
-        }
-    ];
 }
 
 export function getRebirthVisualProfile(rebirthCount = 0) {
@@ -452,11 +297,7 @@ export function drawRebirthVisualUnderlay(ctx, ball, visual, time = performance.
 export function drawRebirthVisualOverlay(ctx, ball, visual, time = performance.now() / 1000) {
     if (!visual || visual.rebirthCount <= 0) return;
     const { x, y } = ball.position;
-    const speedRatio = Math.min(1, getBallSpeed(ball) / Math.max(1, ball.stats?.baseSpeed ?? 1));
-    const direction = getFlameTargetDirection(ball);
     const plume = getRebirthFlamePlume(ball, visual, time);
-    const trailDirection = plume.direction;
-    const contour = createRebirthFlameContour(ball, visual, { time, direction, trailDirection });
     ctx.save();
     ctx.strokeStyle = visual.color;
     ctx.lineWidth = 1.5 + visual.outlineWidth;
@@ -465,40 +306,8 @@ export function drawRebirthVisualOverlay(ctx, ball, visual, time = performance.n
     ctx.arc(x, y, ball.radius - 2, 0, Math.PI * 2);
     ctx.stroke();
 
-    ctx.globalAlpha = 0.55 + speedRatio * visual.afterimageAlpha;
-    ctx.setLineDash([4, 5]);
-    ctx.lineDashOffset = -time * (16 + visual.stage * 5);
-    ctx.beginPath();
-    ctx.arc(x, y, ball.radius + 7 + visual.outlineWidth, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
     ctx.globalCompositeOperation = "source-over";
-    ctx.lineJoin = "round";
-    drawFlameLayer(ctx, contour, {
-        extensionRatio: 1,
-        color: "#e74716",
-        alpha: 0.84,
-        strokeColor: "#b72812",
-        lineWidth: 1.2 + visual.stage * 0.16
-    });
-    drawFlamePlumeParticles(ctx, plume.particles, visual, ball);
-    drawFlameLayer(ctx, contour, {
-        extensionRatio: 0.72,
-        color: "#ff942b",
-        alpha: 0.92
-    });
-    drawFlameLayer(ctx, contour, {
-        extensionRatio: 0.38,
-        color: visual.color,
-        alpha: 0.95
-    });
-    drawFlameLayer(ctx, contour, {
-        extensionRatio: 0.18,
-        color: "#fff2b0",
-        alpha: 0.92
-    });
-    ctx.globalCompositeOperation = "source-over";
+    drawFlameQuadParticles(ctx, plume.particles, visual);
 
     ctx.globalAlpha = 0.94;
     ctx.fillStyle = visual.color;

@@ -45,7 +45,6 @@ import {
     toggleRebirthCardEquip
 } from "../src/rebirth/index.js";
 import {
-    createRebirthFlameContour,
     drawRebirthVisualOverlay,
     getRebirthFlameDirection,
     getRebirthVisualProfile
@@ -17093,70 +17092,6 @@ function testRebirthVisualProfileContract() {
         stats: { baseSpeed: 200 }
     });
 
-    assert.equal(createRebirthFlameContour(createBall(new Vector2()), getRebirthVisualProfile(0)), null);
-
-    const stationaryContour = createRebirthFlameContour(createBall(new Vector2()), visual, { time: 0.1 });
-    const animatedStationaryContour = createRebirthFlameContour(createBall(new Vector2()), visual, { time: 0.13 });
-    assert.ok(
-        stationaryContour.direction.y < -0.8,
-        "Stationary rebirth flame contour should rise upward from the ball"
-    );
-    assert.ok(
-        stationaryContour.pointCount <= 13 && stationaryContour.pointCount >= 9,
-        "Rebirth flame contour draw budget must stay bounded"
-    );
-    assert.ok(
-        stationaryContour.basePoints.length === stationaryContour.outerPoints.length,
-        "Flame silhouette should keep matching base and outer contour points"
-    );
-    assert.deepEqual(
-        stationaryContour.outerPoints[0],
-        stationaryContour.basePoints[0],
-        "Flame silhouette should attach its first root directly to the ball surface"
-    );
-    assert.deepEqual(
-        stationaryContour.outerPoints.at(-1),
-        stationaryContour.basePoints.at(-1),
-        "Flame silhouette should attach its last root directly to the ball surface"
-    );
-    assert.ok(
-        stationaryContour.outerPoints.some((point, index) => point.y < stationaryContour.basePoints[index].y - 8),
-        "Stationary contour should extend above its attached base instead of drawing a flat rim"
-    );
-    assert.ok(
-        stationaryContour.outerPoints.some((point, index) => {
-            const laterPoint = animatedStationaryContour.outerPoints[index];
-            const displacement = Math.hypot(point.x - laterPoint.x, point.y - laterPoint.y);
-            return displacement > 0.01 && displacement < 5;
-        }),
-        "Flame contour should animate continuously instead of jumping between random shapes"
-    );
-    const getTemporalFlickerRange = (rebirthCount) => {
-        const samples = Array.from({ length: 31 }, (_, index) =>
-            createRebirthFlameContour(createBall(new Vector2()), getRebirthVisualProfile(rebirthCount), {
-                time: index / 30
-            })
-        );
-        return Math.max(
-            ...samples[0].outerPoints.map((_, pointIndex) => {
-                const pointPositions = samples.map((sample) => sample.outerPoints[pointIndex]);
-                const origin = pointPositions[0];
-                return Math.max(...pointPositions.map((point) => Math.hypot(point.x - origin.x, point.y - origin.y)));
-            })
-        );
-    };
-    const flickerRanges = [1, 3, 6, 10].map(getTemporalFlickerRange);
-    assert.ok(flickerRanges[0] >= 14, "Base rebirth flame should visibly flicker over one second");
-    assert.ok(
-        flickerRanges.every((range, index) => index === 0 || range >= flickerRanges[index - 1]),
-        "Higher rebirth stages should visibly flicker at least as much as lower stages"
-    );
-
-    const movingRightContour = createRebirthFlameContour(createBall(new Vector2(420, 0)), visual, { time: 0.1 });
-    assert.ok(movingRightContour.direction.x < -0.85, "Moving right should push the flame silhouette behind the ball");
-    const movingDownContour = createRebirthFlameContour(createBall(new Vector2(0, 420)), visual, { time: 0.1 });
-    assert.ok(movingDownContour.direction.y < -0.85, "Moving down should keep the flame silhouette behind the ball");
-
     const turningBall = createBall(new Vector2());
     const initialFlameDirection = getRebirthFlameDirection(turningBall, 0);
     turningBall.velocity = new Vector2(420, 0);
@@ -17167,25 +17102,6 @@ function testRebirthVisualProfileContract() {
         initialDirectionDot > 0.9,
         "Flame direction should retain most of its previous heading on the first turn frame"
     );
-    const turningContour = createRebirthFlameContour(turningBall, visual, {
-        time: 1 / 60,
-        direction: { x: -1, y: 0 },
-        trailDirection: earlyTurnDirection
-    });
-    const directionDifference =
-        turningContour.direction.x * turningContour.trailDirection.x +
-        turningContour.direction.y * turningContour.trailDirection.y;
-    assert.ok(
-        directionDifference < 0.4,
-        "A sharp turn should keep the physical flame tip behind the current root direction"
-    );
-    assert.ok(
-        turningContour.outerPoints.some((point, index) => {
-            const root = turningContour.basePoints[index];
-            return point.y < root.y - 10;
-        }),
-        "The physical flame tip should bend away from the current root during a sharp turn"
-    );
     const settledTurnDirection = Array.from({ length: 45 }, (_, index) =>
         getRebirthFlameDirection(turningBall, (index + 2) / 60)
     ).at(-1);
@@ -17195,48 +17111,59 @@ function testRebirthVisualProfileContract() {
     );
 
     const statlessMovingBall = { ...createBall(new Vector2(420, 0)), stats: undefined };
-    const statlessMovingContour = createRebirthFlameContour(statlessMovingBall, visual, { time: 0.1 });
+    const statlessDirection = getRebirthFlameDirection(statlessMovingBall, 0.1);
     assert.ok(
-        Number.isFinite(statlessMovingContour.direction.x) && statlessMovingContour.direction.x < -0.85,
-        "Preview flame contour should keep a finite movement direction without combat stats"
+        Number.isFinite(statlessDirection.x) && statlessDirection.x < -0.85,
+        "Square particle preview should keep a finite movement direction without combat stats"
     );
 
-    const extensions = [1, 3, 6, 10].map(
-        (rebirthCount) =>
-            createRebirthFlameContour(createBall(new Vector2()), getRebirthVisualProfile(rebirthCount), { time: 0.1 })
-                .maxExtension
-    );
-    assert.ok(
-        extensions.every((extension, index) => index === 0 || extension >= extensions[index - 1]),
-        "Higher rebirth stages should not reduce flame silhouette presence"
-    );
-
+    const baseParticleCtx = makeRecordingCanvasContext();
+    drawRebirthVisualOverlay(baseParticleCtx, createBall(new Vector2()), getRebirthVisualProfile(1), 0.1);
     const canvasCtx = makeRecordingCanvasContext();
     drawRebirthVisualOverlay(canvasCtx, createBall(new Vector2()), visual, 0.1);
     assert.ok(
-        canvasCtx.calls.filter((call) => call[0] === "quadraticCurveTo").length > 0,
-        "Flame should smooth its connected outline with curves"
+        baseParticleCtx.calls.filter((call) => call[0] === "fillRect").length >= 44,
+        "Base rebirth should render a bounded set of square flame particles"
+    );
+    assert.ok(
+        canvasCtx.calls.filter((call) => call[0] === "fillRect").length >= 63,
+        "Higher rebirth stages should increase the square flame particle density"
+    );
+    assert.ok(
+        canvasCtx.calls.filter((call) => call[0] === "rotate").length >= 63,
+        "Square flame particles should rotate with their physical flow"
+    );
+    assert.equal(
+        canvasCtx.calls.filter((call) => call[0] === "quadraticCurveTo").length,
+        0,
+        "Square particle renderer should remove the legacy curved flame silhouette"
+    );
+    assert.equal(
+        canvasCtx.calls.filter((call) => call[0] === "arc").length,
+        1,
+        "Square particle renderer should not draw round flame particles"
+    );
+    assert.equal(
+        canvasCtx.calls.filter((call) => call[0] === "setLineDash").length,
+        0,
+        "Square particle renderer should not restore the removed dotted outer ring"
     );
     assert.equal(
         canvasCtx.calls.filter((call) => call[0] === "closePath").length,
-        4,
-        "Flame should draw four nested connected silhouette layers"
-    );
-    assert.ok(
-        canvasCtx.calls.filter((call) => call[0] === "arc").length >= 26,
-        "Flame plume should add bounded physical particles behind the connected silhouette"
+        0,
+        "Square particle renderer should not restore a closed flame silhouette"
     );
     assert.ok(
         canvasCtx.calls.some(
-            (call) => call[0] === "set" && call[1] === "globalCompositeOperation" && call[2] === "lighter"
+            (call) => call[0] === "set" && call[1] === "globalCompositeOperation" && call[2] === "source-over"
         ),
-        "Flame plume should use additive compositing for its heat layers"
+        "Square particles should use alpha compositing instead of additive saturation"
     );
     const statlessCanvasCtx = makeRecordingCanvasContext();
     drawRebirthVisualOverlay(statlessCanvasCtx, statlessMovingBall, visual, 0.1);
     assert.ok(
-        statlessCanvasCtx.calls.some((call) => call[0] === "quadraticCurveTo"),
-        "Preview overlay should render a moving flame without combat stats"
+        statlessCanvasCtx.calls.some((call) => call[0] === "fillRect"),
+        "Preview overlay should render square particles without combat stats"
     );
     console.log("[rebirth-visual-profile] ok");
 }
