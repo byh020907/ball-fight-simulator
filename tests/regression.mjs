@@ -17125,6 +17125,15 @@ function testRebirthVisualProfileContract() {
         baseParticleCtx.calls.filter((call) => call[0] === "fillRect").length >= 44,
         "Base rebirth should render a bounded set of square flame particles"
     );
+    const wrappedSectors = new Set(
+        baseParticleCtx.calls
+            .filter((call) => call[0] === "translate")
+            .map(([, x, y]) => Math.floor((((Math.atan2(y - 300, x - 300) + Math.PI) / (Math.PI * 2)) * 8) % 8))
+    );
+    assert.ok(
+        wrappedSectors.size >= 6,
+        "Square flame particles should occupy most of the ball perimeter before they join the trailing plume"
+    );
     assert.ok(
         canvasCtx.calls.filter((call) => call[0] === "fillRect").length >= 63,
         "Higher rebirth stages should increase the square flame particle density"
