@@ -38,12 +38,14 @@ import {
     applyExperienceProgressionToBall,
     applyExperienceProgressionToBaseSpec
 } from "./experience/experienceService.js";
+import { getCharacterLevelProgression } from "./experience/characterLevelProgression.js";
 import {
     collectActiveEffects,
     applyMasteryEffectsToFighterSpec,
     MASTERY_EFFECT_DEFS,
     advanceCharacterMastery,
-    getCharacterChallengeLevel
+    getCharacterChallengeLevel,
+    getTournamentOpponentExperienceLevel
 } from "./character-mastery/index.js";
 import { createCollectionHubViewModel } from "./collection/collectionViewModel.js";
 import {
@@ -861,16 +863,29 @@ export class BattleApp {
         // 연계 효과 계산: 해금된 ID 중 현재 캐릭터가 아닌 효과만 적용
         const masteryCtx = collectActiveEffects(this.playerProfile, this.playerFighterId);
         const adjustedAllocation = { ...this.playerStatAllocation };
-        this._experienceProgressionByFighter = new Map([
-            [this.playerFighterId, collectActiveExperienceProgression(this.playerProfile, this.playerFighterId)]
-        ]);
+        const playerExperienceProgression = collectActiveExperienceProgression(
+            this.playerProfile,
+            this.playerFighterId
+        );
+        const opponentExperienceLevel = getTournamentOpponentExperienceLevel(this.playerProfile, this.playerFighterId);
+        const candidateExperienceProgressionByFighter = new Map(
+            this.roster.map((fighter) => {
+                if (fighter.id === this.playerFighterId) {
+                    return [fighter.id, playerExperienceProgression];
+                }
+                return [
+                    fighter.id,
+                    opponentExperienceLevel ? getCharacterLevelProgression(fighter.id, opponentExperienceLevel) : null
+                ];
+            })
+        );
         this._rebirthLoadoutByFighter = new Map([
             [this.playerFighterId, getRebirthLoadout(this.playerProfile, this.playerFighterId)]
         ]);
         const rosterWithExperienceProgression = this.roster.map((fighter) => {
             const withExperience = applyExperienceProgressionToBaseSpec(
                 fighter,
-                this._experienceProgressionByFighter.get(fighter.id)
+                candidateExperienceProgressionByFighter.get(fighter.id)
             );
             return applyRebirthLoadoutToBaseSpec(withExperience, this._rebirthLoadoutByFighter.get(fighter.id));
         });
@@ -881,6 +896,11 @@ export class BattleApp {
             adjustedAllocation,
             undefined,
             undefined
+        );
+        this._experienceProgressionByFighter = new Map(
+            this.tournamentRoster
+                .map((fighter) => [fighter.id, candidateExperienceProgressionByFighter.get(fighter.id)])
+                .filter(([, progression]) => progression)
         );
         // 장비 고정 수치를 더한 뒤 숙련도 퍼센트 보정을 마지막으로 적용한다.
         const playerSpec = this.tournamentRoster.find((f) => f.id === this.playerFighterId);

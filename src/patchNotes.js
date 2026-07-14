@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.25.44",
+        date: "2026-07-15",
+        title: "v0.25.44 숙련도에 맞춰 토너먼트 상대가 성장합니다.",
+        changes: [
+            {
+                type: "fix",
+                text: "숙련도 단계에 맞는 경험치 레벨로 토너먼트 상대가 시작하지 않던 문제를 고쳤습니다. BRONZE/SILVER/GOLD에서는 선택된 AI가 각각 Lv.3/Lv.6/Lv.9로 시작합니다."
+            }
+        ]
+    },
+    {
         version: "0.25.43",
         date: "2026-07-15",
         title: "v0.25.43 환생 보상 선택이 도감으로 이어집니다.",

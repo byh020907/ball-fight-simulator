@@ -1483,6 +1483,124 @@ async function testTournament(app) {
     app.returnToInitialState();
 }
 
+async function testTournamentOpponentProgressionByMastery(app) {
+    const { getTournamentOpponentExperienceLevel } = await import("../src/character-mastery/index.js");
+    const playerId = app.playerFighterId;
+    const scenarios = [
+        { masteryLevel: 0, expectedOpponentLevel: 1 },
+        { masteryLevel: 1, expectedOpponentLevel: 3 },
+        { masteryLevel: 2, expectedOpponentLevel: 6 },
+        { masteryLevel: 3, expectedOpponentLevel: 9 }
+    ];
+
+    for (const { masteryLevel, expectedOpponentLevel } of scenarios) {
+        app.playerProfile = createDefaultPlayerProfile();
+        app.playerProfile.experience.byCharacter[playerId] = { currentXp: getLevelRequirement(4) };
+        app.playerProfile.characterMastery.levels[playerId] = masteryLevel;
+        app.playerStatAllocation = createRandomStatAllocation(() => 0);
+        app.refreshPlayerSetup();
+
+        assert.equal(
+            getTournamentOpponentExperienceLevel(app.playerProfile, playerId),
+            masteryLevel === 0 ? null : expectedOpponentLevel,
+            `Mastery ${masteryLevel} should resolve its tournament opponent starting level`
+        );
+
+        await app.startTournament();
+
+        const playerProgression = collectActiveExperienceProgression(app.playerProfile, playerId);
+        const player = app.tournamentRoster.find((fighter) => fighter.id === playerId);
+        const opponents = app.tournamentRoster.filter((fighter) => fighter.id !== playerId);
+        const expectedPlayerSpec = applyStatAllocation(
+            applyExperienceProgressionToBaseSpec(
+                app.roster.find((fighter) => fighter.id === playerId),
+                playerProgression
+            ),
+            app.playerStatAllocation,
+            true
+        );
+
+        assert.equal(playerProgression.level, 4, "Tournament player should keep the stored experience level");
+        assert.equal(
+            app._experienceProgressionByFighter.get(playerId).level,
+            4,
+            "Tournament progression map should preserve the player experience snapshot"
+        );
+        assert.deepEqual(
+            player.stats,
+            expectedPlayerSpec.stats,
+            "Player base stats should retain the stored XP progression"
+        );
+        assert.equal(
+            opponents.length,
+            app.tournamentRoster.length - 1,
+            "Every selected non-player fighter should be an opponent"
+        );
+        assert.equal(
+            new Set(app.tournamentRoster.map((fighter) => fighter.id)).size,
+            app.tournamentRoster.length,
+            "Tournament selection should not duplicate fighters"
+        );
+        assert.ok(
+            opponents.every((fighter) => getSpentStatPoints(fighter.statAllocation) === PLAYER_STAT_POINTS),
+            "Opponent random stat allocations should remain fully spent"
+        );
+
+        for (const opponent of opponents) {
+            const expectedProgression =
+                masteryLevel === 0 ? null : getCharacterLevelProgression(opponent.id, expectedOpponentLevel);
+            const expectedSpec = applyStatAllocation(
+                applyExperienceProgressionToBaseSpec(
+                    app.roster.find((fighter) => fighter.id === opponent.id),
+                    expectedProgression
+                ),
+                opponent.statAllocation,
+                false
+            );
+
+            assert.deepEqual(
+                opponent.stats,
+                expectedSpec.stats,
+                `Selected AI ${opponent.id} should receive the level ${expectedOpponentLevel} base stat effects before allocation`
+            );
+            assert.equal(
+                app._experienceProgressionByFighter.get(opponent.id)?.level ?? 1,
+                expectedOpponentLevel,
+                `Selected AI ${opponent.id} should keep the level ${expectedOpponentLevel} progression snapshot`
+            );
+        }
+
+        const simulation = new BattleSimulation(app.tournamentRoster, {
+            onBattleBallReady(ball) {
+                applyExperienceProgressionToBall(ball, app._experienceProgressionByFighter.get(ball.id));
+            }
+        });
+
+        for (const fighter of app.tournamentRoster) {
+            const ball = simulation.fighters.find((candidate) => candidate.id === fighter.id);
+            const expectedProgression =
+                fighter.id === playerId
+                    ? playerProgression
+                    : masteryLevel === 0
+                      ? null
+                      : getCharacterLevelProgression(fighter.id, expectedOpponentLevel);
+
+            assert.equal(
+                ball.progression.level,
+                expectedProgression?.level ?? 1,
+                `Battle ball ${fighter.id} should use the same level progression snapshot as its roster spec`
+            );
+            assert.equal(
+                ball.progression.abilityTier,
+                expectedProgression?.abilityTier ?? 0,
+                `Battle ball ${fighter.id} should use the progression ability tier from its roster snapshot`
+            );
+        }
+
+        app.returnToInitialState();
+    }
+}
+
 async function testTournamentEliminationAwaitsConfirmation(app) {
     app.playerProfile = createDefaultPlayerProfile();
     app.playerStatAllocation = createRandomStatAllocation(() => 0);
@@ -12208,6 +12326,7 @@ await testArrowBounceFacing(app);
 await testArcherPredictiveBurst(app);
 await testOrbitShardRecharge(app);
 await testTournament(app);
+await testTournamentOpponentProgressionByMastery(app);
 await testTournamentEliminationAwaitsConfirmation(app);
 await testHeroBallRegistered(app);
 await testHeroAbilitySpawnsOrb(app);

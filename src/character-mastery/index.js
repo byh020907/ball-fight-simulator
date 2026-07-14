@@ -2,6 +2,7 @@ export { MASTERY_EFFECT_DEFS, TIER_LABELS, TIER_DESCRIPTIONS } from "./masteryDe
 export {
     getCharacterMasteryLevel,
     getCharacterChallengeLevel,
+    getTournamentOpponentExperienceLevel,
     getTierText,
     advanceCharacterMastery
 } from "./masteryState.js";
