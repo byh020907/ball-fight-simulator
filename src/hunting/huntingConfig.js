@@ -80,6 +80,12 @@ export const HUNTING_COMBAT_RELIEF = Object.freeze({
     EVENT_TRANSFER: Object.freeze([0.0, 0.55, 0.65, 0.7])
 });
 
+export const HUNTING_MINIBOSS = Object.freeze({
+    INITIAL_CHANCE: 0.05,
+    MISS_CHANCE_INCREASE: 0.05,
+    MAX_CHANCE: 0.3
+});
+
 export const HUNTING_PORTAL_DECLINE = Object.freeze({
     INITIAL_FLOORS: 5,
     HP_MULT: Object.freeze([

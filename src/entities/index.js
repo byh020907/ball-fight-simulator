@@ -31,4 +31,5 @@ export { SmallHealPack } from "./smallHealPack.js";
 export { ShardDrop } from "./shardDrop.js";
 export { ShardBundleDrop } from "./shardBundleDrop.js";
 export { ChestDrop } from "./chestDrop.js";
+export { EnhancementStoneDrop } from "./enhancementStoneDrop.js";
 export { createHuntingLootItem, getHuntingLootItemClass } from "./huntingLootRegistry.js";

@@ -3,7 +3,8 @@ import {
     HUNTING_STAGE_IDS,
     HUNTING_STAGES,
     HUNTING_STAT_KEYS,
-    HUNTING_COMBAT_RELIEF
+    HUNTING_COMBAT_RELIEF,
+    HUNTING_MINIBOSS
 } from "./huntingConfig.js";
 import { applyDefeatPreservation, createEmptyHuntingLoot, mergeHuntingLoot } from "./huntingRewards.js";
 import { HUNTING_EVENT_TYPES } from "./huntingConfig.js";
@@ -25,6 +26,7 @@ export const HUNTING_RUN_PHASES = Object.freeze({
 function cloneLoot(loot = createEmptyHuntingLoot()) {
     return {
         shards: Math.max(0, Math.floor(loot.shards ?? 0)),
+        enhancementStones: Math.max(0, Math.floor(loot.enhancementStones ?? 0)),
         chests: [...(loot.chests ?? [])],
         xp: Math.max(0, Math.floor(loot.xp ?? 0))
     };
@@ -76,6 +78,7 @@ export function createHuntingRun({
         lastEvent: null,
         lastEncounter: null,
         combatReliefFloors: 0,
+        minibossChance: HUNTING_MINIBOSS.INITIAL_CHANCE,
         portalDeclineFloors: 0,
         achievementProgress: createHuntingAchievementProgress(),
         currentBattleAchievement: null,

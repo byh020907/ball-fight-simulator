@@ -88,6 +88,7 @@ import {
     HUNTING_ENEMY_TYPES,
     HUNTING_EVENT_TYPES,
     HUNTING_FLOOR_OUTCOME_TYPES,
+    HUNTING_MINIBOSS,
     HUNTING_MONSTER_TYPES,
     HUNTING_MONSTER_BASE_SPECS,
     HUNTING_MONSTER_TAGS,
@@ -99,6 +100,7 @@ import {
     getHuntingDisplayHealth,
     getHuntingDisplayHp,
     createHuntingMinibossSpec,
+    createHuntingBossMobSpec,
     createHuntingMobSpec,
     createHuntingMobEncounter,
     applyHuntingRunAchievementProgress,
@@ -112,7 +114,7 @@ import {
     getHuntingMonsterEncounteredTypeCount,
     getHuntingMonsterTypeKillCount,
     getHuntingMonsterPool,
-    shouldUseRosterMiniboss,
+    BOSS_MOB_MULTIPLIERS,
     createMerchantOffers,
     createConsumableMerchantOffer,
     applyMerchantOffer,
@@ -128,6 +130,7 @@ import {
     getHuntingBonusLootWeights,
     getHuntingLootDropChance,
     getHuntingShardDropAmount,
+    getHuntingEnhancementStoneDropCount,
     getHuntingShardPhysicalDropCount,
     getSmallHealPackAmount,
     rollHighChestRarity,
@@ -220,6 +223,7 @@ import {
     ChestDrop,
     computeHeroOrbCarryover,
     createHuntingLootItem,
+    EnhancementStoneDrop,
     HeroOrb,
     ShardDrop,
     ShardBundleDrop,
@@ -2363,6 +2367,26 @@ function testHuntingLootBalanceRules() {
         7,
         "Physical shard-drop count should reach seven regardless of the hunting floor"
     );
+    assert.equal(
+        getHuntingEnhancementStoneDropCount(1, () => 0),
+        1,
+        "Floor-one bosses should drop at least one enhancement stone"
+    );
+    assert.equal(
+        getHuntingEnhancementStoneDropCount(1, () => 0.999999),
+        3,
+        "Floor-one bosses should cap their enhancement stone roll at three"
+    );
+    assert.equal(
+        getHuntingEnhancementStoneDropCount(100, () => 0),
+        4,
+        "Floor-one-hundred bosses should raise the minimum enhancement stone roll to four"
+    );
+    assert.equal(
+        getHuntingEnhancementStoneDropCount(100, () => 0.999999),
+        12,
+        "Floor-one-hundred bosses should cap their enhancement stone roll at twelve"
+    );
     assert.deepEqual(
         getHuntingBonusLootWeights({ collector: fullHp, rarity: "common" }),
         { small_heal_pack: 20, chest: 10, shard_bundle: 0, high_chest: 0 },
@@ -2499,6 +2523,11 @@ function testHuntingLootItemsAndDropController(app) {
         simulation.entities.length - entitiesBeforeShardCollection,
         78,
         "Each collected physical shard should create its own burst, particles, and reward label"
+    );
+    assert.equal(
+        simulation.entities.filter((entity) => entity instanceof EnhancementStoneDrop).length,
+        0,
+        "Normal hunting monsters must not create enhancement stone drops"
     );
     assert.deepEqual(
         soundCalls.at(-1),
@@ -2667,6 +2696,14 @@ function testHuntingLootItemsAndDropController(app) {
         22,
         "Shard bundles should remain the largest standard loot item"
     );
+    assert.ok(
+        createHuntingLootItem(HUNTING_LOOT_ITEM_TYPES.ENHANCEMENT_STONE, {
+            position: player.position,
+            velocity: new Vector2(),
+            collectorId: player.id
+        }) instanceof EnhancementStoneDrop,
+        "The loot registry must construct physical enhancement stone drops"
+    );
 
     const victorySweepShard = new ShardDrop({
         position: new Vector2(player.position.x + 300, player.position.y),
@@ -2683,6 +2720,225 @@ function testHuntingLootItemsAndDropController(app) {
     console.log("[hunting-loot-items-and-drop-controller] ok");
 }
 
+function testHuntingBossRolesAndEnhancementStoneDrops(app) {
+    const createSequenceRng = (values) => {
+        let index = 0;
+        return () => values[index++] ?? values.at(-1) ?? 0;
+    };
+    let run = createHuntingRun({ characterId: FIGHTER_IDS.ARCHER, now: 0 });
+
+    [0.1, 0.15, 0.2, 0.25, 0.3, 0.3].forEach((expectedChance) => {
+        run = advanceHuntingRun(run, { rng: createSequenceRng([0, 0.999999, 0.999999]) });
+        assert.equal(
+            run.lastEncounter.type,
+            HUNTING_FLOOR_OUTCOME_TYPES.COMBAT,
+            "The controlled roll must enter combat"
+        );
+        assert.equal(run.lastEncounter.isMiniboss, false, "A missed miniboss roll must keep the normal encounter");
+        assert.equal(run.minibossChance, expectedChance, "A normal combat miss must raise the next miniboss chance");
+    });
+
+    run = advanceHuntingRun(run, { rng: createSequenceRng([0, 0.999999, 0]) });
+    assert.equal(
+        run.lastEncounter.isMiniboss,
+        true,
+        "A successful combat roll must mark only that encounter as a miniboss"
+    );
+    assert.equal(
+        run.minibossChance,
+        HUNTING_MINIBOSS.INITIAL_CHANCE,
+        "A successful miniboss roll must reset the next chance to its initial value"
+    );
+
+    const championEventRun = advanceHuntingRun(
+        { ...run, minibossChance: 0.2 },
+        { rng: createSequenceRng([0.5, 0.999999]) }
+    );
+    assert.equal(
+        championEventRun.lastEvent.type,
+        HUNTING_EVENT_TYPES.CHAMPION_INTRUSION,
+        "The controlled event roll must produce a champion intrusion"
+    );
+    assert.equal(
+        championEventRun.minibossChance,
+        0.2,
+        "Non-combat events must not advance the normal-combat miniboss chance"
+    );
+    const finalBossRun = advanceHuntingRun({ ...run, floor: 99, minibossChance: 0.25 }, { rng: () => 0 });
+    assert.equal(
+        finalBossRun.lastEncounter.type,
+        HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS,
+        "Floor 100 must remain a final boss"
+    );
+    assert.equal(finalBossRun.minibossChance, 0.25, "The final boss must not consume the normal-combat miniboss roll");
+
+    const bossMob = createHuntingBossMobSpec({ floor: 1, index: 0, rng: () => 0 });
+    const normalMob = scaleEnemySpecForHunting(
+        createHuntingMobSpec({ type: bossMob.hunting.monsterType, floor: 1, index: 0, rng: () => 0 }),
+        1,
+        { enemyType: HUNTING_ENEMY_TYPES.NORMAL }
+    );
+    const bossRarity = bossMob.hunting.monsterTags.find((tag) => tag.startsWith("rarity:"))?.slice("rarity:".length);
+    assert.ok(
+        ["rare", "unique", "epic"].includes(bossRarity),
+        "Normal-combat minibosses must use a high-rarity monster"
+    );
+    assert.equal(bossMob.ability, normalMob.ability, "BossMob must preserve the source monster behavior");
+    assert.equal(bossMob.stats.speed, normalMob.stats.speed, "BossMob must preserve the source monster speed");
+    assert.equal(bossMob.hunting.isMob, true, "BossMob must remain a monster for generic loot and statistics");
+    assert.equal(bossMob.hunting.isMiniboss, true, "BossMob must be identified as the normal-combat miniboss");
+    assert.equal(
+        bossMob.stats.radius,
+        normalMob.stats.radius * BOSS_MOB_MULTIPLIERS.radius,
+        "BossMob radius must use the documented multiplier"
+    );
+    assert.ok(
+        Math.abs(bossMob.stats.mass - normalMob.stats.mass * BOSS_MOB_MULTIPLIERS.mass) < 1e-9,
+        "BossMob mass must use the documented multiplier"
+    );
+    assert.equal(bossMob.stats.hp, normalMob.stats.hp * BOSS_MOB_MULTIPLIERS.hp, "BossMob HP must double");
+    assert.equal(
+        bossMob.stats.damage,
+        normalMob.stats.damage * BOSS_MOB_MULTIPLIERS.damage,
+        "BossMob damage must use the documented multiplier"
+    );
+    assert.ok(
+        Math.abs(bossMob.stats.defense - normalMob.stats.defense * BOSS_MOB_MULTIPLIERS.defense) < 1e-9,
+        "BossMob defense must use the documented multiplier"
+    );
+
+    const capturedMatches = [];
+    const managerApp = {
+        roster: app.roster,
+        playerProfile: createDefaultPlayerProfile(),
+        playerStatAllocation: {},
+        startMatch(specs) {
+            capturedMatches.push(specs);
+        }
+    };
+    const roleManager = new HuntingManager(managerApp);
+    roleManager._run = {
+        ...createHuntingRun({ characterId: FIGHTER_IDS.ARCHER, now: 0 }),
+        floor: 3,
+        lastEncounter: { type: HUNTING_FLOOR_OUTCOME_TYPES.COMBAT, isMiniboss: true }
+    };
+    roleManager._startFloorBattle();
+    const normalCombatBoss = capturedMatches[0].slice(1).find((spec) => spec.hunting?.isMiniboss);
+    assert.equal(
+        normalCombatBoss.hunting.isMob,
+        true,
+        "A marked normal combat must compose a BossMob, not a roster boss"
+    );
+    roleManager._run = {
+        ...createHuntingRun({ characterId: FIGHTER_IDS.ARCHER, now: 0 }),
+        floor: 3,
+        lastEncounter: { type: HUNTING_FLOOR_OUTCOME_TYPES.EVENT },
+        lastEvent: { type: HUNTING_EVENT_TYPES.CHAMPION_INTRUSION, enemyType: HUNTING_ENEMY_TYPES.CHAMPION }
+    };
+    roleManager._startFloorBattle();
+    const championBoss = capturedMatches[1].slice(1).find((spec) => spec.hunting?.isMiniboss);
+    assert.equal(
+        championBoss.hunting.isMob,
+        undefined,
+        "Champion events must retain their separate roster-boss composition"
+    );
+    roleManager._run = {
+        ...createHuntingRun({ characterId: FIGHTER_IDS.ARCHER, now: 0 }),
+        floor: 100,
+        lastEncounter: { type: HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS }
+    };
+    roleManager._startFloorBattle();
+    const finalBoss = capturedMatches[2].slice(1).find((spec) => spec.hunting?.isMiniboss);
+    assert.equal(finalBoss.hunting.isMob, undefined, "The final boss must retain its separate roster-boss composition");
+
+    const playerSpec = {
+        ...app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER),
+        teamId: HUNTING_TEAMS.PLAYER
+    };
+    const bossSimulation = new BattleSimulation([playerSpec, bossMob], { onLog() {}, onSound() {} }, null, {
+        assignActions: false
+    });
+    const [player, boss] = bossSimulation.fighters;
+    const bossSession = new HuntingBattleLootSession({ playerId: player.id, floor: 1 });
+    const bossController = new HuntingLootDropController({ session: bossSession, rng: () => 0.999999 });
+    bossController.onFighterDefeated(boss, { simulation: bossSimulation });
+    const bossShards = bossSimulation.entities.filter(
+        (entity) => entity instanceof ShardDrop && !(entity instanceof EnhancementStoneDrop)
+    );
+    const bossStones = bossSimulation.entities.filter((entity) => entity instanceof EnhancementStoneDrop);
+    assert.equal(bossShards.length, 7, "BossMob must retain the generic monster shard drops");
+    assert.equal(bossStones.length, 3, "A floor-one BossMob must create every rolled stone as a physical item");
+    assert.ok(
+        bossStones.every((stone) => stone.amount === 1),
+        "Every physical enhancement stone must be worth exactly one"
+    );
+    bossStones.forEach((stone) => {
+        stone.collectionGraceRemaining = 0;
+        stone.position = player.position.clone();
+        stone.velocity = new Vector2();
+        stone.update(1 / 60, bossSimulation);
+    });
+    assert.equal(
+        bossSession.getCollectedLoot().enhancementStones,
+        3,
+        "Collected physical stones must enter the transient hunting battle loot session"
+    );
+
+    const createRosterBossStoneDrops = (floor) => {
+        const rosterBoss = createHuntingMinibossSpec({
+            roster: app.roster,
+            characterId: playerSpec.id,
+            floor,
+            enemyType: HUNTING_ENEMY_TYPES.CHAMPION,
+            rng: () => 0
+        });
+        const simulation = new BattleSimulation([playerSpec, rosterBoss], { onLog() {}, onSound() {} }, null, {
+            assignActions: false
+        });
+        const [, rosterBossBall] = simulation.fighters;
+        const session = new HuntingBattleLootSession({ playerId: playerSpec.id, floor });
+        new HuntingLootDropController({ session, rng: () => 0.999999 }).onFighterDefeated(rosterBossBall, {
+            simulation
+        });
+        return simulation.entities.filter((entity) => entity instanceof EnhancementStoneDrop);
+    };
+    assert.equal(
+        createRosterBossStoneDrops(1).length,
+        3,
+        "Champion intrusions must add their own individual enhancement stones"
+    );
+    assert.equal(
+        createRosterBossStoneDrops(100).length,
+        12,
+        "Final bosses must use the floor-one-hundred enhancement stone range"
+    );
+
+    const runWithStones = recordHuntingFloorResult(createHuntingRun({ characterId: player.id, now: 0 }), {
+        hpRemain: 80,
+        maxHp: 100,
+        loot: { shards: 0, enhancementStones: 5, chests: [], xp: 0 }
+    });
+    const retreated = retreatHuntingRun(runWithStones, { now: 1 });
+    assert.equal(retreated.securedLoot.enhancementStones, 5, "Retreat must secure collected enhancement stones");
+    const defeated = defeatHuntingRun(runWithStones, { rng: () => 0, now: 1 });
+    assert.equal(
+        defeated.securedLoot.enhancementStones + defeated.defeatLosses.enhancementStones,
+        5,
+        "Defeat preservation must account for every pending enhancement stone"
+    );
+    const profile = createDefaultPlayerProfile();
+    const settlementApp = { playerProfile: profile, _settleHuntingAchievements() {} };
+    const settlementManager = new HuntingManager(settlementApp);
+    settlementManager._run = retreated;
+    settlementManager._mergeIntoSecured(settlementApp);
+    assert.equal(
+        profile.equipment.enhancementStones,
+        5,
+        "Secured enhancement stones must settle into the persistent equipment resource"
+    );
+    console.log("[hunting-boss-roles-and-enhancement-stones] ok");
+}
+
 function testHuntingLootItemsRotate() {
     const lootItems = [
         new ShardDrop({ position: new Vector2(200, 200), velocity: new Vector2(), collectorId: "collector" }),
@@ -2691,13 +2947,25 @@ function testHuntingLootItemsRotate() {
         new ChestDrop({ position: new Vector2(320, 200), velocity: new Vector2(), collectorId: "collector" })
     ];
     const simulation = { fighters: [], keepEntityInsideArena() {} };
+    const initialAngularVelocities = lootItems.map((item) => item.angularVelocity);
+
+    initialAngularVelocities.forEach((angularVelocity) => {
+        assert.ok(
+            Number.isFinite(angularVelocity) && Math.abs(angularVelocity) >= 0.9,
+            "All loot items must receive the shared random initial spin"
+        );
+    });
 
     lootItems.forEach((item) => item.update(0.5, simulation));
-    lootItems.forEach((item) => {
+    lootItems.forEach((item, index) => {
         assert.ok(Number.isFinite(item.angle) && item.angle !== 0, "All loot items must advance a rotation angle");
         assert.ok(
-            Number.isFinite(item.angularVelocity) && Math.abs(item.angularVelocity) >= 0.9,
-            "All loot items must receive the shared random initial spin"
+            Number.isFinite(item.angularVelocity) && Math.abs(item.angularVelocity) > 0,
+            "All loot items must retain a finite angular velocity after rotation integration"
+        );
+        assert.ok(
+            Math.abs(item.angularVelocity) <= Math.abs(initialAngularVelocities[index]),
+            "Rotation integration must not increase a loot item's free-spin velocity"
         );
     });
 
@@ -4039,8 +4307,7 @@ function testHuntingSystem() {
         HUNTING_STAGE_IDS.FOREST,
         "Actual encounters should keep the entered region on their monster specs"
     );
-    assert.equal(shouldUseRosterMiniboss(3), true, "Every third hunting floor should add a roster miniboss");
-    const miniboss = createHuntingMinibossSpec({
+    const rosterMiniboss = createHuntingMinibossSpec({
         roster: [
             {
                 id: FIGHTER_IDS.DASH,
@@ -4061,9 +4328,10 @@ function testHuntingSystem() {
         floor: 3,
         rng: () => 0
     });
-    assert.equal(miniboss.hunting.isMiniboss, true, "Roster enemies should be marked as minibosses");
-    assert.equal(miniboss.hunting.sourceFighterId, FIGHTER_IDS.ARCHER, "Minibosses should not copy the player");
-    assert.equal(miniboss.teamId, HUNTING_TEAMS.ENEMY, "Minibosses should fight on the enemy team");
+    assert.equal(rosterMiniboss.hunting.isMiniboss, true, "Roster enemies should remain marked as minibosses");
+    assert.equal(rosterMiniboss.hunting.isMob, undefined, "Roster bosses must stay separate from generic monster loot");
+    assert.equal(rosterMiniboss.hunting.sourceFighterId, FIGHTER_IDS.ARCHER, "Minibosses should not copy the player");
+    assert.equal(rosterMiniboss.teamId, HUNTING_TEAMS.ENEMY, "Minibosses should fight on the enemy team");
 
     const run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, now: 1000 });
     assert.equal(run.floor, 1, "Hunting run should start at floor 1");
@@ -13403,6 +13671,9 @@ function testHuntingFormatHelpers() {
     assert.ok(noChestSummary.includes("보유 파편 30"), "Should show shard count without chests");
     assert.ok(!noChestSummary.includes("미확보"), "Should not mention chests when none exist");
 
+    const stoneSummary = formatPendingLootSummary({ shards: 0, enhancementStones: 2, chests: [], xp: 0 });
+    assert.ok(stoneSummary.includes("2"), "Pending loot summaries must include enhancement stones");
+
     assert.equal(formatPendingLootSummary(null), "", "Null input should return empty");
     assert.equal(
         formatPendingLootSummary({ shards: 0, chests: [], xp: 0 }),
@@ -13422,6 +13693,9 @@ function testHuntingFormatHelpers() {
 
     const shardOnlyLoss = formatDefeatLossText({ shards: 5, chests: [], xp: 0 });
     assert.equal(shardOnlyLoss, "파편 5 손실", "Should only mention shards when no chests destroyed");
+
+    const stoneLoss = formatDefeatLossText({ shards: 0, enhancementStones: 2, chests: [], xp: 0 });
+    assert.ok(stoneLoss.includes("2"), "Defeat loss text must include lost enhancement stones");
 
     assert.equal(formatDefeatLossText(null), "", "Null defeat losses should return empty");
 
@@ -13507,6 +13781,7 @@ function testHuntingLootHud() {
     const stateNoRun = manager._getLootHudState();
     assert.equal(stateNoRun.huntingLootHudVisible, false, "No run: HUD should be hidden");
     assert.equal(stateNoRun.huntingLootHudShards, 0, "No run: shards should be 0");
+    assert.equal(stateNoRun.huntingLootHudEnhancementStones, 0, "No run: enhancement stones should be 0");
     assert.equal(stateNoRun.huntingLootHudChests, 0, "No run: chests should be 0");
 
     // ── HUD hidden when pending loot is empty ──
@@ -13514,7 +13789,20 @@ function testHuntingLootHud() {
     const stateEmpty = manager._getLootHudState();
     assert.equal(stateEmpty.huntingLootHudVisible, false, "Empty pending loot: HUD should be hidden");
     assert.equal(stateEmpty.huntingLootHudShards, 0, "Empty pending loot: shards should be 0");
+    assert.equal(stateEmpty.huntingLootHudEnhancementStones, 0, "Empty pending loot: enhancement stones should be 0");
     assert.equal(stateEmpty.huntingLootHudChests, 0, "Empty pending loot: chests should be 0");
+
+    manager._run = {
+        ...manager._run,
+        pendingLoot: { shards: 0, enhancementStones: 3, chests: [], xp: 0 }
+    };
+    const stateStones = manager._getLootHudState();
+    assert.equal(stateStones.huntingLootHudVisible, true, "Enhancement stones alone must keep the loot HUD visible");
+    assert.equal(
+        stateStones.huntingLootHudEnhancementStones,
+        3,
+        "The loot HUD must display pending enhancement stones"
+    );
 
     // ── HUD visible with shards only ──
     manager._run = {
@@ -13531,6 +13819,7 @@ function testHuntingLootHud() {
         ...manager._run,
         pendingLoot: {
             shards: 45,
+            enhancementStones: 4,
             chests: [
                 createHuntingChest({ rarity: "common", id: "h1" }),
                 createHuntingChest({ rarity: "rare", id: "h2" })
@@ -13541,6 +13830,7 @@ function testHuntingLootHud() {
     const stateBoth = manager._getLootHudState();
     assert.equal(stateBoth.huntingLootHudVisible, true, "Both: HUD should be visible");
     assert.equal(stateBoth.huntingLootHudShards, 45, "Both: shards should be 45");
+    assert.equal(stateBoth.huntingLootHudEnhancementStones, 4, "Both: enhancement stones should be 4");
     assert.equal(stateBoth.huntingLootHudChests, 2, "Both: chests should be 2");
 
     // ── _setHuntingMoveState includes HUD data ──
@@ -13586,11 +13876,16 @@ function testHuntingLootHud() {
     // ── HUD clears when pending loot becomes empty ──
     manager._run = {
         ...manager._run,
-        pendingLoot: { shards: 0, chests: [], xp: 0 }
+        pendingLoot: { shards: 0, enhancementStones: 0, chests: [], xp: 0 }
     };
     const stateEmpty2 = manager._getLootHudState();
     assert.equal(stateEmpty2.huntingLootHudVisible, false, "Empty after having loot: HUD should hide");
     assert.equal(stateEmpty2.huntingLootHudShards, 0, "Empty after having loot: shards should be 0");
+    assert.equal(
+        stateEmpty2.huntingLootHudEnhancementStones,
+        0,
+        "Empty after having loot: enhancement stones should be 0"
+    );
     assert.equal(stateEmpty2.huntingLootHudChests, 0, "Empty after having loot: chests should be 0");
 
     console.log("[hunting-loot-hud] ok");
@@ -15306,6 +15601,7 @@ testHuntingLootBalanceRules();
 testHuntingSplitterMobActuallySplits(app);
 testHuntingLootItemsRotate();
 testHuntingLootItemsAndDropController(app);
+testHuntingBossRolesAndEnhancementStoneDrops(app);
 testHuntingLootSessionIsDiscardedOnDefeat(app);
 testHuntingCombatRewardChestUi();
 testHuntingCombatWithoutCollectedChestSkipsChestUi();

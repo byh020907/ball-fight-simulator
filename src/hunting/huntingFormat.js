@@ -19,9 +19,13 @@ export function formatChestRarityCounts(chests) {
 export function formatPendingLootSummary(pendingLoot) {
     if (!pendingLoot) return "";
     const shards = pendingLoot.shards ?? 0;
+    const enhancementStones = pendingLoot.enhancementStones ?? 0;
     const chests = pendingLoot.chests ?? [];
-    if (shards <= 0 && chests.length === 0) return "";
+    if (shards <= 0 && enhancementStones <= 0 && chests.length === 0) return "";
     let text = `보유 파편 ${shards}`;
+    if (enhancementStones > 0) {
+        text += ` · 강화석 ${enhancementStones}`;
+    }
     if (chests.length > 0) {
         text += ` · 미확보 상자 ${chests.length}개`;
     }
@@ -32,8 +36,12 @@ export function formatDefeatLossText(defeatLosses) {
     if (!defeatLosses) return "";
     const parts = [];
     const shards = defeatLosses.shards ?? 0;
+    const enhancementStones = defeatLosses.enhancementStones ?? 0;
     if (shards > 0) {
         parts.push(`파편 ${shards} 손실`);
+    }
+    if (enhancementStones > 0) {
+        parts.push(`강화석 ${enhancementStones} 손실`);
     }
     const chestText = formatChestRarityCounts(defeatLosses.chests);
     if (chestText) {

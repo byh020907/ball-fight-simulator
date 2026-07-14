@@ -137,6 +137,10 @@
         <span class="hud-body">
             <span x-text="'파편 ' + huntingLootHudShards"></span>
             <span
+                x-show="huntingLootHudEnhancementStones > 0"
+                x-text="' · 강화석 ' + huntingLootHudEnhancementStones"
+            ></span>
+            <span
                 x-show="huntingLootHudChests > 0"
                 x-text="' · 상자 ' + huntingLootHudChests"
             ></span>
@@ -179,6 +183,7 @@
         huntingBattlePreparationNotice: "",
         huntingLootHudVisible: false,
         huntingLootHudShards: 0,
+        huntingLootHudEnhancementStones: 0,
         huntingLootHudChests: 0,
 
         huntingRetreat() {
@@ -260,6 +265,7 @@
             this.huntingBattlePreparationNotice = "";
             this.huntingLootHudVisible = false;
             this.huntingLootHudShards = 0;
+            this.huntingLootHudEnhancementStones = 0;
             this.huntingLootHudChests = 0;
         },
         showTransient(label, text) {
@@ -300,6 +306,8 @@
             if (data.huntingBattlePreparationNotice !== undefined) this.huntingBattlePreparationNotice = data.huntingBattlePreparationNotice;
             if (data.huntingLootHudVisible !== undefined) this.huntingLootHudVisible = data.huntingLootHudVisible;
             if (data.huntingLootHudShards !== undefined) this.huntingLootHudShards = data.huntingLootHudShards;
+            if (data.huntingLootHudEnhancementStones !== undefined)
+                this.huntingLootHudEnhancementStones = data.huntingLootHudEnhancementStones;
             if (data.huntingLootHudChests !== undefined) this.huntingLootHudChests = data.huntingLootHudChests;
         }
     }));

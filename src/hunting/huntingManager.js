@@ -24,9 +24,9 @@ import { collectActiveEffects, applyMasteryEffectsToFighterSpec } from "../chara
 import { createHuntingTerrain } from "../terrain/index.js";
 import {
     HUNTING_TEAMS,
+    createHuntingBossMobSpec,
     createHuntingMinibossSpec,
-    createHuntingMobEncounter,
-    shouldUseRosterMiniboss
+    createHuntingMobEncounter
 } from "./huntingMonsters.js";
 import { applyMerchantOffer, formatOfferResultToast } from "./huntingMerchant.js";
 import { formatPendingLootSummary, formatDefeatLossText } from "./huntingFormat.js";
@@ -258,29 +258,27 @@ export class HuntingManager {
         const { playerProgression, appliedSpec } = player;
 
         const isFinalBoss = run.lastEncounter?.type === HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS;
-        const encounterEnemyType = run.lastEncounter?.enemyType;
-        const minibossType =
-            isFinalBoss || run.lastEvent?.enemyType === HUNTING_ENEMY_TYPES.CHAMPION
-                ? HUNTING_ENEMY_TYPES.CHAMPION
-                : encounterEnemyType === HUNTING_ENEMY_TYPES.ELITE
-                  ? HUNTING_ENEMY_TYPES.ELITE
-                  : HUNTING_ENEMY_TYPES.ELITE;
+        const isChampion = !isFinalBoss && run.lastEvent?.enemyType === HUNTING_ENEMY_TYPES.CHAMPION;
         const mobSpecs = createHuntingMobEncounter({ floor: run.floor, stageId: run.stageId });
-        const miniboss =
-            isFinalBoss || shouldUseRosterMiniboss(run.floor, run.lastEvent)
+        const rosterMiniboss =
+            isFinalBoss || isChampion
                 ? createHuntingMinibossSpec({
                       roster: app.roster,
                       characterId: run.characterId,
                       floor: run.floor,
-                      enemyType: minibossType
+                      enemyType: HUNTING_ENEMY_TYPES.CHAMPION
                   })
                 : null;
+        const monsterMiniboss = run.lastEncounter?.isMiniboss
+            ? createHuntingBossMobSpec({ floor: run.floor, stageId: run.stageId })
+            : null;
+        const miniboss = rosterMiniboss ?? monsterMiniboss;
         const enemySpecs = miniboss ? [miniboss, ...mobSpecs.slice(0, Math.max(1, mobSpecs.length - 1))] : mobSpecs;
         this._run = recordHuntingBattleStart(run, {
             enemySpecs,
             hpRemain: run.carriedHp,
             maxHp: run.carriedMaxHp,
-            isChampion: !isFinalBoss && run.lastEvent?.enemyType === HUNTING_ENEMY_TYPES.CHAMPION
+            isChampion
         });
         run = this._run;
         const matchSpecs = [appliedSpec, ...enemySpecs];
@@ -415,6 +413,7 @@ export class HuntingManager {
                 huntingChoiceVisible: false,
                 huntingLootHudVisible: false,
                 huntingLootHudShards: 0,
+                huntingLootHudEnhancementStones: 0,
                 huntingLootHudChests: 0
             });
             app.setStartButton({ text: "확인", hidden: false, disabled: false });
@@ -444,6 +443,7 @@ export class HuntingManager {
             huntingChoiceVisible: false,
             huntingLootHudVisible: false,
             huntingLootHudShards: 0,
+            huntingLootHudEnhancementStones: 0,
             huntingLootHudChests: 0
         });
 
@@ -597,15 +597,22 @@ export class HuntingManager {
     _getLootHudState() {
         const run = this._run;
         if (!run) {
-            return { huntingLootHudVisible: false, huntingLootHudShards: 0, huntingLootHudChests: 0 };
+            return {
+                huntingLootHudVisible: false,
+                huntingLootHudShards: 0,
+                huntingLootHudEnhancementStones: 0,
+                huntingLootHudChests: 0
+            };
         }
         const pending = run.pendingLoot;
         const shards = pending?.shards ?? 0;
+        const enhancementStones = pending?.enhancementStones ?? 0;
         const chests = pending?.chests ?? [];
-        const visible = shards > 0 || chests.length > 0;
+        const visible = shards > 0 || enhancementStones > 0 || chests.length > 0;
         return {
             huntingLootHudVisible: visible,
             huntingLootHudShards: shards,
+            huntingLootHudEnhancementStones: enhancementStones,
             huntingLootHudChests: chests.length
         };
     }
@@ -1030,6 +1037,7 @@ export class HuntingManager {
             huntingMoving: false,
             huntingLootHudVisible: false,
             huntingLootHudShards: 0,
+            huntingLootHudEnhancementStones: 0,
             huntingLootHudChests: 0
         });
         app.showOverlay(
@@ -1052,6 +1060,8 @@ export class HuntingManager {
             if (run.securedLoot?.chests?.length > 0) {
                 profile.hunting.chests.push(...run.securedLoot.chests);
             }
+            profile.equipment.enhancementStones =
+                (profile.equipment.enhancementStones ?? 0) + (run.securedLoot?.enhancementStones ?? 0);
             const stats = applyHuntingRunAchievementProgress(profile.hunting.stats, run);
             profile.hunting.stats = {
                 ...stats,

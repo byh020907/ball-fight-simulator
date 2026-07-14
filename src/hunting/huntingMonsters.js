@@ -5,6 +5,7 @@ import {
     HUNTING_STAGE_IDS,
     HUNTING_STAGES
 } from "./huntingConfig.js";
+import { applyBossMob } from "./bossMob.js";
 import { scaleEnemySpecForHunting } from "./huntingEncounters.js";
 
 const DEFAULT_RNG = () => Math.random();
@@ -14,6 +15,7 @@ const MONSTER_PROBABILITY = Object.freeze({
     primaryWeightMultiplier: 3,
     focusLeadInFloors: 10
 });
+const BOSS_MOB_RARITIES = Object.freeze(["rare", "unique", "epic"]);
 
 export const HUNTING_TEAMS = Object.freeze({ PLAYER: "hunting-player", ENEMY: "hunting-enemy" });
 export const HUNTING_MONSTER_TAGS = Object.freeze({
@@ -267,8 +269,16 @@ function getMonsterProbabilityWeight(monster, floor, latestFocusFloor) {
     );
 }
 
-function rollMonster(floor, stageId, rng, excludedTypes = []) {
-    const pool = getHuntingMonsterPool(floor, stageId).filter((monster) => !excludedTypes.includes(monster.type));
+function getMonsterRarity(monster) {
+    return monster.monsterTags.find((tag) => tag.startsWith("rarity:"))?.slice("rarity:".length) ?? "common";
+}
+
+function rollMonster(floor, stageId, rng, excludedTypes = [], allowedRarities = null) {
+    const pool = getHuntingMonsterPool(floor, stageId).filter(
+        (monster) =>
+            !excludedTypes.includes(monster.type) &&
+            (!allowedRarities || allowedRarities.includes(getMonsterRarity(monster)))
+    );
     const total = pool.reduce((sum, monster) => sum + monster.weight, 0);
     let roll = rng() * total;
     for (const monster of pool) {
@@ -355,8 +365,19 @@ export function createHuntingMobEncounter({ floor = 1, stageId = HUNTING_STAGE_I
     );
 }
 
-export function shouldUseRosterMiniboss(floor, lastEvent = null) {
-    return lastEvent?.type === "champion_intrusion" || safeFloor(floor) % 3 === 0;
+export function createHuntingBossMobSpec({
+    floor = 1,
+    index = 0,
+    stageId = HUNTING_STAGE_IDS.CAVE,
+    rng = DEFAULT_RNG
+} = {}) {
+    const candidate = rollMonster(floor, stageId, rng, [], BOSS_MOB_RARITIES);
+    const normalSpec = scaleEnemySpecForHunting(
+        createHuntingMobSpec({ type: candidate.type, floor, index, stageId, rng }),
+        floor,
+        { enemyType: HUNTING_ENEMY_TYPES.NORMAL }
+    );
+    return applyBossMob(normalSpec);
 }
 
 export function createHuntingMinibossSpec({
