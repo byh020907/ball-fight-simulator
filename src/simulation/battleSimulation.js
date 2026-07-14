@@ -105,6 +105,18 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         }
     }
 
+    shouldSkipFighterCollision(a, b) {
+        if (super.shouldSkipFighterCollision(a, b)) return true;
+        return this._shouldSkipFriendlyJumperCollision(a, b);
+    }
+
+    _shouldSkipFriendlyJumperCollision(a, b) {
+        if (this.isHostile(a, b)) return false;
+        const aIsJumping = a.ability?.isJumping?.() === true;
+        const bIsJumping = b.ability?.isJumping?.() === true;
+        return (aIsJumping || bIsJumping) && !(aIsJumping && bIsJumping);
+    }
+
     /** 액션 예약 — 큐에 추가 (여러 액션이 동시에 예약되어도 안전) */
     scheduleAction(actionInstance, playerBall, paidCost = 0) {
         this._clickActionContext.pendingActions.push({ actionInstance, playerBall, paidCost });

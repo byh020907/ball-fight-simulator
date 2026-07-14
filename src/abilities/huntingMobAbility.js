@@ -43,9 +43,34 @@ const BOOMERANG_CONFIG = Object.freeze({
     returnTurnRate: 5.4,
     rotationSpeed: 18
 });
+const JUMP_CONFIG = Object.freeze({
+    duration: 0.55,
+    dashDuration: 0.42,
+    dashSpeed: 680,
+    maximumRadiusScale: 1.34,
+    apexStart: 0.35,
+    apexEnd: 0.65
+});
 
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
+}
+
+function easeOutCubic(progress) {
+    return 1 - (1 - progress) ** 3;
+}
+
+function easeInCubic(progress) {
+    return progress ** 3;
+}
+
+function getJumpHeightProgress(elapsed) {
+    const progress = clamp(elapsed / JUMP_CONFIG.duration, 0, 1);
+    if (progress < JUMP_CONFIG.apexStart) {
+        return easeOutCubic(progress / JUMP_CONFIG.apexStart);
+    }
+    if (progress <= JUMP_CONFIG.apexEnd) return 1;
+    return 1 - easeInCubic((progress - JUMP_CONFIG.apexEnd) / (1 - JUMP_CONFIG.apexEnd));
 }
 
 function normalizeAngle(angle) {
@@ -442,12 +467,12 @@ export class HuntingMobAbility extends Ability {
     }
 
     _jump(target) {
-        this.state.jump = 0.55;
+        this.state.jump = JUMP_CONFIG.duration;
         const direction = this._directionTo(target);
         if (!direction) return;
         this.owner.initiateDash(direction, {
-            speedOverride: 680,
-            duration: 0.42,
+            speedOverride: JUMP_CONFIG.dashSpeed,
+            duration: JUMP_CONFIG.dashDuration,
             color: "#ffd166",
             collisionDamage: 1.1
         });
@@ -643,8 +668,15 @@ export class HuntingMobAbility extends Ability {
         );
     }
 
+    isJumping() {
+        return this.behavior === "jumper" && this.state.jump > 0;
+    }
+
     getRadiusScale() {
-        return this.state.jump > 0 ? 1 + Math.sin((this.state.jump / 0.55) * Math.PI) * 0.34 : 1;
+        if (!this.isJumping()) return 1;
+        const elapsed = JUMP_CONFIG.duration - this.state.jump;
+        const heightProgress = getJumpHeightProgress(elapsed);
+        return 1 + heightProgress * (JUMP_CONFIG.maximumRadiusScale - 1);
     }
 
     getStatModifiers() {

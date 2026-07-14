@@ -8929,6 +8929,105 @@ function testTeamTargetingAndFriendlyCollision(app) {
     );
 }
 
+function createHuntingFriendlyCollisionSimulation(types) {
+    return new BattleSimulation(
+        types.map((type, index) => ({
+            ...createHuntingMobSpec({ type, floor: 1, index }),
+            teamId: HUNTING_TEAMS.ENEMY
+        })),
+        { onLog() {}, onSound() {} },
+        null,
+        { assignActions: false }
+    );
+}
+
+function placeOverlappingFighters(a, b) {
+    a.position = new Vector2(450, 480);
+    b.position = new Vector2(480, 480);
+}
+
+function getDistanceBetween(a, b) {
+    return Vector2.subtract(a.position, b.position).length();
+}
+
+function testHuntingJumperAirborneCollisionAndScale() {
+    const jumpDuration = 0.55;
+    const maximumRadiusScale = 1.34;
+
+    const passingSimulation = createHuntingFriendlyCollisionSimulation([
+        HUNTING_MONSTER_TYPES.JUMPER,
+        HUNTING_MONSTER_TYPES.PURSUER
+    ]);
+    const [jumpingJumper, regularAlly] = passingSimulation.fighters;
+    placeOverlappingFighters(jumpingJumper, regularAlly);
+    jumpingJumper.ability.state.jump = jumpDuration;
+    const passingStartDistance = getDistanceBetween(jumpingJumper, regularAlly);
+    const passingContext = passingSimulation.handleFighterCollision(jumpingJumper, regularAlly);
+    assert.equal(passingContext, null, "An airborne jumper must not create a friendly collision context");
+    assert.equal(
+        getDistanceBetween(jumpingJumper, regularAlly),
+        passingStartDistance,
+        "An airborne jumper must not force-separate a regular ally"
+    );
+
+    const groundedSimulation = createHuntingFriendlyCollisionSimulation([
+        HUNTING_MONSTER_TYPES.JUMPER,
+        HUNTING_MONSTER_TYPES.PURSUER
+    ]);
+    const [groundedJumper, groundedAlly] = groundedSimulation.fighters;
+    placeOverlappingFighters(groundedJumper, groundedAlly);
+    const groundedContext = groundedSimulation.handleFighterCollision(groundedJumper, groundedAlly);
+    assert.ok(groundedContext, "A grounded jumper must preserve normal friendly physics collisions");
+    assert.ok(
+        getDistanceBetween(groundedJumper, groundedAlly) >= groundedJumper.radius + groundedAlly.radius - 1,
+        "A grounded jumper must still force-separate an overlapping ally"
+    );
+
+    const doubleJumpSimulation = createHuntingFriendlyCollisionSimulation([
+        HUNTING_MONSTER_TYPES.JUMPER,
+        HUNTING_MONSTER_TYPES.JUMPER
+    ]);
+    const [firstJumper, secondJumper] = doubleJumpSimulation.fighters;
+    placeOverlappingFighters(firstJumper, secondJumper);
+    firstJumper.ability.state.jump = jumpDuration;
+    secondJumper.ability.state.jump = jumpDuration;
+    firstJumper.radius = firstJumper.stats.baseRadius * firstJumper.ability.getRadiusScale();
+    secondJumper.radius = secondJumper.stats.baseRadius * secondJumper.ability.getRadiusScale();
+    const firstJumperHp = firstJumper.hp;
+    const secondJumperHp = secondJumper.hp;
+    const doubleJumpContext = doubleJumpSimulation.handleFighterCollision(firstJumper, secondJumper);
+    assert.ok(doubleJumpContext, "Two airborne jumpers must retain a physical collision context");
+    assert.ok(
+        getDistanceBetween(firstJumper, secondJumper) >= firstJumper.radius + secondJumper.radius - 1,
+        "Two airborne jumpers must still force-separate each other"
+    );
+    assert.equal(firstJumper.hp, firstJumperHp, "Friendly jumper collisions must not damage the first jumper");
+    assert.equal(secondJumper.hp, secondJumperHp, "Friendly jumper collisions must not damage the second jumper");
+
+    const scaleSimulation = createHuntingFriendlyCollisionSimulation([HUNTING_MONSTER_TYPES.JUMPER]);
+    const [scaleJumper] = scaleSimulation.fighters;
+    const getScaleAt = (elapsed) => {
+        scaleJumper.ability.state.jump = Math.max(0, jumpDuration - elapsed);
+        return scaleJumper.ability.getRadiusScale();
+    };
+    const launchScale = getScaleAt(0.1);
+    const apexStartScale = getScaleAt(0.2);
+    const apexEndScale = getScaleAt(0.35);
+    const descentScale = getScaleAt(0.45);
+    const landingScale = getScaleAt(jumpDuration);
+    assert.equal(getScaleAt(0), 1, "A jump must begin at the normal radius");
+    assert.ok(launchScale > 1.29, "A jump must rise sharply during its opening 0.1 seconds");
+    assert.ok(
+        Math.abs(apexStartScale - maximumRadiusScale) < 1e-9 && Math.abs(apexEndScale - maximumRadiusScale) < 1e-9,
+        "A jump must keep its maximum radius through a readable apex hold"
+    );
+    assert.ok(
+        descentScale < apexEndScale && apexEndScale - descentScale < 0.05,
+        "A jump must leave the apex smoothly before the accelerated landing phase"
+    );
+    assert.equal(landingScale, 1, "A jump must return to the normal radius at landing");
+}
+
 function testTeamsResolveByRemainingHostileTeams(app) {
     const sim = new BattleSimulation(
         [
@@ -11705,6 +11804,7 @@ testHuntingElectricChannelCooldown(app);
 testHuntingLinkCooldowns(app);
 testHuntingConnectionEffectsClearDefeatedTargets(app);
 testTeamTargetingAndFriendlyCollision(app);
+testHuntingJumperAirborneCollisionAndScale();
 testTeamsResolveByRemainingHostileTeams(app);
 testProjectileIgnoresAllies(app);
 testPassiveEvasionAppliesImpulse(app);

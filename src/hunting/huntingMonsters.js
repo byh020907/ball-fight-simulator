@@ -40,7 +40,7 @@ const MONSTER_BEHAVIOR_DESCRIPTIONS = Object.freeze({
     shard: "파편을 흩뿌려 여러 방향을 압박합니다.",
     boomerang: "되돌아오는 부메랑 투사체를 발사합니다.",
     splitter: "사망할 때 2단계에 걸쳐 작은 추적 파편으로 분열합니다.",
-    jumper: "크기를 키우며 도약해 충돌을 노립니다.",
+    jumper: "공중 도약 중 일반 아군을 통과하고, 정점에서 잠시 체공한 뒤 충돌을 노립니다.",
     laser: "충전한 방향으로 벽 끝까지 레이저를 발사합니다."
 });
 
