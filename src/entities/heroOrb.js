@@ -148,10 +148,10 @@ export const HERO_ORB_EFFECTS = {
         color: "#66ddff",
         label: "쿨타임 버스트",
         apply(owner, ctx) {
-            if (!owner.ability || owner.ability.constructor?.name !== "HeroAbility") {
+            if (!ctx.sourceAbility?.applyCooldownBurst) {
                 return { applied: false };
             }
-            owner.ability.applyCooldownBurst(1.0, 0.1);
+            ctx.sourceAbility.applyCooldownBurst(1.0, 0.1);
             ctx.simulation.spawnPulse(ctx.orb.position.clone(), "#66ddff");
             ctx.simulation.playSound("powerup", 1.1);
             ctx.simulation.addLog(`${owner.name} activates cooldown burst!`);
@@ -259,11 +259,19 @@ export function applyHeroOrbCarryoverToBattleBall(ball, carryover) {
 // ── Hero Orb entity ──────────────────────────────────────────────────────────
 
 export class HeroOrb extends CollectionGrace(CombatEntity) {
-    constructor(owner, position, velocity, effectType, life, { collectionGraceDuration = 0 } = {}) {
+    constructor(
+        owner,
+        position,
+        velocity,
+        effectType,
+        life,
+        { collectionGraceDuration = 0, sourceAbility = null } = {}
+    ) {
         super(position, velocity, 12);
         this.owner = owner;
         this.ownerId = owner.id;
         this.effectType = effectType;
+        this.sourceAbility = sourceAbility;
         this.life = life ?? Infinity;
         this.mass = 2;
         this.initializeCollectionGrace(collectionGraceDuration);
@@ -297,14 +305,16 @@ export class HeroOrb extends CollectionGrace(CombatEntity) {
                 if (isCollectionGraceActive) continue;
                 const effectDef = HERO_ORB_EFFECTS[this.effectType];
                 if (effectDef) {
+                    const sourceAbility = this._resolveSourceAbility();
                     const result = effectDef.apply(fighter, {
                         orb: this,
                         simulation,
-                        effectType: this.effectType
+                        effectType: this.effectType,
+                        sourceAbility
                     });
                     simulation.spawnPulse(this.position.clone(), effectDef.color);
                     if (result?.applied) {
-                        fighter.ability?.onOrbCollected?.(this, result);
+                        sourceAbility?.onOrbCollected?.(this, result);
                         simulation.spawnActionText(
                             this.position.clone(),
                             `${effectDef.label} +${result.amount}`,
@@ -327,7 +337,7 @@ export class HeroOrb extends CollectionGrace(CombatEntity) {
     }
 
     _applyOwnerMagnet(delta) {
-        const attraction = this.owner.ability?.getOrbAttraction?.(this);
+        const attraction = this._resolveSourceAbility()?.getOrbAttraction?.(this);
         if (!attraction || this.owner.flags.defeated) return;
 
         applyMagneticAttraction(this, this.owner, delta, {
@@ -335,6 +345,10 @@ export class HeroOrb extends CollectionGrace(CombatEntity) {
             responseRate: attraction.responseRate,
             attractionSpeed: computeOwnerCombatSpeed(this.owner) * 1.35
         });
+    }
+
+    _resolveSourceAbility() {
+        return this.sourceAbility ?? this.owner.abilities?.getByAbilityId("hero") ?? null;
     }
 
     get _isSpecial() {

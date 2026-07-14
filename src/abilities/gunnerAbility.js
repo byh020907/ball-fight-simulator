@@ -85,7 +85,8 @@ export class GunnerAbility extends Ability {
             dir.clone().scale(speed),
             finalMult,
             isFinisher,
-            cdReduction
+            cdReduction,
+            this
         );
         this.state.activeBullets = this.state.activeBullets.filter((b) => !b.isExpired);
         this.state.activeBullets.push(bullet);

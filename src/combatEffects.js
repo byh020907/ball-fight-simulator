@@ -48,7 +48,7 @@ export class DashEffect {
         if (this.collisionSlow) {
             defender.applySlow(this.collisionSlow.duration, this.collisionSlow.amount);
         }
-        attacker.ability?.onDashHit?.(defender, this);
+        attacker.abilities.onDashHit(defender, this);
         if (this.untilImpact) {
             this.expired = true;
         }
@@ -56,7 +56,7 @@ export class DashEffect {
 
     onWallBounce(ball, simulation) {
         if (this.untilWall) {
-            ball.ability?.onDashWall?.(this);
+            ball.abilities.onDashWall(this);
             this.expired = true;
         }
     }

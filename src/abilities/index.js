@@ -1,4 +1,5 @@
 ﻿export { Ability } from "./ability.js";
+export { AbilitySet } from "./abilitySet.js";
 export { ArcherAbility } from "./archerAbility.js";
 export { OrbitAbility } from "./orbitAbility.js";
 export { TricksterAbility } from "./tricksterAbility.js";

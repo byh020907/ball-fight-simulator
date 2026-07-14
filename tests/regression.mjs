@@ -39,6 +39,7 @@ import { getLevelRewardEffectHandler } from "../src/experience/reward-effects/ef
 import { DashEffect, WallSlamEffect } from "../src/combatEffects.js";
 import { shuffled } from "../src/random.js";
 import { BattleSimulation } from "../src/simulation/battleSimulation.js";
+import { Ability, AbilitySet } from "../src/abilities/index.js";
 import { FighterPhysicsSimulation } from "../src/simulation/fighterPhysicsSimulation.js";
 import { PreviewReselectSimulation } from "../src/preview/previewReselectSimulation.js";
 import {
@@ -4172,6 +4173,170 @@ function testAbilityLevelUpgrades(app) {
         "Hero tier 3 should release half of twenty consumed stacks as normal orbs"
     );
     console.log("[ability-level-upgrades] ok");
+}
+
+function testMultiAbilityFoundation(app) {
+    class ProbeAbility extends Ability {
+        constructor(owner, simulation, events, modifier) {
+            super(owner, simulation, 4);
+            this.events = events;
+            this.modifier = modifier;
+        }
+
+        update() {
+            this.events.push(`${this.instanceKey}:update`);
+        }
+
+        onCollision() {
+            this.events.push(`${this.instanceKey}:collision`);
+        }
+
+        getStatModifiers() {
+            return this.modifier;
+        }
+
+        getUiState() {
+            return { label: this.displayName, progress: this.timer / this.cooldown };
+        }
+    }
+
+    const primarySpec = { ...app.roster.find((fighter) => fighter.id === FIGHTER_IDS.DASH), teamId: "ability-set-a" };
+    const opponentSpec = {
+        ...app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER),
+        id: "ability-set-opponent",
+        teamId: "ability-set-b"
+    };
+    const probeSimulation = new BattleSimulation([primarySpec, opponentSpec], { onLog() {}, onSound() {} }, null, {
+        assignActions: false
+    });
+    const [probeOwner, probeTarget] = probeSimulation.fighters;
+    const events = [];
+    const primaryProbe = new ProbeAbility(probeOwner, probeSimulation, events, {
+        speed: 1.2,
+        damage: 1.1,
+        defense: 1.05,
+        impact: 1.15
+    }).setContext({
+        abilityId: "dash",
+        role: "primary",
+        abilityTier: 1,
+        instanceKey: "primary:probe",
+        displayName: "Primary Probe"
+    });
+    const subProbe = new ProbeAbility(probeOwner, probeSimulation, events, {
+        speed: 0.1,
+        damage: 5,
+        defense: 5,
+        impact: 5
+    }).setContext({
+        abilityId: "hero",
+        role: "sub",
+        abilityTier: 3,
+        instanceKey: "sub:probe",
+        displayName: "Sub Probe"
+    });
+    primaryProbe.timer = 3;
+    subProbe.timer = 1;
+    probeOwner.bindAbilitySet(new AbilitySet(probeOwner, { primary: primaryProbe, subAbilities: [subProbe] }));
+
+    probeOwner.abilities.update(0.1, probeTarget);
+    probeOwner.abilities.onCollision(probeTarget, {});
+    assert.deepEqual(
+        events,
+        ["primary:probe:update", "sub:probe:update", "primary:probe:collision", "sub:probe:collision"],
+        "Ability lifecycle hooks should run in primary then sub registration order"
+    );
+    assert.deepEqual(
+        probeOwner.getStatModifiers(),
+        primaryProbe.modifier,
+        "Sub abilities must not change fighter collision physics modifiers"
+    );
+    const probeStates = probeOwner.getAbilityUiStates();
+    assert.deepEqual(
+        probeStates.map((state) => state.key),
+        ["primary:probe", "sub:probe"],
+        "Ability UI state should preserve stable primary/sub registration order"
+    );
+    assert.deepEqual(
+        probeStates.map((state) => state.cooldownRemaining),
+        [3, 1],
+        "Each ability UI row should retain its own cooldown state"
+    );
+    assert.equal(
+        subProbe.getLevelUpgrade().stackCap,
+        20,
+        "A Hero sub ability must read its own id and tier upgrade data"
+    );
+    for (const state of probeStates) {
+        assert.deepEqual(
+            Object.keys(state).sort(),
+            [
+                "abilityId",
+                "cooldownDuration",
+                "cooldownRemaining",
+                "displayName",
+                "key",
+                "label",
+                "progress",
+                "role",
+                "status",
+                "text"
+            ],
+            "Ability UI rows should expose the complete shared card contract"
+        );
+    }
+
+    const gunnerSpec = {
+        ...app.roster.find((fighter) => fighter.id === FIGHTER_IDS.GUNNER),
+        teamId: "source-primary"
+    };
+    const sourceSimulation = new BattleSimulation([gunnerSpec, opponentSpec], { onLog() {}, onSound() {} }, null, {
+        assignActions: false
+    });
+    const [gunnerOwner] = sourceSimulation.fighters;
+    const gunner = gunnerOwner.abilities.primary;
+    const heroSub = sourceSimulation.createAbility("hero", gunnerOwner, {
+        role: "sub",
+        abilityTier: 3,
+        instanceKey: "sub:hero-orb",
+        displayName: "Hero Orb"
+    });
+    gunnerOwner.abilities.addSubAbility(heroSub);
+
+    gunner.timer = 3;
+    heroSub.timer = 3;
+    gunner._startBurst();
+    gunner._fireBurstBullet();
+    const bullet = sourceSimulation.entities.find((entity) => entity.constructor?.name === "BulletProjectile");
+    assert.equal(bullet.sourceAbility, gunner, "Bullets should retain the ability instance that spawned them");
+    bullet.position = gunnerOwner.position.clone();
+    bullet._ownerCollectCheck(sourceSimulation);
+    assert.ok(gunner.timer < 3, "A returned bullet should reduce only the Gunner source cooldown");
+    assert.equal(heroSub.timer, 3, "A returned bullet must not reduce a different sub ability cooldown");
+
+    heroSub._spawnOrb("cooldown_burst", new Vector2(1, 0));
+    const orb = sourceSimulation.entities.find((entity) => entity.constructor?.name === "HeroOrb" && !entity.isExpired);
+    assert.equal(orb.sourceAbility, heroSub, "Hero Orbs should retain their spawning Hero ability instance");
+    orb.collectionGraceRemaining = 0;
+    orb.position = gunnerOwner.position.clone();
+    orb.velocity = new Vector2(0, 0);
+    orb.update(0, sourceSimulation);
+    assert.equal(
+        heroSub.state.cooldownBurstMultiplier,
+        0.1,
+        "A Hero sub ability should receive its own cooldown burst"
+    );
+    assert.equal(gunner.timer, 3 - gunner.cooldown / 2 / 12, "Hero Orb effects must not mutate the Gunner cooldown");
+
+    const fighterStrip = readFileSync("src/components/fighter-strip.html", "utf8");
+    assert.ok(fighterStrip.includes("fighter.abilityStates"), "Fighter cards should render the ability state list");
+    assert.ok(fighterStrip.includes("abilityState.role === 'sub'"), "Fighter cards should identify sub ability rows");
+    const styles = readFileSync("src/styles.css", "utf8");
+    assert.ok(
+        styles.includes(".battle-stage") && styles.includes("overflow-y: auto"),
+        "Portrait battle layout should scroll as cards grow"
+    );
+    console.log("[multi-ability-foundation] ok");
 }
 
 function testHuntingSystem() {
@@ -11412,6 +11577,7 @@ await testGrenadeScatterShot(app);
 testExperienceSystem();
 testCharacterLevelProgressions(app);
 testAbilityLevelUpgrades(app);
+testMultiAbilityFoundation(app);
 testHuntingSystem();
 await testHuntingAchievementProgress();
 testHunting100FloorStructure();

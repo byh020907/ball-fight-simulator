@@ -12,6 +12,7 @@ import { MobAppearance } from "./mobAppearance.js";
 import { drawEquipmentItems, getCharacterOutlineWidth } from "./equipmentVisuals.js";
 import { applyHeroOrbCarryoverToBattleBall, mergeHeroOrbCarryover, HERO_ORB_CARRYOVER_RATE } from "./heroOrb.js";
 import { createEquipmentCombatEffects } from "../hunting/equipmentEffects.js";
+import { AbilitySet } from "../abilities/abilitySet.js";
 
 export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMaterialBody]) {
     constructor(spec, position) {
@@ -58,7 +59,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         this.display = {
             scale: 1
         };
-        this.ability = null;
+        this.abilities = new AbilitySet(this);
         this.progression = {
             characterId: spec.id,
             level: 1,
@@ -135,15 +136,28 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
     }
 
     get meta() {
-        return this.ability?.meta ?? { isRanged: false };
+        return this.abilities.meta;
+    }
+
+    get ability() {
+        return this.abilities.primary;
     }
 
     bindAbility(ability) {
-        this.ability = ability;
+        return this.abilities.setPrimary(ability);
+    }
+
+    bindAbilitySet(abilitySet) {
+        if (!(abilitySet instanceof AbilitySet) || abilitySet.owner !== this) {
+            throw new Error("BattleBall requires an AbilitySet owned by itself");
+        }
+
+        this.abilities = abilitySet;
+        return this.abilities;
     }
 
     getStatModifiers() {
-        return this.ability ? this.ability.getStatModifiers() : { speed: 1, damage: 1, defense: 1, impact: 1 };
+        return this.abilities.getStatModifiers();
     }
 
     getSkillPoints() {
@@ -327,7 +341,11 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
     }
 
     getAbilityUiState() {
-        return this.ability?.getUiState?.() ?? { label: "Passive", progress: 1 };
+        return this.abilities.getPrimaryUiState();
+    }
+
+    getAbilityUiStates() {
+        return this.abilities.getUiStates();
     }
 
     initState() {
@@ -347,7 +365,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         const target = simulation.getOpponent(this);
         this._tickTimers(delta);
         this._tickMasteryPassives(delta);
-        this.ability?.update(delta, target);
+        this.abilities.update(delta, target);
 
         if (this.aiController) {
             try {
@@ -360,7 +378,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             }
         }
 
-        this.radius = this.stats.baseRadius * (this.ability?.getRadiusScale?.() ?? 1);
+        this.radius = this.stats.baseRadius * this.abilities.getRadiusScale();
         this._applyVelocityCorrection(simulation, delta);
         this.integrate(delta);
         simulation.keepInsideArena(this);
@@ -481,7 +499,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         if (this.hp <= 0) {
             const s = source?.simulation ?? this.simulation;
             const defeatContext = { source, label, simulation: s };
-            const suppressLootDrop = Boolean(this.ability?.onOwnerDefeated?.(defeatContext));
+            const suppressLootDrop = this.abilities.onOwnerDefeated(defeatContext);
             this.flags.defeated = true;
             this.flags.destroyed = true;
             if (s) {
@@ -530,7 +548,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         // 얼굴 회전: polygon은 항상 this.angle, 원형은 rotationEnabled에 따라 적용
         const faceRotation = this.appearance.sides > 0 ? this.angle : this.rotationEnabled ? this.angle : 0;
         this.drawFace(ctx, faceRotation);
-        this.ability?.draw?.(ctx);
+        this.abilities.draw(ctx);
         if (this.state.movement?.showRing) {
             ctx.strokeStyle = this.state.movement.color;
             ctx.lineWidth = 4;
@@ -610,7 +628,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         ctx.strokeStyle = "#202020";
         ctx.fillStyle = "#202020";
         ctx.lineWidth = Math.max(3, r * 0.075);
-        const drawn = this.ability?.drawFace?.(ctx, rotation, this);
+        const drawn = this.abilities.drawFace(ctx, rotation, this);
         if (!drawn) {
             this._drawAppearanceFace(ctx);
         }

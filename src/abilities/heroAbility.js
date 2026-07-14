@@ -119,7 +119,10 @@ export class HeroAbility extends Ability {
             direction.scale(this._computeOrbSpeed()),
             effectType,
             undefined,
-            { collectionGraceDuration: this.getLevelUpgrade().collectionGraceDuration ?? 0 }
+            {
+                collectionGraceDuration: this.getLevelUpgrade().collectionGraceDuration ?? 0,
+                sourceAbility: this
+            }
         );
     }
 

@@ -1,13 +1,22 @@
 import { Projectile, Vector2 } from "../core.js";
 
 export class BulletProjectile extends Projectile {
-    constructor(owner, position, velocity, damageMult = 0.5, isFinisher = false, cdReduction = 0) {
+    constructor(
+        owner,
+        position,
+        velocity,
+        damageMult = 0.5,
+        isFinisher = false,
+        cdReduction = 0,
+        sourceAbility = null
+    ) {
         super(owner, position, velocity, 4);
         this.life = 3.0;
         this.angle = Math.atan2(velocity.y, velocity.x);
         this.damageMult = damageMult;
         this.isFinisher = isFinisher;
         this.cdReduction = cdReduction;
+        this.sourceAbility = sourceAbility;
         this._trail = [];
         this._bounceCount = 0;
         if (isFinisher) this.radius = 6;
@@ -34,7 +43,7 @@ export class BulletProjectile extends Projectile {
     _ownerCollectCheck(simulation) {
         const dist = Vector2.subtract(this.position, this.owner.position).length();
         if (dist > this.owner.radius + this.radius) return;
-        const ability = this.owner.ability;
+        const ability = this.sourceAbility;
         if (ability && typeof ability.timer === "number") {
             ability.timer = Math.max(0, ability.timer - this.cdReduction);
             simulation.spawnActionText(this.owner.position.clone(), `CD -${this.cdReduction.toFixed(3)}s`, "#44ddff");

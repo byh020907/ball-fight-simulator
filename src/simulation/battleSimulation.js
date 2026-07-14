@@ -1,5 +1,7 @@
 import { Vector2 } from "../core.js";
 import { Ability } from "../abilities/ability.js";
+import { AbilitySet } from "../abilities/abilitySet.js";
+import { getAbilityDisplayName } from "../abilities/abilityMetadata.js";
 import { getContactDamageSpeed } from "../physics/contactDamage.js";
 import {
     ArcherAbility,
@@ -60,7 +62,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
             };
             const fighter = new BattleBall(fighterSpec, spawnPoints[index]);
             fighter.simulation = this;
-            fighter.bindAbility(this.createAbility(fighterSpec.ability, fighter));
+            fighter.bindAbilitySet(this.createAbilitySet(fighterSpec.ability, fighter));
             this.hooks.onBattleBallReady?.(fighter, fighterSpec, this);
             return fighter;
         });
@@ -183,18 +185,32 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         return points;
     }
 
-    createAbility(type, owner) {
+    createAbility(type, owner, context = {}) {
         const AbilityType = ABILITY_TYPES[type];
         if (!AbilityType) {
             throw new Error(`Unknown ability type: ${type}`);
         }
-        return new AbilityType(owner, this);
+        const role = context.role ?? "primary";
+        const abilityId = context.abilityId ?? type;
+        return new AbilityType(owner, this).setContext({
+            abilityId,
+            role,
+            abilityTier: context.abilityTier ?? null,
+            instanceKey: context.instanceKey ?? `${role}:${abilityId}`,
+            displayName: context.displayName ?? getAbilityDisplayName(abilityId)
+        });
+    }
+
+    createAbilitySet(type, owner, context = {}) {
+        return new AbilitySet(owner, {
+            primary: this.createAbility(type, owner, { ...context, role: "primary" })
+        });
     }
 
     spawnFighter(spec, position) {
         const fighter = new BattleBall(spec, position.clone());
         fighter.simulation = this;
-        fighter.bindAbility(this.createAbility(spec.ability, fighter));
+        fighter.bindAbilitySet(this.createAbilitySet(spec.ability, fighter));
         this.hooks.onBattleBallReady?.(fighter, spec, this);
         this.fighters.push(fighter);
         this.entities.push(fighter);
@@ -334,10 +350,8 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         damageFromBToA = bCollision.outgoingDamage;
         damageFromAToB = bCollision.incomingDamage;
 
-        damageFromAToB =
-            a.ability?.modifyOutgoingFighterCollisionDamage?.(damageFromAToB, b, context) ?? damageFromAToB;
-        damageFromBToA =
-            b.ability?.modifyOutgoingFighterCollisionDamage?.(damageFromBToA, a, context) ?? damageFromBToA;
+        damageFromAToB = a.abilities.modifyOutgoingFighterCollisionDamage(damageFromAToB, b, context);
+        damageFromBToA = b.abilities.modifyOutgoingFighterCollisionDamage(damageFromBToA, a, context);
 
         const damageToA = damageFromBToA > 0 ? a.takeDamage(damageFromBToA, b, "Crash").actualDamage : 0;
         const damageToB = damageFromAToB > 0 ? b.takeDamage(damageFromAToB, a, "Crash").actualDamage : 0;
@@ -425,17 +439,17 @@ export class BattleSimulation extends FighterPhysicsSimulation {
     afterFighterPhysicsCollision(context) {
         const { a, b, contactPoint } = context;
         if (!context.hostile) {
-            a.ability?.onAllyCollision?.(b, context);
-            b.ability?.onAllyCollision?.(a, context);
+            a.abilities.onAllyCollision(b, context);
+            b.abilities.onAllyCollision(a, context);
             return;
         }
 
-        a.ability?.onFighterCollisionDamageResolved?.(b, context.damageFromAToB, context);
-        b.ability?.onFighterCollisionDamageResolved?.(a, context.damageFromBToA, context);
+        a.abilities.onFighterCollisionDamageResolved(b, context.damageFromAToB, context);
+        b.abilities.onFighterCollisionDamageResolved(a, context.damageFromBToA, context);
         this._handleDashCollisions(a, b, contactPoint);
 
-        a.ability?.onCollision(b, { contactPoint });
-        b.ability?.onCollision(a, { contactPoint });
+        a.abilities.onCollision(b, { contactPoint });
+        b.abilities.onCollision(a, { contactPoint });
         this._recordPhysicsDebugCollision(context);
     }
 
@@ -445,7 +459,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
 
     notifyFighterStaticCollision(fighter, context) {
         for (const observer of this.fighters) {
-            observer.ability?.onFighterStaticCollision?.(fighter, context);
+            observer.abilities.onFighterStaticCollision(fighter, context);
         }
     }
 

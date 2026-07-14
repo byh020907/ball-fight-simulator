@@ -74,6 +74,7 @@ import {
 import { FIGHTER_IDS, Vector2 } from "./core.js";
 import { formatHeroStatLine, formatHeroStatParts, mergeOrbBonuses } from "./entities/heroOrb.js";
 import { Ability } from "./abilities/index.js";
+import { getAbilityDisplayName } from "./abilities/abilityMetadata.js";
 import { AppLifecycle } from "./appLifecycle.js";
 import { ScreenWakeLock } from "./screenWakeLock.js";
 
@@ -645,9 +646,20 @@ export class BattleApp {
                 heroStatParts: isHero ? formatHeroStatParts(fighter.stats.allocation ?? {}) : [],
                 isHero,
                 balanceMult: 1,
-                skillLabel: "Skill",
-                skillPct: 1,
-                skillText: "Ready",
+                abilityStates: [
+                    {
+                        key: `primary:${fighter.ability}`,
+                        abilityId: fighter.ability,
+                        displayName: getAbilityDisplayName(fighter.ability),
+                        role: "primary",
+                        label: "Ready",
+                        progress: 1,
+                        status: "ready",
+                        cooldownRemaining: 0,
+                        cooldownDuration: 0,
+                        text: "Ready"
+                    }
+                ],
                 actionName: null
             };
         });
@@ -662,7 +674,11 @@ export class BattleApp {
             const pts = [alloc.hp ?? 0, alloc.damage ?? 0, alloc.speed ?? 0, alloc.skill ?? 0, alloc.defense ?? 0];
             const mult = calculateStatMultiplier(pts).multiplier;
             const bonuses = mergeOrbBonuses(fighter.hero.bonuses ?? {}, fighter.hero.carryover ?? {});
-            const uiState = fighter.getAbilityUiState();
+            const abilityStates = fighter.getAbilityUiStates().map((state) => ({
+                ...state,
+                progress: Math.max(0, Math.min(1, state.progress)),
+                text: state.text ?? (state.progress >= 0.995 ? "Ready" : `${Math.round(state.progress * 100)}%`)
+            }));
             return {
                 ...card,
                 hp: Math.ceil(fighter.hp),
@@ -675,9 +691,7 @@ export class BattleApp {
                     ? formatHeroStatLine(fighter.stats.allocation ?? {}, bonuses)
                     : formatStatAllocation(fighter.stats.allocation ?? {}),
                 heroStatParts: isHero ? formatHeroStatParts(fighter.stats.allocation ?? {}, bonuses) : [],
-                skillLabel: uiState.label,
-                skillPct: Math.max(0, Math.min(1, uiState.progress)),
-                skillText: uiState.progress >= 0.995 ? "Ready" : `${Math.round(uiState.progress * 100)}%`,
+                abilityStates,
                 actionName: fighter.clickActionName ?? null
             };
         });

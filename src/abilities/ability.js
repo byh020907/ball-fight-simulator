@@ -5,10 +5,17 @@ export class Ability extends mixins([Cooldown]) {
     /** @type {Record<string, typeof Ability>} */
     static MAP = {};
 
-    constructor(owner, simulation, baseCooldown = 0) {
+    constructor(owner, simulation, baseCooldown = 0, context = {}) {
         super();
         this.owner = owner;
         this.simulation = simulation;
+        this.context = {
+            abilityId: context.abilityId ?? owner?.abilityId ?? null,
+            role: context.role ?? "primary",
+            abilityTier: context.abilityTier ?? null,
+            instanceKey: context.instanceKey ?? null,
+            displayName: context.displayName ?? null
+        };
         this._baseCooldown = baseCooldown;
         this._cooldownDuration = baseCooldown;
         this._cooldownRemaining = this.cooldown;
@@ -23,8 +30,36 @@ export class Ability extends mixins([Cooldown]) {
         return this._baseCooldown * skillMultiplier * masteryMultiplier * equipmentMultiplier;
     }
 
+    get abilityId() {
+        return this.context.abilityId;
+    }
+
+    get role() {
+        return this.context.role;
+    }
+
+    get abilityTier() {
+        return this.context.abilityTier ?? this.owner.progression?.abilityTier ?? 0;
+    }
+
+    get instanceKey() {
+        return this.context.instanceKey ?? `${this.role}:${this.abilityId ?? "ability"}`;
+    }
+
+    get displayName() {
+        return this.context.displayName;
+    }
+
+    setContext(context) {
+        this.context = {
+            ...this.context,
+            ...context
+        };
+        return this;
+    }
+
     getLevelUpgrade() {
-        return getAbilityUpgrade(this.owner.abilityId, this.owner.progression?.abilityTier ?? 0);
+        return getAbilityUpgrade(this.abilityId, this.abilityTier);
     }
 
     set cooldown(val) {
