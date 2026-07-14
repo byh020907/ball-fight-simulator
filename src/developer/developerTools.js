@@ -1,5 +1,6 @@
 import { getLevelRequirement } from "../experience/experienceConfig.js";
 import { getCharacterExperienceSummary } from "../experience/experienceService.js";
+import { applyTournamentReport, createTournamentReport } from "../collection/index.js";
 import { createRoster } from "../roster.js";
 
 const CHARACTER_IDS = new Set(createRoster().map((fighter) => fighter.id));
@@ -46,4 +47,24 @@ export function setDeveloperRebirthCount(profile, characterId, rebirthCount) {
     const state = ensureRebirthState(profile, characterId);
     state.rebirthCount = Math.max(0, Math.min(MAX_DEBUG_REBIRTH_COUNT, Math.floor(Number(rebirthCount) || 0)));
     return { ok: true, rebirthCount: state.rebirthCount };
+}
+
+export function recordDeveloperTournamentWin(profile, characterId) {
+    if (!profile || !isKnownCharacter(characterId)) return { ok: false, error: "unknown_character" };
+    if (!profile.collection?.characters || !profile.collection?.careerStats) {
+        return { ok: false, error: "invalid_profile" };
+    }
+
+    const report = createTournamentReport();
+    report.playerFighterId = characterId;
+    report.playerWon = true;
+    report.placement = 1;
+    const result = applyTournamentReport(profile, report);
+    if (result.alreadyProcessed) return { ok: false, error: "duplicate_report" };
+
+    return {
+        ok: true,
+        record: profile.collection.characters[characterId],
+        report
+    };
 }

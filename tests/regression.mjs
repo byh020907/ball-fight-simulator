@@ -258,6 +258,7 @@ import { PHYSICS_MATERIALS, resolvePhysicsMaterial, combinePhysicsMaterials } fr
 import PhysicsMaterialBody from "../src/physics/PhysicsMaterialBody.js";
 import { AppLifecycle, APP_LIFECYCLE_STATES } from "../src/appLifecycle.js";
 import { ScreenWakeLock } from "../src/screenWakeLock.js";
+import { recordDeveloperTournamentWin } from "../src/developer/developerTools.js";
 
 const EMPTY_EQUIPMENT_SUMMARY = {
     characterLevel: 1,
@@ -10729,6 +10730,66 @@ async function testApplyTournamentReport() {
     assert.ok(result2.alreadyProcessed, "Duplicate report should be skipped");
 }
 
+function testDeveloperTournamentWinTool() {
+    const profile = createDefaultPlayerProfile();
+    const characterId = FIGHTER_IDS.RAGE;
+    const result = recordDeveloperTournamentWin(profile, characterId);
+
+    assert.equal(result.ok, true, "Developer tournament win should create a valid tournament report");
+    assert.equal(
+        result.report.playerFighterId,
+        characterId,
+        "Developer report should belong to the selected character"
+    );
+    assert.equal(result.report.playerWon, true, "Developer report should record a win");
+    assert.equal(result.report.placement, 1, "Developer report should record first place");
+    assert.equal(result.record.tournamentsCompleted, 1, "Developer win should increase tournament completion count");
+    assert.equal(result.record.tournamentWins, 1, "Developer win should increase the selected character win count");
+    assert.equal(result.record.bestPlacement, 1, "Developer win should record first place as best placement");
+    assert.equal(
+        canEnterHunting(profile, characterId),
+        true,
+        "Developer win should satisfy the hunting entry requirement"
+    );
+    assert.equal(
+        profile.collection.careerStats.playerTournamentsCompleted,
+        1,
+        "Career tournament total should use the report path"
+    );
+    assert.equal(
+        profile.collection.careerStats.processedTournamentReportIds.length,
+        1,
+        "Report deduplication should track the developer report"
+    );
+    assert.equal(recordDeveloperTournamentWin(profile, "unknown").error, "unknown_character");
+
+    const app = {
+        playerProfile: profile,
+        debugActive: false,
+        isDebugModeActive() {
+            return this.debugActive;
+        },
+        _refreshCollectionHub() {
+            this.collectionRefreshCount = (this.collectionRefreshCount ?? 0) + 1;
+        },
+        refreshPlayerSetup() {
+            this.setupRefreshCount = (this.setupRefreshCount ?? 0) + 1;
+        }
+    };
+    const bridge = createAppComponentBridge(app);
+    assert.equal(
+        bridge.recordDebugTournamentWin(characterId).error,
+        "debug_disabled",
+        "Bridge should not allow tournament results outside a development session"
+    );
+    app.debugActive = true;
+    const bridgeResult = bridge.recordDebugTournamentWin(characterId);
+    assert.equal(bridgeResult.ok, true, "Bridge should record the selected debug character victory");
+    assert.equal(app.collectionRefreshCount, 1, "Developer win should refresh collection data");
+    assert.equal(app.setupRefreshCount, 1, "Developer win should refresh setup data");
+    console.log("[developer-tournament-win-tool] ok");
+}
+
 // ── Toast queue tests ───────────────────────────────────────────────────────
 
 async function testToastQueue() {
@@ -11740,6 +11801,7 @@ await testGetCharacterMasteryLevel();
 await testGetCharacterChallengeLevel();
 // Tournament report tests
 await testApplyTournamentReport();
+testDeveloperTournamentWinTool();
 // Collection hub view model tests
 await testCreateCollectionHubViewModel();
 // Toast queue tests
@@ -17101,5 +17163,17 @@ function testRebirthCollectionTemplateContract() {
 }
 
 testRebirthCollectionTemplateContract();
+
+function testDeveloperCollectionTemplateContract() {
+    const template = readFileSync("src/components/collection-hub.html", "utf8");
+    assert.ok(template.includes("우승 처리"), "Developer tools should label the tournament win action");
+    assert.ok(
+        template.includes('@click="recordDebugTournamentWin()"'),
+        "Developer tournament action should use the dedicated debug bridge method"
+    );
+    console.log("[developer-collection-template] ok");
+}
+
+testDeveloperCollectionTemplateContract();
 
 console.log("regression tests ok");

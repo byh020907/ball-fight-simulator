@@ -24,7 +24,11 @@ import { CollectionHubService } from "./collectionHubService.js";
 import { createCollectionActionPopupOptions } from "./collection/collectionActionPopup.js";
 import { beginRebirth, completeRebirth, toggleRebirthCardEquip } from "./rebirth/rebirthService.js";
 import { RebirthPickerService } from "./rebirth/rebirthPicker.js";
-import { setDeveloperCharacterToMaxLevel, setDeveloperRebirthCount } from "./developer/developerTools.js";
+import {
+    recordDeveloperTournamentWin,
+    setDeveloperCharacterToMaxLevel,
+    setDeveloperRebirthCount
+} from "./developer/developerTools.js";
 
 export function createComponentBridge(app) {
     function showLevelLockPopup(item) {
@@ -230,6 +234,12 @@ export function createComponentBridge(app) {
         setDebugRebirthCount(characterId, rebirthCount) {
             if (!app.isDebugModeActive()) return { ok: false, error: "debug_disabled" };
             const result = setDeveloperRebirthCount(app.playerProfile, characterId, rebirthCount);
+            if (result.ok) refreshCollectionAndProfile();
+            return result;
+        },
+        recordDebugTournamentWin(characterId) {
+            if (!app.isDebugModeActive()) return { ok: false, error: "debug_disabled" };
+            const result = recordDeveloperTournamentWin(app.playerProfile, characterId);
             if (result.ok) refreshCollectionAndProfile();
             return result;
         },

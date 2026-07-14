@@ -431,6 +431,10 @@
                     <span>레벨</span>
                     <button class="ch-btn" type="button" @click="setDebugCharacterToMaxLevel()">Lv.10 적용</button>
                 </div>
+                <div class="ch-developer-field ch-developer-field--action">
+                    <span>토너먼트</span>
+                    <button class="ch-btn" type="button" @click="recordDebugTournamentWin()">우승 처리</button>
+                </div>
                 <label class="ch-developer-field">
                     <span>환생 횟수</span>
                     <input class="ch-search" type="number" min="0" max="999" x-model.number="state.developer.rebirthCount" />
@@ -1274,6 +1278,9 @@
             },
             setDebugRebirthCount() {
                 return this.bridge.setDebugRebirthCount(state.developer.targetCharacterId, state.developer.rebirthCount);
+            },
+            recordDebugTournamentWin() {
+                return this.bridge.recordDebugTournamentWin(state.developer.targetCharacterId);
             },
             startDebugHunting() {
                 return this.bridge.startDebugHunting(
