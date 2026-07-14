@@ -12933,8 +12933,9 @@ function testCollectionCharacterDetailTabsContract() {
         "Character detail should not duplicate the always-visible roster navigation"
     );
     assert.ok(
-        !collectionHub.includes("closeCollectionCharacterDetail"),
-        "Character detail should stay selected until another character or hub close"
+        collectionHub.includes("closeCollectionCharacterDetail") &&
+            collectionHub.includes('aria-label="캐릭터 상세 닫기"'),
+        "Character detail should expose a close control that only clears its selection"
     );
     console.log("[collection-character-detail-tabs] ok");
 }
@@ -12959,6 +12960,11 @@ function testCollectionMonsterCodexContract() {
     assert.ok(
         collectionHub.includes("전체 처치") && collectionHub.includes("선택 지역 처치"),
         "Monster detail should show type-wide and selected-region kill statistics"
+    );
+    assert.ok(
+        collectionHub.includes("closeCollectionMonsterDetail") &&
+            collectionHub.includes('aria-label="몬스터 상세 닫기"'),
+        "Monster detail should expose a close control that only clears its selection"
     );
     assert.ok(
         !collectionHub.includes("목록으로"),

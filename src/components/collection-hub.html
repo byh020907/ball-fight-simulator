@@ -128,26 +128,37 @@
                 <div class="ch-detail" x-show="state.selectedCharacterId">
                     <template x-for="item in state.filteredRosterItems" :key="item.id">
                         <div x-show="item.id === state.selectedCharacterId">
-                            <div class="ch-detail-tabs" role="tablist" aria-label="캐릭터 상세">
+                            <div class="ch-detail-header">
+                                <div class="ch-detail-tabs" role="tablist" aria-label="캐릭터 상세">
+                                    <button
+                                        class="ch-detail-tab"
+                                        type="button"
+                                        role="tab"
+                                        x-bind:aria-selected="state.characterDetailTab === 'overview'"
+                                        x-bind:class="{ active: state.characterDetailTab === 'overview' }"
+                                        @click="state.characterDetailTab = 'overview'"
+                                    >
+                                        상세 정보
+                                    </button>
+                                    <button
+                                        class="ch-detail-tab"
+                                        type="button"
+                                        role="tab"
+                                        x-bind:aria-selected="state.characterDetailTab === 'levelRewards'"
+                                        x-bind:class="{ active: state.characterDetailTab === 'levelRewards' }"
+                                        @click="state.characterDetailTab = 'levelRewards'"
+                                    >
+                                        레벨 보상
+                                    </button>
+                                </div>
                                 <button
-                                    class="ch-detail-tab"
+                                    class="ch-detail-close"
                                     type="button"
-                                    role="tab"
-                                    x-bind:aria-selected="state.characterDetailTab === 'overview'"
-                                    x-bind:class="{ active: state.characterDetailTab === 'overview' }"
-                                    @click="state.characterDetailTab = 'overview'"
+                                    aria-label="캐릭터 상세 닫기"
+                                    title="상세 닫기"
+                                    @click="closeCollectionCharacterDetail()"
                                 >
-                                    상세 정보
-                                </button>
-                                <button
-                                    class="ch-detail-tab"
-                                    type="button"
-                                    role="tab"
-                                    x-bind:aria-selected="state.characterDetailTab === 'levelRewards'"
-                                    x-bind:class="{ active: state.characterDetailTab === 'levelRewards' }"
-                                    @click="state.characterDetailTab = 'levelRewards'"
-                                >
-                                    레벨 보상
+                                    &times;
                                 </button>
                             </div>
                             <div
@@ -307,6 +318,15 @@
                                         </template>
                                     </select>
                                 </label>
+                                <button
+                                    class="ch-detail-close"
+                                    type="button"
+                                    aria-label="몬스터 상세 닫기"
+                                    title="상세 닫기"
+                                    @click="closeCollectionMonsterDetail()"
+                                >
+                                    &times;
+                                </button>
                             </div>
                             <div class="ch-monster-unknown" x-show="!item.isDiscovered">
                                 첫 조우 후 이름, 행동, 기본 스펙과 통계가 공개됩니다.
@@ -996,6 +1016,11 @@
             state.selectedCharacterId = characterId;
         }
 
+        function closeCollectionCharacterDetail() {
+            state.selectedCharacterId = null;
+            state.characterDetailTab = "overview";
+        }
+
         function setMonsterFilter(filterId) {
             if (filterId) state.filters.monsters = filterId;
         }
@@ -1007,6 +1032,11 @@
                     item?.regions.find((region) => region.isDiscovered)?.id ?? item?.regions[0]?.id ?? null;
             }
             state.selectedMonsterId = monsterId;
+        }
+
+        function closeCollectionMonsterDetail() {
+            state.selectedMonsterId = null;
+            state.selectedMonsterRegionId = null;
         }
 
         function selectedMonsterRegion(item) {
@@ -1057,8 +1087,10 @@
             setCodexSection,
             setCollectionFilter,
             selectCollectionCharacter,
+            closeCollectionCharacterDetail,
             setMonsterFilter,
             selectCollectionMonster,
+            closeCollectionMonsterDetail,
             selectedMonsterRegion,
             get bridge() {
                 return window.requireGameActionBridge();
@@ -1440,6 +1472,43 @@
         border-bottom: 1px solid #cccccc;
     }
 
+    .ch-detail-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .ch-detail-header .ch-detail-tabs {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .ch-detail-close {
+        width: 30px;
+        height: 30px;
+        padding: 0;
+        border: 1px solid #202020;
+        border-radius: 6px;
+        background: #ffffff;
+        color: #202020;
+        cursor: pointer;
+        display: inline-grid;
+        place-items: center;
+        flex-shrink: 0;
+        font-family: inherit;
+        font-size: 1.25rem;
+        font-weight: 400;
+        line-height: 1;
+    }
+
+    .ch-detail-close:hover {
+        background: #f0f0f0;
+    }
+
+    .ch-detail-close:active {
+        transform: translateY(1px);
+    }
+
     .ch-detail-tab {
         min-height: 34px;
         padding: 6px 12px;
@@ -1565,6 +1634,11 @@
         .ch-monster-region-picker {
             width: 100%;
             margin-left: 0;
+            order: 2;
+        }
+
+        .ch-monster-detail-head .ch-detail-close {
+            margin-left: auto;
         }
 
         .ch-monster-region-picker .ch-select {
