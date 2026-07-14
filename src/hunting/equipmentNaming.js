@@ -14,6 +14,22 @@ export function getDominantEquipmentStat(stats = [], statValueRatios = {}) {
     return dominant;
 }
 
+export function formatEquipmentSpecialName(name, specialOptions = [], specialSuffixes = {}) {
+    const specialOptionType = specialOptions[0]?.type ?? null;
+    const specialSuffix = specialSuffixes[specialOptionType] ?? "";
+    if (!name || !specialSuffix) return name;
+
+    const canonicalSuffix = ` • ${specialSuffix}`;
+    if (name.endsWith(canonicalSuffix)) return name;
+
+    const legacySuffix = ` ${specialSuffix}`;
+    if (name.endsWith(legacySuffix)) {
+        return `${name.slice(0, -legacySuffix.length)}${canonicalSuffix}`;
+    }
+
+    return `${name}${canonicalSuffix}`;
+}
+
 export function createEquipmentName(
     baseName,
     stats,
@@ -22,16 +38,16 @@ export function createEquipmentName(
     const primaryStatType = getDominantEquipmentStat(stats, statValueRatios);
     const candidates = prefixes?.[primaryStatType] ?? [];
     const specialOptionType = specialOptions[0]?.type ?? null;
-    const specialSuffix = specialSuffixes[specialOptionType] ?? "";
+    const formattedBaseName = formatEquipmentSpecialName(baseName, specialOptions, specialSuffixes);
     if (!baseName || candidates.length === 0) {
-        const result = { name: specialSuffix ? `${baseName} ${specialSuffix}` : baseName, primaryStatType };
+        const result = { name: formattedBaseName, primaryStatType };
         if (specialOptionType) result.specialOptionType = specialOptionType;
         return result;
     }
 
     const prefix = candidates[Math.floor(rng() * candidates.length)];
     const result = {
-        name: `${prefix} ${baseName}${specialSuffix ? ` ${specialSuffix}` : ""}`,
+        name: `${prefix} ${formattedBaseName}`,
         primaryStatType
     };
     if (specialOptionType) result.specialOptionType = specialOptionType;

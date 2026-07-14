@@ -9,6 +9,7 @@ import {
 import { grantAchievementReward } from "../src/collection/achievementRewards.js";
 import { ACHIEVEMENT_DEFINITIONS } from "../src/collection/achievementDefinitions.js";
 import { openHuntingChest } from "../src/hunting/chestRewards.js";
+import { EQUIPMENT_SPECIAL_OPTION_SUFFIXES } from "../src/hunting/equipmentConfig.js";
 
 function createSessionStorage(values = {}) {
     const data = new Map(Object.entries(values));
@@ -67,7 +68,7 @@ assert.equal(rewardProfile.hunting.chests.length, 1);
 const flawlessAchievement = ACHIEVEMENT_DEFINITIONS.find((achievement) => achievement.id === "flawless_tournament");
 const equipmentReward = grantAchievementReward(rewardProfile, flawlessAchievement);
 assert.equal(equipmentReward.equipment.rarity, "rare");
-assert.equal(equipmentReward.equipment.name, "무결점의 수정 방패");
+assert.equal(equipmentReward.equipment.name, `무결점의 수정 방패 • ${EQUIPMENT_SPECIAL_OPTION_SUFFIXES.wallBounce}`);
 assert.deepEqual(equipmentReward.equipment.stats, [
     { type: "defense", value: 2, min: 2, max: 2 },
     { type: "hp", value: 20, min: 20, max: 20 }
@@ -83,7 +84,10 @@ const overflowReward = grantAchievementReward(rewardProfile, rosterChampion);
 assert.equal(overflowReward.convertedToChest, true);
 assert.equal(overflowReward.chest.rarity, "epic");
 assert.equal(overflowReward.chest.openCost, 0);
-assert.equal(overflowReward.chest.guaranteedEquipment.name, "개척자의 룬 귀걸이");
+assert.equal(
+    overflowReward.chest.guaranteedEquipment.name,
+    `개척자의 룬 귀걸이 • ${EQUIPMENT_SPECIAL_OPTION_SUFFIXES.cooldown}`
+);
 assert.deepEqual(overflowReward.chest.guaranteedEquipment.specialOptions, [
     { type: "cooldown", value: 10 },
     { type: "hpSteal", value: 8 }
@@ -93,7 +97,10 @@ rewardProfile.equipment.inventory = [];
 const openedGuaranteedChest = openHuntingChest(rewardProfile, overflowReward.chest.id);
 assert.equal(openedGuaranteedChest.opened, true);
 assert.equal(openedGuaranteedChest.cost, 0);
-assert.equal(openedGuaranteedChest.applied.equipment.name, "개척자의 룬 귀걸이");
+assert.equal(
+    openedGuaranteedChest.applied.equipment.name,
+    `개척자의 룬 귀걸이 • ${EQUIPMENT_SPECIAL_OPTION_SUFFIXES.cooldown}`
+);
 assert.deepEqual(openedGuaranteedChest.applied.equipment.specialOptions, [
     { type: "cooldown", value: 10 },
     { type: "hpSteal", value: 8 }
@@ -145,10 +152,39 @@ for (const expectation of guaranteedEquipmentExpectations) {
     const profile = createDefaultPlayerProfile();
     const achievement = ACHIEVEMENT_DEFINITIONS.find(({ id }) => id === expectation.achievementId);
     const granted = grantAchievementReward(profile, achievement);
-    assert.equal(granted.equipment.name, expectation.name);
+    assert.equal(
+        granted.equipment.name,
+        `${expectation.name} • ${EQUIPMENT_SPECIAL_OPTION_SUFFIXES[expectation.specialOptions[0].type]}`
+    );
     assert.deepEqual(granted.equipment.stats, expectation.stats);
     assert.deepEqual(granted.equipment.specialOptions, expectation.specialOptions);
 }
+
+const legacySpecialEquipmentProfile = migratePlayerProfile({
+    ...createDefaultPlayerProfile(),
+    equipment: {
+        inventory: [
+            {
+                instanceId: "legacy-special-name",
+                rarity: "rare",
+                slot: "weapon",
+                name: "질풍의 철검 반향",
+                baseName: "철검",
+                description: "테스트 장비",
+                stats: [{ type: "speed", value: 10, min: 10, max: 10 }],
+                specialOptions: [{ type: "wallBounce", value: 15 }]
+            }
+        ],
+        equipped: { weapon: null, armor: null, accessory1: null, accessory2: null },
+        enhancementStones: 0,
+        maxInventorySlots: 5
+    }
+});
+assert.equal(
+    legacySpecialEquipmentProfile.equipment.inventory[0].name,
+    "질풍의 철검 • 반향",
+    "Existing special equipment should normalize its legacy name during profile migration"
+);
 
 assert.ok(ACHIEVEMENT_DEFINITIONS.every((achievement) => typeof achievement.grant === "function"));
 

@@ -6034,8 +6034,8 @@ function testEquipmentNaming() {
             specialSuffixes: EQUIPMENT_SPECIAL_OPTION_SUFFIXES,
             rng: () => 0
         }),
-        { name: "질풍의 철검 갈망", primaryStatType: "speed", specialOptionType: "hpSteal" },
-        "Equipment special options should appear as a suffix"
+        { name: "질풍의 철검 • 갈망", primaryStatType: "speed", specialOptionType: "hpSteal" },
+        "Equipment special options should use a visually distinct suffix delimiter"
     );
     console.log("[equipment-naming] ok");
 }

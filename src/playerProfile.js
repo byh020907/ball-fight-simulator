@@ -9,6 +9,8 @@ import { HUNTING_STAGES } from "./hunting/huntingConfig.js";
 import { createDefaultHuntingStats, sanitizeHuntingStats } from "./hunting/huntingAchievementProgress.js";
 import { FIGHTER_IDS } from "./core.js";
 import { createDefaultConsumables, sanitizeConsumables } from "./consumables.js";
+import { EQUIPMENT_SPECIAL_OPTION_SUFFIXES } from "./hunting/equipmentConfig.js";
+import { formatEquipmentSpecialName } from "./hunting/equipmentNaming.js";
 
 export const PLAYER_PROFILE_STORAGE_KEY = "bfs:player-profile:v1";
 export const SESSION_STORAGE_VERSION_KEY = "bfs:session-version";
@@ -174,11 +176,12 @@ function sanitizeGuaranteedEquipment(item) {
               .filter((option) => typeof option?.type === "string" && sanitizeNumber(option.value) > 0)
               .map((option) => ({ type: option.type, value: sanitizeNumber(option.value) }))
         : null;
+    const formattedName = formatEquipmentSpecialName(name, specialOptions ?? [], EQUIPMENT_SPECIAL_OPTION_SUFFIXES);
     return {
         instanceId: item.instanceId,
         rarity,
         slot,
-        name,
+        name: formattedName,
         baseName: typeof item.baseName === "string" ? item.baseName : name,
         primaryStatType: stats[0].type,
         specialOptionType: specialOptions?.[0]?.type ?? null,
@@ -323,7 +326,17 @@ function sanitizeCharacterMastery(obj) {
 function sanitizeEquipment(obj) {
     if (!obj || typeof obj !== "object") return createDefaultPlayerProfile().equipment;
     const inventory = Array.isArray(obj.inventory)
-        ? obj.inventory.filter((item) => item && typeof item.instanceId === "string").slice(-100)
+        ? obj.inventory
+              .filter((item) => item && typeof item.instanceId === "string")
+              .slice(-100)
+              .map((item) => ({
+                  ...item,
+                  name: formatEquipmentSpecialName(
+                      item.name,
+                      item.specialOptions ?? [],
+                      EQUIPMENT_SPECIAL_OPTION_SUFFIXES
+                  )
+              }))
         : [];
     const equipped = obj.equipped && typeof obj.equipped === "object" ? obj.equipped : {};
     return {

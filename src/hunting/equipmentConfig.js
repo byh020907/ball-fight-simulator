@@ -1,6 +1,6 @@
 import { EQUIPMENT } from "./equipmentData.js";
 import { getLevelFromXp } from "../experience/experienceState.js";
-import { createEquipmentName } from "./equipmentNaming.js";
+import { createEquipmentName, formatEquipmentSpecialName } from "./equipmentNaming.js";
 
 const EQUIPPED_SLOT_KEYS = Object.freeze(["weapon", "armor", "accessory1", "accessory2"]);
 
@@ -179,12 +179,13 @@ export function createGuaranteedEquipmentInstance({
         }
         return { type, value };
     });
+    const formattedName = formatEquipmentSpecialName(name, fixedSpecialOptions, EQUIPMENT_SPECIAL_OPTION_SUFFIXES);
 
     return {
         instanceId: createEquipmentInstanceId(),
         rarity,
         slot,
-        name,
+        name: formattedName,
         baseName: name,
         primaryStatType: fixedStats[0].type,
         specialOptionType: fixedSpecialOptions[0]?.type ?? null,
