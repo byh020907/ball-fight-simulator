@@ -6,6 +6,75 @@ function deepFreeze(value) {
 
 // The single source of truth for player-facing reward and progression numbers.
 export const REWARD_BALANCE = deepFreeze({
+    rebirth: {
+        offerSize: 3,
+        maxEquippedCards: 3,
+        maxCardRank: 10,
+        candidateWeights: { stat: 72, subAbility: 18 },
+        statPairs: {
+            archer: ["damage", "speed"],
+            orbit: ["defense", "skill"],
+            trickster: ["skill", "speed"],
+            grenade: ["damage", "skill"],
+            dash: ["speed", "damage"],
+            rage: ["hp", "damage"],
+            spin: ["speed", "defense"],
+            eater: ["hp", "defense"],
+            bat_ball: ["damage", "speed"],
+            vampire: ["hp", "skill"],
+            gunner: ["damage", "skill"],
+            phantom: ["speed", "damage"],
+            hero: ["hp", "skill"]
+        },
+        statCardRanks: {
+            balanced: { primary: 1, secondary: 1, perRank: 1 },
+            primary: { primary: 2, secondary: 0, perRank: 1 },
+            secondary: { primary: 0, secondary: 2, perRank: 1 }
+        },
+        subAbilityRankModifiers: {
+            archer: { key: "arrowSpeedMultiplier", base: 1, perRank: 0.08 },
+            orbit: { key: "rechargeSpeedMultiplier", base: 1, perRank: 0.08 },
+            trickster: { key: "seedSpeedMultiplier", base: 1, perRank: 0.08 },
+            grenade: { key: "damageMultiplier", base: 1, perRank: 0.08 },
+            dash: { key: "dashMultiplier", base: 1, perRank: 0.05 },
+            rage: { key: "maxImpactMultiplier", base: 1, perRank: 0.06 },
+            spin: { key: "chargeRetentionRatio", base: 0, perRank: 0.08 },
+            eater: { key: "spitAngularVelocityMultiplier", base: 1, perRank: 0.08 },
+            bat_ball: { key: "arcRangeMultiplier", base: 1, perRank: 0.08 },
+            vampire: { key: "batSpeedMultiplier", base: 1, perRank: 0.08 },
+            gunner: { key: "bulletSpeedMultiplier", base: 1, perRank: 0.08 },
+            phantom: { key: "bonusDamage", base: 18, perRank: 3 },
+            hero: { key: "magnetRadiusMultiplier", base: 1, perRank: 0.2 }
+        },
+        visualStages: [
+            { minimumCount: 0, color: "#ff7b32", outlineWidth: 0, auraRadius: 0, flameCount: 0, afterimageAlpha: 0 },
+            { minimumCount: 1, color: "#ff983d", outlineWidth: 1, auraRadius: 7, flameCount: 2, afterimageAlpha: 0.1 },
+            {
+                minimumCount: 3,
+                color: "#ffc44d",
+                outlineWidth: 2,
+                auraRadius: 12,
+                flameCount: 4,
+                afterimageAlpha: 0.16
+            },
+            {
+                minimumCount: 6,
+                color: "#ffe17a",
+                outlineWidth: 3,
+                auraRadius: 18,
+                flameCount: 6,
+                afterimageAlpha: 0.22
+            },
+            {
+                minimumCount: 10,
+                color: "#fff4bd",
+                outlineWidth: 4,
+                auraRadius: 24,
+                flameCount: 8,
+                afterimageAlpha: 0.28
+            }
+        ]
+    },
     experience: {
         xpScale: 20,
         stageMultipliers: { round1: 1, round2: 1.2, final: 2.5, winBonus: 1 },

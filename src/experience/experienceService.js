@@ -41,6 +41,22 @@ function sumCharacterXp(byCharacter) {
     return Object.values(byCharacter).reduce((sum, record) => sum + Math.max(0, record?.currentXp ?? 0), 0);
 }
 
+export function resetCharacterExperience(profile, characterId) {
+    if (!characterId) return { characterId, previousTotalXp: 0, totalXp: 0, level: 1 };
+    const before = getCharacterExperienceSummary(profile, characterId);
+    const experience = ensureExperienceState(profile);
+    delete experience.byCharacter[characterId];
+    experience.currentXp = sumCharacterXp(experience.byCharacter);
+    const after = getCharacterExperienceSummary(profile, characterId);
+    return {
+        characterId,
+        previousTotalXp: before.totalXp,
+        previousLevel: before.level,
+        totalXp: after.totalXp,
+        level: after.level
+    };
+}
+
 export function getCharacterTotalXp(profile, characterId) {
     if (!characterId) return 0;
     return Math.max(0, profile?.experience?.byCharacter?.[characterId]?.currentXp ?? 0);

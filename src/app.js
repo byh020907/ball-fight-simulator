@@ -77,6 +77,7 @@ import { Ability } from "./abilities/index.js";
 import { getAbilityDisplayName } from "./abilities/abilityMetadata.js";
 import { AppLifecycle } from "./appLifecycle.js";
 import { ScreenWakeLock } from "./screenWakeLock.js";
+import { applyRebirthLoadoutToBaseSpec, applyRebirthLoadoutToBattleBall, getRebirthLoadout } from "./rebirth/index.js";
 
 export class BattleApp {
     constructor() {
@@ -630,6 +631,19 @@ export class BattleApp {
             const isHero = fighter.id === FIGHTER_IDS.HERO;
             const maxHp = fighter.maxHp ?? fighter.stats?.hp ?? 0;
             const hp = fighter.hp ?? maxHp;
+            const rebirthLoadout = this._rebirthLoadoutByFighter?.get(fighter.id);
+            const subAbilityStates = (rebirthLoadout?.subAbilities ?? []).map((subAbility) => ({
+                key: `rebirth:${subAbility.cardId}`,
+                abilityId: subAbility.abilityId,
+                displayName: subAbility.displayName,
+                role: "sub",
+                label: "Ready",
+                progress: 1,
+                status: "ready",
+                cooldownRemaining: 0,
+                cooldownDuration: 0,
+                text: "Ready"
+            }));
             return {
                 id: fighter.id,
                 name: fighter.name,
@@ -658,7 +672,8 @@ export class BattleApp {
                         cooldownRemaining: 0,
                         cooldownDuration: 0,
                         text: "Ready"
-                    }
+                    },
+                    ...subAbilityStates
                 ],
                 actionName: null
             };
@@ -702,15 +717,21 @@ export class BattleApp {
             this._previewBall = null;
             return null;
         }
-        const visualFighter = applyEquipmentVisuals(fighter, this.playerProfile);
+        const rebirthLoadout = getRebirthLoadout(this.playerProfile, fighter.id);
+        const visualFighter = applyRebirthLoadoutToBaseSpec(
+            applyEquipmentVisuals(fighter, this.playerProfile),
+            rebirthLoadout
+        );
         if (this._previewBall && this._previewBall.id === fighter.id) {
             this._previewBall.equipment.items = visualFighter.equipment.equippedItems;
+            this._previewBall.rebirthCount = rebirthLoadout.rebirthCount;
             return this._previewBall;
         }
         const ball = new BattleBall(
             visualFighter,
             new Vector2(this.renderer.canvas.width / 2, this.renderer.canvas.height / 2 - 28)
         );
+        ball.rebirthCount = rebirthLoadout.rebirthCount;
         ball.applyImpulse(ball.velocity.clone().scale(-1));
         ball.radius = Math.round(ball.stats.baseRadius * 1.35);
         const AbilityClass = Ability.MAP[fighter.ability];
@@ -816,9 +837,16 @@ export class BattleApp {
         this._experienceProgressionByFighter = new Map([
             [this.playerFighterId, collectActiveExperienceProgression(this.playerProfile, this.playerFighterId)]
         ]);
-        const rosterWithExperienceProgression = this.roster.map((fighter) =>
-            applyExperienceProgressionToBaseSpec(fighter, this._experienceProgressionByFighter.get(fighter.id))
-        );
+        this._rebirthLoadoutByFighter = new Map([
+            [this.playerFighterId, getRebirthLoadout(this.playerProfile, this.playerFighterId)]
+        ]);
+        const rosterWithExperienceProgression = this.roster.map((fighter) => {
+            const withExperience = applyExperienceProgressionToBaseSpec(
+                fighter,
+                this._experienceProgressionByFighter.get(fighter.id)
+            );
+            return applyRebirthLoadoutToBaseSpec(withExperience, this._rebirthLoadoutByFighter.get(fighter.id));
+        });
 
         this.tournamentRoster = createTournamentRoster(
             rosterWithExperienceProgression,
@@ -924,6 +952,9 @@ export class BattleApp {
             new Map([
                 [this.playerFighterId, collectActiveExperienceProgression(this.playerProfile, this.playerFighterId)]
             ]);
+        const rebirthLoadoutByFighter =
+            options.rebirthLoadoutByFighter ??
+            new Map([[this.playerFighterId, getRebirthLoadout(this.playerProfile, this.playerFighterId)]]);
         this.simulation = new BattleSimulation(
             match,
             {
@@ -956,8 +987,9 @@ export class BattleApp {
                         recordActionSuccess(this._currentMatchReport, actionId);
                     }
                 },
-                onBattleBallReady: (ball) => {
+                onBattleBallReady: (ball, _spec, simulation) => {
                     applyExperienceProgressionToBall(ball, experienceProgressionByFighter.get(ball.id));
+                    applyRebirthLoadoutToBattleBall(ball, simulation, rebirthLoadoutByFighter.get(ball.id));
                 },
                 onFighterDefeated: (fighter, context) => {
                     options.onFighterDefeated?.(fighter, context);
@@ -1171,6 +1203,9 @@ export class BattleApp {
             this._log.add(`[경험치] ${this._formatXpResult(result)}`);
             if (result.levelUp) {
                 this._toast.show(`레벨업! Lv.${result.level}`);
+                if (getCharacterExperienceSummary(this.playerProfile, result.characterId).isMax) {
+                    this._toast.show("Lv.10 도달! 도감 상세에서 환생할 수 있습니다.");
+                }
             }
             savePlayerProfile(this.playerProfile);
             this._refreshCollectionHub();

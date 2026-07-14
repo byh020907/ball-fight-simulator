@@ -10,6 +10,7 @@ import { grantAchievementReward } from "../src/collection/achievementRewards.js"
 import { ACHIEVEMENT_DEFINITIONS } from "../src/collection/achievementDefinitions.js";
 import { openHuntingChest } from "../src/hunting/chestRewards.js";
 import { EQUIPMENT_SPECIAL_OPTION_SUFFIXES } from "../src/hunting/equipmentConfig.js";
+import { getLevelRequirement } from "../src/experience/experienceConfig.js";
 
 function createSessionStorage(values = {}) {
     const data = new Map(Object.entries(values));
@@ -45,6 +46,30 @@ assert.equal(resetStaleSessionStorage(staleStorage), false);
 const staleProfile = { ...createDefaultPlayerProfile(), version: PROFILE_VERSION - 1 };
 assert.equal(migratePlayerProfile(staleProfile).version, PROFILE_VERSION);
 assert.deepEqual(migratePlayerProfile(staleProfile).equipment.inventory, []);
+
+const versionSevenProfile = createDefaultPlayerProfile();
+versionSevenProfile.version = 7;
+versionSevenProfile.experience.byCharacter.archer = { currentXp: getLevelRequirement(10) };
+versionSevenProfile.experience.currentXp = getLevelRequirement(10);
+versionSevenProfile.characterMastery.levels.rage = 2;
+versionSevenProfile.equipment.inventory = [{ instanceId: "preserved-equipment", name: "보존 장비" }];
+versionSevenProfile.collection.characters.archer = {
+    tournamentsCompleted: 4,
+    tournamentWins: 2,
+    matchWins: 8,
+    bestPlacement: 1,
+    totalDamageDealt: 100,
+    comebackMatchWins: 1,
+    firstTournamentAt: 1,
+    lastTournamentAt: 2
+};
+const migratedVersionSevenProfile = migratePlayerProfile(versionSevenProfile);
+assert.equal(migratedVersionSevenProfile.version, PROFILE_VERSION);
+assert.equal(migratedVersionSevenProfile.experience.byCharacter.archer.currentXp, getLevelRequirement(10));
+assert.equal(migratedVersionSevenProfile.characterMastery.levels.rage, 2);
+assert.equal(migratedVersionSevenProfile.equipment.inventory[0].instanceId, "preserved-equipment");
+assert.equal(migratedVersionSevenProfile.collection.characters.archer.tournamentWins, 2);
+assert.deepEqual(migratedVersionSevenProfile.rebirth, { byCharacter: {} });
 
 const rewardProfile = createDefaultPlayerProfile();
 const shardReward = grantAchievementReward(rewardProfile, {

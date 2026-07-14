@@ -37,6 +37,7 @@ import {
     collectActiveExperienceProgression,
     grantExperienceFromMatchReport
 } from "../experience/experienceService.js";
+import { applyRebirthLoadoutToBaseSpec, getRebirthLoadout } from "../rebirth/index.js";
 import { applyStatAllocation } from "../statAllocation.js";
 import { savePlayerProfile } from "../playerProfile.js";
 import { PopupService } from "../popup.js";
@@ -212,9 +213,11 @@ export class HuntingManager {
         if (!playerSpec) return null;
 
         const playerProgression = collectActiveExperienceProgression(app.playerProfile, run.characterId);
+        const rebirthLoadout = getRebirthLoadout(app.playerProfile, run.characterId);
         const masteryCtx = collectActiveEffects(app.playerProfile, run.characterId);
         const baseSpec = applyExperienceProgressionToBaseSpec(playerSpec, playerProgression);
-        const allocatedSpec = applyStatAllocation(baseSpec, app.playerStatAllocation ?? {}, true);
+        const rebornSpec = applyRebirthLoadoutToBaseSpec(baseSpec, rebirthLoadout);
+        const allocatedSpec = applyStatAllocation(rebornSpec, app.playerStatAllocation ?? {}, true);
         const equippedSpec = applyEquipmentStats({ ...allocatedSpec, teamId: HUNTING_TEAMS.PLAYER }, app.playerProfile);
         const huntingSpec = applyHuntingStatModifiersToSpec(equippedSpec, run.statModifiers);
         const appliedSpec = applyMasteryEffectsToFighterSpec(huntingSpec, masteryCtx);
@@ -225,7 +228,7 @@ export class HuntingManager {
             };
         }
 
-        return { playerSpec, playerProgression, appliedSpec };
+        return { playerSpec, playerProgression, rebirthLoadout, appliedSpec };
     }
 
     _getHuntingMaxHp(spec) {
@@ -255,7 +258,7 @@ export class HuntingManager {
         if (!player) return;
         this._run = this._syncRunHealth(run, player.appliedSpec);
         run = this._run;
-        const { playerProgression, appliedSpec } = player;
+        const { playerProgression, rebirthLoadout, appliedSpec } = player;
 
         const isFinalBoss = run.lastEncounter?.type === HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS;
         const isChampion = !isFinalBoss && run.lastEvent?.enemyType === HUNTING_ENEMY_TYPES.CHAMPION;
@@ -312,6 +315,7 @@ export class HuntingManager {
             arenaTheme: stageTheme,
             terrain,
             experienceProgressionByFighter: new Map([[run.characterId, playerProgression]]),
+            rebirthLoadoutByFighter: new Map([[run.characterId, rebirthLoadout]]),
             onFighterDefeated: (fighter, context) => lootDropController.onFighterDefeated(fighter, context),
             onResultResolved: (winner, context) => lootDropController.onResultResolved(winner, context)
         });

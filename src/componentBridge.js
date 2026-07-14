@@ -22,6 +22,7 @@ import { PopupService } from "./popup.js";
 import { HELP_TITLE, HELP_CONTENT } from "./helpContent.js";
 import { CollectionHubService } from "./collectionHubService.js";
 import { createCollectionActionPopupOptions } from "./collection/collectionActionPopup.js";
+import { beginRebirth, completeRebirth, toggleRebirthCardEquip } from "./rebirth/rebirthService.js";
 
 export function createComponentBridge(app) {
     function showLevelLockPopup(item) {
@@ -196,6 +197,53 @@ export function createComponentBridge(app) {
         },
         openEquipmentHub() {
             CollectionHubService.open("equipment");
+        },
+        beginRebirth(characterId) {
+            if (!app.lifecycle.isSetup) {
+                PopupService.show({
+                    title: "환생 대기",
+                    bodyHtml: "<p>전투와 결과 확인이 끝난 준비 화면에서 환생할 수 있습니다.</p>",
+                    buttons: [{ text: "확인", value: "ok", primary: true }]
+                });
+                return { ok: false, error: "not_setup" };
+            }
+            const result = beginRebirth(app.playerProfile, characterId);
+            if (!result.ok) {
+                PopupService.show({
+                    title: "환생 조건",
+                    bodyHtml: "<p>해당 캐릭터를 Lv.10까지 성장시킨 뒤 환생할 수 있습니다.</p>",
+                    buttons: [{ text: "확인", value: "ok", primary: true }]
+                });
+                return result;
+            }
+            refreshCollectionAndProfile();
+            return result;
+        },
+        completeRebirth(characterId, cardId) {
+            if (!app.lifecycle.isSetup) return { ok: false, error: "not_setup" };
+            const result = completeRebirth(app.playerProfile, characterId, cardId);
+            if (!result.ok) return result;
+            refreshCollectionAndProfile();
+            PopupService.show({
+                title: "환생 완료",
+                bodyHtml: `<p>${result.card.name}을(를) 얻었습니다.</p><p>해당 캐릭터의 XP는 Lv.1부터 다시 시작합니다.</p>`,
+                buttons: [{ text: "확인", value: "ok", primary: true }]
+            });
+            return result;
+        },
+        toggleRebirthCardEquip(characterId, cardId) {
+            if (!app.lifecycle.isSetup) return { ok: false, error: "not_setup" };
+            const result = toggleRebirthCardEquip(app.playerProfile, characterId, cardId);
+            if (!result.ok && result.error === "equip_limit") {
+                PopupService.show({
+                    title: "장착 한도",
+                    bodyHtml: "<p>환생 카드는 최대 3장까지 장착할 수 있습니다.</p>",
+                    buttons: [{ text: "확인", value: "ok", primary: true }]
+                });
+                return result;
+            }
+            if (result.ok) refreshCollectionAndProfile();
+            return result;
         },
 
         // ── Chest actions ──

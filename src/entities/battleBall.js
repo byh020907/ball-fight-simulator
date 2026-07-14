@@ -13,6 +13,11 @@ import { drawEquipmentItems, getCharacterOutlineWidth } from "./equipmentVisuals
 import { applyHeroOrbCarryoverToBattleBall, mergeHeroOrbCarryover, HERO_ORB_CARRYOVER_RATE } from "./heroOrb.js";
 import { createEquipmentCombatEffects } from "../hunting/equipmentEffects.js";
 import { AbilitySet } from "../abilities/abilitySet.js";
+import {
+    drawRebirthVisualOverlay,
+    drawRebirthVisualUnderlay,
+    getRebirthVisualProfile
+} from "../rebirth/rebirthVisuals.js";
 
 export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMaterialBody]) {
     constructor(spec, position) {
@@ -24,6 +29,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         this.title = spec.title;
         this.description = spec.description;
         this.color = spec.color;
+        this.rebirthCount = Math.max(0, Math.floor(Number.isFinite(spec.rebirthCount) ? spec.rebirthCount : 0));
         this.face = spec.face ?? spec.id;
         this.maxHp = spec.stats.hp;
         this.hp = Number.isFinite(spec.initialHp)
@@ -514,6 +520,8 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
     draw(ctx) {
         if (this.flags.destroyed || this.state.swallowed) return;
         ctx.save();
+        const rebirthVisual = getRebirthVisualProfile(this.rebirthCount);
+        drawRebirthVisualUnderlay(ctx, this, rebirthVisual);
         const scale = this.display.scale;
         if (scale !== 1) {
             ctx.translate(this.position.x, this.position.y);
@@ -549,6 +557,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         const faceRotation = this.appearance.sides > 0 ? this.angle : this.rotationEnabled ? this.angle : 0;
         this.drawFace(ctx, faceRotation);
         this.abilities.draw(ctx);
+        drawRebirthVisualOverlay(ctx, this, rebirthVisual);
         if (this.state.movement?.showRing) {
             ctx.strokeStyle = this.state.movement.color;
             ctx.lineWidth = 4;

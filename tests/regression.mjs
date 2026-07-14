@@ -32,6 +32,19 @@ import {
     grantExperienceFromMatchReport
 } from "../src/experience/experienceService.js";
 import {
+    applyRebirthLoadoutToBaseSpec,
+    applyRebirthLoadoutToBattleBall,
+    beginRebirth,
+    completeRebirth,
+    createRebirthOffer,
+    getRebirthCardDefinition,
+    getRebirthLoadout,
+    getRebirthState,
+    getSubAbilityIds,
+    toggleRebirthCardEquip
+} from "../src/rebirth/index.js";
+import { getRebirthVisualProfile } from "../src/rebirth/rebirthVisuals.js";
+import {
     getCharacterLevelProgression,
     getCharacterLevelRewardsBetween
 } from "../src/experience/characterLevelProgression.js";
@@ -42,6 +55,7 @@ import { BattleSimulation } from "../src/simulation/battleSimulation.js";
 import { Ability, AbilitySet } from "../src/abilities/index.js";
 import { FighterPhysicsSimulation } from "../src/simulation/fighterPhysicsSimulation.js";
 import { PreviewReselectSimulation } from "../src/preview/previewReselectSimulation.js";
+import { createRoster } from "../src/roster.js";
 import {
     createDefaultPlayerProfile,
     migrateLegacyExperienceToCharacter,
@@ -16662,5 +16676,242 @@ function testFusionEquippedLabelTypographyContract() {
 }
 
 testFusionEquippedLabelTypographyContract();
+
+function createSeededRandom(seed) {
+    let state = seed >>> 0;
+    return () => {
+        state += 0x6d2b79f5;
+        let value = state;
+        value = Math.imul(value ^ (value >>> 15), value | 1);
+        value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+        return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
+function setCharacterXp(profile, characterId, totalXp) {
+    profile.experience.byCharacter[characterId] = { currentXp: totalXp };
+    profile.experience.currentXp = Object.values(profile.experience.byCharacter).reduce(
+        (sum, record) => sum + record.currentXp,
+        0
+    );
+}
+
+function testRebirthDomainContracts() {
+    const profile = createDefaultPlayerProfile();
+    const sourceId = FIGHTER_IDS.ARCHER;
+    const otherId = FIGHTER_IDS.RAGE;
+    const maxXp = getLevelRequirement(10);
+    setCharacterXp(profile, sourceId, maxXp);
+    setCharacterXp(profile, otherId, 123);
+
+    const firstOffer = createRebirthOffer(sourceId, createSeededRandom(20260714));
+    const secondOffer = createRebirthOffer(sourceId, createSeededRandom(20260714));
+    assert.deepEqual(
+        firstOffer.map((card) => card.id),
+        secondOffer.map((card) => card.id),
+        "Seeded rebirth offers must be deterministic"
+    );
+    assert.equal(new Set(firstOffer.map((card) => card.id)).size, 3, "A rebirth offer must not duplicate card ids");
+    assert.ok(
+        firstOffer.every((card) => card.abilityId !== "archer"),
+        "A fighter must never receive its own primary ability as a sub card"
+    );
+
+    const begun = beginRebirth(profile, sourceId, createSeededRandom(20260714));
+    assert.equal(begun.ok, true, "Lv.10 character should begin a rebirth offer");
+    const chosenCard = begun.cards[0];
+    const firstCompletion = completeRebirth(profile, sourceId, chosenCard.id);
+    assert.equal(firstCompletion.ok, true);
+    assert.equal(firstCompletion.rank, 1);
+    assert.equal(
+        getCharacterExperienceSummary(profile, sourceId).level,
+        1,
+        "Rebirth resets only the chosen character XP"
+    );
+    assert.equal(
+        getCharacterExperienceSummary(profile, otherId).totalXp,
+        123,
+        "Other character XP must survive rebirth"
+    );
+    assert.equal(getRebirthState(profile, sourceId).rebirthCount, 1);
+
+    setCharacterXp(profile, sourceId, maxXp);
+    profile.rebirth.byCharacter[sourceId].pendingOfferCardIds = [chosenCard.id];
+    const duplicateCompletion = completeRebirth(profile, sourceId, chosenCard.id);
+    assert.equal(duplicateCompletion.rank, 2, "Duplicate cards should increase rank instead of creating a copy");
+
+    const state = profile.rebirth.byCharacter[sourceId];
+    const equipIds = [
+        chosenCard.id,
+        ...getSubAbilityIds(sourceId)
+            .slice(0, 3)
+            .map((abilityId) => `ability:${abilityId}`)
+    ];
+    equipIds.forEach((cardId) => (state.cardRanks[cardId] = 1));
+    state.equippedCardIds = [];
+    assert.equal(toggleRebirthCardEquip(profile, sourceId, equipIds[0]).ok, true);
+    assert.equal(toggleRebirthCardEquip(profile, sourceId, equipIds[1]).ok, true);
+    assert.equal(toggleRebirthCardEquip(profile, sourceId, equipIds[2]).ok, true);
+    assert.equal(toggleRebirthCardEquip(profile, sourceId, equipIds[3]).error, "equip_limit");
+
+    const loadout = getRebirthLoadout(profile, sourceId);
+    const rebornSpec = applyRebirthLoadoutToBaseSpec(
+        createRoster().find((fighter) => fighter.id === sourceId),
+        loadout
+    );
+    assert.equal(rebornSpec.stats.radius, 50, "Rebirth stat cards must not change collision radius");
+    assert.equal(rebornSpec.stats.mass, 1.2, "Rebirth stat cards must not change mass");
+    assert.ok(loadout.subAbilities.length > 0, "Equipped sub cards should become an explicit combat loadout");
+    console.log("[rebirth-domain-contracts] ok");
+}
+
+testRebirthDomainContracts();
+
+function testHuntingRebirthLoadoutIntegration() {
+    const playerId = FIGHTER_IDS.DASH;
+    const cardId = `stat:${playerId}:balanced`;
+    const createHuntingTestApp = (profile) => ({
+        roster: createRoster(),
+        playerProfile: profile,
+        playerStatAllocation: createEmptyStatAllocation()
+    });
+    const baselineProfile = createDefaultPlayerProfile();
+    const rebornProfile = createDefaultPlayerProfile();
+    rebornProfile.rebirth.byCharacter[playerId] = {
+        rebirthCount: 1,
+        cardRanks: { [cardId]: 1 },
+        equippedCardIds: [cardId],
+        pendingOfferCardIds: []
+    };
+    const run = createHuntingRun({ characterId: playerId, stageId: HUNTING_STAGE_IDS.CAVE });
+    const baselineSpec = new HuntingManager(createHuntingTestApp(baselineProfile))._createPlayerHuntingSpec(
+        run
+    ).appliedSpec;
+    const rebornApp = createHuntingTestApp(rebornProfile);
+    const rebornManager = new HuntingManager(rebornApp);
+    const rebornPlayer = rebornManager._createPlayerHuntingSpec(run);
+    const cardEffect = getRebirthCardDefinition(playerId, cardId).getRankEffect(1).stats;
+    const allocationMultiplier = calculateStatMultiplier(Object.values(createEmptyStatAllocation())).multiplier;
+
+    assert.equal(
+        rebornPlayer.appliedSpec.stats.damage,
+        baselineSpec.stats.damage + cardEffect.damage * allocationMultiplier,
+        "Hunting player specs must apply rebirth stat cards before the stat-allocation multiplier"
+    );
+    assert.equal(
+        rebornPlayer.appliedSpec.stats.speed,
+        baselineSpec.stats.speed + cardEffect.speed * allocationMultiplier,
+        "Hunting player specs must preserve both rebirth stats through the stat-allocation multiplier"
+    );
+
+    let capturedOptions = null;
+    rebornApp.startMatch = (_specs, options) => {
+        capturedOptions = options;
+    };
+    rebornManager._run = run;
+    rebornManager._startFloorBattle();
+    assert.equal(
+        capturedOptions.rebirthLoadoutByFighter.get(playerId).rebirthCount,
+        1,
+        "Hunting battles must pass the rebirth loadout through to BattleSimulation"
+    );
+    console.log("[hunting-rebirth-loadout-integration] ok");
+}
+
+testHuntingRebirthLoadoutIntegration();
+
+function testRebirthSubAbilityMatrix() {
+    const roster = createRoster();
+    let scenarioCount = 0;
+    for (const source of roster) {
+        for (const abilityId of getSubAbilityIds(source.id)) {
+            const card = getRebirthCardDefinition(source.id, `ability:${abilityId}`);
+            const opponent = roster.find((fighter) => fighter.id !== source.id);
+            const loadout = {
+                rebirthCount: 1,
+                statBonuses: { hp: 0, damage: 0, speed: 0, skill: 0, defense: 0 },
+                subAbilities: [
+                    {
+                        cardId: card.id,
+                        abilityId,
+                        rank: 1,
+                        displayName: card.name,
+                        modifiers: card.getRankEffect(1).modifiers
+                    }
+                ]
+            };
+            const sim = new BattleSimulation([source, opponent], {
+                onBattleBallReady(ball, spec, simulation) {
+                    if (spec.id === source.id) applyRebirthLoadoutToBattleBall(ball, simulation, loadout);
+                }
+            });
+            const owner = sim.fighters.find((fighter) => fighter.id === source.id);
+            assert.equal(
+                owner.getAbilityUiStates().length,
+                2,
+                "Primary and rebirth sub ability should expose separate UI states"
+            );
+            assert.equal(owner.abilities.all[1].abilityTier, 0, "Sub abilities must not inherit the owner's XP tier");
+            for (const _ of Array.from({ length: 12 })) sim.update(1 / 30);
+            assert.ok(
+                sim.fighters.every(
+                    (fighter) => Number.isFinite(fighter.position.x) && Number.isFinite(fighter.position.y)
+                )
+            );
+            scenarioCount += 1;
+        }
+    }
+    assert.equal(scenarioCount, 156, "Every fighter x external ability pairing must remain playable");
+    console.log("[rebirth-sub-ability-matrix] ok");
+}
+
+testRebirthSubAbilityMatrix();
+
+function testRebirthVisualProfileContract() {
+    const stages = [0, 1, 3, 6, 10, 999].map(getRebirthVisualProfile);
+    assert.ok(
+        stages.every((visual) => visual.flameCount <= 8),
+        "Rebirth flame draw budget must stay bounded"
+    );
+    assert.ok(stages.every((visual, index) => index === 0 || visual.auraRadius >= stages[index - 1].auraRadius));
+    assert.ok(stages.every((visual, index) => index === 0 || visual.stage >= stages[index - 1].stage));
+    assert.ok(
+        stages.every((visual) => !("radius" in visual) && !("mass" in visual) && !("speed" in visual)),
+        "Visual profile must not expose physics modifiers"
+    );
+    console.log("[rebirth-visual-profile] ok");
+}
+
+testRebirthVisualProfileContract();
+
+function testAbilitySetForwardsDashEffect() {
+    const owner = {};
+    let forwardedEffect = null;
+    const primary = {
+        owner,
+        setContext() {},
+        onDashHit(_target, effect) {
+            forwardedEffect = effect;
+        }
+    };
+    const abilities = new AbilitySet(owner, { primary });
+    const effect = {};
+    abilities.onDashHit({}, effect);
+    assert.equal(forwardedEffect, effect, "AbilitySet must preserve DashEffect context for primary ability handlers");
+    console.log("[ability-set-dash-effect-forwarding] ok");
+}
+
+testAbilitySetForwardsDashEffect();
+
+function testRebirthCollectionTemplateContract() {
+    const template = readFileSync("src/components/collection-hub.html", "utf8");
+    assert.ok(template.includes("환생 카드 선택"), "Character detail should expose the rebirth action");
+    assert.ok(template.includes("pendingOfferCards"), "Character detail should render persistent rebirth offers");
+    assert.ok(template.includes("toggleRebirthCardEquip"), "Character detail should expose card equip controls");
+    assert.ok(template.includes("maxEquippedCards"), "Character detail should display the three-card loadout limit");
+    console.log("[rebirth-collection-template] ok");
+}
+
+testRebirthCollectionTemplateContract();
 
 console.log("regression tests ok");

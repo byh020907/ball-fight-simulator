@@ -116,8 +116,8 @@ export class AbilitySet {
         return this._primary?.modifyOutgoingFighterCollisionDamage?.(damage, target, context) ?? damage;
     }
 
-    onDashHit(target) {
-        this._primary?.onDashHit?.(target);
+    onDashHit(target, effect) {
+        this._primary?.onDashHit?.(target, effect);
     }
 
     onDashWall() {

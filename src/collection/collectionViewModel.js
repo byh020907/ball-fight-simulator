@@ -37,6 +37,7 @@ import {
     calculateEnhanceFailureRate,
     ENHANCE_MAX_LEVEL
 } from "../hunting/equipmentConfig.js";
+import { getRebirthPresentation } from "../rebirth/rebirthService.js";
 
 export const COLLECTION_HUB_TABS = Object.freeze([
     { id: "roster", label: "도감" },
@@ -137,6 +138,7 @@ export function createCollectionHubViewModel({
             earned: reward.level <= experience.level,
             statusLabel: reward.level <= experience.level ? "획득" : "예정"
         }));
+        const rebirth = getRebirthPresentation(profile, fighter.id);
 
         return {
             id: fighter.id,
@@ -164,7 +166,8 @@ export function createCollectionHubViewModel({
             experienceProgressText: experience.progressText,
             experienceNextText: experience.nextText,
             experienceNextRewardText: experience.nextRewardText,
-            levelRewards
+            levelRewards,
+            rebirth
         };
     });
 

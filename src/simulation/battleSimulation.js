@@ -197,7 +197,9 @@ export class BattleSimulation extends FighterPhysicsSimulation {
             role,
             abilityTier: context.abilityTier ?? null,
             instanceKey: context.instanceKey ?? `${role}:${abilityId}`,
-            displayName: context.displayName ?? getAbilityDisplayName(abilityId)
+            displayName: context.displayName ?? getAbilityDisplayName(abilityId),
+            rebirthModifiers: context.rebirthModifiers ?? {},
+            cardRank: context.cardRank ?? 0
         });
     }
 
