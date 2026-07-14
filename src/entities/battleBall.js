@@ -479,13 +479,15 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             sim?.addLog?.(`${label} lands on ${this.name} for ${Math.round(actual)} damage.`);
         }
         if (this.hp <= 0) {
+            const s = source?.simulation ?? this.simulation;
+            const defeatContext = { source, label, simulation: s };
+            const suppressLootDrop = Boolean(this.ability?.onOwnerDefeated?.(defeatContext));
             this.flags.defeated = true;
             this.flags.destroyed = true;
-            const s = source?.simulation ?? this.simulation;
             if (s) {
                 s.spawnDeathExplosion(this.position.clone(), this.color);
                 s.addLog(`${this.name} has been defeated.`);
-                s.hooks?.onFighterDefeated?.(this, { source, label, simulation: s });
+                s.hooks?.onFighterDefeated?.(this, { ...defeatContext, suppressLootDrop });
             }
         }
         return { actualDamage };

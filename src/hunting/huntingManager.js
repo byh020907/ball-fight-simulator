@@ -307,6 +307,8 @@ export class HuntingManager {
             arenaWidth: arena.WIDTH,
             arenaHeight: arena.HEIGHT,
             cameraZoom: 1,
+            hostileAbsenceGraceDuration: 1,
+            hostileAbsenceGraceTeamId: HUNTING_TEAMS.PLAYER,
             arenaTheme: stageTheme,
             terrain,
             experienceProgressionByFighter: new Map([[run.characterId, playerProgression]]),

@@ -50,6 +50,19 @@ function getLootRarity(fighter) {
     return HUNTING_LOOT_RARITIES.includes(rarity) ? rarity : "common";
 }
 
+function normalizeLootMultiplier(value) {
+    return clamp(Number.isFinite(value) ? value : 1, 0, 1);
+}
+
+export function getHuntingLootMultiplier(fighter) {
+    return normalizeLootMultiplier(fighter?.hunting?.lootMultiplier);
+}
+
+export function scaleHuntingLootAmount(amount, multiplier = 1) {
+    const scaledAmount = Math.round(Math.max(0, amount) * normalizeLootMultiplier(multiplier));
+    return scaledAmount > 0 ? Math.max(1, scaledAmount) : 0;
+}
+
 export function roundHuntingLootValue(value) {
     const step = LOOT_CONFIG.valueStep;
     return Math.max(step, Math.round(value / step) * step);
@@ -133,14 +146,21 @@ export function rollHighChestRarity({ rarity = "rare", rng = Math.random } = {})
     );
 }
 
-export function rollHuntingBonusLootItemType({ collector, rarity = "common", rng = Math.random } = {}) {
-    if (!collector || rng() >= getHuntingLootDropChance(collector)) return null;
+export function rollHuntingBonusLootItemType({
+    collector,
+    rarity = "common",
+    rng = Math.random,
+    chanceMultiplier = 1
+} = {}) {
+    const chance = getHuntingLootDropChance(collector) * normalizeLootMultiplier(chanceMultiplier);
+    if (!collector || rng() >= chance) return null;
     return rollWeightedType(getHuntingBonusLootWeights({ collector, rarity }), rng);
 }
 
-function getLootAmount(type, { collector, floor, rarity, rng }) {
+function getLootAmount(type, { collector, floor, rarity, rng, lootMultiplier }) {
     if (type === HUNTING_LOOT_ITEM_TYPES.SMALL_HEAL_PACK) return getSmallHealPackAmount(collector);
-    if (type === HUNTING_LOOT_ITEM_TYPES.SHARD_BUNDLE) return rollHuntingShardBundleAmount({ floor, rarity, rng });
+    if (type === HUNTING_LOOT_ITEM_TYPES.SHARD_BUNDLE)
+        return scaleHuntingLootAmount(rollHuntingShardBundleAmount({ floor, rarity, rng }), lootMultiplier);
     return undefined;
 }
 
@@ -150,7 +170,17 @@ function createLootChest(type, rarity, rng) {
     return createHuntingChest({ rarity: chestRarity });
 }
 
-function createHuntingLootEntity({ type, fighter, collector, floor, rarity, rng, amount, onCollected }) {
+function createHuntingLootEntity({
+    type,
+    fighter,
+    collector,
+    floor,
+    rarity,
+    rng,
+    amount,
+    lootMultiplier,
+    onCollected
+}) {
     return createHuntingLootItem(type, {
         position: fighter.position,
         velocity: createLootLaunchVelocity(fighter, rng),
@@ -160,7 +190,7 @@ function createHuntingLootEntity({ type, fighter, collector, floor, rarity, rng,
         magnetSpeedMultiplier: LOOT_CONFIG.magnet.speedMultiplier,
         collectionGraceDuration: LOOT_CONFIG.magnet.collectionGraceDuration,
         life: LOOT_CONFIG.itemLife,
-        amount: amount ?? getLootAmount(type, { collector, floor, rarity, rng }),
+        amount: amount ?? getLootAmount(type, { collector, floor, rarity, rng, lootMultiplier }),
         chest: createLootChest(type, rarity, rng),
         onCollected
     });
@@ -203,8 +233,9 @@ export class HuntingLootDropController {
         this.rng = rng;
     }
 
-    onFighterDefeated(fighter, { simulation } = {}) {
-        if (!fighter?.hunting || fighter.hunting.suppressLootDrop || !simulation || !this.session) return null;
+    onFighterDefeated(fighter, { simulation, suppressLootDrop = false } = {}) {
+        if (!fighter?.hunting || fighter.hunting.suppressLootDrop || suppressLootDrop || !simulation || !this.session)
+            return null;
 
         const isMob = Boolean(fighter.hunting.isMob);
         const isMiniboss = Boolean(fighter.hunting.isMiniboss);
@@ -216,20 +247,29 @@ export class HuntingLootDropController {
         if (!collector) return null;
 
         const rarity = getLootRarity(fighter);
-        const shards = isMob ? this._spawnGuaranteedShardDrops(fighter, collector, rarity, simulation) : [];
-        if (isMob) {
-            const bonusType = rollHuntingBonusLootItemType({ collector, rarity, rng: this.rng });
-            if (bonusType) this._spawnLootItem(bonusType, fighter, collector, rarity, simulation);
+        const lootMultiplier = getHuntingLootMultiplier(fighter);
+        const shards =
+            isMob && lootMultiplier > 0
+                ? this._spawnGuaranteedShardDrops(fighter, collector, rarity, lootMultiplier, simulation)
+                : [];
+        if (isMob && lootMultiplier > 0) {
+            const bonusType = rollHuntingBonusLootItemType({
+                collector,
+                rarity,
+                rng: this.rng,
+                chanceMultiplier: lootMultiplier
+            });
+            if (bonusType) this._spawnLootItem(bonusType, fighter, collector, rarity, lootMultiplier, simulation);
         }
         const enhancementStones = isMiniboss ? this._spawnEnhancementStoneDrops(fighter, collector, simulation) : [];
         return shards[0] ?? enhancementStones[0] ?? null;
     }
 
-    _spawnGuaranteedShardDrops(fighter, collector, rarity, simulation) {
+    _spawnGuaranteedShardDrops(fighter, collector, rarity, lootMultiplier, simulation) {
         const count = getHuntingShardPhysicalDropCount(this.rng);
         return Array.from({ length: count }, () =>
-            this._spawnLootItem(HUNTING_LOOT_ITEM_TYPES.SHARD, fighter, collector, rarity, simulation, {
-                amount: getHuntingShardDropAmount(this.session.floor, this.rng)
+            this._spawnLootItem(HUNTING_LOOT_ITEM_TYPES.SHARD, fighter, collector, rarity, lootMultiplier, simulation, {
+                amount: scaleHuntingLootAmount(getHuntingShardDropAmount(this.session.floor, this.rng), lootMultiplier)
             })
         );
     }
@@ -237,13 +277,21 @@ export class HuntingLootDropController {
     _spawnEnhancementStoneDrops(fighter, collector, simulation) {
         const count = getHuntingEnhancementStoneDropCount(this.session.floor, this.rng);
         return Array.from({ length: count }, () =>
-            this._spawnLootItem(HUNTING_LOOT_ITEM_TYPES.ENHANCEMENT_STONE, fighter, collector, "common", simulation, {
-                amount: 1
-            })
+            this._spawnLootItem(
+                HUNTING_LOOT_ITEM_TYPES.ENHANCEMENT_STONE,
+                fighter,
+                collector,
+                "common",
+                1,
+                simulation,
+                {
+                    amount: 1
+                }
+            )
         );
     }
 
-    _spawnLootItem(type, fighter, collector, rarity, simulation, { amount } = {}) {
+    _spawnLootItem(type, fighter, collector, rarity, lootMultiplier, simulation, { amount } = {}) {
         const item = createHuntingLootEntity({
             type,
             fighter,
@@ -252,6 +300,7 @@ export class HuntingLootDropController {
             rarity,
             rng: this.rng,
             amount,
+            lootMultiplier,
             onCollected: (reward) => this.session.recordCollection(reward)
         });
         simulation.entities.push(item);

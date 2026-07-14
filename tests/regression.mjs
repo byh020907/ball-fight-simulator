@@ -129,13 +129,15 @@ import {
     HuntingLootDropController,
     getHuntingBonusLootWeights,
     getHuntingLootDropChance,
+    getHuntingLootMultiplier,
     getHuntingShardDropAmount,
     getHuntingEnhancementStoneDropCount,
     getHuntingShardPhysicalDropCount,
     getSmallHealPackAmount,
     rollHighChestRarity,
     rollHuntingBonusLootItemType,
-    rollHuntingShardBundleAmount
+    rollHuntingShardBundleAmount,
+    scaleHuntingLootAmount
 } from "../src/hunting/index.js";
 import { Grenade } from "../src/entities/grenade.js";
 import {
@@ -7961,83 +7963,227 @@ function testHuntingBoomerangReachAndReturnArc(app) {
     console.log("[hunting-boomerang-range-return-arc] ok");
 }
 
-function testHuntingSplitterMobActuallySplits(app) {
-    const playerSpec = {
-        ...app.roster.find((fighter) => fighter.id === FIGHTER_IDS.DASH),
-        teamId: HUNTING_TEAMS.PLAYER
+function testHuntingSplitterDeathFragmentsAndResultGrace(app) {
+    const createScenario = ({ splitLevel = 2, splitCount = 2, splitLootMultiplier = 1 } = {}) => {
+        const playerSpec = {
+            ...app.roster.find((fighter) => fighter.id === FIGHTER_IDS.DASH),
+            teamId: HUNTING_TEAMS.PLAYER
+        };
+        const splitterSpec = createHuntingMobSpec({
+            type: HUNTING_MONSTER_TYPES.SPLITTER,
+            floor: 92,
+            index: 0,
+            splitLevel,
+            splitCount,
+            splitLootMultiplier
+        });
+        const defeatEvents = [];
+        const lootSession = new HuntingBattleLootSession({ playerId: playerSpec.id, floor: 92 });
+        const lootController = new HuntingLootDropController({ session: lootSession, rng: () => 0.999999 });
+        const simulation = new BattleSimulation(
+            [splitterSpec, playerSpec],
+            {
+                onLog() {},
+                onSound() {},
+                onFighterDefeated(fighter, context) {
+                    defeatEvents.push({ fighter, context });
+                    lootController.onFighterDefeated(fighter, context);
+                }
+            },
+            null,
+            {
+                assignActions: false,
+                hostileAbsenceGraceDuration: 1,
+                hostileAbsenceGraceTeamId: HUNTING_TEAMS.PLAYER
+            }
+        );
+        const [splitter, player] = simulation.fighters;
+        splitter.position = new Vector2(300, 480);
+        splitter.velocity = new Vector2();
+        player.position = new Vector2(700, 480);
+        player.velocity = new Vector2();
+        return { simulation, splitter, player, defeatEvents };
     };
-    const splitterSpec = createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.SPLITTER, floor: 92, index: 0 });
-    const simulation = new BattleSimulation([splitterSpec, playerSpec], { onLog() {}, onSound() {} }, null, {
-        assignActions: false
-    });
-    const [splitter, target] = simulation.fighters;
-    splitter.position = new Vector2(300, 480);
-    splitter.velocity = new Vector2();
-    target.position = new Vector2(700, 480);
-    target.velocity = new Vector2();
-    splitter.takeDamage(17, target, "Test Setup");
-    const originalHp = splitter.hp;
+    const getSplitFragments = (simulation) => simulation.fighters.filter((fighter) => fighter.hunting?.isSplitFragment);
+
+    const { simulation, splitter, player, defeatEvents } = createScenario();
     const originalMaxHp = splitter.maxHp;
-
     splitter.ability.state.timer = splitter.ability.cooldown;
-    splitter.ability.update(0, target);
+    splitter.ability.update(0, player);
+    assert.equal(splitter.hunting.splitLevel, 2, "Splitter definitions should expose an extensible split level");
+    assert.equal(splitter.hunting.splitCount, 2, "Splitter definitions should expose an extensible split count");
+    assert.equal(
+        splitter.hunting.lootMultiplier,
+        1,
+        "Splitter definitions should cap their reward budget at the base value"
+    );
+    assert.equal(
+        getHuntingLootMultiplier({ hunting: { lootMultiplier: 1.5 } }),
+        1,
+        "Split reward overrides should never exceed the base monster reward budget"
+    );
+    assert.equal(
+        scaleHuntingLootAmount(18, 0.5),
+        9,
+        "A reduced split reward override should scale physical shard value"
+    );
+    assert.equal(scaleHuntingLootAmount(18, 0), 0, "A zero split reward override should retain a zero reward budget");
+    assert.equal(
+        getSplitFragments(simulation).length,
+        0,
+        "Splitter cooldown updates should not create fragments before the monster is defeated"
+    );
+    assert.ok(simulation.fighters.includes(splitter), "Splitter should stay active until its fatal damage event");
 
-    const fragments = simulation.fighters.filter((fighter) => fighter.hunting?.isSplitFragment);
-    assert.equal(fragments.length, 4, "Splitter mobs should replace themselves with four physical fragments");
+    splitter.takeDamage(99999, player, "Test Split Death");
+    const firstGeneration = getSplitFragments(simulation);
+    assert.equal(firstGeneration.length, 2, "A level-two splitter should create two level-one fragments on death");
     assert.equal(
         simulation.fighters.includes(splitter),
         false,
-        "The original splitter should leave the active fighter roster"
+        "Defeated splitters should leave the active fighter roster"
     );
-    assert.equal(
-        splitter.isExpired,
-        true,
-        "The replaced splitter should leave the entity list after the current update"
-    );
-    assert.equal(
-        fragments.reduce((sum, fragment) => sum + fragment.maxHp, 0),
-        originalMaxHp,
-        "Split fragments should preserve the original total maximum health"
-    );
-    assert.equal(
-        fragments.reduce((sum, fragment) => sum + fragment.hp, 0),
-        originalHp,
-        "Split fragments should preserve the original remaining health"
-    );
+    assert.equal(splitter.isExpired, true, "Defeated splitters should leave the active entity list");
     assert.ok(
-        fragments.every(
+        firstGeneration.every(
             (fragment) =>
-                fragment.hunting.behavior === HUNTING_MONSTER_TYPES.PURSUER && fragment.teamId === splitter.teamId
+                fragment.hunting.splitLevel === 1 &&
+                fragment.hunting.splitCount === 2 &&
+                fragment.hunting.behavior === HUNTING_MONSTER_TYPES.PURSUER &&
+                fragment.teamId === splitter.teamId
         ),
-        "Split fragments should remain hostile pursuers without recursively splitting"
+        "First-generation fragments should keep the split count, lose one level, and continue pursuing"
     );
     assert.equal(
-        fragments.filter((fragment) => !fragment.hunting.suppressLootDrop).length,
+        firstGeneration.reduce((sum, fragment) => sum + fragment.maxHp, 0),
+        originalMaxHp,
+        "Each split generation should preserve the parent total maximum health"
+    );
+    assert.equal(
+        firstGeneration.reduce((sum, fragment) => sum + fragment.hp, 0),
+        originalMaxHp,
+        "Death fragments should begin with their allocated maximum health instead of inheriting zero HP"
+    );
+
+    firstGeneration.forEach((fragment) => fragment.takeDamage(99999, player, "Test Recursive Split Death"));
+    const terminalFragments = getSplitFragments(simulation);
+    assert.equal(terminalFragments.length, 4, "Both level-one fragments should create two terminal fragments each");
+    assert.ok(
+        terminalFragments.every((fragment) => fragment.hunting.splitLevel === 0),
+        "Terminal fragments should retain level zero and stop the recursive split chain"
+    );
+    assert.equal(
+        terminalFragments.reduce((sum, fragment) => sum + fragment.maxHp, 0),
+        originalMaxHp,
+        "The final four fragments should still preserve the original total maximum health"
+    );
+    assert.equal(
+        terminalFragments.filter((fragment) => !fragment.hunting.suppressLootDrop).length,
         1,
-        "Only one fragment should carry the original monster's loot budget"
+        "Only one terminal fragment should retain the original monster loot budget"
     );
     assert.ok(
-        fragments.every((fragment, index) =>
-            fragments.slice(index + 1).every((other) => {
+        terminalFragments.every((fragment) => fragment.hunting.lootMultiplier === 1),
+        "The terminal reward branch should preserve the splitter reward override"
+    );
+    assert.ok(
+        terminalFragments.every((fragment, index) =>
+            terminalFragments.slice(index + 1).every((other) => {
                 const distance = Vector2.subtract(fragment.position, other.position).length();
                 return distance >= fragment.radius + other.radius;
             })
         ),
-        "Split fragments should begin physically separated instead of relying on a later collision correction"
-    );
-    assert.equal(
-        simulation.entities.filter((entity) => entity.constructor.name === "ArrowProjectile").length,
-        0,
-        "Splitter mobs should no longer substitute projectile volleys for physical splitting"
+        "Every fragment generation should begin physically separated"
     );
 
-    simulation.update(1 / 60);
-    assert.equal(
-        simulation.entities.includes(splitter),
-        false,
-        "The replaced splitter should be removed from entities after the update completes"
+    terminalFragments.forEach((fragment) => fragment.takeDamage(99999, player, "Test Terminal Split Death"));
+    const intermediateDefeatEvents = defeatEvents.filter((event) => (event.fighter.hunting?.splitLevel ?? 0) > 0);
+    const terminalDefeatEvents = defeatEvents.filter((event) => event.fighter.hunting?.splitLevel === 0);
+    assert.ok(
+        intermediateDefeatEvents.every((event) => event.context.suppressLootDrop),
+        "Every splitting death should suppress its own loot before the next generation appears"
     );
-    console.log("[hunting-splitter-physical-fragments] ok");
+    assert.equal(terminalDefeatEvents.length, 4, "Every terminal fragment should emit one final defeat event");
+    assert.equal(
+        terminalDefeatEvents.filter((event) => !event.fighter.hunting.suppressLootDrop).length,
+        1,
+        "Only one terminal defeat should remain eligible for the base monster reward budget"
+    );
+    const terminalShardDrops = simulation.entities.filter((entity) => entity instanceof ShardDrop);
+    const baseShardAmount = getHuntingShardDropAmount(92, () => 0.999999);
+    assert.equal(
+        terminalShardDrops.length,
+        7,
+        "The complete split tree should create only one terminal monster's physical shard-drop count"
+    );
+    assert.ok(
+        terminalShardDrops.every((drop) => drop.amount === baseShardAmount),
+        "The eligible terminal fragment should retain the base monster shard value"
+    );
+    simulation.checkResult();
+    assert.equal(simulation.finished, false, "Hunting victory should wait while the hostile-absence grace begins");
+    simulation.update(0.99);
+    assert.equal(simulation.finished, false, "Hunting victory should not resolve before one full hostile-free second");
+    simulation.update(0.02);
+    assert.equal(simulation.finished, true, "Hunting victory should resolve after one hostile-free second");
+
+    const graceScenario = createScenario({ splitLevel: 0 });
+    graceScenario.splitter.takeDamage(99999, graceScenario.player, "Test Grace Start");
+    graceScenario.simulation.checkResult();
+    graceScenario.simulation.update(0.5);
+    assert.equal(
+        graceScenario.simulation.finished,
+        false,
+        "The hostile-free timer should remain pending before one second"
+    );
+    const reenteredEnemy = graceScenario.simulation.spawnFighter(
+        createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.MELEE, floor: 1, index: 4 }),
+        new Vector2(520, 480)
+    );
+    graceScenario.simulation.checkResult();
+    reenteredEnemy.takeDamage(99999, graceScenario.player, "Test Grace Reset");
+    graceScenario.simulation.checkResult();
+    graceScenario.simulation.update(0.75);
+    assert.equal(
+        graceScenario.simulation.finished,
+        false,
+        "A newly spawned hostile should reset the pending result timer before the next defeat"
+    );
+    graceScenario.simulation.update(0.3);
+    assert.equal(
+        graceScenario.simulation.finished,
+        true,
+        "The reset hostile-free timer should resolve after a new full second"
+    );
+
+    const defeatScenario = createScenario({ splitLevel: 0 });
+    defeatScenario.player.takeDamage(99999, defeatScenario.splitter, "Test Player Defeat");
+    defeatScenario.simulation.checkResult();
+    assert.equal(
+        defeatScenario.simulation.finished,
+        true,
+        "The hostile-absence grace should not delay a player defeat while enemy monsters remain"
+    );
+
+    const reducedRewardScenario = createScenario({ splitLootMultiplier: 0.5 });
+    reducedRewardScenario.splitter.takeDamage(99999, reducedRewardScenario.player, "Test Reduced Split Reward");
+    getSplitFragments(reducedRewardScenario.simulation).forEach((fragment) =>
+        fragment.takeDamage(99999, reducedRewardScenario.player, "Test Reduced Recursive Split Reward")
+    );
+    getSplitFragments(reducedRewardScenario.simulation).forEach((fragment) =>
+        fragment.takeDamage(99999, reducedRewardScenario.player, "Test Reduced Terminal Split Reward")
+    );
+    const reducedShardDrops = reducedRewardScenario.simulation.entities.filter((entity) => entity instanceof ShardDrop);
+    assert.equal(
+        reducedShardDrops.length,
+        7,
+        "A reduced split reward override must still spend one terminal monster's physical drop count"
+    );
+    assert.ok(
+        reducedShardDrops.every((drop) => drop.amount === scaleHuntingLootAmount(baseShardAmount, 0.5)),
+        "A reduced split reward override must scale the one eligible terminal monster's shard values"
+    );
+    console.log("[hunting-splitter-death-fragments] ok");
 }
 
 function testElectricArcPathAndHuntingRender(app) {
@@ -15783,7 +15929,7 @@ await testActionGateway();
 await testHuntingEndToEnd();
 await testHuntingChestContinueHandlersContract();
 testHuntingLootBalanceRules();
-testHuntingSplitterMobActuallySplits(app);
+testHuntingSplitterDeathFragmentsAndResultGrace(app);
 testHuntingLootItemsRotate();
 testHuntingLootItemsAndDropController(app);
 testHuntingBossRolesAndEnhancementStoneDrops(app);

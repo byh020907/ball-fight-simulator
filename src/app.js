@@ -957,6 +957,8 @@ export class BattleApp {
                 arenaWidth: options.arenaWidth,
                 arenaHeight: options.arenaHeight,
                 cameraZoom: options.cameraZoom,
+                hostileAbsenceGraceDuration: options.hostileAbsenceGraceDuration,
+                hostileAbsenceGraceTeamId: options.hostileAbsenceGraceTeamId,
                 arenaTheme: options.arenaTheme ?? null,
                 terrain: options.terrain ?? []
             }

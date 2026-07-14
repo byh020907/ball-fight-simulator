@@ -28,7 +28,6 @@ export const HUNTING_LINK_CHANNEL_CONFIG = Object.freeze({
 });
 export const LASER_CHARGE_TURN_RATE = 4;
 const SPLIT_FRAGMENT_CONFIG = Object.freeze({
-    maximumCount: 4,
     radiusMultiplier: 0.54,
     damageMultiplier: 0.65,
     speedMultiplier: 1.08,
@@ -65,7 +64,7 @@ const BEHAVIOR_CONFIG = Object.freeze({
     siphon: { cooldown: 0, face: "xeye" },
     shard: { cooldown: 3, face: "cyclops" },
     boomerang: { cooldown: 3.1, face: "happy" },
-    splitter: { cooldown: 3.8, face: "ooo" },
+    splitter: { cooldown: 0, face: "ooo" },
     jumper: { cooldown: 3.3, face: "dash" },
     laser: { cooldown: 4.2, face: "cyclops" }
 });
@@ -143,6 +142,7 @@ export class HuntingMobAbility extends Ability {
         if (this.behavior === "siphon") return this._tickSiphon(delta, target);
         if (this.behavior === "laser") return this._tickLaser(delta, target);
         if (this.behavior === "boomerang") return this._tickBoomerang(delta, target);
+        if (this.behavior === "splitter") return;
         if (this.state.timer < this.cooldown) return;
         this.state.timer = 0;
         if (this.behavior === "charger") this._charge(target);
@@ -150,7 +150,6 @@ export class HuntingMobAbility extends Ability {
         else if (this.behavior === "shockwave") this._shockwave();
         else if (this.behavior === "barrier") this._activateBarrier();
         else if (this.behavior === "shard") this._shardVolley(target);
-        else if (this.behavior === "splitter") this._splitBurst(target);
         else if (this.behavior === "jumper") this._jump(target);
     }
 
@@ -327,12 +326,18 @@ export class HuntingMobAbility extends Ability {
         });
     }
 
-    _splitBurst(target) {
-        const direction = this._directionTo(target);
-        if (!direction) return;
-        const fragments = this._createSplitFragments(Math.atan2(direction.y, direction.x));
+    onOwnerDefeated({ source } = {}) {
+        const splitLevel = this.owner.hunting?.splitLevel ?? 0;
+        const splitCount = this.owner.hunting?.splitCount ?? 0;
+        if (splitLevel <= 0 || splitCount <= 0) return false;
+
+        const fragments = this._createSplitFragments({
+            baseAngle: this._getSplitBaseAngle(source),
+            splitLevel: splitLevel - 1,
+            splitCount
+        });
         const spawned = this.simulation.replaceFighter(this.owner, fragments);
-        if (!spawned.length) return;
+        if (!spawned.length) return false;
 
         spawned.forEach((fragment, index) => {
             const angle = fragments[index].launchAngle;
@@ -344,12 +349,21 @@ export class HuntingMobAbility extends Ability {
             this.simulation.spawnPulse(fragment.position.clone(), this.owner.color);
         });
         this.simulation.playSound("crash");
+        return true;
     }
 
-    _createSplitFragments(baseAngle) {
-        const fragmentCount = Math.min(SPLIT_FRAGMENT_CONFIG.maximumCount, Math.max(1, Math.floor(this.owner.hp)));
+    _getSplitBaseAngle(source) {
+        if (source && !source.flags?.defeated) {
+            const direction = Vector2.subtract(source.position, this.owner.position);
+            if (direction.length() > 0.001) return Math.atan2(direction.y, direction.x);
+        }
+        if (this.owner.velocity.length() > 0.001) return Math.atan2(this.owner.velocity.y, this.owner.velocity.x);
+        return this.owner.appearance.angle;
+    }
+
+    _createSplitFragments({ baseAngle, splitLevel, splitCount }) {
+        const fragmentCount = Math.max(1, Math.floor(splitCount));
         const maxHpShares = this._splitIntegerValue(this.owner.maxHp, fragmentCount);
-        const hpShares = this._splitIntegerValue(this.owner.hp, fragmentCount);
         return Array.from({ length: fragmentCount }, (_, index) => {
             const angle = baseAngle + (index / fragmentCount) * Math.PI * 2;
             const fragmentRadius = this._getSplitFragmentRadius();
@@ -362,7 +376,14 @@ export class HuntingMobAbility extends Ability {
             return {
                 position,
                 launchAngle: angle,
-                spec: this._createSplitFragmentSpec(index, maxHpShares[index], hpShares[index], angle)
+                spec: this._createSplitFragmentSpec({
+                    index,
+                    maxHp: maxHpShares[index],
+                    hp: maxHpShares[index],
+                    angle,
+                    splitLevel,
+                    splitCount
+                })
             };
         });
     }
@@ -373,13 +394,15 @@ export class HuntingMobAbility extends Ability {
         return Array.from({ length: count }, (_, index) => base + (index < total % count ? 1 : 0));
     }
 
-    _createSplitFragmentSpec(index, maxHp, hp, angle) {
+    _createSplitFragmentSpec({ index, maxHp, hp, angle, splitLevel, splitCount }) {
         const stats = this.owner.stats;
         const fragmentRadius = this._getSplitFragmentRadius();
+        const splitOriginName = this.owner.hunting?.splitOriginName ?? this.owner.name;
+        const carriesLoot = !this.owner.hunting?.suppressLootDrop && index === 0;
         return {
             id: `${this.owner.id}-fragment-${index + 1}`,
-            name: `${this.owner.name} 파편`,
-            title: `${this.owner.title} 파편`,
+            name: `${splitOriginName} 파편`,
+            title: `${splitOriginName} 파편`,
             description: "분열 볼에서 갈라진 작은 파편입니다.",
             color: this.owner.color,
             face: this.owner.face,
@@ -406,7 +429,10 @@ export class HuntingMobAbility extends Ability {
                 monsterType: "splitter_fragment",
                 behavior: "pursuer",
                 isSplitFragment: true,
-                suppressLootDrop: index !== 0
+                splitLevel,
+                splitCount,
+                splitOriginName,
+                suppressLootDrop: !carriesLoot
             }
         };
     }

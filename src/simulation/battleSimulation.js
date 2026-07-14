@@ -77,6 +77,9 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         };
         this.resultAnimationTime = 0;
         this.resultReady = false;
+        this.hostileAbsenceGraceDuration = Math.max(0, options.hostileAbsenceGraceDuration ?? 0);
+        this.hostileAbsenceGraceTeamId = options.hostileAbsenceGraceTeamId ?? null;
+        this._hostileAbsenceElapsed = 0;
 
         // ── 클릭 액션 시스템 ──
         this.playerBall = playerBall;
@@ -293,7 +296,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         }
         this.entities = this.entities.filter((entity) => !entity.isExpired);
 
-        this.checkResult();
+        this.checkResult(delta);
     }
 
     beforeFighterPhysicsCollision(context) {
@@ -653,16 +656,30 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         this._resetAntiStallAfterBurst();
     }
 
-    checkResult() {
+    checkResult(delta = 0) {
         const alive = this.fighters.filter((f) => !f.flags.defeated);
         const aliveTeams = new Set(alive.map((fighter) => fighter.teamId));
-        if (alive.length > 0 && aliveTeams.size === 1) {
+        if (alive.length === 0) {
+            this.resolveResult(this.fighters.reduce((best, current) => (current.hp > best.hp ? current : best)));
+            return;
+        }
+        if (aliveTeams.size > 1) {
+            this._hostileAbsenceElapsed = 0;
+            return;
+        }
+        if (this.hostileAbsenceGraceDuration <= 0) {
             this.resolveResult(alive[0]);
             return;
         }
-        if (alive.length === 0) {
-            this.resolveResult(this.fighters.reduce((best, current) => (current.hp > best.hp ? current : best)));
+        if (
+            this.hostileAbsenceGraceTeamId &&
+            !alive.some((fighter) => fighter.teamId === this.hostileAbsenceGraceTeamId)
+        ) {
+            this.resolveResult(alive[0]);
+            return;
         }
+        this._hostileAbsenceElapsed += Math.max(0, delta);
+        if (this._hostileAbsenceElapsed >= this.hostileAbsenceGraceDuration) this.resolveResult(alive[0]);
     }
 
     resolveResult(winner) {

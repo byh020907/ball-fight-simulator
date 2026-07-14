@@ -16,6 +16,7 @@ const MONSTER_PROBABILITY = Object.freeze({
     focusLeadInFloors: 10
 });
 const BOSS_MOB_RARITIES = Object.freeze(["rare", "unique", "epic"]);
+const SPLITTER_DEFAULTS = Object.freeze({ splitLevel: 2, splitCount: 2, lootMultiplier: 1 });
 
 export const HUNTING_TEAMS = Object.freeze({ PLAYER: "hunting-player", ENEMY: "hunting-enemy" });
 export const HUNTING_MONSTER_TAGS = Object.freeze({
@@ -38,7 +39,7 @@ const MONSTER_BEHAVIOR_DESCRIPTIONS = Object.freeze({
     siphon: "1초 동안 체력을 흡수한 뒤 2초 동안 재사용을 준비합니다.",
     shard: "파편을 흩뿌려 여러 방향을 압박합니다.",
     boomerang: "되돌아오는 부메랑 투사체를 발사합니다.",
-    splitter: "위험해지면 작은 파편으로 분열합니다.",
+    splitter: "사망할 때 2단계에 걸쳐 작은 추적 파편으로 분열합니다.",
     jumper: "크기를 키우며 도약해 충돌을 노립니다.",
     laser: "충전한 방향으로 벽 끝까지 레이저를 발사합니다."
 });
@@ -322,15 +323,33 @@ export function getHuntingMobCount(floor, rng = DEFAULT_RNG) {
     return HUNTING_MOB_COMPOSITION.MAX_COUNT;
 }
 
+function createSplitConfig(type, splitLevel, splitCount, splitLootMultiplier) {
+    const defaults = type === HUNTING_MONSTER_TYPES.SPLITTER ? SPLITTER_DEFAULTS : null;
+    const resolvedLevel = splitLevel ?? defaults?.splitLevel;
+    const resolvedCount = splitCount ?? defaults?.splitCount;
+    const resolvedLootMultiplier = splitLootMultiplier ?? defaults?.lootMultiplier;
+    if (!Number.isFinite(resolvedLevel) || !Number.isFinite(resolvedCount) || !Number.isFinite(resolvedLootMultiplier))
+        return null;
+    return {
+        splitLevel: Math.max(0, Math.floor(resolvedLevel)),
+        splitCount: Math.max(1, Math.floor(resolvedCount)),
+        lootMultiplier: Math.max(0, Math.min(1, resolvedLootMultiplier))
+    };
+}
+
 export function createHuntingMobSpec({
     type = HUNTING_MONSTER_TYPES.MELEE,
     floor = 1,
     index = 0,
     stageId = HUNTING_STAGE_IDS.CAVE,
-    rng = DEFAULT_RNG
+    rng = DEFAULT_RNG,
+    splitLevel,
+    splitCount,
+    splitLootMultiplier
 } = {}) {
     const base =
         getHuntingMonsterDefinition(type, stageId) ?? getHuntingMonsterDefinition(HUNTING_MONSTER_TYPES.MELEE, stageId);
+    const splitConfig = createSplitConfig(base.type, splitLevel, splitCount, splitLootMultiplier);
     return {
         id: `hunting-mob-${base.type}-f${safeFloor(floor)}-${index}`,
         name: base.displayName,
@@ -347,7 +366,8 @@ export function createHuntingMobSpec({
             monsterTags: base.monsterTags,
             behavior: base.type,
             isMob: true,
-            stageSkin: base.stageId
+            stageSkin: base.stageId,
+            ...(splitConfig ?? {})
         }
     };
 }
