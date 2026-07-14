@@ -1,7 +1,7 @@
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
-import { createWaveringPath } from "../effects/waveringPath.js";
 
 const MAX_FLAME_COUNT = Math.max(...REWARD_BALANCE.rebirth.visualStages.map((stage) => stage.flameCount));
+const MAX_CONTOUR_POINT_COUNT = 13;
 const FLAME_MOVEMENT_THRESHOLD = 8;
 
 function clamp(value, min, max) {
@@ -35,75 +35,139 @@ function getBallSeed(ball) {
     return [...identity].reduce((seed, character) => (seed * 31 + character.charCodeAt(0)) % 997, 1);
 }
 
+function getBallSpeed(ball) {
+    const velocity = ball.velocity ?? { x: 0, y: 0 };
+    return typeof velocity.length === "function" ? velocity.length() : Math.hypot(velocity.x, velocity.y);
+}
+
 function getFlameDirection(ball) {
     const velocity = ball.velocity ?? { x: 0, y: 0 };
-    const speed = typeof velocity.length === "function" ? velocity.length() : Math.hypot(velocity.x, velocity.y);
+    const speed = getBallSpeed(ball);
     if (speed < FLAME_MOVEMENT_THRESHOLD) return { x: 0, y: -1 };
     const movementDirection = { x: -velocity.x / speed, y: -velocity.y / speed };
-    const movementBlend = smoothStep(FLAME_MOVEMENT_THRESHOLD, Math.max(36, ball.stats?.baseSpeed * 0.45), speed);
+    const baseSpeed = ball.stats?.baseSpeed ?? speed;
+    const movementBlend = smoothStep(FLAME_MOVEMENT_THRESHOLD, Math.max(36, baseSpeed * 0.45), speed);
     return normalizeDirection({
         x: movementDirection.x * movementBlend,
         y: -1 * (1 - movementBlend) + movementDirection.y * movementBlend
     });
 }
 
-function drawTaperedPath(ctx, points, color, baseWidth, alpha) {
-    ctx.strokeStyle = color;
-    points.slice(1).forEach((point, index) => {
-        const progress = (index + 1) / (points.length - 1);
-        ctx.globalAlpha = alpha * (1 - progress * 0.26);
-        ctx.lineWidth = Math.max(0.45, baseWidth * Math.max(0.1, (1 - progress) ** 0.78));
-        ctx.beginPath();
-        ctx.moveTo(points[index].x, points[index].y);
-        ctx.lineTo(point.x, point.y);
-        ctx.stroke();
+function getFlameContourPointCount(stage) {
+    return Math.min(MAX_CONTOUR_POINT_COUNT, 9 + Math.max(0, stage));
+}
+
+function getFlameTongueIntensity(progress, tongueCount, time, seed) {
+    const mainCrown = Math.sin(progress * Math.PI) ** 1.1;
+    const secondaryTongues = Math.abs(Math.sin(progress * tongueCount * Math.PI));
+    const broadFlow = smoothNoise(time * 0.88 + progress * 2.4, seed);
+    const fineFlow = smoothNoise(time * 1.65 + progress * 5.8, seed + 29);
+    return clamp(0.54 + mainCrown * 0.3 + secondaryTongues * 0.18 + broadFlow * 0.2 + fineFlow * 0.06, 0.32, 1.18);
+}
+
+function createFlamePoint(ball, direction, perpendicular, lateral, forward) {
+    return {
+        x: ball.position.x + perpendicular.x * lateral + direction.x * forward,
+        y: ball.position.y + perpendicular.y * lateral + direction.y * forward
+    };
+}
+
+function getFlameLayerPoints(contour, extensionRatio) {
+    return contour.outerPoints.map((point, index) => {
+        const root = contour.basePoints[index];
+        return {
+            x: root.x + (point.x - root.x) * extensionRatio,
+            y: root.y + (point.y - root.y) * extensionRatio
+        };
     });
 }
 
-export function createRebirthFlamePaths(ball, visual, { time = 0 } = {}) {
-    if (!visual || visual.rebirthCount <= 0) return [];
-    const velocity = ball.velocity ?? { x: 0, y: 0 };
-    const speed = typeof velocity.length === "function" ? velocity.length() : Math.hypot(velocity.x, velocity.y);
+function traceSmoothPath(ctx, points, shouldMoveTo = true) {
+    if (shouldMoveTo) ctx.moveTo(points[0].x, points[0].y);
+    points.slice(1, -1).forEach((point, index) => {
+        const next = points[index + 2];
+        ctx.quadraticCurveTo(point.x, point.y, (point.x + next.x) * 0.5, (point.y + next.y) * 0.5);
+    });
+    const last = points.at(-1);
+    ctx.lineTo(last.x, last.y);
+}
+
+function drawFlameLayer(ctx, contour, { extensionRatio, color, alpha, strokeColor = null, lineWidth = 0 }) {
+    const outerPoints = getFlameLayerPoints(contour, extensionRatio);
+    const basePoints = [...contour.basePoints].reverse();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    traceSmoothPath(ctx, outerPoints);
+    traceSmoothPath(ctx, basePoints, false);
+    ctx.closePath();
+    ctx.fill();
+    if (strokeColor && lineWidth > 0) {
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = lineWidth;
+        ctx.stroke();
+    }
+}
+
+/**
+ * 공 표면에 붙은 하나의 화염 실루엣을 만든다.
+ * 정지 시에는 상단 외곽이, 이동 중에는 속도 반대쪽 외곽이 불꽃으로 밀려난다.
+ */
+export function createRebirthFlameContour(ball, visual, { time = 0 } = {}) {
+    if (!visual || visual.rebirthCount <= 0) return null;
+    const speed = getBallSpeed(ball);
     const speedRatio = Math.min(1, speed / Math.max(1, ball.stats?.baseSpeed ?? 1));
     const direction = getFlameDirection(ball);
     const perpendicular = { x: -direction.y, y: direction.x };
-    const strandCount = Math.max(3, Math.min(MAX_FLAME_COUNT, visual.flameCount));
-    const baseLength = ball.radius * (0.78 + visual.stage * 0.055) + 9 + speedRatio * ball.radius * 0.45;
-    const ballSeed = getBallSeed(ball);
+    const rootHalfWidth = Math.max(4, Math.min(ball.radius - 3, ball.radius * 0.92));
+    const pointCount = getFlameContourPointCount(visual.stage);
+    const tongueCount = Math.max(1, Math.min(4, Math.ceil(visual.flameCount / 2)));
+    const baseLength = ball.radius * (0.72 + visual.stage * 0.11) + 8 + speedRatio * ball.radius * 0.45;
+    const seed = getBallSeed(ball);
+    const basePoints = [];
+    const outerPoints = [];
 
-    return Array.from({ length: strandCount }, (_, index) => {
-        const seed = ballSeed + index * 43;
-        const centeredIndex = index - (strandCount - 1) / 2;
-        const laneDirection = normalizeDirection({
-            x: direction.x + perpendicular.x * centeredIndex * 0.24,
-            y: direction.y + perpendicular.y * centeredIndex * 0.24
-        });
-        const lengthPulse = 0.74 + (smoothNoise(time * 2.4, seed) + 1) * 0.16;
-        const flameLength = baseLength * lengthPulse;
-        const root = {
-            x: ball.position.x + laneDirection.x * (ball.radius - 4) + perpendicular.x * centeredIndex * 2,
-            y: ball.position.y + laneDirection.y * (ball.radius - 4) + perpendicular.y * centeredIndex * 2
-        };
-        const tip = {
-            x: root.x + laneDirection.x * flameLength,
-            y: root.y + laneDirection.y * flameLength
-        };
-        const points = createWaveringPath(root, tip, {
-            time,
-            segmentLength: 8,
-            minSegments: 3,
-            maxSegments: 6,
-            minAmplitude: 2,
-            maxAmplitude: 6 + visual.stage,
-            amplitudeRatio: 0.24,
-            offsetAt: ({ time: pathTime, index: pointIndex, progress }) => {
-                const broadFlow = smoothNoise(pathTime * 4.1 - progress * 4.8 + pointIndex * 0.17, seed);
-                const tipFlicker = smoothNoise(pathTime * 9.7 - progress * 8.2, seed + 19);
-                return broadFlow * 0.72 + tipFlicker * 0.28;
-            }
-        });
-        return { points, root, direction: laneDirection, alpha: 0.58 + ((index + visual.stage) % 3) * 0.1 };
-    });
+    for (const index of Array.from({ length: pointCount }, (_, pointIndex) => pointIndex)) {
+        const progress = index / (pointCount - 1);
+        const lateral = -rootHalfWidth + rootHalfWidth * 2 * progress;
+        const surfaceForward = Math.sqrt(Math.max(0, ball.radius ** 2 - lateral ** 2)) - 1.5;
+        const root = createFlamePoint(ball, direction, perpendicular, lateral, surfaceForward);
+        const rootWeight = index === 0 || index === pointCount - 1 ? 0 : Math.sin(progress * Math.PI) ** 0.58;
+        const extension =
+            baseLength * rootWeight * getFlameTongueIntensity(progress, tongueCount, time, seed + index * 7);
+        basePoints.push(root);
+        outerPoints.push(createFlamePoint(ball, direction, perpendicular, lateral, surfaceForward + extension));
+    }
+
+    return {
+        direction,
+        basePoints,
+        outerPoints,
+        tongueCount,
+        pointCount,
+        maxExtension: Math.max(
+            ...outerPoints.map((point, index) =>
+                Math.hypot(point.x - basePoints[index].x, point.y - basePoints[index].y)
+            )
+        )
+    };
+}
+
+/**
+ * 이전 경로 조회 API 호환용. 독립 가닥 대신 단일 실루엣 경계만 반환한다.
+ */
+export function createRebirthFlamePaths(ball, visual, options) {
+    const contour = createRebirthFlameContour(ball, visual, options);
+    if (!contour) return [];
+    return [
+        {
+            points: contour.outerPoints,
+            root: contour.basePoints[0],
+            direction: contour.direction,
+            alpha: 1,
+            basePoints: contour.basePoints
+        }
+    ];
 }
 
 export function getRebirthVisualProfile(rebirthCount = 0) {
@@ -137,7 +201,8 @@ export function drawRebirthVisualUnderlay(ctx, ball, visual, time = performance.
 export function drawRebirthVisualOverlay(ctx, ball, visual, time = performance.now() / 1000) {
     if (!visual || visual.rebirthCount <= 0) return;
     const { x, y } = ball.position;
-    const speedRatio = Math.min(1, ball.velocity?.length?.() / Math.max(1, ball.stats.baseSpeed) || 0);
+    const speedRatio = Math.min(1, getBallSpeed(ball) / Math.max(1, ball.stats?.baseSpeed ?? 1));
+    const contour = createRebirthFlameContour(ball, visual, { time });
     ctx.save();
     ctx.strokeStyle = visual.color;
     ctx.lineWidth = 1.5 + visual.outlineWidth;
@@ -155,19 +220,28 @@ export function drawRebirthVisualOverlay(ctx, ball, visual, time = performance.n
     ctx.setLineDash([]);
 
     ctx.globalCompositeOperation = "source-over";
-    ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    createRebirthFlamePaths(ball, visual, { time }).forEach((flame) => {
-        drawTaperedPath(ctx, flame.points, "#e74716", 8 + visual.stage * 0.68, flame.alpha * 0.82);
-        drawTaperedPath(ctx, flame.points, "#ff942b", 4.6 + visual.stage * 0.42, flame.alpha);
-        const corePointCount = Math.max(2, Math.ceil(flame.points.length * 0.68));
-        drawTaperedPath(
-            ctx,
-            flame.points.slice(0, corePointCount),
-            "#fff2b0",
-            1.9 + visual.stage * 0.16,
-            flame.alpha * 0.9
-        );
+    drawFlameLayer(ctx, contour, {
+        extensionRatio: 1,
+        color: "#e74716",
+        alpha: 0.84,
+        strokeColor: "#b72812",
+        lineWidth: 1.2 + visual.stage * 0.16
+    });
+    drawFlameLayer(ctx, contour, {
+        extensionRatio: 0.72,
+        color: "#ff942b",
+        alpha: 0.92
+    });
+    drawFlameLayer(ctx, contour, {
+        extensionRatio: 0.38,
+        color: visual.color,
+        alpha: 0.95
+    });
+    drawFlameLayer(ctx, contour, {
+        extensionRatio: 0.18,
+        color: "#fff2b0",
+        alpha: 0.92
     });
     ctx.globalCompositeOperation = "source-over";
 

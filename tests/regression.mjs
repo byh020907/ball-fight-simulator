@@ -44,7 +44,11 @@ import {
     getSubAbilityIds,
     toggleRebirthCardEquip
 } from "../src/rebirth/index.js";
-import { createRebirthFlamePaths, getRebirthVisualProfile } from "../src/rebirth/rebirthVisuals.js";
+import {
+    createRebirthFlameContour,
+    drawRebirthVisualOverlay,
+    getRebirthVisualProfile
+} from "../src/rebirth/rebirthVisuals.js";
 import {
     getCharacterLevelProgression,
     getCharacterLevelRewardsBetween
@@ -330,11 +334,13 @@ function makeRecordingCanvasContext() {
         "ellipse",
         "fill",
         "stroke",
+        "setLineDash",
         "fillRect",
         "strokeRect",
         "roundRect",
         "moveTo",
         "lineTo",
+        "quadraticCurveTo",
         "closePath",
         "fillText"
     ]);
@@ -17081,38 +17087,83 @@ function testRebirthVisualProfileContract() {
         velocity,
         stats: { baseSpeed: 200 }
     });
-    const stationaryPaths = createRebirthFlamePaths(createBall(new Vector2()), visual, { time: 0.1 });
-    const animatedStationaryPaths = createRebirthFlamePaths(createBall(new Vector2()), visual, { time: 0.4 });
+
+    assert.equal(createRebirthFlameContour(createBall(new Vector2()), getRebirthVisualProfile(0)), null);
+
+    const stationaryContour = createRebirthFlameContour(createBall(new Vector2()), visual, { time: 0.1 });
+    const animatedStationaryContour = createRebirthFlameContour(createBall(new Vector2()), visual, { time: 0.13 });
     assert.ok(
-        stationaryPaths.every((flame) => flame.direction.y < -0.8),
-        "Stationary rebirth flames should rise upward from the ball"
+        stationaryContour.direction.y < -0.8,
+        "Stationary rebirth flame contour should rise upward from the ball"
     );
     assert.ok(
-        stationaryPaths.every((flame) => flame.points.length >= 3),
-        "Each flame tongue should use a multi-segment path instead of a static marker"
+        stationaryContour.pointCount <= 13 && stationaryContour.pointCount >= 9,
+        "Rebirth flame contour draw budget must stay bounded"
     );
     assert.ok(
-        stationaryPaths.some((flame, index) => {
-            const laterFlame = animatedStationaryPaths[index];
-            return flame.points.some(
-                (point, pointIndex) =>
-                    pointIndex > 0 &&
-                    pointIndex < flame.points.length - 1 &&
-                    Math.abs(point.x - laterFlame.points[pointIndex].x) > 0.01
-            );
+        stationaryContour.basePoints.length === stationaryContour.outerPoints.length,
+        "Flame silhouette should keep matching base and outer contour points"
+    );
+    assert.deepEqual(
+        stationaryContour.outerPoints[0],
+        stationaryContour.basePoints[0],
+        "Flame silhouette should attach its first root directly to the ball surface"
+    );
+    assert.deepEqual(
+        stationaryContour.outerPoints.at(-1),
+        stationaryContour.basePoints.at(-1),
+        "Flame silhouette should attach its last root directly to the ball surface"
+    );
+    assert.ok(
+        stationaryContour.outerPoints.some((point, index) => point.y < stationaryContour.basePoints[index].y - 8),
+        "Stationary contour should extend above its attached base instead of drawing a flat rim"
+    );
+    assert.ok(
+        stationaryContour.outerPoints.some((point, index) => {
+            const laterPoint = animatedStationaryContour.outerPoints[index];
+            const displacement = Math.hypot(point.x - laterPoint.x, point.y - laterPoint.y);
+            return displacement > 0.01 && displacement < 5;
         }),
-        "Flame tongues should receive independently animated turbulence instead of remaining static"
+        "Flame contour should animate continuously instead of jumping between random shapes"
     );
 
-    const movingRightPaths = createRebirthFlamePaths(createBall(new Vector2(420, 0)), visual, { time: 0.1 });
+    const movingRightContour = createRebirthFlameContour(createBall(new Vector2(420, 0)), visual, { time: 0.1 });
+    assert.ok(movingRightContour.direction.x < -0.85, "Moving right should push the flame silhouette behind the ball");
+    const movingDownContour = createRebirthFlameContour(createBall(new Vector2(0, 420)), visual, { time: 0.1 });
+    assert.ok(movingDownContour.direction.y < -0.85, "Moving down should keep the flame silhouette behind the ball");
+    const statlessMovingBall = { ...createBall(new Vector2(420, 0)), stats: undefined };
+    const statlessMovingContour = createRebirthFlameContour(statlessMovingBall, visual, { time: 0.1 });
     assert.ok(
-        movingRightPaths.every((flame) => flame.direction.x < -0.85),
-        "Moving right should push every flame head behind the ball"
+        Number.isFinite(statlessMovingContour.direction.x) && statlessMovingContour.direction.x < -0.85,
+        "Preview flame contour should keep a finite movement direction without combat stats"
     );
-    const movingDownPaths = createRebirthFlamePaths(createBall(new Vector2(0, 420)), visual, { time: 0.1 });
+
+    const extensions = [1, 3, 6, 10].map(
+        (rebirthCount) =>
+            createRebirthFlameContour(createBall(new Vector2()), getRebirthVisualProfile(rebirthCount), { time: 0.1 })
+                .maxExtension
+    );
     assert.ok(
-        movingDownPaths.every((flame) => flame.direction.y < -0.85),
-        "Moving down should keep every flame head behind the ball"
+        extensions.every((extension, index) => index === 0 || extension >= extensions[index - 1]),
+        "Higher rebirth stages should not reduce flame silhouette presence"
+    );
+
+    const canvasCtx = makeRecordingCanvasContext();
+    drawRebirthVisualOverlay(canvasCtx, createBall(new Vector2()), visual, 0.1);
+    assert.ok(
+        canvasCtx.calls.filter((call) => call[0] === "quadraticCurveTo").length > 0,
+        "Flame should smooth its connected outline with curves"
+    );
+    assert.equal(
+        canvasCtx.calls.filter((call) => call[0] === "closePath").length,
+        4,
+        "Flame should draw four nested connected silhouette layers"
+    );
+    const statlessCanvasCtx = makeRecordingCanvasContext();
+    drawRebirthVisualOverlay(statlessCanvasCtx, statlessMovingBall, visual, 0.1);
+    assert.ok(
+        statlessCanvasCtx.calls.some((call) => call[0] === "quadraticCurveTo"),
+        "Preview overlay should render a moving flame without combat stats"
     );
     console.log("[rebirth-visual-profile] ok");
 }
