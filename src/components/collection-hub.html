@@ -498,7 +498,7 @@
                                     >
                                         <strong x-text="item.name"></strong>
                                         <span x-text="item.stats.map(stat => stat.type + ' +' + stat.value).join(' · ')"></span>
-                                        <small x-text="item.isEquipped ? '장착 중' : '보관 중'"></small>
+                                        <span class="ch-fusion-equipment-state" x-text="item.isEquipped ? '장착 중' : '보관 중'"></span>
                                     </button>
                                 </template>
                                 <div class="ch-empty" x-show="selectedFusionRecipe().items.length === 0">선택할 장비가 없습니다</div>
@@ -1710,7 +1710,7 @@
     .ch-fusion-source-slot span,
     .ch-fusion-source-slot small,
     .ch-fusion-candidate span,
-    .ch-fusion-candidate small {
+    .ch-fusion-equipment-state {
         color: #555555;
         font-size: 0.72rem;
     }
@@ -1763,6 +1763,13 @@
         gap: 2px;
         min-height: 58px;
         padding: 8px 10px;
+        font: inherit;
+    }
+
+    .ch-fusion-equipment-state {
+        display: inline-block;
+        line-height: 1.2;
+        white-space: nowrap;
     }
 
     .ch-fusion-candidate:disabled {

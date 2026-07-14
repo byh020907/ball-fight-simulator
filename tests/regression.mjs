@@ -15606,4 +15606,25 @@ function testDailyShopPopupContract() {
 
 testDailyShopPopupContract();
 
+function testFusionEquippedLabelTypographyContract() {
+    const template = readFileSync("src/components/collection-hub.html", "utf8");
+    assert.ok(
+        template.includes('class="ch-fusion-equipment-state"'),
+        "Fusion candidates should give the equipped-state text a dedicated typography class"
+    );
+    assert.ok(
+        /\.ch-fusion-candidate\s*\{[^}]*font:\s*inherit;/s.test(template),
+        "Fusion candidates should inherit the app font instead of the desktop browser button font"
+    );
+    assert.ok(
+        /\.ch-fusion-equipment-state\s*\{[^}]*display:\s*inline-block;[^}]*line-height:\s*1\.2;[^}]*white-space:\s*nowrap;/s.test(
+            template
+        ),
+        "Fusion equipped-state text should remain on one readable line"
+    );
+    console.log("[fusion-equipped-label-typography] ok");
+}
+
+testFusionEquippedLabelTypographyContract();
+
 console.log("regression tests ok");
