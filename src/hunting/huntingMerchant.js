@@ -2,6 +2,7 @@ import { createHuntingChest } from "./huntingRewards.js";
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 import { buyConsumable, getConsumableDefinition, getConsumableOwnedCount } from "../consumables.js";
 import { getHuntingDisplayHealth, getHuntingDisplayHp } from "./huntingHealth.js";
+import { getRarityLabel } from "./rarityPresentation.js";
 
 export const MERCHANT_OFFER_TYPES = Object.freeze({
     REPAIR: "repair",
@@ -52,7 +53,7 @@ function _createBuyLootOffer(discount) {
         type: MERCHANT_OFFER_TYPES.BUY_LOOT,
         label: "상자 구매",
         description: "미확보 상자 1개 추가",
-        detail: "common 등급",
+        detail: `${getRarityLabel("common")} 등급`,
         cost,
         disabled: false,
         disabledReason: "",
@@ -161,8 +162,8 @@ export function formatOfferResultToast(result) {
     if (result.type === "repair") {
         return `HP +${getHuntingDisplayHp(result.healed)} 회복 (${getHuntingDisplayHp(result.newHp)})`;
     }
-    if (result.type === "buy_loot") return `${result.chest.rarity} 상자 1개 구매 (미확보)`;
-    if (result.type === "secure_transport") return `${result.chest.rarity} 상자 1개 안전 확보`;
+    if (result.type === "buy_loot") return `${getRarityLabel(result.chest.rarity)} 상자 1개 구매 (미확보)`;
+    if (result.type === "secure_transport") return `${getRarityLabel(result.chest.rarity)} 상자 1개 안전 확보`;
     if (result.type === "consumable") return `${result.purchase.label} 구매 · 보유 ${result.purchase.owned}`;
     return "";
 }

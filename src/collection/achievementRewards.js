@@ -1,5 +1,6 @@
 import { createHuntingChest } from "../hunting/huntingRewards.js";
 import { createGuaranteedEquipmentInstance, isInventoryFull } from "../hunting/equipmentConfig.js";
+import { getRarityLabel } from "../hunting/rarityPresentation.js";
 
 export const ACHIEVEMENT_REWARD_TYPES = Object.freeze({
     SHARDS: "SHARDS",
@@ -61,8 +62,8 @@ export function grantAchievementReward(profile, achievement, options) {
 export function formatAchievementReward(reward) {
     if (!reward) return "";
     if (reward.type === ACHIEVEMENT_REWARD_TYPES.SHARDS) return `파편 +${getSafeAmount(reward.amount)}`;
-    if (reward.type === ACHIEVEMENT_REWARD_TYPES.CHEST) return `${reward.rarity ?? "common"} 상자`;
-    if (reward.type === ACHIEVEMENT_REWARD_TYPES.EQUIPMENT) return `${reward.rarity ?? "common"} 확정 장비`;
+    if (reward.type === ACHIEVEMENT_REWARD_TYPES.CHEST) return `${getRarityLabel(reward.rarity)} 상자`;
+    if (reward.type === ACHIEVEMENT_REWARD_TYPES.EQUIPMENT) return `${getRarityLabel(reward.rarity)} 확정 장비`;
     if (reward.type === ACHIEVEMENT_REWARD_TYPES.FEATURE_UNLOCK) return reward.payload?.description ?? "";
     return "";
 }

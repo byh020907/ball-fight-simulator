@@ -50,14 +50,7 @@ import {
     recordHuntingBattleVictory
 } from "./huntingAchievementProgress.js";
 import { HuntingBattleLootSession, HuntingLootDropController } from "./huntingLoot.js";
-
-const CHEST_RARITY_LABELS = Object.freeze({
-    common: "일반",
-    uncommon: "고급",
-    rare: "희귀",
-    epic: "영웅",
-    legendary: "전설"
-});
+import { getRarityLabel } from "./rarityPresentation.js";
 
 const HUNTING_ROUTE_ACTIONS = Object.freeze({
     CONTINUE: "continue",
@@ -740,7 +733,7 @@ export class HuntingManager {
     _stopHuntingMoveForChest(app, { chest, floor, confirmLabel = "계속 전진" }) {
         this._run = setHuntingRunPhase(this._run, HUNTING_RUN_PHASES.AWAITING_CHEST);
         const pendingText = formatPendingLootSummary(this._run?.pendingLoot);
-        const rarityLabel = CHEST_RARITY_LABELS[chest.rarity] ?? chest.rarity;
+        const rarityLabel = getRarityLabel(chest.rarity);
         const hud = this._getLootHudState();
         app.setHuntingOverlayState({
             huntingMoving: false,
@@ -969,7 +962,7 @@ export class HuntingManager {
     _presentCombatRewardChest(app, chest) {
         const run = this._run;
         this._run = setHuntingRunPhase(run, HUNTING_RUN_PHASES.AWAITING_COMBAT_REWARD_CHEST);
-        const rarityLabel = CHEST_RARITY_LABELS[chest.rarity] ?? chest.rarity;
+        const rarityLabel = getRarityLabel(chest.rarity);
         const pendingText = formatPendingLootSummary(run.pendingLoot);
         const hud = this._getLootHudState();
         app.showOverlay("사냥터", `${rarityLabel} 상자 확보`, "전투 보상 상자입니다");

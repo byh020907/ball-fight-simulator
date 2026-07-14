@@ -322,7 +322,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
     createHuntingCounterAchievement({
         id: "hunting_monster_slayer",
         name: "몹 학살자",
-        description: "일반 몬스터를 300마리 처치하세요.",
+        description: "사냥터 몬스터를 300마리 처치하세요.",
         tier: "bronze",
         target: 300,
         rewardKey: "huntingMonsterSlayer",
@@ -330,8 +330,8 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
     }),
     createHuntingCounterAchievement({
         id: "hunting_rare_monster_slayer",
-        name: "레어 몹 학살자",
-        description: "레어 몬스터를 100마리 처치하세요.",
+        name: "rare 몹 학살자",
+        description: "rare 몬스터를 100마리 처치하세요.",
         tier: "silver",
         target: 100,
         rewardKey: "huntingRareMonsterSlayer",
@@ -339,8 +339,8 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
     }),
     createHuntingCounterAchievement({
         id: "hunting_unique_monster_slayer",
-        name: "유니크 몹 학살자",
-        description: "유니크 몬스터를 75마리 처치하세요.",
+        name: "unique 몹 학살자",
+        description: "unique 몬스터를 75마리 처치하세요.",
         tier: "gold",
         target: 75,
         rewardKey: "huntingUniqueMonsterSlayer",
@@ -348,8 +348,8 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
     }),
     createHuntingCounterAchievement({
         id: "hunting_epic_monster_slayer",
-        name: "에픽 몹 학살자",
-        description: "에픽 몬스터를 50마리 처치하세요.",
+        name: "epic 몹 학살자",
+        description: "epic 몬스터를 50마리 처치하세요.",
         tier: "gold",
         target: 50,
         rewardKey: "huntingEpicMonsterSlayer",

@@ -116,6 +116,7 @@ import {
     formatChestRarityCounts,
     formatPendingLootSummary,
     formatDefeatLossText,
+    getRarityLabel,
     HUNTING_LOOT_ITEM_TYPES,
     HuntingBattleLootSession,
     HuntingLootDropController,
@@ -1803,7 +1804,7 @@ function testHuntingChestEventStopsAndResumes() {
     );
     assert.equal(chestState.huntingChestEventActive, true, "Chest event should open the chest reward UI");
     assert.equal(chestState.huntingChestRarity, "rare", "Chest event should pass its rarity to the UI");
-    assert.equal(chestState.huntingChestTitle, "희귀 상자 확보", "Chest event should use the localized rarity title");
+    assert.equal(chestState.huntingChestTitle, "rare 상자 확보", "Chest event should use the canonical rarity title");
     assert.equal(
         manager._run.pendingLoot.chests.length,
         1,
@@ -10506,6 +10507,8 @@ async function testCreateCollectionHubViewModel() {
         { stones: 10, shards: 50 },
         "Fusion UI should display the derived material cost"
     );
+    assert.equal(commonFusionRecipe.rarityLabel, "common", "Fusion UI should use the canonical rarity label");
+    assert.equal(vm2.storage.chests[0].rarityLabel, "uncommon", "Storage UI should use the canonical rarity label");
 
     // 숙련도 레벨이 있으면 masteryItems에 반영
     profile.characterMastery.levels = { archer: 1, orbit: 2, eater: 3 };
@@ -14153,6 +14156,7 @@ function testCollectionActionPopupOptions() {
     });
     assert.equal(chest.title, "상자 개봉 결과", "Chest reward should use the shared result popup");
     assert.ok(chest.bodyHtml.includes("테스트 검"), "Chest popup should identify awarded equipment");
+    assert.ok(chest.bodyHtml.includes("(rare)"), "Chest popup should use the canonical rarity label");
 
     const chestFailure = createCollectionActionPopupOptions("chest", {
         opened: false,
@@ -14163,6 +14167,24 @@ function testCollectionActionPopupOptions() {
     assert.ok(chestFailure.bodyHtml.includes("80"), "Chest failure should include the required cost when known");
     console.log("[collection-action-popup-options] ok");
 }
+
+function testRarityPresentation() {
+    assert.deepEqual(
+        ["common", "uncommon", "rare", "unique", "epic", "legendary"].map((rarity) => getRarityLabel(rarity)),
+        ["common", "uncommon", "rare", "unique", "epic", "legendary"],
+        "Every supported rarity should preserve its canonical lowercase English label"
+    );
+    assert.equal(getRarityLabel(null), "common", "Missing rarities should fall back to common");
+    assert.equal(getRarityLabel("MyStic"), "mystic", "Unknown rarities should remain readable in lowercase");
+    const template = readFileSync("src/components/collection-hub.html", "utf8");
+    assert.ok(
+        !/\.ch-equip-rarity\s*\{[^}]*text-transform:\s*uppercase;/s.test(template),
+        "Equipment rarity badges should preserve canonical lowercase labels"
+    );
+    console.log("[rarity-presentation] ok");
+}
+
+testRarityPresentation();
 
 function testComponentBridgeCollectionActionResultsUsePopupService() {
     const profile = createDefaultPlayerProfile();

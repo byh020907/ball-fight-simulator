@@ -10,6 +10,7 @@ import { getCharacterExperienceSummary } from "../experience/experienceService.j
 import { getCharacterLevelRewards } from "../experience/characterLevelProgression.js";
 import { canOpenHuntingChest, getDailyShop, previewHuntingChest } from "../hunting/index.js";
 import { getConsumableShopItems, getHuntingConsumableUseLimitUpgrade } from "../consumables.js";
+import { getRarityLabel } from "../hunting/rarityPresentation.js";
 import {
     getInventorySlots,
     getInventoryUsed,
@@ -30,14 +31,6 @@ import {
     calculateEnhanceFailureRate,
     ENHANCE_MAX_LEVEL
 } from "../hunting/equipmentConfig.js";
-
-const EQUIPMENT_RARITY_LABELS = Object.freeze({
-    common: "일반",
-    uncommon: "고급",
-    rare: "희귀",
-    epic: "영웅",
-    legendary: "전설"
-});
 
 export const COLLECTION_HUB_TABS = Object.freeze([
     { id: "roster", label: "도감" },
@@ -175,6 +168,7 @@ export function createCollectionHubViewModel({
         return {
             instanceId: item.instanceId,
             rarity: item.rarity,
+            rarityLabel: getRarityLabel(item.rarity),
             slot: item.slot,
             name: item.name,
             description: item.description,
@@ -204,9 +198,9 @@ export function createCollectionHubViewModel({
         return [
             {
                 rarity,
-                rarityLabel: EQUIPMENT_RARITY_LABELS[rarity] ?? rarity,
+                rarityLabel: getRarityLabel(rarity),
                 nextRarity,
-                nextRarityLabel: EQUIPMENT_RARITY_LABELS[nextRarity] ?? nextRarity,
+                nextRarityLabel: getRarityLabel(nextRarity),
                 cost,
                 items: equipmentItems.filter((item) => item.rarity === rarity)
             }
@@ -218,6 +212,7 @@ export function createCollectionHubViewModel({
         return {
             id: chest.id,
             rarity: preview.rarity,
+            rarityLabel: getRarityLabel(preview.rarity),
             acquiredAt: chest.acquiredAt ?? null,
             openCost: preview.cost,
             rewardText: preview.rewardText,

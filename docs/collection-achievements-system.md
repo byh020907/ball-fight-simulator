@@ -494,10 +494,10 @@ reward: {
 | `hunting_champion_victory` | 난입 저지 | 챔피언 난입 전투 승리 | common 상자 |
 | `hunting_secured_chests_10` | 전리품 회수 | 사냥터에서 얻은 상자 2개를 보관함으로 무사히 가져오기 | uncommon 고정 방어구 |
 | `hunting_all_stages_clear` | 전 지역 제패 | 동굴·숲·사막 최종 보스 모두 처치 | epic 상자 |
-| `hunting_monster_slayer` | 몹 학살자 | 일반 몬스터 300마리 처치 | common 상자 |
-| `hunting_rare_monster_slayer` | 레어 몹 학살자 | 레어 몬스터 100마리 처치 | uncommon 상자 |
-| `hunting_unique_monster_slayer` | 유니크 몹 학살자 | 유니크 몬스터 75마리 처치 | rare 상자 |
-| `hunting_epic_monster_slayer` | 에픽 몹 학살자 | 에픽 몬스터 50마리 처치 | epic 상자 |
+| `hunting_monster_slayer` | 몹 학살자 | 사냥터 몬스터 300마리 처치 | common 상자 |
+| `hunting_rare_monster_slayer` | rare 몹 학살자 | rare 몬스터 100마리 처치 | uncommon 상자 |
+| `hunting_unique_monster_slayer` | unique 몹 학살자 | unique 몬스터 75마리 처치 | rare 상자 |
+| `hunting_epic_monster_slayer` | epic 몹 학살자 | epic 몬스터 50마리 처치 | epic 상자 |
 
 희귀도별 목표는 100층 조우 생성기를 500회 완주 기준으로 측정한 평균 처치량(전체 약 512, rare 약 185, unique 약 137, epic 약 85)을 바탕으로 정했습니다. 한 번의 완주만 강제하지 않되, 희귀도가 높을수록 실제로 깊은 층을 반복 공략해야 달성됩니다.
 

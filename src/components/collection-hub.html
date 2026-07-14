@@ -288,11 +288,11 @@
                 <select class="ch-select" x-model="state.filters.storage" @change="setCollectionFilter($el.value)">
                     <option value="all">전체</option>
                     <option value="openable">개봉 가능</option>
-                    <option value="common">Common</option>
-                    <option value="uncommon">Uncommon</option>
-                    <option value="rare">Rare</option>
-                    <option value="epic">Epic</option>
-                    <option value="legendary">Legendary</option>
+                    <option value="common">common</option>
+                    <option value="uncommon">uncommon</option>
+                    <option value="rare">rare</option>
+                    <option value="epic">epic</option>
+                    <option value="legendary">legendary</option>
                 </select>
                 <span class="ch-storage-currency">
                     파편 <b x-text="Number(state.storage.shards || 0).toLocaleString()"></b>
@@ -308,7 +308,7 @@
                             @click="item.canOpen && openChest(item)"
                         >
                             <div class="ch-ach-info">
-                                <strong x-text="item.rarity.toUpperCase() + ' 상자'"></strong>
+                                <strong x-text="item.rarityLabel + ' 상자'"></strong>
                                 <span class="ch-ach-desc" x-text="item.rewardText"></span>
                                 <span class="ch-ach-reward" x-text="'개봉 비용: 파편 ' + item.openCost"></span>
                             </div>
@@ -372,7 +372,7 @@
                     <div class="ch-equip-card" x-bind:class="'ch-equip--' + item.rarity">
                         <div class="ch-equip-card-header">
                             <strong x-text="item.name"></strong>
-                            <span class="ch-equip-rarity" x-text="item.rarity"></span>
+                            <span class="ch-equip-rarity" x-text="item.rarityLabel"></span>
                             <span class="ch-equip-slot-badge" x-text="'Lv.' + item.requiredLevel"></span>
                             <span class="ch-equip-slot-badge" x-text="item.slot"></span>
                             <span
@@ -1500,7 +1500,6 @@
         border-radius: 4px;
         background: #eeeeee;
         color: #555555;
-        text-transform: uppercase;
     }
 
     .ch-equip-slot-badge {

@@ -282,12 +282,12 @@ export const REWARD_BALANCE = deepFreeze({
             rewardTables: {
                 common: [
                     { id: "common-key-shards", weight: 55, type: "SHARDS", amount: 18, text: "파편 +18" },
-                    { id: "common-equipment", weight: 45, type: "equipment", text: "일반 장비" }
+                    { id: "common-equipment", weight: 45, type: "equipment", text: "common 장비" }
                 ],
-                uncommon: [{ id: "uncommon-equipment", weight: 100, type: "equipment", text: "고급 장비" }],
-                rare: [{ id: "rare-equipment", weight: 100, type: "equipment", text: "희귀 장비" }],
-                epic: [{ id: "epic-equipment", weight: 100, type: "equipment", text: "에픽 장비" }],
-                legendary: [{ id: "legendary-equipment", weight: 100, type: "equipment", text: "전설 장비" }]
+                uncommon: [{ id: "uncommon-equipment", weight: 100, type: "equipment", text: "uncommon 장비" }],
+                rare: [{ id: "rare-equipment", weight: 100, type: "equipment", text: "rare 장비" }],
+                epic: [{ id: "epic-equipment", weight: 100, type: "equipment", text: "epic 장비" }],
+                legendary: [{ id: "legendary-equipment", weight: 100, type: "equipment", text: "legendary 장비" }]
             }
         },
         shards: {
@@ -424,7 +424,7 @@ export const REWARD_BALANCE = deepFreeze({
                 equipment: {
                     slot: "armor",
                     name: "무결점의 수정 방패",
-                    description: "흠집 하나 없이 승리한 자에게 주어지는 희귀 방어구.",
+                    description: "흠집 하나 없이 승리한 자에게 주어지는 rare 방어구.",
                     stats: [
                         { type: "defense", value: 2 },
                         { type: "hp", value: 20 }
@@ -458,7 +458,7 @@ export const REWARD_BALANCE = deepFreeze({
                 equipment: {
                     slot: "armor",
                     name: "도감 완성의 영원한 망토",
-                    description: "모든 숙련을 모아 완성한 전설 방어구.",
+                    description: "모든 숙련을 모아 완성한 legendary 방어구.",
                     stats: [
                         { type: "hp", value: 40 },
                         { type: "defense", value: 4 }
@@ -496,7 +496,7 @@ export const REWARD_BALANCE = deepFreeze({
                 equipment: {
                     slot: "weapon",
                     name: "단죄의 수정 단검",
-                    description: "한 번의 압도적인 일격을 기록한 자의 희귀 무기.",
+                    description: "한 번의 압도적인 일격을 기록한 자의 rare 무기.",
                     stats: [
                         { type: "damage", value: 3 },
                         { type: "speed", value: 10 }

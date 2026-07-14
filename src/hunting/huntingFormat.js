@@ -1,3 +1,5 @@
+import { getRarityLabel } from "./rarityPresentation.js";
+
 export function formatChestRarityCounts(chests) {
     if (!chests || chests.length === 0) return "";
     const counts = {};
@@ -10,7 +12,7 @@ export function formatChestRarityCounts(chests) {
             const order = ["common", "uncommon", "rare", "epic", "legendary"];
             return order.indexOf(a[0]) - order.indexOf(b[0]);
         })
-        .map(([rarity, count]) => `${rarity} ${count}개`);
+        .map(([rarity, count]) => `${getRarityLabel(rarity)} ${count}개`);
     return parts.join(", ");
 }
 

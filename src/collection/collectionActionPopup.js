@@ -1,3 +1,5 @@
+import { getRarityLabel } from "../hunting/rarityPresentation.js";
+
 const CONFIRM_BUTTONS = [{ text: "확인", value: "ok", primary: true }];
 
 const STAT_LABELS = Object.freeze({
@@ -6,14 +8,6 @@ const STAT_LABELS = Object.freeze({
     defense: "방어력",
     speed: "속도",
     skill: "스킬"
-});
-
-const RARITY_LABELS = Object.freeze({
-    common: "일반",
-    uncommon: "고급",
-    rare: "희귀",
-    epic: "영웅",
-    legendary: "전설"
 });
 
 function escapeHtml(value) {
@@ -36,7 +30,7 @@ function formatEquipmentStats(item) {
 
 function formatEquipmentReward(item) {
     const name = formatEquipmentName(item);
-    const rarity = RARITY_LABELS[item?.rarity] ?? escapeHtml(item?.rarity ?? "일반");
+    const rarity = escapeHtml(getRarityLabel(item?.rarity));
     const description = item?.description ? `<p>${escapeHtml(item.description)}</p>` : "";
     return `<p><strong>${name}</strong> <span>(${rarity})</span></p>${description}${formatEquipmentStats(item)}`;
 }
@@ -102,7 +96,7 @@ function createFusionPopup(result) {
             profile: "합성 정보를 불러올 수 없습니다.",
             sources: "같은 등급 장비 3개를 선택해 주세요.",
             rarity: "선택한 장비의 등급이 서로 다릅니다.",
-            max_rarity: "전설 장비는 더 이상 합성할 수 없습니다.",
+            max_rarity: "legendary 장비는 더 이상 합성할 수 없습니다.",
             stones: "강화석이 부족합니다.",
             shards: "파편이 부족합니다.",
             cost: "이 등급의 합성 비용을 찾을 수 없습니다."

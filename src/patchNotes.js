@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.25.17",
+        date: "2026-07-14",
+        title: "v0.25.17 등급 표기를 하나로 맞춥니다.",
+        changes: [
+            {
+                type: "style",
+                text: "장비, 상자, 몬스터 업적의 등급 표기를 common·uncommon·rare·unique·epic·legendary 소문자 영문으로 통일했습니다."
+            }
+        ]
+    },
+    {
         version: "0.25.16",
         date: "2026-07-14",
         title: "v0.25.16 장비 합성 재료를 직접 고릅니다.",
