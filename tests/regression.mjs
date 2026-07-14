@@ -6487,7 +6487,7 @@ function testEquipmentPhysicalSpecialEffects() {
     console.log("[equipment-physical-special-effects] ok");
 }
 
-function testEquipmentLevelRequirement() {
+function testEquipmentLevelRequirement(app) {
     const profile = createDefaultPlayerProfile();
     const characterId = FIGHTER_IDS.DASH;
     const rareWeapon = createEquipmentInstance({ rarity: "rare", slot: "weapon", rng: () => 0.5 });
@@ -6514,6 +6514,18 @@ function testEquipmentLevelRequirement() {
     const lockedSpec = applyEquipmentStats(baseSpec, profile);
     assert.equal(lockedSpec.stats.damage, 10, "Locked equipment should not add stat bonuses");
     assert.equal(lockedSpec.equipment.equippedItems.length, 0, "Locked equipment should not be drawn");
+    const lockedSummary = app._getPlayerEquipmentSummary.call({ playerProfile: profile, playerFighterId: characterId });
+    assert.equal(
+        lockedSummary.statLine,
+        "적용 중인 장비 스탯 없음",
+        "Locked equipment should not appear in the main setup stat summary"
+    );
+    assert.equal(lockedSummary.activeCount, 0, "Locked equipment should not count as active in the main setup");
+    assert.equal(
+        lockedSummary.slots.find((slot) => slot.id === "weapon")?.locked,
+        true,
+        "Locked equipment should keep its setup slot lock indicator"
+    );
 
     profile.experience.byCharacter[characterId] = { currentXp: getLevelRequirement(5) };
     assert.equal(
@@ -6524,6 +6536,21 @@ function testEquipmentLevelRequirement() {
     const unlockedSpec = applyEquipmentStats(baseSpec, profile);
     assert.equal(unlockedSpec.stats.damage, 18, "Unlocked equipment should add stat bonuses");
     assert.equal(unlockedSpec.equipment.equippedItems.length, 1, "Unlocked equipment should be drawn");
+    const unlockedSummary = app._getPlayerEquipmentSummary.call({
+        playerProfile: profile,
+        playerFighterId: characterId
+    });
+    assert.equal(
+        unlockedSummary.statLine,
+        "공격 +8",
+        "Unlocked equipment should return to the main setup stat summary"
+    );
+    assert.equal(unlockedSummary.activeCount, 1, "Unlocked equipment should count as active in the main setup");
+    assert.equal(
+        unlockedSummary.slots.find((slot) => slot.id === "weapon")?.locked,
+        false,
+        "Unlocked equipment should clear its setup slot lock indicator"
+    );
 }
 
 function testEquipmentDraw() {
@@ -12172,7 +12199,7 @@ testEquipmentStatValueRatios();
 testEquipmentNaming();
 testEquipmentSpecialCombatEffects();
 testEquipmentPhysicalSpecialEffects();
-testEquipmentLevelRequirement();
+testEquipmentLevelRequirement(app);
 testEquipmentDraw();
 testAlpineTemplateComponentSystem();
 await testMatchEndGrantsImmediateExperience(app);
