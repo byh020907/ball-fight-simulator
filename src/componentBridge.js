@@ -23,6 +23,7 @@ import { HELP_TITLE, HELP_CONTENT } from "./helpContent.js";
 import { CollectionHubService } from "./collectionHubService.js";
 import { createCollectionActionPopupOptions } from "./collection/collectionActionPopup.js";
 import { beginRebirth, completeRebirth, toggleRebirthCardEquip } from "./rebirth/rebirthService.js";
+import { RebirthPickerService } from "./rebirth/rebirthPicker.js";
 import { setDeveloperCharacterToMaxLevel, setDeveloperRebirthCount } from "./developer/developerTools.js";
 
 export function createComponentBridge(app) {
@@ -40,6 +41,19 @@ export function createComponentBridge(app) {
         app._refreshCollectionHub();
         app.refreshPlayerSetup();
         savePlayerProfile(app.playerProfile);
+    }
+
+    function finishRebirth(characterId, cardId) {
+        if (!app.lifecycle.isSetup) return { ok: false, error: "not_setup" };
+        const result = completeRebirth(app.playerProfile, characterId, cardId);
+        if (!result.ok) return result;
+        refreshCollectionAndProfile();
+        PopupService.show({
+            title: "환생 완료",
+            bodyHtml: `<p>${result.card.name}을(를) 얻었습니다.</p><p>해당 캐릭터의 XP는 Lv.1부터 다시 시작합니다.</p>`,
+            buttons: [{ text: "확인", value: "ok", primary: true }]
+        });
+        return result;
     }
 
     return {
@@ -224,7 +238,7 @@ export function createComponentBridge(app) {
             CollectionHubService.close();
             return app.hunting.startDebugRun(characterId, { stageId, encounterFloor });
         },
-        beginRebirth(characterId) {
+        async beginRebirth(characterId) {
             if (!app.lifecycle.isSetup) {
                 PopupService.show({
                     title: "환생 대기",
@@ -243,19 +257,23 @@ export function createComponentBridge(app) {
                 return result;
             }
             refreshCollectionAndProfile();
-            return result;
+            let cardId = null;
+            try {
+                cardId = await RebirthPickerService.show(result.cards);
+            } catch (error) {
+                console.error(error);
+                PopupService.show({
+                    title: "환생 카드 대기",
+                    bodyHtml: "<p>저장된 환생 후보는 유지됩니다. 도감 환생 탭에서 다시 선택해 주세요.</p>",
+                    buttons: [{ text: "확인", value: "ok", primary: true }]
+                });
+                return { ok: false, error: "picker_unavailable" };
+            }
+            if (!cardId) return { ok: false, error: "selection_deferred" };
+            return finishRebirth(characterId, cardId);
         },
         completeRebirth(characterId, cardId) {
-            if (!app.lifecycle.isSetup) return { ok: false, error: "not_setup" };
-            const result = completeRebirth(app.playerProfile, characterId, cardId);
-            if (!result.ok) return result;
-            refreshCollectionAndProfile();
-            PopupService.show({
-                title: "환생 완료",
-                bodyHtml: `<p>${result.card.name}을(를) 얻었습니다.</p><p>해당 캐릭터의 XP는 Lv.1부터 다시 시작합니다.</p>`,
-                buttons: [{ text: "확인", value: "ok", primary: true }]
-            });
-            return result;
+            return finishRebirth(characterId, cardId);
         },
         toggleRebirthCardEquip(characterId, cardId) {
             if (!app.lifecycle.isSetup) return { ok: false, error: "not_setup" };

@@ -257,24 +257,12 @@
                                 <button
                                     class="ch-btn ch-rebirth-start"
                                     type="button"
-                                    x-show="item.rebirth.canRebirth && item.rebirth.pendingOfferCards.length === 0"
+                                    x-show="item.rebirth.canRebirth"
                                     @click="beginRebirth(item.id)"
+                                    x-text="item.rebirth.pendingOfferCards.length ? '진행 중인 카드 선택' : '환생 카드 선택'"
                                 >
                                     환생 카드 선택
                                 </button>
-                                <div class="ch-rebirth-offers" x-show="item.rebirth.pendingOfferCards.length">
-                                    <span class="ch-rebirth-label">이번 환생 후보</span>
-                                    <template x-for="card in item.rebirth.pendingOfferCards" :key="card.id">
-                                        <div class="ch-rebirth-card ch-rebirth-offer">
-                                            <span class="ch-rebirth-kind" x-text="card.categoryLabel"></span>
-                                            <strong x-text="card.name"></strong>
-                                            <span x-text="formatRebirthCardEffect(card)"></span>
-                                            <button class="ch-btn" type="button" @click="completeRebirth(item.id, card.id)">
-                                                선택
-                                            </button>
-                                        </div>
-                                    </template>
-                                </div>
                                 <div class="ch-rebirth-owned" x-show="item.rebirth.ownedCards.length">
                                     <span class="ch-rebirth-label">보유 카드</span>
                                     <template x-for="card in item.rebirth.ownedCards" :key="card.id">
@@ -1811,7 +1799,6 @@
         justify-self: start;
     }
 
-    .ch-rebirth-offers,
     .ch-rebirth-owned {
         display: grid;
         gap: 6px;

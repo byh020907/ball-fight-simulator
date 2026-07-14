@@ -4,6 +4,7 @@ import { createComponentBridge as createAppComponentBridge } from "../src/compon
 import { PopupService } from "../src/popup.js";
 import { createCollectionActionPopupOptions } from "../src/collection/collectionActionPopup.js";
 import { ActionPickerService } from "../src/actionPicker.js";
+import { RebirthPickerService } from "../src/rebirth/rebirthPicker.js";
 import {
     ALLOCATABLE_STATS,
     PLAYER_STAT_POINTS,
@@ -43,7 +44,7 @@ import {
     getSubAbilityIds,
     toggleRebirthCardEquip
 } from "../src/rebirth/index.js";
-import { getRebirthVisualProfile } from "../src/rebirth/rebirthVisuals.js";
+import { createRebirthFlamePaths, getRebirthVisualProfile } from "../src/rebirth/rebirthVisuals.js";
 import {
     getCharacterLevelProgression,
     getCharacterLevelRewardsBetween
@@ -16828,6 +16829,74 @@ function testRebirthDomainContracts() {
 
 testRebirthDomainContracts();
 
+async function testRebirthPickerKeepsPendingOfferUntilSelection() {
+    const profile = createDefaultPlayerProfile();
+    const characterId = FIGHTER_IDS.ARCHER;
+    setCharacterXp(profile, characterId, getLevelRequirement(10));
+    const app = {
+        lifecycle: { isSetup: true },
+        playerProfile: profile,
+        _refreshCollectionHub() {},
+        refreshPlayerSetup() {}
+    };
+    const originalPicker = RebirthPickerService._testPicker;
+    const originalDialog = PopupService._testDialog;
+    let persistedOfferIds = [];
+    PopupService.setTestDialog({ show: () => Promise.resolve("ok") });
+
+    try {
+        RebirthPickerService.setTestPicker({
+            show(cards) {
+                persistedOfferIds = getRebirthState(profile, characterId).pendingOfferCardIds;
+                assert.deepEqual(
+                    persistedOfferIds,
+                    cards.map((card) => card.id),
+                    "Rebirth candidates must be saved before the selection popup opens"
+                );
+                return Promise.resolve(-1);
+            }
+        });
+        const bridge = createAppComponentBridge(app);
+        const deferred = await bridge.beginRebirth(characterId);
+        assert.equal(deferred.error, "selection_deferred", "Closing an active picker must not consume its offer");
+        assert.deepEqual(
+            getRebirthState(profile, characterId).pendingOfferCardIds,
+            persistedOfferIds,
+            "An unselected rebirth offer must survive the picker closing"
+        );
+        assert.equal(
+            getCharacterExperienceSummary(profile, characterId).level,
+            10,
+            "An unselected rebirth offer must not reset character XP"
+        );
+
+        RebirthPickerService.setTestPicker({
+            show(cards) {
+                assert.deepEqual(
+                    cards.map((card) => card.id),
+                    persistedOfferIds,
+                    "Reopening the picker must use the original pending candidates"
+                );
+                return Promise.resolve(1);
+            }
+        });
+        const completed = await bridge.beginRebirth(characterId);
+        assert.equal(completed.ok, true, "Selecting a pending rebirth card should complete the rebirth");
+        assert.deepEqual(
+            getRebirthState(profile, characterId).pendingOfferCardIds,
+            [],
+            "Only a selected rebirth card may consume the pending candidates"
+        );
+        assert.equal(getCharacterExperienceSummary(profile, characterId).level, 1);
+    } finally {
+        RebirthPickerService.setTestPicker(originalPicker);
+        PopupService.setTestDialog(originalDialog);
+    }
+    console.log("[rebirth-picker-pending-offer] ok");
+}
+
+await testRebirthPickerKeepsPendingOfferUntilSelection();
+
 function testHuntingRebirthLoadoutIntegration() {
     const playerId = FIGHTER_IDS.DASH;
     const cardId = `stat:${playerId}:balanced`;
@@ -16941,6 +17010,48 @@ function testRebirthVisualProfileContract() {
         stages.every((visual) => !("radius" in visual) && !("mass" in visual) && !("speed" in visual)),
         "Visual profile must not expose physics modifiers"
     );
+
+    const visual = getRebirthVisualProfile(6);
+    const createBall = (velocity) => ({
+        id: "rebirth-flame-test",
+        position: new Vector2(300, 300),
+        radius: 50,
+        velocity,
+        stats: { baseSpeed: 200 }
+    });
+    const stationaryPaths = createRebirthFlamePaths(createBall(new Vector2()), visual, { time: 0.1 });
+    const animatedStationaryPaths = createRebirthFlamePaths(createBall(new Vector2()), visual, { time: 0.4 });
+    assert.ok(
+        stationaryPaths.every((flame) => flame.direction.y < -0.8),
+        "Stationary rebirth flames should rise upward from the ball"
+    );
+    assert.ok(
+        stationaryPaths.every((flame) => flame.points.length >= 3),
+        "Each flame tongue should use a multi-segment path instead of a static marker"
+    );
+    assert.ok(
+        stationaryPaths.some((flame, index) => {
+            const laterFlame = animatedStationaryPaths[index];
+            return flame.points.some(
+                (point, pointIndex) =>
+                    pointIndex > 0 &&
+                    pointIndex < flame.points.length - 1 &&
+                    Math.abs(point.x - laterFlame.points[pointIndex].x) > 0.01
+            );
+        }),
+        "Flame tongues should receive independently animated turbulence instead of remaining static"
+    );
+
+    const movingRightPaths = createRebirthFlamePaths(createBall(new Vector2(420, 0)), visual, { time: 0.1 });
+    assert.ok(
+        movingRightPaths.every((flame) => flame.direction.x < -0.85),
+        "Moving right should push every flame head behind the ball"
+    );
+    const movingDownPaths = createRebirthFlamePaths(createBall(new Vector2(0, 420)), visual, { time: 0.1 });
+    assert.ok(
+        movingDownPaths.every((flame) => flame.direction.y < -0.85),
+        "Moving down should keep every flame head behind the ball"
+    );
     console.log("[rebirth-visual-profile] ok");
 }
 
@@ -16968,9 +17079,24 @@ testAbilitySetForwardsDashEffect();
 function testRebirthCollectionTemplateContract() {
     const template = readFileSync("src/components/collection-hub.html", "utf8");
     assert.ok(template.includes("환생 카드 선택"), "Character detail should expose the rebirth action");
-    assert.ok(template.includes("pendingOfferCards"), "Character detail should render persistent rebirth offers");
+    assert.ok(template.includes("진행 중인 카드 선택"), "Character detail should reopen an existing rebirth offer");
+    assert.ok(
+        !template.includes("completeRebirth(item.id, card.id)"),
+        "Character detail should not bypass the rebirth card picker with inline selection"
+    );
     assert.ok(template.includes("toggleRebirthCardEquip"), "Character detail should expose card equip controls");
     assert.ok(template.includes("maxEquippedCards"), "Character detail should display the three-card loadout limit");
+
+    const pickerTemplate = readFileSync("src/components/rebirth-picker.html", "utf8");
+    assert.ok(
+        pickerTemplate.includes('x-data="rebirthPicker"'),
+        "Rebirth choices should use a dedicated picker component"
+    );
+    assert.ok(
+        pickerTemplate.includes("@keydown.escape.stop"),
+        "Rebirth picker should require a deliberate card selection"
+    );
+    assert.ok(!pickerTemplate.includes("@click.self"), "Rebirth picker should not dismiss through its backdrop");
     console.log("[rebirth-collection-template] ok");
 }
 

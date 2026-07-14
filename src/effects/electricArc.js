@@ -1,17 +1,4 @@
-import { Vector2 } from "../core.js";
-
-const ELECTRIC_ARC_CONFIG = Object.freeze({
-    segmentLength: 28,
-    minSegments: 4,
-    maxSegments: 14,
-    minAmplitude: 8,
-    maxAmplitude: 26,
-    amplitudeRatio: 0.085
-});
-
-function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
-}
+import { createWaveringPath } from "./waveringPath.js";
 
 function getArcOffset(time, index) {
     const rapidFlicker = Math.sin(time * 34 + index * 2.71);
@@ -29,35 +16,11 @@ function drawArcPath(ctx, points, color, lineWidth) {
 }
 
 export function createElectricArcPath(from, to, { time = 0, amplitude = null } = {}) {
-    const direction = Vector2.subtract(to, from);
-    const distance = direction.length();
-    if (distance <= 0.001) return [new Vector2(from.x, from.y), new Vector2(to.x, to.y)];
-
-    const segmentCount = clamp(
-        Math.ceil(distance / ELECTRIC_ARC_CONFIG.segmentLength),
-        ELECTRIC_ARC_CONFIG.minSegments,
-        ELECTRIC_ARC_CONFIG.maxSegments
-    );
-    const perpendicular = new Vector2(-direction.y / distance, direction.x / distance);
-    const resolvedAmplitude = Number.isFinite(amplitude)
-        ? amplitude
-        : clamp(
-              distance * ELECTRIC_ARC_CONFIG.amplitudeRatio,
-              ELECTRIC_ARC_CONFIG.minAmplitude,
-              ELECTRIC_ARC_CONFIG.maxAmplitude
-          );
-    const intermediatePoints = Array.from({ length: segmentCount - 1 }, (_, offset) => {
-        const index = offset + 1;
-        const progress = index / segmentCount;
-        const envelope = Math.sin(progress * Math.PI);
-        const offsetDistance = getArcOffset(time, index) * resolvedAmplitude * envelope;
-        return new Vector2(
-            from.x + direction.x * progress + perpendicular.x * offsetDistance,
-            from.y + direction.y * progress + perpendicular.y * offsetDistance
-        );
+    return createWaveringPath(from, to, {
+        time,
+        amplitude,
+        offsetAt: ({ time: pathTime, index }) => getArcOffset(pathTime, index)
     });
-
-    return [new Vector2(from.x, from.y), ...intermediatePoints, new Vector2(to.x, to.y)];
 }
 
 export function drawElectricArc(ctx, from, to, { time = 0, color = "#a8e6ff" } = {}) {

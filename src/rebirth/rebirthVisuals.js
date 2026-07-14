@@ -1,6 +1,110 @@
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
+import { createWaveringPath } from "../effects/waveringPath.js";
 
 const MAX_FLAME_COUNT = Math.max(...REWARD_BALANCE.rebirth.visualStages.map((stage) => stage.flameCount));
+const FLAME_MOVEMENT_THRESHOLD = 8;
+
+function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+}
+
+function normalizeDirection(direction) {
+    const length = Math.hypot(direction.x, direction.y) || 1;
+    return { x: direction.x / length, y: direction.y / length };
+}
+
+function smoothStep(edge0, edge1, value) {
+    const progress = clamp((value - edge0) / Math.max(0.001, edge1 - edge0), 0, 1);
+    return progress * progress * (3 - 2 * progress);
+}
+
+function hashNoise(cell, seed) {
+    const value = Math.sin((cell + seed * 0.61803398875) * 127.1 + seed * 311.7) * 43758.5453123;
+    return (value - Math.floor(value)) * 2 - 1;
+}
+
+function smoothNoise(sample, seed) {
+    const cell = Math.floor(sample);
+    const progress = sample - cell;
+    const blend = progress * progress * (3 - 2 * progress);
+    return hashNoise(cell, seed) * (1 - blend) + hashNoise(cell + 1, seed) * blend;
+}
+
+function getBallSeed(ball) {
+    const identity = String(ball.id ?? ball.name ?? `${ball.position.x}:${ball.position.y}`);
+    return [...identity].reduce((seed, character) => (seed * 31 + character.charCodeAt(0)) % 997, 1);
+}
+
+function getFlameDirection(ball) {
+    const velocity = ball.velocity ?? { x: 0, y: 0 };
+    const speed = typeof velocity.length === "function" ? velocity.length() : Math.hypot(velocity.x, velocity.y);
+    if (speed < FLAME_MOVEMENT_THRESHOLD) return { x: 0, y: -1 };
+    const movementDirection = { x: -velocity.x / speed, y: -velocity.y / speed };
+    const movementBlend = smoothStep(FLAME_MOVEMENT_THRESHOLD, Math.max(36, ball.stats?.baseSpeed * 0.45), speed);
+    return normalizeDirection({
+        x: movementDirection.x * movementBlend,
+        y: -1 * (1 - movementBlend) + movementDirection.y * movementBlend
+    });
+}
+
+function drawTaperedPath(ctx, points, color, baseWidth, alpha) {
+    ctx.strokeStyle = color;
+    points.slice(1).forEach((point, index) => {
+        const progress = (index + 1) / (points.length - 1);
+        ctx.globalAlpha = alpha * (1 - progress * 0.26);
+        ctx.lineWidth = Math.max(0.45, baseWidth * Math.max(0.1, (1 - progress) ** 0.78));
+        ctx.beginPath();
+        ctx.moveTo(points[index].x, points[index].y);
+        ctx.lineTo(point.x, point.y);
+        ctx.stroke();
+    });
+}
+
+export function createRebirthFlamePaths(ball, visual, { time = 0 } = {}) {
+    if (!visual || visual.rebirthCount <= 0) return [];
+    const velocity = ball.velocity ?? { x: 0, y: 0 };
+    const speed = typeof velocity.length === "function" ? velocity.length() : Math.hypot(velocity.x, velocity.y);
+    const speedRatio = Math.min(1, speed / Math.max(1, ball.stats?.baseSpeed ?? 1));
+    const direction = getFlameDirection(ball);
+    const perpendicular = { x: -direction.y, y: direction.x };
+    const strandCount = Math.max(3, Math.min(MAX_FLAME_COUNT, visual.flameCount));
+    const baseLength = ball.radius * (0.78 + visual.stage * 0.055) + 9 + speedRatio * ball.radius * 0.45;
+    const ballSeed = getBallSeed(ball);
+
+    return Array.from({ length: strandCount }, (_, index) => {
+        const seed = ballSeed + index * 43;
+        const centeredIndex = index - (strandCount - 1) / 2;
+        const laneDirection = normalizeDirection({
+            x: direction.x + perpendicular.x * centeredIndex * 0.24,
+            y: direction.y + perpendicular.y * centeredIndex * 0.24
+        });
+        const lengthPulse = 0.74 + (smoothNoise(time * 2.4, seed) + 1) * 0.16;
+        const flameLength = baseLength * lengthPulse;
+        const root = {
+            x: ball.position.x + laneDirection.x * (ball.radius - 4) + perpendicular.x * centeredIndex * 2,
+            y: ball.position.y + laneDirection.y * (ball.radius - 4) + perpendicular.y * centeredIndex * 2
+        };
+        const tip = {
+            x: root.x + laneDirection.x * flameLength,
+            y: root.y + laneDirection.y * flameLength
+        };
+        const points = createWaveringPath(root, tip, {
+            time,
+            segmentLength: 8,
+            minSegments: 3,
+            maxSegments: 6,
+            minAmplitude: 2,
+            maxAmplitude: 6 + visual.stage,
+            amplitudeRatio: 0.24,
+            offsetAt: ({ time: pathTime, index: pointIndex, progress }) => {
+                const broadFlow = smoothNoise(pathTime * 4.1 - progress * 4.8 + pointIndex * 0.17, seed);
+                const tipFlicker = smoothNoise(pathTime * 9.7 - progress * 8.2, seed + 19);
+                return broadFlow * 0.72 + tipFlicker * 0.28;
+            }
+        });
+        return { points, root, direction: laneDirection, alpha: 0.58 + ((index + visual.stage) % 3) * 0.1 };
+    });
+}
 
 export function getRebirthVisualProfile(rebirthCount = 0) {
     const normalizedCount = Math.max(0, Math.floor(Number.isFinite(rebirthCount) ? rebirthCount : 0));
@@ -50,22 +154,22 @@ export function drawRebirthVisualOverlay(ctx, ball, visual, time = performance.n
     ctx.stroke();
     ctx.setLineDash([]);
 
-    const flameCount = Math.min(MAX_FLAME_COUNT, visual.flameCount);
-    for (let index = 0; index < flameCount; index += 1) {
-        const angle = (Math.PI * 2 * index) / flameCount - Math.PI / 2 + time * 0.35;
-        const distance = ball.radius + 9 + (index % 2) * 3;
-        const flameLength = 5 + visual.stage * 2 + speedRatio * 6;
-        const startX = x + Math.cos(angle) * distance;
-        const startY = y + Math.sin(angle) * distance;
-        const endX = x + Math.cos(angle) * (distance + flameLength);
-        const endY = y + Math.sin(angle) * (distance + flameLength);
-        ctx.globalAlpha = 0.58 + ((index + visual.stage) % 3) * 0.1;
-        ctx.lineWidth = 2 + visual.stage * 0.35;
-        ctx.beginPath();
-        ctx.moveTo(startX, startY);
-        ctx.lineTo(endX, endY);
-        ctx.stroke();
-    }
+    ctx.globalCompositeOperation = "source-over";
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    createRebirthFlamePaths(ball, visual, { time }).forEach((flame) => {
+        drawTaperedPath(ctx, flame.points, "#e74716", 8 + visual.stage * 0.68, flame.alpha * 0.82);
+        drawTaperedPath(ctx, flame.points, "#ff942b", 4.6 + visual.stage * 0.42, flame.alpha);
+        const corePointCount = Math.max(2, Math.ceil(flame.points.length * 0.68));
+        drawTaperedPath(
+            ctx,
+            flame.points.slice(0, corePointCount),
+            "#fff2b0",
+            1.9 + visual.stage * 0.16,
+            flame.alpha * 0.9
+        );
+    });
+    ctx.globalCompositeOperation = "source-over";
 
     ctx.globalAlpha = 0.94;
     ctx.fillStyle = visual.color;
