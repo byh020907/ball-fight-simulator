@@ -3,8 +3,11 @@ import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 const MAX_FLAME_COUNT = Math.max(...REWARD_BALANCE.rebirth.visualStages.map((stage) => stage.flameCount));
 const MAX_CONTOUR_POINT_COUNT = 13;
 const FLAME_MOVEMENT_THRESHOLD = 8;
-const FLAME_DIRECTION_FOLLOW_RATE = 6;
-const flameDirectionStates = new WeakMap();
+const FLAME_TRAIL_SPRING = 126;
+const FLAME_TRAIL_DAMPING = 14;
+const MAX_FLAME_TRAIL_ELAPSED = 0.25;
+const MAX_FLAME_TRAIL_STEP = 1 / 120;
+const flameTrailStates = new WeakMap();
 
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
@@ -55,23 +58,42 @@ function getFlameTargetDirection(ball) {
     });
 }
 
+function getDirectionAngle(direction) {
+    return Math.atan2(direction.y, direction.x);
+}
+
+function getShortestAngleDelta(from, to) {
+    return Math.atan2(Math.sin(to - from), Math.cos(to - from));
+}
+
+function getDirectionFromAngle(angle) {
+    return { x: Math.cos(angle), y: Math.sin(angle) };
+}
+
 export function getRebirthFlameDirection(ball, time = 0) {
     const targetDirection = getFlameTargetDirection(ball);
-    const previousState = flameDirectionStates.get(ball);
+    const previousState = flameTrailStates.get(ball);
     if (!previousState) {
-        flameDirectionStates.set(ball, { direction: targetDirection, time });
+        flameTrailStates.set(ball, { angle: getDirectionAngle(targetDirection), angularVelocity: 0, time });
         return targetDirection;
     }
 
-    const elapsed = Math.min(0.25, Math.max(0, time - previousState.time));
-    if (elapsed === 0) return previousState.direction;
-    const blend = 1 - Math.exp(-FLAME_DIRECTION_FOLLOW_RATE * elapsed);
-    const direction = normalizeDirection({
-        x: previousState.direction.x + (targetDirection.x - previousState.direction.x) * blend,
-        y: previousState.direction.y + (targetDirection.y - previousState.direction.y) * blend
-    });
-    flameDirectionStates.set(ball, { direction, time });
-    return direction;
+    const elapsed = Math.min(MAX_FLAME_TRAIL_ELAPSED, Math.max(0, time - previousState.time));
+    if (elapsed === 0) return getDirectionFromAngle(previousState.angle);
+
+    const state = { ...previousState };
+    const targetAngle = getDirectionAngle(targetDirection);
+    let remaining = elapsed;
+    while (remaining > 0) {
+        const delta = Math.min(MAX_FLAME_TRAIL_STEP, remaining);
+        state.angularVelocity += getShortestAngleDelta(state.angle, targetAngle) * FLAME_TRAIL_SPRING * delta;
+        state.angularVelocity *= Math.exp(-FLAME_TRAIL_DAMPING * delta);
+        state.angle += state.angularVelocity * delta;
+        remaining -= delta;
+    }
+    state.time = time;
+    flameTrailStates.set(ball, state);
+    return getDirectionFromAngle(state.angle);
 }
 
 function getFlameContourPointCount(stage) {
@@ -101,6 +123,21 @@ function createFlamePoint(ball, direction, perpendicular, lateral, forward) {
         x: ball.position.x + perpendicular.x * lateral + direction.x * forward,
         y: ball.position.y + perpendicular.y * lateral + direction.y * forward
     };
+}
+
+function getQuadraticPoint(start, control, end, progress) {
+    const inverseProgress = 1 - progress;
+    return {
+        x: inverseProgress ** 2 * start.x + 2 * inverseProgress * progress * control.x + progress ** 2 * end.x,
+        y: inverseProgress ** 2 * start.y + 2 * inverseProgress * progress * control.y + progress ** 2 * end.y
+    };
+}
+
+function getQuadraticDirection(start, control, end, progress) {
+    return normalizeDirection({
+        x: 2 * (1 - progress) * (control.x - start.x) + 2 * progress * (end.x - control.x),
+        y: 2 * (1 - progress) * (control.y - start.y) + 2 * progress * (end.y - control.y)
+    });
 }
 
 function getFlameLayerPoints(contour, extensionRatio) {
@@ -144,7 +181,11 @@ function drawFlameLayer(ctx, contour, { extensionRatio, color, alpha, strokeColo
  * 공 표면에 붙은 하나의 화염 실루엣을 만든다.
  * 정지 시에는 상단 외곽이, 이동 중에는 속도 반대쪽 외곽이 불꽃으로 밀려난다.
  */
-export function createRebirthFlameContour(ball, visual, { time = 0, direction = getFlameTargetDirection(ball) } = {}) {
+export function createRebirthFlameContour(
+    ball,
+    visual,
+    { time = 0, direction = getFlameTargetDirection(ball), trailDirection = direction } = {}
+) {
     if (!visual || visual.rebirthCount <= 0) return null;
     const speed = getBallSpeed(ball);
     const speedRatio = Math.min(1, speed / Math.max(1, ball.stats?.baseSpeed ?? 1));
@@ -155,32 +196,67 @@ export function createRebirthFlameContour(ball, visual, { time = 0, direction = 
     const flickerStrength = visual.flickerStrength;
     const baseLength = ball.radius * (0.72 + visual.stage * 0.11) + 8 + speedRatio * ball.radius * 0.45;
     const seed = getBallSeed(ball);
-    const basePoints = [];
-    const outerPoints = [];
-
-    for (const index of Array.from({ length: pointCount }, (_, pointIndex) => pointIndex)) {
+    const samples = Array.from({ length: pointCount }, (_, index) => {
         const progress = index / (pointCount - 1);
         const lateral = -rootHalfWidth + rootHalfWidth * 2 * progress;
-        const surfaceForward = Math.sqrt(Math.max(0, ball.radius ** 2 - lateral ** 2)) - 1.5;
-        const root = createFlamePoint(ball, direction, perpendicular, lateral, surfaceForward);
-        const rootWeight = index === 0 || index === pointCount - 1 ? 0 : Math.sin(progress * Math.PI) ** 0.58;
-        const extension =
-            baseLength *
-            rootWeight *
-            getFlameTongueIntensity(progress, tongueCount, time, seed + index * 7, flickerStrength);
+        return {
+            index,
+            progress,
+            lateral,
+            surfaceForward: Math.sqrt(Math.max(0, ball.radius ** 2 - lateral ** 2)) - 1.5,
+            rootWeight: index === 0 || index === pointCount - 1 ? 0 : Math.sin(progress * Math.PI) ** 0.58
+        };
+    });
+    const basePoints = samples.map(({ lateral, surfaceForward }) =>
+        createFlamePoint(ball, direction, perpendicular, lateral, surfaceForward)
+    );
+    const rootCenter = createFlamePoint(ball, direction, perpendicular, 0, ball.radius - 1.5);
+    const tipIntensity = getFlameTongueIntensity(0.5, tongueCount, time, seed + pointCount * 7, flickerStrength);
+    const tipLength = baseLength * tipIntensity;
+    const tip = {
+        x: rootCenter.x + direction.x * tipLength * 0.34 + trailDirection.x * tipLength * 0.66,
+        y: rootCenter.y + direction.y * tipLength * 0.34 + trailDirection.y * tipLength * 0.66
+    };
+    const turnDifference = 1 - (direction.x * trailDirection.x + direction.y * trailDirection.y);
+    const curveBlend = smoothStep(0.03, 0.35, turnDifference);
+    const outerPoints = samples.map(({ index, progress, lateral, surfaceForward, rootWeight }) => {
+        const localIntensity = getFlameTongueIntensity(progress, tongueCount, time, seed + index * 7, flickerStrength);
+        const extension = baseLength * rootWeight * localIntensity;
         const lateralFlicker =
             ball.radius *
             rootWeight *
             (0.04 + flickerStrength * 0.1) *
             getFlameLateralFlicker(progress, time, seed + index * 11, flickerStrength);
-        basePoints.push(root);
-        outerPoints.push(
-            createFlamePoint(ball, direction, perpendicular, lateral + lateralFlicker, surfaceForward + extension)
+        const alignedPoint = createFlamePoint(
+            ball,
+            direction,
+            perpendicular,
+            lateral + lateralFlicker,
+            surfaceForward + extension
         );
-    }
+        const isLeftEdge = progress <= 0.5;
+        const start = isLeftEdge ? basePoints[0] : basePoints.at(-1);
+        const edgeSign = isLeftEdge ? -1 : 1;
+        const control = {
+            x: start.x + direction.x * tipLength * 0.46 + perpendicular.x * edgeSign * rootHalfWidth * 0.18,
+            y: start.y + direction.y * tipLength * 0.46 + perpendicular.y * edgeSign * rootHalfWidth * 0.18
+        };
+        const edgeProgress = isLeftEdge ? progress * 2 : (1 - progress) * 2;
+        const point = getQuadraticPoint(start, control, tip, edgeProgress);
+        const tangent = getQuadraticDirection(start, control, tip, edgeProgress);
+        const normal = { x: -tangent.y, y: tangent.x };
+        const edgeFlicker = rootWeight * (localIntensity - tipIntensity) * baseLength * 0.28;
+        point.x += tangent.x * edgeFlicker + normal.x * edgeSign * lateralFlicker;
+        point.y += tangent.y * edgeFlicker + normal.y * edgeSign * lateralFlicker;
+        return {
+            x: alignedPoint.x * (1 - curveBlend) + point.x * curveBlend,
+            y: alignedPoint.y * (1 - curveBlend) + point.y * curveBlend
+        };
+    });
 
     return {
         direction,
+        trailDirection,
         basePoints,
         outerPoints,
         tongueCount,
@@ -243,7 +319,9 @@ export function drawRebirthVisualOverlay(ctx, ball, visual, time = performance.n
     if (!visual || visual.rebirthCount <= 0) return;
     const { x, y } = ball.position;
     const speedRatio = Math.min(1, getBallSpeed(ball) / Math.max(1, ball.stats?.baseSpeed ?? 1));
-    const contour = createRebirthFlameContour(ball, visual, { time, direction: getRebirthFlameDirection(ball, time) });
+    const direction = getFlameTargetDirection(ball);
+    const trailDirection = getRebirthFlameDirection(ball, time);
+    const contour = createRebirthFlameContour(ball, visual, { time, direction, trailDirection });
     ctx.save();
     ctx.strokeStyle = visual.color;
     ctx.lineWidth = 1.5 + visual.outlineWidth;

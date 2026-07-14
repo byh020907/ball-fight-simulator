@@ -17167,6 +17167,25 @@ function testRebirthVisualProfileContract() {
         initialDirectionDot > 0.9,
         "Flame direction should retain most of its previous heading on the first turn frame"
     );
+    const turningContour = createRebirthFlameContour(turningBall, visual, {
+        time: 1 / 60,
+        direction: { x: -1, y: 0 },
+        trailDirection: earlyTurnDirection
+    });
+    const directionDifference =
+        turningContour.direction.x * turningContour.trailDirection.x +
+        turningContour.direction.y * turningContour.trailDirection.y;
+    assert.ok(
+        directionDifference < 0.4,
+        "A sharp turn should keep the physical flame tip behind the current root direction"
+    );
+    assert.ok(
+        turningContour.outerPoints.some((point, index) => {
+            const root = turningContour.basePoints[index];
+            return point.y < root.y - 10;
+        }),
+        "The physical flame tip should bend away from the current root during a sharp turn"
+    );
     const settledTurnDirection = Array.from({ length: 45 }, (_, index) =>
         getRebirthFlameDirection(turningBall, (index + 2) / 60)
     ).at(-1);
