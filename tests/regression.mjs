@@ -17222,6 +17222,16 @@ function testRebirthVisualProfileContract() {
         4,
         "Flame should draw four nested connected silhouette layers"
     );
+    assert.ok(
+        canvasCtx.calls.filter((call) => call[0] === "arc").length >= 26,
+        "Flame plume should add bounded physical particles behind the connected silhouette"
+    );
+    assert.ok(
+        canvasCtx.calls.some(
+            (call) => call[0] === "set" && call[1] === "globalCompositeOperation" && call[2] === "lighter"
+        ),
+        "Flame plume should use additive compositing for its heat layers"
+    );
     const statlessCanvasCtx = makeRecordingCanvasContext();
     drawRebirthVisualOverlay(statlessCanvasCtx, statlessMovingBall, visual, 0.1);
     assert.ok(
