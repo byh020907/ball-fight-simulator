@@ -11,6 +11,21 @@ const ELECTRIC_RANGE = 330;
 const ELECTRIC_DAMAGE_PER_TICK = 8;
 const ELECTRIC_COLOR = "#a8e6ff";
 const ELECTRIC_TIMING_EPSILON = 1e-9;
+const LINK_TIMING_EPSILON = 1e-9;
+export const HUNTING_LINK_CHANNEL_CONFIG = Object.freeze({
+    chain: Object.freeze({
+        activeDuration: 0.5,
+        cooldownDuration: 1,
+        range: 290,
+        color: "#e85d75"
+    }),
+    siphon: Object.freeze({
+        activeDuration: 1,
+        cooldownDuration: 2,
+        range: 230,
+        color: "#9f6bcb"
+    })
+});
 export const LASER_CHARGE_TURN_RATE = 4;
 const SPLIT_FRAGMENT_CONFIG = Object.freeze({
     maximumCount: 4,
@@ -86,6 +101,7 @@ export class HuntingMobAbility extends Ability {
             laser: null,
             boomerang: null,
             electric: { channelRemaining: 0, cooldownRemaining: 0 },
+            linkChannel: { activeRemaining: 0, cooldownRemaining: 0 },
             jump: 0
         };
     }
@@ -186,24 +202,54 @@ export class HuntingMobAbility extends Ability {
     }
 
     _tickChain(delta, target) {
-        const distance = Vector2.subtract(target.position, this.owner.position).length();
-        this.state.link = distance <= 290 ? { target, color: "#e85d75" } : null;
-        if (!this.state.link || distance <= 0.001) return;
-        target.applyKnockback(
-            Vector2.subtract(this.owner.position, target.position)
-                .normalize()
-                .scale(58 * delta),
-            0.08
-        );
+        const activeDelta = this._tickLinkChannel(delta, target, HUNTING_LINK_CHANNEL_CONFIG.chain);
+        if (activeDelta <= 0) return;
+        const direction = this._directionTo(target);
+        if (!direction) return;
+        target.applyKnockback(direction.scale(-58 * activeDelta), 0.08);
     }
 
     _tickSiphon(delta, target) {
-        const distance = Vector2.subtract(target.position, this.owner.position).length();
-        this.state.link = distance <= 230 ? { target, color: "#9f6bcb" } : null;
-        if (!this.state.link) return;
+        const activeDelta = this._tickLinkChannel(delta, target, HUNTING_LINK_CHANNEL_CONFIG.siphon);
+        if (activeDelta <= 0) return;
         const before = target.hp;
-        target.takeDamage(7 * delta, this.owner, "Siphon");
+        target.takeDamage(7 * activeDelta, this.owner, "Siphon");
         this.owner.heal((before - target.hp) * 0.8);
+    }
+
+    _tickLinkChannel(delta, target, config) {
+        const channel = this.state.linkChannel;
+        let remainingDelta = delta;
+        if (channel.cooldownRemaining > LINK_TIMING_EPSILON) {
+            const cooldownDelta = Math.min(remainingDelta, channel.cooldownRemaining);
+            channel.cooldownRemaining = Math.max(0, channel.cooldownRemaining - cooldownDelta);
+            remainingDelta -= cooldownDelta;
+            this.state.link = null;
+            if (channel.cooldownRemaining > LINK_TIMING_EPSILON || remainingDelta <= LINK_TIMING_EPSILON) return 0;
+            channel.cooldownRemaining = 0;
+        }
+
+        const distance = Vector2.subtract(target.position, this.owner.position).length();
+        if (distance > config.range) {
+            this.state.link = null;
+            if (channel.activeRemaining > LINK_TIMING_EPSILON) this._startLinkCooldown(config);
+            return 0;
+        }
+
+        if (channel.activeRemaining <= LINK_TIMING_EPSILON) channel.activeRemaining = config.activeDuration;
+        const activeDelta = Math.min(remainingDelta, channel.activeRemaining);
+        this.state.link = { target, color: config.color };
+        channel.activeRemaining = Math.max(0, channel.activeRemaining - activeDelta);
+
+        if (channel.activeRemaining <= LINK_TIMING_EPSILON)
+            this._startLinkCooldown(config, remainingDelta - activeDelta);
+        return activeDelta;
+    }
+
+    _startLinkCooldown(config, elapsed = 0) {
+        this.state.linkChannel.activeRemaining = 0;
+        this.state.linkChannel.cooldownRemaining = Math.max(0, config.cooldownDuration - elapsed);
+        this.state.link = null;
     }
 
     _charge(target) {

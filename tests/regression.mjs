@@ -138,7 +138,11 @@ import {
     rollHuntingShardBundleAmount
 } from "../src/hunting/index.js";
 import { Grenade } from "../src/entities/grenade.js";
-import { getArenaWallRay, LASER_CHARGE_TURN_RATE } from "../src/abilities/huntingMobAbility.js";
+import {
+    getArenaWallRay,
+    HUNTING_LINK_CHANNEL_CONFIG,
+    LASER_CHARGE_TURN_RATE
+} from "../src/abilities/huntingMobAbility.js";
 import { createElectricArcPath } from "../src/effects/electricArc.js";
 import {
     CONSUMABLE_IDS,
@@ -8222,6 +8226,186 @@ function testHuntingElectricChannelCooldown(app) {
     console.log("[hunting-electric-channel-cooldown] ok");
 }
 
+function testHuntingLinkCooldowns(app) {
+    const frameDelta = 1 / 60;
+    const behaviors = [
+        {
+            type: HUNTING_MONSTER_TYPES.CHAIN,
+            config: HUNTING_LINK_CHANNEL_CONFIG.chain,
+            name: "Chain",
+            expectedStrength: 58 * frameDelta
+        },
+        {
+            type: HUNTING_MONSTER_TYPES.SIPHON,
+            config: HUNTING_LINK_CHANNEL_CONFIG.siphon,
+            name: "Siphon",
+            expectedStrength: 7 * frameDelta
+        }
+    ];
+    const createScenario = (type, id) => {
+        const casterSpec = createHuntingMobSpec({ type, floor: 20, index: 0 });
+        const targetSpec = {
+            ...casterSpec,
+            id: `link-cooldown-target-${id}`,
+            teamId: HUNTING_TEAMS.PLAYER,
+            stats: { ...casterSpec.stats, hp: 1000, defense: 0 }
+        };
+        const simulation = new BattleSimulation([casterSpec, targetSpec], { onLog() {}, onSound() {} }, null, {
+            assignActions: false
+        });
+        const [caster, target] = simulation.fighters;
+        caster.position = new Vector2(340, 480);
+        caster.velocity = new Vector2();
+        target.position = new Vector2(500, 480);
+        target.velocity = new Vector2();
+        caster.hp = 1;
+        return { caster, target };
+    };
+    const updateFrames = ({ caster, target }, frames) => {
+        Array.from({ length: frames }).forEach(() => caster.ability.update(frameDelta, target));
+    };
+    const createEffectRecorder = ({ caster, target }, type) => {
+        const strengths = [];
+        const healingRequests = [];
+        if (type === HUNTING_MONSTER_TYPES.CHAIN) {
+            target.applyKnockback = (impulse) => {
+                strengths.push(impulse.length());
+            };
+        } else {
+            const takeDamage = target.takeDamage.bind(target);
+            const heal = caster.heal.bind(caster);
+            target.takeDamage = (...args) => {
+                strengths.push(args[0]);
+                return takeDamage(...args);
+            };
+            caster.heal = (amount) => {
+                healingRequests.push(amount);
+                return heal(amount);
+            };
+        }
+        return { strengths, healingRequests };
+    };
+
+    Object.values(HUNTING_LINK_CHANNEL_CONFIG).forEach((config) => {
+        [config.activeDuration, config.cooldownDuration].forEach((duration) => {
+            assert.equal(
+                Number.isInteger(duration * 2),
+                true,
+                "Link active and cooldown durations should use 0.5-second units"
+            );
+        });
+    });
+    assert.ok(
+        HUNTING_LINK_CHANNEL_CONFIG.chain.activeDuration < HUNTING_LINK_CHANNEL_CONFIG.siphon.activeDuration,
+        "Chain should keep the shorter active window"
+    );
+    assert.ok(
+        HUNTING_LINK_CHANNEL_CONFIG.chain.cooldownDuration < HUNTING_LINK_CHANNEL_CONFIG.siphon.cooldownDuration,
+        "Chain should return more frequently than siphon"
+    );
+
+    behaviors.forEach(({ type, config, name, expectedStrength }) => {
+        const lifecycleScenario = createScenario(type, `${type}-lifecycle`);
+        const { strengths, healingRequests } = createEffectRecorder(lifecycleScenario, type);
+        const activeFrames = config.activeDuration / frameDelta;
+        const cooldownFrames = config.cooldownDuration / frameDelta;
+        const targetHpBefore = lifecycleScenario.target.hp;
+
+        updateFrames(lifecycleScenario, activeFrames);
+        assert.equal(
+            strengths.length,
+            activeFrames,
+            `${name} should apply its existing effect during every active frame`
+        );
+        assert.ok(
+            strengths.every((strength) => Math.abs(strength - expectedStrength) < 1e-9),
+            `${name} should preserve its existing per-frame effect strength`
+        );
+        assert.equal(
+            lifecycleScenario.caster.ability.state.link,
+            null,
+            `${name} should hide its link as the active window ends`
+        );
+        assert.ok(
+            Math.abs(lifecycleScenario.caster.ability.state.linkChannel.cooldownRemaining - config.cooldownDuration) <
+                1e-9,
+            `${name} should begin its full cooldown after the active window`
+        );
+        if (type === HUNTING_MONSTER_TYPES.SIPHON) {
+            assert.equal(
+                targetHpBefore - lifecycleScenario.target.hp,
+                activeFrames,
+                "Siphon should preserve its actual minimum-damage hits during the active window"
+            );
+            assert.ok(
+                Math.abs(healingRequests.reduce((sum, amount) => sum + amount, 0) - activeFrames * 0.8) < 1e-9,
+                "Siphon should heal for 80% of the actual damage dealt"
+            );
+        }
+
+        const effectsAfterActiveWindow = strengths.length;
+        updateFrames(lifecycleScenario, cooldownFrames);
+        assert.equal(strengths.length, effectsAfterActiveWindow, `${name} should apply no effect during its cooldown`);
+        assert.equal(
+            lifecycleScenario.caster.ability.state.link,
+            null,
+            `${name} should keep its link hidden during cooldown`
+        );
+        updateFrames(lifecycleScenario, 1);
+        assert.equal(
+            strengths.length,
+            effectsAfterActiveWindow + 1,
+            `${name} should resume exactly after its cooldown expires`
+        );
+
+        const rangeExitScenario = createScenario(type, `${type}-range-exit`);
+        const { strengths: rangeExitStrengths } = createEffectRecorder(rangeExitScenario, type);
+        updateFrames(rangeExitScenario, 1);
+        rangeExitScenario.target.position.x = rangeExitScenario.caster.position.x + config.range + 1;
+        updateFrames(rangeExitScenario, 1);
+        assert.equal(
+            rangeExitStrengths.length,
+            1,
+            `${name} should stop its effect in the same frame that the target leaves range`
+        );
+        assert.equal(
+            rangeExitScenario.caster.ability.state.link,
+            null,
+            `${name} should immediately hide its link on range exit`
+        );
+        assert.ok(
+            Math.abs(rangeExitScenario.caster.ability.state.linkChannel.cooldownRemaining - config.cooldownDuration) <
+                1e-9,
+            `${name} should start a full cooldown when its active link breaks`
+        );
+        rangeExitScenario.target.position.x = rangeExitScenario.caster.position.x + 160;
+        updateFrames(rangeExitScenario, cooldownFrames);
+        assert.equal(rangeExitStrengths.length, 1, `${name} range re-entry should not bypass its cooldown`);
+        updateFrames(rangeExitScenario, 1);
+        assert.equal(rangeExitStrengths.length, 2, `${name} should reconnect only after the full range-exit cooldown`);
+
+        const firstScenario = createScenario(type, `${type}-first`);
+        const secondScenario = createScenario(type, `${type}-second`);
+        createEffectRecorder(firstScenario, type);
+        const { strengths: secondStrengths } = createEffectRecorder(secondScenario, type);
+        updateFrames(firstScenario, 1);
+        firstScenario.target.position.x = firstScenario.caster.position.x + config.range + 1;
+        updateFrames(firstScenario, 1);
+        updateFrames(secondScenario, 1);
+        assert.ok(
+            firstScenario.caster.ability.state.linkChannel.cooldownRemaining > 0,
+            `${name} first monster should be on its own cooldown`
+        );
+        assert.equal(
+            secondScenario.caster.ability.state.linkChannel.cooldownRemaining,
+            0,
+            `${name} second monster should not inherit another monster's cooldown`
+        );
+        assert.equal(secondStrengths.length, 1, `${name} second monster should stay active independently`);
+    });
+    console.log("[hunting-link-cooldowns] ok");
+}
+
 function testHuntingConnectionEffectsClearDefeatedTargets(app) {
     const createLinkDrawContext = () => {
         let strokes = 0;
@@ -11065,6 +11249,7 @@ testHuntingLaserReachesArenaWall(app);
 testHuntingBoomerangReachAndReturnArc(app);
 testElectricArcPathAndHuntingRender(app);
 testHuntingElectricChannelCooldown(app);
+testHuntingLinkCooldowns(app);
 testHuntingConnectionEffectsClearDefeatedTargets(app);
 testTeamTargetingAndFriendlyCollision(app);
 testTeamsResolveByRemainingHostileTeams(app);
