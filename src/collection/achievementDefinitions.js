@@ -9,8 +9,9 @@
 import { getActionPool } from "../clickActions.js";
 import { getCharacterMasteryLevel } from "../character-mastery/index.js";
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
-import { HUNTING_MONSTER_TAGS } from "../hunting/huntingMonsters.js";
+import { HUNTING_MONSTER_BASE_SPECS, HUNTING_MONSTER_TAGS } from "../hunting/huntingMonsters.js";
 import { HUNTING_STAGE_IDS } from "../hunting/huntingConfig.js";
+import { getHuntingMonsterEncounteredTypeCount } from "../hunting/huntingAchievementProgress.js";
 
 const ACHIEVEMENT_REWARDS = REWARD_BALANCE.progression.achievementRewards;
 
@@ -318,6 +319,15 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         target: Object.values(HUNTING_STAGE_IDS).length,
         rewardKey: "huntingAllStagesClear",
         getCurrent: (context) => getHuntingStats(context).clearedStageIds?.length ?? 0
+    }),
+    createHuntingCounterAchievement({
+        id: "hunting_monster_codex_complete",
+        name: "몬스터 도감 완성",
+        description: `사냥터 몬스터 ${Object.keys(HUNTING_MONSTER_BASE_SPECS).length}종을 모두 조우하세요.`,
+        tier: "gold",
+        target: Object.keys(HUNTING_MONSTER_BASE_SPECS).length,
+        rewardKey: "huntingMonsterCodexComplete",
+        getCurrent: (context) => getHuntingMonsterEncounteredTypeCount(getHuntingStats(context))
     }),
     createHuntingCounterAchievement({
         id: "hunting_monster_slayer",

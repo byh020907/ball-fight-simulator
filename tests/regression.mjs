@@ -104,8 +104,13 @@ import {
     applyHuntingRunAchievementProgress,
     recordHuntingBattleStart,
     recordHuntingBattleVictory,
+    recordHuntingStageVisit,
     getHuntingMobCount,
     getHuntingMobCountWeights,
+    getHuntingMonsterDefinition,
+    getHuntingMonsterDefinitions,
+    getHuntingMonsterEncounteredTypeCount,
+    getHuntingMonsterTypeKillCount,
     getHuntingMonsterPool,
     shouldUseRosterMiniboss,
     createMerchantOffers,
@@ -4012,6 +4017,28 @@ function testHuntingSystem() {
         14,
         "Cave should define fourteen data-driven monster types"
     );
+    const forestDefinitions = getHuntingMonsterDefinitions(HUNTING_STAGE_IDS.FOREST);
+    const forestElectric = getHuntingMonsterDefinition(HUNTING_MONSTER_TYPES.ELECTRIC, HUNTING_STAGE_IDS.FOREST);
+    assert.equal(
+        forestDefinitions.length,
+        14,
+        "Every unlocked region should resolve the full monster definition table"
+    );
+    assert.equal(
+        forestElectric.stageId,
+        HUNTING_STAGE_IDS.FOREST,
+        "Region definitions should retain their stage identity"
+    );
+    assert.ok(
+        forestElectric.behaviorDescription,
+        "Monster definitions should own their player-facing behavior description"
+    );
+    assert.equal(
+        createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.ELECTRIC, stageId: HUNTING_STAGE_IDS.FOREST }).hunting
+            .stageSkin,
+        HUNTING_STAGE_IDS.FOREST,
+        "Actual encounters should keep the entered region on their monster specs"
+    );
     assert.equal(shouldUseRosterMiniboss(3), true, "Every third hunting floor should add a roster miniboss");
     const miniboss = createHuntingMinibossSpec({
         roster: [
@@ -4173,6 +4200,12 @@ async function testHuntingAchievementProgress() {
     const { evaluateAchievements } = await import("../src/collection/achievementRules.js");
     const { grantAchievementReward } = await import("../src/collection/achievementRewards.js");
 
+    assert.deepEqual(
+        recordHuntingStageVisit(createDefaultPlayerProfile().hunting.stats, HUNTING_STAGE_IDS.FOREST).visitedStageIds,
+        [HUNTING_STAGE_IDS.FOREST],
+        "Entered regions should be recorded immediately instead of waiting for a battle result"
+    );
+
     for (const monster of Object.values(HUNTING_MONSTER_BASE_SPECS)) {
         assert.ok(
             monster.monsterTags.includes(HUNTING_MONSTER_TAGS.MONSTER),
@@ -4185,9 +4218,17 @@ async function testHuntingAchievementProgress() {
         );
     }
 
-    const rareMonster = createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.ELECTRIC, floor: 20 });
-    const epicMonster = createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.LASER, floor: 94 });
-    let run = createHuntingRun({ characterId: FIGHTER_IDS.DASH });
+    const rareMonster = createHuntingMobSpec({
+        type: HUNTING_MONSTER_TYPES.ELECTRIC,
+        floor: 20,
+        stageId: HUNTING_STAGE_IDS.FOREST
+    });
+    const epicMonster = createHuntingMobSpec({
+        type: HUNTING_MONSTER_TYPES.LASER,
+        floor: 94,
+        stageId: HUNTING_STAGE_IDS.FOREST
+    });
+    let run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.FOREST });
     run = recordHuntingBattleStart(run, {
         enemySpecs: [rareMonster, epicMonster, { hunting: { isMiniboss: true } }],
         hpRemain: 20,
@@ -4216,6 +4257,17 @@ async function testHuntingAchievementProgress() {
         undefined,
         "Miniboss metadata must not be treated as a normal monster tag"
     );
+    assert.equal(
+        repeatedVictory.achievementProgress.monsterCodexByType[HUNTING_MONSTER_TYPES.ELECTRIC].kills,
+        1,
+        "Monster codex kills should only increase after the battle is won"
+    );
+    assert.equal(
+        repeatedVictory.achievementProgress.monsterCodexByType[HUNTING_MONSTER_TYPES.ELECTRIC].regions.forest
+            .firstEncounterFloor,
+        1,
+        "Monster codex discovery should remember the region of the actual encounter"
+    );
 
     const returnedRun = retreatHuntingRun(
         {
@@ -4232,6 +4284,21 @@ async function testHuntingAchievementProgress() {
     assert.equal(stats.championVictories, 1, "Champion intrusion victories should persist separately");
     assert.equal(stats.securedChestCount, 1, "Only secured run chests should count toward the storage achievement");
     assert.equal(stats.bestPortalRetreatFloor, 45, "Portal retreats should keep their highest floor");
+    assert.deepEqual(
+        stats.visitedStageIds,
+        [HUNTING_STAGE_IDS.FOREST],
+        "Completed runs should persist entered regions"
+    );
+    assert.equal(
+        getHuntingMonsterTypeKillCount(stats, HUNTING_MONSTER_TYPES.ELECTRIC),
+        1,
+        "Monster type kill helpers should read the persisted codex record"
+    );
+    assert.equal(
+        getHuntingMonsterEncounteredTypeCount(stats),
+        2,
+        "Monster codex discovery should count each encountered behavior type"
+    );
 
     const stageClearStats = applyHuntingRunAchievementProgress(stats, {
         ...returnedRun,
@@ -4255,7 +4322,20 @@ async function testHuntingAchievementProgress() {
             [HUNTING_MONSTER_TAGS.RARITY_RARE]: 100,
             [HUNTING_MONSTER_TAGS.RARITY_UNIQUE]: 75,
             [HUNTING_MONSTER_TAGS.RARITY_EPIC]: 50
-        }
+        },
+        monsterCodexByType: Object.fromEntries(
+            Object.keys(HUNTING_MONSTER_BASE_SPECS).map((type) => [
+                type,
+                {
+                    firstEncounterFloor: 1,
+                    lastEncounterFloor: 1,
+                    kills: 1,
+                    regions: {
+                        [HUNTING_STAGE_IDS.CAVE]: { firstEncounterFloor: 1, lastEncounterFloor: 1, kills: 1 }
+                    }
+                }
+            ])
+        )
     };
     const unlocked = evaluateAchievements(profile, ACHIEVEMENT_DEFINITIONS, { profile, roster: [] });
     const huntingAchievementIds = new Set(
@@ -4270,6 +4350,7 @@ async function testHuntingAchievementProgress() {
             "hunting_champion_victory",
             "hunting_secured_chests_10",
             "hunting_all_stages_clear",
+            "hunting_monster_codex_complete",
             "hunting_monster_slayer",
             "hunting_rare_monster_slayer",
             "hunting_unique_monster_slayer",
@@ -4285,6 +4366,15 @@ async function testHuntingAchievementProgress() {
         championAchievement.reward.rarity,
         "common",
         "Champion intrusion should not bypass its existing shard multiplier with a high-rarity chest"
+    );
+    const monsterCodexAchievement = ACHIEVEMENT_DEFINITIONS.find(
+        (achievement) => achievement.id === "hunting_monster_codex_complete"
+    );
+    assert.equal(monsterCodexAchievement.reward.rarity, "rare", "Monster codex completion should grant a rare chest");
+    assert.deepEqual(
+        monsterCodexAchievement.getProgress({ profile, roster: [] }),
+        { current: 14, target: 14 },
+        "Monster codex achievement should use the count of encountered monster types"
     );
     const securedChestAchievement = ACHIEVEMENT_DEFINITIONS.find(
         (achievement) => achievement.id === "hunting_secured_chests_10"
@@ -4326,6 +4416,19 @@ async function testHuntingAchievementProgress() {
         hunting: {
             stats: {
                 monsterKillsByTag: { [HUNTING_MONSTER_TAGS.RARITY_RARE]: 3, "invalid tag": 99 },
+                visitedStageIds: [HUNTING_STAGE_IDS.CAVE, "unknown-stage"],
+                monsterCodexByType: {
+                    [HUNTING_MONSTER_TYPES.ELECTRIC]: {
+                        firstEncounterFloor: 20,
+                        lastEncounterFloor: 25,
+                        kills: 4,
+                        regions: {
+                            [HUNTING_STAGE_IDS.FOREST]: { firstEncounterFloor: 20, lastEncounterFloor: 25, kills: 4 },
+                            "unknown-stage": { firstEncounterFloor: 1, lastEncounterFloor: 1, kills: 1 }
+                        }
+                    },
+                    unknown: { firstEncounterFloor: 1, lastEncounterFloor: 1, kills: 99, regions: {} }
+                },
                 clearedStageIds: [HUNTING_STAGE_IDS.CAVE, "unknown-stage"]
             }
         }
@@ -4344,6 +4447,22 @@ async function testHuntingAchievementProgress() {
         sanitized.hunting.stats.clearedStageIds,
         [HUNTING_STAGE_IDS.CAVE],
         "Profile sanitization should reject unknown cleared stage IDs"
+    );
+    assert.deepEqual(
+        sanitized.hunting.stats.visitedStageIds,
+        [HUNTING_STAGE_IDS.CAVE],
+        "Profile sanitization should reject unknown visited stages"
+    );
+    assert.equal(
+        sanitized.hunting.stats.monsterCodexByType[HUNTING_MONSTER_TYPES.ELECTRIC].regions[HUNTING_STAGE_IDS.FOREST]
+            .kills,
+        4,
+        "Profile sanitization should preserve valid region-specific monster records"
+    );
+    assert.equal(
+        sanitized.hunting.stats.monsterCodexByType.unknown,
+        undefined,
+        "Profile sanitization should reject unknown monster type records"
     );
     console.log("[hunting-achievement-progress] ok");
 }
@@ -4855,6 +4974,9 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
         renderer: { clear() {} },
         stopPlayerPreviewLoop() {},
         beginGameSession() {},
+        _refreshCollectionHub() {
+            this.collectionRefreshCount += 1;
+        },
         _syncPlayerStatAllocationFromUi() {},
         refreshPlayerSetup() {},
         setHuntingActive() {},
@@ -4866,6 +4988,7 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
         },
         addLog() {},
         overlayStates: [],
+        collectionRefreshCount: 0,
         waitForHuntingMoveUiPaint() {
             return new Promise((resolve) => {
                 this.resolveFirstMoveUi = resolve;
@@ -4913,6 +5036,16 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
         );
         assert.deepEqual(popupOptions.buttons, [], "Stage selection should not require a second start action");
         assert.equal(manager._run.characterId, FIGHTER_IDS.RAGE, "Run should use the current preview character");
+        assert.deepEqual(
+            profile.hunting.stats.visitedStageIds,
+            [HUNTING_STAGE_IDS.CAVE],
+            "Run start should record the selected region before the first battle"
+        );
+        assert.equal(
+            app.collectionRefreshCount,
+            1,
+            "Run start should refresh the monster codex after recording the region"
+        );
         assert.equal(advanced, false, "Stage selection should not advance before the first move UI is painted");
         assert.deepEqual(app.overlayShown, {
             label: "사냥터",
@@ -10428,6 +10561,11 @@ async function testCreateCollectionHubViewModel() {
 
     assert.equal(vm.rosterSize, roster.length, "rosterSize should match");
     assert.equal(vm.rosterItems.length, roster.length, "rosterItems should include all characters");
+    assert.equal(vm.monsterCodexItems.length, 14, "Monster codex should include every defined monster type");
+    assert.ok(
+        vm.monsterCodexItems.every((item) => !item.isDiscovered),
+        "Monster codex should keep unencountered monsters hidden by default"
+    );
     assert.equal(vm.masteryItems.length, MASTERY_EFFECT_DEFS.length, "masteryItems should match definitions");
 
     const allHaveIds = vm.rosterItems.every((item) => item.id);
@@ -10526,6 +10664,17 @@ async function testCreateCollectionHubViewModel() {
     assert.equal(vm3.summary.masteryTotal, 6, "Mastery total should sum stored mastery tiers");
 
     profile.hunting.stats.monsterKillsByTag = { [HUNTING_MONSTER_TAGS.MONSTER]: 12 };
+    profile.hunting.stats.visitedStageIds = [HUNTING_STAGE_IDS.CAVE, HUNTING_STAGE_IDS.FOREST];
+    profile.hunting.stats.monsterCodexByType = {
+        [HUNTING_MONSTER_TYPES.ELECTRIC]: {
+            firstEncounterFloor: 20,
+            lastEncounterFloor: 24,
+            kills: 7,
+            regions: {
+                [HUNTING_STAGE_IDS.CAVE]: { firstEncounterFloor: 20, lastEncounterFloor: 24, kills: 7 }
+            }
+        }
+    };
     const vm4 = createCollectionHubViewModel({
         profile,
         roster,
@@ -10537,6 +10686,24 @@ async function testCreateCollectionHubViewModel() {
         vm4.achievementItems.find((item) => item.id === "hunting_monster_slayer").progressText,
         "12 / 300",
         "Collection achievement cards should expose tagged hunting progress"
+    );
+    const electricCodexItem = vm4.monsterCodexItems.find((item) => item.type === HUNTING_MONSTER_TYPES.ELECTRIC);
+    assert.equal(electricCodexItem.isDiscovered, true, "Monster codex should reveal encountered monster types");
+    assert.equal(electricCodexItem.kills, 7, "Monster codex should expose total type kills");
+    assert.equal(
+        electricCodexItem.regions.length,
+        2,
+        "Monster codex should expose every entered region as a selector option"
+    );
+    assert.equal(
+        electricCodexItem.regions.find((region) => region.id === HUNTING_STAGE_IDS.CAVE).isDiscovered,
+        true,
+        "Encountered regions should reveal their detailed monster data"
+    );
+    assert.equal(
+        electricCodexItem.regions.find((region) => region.id === HUNTING_STAGE_IDS.FOREST).isDiscovered,
+        false,
+        "Entered regions without a monster encounter should remain locked"
     );
 }
 
@@ -12772,6 +12939,34 @@ function testCollectionCharacterDetailTabsContract() {
     console.log("[collection-character-detail-tabs] ok");
 }
 
+function testCollectionMonsterCodexContract() {
+    const collectionHub = readFileSync("src/components/collection-hub.html", "utf8");
+    assert.ok(
+        collectionHub.includes("캐릭터") &&
+            collectionHub.includes("몬스터") &&
+            collectionHub.includes("setCodexSection"),
+        "Codex should switch characters and monsters inside the existing roster tab"
+    );
+    assert.ok(
+        collectionHub.includes("selectedMonsterRegionId") && collectionHub.includes("selectedMonsterRegion(item)"),
+        "Monster detail should preserve a selected unlocked region"
+    );
+    assert.ok(
+        collectionHub.includes("첫 조우 후 상세 공개") &&
+            collectionHub.includes("이 지역에서는 아직 조우하지 않았습니다."),
+        "Monster codex should distinguish unknown monsters from unknown regional variants"
+    );
+    assert.ok(
+        collectionHub.includes("전체 처치") && collectionHub.includes("선택 지역 처치"),
+        "Monster detail should show type-wide and selected-region kill statistics"
+    );
+    assert.ok(
+        !collectionHub.includes("목록으로"),
+        "Monster detail should reuse the persistent list instead of a back action"
+    );
+    console.log("[collection-monster-codex] ok");
+}
+
 function testPopupCloseOwnershipContract() {
     const collectionHub = readFileSync("src/components/collection-hub.html", "utf8");
     const popupDialog = readFileSync("src/components/popup-dialog.html", "utf8");
@@ -14001,6 +14196,7 @@ testHuntingMerchantPurchaseRefreshesUiState();
 testHuntingMerchantMobileScrollContract();
 testHuntingChestIconReuseContract();
 testCollectionCharacterDetailTabsContract();
+testCollectionMonsterCodexContract();
 testPopupCloseOwnershipContract();
 testHuntingOverlayResetContract();
 testGameplayUiResetContracts();

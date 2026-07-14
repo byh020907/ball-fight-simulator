@@ -8,7 +8,13 @@ import { formatAchievementReward } from "./achievementRewards.js";
 import { getCharacterMasteryLevel } from "../character-mastery/index.js";
 import { getCharacterExperienceSummary } from "../experience/experienceService.js";
 import { getCharacterLevelRewards } from "../experience/characterLevelProgression.js";
-import { canOpenHuntingChest, getDailyShop, previewHuntingChest } from "../hunting/index.js";
+import {
+    canOpenHuntingChest,
+    getDailyShop,
+    getHuntingMonsterDefinitions,
+    previewHuntingChest
+} from "../hunting/index.js";
+import { HUNTING_STAGES } from "../hunting/huntingConfig.js";
 import { getConsumableShopItems, getHuntingConsumableUseLimitUpgrade } from "../consumables.js";
 import { getRarityLabel } from "../hunting/rarityPresentation.js";
 import {
@@ -39,6 +45,64 @@ export const COLLECTION_HUB_TABS = Object.freeze([
     { id: "storage", label: "보관함" },
     { id: "equipment", label: "장비" }
 ]);
+
+const MONSTER_FACE_LABELS = Object.freeze({
+    default: "o",
+    angry: "!",
+    dash: ">",
+    cyclops: "@",
+    ooo: "O",
+    happy: "^",
+    xeye: "x"
+});
+
+function getMonsterRarity(monster) {
+    return monster.monsterTags.find((tag) => tag.startsWith("rarity:"))?.slice("rarity:".length) ?? "common";
+}
+
+function createMonsterCodexItems(hunting) {
+    const monsterCodexByType = hunting.stats?.monsterCodexByType ?? {};
+    const visitedStageIds = new Set(hunting.stats?.visitedStageIds ?? []);
+    const baseDefinitions = getHuntingMonsterDefinitions();
+
+    return baseDefinitions.map((base) => {
+        const record = monsterCodexByType[base.type] ?? null;
+        const rarity = getMonsterRarity(base);
+        const regions = HUNTING_STAGES.filter((stage) => visitedStageIds.has(stage.id)).map((stage) => {
+            const definition =
+                getHuntingMonsterDefinitions(stage.id).find((monster) => monster.type === base.type) ?? base;
+            const regionRecord = record?.regions?.[stage.id] ?? null;
+            return {
+                id: stage.id,
+                name: stage.name,
+                isDiscovered:
+                    Number.isFinite(regionRecord?.firstEncounterFloor) && regionRecord.firstEncounterFloor > 0,
+                color: definition.color,
+                faceLabel: MONSTER_FACE_LABELS[definition.face] ?? "o",
+                behaviorDescription: definition.behaviorDescription,
+                stats: definition.stats,
+                kills: regionRecord?.kills ?? 0,
+                firstEncounterFloor: regionRecord?.firstEncounterFloor ?? null,
+                lastEncounterFloor: regionRecord?.lastEncounterFloor ?? null
+            };
+        });
+
+        return {
+            id: base.type,
+            type: base.type,
+            name: base.displayName,
+            color: base.color,
+            faceLabel: MONSTER_FACE_LABELS[base.face] ?? "o",
+            rarity,
+            rarityLabel: getRarityLabel(rarity),
+            isDiscovered: Number.isFinite(record?.firstEncounterFloor) && record.firstEncounterFloor > 0,
+            kills: record?.kills ?? 0,
+            firstEncounterFloor: record?.firstEncounterFloor ?? null,
+            lastEncounterFloor: record?.lastEncounterFloor ?? null,
+            regions
+        };
+    });
+}
 
 /**
  * 컬렉션 허브 ViewModel 생성.
@@ -152,6 +216,8 @@ export function createCollectionHubViewModel({
         };
     });
 
+    const monsterCodexItems = createMonsterCodexItems(hunting);
+
     const equipment = profile?.equipment ?? {};
     const inventory = equipment.inventory ?? [];
     const equipped = equipment.equipped ?? {};
@@ -228,11 +294,13 @@ export function createCollectionHubViewModel({
     const maxLevels = rosterItems.length * 3;
     const unlockedMastery = masteryItems.filter((item) => item.unlocked).length;
     const unlockedAchievements = achievementItems.filter((item) => item.unlocked).length;
+    const discoveredMonsterCount = monsterCodexItems.filter((item) => item.isDiscovered).length;
     const masteryTotal = cumulativeLevels;
 
     return {
         rosterSize,
         rosterItems,
+        monsterCodexItems,
         masteryItems,
         achievementItems,
         summary: {
@@ -245,6 +313,8 @@ export function createCollectionHubViewModel({
             unlockedAchievements,
             totalAchievements: achievementDefinitions.length,
             masteryTotal,
+            discoveredMonsterCount,
+            totalMonsterCount: monsterCodexItems.length,
             shards: hunting.shards ?? 0,
             storageChestCount: storageItems.length
         },

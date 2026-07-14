@@ -11,6 +11,25 @@ export const HUNTING_STAGE_IDS = Object.freeze({
     DESERT: "desert"
 });
 
+export const HUNTING_MONSTER_TYPES = Object.freeze({
+    MELEE: "pursuer",
+    RANGED: "shooter",
+    PURSUER: "pursuer",
+    CHARGER: "charger",
+    SHOOTER: "shooter",
+    ELECTRIC: "electric",
+    HEALER: "healer",
+    CHAIN: "chain",
+    SHOCKWAVE: "shockwave",
+    BARRIER: "barrier",
+    SIPHON: "siphon",
+    SHARD: "shard",
+    BOOMERANG: "boomerang",
+    SPLITTER: "splitter",
+    JUMPER: "jumper",
+    LASER: "laser"
+});
+
 export const HUNTING_STAGES = Object.freeze([
     Object.freeze({
         id: HUNTING_STAGE_IDS.CAVE,

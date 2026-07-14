@@ -42,146 +42,303 @@
         </div>
 
         <div class="ch-content" x-show="state.activeTab === 'roster'" role="tabpanel">
-            <div class="ch-toolbar">
-                <input
-                    class="ch-search"
-                    type="search"
-                    placeholder="캐릭터 검색..."
-                    x-model="state.searchQueries.roster"
-                />
-                <select class="ch-select" x-model="state.filters.roster" @change="setCollectionFilter($el.value)">
-                    <option value="all">전체</option>
-                    <option value="unplayed">미기록</option>
-                    <option value="played">플레이</option>
-                    <option value="won">우승</option>
-                    <option value="master">마스터</option>
-                </select>
-                <select class="ch-select" x-model="state.sortModes.roster">
-                    <option value="roster">로스터 순</option>
-                    <option value="wins">우승 많은 순</option>
-                    <option value="recent">최근 플레이</option>
-                </select>
+            <div class="ch-codex-tabs" role="tablist" aria-label="도감 종류">
+                <button
+                    class="ch-codex-tab"
+                    type="button"
+                    role="tab"
+                    x-bind:aria-selected="state.codexSection === 'characters'"
+                    x-bind:class="{ active: state.codexSection === 'characters' }"
+                    @click="setCodexSection('characters')"
+                >
+                    캐릭터
+                </button>
+                <button
+                    class="ch-codex-tab"
+                    type="button"
+                    role="tab"
+                    x-bind:aria-selected="state.codexSection === 'monsters'"
+                    x-bind:class="{ active: state.codexSection === 'monsters' }"
+                    @click="setCodexSection('monsters')"
+                >
+                    몬스터
+                </button>
             </div>
-            <div class="ch-scroll-region">
-                <div class="ch-grid">
-                    <template x-for="item in state.filteredRosterItems" :key="item.id">
-                        <div
-                            class="ch-card"
-                            x-bind:class="{ selected: state.selectedCharacterId === item.id }"
-                            @click="selectCollectionCharacter(item.id)"
-                        >
+            <section class="ch-codex-panel" x-show="state.codexSection === 'characters'" role="tabpanel">
+                <div class="ch-toolbar">
+                    <input
+                        class="ch-search"
+                        type="search"
+                        placeholder="캐릭터 검색..."
+                        x-model="state.searchQueries.roster"
+                    />
+                    <select class="ch-select" x-model="state.filters.roster" @change="setCollectionFilter($el.value)">
+                        <option value="all">전체</option>
+                        <option value="unplayed">미기록</option>
+                        <option value="played">플레이</option>
+                        <option value="won">우승</option>
+                        <option value="master">마스터</option>
+                    </select>
+                    <select class="ch-select" x-model="state.sortModes.roster">
+                        <option value="roster">로스터 순</option>
+                        <option value="wins">우승 많은 순</option>
+                        <option value="recent">최근 플레이</option>
+                    </select>
+                </div>
+                <div class="ch-scroll-region">
+                    <div class="ch-grid">
+                        <template x-for="item in state.filteredRosterItems" :key="item.id">
                             <div
-                                class="ch-card-head"
-                                x-bind:style="'background:' + item.color"
-                                x-bind:class="{ unplayed: !item.hasRecord }"
+                                class="ch-card"
+                                x-bind:class="{ selected: state.selectedCharacterId === item.id }"
+                                @click="selectCollectionCharacter(item.id)"
                             >
-                                <span class="ch-card-icon" x-text="item.name.charAt(0)"></span>
-                                <div class="ch-card-head-text">
-                                    <span class="ch-card-name" x-text="item.name"></span>
+                                <div
+                                    class="ch-card-head"
+                                    x-bind:style="'background:' + item.color"
+                                    x-bind:class="{ unplayed: !item.hasRecord }"
+                                >
+                                    <span class="ch-card-icon" x-text="item.name.charAt(0)"></span>
+                                    <div class="ch-card-head-text">
+                                        <span class="ch-card-name" x-text="item.name"></span>
+                                        <span
+                                            class="ch-card-mastery"
+                                            x-text="['-','☆','☆☆','☆☆☆'][item.masteryLevel]"
+                                        ></span>
+                                    </div>
+                                </div>
+                                <div class="ch-card-body" x-bind:class="{ unplayed: !item.hasRecord }">
+                                    <span x-show="!item.hasRecord" class="ch-empty-badge">미기록</span>
+                                    <span x-show="item.hasRecord">우승 <b x-text="item.tournamentWins"></b>회</span>
                                     <span
-                                        class="ch-card-mastery"
-                                        x-text="['-','☆','☆☆','☆☆☆'][item.masteryLevel]"
+                                        class="ch-xp-chip"
+                                        x-text="item.experienceLevelLabel + ' · ' + Number(item.experienceTotalXp || 0).toLocaleString() + 'XP'"
                                     ></span>
+                                    <span x-show="item.bestPlacement"
+                                        >최고 <b x-text="item.bestPlacement + '위'"></b
+                                    ></span>
+                                    <span x-show="item.masteryUnlocked" class="ch-mast-badge">숙련도 ✓</span>
+                                    <span x-show="item.isCurrent" class="ch-current-badge">현재</span>
                                 </div>
                             </div>
-                            <div class="ch-card-body" x-bind:class="{ unplayed: !item.hasRecord }">
-                                <span x-show="!item.hasRecord" class="ch-empty-badge">미기록</span>
-                                <span x-show="item.hasRecord">우승 <b x-text="item.tournamentWins"></b>회</span>
-                                <span
-                                    class="ch-xp-chip"
-                                    x-text="item.experienceLevelLabel + ' · ' + Number(item.experienceTotalXp || 0).toLocaleString() + 'XP'"
+                        </template>
+                        <div class="ch-empty" x-show="state.filteredRosterItems.length === 0">검색 결과가 없습니다</div>
+                    </div>
+                </div>
+                <div class="ch-detail" x-show="state.selectedCharacterId">
+                    <template x-for="item in state.filteredRosterItems" :key="item.id">
+                        <div x-show="item.id === state.selectedCharacterId">
+                            <div class="ch-detail-tabs" role="tablist" aria-label="캐릭터 상세">
+                                <button
+                                    class="ch-detail-tab"
+                                    type="button"
+                                    role="tab"
+                                    x-bind:aria-selected="state.characterDetailTab === 'overview'"
+                                    x-bind:class="{ active: state.characterDetailTab === 'overview' }"
+                                    @click="state.characterDetailTab = 'overview'"
+                                >
+                                    상세 정보
+                                </button>
+                                <button
+                                    class="ch-detail-tab"
+                                    type="button"
+                                    role="tab"
+                                    x-bind:aria-selected="state.characterDetailTab === 'levelRewards'"
+                                    x-bind:class="{ active: state.characterDetailTab === 'levelRewards' }"
+                                    @click="state.characterDetailTab = 'levelRewards'"
+                                >
+                                    레벨 보상
+                                </button>
+                            </div>
+                            <div
+                                class="ch-detail-body"
+                                x-show="state.characterDetailTab === 'overview'"
+                                role="tabpanel"
+                            >
+                                <div class="ch-detail-xp">
+                                    <div class="ch-detail-xp-head">
+                                        <strong x-text="item.experienceLevelLabel"></strong>
+                                        <span
+                                            x-text="Number(item.experienceTotalXp || 0).toLocaleString() + ' XP'"
+                                        ></span>
+                                    </div>
+                                    <div class="ch-detail-xp-bar" aria-hidden="true">
+                                        <div
+                                            class="ch-detail-xp-fill"
+                                            x-bind:style="'width:' + item.experienceProgressPct + '%; background:' + item.color"
+                                        ></div>
+                                    </div>
+                                    <div class="ch-detail-xp-foot">
+                                        <span x-text="item.experienceProgressText"></span>
+                                        <span x-text="item.experienceNextText"></span>
+                                    </div>
+                                    <div
+                                        class="ch-detail-xp-reward"
+                                        x-text="'다음 보상 · ' + item.experienceNextRewardText"
+                                    ></div>
+                                </div>
+                                <span>토너먼트 완료 <b x-text="item.tournamentsCompleted"></b></span>
+                                <span>토너먼트 우승 <b x-text="item.tournamentWins"></b></span>
+                                <span>매치 승리 <b x-text="item.matchWins"></b></span>
+                                <span x-show="item.bestPlacement"
+                                    >최고 등수 <b x-text="item.bestPlacement + '위'"></b
                                 ></span>
-                                <span x-show="item.bestPlacement">최고 <b x-text="item.bestPlacement + '위'"></b></span>
-                                <span x-show="item.masteryUnlocked" class="ch-mast-badge">숙련도 ✓</span>
-                                <span x-show="item.isCurrent" class="ch-current-badge">현재</span>
+                                <span
+                                    >누적 피해 <b x-text="Number(item.totalDamageDealt || 0).toLocaleString()"></b
+                                ></span>
+                                <span x-show="item.comebackMatchWins"
+                                    >역전승 <b x-text="item.comebackMatchWins"></b
+                                ></span>
+                                <span>
+                                    숙련도 <b x-text="['미해금','BRONZE','SILVER','GOLD'][item.masteryLevel]"></b>
+                                    <span x-show="item.masteryLevel === 0">· 이 캐릭터로 우승</span>
+                                    <span x-show="item.masteryLevel === 1">· 다음: SILVER (난도 1)</span>
+                                    <span x-show="item.masteryLevel === 2">· 다음: GOLD (난도 2)</span>
+                                    <span x-show="item.masteryLevel === 3">· MAX</span>
+                                </span>
+                            </div>
+                            <div
+                                class="ch-level-reward-list"
+                                x-show="state.characterDetailTab === 'levelRewards'"
+                                role="tabpanel"
+                            >
+                                <template x-for="reward in item.levelRewards" :key="reward.id">
+                                    <div class="ch-level-reward" x-bind:class="{ earned: reward.earned }">
+                                        <strong x-text="'Lv.' + reward.level"></strong>
+                                        <span class="ch-level-reward-text" x-text="reward.text"></span>
+                                        <span
+                                            class="ch-level-reward-status"
+                                            x-bind:class="{ earned: reward.earned }"
+                                            x-text="reward.statusLabel"
+                                        ></span>
+                                    </div>
+                                </template>
                             </div>
                         </div>
                     </template>
-                    <div class="ch-empty" x-show="state.filteredRosterItems.length === 0">검색 결과가 없습니다</div>
                 </div>
-            </div>
-            <div class="ch-detail" x-show="state.selectedCharacterId">
-                <template x-for="item in state.filteredRosterItems" :key="item.id">
-                    <div x-show="item.id === state.selectedCharacterId">
-                        <div class="ch-detail-tabs" role="tablist" aria-label="캐릭터 상세">
-                            <button
-                                class="ch-detail-tab"
-                                type="button"
-                                role="tab"
-                                x-bind:aria-selected="state.characterDetailTab === 'overview'"
-                                x-bind:class="{ active: state.characterDetailTab === 'overview' }"
-                                @click="state.characterDetailTab = 'overview'"
+            </section>
+            <section class="ch-codex-panel" x-show="state.codexSection === 'monsters'" role="tabpanel">
+                <div class="ch-toolbar">
+                    <input
+                        class="ch-search"
+                        type="search"
+                        placeholder="몬스터 검색..."
+                        x-model="state.searchQueries.monsters"
+                    />
+                    <select class="ch-select" x-model="state.filters.monsters" @change="setMonsterFilter($el.value)">
+                        <option value="all">전체</option>
+                        <option value="discovered">조우</option>
+                        <option value="unknown">미조우</option>
+                        <option value="common">common</option>
+                        <option value="rare">rare</option>
+                        <option value="unique">unique</option>
+                        <option value="epic">epic</option>
+                    </select>
+                    <select class="ch-select" x-model="state.sortModes.monsters">
+                        <option value="codex">도감 순</option>
+                        <option value="kills">처치 많은 순</option>
+                    </select>
+                </div>
+                <div class="ch-scroll-region">
+                    <div class="ch-grid">
+                        <template x-for="item in state.filteredMonsterItems" :key="item.id">
+                            <div
+                                class="ch-card ch-monster-card"
+                                x-bind:class="{ selected: state.selectedMonsterId === item.id, unknown: !item.isDiscovered }"
+                                @click="selectCollectionMonster(item.id)"
                             >
-                                상세 정보
-                            </button>
-                            <button
-                                class="ch-detail-tab"
-                                type="button"
-                                role="tab"
-                                x-bind:aria-selected="state.characterDetailTab === 'levelRewards'"
-                                x-bind:class="{ active: state.characterDetailTab === 'levelRewards' }"
-                                @click="state.characterDetailTab = 'levelRewards'"
-                            >
-                                레벨 보상
-                            </button>
-                        </div>
-                        <div class="ch-detail-body" x-show="state.characterDetailTab === 'overview'" role="tabpanel">
-                            <div class="ch-detail-xp">
-                                <div class="ch-detail-xp-head">
-                                    <strong x-text="item.experienceLevelLabel"></strong>
-                                    <span x-text="Number(item.experienceTotalXp || 0).toLocaleString() + ' XP'"></span>
-                                </div>
-                                <div class="ch-detail-xp-bar" aria-hidden="true">
-                                    <div
-                                        class="ch-detail-xp-fill"
-                                        x-bind:style="'width:' + item.experienceProgressPct + '%; background:' + item.color"
-                                    ></div>
-                                </div>
-                                <div class="ch-detail-xp-foot">
-                                    <span x-text="item.experienceProgressText"></span>
-                                    <span x-text="item.experienceNextText"></span>
-                                </div>
                                 <div
-                                    class="ch-detail-xp-reward"
-                                    x-text="'다음 보상 · ' + item.experienceNextRewardText"
-                                ></div>
-                            </div>
-                            <span>토너먼트 완료 <b x-text="item.tournamentsCompleted"></b></span>
-                            <span>토너먼트 우승 <b x-text="item.tournamentWins"></b></span>
-                            <span>매치 승리 <b x-text="item.matchWins"></b></span>
-                            <span x-show="item.bestPlacement"
-                                >최고 등수 <b x-text="item.bestPlacement + '위'"></b
-                            ></span>
-                            <span>누적 피해 <b x-text="Number(item.totalDamageDealt || 0).toLocaleString()"></b></span>
-                            <span x-show="item.comebackMatchWins">역전승 <b x-text="item.comebackMatchWins"></b></span>
-                            <span>
-                                숙련도 <b x-text="['미해금','BRONZE','SILVER','GOLD'][item.masteryLevel]"></b>
-                                <span x-show="item.masteryLevel === 0">· 이 캐릭터로 우승</span>
-                                <span x-show="item.masteryLevel === 1">· 다음: SILVER (난도 1)</span>
-                                <span x-show="item.masteryLevel === 2">· 다음: GOLD (난도 2)</span>
-                                <span x-show="item.masteryLevel === 3">· MAX</span>
-                            </span>
-                        </div>
-                        <div
-                            class="ch-level-reward-list"
-                            x-show="state.characterDetailTab === 'levelRewards'"
-                            role="tabpanel"
-                        >
-                            <template x-for="reward in item.levelRewards" :key="reward.id">
-                                <div class="ch-level-reward" x-bind:class="{ earned: reward.earned }">
-                                    <strong x-text="'Lv.' + reward.level"></strong>
-                                    <span class="ch-level-reward-text" x-text="reward.text"></span>
+                                    class="ch-card-head"
+                                    x-bind:style="'background:' + (item.isDiscovered ? item.color : '#666666')"
+                                >
+                                    <span class="ch-card-icon" x-text="item.isDiscovered ? item.faceLabel : '?'"></span>
+                                    <div class="ch-card-head-text">
+                                        <span
+                                            class="ch-card-name"
+                                            x-text="item.isDiscovered ? item.name : '미조우'"
+                                        ></span>
+                                        <span
+                                            class="ch-monster-rarity"
+                                            x-show="item.isDiscovered"
+                                            x-text="item.rarityLabel"
+                                        ></span>
+                                    </div>
+                                </div>
+                                <div class="ch-card-body">
+                                    <span x-show="!item.isDiscovered" class="ch-empty-badge">첫 조우 후 상세 공개</span>
+                                    <span x-show="item.isDiscovered">처치 <b x-text="item.kills"></b>회</span>
                                     <span
-                                        class="ch-level-reward-status"
-                                        x-bind:class="{ earned: reward.earned }"
-                                        x-text="reward.statusLabel"
+                                        x-show="item.isDiscovered"
+                                        x-text="'조우 지역 ' + item.regions.filter(region => region.isDiscovered).length"
                                     ></span>
                                 </div>
-                            </template>
+                            </div>
+                        </template>
+                        <div class="ch-empty" x-show="state.filteredMonsterItems.length === 0">
+                            검색 결과가 없습니다
                         </div>
                     </div>
-                </template>
-            </div>
+                </div>
+                <div class="ch-detail" x-show="state.selectedMonsterId">
+                    <template x-for="item in state.filteredMonsterItems" :key="item.id">
+                        <div x-show="item.id === state.selectedMonsterId" class="ch-monster-detail">
+                            <div class="ch-monster-detail-head">
+                                <span
+                                    class="ch-monster-detail-face"
+                                    x-bind:style="'background:' + (item.isDiscovered ? item.color : '#666666')"
+                                    x-text="item.isDiscovered ? item.faceLabel : '?'"
+                                ></span>
+                                <div>
+                                    <strong x-text="item.isDiscovered ? item.name : '미조우'"></strong>
+                                    <span x-show="item.isDiscovered" x-text="item.rarityLabel"></span>
+                                </div>
+                                <label
+                                    class="ch-monster-region-picker"
+                                    x-show="item.isDiscovered && item.regions.length"
+                                >
+                                    <span>지역</span>
+                                    <select class="ch-select" x-model="state.selectedMonsterRegionId">
+                                        <template x-for="region in item.regions" :key="region.id">
+                                            <option
+                                                x-bind:value="region.id"
+                                                x-text="region.name + (region.isDiscovered ? '' : ' · 미조우')"
+                                            ></option>
+                                        </template>
+                                    </select>
+                                </label>
+                            </div>
+                            <div class="ch-monster-unknown" x-show="!item.isDiscovered">
+                                첫 조우 후 이름, 행동, 기본 스펙과 통계가 공개됩니다.
+                            </div>
+                            <div
+                                class="ch-monster-unknown"
+                                x-show="item.isDiscovered && selectedMonsterRegion(item) && !selectedMonsterRegion(item).isDiscovered"
+                            >
+                                이 지역에서는 아직 조우하지 않았습니다.
+                            </div>
+                            <div
+                                class="ch-detail-body"
+                                x-show="item.isDiscovered && selectedMonsterRegion(item)?.isDiscovered"
+                            >
+                                <strong x-text="selectedMonsterRegion(item)?.behaviorDescription"></strong>
+                                <div class="ch-monster-stat-grid">
+                                    <span>HP <b x-text="selectedMonsterRegion(item)?.stats.hp"></b></span>
+                                    <span>공격 <b x-text="selectedMonsterRegion(item)?.stats.damage"></b></span>
+                                    <span>방어 <b x-text="selectedMonsterRegion(item)?.stats.defense"></b></span>
+                                    <span>속도 <b x-text="selectedMonsterRegion(item)?.stats.speed"></b></span>
+                                </div>
+                                <div class="ch-monster-records">
+                                    <span>전체 처치 <b x-text="item.kills"></b></span>
+                                    <span>선택 지역 처치 <b x-text="selectedMonsterRegion(item)?.kills"></b></span>
+                                    <span>첫 조우 <b x-text="item.firstEncounterFloor + '층'"></b></span>
+                                    <span>마지막 조우 <b x-text="item.lastEncounterFloor + '층'"></b></span>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </section>
         </div>
 
         <div class="ch-content" x-show="state.activeTab === 'mastery'" role="tabpanel">
@@ -443,7 +600,9 @@
                     <button class="ch-close" type="button" aria-label="닫기" @click="closeFusion()">×</button>
                 </div>
                 <div class="ch-fusion-body">
-                    <p class="ch-fusion-description">같은 등급 장비 3개를 선택하면 다음 등급의 새 장비 1개로 재탄생합니다.</p>
+                    <p class="ch-fusion-description">
+                        같은 등급 장비 3개를 선택하면 다음 등급의 새 장비 1개로 재탄생합니다.
+                    </p>
                     <div class="ch-fusion-tier-tabs" role="tablist" aria-label="합성 등급 선택">
                         <template x-for="recipe in state.equipment.fusion.recipes" :key="recipe.rarity">
                             <button
@@ -461,7 +620,9 @@
                             <div class="ch-fusion-summary">
                                 <div>
                                     <strong x-text="selectedFusionRecipe().rarityLabel + ' 장비 3개' "></strong>
-                                    <span x-text="'결과: ' + selectedFusionRecipe().nextRarityLabel + ' 랜덤 장비' "></span>
+                                    <span
+                                        x-text="'결과: ' + selectedFusionRecipe().nextRarityLabel + ' 랜덤 장비' "
+                                    ></span>
                                 </div>
                                 <span
                                     class="ch-fusion-cost"
@@ -497,14 +658,27 @@
                                         @click="toggleFusionItem(item.instanceId)"
                                     >
                                         <strong x-text="item.name"></strong>
-                                        <span x-text="item.stats.map(stat => stat.type + ' +' + stat.value).join(' · ')"></span>
-                                        <span class="ch-fusion-equipment-state" x-text="item.isEquipped ? '장착 중' : '보관 중'"></span>
+                                        <span
+                                            x-text="item.stats.map(stat => stat.type + ' +' + stat.value).join(' · ')"
+                                        ></span>
+                                        <span
+                                            class="ch-fusion-equipment-state"
+                                            x-text="item.isEquipped ? '장착 중' : '보관 중'"
+                                        ></span>
                                     </button>
                                 </template>
-                                <div class="ch-empty" x-show="selectedFusionRecipe().items.length === 0">선택할 장비가 없습니다</div>
+                                <div class="ch-empty" x-show="selectedFusionRecipe().items.length === 0">
+                                    선택할 장비가 없습니다
+                                </div>
                             </div>
-                            <p class="ch-fusion-note">선택한 장비는 모두 사라지며, 강화 단계와 장착 상태는 이어지지 않습니다.</p>
-                            <p class="ch-fusion-warning" x-show="fusionResourceWarning()" x-text="fusionResourceWarning()"></p>
+                            <p class="ch-fusion-note">
+                                선택한 장비는 모두 사라지며, 강화 단계와 장착 상태는 이어지지 않습니다.
+                            </p>
+                            <p
+                                class="ch-fusion-warning"
+                                x-show="fusionResourceWarning()"
+                                x-text="fusionResourceWarning()"
+                            ></p>
                             <button
                                 class="ch-btn ch-fusion-submit"
                                 type="button"
@@ -533,9 +707,7 @@
                 </div>
                 <template x-if="state.storage.dailyShop">
                     <div class="ch-shop-body">
-                        <div
-                            class="ch-shop-offer"
-                        >
+                        <div class="ch-shop-offer">
                             <chest-icon
                                 class="ch-shop-chest"
                                 x-component="'chest-icon'"
@@ -544,7 +716,9 @@
                             ></chest-icon>
                             <div class="ch-shop-offer-info">
                                 <strong>상점 상자</strong>
-                                <span x-text="'구매 ' + getShopPurchaseCount(state.storage.dailyShop) + '/' + state.storage.dailyShop.purchaseLimit"></span>
+                                <span
+                                    x-text="'구매 ' + getShopPurchaseCount(state.storage.dailyShop) + '/' + state.storage.dailyShop.purchaseLimit"
+                                ></span>
                             </div>
                             <button
                                 class="ch-btn"
@@ -596,7 +770,9 @@
                         <div class="ch-shop-upgrade" x-show="state.storage.huntingConsumableUseLimitUpgrade">
                             <div>
                                 <strong>원정 물약 사용 한도</strong>
-                                <span x-text="(state.storage.huntingConsumableUseLimitUpgrade?.currentLimit || 1) + '/' + (state.storage.huntingConsumableUseLimitUpgrade?.maxLimit || 5)"></span>
+                                <span
+                                    x-text="(state.storage.huntingConsumableUseLimitUpgrade?.currentLimit || 1) + '/' + (state.storage.huntingConsumableUseLimitUpgrade?.maxLimit || 5)"
+                                ></span>
                             </div>
                             <button
                                 class="ch-btn"
@@ -624,17 +800,21 @@
         const state = Alpine.reactive({
             visible: false,
             activeTab: "roster",
+            codexSection: "characters",
             tabs: [],
-            filters: { roster: "all", mastery: "all", achievements: "all", storage: "all" },
-            searchQueries: { roster: "", mastery: "", achievements: "", storage: "" },
-            sortModes: { roster: "roster", achievements: "default" },
+            filters: { roster: "all", monsters: "all", mastery: "all", achievements: "all", storage: "all" },
+            searchQueries: { roster: "", monsters: "", mastery: "", achievements: "", storage: "" },
+            sortModes: { roster: "roster", monsters: "codex", achievements: "default" },
             selectedCharacterId: null,
             characterDetailTab: "overview",
+            selectedMonsterId: null,
+            selectedMonsterRegionId: null,
             shopVisible: false,
             shopRerolling: false,
             fusionVisible: false,
             fusionSelection: { rarity: null, itemIds: [] },
             rosterItems: [],
+            monsterCodexItems: [],
             masteryItems: [],
             achievementItems: [],
             storage: { shards: 0, chests: [], stats: {}, consumables: [], huntingConsumableUseLimitUpgrade: null },
@@ -654,7 +834,7 @@
 
             get filteredRosterItems() {
                 const tab = this.activeTab;
-                if (tab !== "roster") return [];
+                if (tab !== "roster" || this.codexSection !== "characters") return [];
                 const filter = this.filters.roster || "all";
                 const query = (this.searchQueries.roster || "").toLowerCase();
                 const sort = this.sortModes.roster || "roster";
@@ -667,6 +847,20 @@
                 if (sort === "wins") items = items.sort((a, b) => b.tournamentWins - a.tournamentWins);
                 else if (sort === "recent")
                     items = items.sort((a, b) => (b.lastTournamentAt ?? 0) - (a.lastTournamentAt ?? 0));
+                return items;
+            },
+
+            get filteredMonsterItems() {
+                if (this.activeTab !== "roster" || this.codexSection !== "monsters") return [];
+                const filter = this.filters.monsters || "all";
+                const query = (this.searchQueries.monsters || "").toLowerCase();
+                const sort = this.sortModes.monsters || "codex";
+                let items = [...(this.monsterCodexItems || [])];
+                if (query) items = items.filter((item) => item.isDiscovered && item.name.toLowerCase().includes(query));
+                if (filter === "discovered") items = items.filter((item) => item.isDiscovered);
+                else if (filter === "unknown") items = items.filter((item) => !item.isDiscovered);
+                else if (filter !== "all") items = items.filter((item) => item.rarity === filter);
+                if (sort === "kills") items = items.sort((a, b) => b.kills - a.kills || a.name.localeCompare(b.name));
                 return items;
             },
 
@@ -701,6 +895,8 @@
         function closeCollectionHub() {
             state.visible = false;
             state.selectedCharacterId = null;
+            state.selectedMonsterId = null;
+            state.selectedMonsterRegionId = null;
             state.shopVisible = false;
             state.fusionVisible = false;
             state.fusionSelection = { rarity: null, itemIds: [] };
@@ -737,7 +933,9 @@
 
         function selectedFusionItems() {
             const items = selectedFusionRecipe()?.items ?? [];
-            return state.fusionSelection.itemIds.map((itemId) => items.find((item) => item.instanceId === itemId)).filter(Boolean);
+            return state.fusionSelection.itemIds
+                .map((itemId) => items.find((item) => item.instanceId === itemId))
+                .filter(Boolean);
         }
 
         function isFusionItemSelected(instanceId) {
@@ -784,6 +982,10 @@
             if (validTabs.includes(tabId)) state.activeTab = tabId;
         }
 
+        function setCodexSection(section) {
+            if (["characters", "monsters"].includes(section)) state.codexSection = section;
+        }
+
         function setCollectionFilter(filterId) {
             const tab = state.activeTab;
             if (tab && filterId) state.filters[tab] = filterId;
@@ -792,6 +994,25 @@
         function selectCollectionCharacter(characterId) {
             if (state.selectedCharacterId !== characterId) state.characterDetailTab = "overview";
             state.selectedCharacterId = characterId;
+        }
+
+        function setMonsterFilter(filterId) {
+            if (filterId) state.filters.monsters = filterId;
+        }
+
+        function selectCollectionMonster(monsterId) {
+            const item = state.monsterCodexItems.find((monster) => monster.id === monsterId);
+            if (state.selectedMonsterId !== monsterId) {
+                state.selectedMonsterRegionId =
+                    item?.regions.find((region) => region.isDiscovered)?.id ?? item?.regions[0]?.id ?? null;
+            }
+            state.selectedMonsterId = monsterId;
+        }
+
+        function selectedMonsterRegion(item) {
+            return (
+                item?.regions.find((region) => region.id === state.selectedMonsterRegionId) ?? item?.regions[0] ?? null
+            );
         }
 
         return {
@@ -833,8 +1054,12 @@
             canFuseSelectedItems,
             fuseSelectedItems,
             setCollectionTab,
+            setCodexSection,
             setCollectionFilter,
             selectCollectionCharacter,
+            setMonsterFilter,
+            selectCollectionMonster,
+            selectedMonsterRegion,
             get bridge() {
                 return window.requireGameActionBridge();
             },
@@ -862,6 +1087,7 @@
             },
             render(vm) {
                 state.rosterItems = vm.rosterItems ?? [];
+                state.monsterCodexItems = vm.monsterCodexItems ?? [];
                 state.masteryItems = vm.masteryItems ?? [];
                 state.achievementItems = vm.achievementItems ?? [];
                 state.equipment = vm.equipment ?? {
@@ -890,6 +1116,8 @@
             close() {
                 state.visible = false;
                 state.selectedCharacterId = null;
+                state.selectedMonsterId = null;
+                state.selectedMonsterRegionId = null;
                 state.fusionVisible = false;
                 state.fusionSelection = { rarity: null, itemIds: [] };
             }
@@ -980,13 +1208,43 @@
         cursor: pointer;
         font-size: 0.85rem;
         font-weight: 700;
-        transition: background 0.1s, border-color 0.1s;
+        transition:
+            background 0.1s,
+            border-color 0.1s;
         flex-shrink: 0;
     }
 
     .ch-tab.active {
         background: #ffffff;
         border-bottom-color: #202020;
+    }
+
+    .ch-codex-tabs {
+        display: flex;
+        gap: 4px;
+        padding: 8px 8px 0;
+        border-bottom: 1px solid #e0e0e0;
+        flex-shrink: 0;
+    }
+
+    .ch-codex-tab {
+        min-height: 34px;
+        padding: 6px 12px;
+        border: 1px solid #bcbcbc;
+        border-bottom: none;
+        border-radius: 6px 6px 0 0;
+        background: #eeeeee;
+        color: #555555;
+        cursor: pointer;
+        font: inherit;
+        font-size: 0.78rem;
+        font-weight: 700;
+    }
+
+    .ch-codex-tab.active {
+        background: #ffffff;
+        color: #202020;
+        border-color: #202020;
     }
 
     .ch-toolbar {
@@ -1038,6 +1296,14 @@
         overflow: hidden;
     }
 
+    .ch-codex-panel {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+    }
+
     .ch-scroll-region {
         flex: 1;
         overflow-y: auto;
@@ -1067,6 +1333,16 @@
 
     .ch-card.selected {
         box-shadow: 0 0 0 3px #006bb8;
+    }
+
+    .ch-monster-card.unknown .ch-card-body {
+        background: #f0f0f0;
+    }
+
+    .ch-monster-rarity {
+        flex-shrink: 0;
+        font-size: 0.68rem;
+        font-weight: 700;
     }
 
     .ch-card-head {
@@ -1189,7 +1465,127 @@
         color: #333333;
     }
 
+    .ch-monster-detail {
+        display: grid;
+        gap: 10px;
+    }
 
+    .ch-monster-detail-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+    }
+
+    .ch-monster-detail-face {
+        width: 34px;
+        height: 34px;
+        border: 2px solid #202020;
+        border-radius: 50%;
+        color: #ffffff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        font-weight: 900;
+        flex-shrink: 0;
+    }
+
+    .ch-monster-detail-head > div {
+        display: grid;
+        gap: 1px;
+        min-width: 0;
+    }
+
+    .ch-monster-detail-head > div span {
+        color: #666666;
+        font-size: 0.72rem;
+        font-weight: 700;
+    }
+
+    .ch-monster-region-picker {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        margin-left: auto;
+        color: #555555;
+        font-size: 0.72rem;
+        font-weight: 700;
+    }
+
+    .ch-monster-region-picker .ch-select {
+        min-width: 96px;
+    }
+
+    .ch-monster-unknown {
+        padding: 9px 10px;
+        border: 1px solid #c7c7c7;
+        border-radius: 6px;
+        background: #f4f4f4;
+        color: #666666;
+        font-size: 0.78rem;
+    }
+
+    .ch-monster-stat-grid,
+    .ch-monster-records {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        border: 1px solid #d0d0d0;
+        border-radius: 6px;
+        overflow: hidden;
+    }
+
+    .ch-monster-stat-grid span,
+    .ch-monster-records span {
+        display: grid;
+        gap: 2px;
+        min-width: 0;
+        padding: 6px 8px;
+        border-right: 1px solid #d0d0d0;
+        color: #666666;
+        font-size: 0.68rem;
+    }
+
+    .ch-monster-stat-grid span:last-child,
+    .ch-monster-records span:last-child {
+        border-right: none;
+    }
+
+    .ch-monster-stat-grid b,
+    .ch-monster-records b {
+        color: #202020;
+        font-size: 0.82rem;
+    }
+
+    @media (max-width: 520px) {
+        .ch-monster-detail-head {
+            flex-wrap: wrap;
+        }
+
+        .ch-monster-region-picker {
+            width: 100%;
+            margin-left: 0;
+        }
+
+        .ch-monster-region-picker .ch-select {
+            flex: 1;
+        }
+
+        .ch-monster-stat-grid,
+        .ch-monster-records {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .ch-monster-stat-grid span:nth-child(2),
+        .ch-monster-records span:nth-child(2) {
+            border-right: none;
+        }
+
+        .ch-monster-stat-grid span:nth-child(-n + 2),
+        .ch-monster-records span:nth-child(-n + 2) {
+            border-bottom: 1px solid #d0d0d0;
+        }
+    }
 
     .ch-detail-xp {
         border: 2px solid #202020;

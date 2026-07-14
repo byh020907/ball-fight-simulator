@@ -47,7 +47,8 @@ import { getHuntingPreparationConsumables, useHuntingPreparationConsumable } fro
 import {
     applyHuntingRunAchievementProgress,
     recordHuntingBattleStart,
-    recordHuntingBattleVictory
+    recordHuntingBattleVictory,
+    recordHuntingStageVisit
 } from "./huntingAchievementProgress.js";
 import { HuntingBattleLootSession, HuntingLootDropController } from "./huntingLoot.js";
 import { getRarityLabel } from "./rarityPresentation.js";
@@ -162,6 +163,9 @@ export class HuntingManager {
         PopupService.close();
         if (!canEnterHunting(this.app.playerProfile, characterId)) return;
         const stageId = getSelectedHuntingStageId(this.app.playerProfile);
+        this.app.playerProfile.hunting.stats = recordHuntingStageVisit(this.app.playerProfile.hunting.stats, stageId);
+        savePlayerProfile(this.app.playerProfile);
+        this.app._refreshCollectionHub();
         this._run = createHuntingRun({ characterId, stageId });
         this.app.playerFighterId = characterId;
         this.app.beginGameSession();

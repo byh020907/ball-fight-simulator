@@ -1,4 +1,10 @@
-import { HUNTING_ENEMY_TYPES, HUNTING_MOB_COMPOSITION, HUNTING_STAGE_IDS } from "./huntingConfig.js";
+import {
+    HUNTING_ENEMY_TYPES,
+    HUNTING_MOB_COMPOSITION,
+    HUNTING_MONSTER_TYPES,
+    HUNTING_STAGE_IDS,
+    HUNTING_STAGES
+} from "./huntingConfig.js";
 import { scaleEnemySpecForHunting } from "./huntingEncounters.js";
 
 const DEFAULT_RNG = () => Math.random();
@@ -10,31 +16,29 @@ const MONSTER_PROBABILITY = Object.freeze({
 });
 
 export const HUNTING_TEAMS = Object.freeze({ PLAYER: "hunting-player", ENEMY: "hunting-enemy" });
-export const HUNTING_MONSTER_TYPES = Object.freeze({
-    MELEE: "pursuer",
-    RANGED: "shooter",
-    PURSUER: "pursuer",
-    CHARGER: "charger",
-    SHOOTER: "shooter",
-    ELECTRIC: "electric",
-    HEALER: "healer",
-    CHAIN: "chain",
-    SHOCKWAVE: "shockwave",
-    BARRIER: "barrier",
-    SIPHON: "siphon",
-    SHARD: "shard",
-    BOOMERANG: "boomerang",
-    SPLITTER: "splitter",
-    JUMPER: "jumper",
-    LASER: "laser"
-});
-
 export const HUNTING_MONSTER_TAGS = Object.freeze({
     MONSTER: "monster",
     RARITY_COMMON: "rarity:common",
     RARITY_RARE: "rarity:rare",
     RARITY_UNIQUE: "rarity:unique",
     RARITY_EPIC: "rarity:epic"
+});
+
+const MONSTER_BEHAVIOR_DESCRIPTIONS = Object.freeze({
+    pursuer: "대상을 향해 계속 추적합니다.",
+    charger: "거리를 벌린 뒤 빠르게 돌진합니다.",
+    shooter: "거리를 유지하며 투사체를 발사합니다.",
+    electric: "가까운 대상과 전격 연결을 유지하며 지속 피해를 줍니다.",
+    healer: "주변 아군 한 명에게 체력을 나누어 회복 빔을 연결합니다.",
+    chain: "사슬을 뻗어 대상을 묶고 끌어당깁니다.",
+    shockwave: "충격파로 주변을 밀어내며 접근을 방해합니다.",
+    barrier: "아군 앞을 막기 위해 가까운 아군과 위치를 교체합니다.",
+    siphon: "대상과 연결해 체력을 흡수합니다.",
+    shard: "파편을 흩뿌려 여러 방향을 압박합니다.",
+    boomerang: "되돌아오는 부메랑 투사체를 발사합니다.",
+    splitter: "위험해지면 작은 파편으로 분열합니다.",
+    jumper: "크기를 키우며 도약해 충돌을 노립니다.",
+    laser: "충전한 방향으로 벽 끝까지 레이저를 발사합니다."
 });
 
 const CAVE_MONSTERS = Object.freeze(
@@ -188,7 +192,8 @@ const CAVE_MONSTERS = Object.freeze(
             color,
             face,
             stats: Object.freeze(stats),
-            monsterTags: Object.freeze([...monsterTags])
+            monsterTags: Object.freeze([...monsterTags]),
+            behaviorDescription: MONSTER_BEHAVIOR_DESCRIPTIONS[type]
         })
     )
 );
@@ -196,11 +201,45 @@ const CAVE_MONSTERS = Object.freeze(
 export const HUNTING_MONSTER_BASE_SPECS = Object.freeze(
     Object.fromEntries(CAVE_MONSTERS.map((monster) => [monster.type, monster]))
 );
+
+// 지역별 강화나 능력 변형은 이 정의에만 추가한다. 현재 지역은 같은 기본 수치를 공유한다.
+const STAGE_MONSTER_OVERRIDES = Object.freeze(
+    Object.fromEntries(HUNTING_STAGES.map((stage) => [stage.id, Object.freeze({})]))
+);
+
+function createStageMonsterDefinition(base, stage) {
+    const override = STAGE_MONSTER_OVERRIDES[stage.id]?.[base.type] ?? {};
+    return Object.freeze({
+        ...base,
+        ...override,
+        stats: Object.freeze({ ...base.stats, ...(override.stats ?? {}) }),
+        stageId: stage.id,
+        stageName: stage.name
+    });
+}
+
+const HUNTING_MONSTERS_BY_STAGE = Object.freeze(
+    Object.fromEntries(
+        HUNTING_STAGES.map((stage) => [
+            stage.id,
+            Object.freeze(CAVE_MONSTERS.map((monster) => createStageMonsterDefinition(monster, stage)))
+        ])
+    )
+);
+
+export function getHuntingMonsterDefinitions(stageId = HUNTING_STAGE_IDS.CAVE) {
+    return HUNTING_MONSTERS_BY_STAGE[stageId] ?? HUNTING_MONSTERS_BY_STAGE[HUNTING_STAGE_IDS.CAVE];
+}
+
+export function getHuntingMonsterDefinition(type, stageId = HUNTING_STAGE_IDS.CAVE) {
+    return getHuntingMonsterDefinitions(stageId).find((monster) => monster.type === type) ?? null;
+}
+
 const safeFloor = (floor) => Math.max(1, Math.floor(Number.isFinite(floor) ? floor : 1));
 
 export function getHuntingMonsterPool(floor, stageId = HUNTING_STAGE_IDS.CAVE) {
     const safe = safeFloor(floor);
-    const definitions = stageId === HUNTING_STAGE_IDS.CAVE ? CAVE_MONSTERS : CAVE_MONSTERS;
+    const definitions = getHuntingMonsterDefinitions(stageId);
     const latestFocusFloor = definitions.reduce(
         (latest, monster) => (monster.focusFloor <= safe ? Math.max(latest, monster.focusFloor) : latest),
         1
@@ -277,14 +316,16 @@ export function createHuntingMobSpec({
     type = HUNTING_MONSTER_TYPES.MELEE,
     floor = 1,
     index = 0,
+    stageId = HUNTING_STAGE_IDS.CAVE,
     rng = DEFAULT_RNG
 } = {}) {
-    const base = HUNTING_MONSTER_BASE_SPECS[type] ?? HUNTING_MONSTER_BASE_SPECS[HUNTING_MONSTER_TYPES.MELEE];
+    const base =
+        getHuntingMonsterDefinition(type, stageId) ?? getHuntingMonsterDefinition(HUNTING_MONSTER_TYPES.MELEE, stageId);
     return {
         id: `hunting-mob-${base.type}-f${safeFloor(floor)}-${index}`,
         name: base.displayName,
         title: base.displayName,
-        description: `${base.displayName} 전용 행동을 사용하는 사냥터 몬스터`,
+        description: base.behaviorDescription,
         color: base.color,
         face: base.face,
         ability: "hunting_mob",
@@ -296,7 +337,7 @@ export function createHuntingMobSpec({
             monsterTags: base.monsterTags,
             behavior: base.type,
             isMob: true,
-            stageSkin: "cave"
+            stageSkin: base.stageId
         }
     };
 }
@@ -308,7 +349,7 @@ export function createHuntingMobEncounter({ floor = 1, stageId = HUNTING_STAGE_I
         monsterTypes.push(rollMonster(floor, stageId, rng, forceDifferentSecondType ? [monsterTypes[0]] : []).type);
     });
     return monsterTypes.map((type, index) =>
-        scaleEnemySpecForHunting(createHuntingMobSpec({ type, floor, index, rng }), floor, {
+        scaleEnemySpecForHunting(createHuntingMobSpec({ type, floor, index, stageId, rng }), floor, {
             enemyType: HUNTING_ENEMY_TYPES.NORMAL
         })
     );

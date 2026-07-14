@@ -486,6 +486,7 @@ export const REWARD_BALANCE = deepFreeze({
                 }
             },
             huntingAllStagesClear: { type: "CHEST", rarity: "epic" },
+            huntingMonsterCodexComplete: { type: "CHEST", rarity: "rare" },
             huntingMonsterSlayer: { type: "CHEST", rarity: "common" },
             huntingRareMonsterSlayer: { type: "CHEST", rarity: "uncommon" },
             huntingUniqueMonsterSlayer: { type: "CHEST", rarity: "rare" },
