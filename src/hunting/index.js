@@ -2,6 +2,8 @@ export * from "./huntingConfig.js";
 export * from "./huntingRewards.js";
 export * from "./huntingEncounters.js";
 export * from "./huntingMonsters.js";
+export * from "./eliteMobCombinations.js";
+export * from "./eliteMobEncounter.js";
 export * from "./bossMob.js";
 export * from "./huntingAchievementProgress.js";
 export * from "./huntingState.js";

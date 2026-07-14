@@ -116,7 +116,8 @@ export const HUNTING_EVENT_TYPES = Object.freeze({
     CHEST_ROOM: "chest_room",
     REST_SITE: "rest_site",
     CURSED_ALTAR: "cursed_altar",
-    CHAMPION_INTRUSION: "champion_intrusion"
+    CHAMPION_INTRUSION: "champion_intrusion",
+    ELITE_MOB: "elite_mob"
 });
 
 export const HUNTING_CHEST_RARITIES = Object.freeze(["common", "uncommon", "rare", "epic", "legendary"]);

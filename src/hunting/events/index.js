@@ -3,6 +3,7 @@ import { BoonEvent } from "./boonEvent.js";
 import { ChampionIntrusionEvent } from "./championIntrusionEvent.js";
 import { ChestRoomEvent } from "./chestRoomEvent.js";
 import { CursedAltarEvent } from "./cursedAltarEvent.js";
+import { EliteMobEvent } from "./eliteMobEvent.js";
 import { HuntingEvent } from "./huntingEvent.js";
 import { MerchantEvent } from "./merchantEvent.js";
 import { MishapEvent } from "./mishapEvent.js";
@@ -17,7 +18,8 @@ HuntingEvent.POOL = Object.freeze([
     new ChestRoomEvent(HUNTING_EVENT_TYPES.CHEST_ROOM),
     new RestSiteEvent(HUNTING_EVENT_TYPES.REST_SITE),
     new CursedAltarEvent(HUNTING_EVENT_TYPES.CURSED_ALTAR),
-    new ChampionIntrusionEvent(HUNTING_EVENT_TYPES.CHAMPION_INTRUSION)
+    new ChampionIntrusionEvent(HUNTING_EVENT_TYPES.CHAMPION_INTRUSION),
+    new EliteMobEvent(HUNTING_EVENT_TYPES.ELITE_MOB)
 ]);
 HuntingEvent.REGISTRY = new Map(HuntingEvent.POOL.map((event) => [event.type, event]));
 

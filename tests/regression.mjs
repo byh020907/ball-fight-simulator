@@ -149,6 +149,10 @@ import {
     HUNTING_LOOT_ITEM_TYPES,
     HuntingBattleLootSession,
     HuntingLootDropController,
+    ELITE_MOB_COMBINATION_GENERATION,
+    ELITE_MOB_COMBINATIONS,
+    createEliteMobEncounter,
+    getEliteMobCombination,
     getHuntingBonusLootWeights,
     getHuntingLootDropChance,
     getHuntingLootMultiplier,
@@ -1873,7 +1877,8 @@ function testHuntingEventPresentationContracts() {
         [HUNTING_EVENT_TYPES.CHEST_ROOM]: "상자방 발견",
         [HUNTING_EVENT_TYPES.REST_SITE]: "휴식지",
         [HUNTING_EVENT_TYPES.CURSED_ALTAR]: "저주받은 제단",
-        [HUNTING_EVENT_TYPES.CHAMPION_INTRUSION]: "챔피언 난입"
+        [HUNTING_EVENT_TYPES.CHAMPION_INTRUSION]: "챔피언 난입",
+        [HUNTING_EVENT_TYPES.ELITE_MOB]: "정예 몹 습격"
     };
 
     for (const event of HuntingEvent.POOL) {
@@ -2781,10 +2786,7 @@ function testHuntingBossRolesAndEnhancementStoneDrops(app) {
         "A successful miniboss roll must reset the next chance to its initial value"
     );
 
-    const championEventRun = advanceHuntingRun(
-        { ...run, minibossChance: 0.2 },
-        { rng: createSequenceRng([0.5, 0.999999]) }
-    );
+    const championEventRun = advanceHuntingRun({ ...run, minibossChance: 0.2 }, { rng: createSequenceRng([0.5, 0.8]) });
     assert.equal(
         championEventRun.lastEvent.type,
         HUNTING_EVENT_TYPES.CHAMPION_INTRUSION,
@@ -2968,6 +2970,181 @@ function testHuntingBossRolesAndEnhancementStoneDrops(app) {
         "Secured enhancement stones must settle into the persistent equipment resource"
     );
     console.log("[hunting-boss-roles-and-enhancement-stones] ok");
+}
+
+function testEliteMobCombinationEvent(app) {
+    const uniqueMonsterTypes = [...new Set(Object.values(HUNTING_MONSTER_TYPES))].sort();
+    assert.equal(
+        HuntingEvent.POOL.at(-1)?.type,
+        HUNTING_EVENT_TYPES.ELITE_MOB,
+        "Elite mob events should append to the pool"
+    );
+    assert.deepEqual(
+        ELITE_MOB_COMBINATIONS.map((combination) => combination.size),
+        [3, 4, 5],
+        "Generated elite data should keep one verified combination for each supported size"
+    );
+    assert.equal(
+        ELITE_MOB_COMBINATION_GENERATION.seed,
+        20260714,
+        "Elite combination data should retain its reproducible generator seed"
+    );
+    assert.deepEqual(
+        ELITE_MOB_COMBINATION_GENERATION.uniqueMonsterTypes,
+        uniqueMonsterTypes,
+        "Elite candidate sampling should remove monster-type aliases before using every unique type equally"
+    );
+    assert.equal(
+        ELITE_MOB_COMBINATION_GENERATION.scoreFormula,
+        "monsterWinRate + winningRemainingHpRatio * 0.01",
+        "Elite scoring should keep win rate primary with only a small surviving-HP tiebreaker"
+    );
+    ELITE_MOB_COMBINATIONS.forEach((combination) => {
+        assert.equal(
+            combination.monsterTypes.length,
+            combination.size,
+            "Combination payload size should match its generated category"
+        );
+        assert.equal(
+            combination.metrics.matches,
+            26,
+            "Every generated combination should evaluate every roster character equally"
+        );
+        assert.equal(
+            getEliteMobCombination(combination.id),
+            combination,
+            "Generated combination IDs should resolve to their committed runtime data"
+        );
+    });
+
+    const event = HuntingEvent.get(HUNTING_EVENT_TYPES.ELITE_MOB);
+    const selected = event.createPayload(37, () => 0.5);
+    const selectedCombination = ELITE_MOB_COMBINATIONS[1];
+    assert.equal(selected.type, HUNTING_EVENT_TYPES.ELITE_MOB, "Elite events should keep their own event type");
+    assert.equal(selected.floor, 37, "Elite event payloads should retain the current floor");
+    assert.equal(
+        selected.enemyType,
+        HUNTING_ENEMY_TYPES.ELITE,
+        "Elite event payloads should mark elite scaling explicitly"
+    );
+    assert.equal(
+        selected.eliteCombinationId,
+        selectedCombination.id,
+        "Elite event payloads should persist the selected stable combination ID"
+    );
+    assert.deepEqual(
+        selected.monsterTypes,
+        selectedCombination.monsterTypes,
+        "Elite event payloads should persist the exact selected type array"
+    );
+
+    const rolledElite = rollHuntingFloorOutcome(
+        10,
+        (() => {
+            const values = [0.5, 0.95];
+            return () => values.shift() ?? 0;
+        })(),
+        0,
+        { hpRatio: 1 }
+    );
+    assert.equal(
+        rolledElite.event.type,
+        HUNTING_EVENT_TYPES.ELITE_MOB,
+        "The appended event should roll through floor outcomes"
+    );
+
+    const resolution = event.resolve(selected, {
+        run: createHuntingRun({ characterId: FIGHTER_IDS.ARCHER, stageId: HUNTING_STAGE_IDS.CAVE })
+    });
+    assert.equal(
+        resolution.transition,
+        HUNTING_EVENT_TRANSITIONS.BATTLE,
+        "Elite events should use the battle preparation flow"
+    );
+    assert.equal(
+        resolution.presentation.title,
+        "정예 몹 습격",
+        "Elite events should identify the verified monster battle"
+    );
+    assert.ok(
+        resolution.presentation.detail.includes("elite 강화"),
+        "Elite preparation text should explain the scaling applied to the selected group"
+    );
+
+    const eliteSpecs = createEliteMobEncounter({
+        floor: selected.floor,
+        stageId: HUNTING_STAGE_IDS.CAVE,
+        combinationId: selected.eliteCombinationId,
+        monsterTypes: selected.monsterTypes,
+        rng: () => 0
+    });
+    assert.deepEqual(
+        eliteSpecs.map((spec) => spec.hunting.monsterType),
+        selected.monsterTypes,
+        "Elite encounter factories should preserve payload order and duplicate monster types"
+    );
+    eliteSpecs.forEach((spec) => {
+        assert.equal(spec.hunting.enemyType, HUNTING_ENEMY_TYPES.ELITE, "Elite event mobs should use elite scaling");
+        assert.equal(spec.hunting.floor, selected.floor, "Elite event mobs should scale from the actual current floor");
+        assert.equal(
+            spec.hunting.enemyPowerMultiplier,
+            getEnemyPowerMultiplier(selected.floor, { enemyType: HUNTING_ENEMY_TYPES.ELITE }),
+            "Elite event mobs should expose the current-floor elite multiplier"
+        );
+    });
+    assert.throws(
+        () =>
+            createEliteMobEncounter({
+                floor: selected.floor,
+                combinationId: selected.eliteCombinationId,
+                monsterTypes: [...selected.monsterTypes].reverse()
+            }),
+        /does not match/,
+        "Elite encounter factories should reject payloads that do not match their stable combination ID"
+    );
+
+    const capturedMatches = [];
+    const managerApp = {
+        roster: app.roster,
+        playerProfile: createDefaultPlayerProfile(),
+        playerStatAllocation: {},
+        startMatch(specs) {
+            capturedMatches.push(specs);
+        }
+    };
+    const manager = new HuntingManager(managerApp);
+    manager._run = {
+        ...createHuntingRun({ characterId: FIGHTER_IDS.ARCHER, stageId: HUNTING_STAGE_IDS.CAVE, now: 0 }),
+        floor: selected.floor,
+        lastEncounter: { type: HUNTING_FLOOR_OUTCOME_TYPES.EVENT },
+        lastEvent: selected
+    };
+    manager._startFloorBattle();
+    const spawnedEliteSpecs = capturedMatches[0].slice(1);
+    assert.deepEqual(
+        spawnedEliteSpecs.map((spec) => spec.hunting.monsterType),
+        selected.monsterTypes,
+        "HuntingManager should spawn the payload combination rather than a normal weighted encounter"
+    );
+    assert.ok(
+        spawnedEliteSpecs.every((spec) => spec.hunting.enemyType === HUNTING_ENEMY_TYPES.ELITE),
+        "HuntingManager should preserve elite scaling on every selected monster"
+    );
+
+    manager._run = {
+        ...createHuntingRun({ characterId: FIGHTER_IDS.ARCHER, stageId: HUNTING_STAGE_IDS.CAVE, now: 1 }),
+        floor: selected.floor,
+        lastEncounter: { type: HUNTING_FLOOR_OUTCOME_TYPES.EVENT },
+        lastEvent: { type: HUNTING_EVENT_TYPES.CHAMPION_INTRUSION, enemyType: HUNTING_ENEMY_TYPES.CHAMPION }
+    };
+    manager._startFloorBattle();
+    const championBoss = capturedMatches[1].slice(1).find((spec) => spec.hunting?.isMiniboss);
+    assert.equal(
+        championBoss.hunting.isMob,
+        undefined,
+        "Elite events must not replace roster-based champion intrusions"
+    );
+    console.log("[hunting-elite-mob-combination-event] ok");
 }
 
 function testHuntingLootItemsRotate() {
@@ -4595,10 +4772,10 @@ function testHuntingSystem() {
         "Non-combat event rewards should not consume temporary stat modifiers"
     );
 
-    // rng(1)=0.4→EVENT, rng(2)=0.95→CHAMPION_INTRUSION(idx7)
+    // rng(1)=0.4→EVENT, rng(2)=0.8→CHAMPION_INTRUSION(idx7)
     const champion = advanceHuntingRun(afterFloor, {
         rng: (() => {
-            const rolls = [0.4, 0.95];
+            const rolls = [0.4, 0.8];
             return () => rolls.shift() ?? 0;
         })()
     });
@@ -16483,6 +16660,7 @@ testHuntingSplitterDeathFragmentsAndResultGrace(app);
 testHuntingLootItemsRotate();
 testHuntingLootItemsAndDropController(app);
 testHuntingBossRolesAndEnhancementStoneDrops(app);
+testEliteMobCombinationEvent(app);
 testHuntingLootSessionIsDiscardedOnDefeat(app);
 testHuntingCombatRewardChestUi();
 testHuntingCombatWithoutCollectedChestSkipsChestUi();
@@ -16651,7 +16829,7 @@ function testHuntingMishapAvoidsLowHpRuns() {
     const highHp = rollHuntingFloorOutcome(
         10,
         (() => {
-            const rolls = [0.5, 0.45];
+            const rolls = [0.5, 0.4];
             return () => rolls.shift() ?? 0;
         })(),
         0,
@@ -16660,7 +16838,7 @@ function testHuntingMishapAvoidsLowHpRuns() {
     const lowHp = rollHuntingFloorOutcome(
         10,
         (() => {
-            const rolls = [0.5, 0.45];
+            const rolls = [0.5, 0.4];
             return () => rolls.shift() ?? 0;
         })(),
         0,

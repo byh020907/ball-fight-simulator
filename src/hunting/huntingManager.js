@@ -30,6 +30,7 @@ import {
     createHuntingMinibossSpec,
     createHuntingMobEncounter
 } from "./huntingMonsters.js";
+import { createEliteMobEncounter } from "./eliteMobEncounter.js";
 import { applyMerchantOffer, formatOfferResultToast } from "./huntingMerchant.js";
 import { formatPendingLootSummary, formatDefeatLossText } from "./huntingFormat.js";
 import { createMatchReport, recordLowestHp } from "../collection/index.js";
@@ -282,7 +283,15 @@ export class HuntingManager {
 
         const isFinalBoss = run.lastEncounter?.type === HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS;
         const isChampion = !isFinalBoss && run.lastEvent?.enemyType === HUNTING_ENEMY_TYPES.CHAMPION;
-        const mobSpecs = createHuntingMobEncounter({ floor: run.floor, stageId: run.stageId });
+        const isEliteMobEvent = !isFinalBoss && run.lastEvent?.type === HUNTING_EVENT_TYPES.ELITE_MOB;
+        const mobSpecs = isEliteMobEvent
+            ? createEliteMobEncounter({
+                  floor: run.floor,
+                  stageId: run.stageId,
+                  combinationId: run.lastEvent.eliteCombinationId,
+                  monsterTypes: run.lastEvent.monsterTypes
+              })
+            : createHuntingMobEncounter({ floor: run.floor, stageId: run.stageId });
         const rosterMiniboss =
             isFinalBoss || isChampion
                 ? createHuntingMinibossSpec({
