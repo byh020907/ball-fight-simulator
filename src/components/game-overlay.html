@@ -747,16 +747,34 @@
         border-top: 1px solid #e0e0e0;
     }
 
-    :scope.hunting-merchant-active .hunting-merchant {
+    :scope.hunting-merchant-active:not(.result-sequence-active) .hunting-merchant {
         display: flex;
         flex: 1 1 auto;
         flex-direction: column;
         min-height: 0;
     }
 
-    :scope.hunting-merchant-active .overlay-card {
-        width: min(420px, calc(100% - 16px));
-        max-height: calc(100% - 12px);
+    :scope.hunting-merchant-active:not(.result-sequence-active) .result-sequence-frame,
+    :scope.hunting-chest-active:not(.result-sequence-active) .result-sequence-frame,
+    :scope.hunting-event-active:not(.result-sequence-active) .result-sequence-frame,
+    :scope.hunting-battle-preparation-active:not(.result-sequence-active) .result-sequence-frame {
+        width: 100%;
+        height: 100%;
+        display: grid;
+        place-items: center;
+    }
+
+    :scope.hunting-merchant-active:not(.result-sequence-active) .overlay-card,
+    :scope.hunting-chest-active:not(.result-sequence-active) .overlay-card,
+    :scope.hunting-event-active:not(.result-sequence-active) .overlay-card,
+    :scope.hunting-battle-preparation-active:not(.result-sequence-active) .overlay-card {
+        width: fit-content;
+        max-width: 100%;
+        max-height: 100%;
+        box-sizing: border-box;
+    }
+
+    :scope.hunting-merchant-active:not(.result-sequence-active) .overlay-card {
         padding: 12px 14px;
         overflow: hidden;
         pointer-events: auto;
@@ -764,24 +782,21 @@
         flex-direction: column;
     }
 
-    :scope.hunting-merchant-active .overlay-card > strong {
+    :scope.hunting-merchant-active:not(.result-sequence-active) .overlay-card > strong {
         font-size: clamp(1.3rem, 6vw, 2rem);
     }
 
     :scope.hunting-chest-active:not(.result-sequence-active) .overlay-card {
-        width: min(360px, calc(100% - 32px));
         padding: 18px 22px;
         pointer-events: auto;
     }
 
     :scope.hunting-event-active:not(.result-sequence-active) .overlay-card {
-        width: min(360px, calc(100% - 32px));
         padding: 18px 22px;
         pointer-events: auto;
     }
 
-    :scope.hunting-battle-preparation-active .overlay-card {
-        width: min(390px, calc(100% - 24px));
+    :scope.hunting-battle-preparation-active:not(.result-sequence-active) .overlay-card {
         padding: 18px 22px;
         pointer-events: auto;
     }
@@ -1138,7 +1153,6 @@
             font-size: 0.65rem;
         }
         :scope.hunting-chest-active:not(.result-sequence-active) .overlay-card {
-            width: min(340px, calc(100% - 24px));
             padding: 14px 16px;
         }
         .hunting-chest-token {

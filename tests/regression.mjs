@@ -14924,8 +14924,10 @@ function testHuntingMerchantMobileScrollContract() {
         "Overlay should expose a merchant-active class for the compact mobile layout"
     );
     assert.ok(
-        content.includes(":scope.hunting-merchant-active .overlay-card"),
-        "Merchant overlay card should have a dedicated bounded layout"
+        content.includes(":scope.hunting-merchant-active:not(.result-sequence-active) .overlay-card") &&
+            content.includes("width: fit-content;") &&
+            content.includes("max-width: 100%;"),
+        "Merchant overlay card should use content width inside the shared fluid frame"
     );
     assert.ok(
         content.includes(".hunting-merchant-offers") && content.includes("overflow-y: auto"),
@@ -17596,12 +17598,33 @@ function testResultOverlayReservesConfirmActionSpace() {
         );
         assert.ok(tabRight <= viewportWidth, "The entire side-tab touch target must remain inside the viewport");
     }
-    assert.ok(
-        overlay.includes(":scope.hunting-chest-active:not(.result-sequence-active) .overlay-card {") &&
-            overlay.includes(":scope.hunting-event-active:not(.result-sequence-active) .overlay-card {") &&
-            !overlay.includes(":scope.hunting-chest-active .overlay-card {") &&
-            !overlay.includes(":scope.hunting-event-active .overlay-card {"),
-        "Standalone hunting card widths must not override the result-sequence card"
+    const huntingFrameRule =
+        overlay.match(
+            /:scope\.hunting-merchant-active:not\(\.result-sequence-active\) \.result-sequence-frame,\s*:scope\.hunting-chest-active:not\(\.result-sequence-active\) \.result-sequence-frame,\s*:scope\.hunting-event-active:not\(\.result-sequence-active\) \.result-sequence-frame,\s*:scope\.hunting-battle-preparation-active:not\(\.result-sequence-active\) \.result-sequence-frame\s*\{([^}]*)\}/s
+        )?.[1] ?? "";
+    assert.match(
+        huntingFrameRule,
+        /width:\s*100%;[\s\S]*height:\s*100%;[\s\S]*display:\s*grid;[\s\S]*place-items:\s*center;/,
+        "Standalone hunting overlays must give the shared frame the full available area before centering the card"
+    );
+    assert.doesNotMatch(
+        huntingFrameRule,
+        /(?:\b\d+px\b|calc\()/,
+        "Standalone hunting frames must not use fixed container dimensions"
+    );
+    const huntingCardRule =
+        overlay.match(
+            /:scope\.hunting-merchant-active:not\(\.result-sequence-active\) \.overlay-card,\s*:scope\.hunting-chest-active:not\(\.result-sequence-active\) \.overlay-card,\s*:scope\.hunting-event-active:not\(\.result-sequence-active\) \.overlay-card,\s*:scope\.hunting-battle-preparation-active:not\(\.result-sequence-active\) \.overlay-card\s*\{([^}]*)\}/s
+        )?.[1] ?? "";
+    assert.match(
+        huntingCardRule,
+        /width:\s*fit-content;[\s\S]*max-width:\s*100%;[\s\S]*max-height:\s*100%;[\s\S]*box-sizing:\s*border-box;/,
+        "Standalone hunting cards must size to their content while staying inside the fluid shared frame"
+    );
+    assert.doesNotMatch(
+        huntingCardRule,
+        /(?:\b\d+px\b|calc\()/,
+        "Standalone hunting cards must not cap their container width with fixed dimensions"
     );
     const transientFrameRule = overlay.match(/:scope\.transient \.result-sequence-frame\s*\{([^}]*)\}/s)?.[1] ?? "";
     assert.match(
