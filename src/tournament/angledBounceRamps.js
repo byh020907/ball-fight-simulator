@@ -1,3 +1,4 @@
+import { Vector2 } from "../core.js";
 import { polygonBoundingRadius } from "../physics/CollisionShape.js";
 import { TERRAIN_SHAPES, TERRAIN_TYPES } from "../terrain/terrainConfig.js";
 
@@ -10,18 +11,11 @@ export const TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS = Object.freeze({
     lifetime: 0.7,
     cooldown: 1.2,
     length: 120,
-    thickness: 16,
-    wallInset: 55,
-    minimumSlopeDegrees: 25,
-    maximumSlopeDegrees: 45
+    wallInset: 55
 });
 
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
-}
-
-function degreesToRadians(degrees) {
-    return (degrees * Math.PI) / 180;
 }
 
 function hashSeed(seed) {
@@ -65,14 +59,7 @@ function getDistance(a, b) {
 }
 
 function getRampBoundingRadius(policy) {
-    return Math.hypot(policy.length / 2, policy.thickness / 2);
-}
-
-function getRampCenter(prediction, policy) {
-    return {
-        x: prediction.impactPoint.x + prediction.normal.x * policy.wallInset,
-        y: prediction.impactPoint.y + prediction.normal.y * policy.wallInset
-    };
+    return Math.hypot(policy.length / 2, policy.wallInset);
 }
 
 function isActiveFighter(fighter) {
@@ -88,7 +75,7 @@ function isClearOfCorner(simulation, prediction, fighter, policy) {
 }
 
 function hasClearRampPlacement(simulation, candidate, policy) {
-    const center = getRampCenter(candidate.prediction, policy);
+    const center = candidate.prediction.impactPoint;
     const rampRadius = getRampBoundingRadius(policy);
     const fighterOverlap = simulation.fighters.some(
         (fighter) =>
@@ -104,30 +91,35 @@ function hasClearRampPlacement(simulation, candidate, policy) {
 }
 
 function createRampTerrain(prediction, policy, random, serial) {
-    const center = getRampCenter(prediction, policy);
-    const slopeDegrees =
-        policy.minimumSlopeDegrees + random() * (policy.maximumSlopeDegrees - policy.minimumSlopeDegrees);
-    const slopeSign = random() < 0.5 ? -1 : 1;
-    const angle = Math.atan2(prediction.normal.y, prediction.normal.x) + slopeSign * degreesToRadians(slopeDegrees);
+    const inwardSide = random() < 0.5 ? -1 : 1;
     const halfLength = policy.length / 2;
-    const halfThickness = policy.thickness / 2;
+    const wallTangent = { x: -prediction.normal.y, y: prediction.normal.x };
+    const wallStart = { x: wallTangent.x * halfLength, y: wallTangent.y * halfLength };
+    const wallEnd = { x: -wallStart.x, y: -wallStart.y };
+    const insideCorner = {
+        x: prediction.normal.x * policy.wallInset + wallTangent.x * halfLength * inwardSide,
+        y: prediction.normal.y * policy.wallInset + wallTangent.y * halfLength * inwardSide
+    };
+    const effectPosition = {
+        x:
+            prediction.impactPoint.x +
+            (prediction.normal.x * policy.wallInset + wallTangent.x * halfLength * inwardSide) / 3,
+        y:
+            prediction.impactPoint.y +
+            (prediction.normal.y * policy.wallInset + wallTangent.y * halfLength * inwardSide) / 3
+    };
 
     return {
         id: `tournament-angled-ramp-${serial}`,
         type: TERRAIN_TYPES.ROCK,
         shape: TERRAIN_SHAPES.POLYGON,
-        x: center.x,
-        y: center.y,
-        angle,
-        points: [
-            { x: -halfLength, y: -halfThickness },
-            { x: halfLength, y: -halfThickness },
-            { x: halfLength, y: halfThickness },
-            { x: -halfLength, y: halfThickness }
-        ],
+        x: prediction.impactPoint.x,
+        y: prediction.impactPoint.y,
+        points: [wallStart, wallEnd, insideCorner],
         blocking: true,
         physicsMaterial: "wood",
-        temporaryKind: RAMP_KIND
+        temporaryKind: RAMP_KIND,
+        effectPosition
     };
 }
 
@@ -135,15 +127,6 @@ export function createTournamentAngledBounceRampPolicy(options = {}) {
     if (options !== true && options?.enabled !== true) return null;
 
     const source = options === true ? {} : options;
-    const minimumSlopeDegrees = normalizeNumber(
-        source.minimumSlopeDegrees,
-        TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS.minimumSlopeDegrees
-    );
-    const maximumSlopeDegrees = Math.max(
-        minimumSlopeDegrees,
-        normalizeNumber(source.maximumSlopeDegrees, TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS.maximumSlopeDegrees)
-    );
-
     return {
         enabled: true,
         incidenceThresholdDegrees: normalizeNumber(
@@ -154,10 +137,7 @@ export function createTournamentAngledBounceRampPolicy(options = {}) {
         lifetime: normalizeNumber(source.lifetime, TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS.lifetime),
         cooldown: normalizeNumber(source.cooldown, TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS.cooldown),
         length: normalizeNumber(source.length, TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS.length, 1),
-        thickness: normalizeNumber(source.thickness, TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS.thickness, 1),
         wallInset: normalizeNumber(source.wallInset, TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS.wallInset),
-        minimumSlopeDegrees,
-        maximumSlopeDegrees,
         seed: source.seed
     };
 }
@@ -294,6 +274,7 @@ export class TournamentAngledBounceRampSystem {
         };
         this._cooldownByFighterId.set(candidate.fighter.id, this.policy.cooldown);
         this.events.push({ type: "created", fighterId: candidate.fighter.id, wall: candidate.prediction.wall });
+        this._emitRampParticles(this.activeRamp, "created");
     }
 
     _removeActiveRamp(reason, fighter = null) {
@@ -307,6 +288,22 @@ export class TournamentAngledBounceRampSystem {
             fighterId: fighter?.id ?? activeRamp.ownerId,
             wall: activeRamp.prediction.wall
         });
+        this._emitRampParticles(activeRamp, reason);
         this.activeRamp = null;
+    }
+
+    _emitRampParticles(activeRamp, phase) {
+        const isCreation = phase === "created";
+        const position = activeRamp.terrain.effectPosition;
+        this.simulation.spawnParticleBurst(new Vector2(position.x, position.y), isCreation ? "#fff0a6" : "#e6ae35", {
+            count: isCreation ? 12 : 18,
+            speed: isCreation ? 150 : 210,
+            radiusMin: 2,
+            radiusMax: 4,
+            gravity: 680,
+            life: isCreation ? 0.38 : 0.52,
+            bounce: 0.08,
+            settleDelay: 0.18
+        });
     }
 }

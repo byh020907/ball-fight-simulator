@@ -6566,22 +6566,23 @@ function testTournamentAngledBounceRamps() {
         "Only the active temporary ramp should join the tournament terrain list"
     );
     assert.equal(activeTerrain.shape, "polygon", "Temporary ramp should use the shared polygon terrain contract");
-    assert.equal(activeTerrain.points.length, 4, "Temporary ramp should be a convex four-point polygon");
+    assert.equal(activeTerrain.points.length, 3, "Temporary ramp should be a right-triangle polygon");
     assert.equal(activeTerrain.physicsMaterial, "wood", "Temporary ramp should use the existing wood terrain material");
-    assert.equal(activeTerrain.x, 905, "Right-wall ramp should stay 55px inside the wall");
-    assert.equal(activeTerrain.y, 480, "Ramp should align to the predicted wall-hit coordinate");
-
-    const angleFromWallNormal =
-        (Math.abs(Math.atan2(Math.sin(activeTerrain.angle - Math.PI), Math.cos(activeTerrain.angle - Math.PI))) * 180) /
-        Math.PI;
+    const trianglePoints = getWorldPolygonPoints(activeTerrain);
+    const wallVertices = trianglePoints.filter((point) => point.x === simulation.width);
+    const innerVertex = trianglePoints.find((point) => point.x < simulation.width);
     assert.ok(
-        angleFromWallNormal >= TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS.minimumSlopeDegrees,
-        "Ramp slope should not fall below the confirmed minimum"
+        wallVertices.length === 2,
+        "Right-triangle ramp should keep one complete side directly attached to the predicted wall"
     );
     assert.ok(
-        angleFromWallNormal <= TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS.maximumSlopeDegrees,
-        "Ramp slope should not exceed the confirmed maximum"
+        Math.abs(innerVertex.x - (simulation.width - TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS.wallInset)) < 0.001,
+        "Right-triangle ramp should extend exactly 55px into the arena"
     );
+    const creationParticleCount = simulation.entities.filter(
+        (entity) => entity.constructor.name === "GravityParticle"
+    ).length;
+    assert.equal(creationParticleCount, 12, "Ramp creation should emit the configured particle burst");
 
     const rampContext = makeRecordingCanvasContext();
     drawTerrain(rampContext, [activeTerrain]);
@@ -6606,6 +6607,11 @@ function testTournamentAngledBounceRamps() {
     assert.ok(collisionVelocity, "Ramp should be removed when a fighter physically collides with it");
     assert.equal(ramps.activeRamp, null, "Physical ramp collision should immediately clear the active terrain");
     assert.equal(simulation.terrain.length, 0, "Physical ramp collision should remove the terrain from simulation");
+    assert.ok(
+        simulation.entities.filter((entity) => entity.constructor.name === "GravityParticle").length >=
+            creationParticleCount + 18,
+        "Ramp removal should emit an additional particle burst"
+    );
     const outgoingAngle = (Math.atan2(Math.abs(collisionVelocity.y), Math.abs(collisionVelocity.x)) * 180) / Math.PI;
     assert.ok(
         outgoingAngle >= 20,
@@ -6614,6 +6620,7 @@ function testTournamentAngledBounceRamps() {
 
     fighter.position = new Vector2(780, 480);
     fighter.velocity = new Vector2(600, 0);
+    simulation.fighters.find((candidate) => candidate !== fighter).velocity = new Vector2();
     ramps.update(0);
     assert.equal(ramps.activeRamp, null, "A fighter cooldown should block immediate duplicate ramp creation");
 
