@@ -2636,6 +2636,8 @@
 
     .ch-fusion-candidate {
         display: grid;
+        grid-template-rows: auto auto minmax(0.9rem, auto);
+        align-content: start;
         gap: 2px;
         min-height: 58px;
         padding: 8px 10px;
@@ -2644,8 +2646,16 @@
 
     .ch-fusion-equipment-state {
         display: inline-block;
+        min-height: 0.9rem;
+        align-self: start;
         line-height: 1.2;
         white-space: nowrap;
+    }
+
+    @media (max-width: 600px) {
+        .ch-fusion-candidate {
+            min-height: 72px;
+        }
     }
 
     .ch-fusion-candidate:disabled {

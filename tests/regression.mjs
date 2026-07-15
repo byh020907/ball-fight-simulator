@@ -17875,6 +17875,17 @@ testDailyShopPopupContract();
 
 function testFusionEquippedLabelTypographyContract() {
     const template = readFileSync("src/components/collection-hub.html", "utf8");
+    const candidateRule =
+        [...template.matchAll(/\.ch-fusion-candidate\s*\{([^}]*)\}/gs)]
+            .map((match) => match[1])
+            .find((rule) => /display:\s*grid;/.test(rule)) ?? "";
+    const stateRule =
+        [...template.matchAll(/\.ch-fusion-equipment-state\s*\{([^}]*)\}/gs)]
+            .map((match) => match[1])
+            .find((rule) => /display:\s*inline-block;/.test(rule)) ?? "";
+    const mobileCandidateRule = template.match(
+        /@media\s*\(max-width:\s*600px\)\s*\{\s*\.ch-fusion-candidate\s*\{([^}]*)\}/s
+    )?.[1];
     assert.ok(
         template.includes('class="ch-fusion-equipment-state"'),
         "Fusion candidates should give the equipped-state text a dedicated typography class"
@@ -17888,6 +17899,25 @@ function testFusionEquippedLabelTypographyContract() {
             template
         ),
         "Fusion equipped-state text should remain on one readable line"
+    );
+    assert.match(
+        candidateRule,
+        /grid-template-rows:\s*auto\s+auto\s+minmax\(/,
+        "Fusion candidates should reserve a dedicated third grid row for the equipped-state text"
+    );
+    assert.match(
+        stateRule,
+        /min-height:\s*[\d.]+rem;/,
+        "Fusion equipped-state text should reserve its own readable line height"
+    );
+    assert.ok(
+        mobileCandidateRule,
+        "Fusion candidates should define a mobile layout rule instead of relying on implicit grid sizing"
+    );
+    const mobileCandidateMinHeight = Number(mobileCandidateRule.match(/min-height:\s*(\d+)px;/)?.[1]);
+    assert.ok(
+        mobileCandidateMinHeight >= 68,
+        "Mobile fusion candidates should reserve enough height for name, stats, state, padding, and a 40px touch target"
     );
     console.log("[fusion-equipped-label-typography] ok");
 }
