@@ -87,6 +87,8 @@ import { AppLifecycle } from "./appLifecycle.js";
 import { ScreenWakeLock } from "./screenWakeLock.js";
 import { applyRebirthLoadoutToBaseSpec, applyRebirthLoadoutToBattleBall, getRebirthLoadout } from "./rebirth/index.js";
 
+const TOURNAMENT_CHALLENGE_INTRO_DURATION = 1000;
+
 export class BattleApp {
     constructor() {
         // ── 디버그 변수 (테스트 편의용) ──
@@ -564,17 +566,23 @@ export class BattleApp {
         this._syncPlayerStatAllocationFromUi();
     }
 
+    _getTournamentChallengePresentation() {
+        const masteryLevel = getCharacterMasteryLevel(this.playerProfile, this.playerFighterId);
+        return {
+            tierLabel: masteryLevel > 0 ? getTierText(masteryLevel) : "첫 도전",
+            opponentLevel: getTournamentOpponentExperienceLevel(this.playerProfile, this.playerFighterId) ?? 1
+        };
+    }
+
     refreshPlayerSetup() {
         const remaining = getRemainingStatPoints(this.playerStatAllocation);
         const player = this.roster.find((fighter) => fighter.id === this.playerFighterId);
         const experienceSummary = getCharacterExperienceSummary(this.playerProfile, this.playerFighterId);
         const equipmentSummary = this._getPlayerEquipmentSummary(this.playerFighterId);
-        const masteryLevel = getCharacterMasteryLevel(this.playerProfile, this.playerFighterId);
-        const tournamentOpponentLevel =
-            getTournamentOpponentExperienceLevel(this.playerProfile, this.playerFighterId) ?? 1;
+        const tournamentChallenge = this._getTournamentChallengePresentation();
         this._panel.fighter = player ? { name: player.name, title: player.title, color: player.color } : null;
-        this._panel.tournamentTierLabel = masteryLevel > 0 ? getTierText(masteryLevel) : "첫 도전";
-        this._panel.tournamentOpponentLevel = tournamentOpponentLevel;
+        this._panel.tournamentTierLabel = tournamentChallenge.tierLabel;
+        this._panel.tournamentOpponentLevel = tournamentChallenge.opponentLevel;
         this._panel.allocation = { ...this.playerStatAllocation };
         this._panel.totalPoints = PLAYER_STAT_POINTS;
         this._panel.remainingPoints = remaining;
@@ -972,6 +980,17 @@ export class BattleApp {
         return this._action.current;
     }
 
+    async _presentTournamentChallengeIntro(lifecycleRevision) {
+        const challenge = this._getTournamentChallengePresentation();
+        this._overlay.show({
+            label: "토너먼트 도전",
+            text: challenge.tierLabel,
+            subtext: `상대 Lv.${challenge.opponentLevel} 시작`
+        });
+        await this.wait(TOURNAMENT_CHALLENGE_INTRO_DURATION);
+        return this.lifecycle.isCurrentRevision(lifecycleRevision);
+    }
+
     async startMatch(customMatch = null, options = {}) {
         const lifecycleRevision = this.lifecycle.revision;
         this.audio.unlock();
@@ -989,12 +1008,15 @@ export class BattleApp {
 
         const match = customMatch ?? this.matchmaker.pick();
         const label = `${match[0].name} vs ${match[1].name}`;
+        const shouldPresentTournamentChallengeIntro =
+            Boolean(this.currentTournamentMatch) &&
+            !this._action.skipPick &&
+            (!this._action.selectedId || this._action.pickEveryMatch);
         this._renderRoster(
             match.map((fighter) => fighter.id),
             match
         );
         this._updateStatus(label, "Drawing");
-        this._overlay.show({ label: "Matchup", text: label });
         this._log.add(`대진 확정: ${label}`);
         this._log.add(`아레나가 ${match[0].title}와 ${match[1].title}의 능력을 감지했습니다.`);
 
@@ -1088,12 +1110,17 @@ export class BattleApp {
         if (playerBall) {
             await this._resolveAction(playerBall);
             if (!this.lifecycle.isCurrentRevision(lifecycleRevision)) return;
+            if (shouldPresentTournamentChallengeIntro && this._action.current) {
+                const canStartMatch = await this._presentTournamentChallengeIntro(lifecycleRevision);
+                if (!canStartMatch) return;
+            }
         }
 
         // 클릭 핸들러 바인딩
         this._bindClickHandler();
 
         this.renderer.render(this.simulation);
+        this._overlay.show({ label: "Matchup", text: label });
         await this.wait(1350);
         if (!this.lifecycle.isCurrentRevision(lifecycleRevision)) return;
 

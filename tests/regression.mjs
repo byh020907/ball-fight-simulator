@@ -1621,6 +1621,46 @@ async function testTournamentOpponentProgressionByMastery(app) {
     }
 }
 
+async function testActionSelectionShowsTournamentChallengeBeforeMatchup() {
+    const app = await loadModuleApp();
+    const player = app.roster.find((fighter) => fighter.id === app.playerFighterId);
+    const opponent = app.roster.find((fighter) => fighter.id !== app.playerFighterId);
+    const events = [];
+    const originalResolveAction = app._resolveAction;
+    const originalPresentChallenge = app._presentTournamentChallengeIntro;
+    const originalOverlayShow = app._overlay.show;
+    const originalWait = app.wait;
+
+    app.currentTournamentMatch = { roundIndex: 0 };
+    app._action = { selectedId: null, current: null, pickEveryMatch: false, ctx: null };
+    app._resolveAction = async () => {
+        events.push("action");
+        app._action.current = { name: "테스트 액션" };
+        return app._action.current;
+    };
+    app._presentTournamentChallengeIntro = async () => {
+        events.push("challenge");
+        return true;
+    };
+    app._overlay.show = ({ label }) => events.push(`overlay:${label}`);
+    app.wait = async () => {};
+
+    try {
+        await app.startMatch([player, opponent]);
+        assert.deepEqual(
+            events,
+            ["action", "challenge", "overlay:Matchup"],
+            "The tournament challenge intro must appear after the first action selection and before the VS matchup"
+        );
+    } finally {
+        app._resolveAction = originalResolveAction;
+        app._presentTournamentChallengeIntro = originalPresentChallenge;
+        app._overlay.show = originalOverlayShow;
+        app.wait = originalWait;
+    }
+    console.log("[tournament-action-selection-challenge-intro] ok");
+}
+
 async function testTournamentEliminationAwaitsConfirmation(app) {
     app.playerProfile = createDefaultPlayerProfile();
     app.playerStatAllocation = createRandomStatAllocation(() => 0);
@@ -12505,6 +12545,7 @@ await testArcherPredictiveBurst(app);
 await testOrbitShardRecharge(app);
 await testTournament(app);
 await testTournamentOpponentProgressionByMastery(app);
+await testActionSelectionShowsTournamentChallengeBeforeMatchup();
 await testTournamentEliminationAwaitsConfirmation(app);
 await testHeroBallRegistered(app);
 await testHeroAbilitySpawnsOrb(app);
