@@ -270,6 +270,7 @@ import PhysicsMaterialBody from "../src/physics/PhysicsMaterialBody.js";
 import { AppLifecycle, APP_LIFECYCLE_STATES } from "../src/appLifecycle.js";
 import { ScreenWakeLock } from "../src/screenWakeLock.js";
 import { recordDeveloperTournamentWin } from "../src/developer/developerTools.js";
+import { advanceResultSequence, createResultSequence, getResultSequencePresentation } from "../src/resultSequence.js";
 
 const EMPTY_EQUIPMENT_SUMMARY = {
     characterLevel: 1,
@@ -1666,7 +1667,9 @@ async function testTournamentWinDisplaysMasteryReward() {
     app.playerFighterId = FIGHTER_IDS.ARCHER;
     const champion = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
     const originalOverlayShow = app._overlay.show;
-    let resultOverlay = null;
+    const originalStartButtonSetState = app._startBtn.setState;
+    const resultOverlays = [];
+    const startButtonStates = [];
 
     app.playerProfile.characterMastery.levels[champion.id] = 1;
     app._lastMasteryResult = {
@@ -1677,14 +1680,24 @@ async function testTournamentWinDisplaysMasteryReward() {
     };
     app._lastMatchXpResult = null;
     app.playerResult = { rankLabel: "1위", fighterName: champion.name };
-    app._overlay.show = (options) => {
-        resultOverlay = options;
+    app._overlay.show = (options) => resultOverlays.push(options);
+    app._startBtn.setState = (state) => {
+        startButtonStates.push(state);
+        originalStartButtonSetState.call(app._startBtn, state);
     };
 
     try {
         app._presentTournamentResult({ playerWon: true, champion, player: champion });
+        assert.equal(resultOverlays.at(-1)?.label, "경험치", "The first result step must explain experience");
+        assert.equal(
+            startButtonStates.at(-1)?.hidden,
+            true,
+            "The shared confirm button must stay hidden before the final result step"
+        );
+
+        assert.equal(app.advanceResultSequence(), true, "The experience step must advance to the mastery result");
         assert.deepEqual(
-            resultOverlay?.masteryReward,
+            resultOverlays.at(-1)?.masteryReward,
             {
                 sourceName: champion.name,
                 tierLabel: "BRONZE",
@@ -1695,10 +1708,67 @@ async function testTournamentWinDisplaysMasteryReward() {
             },
             "Tournament victory must show the newly unlocked mastery effect with its actual value and target"
         );
+        assert.equal(
+            startButtonStates.at(-1)?.hidden,
+            true,
+            "The shared confirm button must stay hidden while the mastery result is still being viewed"
+        );
+
+        assert.equal(
+            app.advanceResultSequence(),
+            true,
+            "The mastery result must advance to the existing congratulation summary"
+        );
+        assert.equal(
+            resultOverlays.at(-1)?.label,
+            "축하합니다!",
+            "The final step must keep the existing congratulation text"
+        );
+        assert.equal(
+            startButtonStates.at(-1)?.hidden,
+            false,
+            "The shared confirm button must appear only on the final result step"
+        );
     } finally {
         app._overlay.show = originalOverlayShow;
+        app._startBtn.setState = originalStartButtonSetState;
     }
     console.log("[tournament-win-mastery-reward] ok");
+}
+
+function testResultSequenceProgression() {
+    const sequence = createResultSequence([
+        { id: "experience", label: "경험치" },
+        { id: "summary", label: "축하합니다!" }
+    ]);
+    assert.deepEqual(
+        getResultSequencePresentation(sequence),
+        {
+            id: "experience",
+            label: "경험치",
+            text: "",
+            subtext: "",
+            xpReward: null,
+            masteryReward: null,
+            currentStep: 1,
+            totalSteps: 2,
+            hasNext: true,
+            isFinal: false
+        },
+        "A reusable result sequence must expose its first step and next-state metadata"
+    );
+    const finalSequence = advanceResultSequence(sequence);
+    assert.equal(
+        getResultSequencePresentation(finalSequence)?.isFinal,
+        true,
+        "The final sequence step must be explicit"
+    );
+    assert.equal(
+        advanceResultSequence(finalSequence),
+        finalSequence,
+        "Advancing past the final step must keep the final state"
+    );
+    console.log("[result-sequence-progression] ok");
 }
 
 async function testTournamentEliminationAwaitsConfirmation(app) {
@@ -1735,7 +1805,13 @@ async function testTournamentEliminationAwaitsConfirmation(app) {
         assert.equal(app.currentTournamentMatch, null, "Elimination should not leave an active tournament match");
         assert.equal(app.tournament.champion, null, "Elimination should not continue AI matches to a champion");
         assert.equal(app._root.tournamentActive, false, "Result confirmation should unlock the tournament session");
-        assert.equal(app._overlay.label, "아쉽네요", "Elimination should show the dedicated loss result presentation");
+        assert.equal(app._overlay.label, "경험치", "Elimination should begin with the shared experience result step");
+        assert.equal(app.advanceResultSequence(), true, "Elimination experience should advance to the loss summary");
+        assert.equal(
+            app._overlay.label,
+            "아쉽네요",
+            "Elimination should end on the dedicated loss result presentation"
+        );
         assert.ok(
             startButtonStates.some((state) => state.text === "확인"),
             "Elimination should reuse the shared confirmation button"
@@ -3424,6 +3500,7 @@ function testHuntingLootSessionIsDiscardedOnDefeat(app) {
         _currentMatchReport: null,
         setHuntingOverlayState() {},
         showOverlay() {},
+        presentResultSequence() {},
         refreshPlayerSetup() {},
         setStartButton() {},
         addLog() {},
@@ -3489,6 +3566,7 @@ function testHuntingCombatRewardChestUi() {
 function createCombatRewardChestTestEnv({ isFinalBoss = false, collectedChestCount = 1 } = {}) {
     const overlayStates = [];
     const showOverlayCalls = [];
+    const resultSequenceCalls = [];
     const playerBall = { id: FIGHTER_IDS.DASH, name: "Dash Ball", hp: 80, maxHp: 100 };
     const mockApp = {
         _cleanupMatch() {},
@@ -3507,6 +3585,9 @@ function createCombatRewardChestTestEnv({ isFinalBoss = false, collectedChestCou
         },
         showOverlay(label, text, subtext) {
             showOverlayCalls.push({ label, text, subtext });
+        },
+        presentResultSequence(steps) {
+            resultSequenceCalls.push(steps);
         },
         refreshPlayerSetup() {},
         setStartButton() {},
@@ -3538,7 +3619,7 @@ function createCombatRewardChestTestEnv({ isFinalBoss = false, collectedChestCou
             })
         });
     });
-    return { overlayStates, showOverlayCalls, playerBall, mockApp, manager };
+    return { overlayStates, showOverlayCalls, resultSequenceCalls, playerBall, mockApp, manager };
 }
 
 function testHuntingCombatWithoutCollectedChestSkipsChestUi() {
@@ -3661,7 +3742,9 @@ function testHuntingCombatRewardChestNormalContinue() {
 }
 
 function testHuntingCombatRewardChestFinalBossContinue() {
-    const { overlayStates, showOverlayCalls, mockApp, manager } = createCombatRewardChestTestEnv({ isFinalBoss: true });
+    const { overlayStates, resultSequenceCalls, mockApp, manager } = createCombatRewardChestTestEnv({
+        isFinalBoss: true
+    });
 
     // Spy on beginResultConfirmation() to prove lifecycle
     let beginResultConfirmationCallCount = 0;
@@ -3696,12 +3779,12 @@ function testHuntingCombatRewardChestFinalBossContinue() {
         );
 
         // Stage clear must NOT have appeared yet
-        const clearBefore = showOverlayCalls.find((c) => c.label === "스테이지 클리어");
+        const clearBefore = resultSequenceCalls.find((steps) => steps[0]?.label === "스테이지 클리어");
         assert.equal(clearBefore, undefined, "Stage clear must NOT appear before chest confirm");
 
         // Reset tracking for chestContinue
         overlayStates.length = 0;
-        showOverlayCalls.length = 0;
+        resultSequenceCalls.length = 0;
         beginResultConfirmationCallCount = 0;
 
         manager.chestContinue();
@@ -3710,7 +3793,7 @@ function testHuntingCombatRewardChestFinalBossContinue() {
         assert.equal(manager._run, null, "Final boss combat reward chest continue must set run to null (stage clear)");
 
         // Stage clear overlay must appear
-        const clearAfter = showOverlayCalls.find((c) => c.label === "스테이지 클리어");
+        const clearAfter = resultSequenceCalls.find((steps) => steps[0]?.label === "스테이지 클리어");
         assert.ok(clearAfter, "After final boss chest confirm, stage clear overlay must appear");
 
         // beginResultConfirmation must be called exactly once after chest confirm
@@ -12587,6 +12670,7 @@ await testTournament(app);
 await testTournamentOpponentProgressionByMastery(app);
 await testActionSelectionShowsTournamentChallengeBeforeMatchup();
 await testTournamentWinDisplaysMasteryReward();
+testResultSequenceProgression();
 await testTournamentEliminationAwaitsConfirmation(app);
 await testHeroBallRegistered(app);
 await testHeroAbilitySpawnsOrb(app);
@@ -14827,8 +14911,10 @@ function testGameplayUiResetContracts() {
 function testResultConfirmationReturnsInitialState() {
     const appSource = readFileSync("src/app.js", "utf8");
     assert.ok(
-        appSource.includes('this._startBtn.setState({ text: "확인", hidden: false, disabled: false });'),
-        "Tournament completion should expose the same confirm button as other completed modes"
+        appSource.includes(
+            'this._startBtn.setState({ text: "확인", hidden: !presentation.isFinal, disabled: !presentation.isFinal });'
+        ),
+        "The common result sequence should expose confirmation only on its final step"
     );
     assert.equal(
         appSource.includes('text: "새 토너먼트 준비"'),
@@ -15191,11 +15277,8 @@ function testHuntingRetreatAwaitsResultConfirmation() {
         setHuntingOverlayState() {
             calls.push("overlay-state");
         },
-        showOverlay() {
-            calls.push("overlay");
-        },
-        setStartButton() {
-            calls.push("button");
+        presentResultSequence() {
+            calls.push("result-sequence");
         },
         showToast() {
             calls.push("toast");
@@ -17268,19 +17351,25 @@ function testResultOverlayReservesConfirmActionSpace() {
     );
     assert.ok(
         styles.includes(
-            `${confirmCardSelector} {\n    margin: auto 0;\n    max-height: 100%;\n    min-height: 0;\n    overflow-y: auto;\n    overscroll-behavior: contain;\n    pointer-events: auto;`
+            `${confirmActionSelector}.result-sequence-active .overlay-card {\n    overflow: hidden;\n    overscroll-behavior: auto;`
         ),
-        "The result card must stay inside the safe area and receive its own touch scroll input"
+        "Tap-through result sequences must avoid a nested mobile scroll area"
     );
     assert.ok(
         styles.includes(`${confirmCardSelector} .xp-reward {\n    width: min(420px, 100%);`),
-        "Result XP rewards must fit the scrollable card without horizontal overflow"
+        "Result XP rewards must fit the result card without horizontal overflow"
+    );
+    assert.ok(
+        overlay.includes("resultSequence: null") &&
+            overlay.includes('@click="advanceResultSequence()"') &&
+            overlay.includes("<b>》</b>"),
+        "The overlay must expose a visible tap-through control for non-final result steps"
     );
     assert.ok(
         overlay.includes(".mastery-reward {\n        width: min(420px, 100%);") &&
             overlay.includes("box-sizing: border-box;") &&
             overlay.includes("overflow-wrap: anywhere;"),
-        "Mastery reward content must fit inside the mobile-scrollable result card without horizontal clipping"
+        "Mastery reward content must fit inside the mobile result card without horizontal clipping"
     );
     console.log("[result-overlay-confirm-action-safe-area] ok");
 }

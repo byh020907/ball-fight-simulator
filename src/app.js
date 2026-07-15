@@ -86,6 +86,7 @@ import { getAbilityDisplayName } from "./abilities/abilityMetadata.js";
 import { AppLifecycle } from "./appLifecycle.js";
 import { ScreenWakeLock } from "./screenWakeLock.js";
 import { applyRebirthLoadoutToBaseSpec, applyRebirthLoadoutToBattleBall, getRebirthLoadout } from "./rebirth/index.js";
+import { advanceResultSequence, createResultSequence, getResultSequencePresentation } from "./resultSequence.js";
 
 const TOURNAMENT_CHALLENGE_INTRO_DURATION = 1000;
 
@@ -166,6 +167,7 @@ export class BattleApp {
         this._lastMasteryResult = null;
         this._lastXpResult = null;
         this._lastMatchXpResult = null;
+        this._resultSequence = null;
         this._pendingRebirthPromptCharacterId = null;
         this._selectionAnimTime = 999;
         this._previewSim = null;
@@ -232,6 +234,7 @@ export class BattleApp {
         this._lastMasteryResult = null;
         this._lastXpResult = null;
         this._lastMatchXpResult = null;
+        this._resultSequence = null;
         this._action = { selectedId: null, current: null, pickEveryMatch: false, ctx: null };
         this._speed = { level: 1, indicatorTimer: 0, indicatorText: "" };
         this.ui.lastOverlayState = null;
@@ -244,7 +247,34 @@ export class BattleApp {
         this._log.add(message);
     }
     showOverlay(label, text, subtext) {
+        this._resultSequence = null;
         this._overlay.show({ label, text, subtext });
+    }
+    presentResultSequence(steps) {
+        this._resultSequence = createResultSequence(steps);
+        this._renderResultSequence();
+    }
+    advanceResultSequence() {
+        const presentation = getResultSequencePresentation(this._resultSequence);
+        if (!presentation?.hasNext) return false;
+
+        this._resultSequence = advanceResultSequence(this._resultSequence);
+        this._renderResultSequence();
+        return true;
+    }
+    _renderResultSequence() {
+        const presentation = getResultSequencePresentation(this._resultSequence);
+        if (!presentation) return;
+
+        this._overlay.show({
+            label: presentation.label,
+            text: presentation.text,
+            subtext: presentation.subtext,
+            xpReward: presentation.xpReward,
+            masteryReward: presentation.masteryReward,
+            resultSequence: presentation
+        });
+        this._startBtn.setState({ text: "확인", hidden: !presentation.isFinal, disabled: !presentation.isFinal });
     }
     setStartButton(opts) {
         this._startBtn.setState(opts);
@@ -1654,16 +1684,33 @@ export class BattleApp {
         const xpMsg = this._formatXpResult(this._lastMatchXpResult);
         const xpReward = this._createXpRewardView(this._lastMatchXpResult);
         const playerResultText = `${player.name} ${this.playerResult?.rankLabel ?? "결과 확정"}`;
+        const resultSteps = [
+            {
+                id: "experience",
+                label: "경험치",
+                text: xpMsg || "이번 토너먼트에서 경험치를 얻지 못했습니다.",
+                xpReward
+            }
+        ];
+
+        if (masteryReward) {
+            resultSteps.push({
+                id: "mastery",
+                label: "숙련도 승급 결과",
+                text: `${masteryReward.sourceName} ${masteryReward.tierLabel} 달성`,
+                masteryReward
+            });
+        }
+
+        resultSteps.push({
+            id: "summary",
+            label: playerWon ? "축하합니다!" : champion ? "토너먼트 종료" : "아쉽네요",
+            text: playerWon ? `${champion.name} 우승${masteryMsg}` : playerResultText
+        });
 
         this._bracket.render(this.tournament);
         this.refreshPlayerSetup();
-        this._overlay.show({
-            label: playerWon ? "축하합니다!" : champion ? "토너먼트 종료" : "아쉽네요",
-            text: playerWon ? `${champion.name} 우승${masteryMsg}` : playerResultText,
-            subtext: xpReward ? "" : xpMsg,
-            xpReward,
-            masteryReward
-        });
+        this.presentResultSequence(resultSteps);
         this._root.statusText = playerWon
             ? `내 캐릭터 ${champion.name} 우승${masteryMsg}`
             : `내 캐릭터 ${playerResultText}`;
@@ -1674,7 +1721,6 @@ export class BattleApp {
                 ? `축하합니다! 내 캐릭터 ${champion.name}가 토너먼트에서 우승했습니다.${masteryMsg}`
                 : `아쉽네요. 내 캐릭터 ${player.name}의 최종 성적은 ${this.playerResult?.rankLabel ?? "기록 없음"}입니다.`
         );
-        this._startBtn.setState({ text: "확인", hidden: false, disabled: false });
     }
 
     wait(ms) {

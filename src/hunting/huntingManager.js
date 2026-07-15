@@ -449,7 +449,14 @@ export class HuntingManager {
             app.refreshPlayerSetup();
 
             const lossDisplay = defeatLossText || `파편 ${lostShards} 손실`;
-            app.showOverlay("사냥터 패배", `${name} 쓰러짐`, `획득 ${securedShards} 파편 · ${lossDisplay}`);
+            app.presentResultSequence([
+                {
+                    id: "summary",
+                    label: "사냥터 패배",
+                    text: `${name} 쓰러짐`,
+                    subtext: `획득 ${securedShards} 파편 · ${lossDisplay}`
+                }
+            ]);
             app.setHuntingActive(false);
             app.setHuntingOverlayState({
                 huntingChoiceVisible: false,
@@ -458,7 +465,6 @@ export class HuntingManager {
                 huntingLootHudEnhancementStones: 0,
                 huntingLootHudChests: 0
             });
-            app.setStartButton({ text: "확인", hidden: false, disabled: false });
             this._run = null;
         }
     }
@@ -489,8 +495,14 @@ export class HuntingManager {
             huntingLootHudChests: 0
         });
 
-        app.showOverlay("사냥터 종료", "귀환 완료", `파편 ${securedShards} 확보 · 최고 층 ${run.floor}`);
-        app.setStartButton({ text: "확인", hidden: false, disabled: false });
+        app.presentResultSequence([
+            {
+                id: "summary",
+                label: "사냥터 종료",
+                text: "귀환 완료",
+                subtext: `파편 ${securedShards} 확보 · 최고 층 ${run.floor}`
+            }
+        ]);
         this._run = null;
     }
 
@@ -1082,14 +1094,16 @@ export class HuntingManager {
             huntingLootHudEnhancementStones: 0,
             huntingLootHudChests: 0
         });
-        app.showOverlay(
-            "스테이지 클리어",
-            `${stage.name} 보스 격파`,
-            stageResult.unlockedStageId
-                ? `${getHuntingStage(nextStageId).name} 해금 · 파편 ${securedShards} 확보`
-                : `파편 ${securedShards} 확보`
-        );
-        app.setStartButton({ text: "확인", hidden: false, disabled: false });
+        app.presentResultSequence([
+            {
+                id: "summary",
+                label: "스테이지 클리어",
+                text: `${stage.name} 보스 격파`,
+                subtext: stageResult.unlockedStageId
+                    ? `${getHuntingStage(nextStageId).name} 해금 · 파편 ${securedShards} 확보`
+                    : `파편 ${securedShards} 확보`
+            }
+        ]);
         this._run = null;
     }
 

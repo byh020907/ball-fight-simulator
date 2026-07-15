@@ -64,6 +64,9 @@ export function createComponentBridge(app) {
         startTournament() {
             return app.startTournament();
         },
+        advanceResultSequence() {
+            return app.advanceResultSequence();
+        },
         setGameMode(mode) {
             return app.setGameMode(mode);
         },

@@ -9,7 +9,7 @@
     x-transition:leave="overlay-leave"
     x-transition:leave-start="overlay-leave-start"
     x-transition:leave-end="overlay-leave-end"
-    x-bind:class="{ transient: transient, 'hunting-merchant-active': huntingMerchantActive, 'hunting-chest-active': huntingChestEventActive, 'hunting-event-active': huntingEventActive, 'hunting-battle-preparation-active': huntingBattlePreparationActive }"
+    x-bind:class="{ transient: transient, 'result-sequence-active': resultSequence, 'hunting-merchant-active': huntingMerchantActive, 'hunting-chest-active': huntingChestEventActive, 'hunting-event-active': huntingEventActive, 'hunting-battle-preparation-active': huntingBattlePreparationActive }"
 >
     <div class="overlay-card">
         <span x-text="label">Waiting Room</span>
@@ -30,6 +30,16 @@
                 x-text="'다음 도전 · 상대 Lv.' + (masteryReward?.nextOpponentLevel ?? 1) + ' 시작'"
             ></p>
         </div>
+        <button
+            class="result-sequence-next"
+            type="button"
+            x-show="resultSequence?.hasNext"
+            @click="advanceResultSequence()"
+            aria-label="다음 결과 보기"
+        >
+            <span x-text="'결과 ' + (resultSequence?.currentStep ?? 1) + '/' + (resultSequence?.totalSteps ?? 1)"></span>
+            <b>》</b>
+        </button>
         <div class="hunting-route" x-show="huntingMoving">
             <div class="hunting-route-head">
                 <span x-text="huntingMoveFrom + 'F'"></span>
@@ -169,6 +179,7 @@
         text: "",
         subtext: "",
         masteryReward: null,
+        resultSequence: null,
         huntingChoiceVisible: false,
         huntingFloor: 1,
         huntingCharacterName: "",
@@ -225,13 +236,17 @@
         huntingStartPreparedBattle() {
             window.requireGameActionBridge("huntingStartPreparedBattle").huntingStartPreparedBattle();
         },
-        show({ label, text, subtext = "", transient = false, xpReward = null, masteryReward = null } = {}) {
+        advanceResultSequence() {
+            window.requireGameActionBridge("advanceResultSequence").advanceResultSequence();
+        },
+        show({ label, text, subtext = "", transient = false, xpReward = null, masteryReward = null, resultSequence = null } = {}) {
             this.visible = true;
             this.transient = transient;
             this.label = label ?? "";
             this.text = text ?? "";
             this.subtext = subtext;
             this.masteryReward = masteryReward;
+            this.resultSequence = resultSequence;
             const xpRewardPanel = Alpine.store("uiManager").requireComponent("xpRewardPanel");
             if (xpReward) {
                 xpRewardPanel.animate(xpReward);
@@ -249,6 +264,7 @@
             this.text = "";
             this.subtext = "";
             this.masteryReward = null;
+            this.resultSequence = null;
             this.resetHuntingState();
             Alpine.store("uiManager").requireComponent("xpRewardPanel").reset();
         },
@@ -487,6 +503,35 @@
         color: #202020;
         font-size: 0.7rem;
         font-weight: 900;
+    }
+
+    .result-sequence-next {
+        width: min(240px, 100%);
+        min-height: 56px;
+        box-sizing: border-box;
+        margin: 18px auto 0;
+        border: 2px solid #202020;
+        border-radius: 999px;
+        background: #ffffff;
+        color: #202020;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        font-family: inherit;
+        font-size: 0.74rem;
+        font-weight: 900;
+        letter-spacing: 0.06em;
+        touch-action: manipulation;
+    }
+
+    .result-sequence-next b {
+        font-size: 1.45rem;
+        line-height: 1;
+    }
+
+    .result-sequence-next:active {
+        transform: translateY(1px);
     }
 
     .hunting-btn {
