@@ -25,7 +25,7 @@ export class ChestRoomEvent extends HuntingEvent {
         const nextRun = recordHuntingFloorResult(run, {
             hpRemain: run.carriedHp,
             maxHp: run.carriedMaxHp,
-            loot: { shards: 0, chests: [chest], xp: 0 },
+            loot: { shards: 0, chests: [chest] },
             consumeStatModifiers: false
         });
         return {

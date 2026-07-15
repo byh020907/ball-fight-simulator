@@ -31,6 +31,32 @@ export function grantExperienceFromMatchReport(profile, report) {
     return grantExperience(profile, report.playerFighterId, calcMatchXp(matchReportToXpInput(report)));
 }
 
+export function grantCharacterExperience(profile, characterId, amount) {
+    return grantExperience(profile, characterId, Math.max(0, Math.floor(amount)));
+}
+
+export function combineExperienceGrantResults(results = []) {
+    const grants = results.filter((result) => result?.xpGained > 0);
+    if (grants.length === 0) return null;
+
+    const first = grants[0];
+    const last = grants.at(-1);
+    return {
+        ...last,
+        xpGained: grants.reduce((total, result) => total + result.xpGained, 0),
+        previousTotalXp: first.previousTotalXp,
+        previousLevel: first.previousLevel,
+        previousLevelLabel: first.previousLevelLabel,
+        progressBefore: first.progressBefore,
+        progressBeforePct: first.progressBeforePct,
+        previousProgressText: first.previousProgressText,
+        previousNextText: first.previousNextText,
+        previousNextRewardText: first.previousNextRewardText,
+        levelUp: last.level > first.previousLevel,
+        earnedRewards: grants.flatMap((result) => result.earnedRewards ?? [])
+    };
+}
+
 function ensureExperienceState(profile) {
     profile.experience ||= { currentXp: 0, byCharacter: {} };
     profile.experience.byCharacter ||= {};

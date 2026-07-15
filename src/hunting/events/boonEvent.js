@@ -28,7 +28,7 @@ export class BoonEvent extends HuntingEvent {
             run: recordHuntingFloorResult(run, {
                 hpRemain: run.carriedHp,
                 maxHp: run.carriedMaxHp,
-                loot: { shards, chests: [], xp: 0 },
+                loot: { shards, chests: [] },
                 consumeStatModifiers: false
             }),
             transition: HUNTING_EVENT_TRANSITIONS.CONTINUE,

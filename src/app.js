@@ -32,6 +32,7 @@ import {
     migrateLegacyExperienceToCharacter
 } from "./playerProfile.js";
 import {
+    grantCharacterExperience,
     grantExperienceFromMatchReport,
     getCharacterExperienceSummary,
     collectActiveExperienceProgression,
@@ -1356,18 +1357,30 @@ export class BattleApp {
 
     _grantExperienceFromMatchReport(report) {
         const result = grantExperienceFromMatchReport(this.playerProfile, report);
-        this._lastXpResult = result;
         this._lastMatchXpResult = result;
 
+        return this._applyExperienceGrant(result);
+    }
+
+    awardExperience(characterId, amount, { persist = true, refresh = true, log = true, notifyLevelUp = true } = {}) {
+        const result = grantCharacterExperience(this.playerProfile, characterId, amount);
+        return this._applyExperienceGrant(result, { persist, refresh, log, notifyLevelUp });
+    }
+
+    _applyExperienceGrant(result, { persist = true, refresh = true, log = true, notifyLevelUp = true } = {}) {
+        this._lastXpResult = result;
+
         if (result.xpGained > 0) {
-            this._log.add(`[경험치] ${this._formatXpResult(result)}`);
+            if (log) this._log.add(`[경험치] ${this._formatXpResult(result)}`);
             if (result.levelUp) {
-                this._toast.show(`레벨업! Lv.${result.level}`);
+                if (notifyLevelUp) this._toast.show(`레벨업! Lv.${result.level}`);
                 this._queueRebirthPrompt(result);
             }
-            savePlayerProfile(this.playerProfile);
-            this._refreshCollectionHub();
-            this.refreshPlayerSetup();
+            if (persist) savePlayerProfile(this.playerProfile);
+            if (refresh) {
+                this._refreshCollectionHub();
+                this.refreshPlayerSetup();
+            }
         }
 
         return result;

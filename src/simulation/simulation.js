@@ -186,6 +186,22 @@ export class Simulation {
         this.spawnActionText(center, label, color);
     }
 
+    spawnExperienceCollection(position, color) {
+        const center = position.clone();
+        this.entities.push(new VisualBurst(center.clone(), color, 150, 0.26));
+        this.spawnParticleBurst(center, color, {
+            count: 7,
+            speed: 150,
+            radiusMin: 1,
+            radiusMax: 3,
+            gravity: 360,
+            life: 0.48,
+            bounce: 0.04,
+            settleDelay: 0.12,
+            upBias: 70
+        });
+    }
+
     addSparkBurst(position, color) {
         this.entities.push(new VisualBurst(position, color, 120, 0.22));
         this.spawnParticleBurst(position, color, { count: 10, speed: 140, radiusMin: 2, radiusMax: 3 });

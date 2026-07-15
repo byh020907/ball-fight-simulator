@@ -122,7 +122,11 @@ export class HuntingLootItem extends RotationalBody(CollectionGrace(CombatEntity
         if (!reward) return false;
 
         this.onCollected?.(reward, this, collector, simulation);
-        simulation.spawnLootCollection(this.position.clone(), reward.color, reward.label);
+        if (reward.collectionEffect === "experience" && typeof simulation.spawnExperienceCollection === "function") {
+            simulation.spawnExperienceCollection(this.position.clone(), reward.color);
+        } else {
+            simulation.spawnLootCollection(this.position.clone(), reward.color, reward.label);
+        }
         simulation.playSound(reward.sound ?? "loot", reward.soundIntensity ?? 1);
         if (reward.logMessage) simulation.addLog(reward.logMessage);
         this.isExpired = true;

@@ -127,8 +127,7 @@ export const HUNTING_CHEST_OPEN_COSTS = HUNTING_REWARDS.chest.openCosts;
 export const HUNTING_CHEST_BREAK_WEIGHTS = HUNTING_REWARDS.chest.breakWeights;
 
 export const HUNTING_DEFEAT_PRESERVE = Object.freeze({
-    SHARDS: HUNTING_REWARDS.shards.defeatPreserve.shards,
-    XP: HUNTING_REWARDS.shards.defeatPreserve.xp
+    SHARDS: HUNTING_REWARDS.shards.defeatPreserve.shards
 });
 
 export const HUNTING_SCALING = Object.freeze({

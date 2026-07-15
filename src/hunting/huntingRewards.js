@@ -77,8 +77,7 @@ export function createEmptyHuntingLoot() {
     return {
         shards: 0,
         enhancementStones: 0,
-        chests: [],
-        xp: 0
+        chests: []
     };
 }
 
@@ -86,8 +85,7 @@ export function mergeHuntingLoot(base = createEmptyHuntingLoot(), addition = cre
     return {
         shards: Math.max(0, Math.floor((base.shards ?? 0) + (addition.shards ?? 0))),
         enhancementStones: Math.max(0, Math.floor((base.enhancementStones ?? 0) + (addition.enhancementStones ?? 0))),
-        chests: [...(base.chests ?? []), ...(addition.chests ?? [])],
-        xp: Math.max(0, Math.floor((base.xp ?? 0) + (addition.xp ?? 0)))
+        chests: [...(base.chests ?? []), ...(addition.chests ?? [])]
     };
 }
 
@@ -123,14 +121,12 @@ export function applyDefeatPreservation(pendingLoot = createEmptyHuntingLoot(), 
         preservedLoot: {
             shards: Math.floor((pendingLoot.shards ?? 0) * HUNTING_DEFEAT_PRESERVE.SHARDS),
             enhancementStones: Math.floor((pendingLoot.enhancementStones ?? 0) * HUNTING_DEFEAT_PRESERVE.SHARDS),
-            chests: preservedChests,
-            xp: Math.floor((pendingLoot.xp ?? 0) * HUNTING_DEFEAT_PRESERVE.XP)
+            chests: preservedChests
         },
         lostLoot: {
             shards: Math.ceil((pendingLoot.shards ?? 0) * (1 - HUNTING_DEFEAT_PRESERVE.SHARDS)),
             enhancementStones: Math.ceil((pendingLoot.enhancementStones ?? 0) * (1 - HUNTING_DEFEAT_PRESERVE.SHARDS)),
-            chests: destroyedChests,
-            xp: Math.ceil((pendingLoot.xp ?? 0) * (1 - HUNTING_DEFEAT_PRESERVE.XP))
+            chests: destroyedChests
         }
     };
 }

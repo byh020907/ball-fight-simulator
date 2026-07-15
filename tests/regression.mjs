@@ -30,6 +30,7 @@ import {
     collectActiveExperienceProgression,
     getCharacterExperienceSummary,
     getExperienceRewardsBetween,
+    grantCharacterExperience,
     grantExperienceFromMatchReport
 } from "../src/experience/experienceService.js";
 import {
@@ -165,6 +166,8 @@ import {
     getHuntingLootMultiplier,
     getHuntingShardDropAmount,
     getHuntingEnhancementStoneDropCount,
+    getHuntingCompletionExperience,
+    getHuntingExperienceDropLimit,
     getHuntingShardPhysicalDropCount,
     getSmallHealPackAmount,
     rollHighChestRarity,
@@ -263,6 +266,7 @@ import {
     computeHeroOrbCarryover,
     createHuntingLootItem,
     EnhancementStoneDrop,
+    ExperienceDrop,
     HeroOrb,
     ShardDrop,
     ShardBundleDrop,
@@ -2912,7 +2916,12 @@ function testHuntingLootItemsAndDropController(app) {
     const session = new HuntingBattleLootSession({ playerId: playerSpec.id, floor: 1 });
     const rolls = [0, 0, 0, 0.25, 0.5, 0, 0.25, 0.999999, 0, 0.25, 0.9];
     const soundCalls = [];
-    const controller = new HuntingLootDropController({ session, rng: () => rolls.shift() ?? 0 });
+    const collectedExperience = [];
+    const controller = new HuntingLootDropController({
+        session,
+        rng: () => rolls.shift() ?? 0,
+        onExperienceCollected: (reward) => collectedExperience.push(reward.amount)
+    });
     const simulation = new BattleSimulation(
         [playerSpec, mobSpec],
         {
@@ -2925,12 +2934,14 @@ function testHuntingLootItemsAndDropController(app) {
         { assignActions: false }
     );
     const [player, mob] = simulation.fighters;
+    controller.prepareExperienceDrops([mob]);
     player.position = new Vector2(300, 480);
     mob.position = player.position.clone();
     player.hp = player.maxHp;
 
     mob.takeDamage(100000, player, "Loot Hook Test");
     const droppedShards = simulation.entities.filter((entity) => entity instanceof ShardDrop);
+    const droppedExperience = simulation.entities.filter((entity) => entity instanceof ExperienceDrop);
     const droppedShard = droppedShards[0];
     assert.ok(droppedShard, "Defeating a hunting mob must create configured floor-loot items");
     assert.equal(
@@ -2944,6 +2955,13 @@ function testHuntingLootItemsAndDropController(app) {
         "Each physical standard shard must roll its own floor-scaled reward value"
     );
     assert.equal(droppedShard.radius, 16, "Standard shard drops should be visibly larger than hero orbs");
+    assert.equal(droppedExperience.length, 2, "A common monster must drop multiple visible XP orbs");
+    assert.deepEqual(
+        droppedExperience.map((experience) => experience.amount),
+        [10, 10],
+        "The normal kill XP pool must be split across the common monster's physical XP orbs"
+    );
+    assert.equal(droppedExperience[0].radius, 10, "XP drops must stay compact round orbs beside normal loot");
     assert.ok(
         Math.abs(droppedShard.velocity.length() - mob.stats.baseSpeed * 1.2) < 1e-9,
         "Loot should launch at least as quickly as its defeated monster, using the Hero Orb speed floor"
@@ -2989,6 +3007,27 @@ function testHuntingLootItemsAndDropController(app) {
         soundCalls.at(-1),
         { type: "loot", intensity: 1 },
         "Loot collection should request its audible collect chime"
+    );
+
+    const entitiesBeforeExperienceCollection = simulation.entities.length;
+    droppedExperience.forEach((experience) => {
+        experience.collectionGraceRemaining = 0;
+        experience.position = player.position.clone();
+        experience.velocity = new Vector2();
+        experience.update(1 / 60, simulation);
+    });
+    assert.equal(session.getCollectedExperience(), 20, "Collected XP must be tracked outside pending hunting loot");
+    assert.equal(session.getCollectedLoot().xp, undefined, "Collected XP must not become defeatable pending loot");
+    assert.deepEqual(collectedExperience, [10, 10], "Each XP orb must notify the immediate XP grant owner");
+    assert.equal(
+        simulation.entities.length - entitiesBeforeExperienceCollection,
+        16,
+        "XP collection must use a compact particle burst without combat reward text"
+    );
+    assert.deepEqual(
+        soundCalls.at(-1),
+        { type: "loot", intensity: 0.72 },
+        "XP orb collection must use the lighter pickup chime"
     );
 
     const bonusSession = new HuntingBattleLootSession({ playerId: player.id, floor: 1 });
@@ -3174,6 +3213,71 @@ function testHuntingLootItemsAndDropController(app) {
         "Winning a hunting battle should pull remaining collectible loot across the whole arena"
     );
     console.log("[hunting-loot-items-and-drop-controller] ok");
+}
+
+function testHuntingExperienceBalance() {
+    const normalEnemy = {
+        id: "normal",
+        hunting: { isMob: true, monsterTags: ["rarity:common"], enemyType: "normal" }
+    };
+    const championEnemy = {
+        id: "champion",
+        hunting: { isMiniboss: true, monsterTags: ["rarity:common"], enemyType: "champion", bossKind: "champion" }
+    };
+    const halfHealthVictory = {
+        playerFighterId: FIGHTER_IDS.DASH,
+        combatDamageDealt: 100,
+        opponentMaxHp: 100,
+        hpRemain: 50,
+        myMaxHp: 100,
+        lowestHpRatio: 0.5
+    };
+
+    assert.equal(
+        getHuntingCompletionExperience(halfHealthVictory, [normalEnemy]),
+        10,
+        "Normal completion XP must preserve the current 30 XP victory baseline after the 20 XP kill-orb pool"
+    );
+    assert.equal(
+        getHuntingCompletionExperience(halfHealthVictory, [championEnemy]),
+        20,
+        "Champion completion XP may add its explicit rarity premium without changing the base formula"
+    );
+    assert.ok(getHuntingExperienceDropLimit() > 0, "Hunting XP orbs must retain a finite visual-drop cap");
+    console.log("[hunting-experience-balance] ok");
+}
+
+function testHuntingExperienceGrantsImmediately() {
+    const profile = createDefaultPlayerProfile();
+    const awardCalls = [];
+    const manager = new HuntingManager({
+        awardExperience(characterId, amount, options) {
+            awardCalls.push({ characterId, amount, options });
+            return grantCharacterExperience(profile, characterId, amount);
+        }
+    });
+    manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH });
+
+    const result = manager._awardHuntingExperience({ amount: 7 });
+
+    assert.equal(result.xpGained, 7, "XP orb collection must grant its exact value immediately");
+    assert.equal(
+        profile.experience.byCharacter[FIGHTER_IDS.DASH].currentXp,
+        7,
+        "Collected hunting XP must update the character profile before the battle ends"
+    );
+    assert.deepEqual(
+        awardCalls[0].options,
+        { persist: false, refresh: false, log: false, notifyLevelUp: true },
+        "The manager must batch persistence and UI refresh until the current battle settles"
+    );
+    assert.equal(
+        manager._battleExperienceGrants.length,
+        1,
+        "The battle result must retain one aggregated XP grant record"
+    );
+    assert.equal(manager._run.pendingLoot.xp, undefined, "Immediate XP must never enter pending hunting loot");
+    console.log("[hunting-experience-immediate-grant] ok");
 }
 
 function testHuntingBossRolesAndEnhancementStoneDrops(app) {
@@ -3369,7 +3473,7 @@ function testHuntingBossRolesAndEnhancementStoneDrops(app) {
     const runWithStones = recordHuntingFloorResult(createHuntingRun({ characterId: player.id, now: 0 }), {
         hpRemain: 80,
         maxHp: 100,
-        loot: { shards: 0, enhancementStones: 5, chests: [], xp: 0 }
+        loot: { shards: 0, enhancementStones: 5, chests: [] }
     });
     const retreated = retreatHuntingRun(runWithStones, { now: 1 });
     assert.equal(retreated.securedLoot.enhancementStones, 5, "Retreat must secure collected enhancement stones");
@@ -3620,9 +3724,18 @@ function testHuntingLootSessionIsDiscardedOnDefeat(app) {
             winner: enemyBall,
             isHostile(a, b) {
                 return a !== b;
+            },
+            getEnemiesOf(fighter) {
+                return this.fighters.filter((candidate) => candidate.id !== fighter.id);
             }
         },
         _currentMatchReport: null,
+        _formatXpResult() {
+            return "";
+        },
+        _createXpRewardView() {
+            return null;
+        },
         setHuntingOverlayState() {},
         showOverlay() {},
         presentResultSequence() {},
@@ -3670,7 +3783,7 @@ function testHuntingCombatRewardChestUi() {
     manager._run = recordHuntingFloorResult(manager._run, {
         hpRemain: 80,
         maxHp: 100,
-        loot: { shards: 15, chests: [chest], xp: 0 },
+        loot: { shards: 15, chests: [chest] },
         combatCleared: true
     });
     manager._presentCombatRewardChest(mockApp, chest);
@@ -3702,9 +3815,18 @@ function createCombatRewardChestTestEnv({ isFinalBoss = false, collectedChestCou
             winner: playerBall,
             isHostile() {
                 return true;
+            },
+            getEnemiesOf(fighter) {
+                return this.fighters.filter((candidate) => candidate.id !== fighter.id);
             }
         },
         _currentMatchReport: null,
+        _formatXpResult() {
+            return "";
+        },
+        _createXpRewardView() {
+            return null;
+        },
         setHuntingOverlayState(data) {
             overlayStates.push({ ...data });
         },
@@ -3918,8 +4040,9 @@ function testHuntingCombatRewardChestFinalBossContinue() {
         assert.equal(manager._run, null, "Final boss combat reward chest continue must set run to null (stage clear)");
 
         // Stage clear overlay must appear
-        const clearAfter = resultSequenceCalls.find((steps) => steps[0]?.label === "스테이지 클리어");
+        const clearAfter = resultSequenceCalls.find((steps) => steps.some((step) => step.label === "스테이지 클리어"));
         assert.ok(clearAfter, "After final boss chest confirm, stage clear overlay must appear");
+        assert.equal(clearAfter[0]?.label, "경험치", "Stage clear results must show collected XP before the summary");
 
         // beginResultConfirmation must be called exactly once after chest confirm
         assert.equal(
@@ -5172,7 +5295,7 @@ function testHuntingSystem() {
     const afterFloor = recordHuntingFloorResult(run, {
         hpRemain: 55,
         maxHp: 100,
-        loot: { shards: 100, chests: [common, uncommon, rare], xp: 90 }
+        loot: { shards: 100, chests: [common, uncommon, rare] }
     });
     assert.equal(afterFloor.carriedHp, 55, "Hunting run should carry HP between floors");
     assert.equal(afterFloor.pendingLoot.chests.length, 3, "Floor rewards should stay pending");
@@ -5210,7 +5333,7 @@ function testHuntingSystem() {
     const consumedCursed = recordHuntingFloorResult(cursedApplied, { hpRemain: 50, maxHp: 100 });
     assert.equal(consumedCursed.statModifiers.length, 0, "One-floor altar modifiers should expire after a floor");
     const preservedEventBuff = recordHuntingFloorResult(cursedApplied, {
-        loot: { shards: 0, chests: [common], xp: 0 },
+        loot: { shards: 0, chests: [common] },
         consumeStatModifiers: false
     });
     assert.equal(
@@ -5248,7 +5371,7 @@ function testHuntingSystem() {
     });
     assert.equal(defeated.status, "defeated", "Defeat should end the run");
     assert.equal(defeated.securedLoot.shards, 50, "Defeat should preserve half of key shards");
-    assert.equal(defeated.securedLoot.xp, 62, "Defeat should preserve 70% XP rounded down");
+    assert.equal(defeated.securedLoot.xp, undefined, "XP must not become defeatable hunting loot");
     assert.deepEqual(
         defeated.defeatLosses.chests.map((chest) => chest.id),
         ["r1", "u1"],
@@ -5361,7 +5484,7 @@ async function testHuntingAchievementProgress() {
             ...repeatedVictory,
             floor: 45,
             lastEvent: { type: HUNTING_EVENT_TYPES.PORTAL },
-            pendingLoot: { shards: 0, chests: [createHuntingChest({ rarity: "common" })], xp: 0 }
+            pendingLoot: { shards: 0, chests: [createHuntingChest({ rarity: "common" })] }
         },
         { reason: "retreat" }
     );
@@ -5799,7 +5922,7 @@ function testHuntingCombatRelief() {
     const afterCombat = recordHuntingFloorResult(run, {
         hpRemain: 50,
         maxHp: 100,
-        loot: { shards: 0, chests: [], xp: 0 },
+        loot: { shards: 0, chests: [] },
         combatCleared: true
     });
     assert.equal(
@@ -5812,7 +5935,7 @@ function testHuntingCombatRelief() {
     const afterEvent = recordHuntingFloorResult(afterCombat, {
         hpRemain: 50,
         maxHp: 100,
-        loot: { shards: 10, chests: [], xp: 0 },
+        loot: { shards: 10, chests: [] },
         consumeStatModifiers: false
     });
     assert.equal(
@@ -14862,9 +14985,9 @@ function testHuntingMerchantOffers() {
                 createHuntingChest({ rarity: "common", id: "p1" }),
                 createHuntingChest({ rarity: "rare", id: "p2" })
             ],
-            xp: 0
+            enhancementStones: 0
         },
-        securedLoot: { shards: 0, chests: [], xp: 0 }
+        securedLoot: { shards: 0, enhancementStones: 0, chests: [] }
     };
 
     const event = { type: HUNTING_EVENT_TYPES.WANDERING_MERCHANT, floor: 10, discountRatio: 0 };
@@ -14911,7 +15034,7 @@ function testHuntingMerchantOffers() {
     assert.equal(potionPurchase.result.type, "consumable", "Merchant result should retain the consumable type");
 
     // ── Secure transport disabled when no pending chests ──
-    const runNoPending = { ...runWithHp, pendingLoot: { shards: 0, chests: [], xp: 0 } };
+    const runNoPending = { ...runWithHp, pendingLoot: { shards: 0, enhancementStones: 0, chests: [] } };
     const noChestOffers = createMerchantOffers(runNoPending, event, profile);
     assert.equal(noChestOffers[2].disabled, true, "Secure transport should be disabled with no pending chests");
     assert.ok(noChestOffers[2].disabledReason.length > 0, "Disabled offer should have a reason");
@@ -15579,7 +15702,7 @@ function testHuntingLootHud() {
 
     manager._run = {
         ...manager._run,
-        pendingLoot: { shards: 0, enhancementStones: 3, chests: [], xp: 0 }
+        pendingLoot: { shards: 0, enhancementStones: 3, chests: [] }
     };
     const stateStones = manager._getLootHudState();
     assert.equal(stateStones.huntingLootHudVisible, true, "Enhancement stones alone must keep the loot HUD visible");
@@ -15592,7 +15715,7 @@ function testHuntingLootHud() {
     // ── HUD visible with shards only ──
     manager._run = {
         ...manager._run,
-        pendingLoot: { shards: 30, chests: [], xp: 0 }
+        pendingLoot: { shards: 30, enhancementStones: 0, chests: [] }
     };
     const stateShards = manager._getLootHudState();
     assert.equal(stateShards.huntingLootHudVisible, true, "Shards only: HUD should be visible");
@@ -15621,7 +15744,7 @@ function testHuntingLootHud() {
     // ── _setHuntingMoveState includes HUD data ──
     manager._run = {
         ...manager._run,
-        pendingLoot: { shards: 12, chests: [createHuntingChest({ rarity: "common" })], xp: 0 }
+        pendingLoot: { shards: 12, enhancementStones: 0, chests: [createHuntingChest({ rarity: "common" })] }
     };
     manager._setHuntingMoveState({
         moving: true,
@@ -15661,7 +15784,7 @@ function testHuntingLootHud() {
     // ── HUD clears when pending loot becomes empty ──
     manager._run = {
         ...manager._run,
-        pendingLoot: { shards: 0, enhancementStones: 0, chests: [], xp: 0 }
+        pendingLoot: { shards: 0, enhancementStones: 0, chests: [] }
     };
     const stateEmpty2 = manager._getLootHudState();
     assert.equal(stateEmpty2.huntingLootHudVisible, false, "Empty after having loot: HUD should hide");
@@ -17111,7 +17234,7 @@ async function testHuntingEndToEnd() {
     const f2Done = recordHuntingFloorResult(f2, {
         hpRemain: 80,
         maxHp: 100,
-        loot: { shards: 20, chests: [commonChest], xp: 30 }
+        loot: { shards: 20, chests: [commonChest] }
     });
     assert.equal(f2Done.carriedHp, 80, "HP carryover after combat");
     assert.equal(f2Done.pendingLoot.shards, 20, "Shards should be pending");
@@ -17132,7 +17255,7 @@ async function testHuntingEndToEnd() {
     const f4Done = recordHuntingFloorResult(f4, {
         hpRemain: 60,
         maxHp: 100,
-        loot: { shards: 35, chests: [uncommonChest, rareChest], xp: 50 }
+        loot: { shards: 35, chests: [uncommonChest, rareChest] }
     });
     assert.equal(f4Done.pendingLoot.shards, 55, "Shards should accumulate: 20+35=55");
     assert.equal(f4Done.pendingLoot.chests.length, 3, "3 chests total pending");
@@ -17142,7 +17265,7 @@ async function testHuntingEndToEnd() {
     assert.equal(retreated.status, "retreated", "Retreat should end run safely");
     assert.equal(retreated.securedLoot.shards, 55, "Retreat secures all pending shards");
     assert.equal(retreated.securedLoot.chests.length, 3, "Retreat secures all pending chests");
-    assert.equal(retreated.securedLoot.xp, 80, "Retreat secures all pending XP");
+    assert.equal(retreated.securedLoot.xp, undefined, "XP must be granted at pickup rather than retreat");
 
     console.log("[hunting-end-to-end] ok");
 }
@@ -17452,6 +17575,8 @@ testHuntingLootBalanceRules();
 testHuntingSplitterDeathFragmentsAndResultGrace(app);
 testHuntingLootItemsRotate();
 testHuntingLootItemsAndDropController(app);
+testHuntingExperienceBalance();
+testHuntingExperienceGrantsImmediately();
 testHuntingBossRolesAndEnhancementStoneDrops(app);
 testEliteMobCombinationEvent(app);
 testHuntingLootSessionIsDiscardedOnDefeat(app);

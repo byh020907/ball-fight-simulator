@@ -27,7 +27,7 @@ export class MishapEvent extends HuntingEvent {
             run: recordHuntingFloorResult(run, {
                 hpRemain: remainingHp,
                 maxHp,
-                loot: { shards: 0, chests: [], xp: 0 },
+                loot: { shards: 0, chests: [] },
                 consumeStatModifiers: false
             }),
             transition: HUNTING_EVENT_TRANSITIONS.CONTINUE,

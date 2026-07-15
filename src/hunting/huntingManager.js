@@ -39,7 +39,7 @@ import { HERO_ORB_HP_PER_POINT } from "../entities/heroOrb.js";
 import {
     applyExperienceProgressionToBaseSpec,
     collectActiveExperienceProgression,
-    grantExperienceFromMatchReport
+    combineExperienceGrantResults
 } from "../experience/experienceService.js";
 import { applyRebirthLoadoutToBaseSpec, getRebirthLoadout } from "../rebirth/index.js";
 import { applyStatAllocation } from "../statAllocation.js";
@@ -56,6 +56,7 @@ import {
     recordHuntingStageVisit
 } from "./huntingAchievementProgress.js";
 import { HuntingBattleLootSession, HuntingLootDropController } from "./huntingLoot.js";
+import { getHuntingCompletionExperience } from "./huntingExperience.js";
 import { getRarityLabel } from "./rarityPresentation.js";
 
 const HUNTING_ROUTE_ACTIONS = Object.freeze({
@@ -96,6 +97,8 @@ export class HuntingManager {
         this._run = null;
         this._moving = false;
         this._battleLootSession = null;
+        this._battleExperienceGrants = [];
+        this._lastBattleExperienceResult = null;
         this._combatRewardChestQueue = [];
     }
 
@@ -322,8 +325,13 @@ export class HuntingManager {
         run = this._run;
         const matchSpecs = [appliedSpec, ...enemySpecs];
         const battleLootSession = new HuntingBattleLootSession({ playerId: run.characterId, floor: run.floor });
-        const lootDropController = new HuntingLootDropController({ session: battleLootSession });
+        const lootDropController = new HuntingLootDropController({
+            session: battleLootSession,
+            onExperienceCollected: (reward) => this._awardHuntingExperience(reward)
+        });
         this._battleLootSession = battleLootSession;
+        this._battleExperienceGrants = [];
+        this._lastBattleExperienceResult = null;
         this._combatRewardChestQueue = [];
         app._currentMatchReport = createMatchReport();
         app._currentMatchReport.playerFighterId = run.characterId;
@@ -353,8 +361,13 @@ export class HuntingManager {
             experienceProgressionByFighter: new Map([[run.characterId, playerProgression]]),
             rebirthLoadoutByFighter: new Map([[run.characterId, rebirthLoadout]]),
             onFighterDefeated: (fighter, context) => lootDropController.onFighterDefeated(fighter, context),
-            onResultResolved: (winner, context) => lootDropController.onResultResolved(winner, context)
+            onResultResolved: (winner, context) =>
+                this._handleHuntingResultResolved(lootDropController, winner, context)
         });
+
+        const playerBall = app.simulation?.fighters?.find((fighter) => fighter.id === run.characterId);
+        const enemies = playerBall ? app.simulation.getEnemiesOf(playerBall) : [];
+        lootDropController.prepareExperienceDrops(enemies);
 
         if (Number.isFinite(run.carriedHp)) {
             const ball = app.simulation?.fighters?.find((f) => f.id === run.characterId);
@@ -372,32 +385,16 @@ export class HuntingManager {
         const run = this._run;
         if (!run) return;
 
-        const playerBall = app.simulation.fighters.find((f) => f.id === run.characterId);
-        const winner = app.simulation.winner;
-        const playerWon = Boolean(
-            playerBall &&
-            winner &&
-            (winner === playerBall ||
-                (typeof app.simulation.isHostile === "function" && !app.simulation.isHostile(winner, playerBall)))
-        );
-
-        if (app._currentMatchReport) {
-            app._currentMatchReport.playerWon = playerWon;
-            if (playerBall) {
-                recordLowestHp(app._currentMatchReport, playerBall.hp, playerBall.maxHp);
-                app._currentMatchReport.hpRemain = playerBall.hp;
-                app._currentMatchReport.myMaxHp = playerBall.maxHp;
-            }
-            const oppMaxHp = app.simulation.fighters
-                .filter((f) => f.id !== run.characterId)
-                .reduce((s, f) => s + f.maxHp, 0);
-            app._currentMatchReport.opponentMaxHp = oppMaxHp;
-
-            const xpResult = grantExperienceFromMatchReport(app.playerProfile, app._currentMatchReport);
-            if (xpResult?.xpGained > 0) {
-                app.addLog(`[사냥터 XP] ${xpResult.xpGained}XP (Lv.${xpResult.level})`);
-            }
-            app._currentMatchReport = null;
+        const battleResult = this._getHuntingBattleResult(app.simulation);
+        const { playerBall, playerWon } = battleResult;
+        this._updateHuntingMatchReport(app, battleResult);
+        app._currentMatchReport = null;
+        const xpResult = combineExperienceGrantResults(this._battleExperienceGrants);
+        this._battleExperienceGrants = [];
+        this._lastBattleExperienceResult = xpResult;
+        if (xpResult) {
+            app._lastMatchXpResult = xpResult;
+            app.addLog(`[사냥터 XP] ${app._formatXpResult(xpResult)}`);
         }
 
         if (playerWon) {
@@ -428,11 +425,11 @@ export class HuntingManager {
             }
 
             if (isFinalBoss) {
-                this._presentFinalBossClear(app);
+                this._presentFinalBossClear(app, xpResult);
                 return;
             }
 
-            this._presentNormalCombatWin(app, playerBall?.name ?? run.characterId);
+            this._presentNormalCombatWin(app, playerBall?.name ?? run.characterId, xpResult);
             savePlayerProfile(app.playerProfile);
         } else {
             this._battleLootSession = null;
@@ -450,6 +447,7 @@ export class HuntingManager {
 
             const lossDisplay = defeatLossText || `파편 ${lostShards} 손실`;
             app.presentResultSequence([
+                this._createHuntingExperienceResultStep(app, xpResult),
                 {
                     id: "summary",
                     label: "사냥터 패배",
@@ -467,6 +465,58 @@ export class HuntingManager {
             });
             this._run = null;
         }
+    }
+
+    _getHuntingBattleResult(simulation) {
+        const run = this._run;
+        const playerBall = simulation?.fighters?.find((fighter) => fighter.id === run?.characterId) ?? null;
+        const winner = simulation?.winner ?? null;
+        const playerWon = Boolean(
+            playerBall &&
+            winner &&
+            (winner === playerBall ||
+                (typeof simulation.isHostile === "function" && !simulation.isHostile(winner, playerBall)))
+        );
+        const enemies = playerBall ? simulation.getEnemiesOf(playerBall) : [];
+        return { playerBall, playerWon, enemies };
+    }
+
+    _updateHuntingMatchReport(app, { playerBall, playerWon, enemies }) {
+        const report = app._currentMatchReport;
+        if (!report) return null;
+
+        report.playerWon = playerWon;
+        if (playerBall) {
+            recordLowestHp(report, playerBall.hp, playerBall.maxHp);
+            report.hpRemain = playerBall.hp;
+            report.myMaxHp = playerBall.maxHp;
+        }
+        report.opponentMaxHp = enemies.reduce((total, fighter) => total + fighter.maxHp, 0);
+        return report;
+    }
+
+    _handleHuntingResultResolved(lootDropController, winner, { simulation } = {}) {
+        const battleResult = this._getHuntingBattleResult(simulation);
+        if (!battleResult.playerWon) return;
+
+        const report = this._updateHuntingMatchReport(this.app, battleResult);
+        const completionExperience = getHuntingCompletionExperience(report, battleResult.enemies);
+        lootDropController.onResultResolved(winner, { simulation, completionExperience });
+    }
+
+    _awardHuntingExperience(reward) {
+        const characterId = this._run?.characterId;
+        const amount = Math.max(0, Math.floor(reward?.amount ?? 0));
+        if (!characterId || amount <= 0) return null;
+
+        const result = this.app.awardExperience(characterId, amount, {
+            persist: false,
+            refresh: false,
+            log: false,
+            notifyLevelUp: true
+        });
+        if (result?.xpGained > 0) this._battleExperienceGrants.push(result);
+        return result;
     }
 
     retreat() {
@@ -952,9 +1002,9 @@ export class HuntingManager {
         const name = playerSpec?.name ?? run.characterId;
         const isFinalBoss = run.lastEncounter?.type === HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS;
         if (isFinalBoss) {
-            this._presentFinalBossClear(app);
+            this._presentFinalBossClear(app, this._lastBattleExperienceResult);
         } else {
-            this._presentNormalCombatWin(app, name);
+            this._presentNormalCombatWin(app, name, this._lastBattleExperienceResult);
         }
     }
 
@@ -1053,13 +1103,24 @@ export class HuntingManager {
         });
     }
 
-    _presentNormalCombatWin(app, name) {
+    _createHuntingExperienceResultStep(app, xpResult) {
+        const xpReward = app._createXpRewardView(xpResult);
+        return {
+            id: "experience",
+            label: "경험치",
+            text: app._formatXpResult(xpResult) || "이번 전투에서는 회수한 XP 오브가 없습니다.",
+            xpReward
+        };
+    }
+
+    _presentNormalCombatWin(app, name, xpResult = this._lastBattleExperienceResult) {
         const run = this._run;
         const pendingText = formatPendingLootSummary(run.pendingLoot);
         const hud = this._getLootHudState();
+        const xpText = app._formatXpResult(xpResult);
         this._run = setHuntingRunPhase(run, HUNTING_RUN_PHASES.AWAITING_CHOICE);
         app.refreshPlayerSetup();
-        app.showOverlay("사냥터", `${name} 승리!`, `층 ${run.floor} 완료`);
+        app.showOverlay("사냥터", `${name} 승리!`, `층 ${run.floor} 완료${xpText ? ` · ${xpText}` : ""}`);
         app.setHuntingOverlayState({
             huntingChoiceVisible: true,
             huntingCanRetreat: false,
@@ -1073,7 +1134,7 @@ export class HuntingManager {
         app.setStartButton({ hidden: true, disabled: true, text: "" });
     }
 
-    _presentFinalBossClear(app) {
+    _presentFinalBossClear(app, xpResult = this._lastBattleExperienceResult) {
         const run = this._run;
         const stage = getHuntingStage(run.stageId);
         const nextStageId = getNextHuntingStageId(run.stageId);
@@ -1095,6 +1156,7 @@ export class HuntingManager {
             huntingLootHudChests: 0
         });
         app.presentResultSequence([
+            this._createHuntingExperienceResultStep(app, xpResult),
             {
                 id: "summary",
                 label: "스테이지 클리어",

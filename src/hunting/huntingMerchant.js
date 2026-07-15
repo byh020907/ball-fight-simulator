@@ -148,8 +148,8 @@ export function applyMerchantOffer(run, profile, offer) {
         };
         newRun.securedLoot = {
             shards: newRun.securedLoot?.shards ?? 0,
-            chests: [...(newRun.securedLoot?.chests ?? []), movedChest],
-            xp: newRun.securedLoot?.xp ?? 0
+            enhancementStones: newRun.securedLoot?.enhancementStones ?? 0,
+            chests: [...(newRun.securedLoot?.chests ?? []), movedChest]
         };
         result = { type: "secure_transport", chest: movedChest };
     }

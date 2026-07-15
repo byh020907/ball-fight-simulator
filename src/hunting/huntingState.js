@@ -27,8 +27,7 @@ function cloneLoot(loot = createEmptyHuntingLoot()) {
     return {
         shards: Math.max(0, Math.floor(loot.shards ?? 0)),
         enhancementStones: Math.max(0, Math.floor(loot.enhancementStones ?? 0)),
-        chests: [...(loot.chests ?? [])],
-        xp: Math.max(0, Math.floor(loot.xp ?? 0))
+        chests: [...(loot.chests ?? [])]
     };
 }
 

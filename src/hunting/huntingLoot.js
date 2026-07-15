@@ -4,6 +4,13 @@ import { getCombatMovementSpeed } from "../physics/magneticAttraction.js";
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 import { createEmptyHuntingLoot, createHuntingChest } from "./huntingRewards.js";
 import { HUNTING_MAX_FLOOR } from "./huntingConfig.js";
+import {
+    createHuntingExperienceAllocation,
+    getHuntingCompletionExperienceDropCount,
+    getHuntingExperienceDropCount,
+    getHuntingExperienceDropLimit,
+    splitHuntingExperienceAmount
+} from "./huntingExperience.js";
 
 export const HUNTING_LOOT_ITEM_TYPES = Object.freeze({
     SMALL_HEAL_PACK: "small_heal_pack",
@@ -11,7 +18,8 @@ export const HUNTING_LOOT_ITEM_TYPES = Object.freeze({
     SHARD_BUNDLE: "shard_bundle",
     CHEST: "chest",
     HIGH_CHEST: "high_chest",
-    ENHANCEMENT_STONE: "enhancement_stone"
+    ENHANCEMENT_STONE: "enhancement_stone",
+    EXPERIENCE: "experience"
 });
 
 export const HUNTING_LOOT_RARITIES = Object.freeze(["common", "rare", "unique", "epic"]);
@@ -201,6 +209,7 @@ export class HuntingBattleLootSession {
         this.playerId = playerId;
         this.floor = floor;
         this._collectedLoot = createEmptyHuntingLoot();
+        this._collectedExperience = 0;
     }
 
     recordCollection(reward) {
@@ -210,6 +219,9 @@ export class HuntingBattleLootSession {
         }
         if (reward.type === HUNTING_LOOT_ITEM_TYPES.ENHANCEMENT_STONE) {
             this._collectedLoot.enhancementStones += Math.max(0, Math.round(reward.amount ?? 0));
+        }
+        if (reward.type === HUNTING_LOOT_ITEM_TYPES.EXPERIENCE) {
+            this._collectedExperience += Math.max(0, Math.round(reward.amount ?? 0));
         }
         if (reward.type === HUNTING_LOOT_ITEM_TYPES.CHEST && reward.chest) {
             this._collectedLoot.chests.push(reward.chest);
@@ -221,16 +233,31 @@ export class HuntingBattleLootSession {
         return {
             shards: this._collectedLoot.shards,
             enhancementStones: this._collectedLoot.enhancementStones,
-            chests: [...this._collectedLoot.chests],
-            xp: this._collectedLoot.xp
+            chests: [...this._collectedLoot.chests]
         };
+    }
+
+    getCollectedExperience() {
+        return this._collectedExperience;
     }
 }
 
 export class HuntingLootDropController {
-    constructor({ session, rng = Math.random } = {}) {
+    constructor({ session, rng = Math.random, onExperienceCollected = null } = {}) {
         this.session = session;
         this.rng = rng;
+        this.onExperienceCollected = onExperienceCollected;
+        this._experiencePhysicalDropCount = 0;
+        this._lastExperienceDropSource = null;
+    }
+
+    prepareExperienceDrops(fighters = []) {
+        const allocation = createHuntingExperienceAllocation(fighters);
+        for (const fighter of fighters) {
+            if (!fighter?.hunting) continue;
+            fighter.hunting.experienceReward = allocation.get(fighter.id) ?? 0;
+        }
+        return allocation;
     }
 
     onFighterDefeated(fighter, { simulation, suppressLootDrop = false } = {}) {
@@ -252,17 +279,19 @@ export class HuntingLootDropController {
             isMob && lootMultiplier > 0
                 ? this._spawnGuaranteedShardDrops(fighter, collector, rarity, lootMultiplier, simulation)
                 : [];
-        if (isMob && lootMultiplier > 0) {
-            const bonusType = rollHuntingBonusLootItemType({
-                collector,
-                rarity,
-                rng: this.rng,
-                chanceMultiplier: lootMultiplier
-            });
-            if (bonusType) this._spawnLootItem(bonusType, fighter, collector, rarity, lootMultiplier, simulation);
-        }
+        const bonusType =
+            isMob && lootMultiplier > 0
+                ? rollHuntingBonusLootItemType({
+                      collector,
+                      rarity,
+                      rng: this.rng,
+                      chanceMultiplier: lootMultiplier
+                  })
+                : null;
+        if (bonusType) this._spawnLootItem(bonusType, fighter, collector, rarity, lootMultiplier, simulation);
+        const experience = this._spawnExperienceDrops(fighter, collector, simulation);
         const enhancementStones = isMiniboss ? this._spawnEnhancementStoneDrops(fighter, collector, simulation) : [];
-        return shards[0] ?? enhancementStones[0] ?? null;
+        return shards[0] ?? experience[0] ?? enhancementStones[0] ?? null;
     }
 
     _spawnGuaranteedShardDrops(fighter, collector, rarity, lootMultiplier, simulation) {
@@ -291,6 +320,43 @@ export class HuntingLootDropController {
         );
     }
 
+    _spawnExperienceDrops(fighter, collector, simulation) {
+        const amount = Math.max(0, Math.floor(fighter?.hunting?.experienceReward ?? 0));
+        const count = getHuntingExperienceDropCount(fighter, amount, this._getRemainingExperienceDropCapacity());
+        return this._spawnExperienceAmounts(
+            fighter,
+            collector,
+            splitHuntingExperienceAmount(amount, count),
+            simulation
+        );
+    }
+
+    _spawnCompletionExperience(source, collector, amount, simulation) {
+        const count = getHuntingCompletionExperienceDropCount(amount, this._getRemainingExperienceDropCapacity());
+        return this._spawnExperienceAmounts(source, collector, splitHuntingExperienceAmount(amount, count), simulation);
+    }
+
+    _spawnExperienceAmounts(fighter, collector, amounts, simulation) {
+        return amounts.map((amount) => {
+            const item = this._spawnLootItem(
+                HUNTING_LOOT_ITEM_TYPES.EXPERIENCE,
+                fighter,
+                collector,
+                "common",
+                1,
+                simulation,
+                { amount }
+            );
+            this._experiencePhysicalDropCount += 1;
+            this._lastExperienceDropSource = fighter;
+            return item;
+        });
+    }
+
+    _getRemainingExperienceDropCapacity() {
+        return Math.max(0, getHuntingExperienceDropLimit() - this._experiencePhysicalDropCount);
+    }
+
     _spawnLootItem(type, fighter, collector, rarity, lootMultiplier, simulation, { amount } = {}) {
         const item = createHuntingLootEntity({
             type,
@@ -301,14 +367,24 @@ export class HuntingLootDropController {
             rng: this.rng,
             amount,
             lootMultiplier,
-            onCollected: (reward) => this.session.recordCollection(reward)
+            onCollected: (reward) => {
+                this.session.recordCollection(reward);
+                if (reward.type === HUNTING_LOOT_ITEM_TYPES.EXPERIENCE) this.onExperienceCollected?.(reward);
+            }
         });
         simulation.entities.push(item);
         return item;
     }
 
-    onResultResolved(winner, { simulation } = {}) {
+    onResultResolved(winner, { simulation, completionExperience = 0 } = {}) {
         if (!simulation || winner?.id !== this.session?.playerId) return;
+        const source =
+            this._lastExperienceDropSource ??
+            simulation.fighters.find(
+                (fighter) => (fighter?.hunting?.isMob || fighter?.hunting?.isMiniboss) && fighter.id !== winner.id
+            ) ??
+            winner;
+        this._spawnCompletionExperience(source, winner, completionExperience, simulation);
         for (const entity of simulation.entities) {
             entity.beginVictoryCollection?.(LOOT_CONFIG.victoryCollection);
         }

@@ -81,6 +81,8 @@
 
 계정 경험치, 스킨, 칭호는 2차 범위로 둡니다.
 
+사냥터는 전투 중 여러 XP 오브를 회수하면서 프로필 XP를 즉시 늘리고, 원정 종료 결과에서 그 전투의 누적 변화를 같은 패널로 다시 확인합니다. 일반 사냥터 승리는 선택을 막는 결과 패널 대신 `층 N 완료 · +XP` 요약만 표시합니다.
+
 ## 5. XP 지급 규칙
 
 유저가 직접 선택한 캐릭터만 XP를 받습니다. AI끼리 진행된 매치와 플레이어가 참가하지 않은 매치는 XP 대상이 아닙니다.
@@ -136,7 +138,8 @@ matchXP = (dealRatio + hpRemainRatio + comebackBonus) × stageMultiplier × XP_S
 - `hpRemainRatio`는 0 이상으로 클램프합니다(패배 시 0).
 - 매치 종료 후 `BattleSimulation`의 `MatchReport`에서 `damageDealt`, `damageTaken`, `minHpRatio`(매치 중 최저 HP 비율)를 수집합니다.
 - 이 값들은 `hooks.onDamageDealt`/`onDamageTaken`을 통해 실시간으로 추적합니다.
-- XP 계산과 지급은 유저가 참가한 매치 종료 단계(`grantExperienceFromMatchReport`)가 소유합니다. 토너먼트 종료 단계에서는 업적/숙련도/도전 단계만 처리하고 XP를 다시 지급하지 않습니다.
+- 토너먼트·일반 매치는 유저가 참가한 매치 종료 단계(`grantExperienceFromMatchReport`)가 XP 계산과 지급을 소유합니다. 토너먼트 종료 단계에서는 업적/숙련도/도전 단계만 처리하고 XP를 다시 지급하지 않습니다.
+- 사냥터는 예외적으로 동일한 매치 공식의 처치 풀과 승리 잔여분을 XP 오브로 나눕니다. 엔티티는 프로필을 직접 수정하지 않고 `HuntingLootDropController`가 회수를 `HuntingManager`에 알리면, 매니저가 `BattleApp.awardExperience()`로 즉시 반영합니다.
 
 ## 6. 레벨 곡선
 
@@ -645,7 +648,7 @@ src/
 | `collectionViewModel.js` | 컬렉션 허브용 레벨/진행도 표시 데이터 |
 | `app.js` | 매치 종료 직후 XP 지급 및 결과 오버레이 UI 연결 |
 
-전투 중 엔티티나 Ability가 직접 `profile.experience`를 수정하지 않습니다. `BattleApp.finishMatch()`가 `MatchReport`를 완성한 뒤 유저 참가 매치에 한해 XP를 지급합니다.
+전투 중 엔티티나 Ability가 직접 `profile.experience`를 수정하지 않습니다. 토너먼트·일반 매치는 `BattleApp.finishMatch()`가 `MatchReport`를 완성한 뒤 지급하고, 사냥터는 `HuntingManager`만 `BattleApp.awardExperience()`를 호출해 수집된 XP 오브를 즉시 지급합니다.
 
 ## 13. 처리 흐름
 
@@ -667,6 +670,13 @@ BattleApp.showTournamentChampion()
   -> 디펜딩 챔피언 격파 여부에 따라 bountyXp 지급
   -> 우승자가 AI면 defendingChampion 등록/갱신
   -> 최종 토너먼트 결과를 UI에 표시
+   -> savePlayerProfile()
+
+HuntingLootDropController
+  -> ExperienceDrop 회수 알림
+HuntingManager
+  -> BattleApp.awardExperience(profile, collectedOrbAmount)
+  -> 층 종료 때 해당 전투의 오브 지급 결과를 합쳐 UI에 표시
   -> savePlayerProfile()
 ```
 

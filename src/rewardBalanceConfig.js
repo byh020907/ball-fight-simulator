@@ -364,7 +364,7 @@ export const REWARD_BALANCE = deepFreeze({
             }
         },
         shards: {
-            defeatPreserve: { shards: 0.5, xp: 0.7 }
+            defeatPreserve: { shards: 0.5 }
         },
         loot: {
             baseDropChance: 0.15,
@@ -373,6 +373,23 @@ export const REWARD_BALANCE = deepFreeze({
             itemLife: 18,
             magnet: { radiusMultiplier: 4, responseRate: 5, speedMultiplier: 1.35, collectionGraceDuration: 1 },
             victoryCollection: { duration: 1, responseRate: 180 },
+            experienceDrops: {
+                killXpPool: 20,
+                completionDropCount: 4,
+                maxPhysicalDropsPerBattle: 24,
+                rarity: {
+                    common: { allocationWeight: 1, physicalDropCount: 2, victoryBonus: 0 },
+                    rare: { allocationWeight: 1.45, physicalDropCount: 4, victoryBonus: 2 },
+                    unique: { allocationWeight: 1.9, physicalDropCount: 5, victoryBonus: 4 },
+                    epic: { allocationWeight: 2.4, physicalDropCount: 6, victoryBonus: 6 }
+                },
+                enemyType: {
+                    normal: { allocationMultiplier: 1, physicalDropBonus: 0, victoryBonus: 0 },
+                    elite: { allocationMultiplier: 1.2, physicalDropBonus: 1, victoryBonus: 6 },
+                    champion: { allocationMultiplier: 1.45, physicalDropBonus: 2, victoryBonus: 10 }
+                },
+                boss: { allocationMultiplier: 1.3, physicalDropCount: 8, victoryBonus: 8 }
+            },
             smallHealPack: { missingHpRecoveryRatio: 0.25 },
             shard: { baseAmount: 5, floorStep: 25, maximumAmount: 20, physicalDropCount: { minimum: 3, maximum: 7 } },
             normalWeights: { small_heal_pack: { minimum: 20, maximum: 40 }, chest: 10 },
