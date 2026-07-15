@@ -59,6 +59,10 @@ import { getLevelRewardEffectHandler } from "../src/experience/reward-effects/ef
 import { DashEffect, WallSlamEffect } from "../src/combatEffects.js";
 import { shuffled } from "../src/random.js";
 import { BattleSimulation } from "../src/simulation/battleSimulation.js";
+import {
+    predictNextWallCollision,
+    TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS
+} from "../src/tournament/angledBounceRamps.js";
 import { Ability, AbilitySet } from "../src/abilities/index.js";
 import { FighterPhysicsSimulation } from "../src/simulation/fighterPhysicsSimulation.js";
 import { PreviewReselectSimulation } from "../src/preview/previewReselectSimulation.js";
@@ -6509,6 +6513,176 @@ function testHuntingTerrain() {
     console.log("[hunting-terrain] ok");
 }
 
+function createTournamentRampSpec(id, color) {
+    return {
+        id,
+        name: id,
+        title: "검증용",
+        description: "토너먼트 경사면 검증",
+        color,
+        ability: "none",
+        appearance: { sides: 0, face: "default" },
+        stats: { hp: 9999, damage: 1, defense: 0, speed: 600, radius: 32, mass: 1 }
+    };
+}
+
+function createTournamentRampSimulation() {
+    const simulation = new BattleSimulation(
+        [createTournamentRampSpec("ramp-a", "#ffffff"), createTournamentRampSpec("ramp-b", "#222222")],
+        { onLog() {}, onSound() {} },
+        null,
+        { assignActions: false, tournamentAngledBounceRamps: { enabled: true, seed: "regression-ramp" } }
+    );
+    const [fighter, opponent] = simulation.fighters;
+    fighter.position = new Vector2(780, 480);
+    fighter.velocity = new Vector2(600, 0);
+    opponent.position = new Vector2(160, 160);
+    opponent.velocity = new Vector2();
+    return { simulation, fighter };
+}
+
+function testTournamentAngledBounceRamps() {
+    const { simulation, fighter } = createTournamentRampSimulation();
+    const ramps = simulation._tournamentAngledBounceRampSystem;
+    const prediction = predictNextWallCollision(simulation, fighter);
+
+    assert.ok(ramps, "Tournament-only option should create the angled-ramp system");
+    assert.equal(prediction.wall, "right", "Axis-aligned fighter should predict the approaching right wall");
+    assert.ok(
+        prediction.incidenceDegrees <= TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS.incidenceThresholdDegrees,
+        "Wall-normal incidence should classify an axis trajectory as eligible"
+    );
+    assert.ok(
+        prediction.time <= TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS.leadTime,
+        "The probe fighter should be inside the ramp lead-time window"
+    );
+
+    ramps.update(0);
+    const activeTerrain = ramps.activeRamp?.terrain;
+    assert.ok(activeTerrain, "Eligible tournament trajectory should create one temporary ramp");
+    assert.equal(
+        simulation.terrain.length,
+        1,
+        "Only the active temporary ramp should join the tournament terrain list"
+    );
+    assert.equal(activeTerrain.shape, "polygon", "Temporary ramp should use the shared polygon terrain contract");
+    assert.equal(activeTerrain.points.length, 4, "Temporary ramp should be a convex four-point polygon");
+    assert.equal(activeTerrain.physicsMaterial, "wood", "Temporary ramp should use the existing wood terrain material");
+    assert.equal(activeTerrain.x, 905, "Right-wall ramp should stay 55px inside the wall");
+    assert.equal(activeTerrain.y, 480, "Ramp should align to the predicted wall-hit coordinate");
+
+    const angleFromWallNormal =
+        (Math.abs(Math.atan2(Math.sin(activeTerrain.angle - Math.PI), Math.cos(activeTerrain.angle - Math.PI))) * 180) /
+        Math.PI;
+    assert.ok(
+        angleFromWallNormal >= TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS.minimumSlopeDegrees,
+        "Ramp slope should not fall below the confirmed minimum"
+    );
+    assert.ok(
+        angleFromWallNormal <= TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS.maximumSlopeDegrees,
+        "Ramp slope should not exceed the confirmed maximum"
+    );
+
+    const rampContext = makeRecordingCanvasContext();
+    drawTerrain(rampContext, [activeTerrain]);
+    assert.equal(
+        rampContext.calls.filter((call) => call[0] === "fill").length,
+        1,
+        "Temporary ramp should render as one clear fill without a terrain shadow pass"
+    );
+    assert.ok(
+        rampContext.calls.some((call) => call[0] === "set" && call[1] === "fillStyle" && call[2] === "#e6ae35"),
+        "Temporary ramp should use its dedicated single-color visual"
+    );
+
+    let collisionVelocity = null;
+    for (let frame = 0; frame < 60; frame += 1) {
+        simulation.update(1 / 60);
+        if (ramps.events.some((event) => event.type === "collision")) {
+            collisionVelocity = fighter.velocity.clone();
+            break;
+        }
+    }
+    assert.ok(collisionVelocity, "Ramp should be removed when a fighter physically collides with it");
+    assert.equal(ramps.activeRamp, null, "Physical ramp collision should immediately clear the active terrain");
+    assert.equal(simulation.terrain.length, 0, "Physical ramp collision should remove the terrain from simulation");
+    const outgoingAngle = (Math.atan2(Math.abs(collisionVelocity.y), Math.abs(collisionVelocity.x)) * 180) / Math.PI;
+    assert.ok(
+        outgoingAngle >= 20,
+        "Shared polygon collision should turn the axis trajectory into a visible angled rebound"
+    );
+
+    fighter.position = new Vector2(780, 480);
+    fighter.velocity = new Vector2(600, 0);
+    ramps.update(0);
+    assert.equal(ramps.activeRamp, null, "A fighter cooldown should block immediate duplicate ramp creation");
+
+    ramps.update(TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS.cooldown + 0.01);
+    assert.ok(ramps.activeRamp, "The same fighter should become eligible again after the confirmed cooldown");
+    fighter.velocity = new Vector2();
+    ramps.update(TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS.lifetime + 0.01);
+    assert.equal(ramps.activeRamp, null, "Unused ramp should expire after the confirmed lifetime");
+    assert.ok(
+        ramps.events.some((event) => event.type === "expired"),
+        "Ramp lifecycle should record expiry cleanup"
+    );
+
+    const staticCollisionTerrain = {
+        shape: "circle",
+        type: "rock",
+        x: 100,
+        y: 100,
+        radius: 40,
+        blocking: true,
+        onTerrainCollision() {
+            this.collisions = (this.collisions ?? 0) + 1;
+        }
+    };
+    const staticCollisionFighter = {
+        position: { x: 100, y: 100 },
+        velocity: { x: 30, y: 0 },
+        radius: 20,
+        applyImpulse(impulse) {
+            this.velocity.x += impulse.x;
+            this.velocity.y += impulse.y;
+        }
+    };
+    assert.equal(
+        resolveTerrainCollision(staticCollisionFighter, staticCollisionTerrain),
+        true,
+        "Existing terrain collision should still resolve through the common dispatcher"
+    );
+    assert.equal(
+        staticCollisionTerrain.collisions,
+        1,
+        "Terrain collision callback should fire only after a real collision"
+    );
+
+    const huntingTerrain = createHuntingTerrain({ stageId: HUNTING_STAGE_IDS.CAVE, floor: 1 });
+    const huntingSimulation = new BattleSimulation(
+        [createTournamentRampSpec("hunting-a", "#ffffff"), createTournamentRampSpec("hunting-b", "#222222")],
+        { onLog() {}, onSound() {} },
+        null,
+        { assignActions: false, terrain: huntingTerrain }
+    );
+    assert.equal(
+        huntingSimulation._tournamentAngledBounceRampSystem,
+        null,
+        "Hunting and general BattleSimulation paths must leave tournament ramps disabled"
+    );
+    assert.equal(
+        huntingSimulation.terrain.length,
+        huntingTerrain.length,
+        "Disabled ramp policy must not mutate hunting terrain"
+    );
+    assert.ok(
+        readFileSync("src/app.js", "utf8").includes("tournamentAngledBounceRamps: this.currentTournamentMatch"),
+        "Actual tournament match creation should explicitly enable the ramp policy"
+    );
+
+    console.log("[tournament-angled-bounce-ramps] ok");
+}
+
 function testEquipmentEnhancement() {
     const profile = createDefaultPlayerProfile();
 
@@ -12660,6 +12834,7 @@ await testHuntingStageSelectUsesPreviewCharacter();
 await testDebugHuntingStartsRequestedFloor();
 await testHuntingResumeStartsAtHalfLatestStageFloor();
 testHuntingTerrain();
+testTournamentAngledBounceRamps();
 testEquipmentEnhancement();
 testEquipmentStatValueRatios();
 testEquipmentNaming();

@@ -88,7 +88,7 @@ export function resolvePolygonTerrainCollision(entity, terrain) {
         };
         const preVel = { x: entity.velocity.x, y: entity.velocity.y };
         applyCollisionResponse(entity, normal, contactPoint, preVel, {
-            surfaceMaterial: "wood"
+            surfaceMaterial: terrain.physicsMaterial ?? "wood"
         });
         return true;
     }
@@ -142,7 +142,7 @@ export function resolvePolygonTerrainCollision(entity, terrain) {
     const contactPoint = { x: bestContactX, y: bestContactY };
     const preVel = { x: entity.velocity.x, y: entity.velocity.y };
     applyCollisionResponse(entity, normal, contactPoint, preVel, {
-        surfaceMaterial: "wood"
+        surfaceMaterial: terrain.physicsMaterial ?? "wood"
     });
     return true;
 }

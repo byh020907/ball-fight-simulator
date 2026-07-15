@@ -1141,7 +1141,13 @@ export class BattleApp {
                 hostileAbsenceGraceDuration: options.hostileAbsenceGraceDuration,
                 hostileAbsenceGraceTeamId: options.hostileAbsenceGraceTeamId,
                 arenaTheme: options.arenaTheme ?? null,
-                terrain: options.terrain ?? []
+                terrain: options.terrain ?? [],
+                tournamentAngledBounceRamps: this.currentTournamentMatch
+                    ? {
+                          enabled: true,
+                          seed: `${this.currentTournamentMatch.id}:${match.map((fighter) => fighter.id).join(":")}`
+                      }
+                    : null
             }
         );
 

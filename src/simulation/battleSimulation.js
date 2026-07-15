@@ -24,6 +24,10 @@ import { BattleBall } from "../entities/index.js";
 import { GravityParticle } from "../effects/index.js";
 import { FighterPhysicsSimulation } from "./fighterPhysicsSimulation.js";
 import { AIActionController } from "./aiActionController.js";
+import {
+    createTournamentAngledBounceRampPolicy,
+    TournamentAngledBounceRampSystem
+} from "../tournament/angledBounceRamps.js";
 
 const ABILITY_TYPES = {
     none: Ability,
@@ -82,6 +86,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         this.hostileAbsenceGraceDuration = Math.max(0, options.hostileAbsenceGraceDuration ?? 0);
         this.hostileAbsenceGraceTeamId = options.hostileAbsenceGraceTeamId ?? null;
         this._hostileAbsenceElapsed = 0;
+        this._tournamentAngledBounceRampSystem = this._createTournamentAngledBounceRampSystem(options);
 
         // ── 클릭 액션 시스템 ──
         this.playerBall = playerBall;
@@ -108,6 +113,15 @@ export class BattleSimulation extends FighterPhysicsSimulation {
     shouldSkipFighterCollision(a, b) {
         if (super.shouldSkipFighterCollision(a, b)) return true;
         return this._shouldSkipFriendlyJumperCollision(a, b);
+    }
+
+    _createTournamentAngledBounceRampSystem(options) {
+        const policy = createTournamentAngledBounceRampPolicy(options.tournamentAngledBounceRamps);
+        return policy ? new TournamentAngledBounceRampSystem(this, policy) : null;
+    }
+
+    _updateTournamentAngledBounceRamps(delta) {
+        this._tournamentAngledBounceRampSystem?.update(delta);
     }
 
     _shouldSkipFriendlyJumperCollision(a, b) {
@@ -315,6 +329,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
             }
         }
 
+        this._updateTournamentAngledBounceRamps(delta);
         this.handleCollision();
         this._checkAntiStall(delta);
 

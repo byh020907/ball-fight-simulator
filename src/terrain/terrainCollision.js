@@ -41,13 +41,14 @@ function resolveCircleTerrainCollision(entity, terrain) {
  */
 export function resolveTerrainCollision(entity, terrain) {
     if (!terrain || !terrain.blocking) return false;
+    let collided = false;
     if (terrain.shape === TERRAIN_SHAPES.CIRCLE) {
-        return resolveCircleTerrainCollision(entity, terrain);
+        collided = resolveCircleTerrainCollision(entity, terrain);
+    } else if (terrain.shape === TERRAIN_SHAPES.POLYGON) {
+        collided = resolvePolygonTerrainCollision(entity, terrain);
     }
-    if (terrain.shape === TERRAIN_SHAPES.POLYGON) {
-        return resolvePolygonTerrainCollision(entity, terrain);
-    }
-    return false;
+    if (collided) terrain.onTerrainCollision?.(entity);
+    return collided;
 }
 
 export function resolveTerrainCollisions(entity, terrainList) {

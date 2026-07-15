@@ -85,6 +85,7 @@ export const HELP_CONTENT = `
 <div class="help-section">
   <h4 class="help-h">🏆 목표</h4>
   <p>토너먼트를 진행하여 최종 우승자가 되세요.</p>
+  <p>토너먼트 전투에서는 벽에 정면으로 튕길 공 앞에 잠깐 경사면이 나타날 수 있습니다. 사냥터 장애물과 같은 실제 충돌 물리로 튕기는 방향을 바꾸며, 벽 자체는 변하지 않습니다.</p>
 </div>
 
 <div class="help-section">

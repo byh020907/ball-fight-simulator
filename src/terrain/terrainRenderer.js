@@ -73,6 +73,28 @@ function drawPolygonTerrain(ctx, terrain) {
     }
 }
 
+function drawTournamentAngledBounceRamp(ctx, terrain) {
+    const worldPoints = getWorldPolygonPoints(terrain);
+    if (worldPoints.length < 3) return;
+
+    ctx.save();
+    try {
+        ctx.beginPath();
+        ctx.moveTo(worldPoints[0].x, worldPoints[0].y);
+        for (const point of worldPoints) {
+            ctx.lineTo(point.x, point.y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = "#e6ae35";
+        ctx.fill();
+        ctx.strokeStyle = "#2f2922";
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+    } finally {
+        ctx.restore();
+    }
+}
+
 export function drawTerrain(ctx, terrainList) {
     if (!terrainList || terrainList.length === 0) return;
 
@@ -81,7 +103,11 @@ export function drawTerrain(ctx, terrainList) {
         if (terrain.shape === TERRAIN_SHAPES.CIRCLE) {
             drawCircleTerrain(ctx, terrain);
         } else if (terrain.shape === TERRAIN_SHAPES.POLYGON) {
-            drawPolygonTerrain(ctx, terrain);
+            if (terrain.temporaryKind === "tournament-angled-ramp") {
+                drawTournamentAngledBounceRamp(ctx, terrain);
+            } else {
+                drawPolygonTerrain(ctx, terrain);
+            }
         }
     }
 }
