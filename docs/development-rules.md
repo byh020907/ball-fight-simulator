@@ -711,11 +711,12 @@ Tested: npm test, npm run check
 - `Get-Content` / `Set-Content`는 `-Encoding UTF8`을 명시해야 한글이 깨지지 않습니다.
 - `Select-String -SimpleMatch`로 단순 문자열 존재 여부를 확인할 수 있습니다.
 
-### `tests/regression.mjs` 보호
+### 회귀 테스트 실행 파일 보호
 
-`tests/regression.mjs`는 `src/simulation.js`와 import 경로가 유사해 실수로 덮어쓰기 쉽습니다. 특히 `single_find_and_replace`가 파일 경로를 잘못 지정하면 파일 전체가 다른 내용으로 대체될 수 있습니다.
+`tests/regression.mjs`는 실제 게임 상태·시뮬레이션 회귀를, `tests/uiContracts.mjs`는 템플릿·브리지·반응형 CSS의 정적 계약을 소유합니다. 두 파일은 `npm test`에서 함께 실행됩니다. `tests/regression.mjs`는 `src/simulation.js`와 import 경로가 유사해 실수로 덮어쓰기 쉽습니다. 특히 `single_find_and_replace`가 파일 경로를 잘못 지정하면 파일 전체가 다른 내용으로 대체될 수 있습니다.
 
 - `tests/regression.mjs` 수정 시 대상 경로를 다시 확인합니다.
+- 화면 구조만 읽는 새 테스트는 `tests/uiContracts.mjs`에 추가하고, 실제 도메인 상태·전투 진행을 만드는 테스트는 `tests/regression.mjs`에 둡니다.
 - 덮어써졌다면 `git checkout -- tests/regression.mjs`로 즉시 복원합니다.
 - 복원 후 id 참조(`"clone"` → `"trickster"`, `"berserker"` → `"rage"`, `"frosty"` → `"dash"`)와 변수명을 다시 적용합니다.
 

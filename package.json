@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node scripts/serve.mjs",
-    "test": "node tests/regression.mjs && node tests/profileVersionReset.mjs",
+    "test": "node tests/regression.mjs && node tests/uiContracts.mjs && node tests/profileVersionReset.mjs",
     "check": "node scripts/checkSyntax.mjs",
     "hunting:elite-combinations": "node scripts/generateEliteMobCombinations.mjs",
     "train": "node scripts/rl/train.mjs",
