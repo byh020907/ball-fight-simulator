@@ -44,7 +44,9 @@ import {
     applyMasteryEffectsToFighterSpec,
     MASTERY_EFFECT_DEFS,
     advanceCharacterMastery,
+    getCharacterMasteryLevel,
     getCharacterChallengeLevel,
+    getTierText,
     getTournamentOpponentExperienceLevel
 } from "./character-mastery/index.js";
 import { createCollectionHubViewModel } from "./collection/collectionViewModel.js";
@@ -567,7 +569,12 @@ export class BattleApp {
         const player = this.roster.find((fighter) => fighter.id === this.playerFighterId);
         const experienceSummary = getCharacterExperienceSummary(this.playerProfile, this.playerFighterId);
         const equipmentSummary = this._getPlayerEquipmentSummary(this.playerFighterId);
+        const masteryLevel = getCharacterMasteryLevel(this.playerProfile, this.playerFighterId);
+        const tournamentOpponentLevel =
+            getTournamentOpponentExperienceLevel(this.playerProfile, this.playerFighterId) ?? 1;
         this._panel.fighter = player ? { name: player.name, title: player.title, color: player.color } : null;
+        this._panel.tournamentTierLabel = masteryLevel > 0 ? getTierText(masteryLevel) : "첫 도전";
+        this._panel.tournamentOpponentLevel = tournamentOpponentLevel;
         this._panel.allocation = { ...this.playerStatAllocation };
         this._panel.totalPoints = PLAYER_STAT_POINTS;
         this._panel.remainingPoints = remaining;

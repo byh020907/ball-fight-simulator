@@ -695,6 +695,8 @@ async function loadModuleApp() {
         statDefs: [],
         challengeLevel: 0,
         highestUnlockedLevel: 0,
+        tournamentTierLabel: "첫 도전",
+        tournamentOpponentLevel: 1,
         progressionBonusSummary: "",
         allocationSummary: "",
         reset() {
@@ -706,6 +708,8 @@ async function loadModuleApp() {
             this.remainingPoints = 0;
             this.locked = false;
             this.statDefs = [];
+            this.tournamentTierLabel = "첫 도전";
+            this.tournamentOpponentLevel = 1;
             this.allocationSummary = "";
         }
     };
@@ -878,6 +882,8 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
         statDefs: [],
         challengeLevel: 0,
         highestUnlockedLevel: 0,
+        tournamentTierLabel: "첫 도전",
+        tournamentOpponentLevel: 1,
         progressionBonusSummary: "",
         allocationSummary: "",
         reset() {
@@ -889,6 +895,8 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
             this.remainingPoints = 0;
             this.locked = false;
             this.statDefs = [];
+            this.tournamentTierLabel = "첫 도전";
+            this.tournamentOpponentLevel = 1;
             this.allocationSummary = "";
         }
     });
@@ -1488,18 +1496,29 @@ async function testTournamentOpponentProgressionByMastery(app) {
     const { getTournamentOpponentExperienceLevel } = await import("../src/character-mastery/index.js");
     const playerId = app.playerFighterId;
     const scenarios = [
-        { masteryLevel: 0, expectedOpponentLevel: 1 },
-        { masteryLevel: 1, expectedOpponentLevel: 3 },
-        { masteryLevel: 2, expectedOpponentLevel: 6 },
-        { masteryLevel: 3, expectedOpponentLevel: 9 }
+        { masteryLevel: 0, expectedTierLabel: "첫 도전", expectedOpponentLevel: 1 },
+        { masteryLevel: 1, expectedTierLabel: "BRONZE", expectedOpponentLevel: 3 },
+        { masteryLevel: 2, expectedTierLabel: "SILVER", expectedOpponentLevel: 6 },
+        { masteryLevel: 3, expectedTierLabel: "GOLD", expectedOpponentLevel: 9 }
     ];
 
-    for (const { masteryLevel, expectedOpponentLevel } of scenarios) {
+    for (const { masteryLevel, expectedTierLabel, expectedOpponentLevel } of scenarios) {
         app.playerProfile = createDefaultPlayerProfile();
         app.playerProfile.experience.byCharacter[playerId] = { currentXp: getLevelRequirement(4) };
         app.playerProfile.characterMastery.levels[playerId] = masteryLevel;
         app.playerStatAllocation = createRandomStatAllocation(() => 0);
         app.refreshPlayerSetup();
+
+        assert.equal(
+            app._panel.tournamentTierLabel,
+            expectedTierLabel,
+            `Mastery ${masteryLevel} should expose the current tournament tier before start`
+        );
+        assert.equal(
+            app._panel.tournamentOpponentLevel,
+            expectedOpponentLevel,
+            `Mastery ${masteryLevel} should expose the actual AI starting level before start`
+        );
 
         assert.equal(
             getTournamentOpponentExperienceLevel(app.playerProfile, playerId),

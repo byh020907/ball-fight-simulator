@@ -38,6 +38,8 @@
 
 `advanceCharacterMastery()`가 이 규칙과 상태 변경을 소유한다. 도감 UI, 숙련도 합계, `도감 완성` 업적은 모두 이 저장된 단계를 조회한다.
 
+시작 전 플레이어 패널은 같은 저장 단계를 토너먼트 도전 정보로 보여 준다. 미해금은 `첫 도전 · 상대 Lv.1 시작`, BRONZE/SILVER/GOLD는 각각 `상대 Lv.3/Lv.6/Lv.9 시작`으로 표시한다. 표시는 `getCharacterMasteryLevel()`과 `getTournamentOpponentExperienceLevel()`을 그대로 사용하므로 실제 선택 AI의 시작 경험치 진행도와 분리되지 않는다.
+
 ## 3. 적용 순서
 
 숙련도의 스탯형 보정은 다른 모든 스탯 계산이 끝난 뒤 한 번만 퍼센트로 적용한다.

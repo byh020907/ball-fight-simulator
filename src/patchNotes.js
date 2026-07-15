@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.25.46",
+        date: "2026-07-15",
+        title: "v0.25.46 토너먼트 도전 난도가 더 잘 보입니다.",
+        changes: [
+            {
+                type: "style",
+                text: "시작 전 패널에서 이번 토너먼트의 BRONZE/SILVER/GOLD 단계와 AI 상대 시작 레벨을 함께 확인합니다."
+            }
+        ]
+    },
+    {
         version: "0.25.45",
         date: "2026-07-15",
         title: "v0.25.45 사냥터 원정이 더 깊은 곳에서 이어집니다.",
