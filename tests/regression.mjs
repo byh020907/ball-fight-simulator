@@ -17551,30 +17551,58 @@ function testResultOverlayReservesConfirmActionSpace() {
             bridge.includes("confirmResultSequence()"),
         "The final side tab must confirm through the shared game action bridge"
     );
-    assert.ok(
-        overlay.includes("width: min(500px, calc(100% - 80px));") &&
-            overlay.includes("width: 40px;") &&
-            overlay.includes("right: -40px;") &&
-            overlay.includes("pointer-events: auto;"),
-        "The centered result card must reserve room for a side tab that begins at its outer border"
+    const resultFrameRule =
+        overlay.match(/:scope\.result-sequence-active \.result-sequence-frame\s*\{([^}]*)\}/s)?.[1] ?? "";
+    assert.match(
+        resultFrameRule,
+        /width:\s*100%;[\s\S]*height:\s*100%;[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 6fr\) minmax\(0, 1fr\);/,
+        "The result frame must use the entire overlay and reserve equal fluid side tracks around the centered card"
+    );
+    assert.doesNotMatch(
+        resultFrameRule,
+        /(?:\b\d+px\b|calc\()/,
+        "The result frame must not constrain desktop width with fixed pixel dimensions"
+    );
+    const resultTabRule = overlay.match(/\.result-sequence-tab\s*\{([^}]*)\}/s)?.[1] ?? "";
+    assert.match(
+        resultTabRule,
+        /grid-column:\s*3;[\s\S]*position:\s*static;/,
+        "The side tab must occupy the result frame's right fluid track instead of offsetting from a fixed container width"
+    );
+    assert.doesNotMatch(
+        resultTabRule,
+        /(?:right|top|transform):/,
+        "The side tab must not rely on a fixed-position offset from the card"
     );
     assert.ok(
         overlay.includes("@media (max-width: 600px)") &&
             overlay.includes("width: 36px;") &&
-            overlay.includes("right: -36px;"),
-        "Mobile result cards must keep the centered card while attaching a smaller side tab outside its border"
+            !overlay.includes("right: -36px;"),
+        "Mobile result cards must keep the smaller side tab inside the frame's fluid side track"
     );
     for (const viewportWidth of [320, 390, 600, 768]) {
         const tabWidth = viewportWidth <= 600 ? 36 : 40;
-        const cardWidth = Math.min(500, viewportWidth - 80);
-        const cardLeft = (viewportWidth - cardWidth) / 2;
+        const sideTrackWidth = viewportWidth / 8;
+        const cardWidth = viewportWidth - sideTrackWidth * 2;
+        const cardLeft = sideTrackWidth;
         const cardRight = cardLeft + cardWidth;
         const tabLeft = cardRight;
         const tabRight = tabLeft + tabWidth;
         assert.equal(cardLeft + cardWidth / 2, viewportWidth / 2, "The result card must remain horizontally centered");
         assert.equal(tabLeft, cardRight, "The side tab must begin at the card border without covering its content");
+        assert.ok(
+            tabWidth <= sideTrackWidth,
+            "The fluid right-side track must keep the entire touch target inside the viewport"
+        );
         assert.ok(tabRight <= viewportWidth, "The entire side-tab touch target must remain inside the viewport");
     }
+    assert.ok(
+        overlay.includes(":scope.hunting-chest-active:not(.result-sequence-active) .overlay-card {") &&
+            overlay.includes(":scope.hunting-event-active:not(.result-sequence-active) .overlay-card {") &&
+            !overlay.includes(":scope.hunting-chest-active .overlay-card {") &&
+            !overlay.includes(":scope.hunting-event-active .overlay-card {"),
+        "Standalone hunting card widths must not override the result-sequence card"
+    );
     const transientFrameRule = overlay.match(/:scope\.transient \.result-sequence-frame\s*\{([^}]*)\}/s)?.[1] ?? "";
     assert.match(
         transientFrameRule,
