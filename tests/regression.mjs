@@ -6575,9 +6575,17 @@ function testTournamentAngledBounceRamps() {
         wallVertices.length === 2,
         "Right-triangle ramp should keep one complete side directly attached to the predicted wall"
     );
+    const expectedTriangleDepth =
+        TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS.length *
+        Math.tan((TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS.surfaceNormalTiltDegrees * Math.PI) / 180);
+    assert.equal(
+        TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS.surfaceNormalTiltDegrees,
+        10,
+        "Ramp surface normal should stay at the approved 10-degree tilt"
+    );
     assert.ok(
-        Math.abs(innerVertex.x - (simulation.width - TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS.wallInset)) < 0.001,
-        "Right-triangle ramp should extend exactly 55px into the arena"
+        Math.abs(innerVertex.x - (simulation.width - expectedTriangleDepth)) < 0.001,
+        "Right-triangle ramp depth should derive from its 120px wall side and 10-degree tilt"
     );
     const creationParticleCount = simulation.entities.filter(
         (entity) => entity.constructor.name === "GravityParticle"
@@ -6614,8 +6622,8 @@ function testTournamentAngledBounceRamps() {
     );
     const outgoingAngle = (Math.atan2(Math.abs(collisionVelocity.y), Math.abs(collisionVelocity.x)) * 180) / Math.PI;
     assert.ok(
-        outgoingAngle >= 20,
-        "Shared polygon collision should turn the axis trajectory into a visible angled rebound"
+        outgoingAngle >= 10 && outgoingAngle <= 25,
+        "The 10-degree triangle should keep the axis trajectory visibly but gently angled"
     );
 
     fighter.position = new Vector2(780, 480);

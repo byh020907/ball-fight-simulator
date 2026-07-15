@@ -11,7 +11,7 @@ export const TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS = Object.freeze({
     lifetime: 0.7,
     cooldown: 1.2,
     length: 120,
-    wallInset: 55
+    surfaceNormalTiltDegrees: 10
 });
 
 function clamp(value, min, max) {
@@ -43,6 +43,14 @@ function normalizeNumber(value, fallback, minimum = 0) {
     return Number.isFinite(value) ? Math.max(minimum, value) : fallback;
 }
 
+function degreesToRadians(degrees) {
+    return (degrees * Math.PI) / 180;
+}
+
+function getTriangleDepth(policy) {
+    return policy.length * Math.tan(degreesToRadians(policy.surfaceNormalTiltDegrees));
+}
+
 function createWallCandidate({ wall, time, impactPoint, normal }) {
     if (!Number.isFinite(time) || time < 0) return null;
     return { wall, time, impactPoint, normal };
@@ -59,7 +67,7 @@ function getDistance(a, b) {
 }
 
 function getRampBoundingRadius(policy) {
-    return Math.hypot(policy.length / 2, policy.wallInset);
+    return Math.hypot(policy.length / 2, getTriangleDepth(policy));
 }
 
 function isActiveFighter(fighter) {
@@ -93,20 +101,21 @@ function hasClearRampPlacement(simulation, candidate, policy) {
 function createRampTerrain(prediction, policy, random, serial) {
     const inwardSide = random() < 0.5 ? -1 : 1;
     const halfLength = policy.length / 2;
+    const triangleDepth = getTriangleDepth(policy);
     const wallTangent = { x: -prediction.normal.y, y: prediction.normal.x };
     const wallStart = { x: wallTangent.x * halfLength, y: wallTangent.y * halfLength };
     const wallEnd = { x: -wallStart.x, y: -wallStart.y };
     const insideCorner = {
-        x: prediction.normal.x * policy.wallInset + wallTangent.x * halfLength * inwardSide,
-        y: prediction.normal.y * policy.wallInset + wallTangent.y * halfLength * inwardSide
+        x: prediction.normal.x * triangleDepth + wallTangent.x * halfLength * inwardSide,
+        y: prediction.normal.y * triangleDepth + wallTangent.y * halfLength * inwardSide
     };
     const effectPosition = {
         x:
             prediction.impactPoint.x +
-            (prediction.normal.x * policy.wallInset + wallTangent.x * halfLength * inwardSide) / 3,
+            (prediction.normal.x * triangleDepth + wallTangent.x * halfLength * inwardSide) / 3,
         y:
             prediction.impactPoint.y +
-            (prediction.normal.y * policy.wallInset + wallTangent.y * halfLength * inwardSide) / 3
+            (prediction.normal.y * triangleDepth + wallTangent.y * halfLength * inwardSide) / 3
     };
 
     return {
@@ -137,7 +146,11 @@ export function createTournamentAngledBounceRampPolicy(options = {}) {
         lifetime: normalizeNumber(source.lifetime, TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS.lifetime),
         cooldown: normalizeNumber(source.cooldown, TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS.cooldown),
         length: normalizeNumber(source.length, TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS.length, 1),
-        wallInset: normalizeNumber(source.wallInset, TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS.wallInset),
+        surfaceNormalTiltDegrees: normalizeNumber(
+            source.surfaceNormalTiltDegrees,
+            TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS.surfaceNormalTiltDegrees,
+            0.1
+        ),
         seed: source.seed
     };
 }
