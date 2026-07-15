@@ -262,6 +262,13 @@ export class BattleApp {
         this._renderResultSequence();
         return true;
     }
+    confirmResultSequence() {
+        const presentation = getResultSequencePresentation(this._resultSequence);
+        if (!presentation?.isFinal || !this.lifecycle.isAwaitingResultConfirmation) return false;
+
+        this.returnToInitialState();
+        return true;
+    }
     _renderResultSequence() {
         const presentation = getResultSequencePresentation(this._resultSequence);
         if (!presentation) return;
@@ -274,7 +281,7 @@ export class BattleApp {
             masteryReward: presentation.masteryReward,
             resultSequence: presentation
         });
-        this._startBtn.setState({ text: "확인", hidden: !presentation.isFinal, disabled: !presentation.isFinal });
+        this._startBtn.setState({ text: "확인", hidden: true, disabled: true });
     }
     setStartButton(opts) {
         this._startBtn.setState(opts);

@@ -9,38 +9,29 @@
     x-transition:leave="overlay-leave"
     x-transition:leave-start="overlay-leave-start"
     x-transition:leave-end="overlay-leave-end"
-    x-bind:class="{ transient: transient, 'result-sequence-active': resultSequence, 'hunting-merchant-active': huntingMerchantActive, 'hunting-chest-active': huntingChestEventActive, 'hunting-event-active': huntingEventActive, 'hunting-battle-preparation-active': huntingBattlePreparationActive }"
+    x-bind:class="{ transient: transient, 'result-sequence-active': resultSequence, 'result-sequence-slide': resultSequenceSlide, 'hunting-merchant-active': huntingMerchantActive, 'hunting-chest-active': huntingChestEventActive, 'hunting-event-active': huntingEventActive, 'hunting-battle-preparation-active': huntingBattlePreparationActive }"
 >
-    <div class="overlay-card">
-        <span x-text="label">Waiting Room</span>
-        <strong x-text="text">START THE FIGHT</strong>
-        <p x-show="subtext" x-text="subtext"></p>
-        <xp-reward-panel class="xp-reward"></xp-reward-panel>
-        <div class="mastery-reward" x-show="masteryReward">
-            <span class="mastery-reward-label">숙련도 보상</span>
-            <div class="mastery-reward-title">
-                <b x-text="masteryReward?.sourceName"></b>
-                <em x-text="masteryReward?.tierLabel"></em>
+    <div class="result-sequence-frame">
+        <div class="overlay-card">
+            <span x-text="label">Waiting Room</span>
+            <strong x-text="text">START THE FIGHT</strong>
+            <p x-show="subtext" x-text="subtext"></p>
+            <xp-reward-panel class="xp-reward"></xp-reward-panel>
+            <div class="mastery-reward" x-show="masteryReward">
+                <span class="mastery-reward-label">숙련도 보상</span>
+                <div class="mastery-reward-title">
+                    <b x-text="masteryReward?.sourceName"></b>
+                    <em x-text="masteryReward?.tierLabel"></em>
+                </div>
+                <b class="mastery-reward-effect-name" x-text="masteryReward?.effectName"></b>
+                <p class="mastery-reward-effect" x-text="masteryReward?.effectDescription"></p>
+                <p class="mastery-reward-scope" x-text="masteryReward?.scopeText"></p>
+                <p
+                    class="mastery-reward-next"
+                    x-text="'다음 도전 · 상대 Lv.' + (masteryReward?.nextOpponentLevel ?? 1) + ' 시작'"
+                ></p>
             </div>
-            <b class="mastery-reward-effect-name" x-text="masteryReward?.effectName"></b>
-            <p class="mastery-reward-effect" x-text="masteryReward?.effectDescription"></p>
-            <p class="mastery-reward-scope" x-text="masteryReward?.scopeText"></p>
-            <p
-                class="mastery-reward-next"
-                x-text="'다음 도전 · 상대 Lv.' + (masteryReward?.nextOpponentLevel ?? 1) + ' 시작'"
-            ></p>
-        </div>
-        <button
-            class="result-sequence-next"
-            type="button"
-            x-show="resultSequence?.hasNext"
-            @click="advanceResultSequence()"
-            aria-label="다음 결과 보기"
-        >
-            <span x-text="'결과 ' + (resultSequence?.currentStep ?? 1) + '/' + (resultSequence?.totalSteps ?? 1)"></span>
-            <b>》</b>
-        </button>
-        <div class="hunting-route" x-show="huntingMoving">
+            <div class="hunting-route" x-show="huntingMoving">
             <div class="hunting-route-head">
                 <span x-text="huntingMoveFrom + 'F'"></span>
                 <strong x-text="huntingMoveTo + 'F'"></strong>
@@ -55,10 +46,10 @@
                 <b x-text="(huntingMoveStep || 0) + '/' + (huntingMoveMax || 10)"></b>
             </div>
         </div>
-        <div
-            class="hunting-choice"
-            x-show="huntingChoiceVisible && !huntingMoving && !huntingMerchantActive"
-        >
+            <div
+                class="hunting-choice"
+                x-show="huntingChoiceVisible && !huntingMoving && !huntingMerchantActive"
+            >
             <div class="hunting-choice-info">
                 <span x-text="huntingLootSummary"></span>
             </div>
@@ -77,10 +68,10 @@
                 <button class="hunting-btn advance" type="button" @click="huntingAdvance()">10층 전진</button>
             </div>
         </div>
-        <div
-            class="hunting-merchant"
-            x-show="huntingMerchantActive"
-        >
+            <div
+                class="hunting-merchant"
+                x-show="huntingMerchantActive"
+            >
             <div class="hunting-choice-info">
                 <span x-text="huntingLootSummary"></span>
             </div>
@@ -104,19 +95,19 @@
                 <button class="hunting-btn advance" type="button" @click="huntingMerchantPass()">계속 전진</button>
             </div>
         </div>
-        <div class="hunting-chest-event" x-show="huntingChestEventActive">
+            <div class="hunting-chest-event" x-show="huntingChestEventActive">
             <chest-icon class="hunting-chest-token" x-bind:data-rarity="huntingChestRarity"></chest-icon>
             <strong x-text="huntingChestTitle"></strong>
             <span x-text="huntingChestSubtext"></span>
             <span class="hunting-chest-loot" x-text="huntingLootSummary"></span>
             <button class="hunting-btn advance" type="button" @click="huntingChestContinue()" x-text="huntingChestConfirmLabel || '계속 전진'"></button>
         </div>
-        <div class="hunting-event-result" x-show="huntingEventActive">
+            <div class="hunting-event-result" x-show="huntingEventActive">
             <span>이벤트 결과</span>
             <strong x-text="huntingEventDetail"></strong>
             <button class="hunting-btn advance" type="button" @click="huntingEventContinue()" x-text="huntingEventConfirmLabel || '계속 전진'"></button>
         </div>
-        <div class="hunting-battle-preparation" x-show="huntingBattlePreparationActive">
+            <div class="hunting-battle-preparation" x-show="huntingBattlePreparationActive">
             <div class="hunting-battle-preparation-hp">
                 <div class="hunting-battle-preparation-hp-head">
                     <span>현재 HP</span>
@@ -151,7 +142,19 @@
                 </template>
             </div>
             <button class="hunting-btn advance hunting-battle-start" type="button" @click="huntingStartPreparedBattle()">전투 시작</button>
+            </div>
         </div>
+        <button
+            class="result-sequence-tab"
+            type="button"
+            x-show="resultSequence"
+            x-bind:class="{ final: resultSequence?.isFinal }"
+            x-bind:aria-label="resultSequence?.isFinal ? '결과 확인' : '다음 결과 보기'"
+            @click="handleResultSequenceAction()"
+        >
+            <span x-text="'결과 ' + (resultSequence?.currentStep ?? 1) + '/' + (resultSequence?.totalSteps ?? 1)"></span>
+            <b x-text="resultSequence?.isFinal ? '확인' : '》'"></b>
+        </button>
     </div>
     <div
         class="hunting-loot-hud"
@@ -180,6 +183,8 @@
         subtext: "",
         masteryReward: null,
         resultSequence: null,
+        resultSequenceSlide: false,
+        resultSequenceStepKey: "",
         huntingChoiceVisible: false,
         huntingFloor: 1,
         huntingCharacterName: "",
@@ -236,10 +241,16 @@
         huntingStartPreparedBattle() {
             window.requireGameActionBridge("huntingStartPreparedBattle").huntingStartPreparedBattle();
         },
-        advanceResultSequence() {
+        handleResultSequenceAction() {
+            if (this.resultSequence?.isFinal) {
+                window.requireGameActionBridge("confirmResultSequence").confirmResultSequence();
+                return;
+            }
             window.requireGameActionBridge("advanceResultSequence").advanceResultSequence();
         },
         show({ label, text, subtext = "", transient = false, xpReward = null, masteryReward = null, resultSequence = null } = {}) {
+            const nextStepKey = resultSequence ? `${resultSequence.id}:${resultSequence.currentStep}` : "";
+            const shouldSlide = Boolean(this.resultSequenceStepKey && nextStepKey && this.resultSequenceStepKey !== nextStepKey);
             this.visible = true;
             this.transient = transient;
             this.label = label ?? "";
@@ -247,6 +258,13 @@
             this.subtext = subtext;
             this.masteryReward = masteryReward;
             this.resultSequence = resultSequence;
+            this.resultSequenceStepKey = nextStepKey;
+            this.resultSequenceSlide = false;
+            if (shouldSlide) {
+                requestAnimationFrame(() => {
+                    this.resultSequenceSlide = true;
+                });
+            }
             const xpRewardPanel = Alpine.store("uiManager").requireComponent("xpRewardPanel");
             if (xpReward) {
                 xpRewardPanel.animate(xpReward);
@@ -265,6 +283,8 @@
             this.subtext = "";
             this.masteryReward = null;
             this.resultSequence = null;
+            this.resultSequenceSlide = false;
+            this.resultSequenceStepKey = "";
             this.resetHuntingState();
             Alpine.store("uiManager").requireComponent("xpRewardPanel").reset();
         },
@@ -505,33 +525,99 @@
         font-weight: 900;
     }
 
-    .result-sequence-next {
-        width: min(240px, 100%);
-        min-height: 56px;
+    .result-sequence-frame {
+        max-width: 100%;
+    }
+
+    :scope.result-sequence-active .result-sequence-frame {
+        width: min(500px, calc(100% - 12px));
+        max-height: calc(100% - 12px);
+        padding-right: 52px;
         box-sizing: border-box;
-        margin: 18px auto 0;
-        border: 2px solid #202020;
-        border-radius: 999px;
+        position: relative;
+        pointer-events: auto;
+    }
+
+    :scope.result-sequence-active .overlay-card {
+        width: 100%;
+        max-height: 100%;
+        overflow: hidden;
+        border: 4px solid #202020;
+        background: #f6f6f6;
+        box-shadow: 4px 4px 0 #202020;
+        padding: 20px;
+    }
+
+    :scope.result-sequence-active .overlay-card .xp-reward {
+        width: min(420px, 100%);
+        max-width: 100%;
+    }
+
+    :scope.result-sequence-slide .overlay-card {
+        animation: result-sequence-slide-in 220ms ease-out both;
+    }
+
+    .result-sequence-tab {
+        width: 52px;
+        min-height: 82px;
+        box-sizing: border-box;
+        border: 3px solid #202020;
+        border-left: 0;
+        border-radius: 0 14px 14px 0;
         background: #ffffff;
         color: #202020;
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 10px;
+        flex-direction: column;
+        gap: 4px;
         font-family: inherit;
-        font-size: 0.74rem;
+        font-size: 0.62rem;
         font-weight: 900;
-        letter-spacing: 0.06em;
+        letter-spacing: 0.03em;
+        line-height: 1.1;
+        position: absolute;
+        top: 50%;
+        right: 0;
+        transform: translateY(-50%);
+        cursor: pointer;
+        pointer-events: auto;
         touch-action: manipulation;
     }
 
-    .result-sequence-next b {
-        font-size: 1.45rem;
+    .result-sequence-tab span {
+        margin: 0;
+        color: inherit;
+        font-size: 0.58rem;
+        letter-spacing: 0.02em;
+    }
+
+    .result-sequence-tab b {
+        font-size: 1.7rem;
         line-height: 1;
     }
 
-    .result-sequence-next:active {
-        transform: translateY(1px);
+    .result-sequence-tab.final {
+        background: #ffcb3d;
+    }
+
+    .result-sequence-tab.final b {
+        font-size: 0.86rem;
+    }
+
+    .result-sequence-tab:active {
+        transform: translateY(calc(-50% + 2px));
+    }
+
+    @keyframes result-sequence-slide-in {
+        from {
+            opacity: 0;
+            transform: translateX(24px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
     }
 
     .hunting-btn {
@@ -975,6 +1061,18 @@
         }
         :scope.transient .overlay-card {
             max-width: min(84%, 320px);
+        }
+        :scope.result-sequence-active .result-sequence-frame {
+            width: calc(100% - 8px);
+            padding-right: 46px;
+        }
+        :scope.result-sequence-active .overlay-card {
+            border-width: 3px;
+            padding: 16px 12px;
+        }
+        .result-sequence-tab {
+            width: 46px;
+            min-height: 74px;
         }
         .hunting-loot-hud {
             top: 4px;

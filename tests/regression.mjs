@@ -1726,8 +1726,8 @@ async function testTournamentWinDisplaysMasteryReward() {
         );
         assert.equal(
             startButtonStates.at(-1)?.hidden,
-            false,
-            "The shared confirm button must appear only on the final result step"
+            true,
+            "The large shared confirm button must stay hidden when the final side tab takes over"
         );
     } finally {
         app._overlay.show = originalOverlayShow;
@@ -1812,12 +1812,18 @@ async function testTournamentEliminationAwaitsConfirmation(app) {
             "아쉽네요",
             "Elimination should end on the dedicated loss result presentation"
         );
-        assert.ok(
-            startButtonStates.some((state) => state.text === "확인"),
-            "Elimination should reuse the shared confirmation button"
+        assert.equal(
+            startButtonStates.at(-1)?.hidden,
+            true,
+            "Elimination should keep the large confirmation button hidden for the side tab"
+        );
+        assert.equal(
+            getResultSequencePresentation(app._resultSequence)?.isFinal,
+            true,
+            "Elimination must expose its final side-tab confirmation state"
         );
 
-        await app.startTournament();
+        assert.equal(app.confirmResultSequence(), true, "The final side tab should confirm the elimination result");
         assert.equal(
             app.lifecycle.isSetup,
             true,
@@ -14911,10 +14917,12 @@ function testGameplayUiResetContracts() {
 function testResultConfirmationReturnsInitialState() {
     const appSource = readFileSync("src/app.js", "utf8");
     assert.ok(
-        appSource.includes(
-            'this._startBtn.setState({ text: "확인", hidden: !presentation.isFinal, disabled: !presentation.isFinal });'
-        ),
-        "The common result sequence should expose confirmation only on its final step"
+        appSource.includes('this._startBtn.setState({ text: "확인", hidden: true, disabled: true });'),
+        "The common result sequence must hide the large bottom confirmation button"
+    );
+    assert.ok(
+        appSource.includes("confirmResultSequence()") && appSource.includes("!presentation?.isFinal"),
+        "Only the final side tab must be allowed to confirm a result sequence"
     );
     assert.equal(
         appSource.includes('text: "새 토너먼트 준비"'),
@@ -17333,37 +17341,46 @@ function testGameOverlayChestConfirmLabelContract() {
 }
 
 function testResultOverlayReservesConfirmActionSpace() {
-    const styles = readFileSync("src/styles.css", "utf8");
     const overlay = readFileSync("src/components/game-overlay.html", "utf8");
-    const confirmActionSelector = "game-overlay:has(~ start-button #startButton:not(.hidden)) #overlay";
-    const confirmCardSelector = `${confirmActionSelector} .overlay-card`;
+    const bridge = readFileSync("src/componentBridge.js", "utf8");
     assert.ok(
-        styles.includes(confirmActionSelector),
-        "Visible result confirmation buttons must reserve vertical space in the game overlay"
+        overlay.includes('class="result-sequence-frame"') && overlay.includes('class="result-sequence-tab"'),
+        "Result sequences must group the card and its adjacent side tab in one frame"
     );
     assert.ok(
-        styles.includes("padding: 20px 16px calc(104px + env(safe-area-inset-bottom));"),
-        "Desktop result overlays must keep content above the confirm button"
+        overlay.includes('x-show="resultSequence"') && overlay.includes('@click="handleResultSequenceAction()"'),
+        "The adjacent side tab must remain the only result-sequence action control"
     );
     assert.ok(
-        styles.includes("padding: 12px 12px calc(92px + env(safe-area-inset-bottom));"),
-        "Mobile result overlays must keep content above the confirm button"
+        overlay.includes("resultSequence?.isFinal ? '확인' : '》'"),
+        "The final side tab must replace the next arrow with confirmation"
     );
     assert.ok(
-        styles.includes(
-            `${confirmActionSelector}.result-sequence-active .overlay-card {\n    overflow: hidden;\n    overscroll-behavior: auto;`
-        ),
-        "Tap-through result sequences must avoid a nested mobile scroll area"
+        overlay.includes('window.requireGameActionBridge("confirmResultSequence").confirmResultSequence()') &&
+            bridge.includes("confirmResultSequence()"),
+        "The final side tab must confirm through the shared game action bridge"
     );
     assert.ok(
-        styles.includes(`${confirmCardSelector} .xp-reward {\n    width: min(420px, 100%);`),
-        "Result XP rewards must fit the result card without horizontal overflow"
+        overlay.includes("padding-right: 52px;") &&
+            overlay.includes("width: 52px;") &&
+            overlay.includes("box-sizing: border-box;") &&
+            overlay.includes("pointer-events: auto;"),
+        "The side tab must reserve a bounded touch target without taking vertical result area or overflowing the viewport"
     );
     assert.ok(
-        overlay.includes("resultSequence: null") &&
-            overlay.includes('@click="advanceResultSequence()"') &&
-            overlay.includes("<b>》</b>"),
-        "The overlay must expose a visible tap-through control for non-final result steps"
+        overlay.includes("@media (max-width: 600px)") &&
+            overlay.includes("padding-right: 46px;") &&
+            overlay.includes("width: 46px;"),
+        "Mobile result cards must reserve a narrower side-tab touch target within the viewport"
+    );
+    assert.ok(
+        overlay.includes(":scope.result-sequence-active .overlay-card .xp-reward {") &&
+            overlay.includes("max-width: 100%;"),
+        "Result XP rewards must fit the narrowed card without horizontal overflow"
+    );
+    assert.ok(
+        overlay.includes("resultSequenceSlide: false") && overlay.includes("result-sequence-slide-in"),
+        "Advancing from the side tab must use a card slide transition"
     );
     assert.ok(
         overlay.includes(".mastery-reward {\n        width: min(420px, 100%);") &&
