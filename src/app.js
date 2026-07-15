@@ -574,6 +574,28 @@ export class BattleApp {
         };
     }
 
+    _getMasteryRewardPresentation() {
+        const masteryResult = this._lastMasteryResult;
+        if (!masteryResult?.changed) return null;
+
+        const effect = MASTERY_EFFECT_DEFS.find(
+            (definition) => definition.sourceFighterId === masteryResult.characterId
+        );
+        if (!effect) return null;
+
+        const sourceName =
+            this.roster.find((fighter) => fighter.id === masteryResult.characterId)?.name ?? masteryResult.characterId;
+        const effectValue = effect.formatValue(effect.tierValues[masteryResult.newLevel]);
+        return {
+            sourceName,
+            tierLabel: masteryResult.newTier ?? getTierText(masteryResult.newLevel),
+            effectName: effect.name,
+            effectDescription: effect.description.replace("{value}", effectValue),
+            scopeText: "다른 볼에 적용",
+            nextOpponentLevel: getTournamentOpponentExperienceLevel(this.playerProfile, masteryResult.characterId) ?? 1
+        };
+    }
+
     refreshPlayerSetup() {
         const remaining = getRemainingStatPoints(this.playerStatAllocation);
         const player = this.roster.find((fighter) => fighter.id === this.playerFighterId);
@@ -1628,6 +1650,7 @@ export class BattleApp {
         if (this._lastMasteryResult?.changed) {
             masteryMsg = ` ${this._lastMasteryResult.previousTier} → ${this._lastMasteryResult.newTier}`;
         }
+        const masteryReward = playerWon ? this._getMasteryRewardPresentation() : null;
         const xpMsg = this._formatXpResult(this._lastMatchXpResult);
         const xpReward = this._createXpRewardView(this._lastMatchXpResult);
         const playerResultText = `${player.name} ${this.playerResult?.rankLabel ?? "결과 확정"}`;
@@ -1638,7 +1661,8 @@ export class BattleApp {
             label: playerWon ? "축하합니다!" : champion ? "토너먼트 종료" : "아쉽네요",
             text: playerWon ? `${champion.name} 우승${masteryMsg}` : playerResultText,
             subtext: xpReward ? "" : xpMsg,
-            xpReward
+            xpReward,
+            masteryReward
         });
         this._root.statusText = playerWon
             ? `내 캐릭터 ${champion.name} 우승${masteryMsg}`

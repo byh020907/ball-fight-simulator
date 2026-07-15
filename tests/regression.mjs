@@ -1661,6 +1661,46 @@ async function testActionSelectionShowsTournamentChallengeBeforeMatchup() {
     console.log("[tournament-action-selection-challenge-intro] ok");
 }
 
+async function testTournamentWinDisplaysMasteryReward() {
+    const app = await loadModuleApp();
+    app.playerFighterId = FIGHTER_IDS.ARCHER;
+    const champion = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
+    const originalOverlayShow = app._overlay.show;
+    let resultOverlay = null;
+
+    app.playerProfile.characterMastery.levels[champion.id] = 1;
+    app._lastMasteryResult = {
+        changed: true,
+        characterId: champion.id,
+        newLevel: 1,
+        newTier: "BRONZE"
+    };
+    app._lastMatchXpResult = null;
+    app.playerResult = { rankLabel: "1위", fighterName: champion.name };
+    app._overlay.show = (options) => {
+        resultOverlay = options;
+    };
+
+    try {
+        app._presentTournamentResult({ playerWon: true, champion, player: champion });
+        assert.deepEqual(
+            resultOverlay?.masteryReward,
+            {
+                sourceName: champion.name,
+                tierLabel: "BRONZE",
+                effectName: "정밀 훈련",
+                effectDescription: "공격력이 2% 증가합니다.",
+                scopeText: "다른 볼에 적용",
+                nextOpponentLevel: 3
+            },
+            "Tournament victory must show the newly unlocked mastery effect with its actual value and target"
+        );
+    } finally {
+        app._overlay.show = originalOverlayShow;
+    }
+    console.log("[tournament-win-mastery-reward] ok");
+}
+
 async function testTournamentEliminationAwaitsConfirmation(app) {
     app.playerProfile = createDefaultPlayerProfile();
     app.playerStatAllocation = createRandomStatAllocation(() => 0);
@@ -12546,6 +12586,7 @@ await testOrbitShardRecharge(app);
 await testTournament(app);
 await testTournamentOpponentProgressionByMastery(app);
 await testActionSelectionShowsTournamentChallengeBeforeMatchup();
+await testTournamentWinDisplaysMasteryReward();
 await testTournamentEliminationAwaitsConfirmation(app);
 await testHeroBallRegistered(app);
 await testHeroAbilitySpawnsOrb(app);
@@ -17210,6 +17251,7 @@ function testGameOverlayChestConfirmLabelContract() {
 
 function testResultOverlayReservesConfirmActionSpace() {
     const styles = readFileSync("src/styles.css", "utf8");
+    const overlay = readFileSync("src/components/game-overlay.html", "utf8");
     const confirmActionSelector = "game-overlay:has(~ start-button #startButton:not(.hidden)) #overlay";
     const confirmCardSelector = `${confirmActionSelector} .overlay-card`;
     assert.ok(
@@ -17233,6 +17275,12 @@ function testResultOverlayReservesConfirmActionSpace() {
     assert.ok(
         styles.includes(`${confirmCardSelector} .xp-reward {\n    width: min(420px, 100%);`),
         "Result XP rewards must fit the scrollable card without horizontal overflow"
+    );
+    assert.ok(
+        overlay.includes(".mastery-reward {\n        width: min(420px, 100%);") &&
+            overlay.includes("box-sizing: border-box;") &&
+            overlay.includes("overflow-wrap: anywhere;"),
+        "Mastery reward content must fit inside the mobile-scrollable result card without horizontal clipping"
     );
     console.log("[result-overlay-confirm-action-safe-area] ok");
 }

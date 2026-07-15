@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.25.48",
+        date: "2026-07-15",
+        title: "v0.25.48 우승 보상을 바로 확인합니다.",
+        changes: [
+            {
+                type: "feature",
+                text: "숙련도 승급 우승 결과에 보상 효과와 다음 상대 레벨을 표시합니다."
+            }
+        ]
+    },
+    {
         version: "0.25.47",
         date: "2026-07-15",
         title: "v0.25.47 액션 선택 뒤 도전을 다시 확인합니다.",
