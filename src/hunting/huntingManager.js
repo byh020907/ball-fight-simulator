@@ -1117,10 +1117,10 @@ export class HuntingManager {
         const run = this._run;
         const pendingText = formatPendingLootSummary(run.pendingLoot);
         const hud = this._getLootHudState();
-        const xpText = app._formatXpResult(xpResult);
+        const xpReward = app._createXpRewardView(xpResult);
         this._run = setHuntingRunPhase(run, HUNTING_RUN_PHASES.AWAITING_CHOICE);
         app.refreshPlayerSetup();
-        app.showOverlay("사냥터", `${name} 승리!`, `층 ${run.floor} 완료${xpText ? ` · ${xpText}` : ""}`);
+        app.showOverlay("사냥터", `${name} 승리!`, `층 ${run.floor} 완료`, { xpReward });
         app.setHuntingOverlayState({
             huntingChoiceVisible: true,
             huntingCanRetreat: false,

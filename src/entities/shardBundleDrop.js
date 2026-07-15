@@ -6,7 +6,7 @@ export class ShardBundleDrop extends ShardDrop {
     static lootType = "shard_bundle";
 
     constructor(options = {}) {
-        super({ ...options, radius: 22 });
+        super({ ...options, radius: 22, valueRadiusType: ShardBundleDrop.lootType });
     }
 
     collectReward(collector) {

@@ -597,10 +597,18 @@ function createHuntingOverlayMock() {
         huntingLootHudShards: 0,
         huntingLootHudEnhancementStones: 0,
         huntingLootHudChests: 0,
-        show({ label, text, subtext } = {}) {
+        show({ label, text, subtext, xpReward } = {}) {
             if (label !== undefined) this.label = label;
             if (text !== undefined) this.text = text;
             if (subtext !== undefined) this.subtext = subtext;
+            const xpRewardPanel =
+                Alpine.store("uiManager").getComponent("huntingXpRewardPanel") ??
+                Alpine.store("uiManager").getComponent("xpRewardPanel");
+            if (xpReward) {
+                xpRewardPanel?.animate(xpReward);
+            } else {
+                xpRewardPanel?.hide();
+            }
             this.visible = true;
         },
         hide() {
@@ -611,6 +619,10 @@ function createHuntingOverlayMock() {
             this.label = "";
             this.text = "";
             this.subtext = "";
+            (
+                Alpine.store("uiManager").getComponent("huntingXpRewardPanel") ??
+                Alpine.store("uiManager").getComponent("xpRewardPanel")
+            )?.reset();
             this.resetHuntingState();
         },
         resetHuntingState() {
@@ -782,6 +794,7 @@ async function loadModuleApp() {
         }
     };
     uiManager.register("xpRewardPanel", xpRewardMock);
+    uiManager.register("huntingXpRewardPanel", xpRewardMock);
     globalThis.Alpine.store("xpReward", xpRewardMock);
     uiManager.register("startButton", {
         hidden: true,
@@ -2954,14 +2967,18 @@ function testHuntingLootItemsAndDropController(app) {
         [3, 5, 7],
         "Each physical standard shard must roll its own floor-scaled reward value"
     );
-    assert.equal(droppedShard.radius, 16, "Standard shard drops should be visibly larger than hero orbs");
+    assert.deepEqual(
+        droppedShards.map((shard) => shard.radius),
+        [14.74, 16, 17.03],
+        "Independent shard amounts must produce visibly different physical sizes"
+    );
     assert.equal(droppedExperience.length, 2, "A common monster must drop multiple visible XP orbs");
     assert.deepEqual(
         droppedExperience.map((experience) => experience.amount),
         [10, 10],
         "The normal kill XP pool must be split across the common monster's physical XP orbs"
     );
-    assert.equal(droppedExperience[0].radius, 10, "XP drops must stay compact round orbs beside normal loot");
+    assert.equal(droppedExperience[0].radius, 12.03, "Higher-value XP drops must grow above the compact base orb");
     assert.ok(
         Math.abs(droppedShard.velocity.length() - mob.stats.baseSpeed * 1.2) < 1e-9,
         "Loot should launch at least as quickly as its defeated monster, using the Hero Orb speed floor"
@@ -3081,7 +3098,7 @@ function testHuntingLootItemsAndDropController(app) {
         position: new Vector2(340, 300),
         velocity: new Vector2(200, 0),
         collectorId: lootCollector.id,
-        amount: 1
+        amount: 5
     });
     fighterCollisionShard.update(0.1, collisionSimulation);
     assert.ok(
@@ -3098,7 +3115,7 @@ function testHuntingLootItemsAndDropController(app) {
         position: new Vector2(collisionTerrain[0].x, collisionTerrain[0].y),
         velocity: new Vector2(),
         collectorId: lootCollector.id,
-        amount: 1
+        amount: 5
     });
     terrainCollisionShard.update(0.1, collisionSimulation);
     assert.ok(
@@ -3111,7 +3128,7 @@ function testHuntingLootItemsAndDropController(app) {
         position: lootCollector.position,
         velocity: new Vector2(),
         collectorId: lootCollector.id,
-        amount: 1
+        amount: 5
     });
     directCollectionGraceShard.update(1, collisionSimulation);
     assert.equal(
@@ -3134,7 +3151,7 @@ function testHuntingLootItemsAndDropController(app) {
         amount: 15,
         onCollected: (reward) => healResults.push(reward)
     });
-    assert.equal(healPack.radius, 18, "Heal packs should use the enlarged loot size");
+    assert.equal(healPack.radius, 16.58, "Heal-pack size must reflect its stored recovery amount");
     healPack.update(1 / 60, simulation);
     assert.equal(healPack.isExpired, false, "Full-HP players must leave a small heal pack on the floor");
     player.hp = 50;
@@ -3213,6 +3230,69 @@ function testHuntingLootItemsAndDropController(app) {
         "Winning a hunting battle should pull remaining collectible loot across the whole arena"
     );
     console.log("[hunting-loot-items-and-drop-controller] ok");
+}
+
+function testHuntingLootValueRadius() {
+    const createDrop = (DropClass, amount) =>
+        new DropClass({ amount, position: new Vector2(), velocity: new Vector2() });
+    const shard = [createDrop(ShardDrop, 3), createDrop(ShardDrop, 20)];
+    const bundle = [createDrop(ShardBundleDrop, 5), createDrop(ShardBundleDrop, 35)];
+    const heal = [createDrop(SmallHealPack, 5), createDrop(SmallHealPack, 100)];
+    const experience = [createDrop(ExperienceDrop, 1), createDrop(ExperienceDrop, 20)];
+
+    [shard, bundle, heal, experience].forEach(([small, large]) => {
+        assert.ok(large.radius > small.radius, "Every value-bearing loot type must grow with its individual amount");
+    });
+    assert.equal(
+        new EnhancementStoneDrop().radius,
+        18,
+        "Fixed-value enhancement stones must keep their known silhouette"
+    );
+    console.log("[hunting-loot-value-radius] ok");
+}
+
+function testHuntingNormalCombatWinUsesXpRewardPanel() {
+    const manager = new HuntingManager({});
+    manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH });
+    manager._run.floor = 3;
+    const calls = { overlay: null, state: null, startButton: null };
+    const xpReward = { xpGained: 7, progressAfterPct: 42 };
+    const app = {
+        _createXpRewardView(result) {
+            assert.equal(
+                result.xpGained,
+                7,
+                "Normal combat must pass its collected XP result to the shared view creator"
+            );
+            return xpReward;
+        },
+        refreshPlayerSetup() {},
+        showOverlay(label, text, subtext, options) {
+            calls.overlay = { label, text, subtext, options };
+        },
+        setHuntingOverlayState(state) {
+            calls.state = state;
+        },
+        setStartButton(state) {
+            calls.startButton = state;
+        }
+    };
+
+    manager._presentNormalCombatWin(app, "Dash Ball", { xpGained: 7 });
+
+    assert.equal(calls.overlay.options.xpReward, xpReward, "Normal combat wins must reuse the XP reward panel data");
+    assert.equal(
+        calls.overlay.subtext.includes("+XP"),
+        false,
+        "Normal combat wins must not fall back to a numeric-only XP string"
+    );
+    assert.equal(
+        calls.state.huntingChoiceVisible,
+        true,
+        "The next-floor choice must remain available beside the XP reward panel"
+    );
+    assert.deepEqual(calls.startButton, { hidden: true, disabled: true, text: "" });
+    console.log("[hunting-normal-win-xp-panel] ok");
 }
 
 function testHuntingExperienceBalance() {
@@ -17577,6 +17657,8 @@ testHuntingLootItemsRotate();
 testHuntingLootItemsAndDropController(app);
 testHuntingExperienceBalance();
 testHuntingExperienceGrantsImmediately();
+testHuntingLootValueRadius();
+testHuntingNormalCombatWinUsesXpRewardPanel();
 testHuntingBossRolesAndEnhancementStoneDrops(app);
 testEliteMobCombinationEvent(app);
 testHuntingLootSessionIsDiscardedOnDefeat(app);

@@ -6,7 +6,7 @@ export class EnhancementStoneDrop extends ShardDrop {
     static lootType = "enhancement_stone";
 
     constructor(options = {}) {
-        super({ ...options, amount: 1, radius: 18 });
+        super({ ...options, amount: 1, radius: 18, valueRadiusType: null });
         this.amount = 1;
     }
 

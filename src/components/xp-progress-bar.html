@@ -1,14 +1,9 @@
-<div x-data="xpProgressBar" class="xp-bar" aria-hidden="true">
+<div class="xp-bar" aria-hidden="true">
     <div
         class="xp-bar-fill"
-        x-bind:style="'width:' + $store.uiManager.requireComponent('xpRewardPanel').animatedProgressPct + '%'"
+        x-bind:style="'width:' + $store.uiManager.requireComponent($el.closest('xp-reward-panel')?.dataset.componentId || 'xpRewardPanel').animatedProgressPct + '%'"
     ></div>
 </div>
-<script>
-    window.createGameUI("xpProgressBar", () => {
-        return {};
-    });
-</script>
 <style scoped>
 .xp-bar {
     height: 14px;

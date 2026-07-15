@@ -1,13 +1,14 @@
-import { HuntingLootItem } from "./huntingLootItem.js";
+import { getHuntingLootValueRadius, HuntingLootItem } from "./huntingLootItem.js";
 
 const SHARD_COLOR = "#48a9ff";
 
 export class ShardDrop extends HuntingLootItem {
     static lootType = "shard";
 
-    constructor({ amount = 5, radius = 16, ...options } = {}) {
-        super({ ...options, radius });
-        this.amount = Math.max(1, Math.round(amount));
+    constructor({ amount = 5, radius = 16, valueRadiusType = ShardDrop.lootType, ...options } = {}) {
+        const safeAmount = Math.max(1, Math.round(amount));
+        super({ ...options, radius: getHuntingLootValueRadius(valueRadiusType, radius, safeAmount) });
+        this.amount = safeAmount;
     }
 
     collectReward(collector) {

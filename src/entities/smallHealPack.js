@@ -1,13 +1,14 @@
-import { HuntingLootItem } from "./huntingLootItem.js";
+import { getHuntingLootValueRadius, HuntingLootItem } from "./huntingLootItem.js";
 
 const HEAL_COLOR = "#49cf6a";
 
 export class SmallHealPack extends HuntingLootItem {
     static lootType = "small_heal_pack";
 
-    constructor({ amount = 5, ...options } = {}) {
-        super({ ...options, radius: 18 });
-        this.amount = Math.max(1, Math.round(amount));
+    constructor({ amount = 5, radius = 18, ...options } = {}) {
+        const safeAmount = Math.max(1, Math.round(amount));
+        super({ ...options, radius: getHuntingLootValueRadius(SmallHealPack.lootType, radius, safeAmount) });
+        this.amount = safeAmount;
     }
 
     canCollect(collector) {

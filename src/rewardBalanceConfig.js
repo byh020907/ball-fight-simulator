@@ -373,6 +373,14 @@ export const REWARD_BALANCE = deepFreeze({
             itemLife: 18,
             magnet: { radiusMultiplier: 4, responseRate: 5, speedMultiplier: 1.35, collectionGraceDuration: 1 },
             victoryCollection: { duration: 1, responseRate: 180 },
+            valueRadius: {
+                minScale: 0.78,
+                maxScale: 1.45,
+                shard: { referenceAmount: 5 },
+                shard_bundle: { referenceAmount: 10 },
+                small_heal_pack: { referenceAmount: 25 },
+                experience: { referenceAmount: 4 }
+            },
             experienceDrops: {
                 killXpPool: 20,
                 completionDropCount: 4,

@@ -548,6 +548,16 @@ function testAlpineTemplateUiManagerContracts() {
     const directiveLine = xpProgress.split("\n").find((line) => line.includes("x-bind:style"));
     assert.ok(directiveLine?.includes("$store.uiManager"), "xp-progress-bar should use the uiManager store");
     assert.equal(directiveLine.includes("window.uiManager"), false, "xp-progress-bar should not use window.uiManager");
+    assert.ok(
+        directiveLine.includes("closest('xp-reward-panel')?.dataset.componentId"),
+        "Each XP progress bar must read the panel instance that owns it"
+    );
+    assert.ok(
+        readSource("src/components/xp-reward-panel.html").includes(
+            "xpRewardPanel($el.parentElement?.dataset.componentId)"
+        ),
+        "The reusable XP panel must accept its host-specific uiManager ID"
+    );
     console.log("[alpine-ui-manager-contracts] ok");
 }
 
@@ -596,6 +606,11 @@ function testHuntingOverlayActionContracts() {
         bridge.includes("huntingUsePreparationConsumable(consumableId)") &&
             bridge.includes("huntingStartPreparedBattle()"),
         "Component bridge must expose preparation actions"
+    );
+    assert.ok(
+        overlay.includes('data-component-id="huntingXpRewardPanel"') &&
+            overlay.includes('requireComponent("huntingXpRewardPanel")'),
+        "Normal hunting wins must render the shared XP reward panel inside the hunting overlay"
     );
     console.log("[hunting-overlay-action-contracts] ok");
 }

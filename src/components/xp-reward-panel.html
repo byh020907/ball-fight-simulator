@@ -1,5 +1,5 @@
 <div
-    x-data="xpRewardPanel"
+    x-data="xpRewardPanel($el.parentElement?.dataset.componentId)"
     class="xp-reward"
     x-show="visible"
     x-bind:class="{ levelup: levelUp, 'bar-resetting': barResetting }"

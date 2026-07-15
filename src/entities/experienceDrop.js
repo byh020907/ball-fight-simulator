@@ -1,4 +1,4 @@
-import { HuntingLootItem } from "./huntingLootItem.js";
+import { getHuntingLootValueRadius, HuntingLootItem } from "./huntingLootItem.js";
 import { getHuntingExperienceDropColor } from "../hunting/huntingExperience.js";
 
 const EXPERIENCE_CORE_COLOR = "#f2ff9b";
@@ -7,8 +7,9 @@ export class ExperienceDrop extends HuntingLootItem {
     static lootType = "experience";
 
     constructor({ amount = 1, radius = 10, ...options } = {}) {
-        super({ ...options, radius });
-        this.amount = Math.max(1, Math.round(amount));
+        const safeAmount = Math.max(1, Math.round(amount));
+        super({ ...options, radius: getHuntingLootValueRadius(ExperienceDrop.lootType, radius, safeAmount) });
+        this.amount = safeAmount;
     }
 
     collectReward() {

@@ -249,16 +249,16 @@ export class BattleApp {
     addLog(message) {
         this._log.add(message);
     }
-    showOverlay(label, text, subtext) {
+    showOverlay(label, text, subtext, { xpReward = null } = {}) {
         this._resultSequence = null;
         if (this._gameMode === "hunting") {
             this._overlay.hide();
             this._huntingOverlay.hide();
-            this._huntingOverlay.show({ label, text, subtext });
+            this._huntingOverlay.show({ label, text, subtext, xpReward });
             return;
         }
         this._huntingOverlay.hide();
-        this._overlay.show({ label, text, subtext });
+        this._overlay.show({ label, text, subtext, xpReward });
     }
     hideOverlay() {
         this._overlay.hide();

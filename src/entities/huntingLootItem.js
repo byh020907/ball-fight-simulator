@@ -2,11 +2,24 @@ import { applyCollisionImpulse, CombatEntity, randomSpin, RENDER_LAYERS, Vector2
 import CollectionGrace from "../physics/CollectionGrace.js";
 import { applyMagneticAttraction, getCombatMovementSpeed } from "../physics/magneticAttraction.js";
 import RotationalBody from "../physics/RotationalBody.js";
+import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 
 const DEFAULT_LIFE = 18;
 const DEFAULT_MAGNET_RESPONSE_RATE = 5;
 const DEFAULT_MAGNET_SPEED_MULTIPLIER = 1.35;
 const DEFAULT_COLLECTION_GRACE_DURATION = 1;
+const VALUE_RADIUS_CONFIG = REWARD_BALANCE.hunting.loot.valueRadius;
+
+export function getHuntingLootValueRadius(lootType, baseRadius, amount) {
+    const typeConfig = VALUE_RADIUS_CONFIG[lootType];
+    const safeBaseRadius = Math.max(1, Number(baseRadius) || 1);
+    const safeAmount = Math.max(1, Number(amount) || 1);
+    if (!typeConfig) return safeBaseRadius;
+
+    const scale = 0.65 + 0.35 * Math.sqrt(safeAmount / typeConfig.referenceAmount);
+    const boundedScale = Math.min(VALUE_RADIUS_CONFIG.maxScale, Math.max(VALUE_RADIUS_CONFIG.minScale, scale));
+    return Number((safeBaseRadius * boundedScale).toFixed(2));
+}
 
 export class HuntingLootItem extends RotationalBody(CollectionGrace(CombatEntity)) {
     static renderLayer = RENDER_LAYERS.FOREGROUND;
