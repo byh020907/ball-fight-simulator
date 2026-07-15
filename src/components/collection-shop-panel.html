@@ -1,0 +1,278 @@
+<div x-data="collectionShopPanel">
+    <div
+        class="ch-shop-modal"
+        x-cloak
+        x-show="state.visible"
+        x-transition.opacity.duration.150ms
+        @click.self="hide()"
+        @keydown.escape.stop="hide()"
+    >
+        <section class="ch-shop-dialog" role="dialog" aria-modal="true" aria-label="파편 상점">
+            <div class="ch-shop-header">
+                <strong>파편 상점</strong>
+                <button class="ch-close" type="button" aria-label="닫기" @click="hide()">×</button>
+            </div>
+            <template x-if="state.storage.dailyShop">
+                <div class="ch-shop-body">
+                    <div class="ch-shop-offer">
+                        <chest-icon
+                            class="ch-shop-chest"
+                            x-component="'chest-icon'"
+                            x-bind:data-rarity="state.storage.dailyShop.rarity"
+                            x-bind:class="{ 'is-rerolling': state.rerolling }"
+                        ></chest-icon>
+                        <div class="ch-shop-offer-info">
+                            <strong>상점 상자</strong>
+                            <span
+                                x-text="'구매 ' + getShopPurchaseCount(state.storage.dailyShop) + '/' + state.storage.dailyShop.purchaseLimit"
+                            ></span>
+                        </div>
+                        <button
+                            class="ch-btn"
+                            type="button"
+                            x-bind:disabled="getShopPurchaseCount(state.storage.dailyShop) >= state.storage.dailyShop.purchaseLimit || state.storage.shards < state.storage.dailyShop.chestCost"
+                            @click="buyDailyShopChest()"
+                            x-text="'구매 ' + state.storage.dailyShop.chestCost"
+                        ></button>
+                    </div>
+                    <div class="ch-shop-meta">
+                        <span x-text="'보유 파편 ' + Number(state.storage.shards || 0).toLocaleString()"></span>
+                        <span
+                            x-show="isShopResetPending(state.storage.dailyShop.purchaseResetAt)"
+                            x-text="'구매 초기화 ' + formatShopTime(state.storage.dailyShop.purchaseResetAt)"
+                        ></span>
+                    </div>
+                    <div class="ch-shop-reroll">
+                        <div>
+                            <strong>상자 리롤</strong>
+                            <span
+                                x-show="isShopResetPending(state.storage.dailyShop.rerollResetAt)"
+                                x-text="'리롤 초기화 ' + formatShopTime(state.storage.dailyShop.rerollResetAt)"
+                            ></span>
+                        </div>
+                        <button
+                            class="ch-btn"
+                            type="button"
+                            x-bind:disabled="state.storage.shards < getShopRerollCost(state.storage.dailyShop)"
+                            @click="rerollDailyShop()"
+                            x-text="'리롤 ' + getShopRerollCost(state.storage.dailyShop)"
+                        ></button>
+                    </div>
+                    <template x-for="item in state.storage.consumables || []" :key="item.id">
+                        <div class="ch-shop-consumable">
+                            <div>
+                                <strong x-text="item.label"></strong>
+                                <span x-text="item.description"></span>
+                                <span x-text="'보유 ' + item.owned + '/' + item.maxOwned"></span>
+                            </div>
+                            <button
+                                class="ch-btn"
+                                type="button"
+                                x-bind:disabled="!item.canPurchase"
+                                @click="buyConsumable(item.id)"
+                                x-text="'구매 ' + item.cost"
+                            ></button>
+                        </div>
+                    </template>
+                    <div class="ch-shop-upgrade" x-show="state.storage.huntingConsumableUseLimitUpgrade">
+                        <div>
+                            <strong>원정 물약 사용 한도</strong>
+                            <span
+                                x-text="(state.storage.huntingConsumableUseLimitUpgrade?.currentLimit || 1) + '/' + (state.storage.huntingConsumableUseLimitUpgrade?.maxLimit || 5)"
+                            ></span>
+                        </div>
+                        <button
+                            class="ch-btn"
+                            type="button"
+                            x-bind:disabled="!state.storage.huntingConsumableUseLimitUpgrade?.canUpgrade"
+                            @click="upgradeHuntingConsumableUseLimit()"
+                            x-text="state.storage.huntingConsumableUseLimitUpgrade?.cost ? '+1 확장 ' + state.storage.huntingConsumableUseLimitUpgrade.cost : '최대'"
+                        ></button>
+                    </div>
+                </div>
+            </template>
+        </section>
+    </div>
+</div>
+
+<script>
+    window.createGameUI("collectionShopPanel", () => {
+        const state = Alpine.reactive({
+            visible: false,
+            rerolling: false,
+            now: Date.now(),
+            get storage() {
+                return Alpine.store("uiManager").requireComponent("collectionHub").state.storage;
+            }
+        });
+
+        function playOfferSwapAnimation() {
+            state.rerolling = false;
+            requestAnimationFrame(() => requestAnimationFrame(() => (state.rerolling = true)));
+            setTimeout(() => (state.rerolling = false), 650);
+        }
+
+        return {
+            state,
+            init() {
+                this._shopTimer = setInterval(() => (state.now = Date.now()), 1000);
+            },
+            destroy() {
+                clearInterval(this._shopTimer);
+            },
+            show() {
+                state.visible = true;
+            },
+            hide() {
+                state.visible = false;
+                state.rerolling = false;
+            },
+            formatShopTime(resetAt) {
+                const seconds = Math.max(0, Math.ceil(((resetAt ?? state.now) - state.now) / 1000));
+                return [Math.floor(seconds / 3600), Math.floor((seconds % 3600) / 60), seconds % 60]
+                    .map((value) => String(value).padStart(2, "0"))
+                    .join(":");
+            },
+            isShopResetPending(resetAt) {
+                return Number.isFinite(resetAt) && resetAt > state.now;
+            },
+            getShopPurchaseCount(shop) {
+                return this.isShopResetPending(shop.purchaseResetAt) ? shop.purchases : 0;
+            },
+            getShopRerollCost(shop) {
+                return this.isShopResetPending(shop.rerollResetAt) ? shop.rerollCost : shop.rerollBaseCost;
+            },
+            buyDailyShopChest() {
+                const chest = Alpine.store("uiManager").invokeGameAction("buyDailyShopChest");
+                if (chest) playOfferSwapAnimation();
+                return chest;
+            },
+            rerollDailyShop() {
+                const result = Alpine.store("uiManager").invokeGameAction("rerollDailyShop");
+                if (!result) return result;
+                playOfferSwapAnimation();
+                return result;
+            },
+            buyConsumable(consumableId) {
+                return Alpine.store("uiManager").invokeGameAction("buyConsumable", consumableId);
+            },
+            upgradeHuntingConsumableUseLimit() {
+                return Alpine.store("uiManager").invokeGameAction("upgradeHuntingConsumableUseLimit");
+            }
+        };
+    });
+</script>
+
+<style scoped>
+    .ch-shop-modal {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        background: rgba(0, 0, 0, 0.4);
+    }
+
+    .ch-shop-dialog {
+        width: min(420px, 100%);
+        border: 2px solid #202020;
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.25);
+    }
+
+    .ch-shop-header {
+        display: flex;
+        align-items: center;
+        padding: 10px 12px;
+        border-bottom: 2px solid #202020;
+    }
+
+    .ch-shop-body {
+        display: grid;
+        gap: 10px;
+        padding: 12px;
+    }
+
+    .ch-shop-offer,
+    .ch-shop-reroll,
+    .ch-shop-consumable,
+    .ch-shop-upgrade {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border: 2px solid #202020;
+        border-radius: 8px;
+        padding: 10px;
+    }
+
+    .ch-shop-offer-info,
+    .ch-shop-reroll > div,
+    .ch-shop-consumable > div,
+    .ch-shop-upgrade > div,
+    .ch-shop-meta {
+        display: grid;
+        gap: 3px;
+    }
+
+    .ch-shop-offer {
+        position: relative;
+    }
+
+    .ch-shop-chest {
+        --chest-icon-scale: 0.55;
+        flex: 0 0 auto;
+        transform-origin: center;
+    }
+
+    .ch-shop-chest.is-rerolling {
+        animation: ch-shop-chest-reroll 650ms cubic-bezier(0.22, 0.8, 0.28, 1);
+    }
+
+    .ch-shop-chest.is-rerolling .bfs-chest-icon__lid {
+        animation: ch-shop-chest-lid 650ms cubic-bezier(0.22, 0.8, 0.28, 1);
+        transform-origin: center bottom;
+    }
+
+    @keyframes ch-shop-chest-reroll {
+        0% {
+            transform: translateY(0) rotate(0deg) scale(1);
+        }
+        35% {
+            transform: translateY(-12px) rotate(-12deg) scale(1.12);
+        }
+        65% {
+            transform: translateY(2px) rotate(10deg) scale(1.08);
+        }
+        100% {
+            transform: translateY(0) rotate(0deg) scale(1);
+        }
+    }
+
+    @keyframes ch-shop-chest-lid {
+        0%,
+        100% {
+            transform: rotateX(0deg);
+        }
+        45% {
+            transform: rotateX(-55deg) translateY(-7px);
+        }
+    }
+
+    .ch-shop-offer span,
+    .ch-shop-reroll span,
+    .ch-shop-consumable span,
+    .ch-shop-upgrade span,
+    .ch-shop-meta {
+        font-size: 0.72rem;
+        color: #555555;
+    }
+
+    .ch-shop-meta {
+        grid-template-columns: 1fr 1fr;
+        padding: 0 2px;
+    }
+</style>

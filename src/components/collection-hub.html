@@ -283,7 +283,10 @@
                                 <div class="ch-rebirth-stats">
                                     <span class="ch-rebirth-label">누적 기초 수치</span>
                                     <div class="ch-rebirth-stat-grid">
-                                        <template x-for="[stat, value] in Object.entries(item.rebirth.statBonuses)" :key="stat">
+                                        <template
+                                            x-for="[stat, value] in Object.entries(item.rebirth.statBonuses)"
+                                            :key="stat"
+                                        >
                                             <span x-text="formatRebirthStatBonus(stat, value)"></span>
                                         </template>
                                     </div>
@@ -446,7 +449,11 @@
             <div class="ch-developer-grid">
                 <label class="ch-developer-field">
                     <span>캐릭터</span>
-                    <select class="ch-select" x-model="state.developer.targetCharacterId" @change="syncDeveloperTarget()">
+                    <select
+                        class="ch-select"
+                        x-model="state.developer.targetCharacterId"
+                        @change="syncDeveloperTarget()"
+                    >
                         <template x-for="item in state.rosterItems" :key="item.id">
                             <option x-bind:value="item.id" x-text="item.name"></option>
                         </template>
@@ -462,7 +469,13 @@
                 </div>
                 <label class="ch-developer-field">
                     <span>환생 횟수</span>
-                    <input class="ch-search" type="number" min="0" max="999" x-model.number="state.developer.rebirthCount" />
+                    <input
+                        class="ch-search"
+                        type="number"
+                        min="0"
+                        max="999"
+                        x-model.number="state.developer.rebirthCount"
+                    />
                 </label>
                 <div class="ch-developer-field ch-developer-field--action">
                     <span>환생</span>
@@ -637,307 +650,9 @@
             </div>
         </div>
 
-        <div class="ch-content" x-show="state.activeTab === 'equipment'" role="tabpanel">
-            <div class="ch-toolbar">
-                <span class="ch-toolbar-title">장비 인벤토리</span>
-                <span class="ch-storage-currency">강화석 <b x-text="state.equipment.enhancementStones"></b></span>
-                <button class="ch-btn" type="button" @click="openFusion()">합성</button>
-                <button class="ch-btn ch-shop-button" type="button" @click="openShop()">상점</button>
-            </div>
-            <div class="ch-equip-slots">
-                <h4>장착 슬롯</h4>
-                <div class="ch-equip-slot-grid">
-                    <template
-                        x-for="(slotName, slotId) in { weapon: '무기', armor: '방어구', accessory1: '장신구1', accessory2: '장신구2' }"
-                    >
-                        <div class="ch-equip-slot-card">
-                            <div class="ch-equip-slot-label" x-text="slotName"></div>
-                            <div class="ch-equip-slot-item" x-text="state.equipment.equippedSlots[slotId] || '—'"></div>
-                        </div>
-                    </template>
-                </div>
-                <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px; font-size: 0.8rem">
-                    <span
-                        >인벤토리 <b x-text="state.equipment.inventoryUsed"></b>/<b
-                            x-text="state.equipment.inventorySlots"
-                        ></b
-                    ></span>
-                    <button
-                        class="ch-btn"
-                        x-show="state.equipment.canExpand"
-                        @click="bridge.expandInventory()"
-                        x-text="`확장 (파편 ${state.equipment.expandCost} · +${state.equipment.expandGain}칸)`"
-                    ></button>
-                    <span
-                        x-show="!state.equipment.canExpand && state.equipment.inventoryUsed >= state.equipment.inventorySlots"
-                        style="color: #dc2626; font-size: 0.72rem"
-                        >가득 참 — 장비를 분해하거나 확장하세요</span
-                    >
-                </div>
-            </div>
-            <div class="ch-equip-list">
-                <h4>보유 장비</h4>
-                <template x-for="item in state.equipment.items" :key="item.instanceId">
-                    <div class="ch-equip-card" x-bind:class="'ch-equip--' + item.rarity">
-                        <div class="ch-equip-card-header">
-                            <strong x-text="item.name"></strong>
-                            <span class="ch-equip-rarity" x-text="item.rarityLabel"></span>
-                            <span class="ch-equip-slot-badge" x-text="'Lv.' + item.requiredLevel"></span>
-                            <span class="ch-equip-slot-badge" x-text="item.slot"></span>
-                            <span
-                                class="ch-equip-enhance"
-                                x-show="item.enhanceLevel > 0"
-                                x-text="'+' + item.enhanceLevel"
-                            ></span>
-                        </div>
-                        <div class="ch-equip-card-stats">
-                            <template x-for="stat in item.stats">
-                                <span class="ch-equip-stat" x-text="stat.type + ' +' + stat.value"></span>
-                            </template>
-                            <template x-if="item.specialOptions.length > 0">
-                                <span
-                                    class="ch-equip-stat ch-equip-stat--special"
-                                    x-text="'특수: ' + item.specialOptions.map(o => o.label + ' +' + o.value + '%').join(', ')"
-                                ></span>
-                            </template>
-                        </div>
-                        <div class="ch-equip-card-actions">
-                            <button
-                                x-show="!item.isEquipped"
-                                class="ch-btn"
-                                x-bind:disabled="!item.canEquip"
-                                @click="bridge.equipItem(item.instanceId)"
-                                x-text="item.canEquip ? '장착' : `잠김 Lv.${item.requiredLevel}`"
-                            ></button>
-                            <button
-                                x-show="item.isEquipped"
-                                class="ch-btn ch-btn--danger"
-                                @click="bridge.unequipItem(item.instanceId)"
-                                x-text="'해제'"
-                            ></button>
-                            <button
-                                class="ch-btn"
-                                x-show="item.canEnhance"
-                                @click="bridge.enhanceItem(item.instanceId)"
-                                x-text="`강화 (+${item.enhanceLevel}→+${item.enhanceLevel + 1}, ${Math.round(item.enhanceFailureRate * 100)}%실패)`"
-                            ></button>
-                            <button
-                                class="ch-btn ch-btn--danger"
-                                @click="bridge.disassembleItem(item.instanceId)"
-                                x-text="`분해 (+${item.disassembleReward}강화석)`"
-                            ></button>
-                            <button
-                                class="ch-btn"
-                                @click="bridge.sellItem(item.instanceId)"
-                                x-text="`판매 (+${item.sellReward}파편)`"
-                            ></button>
-                        </div>
-                    </div>
-                </template>
-                <div class="ch-empty" x-show="state.equipment.items.length === 0">보유한 장비가 없습니다</div>
-            </div>
-        </div>
-
-        <div
-            class="ch-fusion-modal"
-            x-cloak
-            x-show="state.fusionVisible"
-            x-transition.opacity.duration.150ms
-            @click.self="closeFusion()"
-            @keydown.escape.stop="closeFusion()"
-        >
-            <section class="ch-fusion-dialog" role="dialog" aria-modal="true" aria-label="장비 합성">
-                <div class="ch-shop-header">
-                    <strong>장비 합성</strong>
-                    <button class="ch-close" type="button" aria-label="닫기" @click="closeFusion()">×</button>
-                </div>
-                <div class="ch-fusion-body">
-                    <p class="ch-fusion-description">
-                        같은 등급 장비 3개를 선택하면 다음 등급의 새 장비 1개로 재탄생합니다.
-                    </p>
-                    <div class="ch-fusion-tier-tabs" role="tablist" aria-label="합성 등급 선택">
-                        <template x-for="recipe in state.equipment.fusion.recipes" :key="recipe.rarity">
-                            <button
-                                class="ch-fusion-tier"
-                                type="button"
-                                x-bind:class="{ 'is-selected': state.fusionSelection.rarity === recipe.rarity }"
-                                x-bind:aria-pressed="state.fusionSelection.rarity === recipe.rarity"
-                                @click="selectFusionRarity(recipe.rarity)"
-                                x-text="recipe.rarityLabel + ' → ' + recipe.nextRarityLabel"
-                            ></button>
-                        </template>
-                    </div>
-                    <template x-if="selectedFusionRecipe()">
-                        <div class="ch-fusion-content">
-                            <div class="ch-fusion-summary">
-                                <div>
-                                    <strong x-text="selectedFusionRecipe().rarityLabel + ' 장비 3개' "></strong>
-                                    <span
-                                        x-text="'결과: ' + selectedFusionRecipe().nextRarityLabel + ' 랜덤 장비' "
-                                    ></span>
-                                </div>
-                                <span
-                                    class="ch-fusion-cost"
-                                    x-text="'강화석 ' + selectedFusionRecipe().cost.stones + ' · 파편 ' + selectedFusionRecipe().cost.shards"
-                                ></span>
-                            </div>
-                            <div class="ch-fusion-source-slots" aria-label="선택한 합성 재료">
-                                <template x-for="index in state.equipment.fusion.sourceItemCount" :key="index">
-                                    <div class="ch-fusion-source-slot">
-                                        <template x-if="selectedFusionItems()[index - 1]">
-                                            <div>
-                                                <span x-text="'재료 ' + index"></span>
-                                                <strong x-text="selectedFusionItems()[index - 1].name"></strong>
-                                                <small
-                                                    x-text="selectedFusionItems()[index - 1].isEquipped ? '장착 중 · 합성 시 해제' : '선택됨'"
-                                                ></small>
-                                            </div>
-                                        </template>
-                                        <template x-if="!selectedFusionItems()[index - 1]">
-                                            <span x-text="'재료 ' + index + ' 선택' "></span>
-                                        </template>
-                                    </div>
-                                </template>
-                            </div>
-                            <div class="ch-fusion-candidates" aria-label="합성 재료 후보">
-                                <template x-for="item in selectedFusionRecipe().items" :key="item.instanceId">
-                                    <button
-                                        class="ch-fusion-candidate"
-                                        type="button"
-                                        x-bind:class="{ 'is-selected': isFusionItemSelected(item.instanceId) }"
-                                        x-bind:aria-pressed="isFusionItemSelected(item.instanceId)"
-                                        x-bind:disabled="isFusionSelectionFull() && !isFusionItemSelected(item.instanceId)"
-                                        @click="toggleFusionItem(item.instanceId)"
-                                    >
-                                        <strong x-text="item.name"></strong>
-                                        <span
-                                            x-text="item.stats.map(stat => stat.type + ' +' + stat.value).join(' · ')"
-                                        ></span>
-                                        <span
-                                            class="ch-fusion-equipment-state"
-                                            x-text="item.isEquipped ? '장착 중' : '보관 중'"
-                                        ></span>
-                                    </button>
-                                </template>
-                                <div class="ch-empty" x-show="selectedFusionRecipe().items.length === 0">
-                                    선택할 장비가 없습니다
-                                </div>
-                            </div>
-                            <p class="ch-fusion-note">
-                                선택한 장비는 모두 사라지며, 강화 단계와 장착 상태는 이어지지 않습니다.
-                            </p>
-                            <p
-                                class="ch-fusion-warning"
-                                x-show="fusionResourceWarning()"
-                                x-text="fusionResourceWarning()"
-                            ></p>
-                            <button
-                                class="ch-btn ch-fusion-submit"
-                                type="button"
-                                x-bind:disabled="!canFuseSelectedItems()"
-                                @click="fuseSelectedItems()"
-                                x-text="'선택한 ' + state.equipment.fusion.sourceItemCount + '개 합성'"
-                            ></button>
-                        </div>
-                    </template>
-                </div>
-            </section>
-        </div>
-
-        <div
-            class="ch-shop-modal"
-            x-cloak
-            x-show="state.shopVisible"
-            x-transition.opacity.duration.150ms
-            @click.self="closeShop()"
-            @keydown.escape.stop="closeShop()"
-        >
-            <section class="ch-shop-dialog" role="dialog" aria-modal="true" aria-label="파편 상점">
-                <div class="ch-shop-header">
-                    <strong>파편 상점</strong>
-                    <button class="ch-close" type="button" aria-label="닫기" @click="closeShop()">×</button>
-                </div>
-                <template x-if="state.storage.dailyShop">
-                    <div class="ch-shop-body">
-                        <div class="ch-shop-offer">
-                            <chest-icon
-                                class="ch-shop-chest"
-                                x-component="'chest-icon'"
-                                x-bind:data-rarity="state.storage.dailyShop.rarity"
-                                x-bind:class="{ 'is-rerolling': state.shopRerolling }"
-                            ></chest-icon>
-                            <div class="ch-shop-offer-info">
-                                <strong>상점 상자</strong>
-                                <span
-                                    x-text="'구매 ' + getShopPurchaseCount(state.storage.dailyShop) + '/' + state.storage.dailyShop.purchaseLimit"
-                                ></span>
-                            </div>
-                            <button
-                                class="ch-btn"
-                                type="button"
-                                x-bind:disabled="getShopPurchaseCount(state.storage.dailyShop) >= state.storage.dailyShop.purchaseLimit || state.storage.shards < state.storage.dailyShop.chestCost"
-                                @click="buyDailyShopChest()"
-                                x-text="'구매 ' + state.storage.dailyShop.chestCost"
-                            ></button>
-                        </div>
-                        <div class="ch-shop-meta">
-                            <span x-text="'보유 파편 ' + Number(state.storage.shards || 0).toLocaleString()"></span>
-                            <span
-                                x-show="isShopResetPending(state.storage.dailyShop.purchaseResetAt)"
-                                x-text="'구매 초기화 ' + formatShopTime(state.storage.dailyShop.purchaseResetAt)"
-                            ></span>
-                        </div>
-                        <div class="ch-shop-reroll">
-                            <div>
-                                <strong>상자 리롤</strong>
-                                <span
-                                    x-show="isShopResetPending(state.storage.dailyShop.rerollResetAt)"
-                                    x-text="'리롤 초기화 ' + formatShopTime(state.storage.dailyShop.rerollResetAt)"
-                                ></span>
-                            </div>
-                            <button
-                                class="ch-btn"
-                                type="button"
-                                x-bind:disabled="state.storage.shards < getShopRerollCost(state.storage.dailyShop)"
-                                @click="rerollDailyShop()"
-                                x-text="'리롤 ' + getShopRerollCost(state.storage.dailyShop)"
-                            ></button>
-                        </div>
-                        <template x-for="item in (state.storage.consumables || [])" :key="item.id">
-                            <div class="ch-shop-consumable">
-                                <div>
-                                    <strong x-text="item.label"></strong>
-                                    <span x-text="item.description"></span>
-                                    <span x-text="'보유 ' + item.owned + '/' + item.maxOwned"></span>
-                                </div>
-                                <button
-                                    class="ch-btn"
-                                    type="button"
-                                    x-bind:disabled="!item.canPurchase"
-                                    @click="buyConsumable(item.id)"
-                                    x-text="'구매 ' + item.cost"
-                                ></button>
-                            </div>
-                        </template>
-                        <div class="ch-shop-upgrade" x-show="state.storage.huntingConsumableUseLimitUpgrade">
-                            <div>
-                                <strong>원정 물약 사용 한도</strong>
-                                <span
-                                    x-text="(state.storage.huntingConsumableUseLimitUpgrade?.currentLimit || 1) + '/' + (state.storage.huntingConsumableUseLimitUpgrade?.maxLimit || 5)"
-                                ></span>
-                            </div>
-                            <button
-                                class="ch-btn"
-                                type="button"
-                                x-bind:disabled="!state.storage.huntingConsumableUseLimitUpgrade?.canUpgrade"
-                                @click="upgradeHuntingConsumableUseLimit()"
-                                x-text="state.storage.huntingConsumableUseLimitUpgrade?.cost ? '+1 확장 ' + state.storage.huntingConsumableUseLimitUpgrade.cost : '최대'"
-                            ></button>
-                        </div>
-                    </div>
-                </template>
-            </section>
-        </div>
+        <collection-equipment-panel></collection-equipment-panel>
+        <collection-fusion-dialog></collection-fusion-dialog>
+        <collection-shop-panel></collection-shop-panel>
     </div>
 </div>
 
@@ -961,16 +676,11 @@
             characterDetailTab: "overview",
             selectedMonsterId: null,
             selectedMonsterRegionId: null,
-            shopVisible: false,
-            shopRerolling: false,
-            fusionVisible: false,
-            fusionSelection: { rarity: null, itemIds: [] },
             rosterItems: [],
             monsterCodexItems: [],
             masteryItems: [],
             achievementItems: [],
             storage: { shards: 0, chests: [], stats: {}, consumables: [], huntingConsumableUseLimitUpgrade: null },
-            now: Date.now(),
             equipment: {
                 items: [],
                 enhancementStones: 0,
@@ -1059,90 +769,8 @@
             state.selectedCharacterId = null;
             state.selectedMonsterId = null;
             state.selectedMonsterRegionId = null;
-            state.shopVisible = false;
-            state.fusionVisible = false;
-            state.fusionSelection = { rarity: null, itemIds: [] };
-        }
-
-        function openShop() {
-            state.shopVisible = true;
-        }
-
-        function closeShop() {
-            state.shopVisible = false;
-            state.shopRerolling = false;
-        }
-
-        function playShopOfferSwapAnimation() {
-            state.shopRerolling = false;
-            requestAnimationFrame(() => requestAnimationFrame(() => (state.shopRerolling = true)));
-            setTimeout(() => (state.shopRerolling = false), 650);
-        }
-
-        function selectedFusionRecipe() {
-            return (state.equipment.fusion?.recipes ?? []).find(
-                (recipe) => recipe.rarity === state.fusionSelection.rarity
-            );
-        }
-
-        function selectFusionRarity(rarity) {
-            state.fusionSelection = { rarity, itemIds: [] };
-        }
-
-        function openFusion() {
-            state.fusionVisible = true;
-            selectFusionRarity(state.equipment.fusion?.recipes?.[0]?.rarity ?? null);
-        }
-
-        function closeFusion() {
-            state.fusionVisible = false;
-            state.fusionSelection = { rarity: null, itemIds: [] };
-        }
-
-        function selectedFusionItems() {
-            const items = selectedFusionRecipe()?.items ?? [];
-            return state.fusionSelection.itemIds
-                .map((itemId) => items.find((item) => item.instanceId === itemId))
-                .filter(Boolean);
-        }
-
-        function isFusionItemSelected(instanceId) {
-            return state.fusionSelection.itemIds.includes(instanceId);
-        }
-
-        function isFusionSelectionFull() {
-            return state.fusionSelection.itemIds.length >= (state.equipment.fusion?.sourceItemCount ?? 3);
-        }
-
-        function toggleFusionItem(instanceId) {
-            if (isFusionItemSelected(instanceId)) {
-                state.fusionSelection.itemIds = state.fusionSelection.itemIds.filter((itemId) => itemId !== instanceId);
-                return;
-            }
-            if (!isFusionSelectionFull()) state.fusionSelection.itemIds.push(instanceId);
-        }
-
-        function fusionResourceWarning() {
-            const recipe = selectedFusionRecipe();
-            if (!recipe) return "";
-            if (state.equipment.enhancementStones < recipe.cost.stones) return "강화석이 부족합니다.";
-            if (state.storage.shards < recipe.cost.shards) return "파편이 부족합니다.";
-            return "";
-        }
-
-        function canFuseSelectedItems() {
-            return (
-                state.fusionSelection.itemIds.length === (state.equipment.fusion?.sourceItemCount ?? 3) &&
-                !fusionResourceWarning()
-            );
-        }
-
-        function fuseSelectedItems() {
-            if (!canFuseSelectedItems()) return null;
-            const sourceInstanceIds = [...state.fusionSelection.itemIds];
-            closeFusion();
-            const result = this.bridge.fuseEquipmentItems(sourceInstanceIds);
-            return result;
+            Alpine.store("uiManager").requireComponent("collectionFusionDialog").hide();
+            Alpine.store("uiManager").requireComponent("collectionShopPanel").hide();
         }
 
         function setCollectionTab(tabId) {
@@ -1187,7 +815,9 @@
             const stats = Object.entries(card?.stats ?? {})
                 .filter(([, value]) => Number(value) > 0)
                 .map(([stat, value]) => `${statLabels[stat] ?? stat} +${value}`);
-            return stats.length ? stats.join(" · ") : `등급 ${card?.rank ?? 1} · ${card?.effectText ?? "능력 수치 강화"}`;
+            return stats.length
+                ? stats.join(" · ")
+                : `등급 ${card?.rank ?? 1} · ${card?.effectText ?? "능력 수치 강화"}`;
         }
 
         function formatRebirthStatBonus(stat, value) {
@@ -1235,40 +865,8 @@
             state,
             init() {
                 dialogElement = this.$root;
-                this._shopTimer = setInterval(() => (state.now = Date.now()), 1000);
-            },
-            destroy() {
-                clearInterval(this._shopTimer);
-            },
-            formatShopTime(resetAt) {
-                const seconds = Math.max(0, Math.ceil(((resetAt ?? state.now) - state.now) / 1000));
-                return [Math.floor(seconds / 3600), Math.floor((seconds % 3600) / 60), seconds % 60]
-                    .map((v) => String(v).padStart(2, "0"))
-                    .join(":");
-            },
-            isShopResetPending(resetAt) {
-                return Number.isFinite(resetAt) && resetAt > state.now;
-            },
-            getShopPurchaseCount(shop) {
-                return this.isShopResetPending(shop.purchaseResetAt) ? shop.purchases : 0;
-            },
-            getShopRerollCost(shop) {
-                return this.isShopResetPending(shop.rerollResetAt) ? shop.rerollCost : shop.rerollBaseCost;
             },
             closeCollectionHub,
-            openShop,
-            closeShop,
-            openFusion,
-            closeFusion,
-            selectFusionRarity,
-            selectedFusionRecipe,
-            selectedFusionItems,
-            isFusionItemSelected,
-            isFusionSelectionFull,
-            toggleFusionItem,
-            fusionResourceWarning,
-            canFuseSelectedItems,
-            fuseSelectedItems,
             setCollectionTab,
             setCodexSection,
             setCollectionFilter,
@@ -1291,23 +889,6 @@
                     await Alpine.store("uiManager").invokeGameAction("openChest", item.id);
                 }
             },
-            buyDailyShopChest() {
-                const chest = this.bridge.buyDailyShopChest();
-                if (chest) playShopOfferSwapAnimation();
-                return chest;
-            },
-            rerollDailyShop() {
-                const result = this.bridge.rerollDailyShop();
-                if (!result) return result;
-                playShopOfferSwapAnimation();
-                return result;
-            },
-            buyConsumable(consumableId) {
-                return this.bridge.buyConsumable(consumableId);
-            },
-            upgradeHuntingConsumableUseLimit() {
-                return this.bridge.upgradeHuntingConsumableUseLimit();
-            },
             beginRebirth(characterId) {
                 return this.bridge.beginRebirth(characterId);
             },
@@ -1326,7 +907,10 @@
                 return this.bridge.setDebugCharacterToMaxLevel(state.developer.targetCharacterId);
             },
             setDebugRebirthCount() {
-                return this.bridge.setDebugRebirthCount(state.developer.targetCharacterId, state.developer.rebirthCount);
+                return this.bridge.setDebugRebirthCount(
+                    state.developer.targetCharacterId,
+                    state.developer.rebirthCount
+                );
             },
             recordDebugTournamentWin() {
                 return this.bridge.recordDebugTournamentWin(state.developer.targetCharacterId);
@@ -1368,9 +952,11 @@
                 };
                 state.summary = vm.summary ?? {};
                 const developer = vm.developer ?? {};
-                const targetCharacterId = state.rosterItems.some((item) => item.id === state.developer.targetCharacterId)
+                const targetCharacterId = state.rosterItems.some(
+                    (item) => item.id === state.developer.targetCharacterId
+                )
                     ? state.developer.targetCharacterId
-                    : developer.currentCharacterId ?? state.rosterItems[0]?.id ?? null;
+                    : (developer.currentCharacterId ?? state.rosterItems[0]?.id ?? null);
                 const target = state.rosterItems.find((item) => item.id === targetCharacterId);
                 state.developer = {
                     active: Boolean(developer.active),
@@ -1391,12 +977,7 @@
                 focusDialog();
             },
             close() {
-                state.visible = false;
-                state.selectedCharacterId = null;
-                state.selectedMonsterId = null;
-                state.selectedMonsterRegionId = null;
-                state.fusionVisible = false;
-                state.fusionSelection = { rarity: null, itemIds: [] };
+                closeCollectionHub();
             }
         };
     });
@@ -1423,6 +1004,12 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
+    }
+
+    collection-equipment-panel,
+    collection-fusion-dialog,
+    collection-shop-panel {
+        display: contents;
     }
 
     @media (max-width: 600px) {
@@ -2320,108 +1907,6 @@
         box-shadow: 0 0 6px rgba(245, 158, 11, 0.3);
     }
 
-    .ch-equip-slots {
-        margin-bottom: 16px;
-        padding: 8px 8px 0;
-        flex-shrink: 0;
-    }
-
-    .ch-equip-list {
-        flex: 1;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        padding: 0 8px 8px;
-        overflow-y: auto;
-        overscroll-behavior: contain;
-    }
-
-    .ch-equip-slot-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-        gap: 8px;
-    }
-
-    .ch-equip-slot-card {
-        border: 2px solid #202020;
-        border-radius: 8px;
-        padding: 8px 10px;
-        background: #fafafa;
-    }
-
-    .ch-equip-slot-label {
-        font-size: 0.7rem;
-        color: #777777;
-        margin-bottom: 2px;
-    }
-
-    .ch-equip-card {
-        border: 2px solid #202020;
-        border-radius: 8px;
-        padding: 10px 12px;
-        background: #ffffff;
-    }
-
-    .ch-equip-card-header {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        margin-bottom: 6px;
-    }
-
-    .ch-equip-rarity {
-        font-size: 0.65rem;
-        padding: 1px 6px;
-        border-radius: 4px;
-        background: #eeeeee;
-        color: #555555;
-    }
-
-    .ch-equip-slot-badge {
-        font-size: 0.65rem;
-        padding: 1px 6px;
-        border-radius: 4px;
-        background: #e0e0e0;
-        color: #555555;
-    }
-
-    .ch-equip-card-stats {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px;
-        margin-bottom: 6px;
-    }
-
-    .ch-equip-stat {
-        font-size: 0.72rem;
-        padding: 2px 6px;
-        border-radius: 4px;
-        background: #eef2ff;
-        color: #4338ca;
-    }
-
-    .ch-equip-stat--special {
-        background: #fef3c7;
-        color: #92400e;
-    }
-
-    .ch-equip-enhance {
-        font-size: 0.7rem;
-        padding: 1px 6px;
-        border-radius: 4px;
-        background: #fbbf24;
-        color: #92400e;
-        font-weight: 800;
-        margin-left: auto;
-    }
-
-    .ch-equip-card-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-    }
-
     .ch-btn {
         padding: 4px 12px;
         border: 2px solid #202020;
@@ -2460,327 +1945,5 @@
 
     .ch-btn--danger:not(:disabled):hover {
         box-shadow: 2px 2px 0 #dc2626;
-    }
-
-    .ch-shop-button {
-        margin-left: auto;
-    }
-
-    .ch-shop-modal,
-    .ch-fusion-modal {
-        position: absolute;
-        inset: 0;
-        z-index: 2;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 16px;
-        background: rgba(0, 0, 0, 0.4);
-    }
-
-    .ch-shop-dialog,
-    .ch-fusion-dialog {
-        width: min(420px, 100%);
-        border: 2px solid #202020;
-        border-radius: 8px;
-        background: #ffffff;
-        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.25);
-    }
-
-    .ch-fusion-dialog {
-        max-height: min(680px, calc(100dvh - 32px));
-        display: flex;
-        flex-direction: column;
-    }
-
-    .ch-shop-header {
-        display: flex;
-        align-items: center;
-        padding: 10px 12px;
-        border-bottom: 2px solid #202020;
-    }
-
-    .ch-shop-body {
-        display: grid;
-        gap: 10px;
-        padding: 12px;
-    }
-
-    .ch-fusion-body {
-        display: grid;
-        gap: 10px;
-        overflow-y: auto;
-        overscroll-behavior: contain;
-        padding: 12px;
-    }
-
-    .ch-fusion-description,
-    .ch-fusion-note,
-    .ch-fusion-warning {
-        margin: 0;
-        font-size: 0.75rem;
-        line-height: 1.45;
-    }
-
-    .ch-fusion-note {
-        color: #555555;
-    }
-
-    .ch-fusion-warning {
-        color: #b91c1c;
-        font-weight: 700;
-    }
-
-    .ch-fusion-tier-tabs {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 6px;
-    }
-
-    .ch-fusion-tier,
-    .ch-fusion-candidate {
-        border: 2px solid #202020;
-        border-radius: 6px;
-        background: #ffffff;
-        color: #202020;
-        cursor: pointer;
-        font: inherit;
-        text-align: left;
-    }
-
-    .ch-fusion-tier {
-        min-height: 36px;
-        padding: 6px 8px;
-        font-size: 0.75rem;
-        font-weight: 700;
-        text-align: center;
-    }
-
-    .ch-fusion-tier.is-selected,
-    .ch-fusion-candidate.is-selected {
-        border-color: #0f766e;
-        background: #ecfdf5;
-        box-shadow: inset 0 0 0 1px #0f766e;
-    }
-
-    .ch-fusion-content {
-        display: grid;
-        gap: 10px;
-    }
-
-    .ch-fusion-summary {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-        border-bottom: 1px solid #d1d5db;
-        padding-bottom: 8px;
-    }
-
-    .ch-fusion-summary > div {
-        display: grid;
-        gap: 2px;
-    }
-
-    .ch-fusion-summary span,
-    .ch-fusion-source-slot span,
-    .ch-fusion-source-slot small,
-    .ch-fusion-candidate span,
-    .ch-fusion-equipment-state {
-        color: #555555;
-        font-size: 0.72rem;
-    }
-
-    .ch-fusion-cost {
-        flex: 0 0 auto;
-        color: #202020 !important;
-        font-weight: 700;
-        text-align: right;
-    }
-
-    .ch-fusion-source-slots {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 6px;
-    }
-
-    .ch-fusion-source-slot {
-        display: flex;
-        min-height: 76px;
-        align-items: center;
-        border: 2px dashed #9ca3af;
-        border-radius: 6px;
-        padding: 8px;
-    }
-
-    .ch-fusion-source-slot > div {
-        display: grid;
-        gap: 3px;
-        min-width: 0;
-    }
-
-    .ch-fusion-source-slot strong {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        font-size: 0.75rem;
-    }
-
-    .ch-fusion-candidates {
-        display: grid;
-        gap: 6px;
-        max-height: 220px;
-        overflow-y: auto;
-        overscroll-behavior: contain;
-    }
-
-    .ch-fusion-candidate {
-        display: grid;
-        grid-template-rows: auto auto minmax(0.9rem, auto);
-        align-content: start;
-        gap: 2px;
-        min-height: 58px;
-        padding: 8px 10px;
-        font: inherit;
-    }
-
-    .ch-fusion-equipment-state {
-        display: inline-block;
-        min-height: 0.9rem;
-        align-self: start;
-        line-height: 1.2;
-        white-space: nowrap;
-    }
-
-    @media (max-width: 600px) {
-        .ch-fusion-candidate {
-            min-height: 72px;
-        }
-    }
-
-    .ch-fusion-candidate:disabled {
-        border-color: #d1d5db;
-        color: #9ca3af;
-        cursor: not-allowed;
-    }
-
-    .ch-fusion-submit {
-        justify-self: end;
-    }
-
-    .ch-shop-offer,
-    .ch-shop-reroll,
-    .ch-shop-consumable,
-    .ch-shop-upgrade {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        border: 2px solid #202020;
-        border-radius: 8px;
-        padding: 10px;
-    }
-
-    .ch-shop-offer-info,
-    .ch-shop-reroll > div,
-    .ch-shop-consumable > div,
-    .ch-shop-upgrade > div,
-    .ch-shop-meta {
-        display: grid;
-        gap: 3px;
-    }
-
-    .ch-shop-offer {
-        position: relative;
-    }
-
-    .ch-shop-chest {
-        --chest-icon-scale: 0.55;
-        flex: 0 0 auto;
-        transform-origin: center;
-    }
-
-    .ch-shop-chest.is-rerolling {
-        animation: ch-shop-chest-reroll 650ms cubic-bezier(0.22, 0.8, 0.28, 1);
-    }
-
-    .ch-shop-chest.is-rerolling .bfs-chest-icon__lid {
-        animation: ch-shop-chest-lid 650ms cubic-bezier(0.22, 0.8, 0.28, 1);
-        transform-origin: center bottom;
-    }
-
-    @keyframes ch-shop-chest-reroll {
-        0% {
-            transform: translateY(0) rotate(0deg) scale(1);
-        }
-        35% {
-            transform: translateY(-12px) rotate(-12deg) scale(1.12);
-        }
-        65% {
-            transform: translateY(2px) rotate(10deg) scale(1.08);
-        }
-        100% {
-            transform: translateY(0) rotate(0deg) scale(1);
-        }
-    }
-
-    @keyframes ch-shop-chest-lid {
-        0%,
-        100% {
-            transform: rotateX(0deg);
-        }
-        45% {
-            transform: rotateX(-55deg) translateY(-7px);
-        }
-    }
-
-    .ch-shop-label,
-    .ch-shop-offer span,
-    .ch-shop-reroll span,
-    .ch-shop-consumable span,
-    .ch-shop-upgrade span,
-    .ch-shop-meta {
-        font-size: 0.72rem;
-        color: #555555;
-    }
-
-    .ch-shop-meta {
-        grid-template-columns: 1fr 1fr;
-        padding: 0 2px;
-    }
-
-    @media (max-width: 380px) {
-        .ch-fusion-tier-tabs {
-            grid-template-columns: 1fr;
-        }
-
-        .ch-fusion-source-slots {
-            grid-template-columns: 1fr;
-        }
-
-        .ch-fusion-source-slot {
-            min-height: 48px;
-        }
-    }
-
-    .ch-equip--common {
-        border-left: 4px solid #9ca3af;
-    }
-
-    .ch-equip--uncommon {
-        border-left: 4px solid #28a447;
-    }
-
-    .ch-equip--rare {
-        border-left: 4px solid #d4a017;
-    }
-
-    .ch-equip--epic {
-        border-left: 4px solid #a855f7;
-    }
-
-    .ch-equip--legendary {
-        border-left: 4px solid #f59e0b;
-        box-shadow: 0 0 6px rgba(245, 158, 11, 0.3);
     }
 </style>

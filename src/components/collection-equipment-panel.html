@@ -1,0 +1,286 @@
+<div x-data="collectionEquipmentPanel">
+    <div class="ch-content" x-show="state.activeTab === 'equipment'" role="tabpanel">
+        <div class="ch-toolbar">
+            <span class="ch-toolbar-title">장비 인벤토리</span>
+            <span class="ch-storage-currency">강화석 <b x-text="state.equipment.enhancementStones"></b></span>
+            <button class="ch-btn" type="button" @click="openFusion()">합성</button>
+            <button class="ch-btn ch-shop-button" type="button" @click="openShop()">상점</button>
+        </div>
+        <div class="ch-equip-slots">
+            <h4>장착 슬롯</h4>
+            <div class="ch-equip-slot-grid">
+                <template
+                    x-for="(slotName, slotId) in { weapon: '무기', armor: '방어구', accessory1: '장신구1', accessory2: '장신구2' }"
+                >
+                    <div class="ch-equip-slot-card">
+                        <div class="ch-equip-slot-label" x-text="slotName"></div>
+                        <div class="ch-equip-slot-item" x-text="state.equipment.equippedSlots[slotId] || '—'"></div>
+                    </div>
+                </template>
+            </div>
+            <div class="ch-equip-inventory-summary">
+                <span
+                    >인벤토리 <b x-text="state.equipment.inventoryUsed"></b>/<b
+                        x-text="state.equipment.inventorySlots"
+                    ></b
+                ></span>
+                <button
+                    class="ch-btn"
+                    x-show="state.equipment.canExpand"
+                    @click="expandInventory()"
+                    x-text="`확장 (파편 ${state.equipment.expandCost} · +${state.equipment.expandGain}칸)`"
+                ></button>
+                <span
+                    x-show="!state.equipment.canExpand && state.equipment.inventoryUsed >= state.equipment.inventorySlots"
+                    class="ch-equip-inventory-full"
+                    >가득 참 — 장비를 분해하거나 확장하세요</span
+                >
+            </div>
+        </div>
+        <div class="ch-equip-list">
+            <h4>보유 장비</h4>
+            <template x-for="item in state.equipment.items" :key="item.instanceId">
+                <div class="ch-equip-card" x-bind:class="'ch-equip--' + item.rarity">
+                    <div class="ch-equip-card-header">
+                        <strong x-text="item.name"></strong>
+                        <span class="ch-equip-rarity" x-text="item.rarityLabel"></span>
+                        <span class="ch-equip-slot-badge" x-text="'Lv.' + item.requiredLevel"></span>
+                        <span class="ch-equip-slot-badge" x-text="item.slot"></span>
+                        <span
+                            class="ch-equip-enhance"
+                            x-show="item.enhanceLevel > 0"
+                            x-text="'+' + item.enhanceLevel"
+                        ></span>
+                    </div>
+                    <div class="ch-equip-card-stats">
+                        <template x-for="stat in item.stats">
+                            <span class="ch-equip-stat" x-text="stat.type + ' +' + stat.value"></span>
+                        </template>
+                        <template x-if="item.specialOptions.length > 0">
+                            <span
+                                class="ch-equip-stat ch-equip-stat--special"
+                                x-text="'특수: ' + item.specialOptions.map(o => o.label + ' +' + o.value + '%').join(', ')"
+                            ></span>
+                        </template>
+                    </div>
+                    <div class="ch-equip-card-actions">
+                        <button
+                            x-show="!item.isEquipped"
+                            class="ch-btn"
+                            x-bind:disabled="!item.canEquip"
+                            @click="equipItem(item.instanceId)"
+                            x-text="item.canEquip ? '장착' : `잠김 Lv.${item.requiredLevel}`"
+                        ></button>
+                        <button
+                            x-show="item.isEquipped"
+                            class="ch-btn ch-btn--danger"
+                            @click="unequipItem(item.instanceId)"
+                            x-text="'해제'"
+                        ></button>
+                        <button
+                            class="ch-btn"
+                            x-show="item.canEnhance"
+                            @click="enhanceItem(item.instanceId)"
+                            x-text="`강화 (+${item.enhanceLevel}→+${item.enhanceLevel + 1}, ${Math.round(item.enhanceFailureRate * 100)}%실패)`"
+                        ></button>
+                        <button
+                            class="ch-btn ch-btn--danger"
+                            @click="disassembleItem(item.instanceId)"
+                            x-text="`분해 (+${item.disassembleReward}강화석)`"
+                        ></button>
+                        <button
+                            class="ch-btn"
+                            @click="sellItem(item.instanceId)"
+                            x-text="`판매 (+${item.sellReward}파편)`"
+                        ></button>
+                    </div>
+                </div>
+            </template>
+            <div class="ch-empty" x-show="state.equipment.items.length === 0">보유한 장비가 없습니다</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    window.createGameUI("collectionEquipmentPanel", () => {
+        function getCollectionHub() {
+            return Alpine.store("uiManager").requireComponent("collectionHub");
+        }
+
+        function invokeGameAction(actionName, ...args) {
+            return Alpine.store("uiManager").invokeGameAction(actionName, ...args);
+        }
+
+        return {
+            get state() {
+                return getCollectionHub().state;
+            },
+            openFusion() {
+                return Alpine.store("uiManager").requireComponent("collectionFusionDialog").show();
+            },
+            openShop() {
+                return Alpine.store("uiManager").requireComponent("collectionShopPanel").show();
+            },
+            expandInventory() {
+                return invokeGameAction("expandInventory");
+            },
+            equipItem(instanceId) {
+                return invokeGameAction("equipItem", instanceId);
+            },
+            unequipItem(instanceId) {
+                return invokeGameAction("unequipItem", instanceId);
+            },
+            enhanceItem(instanceId) {
+                return invokeGameAction("enhanceItem", instanceId);
+            },
+            disassembleItem(instanceId) {
+                return invokeGameAction("disassembleItem", instanceId);
+            },
+            sellItem(instanceId) {
+                return invokeGameAction("sellItem", instanceId);
+            }
+        };
+    });
+</script>
+
+<style scoped>
+    .ch-equip-slots {
+        margin-bottom: 16px;
+        padding: 8px 8px 0;
+        flex-shrink: 0;
+    }
+
+    .ch-equip-list {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 0 8px 8px;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    .ch-equip-slot-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 8px;
+    }
+
+    .ch-equip-slot-card {
+        border: 2px solid #202020;
+        border-radius: 8px;
+        padding: 8px 10px;
+        background: #fafafa;
+    }
+
+    .ch-equip-slot-label {
+        font-size: 0.7rem;
+        color: #777777;
+        margin-bottom: 2px;
+    }
+
+    .ch-equip-inventory-summary {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 10px;
+        font-size: 0.8rem;
+    }
+
+    .ch-equip-inventory-full {
+        color: #dc2626;
+        font-size: 0.72rem;
+    }
+
+    .ch-equip-card {
+        border: 2px solid #202020;
+        border-radius: 8px;
+        padding: 10px 12px;
+        background: #ffffff;
+    }
+
+    .ch-equip-card-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 6px;
+    }
+
+    .ch-equip-rarity {
+        font-size: 0.65rem;
+        padding: 1px 6px;
+        border-radius: 4px;
+        background: #eeeeee;
+        color: #555555;
+    }
+
+    .ch-equip-slot-badge {
+        font-size: 0.65rem;
+        padding: 1px 6px;
+        border-radius: 4px;
+        background: #e0e0e0;
+        color: #555555;
+    }
+
+    .ch-equip-card-stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-bottom: 6px;
+    }
+
+    .ch-equip-stat {
+        font-size: 0.72rem;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: #eef2ff;
+        color: #4338ca;
+    }
+
+    .ch-equip-stat--special {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .ch-equip-enhance {
+        font-size: 0.7rem;
+        padding: 1px 6px;
+        border-radius: 4px;
+        background: #fbbf24;
+        color: #92400e;
+        font-weight: 800;
+        margin-left: auto;
+    }
+
+    .ch-equip-card-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .ch-shop-button {
+        margin-left: auto;
+    }
+
+    .ch-equip--common {
+        border-left: 4px solid #9ca3af;
+    }
+
+    .ch-equip--uncommon {
+        border-left: 4px solid #28a447;
+    }
+
+    .ch-equip--rare {
+        border-left: 4px solid #d4a017;
+    }
+
+    .ch-equip--epic {
+        border-left: 4px solid #a855f7;
+    }
+
+    .ch-equip--legendary {
+        border-left: 4px solid #f59e0b;
+        box-shadow: 0 0 6px rgba(245, 158, 11, 0.3);
+    }
+</style>

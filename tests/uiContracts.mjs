@@ -37,14 +37,336 @@ function testHuntingMerchantMobileScrollContract() {
 function testHuntingChestIconReuseContract() {
     const chestIcon = readSource("src/components/chest-icon.html");
     const overlay = readSource("src/components/hunting-overlay.html");
-    const collectionHub = readSource("src/components/collection-hub.html");
+    const collectionShopPanel = readSource("src/components/collection-shop-panel.html");
     assert.ok(chestIcon.includes('chest-icon[data-rarity="rare"]'), "Chest icon should own rarity color variants");
     assert.ok(overlay.includes("<chest-icon"), "Hunting chest event should render the shared chest icon");
     assert.ok(
-        collectionHub.includes("ch-shop-chest"),
+        collectionShopPanel.includes("ch-shop-chest"),
         "The shop should render the shared chest icon for its chest offer"
     );
     console.log("[hunting-chest-icon-reuse] ok");
+}
+
+function testCollectionEquipmentPanelsOwnTheirFlows() {
+    const collectionHub = readSource("src/components/collection-hub.html");
+    const equipmentPanel = readSource("src/components/collection-equipment-panel.html");
+    const fusionDialog = readSource("src/components/collection-fusion-dialog.html");
+    const shopPanel = readSource("src/components/collection-shop-panel.html");
+
+    assert.ok(
+        collectionHub.includes("<collection-equipment-panel>") &&
+            collectionHub.includes("<collection-fusion-dialog>") &&
+            collectionHub.includes("<collection-shop-panel>"),
+        "Collection hub should compose the equipment tab, fusion dialog, and shop from dedicated components"
+    );
+    assert.equal(
+        collectionHub.includes("ch-fusion-modal") || collectionHub.includes("ch-shop-modal"),
+        false,
+        "Collection hub must not retain modal markup after moving it to its owner components"
+    );
+    const panelHostRule =
+        collectionHub.match(
+            /collection-equipment-panel,\s*collection-fusion-dialog,\s*collection-shop-panel\s*\{([^}]*)\}/s
+        )?.[1] ?? "";
+    assert.match(
+        panelHostRule,
+        /display:\s*contents;/,
+        "Panel hosts must not add a flex item between the collection frame and its existing screen layout"
+    );
+    assert.ok(
+        equipmentPanel.includes('window.createGameUI("collectionEquipmentPanel"') &&
+            equipmentPanel.includes('requireComponent("collectionHub")') &&
+            equipmentPanel.includes('invokeGameAction("equipItem", instanceId)') &&
+            equipmentPanel.includes('requireComponent("collectionFusionDialog").show()') &&
+            equipmentPanel.includes('requireComponent("collectionShopPanel").show()'),
+        "Equipment panel should render shared hub state and route its own equipment actions through uiManager"
+    );
+    assert.ok(
+        fusionDialog.includes('window.createGameUI("collectionFusionDialog"') &&
+            fusionDialog.includes('invokeGameAction("fuseEquipmentItems", sourceInstanceIds)') &&
+            fusionDialog.includes("selection: { rarity: null, itemIds: [] }") &&
+            fusionDialog.includes("function hide()"),
+        "Fusion dialog should own its visibility and material-selection lifecycle"
+    );
+    assert.ok(
+        shopPanel.includes('window.createGameUI("collectionShopPanel"') &&
+            shopPanel.includes("rerolling: false") &&
+            shopPanel.includes('invokeGameAction("buyDailyShopChest")') &&
+            shopPanel.includes('invokeGameAction("rerollDailyShop")') &&
+            shopPanel.includes("function playOfferSwapAnimation()"),
+        "Shop panel should own its visibility, countdown, and reroll animation lifecycle"
+    );
+    console.log("[collection-equipment-panel-ownership] ok");
+}
+
+function testDailyShopPopupContract() {
+    const collectionHub = readSource("src/components/collection-hub.html");
+    const equipmentPanel = readSource("src/components/collection-equipment-panel.html");
+    const shopPanel = readSource("src/components/collection-shop-panel.html");
+    assert.ok(equipmentPanel.includes('@click="openShop()"'), "Equipment toolbar should open the shard shop popup");
+    assert.ok(shopPanel.includes('class="ch-shop-modal"'), "Shard shop should use a dedicated popup layer");
+    assert.ok(shopPanel.includes('@click.self="hide()"'), "Shop backdrop should close only the shop popup");
+    assert.ok(collectionHub.includes(".ch-ach-info {"), "Collection cards should define their shared info layout");
+    assert.ok(collectionHub.includes("flex: 1;"), "Collection card info should occupy remaining horizontal space");
+    assert.ok(
+        !collectionHub.includes('<chest-icon x-bind:data-rarity="item.rarity">'),
+        "Achievement rows should not repeat a chest icon for every achievement"
+    );
+    assert.ok(
+        !collectionHub.includes("flex-shrink: 0;\n    }\n\n    }\n\n    .ch-mast-tier"),
+        "Collection stylesheet should not contain a dangling mastery block terminator"
+    );
+    assert.ok(
+        !collectionHub.includes("min-width: 0;\n    }\n\n    }\n\n    .ch-ach-desc"),
+        "Collection stylesheet should not contain a dangling achievement block terminator"
+    );
+    assert.ok(
+        collectionHub.includes(".ch-btn:not(:disabled):hover"),
+        "Collection buttons should have an enabled hover state"
+    );
+    assert.ok(
+        collectionHub.includes(".ch-btn:not(:disabled):active"),
+        "Collection buttons should have an enabled pressed state"
+    );
+    assert.ok(
+        collectionHub.includes(".ch-btn--danger:not(:disabled):hover"),
+        "Danger buttons should retain their red hover feedback"
+    );
+    assert.ok(shopPanel.includes("rerolling"), "Shop rerolls should trigger a visible transition state");
+    assert.ok(shopPanel.includes("ch-shop-chest"), "Shop offers should reuse the chest icon component");
+    assert.ok(
+        shopPanel.includes("isShopResetPending"),
+        "Shop reset timers should be shown only while a reset is pending"
+    );
+    assert.ok(
+        shopPanel.includes("getShopPurchaseCount"),
+        "Expired purchase limits should become available without reopening the shop"
+    );
+    assert.ok(
+        shopPanel.includes("getShopRerollCost"),
+        "Expired rerolls should return to their base cost without reopening the shop"
+    );
+    assert.ok(
+        shopPanel.includes("x-component=\"'chest-icon'\""),
+        "Dynamically shown shop chest must mount its template"
+    );
+    assert.ok(
+        shopPanel.includes("ch-shop-chest-reroll"),
+        "Shop rerolls should animate the chest even at the same rarity"
+    );
+    assert.match(
+        shopPanel,
+        /function playOfferSwapAnimation\(\)\s*\{\s*state\.rerolling = false;\s*requestAnimationFrame\(\(\) => requestAnimationFrame\(\(\) => \(state\.rerolling = true\)\)\);\s*setTimeout\(\(\) => \(state\.rerolling = false\), 650\);\s*\}/s,
+        "Shop offer replacement should replay its 650ms animation through one shared UI helper"
+    );
+    assert.match(
+        shopPanel,
+        /buyDailyShopChest\(\)\s*\{\s*const chest = Alpine\.store\("uiManager"\)\.invokeGameAction\("buyDailyShopChest"\);\s*if \(chest\) playOfferSwapAnimation\(\);\s*return chest;\s*\}/s,
+        "A successful chest purchase should use the shared offer replacement animation, while failures should not"
+    );
+    assert.match(
+        shopPanel,
+        /rerollDailyShop\(\)\s*\{\s*const result = Alpine\.store\("uiManager"\)\.invokeGameAction\("rerollDailyShop"\);\s*if \(!result\) return result;\s*playOfferSwapAnimation\(\);\s*return result;\s*\}/s,
+        "A successful manual reroll should use the shared offer replacement animation, while failures should not"
+    );
+    assert.ok(shopPanel.includes("state.storage.consumables"), "Shop should render definition-driven consumable rows");
+    assert.ok(shopPanel.includes("buyConsumable(item.id)"), "Consumable rows should purchase the selected definition");
+    assert.ok(
+        shopPanel.includes("upgradeHuntingConsumableUseLimit"),
+        "Shop should expose the permanent hunting consumable use-limit upgrade"
+    );
+    assert.ok(
+        !collectionHub.includes('class="ch-daily-shop"'),
+        "Shard shop must not appear in an unrelated collection tab"
+    );
+    console.log("[daily-shop-popup-contract] ok");
+}
+
+function testFusionEquippedLabelTypographyContract() {
+    const template = readSource("src/components/collection-fusion-dialog.html");
+    const candidateRule =
+        [...template.matchAll(/\.ch-fusion-candidate\s*\{([^}]*)\}/gs)]
+            .map((match) => match[1])
+            .find((rule) => /display:\s*grid;/.test(rule)) ?? "";
+    const stateRule =
+        [...template.matchAll(/\.ch-fusion-equipment-state\s*\{([^}]*)\}/gs)]
+            .map((match) => match[1])
+            .find((rule) => /display:\s*inline-block;/.test(rule)) ?? "";
+    const mobileCandidateRule = template.match(
+        /@media\s*\(max-width:\s*600px\)\s*\{\s*\.ch-fusion-candidate\s*\{([^}]*)\}/s
+    )?.[1];
+    assert.ok(
+        template.includes('class="ch-fusion-equipment-state"'),
+        "Fusion candidates should give the equipped-state text a dedicated typography class"
+    );
+    assert.ok(
+        /\.ch-fusion-candidate\s*\{[^}]*font:\s*inherit;/s.test(template),
+        "Fusion candidates should inherit the app font instead of the desktop browser button font"
+    );
+    assert.ok(
+        /\.ch-fusion-equipment-state\s*\{[^}]*display:\s*inline-block;[^}]*line-height:\s*1\.2;[^}]*white-space:\s*nowrap;/s.test(
+            template
+        ),
+        "Fusion equipped-state text should remain on one readable line"
+    );
+    assert.match(
+        candidateRule,
+        /grid-template-rows:\s*auto\s+auto\s+minmax\(/,
+        "Fusion candidates should reserve a dedicated third grid row for the equipped-state text"
+    );
+    assert.match(
+        stateRule,
+        /min-height:\s*[\d.]+rem;/,
+        "Fusion equipped-state text should reserve its own readable line height"
+    );
+    assert.ok(
+        mobileCandidateRule,
+        "Fusion candidates should define a mobile layout rule instead of relying on implicit grid sizing"
+    );
+    const mobileCandidateMinHeight = Number(mobileCandidateRule.match(/min-height:\s*(\d+)px;/)?.[1]);
+    assert.ok(
+        mobileCandidateMinHeight >= 68,
+        "Mobile fusion candidates should reserve enough height for name, stats, state, padding, and a 40px touch target"
+    );
+    console.log("[fusion-equipped-label-typography] ok");
+}
+
+function loadCollectionComponentFactory(path, expectedName, factories) {
+    const source = readSource(path);
+    const script = source.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+    assert.ok(script, `${path} should define its Alpine component script`);
+    Function(script)();
+    assert.equal(typeof factories[expectedName], "function", `${path} should register ${expectedName}`);
+    return factories[expectedName];
+}
+
+function restoreGlobalProperty(name, descriptor) {
+    if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+    else delete globalThis[name];
+}
+
+function testCollectionEquipmentPanelsShareHubState() {
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+    const originalAlpine = Object.getOwnPropertyDescriptor(globalThis, "Alpine");
+    const factories = {};
+    const components = {};
+    const calls = [];
+    const uiManager = {
+        requireComponent(componentId) {
+            const component = components[componentId];
+            assert.ok(component, `${componentId} should be available through uiManager`);
+            return component;
+        },
+        invokeGameAction(actionName, ...args) {
+            calls.push([actionName, args]);
+            return { actionName, args };
+        }
+    };
+
+    try {
+        Object.defineProperty(globalThis, "window", {
+            configurable: true,
+            value: {
+                createGameUI(name, factory) {
+                    factories[name] = factory;
+                }
+            }
+        });
+        Object.defineProperty(globalThis, "Alpine", {
+            configurable: true,
+            value: {
+                reactive(value) {
+                    return value;
+                },
+                store(name) {
+                    assert.equal(name, "uiManager", "Collection child components should only request uiManager");
+                    return uiManager;
+                }
+            }
+        });
+
+        const createHub = loadCollectionComponentFactory(
+            "src/components/collection-hub.html",
+            "collectionHub",
+            factories
+        );
+        const hub = createHub();
+        hub.$root = { focus() {}, querySelector() {} };
+        components.collectionHub = hub;
+        hub.init();
+        hub.state.equipment = {
+            enhancementStones: 30,
+            fusion: {
+                sourceItemCount: 1,
+                recipes: [
+                    {
+                        rarity: "common",
+                        items: [{ instanceId: "source-1", isEquipped: false }],
+                        cost: { stones: 10, shards: 20 }
+                    }
+                ]
+            }
+        };
+        hub.state.storage = { shards: 50 };
+
+        const createFusion = loadCollectionComponentFactory(
+            "src/components/collection-fusion-dialog.html",
+            "collectionFusionDialog",
+            factories
+        );
+        components.collectionFusionDialog = createFusion();
+        const createShop = loadCollectionComponentFactory(
+            "src/components/collection-shop-panel.html",
+            "collectionShopPanel",
+            factories
+        );
+        components.collectionShopPanel = createShop();
+        const createEquipmentPanel = loadCollectionComponentFactory(
+            "src/components/collection-equipment-panel.html",
+            "collectionEquipmentPanel",
+            factories
+        );
+        components.collectionEquipmentPanel = createEquipmentPanel();
+
+        components.collectionEquipmentPanel.openFusion();
+        assert.equal(
+            components.collectionFusionDialog.state.visible,
+            true,
+            "Equipment panel should open the fusion dialog"
+        );
+        assert.equal(
+            components.collectionFusionDialog.state.selection.rarity,
+            "common",
+            "Fusion should select its first recipe"
+        );
+        components.collectionFusionDialog.toggleItem("source-1");
+        components.collectionFusionDialog.fuseSelectedItems();
+        assert.deepEqual(
+            calls.at(-1),
+            ["fuseEquipmentItems", [["source-1"]]],
+            "Fusion should use the game action bridge"
+        );
+        assert.equal(
+            components.collectionFusionDialog.state.visible,
+            false,
+            "Fusion should hide after a submitted selection"
+        );
+
+        components.collectionEquipmentPanel.openShop();
+        assert.equal(components.collectionShopPanel.state.visible, true, "Equipment panel should open the shop panel");
+        hub.close();
+        assert.equal(components.collectionShopPanel.state.visible, false, "Closing the hub should hide the shop panel");
+        assert.equal(
+            components.collectionFusionDialog.state.visible,
+            false,
+            "Closing the hub should reset the fusion dialog"
+        );
+    } finally {
+        restoreGlobalProperty("window", originalWindow);
+        restoreGlobalProperty("Alpine", originalAlpine);
+    }
+
+    console.log("[collection-equipment-panel-shared-state] ok");
 }
 
 function testCollectionDetailContracts() {
@@ -454,6 +776,10 @@ function testCollectionRebirthAndDeveloperContracts() {
 
 testHuntingMerchantMobileScrollContract();
 testHuntingChestIconReuseContract();
+testCollectionEquipmentPanelsOwnTheirFlows();
+testDailyShopPopupContract();
+testFusionEquippedLabelTypographyContract();
+testCollectionEquipmentPanelsShareHubState();
 testCollectionDetailContracts();
 testPopupCloseOwnershipContract();
 testGameplayUiResetContracts();
