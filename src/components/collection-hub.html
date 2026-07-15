@@ -1073,6 +1073,12 @@
             state.shopRerolling = false;
         }
 
+        function playShopOfferSwapAnimation() {
+            state.shopRerolling = false;
+            requestAnimationFrame(() => requestAnimationFrame(() => (state.shopRerolling = true)));
+            setTimeout(() => (state.shopRerolling = false), 650);
+        }
+
         function selectedFusionRecipe() {
             return (state.equipment.fusion?.recipes ?? []).find(
                 (recipe) => recipe.rarity === state.fusionSelection.rarity
@@ -1286,14 +1292,14 @@
                 }
             },
             buyDailyShopChest() {
-                return this.bridge.buyDailyShopChest();
+                const chest = this.bridge.buyDailyShopChest();
+                if (chest) playShopOfferSwapAnimation();
+                return chest;
             },
             rerollDailyShop() {
                 const result = this.bridge.rerollDailyShop();
                 if (!result) return result;
-                state.shopRerolling = false;
-                requestAnimationFrame(() => requestAnimationFrame(() => (state.shopRerolling = true)));
-                setTimeout(() => (state.shopRerolling = false), 650);
+                playShopOfferSwapAnimation();
                 return result;
             },
             buyConsumable(consumableId) {

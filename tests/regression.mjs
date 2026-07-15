@@ -17846,6 +17846,21 @@ function testDailyShopPopupContract() {
         template.includes("ch-shop-chest-reroll"),
         "Shop rerolls should animate the chest even at the same rarity"
     );
+    assert.match(
+        template,
+        /function playShopOfferSwapAnimation\(\)\s*\{\s*state\.shopRerolling = false;\s*requestAnimationFrame\(\(\) => requestAnimationFrame\(\(\) => \(state\.shopRerolling = true\)\)\);\s*setTimeout\(\(\) => \(state\.shopRerolling = false\), 650\);\s*\}/s,
+        "Shop offer replacement should replay its 650ms animation through one shared UI helper"
+    );
+    assert.match(
+        template,
+        /buyDailyShopChest\(\)\s*\{\s*const chest = this\.bridge\.buyDailyShopChest\(\);\s*if \(chest\) playShopOfferSwapAnimation\(\);\s*return chest;\s*\}/s,
+        "A successful chest purchase should use the shared offer replacement animation, while failures should not"
+    );
+    assert.match(
+        template,
+        /rerollDailyShop\(\)\s*\{\s*const result = this\.bridge\.rerollDailyShop\(\);\s*if \(!result\) return result;\s*playShopOfferSwapAnimation\(\);\s*return result;\s*\}/s,
+        "A successful manual reroll should use the shared offer replacement animation, while failures should not"
+    );
     assert.ok(template.includes("state.storage.consumables"), "Shop should render definition-driven consumable rows");
     assert.ok(template.includes("buyConsumable(item.id)"), "Consumable rows should purchase the selected definition");
     assert.ok(
