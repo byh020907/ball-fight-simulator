@@ -383,6 +383,7 @@ export const REWARD_BALANCE = deepFreeze({
             },
             experienceDrops: {
                 killXpPool: 20,
+                battleXpVariance: { minimum: -15, maximum: 15, step: 5 },
                 completionDropCount: 4,
                 maxPhysicalDropsPerBattle: 24,
                 rarity: {

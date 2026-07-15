@@ -168,9 +168,11 @@ import {
     getHuntingEnhancementStoneDropCount,
     getHuntingCompletionExperience,
     getHuntingExperienceDropLimit,
+    createHuntingExperienceAllocation,
     getHuntingShardPhysicalDropCount,
     getSmallHealPackAmount,
     rollHighChestRarity,
+    rollHuntingBattleExperienceVariance,
     rollHuntingBonusLootItemType,
     rollHuntingShardBundleAmount,
     scaleHuntingLootAmount
@@ -2927,7 +2929,7 @@ function testHuntingLootItemsAndDropController(app) {
     };
     const mobSpec = createHuntingMobSpec({ type: HUNTING_MONSTER_TYPES.PURSUER, floor: 1, index: 0 });
     const session = new HuntingBattleLootSession({ playerId: playerSpec.id, floor: 1 });
-    const rolls = [0, 0, 0, 0.25, 0.5, 0, 0.25, 0.999999, 0, 0.25, 0.9];
+    const rolls = [0.5, 0, 0, 0, 0.25, 0.5, 0, 0.25, 0.999999, 0, 0.25, 0.9];
     const soundCalls = [];
     const collectedExperience = [];
     const controller = new HuntingLootDropController({
@@ -3312,6 +3314,12 @@ function testHuntingExperienceBalance() {
         myMaxHp: 100,
         lowestHpRatio: 0.5
     };
+    const peakHealthVictory = {
+        ...halfHealthVictory,
+        combatDamageDealt: 200,
+        hpRemain: 100,
+        lowestHpRatio: 1
+    };
 
     assert.equal(
         getHuntingCompletionExperience(halfHealthVictory, [normalEnemy]),
@@ -3322,6 +3330,26 @@ function testHuntingExperienceBalance() {
         getHuntingCompletionExperience(halfHealthVictory, [championEnemy]),
         20,
         "Champion completion XP may add its explicit rarity premium without changing the base formula"
+    );
+    assert.deepEqual(
+        [0, 0.15, 0.3, 0.5, 0.7, 0.85, 0.999999].map((roll) => rollHuntingBattleExperienceVariance(() => roll)),
+        [-15, -10, -5, 0, 5, 10, 15],
+        "Hunting XP variance must use every readable 5 XP result in its configured range"
+    );
+    const getBattleExperienceTotal = (fighter, battleVariance) =>
+        [...createHuntingExperienceAllocation([fighter], { battleVariance }).values()].reduce(
+            (total, amount) => total + amount,
+            0
+        ) + getHuntingCompletionExperience(peakHealthVictory, [fighter]);
+    assert.deepEqual(
+        [-15, -10, -5, 0, 5, 10, 15].map((battleVariance) => getBattleExperienceTotal(normalEnemy, battleVariance)),
+        [45, 50, 55, 60, 65, 70, 75],
+        "A 60 XP hunting victory must vary by range without changing its seven-roll average"
+    );
+    assert.equal(
+        getBattleExperienceTotal(championEnemy, 15),
+        85,
+        "Champion premiums must remain additive after the battle XP range is applied"
     );
     assert.ok(getHuntingExperienceDropLimit() > 0, "Hunting XP orbs must retain a finite visual-drop cap");
     console.log("[hunting-experience-balance] ok");

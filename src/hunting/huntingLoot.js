@@ -9,6 +9,7 @@ import {
     getHuntingCompletionExperienceDropCount,
     getHuntingExperienceDropCount,
     getHuntingExperienceDropLimit,
+    rollHuntingBattleExperienceVariance,
     splitHuntingExperienceAmount
 } from "./huntingExperience.js";
 
@@ -252,7 +253,8 @@ export class HuntingLootDropController {
     }
 
     prepareExperienceDrops(fighters = []) {
-        const allocation = createHuntingExperienceAllocation(fighters);
+        const battleVariance = rollHuntingBattleExperienceVariance(this.rng);
+        const allocation = createHuntingExperienceAllocation(fighters, { battleVariance });
         for (const fighter of fighters) {
             if (!fighter?.hunting) continue;
             fighter.hunting.experienceReward = allocation.get(fighter.id) ?? 0;

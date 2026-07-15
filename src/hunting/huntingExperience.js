@@ -8,6 +8,12 @@ function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
 
+function normalizeBattleExperienceVariance(value) {
+    const { minimum, maximum, step } = EXPERIENCE_CONFIG.battleXpVariance;
+    const safeValue = Number.isFinite(value) ? value : 0;
+    return clamp(Math.round(safeValue / step) * step, minimum, maximum);
+}
+
 function getExperienceRarity(fighter) {
     const rarityTag = fighter?.hunting?.monsterTags?.find((tag) => tag.startsWith("rarity:"));
     const rarity = rarityTag?.slice("rarity:".length);
@@ -53,12 +59,23 @@ export function getHuntingExperienceWeight(fighter) {
     return rarity.allocationWeight * enemyType.allocationMultiplier * bossMultiplier;
 }
 
-export function createHuntingExperienceAllocation(fighters = []) {
+export function rollHuntingBattleExperienceVariance(rng = Math.random) {
+    const { minimum, maximum, step } = EXPERIENCE_CONFIG.battleXpVariance;
+    const count = Math.floor((maximum - minimum) / step) + 1;
+    const index = Math.floor(clamp(rng(), 0, 0.999999) * count);
+    return minimum + index * step;
+}
+
+export function getHuntingKillExperiencePool({ battleVariance = 0 } = {}) {
+    return Math.max(1, EXPERIENCE_CONFIG.killXpPool + normalizeBattleExperienceVariance(battleVariance));
+}
+
+export function createHuntingExperienceAllocation(fighters = [], { battleVariance = 0 } = {}) {
     const eligible = fighters.filter(
         (fighter) => fighter?.id && (fighter?.hunting?.isMob || fighter?.hunting?.isMiniboss)
     );
     const amounts = distributeIntegerTotal(
-        EXPERIENCE_CONFIG.killXpPool,
+        getHuntingKillExperiencePool({ battleVariance }),
         eligible.map((fighter) => getHuntingExperienceWeight(fighter))
     );
     return new Map(eligible.map((fighter, index) => [fighter.id, amounts[index]]));
@@ -116,7 +133,8 @@ export function getHuntingCompletionExperience(matchReport, fighters = []) {
         won: true,
         stage: 1
     });
-    return Math.max(0, matchXp - EXPERIENCE_CONFIG.killXpPool) + getHuntingVictoryExperienceBonus(fighters);
+    const completionExperience = matchXp - EXPERIENCE_CONFIG.killXpPool;
+    return Math.max(0, completionExperience) + getHuntingVictoryExperienceBonus(fighters);
 }
 
 export function getHuntingExperienceDropColor() {
