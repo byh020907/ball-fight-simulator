@@ -187,25 +187,25 @@
         allocationSummary: "",
 
         adjustStat(key, delta) {
-            window.requireGameActionBridge("adjustStat").adjustStat(key, delta);
+            Alpine.store("uiManager").invokeGameAction("adjustStat", key, delta);
         },
         randomAllocation() {
-            window.requireGameActionBridge("randomAllocation").randomAllocation();
+            Alpine.store("uiManager").invokeGameAction("randomAllocation");
         },
         resetAllocation() {
-            window.requireGameActionBridge("resetAllocation").resetAllocation();
+            Alpine.store("uiManager").invokeGameAction("resetAllocation");
         },
         adjustChallengeLevel(delta) {
-            window.requireGameActionBridge("adjustChallengeLevel").adjustChallengeLevel(delta);
+            Alpine.store("uiManager").invokeGameAction("adjustChallengeLevel", delta);
         },
         openCollectionHub(tabId) {
-            window.requireGameActionBridge("openCollectionHub").openCollectionHub(tabId);
+            Alpine.store("uiManager").invokeGameAction("openCollectionHub", tabId);
         },
         openEquipmentHub() {
-            window.requireGameActionBridge("openEquipmentHub").openEquipmentHub();
+            Alpine.store("uiManager").invokeGameAction("openEquipmentHub");
         },
         openHelp() {
-            window.requireGameActionBridge("openHelp").openHelp();
+            Alpine.store("uiManager").invokeGameAction("openHelp");
         },
         reset() {
             this.fighter = null;

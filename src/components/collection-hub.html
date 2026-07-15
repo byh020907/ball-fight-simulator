@@ -1284,11 +1284,11 @@
             syncDeveloperTarget,
             revealActiveTab,
             get bridge() {
-                return window.requireGameActionBridge();
+                return Alpine.store("uiManager").requireGameActionBridge();
             },
             async openChest(item) {
                 if (item.canOpen) {
-                    await window.requireGameActionBridge("openChest").openChest(item.id);
+                    await Alpine.store("uiManager").invokeGameAction("openChest", item.id);
                 }
             },
             buyDailyShopChest() {

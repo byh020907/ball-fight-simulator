@@ -32,7 +32,7 @@
         setMode(mode) {
             if (this.locked) return;
             this.mode = mode;
-            window.requireGameActionBridge("setGameMode").setGameMode(mode);
+            Alpine.store("uiManager").invokeGameAction("setGameMode", mode);
         },
         reset() {
             this.visible = false;

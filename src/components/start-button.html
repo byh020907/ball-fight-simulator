@@ -21,11 +21,11 @@
         handleClick() {
             if (this.textOverride !== null) {
                 // 특수 상태(확인/다시 시작 등) — 기존 startTournament 흐름
-                window.requireGameActionBridge("startTournament").startTournament();
+                Alpine.store("uiManager").invokeGameAction("startTournament");
             } else if (this.gameMode === "hunting") {
-                window.requireGameActionBridge("openHuntingStageSelect").openHuntingStageSelect();
+                Alpine.store("uiManager").invokeGameAction("openHuntingStageSelect");
             } else {
-                window.requireGameActionBridge("startTournament").startTournament();
+                Alpine.store("uiManager").invokeGameAction("startTournament");
             }
         },
         setState({ disabled, text, hidden } = {}) {

@@ -134,6 +134,7 @@
 
             Alpine.store("uiManager", {
                 components: {},
+                gameActionBridge: null,
                 register(id, instance) {
                     this.components[id] = instance;
                 },
@@ -170,6 +171,23 @@
                         );
                     }
                     return component;
+                },
+                setGameActionBridge(bridge) {
+                    this.gameActionBridge = bridge;
+                },
+                requireGameActionBridge(actionName) {
+                    const bridge = this.gameActionBridge;
+                    if (!bridge) {
+                        throw new Error("[uiManager] gameActionBridge가 아직 등록되지 않았습니다.");
+                    }
+                    if (actionName && typeof bridge[actionName] !== "function") {
+                        throw new Error(`[uiManager] gameActionBridge에 '${actionName}' 액션이 등록되지 않았습니다.`);
+                    }
+                    return bridge;
+                },
+                invokeGameAction(actionName, ...args) {
+                    const bridge = this.requireGameActionBridge(actionName);
+                    return bridge[actionName](...args);
                 }
             });
 
@@ -212,8 +230,6 @@
 
             // ── Pre-load shared modules for component scripts ──
 
-            const { requireGameActionBridge } = await import(`./src/actionGateway.js`);
-            window.requireGameActionBridge = requireGameActionBridge;
             const { HELP_TITLE, HELP_CONTENT } = await import(`./src/helpContent.js?v=${V}`);
             window.__helpTitle = HELP_TITLE;
             window.__helpContent = HELP_CONTENT;

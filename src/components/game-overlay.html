@@ -218,35 +218,35 @@
         huntingLootHudChests: 0,
 
         huntingRetreat() {
-            window.requireGameActionBridge("huntingRetreat").huntingRetreat();
+            Alpine.store("uiManager").invokeGameAction("huntingRetreat");
         },
         huntingAdvance() {
-            window.requireGameActionBridge("huntingAdvance").huntingAdvance();
+            Alpine.store("uiManager").invokeGameAction("huntingAdvance");
         },
         huntingMerchantChoose(idx) {
-            window.requireGameActionBridge("huntingMerchantChoose").huntingMerchantChoose(idx);
+            Alpine.store("uiManager").invokeGameAction("huntingMerchantChoose", idx);
         },
         huntingMerchantPass() {
-            window.requireGameActionBridge("huntingMerchantPass").huntingMerchantPass();
+            Alpine.store("uiManager").invokeGameAction("huntingMerchantPass");
         },
         huntingChestContinue() {
-            window.requireGameActionBridge("huntingChestContinue").huntingChestContinue();
+            Alpine.store("uiManager").invokeGameAction("huntingChestContinue");
         },
         huntingEventContinue() {
-            window.requireGameActionBridge("huntingEventContinue").huntingEventContinue();
+            Alpine.store("uiManager").invokeGameAction("huntingEventContinue");
         },
         huntingUsePreparationConsumable(consumableId) {
-            window.requireGameActionBridge("huntingUsePreparationConsumable").huntingUsePreparationConsumable(consumableId);
+            Alpine.store("uiManager").invokeGameAction("huntingUsePreparationConsumable", consumableId);
         },
         huntingStartPreparedBattle() {
-            window.requireGameActionBridge("huntingStartPreparedBattle").huntingStartPreparedBattle();
+            Alpine.store("uiManager").invokeGameAction("huntingStartPreparedBattle");
         },
         handleResultSequenceAction() {
             if (this.resultSequence?.isFinal) {
-                window.requireGameActionBridge("confirmResultSequence").confirmResultSequence();
+                Alpine.store("uiManager").invokeGameAction("confirmResultSequence");
                 return;
             }
-            window.requireGameActionBridge("advanceResultSequence").advanceResultSequence();
+            Alpine.store("uiManager").invokeGameAction("advanceResultSequence");
         },
         show({ label, text, subtext = "", transient = false, xpReward = null, masteryReward = null, resultSequence = null } = {}) {
             const nextStepKey = resultSequence ? `${resultSequence.id}:${resultSequence.currentStep}` : "";

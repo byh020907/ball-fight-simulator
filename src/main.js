@@ -3,5 +3,6 @@ import { createComponentBridge } from "./componentBridge.js";
 import { registerGameActionBridge } from "./actionGateway.js";
 
 window.ballFightApp = new BattleApp();
-window.gameActionBridge = createComponentBridge(window.ballFightApp);
-registerGameActionBridge(window.gameActionBridge);
+const gameActionBridge = createComponentBridge(window.ballFightApp);
+registerGameActionBridge(gameActionBridge);
+Alpine.store("uiManager").setGameActionBridge(gameActionBridge);

@@ -503,6 +503,7 @@ function makeHarness() {
     };
     const uiManagerStore = {
         components: {},
+        gameActionBridge: null,
         register(id, instance) {
             this.components[id] = instance;
         },
@@ -529,6 +530,21 @@ function makeHarness() {
                 throw new Error(`[Test] 필수 UI 컴포넌트 '${componentId}'가 uiManager에 등록되지 않았습니다.`);
             }
             return component;
+        },
+        setGameActionBridge(bridge) {
+            this.gameActionBridge = bridge;
+        },
+        requireGameActionBridge(actionName) {
+            const bridge = this.gameActionBridge;
+            if (!bridge) throw new Error("[Test] gameActionBridge가 아직 등록되지 않았습니다.");
+            if (actionName && typeof bridge[actionName] !== "function") {
+                throw new Error(`[Test] gameActionBridge에 '${actionName}' 액션이 등록되지 않았습니다.`);
+            }
+            return bridge;
+        },
+        invokeGameAction(actionName, ...args) {
+            const bridge = this.requireGameActionBridge(actionName);
+            return bridge[actionName](...args);
         }
     };
     context.Alpine.store("uiManager", uiManagerStore);
@@ -17086,18 +17102,67 @@ async function testActionGateway() {
     console.log("[action-gateway] ok");
 }
 
-// ── Action Gateway index.html module identity contract ──
-// ESM treats `./actionGateway.js` and `./actionGateway.js?v=...` as
-// different modules. index.html and main.js must share the same identity.
+function testUiManagerGameActionBridgeContract() {
+    const harness = makeHarness();
+    const uiManager = harness.context.Alpine.store("uiManager");
 
-{
-    const html = readFileSync("index.html", "utf8");
-    const hasVersionedActionGateway = /actionGateway\.js\?v=/.test(html);
-    assert.ok(
-        !hasVersionedActionGateway,
-        "index.html must import actionGateway.js without ?v= to share module identity with main.js"
+    assert.throws(
+        () => uiManager.invokeGameAction("startTournament"),
+        /gameActionBridge가 아직 등록되지 않았습니다/,
+        "UI actions must fail explicitly until the app installs its bridge"
     );
-    console.log("[action-gateway-import-identity] ok");
+
+    const calls = [];
+    uiManager.setGameActionBridge({
+        startTournament(...args) {
+            calls.push(args);
+            return "started";
+        }
+    });
+    assert.equal(
+        uiManager.invokeGameAction("startTournament", "from-ui"),
+        "started",
+        "uiManager must invoke the registered public bridge action"
+    );
+    assert.deepEqual(calls, [["from-ui"]], "uiManager must preserve action arguments");
+    assert.throws(
+        () => uiManager.invokeGameAction("openHelp"),
+        /openHelp.*등록되지 않았습니다/,
+        "uiManager must reject unknown bridge actions before invocation"
+    );
+
+    const indexSource = readFileSync("index.html", "utf8");
+    const mainSource = readFileSync("src/main.js", "utf8");
+    assert.ok(
+        indexSource.includes("setGameActionBridge(bridge)") &&
+            indexSource.includes("invokeGameAction(actionName, ...args)"),
+        "uiManager must own the explicit bridge installation and invocation path"
+    );
+    assert.equal(
+        indexSource.includes("window.requireGameActionBridge"),
+        false,
+        "index.html must not expose the action bridge as a template window global"
+    );
+    assert.ok(
+        mainSource.includes('Alpine.store("uiManager").setGameActionBridge(gameActionBridge)'),
+        "main.js must install the bridge after creating the BattleApp public actions"
+    );
+    for (const path of [
+        "src/components/game-overlay.html",
+        "src/components/collection-hub.html",
+        "src/components/mode-segment.html",
+        "src/components/player-panel.html",
+        "src/components/start-button.html"
+    ]) {
+        const source = readFileSync(path, "utf8");
+        assert.equal(
+            source.includes("window.requireGameActionBridge"),
+            false,
+            `${path} must not access the window bridge`
+        );
+        assert.ok(source.includes('Alpine.store("uiManager")'), `${path} must access actions through uiManager`);
+    }
+    console.log("[ui-manager-game-action-bridge] ok");
 }
 
 // ── Hunting end-to-end deterministic state regression test ──
@@ -17451,6 +17516,7 @@ await testPlayerPanelAllocationContract(app);
 await testPlayerPanelAllocationContractBoundary(app);
 
 await testActionGateway();
+testUiManagerGameActionBridgeContract();
 await testHuntingEndToEnd();
 await testHuntingChestContinueHandlersContract();
 testHuntingLootBalanceRules();
@@ -17549,7 +17615,7 @@ function testResultOverlayReservesConfirmActionSpace() {
         "The final side tab must replace the next arrow with confirmation"
     );
     assert.ok(
-        overlay.includes('window.requireGameActionBridge("confirmResultSequence").confirmResultSequence()') &&
+        overlay.includes('Alpine.store("uiManager").invokeGameAction("confirmResultSequence")') &&
             bridge.includes("confirmResultSequence()"),
         "The final side tab must confirm through the shared game action bridge"
     );
