@@ -17586,6 +17586,12 @@ function testResultOverlayReservesConfirmActionSpace() {
             overlay.includes("max-width: 100%;"),
         "Result XP rewards must fit the narrowed card without horizontal overflow"
     );
+    const resultCardRule = overlay.match(/:scope\.result-sequence-active \.overlay-card\s*\{([^}]*)\}/s)?.[1] ?? "";
+    assert.match(
+        resultCardRule,
+        /width:\s*100%;[\s\S]*box-sizing:\s*border-box;[\s\S]*max-height:\s*100%;/,
+        "The result card border and padding must stay inside the shared frame in hunting results"
+    );
     assert.ok(
         overlay.includes("padding: 10px 12px;") &&
             overlay.includes(":scope.result-sequence-active .overlay-card > xp-reward-panel {") &&
