@@ -17361,29 +17361,35 @@ function testResultOverlayReservesConfirmActionSpace() {
         "The final side tab must confirm through the shared game action bridge"
     );
     assert.ok(
-        overlay.includes("width: min(500px, calc(100% - 48px));") &&
+        overlay.includes("width: min(500px, calc(100% - 80px));") &&
             overlay.includes("width: 40px;") &&
-            overlay.includes("right: -18px;") &&
+            overlay.includes("right: -40px;") &&
             overlay.includes("pointer-events: auto;"),
-        "The centered card must keep its full layout width while the side tab overlaps only its outside edge"
+        "The centered result card must reserve room for a side tab that begins at its outer border"
     );
     assert.ok(
         overlay.includes("@media (max-width: 600px)") &&
             overlay.includes("width: 36px;") &&
-            overlay.includes("right: -16px;"),
-        "Mobile result cards must keep the centered card while using a smaller overlapping side tab"
+            overlay.includes("right: -36px;"),
+        "Mobile result cards must keep the centered card while attaching a smaller side tab outside its border"
     );
-    for (const viewportWidth of [320, 390, 600]) {
-        const cardWidth = Math.min(500, viewportWidth - 48);
+    for (const viewportWidth of [320, 390, 600, 768]) {
+        const tabWidth = viewportWidth <= 600 ? 36 : 40;
+        const cardWidth = Math.min(500, viewportWidth - 80);
         const cardLeft = (viewportWidth - cardWidth) / 2;
-        const tabRight = cardLeft + cardWidth + 16;
-        assert.equal(
-            cardLeft + cardWidth / 2,
-            viewportWidth / 2,
-            "The mobile result card must remain horizontally centered"
-        );
-        assert.ok(tabRight <= viewportWidth, "The overlapping mobile side tab must remain inside the viewport");
+        const cardRight = cardLeft + cardWidth;
+        const tabLeft = cardRight;
+        const tabRight = tabLeft + tabWidth;
+        assert.equal(cardLeft + cardWidth / 2, viewportWidth / 2, "The result card must remain horizontally centered");
+        assert.equal(tabLeft, cardRight, "The side tab must begin at the card border without covering its content");
+        assert.ok(tabRight <= viewportWidth, "The entire side-tab touch target must remain inside the viewport");
     }
+    const transientFrameRule = overlay.match(/:scope\.transient \.result-sequence-frame\s*\{([^}]*)\}/s)?.[1] ?? "";
+    assert.match(
+        transientFrameRule,
+        /width:\s*100%;[\s\S]*height:\s*100%;[\s\S]*display:\s*grid;[\s\S]*place-items:\s*center;/,
+        "Transient alerts must give their shared frame an independent viewport-centered layout"
+    );
     assert.ok(
         overlay.includes(":scope.result-sequence-active .overlay-card .xp-reward {") &&
             overlay.includes("max-width: 100%;"),
