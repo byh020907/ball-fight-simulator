@@ -13,8 +13,9 @@ import { EQUIPMENT_SPECIAL_OPTION_SUFFIXES } from "./hunting/equipmentConfig.js"
 import { formatEquipmentSpecialName } from "./hunting/equipmentNaming.js";
 import {
     REBIRTH_BASE_STAT_KEYS,
+    getRebirthCardDefinition,
     isValidRebirthCardId,
-    isValidRebirthOfferId,
+    normalizeRebirthOfferMaterial,
     REBIRTH_MAX_CARD_RANK,
     REBIRTH_MAX_EQUIPPED_CARDS,
     REBIRTH_OFFER_SIZE
@@ -28,7 +29,7 @@ export const PROFILE_LIMITS = Object.freeze({
     MAX_TIMESTAMP: 8_640_000_000_000_000
 });
 
-export const PROFILE_VERSION = 8;
+export const PROFILE_VERSION = 9;
 
 const debugProfileSession = {
     active: false,
@@ -418,15 +419,25 @@ function sanitizeRebirthCharacterState(characterId, value) {
     const equippedCardIds = [...new Set(value.equippedCardIds ?? [])]
         .filter((cardId) => cardRanks[cardId] > 0)
         .slice(0, REBIRTH_MAX_EQUIPPED_CARDS);
-    const pendingOfferCardIds = [...new Set(value.pendingOfferCardIds ?? [])]
-        .filter((cardId) => isValidRebirthOfferId(characterId, cardId))
+    const legacyPendingOfferCards = Array.isArray(value.pendingOfferCardIds)
+        ? value.pendingOfferCardIds
+              .map((cardId) => getRebirthCardDefinition(characterId, cardId))
+              .filter(Boolean)
+              .map((card) => ({ id: card.id, type: card.type }))
+        : [];
+    const pendingOfferCards = (
+        Array.isArray(value.pendingOfferCards) ? value.pendingOfferCards : legacyPendingOfferCards
+    )
+        .map((card) => normalizeRebirthOfferMaterial(characterId, card))
+        .filter(Boolean)
+        .filter((card, index, cards) => cards.findIndex((candidate) => candidate.id === card.id) === index)
         .slice(0, REBIRTH_OFFER_SIZE);
     return {
         rebirthCount: Math.floor(sanitizeNumber(value.rebirthCount)),
         statBonuses,
         cardRanks,
         equippedCardIds,
-        pendingOfferCardIds
+        pendingOfferCards
     };
 }
 
@@ -462,7 +473,7 @@ export function sanitizePlayerProfile(raw) {
 
 export function migratePlayerProfile(raw) {
     if (!raw || typeof raw !== "object") return createDefaultPlayerProfile();
-    if (raw.version !== 7 && raw.version !== PROFILE_VERSION) return createDefaultPlayerProfile();
+    if (![7, 8, PROFILE_VERSION].includes(raw.version)) return createDefaultPlayerProfile();
     return sanitizePlayerProfile(raw);
 }
 

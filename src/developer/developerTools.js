@@ -26,9 +26,10 @@ function ensureRebirthState(profile, characterId) {
     const current = profile.rebirth.byCharacter[characterId] ?? {};
     const state = {
         rebirthCount: Math.max(0, Math.floor(current.rebirthCount ?? 0)),
+        statBonuses: { ...(current.statBonuses ?? {}) },
         cardRanks: { ...(current.cardRanks ?? {}) },
         equippedCardIds: [...(current.equippedCardIds ?? [])],
-        pendingOfferCardIds: [...(current.pendingOfferCardIds ?? [])]
+        pendingOfferCards: [...(current.pendingOfferCards ?? [])]
     };
     profile.rebirth.byCharacter[characterId] = state;
     return state;

@@ -19,6 +19,7 @@ import { EQUIPMENT_SPECIAL_OPTION_SUFFIXES } from "../src/hunting/equipmentConfi
 import { getLevelRequirement } from "../src/experience/experienceConfig.js";
 import { getCharacterExperienceSummary } from "../src/experience/experienceService.js";
 import { setDeveloperCharacterToMaxLevel, setDeveloperRebirthCount } from "../src/developer/developerTools.js";
+import { createRebirthStatReward } from "../src/rebirth/index.js";
 
 function createSessionStorage(values = {}) {
     const data = new Map(Object.entries(values));
@@ -96,6 +97,48 @@ assert.equal(resetStaleSessionStorage(staleStorage), false);
 const staleProfile = { ...createDefaultPlayerProfile(), version: PROFILE_VERSION - 1 };
 assert.equal(migratePlayerProfile(staleProfile).version, PROFILE_VERSION);
 assert.deepEqual(migratePlayerProfile(staleProfile).equipment.inventory, []);
+
+const versionEightProfile = createDefaultPlayerProfile();
+const persistedRebirthOffer = createRebirthStatReward(0, () => 0);
+versionEightProfile.version = 8;
+versionEightProfile.equipment.inventory = [{ instanceId: "preserved-version-eight-equipment", name: "보존 장비" }];
+versionEightProfile.rebirth.byCharacter.archer = {
+    rebirthCount: 2,
+    statBonuses: { hp: 40, damage: 4, speed: 0, defense: 0 },
+    cardRanks: {},
+    equippedCardIds: [],
+    pendingOfferCards: [
+        {
+            id: persistedRebirthOffer.id,
+            type: persistedRebirthOffer.type,
+            offerSlot: persistedRebirthOffer.offerSlot,
+            stats: { ...persistedRebirthOffer.stats }
+        }
+    ]
+};
+const migratedVersionEightProfile = migratePlayerProfile(versionEightProfile);
+assert.equal(migratedVersionEightProfile.version, PROFILE_VERSION);
+assert.equal(migratedVersionEightProfile.equipment.inventory[0].instanceId, "preserved-version-eight-equipment");
+assert.deepEqual(
+    migratedVersionEightProfile.rebirth.byCharacter.archer.pendingOfferCards,
+    versionEightProfile.rebirth.byCharacter.archer.pendingOfferCards,
+    "Profile migration must preserve a pending rebirth reward's exact material"
+);
+
+const legacyFixedStatOfferProfile = createDefaultPlayerProfile();
+legacyFixedStatOfferProfile.version = 8;
+legacyFixedStatOfferProfile.rebirth.byCharacter.archer = {
+    rebirthCount: 1,
+    statBonuses: { hp: 0, damage: 0, speed: 0, defense: 0 },
+    cardRanks: {},
+    equippedCardIds: [],
+    pendingOfferCardIds: ["rebirth-stat:archer:balanced"]
+};
+assert.deepEqual(
+    migratePlayerProfile(legacyFixedStatOfferProfile).rebirth.byCharacter.archer.pendingOfferCards,
+    [],
+    "Legacy fixed-stat offers must be discarded instead of applying stale values"
+);
 
 const versionSevenProfile = createDefaultPlayerProfile();
 versionSevenProfile.version = 7;

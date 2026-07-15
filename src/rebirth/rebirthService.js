@@ -1,14 +1,17 @@
 import { MAX_LEVEL } from "../experience/experienceConfig.js";
 import { getCharacterExperienceSummary, resetCharacterExperience } from "../experience/experienceService.js";
+import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 import {
     REBIRTH_BASE_STAT_KEYS,
     getRebirthCardDefinition,
     getRebirthCardView,
     getRebirthFighter,
-    getRebirthOfferCatalog,
     getRebirthOfferDefinition,
+    getRebirthOfferMaterial,
     getRebirthOfferView,
-    isValidRebirthOfferId,
+    createRebirthStatReward,
+    getRebirthCardCatalog,
+    normalizeRebirthOfferMaterial,
     REBIRTH_MAX_CARD_RANK,
     REBIRTH_MAX_EQUIPPED_CARDS,
     REBIRTH_OFFER_SIZE
@@ -21,7 +24,7 @@ const EMPTY_REBIRTH_STATE = Object.freeze({
     statBonuses: EMPTY_STAT_BONUSES,
     cardRanks: {},
     equippedCardIds: [],
-    pendingOfferCardIds: []
+    pendingOfferCards: []
 });
 
 function normalizeRank(value) {
@@ -54,10 +57,22 @@ function ensureRebirthState(profile, characterId) {
         statBonuses: normalizeStatBonuses(current.statBonuses),
         cardRanks: { ...(current.cardRanks ?? {}) },
         equippedCardIds: [...(current.equippedCardIds ?? [])],
-        pendingOfferCardIds: [...(current.pendingOfferCardIds ?? [])]
+        pendingOfferCards: [...(current.pendingOfferCards ?? [])]
     };
     profile.rebirth.byCharacter[characterId] = next;
     return next;
+}
+
+function getValidPendingOfferCards(characterId, pendingOfferCards) {
+    const seen = new Set();
+    return (pendingOfferCards ?? [])
+        .map((card) => normalizeRebirthOfferMaterial(characterId, card))
+        .filter((card) => {
+            if (!card || seen.has(card.id)) return false;
+            seen.add(card.id);
+            return true;
+        })
+        .slice(0, REBIRTH_OFFER_SIZE);
 }
 
 function weightedPick(cards, rng) {
@@ -71,13 +86,24 @@ function weightedPick(cards, rng) {
 }
 
 export function createRebirthOffer(characterId, rng = Math.random) {
-    const catalog = getRebirthOfferCatalog(characterId);
-    const pool = [...catalog];
+    const pool = [
+        ...Array.from({ length: REBIRTH_OFFER_SIZE }, (_, offerSlot) => ({
+            id: `stat-candidate:${offerSlot}`,
+            type: "statCandidate",
+            offerSlot,
+            weight: REWARD_BALANCE.rebirth.candidateWeights.stat
+        })),
+        ...getRebirthCardCatalog(characterId)
+    ];
     const offer = [];
     while (pool.length > 0 && offer.length < REBIRTH_OFFER_SIZE) {
         const selected = weightedPick(pool, rng);
-        offer.push(selected);
         pool.splice(pool.indexOf(selected), 1);
+        const material =
+            selected.type === "statCandidate"
+                ? createRebirthStatReward(selected.offerSlot, rng)
+                : getRebirthOfferMaterial(characterId, selected);
+        if (material) offer.push(material);
     }
     return offer;
 }
@@ -92,15 +118,13 @@ export function getRebirthState(profile, characterId) {
     const equippedCardIds = [...new Set(state.equippedCardIds ?? [])]
         .filter((cardId) => cardRanks[cardId] && getRebirthCardDefinition(characterId, cardId))
         .slice(0, REBIRTH_MAX_EQUIPPED_CARDS);
-    const pendingOfferCardIds = [...new Set(state.pendingOfferCardIds ?? [])]
-        .filter((cardId) => isValidRebirthOfferId(characterId, cardId))
-        .slice(0, REBIRTH_OFFER_SIZE);
+    const pendingOfferCards = getValidPendingOfferCards(characterId, state.pendingOfferCards);
     return {
         rebirthCount: Math.max(0, Math.floor(state.rebirthCount ?? 0)),
         statBonuses: normalizeStatBonuses(state.statBonuses),
         cardRanks,
         equippedCardIds,
-        pendingOfferCardIds
+        pendingOfferCards
     };
 }
 
@@ -113,22 +137,23 @@ export function canRebirth(profile, characterId) {
 export function beginRebirth(profile, characterId, rng = Math.random) {
     if (!canRebirth(profile, characterId)) return { ok: false, error: "not_eligible", cards: [] };
     const state = ensureRebirthState(profile, characterId);
-    const validPending = state.pendingOfferCardIds
-        .map((cardId) => getRebirthOfferDefinition(characterId, cardId))
-        .filter(Boolean);
+    const validPending = getValidPendingOfferCards(characterId, state.pendingOfferCards);
     const offers = validPending.length === REBIRTH_OFFER_SIZE ? validPending : createRebirthOffer(characterId, rng);
-    state.pendingOfferCardIds = offers.map((offer) => offer.id);
+    state.pendingOfferCards = offers;
     return {
         ok: true,
-        cards: state.pendingOfferCardIds.map((cardId) => getRebirthOfferDefinition(characterId, cardId))
+        cards: state.pendingOfferCards.map((offer) => getRebirthOfferView(characterId, offer)).filter(Boolean)
     };
 }
 
 export function completeRebirth(profile, characterId, cardId) {
     if (!canRebirth(profile, characterId)) return { ok: false, error: "not_eligible" };
     const state = ensureRebirthState(profile, characterId);
-    if (!state.pendingOfferCardIds.includes(cardId)) return { ok: false, error: "invalid_offer" };
-    const reward = getRebirthOfferDefinition(characterId, cardId);
+    const pendingOffer = getValidPendingOfferCards(characterId, state.pendingOfferCards).find(
+        (offer) => offer.id === cardId
+    );
+    if (!pendingOffer) return { ok: false, error: "invalid_offer" };
+    const reward = getRebirthOfferDefinition(characterId, pendingOffer);
     if (!reward) return { ok: false, error: "invalid_offer" };
 
     const previousRank = normalizeRank(state.cardRanks[cardId]);
@@ -140,7 +165,7 @@ export function completeRebirth(profile, characterId, cardId) {
         state.cardRanks[cardId] = rank;
     }
     state.rebirthCount += 1;
-    state.pendingOfferCardIds = [];
+    state.pendingOfferCards = [];
     const experience = resetCharacterExperience(profile, characterId);
     return {
         ok: true,
@@ -236,8 +261,8 @@ export function getRebirthPresentation(profile, characterId) {
         .map(([cardId, rank]) => getRebirthCardView(characterId, cardId, rank, state.equippedCardIds))
         .filter(Boolean)
         .sort((left, right) => left.name.localeCompare(right.name));
-    const pendingOfferCards = state.pendingOfferCardIds
-        .map((cardId) => getRebirthOfferView(characterId, cardId, state.cardRanks[cardId] ?? 0, state.equippedCardIds))
+    const pendingOfferCards = state.pendingOfferCards
+        .map((card) => getRebirthOfferView(characterId, card, state.cardRanks[card.id] ?? 0, state.equippedCardIds))
         .filter(Boolean);
     return {
         visible:

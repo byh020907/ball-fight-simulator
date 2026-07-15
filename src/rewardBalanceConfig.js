@@ -11,26 +11,6 @@ export const REWARD_BALANCE = deepFreeze({
         maxEquippedCards: 3,
         maxCardRank: 10,
         candidateWeights: { stat: 72, action: 18, passive: 10 },
-        statPairs: {
-            archer: ["damage", "speed"],
-            orbit: ["defense", "hp"],
-            trickster: ["damage", "speed"],
-            grenade: ["damage", "defense"],
-            dash: ["speed", "damage"],
-            rage: ["hp", "damage"],
-            spin: ["speed", "defense"],
-            eater: ["hp", "defense"],
-            bat_ball: ["damage", "speed"],
-            vampire: ["hp", "damage"],
-            gunner: ["damage", "speed"],
-            phantom: ["speed", "damage"],
-            hero: ["hp", "defense"]
-        },
-        statRewardValues: {
-            balanced: { primary: 1, secondary: 1 },
-            primary: { primary: 2, secondary: 0 },
-            secondary: { primary: 0, secondary: 2 }
-        },
         passiveCardRanks: {
             globalCooldown: {
                 baseReductionPercent: 30,

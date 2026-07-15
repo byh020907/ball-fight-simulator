@@ -3,9 +3,10 @@ import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 import { createRoster } from "../roster.js";
 
 const REBIRTH_BALANCE = REWARD_BALANCE.rebirth;
+const RARE_EQUIPMENT_STAT_RANGE = REWARD_BALANCE.equipment.statRanges.rare;
+const EQUIPMENT_STAT_VALUE_RATIOS = REWARD_BALANCE.equipment.statValueRatios;
 const ROSTER_BY_ID = new Map(createRoster().map((fighter) => [fighter.id, fighter]));
 const STAT_LABELS = Object.freeze({ hp: "HP", damage: "공격", speed: "속도", defense: "방어력" });
-const STAT_VARIANTS = Object.freeze(["balanced", "primary", "secondary"]);
 const SUB_ABILITY_EFFECT_LABELS = Object.freeze({
     archer: "유도 속도",
     orbit: "위성 충전 속도",
@@ -31,13 +32,6 @@ export function getRebirthFighter(characterId) {
     return ROSTER_BY_ID.get(characterId) ?? null;
 }
 
-export function getRebirthStatPair(characterId) {
-    const pair = REBIRTH_BALANCE.statPairs[characterId];
-    return Array.isArray(pair) && pair.length === 2 && pair.every((stat) => REBIRTH_BASE_STAT_KEYS.includes(stat))
-        ? pair
-        : null;
-}
-
 export function getSubAbilityIds(characterId) {
     const ownAbilityId = getRebirthFighter(characterId)?.ability;
     return [...ROSTER_BY_ID.values()]
@@ -50,8 +44,80 @@ function normalizeRank(rank) {
     return Math.max(1, Math.min(REBIRTH_MAX_CARD_RANK, Math.floor(rank || 1)));
 }
 
-function getStatRewardId(characterId, variant) {
-    return `rebirth-stat:${characterId}:${variant}`;
+function normalizeRandomValue(rng) {
+    const value = rng();
+    return Math.max(0, Math.min(0.999999999, Number.isFinite(value) ? value : 0));
+}
+
+function rollRareEquipmentStatValue(stat, rng) {
+    const ratio = EQUIPMENT_STAT_VALUE_RATIOS[stat];
+    const baseValue =
+        RARE_EQUIPMENT_STAT_RANGE.min +
+        Math.floor(normalizeRandomValue(rng) * (RARE_EQUIPMENT_STAT_RANGE.max - RARE_EQUIPMENT_STAT_RANGE.min + 1));
+    return baseValue * ratio;
+}
+
+function getCanonicalStatEntries(stats) {
+    if (!stats || typeof stats !== "object" || Array.isArray(stats)) return null;
+    const entries = Object.entries(stats);
+    if (entries.length !== 2) return null;
+
+    const normalized = REBIRTH_BASE_STAT_KEYS.filter((stat) => Object.hasOwn(stats, stat)).map((stat) => [
+        stat,
+        stats[stat]
+    ]);
+    if (normalized.length !== 2) return null;
+
+    for (const [stat, value] of normalized) {
+        const ratio = EQUIPMENT_STAT_VALUE_RATIOS[stat];
+        const minimum = RARE_EQUIPMENT_STAT_RANGE.min * ratio;
+        const maximum = RARE_EQUIPMENT_STAT_RANGE.max * ratio;
+        if (!Number.isInteger(value) || value < minimum || value > maximum || value % ratio !== 0) return null;
+    }
+    return normalized;
+}
+
+function getStatRewardId(offerSlot, statEntries) {
+    return `rebirth-stat:${offerSlot}:${statEntries.map(([stat, value]) => `${stat}-${value}`).join(":")}`;
+}
+
+function createStatRewardFromMaterial(material) {
+    if (!material || material.type !== "statReward" || !Number.isInteger(material.offerSlot)) return null;
+    if (material.offerSlot < 0 || material.offerSlot >= REBIRTH_OFFER_SIZE) return null;
+    const statEntries = getCanonicalStatEntries(material.stats);
+    if (!statEntries || material.id !== getStatRewardId(material.offerSlot, statEntries)) return null;
+    const stats = Object.freeze(Object.fromEntries(statEntries));
+    return Object.freeze({
+        id: material.id,
+        type: "statReward",
+        categoryLabel: "기초 수치",
+        name: "희귀 기초 수치",
+        description: "희귀 장비와 같은 가치 기준의 무작위 두 기초 수치를 즉시 누적합니다.",
+        effectText: statEntries.map(([stat, value]) => `${STAT_LABELS[stat]} +${value}`).join(" · "),
+        stats,
+        offerSlot: material.offerSlot,
+        weight: REBIRTH_BALANCE.candidateWeights.stat
+    });
+}
+
+export function createRebirthStatReward(offerSlot, rng = Math.random) {
+    if (!Number.isInteger(offerSlot) || offerSlot < 0 || offerSlot >= REBIRTH_OFFER_SIZE) return null;
+    const availableStats = [...REBIRTH_BASE_STAT_KEYS];
+    const selectedStats = [];
+    while (selectedStats.length < 2) {
+        const selectedIndex = Math.floor(normalizeRandomValue(rng) * availableStats.length);
+        selectedStats.push(availableStats.splice(selectedIndex, 1)[0]);
+    }
+    const statEntries = REBIRTH_BASE_STAT_KEYS.filter((stat) => selectedStats.includes(stat)).map((stat) => [
+        stat,
+        rollRareEquipmentStatValue(stat, rng)
+    ]);
+    return createStatRewardFromMaterial({
+        id: getStatRewardId(offerSlot, statEntries),
+        type: "statReward",
+        offerSlot,
+        stats: Object.fromEntries(statEntries)
+    });
 }
 
 function getActionCardId(abilityId) {
@@ -90,35 +156,6 @@ function getCardRankEffect(card, rank) {
     };
 }
 
-function createStatReward(characterId, variant) {
-    const statPair = getRebirthStatPair(characterId);
-    if (!statPair || !STAT_VARIANTS.includes(variant)) return null;
-    const [primaryStat, secondaryStat] = statPair;
-    const values = REBIRTH_BALANCE.statRewardValues[variant];
-    const stats = Object.freeze({
-        [primaryStat]: values.primary,
-        [secondaryStat]: values.secondary
-    });
-    const label =
-        variant === "balanced"
-            ? `${STAT_LABELS[primaryStat]} · ${STAT_LABELS[secondaryStat]} 공명`
-            : `${STAT_LABELS[variant === "primary" ? primaryStat : secondaryStat]} 집중`;
-    const effectText = Object.entries(stats)
-        .filter(([, value]) => value > 0)
-        .map(([stat, value]) => `${STAT_LABELS[stat]} +${value}`)
-        .join(" · ");
-    return Object.freeze({
-        id: getStatRewardId(characterId, variant),
-        type: "statReward",
-        categoryLabel: "기초 수치",
-        name: label,
-        description: "선택 즉시 캐릭터의 영구 기초 수치에 누적됩니다.",
-        effectText,
-        stats,
-        weight: REBIRTH_BALANCE.candidateWeights.stat
-    });
-}
-
 function createActionCard(characterId, abilityId) {
     if (!getSubAbilityIds(characterId).includes(abilityId)) return null;
     const modifier = REBIRTH_BALANCE.subAbilityRankModifiers[abilityId];
@@ -154,11 +191,6 @@ function createPassiveCooldownCard() {
     });
 }
 
-export function getRebirthStatRewardCatalog(characterId) {
-    if (!getRebirthFighter(characterId)) return [];
-    return STAT_VARIANTS.map((variant) => createStatReward(characterId, variant)).filter(Boolean);
-}
-
 export function getRebirthCardCatalog(characterId) {
     if (!getRebirthFighter(characterId)) return [];
     return [
@@ -169,28 +201,46 @@ export function getRebirthCardCatalog(characterId) {
     ];
 }
 
-export function getRebirthOfferCatalog(characterId) {
-    return [...getRebirthStatRewardCatalog(characterId), ...getRebirthCardCatalog(characterId)];
-}
-
 export function getRebirthCardDefinition(characterId, cardId) {
     return getRebirthCardCatalog(characterId).find((card) => card.id === cardId) ?? null;
-}
-
-export function getRebirthStatRewardDefinition(characterId, rewardId) {
-    return getRebirthStatRewardCatalog(characterId).find((reward) => reward.id === rewardId) ?? null;
-}
-
-export function getRebirthOfferDefinition(characterId, offerId) {
-    return getRebirthStatRewardDefinition(characterId, offerId) ?? getRebirthCardDefinition(characterId, offerId);
 }
 
 export function isValidRebirthCardId(characterId, cardId) {
     return typeof cardId === "string" && Boolean(getRebirthCardDefinition(characterId, cardId));
 }
 
-export function isValidRebirthOfferId(characterId, offerId) {
-    return typeof offerId === "string" && Boolean(getRebirthOfferDefinition(characterId, offerId));
+export function normalizeRebirthOfferMaterial(characterId, material) {
+    if (!material || typeof material !== "object" || typeof material.id !== "string") return null;
+    if (material.type === "statReward") {
+        const reward = createStatRewardFromMaterial(material);
+        return reward
+            ? {
+                  id: reward.id,
+                  type: reward.type,
+                  offerSlot: reward.offerSlot,
+                  stats: { ...reward.stats }
+              }
+            : null;
+    }
+    const card = getRebirthCardDefinition(characterId, material.id);
+    if (!card || card.type !== material.type) return null;
+    return { id: card.id, type: card.type };
+}
+
+export function getRebirthOfferDefinition(characterId, offer) {
+    if (typeof offer === "string") return getRebirthCardDefinition(characterId, offer);
+    const material = normalizeRebirthOfferMaterial(characterId, offer);
+    if (!material) return null;
+    if (material.type === "statReward") return createStatRewardFromMaterial(material);
+    return getRebirthCardDefinition(characterId, material.id);
+}
+
+export function getRebirthOfferMaterial(characterId, offer) {
+    if (typeof offer === "string") {
+        const card = getRebirthCardDefinition(characterId, offer);
+        return card ? { id: card.id, type: card.type } : null;
+    }
+    return normalizeRebirthOfferMaterial(characterId, offer);
 }
 
 export function getRebirthCardView(characterId, cardId, rank = 0, equippedCardIds = []) {
@@ -215,9 +265,10 @@ export function getRebirthCardView(characterId, cardId, rank = 0, equippedCardId
     };
 }
 
-export function getRebirthOfferView(characterId, offerId, rank = 0, equippedCardIds = []) {
-    const reward = getRebirthStatRewardDefinition(characterId, offerId);
-    if (reward) {
+export function getRebirthOfferView(characterId, offer, rank = 0, equippedCardIds = []) {
+    const reward = getRebirthOfferDefinition(characterId, offer);
+    if (!reward) return null;
+    if (reward.type === "statReward") {
         return {
             ...reward,
             rank: 0,
@@ -228,5 +279,5 @@ export function getRebirthOfferView(characterId, offerId, rank = 0, equippedCard
             abilityId: null
         };
     }
-    return getRebirthCardView(characterId, offerId, rank, equippedCardIds);
+    return getRebirthCardView(characterId, reward.id, rank, equippedCardIds);
 }

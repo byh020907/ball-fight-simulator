@@ -38,9 +38,10 @@ import {
     beginRebirth,
     completeRebirth,
     createRebirthOffer,
+    createRebirthStatReward,
     getRebirthCardDefinition,
     getRebirthLoadout,
-    getRebirthOfferDefinition,
+    getRebirthOfferMaterial,
     getRebirthState,
     getSubAbilityIds,
     toggleRebirthCardEquip
@@ -17989,29 +17990,50 @@ function testRebirthDomainContracts() {
     );
     assert.equal(new Set(firstOffer.map((card) => card.id)).size, 3, "A rebirth offer must not duplicate card ids");
     assert.ok(
-        firstOffer.filter((card) => card.type === "action").every((card) => card.abilityId !== "archer"),
+        firstOffer
+            .filter((card) => card.type === "action")
+            .every((card) => getRebirthCardDefinition(sourceId, card.id)?.abilityId !== "archer"),
         "A fighter must never receive its own primary ability as a sub card"
     );
 
-    const statReward = getRebirthOfferDefinition(sourceId, `rebirth-stat:${sourceId}:balanced`);
+    const statReward = createRebirthStatReward(0, () => 0);
     assert.deepEqual(
         statReward.stats,
-        { damage: 1, speed: 1 },
-        "Rebirth stat rewards must contain only the character's permanent base-stat pair"
+        {
+            hp: REWARD_BALANCE.equipment.statRanges.rare.min * REWARD_BALANCE.equipment.statValueRatios.hp,
+            damage: REWARD_BALANCE.equipment.statRanges.rare.min * REWARD_BALANCE.equipment.statValueRatios.damage
+        },
+        "Rebirth stat rewards must derive their minimum values from the rare equipment range and value ratios"
     );
+    const maximumStatReward = createRebirthStatReward(1, () => 0.999999999);
+    assert.deepEqual(
+        maximumStatReward.stats,
+        {
+            speed: REWARD_BALANCE.equipment.statRanges.rare.max * REWARD_BALANCE.equipment.statValueRatios.speed,
+            defense: REWARD_BALANCE.equipment.statRanges.rare.max * REWARD_BALANCE.equipment.statValueRatios.defense
+        },
+        "Rebirth stat rewards must derive their maximum values from the rare equipment range and value ratios"
+    );
+    assert.equal(Object.keys(statReward.stats).length, 2, "Rebirth stat rewards must contain exactly two stats");
+    assert.equal(new Set(Object.keys(statReward.stats)).size, 2, "Rebirth stat rewards must never repeat a stat type");
     profile.rebirth.byCharacter[sourceId] = {
         rebirthCount: 0,
         statBonuses: { hp: 0, damage: 0, speed: 0, defense: 0 },
         cardRanks: {},
         equippedCardIds: [],
-        pendingOfferCardIds: [statReward.id]
+        pendingOfferCards: [getRebirthOfferMaterial(sourceId, statReward)]
     };
     const firstCompletion = completeRebirth(profile, sourceId, statReward.id);
     assert.equal(firstCompletion.ok, true);
     assert.equal(firstCompletion.rank, 0, "Permanent base-stat rewards must not receive a card rank");
     assert.deepEqual(
         getRebirthState(profile, sourceId).statBonuses,
-        { hp: 0, damage: 1, speed: 1, defense: 0 },
+        {
+            hp: REWARD_BALANCE.equipment.statRanges.rare.min * REWARD_BALANCE.equipment.statValueRatios.hp,
+            damage: REWARD_BALANCE.equipment.statRanges.rare.min * REWARD_BALANCE.equipment.statValueRatios.damage,
+            speed: 0,
+            defense: 0
+        },
         "A chosen stat reward must immediately accumulate in the permanent base-stat record"
     );
     assert.equal(
@@ -18033,12 +18055,12 @@ function testRebirthDomainContracts() {
 
     setCharacterXp(profile, sourceId, maxXp);
     const actionCardId = `ability:${getSubAbilityIds(sourceId)[0]}`;
-    profile.rebirth.byCharacter[sourceId].pendingOfferCardIds = [actionCardId];
+    profile.rebirth.byCharacter[sourceId].pendingOfferCards = [{ id: actionCardId, type: "action" }];
     const firstActionCompletion = completeRebirth(profile, sourceId, actionCardId);
     assert.equal(firstActionCompletion.rank, 1, "Action cards should begin at rank 1");
 
     setCharacterXp(profile, sourceId, maxXp);
-    profile.rebirth.byCharacter[sourceId].pendingOfferCardIds = [actionCardId];
+    profile.rebirth.byCharacter[sourceId].pendingOfferCards = [{ id: actionCardId, type: "action" }];
     const duplicateCompletion = completeRebirth(profile, sourceId, actionCardId);
     assert.equal(duplicateCompletion.rank, 2, "Duplicate cards should increase rank instead of creating a copy");
 
@@ -18067,8 +18089,14 @@ function testRebirthDomainContracts() {
         createRoster().find((fighter) => fighter.id === sourceId),
         loadout
     );
-    assert.equal(rebornSpec.stats.damage, createRoster().find((fighter) => fighter.id === sourceId).stats.damage + 1);
-    assert.equal(rebornSpec.stats.speed, createRoster().find((fighter) => fighter.id === sourceId).stats.speed + 1);
+    assert.equal(
+        rebornSpec.stats.damage,
+        createRoster().find((fighter) => fighter.id === sourceId).stats.damage + statReward.stats.damage
+    );
+    assert.equal(
+        rebornSpec.stats.hp,
+        createRoster().find((fighter) => fighter.id === sourceId).stats.hp + statReward.stats.hp
+    );
     assert.equal(rebornSpec.stats.radius, 50, "Rebirth base stats must not change collision radius");
     assert.equal(rebornSpec.stats.mass, 1.2, "Rebirth base stats must not change mass");
     assert.ok(loadout.subAbilities.length > 0, "Equipped action cards should become an explicit combat loadout");
@@ -18116,7 +18144,7 @@ function testRebirthDomainContracts() {
         {},
         "Removed legacy stat cards must not be migrated into the new permanent-stat model"
     );
-    assert.deepEqual(sanitizedLegacyProfile.rebirth.byCharacter[sourceId].pendingOfferCardIds, []);
+    assert.deepEqual(sanitizedLegacyProfile.rebirth.byCharacter[sourceId].pendingOfferCards, []);
     console.log("[rebirth-domain-contracts] ok");
 }
 
@@ -18137,13 +18165,19 @@ function testRebirthOfferPersistsUntilInlineSelection() {
 
     try {
         const bridge = createAppComponentBridge(app);
+        const created = beginRebirth(profile, characterId, () => 0);
+        assert.equal(created.ok, true, "Starting a rebirth should save its inline offer before selection");
         const opened = bridge.beginRebirth(characterId);
-        assert.equal(opened.ok, true, "Opening the rebirth tab should create an inline offer");
-        const persistedOfferIds = [...getRebirthState(profile, characterId).pendingOfferCardIds];
+        assert.equal(opened.ok, true, "Opening the rebirth tab should reuse its inline offer");
+        const persistedOfferCards = getRebirthState(profile, characterId).pendingOfferCards;
         assert.deepEqual(
-            persistedOfferIds,
-            opened.cards.map((card) => card.id),
-            "Rebirth candidates must be saved before inline selection begins"
+            persistedOfferCards,
+            opened.cards.map((card) => getRebirthOfferMaterial(characterId, card)),
+            "Rebirth candidates must save their exact material before inline selection begins"
+        );
+        assert.ok(
+            persistedOfferCards.every((card) => card.type === "statReward" && Object.keys(card.stats).length === 2),
+            "Seeded rebirth offers must persist the exact two-stat reward material"
         );
         assert.equal(
             getCharacterExperienceSummary(profile, characterId).level,
@@ -18153,23 +18187,23 @@ function testRebirthOfferPersistsUntilInlineSelection() {
 
         const reopened = bridge.beginRebirth(characterId);
         assert.deepEqual(
-            reopened.cards.map((card) => card.id),
-            persistedOfferIds,
+            reopened.cards.map((card) => getRebirthOfferMaterial(characterId, card)),
+            persistedOfferCards,
             "Reopening the rebirth tab must reuse the original pending candidates"
         );
 
         const reloadedProfile = sanitizePlayerProfile(profile);
         const reloadedOffer = beginRebirth(reloadedProfile, characterId);
         assert.deepEqual(
-            reloadedOffer.cards.map((card) => card.id),
-            persistedOfferIds,
-            "Saved candidates must survive a profile reload before selection"
+            reloadedOffer.cards.map((card) => getRebirthOfferMaterial(characterId, card)),
+            persistedOfferCards,
+            "Saved candidate IDs and exact stat values must survive a profile reload before selection"
         );
 
-        const completed = bridge.completeRebirth(characterId, persistedOfferIds[1]);
+        const completed = bridge.completeRebirth(characterId, persistedOfferCards[1].id);
         assert.equal(completed.ok, true, "Selecting a pending rebirth card should complete the rebirth");
         assert.deepEqual(
-            getRebirthState(profile, characterId).pendingOfferCardIds,
+            getRebirthState(profile, characterId).pendingOfferCards,
             [],
             "Only a selected rebirth card may consume the pending candidates"
         );
@@ -18197,7 +18231,7 @@ function testHuntingRebirthLoadoutIntegration() {
         statBonuses,
         cardRanks: {},
         equippedCardIds: [],
-        pendingOfferCardIds: []
+        pendingOfferCards: []
     };
     const run = createHuntingRun({ characterId: playerId, stageId: HUNTING_STAGE_IDS.CAVE });
     const baselineSpec = new HuntingManager(createHuntingTestApp(baselineProfile))._createPlayerHuntingSpec(
