@@ -17361,18 +17361,29 @@ function testResultOverlayReservesConfirmActionSpace() {
         "The final side tab must confirm through the shared game action bridge"
     );
     assert.ok(
-        overlay.includes("padding-right: 52px;") &&
-            overlay.includes("width: 52px;") &&
-            overlay.includes("box-sizing: border-box;") &&
+        overlay.includes("width: min(500px, calc(100% - 48px));") &&
+            overlay.includes("width: 40px;") &&
+            overlay.includes("right: -18px;") &&
             overlay.includes("pointer-events: auto;"),
-        "The side tab must reserve a bounded touch target without taking vertical result area or overflowing the viewport"
+        "The centered card must keep its full layout width while the side tab overlaps only its outside edge"
     );
     assert.ok(
         overlay.includes("@media (max-width: 600px)") &&
-            overlay.includes("padding-right: 46px;") &&
-            overlay.includes("width: 46px;"),
-        "Mobile result cards must reserve a narrower side-tab touch target within the viewport"
+            overlay.includes("width: 36px;") &&
+            overlay.includes("right: -16px;"),
+        "Mobile result cards must keep the centered card while using a smaller overlapping side tab"
     );
+    for (const viewportWidth of [320, 390, 600]) {
+        const cardWidth = Math.min(500, viewportWidth - 48);
+        const cardLeft = (viewportWidth - cardWidth) / 2;
+        const tabRight = cardLeft + cardWidth + 16;
+        assert.equal(
+            cardLeft + cardWidth / 2,
+            viewportWidth / 2,
+            "The mobile result card must remain horizontally centered"
+        );
+        assert.ok(tabRight <= viewportWidth, "The overlapping mobile side tab must remain inside the viewport");
+    }
     assert.ok(
         overlay.includes(":scope.result-sequence-active .overlay-card .xp-reward {") &&
             overlay.includes("max-width: 100%;"),
