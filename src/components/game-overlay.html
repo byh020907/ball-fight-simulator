@@ -1065,7 +1065,49 @@
         }
         :scope.result-sequence-active .overlay-card {
             border-width: 3px;
-            padding: 16px 12px;
+            padding: 10px 12px;
+        }
+        :scope.result-sequence-active .overlay-card > span {
+            margin-bottom: 10px;
+        }
+        :scope.result-sequence-active .overlay-card > xp-reward-panel {
+            margin-top: 12px;
+        }
+        :scope.result-sequence-active .overlay-card > xp-reward-panel .xp-reward {
+            margin-top: 0;
+        }
+        @media (max-width: 359px) {
+            :scope.result-sequence-active .overlay-card {
+                padding: 7px 10px;
+            }
+            :scope.result-sequence-active .overlay-card > span {
+                margin-bottom: 6px;
+                font-size: 0.72rem;
+            }
+            :scope.result-sequence-active .overlay-card > strong {
+                font-size: clamp(1.6rem, 8vw, 1.75rem);
+            }
+            :scope.result-sequence-active .overlay-card > xp-reward-panel {
+                margin-top: 6px;
+            }
+            :scope.result-sequence-active .overlay-card > xp-reward-panel .xp-reward {
+                gap: 4px;
+                padding: 8px 10px;
+            }
+            :scope.result-sequence-active .xp-reward-head,
+            :scope.result-sequence-active .xp-reward-foot {
+                gap: 6px;
+            }
+            :scope.result-sequence-active .xp-reward-head span,
+            :scope.result-sequence-active .xp-reward-foot span,
+            :scope.result-sequence-active .xp-reward-earned,
+            :scope.result-sequence-active .xp-reward-next {
+                font-size: 0.68rem;
+                line-height: 1.2;
+            }
+            :scope.result-sequence-active .xp-reward-head b {
+                font-size: 1.1rem;
+            }
         }
         .result-sequence-tab {
             width: 36px;

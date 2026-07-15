@@ -17390,6 +17390,22 @@ function testResultOverlayReservesConfirmActionSpace() {
         "Result XP rewards must fit the narrowed card without horizontal overflow"
     );
     assert.ok(
+        overlay.includes("padding: 10px 12px;") &&
+            overlay.includes(":scope.result-sequence-active .overlay-card > xp-reward-panel {") &&
+            overlay.includes("margin-top: 12px;") &&
+            overlay.includes(".overlay-card > xp-reward-panel .xp-reward {") &&
+            overlay.includes("margin-top: 0;"),
+        "Compact mobile result cards must remove duplicate reward-panel margins before the frame clips content"
+    );
+    assert.ok(
+        overlay.includes("@media (max-width: 359px)") &&
+            overlay.includes("padding: 7px 10px;") &&
+            overlay.includes("font-size: clamp(1.6rem, 8vw, 1.75rem);") &&
+            overlay.includes("gap: 4px;") &&
+            overlay.includes("font-size: 0.68rem;"),
+        "320px result cards must use a dedicated compact density instead of clipping or scrolling"
+    );
+    assert.ok(
         overlay.includes("resultSequenceSlide: false") && overlay.includes("result-sequence-slide-in"),
         "Advancing from the side tab must use a card slide transition"
     );
