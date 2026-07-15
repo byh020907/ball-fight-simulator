@@ -17190,6 +17190,35 @@ async function testHuntingOverlayOwnsHuntingPresentation() {
         "Hunting state must stay with the hunting overlay"
     );
 
+    app.showOverlay("Matchup", "Archer Ball vs Cave Mob");
+
+    assert.equal(
+        app._huntingOverlay.huntingBattlePreparationActive,
+        false,
+        "The matchup router must clear battle preparation before BattleSimulation can start"
+    );
+    assert.equal(app._huntingOverlay.label, "Matchup", "Hunting matchups must replace the preparation header");
+
+    app.hideOverlay();
+
+    assert.equal(app._huntingOverlay.visible, false, "The matchup router must close the hunting overlay before combat");
+
+    const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
+    const startMatchSource = appSource.slice(
+        appSource.indexOf("async startMatch"),
+        appSource.indexOf("// ── 클릭 액션 핸들러 ──")
+    );
+    assert.match(
+        startMatchSource,
+        /this\.showOverlay\("Matchup", label\)/,
+        "Matchup must use the active overlay router"
+    );
+    assert.match(
+        startMatchSource,
+        /this\.hideOverlay\(\)/,
+        "Matchup must close the active overlay router before combat"
+    );
+
     app.presentResultSequence([{ id: "summary", label: "사냥터", text: "원정 완료", subtext: "파편을 확보했습니다" }]);
 
     assert.equal(app._huntingOverlay.visible, false, "Result presentation must close the hunting overlay first");

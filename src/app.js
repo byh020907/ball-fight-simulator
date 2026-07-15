@@ -252,11 +252,16 @@ export class BattleApp {
         this._resultSequence = null;
         if (this._gameMode === "hunting") {
             this._overlay.hide();
+            this._huntingOverlay.hide();
             this._huntingOverlay.show({ label, text, subtext });
             return;
         }
         this._huntingOverlay.hide();
         this._overlay.show({ label, text, subtext });
+    }
+    hideOverlay() {
+        this._overlay.hide();
+        this._huntingOverlay.hide();
     }
     presentResultSequence(steps) {
         this._resultSequence = createResultSequence(steps);
@@ -1194,11 +1199,11 @@ export class BattleApp {
         this._bindClickHandler();
 
         this.renderer.render(this.simulation);
-        this._overlay.show({ label: "Matchup", text: label });
+        this.showOverlay("Matchup", label);
         await this.wait(1350);
         if (!this.lifecycle.isCurrentRevision(lifecycleRevision)) return;
 
-        this._overlay.hide();
+        this.hideOverlay();
         this._updateStatus(label, "Fight");
         this.audio.play("start");
         this._log.add("전투가 자동으로 시작됩니다.");
