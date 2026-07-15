@@ -121,6 +121,7 @@ export class BattleApp {
         const self = this;
         this._bracket = Alpine.store("uiManager").requireComponent("tournamentBracket");
         this._overlay = Alpine.store("uiManager").requireComponent("gameOverlay");
+        this._huntingOverlay = Alpine.store("uiManager").requireComponent("huntingOverlay");
         this._panel = Alpine.store("uiManager").requireComponent("playerPanel");
         this._startBtn = Alpine.store("uiManager").requireComponent("startButton");
         this._log = Alpine.store("uiManager").requireComponent("battleLog");
@@ -144,10 +145,10 @@ export class BattleApp {
             lastOverlayState: null
         };
         {
-            const origSetHunting = this._overlay.setHuntingState;
-            this._overlay.setHuntingState = (data) => {
+            const originalSetHuntingState = this._huntingOverlay.setHuntingState;
+            this._huntingOverlay.setHuntingState = (data) => {
                 if (data) self.ui.lastOverlayState = { ...self.ui.lastOverlayState, ...data };
-                if (origSetHunting) origSetHunting.call(self._overlay, data);
+                originalSetHuntingState.call(self._huntingOverlay, data);
             };
         }
         this._bracket.render(null);
@@ -194,10 +195,10 @@ export class BattleApp {
         // huntingButton 제거됨 — 게임 모드 선택 카드로 통합
     }
     setHuntingOverlayState(data) {
-        this._overlay.setHuntingState(data);
+        this._huntingOverlay.setHuntingState(data);
     }
     resetHuntingUiState() {
-        this._overlay.reset();
+        this._huntingOverlay.reset();
     }
     resetGameplayUiState() {
         this._root.reset();
@@ -207,6 +208,7 @@ export class BattleApp {
         this._log.reset();
         this._strip.reset();
         this._bracket.reset();
+        this._overlay.reset();
         this.resetHuntingUiState();
         this._toast.reset();
     }
@@ -248,6 +250,12 @@ export class BattleApp {
     }
     showOverlay(label, text, subtext) {
         this._resultSequence = null;
+        if (this._gameMode === "hunting") {
+            this._overlay.hide();
+            this._huntingOverlay.show({ label, text, subtext });
+            return;
+        }
+        this._huntingOverlay.hide();
         this._overlay.show({ label, text, subtext });
     }
     presentResultSequence(steps) {
@@ -273,6 +281,7 @@ export class BattleApp {
         const presentation = getResultSequencePresentation(this._resultSequence);
         if (!presentation) return;
 
+        this._huntingOverlay.hide();
         this._overlay.show({
             label: presentation.label,
             text: presentation.text,

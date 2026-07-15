@@ -556,6 +556,98 @@ function makeHarness() {
     return { context, elements };
 }
 
+function createHuntingOverlayMock() {
+    return {
+        visible: false,
+        label: "",
+        text: "",
+        subtext: "",
+        huntingChoiceVisible: false,
+        huntingFloor: 1,
+        huntingCharacterName: "",
+        huntingLootSummary: "",
+        huntingCanRetreat: false,
+        huntingMoving: false,
+        huntingMoveFrom: 0,
+        huntingMoveTo: 0,
+        huntingMoveStep: 0,
+        huntingMoveMax: 10,
+        huntingMoveMessage: "",
+        huntingMerchantActive: false,
+        huntingMerchantOffers: null,
+        huntingMerchantResult: "",
+        huntingChestEventActive: false,
+        huntingChestRarity: "common",
+        huntingChestTitle: "",
+        huntingChestSubtext: "",
+        huntingChestConfirmLabel: "",
+        huntingEventActive: false,
+        huntingEventDetail: "",
+        huntingEventConfirmLabel: "",
+        huntingBattlePreparationActive: false,
+        huntingBattlePreparationItems: [],
+        huntingBattlePreparationHp: 0,
+        huntingBattlePreparationMaxHp: 0,
+        huntingBattlePreparationNotice: "",
+        huntingLootHudVisible: false,
+        huntingLootHudShards: 0,
+        huntingLootHudEnhancementStones: 0,
+        huntingLootHudChests: 0,
+        show({ label, text, subtext } = {}) {
+            if (label !== undefined) this.label = label;
+            if (text !== undefined) this.text = text;
+            if (subtext !== undefined) this.subtext = subtext;
+            this.visible = true;
+        },
+        hide() {
+            this.reset();
+        },
+        reset() {
+            this.visible = false;
+            this.label = "";
+            this.text = "";
+            this.subtext = "";
+            this.resetHuntingState();
+        },
+        resetHuntingState() {
+            this.huntingChoiceVisible = false;
+            this.huntingFloor = 1;
+            this.huntingCharacterName = "";
+            this.huntingLootSummary = "";
+            this.huntingCanRetreat = false;
+            this.huntingMoving = false;
+            this.huntingMoveFrom = 0;
+            this.huntingMoveTo = 0;
+            this.huntingMoveStep = 0;
+            this.huntingMoveMax = 10;
+            this.huntingMoveMessage = "";
+            this.huntingMerchantActive = false;
+            this.huntingMerchantOffers = null;
+            this.huntingMerchantResult = "";
+            this.huntingChestEventActive = false;
+            this.huntingChestRarity = "common";
+            this.huntingChestTitle = "";
+            this.huntingChestSubtext = "";
+            this.huntingChestConfirmLabel = "";
+            this.huntingEventActive = false;
+            this.huntingEventDetail = "";
+            this.huntingEventConfirmLabel = "";
+            this.huntingBattlePreparationActive = false;
+            this.huntingBattlePreparationItems = [];
+            this.huntingBattlePreparationHp = 0;
+            this.huntingBattlePreparationMaxHp = 0;
+            this.huntingBattlePreparationNotice = "";
+            this.huntingLootHudVisible = false;
+            this.huntingLootHudShards = 0;
+            this.huntingLootHudEnhancementStones = 0;
+            this.huntingLootHudChests = 0;
+        },
+        setHuntingState(data) {
+            if (data) Object.assign(this, data);
+        }
+    };
+}
+
 async function loadModuleApp() {
     const harness = makeHarness();
     Object.assign(globalThis, harness.context);
@@ -634,6 +726,9 @@ async function loadModuleApp() {
     };
     uiManager.register("gameOverlay", overlayMock);
     globalThis.Alpine.store("gameOverlay", overlayMock);
+    const huntingOverlayMock = createHuntingOverlayMock();
+    uiManager.register("huntingOverlay", huntingOverlayMock);
+    globalThis.Alpine.store("huntingOverlay", huntingOverlayMock);
     const xpRewardMock = {
         visible: false,
         characterName: "",
@@ -871,6 +966,8 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
         }
     };
     uiManager.register("gameOverlay", overlayMock2);
+    const huntingOverlayMock = createHuntingOverlayMock();
+    uiManager.register("huntingOverlay", huntingOverlayMock);
     uiManager.register("startButton", {
         hidden: true,
         disabledOverride: null,
@@ -1028,6 +1125,7 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
     };
     Object.assign(globalThis, harness.context);
     globalThis.Alpine.store("gameOverlay", overlayMock2);
+    globalThis.Alpine.store("huntingOverlay", huntingOverlayMock);
     const moduleUrl = new URL(`../src/app.js?test=${Date.now()}`, import.meta.url).href;
     const { BattleApp } = await import(moduleUrl);
     const app = new BattleApp();
@@ -5625,15 +5723,15 @@ function testHunting100FloorStructure() {
     assert.equal(HUNTING_EVENT_TYPES.BOON, "boon");
     assert.equal(HUNTING_EVENT_TYPES.MISHAP, "mishap");
 
-    // ── gameOverlay store default values ──
-    const overlayStore = Alpine.store("gameOverlay");
-    assert.equal(overlayStore.huntingCanRetreat, false, "gameOverlay huntingCanRetreat default should be false");
-    assert.equal(overlayStore.huntingMoving, false, "gameOverlay huntingMoving default should be false");
-    assert.equal(overlayStore.huntingMoveFrom, 0, "gameOverlay huntingMoveFrom default should be 0");
-    assert.equal(overlayStore.huntingMoveTo, 0, "gameOverlay huntingMoveTo default should be 0");
-    assert.equal(overlayStore.huntingMoveStep, 0, "gameOverlay huntingMoveStep default should be 0");
-    assert.equal(overlayStore.huntingMoveMax, 10, "gameOverlay huntingMoveMax default should be 10");
-    assert.equal(overlayStore.huntingMoveMessage, "", "gameOverlay huntingMoveMessage default should be empty");
+    // ── huntingOverlay store default values ──
+    const overlayStore = Alpine.store("huntingOverlay");
+    assert.equal(overlayStore.huntingCanRetreat, false, "huntingOverlay huntingCanRetreat default should be false");
+    assert.equal(overlayStore.huntingMoving, false, "huntingOverlay huntingMoving default should be false");
+    assert.equal(overlayStore.huntingMoveFrom, 0, "huntingOverlay huntingMoveFrom default should be 0");
+    assert.equal(overlayStore.huntingMoveTo, 0, "huntingOverlay huntingMoveTo default should be 0");
+    assert.equal(overlayStore.huntingMoveStep, 0, "huntingOverlay huntingMoveStep default should be 0");
+    assert.equal(overlayStore.huntingMoveMax, 10, "huntingOverlay huntingMoveMax default should be 10");
+    assert.equal(overlayStore.huntingMoveMessage, "", "huntingOverlay huntingMoveMessage default should be empty");
 
     console.log("[hunting-floors] ok");
 }
@@ -14934,13 +15032,13 @@ function testHuntingMerchantPurchaseRefreshesUiState() {
 }
 
 function testHuntingMerchantMobileScrollContract() {
-    const content = readFileSync("src/components/game-overlay.html", "utf8");
+    const content = readFileSync("src/components/hunting-overlay.html", "utf8");
     assert.ok(
         content.includes("'hunting-merchant-active': huntingMerchantActive"),
         "Overlay should expose a merchant-active class for the compact mobile layout"
     );
     assert.ok(
-        content.includes(":scope.hunting-merchant-active:not(.result-sequence-active) .overlay-card") &&
+        content.includes(":scope.hunting-merchant-active .hunting-overlay-card") &&
             content.includes("width: fit-content;") &&
             content.includes("max-width: 100%;"),
         "Merchant overlay card should use content width inside the shared fluid frame"
@@ -14964,7 +15062,7 @@ function testHuntingMerchantMobileScrollContract() {
 
 function testHuntingChestIconReuseContract() {
     const chestIcon = readFileSync("src/components/chest-icon.html", "utf8");
-    const overlay = readFileSync("src/components/game-overlay.html", "utf8");
+    const overlay = readFileSync("src/components/hunting-overlay.html", "utf8");
     const collectionHub = readFileSync("src/components/collection-hub.html", "utf8");
     assert.ok(chestIcon.includes('chest-icon[data-rarity="rare"]'), "Chest icon should own rarity color variants");
     assert.ok(overlay.includes("<chest-icon"), "Hunting chest event should render the shared chest icon");
@@ -15083,8 +15181,8 @@ function testPopupCloseOwnershipContract() {
 }
 
 function testHuntingOverlayResetContract() {
-    const content = readFileSync("src/components/game-overlay.html", "utf8");
-    assert.ok(content.includes("resetHuntingState()"), "Game overlay should expose an explicit hunting state reset");
+    const content = readFileSync("src/components/hunting-overlay.html", "utf8");
+    assert.ok(content.includes("resetHuntingState()"), "Hunting overlay should expose an explicit hunting state reset");
     assert.ok(content.includes("this.huntingFloor = 1;"), "Hunting reset should restore the first floor");
     assert.ok(content.includes('this.huntingCharacterName = "";'), "Hunting reset should clear the prior character");
     assert.ok(content.includes('this.huntingLootSummary = "";'), "Hunting reset should clear prior loot summary");
@@ -15101,6 +15199,7 @@ function testHuntingOverlayResetContract() {
 function testGameplayUiResetContracts() {
     const components = [
         ["src/components/game-overlay.html", "game overlay"],
+        ["src/components/hunting-overlay.html", "hunting overlay"],
         ["src/components/xp-reward-panel.html", "XP reward panel"],
         ["src/components/fighter-strip.html", "fighter strip"],
         ["src/components/tournament-bracket.html", "tournament bracket"],
@@ -15203,6 +15302,11 @@ function testResultConfirmationReturnsInitialState() {
                 calls.push(["bracket-reset"]);
             }
         },
+        _overlay: {
+            reset() {
+                calls.push(["result-overlay"]);
+            }
+        },
         resetHuntingUiState() {
             calls.push(["overlay"]);
         },
@@ -15250,6 +15354,7 @@ function testResultConfirmationReturnsInitialState() {
         ["log"],
         ["strip"],
         ["bracket-reset"],
+        ["result-overlay"],
         ["overlay"],
         ["toast"],
         ["setup"],
@@ -17149,6 +17254,7 @@ function testUiManagerGameActionBridgeContract() {
     );
     for (const path of [
         "src/components/game-overlay.html",
+        "src/components/hunting-overlay.html",
         "src/components/collection-hub.html",
         "src/components/mode-segment.html",
         "src/components/player-panel.html",
@@ -17247,6 +17353,7 @@ async function testUiManagerRequireComponentResolvesAll() {
     const app = await loadModuleApp();
     resolved.bracket = app._bracket !== undefined && app._bracket !== null;
     resolved.overlay = app._overlay !== undefined && app._overlay !== null;
+    resolved.huntingOverlay = app._huntingOverlay !== undefined && app._huntingOverlay !== null;
     resolved.panel = app._panel !== undefined && app._panel !== null;
     resolved.startBtn = app._startBtn !== undefined && app._startBtn !== null;
     resolved.log = app._log !== undefined && app._log !== null;
@@ -17262,8 +17369,30 @@ async function testUiManagerRequireComponentResolvesAll() {
             .map(([key]) => key);
         console.log(`[ui-manager-require-resolves-all] FAIL: missing ${missing.join(", ")}`);
     }
-    assert.ok(allResolved, "All 9 required UI components must be resolved at startup via uiManager.requireComponent");
+    assert.ok(allResolved, "All required UI components must be resolved at startup via uiManager.requireComponent");
     console.log("[ui-manager-require-resolves-all] ok");
+}
+
+async function testHuntingOverlayOwnsHuntingPresentation() {
+    const app = await loadModuleApp();
+    app._gameMode = "hunting";
+
+    app.showOverlay("사냥터", "전투 준비", "원정 소비품을 준비하세요");
+    app.setHuntingOverlayState({ huntingBattlePreparationActive: true });
+
+    assert.equal(app._overlay.visible, false, "Hunting presentation must not leave the result overlay visible");
+    assert.equal(app._huntingOverlay.visible, true, "Hunting presentation must open the hunting overlay");
+    assert.equal(
+        app._huntingOverlay.huntingBattlePreparationActive,
+        true,
+        "Hunting state must stay with the hunting overlay"
+    );
+
+    app.presentResultSequence([{ id: "summary", label: "사냥터", text: "원정 완료", subtext: "파편을 확보했습니다" }]);
+
+    assert.equal(app._huntingOverlay.visible, false, "Result presentation must close the hunting overlay first");
+    assert.equal(app._overlay.visible, true, "Result presentation must use the result overlay");
+    console.log("[hunting-overlay-presentation-ownership] ok");
 }
 
 async function testUiManagerRequireComponentMissingFails() {
@@ -17319,10 +17448,10 @@ async function testUiManagerRequireComponentNoRemainingGuards() {
     const productionLineErrors = [];
 
     const forbiddenPatterns = [
-        /if\s*\(\s*this\._(bracket|overlay|startBtn|log|strip|root|toast|modeSegment)\b/,
-        /if\s*\(\s*!this\._(bracket|overlay|startBtn|log|strip|root|toast|modeSegment)\b/,
+        /if\s*\(\s*this\._(bracket|overlay|huntingOverlay|startBtn|log|strip|root|toast|modeSegment)\b/,
+        /if\s*\(\s*!this\._(bracket|overlay|huntingOverlay|startBtn|log|strip|root|toast|modeSegment)\b/,
         /this\._panel\?\./,
-        /this\._(bracket|overlay|startBtn|log|strip|root|toast|modeSegment)\s*\?\./
+        /this\._(bracket|overlay|huntingOverlay|startBtn|log|strip|root|toast|modeSegment)\s*\?\./
     ];
 
     for (const pattern of forbiddenPatterns) {
@@ -17508,6 +17637,7 @@ function testNoWindowUiManagerInProduction() {
 }
 
 await testUiManagerRequireComponentResolvesAll();
+await testHuntingOverlayOwnsHuntingPresentation();
 await testUiManagerRequireComponentMissingFails();
 await testUiManagerRequireComponentNoRemainingGuards();
 await testCollectionHubServiceUsesUiManagerRequire();
@@ -17578,11 +17708,14 @@ await testAlpineTemplatesNoWindowUiManager();
 await testXpProgressBarUsesStoreUiManager();
 
 function testGameOverlayChestConfirmLabelContract() {
-    const content = readFileSync("src/components/game-overlay.html", "utf8");
-    assert.ok(content.includes("huntingChestConfirmLabel"), "game-overlay must define huntingChestConfirmLabel state");
+    const content = readFileSync("src/components/hunting-overlay.html", "utf8");
+    assert.ok(
+        content.includes("huntingChestConfirmLabel"),
+        "hunting-overlay must define huntingChestConfirmLabel state"
+    );
     assert.ok(
         content.includes('huntingChestConfirmLabel: ""'),
-        "game-overlay must initialize huntingChestConfirmLabel to empty string"
+        "hunting-overlay must initialize huntingChestConfirmLabel to empty string"
     );
     assert.ok(
         content.includes('this.huntingChestConfirmLabel = ""'),
@@ -17601,6 +17734,7 @@ function testGameOverlayChestConfirmLabelContract() {
 
 function testResultOverlayReservesConfirmActionSpace() {
     const overlay = readFileSync("src/components/game-overlay.html", "utf8");
+    const huntingOverlay = readFileSync("src/components/hunting-overlay.html", "utf8");
     const bridge = readFileSync("src/componentBridge.js", "utf8");
     assert.ok(
         overlay.includes('class="result-sequence-frame"') && overlay.includes('class="result-sequence-tab"'),
@@ -17665,8 +17799,8 @@ function testResultOverlayReservesConfirmActionSpace() {
         assert.ok(tabRight <= viewportWidth, "The entire side-tab touch target must remain inside the viewport");
     }
     const huntingFrameRule =
-        overlay.match(
-            /:scope\.hunting-merchant-active:not\(\.result-sequence-active\) \.result-sequence-frame,\s*:scope\.hunting-chest-active:not\(\.result-sequence-active\) \.result-sequence-frame,\s*:scope\.hunting-event-active:not\(\.result-sequence-active\) \.result-sequence-frame,\s*:scope\.hunting-battle-preparation-active:not\(\.result-sequence-active\) \.result-sequence-frame\s*\{([^}]*)\}/s
+        huntingOverlay.match(
+            /:scope\.hunting-merchant-active \.hunting-overlay-frame,\s*:scope\.hunting-chest-active \.hunting-overlay-frame,\s*:scope\.hunting-event-active \.hunting-overlay-frame,\s*:scope\.hunting-battle-preparation-active \.hunting-overlay-frame\s*\{([^}]*)\}/s
         )?.[1] ?? "";
     assert.match(
         huntingFrameRule,
@@ -17679,8 +17813,8 @@ function testResultOverlayReservesConfirmActionSpace() {
         "Standalone hunting frames must not use fixed container dimensions"
     );
     const huntingCardRule =
-        overlay.match(
-            /:scope\.hunting-merchant-active:not\(\.result-sequence-active\) \.overlay-card,\s*:scope\.hunting-chest-active:not\(\.result-sequence-active\) \.overlay-card,\s*:scope\.hunting-event-active:not\(\.result-sequence-active\) \.overlay-card,\s*:scope\.hunting-battle-preparation-active:not\(\.result-sequence-active\) \.overlay-card\s*\{([^}]*)\}/s
+        huntingOverlay.match(
+            /:scope\.hunting-merchant-active \.hunting-overlay-card,\s*:scope\.hunting-chest-active \.hunting-overlay-card,\s*:scope\.hunting-event-active \.hunting-overlay-card,\s*:scope\.hunting-battle-preparation-active \.hunting-overlay-card\s*\{([^}]*)\}/s
         )?.[1] ?? "";
     assert.match(
         huntingCardRule,
@@ -17739,9 +17873,9 @@ function testResultOverlayReservesConfirmActionSpace() {
 }
 
 function testHuntingEventResultOverlayContract() {
-    const overlay = readFileSync("src/components/game-overlay.html", "utf8");
+    const overlay = readFileSync("src/components/hunting-overlay.html", "utf8");
     const bridge = readFileSync("src/componentBridge.js", "utf8");
-    assert.ok(overlay.includes("huntingEventActive: false"), "game-overlay must initialize the event result state");
+    assert.ok(overlay.includes("huntingEventActive: false"), "hunting-overlay must initialize the event result state");
     assert.ok(overlay.includes("this.huntingEventActive = false"), "event result state must reset with hunting UI");
     assert.ok(
         overlay.includes("data.huntingEventDetail !== undefined"),
@@ -17759,11 +17893,11 @@ function testHuntingEventResultOverlayContract() {
 }
 
 function testHuntingBattlePreparationOverlayContract() {
-    const overlay = readFileSync("src/components/game-overlay.html", "utf8");
+    const overlay = readFileSync("src/components/hunting-overlay.html", "utf8");
     const bridge = readFileSync("src/componentBridge.js", "utf8");
     assert.ok(
         overlay.includes("huntingBattlePreparationActive: false"),
-        "game-overlay must initialize battle preparation state"
+        "hunting-overlay must initialize battle preparation state"
     );
     assert.ok(
         overlay.includes('class="hunting-battle-preparation"'),

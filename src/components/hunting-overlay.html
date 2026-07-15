@@ -1,0 +1,852 @@
+<div
+    class="hunting-overlay"
+    id="huntingOverlay"
+    x-data="huntingOverlay"
+    x-show="visible"
+    x-transition:enter="hunting-overlay-enter"
+    x-transition:enter-start="hunting-overlay-enter-start"
+    x-transition:enter-end="hunting-overlay-enter-end"
+    x-transition:leave="hunting-overlay-leave"
+    x-transition:leave-start="hunting-overlay-leave-start"
+    x-transition:leave-end="hunting-overlay-leave-end"
+    x-bind:class="{
+        'hunting-merchant-active': huntingMerchantActive,
+        'hunting-chest-active': huntingChestEventActive,
+        'hunting-event-active': huntingEventActive,
+        'hunting-battle-preparation-active': huntingBattlePreparationActive
+    }"
+>
+    <div class="hunting-overlay-frame">
+        <div class="hunting-overlay-card">
+            <span x-text="label">사냥터</span>
+            <strong x-text="text">원정 시작</strong>
+            <p x-show="subtext" x-text="subtext"></p>
+
+            <div class="hunting-route" x-show="huntingMoving">
+                <div class="hunting-route-head">
+                    <span x-text="huntingMoveFrom + 'F'"></span>
+                    <strong x-text="huntingMoveTo + 'F'"></strong>
+                </div>
+                <div class="hunting-route-track" aria-hidden="true">
+                    <i
+                        x-bind:style="'width:' + Math.min(100, Math.round(((huntingMoveStep || 0) / Math.max(1, huntingMoveMax || 10)) * 100)) + '%'"
+                    ></i>
+                </div>
+                <div class="hunting-route-foot">
+                    <span x-text="huntingMoveMessage"></span>
+                    <b x-text="(huntingMoveStep || 0) + '/' + (huntingMoveMax || 10)"></b>
+                </div>
+            </div>
+
+            <div class="hunting-choice" x-show="huntingChoiceVisible && !huntingMoving && !huntingMerchantActive">
+                <div class="hunting-choice-info">
+                    <span x-text="huntingLootSummary"></span>
+                </div>
+                <div class="hunting-choice-hint" x-show="huntingMoveMessage">
+                    <span x-text="huntingMoveMessage"></span>
+                </div>
+                <div class="hunting-choice-buttons">
+                    <button
+                        class="hunting-btn retreat"
+                        type="button"
+                        x-show="huntingCanRetreat"
+                        @click="huntingRetreat()"
+                    >
+                        포탈 귀환
+                    </button>
+                    <button class="hunting-btn advance" type="button" @click="huntingAdvance()">10층 전진</button>
+                </div>
+            </div>
+
+            <div class="hunting-merchant" x-show="huntingMerchantActive">
+                <div class="hunting-choice-info">
+                    <span x-text="huntingLootSummary"></span>
+                </div>
+                <p class="hunting-merchant-result" x-show="huntingMerchantResult" x-text="huntingMerchantResult"></p>
+                <div class="hunting-merchant-offers">
+                    <template x-for="(offer, idx) in (huntingMerchantOffers || [])" :key="offer.id">
+                        <button
+                            class="hunting-merchant-offer"
+                            type="button"
+                            x-bind:class="{ disabled: offer.purchased || offer.disabled }"
+                            x-bind:disabled="offer.purchased || offer.disabled"
+                            @click="huntingMerchantChoose(idx)"
+                        >
+                            <strong x-text="offer.label"></strong>
+                            <span class="offer-desc" x-text="offer.description"></span>
+                            <span
+                                class="offer-cost"
+                                x-text="offer.purchased ? '구매 완료' : (offer.disabled ? offer.disabledReason : offer.cost + ' 파편')"
+                            ></span>
+                        </button>
+                    </template>
+                </div>
+                <div class="hunting-merchant-pass">
+                    <button class="hunting-btn advance" type="button" @click="huntingMerchantPass()">계속 전진</button>
+                </div>
+            </div>
+
+            <div class="hunting-chest-event" x-show="huntingChestEventActive">
+                <chest-icon class="hunting-chest-token" x-bind:data-rarity="huntingChestRarity"></chest-icon>
+                <strong x-text="huntingChestTitle"></strong>
+                <span x-text="huntingChestSubtext"></span>
+                <span class="hunting-chest-loot" x-text="huntingLootSummary"></span>
+                <button
+                    class="hunting-btn advance"
+                    type="button"
+                    @click="huntingChestContinue()"
+                    x-text="huntingChestConfirmLabel || '계속 전진'"
+                ></button>
+            </div>
+
+            <div class="hunting-event-result" x-show="huntingEventActive">
+                <span>이벤트 결과</span>
+                <strong x-text="huntingEventDetail"></strong>
+                <button
+                    class="hunting-btn advance"
+                    type="button"
+                    @click="huntingEventContinue()"
+                    x-text="huntingEventConfirmLabel || '계속 전진'"
+                ></button>
+            </div>
+
+            <div class="hunting-battle-preparation" x-show="huntingBattlePreparationActive">
+                <div class="hunting-battle-preparation-hp">
+                    <div class="hunting-battle-preparation-hp-head">
+                        <span>현재 HP</span>
+                        <strong x-text="huntingBattlePreparationHp + ' / ' + huntingBattlePreparationMaxHp"></strong>
+                    </div>
+                    <div class="hunting-battle-preparation-hp-track" aria-hidden="true">
+                        <i
+                            x-bind:style="'width:' + Math.min(100, Math.round(((huntingBattlePreparationHp || 0) / Math.max(1, huntingBattlePreparationMaxHp || 1)) * 100)) + '%'"
+                        ></i>
+                    </div>
+                </div>
+                <p
+                    class="hunting-battle-preparation-notice"
+                    x-show="huntingBattlePreparationNotice"
+                    x-text="huntingBattlePreparationNotice"
+                ></p>
+                <div class="hunting-battle-preparation-items">
+                    <template x-for="item in (huntingBattlePreparationItems || [])" :key="item.id">
+                        <div class="hunting-battle-preparation-item">
+                            <div>
+                                <strong x-text="item.label"></strong>
+                                <span
+                                    x-text="'보유 ' + item.owned + ' · 원정 ' + item.usedInRun + '/' + item.useLimit"
+                                ></span>
+                            </div>
+                            <button
+                                class="hunting-btn potion"
+                                type="button"
+                                x-bind:disabled="!item.canUse"
+                                @click="huntingUsePreparationConsumable(item.id)"
+                                x-text="item.label + ' +' + item.healPercent + '%'"
+                            ></button>
+                        </div>
+                    </template>
+                </div>
+                <button
+                    class="hunting-btn advance hunting-battle-start"
+                    type="button"
+                    @click="huntingStartPreparedBattle()"
+                >
+                    전투 시작
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="hunting-loot-hud" x-show="huntingLootHudVisible">
+        <span class="hud-head">미확보 파편</span>
+        <span class="hud-body">
+            <span x-text="'파편 ' + huntingLootHudShards"></span>
+            <span
+                x-show="huntingLootHudEnhancementStones > 0"
+                x-text="' · 강화석 ' + huntingLootHudEnhancementStones"
+            ></span>
+            <span x-show="huntingLootHudChests > 0" x-text="' · 상자 ' + huntingLootHudChests"></span>
+        </span>
+    </div>
+</div>
+<script>
+    window.createGameUI("huntingOverlay", () => ({
+        visible: false,
+        label: "",
+        text: "",
+        subtext: "",
+        huntingChoiceVisible: false,
+        huntingFloor: 1,
+        huntingCharacterName: "",
+        huntingLootSummary: "",
+        huntingCanRetreat: false,
+        huntingMoving: false,
+        huntingMoveFrom: 0,
+        huntingMoveTo: 0,
+        huntingMoveStep: 0,
+        huntingMoveMax: 10,
+        huntingMoveMessage: "",
+        huntingMerchantActive: false,
+        huntingMerchantOffers: null,
+        huntingMerchantResult: "",
+        huntingChestEventActive: false,
+        huntingChestRarity: "common",
+        huntingChestTitle: "",
+        huntingChestSubtext: "",
+        huntingChestConfirmLabel: "",
+        huntingEventActive: false,
+        huntingEventDetail: "",
+        huntingEventConfirmLabel: "",
+        huntingBattlePreparationActive: false,
+        huntingBattlePreparationItems: [],
+        huntingBattlePreparationHp: 0,
+        huntingBattlePreparationMaxHp: 0,
+        huntingBattlePreparationNotice: "",
+        huntingLootHudVisible: false,
+        huntingLootHudShards: 0,
+        huntingLootHudEnhancementStones: 0,
+        huntingLootHudChests: 0,
+
+        huntingRetreat() {
+            Alpine.store("uiManager").invokeGameAction("huntingRetreat");
+        },
+        huntingAdvance() {
+            Alpine.store("uiManager").invokeGameAction("huntingAdvance");
+        },
+        huntingMerchantChoose(idx) {
+            Alpine.store("uiManager").invokeGameAction("huntingMerchantChoose", idx);
+        },
+        huntingMerchantPass() {
+            Alpine.store("uiManager").invokeGameAction("huntingMerchantPass");
+        },
+        huntingChestContinue() {
+            Alpine.store("uiManager").invokeGameAction("huntingChestContinue");
+        },
+        huntingEventContinue() {
+            Alpine.store("uiManager").invokeGameAction("huntingEventContinue");
+        },
+        huntingUsePreparationConsumable(consumableId) {
+            Alpine.store("uiManager").invokeGameAction("huntingUsePreparationConsumable", consumableId);
+        },
+        huntingStartPreparedBattle() {
+            Alpine.store("uiManager").invokeGameAction("huntingStartPreparedBattle");
+        },
+        show({ label, text, subtext = "" } = {}) {
+            this.visible = true;
+            this.label = label ?? "";
+            this.text = text ?? "";
+            this.subtext = subtext;
+        },
+        hide() {
+            this.reset();
+        },
+        reset() {
+            this.visible = false;
+            this.label = "";
+            this.text = "";
+            this.subtext = "";
+            this.resetHuntingState();
+        },
+        resetHuntingState() {
+            this.huntingChoiceVisible = false;
+            this.huntingFloor = 1;
+            this.huntingCharacterName = "";
+            this.huntingLootSummary = "";
+            this.huntingCanRetreat = false;
+            this.huntingMoving = false;
+            this.huntingMoveFrom = 0;
+            this.huntingMoveTo = 0;
+            this.huntingMoveStep = 0;
+            this.huntingMoveMax = 10;
+            this.huntingMoveMessage = "";
+            this.huntingMerchantActive = false;
+            this.huntingMerchantOffers = null;
+            this.huntingMerchantResult = "";
+            this.huntingChestEventActive = false;
+            this.huntingChestRarity = "common";
+            this.huntingChestTitle = "";
+            this.huntingChestSubtext = "";
+            this.huntingChestConfirmLabel = "";
+            this.huntingEventActive = false;
+            this.huntingEventDetail = "";
+            this.huntingEventConfirmLabel = "";
+            this.huntingBattlePreparationActive = false;
+            this.huntingBattlePreparationItems = [];
+            this.huntingBattlePreparationHp = 0;
+            this.huntingBattlePreparationMaxHp = 0;
+            this.huntingBattlePreparationNotice = "";
+            this.huntingLootHudVisible = false;
+            this.huntingLootHudShards = 0;
+            this.huntingLootHudEnhancementStones = 0;
+            this.huntingLootHudChests = 0;
+        },
+        setHuntingState(data) {
+            if (data.visible !== undefined) this.visible = data.visible;
+            if (data.label !== undefined) this.label = data.label;
+            if (data.text !== undefined) this.text = data.text;
+            if (data.subtext !== undefined) this.subtext = data.subtext;
+            if (data.huntingChoiceVisible !== undefined) this.huntingChoiceVisible = data.huntingChoiceVisible;
+            if (data.huntingFloor !== undefined) this.huntingFloor = data.huntingFloor;
+            if (data.huntingCharacterName !== undefined) this.huntingCharacterName = data.huntingCharacterName;
+            if (data.huntingLootSummary !== undefined) this.huntingLootSummary = data.huntingLootSummary;
+            if (data.huntingCanRetreat !== undefined) this.huntingCanRetreat = data.huntingCanRetreat;
+            if (data.huntingMoving !== undefined) this.huntingMoving = data.huntingMoving;
+            if (data.huntingMoveFrom !== undefined) this.huntingMoveFrom = data.huntingMoveFrom;
+            if (data.huntingMoveTo !== undefined) this.huntingMoveTo = data.huntingMoveTo;
+            if (data.huntingMoveStep !== undefined) this.huntingMoveStep = data.huntingMoveStep;
+            if (data.huntingMoveMax !== undefined) this.huntingMoveMax = data.huntingMoveMax;
+            if (data.huntingMoveMessage !== undefined) this.huntingMoveMessage = data.huntingMoveMessage;
+            if (data.huntingMerchantActive !== undefined) this.huntingMerchantActive = data.huntingMerchantActive;
+            if (data.huntingMerchantOffers !== undefined) this.huntingMerchantOffers = data.huntingMerchantOffers;
+            if (data.huntingMerchantResult !== undefined) this.huntingMerchantResult = data.huntingMerchantResult;
+            if (data.huntingChestEventActive !== undefined) this.huntingChestEventActive = data.huntingChestEventActive;
+            if (data.huntingChestRarity !== undefined) this.huntingChestRarity = data.huntingChestRarity;
+            if (data.huntingChestTitle !== undefined) this.huntingChestTitle = data.huntingChestTitle;
+            if (data.huntingChestSubtext !== undefined) this.huntingChestSubtext = data.huntingChestSubtext;
+            if (data.huntingChestConfirmLabel !== undefined)
+                this.huntingChestConfirmLabel = data.huntingChestConfirmLabel;
+            if (data.huntingEventActive !== undefined) this.huntingEventActive = data.huntingEventActive;
+            if (data.huntingEventDetail !== undefined) this.huntingEventDetail = data.huntingEventDetail;
+            if (data.huntingEventConfirmLabel !== undefined)
+                this.huntingEventConfirmLabel = data.huntingEventConfirmLabel;
+            if (data.huntingBattlePreparationActive !== undefined)
+                this.huntingBattlePreparationActive = data.huntingBattlePreparationActive;
+            if (data.huntingBattlePreparationItems !== undefined)
+                this.huntingBattlePreparationItems = data.huntingBattlePreparationItems;
+            if (data.huntingBattlePreparationHp !== undefined)
+                this.huntingBattlePreparationHp = data.huntingBattlePreparationHp;
+            if (data.huntingBattlePreparationMaxHp !== undefined)
+                this.huntingBattlePreparationMaxHp = data.huntingBattlePreparationMaxHp;
+            if (data.huntingBattlePreparationNotice !== undefined)
+                this.huntingBattlePreparationNotice = data.huntingBattlePreparationNotice;
+            if (data.huntingLootHudVisible !== undefined) this.huntingLootHudVisible = data.huntingLootHudVisible;
+            if (data.huntingLootHudShards !== undefined) this.huntingLootHudShards = data.huntingLootHudShards;
+            if (data.huntingLootHudEnhancementStones !== undefined)
+                this.huntingLootHudEnhancementStones = data.huntingLootHudEnhancementStones;
+            if (data.huntingLootHudChests !== undefined) this.huntingLootHudChests = data.huntingLootHudChests;
+        }
+    }));
+</script>
+<style scoped>
+    :scope {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        background: #eeeeee;
+    }
+
+    .hunting-overlay-enter {
+        transition: opacity 400ms ease;
+    }
+    .hunting-overlay-enter-start {
+        opacity: 0;
+    }
+    .hunting-overlay-enter-end {
+        opacity: 1;
+    }
+    .hunting-overlay-leave {
+        transition: opacity 300ms ease;
+    }
+    .hunting-overlay-leave-start {
+        opacity: 1;
+    }
+    .hunting-overlay-leave-end {
+        opacity: 0;
+    }
+
+    .hunting-overlay-card {
+        padding: 28px 32px;
+        text-align: center;
+    }
+
+    .hunting-overlay-card > span {
+        display: block;
+        margin-bottom: 14px;
+        color: #111111;
+        font-size: 0.82rem;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+    }
+
+    .hunting-overlay-card > strong {
+        display: block;
+        color: #111111;
+        font-size: clamp(2rem, 8vw, 3.4rem);
+        letter-spacing: -0.05em;
+    }
+
+    .hunting-overlay-card > p {
+        margin: 12px 0 0;
+        color: #202020;
+    }
+
+    .hunting-btn {
+        border: 2px solid #202020;
+        border-radius: 8px;
+        padding: 8px 16px;
+        background: #ffffff;
+        font-family: inherit;
+        font-size: 0.82rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 0.1s;
+    }
+
+    .hunting-btn:hover {
+        background: #eeeeee;
+    }
+
+    .hunting-btn.retreat {
+        border-color: #888888;
+    }
+
+    .hunting-btn.advance {
+        border-color: #d4a017;
+    }
+
+    .hunting-route {
+        min-width: min(320px, 72vw);
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px solid #e0e0e0;
+    }
+
+    .hunting-route-head,
+    .hunting-route-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        color: #333333;
+        font-size: 0.75rem;
+        font-weight: 900;
+    }
+
+    .hunting-route-head strong {
+        display: inline;
+        font-size: 1rem;
+        letter-spacing: 0;
+    }
+
+    .hunting-route-track {
+        height: 8px;
+        margin: 8px 0;
+        overflow: hidden;
+        border: 2px solid #202020;
+        background: #ffffff;
+    }
+
+    .hunting-route-track i {
+        display: block;
+        width: 0;
+        height: 100%;
+        background: #d4a017;
+        transition: width 240ms ease;
+    }
+
+    .hunting-route-foot span {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .hunting-route-foot b {
+        flex: 0 0 auto;
+    }
+
+    .hunting-choice,
+    .hunting-merchant {
+        margin-top: 12px;
+        padding-top: 10px;
+        border-top: 1px solid #e0e0e0;
+    }
+
+    .hunting-choice-info {
+        margin-bottom: 8px;
+        color: #555555;
+        font-size: 0.75rem;
+        text-align: center;
+    }
+
+    .hunting-choice-hint {
+        margin-bottom: 8px;
+        color: #d4a017;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-align: center;
+    }
+
+    .hunting-choice-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        pointer-events: auto;
+    }
+
+    .hunting-choice-buttons button {
+        flex: 1;
+        max-width: 140px;
+    }
+
+    :scope.hunting-merchant-active .hunting-merchant {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        min-height: 0;
+    }
+
+    :scope.hunting-merchant-active .hunting-overlay-frame,
+    :scope.hunting-chest-active .hunting-overlay-frame,
+    :scope.hunting-event-active .hunting-overlay-frame,
+    :scope.hunting-battle-preparation-active .hunting-overlay-frame {
+        width: 100%;
+        height: 100%;
+        display: grid;
+        place-items: center;
+    }
+
+    :scope.hunting-merchant-active .hunting-overlay-card,
+    :scope.hunting-chest-active .hunting-overlay-card,
+    :scope.hunting-event-active .hunting-overlay-card,
+    :scope.hunting-battle-preparation-active .hunting-overlay-card {
+        width: fit-content;
+        max-width: 100%;
+        max-height: 100%;
+        box-sizing: border-box;
+    }
+
+    :scope.hunting-merchant-active .hunting-overlay-card {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        padding: 12px 14px;
+        overflow: hidden;
+        pointer-events: auto;
+    }
+
+    :scope.hunting-merchant-active .hunting-overlay-card > strong {
+        font-size: clamp(1.3rem, 6vw, 2rem);
+    }
+
+    :scope.hunting-chest-active .hunting-overlay-card,
+    :scope.hunting-event-active .hunting-overlay-card,
+    :scope.hunting-battle-preparation-active .hunting-overlay-card {
+        padding: 18px 22px;
+        pointer-events: auto;
+    }
+
+    .hunting-chest-event,
+    .hunting-event-result {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        pointer-events: auto;
+    }
+
+    .hunting-chest-event {
+        gap: 8px;
+        margin-top: 12px;
+    }
+
+    .hunting-chest-event > strong {
+        color: #202020;
+        font-size: 1.2rem;
+        letter-spacing: 0;
+    }
+
+    .hunting-chest-event > span {
+        color: #555555;
+        font-size: 0.76rem;
+        text-align: center;
+    }
+
+    .hunting-chest-event .hunting-chest-loot {
+        color: #8a6500;
+        font-weight: 700;
+    }
+
+    .hunting-chest-event .hunting-btn {
+        margin-top: 4px;
+    }
+
+    .hunting-event-result {
+        gap: 10px;
+        margin-top: 14px;
+        padding: 14px 0 0;
+        border-top: 1px solid #e0e0e0;
+    }
+
+    .hunting-event-result > span {
+        margin: 0;
+        color: #8a6500;
+        font-size: 0.7rem;
+        letter-spacing: 0.12em;
+    }
+
+    .hunting-event-result > strong {
+        color: #202020;
+        font-size: 1.1rem;
+        letter-spacing: 0;
+    }
+
+    .hunting-battle-preparation {
+        display: grid;
+        gap: 10px;
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 1px solid #e0e0e0;
+        pointer-events: auto;
+    }
+
+    .hunting-battle-preparation-hp-head,
+    .hunting-battle-preparation-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+    }
+
+    .hunting-battle-preparation-hp-head span,
+    .hunting-battle-preparation-item span {
+        margin: 0;
+        color: #555555;
+        font-size: 0.72rem;
+        letter-spacing: 0;
+        text-transform: none;
+    }
+
+    .hunting-battle-preparation-hp-head strong,
+    .hunting-battle-preparation-item strong {
+        color: #202020;
+        font-size: 0.9rem;
+        letter-spacing: 0;
+    }
+
+    .hunting-battle-preparation-hp-track {
+        height: 10px;
+        margin-top: 6px;
+        overflow: hidden;
+        border: 2px solid #202020;
+        background: #ffffff;
+    }
+
+    .hunting-battle-preparation-hp-track i {
+        display: block;
+        width: 0;
+        height: 100%;
+        background: #38a169;
+        transition: width 260ms ease;
+    }
+
+    .hunting-battle-preparation-notice {
+        margin: 0;
+        color: #16803d;
+        font-size: 0.76rem;
+        font-weight: 700;
+    }
+
+    .hunting-battle-preparation-items {
+        display: grid;
+        gap: 8px;
+    }
+
+    .hunting-battle-preparation-item {
+        padding: 10px;
+        border: 2px solid #202020;
+        border-radius: 8px;
+        text-align: left;
+    }
+
+    .hunting-battle-preparation-item > div {
+        display: grid;
+        gap: 3px;
+    }
+
+    .hunting-btn.potion {
+        border-color: #38a169;
+        color: #176b38;
+    }
+
+    .hunting-btn.potion:disabled {
+        border-color: #aaaaaa;
+        color: #888888;
+        cursor: not-allowed;
+    }
+
+    .hunting-battle-start {
+        width: 100%;
+    }
+
+    .hunting-chest-token {
+        margin: 4px 0 8px;
+        animation: hunting-chest-land 340ms cubic-bezier(0.2, 0.85, 0.35, 1.25) both;
+    }
+
+    @keyframes hunting-chest-land {
+        from {
+            opacity: 0;
+            transform: translateY(-20px) scale(0.82);
+        }
+        70% {
+            transform: translateY(3px) scale(1.06);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    .hunting-merchant .hunting-choice-info span,
+    .hunting-merchant-offer .offer-desc,
+    .hunting-merchant-offer .offer-cost {
+        margin-bottom: 0;
+        letter-spacing: 0;
+        text-transform: none;
+    }
+
+    .hunting-merchant-result {
+        margin: 0 0 8px;
+        color: #8a6500;
+        font-size: 0.76rem;
+        font-weight: 700;
+        text-align: center;
+    }
+
+    .hunting-merchant-offers {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        gap: 6px;
+        min-height: 0;
+        margin-top: 8px;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        pointer-events: auto;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-y;
+    }
+
+    .hunting-merchant-offer {
+        display: flex;
+        flex: 0 0 auto;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        width: 100%;
+        min-height: 76px;
+        padding: 8px 12px;
+        border: 2px solid #202020;
+        border-radius: 8px;
+        background: #ffffff;
+        font-family: inherit;
+        font-size: 0.82rem;
+        cursor: pointer;
+        transition: background 0.1s;
+    }
+
+    .hunting-merchant-offer:hover {
+        background: #eeeeee;
+    }
+
+    .hunting-merchant-offer.disabled {
+        border-color: #cccccc;
+        opacity: 0.5;
+        cursor: default;
+    }
+
+    .hunting-merchant-offer strong {
+        font-size: 0.85rem;
+    }
+
+    .hunting-merchant-offer .offer-desc {
+        color: #555555;
+        font-size: 0.72rem;
+        overflow-wrap: anywhere;
+    }
+
+    .hunting-merchant-offer .offer-cost {
+        color: #d4a017;
+        font-size: 0.7rem;
+        font-weight: 700;
+    }
+
+    .hunting-merchant-offer.disabled .offer-cost {
+        color: #888888;
+    }
+
+    .hunting-merchant-pass {
+        flex: 0 0 auto;
+        margin-top: 8px;
+        pointer-events: auto;
+        text-align: center;
+    }
+
+    .hunting-loot-hud {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 2px;
+        max-width: min(200px, 40vw);
+        padding: 6px 10px;
+        border: 1px solid #cccccc;
+        border-radius: 6px;
+        background: rgba(238, 238, 238, 0.92);
+        pointer-events: none;
+    }
+
+    .hunting-loot-hud .hud-head {
+        color: #888888;
+        font-size: 0.62rem;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .hunting-loot-hud .hud-body {
+        overflow: hidden;
+        color: #333333;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    @media (max-width: 600px) {
+        .hunting-loot-hud {
+            top: 4px;
+            right: 4px;
+            max-width: min(160px, 36vw);
+            padding: 4px 8px;
+        }
+        .hunting-loot-hud .hud-head {
+            font-size: 0.55rem;
+        }
+        .hunting-loot-hud .hud-body {
+            font-size: 0.65rem;
+        }
+        :scope.hunting-chest-active .hunting-overlay-card {
+            padding: 14px 16px;
+        }
+        .hunting-chest-token {
+            --chest-icon-scale: 0.9;
+            margin: -2px 0 0;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .hunting-chest-token {
+            animation: none;
+        }
+    }
+</style>
