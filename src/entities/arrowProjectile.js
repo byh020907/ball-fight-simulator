@@ -6,6 +6,7 @@ export class ArrowProjectile extends Projectile {
         this.life = 1.55;
         this.angle = 0;
         this.onResult = options.onResult ?? null;
+        this.critBoostOverride = options.critBoostOverride ?? null;
         this.syncFacingToVelocity();
     }
 
@@ -43,6 +44,18 @@ export class ArrowProjectile extends Projectile {
 
     _onExpired(simulation) {
         this.onResult?.(false);
+    }
+
+    dealDamageToTarget(target, rawDamage, source, label, simulation) {
+        if (this.critBoostOverride && source) {
+            source._tempCritMultiplier = this.critBoostOverride;
+        }
+        const final =
+            target.actionContext?.onProjectileDamage?.(rawDamage, this, source, label, simulation, target) ?? rawDamage;
+        target.takeDamage(final, source, label);
+        if (source) {
+            source._tempCritMultiplier = null;
+        }
     }
 
     draw(ctx) {

@@ -7,6 +7,7 @@ import {
     SlashTrail,
     VisualBurst,
     DamageNumber,
+    CriticalNumber,
     ActionText,
     ActionWindowEffect,
     ActionSuccessEffect,
@@ -62,18 +63,23 @@ export class Simulation {
     keepInsideArena(ball) {
         const xBounce = this._reflectX(ball);
         const yBounce = this._reflectY(ball);
-        const terrainCollision = resolveTerrainCollisions(ball, this.terrain);
-        if (!xBounce && !yBounce && !terrainCollision) return;
+        const terrainResult = resolveTerrainCollisions(ball, this.terrain);
+        if (!xBounce && !yBounce && !terrainResult) return;
 
         ball.bounced = true;
         if (xBounce || yBounce) {
-            ball.applyWallBounceBoost?.(xBounce, yBounce);
-            ball.state.wallSlam?.onWallBounce(ball, xBounce ?? yBounce, this);
+            const normal = xBounce ?? yBounce;
+            ball.applyWallBounceBoost?.(normal);
+            ball.state.wallSlam?.onWallBounce(ball, normal, this);
+        }
+        if (terrainResult) {
+            ball.state.wallSlam?.onTerrainCollision(ball, terrainResult.normal, this, terrainResult.contactPoint);
         }
         this.notifyFighterStaticCollision?.(ball, {
             wall: Boolean(xBounce || yBounce),
-            terrain: terrainCollision,
-            normal: xBounce ?? yBounce ?? null
+            terrain: Boolean(terrainResult),
+            normal: xBounce ?? yBounce ?? terrainResult?.normal ?? null,
+            contactPoint: terrainResult?.contactPoint ?? null
         });
     }
 
@@ -296,6 +302,11 @@ export class Simulation {
     spawnDamageNumber(position, amount, color = "#ff3333") {
         if (!this.showDamageNumbers) return;
         this.entities.push(new DamageNumber(position, amount, color));
+    }
+
+    spawnCriticalNumber(position, amount) {
+        if (!this.showDamageNumbers) return;
+        this.entities.push(new CriticalNumber(position, amount));
     }
 
     spawnActionText(position, text, color = "#ffffff") {

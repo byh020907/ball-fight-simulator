@@ -42,6 +42,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             baseSkill: spec.stats.skill ?? 0,
             baseRadius: spec.stats.radius,
             mass: spec.stats.mass,
+            criticalChance: 5,
             allocation: spec.statAllocation ?? null
         };
         // PhysicsBody 프로퍼티 초기화
@@ -99,6 +100,8 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         this.mass *= this.equipmentEffects.massMultiplier;
         this.stats.mass = this.mass;
         this._equipmentEffectCooldowns = { hpSteal: 0 };
+        this._igniteState = null;
+        this._tempCritMultiplier = null;
         this.mastery = {
             physics: spec.mastery?.physics ?? {
                 velocityRecoveryBonus: 0,
@@ -310,6 +313,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         this.state.slow = null;
         this.state.swallowed = null;
         this.state.wallSlam = null;
+        this._igniteState = null;
     }
 
     destroyForResult() {
@@ -466,7 +470,26 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         for (const type of Object.keys(this._equipmentEffectCooldowns)) {
             this._equipmentEffectCooldowns[type] = Math.max(0, this._equipmentEffectCooldowns[type] - delta);
         }
+        this._tickIgnite(delta);
         this.actionContext.tickTimers(this, delta);
+    }
+
+    _tickIgnite(delta) {
+        const ignite = this._igniteState;
+        if (!ignite) return;
+        ignite.remaining -= delta;
+        if (ignite.remaining <= 0) {
+            this._igniteState = null;
+            return;
+        }
+        ignite.tickTimer += delta;
+        while (ignite.tickTimer >= ignite.tickInterval && ignite.tickIndex < 10) {
+            ignite.tickTimer -= ignite.tickInterval;
+            ignite.tickIndex++;
+            if (ignite.source && !ignite.source.flags.defeated) {
+                this.takeDamage(ignite.damagePerTick, ignite.source, "Ignite");
+            }
+        }
     }
 
     applySlow(duration, amount) {
@@ -474,8 +497,25 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         this.state.slow.amount = amount;
     }
 
+    getCriticalChance() {
+        return Math.max(0, Math.min(100, this.stats.criticalChance ?? 5));
+    }
+
+    rollCritical(attacker, critChanceOverride) {
+        if (!attacker || attacker === this) return false;
+        let critChance = critChanceOverride ?? attacker.getCriticalChance?.() ?? attacker.stats?.criticalChance ?? 5;
+        if (attacker._tempCritMultiplier) {
+            critChance = Math.min(100, critChance * attacker._tempCritMultiplier);
+        }
+        return Math.random() * 100 < critChance;
+    }
+
     takeDamage(amount, source, label = "Hit") {
         if (this.flags.defeated) return { actualDamage: 0 };
+        const isCritical = source && source !== this && this.rollCritical(source);
+        if (isCritical) {
+            amount = Math.round(amount * 2);
+        }
         const sim = source?.simulation ?? this.simulation;
         amount = sim?.modifyFighterCollisionDamage?.(amount, source, this, label) ?? amount;
         amount = this.actionContext.onDamageTaken(amount, source, label);
@@ -500,10 +540,16 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             sim?.playSound?.("hit", Math.min(1.8, 0.7 + actual / 18));
         }
         if (actual >= 1 && sim) {
-            sim.spawnDamageNumber(this.position.clone(), Math.round(actual), "#ff3333");
+            if (isCritical) {
+                sim.spawnCriticalNumber(this.position.clone(), Math.round(actual));
+            } else {
+                sim.spawnDamageNumber(this.position.clone(), Math.round(actual), "#ff3333");
+            }
         }
         if (actual >= 10) {
-            sim?.addLog?.(`${label} lands on ${this.name} for ${Math.round(actual)} damage.`);
+            sim?.addLog?.(
+                `${label} lands on ${this.name} for ${Math.round(actual)} damage${isCritical ? " (CRIT!)" : ""}.`
+            );
         }
         if (this.hp <= 0) {
             const s = source?.simulation ?? this.simulation;

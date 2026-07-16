@@ -1,4 +1,4 @@
-import { TimedEffect } from "./core.js";
+import { TimedEffect, Vector2 } from "./core.js";
 import { applyRotationalContactDamage } from "./physics/contactDamage.js";
 
 export class DashEffect {
@@ -63,12 +63,13 @@ export class DashEffect {
 }
 
 export class WallSlamEffect {
-    constructor({ source, damage, duration }) {
+    constructor({ source, damage, duration, onRupture = null }) {
         this.effect = new TimedEffect(duration);
         this.source = source;
         this.damage = damage;
         this.cooldown = 0;
         this.angularImpulseApplied = false;
+        this.onRupture = onRupture;
     }
 
     tick(ball, delta) {
@@ -78,21 +79,28 @@ export class WallSlamEffect {
         return this.effect.finished;
     }
 
-    onWallBounce(ball, normal, simulation) {
-        if (this.cooldown > 0) {
-            return;
-        }
+    onWallBounce(ball, normal, simulation, contactPoint) {
+        if (this.cooldown > 0) return;
 
         this.cooldown = 0.18;
         ball.takeDamage(this.damage, this.source, "Wall Slam");
-        simulation.spawnWallImpact(
-            ball.position.clone(),
-            normal ?? ball.velocity.clone().normalize().scale(-1),
-            this.source?.color ?? ball.color
-        );
-        simulation.playSound("wall", 1.15);
-        simulation.shakeScreen(0.24, 16);
+
+        if (this.onRupture) {
+            this.onRupture({ normal, contactPoint });
+        } else {
+            simulation.spawnWallImpact(
+                ball.position.clone(),
+                normal ?? ball.velocity.clone().normalize().scale(-1),
+                this.source?.color ?? ball.color
+            );
+            simulation.playSound("wall", 1.15);
+            simulation.shakeScreen(0.24, 16);
+        }
         simulation.addLog(`${ball.name} takes wall slam damage.`);
+    }
+
+    onTerrainCollision(ball, normal, simulation, contactPoint) {
+        this.onWallBounce(ball, normal, simulation, contactPoint);
     }
 
     _applyPhysicalAngularImpulse(ball) {

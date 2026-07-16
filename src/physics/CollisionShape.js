@@ -67,15 +67,14 @@ function pointInConvexPolygon(point, worldPoints) {
  * @returns {boolean}
  */
 export function resolvePolygonTerrainCollision(entity, terrain) {
-    if (!terrain || !terrain.blocking) return false;
+    if (!terrain || !terrain.blocking) return null;
     const worldPoints = getWorldPolygonPoints(terrain);
-    if (worldPoints.length < 3) return false;
+    if (worldPoints.length < 3) return null;
 
     const cx = entity.position.x;
     const cy = entity.position.y;
     const r = entity.radius ?? 0;
 
-    // 1. polygon 내부에 entity center가 완전히 들어갔는지 확인
     if (pointInConvexPolygon({ x: cx, y: cy }, worldPoints)) {
         const edgeResult = closestEdgeNormal(cx, cy, worldPoints);
         const overlap = r + edgeResult.distance;
@@ -90,10 +89,9 @@ export function resolvePolygonTerrainCollision(entity, terrain) {
         applyCollisionResponse(entity, normal, contactPoint, preVel, {
             surfaceMaterial: terrain.physicsMaterial ?? "wood"
         });
-        return true;
+        return { normal: new Vector2(normal.x, normal.y), contactPoint: new Vector2(contactPoint.x, contactPoint.y) };
     }
 
-    // 2. 각 edge에 대해 circle center와의 거리 검사
     let bestOverlap = -Infinity;
     let bestNx = 0;
     let bestNy = 0;
@@ -104,7 +102,6 @@ export function resolvePolygonTerrainCollision(entity, terrain) {
     for (let i = 0; i < n; i++) {
         const a = worldPoints[i];
         const b = worldPoints[(i + 1) % n];
-        // edge normal (polygon 바깥 방향 가정: CCW winding)
         const ex = b.x - a.x;
         const ey = b.y - a.y;
         const len = Math.sqrt(ex * ex + ey * ey);
@@ -112,7 +109,6 @@ export function resolvePolygonTerrainCollision(entity, terrain) {
         const nx = -ey / len;
         const ny = ex / len;
 
-        // circle center를 edge line에 projection
         const t = ((cx - a.x) * ex + (cy - a.y) * ey) / (len * len);
         const clampedT = Math.max(0, Math.min(1, t));
         const closestX = a.x + ex * clampedT;
@@ -132,9 +128,8 @@ export function resolvePolygonTerrainCollision(entity, terrain) {
         }
     }
 
-    if (bestOverlap <= 0) return false;
+    if (bestOverlap <= 0) return null;
 
-    // 밀어내기
     entity.position.x += bestNx * bestOverlap;
     entity.position.y += bestNy * bestOverlap;
 
@@ -144,7 +139,7 @@ export function resolvePolygonTerrainCollision(entity, terrain) {
     applyCollisionResponse(entity, normal, contactPoint, preVel, {
         surfaceMaterial: terrain.physicsMaterial ?? "wood"
     });
-    return true;
+    return { normal: new Vector2(normal.x, normal.y), contactPoint: new Vector2(contactPoint.x, contactPoint.y) };
 }
 
 function closestEdgeNormal(cx, cy, worldPoints) {

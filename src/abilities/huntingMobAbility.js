@@ -153,6 +153,7 @@ export class HuntingMobAbility extends Ability {
 
     _steer(delta, target) {
         if (this.behavior === "healer") return;
+        if (this.owner.state.movement || this.owner.state.swallowed) return;
         steerBallToward(this.owner, target, delta, {
             turnRate: this.behavior === "shooter" ? 3.2 : 7.4,
             persist: true
@@ -180,7 +181,7 @@ export class HuntingMobAbility extends Ability {
     }
 
     _hasRepositionBlocker() {
-        return Boolean(this.owner.state.movement || this.state.laser || this.state.link);
+        return Boolean(this.owner.state.movement || this.owner.state.swallowed || this.state.laser || this.state.link);
     }
 
     _getAdaptiveRepositionDirection(directionToTarget, config) {

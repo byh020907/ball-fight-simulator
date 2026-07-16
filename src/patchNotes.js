@@ -19,6 +19,41 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.26.0",
+        date: "2026-07-16",
+        title: "v0.26.0 Archer·Rage·Eater 레벨 보상과 공통 크리티컬",
+        changes: [
+            {
+                type: "feature",
+                text: "공통 크리티컬 스탯(criticalChance)이 추가되었습니다. 모든 볼/몹 기본 5%, 포인트당 +1%p, 적대 피해에 독립 판정, 원본 ×2 후 방어력 경로."
+            },
+            {
+                type: "feature",
+                text: "Archer Lv.3 예측 화살(점선 원), Lv.6 조준 -20%·70% 단발/30% 2발(0.12초 순차 재조준), Lv.9 50% 확률로 크리티컬 ×2."
+            },
+            {
+                type: "feature",
+                text: "Rage Lv.3 35%+ 점화(10틱 ×0.075), Lv.6 70%+ 폭발 ×1.5(120px), Lv.9 완충 여진 ×2.25(180px·넉백·3중 링)."
+            },
+            {
+                type: "feature",
+                text: "Eater Lv.3 삼킨 중 소화 6틱 ×0.12, Lv.6 뱉기 ×1.0 피해·속도 ×3·반동 420, Lv.9 첫 벽 파열 ×1.5+주변 ×0.75(150px 반원)."
+            },
+            {
+                type: "fix",
+                text: "모든 모드의 공통 장애물 충돌이 WallSlamEffect를 올바르게 발동하게 수정했습니다. Eater뿐 아니라 Bat Ball 등 기존 Wall Slam 사용자도 장애물에서 효과를 받습니다."
+            },
+            {
+                type: "fix",
+                text: "Eater가 뱉은 몹이 추적 AI에 방향을 빼앗기지 않게 수정했습니다. 이동/삼킴 상태에서는 조향을 건너뜁니다."
+            },
+            {
+                type: "fix",
+                text: "크리티컬 피해는 전용 큰 황금색 CRIT! 숫자로 표시됩니다. 자기 피해와 HP 비용은 크리티컬이 적용되지 않습니다."
+            }
+        ]
+    },
+    {
         version: "0.25.65",
         date: "2026-07-16",
         title: "v0.25.65 사냥터 층간 이동이 모바일 화면 안에 머뭅니다.",

@@ -93,13 +93,13 @@ export const REWARD_BALANCE = deepFreeze({
         characterLevelProgressions: {
             archer: [
                 { level: 2 },
-                { level: 3, abilityTier: 1, gameText: "예측 화살 속도 +15%" },
+                { level: 3, abilityTier: 1, gameText: "예측 화살 + 속도 15%" },
                 { level: 4 },
                 { level: 5 },
-                { level: 6, abilityTier: 2, gameText: "조준 시간 -20%" },
+                { level: 6, abilityTier: 2, gameText: "조준 -20% · 70% 단발 30% 2발" },
                 { level: 7 },
                 { level: 8 },
-                { level: 9, abilityTier: 3, gameText: "연사 화살 수 +1" },
+                { level: 9, abilityTier: 3, gameText: "50% 확률로 크리티컬 ×2" },
                 { level: 10 }
             ],
             orbit: [
@@ -152,13 +152,13 @@ export const REWARD_BALANCE = deepFreeze({
             ],
             rage: [
                 { level: 2 },
-                { level: 3, abilityTier: 1, gameText: "최대 충전 시간 -15%" },
+                { level: 3, abilityTier: 1, gameText: "35%+ 점화 (10틱 ×0.075)" },
                 { level: 4 },
                 { level: 5 },
-                { level: 6, abilityTier: 2, gameText: "최대 충돌 수치 +15%" },
+                { level: 6, abilityTier: 2, gameText: "70%+ 폭발 ×1.50 120px" },
                 { level: 7 },
                 { level: 8 },
-                { level: 9, abilityTier: 3, gameText: "충돌 후 충전량 20% 유지" },
+                { level: 9, abilityTier: 3, gameText: "100% 여진 ×2.25 180px" },
                 { level: 10 }
             ],
             spin: [
@@ -174,13 +174,13 @@ export const REWARD_BALANCE = deepFreeze({
             ],
             eater: [
                 { level: 2 },
-                { level: 3, abilityTier: 1, gameText: "삼킨 뒤 뱉기 대기 -25%" },
+                { level: 3, abilityTier: 1, gameText: "삼킨 중 소화 6틱 ×0.12" },
                 { level: 4 },
                 { level: 5 },
-                { level: 6, abilityTier: 2, gameText: "뱉은 대상 회전 충격 +50%" },
+                { level: 6, abilityTier: 2, gameText: "뱉기 ×1.0 피해 · 속도 ×3 · 반동" },
                 { level: 7 },
                 { level: 8 },
-                { level: 9, abilityTier: 3, gameText: "벽 압박 시간 +15%" },
+                { level: 9, abilityTier: 3, gameText: "첫 벽 충돌 파열 ×1.5+주변 ×0.75" },
                 { level: 10 }
             ],
             bat_ball: [
@@ -249,12 +249,7 @@ export const REWARD_BALANCE = deepFreeze({
         },
         abilityUpgrades: {
             archer: {
-                tiers: [
-                    {},
-                    { arrowSpeedMultiplier: 1.15 },
-                    { windupMultiplier: 0.8 },
-                    { burstShotCountMultiplier: 1.35 }
-                ]
+                tiers: [{}, { arrowSpeedMultiplier: 1.15 }, { windupMultiplier: 0.8 }, {}]
             },
             orbit: {
                 tiers: [
@@ -284,12 +279,7 @@ export const REWARD_BALANCE = deepFreeze({
                 ]
             },
             rage: {
-                tiers: [
-                    {},
-                    { maxChargeTimeMultiplier: 0.85 },
-                    { maxImpactMultiplier: 1.15 },
-                    { chargeRetentionRatio: 0.2 }
-                ]
+                tiers: [{}, {}, {}, {}]
             },
             spin: {
                 tiers: [
@@ -300,12 +290,7 @@ export const REWARD_BALANCE = deepFreeze({
                 ]
             },
             eater: {
-                tiers: [
-                    {},
-                    { swallowHoldDurationMultiplier: 0.75 },
-                    { spitAngularVelocityMultiplier: 1.5 },
-                    { wallSlamDurationMultiplier: 1.15 }
-                ]
+                tiers: [{}, {}, {}, {}]
             },
             bat_ball: {
                 tiers: [

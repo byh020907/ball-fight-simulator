@@ -1,12 +1,10 @@
 import { TERRAIN_SHAPES } from "./terrainConfig.js";
 import { applyCollisionResponse } from "../physics/collisionResponse.js";
 import { resolvePolygonTerrainCollision } from "../physics/CollisionShape.js";
+import { Vector2 } from "../core.js";
 
-/**
- * 원형 entity vs 원형 terrain 충돌 해결.
- */
 function resolveCircleTerrainCollision(entity, terrain) {
-    if (!Number.isFinite(terrain.x) || !Number.isFinite(terrain.y) || !Number.isFinite(terrain.radius)) return false;
+    if (!Number.isFinite(terrain.x) || !Number.isFinite(terrain.y) || !Number.isFinite(terrain.radius)) return null;
 
     const entityRadius = entity.radius ?? 0;
     const dx = entity.position.x - terrain.x;
@@ -14,7 +12,7 @@ function resolveCircleTerrainCollision(entity, terrain) {
     const dist = Math.sqrt(dx * dx + dy * dy);
 
     const minDist = entityRadius + terrain.radius;
-    if (dist >= minDist) return false;
+    if (dist >= minDist) return null;
 
     const nx = dist > 0 ? dx / dist : 1;
     const ny = dist > 0 ? dy / dist : 0;
@@ -33,29 +31,27 @@ function resolveCircleTerrainCollision(entity, terrain) {
         surfaceMaterial: "wood"
     });
 
-    return true;
+    return { normal: new Vector2(normal.x, normal.y), contactPoint: new Vector2(contactPoint.x, contactPoint.y) };
 }
 
-/**
- * shape dispatcher: entity vs terrain.
- */
 export function resolveTerrainCollision(entity, terrain) {
-    if (!terrain || !terrain.blocking) return false;
-    let collided = false;
+    if (!terrain || !terrain.blocking) return null;
+    let result = null;
     if (terrain.shape === TERRAIN_SHAPES.CIRCLE) {
-        collided = resolveCircleTerrainCollision(entity, terrain);
+        result = resolveCircleTerrainCollision(entity, terrain);
     } else if (terrain.shape === TERRAIN_SHAPES.POLYGON) {
-        collided = resolvePolygonTerrainCollision(entity, terrain);
+        result = resolvePolygonTerrainCollision(entity, terrain);
     }
-    if (collided) terrain.onTerrainCollision?.(entity);
-    return collided;
+    if (result) terrain.onTerrainCollision?.(entity);
+    return result;
 }
 
 export function resolveTerrainCollisions(entity, terrainList) {
-    if (!terrainList || terrainList.length === 0) return false;
-    let collided = false;
+    if (!terrainList || terrainList.length === 0) return null;
+    let lastResult = null;
     for (const terrain of terrainList) {
-        collided = resolveTerrainCollision(entity, terrain) || collided;
+        const result = resolveTerrainCollision(entity, terrain);
+        if (result) lastResult = result;
     }
-    return collided;
+    return lastResult;
 }

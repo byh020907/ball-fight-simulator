@@ -40,6 +40,12 @@ export class DamageNumber extends FloatingText {
     }
 }
 
+export class CriticalNumber extends FloatingText {
+    constructor(position, amount) {
+        super(position, -36, `CRIT! ${Math.round(amount)}`, "#ffdd00", 19, 1.1);
+    }
+}
+
 export class ActionText extends FloatingText {
     constructor(position, text, color) {
         super(position, -36, text, color, 13, 1.1);

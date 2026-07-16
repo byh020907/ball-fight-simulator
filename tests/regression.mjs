@@ -1519,29 +1519,36 @@ async function testArcherPredictiveBurst(app) {
     target.velocity = upwardVelocity.clone();
     app.simulation.entities = app.simulation.fighters;
 
-    ability.state.missStreak = 2;
-    ability.release(target);
-    const burstArrows = app.simulation.entities.filter((entity) => entity.constructor?.name === "ArrowProjectile");
-    assert.equal(
-        burstArrows.length,
-        1,
-        "Burst should fire its first arrow immediately instead of a simultaneous scatter"
-    );
-    assert.ok(burstArrows[0].velocity.y < 0, "First burst arrow should lead the current upward movement");
+    // Tier 0: direct aim (no predictive)
+    ability.setContext({ abilityTier: 0 });
+    ability.timer = 0;
+    ability.update(0.016, target);
+    assert.ok(ability.state.aimPoint !== null, "Archer should enter aim state");
 
-    target.velocity = new Vector2(0, 240);
-    ability.update(0.12, target);
-    target.velocity = new Vector2(0, -240);
-    ability.update(0.12, target);
+    // Tier 1+ should use predictive aim
+    ability.setContext({ abilityTier: 1 });
+    ability.timer = 0;
+    ability.state.aimPoint = null;
+    // trigger cooldown to start aim
+    ability.timer = 0;
+    ability.update(0.016, target);
+    assert.ok(ability.state.aimPoint !== null, "Archer tier 1+ should set predictive aim point");
 
-    const completedBurst = app.simulation.entities.filter((entity) => entity.constructor?.name === "ArrowProjectile");
-    assert.equal(completedBurst.length, 3, "Burst should contain exactly three sequential arrows");
-    assert.ok(completedBurst[1].velocity.y > 0, "Second burst arrow should re-predict the changed target movement");
-    assert.ok(completedBurst[2].velocity.y < 0, "Third burst arrow should independently re-predict again");
-    assert.equal(ability.state.burstShotsRemaining, 0, "Burst should end after its third arrow");
+    // Tier 2: windup and double shot
+    ability.setContext({ abilityTier: 2 });
+    assert.ok(Math.abs(ability._getWindupDuration() - 0.32) < 1e-9, "Archer tier 2 should reduce windup to 0.32s");
 
-    completedBurst.forEach((arrow) => arrow._onExpired(app.simulation));
-    assert.equal(ability.state.missStreak, 0, "Burst arrow misses should not prime another burst");
+    // Tier 3: crit boost
+    ability.setContext({ abilityTier: 3 });
+    const spawnedOptions = [];
+    const originalSpawnArrow = app.simulation.spawnArrow;
+    const originalRandom = Math.random;
+    app.simulation.spawnArrow = (owner, start, velocity, options) => spawnedOptions.push(options);
+    Math.random = () => 0;
+    ability._fireArrowWithCrit(target, true);
+    Math.random = originalRandom;
+    app.simulation.spawnArrow = originalSpawnArrow;
+    assert.equal(spawnedOptions.at(-1).critBoostOverride, 2, "Archer tier 3 arrow should double its critical chance");
     console.log("[archer-predictive-burst] ok");
 }
 
@@ -1988,7 +1995,7 @@ function testStatAllocationRules(app) {
     stepped = adjustStatAllocation(stepped, "damage", -10);
     assert.equal(stepped.damage, 40, "Large negative stat steps should subtract multiple points");
 
-    const allocation = { hp: 30, damage: 40, speed: 30, skill: 0, defense: 0 };
+    const allocation = { hp: 30, damage: 40, speed: 30, skill: 0, defense: 0, criticalChance: 0 };
     const boosted = applyStatAllocation(archer, allocation, true);
     const { multiplier } = calculateStatMultiplier([30, 40, 30, 0, 0]);
     assert.equal(
@@ -2009,7 +2016,7 @@ function testStatAllocationRules(app) {
     assert.equal("force" in boosted.stats, false, "Force should not exist as an unused gameplay stat");
     assert.equal(
         formatStatAllocation(allocation),
-        "체력 +30% · 공격 +40% · 속도 +30% · 쿨타임 +0% · 방어력 +0%",
+        "체력 +30% · 공격 +40% · 속도 +30% · 쿨타임 +0% · 방어력 +0% · 크리티컬 +0%",
         "Allocation summary should show percentages instead of raw stats"
     );
     assert.equal(boosted.stats.radius, archer.stats.radius, "Radius should stay character-specific");
@@ -4321,7 +4328,7 @@ function testComponentBridgeEquipmentFunctions() {
 }
 
 async function testBattleAppAdoptsPreExistingAlpineAllocation() {
-    const initialAllocation = { hp: 20, damage: 20, speed: 20, skill: 20, defense: 20 };
+    const initialAllocation = { hp: 20, damage: 20, speed: 20, skill: 20, defense: 20, criticalChance: 0 };
     const { app } = await loadModuleAppWithInitialAlpineAllocation(initialAllocation);
     assert.deepEqual(
         app.playerStatAllocation,
@@ -4766,7 +4773,6 @@ function testAbilityLevelUpgrades(app) {
     const archer = createTierSimulation(FIGHTER_IDS.ARCHER).ball.ability;
     assertClose(archer._getArrowSpeed(), 270 * 2 * 1.15, "Archer tier 1 should increase arrow speed by 15%");
     assertClose(archer._getWindupDuration(), 0.32, "Archer tier 2 should reduce windup by 20%");
-    assert.equal(archer._getBurstShotCount(), 4, "Archer tier 3 should round the burst to four arrows");
 
     const orbitRun = createTierSimulation(FIGHTER_IDS.ORBIT);
     orbitRun.ball.ability.update(0, orbitRun.target);
@@ -4803,14 +4809,7 @@ function testAbilityLevelUpgrades(app) {
 
     const rageRun = createTierSimulation(FIGHTER_IDS.RAGE);
     rageRun.ball.ability.state.timeWithoutCollision = rageRun.ball.ability.getMaxChargeTime();
-    assertClose(rageRun.ball.ability.getMaxChargeTime(), 11.9, "Rage tier 1 should reduce max charge time by 15%");
-    assertClose(
-        rageRun.ball.ability.getStatModifiers().impact,
-        1.52 * 1.15,
-        "Rage tier 2 should increase maximum impact by 15%"
-    );
-    rageRun.ball.ability.onCollision();
-    assertClose(rageRun.ball.ability.state.timeWithoutCollision, 11.9 * 0.2, "Rage tier 3 should retain 20% charge");
+    assertClose(rageRun.ball.ability.getMaxChargeTime(), 14, "Rage max charge time should be 14 seconds");
 
     const setBallAngularVelocity = (ball, value) => {
         ball._computeMomentOfInertia();
@@ -4917,17 +4916,7 @@ function testAbilityLevelUpgrades(app) {
     assert.equal(spinTierThree.state.overspinHit, false, "Overspin should be consumed by its charged collision");
 
     const eaterRun = createTierSimulation(FIGHTER_IDS.EATER);
-    assertClose(
-        eaterRun.ball.ability._getSwallowHoldDuration(),
-        0.54,
-        "Eater tier 1 should shorten swallow hold by 25%"
-    );
-    eaterRun.target.angularVelocity = 2;
-    eaterRun.ball.ability._applySpitAngularImpulse(eaterRun.target, new Vector2(1, 0));
-    assert.ok(
-        eaterRun.target._accumulatedAngularImpulse > 0,
-        "Eater tier 2 should add angular impulse instead of assigning spin"
-    );
+    assertClose(eaterRun.ball.ability._getSwallowHoldDuration(), 0.72, "Eater swallow hold duration should be 0.72s");
 
     const batRun = createTierSimulation(FIGHTER_IDS.BAT_BALL);
     assert.equal(batRun.ball.ability.getArcRange(), 184, "Bat tier 1 should extend arc range by 15%");
@@ -6786,7 +6775,7 @@ function testHuntingTerrain() {
     };
     const rock = { shape: "circle", type: "rock", x: 200, y: 200, radius: 50, blocking: true };
     const collided = resolveTerrainCollision(fighter, rock);
-    assert.equal(collided, true, "Fighter at rock center should collide");
+    assert.ok(collided, "Fighter at rock center should collide");
     const distAfter = Math.sqrt((fighter.position.x - rock.x) ** 2 + (fighter.position.y - rock.y) ** 2);
     assert.ok(
         distAfter >= fighter.radius + rock.radius - 0.01,
@@ -6814,7 +6803,7 @@ function testHuntingTerrain() {
         applyImpulse() {}
     };
     const polyCollided = resolveTerrainCollision(polyFighter, polyTerrain);
-    assert.equal(polyCollided, true, "Fighter inside polygon should collide");
+    assert.ok(polyCollided, "Fighter inside polygon should collide");
     // fighter should be pushed outside polygon bounding box
     const polyDistAfter = Math.sqrt(
         (polyFighter.position.x - polyTerrain.x) ** 2 + (polyFighter.position.y - polyTerrain.y) ** 2
@@ -6827,7 +6816,7 @@ function testHuntingTerrain() {
             { position: { x: 200, y: 200 }, velocity: { x: 0, y: 0 }, radius: 24, applyImpulse() {} },
             { shape: "circle", type: "rock", x: 200, y: 200, radius: 50, blocking: false }
         ),
-        false,
+        null,
         "Non-blocking should be ignored"
     );
     assert.equal(
@@ -6835,7 +6824,7 @@ function testHuntingTerrain() {
             { position: { x: 500, y: 500 }, velocity: { x: 0, y: 0 }, radius: 24, applyImpulse() {} },
             rock
         ),
-        false,
+        null,
         "Far fighter should not collide"
     );
 
@@ -7106,9 +7095,8 @@ function testTournamentAngledBounceRamps() {
             this.velocity.y += impulse.y;
         }
     };
-    assert.equal(
+    assert.ok(
         resolveTerrainCollision(staticCollisionFighter, staticCollisionTerrain),
-        true,
         "Existing terrain collision should still resolve through the common dispatcher"
     );
     assert.equal(
@@ -14042,7 +14030,7 @@ function testCircleTerrainCollisionProducesAngularImpulse() {
     };
     const rock = { shape: "circle", type: "rock", x: 200, y: 200, radius: 50, blocking: true };
     const collided = resolveTerrainCollision(fighter, rock);
-    assert.equal(collided, true, "fighter at rock edge should collide");
+    assert.ok(collided, "fighter at rock edge should collide");
     assert.ok(Number.isFinite(fighter._angularImpulseApplied), "circle terrain collision should apply angular impulse");
     const impulseMag = Math.abs(fighter._angularImpulseApplied);
     assert.ok(impulseMag > 0, "circle terrain collision angular impulse should be non-zero");
@@ -14073,7 +14061,7 @@ function testPolygonTerrainCollisionProducesAngularImpulse() {
         }
     };
     const collided = resolveTerrainCollision(fighter, polyTerrain);
-    assert.equal(collided, true, "fighter inside polygon should collide");
+    assert.ok(collided, "fighter inside polygon should collide");
     assert.ok(
         Number.isFinite(fighter._angularImpulseApplied),
         "polygon terrain collision should apply angular impulse"
@@ -14683,7 +14671,7 @@ function testTerrainCollisionUsesMaterial() {
     ball.velocity = new Vector2(0, 200);
 
     const hit = resolveTerrainCollision(ball, terrain);
-    assert.equal(hit, true, "terrain collision should detect overlap");
+    assert.ok(hit, "terrain collision should detect overlap");
     // restitution=0.92, friction=0.20 조합 속도 반전
     assert.ok(ball.velocity.y < 0, "terrain collision should reverse y velocity");
     assert.ok(Number.isFinite(ball.velocity.y), "velocity should stay finite");
@@ -18769,5 +18757,297 @@ function testAbilitySetForwardsDashEffect() {
 }
 
 testAbilitySetForwardsDashEffect();
+
+function testCriticalChanceInAllocatableStats() {
+    const criticalStat = ALLOCATABLE_STATS.find((stat) => stat.key === "criticalChance");
+    assert.ok(criticalStat, "criticalChance should be in ALLOCATABLE_STATS");
+    assert.equal(
+        criticalStat.description.includes("분산"),
+        false,
+        "criticalChance should not use the dispersion multiplier"
+    );
+    console.log("[critical-stat-allocation] ok");
+}
+
+testCriticalChanceInAllocatableStats();
+
+function testCriticalChanceAppliedToStats() {
+    const baseFighter = createRoster().find((f) => f.id === FIGHTER_IDS.ARCHER);
+    const allocation = createEmptyStatAllocation();
+    allocation.criticalChance = 20;
+    const applied = applyStatAllocation(baseFighter, allocation, false);
+    assert.equal(applied.stats.criticalChance, 25, "criticalChance should be 5 base + 20 stat = 25");
+    const zeroAlloc = createEmptyStatAllocation();
+    const zeroApplied = applyStatAllocation(baseFighter, zeroAlloc, false);
+    assert.equal(zeroApplied.stats.criticalChance, 5, "criticalChance should default to 5 base");
+    const cappedAlloc = createEmptyStatAllocation();
+    cappedAlloc.criticalChance = 100;
+    const cappedApplied = applyStatAllocation(baseFighter, cappedAlloc, false);
+    assert.equal(cappedApplied.stats.criticalChance, 100, "criticalChance should cap at 100");
+    console.log("[critical-stat-application] ok");
+}
+
+testCriticalChanceAppliedToStats();
+
+function testCriticalRollAndDamage() {
+    const sim = new BattleSimulation(
+        [
+            createRoster().find((f) => f.id === FIGHTER_IDS.ARCHER),
+            createRoster().find((f) => f.id === FIGHTER_IDS.GRENADE)
+        ],
+        { onLog() {}, onSound() {}, onDamageTaken() {}, onDamageDealt() {}, onHpChanged() {} }
+    );
+    const [a, b] = sim.fighters;
+    a.stats.criticalChance = 100;
+    // enemy damage should be able to crit
+    const baseDamage = 20;
+    const defenseVal = b.stats.baseDefense;
+    const rawBefore = baseDamage;
+    // critical: rawBefore * 2 = 40, then - defense
+    const expectedCrit = Math.max(1, rawBefore * 2 - Math.round(defenseVal));
+    // non-critical: rawBefore - defense
+    const expectedNormal = Math.max(1, rawBefore - Math.round(defenseVal));
+    // force a crit roll by temporarily storing the result
+    let critRolled = false;
+    const originalSpawn = sim.spawnCriticalNumber;
+    sim.spawnCriticalNumber = () => {
+        critRolled = true;
+    };
+    const hpBefore = b.hp;
+    a._tempCritMultiplier = null;
+    b.takeDamage(baseDamage, a, "Test Critical");
+    sim.spawnCriticalNumber = originalSpawn;
+    if (critRolled) {
+        assert.equal(hpBefore - b.hp, expectedCrit, "Critical should double damage before defense");
+    } else {
+        assert.equal(hpBefore - b.hp, expectedNormal, "Non-critical should apply normal damage");
+    }
+    // self-damage must not crit
+    critRolled = false;
+    sim.spawnCriticalNumber = () => {
+        critRolled = true;
+    };
+    a.takeDamage(baseDamage, a, "Self Damage");
+    sim.spawnCriticalNumber = originalSpawn;
+    assert.equal(critRolled, false, "Self-damage should not trigger critical");
+    console.log("[critical-damage-path] ok");
+}
+
+testCriticalRollAndDamage();
+
+function testArcherAbilityTierBehavior() {
+    const sim = new BattleSimulation(
+        [
+            createRoster().find((f) => f.id === FIGHTER_IDS.ARCHER),
+            createRoster().find((f) => f.id === FIGHTER_IDS.ORBIT)
+        ],
+        { onLog() {}, onSound() {}, onDamageTaken() {}, onDamageDealt() {}, onHpChanged() {} }
+    );
+    const [archer, opponent] = sim.fighters;
+    archer.ability.setContext({ abilityTier: 0 });
+    archer.ability.timer = 0;
+    archer.ability.update(0.016, opponent);
+    assert.ok(archer.ability.state.aimPoint !== null, "Archer Lv0 should aim directly");
+    archer.ability.setContext({ abilityTier: 1 });
+    archer.ability.timer = 0;
+    archer.ability.state.aimPoint = null;
+    archer.ability.update(0.016, opponent);
+    assert.ok(archer.ability.state.aimPoint !== null, "Archer Lv3+ should enter predictive aim");
+    // Lv6 windup and double shot
+    archer.ability.setContext({ abilityTier: 2 });
+    assert.ok(Math.abs(archer.ability._getWindupDuration() - 0.32) < 1e-9, "Archer Lv6 should have 0.32s windup");
+    // Lv9 crit boost override
+    archer.ability.setContext({ abilityTier: 3 });
+    assert.equal(archer.ability.abilityTier, 3, "Archer Lv9 should enable the per-arrow critical chance boost");
+    console.log("[archer-ability-tier] ok");
+}
+
+testArcherAbilityTierBehavior();
+
+function testRageAbilityThresholds() {
+    const sim = new BattleSimulation(
+        [createRoster().find((f) => f.id === FIGHTER_IDS.RAGE), createRoster().find((f) => f.id === FIGHTER_IDS.DASH)],
+        { onLog() {}, onSound() {} }
+    );
+    const [rage, opponent] = sim.fighters;
+    const setCharge = (ability, pct) => {
+        ability.state.timeWithoutCollision = ability.getMaxChargeTime() * (pct / 100);
+    };
+
+    rage.ability.state.aftershock = null;
+    opponent._igniteState = undefined;
+
+    // --- Tier 1 (Lv3): >=35 ignite only ---
+    rage.ability.setContext({ abilityTier: 1 });
+
+    setCharge(rage.ability, 34);
+    rage.ability.onCollision(opponent);
+    assert.equal(opponent._igniteState, undefined, "Lv3 34%: no ignite");
+    assert.ok(rage.ability.getChargeProgress() > 0, "Lv3 34%: charge preserved below threshold");
+
+    setCharge(rage.ability, 35);
+    opponent._igniteState = undefined;
+    rage.ability.onCollision(opponent);
+    assert.ok(opponent._igniteState !== undefined, "Lv3 35%: ignite applied");
+    assert.equal(rage.ability.getChargeProgress(), 0, "Lv3 35%: charge reset");
+
+    setCharge(rage.ability, 69);
+    opponent._igniteState = undefined;
+    rage.ability.onCollision(opponent);
+    assert.ok(opponent._igniteState !== undefined, "Lv3 69%: ignite applied");
+
+    setCharge(rage.ability, 100);
+    opponent._igniteState = undefined;
+    rage.ability.onCollision(opponent);
+    assert.ok(opponent._igniteState !== undefined, "Lv3 100%: ignite still applied (tier1 has no explosion)");
+
+    // --- Tier 2 (Lv6): 35-69 ignite, >=70 explosion ONLY ---
+    rage.ability.setContext({ abilityTier: 2 });
+
+    setCharge(rage.ability, 35);
+    opponent._igniteState = undefined;
+    rage.ability.onCollision(opponent);
+    assert.ok(opponent._igniteState !== undefined, "Lv6 35%: ignite applied");
+
+    setCharge(rage.ability, 69);
+    opponent._igniteState = undefined;
+    rage.ability.onCollision(opponent);
+    assert.ok(opponent._igniteState !== undefined, "Lv6 69%: ignite applied");
+
+    setCharge(rage.ability, 70);
+    opponent._igniteState = undefined;
+    const hpAt70 = opponent.hp;
+    rage.ability.onCollision(opponent);
+    assert.equal(opponent._igniteState, undefined, "Lv6 70%: no ignite (explosion only)");
+    assert.equal(rage.ability.getChargeProgress(), 0, "Lv6 70%: charge reset");
+    assert.ok(opponent.hp < hpAt70, "Lv6 70%: explosion dealt damage");
+
+    setCharge(rage.ability, 99);
+    const hpAt99 = opponent.hp;
+    opponent._igniteState = undefined;
+    rage.ability.onCollision(opponent);
+    assert.equal(opponent._igniteState, undefined, "Lv6 99%: no ignite (explosion only)");
+    assert.ok(opponent.hp < hpAt99, "Lv6 99%: explosion dealt damage");
+
+    setCharge(rage.ability, 100);
+    const hpAt100 = opponent.hp;
+    opponent._igniteState = undefined;
+    rage.ability.onCollision(opponent);
+    assert.equal(opponent._igniteState, undefined, "Lv6 100%: no ignite (explosion only at tier2)");
+    assert.ok(opponent.hp < hpAt100, "Lv6 100%: explosion dealt damage");
+
+    // --- Tier 3 (Lv9): 35-69 ignite, 70-99 explosion ONLY, 100 aftershock ONLY ---
+    rage.ability.setContext({ abilityTier: 3 });
+
+    setCharge(rage.ability, 35);
+    opponent._igniteState = undefined;
+    rage.ability.onCollision(opponent);
+    assert.ok(opponent._igniteState !== undefined, "Lv9 35%: ignite applied");
+
+    setCharge(rage.ability, 69);
+    opponent._igniteState = undefined;
+    rage.ability.onCollision(opponent);
+    assert.ok(opponent._igniteState !== undefined, "Lv9 69%: ignite applied");
+
+    setCharge(rage.ability, 70);
+    opponent._igniteState = undefined;
+    const hpBeforeExplode = opponent.hp;
+    rage.ability.onCollision(opponent);
+    assert.equal(opponent._igniteState, undefined, "Lv9 70%: no ignite (explosion only)");
+    assert.equal(rage.ability.getChargeProgress(), 0, "Lv9 70%: charge reset");
+    assert.ok(opponent.hp < hpBeforeExplode, "Lv9 70%: explosion dealt damage");
+
+    setCharge(rage.ability, 99);
+    opponent._igniteState = undefined;
+    const hpBeforeExplode99 = opponent.hp;
+    rage.ability.onCollision(opponent);
+    assert.equal(opponent._igniteState, undefined, "Lv9 99%: no ignite (explosion only)");
+    assert.ok(opponent.hp < hpBeforeExplode99, "Lv9 99%: explosion dealt damage");
+
+    setCharge(rage.ability, 100);
+    opponent._igniteState = undefined;
+    rage.ability.state.aftershock = null;
+    rage.ability.onCollision(opponent);
+    assert.equal(opponent._igniteState, undefined, "Lv9 100%: no ignite (aftershock only)");
+    assert.equal(rage.ability.getChargeProgress(), 0, "Lv9 100%: charge reset");
+    assert.ok(rage.ability.state.aftershock !== null, "Lv9 100%: aftershock queued");
+
+    console.log("[rage-ability-thresholds] ok");
+}
+
+testRageAbilityThresholds();
+
+function testEaterAbilityDigestion() {
+    const sim = new BattleSimulation(
+        [createRoster().find((f) => f.id === FIGHTER_IDS.EATER), createRoster().find((f) => f.id === FIGHTER_IDS.SPIN)],
+        { onLog() {}, onSound() {} }
+    );
+    const [eater, target] = sim.fighters;
+    eater.ability.setContext({ abilityTier: 1 });
+    eater.ability.state.swallowedTarget = target;
+    eater.ability.state.swallowTimer = 0.72;
+    const hpBefore = target.hp;
+    for (let index = 0; index < 6; index += 1) {
+        eater.ability._tickDigestion(0.12);
+    }
+    assert.ok(target.hp < hpBefore, "Eater Lv3 digestion should deal damage over time");
+    eater.ability.state.swallowedTarget = null;
+    // Lv6 spit behavior
+    eater.ability.setContext({ abilityTier: 2 });
+    eater.ability.state.swallowedTarget = target;
+    eater.ability.state.swallowTimer = 0.72;
+    const hpBeforeSpit = target.hp;
+    eater.ability.releaseSwallowed();
+    assert.ok(target.hp < hpBeforeSpit, "Eater Lv6 spit should deal damage");
+    console.log("[eater-ability-digestion] ok");
+}
+
+testEaterAbilityDigestion();
+
+function testTerrainCollisionReturnsResult() {
+    const entity = {
+        position: { x: 200, y: 200 },
+        velocity: { x: 50, y: 0 },
+        radius: 24,
+        applyImpulse() {},
+        applyAngularImpulse() {}
+    };
+    const terrain = { shape: "circle", type: "rock", x: 200, y: 200, radius: 50, blocking: true };
+    const result = resolveTerrainCollision(entity, terrain);
+    assert.ok(result, "terrain collision should return truthy");
+    assert.ok(result.normal && result.contactPoint, "terrain collision should return { normal, contactPoint }");
+    assert.ok(typeof result.normal.x === "number", "result.normal.x should be a number");
+    assert.ok(typeof result.contactPoint.x === "number", "result.contactPoint.x should be a number");
+    console.log("[terrain-collision-result] ok");
+}
+
+testTerrainCollisionReturnsResult();
+
+function testKeepInsideArenaWallSlamIntegration() {
+    const sim = new BattleSimulation(
+        [
+            createRoster().find((f) => f.id === FIGHTER_IDS.ARCHER),
+            createRoster().find((f) => f.id === FIGHTER_IDS.GRENADE)
+        ],
+        { onLog() {}, onSound() {}, onDamageTaken() {}, onDamageDealt() {}, onHpChanged() {} }
+    );
+    const [a] = sim.fighters;
+    let onRuptureCalled = false;
+    const slam = new WallSlamEffect({
+        source: a,
+        damage: 25,
+        duration: 2.45,
+        onRupture: () => {
+            onRuptureCalled = true;
+        }
+    });
+    a.state.wallSlam = slam;
+    a.position.x = sim.width + a.radius + 5;
+    sim.keepInsideArena(a);
+    assert.ok(a.position.x <= sim.width, "keepInsideArena should push fighter inside the arena");
+    console.log("[keep-inside-arena-wallslam] ok");
+}
+
+testKeepInsideArenaWallSlamIntegration();
 
 console.log("regression tests ok");

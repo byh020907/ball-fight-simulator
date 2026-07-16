@@ -11,6 +11,18 @@ const SPIT_MAX_DURATION = 2.45;
 const WALL_SLAM_DAMAGE = 25;
 const FEAST_HOMING_TURN_RATE = 3.5;
 
+const DIGEST_TICK_COUNT = 6;
+const DIGEST_TICK_INTERVAL = 0.12;
+const DIGEST_DAMAGE_PER_TICK = 0.12;
+
+const SPIT_LEVEL6_DAMAGE_MULT = 1.0;
+const SPIT_LEVEL6_SPEED_MULT = 3.0;
+const SPIT_LEVEL6_RECOIL = 420;
+
+const WALL_RUPTURE_RADIUS = 150;
+const WALL_RUPTURE_TARGET_MULT = 1.5;
+const WALL_RUPTURE_OTHER_MULT = 0.75;
+
 export class EaterAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation, 6.0);
@@ -21,7 +33,10 @@ export class EaterAbility extends Ability {
             swallowedTarget: null,
             swallowTimer: 0,
             spitDirection: new Vector2(1, 0),
-            hasEatenThisFeast: false
+            hasEatenThisFeast: false,
+            digestionTimer: 0,
+            digestionTick: 0,
+            lv9WallRuptureUsed: false
         };
         this.feastDuration = FEAST_DURATION;
     }
@@ -33,16 +48,15 @@ export class EaterAbility extends Ability {
     update(delta, target) {
         this.updateRadiusScale(delta);
 
-        // Update swallowed target position (runs even during feast)
         if (this.state.swallowedTarget) {
             this.state.swallowTimer -= delta;
             this.state.swallowedTarget.position = this.owner.position.clone();
+            this._tickDigestion(delta);
             if (this.state.swallowTimer <= 0 || this.state.swallowedTarget.flags.defeated) {
                 this.releaseSwallowed();
             }
         }
 
-        // Feast mode: home toward target + passive defense
         if (this.isFeasting()) {
             this.state.feastTimer = Math.max(0, this.state.feastTimer - delta);
             this.state.feastElapsed = Math.min(this.feastDuration, this.state.feastElapsed + delta);
@@ -68,7 +82,6 @@ export class EaterAbility extends Ability {
             return;
         }
 
-        // Cooldown timer only counts down when not feasting and not swallowing
         if (!this.state.swallowedTarget) {
             this.timer -= delta;
         }
@@ -78,9 +91,25 @@ export class EaterAbility extends Ability {
             this.state.feastTimer = this.feastDuration;
             this.state.feastElapsed = 0;
             this.state.hasEatenThisFeast = false;
+            this.state.lv9WallRuptureUsed = false;
             this.simulation.playSound("chomp", 0.8);
             this.simulation.spawnPulse(this.owner.position.clone(), this.owner.color);
             this.simulation.addLog(`${this.owner.name} enters feast mode.`);
+        }
+    }
+
+    _tickDigestion(delta) {
+        if (this.abilityTier < 1) return;
+        this.state.digestionTimer += delta;
+        while (this.state.digestionTimer >= DIGEST_TICK_INTERVAL && this.state.digestionTick < DIGEST_TICK_COUNT) {
+            this.state.digestionTimer -= DIGEST_TICK_INTERVAL;
+            const target = this.state.swallowedTarget;
+            if (target && !target.flags.defeated) {
+                const dmg = Math.round(this.owner.stats.baseDamage * DIGEST_DAMAGE_PER_TICK);
+                target.takeDamage(dmg, this.owner, "Digestion");
+                this.simulation.spawnPulse(target.position.clone(), "#ffffff");
+            }
+            this.state.digestionTick++;
         }
     }
 
@@ -107,6 +136,8 @@ export class EaterAbility extends Ability {
             this.owner.velocity.length() > 0
                 ? this.owner.velocity.clone().normalize()
                 : Vector2.subtract(target.position, this.owner.position).normalize();
+        this.state.digestionTimer = 0;
+        this.state.digestionTick = 0;
 
         target.state.swallowed = { owner: this.owner };
         target.clearDash();
@@ -126,11 +157,8 @@ export class EaterAbility extends Ability {
 
     releaseSwallowed() {
         const target = this.state.swallowedTarget;
-        if (!target) {
-            return;
-        }
+        if (!target) return;
 
-        // Reset cooldown timer after spitting
         this.timer = this.cooldown;
 
         if (target.flags.defeated) {
@@ -145,10 +173,21 @@ export class EaterAbility extends Ability {
             this.owner.position,
             direction.clone().scale(this.owner.radius + target.radius + 10)
         );
+
+        let spitSpeedMult = SPIT_SPEED_MULTIPLIER;
+        if (this.abilityTier >= 2) {
+            spitSpeedMult = SPIT_LEVEL6_SPEED_MULT;
+            const spitDmg = Math.round(this.owner.stats.baseDamage * SPIT_LEVEL6_DAMAGE_MULT);
+            target.takeDamage(spitDmg, this.owner, "Spit Impact");
+            const recoilDir = direction.clone().scale(-1);
+            this.owner.applyImpulse(recoilDir.scale(SPIT_LEVEL6_RECOIL));
+            this.simulation.spawnPulse(this.owner.position.clone(), "#ffffff");
+        }
+
         target.initiateDash(direction, {
-            duration: 2.45,
-            multiplier: 2,
-            speedOverride: target.stats.baseSpeed * 2,
+            duration: SPIT_MAX_DURATION,
+            multiplier: SPIT_DASH_MULTIPLIER,
+            speedOverride: target.stats.baseSpeed * spitSpeedMult,
             collisionLabel: "Spit Dash",
             showRing: false,
             noHeading: true
@@ -156,9 +195,9 @@ export class EaterAbility extends Ability {
         target.state.wallSlam = new WallSlamEffect({
             source: this.owner,
             damage: WALL_SLAM_DAMAGE,
-            duration: SPIT_MAX_DURATION * (this.getLevelUpgrade().wallSlamDurationMultiplier ?? 1)
+            duration: SPIT_MAX_DURATION,
+            onRupture: this.abilityTier >= 3 ? (collisionCtx) => this._onWallRupture(target, collisionCtx) : null
         });
-        this._applySpitAngularImpulse(target, direction);
         this.simulation.keepInsideArena(target);
         this.simulation.playSound("spit", 1.2);
         this.simulation.spawnSlash(this.owner.position.clone(), target.position.clone(), this.owner.color);
@@ -167,35 +206,80 @@ export class EaterAbility extends Ability {
         this.state.swallowedTarget = null;
     }
 
-    _getSwallowHoldDuration() {
-        return SWALLOW_HOLD_DURATION * (this.getLevelUpgrade().swallowHoldDurationMultiplier ?? 1);
+    _onWallRupture(target, collisionCtx) {
+        if (this.state.lv9WallRuptureUsed) return;
+        this.state.lv9WallRuptureUsed = true;
+
+        const contactPoint = collisionCtx?.contactPoint ?? target.position.clone();
+        const normal = collisionCtx?.normal ?? null;
+        const targetDmg = Math.round(this.owner.stats.baseDamage * WALL_RUPTURE_TARGET_MULT);
+        target.takeDamage(targetDmg, this.owner, "Wall Rupture");
+
+        const otherDmg = Math.round(this.owner.stats.baseDamage * WALL_RUPTURE_OTHER_MULT);
+        const enemies = this.simulation.getEnemiesOf(this.owner);
+        for (const enemy of enemies) {
+            if (enemy === target) continue;
+            const dist = Vector2.subtract(enemy.position, contactPoint).length();
+            if (dist <= WALL_RUPTURE_RADIUS) {
+                enemy.takeDamage(otherDmg, this.owner, "Wall Rupture");
+            }
+        }
+
+        this.simulation.shakeScreen(0.3, 20);
+        this.simulation.playSound("wall", 1.35);
+        this.simulation.playSound("explosion", 0.75);
+
+        if (normal) {
+            const perpDir = new Vector2(-normal.y, normal.x);
+            const semispherePts = [];
+            for (let i = 0; i <= 12; i++) {
+                const t = i / 12;
+                const angle = -Math.PI / 2 + Math.PI * t;
+                const dir = new Vector2(
+                    normal.x * Math.cos(angle) - perpDir.x * Math.sin(angle),
+                    normal.y * Math.cos(angle) - perpDir.y * Math.sin(angle)
+                );
+                const r = (WALL_RUPTURE_RADIUS * 0.28 * t) / 0.28;
+                semispherePts.push({
+                    x: contactPoint.x + dir.x * r,
+                    y: contactPoint.y + dir.y * r
+                });
+            }
+            for (const pt of semispherePts) {
+                this.simulation.spawnParticleBurst(pt, this.owner.color, {
+                    count: 2,
+                    speed: 60,
+                    radiusMin: 2,
+                    radiusMax: 4,
+                    life: 0.4,
+                    upBias: 0,
+                    gravity: 0
+                });
+            }
+        }
+
+        this.simulation.addLog(`${this.owner.name} triggers wall rupture!`);
     }
 
-    _applySpitAngularImpulse(target, direction) {
-        const multiplier = this.getLevelUpgrade().spitAngularVelocityMultiplier ?? 1;
-        if (multiplier <= 1 || target.rotationEnabled === false || typeof target.applyAngularImpulse !== "function")
-            return;
+    _getSwallowHoldDuration() {
+        return SWALLOW_HOLD_DURATION;
+    }
 
-        const radius = Math.max(1, target.radius ?? 1);
-        const currentAngularVelocity = target.angularVelocity ?? 0;
-        const fallbackAngularVelocity = (target.stats.baseSpeed * SPIT_SPEED_MULTIPLIER) / radius;
-        const directionSign = direction.x >= 0 ? 1 : -1;
-        const sourceAngularVelocity =
-            Math.abs(currentAngularVelocity) > 0.01 ? currentAngularVelocity : fallbackAngularVelocity * directionSign;
-        const angularVelocityDelta = sourceAngularVelocity * (multiplier - 1);
-        const inverseMoment = target._inverseMomentOfInertia;
-        const impulse =
-            Number.isFinite(inverseMoment) && inverseMoment > 0
-                ? angularVelocityDelta / inverseMoment
-                : angularVelocityDelta * 0.5 * (target.mass ?? 1) * radius ** 2;
+    updateRadiusScale(delta) {
+        const targetScale = this.state.swallowedTarget ? 1.5 : 1;
+        const smoothing = 1 - Math.exp(-delta * (targetScale > this.state.radiusScale ? 4.8 : 7.2));
+        this.state.radiusScale += (targetScale - this.state.radiusScale) * smoothing;
+        if (Math.abs(this.state.radiusScale - 1) < 0.01 && targetScale === 1) {
+            this.state.radiusScale = 1;
+        }
+    }
 
-        target.applyAngularImpulse(impulse);
+    getRadiusScale() {
+        return Math.max(1, Math.min(1.5, this.state.radiusScale));
     }
 
     draw(ctx) {
-        if (!this.isFeasting()) {
-            return;
-        }
+        if (!this.isFeasting()) return;
 
         const pos = this.owner.position;
         const r = this.owner.radius;
@@ -232,19 +316,6 @@ export class EaterAbility extends Ability {
 
     getMouthTarget() {
         return this.simulation.getOpponent(this.owner);
-    }
-
-    updateRadiusScale(delta) {
-        const targetScale = this.state.swallowedTarget ? 1.5 : 1;
-        const smoothing = 1 - Math.exp(-delta * (targetScale > this.state.radiusScale ? 4.8 : 7.2));
-        this.state.radiusScale += (targetScale - this.state.radiusScale) * smoothing;
-        if (Math.abs(this.state.radiusScale - 1) < 0.01 && targetScale === 1) {
-            this.state.radiusScale = 1;
-        }
-    }
-
-    getRadiusScale() {
-        return Math.max(1, Math.min(1.5, this.state.radiusScale));
     }
 
     drawFace(ctx, rotation, ball) {
