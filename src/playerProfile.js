@@ -29,7 +29,7 @@ export const PROFILE_LIMITS = Object.freeze({
     MAX_TIMESTAMP: 8_640_000_000_000_000
 });
 
-export const PROFILE_VERSION = 9;
+export const PROFILE_VERSION = 10;
 
 const debugProfileSession = {
     active: false,
@@ -86,6 +86,9 @@ export function createDefaultPlayerProfile() {
     return {
         version: PROFILE_VERSION,
         characterMastery: {
+            levels: {}
+        },
+        tournamentChallenge: {
             levels: {}
         },
         experience: {
@@ -373,6 +376,20 @@ function sanitizeCharacterMastery(obj) {
     return { levels };
 }
 
+function sanitizeTournamentChallenge(obj) {
+    if (!obj || typeof obj !== "object" || !obj.levels || typeof obj.levels !== "object") {
+        return { levels: {} };
+    }
+    const levels = {};
+    for (const id of VALID_CHARACTER_IDS) {
+        const value = obj.levels[id];
+        if (typeof value !== "number" || !Number.isFinite(value)) continue;
+        const level = Math.max(0, Math.min(3, Math.floor(value)));
+        if (level > 0) levels[id] = level;
+    }
+    return { levels };
+}
+
 function sanitizeEquipment(obj) {
     if (!obj || typeof obj !== "object") return createDefaultPlayerProfile().equipment;
     const inventory = Array.isArray(obj.inventory)
@@ -456,6 +473,7 @@ export function sanitizePlayerProfile(raw) {
     return {
         version: PROFILE_VERSION,
         characterMastery: sanitizeCharacterMastery(raw.characterMastery ?? raw.characterLinks),
+        tournamentChallenge: sanitizeTournamentChallenge(raw.tournamentChallenge),
         experience: sanitizeExperience(raw.experience),
         consumables: sanitizeConsumables(raw.consumables),
         equipment: sanitizeEquipment(raw.equipment),
@@ -473,7 +491,7 @@ export function sanitizePlayerProfile(raw) {
 
 export function migratePlayerProfile(raw) {
     if (!raw || typeof raw !== "object") return createDefaultPlayerProfile();
-    if (![7, 8, PROFILE_VERSION].includes(raw.version)) return createDefaultPlayerProfile();
+    if (![7, 8, 9, PROFILE_VERSION].includes(raw.version)) return createDefaultPlayerProfile();
     return sanitizePlayerProfile(raw);
 }
 

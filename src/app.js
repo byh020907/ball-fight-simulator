@@ -45,6 +45,7 @@ import {
     applyMasteryEffectsToFighterSpec,
     MASTERY_EFFECT_DEFS,
     advanceCharacterMastery,
+    advanceTournamentChallenge,
     getCharacterMasteryLevel,
     getCharacterChallengeLevel,
     getTierText,
@@ -1675,9 +1676,14 @@ export class BattleApp {
             playerFighterId: this.playerFighterId
         });
 
+        const challengeLevel = getCharacterChallengeLevel(this.playerProfile, this.playerFighterId);
         const masteryResult = advanceCharacterMastery(this.playerProfile, {
             characterId: this.playerFighterId,
-            challengeLevel: getCharacterChallengeLevel(this.playerProfile, this.playerFighterId),
+            challengeLevel,
+            playerWon
+        });
+        advanceTournamentChallenge(this.playerProfile, {
+            characterId: this.playerFighterId,
             playerWon
         });
         if (masteryResult.changed) {

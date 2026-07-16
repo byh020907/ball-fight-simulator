@@ -54,7 +54,7 @@ export function createComponentBridge(app) {
         refreshCollectionAndProfile();
         PopupService.show({
             title: "환생 완료",
-            bodyHtml: `<p>${result.reward.name} 보상을 얻었습니다.</p><p>해당 캐릭터의 XP는 Lv.1부터 다시 시작합니다.</p>`,
+            bodyHtml: `<p>${result.reward.name} 보상을 얻었습니다.</p><p>XP와 토너먼트 도전 단계가 Lv.1 상대부터 다시 시작합니다. 숙련도는 유지됩니다.</p>`,
             buttons: [{ text: "확인", value: "ok", primary: true }]
         });
         return result;

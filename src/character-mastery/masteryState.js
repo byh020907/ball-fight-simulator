@@ -6,8 +6,6 @@
 import { VALID_CHARACTER_IDS } from "../playerProfile.js";
 import { MASTERY_EFFECT_DEFS, TIER_LABELS } from "./masteryDefinitions.js";
 
-const TOURNAMENT_OPPONENT_EXPERIENCE_LEVEL_BY_MASTERY = Object.freeze([null, 3, 6, 9]);
-
 /** 캐릭터의 현재 숙련도 등급 (0~3) */
 export function getCharacterMasteryLevel(profile, characterId) {
     if (!VALID_CHARACTER_IDS.includes(characterId)) return 0;
@@ -15,19 +13,6 @@ export function getCharacterMasteryLevel(profile, characterId) {
     const val = levels[characterId];
     if (typeof val !== "number" || !Number.isFinite(val)) return 0;
     return Math.max(0, Math.min(3, Math.floor(val)));
-}
-
-/** 캐릭터의 토너먼트 난도 (0~2, GOLD는 2) */
-export function getCharacterChallengeLevel(profile, characterId) {
-    return Math.min(getCharacterMasteryLevel(profile, characterId), 2);
-}
-
-/**
- * 숙련도 단계에 맞는 다음 토너먼트 AI의 시작 경험치 레벨을 반환한다.
- * GOLD는 승급 도전 난도와 달리 Lv.9 상대를 사용한다.
- */
-export function getTournamentOpponentExperienceLevel(profile, characterId) {
-    return TOURNAMENT_OPPONENT_EXPERIENCE_LEVEL_BY_MASTERY[getCharacterMasteryLevel(profile, characterId)] ?? null;
 }
 
 /** 등급 텍스트 */

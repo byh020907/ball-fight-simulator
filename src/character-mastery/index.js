@@ -1,11 +1,11 @@
 export { MASTERY_EFFECT_DEFS, TIER_LABELS, TIER_DESCRIPTIONS } from "./masteryDefinitions.js";
+export { getCharacterMasteryLevel, getTierText, advanceCharacterMastery } from "./masteryState.js";
 export {
-    getCharacterMasteryLevel,
     getCharacterChallengeLevel,
     getTournamentOpponentExperienceLevel,
-    getTierText,
-    advanceCharacterMastery
-} from "./masteryState.js";
+    advanceTournamentChallenge,
+    resetTournamentChallenge
+} from "./tournamentChallengeState.js";
 export {
     collectActiveEffects,
     collectEffectsFromDefinitions,

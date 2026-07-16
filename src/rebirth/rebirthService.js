@@ -1,5 +1,6 @@
 import { MAX_LEVEL } from "../experience/experienceConfig.js";
 import { getCharacterExperienceSummary, resetCharacterExperience } from "../experience/experienceService.js";
+import { resetTournamentChallenge } from "../character-mastery/index.js";
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 import {
     REBIRTH_BASE_STAT_KEYS,
@@ -167,6 +168,7 @@ export function completeRebirth(profile, characterId, cardId) {
     state.rebirthCount += 1;
     state.pendingOfferCards = [];
     const experience = resetCharacterExperience(profile, characterId);
+    const tournamentChallenge = resetTournamentChallenge(profile, characterId);
     return {
         ok: true,
         reward,
@@ -174,7 +176,8 @@ export function completeRebirth(profile, characterId, cardId) {
         duplicate: !isStatReward && previousRank > 0,
         rebirthCount: state.rebirthCount,
         statBonuses: { ...state.statBonuses },
-        experience
+        experience,
+        tournamentChallenge
     };
 }
 

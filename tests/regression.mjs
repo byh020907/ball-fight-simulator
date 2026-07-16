@@ -71,6 +71,7 @@ import { createRoster } from "../src/roster.js";
 import {
     createDefaultPlayerProfile,
     migrateLegacyExperienceToCharacter,
+    migratePlayerProfile,
     sanitizePlayerProfile
 } from "../src/playerProfile.js";
 import { HuntingManager } from "../src/hunting/huntingManager.js";
@@ -1638,38 +1639,40 @@ async function testTournament(app) {
     app.returnToInitialState();
 }
 
-async function testTournamentOpponentProgressionByMastery(app) {
+async function testTournamentOpponentProgressionByChallenge(app) {
     const { getTournamentOpponentExperienceLevel } = await import("../src/character-mastery/index.js");
     const playerId = app.playerFighterId;
     const scenarios = [
-        { masteryLevel: 0, expectedTierLabel: "첫 도전", expectedOpponentLevel: 1 },
-        { masteryLevel: 1, expectedTierLabel: "BRONZE", expectedOpponentLevel: 3 },
-        { masteryLevel: 2, expectedTierLabel: "SILVER", expectedOpponentLevel: 6 },
-        { masteryLevel: 3, expectedTierLabel: "GOLD", expectedOpponentLevel: 9 }
+        { masteryLevel: 0, challengeLevel: 0, expectedTierLabel: "첫 도전", expectedOpponentLevel: 1 },
+        { masteryLevel: 1, challengeLevel: 1, expectedTierLabel: "BRONZE", expectedOpponentLevel: 3 },
+        { masteryLevel: 2, challengeLevel: 2, expectedTierLabel: "SILVER", expectedOpponentLevel: 6 },
+        { masteryLevel: 3, challengeLevel: 3, expectedTierLabel: "GOLD", expectedOpponentLevel: 9 },
+        { masteryLevel: 3, challengeLevel: 0, expectedTierLabel: "GOLD", expectedOpponentLevel: 1 }
     ];
 
-    for (const { masteryLevel, expectedTierLabel, expectedOpponentLevel } of scenarios) {
+    for (const { masteryLevel, challengeLevel, expectedTierLabel, expectedOpponentLevel } of scenarios) {
         app.playerProfile = createDefaultPlayerProfile();
         app.playerProfile.experience.byCharacter[playerId] = { currentXp: getLevelRequirement(4) };
         app.playerProfile.characterMastery.levels[playerId] = masteryLevel;
+        if (challengeLevel > 0) app.playerProfile.tournamentChallenge.levels[playerId] = challengeLevel;
         app.playerStatAllocation = createRandomStatAllocation(() => 0);
         app.refreshPlayerSetup();
 
         assert.equal(
             app._panel.tournamentTierLabel,
             expectedTierLabel,
-            `Mastery ${masteryLevel} should expose the current tournament tier before start`
+            `Mastery ${masteryLevel} should remain visible before the tournament starts`
         );
         assert.equal(
             app._panel.tournamentOpponentLevel,
             expectedOpponentLevel,
-            `Mastery ${masteryLevel} should expose the actual AI starting level before start`
+            `Challenge ${challengeLevel} should expose the actual AI starting level before start`
         );
 
         assert.equal(
             getTournamentOpponentExperienceLevel(app.playerProfile, playerId),
-            masteryLevel === 0 ? null : expectedOpponentLevel,
-            `Mastery ${masteryLevel} should resolve its tournament opponent starting level`
+            challengeLevel === 0 ? null : expectedOpponentLevel,
+            `Challenge ${challengeLevel} should resolve its tournament opponent starting level`
         );
 
         await app.startTournament();
@@ -1714,7 +1717,7 @@ async function testTournamentOpponentProgressionByMastery(app) {
 
         for (const opponent of opponents) {
             const expectedProgression =
-                masteryLevel === 0 ? null : getCharacterLevelProgression(opponent.id, expectedOpponentLevel);
+                challengeLevel === 0 ? null : getCharacterLevelProgression(opponent.id, expectedOpponentLevel);
             const expectedSpec = applyStatAllocation(
                 applyExperienceProgressionToBaseSpec(
                     app.roster.find((fighter) => fighter.id === opponent.id),
@@ -1747,7 +1750,7 @@ async function testTournamentOpponentProgressionByMastery(app) {
             const expectedProgression =
                 fighter.id === playerId
                     ? playerProgression
-                    : masteryLevel === 0
+                    : challengeLevel === 0
                       ? null
                       : getCharacterLevelProgression(fighter.id, expectedOpponentLevel);
 
@@ -1764,6 +1767,42 @@ async function testTournamentOpponentProgressionByMastery(app) {
         }
 
         app.returnToInitialState();
+    }
+}
+
+async function testTournamentWinAdvancesChallengeAfterMasteryCheck() {
+    const app = await loadModuleApp();
+    const { createTournamentReport } = await import("../src/collection/index.js");
+    const { getCharacterChallengeLevel, getCharacterMasteryLevel, getTournamentOpponentExperienceLevel } =
+        await import("../src/character-mastery/index.js");
+    const playerId = FIGHTER_IDS.ARCHER;
+    const originalSettleAchievements = app._settleAchievements;
+
+    app.playerProfile = createDefaultPlayerProfile();
+    app.playerFighterId = playerId;
+    app._currentTournamentReport = createTournamentReport();
+    app._currentTournamentReport.playerFighterId = playerId;
+    app._settleAchievements = () => [];
+
+    try {
+        app._settleTournamentProgression(true);
+        assert.equal(
+            getCharacterMasteryLevel(app.playerProfile, playerId),
+            1,
+            "First challenge win should unlock BRONZE"
+        );
+        assert.equal(
+            getCharacterChallengeLevel(app.playerProfile, playerId),
+            1,
+            "Win should advance the next challenge"
+        );
+        assert.equal(
+            getTournamentOpponentExperienceLevel(app.playerProfile, playerId),
+            3,
+            "The next tournament should use the Lv.3 AI after the first win"
+        );
+    } finally {
+        app._settleAchievements = originalSettleAchievements;
     }
 }
 
@@ -1817,6 +1856,7 @@ async function testTournamentWinDisplaysMasteryReward() {
     const startButtonStates = [];
 
     app.playerProfile.characterMastery.levels[champion.id] = 1;
+    app.playerProfile.tournamentChallenge.levels[champion.id] = 1;
     app._lastMasteryResult = {
         changed: true,
         characterId: champion.id,
@@ -12188,16 +12228,47 @@ async function testGetCharacterMasteryLevel() {
 
 async function testGetCharacterChallengeLevel() {
     const { createDefaultPlayerProfile } = await import("../src/playerProfile.js");
-    const { getCharacterChallengeLevel } = await import("../src/character-mastery/index.js");
+    const {
+        advanceTournamentChallenge,
+        getCharacterChallengeLevel,
+        getCharacterMasteryLevel,
+        getTournamentOpponentExperienceLevel,
+        resetTournamentChallenge
+    } = await import("../src/character-mastery/index.js");
 
     const profile = createDefaultPlayerProfile();
-    assert.equal(getCharacterChallengeLevel(profile, "archer"), 0, "Level 0 -> challenge 0");
+    profile.characterMastery.levels.archer = 3;
+    assert.equal(getCharacterChallengeLevel(profile, "archer"), 0, "Mastery must not set the first challenge level");
+    assert.equal(getTournamentOpponentExperienceLevel(profile, "archer"), null, "First challenge should use Lv.1 AI");
 
-    profile.characterMastery.levels = { archer: 1 };
-    assert.equal(getCharacterChallengeLevel(profile, "archer"), 1, "Level 1 -> challenge 1");
+    const firstWin = advanceTournamentChallenge(profile, { characterId: "archer", playerWon: true });
+    assert.ok(firstWin.changed, "Tournament win should advance the next challenge");
+    assert.equal(getCharacterChallengeLevel(profile, "archer"), 1, "First win -> challenge 1");
+    assert.equal(getTournamentOpponentExperienceLevel(profile, "archer"), 3, "Challenge 1 should use Lv.3 AI");
 
-    profile.characterMastery.levels = { archer: 3 };
-    assert.equal(getCharacterChallengeLevel(profile, "archer"), 2, "Level 3 (GOLD) -> challenge 2 (capped)");
+    advanceTournamentChallenge(profile, { characterId: "archer", playerWon: true });
+    advanceTournamentChallenge(profile, { characterId: "archer", playerWon: true });
+    assert.equal(getCharacterChallengeLevel(profile, "archer"), 3, "Challenge should reach the Lv.9 cap");
+    assert.equal(getTournamentOpponentExperienceLevel(profile, "archer"), 9, "Challenge 3 should use Lv.9 AI");
+
+    const reset = resetTournamentChallenge(profile, "archer");
+    assert.ok(reset.changed, "Rebirth reset should clear the current tournament challenge");
+    assert.equal(getCharacterChallengeLevel(profile, "archer"), 0, "Reset challenge should return to Lv.1 AI");
+    assert.equal(profile.characterMastery.levels.archer, 3, "Resetting the challenge must preserve mastery");
+
+    const versionNineProfile = createDefaultPlayerProfile();
+    versionNineProfile.version = 9;
+    versionNineProfile.characterMastery.levels.archer = 3;
+    versionNineProfile.experience.byCharacter.archer = { currentXp: 500 };
+    versionNineProfile.experience.currentXp = 500;
+    delete versionNineProfile.tournamentChallenge;
+    const migratedProfile = migratePlayerProfile(versionNineProfile);
+    assert.equal(getCharacterMasteryLevel(migratedProfile, "archer"), 3, "Version 9 profiles must retain mastery");
+    assert.equal(
+        getCharacterChallengeLevel(migratedProfile, "archer"),
+        0,
+        "Version 9 profiles must receive the first tournament challenge by default"
+    );
 }
 
 async function testAdvanceCharacterMastery() {
@@ -13332,7 +13403,8 @@ await testArrowBounceFacing(app);
 await testArcherPredictiveBurst(app);
 await testOrbitShardRecharge(app);
 await testTournament(app);
-await testTournamentOpponentProgressionByMastery(app);
+await testTournamentOpponentProgressionByChallenge(app);
+await testTournamentWinAdvancesChallengeAfterMasteryCheck();
 await testActionSelectionShowsTournamentChallengeBeforeMatchup();
 await testTournamentWinDisplaysMasteryReward();
 testResultSequenceProgression();
@@ -18220,6 +18292,8 @@ function testRebirthDomainContracts() {
     const maxXp = getLevelRequirement(10);
     setCharacterXp(profile, sourceId, maxXp);
     setCharacterXp(profile, otherId, 123);
+    profile.characterMastery.levels[sourceId] = 3;
+    profile.tournamentChallenge.levels[sourceId] = 3;
 
     const firstOffer = createRebirthOffer(sourceId, createSeededRandom(20260714));
     const secondOffer = createRebirthOffer(sourceId, createSeededRandom(20260714));
@@ -18266,6 +18340,17 @@ function testRebirthDomainContracts() {
     const firstCompletion = completeRebirth(profile, sourceId, statReward.id);
     assert.equal(firstCompletion.ok, true);
     assert.equal(firstCompletion.rank, 0, "Permanent base-stat rewards must not receive a card rank");
+    assert.deepEqual(
+        firstCompletion.tournamentChallenge,
+        { changed: true, characterId: sourceId, previousLevel: 3, newLevel: 0 },
+        "Rebirth must reset the completed character's tournament challenge"
+    );
+    assert.equal(profile.characterMastery.levels[sourceId], 3, "Rebirth must keep earned mastery");
+    assert.equal(
+        profile.tournamentChallenge.levels[sourceId],
+        undefined,
+        "Rebirth must return the tournament challenge to its Lv.1 default"
+    );
     assert.deepEqual(
         getRebirthState(profile, sourceId).statBonuses,
         {
