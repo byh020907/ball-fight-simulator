@@ -596,7 +596,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             ctx.translate(this.position.x, this.position.y);
             ctx.rotate(this.angle);
             const rotatedBall = Object.create(this);
-            rotatedBall.position = { x: 0, y: 0 };
+            rotatedBall.position = new Vector2(0, 0);
             drawEquipmentItems(ctx, rotatedBall, this.equipment.items, outlineWidth);
             ctx.restore();
         } else {

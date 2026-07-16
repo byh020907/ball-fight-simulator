@@ -21,17 +21,17 @@ function resolveCircleTerrainCollision(entity, terrain) {
     entity.position.x += nx * overlap;
     entity.position.y += ny * overlap;
 
-    const normal = { x: nx, y: ny };
-    const contactPoint = {
-        x: entity.position.x - normal.x * entityRadius,
-        y: entity.position.y - normal.y * entityRadius
-    };
-    const preVel = { x: entity.velocity.x, y: entity.velocity.y };
+    const normal = new Vector2(nx, ny);
+    const contactPoint = new Vector2(
+        entity.position.x - normal.x * entityRadius,
+        entity.position.y - normal.y * entityRadius
+    );
+    const preVel = new Vector2(entity.velocity.x, entity.velocity.y);
     applyCollisionResponse(entity, normal, contactPoint, preVel, {
         surfaceMaterial: "wood"
     });
 
-    return { normal: new Vector2(normal.x, normal.y), contactPoint: new Vector2(contactPoint.x, contactPoint.y) };
+    return { normal, contactPoint };
 }
 
 export function resolveTerrainCollision(entity, terrain) {

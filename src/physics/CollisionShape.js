@@ -8,8 +8,8 @@ import { applyCollisionResponse } from "./collisionResponse.js";
 
 /**
  * local coordinates의 polygon 점 배열을 world coordinates로 변환.
- * @param {{ points: Array<{x:number,y:number}>, x: number, y: number, angle?: number }} shape
- * @returns {Array<{x:number,y:number}>}
+ * @param {{ points: Array<Vector2|{x:number,y:number}>, x: number, y: number, angle?: number }} shape
+ * @returns {Vector2[]}
  */
 export function getWorldPolygonPoints(shape) {
     const points = shape.points;
@@ -17,10 +17,7 @@ export function getWorldPolygonPoints(shape) {
     const angle = shape.angle ?? 0;
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
-    return points.map((p) => ({
-        x: shape.x + p.x * cos - p.y * sin,
-        y: shape.y + p.x * sin + p.y * cos
-    }));
+    return points.map((p) => new Vector2(shape.x + p.x * cos - p.y * sin, shape.y + p.x * sin + p.y * cos));
 }
 
 /**
@@ -75,21 +72,18 @@ export function resolvePolygonTerrainCollision(entity, terrain) {
     const cy = entity.position.y;
     const r = entity.radius ?? 0;
 
-    if (pointInConvexPolygon({ x: cx, y: cy }, worldPoints)) {
+    if (pointInConvexPolygon(new Vector2(cx, cy), worldPoints)) {
         const edgeResult = closestEdgeNormal(cx, cy, worldPoints);
         const overlap = r + edgeResult.distance;
         entity.position.x += edgeResult.nx * overlap;
         entity.position.y += edgeResult.ny * overlap;
-        const normal = { x: edgeResult.nx, y: edgeResult.ny };
-        const contactPoint = edgeResult.contactPoint ?? {
-            x: entity.position.x,
-            y: entity.position.y
-        };
-        const preVel = { x: entity.velocity.x, y: entity.velocity.y };
+        const normal = new Vector2(edgeResult.nx, edgeResult.ny);
+        const contactPoint = edgeResult.contactPoint ?? new Vector2(entity.position.x, entity.position.y);
+        const preVel = new Vector2(entity.velocity.x, entity.velocity.y);
         applyCollisionResponse(entity, normal, contactPoint, preVel, {
             surfaceMaterial: terrain.physicsMaterial ?? "wood"
         });
-        return { normal: new Vector2(normal.x, normal.y), contactPoint: new Vector2(contactPoint.x, contactPoint.y) };
+        return { normal, contactPoint };
     }
 
     let bestOverlap = -Infinity;
@@ -133,13 +127,13 @@ export function resolvePolygonTerrainCollision(entity, terrain) {
     entity.position.x += bestNx * bestOverlap;
     entity.position.y += bestNy * bestOverlap;
 
-    const normal = { x: bestNx, y: bestNy };
-    const contactPoint = { x: bestContactX, y: bestContactY };
-    const preVel = { x: entity.velocity.x, y: entity.velocity.y };
+    const normal = new Vector2(bestNx, bestNy);
+    const contactPoint = new Vector2(bestContactX, bestContactY);
+    const preVel = new Vector2(entity.velocity.x, entity.velocity.y);
     applyCollisionResponse(entity, normal, contactPoint, preVel, {
         surfaceMaterial: terrain.physicsMaterial ?? "wood"
     });
-    return { normal: new Vector2(normal.x, normal.y), contactPoint: new Vector2(contactPoint.x, contactPoint.y) };
+    return { normal, contactPoint };
 }
 
 function closestEdgeNormal(cx, cy, worldPoints) {
@@ -177,7 +171,7 @@ function closestEdgeNormal(cx, cy, worldPoints) {
         nx: bestNx,
         ny: bestNy,
         distance: minDist,
-        contactPoint: { x: bestContactX, y: bestContactY }
+        contactPoint: new Vector2(bestContactX, bestContactY)
     };
 }
 
@@ -189,7 +183,7 @@ function closestEdgeNormal(cx, cy, worldPoints) {
  * _drawPolygonBody와 일치하는 정다각형 로컬 꼭짓점 배열을 반환합니다.
  * @param {number} sides - 변 개수 (≥3)
  * @param {number} radius - 외접원 반지름
- * @returns {Array<{x:number,y:number}>}
+ * @returns {Vector2[]}
  */
 export function computeRegularPolygonLocalPoints(sides, radius) {
     if (sides < 3) return [];
@@ -198,7 +192,7 @@ export function computeRegularPolygonLocalPoints(sides, radius) {
     const points = [];
     for (let i = 0; i < sides; i++) {
         const angle = i * a + offset;
-        points.push({ x: Math.cos(angle) * radius, y: Math.sin(angle) * radius });
+        points.push(new Vector2(Math.cos(angle) * radius, Math.sin(angle) * radius));
     }
     return points;
 }
@@ -207,7 +201,7 @@ export function computeRegularPolygonLocalPoints(sides, radius) {
  * Fighter의 충돌 shape 정보를 반환합니다.
  * 다각형 몹이면 polygon shape, 아니면 circle shape.
  * @param {object} entity — BattleBall 인스턴스
- * @returns {{ type: "circle"|"polygon", x: number, y: number, radius: number, sides?: number, angle?: number, localPoints?: Array<{x:number,y:number}>, worldPoints?: Array<{x:number,y:number}> }}
+ * @returns {{ type: "circle"|"polygon", x: number, y: number, radius: number, sides?: number, angle?: number, localPoints?: Vector2[], worldPoints?: Vector2[] }}
  */
 export function getFighterCollisionShape(entity) {
     const sides = entity.appearance?.sides ?? 0;
@@ -229,7 +223,7 @@ export function getFighterCollisionShape(entity) {
  *
  * @param {object} a — BattleBall 인스턴스
  * @param {object} b — BattleBall 인스턴스
- * @returns {{ normal: Vector2|null, overlap: number, separationOverlap: number }} — normal은 a→b 방향, overlap은 SAT 침투 깊이, separationOverlap은 분리에 사용할 값
+ * @returns {{ normal: Vector2|null, overlap: number, separationOverlap: number, contactPoint?: Vector2, separationVec?: Vector2 }} — normal은 a→b 방향, overlap은 SAT 침투 깊이, separationOverlap은 분리에 사용할 값
  */
 export function resolveFighterShapeCollision(a, b) {
     const shapeA = getFighterCollisionShape(a);
@@ -313,7 +307,7 @@ function _computeSeparationOverlap(shapeA, shapeB, normal, satOverlap) {
  * SAT normal은 polygon 회전에 따라 변하므로, 회전된 shape 기준 충돌 결과가 달라집니다.
  */
 function _computeSeparationVector(shapeA, shapeB, separationOverlap, normal) {
-    return { x: normal.x * separationOverlap, y: normal.y * separationOverlap };
+    return new Vector2(normal.x * separationOverlap, normal.y * separationOverlap);
 }
 
 /**
@@ -330,14 +324,14 @@ function _computePolygonContactPoint(shapeA, shapeB) {
     // 1. A의 vertex 중 B 내부/경계에 있는 점
     for (const p of ptsA) {
         if (pointInConvexPolygon(p, ptsB)) {
-            candidates.push({ x: p.x, y: p.y });
+            candidates.push(p.clone());
         }
     }
 
     // 2. B의 vertex 중 A 내부/경계에 있는 점
     for (const p of ptsB) {
         if (pointInConvexPolygon(p, ptsA)) {
-            candidates.push({ x: p.x, y: p.y });
+            candidates.push(p.clone());
         }
     }
 
@@ -365,30 +359,27 @@ function _computePolygonContactPoint(shapeA, shapeB) {
         const avgX = sumX / candidates.length;
         const avgY = sumY / candidates.length;
         if (Number.isFinite(avgX) && Number.isFinite(avgY)) {
-            return { x: avgX, y: avgY };
+            return new Vector2(avgX, avgY);
         }
     }
 
     // fallback: center midpoint
-    return { x: (shapeA.x + shapeB.x) / 2, y: (shapeA.y + shapeB.y) / 2 };
+    return new Vector2((shapeA.x + shapeB.x) / 2, (shapeA.y + shapeB.y) / 2);
 }
 
 /**
  * circle-polygon 충돌의 fallback contactPoint.
  * SAT 정상에서 _closestPoint가 없을 때 circle surface point를 반환합니다.
  * @param {{ x: number, y: number, radius: number }} circleShape
- * @param {{ x: number, y: number }} normal — circle → polygon 방향
- * @returns {{ x: number, y: number }}
+ * @param {Vector2} normal — circle → polygon 방향
+ * @returns {Vector2}
  */
 function _computeCirclePolyContactFallback(circleShape, normal) {
     const len = Math.sqrt(normal.x * normal.x + normal.y * normal.y);
-    if (len < 1e-10) return { x: circleShape.x, y: circleShape.y };
+    if (len < 1e-10) return new Vector2(circleShape.x, circleShape.y);
     const nx = normal.x / len;
     const ny = normal.y / len;
-    return {
-        x: circleShape.x - nx * circleShape.radius,
-        y: circleShape.y - ny * circleShape.radius
-    };
+    return new Vector2(circleShape.x - nx * circleShape.radius, circleShape.y - ny * circleShape.radius);
 }
 
 /**
@@ -408,7 +399,7 @@ function _segmentIntersection(p1, p2, p3, p4) {
     const u = ((p3.x - p1.x) * d1y - (p3.y - p1.y) * d1x) / denom;
 
     if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
-        return { x: p1.x + t * d1x, y: p1.y + t * d1y };
+        return new Vector2(p1.x + t * d1x, p1.y + t * d1y);
     }
     return null;
 }
@@ -427,7 +418,7 @@ function _resolveCircleCircle(shapeA, shapeB) {
 function _computeCircleCircleContact(shapeA, shapeB, normal, overlap) {
     const contactX = shapeA.x + normal.x * (shapeA.radius - overlap * 0.5);
     const contactY = shapeA.y + normal.y * (shapeA.radius - overlap * 0.5);
-    return { x: contactX, y: contactY };
+    return new Vector2(contactX, contactY);
 }
 
 /**
@@ -547,7 +538,7 @@ function _resolveCirclePolygon(circleShape, polyShape) {
         const vny = (cy - closestVertex.y) / dist;
         const vOverlap = r - dist;
         if (vOverlap > 0) {
-            _closestPoint = { x: closestVertex.x, y: closestVertex.y };
+            _closestPoint = closestVertex.clone();
         }
         if (vOverlap > 0 && vOverlap < bestOverlap) {
             bestOverlap = vOverlap;
@@ -572,8 +563,8 @@ function _resolveCirclePolygon(circleShape, polyShape) {
 
 /**
  * SAT helper: 한 polygon의 edge normal들에 대해 두 polygon의 projection overlap을 검사.
- * @param {Array<{x:number,y:number}>} pointsA - edge normal을 추출할 polygon
- * @param {Array<{x:number,y:number}>} pointsB - 상대 polygon
+ * @param {Vector2[]} pointsA - edge normal을 추출할 polygon
+ * @param {Vector2[]} pointsB - 상대 polygon
  * @param {(best: {overlap:number, normal:Vector2}) => void} onBest
  * @param {boolean} swapNormal - true면 normal 방향을 반전 (B의 edge를 A→B 방향으로)
  */

@@ -181,10 +181,7 @@ export class RageAbility extends Ability {
         const localY = contactPoint.y - target.position.y;
         const cos = Math.cos(-target.angle);
         const sin = Math.sin(-target.angle);
-        const localContact = {
-            x: localX * cos - localY * sin,
-            y: localX * sin + localY * cos
-        };
+        const localContact = new Vector2(localX * cos - localY * sin, localX * sin + localY * cos);
         this.state.aftershock = {
             target,
             localContact,

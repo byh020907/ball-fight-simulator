@@ -18993,6 +18993,10 @@ function testRageAftershockUsesVector2Effects() {
 
     rage.ability.onCollision(opponent, { contactPoint: { x: opponent.position.x, y: opponent.position.y } });
     assert.ok(rage.ability.state.aftershock, "Rage Lv9 should queue an aftershock at full charge");
+    assert.ok(
+        rage.ability.state.aftershock.localContact instanceof Vector2,
+        "Rage Lv9 should keep its saved local contact as Vector2"
+    );
 
     assert.doesNotThrow(() => {
         for (let frame = 0; frame < 24; frame += 1) {
@@ -19116,6 +19120,8 @@ function testTerrainCollisionReturnsResult() {
     const result = resolveTerrainCollision(entity, terrain);
     assert.ok(result, "terrain collision should return truthy");
     assert.ok(result.normal && result.contactPoint, "terrain collision should return { normal, contactPoint }");
+    assert.ok(result.normal instanceof Vector2, "terrain collision normal should be Vector2");
+    assert.ok(result.contactPoint instanceof Vector2, "terrain collision contactPoint should be Vector2");
     assert.ok(typeof result.normal.x === "number", "result.normal.x should be a number");
     assert.ok(typeof result.contactPoint.x === "number", "result.contactPoint.x should be a number");
     console.log("[terrain-collision-result] ok");

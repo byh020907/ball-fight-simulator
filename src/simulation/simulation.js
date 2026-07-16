@@ -93,8 +93,8 @@ export class Simulation {
     _reflectX(entity) {
         if (entity.position.x <= entity.radius) {
             entity.position.x = entity.radius;
-            const preVel = { x: entity.velocity.x, y: entity.velocity.y };
-            applyCollisionResponse(entity, { x: 1, y: 0 }, { x: 0, y: entity.position.y }, preVel, {
+            const preVel = new Vector2(entity.velocity.x, entity.velocity.y);
+            applyCollisionResponse(entity, new Vector2(1, 0), new Vector2(0, entity.position.y), preVel, {
                 surfaceMaterial: "wall"
             });
             if (entity.state?.movement) this._handleWallBounce(entity);
@@ -102,8 +102,8 @@ export class Simulation {
         }
         if (entity.position.x >= this.width - entity.radius) {
             entity.position.x = this.width - entity.radius;
-            const preVel = { x: entity.velocity.x, y: entity.velocity.y };
-            applyCollisionResponse(entity, { x: -1, y: 0 }, { x: this.width, y: entity.position.y }, preVel, {
+            const preVel = new Vector2(entity.velocity.x, entity.velocity.y);
+            applyCollisionResponse(entity, new Vector2(-1, 0), new Vector2(this.width, entity.position.y), preVel, {
                 surfaceMaterial: "wall"
             });
             if (entity.state?.movement) this._handleWallBounce(entity);
@@ -116,8 +116,8 @@ export class Simulation {
     _reflectY(entity) {
         if (entity.position.y <= entity.radius) {
             entity.position.y = entity.radius;
-            const preVel = { x: entity.velocity.x, y: entity.velocity.y };
-            applyCollisionResponse(entity, { x: 0, y: 1 }, { x: entity.position.x, y: 0 }, preVel, {
+            const preVel = new Vector2(entity.velocity.x, entity.velocity.y);
+            applyCollisionResponse(entity, new Vector2(0, 1), new Vector2(entity.position.x, 0), preVel, {
                 surfaceMaterial: "wall"
             });
             if (entity.state?.movement) this._handleWallBounce(entity);
@@ -125,8 +125,8 @@ export class Simulation {
         }
         if (entity.position.y >= this.height - entity.radius) {
             entity.position.y = this.height - entity.radius;
-            const preVel = { x: entity.velocity.x, y: entity.velocity.y };
-            applyCollisionResponse(entity, { x: 0, y: -1 }, { x: entity.position.x, y: this.height }, preVel, {
+            const preVel = new Vector2(entity.velocity.x, entity.velocity.y);
+            applyCollisionResponse(entity, new Vector2(0, -1), new Vector2(entity.position.x, this.height), preVel, {
                 surfaceMaterial: "wall"
             });
             if (entity.state?.movement) this._handleWallBounce(entity);
