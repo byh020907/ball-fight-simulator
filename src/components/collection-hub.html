@@ -14,7 +14,16 @@
 >
     <div class="ch-frame">
         <div class="ch-header">
-            <strong class="ch-title">컬렉션</strong>
+            <strong
+                class="ch-title"
+                x-bind:class="{ 'ch-title--holding': state.debugModeHoldActive }"
+                @pointerdown.prevent="startDebugModeHold($event)"
+                @pointerup="cancelDebugModeHold()"
+                @pointercancel="cancelDebugModeHold()"
+                @pointerleave="cancelDebugModeHold()"
+                @contextmenu.prevent
+                >컬렉션</strong
+            >
             <span class="ch-summary">
                 <span>숙련도 <b x-text="state.summary.cumulativeLevels + '/' + state.summary.maxLevels"></b></span>
                 <span>·</span>
@@ -673,8 +682,10 @@
 
 <script>
     window.createGameUI("collectionHub", () => {
+        const DEBUG_MODE_HOLD_DURATION_MS = 1000;
         let dialogElement = null;
         let tabResizeObserver = null;
+        let debugModeHoldTimerId = null;
 
         function focusDialog() {
             requestAnimationFrame(() => dialogElement.focus());
@@ -692,6 +703,7 @@
             characterDetailTab: "overview",
             selectedMonsterId: null,
             selectedMonsterRegionId: null,
+            debugModeHoldActive: false,
             rosterItems: [],
             monsterCodexItems: [],
             masteryItems: [],
@@ -783,6 +795,7 @@
         });
 
         function closeCollectionHub() {
+            cancelDebugModeHold();
             state.visible = false;
             state.selectedCharacterId = null;
             state.selectedMonsterId = null;
@@ -889,6 +902,24 @@
             state.developer.rebirthCount = target?.rebirth?.rebirthCount ?? 0;
         }
 
+        function cancelDebugModeHold() {
+            if (debugModeHoldTimerId !== null) clearTimeout(debugModeHoldTimerId);
+            debugModeHoldTimerId = null;
+            state.debugModeHoldActive = false;
+        }
+
+        function startDebugModeHold(event) {
+            if (event.pointerType === "mouse" && event.button !== 0) return;
+            cancelDebugModeHold();
+            state.debugModeHoldActive = true;
+            debugModeHoldTimerId = setTimeout(() => {
+                debugModeHoldTimerId = null;
+                state.debugModeHoldActive = false;
+                const result = this.bridge.enterDebugMode();
+                if (result.ok) setCollectionTab("developer");
+            }, DEBUG_MODE_HOLD_DURATION_MS);
+        }
+
         return {
             state,
             init() {
@@ -896,6 +927,7 @@
                 observeTabLayout();
             },
             destroy() {
+                cancelDebugModeHold();
                 stopObservingTabLayout();
                 dialogElement = null;
             },
@@ -914,6 +946,8 @@
             selectedMonsterRegion,
             syncDeveloperTarget,
             revealActiveTab,
+            startDebugModeHold,
+            cancelDebugModeHold,
             get bridge() {
                 return Alpine.store("uiManager").requireGameActionBridge();
             },
@@ -1095,8 +1129,29 @@
     }
 
     .ch-title {
+        position: relative;
         font-size: 1.1rem;
         font-weight: 900;
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-touch-callout: none;
+        touch-action: manipulation;
+    }
+
+    .ch-title::after {
+        content: "";
+        position: absolute;
+        right: 0;
+        bottom: -0.2em;
+        left: 0;
+        border-bottom: 2px solid currentColor;
+        transform: scaleX(0);
+        transform-origin: left;
+    }
+
+    .ch-title--holding::after {
+        transform: scaleX(1);
+        transition: transform 1s linear;
     }
 
     .ch-summary {

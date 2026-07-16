@@ -1019,6 +1019,125 @@ function testCollectionRebirthAndDeveloperContracts() {
     console.log("[collection-rebirth-and-developer-contracts] ok");
 }
 
+function testCollectionTitleLongPressDebugEntry() {
+    const template = readSource("src/components/collection-hub.html");
+    assert.ok(
+        template.includes('@pointerdown.prevent="startDebugModeHold($event)"') &&
+            template.includes('@pointerup="cancelDebugModeHold()"') &&
+            template.includes('@pointercancel="cancelDebugModeHold()"'),
+        "Collection title should own a cancellable pointer hold gesture"
+    );
+    assert.ok(
+        template.includes("const DEBUG_MODE_HOLD_DURATION_MS = 1000"),
+        "Collection title debug entry should require a one-second hold"
+    );
+
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+    const originalAlpine = Object.getOwnPropertyDescriptor(globalThis, "Alpine");
+    const originalResizeObserver = Object.getOwnPropertyDescriptor(globalThis, "ResizeObserver");
+    const originalRequestAnimationFrame = Object.getOwnPropertyDescriptor(globalThis, "requestAnimationFrame");
+    const originalSetTimeout = Object.getOwnPropertyDescriptor(globalThis, "setTimeout");
+    const originalClearTimeout = Object.getOwnPropertyDescriptor(globalThis, "clearTimeout");
+    const factories = {};
+    let scheduledHold = null;
+    let clearedTimerId = null;
+    let debugEntryCount = 0;
+
+    try {
+        Object.defineProperty(globalThis, "window", {
+            configurable: true,
+            value: {
+                createGameUI(name, factory) {
+                    factories[name] = factory;
+                }
+            }
+        });
+        Object.defineProperty(globalThis, "Alpine", {
+            configurable: true,
+            value: {
+                reactive(value) {
+                    return value;
+                },
+                store() {
+                    return {
+                        requireGameActionBridge() {
+                            return {
+                                enterDebugMode() {
+                                    debugEntryCount += 1;
+                                    return { ok: true };
+                                }
+                            };
+                        }
+                    };
+                }
+            }
+        });
+        Object.defineProperty(globalThis, "ResizeObserver", {
+            configurable: true,
+            value: class {
+                observe() {}
+                disconnect() {}
+            }
+        });
+        Object.defineProperty(globalThis, "requestAnimationFrame", {
+            configurable: true,
+            value(callback) {
+                callback();
+                return 1;
+            }
+        });
+        Object.defineProperty(globalThis, "setTimeout", {
+            configurable: true,
+            value(callback, delay) {
+                scheduledHold = { callback, delay, timerId: 7 };
+                return scheduledHold.timerId;
+            }
+        });
+        Object.defineProperty(globalThis, "clearTimeout", {
+            configurable: true,
+            value(timerId) {
+                clearedTimerId = timerId;
+            }
+        });
+
+        const createHub = loadCollectionComponentFactory(
+            "src/components/collection-hub.html",
+            "collectionHub",
+            factories
+        );
+        const hub = createHub();
+        hub.$root = { focus() {}, querySelector() {} };
+        hub.init();
+        hub.state.tabs = [
+            { id: "roster", label: "도감" },
+            { id: "developer", label: "개발자" }
+        ];
+
+        hub.startDebugModeHold({ pointerType: "touch", button: 0 });
+        assert.equal(scheduledHold.delay, 1000, "Touch hold should wait exactly one second");
+        assert.equal(hub.state.debugModeHoldActive, true, "Touch hold should expose visible progress feedback");
+        hub.cancelDebugModeHold();
+        assert.equal(clearedTimerId, 7, "Releasing early should cancel the pending debug entry");
+        assert.equal(debugEntryCount, 0, "Cancelled hold must not enter debug mode");
+
+        hub.startDebugModeHold({ pointerType: "touch", button: 0 });
+        scheduledHold.callback();
+        assert.equal(debugEntryCount, 1, "Completed hold should enter debug mode once");
+        assert.equal(hub.state.activeTab, "developer", "Completed hold should open the developer tab");
+        assert.equal(hub.state.debugModeHoldActive, false, "Completed hold should clear its progress state");
+        hub.destroy();
+    } finally {
+        restoreGlobalProperty("window", originalWindow);
+        restoreGlobalProperty("Alpine", originalAlpine);
+        restoreGlobalProperty("ResizeObserver", originalResizeObserver);
+        restoreGlobalProperty("requestAnimationFrame", originalRequestAnimationFrame);
+        restoreGlobalProperty("setTimeout", originalSetTimeout);
+        restoreGlobalProperty("clearTimeout", originalClearTimeout);
+    }
+
+    console.log("[collection-title-long-press-debug-entry] ok");
+}
+
 testHuntingMerchantMobileScrollContract();
 testHuntingChestIconReuseContract();
 testCollectionEquipmentPanelsOwnTheirFlows();
@@ -1034,5 +1153,6 @@ testHuntingOverlayActionContracts();
 testResultOverlayLayoutContract();
 testFluidModalLayoutContracts();
 testCollectionRebirthAndDeveloperContracts();
+testCollectionTitleLongPressDebugEntry();
 
 console.log("ui contract tests ok");
