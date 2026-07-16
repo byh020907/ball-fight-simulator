@@ -53,9 +53,7 @@ export class ArcherAbility extends Ability {
             return false;
         }
 
-        if (this.abilityTier >= 1) {
-            this._updateAim(target);
-        }
+        this._updateAim(target);
         this.state.windUp = Math.max(0, this.state.windUp - delta);
         if (this.state.windUp <= 0) {
             this.release(target);
@@ -67,25 +65,20 @@ export class ArcherAbility extends Ability {
         this.timer -= delta;
         if (this.timer <= 0 && target) {
             this.timer = this.cooldown * (0.7 + Math.random() * 0.6);
-            if (this.abilityTier >= 1) {
-                this._updateAim(target);
-            } else {
-                this.state.lastAimDir = Vector2.subtract(target.position, this.owner.position).normalize();
-                this.state.aimPoint = target.position.clone();
-            }
+            this._updateAim(target);
             this.state.windUp = this._getWindupDuration();
         }
     }
 
     _updateAim(target) {
-        const aimPoint = calculateInterceptPoint(
-            this.owner.position,
-            target.position,
-            target.velocity,
-            this._getArrowSpeed()
-        );
+        const aimPoint = this._getAimPoint(target);
         this.state.aimPoint = aimPoint;
         this.state.lastAimDir = Vector2.subtract(aimPoint, this.owner.position).normalize();
+    }
+
+    _getAimPoint(target) {
+        if (this.abilityTier < 1) return target.position.clone();
+        return calculateInterceptPoint(this.owner.position, target.position, target.velocity, this._getArrowSpeed());
     }
 
     _getArrowSpeed() {

@@ -18922,29 +18922,109 @@ function testCriticalRollAndDamage() {
 testCriticalRollAndDamage();
 
 function testArcherAbilityTierBehavior() {
-    const sim = new BattleSimulation(
-        [
-            createRoster().find((f) => f.id === FIGHTER_IDS.ARCHER),
-            createRoster().find((f) => f.id === FIGHTER_IDS.ORBIT)
-        ],
-        { onLog() {}, onSound() {}, onDamageTaken() {}, onDamageDealt() {}, onHpChanged() {} }
+    const createAimSimulation = (abilityTier) => {
+        const sim = new BattleSimulation(
+            [
+                createRoster().find((fighter) => fighter.id === FIGHTER_IDS.ARCHER),
+                createRoster().find((fighter) => fighter.id === FIGHTER_IDS.ORBIT)
+            ],
+            { onLog() {}, onSound() {}, onDamageTaken() {}, onDamageDealt() {}, onHpChanged() {} }
+        );
+        const [archer, opponent] = sim.fighters;
+        archer.position = new Vector2(240, 360);
+        opponent.position = new Vector2(640, 360);
+        opponent.velocity = new Vector2(0, 0);
+        sim.entities = sim.fighters.slice();
+        archer.ability.setContext({ abilityTier });
+        archer.ability.timer = 0;
+        return { sim, archer, opponent, ability: archer.ability };
+    };
+
+    const direct = createAimSimulation(0);
+    direct.ability.update(0.016, direct.opponent);
+    const initialDirectAim = direct.ability.state.aimPoint.clone();
+    direct.opponent.position = new Vector2(640, 660);
+    direct.opponent.velocity = new Vector2(180, -120);
+    direct.ability.update(0.1, direct.opponent);
+    const movedDirectAim = direct.ability.state.aimPoint;
+    const expectedDirectDirection = Vector2.subtract(direct.opponent.position, direct.archer.position).normalize();
+    assert.ok(
+        Vector2.subtract(movedDirectAim, initialDirectAim).length() > 100,
+        "Archer Lv0 should update its aim point while the target moves during windup"
     );
-    const [archer, opponent] = sim.fighters;
-    archer.ability.setContext({ abilityTier: 0 });
-    archer.ability.timer = 0;
-    archer.ability.update(0.016, opponent);
-    assert.ok(archer.ability.state.aimPoint !== null, "Archer Lv0 should aim directly");
-    archer.ability.setContext({ abilityTier: 1 });
-    archer.ability.timer = 0;
-    archer.ability.state.aimPoint = null;
-    archer.ability.update(0.016, opponent);
-    assert.ok(archer.ability.state.aimPoint !== null, "Archer Lv3+ should enter predictive aim");
-    // Lv6 windup and double shot
-    archer.ability.setContext({ abilityTier: 2 });
-    assert.ok(Math.abs(archer.ability._getWindupDuration() - 0.32) < 1e-9, "Archer Lv6 should have 0.32s windup");
-    // Lv9 crit boost override
-    archer.ability.setContext({ abilityTier: 3 });
-    assert.equal(archer.ability.abilityTier, 3, "Archer Lv9 should enable the per-arrow critical chance boost");
+    assert.ok(
+        Vector2.subtract(movedDirectAim, direct.opponent.position).length() < 1e-9,
+        "Archer Lv0 should aim at the target's latest current position"
+    );
+    assert.ok(
+        Vector2.subtract(direct.ability.state.lastAimDir, expectedDirectDirection).length() < 1e-9,
+        "Archer Lv0 should refresh its direction toward the latest current position"
+    );
+    direct.ability.update(0.31, direct.opponent);
+    const directArrow = direct.sim.entities.find((entity) => entity.constructor?.name === "ArrowProjectile");
+    assert.ok(directArrow, "Archer Lv0 should fire after windup");
+    assert.ok(
+        Vector2.subtract(directArrow.velocity.clone().normalize(), direct.ability.state.lastAimDir).length() < 1e-9,
+        "The fired arrow should use the final windup direction"
+    );
+    const postFireVelocity = directArrow.velocity.clone();
+    direct.opponent.position = new Vector2(200, 760);
+    directArrow.update(0.01, direct.sim);
+    assert.ok(
+        Vector2.subtract(directArrow.velocity, postFireVelocity).length() < 1e-9,
+        "The arrow should not steer toward the target after release"
+    );
+
+    const predictive = createAimSimulation(1);
+    predictive.opponent.velocity = new Vector2(0, -180);
+    predictive.ability.update(0.016, predictive.opponent);
+    const initialPredictiveAim = predictive.ability.state.aimPoint.clone();
+    predictive.opponent.position = new Vector2(600, 650);
+    predictive.opponent.velocity = new Vector2(-40, -220);
+    predictive.ability.update(0.1, predictive.opponent);
+    const expectedPredictiveAim = calculateInterceptPoint(
+        predictive.archer.position,
+        predictive.opponent.position,
+        predictive.opponent.velocity,
+        predictive.ability._getArrowSpeed()
+    );
+    assert.ok(
+        Vector2.subtract(predictive.ability.state.aimPoint, initialPredictiveAim).length() > 100,
+        "Archer Lv3+ should refresh its predictive point during windup"
+    );
+    assert.ok(
+        Vector2.subtract(predictive.ability.state.aimPoint, expectedPredictiveAim).length() < 1e-9,
+        "Archer Lv3+ should use the target's latest position and velocity for prediction"
+    );
+
+    const doubleShot = createAimSimulation(2);
+    assert.ok(Math.abs(doubleShot.ability._getWindupDuration() - 0.32) < 1e-9, "Archer Lv6 should have 0.32s windup");
+    doubleShot.ability.timer = 10;
+    doubleShot.ability.state.pendingSecondShot = true;
+    doubleShot.ability.state.secondShotTimer = 0.01;
+    doubleShot.ability.state.secondShotTargetCache = doubleShot.opponent;
+    doubleShot.opponent.position = new Vector2(620, 620);
+    doubleShot.opponent.velocity = new Vector2(-80, -180);
+    doubleShot.ability.update(0.02, doubleShot.opponent);
+    const secondArrow = doubleShot.sim.entities.find((entity) => entity.constructor?.name === "ArrowProjectile");
+    const expectedSecondAim = calculateInterceptPoint(
+        doubleShot.archer.position,
+        doubleShot.opponent.position,
+        doubleShot.opponent.velocity,
+        doubleShot.ability._getArrowSpeed()
+    );
+    assert.ok(secondArrow, "Archer Lv6 should release its pending second arrow");
+    assert.ok(
+        Vector2.subtract(doubleShot.ability.state.aimPoint, expectedSecondAim).length() < 1e-9,
+        "Archer Lv6 should re-aim the second arrow from the target's latest movement"
+    );
+    assert.ok(
+        Vector2.subtract(secondArrow.velocity.clone().normalize(), doubleShot.ability.state.lastAimDir).length() < 1e-9,
+        "Archer Lv6 second arrow should use its refreshed direction"
+    );
+
+    doubleShot.ability.setContext({ abilityTier: 3 });
+    assert.equal(doubleShot.ability.abilityTier, 3, "Archer Lv9 should enable the per-arrow critical chance boost");
     console.log("[archer-ability-tier] ok");
 }
 

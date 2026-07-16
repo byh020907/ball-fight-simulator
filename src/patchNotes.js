@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.26.1",
+        date: "2026-07-16",
+        title: "v0.26.1 Archer 실시간 조준 복구",
+        changes: [
+            {
+                type: "fix",
+                text: "Archer가 조준 중 움직인 상대를 발사 직전까지 계속 겨냥하도록 수정했습니다. 화살은 발사 후 기존처럼 직선 비행합니다."
+            }
+        ]
+    },
+    {
         version: "0.26.0",
         date: "2026-07-16",
         title: "v0.26.0 Archer·Rage·Eater 레벨 보상과 공통 크리티컬",
