@@ -18,7 +18,7 @@ export function createRoster() {
             name: "Orbit Ball",
             title: "Visible Halo",
             description:
-                "몸 주위를 도는 위성 3개가 가까운 적을 계속 긁어내며 피해를 줍니다. 위성은 하나씩 재충전됩니다.",
+                "위성 5개가 가까운 적을 긁고, 완충되면 일제 발사됩니다. 성장하면 첫 적중점 협공·적중 폭발·본체 캐치로 진화합니다.",
             color: "#6fe3ff",
             face: "orbit",
             ability: "orbit",
@@ -71,7 +71,7 @@ export function createRoster() {
             name: "Spin Ball",
             title: "Gyro Drive",
             description:
-                "충돌 없이 회전력을 충전해 접점 피해를 키웁니다. 충돌하면 회전력을 소비하며, 만충 충돌은 오버스핀이 됩니다.",
+                "충돌 없이 회전력을 충전해 접점 피해를 키웁니다. 성장하면 만충 표면 절단·가속 절삭·관통 유체장으로 진화합니다.",
             color: "#d95f2f",
             face: "spin",
             ability: "spin",

@@ -14146,6 +14146,22 @@ function testRewardBalanceConfig() {
     console.log("[reward-balance-config] ok");
 }
 
+function testRosterLevelRewardDescriptions() {
+    const roster = createRoster();
+    const orbit = roster.find((fighter) => fighter.id === FIGHTER_IDS.ORBIT);
+    const spin = roster.find((fighter) => fighter.id === FIGHTER_IDS.SPIN);
+
+    assert.equal(orbit.description.includes("3개"), false, "Orbit roster copy must not restore the old shard count");
+    for (const term of ["위성 5개", "첫 적중점", "폭발", "본체 캐치"]) {
+        assert.ok(orbit.description.includes(term), `Orbit roster copy should include ${term}`);
+    }
+    assert.equal(spin.description.includes("오버스핀"), false, "Spin roster copy must not restore the removed reward");
+    for (const term of ["만충", "표면 절단", "가속 절삭", "유체장"]) {
+        assert.ok(spin.description.includes(term), `Spin roster copy should include ${term}`);
+    }
+    console.log("[roster-level-reward-descriptions] ok");
+}
+
 function testNoAbilityStandardBallSupport() {
     const spec = {
         id: "standard-no-ability",
@@ -14172,6 +14188,7 @@ function testNoAbilityStandardBallSupport() {
 }
 
 testRewardBalanceConfig();
+testRosterLevelRewardDescriptions();
 testNoAbilityStandardBallSupport();
 testShuffledUtility();
 testStatAllocationRules(app);
