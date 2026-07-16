@@ -953,8 +953,8 @@ function testFluidModalLayoutContracts() {
     const equipmentListRule = equipmentPanel.match(/\.ch-equip-list\s*\{([^}]*)\}/s)?.[1] ?? "";
     assert.match(
         equipmentListRule,
-        /flex:\s*1;[\s\S]*min-height:\s*0;[\s\S]*overflow-y:\s*auto;/,
-        "Equipment inventory must scroll inside the remaining tab area"
+        /flex:\s*1;[\s\S]*min-height:\s*0;[\s\S]*overflow-y:\s*auto;[\s\S]*-webkit-overflow-scrolling:\s*touch;[\s\S]*touch-action:\s*pan-y;/,
+        "Equipment inventory must own both its scroll area and mobile vertical touch input"
     );
     assert.ok(
         equipmentPanel.includes("repeat(auto-fit, minmax(min(100%, 8rem), 1fr))"),
