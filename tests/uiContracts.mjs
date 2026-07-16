@@ -612,6 +612,17 @@ function testHuntingOverlayActionContracts() {
             overlay.includes('requireComponent("huntingXpRewardPanel")'),
         "Normal hunting wins must render the shared XP reward panel inside the hunting overlay"
     );
+    assert.ok(
+        overlay.includes("huntingCombatResultActive: false") &&
+            overlay.includes('class="hunting-combat-choice-card"') &&
+            overlay.includes('class="hunting-combat-result-tab"') &&
+            overlay.includes('@click="showHuntingCombatResultSummary()"'),
+        "Normal hunting wins must split XP and combat status into two locally owned result cards"
+    );
+    assert.ok(
+        overlay.includes("this.resetHuntingCombatResult();") && overlay.includes('huntingCombatResultStep = "summary"'),
+        "Advancing or leaving the post-combat cards must reset their display-only state before hunting continues"
+    );
     console.log("[hunting-overlay-action-contracts] ok");
 }
 
@@ -704,6 +715,38 @@ function testResultOverlayLayoutContract() {
         huntingCardRule,
         /(?:\b\d+px\b|calc\()/,
         "Standalone hunting cards must not use fixed container dimensions"
+    );
+    const huntingCombatResultFrameRule =
+        huntingOverlay.match(/:scope\.hunting-combat-result-active \.hunting-overlay-frame\s*\{([^}]*)\}/s)?.[1] ?? "";
+    assert.match(
+        huntingCombatResultFrameRule,
+        /width:\s*100%;[\s\S]*height:\s*100%;[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 6fr\) minmax\(0, 1fr\);/,
+        "Normal combat result cards must reserve equal fluid tracks around the centered card"
+    );
+    assert.doesNotMatch(
+        huntingCombatResultFrameRule,
+        /(?:\b\d+px\b|calc\()/,
+        "Normal combat result frame must not use a fixed container width"
+    );
+    const huntingCombatCardRule =
+        huntingOverlay.match(
+            /:scope\.hunting-combat-result-active \.hunting-overlay-card,\s*:scope\.hunting-combat-result-active \.hunting-combat-choice-card\s*\{([^}]*)\}/s
+        )?.[1] ?? "";
+    assert.match(
+        huntingCombatCardRule,
+        /grid-column:\s*2;[\s\S]*width:\s*100%;[\s\S]*max-height:\s*100%;[\s\S]*box-sizing:\s*border-box;/,
+        "Both normal combat result cards must fit inside the centered fluid track"
+    );
+    assert.doesNotMatch(
+        huntingCombatCardRule,
+        /width:\s*(?:\d+px|calc\()/,
+        "Normal combat result cards must not introduce fixed container widths"
+    );
+    const huntingCombatTabRule = huntingOverlay.match(/\.hunting-combat-result-tab\s*\{([^}]*)}/s)?.[1] ?? "";
+    assert.match(
+        huntingCombatTabRule,
+        /grid-column:\s*3;[\s\S]*justify-self:\s*start;[\s\S]*align-self:\s*center;/,
+        "Normal combat result tab must begin at the centered card border"
     );
     const transientFrameRule = overlay.match(/:scope\.transient \.result-sequence-frame\s*\{([^}]*)\}/s)?.[1] ?? "";
     assert.match(

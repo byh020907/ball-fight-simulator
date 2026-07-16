@@ -13,14 +13,16 @@
         'hunting-merchant-active': huntingMerchantActive,
         'hunting-chest-active': huntingChestEventActive,
         'hunting-event-active': huntingEventActive,
-        'hunting-battle-preparation-active': huntingBattlePreparationActive
+        'hunting-battle-preparation-active': huntingBattlePreparationActive,
+        'hunting-combat-result-active': huntingCombatResultActive
     }"
 >
     <div class="hunting-overlay-frame">
-        <div class="hunting-overlay-card">
-            <span x-text="label">사냥터</span>
-            <strong x-text="text">원정 시작</strong>
-            <p x-show="subtext" x-text="subtext"></p>
+        <div class="hunting-overlay-card" x-show="!huntingCombatResultActive || huntingCombatResultStep === 'experience'">
+            <span x-show="!huntingCombatResultActive" x-text="label">사냥터</span>
+            <span class="hunting-combat-experience-label" x-show="huntingCombatResultActive">경험치</span>
+            <strong x-show="!huntingCombatResultActive" x-text="text">원정 시작</strong>
+            <p x-show="subtext && !huntingCombatResultActive" x-text="subtext"></p>
             <xp-reward-panel data-component-id="huntingXpRewardPanel"></xp-reward-panel>
 
             <div class="hunting-route" x-show="huntingMoving">
@@ -39,7 +41,10 @@
                 </div>
             </div>
 
-            <div class="hunting-choice" x-show="huntingChoiceVisible && !huntingMoving && !huntingMerchantActive">
+            <div
+                class="hunting-choice"
+                x-show="huntingChoiceVisible && !huntingCombatResultActive && !huntingMoving && !huntingMerchantActive"
+            >
                 <div class="hunting-choice-info">
                     <span x-text="huntingLootSummary"></span>
                 </div>
@@ -156,6 +161,40 @@
                 </button>
             </div>
         </div>
+
+        <div
+            class="hunting-combat-choice-card"
+            x-show="huntingCombatResultActive && huntingCombatResultStep === 'summary'"
+        >
+            <span>전투 결과</span>
+            <strong x-text="huntingCombatResultTitle"></strong>
+            <p class="hunting-combat-result-summary" x-text="huntingCombatResultSummary"></p>
+            <div class="hunting-combat-choice-actions" x-show="huntingChoiceVisible">
+                <p class="hunting-choice-hint" x-show="huntingMoveMessage" x-text="huntingMoveMessage"></p>
+                <div class="hunting-choice-buttons">
+                    <button
+                        class="hunting-btn retreat"
+                        type="button"
+                        x-show="huntingCanRetreat"
+                        @click="huntingRetreat()"
+                    >
+                        포탈 귀환
+                    </button>
+                    <button class="hunting-btn advance" type="button" @click="huntingAdvance()">10층 전진</button>
+                </div>
+            </div>
+        </div>
+
+        <button
+            class="hunting-combat-result-tab"
+            type="button"
+            x-show="huntingCombatResultActive && huntingCombatResultStep === 'experience'"
+            aria-label="전투 결과 보기"
+            @click="showHuntingCombatResultSummary()"
+        >
+            <span>결과 1/2</span>
+            <b>》</b>
+        </button>
     </div>
 
     <div class="hunting-loot-hud" x-show="huntingLootHudVisible">
@@ -187,6 +226,10 @@
         huntingMoveStep: 0,
         huntingMoveMax: 10,
         huntingMoveMessage: "",
+        huntingCombatResultActive: false,
+        huntingCombatResultStep: "experience",
+        huntingCombatResultTitle: "",
+        huntingCombatResultSummary: "",
         huntingMerchantActive: false,
         huntingMerchantOffers: null,
         huntingMerchantResult: "",
@@ -209,10 +252,22 @@
         huntingLootHudChests: 0,
 
         huntingRetreat() {
+            this.resetHuntingCombatResult();
             Alpine.store("uiManager").invokeGameAction("huntingRetreat");
         },
         huntingAdvance() {
+            this.resetHuntingCombatResult();
             Alpine.store("uiManager").invokeGameAction("huntingAdvance");
+        },
+        showHuntingCombatResultSummary() {
+            if (!this.huntingCombatResultActive) return;
+            this.huntingCombatResultStep = "summary";
+        },
+        resetHuntingCombatResult() {
+            this.huntingCombatResultActive = false;
+            this.huntingCombatResultStep = "experience";
+            this.huntingCombatResultTitle = "";
+            this.huntingCombatResultSummary = "";
         },
         huntingMerchantChoose(idx) {
             Alpine.store("uiManager").invokeGameAction("huntingMerchantChoose", idx);
@@ -267,6 +322,7 @@
             this.huntingMoveStep = 0;
             this.huntingMoveMax = 10;
             this.huntingMoveMessage = "";
+            this.resetHuntingCombatResult();
             this.huntingMerchantActive = false;
             this.huntingMerchantOffers = null;
             this.huntingMerchantResult = "";
@@ -304,6 +360,13 @@
             if (data.huntingMoveStep !== undefined) this.huntingMoveStep = data.huntingMoveStep;
             if (data.huntingMoveMax !== undefined) this.huntingMoveMax = data.huntingMoveMax;
             if (data.huntingMoveMessage !== undefined) this.huntingMoveMessage = data.huntingMoveMessage;
+            if (data.huntingCombatResultActive !== undefined)
+                this.huntingCombatResultActive = data.huntingCombatResultActive;
+            if (data.huntingCombatResultStep !== undefined) this.huntingCombatResultStep = data.huntingCombatResultStep;
+            if (data.huntingCombatResultTitle !== undefined)
+                this.huntingCombatResultTitle = data.huntingCombatResultTitle;
+            if (data.huntingCombatResultSummary !== undefined)
+                this.huntingCombatResultSummary = data.huntingCombatResultSummary;
             if (data.huntingMerchantActive !== undefined) this.huntingMerchantActive = data.huntingMerchantActive;
             if (data.huntingMerchantOffers !== undefined) this.huntingMerchantOffers = data.huntingMerchantOffers;
             if (data.huntingMerchantResult !== undefined) this.huntingMerchantResult = data.huntingMerchantResult;
@@ -368,6 +431,109 @@
     .hunting-overlay-card {
         padding: 28px 32px;
         text-align: center;
+    }
+
+    :scope.hunting-combat-result-active .hunting-overlay-frame {
+        width: 100%;
+        height: 100%;
+        max-width: 100%;
+        max-height: 100%;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 6fr) minmax(0, 1fr);
+        align-items: center;
+        pointer-events: auto;
+    }
+
+    :scope.hunting-combat-result-active .hunting-overlay-card,
+    :scope.hunting-combat-result-active .hunting-combat-choice-card {
+        grid-column: 2;
+        grid-row: 1;
+        width: 100%;
+        max-height: 100%;
+        box-sizing: border-box;
+        overflow: hidden;
+        border: 4px solid #202020;
+        background: #f6f6f6;
+        box-shadow: 4px 4px 0 #202020;
+        padding: 20px;
+        text-align: center;
+    }
+
+    .hunting-combat-choice-card > span {
+        display: block;
+        margin-bottom: 14px;
+        color: #111111;
+        font-size: 0.82rem;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+    }
+
+    .hunting-combat-choice-card > strong {
+        display: block;
+        color: #111111;
+        font-size: clamp(2rem, 8vw, 3.4rem);
+        letter-spacing: -0.05em;
+    }
+
+    .hunting-combat-result-summary {
+        margin: 12px 0 0;
+        color: #555555;
+        font-size: 0.82rem;
+        font-weight: 800;
+    }
+
+    .hunting-combat-choice-actions {
+        display: grid;
+        gap: 10px;
+        margin-top: 16px;
+        padding-top: 14px;
+        border-top: 1px solid #e0e0e0;
+    }
+
+    .hunting-combat-choice-actions .hunting-choice-hint {
+        margin: 0;
+    }
+
+    .hunting-combat-result-tab {
+        grid-column: 3;
+        grid-row: 1;
+        justify-self: start;
+        align-self: center;
+        width: 40px;
+        min-height: 68px;
+        box-sizing: border-box;
+        border: 3px solid #202020;
+        border-left: 0;
+        border-radius: 0 12px 12px 0;
+        background: #ffffff;
+        color: #202020;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        font-family: inherit;
+        font-size: 0.62rem;
+        font-weight: 900;
+        letter-spacing: 0.03em;
+        line-height: 1.1;
+        cursor: pointer;
+        touch-action: manipulation;
+    }
+
+    .hunting-combat-result-tab span {
+        font-size: 0.52rem;
+        letter-spacing: 0.02em;
+    }
+
+    .hunting-combat-result-tab b {
+        font-size: 1.4rem;
+        line-height: 1;
+    }
+
+    .hunting-combat-result-tab:active {
+        transform: translateY(2px);
     }
 
     .hunting-overlay-card > span {
@@ -838,6 +1004,93 @@
     }
 
     @media (max-width: 600px) {
+        :scope.hunting-combat-result-active .hunting-overlay-card,
+        :scope.hunting-combat-result-active .hunting-combat-choice-card {
+            border-width: 3px;
+            padding: 10px 12px;
+        }
+
+        :scope.hunting-combat-result-active .hunting-overlay-card > span,
+        :scope.hunting-combat-result-active .hunting-combat-choice-card > span {
+            margin-bottom: 10px;
+        }
+
+        :scope.hunting-combat-result-active .hunting-overlay-card > xp-reward-panel {
+            margin-top: 12px;
+        }
+
+        :scope.hunting-combat-result-active .hunting-overlay-card > xp-reward-panel .xp-reward {
+            margin-top: 0;
+        }
+
+        .hunting-combat-result-tab {
+            width: 36px;
+            min-height: 62px;
+        }
+
+        @media (max-width: 359px) {
+            :scope.hunting-combat-result-active .hunting-overlay-frame {
+                grid-template-columns: minmax(0, 1fr) minmax(0, 9fr) minmax(0, 1fr);
+            }
+
+            :scope.hunting-combat-result-active .hunting-overlay-card,
+            :scope.hunting-combat-result-active .hunting-combat-choice-card {
+                padding: 7px 8px;
+            }
+
+            :scope.hunting-combat-result-active .hunting-overlay-card > span,
+            :scope.hunting-combat-result-active .hunting-combat-choice-card > span {
+                margin-bottom: 6px;
+                font-size: 0.72rem;
+            }
+
+            :scope.hunting-combat-result-active .hunting-overlay-card > xp-reward-panel {
+                margin-top: 6px;
+            }
+
+            :scope.hunting-combat-result-active .hunting-overlay-card > xp-reward-panel .xp-reward {
+                gap: 4px;
+                padding: 8px 10px;
+            }
+
+            :scope.hunting-combat-result-active .xp-reward-head,
+            :scope.hunting-combat-result-active .xp-reward-foot {
+                gap: 6px;
+            }
+
+            :scope.hunting-combat-result-active .xp-reward-head span,
+            :scope.hunting-combat-result-active .xp-reward-foot span,
+            :scope.hunting-combat-result-active .xp-reward-earned,
+            :scope.hunting-combat-result-active .xp-reward-next {
+                font-size: 0.68rem;
+                line-height: 1.2;
+            }
+
+            :scope.hunting-combat-result-active .xp-reward-head b {
+                font-size: 1.1rem;
+            }
+
+            :scope.hunting-combat-result-active .hunting-combat-choice-card > strong {
+                font-size: clamp(1.45rem, 7vw, 1.75rem);
+            }
+
+            .hunting-combat-result-summary {
+                margin-top: 8px;
+                font-size: 0.72rem;
+            }
+
+            .hunting-combat-choice-actions {
+                gap: 6px;
+                margin-top: 10px;
+                padding-top: 10px;
+            }
+
+            .hunting-combat-result-tab {
+                width: 32px;
+                min-height: 58px;
+            }
+        }
+
         .hunting-loot-hud {
             top: 4px;
             right: 4px;

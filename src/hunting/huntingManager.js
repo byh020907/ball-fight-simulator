@@ -1129,6 +1129,10 @@ export class HuntingManager {
             huntingCharacterName: name,
             huntingLootSummary: pendingText,
             huntingMoveMessage: `${run.floor}층 전투 승리 · 10층 전진 가능`,
+            huntingCombatResultActive: true,
+            huntingCombatResultStep: "experience",
+            huntingCombatResultTitle: `${run.floor}층 전투 완료`,
+            huntingCombatResultSummary: pendingText,
             ...hud
         });
         app.setStartButton({ hidden: true, disabled: true, text: "" });

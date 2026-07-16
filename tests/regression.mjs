@@ -3291,8 +3291,19 @@ function testHuntingNormalCombatWinUsesXpRewardPanel() {
     assert.equal(
         calls.state.huntingChoiceVisible,
         true,
-        "The next-floor choice must remain available beside the XP reward panel"
+        "The next-floor choice must remain available after the post-combat result cards"
     );
+    assert.equal(
+        calls.state.huntingCombatResultActive,
+        true,
+        "Normal hunting wins must open the dedicated two-card combat result flow"
+    );
+    assert.equal(
+        calls.state.huntingCombatResultStep,
+        "experience",
+        "Normal hunting wins must show the XP card before the combat-status card"
+    );
+    assert.equal(calls.state.huntingCombatResultTitle, "3층 전투 완료");
     assert.deepEqual(calls.startButton, { hidden: true, disabled: true, text: "" });
     console.log("[hunting-normal-win-xp-panel] ok");
 }

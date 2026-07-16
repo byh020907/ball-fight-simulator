@@ -162,7 +162,7 @@ hunting-overlay:has(~ start-button #startButton:not(.hidden)) #huntingOverlay {
 }
 
 game-overlay:has(~ start-button #startButton:not(.hidden)) #overlay .overlay-card,
-hunting-overlay:has(~ start-button #startButton:not(.hidden)) #huntingOverlay .hunting-overlay-card {
+hunting-overlay:not(.hunting-combat-result-active):has(~ start-button #startButton:not(.hidden)) #huntingOverlay .hunting-overlay-card {
     margin: auto 0;
     max-height: 100%;
     min-height: 0;
