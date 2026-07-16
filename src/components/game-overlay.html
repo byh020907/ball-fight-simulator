@@ -9,7 +9,12 @@
     x-transition:leave="overlay-leave"
     x-transition:leave-start="overlay-leave-start"
     x-transition:leave-end="overlay-leave-end"
-    x-bind:class="{ transient: transient, 'result-sequence-active': resultSequence, 'result-sequence-slide': resultSequenceSlide }"
+    x-bind:class="{
+        transient: transient,
+        'result-sequence-active': resultSequence,
+        'result-sequence-slide': resultSequenceSlide,
+        'result-sequence-empty-experience': resultSequence?.id === 'experience' && !resultSequence?.xpReward
+    }"
 >
     <div class="result-sequence-frame">
         <div class="overlay-card">
@@ -318,6 +323,15 @@
     :scope.result-sequence-active .overlay-card .xp-reward {
         width: min(420px, 100%);
         max-width: 100%;
+    }
+
+    @media (min-width: 601px) {
+        :scope.result-sequence-empty-experience .overlay-card > strong {
+            max-width: 17ch;
+            margin: 0 auto;
+            font-size: clamp(1.5rem, 2vw, 2.15rem);
+            line-height: 1.28;
+        }
     }
 
     :scope.result-sequence-slide .overlay-card {

@@ -642,6 +642,15 @@ function testResultOverlayLayoutContract() {
         "Final side tab must replace the arrow with confirmation"
     );
     assert.ok(
+        overlay.includes(
+            "'result-sequence-empty-experience': resultSequence?.id === 'experience' && !resultSequence?.xpReward"
+        ) &&
+            overlay.includes("@media (min-width: 601px)") &&
+            overlay.includes("max-width: 17ch;") &&
+            overlay.includes("font-size: clamp(1.5rem, 2vw, 2.15rem);"),
+        "Only empty XP result steps may use the smaller desktop result copy"
+    );
+    assert.ok(
         overlay.includes('Alpine.store("uiManager").invokeGameAction("confirmResultSequence")') &&
             bridge.includes("confirmResultSequence()"),
         "The final side tab must confirm through the shared game action bridge"
