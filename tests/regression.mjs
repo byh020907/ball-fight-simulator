@@ -18978,6 +18978,58 @@ function testRageAbilityThresholds() {
 
 testRageAbilityThresholds();
 
+function testRageAftershockUsesVector2Effects() {
+    const sim = new BattleSimulation(
+        [
+            createRoster().find((fighter) => fighter.id === FIGHTER_IDS.RAGE),
+            createRoster().find((fighter) => fighter.id === FIGHTER_IDS.ORBIT)
+        ],
+        { onLog() {}, onSound() {}, onDamageTaken() {}, onDamageDealt() {}, onHpChanged() {} }
+    );
+    const [rage, opponent] = sim.fighters;
+    rage.ability.setContext({ abilityTier: 3 });
+    rage.ability.state.timeWithoutCollision = rage.ability.getMaxChargeTime();
+    const hpBefore = opponent.hp;
+
+    rage.ability.onCollision(opponent, { contactPoint: { x: opponent.position.x, y: opponent.position.y } });
+    assert.ok(rage.ability.state.aftershock, "Rage Lv9 should queue an aftershock at full charge");
+
+    assert.doesNotThrow(() => {
+        for (let frame = 0; frame < 24; frame += 1) {
+            rage.ability.update(0.016);
+        }
+    }, "Rage Lv9 aftershock should pass Vector2 positions to effect APIs");
+    assert.equal(rage.ability.state.aftershock, null, "Rage aftershock should finish after its delay");
+    assert.ok(opponent.hp < hpBefore, "Rage aftershock should damage the target after its delay");
+    console.log("[rage-aftershock-vector2-effects] ok");
+}
+
+testRageAftershockUsesVector2Effects();
+
+function testRageExplosionUsesVector2Effects() {
+    const sim = new BattleSimulation(
+        [
+            createRoster().find((fighter) => fighter.id === FIGHTER_IDS.RAGE),
+            createRoster().find((fighter) => fighter.id === FIGHTER_IDS.ORBIT)
+        ],
+        { onLog() {}, onSound() {}, onDamageTaken() {}, onDamageDealt() {}, onHpChanged() {} }
+    );
+    const [rage, opponent] = sim.fighters;
+    rage.ability.setContext({ abilityTier: 2 });
+    rage.ability.state.timeWithoutCollision = rage.ability.getMaxChargeTime() * 0.8;
+    const hpBefore = opponent.hp;
+
+    assert.doesNotThrow(() => {
+        rage.ability.onCollision(opponent, {
+            contactPoint: { x: opponent.position.x, y: opponent.position.y }
+        });
+    }, "Rage Lv6 explosion should convert plain collision positions for effect APIs");
+    assert.ok(opponent.hp < hpBefore, "Rage explosion should damage the target from its collision center");
+    console.log("[rage-explosion-vector2-effects] ok");
+}
+
+testRageExplosionUsesVector2Effects();
+
 function testEaterAbilityDigestion() {
     const sim = new BattleSimulation(
         [createRoster().find((f) => f.id === FIGHTER_IDS.EATER), createRoster().find((f) => f.id === FIGHTER_IDS.SPIN)],

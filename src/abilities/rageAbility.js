@@ -99,10 +99,10 @@ export class RageAbility extends Ability {
     _localToWorld(ball, localPoint) {
         const cos = Math.cos(ball.angle);
         const sin = Math.sin(ball.angle);
-        return {
-            x: ball.position.x + localPoint.x * cos - localPoint.y * sin,
-            y: ball.position.y + localPoint.x * sin + localPoint.y * cos
-        };
+        return new Vector2(
+            ball.position.x + localPoint.x * cos - localPoint.y * sin,
+            ball.position.y + localPoint.x * sin + localPoint.y * cos
+        );
     }
 
     onCollision(target, context) {
@@ -154,7 +154,8 @@ export class RageAbility extends Ability {
     }
 
     _applyExplosion(target, context) {
-        const center = context?.contactPoint ?? target.position.clone();
+        const contactPoint = context?.contactPoint ?? target.position;
+        const center = new Vector2(contactPoint.x, contactPoint.y);
         const rawDamage = Math.round(this.owner.stats.baseDamage * EXPLOSION_DAMAGE_MULT);
         const enemies = this.simulation.getEnemiesOf(this.owner);
         for (const enemy of enemies) {
