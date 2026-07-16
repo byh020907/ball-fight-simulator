@@ -95,7 +95,7 @@ export function createComponentBridge(app) {
             return app.hunting.retreat();
         },
         huntingAdvance() {
-            return app.hunting.advance();
+            return app.hunting.advance({ waitForFirstMoveUi: true });
         },
         huntingMerchantChoose(idx) {
             return app.hunting.merchantChoose(idx);

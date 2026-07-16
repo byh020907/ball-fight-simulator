@@ -2029,6 +2029,7 @@ function testComponentBridgeCallsGameHandlers(app) {
     let openedStageSelect = false;
     let retreated = false;
     let advanced = false;
+    let advanceOptions = null;
     let chestContinued = false;
     const originalStartTournament = app.startTournament;
     const originalShowStageSelect = app.hunting.showStageSelect;
@@ -2046,8 +2047,9 @@ function testComponentBridgeCallsGameHandlers(app) {
         app.hunting.retreat = () => {
             retreated = true;
         };
-        app.hunting.advance = () => {
+        app.hunting.advance = (options) => {
             advanced = true;
+            advanceOptions = options;
         };
         app.hunting.chestContinue = () => {
             chestContinued = true;
@@ -2071,6 +2073,11 @@ function testComponentBridgeCallsGameHandlers(app) {
     assert.equal(openedStageSelect, true, "Hunting button bridge action should open stage selection");
     assert.equal(retreated, true, "Overlay retreat action should call HuntingManager.retreat");
     assert.equal(advanced, true, "Overlay advance action should call HuntingManager.advance");
+    assert.deepEqual(
+        advanceOptions,
+        { waitForFirstMoveUi: true },
+        "Player-triggered hunting advance must wait for the movement card to paint"
+    );
     assert.equal(chestContinued, true, "Chest reward action should call HuntingManager.chestContinue");
 }
 
@@ -2295,12 +2302,19 @@ function testHuntingChestEventStopsAndResumes() {
     );
 
     let advanceCalls = 0;
-    manager.advance = () => {
+    let advanceOptions = null;
+    manager.advance = (options) => {
         advanceCalls += 1;
+        advanceOptions = options;
     };
     manager.chestContinue();
 
     assert.equal(advanceCalls, 1, "Chest continue should resume the advance loop");
+    assert.deepEqual(
+        advanceOptions,
+        { waitForFirstMoveUi: true },
+        "Chest continue must paint the resumed movement card before advancing"
+    );
     assert.equal(overlayCalls.at(-1).huntingChestEventActive, false, "Chest continue should close the chest reward UI");
     console.log("[hunting-chest-event] ok");
 }
@@ -2443,12 +2457,19 @@ function testHuntingAutoEventRequiresConfirmation() {
     assert.equal(overlayCalls.at(-1).huntingEventDetail, "파편 +8", "Event result UI should show the concrete gain");
 
     let advanceCalls = 0;
-    manager.advance = () => {
+    let advanceOptions = null;
+    manager.advance = (options) => {
         advanceCalls += 1;
+        advanceOptions = options;
     };
     manager.eventContinue();
 
     assert.equal(advanceCalls, 1, "Confirming an auto event should resume the route exactly once");
+    assert.deepEqual(
+        advanceOptions,
+        { waitForFirstMoveUi: true },
+        "Event confirmation must paint the resumed movement card before advancing"
+    );
     assert.equal(
         overlayCalls.at(-1).huntingEventActive,
         false,
@@ -15376,6 +15397,32 @@ function testHuntingMerchantPurchaseRefreshesUiState() {
     console.log("[hunting-merchant-ui-refresh] ok");
 }
 
+function testHuntingMerchantPassPaintsResumedMove() {
+    const overlayStates = [];
+    const app = {
+        setHuntingOverlayState(data) {
+            overlayStates.push(data);
+        }
+    };
+    const manager = new HuntingManager(app);
+    manager._run = createHuntingRun({ characterId: FIGHTER_IDS.RAGE, stageId: HUNTING_STAGE_IDS.CAVE });
+
+    let advanceOptions = null;
+    manager.advance = (options) => {
+        advanceOptions = options;
+    };
+
+    manager.merchantPass();
+
+    assert.deepEqual(
+        advanceOptions,
+        { waitForFirstMoveUi: true },
+        "Merchant pass must paint the resumed movement card before advancing"
+    );
+    assert.equal(overlayStates.at(-1).huntingMerchantActive, false, "Merchant pass should close the merchant screen");
+    console.log("[hunting-merchant-pass-paint] ok");
+}
+
 function testResultConfirmationReturnsInitialState() {
     const appSource = readFileSync("src/app.js", "utf8");
     assert.ok(
@@ -16624,6 +16671,7 @@ function testPreviewReselectTransitionFinalizes(app) {
 
 testHuntingMerchantOffers();
 testHuntingMerchantPurchaseRefreshesUiState();
+testHuntingMerchantPassPaintsResumedMove();
 testAppLifecycleTransitions();
 await testScreenWakeLock();
 testBattleAppControlsScreenWakeLock();

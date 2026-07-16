@@ -978,7 +978,7 @@ export class HuntingManager {
             huntingMerchantResult: ""
         });
         this._run = { ...setHuntingRunPhase(this._run, HUNTING_RUN_PHASES.READY), merchantOffers: null };
-        this.advance();
+        this.advance({ waitForFirstMoveUi: true });
     }
 
     chestContinue() {
@@ -1017,11 +1017,11 @@ export class HuntingManager {
 
     _continueEventAdvance() {
         this._run = setHuntingRunPhase(this._run, HUNTING_RUN_PHASES.READY);
-        this.advance();
+        this.advance({ waitForFirstMoveUi: true });
     }
 
     _continueChestRoom() {
-        this.advance();
+        this.advance({ waitForFirstMoveUi: true });
     }
 
     _continueCombatRewardChest() {
