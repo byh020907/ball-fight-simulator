@@ -9972,6 +9972,7 @@ function testHuntingElectricChannelCooldown(app) {
         const [caster, target] = simulation.fighters;
         caster.position = new Vector2(340, 480);
         caster.velocity = new Vector2();
+        caster.stats.criticalChance = 0;
         target.position = new Vector2(580, 480);
         target.velocity = new Vector2();
         return { caster, target };
@@ -19003,6 +19004,53 @@ function testEaterAbilityDigestion() {
 }
 
 testEaterAbilityDigestion();
+
+function testEaterOrbitDigestionLifecycleKeepsBattleProgressing() {
+    const sim = new BattleSimulation(
+        [
+            createRoster().find((fighter) => fighter.id === FIGHTER_IDS.EATER),
+            createRoster().find((fighter) => fighter.id === FIGHTER_IDS.ORBIT)
+        ],
+        { onLog() {}, onSound() {}, onDamageTaken() {}, onDamageDealt() {}, onHpChanged() {} }
+    );
+    const [eater, orbit] = sim.fighters;
+    eater.ability.setContext({ abilityTier: 3 });
+    orbit.ability.setContext({ abilityTier: 3 });
+    eater.position.x = 480;
+    eater.position.y = 480;
+    orbit.position.x = 480;
+    orbit.position.y = 480;
+    eater.ability.state.feastTimer = 1;
+    const orbitHpBefore = orbit.hp;
+
+    eater.ability.onCollision(orbit);
+    assert.equal(orbit.state.swallowed?.owner, eater, "Eater should hold Orbit during digestion");
+
+    for (let frame = 0; frame < 47; frame += 1) {
+        sim.update(0.016);
+    }
+
+    assert.equal(eater.ability.state.digestionTick, 6, "Eater should complete all six digestion ticks");
+    assert.ok(orbit.hp < orbitHpBefore, "Orbit should receive the digestion damage");
+    assert.equal(eater.ability.state.swallowedTarget, null, "Eater should release Orbit after the hold duration");
+    assert.equal(orbit.state.swallowed, null, "Orbit should resume normal battle updates after release");
+    assert.equal(sim.finished, false, "Digestion must not stall or prematurely end an active duel");
+    assert.ok(sim.entities.length < 140, "Digestion feedback should stay below the mobile render budget");
+
+    orbit.position.x = sim.width + orbit.radius + 5;
+    assert.doesNotThrow(
+        () => sim.keepInsideArena(orbit),
+        "Lv9 wall rupture should accept particle positions from the arc"
+    );
+    assert.equal(
+        eater.ability.state.lv9WallRuptureUsed,
+        true,
+        "Lv9 wall rupture should resolve after Orbit hits a wall"
+    );
+    console.log("[eater-orbit-digestion-lifecycle] ok");
+}
+
+testEaterOrbitDigestionLifecycleKeepsBattleProgressing();
 
 function testTerrainCollisionReturnsResult() {
     const entity = {

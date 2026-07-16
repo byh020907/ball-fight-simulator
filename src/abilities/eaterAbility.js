@@ -14,6 +14,7 @@ const FEAST_HOMING_TURN_RATE = 3.5;
 const DIGEST_TICK_COUNT = 6;
 const DIGEST_TICK_INTERVAL = 0.12;
 const DIGEST_DAMAGE_PER_TICK = 0.12;
+const DIGEST_PARTICLE_COUNT = 2;
 
 const SPIT_LEVEL6_DAMAGE_MULT = 1.0;
 const SPIT_LEVEL6_SPEED_MULT = 3.0;
@@ -107,10 +108,24 @@ export class EaterAbility extends Ability {
             if (target && !target.flags.defeated) {
                 const dmg = Math.round(this.owner.stats.baseDamage * DIGEST_DAMAGE_PER_TICK);
                 target.takeDamage(dmg, this.owner, "Digestion");
-                this.simulation.spawnPulse(target.position.clone(), "#ffffff");
+                this._emitDigestionFeedback(target);
             }
             this.state.digestionTick++;
         }
+    }
+
+    _emitDigestionFeedback(target) {
+        this.simulation.spawnParticleBurst(target.position.clone(), "#ffffff", {
+            count: DIGEST_PARTICLE_COUNT,
+            speed: 90,
+            radiusMin: 1,
+            radiusMax: 2,
+            upBias: 30,
+            gravity: 480,
+            life: 0.45,
+            bounce: 0.04,
+            settleDelay: 0.08
+        });
     }
 
     getStatModifiers() {
@@ -240,10 +255,7 @@ export class EaterAbility extends Ability {
                     normal.y * Math.cos(angle) - perpDir.y * Math.sin(angle)
                 );
                 const r = (WALL_RUPTURE_RADIUS * 0.28 * t) / 0.28;
-                semispherePts.push({
-                    x: contactPoint.x + dir.x * r,
-                    y: contactPoint.y + dir.y * r
-                });
+                semispherePts.push(new Vector2(contactPoint.x + dir.x * r, contactPoint.y + dir.y * r));
             }
             for (const pt of semispherePts) {
                 this.simulation.spawnParticleBurst(pt, this.owner.color, {
