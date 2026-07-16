@@ -196,13 +196,13 @@ export const REWARD_BALANCE = deepFreeze({
             ],
             vampire: [
                 { level: 2 },
-                { level: 3, abilityTier: 1, gameText: "박쥐 수 +1" },
+                { level: 3, abilityTier: 1, gameText: "반복 물기 ×0.05 · 반동 재돌입" },
                 { level: 4 },
                 { level: 5 },
-                { level: 6, abilityTier: 2, gameText: "박쥐 초기 속도 +15%" },
+                { level: 6, abilityTier: 2, gameText: "수명 종료 폭발 65px · ×0.05" },
                 { level: 7 },
                 { level: 8 },
-                { level: 9, abilityTier: 3, gameText: "박쥐 수명 +20%" },
+                { level: 9, abilityTier: 3, gameText: "피의 견인 180px/s · 혈액 파열 ×0.15" },
                 { level: 10 }
             ],
             gunner: [
@@ -301,7 +301,7 @@ export const REWARD_BALANCE = deepFreeze({
                 ]
             },
             vampire: {
-                tiers: [{}, { batCountMultiplier: 1.15 }, { batSpeedMultiplier: 1.15 }, { batLifeMultiplier: 1.2 }]
+                tiers: [{}, { repeatBite: true }, { lifeBurst: true }, { bloodPull: true }]
             },
             gunner: {
                 tiers: [

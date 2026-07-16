@@ -19,6 +19,21 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.27.0",
+        date: "2026-07-17",
+        title: "v0.27.0 Vampire 레벨 보상 개편",
+        changes: [
+            {
+                type: "feature",
+                text: "Vampire Lv.3 박쥐가 실제 접촉마다 반복 물기하고, 반동 뒤 다시 사냥감을 추적합니다."
+            },
+            {
+                type: "feature",
+                text: "Vampire Lv.6 박쥐가 서로 다른 수명 끝에 순차 폭발하고, Lv.9 물기는 피의 견인과 본체 충돌 혈액 파열로 이어집니다."
+            }
+        ]
+    },
+    {
         version: "0.26.1",
         date: "2026-07-16",
         title: "v0.26.1 Archer 실시간 조준 복구",

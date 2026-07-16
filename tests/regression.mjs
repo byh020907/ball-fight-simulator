@@ -4970,12 +4970,16 @@ function testAbilityLevelUpgrades(app) {
     const vampireRun = createTierSimulation(FIGHTER_IDS.VAMPIRE);
     vampireRun.ball.ability._spawnBats(vampireRun.target);
     const tierBats = vampireRun.sim.entities.filter((entity) => entity.constructor?.name === "BatProjectile");
-    assert.equal(tierBats.length, 8, "Vampire tier 1 should launch eight bats");
-    assertClose(tierBats[0].life, 4.8, "Vampire tier 3 should extend bat life by 20%");
+    assert.equal(tierBats.length, 7, "Vampire level rewards should keep the base seven-bat swarm");
     assertClose(
         tierBats[0].velocity.length(),
-        vampireRun.ball.stats.baseSpeed * 0.5 * 1.15,
-        "Vampire tier 2 should increase bat speed by 15%"
+        vampireRun.ball.stats.baseSpeed * 0.5,
+        "Vampire level rewards should keep the base launch speed"
+    );
+    assert.deepEqual(
+        vampireRun.ball.ability.getLevelUpgrade(),
+        { repeatBite: true, lifeBurst: true, bloodPull: true },
+        "Vampire tiers should expose only the three behavior rewards"
     );
 
     const gunnerRun = createTierSimulation(FIGHTER_IDS.GUNNER);
@@ -5113,6 +5117,276 @@ function testAbilityLevelUpgrades(app) {
         "Hero tier 3 should release half of twenty consumed stacks as normal orbs"
     );
     console.log("[ability-level-upgrades] ok");
+}
+
+function testVampireLevelRewardContracts(app) {
+    const tierLevels = [1, 3, 6, 9];
+    const setVelocity = (body, velocity) => {
+        body.applyImpulse(Vector2.subtract(velocity, body.velocity));
+    };
+    const createRun = (tier, { ally = false } = {}) => {
+        const vampireSpec = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.VAMPIRE);
+        const enemySpec = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
+        const specs = [
+            { ...vampireSpec, teamId: "vampire-team" },
+            { ...enemySpec, id: `vampire-reward-target-${tier}`, teamId: "enemy-team" }
+        ];
+        if (ally) {
+            const allySpec = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.GUNNER);
+            specs.push({ ...allySpec, id: `vampire-reward-ally-${tier}`, teamId: "vampire-team" });
+        }
+        const simulation = new BattleSimulation(specs, { onLog() {}, onSound() {} }, null, {
+            assignActions: false,
+            arenaWidth: 2_000,
+            arenaHeight: 960
+        });
+        const [owner, target, friendly] = simulation.fighters;
+        applyExperienceProgressionToBall(owner, getCharacterLevelProgression(FIGHTER_IDS.VAMPIRE, tierLevels[tier]));
+        simulation.spawnParticleBurst = () => {};
+        simulation.spawnExplosion = () => {};
+        simulation.spawnPulse = () => {};
+        simulation.spawnDamageNumber = () => {};
+        simulation.spawnCriticalNumber = () => {};
+        simulation.spawnActionText = () => {};
+        simulation.shakeScreen = () => {};
+        owner.stats.baseDamage = 100;
+        owner.stats.criticalChance = 0;
+        target.maxHp = 100;
+        target.hp = 100;
+        target.stats.baseDefense = 0;
+        target.position = new Vector2(700, 480);
+        owner.position = new Vector2(300, 480);
+        setVelocity(owner, new Vector2());
+        setVelocity(target, new Vector2());
+        if (friendly) {
+            friendly.position = new Vector2(700, 480);
+            setVelocity(friendly, new Vector2());
+        }
+        return { simulation, owner, target, friendly };
+    };
+    const spawnBats = (run, rolls = null) => {
+        const previousRandom = Math.random;
+        if (rolls) {
+            const values = [...rolls];
+            Math.random = () => values.shift() ?? 0.5;
+        }
+        try {
+            run.owner.ability._spawnBats(run.target);
+        } finally {
+            Math.random = previousRandom;
+        }
+        return run.simulation.entities.filter((entity) => entity.constructor?.name === "BatProjectile");
+    };
+    const placeBatInContact = (bat, target) => {
+        bat.position = new Vector2(target.position.x - target.radius - bat.radius + 1, target.position.y);
+        setVelocity(bat, new Vector2());
+    };
+
+    const progressionRows = REWARD_BALANCE.experience.characterLevelProgressions.vampire.filter(
+        (entry) => entry.abilityTier
+    );
+    assert.deepEqual(
+        progressionRows.map((entry) => entry.gameText),
+        ["반복 물기 ×0.05 · 반동 재돌입", "수명 종료 폭발 65px · ×0.05", "피의 견인 180px/s · 혈액 파열 ×0.15"],
+        "Vampire level rewards should describe the three behavior tiers"
+    );
+    assert.deepEqual(
+        REWARD_BALANCE.experience.abilityUpgrades.vampire.tiers,
+        [{}, { repeatBite: true }, { lifeBurst: true }, { bloodPull: true }],
+        "Vampire level tiers should not retain count, speed, or lifetime multipliers"
+    );
+
+    const lifetimeRun = createRun(3);
+    const lifeRolls = [0, 0.200001, 0.4, 0.5, 0.6, 0.8, 0.999999];
+    const lifetimeBats = spawnBats(lifetimeRun, lifeRolls);
+    assert.equal(lifetimeBats.length, 7, "Vampire should always launch seven bats");
+    assert.ok(
+        lifetimeBats.every((bat) => bat.life >= 3.25 && bat.life <= 4.75 && bat.maxLife === bat.life),
+        "Every bat should receive an independent 3.25-4.75 second base lifetime"
+    );
+    assert.ok(
+        Math.abs(lifetimeBats.reduce((sum, bat) => sum + bat.life, 0) / lifetimeBats.length - 4) < 1e-6,
+        "Symmetric deterministic lifetime rolls should preserve the four-second average"
+    );
+    assert.equal(
+        new Set(lifetimeBats.map((bat) => bat.life)).size,
+        7,
+        "A swarm should retain independently rolled lifetimes"
+    );
+
+    const baseRun = createRun(0);
+    baseRun.owner.hp = 50;
+    const [baseBat] = spawnBats(baseRun, Array(7).fill(0.5));
+    placeBatInContact(baseBat, baseRun.target);
+    baseBat.update(0, baseRun.simulation);
+    assert.equal(baseRun.target.hp, 80, "Lv.1-2 bat bites should keep the base total-attack x0.20 damage");
+    assert.equal(baseRun.owner.hp, 64, "Base bat healing should use 70% of actual bite damage");
+    assert.equal(baseBat.isExpired, true, "Lv.1-2 bats should still expire after the first real contact");
+
+    const repeatRun = createRun(1);
+    repeatRun.owner.hp = 50;
+    const [repeatBat] = spawnBats(repeatRun, Array(7).fill(0.5));
+    placeBatInContact(repeatBat, repeatRun.target);
+    repeatBat.update(0, repeatRun.simulation);
+    assert.equal(repeatRun.target.hp, 95, "Lv.3 bites should deal total-attack x0.05");
+    assert.equal(repeatRun.owner.hp, 54, "Lv.3 bites should heal 70% of actual damage exactly once");
+    assert.equal(repeatBat.isExpired, false, "Lv.3 bats should survive their first bite");
+    assert.ok(
+        Math.abs(repeatBat.velocity.length() - 240) < 1e-9 && repeatBat.velocity.x < 0,
+        "Lv.3 bites should apply a 240px/s outward recoil impulse"
+    );
+    assert.equal(repeatBat.isHomingLocked, true, "Lv.3 recoil should pause homing for 0.15 seconds");
+    repeatBat.update(0, repeatRun.simulation);
+    assert.equal(repeatRun.target.hp, 95, "A repeated contact inside one second should not bite again");
+    repeatRun.target.position = new Vector2(1_700, 480);
+    repeatBat.update(0.99, repeatRun.simulation);
+    repeatRun.target.position = new Vector2(700, 480);
+    placeBatInContact(repeatBat, repeatRun.target);
+    repeatBat.update(0, repeatRun.simulation);
+    assert.equal(repeatRun.target.hp, 95, "The per-bat target cooldown should still block at 0.99 seconds");
+    repeatRun.target.position = new Vector2(1_700, 480);
+    repeatBat.update(0.01, repeatRun.simulation);
+    repeatRun.target.position = new Vector2(700, 480);
+    placeBatInContact(repeatBat, repeatRun.target);
+    repeatBat.update(0, repeatRun.simulation);
+    assert.equal(repeatRun.target.hp, 90, "A new real contact should bite again after one second");
+    assert.equal(repeatBat.isHomingLocked, true, "Every successful repeat bite should restart the homing pause");
+    const repeatBatContext = makeRecordingCanvasContext();
+    assert.doesNotThrow(() => repeatBat.draw(repeatBatContext), "The recoil bat visual should render without errors");
+    assert.ok(
+        repeatBatContext.calls.some((call) => call[0] === "setLineDash"),
+        "A recoiling bat should render the dotted blood trail"
+    );
+    const biteEffect = repeatRun.simulation.entities.find((entity) => entity.constructor?.name === "BloodBiteEffect");
+    assert.ok(biteEffect, "A successful bite should emit the crescent bite effect");
+    assert.doesNotThrow(
+        () => biteEffect.draw(makeRecordingCanvasContext()),
+        "The crescent bite effect should render without errors"
+    );
+
+    const guardedRun = createRun(1);
+    guardedRun.owner.hp = 50;
+    guardedRun.target.hp = 3;
+    guardedRun.target.stats.baseDefense = 2;
+    let projectileGuardCalls = 0;
+    let damageCalls = 0;
+    let healCalls = 0;
+    guardedRun.target.actionContext.onProjectileDamage = (rawDamage) => {
+        projectileGuardCalls += 1;
+        return rawDamage;
+    };
+    const originalTakeDamage = guardedRun.target.takeDamage.bind(guardedRun.target);
+    guardedRun.target.takeDamage = (...args) => {
+        damageCalls += 1;
+        return originalTakeDamage(...args);
+    };
+    const originalHeal = guardedRun.owner.heal.bind(guardedRun.owner);
+    guardedRun.owner.heal = (amount) => {
+        healCalls += 1;
+        return originalHeal(amount);
+    };
+    const [guardedBat] = spawnBats(guardedRun, Array(7).fill(0.5));
+    placeBatInContact(guardedBat, guardedRun.target);
+    guardedBat.update(0, guardedRun.simulation);
+    assert.equal(guardedRun.target.hp, 0, "Bite damage should respect defense and remaining HP");
+    assert.equal(guardedRun.owner.hp, 52, "Bite healing should use capped actual damage instead of raw damage");
+    assert.deepEqual(
+        [projectileGuardCalls, damageCalls, healCalls],
+        [1, 1, 1],
+        "A bite should traverse projectile defense, damage, and healing exactly once"
+    );
+
+    const burstRun = createRun(2, { ally: true });
+    burstRun.owner.hp = 50;
+    const [burstBat] = spawnBats(burstRun, Array(7).fill(0.5));
+    burstBat.position = new Vector2(700, 480);
+    burstRun.target.position = new Vector2(750, 480);
+    burstRun.friendly.position = new Vector2(750, 480);
+    const friendlyHp = burstRun.friendly.hp;
+    burstBat.life = 0.01;
+    burstBat.update(0.02, burstRun.simulation);
+    assert.equal(burstRun.target.hp, 95, "Lv.6 natural expiration should deal x0.05 inside 65px");
+    assert.equal(burstRun.friendly.hp, friendlyHp, "Lv.6 expiration should not damage the owner team");
+    assert.equal(burstRun.owner.hp, 54, "Lv.6 expiration should heal from actual damage exactly once");
+    assert.equal(burstBat.isExpired, true, "The bat should expire after its lifetime burst");
+    const burstEffects = burstRun.simulation.entities.filter(
+        (entity) => entity.constructor?.name === "BloodBatBurstEffect"
+    );
+    assert.equal(burstEffects.length, 1, "Lv.6 natural expiration should emit one sequential blood-bat burst effect");
+    assert.doesNotThrow(
+        () => burstEffects[0].draw(makeRecordingCanvasContext()),
+        "The sequential blood-bat burst should render without errors"
+    );
+    burstBat.update(0.02, burstRun.simulation);
+    assert.equal(burstRun.target.hp, 95, "An expired bat should never burst twice");
+
+    const pullRun = createRun(3);
+    pullRun.owner.hp = 50;
+    const pullBats = spawnBats(pullRun, Array(7).fill(0.5));
+    placeBatInContact(pullBats[0], pullRun.target);
+    placeBatInContact(pullBats[1], pullRun.target);
+    pullBats[0].update(0, pullRun.simulation);
+    pullBats[1].update(0, pullRun.simulation);
+    assert.ok(
+        Math.abs(pullRun.target.velocity.x + 180) < 1e-9 && Math.abs(pullRun.target.velocity.y) < 1e-9,
+        "Same-frame bites should apply only one 180px/s pull toward Vampire"
+    );
+    assert.equal(
+        pullRun.owner.ability.getBloodMarkRemaining(pullRun.target),
+        0.6,
+        "Blood pull should mark 0.6s vulnerability"
+    );
+    assert.equal(
+        pullRun.simulation.entities.filter((entity) => entity.constructor?.name === "BloodTetherEffect").length,
+        1,
+        "Same-frame bites should emit only one short blood tether"
+    );
+    const tetherEffect = pullRun.simulation.entities.find((entity) => entity.constructor?.name === "BloodTetherEffect");
+    const markEffect = pullRun.simulation.entities.find((entity) => entity.constructor?.name === "BloodMarkEffect");
+    assert.doesNotThrow(
+        () => tetherEffect.draw(makeRecordingCanvasContext()),
+        "The short blood tether should render without errors"
+    );
+    assert.doesNotThrow(
+        () => markEffect.draw(makeRecordingCanvasContext()),
+        "The blood vulnerability mark should render without errors"
+    );
+    setVelocity(pullRun.target, new Vector2());
+    pullRun.target.position = new Vector2(
+        pullRun.owner.position.x + pullRun.owner.radius + pullRun.target.radius - 1,
+        pullRun.owner.position.y
+    );
+    const hpBeforeRupture = pullRun.target.hp;
+    pullRun.owner.ability.onCollision(pullRun.target, { contactPoint: pullRun.target.position.clone() });
+    assert.equal(pullRun.target.hp, hpBeforeRupture - 15, "The first marked body collision should deal x0.15 rupture");
+    assert.equal(pullRun.owner.hp, 69, "Two bites and one rupture should each heal once from actual damage");
+    const ruptureEffect = pullRun.simulation.entities.find(
+        (entity) => entity.constructor?.name === "BloodRuptureEffect"
+    );
+    assert.ok(ruptureEffect, "A marked body collision should emit the blood rupture effect");
+    assert.doesNotThrow(
+        () => ruptureEffect.draw(makeRecordingCanvasContext()),
+        "The blood rupture effect should render without errors"
+    );
+    assert.equal(
+        pullRun.owner.ability.getBloodMarkRemaining(pullRun.target),
+        0,
+        "Rupture should consume vulnerability"
+    );
+    pullRun.owner.ability.onCollision(pullRun.target, { contactPoint: pullRun.target.position.clone() });
+    assert.equal(pullRun.target.hp, hpBeforeRupture - 15, "Consumed vulnerability should not rupture twice");
+
+    const expiredMarkRun = createRun(3);
+    const [expiredMarkBat] = spawnBats(expiredMarkRun, Array(7).fill(0.5));
+    placeBatInContact(expiredMarkBat, expiredMarkRun.target);
+    expiredMarkBat.update(0, expiredMarkRun.simulation);
+    expiredMarkRun.owner.ability.update(0.61, expiredMarkRun.target);
+    assert.equal(
+        expiredMarkRun.owner.ability.getBloodMarkRemaining(expiredMarkRun.target),
+        0,
+        "Blood vulnerability should expire after 0.6 seconds"
+    );
+    console.log("[vampire-level-reward-contracts] ok");
 }
 
 function testMultiAbilityFoundation(app) {
@@ -13376,6 +13650,7 @@ await testGrenadeScatterShot(app);
 testExperienceSystem();
 testCharacterLevelProgressions(app);
 testAbilityLevelUpgrades(app);
+testVampireLevelRewardContracts(app);
 testMultiAbilityFoundation(app);
 testHuntingSystem();
 await testHuntingAchievementProgress();
