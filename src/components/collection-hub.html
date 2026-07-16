@@ -499,8 +499,18 @@
                         x-model.number="state.developer.huntingFloor"
                     />
                 </label>
+                <label class="ch-developer-field">
+                    <span>이벤트 미리보기</span>
+                    <select class="ch-select" x-model="state.developer.huntingEventType">
+                        <template x-for="event in state.developer.events" :key="event.id">
+                            <option x-bind:value="event.id" x-text="event.label"></option>
+                        </template>
+                    </select>
+                </label>
             </div>
             <div class="ch-developer-actions">
+                <button class="ch-btn" type="button" @click="seedDebugCollectionSample()">컬렉션 샘플</button>
+                <button class="ch-btn" type="button" @click="startDebugHuntingEvent()">이벤트 미리보기</button>
                 <button class="ch-btn" type="button" @click="startDebugHunting()">사냥터 시작</button>
                 <button class="ch-btn ch-btn--danger" type="button" @click="exitDebugMode()">디버그 종료</button>
             </div>
@@ -659,6 +669,7 @@
 <script>
     window.createGameUI("collectionHub", () => {
         let dialogElement = null;
+        let tabResizeObserver = null;
 
         function focusDialog() {
             requestAnimationFrame(() => dialogElement.focus());
@@ -700,7 +711,9 @@
                 huntingStageId: "cave",
                 huntingFloor: 1,
                 maxFloor: 100,
-                stages: []
+                stages: [],
+                huntingEventType: "portal",
+                events: []
             },
             summary: {},
 
@@ -856,6 +869,16 @@
             });
         }
 
+        function observeTabLayout() {
+            tabResizeObserver = new ResizeObserver(revealActiveTab);
+            tabResizeObserver.observe(dialogElement);
+        }
+
+        function stopObservingTabLayout() {
+            tabResizeObserver.disconnect();
+            tabResizeObserver = null;
+        }
+
         function syncDeveloperTarget() {
             const target = state.rosterItems.find((item) => item.id === state.developer.targetCharacterId);
             state.developer.rebirthCount = target?.rebirth?.rebirthCount ?? 0;
@@ -865,6 +888,11 @@
             state,
             init() {
                 dialogElement = this.$root;
+                observeTabLayout();
+            },
+            destroy() {
+                stopObservingTabLayout();
+                dialogElement = null;
             },
             closeCollectionHub,
             setCollectionTab,
@@ -915,11 +943,22 @@
             recordDebugTournamentWin() {
                 return this.bridge.recordDebugTournamentWin(state.developer.targetCharacterId);
             },
+            seedDebugCollectionSample() {
+                return this.bridge.seedDebugCollectionSample(state.developer.targetCharacterId);
+            },
             startDebugHunting() {
                 return this.bridge.startDebugHunting(
                     state.developer.targetCharacterId,
                     state.developer.huntingStageId,
                     state.developer.huntingFloor
+                );
+            },
+            startDebugHuntingEvent() {
+                return this.bridge.startDebugHuntingEvent(
+                    state.developer.targetCharacterId,
+                    state.developer.huntingStageId,
+                    state.developer.huntingFloor,
+                    state.developer.huntingEventType
                 );
             },
             exitDebugMode() {
@@ -966,7 +1005,9 @@
                     huntingStageId: state.developer.huntingStageId ?? developer.stages?.[0]?.id ?? "cave",
                     huntingFloor: state.developer.huntingFloor ?? 1,
                     maxFloor: developer.maxFloor ?? 100,
-                    stages: developer.stages ?? []
+                    stages: developer.stages ?? [],
+                    huntingEventType: state.developer.huntingEventType ?? developer.events?.[0]?.id ?? "portal",
+                    events: developer.events ?? []
                 };
                 state.tabs = vm.tabs ?? [];
                 if (!state.tabs.some((tab) => tab.id === state.activeTab)) setCollectionTab("roster");

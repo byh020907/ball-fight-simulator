@@ -280,7 +280,7 @@ import { PHYSICS_MATERIALS, resolvePhysicsMaterial, combinePhysicsMaterials } fr
 import PhysicsMaterialBody from "../src/physics/PhysicsMaterialBody.js";
 import { AppLifecycle, APP_LIFECYCLE_STATES } from "../src/appLifecycle.js";
 import { ScreenWakeLock } from "../src/screenWakeLock.js";
-import { recordDeveloperTournamentWin } from "../src/developer/developerTools.js";
+import { recordDeveloperTournamentWin, seedDeveloperCollectionSample } from "../src/developer/developerTools.js";
 import { advanceResultSequence, createResultSequence, getResultSequencePresentation } from "../src/resultSequence.js";
 
 const EMPTY_EQUIPMENT_SUMMARY = {
@@ -6460,6 +6460,73 @@ async function testDebugHuntingStartsRequestedFloor() {
     console.log("[debug-hunting-requested-floor] ok");
 }
 
+async function testDebugHuntingEventPreviewUsesProductionEventFlow() {
+    const profile = createDefaultPlayerProfile();
+    const overlayStates = [];
+    const app = {
+        playerProfile: profile,
+        playerFighterId: FIGHTER_IDS.RAGE,
+        playerStatAllocation: createEmptyStatAllocation(),
+        roster: createRoster(),
+        renderer: { clear() {} },
+        stopPlayerPreviewLoop() {},
+        beginGameSession() {},
+        _refreshCollectionHub() {},
+        _syncPlayerStatAllocationFromUi() {},
+        refreshPlayerSetup() {},
+        setHuntingActive() {},
+        setHuntingOverlayState(data) {
+            overlayStates.push({ ...data });
+        },
+        showOverlay() {},
+        addLog(message) {
+            this.lastLog = message;
+        }
+    };
+    const manager = new HuntingManager(app);
+    let advanceCalled = false;
+    manager.advance = async () => {
+        advanceCalled = true;
+    };
+
+    const originalDialog = PopupService._testDialog;
+    PopupService.setTestDialog({ close() {} });
+    try {
+        await manager.startDebugEventPreview(FIGHTER_IDS.RAGE, {
+            stageId: HUNTING_STAGE_IDS.FOREST,
+            encounterFloor: 17,
+            eventType: HUNTING_EVENT_TYPES.PORTAL
+        });
+
+        assert.equal(advanceCalled, false, "Event preview must not advance into a random floor");
+        assert.equal(manager._run.floor, 17, "Event preview should use the requested floor");
+        assert.equal(manager._run.lastEncounter.type, HUNTING_FLOOR_OUTCOME_TYPES.EVENT);
+        assert.equal(manager._run.lastEvent.type, HUNTING_EVENT_TYPES.PORTAL);
+        assert.equal(manager._run.phase, HUNTING_RUN_PHASES.AWAITING_CHOICE);
+        assert.equal(overlayStates.at(-1).huntingChoiceVisible, true, "Portal should open its production choice UI");
+
+        await manager.startDebugEventPreview(FIGHTER_IDS.RAGE, {
+            stageId: "invalid-stage",
+            encounterFloor: HUNTING_MAX_FLOOR + 1,
+            eventType: "invalid-event"
+        });
+        assert.equal(
+            manager._run.stageId,
+            HUNTING_STAGE_IDS.CAVE,
+            "Invalid stages should use the normal debug fallback"
+        );
+        assert.equal(manager._run.floor, HUNTING_MAX_FLOOR, "Event preview should keep the configured floor bound");
+        assert.equal(
+            manager._run.lastEvent.type,
+            HUNTING_EVENT_TYPES.PORTAL,
+            "Invalid events should use the normal fallback"
+        );
+    } finally {
+        PopupService.setTestDialog(originalDialog);
+    }
+    console.log("[debug-hunting-event-preview] ok");
+}
+
 async function testHuntingResumeStartsAtHalfLatestStageFloor() {
     const sanitized = sanitizePlayerProfile({
         version: 8,
@@ -12269,6 +12336,40 @@ function testDeveloperTournamentWinTool() {
     console.log("[developer-tournament-win-tool] ok");
 }
 
+function testDeveloperCollectionSampleTool() {
+    const profile = createDefaultPlayerProfile();
+    const result = seedDeveloperCollectionSample(profile, FIGHTER_IDS.HERO);
+    const commonItems = profile.equipment.inventory.filter((item) => item.rarity === "common");
+
+    assert.equal(result.ok, true, "Collection sample should be created for a valid profile");
+    assert.equal(result.itemCount, 6, "Collection sample should provide equipment management coverage");
+    assert.equal(result.chestCount, 3, "Collection sample should provide storage coverage");
+    assert.equal(profile.hunting.shards, 800, "Collection sample should fund shop and equipment actions");
+    assert.equal(profile.equipment.enhancementStones, 99, "Collection sample should fund enhancement actions");
+    assert.equal(profile.equipment.maxInventorySlots, 12, "Collection sample should leave room for fusion output");
+    assert.deepEqual(
+        profile.hunting.chests.map((chest) => chest.rarity),
+        ["common", "rare", "epic"],
+        "Collection sample should use real chest rarity definitions"
+    );
+    assert.equal(commonItems.length, 3, "Collection sample should provide one complete fusion recipe");
+    assert.equal(
+        canFuseEquipment(
+            profile,
+            commonItems.map((item) => item.instanceId)
+        ),
+        true,
+        "Collection sample should make the fusion UI immediately actionable"
+    );
+    assert.deepEqual(
+        Object.values(profile.equipment.equipped).filter(Boolean).length,
+        3,
+        "Collection sample should use production equipment slots for the equipped summaries"
+    );
+    assert.equal(seedDeveloperCollectionSample(null, FIGHTER_IDS.HERO).error, "invalid_profile");
+    console.log("[developer-collection-sample-tool] ok");
+}
+
 // ── Toast queue tests ───────────────────────────────────────────────────────
 
 async function testToastQueue() {
@@ -13203,6 +13304,7 @@ testHuntingPortalDecline();
 testHuntingStageSelectionAndArenaTheme();
 await testHuntingStageSelectUsesPreviewCharacter();
 await testDebugHuntingStartsRequestedFloor();
+await testDebugHuntingEventPreviewUsesProductionEventFlow();
 await testHuntingResumeStartsAtHalfLatestStageFloor();
 testHuntingTerrain();
 testTournamentAngledBounceRamps();
@@ -13289,6 +13391,7 @@ await testGetCharacterChallengeLevel();
 // Tournament report tests
 await testApplyTournamentReport();
 testDeveloperTournamentWinTool();
+testDeveloperCollectionSampleTool();
 // Collection hub view model tests
 await testCreateCollectionHubViewModel();
 // Toast queue tests

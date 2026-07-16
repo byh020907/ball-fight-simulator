@@ -248,9 +248,11 @@ function restoreGlobalProperty(name, descriptor) {
 function testCollectionEquipmentPanelsShareHubState() {
     const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
     const originalAlpine = Object.getOwnPropertyDescriptor(globalThis, "Alpine");
+    const originalResizeObserver = Object.getOwnPropertyDescriptor(globalThis, "ResizeObserver");
     const factories = {};
     const components = {};
     const calls = [];
+    let observedElement = null;
     const uiManager = {
         requireComponent(componentId) {
             const component = components[componentId];
@@ -284,6 +286,18 @@ function testCollectionEquipmentPanelsShareHubState() {
                 }
             }
         });
+        Object.defineProperty(globalThis, "ResizeObserver", {
+            configurable: true,
+            value: class {
+                constructor() {}
+
+                observe(element) {
+                    observedElement = element;
+                }
+
+                disconnect() {}
+            }
+        });
 
         const createHub = loadCollectionComponentFactory(
             "src/components/collection-hub.html",
@@ -294,6 +308,11 @@ function testCollectionEquipmentPanelsShareHubState() {
         hub.$root = { focus() {}, querySelector() {} };
         components.collectionHub = hub;
         hub.init();
+        assert.equal(
+            observedElement,
+            hub.$root,
+            "Collection hub should observe its frame size for active tab visibility"
+        );
         hub.state.equipment = {
             enhancementStones: 30,
             fusion: {
@@ -364,6 +383,7 @@ function testCollectionEquipmentPanelsShareHubState() {
     } finally {
         restoreGlobalProperty("window", originalWindow);
         restoreGlobalProperty("Alpine", originalAlpine);
+        restoreGlobalProperty("ResizeObserver", originalResizeObserver);
     }
 
     console.log("[collection-equipment-panel-shared-state] ok");
@@ -872,6 +892,24 @@ function testCollectionRebirthAndDeveloperContracts() {
     assert.ok(
         template.includes('@click="recordDebugTournamentWin()"'),
         "Developer tournament action should use the dedicated debug bridge method"
+    );
+    assert.ok(
+        template.includes("new ResizeObserver(revealActiveTab)"),
+        "Collection tab visibility should be refreshed when the modal layout changes"
+    );
+    assert.ok(template.includes("이벤트 미리보기"), "Developer tools should expose hunting event previews");
+    assert.ok(template.includes("컬렉션 샘플"), "Developer tools should expose collection sample data");
+    assert.ok(
+        template.includes('@click="startDebugHuntingEvent()"'),
+        "Event preview should use the dedicated debug bridge method"
+    );
+    assert.ok(
+        template.includes("this.bridge.startDebugHuntingEvent("),
+        "The collection component should not reach into app state for event previews"
+    );
+    assert.ok(
+        template.includes("this.bridge.seedDebugCollectionSample(state.developer.targetCharacterId)"),
+        "The collection component should use the dedicated sample-data bridge"
     );
     console.log("[collection-rebirth-and-developer-contracts] ok");
 }

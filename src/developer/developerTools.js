@@ -1,10 +1,40 @@
 import { getLevelRequirement } from "../experience/experienceConfig.js";
 import { getCharacterExperienceSummary } from "../experience/experienceService.js";
 import { applyTournamentReport, createTournamentReport } from "../collection/index.js";
+import { createHuntingChest } from "../hunting/huntingRewards.js";
+import { createEquipmentInstance, equipEquipmentItem } from "../hunting/equipmentConfig.js";
 import { createRoster } from "../roster.js";
 
 const CHARACTER_IDS = new Set(createRoster().map((fighter) => fighter.id));
 const MAX_DEBUG_REBIRTH_COUNT = 999;
+const DEBUG_COLLECTION_SAMPLE_ITEMS = Object.freeze([
+    { rarity: "common", slot: "weapon" },
+    { rarity: "common", slot: "weapon" },
+    { rarity: "common", slot: "weapon" },
+    { rarity: "rare", slot: "armor" },
+    { rarity: "epic", slot: "accessory" },
+    { rarity: "legendary", slot: "accessory" }
+]);
+const DEBUG_COLLECTION_SAMPLE_CHESTS = Object.freeze(["common", "rare", "epic"]);
+const DEBUG_COLLECTION_SAMPLE_SHARDS = 800;
+const DEBUG_COLLECTION_SAMPLE_STONES = 99;
+const DEBUG_COLLECTION_SAMPLE_INVENTORY_SLOTS = 12;
+
+function createDebugSampleRng(seed) {
+    let state = seed;
+    return () => {
+        state = (state * 16807) % 2147483647;
+        return (state - 1) / 2147483646;
+    };
+}
+
+function ensureCollectionStorage(profile) {
+    if (!profile?.hunting || !profile?.equipment) return null;
+    profile.hunting.chests ||= [];
+    profile.equipment.inventory ||= [];
+    profile.equipment.equipped ||= { weapon: null, armor: null, accessory1: null, accessory2: null };
+    return { hunting: profile.hunting, equipment: profile.equipment };
+}
 
 function isKnownCharacter(characterId) {
     return CHARACTER_IDS.has(characterId);
@@ -67,5 +97,42 @@ export function recordDeveloperTournamentWin(profile, characterId) {
         ok: true,
         record: profile.collection.characters[characterId],
         report
+    };
+}
+
+export function seedDeveloperCollectionSample(profile, characterId) {
+    if (!profile) return { ok: false, error: "invalid_profile" };
+    if (!isKnownCharacter(characterId)) return { ok: false, error: "unknown_character" };
+    const storage = ensureCollectionStorage(profile);
+    if (!storage) return { ok: false, error: "invalid_profile" };
+
+    const items = DEBUG_COLLECTION_SAMPLE_ITEMS.map((definition, index) =>
+        createEquipmentInstance({ ...definition, rng: createDebugSampleRng(index + 1) })
+    );
+    const chests = DEBUG_COLLECTION_SAMPLE_CHESTS.map((rarity, index) =>
+        createHuntingChest({ rarity, id: `debug-collection-${rarity}-${index}` })
+    );
+    storage.hunting.shards = DEBUG_COLLECTION_SAMPLE_SHARDS;
+    storage.hunting.chests = chests;
+    storage.equipment.inventory = items;
+    storage.equipment.equipped = {
+        weapon: null,
+        armor: null,
+        accessory1: null,
+        accessory2: null
+    };
+    storage.equipment.enhancementStones = DEBUG_COLLECTION_SAMPLE_STONES;
+    storage.equipment.maxInventorySlots = DEBUG_COLLECTION_SAMPLE_INVENTORY_SLOTS;
+    setDeveloperCharacterToMaxLevel(profile, characterId);
+    const equippedResults = items.slice(3).map((item) => equipEquipmentItem(profile, item.instanceId, characterId));
+    if (equippedResults.some((result) => !result?.item)) return { ok: false, error: "equip_failed" };
+
+    return {
+        ok: true,
+        characterId,
+        itemCount: items.length,
+        chestCount: chests.length,
+        shards: storage.hunting.shards,
+        enhancementStones: storage.equipment.enhancementStones
     };
 }

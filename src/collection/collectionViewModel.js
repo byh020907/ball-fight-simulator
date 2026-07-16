@@ -14,7 +14,7 @@ import {
     getHuntingMonsterDefinitions,
     previewHuntingChest
 } from "../hunting/index.js";
-import { HUNTING_MAX_FLOOR, HUNTING_STAGES } from "../hunting/huntingConfig.js";
+import { HUNTING_EVENT_TYPES, HUNTING_MAX_FLOOR, HUNTING_STAGES } from "../hunting/huntingConfig.js";
 import { getConsumableShopItems, getHuntingConsumableUseLimitUpgrade } from "../consumables.js";
 import { getRarityLabel } from "../hunting/rarityPresentation.js";
 import {
@@ -56,6 +56,18 @@ const MONSTER_FACE_LABELS = Object.freeze({
     happy: "^",
     xeye: "x"
 });
+
+const HUNTING_DEBUG_EVENT_OPTIONS = Object.freeze([
+    { id: HUNTING_EVENT_TYPES.PORTAL, label: "귀환 포탈" },
+    { id: HUNTING_EVENT_TYPES.WANDERING_MERCHANT, label: "방랑 상인" },
+    { id: HUNTING_EVENT_TYPES.BOON, label: "축복" },
+    { id: HUNTING_EVENT_TYPES.MISHAP, label: "함정" },
+    { id: HUNTING_EVENT_TYPES.CHEST_ROOM, label: "상자방" },
+    { id: HUNTING_EVENT_TYPES.REST_SITE, label: "휴식지" },
+    { id: HUNTING_EVENT_TYPES.CURSED_ALTAR, label: "저주받은 제단" },
+    { id: HUNTING_EVENT_TYPES.CHAMPION_INTRUSION, label: "챔피언 난입" },
+    { id: HUNTING_EVENT_TYPES.ELITE_MOB, label: "정예 몹 습격" }
+]);
 
 function getMonsterRarity(monster) {
     return monster.monsterTags.find((tag) => tag.startsWith("rarity:"))?.slice("rarity:".length) ?? "common";
@@ -362,7 +374,8 @@ export function createCollectionHubViewModel({
             active: developerMode,
             currentCharacterId: currentPlayerFighterId,
             maxFloor: HUNTING_MAX_FLOOR,
-            stages: HUNTING_STAGES.map((stage) => ({ id: stage.id, name: stage.name }))
+            stages: HUNTING_STAGES.map((stage) => ({ id: stage.id, name: stage.name })),
+            events: HUNTING_DEBUG_EVENT_OPTIONS
         }
     };
 }

@@ -25,6 +25,7 @@ import { createCollectionActionPopupOptions } from "./collection/collectionActio
 import { beginRebirth, completeRebirth, toggleRebirthCardEquip } from "./rebirth/rebirthService.js";
 import {
     recordDeveloperTournamentWin,
+    seedDeveloperCollectionSample,
     setDeveloperCharacterToMaxLevel,
     setDeveloperRebirthCount
 } from "./developer/developerTools.js";
@@ -248,10 +249,23 @@ export function createComponentBridge(app) {
             if (result.ok) refreshCollectionAndProfile();
             return result;
         },
+        seedDebugCollectionSample(characterId) {
+            if (!app.isDebugModeActive()) return { ok: false, error: "debug_disabled" };
+            const result = seedDeveloperCollectionSample(app.playerProfile, characterId);
+            if (result.ok) refreshCollectionAndProfile();
+            return result;
+        },
         startDebugHunting(characterId, stageId, encounterFloor) {
             if (!app.isDebugModeActive() || !app.lifecycle.isSetup) return { ok: false, error: "debug_disabled" };
+            app.setGameMode("hunting");
             CollectionHubService.close();
             return app.hunting.startDebugRun(characterId, { stageId, encounterFloor });
+        },
+        startDebugHuntingEvent(characterId, stageId, encounterFloor, eventType) {
+            if (!app.isDebugModeActive() || !app.lifecycle.isSetup) return { ok: false, error: "debug_disabled" };
+            app.setGameMode("hunting");
+            CollectionHubService.close();
+            return app.hunting.startDebugEventPreview(characterId, { stageId, encounterFloor, eventType });
         },
         beginRebirth(characterId) {
             if (!app.lifecycle.isSetup) {

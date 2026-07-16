@@ -19,6 +19,7 @@ import {
     HUNTING_EVENT_TYPES,
     HUNTING_FLOOR_OUTCOME_TYPES,
     HUNTING_MAX_FLOOR,
+    HUNTING_STAGE_IDS,
     HUNTING_STAGES
 } from "./huntingConfig.js";
 import { getHuntingBattleArena, getHuntingStage, getNextHuntingStageId } from "./huntingEncounters.js";
@@ -192,7 +193,26 @@ export class HuntingManager {
         });
     }
 
-    async _startRun(characterId, { stageId, encounterFloor, displayFloor, debug }) {
+    async startDebugEventPreview(
+        characterId,
+        { stageId = HUNTING_STAGE_IDS.CAVE, encounterFloor = 1, eventType = HUNTING_EVENT_TYPES.PORTAL } = {}
+    ) {
+        PopupService.close();
+        const validStageId = HUNTING_STAGES.some((stage) => stage.id === stageId) ? stageId : HUNTING_STAGE_IDS.CAVE;
+        const validFloor = Math.max(1, Math.min(HUNTING_MAX_FLOOR, Math.floor(encounterFloor) || 1));
+        const validEventType = Object.values(HUNTING_EVENT_TYPES).includes(eventType)
+            ? eventType
+            : HUNTING_EVENT_TYPES.PORTAL;
+        return this._startRun(characterId, {
+            stageId: validStageId,
+            encounterFloor: validFloor,
+            displayFloor: validFloor,
+            debug: true,
+            debugEventType: validEventType
+        });
+    }
+
+    async _startRun(characterId, { stageId, encounterFloor, displayFloor, debug, debugEventType = null }) {
         this.app.playerProfile.hunting.stats = recordHuntingStageVisit(this.app.playerProfile.hunting.stats, stageId);
         savePlayerProfile(this.app.playerProfile);
         this.app._refreshCollectionHub();
@@ -209,7 +229,21 @@ export class HuntingManager {
         const stage = getHuntingStage(stageId);
         this.app.addLog(`[Hunting] ${stage.name} ${encounterFloor}층${debug ? " 디버그" : ""} 원정 시작`);
         this._showStartingMove(stage, displayFloor);
+        if (debugEventType) return this._showDebugEventPreview(debugEventType, encounterFloor);
         await this.advance({ waitForFirstMoveUi: true });
+    }
+
+    _showDebugEventPreview(eventType, floor) {
+        const event = HuntingEvent.createPayload(eventType, floor);
+        this._run = {
+            ...this._run,
+            floor,
+            lastEvent: event,
+            lastEncounter: { type: HUNTING_FLOOR_OUTCOME_TYPES.EVENT, event },
+            history: [...this._run.history, { type: "debug_event_preview", floor, event }]
+        };
+        this.app.addLog(`[Hunting] ${floor}층 — ${event.type} 디버그 이벤트 미리보기`);
+        return this._handleEventFloor({ app: this.app, event });
     }
 
     _showStartingMove(stage, floor = this._run?.floor ?? 1) {
