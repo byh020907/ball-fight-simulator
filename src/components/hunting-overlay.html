@@ -19,11 +19,16 @@
     }"
 >
     <div class="hunting-overlay-frame">
-        <div class="hunting-overlay-card" x-show="!huntingCombatResultActive || huntingCombatResultStep === 'experience'">
-            <span x-show="!huntingCombatResultActive" x-text="label">사냥터</span>
-            <span class="hunting-combat-experience-label" x-show="huntingCombatResultActive">경험치</span>
-            <strong x-show="!huntingCombatResultActive" x-text="text">원정 시작</strong>
-            <p x-show="subtext && !huntingCombatResultActive" x-text="subtext"></p>
+        <div
+            class="hunting-overlay-card"
+            x-show="!huntingCombatResultActive || huntingCombatResultStep === 'experience'"
+        >
+            <div class="hunting-overlay-heading">
+                <span x-show="!huntingCombatResultActive" x-text="label">사냥터</span>
+                <span class="hunting-combat-experience-label" x-show="huntingCombatResultActive">경험치</span>
+                <strong x-show="!huntingCombatResultActive" x-text="text">원정 시작</strong>
+                <p x-show="subtext && !huntingCombatResultActive" x-text="subtext"></p>
+            </div>
             <xp-reward-panel data-component-id="huntingXpRewardPanel"></xp-reward-panel>
 
             <div class="hunting-route" x-show="huntingMoving">
@@ -94,72 +99,86 @@
             </div>
 
             <div class="hunting-chest-event" x-show="huntingChestEventActive">
-                <chest-icon class="hunting-chest-token" x-bind:data-rarity="huntingChestRarity"></chest-icon>
-                <strong x-text="huntingChestTitle"></strong>
-                <span x-text="huntingChestSubtext"></span>
-                <span class="hunting-chest-loot" x-text="huntingLootSummary"></span>
-                <button
-                    class="hunting-btn advance"
-                    type="button"
-                    @click="huntingChestContinue()"
-                    x-text="huntingChestConfirmLabel || '계속 전진'"
-                ></button>
+                <div class="hunting-event-scroll-body">
+                    <chest-icon class="hunting-chest-token" x-bind:data-rarity="huntingChestRarity"></chest-icon>
+                    <strong x-text="huntingChestTitle"></strong>
+                    <span x-text="huntingChestSubtext"></span>
+                    <span class="hunting-chest-loot" x-text="huntingLootSummary"></span>
+                </div>
+                <div class="hunting-event-actions">
+                    <button
+                        class="hunting-btn advance"
+                        type="button"
+                        @click="huntingChestContinue()"
+                        x-text="huntingChestConfirmLabel || '계속 전진'"
+                    ></button>
+                </div>
             </div>
 
             <div class="hunting-event-result" x-show="huntingEventActive">
-                <span>이벤트 결과</span>
-                <strong x-text="huntingEventDetail"></strong>
-                <button
-                    class="hunting-btn advance"
-                    type="button"
-                    @click="huntingEventContinue()"
-                    x-text="huntingEventConfirmLabel || '계속 전진'"
-                ></button>
+                <div class="hunting-event-scroll-body">
+                    <span>이벤트 결과</span>
+                    <strong x-text="huntingEventDetail"></strong>
+                </div>
+                <div class="hunting-event-actions">
+                    <button
+                        class="hunting-btn advance"
+                        type="button"
+                        @click="huntingEventContinue()"
+                        x-text="huntingEventConfirmLabel || '계속 전진'"
+                    ></button>
+                </div>
             </div>
 
             <div class="hunting-battle-preparation" x-show="huntingBattlePreparationActive">
-                <div class="hunting-battle-preparation-hp">
-                    <div class="hunting-battle-preparation-hp-head">
-                        <span>현재 HP</span>
-                        <strong x-text="huntingBattlePreparationHp + ' / ' + huntingBattlePreparationMaxHp"></strong>
-                    </div>
-                    <div class="hunting-battle-preparation-hp-track" aria-hidden="true">
-                        <i
-                            x-bind:style="'width:' + Math.min(100, Math.round(((huntingBattlePreparationHp || 0) / Math.max(1, huntingBattlePreparationMaxHp || 1)) * 100)) + '%'"
-                        ></i>
-                    </div>
-                </div>
-                <p
-                    class="hunting-battle-preparation-notice"
-                    x-show="huntingBattlePreparationNotice"
-                    x-text="huntingBattlePreparationNotice"
-                ></p>
-                <div class="hunting-battle-preparation-items">
-                    <template x-for="item in (huntingBattlePreparationItems || [])" :key="item.id">
-                        <div class="hunting-battle-preparation-item">
-                            <div>
-                                <strong x-text="item.label"></strong>
-                                <span
-                                    x-text="'보유 ' + item.owned + ' · 원정 ' + item.usedInRun + '/' + item.useLimit"
-                                ></span>
-                            </div>
-                            <button
-                                class="hunting-btn potion"
-                                type="button"
-                                x-bind:disabled="!item.canUse"
-                                @click="huntingUsePreparationConsumable(item.id)"
-                                x-text="item.label + ' +' + item.healPercent + '%'"
-                            ></button>
+                <div class="hunting-event-scroll-body">
+                    <div class="hunting-battle-preparation-hp">
+                        <div class="hunting-battle-preparation-hp-head">
+                            <span>현재 HP</span>
+                            <strong
+                                x-text="huntingBattlePreparationHp + ' / ' + huntingBattlePreparationMaxHp"
+                            ></strong>
                         </div>
-                    </template>
+                        <div class="hunting-battle-preparation-hp-track" aria-hidden="true">
+                            <i
+                                x-bind:style="'width:' + Math.min(100, Math.round(((huntingBattlePreparationHp || 0) / Math.max(1, huntingBattlePreparationMaxHp || 1)) * 100)) + '%'"
+                            ></i>
+                        </div>
+                    </div>
+                    <p
+                        class="hunting-battle-preparation-notice"
+                        x-show="huntingBattlePreparationNotice"
+                        x-text="huntingBattlePreparationNotice"
+                    ></p>
+                    <div class="hunting-battle-preparation-items">
+                        <template x-for="item in (huntingBattlePreparationItems || [])" :key="item.id">
+                            <div class="hunting-battle-preparation-item">
+                                <div>
+                                    <strong x-text="item.label"></strong>
+                                    <span
+                                        x-text="'보유 ' + item.owned + ' · 원정 ' + item.usedInRun + '/' + item.useLimit"
+                                    ></span>
+                                </div>
+                                <button
+                                    class="hunting-btn potion"
+                                    type="button"
+                                    x-bind:disabled="!item.canUse"
+                                    @click="huntingUsePreparationConsumable(item.id)"
+                                    x-text="item.label + ' +' + item.healPercent + '%'"
+                                ></button>
+                            </div>
+                        </template>
+                    </div>
                 </div>
-                <button
-                    class="hunting-btn advance hunting-battle-start"
-                    type="button"
-                    @click="huntingStartPreparedBattle()"
-                >
-                    전투 시작
-                </button>
+                <div class="hunting-event-actions">
+                    <button
+                        class="hunting-btn advance hunting-battle-start"
+                        type="button"
+                        @click="huntingStartPreparedBattle()"
+                    >
+                        전투 시작
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -537,9 +556,13 @@
         transform: translateY(2px);
     }
 
-    .hunting-overlay-card > span {
+    .hunting-overlay-heading {
+        display: grid;
+        gap: 12px;
+    }
+
+    .hunting-overlay-heading > span {
         display: block;
-        margin-bottom: 14px;
         color: #111111;
         font-size: 0.82rem;
         font-weight: 700;
@@ -547,15 +570,15 @@
         text-transform: uppercase;
     }
 
-    .hunting-overlay-card > strong {
+    .hunting-overlay-heading > strong {
         display: block;
         color: #111111;
         font-size: clamp(2rem, 8vw, 3.4rem);
         letter-spacing: -0.05em;
     }
 
-    .hunting-overlay-card > p {
-        margin: 12px 0 0;
+    .hunting-overlay-heading > p {
+        margin: 0;
         color: #202020;
     }
 
@@ -680,6 +703,8 @@
         flex: 1 1 auto;
         flex-direction: column;
         min-height: 0;
+        margin-top: 6px;
+        padding-top: 6px;
     }
 
     :scope.hunting-merchant-active .hunting-overlay-frame,
@@ -688,8 +713,11 @@
     :scope.hunting-battle-preparation-active .hunting-overlay-frame {
         width: 100%;
         height: 100%;
+        min-width: 0;
+        min-height: 0;
         display: grid;
         place-items: center;
+        overflow: hidden;
     }
 
     :scope.hunting-merchant-active .hunting-overlay-card,
@@ -700,19 +728,32 @@
         max-width: 100%;
         max-height: 100%;
         box-sizing: border-box;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
     }
 
     :scope.hunting-merchant-active .hunting-overlay-card {
-        display: flex;
-        flex-direction: column;
+        height: 100%;
         min-height: 0;
         padding: 12px 14px;
-        overflow: hidden;
         pointer-events: auto;
     }
 
-    :scope.hunting-merchant-active .hunting-overlay-card > strong {
+    :scope.hunting-merchant-active .hunting-overlay-heading {
+        gap: 6px;
+    }
+
+    :scope.hunting-merchant-active .hunting-overlay-heading > strong {
         font-size: clamp(1.3rem, 6vw, 2rem);
+    }
+
+    :scope.hunting-merchant-active .hunting-overlay-heading > p {
+        display: -webkit-box;
+        overflow: hidden;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 1;
     }
 
     :scope.hunting-chest-active .hunting-overlay-card,
@@ -723,25 +764,48 @@
     }
 
     .hunting-chest-event,
-    .hunting-event-result {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
+    .hunting-event-result,
+    .hunting-battle-preparation {
+        display: grid;
+        grid-template-rows: minmax(0, 1fr) auto;
+        flex: 1 1 auto;
+        min-height: 0;
         pointer-events: auto;
     }
 
+    .hunting-event-scroll-body {
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-y;
+    }
+
+    .hunting-event-actions {
+        padding-top: 8px;
+        text-align: center;
+    }
+
     .hunting-chest-event {
-        gap: 8px;
         margin-top: 12px;
     }
 
-    .hunting-chest-event > strong {
+    .hunting-chest-event .hunting-event-scroll-body,
+    .hunting-event-result .hunting-event-scroll-body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .hunting-chest-event .hunting-event-scroll-body > strong {
         color: #202020;
         font-size: 1.2rem;
         letter-spacing: 0;
     }
 
-    .hunting-chest-event > span {
+    .hunting-chest-event .hunting-event-scroll-body > span {
         color: #555555;
         font-size: 0.76rem;
         text-align: center;
@@ -757,32 +821,35 @@
     }
 
     .hunting-event-result {
-        gap: 10px;
         margin-top: 14px;
         padding: 14px 0 0;
         border-top: 1px solid #e0e0e0;
     }
 
-    .hunting-event-result > span {
+    .hunting-event-result .hunting-event-scroll-body > span {
         margin: 0;
         color: #8a6500;
         font-size: 0.7rem;
         letter-spacing: 0.12em;
     }
 
-    .hunting-event-result > strong {
+    .hunting-event-result .hunting-event-scroll-body > strong {
         color: #202020;
         font-size: 1.1rem;
         letter-spacing: 0;
     }
 
     .hunting-battle-preparation {
-        display: grid;
         gap: 10px;
         margin-top: 14px;
         padding-top: 14px;
         border-top: 1px solid #e0e0e0;
-        pointer-events: auto;
+    }
+
+    .hunting-battle-preparation .hunting-event-scroll-body {
+        display: grid;
+        align-content: start;
+        gap: 10px;
     }
 
     .hunting-battle-preparation-hp-head,
@@ -1033,7 +1100,7 @@
             padding: 10px 12px;
         }
 
-        :scope.hunting-combat-result-active .hunting-overlay-card > span,
+        :scope.hunting-combat-result-active .hunting-overlay-heading > span,
         :scope.hunting-combat-result-active .hunting-combat-choice-card > span {
             margin-bottom: 10px;
         }
@@ -1061,7 +1128,7 @@
                 padding: 7px 8px;
             }
 
-            :scope.hunting-combat-result-active .hunting-overlay-card > span,
+            :scope.hunting-combat-result-active .hunting-overlay-heading > span,
             :scope.hunting-combat-result-active .hunting-combat-choice-card > span {
                 margin-bottom: 6px;
                 font-size: 0.72rem;

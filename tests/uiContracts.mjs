@@ -54,7 +54,9 @@ function testCollectionEquipmentPanelsOwnTheirFlows() {
     const shopPanel = readSource("src/components/collection-shop-panel.html");
 
     assert.ok(
-        collectionHub.includes("<collection-equipment-panel>") &&
+        collectionHub.includes(
+            "<collection-equipment-panel x-show=\"state.activeTab === 'equipment'\"></collection-equipment-panel>"
+        ) &&
             collectionHub.includes("<collection-fusion-dialog>") &&
             collectionHub.includes("<collection-shop-panel>"),
         "Collection hub should compose the equipment tab, fusion dialog, and shop from dedicated components"
@@ -64,14 +66,24 @@ function testCollectionEquipmentPanelsOwnTheirFlows() {
         false,
         "Collection hub must not retain modal markup after moving it to its owner components"
     );
-    const panelHostRule =
-        collectionHub.match(
-            /collection-equipment-panel,\s*collection-fusion-dialog,\s*collection-shop-panel\s*\{([^}]*)\}/s
-        )?.[1] ?? "";
+    const equipmentHostRule = collectionHub.match(/collection-equipment-panel\s*\{([^}]*)\}/s)?.[1] ?? "";
+    const equipmentRootRule = collectionHub.match(/collection-equipment-panel\s*>\s*div\s*\{([^}]*)\}/s)?.[1] ?? "";
+    const overlayPanelHostRule =
+        collectionHub.match(/collection-fusion-dialog,\s*collection-shop-panel\s*\{([^}]*)\}/s)?.[1] ?? "";
     assert.match(
-        panelHostRule,
+        equipmentHostRule,
+        /display:\s*flex;[\s\S]*flex:\s*1\s+1\s+0;[\s\S]*min-height:\s*0;/,
+        "The active equipment host must own a shrinkable flex boundary inside the collection frame"
+    );
+    assert.match(
+        equipmentRootRule,
+        /display:\s*flex;[\s\S]*flex:\s*1\s+1\s+0;[\s\S]*min-height:\s*0;/,
+        "The equipment panel root must pass the available height to its scrollable content"
+    );
+    assert.match(
+        overlayPanelHostRule,
         /display:\s*contents;/,
-        "Panel hosts must not add a flex item between the collection frame and its existing screen layout"
+        "Overlay-only panel hosts must remain outside the collection frame layout"
     );
     assert.ok(
         equipmentPanel.includes('window.createGameUI("collectionEquipmentPanel"') &&
@@ -858,6 +870,99 @@ function testResultOverlayLayoutContract() {
     console.log("[result-overlay-layout-contract] ok");
 }
 
+function testFluidModalLayoutContracts() {
+    const huntingOverlay = readSource("src/components/hunting-overlay.html");
+    const collectionHub = readSource("src/components/collection-hub.html");
+    const equipmentPanel = readSource("src/components/collection-equipment-panel.html");
+
+    const huntingCardRule =
+        huntingOverlay.match(
+            /:scope\.hunting-merchant-active \.hunting-overlay-card,\s*:scope\.hunting-chest-active \.hunting-overlay-card,\s*:scope\.hunting-event-active \.hunting-overlay-card,\s*:scope\.hunting-battle-preparation-active \.hunting-overlay-card\s*\{([^}]*)\}/s
+        )?.[1] ?? "";
+    assert.match(
+        huntingCardRule,
+        /min-height:\s*0;[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;[\s\S]*overflow:\s*hidden;/,
+        "Hunting event cards must pass their available height to internal content instead of relying on a viewport-specific card size"
+    );
+    const eventLayoutRule =
+        huntingOverlay.match(
+            /\.hunting-chest-event,\s*\.hunting-event-result,\s*\.hunting-battle-preparation\s*\{([^}]*)\}/s
+        )?.[1] ?? "";
+    assert.match(
+        eventLayoutRule,
+        /display:\s*grid;[\s\S]*grid-template-rows:\s*minmax\(0, 1fr\) auto;[\s\S]*min-height:\s*0;/,
+        "Hunting events must reserve their action row after a shrinkable body row"
+    );
+    const eventBodyRule = huntingOverlay.match(/\.hunting-event-scroll-body\s*\{([^}]*)\}/s)?.[1] ?? "";
+    assert.match(
+        eventBodyRule,
+        /min-height:\s*0;[\s\S]*overflow-y:\s*auto;[\s\S]*touch-action:\s*pan-y;/,
+        "Only the hunting event body may scroll when event content exceeds its card"
+    );
+    assert.ok(
+        huntingOverlay.includes('class="hunting-event-scroll-body"') &&
+            huntingOverlay.includes('class="hunting-event-actions"'),
+        "Hunting event markup must keep the scroll body and action footer as reusable siblings"
+    );
+
+    const collectionScopeRule = collectionHub.match(/:scope\s*\{([^}]*)\}/s)?.[1] ?? "";
+    assert.match(
+        collectionScopeRule,
+        /display:\s*flex;[\s\S]*padding:\s*clamp\([^)]*rem[^)]*\);[\s\S]*box-sizing:\s*border-box;/,
+        "Collection overlay must own responsive safety padding rather than a device-width container"
+    );
+    const collectionFrameRule = collectionHub.match(/\.ch-frame\s*\{([^}]*)\}/s)?.[1] ?? "";
+    assert.match(
+        collectionFrameRule,
+        /width:\s*min\(72rem, 100%\);[\s\S]*height:\s*100%;[\s\S]*max-height:\s*100%;[\s\S]*display:\s*flex;[\s\S]*min-height:\s*0;/,
+        "Collection frame must use the overlay's available size with one content-width cap"
+    );
+    assert.doesNotMatch(
+        collectionFrameRule,
+        /width:\s*(?:\d+px|calc\()/,
+        "Collection frame must not introduce a viewport-specific fixed width"
+    );
+    const codexDetailRule = collectionHub.match(/\.ch-codex-panel--detail-open\s*\{([^}]*)\}/s)?.[1] ?? "";
+    assert.match(
+        codexDetailRule,
+        /grid-template-rows:\s*auto minmax\(0, 1fr\) minmax\(0, 1fr\);/,
+        "Selected codex entries must split the remaining space between list and detail"
+    );
+    const detailRule = collectionHub.match(/\.ch-detail\s*\{([^}]*)\}/s)?.[1] ?? "";
+    assert.match(
+        detailRule,
+        /flex:\s*1 1 0;[\s\S]*min-height:\s*0;[\s\S]*overflow-y:\s*auto;[\s\S]*touch-action:\s*pan-y;/,
+        "Codex detail must scroll inside its own fluid row"
+    );
+    assert.ok(
+        !collectionHub.includes("min-height: 400px") && !collectionHub.includes("max-height: 85vh"),
+        "Collection layout must not restore legacy fixed content-height fallbacks"
+    );
+    const equipmentHostRule = collectionHub.match(/collection-equipment-panel\s*\{([^}]*)\}/s)?.[1] ?? "";
+    const equipmentRootRule = collectionHub.match(/collection-equipment-panel\s*>\s*div\s*\{([^}]*)\}/s)?.[1] ?? "";
+    assert.match(
+        equipmentHostRule,
+        /display:\s*flex;[\s\S]*flex:\s*1 1 0;[\s\S]*min-height:\s*0;/,
+        "Equipment host must preserve the collection frame's available height through its component boundary"
+    );
+    assert.match(
+        equipmentRootRule,
+        /display:\s*flex;[\s\S]*flex:\s*1 1 0;[\s\S]*min-height:\s*0;/,
+        "Equipment root must preserve the host height for its internal list"
+    );
+    const equipmentListRule = equipmentPanel.match(/\.ch-equip-list\s*\{([^}]*)\}/s)?.[1] ?? "";
+    assert.match(
+        equipmentListRule,
+        /flex:\s*1;[\s\S]*min-height:\s*0;[\s\S]*overflow-y:\s*auto;/,
+        "Equipment inventory must scroll inside the remaining tab area"
+    );
+    assert.ok(
+        equipmentPanel.includes("repeat(auto-fit, minmax(min(100%, 8rem), 1fr))"),
+        "Equipment slots must use a fluid grid instead of a viewport-specific column count"
+    );
+    console.log("[fluid-modal-layout-contracts] ok");
+}
+
 function testCollectionRebirthAndDeveloperContracts() {
     const template = readSource("src/components/collection-hub.html");
     assert.ok(template.includes("환생 보상 선택"), "Character detail should expose the rebirth action");
@@ -927,6 +1032,7 @@ testNoWindowUiManagerInProduction();
 testAlpineTemplateUiManagerContracts();
 testHuntingOverlayActionContracts();
 testResultOverlayLayoutContract();
+testFluidModalLayoutContracts();
 testCollectionRebirthAndDeveloperContracts();
 
 console.log("ui contract tests ok");
