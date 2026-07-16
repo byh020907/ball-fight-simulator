@@ -1,12 +1,14 @@
 import { CombatEntity, Vector2 } from "../core.js";
-import { DashEffect } from "../combatEffects.js";
 
 export class SeedOrb extends CombatEntity {
-    constructor(owner, position, velocity, life) {
+    constructor(owner, position, velocity, life, options = {}) {
         super(position, velocity, 14);
         this.owner = owner;
         this.ownerId = owner.id;
         this.life = life;
+        this.maxLife = life;
+        this.collisionGraceRemaining = Math.max(0, options.collisionGrace ?? 0);
+        this.collisionGraceDuration = this.collisionGraceRemaining;
     }
 
     update(delta, simulation) {
@@ -16,8 +18,13 @@ export class SeedOrb extends CombatEntity {
             this.isExpired = true;
         }
 
+        this.collisionGraceRemaining = Math.max(0, this.collisionGraceRemaining - delta);
+        if (this.collisionGraceRemaining > 1e-9) return;
+        this.collisionGraceRemaining = 0;
+
         for (const fighter of simulation.fighters) {
             if (fighter.flags.defeated) continue;
+            if (fighter !== this.owner && !simulation.isHostile(this.owner, fighter)) continue;
             const distance = Vector2.subtract(this.position, fighter.position).length();
             if (distance > this.radius + fighter.radius) continue;
             this._onHitEffects(fighter, simulation);
@@ -27,7 +34,11 @@ export class SeedOrb extends CombatEntity {
     }
 
     _onHitEffects(target, simulation) {
-        const opponent = simulation.getOpponent(this.owner);
+        const hostileTarget = simulation.isHostile(this.owner, target) ? target : null;
+        const opponent = hostileTarget ?? simulation.getOpponent(this.owner);
+        if (hostileTarget) {
+            this.owner.ability?.onEnemySeedContact?.(hostileTarget);
+        }
         const dashDirection = opponent
             ? Vector2.subtract(opponent.position, this.owner.position).normalize()
             : this.velocity.clone().normalize();
@@ -49,14 +60,27 @@ export class SeedOrb extends CombatEntity {
     }
 
     draw(ctx) {
+        const graceProgress =
+            this.collisionGraceDuration > 0 ? 1 - this.collisionGraceRemaining / this.collisionGraceDuration : 1;
+        const drawRadius = this.radius * (0.55 + graceProgress * 0.45);
         ctx.save();
+        ctx.globalAlpha = 0.35 + graceProgress * 0.65;
         ctx.fillStyle = this.owner.color;
         ctx.beginPath();
-        ctx.arc(this.position.x, this.position.y, this.radius, 0, Math.PI * 2);
+        ctx.arc(this.position.x, this.position.y, drawRadius, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 2 + graceProgress;
         ctx.stroke();
+        if (this.collisionGraceDuration > 0) {
+            ctx.strokeStyle = "#8dff6a";
+            for (const side of [-1, 1]) {
+                ctx.beginPath();
+                ctx.moveTo(this.position.x, this.position.y - drawRadius * 0.3);
+                ctx.lineTo(this.position.x + side * drawRadius * graceProgress, this.position.y - drawRadius * 1.3);
+                ctx.stroke();
+            }
+        }
         ctx.restore();
     }
 }

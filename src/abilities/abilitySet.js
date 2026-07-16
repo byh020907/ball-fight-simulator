@@ -116,8 +116,16 @@ export class AbilitySet {
         return this._primary?.modifyOutgoingFighterCollisionDamage?.(damage, target, context) ?? damage;
     }
 
-    onDashHit(target, effect) {
-        this._primary?.onDashHit?.(target, effect);
+    beforeFighterCollision(target, context) {
+        return this._primary?.beforeFighterCollision?.(target, context) ?? null;
+    }
+
+    shouldSkipFighterCollision(target) {
+        return this.all.some((ability) => ability.shouldSkipFighterCollision?.(target) === true);
+    }
+
+    onDashHit(target, effect, context) {
+        this._primary?.onDashHit?.(target, effect, context);
     }
 
     onDashWall() {

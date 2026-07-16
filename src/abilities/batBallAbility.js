@@ -1,4 +1,4 @@
-import { WallSlamEffect } from "../combatEffects.js";
+import { calculateWallSlamAngularImpulse, WallSlamEffect } from "../combatEffects.js";
 import { Vector2 } from "../core.js";
 import { Ability } from "./ability.js";
 
@@ -17,10 +17,11 @@ function normalizeAngle(a) {
 }
 
 const SLASH_DAMAGE_MULT = 1.3;
-const WALL_SLAM_DAMAGE_MULT = 1.2;
 const KNOCKBACK_FORCE = 550;
 const KNOCKBACK_DURATION = 0.85;
-const WALL_SLAM_EFFECT_DURATION = 1.0;
+const WALL_SLAM_EFFECT_DURATION = 0.85;
+const RESET_COOLDOWN = 0.5;
+const RESET_FLASH_DURATION = 0.25;
 const FACING_SMOOTH_RATE = 8;
 const SWEEP_AMPLITUDE = 0.45;
 const VISION_ARC_RADIUS_SCALE = 0.55;
@@ -28,7 +29,15 @@ const VISION_ARC_RADIUS_SCALE = 0.55;
 export class BatBallAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation, 3.0);
-        this.state = { arcAngle: 0, slashTimer: 0, slashStartAngle: 0, slashEndAngle: 0, _facingAngle: 0 };
+        this.state = {
+            arcAngle: 0,
+            slashTimer: 0,
+            slashStartAngle: 0,
+            slashEndAngle: 0,
+            resetCooldown: 0,
+            resetFlash: 0,
+            _facingAngle: 0
+        };
     }
 
     update(delta, target) {
@@ -39,6 +48,8 @@ export class BatBallAbility extends Ability {
             this.state.slashTimer -= delta;
             if (this.state.slashTimer < 0) this.state.slashTimer = 0;
         }
+        this.state.resetCooldown = Math.max(0, this.state.resetCooldown - delta);
+        this.state.resetFlash = Math.max(0, this.state.resetFlash - delta);
 
         // 시야 범위가 좌우로 자유롭게 스윕 (벽 반동 시 부드럽게 회전)
         const time = performance.now() / 1000;
@@ -70,17 +81,37 @@ export class BatBallAbility extends Ability {
     }
 
     performSlash(target) {
+        const upgrade = this.getLevelUpgrade();
         const damage = Math.round(this.owner.stats.baseDamage * SLASH_DAMAGE_MULT);
         target.takeDamage(damage, this.owner, "Slash");
 
         // 강한 넉백 + 벽 충돌 시 추가 데미지
         const kbDir = Vector2.subtract(target.position, this.owner.position).normalize();
+        const hitContactPoint = Vector2.subtract(target.position, kbDir.clone().scale(target.radius));
         target.applyKnockback(kbDir.scale(KNOCKBACK_FORCE), KNOCKBACK_DURATION);
+        let homeRunUsed = false;
         target.state.wallSlam = new WallSlamEffect({
             source: this.owner,
-            damage: Math.round(this.owner.stats.baseDamage * WALL_SLAM_DAMAGE_MULT),
-            duration: this.getWallSlamDuration()
+            duration: this.getWallSlamDuration(),
+            getDamageMultiplier: ({ contactPoint }) => {
+                if (!upgrade.homeRun || homeRunUsed || !contactPoint) return 1;
+                homeRunUsed = true;
+                const distance = Vector2.subtract(contactPoint, hitContactPoint).length();
+                const multiplier = Math.min(
+                    2,
+                    1 + distance / Math.hypot(this.simulation.width, this.simulation.height)
+                );
+                this.simulation.spawnActionText(contactPoint.clone(), `HOME RUN ×${multiplier.toFixed(2)}`, "#fff1a8");
+                return multiplier;
+            },
+            onImpact: (context) => this._handleWallSlamImpact(context)
         });
+        if (upgrade.rotatingHit) {
+            target._computeMomentOfInertia();
+            const swingDirection = Math.sign(normalizeAngle(this.getArcAngle())) || 1;
+            const extraImpulse = Math.abs(calculateWallSlamAngularImpulse(target)) * 1.5 * swingDirection;
+            target.applyAngularImpulse(extraImpulse);
+        }
 
         // Slash 애니메이션 설정 — arcAngle 기준으로 ±60도 휘두르기
         this.state.slashTimer = SLASH_DURATION;
@@ -94,6 +125,16 @@ export class BatBallAbility extends Ability {
         this.simulation.addLog(`${this.owner.name} swings the bat at ${target.name}!`);
     }
 
+    _handleWallSlamImpact({ actualDamage }) {
+        if (!this.getLevelUpgrade().wallReset || actualDamage <= 0 || this.state.resetCooldown > 0) return;
+        this.timer = 0;
+        this.state.resetCooldown = RESET_COOLDOWN;
+        this.state.resetFlash = RESET_FLASH_DURATION;
+        this.simulation.spawnActionText(this.owner.position.clone(), "RESET!", "#ffffff");
+        this.simulation.addSparkBurst(this.owner.position.clone(), this.owner.color);
+        this.simulation.playSound("charge", 1.05);
+    }
+
     getStatModifiers() {
         return { speed: 0.95, damage: 1, defense: 1, impact: 1 };
     }
@@ -103,11 +144,11 @@ export class BatBallAbility extends Ability {
     }
 
     getArcAngle() {
-        return ARC_ANGLE * (this.getLevelUpgrade().arcAngleMultiplier ?? 1);
+        return ARC_ANGLE;
     }
 
     getWallSlamDuration() {
-        return WALL_SLAM_EFFECT_DURATION * (this.getLevelUpgrade().wallSlamDurationMultiplier ?? 1);
+        return WALL_SLAM_EFFECT_DURATION;
     }
 
     draw(ctx) {
@@ -235,6 +276,15 @@ export class BatBallAbility extends Ability {
         ctx.save();
         this._drawBarrel(ctx, hx, hy, bx, by);
         this._drawHandle(ctx, hx, hy, handleEndX, handleEndY, batAngle);
+        if (this.state.resetFlash > 0) {
+            ctx.globalAlpha = this.state.resetFlash / RESET_FLASH_DURATION;
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 13;
+            ctx.beginPath();
+            ctx.moveTo(handleEndX, handleEndY);
+            ctx.lineTo(bx, by);
+            ctx.stroke();
+        }
         ctx.restore();
     }
 

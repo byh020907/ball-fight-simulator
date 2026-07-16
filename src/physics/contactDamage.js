@@ -87,3 +87,37 @@ export function applyRotationalContactDamage(baseDamage, body, contactPoint, opt
     const bonus = calculateRotationalContactDamageBonus(body, contactPoint, options);
     return Math.round(baseDamage * (1 + bonus));
 }
+
+export function calculateStaticCollisionDamage({
+    source,
+    impactBody,
+    normal,
+    contactPoint,
+    preCollisionVelocity = null,
+    damageMultiplier = 1
+}) {
+    const sourceDamage = source?.stats?.baseDamage ?? 0;
+    if (sourceDamage <= 0 || !impactBody || !normal || !contactPoint) return 0;
+
+    const bodyAtImpact = {
+        position: impactBody.position,
+        velocity: preCollisionVelocity ?? impactBody.velocity,
+        angularVelocity: impactBody.angularVelocity,
+        stats: impactBody.stats
+    };
+    const contactVelocity = getContactPointVelocity(bodyAtImpact, contactPoint);
+    const contactSpeed = Math.hypot(contactVelocity.x, contactVelocity.y);
+    const normalLength = Math.hypot(normal.x, normal.y);
+    if (contactSpeed <= 1e-9 || normalLength <= 1e-9) return 0;
+
+    const normalAlignment = Math.max(
+        0,
+        -(contactVelocity.x * normal.x + contactVelocity.y * normal.y) / (contactSpeed * normalLength)
+    );
+    if (normalAlignment <= 0) return 0;
+
+    const { damageSpeed } = getContactDamageSpeed(bodyAtImpact, contactPoint);
+    const baseSpeed = impactBody.stats?.baseSpeed > 0 ? impactBody.stats.baseSpeed : 1;
+    const speedEfficiency = damageSpeed / baseSpeed;
+    return Math.max(1, Math.round(sourceDamage * speedEfficiency * normalAlignment * damageMultiplier));
+}

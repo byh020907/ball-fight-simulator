@@ -112,6 +112,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
 
     shouldSkipFighterCollision(a, b) {
         if (super.shouldSkipFighterCollision(a, b)) return true;
+        if (a.abilities.shouldSkipFighterCollision(b) || b.abilities.shouldSkipFighterCollision(a)) return true;
         return this._shouldSkipFriendlyJumperCollision(a, b);
     }
 
@@ -350,6 +351,16 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         const { a, b, normal, contactPoint, aModifiers, bModifiers } = context;
         this._resetAntiStallTimerForFighterCollision();
 
+        const replacement =
+            a.abilities.beforeFighterCollision(b, context) ?? b.abilities.beforeFighterCollision(a, context);
+        if (replacement?.replaceCollision) {
+            context.collisionReplaced = true;
+            context.skipPhysics = true;
+            context.damageFromAToB = 0;
+            context.damageFromBToA = 0;
+            return;
+        }
+
         const aCollisionEffects = a.getActiveMasteryCollisionEffects?.() ?? [];
         const bCollisionEffects = b.getActiveMasteryCollisionEffects?.() ?? [];
         context.masteryEffectsByAttacker = new Map([
@@ -472,6 +483,10 @@ export class BattleSimulation extends FighterPhysicsSimulation {
             b.abilities.onAllyCollision(a, context);
             return;
         }
+        if (context.collisionReplaced) {
+            this._recordPhysicsDebugCollision(context);
+            return;
+        }
 
         a.abilities.onFighterCollisionDamageResolved(b, context.damageFromAToB, context);
         b.abilities.onFighterCollisionDamageResolved(a, context.damageFromBToA, context);
@@ -483,7 +498,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
     }
 
     shouldEmitFighterCollisionFeedback(context) {
-        return context.hostile && context.approachSpeed < 0;
+        return context.hostile && !context.collisionReplaced && context.approachSpeed < 0;
     }
 
     notifyFighterStaticCollision(fighter, context) {

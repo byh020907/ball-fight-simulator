@@ -1,13 +1,15 @@
 import { CombatEntity, Vector2 } from "../core.js";
 
 export class OrbitHitEffect extends CombatEntity {
-    constructor(shardPosition, targetPosition, color) {
+    constructor(shardPosition, targetPosition, color, options = {}) {
         super(targetPosition, new Vector2(), 0);
         this.shardPosition = shardPosition;
         this.targetPosition = targetPosition;
         this.color = color;
         this.life = 0.24;
         this.maxLife = this.life;
+        this.impactRadius = options.impactRadius ?? 66;
+        this.drawConnection = options.drawConnection !== false;
     }
 
     update(delta) {
@@ -20,15 +22,17 @@ export class OrbitHitEffect extends CombatEntity {
         ctx.strokeStyle = this.color;
         ctx.lineWidth = 7;
         ctx.lineCap = "round";
-        ctx.beginPath();
-        ctx.moveTo(this.shardPosition.x, this.shardPosition.y);
-        ctx.lineTo(this.targetPosition.x, this.targetPosition.y);
-        ctx.stroke();
+        if (this.drawConnection) {
+            ctx.beginPath();
+            ctx.moveTo(this.shardPosition.x, this.shardPosition.y);
+            ctx.lineTo(this.targetPosition.x, this.targetPosition.y);
+            ctx.stroke();
+        }
 
         ctx.strokeStyle = "#ffffff";
         ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.arc(this.targetPosition.x, this.targetPosition.y, 18 + progress * 48, 0, Math.PI * 2);
+        ctx.arc(this.targetPosition.x, this.targetPosition.y, 18 + progress * (this.impactRadius - 18), 0, Math.PI * 2);
         ctx.stroke();
 
         ctx.fillStyle = this.color;

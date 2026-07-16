@@ -8,7 +8,6 @@ const DEFENSE_MULT_DURING_FEAST = 1.5;
 const SPIT_DASH_MULTIPLIER = 2;
 const SPIT_SPEED_MULTIPLIER = 2;
 const SPIT_MAX_DURATION = 2.45;
-const WALL_SLAM_DAMAGE = 25;
 const FEAST_HOMING_TURN_RATE = 3.5;
 
 const DIGEST_TICK_COUNT = 6;
@@ -209,7 +208,6 @@ export class EaterAbility extends Ability {
         });
         target.state.wallSlam = new WallSlamEffect({
             source: this.owner,
-            damage: WALL_SLAM_DAMAGE,
             duration: SPIT_MAX_DURATION,
             onRupture: this.abilityTier >= 3 ? (collisionCtx) => this._onWallRupture(target, collisionCtx) : null
         });

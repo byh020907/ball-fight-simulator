@@ -104,24 +104,24 @@ export const REWARD_BALANCE = deepFreeze({
             ],
             orbit: [
                 { level: 2 },
-                { level: 3, abilityTier: 1, gameText: "위성 수 +1" },
+                { level: 3, abilityTier: 1, gameText: "첫 적중점 동기화 협공 · 직접 ×0.80/×1.00" },
                 { level: 4 },
                 { level: 5 },
-                { level: 6, abilityTier: 2, gameText: "위성 충전 속도 +15%" },
+                { level: 6, abilityTier: 2, gameText: "수명 2.4초 · 협공 폭발 70px ×0.25" },
                 { level: 7 },
                 { level: 8 },
-                { level: 9, abilityTier: 3, gameText: "일제 발사 간격 -35%" },
+                { level: 9, abilityTier: 3, gameText: "미적중 탄 본체 캐치 · 원래 위성 회수" },
                 { level: 10 }
             ],
             trickster: [
                 { level: 2 },
-                { level: 3, abilityTier: 1, gameText: "씨앗 수 +1" },
+                { level: 3, abilityTier: 1, gameText: "덩굴 감속 0.5초 · 5틱 ×0.10" },
                 { level: 4 },
                 { level: 5 },
-                { level: 6, abilityTier: 2, gameText: "씨앗 수명 +35%" },
+                { level: 6, abilityTier: 2, gameText: "씨앗 표식 1.8초 · 돌진 폭발 ×1.20" },
                 { level: 7 },
                 { level: 8 },
-                { level: 9, abilityTier: 3, gameText: "씨앗 속도 +15%" },
+                { level: 9, abilityTier: 3, gameText: "폭발 접점 후속 씨앗 · 활성 유예 0.5초" },
                 { level: 10 }
             ],
             grenade: [
@@ -163,13 +163,13 @@ export const REWARD_BALANCE = deepFreeze({
             ],
             spin: [
                 { level: 2 },
-                { level: 3, abilityTier: 1, gameText: "충돌 후 회전 충전 25% 유지" },
+                { level: 3, abilityTier: 1, gameText: "만충 표면 절단 0.60초 · 12틱 ×0.15" },
                 { level: 4 },
                 { level: 5 },
-                { level: 6, abilityTier: 2, gameText: "고회전 충돌 나선 넉백" },
+                { level: 6, abilityTier: 2, gameText: "가속 절삭 ×0.10→×0.30 · 합계 ×2.40" },
                 { level: 7 },
                 { level: 8 },
-                { level: 9, abilityTier: 3, gameText: "만충 충돌 오버스핀" },
+                { level: 9, abilityTier: 3, gameText: "260px 관통 유체장 · 절단 방어 무시" },
                 { level: 10 }
             ],
             eater: [
@@ -185,13 +185,13 @@ export const REWARD_BALANCE = deepFreeze({
             ],
             bat_ball: [
                 { level: 2 },
-                { level: 3, abilityTier: 1, gameText: "방망이 판정 거리 +15%" },
+                { level: 3, abilityTier: 1, gameText: "회전 타구 · 기본 Wall Slam 각충격 ×1.5 추가" },
                 { level: 4 },
                 { level: 5 },
-                { level: 6, abilityTier: 2, gameText: "시야 호 각도 +15%" },
+                { level: 6, abilityTier: 2, gameText: "첫 Wall Slam 비거리 HOME RUN ×1.00~×2.00" },
                 { level: 7 },
                 { level: 8 },
-                { level: 9, abilityTier: 3, gameText: "벽 압박 시간 +30%" },
+                { level: 9, abilityTier: 3, gameText: "유효 Wall Slam 스킬 초기화 · 재발동 0.50초" },
                 { level: 10 }
             ],
             vampire: [
@@ -252,15 +252,10 @@ export const REWARD_BALANCE = deepFreeze({
                 tiers: [{}, { arrowSpeedMultiplier: 1.15 }, { windupMultiplier: 0.8 }, {}]
             },
             orbit: {
-                tiers: [
-                    {},
-                    { shardCountMultiplier: 1.2 },
-                    { rechargeSpeedMultiplier: 1.15 },
-                    { volleyDelayMultiplier: 0.65 }
-                ]
+                tiers: [{}, { synchronizedVolley: true }, { explosiveVolley: true }, { bodyCatch: true }]
             },
             trickster: {
-                tiers: [{}, { seedCountMultiplier: 1.35 }, { seedLifeMultiplier: 1.35 }, { seedSpeedMultiplier: 1.15 }]
+                tiers: [{}, { vineSnare: true }, { seedMarkBurst: true }, { followupSeed: true }]
             },
             grenade: {
                 tiers: [
@@ -282,23 +277,13 @@ export const REWARD_BALANCE = deepFreeze({
                 tiers: [{}, {}, {}, {}]
             },
             spin: {
-                tiers: [
-                    {},
-                    { chargeRetentionRatio: 0.25 },
-                    { spiralKnockback: 210 },
-                    { overspinDamageMultiplier: 1.45 }
-                ]
+                tiers: [{}, { surfaceCut: true }, { acceleratingCut: true }, { piercingVortex: true }]
             },
             eater: {
                 tiers: [{}, {}, {}, {}]
             },
             bat_ball: {
-                tiers: [
-                    {},
-                    { arcRangeMultiplier: 1.15 },
-                    { arcAngleMultiplier: 1.15 },
-                    { wallSlamDurationMultiplier: 1.3 }
-                ]
+                tiers: [{}, { rotatingHit: true }, { homeRun: true }, { wallReset: true }]
             },
             vampire: {
                 tiers: [{}, { repeatBite: true }, { lifeBurst: true }, { bloodPull: true }]

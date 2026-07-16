@@ -500,7 +500,6 @@ class ShockwaveAction extends ClickAction {
             fighter.applyKnockback(toFighter.normalize().scale(force), 0.3);
             fighter.state.wallSlam = new WallSlamEffect({
                 source: playerBall,
-                damage: Math.round(force * 0.015),
                 duration: 0.3
             });
         }

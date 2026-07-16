@@ -32,7 +32,10 @@ export class OrbitAbility extends Ability {
             volleyTimer: 0,
             volleyIndex: 0,
             volleyActive: false,
-            volleyStartTime: 0
+            volleyStartTime: 0,
+            volleySerial: 0,
+            currentVolleyId: null,
+            synchronizedVolleys: new Map()
         };
     }
 
@@ -53,6 +56,7 @@ export class OrbitAbility extends Ability {
         this.state.hitCooldown = Math.max(0, this.state.hitCooldown - delta);
         this.updateRecharge(delta);
         this.updateVolley(delta, target);
+        this._pruneSynchronizedVolleys();
 
         if (!target) {
             return;
@@ -175,6 +179,7 @@ export class OrbitAbility extends Ability {
                 this.state.volleyActive = false;
                 this.state.volleyIndex = 0;
                 this.state.volleyTimer = VOLLEY_COOLDOWN;
+                this.state.currentVolleyId = null;
                 return;
             }
             this.state.volleyStartTime -= delta;
@@ -187,6 +192,7 @@ export class OrbitAbility extends Ability {
                 this.state.volleyActive = false;
                 this.state.volleyIndex = 0;
                 this.state.volleyTimer = VOLLEY_COOLDOWN;
+                this.state.currentVolleyId = null;
             }
             return;
         }
@@ -202,6 +208,8 @@ export class OrbitAbility extends Ability {
                 this.state.volleyActive = true;
                 this.state.volleyIndex = 0;
                 this.state.volleyStartTime = 0;
+                this.state.volleySerial += 1;
+                this.state.currentVolleyId = `${this.owner.id}:orbit:${this.state.volleySerial}`;
             }
         }
     }
@@ -215,9 +223,61 @@ export class OrbitAbility extends Ability {
 
         const entry = activeEntries[0];
         const dir = Vector2.subtract(target.position, entry.position).normalize();
-        this.simulation.spawnOrbitShot(this.owner, entry.position.clone(), dir, SHARD_SIZE);
+        this.simulation.spawnOrbitShot(this.owner, entry.position.clone(), dir, SHARD_SIZE, {
+            slotIndex: entry.index,
+            volleyId: this.state.currentVolleyId
+        });
         this.consumeShard(entry.index);
         this.simulation.playSound("shoot", 0.6);
+    }
+
+    registerProjectileHit(projectile, target, contactPoint) {
+        const upgrade = this.getLevelUpgrade();
+        if (!upgrade.synchronizedVolley || !projectile.volleyId) return;
+        if (this.state.synchronizedVolleys.has(projectile.volleyId)) return;
+
+        const fixedPoint = contactPoint.clone();
+        this.state.synchronizedVolleys.set(projectile.volleyId, fixedPoint);
+        for (const entity of this.simulation.entities) {
+            if (
+                entity === projectile ||
+                entity.constructor?.name !== "OrbitProjectile" ||
+                entity.owner !== this.owner ||
+                entity.volleyId !== projectile.volleyId ||
+                entity.isExpired ||
+                entity.hasHit
+            ) {
+                continue;
+            }
+            entity.beginSynchronizedConvergence(fixedPoint);
+        }
+        this.simulation.spawnOrbitHit(projectile.position.clone(), fixedPoint.clone(), this.owner.color);
+        this.simulation.addLog(`${this.owner.name}'s orbit volley synchronizes on ${target.name}.`);
+    }
+
+    restoreShardFromCatch(slotIndex, position) {
+        const shard = this.state.shards[slotIndex];
+        if (!shard || shard.active) return false;
+        shard.active = true;
+        shard.refilling = false;
+        shard.refillProgress = 1;
+        this.state.rechargeGapTimer = this.rechargeGap;
+        this.simulation.spawnPulse(position.clone(), this.owner.color);
+        this.simulation.playSound("charge", 1);
+        return true;
+    }
+
+    _pruneSynchronizedVolleys() {
+        for (const volleyId of this.state.synchronizedVolleys.keys()) {
+            const remainsInFlight = this.simulation.entities.some(
+                (entity) =>
+                    entity.constructor?.name === "OrbitProjectile" &&
+                    entity.owner === this.owner &&
+                    entity.volleyId === volleyId &&
+                    !entity.isExpired
+            );
+            if (!remainsInFlight) this.state.synchronizedVolleys.delete(volleyId);
+        }
     }
 
     getActiveShardCount() {

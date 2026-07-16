@@ -31,7 +31,7 @@ function resolveCircleTerrainCollision(entity, terrain) {
         surfaceMaterial: "wood"
     });
 
-    return { normal, contactPoint };
+    return { normal, contactPoint, preCollisionVelocity: preVel };
 }
 
 export function resolveTerrainCollision(entity, terrain) {

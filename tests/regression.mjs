@@ -237,7 +237,8 @@ import {
     getContactPointVelocity,
     getContactDamageSpeed,
     calculateRotationalContactDamageBonus,
-    applyRotationalContactDamage
+    applyRotationalContactDamage,
+    calculateStaticCollisionDamage
 } from "../src/physics/contactDamage.js";
 import RotationalBody from "../src/physics/RotationalBody.js";
 import {
@@ -1249,7 +1250,7 @@ async function testEaterFeast(app) {
     );
     target.position.x = app.simulation.width + target.radius + 5;
     app.simulation.keepInsideArena(target);
-    assert.equal(beforeHp - target.hp, 24, "Wall bounce should deal wall slam damage (25 - 1 defense)");
+    assert.ok(beforeHp - target.hp > 0, "Wall bounce should deal shared source-and-impact-based wall slam damage");
     const afterFirstWallSlamHp = target.hp;
     target.position.x = app.simulation.width + target.radius + 5;
     app.simulation.keepInsideArena(target);
@@ -4816,16 +4817,26 @@ function testAbilityLevelUpgrades(app) {
 
     const orbitRun = createTierSimulation(FIGHTER_IDS.ORBIT);
     orbitRun.ball.ability.update(0, orbitRun.target);
-    assert.equal(orbitRun.ball.ability.shardCount, 6, "Orbit tier 1 should add a sixth shard");
-    assertClose(orbitRun.ball.ability.rechargeDuration, 1 / 1.15, "Orbit tier 2 should increase recharge speed by 15%");
-    assertClose(orbitRun.ball.ability.getVolleyDelay(), 0.18 * 0.65, "Orbit tier 3 should shorten volley delay by 35%");
+    assert.equal(orbitRun.ball.ability.shardCount, 5, "Orbit level rewards should keep the base five shards");
+    assertClose(orbitRun.ball.ability.rechargeDuration, 1, "Orbit level rewards should keep base recharge speed");
+    assertClose(orbitRun.ball.ability.getVolleyDelay(), 0.18, "Orbit level rewards should keep base volley delay");
+    assert.deepEqual(
+        orbitRun.ball.ability.getLevelUpgrade(),
+        { synchronizedVolley: true, explosiveVolley: true, bodyCatch: true },
+        "Orbit tiers should expose only the three behavior rewards"
+    );
 
     const tricksterRun = createTierSimulation(FIGHTER_IDS.TRICKSTER);
     tricksterRun.ball.ability.timer = 0;
     tricksterRun.ball.ability.update(0.01, tricksterRun.target);
     const tierSeeds = tricksterRun.sim.entities.filter((entity) => entity.constructor?.name === "SeedOrb");
-    assert.equal(tierSeeds.length, 4, "Trickster tier 1 should launch four seeds");
-    assertClose(tierSeeds[0].life, 18.9, "Trickster tier 2 should extend seed life by 35%");
+    assert.equal(tierSeeds.length, 3, "Trickster level rewards should keep the base three seeds");
+    assertClose(tierSeeds[0].life, 14, "Trickster level rewards should keep the base fourteen-second lifetime");
+    assert.deepEqual(
+        tricksterRun.ball.ability.getLevelUpgrade(),
+        { vineSnare: true, seedMarkBurst: true, followupSeed: true },
+        "Trickster tiers should expose only the three behavior rewards"
+    );
 
     const grenadeRun = createTierSimulation(FIGHTER_IDS.GRENADE);
     const originalRandom = Math.random;
@@ -4920,52 +4931,30 @@ function testAbilityLevelUpgrades(app) {
     );
 
     const spinTierOneRun = createTierSimulation(FIGHTER_IDS.SPIN, 1);
-    spinTierOneRun.ball.ability.state.timeWithoutCollision = spinTierOneRun.ball.ability.getMaxChargeTime();
-    spinTierOneRun.ball.ability.onCollision(spinTierOneRun.target);
-    assertClose(
-        spinTierOneRun.ball.ability.getChargeProgress(),
-        0.25,
-        "Spin tier 1 should retain 25% of its rotation charge after a collision"
+    assert.deepEqual(
+        spinTierOneRun.ball.ability.getLevelUpgrade(),
+        { surfaceCut: true },
+        "Spin tier 1 should expose the surface-cut behavior"
     );
-
-    const spinTierTwoRun = createTierSimulation(FIGHTER_IDS.SPIN, 2);
-    const spinTierTwo = spinTierTwoRun.ball.ability;
-    spinTierTwo.state.timeWithoutCollision = spinTierTwo.getMaxChargeTime() * 0.6;
-    spinTierTwo.onCollision(spinTierTwoRun.target);
-    assert.equal(spinTierTwo.getSpiralKnockback(), 210, "Spin tier 2 should unlock spiral knockback");
-    assert.ok(
-        spinTierTwoRun.target.state.forcedHeading,
-        "Spin tier 2 should apply its lateral knockback through the existing physics API"
-    );
-
     const spinTierThreeRun = createTierSimulation(FIGHTER_IDS.SPIN, 3);
-    const spinTierThree = spinTierThreeRun.ball.ability;
-    spinTierThree.state.timeWithoutCollision = spinTierThree.getMaxChargeTime();
-    assert.equal(spinTierThree.getUiState().label, "오버스핀", "Full Spin charge should announce ready overspin");
-    assert.equal(
-        spinTierThree.modifyOutgoingFighterCollisionDamage(10),
-        15,
-        "Spin tier 3 should strengthen the full-charge collision that consumes rotation"
+    assert.deepEqual(
+        spinTierThreeRun.ball.ability.getLevelUpgrade(),
+        { surfaceCut: true, acceleratingCut: true, piercingVortex: true },
+        "Spin tiers should expose only the three behavior rewards"
     );
-    spinTierThree.onCollision(spinTierThreeRun.target);
-    assertClose(
-        spinTierThree.getChargeProgress(),
-        0.25,
-        "Spin tier 3 should consume its overspin collision while preserving the tier 1 charge retention"
-    );
-    assert.equal(spinTierThree.state.overspinHit, false, "Overspin should be consumed by its charged collision");
 
     const eaterRun = createTierSimulation(FIGHTER_IDS.EATER);
     assertClose(eaterRun.ball.ability._getSwallowHoldDuration(), 0.72, "Eater swallow hold duration should be 0.72s");
 
     const batRun = createTierSimulation(FIGHTER_IDS.BAT_BALL);
-    assert.equal(batRun.ball.ability.getArcRange(), 184, "Bat tier 1 should extend arc range by 15%");
-    assertClose(
-        batRun.ball.ability.getArcAngle(),
-        (Math.PI * 2 * 1.15) / 3,
-        "Bat tier 2 should extend arc angle by 15%"
+    assert.equal(batRun.ball.ability.getArcRange(), 160, "Bat level rewards should keep the base arc range");
+    assertClose(batRun.ball.ability.getArcAngle(), (Math.PI * 2) / 3, "Bat level rewards should keep the base arc");
+    assertClose(batRun.ball.ability.getWallSlamDuration(), 0.85, "Bat should keep the base 0.85s Wall Slam flow");
+    assert.deepEqual(
+        batRun.ball.ability.getLevelUpgrade(),
+        { rotatingHit: true, homeRun: true, wallReset: true },
+        "Bat tiers should expose only the three behavior rewards"
     );
-    assertClose(batRun.ball.ability.getWallSlamDuration(), 1.3, "Bat tier 3 should extend wall slam duration by 30%");
 
     const vampireRun = createTierSimulation(FIGHTER_IDS.VAMPIRE);
     vampireRun.ball.ability._spawnBats(vampireRun.target);
@@ -5117,6 +5106,589 @@ function testAbilityLevelUpgrades(app) {
         "Hero tier 3 should release half of twenty consumed stacks as normal orbs"
     );
     console.log("[ability-level-upgrades] ok");
+}
+
+function testTricksterLevelRewardContracts(app) {
+    const createRun = (tier) => {
+        const ownerSpec = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.TRICKSTER);
+        const targetSpec = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
+        const simulation = new BattleSimulation(
+            [
+                { ...ownerSpec, teamId: "trickster-team" },
+                { ...targetSpec, id: `trickster-target-${tier}`, teamId: "enemy-team" }
+            ],
+            { onLog() {}, onSound() {}, onDamageTaken() {}, onDamageDealt() {}, onHpChanged() {} },
+            null,
+            { assignActions: false, arenaWidth: 2_000 }
+        );
+        const [owner, target] = simulation.fighters;
+        owner.ability.setContext({ abilityTier: tier });
+        owner.stats.baseDamage = 100;
+        owner.stats.criticalChance = 0;
+        target.maxHp = 2_000;
+        target.hp = 2_000;
+        target.stats.baseDefense = 0;
+        owner.position = new Vector2(300, 480);
+        target.position = new Vector2(700, 480);
+        return { simulation, owner, target };
+    };
+    const triggerEnemySeed = (run) => {
+        const seed = run.simulation.spawnSeedOrb(run.owner, run.target.position.clone(), new Vector2(), 14);
+        seed.update(0, run.simulation);
+        return seed;
+    };
+
+    const progressionRows = REWARD_BALANCE.experience.characterLevelProgressions.trickster.filter(
+        (entry) => entry.abilityTier
+    );
+    assert.deepEqual(
+        progressionRows.map((entry) => entry.gameText),
+        ["덩굴 감속 0.5초 · 5틱 ×0.10", "씨앗 표식 1.8초 · 돌진 폭발 ×1.20", "폭발 접점 후속 씨앗 · 활성 유예 0.5초"]
+    );
+    assert.deepEqual(REWARD_BALANCE.experience.abilityUpgrades.trickster.tiers, [
+        {},
+        { vineSnare: true },
+        { seedMarkBurst: true },
+        { followupSeed: true }
+    ]);
+
+    const slowRun = createRun(1);
+    const hpBeforeTicks = slowRun.target.hp;
+    triggerEnemySeed(slowRun);
+    assert.equal(slowRun.target.state.slow.amount, 0.8, "Lv3 seed contact should slow hostile targets by 20%");
+    assert.equal(slowRun.target.state.periodicDamage.length, 1, "Lv3 should attach one reusable periodic effect");
+    const vineDrawContext = makeRecordingCanvasContext();
+    slowRun.target.state.periodicDamage[0].draw(vineDrawContext, slowRun.target);
+    assert.ok(vineDrawContext.calls.length > 0, "Lv3 vine feedback should draw on a recording canvas context");
+    for (const _ of Array.from({ length: 5 })) slowRun.target._tickTimers(0.1);
+    assert.equal(hpBeforeTicks - slowRun.target.hp, 50, "Lv3 vines should deal five total-attack x0.10 ticks");
+    assert.equal(slowRun.target.state.slow, null, "Lv3 slow should finish at 0.50 seconds");
+
+    const markRun = createRun(2);
+    triggerEnemySeed(markRun);
+    assert.equal(markRun.owner.ability.state.marks.get(markRun.target), 1.8, "Lv6 mark should last 1.8 seconds");
+    const markDrawContext = makeRecordingCanvasContext();
+    markRun.owner.ability.draw(markDrawContext);
+    assert.ok(markDrawContext.calls.length > 0, "Lv6 seed mark should draw on a recording canvas context");
+    const hpBeforeBurst = markRun.target.hp;
+    markRun.owner.ability.onDashHit(
+        markRun.target,
+        { collisionLabel: "Seed Dash" },
+        { contactPoint: markRun.target.position.clone() }
+    );
+    assert.equal(hpBeforeBurst - markRun.target.hp, 120, "Lv6 marked dash should add total-attack x1.20 damage");
+    assert.equal(markRun.owner.ability.state.marks.has(markRun.target), false, "Lv6 mark should be consumed first");
+    const hpAfterBurst = markRun.target.hp;
+    markRun.owner.ability.onDashHit(markRun.target, { collisionLabel: "Seed Dash" });
+    assert.equal(markRun.target.hp, hpAfterBurst, "The same mark must not burst twice");
+
+    const followupRun = createRun(3);
+    triggerEnemySeed(followupRun);
+    followupRun.owner.ability.onDashHit(
+        followupRun.target,
+        { collisionLabel: "Seed Dash" },
+        { contactPoint: followupRun.target.position.clone() }
+    );
+    const followup = followupRun.simulation.entities.find(
+        (entity) => entity.constructor?.name === "SeedOrb" && !entity.isExpired
+    );
+    assert.ok(followup, "Lv9 marked dash should scatter one follow-up seed");
+    assert.equal(followup.life, 14, "Lv9 follow-up seed should keep the base fourteen-second life");
+    assert.equal(followup.collisionGraceRemaining, 0.5, "Lv9 follow-up seed should start with 0.50s collision grace");
+    const sproutDrawContext = makeRecordingCanvasContext();
+    followup.draw(sproutDrawContext);
+    assert.ok(sproutDrawContext.calls.length > 0, "Lv9 grace-period sprout should draw on a recording canvas context");
+    followup.applyImpulse(followup.velocity.clone().scale(-1));
+    followup.position = followupRun.target.position.clone();
+    followup.update(0.49, followupRun.simulation);
+    assert.equal(followup.isExpired, false, "Follow-up seed must remain intangible before 0.50 seconds");
+    followup.update(0.01, followupRun.simulation);
+    assert.equal(followup.isExpired, true, "Follow-up seed should activate after the grace period");
+
+    const ownerRun = createRun(3);
+    const ownerSeed = ownerRun.simulation.spawnSeedOrb(
+        ownerRun.owner,
+        ownerRun.owner.position.clone(),
+        new Vector2(),
+        14
+    );
+    ownerSeed.update(0, ownerRun.simulation);
+    assert.ok(ownerRun.owner.state.movement, "Owner seed contact should retain the base dash");
+    assert.equal(ownerRun.owner.state.periodicDamage.length, 0, "Owner seed contact should not apply hostile vines");
+    assert.equal(
+        ownerRun.owner.ability.state.marks.has(ownerRun.owner),
+        false,
+        "Owner seed contact should not mark itself"
+    );
+    console.log("[trickster-level-reward-contracts] ok");
+}
+
+function testOrbitLevelRewardContracts(app) {
+    const createRun = (tier, extraEnemy = false) => {
+        const ownerSpec = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ORBIT);
+        const targetSpec = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
+        const specs = [
+            { ...ownerSpec, teamId: "orbit-team" },
+            { ...targetSpec, id: `orbit-target-${tier}`, teamId: "enemy-team" }
+        ];
+        if (extraEnemy) {
+            specs.push({ ...targetSpec, id: `orbit-nearby-${tier}`, teamId: "enemy-team" });
+        }
+        const simulation = new BattleSimulation(
+            specs,
+            { onLog() {}, onSound() {}, onDamageTaken() {}, onDamageDealt() {}, onHpChanged() {} },
+            null,
+            { assignActions: false, arenaWidth: 2_000 }
+        );
+        const [owner, target, nearby] = simulation.fighters;
+        owner.ability.setContext({ abilityTier: tier });
+        owner.stats.baseDamage = 100;
+        owner.stats.criticalChance = 0;
+        owner.position = new Vector2(300, 480);
+        target.position = new Vector2(900, 480);
+        for (const enemy of [target, nearby].filter(Boolean)) {
+            enemy.maxHp = 2_000;
+            enemy.hp = 2_000;
+            enemy.stats.baseDefense = 0;
+        }
+        return { simulation, owner, target, nearby };
+    };
+
+    const rows = REWARD_BALANCE.experience.characterLevelProgressions.orbit.filter((entry) => entry.abilityTier);
+    assert.deepEqual(
+        rows.map((entry) => entry.gameText),
+        [
+            "첫 적중점 동기화 협공 · 직접 ×0.80/×1.00",
+            "수명 2.4초 · 협공 폭발 70px ×0.25",
+            "미적중 탄 본체 캐치 · 원래 위성 회수"
+        ]
+    );
+    assert.deepEqual(REWARD_BALANCE.experience.abilityUpgrades.orbit.tiers, [
+        {},
+        { synchronizedVolley: true },
+        { explosiveVolley: true },
+        { bodyCatch: true }
+    ]);
+
+    const syncRun = createRun(1);
+    const first = syncRun.simulation.spawnOrbitShot(
+        syncRun.owner,
+        syncRun.target.position.clone(),
+        new Vector2(1, 0),
+        16,
+        { slotIndex: 0, volleyId: "same-volley" }
+    );
+    const converging = syncRun.simulation.spawnOrbitShot(syncRun.owner, new Vector2(500, 400), new Vector2(1, 0), 16, {
+        slotIndex: 1,
+        volleyId: "same-volley"
+    });
+    const otherVolley = syncRun.simulation.spawnOrbitShot(syncRun.owner, new Vector2(500, 560), new Vector2(1, 0), 16, {
+        slotIndex: 2,
+        volleyId: "other-volley"
+    });
+    const hpBeforeFirst = syncRun.target.hp;
+    first.update(0, syncRun.simulation);
+    assert.equal(hpBeforeFirst - syncRun.target.hp, 80, "Lv3 first volley hit should deal total-attack x0.80");
+    assert.ok(converging.convergence, "Lv3 should convert a living projectile from the same volley");
+    assert.equal(otherVolley.convergence, null, "Lv3 must not convert another volley");
+    const convergenceDrawContext = makeRecordingCanvasContext();
+    converging.draw(convergenceDrawContext);
+    assert.ok(convergenceDrawContext.calls.length > 0, "Lv3 convergence trail should draw on a recording context");
+    assert.deepEqual(
+        converging.convergence.fixedPoint,
+        syncRun.target.position,
+        "Lv3 convergence should snapshot the first world contact"
+    );
+    const fixedPoint = converging.convergence.fixedPoint.clone();
+    syncRun.target.position.add(new Vector2(200, 120));
+    converging._getPlannedDirection(0.15);
+    assert.deepEqual(
+        converging.convergence.fixedPoint,
+        fixedPoint,
+        "Lv3 convergence must not track later target movement"
+    );
+    converging.position = syncRun.target.position.clone();
+    const hpBeforeConvergence = syncRun.target.hp;
+    converging.update(0, syncRun.simulation);
+    assert.equal(hpBeforeConvergence - syncRun.target.hp, 100, "Lv3 convergence hit should deal total-attack x1.00");
+
+    const explosiveRun = createRun(2, true);
+    explosiveRun.nearby.position = new Vector2(explosiveRun.target.position.x + 60, explosiveRun.target.position.y);
+    const standard = explosiveRun.simulation.spawnOrbitShot(
+        explosiveRun.owner,
+        explosiveRun.target.position.clone(),
+        new Vector2(1, 0),
+        16,
+        { slotIndex: 0, volleyId: "explosive" }
+    );
+    assert.equal(standard.life, 2.4, "Lv6 projectile life should be 2.4 seconds");
+    const targetHpBefore = explosiveRun.target.hp;
+    const nearbyHpBefore = explosiveRun.nearby.hp;
+    standard.update(0, explosiveRun.simulation);
+    assert.equal(targetHpBefore - explosiveRun.target.hp, 115, "Lv6 direct target should take x0.90 and x0.25");
+    assert.equal(nearbyHpBefore - explosiveRun.nearby.hp, 25, "Lv6 nearby target should take the 70px x0.25 burst");
+    const explosionDrawContext = makeRecordingCanvasContext();
+    for (const entity of explosiveRun.simulation.entities) entity.draw?.(explosionDrawContext);
+    assert.ok(explosionDrawContext.calls.length > 0, "Lv6 impact burst should draw on a recording context");
+
+    const catchRun = createRun(3);
+    catchRun.owner.ability.consumeShard(0);
+    const caught = catchRun.simulation.spawnOrbitShot(
+        catchRun.owner,
+        catchRun.owner.position.clone(),
+        new Vector2(1, 0),
+        16,
+        { slotIndex: 0, volleyId: "catch" }
+    );
+    caught.update(0, catchRun.simulation);
+    assert.equal(caught.wasCaught, true, "Lv9 should catch an unhit projectile on body contact");
+    assert.equal(
+        catchRun.owner.ability.state.shards[0].active,
+        true,
+        "Lv9 catch should restore the original slot once"
+    );
+    assert.equal(caught.isExpired, true, "Caught projectile should disappear immediately");
+
+    const priorityRun = createRun(3);
+    priorityRun.owner.ability.consumeShard(1);
+    priorityRun.target.position = priorityRun.owner.position.clone();
+    const priorityShot = priorityRun.simulation.spawnOrbitShot(
+        priorityRun.owner,
+        priorityRun.owner.position.clone(),
+        new Vector2(1, 0),
+        16,
+        { slotIndex: 1, volleyId: "priority" }
+    );
+    priorityShot.update(0, priorityRun.simulation);
+    assert.equal(priorityShot.hasHit, true, "Enemy hit should resolve when enemy and owner overlap");
+    assert.equal(priorityShot.wasCaught, false, "Enemy hit must win over body catch in the same frame");
+    assert.equal(priorityRun.owner.ability.state.shards[1].active, false, "Hit projectile must not restore its slot");
+    console.log("[orbit-level-reward-contracts] ok");
+}
+
+function testSpinLevelRewardContracts(app) {
+    const setVelocity = (body, velocity) => body.applyImpulse(Vector2.subtract(velocity, body.velocity));
+    const createRun = (tier, { defense = 0, extraEnemy = false } = {}) => {
+        const ownerSpec = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.SPIN);
+        const targetSpec = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
+        const specs = [
+            { ...ownerSpec, teamId: "spin-team" },
+            { ...targetSpec, id: `spin-target-${tier}`, teamId: "enemy-team" }
+        ];
+        if (extraEnemy) specs.push({ ...targetSpec, id: `spin-nearby-${tier}`, teamId: "enemy-team" });
+        const simulation = new BattleSimulation(
+            specs,
+            { onLog() {}, onSound() {}, onDamageTaken() {}, onDamageDealt() {}, onHpChanged() {} },
+            null,
+            { assignActions: false, arenaWidth: 2_000 }
+        );
+        const [owner, target, nearby] = simulation.fighters;
+        owner.ability.setContext({ abilityTier: tier });
+        owner.stats.baseDamage = 100;
+        owner.stats.criticalChance = 0;
+        target.maxHp = 3_000;
+        target.hp = 3_000;
+        target.stats.baseDefense = defense;
+        owner.position = new Vector2(500, 480);
+        target.position = new Vector2(500 + owner.radius + target.radius - 1, 480);
+        setVelocity(owner, new Vector2(200, 0));
+        setVelocity(target, new Vector2());
+        if (nearby) {
+            nearby.maxHp = 3_000;
+            nearby.hp = 3_000;
+            nearby.stats.baseDefense = defense;
+            setVelocity(nearby, new Vector2());
+        }
+        return { simulation, owner, target, nearby };
+    };
+    const runCut = (run) => {
+        run.owner.ability.state.timeWithoutCollision = run.owner.ability.getMaxChargeTime();
+        const hpBefore = run.target.hp;
+        run.simulation.handleCollision();
+        assert.ok(
+            run.owner.ability.state.cut,
+            "A full charged tier Spin should replace the direct collision with a cut"
+        );
+        assert.equal(run.target.hp, hpBefore, "Cut start must suppress the ordinary immediate collision damage");
+        const cutDrawContext = makeRecordingCanvasContext();
+        run.owner.ability.draw(cutDrawContext);
+        assert.ok(cutDrawContext.calls.length > 0, "Spin cut feedback should draw on a recording context");
+        setVelocity(run.owner, new Vector2());
+        setVelocity(run.target, new Vector2());
+        for (const _ of Array.from({ length: 12 })) run.owner.ability.update(0.05);
+        return hpBefore - run.target.hp;
+    };
+
+    const rows = REWARD_BALANCE.experience.characterLevelProgressions.spin.filter((entry) => entry.abilityTier);
+    assert.deepEqual(
+        rows.map((entry) => entry.gameText),
+        [
+            "만충 표면 절단 0.60초 · 12틱 ×0.15",
+            "가속 절삭 ×0.10→×0.30 · 합계 ×2.40",
+            "260px 관통 유체장 · 절단 방어 무시"
+        ]
+    );
+    assert.deepEqual(REWARD_BALANCE.experience.abilityUpgrades.spin.tiers, [
+        {},
+        { surfaceCut: true },
+        { acceleratingCut: true },
+        { piercingVortex: true }
+    ]);
+
+    const partialRun = createRun(1);
+    partialRun.owner.ability.state.timeWithoutCollision = partialRun.owner.ability.getMaxChargeTime() * 0.5;
+    const partialHpBefore = partialRun.target.hp;
+    partialRun.simulation.handleCollision();
+    assert.equal(partialRun.owner.ability.state.cut, null, "Partial charge should retain the ordinary collision flow");
+    assert.ok(partialRun.target.hp < partialHpBefore, "Partial charge should keep immediate collision damage");
+    assert.equal(partialRun.owner.ability.getChargeProgress(), 0, "Partial collision should consume the base charge");
+
+    const tierOneRun = createRun(1);
+    assert.equal(runCut(tierOneRun), 180, "Lv3 cut should deal twelve x0.15 ticks for x1.80 total");
+    assert.equal(tierOneRun.owner.ability.state.cut, null, "Lv3 cut should finish after twelve ticks");
+    assert.ok(tierOneRun.target.velocity.x >= 359, "Cut finish should apply +360px/s along the first collision line");
+    assert.ok(tierOneRun.owner.velocity.x <= -219, "Cut finish should apply -220px/s recoil to Spin");
+
+    const tierTwoRun = createRun(2);
+    assert.equal(runCut(tierTwoRun), 240, "Lv6 linear x0.10-to-x0.30 ticks should total x2.40");
+
+    const defendedTierTwo = createRun(2, { defense: 50 });
+    const defendedTierTwoDamage = runCut(defendedTierTwo);
+    assert.ok(defendedTierTwoDamage < 240, "Lv6 cut should still use ordinary defense");
+    const piercingRun = createRun(3, { defense: 50 });
+    assert.equal(runCut(piercingRun), 240, "Lv9 cut should ignore defense for exactly its twelve ticks");
+    const hpBeforeOrdinaryDamage = piercingRun.target.hp;
+    piercingRun.target.takeDamage(100, piercingRun.owner, "Post-cut hit");
+    assert.equal(
+        hpBeforeOrdinaryDamage - piercingRun.target.hp,
+        50,
+        "Defense ignore must not leak beyond the cut ticks"
+    );
+
+    const vortexRun = createRun(3, { extraEnemy: true });
+    vortexRun.owner.ability.state.timeWithoutCollision = vortexRun.owner.ability.getMaxChargeTime();
+    vortexRun.target.position = Vector2.add(vortexRun.owner.position, new Vector2(130, 0));
+    vortexRun.nearby.position = Vector2.add(vortexRun.owner.position, new Vector2(65, 0));
+    const halfRadiusAcceleration = vortexRun.owner.ability.getVortexAccelerationAt(vortexRun.target.position);
+    assert.ok(
+        Math.abs(halfRadiusAcceleration.length() - 210) < 1e-9,
+        "Lv9 vortex should use smoothstep distance attenuation"
+    );
+    assert.ok(
+        Math.abs(Math.abs(halfRadiusAcceleration.y / halfRadiusAcceleration.x) - 3) < 1e-9,
+        "Lv9 vortex direction should combine tangent and inward components at 3:1"
+    );
+    const targetVelocityBefore = vortexRun.target.velocity.clone();
+    const nearbyVelocityBefore = vortexRun.nearby.velocity.clone();
+    vortexRun.owner.ability.update(0.1);
+    assert.ok(
+        Vector2.subtract(vortexRun.target.velocity, targetVelocityBefore).length() > 0,
+        "Lv9 vortex should apply physical impulse to one hostile target"
+    );
+    assert.ok(
+        Vector2.subtract(vortexRun.nearby.velocity, nearbyVelocityBefore).length() > 0,
+        "Lv9 vortex should apply to every hostile target in range"
+    );
+    assert.equal(
+        vortexRun.owner.ability
+            .getVortexAccelerationAt(Vector2.add(vortexRun.owner.position, new Vector2(261, 0)))
+            .length(),
+        0,
+        "Lv9 vortex should stop outside 260px"
+    );
+    console.log("[spin-level-reward-contracts] ok");
+}
+
+function testBatBallWallSlamContracts(app) {
+    const setVelocity = (body, velocity) => body.applyImpulse(Vector2.subtract(velocity, body.velocity));
+    const setAngularVelocity = (body, value) => {
+        body._computeMomentOfInertia();
+        body.applyAngularImpulse((value - body.angularVelocity) / body._inverseMomentOfInertia);
+        body.integrateRotation(Number.EPSILON);
+    };
+    const createRun = (tier, options = {}) => {
+        const ownerSpec = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.BAT_BALL);
+        const targetSpec = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
+        const terrain = options.terrain ?? [];
+        const simulation = new BattleSimulation(
+            [
+                { ...ownerSpec, teamId: "bat-team" },
+                { ...targetSpec, id: `bat-target-${tier}`, teamId: "enemy-team" }
+            ],
+            { onLog() {}, onSound() {}, onDamageTaken() {}, onDamageDealt() {}, onHpChanged() {} },
+            null,
+            { assignActions: false, arenaWidth: 2_000, terrain }
+        );
+        const [owner, target] = simulation.fighters;
+        owner.ability.setContext({ abilityTier: tier });
+        owner.stats.baseDamage = 100;
+        owner.stats.criticalChance = 0;
+        target.maxHp = 4_000;
+        target.hp = 4_000;
+        target.stats.baseDefense = 0;
+        owner.position = new Vector2(300, 480);
+        target.position = new Vector2(430, 480);
+        setVelocity(owner, new Vector2());
+        setVelocity(target, new Vector2());
+        setAngularVelocity(target, 0);
+        return { simulation, owner, target };
+    };
+
+    const rows = REWARD_BALANCE.experience.characterLevelProgressions.bat_ball.filter((entry) => entry.abilityTier);
+    assert.deepEqual(
+        rows.map((entry) => entry.gameText),
+        [
+            "회전 타구 · 기본 Wall Slam 각충격 ×1.5 추가",
+            "첫 Wall Slam 비거리 HOME RUN ×1.00~×2.00",
+            "유효 Wall Slam 스킬 초기화 · 재발동 0.50초"
+        ]
+    );
+    assert.deepEqual(REWARD_BALANCE.experience.abilityUpgrades.bat_ball.tiers, [
+        {},
+        { rotatingHit: true },
+        { homeRun: true },
+        { wallReset: true }
+    ]);
+
+    const baseRun = createRun(0);
+    baseRun.owner.ability.performSlash(baseRun.target);
+    baseRun.target.integrateRotation(1 / 60);
+    const baseAngularVelocity = baseRun.target.angularVelocity;
+    const rotatingRun = createRun(1);
+    rotatingRun.owner.ability.performSlash(rotatingRun.target);
+    rotatingRun.target.integrateRotation(1 / 60);
+    assert.ok(
+        Math.abs(rotatingRun.target.angularVelocity) > Math.abs(baseAngularVelocity),
+        "Lv3 should add a real angular impulse in the swing direction"
+    );
+
+    const source = { stats: { baseDamage: 100 } };
+    const impactBody = {
+        position: new Vector2(100, 100),
+        velocity: new Vector2(-200, 0),
+        angularVelocity: 0,
+        stats: { baseSpeed: 200, baseDamage: 1 }
+    };
+    const impactContext = {
+        source,
+        impactBody,
+        normal: new Vector2(1, 0),
+        contactPoint: new Vector2(100, 150),
+        preCollisionVelocity: new Vector2(-200, 0)
+    };
+    const baseImpactDamage = calculateStaticCollisionDamage(impactContext);
+    const fasterImpactDamage = calculateStaticCollisionDamage({
+        ...impactContext,
+        preCollisionVelocity: new Vector2(-400, 0)
+    });
+    const rotatingImpactDamage = calculateStaticCollisionDamage({
+        ...impactContext,
+        impactBody: { ...impactBody, angularVelocity: 4 }
+    });
+    const glancingDamage = calculateStaticCollisionDamage({ ...impactContext, normal: new Vector2(0, 1) });
+    const highImpactBodyAttackDamage = calculateStaticCollisionDamage({
+        ...impactContext,
+        impactBody: { ...impactBody, stats: { ...impactBody.stats, baseDamage: 999 } }
+    });
+    assert.ok(fasterImpactDamage > baseImpactDamage, "Wall Slam damage should rise with impact linear speed");
+    assert.ok(rotatingImpactDamage > baseImpactDamage, "Wall Slam damage should include rotational contact speed");
+    assert.equal(glancingDamage, 0, "Wall Slam damage should require inward surface-normal alignment");
+    assert.equal(
+        highImpactBodyAttackDamage,
+        baseImpactDamage,
+        "Wall Slam damage should use the original source attack, not the impact body's attack"
+    );
+
+    const cooldownRun = createRun(0);
+    const cooldownEffect = new WallSlamEffect({ source: cooldownRun.owner, duration: 1 });
+    cooldownRun.target.state.wallSlam = cooldownEffect;
+    cooldownRun.target.position = new Vector2(cooldownRun.simulation.width + cooldownRun.target.radius, 480);
+    setVelocity(cooldownRun.target, new Vector2(400, 0));
+    const hpBeforeWall = cooldownRun.target.hp;
+    cooldownRun.simulation.keepInsideArena(cooldownRun.target);
+    assert.ok(cooldownRun.target.hp < hpBeforeWall, "Common Wall Slam should damage on arena wall contact");
+    const hpAfterFirstWall = cooldownRun.target.hp;
+    cooldownRun.target.position = new Vector2(cooldownRun.simulation.width + cooldownRun.target.radius, 480);
+    setVelocity(cooldownRun.target, new Vector2(400, 0));
+    cooldownRun.simulation.keepInsideArena(cooldownRun.target);
+    assert.equal(cooldownRun.target.hp, hpAfterFirstWall, "Wall Slam should enforce its 0.20s per-body cooldown");
+    cooldownEffect.tick(cooldownRun.target, 0.2);
+    cooldownRun.target.position = new Vector2(cooldownRun.simulation.width + cooldownRun.target.radius, 480);
+    setVelocity(cooldownRun.target, new Vector2(400, 0));
+    cooldownRun.simulation.keepInsideArena(cooldownRun.target);
+    assert.ok(cooldownRun.target.hp < hpAfterFirstWall, "Wall Slam should reactivate after 0.20s");
+
+    const terrain = [{ shape: "circle", x: 900, y: 480, radius: 50, blocking: true }];
+    const terrainRun = createRun(0, { terrain });
+    terrainRun.target.state.wallSlam = new WallSlamEffect({ source: terrainRun.owner, duration: 1 });
+    terrainRun.target.position = new Vector2(850, 480);
+    setVelocity(terrainRun.target, new Vector2(400, 0));
+    const hpBeforeTerrain = terrainRun.target.hp;
+    terrainRun.simulation.keepInsideArena(terrainRun.target);
+    assert.ok(terrainRun.target.hp < hpBeforeTerrain, "Common Wall Slam should reuse terrain contactPoint and normal");
+
+    for (const ratio of [0, 0.5, 1]) {
+        const homeRun = createRun(2);
+        homeRun.owner.ability.performSlash(homeRun.target);
+        const effect = homeRun.target.state.wallSlam;
+        const hitContactPoint = new Vector2(
+            homeRun.target.position.x - homeRun.target.radius,
+            homeRun.target.position.y
+        );
+        const multiplier = effect.getDamageMultiplier({
+            contactPoint: Vector2.add(
+                hitContactPoint,
+                new Vector2(Math.hypot(homeRun.simulation.width, homeRun.simulation.height) * ratio, 0)
+            )
+        });
+        assert.ok(
+            Math.abs(multiplier - (1 + ratio)) < 1e-9,
+            `Lv6 home run multiplier should be ${1 + ratio} at diagonal ratio ${ratio}`
+        );
+        assert.equal(
+            effect.getDamageMultiplier({ contactPoint: hitContactPoint }),
+            1,
+            "Lv6 should enhance only the first Wall Slam"
+        );
+    }
+
+    const resetRun = createRun(3);
+    resetRun.owner.ability.performSlash(resetRun.target);
+    const resetEffect = resetRun.target.state.wallSlam;
+    resetRun.owner.ability.timer = 2;
+    resetEffect.onWallBounce(
+        resetRun.target,
+        new Vector2(-1, 0),
+        resetRun.simulation,
+        resetRun.target.position.clone(),
+        new Vector2(400, 0)
+    );
+    assert.equal(resetRun.owner.ability.timer, 0, "Lv9 valid Wall Slam should reset Bat cooldown");
+    const resetDrawContext = makeRecordingCanvasContext();
+    resetRun.owner.ability.draw(resetDrawContext);
+    assert.ok(resetDrawContext.calls.length > 0, "Bat RESET flash should draw on a recording context");
+    resetRun.owner.ability.timer = 2;
+    resetEffect.tick(resetRun.target, 0.2);
+    resetEffect.onWallBounce(
+        resetRun.target,
+        new Vector2(-1, 0),
+        resetRun.simulation,
+        resetRun.target.position.clone(),
+        new Vector2(400, 0)
+    );
+    assert.equal(resetRun.owner.ability.timer, 2, "Lv9 reset should retain its owner-level 0.50s cooldown");
+    resetRun.owner.ability.update(0.5, null);
+    resetRun.owner.ability.timer = 2;
+    resetEffect.tick(resetRun.target, 0.3);
+    resetEffect.onWallBounce(
+        resetRun.target,
+        new Vector2(-1, 0),
+        resetRun.simulation,
+        resetRun.target.position.clone(),
+        new Vector2(400, 0)
+    );
+    assert.equal(resetRun.owner.ability.timer, 0, "Lv9 reset should reactivate after 0.50s without a target lock");
+    console.log("[bat-ball-wall-slam-contracts] ok");
 }
 
 function testVampireLevelRewardContracts(app) {
@@ -13650,6 +14222,10 @@ await testGrenadeScatterShot(app);
 testExperienceSystem();
 testCharacterLevelProgressions(app);
 testAbilityLevelUpgrades(app);
+testTricksterLevelRewardContracts(app);
+testOrbitLevelRewardContracts(app);
+testSpinLevelRewardContracts(app);
+testBatBallWallSlamContracts(app);
 testVampireLevelRewardContracts(app);
 testMultiAbilityFoundation(app);
 testHuntingSystem();
@@ -19533,6 +20109,7 @@ function testEaterOrbitDigestionLifecycleKeepsBattleProgressing() {
     assert.equal(sim.finished, false, "Digestion must not stall or prematurely end an active duel");
     assert.ok(sim.entities.length < 140, "Digestion feedback should stay below the mobile render budget");
 
+    orbit.applyImpulse(Vector2.subtract(new Vector2(400, 0), orbit.velocity));
     orbit.position.x = sim.width + orbit.radius + 5;
     assert.doesNotThrow(
         () => sim.keepInsideArena(orbit),

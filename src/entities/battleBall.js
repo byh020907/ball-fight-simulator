@@ -53,6 +53,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         this.bounced = false;
         this.state = {
             slow: null,
+            periodicDamage: [],
             speedBoost: null,
             forcedHeading: null,
             movement: null,
@@ -311,6 +312,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         this.applyImpulse(this.velocity.clone().scale(-1));
         this.clearDash();
         this.state.slow = null;
+        this.state.periodicDamage = [];
         this.state.swallowed = null;
         this.state.wallSlam = null;
         this._igniteState = null;
@@ -471,6 +473,10 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             this._equipmentEffectCooldowns[type] = Math.max(0, this._equipmentEffectCooldowns[type] - delta);
         }
         this._tickIgnite(delta);
+        for (const effect of this.state.periodicDamage) {
+            effect.tick(this, delta);
+        }
+        this.state.periodicDamage = this.state.periodicDamage.filter((effect) => !effect.finished);
         this.actionContext.tickTimers(this, delta);
     }
 
@@ -497,6 +503,11 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         this.state.slow.amount = amount;
     }
 
+    addPeriodicDamageEffect(effect) {
+        this.state.periodicDamage.push(effect);
+        return effect;
+    }
+
     getCriticalChance() {
         return Math.max(0, Math.min(100, this.stats.criticalChance ?? 5));
     }
@@ -510,7 +521,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         return Math.random() * 100 < critChance;
     }
 
-    takeDamage(amount, source, label = "Hit") {
+    takeDamage(amount, source, label = "Hit", options = {}) {
         if (this.flags.defeated) return { actualDamage: 0 };
         const isCritical = source && source !== this && this.rollCritical(source);
         if (isCritical) {
@@ -521,7 +532,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         amount = this.actionContext.onDamageTaken(amount, source, label);
         amount = sim?.modifyIncomingFighterCollisionDamage?.(amount, source, this, label) ?? amount;
         const abilityDefMult = this.getStatModifiers().defense;
-        const totalDefense = Math.round(this.stats.baseDefense * abilityDefMult);
+        const totalDefense = options.ignoreDefense ? 0 : Math.round(this.stats.baseDefense * abilityDefMult);
         const hpBefore = this.hp;
         const rawActual = Math.max(1, Math.round(amount - totalDefense));
         const actual = Math.min(rawActual, hpBefore);
@@ -539,7 +550,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         if (label !== "Crash") {
             sim?.playSound?.("hit", Math.min(1.8, 0.7 + actual / 18));
         }
-        if (actual >= 1 && sim) {
+        if (actual >= 1 && sim && !options.suppressDamageNumber) {
             if (isCritical) {
                 sim.spawnCriticalNumber(this.position.clone(), Math.round(actual));
             } else {
@@ -606,6 +617,9 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         const faceRotation = this.appearance.sides > 0 ? this.angle : this.rotationEnabled ? this.angle : 0;
         this.drawFace(ctx, faceRotation);
         this.abilities.draw(ctx);
+        for (const effect of this.state.periodicDamage) {
+            effect.draw?.(ctx, this);
+        }
         drawRebirthVisualOverlay(ctx, this, rebirthVisual);
         if (this.state.movement?.showRing) {
             ctx.strokeStyle = this.state.movement.color;

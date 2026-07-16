@@ -19,6 +19,29 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.28.0",
+        date: "2026-07-17",
+        title: "v0.28.0 네 캐릭터 행동형 레벨 보상 완성",
+        changes: [
+            {
+                type: "feature",
+                text: "Trickster Lv.3 덩굴 감속·5틱 피해, Lv.6 씨앗 표식 돌진 폭발, Lv.9 폭발 접점 후속 씨앗으로 레벨 보상을 교체했습니다."
+            },
+            {
+                type: "feature",
+                text: "Orbit Lv.3 첫 적중점 곡선 협공, Lv.6 장수 탄환·70px 적중 폭발, Lv.9 미적중 탄 본체 캐치로 레벨 보상을 교체했습니다."
+            },
+            {
+                type: "feature",
+                text: "Spin Lv.3 만충 12틱 표면 절단, Lv.6 가속 절삭, Lv.9 260px 관통 유체장·절단 방어 무시로 레벨 보상을 교체했습니다."
+            },
+            {
+                type: "feature",
+                text: "Bat Ball Lv.3 실제 회전 타구, Lv.6 비거리 HOME RUN, Lv.9 벽 압박 RESET을 추가하고, 공통 Wall Slam을 유발자 공격력과 실제 정적 충돌 물리량 기반으로 통합했습니다."
+            }
+        ]
+    },
+    {
         version: "0.27.0",
         date: "2026-07-17",
         title: "v0.27.0 Vampire 레벨 보상 개편",

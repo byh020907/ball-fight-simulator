@@ -15,6 +15,7 @@ import {
 } from "../effects/index.js";
 import { resolveTerrainCollisions } from "../terrain/terrainCollision.js";
 import { applyCollisionResponse } from "../physics/collisionResponse.js";
+import { PeriodicDamageEffect } from "../combatEffects.js";
 
 /**
  * Base simulation — arena boundaries, wall bouncing, effect spawning.
@@ -67,19 +68,32 @@ export class Simulation {
         if (!xBounce && !yBounce && !terrainResult) return;
 
         ball.bounced = true;
-        if (xBounce || yBounce) {
-            const normal = xBounce ?? yBounce;
-            ball.applyWallBounceBoost?.(normal);
-            ball.state.wallSlam?.onWallBounce(ball, normal, this);
+        for (const wallCollision of [xBounce, yBounce].filter(Boolean)) {
+            ball.applyWallBounceBoost?.(wallCollision.normal);
+            ball.state.wallSlam?.onWallBounce(
+                ball,
+                wallCollision.normal,
+                this,
+                wallCollision.contactPoint,
+                wallCollision.preCollisionVelocity
+            );
         }
         if (terrainResult) {
-            ball.state.wallSlam?.onTerrainCollision(ball, terrainResult.normal, this, terrainResult.contactPoint);
+            ball.state.wallSlam?.onTerrainCollision(
+                ball,
+                terrainResult.normal,
+                this,
+                terrainResult.contactPoint,
+                terrainResult.preCollisionVelocity
+            );
         }
+        const primaryCollision = xBounce ?? yBounce ?? terrainResult;
         this.notifyFighterStaticCollision?.(ball, {
             wall: Boolean(xBounce || yBounce),
             terrain: Boolean(terrainResult),
-            normal: xBounce ?? yBounce ?? terrainResult?.normal ?? null,
-            contactPoint: terrainResult?.contactPoint ?? null
+            normal: primaryCollision?.normal ?? null,
+            contactPoint: primaryCollision?.contactPoint ?? null,
+            preCollisionVelocity: primaryCollision?.preCollisionVelocity ?? null
         });
     }
 
@@ -98,7 +112,11 @@ export class Simulation {
                 surfaceMaterial: "wall"
             });
             if (entity.state?.movement) this._handleWallBounce(entity);
-            return new Vector2(1, 0);
+            return {
+                normal: new Vector2(1, 0),
+                contactPoint: new Vector2(0, entity.position.y),
+                preCollisionVelocity: preVel
+            };
         }
         if (entity.position.x >= this.width - entity.radius) {
             entity.position.x = this.width - entity.radius;
@@ -107,7 +125,11 @@ export class Simulation {
                 surfaceMaterial: "wall"
             });
             if (entity.state?.movement) this._handleWallBounce(entity);
-            return new Vector2(-1, 0);
+            return {
+                normal: new Vector2(-1, 0),
+                contactPoint: new Vector2(this.width, entity.position.y),
+                preCollisionVelocity: preVel
+            };
         }
         return null;
     }
@@ -121,7 +143,11 @@ export class Simulation {
                 surfaceMaterial: "wall"
             });
             if (entity.state?.movement) this._handleWallBounce(entity);
-            return new Vector2(0, 1);
+            return {
+                normal: new Vector2(0, 1),
+                contactPoint: new Vector2(entity.position.x, 0),
+                preCollisionVelocity: preVel
+            };
         }
         if (entity.position.y >= this.height - entity.radius) {
             entity.position.y = this.height - entity.radius;
@@ -130,7 +156,11 @@ export class Simulation {
                 surfaceMaterial: "wall"
             });
             if (entity.state?.movement) this._handleWallBounce(entity);
-            return new Vector2(0, -1);
+            return {
+                normal: new Vector2(0, -1),
+                contactPoint: new Vector2(entity.position.x, this.height),
+                preCollisionVelocity: preVel
+            };
         }
         return null;
     }
@@ -152,16 +182,24 @@ export class Simulation {
         return arrow;
     }
 
-    spawnSeedOrb(owner, position, velocity, life) {
-        this.entities.push(new SeedOrb(owner, position, velocity, life));
+    spawnSeedOrb(owner, position, velocity, life, options = {}) {
+        const seed = new SeedOrb(owner, position, velocity, life, options);
+        this.entities.push(seed);
+        return seed;
+    }
+
+    createPeriodicDamageEffect(options) {
+        return new PeriodicDamageEffect(options);
     }
 
     spawnGrenade(owner, targetPosition, fuseTime, options = {}) {
         this.entities.push(new Grenade(owner, targetPosition, fuseTime, options));
     }
 
-    spawnOrbitShot(owner, position, direction, size) {
-        this.entities.push(new OrbitProjectile(owner, position, direction, size));
+    spawnOrbitShot(owner, position, direction, size, options = {}) {
+        const projectile = new OrbitProjectile(owner, position, direction, size, options);
+        this.entities.push(projectile);
+        return projectile;
     }
 
     spawnHeroOrb(owner, position, velocity, effectType, life, options) {
@@ -248,6 +286,22 @@ export class Simulation {
         this.entities.push(new OrbitHitEffect(shardPosition, targetPosition, color));
     }
 
+    spawnOrbitExplosion(position, color, radius) {
+        this.entities.push(
+            new OrbitHitEffect(position.clone(), position.clone(), color, {
+                impactRadius: radius,
+                drawConnection: false
+            })
+        );
+        this.spawnParticleBurst(position, color, {
+            count: 20,
+            speed: 220,
+            radiusMin: 2,
+            radiusMax: 5,
+            upBias: 10
+        });
+    }
+
     spawnSlash(from, to, color) {
         this.entities.push(new SlashTrail(from, to, color));
         this.playSound("dash", 0.72);
@@ -311,7 +365,9 @@ export class Simulation {
 
     spawnActionText(position, text, color = "#ffffff") {
         if (!this.showDamageNumbers) return;
-        this.entities.push(new ActionText(position, text, color));
+        const effect = new ActionText(position, text, color);
+        this.entities.push(effect);
+        return effect;
     }
 
     spawnActionWindow(ball, actionId, duration) {

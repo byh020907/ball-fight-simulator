@@ -6,11 +6,40 @@ const MAX_SPIN_REVOLUTIONS_PER_SECOND = 10;
 const MAX_SPIN_VELOCITY = MAX_SPIN_REVOLUTIONS_PER_SECOND * Math.PI * 2;
 const SPIN_RESPONSE_RATE = 15;
 const BASE_COLLISION_RETENTION = 0;
-const SPIRAL_KNOCKBACK_THRESHOLD = 0.5;
 const DISCHARGE_NOTICE_THRESHOLD = 0.55;
 const FULL_CHARGE_THRESHOLD = 0.98;
 const CHARGE_THRESHOLD_PARTICLES = 0.2;
 const RING_SEGMENT_COUNT = 12;
+const CUT_DURATION = 0.6;
+const CUT_INTERVAL = 0.05;
+const CUT_TICKS = 12;
+const CUT_TARGET_RELEASE_SPEED = 360;
+const CUT_OWNER_RELEASE_SPEED = 220;
+const VORTEX_RADIUS = 260;
+const VORTEX_ACCELERATION = 420;
+
+function smoothstep(value) {
+    const clamped = Math.max(0, Math.min(1, value));
+    return clamped * clamped * (3 - 2 * clamped);
+}
+
+function toLocalAnchor(body, point) {
+    const relative = Vector2.subtract(point, body.position);
+    const angle = -(body.angle ?? 0);
+    const cosine = Math.cos(angle);
+    const sine = Math.sin(angle);
+    return new Vector2(relative.x * cosine - relative.y * sine, relative.x * sine + relative.y * cosine);
+}
+
+function toWorldAnchor(body, localPoint) {
+    const angle = body.angle ?? 0;
+    const cosine = Math.cos(angle);
+    const sine = Math.sin(angle);
+    return Vector2.add(
+        body.position,
+        new Vector2(localPoint.x * cosine - localPoint.y * sine, localPoint.x * sine + localPoint.y * cosine)
+    );
+}
 
 export class SpinAbility extends Ability {
     constructor(owner, simulation) {
@@ -21,16 +50,24 @@ export class SpinAbility extends Ability {
             particleTimer: 0,
             readyFlash: 0,
             dischargeFlash: 0,
-            overspinFlash: 0,
-            overspinHit: false
+            cutFlash: 0,
+            cut: null,
+            fluidParticleTimer: 0,
+            fluidParticles: []
         };
     }
 
     update(delta) {
         this._tickVisualEffects(delta);
+        if (this.state.cut) {
+            this._updateCut(delta);
+            return;
+        }
+
         this._advanceCharge(delta);
         this._applyChargeTorque();
         this._emitChargeParticles(delta);
+        this._applyVortex(delta);
     }
 
     getMaxChargeTime() {
@@ -59,35 +96,146 @@ export class SpinAbility extends Ability {
         return this.getLevelUpgrade().chargeRetentionRatio ?? BASE_COLLISION_RETENTION;
     }
 
-    getSpiralKnockback() {
-        return this.getLevelUpgrade().spiralKnockback ?? 0;
-    }
-
     isFullyCharged() {
         return this.getChargeProgress() >= FULL_CHARGE_THRESHOLD;
     }
 
-    modifyOutgoingFighterCollisionDamage(amount) {
-        const overspinDamageMultiplier = this.getLevelUpgrade().overspinDamageMultiplier;
-        if (amount <= 0 || !overspinDamageMultiplier || !this.isFullyCharged()) return amount;
-
-        this.state.overspinHit = true;
-        return Math.round(amount * overspinDamageMultiplier);
+    beforeFighterCollision(target, context) {
+        if (
+            !this.getLevelUpgrade().surfaceCut ||
+            !this.isFullyCharged() ||
+            this.state.cut ||
+            context.collisionReplaced
+        ) {
+            return null;
+        }
+        this._startCut(target, context);
+        return { replaceCollision: true };
     }
 
-    onCollision(target) {
-        const charge = this.getChargeProgress();
-        const wasOverspinHit = this.state.overspinHit;
-        if (charge >= SPIRAL_KNOCKBACK_THRESHOLD && this.getSpiralKnockback() > 0) {
-            this._applySpiralKnockback(target, charge);
+    shouldSkipFighterCollision(target) {
+        return this.state.cut?.target === target;
+    }
+
+    onCollision() {
+        if (this.state.cut) return;
+        this._consumeCharge(this.getChargeProgress());
+    }
+
+    _startCut(target, context) {
+        const contactPoint =
+            context.contactPoint?.clone?.() ?? Vector2.add(this.owner.position, target.position).scale(0.5);
+        const direction = context.a === this.owner ? context.normal.clone() : context.normal.clone().scale(-1);
+        this.state.cut = {
+            target,
+            elapsed: 0,
+            tickTimer: 0,
+            tickCount: 0,
+            totalDamage: 0,
+            direction,
+            ownerAnchor: toLocalAnchor(this.owner, contactPoint),
+            targetAnchor: toLocalAnchor(target, contactPoint),
+            contactPoint,
+            counterText: this.simulation.spawnActionText(contactPoint.clone(), "0 ×0", "#ffe36d")
+        };
+        if (this.state.cut.counterText) {
+            this.state.cut.counterText.applyImpulse(this.state.cut.counterText.velocity.clone().scale(-1));
         }
-        this._consumeCharge(charge, wasOverspinHit);
+        if (this.getLevelUpgrade().piercingVortex) {
+            this.simulation.spawnActionText(contactPoint.clone(), "관통 절단!", "#fff2a8");
+        }
+        this.state.timeWithoutCollision = 0;
+        this._applySpinVelocity(0);
+        this.state.dischargeFlash = 0.34;
+        this.simulation.playSound("rage", 0.88);
+    }
+
+    _updateCut(delta) {
+        const cut = this.state.cut;
+        if (!cut) return;
+        if (cut.target.flags.defeated) {
+            this._finishCut(cut);
+            return;
+        }
+
+        const activeDelta = Math.min(delta, Math.max(0, CUT_DURATION - cut.elapsed));
+        cut.elapsed += activeDelta;
+        cut.tickTimer += activeDelta;
+        this._applyCutConstraint(cut);
+        this._updateCutContact(cut);
+
+        while (cut.tickTimer + 1e-9 >= CUT_INTERVAL && cut.tickCount < CUT_TICKS) {
+            cut.tickTimer -= CUT_INTERVAL;
+            this._applyCutTick(cut);
+            if (cut.target.flags.defeated) break;
+        }
+
+        if (cut.tickCount >= CUT_TICKS || cut.elapsed + 1e-9 >= CUT_DURATION || cut.target.flags.defeated) {
+            this._finishCut(cut);
+        }
+    }
+
+    _applyCutConstraint(cut) {
+        const ownerPoint = toWorldAnchor(this.owner, cut.ownerAnchor);
+        const targetPoint = toWorldAnchor(cut.target, cut.targetAnchor);
+        const gap = Vector2.subtract(targetPoint, ownerPoint);
+        const relativeVelocity = Vector2.subtract(cut.target.velocity, this.owner.velocity);
+        const correction = gap.clone().scale(-18).subtract(relativeVelocity.scale(0.65));
+        cut.target.applyImpulse(correction.clone().scale(0.5));
+        this.owner.applyImpulse(correction.scale(-0.5));
+    }
+
+    _updateCutContact(cut) {
+        const ownerPoint = toWorldAnchor(this.owner, cut.ownerAnchor);
+        const targetPoint = toWorldAnchor(cut.target, cut.targetAnchor);
+        cut.contactPoint = Vector2.add(ownerPoint, targetPoint).scale(0.5);
+        if (cut.counterText) cut.counterText.pos = cut.contactPoint.clone();
+    }
+
+    _applyCutTick(cut) {
+        const tickIndex = cut.tickCount;
+        const multiplier = this.getLevelUpgrade().acceleratingCut ? 0.1 + (0.2 * tickIndex) / (CUT_TICKS - 1) : 0.15;
+        const result = cut.target.takeDamage(this.owner.stats.baseDamage * multiplier, this.owner, "Spin Cut", {
+            ignoreDefense: Boolean(this.getLevelUpgrade().piercingVortex),
+            suppressDamageNumber: true
+        });
+        cut.tickCount += 1;
+        cut.totalDamage += result.actualDamage;
+        this.state.cutFlash = 0.08;
+        if (cut.counterText) {
+            cut.counterText.displayText = `${Math.round(cut.totalDamage)} ×${cut.tickCount}`;
+            cut.counterText.color = this.getLevelUpgrade().piercingVortex ? "#fff4ae" : "#ffb347";
+            cut.counterText.fontSize = cut.tickCount === CUT_TICKS ? 19 : 15;
+            cut.counterText.life = Math.max(cut.counterText.life, 0.35);
+        }
+        this.simulation.spawnParticleBurst(cut.contactPoint.clone(), "#ffd86b", {
+            count: cut.tickCount === CUT_TICKS ? 12 : 3,
+            speed: 100 + cut.tickCount * 8,
+            radiusMin: 1,
+            radiusMax: 3,
+            upBias: 5,
+            life: 0.35
+        });
+    }
+
+    _finishCut(cut) {
+        if (this.state.cut !== cut) return;
+        if (!cut.target.flags.defeated) {
+            cut.target.applyImpulse(cut.direction.clone().scale(CUT_TARGET_RELEASE_SPEED));
+        }
+        this.owner.applyImpulse(cut.direction.clone().scale(-CUT_OWNER_RELEASE_SPEED));
+        this.simulation.spawnPulse(
+            cut.contactPoint.clone(),
+            this.getLevelUpgrade().piercingVortex ? "#fff4ae" : "#ffd07b"
+        );
+        this.simulation.playSound("hit", 1.05);
+        this.state.cut = null;
     }
 
     _tickVisualEffects(delta) {
         this.state.readyFlash = Math.max(0, this.state.readyFlash - delta);
         this.state.dischargeFlash = Math.max(0, this.state.dischargeFlash - delta);
-        this.state.overspinFlash = Math.max(0, this.state.overspinFlash - delta);
+        this.state.cutFlash = Math.max(0, this.state.cutFlash - delta);
     }
 
     _advanceCharge(delta) {
@@ -130,13 +278,12 @@ export class SpinAbility extends Ability {
         });
     }
 
-    _consumeCharge(charge, wasOverspinHit) {
+    _consumeCharge(charge) {
         const nextCharge = charge * this.getCollisionRetention();
         this.state.timeWithoutCollision = this.getMaxChargeTime() * nextCharge;
         this.state.dischargeFlash = 0.34;
-        this.state.overspinHit = false;
         this._applySpinVelocity(this.getTargetSpinVelocity());
-        this._showChargeDischarge(charge, wasOverspinHit);
+        this._showChargeDischarge(charge);
     }
 
     _applySpinVelocity(nextSpinVelocity) {
@@ -149,10 +296,9 @@ export class SpinAbility extends Ability {
         this.owner.applyAngularImpulse(angularImpulse);
     }
 
-    _showChargeDischarge(charge, wasOverspinHit) {
-        const color = wasOverspinHit ? "#ffe36d" : "#f6a23a";
-        this.simulation.spawnPulse(this.owner.position.clone(), color);
-        this.simulation.spawnParticleBurst(this.owner.position.clone(), color, {
+    _showChargeDischarge(charge) {
+        this.simulation.spawnPulse(this.owner.position.clone(), "#f6a23a");
+        this.simulation.spawnParticleBurst(this.owner.position.clone(), "#f6a23a", {
             count: 6 + Math.floor(charge * 10),
             speed: 100 + charge * 140,
             radiusMin: 2,
@@ -161,45 +307,100 @@ export class SpinAbility extends Ability {
             life: 0.45
         });
 
-        if (wasOverspinHit) {
-            this.state.overspinFlash = 0.45;
-            this.simulation.spawnActionText(this.owner.position.clone(), "오버스핀!", "#ffe36d");
-            this.simulation.playSound("rage", 0.95);
-            return;
-        }
-
         if (charge >= DISCHARGE_NOTICE_THRESHOLD) {
             this.simulation.spawnActionText(this.owner.position.clone(), "회전력 방출!", "#ffd07b");
             this.simulation.playSound("hit", 0.85);
         }
     }
 
-    _applySpiralKnockback(target, charge) {
-        const radial = Vector2.subtract(target.position, this.owner.position).normalize();
-        const tangent = new Vector2(-radial.y * this._spinDirection, radial.x * this._spinDirection);
-        const strength = this.getSpiralKnockback() * charge;
-        target.applyKnockback(tangent.scale(strength), 0.22);
-        this.simulation.spawnSlash(this.owner.position.clone(), target.position.clone(), "#ffe36d");
+    _applyVortex(delta) {
+        const active = this.getLevelUpgrade().piercingVortex && this.isFullyCharged();
+        if (!active) {
+            this.state.fluidParticles = [];
+            return;
+        }
+
+        for (const target of this.simulation.getEnemiesOf(this.owner)) {
+            const acceleration = this.getVortexAccelerationAt(target.position);
+            target.applyImpulse(acceleration.scale(delta));
+        }
+        this._updateFluidParticles(delta);
     }
 
-    _isOverspinReady() {
-        return this.getLevelUpgrade().overspinDamageMultiplier != null && this.isFullyCharged();
+    getVortexAccelerationAt(position) {
+        const inward = Vector2.subtract(this.owner.position, position);
+        const distance = inward.length();
+        if (distance > VORTEX_RADIUS) return new Vector2();
+        if (distance <= 1e-9) inward.add(new Vector2(1, 0));
+        inward.normalize();
+        const tangent = new Vector2(-inward.y * this._spinDirection, inward.x * this._spinDirection);
+        const direction = tangent.scale(3).add(inward).normalize();
+        const ratio = Math.max(0, 1 - distance / VORTEX_RADIUS);
+        return direction.scale(VORTEX_ACCELERATION * smoothstep(ratio));
+    }
+
+    _updateFluidParticles(delta) {
+        this.state.fluidParticleTimer -= delta;
+        if (this.state.fluidParticleTimer <= 0) {
+            this.state.fluidParticleTimer = 0.025;
+            for (const _ of Array.from({ length: 2 })) {
+                const angle = Math.random() * Math.PI * 2;
+                const radius = Math.sqrt(Math.random()) * VORTEX_RADIUS;
+                this.state.fluidParticles.push({
+                    position: Vector2.add(this.owner.position, Vector2.fromAngle(angle, radius)),
+                    previous: null,
+                    life: 0.35 + Math.random() * 0.35
+                });
+            }
+        }
+
+        for (const particle of this.state.fluidParticles) {
+            particle.previous = particle.position.clone();
+            const flow = this.getVortexAccelerationAt(particle.position).scale(0.55);
+            particle.position.add(flow.scale(delta));
+            particle.life -= delta;
+            if (Vector2.subtract(particle.position, this.owner.position).length() < this.owner.radius * 0.75) {
+                particle.life = 0;
+            }
+        }
+        this.state.fluidParticles = this.state.fluidParticles.filter((particle) => particle.life > 0);
     }
 
     draw(ctx) {
+        this._drawFluidParticles(ctx);
+        this._drawChargeRing(ctx);
+        this._drawCut(ctx);
+    }
+
+    _drawFluidParticles(ctx) {
+        if (this.state.fluidParticles.length === 0) return;
+        ctx.save();
+        ctx.strokeStyle = "#ffe36d";
+        ctx.lineWidth = 2;
+        for (const particle of this.state.fluidParticles) {
+            if (!particle.previous) continue;
+            ctx.globalAlpha = Math.min(0.8, particle.life * 1.8);
+            ctx.beginPath();
+            ctx.moveTo(particle.previous.x, particle.previous.y);
+            ctx.lineTo(particle.position.x, particle.position.y);
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+
+    _drawChargeRing(ctx) {
         const progress = this.getRotationProgress();
         if (progress <= 0.02) return;
 
         const activeSegments = Math.max(1, Math.ceil(progress * RING_SEGMENT_COUNT));
         const { position, radius } = this.owner;
         const startAngle = this.owner.angle * this._spinDirection - Math.PI / 2;
-        const overspinReady = this._isOverspinReady();
 
         ctx.save();
         ctx.lineCap = "round";
-        for (let index = 0; index < activeSegments; index += 1) {
+        for (const index of Array.from({ length: activeSegments }, (_, value) => value)) {
             const segmentAngle = startAngle + (index / RING_SEGMENT_COUNT) * Math.PI * 2;
-            ctx.strokeStyle = overspinReady ? "#ffe36d" : "#f6a23a";
+            ctx.strokeStyle = this._isCutReady() ? "#ffe36d" : "#f6a23a";
             ctx.lineWidth = 3 + progress * 2;
             ctx.beginPath();
             ctx.arc(
@@ -212,20 +413,41 @@ export class SpinAbility extends Ability {
             ctx.stroke();
         }
 
-        const flash = Math.max(
-            this.state.readyFlash / 0.45,
-            this.state.dischargeFlash / 0.34,
-            this.state.overspinFlash / 0.45
-        );
+        const flash = Math.max(this.state.readyFlash / 0.45, this.state.dischargeFlash / 0.34);
         if (flash > 0) {
             ctx.globalAlpha = Math.min(1, flash);
-            ctx.strokeStyle = this.state.overspinFlash > 0 || overspinReady ? "#fff4ae" : "#ffd07b";
+            ctx.strokeStyle = this._isCutReady() ? "#fff4ae" : "#ffd07b";
             ctx.lineWidth = 3;
             ctx.beginPath();
             ctx.arc(position.x, position.y, radius + 24 + progress * 10, 0, Math.PI * 2);
             ctx.stroke();
         }
         ctx.restore();
+    }
+
+    _drawCut(ctx) {
+        const cut = this.state.cut;
+        if (!cut) return;
+        const progress = Math.min(1, cut.elapsed / CUT_DURATION);
+        const intensity = 0.5 + progress * 0.5 + (this.state.cutFlash > 0 ? 0.35 : 0);
+        ctx.save();
+        ctx.strokeStyle = this.getLevelUpgrade().piercingVortex ? "#fff4ae" : "#ffb347";
+        ctx.lineWidth = 3 + intensity * 4;
+        ctx.globalAlpha = Math.min(1, intensity);
+        ctx.beginPath();
+        ctx.arc(
+            cut.contactPoint.x,
+            cut.contactPoint.y,
+            16 + progress * 12,
+            this.owner.angle,
+            this.owner.angle + Math.PI * 1.35
+        );
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    _isCutReady() {
+        return this.getLevelUpgrade().surfaceCut && this.isFullyCharged();
     }
 
     drawFace(ctx, rotation, ball) {
@@ -239,8 +461,14 @@ export class SpinAbility extends Ability {
     }
 
     getUiState() {
-        if (this._isOverspinReady()) {
-            return { label: "오버스핀", progress: 1 };
+        if (this.state.cut) {
+            return {
+                label: `절단 ${this.state.cut.tickCount}/${CUT_TICKS}`,
+                progress: this.state.cut.tickCount / CUT_TICKS
+            };
+        }
+        if (this._isCutReady()) {
+            return { label: "회전 절단", progress: 1 };
         }
         return { label: "회전력", progress: Math.max(0.04, this.getRotationProgress()) };
     }

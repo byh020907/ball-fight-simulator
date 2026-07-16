@@ -83,7 +83,7 @@ export function resolvePolygonTerrainCollision(entity, terrain) {
         applyCollisionResponse(entity, normal, contactPoint, preVel, {
             surfaceMaterial: terrain.physicsMaterial ?? "wood"
         });
-        return { normal, contactPoint };
+        return { normal, contactPoint, preCollisionVelocity: preVel };
     }
 
     let bestOverlap = -Infinity;
@@ -133,7 +133,7 @@ export function resolvePolygonTerrainCollision(entity, terrain) {
     applyCollisionResponse(entity, normal, contactPoint, preVel, {
         surfaceMaterial: terrain.physicsMaterial ?? "wood"
     });
-    return { normal, contactPoint };
+    return { normal, contactPoint, preCollisionVelocity: preVel };
 }
 
 function closestEdgeNormal(cx, cy, worldPoints) {

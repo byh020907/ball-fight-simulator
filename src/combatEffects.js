@@ -1,5 +1,5 @@
 import { TimedEffect, Vector2 } from "./core.js";
-import { applyRotationalContactDamage } from "./physics/contactDamage.js";
+import { applyRotationalContactDamage, calculateStaticCollisionDamage } from "./physics/contactDamage.js";
 
 export class DashEffect {
     constructor({
@@ -48,7 +48,7 @@ export class DashEffect {
         if (this.collisionSlow) {
             defender.applySlow(this.collisionSlow.duration, this.collisionSlow.amount);
         }
-        attacker.abilities.onDashHit(defender, this);
+        attacker.abilities.onDashHit(defender, this, { contactPoint });
         if (this.untilImpact) {
             this.expired = true;
         }
@@ -62,14 +62,71 @@ export class DashEffect {
     }
 }
 
+export class PeriodicDamageEffect {
+    constructor({ duration, interval, ticks, damage, source, label, color = "#44cc66" }) {
+        this.duration = duration;
+        this.interval = interval;
+        this.maximumTicks = ticks;
+        this.damage = damage;
+        this.source = source;
+        this.label = label;
+        this.color = color;
+        this.elapsed = 0;
+        this.tickTimer = 0;
+        this.tickCount = 0;
+        this.pulse = 0;
+        this.finished = false;
+    }
+
+    tick(target, delta) {
+        if (this.finished) return;
+        const activeDelta = Math.min(delta, Math.max(0, this.duration - this.elapsed));
+        this.elapsed += activeDelta;
+        this.tickTimer += activeDelta;
+        this.pulse = Math.max(0, this.pulse - delta);
+
+        while (this.tickTimer + 1e-9 >= this.interval && this.tickCount < this.maximumTicks) {
+            this.tickTimer -= this.interval;
+            this.tickCount += 1;
+            this.pulse = 0.08;
+            target.takeDamage(this.damage, this.source, this.label);
+        }
+
+        this.finished = this.elapsed + 1e-9 >= this.duration || this.tickCount >= this.maximumTicks;
+    }
+
+    draw(ctx, target) {
+        const progress = Math.min(1, this.elapsed / this.duration);
+        const tighten = this.pulse > 0 ? this.pulse / 0.08 : 0;
+        const radius = target.radius + 7 - tighten * 4;
+        ctx.save();
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 3 + tighten * 2;
+        ctx.globalAlpha = 0.85 * (1 - progress * 0.35);
+        for (const offset of [-0.28, 0.28]) {
+            ctx.beginPath();
+            ctx.arc(
+                target.position.x,
+                target.position.y,
+                radius,
+                Math.PI * (0.18 + offset + progress * 0.25),
+                Math.PI * (1.38 + offset + progress * 0.25)
+            );
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+}
+
 export class WallSlamEffect {
-    constructor({ source, damage, duration, onRupture = null }) {
+    constructor({ source, duration, onRupture = null, getDamageMultiplier = null, onImpact = null }) {
         this.effect = new TimedEffect(duration);
         this.source = source;
-        this.damage = damage;
         this.cooldown = 0;
         this.angularImpulseApplied = false;
         this.onRupture = onRupture;
+        this.getDamageMultiplier = getDamageMultiplier;
+        this.onImpact = onImpact;
     }
 
     tick(ball, delta) {
@@ -79,17 +136,29 @@ export class WallSlamEffect {
         return this.effect.finished;
     }
 
-    onWallBounce(ball, normal, simulation, contactPoint) {
+    onWallBounce(ball, normal, simulation, contactPoint, preCollisionVelocity = null) {
         if (this.cooldown > 0) return;
 
-        this.cooldown = 0.18;
-        ball.takeDamage(this.damage, this.source, "Wall Slam");
+        const impactContext = { ball, normal, simulation, contactPoint, preCollisionVelocity };
+        const rawDamage = calculateStaticCollisionDamage({
+            source: this.source,
+            impactBody: ball,
+            normal,
+            contactPoint,
+            preCollisionVelocity,
+            damageMultiplier: simulation.getDamageMultiplier?.() ?? 1
+        });
+        if (rawDamage <= 0) return;
+
+        const damageMultiplier = Math.max(0, this.getDamageMultiplier?.(impactContext) ?? 1);
+        const { actualDamage } = ball.takeDamage(rawDamage * damageMultiplier, this.source, "Wall Slam");
+        this.cooldown = 0.2;
 
         if (this.onRupture) {
-            this.onRupture({ normal, contactPoint });
+            this.onRupture({ ...impactContext, rawDamage, damageMultiplier, actualDamage });
         } else {
             simulation.spawnWallImpact(
-                ball.position.clone(),
+                contactPoint?.clone?.() ?? ball.position.clone(),
                 normal ?? ball.velocity.clone().normalize().scale(-1),
                 this.source?.color ?? ball.color
             );
@@ -97,10 +166,11 @@ export class WallSlamEffect {
             simulation.shakeScreen(0.24, 16);
         }
         simulation.addLog(`${ball.name} takes wall slam damage.`);
+        this.onImpact?.({ ...impactContext, rawDamage, damageMultiplier, actualDamage });
     }
 
-    onTerrainCollision(ball, normal, simulation, contactPoint) {
-        this.onWallBounce(ball, normal, simulation, contactPoint);
+    onTerrainCollision(ball, normal, simulation, contactPoint, preCollisionVelocity = null) {
+        this.onWallBounce(ball, normal, simulation, contactPoint, preCollisionVelocity);
     }
 
     _applyPhysicalAngularImpulse(ball) {
@@ -109,21 +179,22 @@ export class WallSlamEffect {
         if (typeof ball.applyAngularImpulse !== "function") return;
         this.angularImpulseApplied = true;
 
-        const speed = ball.velocity.length();
-        const radius = Math.max(1, ball.radius ?? 1);
-        const sign = ball.velocity.x >= 0 ? 1 : -1;
-        const desiredOmega = sign * Math.min(14, Math.max(5, (speed / radius) * 1.2));
-
-        const invI = ball._inverseMomentOfInertia;
-        let impulse;
-        if (Number.isFinite(invI) && invI > 0) {
-            impulse = desiredOmega / invI;
-        } else {
-            impulse = (ball.mass ?? 1) * radius * speed * 0.35 * sign;
-        }
+        const impulse = calculateWallSlamAngularImpulse(ball);
 
         if (Number.isFinite(impulse) && impulse !== 0) {
             ball.applyAngularImpulse(impulse);
         }
     }
+}
+
+export function calculateWallSlamAngularImpulse(ball) {
+    const speed = ball.velocity.length();
+    const radius = Math.max(1, ball.radius ?? 1);
+    const sign = ball.velocity.x >= 0 ? 1 : -1;
+    const desiredOmega = sign * Math.min(14, Math.max(5, (speed / radius) * 1.2));
+    const inverseMoment = ball._inverseMomentOfInertia;
+    if (Number.isFinite(inverseMoment) && inverseMoment > 0) {
+        return desiredOmega / inverseMoment;
+    }
+    return (ball.mass ?? 1) * radius * speed * 0.35 * sign;
 }
