@@ -14,6 +14,7 @@
         'hunting-chest-active': huntingChestEventActive,
         'hunting-event-active': huntingEventActive,
         'hunting-battle-preparation-active': huntingBattlePreparationActive,
+        'hunting-moving': huntingMoving,
         'hunting-combat-result-active': huntingCombatResultActive
     }"
 >
@@ -1004,6 +1005,28 @@
     }
 
     @media (max-width: 600px) {
+        :scope.hunting-moving .hunting-overlay-frame {
+            width: 100%;
+            height: 100%;
+            max-width: 100%;
+            max-height: 100%;
+            display: grid;
+            place-items: center;
+        }
+
+        :scope.hunting-moving .hunting-overlay-card {
+            width: 100%;
+            max-width: 100%;
+            max-height: 100%;
+            box-sizing: border-box;
+        }
+
+        :scope.hunting-moving .hunting-route {
+            min-width: 0;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+
         :scope.hunting-combat-result-active .hunting-overlay-card,
         :scope.hunting-combat-result-active .hunting-combat-choice-card {
             border-width: 3px;

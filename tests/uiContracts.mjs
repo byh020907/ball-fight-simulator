@@ -725,6 +725,41 @@ function testResultOverlayLayoutContract() {
         /(?:\b\d+px\b|calc\()/,
         "Standalone hunting cards must not use fixed container dimensions"
     );
+    assert.ok(
+        huntingOverlay.includes("'hunting-moving': huntingMoving"),
+        "Floor movement must expose a dedicated layout state instead of inheriting unrelated result-card rules"
+    );
+    const huntingMovingFrameRule =
+        huntingOverlay.match(/:scope\.hunting-moving \.hunting-overlay-frame\s*\{([^}]*)\}/s)?.[1] ?? "";
+    assert.match(
+        huntingMovingFrameRule,
+        /width:\s*100%;[\s\S]*height:\s*100%;[\s\S]*max-width:\s*100%;[\s\S]*max-height:\s*100%;[\s\S]*display:\s*grid;[\s\S]*place-items:\s*center;/,
+        "Mobile floor movement must center its card in the available overlay area"
+    );
+    assert.doesNotMatch(
+        huntingMovingFrameRule,
+        /(?:\b\d+px\b|calc\()/,
+        "Mobile floor movement frame must not use fixed container dimensions"
+    );
+    const huntingMovingCardRule =
+        huntingOverlay.match(/:scope\.hunting-moving \.hunting-overlay-card\s*\{([^}]*)\}/s)?.[1] ?? "";
+    assert.match(
+        huntingMovingCardRule,
+        /width:\s*100%;[\s\S]*max-width:\s*100%;[\s\S]*max-height:\s*100%;[\s\S]*box-sizing:\s*border-box;/,
+        "Mobile floor movement card must include its padding inside the available overlay width"
+    );
+    assert.doesNotMatch(
+        huntingMovingCardRule,
+        /(?:\b\d+px\b|calc\()/,
+        "Mobile floor movement card must not use a fixed container width"
+    );
+    const huntingMovingRouteRule =
+        huntingOverlay.match(/:scope\.hunting-moving \.hunting-route\s*\{([^}]*)\}/s)?.[1] ?? "";
+    assert.match(
+        huntingMovingRouteRule,
+        /min-width:\s*0;[\s\S]*max-width:\s*100%;[\s\S]*box-sizing:\s*border-box;/,
+        "Floor movement route must shrink within the movement card on narrow mobile screens"
+    );
     const huntingCombatResultFrameRule =
         huntingOverlay.match(/:scope\.hunting-combat-result-active \.hunting-overlay-frame\s*\{([^}]*)\}/s)?.[1] ?? "";
     assert.match(
