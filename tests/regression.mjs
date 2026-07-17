@@ -251,6 +251,7 @@ import {
 } from "../src/entities/equipmentVisuals.js";
 import { ArenaRenderer } from "../src/ui.js";
 import { ArenaCamera } from "../src/camera.js";
+import { BurningEffect } from "../src/effects/rageEffects.js";
 import { PATCH_NOTES } from "../src/patchNotes.js";
 import {
     createTemplateComponentDirective,
@@ -345,6 +346,7 @@ function makeElement(id = "el") {
 
 function makeRecordingCanvasContext() {
     const calls = [];
+    const primitives = [];
     const methods = new Set([
         "save",
         "restore",
@@ -371,6 +373,7 @@ function makeRecordingCanvasContext() {
     return new Proxy(
         {
             calls,
+            primitives,
             globalAlpha: 1,
             getTransform: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 })
         },
@@ -380,6 +383,14 @@ function makeRecordingCanvasContext() {
                 if (methods.has(prop)) {
                     return (...args) => {
                         calls.push([prop, ...args]);
+                        primitives.push({
+                            method: prop,
+                            args,
+                            fillStyle: target.fillStyle,
+                            strokeStyle: target.strokeStyle,
+                            lineWidth: target.lineWidth,
+                            globalAlpha: target.globalAlpha
+                        });
                     };
                 }
                 return target[prop];
@@ -393,7 +404,7 @@ function makeRecordingCanvasContext() {
     );
 }
 
-function assertForegroundEffectRenders(effect, label) {
+function assertForegroundEffectRenders(effect, label, assertEffectPrimitives = null) {
     assert.ok(effect, `${label} should create a dedicated effect entity`);
     assert.equal(effect.renderLayer, RENDER_LAYERS.FOREGROUND, `${label} should render in the foreground pass`);
     const ctx = makeRecordingCanvasContext();
@@ -407,22 +418,77 @@ function assertForegroundEffectRenders(effect, label) {
     };
     ctx.canvas = canvas;
     let drawCount = 0;
+    let effectPrimitives = [];
     const originalDraw = effect.draw.bind(effect);
     effect.draw = (...args) => {
         drawCount += 1;
-        return originalDraw(...args);
+        const primitiveStart = ctx.primitives.length;
+        const result = originalDraw(...args);
+        effectPrimitives = ctx.primitives.slice(primitiveStart);
+        return result;
     };
     const renderer = new ArenaRenderer(canvas);
-    renderer.render({
-        width: 960,
-        height: 960,
-        screenShake: null,
-        arenaTheme: "default",
-        terrain: [],
-        entities: [effect]
-    });
+    try {
+        renderer.render({
+            width: 960,
+            height: 960,
+            screenShake: null,
+            arenaTheme: "default",
+            terrain: [],
+            entities: [effect]
+        });
+    } finally {
+        effect.draw = originalDraw;
+    }
     assert.equal(drawCount, 1, `${label} should pass through ArenaRenderer exactly once`);
-    assert.ok(ctx.calls.length > 0, `${label} should issue canvas drawing primitives`);
+    assert.ok(effectPrimitives.length > 0, `${label} should issue its own canvas drawing primitives`);
+    assert.ok(
+        effectPrimitives.some((primitive) =>
+            ["arc", "ellipse", "fillRect", "lineTo", "quadraticCurveTo"].includes(primitive.method)
+        ),
+        `${label} should draw effect-specific geometry instead of passing on unrelated renderer calls`
+    );
+    assert.ok(
+        effectPrimitives.some((primitive) => primitive.method === "fill" || primitive.method === "stroke"),
+        `${label} should paint its geometry through the foreground renderer pass`
+    );
+    assertEffectPrimitives?.(effectPrimitives);
+    return effectPrimitives;
+}
+
+function findEffectPrimitive(primitives, method, predicate = () => true) {
+    return primitives.find((primitive) => primitive.method === method && predicate(primitive.args, primitive));
+}
+
+function assertEffectArcAt(primitives, point, label, radiusPredicate = (radius) => radius > 0) {
+    const arc = findEffectPrimitive(
+        primitives,
+        "arc",
+        ([x, y, radius]) => Math.abs(x - point.x) < 1e-6 && Math.abs(y - point.y) < 1e-6 && radiusPredicate(radius)
+    );
+    assert.ok(arc, `${label} should draw an arc at its gameplay center with the expected radius`);
+    return arc;
+}
+
+function assertEffectTrajectory(primitives, start, end, label) {
+    const startsAtOrigin = findEffectPrimitive(
+        primitives,
+        "moveTo",
+        ([x, y]) => Math.abs(x - start.x) < 1e-6 && Math.abs(y - start.y) < 1e-6
+    );
+    const reachesTarget = findEffectPrimitive(
+        primitives,
+        "lineTo",
+        ([x, y]) => Math.abs(x - end.x) < 1e-6 && Math.abs(y - end.y) < 1e-6
+    );
+    assert.ok(startsAtOrigin && reachesTarget, `${label} should preserve its gameplay start-to-target trajectory`);
+}
+
+function assertEffectUsesColor(primitives, color, label) {
+    assert.ok(
+        primitives.some((primitive) => primitive.fillStyle === color || primitive.strokeStyle === color),
+        `${label} should retain its identifying ${color} color`
+    );
 }
 
 function testEffectVisibilityTokens() {
@@ -5238,7 +5304,39 @@ function testTricksterLevelRewardContracts(app) {
     const markEffect = markRun.simulation.entities.find(
         (entity) => entity.constructor?.name === "TricksterSeedMarkEffect"
     );
-    assertForegroundEffectRenders(markEffect, "Lv6 seed mark");
+    const markCenter = Vector2.add(markRun.target.position, new Vector2(0, -markRun.target.radius - 14));
+    const renderSeedMark = (label) => {
+        let seedAlpha;
+        assertForegroundEffectRenders(markEffect, label, (primitives) => {
+            assert.ok(
+                findEffectPrimitive(
+                    primitives,
+                    "translate",
+                    ([x, y]) => Math.abs(x - markCenter.x) < 1e-6 && Math.abs(y - markCenter.y) < 1e-6
+                ),
+                `${label} should anchor the seed above the marked target`
+            );
+            const seed = findEffectPrimitive(
+                primitives,
+                "ellipse",
+                ([x, y, radiusX, radiusY, rotation]) =>
+                    x === 0 && y === 2 && radiusX > 0 && radiusY > radiusX && Math.abs(rotation + 0.36) < 1e-9
+            );
+            assert.ok(seed, `${label} should draw the tilted seed silhouette`);
+            assertEffectUsesColor(primitives, markRun.owner.color, label);
+            seedAlpha = seed.globalAlpha;
+        });
+        return seedAlpha;
+    };
+    const markStartAlpha = renderSeedMark("Lv6 seed mark start");
+    markEffect.update(0.9);
+    const markMidAlpha = renderSeedMark("Lv6 seed mark mid");
+    markEffect.update(0.8);
+    const markEndAlpha = renderSeedMark("Lv6 seed mark end");
+    assert.ok(
+        markStartAlpha > markMidAlpha && markMidAlpha > markEndAlpha,
+        "Trickster mark should visibly fade from start through its final active frame"
+    );
     const hpBeforeBurst = markRun.target.hp;
     markRun.owner.ability.onDashHit(
         markRun.target,
@@ -5428,7 +5526,48 @@ function testOrbitLevelRewardContracts(app) {
     );
     assert.equal(caught.isExpired, true, "Caught projectile should disappear immediately");
     const catchEffect = catchRun.simulation.entities.find((entity) => entity.constructor?.name === "OrbitCatchEffect");
-    assertForegroundEffectRenders(catchEffect, "Lv9 orbit catch");
+    const renderOrbitCatch = (label) => {
+        const slotPosition = catchRun.owner.ability.getOrbitPosition(0);
+        let catchRadius;
+        assertForegroundEffectRenders(catchEffect, label, (primitives) => {
+            assert.ok(
+                findEffectPrimitive(
+                    primitives,
+                    "moveTo",
+                    ([x, y]) =>
+                        Math.abs(x - catchEffect.contactPosition.x) < 1e-6 &&
+                        Math.abs(y - catchEffect.contactPosition.y) < 1e-6
+                ),
+                `${label} should begin at the projectile contact point`
+            );
+            assert.ok(
+                findEffectPrimitive(
+                    primitives,
+                    "quadraticCurveTo",
+                    ([, , x, y]) => Math.abs(x - slotPosition.x) < 1e-6 && Math.abs(y - slotPosition.y) < 1e-6
+                ),
+                `${label} should curve back into the restored orbit slot`
+            );
+            const slotArc = assertEffectArcAt(
+                primitives,
+                slotPosition,
+                label,
+                (radius) => radius >= 10 && radius <= 28
+            );
+            catchRadius = slotArc.args[2];
+            assertEffectUsesColor(primitives, catchEffect.color, label);
+        });
+        return catchRadius;
+    };
+    const catchStartRadius = renderOrbitCatch("Lv9 orbit catch start");
+    catchEffect.update(0.16);
+    const catchMidRadius = renderOrbitCatch("Lv9 orbit catch mid");
+    catchEffect.update(0.15);
+    const catchEndRadius = renderOrbitCatch("Lv9 orbit catch end");
+    assert.ok(
+        catchStartRadius < catchMidRadius && catchMidRadius < catchEndRadius,
+        "Orbit catch ring should expand along its return trajectory"
+    );
 
     const priorityRun = createRun(3);
     priorityRun.owner.ability.consumeShard(1);
@@ -5492,10 +5631,39 @@ function testSpinLevelRewardContracts(app) {
         );
         assert.equal(run.target.hp, hpBefore, "Cut start must suppress the ordinary immediate collision damage");
         const cutEffect = run.simulation.entities.find((entity) => entity.constructor?.name === "SpinCutEffect");
-        assertForegroundEffectRenders(cutEffect, "Spin cut feedback");
+        const renderSpinCut = (label) => {
+            let cutArc;
+            assertForegroundEffectRenders(cutEffect, label, (primitives) => {
+                cutArc = assertEffectArcAt(
+                    primitives,
+                    cutEffect.position,
+                    label,
+                    (radius) => radius >= 18 && radius <= 42
+                );
+                const expectedColor = run.owner.ability.getLevelUpgrade().piercingVortex ? "#fff4ae" : "#ffb347";
+                assertEffectUsesColor(primitives, expectedColor, label);
+                assert.ok(
+                    cutArc.args[4] - cutArc.args[3] >= Math.PI * 0.85,
+                    `${label} should retain the charged cut sweep angle`
+                );
+            });
+            return { radius: cutArc.args[2], sweep: cutArc.args[4] - cutArc.args[3] };
+        };
+        const cutStart = renderSpinCut("Spin cut feedback start");
         setVelocity(run.owner, new Vector2());
         setVelocity(run.target, new Vector2());
-        for (const _ of Array.from({ length: 12 })) run.owner.ability.update(0.05);
+        for (const _ of Array.from({ length: 6 })) run.owner.ability.update(0.05);
+        const cutMid = renderSpinCut("Spin cut feedback mid");
+        for (const _ of Array.from({ length: 6 })) run.owner.ability.update(0.05);
+        const cutEnd = renderSpinCut("Spin cut feedback end");
+        assert.ok(
+            cutStart.radius < cutMid.radius && cutMid.radius <= cutEnd.radius,
+            "Spin cut radius should advance across start, mid, and finish frames"
+        );
+        assert.ok(
+            cutStart.sweep < cutMid.sweep && cutMid.sweep <= cutEnd.sweep,
+            "Spin cut sweep angle should widen across start, mid, and finish frames"
+        );
         return hpBefore - run.target.hp;
     };
 
@@ -5564,7 +5732,28 @@ function testSpinLevelRewardContracts(app) {
     const vortexEffect = vortexRun.simulation.entities.find(
         (entity) => entity.constructor?.name === "SpinVortexEffect"
     );
-    assertForegroundEffectRenders(vortexEffect, "Lv9 spin vortex");
+    const renderVortex = (label) => {
+        assertForegroundEffectRenders(vortexEffect, label, (primitives) => {
+            assertEffectArcAt(primitives, vortexRun.owner.position, label, (radius) => Math.abs(radius - 260) < 1e-9);
+            assertEffectUsesColor(primitives, "#ffe36d", label);
+            assert.ok(
+                findEffectPrimitive(primitives, "lineTo"),
+                `${label} should draw inward-curving stream trajectories inside the 260px boundary`
+            );
+        });
+        return Vector2.subtract(vortexEffect.streams[0].position, vortexRun.owner.position).length();
+    };
+    vortexEffect.update(0.016);
+    const vortexStartDistance = renderVortex("Lv9 spin vortex start");
+    vortexEffect.update(0.08);
+    const vortexMidDistance = renderVortex("Lv9 spin vortex mid");
+    vortexEffect.update(0.08);
+    const vortexEndDistance = renderVortex("Lv9 spin vortex end");
+    assert.ok(
+        new Set([vortexStartDistance, vortexMidDistance, vortexEndDistance].map((distance) => distance.toFixed(3)))
+            .size === 3,
+        "Spin vortex stream positions should visibly evolve across consecutive frames"
+    );
     assert.ok(
         Vector2.subtract(vortexRun.target.velocity, targetVelocityBefore).length() > 0,
         "Lv9 vortex should apply physical impulse to one hostile target"
@@ -19922,11 +20111,38 @@ function testArcherAbilityTierBehavior() {
     const predictive = createAimSimulation(1);
     predictive.opponent.velocity = new Vector2(0, -180);
     predictive.ability.update(0.016, predictive.opponent);
-    assertForegroundEffectRenders(predictive.ability.state.predictionEffect, "Archer predictive marker");
+    const predictionEffect = predictive.ability.state.predictionEffect;
+    predictionEffect.update();
+    const renderPredictionMarker = (label) => {
+        let markerArc;
+        assertForegroundEffectRenders(predictionEffect, label, (primitives) => {
+            markerArc = assertEffectArcAt(
+                primitives,
+                predictionEffect.position,
+                label,
+                (radius) => radius >= 6 && radius <= 11
+            );
+            assertEffectUsesColor(primitives, predictive.archer.color, label);
+            assert.ok(
+                findEffectPrimitive(
+                    primitives,
+                    "lineTo",
+                    ([x, y]) =>
+                        Math.abs(x - predictionEffect.position.x) < 1e-6 ||
+                        Math.abs(y - predictionEffect.position.y) < 1e-6
+                ),
+                `${label} should draw a crosshair through the predicted aim point`
+            );
+        });
+        return markerArc.args[2];
+    };
+    const predictionStartRadius = renderPredictionMarker("Archer predictive marker start");
     const initialPredictiveAim = predictive.ability.state.aimPoint.clone();
     predictive.opponent.position = new Vector2(600, 650);
     predictive.opponent.velocity = new Vector2(-40, -220);
     predictive.ability.update(0.1, predictive.opponent);
+    predictionEffect.update();
+    const predictionMidRadius = renderPredictionMarker("Archer predictive marker mid");
     const expectedPredictiveAim = calculateInterceptPoint(
         predictive.archer.position,
         predictive.opponent.position,
@@ -19940,6 +20156,13 @@ function testArcherAbilityTierBehavior() {
     assert.ok(
         Vector2.subtract(predictive.ability.state.aimPoint, expectedPredictiveAim).length() < 1e-9,
         "Archer Lv3+ should use the target's latest position and velocity for prediction"
+    );
+    predictive.ability.state.windUp = predictive.ability._getWindupDuration() * 0.05;
+    predictionEffect.update();
+    const predictionEndRadius = renderPredictionMarker("Archer predictive marker end");
+    assert.ok(
+        predictionStartRadius < predictionMidRadius && predictionMidRadius < predictionEndRadius,
+        "Archer prediction marker radius should visibly advance from windup start through its end"
     );
 
     const doubleShot = createAimSimulation(2);
@@ -20089,6 +20312,94 @@ function testRageAbilityThresholds() {
 
 testRageAbilityThresholds();
 
+function testRageIgniteRefreshSeparatesDamageFromVisualLifetime() {
+    const sim = new BattleSimulation(
+        [
+            createRoster().find((fighter) => fighter.id === FIGHTER_IDS.RAGE),
+            createRoster().find((fighter) => fighter.id === FIGHTER_IDS.ORBIT)
+        ],
+        { onLog() {}, onSound() {}, onDamageTaken() {}, onDamageDealt() {}, onHpChanged() {} }
+    );
+    const [rage, opponent] = sim.fighters;
+    rage.ability.setContext({ abilityTier: 1 });
+    rage.ability._applyIgnite(opponent);
+    const ignite = opponent._igniteState;
+    const hpBefore = opponent.hp;
+    const damagePerTick = Math.round(rage.stats.baseDamage * 0.075);
+    const assertIgniteFrame = (label) => {
+        assertForegroundEffectRenders(ignite, label, (primitives) => {
+            assertEffectArcAt(
+                primitives,
+                opponent.position,
+                label,
+                (radius) => Math.abs(radius - (opponent.radius + 2)) < 1e-9
+            );
+            assertEffectUsesColor(primitives, "#fff4bd", label);
+        });
+    };
+
+    ignite.update(0.25);
+    assert.equal(ignite.tickCount, 5, "Ignite should resolve five damage ticks during its first 0.25s");
+    assert.equal(opponent.hp, hpBefore - damagePerTick * 5, "Ignite should preserve its original per-tick damage");
+
+    rage.ability._applyIgnite(opponent);
+    assert.equal(opponent._igniteState, ignite, "Reapplying ignite should refresh the existing visual entity");
+    assert.equal(ignite.tickCount, 5, "Refreshing ignite should not reserve additional damage ticks");
+    assert.equal(opponent.hp, hpBefore - damagePerTick * 5, "Refreshing ignite should not deal immediate damage");
+    assert.ok(Math.abs(ignite.life - 0.5) < 1e-9, "Refreshing ignite should restore 0.5s of visual lifetime");
+    assertIgniteFrame("Rage ignite refresh start");
+
+    ignite.update(0.25);
+    assert.equal(ignite.tickCount, 10, "Ignite should finish its original ten-tick damage schedule");
+    assert.equal(opponent.hp, hpBefore - damagePerTick * 10, "Refresh should not increase ignite's total damage");
+    assert.equal(ignite.damageComplete, true, "Ignite should report that its damage schedule is complete");
+    assert.equal(ignite.isExpired, false, "Completing damage ticks should not remove the refreshed visual");
+    assert.equal(opponent._igniteState, ignite, "The target should retain the effect until its visual lifetime ends");
+    assertIgniteFrame("Rage ignite refresh mid");
+
+    ignite.update(0.249);
+    assert.equal(opponent.hp, hpBefore - damagePerTick * 10, "The visual tail should not deal extra damage");
+    assert.equal(ignite.isExpired, false, "The refreshed visual should remain visible until 0.5s after refresh");
+    assertIgniteFrame("Rage ignite refresh end");
+    ignite.update(0.001);
+    assert.equal(ignite.isExpired, true, "The refreshed visual should expire 0.5s after refresh");
+    assert.equal(opponent._igniteState, null, "Visual expiry should clear the target's ignite state");
+
+    const mobTarget = {
+        position: new Vector2(300, 320),
+        radius: 24,
+        color: "#5aa865",
+        flags: { defeated: false },
+        damageTaken: 0,
+        takeDamage(amount) {
+            this.damageTaken += amount;
+        }
+    };
+    const mobIgnite = new BurningEffect({
+        source: rage,
+        target: mobTarget,
+        duration: 0.5,
+        tickInterval: 0.05,
+        maximumTicks: 10,
+        damagePerTick,
+        label: "Ignite"
+    });
+    mobTarget._igniteState = mobIgnite;
+    mobIgnite.update(0.225);
+    const reservedTickTime = mobIgnite.tickTimer;
+    mobIgnite.refresh();
+    assert.ok(
+        Math.abs(mobIgnite.tickTimer - reservedTickTime) < 1e-9,
+        "Mob ignite refresh should preserve the next tick reservation"
+    );
+    mobIgnite.update(0.025);
+    assert.equal(mobIgnite.tickCount, 5, "Mob ignite should resolve only the already-reserved next tick");
+    assert.equal(mobTarget.damageTaken, damagePerTick * 5, "Mob targets should share the same ignite damage contract");
+    console.log("[rage-ignite-refresh-lifetimes] ok");
+}
+
+testRageIgniteRefreshSeparatesDamageFromVisualLifetime();
+
 function testRageAftershockUsesVector2Effects() {
     const sim = new BattleSimulation(
         [
@@ -20141,7 +20452,38 @@ function testRageExplosionUsesVector2Effects() {
     }, "Rage Lv6 explosion should convert plain collision positions for effect APIs");
     assert.ok(opponent.hp < hpBefore, "Rage explosion should damage the target from its collision center");
     const ring = sim.entities.find((entity) => entity.constructor?.name === "RageFlameRing");
-    assertForegroundEffectRenders(ring, "Rage explosion ring");
+    const renderRageRing = (label) => {
+        let ringRadius;
+        assertForegroundEffectRenders(ring, label, (primitives) => {
+            const expandingRing = findEffectPrimitive(
+                primitives,
+                "arc",
+                ([x, y, radius], primitive) =>
+                    Math.abs(x - ring.position.x) < 1e-6 &&
+                    Math.abs(y - ring.position.y) < 1e-6 &&
+                    radius >= 0 &&
+                    primitive.strokeStyle === "#ff983d"
+            );
+            assert.ok(expandingRing, `${label} should draw its orange fire wave at the collision center`);
+            ringRadius = expandingRing.args[2];
+            assertEffectUsesColor(primitives, "#fff4bd", label);
+            assert.ok(
+                primitives.filter((primitive) => primitive.method === "fillRect").length >= 18,
+                `${label} should retain the radial flame fragments`
+            );
+        });
+        return ringRadius;
+    };
+    ring.update(0.01);
+    const ringStartRadius = renderRageRing("Rage explosion ring start");
+    ring.update(0.1);
+    const ringMidRadius = renderRageRing("Rage explosion ring mid");
+    ring.update(0.1);
+    const ringEndRadius = renderRageRing("Rage explosion ring end");
+    assert.ok(
+        ringStartRadius < ringMidRadius && ringMidRadius < ringEndRadius,
+        "Rage fire wave should expand from collision start through its final visible frame"
+    );
     console.log("[rage-explosion-vector2-effects] ok");
 }
 
@@ -20170,7 +20512,38 @@ function testEaterAbilityDigestion() {
     eater.ability.releaseSwallowed();
     assert.ok(target.hp < hpBeforeSpit, "Eater Lv6 spit should deal damage");
     const spitEffect = sim.entities.find((entity) => entity.constructor?.name === "EaterSpitEffect");
-    assertForegroundEffectRenders(spitEffect, "Eater spit trajectory");
+    const renderSpit = (label) => {
+        const mouth = Vector2.add(
+            spitEffect.origin,
+            spitEffect.direction.clone().scale(spitEffect.owner.radius * 0.86)
+        );
+        let dustRadius;
+        assertForegroundEffectRenders(spitEffect, label, (primitives) => {
+            assertEffectTrajectory(primitives, mouth, spitEffect.target.position, label);
+            assertEffectUsesColor(primitives, spitEffect.color, label);
+            const dustArc = findEffectPrimitive(
+                primitives,
+                "arc",
+                ([, , radius, startAngle, endAngle]) =>
+                    radius >= spitEffect.owner.radius * 0.55 &&
+                    radius <= spitEffect.owner.radius * 1.55 &&
+                    startAngle !== 0 &&
+                    endAngle !== Math.PI * 2
+            );
+            assert.ok(dustArc, `${label} should draw the recoil dust arc behind the spit trajectory`);
+            dustRadius = dustArc.args[2];
+        });
+        return dustRadius;
+    };
+    const spitStartRadius = renderSpit("Eater spit trajectory start");
+    spitEffect.update(0.16);
+    const spitMidRadius = renderSpit("Eater spit trajectory mid");
+    spitEffect.update(0.15);
+    const spitEndRadius = renderSpit("Eater spit trajectory end");
+    assert.ok(
+        spitStartRadius < spitMidRadius && spitMidRadius < spitEndRadius,
+        "Eater spit recoil arc should expand across its start, mid, and end frames"
+    );
     console.log("[eater-ability-digestion] ok");
 }
 
@@ -20197,7 +20570,29 @@ function testEaterOrbitDigestionLifecycleKeepsBattleProgressing() {
     eater.ability.onCollision(orbit);
     assert.equal(orbit.state.swallowed?.owner, eater, "Eater should hold Orbit during digestion");
     const digestEffect = sim.entities.find((entity) => entity.constructor?.name === "EaterDigestEffect");
-    assertForegroundEffectRenders(digestEffect, "Eater digestion proxy");
+    assertForegroundEffectRenders(digestEffect, "Eater digestion proxy", (primitives) => {
+        assert.ok(
+            findEffectPrimitive(
+                primitives,
+                "translate",
+                ([x, y]) => Math.abs(x - eater.position.x) < 1e-6 && Math.abs(y - eater.position.y) < 1e-6
+            ),
+            "Eater digestion proxy should stay centered inside Eater"
+        );
+        assert.ok(
+            findEffectPrimitive(
+                primitives,
+                "arc",
+                ([x, y, radius]) => x === 0 && y === 0 && radius === Math.min(orbit.radius, eater.radius * 0.72)
+            ),
+            "Eater digestion proxy should render the swallowed target at the compressed radius"
+        );
+        assertEffectUsesColor(primitives, orbit.color, "Eater digestion proxy");
+        assert.ok(
+            primitives.filter((primitive) => primitive.method === "moveTo").length >= 6,
+            "Eater digestion proxy should draw both rows of teeth around the swallowed target"
+        );
+    });
 
     for (let frame = 0; frame < 47; frame += 1) {
         sim.update(0.016);
@@ -20222,7 +20617,33 @@ function testEaterOrbitDigestionLifecycleKeepsBattleProgressing() {
         "Lv9 wall rupture should resolve after Orbit hits a wall"
     );
     const ruptureEffect = sim.entities.find((entity) => entity.constructor?.name === "EaterWallRuptureEffect");
-    assertForegroundEffectRenders(ruptureEffect, "Eater wall rupture");
+    const renderRupture = (label) => {
+        let ruptureArc;
+        assertForegroundEffectRenders(ruptureEffect, label, (primitives) => {
+            ruptureArc = assertEffectArcAt(
+                primitives,
+                ruptureEffect.position,
+                label,
+                (radius) => radius >= 0 && radius <= ruptureEffect.maxRadius
+            );
+            assert.ok(
+                Math.abs(ruptureArc.args[4] - ruptureArc.args[3] - Math.PI) < 1e-9,
+                `${label} should preserve the inward-facing half-circle rupture angle`
+            );
+            assertEffectUsesColor(primitives, ruptureEffect.color, label);
+        });
+        return ruptureArc.args[2];
+    };
+    ruptureEffect.update(0.01);
+    const ruptureStartRadius = renderRupture("Eater wall rupture start");
+    ruptureEffect.update(0.13);
+    const ruptureMidRadius = renderRupture("Eater wall rupture mid");
+    ruptureEffect.update(0.13);
+    const ruptureEndRadius = renderRupture("Eater wall rupture end");
+    assert.ok(
+        ruptureStartRadius < ruptureMidRadius && ruptureMidRadius < ruptureEndRadius,
+        "Eater wall rupture should expand from the wall contact across start, mid, and end frames"
+    );
     console.log("[eater-orbit-digestion-lifecycle] ok");
 }
 

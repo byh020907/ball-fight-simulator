@@ -102,8 +102,10 @@ export class BurningEffect extends CombatEntity {
         this.maximumTicks = maximumTicks;
         this.damagePerTick = damagePerTick;
         this.label = label;
+        this.damageLife = duration;
         this.tickTimer = 0;
         this.tickCount = 0;
+        this.damageComplete = false;
         this.rebirthVisual = getRebirthVisualProfile(10);
     }
 
@@ -113,20 +115,24 @@ export class BurningEffect extends CombatEntity {
     }
 
     update(delta) {
-        if (this.target.flags.defeated || this.source?.flags?.defeated) {
+        if (this.target.flags.defeated) {
             this._finish();
             return;
         }
         this.pos = this.target.position.clone();
-        const activeDelta = Math.min(delta, Math.max(0, this.life));
-        this.life -= activeDelta;
-        this.tickTimer += activeDelta;
+        this.life = Math.max(0, this.life - delta);
+        const damageDelta = Math.min(delta, Math.max(0, this.damageLife));
+        this.damageLife = Math.max(0, this.damageLife - damageDelta);
+        this.tickTimer += damageDelta;
         while (this.tickTimer + 1e-9 >= this.tickInterval && this.tickCount < this.maximumTicks) {
             this.tickTimer -= this.tickInterval;
             this.tickCount += 1;
-            this.target.takeDamage(this.damagePerTick, this.source, this.label);
+            if (!this.source?.flags?.defeated) {
+                this.target.takeDamage(this.damagePerTick, this.source, this.label);
+            }
         }
-        if (this.life <= 1e-9 || this.tickCount >= this.maximumTicks) this._finish();
+        this.damageComplete = this.damageLife <= 1e-9 || this.tickCount >= this.maximumTicks;
+        if (this.life <= 1e-9) this._finish();
     }
 
     _finish() {
