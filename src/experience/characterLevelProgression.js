@@ -5,7 +5,7 @@ import { getLevelRewardEffectText, LEVEL_REWARD_EFFECT_TYPES } from "./reward-ef
 const EMPTY_REWARDS = Object.freeze([]);
 const progressionCache = new Map();
 const LEVEL_STAT_KEYS = Object.freeze(["hp", "damage", "speed", "defense"]);
-const LEVEL_STAT_UNIT_SCALE = 2;
+const LEVEL_STAT_UNIT_SCALE = 4;
 const ROSTER_BY_ID = new Map(createRoster().map((fighter) => [fighter.id, fighter]));
 
 function normalizeLevel(level) {

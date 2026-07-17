@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.30.3",
+        date: "2026-07-17",
+        title: "v0.30.3 기본 속도감 복원",
+        changes: [
+            {
+                type: "fix",
+                text: "모든 캐릭터의 기본 이동 속도를 1.5배로 올려 전투 속도감을 복원했습니다."
+            }
+        ]
+    },
+    {
         version: "0.30.2",
         date: "2026-07-17",
         title: "v0.30.2 사냥터 시작 체크포인트",

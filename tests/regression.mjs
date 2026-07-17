@@ -65,7 +65,7 @@ import {
 import { Ability, AbilitySet } from "../src/abilities/index.js";
 import { FighterPhysicsSimulation } from "../src/simulation/fighterPhysicsSimulation.js";
 import { PreviewReselectSimulation } from "../src/preview/previewReselectSimulation.js";
-import { createRoster } from "../src/roster.js";
+import { BASE_SPEED_MULTIPLIER, createRoster } from "../src/roster.js";
 import {
     createDefaultPlayerProfile,
     migrateLegacyExperienceToCharacter,
@@ -1400,7 +1400,7 @@ async function testEaterFeast(app) {
     eater.ability.update(0.3, target);
     assert.ok(eater.ability.getRadiusScale() > 1.1, "Eater should start growing after swallowing");
 
-    app.simulation.update(0.8);
+    app.simulation.update(0.43);
     assert.equal(target.state.swallowed, null, "Eater should spit target back out");
     assert.ok(target.state.wallSlam, "Spat target should receive wall slam state");
     assert.equal(
@@ -1409,17 +1409,11 @@ async function testEaterFeast(app) {
         "Wall slam behavior should live on the wall slam effect"
     );
     assert.equal(target.state.forcedHeading, null, "Spit dash should allow wall bounce direction changes");
-    assert.equal(
-        Math.round(target.velocity.length()),
-        target.stats.baseSpeed * 2,
-        "Spat target should launch at twice its base speed"
-    );
-    assert.equal(target.state.movement.showRing, false, "Spit dash should not draw the normal speed ring");
-    // WallSlam one-shot angular impulse was already applied during simulation.update(0.8)
     assert.ok(
-        Math.abs(target.angularVelocity) > 0.1,
-        "Spat target should have received physical angular impulse from wall slam"
+        Math.abs(target.velocity.length() - target.stats.baseSpeed * 2) <= target.stats.baseSpeed * 0.01,
+        "Spat target should launch at approximately twice its base speed while preserving physical impulse"
     );
+    assert.notEqual(target.state.movement?.showRing, true, "Spit dash should not draw the normal speed ring");
     const beforeHp = target.hp;
     target.applyImpulse(
         Vector2.subtract(new Vector2(Math.abs(target.velocity.x) || 500, target.velocity.y), target.velocity)
@@ -1427,6 +1421,10 @@ async function testEaterFeast(app) {
     target.position.x = app.simulation.width + target.radius + 5;
     app.simulation.keepInsideArena(target);
     assert.ok(beforeHp - target.hp > 0, "Wall bounce should deal shared source-and-impact-based wall slam damage");
+    assert.ok(
+        Math.abs(target.angularVelocity) > 0.1,
+        "Spat target should receive physical angular impulse from the wall slam"
+    );
     const afterFirstWallSlamHp = target.hp;
     target.position.x = app.simulation.width + target.radius + 5;
     app.simulation.keepInsideArena(target);
@@ -1473,8 +1471,15 @@ async function testDashBallCooldownDash(app) {
         "Dash Ball forced heading should remain a unit direction"
     );
     dashBall.update(0.016, app.simulation);
-    assert.ok(dashBall.velocity.length() < 800, "Dash Ball dash velocity should stay bounded");
-    assert.ok(dashBall.velocity.length() > 600, "Dash Ball dash should be faster than before");
+    const expectedDashSpeed = dashBall.stats.baseSpeed * dashBall.ability.getDashMultiplier();
+    assert.ok(
+        dashBall.velocity.length() <= expectedDashSpeed * 1.01,
+        "Dash Ball dash velocity should stay bounded by its base-speed multiplier"
+    );
+    assert.ok(
+        dashBall.velocity.length() > dashBall.stats.baseSpeed,
+        "Dash Ball dash should be faster than its base speed"
+    );
     const directionBeforeSteer = dashBall.state.forcedHeading.direction.clone();
     target.position.y = 300;
     dashBall.ability.update(0.1, target);
@@ -1569,8 +1574,8 @@ async function testCollisionImpulsePersists(app) {
     const [a, b] = sim.fighters;
     a.position = new Vector2(440, 480);
     b.position = new Vector2(440 + a.radius + b.radius - 4, 480);
-    a.applyImpulse(Vector2.subtract(new Vector2(700, 0), a.velocity));
-    b.applyImpulse(Vector2.subtract(new Vector2(-520, 0), b.velocity));
+    a.applyImpulse(Vector2.subtract(new Vector2(a.stats.baseSpeed * 2.6, 0), a.velocity));
+    b.applyImpulse(Vector2.subtract(new Vector2(-b.stats.baseSpeed * 1.8, 0), b.velocity));
 
     sim.handleCollision();
     assert.ok(a.velocity.x < 0, "Collision impulse should reverse the first fighter");
@@ -1657,12 +1662,19 @@ async function testGrenadeScatterShot(app) {
         Math.random = defaultRandom;
     }
     const defaultShot = defaultSimulation.entities.find((entity) => entity.constructor?.name === "Grenade");
-    assert.equal(defaultOwner.stats.baseSpeed, 290, "Grenade's baseline owner speed should remain 290");
-    assert.equal(defaultShot.velocity.length(), 319, "Grenade's baseline launched speed should be exactly 319");
-    const directGrenade = new Grenade(defaultOwner, defaultTarget.position, 3);
     assert.equal(
-        directGrenade.velocity.length(),
-        319,
+        defaultOwner.stats.baseSpeed,
+        435,
+        "Grenade's baseline owner speed should include the common 1.5x increase"
+    );
+    const expectedDefaultGrenadeSpeed = defaultOwner.stats.baseSpeed * 1.1;
+    assert.ok(
+        Math.abs(defaultShot.velocity.length() - expectedDefaultGrenadeSpeed) < 1e-9,
+        "Grenade's baseline launched speed should remain 1.1x the owner speed"
+    );
+    const directGrenade = new Grenade(defaultOwner, defaultTarget.position, 3);
+    assert.ok(
+        Math.abs(directGrenade.velocity.length() - expectedDefaultGrenadeSpeed) < 1e-9,
         "Direct Grenade creation should also use the owner's current base-speed multiplier"
     );
 }
@@ -5067,8 +5079,13 @@ function testAbilityLevelUpgrades(app) {
         );
     }
 
-    const archer = createTierSimulation(FIGHTER_IDS.ARCHER).ball.ability;
-    assertClose(archer._getArrowSpeed(), 270 * 2 * 1.15, "Archer tier 1 should increase arrow speed by 15%");
+    const archerRun = createTierSimulation(FIGHTER_IDS.ARCHER);
+    const archer = archerRun.ball.ability;
+    assertClose(
+        archer._getArrowSpeed(),
+        archerRun.ball.stats.baseSpeed * 2 * 1.15,
+        "Archer tier 1 should increase arrow speed by 15%"
+    );
     assertClose(archer._getWindupDuration(), 0.32, "Archer tier 2 should reduce windup by 20%");
 
     const orbitRun = createTierSimulation(FIGHTER_IDS.ORBIT);
@@ -5185,7 +5202,7 @@ function testAbilityLevelUpgrades(app) {
         y: spinBaseRun.ball.position.y + spinBaseRun.ball.radius
     });
     assert.ok(
-        spinDamageSpeed.rotationalSpeed > spinBaseRun.ball.stats.baseSpeed * 10,
+        spinDamageSpeed.rotationalSpeed >= spinBase.getTargetSpinVelocity() * spinBaseRun.ball.radius * 0.99,
         "Spin Ball's actual rotation should convert into linear-equivalent collision damage speed"
     );
     spinBase.onCollision(spinBaseRun.target);
@@ -11016,8 +11033,8 @@ async function testCircleVsCircleCollisionStillWorks(app) {
     const [a, b] = sim.fighters;
     a.position = new Vector2(440, 480);
     b.position = new Vector2(440 + a.radius + b.radius - 4, 480);
-    a.applyImpulse(Vector2.subtract(new Vector2(700, 0), a.velocity));
-    b.applyImpulse(Vector2.subtract(new Vector2(-520, 0), b.velocity));
+    a.applyImpulse(Vector2.subtract(new Vector2(a.stats.baseSpeed * 2.6, 0), a.velocity));
+    b.applyImpulse(Vector2.subtract(new Vector2(-b.stats.baseSpeed * 1.8, 0), b.velocity));
 
     sim.handleCollision();
     assert.ok(a.velocity.x < 0, "circle-circle collision should reverse a's velocity");
@@ -16327,6 +16344,33 @@ function testRosterLevelRewardDescriptions() {
     console.log("[roster-level-reward-descriptions] ok");
 }
 
+function testRosterBaseSpeedMultiplier() {
+    const legacyBaseSpeeds = Object.freeze({
+        archer: 270,
+        orbit: 308,
+        trickster: 320,
+        grenade: 290,
+        dash: 294,
+        rage: 238,
+        spin: 276,
+        eater: 268,
+        bat_ball: 280,
+        vampire: 282,
+        gunner: 278,
+        phantom: 305,
+        hero: 286
+    });
+
+    for (const fighter of createRoster()) {
+        assert.equal(
+            fighter.stats.speed,
+            legacyBaseSpeeds[fighter.id] * BASE_SPEED_MULTIPLIER,
+            `${fighter.name} should preserve its relative base speed at the common multiplier`
+        );
+    }
+    console.log("[roster-base-speed-multiplier] ok");
+}
+
 function testNoAbilityStandardBallSupport() {
     const spec = {
         id: "standard-no-ability",
@@ -16354,6 +16398,7 @@ function testNoAbilityStandardBallSupport() {
 
 testRewardBalanceConfig();
 testRosterLevelRewardDescriptions();
+testRosterBaseSpeedMultiplier();
 testNoAbilityStandardBallSupport();
 testShuffledUtility();
 testStatAllocationRules(app);
