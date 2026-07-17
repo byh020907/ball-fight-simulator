@@ -11,11 +11,13 @@ function formatEliteMobNames(monsterTypes) {
 
 export class EliteMobEvent extends HuntingEvent {
     createPayload(floor, rng = Math.random) {
-        const combination = pickEliteMobCombination(rng);
-        if (!combination) throw new Error("No generated elite mob combination is available");
+        const safe = safeFloor(floor);
+        if (safe < 10) throw new Error("Elite mob events unlock at floor 10");
+        const combination = pickEliteMobCombination(safe, rng);
+        if (!combination) throw new Error("No elite mob combination is available");
         return {
             type: this.type,
-            floor: safeFloor(floor),
+            floor: safe,
             enemyType: HUNTING_ENEMY_TYPES.ELITE,
             eliteCombinationId: combination.id,
             monsterTypes: [...combination.monsterTypes]

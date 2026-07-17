@@ -26,8 +26,12 @@ export function createEliteMobEncounter({
 
     return monsterTypes.map((type, index) => {
         if (!getHuntingMonsterDefinition(type, stageId)) throw new Error(`Unknown elite mob type: ${type}`);
-        return scaleEnemySpecForHunting(createHuntingMobSpec({ type, floor, index, stageId, rng }), floor, {
-            enemyType: HUNTING_ENEMY_TYPES.ELITE
+        const normalSpec = scaleEnemySpecForHunting(createHuntingMobSpec({ type, floor, index, stageId, rng }), floor, {
+            enemyType: HUNTING_ENEMY_TYPES.NORMAL
         });
+        return {
+            ...normalSpec,
+            hunting: { ...normalSpec.hunting, enemyType: HUNTING_ENEMY_TYPES.ELITE, eliteFormation: true }
+        };
     });
 }

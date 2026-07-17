@@ -17,12 +17,20 @@ function isTrackedMonsterTag(tag) {
 
 function sanitizeMonsterKillsByTag(value) {
     if (!value || typeof value !== "object") return {};
-    return Object.fromEntries(
+    const counts = Object.fromEntries(
         Object.entries(value)
             .filter(([tag]) => isTrackedMonsterTag(tag))
             .slice(0, MAX_TRACKED_MONSTER_TAGS)
             .map(([tag, count]) => [tag, sanitizeCounter(count)])
     );
+    if (counts["rarity:unique"] !== undefined) {
+        counts["rarity:rare"] = Math.max(counts["rarity:rare"] ?? 0, counts["rarity:unique"]);
+        delete counts["rarity:unique"];
+    }
+    if (counts["rarity:uncommon"] === undefined && counts["rarity:rare"] !== undefined) {
+        counts["rarity:uncommon"] = counts["rarity:rare"];
+    }
+    return counts;
 }
 
 function sanitizeStageIds(value) {

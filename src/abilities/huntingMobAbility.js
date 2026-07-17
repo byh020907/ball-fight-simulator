@@ -1,4 +1,5 @@
 import { steerBallToward, Vector2 } from "../core.js";
+import { getEliteFormationImpulse } from "../hunting/eliteMobFormation.js";
 import { ArrowProjectile } from "../entities/arrowProjectile.js";
 import { drawElectricArc } from "../effects/electricArc.js";
 import {
@@ -170,6 +171,11 @@ export class HuntingMobAbility extends Ability {
         if (this.state.barrierSwapTime <= 0) this.state.barrierSwapTarget = null;
         this.state.jump = Math.max(0, this.state.jump - delta);
         this.state.repositionCooldown = Math.max(0, this.state.repositionCooldown - delta);
+        if (this.owner.hunting?.eliteFormation) {
+            this.owner.applyImpulse(
+                getEliteFormationImpulse(this.owner, target, this.simulation.getAlliesOf(this.owner)).scale(delta * 60)
+            );
+        }
         this._steer(delta, target);
         this._tickProximityReposition(target);
         this._tickNaturalHeal(delta);

@@ -343,8 +343,8 @@ export const REWARD_BALANCE = deepFreeze({
                 maxPhysicalDropsPerBattle: 24,
                 rarity: {
                     common: { allocationWeight: 1, physicalDropCount: 2, victoryBonus: 0 },
-                    rare: { allocationWeight: 1.45, physicalDropCount: 4, victoryBonus: 2 },
-                    unique: { allocationWeight: 1.9, physicalDropCount: 5, victoryBonus: 4 },
+                    uncommon: { allocationWeight: 1.45, physicalDropCount: 4, victoryBonus: 2 },
+                    rare: { allocationWeight: 1.9, physicalDropCount: 5, victoryBonus: 4 },
                     epic: { allocationWeight: 2.4, physicalDropCount: 6, victoryBonus: 6 }
                 },
                 enemyType: {
@@ -359,8 +359,8 @@ export const REWARD_BALANCE = deepFreeze({
             normalWeights: { small_heal_pack: { minimum: 20, maximum: 40 }, chest: 10 },
             rarityRewards: {
                 common: { shard_bundle: 0, high_chest: 0 },
-                rare: { shard_bundle: 15, high_chest: 5 },
-                unique: { shard_bundle: 30, high_chest: 10 },
+                uncommon: { shard_bundle: 15, high_chest: 5 },
+                rare: { shard_bundle: 30, high_chest: 10 },
                 epic: { shard_bundle: 45, high_chest: 20 }
             },
             shardBundle: {
@@ -370,7 +370,7 @@ export const REWARD_BALANCE = deepFreeze({
                         { value: 1.5, weight: 50 },
                         { value: 2, weight: 25 }
                     ],
-                    unique: [
+                    rare: [
                         { value: 1, weight: 15 },
                         { value: 1.5, weight: 35 },
                         { value: 2, weight: 35 },
@@ -388,8 +388,8 @@ export const REWARD_BALANCE = deepFreeze({
             },
             highChest: {
                 rarities: {
-                    rare: [{ rarity: "uncommon", weight: 100 }],
-                    unique: [
+                    uncommon: [{ rarity: "uncommon", weight: 100 }],
+                    rare: [
                         { rarity: "uncommon", weight: 70 },
                         { rarity: "rare", weight: 30 }
                     ],

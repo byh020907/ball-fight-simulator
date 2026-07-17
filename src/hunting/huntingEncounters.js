@@ -148,6 +148,10 @@ export function getHuntingFloorChances(floor, combatReliefFloors = 0) {
 export function getHuntingCombatEnemyType(floor, rng = DEFAULT_RNG) {
     const safe = safeFloor(floor);
     if (safe >= HUNTING_MAX_FLOOR) return HUNTING_ENEMY_TYPES.CHAMPION;
+    if (safe < 10) {
+        rng();
+        return HUNTING_ENEMY_TYPES.NORMAL;
+    }
     const depth = Math.min(1, safe / HUNTING_MAX_FLOOR);
     const eliteChance = 0.06 + depth * 0.24;
     return rng() < eliteChance ? HUNTING_ENEMY_TYPES.ELITE : HUNTING_ENEMY_TYPES.NORMAL;

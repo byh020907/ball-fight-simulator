@@ -340,21 +340,21 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
     }),
     createHuntingCounterAchievement({
         id: "hunting_rare_monster_slayer",
-        name: "rare 몹 학살자",
-        description: "rare 몬스터를 100마리 처치하세요.",
+        name: "uncommon 몹 학살자",
+        description: "uncommon 몬스터를 100마리 처치하세요.",
         tier: "silver",
         target: 100,
         rewardKey: "huntingRareMonsterSlayer",
-        getCurrent: (context) => getMonsterKillCount(context, HUNTING_MONSTER_TAGS.RARITY_RARE)
+        getCurrent: (context) => getMonsterKillCount(context, HUNTING_MONSTER_TAGS.RARITY_UNCOMMON)
     }),
     createHuntingCounterAchievement({
         id: "hunting_unique_monster_slayer",
-        name: "unique 몹 학살자",
-        description: "unique 몬스터를 75마리 처치하세요.",
+        name: "rare 몹 학살자",
+        description: "rare 몬스터를 75마리 처치하세요.",
         tier: "gold",
         target: 75,
         rewardKey: "huntingUniqueMonsterSlayer",
-        getCurrent: (context) => getMonsterKillCount(context, HUNTING_MONSTER_TAGS.RARITY_UNIQUE)
+        getCurrent: (context) => getMonsterKillCount(context, HUNTING_MONSTER_TAGS.RARITY_RARE)
     }),
     createHuntingCounterAchievement({
         id: "hunting_epic_monster_slayer",

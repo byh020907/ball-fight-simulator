@@ -10,7 +10,6 @@
     "test:uiContracts": "node tests/runAll.mjs uiContracts",
     "test:profileVersionReset": "node tests/runAll.mjs profileVersionReset",
     "check": "node scripts/checkSyntax.mjs",
-    "hunting:elite-combinations": "node scripts/generateEliteMobCombinations.mjs",
     "train": "node scripts/rl/train.mjs",
     "benchmark": "node scripts/benchmark.mjs",
     "format": "prettier --write \"src/**/*.js\" \"tests/**/*.mjs\" \"scripts/**/*.mjs\" \"*.html\"",

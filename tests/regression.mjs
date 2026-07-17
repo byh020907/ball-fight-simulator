@@ -156,7 +156,6 @@ import {
     HUNTING_LOOT_ITEM_TYPES,
     HuntingBattleLootSession,
     HuntingLootDropController,
-    ELITE_MOB_COMBINATION_GENERATION,
     ELITE_MOB_COMBINATIONS,
     createEliteMobEncounter,
     getEliteMobCombination,
@@ -2683,7 +2682,7 @@ function testHuntingEventPresentationContracts() {
     };
 
     for (const event of HuntingEvent.POOL) {
-        const payload = event.createPayload(6, () => 0);
+        const payload = event.createPayload(event.type === HUNTING_EVENT_TYPES.ELITE_MOB ? 10 : 6, () => 0);
         const resolution = event.resolve(payload, { run, playerProfile: profile, roster: app.roster });
         assert.equal(
             resolution.presentation?.title,
@@ -3237,9 +3236,9 @@ function testHuntingLootBalanceRules() {
         "Common monsters should use only the ordinary bonus-loot table"
     );
     assert.deepEqual(
-        getHuntingBonusLootWeights({ collector: halfHp, rarity: "rare" }),
+        getHuntingBonusLootWeights({ collector: halfHp, rarity: "uncommon" }),
         { small_heal_pack: 24, chest: 8, shard_bundle: 15, high_chest: 5 },
-        "Rare monsters should preserve special rewards in the bonus-loot table"
+        "Uncommon monsters should preserve the former rare special-reward table"
     );
     assert.equal(
         getHuntingBonusLootWeights({ collector: emptyHp, rarity: "epic" }).small_heal_pack,
@@ -3269,9 +3268,9 @@ function testHuntingLootBalanceRules() {
         "A wounded player should retain heal-pack entries in the drop table"
     );
     assert.equal(
-        rollHuntingShardBundleAmount({ floor: 1, rarity: "rare", rng: () => 0.3 }),
+        rollHuntingShardBundleAmount({ floor: 1, rarity: "uncommon", rng: () => 0.3 }),
         10,
-        "Rare bundle multipliers must preserve the configured decimal-weight order"
+        "Uncommon bundle multipliers must preserve the former rare economy"
     );
     assert.equal(
         rollHuntingShardBundleAmount({ floor: 100, rarity: "epic", rng: () => 0.99 }),
@@ -3279,14 +3278,14 @@ function testHuntingLootBalanceRules() {
         "Epic bundles should retain the 3.5x high-end roll on the deep-floor base amount"
     );
     assert.equal(
-        rollHighChestRarity({ rarity: "rare", rng: () => 0.99 }),
+        rollHighChestRarity({ rarity: "uncommon", rng: () => 0.99 }),
         "uncommon",
-        "Rare monsters should always produce an uncommon high chest"
+        "Uncommon monsters should always produce an uncommon high chest"
     );
     assert.equal(
-        rollHighChestRarity({ rarity: "unique", rng: () => 0.8 }),
+        rollHighChestRarity({ rarity: "rare", rng: () => 0.8 }),
         "rare",
-        "Unique high chests should retain the 30% rare branch"
+        "Rare high chests should retain the former unique 30% rare branch"
     );
     console.log("[hunting-loot-balance-rules] ok");
 }
@@ -3985,42 +3984,21 @@ function testHuntingBossRolesAndEnhancementStoneDrops(app) {
 }
 
 function testEliteMobCombinationEvent(app) {
-    const uniqueMonsterTypes = [...new Set(Object.values(HUNTING_MONSTER_TYPES))].sort();
     assert.equal(
         HuntingEvent.POOL.at(-1)?.type,
         HUNTING_EVENT_TYPES.ELITE_MOB,
         "Elite mob events should append to the pool"
     );
     assert.deepEqual(
-        ELITE_MOB_COMBINATIONS.map((combination) => combination.size),
-        [3, 4, 5],
-        "Generated elite data should keep one verified combination for each supported size"
-    );
-    assert.equal(
-        ELITE_MOB_COMBINATION_GENERATION.seed,
-        20260714,
-        "Elite combination data should retain its reproducible generator seed"
-    );
-    assert.deepEqual(
-        ELITE_MOB_COMBINATION_GENERATION.uniqueMonsterTypes,
-        uniqueMonsterTypes,
-        "Elite candidate sampling should remove monster-type aliases before using every unique type equally"
-    );
-    assert.equal(
-        ELITE_MOB_COMBINATION_GENERATION.scoreFormula,
-        "monsterWinRate + winningRemainingHpRatio * 0.01",
-        "Elite scoring should keep win rate primary with only a small surviving-HP tiebreaker"
+        ELITE_MOB_COMBINATIONS.map((combination) => combination.minimumFloor),
+        [10, 20, 40, 80, 20, 20, 40],
+        "Elite encounters should use the approved manual floor-gated roster"
     );
     ELITE_MOB_COMBINATIONS.forEach((combination) => {
         assert.equal(
             combination.monsterTypes.length,
             combination.size,
             "Combination payload size should match its generated category"
-        );
-        assert.equal(
-            combination.metrics.matches,
-            26,
-            "Every generated combination should evaluate every roster character equally"
         );
         assert.equal(
             getEliteMobCombination(combination.id),
@@ -4031,13 +4009,13 @@ function testEliteMobCombinationEvent(app) {
 
     const event = HuntingEvent.get(HUNTING_EVENT_TYPES.ELITE_MOB);
     const selected = event.createPayload(37, () => 0.5);
-    const selectedCombination = ELITE_MOB_COMBINATIONS[1];
+    const selectedCombination = ELITE_MOB_COMBINATIONS[4];
     assert.equal(selected.type, HUNTING_EVENT_TYPES.ELITE_MOB, "Elite events should keep their own event type");
     assert.equal(selected.floor, 37, "Elite event payloads should retain the current floor");
     assert.equal(
         selected.enemyType,
         HUNTING_ENEMY_TYPES.ELITE,
-        "Elite event payloads should mark elite scaling explicitly"
+        "Elite event payloads should mark elite rewards explicitly"
     );
     assert.equal(
         selected.eliteCombinationId,
@@ -4096,12 +4074,12 @@ function testEliteMobCombinationEvent(app) {
         "Elite encounter factories should preserve payload order and duplicate monster types"
     );
     eliteSpecs.forEach((spec) => {
-        assert.equal(spec.hunting.enemyType, HUNTING_ENEMY_TYPES.ELITE, "Elite event mobs should use elite scaling");
+        assert.equal(spec.hunting.enemyType, HUNTING_ENEMY_TYPES.ELITE, "Elite event mobs should retain elite rewards");
         assert.equal(spec.hunting.floor, selected.floor, "Elite event mobs should scale from the actual current floor");
         assert.equal(
             spec.hunting.enemyPowerMultiplier,
-            getEnemyPowerMultiplier(selected.floor, { enemyType: HUNTING_ENEMY_TYPES.ELITE }),
-            "Elite event mobs should expose the current-floor elite multiplier"
+            getEnemyPowerMultiplier(selected.floor, { enemyType: HUNTING_ENEMY_TYPES.NORMAL }),
+            "Elite event mobs should use current-floor normal stats"
         );
     });
     assert.throws(
@@ -8178,10 +8156,15 @@ function testHuntingSystem() {
     const floor10Pool = getHuntingMonsterPool(10);
     const floor90Pool = getHuntingMonsterPool(90);
     const floor94Pool = getHuntingMonsterPool(94);
-    assert.equal(floor1Pool.length, 14, "All monster types should have a small chance from floor 1");
-    assert.ok(
-        floor1Pool.find((monster) => monster.type === HUNTING_MONSTER_TYPES.LASER).weight > 0,
-        "Late monsters should remain rare but possible in early floors"
+    assert.equal(
+        floor1Pool.filter((monster) => monster.weight > 0).length,
+        2,
+        "Only unlocked monsters should enter floor 1"
+    );
+    assert.equal(
+        floor1Pool.find((monster) => monster.type === HUNTING_MONSTER_TYPES.LASER).weight,
+        0,
+        "Locked monsters must not appear early"
     );
     assert.ok(
         floor10Pool.find((monster) => monster.type === HUNTING_MONSTER_TYPES.SHOOTER).weight >
@@ -8409,8 +8392,8 @@ async function testHuntingAchievementProgress() {
     }
 
     const rareMonster = createHuntingMobSpec({
-        type: HUNTING_MONSTER_TYPES.ELECTRIC,
-        floor: 20,
+        type: HUNTING_MONSTER_TYPES.CHAIN,
+        floor: 40,
         stageId: HUNTING_STAGE_IDS.FOREST
     });
     const epicMonster = createHuntingMobSpec({
@@ -8448,12 +8431,12 @@ async function testHuntingAchievementProgress() {
         "Miniboss metadata must not be treated as a normal monster tag"
     );
     assert.equal(
-        repeatedVictory.achievementProgress.monsterCodexByType[HUNTING_MONSTER_TYPES.ELECTRIC].kills,
+        repeatedVictory.achievementProgress.monsterCodexByType[HUNTING_MONSTER_TYPES.CHAIN].kills,
         1,
         "Monster codex kills should only increase after the battle is won"
     );
     assert.equal(
-        repeatedVictory.achievementProgress.monsterCodexByType[HUNTING_MONSTER_TYPES.ELECTRIC].regions.forest
+        repeatedVictory.achievementProgress.monsterCodexByType[HUNTING_MONSTER_TYPES.CHAIN].regions.forest
             .firstEncounterFloor,
         1,
         "Monster codex discovery should remember the region of the actual encounter"
@@ -8480,7 +8463,7 @@ async function testHuntingAchievementProgress() {
         "Completed runs should persist entered regions"
     );
     assert.equal(
-        getHuntingMonsterTypeKillCount(stats, HUNTING_MONSTER_TYPES.ELECTRIC),
+        getHuntingMonsterTypeKillCount(stats, HUNTING_MONSTER_TYPES.CHAIN),
         1,
         "Monster type kill helpers should read the persisted codex record"
     );
@@ -8509,8 +8492,8 @@ async function testHuntingAchievementProgress() {
         clearedStageIds: Object.values(HUNTING_STAGE_IDS),
         monsterKillsByTag: {
             [HUNTING_MONSTER_TAGS.MONSTER]: 300,
-            [HUNTING_MONSTER_TAGS.RARITY_RARE]: 100,
-            [HUNTING_MONSTER_TAGS.RARITY_UNIQUE]: 75,
+            [HUNTING_MONSTER_TAGS.RARITY_UNCOMMON]: 100,
+            [HUNTING_MONSTER_TAGS.RARITY_RARE]: 75,
             [HUNTING_MONSTER_TAGS.RARITY_EPIC]: 50
         },
         monsterCodexByType: Object.fromEntries(

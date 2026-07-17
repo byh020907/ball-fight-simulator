@@ -34,6 +34,7 @@ import {
     createHuntingMobEncounter
 } from "./huntingMonsters.js";
 import { createEliteMobEncounter } from "./eliteMobEncounter.js";
+import { placeEliteMobFormation } from "./eliteMobFormation.js";
 import { applyMerchantOffer, formatOfferResultToast } from "./huntingMerchant.js";
 import { formatPendingLootSummary, formatDefeatLossText } from "./huntingFormat.js";
 import { createMatchReport, recordLowestHp } from "../collection/index.js";
@@ -432,6 +433,7 @@ export class HuntingManager {
 
         const playerBall = app.simulation?.fighters?.find((fighter) => fighter.id === run.characterId);
         const enemies = playerBall ? app.simulation.getEnemiesOf(playerBall) : [];
+        if (isEliteMobEvent && playerBall) placeEliteMobFormation(playerBall, enemies);
         lootDropController.prepareExperienceDrops(enemies);
 
         if (Number.isFinite(run.carriedHp)) {

@@ -19,6 +19,12 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.31.0",
+        date: "2026-07-18",
+        title: "v0.31.0 정예 조우와 몬스터 진행도",
+        changes: [{ type: "feature", text: "정예 군집 조합, 실제 몬스터 해금, 통합 희귀도를 적용했습니다." }]
+    },
+    {
         version: "0.30.4",
         date: "2026-07-17",
         title: "v0.30.4 기본 전투 기준 조정",

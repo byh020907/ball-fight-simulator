@@ -10,20 +10,18 @@ import { scaleEnemySpecForHunting } from "./huntingEncounters.js";
 
 const DEFAULT_RNG = () => Math.random();
 const MONSTER_PROBABILITY = Object.freeze({
-    preFocusWeightRatio: 0.08,
     establishedWeightRatio: 0.35,
-    primaryWeightMultiplier: 3,
-    focusLeadInFloors: 10
+    primaryWeightMultiplier: 3
 });
-const BOSS_MOB_RARITIES = Object.freeze(["rare", "unique", "epic"]);
+const BOSS_MOB_RARITIES = Object.freeze(["uncommon", "rare", "epic"]);
 const SPLITTER_DEFAULTS = Object.freeze({ splitLevel: 2, splitCount: 2, lootMultiplier: 1 });
 
 export const HUNTING_TEAMS = Object.freeze({ PLAYER: "hunting-player", ENEMY: "hunting-enemy" });
 export const HUNTING_MONSTER_TAGS = Object.freeze({
     MONSTER: "monster",
     RARITY_COMMON: "rarity:common",
+    RARITY_UNCOMMON: "rarity:uncommon",
     RARITY_RARE: "rarity:rare",
-    RARITY_UNIQUE: "rarity:unique",
     RARITY_EPIC: "rarity:epic"
 });
 
@@ -104,22 +102,22 @@ const CAVE_MONSTERS = Object.freeze(
         [
             "electric",
             "전기 마법사",
-            20,
+            30,
             1.8,
             "#5e8ee6",
             "ooo",
             { hp: 68, damage: 9, speed: 252, radius: 34, mass: 0.9, defense: 0.8 },
-            [HUNTING_MONSTER_TAGS.MONSTER, HUNTING_MONSTER_TAGS.RARITY_RARE]
+            [HUNTING_MONSTER_TAGS.MONSTER, HUNTING_MONSTER_TAGS.RARITY_UNCOMMON]
         ],
         [
             "healer",
             "힐러 볼",
-            30,
+            20,
             1.8,
             "#65b87a",
             "happy",
             { hp: 110, damage: 5, speed: 268, radius: 35, mass: 1, defense: 1 },
-            [HUNTING_MONSTER_TAGS.MONSTER, HUNTING_MONSTER_TAGS.RARITY_RARE]
+            [HUNTING_MONSTER_TAGS.MONSTER, HUNTING_MONSTER_TAGS.RARITY_UNCOMMON]
         ],
         [
             "chain",
@@ -134,47 +132,47 @@ const CAVE_MONSTERS = Object.freeze(
         [
             "shockwave",
             "충격파 볼",
-            50,
+            30,
             1.9,
             "#e1a94e",
             "ooo",
             { hp: 106, damage: 11, speed: 240, radius: 40, mass: 1.22, defense: 1.3 },
-            [HUNTING_MONSTER_TAGS.MONSTER, HUNTING_MONSTER_TAGS.RARITY_RARE]
+            [HUNTING_MONSTER_TAGS.MONSTER, HUNTING_MONSTER_TAGS.RARITY_UNCOMMON]
         ],
         [
             "barrier",
             "방벽 볼",
-            60,
+            20,
             2.0,
             "#5dbaeb",
             "default",
             { hp: 104, damage: 7, speed: 250, radius: 39, mass: 1.18, defense: 1.5 },
-            [HUNTING_MONSTER_TAGS.MONSTER, HUNTING_MONSTER_TAGS.RARITY_UNIQUE]
+            [HUNTING_MONSTER_TAGS.MONSTER, HUNTING_MONSTER_TAGS.RARITY_UNCOMMON]
         ],
         [
             "siphon",
             "흡수 볼",
-            70,
+            40,
             2.0,
             "#9b69be",
             "xeye",
             { hp: 92, damage: 10, speed: 272, radius: 35, mass: 0.98, defense: 1 },
-            [HUNTING_MONSTER_TAGS.MONSTER, HUNTING_MONSTER_TAGS.RARITY_UNIQUE]
+            [HUNTING_MONSTER_TAGS.MONSTER, HUNTING_MONSTER_TAGS.RARITY_RARE]
         ],
         [
             "shard",
             "파편 볼",
-            80,
+            40,
             2.1,
             "#e0d05b",
             "cyclops",
             { hp: 82, damage: 10, speed: 260, radius: 35, mass: 0.95, defense: 1 },
-            [HUNTING_MONSTER_TAGS.MONSTER, HUNTING_MONSTER_TAGS.RARITY_UNIQUE]
+            [HUNTING_MONSTER_TAGS.MONSTER, HUNTING_MONSTER_TAGS.RARITY_RARE]
         ],
         [
             "boomerang",
             "부메랑 볼",
-            91,
+            50,
             2.1,
             "#e58a52",
             "happy",
@@ -184,7 +182,7 @@ const CAVE_MONSTERS = Object.freeze(
         [
             "splitter",
             "분열 볼",
-            92,
+            50,
             2.2,
             "#c56bd5",
             "ooo",
@@ -194,7 +192,7 @@ const CAVE_MONSTERS = Object.freeze(
         [
             "jumper",
             "도약 볼",
-            93,
+            50,
             2.2,
             "#e9c45d",
             "dash",
@@ -204,18 +202,18 @@ const CAVE_MONSTERS = Object.freeze(
         [
             "laser",
             "레이저 볼",
-            94,
+            50,
             2.3,
             "#ef5b5b",
             "cyclops",
             { hp: 92, damage: 11, speed: 248, radius: 36, mass: 1.04, defense: 1 },
             [HUNTING_MONSTER_TAGS.MONSTER, HUNTING_MONSTER_TAGS.RARITY_EPIC]
         ]
-    ].map(([type, displayName, focusFloor, weight, color, face, stats, monsterTags]) =>
+    ].map(([type, displayName, unlockFloor, weight, color, face, stats, monsterTags]) =>
         Object.freeze({
             type,
             displayName,
-            focusFloor,
+            unlockFloor,
             weight,
             color,
             face,
@@ -269,31 +267,20 @@ const safeFloor = (floor) => Math.max(1, Math.floor(Number.isFinite(floor) ? flo
 export function getHuntingMonsterPool(floor, stageId = HUNTING_STAGE_IDS.CAVE) {
     const safe = safeFloor(floor);
     const definitions = getHuntingMonsterDefinitions(stageId);
-    const latestFocusFloor = definitions.reduce(
-        (latest, monster) => (monster.focusFloor <= safe ? Math.max(latest, monster.focusFloor) : latest),
+    const latestUnlockFloor = definitions.reduce(
+        (latest, monster) => (monster.unlockFloor <= safe ? Math.max(latest, monster.unlockFloor) : latest),
         1
     );
     return definitions.map((monster) => ({
         ...monster,
-        weight: getMonsterProbabilityWeight(monster, safe, latestFocusFloor)
+        weight: getMonsterProbabilityWeight(monster, latestUnlockFloor)
     }));
 }
 
-function getMonsterProbabilityWeight(monster, floor, latestFocusFloor) {
-    if (monster.focusFloor === latestFocusFloor) return monster.weight * MONSTER_PROBABILITY.primaryWeightMultiplier;
-    if (monster.focusFloor < latestFocusFloor) return monster.weight * MONSTER_PROBABILITY.establishedWeightRatio;
-    const focusProgress = Math.max(
-        0,
-        Math.min(
-            1,
-            (floor - (monster.focusFloor - MONSTER_PROBABILITY.focusLeadInFloors)) /
-                MONSTER_PROBABILITY.focusLeadInFloors
-        )
-    );
-    return (
-        monster.weight *
-        (MONSTER_PROBABILITY.preFocusWeightRatio + (1 - MONSTER_PROBABILITY.preFocusWeightRatio) * focusProgress)
-    );
+function getMonsterProbabilityWeight(monster, latestUnlockFloor) {
+    if (monster.unlockFloor > latestUnlockFloor) return 0;
+    if (monster.unlockFloor === latestUnlockFloor) return monster.weight * MONSTER_PROBABILITY.primaryWeightMultiplier;
+    return monster.weight * MONSTER_PROBABILITY.establishedWeightRatio;
 }
 
 function getMonsterRarity(monster) {

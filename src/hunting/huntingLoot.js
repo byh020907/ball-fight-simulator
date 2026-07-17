@@ -23,7 +23,7 @@ export const HUNTING_LOOT_ITEM_TYPES = Object.freeze({
     EXPERIENCE: "experience"
 });
 
-export const HUNTING_LOOT_RARITIES = Object.freeze(["common", "rare", "unique", "epic"]);
+export const HUNTING_LOOT_RARITIES = Object.freeze(["common", "uncommon", "rare", "epic"]);
 
 const LOOT_CONFIG = REWARD_BALANCE.hunting.loot;
 const LOOT_LAUNCH_SPEED_MIN_MULTIPLIER = 1.2;
