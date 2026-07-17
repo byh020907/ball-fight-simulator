@@ -5633,6 +5633,11 @@ function testFiveBallLevelRewardContracts(app) {
             findEffectPrimitive(primitives, "arc", ([x]) => Math.abs(x - steppedDash.run.simulation.width) <= 0.02),
             "Dash reflected laser should draw a white reflection core at the wall hit"
         );
+        assertEffectUsesColor(
+            primitives,
+            "#c85222",
+            "Dash reflected laser should keep its reflected segment visible against the bright arena"
+        );
     });
     const overloadEffect = steppedDash.run.simulation.entities.find((entity) => entity instanceof CrossOverloadEffect);
     assertForegroundEffectRenders(overloadEffect, "Dash cross overload", (primitives) => {

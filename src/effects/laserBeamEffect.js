@@ -13,6 +13,7 @@ const LASER_DAMAGE_TICK = 0.05;
 const DASH_MATERIALIZE_PROGRESS = 0.18;
 const DASH_CASTER_SCALE = 0.76;
 const DASH_CASTER_DISSIPATE_DURATION = 0.16;
+const REFLECTED_LASER_COLOR = "#c85222";
 
 export const DASH_LASER_CASTER_RENDERER = drawLaserCasterVisual;
 
@@ -73,7 +74,7 @@ export function drawLaserSegments(ctx, segments, { alpha = 1, color = "#ff5656" 
     ctx.lineCap = "round";
     segments.forEach((segment) => {
         const reflected = segment.bounceIndex > 0;
-        ctx.strokeStyle = reflected ? "#fff1ed" : color;
+        ctx.strokeStyle = reflected ? REFLECTED_LASER_COLOR : color;
         ctx.lineWidth = getVisibleLineWidth(ctx, reflected ? "emphasis" : "standard", reflected ? 9 : 7);
         ctx.beginPath();
         ctx.moveTo(segment.start.x, segment.start.y);
@@ -194,7 +195,7 @@ export class LaserBeamEffect extends CombatEntity {
         this._syncLife();
         this._syncFireSegments(simulation);
         for (const segment of this.segments.slice(1)) {
-            simulation.addSparkBurst(segment.start.clone(), "#fff1ed");
+            simulation.addSparkBurst(segment.start.clone(), REFLECTED_LASER_COLOR);
         }
         simulation.playSound("laser", 0.9);
     }
