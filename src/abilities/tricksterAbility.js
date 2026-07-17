@@ -1,4 +1,5 @@
 import { Vector2 } from "../core.js";
+import { TricksterSeedBurstEffect, TricksterSeedMarkEffect, VineSnareVisualEffect } from "../effects/index.js";
 import { computeOwnerCombatSpeed } from "./heroAbility.js";
 import { Ability } from "./ability.js";
 
@@ -14,7 +15,8 @@ export class TricksterAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation, 7.0);
         this.state = {
-            marks: new Map()
+            marks: new Map(),
+            markEffects: new Map()
         };
     }
 
@@ -57,20 +59,29 @@ export class TricksterAbility extends Ability {
         const upgrade = this.getLevelUpgrade();
         if (upgrade.vineSnare) {
             target.applySlow(0.5, 0.8);
-            target.addPeriodicDamageEffect(
-                this.simulation.createPeriodicDamageEffect({
-                    duration: 0.5,
-                    interval: 0.1,
-                    ticks: 5,
-                    damage: this.owner.stats.baseDamage * 0.1,
-                    source: this.owner,
-                    label: "Vine Snare",
-                    color: "#55d66b"
-                })
-            );
+            const periodicEffect = this.simulation.createPeriodicDamageEffect({
+                duration: 0.5,
+                interval: 0.1,
+                ticks: 5,
+                damage: this.owner.stats.baseDamage * 0.1,
+                source: this.owner,
+                label: "Vine Snare",
+                color: "#55d66b"
+            });
+            periodicEffect.renderInFighter = false;
+            target.addPeriodicDamageEffect(periodicEffect);
+            this.simulation.entities.push(new VineSnareVisualEffect(target, periodicEffect));
         }
         if (upgrade.seedMarkBurst) {
             this.state.marks.set(target, MARK_DURATION);
+            const currentEffect = this.state.markEffects.get(target);
+            if (currentEffect && !currentEffect.isExpired) {
+                currentEffect.refresh();
+            } else {
+                const markEffect = new TricksterSeedMarkEffect(target, this.owner.color, MARK_DURATION);
+                this.state.markEffects.set(target, markEffect);
+                this.simulation.entities.push(markEffect);
+            }
         }
     }
 
@@ -80,16 +91,12 @@ export class TricksterAbility extends Ability {
         if (!upgrade.seedMarkBurst) return;
 
         this.state.marks.delete(target);
+        const markEffect = this.state.markEffects.get(target);
+        if (markEffect) markEffect.isExpired = true;
+        this.state.markEffects.delete(target);
         const contactPoint = context.contactPoint?.clone?.() ?? target.position.clone();
         target.takeDamage(this.owner.stats.baseDamage * 1.2, this.owner, "Seed Burst");
-        this.simulation.spawnPulse(contactPoint.clone(), "#b7ff76");
-        this.simulation.spawnParticleBurst(contactPoint.clone(), this.owner.color, {
-            count: 24,
-            speed: 260,
-            radiusMin: 2,
-            radiusMax: 5,
-            upBias: 20
-        });
+        this.simulation.entities.push(new TricksterSeedBurstEffect(contactPoint, this.owner.color));
 
         if (upgrade.followupSeed) {
             const direction = Vector2.fromAngle(Math.random() * Math.PI * 2, 1);
@@ -103,33 +110,16 @@ export class TricksterAbility extends Ability {
     _updateMarks(delta) {
         for (const [target, remaining] of this.state.marks) {
             const next = remaining - delta;
-            if (next <= 0 || target.flags.defeated) this.state.marks.delete(target);
-            else this.state.marks.set(target, next);
+            if (next <= 0 || target.flags.defeated) {
+                this.state.marks.delete(target);
+                const markEffect = this.state.markEffects.get(target);
+                if (markEffect) markEffect.isExpired = true;
+                this.state.markEffects.delete(target);
+            } else this.state.marks.set(target, next);
         }
     }
 
-    draw(ctx) {
-        for (const [target, remaining] of this.state.marks) {
-            const pulse = 1 + Math.sin((MARK_DURATION - remaining) * 14) * 0.12;
-            ctx.save();
-            ctx.translate(target.position.x, target.position.y);
-            ctx.scale(pulse, pulse);
-            ctx.strokeStyle = "#8ef06a";
-            ctx.fillStyle = "rgba(142, 240, 106, 0.2)";
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            for (const index of Array.from({ length: 6 }, (_, value) => value)) {
-                const angle = -Math.PI / 2 + (Math.PI * 2 * index) / 6;
-                const point = Vector2.fromAngle(angle, target.radius + 8);
-                if (index === 0) ctx.moveTo(point.x, point.y);
-                else ctx.lineTo(point.x, point.y);
-            }
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-            ctx.restore();
-        }
-    }
+    draw() {}
 
     drawFace(ctx, rotation, ball) {
         this._dotEye(ctx, ball, -0.25, -0.08, 0.047);

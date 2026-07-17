@@ -1,5 +1,6 @@
 import { calculateWallSlamAngularImpulse, WallSlamEffect } from "../combatEffects.js";
 import { Vector2 } from "../core.js";
+import { getVisibleLineWidth } from "../effects/effectVisibility.js";
 import { Ability } from "./ability.js";
 
 const ARC_ANGLE = (Math.PI * 2) / 3; // 120도
@@ -36,7 +37,8 @@ export class BatBallAbility extends Ability {
             slashEndAngle: 0,
             resetCooldown: 0,
             resetFlash: 0,
-            _facingAngle: 0
+            _facingAngle: 0,
+            sweepDirection: 1
         };
     }
 
@@ -62,7 +64,10 @@ export class BatBallAbility extends Ability {
         while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
         this.state._facingAngle += angleDiff * Math.min(1, FACING_SMOOTH_RATE * delta);
         const sweepOffset = Math.sin(time * SWEEP_SPEED) * (Math.PI * SWEEP_AMPLITUDE);
-        this.state.arcAngle = this.state._facingAngle + sweepOffset;
+        const nextArcAngle = this.state._facingAngle + sweepOffset;
+        const sweepDelta = normalizeAngle(nextArcAngle - this.state.arcAngle);
+        if (Math.abs(sweepDelta) > 1e-4) this.state.sweepDirection = Math.sign(sweepDelta);
+        this.state.arcAngle = nextArcAngle;
 
         if (!target || this.timer > 0) return;
 
@@ -82,6 +87,10 @@ export class BatBallAbility extends Ability {
 
     performSlash(target) {
         const upgrade = this.getLevelUpgrade();
+        const swingDirection = this.state.sweepDirection || 1;
+        this.state.slashTimer = SLASH_DURATION;
+        this.state.slashStartAngle = this.state.arcAngle - (this.getArcAngle() / 2) * swingDirection;
+        this.state.slashEndAngle = this.state.arcAngle + (this.getArcAngle() / 2) * swingDirection;
         const damage = Math.round(this.owner.stats.baseDamage * SLASH_DAMAGE_MULT);
         target.takeDamage(damage, this.owner, "Slash");
 
@@ -93,7 +102,7 @@ export class BatBallAbility extends Ability {
         target.state.wallSlam = new WallSlamEffect({
             source: this.owner,
             duration: this.getWallSlamDuration(),
-            getDamageMultiplier: ({ contactPoint }) => {
+            getDamageMultiplier: ({ contactPoint, normal }) => {
                 if (!upgrade.homeRun || homeRunUsed || !contactPoint) return 1;
                 homeRunUsed = true;
                 const distance = Vector2.subtract(contactPoint, hitContactPoint).length();
@@ -101,22 +110,24 @@ export class BatBallAbility extends Ability {
                     2,
                     1 + distance / Math.hypot(this.simulation.width, this.simulation.height)
                 );
-                this.simulation.spawnActionText(contactPoint.clone(), `HOME RUN ×${multiplier.toFixed(2)}`, "#fff1a8");
+                const textPosition = normal
+                    ? Vector2.add(contactPoint, normal.clone().scale(Math.max(22, target.radius * 0.65)))
+                    : target.position.clone();
+                const homeRunText = this.simulation.spawnActionText(
+                    textPosition,
+                    `HOME RUN ×${multiplier.toFixed(2)}`,
+                    "#fff1a8"
+                );
+                if (homeRunText) homeRunText.visibilityToken = "combatText";
                 return multiplier;
             },
             onImpact: (context) => this._handleWallSlamImpact(context)
         });
         if (upgrade.rotatingHit) {
             target._computeMomentOfInertia();
-            const swingDirection = Math.sign(normalizeAngle(this.getArcAngle())) || 1;
             const extraImpulse = Math.abs(calculateWallSlamAngularImpulse(target)) * 1.5 * swingDirection;
             target.applyAngularImpulse(extraImpulse);
         }
-
-        // Slash 애니메이션 설정 — arcAngle 기준으로 ±60도 휘두르기
-        this.state.slashTimer = SLASH_DURATION;
-        this.state.slashStartAngle = this.state.arcAngle - this.getArcAngle() / 2;
-        this.state.slashEndAngle = this.state.arcAngle + this.getArcAngle() / 2;
 
         // 시각 효과 — 스윙 아크 + 충돌 스파크
         this.simulation.addSparkBurst(this.owner.position.clone(), this.owner.color);
@@ -130,7 +141,8 @@ export class BatBallAbility extends Ability {
         this.timer = 0;
         this.state.resetCooldown = RESET_COOLDOWN;
         this.state.resetFlash = RESET_FLASH_DURATION;
-        this.simulation.spawnActionText(this.owner.position.clone(), "RESET!", "#ffffff");
+        const resetText = this.simulation.spawnActionText(this.owner.position.clone(), "RESET!", "#ffffff");
+        if (resetText) resetText.visibilityToken = "combatText";
         this.simulation.addSparkBurst(this.owner.position.clone(), this.owner.color);
         this.simulation.playSound("charge", 1.05);
     }
@@ -181,7 +193,14 @@ export class BatBallAbility extends Ability {
         ctx.lineWidth = 10 - progress * 6;
         ctx.globalAlpha = glowAlpha * 0.6;
         ctx.beginPath();
-        ctx.arc(pos.x, pos.y, this.getArcRange() * VISION_ARC_RADIUS_SCALE, this.state.slashStartAngle, currentEnd);
+        ctx.arc(
+            pos.x,
+            pos.y,
+            this.getArcRange() * VISION_ARC_RADIUS_SCALE,
+            this.state.slashStartAngle,
+            currentEnd,
+            this.state.sweepDirection < 0
+        );
         ctx.stroke();
 
         // 메인 스윙 선
@@ -189,7 +208,14 @@ export class BatBallAbility extends Ability {
         ctx.lineWidth = 5 - progress * 3;
         ctx.globalAlpha = glowAlpha * 0.9;
         ctx.beginPath();
-        ctx.arc(pos.x, pos.y, this.getArcRange() * VISION_ARC_RADIUS_SCALE, this.state.slashStartAngle, currentEnd);
+        ctx.arc(
+            pos.x,
+            pos.y,
+            this.getArcRange() * VISION_ARC_RADIUS_SCALE,
+            this.state.slashStartAngle,
+            currentEnd,
+            this.state.sweepDirection < 0
+        );
         ctx.stroke();
 
         // 잔상 (trail) — 여러 겹
@@ -207,7 +233,8 @@ export class BatBallAbility extends Ability {
                 pos.y,
                 this.getArcRange() * VISION_ARC_RADIUS_SCALE - i * 8,
                 this.state.slashStartAngle,
-                trailEnd
+                trailEnd,
+                this.state.sweepDirection < 0
             );
             ctx.stroke();
         }
@@ -279,7 +306,7 @@ export class BatBallAbility extends Ability {
         if (this.state.resetFlash > 0) {
             ctx.globalAlpha = this.state.resetFlash / RESET_FLASH_DURATION;
             ctx.strokeStyle = "#ffffff";
-            ctx.lineWidth = 13;
+            ctx.lineWidth = getVisibleLineWidth(ctx, "emphasis", 13);
             ctx.beginPath();
             ctx.moveTo(handleEndX, handleEndY);
             ctx.lineTo(bx, by);

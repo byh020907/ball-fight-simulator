@@ -1,4 +1,5 @@
 import { calculateInterceptPoint, Vector2, evadeTarget } from "../core.js";
+import { ArcherPredictionEffect } from "../effects/archerPredictionEffect.js";
 import { Ability } from "./ability.js";
 
 const WINDUP = 0.4;
@@ -19,7 +20,8 @@ export class ArcherAbility extends Ability {
             aimPoint: null,
             pendingSecondShot: false,
             secondShotTimer: 0,
-            secondShotTargetCache: null
+            secondShotTargetCache: null,
+            predictionEffect: null
         };
         this.arrowSpeedMult = ARROW_SPEED_MULT;
     }
@@ -50,6 +52,7 @@ export class ArcherAbility extends Ability {
         if (!target || target.flags.defeated) {
             this.state.windUp = 0;
             this.state.aimPoint = null;
+            this._expirePredictionEffect();
             return false;
         }
 
@@ -67,6 +70,7 @@ export class ArcherAbility extends Ability {
             this.timer = this.cooldown * (0.7 + Math.random() * 0.6);
             this._updateAim(target);
             this.state.windUp = this._getWindupDuration();
+            this._ensurePredictionEffect();
         }
     }
 
@@ -74,6 +78,18 @@ export class ArcherAbility extends Ability {
         const aimPoint = this._getAimPoint(target);
         this.state.aimPoint = aimPoint;
         this.state.lastAimDir = Vector2.subtract(aimPoint, this.owner.position).normalize();
+    }
+
+    _ensurePredictionEffect() {
+        if (this.abilityTier < 1 || !this.state.aimPoint) return;
+        if (this.state.predictionEffect && !this.state.predictionEffect.isExpired) return;
+        this.state.predictionEffect = new ArcherPredictionEffect(this);
+        this.simulation.entities.push(this.state.predictionEffect);
+    }
+
+    _expirePredictionEffect() {
+        if (this.state.predictionEffect) this.state.predictionEffect.isExpired = true;
+        this.state.predictionEffect = null;
     }
 
     _getAimPoint(target) {
@@ -90,6 +106,7 @@ export class ArcherAbility extends Ability {
     }
 
     release(target) {
+        this._expirePredictionEffect();
         this._fireArrowWithCrit(target, true);
         this.simulation.playSound("shoot");
         if (this.abilityTier >= 2) {
@@ -158,24 +175,6 @@ export class ArcherAbility extends Ability {
         ctx.lineTo(bowBot.x, bowBot.y);
         ctx.stroke();
 
-        ctx.restore();
-        if (this.abilityTier >= 1) {
-            this._drawPredictionMarker(ctx, progress);
-        }
-    }
-
-    _drawPredictionMarker(ctx, progress) {
-        const point = this.state.aimPoint;
-        if (!point) return;
-
-        ctx.save();
-        ctx.globalAlpha = 0.35 + progress * 0.35;
-        ctx.strokeStyle = this.owner.color;
-        ctx.lineWidth = 2;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.arc(point.x, point.y, 6 + progress * 5, 0, Math.PI * 2);
-        ctx.stroke();
         ctx.restore();
     }
 

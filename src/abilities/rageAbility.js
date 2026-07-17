@@ -1,6 +1,6 @@
 import { Ability } from "./ability.js";
 import { Vector2 } from "../core.js";
-import { getRebirthVisualProfile } from "../rebirth/rebirthVisuals.js";
+import { BurningEffect, RageFlameRing } from "../effects/index.js";
 
 const CHARGE_THRESHOLD_PARTICLES = 0.22;
 const PARTICLE_BASE_INTERVAL = 0.15;
@@ -137,19 +137,20 @@ export class RageAbility extends Ability {
 
     _applyIgnite(target) {
         if (target.flags.defeated) return;
-        const igniteState = {
-            remaining: IGNITE_DURATION,
-            tickInterval: IGNITE_TICK_INTERVAL,
-            tickTimer: 0,
-            tickIndex: 0,
-            damagePerTick: Math.round(this.owner.stats.baseDamage * IGNITE_DAMAGE_PER_TICK),
-            source: this.owner
-        };
-        if (target._igniteState) {
-            target._igniteState.remaining = IGNITE_DURATION;
+        if (target._igniteState instanceof BurningEffect && !target._igniteState.isExpired) {
+            target._igniteState.refresh(IGNITE_DURATION);
             return;
         }
-        target._igniteState = igniteState;
+        const igniteEffect = new BurningEffect({
+            source: this.owner,
+            target,
+            duration: IGNITE_DURATION,
+            tickInterval: IGNITE_TICK_INTERVAL,
+            maximumTicks: IGNITE_TICK_COUNT,
+            damagePerTick: Math.round(this.owner.stats.baseDamage * IGNITE_DAMAGE_PER_TICK)
+        });
+        target._igniteState = igniteEffect;
+        this.simulation.entities.push(igniteEffect);
         this.simulation.addLog(`${target.name} is ignited by ${this.owner.name}.`);
     }
 
@@ -165,14 +166,18 @@ export class RageAbility extends Ability {
             }
         }
         this.simulation.spawnExplosion(center, "#ff7b32");
-        this._spawnFlameRing(center, EXPLOSION_RADIUS, "#ff7b32", 0.22);
-        this._spawnFlameRing(center, EXPLOSION_RADIUS * 0.7, "#ff983d", 0.18);
+        this._spawnFlameRing(center, EXPLOSION_RADIUS, {
+            waveDelays: [0],
+            waveDuration: 0.22,
+            doubleRing: true,
+            particleCount: 22
+        });
         this.simulation.playSound("explosion", 1.35);
         this.simulation.addLog(`${this.owner.name} triggers explosion!`);
     }
 
-    _spawnFlameRing(center, radius, color, duration) {
-        this.simulation.entities.push(new RageFlameRing(center, radius, color, duration));
+    _spawnFlameRing(center, radius, options) {
+        this.simulation.entities.push(new RageFlameRing(center, radius, options));
     }
 
     _applyAftershock(target, context) {
@@ -223,9 +228,12 @@ export class RageAbility extends Ability {
         this.simulation.playSound("explosion", 0.75);
         this.simulation.playSound("rage", 0.8);
 
-        this._spawnFlameRing(worldPoint, AFTERSHOCK_RADIUS, "#fff4bd", 0.32);
-        this._spawnFlameRing(worldPoint, AFTERSHOCK_RADIUS * 0.65, "#ff7b32", 0.28);
-        this._spawnFlameRing(worldPoint, AFTERSHOCK_RADIUS * 0.35, "#ff983d", 0.24);
+        this._spawnFlameRing(worldPoint, AFTERSHOCK_RADIUS, {
+            waveDelays: [0, 0.05, 0.1],
+            waveDuration: 0.22,
+            doubleRing: true,
+            particleCount: 30
+        });
         this.simulation.spawnExplosion(worldPoint, "#fff4bd");
 
         this.simulation.addLog(`${this.owner.name} unleashes aftershock!`);
@@ -291,35 +299,5 @@ export class RageAbility extends Ability {
 
     getUiState() {
         return { label: "Momentum", progress: Math.max(0.08, this.getChargeProgress()) };
-    }
-}
-
-class RageFlameRing {
-    constructor(center, radius, color, duration) {
-        this.center = center;
-        this.maxRadius = radius;
-        this.color = color;
-        this.remaining = duration;
-        this.maxDuration = duration;
-        this.isExpired = false;
-    }
-
-    update(delta) {
-        this.remaining -= delta;
-        if (this.remaining <= 0) this.isExpired = true;
-    }
-
-    draw(ctx) {
-        const progress = 1 - this.remaining / this.maxDuration;
-        const currentRadius = this.maxRadius * progress;
-        const alpha = progress < 0.8 ? 1 : 1 - (progress - 0.8) / 0.2;
-        ctx.save();
-        ctx.globalAlpha = Math.max(0, alpha);
-        ctx.strokeStyle = this.color;
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.arc(this.center.x, this.center.y, currentRadius, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
     }
 }

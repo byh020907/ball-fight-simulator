@@ -472,30 +472,11 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         for (const type of Object.keys(this._equipmentEffectCooldowns)) {
             this._equipmentEffectCooldowns[type] = Math.max(0, this._equipmentEffectCooldowns[type] - delta);
         }
-        this._tickIgnite(delta);
         for (const effect of this.state.periodicDamage) {
             effect.tick(this, delta);
         }
         this.state.periodicDamage = this.state.periodicDamage.filter((effect) => !effect.finished);
         this.actionContext.tickTimers(this, delta);
-    }
-
-    _tickIgnite(delta) {
-        const ignite = this._igniteState;
-        if (!ignite) return;
-        ignite.remaining -= delta;
-        if (ignite.remaining <= 0) {
-            this._igniteState = null;
-            return;
-        }
-        ignite.tickTimer += delta;
-        while (ignite.tickTimer >= ignite.tickInterval && ignite.tickIndex < 10) {
-            ignite.tickTimer -= ignite.tickInterval;
-            ignite.tickIndex++;
-            if (ignite.source && !ignite.source.flags.defeated) {
-                this.takeDamage(ignite.damagePerTick, ignite.source, "Ignite");
-            }
-        }
     }
 
     applySlow(duration, amount) {
@@ -618,7 +599,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         this.drawFace(ctx, faceRotation);
         this.abilities.draw(ctx);
         for (const effect of this.state.periodicDamage) {
-            effect.draw?.(ctx, this);
+            if (effect.renderInFighter !== false) effect.draw?.(ctx, this);
         }
         drawRebirthVisualOverlay(ctx, this, rebirthVisual);
         if (this.state.movement?.showRing) {

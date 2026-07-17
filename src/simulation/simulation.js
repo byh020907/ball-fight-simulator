@@ -282,8 +282,8 @@ export class Simulation {
         });
     }
 
-    spawnOrbitHit(shardPosition, targetPosition, color) {
-        this.entities.push(new OrbitHitEffect(shardPosition, targetPosition, color));
+    spawnOrbitHit(shardPosition, targetPosition, color, options = {}) {
+        this.entities.push(new OrbitHitEffect(shardPosition, targetPosition, color, options));
     }
 
     spawnOrbitExplosion(position, color, radius) {

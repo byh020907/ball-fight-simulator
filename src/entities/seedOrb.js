@@ -1,6 +1,9 @@
-import { CombatEntity, Vector2 } from "../core.js";
+import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
+import { getVisibleLineWidth, SeedActivationEffect } from "../effects/index.js";
 
 export class SeedOrb extends CombatEntity {
+    static renderLayer = RENDER_LAYERS.FOREGROUND;
+
     constructor(owner, position, velocity, life, options = {}) {
         super(position, velocity, 14);
         this.owner = owner;
@@ -9,6 +12,7 @@ export class SeedOrb extends CombatEntity {
         this.maxLife = life;
         this.collisionGraceRemaining = Math.max(0, options.collisionGrace ?? 0);
         this.collisionGraceDuration = this.collisionGraceRemaining;
+        this.activationEffectSpawned = this.collisionGraceRemaining <= 0;
     }
 
     update(delta, simulation) {
@@ -18,9 +22,14 @@ export class SeedOrb extends CombatEntity {
             this.isExpired = true;
         }
 
+        const graceBefore = this.collisionGraceRemaining;
         this.collisionGraceRemaining = Math.max(0, this.collisionGraceRemaining - delta);
         if (this.collisionGraceRemaining > 1e-9) return;
         this.collisionGraceRemaining = 0;
+        if (graceBefore > 0 && !this.activationEffectSpawned) {
+            this.activationEffectSpawned = true;
+            simulation.entities.push(new SeedActivationEffect(this));
+        }
 
         for (const fighter of simulation.fighters) {
             if (fighter.flags.defeated) continue;
@@ -70,7 +79,7 @@ export class SeedOrb extends CombatEntity {
         ctx.arc(this.position.x, this.position.y, drawRadius, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 2 + graceProgress;
+        ctx.lineWidth = getVisibleLineWidth(ctx, "standard", 2 + graceProgress);
         ctx.stroke();
         if (this.collisionGraceDuration > 0) {
             ctx.strokeStyle = "#8dff6a";
@@ -79,6 +88,20 @@ export class SeedOrb extends CombatEntity {
                 ctx.moveTo(this.position.x, this.position.y - drawRadius * 0.3);
                 ctx.lineTo(this.position.x + side * drawRadius * graceProgress, this.position.y - drawRadius * 1.3);
                 ctx.stroke();
+            }
+        }
+        if (graceProgress >= 1) {
+            ctx.fillStyle = "#eaffc4";
+            for (const index of Array.from({ length: 6 }, (_, value) => value)) {
+                const angle = (Math.PI * 2 * index) / 6;
+                const inner = Vector2.add(this.position, Vector2.fromAngle(angle, drawRadius * 0.74));
+                const outer = Vector2.add(this.position, Vector2.fromAngle(angle, drawRadius * 1.28));
+                ctx.beginPath();
+                ctx.moveTo(outer.x, outer.y);
+                ctx.lineTo(inner.x - Math.sin(angle) * 3, inner.y + Math.cos(angle) * 3);
+                ctx.lineTo(inner.x + Math.sin(angle) * 3, inner.y - Math.cos(angle) * 3);
+                ctx.closePath();
+                ctx.fill();
             }
         }
         ctx.restore();

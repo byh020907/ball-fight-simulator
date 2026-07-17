@@ -19,6 +19,25 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.28.1",
+        date: "2026-07-17",
+        title: "v0.28.1 핵심 레벨 보상 효과 가시성 복구",
+        changes: [
+            {
+                type: "fix",
+                text: "Rage 점화·폭발·여진과 Eater 소화·뱉기·벽 파열이 전투원 위에서 단계별 전용 효과로 보이도록 복구했습니다."
+            },
+            {
+                type: "style",
+                text: "Trickster 표식, Orbit 협공·회수, Spin 절단·유체장, Bat Ball 보상 문구를 PC와 모바일에서 식별하기 쉽게 정리했습니다."
+            },
+            {
+                type: "style",
+                text: "Vampire 혈액 효과와 Archer 예측 조준점에 화면 축소를 고려한 공통 가시성 기준을 적용했습니다."
+            }
+        ]
+    },
+    {
         version: "0.28.0",
         date: "2026-07-17",
         title: "v0.28.0 네 캐릭터 행동형 레벨 보상 완성",

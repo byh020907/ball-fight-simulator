@@ -1,4 +1,5 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
+import { getVisibleCombatTextSize, getVisibleLineWidth } from "./effectVisibility.js";
 
 class FloatingText extends CombatEntity {
     static renderLayer = RENDER_LAYERS.FOREGROUND;
@@ -10,6 +11,7 @@ class FloatingText extends CombatEntity {
         this.life = life;
         this.maxLife = this.life;
         this.fontSize = fontSize;
+        this.visibilityToken = null;
     }
 
     update(delta) {
@@ -20,16 +22,30 @@ class FloatingText extends CombatEntity {
         }
     }
 
-    draw(ctx) {
+    draw(ctx, simulation = null) {
         const progress = 1 - Math.max(0, this.life / this.maxLife);
         const alpha = progress < 0.2 ? progress / 0.2 : 1;
         ctx.save();
         ctx.globalAlpha = alpha;
         ctx.fillStyle = this.color;
-        ctx.font = `700 ${this.fontSize}px Bahnschrift, "Segoe UI", sans-serif`;
+        const fontSize =
+            this.visibilityToken === "combatText" ? getVisibleCombatTextSize(ctx, this.fontSize) : this.fontSize;
+        ctx.font = `700 ${fontSize}px Bahnschrift, "Segoe UI", sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(this.displayText, this.position.x, this.position.y);
+        let textX = this.position.x;
+        if (this.visibilityToken === "combatText") {
+            const measuredWidth =
+                ctx.measureText?.(this.displayText)?.width ?? fontSize * this.displayText.length * 0.55;
+            if (simulation?.width) {
+                const horizontalInset = measuredWidth / 2 + fontSize * 0.45;
+                textX = Math.max(horizontalInset, Math.min(simulation.width - horizontalInset, textX));
+            }
+            ctx.strokeStyle = "#202020";
+            ctx.lineWidth = getVisibleLineWidth(ctx, "standard", 2);
+            ctx.strokeText(this.displayText, textX, this.position.y);
+        }
+        ctx.fillText(this.displayText, textX, this.position.y);
         ctx.restore();
     }
 }

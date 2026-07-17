@@ -1,4 +1,5 @@
 import { CombatEntity, Projectile, RENDER_LAYERS, Vector2 } from "../core.js";
+import { getVisibleLineWidth } from "../effects/effectVisibility.js";
 
 const BAT_RADIUS = 10;
 const BAT_LIFE = 4.0;
@@ -46,7 +47,7 @@ class BloodBiteEffect extends CombatEntity {
         ctx.rotate(this.angle);
         ctx.globalAlpha = alpha;
         ctx.strokeStyle = "#ed2856";
-        ctx.lineWidth = 2.6;
+        ctx.lineWidth = getVisibleLineWidth(ctx, "standard", 2.6);
         ctx.beginPath();
         ctx.arc(0, 0, 8, -0.95, 0.95);
         ctx.stroke();
@@ -103,7 +104,7 @@ class BloodBatBurstEffect extends CombatEntity {
             ctx.restore();
         }
         ctx.strokeStyle = "#d51f4c";
-        ctx.lineWidth = 2;
+        ctx.lineWidth = getVisibleLineWidth(ctx, "standard", 2);
         ctx.beginPath();
         ctx.arc(0, 0, 10 + progress * 48, 0, Math.PI * 2);
         ctx.stroke();

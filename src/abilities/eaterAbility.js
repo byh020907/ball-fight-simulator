@@ -1,5 +1,6 @@
 import { DashEffect, WallSlamEffect } from "../combatEffects.js";
 import { steerBallToward, Vector2 } from "../core.js";
+import { EaterDigestEffect, EaterSpitEffect, EaterWallRuptureEffect } from "../effects/index.js";
 import { Ability } from "./ability.js";
 
 const FEAST_DURATION = 4.0;
@@ -13,8 +14,6 @@ const FEAST_HOMING_TURN_RATE = 3.5;
 const DIGEST_TICK_COUNT = 6;
 const DIGEST_TICK_INTERVAL = 0.12;
 const DIGEST_DAMAGE_PER_TICK = 0.12;
-const DIGEST_PARTICLE_COUNT = 2;
-
 const SPIT_LEVEL6_DAMAGE_MULT = 1.0;
 const SPIT_LEVEL6_SPEED_MULT = 3.0;
 const SPIT_LEVEL6_RECOIL = 420;
@@ -36,6 +35,7 @@ export class EaterAbility extends Ability {
             hasEatenThisFeast: false,
             digestionTimer: 0,
             digestionTick: 0,
+            digestionEffect: null,
             lv9WallRuptureUsed: false
         };
         this.feastDuration = FEAST_DURATION;
@@ -114,17 +114,7 @@ export class EaterAbility extends Ability {
     }
 
     _emitDigestionFeedback(target) {
-        this.simulation.spawnParticleBurst(target.position.clone(), "#ffffff", {
-            count: DIGEST_PARTICLE_COUNT,
-            speed: 90,
-            radiusMin: 1,
-            radiusMax: 2,
-            upBias: 30,
-            gravity: 480,
-            life: 0.45,
-            bounce: 0.04,
-            settleDelay: 0.08
-        });
+        this.state.digestionEffect?.registerTick();
     }
 
     getStatModifiers() {
@@ -156,6 +146,8 @@ export class EaterAbility extends Ability {
         target.state.swallowed = { owner: this.owner };
         target.clearDash();
         target.applyImpulse(target.velocity.clone().scale(-1));
+        this.state.digestionEffect = new EaterDigestEffect(this.owner, target);
+        this.simulation.entities.push(this.state.digestionEffect);
         this.simulation.playSound("chomp", 1.25);
         this.simulation.spawnParticleBurst(target.position.clone(), this.owner.color, {
             count: 30,
@@ -177,12 +169,16 @@ export class EaterAbility extends Ability {
 
         if (target.flags.defeated) {
             target.state.swallowed = null;
+            this.state.digestionEffect?.finish();
+            this.state.digestionEffect = null;
             this.state.swallowedTarget = null;
             return;
         }
 
         const direction = this.state.spitDirection.clone().normalize();
         target.state.swallowed = null;
+        this.state.digestionEffect?.finish();
+        this.state.digestionEffect = null;
         target.position = Vector2.add(
             this.owner.position,
             direction.clone().scale(this.owner.radius + target.radius + 10)
@@ -195,7 +191,7 @@ export class EaterAbility extends Ability {
             target.takeDamage(spitDmg, this.owner, "Spit Impact");
             const recoilDir = direction.clone().scale(-1);
             this.owner.applyImpulse(recoilDir.scale(SPIT_LEVEL6_RECOIL));
-            this.simulation.spawnPulse(this.owner.position.clone(), "#ffffff");
+            this.simulation.entities.push(new EaterSpitEffect(this.owner, target, direction));
         }
 
         target.initiateDash(direction, {
@@ -243,29 +239,14 @@ export class EaterAbility extends Ability {
         this.simulation.playSound("explosion", 0.75);
 
         if (normal) {
-            const perpDir = new Vector2(-normal.y, normal.x);
-            const semispherePts = [];
-            for (let i = 0; i <= 12; i++) {
-                const t = i / 12;
-                const angle = -Math.PI / 2 + Math.PI * t;
-                const dir = new Vector2(
-                    normal.x * Math.cos(angle) - perpDir.x * Math.sin(angle),
-                    normal.y * Math.cos(angle) - perpDir.y * Math.sin(angle)
-                );
-                const r = (WALL_RUPTURE_RADIUS * 0.28 * t) / 0.28;
-                semispherePts.push(new Vector2(contactPoint.x + dir.x * r, contactPoint.y + dir.y * r));
-            }
-            for (const pt of semispherePts) {
-                this.simulation.spawnParticleBurst(pt, this.owner.color, {
-                    count: 2,
-                    speed: 60,
-                    radiusMin: 2,
-                    radiusMax: 4,
-                    life: 0.4,
-                    upBias: 0,
-                    gravity: 0
-                });
-            }
+            this.simulation.entities.push(
+                new EaterWallRuptureEffect(
+                    new Vector2(contactPoint.x, contactPoint.y),
+                    new Vector2(normal.x, normal.y),
+                    this.owner.color,
+                    WALL_RUPTURE_RADIUS
+                )
+            );
         }
 
         this.simulation.addLog(`${this.owner.name} triggers wall rupture!`);

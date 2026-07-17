@@ -520,6 +520,14 @@ npm run format:check
 - **파일 간 import는 명시적으로**: `index.js` 배럴 파일을 사용해 외부 import 경로가 바뀌지 않게 합니다.
 - **분리 후 `npm test` 통과 확인**: 회귀 테스트로 동작이 유지됨을 검증합니다.
 
+## 전투 효과 렌더링
+
+- 다른 전투원이나 접점을 중심으로 보여야 하는 핵심 효과는 Ability의 `draw()`에 넣지 않고, 대상·수명주기를 소유한 `CombatEntity`로 분리합니다.
+- 대상 표식·접촉 섬광·궤적처럼 전투원에 가려지면 의미가 사라지는 효과는 `RENDER_LAYERS.FOREGROUND`를 명시합니다. 전투원 자체 장식만 `BattleBall`의 fighter pass에 둡니다.
+- 모바일에서 선과 전투 문구가 1 CSS px 미만으로 축소되지 않도록 `effectVisibility.js`의 `hairline`·`standard`·`emphasis`·`combatText` 의미 토큰을 사용합니다. 캐릭터마다 별도의 화면 고정 px 값을 만들지 않습니다.
+- 가시성 계산은 현재 Canvas transform과 canvas intrinsic 크기 대비 CSS 표시 크기를 함께 반영합니다. 월드 크기와 게임 판정 반경은 이 보정으로 바꾸지 않습니다.
+- 핵심 효과 회귀는 엔티티의 `draw()` 직접 호출만으로 끝내지 않고, 실제 `ArenaRenderer.render()`의 레이어 패스를 통과하는지 검증합니다.
+
 ## UI 아키텍처
 
 UI는 **Alpine.js**를 통해 컴포넌트 기반으로 관리됩니다.

@@ -1,4 +1,5 @@
 import { Vector2 } from "../core.js";
+import { SpinCutEffect, SpinVortexEffect } from "../effects/spinEffects.js";
 import { Ability } from "./ability.js";
 
 const BASE_CHARGE_TIME = 4.5;
@@ -52,8 +53,7 @@ export class SpinAbility extends Ability {
             dischargeFlash: 0,
             cutFlash: 0,
             cut: null,
-            fluidParticleTimer: 0,
-            fluidParticles: []
+            vortexEffect: null
         };
     }
 
@@ -126,7 +126,7 @@ export class SpinAbility extends Ability {
         const contactPoint =
             context.contactPoint?.clone?.() ?? Vector2.add(this.owner.position, target.position).scale(0.5);
         const direction = context.a === this.owner ? context.normal.clone() : context.normal.clone().scale(-1);
-        this.state.cut = {
+        const cut = {
             target,
             elapsed: 0,
             tickTimer: 0,
@@ -138,8 +138,12 @@ export class SpinAbility extends Ability {
             contactPoint,
             counterText: this.simulation.spawnActionText(contactPoint.clone(), "0 ×0", "#ffe36d")
         };
+        cut.visualEffect = new SpinCutEffect(this, cut);
+        this.state.cut = cut;
+        this.simulation.entities.push(cut.visualEffect);
         if (this.state.cut.counterText) {
             this.state.cut.counterText.applyImpulse(this.state.cut.counterText.velocity.clone().scale(-1));
+            this.state.cut.counterText.visibilityToken = "combatText";
         }
         if (this.getLevelUpgrade().piercingVortex) {
             this.simulation.spawnActionText(contactPoint.clone(), "관통 절단!", "#fff2a8");
@@ -202,20 +206,13 @@ export class SpinAbility extends Ability {
         cut.tickCount += 1;
         cut.totalDamage += result.actualDamage;
         this.state.cutFlash = 0.08;
+        cut.visualEffect?.registerTick(cut.tickCount);
         if (cut.counterText) {
             cut.counterText.displayText = `${Math.round(cut.totalDamage)} ×${cut.tickCount}`;
             cut.counterText.color = this.getLevelUpgrade().piercingVortex ? "#fff4ae" : "#ffb347";
             cut.counterText.fontSize = cut.tickCount === CUT_TICKS ? 19 : 15;
             cut.counterText.life = Math.max(cut.counterText.life, 0.35);
         }
-        this.simulation.spawnParticleBurst(cut.contactPoint.clone(), "#ffd86b", {
-            count: cut.tickCount === CUT_TICKS ? 12 : 3,
-            speed: 100 + cut.tickCount * 8,
-            radiusMin: 1,
-            radiusMax: 3,
-            upBias: 5,
-            life: 0.35
-        });
     }
 
     _finishCut(cut) {
@@ -229,6 +226,7 @@ export class SpinAbility extends Ability {
             this.getLevelUpgrade().piercingVortex ? "#fff4ae" : "#ffd07b"
         );
         this.simulation.playSound("hit", 1.05);
+        cut.visualEffect?.finish();
         this.state.cut = null;
     }
 
@@ -316,7 +314,7 @@ export class SpinAbility extends Ability {
     _applyVortex(delta) {
         const active = this.getLevelUpgrade().piercingVortex && this.isFullyCharged();
         if (!active) {
-            this.state.fluidParticles = [];
+            this.state.vortexEffect = null;
             return;
         }
 
@@ -324,7 +322,10 @@ export class SpinAbility extends Ability {
             const acceleration = this.getVortexAccelerationAt(target.position);
             target.applyImpulse(acceleration.scale(delta));
         }
-        this._updateFluidParticles(delta);
+        if (!this.state.vortexEffect || this.state.vortexEffect.isExpired) {
+            this.state.vortexEffect = new SpinVortexEffect(this);
+            this.simulation.entities.push(this.state.vortexEffect);
+        }
     }
 
     getVortexAccelerationAt(position) {
@@ -339,53 +340,8 @@ export class SpinAbility extends Ability {
         return direction.scale(VORTEX_ACCELERATION * smoothstep(ratio));
     }
 
-    _updateFluidParticles(delta) {
-        this.state.fluidParticleTimer -= delta;
-        if (this.state.fluidParticleTimer <= 0) {
-            this.state.fluidParticleTimer = 0.025;
-            for (const _ of Array.from({ length: 2 })) {
-                const angle = Math.random() * Math.PI * 2;
-                const radius = Math.sqrt(Math.random()) * VORTEX_RADIUS;
-                this.state.fluidParticles.push({
-                    position: Vector2.add(this.owner.position, Vector2.fromAngle(angle, radius)),
-                    previous: null,
-                    life: 0.35 + Math.random() * 0.35
-                });
-            }
-        }
-
-        for (const particle of this.state.fluidParticles) {
-            particle.previous = particle.position.clone();
-            const flow = this.getVortexAccelerationAt(particle.position).scale(0.55);
-            particle.position.add(flow.scale(delta));
-            particle.life -= delta;
-            if (Vector2.subtract(particle.position, this.owner.position).length() < this.owner.radius * 0.75) {
-                particle.life = 0;
-            }
-        }
-        this.state.fluidParticles = this.state.fluidParticles.filter((particle) => particle.life > 0);
-    }
-
     draw(ctx) {
-        this._drawFluidParticles(ctx);
         this._drawChargeRing(ctx);
-        this._drawCut(ctx);
-    }
-
-    _drawFluidParticles(ctx) {
-        if (this.state.fluidParticles.length === 0) return;
-        ctx.save();
-        ctx.strokeStyle = "#ffe36d";
-        ctx.lineWidth = 2;
-        for (const particle of this.state.fluidParticles) {
-            if (!particle.previous) continue;
-            ctx.globalAlpha = Math.min(0.8, particle.life * 1.8);
-            ctx.beginPath();
-            ctx.moveTo(particle.previous.x, particle.previous.y);
-            ctx.lineTo(particle.position.x, particle.position.y);
-            ctx.stroke();
-        }
-        ctx.restore();
     }
 
     _drawChargeRing(ctx) {
@@ -422,27 +378,6 @@ export class SpinAbility extends Ability {
             ctx.arc(position.x, position.y, radius + 24 + progress * 10, 0, Math.PI * 2);
             ctx.stroke();
         }
-        ctx.restore();
-    }
-
-    _drawCut(ctx) {
-        const cut = this.state.cut;
-        if (!cut) return;
-        const progress = Math.min(1, cut.elapsed / CUT_DURATION);
-        const intensity = 0.5 + progress * 0.5 + (this.state.cutFlash > 0 ? 0.35 : 0);
-        ctx.save();
-        ctx.strokeStyle = this.getLevelUpgrade().piercingVortex ? "#fff4ae" : "#ffb347";
-        ctx.lineWidth = 3 + intensity * 4;
-        ctx.globalAlpha = Math.min(1, intensity);
-        ctx.beginPath();
-        ctx.arc(
-            cut.contactPoint.x,
-            cut.contactPoint.y,
-            16 + progress * 12,
-            this.owner.angle,
-            this.owner.angle + Math.PI * 1.35
-        );
-        ctx.stroke();
         ctx.restore();
     }
 

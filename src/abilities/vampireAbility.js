@@ -1,5 +1,6 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
 import { BatProjectile } from "../entities/index.js";
+import { getVisibleLineWidth } from "../effects/effectVisibility.js";
 import { applyRotationalContactDamage } from "../physics/contactDamage.js";
 import { Ability } from "./ability.js";
 
@@ -38,7 +39,7 @@ class BloodTetherEffect extends CombatEntity {
         ctx.save();
         ctx.globalAlpha = alpha;
         ctx.strokeStyle = "#d81f4d";
-        ctx.lineWidth = 2.5 - progress;
+        ctx.lineWidth = getVisibleLineWidth(ctx, "standard", 2.5 - progress);
         ctx.beginPath();
         ctx.moveTo(this.position.x, this.position.y);
         ctx.lineTo(this.owner.position.x, this.owner.position.y);
@@ -80,7 +81,7 @@ class BloodMarkEffect extends CombatEntity {
         ctx.save();
         ctx.translate(this.target.position.x, this.target.position.y);
         ctx.strokeStyle = `rgba(210, 24, 67, ${0.45 + (1 - this.lifeProgress) * 0.4})`;
-        ctx.lineWidth = 2.4;
+        ctx.lineWidth = getVisibleLineWidth(ctx, "standard", 2.4);
         ctx.beginPath();
         ctx.arc(0, 0, radius, -1.05, 1.05);
         ctx.stroke();
@@ -115,7 +116,7 @@ class BloodRuptureEffect extends CombatEntity {
         ctx.translate(this.position.x, this.position.y);
         ctx.globalAlpha = alpha;
         ctx.strokeStyle = "#ff315f";
-        ctx.lineWidth = 3;
+        ctx.lineWidth = getVisibleLineWidth(ctx, "emphasis", 3);
         ctx.beginPath();
         ctx.arc(0, 0, radius, 0, Math.PI * 2);
         ctx.stroke();

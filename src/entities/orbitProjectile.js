@@ -1,4 +1,5 @@
-import { Projectile, Vector2 } from "../core.js";
+import { Projectile, RENDER_LAYERS, Vector2 } from "../core.js";
+import { getVisibleLineWidth } from "../effects/effectVisibility.js";
 
 const CONVERGENCE_DURATION = 0.15;
 const EXPLOSION_RADIUS = 70;
@@ -16,6 +17,8 @@ function smoothstep(value) {
 }
 
 export class OrbitProjectile extends Projectile {
+    static renderLayer = RENDER_LAYERS.FOREGROUND;
+
     constructor(owner, position, direction, size, options = {}) {
         super(owner, position, new Vector2(0, 0), 11);
         this.dir = direction.clone().normalize();
@@ -148,7 +151,7 @@ export class OrbitProjectile extends Projectile {
         ctx.save();
         if (this.trail.length > 1) {
             ctx.strokeStyle = this.owner.color;
-            ctx.lineWidth = 3;
+            ctx.lineWidth = getVisibleLineWidth(ctx, "standard", 3);
             ctx.globalAlpha = 0.65;
             ctx.beginPath();
             this.trail.forEach((point, index) => {
@@ -162,7 +165,7 @@ export class OrbitProjectile extends Projectile {
         ctx.rotate(this.angle);
         ctx.fillStyle = "#ffea00";
         ctx.strokeStyle = "#202020";
-        ctx.lineWidth = 3;
+        ctx.lineWidth = getVisibleLineWidth(ctx, "standard", 3);
         ctx.fillRect(-s / 2, -s / 2, s, s);
         ctx.strokeRect(-s / 2, -s / 2, s, s);
         ctx.restore();

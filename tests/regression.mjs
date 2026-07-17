@@ -19,7 +19,7 @@ import {
     getRemainingStatPoints,
     getSpentStatPoints
 } from "../src/statAllocation.js";
-import { calculateInterceptPoint, FIGHTER_IDS, Vector2, randomSpin } from "../src/core.js";
+import { calculateInterceptPoint, FIGHTER_IDS, RENDER_LAYERS, Vector2, randomSpin } from "../src/core.js";
 import { findActionById } from "../src/clickActions.js";
 import { calcMatchXp, getLevelFromXp, getXpForNextLevel, calcTournamentXp } from "../src/experience/experienceState.js";
 import { getLevelRequirement, XP_SCALE } from "../src/experience/experienceConfig.js";
@@ -185,6 +185,7 @@ import {
     LASER_CHARGE_TURN_RATE
 } from "../src/abilities/huntingMobAbility.js";
 import { createElectricArcPath } from "../src/effects/electricArc.js";
+import { getVisibleCombatTextSize, getVisibleLineWidth } from "../src/effects/effectVisibility.js";
 import {
     CONSUMABLE_IDS,
     HUNTING_CONSUMABLE_USE_LIMIT,
@@ -347,6 +348,7 @@ function makeRecordingCanvasContext() {
     const methods = new Set([
         "save",
         "restore",
+        "clearRect",
         "translate",
         "scale",
         "rotate",
@@ -363,10 +365,15 @@ function makeRecordingCanvasContext() {
         "lineTo",
         "quadraticCurveTo",
         "closePath",
-        "fillText"
+        "fillText",
+        "strokeText"
     ]);
     return new Proxy(
-        { calls, globalAlpha: 1 },
+        {
+            calls,
+            globalAlpha: 1,
+            getTransform: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 })
+        },
         {
             get(target, prop) {
                 if (prop in target) return target[prop];
@@ -385,6 +392,67 @@ function makeRecordingCanvasContext() {
         }
     );
 }
+
+function assertForegroundEffectRenders(effect, label) {
+    assert.ok(effect, `${label} should create a dedicated effect entity`);
+    assert.equal(effect.renderLayer, RENDER_LAYERS.FOREGROUND, `${label} should render in the foreground pass`);
+    const ctx = makeRecordingCanvasContext();
+    const canvas = {
+        width: 960,
+        height: 960,
+        clientWidth: 700,
+        clientHeight: 700,
+        getBoundingClientRect: () => ({ width: 700, height: 700 }),
+        getContext: () => ctx
+    };
+    ctx.canvas = canvas;
+    let drawCount = 0;
+    const originalDraw = effect.draw.bind(effect);
+    effect.draw = (...args) => {
+        drawCount += 1;
+        return originalDraw(...args);
+    };
+    const renderer = new ArenaRenderer(canvas);
+    renderer.render({
+        width: 960,
+        height: 960,
+        screenShake: null,
+        arenaTheme: "default",
+        terrain: [],
+        entities: [effect]
+    });
+    assert.equal(drawCount, 1, `${label} should pass through ArenaRenderer exactly once`);
+    assert.ok(ctx.calls.length > 0, `${label} should issue canvas drawing primitives`);
+}
+
+function testEffectVisibilityTokens() {
+    const createContext = ({ transformScale, cssSize }) => ({
+        getTransform: () => ({ a: transformScale, b: 0, c: 0, d: transformScale }),
+        canvas: {
+            width: 960,
+            height: 960,
+            getBoundingClientRect: () => ({ width: cssSize, height: cssSize })
+        }
+    });
+    for (const viewport of [
+        { name: "PC", transformScale: 0.729, cssSize: 700 },
+        { name: "mobile", transformScale: 0.28125, cssSize: 270 }
+    ]) {
+        const context = createContext(viewport);
+        const worldToCss = viewport.transformScale * (viewport.cssSize / 960);
+        assert.ok(
+            getVisibleLineWidth(context, "standard", 2) * worldToCss >= 2 - 1e-9,
+            `${viewport.name} standard effect line should remain at least 2 CSS px`
+        );
+        assert.ok(
+            getVisibleCombatTextSize(context, 13) * worldToCss >= 13 - 1e-9,
+            `${viewport.name} combat text should remain at least 13 CSS px`
+        );
+    }
+    console.log("[effect-visibility-tokens] ok");
+}
+
+testEffectVisibilityTokens();
 
 function makeCanvasContext() {
     const gradient = { addColorStop() {} };
@@ -5167,9 +5235,10 @@ function testTricksterLevelRewardContracts(app) {
     const markRun = createRun(2);
     triggerEnemySeed(markRun);
     assert.equal(markRun.owner.ability.state.marks.get(markRun.target), 1.8, "Lv6 mark should last 1.8 seconds");
-    const markDrawContext = makeRecordingCanvasContext();
-    markRun.owner.ability.draw(markDrawContext);
-    assert.ok(markDrawContext.calls.length > 0, "Lv6 seed mark should draw on a recording canvas context");
+    const markEffect = markRun.simulation.entities.find(
+        (entity) => entity.constructor?.name === "TricksterSeedMarkEffect"
+    );
+    assertForegroundEffectRenders(markEffect, "Lv6 seed mark");
     const hpBeforeBurst = markRun.target.hp;
     markRun.owner.ability.onDashHit(
         markRun.target,
@@ -5195,6 +5264,11 @@ function testTricksterLevelRewardContracts(app) {
     assert.ok(followup, "Lv9 marked dash should scatter one follow-up seed");
     assert.equal(followup.life, 14, "Lv9 follow-up seed should keep the base fourteen-second life");
     assert.equal(followup.collisionGraceRemaining, 0.5, "Lv9 follow-up seed should start with 0.50s collision grace");
+    assert.equal(
+        followup.renderLayer,
+        RENDER_LAYERS.FOREGROUND,
+        "Lv9 follow-up seed should stay visible above fighters"
+    );
     const sproutDrawContext = makeRecordingCanvasContext();
     followup.draw(sproutDrawContext);
     assert.ok(sproutDrawContext.calls.length > 0, "Lv9 grace-period sprout should draw on a recording canvas context");
@@ -5290,6 +5364,11 @@ function testOrbitLevelRewardContracts(app) {
     first.update(0, syncRun.simulation);
     assert.equal(hpBeforeFirst - syncRun.target.hp, 80, "Lv3 first volley hit should deal total-attack x0.80");
     assert.ok(converging.convergence, "Lv3 should convert a living projectile from the same volley");
+    assert.equal(
+        converging.renderLayer,
+        RENDER_LAYERS.FOREGROUND,
+        "Lv3 convergence projectile should render above fighters"
+    );
     assert.equal(otherVolley.convergence, null, "Lv3 must not convert another volley");
     const convergenceDrawContext = makeRecordingCanvasContext();
     converging.draw(convergenceDrawContext);
@@ -5348,6 +5427,8 @@ function testOrbitLevelRewardContracts(app) {
         "Lv9 catch should restore the original slot once"
     );
     assert.equal(caught.isExpired, true, "Caught projectile should disappear immediately");
+    const catchEffect = catchRun.simulation.entities.find((entity) => entity.constructor?.name === "OrbitCatchEffect");
+    assertForegroundEffectRenders(catchEffect, "Lv9 orbit catch");
 
     const priorityRun = createRun(3);
     priorityRun.owner.ability.consumeShard(1);
@@ -5410,9 +5491,8 @@ function testSpinLevelRewardContracts(app) {
             "A full charged tier Spin should replace the direct collision with a cut"
         );
         assert.equal(run.target.hp, hpBefore, "Cut start must suppress the ordinary immediate collision damage");
-        const cutDrawContext = makeRecordingCanvasContext();
-        run.owner.ability.draw(cutDrawContext);
-        assert.ok(cutDrawContext.calls.length > 0, "Spin cut feedback should draw on a recording context");
+        const cutEffect = run.simulation.entities.find((entity) => entity.constructor?.name === "SpinCutEffect");
+        assertForegroundEffectRenders(cutEffect, "Spin cut feedback");
         setVelocity(run.owner, new Vector2());
         setVelocity(run.target, new Vector2());
         for (const _ of Array.from({ length: 12 })) run.owner.ability.update(0.05);
@@ -5481,6 +5561,10 @@ function testSpinLevelRewardContracts(app) {
     const targetVelocityBefore = vortexRun.target.velocity.clone();
     const nearbyVelocityBefore = vortexRun.nearby.velocity.clone();
     vortexRun.owner.ability.update(0.1);
+    const vortexEffect = vortexRun.simulation.entities.find(
+        (entity) => entity.constructor?.name === "SpinVortexEffect"
+    );
+    assertForegroundEffectRenders(vortexEffect, "Lv9 spin vortex");
     assert.ok(
         Vector2.subtract(vortexRun.target.velocity, targetVelocityBefore).length() > 0,
         "Lv9 vortex should apply physical impulse to one hostile target"
@@ -5555,12 +5639,14 @@ function testBatBallWallSlamContracts(app) {
     baseRun.target.integrateRotation(1 / 60);
     const baseAngularVelocity = baseRun.target.angularVelocity;
     const rotatingRun = createRun(1);
+    rotatingRun.owner.ability.state.sweepDirection = -1;
     rotatingRun.owner.ability.performSlash(rotatingRun.target);
     rotatingRun.target.integrateRotation(1 / 60);
     assert.ok(
         Math.abs(rotatingRun.target.angularVelocity) > Math.abs(baseAngularVelocity),
         "Lv3 should add a real angular impulse in the swing direction"
     );
+    assert.ok(rotatingRun.target.angularVelocity < 0, "Lv3 rotating hit should preserve a counter-clockwise bat sweep");
 
     const source = { stats: { baseDamage: 100 } };
     const impactBody = {
@@ -5915,14 +6001,8 @@ function testVampireLevelRewardContracts(app) {
     );
     const tetherEffect = pullRun.simulation.entities.find((entity) => entity.constructor?.name === "BloodTetherEffect");
     const markEffect = pullRun.simulation.entities.find((entity) => entity.constructor?.name === "BloodMarkEffect");
-    assert.doesNotThrow(
-        () => tetherEffect.draw(makeRecordingCanvasContext()),
-        "The short blood tether should render without errors"
-    );
-    assert.doesNotThrow(
-        () => markEffect.draw(makeRecordingCanvasContext()),
-        "The blood vulnerability mark should render without errors"
-    );
+    assertForegroundEffectRenders(tetherEffect, "Vampire blood tether");
+    assertForegroundEffectRenders(markEffect, "Vampire blood mark");
     setVelocity(pullRun.target, new Vector2());
     pullRun.target.position = new Vector2(
         pullRun.owner.position.x + pullRun.owner.radius + pullRun.target.radius - 1,
@@ -5935,11 +6015,7 @@ function testVampireLevelRewardContracts(app) {
     const ruptureEffect = pullRun.simulation.entities.find(
         (entity) => entity.constructor?.name === "BloodRuptureEffect"
     );
-    assert.ok(ruptureEffect, "A marked body collision should emit the blood rupture effect");
-    assert.doesNotThrow(
-        () => ruptureEffect.draw(makeRecordingCanvasContext()),
-        "The blood rupture effect should render without errors"
-    );
+    assertForegroundEffectRenders(ruptureEffect, "Vampire blood rupture");
     assert.equal(
         pullRun.owner.ability.getBloodMarkRemaining(pullRun.target),
         0,
@@ -19846,6 +19922,7 @@ function testArcherAbilityTierBehavior() {
     const predictive = createAimSimulation(1);
     predictive.opponent.velocity = new Vector2(0, -180);
     predictive.ability.update(0.016, predictive.opponent);
+    assertForegroundEffectRenders(predictive.ability.state.predictionEffect, "Archer predictive marker");
     const initialPredictiveAim = predictive.ability.state.aimPoint.clone();
     predictive.opponent.position = new Vector2(600, 650);
     predictive.opponent.velocity = new Vector2(-40, -220);
@@ -19923,6 +20000,7 @@ function testRageAbilityThresholds() {
     opponent._igniteState = undefined;
     rage.ability.onCollision(opponent);
     assert.ok(opponent._igniteState !== undefined, "Lv3 35%: ignite applied");
+    assertForegroundEffectRenders(opponent._igniteState, "Rage burning target");
     assert.equal(rage.ability.getChargeProgress(), 0, "Lv3 35%: charge reset");
 
     setCharge(rage.ability, 69);
@@ -20062,6 +20140,8 @@ function testRageExplosionUsesVector2Effects() {
         });
     }, "Rage Lv6 explosion should convert plain collision positions for effect APIs");
     assert.ok(opponent.hp < hpBefore, "Rage explosion should damage the target from its collision center");
+    const ring = sim.entities.find((entity) => entity.constructor?.name === "RageFlameRing");
+    assertForegroundEffectRenders(ring, "Rage explosion ring");
     console.log("[rage-explosion-vector2-effects] ok");
 }
 
@@ -20089,6 +20169,8 @@ function testEaterAbilityDigestion() {
     const hpBeforeSpit = target.hp;
     eater.ability.releaseSwallowed();
     assert.ok(target.hp < hpBeforeSpit, "Eater Lv6 spit should deal damage");
+    const spitEffect = sim.entities.find((entity) => entity.constructor?.name === "EaterSpitEffect");
+    assertForegroundEffectRenders(spitEffect, "Eater spit trajectory");
     console.log("[eater-ability-digestion] ok");
 }
 
@@ -20114,6 +20196,8 @@ function testEaterOrbitDigestionLifecycleKeepsBattleProgressing() {
 
     eater.ability.onCollision(orbit);
     assert.equal(orbit.state.swallowed?.owner, eater, "Eater should hold Orbit during digestion");
+    const digestEffect = sim.entities.find((entity) => entity.constructor?.name === "EaterDigestEffect");
+    assertForegroundEffectRenders(digestEffect, "Eater digestion proxy");
 
     for (let frame = 0; frame < 47; frame += 1) {
         sim.update(0.016);
@@ -20137,6 +20221,8 @@ function testEaterOrbitDigestionLifecycleKeepsBattleProgressing() {
         true,
         "Lv9 wall rupture should resolve after Orbit hits a wall"
     );
+    const ruptureEffect = sim.entities.find((entity) => entity.constructor?.name === "EaterWallRuptureEffect");
+    assertForegroundEffectRenders(ruptureEffect, "Eater wall rupture");
     console.log("[eater-orbit-digestion-lifecycle] ok");
 }
 

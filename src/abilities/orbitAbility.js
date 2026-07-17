@@ -1,4 +1,5 @@
 import { Vector2 } from "../core.js";
+import { OrbitCatchEffect } from "../effects/orbitHitEffect.js";
 import { Ability } from "./ability.js";
 
 const VOLLEY_COOLDOWN = 3.5;
@@ -238,6 +239,7 @@ export class OrbitAbility extends Ability {
 
         const fixedPoint = contactPoint.clone();
         this.state.synchronizedVolleys.set(projectile.volleyId, fixedPoint);
+        const convergingProjectiles = [];
         for (const entity of this.simulation.entities) {
             if (
                 entity === projectile ||
@@ -249,9 +251,11 @@ export class OrbitAbility extends Ability {
             ) {
                 continue;
             }
-            entity.beginSynchronizedConvergence(fixedPoint);
+            if (entity.beginSynchronizedConvergence(fixedPoint)) convergingProjectiles.push(entity);
         }
-        this.simulation.spawnOrbitHit(projectile.position.clone(), fixedPoint.clone(), this.owner.color);
+        this.simulation.spawnOrbitHit(projectile.position.clone(), fixedPoint.clone(), this.owner.color, {
+            trackedProjectiles: convergingProjectiles
+        });
         this.simulation.addLog(`${this.owner.name}'s orbit volley synchronizes on ${target.name}.`);
     }
 
@@ -262,7 +266,7 @@ export class OrbitAbility extends Ability {
         shard.refilling = false;
         shard.refillProgress = 1;
         this.state.rechargeGapTimer = this.rechargeGap;
-        this.simulation.spawnPulse(position.clone(), this.owner.color);
+        this.simulation.entities.push(new OrbitCatchEffect(this.owner, slotIndex, position, this.owner.color));
         this.simulation.playSound("charge", 1);
         return true;
     }
