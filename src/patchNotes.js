@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.29.6",
+        date: "2026-07-17",
+        title: "v0.29.6 Dash 이동 레이저 정렬",
+        changes: [
+            {
+                type: "fix",
+                text: "Dash Lv.3 레이저가 발사 각도는 유지한 채 발사자와 함께 이동하도록 정렬했습니다."
+            }
+        ]
+    },
+    {
         version: "0.29.5",
         date: "2026-07-17",
         title: "v0.29.5 Grenade 점착 유도 수류탄",

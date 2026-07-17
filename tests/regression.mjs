@@ -5475,6 +5475,68 @@ function testFiveBallLevelRewardContracts(app) {
     );
     dissipateCaster.update(0.08, phaseRun.simulation);
     assert.equal(dissipateCaster.isExpired, true, "Dash caster dissipate visual should clear within 0.12~0.20 seconds");
+    const movingOriginRun = createRun(FIGHTER_IDS.DASH, { extraEnemy: true });
+    movingOriginRun.owner.position = new Vector2(100, 300);
+    movingOriginRun.target.position = new Vector2(320, 300);
+    movingOriginRun.nearby.position = new Vector2(520, 360);
+    const movingOriginLaser = new LaserBeamEffect(movingOriginRun.owner, movingOriginRun.target, {
+        maxWallBounces: 1
+    });
+    movingOriginLaser.update(0.35, movingOriginRun.simulation);
+    const lockedFireAngle = movingOriginLaser.angle;
+    movingOriginRun.owner.position = new Vector2(140, 360);
+    movingOriginRun.target.position = new Vector2(320, 300);
+    movingOriginLaser.target = movingOriginRun.nearby;
+    const oldWorldHpBefore = movingOriginRun.target.hp;
+    const translatedLineHpBefore = movingOriginRun.nearby.hp;
+    movingOriginLaser.update(0.1, movingOriginRun.simulation);
+    assert.equal(movingOriginLaser.angle, lockedFireAngle, "Dash laser should not re-aim after fire starts");
+    assert.deepEqual(
+        {
+            x: movingOriginLaser.segments[0].start.x,
+            y: movingOriginLaser.segments[0].start.y
+        },
+        {
+            x: movingOriginRun.owner.position.x,
+            y: movingOriginRun.owner.position.y
+        },
+        "Dash laser should keep the first beam segment anchored to the latest owner position during fire"
+    );
+    assert.ok(
+        Math.abs(movingOriginLaser.segments[1].start.x - movingOriginRun.simulation.width) <= 0.02 &&
+            Math.abs(movingOriginLaser.segments[1].start.y - movingOriginRun.owner.position.y) <= 0.02,
+        "Dash reflected segment should also be recomputed from the moved owner origin"
+    );
+    assert.equal(
+        oldWorldHpBefore - movingOriginRun.target.hp,
+        0,
+        "A target left behind on the old world beam should stop taking Dash laser damage after the owner moves"
+    );
+    assert.equal(
+        translatedLineHpBefore - movingOriginRun.nearby.hp,
+        40,
+        "A target on the translated fixed-angle beam should still receive the reflected Dash laser segments at the moved origin"
+    );
+    assertForegroundEffectRenders(movingOriginLaser, "Dash moving-origin laser", (primitives) => {
+        assert.ok(
+            findEffectPrimitive(
+                primitives,
+                "moveTo",
+                ([x, y]) =>
+                    Math.abs(x - movingOriginRun.owner.position.x) <= 0.02 &&
+                    Math.abs(y - movingOriginRun.owner.position.y) <= 0.02
+            ),
+            "Dash moving-origin laser should draw from the moved owner position"
+        );
+        assert.ok(
+            !findEffectPrimitive(
+                primitives,
+                "moveTo",
+                ([x, y]) => Math.abs(x - 100) <= 0.02 && Math.abs(y - 300) <= 0.02
+            ),
+            "Dash moving-origin laser should not leave a fixed beam start at the original fire point"
+        );
+    });
     const activeCasterLaser = new LaserBeamEffect(phaseRun.owner, phaseRun.target);
     const dissipateCountBeforeSourceDefeat = phaseRun.simulation.entities.filter(
         (entity) => entity instanceof LaserCasterDissipateEffect

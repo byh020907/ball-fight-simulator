@@ -166,6 +166,7 @@ export class LaserBeamEffect extends CombatEntity {
     }
 
     _advanceFire(delta, simulation) {
+        this._syncFireSegments(simulation);
         this.damageTickAccumulator += delta;
         while (this.damageTickAccumulator + PHASE_EPSILON >= this.damageTickInterval) {
             this.damageTickAccumulator -= this.damageTickInterval;
@@ -191,6 +192,14 @@ export class LaserBeamEffect extends CombatEntity {
         this.phase = "fire";
         this.chargeRemaining = 0;
         this._syncLife();
+        this._syncFireSegments(simulation);
+        for (const segment of this.segments.slice(1)) {
+            simulation.addSparkBurst(segment.start.clone(), "#fff1ed");
+        }
+        simulation.playSound("laser", 0.9);
+    }
+
+    _syncFireSegments(simulation) {
         this.segments = traceArenaLaserSegments(
             this.source.position,
             this.angle,
@@ -198,10 +207,6 @@ export class LaserBeamEffect extends CombatEntity {
             simulation.height,
             this.maxWallBounces
         );
-        for (const segment of this.segments.slice(1)) {
-            simulation.addSparkBurst(segment.start.clone(), "#fff1ed");
-        }
-        simulation.playSound("laser", 0.9);
     }
 
     _finish(simulation) {
