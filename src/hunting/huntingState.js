@@ -233,6 +233,31 @@ export function applyHuntingEventRecovery(run, { amount = 0 } = {}) {
     };
 }
 
+export function applyHuntingFloorRecovery(run) {
+    if (!run || run.status !== "active") return run;
+    const maxHp = Number.isFinite(run.carriedMaxHp) && run.carriedMaxHp > 0 ? run.carriedMaxHp : null;
+    if (maxHp === null) return run;
+
+    const currentHp = Math.min(maxHp, Math.max(0, run.carriedHp ?? maxHp));
+    const recoveredAmount = (maxHp - currentHp) * 0.1;
+    if (recoveredAmount <= 0) return run;
+
+    const recoveredHp = Math.min(maxHp, currentHp + recoveredAmount);
+    return {
+        ...run,
+        carriedHp: recoveredHp,
+        history: [
+            ...run.history,
+            {
+                type: "floor_recovery",
+                floor: run.floor,
+                amount: recoveredAmount,
+                hpRemain: recoveredHp
+            }
+        ]
+    };
+}
+
 export function applyHuntingCursedAltar(run, { trade = null } = {}) {
     if (!run || run.status !== "active" || !trade) return run;
     const gainModifier = sanitizeHuntingStatModifier({

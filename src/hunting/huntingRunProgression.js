@@ -1,6 +1,6 @@
 import { HUNTING_FLOOR_OUTCOME_TYPES, HUNTING_MINIBOSS, HUNTING_STAGE_IDS } from "./huntingConfig.js";
 import { getNextHuntingStageId, rollHuntingFloorOutcome } from "./huntingEncounters.js";
-import { getUnlockedHuntingStageIds, retreatHuntingRun } from "./huntingState.js";
+import { applyHuntingFloorRecovery, getUnlockedHuntingStageIds, retreatHuntingRun } from "./huntingState.js";
 
 function normalizeMinibossChance(value) {
     return Number(Math.max(HUNTING_MINIBOSS.INITIAL_CHANCE, Math.min(HUNTING_MINIBOSS.MAX_CHANCE, value)).toFixed(3));
@@ -48,9 +48,13 @@ export function advanceHuntingRun(run, { rng = Math.random } = {}) {
     }
 
     const nextFloor = Math.min(run.maxFloor, run.floor + 1);
-    const combatReliefFloors = Math.max(0, run.combatReliefFloors ?? 0);
-    const portalDeclineFloors = Math.max(0, run.portalDeclineFloors ?? 0);
-    const hpRatio = run.carriedMaxHp > 0 ? (run.carriedHp ?? run.carriedMaxHp) / run.carriedMaxHp : 1.0;
+    const advancedRun = applyHuntingFloorRecovery({ ...run, floor: nextFloor });
+    const combatReliefFloors = Math.max(0, advancedRun.combatReliefFloors ?? 0);
+    const portalDeclineFloors = Math.max(0, advancedRun.portalDeclineFloors ?? 0);
+    const hpRatio =
+        advancedRun.carriedMaxHp > 0
+            ? (advancedRun.carriedHp ?? advancedRun.carriedMaxHp) / advancedRun.carriedMaxHp
+            : 1.0;
     const rolledEncounter = rollHuntingFloorOutcome(nextFloor, rng, combatReliefFloors, {
         hpRatio,
         portalDeclineFloors
@@ -58,13 +62,12 @@ export function advanceHuntingRun(run, { rng = Math.random } = {}) {
     const { encounter, nextChance } = rollMinibossEncounter(rolledEncounter, getMinibossChance(run), rng);
 
     return {
-        ...run,
-        floor: nextFloor,
+        ...advancedRun,
         combatReliefFloors: Math.max(0, combatReliefFloors - 1),
         minibossChance: nextChance,
         portalDeclineFloors: Math.max(0, portalDeclineFloors - 1),
         lastEvent: encounter.type === "event" ? encounter.event : null,
         lastEncounter: encounter,
-        history: [...run.history, { type: "advance", floor: nextFloor, encounter }]
+        history: [...advancedRun.history, { type: "advance", floor: nextFloor, encounter }]
     };
 }

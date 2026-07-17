@@ -671,7 +671,19 @@ export class HuntingManager {
         if (!handlerName || typeof this[handlerName] !== "function") {
             throw new Error(`Unsupported hunting floor outcome: ${encounter?.type ?? "missing"}`);
         }
+        this._showFloorRecoveryFeedback(app);
         return this[handlerName]({ app, event: this._run.lastEvent, floor: this._run.floor });
+    }
+
+    _showFloorRecoveryFeedback(app) {
+        const recovery = this._run.history.at(-2);
+        if (recovery?.type !== "floor_recovery" || recovery.floor !== this._run.floor) return;
+
+        const healed = getHuntingDisplayHp(recovery.amount);
+        const health = getHuntingDisplayHealth(this._run);
+        const message = `${this._run.floor}층 이동 · HP +${healed} 회복 (${health.hp}/${health.maxHp})`;
+        app.addLog(`[사냥터] ${message}`);
+        app.setHuntingOverlayState({ huntingMoveMessage: message });
     }
 
     _handleEmptyFloor({ app, floor }) {

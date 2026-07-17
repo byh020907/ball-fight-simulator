@@ -9065,6 +9065,116 @@ function testHuntingPortalDecline() {
     console.log("[hunting-portal] ok");
 }
 
+function testHuntingMovementRecovery() {
+    const createSequenceRng = (values) => {
+        let index = 0;
+        return () => values[index++] ?? values.at(-1) ?? 0;
+    };
+
+    let lowHpRun = {
+        ...createHuntingRun({ characterId: FIGHTER_IDS.ARCHER, now: 0 }),
+        carriedHp: 1,
+        carriedMaxHp: 100
+    };
+    for (let step = 0; step < 10; step += 1) {
+        lowHpRun = advanceHuntingRun(lowHpRun, { rng: () => 0.9 });
+    }
+    const expectedTenFloorHp = 100 - 99 * Math.pow(0.9, 10);
+    assert.ok(
+        Math.abs(lowHpRun.carriedHp - expectedTenFloorHp) < 1e-6,
+        "Ten floor recoveries should preserve raw fractional HP"
+    );
+    assert.equal(
+        getHuntingDisplayHp(lowHpRun.carriedHp),
+        66,
+        "Hunting HP display should keep its existing ceiling rule"
+    );
+    assert.equal(
+        lowHpRun.history.filter((entry) => entry.type === "floor_recovery").length,
+        10,
+        "Each advanced floor should apply exactly one natural recovery"
+    );
+
+    const fullHpRun = advanceHuntingRun(
+        { ...createHuntingRun({ characterId: FIGHTER_IDS.ARCHER, now: 0 }), carriedHp: 100, carriedMaxHp: 100 },
+        { rng: () => 0.9 }
+    );
+    assert.equal(fullHpRun.carriedHp, 100, "Full HP should remain capped without changing its raw value");
+    assert.equal(
+        fullHpRun.history.some((entry) => entry.type === "floor_recovery"),
+        false,
+        "Full HP should not create a zero-value recovery history entry"
+    );
+
+    const portalRolls = [0.5, 0.15, 0.999999];
+    const recoveredPortalRun = advanceHuntingRun(
+        { ...createHuntingRun({ characterId: FIGHTER_IDS.ARCHER, now: 0 }), carriedHp: 49, carriedMaxHp: 100 },
+        { rng: createSequenceRng(portalRolls) }
+    );
+    const recoveredHpRatio = 54.1 / 100;
+    const expectedRecoveredOutcome = rollHuntingFloorOutcome(2, createSequenceRng(portalRolls), 0, {
+        hpRatio: recoveredHpRatio,
+        portalDeclineFloors: 0
+    });
+    const legacyLowHpOutcome = rollHuntingFloorOutcome(2, createSequenceRng(portalRolls), 0, {
+        hpRatio: 0.49,
+        portalDeclineFloors: 0
+    });
+    assert.equal(
+        recoveredPortalRun.carriedHp,
+        54.1,
+        "Recovery must happen after floor advancement and before encounter rolls"
+    );
+    assert.equal(
+        recoveredPortalRun.lastEncounter.event?.type,
+        expectedRecoveredOutcome.event?.type,
+        "Portal weighting must read the recovered HP ratio"
+    );
+    assert.notEqual(
+        recoveredPortalRun.lastEncounter.event?.type,
+        legacyLowHpOutcome.event?.type,
+        "The controlled portal roll should distinguish recovered HP from the legacy low-HP input"
+    );
+
+    const feedback = { logs: [], overlayStates: [] };
+    const feedbackManager = new HuntingManager({});
+    feedbackManager._run = recoveredPortalRun;
+    feedbackManager._showFloorRecoveryFeedback({
+        addLog(message) {
+            feedback.logs.push(message);
+        },
+        setHuntingOverlayState(state) {
+            feedback.overlayStates.push(state);
+        }
+    });
+    assert.match(
+        feedback.logs[0],
+        /HP \+6 회복 \(55\/100\)/,
+        "Recovery feedback should use the shared display HP boundary"
+    );
+    assert.match(
+        feedback.overlayStates[0].huntingMoveMessage,
+        /HP \+6 회복/,
+        "Recovery feedback should be visible during the floor transition"
+    );
+
+    const fullHpFeedback = { logs: [], overlayStates: [] };
+    const fullHpManager = new HuntingManager({});
+    fullHpManager._run = fullHpRun;
+    fullHpManager._showFloorRecoveryFeedback({
+        addLog(message) {
+            fullHpFeedback.logs.push(message);
+        },
+        setHuntingOverlayState(state) {
+            fullHpFeedback.overlayStates.push(state);
+        }
+    });
+    assert.equal(fullHpFeedback.logs.length, 0, "Full HP must not emit a zero-value recovery log");
+    assert.equal(fullHpFeedback.overlayStates.length, 0, "Full HP must not replace the movement feedback");
+
+    console.log("[hunting-movement-recovery] ok");
+}
+
 function testHuntingStageSelectionAndArenaTheme() {
     // ── stage selection state ──
     const profile = createDefaultPlayerProfile();
@@ -16280,6 +16390,7 @@ await testHuntingAchievementProgress();
 testHunting100FloorStructure();
 testHuntingCombatRelief();
 testHuntingPortalDecline();
+testHuntingMovementRecovery();
 testHuntingStageSelectionAndArenaTheme();
 await testHuntingStageSelectUsesPreviewCharacter();
 await testDebugHuntingStartsRequestedFloor();
