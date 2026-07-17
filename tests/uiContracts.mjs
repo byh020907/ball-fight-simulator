@@ -867,6 +867,18 @@ function testResultOverlayLayoutContract() {
             overlay.includes("overflow-wrap: anywhere;"),
         "Mastery reward content must fit inside the mobile result card"
     );
+    const masteryRewardTitleRule = overlay.match(/\.mastery-reward-title b\s*\{([^}]*)\}/s)?.[1] ?? "";
+    const masteryRewardEffectNameRule = overlay.match(/\.mastery-reward-effect-name\s*\{([^}]*)\}/s)?.[1] ?? "";
+    assert.match(
+        masteryRewardTitleRule,
+        /color:\s*#202020;/,
+        "Mastery reward source names must keep an explicit dark color inside the light reward card"
+    );
+    assert.match(
+        masteryRewardEffectNameRule,
+        /color:\s*#202020;/,
+        "Mastery reward effect names must keep an explicit dark color inside the light reward card"
+    );
     console.log("[result-overlay-layout-contract] ok");
 }
 
