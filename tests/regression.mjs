@@ -389,7 +389,10 @@ function makeRecordingCanvasContext() {
                             fillStyle: target.fillStyle,
                             strokeStyle: target.strokeStyle,
                             lineWidth: target.lineWidth,
-                            globalAlpha: target.globalAlpha
+                            globalAlpha: target.globalAlpha,
+                            font: target.font,
+                            textAlign: target.textAlign,
+                            textBaseline: target.textBaseline
                         });
                     };
                 }
@@ -444,12 +447,16 @@ function assertForegroundEffectRenders(effect, label, assertEffectPrimitives = n
     assert.ok(effectPrimitives.length > 0, `${label} should issue its own canvas drawing primitives`);
     assert.ok(
         effectPrimitives.some((primitive) =>
-            ["arc", "ellipse", "fillRect", "lineTo", "quadraticCurveTo"].includes(primitive.method)
+            ["arc", "ellipse", "fillRect", "lineTo", "quadraticCurveTo", "fillText", "strokeText"].includes(
+                primitive.method
+            )
         ),
         `${label} should draw effect-specific geometry instead of passing on unrelated renderer calls`
     );
     assert.ok(
-        effectPrimitives.some((primitive) => primitive.method === "fill" || primitive.method === "stroke"),
+        effectPrimitives.some((primitive) =>
+            ["fill", "stroke", "fillRect", "strokeRect", "fillText", "strokeText"].includes(primitive.method)
+        ),
         `${label} should paint its geometry through the foreground renderer pass`
     );
     assertEffectPrimitives?.(effectPrimitives);
@@ -489,6 +496,25 @@ function assertEffectUsesColor(primitives, color, label) {
         primitives.some((primitive) => primitive.fillStyle === color || primitive.strokeStyle === color),
         `${label} should retain its identifying ${color} color`
     );
+}
+
+function assertCombatTextSignature(primitives, effect, label) {
+    const fillText = findEffectPrimitive(
+        primitives,
+        "fillText",
+        ([text, x]) => text === effect.displayText && x > 0 && x < 960
+    );
+    const strokeText = findEffectPrimitive(
+        primitives,
+        "strokeText",
+        ([text, x]) => text === effect.displayText && x > 0 && x < 960
+    );
+    assert.ok(fillText && strokeText, `${label} should paint outlined combat text inside the arena boundary`);
+    assert.equal(fillText.fillStyle, effect.color, `${label} should preserve its identifying text color`);
+    assert.equal(strokeText.strokeStyle, "#202020", `${label} should retain its dark combat-text outline`);
+    assert.match(fillText.font, /^700 /, `${label} should use the combat-text font weight`);
+    assert.equal(fillText.textAlign, "center", `${label} should keep centered text alignment`);
+    return fillText;
 }
 
 function testEffectVisibilityTokens() {
@@ -5291,10 +5317,48 @@ function testTricksterLevelRewardContracts(app) {
     triggerEnemySeed(slowRun);
     assert.equal(slowRun.target.state.slow.amount, 0.8, "Lv3 seed contact should slow hostile targets by 20%");
     assert.equal(slowRun.target.state.periodicDamage.length, 1, "Lv3 should attach one reusable periodic effect");
-    const vineDrawContext = makeRecordingCanvasContext();
-    slowRun.target.state.periodicDamage[0].draw(vineDrawContext, slowRun.target);
-    assert.ok(vineDrawContext.calls.length > 0, "Lv3 vine feedback should draw on a recording canvas context");
-    for (const _ of Array.from({ length: 5 })) slowRun.target._tickTimers(0.1);
+    const vineEffect = slowRun.simulation.entities.find(
+        (entity) => entity.constructor?.name === "VineSnareVisualEffect"
+    );
+    const renderVine = (label) => {
+        let vineArc;
+        assertForegroundEffectRenders(vineEffect, label, (primitives) => {
+            vineArc = assertEffectArcAt(
+                primitives,
+                slowRun.target.position,
+                label,
+                (radius) => radius >= slowRun.target.radius + 4 && radius <= slowRun.target.radius + 14
+            );
+            assertEffectUsesColor(primitives, "#55d66b", label);
+            assert.ok(
+                findEffectPrimitive(
+                    primitives,
+                    "ellipse",
+                    ([x, y, radiusX, radiusY]) => x === 0 && y === 0 && radiusX >= 6 && radiusY === 2.5
+                ),
+                `${label} should draw the vine leaves around the snared target`
+            );
+        });
+        return { alpha: vineArc.globalAlpha, startAngle: vineArc.args[3] };
+    };
+    const vineStart = renderVine("Lv3 vine snare start");
+    for (const _ of Array.from({ length: 2 })) slowRun.target._tickTimers(0.1);
+    vineEffect.update(0);
+    const vineMid = renderVine("Lv3 vine snare mid");
+    for (const _ of Array.from({ length: 2 })) slowRun.target._tickTimers(0.1);
+    vineEffect.update(0);
+    const vineEnd = renderVine("Lv3 vine snare end");
+    assert.ok(
+        vineStart.alpha > vineMid.alpha && vineMid.alpha > vineEnd.alpha,
+        "Vine snare should visibly fade across start, mid, and final active frames"
+    );
+    assert.ok(
+        vineStart.startAngle < vineMid.startAngle && vineMid.startAngle < vineEnd.startAngle,
+        "Vine arcs should tighten around the target as the periodic effect advances"
+    );
+    slowRun.target._tickTimers(0.1);
+    vineEffect.update(0);
+    assert.equal(vineEffect.isExpired, true, "Vine visual should expire with the fifth periodic damage tick");
     assert.equal(hpBeforeTicks - slowRun.target.hp, 50, "Lv3 vines should deal five total-attack x0.10 ticks");
     assert.equal(slowRun.target.state.slow, null, "Lv3 slow should finish at 0.50 seconds");
 
@@ -5367,15 +5431,74 @@ function testTricksterLevelRewardContracts(app) {
         RENDER_LAYERS.FOREGROUND,
         "Lv9 follow-up seed should stay visible above fighters"
     );
-    const sproutDrawContext = makeRecordingCanvasContext();
-    followup.draw(sproutDrawContext);
-    assert.ok(sproutDrawContext.calls.length > 0, "Lv9 grace-period sprout should draw on a recording canvas context");
+    const renderFollowupSeed = (label) => {
+        let seedArc;
+        assertForegroundEffectRenders(followup, label, (primitives) => {
+            seedArc = assertEffectArcAt(
+                primitives,
+                followup.position,
+                label,
+                (radius) => radius >= followup.radius * 0.55 && radius <= followup.radius
+            );
+            assertEffectUsesColor(primitives, followup.owner.color, label);
+            assert.ok(
+                primitives.filter((primitive) => primitive.method === "lineTo").length >= 2,
+                `${label} should draw both growing sprout stems during collision grace`
+            );
+        });
+        return { radius: seedArc.args[2], alpha: seedArc.globalAlpha };
+    };
+    const followupStart = renderFollowupSeed("Lv9 follow-up seed start");
     followup.applyImpulse(followup.velocity.clone().scale(-1));
     followup.position = followupRun.target.position.clone();
-    followup.update(0.49, followupRun.simulation);
+    followup.update(0.25, followupRun.simulation);
+    const followupMid = renderFollowupSeed("Lv9 follow-up seed mid");
+    followup.update(0.24, followupRun.simulation);
+    const followupEnd = renderFollowupSeed("Lv9 follow-up seed end");
+    assert.ok(
+        followupStart.radius < followupMid.radius && followupMid.radius < followupEnd.radius,
+        "Follow-up seed should grow from start through the end of collision grace"
+    );
+    assert.ok(
+        followupStart.alpha < followupMid.alpha && followupMid.alpha < followupEnd.alpha,
+        "Follow-up seed should become fully opaque as it activates"
+    );
     assert.equal(followup.isExpired, false, "Follow-up seed must remain intangible before 0.50 seconds");
     followup.update(0.01, followupRun.simulation);
     assert.equal(followup.isExpired, true, "Follow-up seed should activate after the grace period");
+    const activationEffect = followupRun.simulation.entities.find(
+        (entity) => entity.constructor?.name === "SeedActivationEffect"
+    );
+    const renderActivation = (label) => {
+        let activationArc;
+        assertForegroundEffectRenders(activationEffect, label, (primitives) => {
+            activationArc = assertEffectArcAt(
+                primitives,
+                activationEffect.position,
+                label,
+                (radius) => radius >= followup.radius * 0.9 && radius <= followup.radius * 2.05
+            );
+            assertEffectUsesColor(primitives, "#caff7b", label);
+            assert.ok(
+                primitives.filter((primitive) => primitive.method === "moveTo").length >= 8,
+                `${label} should draw the eight activation rays around the seed`
+            );
+        });
+        return { radius: activationArc.args[2], alpha: activationArc.globalAlpha };
+    };
+    const activationStart = renderActivation("Lv9 seed activation start");
+    activationEffect.update(0.12);
+    const activationMid = renderActivation("Lv9 seed activation mid");
+    activationEffect.update(0.11);
+    const activationEnd = renderActivation("Lv9 seed activation end");
+    assert.ok(
+        activationStart.radius < activationMid.radius && activationMid.radius < activationEnd.radius,
+        "Seed activation ring should expand across start, mid, and end frames"
+    );
+    assert.ok(
+        activationStart.alpha > activationMid.alpha && activationMid.alpha > activationEnd.alpha,
+        "Seed activation rays should fade while the activation ring expands"
+    );
 
     const ownerRun = createRun(3);
     const ownerSeed = ownerRun.simulation.spawnSeedOrb(
@@ -5468,9 +5591,44 @@ function testOrbitLevelRewardContracts(app) {
         "Lv3 convergence projectile should render above fighters"
     );
     assert.equal(otherVolley.convergence, null, "Lv3 must not convert another volley");
-    const convergenceDrawContext = makeRecordingCanvasContext();
-    converging.draw(convergenceDrawContext);
-    assert.ok(convergenceDrawContext.calls.length > 0, "Lv3 convergence trail should draw on a recording context");
+    const renderConvergence = (label, expectTrail) => {
+        let projectileSquare;
+        assertForegroundEffectRenders(converging, label, (primitives) => {
+            assert.ok(
+                findEffectPrimitive(
+                    primitives,
+                    "translate",
+                    ([x, y]) => Math.abs(x - converging.position.x) < 1e-6 && Math.abs(y - converging.position.y) < 1e-6
+                ),
+                `${label} should anchor the synchronized shard at its physical position`
+            );
+            projectileSquare = findEffectPrimitive(
+                primitives,
+                "fillRect",
+                ([x, y, width, height], primitive) =>
+                    x === -8 && y === -8 && width === 16 && height === 16 && primitive.fillStyle === "#ffea00"
+            );
+            assert.ok(projectileSquare, `${label} should retain the yellow synchronized shard silhouette`);
+            if (expectTrail) {
+                assertEffectUsesColor(primitives, syncRun.owner.color, label);
+                assert.ok(
+                    findEffectPrimitive(primitives, "lineTo"),
+                    `${label} should draw the accumulated convergence trajectory`
+                );
+            }
+        });
+        return converging.angle;
+    };
+    const convergenceStartAngle = renderConvergence("Lv3 convergence start", false);
+    converging.update(0.04, syncRun.simulation);
+    converging.update(0.04, syncRun.simulation);
+    const convergenceMidAngle = renderConvergence("Lv3 convergence mid", true);
+    converging.update(0.07, syncRun.simulation);
+    const convergenceEndAngle = renderConvergence("Lv3 convergence end", true);
+    assert.ok(
+        convergenceStartAngle < convergenceMidAngle && convergenceMidAngle < convergenceEndAngle,
+        "Synchronized shard angle should converge toward the fixed contact across start, mid, and end frames"
+    );
     assert.deepEqual(
         converging.convergence.fixedPoint,
         syncRun.target.position,
@@ -5504,9 +5662,36 @@ function testOrbitLevelRewardContracts(app) {
     standard.update(0, explosiveRun.simulation);
     assert.equal(targetHpBefore - explosiveRun.target.hp, 115, "Lv6 direct target should take x0.90 and x0.25");
     assert.equal(nearbyHpBefore - explosiveRun.nearby.hp, 25, "Lv6 nearby target should take the 70px x0.25 burst");
-    const explosionDrawContext = makeRecordingCanvasContext();
-    for (const entity of explosiveRun.simulation.entities) entity.draw?.(explosionDrawContext);
-    assert.ok(explosionDrawContext.calls.length > 0, "Lv6 impact burst should draw on a recording context");
+    const explosionEffect = explosiveRun.simulation.entities.find(
+        (entity) => entity.constructor?.name === "OrbitHitEffect" && entity.drawConnection === false
+    );
+    const renderOrbitExplosion = (label) => {
+        let impactArc;
+        assertForegroundEffectRenders(explosionEffect, label, (primitives) => {
+            impactArc = assertEffectArcAt(
+                primitives,
+                explosionEffect.targetPosition,
+                label,
+                (radius) => radius >= 18 && radius <= 70
+            );
+            assertEffectUsesColor(primitives, explosiveRun.owner.color, label);
+            assert.equal(
+                primitives.some((primitive) => primitive.method === "moveTo"),
+                false,
+                `${label} should remain a zero-distance burst without a false connection beam`
+            );
+        });
+        return impactArc.args[2];
+    };
+    const explosionStartRadius = renderOrbitExplosion("Lv6 zero-distance explosion start");
+    explosionEffect.update(0.12);
+    const explosionMidRadius = renderOrbitExplosion("Lv6 zero-distance explosion mid");
+    explosionEffect.update(0.11);
+    const explosionEndRadius = renderOrbitExplosion("Lv6 zero-distance explosion end");
+    assert.ok(
+        explosionStartRadius < explosionMidRadius && explosionMidRadius < explosionEndRadius,
+        "Orbit explosion should expand toward its 70px radius across start, mid, and end frames"
+    );
 
     const catchRun = createRun(3);
     catchRun.owner.ability.consumeShard(0);
@@ -5925,6 +6110,44 @@ function testBatBallWallSlamContracts(app) {
             1,
             "Lv6 should enhance only the first Wall Slam"
         );
+        if (ratio === 1) {
+            const homeRunText = homeRun.simulation.entities.find(
+                (entity) => entity.constructor?.name === "ActionText" && entity.displayText.startsWith("HOME RUN ")
+            );
+            assert.ok(
+                homeRunText.displayText.endsWith("2.00"),
+                "Maximum first-wall distance should announce HOME RUN x2"
+            );
+            homeRunText.position.x = homeRun.simulation.width + 100;
+            const renderHomeRunText = (label) => {
+                let textPrimitive;
+                assertForegroundEffectRenders(homeRunText, label, (primitives) => {
+                    textPrimitive = assertCombatTextSignature(primitives, homeRunText, label);
+                    assert.equal(
+                        homeRunText.visibilityToken,
+                        "combatText",
+                        `${label} should use the shared visibility token`
+                    );
+                });
+                return { y: textPrimitive.args[2], alpha: textPrimitive.globalAlpha };
+            };
+            homeRunText.update(0.05);
+            const homeRunStart = renderHomeRunText("Bat HOME RUN text start");
+            homeRunText.update(0.45);
+            const homeRunMid = renderHomeRunText("Bat HOME RUN text mid");
+            homeRunText.update(0.45);
+            const homeRunEnd = renderHomeRunText("Bat HOME RUN text end");
+            assert.ok(
+                homeRunStart.y > homeRunMid.y && homeRunMid.y > homeRunEnd.y,
+                "HOME RUN combat text should rise across start, mid, and end frames"
+            );
+            assert.ok(
+                homeRunStart.alpha < homeRunMid.alpha && homeRunMid.alpha === homeRunEnd.alpha,
+                "HOME RUN combat text should fade in before holding readable opacity"
+            );
+            homeRunText.update(0.151);
+            assert.equal(homeRunText.isExpired, true, "HOME RUN combat text should expire after its 1.1s lifetime");
+        }
     }
 
     const resetRun = createRun(3);
@@ -5939,9 +6162,35 @@ function testBatBallWallSlamContracts(app) {
         new Vector2(400, 0)
     );
     assert.equal(resetRun.owner.ability.timer, 0, "Lv9 valid Wall Slam should reset Bat cooldown");
-    const resetDrawContext = makeRecordingCanvasContext();
-    resetRun.owner.ability.draw(resetDrawContext);
-    assert.ok(resetDrawContext.calls.length > 0, "Bat RESET flash should draw on a recording context");
+    assert.ok(resetRun.owner.ability.state.resetFlash > 0, "Lv9 reset should activate the bat flash state");
+    const resetText = resetRun.simulation.entities.find(
+        (entity) => entity.constructor?.name === "ActionText" && entity.displayText === "RESET!"
+    );
+    resetText.position.x = -100;
+    const renderResetText = (label) => {
+        let textPrimitive;
+        assertForegroundEffectRenders(resetText, label, (primitives) => {
+            textPrimitive = assertCombatTextSignature(primitives, resetText, label);
+            assert.equal(resetText.visibilityToken, "combatText", `${label} should use the shared visibility token`);
+        });
+        return { y: textPrimitive.args[2], alpha: textPrimitive.globalAlpha };
+    };
+    resetText.update(0.05);
+    const resetStart = renderResetText("Bat RESET text start");
+    resetText.update(0.45);
+    const resetMid = renderResetText("Bat RESET text mid");
+    resetText.update(0.45);
+    const resetEnd = renderResetText("Bat RESET text end");
+    assert.ok(
+        resetStart.y > resetMid.y && resetMid.y > resetEnd.y,
+        "RESET combat text should rise across start, mid, and end frames"
+    );
+    assert.ok(
+        resetStart.alpha < resetMid.alpha && resetMid.alpha === resetEnd.alpha,
+        "RESET combat text should fade in before holding readable opacity"
+    );
+    resetText.update(0.151);
+    assert.equal(resetText.isExpired, true, "RESET combat text should expire after its 1.1s lifetime");
     resetRun.owner.ability.timer = 2;
     resetEffect.tick(resetRun.target, 0.2);
     resetEffect.onWallBounce(
@@ -6190,8 +6439,74 @@ function testVampireLevelRewardContracts(app) {
     );
     const tetherEffect = pullRun.simulation.entities.find((entity) => entity.constructor?.name === "BloodTetherEffect");
     const markEffect = pullRun.simulation.entities.find((entity) => entity.constructor?.name === "BloodMarkEffect");
-    assertForegroundEffectRenders(tetherEffect, "Vampire blood tether");
-    assertForegroundEffectRenders(markEffect, "Vampire blood mark");
+    const renderBloodTether = (label) => {
+        let travelingDrop;
+        assertForegroundEffectRenders(tetherEffect, label, (primitives) => {
+            assertEffectTrajectory(primitives, tetherEffect.position, pullRun.owner.position, label);
+            assertEffectUsesColor(primitives, "#d81f4d", label);
+            const drops = primitives.filter(
+                (primitive) => primitive.method === "arc" && primitive.fillStyle === "#ff426d"
+            );
+            assert.equal(drops.length, 3, `${label} should draw three blood drops traveling toward Vampire`);
+            travelingDrop = drops[0];
+        });
+        return { radius: travelingDrop.args[2], alpha: travelingDrop.globalAlpha };
+    };
+    const tetherStart = renderBloodTether("Vampire blood tether start");
+    tetherEffect.update(0.09);
+    const tetherMid = renderBloodTether("Vampire blood tether mid");
+    tetherEffect.update(0.08);
+    const tetherEnd = renderBloodTether("Vampire blood tether end");
+    assert.ok(
+        tetherStart.radius > tetherMid.radius && tetherMid.radius > tetherEnd.radius,
+        "Blood tether drops should contract while traveling to Vampire"
+    );
+    assert.ok(
+        tetherStart.alpha > tetherMid.alpha && tetherMid.alpha > tetherEnd.alpha,
+        "Blood tether should fade across start, mid, and end frames"
+    );
+
+    const renderBloodMark = (label) => {
+        let markArc;
+        assertForegroundEffectRenders(markEffect, label, (primitives) => {
+            assert.ok(
+                findEffectPrimitive(
+                    primitives,
+                    "translate",
+                    ([x, y]) =>
+                        Math.abs(x - pullRun.target.position.x) < 1e-6 && Math.abs(y - pullRun.target.position.y) < 1e-6
+                ),
+                `${label} should stay anchored to the marked target`
+            );
+            markArc = findEffectPrimitive(
+                primitives,
+                "arc",
+                ([x, y, radius, startAngle, endAngle], primitive) =>
+                    x === 0 &&
+                    y === 0 &&
+                    radius >= pullRun.target.radius + 4 &&
+                    radius <= pullRun.target.radius + 10 &&
+                    Math.abs(startAngle + 1.05) < 1e-9 &&
+                    Math.abs(endAngle - 1.05) < 1e-9 &&
+                    primitive.strokeStyle.startsWith("rgba(210, 24, 67,")
+            );
+            assert.ok(markArc, `${label} should draw the blood crescent around the target`);
+            assert.ok(
+                primitives.filter((primitive) => primitive.method === "lineTo").length >= 3,
+                `${label} should retain the lightning-shaped vulnerability mark`
+            );
+        });
+        return Number(markArc.strokeStyle.match(/([0-9.]+)\)$/)?.[1]);
+    };
+    const markStartAlpha = renderBloodMark("Vampire blood mark start");
+    markEffect.update(0.3);
+    const markMidAlpha = renderBloodMark("Vampire blood mark mid");
+    markEffect.update(0.29);
+    const markEndAlpha = renderBloodMark("Vampire blood mark end");
+    assert.ok(
+        markStartAlpha > markMidAlpha && markMidAlpha > markEndAlpha,
+        "Blood mark crescent should fade across start, mid, and final active frames"
+    );
     setVelocity(pullRun.target, new Vector2());
     pullRun.target.position = new Vector2(
         pullRun.owner.position.x + pullRun.owner.radius + pullRun.target.radius - 1,
@@ -6204,7 +6519,46 @@ function testVampireLevelRewardContracts(app) {
     const ruptureEffect = pullRun.simulation.entities.find(
         (entity) => entity.constructor?.name === "BloodRuptureEffect"
     );
-    assertForegroundEffectRenders(ruptureEffect, "Vampire blood rupture");
+    const renderBloodRupture = (label) => {
+        let ruptureArc;
+        assertForegroundEffectRenders(ruptureEffect, label, (primitives) => {
+            assert.ok(
+                findEffectPrimitive(
+                    primitives,
+                    "translate",
+                    ([x, y]) =>
+                        Math.abs(x - ruptureEffect.position.x) < 1e-6 && Math.abs(y - ruptureEffect.position.y) < 1e-6
+                ),
+                `${label} should stay anchored to the collision contact`
+            );
+            ruptureArc = findEffectPrimitive(
+                primitives,
+                "arc",
+                ([x, y, radius], primitive) =>
+                    x === 0 && y === 0 && radius >= 0 && radius <= 38 && primitive.strokeStyle === "#ff315f"
+            );
+            assert.ok(ruptureArc, `${label} should draw the collapsing blood rupture ring`);
+            assert.equal(
+                primitives.filter((primitive) => primitive.method === "lineTo").length,
+                6,
+                `${label} should draw six radial rupture cuts`
+            );
+        });
+        return { radius: ruptureArc.args[2], alpha: ruptureArc.globalAlpha };
+    };
+    const ruptureStart = renderBloodRupture("Vampire blood rupture start");
+    ruptureEffect.update(0.11);
+    const ruptureMid = renderBloodRupture("Vampire blood rupture mid");
+    ruptureEffect.update(0.1);
+    const ruptureEnd = renderBloodRupture("Vampire blood rupture end");
+    assert.ok(
+        ruptureStart.radius > ruptureMid.radius && ruptureMid.radius < ruptureEnd.radius,
+        "Blood rupture should collapse inward before bursting outward"
+    );
+    assert.ok(
+        ruptureStart.alpha > ruptureMid.alpha && ruptureMid.alpha > ruptureEnd.alpha,
+        "Blood rupture should fade across start, collapse, and burst frames"
+    );
     assert.equal(
         pullRun.owner.ability.getBloodMarkRemaining(pullRun.target),
         0,
