@@ -13,7 +13,7 @@ const FOLLOWUP_COLLISION_GRACE = 0.5;
 
 export class TricksterAbility extends Ability {
     constructor(owner, simulation) {
-        super(owner, simulation, 7.0);
+        super(owner, simulation, 5.5);
         this.state = {
             marks: new Map(),
             markEffects: new Map()

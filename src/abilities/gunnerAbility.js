@@ -4,7 +4,7 @@ import { BulletProjectile, GunnerTurret } from "../entities/index.js";
 import { polygonBoundingRadius } from "../physics/CollisionShape.js";
 import { TERRAIN_SHAPES } from "../terrain/terrainConfig.js";
 
-const GUNNER_COOLDOWN = 5;
+const GUNNER_COOLDOWN = 4;
 const BULLET_INTERVAL = 0.05;
 const BULLET_SPEED_MULT = 2.0;
 const MIN_BULLETS = 6;

@@ -3,7 +3,7 @@ import { SpinCutEffect, SpinVortexEffect } from "../effects/spinEffects.js";
 import { Ability } from "./ability.js";
 import { SPIN_VORTEX_CONFIG } from "./spinConfig.js";
 
-const BASE_CHARGE_TIME = 4.5;
+const BASE_CHARGE_TIME = 3.5;
 const MAX_SPIN_REVOLUTIONS_PER_SECOND = 10;
 const MAX_SPIN_VELOCITY = MAX_SPIN_REVOLUTIONS_PER_SECOND * Math.PI * 2;
 const SPIN_RESPONSE_RATE = 15;

@@ -29,7 +29,7 @@ const VISION_ARC_RADIUS_SCALE = 0.55;
 
 export class BatBallAbility extends Ability {
     constructor(owner, simulation) {
-        super(owner, simulation, 3.0);
+        super(owner, simulation, 2.5);
         this.state = {
             arcAngle: 0,
             slashTimer: 0,

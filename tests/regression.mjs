@@ -1348,8 +1348,8 @@ async function testCloneSeedDash(app) {
     const seeds = app.simulation.entities.filter((entity) => entity.constructor.name === "SeedOrb");
     assert.equal(seeds.length, 3, "Clone should launch three seeds");
     assert.ok(
-        seeds.every((seed) => seed.life === trickster.ability.cooldown * 2),
-        "Clone seeds should live for 2x the seed cooldown"
+        seeds.every((seed) => seed.life === 14),
+        "Clone seeds should retain the fixed fourteen-second lifetime"
     );
 
     const angles = seeds.map((seed) => Math.atan2(seed.velocity.y, seed.velocity.x)).sort((a, b) => a - b);
@@ -1359,11 +1359,11 @@ async function testCloneSeedDash(app) {
     });
     assert.deepEqual(gaps, [120, 120, 120], "Clone seeds should spread at 120 degree intervals");
 
-    const seedLife = trickster.ability.cooldown * 2;
+    const seedLife = 14;
     seeds[1].update(seedLife - 0.01, app.simulation);
     assert.equal(seeds[1].isExpired, false, "Clone seed should stay alive before its lifetime ends");
     seeds[1].update(0.02, app.simulation);
-    assert.equal(seeds[1].isExpired, true, "Clone seed should expire at its lifetime (cooldown * 2)");
+    assert.equal(seeds[1].isExpired, true, "Clone seed should expire at its fixed lifetime");
 
     seeds[0].position = opponent.position.clone();
     seeds[0].update(0.016, app.simulation);
@@ -1377,7 +1377,7 @@ async function testEaterFeast(app) {
         app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER)
     ]);
     const [eater, target] = app.simulation.fighters;
-    assert.equal(eater.stats.baseDefense, 2, "Eater base defense should stay near the roster average");
+    assert.equal(eater.stats.baseDefense, 3, "Eater base defense should use the approved combat baseline");
     eater.position.x = 300;
     eater.position.y = 480;
     target.position.x = 360;
@@ -1458,7 +1458,7 @@ async function testDashBallCooldownDash(app) {
         app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER)
     ]);
     const [dashBall, target] = app.simulation.fighters;
-    assert.equal(dashBall.stats.baseDamage, 10, "Dash Ball should have reduced base damage");
+    assert.equal(dashBall.stats.baseDamage, 15, "Dash Ball should use the approved combat baseline");
     dashBall.position.x = 300;
     dashBall.position.y = 480;
     target.position.x = 620;
@@ -1512,7 +1512,7 @@ async function testDashBallCooldownDash(app) {
         "Dash Ball dash should not add separate collision damage"
     );
     assert.equal(target.state.slow, null, "Dash Ball collision should not slow target");
-    assert.equal(baseCooldown, 3, "Dash Ball base cooldown should be 3 seconds");
+    assert.equal(baseCooldown, 2.5, "Dash Ball base cooldown should be 2.5 seconds");
     assert.equal(dashBall.ability.state.cooldownLevel, 1, "First dash hit should add one cooldown stack");
     assert.equal(dashBall.ability.cooldown, baseCooldown * 0.5, "First dash hit should halve future cooldown");
     assert.equal(dashBall.ability.maxCooldownLevel, 2, "Dash should have max 2 cooldown stacks");
@@ -1636,8 +1636,8 @@ async function testGrenadeScatterShot(app) {
     const longestFuse = Math.max(...allGrenades().map((grenade) => grenade.maxTimer));
     const shortestFuse = Math.min(...allGrenades().map((grenade) => grenade.maxTimer));
     assert.ok(
-        Math.abs(shortestFuse - grenadeFighter.ability.cooldown * 0.2) < 0.001,
-        "The first grenade fuse should equal 20% of the effective grenade cooldown"
+        Math.abs(shortestFuse - Math.max(0.32, grenadeFighter.ability.cooldown * 0.2)) < 0.001,
+        "The first grenade fuse should retain its 20% ratio with the existing 0.32-second safety floor"
     );
     assert.ok(
         Math.abs(longestFuse - grenadeFighter.ability.cooldown) < 0.001,
@@ -2972,8 +2972,8 @@ function testHuntingBattlePreparationUsesActualBattleHp() {
     );
     assert.equal(
         overlayStates.at(-1).huntingBattlePreparationItems[0].healAmount,
-        28,
-        "Preparation UI should calculate healing from the actual 112 maximum HP"
+        42,
+        "Preparation UI should calculate healing from the actual 168 maximum HP"
     );
     assert.equal(
         overlayStates.at(-1).huntingBattlePreparationHp,
@@ -2982,21 +2982,21 @@ function testHuntingBattlePreparationUsesActualBattleHp() {
     );
     assert.equal(
         overlayStates.at(-1).huntingBattlePreparationMaxHp,
-        112,
+        168,
         "Preparation UI should expose an integer maximum HP"
     );
 
     const useResult = manager.usePreparationConsumable(CONSUMABLE_IDS.HP_POTION);
-    assert.ok(Math.abs(useResult.healed - 28) < 1e-9, "Preparation potion use should report the actual healed amount");
-    assert.equal(manager._run.carriedHp, 56.4, "Preparation potion use should preserve raw HP before battle start");
+    assert.ok(Math.abs(useResult.healed - 42) < 1e-9, "Preparation potion use should report the actual healed amount");
+    assert.equal(manager._run.carriedHp, 70.4, "Preparation potion use should preserve raw HP before battle start");
     assert.equal(
         overlayStates.at(-1).huntingBattlePreparationHp,
-        57,
+        71,
         "Potion feedback should refresh the displayed HP through the shared integer getter"
     );
     assert.match(
         overlayStates.at(-1).huntingBattlePreparationNotice,
-        /57\/112$/,
+        /71\/168$/,
         "Potion feedback should not expose a fractional current HP"
     );
     assert.equal(
@@ -3008,7 +3008,7 @@ function testHuntingBattlePreparationUsesActualBattleHp() {
     manager.startPreparedBattle();
     const player = mockApp.simulation.fighters.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
     assert.equal(startedMatches, 1, "BattleSimulation should start only after the preparation start action");
-    assert.equal(player.hp, 56.4, "BattleSimulation should receive the raw potion-adjusted carried HP");
+    assert.equal(player.hp, 70.4, "BattleSimulation should receive the raw potion-adjusted carried HP");
     console.log("[hunting-battle-preparation-actual-hp] ok");
 }
 
@@ -5161,7 +5161,7 @@ function testAbilityLevelUpgrades(app) {
 
     const rageRun = createTierSimulation(FIGHTER_IDS.RAGE);
     rageRun.ball.ability.state.timeWithoutCollision = rageRun.ball.ability.getMaxChargeTime();
-    assertClose(rageRun.ball.ability.getMaxChargeTime(), 14, "Rage max charge time should be 14 seconds");
+    assertClose(rageRun.ball.ability.getMaxChargeTime(), 10.5, "Rage max charge time should be 10.5 seconds");
 
     const setBallAngularVelocity = (ball, value) => {
         ball._computeMomentOfInertia();
@@ -10465,7 +10465,7 @@ function testEquipmentSpecialCombatEffects() {
         { assignActions: false }
     );
     const [attacker, defender] = sim.fighters;
-    assert.equal(attacker.ability.cooldown, 2.7, "순환 should affect the equipped fighter's ability cooldown");
+    assert.equal(attacker.ability.cooldown, 2.25, "순환 should affect the equipped fighter's ability cooldown");
 
     attacker.hp = 60;
     attacker.position = new Vector2(400, 480);
@@ -14936,10 +14936,14 @@ async function testTricksterSeedLifeBuff(app) {
     const seeds = app.simulation.entities.filter((entity) => entity.constructor.name === "SeedOrb");
     assert.equal(seeds.length, 3, "Trickster should launch three seeds");
 
-    // Seed life should be cooldown * 2
-    const expectedLife = trickster.ability.cooldown * 2;
+    // Seed life remains independent from the adjusted base cooldown.
+    const expectedLife = 14;
     for (const seed of seeds) {
-        assert.equal(seed.life, expectedLife, `Seed life (${seed.life}) should be cooldown * 2 (${expectedLife})`);
+        assert.equal(
+            seed.life,
+            expectedLife,
+            `Seed life (${seed.life}) should remain fixed at ${expectedLife} seconds`
+        );
     }
 }
 
@@ -21317,6 +21321,101 @@ function testLevelTenBaseStatTarget() {
 
 testLevelTenBaseStatTarget();
 
+function testRosterCombatBaselineAndCooldowns() {
+    const expectedStats = {
+        archer: { hp: 168, damage: 15, defense: 1.5 },
+        orbit: { hp: 153, damage: 15, defense: 1.5 },
+        trickster: { hp: 165, damage: 15, defense: 1.5 },
+        grenade: { hp: 162, damage: 16.5, defense: 3 },
+        dash: { hp: 165, damage: 15, defense: 1.5 },
+        rage: { hp: 186, damage: 15, defense: 3 },
+        spin: { hp: 174, damage: 15, defense: 1.5 },
+        eater: { hp: 177, damage: 15, defense: 3 },
+        bat_ball: { hp: 159, damage: 15, defense: 1.5 },
+        vampire: { hp: 150, damage: 16.5, defense: 1.5 },
+        gunner: { hp: 150, damage: 16.5, defense: 1.5 },
+        phantom: { hp: 165, damage: 15, defense: 1.5 },
+        hero: { hp: 162, damage: 15, defense: 1.5 }
+    };
+    const expectedSpeed = {
+        archer: 405,
+        orbit: 462,
+        trickster: 480,
+        grenade: 435,
+        dash: 441,
+        rage: 357,
+        spin: 414,
+        eater: 402,
+        bat_ball: 420,
+        vampire: 423,
+        gunner: 417,
+        phantom: 457.5,
+        hero: 429
+    };
+    const expectedCooldown = {
+        archer: 2.5,
+        trickster: 5.5,
+        grenade: 3,
+        dash: 2.5,
+        eater: 4.5,
+        bat_ball: 2.5,
+        vampire: 3,
+        gunner: 4,
+        phantom: 2.5
+    };
+    const roster = createRoster();
+    for (const fighter of roster) {
+        assert.deepEqual(
+            { hp: fighter.stats.hp, damage: fighter.stats.damage, defense: fighter.stats.defense },
+            expectedStats[fighter.id],
+            `${fighter.id} should use the approved Lv.1 combat baseline`
+        );
+        assert.equal(
+            fighter.stats.speed,
+            expectedSpeed[fighter.id],
+            `${fighter.id} speed should retain the 1.5x baseline`
+        );
+        const progression = getCharacterLevelProgression(fighter.id, 10);
+        const levelTen = applyExperienceProgressionToBaseSpec(fighter, progression);
+        for (const stat of ["hp", "damage", "speed", "defense"]) {
+            assert.equal(
+                levelTen.stats[stat],
+                fighter.stats[stat] * 1.5,
+                `${fighter.id} Lv.10 ${stat} should remain 1.5x`
+            );
+        }
+    }
+
+    for (const fighter of roster.filter((candidate) => expectedCooldown[candidate.id] !== undefined)) {
+        const simulation = new BattleSimulation(
+            [fighter, roster.find((candidate) => candidate.id === FIGHTER_IDS.ARCHER)],
+            {
+                onLog() {},
+                onSound() {}
+            }
+        );
+        const ball = simulation.fighters.find((candidate) => candidate.id === fighter.id);
+        assert.equal(
+            ball.ability.cooldown,
+            expectedCooldown[fighter.id],
+            `${fighter.id} should use the approved base cooldown`
+        );
+    }
+
+    const orbit = new BattleSimulation([roster[1], roster[0]], { onLog() {}, onSound() {} }).fighters[0].ability;
+    const rage = new BattleSimulation([roster[5], roster[0]], { onLog() {}, onSound() {} }).fighters[0].ability;
+    const spin = new BattleSimulation([roster[6], roster[0]], { onLog() {}, onSound() {} }).fighters[0].ability;
+    const hero = new BattleSimulation([roster[12], roster[0]], { onLog() {}, onSound() {} }).fighters[0].ability;
+    assert.equal(orbit._baseRechargeDuration, 1, "Orbit satellite recharge should remain one second");
+    orbit.state.volleyTimer = 3;
+    assert.equal(orbit.state.volleyTimer, 3, "Orbit volley cooldown should be three seconds");
+    assert.equal(rage.getMaxChargeTime(), 10.5, "Rage max charge should be 10.5 seconds");
+    assert.equal(spin.getMaxChargeTime(), 3.5, "Spin max charge should be 3.5 seconds");
+    assert.equal(hero._baseCooldown, 1, "Hero growth stack interval should remain one second");
+}
+
+testRosterCombatBaselineAndCooldowns();
+
 function testRebirthDomainContracts() {
     const profile = createDefaultPlayerProfile();
     const sourceId = FIGHTER_IDS.ARCHER;
@@ -22218,6 +22317,8 @@ function testRageIgniteRefreshSeparatesDamageFromVisualLifetime() {
         { onLog() {}, onSound() {}, onDamageTaken() {}, onDamageDealt() {}, onHpChanged() {} }
     );
     const [rage, opponent] = sim.fighters;
+    rage.stats.baseDamage = 10;
+    opponent.stats.baseDefense = 0;
     rage.ability.setContext({ abilityTier: 1 });
     rage.ability._applyIgnite(opponent);
     const ignite = opponent._igniteState;

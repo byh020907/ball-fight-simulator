@@ -17,7 +17,7 @@ export function createRoster() {
             color: "#f7b34d",
             face: "archer",
             ability: "archer",
-            stats: { hp: 112, damage: 10, speed: getFighterBaseSpeed(270), radius: 50, mass: 1.2, defense: 1 }
+            stats: { hp: 168, damage: 15, speed: getFighterBaseSpeed(270), radius: 50, mass: 1.2, defense: 1.5 }
         },
         {
             id: FIGHTER_IDS.ORBIT,
@@ -28,7 +28,7 @@ export function createRoster() {
             color: "#6fe3ff",
             face: "orbit",
             ability: "orbit",
-            stats: { hp: 102, damage: 10, speed: getFighterBaseSpeed(308), radius: 48, mass: 1.1, defense: 1 }
+            stats: { hp: 153, damage: 15, speed: getFighterBaseSpeed(308), radius: 48, mass: 1.1, defense: 1.5 }
         },
         {
             id: FIGHTER_IDS.TRICKSTER,
@@ -38,7 +38,7 @@ export function createRoster() {
             color: "#d99cff",
             face: "trickster",
             ability: "trickster",
-            stats: { hp: 110, damage: 10, speed: getFighterBaseSpeed(320), radius: 46, mass: 1.02, defense: 1 }
+            stats: { hp: 165, damage: 15, speed: getFighterBaseSpeed(320), radius: 46, mass: 1.02, defense: 1.5 }
         },
         {
             id: FIGHTER_IDS.GRENADE,
@@ -49,7 +49,7 @@ export function createRoster() {
             color: "#ff7676",
             face: "grenade",
             ability: "grenade",
-            stats: { hp: 108, damage: 11, speed: getFighterBaseSpeed(290), radius: 49, mass: 1.18, defense: 2 }
+            stats: { hp: 162, damage: 16.5, speed: getFighterBaseSpeed(290), radius: 49, mass: 1.18, defense: 3 }
         },
         {
             id: FIGHTER_IDS.DASH,
@@ -60,7 +60,7 @@ export function createRoster() {
             color: "#8ee8d7",
             face: "dash",
             ability: "dash",
-            stats: { hp: 110, damage: 10, speed: getFighterBaseSpeed(294), radius: 49, mass: 1.16, defense: 1 }
+            stats: { hp: 165, damage: 15, speed: getFighterBaseSpeed(294), radius: 49, mass: 1.16, defense: 1.5 }
         },
         {
             id: FIGHTER_IDS.RAGE,
@@ -70,7 +70,7 @@ export function createRoster() {
             color: "#ffae6e",
             face: "rage",
             ability: "rage",
-            stats: { hp: 124, damage: 10, speed: getFighterBaseSpeed(238), radius: 51, mass: 1.28, defense: 2 }
+            stats: { hp: 186, damage: 15, speed: getFighterBaseSpeed(238), radius: 51, mass: 1.28, defense: 3 }
         },
         {
             id: FIGHTER_IDS.SPIN,
@@ -82,7 +82,7 @@ export function createRoster() {
             face: "spin",
             ability: "spin",
             physicsMaterial: "spinGrip",
-            stats: { hp: 116, damage: 10, speed: getFighterBaseSpeed(276), radius: 50, mass: 1.22, defense: 1 }
+            stats: { hp: 174, damage: 15, speed: getFighterBaseSpeed(276), radius: 50, mass: 1.22, defense: 1.5 }
         },
         {
             id: FIGHTER_IDS.EATER,
@@ -93,7 +93,7 @@ export function createRoster() {
             color: "#a6ff4d",
             face: "eater",
             ability: "eater",
-            stats: { hp: 118, damage: 10, speed: getFighterBaseSpeed(268), radius: 52, mass: 1.34, defense: 2 }
+            stats: { hp: 177, damage: 15, speed: getFighterBaseSpeed(268), radius: 52, mass: 1.34, defense: 3 }
         },
         {
             id: FIGHTER_IDS.BAT_BALL,
@@ -103,7 +103,7 @@ export function createRoster() {
             color: "#66ccff",
             face: "bat_ball",
             ability: "bat_ball",
-            stats: { hp: 106, damage: 10, speed: getFighterBaseSpeed(280), radius: 48, mass: 1.14, defense: 1 }
+            stats: { hp: 159, damage: 15, speed: getFighterBaseSpeed(280), radius: 48, mass: 1.14, defense: 1.5 }
         },
         {
             id: FIGHTER_IDS.VAMPIRE,
@@ -114,7 +114,7 @@ export function createRoster() {
             color: "#cc3355",
             face: "vampire",
             ability: "vampire",
-            stats: { hp: 100, damage: 11, speed: getFighterBaseSpeed(282), radius: 47, mass: 1.05, defense: 1 }
+            stats: { hp: 150, damage: 16.5, speed: getFighterBaseSpeed(282), radius: 47, mass: 1.05, defense: 1.5 }
         },
         {
             id: FIGHTER_IDS.GUNNER,
@@ -125,7 +125,7 @@ export function createRoster() {
             color: "#8877cc",
             face: "gunner",
             ability: "gunner",
-            stats: { hp: 100, damage: 11, speed: getFighterBaseSpeed(278), radius: 48, mass: 1.1, defense: 1 }
+            stats: { hp: 150, damage: 16.5, speed: getFighterBaseSpeed(278), radius: 48, mass: 1.1, defense: 1.5 }
         },
         {
             id: FIGHTER_IDS.PHANTOM,
@@ -136,7 +136,7 @@ export function createRoster() {
             color: "#55bbdd",
             face: "phantom",
             ability: "phantom",
-            stats: { hp: 110, damage: 10, speed: getFighterBaseSpeed(305), radius: 47, mass: 1.0, defense: 1 }
+            stats: { hp: 165, damage: 15, speed: getFighterBaseSpeed(305), radius: 47, mass: 1.0, defense: 1.5 }
         },
         {
             id: FIGHTER_IDS.HERO,
@@ -147,7 +147,7 @@ export function createRoster() {
             color: "#ffcc00",
             face: "hero",
             ability: "hero",
-            stats: { hp: 108, damage: 10, speed: getFighterBaseSpeed(286), radius: 49, mass: 1.2, defense: 1 }
+            stats: { hp: 162, damage: 15, speed: getFighterBaseSpeed(286), radius: 49, mass: 1.2, defense: 1.5 }
         }
     ];
 }

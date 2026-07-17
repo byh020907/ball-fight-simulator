@@ -13,7 +13,7 @@ const CRIT_BOOST_MULT = 2;
 
 export class ArcherAbility extends Ability {
     constructor(owner, simulation) {
-        super(owner, simulation, 3);
+        super(owner, simulation, 2.5);
         this.state = {
             windUp: 0,
             lastAimDir: new Vector2(1, 0),

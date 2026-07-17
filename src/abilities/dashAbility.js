@@ -13,7 +13,7 @@ export class DashAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation);
         this.state = { cooldownLevel: INITIAL_COOLDOWN_LEVEL };
-        this.baseCooldown = 3;
+        this.baseCooldown = 2.5;
         this.maxCooldownLevel = 2;
         this._baseCooldown = this.getCooldownForLevel();
         this.timer = this.cooldown;

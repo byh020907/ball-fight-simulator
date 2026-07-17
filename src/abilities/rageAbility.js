@@ -33,7 +33,7 @@ export class RageAbility extends Ability {
             timeWithoutCollision: 0,
             aftershock: null
         };
-        this._baseMaxChargeTime = 14.0;
+        this._baseMaxChargeTime = 10.5;
     }
 
     getMaxChargeTime() {

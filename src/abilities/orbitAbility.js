@@ -2,7 +2,7 @@ import { Vector2 } from "../core.js";
 import { OrbitCatchEffect } from "../effects/orbitHitEffect.js";
 import { Ability } from "./ability.js";
 
-const VOLLEY_COOLDOWN = 3.5;
+const VOLLEY_COOLDOWN = 3.0;
 const VOLLEY_DELAY = 0.18;
 const VOLLEY_MIN_RANGE = 200;
 const VOLLEY_MAX_RANGE = 500;

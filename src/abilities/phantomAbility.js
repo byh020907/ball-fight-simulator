@@ -2,7 +2,7 @@ import { Vector2 } from "../core.js";
 import { DashEffect } from "../combatEffects.js";
 import { Ability } from "./ability.js";
 
-const PHANTOM_COOLDOWN = 3.0;
+const PHANTOM_COOLDOWN = 2.5;
 const PRIMED_DURATION = 2.5;
 const RANDOM_MISS_COOLDOWN_FACTOR = 0.5;
 const DASH_DURATION = 0.8;

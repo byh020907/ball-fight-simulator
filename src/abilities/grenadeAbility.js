@@ -1,7 +1,7 @@
 import { Vector2 } from "../core.js";
 import { Ability } from "./ability.js";
 
-const GRENADE_COOLDOWN = 3.5;
+const GRENADE_COOLDOWN = 3.0;
 const BURST_COUNT_MIN = 3;
 const BURST_COUNT_MAX = 5;
 const BURST_INTERVAL = 0.12;

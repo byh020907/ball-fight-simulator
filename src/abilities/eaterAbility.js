@@ -24,7 +24,7 @@ const WALL_RUPTURE_OTHER_MULT = 0.75;
 
 export class EaterAbility extends Ability {
     constructor(owner, simulation) {
-        super(owner, simulation, 6.0);
+        super(owner, simulation, 4.5);
         this.state = {
             feastTimer: 0,
             feastElapsed: 0,

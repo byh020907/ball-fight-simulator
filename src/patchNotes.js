@@ -19,6 +19,15 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.30.4",
+        date: "2026-07-17",
+        title: "v0.30.4 기본 전투 기준 조정",
+        changes: [
+            { type: "fix", text: "모든 캐릭터의 기본 HP·공격력·방어력을 상향했습니다." },
+            { type: "fix", text: "캐릭터별 기본 능력 주기를 조정했습니다." }
+        ]
+    },
+    {
         version: "0.30.3",
         date: "2026-07-17",
         title: "v0.30.3 기본 속도감 복원",
