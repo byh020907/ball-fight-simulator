@@ -20,18 +20,21 @@ function safeFloor(floor) {
     return Math.max(1, Math.floor(floor));
 }
 
-function scaleNumber(value, multiplier, digits = 0) {
+function scaleToHalf(value, multiplier) {
     if (!Number.isFinite(value)) return value;
-    const scaled = value * multiplier;
-    if (digits <= 0) return Math.round(scaled);
-    return Number(scaled.toFixed(digits));
+    return Math.round(value * multiplier * 2) / 2;
 }
 
 export function getEnemyPowerMultiplier(floor, { enemyType = HUNTING_ENEMY_TYPES.NORMAL } = {}) {
-    const base = 1 + (safeFloor(floor) - 1) * HUNTING_SCALING.ENEMY_POWER_PER_FLOOR;
-    if (enemyType === HUNTING_ENEMY_TYPES.CHAMPION) return base + HUNTING_SCALING.CHAMPION_POWER_BONUS;
-    if (enemyType === HUNTING_ENEMY_TYPES.ELITE) return base + HUNTING_SCALING.ELITE_POWER_BONUS;
-    return base;
+    const depth = (Math.min(HUNTING_MAX_FLOOR, safeFloor(floor)) - 1) / (HUNTING_MAX_FLOOR - 1);
+    const base = 1 + depth * (HUNTING_SCALING.NORMAL_MAX_POWER_MULTIPLIER - 1);
+    const roleBonus =
+        enemyType === HUNTING_ENEMY_TYPES.CHAMPION
+            ? HUNTING_SCALING.CHAMPION_POWER_BONUS
+            : enemyType === HUNTING_ENEMY_TYPES.ELITE
+              ? HUNTING_SCALING.ELITE_POWER_BONUS
+              : 0;
+    return Number(Math.min(HUNTING_SCALING.MAX_POWER_MULTIPLIER, base + roleBonus).toFixed(3));
 }
 
 export function scaleEnemySpecForHunting(spec, floor, { enemyType = HUNTING_ENEMY_TYPES.NORMAL } = {}) {
@@ -40,9 +43,9 @@ export function scaleEnemySpecForHunting(spec, floor, { enemyType = HUNTING_ENEM
         ...spec,
         stats: {
             ...spec.stats,
-            hp: scaleNumber(spec.stats?.hp, multiplier),
-            damage: scaleNumber(spec.stats?.damage, multiplier),
-            defense: scaleNumber(spec.stats?.defense, multiplier, 3)
+            hp: scaleToHalf(spec.stats?.hp, multiplier),
+            damage: scaleToHalf(spec.stats?.damage, multiplier),
+            defense: scaleToHalf(spec.stats?.defense, multiplier)
         },
         hunting: {
             ...(spec.hunting ?? {}),

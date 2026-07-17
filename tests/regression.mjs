@@ -87,7 +87,7 @@ import {
     defeatHuntingRun,
     applyHuntingCursedAltar,
     applyHuntingStatModifiersToSpec,
-    getHuntingResumeStartFloor,
+    getHuntingAvailableStartFloors,
     getEligibleHuntingCharacters,
     getEnemyPowerMultiplier,
     getHuntingFloorChances,
@@ -8073,17 +8073,37 @@ function testHuntingSystem() {
         "Only tournament winners should be listed as hunting candidates"
     );
 
-    assert.equal(getEnemyPowerMultiplier(1), 1, "Floor 1 enemy power should be base");
-    assert.equal(getEnemyPowerMultiplier(3), 1.16, "Enemy power should scale by 8% per floor");
-    assert.equal(getEnemyPowerMultiplier(3, { enemyType: "champion" }), 1.44, "Champion intrusions should be stronger");
+    assert.equal(getEnemyPowerMultiplier(1), 1, "Floor 1 normal enemy power should be base");
+    assert.equal(getEnemyPowerMultiplier(100), 1.7, "Floor 100 normal power should remain on the capped curve");
+    assert.equal(
+        getEnemyPowerMultiplier(100, { enemyType: HUNTING_ENEMY_TYPES.ELITE }),
+        1.82,
+        "Elite role bonus must remain inside the cap"
+    );
+    assert.equal(
+        getEnemyPowerMultiplier(100, { enemyType: HUNTING_ENEMY_TYPES.CHAMPION }),
+        1.95,
+        "Champion role bonus must remain inside the cap"
+    );
+    for (const floor of [1, HUNTING_MAX_FLOOR]) {
+        for (const enemyType of Object.values(HUNTING_ENEMY_TYPES)) {
+            assert.ok(
+                getEnemyPowerMultiplier(floor, { enemyType }) <= 2,
+                "Every enemy role must remain at or below the power cap"
+            );
+        }
+    }
     const baseSpec = {
         id: "enemy",
         stats: { hp: 100, damage: 10, defense: 2, speed: 300, skill: 4, radius: 24 }
     };
     const scaled = scaleEnemySpecForHunting(baseSpec, 3);
-    assert.equal(scaled.stats.hp, 116, "Hunting scaling should affect HP");
-    assert.equal(scaled.stats.damage, 12, "Hunting scaling should affect damage");
-    assert.equal(scaled.stats.defense, 2.32, "Hunting scaling should affect defense");
+    assert.equal(scaled.stats.hp, 101.5, "Hunting scaling should affect HP in half-stat units");
+    assert.equal(scaled.stats.damage, 10, "Hunting scaling should affect damage in half-stat units");
+    assert.equal(scaled.stats.defense, 2, "Hunting scaling should affect defense in half-stat units");
+    for (const value of [scaled.stats.hp, scaled.stats.damage, scaled.stats.defense]) {
+        assert.equal(value * 2, Math.round(value * 2), "Scaled combat stats must use 0.5 units");
+    }
     assert.equal(scaled.stats.speed, 300, "Hunting scaling should not affect speed");
     assert.equal(scaled.stats.skill, 4, "Hunting scaling should not affect skill");
 
@@ -9243,6 +9263,7 @@ function testHuntingStageSelectionAndArenaTheme() {
 async function testHuntingStageSelectUsesPreviewCharacter() {
     const profile = createDefaultPlayerProfile();
     profile.collection.characters[FIGHTER_IDS.RAGE] = { tournamentWins: 1 };
+    profile.hunting.stats.lastReachedFloorByStage = { [HUNTING_STAGE_IDS.CAVE]: 47 };
     const app = {
         playerProfile: profile,
         playerFighterId: FIGHTER_IDS.RAGE,
@@ -9272,27 +9293,43 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
         }
     };
     const manager = new HuntingManager(app);
-    let popupOptions = null;
+    const popupOptions = [];
     let advanced = false;
     let selectStage = null;
+    let selectCheckpoint = null;
     const originalDialog = PopupService._testDialog;
     const originalQuerySelectorAll = document.querySelectorAll;
 
     PopupService.setTestDialog({
         show(options) {
-            popupOptions = options;
+            popupOptions.push(options);
             return Promise.resolve("start");
         },
         close() {}
     });
-    document.querySelectorAll = () => [
-        {
-            dataset: { stage: HUNTING_STAGE_IDS.CAVE },
-            addEventListener(_type, handler) {
-                selectStage = handler;
-            }
+    document.querySelectorAll = (selector) => {
+        if (selector === ".hunting-stage-btn") {
+            return [
+                {
+                    dataset: { stage: HUNTING_STAGE_IDS.CAVE },
+                    addEventListener(_type, handler) {
+                        selectStage = handler;
+                    }
+                }
+            ];
         }
-    ];
+        if (selector === ".hunting-checkpoint-btn") {
+            return [
+                {
+                    dataset: { checkpoint: "1" },
+                    addEventListener(_type, handler) {
+                        selectCheckpoint = handler;
+                    }
+                }
+            ];
+        }
+        return [];
+    };
     manager.advance = async ({ waitForFirstMoveUi } = {}) => {
         assert.equal(waitForFirstMoveUi, true, "Run start should require the first move UI paint before advancing");
         await app.waitForHuntingMoveUiPaint();
@@ -9301,16 +9338,37 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
 
     try {
         manager.showStageSelect();
-        const startPromise = selectStage();
-        await Promise.resolve();
+        await new Promise((resolve) => setTimeout(resolve, 60));
 
-        assert.ok(popupOptions.bodyHtml.includes("hunting-stage-btn"), "Stage selection should render map cards");
+        assert.ok(popupOptions[0].bodyHtml.includes("hunting-stage-btn"), "Stage selection should render map cards");
         assert.equal(
-            popupOptions.bodyHtml.includes("hunting-char-btn"),
+            popupOptions[0].bodyHtml.includes("hunting-char-btn"),
             false,
             "Stage selection should not render character selection cards"
         );
-        assert.deepEqual(popupOptions.buttons, [], "Stage selection should not require a second start action");
+        assert.deepEqual(popupOptions[0].buttons, [], "Stage selection should not require a second start action");
+        selectStage();
+        await new Promise((resolve) => setTimeout(resolve, 60));
+        assert.ok(
+            popupOptions[1].bodyHtml.includes("hunting-checkpoint-btn"),
+            "Selecting a stage should present explicit start checkpoints"
+        );
+        assert.ok(
+            popupOptions[1].bodyHtml.includes("1층 첫 조우"),
+            "Checkpoint copy must identify its real first encounter"
+        );
+        assert.equal(
+            (popupOptions[1].bodyHtml.match(/hunting-checkpoint-btn/g) ?? []).length,
+            5,
+            "Checkpoint selection must always render all five requested start floors"
+        );
+        assert.ok(
+            popupOptions[1].bodyHtml.includes('data-checkpoint="40"') &&
+                popupOptions[1].bodyHtml.includes('data-checkpoint="60" disabled'),
+            "A floor-47 record should unlock 40 but keep 60 and 80 disabled"
+        );
+        const startPromise = selectCheckpoint();
+        await Promise.resolve();
         assert.equal(manager._run.characterId, FIGHTER_IDS.RAGE, "Run should use the current preview character");
         assert.deepEqual(
             profile.hunting.stats.visitedStageIds,
@@ -9338,7 +9396,7 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
         assert.equal(firstFloorState.huntingFloor, 1, "Start should render the first floor before advancing");
         app.resolveFirstMoveUi();
         await startPromise;
-        assert.equal(advanced, true, "Stage selection should advance only after the first move UI is painted");
+        assert.equal(advanced, true, "Checkpoint selection should advance only after the first move UI is painted");
     } finally {
         PopupService.setTestDialog(originalDialog);
         document.querySelectorAll = originalQuerySelectorAll;
@@ -9474,7 +9532,7 @@ async function testDebugHuntingEventPreviewUsesProductionEventFlow() {
     console.log("[debug-hunting-event-preview] ok");
 }
 
-async function testHuntingResumeStartsAtHalfLatestStageFloor() {
+async function testHuntingCheckpointStartsAtSelectedFloor() {
     const sanitized = sanitizePlayerProfile({
         version: 8,
         hunting: {
@@ -9496,38 +9554,18 @@ async function testHuntingResumeStartsAtHalfLatestStageFloor() {
         },
         "Stored resume floors must keep only valid stages and safe integer floors"
     );
-    assert.equal(getHuntingResumeStartFloor({}, HUNTING_STAGE_IDS.CAVE), 1, "Missing progress should start at floor 1");
-    assert.equal(
-        getHuntingResumeStartFloor(
-            { lastReachedFloorByStage: { [HUNTING_STAGE_IDS.CAVE]: 1 } },
-            HUNTING_STAGE_IDS.CAVE
-        ),
-        1,
-        "Floor 1 should restart from floor 1"
+    assert.deepEqual(
+        getHuntingAvailableStartFloors({}, HUNTING_STAGE_IDS.CAVE),
+        [1],
+        "Missing progress should expose only the floor-one checkpoint"
     );
-    assert.equal(
-        getHuntingResumeStartFloor(
-            { lastReachedFloorByStage: { [HUNTING_STAGE_IDS.CAVE]: 2 } },
-            HUNTING_STAGE_IDS.CAVE
-        ),
-        1,
-        "Floor 2 should restart from floor 1"
-    );
-    assert.equal(
-        getHuntingResumeStartFloor(
+    assert.deepEqual(
+        getHuntingAvailableStartFloors(
             { lastReachedFloorByStage: { [HUNTING_STAGE_IDS.CAVE]: 47 } },
             HUNTING_STAGE_IDS.CAVE
         ),
-        23,
-        "Floor 47 should restart from floor 23"
-    );
-    assert.equal(
-        getHuntingResumeStartFloor(
-            { lastReachedFloorByStage: { [HUNTING_STAGE_IDS.CAVE]: 100 } },
-            HUNTING_STAGE_IDS.CAVE
-        ),
-        50,
-        "Floor 100 should restart from floor 50"
+        [1, 20, 40],
+        "A floor-47 record should unlock only the 1, 20, and 40 checkpoints"
     );
 
     const profile = createDefaultPlayerProfile();
@@ -9564,13 +9602,31 @@ async function testHuntingResumeStartsAtHalfLatestStageFloor() {
     PopupService.setTestDialog({ close() {} });
     try {
         await manager.startRun(FIGHTER_IDS.RAGE);
-        assert.equal(manager._run.floor, 23, "Normal restart should preserve the displayed starting floor internally");
+        assert.equal(
+            manager._run.floor,
+            0,
+            "Normal starts must always begin from floor 1 without an explicit checkpoint"
+        );
         assert.deepEqual(overlayMessages.at(-1), {
             label: "사냥터",
-            text: "숲 · 23층",
+            text: "숲 · 1층",
             subtext: "원정 시작"
         });
-        assert.equal(manager._run.floor + 1, 24, "The first encounter must remain one floor after the displayed start");
+        assert.equal(manager._run.floor + 1, 1, "The default first encounter must be floor 1");
+
+        await manager.startRun(FIGHTER_IDS.RAGE, { encounterFloor: 20 });
+        assert.equal(manager._run.floor + 1, 20, "The selected checkpoint must be the actual first encounter floor");
+        assert.equal(overlayMessages.at(-1).text, "숲 · 20층", "Selected checkpoint display must remain exact");
+
+        profile.hunting.stats.lastReachedFloorByStage[HUNTING_STAGE_IDS.FOREST] = HUNTING_MAX_FLOOR;
+        for (const checkpoint of [40, 60, 80]) {
+            await manager.startRun(FIGHTER_IDS.RAGE, { encounterFloor: checkpoint });
+            assert.equal(
+                manager._run.floor + 1,
+                checkpoint,
+                `The ${checkpoint}-floor checkpoint must remain the actual first encounter floor`
+            );
+        }
 
         await manager.startDebugRun(FIGHTER_IDS.RAGE, {
             stageId: HUNTING_STAGE_IDS.FOREST,
@@ -9627,7 +9683,7 @@ async function testHuntingResumeStartsAtHalfLatestStageFloor() {
         100,
         "Achievement maximum must remain independent of resume state"
     );
-    console.log("[hunting-resume-half-floor] ok");
+    console.log("[hunting-checkpoint-start] ok");
 }
 
 function testHuntingTerrain() {
@@ -16364,7 +16420,7 @@ testHuntingStageSelectionAndArenaTheme();
 await testHuntingStageSelectUsesPreviewCharacter();
 await testDebugHuntingStartsRequestedFloor();
 await testDebugHuntingEventPreviewUsesProductionEventFlow();
-await testHuntingResumeStartsAtHalfLatestStageFloor();
+await testHuntingCheckpointStartsAtSelectedFloor();
 testHuntingTerrain();
 testTournamentAngledBounceRamps();
 testEquipmentEnhancement();

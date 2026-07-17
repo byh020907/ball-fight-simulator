@@ -4,6 +4,7 @@ const HUNTING_REWARDS = REWARD_BALANCE.hunting;
 
 export const HUNTING_MAX_FLOOR = 100;
 export const HUNTING_ADVANCE_STEPS = 10;
+export const HUNTING_START_CHECKPOINTS = Object.freeze([1, 20, 40, 60, 80]);
 
 export const HUNTING_STAGE_IDS = Object.freeze({
     CAVE: "cave",
@@ -131,9 +132,10 @@ export const HUNTING_DEFEAT_PRESERVE = Object.freeze({
 });
 
 export const HUNTING_SCALING = Object.freeze({
-    ENEMY_POWER_PER_FLOOR: 0.08,
+    NORMAL_MAX_POWER_MULTIPLIER: 1.7,
     ELITE_POWER_BONUS: 0.12,
-    CHAMPION_POWER_BONUS: 0.28
+    CHAMPION_POWER_BONUS: 0.25,
+    MAX_POWER_MULTIPLIER: 2
 });
 
 export const HUNTING_CHEST_REWARD_TYPES = Object.freeze({

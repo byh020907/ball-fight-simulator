@@ -5,7 +5,7 @@ import {
     defeatHuntingRun,
     canRetreatFromHuntingRun,
     canEnterHunting,
-    getHuntingResumeStartFloor,
+    getHuntingAvailableStartFloors,
     getSelectedHuntingStageId,
     getUnlockedHuntingStageIds,
     applyHuntingStatModifiersToSpec,
@@ -19,6 +19,7 @@ import {
     HUNTING_EVENT_TYPES,
     HUNTING_FLOOR_OUTCOME_TYPES,
     HUNTING_MAX_FLOOR,
+    HUNTING_START_CHECKPOINTS,
     HUNTING_STAGE_IDS,
     HUNTING_STAGES
 } from "./huntingConfig.js";
@@ -162,21 +163,51 @@ export class HuntingManager {
                     const stageId = btn.dataset.stage;
                     app.playerProfile.hunting.selectedStageId = stageId;
                     savePlayerProfile(app.playerProfile);
-                    return this.startRun(characterId);
+                    return this.showCheckpointSelect(characterId, stageId);
                 });
             });
         }, 50);
     }
 
-    async startRun(characterId) {
+    showCheckpointSelect(characterId, stageId = getSelectedHuntingStageId(this.app.playerProfile)) {
+        const stage = getHuntingStage(stageId);
+        const availableCheckpoints = getHuntingAvailableStartFloors(this.app.playerProfile.hunting.stats, stageId);
+        const checkpointButtons = HUNTING_START_CHECKPOINTS.map((checkpoint) => {
+            const available = availableCheckpoints.includes(checkpoint);
+            return `<button class="hunting-checkpoint-btn" data-checkpoint="${checkpoint}" ${available ? "" : "disabled"}>
+                <strong>${checkpoint}</strong><span>${checkpoint}층 첫 조우</span>
+            </button>`;
+        }).join("");
+        PopupService.show({
+            title: `사냥터 — ${stage.name} 시작 층`,
+            bodyHtml: `<div class="hunting-checkpoint-select">
+                <span class="hunting-section-label">첫 조우 층 선택</span>
+                <p class="hunting-checkpoint-desc">도달한 층까지의 체크포인트만 선택할 수 있습니다.</p>
+                <div class="hunting-checkpoint-grid">${checkpointButtons}</div>
+            </div>`,
+            buttons: []
+        });
+        setTimeout(() => {
+            document.querySelectorAll(".hunting-checkpoint-btn").forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    const encounterFloor = Number(btn.dataset.checkpoint);
+                    if (!availableCheckpoints.includes(encounterFloor)) return;
+                    return this.startRun(characterId, { encounterFloor });
+                });
+            });
+        }, 50);
+    }
+
+    async startRun(characterId, { encounterFloor = 1 } = {}) {
         PopupService.close();
         if (!canEnterHunting(this.app.playerProfile, characterId)) return;
         const stageId = getSelectedHuntingStageId(this.app.playerProfile);
-        const displayFloor = getHuntingResumeStartFloor(this.app.playerProfile.hunting.stats, stageId);
+        const availableCheckpoints = getHuntingAvailableStartFloors(this.app.playerProfile.hunting.stats, stageId);
+        const selectedCheckpoint = availableCheckpoints.includes(encounterFloor) ? encounterFloor : 1;
         return this._startRun(characterId, {
             stageId,
-            encounterFloor: displayFloor + 1,
-            displayFloor,
+            encounterFloor: selectedCheckpoint,
+            displayFloor: selectedCheckpoint,
             debug: false
         });
     }

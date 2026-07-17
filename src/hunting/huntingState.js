@@ -1,5 +1,6 @@
 import {
     HUNTING_MAX_FLOOR,
+    HUNTING_START_CHECKPOINTS,
     HUNTING_STAGE_IDS,
     HUNTING_STAGES,
     HUNTING_STAT_KEYS,
@@ -88,15 +89,15 @@ export function createHuntingRun({
     };
 }
 
-export function getHuntingResumeStartFloor(stats, stageId) {
+export function getHuntingAvailableStartFloors(stats, stageId) {
     const hasKnownStage = HUNTING_STAGES.some((stage) => stage.id === stageId);
-    if (!hasKnownStage) return 1;
+    if (!hasKnownStage) return [HUNTING_START_CHECKPOINTS[0]];
 
     const lastReachedFloor = stats?.lastReachedFloorByStage?.[stageId];
-    if (!Number.isFinite(lastReachedFloor) || lastReachedFloor < 1) return 1;
+    if (!Number.isFinite(lastReachedFloor) || lastReachedFloor < 1) return [HUNTING_START_CHECKPOINTS[0]];
 
     const safeLastReachedFloor = Math.min(HUNTING_MAX_FLOOR, Math.floor(lastReachedFloor));
-    return Math.max(1, Math.floor(safeLastReachedFloor / 2));
+    return HUNTING_START_CHECKPOINTS.filter((checkpoint) => checkpoint === 1 || safeLastReachedFloor >= checkpoint);
 }
 
 export function getUnlockedHuntingStageIds(profile) {
