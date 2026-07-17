@@ -360,6 +360,12 @@ export class BattleSimulation extends FighterPhysicsSimulation {
             context.damageFromBToA = 0;
             return;
         }
+        if (replacement?.skipPhysicsOnly) {
+            context.skipPhysics = true;
+            context.skipPhysicsOnly = true;
+            context.deferredRigidBodyResponse = this.captureFighterRigidBodyCollision(context);
+            context.deferredSpinCut = replacement.deferredSpinCut ?? null;
+        }
 
         const aCollisionEffects = a.getActiveMasteryCollisionEffects?.() ?? [];
         const bCollisionEffects = b.getActiveMasteryCollisionEffects?.() ?? [];
@@ -494,6 +500,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
 
         a.abilities.onCollision(b, { contactPoint });
         b.abilities.onCollision(a, { contactPoint });
+        context.deferredSpinCut?.start(context);
         this._recordPhysicsDebugCollision(context);
     }
 

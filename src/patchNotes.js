@@ -19,6 +19,25 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.29.1",
+        date: "2026-07-17",
+        title: "v0.29.1 Spin 만충 보상 정비",
+        changes: [
+            {
+                type: "fix",
+                text: "Spin 만충 절단도 일반 Crash 피해와 충돌 보상을 함께 받도록 수정했습니다."
+            },
+            {
+                type: "fix",
+                text: "절단 종료 반동을 고정 속도 대신 실제 충돌 에너지로 분리하도록 수정했습니다."
+            },
+            {
+                type: "style",
+                text: "절단 피해를 실제 수치별 작은 표기로 바꾸고 Lv.9 유체장 범위를 340px로 넓혔습니다."
+            }
+        ]
+    },
+    {
         version: "0.29.0",
         date: "2026-07-17",
         title: "v0.29.0 다섯 캐릭터 레벨 보상 개편",

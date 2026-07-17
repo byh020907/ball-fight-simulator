@@ -177,6 +177,10 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         return this.stats.baseSkill + (this.stats.allocation?.skill ?? 0) + (this.hero?.bonuses?.skill ?? 0);
     }
 
+    getTotalAttackDamage() {
+        return this.stats.baseDamage;
+    }
+
     // ── 물리 디버그 래퍼 (원본 믹스인 메서드를 보존하고 기록 추가) ──
 
     applyImpulse(impulse) {
@@ -503,7 +507,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
     }
 
     takeDamage(amount, source, label = "Hit", options = {}) {
-        if (this.flags.defeated) return { actualDamage: 0 };
+        if (this.flags.defeated) return { actualDamage: 0, isCritical: false };
         const isCritical = source && source !== this && this.rollCritical(source);
         if (isCritical) {
             amount = Math.round(amount * 2);
@@ -555,7 +559,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
                 s.hooks?.onFighterDefeated?.(this, { ...defeatContext, suppressLootDrop });
             }
         }
-        return { actualDamage };
+        return { actualDamage, isCritical };
     }
 
     draw(ctx) {

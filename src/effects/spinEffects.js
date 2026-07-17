@@ -1,8 +1,8 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
 import { getVisibleLineWidth } from "./effectVisibility.js";
+import { SPIN_VORTEX_CONFIG } from "../abilities/spinConfig.js";
 
 const CUT_DURATION = 0.6;
-const VORTEX_RADIUS = 260;
 
 export class SpinCutEffect extends CombatEntity {
     static renderLayer = RENDER_LAYERS.FOREGROUND;
@@ -88,7 +88,7 @@ export class SpinVortexEffect extends CombatEntity {
         const radialRatio = 0.18 + ((index * 11) % 23) / 27;
         const position = Vector2.add(
             this.ability.owner.position,
-            Vector2.fromAngle(angle, VORTEX_RADIUS * radialRatio)
+            Vector2.fromAngle(angle, SPIN_VORTEX_CONFIG.radius * radialRatio)
         );
         return { position, points: [position.clone()], seed: index };
     }
@@ -103,13 +103,16 @@ export class SpinVortexEffect extends CombatEntity {
         for (const stream of this.streams) {
             const acceleration = this.ability.getVortexAccelerationAt(stream.position);
             const distance = Vector2.subtract(stream.position, this.position).length();
-            const speedBoost = 1.25 + Math.max(0, 1 - distance / VORTEX_RADIUS) * 2.2;
+            const speedBoost = 1.25 + Math.max(0, 1 - distance / SPIN_VORTEX_CONFIG.radius) * 2.2;
             stream.position.add(acceleration.scale(delta * speedBoost));
             stream.points.push(stream.position.clone());
             if (stream.points.length > 7) stream.points.shift();
-            if (distance < this.ability.owner.radius * 0.8 || distance > VORTEX_RADIUS + 20) {
+            if (distance < this.ability.owner.radius * 0.8 || distance > SPIN_VORTEX_CONFIG.radius + 20) {
                 const angle = (stream.seed * 2.399 + this.ability.owner.angle) % (Math.PI * 2);
-                stream.position = Vector2.add(this.position, Vector2.fromAngle(angle, VORTEX_RADIUS * 0.94));
+                stream.position = Vector2.add(
+                    this.position,
+                    Vector2.fromAngle(angle, SPIN_VORTEX_CONFIG.radius * 0.94)
+                );
                 stream.points = [stream.position.clone()];
             }
         }
@@ -123,7 +126,7 @@ export class SpinVortexEffect extends CombatEntity {
         for (const stream of this.streams) {
             if (stream.points.length < 2) continue;
             const distance = Vector2.subtract(stream.position, this.position).length();
-            ctx.globalAlpha = 0.35 + Math.max(0, 1 - distance / VORTEX_RADIUS) * 0.6;
+            ctx.globalAlpha = 0.35 + Math.max(0, 1 - distance / SPIN_VORTEX_CONFIG.radius) * 0.6;
             ctx.beginPath();
             stream.points.forEach((point, index) => {
                 if (index === 0) ctx.moveTo(point.x, point.y);
@@ -135,7 +138,7 @@ export class SpinVortexEffect extends CombatEntity {
         ctx.strokeStyle = "#ffffff";
         ctx.lineWidth = getVisibleLineWidth(ctx, "hairline", 1.5);
         ctx.beginPath();
-        ctx.arc(this.position.x, this.position.y, VORTEX_RADIUS, 0, Math.PI * 2);
+        ctx.arc(this.position.x, this.position.y, SPIN_VORTEX_CONFIG.radius, 0, Math.PI * 2);
         ctx.stroke();
         ctx.restore();
     }

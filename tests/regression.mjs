@@ -6322,6 +6322,9 @@ function testOrbitLevelRewardContracts(app) {
 
 function testSpinLevelRewardContracts(app) {
     const setVelocity = (body, velocity) => body.applyImpulse(Vector2.subtract(velocity, body.velocity));
+    const assertClose = (actual, expected, message, tolerance = 1e-9) => {
+        assert.ok(Math.abs(actual - expected) <= tolerance, `${message}: ${actual} !== ${expected}`);
+    };
     const createRun = (tier, { defense = 0, extraEnemy = false } = {}) => {
         const ownerSpec = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.SPIN);
         const targetSpec = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
@@ -6355,15 +6358,45 @@ function testSpinLevelRewardContracts(app) {
         }
         return { simulation, owner, target, nearby };
     };
-    const runCut = (run) => {
+    const recordDamageEvents = (target) => {
+        const events = [];
+        const takeDamage = target.takeDamage.bind(target);
+        target.takeDamage = (amount, source, label, options) => {
+            const result = takeDamage(amount, source, label, options);
+            events.push({ amount, label, options, ...result });
+            return result;
+        };
+        return events;
+    };
+    const runCut = (run, { assertCrash = true } = {}) => {
         run.owner.ability.state.timeWithoutCollision = run.owner.ability.getMaxChargeTime();
+        const events = recordDamageEvents(run.target);
+        let opponentNormalHooks = 0;
+        const onCollision = run.target.abilities.onCollision.bind(run.target.abilities);
+        run.target.abilities.onCollision = (...args) => {
+            opponentNormalHooks += 1;
+            return onCollision(...args);
+        };
+        run.owner.hp = Math.max(1, run.owner.maxHp - 30);
+        run.owner.equipmentEffects = { ...run.owner.equipmentEffects, hpStealRatio: 0.1, hpStealCooldown: 0 };
+        let hpStealCalls = 0;
+        const heal = run.owner.heal.bind(run.owner);
+        run.owner.heal = (amount) => {
+            hpStealCalls += 1;
+            return heal(amount);
+        };
         const hpBefore = run.target.hp;
         run.simulation.handleCollision();
         assert.ok(
             run.owner.ability.state.cut,
-            "A full charged tier Spin should replace the direct collision with a cut"
+            "A full charged tier Spin should retain damage while deferring only rigid-body separation"
         );
-        assert.equal(run.target.hp, hpBefore, "Cut start must suppress the ordinary immediate collision damage");
+        const crashEvents = events.filter((event) => event.label === "Crash");
+        assert.equal(crashEvents.length, 1, "Full-charge cut must retain exactly one ordinary Crash damage event");
+        assert.ok(crashEvents[0].actualDamage > 0, "Full-charge Crash must retain its actual damage");
+        assert.equal(opponentNormalHooks, 1, "Full-charge cut must retain the opponent normal collision hook once");
+        assert.equal(hpStealCalls, 1, "Full-charge Crash must trigger collision lifesteal only once");
+        assert.ok(run.target.hp < hpBefore, "Full-charge cut must apply ordinary Crash damage before cutting");
         const cutEffect = run.simulation.entities.find((entity) => entity.constructor?.name === "SpinCutEffect");
         const renderSpinCut = (label) => {
             let cutArc;
@@ -6398,16 +6431,29 @@ function testSpinLevelRewardContracts(app) {
             cutStart.sweep < cutMid.sweep && cutMid.sweep <= cutEnd.sweep,
             "Spin cut sweep angle should widen across start, mid, and finish frames"
         );
-        return hpBefore - run.target.hp;
+        assert.equal(
+            events.filter((event) => event.label === "Spin Cut").length,
+            12,
+            "Cut must apply exactly twelve ticks"
+        );
+        assert.equal(
+            events.filter((event) => event.label === "Crash").length,
+            1,
+            "Cut finish must not replay Crash damage"
+        );
+        if (assertCrash) {
+            assert.ok(events.some((event) => event.label === "Crash" && event.actualDamage > 0));
+        }
+        return { events, cutEffect, crashActual: crashEvents[0].actualDamage };
     };
 
     const rows = REWARD_BALANCE.experience.characterLevelProgressions.spin.filter((entry) => entry.abilityTier);
     assert.deepEqual(
         rows.map((entry) => entry.gameText),
         [
-            "만충 표면 절단 0.60초 · 12틱 ×0.15",
+            "만충 Crash 유지 · 표면 절단 0.60초 · 12틱 ×0.15",
             "가속 절삭 ×0.10→×0.30 · 합계 ×2.40",
-            "260px 관통 유체장 · 절단 방어 무시"
+            "340px 관통 유체장 · 절단 방어 무시"
         ]
     );
     assert.deepEqual(REWARD_BALANCE.experience.abilityUpgrades.spin.tiers, [
@@ -6426,19 +6472,43 @@ function testSpinLevelRewardContracts(app) {
     assert.equal(partialRun.owner.ability.getChargeProgress(), 0, "Partial collision should consume the base charge");
 
     const tierOneRun = createRun(1);
-    assert.equal(runCut(tierOneRun), 180, "Lv3 cut should deal twelve x0.15 ticks for x1.80 total");
+    tierOneRun.target.stats.baseDefense = 0;
+    const tierOneCut = runCut(tierOneRun);
+    assert.equal(
+        tierOneCut.events
+            .filter((event) => event.label === "Spin Cut")
+            .reduce((total, event) => total + event.actualDamage, 0),
+        180,
+        "Lv3 cut should deal twelve x0.15 ticks for x1.80 total attack"
+    );
     assert.equal(tierOneRun.owner.ability.state.cut, null, "Lv3 cut should finish after twelve ticks");
-    assert.ok(tierOneRun.target.velocity.x >= 359, "Cut finish should apply +360px/s along the first collision line");
-    assert.ok(tierOneRun.owner.velocity.x <= -219, "Cut finish should apply -220px/s recoil to Spin");
 
     const tierTwoRun = createRun(2);
-    assert.equal(runCut(tierTwoRun), 240, "Lv6 linear x0.10-to-x0.30 ticks should total x2.40");
+    tierTwoRun.target.stats.baseDefense = 0;
+    const tierTwoCut = runCut(tierTwoRun);
+    assert.equal(
+        tierTwoCut.events
+            .filter((event) => event.label === "Spin Cut")
+            .reduce((total, event) => total + event.actualDamage, 0),
+        240,
+        "Lv6 linear x0.10-to-x0.30 ticks should total x2.40 total attack"
+    );
 
     const defendedTierTwo = createRun(2, { defense: 50 });
-    const defendedTierTwoDamage = runCut(defendedTierTwo);
+    const defendedTierTwoCut = runCut(defendedTierTwo);
+    const defendedTierTwoDamage = defendedTierTwoCut.events
+        .filter((event) => event.label === "Spin Cut")
+        .reduce((total, event) => total + event.actualDamage, 0);
     assert.ok(defendedTierTwoDamage < 240, "Lv6 cut should still use ordinary defense");
     const piercingRun = createRun(3, { defense: 50 });
-    assert.equal(runCut(piercingRun), 240, "Lv9 cut should ignore defense for exactly its twelve ticks");
+    const piercingCut = runCut(piercingRun);
+    assert.equal(
+        piercingCut.events
+            .filter((event) => event.label === "Spin Cut")
+            .reduce((total, event) => total + event.actualDamage, 0),
+        240,
+        "Lv9 cut should ignore defense for exactly its twelve ticks"
+    );
     const hpBeforeOrdinaryDamage = piercingRun.target.hp;
     piercingRun.target.takeDamage(100, piercingRun.owner, "Post-cut hit");
     assert.equal(
@@ -6447,9 +6517,139 @@ function testSpinLevelRewardContracts(app) {
         "Defense ignore must not leak beyond the cut ticks"
     );
 
+    const totalAttackRun = createRun(1);
+    totalAttackRun.target.stats.baseDefense = 0;
+    totalAttackRun.owner.stats.baseDamage = 125;
+    const totalAttackCut = runCut(totalAttackRun);
+    assert.equal(
+        totalAttackCut.events
+            .filter((event) => event.label === "Spin Cut")
+            .reduce((total, event) => total + event.amount, 0),
+        225,
+        "Lv3 cut raw damage must use BattleBall's final total attack helper"
+    );
+
+    const referenceRun = createRun(1);
+    referenceRun.owner.angularVelocity = 8;
+    referenceRun.target.angularVelocity = -3;
+    referenceRun.owner.ability.onCollision = () => {};
+    const referenceOwnerVelocity = referenceRun.owner.velocity.clone();
+    const referenceTargetVelocity = referenceRun.target.velocity.clone();
+    const referenceOwnerAngular = referenceRun.owner._accumulatedAngularImpulse;
+    const referenceTargetAngular = referenceRun.target._accumulatedAngularImpulse;
+    referenceRun.simulation.handleCollision();
+    const referenceDelta = {
+        ownerLinear: Vector2.subtract(referenceRun.owner.velocity, referenceOwnerVelocity),
+        targetLinear: Vector2.subtract(referenceRun.target.velocity, referenceTargetVelocity),
+        ownerAngular: referenceRun.owner._accumulatedAngularImpulse - referenceOwnerAngular,
+        targetAngular: referenceRun.target._accumulatedAngularImpulse - referenceTargetAngular
+    };
+
+    const deferredRun = createRun(1);
+    deferredRun.owner.angularVelocity = 8;
+    deferredRun.target.angularVelocity = -3;
+    deferredRun.owner.ability.state.timeWithoutCollision = deferredRun.owner.ability.getMaxChargeTime();
+    const deferredOwnerVelocity = deferredRun.owner.velocity.clone();
+    const deferredTargetVelocity = deferredRun.target.velocity.clone();
+    deferredRun.simulation.handleCollision();
+    const storedResponse = deferredRun.owner.ability.state.cut.deferredRigidBodyResponse;
+    assert.ok(storedResponse, "Full charge must capture the common collision response at contact time");
+    assertClose(
+        storedResponse.bodyA.linearDelta.x,
+        referenceDelta.ownerLinear.x,
+        "Stored owner x delta must match normal response"
+    );
+    assertClose(
+        storedResponse.bodyA.linearDelta.y,
+        referenceDelta.ownerLinear.y,
+        "Stored owner y delta must match normal response"
+    );
+    assertClose(
+        storedResponse.bodyB.linearDelta.x,
+        referenceDelta.targetLinear.x,
+        "Stored target x delta must match normal response"
+    );
+    assertClose(
+        storedResponse.bodyB.linearDelta.y,
+        referenceDelta.targetLinear.y,
+        "Stored target y delta must match normal response"
+    );
+    assertClose(
+        storedResponse.bodyA.angularImpulse,
+        referenceDelta.ownerAngular,
+        "Stored owner angular delta must match normal response"
+    );
+    assertClose(
+        storedResponse.bodyB.angularImpulse,
+        referenceDelta.targetAngular,
+        "Stored target angular delta must match normal response"
+    );
+    assertClose(
+        deferredRun.owner.velocity.x,
+        deferredOwnerVelocity.x,
+        "Deferred response must not immediately change owner linear velocity"
+    );
+    assertClose(
+        deferredRun.target.velocity.x,
+        deferredTargetVelocity.x,
+        "Deferred response must not immediately change target linear velocity"
+    );
+    for (const _ of Array.from({ length: 11 })) deferredRun.owner.ability.update(0.05, deferredRun.target);
+    const beforeReleaseOwnerVelocity = deferredRun.owner.velocity.clone();
+    const beforeReleaseTargetVelocity = deferredRun.target.velocity.clone();
+    const beforeReleaseOwnerAngular = deferredRun.owner._accumulatedAngularImpulse;
+    const beforeReleaseTargetAngular = deferredRun.target._accumulatedAngularImpulse;
+    deferredRun.owner.ability.update(0.05, deferredRun.target);
+    assertClose(
+        deferredRun.owner.velocity.x - beforeReleaseOwnerVelocity.x,
+        storedResponse.bodyA.linearDelta.x,
+        "Cut finish must apply the stored owner x response without recalculation"
+    );
+    assertClose(
+        deferredRun.target.velocity.x - beforeReleaseTargetVelocity.x,
+        storedResponse.bodyB.linearDelta.x,
+        "Cut finish must apply the stored target x response without recalculation"
+    );
+    assertClose(
+        deferredRun.owner._accumulatedAngularImpulse - beforeReleaseOwnerAngular,
+        storedResponse.bodyA.angularImpulse,
+        "Cut finish must apply the stored owner angular response once"
+    );
+    assertClose(
+        deferredRun.target._accumulatedAngularImpulse - beforeReleaseTargetAngular,
+        storedResponse.bodyB.angularImpulse,
+        "Cut finish must apply the stored target angular response once"
+    );
+    assert.equal(storedResponse.applied, true, "Deferred collision response must only apply once");
+
+    const criticalRun = createRun(1);
+    criticalRun.owner.stats.criticalChance = 100;
+    criticalRun.target.stats.baseDefense = 0;
+    const criticalCut = runCut(criticalRun);
+    const tickNumbers = criticalRun.simulation.entities.filter(
+        (entity) => entity.constructor?.name === "DamageNumber" && entity.visibilityToken === "combatText"
+    );
+    assert.ok(tickNumbers.length > 0, "Cut ticks must create actual-damage number entities");
+    for (const number of tickNumbers) {
+        assert.equal(number.visibilityToken, "combatText", "Cut numbers must reuse common combat text visibility");
+        assert.ok(number.fontSize >= 11 && number.fontSize <= 12, "Cut numbers must stay small");
+        assert.ok(number.maxLife >= 0.22 && number.maxLife <= 0.3, "Cut numbers must stay short-lived");
+        assert.equal(number.color, "#ffdd00", "Critical cut numbers must use the takeDamage critical color");
+        assert.ok(/^\d+$/.test(number.displayText), "Cut numbers must show only actual damage values");
+    }
+    assert.ok(
+        criticalCut.events.filter((event) => event.label === "Spin Cut").every((event) => event.isCritical),
+        "Critical cut text must use the exact takeDamage critical result without rerolling"
+    );
+    assert.equal(
+        criticalRun.simulation.entities.some((entity) => String(entity.displayText ?? "").includes("×")),
+        false,
+        "Cut must not create cumulative or multiplier counter text"
+    );
+
     const vortexRun = createRun(3, { extraEnemy: true });
     vortexRun.owner.ability.state.timeWithoutCollision = vortexRun.owner.ability.getMaxChargeTime();
-    vortexRun.target.position = Vector2.add(vortexRun.owner.position, new Vector2(130, 0));
+    vortexRun.target.position = Vector2.add(vortexRun.owner.position, new Vector2(170, 0));
     vortexRun.nearby.position = Vector2.add(vortexRun.owner.position, new Vector2(65, 0));
     const halfRadiusAcceleration = vortexRun.owner.ability.getVortexAccelerationAt(vortexRun.target.position);
     assert.ok(
@@ -6468,11 +6668,11 @@ function testSpinLevelRewardContracts(app) {
     );
     const renderVortex = (label) => {
         assertForegroundEffectRenders(vortexEffect, label, (primitives) => {
-            assertEffectArcAt(primitives, vortexRun.owner.position, label, (radius) => Math.abs(radius - 260) < 1e-9);
+            assertEffectArcAt(primitives, vortexRun.owner.position, label, (radius) => Math.abs(radius - 340) < 1e-9);
             assertEffectUsesColor(primitives, "#ffe36d", label);
             assert.ok(
                 findEffectPrimitive(primitives, "lineTo"),
-                `${label} should draw inward-curving stream trajectories inside the 260px boundary`
+                `${label} should draw inward-curving stream trajectories inside the 340px boundary`
             );
         });
         return Vector2.subtract(vortexEffect.streams[0].position, vortexRun.owner.position).length();
@@ -6498,11 +6698,29 @@ function testSpinLevelRewardContracts(app) {
     );
     assert.equal(
         vortexRun.owner.ability
-            .getVortexAccelerationAt(Vector2.add(vortexRun.owner.position, new Vector2(261, 0)))
+            .getVortexAccelerationAt(Vector2.add(vortexRun.owner.position, new Vector2(341, 0)))
             .length(),
         0,
-        "Lv9 vortex should stop outside 260px"
+        "Lv9 vortex should stop outside 340px"
     );
+    assert.equal(
+        vortexRun.owner.ability
+            .getVortexAccelerationAt(Vector2.add(vortexRun.owner.position, new Vector2(340, 0)))
+            .length(),
+        0,
+        "Lv9 vortex should have zero acceleration at the 340px boundary"
+    );
+    vortexRun.target.position = new Vector2(
+        vortexRun.owner.position.x + vortexRun.owner.radius + vortexRun.target.radius - 1,
+        vortexRun.owner.position.y
+    );
+    vortexRun.simulation.handleCollision();
+    assert.equal(
+        vortexRun.owner.ability.state.vortexEffect,
+        null,
+        "Full-charge collision must end Lv9 vortex immediately"
+    );
+    assert.equal(vortexEffect.isExpired, true, "Existing vortex entity must expire during the cut");
     console.log("[spin-level-reward-contracts] ok");
 }
 

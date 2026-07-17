@@ -153,7 +153,7 @@ function _effectiveMassDenom(bodyA, bodyB, direction, contactPoint) {
  * @param {number} [options.angularScaleB=1] — bodyB angular impulse 배율
  * @returns {{ normalImpulse: number, tangentImpulse: number }}
  */
-function _resolveContactImpulse(bodyA, bodyB, normal, contactPoint, options = {}) {
+function _createContactImpulseResponse(bodyA, bodyB, normal, contactPoint, options = {}) {
     const restitution = options.restitution ?? 0.92;
     const friction = options.tangentialFriction ?? 0.2;
     const linearScaleA = options.linearScaleA ?? 1;
@@ -172,7 +172,15 @@ function _resolveContactImpulse(bodyA, bodyB, normal, contactPoint, options = {}
     };
 
     const vn = relVel.x * normal.x + relVel.y * normal.y;
-    if (vn > 0) return { normalImpulse: 0, tangentImpulse: 0 };
+    if (vn > 0) {
+        return {
+            normalImpulse: 0,
+            tangentImpulse: 0,
+            impulse: { x: 0, y: 0 },
+            bodyA: null,
+            bodyB: null
+        };
+    }
 
     const vt = relVel.x * tangent.x + relVel.y * tangent.y;
 
@@ -194,53 +202,44 @@ function _resolveContactImpulse(bodyA, bodyB, normal, contactPoint, options = {}
     const Jx = normal.x * jn + tangent.x * jt;
     const Jy = normal.y * jn + tangent.y * jt;
 
-    // ── 적용 ──
-
     const invMassA = _getInvMass(bodyA);
     const invMassB = _getInvMass(bodyB);
-
-    // Body A: -J (J는 A→B 방향, bodyA는 반대 방향 impulse)
-    if (bodyA !== null && typeof bodyA.applyImpulse === "function") {
-        bodyA.applyImpulse({
-            x: -Jx * invMassA * linearScaleA,
-            y: -Jy * invMassA * linearScaleA
-        });
-    }
-
-    // Body B: +J
-    if (bodyB !== null && typeof bodyB.applyImpulse === "function") {
-        bodyB.applyImpulse({
-            x: Jx * invMassB * linearScaleB,
-            y: Jy * invMassB * linearScaleB
-        });
-    }
-
-    // Angular impulse: L = r × J
-    // Body A: -(rA × J) * scale
-    if (bodyA !== null && typeof bodyA.applyAngularImpulse === "function") {
-        const rA = {
-            x: contactPoint.x - bodyA.position.x,
-            y: contactPoint.y - bodyA.position.y
+    const createBodyDelta = (body, linearImpulse, angularScale) => {
+        if (body === null) return null;
+        const r = {
+            x: contactPoint.x - body.position.x,
+            y: contactPoint.y - body.position.y
         };
-        const angularLA = cross2D(rA, { x: -Jx, y: -Jy }) * angularScaleA;
-        if (Number.isFinite(angularLA) && angularLA !== 0) {
-            bodyA.applyAngularImpulse(angularLA);
+        return {
+            body,
+            linearDelta: {
+                x: linearImpulse.x * (body === bodyA ? invMassA * linearScaleA : invMassB * linearScaleB),
+                y: linearImpulse.y * (body === bodyA ? invMassA * linearScaleA : invMassB * linearScaleB)
+            },
+            angularImpulse: cross2D(r, linearImpulse) * angularScale
+        };
+    };
+
+    return {
+        normalImpulse: jn,
+        tangentImpulse: jt,
+        impulse: { x: Jx, y: Jy },
+        bodyA: createBodyDelta(bodyA, { x: -Jx, y: -Jy }, angularScaleA),
+        bodyB: createBodyDelta(bodyB, { x: Jx, y: Jy }, angularScaleB)
+    };
+}
+
+function _applyContactImpulseResponse(response, isBodyActive = () => true) {
+    for (const delta of [response.bodyA, response.bodyB]) {
+        if (!delta || !isBodyActive(delta.body)) continue;
+        if (typeof delta.body.applyImpulse === "function") {
+            delta.body.applyImpulse(delta.linearDelta);
+        }
+        if (typeof delta.body.applyAngularImpulse === "function" && Number.isFinite(delta.angularImpulse)) {
+            delta.body.applyAngularImpulse(delta.angularImpulse);
         }
     }
-
-    // Body B: +(rB × J) * scale
-    if (bodyB !== null && typeof bodyB.applyAngularImpulse === "function") {
-        const rB = {
-            x: contactPoint.x - bodyB.position.x,
-            y: contactPoint.y - bodyB.position.y
-        };
-        const angularLB = cross2D(rB, { x: Jx, y: Jy }) * angularScaleB;
-        if (Number.isFinite(angularLB) && angularLB !== 0) {
-            bodyB.applyAngularImpulse(angularLB);
-        }
-    }
-
-    return { normalImpulse: jn, tangentImpulse: jt };
+    return response;
 }
 
 // ── Public API ──────────────────────────────────────────────────────────────
@@ -285,13 +284,15 @@ export function applyCollisionResponse(body, normal, contactPoint, preCollisionV
 
     // 정적 표면 충돌: bodyA=null(표면), bodyB=body(이동체).
     // normal이 표면→body 방향이므로 A→B = 표면→body가 일치한다.
-    _resolveContactImpulse(null, body, normal, contactPoint, {
-        restitution,
-        tangentialFriction,
-        velocityA: surfaceVel,
-        velocityB: preCollisionVelocity,
-        angularScaleB: angularFactor
-    });
+    _applyContactImpulseResponse(
+        _createContactImpulseResponse(null, body, normal, contactPoint, {
+            restitution,
+            tangentialFriction,
+            velocityA: surfaceVel,
+            velocityB: preCollisionVelocity,
+            angularScaleB: angularFactor
+        })
+    );
 }
 
 /**
@@ -321,7 +322,18 @@ export function applyCollisionResponse(body, normal, contactPoint, preCollisionV
  * @param {{x:number,y:number}} [options.preCollisionVel]
  */
 export function applyDynamicCollisionResponse(bodyA, bodyB, normal, contactPoint, approachSpeed, options = {}) {
-    if (approachSpeed >= 0) return;
+    const response = captureDynamicCollisionResponse(bodyA, bodyB, normal, contactPoint, approachSpeed, options);
+    if (!response) return;
+    applyCapturedDynamicCollisionResponse(response);
+    return response;
+}
+
+/**
+ * 동적 충돌의 공통 impulse 결과를 현재 접점 상태에서 계산만 한다.
+ * 저장한 결과는 이후 applyCapturedDynamicCollisionResponse로 재계산 없이 적용할 수 있다.
+ */
+export function captureDynamicCollisionResponse(bodyA, bodyB, normal, contactPoint, approachSpeed, options = {}) {
+    if (approachSpeed >= 0) return null;
 
     const matA = resolvePhysicsMaterial(bodyA?.physicsMaterial);
     const matB = resolvePhysicsMaterial(bodyB?.physicsMaterial);
@@ -336,7 +348,7 @@ export function applyDynamicCollisionResponse(bodyA, bodyB, normal, contactPoint
 
     // impact 의미: impactA는 bodyA의 outgoing → bodyB에 적용
     //               impactB는 bodyB의 outgoing → bodyA에 적용
-    _resolveContactImpulse(bodyA, bodyB, normal, contactPoint, {
+    return _createContactImpulseResponse(bodyA, bodyB, normal, contactPoint, {
         restitution,
         tangentialFriction,
         linearScaleA: impactB,
@@ -344,6 +356,15 @@ export function applyDynamicCollisionResponse(bodyA, bodyB, normal, contactPoint
         angularScaleA,
         angularScaleB
     });
+}
+
+/** 저장된 동적 충돌 impulse를 피해/훅 없이 한 번만 적용한다. */
+export function applyCapturedDynamicCollisionResponse(response, options = {}) {
+    if (!response || response.applied) return false;
+    const isBodyActive = options.isBodyActive ?? (() => true);
+    _applyContactImpulseResponse(response, isBodyActive);
+    response.applied = true;
+    return true;
 }
 
 /**

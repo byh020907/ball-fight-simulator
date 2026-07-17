@@ -1,6 +1,10 @@
 import { Vector2 } from "../core.js";
 import { resolveFighterShapeCollision } from "../physics/CollisionShape.js";
-import { applyDynamicCollisionResponse } from "../physics/collisionResponse.js";
+import {
+    applyCapturedDynamicCollisionResponse,
+    applyDynamicCollisionResponse,
+    captureDynamicCollisionResponse
+} from "../physics/collisionResponse.js";
 import { Simulation } from "./simulation.js";
 
 const COLLISION_SEPARATION_PADDING = 0.6;
@@ -154,6 +158,19 @@ export class FighterPhysicsSimulation extends Simulation {
         const { a, b, normal, contactPoint, approachSpeed } = context;
         applyDynamicCollisionResponse(a, b, normal, contactPoint, approachSpeed, {
             ...this.getFighterCollisionResponseOptions(context)
+        });
+    }
+
+    captureFighterRigidBodyCollision(context) {
+        const { a, b, normal, contactPoint, approachSpeed } = context;
+        return captureDynamicCollisionResponse(a, b, normal, contactPoint, approachSpeed, {
+            ...this.getFighterCollisionResponseOptions(context)
+        });
+    }
+
+    applyDeferredFighterRigidBodyCollision(response) {
+        return applyCapturedDynamicCollisionResponse(response, {
+            isBodyActive: (fighter) => !fighter.flags?.defeated && !fighter.flags?.destroyed && !fighter.isExpired
         });
     }
 

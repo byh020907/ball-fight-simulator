@@ -1,6 +1,7 @@
 import { Vector2 } from "../core.js";
 import { SpinCutEffect, SpinVortexEffect } from "../effects/spinEffects.js";
 import { Ability } from "./ability.js";
+import { SPIN_VORTEX_CONFIG } from "./spinConfig.js";
 
 const BASE_CHARGE_TIME = 4.5;
 const MAX_SPIN_REVOLUTIONS_PER_SECOND = 10;
@@ -14,10 +15,6 @@ const RING_SEGMENT_COUNT = 12;
 const CUT_DURATION = 0.6;
 const CUT_INTERVAL = 0.05;
 const CUT_TICKS = 12;
-const CUT_TARGET_RELEASE_SPEED = 360;
-const CUT_OWNER_RELEASE_SPEED = 220;
-const VORTEX_RADIUS = 260;
-const VORTEX_ACCELERATION = 420;
 
 function smoothstep(value) {
     const clamped = Math.max(0, Math.min(1, value));
@@ -109,8 +106,12 @@ export class SpinAbility extends Ability {
         ) {
             return null;
         }
-        this._startCut(target, context);
-        return { replaceCollision: true };
+        return {
+            skipPhysicsOnly: true,
+            deferredSpinCut: {
+                start: (collisionContext) => this._startCut(target, collisionContext)
+            }
+        };
     }
 
     shouldSkipFighterCollision(target) {
@@ -131,25 +132,20 @@ export class SpinAbility extends Ability {
             elapsed: 0,
             tickTimer: 0,
             tickCount: 0,
-            totalDamage: 0,
             direction,
             ownerAnchor: toLocalAnchor(this.owner, contactPoint),
             targetAnchor: toLocalAnchor(target, contactPoint),
             contactPoint,
-            counterText: this.simulation.spawnActionText(contactPoint.clone(), "0 ×0", "#ffe36d")
+            deferredRigidBodyResponse: context.deferredRigidBodyResponse ?? null
         };
         cut.visualEffect = new SpinCutEffect(this, cut);
         this.state.cut = cut;
         this.simulation.entities.push(cut.visualEffect);
-        if (this.state.cut.counterText) {
-            this.state.cut.counterText.applyImpulse(this.state.cut.counterText.velocity.clone().scale(-1));
-            this.state.cut.counterText.visibilityToken = "combatText";
-        }
-        if (this.getLevelUpgrade().piercingVortex) {
-            this.simulation.spawnActionText(contactPoint.clone(), "관통 절단!", "#fff2a8");
+        if (this.state.vortexEffect) {
+            this.state.vortexEffect.isExpired = true;
+            this.state.vortexEffect = null;
         }
         this.state.timeWithoutCollision = 0;
-        this._applySpinVelocity(0);
         this.state.dischargeFlash = 0.34;
         this.simulation.playSound("rage", 0.88);
     }
@@ -165,7 +161,8 @@ export class SpinAbility extends Ability {
         const activeDelta = Math.min(delta, Math.max(0, CUT_DURATION - cut.elapsed));
         cut.elapsed += activeDelta;
         cut.tickTimer += activeDelta;
-        this._applyCutConstraint(cut);
+        const reachesCutEnd = cut.elapsed + 1e-9 >= CUT_DURATION;
+        if (!reachesCutEnd) this._applyCutConstraint(cut);
         this._updateCutContact(cut);
 
         while (cut.tickTimer + 1e-9 >= CUT_INTERVAL && cut.tickCount < CUT_TICKS) {
@@ -193,34 +190,52 @@ export class SpinAbility extends Ability {
         const ownerPoint = toWorldAnchor(this.owner, cut.ownerAnchor);
         const targetPoint = toWorldAnchor(cut.target, cut.targetAnchor);
         cut.contactPoint = Vector2.add(ownerPoint, targetPoint).scale(0.5);
-        if (cut.counterText) cut.counterText.pos = cut.contactPoint.clone();
     }
 
     _applyCutTick(cut) {
         const tickIndex = cut.tickCount;
         const multiplier = this.getLevelUpgrade().acceleratingCut ? 0.1 + (0.2 * tickIndex) / (CUT_TICKS - 1) : 0.15;
-        const result = cut.target.takeDamage(this.owner.stats.baseDamage * multiplier, this.owner, "Spin Cut", {
+        const result = cut.target.takeDamage(this.owner.getTotalAttackDamage() * multiplier, this.owner, "Spin Cut", {
             ignoreDefense: Boolean(this.getLevelUpgrade().piercingVortex),
             suppressDamageNumber: true
         });
         cut.tickCount += 1;
-        cut.totalDamage += result.actualDamage;
         this.state.cutFlash = 0.08;
         cut.visualEffect?.registerTick(cut.tickCount);
-        if (cut.counterText) {
-            cut.counterText.displayText = `${Math.round(cut.totalDamage)} ×${cut.tickCount}`;
-            cut.counterText.color = this.getLevelUpgrade().piercingVortex ? "#fff4ae" : "#ffb347";
-            cut.counterText.fontSize = cut.tickCount === CUT_TICKS ? 19 : 15;
-            cut.counterText.life = Math.max(cut.counterText.life, 0.35);
-        }
+        this._spawnCutDamageNumber(cut, result, tickIndex);
+    }
+
+    _spawnCutDamageNumber(cut, result, tickIndex) {
+        if (result.actualDamage <= 0) return;
+
+        const tangent = new Vector2(-cut.direction.y, cut.direction.x);
+        const textLane = tickIndex % 4;
+        const tangentOffset = [-2.1, -0.7, 0.7, 2.1][textLane] * cut.target.radius;
+        const normalOffset = [0.42, 0.58, 0.42, 0.58][textLane] * cut.target.radius;
+        const textPosition = cut.contactPoint
+            .clone()
+            .add(tangent.clone().scale(tangentOffset))
+            .add(cut.direction.clone().scale(normalOffset));
+        const textVelocity = tangent
+            .scale(cut.target.radius * (0.34 + textLane * 0.06))
+            .add(cut.direction.clone().scale(-cut.target.radius * 0.16));
+        const text = this.simulation.spawnDamageNumber(
+            textPosition,
+            result.actualDamage,
+            result.isCritical ? "#ffdd00" : "#ffb347"
+        );
+        if (!text) return;
+
+        text.fontSize = 11 + (tickIndex % 2);
+        text.life = 0.22;
+        text.maxLife = text.life;
+        text.velocity = textVelocity;
+        text.visibilityToken = "combatText";
     }
 
     _finishCut(cut) {
         if (this.state.cut !== cut) return;
-        if (!cut.target.flags.defeated) {
-            cut.target.applyImpulse(cut.direction.clone().scale(CUT_TARGET_RELEASE_SPEED));
-        }
-        this.owner.applyImpulse(cut.direction.clone().scale(-CUT_OWNER_RELEASE_SPEED));
+        this.simulation.applyDeferredFighterRigidBodyCollision(cut.deferredRigidBodyResponse);
         this.simulation.spawnPulse(
             cut.contactPoint.clone(),
             this.getLevelUpgrade().piercingVortex ? "#fff4ae" : "#ffd07b"
@@ -331,13 +346,16 @@ export class SpinAbility extends Ability {
     getVortexAccelerationAt(position) {
         const inward = Vector2.subtract(this.owner.position, position);
         const distance = inward.length();
-        if (distance > VORTEX_RADIUS) return new Vector2();
+        if (distance > SPIN_VORTEX_CONFIG.radius) return new Vector2();
         if (distance <= 1e-9) inward.add(new Vector2(1, 0));
         inward.normalize();
         const tangent = new Vector2(-inward.y * this._spinDirection, inward.x * this._spinDirection);
-        const direction = tangent.scale(3).add(inward).normalize();
-        const ratio = Math.max(0, 1 - distance / VORTEX_RADIUS);
-        return direction.scale(VORTEX_ACCELERATION * smoothstep(ratio));
+        const direction = tangent
+            .scale(SPIN_VORTEX_CONFIG.tangentWeight)
+            .add(inward.scale(SPIN_VORTEX_CONFIG.inwardWeight))
+            .normalize();
+        const ratio = Math.max(0, 1 - distance / SPIN_VORTEX_CONFIG.radius);
+        return direction.scale(SPIN_VORTEX_CONFIG.maxAcceleration * smoothstep(ratio));
     }
 
     draw(ctx) {

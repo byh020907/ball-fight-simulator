@@ -359,7 +359,9 @@ export class Simulation {
 
     spawnDamageNumber(position, amount, color = "#ff3333") {
         if (!this.showDamageNumbers) return;
-        this.entities.push(new DamageNumber(position, amount, color));
+        const effect = new DamageNumber(position, amount, color);
+        this.entities.push(effect);
+        return effect;
     }
 
     spawnCriticalNumber(position, amount) {
