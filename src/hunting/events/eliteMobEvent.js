@@ -35,7 +35,7 @@ export class EliteMobEvent extends HuntingEvent {
             presentation: {
                 title: "정예 몹 습격",
                 subtext: `${names} 조합이 길을 막았습니다.`,
-                detail: `${names} · elite 강화`
+                detail: `${names} · 일반 스탯 · 정예 XP`
             }
         };
     }

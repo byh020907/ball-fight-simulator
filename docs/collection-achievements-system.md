@@ -498,11 +498,11 @@ reward: {
 | `hunting_secured_chests_10` | 전리품 회수 | 사냥터에서 얻은 상자 2개를 보관함으로 무사히 가져오기 | uncommon 고정 방어구 |
 | `hunting_all_stages_clear` | 전 지역 제패 | 동굴·숲·사막 최종 보스 모두 처치 | epic 상자 |
 | `hunting_monster_slayer` | 몹 학살자 | 사냥터 몬스터 300마리 처치 | common 상자 |
-| `hunting_rare_monster_slayer` | rare 몹 학살자 | rare 몬스터 100마리 처치 | uncommon 상자 |
-| `hunting_unique_monster_slayer` | unique 몹 학살자 | unique 몬스터 75마리 처치 | rare 상자 |
+| `hunting_rare_monster_slayer` | uncommon 몹 학살자 | uncommon 몬스터 100마리 처치 | uncommon 상자 |
+| `hunting_unique_monster_slayer` | rare 몹 학살자 | rare 몬스터 75마리 처치 | rare 상자 |
 | `hunting_epic_monster_slayer` | epic 몹 학살자 | epic 몬스터 50마리 처치 | epic 상자 |
 
-희귀도별 목표는 100층 조우 생성기를 500회 완주 기준으로 측정한 평균 처치량(전체 약 512, rare 약 185, unique 약 137, epic 약 85)을 바탕으로 정했습니다. 한 번의 완주만 강제하지 않되, 희귀도가 높을수록 실제로 깊은 층을 반복 공략해야 달성됩니다.
+희귀도별 업적 ID는 기존 저장 프로필과의 호환을 위해 유지하지만, 사용자 문구와 판정 태그는 장비 체계와 같은 `uncommon`·`rare`·`epic`을 사용합니다. 프로필 정리 시 기존 `rarity:unique` 진행은 새 `rarity:rare`로 옮기고, 기존 `rarity:rare` 진행은 새 `rarity:uncommon`에도 보존해 업데이트로 처치 기록을 잃지 않습니다.
 
 챔피언 난입은 100층 조우 생성기 1,000회 측정에서 원정당 평균 약 3.42회 발생하고, 전투 보상도 파편 1.5배를 이미 제공합니다. 그래서 첫 난입 승리 업적은 `bronze` 등급의 common 상자로 두어 난입을 이기는 재미는 남기되 고등급 장비 상자를 우회 지급하지 않습니다.
 

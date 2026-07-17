@@ -22,7 +22,12 @@ export const PATCH_NOTES = [
         version: "0.31.0",
         date: "2026-07-18",
         title: "v0.31.0 정예 조우와 몬스터 진행도",
-        changes: [{ type: "feature", text: "정예 군집 조합, 실제 몬스터 해금, 통합 희귀도를 적용했습니다." }]
+        changes: [
+            {
+                type: "feature",
+                text: "정예 몹은 수동 7종 군집 조합과 일반 층 스탯·정예 XP 보상을 사용하고, 일반 몬스터는 실제 해금 층과 장비 계열 희귀도를 따릅니다."
+            }
+        ]
     },
     {
         version: "0.30.4",

@@ -4057,8 +4057,8 @@ function testEliteMobCombinationEvent(app) {
         "Elite events should identify the verified monster battle"
     );
     assert.ok(
-        resolution.presentation.detail.includes("elite 강화"),
-        "Elite preparation text should explain the scaling applied to the selected group"
+        resolution.presentation.detail.includes("일반 스탯 · 정예 XP"),
+        "Elite preparation text should distinguish normal combat stats from the elite XP reward"
     );
 
     const eliteSpecs = createEliteMobEncounter({
