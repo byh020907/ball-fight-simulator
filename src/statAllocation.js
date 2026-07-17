@@ -42,47 +42,6 @@ export const ALLOCATABLE_STATS = [
 
 const STAT_KEYS = ALLOCATABLE_STATS.map((stat) => stat.key);
 
-// ── 스탯 밸런스 배율 시스템 ─────────────────────────────────────────────────
-
-/**
- * 스탯 분산 기반 배율 설정 상수
- *
- * - BASE_MULTIPLIER: 분산이 극대화되어도 유지되는 최소 배율
- * - MAX_BONUS: 균등 분배 시 추가되는 최대 보너스 (BASE_MULTIPLIER에 더해짐)
- * - SENSITIVITY: 낮을수록 균등 분배 강제, 높을수록 올인 우대
- */
-export const STAT_BALANCER_CONFIG = {
-    BASE_MULTIPLIER: 1.0,
-    MAX_BONUS: 1.0,
-    SENSITIVITY: 20.0
-};
-
-/**
- * 표준편차 기반 스탯 배율 계산
- * @param {number[]} stats - 스탯 포인트 배열 (예: [30, 40, 30])
- * @returns {{ multiplier: number, stdDev: number }}
- */
-export function calculateStatMultiplier(stats) {
-    const { BASE_MULTIPLIER, MAX_BONUS, SENSITIVITY } = STAT_BALANCER_CONFIG;
-
-    if (!stats || stats.length === 0) {
-        return { multiplier: BASE_MULTIPLIER, stdDev: 0 };
-    }
-
-    const sum = stats.reduce((acc, val) => acc + val, 0);
-    const average = sum / stats.length;
-    const sumOfSquares = stats.reduce((acc, val) => acc + Math.pow(val - average, 2), 0);
-    const variance = sumOfSquares / stats.length;
-    const stdDev = Math.sqrt(variance);
-
-    const multiplier = BASE_MULTIPLIER + MAX_BONUS * (SENSITIVITY / (SENSITIVITY + stdDev));
-
-    return {
-        multiplier: Number(multiplier.toFixed(3)),
-        stdDev: Number(stdDev.toFixed(3))
-    };
-}
-
 export function createEmptyStatAllocation() {
     return Object.fromEntries(STAT_KEYS.map((key) => [key, 0]));
 }
@@ -125,18 +84,15 @@ export function createRandomStatAllocation(rng = Math.random, total = PLAYER_STA
 
 export function applyStatAllocation(fighter, allocation, isPlayer = false) {
     const stats = { ...fighter.stats };
-    const points = STAT_KEYS.filter((k) => k !== "criticalChance").map((key) => allocation[key] ?? 0);
-    const { multiplier } = calculateStatMultiplier(points);
-
     for (const stat of ALLOCATABLE_STATS) {
         const pts = allocation[stat.key] ?? 0;
         if (!Number.isFinite(pts)) continue;
         if (stat.key === "skill") {
             stats[stat.key] = stats[stat.key] ?? 0;
         } else if (stat.key === "criticalChance") {
-            stats[stat.key] = Math.max(0, Math.min(100, stats[stat.key] ?? 5 + pts));
+            stats[stat.key] = Math.max(0, Math.min(100, (stats[stat.key] ?? 5) + pts));
         } else {
-            stats[stat.key] = Number((stats[stat.key] * (1 + pts / 100) * multiplier).toFixed(3));
+            stats[stat.key] = Number((stats[stat.key] * (1 + pts / 100)).toFixed(3));
         }
     }
 

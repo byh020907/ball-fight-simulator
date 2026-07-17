@@ -11,8 +11,7 @@ import {
     createTournamentRoster,
     getRemainingStatPoints,
     adjustStatAllocation,
-    formatStatAllocation,
-    calculateStatMultiplier
+    formatStatAllocation
 } from "./statAllocation.js";
 import { ActionPickerService } from "./actionPicker.js";
 import { CollectionHubService } from "./collectionHubService.js";
@@ -566,16 +565,7 @@ export class BattleApp {
     }
 
     _updatePlayerPanelSummary() {
-        const m = formatStatAllocation(this._panel.allocation);
-        const vals = [
-            this._panel.allocation.hp ?? 0,
-            this._panel.allocation.damage ?? 0,
-            this._panel.allocation.speed ?? 0,
-            this._panel.allocation.skill ?? 0,
-            this._panel.allocation.defense ?? 0
-        ];
-        const mult = calculateStatMultiplier(vals).multiplier;
-        this._panel.allocationSummary = m + "  \u00D7" + mult.toFixed(3);
+        this._panel.allocationSummary = formatStatAllocation(this._panel.allocation);
     }
 
     _syncStartButton() {
@@ -778,7 +768,6 @@ export class BattleApp {
                     : formatStatAllocation(fighter.stats.allocation ?? {}),
                 heroStatParts: isHero ? formatHeroStatParts(fighter.stats.allocation ?? {}) : [],
                 isHero,
-                balanceMult: 1,
                 abilityStates: [
                     {
                         key: `primary:${fighter.ability}`,
@@ -805,8 +794,6 @@ export class BattleApp {
             if (!fighter) return card;
             const alloc = fighter.stats.allocation ?? {};
             const isHero = fighter.id === FIGHTER_IDS.HERO;
-            const pts = [alloc.hp ?? 0, alloc.damage ?? 0, alloc.speed ?? 0, alloc.skill ?? 0, alloc.defense ?? 0];
-            const mult = calculateStatMultiplier(pts).multiplier;
             const bonuses = mergeOrbBonuses(fighter.hero.bonuses ?? {}, fighter.hero.carryover ?? {});
             const abilityStates = fighter.getAbilityUiStates().map((state) => ({
                 ...state,
@@ -819,7 +806,6 @@ export class BattleApp {
                 maxHp: Math.ceil(fighter.maxHp),
                 hpPct: Math.max(0, (fighter.hp / fighter.maxHp) * 100),
                 defeated: fighter.flags.defeated,
-                balanceMult: mult,
                 mergedBonuses: bonuses,
                 statLine: isHero
                     ? formatHeroStatLine(fighter.stats.allocation ?? {}, bonuses)

@@ -68,7 +68,7 @@
 | 속도     | `speed`          | 종족값 x `1 + 포인트/100`        | 기본 이동 속도를 올립니다.                             |
 | 쿨타임   | `skill`          | 스킬 쿨타임 × `100/(100+포인트)` | 스킬 쿨타임이 체감 감소합니다. (100포인트 시 50% 단축) |
 | 방어력   | `defense`        | 종족값 x `1 + 포인트/100`        | 받는 피해에서 방어력만큼 차감됩니다.                   |
-| 크리티컬 | `criticalChance` | 기본 5% + 포인트당 +1%p          | 분산 배율 미적용. 발동 시 원본 피해 ×2.                |
+| 크리티컬 | `criticalChance` | 기본 5% + 포인트당 +1%p          | 발동 시 원본 피해 ×2.                                  |
 
 스탯 하나에 최대 50점까지 투자할 수 있습니다.
 
@@ -79,10 +79,10 @@
 `applyStatAllocation()`에서 모든 스탯은 **pre-compute**됩니다 (전투 중 재계산 없음).
 
 ```
-hp      = baseHP      × (1 + pts/100) × 밸런스배율
-damage  = baseDamage  × (1 + pts/100) × 밸런스배율
-speed   = baseSpeed   × (1 + pts/100) × 밸런스배율
-defense = baseDefense × (1 + pts/100) × 밸런스배율
+hp      = baseHP      × (1 + pts/100)
+damage  = baseDamage  × (1 + pts/100)
+speed   = baseSpeed   × (1 + pts/100)
+defense = baseDefense × (1 + pts/100)
 skill   = pts         (별도 저장, Ability.cooldown에서 100/(100+pts)로 계산)
 ```
 
@@ -143,7 +143,7 @@ totalDefense = round(baseDefense × abilityDefMult)
 
 ### 크리티컬 히트 (v0.26.0+)
 
-크리티컬은 `criticalChance` 스탯으로 발동률이 결정됩니다. 기본 5% + 포인트당 +1%p이며 분산 배율이 적용되지 않습니다.
+크리티컬은 `criticalChance` 스탯으로 발동률이 결정됩니다. 기본 5% + 포인트당 +1%p입니다.
 
 ```
 크리티컬 피해 = 들어온 피해 × 2 (방어력 차감 전에 2배)

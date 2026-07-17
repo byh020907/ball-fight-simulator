@@ -8,10 +8,8 @@ import { ActionPickerService } from "../src/actionPicker.js";
 import {
     ALLOCATABLE_STATS,
     PLAYER_STAT_POINTS,
-    STAT_BALANCER_CONFIG,
     adjustStatAllocation,
     applyStatAllocation,
-    calculateStatMultiplier,
     createEmptyStatAllocation,
     createRandomStatAllocation,
     createTournamentRoster,
@@ -2315,21 +2313,34 @@ function testStatAllocationRules(app) {
 
     const allocation = { hp: 30, damage: 40, speed: 30, skill: 0, defense: 0, criticalChance: 0 };
     const boosted = applyStatAllocation(archer, allocation, true);
-    const { multiplier } = calculateStatMultiplier([30, 40, 30, 0, 0]);
     assert.equal(
         boosted.stats.hp,
-        Number((archer.stats.hp * 1.3 * multiplier).toFixed(3)),
-        "HP points should multiply base health and balance multiplier"
+        Number((archer.stats.hp * 1.3).toFixed(3)),
+        "HP points should multiply only base health"
     );
     assert.equal(
         boosted.stats.damage,
-        Number((archer.stats.damage * 1.4 * multiplier).toFixed(3)),
-        "Damage points should multiply base damage and balance multiplier"
+        Number((archer.stats.damage * 1.4).toFixed(3)),
+        "Damage points should multiply only base damage"
     );
     assert.equal(
         boosted.stats.speed,
-        Number((archer.stats.speed * 1.3 * multiplier).toFixed(3)),
-        "Speed points should multiply base speed and balance multiplier"
+        Number((archer.stats.speed * 1.3).toFixed(3)),
+        "Speed points should multiply only base speed"
+    );
+    assert.equal(boosted.stats.skill, 0, "Skill base stats should remain independent from allocation points");
+    assert.equal(boosted.stats.criticalChance, 5, "Critical chance should preserve its 5% base chance");
+    const directAllocation = applyStatAllocation(
+        archer,
+        { hp: 0, damage: 0, speed: 0, skill: 20, defense: 50, criticalChance: 50 },
+        true
+    );
+    assert.equal(directAllocation.statAllocation.skill, 20, "Skill points should keep the cooldown formula input");
+    assert.equal(directAllocation.stats.defense, Number((archer.stats.defense * 1.5).toFixed(3)));
+    assert.equal(
+        directAllocation.stats.criticalChance,
+        55,
+        "Critical points should add directly to the 5% base chance"
     );
     assert.equal("force" in boosted.stats, false, "Force should not exist as an unused gameplay stat");
     assert.equal(
@@ -2949,8 +2960,8 @@ function testHuntingBattlePreparationUsesActualBattleHp() {
     );
     assert.equal(
         overlayStates.at(-1).huntingBattlePreparationItems[0].healAmount,
-        56,
-        "Preparation UI should calculate healing from the actual 224 maximum HP"
+        28,
+        "Preparation UI should calculate healing from the actual 112 maximum HP"
     );
     assert.equal(
         overlayStates.at(-1).huntingBattlePreparationHp,
@@ -2959,21 +2970,21 @@ function testHuntingBattlePreparationUsesActualBattleHp() {
     );
     assert.equal(
         overlayStates.at(-1).huntingBattlePreparationMaxHp,
-        224,
+        112,
         "Preparation UI should expose an integer maximum HP"
     );
 
     const useResult = manager.usePreparationConsumable(CONSUMABLE_IDS.HP_POTION);
-    assert.ok(Math.abs(useResult.healed - 56) < 1e-9, "Preparation potion use should report the actual healed amount");
-    assert.equal(manager._run.carriedHp, 84.4, "Preparation potion use should preserve raw HP before battle start");
+    assert.ok(Math.abs(useResult.healed - 28) < 1e-9, "Preparation potion use should report the actual healed amount");
+    assert.equal(manager._run.carriedHp, 56.4, "Preparation potion use should preserve raw HP before battle start");
     assert.equal(
         overlayStates.at(-1).huntingBattlePreparationHp,
-        85,
+        57,
         "Potion feedback should refresh the displayed HP through the shared integer getter"
     );
     assert.match(
         overlayStates.at(-1).huntingBattlePreparationNotice,
-        /85\/224$/,
+        /57\/112$/,
         "Potion feedback should not expose a fractional current HP"
     );
     assert.equal(
@@ -2985,7 +2996,7 @@ function testHuntingBattlePreparationUsesActualBattleHp() {
     manager.startPreparedBattle();
     const player = mockApp.simulation.fighters.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
     assert.equal(startedMatches, 1, "BattleSimulation should start only after the preparation start action");
-    assert.equal(player.hp, 84.4, "BattleSimulation should receive the raw potion-adjusted carried HP");
+    assert.equal(player.hp, 56.4, "BattleSimulation should receive the raw potion-adjusted carried HP");
     console.log("[hunting-battle-preparation-actual-hp] ok");
 }
 
@@ -4702,38 +4713,6 @@ function testIndexCacheVersionMatchesLatestPatchNote() {
     );
 }
 
-function testStatBalanceSystem() {
-    // 극단 올인 [100, 0, 0] → 표준편차 큼 → 배율 낮음
-    const allIn = calculateStatMultiplier([100, 0, 0]);
-    assert.ok(allIn.stdDev > 40, "All-in build should have high stdDev");
-    assert.ok(
-        allIn.multiplier < STAT_BALANCER_CONFIG.BASE_MULTIPLIER + STAT_BALANCER_CONFIG.MAX_BONUS * 0.5,
-        "All-in build should get less than half of max bonus"
-    );
-
-    // 완벽 균등 [30, 30, 30] → 표준편차 0 → 최대 배율
-    const even = calculateStatMultiplier([30, 30, 30]);
-    assert.equal(even.stdDev, 0, "Even build should have zero stdDev");
-    assert.equal(
-        even.multiplier,
-        STAT_BALANCER_CONFIG.BASE_MULTIPLIER + STAT_BALANCER_CONFIG.MAX_BONUS,
-        "Even build should receive maximum bonus"
-    );
-
-    // 분산이 작을수록 multiplier가 높음
-    const lowVar = calculateStatMultiplier([35, 30, 35]);
-    const highVar = calculateStatMultiplier([70, 30, 0]);
-    assert.ok(lowVar.multiplier > highVar.multiplier, "Lower variance build should have higher multiplier");
-    assert.ok(
-        lowVar.multiplier >= STAT_BALANCER_CONFIG.BASE_MULTIPLIER,
-        "Multiplier should never drop below BASE_MULTIPLIER"
-    );
-    assert.ok(
-        lowVar.multiplier <= STAT_BALANCER_CONFIG.BASE_MULTIPLIER + STAT_BALANCER_CONFIG.MAX_BONUS,
-        "Multiplier should never exceed BASE_MULTIPLIER + MAX_BONUS"
-    );
-}
-
 function testExperienceSystem() {
     assert.equal(
         calcMatchXp({
@@ -4896,8 +4875,8 @@ function testExperienceSystem() {
         allocation,
         true
     );
-    const expectedDamageMultiplier = baselineSpec.stats.damage / playerSpec.stats.damage;
-    const expectedSpeedMultiplier = baselineSpec.stats.speed / playerSpec.stats.speed;
+    const expectedDamageMultiplier = 1 + allocation.damage / 100;
+    const expectedSpeedMultiplier = 1 + allocation.speed / 100;
     assert.equal(
         rewardedSpec.stats.damage,
         Number(((playerSpec.stats.damage + progression.baseStatBonuses.damage) * expectedDamageMultiplier).toFixed(3)),
@@ -15521,26 +15500,6 @@ async function testToastQueue() {
     assert.ok(!source.includes('x-show="visible"'), "Toast should not use a single visible flag for replacement");
 }
 
-// ── Sensitivity reset test ──────────────────────────────────────────────────
-
-async function testSensitivityAlwaysReset() {
-    const { STAT_BALANCER_CONFIG } = await import("../src/statAllocation.js");
-
-    // balanceTolerance가 0이어도 SENSITIVITY는 20으로 설정되어야 함
-    STAT_BALANCER_CONFIG.SENSITIVITY = 99; // 이전 값 흔적
-    const totalBalanceTol = 0;
-    STAT_BALANCER_CONFIG.SENSITIVITY = 20 + totalBalanceTol;
-    assert.equal(STAT_BALANCER_CONFIG.SENSITIVITY, 20, "SENSITIVITY should reset to 20 when balanceTol=0");
-
-    // balanceTolerance가 있으면 증가
-    STAT_BALANCER_CONFIG.SENSITIVITY = 20 + 5;
-    assert.equal(STAT_BALANCER_CONFIG.SENSITIVITY, 25, "SENSITIVITY should be 20+5=25 when balanceTol=5");
-
-    // 다시 0으로
-    STAT_BALANCER_CONFIG.SENSITIVITY = 20 + 0;
-    assert.equal(STAT_BALANCER_CONFIG.SENSITIVITY, 20, "SENSITIVITY should reset back to 20");
-}
-
 // ── adjustStat with bonus total test ────────────────────────────────────────
 
 async function testAdjustStatWithBonusTotal() {
@@ -15996,14 +15955,12 @@ async function testHuntingMasteryPlayerOnly(app) {
     assert.equal(playerSpec.teamId, HUNTING_TEAMS.PLAYER, "Player spec should be on player team");
 
     // Damage should include Archer GOLD +6% final multiplier (statModifiers.damage = 0.06)
-    const alloc = createEmptyStatAllocation();
-    const { multiplier } = calculateStatMultiplier(Object.values(alloc));
     const baseDamage = player.stats.damage;
-    const expectedDamage = Number((baseDamage * multiplier * 1.06).toFixed(3));
+    const expectedDamage = Number((baseDamage * 1.06).toFixed(3));
     assert.equal(
         playerSpec.stats.damage,
         expectedDamage,
-        `Player spec damage should get archer GOLD +6% final multiplier: base ${baseDamage} * ${multiplier} * 1.06 = ${expectedDamage}`
+        `Player spec damage should get archer GOLD +6% final modifier: base ${baseDamage} * 1.06 = ${expectedDamage}`
     );
 
     // Enemy specs should NOT have mastery effects from player profile
@@ -16364,7 +16321,6 @@ testComponentBridgeEquipmentFunctions();
 await testBattleAppAdoptsPreExistingAlpineAllocation();
 await testAdjustRandomResetSyncPlayerStatAllocation(app);
 testIndexCacheVersionMatchesLatestPatchNote();
-testStatBalanceSystem();
 testMultiFighterSimulationSetup(app);
 testArenaCameraZoom();
 testHuntingMeleeMobChasesTarget(app);
@@ -16454,8 +16410,7 @@ testDeveloperCollectionSampleTool();
 await testCreateCollectionHubViewModel();
 // Toast queue tests
 await testToastQueue();
-// Sensitivity reset + adjustStat with bonus total test
-await testSensitivityAlwaysReset();
+// adjustStat with bonus total test
 await testAdjustStatWithBonusTotal();
 // Mastery modifier tests
 await testMasteryModifiersStoredOnBattleBall(app);
@@ -21541,17 +21496,15 @@ function testHuntingRebirthLoadoutIntegration() {
     const rebornApp = createHuntingTestApp(rebornProfile);
     const rebornManager = new HuntingManager(rebornApp);
     const rebornPlayer = rebornManager._createPlayerHuntingSpec(run);
-    const allocationMultiplier = calculateStatMultiplier(Object.values(createEmptyStatAllocation())).multiplier;
-
     assert.equal(
         rebornPlayer.appliedSpec.stats.damage,
-        baselineSpec.stats.damage + statBonuses.damage * allocationMultiplier,
-        "Hunting player specs must apply permanent rebirth stats before the stat-allocation multiplier"
+        baselineSpec.stats.damage + statBonuses.damage,
+        "Hunting player specs must retain permanent rebirth stats without a distribution multiplier"
     );
     assert.equal(
         rebornPlayer.appliedSpec.stats.speed,
-        baselineSpec.stats.speed + statBonuses.speed * allocationMultiplier,
-        "Hunting player specs must preserve permanent rebirth stats through the stat-allocation multiplier"
+        baselineSpec.stats.speed + statBonuses.speed,
+        "Hunting player specs must retain permanent rebirth stats without a distribution multiplier"
     );
 
     let capturedOptions = null;

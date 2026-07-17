@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.30.1",
+        date: "2026-07-17",
+        title: "v0.30.1 스탯 분배 배율 폐기",
+        changes: [
+            {
+                type: "refactor",
+                text: "스탯을 고르게 나눌 때 붙던 전투 배율을 없애, 투자한 항목의 직접 효과만 적용합니다."
+            }
+        ]
+    },
+    {
         version: "0.30.0",
         date: "2026-07-17",
         title: "v0.30.0 사냥터 층 이동 자연 회복",
