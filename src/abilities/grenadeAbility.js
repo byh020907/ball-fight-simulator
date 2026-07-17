@@ -6,8 +6,7 @@ const BURST_COUNT_MIN = 3;
 const BURST_COUNT_MAX = 5;
 const BURST_INTERVAL = 0.12;
 const BASE_GRENADE_SPEED = 290;
-const BASE_PROJECTILE_SPEED = 800;
-const PROJECTILE_SPEED_MULTIPLIER = BASE_PROJECTILE_SPEED / BASE_GRENADE_SPEED;
+const PROJECTILE_SPEED_MULTIPLIER = 1.1;
 const FIRST_FUSE_COOLDOWN_RATIO = 0.2;
 
 export class GrenadeAbility extends Ability {
@@ -57,9 +56,10 @@ export class GrenadeAbility extends Ability {
         const targetPos = Vector2.add(this.owner.position, dir.clone().scale(projectileSpeed * fuse));
 
         this.simulation.spawnGrenade(this.owner, targetPos, fuse, {
+            launchSpeed: projectileSpeed,
             sticky: Boolean(this.getLevelUpgrade().stickyGrenade),
             burning: Boolean(this.getLevelUpgrade().burningExplosion),
-            reburst: Boolean(this.getLevelUpgrade().burningReburst)
+            stickyHoming: Boolean(this.getLevelUpgrade().stickyHoming)
         });
 
         this._burstRemaining--;

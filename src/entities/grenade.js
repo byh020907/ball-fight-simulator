@@ -1,16 +1,25 @@
 import { CombatEntity, Vector2 } from "../core.js";
-import { GrenadeReburstEffect, applyBurningEffect, consumeBurningEffect } from "../effects/index.js";
+import { getVisibleLineWidth } from "../effects/effectVisibility.js";
+import { applyBurningEffect } from "../effects/index.js";
+import { steerProjectileVelocityToward } from "../physics/projectileSteering.js";
 
 const PROXIMITY_FUSE_BASE_MULTIPLIER = 3;
 const PROXIMITY_FUSE_MAX_MULTIPLIER = 6;
 const EXPLOSION_RADIUS = 174;
 const EXPLOSION_INNER_RADIUS = 72;
+const STICKY_HOMING_DELAY = 0.5;
+const STICKY_HOMING_TURN_RATE = 2;
+const STICKY_HOMING_TRAIL_LENGTH = 8;
 
 export class Grenade extends CombatEntity {
     constructor(owner, targetPosition, fuseTime = 1.08, options = {}) {
         const start = owner.position.clone();
         const safeFuse = Math.max(0.32, fuseTime);
-        const drift = Vector2.subtract(targetPosition, start).scale(1 / safeFuse);
+        const targetOffset = Vector2.subtract(targetPosition, start);
+        const fallbackSpeed = targetOffset.length() / safeFuse;
+        const launchSpeed = options.launchSpeed ?? (owner.stats?.baseSpeed ?? fallbackSpeed) * 1.1;
+        const drift =
+            targetOffset.length() > 0 ? targetOffset.normalize().scale(launchSpeed) : Vector2.fromAngle(0, launchSpeed);
         super(start, drift, 12);
         this.owner = owner;
         this.ownerId = owner.id;
@@ -22,13 +31,15 @@ export class Grenade extends CombatEntity {
         this.innerRadius = EXPLOSION_INNER_RADIUS;
         this.stickyEnabled = options.sticky ?? false;
         this.burningEnabled = options.burning ?? false;
-        this.reburstEnabled = options.reburst ?? false;
+        this.stickyHomingEnabled = options.stickyHoming ?? false;
         this.stickyTarget = null;
         this.stickyLocalOffset = null;
         this.stickyLocalSurfaceOffset = null;
         this.stickyLocalAngle = null;
         this.bounces = 0;
         this.maxBounces = 4;
+        this.launchElapsed = 0;
+        this.homingTrail = [];
     }
 
     update(delta, simulation) {
@@ -38,14 +49,30 @@ export class Grenade extends CombatEntity {
             if (this.timer <= 0) this._detonate(simulation);
             return;
         }
+        const preHomingDelta = Math.min(delta, Math.max(0, STICKY_HOMING_DELAY - this.launchElapsed));
+        if (preHomingDelta > 0 && this._updateFlying(preHomingDelta, simulation, false)) return;
+
+        const homingDelta = delta - preHomingDelta;
+        if (homingDelta > 0) this._updateFlying(homingDelta, simulation, true);
+    }
+
+    _updateFlying(delta, simulation, canHome) {
         const previousPosition = this.position.clone();
+        const homingTarget = canHome ? this._getStickyHomingTarget(simulation) : null;
+        if (homingTarget) {
+            steerProjectileVelocityToward(this, homingTarget.position, delta, STICKY_HOMING_TURN_RATE);
+        } else {
+            this.homingTrail = [];
+        }
         const travelSpeed = this.velocity.length();
         this.integrate(delta);
+        this.launchElapsed += delta;
+        if (homingTarget) this._recordHomingTrail();
 
         if (this.stickyEnabled && this._tryStick(previousPosition, simulation)) {
             this.timer -= delta;
             if (this.timer <= 0) this._detonate(simulation);
-            return;
+            return true;
         }
 
         if (this.bounces < this.maxBounces) {
@@ -70,10 +97,40 @@ export class Grenade extends CombatEntity {
 
         this.timer -= delta * this._proximityFuseMultiplier;
         if (this.timer > 0) {
-            return;
+            return false;
         }
 
         this._detonate(simulation);
+        return true;
+    }
+
+    _getStickyHomingTarget(simulation) {
+        if (!this.stickyHomingEnabled || this.stickyTarget) return null;
+        return simulation
+            .getEnemiesOf(this.owner)
+            .filter((target) => this._isValidStickyHomingTarget(target))
+            .sort(
+                (a, b) =>
+                    Vector2.subtract(a.position, this.position).length() -
+                    Vector2.subtract(b.position, this.position).length()
+            )[0];
+    }
+
+    _isValidStickyHomingTarget(target) {
+        const marker = target?._stickyGrenade;
+        return Boolean(
+            !target?.flags?.defeated &&
+            marker &&
+            !marker.isExpired &&
+            marker !== this &&
+            marker.ownerId === this.ownerId &&
+            marker.stickyTarget === target
+        );
+    }
+
+    _recordHomingTrail() {
+        this.homingTrail.push(this.position.clone());
+        if (this.homingTrail.length > STICKY_HOMING_TRAIL_LENGTH) this.homingTrail.shift();
     }
 
     _crossedExplosionRange(startPosition, targetPosition) {
@@ -159,6 +216,7 @@ export class Grenade extends CombatEntity {
         this.stickyLocalSurfaceOffset = toLocal(contact.worldSurfaceOffset);
         this.stickyLocalAngle = Math.atan2(this.stickyLocalSurfaceOffset.y, this.stickyLocalSurfaceOffset.x);
         contact.target._stickyGrenade = this;
+        this.homingTrail = [];
         this._followStickyTarget();
     }
 
@@ -183,6 +241,7 @@ export class Grenade extends CombatEntity {
         this.stickyLocalOffset = null;
         this.stickyLocalSurfaceOffset = null;
         this.stickyLocalAngle = null;
+        this.homingTrail = [];
     }
 
     _detonate(simulation) {
@@ -197,14 +256,10 @@ export class Grenade extends CombatEntity {
                 const final =
                     target.actionContext?.onProjectileDamage?.(raw, this, this.owner, "Grenade", simulation, target) ??
                     raw;
-                const hadBurning = Boolean(target._igniteState && !target._igniteState.isExpired);
                 const { actualDamage } = target.takeDamage(final, this.owner, "Grenade");
                 if (actualDamage <= 0) continue;
                 const kbDir = Vector2.subtract(target.position, this.position).normalize();
                 target.applyKnockback(kbDir.scale(900), 1.3);
-                if (this.reburstEnabled && hadBurning && consumeBurningEffect(target)) {
-                    this._triggerBurningReburst(target, simulation);
-                }
                 if (this.burningEnabled && !target.flags.defeated) {
                     applyBurningEffect({
                         source: this.owner,
@@ -223,34 +278,27 @@ export class Grenade extends CombatEntity {
         this.isExpired = true;
     }
 
-    _triggerBurningReburst(triggerTarget, simulation) {
-        const center = triggerTarget.position.clone();
-        for (const target of simulation.getEnemiesOf(this.owner)) {
-            if (Vector2.subtract(target.position, center).length() > 90) continue;
-            const { actualDamage } = target.takeDamage(
-                this.owner.stats.baseDamage * 0.75,
-                this.owner,
-                "Grenade Reburst"
-            );
-            if (actualDamage <= 0) continue;
-            const direction = Vector2.subtract(target.position, center);
-            if (direction.length() <= 0.001) direction.x = 1;
-            target.applyKnockback(direction.normalize().scale(540), 0.35);
-        }
-        simulation.entities.push(new GrenadeReburstEffect(center, 90));
-        simulation.spawnParticleBurst(center, "#ff8b2f", {
-            count: 18,
-            speed: 210,
-            radiusMin: 2,
-            radiusMax: 5,
-            gravity: 120
-        });
-        simulation.playSound("explosion", 0.75);
-    }
-
     draw(ctx) {
         const charge = 1 - Math.max(0, this.timer / this.maxTimer);
         ctx.save();
+
+        if (!this.stickyTarget && this.homingTrail.length > 1) {
+            ctx.strokeStyle = this.owner.color;
+            ctx.lineWidth = getVisibleLineWidth(ctx, "standard", 3);
+            ctx.globalAlpha = 0.58;
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            ctx.moveTo(this.homingTrail[0].x, this.homingTrail[0].y);
+            this.homingTrail.slice(1).forEach((point, index) => {
+                const previous = this.homingTrail[index];
+                const midpoint = Vector2.add(previous, point).scale(0.5);
+                ctx.quadraticCurveTo(previous.x, previous.y, midpoint.x, midpoint.y);
+            });
+            ctx.lineTo(this.position.x, this.position.y);
+            ctx.stroke();
+            ctx.lineCap = "butt";
+            ctx.globalAlpha = 1;
+        }
 
         if (this.stickyTarget) {
             const warning = Math.sin((this.maxTimer / Math.max(0.04, this.timer)) * Math.PI) > 0;

@@ -23,6 +23,7 @@ export {
 } from "./collisionResponse.js";
 export { PHYSICS_MATERIALS, resolvePhysicsMaterial, combinePhysicsMaterials } from "./PhysicsMaterial.js";
 export { createSteeringRebaseState } from "./steeringRebase.js";
+export { steerProjectileVelocityToward } from "./projectileSteering.js";
 export {
     getContactPointVelocity,
     getContactDamageSpeed,

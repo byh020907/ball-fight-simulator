@@ -132,7 +132,7 @@ export const REWARD_BALANCE = deepFreeze({
                 { level: 6, abilityTier: 2, gameText: "폭발 피해 대상 화상 · 0.5초 ×0.50" },
                 { level: 7 },
                 { level: 8 },
-                { level: 9, abilityTier: 3, gameText: "화상 소비 재폭발 · 90px ×0.75" },
+                { level: 9, abilityTier: 3, gameText: "점착 표식 유도 · 0.5초 뒤 2rad/s" },
                 { level: 10 }
             ],
             dash: [
@@ -258,7 +258,7 @@ export const REWARD_BALANCE = deepFreeze({
                 tiers: [{}, { vineSnare: true }, { seedMarkBurst: true }, { followupSeed: true }]
             },
             grenade: {
-                tiers: [{}, { stickyGrenade: true }, { burningExplosion: true }, { burningReburst: true }]
+                tiers: [{}, { stickyGrenade: true }, { burningExplosion: true }, { stickyHoming: true }]
             },
             dash: {
                 tiers: [{}, { laserStrike: true }, { laserWallBounces: 1 }, { crossOverload: true }]

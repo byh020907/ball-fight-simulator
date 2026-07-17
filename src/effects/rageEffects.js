@@ -35,13 +35,6 @@ export function applyBurningEffect({ source, target, simulation, label = "Burnin
     return effect;
 }
 
-export function consumeBurningEffect(target) {
-    const effect = target._igniteState;
-    if (!(effect instanceof BurningEffect) || effect.isExpired) return false;
-    effect.consume();
-    return true;
-}
-
 function clamp01(value) {
     return Math.max(0, Math.min(1, value));
 }

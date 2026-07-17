@@ -257,7 +257,6 @@ import { BurningEffect } from "../src/effects/rageEffects.js";
 import {
     CrossOverloadEffect,
     DASH_LASER_CASTER_RENDERER,
-    GrenadeReburstEffect,
     HeroResonanceEffect,
     LaserCasterDissipateEffect,
     LaserBeamEffect,
@@ -1619,10 +1618,15 @@ async function testGrenadeScatterShot(app) {
     const total = allGrenades().length;
     assert.ok(total >= 3, "Grenade should fire 3-5 grenades in burst");
     assert.ok(total <= 5, "Grenade should fire at most 5 grenades total");
+    assert.equal(
+        grenadeFighter.stats.baseSpeed,
+        580,
+        "Modified Grenade owner speed should reach the spawned projectile"
+    );
     for (const g of allGrenades()) {
         assert.ok(
-            Math.abs(g.velocity.length() - 1600) < 0.001,
-            "Grenade speed should scale with the owner's base speed"
+            Math.abs(g.velocity.length() - 638) < 0.001,
+            "Grenade speed should be exactly 638 for a 580-speed owner"
         );
         assert.ok(g.timer > 0, "Each grenade should have a fuse timer");
     }
@@ -1635,6 +1639,33 @@ async function testGrenadeScatterShot(app) {
     assert.ok(
         Math.abs(longestFuse - grenadeFighter.ability.cooldown) < 0.001,
         "The longest grenade fuse should match the effective grenade cooldown"
+    );
+
+    const defaultGrenade = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.GRENADE);
+    const defaultSimulation = new BattleSimulation(
+        [defaultGrenade, opponent],
+        { onLog() {}, onSound() {}, onDamageTaken() {}, onDamageDealt() {}, onHpChanged() {} },
+        null,
+        { assignActions: false, arenaWidth: 960 }
+    );
+    const defaultOwner = defaultSimulation.fighters.find((fighter) => fighter.id === FIGHTER_IDS.GRENADE);
+    const defaultTarget = defaultSimulation.getOpponent(defaultOwner);
+    defaultSimulation.entities = [...defaultSimulation.fighters];
+    const defaultRandom = Math.random;
+    Math.random = () => 0;
+    try {
+        defaultOwner.ability._startBurst(defaultTarget);
+    } finally {
+        Math.random = defaultRandom;
+    }
+    const defaultShot = defaultSimulation.entities.find((entity) => entity.constructor?.name === "Grenade");
+    assert.equal(defaultOwner.stats.baseSpeed, 290, "Grenade's baseline owner speed should remain 290");
+    assert.equal(defaultShot.velocity.length(), 319, "Grenade's baseline launched speed should be exactly 319");
+    const directGrenade = new Grenade(defaultOwner, defaultTarget.position, 3);
+    assert.equal(
+        directGrenade.velocity.length(),
+        319,
+        "Direct Grenade creation should also use the owner's current base-speed multiplier"
     );
 }
 
@@ -5096,9 +5127,9 @@ function testAbilityLevelUpgrades(app) {
     const grenade = grenadeRun.sim.entities.find((entity) => entity.constructor?.name === "Grenade");
     assert.equal(grenade.explosionRadius, 174, "Grenade rewards should preserve the base explosion radius");
     assert.deepEqual(
-        [grenade.stickyEnabled, grenade.burningEnabled, grenade.reburstEnabled],
+        [grenade.stickyEnabled, grenade.burningEnabled, grenade.stickyHomingEnabled],
         [true, true, true],
-        "Grenade tiers should expose sticky, burning, and reburst behavior"
+        "Grenade tiers should expose sticky, burning, and sticky-homing behavior"
     );
 
     const dashRun = createTierSimulation(FIGHTER_IDS.DASH);
@@ -5610,13 +5641,145 @@ function testFiveBallLevelRewardContracts(app) {
         "A swept frame crossing multiple hostiles should attach only to the earliest intersection"
     );
 
+    const attachStickyMarker = (run, target) => {
+        const marker = new Grenade(run.owner, target.position, 3, { sticky: true, stickyHoming: true });
+        marker.pos = Vector2.add(target.position, new Vector2(-(target.radius + marker.radius + 8), 0));
+        marker.applyImpulse(Vector2.subtract(new Vector2(240, 0), marker.velocity));
+        marker.update(0.1, run.simulation);
+        run.simulation.entities.push(marker);
+        assert.equal(marker.stickyTarget, target, "Homing markers should come from actual Lv3 surface contact");
+        return marker;
+    };
+
+    const homingRun = createRun(FIGHTER_IDS.GRENADE, { extraEnemy: true });
+    homingRun.owner.position = new Vector2(120, 300);
+    homingRun.target.position = new Vector2(720, 560);
+    homingRun.nearby.position = new Vector2(520, 620);
+    const existingFlyer = new Grenade(homingRun.owner, new Vector2(900, 300), 4, { sticky: true, stickyHoming: true });
+    homingRun.simulation.entities.push(existingFlyer);
+    const speedBeforeHoming = existingFlyer.velocity.length();
+    existingFlyer.update(0.5, homingRun.simulation);
+    assert.equal(
+        Math.atan2(existingFlyer.velocity.y, existingFlyer.velocity.x),
+        0,
+        "Grenade should retain its initial inertia through the exact 0.50-second homing offset"
+    );
+    assert.equal(
+        existingFlyer.homingTrail.length,
+        0,
+        "Grenade should not draw a homing trail before the 0.50-second offset"
+    );
+    const preHomingContext = makeRecordingCanvasContext();
+    existingFlyer.draw(preHomingContext);
+    assert.equal(
+        preHomingContext.primitives.some((primitive) => primitive.method === "quadraticCurveTo"),
+        false,
+        "Grenade should not render a curved trail before homing is active"
+    );
+
+    const distantMarker = attachStickyMarker(homingRun, homingRun.target);
+    const closestMarker = attachStickyMarker(homingRun, homingRun.nearby);
+    assert.equal(
+        existingFlyer._getStickyHomingTarget(homingRun.simulation),
+        homingRun.nearby,
+        "Grenade should select only the closest same-owner sticky hostile marker"
+    );
+    assert.equal(
+        closestMarker._getStickyHomingTarget(homingRun.simulation),
+        null,
+        "A sticky grenade should be excluded from its own flying homing path"
+    );
+    const markerContext = makeRecordingCanvasContext();
+    closestMarker.draw(markerContext);
+    assert.ok(
+        findEffectPrimitive(
+            markerContext.primitives,
+            "arc",
+            ([x, y, radius], primitive) =>
+                x === closestMarker.position.x &&
+                y === closestMarker.position.y &&
+                radius === closestMarker.radius + 8 &&
+                String(primitive.fillStyle).includes("rgba")
+        ),
+        "Sticky grenade should keep its existing red blinking marker ring"
+    );
+    assert.equal(
+        markerContext.primitives.some((primitive) => primitive.method === "quadraticCurveTo"),
+        false,
+        "Sticky grenade should never draw the flying homing trail"
+    );
+
+    existingFlyer.update(0.1, homingRun.simulation);
+    const firstTurn = Math.atan2(existingFlyer.velocity.y, existingFlyer.velocity.x);
+    assert.ok(firstTurn > 0 && firstTurn <= 0.2 + 1e-9, "Grenade homing should turn at most 2 rad/s toward its marker");
+    assert.ok(
+        Math.abs(existingFlyer.velocity.length() - speedBeforeHoming) < 1e-9,
+        "Grenade homing should preserve its exact speed magnitude"
+    );
+    assert.ok(
+        Math.abs(existingFlyer.timer - 3.4) < 1e-9,
+        "Grenade homing should not shorten its fuse outside the existing proximity rule"
+    );
+    existingFlyer.update(0.1, homingRun.simulation);
+    const activeTrailContext = makeRecordingCanvasContext();
+    existingFlyer.draw(activeTrailContext);
+    assert.ok(
+        activeTrailContext.primitives.some((primitive) => primitive.method === "quadraticCurveTo"),
+        "Only an actively homing flying grenade should draw a short curved trail"
+    );
+
+    const newFlyer = new Grenade(homingRun.owner, new Vector2(900, 300), 4, { sticky: true, stickyHoming: true });
+    newFlyer.update(0.49, homingRun.simulation);
+    assert.equal(
+        Math.atan2(newFlyer.velocity.y, newFlyer.velocity.x),
+        0,
+        "Newly fired Grenades should also retain the full 0.50-second initial offset"
+    );
+    newFlyer.update(0.02, homingRun.simulation);
+    assert.ok(
+        Math.atan2(newFlyer.velocity.y, newFlyer.velocity.x) > 0,
+        "Newly fired Grenades should begin homing immediately after their own offset completes"
+    );
+    assert.ok(
+        Math.abs(newFlyer.velocity.length() - speedBeforeHoming) < 1e-9,
+        "Newly fired homing Grenades should also preserve speed magnitude"
+    );
+
+    homingRun.nearby.flags.defeated = true;
+    assert.equal(
+        existingFlyer._getStickyHomingTarget(homingRun.simulation),
+        homingRun.target,
+        "Grenade should immediately reselect the next closest live sticky marker after a target disappears"
+    );
+    homingRun.nearby.flags.defeated = false;
+    const foreignMarker = new Grenade(homingRun.target, homingRun.nearby.position, 3, { sticky: true });
+    foreignMarker.stickyTarget = homingRun.nearby;
+    homingRun.nearby._stickyGrenade = foreignMarker;
+    assert.equal(
+        existingFlyer._getStickyHomingTarget(homingRun.simulation),
+        homingRun.target,
+        "Grenade should ignore a sticky marker owned by another fighter"
+    );
+    homingRun.nearby._stickyGrenade = closestMarker;
+    homingRun.target.flags.defeated = true;
+    homingRun.nearby.flags.defeated = true;
+    const inertialVelocity = existingFlyer.velocity.clone();
+    const inertialTimer = existingFlyer.timer;
+    existingFlyer.update(0.1, homingRun.simulation);
+    assert.ok(
+        Vector2.subtract(existingFlyer.velocity, inertialVelocity).length() < 1e-9,
+        "Grenade should resume inertial flight when no live sticky marker remains"
+    );
+    assert.equal(existingFlyer.homingTrail.length, 0, "Grenade should remove its trail when no marker remains");
+    assert.ok(
+        Math.abs(existingFlyer.timer - (inertialTimer - 0.1)) < 1e-9,
+        "No-marker inertia should keep the normal fuse countdown without Lv9 shortening"
+    );
+
     const grenadeRun = createRun(FIGHTER_IDS.GRENADE, { extraEnemy: true });
     grenadeRun.target.position = new Vector2(440, 300);
     grenadeRun.nearby.position = new Vector2(510, 300);
-    const firstExplosion = new Grenade(grenadeRun.owner, grenadeRun.target.position, 1, {
-        burning: true,
-        reburst: true
-    });
+    const firstExplosion = new Grenade(grenadeRun.owner, grenadeRun.target.position, 1, { burning: true });
     firstExplosion.pos = grenadeRun.target.position.clone();
     firstExplosion._detonate(grenadeRun.simulation);
     const burning = grenadeRun.target._igniteState;
@@ -5630,10 +5793,9 @@ function testFiveBallLevelRewardContracts(app) {
     const burnPrimer = new Grenade(grenadeRun.owner, grenadeRun.target.position, 1, { burning: true });
     burnPrimer.pos = grenadeRun.target.position.clone();
     burnPrimer._detonate(grenadeRun.simulation);
-    grenadeRun.nearby._igniteState?.consume();
     const secondExplosion = new Grenade(grenadeRun.owner, grenadeRun.target.position, 1, {
         burning: true,
-        reburst: true
+        stickyHoming: true
     });
     secondExplosion.pos = grenadeRun.target.position.clone();
     const targetHpBeforeReburst = grenadeRun.target.hp;
@@ -5641,19 +5803,19 @@ function testFiveBallLevelRewardContracts(app) {
     secondExplosion._detonate(grenadeRun.simulation);
     assert.equal(
         targetHpBeforeReburst - grenadeRun.target.hp,
-        325,
-        "Grenade Lv9 should combine the direct center hit and one x0.75 reburst on the burning target"
+        250,
+        "Grenade Lv9 should keep only the original direct explosion damage on an already burning target"
     );
     assert.equal(
         nearbyHpBeforeReburst - grenadeRun.nearby.hp,
-        325,
-        "Grenade Lv9 reburst should include nearby hostile targets without double triggering"
+        250,
+        "Grenade Lv9 should not add a nearby reburst damage or knockback path"
     );
-    const reburstEffects = grenadeRun.simulation.entities.filter((entity) => entity instanceof GrenadeReburstEffect);
-    assert.equal(reburstEffects.length, 1, "One consumed burning target should create one reburst entity");
-    assertForegroundEffectRenders(reburstEffects[0], "Grenade burning reburst", (primitives) => {
-        assertEffectArcAt(primitives, grenadeRun.target.position, "Grenade burning reburst", (radius) => radius <= 90);
-    });
+    assert.equal(
+        grenadeRun.simulation.entities.some((entity) => entity.constructor?.name === "GrenadeReburstEffect"),
+        false,
+        "Grenade Lv9 should not create the removed reburst effect entity"
+    );
 
     const gunnerRun = createRun(FIGHTER_IDS.GUNNER, { extraEnemy: true });
     const gunnerAbility = gunnerRun.owner.ability;
@@ -16308,7 +16470,7 @@ function testGrenadeHighSpeedProximityTrigger() {
     target.position = new Vector2(400, 480);
     const grenade = new Grenade(owner, new Vector2(900, 480), 1);
     grenade.position = new Vector2(100, 480);
-    grenade.velocity = new Vector2(6000, 0);
+    grenade.applyImpulse(Vector2.subtract(new Vector2(6000, 0), grenade.velocity));
 
     grenade.update(0.08, sim);
 
@@ -16328,7 +16490,7 @@ function testGrenadeProximityFuseMultiplier() {
     target.position = new Vector2(420, 480);
     const grenade = new Grenade(owner, new Vector2(1200, 480), 1);
     grenade.position = owner.position.clone();
-    grenade.velocity = new Vector2(800, 0);
+    grenade.applyImpulse(Vector2.subtract(new Vector2(grenade.launchSpeed, 0), grenade.velocity));
 
     grenade.update(0.1, sim);
 

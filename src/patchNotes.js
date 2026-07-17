@@ -19,6 +19,21 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.29.5",
+        date: "2026-07-17",
+        title: "v0.29.5 Grenade 점착 유도 수류탄",
+        changes: [
+            {
+                type: "feature",
+                text: "Grenade 기본 탄속을 현재 기본 속도의 1.1배로 조정하고, Lv.9을 점착 표식 유도로 교체했습니다."
+            },
+            {
+                type: "style",
+                text: "유도 중인 비점착 수류탄에만 짧은 곡선 잔상을 표시하고, 점착 표식의 붉은 고리는 유지했습니다."
+            }
+        ]
+    },
+    {
         version: "0.29.4",
         date: "2026-07-17",
         title: "v0.29.4 Dash 레이저 캐스터 연출",
