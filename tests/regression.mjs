@@ -19,7 +19,7 @@ import {
     getRemainingStatPoints,
     getSpentStatPoints
 } from "../src/statAllocation.js";
-import { calculateInterceptPoint, FIGHTER_IDS, RENDER_LAYERS, Vector2, randomSpin } from "../src/core.js";
+import { calculateInterceptPoint, FIGHTER_IDS, Projectile, RENDER_LAYERS, Vector2, randomSpin } from "../src/core.js";
 import { findActionById } from "../src/clickActions.js";
 import { calcMatchXp, getLevelFromXp, getXpForNextLevel, calcTournamentXp } from "../src/experience/experienceState.js";
 import { getLevelRequirement, XP_SCALE } from "../src/experience/experienceConfig.js";
@@ -6135,6 +6135,21 @@ function testTricksterLevelRewardContracts(app) {
 }
 
 function testOrbitLevelRewardContracts(app) {
+    class StaticCollisionProbe extends Projectile {
+        constructor(owner, position, velocity, radius, { resolveTerrain = false } = {}) {
+            super(owner, position, velocity, radius);
+            this.resolveTerrain = resolveTerrain;
+            this.staticCollisionContexts = [];
+        }
+
+        getStaticCollisionOptions() {
+            return {
+                resolveTerrain: this.resolveTerrain,
+                onStaticCollision: (context) => this.staticCollisionContexts.push(context)
+            };
+        }
+    }
+
     const createRun = (tier, extraEnemy = false) => {
         const ownerSpec = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ORBIT);
         const targetSpec = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
@@ -6181,6 +6196,83 @@ function testOrbitLevelRewardContracts(app) {
         { bodyCatch: true }
     ]);
 
+    const staticCollisionRun = createRun(1);
+    const wallProbe = new StaticCollisionProbe(
+        staticCollisionRun.owner,
+        new Vector2(10, 300),
+        new Vector2(-120, 30),
+        11
+    );
+    wallProbe._integrateAndClamp(0, staticCollisionRun.simulation);
+    assert.equal(wallProbe.staticCollisionContexts.length, 1, "Opt-in projectile should receive one wall context");
+    const wallContext = wallProbe.staticCollisionContexts[0];
+    assert.equal(wallContext.wall, true, "Wall context should identify the arena wall");
+    assert.equal(wallContext.terrain, false, "Wall context should not identify terrain");
+    assert.deepEqual(wallContext.normal, new Vector2(1, 0), "Left wall context should expose its inward normal");
+    assert.deepEqual(
+        wallContext.contactPoint,
+        new Vector2(0, 300),
+        "Wall context should expose the world contact point"
+    );
+    assert.deepEqual(
+        wallContext.preCollisionVelocity,
+        new Vector2(-120, 30),
+        "Wall context should snapshot the pre-reflection velocity"
+    );
+    assert.ok(
+        wallContext.postCollisionVelocity.dot(wallContext.normal) > 0,
+        "Wall context should expose the actual inward post-reflection velocity"
+    );
+
+    staticCollisionRun.simulation.terrain = [
+        { id: "probe-rock", shape: "circle", x: 420, y: 420, radius: 40, blocking: true }
+    ];
+    const terrainProbe = new StaticCollisionProbe(
+        staticCollisionRun.owner,
+        new Vector2(420, 420),
+        new Vector2(-120, 0),
+        11,
+        { resolveTerrain: true }
+    );
+    terrainProbe._integrateAndClamp(0, staticCollisionRun.simulation);
+    assert.equal(
+        terrainProbe.staticCollisionContexts.length,
+        1,
+        "Opt-in terrain projectile should receive one context"
+    );
+    const terrainContext = terrainProbe.staticCollisionContexts[0];
+    assert.equal(terrainContext.wall, false, "Terrain context should not identify a wall");
+    assert.equal(terrainContext.terrain, true, "Terrain context should identify terrain");
+    assert.deepEqual(terrainContext.normal, new Vector2(1, 0), "Terrain context should preserve its collision normal");
+    assert.deepEqual(
+        terrainContext.contactPoint,
+        new Vector2(460, 420),
+        "Terrain context should preserve the terrain contact point"
+    );
+    assert.deepEqual(
+        terrainContext.preCollisionVelocity,
+        new Vector2(-120, 0),
+        "Terrain context should snapshot the pre-reflection velocity"
+    );
+    assert.ok(
+        terrainContext.postCollisionVelocity.dot(terrainContext.normal) > 0,
+        "Terrain context should expose the actual post-reflection velocity"
+    );
+
+    const nonOptInProjectile = new Projectile(staticCollisionRun.owner, new Vector2(10, 620), new Vector2(-120, 0), 11);
+    nonOptInProjectile._integrateAndClamp(0, staticCollisionRun.simulation);
+    assert.equal(
+        nonOptInProjectile.position.x,
+        11,
+        "Non-opt-in projectile should retain the existing wall position clamp"
+    );
+    assert.ok(nonOptInProjectile.velocity.x > 0, "Non-opt-in projectile should retain the existing wall reflection");
+    assert.equal(
+        Object.hasOwn(nonOptInProjectile, "staticCollisionContexts"),
+        false,
+        "Non-opt-in projectile should not allocate a static collision context"
+    );
+
     const syncRun = createRun(1);
     const first = syncRun.simulation.spawnOrbitShot(
         syncRun.owner,
@@ -6207,6 +6299,45 @@ function testOrbitLevelRewardContracts(app) {
         "Lv3 convergence projectile should render above fighters"
     );
     assert.equal(otherVolley.convergence, null, "Lv3 must not convert another volley");
+
+    const wallRebaseRun = createRun(1);
+    wallRebaseRun.owner.position = new Vector2(180, 700);
+    wallRebaseRun.target.position = new Vector2(420, 480);
+    const wallRebaseShot = wallRebaseRun.simulation.spawnOrbitShot(
+        wallRebaseRun.owner,
+        new Vector2(wallRebaseRun.simulation.width - 11.5, 700),
+        new Vector2(1, 0),
+        16,
+        { slotIndex: 1, volleyId: "wall-rebase" }
+    );
+    wallRebaseShot.elapsed = 1;
+    wallRebaseShot.beginSynchronizedConvergence(wallRebaseRun.target.position.clone());
+    const wallRebaseFixedPoint = wallRebaseShot.convergence.fixedPoint.clone();
+    const synchronizedVolleysBeforeRebase = wallRebaseRun.owner.ability.state.synchronizedVolleys.size;
+    wallRebaseShot.update(1 / 60, wallRebaseRun.simulation);
+    const reboundStartAngle = Math.atan2(wallRebaseShot.velocity.y, wallRebaseShot.velocity.x);
+    assert.equal(wallRebaseShot.convergence.elapsed, 0, "Wall reflection should restart convergence progress");
+    assert.ok(
+        Math.abs(wallRebaseShot.convergence.startAngle - reboundStartAngle) < 1e-9,
+        "Wall reflection should use the actual reflected velocity as the new convergence start direction"
+    );
+    assert.deepEqual(
+        wallRebaseShot.convergence.fixedPoint,
+        wallRebaseFixedPoint,
+        "Wall reflection should preserve the original synchronized fixed point"
+    );
+    assert.equal(
+        wallRebaseRun.owner.ability.state.synchronizedVolleys.size,
+        synchronizedVolleysBeforeRebase,
+        "Wall rebasing must not synchronize another volley"
+    );
+    const wallBoundaryX = wallRebaseShot.position.x;
+    assert.ok(wallRebaseShot.velocity.x < 0, "Wall reflection should leave the shard travelling into the arena");
+    wallRebaseShot.update(1 / 60, wallRebaseRun.simulation);
+    assert.ok(
+        wallRebaseShot.position.x < wallBoundaryX,
+        "Rebased convergence should leave the wall on its first post-reflection frame"
+    );
     const renderConvergence = (label, expectTrail) => {
         let projectileSquare;
         assertForegroundEffectRenders(converging, label, (primitives) => {

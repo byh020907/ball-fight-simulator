@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.29.3",
+        date: "2026-07-17",
+        title: "v0.29.3 Orbit 협공 경로 수정",
+        changes: [
+            {
+                type: "fix",
+                text: "Orbit 협공 탄이 벽 반사 뒤에도 자연스럽게 고정 접점으로 경로를 이어 갑니다."
+            }
+        ]
+    },
+    {
         version: "0.29.2",
         date: "2026-07-17",
         title: "v0.29.2 토너먼트 도전 문구 수정",

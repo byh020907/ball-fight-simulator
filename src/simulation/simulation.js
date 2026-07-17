@@ -17,6 +17,17 @@ import { resolveTerrainCollisions } from "../terrain/terrainCollision.js";
 import { applyCollisionResponse } from "../physics/collisionResponse.js";
 import { PeriodicDamageEffect } from "../combatEffects.js";
 
+function createStaticCollisionContext(surface, collision, postCollisionVelocity) {
+    return {
+        wall: surface === "wall",
+        terrain: surface === "terrain",
+        normal: collision.normal.clone(),
+        contactPoint: collision.contactPoint.clone(),
+        preCollisionVelocity: collision.preCollisionVelocity.clone(),
+        postCollisionVelocity: postCollisionVelocity.clone()
+    };
+}
+
 /**
  * Base simulation — arena boundaries, wall bouncing, effect spawning.
  * Extended by BattleSimulation (real game) and TestSimulation (tests).
@@ -101,10 +112,18 @@ export class Simulation {
         });
     }
 
-    keepEntityInsideArena(entity, { resolveTerrain = false } = {}) {
-        this._reflectX(entity);
-        this._reflectY(entity);
-        if (resolveTerrain) resolveTerrainCollisions(entity, this.terrain);
+    keepEntityInsideArena(entity, { resolveTerrain = false, onStaticCollision = null } = {}) {
+        const notifyStaticCollision = (surface, collision) => {
+            if (!collision || typeof onStaticCollision !== "function") return;
+            onStaticCollision(createStaticCollisionContext(surface, collision, entity.velocity));
+        };
+
+        const xBounce = this._reflectX(entity);
+        notifyStaticCollision("wall", xBounce);
+        const yBounce = this._reflectY(entity);
+        notifyStaticCollision("wall", yBounce);
+        const terrainCollision = resolveTerrain ? resolveTerrainCollisions(entity, this.terrain) : null;
+        notifyStaticCollision("terrain", terrainCollision);
     }
 
     /** X축 벽 반사. bounce 발생 시 normal 반환. */

@@ -22,6 +22,7 @@ export {
     applyDynamicCollisionResponse
 } from "./collisionResponse.js";
 export { PHYSICS_MATERIALS, resolvePhysicsMaterial, combinePhysicsMaterials } from "./PhysicsMaterial.js";
+export { createSteeringRebaseState } from "./steeringRebase.js";
 export {
     getContactPointVelocity,
     getContactDamageSpeed,

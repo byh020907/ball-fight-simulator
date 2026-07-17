@@ -1,5 +1,6 @@
 import { Projectile, RENDER_LAYERS, Vector2 } from "../core.js";
 import { getVisibleLineWidth } from "../effects/effectVisibility.js";
+import { createSteeringRebaseState } from "../physics/steeringRebase.js";
 
 const CONVERGENCE_DURATION = 0.15;
 const EXPLOSION_RADIUS = 70;
@@ -34,6 +35,9 @@ export class OrbitProjectile extends Projectile {
         this.wasCaught = false;
         this.convergence = null;
         this.trail = [];
+        this._staticCollisionOptions = {
+            onStaticCollision: (context) => this._rebaseConvergenceAfterStaticCollision(context)
+        };
     }
 
     update(delta, simulation) {
@@ -61,6 +65,7 @@ export class OrbitProjectile extends Projectile {
         const targetDirection = Vector2.subtract(fixedPoint, this.position).normalize();
         this.convergence = {
             elapsed: 0,
+            duration: CONVERGENCE_DURATION,
             fixedPoint: fixedPoint.clone(),
             startAngle: Math.atan2(startDirection.y, startDirection.x),
             targetAngle: Math.atan2(targetDirection.y, targetDirection.x)
@@ -68,10 +73,30 @@ export class OrbitProjectile extends Projectile {
         return true;
     }
 
+    getStaticCollisionOptions() {
+        return this._staticCollisionOptions;
+    }
+
+    _rebaseConvergenceAfterStaticCollision(context) {
+        if (!this.convergence || (!context.wall && !context.terrain)) return;
+
+        const rebase = createSteeringRebaseState({
+            fixedTarget: this.convergence.fixedPoint,
+            currentPosition: this.position,
+            reflectedVelocity: context.postCollisionVelocity,
+            duration: this.convergence.duration ?? CONVERGENCE_DURATION
+        });
+        this.convergence = {
+            ...this.convergence,
+            ...rebase
+        };
+    }
+
     _getPlannedDirection(delta) {
         if (!this.convergence) return this.dir.clone();
-        this.convergence.elapsed = Math.min(CONVERGENCE_DURATION, this.convergence.elapsed + delta);
-        const progress = smoothstep(this.convergence.elapsed / CONVERGENCE_DURATION);
+        const duration = this.convergence.duration ?? CONVERGENCE_DURATION;
+        this.convergence.elapsed = Math.min(duration, this.convergence.elapsed + delta);
+        const progress = smoothstep(this.convergence.elapsed / duration);
         const angle =
             this.convergence.startAngle +
             shortestAngleDelta(this.convergence.startAngle, this.convergence.targetAngle) * progress;

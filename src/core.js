@@ -112,9 +112,18 @@ function ProjectileBehavior(Base) {
 
         // ── 투사체 update (조합 가능한 단계별 메서드) ──
 
+        /**
+         * 정적 표면 반사 뒤 실제 속도를 읽어야 하는 투사체의 opt-in hook입니다.
+         * 기본 투사체는 null을 반환해 기존 Arena/지형 충돌 흐름을 그대로 사용합니다.
+         */
+        getStaticCollisionOptions() {
+            return null;
+        }
+
         _integrateAndClamp(delta, simulation) {
             this.integrate(delta);
-            simulation.keepEntityInsideArena(this);
+            const staticCollisionOptions = this.getStaticCollisionOptions();
+            simulation.keepEntityInsideArena(this, staticCollisionOptions ?? undefined);
         }
 
         _lifecycleCheck(delta, simulation) {
