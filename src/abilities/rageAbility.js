@@ -1,6 +1,6 @@
 import { Ability } from "./ability.js";
 import { Vector2 } from "../core.js";
-import { BurningEffect, RageFlameRing } from "../effects/index.js";
+import { RageFlameRing, applyBurningEffect } from "../effects/index.js";
 
 const CHARGE_THRESHOLD_PARTICLES = 0.22;
 const PARTICLE_BASE_INTERVAL = 0.15;
@@ -15,11 +15,6 @@ const DAMAGE_BASE = 0.96;
 const DAMAGE_PER_CHARGE = 0.04;
 const IMPACT_BASE = 0.9;
 const IMPACT_PER_CHARGE = 0.1;
-
-const IGNITE_DURATION = 0.5;
-const IGNITE_TICK_COUNT = 10;
-const IGNITE_TICK_INTERVAL = IGNITE_DURATION / IGNITE_TICK_COUNT;
-const IGNITE_DAMAGE_PER_TICK = 0.075;
 
 const EXPLOSION_RADIUS = 120;
 const EXPLOSION_DAMAGE_MULT = 1.5;
@@ -137,20 +132,12 @@ export class RageAbility extends Ability {
 
     _applyIgnite(target) {
         if (target.flags.defeated) return;
-        if (target._igniteState instanceof BurningEffect && !target._igniteState.isExpired) {
-            target._igniteState.refresh(IGNITE_DURATION);
-            return;
-        }
-        const igniteEffect = new BurningEffect({
+        applyBurningEffect({
             source: this.owner,
             target,
-            duration: IGNITE_DURATION,
-            tickInterval: IGNITE_TICK_INTERVAL,
-            maximumTicks: IGNITE_TICK_COUNT,
-            damagePerTick: Math.round(this.owner.stats.baseDamage * IGNITE_DAMAGE_PER_TICK)
+            simulation: this.simulation,
+            label: "Ignite"
         });
-        target._igniteState = igniteEffect;
-        this.simulation.entities.push(igniteEffect);
         this.simulation.addLog(`${target.name} is ignited by ${this.owner.name}.`);
     }
 

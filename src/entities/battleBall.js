@@ -76,8 +76,8 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             rewardIds: []
         };
         this.hero = {
-            bonuses: { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 },
-            carryover: { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 }
+            bonuses: { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0, critical: 0 },
+            carryover: { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0, critical: 0 }
         };
         this.applyHeroOrbCarryover(spec.hero?.carryover);
         this.hunting = spec.hunting ?? null;
@@ -174,7 +174,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
     }
 
     getSkillPoints() {
-        return this.stats.baseSkill + (this.stats.allocation?.skill ?? 0);
+        return this.stats.baseSkill + (this.stats.allocation?.skill ?? 0) + (this.hero?.bonuses?.skill ?? 0);
     }
 
     // ── 물리 디버그 래퍼 (원본 믹스인 메서드를 보존하고 기록 추가) ──

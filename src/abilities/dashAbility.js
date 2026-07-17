@@ -1,5 +1,6 @@
 import { steerBallToward, Vector2 } from "../core.js";
 import { DashEffect } from "../combatEffects.js";
+import { LaserBeamEffect } from "../effects/index.js";
 import { Ability } from "./ability.js";
 
 const INITIAL_COOLDOWN_LEVEL = 0;
@@ -54,20 +55,23 @@ export class DashAbility extends Ability {
         steerBallToward(this.owner, target, delta, { turnRate: this.getHomingTurnRate(), persist: true });
     }
 
-    onDashHit() {
+    onDashHit(target) {
         this.state.cooldownLevel = Math.min(this.maxCooldownLevel, this.state.cooldownLevel + 1);
         this.cooldown = this.getCooldownForLevel();
         this.timer = Math.min(this.timer, this.cooldown);
         this.simulation.addLog(`${this.owner.name} lands a dash and shortens future cooldowns.`);
+        if (this.getLevelUpgrade().laserStrike && target && !target.flags.defeated) {
+            this.simulation.entities.push(
+                new LaserBeamEffect(this.owner, target, {
+                    maxWallBounces: this.getLevelUpgrade().laserWallBounces ?? 0
+                })
+            );
+        }
     }
 
     onDashWall() {
-        const retention = this.getLevelUpgrade().wallCooldownLevelRetention;
         const previousLevel = this.state.cooldownLevel;
-        this.state.cooldownLevel =
-            retention == null || this.state.cooldownLevel === 0
-                ? 0
-                : Math.max(1, Math.round(this.state.cooldownLevel * retention));
+        this.state.cooldownLevel = 0;
         this._baseCooldown = this.getCooldownForLevel();
         this.timer = this.cooldown;
         this.simulation.addLog(
@@ -76,11 +80,11 @@ export class DashAbility extends Ability {
     }
 
     getDashMultiplier() {
-        return this.dashMultiplier * (this.getLevelUpgrade().dashMultiplier ?? 1);
+        return this.dashMultiplier;
     }
 
     getHomingTurnRate() {
-        return this.homingTurnRate * (this.getLevelUpgrade().homingTurnRateMultiplier ?? 1);
+        return this.homingTurnRate;
     }
 
     getCooldownForLevel() {

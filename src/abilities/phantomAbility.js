@@ -8,8 +8,6 @@ const RANDOM_MISS_COOLDOWN_FACTOR = 0.5;
 const DASH_DURATION = 0.8;
 const DASH_MULTIPLIER = 2.5;
 const TELEPORT_BEHIND_DIST = 250;
-const BONUS_DAMAGE = 12;
-const COLLISION_DAMAGE_WHEN_READY = 5;
 const VANISH_DURATION = 0.15;
 const APPEAR_DURATION = 0.4;
 
@@ -195,7 +193,10 @@ export class PhantomAbility extends Ability {
         owner.initiateDash(dashDir, {
             duration: DASH_DURATION,
             multiplier: DASH_MULTIPLIER,
-            collisionDamage: stage === "base" ? this.getLevelUpgrade().bonusDamage : 0,
+            collisionDamage:
+                stage === "base"
+                    ? this.owner.stats.baseDamage * (this.getLevelUpgrade().bonusDamageMultiplier ?? 1.5)
+                    : 0,
             collisionLabel: stage === "base" ? "Shadow Strike" : "Shadow Echo",
             showRing: false
         });

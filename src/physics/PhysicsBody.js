@@ -52,6 +52,11 @@ export default function PhysicsBody(Base) {
             this._forceAccum.add(force);
         }
 
+        /** 겹침 해소처럼 속도를 바꾸지 않아야 하는 물리 위치 보정에만 사용한다. */
+        applyPositionCorrection(correction) {
+            this.pos.add(correction);
+        }
+
         // ── 속도 → 위치 적분 ──
 
         integrate(delta) {

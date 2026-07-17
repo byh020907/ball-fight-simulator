@@ -115,7 +115,7 @@ export function createRoster() {
             name: "Gunner Ball",
             title: "Roulette Shot",
             description:
-                "쿨타임마다 1~6발의 총알을 360도 랜덤 방향으로 연사합니다. 발수가 많을수록 발당 데미지가 증가합니다.",
+                "쿨타임마다 6~12발의 총알을 360도 랜덤 방향으로 연사합니다. 발수가 많을수록 발당 데미지가 증가하고, 회수한 탄은 다음 연계를 만듭니다.",
             color: "#8877cc",
             face: "gunner",
             ability: "gunner",
@@ -125,7 +125,8 @@ export function createRoster() {
             id: FIGHTER_IDS.PHANTOM,
             name: "Phantom Ball",
             title: "Shadow Strike",
-            description: "충돌 시 사라졌다가 상대 뒤에서 나타나 돌진합니다. 쿨타임 동안 충돌은 일반 충돌로 처리됩니다.",
+            description:
+                "충돌 시 사라졌다가 상대 뒤에서 나타나 총공격력에 비례한 추가 피해와 함께 돌진합니다. 쿨타임 동안 충돌은 일반 충돌로 처리됩니다.",
             color: "#55bbdd",
             face: "phantom",
             ability: "phantom",
@@ -136,7 +137,7 @@ export function createRoster() {
             name: "Hero Ball",
             title: "Hero Orb",
             description:
-                "쿨타임마다 랜덤 스탯 오브를 던집니다. 본인이 먹으면 해당 스탯이 영구 증가합니다. 상대가 먹으면 아무 효과 없이 사라집니다.",
+                "성장 스택을 충전하고 적과 충돌할 때 같은 수의 성장 코어를 방출합니다. 직접 회수하면 무작위 스탯이 증가합니다.",
             color: "#ffcc00",
             face: "hero",
             ability: "hero",

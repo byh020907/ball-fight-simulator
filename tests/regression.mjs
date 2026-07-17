@@ -252,6 +252,13 @@ import {
 import { ArenaRenderer } from "../src/ui.js";
 import { ArenaCamera } from "../src/camera.js";
 import { BurningEffect } from "../src/effects/rageEffects.js";
+import {
+    CrossOverloadEffect,
+    GrenadeReburstEffect,
+    HeroResonanceEffect,
+    LaserBeamEffect,
+    traceArenaLaserSegments
+} from "../src/effects/index.js";
 import { PATCH_NOTES } from "../src/patchNotes.js";
 import {
     createTemplateComponentDirective,
@@ -273,7 +280,9 @@ import {
     createHuntingLootItem,
     EnhancementStoneDrop,
     ExperienceDrop,
+    HERO_ORB_EFFECTS,
     HeroOrb,
+    GunnerTurret,
     ShardDrop,
     ShardBundleDrop,
     SmallHealPack,
@@ -4757,7 +4766,7 @@ function testExperienceSystem() {
     );
     assert.equal(
         allRewardEffects.find((effect) => effect.type === "ability_tier")?.gameText,
-        "대시 배율 +5%",
+        "대시 적중 레이저 · 0.35초 조준 ×0.60",
         "Ability tier effects should preserve the configured game text"
     );
 
@@ -5003,20 +5012,29 @@ function testAbilityLevelUpgrades(app) {
     Math.random = () => 0;
     try {
         grenadeRun.ball.ability._startBurst(grenadeRun.target);
-        assert.equal(grenadeRun.ball.ability._burstTotal, 4, "Grenade tier 1 should raise the minimum burst to four");
+        assert.equal(grenadeRun.ball.ability._burstTotal, 3, "Grenade rewards should preserve the base minimum burst");
     } finally {
         Math.random = originalRandom;
     }
     const grenade = grenadeRun.sim.entities.find((entity) => entity.constructor?.name === "Grenade");
-    assertClose(grenade.explosionRadius, 174 * 1.15, "Grenade tier 2 should expand the explosion radius by 15%");
-    assertClose(grenade.damageMultiplier, 1.1, "Grenade tier 3 should increase explosion damage by 10%");
+    assert.equal(grenade.explosionRadius, 174, "Grenade rewards should preserve the base explosion radius");
+    assert.deepEqual(
+        [grenade.stickyEnabled, grenade.burningEnabled, grenade.reburstEnabled],
+        [true, true, true],
+        "Grenade tiers should expose sticky, burning, and reburst behavior"
+    );
 
     const dashRun = createTierSimulation(FIGHTER_IDS.DASH);
     dashRun.ball.ability.state.cooldownLevel = 2;
     dashRun.ball.ability.onDashWall();
-    assertClose(dashRun.ball.ability.getDashMultiplier(), 2.15 * 1.05, "Dash tier 1 should increase dash speed");
-    assertClose(dashRun.ball.ability.getHomingTurnRate(), 2.4 * 1.3, "Dash tier 2 should increase turn rate");
-    assert.equal(dashRun.ball.ability.state.cooldownLevel, 1, "Dash tier 3 should retain half of a two-stage cooldown");
+    assertClose(dashRun.ball.ability.getDashMultiplier(), 2.15, "Dash rewards should preserve dash speed");
+    assertClose(dashRun.ball.ability.getHomingTurnRate(), 2.4, "Dash rewards should preserve turn rate");
+    assert.equal(dashRun.ball.ability.state.cooldownLevel, 0, "Dash wall contact should reset the cooldown stage");
+    dashRun.ball.ability.onDashHit(dashRun.target);
+    assert.ok(
+        dashRun.sim.entities.some((entity) => entity instanceof LaserBeamEffect),
+        "Dash tier rewards should create the shared laser effect after a real dash hit"
+    );
 
     const rageRun = createTierSimulation(FIGHTER_IDS.RAGE);
     rageRun.ball.ability.state.timeWithoutCollision = rageRun.ball.ability.getMaxChargeTime();
@@ -5138,17 +5156,38 @@ function testAbilityLevelUpgrades(app) {
     } finally {
         Math.random = originalRandom;
     }
-    assert.equal(
-        gunnerRun.ball.ability.state.burstBulletCount,
-        7,
-        "Gunner tier 1 should raise the minimum bullet count to seven"
-    );
-    gunnerRun.ball.ability._fireBurstBullet();
-    const bullet = gunnerRun.sim.entities.find((entity) => entity.constructor?.name === "BulletProjectile");
+    assert.equal(gunnerRun.ball.ability.state.burstBulletCount, 6, "Gunner rewards should preserve the 6-shot minimum");
+    while (gunnerRun.ball.ability._burstRemaining > 0) gunnerRun.ball.ability._fireBurstBullet();
+    const bullets = gunnerRun.sim.entities.filter((entity) => entity.constructor?.name === "BulletProjectile");
+    const bullet = bullets[0];
     assertClose(
         bullet.velocity.length(),
-        gunnerRun.ball.stats.baseSpeed * 2 * 1.15,
-        "Gunner tier 2 should increase bullet speed by 15%"
+        gunnerRun.ball.stats.baseSpeed * 2,
+        "Gunner rewards should preserve bullet speed"
+    );
+    assert.equal(bullets.at(-1).isFinisher, true, "Gunner tier 1 should empower every burst's last bullet");
+    assertClose(
+        bullets.at(-1).damageMult,
+        (0.2 + (6 / 12) * 0.8) * 2,
+        "The empowered last bullet should retain the burst-derived multiplier and double it"
+    );
+    bullet.position = gunnerRun.ball.position.clone();
+    bullet._ownerCollectCheck(gunnerRun.sim);
+    const refire = gunnerRun.sim.entities.find((entity) => entity.isRefire && !entity.isExpired);
+    assert.ok(refire, "Gunner tier 2 should refire an actually collected normal bullet");
+    assert.deepEqual(
+        [refire.damageMult, refire.canCollect, refire.canStack, refire.retargetAfterBounce],
+        [bullet.damageMult, false, false, true],
+        "The refire bullet should preserve damage and allow exactly one ricochet retarget"
+    );
+    gunnerRun.ball.ability.state.collectionStacks = 19;
+    gunnerRun.ball.ability.onBulletCollected(bullets[1], gunnerRun.sim);
+    const turret = gunnerRun.sim.entities.find((entity) => entity instanceof GunnerTurret);
+    assert.ok(turret, "Gunner tier 3 should consume twenty actual collections to deploy a turret");
+    assert.deepEqual(
+        [turret.life, turret.maxHp, turret.movementMode],
+        [8, Math.round(gunnerRun.ball.maxHp * 0.25), "fixed"],
+        "The default turret should use the shared eight-second, 25%-HP fixed contract"
     );
 
     const phantomRun = createTierSimulation(FIGHTER_IDS.PHANTOM);
@@ -5174,98 +5213,608 @@ function testAbilityLevelUpgrades(app) {
 
     const heroRun = createTierSimulation(FIGHTER_IDS.HERO);
     const heroAbility = heroRun.ball.ability;
-    for (const _ of Array.from({ length: 24 })) {
-        heroAbility.onOrbCollected();
-    }
-    assert.equal(heroAbility.state.orbStacks, 20, "Hero tier 2 should cap orb stacks at twenty");
+    heroAbility.update(5, heroRun.target);
     assert.deepEqual(
         heroAbility.getOrbStackState(),
-        { stacks: 20, stackCap: 20, progress: 1 },
-        "Hero should expose its capped orb stack progress for the battle visual"
-    );
-    heroAbility.state.orbStacks = 3;
-    const drawnStackArcs = [];
-    const drawnStackLabels = [];
-    heroAbility.draw({
-        save() {},
-        restore() {},
-        beginPath() {},
-        arc(...args) {
-            drawnStackArcs.push(args);
-        },
-        stroke() {},
-        fillText(...args) {
-            drawnStackLabels.push(args);
-        }
-    });
-    assert.equal(drawnStackArcs.length, 3, "Hero should draw one bright stack band segment per collected orb");
-    assert.equal(drawnStackLabels[0][0], "x3", "Hero stack band should show the current stack count");
-    heroAbility.state.orbStacks = 20;
-    assert.equal(
-        heroAbility.modifyOutgoingFighterCollisionDamage(10),
-        16,
-        "Hero stacks should add 3% collision damage each"
+        { stacks: 5, stackCap: 5, progress: 1 },
+        "Hero should charge exactly five growth stacks in five seconds"
     );
     const attractionOrb = new HeroOrb(heroRun.ball, heroRun.ball.position.clone(), new Vector2(0, 0), "hp");
     const heroAttraction = heroAbility.getOrbAttraction(attractionOrb);
-    assert.equal(
-        heroAttraction.radius,
-        heroRun.ball.radius * 2.5 + attractionOrb.radius,
-        "Hero tier 1 should use two-and-a-half times the Hero radius plus the Orb radius as magnet range"
-    );
-
-    heroRun.sim.width = 10_000;
-    heroRun.target.position = new Vector2(9_000, 9_000);
-    heroAbility._spawnOrb("hp", new Vector2(1, 0));
-    const launchedOrb = heroRun.sim.entities.find((entity) => entity.constructor?.name === "HeroOrb");
-    const launchVelocity = launchedOrb.velocity.clone();
-    assert.equal(
-        launchedOrb.collectionGraceRemaining,
-        1,
-        "Hero tier 1 should give launched orbs a one-second collection grace period"
-    );
-    for (const _ of Array.from({ length: 10 })) {
-        launchedOrb.update(0.1, heroRun.sim);
-    }
-    assertClose(
-        launchedOrb.velocity.length(),
-        launchVelocity.length(),
-        "Hero magnet should not reduce launch speed during the first second"
-    );
-    heroRun.sim.entities = heroRun.sim.entities.filter((entity) => entity !== launchedOrb);
-
-    const heroOrb = new HeroOrb(
-        heroRun.ball,
-        Vector2.add(heroRun.ball.position, new Vector2(heroRun.ball.radius + 20, 0)),
-        new Vector2(0, 0),
-        "hp",
-        undefined,
-        { collectionGraceDuration: 1 }
-    );
-    heroOrb.update(1, heroRun.sim);
-    assert.equal(
-        heroOrb.velocity.length(),
-        0,
-        "Hero magnet should ignore an orb until its one-second grace period ends"
-    );
-    heroOrb.update(0.1, heroRun.sim);
-    assert.ok(
-        heroOrb.velocity.x < 0,
-        "Hero tier 1 should physically pull owned orbs after the grace period inside the Hero-radius range"
-    );
-    heroAbility.onFighterCollisionDamageResolved(heroRun.target, 1);
-    assert.equal(
-        heroAbility.state.orbStacks,
-        0,
-        "Hero should consume stacks only after actual fighter collision damage"
-    );
+    assert.ok(heroAttraction.radius > heroRun.ball.radius, "Hero tier 1 should magnetize growth cores only nearby");
+    heroAbility.onFighterCollisionDamageResolved(heroRun.target, 1, { contactPoint: heroRun.target.position });
+    assert.equal(heroAbility.state.growthStacks, 0, "Hero should consume every growth stack on one real collision");
     assert.ok(heroAbility.state.stackReleaseFlash > 0, "Hero stack consumption should trigger a visible release flash");
     assert.equal(
         heroRun.sim.entities.filter((entity) => entity.constructor?.name === "HeroOrb").length,
-        10,
-        "Hero tier 3 should release half of twenty consumed stacks as normal orbs"
+        5,
+        "Five consumed growth stacks should create exactly five eight-second cores"
     );
+    heroAbility.state.resonanceFragments = Array.from({ length: 5 }, () => ({ color: "#ffd84d" }));
+    heroAbility.onFighterCollisionDamageResolved(heroRun.target, 1, { contactPoint: heroRun.target.position });
+    const resonance = heroRun.sim.entities.find((entity) => entity instanceof HeroResonanceEffect);
+    assert.ok(resonance?.heroicBurst, "Five stored fragments at tier three should arm Heroic Burst");
     console.log("[ability-level-upgrades] ok");
+}
+
+function testFiveBallLevelRewardContracts(app) {
+    const createRun = (fighterId, { extraEnemy = false, abilityTier = 3 } = {}) => {
+        const ownerSpec = app.roster.find((fighter) => fighter.id === fighterId);
+        const targetSpec = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
+        const specs = [
+            { ...ownerSpec, teamId: `${fighterId}-reward-team` },
+            { ...targetSpec, id: `${fighterId}-reward-target`, teamId: "reward-enemy-team" }
+        ];
+        if (extraEnemy) {
+            specs.push({ ...targetSpec, id: `${fighterId}-reward-nearby`, teamId: "reward-enemy-team" });
+        }
+        const simulation = new BattleSimulation(
+            specs,
+            { onLog() {}, onSound() {}, onDamageTaken() {}, onDamageDealt() {}, onHpChanged() {} },
+            null,
+            { assignActions: false, arenaWidth: 960 }
+        );
+        const [owner, target, nearby] = simulation.fighters;
+        owner.ability.setContext({ abilityTier });
+        owner.progression.abilityTier = abilityTier;
+        owner.stats.baseDamage = 100;
+        owner.stats.criticalChance = 0;
+        owner.position = new Vector2(180, 300);
+        target.position = new Vector2(520, 300);
+        for (const enemy of [target, nearby].filter(Boolean)) {
+            enemy.maxHp = 5_000;
+            enemy.hp = 5_000;
+            enemy.stats.baseDefense = 0;
+            enemy.stats.criticalChance = 0;
+        }
+        if (nearby) nearby.position = new Vector2(580, 300);
+        return { simulation, owner, target, nearby };
+    };
+
+    const straightSegments = traceArenaLaserSegments(new Vector2(100, 100), 0, 300, 200, 1);
+    assert.equal(straightSegments.length, 2, "Dash Lv6 should trace an incident and one reflected segment");
+    assert.deepEqual(
+        [straightSegments[0].end.x, straightSegments[0].end.y, straightSegments[1].end.x],
+        [300, 100, 0],
+        "Dash reflected ray should use the shared arena bounds"
+    );
+    const cornerAngle = Math.atan2(100, 200);
+    const [cornerSegment] = traceArenaLaserSegments(new Vector2(100, 100), cornerAngle, 300, 200, 0);
+    assert.deepEqual(
+        [cornerSegment.normal.x, cornerSegment.normal.y],
+        [-1, 0],
+        "Equal-time corner rays should deterministically choose the x-axis normal"
+    );
+
+    const phaseRun = createRun(FIGHTER_IDS.DASH);
+    phaseRun.owner.position = new Vector2(100, 300);
+    phaseRun.target.position = new Vector2(320, 300);
+    const phaseLaser = new LaserBeamEffect(phaseRun.owner, phaseRun.target, { maxWallBounces: 0 });
+    const phaseHpBefore = phaseRun.target.hp;
+    phaseLaser.update(0.35, phaseRun.simulation);
+    assert.deepEqual(
+        [phaseLaser.phase, phaseLaser.fireRemaining, phaseRun.target.hp],
+        ["fire", 0.3, phaseHpBefore],
+        "An exact 0.35s update should finish only the Dash charge and leave the whole fire phase"
+    );
+    phaseLaser.update(0.1, phaseRun.simulation);
+    assert.equal(
+        phaseHpBefore - phaseRun.target.hp,
+        20,
+        "Dash laser should route two immediate 0.05s damage ticks through takeDamage during fire"
+    );
+    phaseRun.target.position = new Vector2(320, 430);
+    phaseLaser.update(0.2, phaseRun.simulation);
+    assert.equal(
+        phaseHpBefore - phaseRun.target.hp,
+        20,
+        "A target that leaves the locked beam should receive no later fire ticks"
+    );
+
+    const runReflectedLaser = (steps) => {
+        const run = createRun(FIGHTER_IDS.DASH);
+        run.owner.position = new Vector2(100, 300);
+        run.target.position = new Vector2(320, 300);
+        const laser = new LaserBeamEffect(run.owner, run.target, { maxWallBounces: 1 });
+        const hpBefore = run.target.hp;
+        for (const delta of steps) laser.update(delta, run.simulation);
+        return { run, laser, damage: hpBefore - run.target.hp };
+    };
+    const steppedDash = runReflectedLaser([0.35, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05]);
+    const largeDeltaDash = runReflectedLaser([0.65]);
+    assert.deepEqual(
+        [steppedDash.damage, largeDeltaDash.damage],
+        [220, 220],
+        "Dash should apply two x0.60 segments and one x1.00 overload independent of phase-sized or large delta updates"
+    );
+    assert.equal(steppedDash.laser.isExpired, true, "Dash laser should expire only after 0.35s charge plus 0.30s fire");
+    assertForegroundEffectRenders(steppedDash.laser, "Dash reflected laser", (primitives) => {
+        assert.ok(
+            primitives.filter((primitive) => primitive.method === "lineTo").length >= 2,
+            "Dash reflected laser should draw both gameplay segments"
+        );
+        assert.ok(
+            findEffectPrimitive(primitives, "arc", ([x]) => Math.abs(x - steppedDash.run.simulation.width) <= 0.02),
+            "Dash reflected laser should draw a white reflection core at the wall hit"
+        );
+    });
+    const overloadEffect = steppedDash.run.simulation.entities.find((entity) => entity instanceof CrossOverloadEffect);
+    assertForegroundEffectRenders(overloadEffect, "Dash cross overload", (primitives) => {
+        assertEffectArcAt(
+            primitives,
+            steppedDash.run.target.position,
+            "Dash cross overload",
+            (radius) => radius <= 100
+        );
+        assert.ok(
+            primitives.filter((primitive) => primitive.method === "lineTo").length >= 2,
+            "Dash cross overload should persist its crossed warning above fighters"
+        );
+    });
+
+    const stickyRun = createRun(FIGHTER_IDS.GRENADE);
+    stickyRun.owner.position = new Vector2(180, 300);
+    stickyRun.target.position = new Vector2(420, 300);
+    const sticky = new Grenade(stickyRun.owner, stickyRun.target.position, 1, { sticky: true });
+    sticky.pos = new Vector2(320, 300);
+    sticky.velocity = new Vector2(200, 0);
+    sticky.update(0.5, stickyRun.simulation);
+    assert.equal(sticky.stickyTarget, stickyRun.target, "Grenade Lv3 should stick only after actual path-body contact");
+    const localOffset = sticky.stickyLocalOffset.clone();
+    stickyRun.target.angle = Math.PI / 2;
+    stickyRun.target.position = new Vector2(440, 330);
+    sticky.update(0, stickyRun.simulation);
+    const rotatedOffset = new Vector2(-localOffset.y, localOffset.x);
+    assert.ok(
+        Vector2.subtract(sticky.position, Vector2.add(stickyRun.target.position, rotatedOffset)).length() < 1e-6,
+        "Sticky grenade should follow the target's rotated local surface coordinate"
+    );
+    const blockedSticky = new Grenade(stickyRun.owner, stickyRun.target.position, 1, { sticky: true });
+    const blockedStart = Vector2.add(stickyRun.target.position, new Vector2(-100, 0));
+    blockedSticky.pos = stickyRun.target.position.clone();
+    blockedSticky.velocity = new Vector2(160, 0);
+    assert.equal(
+        blockedSticky._tryStick(blockedStart, stickyRun.simulation),
+        false,
+        "A target with one live sticky grenade should reject a simultaneous second sticky grenade"
+    );
+
+    const sweepRun = createRun(FIGHTER_IDS.GRENADE, { extraEnemy: true });
+    sweepRun.target.position = new Vector2(420, 300);
+    sweepRun.nearby.position = new Vector2(570, 300);
+    const sweepGrenade = new Grenade(sweepRun.owner, new Vector2(700, 300), 1, { sticky: true });
+    const leftEntry = sweepGrenade._getSweptContact(new Vector2(300, 300), new Vector2(700, 300), sweepRun.target);
+    const rightEntry = sweepGrenade._getSweptContact(new Vector2(540, 300), new Vector2(300, 300), sweepRun.target);
+    assert.ok(
+        leftEntry.surfacePoint.x < sweepRun.target.position.x && rightEntry.surfacePoint.x > sweepRun.target.position.x,
+        "Swept sticky contact should preserve the actual entry surface instead of estimating it from the end position"
+    );
+    const overlapContact = sweepGrenade._getSweptContact(
+        sweepRun.target.position,
+        sweepRun.target.position,
+        sweepRun.target
+    );
+    assert.deepEqual(
+        [overlapContact.time, overlapContact.surfacePoint.x, overlapContact.surfacePoint.y],
+        [0, sweepRun.target.position.x + sweepRun.target.radius, sweepRun.target.position.y],
+        "Zero-length center overlap should use a deterministic positive-x surface anchor"
+    );
+    sweepGrenade.pos = new Vector2(700, 300);
+    assert.equal(sweepGrenade._tryStick(new Vector2(300, 300), sweepRun.simulation), true);
+    assert.equal(
+        sweepGrenade.stickyTarget,
+        sweepRun.target,
+        "A swept frame crossing multiple hostiles should attach only to the earliest intersection"
+    );
+
+    const grenadeRun = createRun(FIGHTER_IDS.GRENADE, { extraEnemy: true });
+    grenadeRun.target.position = new Vector2(440, 300);
+    grenadeRun.nearby.position = new Vector2(510, 300);
+    const firstExplosion = new Grenade(grenadeRun.owner, grenadeRun.target.position, 1, {
+        burning: true,
+        reburst: true
+    });
+    firstExplosion.pos = grenadeRun.target.position.clone();
+    firstExplosion._detonate(grenadeRun.simulation);
+    const burning = grenadeRun.target._igniteState;
+    const hpAfterExplosion = grenadeRun.target.hp;
+    burning.update(0.5);
+    assert.equal(
+        hpAfterExplosion - grenadeRun.target.hp,
+        50,
+        "Grenade Lv6 should deal five 0.1s ticks for total-attack x0.50"
+    );
+    const burnPrimer = new Grenade(grenadeRun.owner, grenadeRun.target.position, 1, { burning: true });
+    burnPrimer.pos = grenadeRun.target.position.clone();
+    burnPrimer._detonate(grenadeRun.simulation);
+    grenadeRun.nearby._igniteState?.consume();
+    const secondExplosion = new Grenade(grenadeRun.owner, grenadeRun.target.position, 1, {
+        burning: true,
+        reburst: true
+    });
+    secondExplosion.pos = grenadeRun.target.position.clone();
+    const targetHpBeforeReburst = grenadeRun.target.hp;
+    const nearbyHpBeforeReburst = grenadeRun.nearby.hp;
+    secondExplosion._detonate(grenadeRun.simulation);
+    assert.equal(
+        targetHpBeforeReburst - grenadeRun.target.hp,
+        325,
+        "Grenade Lv9 should combine the direct center hit and one x0.75 reburst on the burning target"
+    );
+    assert.equal(
+        nearbyHpBeforeReburst - grenadeRun.nearby.hp,
+        325,
+        "Grenade Lv9 reburst should include nearby hostile targets without double triggering"
+    );
+    const reburstEffects = grenadeRun.simulation.entities.filter((entity) => entity instanceof GrenadeReburstEffect);
+    assert.equal(reburstEffects.length, 1, "One consumed burning target should create one reburst entity");
+    assertForegroundEffectRenders(reburstEffects[0], "Grenade burning reburst", (primitives) => {
+        assertEffectArcAt(primitives, grenadeRun.target.position, "Grenade burning reburst", (radius) => radius <= 90);
+    });
+
+    const gunnerRun = createRun(FIGHTER_IDS.GUNNER, { extraEnemy: true });
+    const gunnerAbility = gunnerRun.owner.ability;
+    const originalRandom = Math.random;
+    Math.random = () => 0;
+    try {
+        gunnerAbility._startBurst();
+        gunnerAbility._fireBurstBullet();
+    } finally {
+        Math.random = originalRandom;
+    }
+    const collectedBullet = gunnerRun.simulation.entities.find(
+        (entity) => entity.constructor?.name === "BulletProjectile" && !entity.isRefire
+    );
+    collectedBullet.position = gunnerRun.owner.position.clone();
+    collectedBullet._ownerCollectCheck(gunnerRun.simulation);
+    const refire = gunnerRun.simulation.entities.find((entity) => entity.isRefire && !entity.isExpired);
+    gunnerRun.target.position = new Vector2(300, 500);
+    gunnerRun.nearby.position = new Vector2(850, 240);
+    refire.pos = new Vector2(gunnerRun.simulation.width - refire.radius - 1, 240);
+    refire.applyImpulse(Vector2.subtract(new Vector2(300, 0), refire.velocity));
+    refire.update(0.02, gunnerRun.simulation);
+    assert.deepEqual(
+        [refire.retargetConsumed, refire.canBounce, refire.canCollect, refire.canStack],
+        [true, false, false, false],
+        "Gunner refire should consume its only ricochet retarget and remain ineligible for every collection chain"
+    );
+    const nearbyDirection = Vector2.subtract(gunnerRun.nearby.position, refire.position).normalize();
+    assert.ok(
+        refire.velocity.clone().normalize().dot(nearbyDirection) > 0.999,
+        "Gunner first ricochet should turn toward the hostile nearest to the wall contact point"
+    );
+    const ricochetTrail = gunnerRun.simulation.entities
+        .filter((entity) => entity.constructor?.name === "SlashTrail")
+        .at(-1);
+    assert.ok(
+        Math.abs(Vector2.subtract(ricochetTrail.to, ricochetTrail.from).length() - 48) < 0.001,
+        "Gunner ricochet direction marker should remain a bounded 48-unit trail"
+    );
+    refire.pos = new Vector2(gunnerRun.simulation.width - refire.radius - 1, 240);
+    refire.applyImpulse(Vector2.subtract(new Vector2(300, 0), refire.velocity));
+    refire.update(0.02, gunnerRun.simulation);
+    assert.equal(refire.isExpired, true, "Gunner refire should expire instead of bouncing a second time");
+    while (gunnerAbility._burstRemaining > 1) gunnerAbility._fireBurstBullet();
+    const bulletCountBeforeCharge = gunnerRun.simulation.entities.filter(
+        (entity) => entity.constructor?.name === "BulletProjectile"
+    ).length;
+    gunnerAbility._fireBurstBullet();
+    assert.ok(gunnerAbility.finisherCharge, "Gunner should visibly charge before every eligible last bullet");
+    assert.equal(
+        gunnerRun.simulation.entities.filter((entity) => entity.constructor?.name === "BulletProjectile").length,
+        bulletCountBeforeCharge,
+        "Gunner finisher charge should precede projectile creation instead of overlapping it"
+    );
+    const chargeCtx = makeRecordingCanvasContext();
+    gunnerAbility.draw(chargeCtx);
+    assert.ok(
+        findEffectPrimitive(chargeCtx.primitives, "arc", (args, primitive) => primitive.strokeStyle === "#ff4488"),
+        "Gunner finisher charge should draw a dedicated pink muzzle ring"
+    );
+    gunnerAbility._fireBurstBullet();
+    const chargedFinisher = gunnerRun.simulation.entities
+        .filter((entity) => entity.constructor?.name === "BulletProjectile")
+        .at(-1);
+    assert.deepEqual(
+        [chargedFinisher.isFinisher, chargedFinisher.radius, gunnerAbility.finisherCharge],
+        [true, 7, null],
+        "Gunner charge should release one larger pink finisher and clear its transient state"
+    );
+    const blockedPlacement = Vector2.add(gunnerRun.owner.position, new Vector2(80, 0));
+    gunnerRun.simulation.terrain.push({
+        shape: "circle",
+        x: blockedPlacement.x,
+        y: blockedPlacement.y,
+        radius: 42,
+        blocking: true
+    });
+    const correctedPlacement = gunnerAbility._findTurretPlacement(new Vector2(1, 0), gunnerRun.simulation);
+    assert.ok(
+        Vector2.subtract(correctedPlacement, blockedPlacement).length() >= 70,
+        "Gunner turret placement should reject terrain overlap and select the nearest clear candidate"
+    );
+
+    const compareTurretMode = (movementMode) => {
+        const run = createRun(FIGHTER_IDS.GUNNER);
+        run.owner.position = new Vector2(180, 300);
+        run.target.position = new Vector2(760, 300);
+        const turret = new GunnerTurret(run.owner, new Vector2(320, 300), { movementMode });
+        run.simulation.entities.push(turret);
+        const start = turret.position.clone();
+        for (const _ of Array.from({ length: 10 })) turret.update(0.1, run.simulation);
+        return {
+            run,
+            turret,
+            displacement: Vector2.subtract(turret.position, start).length(),
+            shots: run.simulation.entities.filter((entity) => entity.constructor?.name === "BulletProjectile").length
+        };
+    };
+    const fixedTurret = compareTurretMode("fixed");
+    const mobileTurret = compareTurretMode("mobile");
+    assert.equal(
+        fixedTurret.displacement,
+        0,
+        "The selected default fixed turret should preserve its deployed position"
+    );
+    assert.ok(
+        mobileTurret.displacement > 60,
+        "The comparison mobile turret should visibly move during the same second"
+    );
+    assert.deepEqual(
+        [fixedTurret.shots, fixedTurret.turret.hp, fixedTurret.turret.life],
+        [mobileTurret.shots, mobileTurret.turret.hp, mobileTurret.turret.life],
+        "Fixed and mobile turret modes should preserve the same fire, HP, and lifetime contract"
+    );
+    const verifyTurretSeparation = (movementMode) => {
+        const run = createRun(FIGHTER_IDS.GUNNER);
+        const turret = new GunnerTurret(run.owner, new Vector2(320, 300), { movementMode });
+        run.target.position = new Vector2(320 + turret.radius + run.target.radius - 9, 300);
+        const fighterVelocity = run.target.velocity.clone();
+        const fighterAngularVelocity = run.target.angularVelocity;
+        const turretVelocity = turret.velocity.clone();
+        turret._handleFighterContacts(run.simulation);
+        return {
+            separatedDistance: Vector2.subtract(run.target.position, turret.position).length(),
+            requiredDistance: turret.radius + run.target.radius,
+            fighterVelocity,
+            fighterAngularVelocity,
+            turretVelocity,
+            run,
+            turret
+        };
+    };
+    const fixedSeparation = verifyTurretSeparation("fixed");
+    const mobileSeparation = verifyTurretSeparation("mobile");
+    for (const separation of [fixedSeparation, mobileSeparation]) {
+        assert.ok(
+            separation.separatedDistance >= separation.requiredDistance,
+            "PhysicsBody position correction should separate turret contacts in both movement modes"
+        );
+        assert.deepEqual(
+            [separation.run.target.velocity, separation.run.target.angularVelocity],
+            [separation.fighterVelocity, separation.fighterAngularVelocity],
+            "Turret overlap correction should not mutate fighter velocity or angular velocity"
+        );
+    }
+    assert.deepEqual(
+        fixedSeparation.turret.velocity,
+        fixedSeparation.turretVelocity,
+        "Fixed turret separation should not add an unintended movement impulse"
+    );
+    assert.ok(
+        Vector2.subtract(mobileSeparation.turret.velocity, mobileSeparation.turretVelocity).length() > 0,
+        "Mobile turret separation may retain its intentional recoil impulse"
+    );
+    fixedTurret.turret.aimTarget = fixedTurret.run.target;
+    assertForegroundEffectRenders(fixedTurret.turret, "Gunner fixed turret", (primitives) => {
+        assert.ok(findEffectPrimitive(primitives, "fillRect"), "Gunner turret should draw its body and HP bar");
+        assertEffectArcAt(primitives, fixedTurret.turret.position, "Gunner fixed turret");
+        assert.ok(findEffectPrimitive(primitives, "lineTo"), "Gunner turret should telegraph its next shot in teal");
+    });
+    const expiringAbility = { state: { turret: null } };
+    const expiringTurret = new GunnerTurret(fixedTurret.run.owner, new Vector2(420, 300), {
+        movementMode: "fixed",
+        sourceAbility: expiringAbility
+    });
+    expiringAbility.state.turret = expiringTurret;
+    expiringTurret.life = 0.05;
+    expiringTurret.update(0.1, fixedTurret.run.simulation);
+    assert.deepEqual(
+        [expiringTurret.isExpired, expiringAbility.state.turret],
+        [true, null],
+        "Gunner turret natural expiry should run shared cleanup and release the ability reference"
+    );
+    fixedTurret.turret.takeDamage(fixedTurret.turret.maxHp, fixedTurret.run.owner, "Turret Test");
+    assert.equal(
+        fixedTurret.turret.isExpired,
+        true,
+        "Gunner turret should use the common destructible target lifecycle"
+    );
+
+    const phantomRun = createRun(FIGHTER_IDS.PHANTOM);
+    phantomRun.owner.ability.setContext({ abilityTier: 3 });
+    phantomRun.owner.stats.criticalChance = 0;
+    phantomRun.target.stats.criticalChance = 0;
+    const approvedOptimalCollisionBaseline = 46.2;
+    const shadowStrikeDamage = 10 * 1.5;
+    assert.equal(
+        approvedOptimalCollisionBaseline + shadowStrikeDamage,
+        61.2,
+        "Phantom attack 10 approved optimal Lv9 chain baseline should fall from 64.2 to 61.2"
+    );
+    let capturedDash = null;
+    phantomRun.owner.initiateDash = (direction, options) => {
+        capturedDash = { direction, options };
+    };
+    phantomRun.owner.ability.state.teleportTargetId = phantomRun.target.id;
+    phantomRun.owner.ability.state.pendingStrikeStage = "base";
+    phantomRun.owner.stats.baseDamage = 40;
+    phantomRun.owner.ability._startDashAfterTeleport();
+    assert.equal(
+        capturedDash.options.collisionDamage,
+        60,
+        "Phantom base Shadow Strike should scale growth and equipment attack by x1.50 instead of fixed damage"
+    );
+
+    const heroRun = createRun(FIGHTER_IDS.HERO, { extraEnemy: true });
+    const heroAbility = heroRun.owner.ability;
+    heroAbility.update(5);
+    const seededRandom = Math.random;
+    Math.random = () => 0.5;
+    try {
+        heroAbility.onFighterCollisionDamageResolved(heroRun.target, 1, {
+            contactPoint: heroRun.target.position.clone()
+        });
+    } finally {
+        Math.random = seededRandom;
+    }
+    const growthCores = heroRun.simulation.entities.filter((entity) => entity.constructor?.name === "HeroOrb");
+    assert.equal(growthCores.length, 5, "Hero should release one growth core per consumed stack");
+    assert.ok(
+        growthCores.every((core) => core.life === 8),
+        "Every Hero growth core should use the fixed eight-second life"
+    );
+    const combatSpeed = heroRun.owner.stats.baseSpeed * heroRun.owner.getStatModifiers().speed;
+    assert.ok(
+        growthCores.every(
+            (core) => core.velocity.length() >= combatSpeed * 0.72 && core.velocity.length() <= combatSpeed * 0.96
+        ),
+        "Hero growth core launch speeds should stay inside the owner combat-speed range"
+    );
+    const oldestCore = growthCores[0];
+    heroAbility._spawnCore("hp", heroRun.owner.position, new Vector2(1, 0));
+    assert.equal(oldestCore.isExpired, true, "Hero should expire the oldest core before exceeding five active cores");
+
+    const criticalCore = heroRun.simulation.entities.find(
+        (entity) => entity.constructor?.name === "HeroOrb" && !entity.isExpired
+    );
+    criticalCore.effectType = "critical";
+    criticalCore.color = "#ff7bd5";
+    criticalCore.collectionGraceRemaining = 0;
+    criticalCore.position = heroRun.owner.position.clone();
+    heroRun.owner.stats.criticalChance = 95;
+    Math.random = () => 0.999;
+    try {
+        criticalCore.update(0, heroRun.simulation);
+    } finally {
+        Math.random = seededRandom;
+    }
+    assert.equal(heroRun.owner.stats.criticalChance, 100, "Hero critical core should clamp its 2~6%p reward at 100%");
+
+    const skillRun = createRun(FIGHTER_IDS.HERO);
+    const skillBefore = skillRun.owner.getSkillPoints();
+    const cooldownBefore = skillRun.owner.ability.cooldown;
+    const allocationBefore = skillRun.owner.stats.allocation ? { ...skillRun.owner.stats.allocation } : null;
+    Math.random = () => 0;
+    try {
+        HERO_ORB_EFFECTS.skill.apply(skillRun.owner);
+    } finally {
+        Math.random = seededRandom;
+    }
+    assert.deepEqual(
+        [skillRun.owner.hero.bonuses.skill, skillRun.owner.getSkillPoints()],
+        [2, skillBefore + 2],
+        "Hero skill cores should contribute their current-match bonus through the shared skill-point getter"
+    );
+    assert.ok(
+        skillRun.owner.ability.cooldown < cooldownBefore,
+        "Hero skill cores should immediately reduce ability cooldown"
+    );
+    assert.deepEqual(
+        skillRun.owner.stats.allocation,
+        allocationBefore,
+        "Current-match Hero skill cores should not mutate permanent or allocated skill ownership"
+    );
+    const archerDefaults = createRun(FIGHTER_IDS.ARCHER).owner;
+    assert.equal(
+        archerDefaults.getSkillPoints(),
+        archerDefaults.stats.baseSkill + (archerDefaults.stats.allocation?.skill ?? 0),
+        "Non-Hero fighters should preserve their default skill-point calculation when Hero bonuses are zero"
+    );
+    const carryoverSpec = {
+        ...app.roster.find((fighter) => fighter.id === FIGHTER_IDS.HERO),
+        teamId: "hero-carryover-team",
+        statAllocation: { skill: 4 },
+        hero: { carryover: { skill: 3 } }
+    };
+    const carryoverOpponent = {
+        ...app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER),
+        id: "hero-carryover-target",
+        teamId: "hero-carryover-enemy"
+    };
+    const carryoverSimulation = new BattleSimulation([carryoverSpec, carryoverOpponent], {}, null, {
+        assignActions: false
+    });
+    assert.deepEqual(
+        [carryoverSimulation.fighters[0].getSkillPoints(), carryoverSimulation.fighters[0].hero.bonuses.skill],
+        [7, 0],
+        "Hunting carryover skill should remain in its existing carryover/allocation path without double counting bonuses"
+    );
+
+    heroRun.owner.stats.baseDamage = 100;
+    heroRun.owner.stats.criticalChance = 0;
+    heroRun.target.position = new Vector2(520, 300);
+    heroRun.nearby.position = new Vector2(580, 300);
+    const resonance = new HeroResonanceEffect(
+        heroRun.owner,
+        heroRun.target,
+        Array.from({ length: 5 }, (_, index) => ({
+            color: ["#44dd44", "#ff4444", "#4488ff", "#bb66ff", "#ff7bd5"][index]
+        })),
+        { heroicBurst: true }
+    );
+    assertForegroundEffectRenders(resonance, "Hero resonance launch", (primitives) => {
+        assert.ok(
+            findEffectPrimitive(primitives, "quadraticCurveTo"),
+            "Hero resonance should draw its curved flight path"
+        );
+    });
+    const heroTargetHpBefore = heroRun.target.hp;
+    const heroNearbyHpBefore = heroRun.nearby.hp;
+    resonance.update(0.2, heroRun.simulation);
+    assert.equal(resonance.hitCount, 2, "Hero resonance mid-frame should retain two actual surface anchors");
+    assertForegroundEffectRenders(resonance, "Hero resonance mid", (primitives) => {
+        assert.ok(
+            primitives.filter((primitive) => primitive.method === "lineTo").length >= 1,
+            "Hero resonance mid-frame should connect its first anchored star vertices"
+        );
+    });
+    resonance.update(0.3, heroRun.simulation);
+    assert.equal(
+        heroTargetHpBefore - heroRun.target.hp,
+        175,
+        "Five Hero resonance hits and one Heroic Burst should total x1.75 on the primary target"
+    );
+    assert.equal(heroNearbyHpBefore - heroRun.nearby.hp, 75, "Heroic Burst should deal x0.75 once to a nearby hostile");
+    const firstAnchor = resonance.starAnchors[0];
+    heroRun.target.applyPositionCorrection(new Vector2(45, 30));
+    heroRun.target.angle = Math.PI / 2;
+    const expectedAnchor = Vector2.add(
+        heroRun.target.position,
+        new Vector2(-firstAnchor.localOffset.y, firstAnchor.localOffset.x)
+    );
+    const movedAnchor = resonance.getStarAnchorPosition(0);
+    assert.ok(
+        Vector2.subtract(movedAnchor, expectedAnchor).length() < 1e-6,
+        "Hero star vertices should follow target translation and rotation from their stored local surface offsets"
+    );
+    assertForegroundEffectRenders(resonance, "Heroic Burst star", (primitives) => {
+        const visibleAnchor = resonance.getStarAnchorPosition(0, 7);
+        assert.ok(
+            findEffectPrimitive(
+                primitives,
+                "moveTo",
+                ([x, y]) => Math.abs(x - visibleAnchor.x) < 1e-6 && Math.abs(y - visibleAnchor.y) < 1e-6
+            ),
+            "ArenaRenderer should draw the completed star from the moved target's local surface anchor"
+        );
+        assert.ok(
+            primitives.filter((primitive) => primitive.method === "lineTo").length >= 4,
+            "Heroic Burst should draw the completed five-point star"
+        );
+    });
+
+    console.log("[five-ball-level-reward-contracts] ok");
 }
 
 function testTricksterLevelRewardContracts(app) {
@@ -6668,8 +7217,8 @@ function testMultiAbilityFoundation(app) {
         "Each ability UI row should retain its own cooldown state"
     );
     assert.equal(
-        subProbe.getLevelUpgrade().stackCap,
-        20,
+        subProbe.getLevelUpgrade().heroicBurst,
+        true,
         "A Hero sub ability must read its own id and tier upgrade data"
     );
     for (const state of probeStates) {
@@ -6719,19 +7268,19 @@ function testMultiAbilityFoundation(app) {
     assert.ok(gunner.timer < 3, "A returned bullet should reduce only the Gunner source cooldown");
     assert.equal(heroSub.timer, 3, "A returned bullet must not reduce a different sub ability cooldown");
 
-    heroSub._spawnOrb("cooldown_burst", new Vector2(1, 0));
+    heroSub._spawnCore("critical", gunnerOwner.position, new Vector2(1, 0));
     const orb = sourceSimulation.entities.find((entity) => entity.constructor?.name === "HeroOrb" && !entity.isExpired);
-    assert.equal(orb.sourceAbility, heroSub, "Hero Orbs should retain their spawning Hero ability instance");
+    assert.equal(orb.sourceAbility, heroSub, "Hero cores should retain their spawning Hero ability instance");
     orb.collectionGraceRemaining = 0;
     orb.position = gunnerOwner.position.clone();
     orb.velocity = new Vector2(0, 0);
     orb.update(0, sourceSimulation);
     assert.equal(
-        heroSub.state.cooldownBurstMultiplier,
-        0.1,
-        "A Hero sub ability should receive its own cooldown burst"
+        heroSub.state.resonanceFragments.length,
+        1,
+        "A Hero sub ability should retain its own collected resonance fragment"
     );
-    assert.equal(gunner.timer, 3 - gunner.cooldown / 2 / 12, "Hero Orb effects must not mutate the Gunner cooldown");
+    assert.equal(gunner.timer, 3 - gunner.cooldown / 2 / 12, "Hero core effects must not mutate the Gunner cooldown");
 
     const fighterStrip = readFileSync("src/components/fighter-strip.html", "utf8");
     assert.ok(fighterStrip.includes("fighter.abilityStates"), "Fighter cards should render the ability state list");
@@ -14213,7 +14762,7 @@ async function testMasteryCombatModifiersApplyAtFinalDamageStage() {
         recordFighterCollisionDamage() {}
     };
 
-    const result = target.takeDamage(100, { id: "source", simulation }, "Crash");
+    const result = target.takeDamage(100, { id: "source", stats: { criticalChance: 0 }, simulation }, "Crash");
     assert.deepEqual(calls, ["equipment", "mastery"], "Mastery reduction should follow equipment collision damage");
     assert.equal(result.actualDamage, 108, "Mastery reduction should apply to the completed collision damage amount");
 }
@@ -14858,6 +15407,7 @@ await testGrenadeScatterShot(app);
 testExperienceSystem();
 testCharacterLevelProgressions(app);
 testAbilityLevelUpgrades(app);
+testFiveBallLevelRewardContracts(app);
 testTricksterLevelRewardContracts(app);
 testOrbitLevelRewardContracts(app);
 testSpinLevelRewardContracts(app);
@@ -14897,53 +15447,6 @@ await testTournamentWinDisplaysMasteryReward();
 testResultSequenceProgression();
 await testTournamentEliminationAwaitsConfirmation(app);
 await testHeroBallRegistered(app);
-await testHeroAbilitySpawnsOrb(app);
-await testHeroOrbEffectType(app);
-await testHeroOrbOwnerCollects(app);
-await testHeroOrbCollectionGraceDefersOwnerPickup(app);
-await testHeroOrbOpponentCollects(app);
-await testHeroOrbMaxActivePerOwner(app);
-await testHeroOrbDoesNotExpireFromCooldown(app);
-await testHeroOrbLimitIgnoresCollectedOrbs(app);
-await testHeroOrbStatCapInfinite(app);
-await testHeroOrbStatCapLimited(app);
-await testHeroOrbNoDamage(app);
-await testHeroBaseCooldown(app);
-await testHeroOrbSpeedMinMax(app);
-await testHeroOrbSpeedScalesWithOwner(app);
-await testHeroOrbOwnerCollectFeedback(app);
-await testHeroOrbOpponentNoFeedback(app);
-await testHeroOrbCapNoFeedback(app);
-await testHeroOrbBonusUiFormat(app);
-await testHeroOrbBonusUiOnlyForHero(app);
-await testHeroExistingRulesNotBroken(app);
-await testPickHeroOrbEffectType();
-await testSpecialOrbOwnerCollectDash(app);
-await testSpecialOrbOwnerCollectArrow(app);
-await testSpecialOrbOwnerCollectCooldownBurst(app);
-await testSpecialOrbCooldownBurstExpires(app);
-await testSpecialOrbOpponentCollects(app);
-await testSpecialOrbNotInStatBonuses(app);
-await testSpecialOrbCountsTowardMaxActive(app);
-await testSpecialOrbDrawDistinction(app);
-await testCarryoverRateConstant();
-await testComputeHeroOrbCarryover();
-await testComputeHeroOrbCarryoverCustomRate();
-await testMergeHeroOrbCarryover();
-await testMergeHeroOrbCarryoverNoRecycle();
-await testApplyHeroOrbCarryoverToBattleBall(app);
-await testMergeOrbBonuses(app);
-await testCarryoverNotForNonHero(app);
-await testCarryoverSkillAffectsCooldown(app);
-await testCarryoverDoesNotAffectSpecialOrbs(app);
-await testRollHeroOrbStatGain();
-await testHeroOrbStatGainAmountApplied(app);
-await testHeroOrbStatGainDamage(app);
-await testHeroOrbStatGainSpeed(app);
-await testHeroOrbStatGainDefense(app);
-await testHeroOrbStatGainSkill(app);
-await testHeroOrbStatGainCapClamp(app);
-await testHeroOrbSpecialNotAffectedByGain(app);
 await testTricksterSeedSpeedBuff(app);
 await testTricksterSeedLifeBuff(app);
 await testTricksterSeedSpeedScalesWithOwner(app);
@@ -20679,7 +21182,7 @@ function testRageIgniteRefreshSeparatesDamageFromVisualLifetime() {
     rage.ability._applyIgnite(opponent);
     const ignite = opponent._igniteState;
     const hpBefore = opponent.hp;
-    const damagePerTick = Math.round(rage.stats.baseDamage * 0.075);
+    const damagePerTick = rage.stats.baseDamage * 0.1;
     const assertIgniteFrame = (label) => {
         assertForegroundEffectRenders(ignite, label, (primitives) => {
             assertEffectArcAt(
@@ -20693,29 +21196,38 @@ function testRageIgniteRefreshSeparatesDamageFromVisualLifetime() {
     };
 
     ignite.update(0.25);
-    assert.equal(ignite.tickCount, 5, "Ignite should resolve five damage ticks during its first 0.25s");
-    assert.equal(opponent.hp, hpBefore - damagePerTick * 5, "Ignite should preserve its original per-tick damage");
+    assert.equal(ignite.tickCount, 2, "Ignite should resolve two 0.1s ticks during its first 0.25s");
+    assert.equal(opponent.hp, hpBefore - damagePerTick * 2, "Ignite should preserve total-attack x0.10 per tick");
 
     rage.ability._applyIgnite(opponent);
     assert.equal(opponent._igniteState, ignite, "Reapplying ignite should refresh the existing visual entity");
-    assert.equal(ignite.tickCount, 5, "Refreshing ignite should not reserve additional damage ticks");
-    assert.equal(opponent.hp, hpBefore - damagePerTick * 5, "Refreshing ignite should not deal immediate damage");
+    assert.equal(ignite.tickCount, 0, "Refreshing ignite should restart the shared five-tick cycle");
+    assert.equal(opponent.hp, hpBefore - damagePerTick * 2, "Refreshing ignite should not deal immediate damage");
     assert.ok(Math.abs(ignite.life - 0.5) < 1e-9, "Refreshing ignite should restore 0.5s of visual lifetime");
     assertIgniteFrame("Rage ignite refresh start");
 
     ignite.update(0.25);
-    assert.equal(ignite.tickCount, 10, "Ignite should finish its original ten-tick damage schedule");
-    assert.equal(opponent.hp, hpBefore - damagePerTick * 10, "Refresh should not increase ignite's total damage");
-    assert.equal(ignite.damageComplete, true, "Ignite should report that its damage schedule is complete");
-    assert.equal(ignite.isExpired, false, "Completing damage ticks should not remove the refreshed visual");
-    assert.equal(opponent._igniteState, ignite, "The target should retain the effect until its visual lifetime ends");
+    assert.equal(ignite.tickCount, 2, "Refreshed ignite should reserve its own five-tick cycle");
+    assert.equal(
+        opponent.hp,
+        hpBefore - damagePerTick * 4,
+        "Refresh should restart rather than overlap burning damage"
+    );
+    assert.equal(ignite.damageComplete, false, "The refreshed damage cycle should remain active at 0.25s");
+    assert.equal(ignite.isExpired, false, "The refreshed visual should remain active at 0.25s");
+    assert.equal(opponent._igniteState, ignite, "The target should retain the refreshed shared effect");
     assertIgniteFrame("Rage ignite refresh mid");
 
     ignite.update(0.249);
-    assert.equal(opponent.hp, hpBefore - damagePerTick * 10, "The visual tail should not deal extra damage");
+    assert.equal(ignite.tickCount, 4, "The refreshed effect should emit four ticks before its final frame");
     assert.equal(ignite.isExpired, false, "The refreshed visual should remain visible until 0.5s after refresh");
     assertIgniteFrame("Rage ignite refresh end");
     ignite.update(0.001);
+    assert.equal(
+        opponent.hp,
+        hpBefore - damagePerTick * 7,
+        "The original two and refreshed five ticks should be exact"
+    );
     assert.equal(ignite.isExpired, true, "The refreshed visual should expire 0.5s after refresh");
     assert.equal(opponent._igniteState, null, "Visual expiry should clear the target's ignite state");
 
@@ -20733,22 +21245,18 @@ function testRageIgniteRefreshSeparatesDamageFromVisualLifetime() {
         source: rage,
         target: mobTarget,
         duration: 0.5,
-        tickInterval: 0.05,
-        maximumTicks: 10,
+        tickInterval: 0.1,
+        maximumTicks: 5,
         damagePerTick,
         label: "Ignite"
     });
     mobTarget._igniteState = mobIgnite;
     mobIgnite.update(0.225);
-    const reservedTickTime = mobIgnite.tickTimer;
     mobIgnite.refresh();
-    assert.ok(
-        Math.abs(mobIgnite.tickTimer - reservedTickTime) < 1e-9,
-        "Mob ignite refresh should preserve the next tick reservation"
-    );
-    mobIgnite.update(0.025);
-    assert.equal(mobIgnite.tickCount, 5, "Mob ignite should resolve only the already-reserved next tick");
-    assert.equal(mobTarget.damageTaken, damagePerTick * 5, "Mob targets should share the same ignite damage contract");
+    assert.equal(mobIgnite.tickTimer, 0, "Mob ignite refresh should restart the next shared tick reservation");
+    mobIgnite.update(0.1);
+    assert.equal(mobIgnite.tickCount, 1, "Mob ignite should restart at the first 0.1s tick after refresh");
+    assert.equal(mobTarget.damageTaken, damagePerTick * 3, "Mob targets should share the same refresh contract");
     console.log("[rage-ignite-refresh-lifetimes] ok");
 }
 

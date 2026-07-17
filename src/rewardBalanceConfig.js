@@ -126,33 +126,33 @@ export const REWARD_BALANCE = deepFreeze({
             ],
             grenade: [
                 { level: 2 },
-                { level: 3, abilityTier: 1, gameText: "연사 수 +1" },
+                { level: 3, abilityTier: 1, gameText: "실제 접촉 수류탄 점착 · 대상당 1개" },
                 { level: 4 },
                 { level: 5 },
-                { level: 6, abilityTier: 2, gameText: "폭발 반경 +15%" },
+                { level: 6, abilityTier: 2, gameText: "폭발 피해 대상 화상 · 0.5초 ×0.50" },
                 { level: 7 },
                 { level: 8 },
-                { level: 9, abilityTier: 3, gameText: "수류탄 피해 +10%" },
+                { level: 9, abilityTier: 3, gameText: "화상 소비 재폭발 · 90px ×0.75" },
                 { level: 10 }
             ],
             dash: [
                 { level: 2 },
-                { level: 3, abilityTier: 1, gameText: "대시 배율 +5%" },
+                { level: 3, abilityTier: 1, gameText: "대시 적중 레이저 · 0.35초 조준 ×0.60" },
                 { level: 4 },
                 { level: 5 },
-                { level: 6, abilityTier: 2, gameText: "유도 회전 속도 +30%" },
+                { level: 6, abilityTier: 2, gameText: "레이저 벽 1회 반사 · 구간별 ×0.60" },
                 { level: 7 },
                 { level: 8 },
                 {
                     level: 9,
                     abilityTier: 3,
-                    gameText: "벽 충돌 후 쿨다운 단계 50% 보존"
+                    gameText: "교차 적중 과부하 · 100px ×1.00"
                 },
                 { level: 10 }
             ],
             rage: [
                 { level: 2 },
-                { level: 3, abilityTier: 1, gameText: "35%+ 점화 (10틱 ×0.075)" },
+                { level: 3, abilityTier: 1, gameText: "35%+ 점화 (5틱 ×0.10)" },
                 { level: 4 },
                 { level: 5 },
                 { level: 6, abilityTier: 2, gameText: "70%+ 폭발 ×1.50 120px" },
@@ -207,13 +207,13 @@ export const REWARD_BALANCE = deepFreeze({
             ],
             gunner: [
                 { level: 2 },
-                { level: 3, abilityTier: 1, gameText: "최소 탄 수 +1" },
+                { level: 3, abilityTier: 1, gameText: "모든 6~12발 연사 마무리 탄 ×2" },
                 { level: 4 },
                 { level: 5 },
-                { level: 6, abilityTier: 2, gameText: "탄속 +15%" },
+                { level: 6, abilityTier: 2, gameText: "일반 탄 회수 즉시 재사격 · 첫 반사 재조준" },
                 { level: 7 },
                 { level: 8 },
-                { level: 9, abilityTier: 3, gameText: "마무리 탄 조건 11발 이상" },
+                { level: 9, abilityTier: 3, gameText: "일반 탄 20회 회수 · 8초 자동 포탑" },
                 { level: 10 }
             ],
             phantom: [
@@ -237,13 +237,13 @@ export const REWARD_BALANCE = deepFreeze({
             ],
             hero: [
                 { level: 2 },
-                { level: 3, abilityTier: 1, gameText: "발사 1초 후 오브 귀환 자석" },
+                { level: 3, abilityTier: 1, gameText: "성장 코어 근거리 자석 회수" },
                 { level: 4 },
                 { level: 5 },
-                { level: 6, abilityTier: 2, gameText: "오브 획득 축적 충돌 강화" },
+                { level: 6, abilityTier: 2, gameText: "회수 코어 공명 조각 · 순차 ×0.20" },
                 { level: 7 },
                 { level: 8 },
-                { level: 9, abilityTier: 3, gameText: "축적 소비 후 오브 방출" },
+                { level: 9, abilityTier: 3, gameText: "조각 5개 Heroic Burst · 90px ×0.75" },
                 { level: 10 }
             ]
         },
@@ -258,20 +258,10 @@ export const REWARD_BALANCE = deepFreeze({
                 tiers: [{}, { vineSnare: true }, { seedMarkBurst: true }, { followupSeed: true }]
             },
             grenade: {
-                tiers: [
-                    {},
-                    { burstCountMultiplier: 1.25 },
-                    { explosionRadiusMultiplier: 1.15 },
-                    { damageMultiplier: 1.1 }
-                ]
+                tiers: [{}, { stickyGrenade: true }, { burningExplosion: true }, { burningReburst: true }]
             },
             dash: {
-                tiers: [
-                    {},
-                    { dashMultiplier: 1.05 },
-                    { homingTurnRateMultiplier: 1.3 },
-                    { wallCooldownLevelRetention: 0.5 }
-                ]
+                tiers: [{}, { laserStrike: true }, { laserWallBounces: 1 }, { crossOverload: true }]
             },
             rage: {
                 tiers: [{}, {}, {}, {}]
@@ -291,9 +281,9 @@ export const REWARD_BALANCE = deepFreeze({
             gunner: {
                 tiers: [
                     {},
-                    { minBulletCountMultiplier: 1.15 },
-                    { bulletSpeedMultiplier: 1.15 },
-                    { finisherMinimum: 11 }
+                    { everyBurstFinisher: true },
+                    { refireOnCollect: true, ricochetReload: true },
+                    { collectionTurret: true }
                 ]
             },
             phantom: {
@@ -302,18 +292,13 @@ export const REWARD_BALANCE = deepFreeze({
                     damageMultiplier: 1.1,
                     defenseMultiplier: 1.5,
                     impactMultiplier: 1.15,
-                    bonusDamage: 18,
+                    bonusDamageMultiplier: 1.5,
                     markDuration: 2.5
                 },
                 tiers: [{}, { echoOnNaturalCollision: true }, { echoOnStaticCollision: true }, { terminalDash: true }]
             },
             hero: {
-                tiers: [
-                    {},
-                    { magnetRadiusMultiplier: 2.5, magnetResponseRate: 5, collectionGraceDuration: 1 },
-                    { stackCap: 20, damagePerStack: 0.03 },
-                    { releaseStackRatio: 0.5 }
-                ]
+                tiers: [{}, { magneticCoreCollection: true }, { resonanceFragments: true }, { heroicBurst: true }]
             }
         }
     },

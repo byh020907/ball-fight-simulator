@@ -7,6 +7,40 @@ import {
 import { getVisibleLineWidth } from "./effectVisibility.js";
 
 const RAGE_FIRE_COLORS = Object.freeze(["#fff4bd", "#ff983d", "#e83f18"]);
+export const BURNING_EFFECT_CONFIG = Object.freeze({
+    duration: 0.5,
+    tickInterval: 0.1,
+    maximumTicks: 5,
+    totalDamageMultiplier: 0.5
+});
+
+export function applyBurningEffect({ source, target, simulation, label = "Burning" }) {
+    const damagePerTick =
+        (source.stats.baseDamage * BURNING_EFFECT_CONFIG.totalDamageMultiplier) / BURNING_EFFECT_CONFIG.maximumTicks;
+    if (target._igniteState instanceof BurningEffect && !target._igniteState.isExpired) {
+        target._igniteState.refresh({ source, damagePerTick, label });
+        return target._igniteState;
+    }
+    const effect = new BurningEffect({
+        source,
+        target,
+        duration: BURNING_EFFECT_CONFIG.duration,
+        tickInterval: BURNING_EFFECT_CONFIG.tickInterval,
+        maximumTicks: BURNING_EFFECT_CONFIG.maximumTicks,
+        damagePerTick,
+        label
+    });
+    target._igniteState = effect;
+    simulation.entities.push(effect);
+    return effect;
+}
+
+export function consumeBurningEffect(target) {
+    const effect = target._igniteState;
+    if (!(effect instanceof BurningEffect) || effect.isExpired) return false;
+    effect.consume();
+    return true;
+}
 
 function clamp01(value) {
     return Math.max(0, Math.min(1, value));
@@ -109,9 +143,20 @@ export class BurningEffect extends CombatEntity {
         this.rebirthVisual = getRebirthVisualProfile(10);
     }
 
-    refresh(duration = this.duration) {
-        this.life = duration;
-        this.maxLife = Math.max(this.maxLife, duration);
+    refresh({ source = this.source, damagePerTick = this.damagePerTick, label = this.label } = {}) {
+        this.source = source;
+        this.damagePerTick = damagePerTick;
+        this.label = label;
+        this.life = this.duration;
+        this.maxLife = this.duration;
+        this.damageLife = this.duration;
+        this.tickTimer = 0;
+        this.tickCount = 0;
+        this.damageComplete = false;
+    }
+
+    consume() {
+        this._finish();
     }
 
     update(delta) {

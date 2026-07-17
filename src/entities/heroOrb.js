@@ -1,5 +1,4 @@
 import { applyCollisionImpulse, CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
-import { DashEffect } from "../combatEffects.js";
 import { computeOwnerCombatSpeed } from "../abilities/heroAbility.js";
 import CollectionGrace from "../physics/CollectionGrace.js";
 import { applyMagneticAttraction } from "../physics/magneticAttraction.js";
@@ -11,8 +10,8 @@ export function setHeroOrbStatCap(value) {
     HERO_ORB_STAT_CAP = value;
 }
 
-const HERO_ORB_STAT_GAIN_MIN = 1;
-const HERO_ORB_STAT_GAIN_MAX = 5;
+const HERO_ORB_STAT_GAIN_MIN = 2;
+const HERO_ORB_STAT_GAIN_MAX = 6;
 export const HERO_ORB_HP_PER_POINT = 5;
 
 export function rollHeroOrbStatGain(rng = Math.random) {
@@ -98,64 +97,17 @@ export const HERO_ORB_EFFECTS = {
             return { applied: true, amount };
         }
     },
-    dash: {
-        color: "#ff8833",
-        label: "대시",
-        apply(owner, ctx) {
-            const target = ctx.simulation.getOpponent(owner);
-            if (!target || target.flags.defeated) return { applied: false };
-            const direction = Vector2.subtract(target.position, owner.position);
-            if (direction.length() < 0.01) return { applied: false };
-            direction.normalize();
-            const speed = computeOwnerCombatSpeed(owner) * 1.5;
-            owner.initiateDash(direction, {
-                duration: 1.55,
-                multiplier: 1,
-                speedOverride: speed,
-                color: "#ff8833",
-                showRing: true,
-                collisionDamage: 0
-            });
-            ctx.simulation.spawnSlash(
-                owner.position.clone(),
-                Vector2.add(owner.position, direction.clone().scale(150)),
-                owner.color
-            );
-            ctx.simulation.spawnPulse(ctx.orb.position.clone(), "#ff8833");
-            ctx.simulation.playSound("dash", 0.8);
-            ctx.simulation.addLog(`${owner.name} dashes toward ${target.name}!`);
-            return { applied: true, amount: 1 };
-        }
-    },
-    arrow: {
-        color: "#ff6666",
-        label: "화살",
-        apply(owner, ctx) {
-            const target = ctx.simulation.getOpponent(owner);
-            if (!target || target.flags.defeated) return { applied: false };
-            const direction = Vector2.subtract(target.position, owner.position);
-            if (direction.length() < 0.01) return { applied: false };
-            direction.normalize();
-            const speed = computeOwnerCombatSpeed(owner) * 2.0;
-            const start = Vector2.add(owner.position, direction.clone().scale(owner.radius + 12));
-            ctx.simulation.spawnArrow(owner, start, direction.scale(speed));
-            ctx.simulation.playSound("arrow", 0.8);
-            ctx.simulation.addLog(`${owner.name} fires an arrow at ${target.name}!`);
-            return { applied: true, amount: 1 };
-        }
-    },
-    cooldown_burst: {
-        color: "#66ddff",
-        label: "쿨타임 버스트",
-        apply(owner, ctx) {
-            if (!ctx.sourceAbility?.applyCooldownBurst) {
-                return { applied: false };
-            }
-            ctx.sourceAbility.applyCooldownBurst(1.0, 0.1);
-            ctx.simulation.spawnPulse(ctx.orb.position.clone(), "#66ddff");
-            ctx.simulation.playSound("powerup", 1.1);
-            ctx.simulation.addLog(`${owner.name} activates cooldown burst!`);
-            return { applied: true, amount: 1 };
+    critical: {
+        color: "#ff7bd5",
+        label: "치명타",
+        apply(owner) {
+            const rollAmount = rollHeroOrbStatGain();
+            const available = Math.max(0, 100 - owner.getCriticalChance());
+            const amount = Math.min(rollAmount, available);
+            if (amount <= 0) return { applied: false, amount: 0 };
+            owner.hero.bonuses.critical = (owner.hero.bonuses.critical ?? 0) + amount;
+            owner.stats.criticalChance = Math.min(100, owner.stats.criticalChance + amount);
+            return { applied: true, amount };
         }
     }
 };
@@ -168,7 +120,7 @@ export function formatHeroStatLine(allocation = {}, bonuses = {}) {
         .join(" · ");
 }
 
-export const STAT_ORB_KEYS = ["hp", "damage", "speed", "skill", "defense"];
+export const STAT_ORB_KEYS = ["hp", "damage", "speed", "skill", "defense", "critical"];
 
 export function mergeOrbBonuses(current = {}, carry = {}) {
     const result = {};
@@ -219,6 +171,9 @@ export function applyHeroOrbStatAmount(owner, statKey, amount, opts = {}) {
                 owner.stats.allocation.skill = (owner.stats.allocation.skill ?? 0) + amount;
             }
             break;
+        case "critical":
+            owner.stats.criticalChance = Math.min(100, owner.stats.criticalChance + amount);
+            break;
     }
 }
 
@@ -239,7 +194,7 @@ export function mergeHeroOrbCarryover(spec, gained = {}, rate = HERO_ORB_CARRYOV
     const carryover = computeHeroOrbCarryover(gained, rate);
     if (Object.keys(carryover).length === 0) return carryover;
     spec.hero = spec.hero || {};
-    spec.hero.carryover = spec.hero.carryover || { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 };
+    spec.hero.carryover = spec.hero.carryover || { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0, critical: 0 };
     for (const key of Object.keys(carryover)) {
         spec.hero.carryover[key] = (spec.hero.carryover[key] ?? 0) + carryover[key];
     }
@@ -274,6 +229,7 @@ export class HeroOrb extends CollectionGrace(CombatEntity) {
         this.sourceAbility = sourceAbility;
         this.life = life ?? Infinity;
         this.mass = 2;
+        this.color = HERO_ORB_EFFECTS[effectType]?.color ?? "#ffffff";
         this.initializeCollectionGrace(collectionGraceDuration);
     }
 
@@ -351,10 +307,6 @@ export class HeroOrb extends CollectionGrace(CombatEntity) {
         return this.sourceAbility ?? this.owner.abilities?.getByAbilityId("hero") ?? null;
     }
 
-    get _isSpecial() {
-        return ["dash", "arrow", "cooldown_burst"].includes(this.effectType);
-    }
-
     draw(ctx) {
         const effectDef = HERO_ORB_EFFECTS[this.effectType];
         const color = effectDef?.color ?? "#ffffff";
@@ -362,22 +314,34 @@ export class HeroOrb extends CollectionGrace(CombatEntity) {
         const r = this.radius * pulse;
 
         ctx.save();
+        ctx.strokeStyle = "#ffe89a";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        for (let side = 0; side < 6; side += 1) {
+            const angle = -Math.PI / 2 + (Math.PI * 2 * side) / 6;
+            const x = this.position.x + Math.cos(angle) * (r + 3);
+            const y = this.position.y + Math.sin(angle) * (r + 3);
+            if (side === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.stroke();
         ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.arc(this.position.x, this.position.y, r, 0, Math.PI * 2);
+        ctx.arc(this.position.x, this.position.y, r * 0.72, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = this._isSpecial ? 3 : 2;
+        ctx.strokeStyle = "rgba(255, 232, 154, 0.68)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(this.position.x, this.position.y);
+        ctx.lineTo(this.owner.position.x, this.owner.position.y);
         ctx.stroke();
-
-        if (this._isSpecial) {
-            ctx.fillStyle = "#ffffff";
-            ctx.font = `900 ${Math.round(r * 1.1)}px Bahnschrift, "Segoe UI", sans-serif`;
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            const icon = this.effectType === "dash" ? "≫" : this.effectType === "arrow" ? "↑" : "⚡";
-            ctx.fillText(icon, this.position.x, this.position.y + 1);
-        }
+        ctx.fillStyle = "#ffffff";
+        ctx.font = `900 ${Math.round(r * 0.9)}px Bahnschrift, "Segoe UI", sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        const icons = { hp: "+", damage: "◆", speed: "›", defense: "■", skill: "↻", critical: "★" };
+        ctx.fillText(icons[this.effectType] ?? "•", this.position.x, this.position.y + 1);
 
         ctx.restore();
     }

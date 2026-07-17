@@ -42,8 +42,12 @@ export class Simulation {
     }
 
     getEnemiesOf(ball) {
-        return this.fighters.filter(
-            (fighter) => this.isHostile(ball, fighter) && !fighter.flags.defeated && !fighter.state.swallowed
+        const combatTargets = [
+            ...this.fighters,
+            ...this.entities.filter((entity) => entity.isCombatTarget && !this.fighters.includes(entity))
+        ];
+        return combatTargets.filter(
+            (fighter) => this.isHostile(ball, fighter) && !fighter.flags.defeated && !fighter.state?.swallowed
         );
     }
 

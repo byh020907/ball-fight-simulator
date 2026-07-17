@@ -1,4 +1,5 @@
-import { CombatEntity, dealProjectileDamage, Vector2 } from "../core.js";
+import { CombatEntity, Vector2 } from "../core.js";
+import { GrenadeReburstEffect, applyBurningEffect, consumeBurningEffect } from "../effects/index.js";
 
 const PROXIMITY_FUSE_BASE_MULTIPLIER = 3;
 const PROXIMITY_FUSE_MAX_MULTIPLIER = 6;
@@ -17,17 +18,35 @@ export class Grenade extends CombatEntity {
         this.maxTimer = this.timer;
         this.launchSpeed = drift.length();
         this._proximityFuseMultiplier = 1;
-        this.explosionRadius = EXPLOSION_RADIUS * (options.explosionRadiusMultiplier ?? 1);
-        this.innerRadius = EXPLOSION_INNER_RADIUS * (options.explosionRadiusMultiplier ?? 1);
-        this.damageMultiplier = options.damageMultiplier ?? 1;
+        this.explosionRadius = EXPLOSION_RADIUS;
+        this.innerRadius = EXPLOSION_INNER_RADIUS;
+        this.stickyEnabled = options.sticky ?? false;
+        this.burningEnabled = options.burning ?? false;
+        this.reburstEnabled = options.reburst ?? false;
+        this.stickyTarget = null;
+        this.stickyLocalOffset = null;
+        this.stickyLocalSurfaceOffset = null;
+        this.stickyLocalAngle = null;
         this.bounces = 0;
         this.maxBounces = 4;
     }
 
     update(delta, simulation) {
+        if (this.stickyTarget) {
+            this._followStickyTarget();
+            this.timer -= delta;
+            if (this.timer <= 0) this._detonate(simulation);
+            return;
+        }
         const previousPosition = this.position.clone();
         const travelSpeed = this.velocity.length();
         this.integrate(delta);
+
+        if (this.stickyEnabled && this._tryStick(previousPosition, simulation)) {
+            this.timer -= delta;
+            if (this.timer <= 0) this._detonate(simulation);
+            return;
+        }
 
         if (this.bounces < this.maxBounces) {
             const bx = this.position.x,
@@ -41,9 +60,11 @@ export class Grenade extends CombatEntity {
 
         // 이동 경로가 상대 폭발권을 스치면 탄속 비례로 퓨즈 소모 속도를 높인다.
         if (!this._proximityTriggered) {
-            const target = simulation.getOpponent(this.owner);
-            if (target && !target.flags.defeated && this._crossedExplosionRange(previousPosition, target.position)) {
-                this._activateProximityFuse(travelSpeed);
+            for (const target of simulation.getEnemiesOf(this.owner)) {
+                if (this._crossedExplosionRange(previousPosition, target.position)) {
+                    this._activateProximityFuse(travelSpeed);
+                    break;
+                }
             }
         }
 
@@ -76,33 +97,168 @@ export class Grenade extends CombatEntity {
         this._proximityTriggered = true;
     }
 
+    _tryStick(previousPosition, simulation) {
+        const contacts = simulation
+            .getEnemiesOf(this.owner)
+            .map((target, order) => ({ ...this._getSweptContact(previousPosition, this.position, target), order }))
+            .filter((contact) => contact.target)
+            .sort((a, b) => a.time - b.time || a.order - b.order);
+        const contact = contacts[0];
+        if (!contact) return false;
+        if (contact.target._stickyGrenade && !contact.target._stickyGrenade.isExpired) return false;
+        this._attachToContact(contact);
+        simulation.addSparkBurst(contact.surfacePoint.clone(), "#ff5f45");
+        simulation.playSound("hit", 0.55);
+        return true;
+    }
+
+    _getSweptContact(start, end, target) {
+        const path = Vector2.subtract(end, start);
+        const startOffset = Vector2.subtract(start, target.position);
+        const expandedRadius = target.radius + this.radius;
+        const pathLengthSquared = path.dot(path);
+        const startsOverlapping = startOffset.dot(startOffset) <= expandedRadius * expandedRadius;
+        let time = null;
+        if (startsOverlapping) {
+            time = 0;
+        } else if (pathLengthSquared > 1e-9) {
+            const projection = 2 * startOffset.dot(path);
+            const distance = startOffset.dot(startOffset) - expandedRadius * expandedRadius;
+            const discriminant = projection * projection - 4 * pathLengthSquared * distance;
+            if (discriminant >= 0) {
+                const entryTime = (-projection - Math.sqrt(discriminant)) / (2 * pathLengthSquared);
+                if (entryTime >= 0 && entryTime <= 1) time = entryTime;
+            }
+        }
+        if (time === null) return { target: null };
+
+        const grenadeCenter = Vector2.add(start, path.clone().scale(time));
+        const outward = Vector2.subtract(grenadeCenter, target.position);
+        if (outward.length() <= 1e-9) {
+            if (path.length() > 1e-9) outward.add(path.clone().normalize().scale(-1));
+            else outward.x = 1;
+        }
+        outward.normalize();
+        return {
+            target,
+            time,
+            grenadeCenter,
+            surfacePoint: Vector2.add(target.position, outward.clone().scale(target.radius)),
+            worldCenterOffset: outward.clone().scale(expandedRadius),
+            worldSurfaceOffset: outward.clone().scale(target.radius)
+        };
+    }
+
+    _attachToContact(contact) {
+        const targetAngle = contact.target.angle ?? 0;
+        const cos = Math.cos(-targetAngle);
+        const sin = Math.sin(-targetAngle);
+        const toLocal = (offset) => new Vector2(offset.x * cos - offset.y * sin, offset.x * sin + offset.y * cos);
+        this.stickyTarget = contact.target;
+        this.stickyLocalOffset = toLocal(contact.worldCenterOffset);
+        this.stickyLocalSurfaceOffset = toLocal(contact.worldSurfaceOffset);
+        this.stickyLocalAngle = Math.atan2(this.stickyLocalSurfaceOffset.y, this.stickyLocalSurfaceOffset.x);
+        contact.target._stickyGrenade = this;
+        this._followStickyTarget();
+    }
+
+    _followStickyTarget() {
+        if (!this.stickyTarget || this.stickyTarget.flags.defeated) {
+            this._releaseStickyTarget();
+            return;
+        }
+        const angle = this.stickyTarget.angle ?? 0;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        const offset = this.stickyLocalOffset;
+        this.pos = Vector2.add(
+            this.stickyTarget.position,
+            new Vector2(offset.x * cos - offset.y * sin, offset.x * sin + offset.y * cos)
+        );
+    }
+
+    _releaseStickyTarget() {
+        if (this.stickyTarget?._stickyGrenade === this) this.stickyTarget._stickyGrenade = null;
+        this.stickyTarget = null;
+        this.stickyLocalOffset = null;
+        this.stickyLocalSurfaceOffset = null;
+        this.stickyLocalAngle = null;
+    }
+
     _detonate(simulation) {
-        const target = simulation.getOpponent(this.owner);
-        if (target && !target.flags.defeated) {
+        for (const target of simulation.getEnemiesOf(this.owner)) {
             const distance = Vector2.subtract(this.position, target.position).length();
             if (distance <= this.explosionRadius) {
                 const edgeProgress = Math.max(
                     0,
                     Math.min(1, (distance - this.innerRadius) / (this.explosionRadius - this.innerRadius))
                 );
-                const raw = Math.round(
-                    this.owner.stats.baseDamage * (2.5 - edgeProgress * 1.0) * this.damageMultiplier
-                );
-                dealProjectileDamage(target, raw, this.owner, "Grenade", simulation);
+                const raw = Math.round(this.owner.stats.baseDamage * (2.5 - edgeProgress * 1.0));
+                const final =
+                    target.actionContext?.onProjectileDamage?.(raw, this, this.owner, "Grenade", simulation, target) ??
+                    raw;
+                const hadBurning = Boolean(target._igniteState && !target._igniteState.isExpired);
+                const { actualDamage } = target.takeDamage(final, this.owner, "Grenade");
+                if (actualDamage <= 0) continue;
                 const kbDir = Vector2.subtract(target.position, this.position).normalize();
                 target.applyKnockback(kbDir.scale(900), 1.3);
+                if (this.reburstEnabled && hadBurning && consumeBurningEffect(target)) {
+                    this._triggerBurningReburst(target, simulation);
+                }
+                if (this.burningEnabled && !target.flags.defeated) {
+                    applyBurningEffect({
+                        source: this.owner,
+                        target,
+                        simulation,
+                        label: "Grenade Burn"
+                    });
+                }
             }
         }
 
         simulation.spawnExplosion(this.position.clone(), this.owner.color);
         simulation.playSound("explosion");
         simulation.addLog(`${this.owner.name}'s grenade explodes.`);
+        this._releaseStickyTarget();
         this.isExpired = true;
+    }
+
+    _triggerBurningReburst(triggerTarget, simulation) {
+        const center = triggerTarget.position.clone();
+        for (const target of simulation.getEnemiesOf(this.owner)) {
+            if (Vector2.subtract(target.position, center).length() > 90) continue;
+            const { actualDamage } = target.takeDamage(
+                this.owner.stats.baseDamage * 0.75,
+                this.owner,
+                "Grenade Reburst"
+            );
+            if (actualDamage <= 0) continue;
+            const direction = Vector2.subtract(target.position, center);
+            if (direction.length() <= 0.001) direction.x = 1;
+            target.applyKnockback(direction.normalize().scale(540), 0.35);
+        }
+        simulation.entities.push(new GrenadeReburstEffect(center, 90));
+        simulation.spawnParticleBurst(center, "#ff8b2f", {
+            count: 18,
+            speed: 210,
+            radiusMin: 2,
+            radiusMax: 5,
+            gravity: 120
+        });
+        simulation.playSound("explosion", 0.75);
     }
 
     draw(ctx) {
         const charge = 1 - Math.max(0, this.timer / this.maxTimer);
         ctx.save();
+
+        if (this.stickyTarget) {
+            const warning = Math.sin((this.maxTimer / Math.max(0.04, this.timer)) * Math.PI) > 0;
+            ctx.fillStyle = warning ? "rgba(255, 42, 24, 0.52)" : "rgba(255, 160, 80, 0.24)";
+            ctx.beginPath();
+            ctx.arc(this.position.x, this.position.y, this.radius + 8, 0, Math.PI * 2);
+            ctx.fill();
+        }
 
         // 시계 링 — 남은 시간만큼 채워진 원호가 회전
         // 폭발 범위 외곽선

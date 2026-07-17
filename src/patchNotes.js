@@ -19,6 +19,33 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.29.0",
+        date: "2026-07-17",
+        title: "v0.29.0 다섯 캐릭터 레벨 보상 개편",
+        changes: [
+            {
+                type: "feature",
+                text: "Dash Lv.3 적중 레이저, Lv.6 벽 반사, Lv.9 교차 적중 과부하를 추가했습니다."
+            },
+            {
+                type: "feature",
+                text: "Grenade Lv.3 점착, Lv.6 공통 화상, Lv.9 화상 소비 재폭발로 레벨 보상을 교체했습니다."
+            },
+            {
+                type: "feature",
+                text: "Gunner Lv.3 모든 연사 마무리 탄 강화, Lv.6 회수 탄 재사격·첫 반사 재조준, Lv.9 20회 회수 자동 포탑을 추가했습니다."
+            },
+            {
+                type: "refactor",
+                text: "Phantom Shadow Strike의 고정 추가 피해를 성장·장비가 반영되는 총공격력 ×1.50으로 교체했습니다."
+            },
+            {
+                type: "feature",
+                text: "Hero의 자동·특수 오브를 5스택 성장 코어, 공명 조각, 5조각 Heroic Burst 흐름으로 개편하고 치명타 성장 코어를 추가했습니다."
+            }
+        ]
+    },
+    {
         version: "0.28.1",
         date: "2026-07-17",
         title: "v0.28.1 핵심 레벨 보상 효과 가시성 복구",

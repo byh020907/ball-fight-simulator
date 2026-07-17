@@ -1,6 +1,12 @@
 import { steerBallToward, Vector2 } from "../core.js";
 import { ArrowProjectile } from "../entities/arrowProjectile.js";
 import { drawElectricArc } from "../effects/electricArc.js";
+import {
+    circleIntersectsLaserSegment,
+    drawLaserSegments,
+    getArenaWallRay,
+    traceArenaLaserSegments
+} from "../effects/laserBeamEffect.js";
 import { Ability } from "./ability.js";
 
 const BARRIER_DURATION = 1.5;
@@ -94,19 +100,7 @@ const BEHAVIOR_CONFIG = Object.freeze({
     laser: { cooldown: 4.2, face: "cyclops" }
 });
 
-export function getArenaWallRay(origin, angle, width, height) {
-    const direction = Vector2.fromAngle(angle, 1);
-    const distances = [];
-    if (direction.x > 0) distances.push((width - origin.x) / direction.x);
-    if (direction.x < 0) distances.push(-origin.x / direction.x);
-    if (direction.y > 0) distances.push((height - origin.y) / direction.y);
-    if (direction.y < 0) distances.push(-origin.y / direction.y);
-    const length = Math.max(0, Math.min(...distances));
-    return {
-        length,
-        end: Vector2.add(origin, direction.scale(length))
-    };
-}
+export { getArenaWallRay };
 
 export class HuntingMobAbility extends Ability {
     constructor(owner, simulation) {
@@ -543,18 +537,18 @@ export class HuntingMobAbility extends Ability {
         }
         if (laser.charge <= 0) {
             laser.fire += delta;
-            const direction = Vector2.fromAngle(laser.angle, 1);
-            const ray = getArenaWallRay(
+            const segments = traceArenaLaserSegments(
                 this.owner.position,
                 laser.angle,
                 this.simulation.width,
-                this.simulation.height
+                this.simulation.height,
+                0
             );
-            const relative = Vector2.subtract(target.position, this.owner.position);
-            const along = relative.dot(direction);
-            const offLine = Math.abs(relative.x * direction.y - relative.y * direction.x);
-            if (along > 0 && along < ray.length && offLine < target.radius + 15)
-                target.takeDamage(20 * delta, this.owner, "Laser Beam");
+            for (const enemy of this.simulation.getEnemiesOf(this.owner)) {
+                if (segments.some((segment) => circleIntersectsLaserSegment(enemy, segment))) {
+                    enemy.takeDamage(20 * delta, this.owner, "Laser Beam");
+                }
+            }
         }
         if (laser.fire >= 0.55) this.state.laser = null;
     }
@@ -823,13 +817,17 @@ export class HuntingMobAbility extends Ability {
     }
 
     _drawLaser(ctx, laser) {
-        const ray = getArenaWallRay(this.owner.position, laser.angle, this.simulation.width, this.simulation.height);
-        ctx.strokeStyle = laser.charge > 0 ? "rgba(255, 90, 90, 0.45)" : "#ff5656";
-        ctx.lineWidth = laser.charge > 0 ? 2 : 7;
-        ctx.beginPath();
-        ctx.moveTo(this.owner.position.x, this.owner.position.y);
-        ctx.lineTo(ray.end.x, ray.end.y);
-        ctx.stroke();
+        const segments = traceArenaLaserSegments(
+            this.owner.position,
+            laser.angle,
+            this.simulation.width,
+            this.simulation.height,
+            0
+        );
+        drawLaserSegments(ctx, segments, {
+            alpha: laser.charge > 0 ? 0.45 : 1,
+            color: "#ff5656"
+        });
     }
 
     _drawBarrierSwap(ctx, from, to) {

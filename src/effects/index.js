@@ -13,7 +13,23 @@ export { createElectricArcPath, drawElectricArc } from "./electricArc.js";
 export { DamageNumber, CriticalNumber, ActionText } from "./floatingText.js";
 export { ActionWindowEffect, ActionSuccessEffect, ActionWhiffEffect } from "./actionEffects.js";
 export { EFFECT_VISIBILITY_TOKENS, getVisibleCombatTextSize, getVisibleLineWidth } from "./effectVisibility.js";
-export { BurningEffect, RageFlameRing } from "./rageEffects.js";
+export {
+    BURNING_EFFECT_CONFIG,
+    BurningEffect,
+    RageFlameRing,
+    applyBurningEffect,
+    consumeBurningEffect
+} from "./rageEffects.js";
+export { GrenadeReburstEffect } from "./grenadeEffects.js";
+export { HeroResonanceEffect } from "./heroEffects.js";
+export {
+    CrossOverloadEffect,
+    LaserBeamEffect,
+    circleIntersectsLaserSegment,
+    drawLaserSegments,
+    getArenaWallRay,
+    traceArenaLaserSegments
+} from "./laserBeamEffect.js";
 export { EaterDigestEffect, EaterSpitEffect, EaterWallRuptureEffect } from "./eaterEffects.js";
 export {
     SeedActivationEffect,

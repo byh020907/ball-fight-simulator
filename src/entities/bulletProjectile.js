@@ -8,7 +8,8 @@ export class BulletProjectile extends Projectile {
         damageMult = 0.5,
         isFinisher = false,
         cdReduction = 0,
-        sourceAbility = null
+        sourceAbility = null,
+        options = {}
     ) {
         super(owner, position, velocity, 4);
         this.life = 3.0;
@@ -17,19 +18,36 @@ export class BulletProjectile extends Projectile {
         this.isFinisher = isFinisher;
         this.cdReduction = cdReduction;
         this.sourceAbility = sourceAbility;
+        this.canBounce = options.canBounce ?? true;
+        this.canCollect = options.canCollect ?? true;
+        this.canRefire = options.canRefire ?? true;
+        this.canStack = options.canStack ?? true;
+        this.retargetAfterBounce = options.retargetAfterBounce ?? false;
+        this.retargetConsumed = false;
+        this.isRefire = options.isRefire ?? false;
+        this.turretShot = options.turretShot ?? false;
+        this.age = 0;
         this._trail = [];
         this._bounceCount = 0;
-        if (isFinisher) this.radius = 6;
+        if (isFinisher) this.radius = 7;
     }
 
     update(delta, simulation) {
-        this._integrateAndClamp(delta, simulation);
-        const px = this.position.x;
-        const py = this.position.y;
-        // re-check arena after clamp for bounce detection (integrate+clamp already called)
-        if (this.position.x !== px || this.position.y !== py) {
+        this.age += delta;
+        this.integrate(delta);
+        const unclamped = this.position.clone();
+        simulation.keepEntityInsideArena(this);
+        const bounced = this.position.x !== unclamped.x || this.position.y !== unclamped.y;
+        if (bounced) {
             this._bounceCount++;
-            simulation.addSparkBurst(this.position.clone(), "#ffdd44");
+            if (!this.canBounce) {
+                this.isExpired = true;
+                return;
+            }
+            if (this.retargetAfterBounce && !this.retargetConsumed) {
+                this._retargetAfterRicochet(simulation);
+            }
+            simulation.addSparkBurst(this.position.clone(), this.isRefire ? "#66f2e2" : "#ffdd44");
             simulation.playSound("hit", 0.3);
         }
         this._trail.push(this.position.clone());
@@ -37,12 +55,34 @@ export class BulletProjectile extends Projectile {
         if (!this._lifecycleCheck(delta, simulation)) return;
         this.angle = Math.atan2(this.velocity.y, this.velocity.x);
         this._hitCheck(simulation);
-        if (!this.isExpired) this._ownerCollectCheck(simulation);
+        if (!this.isExpired && this.age >= 0.08) this._ownerCollectCheck(simulation);
+    }
+
+    _retargetAfterRicochet(simulation) {
+        const target = simulation.getEnemiesOf(this.owner).reduce((nearest, candidate) => {
+            if (!nearest) return candidate;
+            const candidateDistance = Vector2.subtract(candidate.position, this.position).length();
+            const nearestDistance = Vector2.subtract(nearest.position, this.position).length();
+            return candidateDistance < nearestDistance ? candidate : nearest;
+        }, null);
+        this.retargetConsumed = true;
+        this.canBounce = false;
+        if (!target) return;
+        const direction = Vector2.subtract(target.position, this.position);
+        if (direction.length() <= 0.001) return;
+        const desiredVelocity = direction.normalize().scale(this.velocity.length());
+        this.applyImpulse(Vector2.subtract(desiredVelocity, this.velocity));
+        const trailDirection = direction.clone().normalize();
+        simulation.spawnSlash(this.position.clone(), Vector2.add(this.position, trailDirection.scale(48)), "#66f2e2");
     }
 
     _ownerCollectCheck(simulation) {
         const dist = Vector2.subtract(this.position, this.owner.position).length();
         if (dist > this.owner.radius + this.radius) return;
+        if (!this.canCollect) {
+            this.isExpired = true;
+            return;
+        }
         const ability = this.sourceAbility;
         if (ability && typeof ability.timer === "number") {
             ability.timer = Math.max(0, ability.timer - this.cdReduction);
@@ -50,6 +90,7 @@ export class BulletProjectile extends Projectile {
             simulation.addSparkBurst(this.position.clone(), "#44ddff");
             simulation.playSound("shoot", 0.4);
         }
+        ability?.onBulletCollected?.(this, simulation);
         this.isExpired = true;
     }
 
@@ -58,6 +99,8 @@ export class BulletProjectile extends Projectile {
     }
 
     _getHitLabel() {
+        if (this.turretShot) return "Turret Shot";
+        if (this.isRefire) return "Ricochet Reload";
         return this.isFinisher ? "Finisher" : "Bullet";
     }
 
@@ -85,10 +128,10 @@ export class BulletProjectile extends Projectile {
 
     draw(ctx) {
         if (this._trail.length > 1) {
-            const trailColor = this.isFinisher ? "#ff4488" : "#ffdd44";
+            const trailColor = this.isRefire ? "#66f2e2" : this.isFinisher ? "#ff4488" : "#ffdd44";
             for (let index = 0; index < this._trail.length - 1; index++) {
                 const alpha = (index / this._trail.length) * (this.isFinisher ? 0.6 : 0.4);
-                ctx.fillStyle = `rgba(${this.isFinisher ? "255, 68, 136" : "255, 220, 68"}, ${alpha})`;
+                ctx.fillStyle = `rgba(${this.isRefire ? "102, 242, 226" : this.isFinisher ? "255, 68, 136" : "255, 220, 68"}, ${alpha})`;
                 ctx.beginPath();
                 ctx.arc(this._trail[index].x, this._trail[index].y, this.radius * 0.6, 0, Math.PI * 2);
                 ctx.fill();
@@ -107,7 +150,7 @@ export class BulletProjectile extends Projectile {
             ctx.fill();
         }
 
-        ctx.fillStyle = this.isFinisher ? "#ff4488" : "#ffdd44";
+        ctx.fillStyle = this.isRefire ? "#66f2e2" : this.isFinisher ? "#ff4488" : "#ffdd44";
         ctx.strokeStyle = "#202020";
         ctx.lineWidth = 2;
         ctx.beginPath();
