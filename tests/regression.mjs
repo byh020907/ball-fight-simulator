@@ -181,6 +181,8 @@ import {
 import { Grenade } from "../src/entities/grenade.js";
 import {
     getArenaWallRay,
+    getHuntingLaserCasterVisualState,
+    HUNTING_LASER_CASTER_RENDERER,
     HUNTING_LINK_CHANNEL_CONFIG,
     LASER_CHARGE_TURN_RATE
 } from "../src/abilities/huntingMobAbility.js";
@@ -254,11 +256,19 @@ import { ArenaCamera } from "../src/camera.js";
 import { BurningEffect } from "../src/effects/rageEffects.js";
 import {
     CrossOverloadEffect,
+    DASH_LASER_CASTER_RENDERER,
     GrenadeReburstEffect,
     HeroResonanceEffect,
+    LaserCasterDissipateEffect,
     LaserBeamEffect,
     traceArenaLaserSegments
 } from "../src/effects/index.js";
+import {
+    createLaserCasterVisualState,
+    drawLaserCasterVisual,
+    getLaserCasterFireOrigin,
+    LASER_CASTER_PHASES
+} from "../src/effects/laserCasterVisual.js";
 import { PATCH_NOTES } from "../src/patchNotes.js";
 import {
     createTemplateComponentDirective,
@@ -5102,6 +5112,25 @@ function testAbilityLevelUpgrades(app) {
         dashRun.sim.entities.some((entity) => entity instanceof LaserBeamEffect),
         "Dash tier rewards should create the shared laser effect after a real dash hit"
     );
+    const dashCasterLaser = dashRun.sim.entities.find((entity) => entity instanceof LaserBeamEffect);
+    const dashCasterState = dashCasterLaser.getCasterVisualState();
+    assert.equal(
+        DASH_LASER_CASTER_RENDERER,
+        drawLaserCasterVisual,
+        "Dash laser should expose the named shared caster renderer instead of a Dash-only drawing path"
+    );
+    assert.deepEqual(
+        dashCasterState.origin,
+        { x: dashRun.ball.position.x, y: dashRun.ball.position.y },
+        "Dash caster visual should anchor its fire origin at the moving Dash owner"
+    );
+    assert.equal(
+        dashCasterState.phase,
+        LASER_CASTER_PHASES.MATERIALIZE,
+        "Dash caster should materialize before charge"
+    );
+    assert.equal("target" in dashCasterState, false, "Dash caster visual state should not expose a combat target");
+    assert.equal("simulation" in dashCasterState, false, "Dash caster visual state should not expose simulation state");
 
     const rageRun = createTierSimulation(FIGHTER_IDS.RAGE);
     rageRun.ball.ability.state.timeWithoutCollision = rageRun.ball.ability.getMaxChargeTime();
@@ -5358,11 +5387,28 @@ function testFiveBallLevelRewardContracts(app) {
     phaseRun.target.position = new Vector2(320, 300);
     const phaseLaser = new LaserBeamEffect(phaseRun.owner, phaseRun.target, { maxWallBounces: 0 });
     const phaseHpBefore = phaseRun.target.hp;
-    phaseLaser.update(0.35, phaseRun.simulation);
+    assert.equal(
+        phaseLaser.getCasterVisualState().phase,
+        LASER_CASTER_PHASES.MATERIALIZE,
+        "Dash laser should start with a materialize flash before its charge aim"
+    );
+    phaseLaser.update(0.1, phaseRun.simulation);
+    phaseRun.owner.position = new Vector2(140, 340);
+    phaseLaser.update(0.25, phaseRun.simulation);
     assert.deepEqual(
         [phaseLaser.phase, phaseLaser.fireRemaining, phaseRun.target.hp],
         ["fire", 0.3, phaseHpBefore],
         "An exact 0.35s update should finish only the Dash charge and leave the whole fire phase"
+    );
+    assert.deepEqual(
+        phaseLaser.getCasterVisualState().origin,
+        { x: 140, y: 340 },
+        "Dash caster visual should follow its owner before the beam locks"
+    );
+    assert.deepEqual(
+        getLaserCasterFireOrigin(phaseLaser.getCasterVisualState()),
+        { x: phaseLaser.segments[0].start.x, y: phaseLaser.segments[0].start.y },
+        "Dash caster eye origin should match the first gameplay beam segment origin"
     );
     phaseLaser.update(0.1, phaseRun.simulation);
     assert.equal(
@@ -5376,6 +5422,96 @@ function testFiveBallLevelRewardContracts(app) {
         phaseHpBefore - phaseRun.target.hp,
         20,
         "A target that leaves the locked beam should receive no later fire ticks"
+    );
+    assert.equal(phaseLaser.isExpired, true, "Dash laser gameplay should still end at 0.35s charge plus 0.30s fire");
+    const dissipateCaster = phaseRun.simulation.entities.find((entity) => entity instanceof LaserCasterDissipateEffect);
+    assert.ok(dissipateCaster, "Dash laser expiry should create a short-lived caster dissipate visual");
+    assert.equal(
+        dissipateCaster.getCasterVisualState().phase,
+        LASER_CASTER_PHASES.DISSIPATE,
+        "Dash caster should expose a dissipate phase after firing"
+    );
+    assert.equal("hp" in dissipateCaster, false, "Dash caster visual should not create HP state");
+    assert.equal("teamId" in dissipateCaster, false, "Dash caster visual should not create team state");
+    assert.equal("name" in dissipateCaster, false, "Dash caster visual should not create a nameplate identity");
+    assert.equal("isCombatTarget" in dissipateCaster, false, "Dash caster visual should not become a combat target");
+    phaseRun.owner.position = new Vector2(170, 360);
+    dissipateCaster.update(0.08, phaseRun.simulation);
+    assert.deepEqual(
+        dissipateCaster.getCasterVisualState().origin,
+        { x: 170, y: 360 },
+        "Dissipating Dash caster should remain anchored to owner movement"
+    );
+    dissipateCaster.update(0.08, phaseRun.simulation);
+    assert.equal(dissipateCaster.isExpired, true, "Dash caster dissipate visual should clear within 0.12~0.20 seconds");
+    const activeCasterLaser = new LaserBeamEffect(phaseRun.owner, phaseRun.target);
+    const dissipateCountBeforeSourceDefeat = phaseRun.simulation.entities.filter(
+        (entity) => entity instanceof LaserCasterDissipateEffect
+    ).length;
+    phaseRun.owner.flags.defeated = true;
+    activeCasterLaser.update(0.01, phaseRun.simulation);
+    assert.equal(
+        activeCasterLaser.isExpired,
+        true,
+        "Defeated Dash source should expire an active caster visual immediately"
+    );
+    assert.equal(
+        phaseRun.simulation.entities.filter((entity) => entity instanceof LaserCasterDissipateEffect).length,
+        dissipateCountBeforeSourceDefeat,
+        "Early Dash caster expiry should not leave a new dissipation visual behind"
+    );
+    const sourceCleanupCaster = new LaserCasterDissipateEffect(phaseRun.owner, {
+        angle: 0,
+        scale: 1,
+        palette: phaseLaser.getCasterVisualState().palette
+    });
+    phaseRun.owner.flags.defeated = true;
+    sourceCleanupCaster.update(0.01, phaseRun.simulation);
+    assert.equal(
+        sourceCleanupCaster.isExpired,
+        true,
+        "Defeated Dash source should clear its caster visual immediately"
+    );
+    phaseRun.owner.flags.defeated = false;
+    const activeBattleEndLaser = new LaserBeamEffect(phaseRun.owner, phaseRun.target);
+    const dissipateCountBeforeBattleEnd = phaseRun.simulation.entities.filter(
+        (entity) => entity instanceof LaserCasterDissipateEffect
+    ).length;
+    phaseRun.simulation.winner = phaseRun.target;
+    activeBattleEndLaser.update(0.01, phaseRun.simulation);
+    assert.equal(activeBattleEndLaser.isExpired, true, "Battle end should expire an active Dash caster immediately");
+    assert.equal(
+        phaseRun.simulation.entities.filter((entity) => entity instanceof LaserCasterDissipateEffect).length,
+        dissipateCountBeforeBattleEnd,
+        "Battle-ended Dash caster should not create a new dissipation visual"
+    );
+    phaseRun.simulation.winner = null;
+    const battleEndCaster = new LaserCasterDissipateEffect(phaseRun.owner, {
+        angle: 0,
+        scale: 1,
+        palette: phaseLaser.getCasterVisualState().palette
+    });
+    battleEndCaster.update(0.01, { winner: phaseRun.target });
+    assert.equal(battleEndCaster.isExpired, true, "Battle end should clear a pending Dash caster visual immediately");
+    const casterSmokeContext = makeRecordingCanvasContext();
+    drawLaserCasterVisual(
+        casterSmokeContext,
+        createLaserCasterVisualState({
+            origin: { x: 140, y: 340 },
+            angle: 0,
+            phase: LASER_CASTER_PHASES.CHARGE,
+            phaseProgress: 0.5,
+            scale: 1,
+            aimLength: 180
+        })
+    );
+    assert.ok(
+        casterSmokeContext.primitives.some((primitive) => primitive.method === "ellipse"),
+        "Shared caster renderer smoke should paint the cyclops silhouette"
+    );
+    assert.ok(
+        casterSmokeContext.primitives.some((primitive) => primitive.method === "setLineDash"),
+        "Shared caster renderer smoke should paint the dotted aim line"
     );
 
     const runReflectedLaser = (steps) => {
@@ -11944,6 +12080,86 @@ function testHuntingLaserReachesArenaWall(app) {
     };
     const normalizeAngle = (angle) => Math.atan2(Math.sin(angle), Math.cos(angle));
     const chargingLaser = startCharge(new Vector2(900, 400));
+    const huntingCasterState = getHuntingLaserCasterVisualState(laserBall, chargingLaser);
+    assert.equal(
+        HUNTING_LASER_CASTER_RENDERER,
+        drawLaserCasterVisual,
+        "Hunting laser should expose the same named caster renderer as Dash"
+    );
+    assert.deepEqual(
+        huntingCasterState.origin,
+        { x: laserBall.position.x, y: laserBall.position.y },
+        "Hunting laser caster should use the monster position as its shared renderer origin"
+    );
+    const dashHalfCharge = new LaserBeamEffect(target, laserBall);
+    dashHalfCharge.angle = chargingLaser.angle;
+    dashHalfCharge.chargeRemaining = 0.175;
+    const dashHalfChargeState = dashHalfCharge.getCasterVisualState();
+    const huntingHalfChargeState = getHuntingLaserCasterVisualState(laserBall, {
+        angle: chargingLaser.angle,
+        charge: 0.375,
+        fire: 0,
+        aimLength: 200
+    });
+    assert.deepEqual(
+        [dashHalfChargeState.phase, dashHalfChargeState.phaseProgress],
+        [LASER_CASTER_PHASES.CHARGE, 0.5],
+        "Dash 0.35s charge should map its own half-duration to shared charge progress"
+    );
+    assert.deepEqual(
+        [huntingHalfChargeState.phase, huntingHalfChargeState.phaseProgress],
+        [LASER_CASTER_PHASES.CHARGE, 0.5],
+        "Hunting 0.75s charge should map its own half-duration to the same shared charge progress"
+    );
+    const commonRendererState = createLaserCasterVisualState({
+        origin: { x: 200, y: 400 },
+        angle: 0.2,
+        phase: LASER_CASTER_PHASES.CHARGE,
+        phaseProgress: 0.5,
+        scale: 0.9,
+        aimLength: 200
+    });
+    const dashRendererContext = makeRecordingCanvasContext();
+    const huntingRendererContext = makeRecordingCanvasContext();
+    DASH_LASER_CASTER_RENDERER(dashRendererContext, commonRendererState);
+    HUNTING_LASER_CASTER_RENDERER(huntingRendererContext, commonRendererState);
+    assert.deepEqual(
+        dashRendererContext.primitives,
+        huntingRendererContext.primitives,
+        "Identical shared phase input should produce the same cyclops lens and aim rendering for Dash and hunting lasers"
+    );
+    const huntingAdapterContext = makeRecordingCanvasContext();
+    laserBall.ability._drawLaser(huntingAdapterContext, chargingLaser);
+    assert.ok(
+        huntingAdapterContext.primitives.some((primitive) => primitive.method === "ellipse"),
+        "Hunting laser draw adapter should call the shared cyclops caster renderer during charge"
+    );
+    const arenaContext = makeRecordingCanvasContext();
+    const arenaCanvas = {
+        width: 960,
+        height: 960,
+        clientWidth: 700,
+        clientHeight: 700,
+        getBoundingClientRect: () => ({ width: 700, height: 700 }),
+        getContext: () => arenaContext
+    };
+    arenaContext.canvas = arenaCanvas;
+    const originalHuntingLaserDraw = laserBall.ability._drawLaser;
+    let huntingLaserArenaDraws = 0;
+    laserBall.ability._drawLaser = (...args) => {
+        huntingLaserArenaDraws += 1;
+        return originalHuntingLaserDraw.call(laserBall.ability, ...args);
+    };
+    try {
+        new ArenaRenderer(arenaCanvas).render(simulation);
+    } finally {
+        laserBall.ability._drawLaser = originalHuntingLaserDraw;
+    }
+    assert.equal(
+        huntingLaserArenaDraws,
+        1,
+        "ArenaRenderer should render the hunting laser's shared caster visual exactly once during charge"
+    );
     const initialAngle = chargingLaser.angle;
     target.position = new Vector2(200, 800);
     laserBall.ability._tickLaser(0.1, target);

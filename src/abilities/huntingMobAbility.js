@@ -7,6 +7,12 @@ import {
     getArenaWallRay,
     traceArenaLaserSegments
 } from "../effects/laserBeamEffect.js";
+import {
+    createLaserCasterVisualState,
+    drawLaserCasterVisual,
+    LASER_CASTER_PALETTE,
+    LASER_CASTER_PHASES
+} from "../effects/laserCasterVisual.js";
 import { Ability } from "./ability.js";
 
 const BARRIER_DURATION = 1.5;
@@ -33,6 +39,12 @@ export const HUNTING_LINK_CHANNEL_CONFIG = Object.freeze({
     })
 });
 export const LASER_CHARGE_TURN_RATE = 4;
+const HUNTING_LASER_CHARGE_DURATION = 0.75;
+const HUNTING_LASER_FIRE_DURATION = 0.55;
+const HUNTING_LASER_CASTER_SCALE = 0.92;
+const HUNTING_LASER_MATERIALIZE_PROGRESS = 0.18;
+
+export const HUNTING_LASER_CASTER_RENDERER = drawLaserCasterVisual;
 const SPLIT_FRAGMENT_CONFIG = Object.freeze({
     radiusMultiplier: 0.54,
     damageMultiplier: 0.65,
@@ -81,6 +93,25 @@ function getJumpHeightProgress(elapsed) {
 
 function normalizeAngle(angle) {
     return Math.atan2(Math.sin(angle), Math.cos(angle));
+}
+
+export function getHuntingLaserCasterVisualState(owner, laser) {
+    const chargeProgress = 1 - laser.charge / HUNTING_LASER_CHARGE_DURATION;
+    const fireProgress = laser.fire / HUNTING_LASER_FIRE_DURATION;
+    const isCharging = laser.charge > 0;
+    return createLaserCasterVisualState({
+        origin: owner.position,
+        angle: laser.angle,
+        phase: isCharging
+            ? chargeProgress < HUNTING_LASER_MATERIALIZE_PROGRESS
+                ? LASER_CASTER_PHASES.MATERIALIZE
+                : LASER_CASTER_PHASES.CHARGE
+            : LASER_CASTER_PHASES.FIRE,
+        phaseProgress: isCharging ? chargeProgress : fireProgress,
+        scale: HUNTING_LASER_CASTER_SCALE,
+        palette: LASER_CASTER_PALETTE,
+        aimLength: laser.aimLength ?? 140
+    });
 }
 
 const BEHAVIOR_CONFIG = Object.freeze({
@@ -526,13 +557,15 @@ export class HuntingMobAbility extends Ability {
             this.state.timer = 0;
             this.state.laser = {
                 angle: Math.atan2(target.position.y - this.owner.position.y, target.position.x - this.owner.position.x),
-                charge: 0.75,
-                fire: 0
+                charge: HUNTING_LASER_CHARGE_DURATION,
+                fire: 0,
+                aimLength: Vector2.subtract(target.position, this.owner.position).length()
             };
         }
         const laser = this.state.laser;
         if (laser.charge > 0) {
             this._trackLaserCharge(laser, target, delta);
+            laser.aimLength = Vector2.subtract(target.position, this.owner.position).length();
             laser.charge -= delta;
         }
         if (laser.charge <= 0) {
@@ -550,7 +583,7 @@ export class HuntingMobAbility extends Ability {
                 }
             }
         }
-        if (laser.fire >= 0.55) this.state.laser = null;
+        if (laser.fire >= HUNTING_LASER_FIRE_DURATION) this.state.laser = null;
     }
 
     _trackLaserCharge(laser, target, delta) {
@@ -817,6 +850,8 @@ export class HuntingMobAbility extends Ability {
     }
 
     _drawLaser(ctx, laser) {
+        HUNTING_LASER_CASTER_RENDERER(ctx, getHuntingLaserCasterVisualState(this.owner, laser));
+        if (laser.charge > 0) return;
         const segments = traceArenaLaserSegments(
             this.owner.position,
             laser.angle,
@@ -825,7 +860,7 @@ export class HuntingMobAbility extends Ability {
             0
         );
         drawLaserSegments(ctx, segments, {
-            alpha: laser.charge > 0 ? 0.45 : 1,
+            alpha: 1,
             color: "#ff5656"
         });
     }

@@ -1,9 +1,20 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
 import { getVisibleLineWidth } from "./effectVisibility.js";
+import {
+    createLaserCasterVisualState,
+    drawLaserCasterVisual,
+    LASER_CASTER_PALETTE,
+    LASER_CASTER_PHASES
+} from "./laserCasterVisual.js";
 
 const RAY_EPSILON = 0.01;
 const PHASE_EPSILON = 1e-9;
 const LASER_DAMAGE_TICK = 0.05;
+const DASH_MATERIALIZE_PROGRESS = 0.18;
+const DASH_CASTER_SCALE = 0.76;
+const DASH_CASTER_DISSIPATE_DURATION = 0.16;
+
+export const DASH_LASER_CASTER_RENDERER = drawLaserCasterVisual;
 
 function distanceToSegment(point, start, end) {
     const segment = Vector2.subtract(end, start);
@@ -117,7 +128,7 @@ export class LaserBeamEffect extends CombatEntity {
     }
 
     update(delta, simulation) {
-        if (this.source.flags.defeated) {
+        if (this.source.flags.defeated || simulation?.winner) {
             this.isExpired = true;
             return;
         }
@@ -200,6 +211,13 @@ export class LaserBeamEffect extends CombatEntity {
                 this._triggerOverload(target, simulation);
             }
         }
+        simulation.entities.push(
+            new LaserCasterDissipateEffect(this.source, {
+                angle: this.angle,
+                scale: DASH_CASTER_SCALE,
+                palette: LASER_CASTER_PALETTE
+            })
+        );
         this.isExpired = true;
     }
 
@@ -214,22 +232,31 @@ export class LaserBeamEffect extends CombatEntity {
         simulation.entities.push(new CrossOverloadEffect(center, 100));
     }
 
+    getCasterVisualState() {
+        const chargeProgress = 1 - this.chargeRemaining / this.chargeDuration;
+        const fireProgress = 1 - this.fireRemaining / this.fireDuration;
+        const isCharging = this.phase === "charge";
+        const aimEnd = this.target?.flags?.defeated
+            ? Vector2.add(this.pos, Vector2.fromAngle(this.angle, 120))
+            : (this.target?.position ?? Vector2.add(this.pos, Vector2.fromAngle(this.angle, 120)));
+        return createLaserCasterVisualState({
+            origin: this.pos,
+            angle: this.angle,
+            phase: isCharging
+                ? chargeProgress < DASH_MATERIALIZE_PROGRESS
+                    ? LASER_CASTER_PHASES.MATERIALIZE
+                    : LASER_CASTER_PHASES.CHARGE
+                : LASER_CASTER_PHASES.FIRE,
+            phaseProgress: isCharging ? chargeProgress : fireProgress,
+            scale: DASH_CASTER_SCALE,
+            palette: LASER_CASTER_PALETTE,
+            aimLength: Vector2.subtract(aimEnd, this.pos).length()
+        });
+    }
+
     draw(ctx) {
-        if (this.phase === "charge") {
-            const end = this.target?.flags?.defeated
-                ? Vector2.add(this.position, Vector2.fromAngle(this.angle, 120))
-                : this.target.position;
-            ctx.save();
-            ctx.strokeStyle = "rgba(255, 82, 82, 0.72)";
-            ctx.lineWidth = getVisibleLineWidth(ctx, "hairline", 2);
-            ctx.setLineDash([8, 7]);
-            ctx.beginPath();
-            ctx.moveTo(this.position.x, this.position.y);
-            ctx.lineTo(end.x, end.y);
-            ctx.stroke();
-            ctx.restore();
-            return;
-        }
+        DASH_LASER_CASTER_RENDERER(ctx, this.getCasterVisualState());
+        if (this.phase === "charge") return;
         drawLaserSegments(ctx, this.segments, { color: "#ff4d4d" });
         for (const [target, segments] of this.hitSegmentsByTarget) {
             if (segments.size < 2 || target.flags.defeated) continue;
@@ -245,6 +272,45 @@ export class LaserBeamEffect extends CombatEntity {
             ctx.stroke();
             ctx.restore();
         }
+    }
+}
+
+export class LaserCasterDissipateEffect extends CombatEntity {
+    static renderLayer = RENDER_LAYERS.FOREGROUND;
+
+    constructor(source, { angle, scale, palette }) {
+        super(source.position.clone(), new Vector2(), 0);
+        this.source = source;
+        this.angle = angle;
+        this.scale = scale;
+        this.palette = palette;
+        this.life = DASH_CASTER_DISSIPATE_DURATION;
+        this.maxLife = this.life;
+    }
+
+    update(delta, simulation) {
+        if (this.source.flags.defeated || simulation.winner) {
+            this.isExpired = true;
+            return;
+        }
+        this.pos = this.source.position.clone();
+        this.tickLife(delta);
+    }
+
+    getCasterVisualState() {
+        return createLaserCasterVisualState({
+            origin: this.pos,
+            angle: this.angle,
+            phase: LASER_CASTER_PHASES.DISSIPATE,
+            phaseProgress: 1 - this.life / this.maxLife,
+            scale: this.scale,
+            palette: this.palette,
+            aimLength: 0
+        });
+    }
+
+    draw(ctx) {
+        DASH_LASER_CASTER_RENDERER(ctx, this.getCasterVisualState());
     }
 }
 

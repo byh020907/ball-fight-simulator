@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.29.4",
+        date: "2026-07-17",
+        title: "v0.29.4 Dash 레이저 캐스터 연출",
+        changes: [
+            {
+                type: "style",
+                text: "Dash 레이저에 조준·발사·소멸하는 캐스터 연출을 더했습니다."
+            }
+        ]
+    },
+    {
         version: "0.29.3",
         date: "2026-07-17",
         title: "v0.29.3 Orbit 협공 경로 수정",

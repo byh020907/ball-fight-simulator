@@ -24,12 +24,21 @@ export { GrenadeReburstEffect } from "./grenadeEffects.js";
 export { HeroResonanceEffect } from "./heroEffects.js";
 export {
     CrossOverloadEffect,
+    DASH_LASER_CASTER_RENDERER,
+    LaserCasterDissipateEffect,
     LaserBeamEffect,
     circleIntersectsLaserSegment,
     drawLaserSegments,
     getArenaWallRay,
     traceArenaLaserSegments
 } from "./laserBeamEffect.js";
+export {
+    createLaserCasterVisualState,
+    drawLaserCasterVisual,
+    getLaserCasterFireOrigin,
+    LASER_CASTER_PALETTE,
+    LASER_CASTER_PHASES
+} from "./laserCasterVisual.js";
 export { EaterDigestEffect, EaterSpitEffect, EaterWallRuptureEffect } from "./eaterEffects.js";
 export {
     SeedActivationEffect,
