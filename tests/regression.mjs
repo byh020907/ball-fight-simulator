@@ -22317,13 +22317,16 @@ function testRageIgniteRefreshSeparatesDamageFromVisualLifetime() {
         { onLog() {}, onSound() {}, onDamageTaken() {}, onDamageDealt() {}, onHpChanged() {} }
     );
     const [rage, opponent] = sim.fighters;
-    rage.stats.baseDamage = 10;
-    opponent.stats.baseDefense = 0;
+    rage.stats.criticalChance = 0;
     rage.ability.setContext({ abilityTier: 1 });
     rage.ability._applyIgnite(opponent);
     const ignite = opponent._igniteState;
     const hpBefore = opponent.hp;
     const damagePerTick = rage.stats.baseDamage * 0.1;
+    const actualDamagePerTick = Math.max(
+        1,
+        Math.round(damagePerTick - Math.round(opponent.stats.baseDefense * opponent.getStatModifiers().defense))
+    );
     const assertIgniteFrame = (label) => {
         assertForegroundEffectRenders(ignite, label, (primitives) => {
             assertEffectArcAt(
@@ -22338,12 +22341,16 @@ function testRageIgniteRefreshSeparatesDamageFromVisualLifetime() {
 
     ignite.update(0.25);
     assert.equal(ignite.tickCount, 2, "Ignite should resolve two 0.1s ticks during its first 0.25s");
-    assert.equal(opponent.hp, hpBefore - damagePerTick * 2, "Ignite should preserve total-attack x0.10 per tick");
+    assert.equal(
+        opponent.hp,
+        hpBefore - actualDamagePerTick * 2,
+        "Ignite should apply total-attack x0.10 through the standard defense and minimum-damage contract"
+    );
 
     rage.ability._applyIgnite(opponent);
     assert.equal(opponent._igniteState, ignite, "Reapplying ignite should refresh the existing visual entity");
     assert.equal(ignite.tickCount, 0, "Refreshing ignite should restart the shared five-tick cycle");
-    assert.equal(opponent.hp, hpBefore - damagePerTick * 2, "Refreshing ignite should not deal immediate damage");
+    assert.equal(opponent.hp, hpBefore - actualDamagePerTick * 2, "Refreshing ignite should not deal immediate damage");
     assert.ok(Math.abs(ignite.life - 0.5) < 1e-9, "Refreshing ignite should restore 0.5s of visual lifetime");
     assertIgniteFrame("Rage ignite refresh start");
 
@@ -22351,7 +22358,7 @@ function testRageIgniteRefreshSeparatesDamageFromVisualLifetime() {
     assert.equal(ignite.tickCount, 2, "Refreshed ignite should reserve its own five-tick cycle");
     assert.equal(
         opponent.hp,
-        hpBefore - damagePerTick * 4,
+        hpBefore - actualDamagePerTick * 4,
         "Refresh should restart rather than overlap burning damage"
     );
     assert.equal(ignite.damageComplete, false, "The refreshed damage cycle should remain active at 0.25s");
@@ -22366,7 +22373,7 @@ function testRageIgniteRefreshSeparatesDamageFromVisualLifetime() {
     ignite.update(0.001);
     assert.equal(
         opponent.hp,
-        hpBefore - damagePerTick * 7,
+        hpBefore - actualDamagePerTick * 7,
         "The original two and refreshed five ticks should be exact"
     );
     assert.equal(ignite.isExpired, true, "The refreshed visual should expire 0.5s after refresh");
