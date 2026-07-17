@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.29.2",
+        date: "2026-07-17",
+        title: "v0.29.2 토너먼트 도전 문구 수정",
+        changes: [
+            {
+                type: "fix",
+                text: "환생 뒤 토너먼트가 첫 도전과 상대 Lv.1 시작으로 올바르게 표시됩니다."
+            }
+        ]
+    },
+    {
         version: "0.29.1",
         date: "2026-07-17",
         title: "v0.29.1 Spin 만충 보상 정비",

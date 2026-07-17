@@ -620,9 +620,9 @@ export class BattleApp {
     }
 
     _getTournamentChallengePresentation() {
-        const masteryLevel = getCharacterMasteryLevel(this.playerProfile, this.playerFighterId);
+        const challengeLevel = getCharacterChallengeLevel(this.playerProfile, this.playerFighterId);
         return {
-            tierLabel: masteryLevel > 0 ? getTierText(masteryLevel) : "첫 도전",
+            tierLabel: challengeLevel > 0 ? getTierText(challengeLevel) : "첫 도전",
             opponentLevel: getTournamentOpponentExperienceLevel(this.playerProfile, this.playerFighterId) ?? 1
         };
     }

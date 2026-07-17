@@ -1817,7 +1817,7 @@ async function testTournamentOpponentProgressionByChallenge(app) {
         { masteryLevel: 1, challengeLevel: 1, expectedTierLabel: "BRONZE", expectedOpponentLevel: 3 },
         { masteryLevel: 2, challengeLevel: 2, expectedTierLabel: "SILVER", expectedOpponentLevel: 6 },
         { masteryLevel: 3, challengeLevel: 3, expectedTierLabel: "GOLD", expectedOpponentLevel: 9 },
-        { masteryLevel: 3, challengeLevel: 0, expectedTierLabel: "GOLD", expectedOpponentLevel: 1 }
+        { masteryLevel: 3, challengeLevel: 0, expectedTierLabel: "첫 도전", expectedOpponentLevel: 1 }
     ];
 
     for (const { masteryLevel, challengeLevel, expectedTierLabel, expectedOpponentLevel } of scenarios) {
@@ -1831,7 +1831,7 @@ async function testTournamentOpponentProgressionByChallenge(app) {
         assert.equal(
             app._panel.tournamentTierLabel,
             expectedTierLabel,
-            `Mastery ${masteryLevel} should remain visible before the tournament starts`
+            `Challenge ${challengeLevel} should determine the tournament label before the tournament starts`
         );
         assert.equal(
             app._panel.tournamentOpponentLevel,
@@ -1844,6 +1844,25 @@ async function testTournamentOpponentProgressionByChallenge(app) {
             challengeLevel === 0 ? null : expectedOpponentLevel,
             `Challenge ${challengeLevel} should resolve its tournament opponent starting level`
         );
+
+        const originalWait = app.wait;
+        app.wait = async () => {};
+        try {
+            const introCompleted = await app._presentTournamentChallengeIntro(app.lifecycle.revision);
+            assert.equal(introCompleted, true, "The current tournament challenge intro should complete");
+            assert.equal(
+                app._overlay.text,
+                expectedTierLabel,
+                `Challenge ${challengeLevel} should determine the shared tournament intro label`
+            );
+            assert.equal(
+                app._overlay.subtext,
+                `상대 Lv.${expectedOpponentLevel} 시작`,
+                `Challenge ${challengeLevel} should determine the shared tournament intro opponent level`
+            );
+        } finally {
+            app.wait = originalWait;
+        }
 
         await app.startTournament();
 
@@ -1937,6 +1956,54 @@ async function testTournamentOpponentProgressionByChallenge(app) {
         }
 
         app.returnToInitialState();
+    }
+}
+
+async function testRebirthResetsTournamentChallengePresentation() {
+    const app = await loadModuleApp();
+    const { collectActiveEffects, getCharacterChallengeLevel, getCharacterMasteryLevel } =
+        await import("../src/character-mastery/index.js");
+    const playerId = FIGHTER_IDS.ARCHER;
+    const supportTargetId = FIGHTER_IDS.RAGE;
+    const profile = createDefaultPlayerProfile();
+    const rebirthReward = createRebirthStatReward(0, () => 0);
+
+    setCharacterXp(profile, playerId, getLevelRequirement(10));
+    profile.characterMastery.levels[playerId] = 3;
+    profile.tournamentChallenge.levels[playerId] = 3;
+    profile.rebirth.byCharacter[playerId] = {
+        rebirthCount: 0,
+        statBonuses: { hp: 0, damage: 0, speed: 0, defense: 0 },
+        cardRanks: {},
+        equippedCardIds: [],
+        pendingOfferCards: [getRebirthOfferMaterial(playerId, rebirthReward)]
+    };
+    app.playerProfile = profile;
+    app.playerFighterId = playerId;
+
+    const completion = completeRebirth(profile, playerId, rebirthReward.id);
+    assert.equal(completion.ok, true, "A completed rebirth should provide the presentation reset scenario");
+    assert.equal(getCharacterMasteryLevel(profile, playerId), 3, "Rebirth must preserve GOLD mastery");
+    assert.equal(getCharacterChallengeLevel(profile, playerId), 0, "Rebirth must reset the current challenge to zero");
+    assert.equal(
+        collectActiveEffects(profile, supportTargetId).statModifiers.damage,
+        0.06,
+        "Preserved GOLD mastery must continue supporting other characters after rebirth"
+    );
+
+    app.refreshPlayerSetup();
+    assert.equal(app._panel.tournamentTierLabel, "첫 도전", "The setup panel must use the reset challenge label");
+    assert.equal(app._panel.tournamentOpponentLevel, 1, "The setup panel must use the reset Lv.1 opponent");
+
+    const originalWait = app.wait;
+    app.wait = async () => {};
+    try {
+        const introCompleted = await app._presentTournamentChallengeIntro(app.lifecycle.revision);
+        assert.equal(introCompleted, true, "The rebirth challenge intro should complete");
+        assert.equal(app._overlay.text, "첫 도전", "The intro must share the reset challenge label");
+        assert.equal(app._overlay.subtext, "상대 Lv.1 시작", "The intro must share the reset Lv.1 opponent");
+    } finally {
+        app.wait = originalWait;
     }
 }
 
@@ -15659,6 +15726,7 @@ await testArcherPredictiveBurst(app);
 await testOrbitShardRecharge(app);
 await testTournament(app);
 await testTournamentOpponentProgressionByChallenge(app);
+await testRebirthResetsTournamentChallengePresentation();
 await testTournamentWinAdvancesChallengeAfterMasteryCheck();
 await testActionSelectionShowsTournamentChallengeBeforeMatchup();
 await testTournamentWinDisplaysMasteryReward();
