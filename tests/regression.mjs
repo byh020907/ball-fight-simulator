@@ -9138,8 +9138,12 @@ function testHuntingMovementRecovery() {
 
     const feedback = { logs: [], overlayStates: [] };
     const feedbackManager = new HuntingManager({});
-    feedbackManager._run = recoveredPortalRun;
-    feedbackManager._showFloorRecoveryFeedback({
+    feedbackManager._run = {
+        ...recoveredPortalRun,
+        lastEncounter: { type: HUNTING_FLOOR_OUTCOME_TYPES.EMPTY, floor: recoveredPortalRun.floor },
+        lastEvent: null
+    };
+    feedbackManager._handleCurrentFloor({
         addLog(message) {
             feedback.logs.push(message);
         },
@@ -9150,18 +9154,22 @@ function testHuntingMovementRecovery() {
     assert.match(
         feedback.logs[0],
         /HP \+6 회복 \(55\/100\)/,
-        "Recovery feedback should use the shared display HP boundary"
+        "Recovery feedback should use the shared display HP boundary before the floor outcome"
     );
     assert.match(
-        feedback.overlayStates[0].huntingMoveMessage,
+        feedback.overlayStates.at(-1).huntingMoveMessage,
         /HP \+6 회복/,
-        "Recovery feedback should be visible during the floor transition"
+        "The final floor outcome message must retain recovery feedback after synchronous updates"
     );
 
     const fullHpFeedback = { logs: [], overlayStates: [] };
     const fullHpManager = new HuntingManager({});
-    fullHpManager._run = fullHpRun;
-    fullHpManager._showFloorRecoveryFeedback({
+    fullHpManager._run = {
+        ...fullHpRun,
+        lastEncounter: { type: HUNTING_FLOOR_OUTCOME_TYPES.EMPTY, floor: fullHpRun.floor },
+        lastEvent: null
+    };
+    fullHpManager._handleCurrentFloor({
         addLog(message) {
             fullHpFeedback.logs.push(message);
         },
@@ -9169,8 +9177,13 @@ function testHuntingMovementRecovery() {
             fullHpFeedback.overlayStates.push(state);
         }
     });
-    assert.equal(fullHpFeedback.logs.length, 0, "Full HP must not emit a zero-value recovery log");
-    assert.equal(fullHpFeedback.overlayStates.length, 0, "Full HP must not replace the movement feedback");
+    assert.equal(fullHpFeedback.logs.length, 1, "Full HP should retain only the regular floor outcome log");
+    assert.doesNotMatch(fullHpFeedback.logs[0], /회복/, "Full HP must not emit a zero-value recovery log");
+    assert.doesNotMatch(
+        fullHpFeedback.overlayStates.at(-1).huntingMoveMessage,
+        /회복/,
+        "Full HP must keep the regular floor outcome message"
+    );
 
     console.log("[hunting-movement-recovery] ok");
 }

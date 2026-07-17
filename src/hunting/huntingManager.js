@@ -671,37 +671,46 @@ export class HuntingManager {
         if (!handlerName || typeof this[handlerName] !== "function") {
             throw new Error(`Unsupported hunting floor outcome: ${encounter?.type ?? "missing"}`);
         }
-        this._showFloorRecoveryFeedback(app);
-        return this[handlerName]({ app, event: this._run.lastEvent, floor: this._run.floor });
+        this._currentFloorRecoveryFeedback = this._showFloorRecoveryFeedback(app);
+        try {
+            return this[handlerName]({ app, event: this._run.lastEvent, floor: this._run.floor });
+        } finally {
+            this._currentFloorRecoveryFeedback = null;
+        }
     }
 
     _showFloorRecoveryFeedback(app) {
         const recovery = this._run.history.at(-2);
-        if (recovery?.type !== "floor_recovery" || recovery.floor !== this._run.floor) return;
+        if (recovery?.type !== "floor_recovery" || recovery.floor !== this._run.floor) return "";
 
         const healed = getHuntingDisplayHp(recovery.amount);
         const health = getHuntingDisplayHealth(this._run);
-        const message = `${this._run.floor}층 이동 · HP +${healed} 회복 (${health.hp}/${health.maxHp})`;
-        app.addLog(`[사냥터] ${message}`);
-        app.setHuntingOverlayState({ huntingMoveMessage: message });
+        const feedback = `HP +${healed} 회복 (${health.hp}/${health.maxHp})`;
+        app.addLog(`[사냥터] ${this._run.floor}층 이동 · ${feedback}`);
+        return feedback;
+    }
+
+    _withFloorRecoveryFeedback(message) {
+        return this._currentFloorRecoveryFeedback ? `${message} · ${this._currentFloorRecoveryFeedback}` : message;
     }
 
     _handleEmptyFloor({ app, floor }) {
-        app.addLog(`[사냥터] ${floor}층 — 빈 통로`);
-        app.setHuntingOverlayState({ huntingMoveMessage: `${floor}층 — 빈 통로` });
+        const message = this._withFloorRecoveryFeedback(`${floor}층 — 빈 통로`);
+        app.addLog(`[사냥터] ${message}`);
+        app.setHuntingOverlayState({ huntingMoveMessage: message });
         return HUNTING_ROUTE_ACTIONS.CONTINUE;
     }
 
     _handleCombatFloor({ app, floor }) {
-        const message = `${floor}층 — 전투 발생`;
+        const message = this._withFloorRecoveryFeedback(`${floor}층 — 전투 발생`);
         app.addLog(`[사냥터] ${message}`);
         this._stopHuntingMoveForBattle(app, message);
         return HUNTING_ROUTE_ACTIONS.STOP;
     }
 
     _handleFinalBossFloor({ app, floor }) {
-        const message = `${floor}층 — 최종 보스!`;
-        app.addLog(`[사냥터] ${floor}층 — 최종 보스 등장!`);
+        const message = this._withFloorRecoveryFeedback(`${floor}층 — 최종 보스!`);
+        app.addLog(`[사냥터] ${message}`);
         this._stopHuntingMoveForBattle(app, message);
         return HUNTING_ROUTE_ACTIONS.STOP;
     }
@@ -891,7 +900,7 @@ export class HuntingManager {
         this._moving = false;
     }
 
-    _stopHuntingMoveForChest(app, { chest, floor, confirmLabel = "계속 전진" }) {
+    _stopHuntingMoveForChest(app, { chest, floor, confirmLabel = "계속 전진", message = "" }) {
         this._run = setHuntingRunPhase(this._run, HUNTING_RUN_PHASES.AWAITING_CHEST);
         const pendingText = formatPendingLootSummary(this._run?.pendingLoot);
         const rarityLabel = getRarityLabel(chest.rarity);
@@ -906,7 +915,7 @@ export class HuntingManager {
             huntingMoveTo: 0,
             huntingMoveStep: 0,
             huntingMoveMax: HUNTING_ADVANCE_STEPS,
-            huntingMoveMessage: `${floor}층 — ${rarityLabel} 상자 확보`,
+            huntingMoveMessage: message || `${floor}층 — ${rarityLabel} 상자 확보`,
             huntingLootSummary: pendingText,
             huntingMerchantActive: false,
             huntingMerchantOffers: null,
@@ -1076,15 +1085,22 @@ export class HuntingManager {
 
     _presentContinueEvent(app, resolution) {
         if (resolution.logMessage) app.addLog(resolution.logMessage);
-        this._stopHuntingMoveForEvent(app, resolution.presentation);
+        this._stopHuntingMoveForEvent(app, {
+            ...resolution.presentation,
+            title: this._withFloorRecoveryFeedback(resolution.presentation.title)
+        });
         return HUNTING_ROUTE_ACTIONS.STOP;
     }
 
     _presentChoiceEvent(app, resolution) {
         if (resolution.logMessage) app.addLog(resolution.logMessage);
-        app.showOverlay("사냥터 이벤트", resolution.presentation.title, resolution.presentation.subtext);
+        app.showOverlay(
+            "사냥터 이벤트",
+            this._withFloorRecoveryFeedback(resolution.presentation.title),
+            resolution.presentation.subtext
+        );
         this._stopHuntingMoveForChoice(app, {
-            message: resolution.message,
+            message: this._withFloorRecoveryFeedback(resolution.message),
             canRetreat: resolution.canRetreat,
             floor: this._run.floor,
             summary: resolution.summary
@@ -1094,9 +1110,13 @@ export class HuntingManager {
 
     _presentMerchantEvent(app, resolution) {
         if (resolution.logMessage) app.addLog(resolution.logMessage);
-        app.showOverlay("사냥터 이벤트", resolution.presentation.title, resolution.presentation.subtext);
+        app.showOverlay(
+            "사냥터 이벤트",
+            this._withFloorRecoveryFeedback(resolution.presentation.title),
+            resolution.presentation.subtext
+        );
         this._stopHuntingMoveForMerchant(app, {
-            message: resolution.message,
+            message: this._withFloorRecoveryFeedback(resolution.message),
             floor: this._run.floor,
             offers: resolution.offers,
             summary: formatPendingLootSummary(this._run.pendingLoot)
@@ -1106,17 +1126,29 @@ export class HuntingManager {
 
     _presentChestEvent(app, resolution) {
         if (resolution.logMessage) app.addLog(resolution.logMessage);
-        app.showOverlay("사냥터 이벤트", resolution.presentation.title, resolution.presentation.subtext);
-        this._stopHuntingMoveForChest(app, { chest: resolution.chest, floor: this._run.floor });
+        app.showOverlay(
+            "사냥터 이벤트",
+            this._withFloorRecoveryFeedback(resolution.presentation.title),
+            resolution.presentation.subtext
+        );
+        this._stopHuntingMoveForChest(app, {
+            chest: resolution.chest,
+            floor: this._run.floor,
+            message: this._withFloorRecoveryFeedback(`${this._run.floor}층 — ${resolution.presentation.title}`)
+        });
         return HUNTING_ROUTE_ACTIONS.STOP;
     }
 
     _presentBattleEvent(app, resolution) {
         if (resolution.logMessage) app.addLog(resolution.logMessage);
-        this._stopHuntingMoveForBattle(app, resolution.message ?? resolution.presentation.title, {
-            label: resolution.presentation.title,
-            subtext: resolution.presentation.subtext
-        });
+        this._stopHuntingMoveForBattle(
+            app,
+            this._withFloorRecoveryFeedback(resolution.message ?? resolution.presentation.title),
+            {
+                label: resolution.presentation.title,
+                subtext: resolution.presentation.subtext
+            }
+        );
         return HUNTING_ROUTE_ACTIONS.STOP;
     }
 
