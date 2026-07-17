@@ -55,11 +55,16 @@ npm test
 
 ```bash
 npm start        # 로컬 서버 실행
-npm test         # 회귀 테스트
+npm test         # 전체 회귀 테스트
+npm run test:regression  # 전투/게임 상태 회귀만 빠르게 실행
+npm run test:uiContracts  # 템플릿/CSS 계약만 빠르게 실행
+npm run test:profileVersionReset  # 프로필 reset 경계만 빠르게 실행
 npm run check    # 구문 검증
 npm run format   # Prettier 코드 포맷
 npm run format:check  # 포맷 상태 확인
 ```
+
+`npm test`는 세 도메인을 한 Node 프로세스에서 순서대로 실행합니다. 성공 시에는 도메인별 요약과 전체 시간을 출력하고, 실패 시에는 실패한 도메인을 먼저 표시한 뒤 기존 assertion stack을 그대로 보여 줍니다.
 
 ## 라이선스
 
