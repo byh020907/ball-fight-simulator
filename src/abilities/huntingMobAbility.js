@@ -1,5 +1,11 @@
 import { steerBallToward, Vector2 } from "../core.js";
 import { getEliteFormationImpulse, getEliteFormationMemberTarget } from "../hunting/eliteMobFormation.js";
+import {
+    advanceEliteFormationSortie,
+    createEliteFormationSortieConfig,
+    createEliteFormationSortieState,
+    finishEliteFormationSortie
+} from "../hunting/eliteMobFormationSortie.js";
 import { ArrowProjectile } from "../entities/arrowProjectile.js";
 import { drawElectricArc } from "../effects/electricArc.js";
 import {
@@ -122,7 +128,7 @@ const BEHAVIOR_CONFIG = Object.freeze({
     electric: { cooldown: 0, face: "ooo" },
     healer: { cooldown: 0, face: "happy" },
     chain: { cooldown: 0, face: "angry" },
-    shockwave: { cooldown: 3.4, face: "ooo" },
+    shockwave: { cooldown: 3.4, face: "ooo", range: 190 },
     barrier: { cooldown: 4, face: "default" },
     siphon: { cooldown: 0, face: "xeye" },
     shard: { cooldown: 3, face: "cyclops" },
@@ -139,6 +145,7 @@ export class HuntingMobAbility extends Ability {
         const behavior = owner.hunting?.behavior ?? "pursuer";
         super(owner, simulation, BEHAVIOR_CONFIG[behavior]?.cooldown ?? 0);
         this.behavior = behavior;
+        this.formationSortieConfig = createEliteFormationSortieConfig(owner.hunting?.eliteFormationSortieConfig);
         this.state = {
             timer: 0,
             link: null,
@@ -153,7 +160,8 @@ export class HuntingMobAbility extends Ability {
             electric: { channelRemaining: 0, cooldownRemaining: 0 },
             linkChannel: { activeRemaining: 0, cooldownRemaining: 0 },
             jump: 0,
-            repositionCooldown: 0
+            repositionCooldown: 0,
+            formationSortie: createEliteFormationSortieState(this.formationSortieConfig)
         };
     }
 
@@ -171,14 +179,14 @@ export class HuntingMobAbility extends Ability {
         if (this.state.barrierSwapTime <= 0) this.state.barrierSwapTarget = null;
         this.state.jump = Math.max(0, this.state.jump - delta);
         this.state.repositionCooldown = Math.max(0, this.state.repositionCooldown - delta);
-        const formationTarget = this._maintainEliteFormation(delta, target);
-        this._steer(delta, formationTarget ?? target, Boolean(formationTarget));
+        const formationSteering = this._getEliteFormationSteering(delta, target);
+        this._steer(delta, formationSteering?.target ?? target, Boolean(formationSteering?.isFormationTarget));
         this._tickProximityReposition(target);
         this._tickNaturalHeal(delta);
         this._tickBehavior(delta, target);
     }
 
-    _maintainEliteFormation(delta, target) {
+    _getEliteFormationSteering(delta, target) {
         if (!this.owner.hunting?.eliteFormation || this.owner.state.movement || this.owner.state.swallowed) return null;
         const allies = this.simulation.getAlliesOf(this.owner);
         const formationTarget = getEliteFormationMemberTarget(
@@ -189,12 +197,33 @@ export class HuntingMobAbility extends Ability {
             this.simulation.height
         );
         if (!formationTarget) return null;
+        if (this._shouldContinueFormationSortie(delta, formationTarget)) {
+            return { target, isFormationTarget: false };
+        }
         this.owner.applyImpulse(
             getEliteFormationImpulse(this.owner, target, allies, this.simulation.width, this.simulation.height).scale(
                 delta * 60
             )
         );
-        return { position: formationTarget };
+        return { target: { position: formationTarget }, isFormationTarget: true };
+    }
+
+    _shouldContinueFormationSortie(delta, formationTarget) {
+        const transition = advanceEliteFormationSortie(
+            this.state.formationSortie,
+            {
+                behavior: this.behavior,
+                delta,
+                slotDistance: Vector2.subtract(formationTarget, this.owner.position).length()
+            },
+            this.formationSortieConfig
+        );
+        this.state.formationSortie = transition.state;
+        return transition.shouldAttack;
+    }
+
+    _finishFormationSortie() {
+        this.state.formationSortie = finishEliteFormationSortie(this.state.formationSortie);
     }
 
     _steer(delta, target, isFormationTarget = false) {
@@ -263,6 +292,8 @@ export class HuntingMobAbility extends Ability {
         if (this.behavior === "boomerang") return this._tickBoomerang(delta, target);
         if (this.behavior === "splitter") return;
         if (this.state.timer < this.cooldown) return;
+        const behaviorRange = BEHAVIOR_CONFIG[this.behavior]?.range;
+        if (behaviorRange && Vector2.subtract(target.position, this.owner.position).length() > behaviorRange) return;
         this.state.timer = 0;
         if (this.behavior === "charger") this._charge(target);
         else if (this.behavior === "shooter") this._shoot(target);
@@ -402,6 +433,11 @@ export class HuntingMobAbility extends Ability {
     _activateBarrier() {
         this.state.barrier = BARRIER_DURATION;
         this.state.barrierSwapTargetIds.clear();
+    }
+
+    onFighterCollisionDamageResolved(target) {
+        if (!this.simulation.isHostile(this.owner, target)) return;
+        this._finishFormationSortie();
     }
 
     onAllyCollision(ally, context) {
