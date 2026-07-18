@@ -4150,106 +4150,126 @@ function assertHuntingCombatProgresses(playerSpec, label, enemySpecs) {
 }
 
 function testEliteMobCombinationEvent(app) {
-    assert.equal(
-        HuntingEvent.POOL.at(-1)?.type,
-        HUNTING_EVENT_TYPES.ELITE_MOB,
-        "Elite mob events should append to the pool"
-    );
-    assert.deepEqual(
-        ELITE_MOB_COMBINATIONS.map((combination) => combination.minimumFloor),
-        [10, 20, 40, 80, 20, 20, 40],
-        "Elite encounters should use the approved manual floor-gated roster"
-    );
-    ELITE_MOB_COMBINATIONS.forEach((combination) => {
+    let selected;
+    let eliteSpecs;
+    let playerSpec;
+
+    function testEliteMobEventPayload() {
         assert.equal(
-            combination.monsterTypes.length,
-            combination.size,
-            "Combination payload size should match its generated category"
+            HuntingEvent.POOL.at(-1)?.type,
+            HUNTING_EVENT_TYPES.ELITE_MOB,
+            "Elite mob events should append to the pool"
+        );
+        assert.deepEqual(
+            ELITE_MOB_COMBINATIONS.map((combination) => combination.minimumFloor),
+            [10, 20, 40, 80, 20, 20, 40],
+            "Elite encounters should use the approved manual floor-gated roster"
+        );
+        ELITE_MOB_COMBINATIONS.forEach((combination) => {
+            assert.equal(
+                combination.monsterTypes.length,
+                combination.size,
+                "Combination payload size should match its generated category"
+            );
+            assert.equal(
+                getEliteMobCombination(combination.id),
+                combination,
+                "Generated combination IDs should resolve to their committed runtime data"
+            );
+        });
+
+        const event = HuntingEvent.get(HUNTING_EVENT_TYPES.ELITE_MOB);
+        selected = event.createPayload(37, () => 0.5);
+        const selectedCombination = ELITE_MOB_COMBINATIONS[4];
+        assert.equal(selected.type, HUNTING_EVENT_TYPES.ELITE_MOB, "Elite events should keep their own event type");
+        assert.equal(selected.floor, 37, "Elite event payloads should retain the current floor");
+        assert.equal(
+            selected.enemyType,
+            HUNTING_ENEMY_TYPES.ELITE,
+            "Elite event payloads should mark elite rewards explicitly"
         );
         assert.equal(
-            getEliteMobCombination(combination.id),
-            combination,
-            "Generated combination IDs should resolve to their committed runtime data"
+            selected.eliteCombinationId,
+            selectedCombination.id,
+            "Elite event payloads should persist the selected stable combination ID"
         );
-    });
+        assert.deepEqual(
+            selected.monsterTypes,
+            selectedCombination.monsterTypes,
+            "Elite event payloads should persist the exact selected type array"
+        );
 
-    const event = HuntingEvent.get(HUNTING_EVENT_TYPES.ELITE_MOB);
-    const selected = event.createPayload(37, () => 0.5);
-    const selectedCombination = ELITE_MOB_COMBINATIONS[4];
-    assert.equal(selected.type, HUNTING_EVENT_TYPES.ELITE_MOB, "Elite events should keep their own event type");
-    assert.equal(selected.floor, 37, "Elite event payloads should retain the current floor");
-    assert.equal(
-        selected.enemyType,
-        HUNTING_ENEMY_TYPES.ELITE,
-        "Elite event payloads should mark elite rewards explicitly"
-    );
-    assert.equal(
-        selected.eliteCombinationId,
-        selectedCombination.id,
-        "Elite event payloads should persist the selected stable combination ID"
-    );
-    assert.deepEqual(
-        selected.monsterTypes,
-        selectedCombination.monsterTypes,
-        "Elite event payloads should persist the exact selected type array"
-    );
-
-    const rolledElite = rollHuntingFloorOutcome(
-        10,
-        (() => {
-            const values = [0.5, 0.95];
-            return () => values.shift() ?? 0;
-        })(),
-        0,
-        { hpRatio: 1 }
-    );
-    assert.equal(
-        rolledElite.event.type,
-        HUNTING_EVENT_TYPES.ELITE_MOB,
-        "The appended event should roll through floor outcomes"
-    );
-
-    const resolution = event.resolve(selected, {
-        run: createHuntingRun({ characterId: FIGHTER_IDS.ARCHER, stageId: HUNTING_STAGE_IDS.CAVE })
-    });
-    assert.equal(
-        resolution.transition,
-        HUNTING_EVENT_TRANSITIONS.BATTLE,
-        "Elite events should use the battle preparation flow"
-    );
-    assert.equal(
-        resolution.presentation.title,
-        "정예 몹 습격",
-        "Elite events should identify the verified monster battle"
-    );
-    assert.ok(
-        resolution.presentation.detail.includes("일반 스탯 · 정예 XP"),
-        "Elite preparation text should distinguish normal combat stats from the elite XP reward"
-    );
-
-    const eliteSpecs = createEliteMobEncounter({
-        floor: selected.floor,
-        stageId: HUNTING_STAGE_IDS.CAVE,
-        combinationId: selected.eliteCombinationId,
-        monsterTypes: selected.monsterTypes,
-        rng: () => 0
-    });
-    assert.deepEqual(
-        eliteSpecs.map((spec) => spec.hunting.monsterType),
-        selected.monsterTypes,
-        "Elite encounter factories should preserve payload order and duplicate monster types"
-    );
-    eliteSpecs.forEach((spec) => {
-        assert.equal(spec.hunting.enemyType, HUNTING_ENEMY_TYPES.ELITE, "Elite event mobs should retain elite rewards");
-        assert.equal(spec.hunting.floor, selected.floor, "Elite event mobs should scale from the actual current floor");
+        const rolledElite = rollHuntingFloorOutcome(
+            10,
+            (() => {
+                const values = [0.5, 0.95];
+                return () => values.shift() ?? 0;
+            })(),
+            0,
+            { hpRatio: 1 }
+        );
         assert.equal(
-            spec.hunting.enemyPowerMultiplier,
-            getEnemyPowerMultiplier(selected.floor, { enemyType: HUNTING_ENEMY_TYPES.NORMAL }),
-            "Elite event mobs should use current-floor normal stats"
+            rolledElite.event.type,
+            HUNTING_EVENT_TYPES.ELITE_MOB,
+            "The appended event should roll through floor outcomes"
         );
-    });
 
-    const playerSpec = {
+        const resolution = event.resolve(selected, {
+            run: createHuntingRun({ characterId: FIGHTER_IDS.ARCHER, stageId: HUNTING_STAGE_IDS.CAVE })
+        });
+        assert.equal(
+            resolution.transition,
+            HUNTING_EVENT_TRANSITIONS.BATTLE,
+            "Elite events should use the battle preparation flow"
+        );
+        assert.equal(
+            resolution.presentation.title,
+            "정예 몹 습격",
+            "Elite events should identify the verified monster battle"
+        );
+        assert.ok(
+            resolution.presentation.detail.includes("일반 스탯 · 정예 XP"),
+            "Elite preparation text should distinguish normal combat stats from the elite XP reward"
+        );
+    }
+
+    testEliteMobEventPayload();
+
+    function testEliteMobEncounterPayload() {
+        eliteSpecs = createEliteMobEncounter({
+            floor: selected.floor,
+            stageId: HUNTING_STAGE_IDS.CAVE,
+            combinationId: selected.eliteCombinationId,
+            monsterTypes: selected.monsterTypes,
+            rng: () => 0
+        });
+        assert.deepEqual(
+            eliteSpecs.map((spec) => spec.hunting.monsterType),
+            selected.monsterTypes,
+            "Elite encounter factories should preserve payload order and duplicate monster types"
+        );
+        eliteSpecs.forEach((spec) => {
+            assert.equal(
+                spec.hunting.enemyType,
+                HUNTING_ENEMY_TYPES.ELITE,
+                "Elite event mobs should retain elite rewards"
+            );
+            assert.equal(
+                spec.hunting.floor,
+                selected.floor,
+                "Elite event mobs should scale from the actual current floor"
+            );
+            assert.equal(
+                spec.hunting.enemyPowerMultiplier,
+                getEnemyPowerMultiplier(selected.floor, { enemyType: HUNTING_ENEMY_TYPES.NORMAL }),
+                "Elite event mobs should use current-floor normal stats"
+            );
+        });
+    }
+
+    testEliteMobEncounterPayload();
+
+    playerSpec = {
         ...app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER),
         teamId: HUNTING_TEAMS.PLAYER
     };
@@ -4272,225 +4292,243 @@ function testEliteMobCombinationEvent(app) {
         createHuntingBossMobSpec({ floor: 50, rng: () => 0 })
     ]);
 
-    const fixedFormationSpecs = createEliteMobEncounter({
-        floor: 10,
-        stageId: HUNTING_STAGE_IDS.CAVE,
-        combinationId: "elite-10-pursuer-charger-shooter",
-        monsterTypes: ["pursuer", "charger", "shooter"],
-        rng: () => 0
-    });
-    const formationSimulation = new BattleSimulation([playerSpec, ...fixedFormationSpecs], {
-        onLog() {},
-        onSound() {}
-    });
-    const formationPlayer = formationSimulation.fighters.find((fighter) => fighter.id === playerSpec.id);
-    const formationEnemies = formationSimulation.getEnemiesOf(formationPlayer);
-    formationPlayer.position = new Vector2(500, 500);
-    assert.doesNotThrow(
-        () => placeEliteMobFormation(formationPlayer, formationEnemies),
-        "Elite formation placement should use the Vector2 position contract"
-    );
-    const expectedFormationSlots = new Map([
-        ["pursuer", { distance: 260, lateral: -52.5 }],
-        ["charger", { distance: 260, lateral: 52.5 }],
-        ["shooter", { distance: 430, lateral: 0 }]
-    ]);
-    formationEnemies.forEach((fighter) => {
-        const expected = expectedFormationSlots.get(fighter.hunting.monsterType);
-        assert.ok(fighter.position instanceof Vector2, "Elite formation positions should remain Vector2 instances");
-        assert.deepEqual(fighter.hunting.eliteFormationSlot, expected, "Elite formation should preserve each row slot");
-        assert.equal(
-            fighter.position.x,
-            500 + expected.distance,
-            "Elite formation should place fighters by row distance"
+    function testEliteMobFormationPlacement() {
+        const fixedFormationSpecs = createEliteMobEncounter({
+            floor: 10,
+            stageId: HUNTING_STAGE_IDS.CAVE,
+            combinationId: "elite-10-pursuer-charger-shooter",
+            monsterTypes: ["pursuer", "charger", "shooter"],
+            rng: () => 0
+        });
+        const formationSimulation = new BattleSimulation([playerSpec, ...fixedFormationSpecs], {
+            onLog() {},
+            onSound() {}
+        });
+        const formationPlayer = formationSimulation.fighters.find((fighter) => fighter.id === playerSpec.id);
+        const formationEnemies = formationSimulation.getEnemiesOf(formationPlayer);
+        formationPlayer.position = new Vector2(500, 500);
+        assert.doesNotThrow(
+            () => placeEliteMobFormation(formationPlayer, formationEnemies),
+            "Elite formation placement should use the Vector2 position contract"
         );
-        assert.equal(
-            fighter.position.y,
-            500 + expected.lateral,
-            "Elite formation should place fighters by row lateral offset"
+        const expectedFormationSlots = new Map([
+            ["pursuer", { distance: 260, lateral: -52.5 }],
+            ["charger", { distance: 260, lateral: 52.5 }],
+            ["shooter", { distance: 430, lateral: 0 }]
+        ]);
+        formationEnemies.forEach((fighter) => {
+            const expected = expectedFormationSlots.get(fighter.hunting.monsterType);
+            assert.ok(fighter.position instanceof Vector2, "Elite formation positions should remain Vector2 instances");
+            assert.deepEqual(
+                fighter.hunting.eliteFormationSlot,
+                expected,
+                "Elite formation should preserve each row slot"
+            );
+            assert.equal(
+                fighter.position.x,
+                500 + expected.distance,
+                "Elite formation should place fighters by row distance"
+            );
+            assert.equal(
+                fighter.position.y,
+                500 + expected.lateral,
+                "Elite formation should place fighters by row lateral offset"
+            );
+        });
+        const createFormationMember = ({ x, y, distance, lateral, ...overrides }) => ({
+            position: new Vector2(x, y),
+            radius: 20,
+            mass: 1,
+            flags: { defeated: false, destroyed: false },
+            state: { swallowed: false },
+            hunting: { eliteFormation: true, eliteFormationSlot: { distance, lateral } },
+            ...overrides
+        });
+        const sharedPlayer = { position: new Vector2(500, 500) };
+        const exactFrontLeft = createFormationMember({ x: 760, y: 447.5, distance: 260, lateral: -52.5 });
+        const exactFrontRight = createFormationMember({ x: 760, y: 552.5, distance: 260, lateral: 52.5 });
+        const exactBackline = createFormationMember({ x: 930, y: 500, distance: 430, lateral: 0 });
+        const exactMembers = [exactFrontLeft, exactFrontRight, exactBackline];
+        assert.deepEqual(
+            getEliteFormationSteering(exactFrontLeft, sharedPlayer, exactMembers, 1_000, 960).impulse,
+            new Vector2(),
+            "A nonzero lateral slot already on the shared frame must have zero formation correction"
         );
-    });
-    const createFormationMember = ({ x, y, distance, lateral, ...overrides }) => ({
-        position: new Vector2(x, y),
-        radius: 20,
-        mass: 1,
-        flags: { defeated: false, destroyed: false },
-        state: { swallowed: false },
-        hunting: { eliteFormation: true, eliteFormationSlot: { distance, lateral } },
-        ...overrides
-    });
-    const sharedPlayer = { position: new Vector2(500, 500) };
-    const exactFrontLeft = createFormationMember({ x: 760, y: 447.5, distance: 260, lateral: -52.5 });
-    const exactFrontRight = createFormationMember({ x: 760, y: 552.5, distance: 260, lateral: 52.5 });
-    const exactBackline = createFormationMember({ x: 930, y: 500, distance: 430, lateral: 0 });
-    const exactMembers = [exactFrontLeft, exactFrontRight, exactBackline];
-    assert.deepEqual(
-        getEliteFormationSteering(exactFrontLeft, sharedPlayer, exactMembers, 1_000, 960).impulse,
-        new Vector2(),
-        "A nonzero lateral slot already on the shared frame must have zero formation correction"
-    );
-    const rotatedFrontLeft = createFormationMember({ x: 552.5, y: 760, distance: 260, lateral: -52.5 });
-    const rotatedFrontRight = createFormationMember({ x: 447.5, y: 760, distance: 260, lateral: 52.5 });
-    const rotatedBackline = createFormationMember({ x: 500, y: 930, distance: 430, lateral: 0 });
-    const rotatedFrame = getEliteFormationFrame(sharedPlayer, [rotatedFrontLeft, rotatedFrontRight, rotatedBackline]);
-    assert.deepEqual(
-        rotatedFrame.axis,
-        new Vector2(0, 1),
-        "All rotated formation members should share one forward axis"
-    );
-    assert.deepEqual(
-        rotatedFrame.perpendicular,
-        new Vector2(-1, 0),
-        "The rotated formation should derive one shared perpendicular axis"
-    );
-    assert.deepEqual(
-        getEliteFormationTarget(sharedPlayer, rotatedFrontLeft, rotatedFrame, 1_000, 960),
-        rotatedFrontLeft.position,
-        "The left front slot should rotate with the shared formation frame"
-    );
-    assert.deepEqual(
-        getEliteFormationTarget(sharedPlayer, rotatedBackline, rotatedFrame, 1_000, 960),
-        rotatedBackline.position,
-        "The backline slot should preserve its row order on the shared frame"
-    );
-    assert.deepEqual(
-        getEliteFormationSteering(exactBackline, sharedPlayer, exactMembers, 1_000, 960).target,
-        exactBackline.position,
-        "Elite members should expose the shared slot target used by their default steering"
-    );
-    const healerFormationSpecs = createEliteMobEncounter({
-        floor: 20,
-        stageId: HUNTING_STAGE_IDS.CAVE,
-        combinationId: "elite-20-barrier-pursuer-healer-shooter",
-        monsterTypes: ["barrier", "pursuer", "healer", "shooter"],
-        rng: () => 0
-    });
-    const healerFormationSimulation = new BattleSimulation([playerSpec, ...healerFormationSpecs], {
-        onLog() {},
-        onSound() {}
-    });
-    const healerFormationPlayer = healerFormationSimulation.fighters.find((fighter) => fighter.id === playerSpec.id);
-    const healerFormationEnemies = healerFormationSimulation.getEnemiesOf(healerFormationPlayer);
-    healerFormationPlayer.position = new Vector2(500, 500);
-    placeEliteMobFormation(healerFormationPlayer, healerFormationEnemies);
-    const formationHealer = healerFormationEnemies.find((fighter) => fighter.hunting.monsterType === "healer");
-    formationHealer.position.add(new Vector2(0, 120));
-    formationHealer.abilities.update(1 / 60, healerFormationPlayer);
-    assert.ok(
-        formationHealer.state.forcedHeading,
-        "Elite healers should steer back toward their formation slot instead of remaining directionless"
-    );
-    testEliteFormationSortieCombat(playerSpec, fixedFormationSpecs);
-    testEliteFormationSortieConfigInjection();
-    testEliteMobFormationConfigInjection();
-    const excludedMembers = [
-        exactFrontLeft,
-        createFormationMember({
-            x: 400,
-            y: 400,
-            distance: 260,
-            lateral: 0,
-            flags: { defeated: true, destroyed: false }
-        }),
-        createFormationMember({
-            x: 400,
-            y: 400,
-            distance: 260,
-            lateral: 0,
-            flags: { defeated: false, destroyed: true }
-        }),
-        createFormationMember({ x: 400, y: 400, distance: 260, lateral: 0, state: { swallowed: true } }),
-        { position: new Vector2(400, 400), hunting: { eliteFormation: true } },
-        { position: new Vector2(400, 400), hunting: { eliteFormationSlot: { distance: 260, lateral: 0 } } }
-    ];
-    assert.deepEqual(
-        getEliteFormationMembers(excludedMembers),
-        [exactFrontLeft],
-        "Only living, intact, unswallowed elite fighters with valid slots should shape the shared frame"
-    );
-    const overlapMember = createFormationMember({ x: 500, y: 500, distance: 260, lateral: 0 });
-    assert.deepEqual(
-        getEliteFormationFrame(sharedPlayer, [overlapMember]).axis,
-        new Vector2(1, 0),
-        "An overlapping formation center should use the stable placement +X fallback"
-    );
-    const boundedMember = createFormationMember({ x: 500, y: 500, distance: 430, lateral: 105, radius: 30 });
-    assert.deepEqual(
-        getEliteFormationTarget(
-            { position: new Vector2(900, 900) },
-            boundedMember,
-            { axis: new Vector2(1, 0), perpendicular: new Vector2(0, 1) },
-            1_000,
-            960
-        ),
-        new Vector2(970, 930),
-        "Elite targets outside the arena should clamp inward by the owner radius"
-    );
-    assert.throws(
-        () =>
-            createEliteMobEncounter({
-                floor: selected.floor,
-                combinationId: selected.eliteCombinationId,
-                monsterTypes: [...selected.monsterTypes].reverse()
+        const rotatedFrontLeft = createFormationMember({ x: 552.5, y: 760, distance: 260, lateral: -52.5 });
+        const rotatedFrontRight = createFormationMember({ x: 447.5, y: 760, distance: 260, lateral: 52.5 });
+        const rotatedBackline = createFormationMember({ x: 500, y: 930, distance: 430, lateral: 0 });
+        const rotatedFrame = getEliteFormationFrame(sharedPlayer, [
+            rotatedFrontLeft,
+            rotatedFrontRight,
+            rotatedBackline
+        ]);
+        assert.deepEqual(
+            rotatedFrame.axis,
+            new Vector2(0, 1),
+            "All rotated formation members should share one forward axis"
+        );
+        assert.deepEqual(
+            rotatedFrame.perpendicular,
+            new Vector2(-1, 0),
+            "The rotated formation should derive one shared perpendicular axis"
+        );
+        assert.deepEqual(
+            getEliteFormationTarget(sharedPlayer, rotatedFrontLeft, rotatedFrame, 1_000, 960),
+            rotatedFrontLeft.position,
+            "The left front slot should rotate with the shared formation frame"
+        );
+        assert.deepEqual(
+            getEliteFormationTarget(sharedPlayer, rotatedBackline, rotatedFrame, 1_000, 960),
+            rotatedBackline.position,
+            "The backline slot should preserve its row order on the shared frame"
+        );
+        assert.deepEqual(
+            getEliteFormationSteering(exactBackline, sharedPlayer, exactMembers, 1_000, 960).target,
+            exactBackline.position,
+            "Elite members should expose the shared slot target used by their default steering"
+        );
+        const healerFormationSpecs = createEliteMobEncounter({
+            floor: 20,
+            stageId: HUNTING_STAGE_IDS.CAVE,
+            combinationId: "elite-20-barrier-pursuer-healer-shooter",
+            monsterTypes: ["barrier", "pursuer", "healer", "shooter"],
+            rng: () => 0
+        });
+        const healerFormationSimulation = new BattleSimulation([playerSpec, ...healerFormationSpecs], {
+            onLog() {},
+            onSound() {}
+        });
+        const healerFormationPlayer = healerFormationSimulation.fighters.find(
+            (fighter) => fighter.id === playerSpec.id
+        );
+        const healerFormationEnemies = healerFormationSimulation.getEnemiesOf(healerFormationPlayer);
+        healerFormationPlayer.position = new Vector2(500, 500);
+        placeEliteMobFormation(healerFormationPlayer, healerFormationEnemies);
+        const formationHealer = healerFormationEnemies.find((fighter) => fighter.hunting.monsterType === "healer");
+        formationHealer.position.add(new Vector2(0, 120));
+        formationHealer.abilities.update(1 / 60, healerFormationPlayer);
+        assert.ok(
+            formationHealer.state.forcedHeading,
+            "Elite healers should steer back toward their formation slot instead of remaining directionless"
+        );
+        testEliteFormationSortieCombat(playerSpec, fixedFormationSpecs);
+        testEliteFormationSortieConfigInjection();
+        testEliteMobFormationConfigInjection();
+        const excludedMembers = [
+            exactFrontLeft,
+            createFormationMember({
+                x: 400,
+                y: 400,
+                distance: 260,
+                lateral: 0,
+                flags: { defeated: true, destroyed: false }
             }),
-        /does not match/,
-        "Elite encounter factories should reject payloads that do not match their stable combination ID"
-    );
+            createFormationMember({
+                x: 400,
+                y: 400,
+                distance: 260,
+                lateral: 0,
+                flags: { defeated: false, destroyed: true }
+            }),
+            createFormationMember({ x: 400, y: 400, distance: 260, lateral: 0, state: { swallowed: true } }),
+            { position: new Vector2(400, 400), hunting: { eliteFormation: true } },
+            { position: new Vector2(400, 400), hunting: { eliteFormationSlot: { distance: 260, lateral: 0 } } }
+        ];
+        assert.deepEqual(
+            getEliteFormationMembers(excludedMembers),
+            [exactFrontLeft],
+            "Only living, intact, unswallowed elite fighters with valid slots should shape the shared frame"
+        );
+        const overlapMember = createFormationMember({ x: 500, y: 500, distance: 260, lateral: 0 });
+        assert.deepEqual(
+            getEliteFormationFrame(sharedPlayer, [overlapMember]).axis,
+            new Vector2(1, 0),
+            "An overlapping formation center should use the stable placement +X fallback"
+        );
+        const boundedMember = createFormationMember({ x: 500, y: 500, distance: 430, lateral: 105, radius: 30 });
+        assert.deepEqual(
+            getEliteFormationTarget(
+                { position: new Vector2(900, 900) },
+                boundedMember,
+                { axis: new Vector2(1, 0), perpendicular: new Vector2(0, 1) },
+                1_000,
+                960
+            ),
+            new Vector2(970, 930),
+            "Elite targets outside the arena should clamp inward by the owner radius"
+        );
+        assert.throws(
+            () =>
+                createEliteMobEncounter({
+                    floor: selected.floor,
+                    combinationId: selected.eliteCombinationId,
+                    monsterTypes: [...selected.monsterTypes].reverse()
+                }),
+            /does not match/,
+            "Elite encounter factories should reject payloads that do not match their stable combination ID"
+        );
+    }
 
-    const capturedMatches = [];
-    const managerApp = {
-        roster: app.roster,
-        playerProfile: createDefaultPlayerProfile(),
-        playerStatAllocation: {},
-        startMatch(specs, options) {
-            capturedMatches.push(specs);
-            this.simulation = new BattleSimulation(specs, { onLog() {}, onSound() {} }, null, options);
-        }
-    };
-    const manager = new HuntingManager(managerApp);
-    manager._run = {
-        ...createHuntingRun({ characterId: FIGHTER_IDS.ARCHER, stageId: HUNTING_STAGE_IDS.CAVE, now: 0 }),
-        floor: selected.floor,
-        lastEncounter: { type: HUNTING_FLOOR_OUTCOME_TYPES.EVENT },
-        lastEvent: selected
-    };
-    manager._startFloorBattle();
-    const spawnedEliteSpecs = capturedMatches[0].slice(1);
-    assert.deepEqual(
-        spawnedEliteSpecs.map((spec) => spec.hunting.monsterType),
-        selected.monsterTypes,
-        "HuntingManager should spawn the payload combination rather than a normal weighted encounter"
-    );
-    assert.ok(
-        spawnedEliteSpecs.every((spec) => spec.hunting.enemyType === HUNTING_ENEMY_TYPES.ELITE),
-        "HuntingManager should preserve elite scaling on every selected monster"
-    );
-    const managedPlayer = managerApp.simulation.fighters.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
-    const managedEliteFighters = managerApp.simulation.getEnemiesOf(managedPlayer);
-    managedEliteFighters.forEach((fighter) => {
-        assert.ok(
-            fighter.position instanceof Vector2,
-            "HuntingManager should retain Vector2 positions after elite placement"
+    testEliteMobFormationPlacement();
+
+    function testEliteMobManagerSpawnAndEntry() {
+        const capturedMatches = [];
+        const managerApp = {
+            roster: app.roster,
+            playerProfile: createDefaultPlayerProfile(),
+            playerStatAllocation: {},
+            startMatch(specs, options) {
+                capturedMatches.push(specs);
+                this.simulation = new BattleSimulation(specs, { onLog() {}, onSound() {} }, null, options);
+            }
+        };
+        const manager = new HuntingManager(managerApp);
+        manager._run = {
+            ...createHuntingRun({ characterId: FIGHTER_IDS.ARCHER, stageId: HUNTING_STAGE_IDS.CAVE, now: 0 }),
+            floor: selected.floor,
+            lastEncounter: { type: HUNTING_FLOOR_OUTCOME_TYPES.EVENT },
+            lastEvent: selected
+        };
+        manager._startFloorBattle();
+        const spawnedEliteSpecs = capturedMatches[0].slice(1);
+        assert.deepEqual(
+            spawnedEliteSpecs.map((spec) => spec.hunting.monsterType),
+            selected.monsterTypes,
+            "HuntingManager should spawn the payload combination rather than a normal weighted encounter"
         );
         assert.ok(
-            fighter.hunting.eliteFormationSlot,
-            "HuntingManager should assign elite formation slots before combat"
+            spawnedEliteSpecs.every((spec) => spec.hunting.enemyType === HUNTING_ENEMY_TYPES.ELITE),
+            "HuntingManager should preserve elite scaling on every selected monster"
         );
-    });
+        const managedPlayer = managerApp.simulation.fighters.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
+        const managedEliteFighters = managerApp.simulation.getEnemiesOf(managedPlayer);
+        managedEliteFighters.forEach((fighter) => {
+            assert.ok(
+                fighter.position instanceof Vector2,
+                "HuntingManager should retain Vector2 positions after elite placement"
+            );
+            assert.ok(
+                fighter.hunting.eliteFormationSlot,
+                "HuntingManager should assign elite formation slots before combat"
+            );
+        });
 
-    manager._run = {
-        ...createHuntingRun({ characterId: FIGHTER_IDS.ARCHER, stageId: HUNTING_STAGE_IDS.CAVE, now: 1 }),
-        floor: selected.floor,
-        lastEncounter: { type: HUNTING_FLOOR_OUTCOME_TYPES.EVENT },
-        lastEvent: { type: HUNTING_EVENT_TYPES.CHAMPION_INTRUSION, enemyType: HUNTING_ENEMY_TYPES.CHAMPION }
-    };
-    manager._startFloorBattle();
-    const championBoss = capturedMatches[1].slice(1).find((spec) => spec.hunting?.isMiniboss);
-    assert.equal(
-        championBoss.hunting.isMob,
-        undefined,
-        "Elite events must not replace roster-based champion intrusions"
-    );
+        manager._run = {
+            ...createHuntingRun({ characterId: FIGHTER_IDS.ARCHER, stageId: HUNTING_STAGE_IDS.CAVE, now: 1 }),
+            floor: selected.floor,
+            lastEncounter: { type: HUNTING_FLOOR_OUTCOME_TYPES.EVENT },
+            lastEvent: { type: HUNTING_EVENT_TYPES.CHAMPION_INTRUSION, enemyType: HUNTING_ENEMY_TYPES.CHAMPION }
+        };
+        manager._startFloorBattle();
+        const championBoss = capturedMatches[1].slice(1).find((spec) => spec.hunting?.isMiniboss);
+        assert.equal(
+            championBoss.hunting.isMob,
+            undefined,
+            "Elite events must not replace roster-based champion intrusions"
+        );
+    }
+
+    testEliteMobManagerSpawnAndEntry();
     console.log("[hunting-elite-mob-combination-event] ok");
 }
 
