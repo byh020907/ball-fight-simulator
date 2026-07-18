@@ -16,6 +16,7 @@ import {
 import { resolveTerrainCollisions } from "../terrain/terrainCollision.js";
 import { applyCollisionResponse } from "../physics/collisionResponse.js";
 import { PeriodicDamageEffect } from "../combatEffects.js";
+import { StickyGrenadeRegistry } from "./stickyGrenadeRegistry.js";
 
 function createStaticCollisionContext(surface, collision, postCollisionVelocity) {
     return {
@@ -42,6 +43,7 @@ export class Simulation {
         this.entities = [];
         this.screenShake = null;
         this.showDamageNumbers = true;
+        this.stickyGrenadeRegistry = new StickyGrenadeRegistry();
     }
 
     // ── Arena helpers ─────────────────────────────────────────────────────
@@ -84,6 +86,22 @@ export class Simulation {
 
     getOpponent(ball) {
         return this.getNearestEnemy(ball);
+    }
+
+    registerStickyGrenade(target, ownerId, grenade) {
+        return this.stickyGrenadeRegistry.register(target, ownerId, grenade);
+    }
+
+    getStickyGrenade(target, ownerId) {
+        return this.stickyGrenadeRegistry.get(target, ownerId);
+    }
+
+    releaseStickyGrenade(target, ownerId, grenade) {
+        return this.stickyGrenadeRegistry.release(target, ownerId, grenade);
+    }
+
+    getActiveStickyGrenadeCount() {
+        return this.stickyGrenadeRegistry.activeCount;
     }
 
     keepInsideArena(ball) {

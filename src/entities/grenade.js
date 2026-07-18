@@ -43,6 +43,7 @@ export class Grenade extends CombatEntity {
     }
 
     update(delta, simulation) {
+        this.simulation = simulation;
         if (this.stickyTarget) {
             this._followStickyTarget();
             this.timer -= delta;
@@ -108,7 +109,7 @@ export class Grenade extends CombatEntity {
         if (!this.stickyHomingEnabled || this.stickyTarget) return null;
         return simulation
             .getEnemiesOf(this.owner)
-            .filter((target) => this._isValidStickyHomingTarget(target))
+            .filter((target) => this._isValidStickyHomingTarget(target, simulation))
             .sort(
                 (a, b) =>
                     Vector2.subtract(a.position, this.position).length() -
@@ -116,15 +117,14 @@ export class Grenade extends CombatEntity {
             )[0];
     }
 
-    _isValidStickyHomingTarget(target) {
-        const marker = target?._stickyGrenade;
+    _isValidStickyHomingTarget(target, simulation) {
+        const marker = target ? simulation.getStickyGrenade(target, this.ownerId) : null;
         return Boolean(
             !target?.flags?.defeated &&
             marker &&
             !marker.isExpired &&
             marker !== this &&
-            marker.ownerId === this.ownerId &&
-            marker.stickyTarget === target
+            marker.ownerId === this.ownerId
         );
     }
 
@@ -162,8 +162,8 @@ export class Grenade extends CombatEntity {
             .sort((a, b) => a.time - b.time || a.order - b.order);
         const contact = contacts[0];
         if (!contact) return false;
-        if (contact.target._stickyGrenade && !contact.target._stickyGrenade.isExpired) return false;
-        this._attachToContact(contact);
+        if (!simulation.registerStickyGrenade(contact.target, this.ownerId, this)) return false;
+        this._attachToContact(contact, simulation);
         simulation.addSparkBurst(contact.surfacePoint.clone(), "#ff5f45");
         simulation.playSound("hit", 0.55);
         return true;
@@ -206,7 +206,7 @@ export class Grenade extends CombatEntity {
         };
     }
 
-    _attachToContact(contact) {
+    _attachToContact(contact, simulation) {
         const targetAngle = contact.target.angle ?? 0;
         const cos = Math.cos(-targetAngle);
         const sin = Math.sin(-targetAngle);
@@ -215,7 +215,7 @@ export class Grenade extends CombatEntity {
         this.stickyLocalOffset = toLocal(contact.worldCenterOffset);
         this.stickyLocalSurfaceOffset = toLocal(contact.worldSurfaceOffset);
         this.stickyLocalAngle = Math.atan2(this.stickyLocalSurfaceOffset.y, this.stickyLocalSurfaceOffset.x);
-        contact.target._stickyGrenade = this;
+        this.simulation = simulation;
         this.homingTrail = [];
         this._followStickyTarget();
     }
@@ -235,8 +235,10 @@ export class Grenade extends CombatEntity {
         );
     }
 
-    _releaseStickyTarget() {
-        if (this.stickyTarget?._stickyGrenade === this) this.stickyTarget._stickyGrenade = null;
+    _releaseStickyTarget(simulation = this.simulation) {
+        if (this.stickyTarget) {
+            simulation?.releaseStickyGrenade(this.stickyTarget, this.ownerId, this);
+        }
         this.stickyTarget = null;
         this.stickyLocalOffset = null;
         this.stickyLocalSurfaceOffset = null;
@@ -274,7 +276,7 @@ export class Grenade extends CombatEntity {
         simulation.spawnExplosion(this.position.clone(), this.owner.color);
         simulation.playSound("explosion");
         simulation.addLog(`${this.owner.name}'s grenade explodes.`);
-        this._releaseStickyTarget();
+        this._releaseStickyTarget(simulation);
         this.isExpired = true;
     }
 

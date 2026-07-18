@@ -6079,6 +6079,11 @@ function testFiveBallLevelRewardContracts(app) {
     sticky.velocity = new Vector2(200, 0);
     sticky.update(0.5, stickyRun.simulation);
     assert.equal(sticky.stickyTarget, stickyRun.target, "Grenade Lv3 should stick only after actual path-body contact");
+    assert.equal(
+        stickyRun.simulation.getStickyGrenade(stickyRun.target, stickyRun.owner.id),
+        sticky,
+        "Grenade Lv3 should register its actual contact marker through Simulation's public contract"
+    );
     const localOffset = sticky.stickyLocalOffset.clone();
     stickyRun.target.angle = Math.PI / 2;
     stickyRun.target.position = new Vector2(440, 330);
@@ -6095,7 +6100,7 @@ function testFiveBallLevelRewardContracts(app) {
     assert.equal(
         blockedSticky._tryStick(blockedStart, stickyRun.simulation),
         false,
-        "A target with one live sticky grenade should reject a simultaneous second sticky grenade"
+        "A target should reject a simultaneous sticky grenade from the same owner"
     );
 
     const sweepRun = createRun(FIGHTER_IDS.GRENADE, { extraEnemy: true });
@@ -6236,16 +6241,24 @@ function testFiveBallLevelRewardContracts(app) {
         homingRun.target,
         "Grenade should immediately reselect the next closest live sticky marker after a target disappears"
     );
+    closestMarker.update(0, homingRun.simulation);
+    assert.equal(
+        homingRun.simulation.getStickyGrenade(homingRun.nearby, homingRun.owner.id),
+        null,
+        "A defeated target should release its same-owner sticky registry entry through the grenade lifecycle"
+    );
     homingRun.nearby.flags.defeated = false;
     const foreignMarker = new Grenade(homingRun.target, homingRun.nearby.position, 3, { sticky: true });
-    foreignMarker.stickyTarget = homingRun.nearby;
-    homingRun.nearby._stickyGrenade = foreignMarker;
+    assert.equal(
+        homingRun.simulation.registerStickyGrenade(homingRun.nearby, foreignMarker.ownerId, foreignMarker),
+        true,
+        "Simulation should keep a separate sticky registration for another owner"
+    );
     assert.equal(
         existingFlyer._getStickyHomingTarget(homingRun.simulation),
         homingRun.target,
         "Grenade should ignore a sticky marker owned by another fighter"
     );
-    homingRun.nearby._stickyGrenade = closestMarker;
     homingRun.target.flags.defeated = true;
     homingRun.nearby.flags.defeated = true;
     const inertialVelocity = existingFlyer.velocity.clone();
@@ -6259,6 +6272,14 @@ function testFiveBallLevelRewardContracts(app) {
     assert.ok(
         Math.abs(existingFlyer.timer - (inertialTimer - 0.1)) < 1e-9,
         "No-marker inertia should keep the normal fuse countdown without Lv9 shortening"
+    );
+    closestMarker.update(3, homingRun.simulation);
+    distantMarker.update(3, homingRun.simulation);
+    foreignMarker.update(3, homingRun.simulation);
+    assert.equal(
+        homingRun.simulation.getActiveStickyGrenadeCount(),
+        0,
+        "Repeated sticky marker detonation should release every active registry entry"
     );
 
     const grenadeRun = createRun(FIGHTER_IDS.GRENADE, { extraEnemy: true });
