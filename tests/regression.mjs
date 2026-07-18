@@ -56,6 +56,13 @@ import {
 } from "../src/experience/characterLevelProgression.js";
 import { getLevelRewardEffectHandler } from "../src/experience/reward-effects/effectRegistry.js";
 import { DashEffect, WallSlamEffect } from "../src/combatEffects.js";
+import {
+    BloodBatBurstEffect,
+    BloodBiteEffect,
+    BloodMarkEffect,
+    BloodRuptureEffect,
+    BloodTetherEffect
+} from "../src/effects/index.js";
 import { shuffled } from "../src/random.js";
 import { BattleSimulation } from "../src/simulation/battleSimulation.js";
 import {
@@ -8060,6 +8067,7 @@ function testVampireLevelRewardContracts(app) {
     );
     const biteEffect = repeatRun.simulation.entities.find((entity) => entity.constructor?.name === "BloodBiteEffect");
     assert.ok(biteEffect, "A successful bite should emit the crescent bite effect");
+    assert.ok(biteEffect instanceof BloodBiteEffect, "Bat bites should use the effects-module BloodBiteEffect export");
     assert.doesNotThrow(
         () => biteEffect.draw(makeRecordingCanvasContext()),
         "The crescent bite effect should render without errors"
@@ -8114,6 +8122,10 @@ function testVampireLevelRewardContracts(app) {
         (entity) => entity.constructor?.name === "BloodBatBurstEffect"
     );
     assert.equal(burstEffects.length, 1, "Lv.6 natural expiration should emit one sequential blood-bat burst effect");
+    assert.ok(
+        burstEffects[0] instanceof BloodBatBurstEffect,
+        "Bat expiration should use the effects-module BloodBatBurstEffect export"
+    );
     assert.doesNotThrow(
         () => burstEffects[0].draw(makeRecordingCanvasContext()),
         "The sequential blood-bat burst should render without errors"
@@ -8144,6 +8156,11 @@ function testVampireLevelRewardContracts(app) {
     );
     const tetherEffect = pullRun.simulation.entities.find((entity) => entity.constructor?.name === "BloodTetherEffect");
     const markEffect = pullRun.simulation.entities.find((entity) => entity.constructor?.name === "BloodMarkEffect");
+    assert.ok(
+        tetherEffect instanceof BloodTetherEffect,
+        "Blood pull should use the effects-module BloodTetherEffect export"
+    );
+    assert.ok(markEffect instanceof BloodMarkEffect, "Blood pull should use the effects-module BloodMarkEffect export");
     const renderBloodTether = (label) => {
         let travelingDrop;
         assertForegroundEffectRenders(tetherEffect, label, (primitives) => {
@@ -8223,6 +8240,10 @@ function testVampireLevelRewardContracts(app) {
     assert.equal(pullRun.owner.hp, 69, "Two bites and one rupture should each heal once from actual damage");
     const ruptureEffect = pullRun.simulation.entities.find(
         (entity) => entity.constructor?.name === "BloodRuptureEffect"
+    );
+    assert.ok(
+        ruptureEffect instanceof BloodRuptureEffect,
+        "Blood rupture should use the effects-module BloodRuptureEffect export"
     );
     const renderBloodRupture = (label) => {
         let ruptureArc;

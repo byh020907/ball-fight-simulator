@@ -16,6 +16,13 @@ export { EFFECT_VISIBILITY_TOKENS, getVisibleCombatTextSize, getVisibleLineWidth
 export { BURNING_EFFECT_CONFIG, BurningEffect, RageFlameRing, applyBurningEffect } from "./rageEffects.js";
 export { HeroResonanceEffect } from "./heroEffects.js";
 export {
+    BloodBatBurstEffect,
+    BloodBiteEffect,
+    BloodMarkEffect,
+    BloodRuptureEffect,
+    BloodTetherEffect
+} from "./vampireEffects.js";
+export {
     CrossOverloadEffect,
     DASH_LASER_CASTER_RENDERER,
     LaserCasterDissipateEffect,

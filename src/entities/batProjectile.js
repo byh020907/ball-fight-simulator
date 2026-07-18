@@ -1,5 +1,5 @@
-import { CombatEntity, Projectile, RENDER_LAYERS, Vector2 } from "../core.js";
-import { getVisibleLineWidth } from "../effects/effectVisibility.js";
+import { Projectile, Vector2 } from "../core.js";
+import { BloodBatBurstEffect, BloodBiteEffect } from "../effects/index.js";
 
 const BAT_RADIUS = 10;
 const BAT_LIFE = 4.0;
@@ -24,93 +24,6 @@ const TARGET_ATTRACTION_WEIGHT = 10;
 // Flutter
 const FLUTTER_FREQ = 28;
 const FLUTTER_AMP = 6;
-
-class BloodBiteEffect extends CombatEntity {
-    constructor(position, normal) {
-        super(position.clone(), new Vector2(), 12);
-        this.normal = normal.clone();
-        this.angle = Math.atan2(normal.y, normal.x);
-        this.life = 0.28;
-        this.maxLife = this.life;
-    }
-
-    static renderLayer = RENDER_LAYERS.FOREGROUND;
-
-    update(delta) {
-        this.tickLife(delta);
-    }
-
-    draw(ctx) {
-        const alpha = Math.max(0, 1 - this.lifeProgress);
-        ctx.save();
-        ctx.translate(this.position.x, this.position.y);
-        ctx.rotate(this.angle);
-        ctx.globalAlpha = alpha;
-        ctx.strokeStyle = "#ed2856";
-        ctx.lineWidth = getVisibleLineWidth(ctx, "standard", 2.6);
-        ctx.beginPath();
-        ctx.arc(0, 0, 8, -0.95, 0.95);
-        ctx.stroke();
-        ctx.fillStyle = "#a90f36";
-        for (const [x, y, radius] of [
-            [7, -5, 2],
-            [11, 1, 1.5],
-            [6, 6, 1.2]
-        ]) {
-            ctx.beginPath();
-            ctx.arc(x, y, radius, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        ctx.restore();
-    }
-}
-
-class BloodBatBurstEffect extends CombatEntity {
-    constructor(position) {
-        super(position.clone(), new Vector2(), LIFE_BURST_RADIUS);
-        this.life = 0.42;
-        this.maxLife = this.life;
-    }
-
-    static renderLayer = RENDER_LAYERS.FOREGROUND;
-
-    update(delta) {
-        this.tickLife(delta);
-    }
-
-    draw(ctx) {
-        const progress = this.lifeProgress;
-        const alpha = Math.max(0, 1 - progress);
-        ctx.save();
-        ctx.translate(this.position.x, this.position.y);
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = "#8d1235";
-        for (const angle of [-1.15, -0.3, 0.55, 1.4, 2.25]) {
-            const distance = 8 + progress * 42;
-            const x = Math.cos(angle) * distance;
-            const y = Math.sin(angle) * distance;
-            ctx.save();
-            ctx.translate(x, y);
-            ctx.rotate(angle);
-            ctx.beginPath();
-            ctx.moveTo(4, 0);
-            ctx.lineTo(-2, -2);
-            ctx.lineTo(-8, -6);
-            ctx.lineTo(-5, 0);
-            ctx.lineTo(-8, 6);
-            ctx.lineTo(-2, 2);
-            ctx.closePath();
-            ctx.fill();
-            ctx.restore();
-        }
-        ctx.strokeStyle = "#d51f4c";
-        ctx.lineWidth = getVisibleLineWidth(ctx, "standard", 2);
-        ctx.beginPath();
-        ctx.arc(0, 0, 10 + progress * 48, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
-    }
-}
 
 export class BatProjectile extends Projectile {
     constructor(owner, position, velocity, flock, options = {}) {
@@ -315,7 +228,7 @@ export class BatProjectile extends Projectile {
                 "Bat Life Burst"
             );
         }
-        simulation.entities.push(new BloodBatBurstEffect(center));
+        simulation.entities.push(new BloodBatBurstEffect(center, LIFE_BURST_RADIUS));
         simulation.spawnParticleBurst(center, "#8d1235", {
             count: 9,
             speed: 125,
