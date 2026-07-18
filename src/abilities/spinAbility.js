@@ -229,7 +229,7 @@ export class SpinAbility extends Ability {
         text.fontSize = 11 + (tickIndex % 2);
         text.life = 0.22;
         text.maxLife = text.life;
-        text.velocity = textVelocity;
+        text.applyImpulse(Vector2.subtract(textVelocity, text.velocity));
         text.visibilityToken = "combatText";
     }
 

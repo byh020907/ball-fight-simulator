@@ -157,14 +157,14 @@ export class BatProjectile extends Projectile {
     }
 
     _applyGuidance(delta, target) {
-        this.velocity.add(this._computeBoidsForce(delta));
-        if (!target || target.flags.defeated) return;
-        const toTarget = Vector2.subtract(target.position, this.position).normalize();
-        this.velocity.add(toTarget.scale(TARGET_ATTRACTION_WEIGHT * 60 * delta));
-        const maxSpeed = this.owner.stats.baseSpeed * MAX_SPEED_MULT;
-        if (this.velocity.length() > maxSpeed) {
-            this.velocity.normalize().scale(maxSpeed);
+        const nextVelocity = this.velocity.clone().add(this._computeBoidsForce(delta));
+        if (target && !target.flags.defeated) {
+            const toTarget = Vector2.subtract(target.position, this.position).normalize();
+            nextVelocity.add(toTarget.scale(TARGET_ATTRACTION_WEIGHT * 60 * delta));
         }
+        const maxSpeed = this.owner.stats.baseSpeed * MAX_SPEED_MULT;
+        if (nextVelocity.length() > maxSpeed) nextVelocity.normalize().scale(maxSpeed);
+        this.applyImpulse(Vector2.subtract(nextVelocity, this.velocity));
     }
 
     _integrateFlutter(delta) {

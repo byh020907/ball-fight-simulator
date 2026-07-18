@@ -31,6 +31,7 @@
  */
 
 import { resolvePhysicsMaterial, combinePhysicsMaterials } from "./PhysicsMaterial.js";
+import { Vector2 } from "../core.js";
 
 /**
  * 2D cross product: r × v = r.x * v.y - r.y * v.x (스칼라)
@@ -75,21 +76,18 @@ function _getInvInertia(body) {
  */
 function _contactPointVelocity(body, contactPoint, velocityOverride) {
     if (body === null) {
-        return velocityOverride ?? { x: 0, y: 0 };
+        return velocityOverride?.clone?.() ?? new Vector2(velocityOverride?.x ?? 0, velocityOverride?.y ?? 0);
     }
     const v = velocityOverride ?? body.velocity ?? { x: 0, y: 0 };
     if (typeof body.angularVelocity !== "number" || body.angularVelocity === 0) {
-        return { x: v.x, y: v.y };
+        return v.clone?.() ?? new Vector2(v.x, v.y);
     }
     const r = {
         x: contactPoint.x - body.position.x,
         y: contactPoint.y - body.position.y
     };
     // ω × r: (-ω * r.y, ω * r.x)
-    return {
-        x: v.x - body.angularVelocity * r.y,
-        y: v.y + body.angularVelocity * r.x
-    };
+    return new Vector2(v.x - body.angularVelocity * r.y, v.y + body.angularVelocity * r.x);
 }
 
 /**
@@ -154,6 +152,8 @@ function _effectiveMassDenom(bodyA, bodyB, direction, contactPoint) {
  * @returns {{ normalImpulse: number, tangentImpulse: number }}
  */
 function _createContactImpulseResponse(bodyA, bodyB, normal, contactPoint, options = {}) {
+    normal = normal.clone?.() ?? new Vector2(normal.x, normal.y);
+    contactPoint = contactPoint.clone?.() ?? new Vector2(contactPoint.x, contactPoint.y);
     const restitution = options.restitution ?? 0.92;
     const friction = options.tangentialFriction ?? 0.2;
     const linearScaleA = options.linearScaleA ?? 1;
@@ -161,22 +161,19 @@ function _createContactImpulseResponse(bodyA, bodyB, normal, contactPoint, optio
     const angularScaleA = options.angularScaleA ?? 1;
     const angularScaleB = options.angularScaleB ?? 1;
 
-    const tangent = { x: -normal.y, y: normal.x };
+    const tangent = new Vector2(-normal.y, normal.x);
 
     // 접촉점 상대 속도
     const velA = _contactPointVelocity(bodyA, contactPoint, options.velocityA);
     const velB = _contactPointVelocity(bodyB, contactPoint, options.velocityB);
-    const relVel = {
-        x: (velB?.x ?? 0) - (velA?.x ?? 0),
-        y: (velB?.y ?? 0) - (velA?.y ?? 0)
-    };
+    const relVel = Vector2.subtract(velB ?? new Vector2(), velA ?? new Vector2());
 
     const vn = relVel.x * normal.x + relVel.y * normal.y;
     if (vn > 0) {
         return {
             normalImpulse: 0,
             tangentImpulse: 0,
-            impulse: { x: 0, y: 0 },
+            impulse: new Vector2(),
             bodyA: null,
             bodyB: null
         };
@@ -199,8 +196,7 @@ function _createContactImpulseResponse(bodyA, bodyB, normal, contactPoint, optio
     }
 
     // 총 impulse vector J = jn * n + jt * t
-    const Jx = normal.x * jn + tangent.x * jt;
-    const Jy = normal.y * jn + tangent.y * jt;
+    const impulse = normal.clone().scale(jn).add(tangent.clone().scale(jt));
 
     const invMassA = _getInvMass(bodyA);
     const invMassB = _getInvMass(bodyB);
@@ -212,10 +208,9 @@ function _createContactImpulseResponse(bodyA, bodyB, normal, contactPoint, optio
         };
         return {
             body,
-            linearDelta: {
-                x: linearImpulse.x * (body === bodyA ? invMassA * linearScaleA : invMassB * linearScaleB),
-                y: linearImpulse.y * (body === bodyA ? invMassA * linearScaleA : invMassB * linearScaleB)
-            },
+            linearDelta: linearImpulse
+                .clone()
+                .scale(body === bodyA ? invMassA * linearScaleA : invMassB * linearScaleB),
             angularImpulse: cross2D(r, linearImpulse) * angularScale
         };
     };
@@ -223,9 +218,9 @@ function _createContactImpulseResponse(bodyA, bodyB, normal, contactPoint, optio
     return {
         normalImpulse: jn,
         tangentImpulse: jt,
-        impulse: { x: Jx, y: Jy },
-        bodyA: createBodyDelta(bodyA, { x: -Jx, y: -Jy }, angularScaleA),
-        bodyB: createBodyDelta(bodyB, { x: Jx, y: Jy }, angularScaleB)
+        impulse,
+        bodyA: createBodyDelta(bodyA, impulse.clone().scale(-1), angularScaleA),
+        bodyB: createBodyDelta(bodyB, impulse, angularScaleB)
     };
 }
 

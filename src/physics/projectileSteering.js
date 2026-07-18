@@ -1,3 +1,5 @@
+import { Vector2 } from "../core.js";
+
 const EPSILON = 1e-9;
 
 function clampTurn(turn, maximumTurn) {
@@ -11,23 +13,14 @@ function clampTurn(turn, maximumTurn) {
 export function steerProjectileVelocityToward(body, targetPosition, delta, maximumTurnRate) {
     const currentVelocity = body.velocity;
     const speed = Math.hypot(currentVelocity.x, currentVelocity.y);
-    const targetOffset = {
-        x: targetPosition.x - body.position.x,
-        y: targetPosition.y - body.position.y
-    };
+    const targetOffset = Vector2.subtract(targetPosition, body.position);
     if (speed <= EPSILON || Math.hypot(targetOffset.x, targetOffset.y) <= EPSILON) return false;
 
     const currentAngle = Math.atan2(currentVelocity.y, currentVelocity.x);
     const targetAngle = Math.atan2(targetOffset.y, targetOffset.x);
     const angleDelta = Math.atan2(Math.sin(targetAngle - currentAngle), Math.cos(targetAngle - currentAngle));
     const turn = clampTurn(angleDelta, Math.max(0, maximumTurnRate * delta));
-    const nextVelocity = {
-        x: Math.cos(currentAngle + turn) * speed,
-        y: Math.sin(currentAngle + turn) * speed
-    };
-    body.applyImpulse({
-        x: nextVelocity.x - currentVelocity.x,
-        y: nextVelocity.y - currentVelocity.y
-    });
+    const nextVelocity = Vector2.fromAngle(currentAngle + turn, speed);
+    body.applyImpulse(Vector2.subtract(nextVelocity, currentVelocity));
     return true;
 }
