@@ -4633,6 +4633,7 @@ function testHuntingLootItemsRotate() {
 
 function testHuntingLootSessionIsDiscardedOnDefeat(app) {
     const profile = createDefaultPlayerProfile();
+    let resultSequenceSteps = null;
     const playerBall = { id: FIGHTER_IDS.DASH, name: "Dash Ball", hp: 0, maxHp: 100 };
     const enemyBall = { id: "enemy", name: "Enemy", hp: 80, maxHp: 100 };
     const mockApp = {
@@ -4658,7 +4659,9 @@ function testHuntingLootSessionIsDiscardedOnDefeat(app) {
         },
         setHuntingOverlayState() {},
         showOverlay() {},
-        presentResultSequence() {},
+        presentResultSequence(steps) {
+            resultSequenceSteps = steps;
+        },
         refreshPlayerSetup() {},
         setStartButton() {},
         addLog() {},
@@ -4670,8 +4673,11 @@ function testHuntingLootSessionIsDiscardedOnDefeat(app) {
         playerProfile: profile
     };
     const manager = new HuntingManager(mockApp);
-    manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE });
-    manager._battleLootSession = new HuntingBattleLootSession({ playerId: FIGHTER_IDS.DASH, floor: 1 });
+    manager._run = {
+        ...createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE }),
+        floor: 37
+    };
+    manager._battleLootSession = new HuntingBattleLootSession({ playerId: FIGHTER_IDS.DASH, floor: 37 });
     manager._battleLootSession.recordCollection({ type: HUNTING_LOOT_ITEM_TYPES.SHARD, amount: 20 });
     manager._battleLootSession.recordCollection({
         type: HUNTING_LOOT_ITEM_TYPES.CHEST,
@@ -4683,6 +4689,11 @@ function testHuntingLootSessionIsDiscardedOnDefeat(app) {
     assert.equal(profile.hunting.shards, 0, "Collected battle loot must not be secured after a defeat");
     assert.equal(profile.hunting.chests.length, 0, "Collected battle chests must not be secured after a defeat");
     assert.equal(manager._battleLootSession, null, "Defeat must discard the transient battle loot session");
+    assert.equal(
+        resultSequenceSteps?.find((step) => step.id === "summary")?.text,
+        "Dash Ball · 37층에서 쓰러짐",
+        "Defeat summary must show the floor where the character fell"
+    );
     console.log("[hunting-loot-defeat-discard] ok");
 }
 

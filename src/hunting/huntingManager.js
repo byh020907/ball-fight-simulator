@@ -603,7 +603,7 @@ export class HuntingManager {
                 {
                     id: "summary",
                     label: "사냥터 패배",
-                    text: `${name} 쓰러짐`,
+                    text: `${name} · ${run.floor}층에서 쓰러짐`,
                     subtext: `획득 ${securedShards} 파편 · ${lossDisplay}`
                 }
             ]);

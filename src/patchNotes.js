@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.31.6",
+        date: "2026-07-18",
+        title: "v0.31.6 사냥터 패배 층 표시",
+        changes: [
+            {
+                type: "fix",
+                text: "사냥터에서 쓰러졌을 때 패배 결과에 어느 층에서 원정이 끝났는지 표시합니다."
+            }
+        ]
+    },
+    {
         version: "0.31.5",
         date: "2026-07-18",
         title: "v0.31.5 Eater 소화 회복",
