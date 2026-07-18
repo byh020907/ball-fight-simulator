@@ -20,17 +20,57 @@ export function placeEliteMobFormation(player, fighters) {
     placeRow(fighters.filter(isEliteBackline), 430);
 }
 
-export function getEliteFormationImpulse(owner, player, allies) {
-    const slot = owner?.hunting?.eliteFormationSlot;
-    if (!slot || !player) return new Vector2();
-    const axis = Vector2.subtract(owner.position, player.position);
-    if (axis.length() <= 0.001) return new Vector2();
-    axis.normalize();
-    const desired = Vector2.add(player.position, axis.scale(slot.distance)).add(
-        new Vector2(-axis.y, axis.x).scale(slot.lateral)
+function hasEliteFormationSlot(fighter) {
+    const slot = fighter?.hunting?.eliteFormationSlot;
+    return Number.isFinite(slot?.distance) && Number.isFinite(slot?.lateral);
+}
+
+function isActiveEliteFormationMember(fighter) {
+    return Boolean(
+        fighter?.hunting?.eliteFormation &&
+        hasEliteFormationSlot(fighter) &&
+        !fighter.flags?.defeated &&
+        !fighter.flags?.destroyed &&
+        !fighter.state?.swallowed
     );
+}
+
+export function getEliteFormationMembers(allies) {
+    return allies.filter(isActiveEliteFormationMember);
+}
+
+export function getEliteFormationFrame(player, members) {
+    if (!player || members.length === 0) return null;
+    const center = members
+        .reduce((total, member) => total.add(member.position), new Vector2())
+        .scale(1 / members.length);
+    const candidateAxis = Vector2.subtract(center, player.position);
+    const axis = candidateAxis.length() <= 0.001 ? new Vector2(1, 0) : candidateAxis.normalize();
+    return { axis, perpendicular: new Vector2(-axis.y, axis.x) };
+}
+
+export function getEliteFormationTarget(player, owner, frame, arenaWidth, arenaHeight) {
+    const slot = owner?.hunting?.eliteFormationSlot;
+    if (!player || !slot || !frame) return null;
+    const target = Vector2.add(player.position, frame.axis.clone().scale(slot.distance)).add(
+        frame.perpendicular.clone().scale(slot.lateral)
+    );
+    const radius = owner.radius;
+    const boundaryCorrection = new Vector2(
+        Math.min(Math.max(target.x, radius), arenaWidth - radius) - target.x,
+        Math.min(Math.max(target.y, radius), arenaHeight - radius) - target.y
+    );
+    return Vector2.add(target, boundaryCorrection);
+}
+
+export function getEliteFormationImpulse(owner, player, allies, arenaWidth, arenaHeight) {
+    const members = getEliteFormationMembers(allies);
+    if (!members.includes(owner)) return new Vector2();
+    const frame = getEliteFormationFrame(player, members);
+    const desired = getEliteFormationTarget(player, owner, frame, arenaWidth, arenaHeight);
+    if (!desired) return new Vector2();
     const correction = Vector2.subtract(desired, owner.position);
-    allies.forEach((ally) => {
+    members.forEach((ally) => {
         const offset = Vector2.subtract(owner.position, ally.position);
         const distance = offset.length();
         if (ally !== owner && distance > 0.001 && distance < owner.radius + ally.radius + 24)

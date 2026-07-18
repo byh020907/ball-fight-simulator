@@ -76,7 +76,13 @@ import { HuntingManager } from "../src/hunting/huntingManager.js";
 import { HUNTING_EVENT_TRANSITIONS, HuntingEvent } from "../src/hunting/huntingEvents.js";
 import { MishapEvent } from "../src/hunting/events/mishapEvent.js";
 import { RestSiteEvent } from "../src/hunting/events/restSiteEvent.js";
-import { placeEliteMobFormation } from "../src/hunting/eliteMobFormation.js";
+import {
+    getEliteFormationFrame,
+    getEliteFormationImpulse,
+    getEliteFormationMembers,
+    getEliteFormationTarget,
+    placeEliteMobFormation
+} from "../src/hunting/eliteMobFormation.js";
 import {
     advanceHuntingRun,
     canEnterHunting,
@@ -4154,6 +4160,92 @@ function testEliteMobCombinationEvent(app) {
             "Elite formation should place fighters by row lateral offset"
         );
     });
+    const createFormationMember = ({ x, y, distance, lateral, ...overrides }) => ({
+        position: new Vector2(x, y),
+        radius: 20,
+        mass: 1,
+        flags: { defeated: false, destroyed: false },
+        state: { swallowed: false },
+        hunting: { eliteFormation: true, eliteFormationSlot: { distance, lateral } },
+        ...overrides
+    });
+    const sharedPlayer = { position: new Vector2(500, 500) };
+    const exactFrontLeft = createFormationMember({ x: 760, y: 447.5, distance: 260, lateral: -52.5 });
+    const exactFrontRight = createFormationMember({ x: 760, y: 552.5, distance: 260, lateral: 52.5 });
+    const exactBackline = createFormationMember({ x: 930, y: 500, distance: 430, lateral: 0 });
+    const exactMembers = [exactFrontLeft, exactFrontRight, exactBackline];
+    assert.deepEqual(
+        getEliteFormationImpulse(exactFrontLeft, sharedPlayer, exactMembers, 1_000, 960),
+        new Vector2(),
+        "A nonzero lateral slot already on the shared frame must have zero formation correction"
+    );
+    const rotatedFrontLeft = createFormationMember({ x: 552.5, y: 760, distance: 260, lateral: -52.5 });
+    const rotatedFrontRight = createFormationMember({ x: 447.5, y: 760, distance: 260, lateral: 52.5 });
+    const rotatedBackline = createFormationMember({ x: 500, y: 930, distance: 430, lateral: 0 });
+    const rotatedFrame = getEliteFormationFrame(sharedPlayer, [rotatedFrontLeft, rotatedFrontRight, rotatedBackline]);
+    assert.deepEqual(
+        rotatedFrame.axis,
+        new Vector2(0, 1),
+        "All rotated formation members should share one forward axis"
+    );
+    assert.deepEqual(
+        rotatedFrame.perpendicular,
+        new Vector2(-1, 0),
+        "The rotated formation should derive one shared perpendicular axis"
+    );
+    assert.deepEqual(
+        getEliteFormationTarget(sharedPlayer, rotatedFrontLeft, rotatedFrame, 1_000, 960),
+        rotatedFrontLeft.position,
+        "The left front slot should rotate with the shared formation frame"
+    );
+    assert.deepEqual(
+        getEliteFormationTarget(sharedPlayer, rotatedBackline, rotatedFrame, 1_000, 960),
+        rotatedBackline.position,
+        "The backline slot should preserve its row order on the shared frame"
+    );
+    const excludedMembers = [
+        exactFrontLeft,
+        createFormationMember({
+            x: 400,
+            y: 400,
+            distance: 260,
+            lateral: 0,
+            flags: { defeated: true, destroyed: false }
+        }),
+        createFormationMember({
+            x: 400,
+            y: 400,
+            distance: 260,
+            lateral: 0,
+            flags: { defeated: false, destroyed: true }
+        }),
+        createFormationMember({ x: 400, y: 400, distance: 260, lateral: 0, state: { swallowed: true } }),
+        { position: new Vector2(400, 400), hunting: { eliteFormation: true } },
+        { position: new Vector2(400, 400), hunting: { eliteFormationSlot: { distance: 260, lateral: 0 } } }
+    ];
+    assert.deepEqual(
+        getEliteFormationMembers(excludedMembers),
+        [exactFrontLeft],
+        "Only living, intact, unswallowed elite fighters with valid slots should shape the shared frame"
+    );
+    const overlapMember = createFormationMember({ x: 500, y: 500, distance: 260, lateral: 0 });
+    assert.deepEqual(
+        getEliteFormationFrame(sharedPlayer, [overlapMember]).axis,
+        new Vector2(1, 0),
+        "An overlapping formation center should use the stable placement +X fallback"
+    );
+    const boundedMember = createFormationMember({ x: 500, y: 500, distance: 430, lateral: 105, radius: 30 });
+    assert.deepEqual(
+        getEliteFormationTarget(
+            { position: new Vector2(900, 900) },
+            boundedMember,
+            { axis: new Vector2(1, 0), perpendicular: new Vector2(0, 1) },
+            1_000,
+            960
+        ),
+        new Vector2(970, 930),
+        "Elite targets outside the arena should clamp inward by the owner radius"
+    );
     assert.throws(
         () =>
             createEliteMobEncounter({

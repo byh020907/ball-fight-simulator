@@ -173,7 +173,13 @@ export class HuntingMobAbility extends Ability {
         this.state.repositionCooldown = Math.max(0, this.state.repositionCooldown - delta);
         if (this.owner.hunting?.eliteFormation) {
             this.owner.applyImpulse(
-                getEliteFormationImpulse(this.owner, target, this.simulation.getAlliesOf(this.owner)).scale(delta * 60)
+                getEliteFormationImpulse(
+                    this.owner,
+                    target,
+                    this.simulation.getAlliesOf(this.owner),
+                    this.simulation.width,
+                    this.simulation.height
+                ).scale(delta * 60)
             );
         }
         this._steer(delta, target);
