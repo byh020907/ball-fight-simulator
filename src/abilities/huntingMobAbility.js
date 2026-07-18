@@ -1,5 +1,5 @@
 import { steerBallToward, Vector2 } from "../core.js";
-import { getEliteFormationImpulse, getEliteFormationMemberTarget } from "../hunting/eliteMobFormation.js";
+import { createEliteMobFormationConfig, getEliteFormationSteering } from "../hunting/eliteMobFormation.js";
 import {
     advanceEliteFormationSortie,
     createEliteFormationSortieConfig,
@@ -145,6 +145,7 @@ export class HuntingMobAbility extends Ability {
         const behavior = owner.hunting?.behavior ?? "pursuer";
         super(owner, simulation, BEHAVIOR_CONFIG[behavior]?.cooldown ?? 0);
         this.behavior = behavior;
+        this.formationConfig = createEliteMobFormationConfig(owner.hunting?.eliteFormationConfig);
         this.formationSortieConfig = createEliteFormationSortieConfig(owner.hunting?.eliteFormationSortieConfig);
         this.state = {
             timer: 0,
@@ -188,24 +189,20 @@ export class HuntingMobAbility extends Ability {
 
     _getEliteFormationSteering(delta, target) {
         if (!this.owner.hunting?.eliteFormation || this.owner.state.movement || this.owner.state.swallowed) return null;
-        const allies = this.simulation.getAlliesOf(this.owner);
-        const formationTarget = getEliteFormationMemberTarget(
+        const formationSteering = getEliteFormationSteering(
             this.owner,
             target,
-            allies,
+            this.simulation.getAlliesOf(this.owner),
             this.simulation.width,
-            this.simulation.height
+            this.simulation.height,
+            this.formationConfig
         );
-        if (!formationTarget) return null;
-        if (this._shouldContinueFormationSortie(delta, formationTarget)) {
+        if (!formationSteering) return null;
+        if (this._shouldContinueFormationSortie(delta, formationSteering.target)) {
             return { target, isFormationTarget: false };
         }
-        this.owner.applyImpulse(
-            getEliteFormationImpulse(this.owner, target, allies, this.simulation.width, this.simulation.height).scale(
-                delta * 60
-            )
-        );
-        return { target: { position: formationTarget }, isFormationTarget: true };
+        this.owner.applyImpulse(formationSteering.impulse.scale(delta * this.formationConfig.referenceFramesPerSecond));
+        return { target: { position: formationSteering.target }, isFormationTarget: true };
     }
 
     _shouldContinueFormationSortie(delta, formationTarget) {

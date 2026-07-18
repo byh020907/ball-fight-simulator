@@ -2,22 +2,36 @@ import { Vector2 } from "../core.js";
 
 const BACKLINE_TYPES = new Set(["healer", "shooter", "shard", "boomerang", "laser"]);
 
+export const DEFAULT_ELITE_MOB_FORMATION_CONFIG = Object.freeze({
+    frontRowDistance: 260,
+    backRowDistance: 430,
+    rowSpacing: 105,
+    separationPadding: 24,
+    separationStrength: 55,
+    correctionStrength: 0.02,
+    referenceFramesPerSecond: 60
+});
+
+export function createEliteMobFormationConfig(overrides = {}) {
+    return { ...DEFAULT_ELITE_MOB_FORMATION_CONFIG, ...overrides };
+}
+
 export function isEliteBackline(fighter) {
     return BACKLINE_TYPES.has(fighter?.hunting?.monsterType);
 }
 
-export function placeEliteMobFormation(player, fighters) {
+export function placeEliteMobFormation(player, fighters, config = DEFAULT_ELITE_MOB_FORMATION_CONFIG) {
     const placeRow = (row, distance) =>
         row.forEach((fighter, index) => {
-            const lateral = (index - (row.length - 1) / 2) * 105;
+            const lateral = (index - (row.length - 1) / 2) * config.rowSpacing;
             fighter.position = new Vector2(player.position.x + distance, player.position.y + lateral);
             fighter.hunting.eliteFormationSlot = { distance, lateral };
         });
     placeRow(
         fighters.filter((fighter) => !isEliteBackline(fighter)),
-        260
+        config.frontRowDistance
     );
-    placeRow(fighters.filter(isEliteBackline), 430);
+    placeRow(fighters.filter(isEliteBackline), config.backRowDistance);
 }
 
 function hasEliteFormationSlot(fighter) {
@@ -63,23 +77,28 @@ export function getEliteFormationTarget(player, owner, frame, arenaWidth, arenaH
     return Vector2.add(target, boundaryCorrection);
 }
 
-export function getEliteFormationMemberTarget(owner, player, allies, arenaWidth, arenaHeight) {
+export function getEliteFormationSteering(
+    owner,
+    player,
+    allies,
+    arenaWidth,
+    arenaHeight,
+    config = DEFAULT_ELITE_MOB_FORMATION_CONFIG
+) {
     const members = getEliteFormationMembers(allies);
     if (!members.includes(owner)) return null;
     const frame = getEliteFormationFrame(player, members);
-    return getEliteFormationTarget(player, owner, frame, arenaWidth, arenaHeight);
-}
-
-export function getEliteFormationImpulse(owner, player, allies, arenaWidth, arenaHeight) {
-    const members = getEliteFormationMembers(allies);
-    const desired = getEliteFormationMemberTarget(owner, player, members, arenaWidth, arenaHeight);
-    if (!desired) return new Vector2();
-    const correction = Vector2.subtract(desired, owner.position);
+    const target = getEliteFormationTarget(player, owner, frame, arenaWidth, arenaHeight);
+    if (!target) return null;
+    const impulse = Vector2.subtract(target, owner.position);
     members.forEach((ally) => {
         const offset = Vector2.subtract(owner.position, ally.position);
         const distance = offset.length();
-        if (ally !== owner && distance > 0.001 && distance < owner.radius + ally.radius + 24)
-            correction.add(offset.normalize().scale(55));
+        if (ally !== owner && distance > 0.001 && distance < owner.radius + ally.radius + config.separationPadding)
+            impulse.add(offset.normalize().scale(config.separationStrength));
     });
-    return correction.scale(0.02 * owner.mass);
+    return {
+        target,
+        impulse: impulse.scale(config.correctionStrength * owner.mass)
+    };
 }

@@ -77,10 +77,10 @@ import { HUNTING_EVENT_TRANSITIONS, HuntingEvent } from "../src/hunting/huntingE
 import { MishapEvent } from "../src/hunting/events/mishapEvent.js";
 import { RestSiteEvent } from "../src/hunting/events/restSiteEvent.js";
 import {
+    createEliteMobFormationConfig,
     getEliteFormationFrame,
-    getEliteFormationImpulse,
-    getEliteFormationMemberTarget,
     getEliteFormationMembers,
+    getEliteFormationSteering,
     getEliteFormationTarget,
     placeEliteMobFormation
 } from "../src/hunting/eliteMobFormation.js";
@@ -4001,6 +4001,107 @@ function testHuntingBossRolesAndEnhancementStoneDrops(app) {
     console.log("[hunting-boss-roles-and-enhancement-stones] ok");
 }
 
+function testEliteFormationSortieCombat(playerSpec, fixedFormationSpecs) {
+    const stationaryFormationPlayerSpec = {
+        ...playerSpec,
+        stats: { ...playerSpec.stats, hp: 1_000_000, damage: 0, speed: 0 }
+    };
+    const sortieFormationSpecs = fixedFormationSpecs.map((spec) => ({
+        ...spec,
+        stats: { ...spec.stats, hp: 1_000_000 }
+    }));
+    const sortieFormationSimulation = new BattleSimulation([stationaryFormationPlayerSpec, ...sortieFormationSpecs], {
+        onLog() {},
+        onSound() {}
+    });
+    const sortieFormationPlayer = sortieFormationSimulation.fighters.find(
+        (fighter) => fighter.id === stationaryFormationPlayerSpec.id
+    );
+    const sortieFormationEnemies = sortieFormationSimulation.getEnemiesOf(sortieFormationPlayer);
+    const sortiePursuer = sortieFormationEnemies.find((fighter) => fighter.hunting.monsterType === "pursuer");
+    sortieFormationPlayer.position = new Vector2(500, 500);
+    placeEliteMobFormation(sortieFormationPlayer, sortieFormationEnemies);
+    const sortiePhases = new Set();
+    let minimumSortieGap = Infinity;
+    for (let frame = 0; frame < 360; frame += 1) {
+        sortieFormationSimulation.update(1 / 60);
+        sortieFormationPlayer.position = new Vector2(500, 500);
+        sortieFormationPlayer.velocity = new Vector2();
+        const gap =
+            Vector2.subtract(sortiePursuer.position, sortieFormationPlayer.position).length() -
+            sortiePursuer.radius -
+            sortieFormationPlayer.radius;
+        minimumSortieGap = Math.min(minimumSortieGap, gap);
+        sortiePhases.add(sortiePursuer.abilities.primary.state.formationSortie.phase);
+    }
+    assert.ok(minimumSortieGap <= 1, "Elite melee sorties should reach collision range instead of holding at 260px");
+    assert.ok(
+        ["holding", "attacking", "returning"].every((phase) => sortiePhases.has(phase)),
+        "Elite melee fighters should cycle through formation hold, attack sortie, and slot return"
+    );
+}
+
+function testEliteFormationSortieConfigInjection() {
+    const reusableSortieConfig = createEliteFormationSortieConfig({
+        behaviors: ["test-melee"],
+        holdDuration: 0.1,
+        attackDuration: 0.2,
+        returnDistance: 5
+    });
+    const reusableHoldingState = createEliteFormationSortieState(reusableSortieConfig);
+    const reusableAttackTransition = advanceEliteFormationSortie(
+        reusableHoldingState,
+        { behavior: "test-melee", delta: 0.1, slotDistance: 100 },
+        reusableSortieConfig
+    );
+    assert.deepEqual(
+        reusableHoldingState,
+        { phase: "holding", remaining: 0.1 },
+        "Reusable sortie transitions should not mutate their input state"
+    );
+    assert.deepEqual(
+        reusableAttackTransition,
+        { state: { phase: "attacking", remaining: 0.2 }, shouldAttack: true },
+        "Injected sortie settings should control the hold-to-attack transition"
+    );
+    const reusableReturnState = finishEliteFormationSortie(reusableAttackTransition.state);
+    assert.deepEqual(
+        advanceEliteFormationSortie(
+            reusableReturnState,
+            { behavior: "test-melee", delta: 0, slotDistance: 5 },
+            reusableSortieConfig
+        ),
+        { state: { phase: "holding", remaining: 0.1 }, shouldAttack: false },
+        "Injected return distance should control when a reusable sortie reforms"
+    );
+}
+
+function testEliteMobFormationConfigInjection() {
+    const formationConfig = createEliteMobFormationConfig({
+        frontRowDistance: 100,
+        backRowDistance: 200,
+        rowSpacing: 40,
+        separationPadding: 0,
+        separationStrength: 0,
+        correctionStrength: 1,
+        referenceFramesPerSecond: 1
+    });
+    const player = { position: new Vector2(500, 500) };
+    const frontliner = { hunting: { monsterType: "pursuer" } };
+    const backliner = { hunting: { monsterType: "healer" } };
+    placeEliteMobFormation(player, [frontliner, backliner], formationConfig);
+    assert.deepEqual(
+        frontliner.hunting.eliteFormationSlot,
+        { distance: 100, lateral: 0 },
+        "Injected formation settings should control front-row placement"
+    );
+    assert.deepEqual(
+        backliner.hunting.eliteFormationSlot,
+        { distance: 200, lateral: 0 },
+        "Injected formation settings should control back-row placement"
+    );
+}
+
 function testEliteMobCombinationEvent(app) {
     assert.equal(
         HuntingEvent.POOL.at(-1)?.type,
@@ -4185,7 +4286,7 @@ function testEliteMobCombinationEvent(app) {
     const exactBackline = createFormationMember({ x: 930, y: 500, distance: 430, lateral: 0 });
     const exactMembers = [exactFrontLeft, exactFrontRight, exactBackline];
     assert.deepEqual(
-        getEliteFormationImpulse(exactFrontLeft, sharedPlayer, exactMembers, 1_000, 960),
+        getEliteFormationSteering(exactFrontLeft, sharedPlayer, exactMembers, 1_000, 960).impulse,
         new Vector2(),
         "A nonzero lateral slot already on the shared frame must have zero formation correction"
     );
@@ -4214,7 +4315,7 @@ function testEliteMobCombinationEvent(app) {
         "The backline slot should preserve its row order on the shared frame"
     );
     assert.deepEqual(
-        getEliteFormationMemberTarget(exactBackline, sharedPlayer, exactMembers, 1_000, 960),
+        getEliteFormationSteering(exactBackline, sharedPlayer, exactMembers, 1_000, 960).target,
         exactBackline.position,
         "Elite members should expose the shared slot target used by their default steering"
     );
@@ -4240,75 +4341,9 @@ function testEliteMobCombinationEvent(app) {
         formationHealer.state.forcedHeading,
         "Elite healers should steer back toward their formation slot instead of remaining directionless"
     );
-    const stationaryFormationPlayerSpec = {
-        ...playerSpec,
-        stats: { ...playerSpec.stats, hp: 1_000_000, damage: 0, speed: 0 }
-    };
-    const sortieFormationSpecs = fixedFormationSpecs.map((spec) => ({
-        ...spec,
-        stats: { ...spec.stats, hp: 1_000_000 }
-    }));
-    const sortieFormationSimulation = new BattleSimulation([stationaryFormationPlayerSpec, ...sortieFormationSpecs], {
-        onLog() {},
-        onSound() {}
-    });
-    const sortieFormationPlayer = sortieFormationSimulation.fighters.find(
-        (fighter) => fighter.id === stationaryFormationPlayerSpec.id
-    );
-    const sortieFormationEnemies = sortieFormationSimulation.getEnemiesOf(sortieFormationPlayer);
-    const sortiePursuer = sortieFormationEnemies.find((fighter) => fighter.hunting.monsterType === "pursuer");
-    sortieFormationPlayer.position = new Vector2(500, 500);
-    placeEliteMobFormation(sortieFormationPlayer, sortieFormationEnemies);
-    const sortiePhases = new Set();
-    let minimumSortieGap = Infinity;
-    for (let frame = 0; frame < 360; frame += 1) {
-        sortieFormationSimulation.update(1 / 60);
-        sortieFormationPlayer.position = new Vector2(500, 500);
-        sortieFormationPlayer.velocity = new Vector2();
-        const gap =
-            Vector2.subtract(sortiePursuer.position, sortieFormationPlayer.position).length() -
-            sortiePursuer.radius -
-            sortieFormationPlayer.radius;
-        minimumSortieGap = Math.min(minimumSortieGap, gap);
-        sortiePhases.add(sortiePursuer.abilities.primary.state.formationSortie.phase);
-    }
-    assert.ok(minimumSortieGap <= 1, "Elite melee sorties should reach collision range instead of holding at 260px");
-    assert.ok(
-        ["holding", "attacking", "returning"].every((phase) => sortiePhases.has(phase)),
-        "Elite melee fighters should cycle through formation hold, attack sortie, and slot return"
-    );
-    const reusableSortieConfig = createEliteFormationSortieConfig({
-        behaviors: ["test-melee"],
-        holdDuration: 0.1,
-        attackDuration: 0.2,
-        returnDistance: 5
-    });
-    const reusableHoldingState = createEliteFormationSortieState(reusableSortieConfig);
-    const reusableAttackTransition = advanceEliteFormationSortie(
-        reusableHoldingState,
-        { behavior: "test-melee", delta: 0.1, slotDistance: 100 },
-        reusableSortieConfig
-    );
-    assert.deepEqual(
-        reusableHoldingState,
-        { phase: "holding", remaining: 0.1 },
-        "Reusable sortie transitions should not mutate their input state"
-    );
-    assert.deepEqual(
-        reusableAttackTransition,
-        { state: { phase: "attacking", remaining: 0.2 }, shouldAttack: true },
-        "Injected sortie settings should control the hold-to-attack transition"
-    );
-    const reusableReturnState = finishEliteFormationSortie(reusableAttackTransition.state);
-    assert.deepEqual(
-        advanceEliteFormationSortie(
-            reusableReturnState,
-            { behavior: "test-melee", delta: 0, slotDistance: 5 },
-            reusableSortieConfig
-        ),
-        { state: { phase: "holding", remaining: 0.1 }, shouldAttack: false },
-        "Injected return distance should control when a reusable sortie reforms"
-    );
+    testEliteFormationSortieCombat(playerSpec, fixedFormationSpecs);
+    testEliteFormationSortieConfigInjection();
+    testEliteMobFormationConfigInjection();
     const excludedMembers = [
         exactFrontLeft,
         createFormationMember({
