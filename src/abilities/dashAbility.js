@@ -101,26 +101,28 @@ export class DashAbility extends Ability {
         for (const target of this.simulation.getEnemiesOf(this.owner)) {
             laser.segments.forEach((segment, index) => {
                 if (!circleIntersectsLaserSegment(target, segment)) return;
+                const isFirstLaserHit = !laser.getHitSegmentsByTarget().has(target);
                 const rawDamage = this.owner.stats.baseDamage * 0.6 * (activeDuration / laser.fireDuration);
                 const { actualDamage } = target.takeDamage(rawDamage, this.owner, "Dash Laser");
-                if (actualDamage > 0) laser.recordHit(target, index);
+                if (actualDamage <= 0) return;
+                laser.recordHit(target, index);
+                if (isFirstLaserHit) this._igniteDashLaserTarget(target);
             });
         }
     }
 
+    _igniteDashLaserTarget(target) {
+        if (!this.getLevelUpgrade().laserIgnition || target.flags.defeated) return;
+        applyBurningEffect({
+            source: this.owner,
+            target,
+            simulation: this.simulation,
+            label: "Dash Ignition",
+            config: DASH_LEVEL9_IGNITION_CONFIG
+        });
+    }
+
     finishDashLaserCombat(laser) {
-        if (this.owner.progression?.abilityTier >= 3) {
-            for (const target of laser.getHitSegmentsByTarget().keys()) {
-                if (target.flags.defeated) continue;
-                applyBurningEffect({
-                    source: this.owner,
-                    target,
-                    simulation: this.simulation,
-                    label: "Dash Ignition",
-                    config: DASH_LEVEL9_IGNITION_CONFIG
-                });
-            }
-        }
         this.laserCombatStates.delete(laser);
     }
 

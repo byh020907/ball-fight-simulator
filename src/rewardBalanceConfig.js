@@ -146,7 +146,7 @@ export const REWARD_BALANCE = deepFreeze({
                 {
                     level: 9,
                     abilityTier: 3,
-                    gameText: "레이저 적중 점화 · 1초 10틱 ×0.10"
+                    gameText: "첫 레이저 적중 즉시 점화 · 1초 10틱 ×0.10"
                 },
                 { level: 10 }
             ],
@@ -261,7 +261,7 @@ export const REWARD_BALANCE = deepFreeze({
                 tiers: [{}, { stickyGrenade: true }, { burningExplosion: true }, { stickyHoming: true }]
             },
             dash: {
-                tiers: [{}, { laserStrike: true }, { laserWallBounces: 1 }, { crossOverload: true }]
+                tiers: [{}, { laserStrike: true }, { laserWallBounces: 1 }, { laserIgnition: true }]
             },
             rage: {
                 tiers: [{}, {}, {}, {}]

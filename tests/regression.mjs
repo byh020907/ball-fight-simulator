@@ -5909,6 +5909,11 @@ function testFiveBallLevelRewardContracts(app) {
         20,
         "Dash laser should route two immediate 0.05s damage ticks through takeDamage during fire"
     );
+    const activeFireIgnition = phaseRun.simulation.entities.find(
+        (entity) => entity instanceof BurningEffect && entity.target === phaseRun.target
+    );
+    assert.ok(activeFireIgnition, "Dash Lv9 ignition should start on the first real laser hit before fire ends");
+    assert.equal(phaseLaser.isExpired, false, "Dash ignition should already be active while the laser is still firing");
     phaseRun.target.position = new Vector2(320, 430);
     phaseLaser.update(0.2, phaseRun.simulation);
     assert.equal(
@@ -6126,6 +6131,11 @@ function testFiveBallLevelRewardContracts(app) {
         "Dash should keep both x0.60 laser segments independent of phase-sized or large delta updates"
     );
     assert.ok(steppedDash.ignition && largeDeltaDash.ignition, "Dash Lv9 should ignite any target hit by its laser");
+    assert.equal(
+        steppedDash.run.owner.ability.getLevelUpgrade().laserIgnition,
+        true,
+        "Dash tier-three metadata should expose laser ignition instead of the removed overload"
+    );
     assertForegroundEffectRenders(steppedDash.ignition, "Dash laser ignition", (primitives) => {
         assertEffectArcAt(primitives, steppedDash.run.target.position, "Dash laser ignition");
     });

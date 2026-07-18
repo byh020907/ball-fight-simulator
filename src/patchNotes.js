@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.31.8",
+        date: "2026-07-18",
+        title: "v0.31.8 Dash 레이저 점화 타이밍",
+        changes: [
+            {
+                type: "fix",
+                text: "Dash Ball Lv.9 점화가 레이저 종료를 기다리지 않고 첫 실제 적중 순간 바로 시작됩니다."
+            }
+        ]
+    },
+    {
         version: "0.31.7",
         date: "2026-07-18",
         title: "v0.31.7 Dash Lv.9 레이저 점화",
