@@ -460,88 +460,117 @@
         </div>
 
         <div class="ch-content ch-developer" x-show="state.activeTab === 'developer'" role="tabpanel">
-            <div class="ch-developer-grid">
-                <label class="ch-developer-field">
-                    <span>캐릭터</span>
-                    <select
-                        class="ch-select"
-                        x-model="state.developer.targetCharacterId"
-                        @change="syncDeveloperTarget()"
-                    >
-                        <template x-for="item in state.rosterItems" :key="item.id">
-                            <option x-bind:value="item.id" x-text="item.name"></option>
-                        </template>
-                    </select>
-                </label>
-                <div class="ch-developer-field ch-developer-field--action">
-                    <span>레벨</span>
-                    <button class="ch-btn" type="button" @click="setDebugCharacterToMaxLevel()">Lv.10 적용</button>
-                </div>
-                <div class="ch-developer-field ch-developer-field--action">
-                    <span>토너먼트</span>
-                    <button class="ch-btn" type="button" @click="recordDebugTournamentWin()">우승 처리</button>
-                </div>
-                <label class="ch-developer-field">
-                    <span>환생 횟수</span>
-                    <input
-                        class="ch-search"
-                        type="number"
-                        min="0"
-                        max="999"
-                        x-model.number="state.developer.rebirthCount"
-                    />
-                </label>
-                <div class="ch-developer-field ch-developer-field--action">
-                    <span>환생</span>
-                    <button class="ch-btn" type="button" @click="setDebugRebirthCount()">적용</button>
-                </div>
-                <label class="ch-developer-field">
-                    <span>사냥터 지역</span>
-                    <select class="ch-select" x-model="state.developer.huntingStageId">
-                        <template x-for="stage in state.developer.stages" :key="stage.id">
-                            <option x-bind:value="stage.id" x-text="stage.name"></option>
-                        </template>
-                    </select>
-                </label>
-                <label class="ch-developer-field">
-                    <span>시작 층</span>
-                    <input
-                        class="ch-search"
-                        type="number"
-                        min="1"
-                        x-bind:max="state.developer.maxFloor"
-                        x-model.number="state.developer.huntingFloor"
-                    />
-                </label>
-                <label class="ch-developer-field">
-                    <span>이벤트 미리보기</span>
-                    <select
-                        class="ch-select"
-                        x-model="state.developer.huntingEventType"
-                        @change="syncDeveloperEventSelection()"
-                    >
-                        <template x-for="event in state.developer.events" :key="event.id">
-                            <option x-bind:value="event.id" x-text="event.label"></option>
-                        </template>
-                    </select>
-                </label>
-                <label class="ch-developer-field" x-show="state.developer.huntingEventType === 'elite_mob'">
-                    <span>정예 조합</span>
-                    <select
-                        class="ch-select"
-                        x-model="state.developer.eliteCombinationId"
-                        @change="syncDeveloperEventSelection()"
-                    >
-                        <template x-for="combination in state.developer.eliteCombinations" :key="combination.id">
-                            <option x-bind:value="combination.id" x-text="combination.label"></option>
-                        </template>
-                    </select>
-                </label>
+            <div class="ch-developer-groups">
+                <section class="ch-developer-group" aria-labelledby="ch-developer-character-title">
+                    <h3 id="ch-developer-character-title" class="ch-developer-group-title">캐릭터 설정</h3>
+                    <div class="ch-developer-grid">
+                        <label class="ch-developer-field ch-developer-field--wide">
+                            <span>캐릭터</span>
+                            <select
+                                class="ch-select"
+                                x-model="state.developer.targetCharacterId"
+                                @change="syncDeveloperTarget()"
+                            >
+                                <template x-for="item in state.rosterItems" :key="item.id">
+                                    <option x-bind:value="item.id" x-text="item.name"></option>
+                                </template>
+                            </select>
+                        </label>
+                        <div class="ch-developer-field ch-developer-field--action">
+                            <span>레벨</span>
+                            <button class="ch-btn" type="button" @click="setDebugCharacterToMaxLevel()">
+                                Lv.10 적용
+                            </button>
+                        </div>
+                        <div class="ch-developer-field ch-developer-field--action">
+                            <span>토너먼트</span>
+                            <button class="ch-btn" type="button" @click="recordDebugTournamentWin()">우승 처리</button>
+                        </div>
+                        <div class="ch-developer-field ch-developer-field--wide">
+                            <span>환생 횟수</span>
+                            <div class="ch-developer-control-row">
+                                <input
+                                    class="ch-search"
+                                    type="number"
+                                    min="0"
+                                    max="999"
+                                    x-model.number="state.developer.rebirthCount"
+                                />
+                                <button class="ch-btn" type="button" @click="setDebugRebirthCount()">환생 적용</button>
+                            </div>
+                        </div>
+                        <div class="ch-developer-field ch-developer-field--wide">
+                            <span>컬렉션 상태</span>
+                            <button class="ch-btn" type="button" @click="seedDebugCollectionSample()">
+                                컬렉션 샘플 적용
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="ch-developer-group" aria-labelledby="ch-developer-hunting-title">
+                    <h3 id="ch-developer-hunting-title" class="ch-developer-group-title">사냥터 테스트</h3>
+                    <div class="ch-developer-grid">
+                        <label class="ch-developer-field">
+                            <span>사냥터 지역</span>
+                            <select class="ch-select" x-model="state.developer.huntingStageId">
+                                <template x-for="stage in state.developer.stages" :key="stage.id">
+                                    <option x-bind:value="stage.id" x-text="stage.name"></option>
+                                </template>
+                            </select>
+                        </label>
+                        <div class="ch-developer-field">
+                            <span>시작 층</span>
+                            <div class="ch-developer-control-row">
+                                <input
+                                    class="ch-search"
+                                    type="number"
+                                    min="1"
+                                    x-bind:max="state.developer.maxFloor"
+                                    x-model.number="state.developer.huntingFloor"
+                                />
+                                <button class="ch-btn" type="button" @click="startDebugHunting()">사냥터 시작</button>
+                            </div>
+                        </div>
+                        <div class="ch-developer-field ch-developer-field--wide">
+                            <span>이벤트 미리보기</span>
+                            <div class="ch-developer-control-row">
+                                <select
+                                    class="ch-select"
+                                    x-model="state.developer.huntingEventType"
+                                    @change="syncDeveloperEventSelection()"
+                                >
+                                    <template x-for="event in state.developer.events" :key="event.id">
+                                        <option x-bind:value="event.id" x-text="event.label"></option>
+                                    </template>
+                                </select>
+                                <button class="ch-btn" type="button" @click="startDebugHuntingEvent()">
+                                    미리보기 열기
+                                </button>
+                            </div>
+                        </div>
+                        <label
+                            class="ch-developer-field ch-developer-field--wide"
+                            x-show="state.developer.huntingEventType === 'elite_mob'"
+                        >
+                            <span>정예 조합</span>
+                            <select
+                                class="ch-select"
+                                x-model="state.developer.eliteCombinationId"
+                                @change="syncDeveloperEventSelection()"
+                            >
+                                <template
+                                    x-for="combination in state.developer.eliteCombinations"
+                                    :key="combination.id"
+                                >
+                                    <option x-bind:value="combination.id" x-text="combination.label"></option>
+                                </template>
+                            </select>
+                        </label>
+                    </div>
+                </section>
             </div>
             <div class="ch-developer-actions">
-                <button class="ch-btn" type="button" @click="seedDebugCollectionSample()">컬렉션 샘플</button>
-                <button class="ch-btn" type="button" @click="startDebugHuntingEvent()">이벤트 미리보기</button>
-                <button class="ch-btn" type="button" @click="startDebugHunting()">사냥터 시작</button>
                 <button class="ch-btn ch-btn--danger" type="button" @click="exitDebugMode()">디버그 종료</button>
             </div>
         </div>
@@ -1154,10 +1183,6 @@
         .ch-frame {
             border-radius: 10px;
         }
-
-        .ch-developer-grid {
-            grid-template-columns: 1fr;
-        }
     }
 
     .ch-header {
@@ -1323,15 +1348,36 @@
     }
 
     .ch-developer {
-        gap: 12px;
-        padding: 12px;
+        gap: 0.75rem;
+        padding: 0.75rem;
         overflow: auto;
+    }
+
+    .ch-developer-groups {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+        align-items: start;
+        gap: 0.75rem;
+    }
+
+    .ch-developer-group {
+        display: grid;
+        gap: 0.625rem;
+        min-width: 0;
+        padding: clamp(0.625rem, 2vw, 0.875rem);
+        border: 1px solid #bcbcbc;
+        border-radius: 0.5rem;
+    }
+
+    .ch-developer-group-title {
+        margin: 0;
+        font-size: 0.9rem;
     }
 
     .ch-developer-grid {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 10px;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+        gap: 0.625rem;
     }
 
     .ch-developer-field {
@@ -1353,11 +1399,28 @@
         align-content: start;
     }
 
+    .ch-developer-field--wide {
+        grid-column: 1 / -1;
+    }
+
+    .ch-developer-control-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: stretch;
+        gap: 0.5rem;
+        min-width: 0;
+    }
+
+    .ch-developer-control-row .ch-btn {
+        width: auto;
+        white-space: nowrap;
+    }
+
     .ch-developer-actions {
         display: flex;
         flex-wrap: wrap;
         justify-content: flex-end;
-        gap: 8px;
+        gap: 0.5rem;
     }
 
     .ch-codex-panel {

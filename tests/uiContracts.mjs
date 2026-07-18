@@ -1167,6 +1167,18 @@ function testCollectionRebirthAndDeveloperContracts() {
         "Collection tab visibility should be refreshed when the modal layout changes"
     );
     assert.ok(template.includes("이벤트 미리보기"), "Developer tools should expose hunting event previews");
+    assert.ok(
+        template.includes('class="ch-developer-control-row"') && template.includes("미리보기 열기"),
+        "Developer event actions should stay beside their event selector"
+    );
+    assert.ok(
+        template.includes("환생 횟수") && template.includes("환생 적용"),
+        "Developer rebirth actions should stay grouped with their count input"
+    );
+    assert.ok(
+        template.includes("캐릭터 설정") && template.includes("사냥터 테스트"),
+        "Developer controls should be grouped by the context they affect"
+    );
     assert.ok(template.includes("정예 조합"), "Developer tools should expose the elite combination selector");
     assert.ok(
         template.includes("state.developer.huntingEventType === 'elite_mob'"),
