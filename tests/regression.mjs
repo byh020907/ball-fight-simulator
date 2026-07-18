@@ -23779,10 +23779,11 @@ function testElementalistOrbProgressionAndOwnership() {
     const hpBeforePickup = primaryEnemy.hp;
     ability.consumeOrbByEnemy(enemyOrb, primaryEnemy);
     assert.ok(primaryEnemy.hp < hpBeforePickup, "Enemy direct pickup must apply the owner's spell to the enemy");
-    assert.equal(
-        simulation.entities.some((entity) => entity.visualOnly === true && entity.source === owner),
-        true,
-        "Enemy pickup must add a visual-only compressed timeline"
+    const pickupEffect = simulation.entities.find((entity) => entity.visualOnly === true && entity.source === owner);
+    assert.ok(pickupEffect, "Enemy pickup must add a visual-only compressed timeline");
+    assert.doesNotThrow(
+        () => pickupEffect.draw(makeCanvasContext()),
+        "Enemy pickup timeline must render without terminating the battle loop"
     );
     console.log("[elementalist-orb-progression-ownership] ok");
 }

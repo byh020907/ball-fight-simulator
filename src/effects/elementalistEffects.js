@@ -163,7 +163,7 @@ export function drawMultiShapeMotion(ctx, channel, progress) {
         ctx.save();
         ctx.fillStyle = channel.colors[side];
         ctx.strokeStyle = channel.colors[side];
-        ctx.lineWidth = getVisibleLineWidth(ctx, "detail", 2);
+        ctx.lineWidth = getVisibleLineWidth(ctx, "hairline", 2);
         ctx.translate(point.x, point.y);
         ctx.rotate(point.angle + progress * 2);
         const size = 3 + (index % 3);
