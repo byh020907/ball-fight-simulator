@@ -62,6 +62,16 @@ export class Simulation {
         );
     }
 
+    getAlliesOf(ball) {
+        return this.fighters.filter(
+            (fighter) =>
+                !this.isHostile(ball, fighter) &&
+                !fighter.flags.defeated &&
+                !fighter.flags.destroyed &&
+                !fighter.state?.swallowed
+        );
+    }
+
     getNearestEnemy(ball) {
         const enemies = this.getEnemiesOf(ball);
         if (enemies.length === 0) return null;

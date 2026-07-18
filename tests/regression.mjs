@@ -76,6 +76,7 @@ import { HuntingManager } from "../src/hunting/huntingManager.js";
 import { HUNTING_EVENT_TRANSITIONS, HuntingEvent } from "../src/hunting/huntingEvents.js";
 import { MishapEvent } from "../src/hunting/events/mishapEvent.js";
 import { RestSiteEvent } from "../src/hunting/events/restSiteEvent.js";
+import { placeEliteMobFormation } from "../src/hunting/eliteMobFormation.js";
 import {
     advanceHuntingRun,
     canEnterHunting,
@@ -3856,8 +3857,9 @@ function testHuntingBossRolesAndEnhancementStoneDrops(app) {
         roster: app.roster,
         playerProfile: createDefaultPlayerProfile(),
         playerStatAllocation: {},
-        startMatch(specs) {
+        startMatch(specs, options) {
             capturedMatches.push(specs);
+            this.simulation = new BattleSimulation(specs, { onLog() {}, onSound() {} }, null, options);
         }
     };
     const roleManager = new HuntingManager(managerApp);
@@ -4082,6 +4084,76 @@ function testEliteMobCombinationEvent(app) {
             "Elite event mobs should use current-floor normal stats"
         );
     });
+
+    const playerSpec = {
+        ...app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER),
+        teamId: HUNTING_TEAMS.PLAYER
+    };
+    const assertHuntingCombatProgresses = (label, enemySpecs) => {
+        const simulation = new BattleSimulation([playerSpec, ...enemySpecs], { onLog() {}, onSound() {} });
+        const playerBall = simulation.fighters.find((fighter) => fighter.id === playerSpec.id);
+        const enemies = simulation.getEnemiesOf(playerBall);
+        const allies = simulation.getAlliesOf(enemies[0]);
+
+        assert.ok(allies.includes(enemies[0]), `${label} should include the owner in its allied team query`);
+        assert.ok(
+            allies.every((fighter) => fighter.teamId === HUNTING_TEAMS.ENEMY),
+            `${label} should exclude hostile fighters`
+        );
+        assert.doesNotThrow(() => simulation.update(1 / 60), `${label} should complete its first combat frame`);
+        assert.ok(simulation.elapsed > 0, `${label} should advance simulation time after its first combat frame`);
+    };
+    assertHuntingCombatProgresses("Normal hunting combat", createHuntingMobEncounter({ floor: 10, rng: () => 0 }));
+    assertHuntingCombatProgresses("Elite hunting combat", eliteSpecs);
+    assertHuntingCombatProgresses("Champion hunting combat", [
+        createHuntingMinibossSpec({
+            roster: app.roster,
+            characterId: FIGHTER_IDS.ARCHER,
+            floor: 20,
+            enemyType: HUNTING_ENEMY_TYPES.CHAMPION,
+            rng: () => 0
+        })
+    ]);
+    assertHuntingCombatProgresses("Boss hunting combat", [createHuntingBossMobSpec({ floor: 50, rng: () => 0 })]);
+
+    const fixedFormationSpecs = createEliteMobEncounter({
+        floor: 10,
+        stageId: HUNTING_STAGE_IDS.CAVE,
+        combinationId: "elite-10-pursuer-charger-shooter",
+        monsterTypes: ["pursuer", "charger", "shooter"],
+        rng: () => 0
+    });
+    const formationSimulation = new BattleSimulation([playerSpec, ...fixedFormationSpecs], {
+        onLog() {},
+        onSound() {}
+    });
+    const formationPlayer = formationSimulation.fighters.find((fighter) => fighter.id === playerSpec.id);
+    const formationEnemies = formationSimulation.getEnemiesOf(formationPlayer);
+    formationPlayer.position = new Vector2(500, 500);
+    assert.doesNotThrow(
+        () => placeEliteMobFormation(formationPlayer, formationEnemies),
+        "Elite formation placement should use the Vector2 position contract"
+    );
+    const expectedFormationSlots = new Map([
+        ["pursuer", { distance: 260, lateral: -52.5 }],
+        ["charger", { distance: 260, lateral: 52.5 }],
+        ["shooter", { distance: 430, lateral: 0 }]
+    ]);
+    formationEnemies.forEach((fighter) => {
+        const expected = expectedFormationSlots.get(fighter.hunting.monsterType);
+        assert.ok(fighter.position instanceof Vector2, "Elite formation positions should remain Vector2 instances");
+        assert.deepEqual(fighter.hunting.eliteFormationSlot, expected, "Elite formation should preserve each row slot");
+        assert.equal(
+            fighter.position.x,
+            500 + expected.distance,
+            "Elite formation should place fighters by row distance"
+        );
+        assert.equal(
+            fighter.position.y,
+            500 + expected.lateral,
+            "Elite formation should place fighters by row lateral offset"
+        );
+    });
     assert.throws(
         () =>
             createEliteMobEncounter({
@@ -4098,8 +4170,9 @@ function testEliteMobCombinationEvent(app) {
         roster: app.roster,
         playerProfile: createDefaultPlayerProfile(),
         playerStatAllocation: {},
-        startMatch(specs) {
+        startMatch(specs, options) {
             capturedMatches.push(specs);
+            this.simulation = new BattleSimulation(specs, { onLog() {}, onSound() {} }, null, options);
         }
     };
     const manager = new HuntingManager(managerApp);
@@ -4120,6 +4193,18 @@ function testEliteMobCombinationEvent(app) {
         spawnedEliteSpecs.every((spec) => spec.hunting.enemyType === HUNTING_ENEMY_TYPES.ELITE),
         "HuntingManager should preserve elite scaling on every selected monster"
     );
+    const managedPlayer = managerApp.simulation.fighters.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
+    const managedEliteFighters = managerApp.simulation.getEnemiesOf(managedPlayer);
+    managedEliteFighters.forEach((fighter) => {
+        assert.ok(
+            fighter.position instanceof Vector2,
+            "HuntingManager should retain Vector2 positions after elite placement"
+        );
+        assert.ok(
+            fighter.hunting.eliteFormationSlot,
+            "HuntingManager should assign elite formation slots before combat"
+        );
+    });
 
     manager._run = {
         ...createHuntingRun({ characterId: FIGHTER_IDS.ARCHER, stageId: HUNTING_STAGE_IDS.CAVE, now: 1 }),

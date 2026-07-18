@@ -10,7 +10,7 @@ export function placeEliteMobFormation(player, fighters) {
     const placeRow = (row, distance) =>
         row.forEach((fighter, index) => {
             const lateral = (index - (row.length - 1) / 2) * 105;
-            fighter.position.set(player.position.x + distance, player.position.y + lateral);
+            fighter.position = new Vector2(player.position.x + distance, player.position.y + lateral);
             fighter.hunting.eliteFormationSlot = { distance, lateral };
         });
     placeRow(
