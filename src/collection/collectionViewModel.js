@@ -33,6 +33,7 @@ import {
     getCharacterEquipmentLevel,
     getEquipmentRequiredLevel,
     getEquipmentSpecialOptionLabel,
+    getEquipmentSpecialOptionDescription,
     calculateEnhanceCost,
     calculateEnhanceFailureRate,
     ENHANCE_MAX_LEVEL
@@ -257,7 +258,8 @@ export function createCollectionHubViewModel({
             stats: item.stats ?? [],
             specialOptions: (item.specialOptions ?? []).map((option) => ({
                 ...option,
-                label: getEquipmentSpecialOptionLabel(option.type)
+                label: getEquipmentSpecialOptionLabel(option.type),
+                description: getEquipmentSpecialOptionDescription(option.type)
             })),
             enhanceLevel: level,
             isEquipped: equippedIdSet.has(item.instanceId),

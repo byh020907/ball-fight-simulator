@@ -27,6 +27,9 @@ export const SPECIAL_OPTION_POOL = EQUIPMENT.SPECIALS.POOL;
 export const EQUIPMENT_SPECIAL_OPTION_LABELS = Object.freeze(
     Object.fromEntries(SPECIAL_OPTION_POOL.map((option) => [option.type, option.label]))
 );
+export const EQUIPMENT_SPECIAL_OPTION_DESCRIPTIONS = Object.freeze(
+    Object.fromEntries(SPECIAL_OPTION_POOL.map((option) => [option.type, option.description]))
+);
 export const EQUIPMENT_SPECIAL_OPTION_SUFFIXES = Object.freeze(
     Object.fromEntries(SPECIAL_OPTION_POOL.map((option) => [option.type, option.nameSuffix]))
 );
@@ -200,6 +203,10 @@ export function createGuaranteedEquipmentInstance({
 
 export function getEquipmentSpecialOptionLabel(type) {
     return EQUIPMENT_SPECIAL_OPTION_LABELS[type] ?? type;
+}
+
+export function getEquipmentSpecialOptionDescription(type) {
+    return EQUIPMENT_SPECIAL_OPTION_DESCRIPTIONS[type] ?? "특수 전투 효과를 적용합니다.";
 }
 
 export function generateEquipmentFromRarity(rarity, rng = defaultRng) {

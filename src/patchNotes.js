@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.31.3",
+        date: "2026-07-18",
+        title: "v0.31.3 장비 특수 옵션 툴팁",
+        changes: [
+            {
+                type: "feature",
+                text: "장비 특수 옵션에 마우스를 올리거나 키보드·터치로 포커스하면 실제 전투 효과를 바로 확인할 수 있습니다."
+            }
+        ]
+    },
+    {
         version: "0.31.2",
         date: "2026-07-18",
         title: "v0.31.2 정예 진형 조향 복구",

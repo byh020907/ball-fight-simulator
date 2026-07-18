@@ -78,6 +78,7 @@ export const EQUIPMENT = Object.freeze({
                 type: "crashDamage",
                 label: "파쇄",
                 nameSuffix: "파쇄",
+                description: "충돌 피해가 증가합니다.",
                 ...EQUIPMENT_BALANCE.specialRanges.crashDamage,
                 suffix: "%"
             }),
@@ -85,6 +86,7 @@ export const EQUIPMENT = Object.freeze({
                 type: "cooldown",
                 label: "순환",
                 nameSuffix: "순환",
+                description: "스킬 쿨다운이 감소합니다.",
                 ...EQUIPMENT_BALANCE.specialRanges.cooldown,
                 suffix: "%"
             }),
@@ -92,6 +94,7 @@ export const EQUIPMENT = Object.freeze({
                 type: "hpSteal",
                 label: "갈망",
                 nameSuffix: "갈망",
+                description: "충돌·접촉형 스킬 피해 일부를 HP로 회복합니다. (2.5초당 최대 1회)",
                 ...EQUIPMENT_BALANCE.specialRanges.hpSteal,
                 suffix: "%"
             }),
@@ -99,6 +102,7 @@ export const EQUIPMENT = Object.freeze({
                 type: "mass",
                 label: "중량",
                 nameSuffix: "중량",
+                description: "전투원의 질량이 증가합니다.",
                 ...EQUIPMENT_BALANCE.specialRanges.mass,
                 suffix: "%"
             }),
@@ -106,6 +110,7 @@ export const EQUIPMENT = Object.freeze({
                 type: "wallBounce",
                 label: "반향",
                 nameSuffix: "반향",
+                description: "벽에 튕긴 뒤의 속도가 증가합니다.",
                 ...EQUIPMENT_BALANCE.specialRanges.wallBounce,
                 suffix: "%"
             }),
@@ -113,6 +118,7 @@ export const EQUIPMENT = Object.freeze({
                 type: "angularImpulse",
                 label: "소용돌이",
                 nameSuffix: "소용돌이",
+                description: "충돌 때 전달하는 각충격이 증가합니다.",
                 ...EQUIPMENT_BALANCE.specialRanges.angularImpulse,
                 suffix: "%"
             })

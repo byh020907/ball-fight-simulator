@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import {
+    EQUIPMENT_SPECIAL_OPTION_DESCRIPTIONS,
+    getEquipmentSpecialOptionDescription
+} from "../src/hunting/equipmentConfig.js";
+import { createCollectionHubViewModel } from "../src/collection/collectionViewModel.js";
+import { createDefaultPlayerProfile } from "../src/playerProfile.js";
 
 function readSource(path) {
     return readFileSync(path, "utf8");
@@ -109,6 +115,80 @@ function testCollectionEquipmentPanelsOwnTheirFlows() {
         "Shop panel should own its visibility, countdown, and reroll animation lifecycle"
     );
     console.log("[collection-equipment-panel-ownership] ok");
+}
+
+function testEquipmentSpecialOptionTooltipContract() {
+    const equipmentPanel = readSource("src/components/collection-equipment-panel.html");
+    const expectedOptionTypes = ["crashDamage", "cooldown", "hpSteal", "mass", "wallBounce", "angularImpulse"];
+
+    assert.deepEqual(
+        Object.keys(EQUIPMENT_SPECIAL_OPTION_DESCRIPTIONS),
+        expectedOptionTypes,
+        "Every equipment special option should expose one effect description"
+    );
+    for (const description of Object.values(EQUIPMENT_SPECIAL_OPTION_DESCRIPTIONS)) {
+        assert.match(description, /[가-힣]/, "Equipment special option descriptions should be readable Korean text");
+    }
+    const profile = createDefaultPlayerProfile();
+    profile.equipment.inventory = expectedOptionTypes.map((type) => ({
+        instanceId: `tooltip-${type}`,
+        rarity: "common",
+        slot: "weapon",
+        name: type,
+        stats: [],
+        specialOptions: [{ type, value: 10 }]
+    }));
+    const viewModel = createCollectionHubViewModel({ profile, roster: [] });
+    assert.deepEqual(
+        viewModel.equipment.items.map((item) => item.specialOptions[0].description),
+        expectedOptionTypes.map((type) => EQUIPMENT_SPECIAL_OPTION_DESCRIPTIONS[type]),
+        "The collection view model should expose each special option effect description to the equipment panel"
+    );
+    assert.ok(
+        equipmentPanel.includes('x-for="option in item.specialOptions"') &&
+            equipmentPanel.includes('role="tooltip"') &&
+            equipmentPanel.includes('tabindex="0"') &&
+            equipmentPanel.includes('x-teleport="body"'),
+        "Equipment special options should render individually with one focusable, teleported tooltip"
+    );
+    assert.ok(
+        equipmentPanel.includes('@mouseenter="openSpecialTooltip(item, option, $el)"') &&
+            equipmentPanel.includes('@focus="openSpecialTooltip(item, option, $el)"') &&
+            equipmentPanel.includes('@click="openSpecialTooltip(item, option, $el)"') &&
+            equipmentPanel.includes('@mouseleave="closeSpecialTooltip()"') &&
+            equipmentPanel.includes('@blur="closeSpecialTooltip()"') &&
+            equipmentPanel.includes('@keydown.escape.window="closeSpecialTooltip()"') &&
+            equipmentPanel.includes('@scroll="closeSpecialTooltip()"') &&
+            equipmentPanel.includes('@click.outside="closeSpecialTooltip()"'),
+        "Special option tooltips should open for pointer, keyboard, and touch then close on leave, blur, outside tap, Escape, or list scroll"
+    );
+    assert.ok(
+        equipmentPanel.includes("position: fixed") &&
+            equipmentPanel.includes("getBoundingClientRect") &&
+            equipmentPanel.includes('x-bind:style="specialTooltip.style"') &&
+            equipmentPanel.includes('x-ref="specialTooltip"'),
+        "The tooltip should use a teleported fixed viewport anchor whose reactive style is measured after rendering"
+    );
+    assert.ok(
+        equipmentPanel.includes("this.$nextTick(() => {") &&
+            equipmentPanel.includes("this.$refs.specialTooltip") &&
+            equipmentPanel.includes("tooltip.getBoundingClientRect()") &&
+            equipmentPanel.includes("document.documentElement.clientWidth") &&
+            equipmentPanel.includes("document.documentElement.clientHeight") &&
+            equipmentPanel.includes("canFitBelow") &&
+            equipmentPanel.includes("canFitAbove") &&
+            equipmentPanel.includes("max-height: calc(100vh - 1rem)") &&
+            !equipmentPanel.includes("tooltipWidth") &&
+            !equipmentPanel.includes("tooltipHeight") &&
+            !equipmentPanel.includes("globalThis.innerWidth"),
+        "The tooltip should measure its actual rendered size, choose an above or below placement, and clamp it inside the viewport"
+    );
+    assert.equal(
+        getEquipmentSpecialOptionDescription("legacyUnknown"),
+        "특수 전투 효과를 적용합니다.",
+        "Unknown legacy special options should keep a safe description fallback"
+    );
+    console.log("[equipment-special-option-tooltip] ok");
 }
 
 function testDailyShopPopupContract() {
@@ -1153,6 +1233,7 @@ function testCollectionTitleLongPressDebugEntry() {
 testHuntingMerchantMobileScrollContract();
 testHuntingChestIconReuseContract();
 testCollectionEquipmentPanelsOwnTheirFlows();
+testEquipmentSpecialOptionTooltipContract();
 testDailyShopPopupContract();
 testFusionEquippedLabelTypographyContract();
 testCollectionEquipmentPanelsShareHubState();
