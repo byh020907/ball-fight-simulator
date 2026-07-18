@@ -4134,6 +4134,21 @@ function testEliteMobFormationConfigInjection() {
     );
 }
 
+function assertHuntingCombatProgresses(playerSpec, label, enemySpecs) {
+    const simulation = new BattleSimulation([playerSpec, ...enemySpecs], { onLog() {}, onSound() {} });
+    const playerBall = simulation.fighters.find((fighter) => fighter.id === playerSpec.id);
+    const enemies = simulation.getEnemiesOf(playerBall);
+    const allies = simulation.getAlliesOf(enemies[0]);
+
+    assert.ok(allies.includes(enemies[0]), `${label} should include the owner in its allied team query`);
+    assert.ok(
+        allies.every((fighter) => fighter.teamId === HUNTING_TEAMS.ENEMY),
+        `${label} should exclude hostile fighters`
+    );
+    assert.doesNotThrow(() => simulation.update(1 / 60), `${label} should complete its first combat frame`);
+    assert.ok(simulation.elapsed > 0, `${label} should advance simulation time after its first combat frame`);
+}
+
 function testEliteMobCombinationEvent(app) {
     assert.equal(
         HuntingEvent.POOL.at(-1)?.type,
@@ -4238,23 +4253,13 @@ function testEliteMobCombinationEvent(app) {
         ...app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER),
         teamId: HUNTING_TEAMS.PLAYER
     };
-    const assertHuntingCombatProgresses = (label, enemySpecs) => {
-        const simulation = new BattleSimulation([playerSpec, ...enemySpecs], { onLog() {}, onSound() {} });
-        const playerBall = simulation.fighters.find((fighter) => fighter.id === playerSpec.id);
-        const enemies = simulation.getEnemiesOf(playerBall);
-        const allies = simulation.getAlliesOf(enemies[0]);
-
-        assert.ok(allies.includes(enemies[0]), `${label} should include the owner in its allied team query`);
-        assert.ok(
-            allies.every((fighter) => fighter.teamId === HUNTING_TEAMS.ENEMY),
-            `${label} should exclude hostile fighters`
-        );
-        assert.doesNotThrow(() => simulation.update(1 / 60), `${label} should complete its first combat frame`);
-        assert.ok(simulation.elapsed > 0, `${label} should advance simulation time after its first combat frame`);
-    };
-    assertHuntingCombatProgresses("Normal hunting combat", createHuntingMobEncounter({ floor: 10, rng: () => 0 }));
-    assertHuntingCombatProgresses("Elite hunting combat", eliteSpecs);
-    assertHuntingCombatProgresses("Champion hunting combat", [
+    assertHuntingCombatProgresses(
+        playerSpec,
+        "Normal hunting combat",
+        createHuntingMobEncounter({ floor: 10, rng: () => 0 })
+    );
+    assertHuntingCombatProgresses(playerSpec, "Elite hunting combat", eliteSpecs);
+    assertHuntingCombatProgresses(playerSpec, "Champion hunting combat", [
         createHuntingMinibossSpec({
             roster: app.roster,
             characterId: FIGHTER_IDS.ARCHER,
@@ -4263,7 +4268,9 @@ function testEliteMobCombinationEvent(app) {
             rng: () => 0
         })
     ]);
-    assertHuntingCombatProgresses("Boss hunting combat", [createHuntingBossMobSpec({ floor: 50, rng: () => 0 })]);
+    assertHuntingCombatProgresses(playerSpec, "Boss hunting combat", [
+        createHuntingBossMobSpec({ floor: 50, rng: () => 0 })
+    ]);
 
     const fixedFormationSpecs = createEliteMobEncounter({
         floor: 10,

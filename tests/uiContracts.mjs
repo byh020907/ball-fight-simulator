@@ -338,81 +338,86 @@ function loadCollectionComponentFactory(path, expectedName, factories) {
     return factories[expectedName];
 }
 
-function restoreGlobalProperty(name, descriptor) {
-    if (descriptor) Object.defineProperty(globalThis, name, descriptor);
-    else delete globalThis[name];
+function withGlobalPropertyStubs(stubs, callback) {
+    const originalDescriptors = new Map(
+        Object.keys(stubs).map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)])
+    );
+
+    try {
+        Object.entries(stubs).forEach(([name, value]) => {
+            Object.defineProperty(globalThis, name, { configurable: true, value });
+        });
+        return callback();
+    } finally {
+        originalDescriptors.forEach((descriptor, name) => {
+            if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+            else delete globalThis[name];
+        });
+    }
 }
 
 function testEquipmentSpecialTooltipInteractionContract() {
-    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
-    const originalAlpine = Object.getOwnPropertyDescriptor(globalThis, "Alpine");
-    const originalDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
     const factories = {};
 
-    try {
-        Object.defineProperty(globalThis, "window", {
-            configurable: true,
-            value: {
+    withGlobalPropertyStubs(
+        {
+            window: {
                 createGameUI(name, factory) {
                     factories[name] = factory;
                 }
-            }
-        });
-        Object.defineProperty(globalThis, "Alpine", {
-            configurable: true,
-            value: { store() {} }
-        });
-        Object.defineProperty(globalThis, "document", {
-            configurable: true,
-            value: { documentElement: { clientWidth: 360, clientHeight: 800 } }
-        });
-
-        const createEquipmentPanel = loadCollectionComponentFactory(
-            "src/components/collection-equipment-panel.html",
-            "collectionEquipmentPanel",
-            factories
-        );
-        const panel = createEquipmentPanel();
-        panel.$refs = {
-            specialTooltip: {
-                getBoundingClientRect() {
-                    return { width: 220, height: 64 };
+            },
+            Alpine: { store() {} },
+            document: { documentElement: { clientWidth: 360, clientHeight: 800 } }
+        },
+        () => {
+            const createEquipmentPanel = loadCollectionComponentFactory(
+                "src/components/collection-equipment-panel.html",
+                "collectionEquipmentPanel",
+                factories
+            );
+            const panel = createEquipmentPanel();
+            panel.$refs = {
+                specialTooltip: {
+                    getBoundingClientRect() {
+                        return { width: 220, height: 64 };
+                    }
                 }
-            }
-        };
-        panel.$nextTick = (callback) => callback();
-        const anchor = {
-            getBoundingClientRect() {
-                return { left: 320, top: 700, bottom: 724 };
-            }
-        };
-        const item = { instanceId: "mobile-tooltip" };
-        const option = { type: "hpSteal", description: "긴 갈망 설명" };
+            };
+            panel.$nextTick = (callback) => callback();
+            const anchor = {
+                getBoundingClientRect() {
+                    return { left: 320, top: 700, bottom: 724 };
+                }
+            };
+            const item = { instanceId: "mobile-tooltip" };
+            const option = { type: "hpSteal", description: "긴 갈망 설명" };
 
-        panel.openSpecialTooltip(item, option, anchor);
-        assert.equal(panel.specialTooltip.visible, true, "One tap should leave its tooltip open");
-        assert.equal(panel.specialTooltip.placement, "above", "A bottom-edge anchor should place the tooltip above");
-        assert.match(panel.specialTooltip.style, /left:\s*132px/, "A right-edge anchor should clamp tooltip placement");
+            panel.openSpecialTooltip(item, option, anchor);
+            assert.equal(panel.specialTooltip.visible, true, "One tap should leave its tooltip open");
+            assert.equal(
+                panel.specialTooltip.placement,
+                "above",
+                "A bottom-edge anchor should place the tooltip above"
+            );
+            assert.match(
+                panel.specialTooltip.style,
+                /left:\s*132px/,
+                "A right-edge anchor should clamp tooltip placement"
+            );
 
-        panel.closeSpecialTooltip();
-        assert.equal(
-            panel.specialTooltip.visible,
-            false,
-            "Blur or an outside panel tap should close the visible tooltip"
-        );
-    } finally {
-        restoreGlobalProperty("window", originalWindow);
-        restoreGlobalProperty("Alpine", originalAlpine);
-        restoreGlobalProperty("document", originalDocument);
-    }
+            panel.closeSpecialTooltip();
+            assert.equal(
+                panel.specialTooltip.visible,
+                false,
+                "Blur or an outside panel tap should close the visible tooltip"
+            );
+        }
+    );
 
     console.log("[equipment-special-option-tooltip-interaction] ok");
 }
 
 function testCollectionEquipmentPanelsShareHubState() {
-    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
-    const originalAlpine = Object.getOwnPropertyDescriptor(globalThis, "Alpine");
-    const originalResizeObserver = Object.getOwnPropertyDescriptor(globalThis, "ResizeObserver");
     const factories = {};
     const components = {};
     const calls = [];
@@ -429,18 +434,14 @@ function testCollectionEquipmentPanelsShareHubState() {
         }
     };
 
-    try {
-        Object.defineProperty(globalThis, "window", {
-            configurable: true,
-            value: {
+    withGlobalPropertyStubs(
+        {
+            window: {
                 createGameUI(name, factory) {
                     factories[name] = factory;
                 }
-            }
-        });
-        Object.defineProperty(globalThis, "Alpine", {
-            configurable: true,
-            value: {
+            },
+            Alpine: {
                 reactive(value) {
                     return value;
                 },
@@ -448,11 +449,8 @@ function testCollectionEquipmentPanelsShareHubState() {
                     assert.equal(name, "uiManager", "Collection child components should only request uiManager");
                     return uiManager;
                 }
-            }
-        });
-        Object.defineProperty(globalThis, "ResizeObserver", {
-            configurable: true,
-            value: class {
+            },
+            ResizeObserver: class {
                 constructor() {}
 
                 observe(element) {
@@ -461,94 +459,99 @@ function testCollectionEquipmentPanelsShareHubState() {
 
                 disconnect() {}
             }
-        });
+        },
+        () => {
+            const createHub = loadCollectionComponentFactory(
+                "src/components/collection-hub.html",
+                "collectionHub",
+                factories
+            );
+            const hub = createHub();
+            hub.$root = { focus() {}, querySelector() {} };
+            components.collectionHub = hub;
+            hub.init();
+            assert.equal(
+                observedElement,
+                hub.$root,
+                "Collection hub should observe its frame size for active tab visibility"
+            );
+            hub.state.equipment = {
+                enhancementStones: 30,
+                fusion: {
+                    sourceItemCount: 1,
+                    recipes: [
+                        {
+                            rarity: "common",
+                            items: [{ instanceId: "source-1", isEquipped: false }],
+                            cost: { stones: 10, shards: 20 }
+                        }
+                    ]
+                }
+            };
+            hub.state.storage = { shards: 50 };
 
-        const createHub = loadCollectionComponentFactory(
-            "src/components/collection-hub.html",
-            "collectionHub",
-            factories
-        );
-        const hub = createHub();
-        hub.$root = { focus() {}, querySelector() {} };
-        components.collectionHub = hub;
-        hub.init();
-        assert.equal(
-            observedElement,
-            hub.$root,
-            "Collection hub should observe its frame size for active tab visibility"
-        );
-        hub.state.equipment = {
-            enhancementStones: 30,
-            fusion: {
-                sourceItemCount: 1,
-                recipes: [
-                    {
-                        rarity: "common",
-                        items: [{ instanceId: "source-1", isEquipped: false }],
-                        cost: { stones: 10, shards: 20 }
-                    }
-                ]
-            }
-        };
-        hub.state.storage = { shards: 50 };
+            const createFusion = loadCollectionComponentFactory(
+                "src/components/collection-fusion-dialog.html",
+                "collectionFusionDialog",
+                factories
+            );
+            components.collectionFusionDialog = createFusion();
+            const createShop = loadCollectionComponentFactory(
+                "src/components/collection-shop-panel.html",
+                "collectionShopPanel",
+                factories
+            );
+            components.collectionShopPanel = createShop();
+            const createEquipmentPanel = loadCollectionComponentFactory(
+                "src/components/collection-equipment-panel.html",
+                "collectionEquipmentPanel",
+                factories
+            );
+            components.collectionEquipmentPanel = createEquipmentPanel();
 
-        const createFusion = loadCollectionComponentFactory(
-            "src/components/collection-fusion-dialog.html",
-            "collectionFusionDialog",
-            factories
-        );
-        components.collectionFusionDialog = createFusion();
-        const createShop = loadCollectionComponentFactory(
-            "src/components/collection-shop-panel.html",
-            "collectionShopPanel",
-            factories
-        );
-        components.collectionShopPanel = createShop();
-        const createEquipmentPanel = loadCollectionComponentFactory(
-            "src/components/collection-equipment-panel.html",
-            "collectionEquipmentPanel",
-            factories
-        );
-        components.collectionEquipmentPanel = createEquipmentPanel();
+            components.collectionEquipmentPanel.openFusion();
+            assert.equal(
+                components.collectionFusionDialog.state.visible,
+                true,
+                "Equipment panel should open the fusion dialog"
+            );
+            assert.equal(
+                components.collectionFusionDialog.state.selection.rarity,
+                "common",
+                "Fusion should select its first recipe"
+            );
+            components.collectionFusionDialog.toggleItem("source-1");
+            components.collectionFusionDialog.fuseSelectedItems();
+            assert.deepEqual(
+                calls.at(-1),
+                ["fuseEquipmentItems", [["source-1"]]],
+                "Fusion should use the game action bridge"
+            );
+            assert.equal(
+                components.collectionFusionDialog.state.visible,
+                false,
+                "Fusion should hide after a submitted selection"
+            );
 
-        components.collectionEquipmentPanel.openFusion();
-        assert.equal(
-            components.collectionFusionDialog.state.visible,
-            true,
-            "Equipment panel should open the fusion dialog"
-        );
-        assert.equal(
-            components.collectionFusionDialog.state.selection.rarity,
-            "common",
-            "Fusion should select its first recipe"
-        );
-        components.collectionFusionDialog.toggleItem("source-1");
-        components.collectionFusionDialog.fuseSelectedItems();
-        assert.deepEqual(
-            calls.at(-1),
-            ["fuseEquipmentItems", [["source-1"]]],
-            "Fusion should use the game action bridge"
-        );
-        assert.equal(
-            components.collectionFusionDialog.state.visible,
-            false,
-            "Fusion should hide after a submitted selection"
-        );
-
-        components.collectionEquipmentPanel.openShop();
-        assert.equal(components.collectionShopPanel.state.visible, true, "Equipment panel should open the shop panel");
-        hub.close();
-        assert.equal(components.collectionShopPanel.state.visible, false, "Closing the hub should hide the shop panel");
-        assert.equal(
-            components.collectionFusionDialog.state.visible,
-            false,
-            "Closing the hub should reset the fusion dialog"
-        );
-    } finally {
-        restoreGlobalProperty("window", originalWindow);
-        restoreGlobalProperty("Alpine", originalAlpine);
-        restoreGlobalProperty("ResizeObserver", originalResizeObserver);
-    }
+            components.collectionEquipmentPanel.openShop();
+            assert.equal(
+                components.collectionShopPanel.state.visible,
+                true,
+                "Equipment panel should open the shop panel"
+            );
+            hub.close();
+            assert.equal(
+                components.collectionShopPanel.state.visible,
+                false,
+                "Closing the hub should hide the shop panel"
+            );
+            assert.equal(
+                components.collectionFusionDialog.state.visible,
+                false,
+                "Closing the hub should reset the fusion dialog"
+            );
+        }
+    );
 
     console.log("[collection-equipment-panel-shared-state] ok");
 }
@@ -1258,29 +1261,19 @@ function testCollectionTitleLongPressDebugEntry() {
         "Collection title debug entry should require a one-second hold"
     );
 
-    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
-    const originalAlpine = Object.getOwnPropertyDescriptor(globalThis, "Alpine");
-    const originalResizeObserver = Object.getOwnPropertyDescriptor(globalThis, "ResizeObserver");
-    const originalRequestAnimationFrame = Object.getOwnPropertyDescriptor(globalThis, "requestAnimationFrame");
-    const originalSetTimeout = Object.getOwnPropertyDescriptor(globalThis, "setTimeout");
-    const originalClearTimeout = Object.getOwnPropertyDescriptor(globalThis, "clearTimeout");
     const factories = {};
     let scheduledHold = null;
     let clearedTimerId = null;
     let debugEntryCount = 0;
 
-    try {
-        Object.defineProperty(globalThis, "window", {
-            configurable: true,
-            value: {
+    withGlobalPropertyStubs(
+        {
+            window: {
                 createGameUI(name, factory) {
                     factories[name] = factory;
                 }
-            }
-        });
-        Object.defineProperty(globalThis, "Alpine", {
-            configurable: true,
-            value: {
+            },
+            Alpine: {
                 reactive(value) {
                     return value;
                 },
@@ -1296,70 +1289,52 @@ function testCollectionTitleLongPressDebugEntry() {
                         }
                     };
                 }
-            }
-        });
-        Object.defineProperty(globalThis, "ResizeObserver", {
-            configurable: true,
-            value: class {
+            },
+            ResizeObserver: class {
                 observe() {}
                 disconnect() {}
-            }
-        });
-        Object.defineProperty(globalThis, "requestAnimationFrame", {
-            configurable: true,
-            value(callback) {
+            },
+            requestAnimationFrame(callback) {
                 callback();
                 return 1;
-            }
-        });
-        Object.defineProperty(globalThis, "setTimeout", {
-            configurable: true,
-            value(callback, delay) {
+            },
+            setTimeout(callback, delay) {
                 scheduledHold = { callback, delay, timerId: 7 };
                 return scheduledHold.timerId;
-            }
-        });
-        Object.defineProperty(globalThis, "clearTimeout", {
-            configurable: true,
-            value(timerId) {
+            },
+            clearTimeout(timerId) {
                 clearedTimerId = timerId;
             }
-        });
+        },
+        () => {
+            const createHub = loadCollectionComponentFactory(
+                "src/components/collection-hub.html",
+                "collectionHub",
+                factories
+            );
+            const hub = createHub();
+            hub.$root = { focus() {}, querySelector() {} };
+            hub.init();
+            hub.state.tabs = [
+                { id: "roster", label: "도감" },
+                { id: "developer", label: "개발자" }
+            ];
 
-        const createHub = loadCollectionComponentFactory(
-            "src/components/collection-hub.html",
-            "collectionHub",
-            factories
-        );
-        const hub = createHub();
-        hub.$root = { focus() {}, querySelector() {} };
-        hub.init();
-        hub.state.tabs = [
-            { id: "roster", label: "도감" },
-            { id: "developer", label: "개발자" }
-        ];
+            hub.startDebugModeHold({ pointerType: "touch", button: 0 });
+            assert.equal(scheduledHold.delay, 1000, "Touch hold should wait exactly one second");
+            assert.equal(hub.state.debugModeHoldActive, true, "Touch hold should expose visible progress feedback");
+            hub.cancelDebugModeHold();
+            assert.equal(clearedTimerId, 7, "Releasing early should cancel the pending debug entry");
+            assert.equal(debugEntryCount, 0, "Cancelled hold must not enter debug mode");
 
-        hub.startDebugModeHold({ pointerType: "touch", button: 0 });
-        assert.equal(scheduledHold.delay, 1000, "Touch hold should wait exactly one second");
-        assert.equal(hub.state.debugModeHoldActive, true, "Touch hold should expose visible progress feedback");
-        hub.cancelDebugModeHold();
-        assert.equal(clearedTimerId, 7, "Releasing early should cancel the pending debug entry");
-        assert.equal(debugEntryCount, 0, "Cancelled hold must not enter debug mode");
-
-        hub.startDebugModeHold({ pointerType: "touch", button: 0 });
-        scheduledHold.callback();
-        assert.equal(debugEntryCount, 1, "Completed hold should enter debug mode once");
-        assert.equal(hub.state.activeTab, "developer", "Completed hold should open the developer tab");
-        assert.equal(hub.state.debugModeHoldActive, false, "Completed hold should clear its progress state");
-        hub.destroy();
-    } finally {
-        restoreGlobalProperty("window", originalWindow);
-        restoreGlobalProperty("Alpine", originalAlpine);
-        restoreGlobalProperty("ResizeObserver", originalResizeObserver);
-        restoreGlobalProperty("requestAnimationFrame", originalRequestAnimationFrame);
-        restoreGlobalProperty("setTimeout", originalSetTimeout);
-        restoreGlobalProperty("clearTimeout", originalClearTimeout);
-    }
+            hub.startDebugModeHold({ pointerType: "touch", button: 0 });
+            scheduledHold.callback();
+            assert.equal(debugEntryCount, 1, "Completed hold should enter debug mode once");
+            assert.equal(hub.state.activeTab, "developer", "Completed hold should open the developer tab");
+            assert.equal(hub.state.debugModeHoldActive, false, "Completed hold should clear its progress state");
+            hub.destroy();
+        }
+    );
 
     console.log("[collection-title-long-press-debug-entry] ok");
 }
