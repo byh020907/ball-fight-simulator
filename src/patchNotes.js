@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.31.5",
+        date: "2026-07-18",
+        title: "v0.31.5 Eater 소화 회복",
+        changes: [
+            {
+                type: "feature",
+                text: "Eater Ball은 Lv.3부터 삼킨 상대를 소화해 실제로 준 피해만큼 HP를 회복합니다."
+            }
+        ]
+    },
+    {
         version: "0.31.4",
         date: "2026-07-18",
         title: "v0.31.4 낮은 층 원정 진행 수정",

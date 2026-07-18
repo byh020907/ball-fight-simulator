@@ -23163,11 +23163,15 @@ function testEaterAbilityDigestion() {
     eater.ability.setContext({ abilityTier: 1 });
     eater.ability.state.swallowedTarget = target;
     eater.ability.state.swallowTimer = 0.72;
+    eater.hp = Math.max(1, eater.maxHp - 30);
+    const eaterHpBefore = eater.hp;
     const hpBefore = target.hp;
     for (let index = 0; index < 6; index += 1) {
         eater.ability._tickDigestion(0.12);
     }
-    assert.ok(target.hp < hpBefore, "Eater Lv3 digestion should deal damage over time");
+    const digestionDamage = hpBefore - target.hp;
+    assert.ok(digestionDamage > 0, "Eater Lv3 digestion should deal damage over time");
+    assert.equal(eater.hp - eaterHpBefore, digestionDamage, "Eater Lv3 should heal for actual digestion damage");
     eater.ability.state.swallowedTarget = null;
     // Lv6 spit behavior
     eater.ability.setContext({ abilityTier: 2 });

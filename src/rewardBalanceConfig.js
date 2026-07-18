@@ -174,7 +174,7 @@ export const REWARD_BALANCE = deepFreeze({
             ],
             eater: [
                 { level: 2 },
-                { level: 3, abilityTier: 1, gameText: "삼킨 중 소화 6틱 ×0.12" },
+                { level: 3, abilityTier: 1, gameText: "삼킨 중 소화 6틱 ×0.12 · 실제 피해만큼 회복" },
                 { level: 4 },
                 { level: 5 },
                 { level: 6, abilityTier: 2, gameText: "뱉기 ×1.0 피해 · 속도 ×3 · 반동" },

@@ -106,7 +106,8 @@ export class EaterAbility extends Ability {
             const target = this.state.swallowedTarget;
             if (target && !target.flags.defeated) {
                 const dmg = Math.round(this.owner.stats.baseDamage * DIGEST_DAMAGE_PER_TICK);
-                target.takeDamage(dmg, this.owner, "Digestion");
+                const { actualDamage } = target.takeDamage(dmg, this.owner, "Digestion");
+                this.owner.heal(actualDamage);
                 this._emitDigestionFeedback(target);
             }
             this.state.digestionTick++;
