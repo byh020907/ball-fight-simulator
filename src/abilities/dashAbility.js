@@ -1,6 +1,6 @@
 import { steerBallToward, Vector2 } from "../core.js";
 import { DashEffect } from "../combatEffects.js";
-import { LaserBeamEffect } from "../effects/index.js";
+import { CrossOverloadEffect, LaserBeamEffect, circleIntersectsLaserSegment } from "../effects/index.js";
 import { Ability } from "./ability.js";
 
 const INITIAL_COOLDOWN_LEVEL = 0;
@@ -8,6 +8,8 @@ const HOMING_RANGE = 400;
 const MAX_DASH_DURATION = 1.4;
 const DASH_SOUND_PITCH = 1.15;
 const SLASH_LENGTH = 120;
+const LASER_DAMAGE_TICK = 0.05;
+const LASER_TICK_EPSILON = 1e-9;
 
 export class DashAbility extends Ability {
     constructor(owner, simulation) {
@@ -19,6 +21,7 @@ export class DashAbility extends Ability {
         this.timer = this.cooldown;
         this.dashMultiplier = 2.15;
         this.homingTurnRate = 2.4;
+        this.laserCombatStates = new WeakMap();
     }
 
     update(delta, target) {
@@ -63,10 +66,60 @@ export class DashAbility extends Ability {
         if (this.getLevelUpgrade().laserStrike && target && !target.flags.defeated) {
             this.simulation.entities.push(
                 new LaserBeamEffect(this.owner, target, {
-                    maxWallBounces: this.getLevelUpgrade().laserWallBounces ?? 0
+                    maxWallBounces: this.getLevelUpgrade().laserWallBounces ?? 0,
+                    combatOwner: this
                 })
             );
         }
+    }
+
+    beginDashLaserCombat(laser) {
+        this.laserCombatStates.set(laser, {
+            damageTickAccumulator: 0,
+            damageTickInterval: laser.fireDuration / Math.max(1, Math.ceil(laser.fireDuration / LASER_DAMAGE_TICK))
+        });
+    }
+
+    resolveDashLaserFire(laser, activeDuration) {
+        const state = this.laserCombatStates.get(laser);
+        if (!state) return;
+        state.damageTickAccumulator += activeDuration;
+        while (state.damageTickAccumulator + LASER_TICK_EPSILON >= state.damageTickInterval) {
+            state.damageTickAccumulator -= state.damageTickInterval;
+            this._dealDashLaserTick(laser, state.damageTickInterval);
+        }
+    }
+
+    _dealDashLaserTick(laser, activeDuration) {
+        for (const target of this.simulation.getEnemiesOf(this.owner)) {
+            laser.segments.forEach((segment, index) => {
+                if (!circleIntersectsLaserSegment(target, segment)) return;
+                const rawDamage = this.owner.stats.baseDamage * 0.6 * (activeDuration / laser.fireDuration);
+                const { actualDamage } = target.takeDamage(rawDamage, this.owner, "Dash Laser");
+                if (actualDamage > 0) laser.recordHit(target, index);
+            });
+        }
+    }
+
+    finishDashLaserCombat(laser) {
+        if (laser.maxWallBounces > 0 && this.owner.progression?.abilityTier >= 3) {
+            for (const [target, segments] of laser.getHitSegmentsByTarget()) {
+                if (segments.size < 2 || target.flags.defeated) continue;
+                this._triggerDashLaserOverload(target);
+            }
+        }
+        this.laserCombatStates.delete(laser);
+    }
+
+    _triggerDashLaserOverload(target) {
+        const center = target.position.clone();
+        for (const enemy of this.simulation.getEnemiesOf(this.owner)) {
+            if (Vector2.subtract(enemy.position, center).length() > 100) continue;
+            enemy.takeDamage(this.owner.stats.baseDamage, this.owner, "Cross Overload");
+        }
+        this.simulation.spawnExplosion(center, "#ff8b2f");
+        this.simulation.spawnPulse(center, "#ffffff");
+        this.simulation.entities.push(new CrossOverloadEffect(center, 100));
     }
 
     onDashWall() {

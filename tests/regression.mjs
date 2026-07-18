@@ -5998,6 +5998,42 @@ function testFiveBallLevelRewardContracts(app) {
         for (const delta of steps) laser.update(delta, run.simulation);
         return { run, laser, damage: hpBefore - run.target.hp };
     };
+    const ownershipRun = createRun(FIGHTER_IDS.DASH);
+    ownershipRun.owner.position = new Vector2(100, 300);
+    ownershipRun.target.position = new Vector2(320, 300);
+    const combatSignals = [];
+    const visualOnlyLaser = new LaserBeamEffect(ownershipRun.owner, ownershipRun.target, {
+        combatOwner: {
+            beginDashLaserCombat(laser) {
+                combatSignals.push(["begin", laser]);
+            },
+            resolveDashLaserFire(laser, duration) {
+                combatSignals.push(["fire", laser, duration]);
+                laser.recordHit(ownershipRun.target, 0);
+            },
+            finishDashLaserCombat(laser) {
+                combatSignals.push(["finish", laser]);
+            }
+        }
+    });
+    const ownershipHpBefore = ownershipRun.target.hp;
+    visualOnlyLaser.update(0.35, ownershipRun.simulation);
+    visualOnlyLaser.update(0.3, ownershipRun.simulation);
+    assert.deepEqual(
+        combatSignals.map(([phase]) => phase),
+        ["begin", "fire", "finish"],
+        "Dash laser effect should expose phase and segment callbacks while Dash combat owns outcomes"
+    );
+    assert.equal(
+        ownershipHpBefore - ownershipRun.target.hp,
+        0,
+        "A visual-only Dash laser callback should not apply damage without Dash combat handling it"
+    );
+    assert.equal(
+        visualOnlyLaser.getHitSegmentsByTarget().get(ownershipRun.target).size,
+        1,
+        "Dash combat should supply the hit markers that the laser effect renders"
+    );
     const steppedDash = runReflectedLaser([0.35, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05]);
     const largeDeltaDash = runReflectedLaser([0.65]);
     assert.deepEqual(

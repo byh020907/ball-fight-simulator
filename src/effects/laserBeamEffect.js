@@ -9,7 +9,6 @@ import {
 
 const RAY_EPSILON = 0.01;
 const PHASE_EPSILON = 1e-9;
-const LASER_DAMAGE_TICK = 0.05;
 const DASH_MATERIALIZE_PROGRESS = 0.18;
 const DASH_CASTER_SCALE = 0.76;
 const DASH_CASTER_DISSIPATE_DURATION = 0.16;
@@ -110,7 +109,11 @@ export function drawLaserSegments(ctx, segments, { alpha = 1, color = "#ff5656" 
 export class LaserBeamEffect extends CombatEntity {
     static renderLayer = RENDER_LAYERS.FOREGROUND;
 
-    constructor(source, target, { chargeDuration = 0.35, fireDuration = 0.3, maxWallBounces = 0 } = {}) {
+    constructor(
+        source,
+        target,
+        { chargeDuration = 0.35, fireDuration = 0.3, maxWallBounces = 0, combatOwner = source.ability } = {}
+    ) {
         super(source.position.clone(), new Vector2(), 0);
         this.source = source;
         this.target = target;
@@ -123,9 +126,9 @@ export class LaserBeamEffect extends CombatEntity {
         this.phase = "charge";
         this.angle = 0;
         this.segments = [];
-        this.damageTickInterval = fireDuration / Math.max(1, Math.ceil(fireDuration / LASER_DAMAGE_TICK));
-        this.damageTickAccumulator = 0;
         this.hitSegmentsByTarget = new Map();
+        this.combatOwner = combatOwner;
+        this.combatOwner?.beginDashLaserCombat?.(this);
     }
 
     update(delta, simulation) {
@@ -168,25 +171,7 @@ export class LaserBeamEffect extends CombatEntity {
 
     _advanceFire(delta, simulation) {
         this._syncFireSegments(simulation);
-        this.damageTickAccumulator += delta;
-        while (this.damageTickAccumulator + PHASE_EPSILON >= this.damageTickInterval) {
-            this.damageTickAccumulator -= this.damageTickInterval;
-            this._dealBeamTick(this.damageTickInterval, simulation);
-        }
-    }
-
-    _dealBeamTick(activeDuration, simulation) {
-        for (const target of simulation.getEnemiesOf(this.source)) {
-            this.segments.forEach((segment, index) => {
-                if (!circleIntersectsLaserSegment(target, segment)) return;
-                const rawDamage = this.source.stats.baseDamage * 0.6 * (activeDuration / this.fireDuration);
-                const { actualDamage } = target.takeDamage(rawDamage, this.source, "Dash Laser");
-                if (actualDamage <= 0) return;
-                const hitSegments = this.hitSegmentsByTarget.get(target) ?? new Set();
-                hitSegments.add(index);
-                this.hitSegmentsByTarget.set(target, hitSegments);
-            });
-        }
+        this.combatOwner?.resolveDashLaserFire?.(this, delta);
     }
 
     _lockBeam(simulation) {
@@ -211,12 +196,7 @@ export class LaserBeamEffect extends CombatEntity {
     }
 
     _finish(simulation) {
-        if (this.maxWallBounces > 0 && this.source.progression?.abilityTier >= 3) {
-            for (const [target, segments] of this.hitSegmentsByTarget) {
-                if (segments.size < 2 || target.flags.defeated) continue;
-                this._triggerOverload(target, simulation);
-            }
-        }
+        this.combatOwner?.finishDashLaserCombat?.(this);
         simulation.entities.push(
             new LaserCasterDissipateEffect(this.source, {
                 angle: this.angle,
@@ -227,15 +207,14 @@ export class LaserBeamEffect extends CombatEntity {
         this.isExpired = true;
     }
 
-    _triggerOverload(target, simulation) {
-        const center = target.position.clone();
-        for (const enemy of simulation.getEnemiesOf(this.source)) {
-            if (Vector2.subtract(enemy.position, center).length() > 100) continue;
-            enemy.takeDamage(this.source.stats.baseDamage, this.source, "Cross Overload");
-        }
-        simulation.spawnExplosion(center, "#ff8b2f");
-        simulation.spawnPulse(center, "#ffffff");
-        simulation.entities.push(new CrossOverloadEffect(center, 100));
+    recordHit(target, segmentIndex) {
+        const hitSegments = this.hitSegmentsByTarget.get(target) ?? new Set();
+        hitSegments.add(segmentIndex);
+        this.hitSegmentsByTarget.set(target, hitSegments);
+    }
+
+    getHitSegmentsByTarget() {
+        return this.hitSegmentsByTarget;
     }
 
     getCasterVisualState() {
