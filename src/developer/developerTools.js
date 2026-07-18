@@ -3,11 +3,11 @@ import { getCharacterExperienceSummary } from "../experience/experienceService.j
 import { applyTournamentReport, createTournamentReport } from "../collection/index.js";
 import { createHuntingChest } from "../hunting/huntingRewards.js";
 import { createEquipmentInstance, equipEquipmentItem } from "../hunting/equipmentConfig.js";
-import { createRoster } from "../roster.js";
+import { CHARACTER_DEFINITIONS } from "../characters/characterRegistry.js";
 import { isHiddenCharacterId } from "../characterAvailability.js";
 import { isCharacterUnlocked, unlockHiddenCharacter } from "../playerProfile.js";
 
-const CHARACTER_IDS = new Set(createRoster().map((fighter) => fighter.id));
+const CHARACTER_IDS = new Set(CHARACTER_DEFINITIONS.map((definition) => definition.id));
 const MAX_DEBUG_REBIRTH_COUNT = 999;
 const DEBUG_COLLECTION_SAMPLE_ITEMS = Object.freeze([
     { rarity: "common", slot: "weapon" },

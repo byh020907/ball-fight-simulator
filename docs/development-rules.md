@@ -89,6 +89,8 @@ Boids 알고리즘이 눈에 보이지 않는다는 피드백을 받았을 때:
 - **폴더링 기준:** 200줄 이상이거나 자연스러운 분리점(예: Ability 클래스들)이 있으면 폴더로 분리.
 - **`index.js`**는 폴더 내부의 exports를 모아서 외부에 공개하는 barrel 파일로만 사용. 자체 로직 금지.
 - **매핑/레지스트리는 대표 클래스의 static에**: `ABILITY_MAP` 같은 상수 매핑은 별도 barrel이나 모듈 레벨 변수 대신, 대표 클래스(예: `Ability.MAP`)의 static 프로퍼티로 관리합니다. `index.js`에서 초기화 책임을 지고, 외부에서는 `Ability.MAP`으로 접근합니다. (참조: `src/abilities/index.js` → `Ability.MAP`)
+- **플레이 캐릭터 메타데이터는 개별 정적 정의에**: `src/characters/definitions/`의 캐릭터별 모듈이 ID, 로스터 표시·기초 스펙, Ability, Lv.1·3·6·9 성장, 숙련도, 해금, 환생 액션, 도감 설명을 한 관점에서 선언합니다. `characterRegistry.js`는 정의 수집·필수 계약/중복 검증·조회만 담당하며 계산·저장·전투·UI 실행 책임을 가져가지 않습니다.
+- **신규 캐릭터 등록은 정의와 중앙 수집 한 번으로 끝냅니다**: 로스터, Ability 생성/표시명, 경험치, 숙련도, 해금, 도감, 환생 시스템에 별도 캐릭터 포함 목록을 추가하지 않습니다. 시스템은 중앙 정의를 투영하거나 정책 조회를 사용하며, 실제 Ability/Entity/Effect 구현은 기존 전용 모듈에 둡니다.
 - **디렉토리명은 `kebab-case`**, 파일명은 `camelCase` (예외: `index.js`).
 
 ### 계층 구조 (Namespace)

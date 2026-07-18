@@ -237,23 +237,6 @@ export class TimedEffect {
     }
 }
 
-export const FIGHTER_IDS = Object.freeze({
-    ARCHER: "archer",
-    ORBIT: "orbit",
-    TRICKSTER: "trickster",
-    GRENADE: "grenade",
-    DASH: "dash",
-    RAGE: "rage",
-    SPIN: "spin",
-    EATER: "eater",
-    BAT_BALL: "bat_ball",
-    VAMPIRE: "vampire",
-    GUNNER: "gunner",
-    PHANTOM: "phantom",
-    HERO: "hero",
-    ELEMENTALIST: "elementalist"
-});
-
 const EVADE_IMPULSE_RESPONSE = 0.72;
 
 /**

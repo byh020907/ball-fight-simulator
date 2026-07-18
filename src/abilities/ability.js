@@ -15,8 +15,7 @@ export class Ability extends mixins([Cooldown]) {
             abilityTier: context.abilityTier ?? null,
             instanceKey: context.instanceKey ?? null,
             displayName: context.displayName ?? null,
-            rebirthModifiers: context.rebirthModifiers ?? {},
-            cardRank: context.cardRank ?? 0
+            subAction: context.subAction ?? null
         };
         this._baseCooldown = baseCooldown;
         this._cooldownDuration = baseCooldown;
@@ -62,10 +61,7 @@ export class Ability extends mixins([Cooldown]) {
     }
 
     getLevelUpgrade() {
-        return {
-            ...getAbilityUpgrade(this.abilityId, this.abilityTier),
-            ...(this.context.rebirthModifiers ?? {})
-        };
+        return getAbilityUpgrade(this.abilityId, this.abilityTier);
     }
 
     set cooldown(val) {

@@ -2,7 +2,7 @@
 //
 // 패치노트 작성 규칙은 docs/patch-notes-guide.md 를 참고하세요.
 //   - version 증가 / date 갱신 / changes 배열 추가
-//   - type: feature | refactor | fix | style (새 type 추가시 CSS도 필요)
+//   - type: feature | refactor | fix | style | balance | ui (새 type 추가시 CSS도 필요)
 //   - 한국어, 유저 시점, 간결하게
 //
 // 유틸 함수(getUnseenEntries, dismissPatchNotes 등)는 src/utils.js 에 있습니다.
@@ -18,6 +18,25 @@
  * @type {PatchEntry[]}
  */
 export const PATCH_NOTES = [
+    {
+        version: "0.33.0",
+        date: "2026-07-19",
+        title: "v0.33.0 환생 카드가 원래 성장을 이어갑니다.",
+        changes: [
+            {
+                type: "feature",
+                text: "액션 카드는 네 단계에서 원 캐릭터의 Lv.1·3·6·9 능력을 차례로 해금하며, 해금한 히든 캐릭터의 액션도 사용할 수 있습니다."
+            },
+            {
+                type: "balance",
+                text: "패시브 카드도 네 단계로 통일되고 냉각 회로는 모든 능력 쿨타임을 30%·40%·50%·60% 줄입니다."
+            },
+            {
+                type: "ui",
+                text: "최대 단계 카드는 보상 후보에서 빠지며, 환생 카드에서 현재 단계·다음 성장·MAX 효과를 확인할 수 있습니다."
+            }
+        ]
+    },
     {
         version: "0.32.0",
         date: "2026-07-19",

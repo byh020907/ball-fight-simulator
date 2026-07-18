@@ -1187,6 +1187,14 @@ function testCollectionRebirthAndDeveloperContracts() {
     );
     assert.ok(template.includes("toggleRebirthCardEquip"), "Character detail should expose card equip controls");
     assert.ok(template.includes("maxEquippedCards"), "Character detail should display the three-card loadout limit");
+    assert.ok(
+        template.includes("card.rankLabel") && template.includes("현재:") && template.includes("card?.nextUnlockText"),
+        "Rebirth cards should show stage n/4, the current effect, and the next original growth unlock"
+    );
+    assert.ok(
+        readSource("src/rebirth/rebirthCards.js").includes("MAX · 단계"),
+        "Maximum rebirth cards should expose an explicit MAX stage label"
+    );
     assert.ok(template.includes("누적 기초 수치"), "Character detail should show accumulated permanent rebirth stats");
     assert.ok(
         template.includes("formatRebirthStatBonus"),

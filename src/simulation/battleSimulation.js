@@ -1,26 +1,7 @@
 import { Vector2 } from "../core.js";
-import { Ability } from "../abilities/ability.js";
-import { AbilitySet } from "../abilities/abilitySet.js";
 import { getAbilityDisplayName } from "../abilities/abilityMetadata.js";
 import { getContactDamageSpeed } from "../physics/contactDamage.js";
-import {
-    ArcherAbility,
-    EaterAbility,
-    GrenadeAbility,
-    OrbitAbility,
-    RageAbility,
-    SpinAbility,
-    TricksterAbility,
-    DashAbility,
-    BatBallAbility,
-    HeroAbility,
-    VampireAbility,
-    GunnerAbility,
-    PhantomAbility,
-    ElementalistAbility,
-    HuntingMeleeAbility,
-    HuntingMobAbility
-} from "../abilities/index.js";
+import { Ability, AbilitySet, HuntingMeleeAbility, HuntingMobAbility } from "../abilities/index.js";
 import { BattleBall } from "../entities/index.js";
 import { GravityParticle } from "../effects/index.js";
 import { FighterPhysicsSimulation } from "./fighterPhysicsSimulation.js";
@@ -30,25 +11,11 @@ import {
     TournamentAngledBounceRampSystem
 } from "../tournament/angledBounceRamps.js";
 
-const ABILITY_TYPES = {
+const NON_CHARACTER_ABILITY_TYPES = Object.freeze({
     none: Ability,
-    archer: ArcherAbility,
-    orbit: OrbitAbility,
-    trickster: TricksterAbility,
-    grenade: GrenadeAbility,
-    dash: DashAbility,
-    rage: RageAbility,
-    spin: SpinAbility,
-    eater: EaterAbility,
-    bat_ball: BatBallAbility,
-    hero: HeroAbility,
-    vampire: VampireAbility,
-    gunner: GunnerAbility,
-    phantom: PhantomAbility,
-    elementalist: ElementalistAbility,
     hunting_melee: HuntingMeleeAbility,
     hunting_mob: HuntingMobAbility
-};
+});
 
 const ANTI_STALL_INTERVAL = 8;
 const ANTI_STALL_WALL_REACH_SECONDS = 1;
@@ -216,7 +183,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
     }
 
     createAbility(type, owner, context = {}) {
-        const AbilityType = ABILITY_TYPES[type];
+        const AbilityType = Ability.MAP[type] ?? NON_CHARACTER_ABILITY_TYPES[type];
         if (!AbilityType) {
             throw new Error(`Unknown ability type: ${type}`);
         }
@@ -228,8 +195,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
             abilityTier: context.abilityTier ?? null,
             instanceKey: context.instanceKey ?? `${role}:${abilityId}`,
             displayName: context.displayName ?? getAbilityDisplayName(abilityId),
-            rebirthModifiers: context.rebirthModifiers ?? {},
-            cardRank: context.cardRank ?? 0
+            subAction: context.subAction ?? null
         });
     }
 

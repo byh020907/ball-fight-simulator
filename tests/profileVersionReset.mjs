@@ -20,7 +20,12 @@ import { getLevelRequirement } from "../src/experience/experienceConfig.js";
 import { getCharacterExperienceSummary } from "../src/experience/experienceService.js";
 import { setDeveloperCharacterToMaxLevel, setDeveloperRebirthCount } from "../src/developer/developerTools.js";
 import { setDeveloperHiddenCharacterUnlocked } from "../src/developer/developerTools.js";
-import { createRebirthStatReward } from "../src/rebirth/index.js";
+import { createRebirthStatReward, getRebirthPresentation } from "../src/rebirth/index.js";
+import {
+    createDefaultRebirthArea,
+    migrateRebirthArea,
+    REBIRTH_SCHEMA_VERSION
+} from "../src/rebirth/rebirthMigrations.js";
 
 function createSessionStorage(values = {}) {
     const data = new Map(Object.entries(values));
@@ -127,6 +132,77 @@ assert.equal(
     "v10 hidden unlock normalization must preserve mastery progress"
 );
 
+const legacyRebirthProfile = createDefaultPlayerProfile();
+delete legacyRebirthProfile.rebirth.schemaVersion;
+legacyRebirthProfile.hunting.shards = 417;
+legacyRebirthProfile.characterMastery.levels.rage = 2;
+legacyRebirthProfile.experience.byCharacter.archer = { currentXp: getLevelRequirement(10) };
+legacyRebirthProfile.experience.currentXp = getLevelRequirement(10);
+legacyRebirthProfile.rebirth.byCharacter.archer = {
+    rebirthCount: 7,
+    statBonuses: { hp: 40, damage: 3, speed: 2, defense: 1 },
+    cardRanks: {
+        "ability:rage": 9,
+        "ability:elementalist": 3,
+        "passive:global-cooldown": 8
+    },
+    equippedCardIds: ["ability:rage", "ability:elementalist", "passive:global-cooldown"],
+    pendingOfferCardIds: ["ability:rage"]
+};
+const migratedLegacyRebirthProfile = migratePlayerProfile(legacyRebirthProfile);
+const migratedLegacyRebirth = migratedLegacyRebirthProfile.rebirth.byCharacter.archer;
+assert.equal(migratedLegacyRebirthProfile.rebirth.schemaVersion, REBIRTH_SCHEMA_VERSION);
+assert.deepEqual(migratedLegacyRebirth.cardRanks, {
+    "ability:rage": 4,
+    "ability:elementalist": 3,
+    "passive:global-cooldown": 3
+});
+assert.equal(migratedLegacyRebirth.rebirthCount, 7);
+assert.deepEqual(migratedLegacyRebirth.statBonuses, { hp: 40, damage: 3, speed: 2, defense: 1 });
+assert.deepEqual(migratedLegacyRebirth.equippedCardIds, [
+    "ability:rage",
+    "ability:elementalist",
+    "passive:global-cooldown"
+]);
+assert.equal(migratedLegacyRebirth.pendingOfferNeedsRegeneration, true);
+assert.deepEqual(migratedLegacyRebirth.pendingOfferCards, []);
+assert.equal(migratedLegacyRebirthProfile.hunting.shards, 417);
+assert.equal(migratedLegacyRebirthProfile.characterMastery.levels.rage, 2);
+const regeneratedPresentation = getRebirthPresentation(migratedLegacyRebirthProfile, "archer", () => 0);
+assert.equal(regeneratedPresentation.pendingOfferCards.length, 3);
+assert.equal(migratedLegacyRebirthProfile.rebirth.byCharacter.archer.pendingOfferNeedsRegeneration, false);
+
+const expectedLegacyCooldownRanks = [1, 1, 2, 2, 2, 3, 3, 3, 4, 4];
+for (const [index, expectedRank] of expectedLegacyCooldownRanks.entries()) {
+    const migratedArea = migrateRebirthArea({
+        byCharacter: {
+            archer: {
+                cardRanks: { "passive:global-cooldown": index + 1 }
+            }
+        }
+    });
+    assert.equal(migratedArea.byCharacter.archer.cardRanks["passive:global-cooldown"], expectedRank);
+}
+
+const futureRebirthProfile = createDefaultPlayerProfile();
+futureRebirthProfile.hunting.shards = 812;
+futureRebirthProfile.rebirth = {
+    schemaVersion: REBIRTH_SCHEMA_VERSION + 1,
+    byCharacter: { archer: { rebirthCount: 99 } }
+};
+const migratedFutureRebirthProfile = migratePlayerProfile(futureRebirthProfile);
+assert.deepEqual(migratedFutureRebirthProfile.rebirth, createDefaultRebirthArea());
+assert.equal(
+    migratedFutureRebirthProfile.hunting.shards,
+    812,
+    "A future rebirth schema must reset only the rebirth region"
+);
+assert.deepEqual(
+    migrateRebirthArea({ schemaVersion: 0, byCharacter: { archer: { rebirthCount: 3 } } }, new Map()),
+    createDefaultRebirthArea(),
+    "Removing a required migration step must reset only that region through the common runner"
+);
+
 const versionEightProfile = createDefaultPlayerProfile();
 const persistedRebirthOffer = createRebirthStatReward(0, () => 0);
 versionEightProfile.version = 8;
@@ -191,7 +267,7 @@ assert.equal(migratedVersionSevenProfile.experience.byCharacter.archer.currentXp
 assert.equal(migratedVersionSevenProfile.characterMastery.levels.rage, 2);
 assert.equal(migratedVersionSevenProfile.equipment.inventory[0].instanceId, "preserved-equipment");
 assert.equal(migratedVersionSevenProfile.collection.characters.archer.tournamentWins, 2);
-assert.deepEqual(migratedVersionSevenProfile.rebirth, { byCharacter: {} });
+assert.deepEqual(migratedVersionSevenProfile.rebirth, { schemaVersion: 1, byCharacter: {} });
 
 const rewardProfile = createDefaultPlayerProfile();
 const shardReward = grantAchievementReward(rewardProfile, {

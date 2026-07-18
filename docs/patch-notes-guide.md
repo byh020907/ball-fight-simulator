@@ -50,6 +50,8 @@
 | `refactor` | 코드/구조 개선   | 파랑      |
 | `fix`      | 버그 수정        | 주황      |
 | `style`    | UI/디자인 개선   | 보라      |
+| `balance`  | 게임 수치 조정   | 갈색      |
+| `ui`       | 화면 정보 개선   | 청록      |
 
 > 새로운 `type`이 필요하면 `styles.css`에 `.patch-badge--{type}` 클래스를 추가해야 합니다.
 

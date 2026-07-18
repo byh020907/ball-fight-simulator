@@ -4,34 +4,21 @@ function deepFreeze(value) {
     return Object.freeze(value);
 }
 
-// The single source of truth for player-facing reward and progression numbers.
+const REBIRTH_PASSIVE_RANK_MULTIPLIERS = Object.freeze([1, 4 / 3, 5 / 3, 2]);
+
+// Shared source of truth for cross-character reward and progression numbers.
+// Character-specific progression belongs to each static character definition.
 export const REWARD_BALANCE = deepFreeze({
     rebirth: {
         offerSize: 3,
         maxEquippedCards: 3,
-        maxCardRank: 10,
+        maxCardRank: 4,
         candidateWeights: { stat: 72, action: 18, passive: 10 },
+        passiveRankMultipliers: REBIRTH_PASSIVE_RANK_MULTIPLIERS,
         passiveCardRanks: {
             globalCooldown: {
-                baseReductionPercent: 30,
-                perRankReductionPercent: 2,
-                maximumReductionPercent: 48
+                reductionPercents: REBIRTH_PASSIVE_RANK_MULTIPLIERS.map((multiplier) => 30 * multiplier)
             }
-        },
-        subAbilityRankModifiers: {
-            archer: { key: "arrowSpeedMultiplier", base: 1, perRank: 0.08 },
-            orbit: { key: "rechargeSpeedMultiplier", base: 1, perRank: 0.08 },
-            trickster: { key: "seedSpeedMultiplier", base: 1, perRank: 0.08 },
-            grenade: { key: "damageMultiplier", base: 1, perRank: 0.08 },
-            dash: { key: "dashMultiplier", base: 1, perRank: 0.05 },
-            rage: { key: "maxImpactMultiplier", base: 1, perRank: 0.06 },
-            spin: { key: "chargeRetentionRatio", base: 0, perRank: 0.08 },
-            eater: { key: "spitAngularVelocityMultiplier", base: 1, perRank: 0.08 },
-            bat_ball: { key: "arcRangeMultiplier", base: 1, perRank: 0.08 },
-            vampire: { key: "batSpeedMultiplier", base: 1, perRank: 0.08 },
-            gunner: { key: "bulletSpeedMultiplier", base: 1, perRank: 0.08 },
-            phantom: { key: "bonusDamage", base: 18, perRank: 3 },
-            hero: { key: "magnetRadiusMultiplier", base: 1, perRank: 0.2 }
         },
         visualStages: [
             {
@@ -89,232 +76,7 @@ export const REWARD_BALANCE = deepFreeze({
         maxDealRatio: 2,
         maxLevel: 10,
         levelStatTargetMultiplier: 1.5,
-        levelCost: { first: 100, multiplier: 1.35 },
-        characterLevelProgressions: {
-            archer: [
-                { level: 2 },
-                { level: 3, abilityTier: 1, gameText: "예측 화살 + 속도 15%" },
-                { level: 4 },
-                { level: 5 },
-                { level: 6, abilityTier: 2, gameText: "조준 -20% · 70% 단발 30% 2발" },
-                { level: 7 },
-                { level: 8 },
-                { level: 9, abilityTier: 3, gameText: "50% 확률로 크리티컬 ×2" },
-                { level: 10 }
-            ],
-            orbit: [
-                { level: 2 },
-                { level: 3, abilityTier: 1, gameText: "첫 적중점 동기화 협공 · 직접 ×0.80/×1.00" },
-                { level: 4 },
-                { level: 5 },
-                { level: 6, abilityTier: 2, gameText: "수명 2.4초 · 협공 폭발 70px ×0.25" },
-                { level: 7 },
-                { level: 8 },
-                { level: 9, abilityTier: 3, gameText: "미적중 탄 본체 캐치 · 원래 위성 회수" },
-                { level: 10 }
-            ],
-            trickster: [
-                { level: 2 },
-                { level: 3, abilityTier: 1, gameText: "덩굴 감속 0.5초 · 5틱 ×0.10" },
-                { level: 4 },
-                { level: 5 },
-                { level: 6, abilityTier: 2, gameText: "씨앗 표식 1.8초 · 돌진 폭발 ×1.20" },
-                { level: 7 },
-                { level: 8 },
-                { level: 9, abilityTier: 3, gameText: "폭발 접점 후속 씨앗 · 활성 유예 0.5초" },
-                { level: 10 }
-            ],
-            grenade: [
-                { level: 2 },
-                { level: 3, abilityTier: 1, gameText: "실제 접촉 수류탄 점착 · 대상당 1개" },
-                { level: 4 },
-                { level: 5 },
-                { level: 6, abilityTier: 2, gameText: "폭발 피해 대상 화상 · 0.5초 ×0.50" },
-                { level: 7 },
-                { level: 8 },
-                { level: 9, abilityTier: 3, gameText: "점착 표식 유도 · 0.5초 뒤 2rad/s" },
-                { level: 10 }
-            ],
-            dash: [
-                { level: 2 },
-                { level: 3, abilityTier: 1, gameText: "대시 적중 레이저 · 0.35초 조준 ×0.60" },
-                { level: 4 },
-                { level: 5 },
-                { level: 6, abilityTier: 2, gameText: "레이저 벽 1회 반사 · 구간별 ×0.60" },
-                { level: 7 },
-                { level: 8 },
-                {
-                    level: 9,
-                    abilityTier: 3,
-                    gameText: "첫 레이저 적중 즉시 점화 · 1초 10틱 ×0.10"
-                },
-                { level: 10 }
-            ],
-            rage: [
-                { level: 2 },
-                { level: 3, abilityTier: 1, gameText: "35%+ 점화 (5틱 ×0.10)" },
-                { level: 4 },
-                { level: 5 },
-                { level: 6, abilityTier: 2, gameText: "70%+ 폭발 ×1.50 120px" },
-                { level: 7 },
-                { level: 8 },
-                { level: 9, abilityTier: 3, gameText: "100% 여진 ×2.25 180px" },
-                { level: 10 }
-            ],
-            spin: [
-                { level: 2 },
-                { level: 3, abilityTier: 1, gameText: "만충 Crash 유지 · 표면 절단 0.60초 · 12틱 ×0.15" },
-                { level: 4 },
-                { level: 5 },
-                { level: 6, abilityTier: 2, gameText: "가속 절삭 ×0.10→×0.30 · 합계 ×2.40" },
-                { level: 7 },
-                { level: 8 },
-                { level: 9, abilityTier: 3, gameText: "340px 관통 유체장 · 절단 방어 무시" },
-                { level: 10 }
-            ],
-            eater: [
-                { level: 2 },
-                { level: 3, abilityTier: 1, gameText: "삼킨 중 소화 6틱 ×0.12 · 실제 피해만큼 회복" },
-                { level: 4 },
-                { level: 5 },
-                { level: 6, abilityTier: 2, gameText: "뱉기 ×1.0 피해 · 속도 ×3 · 반동" },
-                { level: 7 },
-                { level: 8 },
-                { level: 9, abilityTier: 3, gameText: "첫 벽 충돌 파열 ×1.5+주변 ×0.75" },
-                { level: 10 }
-            ],
-            bat_ball: [
-                { level: 2 },
-                { level: 3, abilityTier: 1, gameText: "회전 타구 · 기본 Wall Slam 각충격 ×1.5 추가" },
-                { level: 4 },
-                { level: 5 },
-                { level: 6, abilityTier: 2, gameText: "첫 Wall Slam 비거리 HOME RUN ×1.00~×2.00" },
-                { level: 7 },
-                { level: 8 },
-                { level: 9, abilityTier: 3, gameText: "유효 Wall Slam 스킬 초기화 · 재발동 0.50초" },
-                { level: 10 }
-            ],
-            vampire: [
-                { level: 2 },
-                { level: 3, abilityTier: 1, gameText: "반복 물기 ×0.05 · 반동 재돌입" },
-                { level: 4 },
-                { level: 5 },
-                { level: 6, abilityTier: 2, gameText: "수명 종료 폭발 65px · ×0.05" },
-                { level: 7 },
-                { level: 8 },
-                { level: 9, abilityTier: 3, gameText: "피의 견인 180px/s · 혈액 파열 ×0.15" },
-                { level: 10 }
-            ],
-            gunner: [
-                { level: 2 },
-                { level: 3, abilityTier: 1, gameText: "모든 6~12발 연사 마무리 탄 ×2" },
-                { level: 4 },
-                { level: 5 },
-                { level: 6, abilityTier: 2, gameText: "일반 탄 회수 즉시 재사격 · 첫 반사 재조준" },
-                { level: 7 },
-                { level: 8 },
-                { level: 9, abilityTier: 3, gameText: "일반 탄 20회 회수 · 8초 자동 포탑" },
-                { level: 10 }
-            ],
-            phantom: [
-                { level: 2 },
-                {
-                    level: 3,
-                    abilityTier: 1,
-                    gameText: "표식 대상 자연 충돌 시 메아리 돌진"
-                },
-                { level: 4 },
-                { level: 5 },
-                {
-                    level: 6,
-                    abilityTier: 2,
-                    gameText: "표식 대상 벽·지형 충돌에도 메아리 돌진"
-                },
-                { level: 7 },
-                { level: 8 },
-                { level: 9, abilityTier: 3, gameText: "메아리 적중 시 종결 돌진 1회" },
-                { level: 10 }
-            ],
-            hero: [
-                { level: 2 },
-                { level: 3, abilityTier: 1, gameText: "성장 코어 근거리 자석 회수" },
-                { level: 4 },
-                { level: 5 },
-                { level: 6, abilityTier: 2, gameText: "회수 코어 공명 조각 · 순차 ×0.20" },
-                { level: 7 },
-                { level: 8 },
-                { level: 9, abilityTier: 3, gameText: "조각 5개 Heroic Burst · 90px ×0.75" },
-                { level: 10 }
-            ],
-            elementalist: [
-                { level: 2 },
-                { level: 3, abilityTier: 1, gameText: "젖음 2.5초 · 원 피격자 우선 원소 반응" },
-                { level: 4 },
-                { level: 5 },
-                { level: 6, abilityTier: 2, gameText: "30% 확률로 서로 다른 원소 오브 2개" },
-                { level: 7 },
-                { level: 8 },
-                { level: 9, abilityTier: 3, gameText: "같은 시전자 오브 자성 · 10종 원소 융합" },
-                { level: 10 }
-            ]
-        },
-        abilityUpgrades: {
-            archer: {
-                tiers: [{}, { arrowSpeedMultiplier: 1.15 }, { windupMultiplier: 0.8 }, {}]
-            },
-            orbit: {
-                tiers: [{}, { synchronizedVolley: true }, { explosiveVolley: true }, { bodyCatch: true }]
-            },
-            trickster: {
-                tiers: [{}, { vineSnare: true }, { seedMarkBurst: true }, { followupSeed: true }]
-            },
-            grenade: {
-                tiers: [{}, { stickyGrenade: true }, { burningExplosion: true }, { stickyHoming: true }]
-            },
-            dash: {
-                tiers: [{}, { laserStrike: true }, { laserWallBounces: 1 }, { laserIgnition: true }]
-            },
-            rage: {
-                tiers: [{}, {}, {}, {}]
-            },
-            spin: {
-                tiers: [{}, { surfaceCut: true }, { acceleratingCut: true }, { piercingVortex: true }]
-            },
-            eater: {
-                tiers: [{}, {}, {}, {}]
-            },
-            bat_ball: {
-                tiers: [{}, { rotatingHit: true }, { homeRun: true }, { wallReset: true }]
-            },
-            vampire: {
-                tiers: [{}, { repeatBite: true }, { lifeBurst: true }, { bloodPull: true }]
-            },
-            gunner: {
-                tiers: [
-                    {},
-                    { everyBurstFinisher: true },
-                    { refireOnCollect: true, ricochetReload: true },
-                    { collectionTurret: true }
-                ]
-            },
-            phantom: {
-                base: {
-                    speedMultiplier: 1.15,
-                    damageMultiplier: 1.1,
-                    defenseMultiplier: 1.5,
-                    impactMultiplier: 1.15,
-                    bonusDamageMultiplier: 1.5,
-                    markDuration: 2.5
-                },
-                tiers: [{}, { echoOnNaturalCollision: true }, { echoOnStaticCollision: true }, { terminalDash: true }]
-            },
-            hero: {
-                tiers: [{}, { magneticCoreCollection: true }, { resonanceFragments: true }, { heroicBurst: true }]
-            },
-            elementalist: {
-                tiers: [{}, { wetDuration: 2.5 }, { dualOrbChance: 0.3 }, { orbitalFusion: true }]
-            }
-        }
+        levelCost: { first: 100, multiplier: 1.35 }
     },
     hunting: {
         chest: {

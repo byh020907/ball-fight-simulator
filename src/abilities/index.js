@@ -18,34 +18,8 @@ export { HuntingMeleeAbility } from "./huntingMeleeAbility.js";
 export { HuntingMobAbility } from "./huntingMobAbility.js";
 
 import { Ability } from "./ability.js";
-import { ArcherAbility } from "./archerAbility.js";
-import { OrbitAbility } from "./orbitAbility.js";
-import { TricksterAbility } from "./tricksterAbility.js";
-import { GrenadeAbility } from "./grenadeAbility.js";
-import { DashAbility } from "./dashAbility.js";
-import { RageAbility } from "./rageAbility.js";
-import { SpinAbility } from "./spinAbility.js";
-import { EaterAbility } from "./eaterAbility.js";
-import { BatBallAbility } from "./batBallAbility.js";
-import { HeroAbility } from "./heroAbility.js";
-import { VampireAbility } from "./vampireAbility.js";
-import { GunnerAbility } from "./gunnerAbility.js";
-import { PhantomAbility } from "./phantomAbility.js";
-import { ElementalistAbility } from "./elementalistAbility.js";
+import { CHARACTER_DEFINITIONS } from "../characters/characterRegistry.js";
 
-Ability.MAP = Object.freeze({
-    archer: ArcherAbility,
-    orbit: OrbitAbility,
-    trickster: TricksterAbility,
-    grenade: GrenadeAbility,
-    dash: DashAbility,
-    rage: RageAbility,
-    spin: SpinAbility,
-    eater: EaterAbility,
-    bat_ball: BatBallAbility,
-    hero: HeroAbility,
-    vampire: VampireAbility,
-    gunner: GunnerAbility,
-    phantom: PhantomAbility,
-    elementalist: ElementalistAbility
-});
+Ability.MAP = Object.freeze(
+    Object.fromEntries(CHARACTER_DEFINITIONS.map((definition) => [definition.abilityId, definition.abilityClass]))
+);

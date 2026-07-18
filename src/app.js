@@ -80,7 +80,8 @@ import {
     getInventorySlots,
     getInventoryUsed
 } from "./hunting/equipmentConfig.js";
-import { FIGHTER_IDS, Vector2 } from "./core.js";
+import { Vector2 } from "./core.js";
+import { FIGHTER_IDS } from "./characters/characterRegistry.js";
 import { formatHeroStatLine, formatHeroStatParts, mergeOrbBonuses } from "./entities/heroOrb.js";
 import { Ability } from "./abilities/index.js";
 import { getAbilityDisplayName } from "./abilities/abilityMetadata.js";

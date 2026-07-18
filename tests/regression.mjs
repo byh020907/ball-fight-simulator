@@ -17,7 +17,14 @@ import {
     getRemainingStatPoints,
     getSpentStatPoints
 } from "../src/statAllocation.js";
-import { calculateInterceptPoint, FIGHTER_IDS, Projectile, RENDER_LAYERS, Vector2, randomSpin } from "../src/core.js";
+import { calculateInterceptPoint, Projectile, RENDER_LAYERS, Vector2, randomSpin } from "../src/core.js";
+import {
+    CHARACTER_DEFINITIONS,
+    FIGHTER_IDS,
+    getCharacterDefinition,
+    getCharacterDefinitionByAbility,
+    validateCharacterDefinitions
+} from "../src/characters/characterRegistry.js";
 import { findActionById } from "../src/clickActions.js";
 import { calcMatchXp, getLevelFromXp, getXpForNextLevel, calcTournamentXp } from "../src/experience/experienceState.js";
 import { getLevelRequirement, XP_SCALE } from "../src/experience/experienceConfig.js";
@@ -38,9 +45,13 @@ import {
     completeRebirth,
     createRebirthOffer,
     createRebirthStatReward,
+    getRebirthCardCatalog,
     getRebirthCardDefinition,
+    getRebirthCardView,
     getRebirthLoadout,
     getRebirthOfferMaterial,
+    getRebirthOfferView,
+    getRebirthPresentation,
     getRebirthState,
     getSubAbilityIds,
     toggleRebirthCardEquip
@@ -5462,7 +5473,7 @@ function testCharacterLevelProgressions(app) {
     const tierLevels = [3, 6, 9];
 
     for (const fighter of app.roster) {
-        const entries = REWARD_BALANCE.experience.characterLevelProgressions[fighter.id];
+        const entries = getCharacterDefinition(fighter.id).levelRewards;
         assert.ok(entries, `${fighter.id} should define its own level progression`);
         assert.deepEqual(
             entries.map((entry) => entry.level),
@@ -5542,7 +5553,7 @@ function testAbilityLevelUpgrades(app) {
 
     for (const fighter of app.roster) {
         const { ball } = createTierSimulation(fighter.id);
-        const definition = REWARD_BALANCE.experience.abilityUpgrades[fighter.ability];
+        const definition = getCharacterDefinition(fighter.id).abilityUpgrade;
         const expectedUpgrade = definition.tiers.reduce((merged, tierUpgrade) => ({ ...merged, ...tierUpgrade }), {
             ...definition.base
         });
@@ -6907,14 +6918,14 @@ function testTricksterLevelRewardContracts(app) {
         return seed;
     };
 
-    const progressionRows = REWARD_BALANCE.experience.characterLevelProgressions.trickster.filter(
+    const progressionRows = getCharacterDefinition(FIGHTER_IDS.TRICKSTER).levelRewards.filter(
         (entry) => entry.abilityTier
     );
     assert.deepEqual(
         progressionRows.map((entry) => entry.gameText),
         ["덩굴 감속 0.5초 · 5틱 ×0.10", "씨앗 표식 1.8초 · 돌진 폭발 ×1.20", "폭발 접점 후속 씨앗 · 활성 유예 0.5초"]
     );
-    assert.deepEqual(REWARD_BALANCE.experience.abilityUpgrades.trickster.tiers, [
+    assert.deepEqual(getCharacterDefinition(FIGHTER_IDS.TRICKSTER).abilityUpgrade.tiers, [
         {},
         { vineSnare: true },
         { seedMarkBurst: true },
@@ -7173,7 +7184,7 @@ function testOrbitLevelRewardContracts(app) {
         return { simulation, owner, target, nearby };
     };
 
-    const rows = REWARD_BALANCE.experience.characterLevelProgressions.orbit.filter((entry) => entry.abilityTier);
+    const rows = getCharacterDefinition(FIGHTER_IDS.ORBIT).levelRewards.filter((entry) => entry.abilityTier);
     assert.deepEqual(
         rows.map((entry) => entry.gameText),
         [
@@ -7182,7 +7193,7 @@ function testOrbitLevelRewardContracts(app) {
             "미적중 탄 본체 캐치 · 원래 위성 회수"
         ]
     );
-    assert.deepEqual(REWARD_BALANCE.experience.abilityUpgrades.orbit.tiers, [
+    assert.deepEqual(getCharacterDefinition(FIGHTER_IDS.ORBIT).abilityUpgrade.tiers, [
         {},
         { synchronizedVolley: true },
         { explosiveVolley: true },
@@ -7638,7 +7649,7 @@ function testSpinLevelRewardContracts(app) {
         return { events, cutEffect, crashActual: crashEvents[0].actualDamage };
     };
 
-    const rows = REWARD_BALANCE.experience.characterLevelProgressions.spin.filter((entry) => entry.abilityTier);
+    const rows = getCharacterDefinition(FIGHTER_IDS.SPIN).levelRewards.filter((entry) => entry.abilityTier);
     assert.deepEqual(
         rows.map((entry) => entry.gameText),
         [
@@ -7647,7 +7658,7 @@ function testSpinLevelRewardContracts(app) {
             "340px 관통 유체장 · 절단 방어 무시"
         ]
     );
-    assert.deepEqual(REWARD_BALANCE.experience.abilityUpgrades.spin.tiers, [
+    assert.deepEqual(getCharacterDefinition(FIGHTER_IDS.SPIN).abilityUpgrade.tiers, [
         {},
         { surfaceCut: true },
         { acceleratingCut: true },
@@ -7950,7 +7961,7 @@ function testBatBallWallSlamContracts(app) {
         return { simulation, owner, target };
     };
 
-    const rows = REWARD_BALANCE.experience.characterLevelProgressions.bat_ball.filter((entry) => entry.abilityTier);
+    const rows = getCharacterDefinition(FIGHTER_IDS.BAT_BALL).levelRewards.filter((entry) => entry.abilityTier);
     assert.deepEqual(
         rows.map((entry) => entry.gameText),
         [
@@ -7959,7 +7970,7 @@ function testBatBallWallSlamContracts(app) {
             "유효 Wall Slam 스킬 초기화 · 재발동 0.50초"
         ]
     );
-    assert.deepEqual(REWARD_BALANCE.experience.abilityUpgrades.bat_ball.tiers, [
+    assert.deepEqual(getCharacterDefinition(FIGHTER_IDS.BAT_BALL).abilityUpgrade.tiers, [
         {},
         { rotatingHit: true },
         { homeRun: true },
@@ -8236,7 +8247,7 @@ function testVampireLevelRewardContracts(app) {
         setVelocity(bat, new Vector2());
     };
 
-    const progressionRows = REWARD_BALANCE.experience.characterLevelProgressions.vampire.filter(
+    const progressionRows = getCharacterDefinition(FIGHTER_IDS.VAMPIRE).levelRewards.filter(
         (entry) => entry.abilityTier
     );
     assert.deepEqual(
@@ -8245,7 +8256,7 @@ function testVampireLevelRewardContracts(app) {
         "Vampire level rewards should describe the three behavior tiers"
     );
     assert.deepEqual(
-        REWARD_BALANCE.experience.abilityUpgrades.vampire.tiers,
+        getCharacterDefinition(FIGHTER_IDS.VAMPIRE).abilityUpgrade.tiers,
         [{}, { repeatBite: true }, { lifeBurst: true }, { bloodPull: true }],
         "Vampire level tiers should not retain count, speed, or lifetime multipliers"
     );
@@ -22129,6 +22140,177 @@ function testRosterCombatBaselineAndCooldowns() {
 
 testRosterCombatBaselineAndCooldowns();
 
+function testCharacterRegistryContracts() {
+    assert.equal(CHARACTER_DEFINITIONS.length, 14, "Every playable character must have one static definition");
+    assert.equal(new Set(CHARACTER_DEFINITIONS.map((definition) => definition.id)).size, 14);
+    assert.equal(new Set(CHARACTER_DEFINITIONS.map((definition) => definition.abilityId)).size, 14);
+    assert.equal(validateCharacterDefinitions(), true);
+    assert.doesNotMatch(
+        readFileSync(new URL("../src/rewardBalanceConfig.js", import.meta.url), "utf8"),
+        /characterLevelProgressions|abilityUpgrades/,
+        "Character progression and ability tiers must not remain in a second system-wide registry"
+    );
+    assert.doesNotMatch(
+        readFileSync(new URL("../src/characters/definitions/definitionFactory.js", import.meta.url), "utf8"),
+        /REWARD_BALANCE|characterLevelProgressions|abilityUpgrades/,
+        "A character definition must own its onboarding data without an implicit reward-table lookup"
+    );
+    assert.doesNotMatch(
+        readFileSync(new URL("../src/experience/abilityUpgradeConfig.js", import.meta.url), "utf8"),
+        /REWARD_BALANCE/,
+        "Ability upgrades must resolve through the central character registry"
+    );
+    assert.throws(
+        () => validateCharacterDefinitions([...CHARACTER_DEFINITIONS, CHARACTER_DEFINITIONS[0]]),
+        /Duplicate character definition/,
+        "The registry must reject duplicate character IDs and abilities"
+    );
+    const { collection: _collection, ...missingCollection } = CHARACTER_DEFINITIONS[0];
+    assert.throws(
+        () => validateCharacterDefinitions([missingCollection]),
+        /missing: collection/,
+        "The registry must report missing character contracts clearly"
+    );
+    assert.deepEqual(
+        createRoster().map((fighter) => fighter.id),
+        CHARACTER_DEFINITIONS.map((definition) => definition.id),
+        "The playable roster must be projected from the central character registry"
+    );
+    for (const definition of CHARACTER_DEFINITIONS) {
+        assert.equal(Ability.MAP[definition.abilityId], definition.abilityClass);
+        assert.equal(definition.levelRewards.length, 9, `${definition.id} must own all level reward rows`);
+        assert.equal(definition.abilityUpgrade.tiers.length, 4, `${definition.id} must own all four ability tiers`);
+        assert.deepEqual(
+            definition.abilityGrowth.map((growth) => [growth.level, growth.abilityTier]),
+            [
+                [1, 0],
+                [3, 1],
+                [6, 2],
+                [9, 3]
+            ],
+            `${definition.id} must own its Lv.1/3/6/9 ability growth contract`
+        );
+    }
+    console.log("[character-registry-contracts] ok");
+}
+
+testCharacterRegistryContracts();
+
+function testRebirthFourTierAndHiddenAvailabilityContracts() {
+    const sourceId = FIGHTER_IDS.ARCHER;
+    const unlockedProfile = createDefaultPlayerProfile();
+    unlockHiddenCharacter(unlockedProfile, FIGHTER_IDS.ELEMENTALIST);
+    const fullCatalog = getRebirthCardCatalog(sourceId, unlockedProfile, { availableOnly: false });
+    const actionCards = fullCatalog.filter((card) => card.type === "action");
+    assert.equal(actionCards.length, CHARACTER_DEFINITIONS.length - 1);
+
+    for (const card of actionCards) {
+        const definition = getCharacterDefinitionByAbility(card.abilityId);
+        const growth = definition.abilityGrowth;
+        for (const rank of [1, 2, 3, 4]) {
+            const effect = card.getRankEffect(rank);
+            assert.equal(effect.abilityTier, rank - 1, `${card.id} rank ${rank} must map to the original tier`);
+            assert.deepEqual(effect.modifiers, {}, `${card.id} must not retain legacy numeric rebirth modifiers`);
+            assert.equal(effect.effectText, `Lv.${growth[rank - 1].level} ${growth[rank - 1].gameText}`);
+        }
+        const maxView = getRebirthCardView(sourceId, card.id, 4, [], unlockedProfile);
+        assert.equal(maxView.rankLabel, "MAX · 단계 4/4");
+        assert.equal(maxView.nextUnlockText, null);
+        assert.equal(definition.abilityId, card.abilityId);
+    }
+
+    const passive = getRebirthCardDefinition(sourceId, "passive:global-cooldown");
+    const firstOfferView = getRebirthOfferView(
+        sourceId,
+        { id: actionCards[0].id, type: "action" },
+        0,
+        [],
+        unlockedProfile
+    );
+    assert.equal(firstOfferView.rank, 1, "A newly offered action card must preview stage one, not stage two");
+    assert.equal(firstOfferView.rankLabel, "단계 1/4");
+    assert.deepEqual(
+        [1, 2, 3, 4].map((rank) => passive.getRankEffect(rank).reductionPercent),
+        [30, 40, 50, 60],
+        "Cooling Circuit must grow through the approved four exact stages"
+    );
+    assert.equal(
+        passive.getRankEffect(4).reductionPercent,
+        passive.getRankEffect(1).reductionPercent * 2,
+        "The final passive stage must be exactly twice its initial effect"
+    );
+
+    const maxRanks = Object.fromEntries(fullCatalog.map((card) => [card.id, 4]));
+    const maxedOffer = createRebirthOffer(sourceId, () => 0.5, maxRanks, unlockedProfile);
+    assert.equal(maxedOffer.length, 3);
+    assert.ok(
+        maxedOffer.every((offer) => offer.type === "statReward"),
+        "Maxed cards must leave three permanent-stat candidates instead of being offered again"
+    );
+
+    const lockedProfile = createDefaultPlayerProfile();
+    const hiddenCardId = `ability:${FIGHTER_IDS.ELEMENTALIST}`;
+    const activeCardIds = [FIGHTER_IDS.RAGE, FIGHTER_IDS.ORBIT, FIGHTER_IDS.DASH].map(
+        (abilityId) => `ability:${abilityId}`
+    );
+    lockedProfile.rebirth.byCharacter[sourceId] = {
+        rebirthCount: 1,
+        statBonuses: { hp: 0, damage: 0, speed: 0, defense: 0 },
+        cardRanks: { [hiddenCardId]: 3, [activeCardIds[0]]: 1, [activeCardIds[1]]: 1, [activeCardIds[2]]: 1 },
+        equippedCardIds: [hiddenCardId, activeCardIds[0], activeCardIds[1]],
+        pendingOfferCards: []
+    };
+    assert.ok(getRebirthCardDefinition(sourceId, hiddenCardId), "A locked hidden card must remain a valid definition");
+    assert.equal(
+        getRebirthCardCatalog(sourceId, lockedProfile).some((card) => card.id === hiddenCardId),
+        false,
+        "A locked hidden card must not enter the available catalog"
+    );
+    assert.equal(toggleRebirthCardEquip(lockedProfile, sourceId, hiddenCardId).error, "not_owned");
+    assert.equal(
+        toggleRebirthCardEquip(lockedProfile, sourceId, activeCardIds[2]).ok,
+        true,
+        "A dormant hidden card must not consume one of the three active slots"
+    );
+    assert.deepEqual(getRebirthState(lockedProfile, sourceId).equippedCardIds, activeCardIds);
+    assert.equal(
+        getRebirthPresentation(lockedProfile, sourceId).ownedCards.some((card) => card.id === hiddenCardId),
+        false,
+        "Locked hidden card details must stay out of the collection UI"
+    );
+    assert.equal(
+        getRebirthLoadout(lockedProfile, sourceId).subAbilities.some(
+            (subAbility) => subAbility.abilityId === FIGHTER_IDS.ELEMENTALIST
+        ),
+        false,
+        "A locked hidden card must not enter combat"
+    );
+    const sanitizedLocked = sanitizePlayerProfile(lockedProfile);
+    assert.equal(sanitizedLocked.rebirth.byCharacter[sourceId].cardRanks[hiddenCardId], 3);
+    assert.ok(
+        sanitizedLocked.rebirth.byCharacter[sourceId].equippedCardIds.includes(hiddenCardId),
+        "Sanitization must preserve the dormant hidden card without treating it as an active slot"
+    );
+
+    unlockHiddenCharacter(lockedProfile, FIGHTER_IDS.ELEMENTALIST);
+    const restoredCard = getRebirthPresentation(lockedProfile, sourceId).ownedCards.find(
+        (card) => card.id === hiddenCardId
+    );
+    assert.equal(restoredCard.rank, 3, "Unlocking again must restore the same owned card rank");
+    const restoredSubAbility = getRebirthLoadout(lockedProfile, sourceId).subAbilities.find(
+        (subAbility) => subAbility.abilityId === FIGHTER_IDS.ELEMENTALIST
+    );
+    assert.equal(restoredSubAbility.abilityTier, 2, "The restored rank-three card must use ability tier two");
+    assert.deepEqual(restoredSubAbility.subAction, {
+        automatic: true,
+        cooldownSeconds: 1.5,
+        reusePrimaryLoop: true
+    });
+    console.log("[rebirth-four-tier-hidden-availability] ok");
+}
+
+testRebirthFourTierAndHiddenAvailabilityContracts();
+
 function testRebirthDomainContracts() {
     const profile = createDefaultPlayerProfile();
     const sourceId = FIGHTER_IDS.ARCHER;
@@ -22453,7 +22635,8 @@ function testRebirthSubAbilityMatrix() {
                         abilityId,
                         rank: 1,
                         displayName: card.name,
-                        modifiers: card.getRankEffect(1).modifiers
+                        abilityTier: card.getRankEffect(1).abilityTier,
+                        subAction: card.subAction
                     }
                 ]
             };
@@ -22484,6 +22667,83 @@ function testRebirthSubAbilityMatrix() {
 }
 
 testRebirthSubAbilityMatrix();
+
+function testElementalistRebirthSubActionLoop() {
+    const profile = createDefaultPlayerProfile();
+    unlockHiddenCharacter(profile, FIGHTER_IDS.ELEMENTALIST);
+    const sourceId = FIGHTER_IDS.ARCHER;
+    const cardId = `ability:${FIGHTER_IDS.ELEMENTALIST}`;
+    profile.rebirth.byCharacter[sourceId] = {
+        rebirthCount: 1,
+        statBonuses: { hp: 0, damage: 0, speed: 0, defense: 0 },
+        cardRanks: { [cardId]: 4 },
+        equippedCardIds: [cardId],
+        pendingOfferCards: []
+    };
+    const loadout = getRebirthLoadout(profile, sourceId);
+    const roster = createRoster();
+    const source = roster.find((fighter) => fighter.id === sourceId);
+    const opponent = roster.find((fighter) => fighter.id === FIGHTER_IDS.RAGE);
+    const simulation = new BattleSimulation(
+        [source, opponent],
+        {
+            onLog() {},
+            onSound() {},
+            onBattleBallReady(ball, spec, currentSimulation) {
+                if (spec.id === sourceId) applyRebirthLoadoutToBattleBall(ball, currentSimulation, loadout);
+            }
+        },
+        null,
+        { rng: () => 0 }
+    );
+    const owner = simulation.fighters.find((fighter) => fighter.id === sourceId);
+    const target = simulation.getOpponent(owner);
+    const primary = owner.abilities.primary;
+    const subAbility = owner.abilities.getByAbilityId(FIGHTER_IDS.ELEMENTALIST);
+    assert.ok(subAbility instanceof ElementalistAbility);
+    assert.equal(subAbility.role, "sub");
+    assert.equal(subAbility.abilityTier, 3);
+    assert.equal(subAbility.cooldown, 1.5);
+    assert.deepEqual(subAbility.getLevelUpgrade(), {
+        wetDuration: 2.5,
+        dualOrbChance: 0.3,
+        orbitalFusion: true
+    });
+    const sibling = simulation.createAbility(FIGHTER_IDS.ELEMENTALIST, owner, {
+        role: "sub",
+        abilityTier: 0,
+        instanceKey: "rebirth:test-independent-elementalist"
+    });
+    assert.notEqual(subAbility.activeChannels, sibling.activeChannels);
+    assert.notEqual(subAbility.activeOrbs, sibling.activeOrbs);
+
+    const primaryTimerBefore = primary.timer;
+    subAbility.update(1.51, target);
+    const waterBolt = simulation.entities.find(
+        (entity) => entity.constructor.name === "ElementalWaterBolt" && entity.ability === subAbility
+    );
+    assert.ok(waterBolt, "The sub action must fire its own water bolt after the independent 1.5 second cooldown");
+    assert.equal(primary.timer, primaryTimerBefore, "The sub action cooldown must not advance the primary ability");
+    assert.equal(waterBolt.owner, owner, "The sub action projectile must retain the equipped character as owner");
+    assert.equal(waterBolt.owner.teamId, owner.teamId, "The sub action projectile must retain the equipped team");
+    assert.equal(
+        waterBolt._getHitDamage(),
+        Math.round(owner.stats.baseDamage * owner.getStatModifiers().damage * 0.15),
+        "The sub action projectile must derive damage from the equipped character's total attack"
+    );
+
+    subAbility.onWaterBoltHit(target, target.position.clone());
+    assert.equal(subAbility.activeOrbs.length, 2, "Tier three must keep the approved different dual-orb chance path");
+    subAbility.consumeOrbByOwner(subAbility.activeOrbs[0]);
+    assert.equal(subAbility.activeChannels.length, 1, "Collected orbs must create channels on the sub instance");
+    assert.equal(sibling.activeChannels.length, 0, "Sibling Elementalist instances must not share channel state");
+    subAbility.cleanupElementalState();
+    assert.deepEqual(subAbility.activeOrbs, []);
+    assert.deepEqual(subAbility.activeChannels, []);
+    console.log("[elementalist-rebirth-sub-action-loop] ok");
+}
+
+testElementalistRebirthSubActionLoop();
 
 function testRebirthVisualProfileContract() {
     const stages = [0, 1, 3, 6, 10, 999].map(getRebirthVisualProfile);

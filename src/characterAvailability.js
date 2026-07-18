@@ -1,14 +1,7 @@
-import { FIGHTER_IDS } from "./core.js";
+import { CHARACTER_DEFINITIONS, getCharacterDefinition } from "./characters/characterRegistry.js";
 
 export const CHARACTER_UNLOCK_TYPES = Object.freeze({
     HUNTING_CHAMPION: "huntingChampion"
-});
-
-export const CHARACTER_ACCESS_POLICIES = Object.freeze({
-    [FIGHTER_IDS.ELEMENTALIST]: Object.freeze({
-        unlockType: CHARACTER_UNLOCK_TYPES.HUNTING_CHAMPION,
-        rebirthActionEligible: false
-    })
 });
 
 const DEFAULT_CHARACTER_ACCESS_POLICY = Object.freeze({
@@ -17,12 +10,17 @@ const DEFAULT_CHARACTER_ACCESS_POLICY = Object.freeze({
 });
 
 export function getCharacterAccessPolicy(characterId) {
-    return CHARACTER_ACCESS_POLICIES[characterId] ?? DEFAULT_CHARACTER_ACCESS_POLICY;
+    const definition = getCharacterDefinition(characterId);
+    if (!definition) return DEFAULT_CHARACTER_ACCESS_POLICY;
+    return Object.freeze({
+        unlockType: definition.availability.unlockType,
+        rebirthActionEligible: definition.rebirth.actionEligible
+    });
 }
 
 export function getHiddenCharacterIds() {
-    return Object.keys(CHARACTER_ACCESS_POLICIES).filter(
-        (characterId) => getCharacterAccessPolicy(characterId).unlockType !== null
+    return CHARACTER_DEFINITIONS.filter((definition) => definition.availability.unlockType !== null).map(
+        (definition) => definition.id
     );
 }
 
@@ -32,6 +30,11 @@ export function isHiddenCharacterId(characterId) {
 
 export function isRebirthActionEligible(characterId) {
     return getCharacterAccessPolicy(characterId).rebirthActionEligible !== false;
+}
+
+export function isRebirthActionAvailable(profile, characterId) {
+    if (!isRebirthActionEligible(characterId)) return false;
+    return !isHiddenCharacterId(characterId) || Boolean(profile?.unlockedCharacterIds?.includes(characterId));
 }
 
 export function canUnlockFromEncounter(characterId, encounterType) {

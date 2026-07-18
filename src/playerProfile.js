@@ -7,20 +7,19 @@
 
 import { HUNTING_STAGES } from "./hunting/huntingConfig.js";
 import { createDefaultHuntingStats, sanitizeHuntingStats } from "./hunting/huntingAchievementProgress.js";
-import { FIGHTER_IDS } from "./core.js";
+import { FIGHTER_IDS } from "./characters/characterRegistry.js";
 import { getHiddenCharacterIds } from "./characterAvailability.js";
 import { createDefaultConsumables, sanitizeConsumables } from "./consumables.js";
 import { EQUIPMENT_SPECIAL_OPTION_SUFFIXES } from "./hunting/equipmentConfig.js";
 import { formatEquipmentSpecialName } from "./hunting/equipmentNaming.js";
 import {
     REBIRTH_BASE_STAT_KEYS,
-    getRebirthCardDefinition,
     isValidRebirthCardId,
     normalizeRebirthOfferMaterial,
     REBIRTH_MAX_CARD_RANK,
-    REBIRTH_MAX_EQUIPPED_CARDS,
     REBIRTH_OFFER_SIZE
 } from "./rebirth/rebirthCards.js";
+import { createDefaultRebirthArea, migrateRebirthArea, REBIRTH_SCHEMA_VERSION } from "./rebirth/rebirthMigrations.js";
 
 export const PLAYER_PROFILE_STORAGE_KEY = "bfs:player-profile:v1";
 export const SESSION_STORAGE_VERSION_KEY = "bfs:session-version";
@@ -126,9 +125,7 @@ export function createDefaultPlayerProfile() {
                 processedTournamentReportIds: []
             }
         },
-        rebirth: {
-            byCharacter: {}
-        }
+        rebirth: createDefaultRebirthArea()
     };
 }
 
@@ -455,16 +452,8 @@ function sanitizeRebirthCharacterState(characterId, value) {
     );
     const equippedCardIds = [...new Set(value.equippedCardIds ?? [])]
         .filter((cardId) => cardRanks[cardId] > 0)
-        .slice(0, REBIRTH_MAX_EQUIPPED_CARDS);
-    const legacyPendingOfferCards = Array.isArray(value.pendingOfferCardIds)
-        ? value.pendingOfferCardIds
-              .map((cardId) => getRebirthCardDefinition(characterId, cardId))
-              .filter(Boolean)
-              .map((card) => ({ id: card.id, type: card.type }))
-        : [];
-    const pendingOfferCards = (
-        Array.isArray(value.pendingOfferCards) ? value.pendingOfferCards : legacyPendingOfferCards
-    )
+        .slice(0, Object.keys(cardRanks).length);
+    const pendingOfferCards = (Array.isArray(value.pendingOfferCards) ? value.pendingOfferCards : [])
         .map((card) => normalizeRebirthOfferMaterial(characterId, card))
         .filter(Boolean)
         .filter((card, index, cards) => cards.findIndex((candidate) => candidate.id === card.id) === index)
@@ -474,18 +463,20 @@ function sanitizeRebirthCharacterState(characterId, value) {
         statBonuses,
         cardRanks,
         equippedCardIds,
-        pendingOfferCards
+        pendingOfferCards,
+        pendingOfferNeedsRegeneration: Boolean(value.pendingOfferNeedsRegeneration)
     };
 }
 
 function sanitizeRebirth(obj) {
-    if (!obj || typeof obj !== "object") return { byCharacter: {} };
+    const migrated = migrateRebirthArea(obj);
+    if (!migrated || typeof migrated !== "object") return createDefaultRebirthArea();
     const byCharacter = {};
     for (const characterId of VALID_CHARACTER_IDS) {
-        const state = sanitizeRebirthCharacterState(characterId, obj.byCharacter?.[characterId]);
+        const state = sanitizeRebirthCharacterState(characterId, migrated.byCharacter?.[characterId]);
         if (state) byCharacter[characterId] = state;
     }
-    return { byCharacter };
+    return { schemaVersion: REBIRTH_SCHEMA_VERSION, byCharacter };
 }
 
 export function sanitizePlayerProfile(raw) {

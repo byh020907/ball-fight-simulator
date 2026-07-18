@@ -1,10 +1,10 @@
-import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
+import { getCharacterDefinitionByAbility } from "../characters/characterRegistry.js";
 
 const EMPTY_UPGRADE = Object.freeze({});
 const upgradeCache = new Map();
 
 export function getAbilityUpgrade(abilityId, tier = 0) {
-    const definition = REWARD_BALANCE.experience.abilityUpgrades[abilityId];
+    const definition = getCharacterDefinitionByAbility(abilityId)?.abilityUpgrade;
     if (!definition) return EMPTY_UPGRADE;
 
     const normalizedTier = Math.max(0, Math.min(definition.tiers.length - 1, Math.floor(tier)));

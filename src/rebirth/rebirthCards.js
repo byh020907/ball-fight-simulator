@@ -1,27 +1,16 @@
 import { getAbilityDisplayName } from "../abilities/abilityMetadata.js";
+import {
+    CHARACTER_DEFINITIONS,
+    getCharacterDefinition,
+    getCharacterDefinitionByAbility
+} from "../characters/characterRegistry.js";
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
-import { createRoster } from "../roster.js";
+import { isRebirthActionAvailable } from "../characterAvailability.js";
 
 const REBIRTH_BALANCE = REWARD_BALANCE.rebirth;
 const RARE_EQUIPMENT_STAT_RANGE = REWARD_BALANCE.equipment.statRanges.rare;
 const EQUIPMENT_STAT_VALUE_RATIOS = REWARD_BALANCE.equipment.statValueRatios;
-const ROSTER_BY_ID = new Map(createRoster().map((fighter) => [fighter.id, fighter]));
 const STAT_LABELS = Object.freeze({ hp: "HP", damage: "공격", speed: "속도", defense: "방어력" });
-const SUB_ABILITY_EFFECT_LABELS = Object.freeze({
-    archer: "유도 속도",
-    orbit: "위성 충전 속도",
-    trickster: "씨앗 속도",
-    grenade: "수류탄 피해",
-    dash: "대시 배율",
-    rage: "최대 충돌 수치",
-    spin: "충돌 후 회전력 유지",
-    eater: "뱉기 회전 충격",
-    bat_ball: "방망이 판정 거리",
-    vampire: "박쥐 속도",
-    gunner: "탄속",
-    phantom: "그림자 공격 피해",
-    hero: "오브 자석 범위"
-});
 
 export const REBIRTH_BASE_STAT_KEYS = Object.freeze(["hp", "damage", "speed", "defense"]);
 export const REBIRTH_MAX_CARD_RANK = REBIRTH_BALANCE.maxCardRank;
@@ -29,20 +18,25 @@ export const REBIRTH_MAX_EQUIPPED_CARDS = REBIRTH_BALANCE.maxEquippedCards;
 export const REBIRTH_OFFER_SIZE = REBIRTH_BALANCE.offerSize;
 
 export function getRebirthFighter(characterId) {
-    return ROSTER_BY_ID.get(characterId) ?? null;
+    return getCharacterDefinition(characterId)?.roster ?? null;
 }
 
-export function getSubAbilityIds(characterId) {
+export function getSubAbilityIds(characterId, profile = null, options = {}) {
     const ownAbilityId = getRebirthFighter(characterId)?.ability;
-    return [...ROSTER_BY_ID.values()]
-        .filter((fighter) => fighter.rebirthEligible !== false)
-        .map((fighter) => fighter.ability)
+    const availableOnly = options.availableOnly !== false;
+    return CHARACTER_DEFINITIONS.filter((definition) => definition.rebirth.actionEligible !== false)
+        .filter((definition) => !availableOnly || isRebirthActionAvailable(profile, definition.id))
+        .map((definition) => definition.abilityId)
         .filter((abilityId) => abilityId !== ownAbilityId)
         .filter((abilityId, index, ids) => ids.indexOf(abilityId) === index);
 }
 
+function normalizeOwnedRank(rank) {
+    return Math.max(0, Math.min(REBIRTH_MAX_CARD_RANK, Math.floor(rank || 0)));
+}
+
 function normalizeRank(rank) {
-    return Math.max(1, Math.min(REBIRTH_MAX_CARD_RANK, Math.floor(rank || 1)));
+    return Math.max(1, normalizeOwnedRank(rank));
 }
 
 function normalizeRandomValue(rng) {
@@ -132,24 +126,22 @@ function getPassiveCooldownCardId() {
 function getCardRankEffect(card, rank) {
     const normalizedRank = normalizeRank(rank);
     if (card.type === "action") {
-        const modifier = REBIRTH_BALANCE.subAbilityRankModifiers[card.abilityId];
+        const growth = card.growth[normalizedRank - 1];
         return {
             stats: {},
-            modifiers: {
-                [modifier.key]: modifier.base + modifier.perRank * normalizedRank
-            },
-            passiveModifiers: {}
+            modifiers: {},
+            passiveModifiers: {},
+            abilityTier: normalizedRank - 1,
+            effectText: `Lv.${growth.level} ${growth.gameText}`
         };
     }
 
     const passive = REBIRTH_BALANCE.passiveCardRanks.globalCooldown;
-    const reductionPercent = Math.min(
-        passive.maximumReductionPercent,
-        passive.baseReductionPercent + passive.perRankReductionPercent * (normalizedRank - 1)
-    );
+    const reductionPercent = passive.reductionPercents[normalizedRank - 1];
     return {
         stats: {},
         modifiers: {},
+        reductionPercent,
         passiveModifiers: {
             abilityCooldownMultiplier: (100 - reductionPercent) / 100
         },
@@ -157,19 +149,21 @@ function getCardRankEffect(card, rank) {
     };
 }
 
-function createActionCard(characterId, abilityId) {
-    if (!getSubAbilityIds(characterId).includes(abilityId)) return null;
-    const modifier = REBIRTH_BALANCE.subAbilityRankModifiers[abilityId];
-    if (!modifier) return null;
+function createActionCard(characterId, abilityId, profile) {
+    if (!getSubAbilityIds(characterId, profile, { availableOnly: false }).includes(abilityId)) return null;
+    const character = getCharacterDefinitionByAbility(abilityId);
+    if (!character) return null;
     const name = getAbilityDisplayName(abilityId);
     return Object.freeze({
         id: getActionCardId(abilityId),
         type: "action",
         categoryLabel: "액션",
         name: `${name} 호출`,
-        description: `${name} 능력을 독립 쿨타임으로 사용합니다. 중복 선택하면 기존 수치가 강화됩니다.`,
-        effectText: `등급마다 ${SUB_ABILITY_EFFECT_LABELS[abilityId] ?? "능력 수치"} 강화`,
+        description: `${name} 능력을 독립 쿨타임으로 사용합니다. 단계마다 원래 성장 능력을 해금합니다.`,
+        effectText: "원래 캐릭터 성장 해금",
         abilityId,
+        growth: character.abilityGrowth,
+        subAction: character.rebirth.subAction,
         weight: REBIRTH_BALANCE.candidateWeights.action,
         getRankEffect(rank) {
             return getCardRankEffect(this, rank);
@@ -183,7 +177,7 @@ function createPassiveCooldownCard() {
         type: "passive",
         categoryLabel: "패시브",
         name: "냉각 회로",
-        description: "장착하면 모든 능력의 쿨타임을 줄입니다. 중복 선택하면 감소량이 강화됩니다.",
+        description: "장착하면 모든 능력의 쿨타임을 줄입니다. 단계마다 감소량이 증가합니다.",
         effectText: "전체 능력 쿨타임 감소",
         weight: REBIRTH_BALANCE.candidateWeights.passive,
         getRankEffect(rank) {
@@ -192,18 +186,25 @@ function createPassiveCooldownCard() {
     });
 }
 
-export function getRebirthCardCatalog(characterId) {
+export function getRebirthCardCatalog(characterId, profile = null, options = {}) {
     if (!getRebirthFighter(characterId)) return [];
+    const availableOnly = options.availableOnly !== false;
     return [
-        ...getSubAbilityIds(characterId)
-            .map((abilityId) => createActionCard(characterId, abilityId))
+        ...getSubAbilityIds(characterId, profile, { availableOnly })
+            .map((abilityId) => createActionCard(characterId, abilityId, profile))
             .filter(Boolean),
         createPassiveCooldownCard()
     ];
 }
 
 export function getRebirthCardDefinition(characterId, cardId) {
-    return getRebirthCardCatalog(characterId).find((card) => card.id === cardId) ?? null;
+    return (
+        getRebirthCardCatalog(characterId, null, { availableOnly: false }).find((card) => card.id === cardId) ?? null
+    );
+}
+
+export function getAvailableRebirthCardDefinition(profile, characterId, cardId) {
+    return getRebirthCardCatalog(characterId, profile).find((card) => card.id === cardId) ?? null;
 }
 
 export function isValidRebirthCardId(characterId, cardId) {
@@ -228,26 +229,28 @@ export function normalizeRebirthOfferMaterial(characterId, material) {
     return { id: card.id, type: card.type };
 }
 
-export function getRebirthOfferDefinition(characterId, offer) {
-    if (typeof offer === "string") return getRebirthCardDefinition(characterId, offer);
+export function getRebirthOfferDefinition(characterId, offer, profile = null) {
+    if (typeof offer === "string") return getAvailableRebirthCardDefinition(profile, characterId, offer);
     const material = normalizeRebirthOfferMaterial(characterId, offer);
     if (!material) return null;
     if (material.type === "statReward") return createStatRewardFromMaterial(material);
-    return getRebirthCardDefinition(characterId, material.id);
+    return getAvailableRebirthCardDefinition(profile, characterId, material.id);
 }
 
-export function getRebirthOfferMaterial(characterId, offer) {
+export function getRebirthOfferMaterial(characterId, offer, profile = null) {
     if (typeof offer === "string") {
-        const card = getRebirthCardDefinition(characterId, offer);
+        const card = getAvailableRebirthCardDefinition(profile, characterId, offer);
         return card ? { id: card.id, type: card.type } : null;
     }
     return normalizeRebirthOfferMaterial(characterId, offer);
 }
 
-export function getRebirthCardView(characterId, cardId, rank = 0, equippedCardIds = []) {
-    const card = getRebirthCardDefinition(characterId, cardId);
+export function getRebirthCardView(characterId, cardId, rank = 0, equippedCardIds = [], profile = null) {
+    const card = profile
+        ? getAvailableRebirthCardDefinition(profile, characterId, cardId)
+        : getRebirthCardDefinition(characterId, cardId);
     if (!card) return null;
-    const normalizedRank = Math.max(0, Math.min(REBIRTH_MAX_CARD_RANK, Math.floor(rank || 0)));
+    const normalizedRank = normalizeOwnedRank(rank);
     const effect = card.getRankEffect(Math.max(1, normalizedRank));
     return {
         id: card.id,
@@ -257,7 +260,16 @@ export function getRebirthCardView(characterId, cardId, rank = 0, equippedCardId
         description: card.description,
         effectText: effect.effectText ?? card.effectText,
         rank: normalizedRank,
-        rankLabel: `등급 ${normalizedRank || 1}`,
+        rankLabel:
+            normalizedRank >= REBIRTH_MAX_CARD_RANK
+                ? `MAX · 단계 ${REBIRTH_MAX_CARD_RANK}/${REBIRTH_MAX_CARD_RANK}`
+                : `단계 ${normalizedRank || 1}/${REBIRTH_MAX_CARD_RANK}`,
+        maxRank: REBIRTH_MAX_CARD_RANK,
+        isMax: normalizedRank >= REBIRTH_MAX_CARD_RANK,
+        nextUnlockText:
+            card.type === "action" && normalizedRank < REBIRTH_MAX_CARD_RANK
+                ? `다음: Lv.${card.growth[normalizedRank].level} ${card.growth[normalizedRank].gameText}`
+                : null,
         equipped: equippedCardIds.includes(card.id),
         stats: effect.stats,
         modifiers: effect.modifiers,
@@ -266,8 +278,8 @@ export function getRebirthCardView(characterId, cardId, rank = 0, equippedCardId
     };
 }
 
-export function getRebirthOfferView(characterId, offer, rank = 0, equippedCardIds = []) {
-    const reward = getRebirthOfferDefinition(characterId, offer);
+export function getRebirthOfferView(characterId, offer, rank = 0, equippedCardIds = [], profile = null) {
+    const reward = getRebirthOfferDefinition(characterId, offer, profile);
     if (!reward) return null;
     if (reward.type === "statReward") {
         return {
@@ -280,5 +292,11 @@ export function getRebirthOfferView(characterId, offer, rank = 0, equippedCardId
             abilityId: null
         };
     }
-    return getRebirthCardView(characterId, reward.id, rank, equippedCardIds);
+    return getRebirthCardView(
+        characterId,
+        reward.id,
+        Math.min(REBIRTH_MAX_CARD_RANK, normalizeOwnedRank(rank) + 1),
+        equippedCardIds,
+        profile
+    );
 }

@@ -1,12 +1,36 @@
+import assert from "node:assert/strict";
 import { createRandomStatAllocation, applyStatAllocation } from "../src/statAllocation.js";
 import { BattleSimulation } from "../src/simulation/battleSimulation.js";
 import { TournamentManager } from "../src/tournament.js";
 import { createRoster } from "../src/roster.js";
 import { getActionPool } from "../src/clickActions.js";
+import { CHARACTER_DEFINITIONS } from "../src/characters/characterRegistry.js";
+import { getRebirthCardCatalog, getRebirthCardDefinition } from "../src/rebirth/index.js";
 
 const roster = createRoster();
 const TOURNAMENT_COUNT = 200;
 const TOTAL_STAT_POINTS = 100;
+
+function verifyRebirthTierBalance() {
+    for (const source of CHARACTER_DEFINITIONS) {
+        const actionCards = getRebirthCardCatalog(source.id, null, { availableOnly: false }).filter(
+            (card) => card.type === "action"
+        );
+        for (const card of actionCards) {
+            assert.deepEqual(
+                [1, 2, 3, 4].map((rank) => card.getRankEffect(rank).abilityTier),
+                [0, 1, 2, 3]
+            );
+        }
+    }
+    const cooling = getRebirthCardDefinition(CHARACTER_DEFINITIONS[0].id, "passive:global-cooldown");
+    assert.deepEqual(
+        [1, 2, 3, 4].map((rank) => cooling.getRankEffect(rank).reductionPercent),
+        [30, 40, 50, 60]
+    );
+}
+
+verifyRebirthTierBalance();
 
 const ACTION_NAME_MAP = {
     time_warp: "시간왜곡",

@@ -1,12 +1,11 @@
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
-import { createRoster } from "../roster.js";
+import { getCharacterDefinition } from "../characters/characterRegistry.js";
 import { getLevelRewardEffectText, LEVEL_REWARD_EFFECT_TYPES } from "./reward-effects/effectRegistry.js";
 
 const EMPTY_REWARDS = Object.freeze([]);
 const progressionCache = new Map();
 const LEVEL_STAT_KEYS = Object.freeze(["hp", "damage", "speed", "defense"]);
 const LEVEL_STAT_UNIT_SCALE = 4;
-const ROSTER_BY_ID = new Map(createRoster().map((fighter) => [fighter.id, fighter]));
 
 function normalizeLevel(level) {
     const maxLevel = REWARD_BALANCE.experience.maxLevel;
@@ -14,11 +13,11 @@ function normalizeLevel(level) {
 }
 
 function getEntries(characterId) {
-    return REWARD_BALANCE.experience.characterLevelProgressions[characterId] ?? EMPTY_REWARDS;
+    return getCharacterDefinition(characterId)?.levelRewards ?? EMPTY_REWARDS;
 }
 
 function getLevelStatBonus(characterId, level) {
-    const fighter = ROSTER_BY_ID.get(characterId);
+    const fighter = getCharacterDefinition(characterId)?.roster;
     const maxLevel = REWARD_BALANCE.experience.maxLevel;
     const targetMultiplier = REWARD_BALANCE.experience.levelStatTargetMultiplier;
     if (!fighter || level < 2 || level > maxLevel) return {};

@@ -294,6 +294,11 @@
                                             <span class="ch-rebirth-kind" x-text="card.categoryLabel"></span>
                                             <strong x-text="card.name"></strong>
                                             <span x-text="formatRebirthCardEffect(card)"></span>
+                                            <span
+                                                class="ch-rebirth-rank"
+                                                x-show="card.type !== 'statReward'"
+                                                x-text="card.rankLabel"
+                                            ></span>
                                             <button
                                                 class="ch-btn"
                                                 type="button"
@@ -932,9 +937,10 @@
             const stats = Object.entries(card?.stats ?? {})
                 .filter(([, value]) => Number(value) > 0)
                 .map(([stat, value]) => `${statLabels[stat] ?? stat} +${value}`);
-            return stats.length
-                ? stats.join(" · ")
-                : `등급 ${card?.rank ?? 1} · ${card?.effectText ?? "능력 수치 강화"}`;
+            if (stats.length) return stats.join(" · ");
+            const effectParts = [`현재: ${card?.effectText ?? "효과 정보 없음"}`];
+            if (card?.nextUnlockText) effectParts.push(card.nextUnlockText);
+            return effectParts.join(" · ");
         }
 
         function formatRebirthStatBonus(stat, value) {
