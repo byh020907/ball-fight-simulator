@@ -12,6 +12,7 @@ import {
     canOpenHuntingChest,
     ELITE_MOB_COMBINATIONS,
     getDailyShop,
+    HUNTING_DEBUG_ENCOUNTER_TYPES,
     getHuntingMonsterDefinitions,
     previewHuntingChest
 } from "../hunting/index.js";
@@ -69,6 +70,14 @@ const HUNTING_DEBUG_EVENT_OPTIONS = Object.freeze([
     { id: HUNTING_EVENT_TYPES.CURSED_ALTAR, label: "저주받은 제단" },
     { id: HUNTING_EVENT_TYPES.CHAMPION_INTRUSION, label: "챔피언 난입" },
     { id: HUNTING_EVENT_TYPES.ELITE_MOB, label: "정예 몹 습격" }
+]);
+
+const HUNTING_DEBUG_ENCOUNTER_OPTIONS = Object.freeze([
+    { id: HUNTING_DEBUG_ENCOUNTER_TYPES.NORMAL, label: "일반 몬스터" },
+    { id: HUNTING_DEBUG_ENCOUNTER_TYPES.MINIBOSS, label: "중간 보스" },
+    { id: HUNTING_DEBUG_ENCOUNTER_TYPES.CHAMPION, label: "챔피언" },
+    { id: HUNTING_DEBUG_ENCOUNTER_TYPES.ELITE, label: "정예 조합" },
+    { id: HUNTING_DEBUG_ENCOUNTER_TYPES.FINAL_BOSS, label: "최종 보스" }
 ]);
 
 function createHuntingDebugEliteCombinationOptions() {
@@ -390,6 +399,7 @@ export function createCollectionHubViewModel({
             maxFloor: HUNTING_MAX_FLOOR,
             stages: HUNTING_STAGES.map((stage) => ({ id: stage.id, name: stage.name })),
             events: HUNTING_DEBUG_EVENT_OPTIONS,
+            encounters: HUNTING_DEBUG_ENCOUNTER_OPTIONS,
             eliteCombinations: createHuntingDebugEliteCombinationOptions()
         }
     };

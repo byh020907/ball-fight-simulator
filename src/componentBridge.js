@@ -246,7 +246,10 @@ export function createComponentBridge(app) {
         recordDebugTournamentWin(characterId) {
             if (!app.isDebugModeActive()) return { ok: false, error: "debug_disabled" };
             const result = recordDeveloperTournamentWin(app.playerProfile, characterId);
-            if (result.ok) refreshCollectionAndProfile();
+            if (result.ok) {
+                app.playerFighterId = characterId;
+                refreshCollectionAndProfile();
+            }
             return result;
         },
         seedDebugCollectionSample(characterId) {
@@ -269,6 +272,17 @@ export function createComponentBridge(app) {
                 stageId,
                 encounterFloor,
                 eventType,
+                eliteCombinationId
+            });
+        },
+        startDebugHuntingEncounter(characterId, stageId, encounterFloor, encounterType, eliteCombinationId) {
+            if (!app.isDebugModeActive() || !app.lifecycle.isSetup) return { ok: false, error: "debug_disabled" };
+            app.setGameMode("hunting");
+            CollectionHubService.close();
+            return app.hunting.startDebugCombatPreview(characterId, {
+                stageId,
+                encounterFloor,
+                encounterType,
                 eliteCombinationId
             });
         },

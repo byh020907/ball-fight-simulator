@@ -1167,6 +1167,12 @@ function testCollectionRebirthAndDeveloperContracts() {
         "Collection tab visibility should be refreshed when the modal layout changes"
     );
     assert.ok(template.includes("이벤트 미리보기"), "Developer tools should expose hunting event previews");
+    assert.ok(template.includes("전투 조우 테스트"), "Developer tools should expose direct combat encounter previews");
+    assert.ok(
+        template.includes('@click="startDebugHuntingEncounter()"') &&
+            template.includes("this.bridge.startDebugHuntingEncounter("),
+        "Combat encounter previews should use their dedicated component bridge path"
+    );
     assert.ok(
         template.includes('class="ch-developer-control-row"') && template.includes("미리보기 열기"),
         "Developer event actions should stay beside their event selector"

@@ -109,6 +109,14 @@ export const HUNTING_ENEMY_TYPES = Object.freeze({
     CHAMPION: "champion"
 });
 
+export const HUNTING_DEBUG_ENCOUNTER_TYPES = Object.freeze({
+    NORMAL: HUNTING_ENEMY_TYPES.NORMAL,
+    MINIBOSS: "miniboss",
+    CHAMPION: HUNTING_ENEMY_TYPES.CHAMPION,
+    ELITE: HUNTING_ENEMY_TYPES.ELITE,
+    FINAL_BOSS: HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS
+});
+
 export const HUNTING_EVENT_TYPES = Object.freeze({
     PORTAL: "portal",
     WANDERING_MERCHANT: "wandering_merchant",

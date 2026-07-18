@@ -15,6 +15,7 @@ import {
 import { createEmptyHuntingLoot } from "./huntingRewards.js";
 import {
     HUNTING_ADVANCE_STEPS,
+    HUNTING_DEBUG_ENCOUNTER_TYPES,
     HUNTING_ENEMY_TYPES,
     HUNTING_EVENT_TYPES,
     HUNTING_FLOOR_OUTCOME_TYPES,
@@ -260,9 +261,52 @@ export class HuntingManager {
         });
     }
 
+    async startDebugCombatPreview(
+        characterId,
+        {
+            stageId = HUNTING_STAGE_IDS.CAVE,
+            encounterFloor = 1,
+            encounterType = HUNTING_DEBUG_ENCOUNTER_TYPES.NORMAL,
+            eliteCombinationId = null
+        } = {}
+    ) {
+        PopupService.close();
+        const validStageId = HUNTING_STAGES.some((stage) => stage.id === stageId) ? stageId : HUNTING_STAGE_IDS.CAVE;
+        const validFloor = Math.max(1, Math.min(HUNTING_MAX_FLOOR, Math.floor(encounterFloor) || 1));
+        const validEncounterType = Object.values(HUNTING_DEBUG_ENCOUNTER_TYPES).includes(encounterType)
+            ? encounterType
+            : HUNTING_DEBUG_ENCOUNTER_TYPES.NORMAL;
+        const eliteCombination =
+            validEncounterType === HUNTING_DEBUG_ENCOUNTER_TYPES.ELITE
+                ? (getEliteMobCombination(eliteCombinationId) ?? ELITE_MOB_COMBINATIONS[0])
+                : null;
+        const previewFloor =
+            validEncounterType === HUNTING_DEBUG_ENCOUNTER_TYPES.FINAL_BOSS
+                ? HUNTING_MAX_FLOOR
+                : eliteCombination
+                  ? Math.max(validFloor, eliteCombination.minimumFloor)
+                  : validFloor;
+        return this._startRun(characterId, {
+            stageId: validStageId,
+            encounterFloor: previewFloor,
+            displayFloor: previewFloor,
+            debug: true,
+            debugEncounterType: validEncounterType,
+            debugEliteCombinationId: eliteCombination?.id ?? null
+        });
+    }
+
     async _startRun(
         characterId,
-        { stageId, encounterFloor, displayFloor, debug, debugEventType = null, debugEliteCombinationId = null }
+        {
+            stageId,
+            encounterFloor,
+            displayFloor,
+            debug,
+            debugEventType = null,
+            debugEncounterType = null,
+            debugEliteCombinationId = null
+        }
     ) {
         this.app.playerProfile.hunting.stats = recordHuntingStageVisit(this.app.playerProfile.hunting.stats, stageId);
         savePlayerProfile(this.app.playerProfile);
@@ -282,6 +326,9 @@ export class HuntingManager {
         this._showStartingMove(stage, displayFloor);
         if (debugEventType) {
             return this._showDebugEventPreview(debugEventType, encounterFloor, debugEliteCombinationId);
+        }
+        if (debugEncounterType) {
+            return this._showDebugCombatPreview(debugEncounterType, encounterFloor, debugEliteCombinationId);
         }
         await this.advance({ waitForFirstMoveUi: true });
     }
@@ -308,6 +355,34 @@ export class HuntingManager {
         };
         this.app.addLog(`[Hunting] ${floor}층 — ${event.type} 디버그 이벤트 미리보기`);
         return this._handleEventFloor({ app: this.app, event });
+    }
+
+    _showDebugCombatPreview(encounterType, floor, eliteCombinationId = null) {
+        if (encounterType === HUNTING_DEBUG_ENCOUNTER_TYPES.CHAMPION) {
+            return this._showDebugEventPreview(HUNTING_EVENT_TYPES.CHAMPION_INTRUSION, floor);
+        }
+        if (encounterType === HUNTING_DEBUG_ENCOUNTER_TYPES.ELITE) {
+            return this._showDebugEventPreview(HUNTING_EVENT_TYPES.ELITE_MOB, floor, eliteCombinationId);
+        }
+
+        const isFinalBoss = encounterType === HUNTING_DEBUG_ENCOUNTER_TYPES.FINAL_BOSS;
+        const encounter = {
+            type: isFinalBoss ? HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS : HUNTING_FLOOR_OUTCOME_TYPES.COMBAT,
+            floor,
+            enemyType: isFinalBoss ? HUNTING_ENEMY_TYPES.CHAMPION : HUNTING_ENEMY_TYPES.NORMAL,
+            isMiniboss: encounterType === HUNTING_DEBUG_ENCOUNTER_TYPES.MINIBOSS
+        };
+        this._run = {
+            ...this._run,
+            floor,
+            lastEvent: null,
+            lastEncounter: encounter,
+            history: [...this._run.history, { type: "debug_combat_preview", floor, encounter }]
+        };
+        this.app.addLog(`[Hunting] ${floor}층 — ${encounterType} 디버그 전투 조우`);
+        return isFinalBoss
+            ? this._handleFinalBossFloor({ app: this.app, floor })
+            : this._handleCombatFloor({ app: this.app, floor });
     }
 
     _showStartingMove(stage, floor = this._run?.floor ?? 1) {

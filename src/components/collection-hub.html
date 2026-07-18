@@ -533,6 +533,23 @@
                             </div>
                         </div>
                         <div class="ch-developer-field ch-developer-field--wide">
+                            <span>전투 조우 테스트</span>
+                            <div class="ch-developer-control-row">
+                                <select
+                                    class="ch-select"
+                                    x-model="state.developer.huntingEncounterType"
+                                    @change="syncDeveloperEventSelection()"
+                                >
+                                    <template x-for="encounter in state.developer.encounters" :key="encounter.id">
+                                        <option x-bind:value="encounter.id" x-text="encounter.label"></option>
+                                    </template>
+                                </select>
+                                <button class="ch-btn" type="button" @click="startDebugHuntingEncounter()">
+                                    전투 준비 열기
+                                </button>
+                            </div>
+                        </div>
+                        <div class="ch-developer-field ch-developer-field--wide">
                             <span>이벤트 미리보기</span>
                             <div class="ch-developer-control-row">
                                 <select
@@ -551,7 +568,7 @@
                         </div>
                         <label
                             class="ch-developer-field ch-developer-field--wide"
-                            x-show="state.developer.huntingEventType === 'elite_mob'"
+                            x-show="state.developer.huntingEventType === 'elite_mob' || state.developer.huntingEncounterType === 'elite'"
                         >
                             <span>정예 조합</span>
                             <select
@@ -774,6 +791,8 @@
                 huntingFloor: 1,
                 maxFloor: 100,
                 stages: [],
+                huntingEncounterType: "normal",
+                encounters: [],
                 huntingEventType: "portal",
                 events: [],
                 eliteCombinationId: null,
@@ -950,7 +969,9 @@
         }
 
         function syncDeveloperEventSelection() {
-            if (state.developer.huntingEventType !== "elite_mob") return;
+            const requiresEliteCombination =
+                state.developer.huntingEventType === "elite_mob" || state.developer.huntingEncounterType === "elite";
+            if (!requiresEliteCombination) return;
             const selected =
                 state.developer.eliteCombinations.find(
                     (combination) => combination.id === state.developer.eliteCombinationId
@@ -1061,6 +1082,16 @@
                     state.developer.eliteCombinationId
                 );
             },
+            startDebugHuntingEncounter() {
+                syncDeveloperEventSelection();
+                return this.bridge.startDebugHuntingEncounter(
+                    state.developer.targetCharacterId,
+                    state.developer.huntingStageId,
+                    state.developer.huntingFloor,
+                    state.developer.huntingEncounterType,
+                    state.developer.eliteCombinationId
+                );
+            },
             exitDebugMode() {
                 const result = this.bridge.exitDebugMode();
                 if (result.ok) {
@@ -1103,6 +1134,12 @@
                 )
                     ? state.developer.eliteCombinationId
                     : (eliteCombinations[0]?.id ?? null);
+                const encounters = developer.encounters ?? [];
+                const huntingEncounterType = encounters.some(
+                    (encounter) => encounter.id === state.developer.huntingEncounterType
+                )
+                    ? state.developer.huntingEncounterType
+                    : (encounters[0]?.id ?? "normal");
                 state.developer = {
                     active: Boolean(developer.active),
                     currentCharacterId: developer.currentCharacterId ?? null,
@@ -1112,6 +1149,8 @@
                     huntingFloor: state.developer.huntingFloor ?? 1,
                     maxFloor: developer.maxFloor ?? 100,
                     stages: developer.stages ?? [],
+                    huntingEncounterType,
+                    encounters,
                     huntingEventType: state.developer.huntingEventType ?? developer.events?.[0]?.id ?? "portal",
                     events: developer.events ?? [],
                     eliteCombinationId,

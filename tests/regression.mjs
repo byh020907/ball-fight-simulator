@@ -96,6 +96,7 @@ import {
     applyHuntingStatModifiersToSpec,
     getHuntingAvailableStartFloors,
     getEligibleHuntingCharacters,
+    selectHuntingModeCharacterId,
     getEnemyPowerMultiplier,
     getHuntingFloorChances,
     getHuntingPortalWeightMultiplier,
@@ -120,6 +121,7 @@ import {
     HUNTING_ARENA,
     DAILY_SHOP,
     HUNTING_COMBAT_RELIEF,
+    HUNTING_DEBUG_ENCOUNTER_TYPES,
     HUNTING_ENEMY_TYPES,
     HUNTING_EVENT_TYPES,
     HUNTING_FLOOR_OUTCOME_TYPES,
@@ -9794,6 +9796,39 @@ async function testDebugHuntingEventPreviewUsesProductionEventFlow() {
             "Elite combination previews should use the selected production monster roster"
         );
 
+        await manager.startDebugCombatPreview(FIGHTER_IDS.RAGE, {
+            stageId: HUNTING_STAGE_IDS.FOREST,
+            encounterFloor: 23,
+            encounterType: HUNTING_DEBUG_ENCOUNTER_TYPES.MINIBOSS
+        });
+        assert.equal(manager._run.floor, 23, "Combat previews should use the requested floor");
+        assert.equal(manager._run.lastEncounter.type, HUNTING_FLOOR_OUTCOME_TYPES.COMBAT);
+        assert.equal(manager._run.lastEncounter.isMiniboss, true, "Miniboss previews should use the boss mob path");
+        assert.equal(
+            manager._run.phase,
+            HUNTING_RUN_PHASES.AWAITING_BATTLE_PREPARATION,
+            "Combat previews should stop at the production battle preparation UI"
+        );
+
+        await manager.startDebugCombatPreview(FIGHTER_IDS.RAGE, {
+            stageId: HUNTING_STAGE_IDS.FOREST,
+            encounterFloor: 1,
+            encounterType: HUNTING_DEBUG_ENCOUNTER_TYPES.ELITE,
+            eliteCombinationId: debugCombination.id
+        });
+        assert.equal(manager._run.floor, debugCombination.minimumFloor);
+        assert.equal(manager._run.lastEvent.eliteCombinationId, debugCombination.id);
+        assert.equal(manager._run.phase, HUNTING_RUN_PHASES.AWAITING_BATTLE_PREPARATION);
+
+        await manager.startDebugCombatPreview(FIGHTER_IDS.RAGE, {
+            stageId: HUNTING_STAGE_IDS.FOREST,
+            encounterFloor: 5,
+            encounterType: HUNTING_DEBUG_ENCOUNTER_TYPES.FINAL_BOSS
+        });
+        assert.equal(manager._run.floor, HUNTING_MAX_FLOOR, "Final boss previews should use the production boss floor");
+        assert.equal(manager._run.lastEncounter.type, HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS);
+        assert.equal(manager._run.phase, HUNTING_RUN_PHASES.AWAITING_BATTLE_PREPARATION);
+
         await manager.startDebugEventPreview(FIGHTER_IDS.RAGE, {
             stageId: "invalid-stage",
             encounterFloor: HUNTING_MAX_FLOOR + 1,
@@ -15713,6 +15748,7 @@ function testDeveloperTournamentWinTool() {
 
     const app = {
         playerProfile: profile,
+        playerFighterId: FIGHTER_IDS.HERO,
         debugActive: false,
         isDebugModeActive() {
             return this.debugActive;
@@ -15733,6 +15769,16 @@ function testDeveloperTournamentWinTool() {
     app.debugActive = true;
     const bridgeResult = bridge.recordDebugTournamentWin(characterId);
     assert.equal(bridgeResult.ok, true, "Bridge should record the selected debug character victory");
+    assert.equal(
+        app.playerFighterId,
+        characterId,
+        "Developer wins should make the unlocked character the current setup character"
+    );
+    assert.equal(
+        selectHuntingModeCharacterId(profile, createRoster(), characterId, () => 0.99),
+        characterId,
+        "Hunting mode should preserve the current character when that character is eligible"
+    );
     assert.equal(app.collectionRefreshCount, 1, "Developer win should refresh collection data");
     assert.equal(app.setupRefreshCount, 1, "Developer win should refresh setup data");
     console.log("[developer-tournament-win-tool] ok");
@@ -16430,6 +16476,11 @@ async function testCreateCollectionHubViewModel() {
         vm.developer.eliteCombinations.map(({ id, minimumFloor }) => ({ id, minimumFloor })),
         ELITE_MOB_COMBINATIONS.map(({ id, minimumFloor }) => ({ id, minimumFloor })),
         "Developer tools should expose every production elite combination in source order"
+    );
+    assert.deepEqual(
+        vm.developer.encounters.map((encounter) => encounter.id),
+        Object.values(HUNTING_DEBUG_ENCOUNTER_TYPES),
+        "Developer tools should expose every supported combat encounter type"
     );
     assert.ok(
         vm.developer.eliteCombinations.every((combination) => combination.label.includes("층 · ")),

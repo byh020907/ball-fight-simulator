@@ -45,6 +45,13 @@ export function getEligibleHuntingCharacters(profile, roster = []) {
     return roster.filter((fighter) => canEnterHunting(profile, fighter.id));
 }
 
+export function selectHuntingModeCharacterId(profile, roster = [], currentCharacterId = null, rng = Math.random) {
+    const eligible = getEligibleHuntingCharacters(profile, roster);
+    if (eligible.some((fighter) => fighter.id === currentCharacterId)) return currentCharacterId;
+    if (eligible.length === 0) return currentCharacterId;
+    return eligible[Math.floor(rng() * eligible.length)]?.id ?? eligible[0].id;
+}
+
 export function createHuntingRun({
     characterId,
     stageId = HUNTING_STAGE_IDS.CAVE,

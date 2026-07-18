@@ -67,7 +67,7 @@ import {
     grantAchievementReward,
     formatAchievementReward
 } from "./collection/index.js";
-import { getEligibleHuntingCharacters } from "./hunting/huntingState.js";
+import { getEligibleHuntingCharacters, selectHuntingModeCharacterId } from "./hunting/huntingState.js";
 import { HuntingManager } from "./hunting/huntingManager.js";
 import {
     applyEquipmentStats,
@@ -310,12 +310,9 @@ export class BattleApp {
         if (!this.lifecycle.isSetup) return;
         this._gameMode = mode;
         this._modeSegment.mode = mode;
-        // 모드 전환 시 새 캐릭터로 랜덤 변경
+        // 사냥터는 해금된 현재 캐릭터를 유지하고, 토너먼트는 다른 캐릭터로 전환한다.
         if (mode === "hunting") {
-            const eligible = getEligibleHuntingCharacters(this.playerProfile, this.roster);
-            if (eligible.length > 0) {
-                this.playerFighterId = eligible[Math.floor(Math.random() * eligible.length)].id;
-            }
+            this.playerFighterId = selectHuntingModeCharacterId(this.playerProfile, this.roster, this.playerFighterId);
         } else {
             const others = this.roster.filter((f) => f.id !== this.playerFighterId);
             if (others.length > 0) {
