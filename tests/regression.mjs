@@ -70,6 +70,7 @@ import {
     TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS
 } from "../src/tournament/angledBounceRamps.js";
 import { Ability, AbilitySet } from "../src/abilities/index.js";
+import { findGunnerTurretPlacement } from "../src/abilities/gunnerTurretPlacement.js";
 import { FighterPhysicsSimulation } from "../src/simulation/fighterPhysicsSimulation.js";
 import { PreviewReselectSimulation } from "../src/preview/previewReselectSimulation.js";
 import { BASE_SPEED_MULTIPLIER, createRoster } from "../src/roster.js";
@@ -6404,6 +6405,62 @@ function testFiveBallLevelRewardContracts(app) {
         Vector2.subtract(correctedPlacement, blockedPlacement).length() >= 70,
         "Gunner turret placement should reject terrain overlap and select the nearest clear candidate"
     );
+    const placementOwner = { position: new Vector2(100, 100) };
+    const placementContext = {
+        ownerPosition: placementOwner.position,
+        owner: placementOwner,
+        direction: new Vector2(1, 0),
+        arena: { width: 1000, height: 700 },
+        entities: [],
+        terrain: []
+    };
+    const directPlacement = findGunnerTurretPlacement(placementContext);
+    assert.deepEqual(
+        [directPlacement.x, directPlacement.y],
+        [180, 100],
+        "Gunner turret placement defaults should preserve the 80-unit forward candidate"
+    );
+    const boundedPlacement = findGunnerTurretPlacement({
+        ...placementContext,
+        ownerPosition: new Vector2(40, 40),
+        direction: new Vector2(-1, -1),
+        arena: { width: 200, height: 200 }
+    });
+    assert.deepEqual(
+        [boundedPlacement.x, boundedPlacement.y],
+        [30, 30],
+        "Gunner turret placement defaults should preserve the 30-unit arena boundary"
+    );
+    const polygonBlockedPlacement = findGunnerTurretPlacement({
+        ...placementContext,
+        terrain: [
+            {
+                shape: "polygon",
+                x: 180,
+                y: 100,
+                points: [new Vector2(-40, -40), new Vector2(40, -40), new Vector2(40, 40), new Vector2(-40, 40)],
+                blocking: true
+            }
+        ]
+    });
+    assert.notDeepEqual(
+        [polygonBlockedPlacement.x, polygonBlockedPlacement.y],
+        [180, 100],
+        "Gunner turret placement should preserve polygon terrain occupancy rejection"
+    );
+    let occupiedCandidateCount = 0;
+    const fallbackPlacement = findGunnerTurretPlacement({
+        ...placementContext,
+        isOccupied: () => {
+            occupiedCandidateCount++;
+            return true;
+        }
+    });
+    assert.deepEqual(
+        [occupiedCandidateCount, fallbackPlacement.x, fallbackPlacement.y],
+        [48, 100, 100],
+        "Gunner turret placement should test all sixteen candidates at each distance before its owner fallback"
+    );
 
     const compareTurretMode = (movementMode) => {
         const run = createRun(FIGHTER_IDS.GUNNER);
@@ -6482,18 +6539,27 @@ function testFiveBallLevelRewardContracts(app) {
         assertEffectArcAt(primitives, fixedTurret.turret.position, "Gunner fixed turret");
         assert.ok(findEffectPrimitive(primitives, "lineTo"), "Gunner turret should telegraph its next shot in teal");
     });
-    const expiringAbility = { state: { turret: null } };
+    const dismissals = [];
     const expiringTurret = new GunnerTurret(fixedTurret.run.owner, new Vector2(420, 300), {
         movementMode: "fixed",
-        sourceAbility: expiringAbility
+        onDismiss: (turret, details) => dismissals.push({ turret, details })
     });
-    expiringAbility.state.turret = expiringTurret;
     expiringTurret.life = 0.05;
     expiringTurret.update(0.1, fixedTurret.run.simulation);
     assert.deepEqual(
-        [expiringTurret.isExpired, expiringAbility.state.turret],
-        [true, null],
-        "Gunner turret natural expiry should run shared cleanup and release the ability reference"
+        [expiringTurret.isExpired, dismissals.length, dismissals[0].turret, dismissals[0].details.destroyed],
+        [true, 1, expiringTurret, false],
+        "Gunner turret natural expiry should notify its owner exactly once through the public dismissal callback"
+    );
+    const deploymentRun = createRun(FIGHTER_IDS.GUNNER);
+    const deploymentAbility = deploymentRun.owner.ability;
+    deploymentAbility._deployTurret(deploymentRun.simulation);
+    const replacedTurret = deploymentAbility.state.turret;
+    deploymentAbility._deployTurret(deploymentRun.simulation);
+    assert.deepEqual(
+        [replacedTurret.isExpired, deploymentAbility.state.turret === replacedTurret],
+        [true, false],
+        "Gunner ability should replace an existing turret through its public dismissal contract"
     );
     fixedTurret.turret.takeDamage(fixedTurret.turret.maxHp, fixedTurret.run.owner, "Turret Test");
     assert.equal(

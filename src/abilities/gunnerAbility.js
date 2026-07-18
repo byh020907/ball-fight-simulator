@@ -1,8 +1,7 @@
 import { Vector2 } from "../core.js";
 import { Ability } from "./ability.js";
 import { BulletProjectile, GunnerTurret } from "../entities/index.js";
-import { polygonBoundingRadius } from "../physics/CollisionShape.js";
-import { TERRAIN_SHAPES } from "../terrain/terrainConfig.js";
+import { findGunnerTurretPlacement } from "./gunnerTurretPlacement.js";
 
 const GUNNER_COOLDOWN = 4;
 const BULLET_INTERVAL = 0.05;
@@ -14,7 +13,6 @@ const KNOCKBACK_STRENGTH = 0.25;
 const KNOCKBACK_DURATION = 0.15;
 const FINISHER_CHARGE_DURATION = 0.16;
 const TURRET_STACK_REQUIREMENT = 20;
-const TURRET_PLACEMENT_DISTANCE = 80;
 
 export class GunnerAbility extends Ability {
     constructor(owner, simulation) {
@@ -200,7 +198,7 @@ export class GunnerAbility extends Ability {
 
     _deployTurret(simulation) {
         if (this.state.turret && !this.state.turret.isExpired) {
-            this.state.turret._expire(simulation, false);
+            this.state.turret.dismiss(simulation);
         }
         const target = simulation.getNearestEnemy(this.owner);
         const direction = target
@@ -209,7 +207,9 @@ export class GunnerAbility extends Ability {
         const position = this._findTurretPlacement(direction, simulation);
         const turret = new GunnerTurret(this.owner, position, {
             movementMode: this.turretMovementMode,
-            sourceAbility: this
+            onDismiss: (dismissedTurret) => {
+                if (this.state.turret === dismissedTurret) this.state.turret = null;
+            }
         });
         this.state.turret = turret;
         simulation.entities.push(turret);
@@ -217,41 +217,13 @@ export class GunnerAbility extends Ability {
     }
 
     _findTurretPlacement(direction, simulation) {
-        const baseAngle = Math.atan2(direction.y, direction.x);
-        const angleOffsets = Array.from({ length: 16 }, (_, index) => {
-            const step = Math.ceil(index / 2);
-            return (index % 2 === 0 ? step : -step) * (Math.PI / 8);
-        });
-        for (const distance of [TURRET_PLACEMENT_DISTANCE, 120, 160]) {
-            for (const offset of angleOffsets) {
-                const candidate = Vector2.add(this.owner.position, Vector2.fromAngle(baseAngle + offset, distance));
-                candidate.x = Math.max(30, Math.min(simulation.width - 30, candidate.x));
-                candidate.y = Math.max(30, Math.min(simulation.height - 30, candidate.y));
-                if (this._isTurretPlacementOccupied(candidate, simulation)) continue;
-                return candidate;
-            }
-        }
-        return this.owner.position.clone();
-    }
-
-    _isTurretPlacementOccupied(candidate, simulation) {
-        const entityOverlap = simulation.entities.some(
-            (entity) =>
-                !entity.isExpired &&
-                entity !== this.owner &&
-                entity.radius > 0 &&
-                Vector2.subtract(entity.position, candidate).length() < entity.radius + 28
-        );
-        if (entityOverlap) return true;
-        return simulation.terrain.some((terrain) => {
-            if (!terrain?.blocking || !Number.isFinite(terrain.x) || !Number.isFinite(terrain.y)) return false;
-            const radius =
-                terrain.shape === TERRAIN_SHAPES.CIRCLE
-                    ? (terrain.radius ?? 0)
-                    : terrain.shape === TERRAIN_SHAPES.POLYGON
-                      ? polygonBoundingRadius(terrain.points)
-                      : 0;
-            return Vector2.subtract(new Vector2(terrain.x, terrain.y), candidate).length() < radius + 28;
+        return findGunnerTurretPlacement({
+            ownerPosition: this.owner.position,
+            owner: this.owner,
+            direction,
+            arena: simulation,
+            entities: simulation.entities,
+            terrain: simulation.terrain
         });
     }
 

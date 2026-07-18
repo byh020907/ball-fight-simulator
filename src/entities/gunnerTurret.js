@@ -10,7 +10,7 @@ const TURRET_RADIUS = 24;
 export class GunnerTurret extends CombatEntity {
     static renderLayer = RENDER_LAYERS.FOREGROUND;
 
-    constructor(owner, position, { movementMode = "fixed", sourceAbility = null } = {}) {
+    constructor(owner, position, { movementMode = "fixed", onDismiss = null } = {}) {
         super(position.clone(), new Vector2(), TURRET_RADIUS);
         this.id = `gunner-turret-${owner.id}`;
         this.name = `${owner.name} Turret`;
@@ -18,7 +18,7 @@ export class GunnerTurret extends CombatEntity {
         this.simulation = owner.simulation;
         this.ownerId = owner.id;
         this.teamId = owner.teamId;
-        this.sourceAbility = sourceAbility;
+        this.onDismiss = onDismiss;
         this.movementMode = movementMode;
         this.isCombatTarget = true;
         this.life = TURRET_LIFETIME;
@@ -45,7 +45,7 @@ export class GunnerTurret extends CombatEntity {
         simulation.keepEntityInsideArena(this, { resolveTerrain: true });
         this._handleFighterContacts(simulation);
         this._tickFire(delta, simulation);
-        if (!this.tickLife(delta)) this._expire(simulation, false);
+        if (!this.tickLife(delta)) this.dismiss(simulation);
     }
 
     _moveTowardEnemy(delta, simulation) {
@@ -126,15 +126,16 @@ export class GunnerTurret extends CombatEntity {
         const actualDamage = hpBefore - this.hp;
         const simulation = source?.simulation ?? this.owner.simulation;
         if (actualDamage > 0) simulation?.spawnDamageNumber?.(this.position.clone(), actualDamage, "#66f2e2");
-        if (this.hp <= 0) this._expire(simulation, true);
+        if (this.hp <= 0) this.dismiss(simulation, { destroyed: true });
         return { actualDamage };
     }
 
-    _expire(simulation, destroyed) {
+    dismiss(simulation, { destroyed = false } = {}) {
+        if (this.flags.defeated) return;
         this.flags.defeated = true;
         this.flags.destroyed = destroyed;
         this.isExpired = true;
-        if (this.sourceAbility?.state?.turret === this) this.sourceAbility.state.turret = null;
+        this.onDismiss?.(this, { destroyed });
         simulation?.spawnParticleBurst?.(this.position.clone(), "#66f2e2", {
             count: destroyed ? 22 : 10,
             speed: destroyed ? 240 : 120,
