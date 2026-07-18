@@ -35,6 +35,7 @@ export function getRebirthFighter(characterId) {
 export function getSubAbilityIds(characterId) {
     const ownAbilityId = getRebirthFighter(characterId)?.ability;
     return [...ROSTER_BY_ID.values()]
+        .filter((fighter) => fighter.rebirthEligible !== false)
         .map((fighter) => fighter.ability)
         .filter((abilityId) => abilityId !== ownAbilityId)
         .filter((abilityId, index, ids) => ids.indexOf(abilityId) === index);

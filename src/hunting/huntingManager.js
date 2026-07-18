@@ -52,7 +52,8 @@ import {
 } from "../experience/experienceService.js";
 import { applyRebirthLoadoutToBaseSpec, getRebirthLoadout } from "../rebirth/index.js";
 import { applyStatAllocation } from "../statAllocation.js";
-import { savePlayerProfile } from "../playerProfile.js";
+import { savePlayerProfile, unlockHiddenCharacter } from "../playerProfile.js";
+import { CHARACTER_ROSTER_CONTEXTS, getEligibleRoster, getEncounterFighterIdentity } from "../characterRosterPolicy.js";
 import { PopupService } from "../popup.js";
 import { advanceHuntingRun, completeHuntingStage } from "./huntingRunProgression.js";
 import { HUNTING_EVENT_TRANSITIONS, HuntingEvent } from "./huntingEvents.js";
@@ -456,10 +457,19 @@ export class HuntingManager {
         const rosterMiniboss =
             isFinalBoss || isChampion
                 ? createHuntingMinibossSpec({
-                      roster: app.roster,
+                      roster: getEligibleRoster(
+                          app.playerProfile,
+                          app.roster,
+                          isChampion
+                              ? CHARACTER_ROSTER_CONTEXTS.HUNTING_CHAMPION
+                              : CHARACTER_ROSTER_CONTEXTS.HUNTING_FINAL_BOSS
+                      ).map((fighter) =>
+                          isChampion ? getEncounterFighterIdentity(app.playerProfile, fighter) : fighter
+                      ),
                       characterId: run.characterId,
                       floor: run.floor,
-                      enemyType: HUNTING_ENEMY_TYPES.CHAMPION
+                      enemyType: HUNTING_ENEMY_TYPES.CHAMPION,
+                      rng: app.simulationRng ?? Math.random
                   })
                 : null;
         const monsterMiniboss = run.lastEncounter?.isMiniboss
@@ -467,12 +477,16 @@ export class HuntingManager {
             : null;
         const miniboss = rosterMiniboss ?? monsterMiniboss;
         const enemySpecs = miniboss ? [miniboss, ...mobSpecs.slice(0, Math.max(1, mobSpecs.length - 1))] : mobSpecs;
-        this._run = recordHuntingBattleStart(run, {
-            enemySpecs,
-            hpRemain: run.carriedHp,
-            maxHp: run.carriedMaxHp,
-            isChampion
-        });
+        this._run = {
+            ...recordHuntingBattleStart(run, {
+                enemySpecs,
+                hpRemain: run.carriedHp,
+                maxHp: run.carriedMaxHp,
+                isChampion
+            }),
+            currentChampionCharacterId: isChampion ? (miniboss?.hunting?.sourceFighterId ?? null) : null,
+            currentChampionHiddenIdentity: Boolean(isChampion && miniboss?.hunting?.hiddenIdentity)
+        };
         run = this._run;
         const matchSpecs = [appliedSpec, ...enemySpecs];
         const battleLootSession = new HuntingBattleLootSession({ playerId: run.characterId, floor: run.floor });
@@ -550,6 +564,22 @@ export class HuntingManager {
         }
 
         if (playerWon) {
+            const unlockedCharacterId = run.currentChampionHiddenIdentity ? run.currentChampionCharacterId : null;
+            const characterUnlocked = unlockedCharacterId
+                ? unlockHiddenCharacter(app.playerProfile, unlockedCharacterId)
+                : false;
+            this._lastBattleCharacterUnlock = characterUnlocked
+                ? {
+                      characterId: unlockedCharacterId,
+                      previousName: "???",
+                      name:
+                          app.roster.find((fighter) => fighter.id === unlockedCharacterId)?.name ?? unlockedCharacterId
+                  }
+                : null;
+            if (characterUnlocked) {
+                savePlayerProfile(app.playerProfile);
+                app._refreshCollectionHub();
+            }
             const collectedBattleLoot = this._battleLootSession?.getCollectedLoot() ?? createEmptyHuntingLoot();
             this._battleLootSession = null;
             const isFinalBoss = run.lastEncounter?.type === HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS;
@@ -571,6 +601,12 @@ export class HuntingManager {
             // 전투 승리로 상자가 드롭되면 상자 UI를 먼저 표시
             if (floorLoot.chests.length > 0) {
                 this._combatRewardChestQueue = [...floorLoot.chests];
+                if (this._lastBattleCharacterUnlock) {
+                    this._pendingUnlockResultChest = true;
+                    this._presentNormalCombatWin(app, playerBall?.name ?? run.characterId, xpResult);
+                    savePlayerProfile(app.playerProfile);
+                    return;
+                }
                 this._presentCombatRewardChest(app, this._combatRewardChestQueue[0]);
                 savePlayerProfile(app.playerProfile);
                 return;
@@ -1181,6 +1217,14 @@ export class HuntingManager {
         }
     }
 
+    continueCharacterUnlockResult() {
+        if (!this._pendingUnlockResultChest || this._combatRewardChestQueue.length === 0) return false;
+        this._pendingUnlockResultChest = false;
+        this._lastBattleCharacterUnlock = null;
+        this._presentCombatRewardChest(this.app, this._combatRewardChestQueue[0]);
+        return true;
+    }
+
     _resolveHuntingEvent(event, app) {
         const player = this._createPlayerHuntingSpec(this._run);
         if (player) {
@@ -1318,7 +1362,7 @@ export class HuntingManager {
         app.refreshPlayerSetup();
         app.showOverlay("사냥터", `${name} 승리!`, `층 ${run.floor} 완료`, { xpReward });
         app.setHuntingOverlayState({
-            huntingChoiceVisible: true,
+            huntingChoiceVisible: !this._pendingUnlockResultChest,
             huntingCanRetreat: false,
             huntingMoving: false,
             huntingFloor: run.floor,
@@ -1326,12 +1370,16 @@ export class HuntingManager {
             huntingLootSummary: pendingText,
             huntingMoveMessage: `${run.floor}층 전투 승리 · 10층 전진 가능`,
             huntingCombatResultActive: true,
-            huntingCombatResultStep: "experience",
+            huntingCombatResultStep: this._lastBattleCharacterUnlock ? "unlock" : "experience",
+            huntingCombatResultTotal: this._lastBattleCharacterUnlock ? 3 : 2,
+            huntingCharacterUnlock: this._lastBattleCharacterUnlock,
+            huntingResultContinueVisible: Boolean(this._pendingUnlockResultChest),
             huntingCombatResultTitle: `${run.floor}층 전투 완료`,
             huntingCombatResultSummary: pendingText,
             ...hud
         });
         app.setStartButton({ hidden: true, disabled: true, text: "" });
+        if (!this._pendingUnlockResultChest) this._lastBattleCharacterUnlock = null;
     }
 
     _presentFinalBossClear(app, xpResult = this._lastBattleExperienceResult) {

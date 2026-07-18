@@ -13,6 +13,7 @@ export { HeroAbility } from "./heroAbility.js";
 export { VampireAbility } from "./vampireAbility.js";
 export { GunnerAbility } from "./gunnerAbility.js";
 export { PhantomAbility } from "./phantomAbility.js";
+export { ElementalistAbility } from "./elementalistAbility.js";
 export { HuntingMeleeAbility } from "./huntingMeleeAbility.js";
 export { HuntingMobAbility } from "./huntingMobAbility.js";
 
@@ -30,6 +31,7 @@ import { HeroAbility } from "./heroAbility.js";
 import { VampireAbility } from "./vampireAbility.js";
 import { GunnerAbility } from "./gunnerAbility.js";
 import { PhantomAbility } from "./phantomAbility.js";
+import { ElementalistAbility } from "./elementalistAbility.js";
 
 Ability.MAP = Object.freeze({
     archer: ArcherAbility,
@@ -44,5 +46,6 @@ Ability.MAP = Object.freeze({
     hero: HeroAbility,
     vampire: VampireAbility,
     gunner: GunnerAbility,
-    phantom: PhantomAbility
+    phantom: PhantomAbility,
+    elementalist: ElementalistAbility
 });

@@ -769,3 +769,9 @@ src/
 저주받은 제단은 `applyHuntingCursedAltar()`를 통해 `run.statModifiers`에 gain/loss modifier를 추가합니다. 전투 클리어 시 `recordHuntingFloorResult()`가 modifier 지속 층수를 소모합니다. 상자방처럼 전투가 아닌 이벤트 보상은 `consumeStatModifiers: false`를 사용해 지속 층수를 소모하지 않습니다.
 
 챔피언 난입은 `HUNTING_ENEMY_TYPES.CHAMPION`과 `HUNTING_SCALING.CHAMPION_POWER_BONUS`를 사용합니다. `HuntingManager`는 해당 이벤트가 걸린 층의 적을 champion으로 스케일합니다. 챔피언 본체는 일반 몬스터 전리품 대상에서 제외되지만 강화석을 드롭하고, 동반 일반 몬스터가 남긴 전리품도 함께 회수할 수 있습니다.
+## 히든 챔피언 조우와 해금
+
+- 챔피언 난입 후보는 일반 해금 캐릭터와 `huntingChampion` 정책의 잠긴 히든 캐릭터를 같은 확률로 포함한다. 최종 보스 후보는 해금 캐릭터만 사용한다.
+- 잠긴 히든 챔피언은 실제 외형과 능력으로 싸우되 안내·HUD·패배 결과의 이름을 `???`로 가린다.
+- 해당 챔피언 전투의 플레이어 승리가 확정되는 즉시 프로필을 저장한다. 전리품 회수나 이후 원정 결과와 무관하게 해금이 유지된다.
+- 최초 승리 결과는 `새 캐릭터 해금(??? → 실제 이름) → 경험치 → 전투 결과` 순서다. 전투 보상 상자가 있으면 공개 결과 뒤 상자 확인으로 이어진다.

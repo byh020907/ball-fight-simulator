@@ -19,6 +19,7 @@ import { EQUIPMENT_SPECIAL_OPTION_SUFFIXES } from "../src/hunting/equipmentConfi
 import { getLevelRequirement } from "../src/experience/experienceConfig.js";
 import { getCharacterExperienceSummary } from "../src/experience/experienceService.js";
 import { setDeveloperCharacterToMaxLevel, setDeveloperRebirthCount } from "../src/developer/developerTools.js";
+import { setDeveloperHiddenCharacterUnlocked } from "../src/developer/developerTools.js";
 import { createRebirthStatReward } from "../src/rebirth/index.js";
 
 function createSessionStorage(values = {}) {
@@ -54,6 +55,7 @@ const debugProfile = beginDebugProfileSession(persistentProfile);
 assert.equal(isDebugProfileSessionActive(), true);
 assert.notEqual(debugProfile, persistentProfile, "Debug mode should work on a cloned profile");
 debugProfile.hunting.shards = 999;
+assert.equal(setDeveloperHiddenCharacterUnlocked(debugProfile, "elementalist", true).unlocked, true);
 assert.equal(savePlayerProfile(debugProfile), true);
 assert.equal(
     profileStorage.getItem(PLAYER_PROFILE_STORAGE_KEY),
@@ -61,9 +63,15 @@ assert.equal(
     "Debug profile saves must not write to localStorage"
 );
 assert.equal(loadPlayerProfile().hunting.shards, 999, "Debug reads should stay in the memory-only profile");
+assert.deepEqual(loadPlayerProfile().unlockedCharacterIds, ["elementalist"]);
 const restoredProfile = endDebugProfileSession();
 assert.equal(isDebugProfileSessionActive(), false);
 assert.equal(restoredProfile.hunting.shards, 120, "Ending debug mode should restore the persistent profile snapshot");
+assert.deepEqual(
+    restoredProfile.unlockedCharacterIds,
+    [],
+    "Debug hidden unlock must not escape the memory-only session"
+);
 assert.equal(
     loadPlayerProfile().hunting.shards,
     120,
@@ -80,6 +88,10 @@ const rebirthResult = setDeveloperRebirthCount(developerProfile, developerCharac
 assert.equal(rebirthResult.rebirthCount, 999, "Debug rebirth input should keep a finite upper boundary");
 assert.deepEqual(developerProfile.rebirth.byCharacter[developerCharacterId].equippedCardIds, []);
 assert.equal(setDeveloperRebirthCount(developerProfile, "unknown", 2).error, "unknown_character");
+assert.equal(setDeveloperHiddenCharacterUnlocked(developerProfile, "elementalist", true).unlocked, true);
+assert.deepEqual(developerProfile.unlockedCharacterIds, ["elementalist"]);
+assert.equal(setDeveloperHiddenCharacterUnlocked(developerProfile, "elementalist", false).unlocked, false);
+assert.deepEqual(developerProfile.unlockedCharacterIds, []);
 
 if (originalLocalStorage) Object.defineProperty(globalThis, "localStorage", originalLocalStorage);
 else delete globalThis.localStorage;
@@ -97,6 +109,23 @@ assert.equal(resetStaleSessionStorage(staleStorage), false);
 const staleProfile = { ...createDefaultPlayerProfile(), version: PROFILE_VERSION - 1 };
 assert.equal(migratePlayerProfile(staleProfile).version, PROFILE_VERSION);
 assert.deepEqual(migratePlayerProfile(staleProfile).equipment.inventory, []);
+
+const currentHiddenProfile = createDefaultPlayerProfile();
+currentHiddenProfile.unlockedCharacterIds = ["elementalist", "elementalist", "unknown-hidden"];
+currentHiddenProfile.hunting.shards = 321;
+currentHiddenProfile.characterMastery.levels.archer = 2;
+const sanitizedHiddenProfile = migratePlayerProfile(currentHiddenProfile);
+assert.deepEqual(sanitizedHiddenProfile.unlockedCharacterIds, ["elementalist"]);
+assert.equal(
+    sanitizedHiddenProfile.hunting.shards,
+    321,
+    "v10 hidden unlock normalization must preserve hunting progress"
+);
+assert.equal(
+    sanitizedHiddenProfile.characterMastery.levels.archer,
+    2,
+    "v10 hidden unlock normalization must preserve mastery progress"
+);
 
 const versionEightProfile = createDefaultPlayerProfile();
 const persistedRebirthOffer = createRebirthStatReward(0, () => 0);

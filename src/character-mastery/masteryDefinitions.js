@@ -219,6 +219,20 @@ export const MASTERY_EFFECT_DEFS = Object.freeze([
         apply(ctx, level) {
             ctx.combatModifiers.incomingCollisionDamageReduce += this.tierValues[level];
         }
+    },
+    {
+        id: "elementalist_elemental_blessing",
+        sourceFighterId: "elementalist",
+        name: "원소 가호",
+        kind: "stat_modifier",
+        description: "방어력이 {value} 증가합니다.",
+        tierValues: MASTERY_TIERS.defense,
+        formatValue(v) {
+            return (v * 100).toFixed(0) + "%";
+        },
+        apply(ctx, level) {
+            ctx.statModifiers.defense += this.tierValues[level];
+        }
     }
 ]);
 

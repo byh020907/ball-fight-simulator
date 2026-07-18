@@ -69,17 +69,26 @@ import {
     predictNextWallCollision,
     TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS
 } from "../src/tournament/angledBounceRamps.js";
-import { Ability, AbilitySet } from "../src/abilities/index.js";
+import { Ability, AbilitySet, ElementalistAbility } from "../src/abilities/index.js";
+import { ELEMENTALIST_CONFIG, ELEMENTAL_COMPOSITE_RECIPES } from "../src/abilities/elementalistAbility.js";
+import { ElementalOrb } from "../src/entities/elementalOrb.js";
 import { findGunnerTurretPlacement } from "../src/abilities/gunnerTurretPlacement.js";
 import { FighterPhysicsSimulation } from "../src/simulation/fighterPhysicsSimulation.js";
 import { PreviewReselectSimulation } from "../src/preview/previewReselectSimulation.js";
 import { BASE_SPEED_MULTIPLIER, createRoster } from "../src/roster.js";
 import {
     createDefaultPlayerProfile,
+    isCharacterUnlocked,
     migrateLegacyExperienceToCharacter,
     migratePlayerProfile,
-    sanitizePlayerProfile
+    sanitizePlayerProfile,
+    unlockHiddenCharacter
 } from "../src/playerProfile.js";
+import {
+    CHARACTER_ROSTER_CONTEXTS,
+    getEligibleRoster,
+    getPublicFighterIdentity
+} from "../src/characterRosterPolicy.js";
 import { HuntingManager } from "../src/hunting/huntingManager.js";
 import { HUNTING_EVENT_TRANSITIONS, HuntingEvent } from "../src/hunting/huntingEvents.js";
 import { MishapEvent } from "../src/hunting/events/mishapEvent.js";
@@ -17061,7 +17070,8 @@ function testRosterBaseSpeedMultiplier() {
         vampire: 282,
         gunner: 278,
         phantom: 305,
-        hero: 286
+        hero: 286,
+        elementalist: 295
     });
 
     for (const fighter of createRoster()) {
@@ -22035,7 +22045,8 @@ function testRosterCombatBaselineAndCooldowns() {
         vampire: { hp: 150, damage: 16.5, defense: 1.5 },
         gunner: { hp: 150, damage: 16.5, defense: 1.5 },
         phantom: { hp: 165, damage: 15, defense: 1.5 },
-        hero: { hp: 162, damage: 15, defense: 1.5 }
+        hero: { hp: 162, damage: 15, defense: 1.5 },
+        elementalist: { hp: 165, damage: 15, defense: 2 }
     };
     const expectedSpeed = {
         archer: 405,
@@ -22050,7 +22061,8 @@ function testRosterCombatBaselineAndCooldowns() {
         vampire: 423,
         gunner: 417,
         phantom: 457.5,
-        hero: 429
+        hero: 429,
+        elementalist: 442.5
     };
     const expectedCooldown = {
         archer: 2.5,
@@ -22061,7 +22073,8 @@ function testRosterCombatBaselineAndCooldowns() {
         bat_ball: 2.5,
         vampire: 3,
         gunner: 4,
-        phantom: 2.5
+        phantom: 2.5,
+        elementalist: 1.5
     };
     const roster = createRoster();
     for (const fighter of roster) {
@@ -22466,7 +22479,7 @@ function testRebirthSubAbilityMatrix() {
             scenarioCount += 1;
         }
     }
-    assert.equal(scenarioCount, 156, "Every fighter x external ability pairing must remain playable");
+    assert.equal(scenarioCount, 169, "Every fighter x eligible external ability pairing must remain playable");
     console.log("[rebirth-sub-ability-matrix] ok");
 }
 
@@ -23410,5 +23423,193 @@ function testKeepInsideArenaWallSlamIntegration() {
 }
 
 testKeepInsideArenaWallSlamIntegration();
+
+function createSequenceRng(values, fallback = 0.5) {
+    let index = 0;
+    return () => values[index++] ?? fallback;
+}
+
+function createElementalistSimulation({ rng = () => 0.5, tier = 0, enemyCount = 1 } = {}) {
+    const roster = createRoster();
+    const elementalist = roster.find((fighter) => fighter.id === FIGHTER_IDS.ELEMENTALIST);
+    const opponents = roster
+        .filter((fighter) => fighter.id !== FIGHTER_IDS.ELEMENTALIST)
+        .slice(0, enemyCount)
+        .map((fighter, index) => ({ ...fighter, teamId: `enemy-${index}` }));
+    const simulation = new BattleSimulation(
+        [{ ...elementalist, teamId: "elementalist-team" }, ...opponents],
+        { onLog() {}, onSound() {}, onDamageTaken() {}, onDamageDealt() {}, onHpChanged() {} },
+        null,
+        { rng }
+    );
+    const owner = simulation.fighters[0];
+    owner.progression.abilityTier = tier;
+    const ability = owner.ability;
+    assert.ok(ability instanceof ElementalistAbility);
+    return { simulation, owner, ability, enemies: simulation.fighters.slice(1) };
+}
+
+function testElementalistHiddenRosterPolicy() {
+    const profile = createDefaultPlayerProfile();
+    const roster = createRoster();
+    const elementalist = roster.find((fighter) => fighter.id === FIGHTER_IDS.ELEMENTALIST);
+    assert.equal(isCharacterUnlocked(profile, elementalist.id), false);
+    assert.equal(
+        getEligibleRoster(profile, roster).some((fighter) => fighter.id === elementalist.id),
+        false
+    );
+    assert.equal(
+        getEligibleRoster(profile, roster, CHARACTER_ROSTER_CONTEXTS.TOURNAMENT).some(
+            (fighter) => fighter.id === elementalist.id
+        ),
+        false
+    );
+    assert.equal(
+        getEligibleRoster(profile, roster, CHARACTER_ROSTER_CONTEXTS.HUNTING_CHAMPION).some(
+            (fighter) => fighter.id === elementalist.id
+        ),
+        true
+    );
+    const masked = getPublicFighterIdentity(profile, elementalist);
+    assert.equal(masked.name, "???");
+    assert.equal(masked.description, "사냥터의 정체불명 챔피언을 격파하면 해금됩니다");
+    assert.equal(unlockHiddenCharacter(profile, elementalist.id), true);
+    assert.equal(unlockHiddenCharacter(profile, elementalist.id), false, "Repeated unlocks must be idempotent");
+    assert.equal(
+        getEligibleRoster(profile, roster).some((fighter) => fighter.id === elementalist.id),
+        true
+    );
+    console.log("[elementalist-hidden-roster-policy] ok");
+}
+
+testElementalistHiddenRosterPolicy();
+
+function testElementalistOrbProgressionAndOwnership() {
+    const rng = createSequenceRng([0, 0, 0.99, 0.2, 0.4, 0.6, 0.8]);
+    const { simulation, owner, ability, enemies } = createElementalistSimulation({ rng, tier: 2, enemyCount: 2 });
+    const [primaryEnemy] = enemies;
+    primaryEnemy.rollCritical = () => false;
+    ability.onWaterBoltHit(primaryEnemy, primaryEnemy.position.clone());
+    assert.equal(primaryEnemy.state.elementalWetUntil, ELEMENTALIST_CONFIG.wetDuration);
+    assert.equal(ability.activeOrbs.length, 2, "Lv.6 proc must emit exactly two orbs");
+    assert.notEqual(ability.activeOrbs[0].element, ability.activeOrbs[1].element);
+
+    const firstOrb = ability.activeOrbs[0];
+    ability.consumeOrbByOwner(firstOrb);
+    assert.equal(ability.activeChannels.length, 1);
+    assert.equal(ability.activeChannels[0].target, primaryEnemy, "Wet remembered target should win target selection");
+    assert.equal(ability.activeChannels[0].wetSnapshot, true);
+    assert.equal(primaryEnemy.state.elementalWetUntil, 0, "The first compatible channel must consume all wet state");
+
+    for (const step of [0, 1, 2, 3, 4]) {
+        simulation.elapsed += 0.01;
+        ability._spawnOrb("fire", primaryEnemy, primaryEnemy.position.clone(), step, 1);
+    }
+    assert.equal(ability.activeOrbs.length, 4, "Oldest overflow must keep the per-caster cap at four");
+
+    const enemyOrb = new ElementalOrb({
+        owner,
+        element: "earth",
+        position: primaryEnemy.position.clone(),
+        targetMemory: primaryEnemy,
+        ability
+    });
+    ability.activeOrbs.push(enemyOrb);
+    simulation.entities.push(enemyOrb);
+    const hpBeforePickup = primaryEnemy.hp;
+    ability.consumeOrbByEnemy(enemyOrb, primaryEnemy);
+    assert.ok(primaryEnemy.hp < hpBeforePickup, "Enemy direct pickup must apply the owner's spell to the enemy");
+    assert.equal(
+        simulation.entities.some((entity) => entity.visualOnly === true && entity.source === owner),
+        true,
+        "Enemy pickup must add a visual-only compressed timeline"
+    );
+    console.log("[elementalist-orb-progression-ownership] ok");
+}
+
+testElementalistOrbProgressionAndOwnership();
+
+function testElementalistFusionChannelsAndCleanup() {
+    assert.equal(Object.keys(ELEMENTAL_COMPOSITE_RECIPES).length, 10, "All ten unordered pairs need recipes");
+    assert.equal(
+        new Set(Object.values(ELEMENTAL_COMPOSITE_RECIPES).map((recipe) => recipe.name)).size,
+        10,
+        "Each pair must keep a distinct player-facing spell"
+    );
+    assert.equal(
+        new Set(
+            Object.values(ELEMENTAL_COMPOSITE_RECIPES).map((recipe) =>
+                [recipe.shape, recipe.motion, recipe.path, recipe.marker, recipe.finish].join(":")
+            )
+        ).size,
+        10,
+        "Each pair must keep a distinct configuration-driven visual recipe"
+    );
+    const { simulation, owner, ability, enemies } = createElementalistSimulation({ tier: 3, enemyCount: 2 });
+    const [enemy, secondaryEnemy] = enemies;
+    enemy.rollCritical = () => false;
+    const expires = simulation.elapsed + 4;
+    const first = new ElementalOrb({
+        owner,
+        element: "fire",
+        position: enemy.position.clone(),
+        targetMemory: enemy,
+        ability,
+        expiresAt: simulation.elapsed + 2
+    });
+    const second = new ElementalOrb({
+        owner,
+        element: "electric",
+        position: enemy.position.clone(),
+        targetMemory: enemy,
+        ability,
+        expiresAt: expires
+    });
+    ability.activeOrbs.push(first, second);
+    simulation.entities.push(first, second);
+    ability._processOrbInteractions(0.016);
+    assert.equal(ability.activeOrbs.length, 1);
+    const composite = ability.activeOrbs[0];
+    assert.equal(composite.isComposite, true);
+    assert.equal(composite.recipe.name, "플라즈마 송곳");
+    assert.equal(composite.expiresAt, expires, "Fusion must inherit the later material expiry");
+
+    ability._applyWet(enemy);
+    ability.consumeOrbByOwner(composite);
+    const extra = new ElementalOrb({
+        owner,
+        element: "wind",
+        position: owner.position.clone(),
+        targetMemory: secondaryEnemy,
+        ability
+    });
+    ability.activeOrbs.push(extra);
+    simulation.entities.push(extra);
+    ability._applyWet(secondaryEnemy);
+    ability.consumeOrbByOwner(extra);
+    assert.equal(ability.activeChannels.length, 2, "Simultaneous recovered orbs need independent channels");
+    ability.activeChannels[0].target.flags.defeated = true;
+    ability._updateChannels(0.02);
+    assert.equal(ability.activeChannels.length, 1, "Cancelling one target must not overwrite a concurrent channel");
+    enemy.flags.defeated = false;
+
+    simulation.resolveResult(owner);
+    assert.equal(ability.activeOrbs.length, 0);
+    assert.equal(ability.activeChannels.length, 0);
+    assert.equal(
+        simulation.fighters.every((fighter) => fighter.state.elementalWetUntil === 0),
+        true
+    );
+    assert.equal(
+        simulation.entities
+            .filter((entity) => entity.source === owner && entity.constructor.name === "ElementalChannelEffect")
+            .every((entity) => entity.isExpired),
+        true,
+        "Battle completion must expire owned channel visuals"
+    );
+    console.log("[elementalist-fusion-channels-cleanup] ok");
+}
+
+testElementalistFusionChannelsAndCleanup();
 
 console.log("regression tests ok");

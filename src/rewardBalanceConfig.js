@@ -245,6 +245,17 @@ export const REWARD_BALANCE = deepFreeze({
                 { level: 8 },
                 { level: 9, abilityTier: 3, gameText: "조각 5개 Heroic Burst · 90px ×0.75" },
                 { level: 10 }
+            ],
+            elementalist: [
+                { level: 2 },
+                { level: 3, abilityTier: 1, gameText: "젖음 2.5초 · 원 피격자 우선 원소 반응" },
+                { level: 4 },
+                { level: 5 },
+                { level: 6, abilityTier: 2, gameText: "30% 확률로 서로 다른 원소 오브 2개" },
+                { level: 7 },
+                { level: 8 },
+                { level: 9, abilityTier: 3, gameText: "같은 시전자 오브 자성 · 10종 원소 융합" },
+                { level: 10 }
             ]
         },
         abilityUpgrades: {
@@ -299,6 +310,9 @@ export const REWARD_BALANCE = deepFreeze({
             },
             hero: {
                 tiers: [{}, { magneticCoreCollection: true }, { resonanceFragments: true }, { heroicBurst: true }]
+            },
+            elementalist: {
+                tiers: [{}, { wetDuration: 2.5 }, { dualOrbChance: 0.3 }, { orbitalFusion: true }]
             }
         }
     },
@@ -562,6 +576,7 @@ export const REWARD_BALANCE = deepFreeze({
             tournamentStreak3: { type: "CHEST", rarity: "uncommon" }
         },
         masteryTiers: {
+            defense: [0, 0.02, 0.04, 0.06],
             damage: [0, 0.02, 0.04, 0.06],
             incomingCollisionDamageReduce: [0, 0.02, 0.04, 0.06],
             outgoingCollisionDamageBonus: [0, 0.02, 0.04, 0.06],

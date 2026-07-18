@@ -9,6 +9,8 @@ export { Grenade } from "./grenade.js";
 export { GunnerTurret } from "./gunnerTurret.js";
 export { BatProjectile } from "./batProjectile.js";
 export { BulletProjectile } from "./bulletProjectile.js";
+export { ElementalWaterBolt } from "./elementalWaterBolt.js";
+export { ElementalOrb } from "./elementalOrb.js";
 export {
     HeroOrb,
     HERO_ORB_STAT_CAP,

@@ -27,7 +27,8 @@ import {
     recordDeveloperTournamentWin,
     seedDeveloperCollectionSample,
     setDeveloperCharacterToMaxLevel,
-    setDeveloperRebirthCount
+    setDeveloperRebirthCount,
+    setDeveloperHiddenCharacterUnlocked
 } from "./developer/developerTools.js";
 
 export function createComponentBridge(app) {
@@ -111,6 +112,9 @@ export function createComponentBridge(app) {
         },
         huntingChestContinue() {
             return app.hunting.chestContinue();
+        },
+        huntingContinueCharacterUnlockResult() {
+            return app.hunting.continueCharacterUnlockResult();
         },
         huntingEventContinue() {
             return app.hunting.eventContinue();
@@ -246,6 +250,12 @@ export function createComponentBridge(app) {
         setDebugRebirthCount(characterId, rebirthCount) {
             if (!app.isDebugModeActive()) return { ok: false, error: "debug_disabled" };
             const result = setDeveloperRebirthCount(app.playerProfile, characterId, rebirthCount);
+            if (result.ok) refreshCollectionAndProfile();
+            return result;
+        },
+        setDebugHiddenCharacterUnlocked(characterId, unlocked) {
+            if (!app.isDebugModeActive()) return { ok: false, error: "debug_disabled" };
+            const result = setDeveloperHiddenCharacterUnlocked(app.playerProfile, characterId, unlocked);
             if (result.ok) refreshCollectionAndProfile();
             return result;
         },

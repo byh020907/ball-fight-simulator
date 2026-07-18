@@ -41,6 +41,9 @@ import {
     ENHANCE_MAX_LEVEL
 } from "../hunting/equipmentConfig.js";
 import { getRebirthPresentation } from "../rebirth/rebirthService.js";
+import { isCharacterUnlocked } from "../playerProfile.js";
+import { getPublicFighterIdentity } from "../characterRosterPolicy.js";
+import { isHiddenCharacterId } from "../characterAvailability.js";
 
 export const COLLECTION_HUB_TABS = Object.freeze([
     { id: "roster", label: "도감" },
@@ -158,6 +161,8 @@ export function createCollectionHubViewModel({
 
     // 도감 항목
     const rosterItems = roster.map((fighter) => {
+        const isLocked = !isCharacterUnlocked(profile, fighter.id);
+        const publicFighter = getPublicFighterIdentity(profile, fighter);
         const record = characters[fighter.id] || {};
         const tournamentWins = record.tournamentWins ?? 0;
         const hasRecord = record.tournamentsCompleted > 0;
@@ -177,32 +182,36 @@ export function createCollectionHubViewModel({
 
         return {
             id: fighter.id,
-            name: fighter.name,
-            color: fighter.color,
-            ability: fighter.ability,
-            hasRecord,
-            tournamentsCompleted: record.tournamentsCompleted ?? 0,
-            tournamentWins,
-            matchWins: record.matchWins ?? 0,
-            bestPlacement: record.bestPlacement ?? null,
-            totalDamageDealt: record.totalDamageDealt ?? 0,
-            comebackMatchWins: record.comebackMatchWins ?? 0,
-            firstTournamentAt: record.firstTournamentAt ?? null,
-            lastTournamentAt: record.lastTournamentAt ?? null,
-            isCurrent,
-            masteryLevel,
-            masteryUnlocked,
-            masteryActive,
-            experience,
-            experienceLevel: experience.level,
-            experienceLevelLabel: experience.levelLabel,
-            experienceTotalXp: experience.totalXp,
-            experienceProgressPct: experience.progressPct,
-            experienceProgressText: experience.progressText,
-            experienceNextText: experience.nextText,
-            experienceNextRewardText: experience.nextRewardText,
-            levelRewards,
-            rebirth
+            name: publicFighter.name,
+            developerName: fighter.name,
+            color: publicFighter.color,
+            ability: isLocked ? "?" : fighter.ability,
+            isLocked,
+            isHidden: isHiddenCharacterId(fighter.id),
+            unlockHint: isLocked ? publicFighter.description : "",
+            hasRecord: isLocked ? false : hasRecord,
+            tournamentsCompleted: isLocked ? 0 : (record.tournamentsCompleted ?? 0),
+            tournamentWins: isLocked ? 0 : tournamentWins,
+            matchWins: isLocked ? 0 : (record.matchWins ?? 0),
+            bestPlacement: isLocked ? null : (record.bestPlacement ?? null),
+            totalDamageDealt: isLocked ? 0 : (record.totalDamageDealt ?? 0),
+            comebackMatchWins: isLocked ? 0 : (record.comebackMatchWins ?? 0),
+            firstTournamentAt: isLocked ? null : (record.firstTournamentAt ?? null),
+            lastTournamentAt: isLocked ? null : (record.lastTournamentAt ?? null),
+            isCurrent: isLocked ? false : isCurrent,
+            masteryLevel: isLocked ? 0 : masteryLevel,
+            masteryUnlocked: isLocked ? false : masteryUnlocked,
+            masteryActive: isLocked ? false : masteryActive,
+            experience: isLocked ? null : experience,
+            experienceLevel: isLocked ? 0 : experience.level,
+            experienceLevelLabel: isLocked ? "미해금" : experience.levelLabel,
+            experienceTotalXp: isLocked ? 0 : experience.totalXp,
+            experienceProgressPct: isLocked ? 0 : experience.progressPct,
+            experienceProgressText: isLocked ? "" : experience.progressText,
+            experienceNextText: isLocked ? "" : experience.nextText,
+            experienceNextRewardText: isLocked ? "" : experience.nextRewardText,
+            levelRewards: isLocked ? [] : levelRewards,
+            rebirth: isLocked ? { ...rebirth, visible: false, canRebirth: false } : rebirth
         };
     });
 
@@ -213,20 +222,22 @@ export function createCollectionHubViewModel({
         const isSelf = def.sourceFighterId === currentPlayerFighterId;
         const active = unlocked && !isSelf;
         const sourceName = roster.find((f) => f.id === def.sourceFighterId)?.name ?? def.sourceFighterId;
-        const unlockCondition = `${sourceName}으로 토너먼트 우승`;
+        const sourceLocked = !isCharacterUnlocked(profile, def.sourceFighterId);
+        const publicSourceName = sourceLocked ? "???" : sourceName;
+        const unlockCondition = sourceLocked ? "미해금 캐릭터" : `${sourceName}으로 토너먼트 우승`;
         return {
             id: def.id,
             sourceFighterId: def.sourceFighterId,
-            name: def.name,
+            name: sourceLocked ? "???" : def.name,
             kind: def.kind,
-            description: def.description,
-            tierValues: def.tierValues,
+            description: sourceLocked ? "캐릭터 해금 후 공개됩니다." : def.description,
+            tierValues: sourceLocked ? [0, 0, 0, 0] : def.tierValues,
             formatValue: def.formatValue,
             level,
             unlocked,
             isSelf,
             active,
-            sourceName,
+            sourceName: publicSourceName,
             unlockCondition
         };
     });

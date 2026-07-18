@@ -6,6 +6,8 @@ import {
 } from "../src/hunting/equipmentConfig.js";
 import { createCollectionHubViewModel } from "../src/collection/collectionViewModel.js";
 import { createDefaultPlayerProfile } from "../src/playerProfile.js";
+import { createRoster } from "../src/roster.js";
+import { MASTERY_EFFECT_DEFS } from "../src/character-mastery/masteryDefinitions.js";
 
 function readSource(path) {
     return readFileSync(path, "utf8");
@@ -803,12 +805,18 @@ function testHuntingOverlayActionContracts() {
         overlay.includes("huntingCombatResultActive: false") &&
             overlay.includes('class="hunting-combat-choice-card"') &&
             overlay.includes('class="hunting-combat-result-tab"') &&
-            overlay.includes('@click="showHuntingCombatResultSummary()"'),
-        "Normal hunting wins must split XP and combat status into two locally owned result cards"
+            overlay.includes('@click="advanceHuntingCombatResult()"'),
+        "Hunting wins must advance reusable local result cards"
     );
     assert.ok(
-        overlay.includes("this.resetHuntingCombatResult();") && overlay.includes('huntingCombatResultStep = "summary"'),
+        overlay.includes("this.resetHuntingCombatResult();") && overlay.includes('? "experience" : "summary"'),
         "Advancing or leaving the post-combat cards must reset their display-only state before hunting continues"
+    );
+    assert.ok(
+        overlay.includes('class="hunting-combat-unlock-card"') &&
+            overlay.includes("huntingCharacterUnlock") &&
+            overlay.includes("huntingCombatResultTotal"),
+        "The first hidden champion victory must prepend a compact unlock card without replacing XP and summary cards"
     );
     console.log("[hunting-overlay-action-contracts] ok");
 }
@@ -1339,6 +1347,39 @@ function testCollectionTitleLongPressDebugEntry() {
     console.log("[collection-title-long-press-debug-entry] ok");
 }
 
+function testHiddenCharacterCollectionMasking() {
+    const profile = createDefaultPlayerProfile();
+    profile.collection.characters.elementalist = {
+        tournamentsCompleted: 9,
+        tournamentWins: 4,
+        matchWins: 12,
+        totalDamageDealt: 9999
+    };
+    profile.experience.byCharacter.elementalist = { currentXp: 99999 };
+    profile.characterMastery.levels.elementalist = 3;
+    const viewModel = createCollectionHubViewModel({
+        profile,
+        roster: createRoster(),
+        masteryDefinitions: MASTERY_EFFECT_DEFS
+    });
+    const locked = viewModel.rosterItems.find((item) => item.id === "elementalist");
+    assert.equal(locked.name, "???");
+    assert.equal(locked.color, "#777777");
+    assert.equal(locked.ability, "?");
+    assert.equal(locked.tournamentWins, 0);
+    assert.equal(locked.experienceLevelLabel, "미해금");
+    assert.deepEqual(locked.levelRewards, []);
+    assert.equal(locked.rebirth.visible, false);
+    const mastery = viewModel.masteryItems.find((item) => item.sourceFighterId === "elementalist");
+    assert.equal(mastery.sourceName, "???");
+    assert.equal(mastery.name, "???");
+    assert.equal(
+        readSource("src/components/collection-hub.html").includes("item.isLocked ? '?' : item.name.charAt(0)"),
+        true
+    );
+    console.log("[hidden-character-collection-masking] ok");
+}
+
 testHuntingMerchantMobileScrollContract();
 testHuntingChestIconReuseContract();
 testCollectionEquipmentPanelsOwnTheirFlows();
@@ -1358,5 +1399,6 @@ testResultOverlayLayoutContract();
 testFluidModalLayoutContracts();
 testCollectionRebirthAndDeveloperContracts();
 testCollectionTitleLongPressDebugEntry();
+testHiddenCharacterCollectionMasking();
 
 console.log("ui contract tests ok");

@@ -19,6 +19,12 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.32.0",
+        date: "2026-07-19",
+        title: "v0.32.0 숨겨진 도전",
+        changes: [{ type: "feature", text: "사냥터 챔피언 승리로 해금되는 히든 캐릭터가 추가됩니다." }]
+    },
+    {
         version: "0.31.8",
         date: "2026-07-18",
         title: "v0.31.8 Dash 레이저 점화 타이밍",

@@ -136,6 +136,10 @@ export class AbilitySet {
         return this._forEach("onOwnerDefeated", context).some(Boolean);
     }
 
+    onBattleEnded(context) {
+        this._forEach("onBattleEnded", context);
+    }
+
     onAllyCollision(other, context) {
         this._forEach("onAllyCollision", other, context);
     }

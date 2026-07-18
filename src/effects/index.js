@@ -40,6 +40,15 @@ export {
 } from "./laserCasterVisual.js";
 export { EaterDigestEffect, EaterSpitEffect, EaterWallRuptureEffect } from "./eaterEffects.js";
 export {
+    ElementalChannelEffect,
+    drawAttachedMarker,
+    drawElementalOrb,
+    drawFinishImpact,
+    drawMultiShapeMotion,
+    drawPathFlow,
+    drawTargetChannelTimeline
+} from "./elementalistEffects.js";
+export {
     SeedActivationEffect,
     TricksterSeedBurstEffect,
     TricksterSeedMarkEffect,

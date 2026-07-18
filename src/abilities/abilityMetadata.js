@@ -13,6 +13,7 @@ const ABILITY_DISPLAY_NAMES = Object.freeze({
     vampire: "Vampire",
     gunner: "Gunner",
     phantom: "Phantom",
+    elementalist: "Elementalist",
     hunting_melee: "Melee",
     hunting_mob: "Hunting Mob"
 });

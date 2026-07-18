@@ -442,10 +442,15 @@ export function createHuntingMinibossSpec({
         {
             ...base,
             id: `hunting-miniboss-${base.id}-f${safeFloor(floor)}`,
-            name: `${base.name} 중간 보스`,
+            name: base.hiddenIdentity ? "???" : `${base.name} 중간 보스`,
             teamId: HUNTING_TEAMS.ENEMY,
             stats: { ...base.stats },
-            hunting: { ...(base.hunting ?? {}), isMiniboss: true, sourceFighterId: base.id }
+            hunting: {
+                ...(base.hunting ?? {}),
+                isMiniboss: true,
+                sourceFighterId: base.sourceFighterId ?? base.id,
+                hiddenIdentity: Boolean(base.hiddenIdentity)
+            }
         },
         floor,
         { enemyType }

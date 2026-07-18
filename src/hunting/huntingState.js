@@ -10,6 +10,7 @@ import {
 import { applyDefeatPreservation, createEmptyHuntingLoot, mergeHuntingLoot } from "./huntingRewards.js";
 import { HUNTING_EVENT_TYPES } from "./huntingConfig.js";
 import { createHuntingAchievementProgress } from "./huntingAchievementProgress.js";
+import { isCharacterUnlocked } from "../playerProfile.js";
 
 export const HUNTING_RUN_PHASES = Object.freeze({
     READY: "ready",
@@ -42,7 +43,7 @@ export function canEnterHunting(profile, characterId) {
 }
 
 export function getEligibleHuntingCharacters(profile, roster = []) {
-    return roster.filter((fighter) => canEnterHunting(profile, fighter.id));
+    return roster.filter((fighter) => isCharacterUnlocked(profile, fighter.id) && canEnterHunting(profile, fighter.id));
 }
 
 export function selectHuntingModeCharacterId(profile, roster = [], currentCharacterId = null, rng = Math.random) {

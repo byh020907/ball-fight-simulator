@@ -88,6 +88,7 @@ import { AppLifecycle } from "./appLifecycle.js";
 import { ScreenWakeLock } from "./screenWakeLock.js";
 import { applyRebirthLoadoutToBaseSpec, applyRebirthLoadoutToBattleBall, getRebirthLoadout } from "./rebirth/index.js";
 import { advanceResultSequence, createResultSequence, getResultSequencePresentation } from "./resultSequence.js";
+import { CHARACTER_ROSTER_CONTEXTS, getEligibleRoster } from "./characterRosterPolicy.js";
 
 const TOURNAMENT_CHALLENGE_INTRO_DURATION = 1000;
 
@@ -107,8 +108,12 @@ export class BattleApp {
         };
 
         this.roster = createRoster();
-        this.tournamentRoster = this.roster;
         this.playerProfile = loadPlayerProfile();
+        this.tournamentRoster = getEligibleRoster(
+            this.playerProfile,
+            this.roster,
+            CHARACTER_ROSTER_CONTEXTS.TOURNAMENT
+        );
         this.playerFighterId = this.pickPlayerFighterId();
         migrateLegacyExperienceToCharacter(this.playerProfile, this.playerFighterId);
         this.playerStatAllocation = createEmptyStatAllocation();
@@ -153,7 +158,7 @@ export class BattleApp {
             };
         }
         this._bracket.render(null);
-        this.matchmaker = new Matchmaker(this.roster);
+        this.matchmaker = new Matchmaker(this.tournamentRoster);
         this.audio = new AudioEngine();
         this._screenWakeLock = new ScreenWakeLock();
         this.tournament = null;
@@ -314,11 +319,12 @@ export class BattleApp {
         if (mode === "hunting") {
             this.playerFighterId = selectHuntingModeCharacterId(this.playerProfile, this.roster, this.playerFighterId);
         } else {
-            const others = this.roster.filter((f) => f.id !== this.playerFighterId);
+            const playableRoster = getEligibleRoster(this.playerProfile, this.roster);
+            const others = playableRoster.filter((f) => f.id !== this.playerFighterId);
             if (others.length > 0) {
                 this.playerFighterId = others[Math.floor(Math.random() * others.length)].id;
             } else {
-                this.playerFighterId = this.roster[Math.floor(Math.random() * this.roster.length)].id;
+                this.playerFighterId = playableRoster[Math.floor(Math.random() * playableRoster.length)].id;
             }
         }
         this.playerStatAllocation = createEmptyStatAllocation();
@@ -328,8 +334,11 @@ export class BattleApp {
     }
 
     pickPlayerFighterId() {
-        if (this.debug.startCharacter) return this.debug.startCharacter;
-        return this.roster[Math.floor(Math.random() * this.roster.length)].id;
+        const playableRoster = getEligibleRoster(this.playerProfile, this.roster);
+        if (this.debug.startCharacter && playableRoster.some((fighter) => fighter.id === this.debug.startCharacter)) {
+            return this.debug.startCharacter;
+        }
+        return playableRoster[Math.floor(Math.random() * playableRoster.length)].id;
     }
 
     canReselectPreviewCharacter() {
@@ -352,7 +361,7 @@ export class BattleApp {
             const nextIdx = currentIdx < 0 ? 0 : (currentIdx + 1) % eligible.length;
             return eligible[nextIdx].id;
         }
-        const others = this.roster.filter((f) => f.id !== this.playerFighterId);
+        const others = getEligibleRoster(this.playerProfile, this.roster).filter((f) => f.id !== this.playerFighterId);
         if (others.length === 0) return this.playerFighterId;
         return others[Math.floor(Math.random() * others.length)].id;
     }
@@ -941,8 +950,9 @@ export class BattleApp {
             this.playerFighterId
         );
         const opponentExperienceLevel = getTournamentOpponentExperienceLevel(this.playerProfile, this.playerFighterId);
+        const playableRoster = getEligibleRoster(this.playerProfile, this.roster, CHARACTER_ROSTER_CONTEXTS.TOURNAMENT);
         const candidateExperienceProgressionByFighter = new Map(
-            this.roster.map((fighter) => {
+            playableRoster.map((fighter) => {
                 if (fighter.id === this.playerFighterId) {
                     return [fighter.id, playerExperienceProgression];
                 }
@@ -955,7 +965,7 @@ export class BattleApp {
         this._rebirthLoadoutByFighter = new Map([
             [this.playerFighterId, getRebirthLoadout(this.playerProfile, this.playerFighterId)]
         ]);
-        const rosterWithExperienceProgression = this.roster.map((fighter) => {
+        const rosterWithExperienceProgression = playableRoster.map((fighter) => {
             const withExperience = applyExperienceProgressionToBaseSpec(
                 fighter,
                 candidateExperienceProgressionByFighter.get(fighter.id)

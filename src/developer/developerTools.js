@@ -4,6 +4,8 @@ import { applyTournamentReport, createTournamentReport } from "../collection/ind
 import { createHuntingChest } from "../hunting/huntingRewards.js";
 import { createEquipmentInstance, equipEquipmentItem } from "../hunting/equipmentConfig.js";
 import { createRoster } from "../roster.js";
+import { isHiddenCharacterId } from "../characterAvailability.js";
+import { isCharacterUnlocked, unlockHiddenCharacter } from "../playerProfile.js";
 
 const CHARACTER_IDS = new Set(createRoster().map((fighter) => fighter.id));
 const MAX_DEBUG_REBIRTH_COUNT = 999;
@@ -78,6 +80,14 @@ export function setDeveloperRebirthCount(profile, characterId, rebirthCount) {
     const state = ensureRebirthState(profile, characterId);
     state.rebirthCount = Math.max(0, Math.min(MAX_DEBUG_REBIRTH_COUNT, Math.floor(Number(rebirthCount) || 0)));
     return { ok: true, rebirthCount: state.rebirthCount };
+}
+
+export function setDeveloperHiddenCharacterUnlocked(profile, characterId, unlocked) {
+    if (!profile || !isHiddenCharacterId(characterId)) return { ok: false, error: "not_hidden_character" };
+    profile.unlockedCharacterIds ||= [];
+    if (unlocked) unlockHiddenCharacter(profile, characterId);
+    else profile.unlockedCharacterIds = profile.unlockedCharacterIds.filter((id) => id !== characterId);
+    return { ok: true, unlocked: isCharacterUnlocked(profile, characterId) };
 }
 
 export function recordDeveloperTournamentWin(profile, characterId) {

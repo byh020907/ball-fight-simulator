@@ -261,3 +261,8 @@ const PROFILE_LIMITS = Object.freeze({
 - [RFC 6265](https://www.rfc-editor.org/info/rfc6265/): 쿠키는 크기 제한이 있고 모든 요청의 Cookie 헤더에 포함되므로 작게 유지해야 합니다.
 - [MDN Web Crypto API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API): 암호 기능 자체보다 키 관리와 전체 보안 설계가 어렵고 잘못 사용하기 쉽습니다.
 - [OWASP Browser Storage](https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client-side_Testing/12-Testing_Browser_Storage): 브라우저 저장소는 개발자 도구와 로컬 권한으로 확인 및 변경할 수 있으므로 기밀성이나 권위 저장소로 가정하면 안 됩니다.
+## 히든 캐릭터 해금 저장
+
+- 프로필 v10의 `unlockedCharacterIds`에는 허용 목록에 등록된 히든 캐릭터 ID만 저장한다. 일반 캐릭터는 별도 저장 없이 항상 해금이다.
+- 로드·저장 정규화는 누락을 빈 배열로 바꾸고 중복·알 수 없는 ID를 제거한다. 같은 v10 프로필의 경험치·숙련도·수집·장비·환생·사냥터 데이터는 그대로 보존한다.
+- 개발자 모드의 잠금/해금 변경은 기존 디버그 세션 복제본에만 적용되며 세션 종료 시 영구 프로필로 되돌아간다.

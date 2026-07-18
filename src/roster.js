@@ -1,4 +1,5 @@
 import { FIGHTER_IDS } from "./core.js";
+import { getCharacterAccessPolicy } from "./characterAvailability.js";
 
 export const BASE_SPEED_MULTIPLIER = 1.5;
 
@@ -148,6 +149,19 @@ export function createRoster() {
             face: "hero",
             ability: "hero",
             stats: { hp: 162, damage: 15, speed: getFighterBaseSpeed(286), radius: 49, mass: 1.2, defense: 1.5 }
+        },
+        {
+            id: FIGHTER_IDS.ELEMENTALIST,
+            name: "Elementalist Ball",
+            title: "Elemental Confluence",
+            description:
+                "물 에너지 볼이 적중한 자리에서 원소 오브를 방출합니다. 회수한 오브의 원소와 젖음 상태에 따라 단일 대상 주문을 완성합니다.",
+            color: "#34425f",
+            face: "elementalist",
+            ability: "elementalist",
+            unlock: { type: getCharacterAccessPolicy(FIGHTER_IDS.ELEMENTALIST).unlockType },
+            rebirthEligible: getCharacterAccessPolicy(FIGHTER_IDS.ELEMENTALIST).rebirthActionEligible,
+            stats: { hp: 165, damage: 15, speed: getFighterBaseSpeed(295), radius: 50, mass: 1.1, defense: 2 }
         }
     ];
 }

@@ -113,7 +113,7 @@
                                     x-bind:style="'background:' + item.color"
                                     x-bind:class="{ unplayed: !item.hasRecord }"
                                 >
-                                    <span class="ch-card-icon" x-text="item.name.charAt(0)"></span>
+                                    <span class="ch-card-icon" x-text="item.isLocked ? '?' : item.name.charAt(0)"></span>
                                     <div class="ch-card-head-text">
                                         <span class="ch-card-name" x-text="item.name"></span>
                                         <span
@@ -123,16 +123,18 @@
                                     </div>
                                 </div>
                                 <div class="ch-card-body" x-bind:class="{ unplayed: !item.hasRecord }">
-                                    <span x-show="!item.hasRecord" class="ch-empty-badge">미기록</span>
-                                    <span x-show="item.hasRecord">우승 <b x-text="item.tournamentWins"></b>회</span>
+                                    <span x-show="item.isLocked" class="ch-empty-badge">미해금</span>
+                                    <span x-show="!item.isLocked && !item.hasRecord" class="ch-empty-badge">미기록</span>
+                                    <span x-show="!item.isLocked && item.hasRecord">우승 <b x-text="item.tournamentWins"></b>회</span>
                                     <span
                                         class="ch-xp-chip"
+                                        x-show="!item.isLocked"
                                         x-text="item.experienceLevelLabel + ' · ' + Number(item.experienceTotalXp || 0).toLocaleString() + 'XP'"
                                     ></span>
-                                    <span x-show="item.bestPlacement"
+                                    <span x-show="!item.isLocked && item.bestPlacement"
                                         >최고 <b x-text="item.bestPlacement + '위'"></b
                                     ></span>
-                                    <span x-show="item.masteryUnlocked" class="ch-mast-badge">숙련도 ✓</span>
+                                    <span x-show="!item.isLocked && item.masteryUnlocked" class="ch-mast-badge">숙련도 ✓</span>
                                     <span x-show="item.isCurrent" class="ch-current-badge">현재</span>
                                 </div>
                             </div>
@@ -161,6 +163,7 @@
                                         role="tab"
                                         x-bind:aria-selected="state.characterDetailTab === 'levelRewards'"
                                         x-bind:class="{ active: state.characterDetailTab === 'levelRewards' }"
+                                        x-show="!item.isLocked"
                                         @click="state.characterDetailTab = 'levelRewards'"
                                     >
                                         레벨 보상
@@ -192,6 +195,12 @@
                                 x-show="state.characterDetailTab === 'overview'"
                                 role="tabpanel"
                             >
+                                <div class="ch-locked-detail" x-show="item.isLocked">
+                                    <strong>?</strong>
+                                    <span>미해금</span>
+                                    <p x-text="item.unlockHint"></p>
+                                </div>
+                                <div class="ch-unlocked-detail" x-show="!item.isLocked">
                                 <div class="ch-detail-xp">
                                     <div class="ch-detail-xp-head">
                                         <strong x-text="item.experienceLevelLabel"></strong>
@@ -233,6 +242,7 @@
                                     <span x-show="item.masteryLevel === 2">· 다음: GOLD (난도 2)</span>
                                     <span x-show="item.masteryLevel === 3">· MAX</span>
                                 </span>
+                                </div>
                             </div>
                             <div
                                 class="ch-level-reward-list"
@@ -472,7 +482,7 @@
                                 @change="syncDeveloperTarget()"
                             >
                                 <template x-for="item in state.rosterItems" :key="item.id">
-                                    <option x-bind:value="item.id" x-text="item.name"></option>
+                                    <option x-bind:value="item.id" x-text="item.developerName || item.name"></option>
                                 </template>
                             </select>
                         </label>
@@ -481,6 +491,16 @@
                             <button class="ch-btn" type="button" @click="setDebugCharacterToMaxLevel()">
                                 Lv.10 적용
                             </button>
+                        </div>
+                        <div
+                            class="ch-developer-field ch-developer-field--wide"
+                            x-show="state.rosterItems.find(item => item.id === state.developer.targetCharacterId)?.isHidden"
+                        >
+                            <span>히든 캐릭터</span>
+                            <div class="ch-developer-control-row">
+                                <button class="ch-btn" type="button" @click="setDebugHiddenCharacterUnlocked(true)">해금</button>
+                                <button class="ch-btn" type="button" @click="setDebugHiddenCharacterUnlocked(false)">잠금</button>
+                            </div>
                         </div>
                         <div class="ch-developer-field ch-developer-field--action">
                             <span>토너먼트</span>
@@ -1057,6 +1077,12 @@
                 return this.bridge.setDebugRebirthCount(
                     state.developer.targetCharacterId,
                     state.developer.rebirthCount
+                );
+            },
+            setDebugHiddenCharacterUnlocked(unlocked) {
+                return this.bridge.setDebugHiddenCharacterUnlocked(
+                    state.developer.targetCharacterId,
+                    Boolean(unlocked)
                 );
             },
             recordDebugTournamentWin() {

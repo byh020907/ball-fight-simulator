@@ -8,6 +8,7 @@
 import { HUNTING_STAGES } from "./hunting/huntingConfig.js";
 import { createDefaultHuntingStats, sanitizeHuntingStats } from "./hunting/huntingAchievementProgress.js";
 import { FIGHTER_IDS } from "./core.js";
+import { getHiddenCharacterIds } from "./characterAvailability.js";
 import { createDefaultConsumables, sanitizeConsumables } from "./consumables.js";
 import { EQUIPMENT_SPECIAL_OPTION_SUFFIXES } from "./hunting/equipmentConfig.js";
 import { formatEquipmentSpecialName } from "./hunting/equipmentNaming.js";
@@ -85,6 +86,7 @@ export function endDebugProfileSession() {
 export function createDefaultPlayerProfile() {
     return {
         version: PROFILE_VERSION,
+        unlockedCharacterIds: [],
         characterMastery: {
             levels: {}
         },
@@ -134,8 +136,26 @@ export function createDefaultPlayerProfile() {
 // 실제 해금만 유효한 ID로 처리 (화이트리스트)
 
 export const VALID_CHARACTER_IDS = Object.freeze(Object.values(FIGHTER_IDS));
+export const HIDDEN_CHARACTER_IDS = Object.freeze(getHiddenCharacterIds());
 
 export const MASTERY_EFFECT_IDS = Object.freeze(VALID_CHARACTER_IDS);
+
+function sanitizeUnlockedCharacterIds(value) {
+    if (!Array.isArray(value)) return [];
+    return [...new Set(value)].filter((id) => HIDDEN_CHARACTER_IDS.includes(id));
+}
+
+export function isCharacterUnlocked(profile, characterId) {
+    return !HIDDEN_CHARACTER_IDS.includes(characterId) || Boolean(profile?.unlockedCharacterIds?.includes(characterId));
+}
+
+export function unlockHiddenCharacter(profile, characterId) {
+    if (!HIDDEN_CHARACTER_IDS.includes(characterId)) return false;
+    const ids = sanitizeUnlockedCharacterIds(profile.unlockedCharacterIds);
+    if (ids.includes(characterId)) return false;
+    profile.unlockedCharacterIds = [...ids, characterId];
+    return true;
+}
 
 // ── 보정 ────────────────────────────────────────────────────────────────────
 
@@ -472,6 +492,7 @@ export function sanitizePlayerProfile(raw) {
     if (!raw || typeof raw !== "object") return createDefaultPlayerProfile();
     return {
         version: PROFILE_VERSION,
+        unlockedCharacterIds: sanitizeUnlockedCharacterIds(raw.unlockedCharacterIds),
         characterMastery: sanitizeCharacterMastery(raw.characterMastery ?? raw.characterLinks),
         tournamentChallenge: sanitizeTournamentChallenge(raw.tournamentChallenge),
         experience: sanitizeExperience(raw.experience),

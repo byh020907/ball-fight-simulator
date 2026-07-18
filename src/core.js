@@ -250,7 +250,8 @@ export const FIGHTER_IDS = Object.freeze({
     VAMPIRE: "vampire",
     GUNNER: "gunner",
     PHANTOM: "phantom",
-    HERO: "hero"
+    HERO: "hero",
+    ELEMENTALIST: "elementalist"
 });
 
 const EVADE_IMPULSE_RESPONSE = 0.72;

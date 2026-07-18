@@ -17,6 +17,7 @@ import {
     VampireAbility,
     GunnerAbility,
     PhantomAbility,
+    ElementalistAbility,
     HuntingMeleeAbility,
     HuntingMobAbility
 } from "../abilities/index.js";
@@ -44,6 +45,7 @@ const ABILITY_TYPES = {
     vampire: VampireAbility,
     gunner: GunnerAbility,
     phantom: PhantomAbility,
+    elementalist: ElementalistAbility,
     hunting_melee: HuntingMeleeAbility,
     hunting_mob: HuntingMobAbility
 };
@@ -58,6 +60,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
     constructor(fighterSpecs, hooks, playerBall = null, options = {}) {
         super(options);
         this.hooks = hooks;
+        this.rng = options.rng ?? Math.random;
         const spawnPoints = this.createSpawnPoints(fighterSpecs.length);
         this.fighters = fighterSpecs.map((spec, index) => {
             const fighterSpec = {
@@ -754,7 +757,10 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         this.loser = this.fighters.find((fighter) => this.isHostile(winner, fighter)) ?? null;
         this.resultAnimationTime = 0;
         this.resultReady = false;
-        for (const fighter of this.fighters) fighter.freezeForResult();
+        for (const fighter of this.fighters) {
+            fighter.abilities.onBattleEnded?.({ winner, simulation: this });
+            fighter.freezeForResult();
+        }
         for (const loser of this.fighters.filter((fighter) => this.isHostile(winner, fighter))) {
             if (loser.flags.destroyed) continue;
             const pos = loser.position.clone();

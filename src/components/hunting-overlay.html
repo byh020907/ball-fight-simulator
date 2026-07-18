@@ -20,6 +20,18 @@
 >
     <div class="hunting-overlay-frame">
         <div
+            class="hunting-combat-unlock-card"
+            x-show="huntingCombatResultActive && huntingCombatResultStep === 'unlock'"
+        >
+            <span>새 캐릭터 해금</span>
+            <div class="hunting-combat-unlock-reveal">
+                <strong x-text="huntingCharacterUnlock?.previousName || '???'"></strong>
+                <b aria-hidden="true">→</b>
+                <strong x-text="huntingCharacterUnlock?.name || ''"></strong>
+            </div>
+            <p>사냥터의 정체불명 챔피언이 동료가 되었습니다.</p>
+        </div>
+        <div
             class="hunting-overlay-card"
             x-show="!huntingCombatResultActive || huntingCombatResultStep === 'experience'"
         >
@@ -203,16 +215,24 @@
                     <button class="hunting-btn advance" type="button" @click="huntingAdvance()">10층 전진</button>
                 </div>
             </div>
+            <button
+                class="hunting-btn advance"
+                type="button"
+                x-show="huntingResultContinueVisible"
+                @click="continueCharacterUnlockResult()"
+            >
+                전리품 확인
+            </button>
         </div>
 
         <button
             class="hunting-combat-result-tab"
             type="button"
-            x-show="huntingCombatResultActive && huntingCombatResultStep === 'experience'"
+            x-show="huntingCombatResultActive && huntingCombatResultStep !== 'summary'"
             aria-label="전투 결과 보기"
-            @click="showHuntingCombatResultSummary()"
+            @click="advanceHuntingCombatResult()"
         >
-            <span>결과 1/2</span>
+            <span x-text="'결과 ' + getHuntingCombatResultIndex() + '/' + huntingCombatResultTotal"></span>
             <b>》</b>
         </button>
     </div>
@@ -250,6 +270,9 @@
         huntingCombatResultStep: "experience",
         huntingCombatResultTitle: "",
         huntingCombatResultSummary: "",
+        huntingCombatResultTotal: 2,
+        huntingCharacterUnlock: null,
+        huntingResultContinueVisible: false,
         huntingMerchantActive: false,
         huntingMerchantOffers: null,
         huntingMerchantResult: "",
@@ -279,15 +302,26 @@
             this.resetHuntingCombatResult();
             Alpine.store("uiManager").invokeGameAction("huntingAdvance");
         },
-        showHuntingCombatResultSummary() {
+        advanceHuntingCombatResult() {
             if (!this.huntingCombatResultActive) return;
-            this.huntingCombatResultStep = "summary";
+            this.huntingCombatResultStep = this.huntingCombatResultStep === "unlock" ? "experience" : "summary";
+        },
+        getHuntingCombatResultIndex() {
+            if (this.huntingCombatResultStep === "unlock") return 1;
+            return this.huntingCharacterUnlock ? 2 : 1;
+        },
+        continueCharacterUnlockResult() {
+            this.resetHuntingCombatResult();
+            Alpine.store("uiManager").invokeGameAction("huntingContinueCharacterUnlockResult");
         },
         resetHuntingCombatResult() {
             this.huntingCombatResultActive = false;
             this.huntingCombatResultStep = "experience";
             this.huntingCombatResultTitle = "";
             this.huntingCombatResultSummary = "";
+            this.huntingCombatResultTotal = 2;
+            this.huntingCharacterUnlock = null;
+            this.huntingResultContinueVisible = false;
         },
         huntingMerchantChoose(idx) {
             Alpine.store("uiManager").invokeGameAction("huntingMerchantChoose", idx);
@@ -387,6 +421,11 @@
                 this.huntingCombatResultTitle = data.huntingCombatResultTitle;
             if (data.huntingCombatResultSummary !== undefined)
                 this.huntingCombatResultSummary = data.huntingCombatResultSummary;
+            if (data.huntingCombatResultTotal !== undefined)
+                this.huntingCombatResultTotal = data.huntingCombatResultTotal;
+            if (data.huntingCharacterUnlock !== undefined) this.huntingCharacterUnlock = data.huntingCharacterUnlock;
+            if (data.huntingResultContinueVisible !== undefined)
+                this.huntingResultContinueVisible = data.huntingResultContinueVisible;
             if (data.huntingMerchantActive !== undefined) this.huntingMerchantActive = data.huntingMerchantActive;
             if (data.huntingMerchantOffers !== undefined) this.huntingMerchantOffers = data.huntingMerchantOffers;
             if (data.huntingMerchantResult !== undefined) this.huntingMerchantResult = data.huntingMerchantResult;
@@ -464,6 +503,7 @@
         pointer-events: auto;
     }
 
+    :scope.hunting-combat-result-active .hunting-combat-unlock-card,
     :scope.hunting-combat-result-active .hunting-overlay-card,
     :scope.hunting-combat-result-active .hunting-combat-choice-card {
         grid-column: 2;
@@ -477,6 +517,33 @@
         box-shadow: 4px 4px 0 #202020;
         padding: 20px;
         text-align: center;
+    }
+
+    .hunting-combat-unlock-card {
+        display: grid;
+        gap: 1rem;
+        place-items: center;
+    }
+
+    .hunting-combat-unlock-card > span {
+        font-size: 0.82rem;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+    }
+
+    .hunting-combat-unlock-reveal {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        gap: 0.8em;
+        font-size: clamp(1.35rem, 5vw, 2.5rem);
+    }
+
+    .hunting-combat-unlock-card > p {
+        margin: 0;
+        color: #555555;
+        font-weight: 700;
     }
 
     .hunting-combat-choice-card > span {
@@ -1094,6 +1161,7 @@
             box-sizing: border-box;
         }
 
+        :scope.hunting-combat-result-active .hunting-combat-unlock-card,
         :scope.hunting-combat-result-active .hunting-overlay-card,
         :scope.hunting-combat-result-active .hunting-combat-choice-card {
             border-width: 3px;
@@ -1123,6 +1191,7 @@
                 grid-template-columns: minmax(0, 1fr) minmax(0, 9fr) minmax(0, 1fr);
             }
 
+            :scope.hunting-combat-result-active .hunting-combat-unlock-card,
             :scope.hunting-combat-result-active .hunting-overlay-card,
             :scope.hunting-combat-result-active .hunting-combat-choice-card {
                 padding: 7px 8px;
