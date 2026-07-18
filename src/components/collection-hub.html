@@ -515,9 +515,25 @@
                 </label>
                 <label class="ch-developer-field">
                     <span>이벤트 미리보기</span>
-                    <select class="ch-select" x-model="state.developer.huntingEventType">
+                    <select
+                        class="ch-select"
+                        x-model="state.developer.huntingEventType"
+                        @change="syncDeveloperEventSelection()"
+                    >
                         <template x-for="event in state.developer.events" :key="event.id">
                             <option x-bind:value="event.id" x-text="event.label"></option>
+                        </template>
+                    </select>
+                </label>
+                <label class="ch-developer-field" x-show="state.developer.huntingEventType === 'elite_mob'">
+                    <span>정예 조합</span>
+                    <select
+                        class="ch-select"
+                        x-model="state.developer.eliteCombinationId"
+                        @change="syncDeveloperEventSelection()"
+                    >
+                        <template x-for="combination in state.developer.eliteCombinations" :key="combination.id">
+                            <option x-bind:value="combination.id" x-text="combination.label"></option>
                         </template>
                     </select>
                 </label>
@@ -730,7 +746,9 @@
                 maxFloor: 100,
                 stages: [],
                 huntingEventType: "portal",
-                events: []
+                events: [],
+                eliteCombinationId: null,
+                eliteCombinations: []
             },
             summary: {},
 
@@ -902,6 +920,17 @@
             state.developer.rebirthCount = target?.rebirth?.rebirthCount ?? 0;
         }
 
+        function syncDeveloperEventSelection() {
+            if (state.developer.huntingEventType !== "elite_mob") return;
+            const selected =
+                state.developer.eliteCombinations.find(
+                    (combination) => combination.id === state.developer.eliteCombinationId
+                ) ?? state.developer.eliteCombinations[0];
+            if (!selected) return;
+            state.developer.eliteCombinationId = selected.id;
+            state.developer.huntingFloor = Math.max(Number(state.developer.huntingFloor) || 1, selected.minimumFloor);
+        }
+
         function cancelDebugModeHold() {
             if (debugModeHoldTimerId !== null) clearTimeout(debugModeHoldTimerId);
             debugModeHoldTimerId = null;
@@ -945,6 +974,7 @@
             closeCollectionMonsterDetail,
             selectedMonsterRegion,
             syncDeveloperTarget,
+            syncDeveloperEventSelection,
             revealActiveTab,
             startDebugModeHold,
             cancelDebugModeHold,
@@ -993,11 +1023,13 @@
                 );
             },
             startDebugHuntingEvent() {
+                syncDeveloperEventSelection();
                 return this.bridge.startDebugHuntingEvent(
                     state.developer.targetCharacterId,
                     state.developer.huntingStageId,
                     state.developer.huntingFloor,
-                    state.developer.huntingEventType
+                    state.developer.huntingEventType,
+                    state.developer.eliteCombinationId
                 );
             },
             exitDebugMode() {
@@ -1036,6 +1068,12 @@
                     ? state.developer.targetCharacterId
                     : (developer.currentCharacterId ?? state.rosterItems[0]?.id ?? null);
                 const target = state.rosterItems.find((item) => item.id === targetCharacterId);
+                const eliteCombinations = developer.eliteCombinations ?? [];
+                const eliteCombinationId = eliteCombinations.some(
+                    (combination) => combination.id === state.developer.eliteCombinationId
+                )
+                    ? state.developer.eliteCombinationId
+                    : (eliteCombinations[0]?.id ?? null);
                 state.developer = {
                     active: Boolean(developer.active),
                     currentCharacterId: developer.currentCharacterId ?? null,
@@ -1046,8 +1084,11 @@
                     maxFloor: developer.maxFloor ?? 100,
                     stages: developer.stages ?? [],
                     huntingEventType: state.developer.huntingEventType ?? developer.events?.[0]?.id ?? "portal",
-                    events: developer.events ?? []
+                    events: developer.events ?? [],
+                    eliteCombinationId,
+                    eliteCombinations
                 };
+                syncDeveloperEventSelection();
                 state.tabs = vm.tabs ?? [];
                 if (!state.tabs.some((tab) => tab.id === state.activeTab)) setCollectionTab("roster");
             },

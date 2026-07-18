@@ -1167,6 +1167,11 @@ function testCollectionRebirthAndDeveloperContracts() {
         "Collection tab visibility should be refreshed when the modal layout changes"
     );
     assert.ok(template.includes("이벤트 미리보기"), "Developer tools should expose hunting event previews");
+    assert.ok(template.includes("정예 조합"), "Developer tools should expose the elite combination selector");
+    assert.ok(
+        template.includes("state.developer.huntingEventType === 'elite_mob'"),
+        "The elite combination selector should only appear for elite event previews"
+    );
     assert.ok(template.includes("컬렉션 샘플"), "Developer tools should expose collection sample data");
     assert.ok(
         template.includes('@click="startDebugHuntingEvent()"'),
@@ -1175,6 +1180,10 @@ function testCollectionRebirthAndDeveloperContracts() {
     assert.ok(
         template.includes("this.bridge.startDebugHuntingEvent("),
         "The collection component should not reach into app state for event previews"
+    );
+    assert.ok(
+        template.includes("state.developer.eliteCombinationId"),
+        "Elite event previews should pass the selected production combination through the component bridge"
     );
     assert.ok(
         template.includes("this.bridge.seedDebugCollectionSample(state.developer.targetCharacterId)"),

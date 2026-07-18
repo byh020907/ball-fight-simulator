@@ -261,11 +261,16 @@ export function createComponentBridge(app) {
             CollectionHubService.close();
             return app.hunting.startDebugRun(characterId, { stageId, encounterFloor });
         },
-        startDebugHuntingEvent(characterId, stageId, encounterFloor, eventType) {
+        startDebugHuntingEvent(characterId, stageId, encounterFloor, eventType, eliteCombinationId) {
             if (!app.isDebugModeActive() || !app.lifecycle.isSetup) return { ok: false, error: "debug_disabled" };
             app.setGameMode("hunting");
             CollectionHubService.close();
-            return app.hunting.startDebugEventPreview(characterId, { stageId, encounterFloor, eventType });
+            return app.hunting.startDebugEventPreview(characterId, {
+                stageId,
+                encounterFloor,
+                eventType,
+                eliteCombinationId
+            });
         },
         beginRebirth(characterId) {
             if (!app.lifecycle.isSetup) {

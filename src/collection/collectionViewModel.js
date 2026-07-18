@@ -10,6 +10,7 @@ import { getCharacterExperienceSummary } from "../experience/experienceService.j
 import { getCharacterLevelRewards } from "../experience/characterLevelProgression.js";
 import {
     canOpenHuntingChest,
+    ELITE_MOB_COMBINATIONS,
     getDailyShop,
     getHuntingMonsterDefinitions,
     previewHuntingChest
@@ -69,6 +70,17 @@ const HUNTING_DEBUG_EVENT_OPTIONS = Object.freeze([
     { id: HUNTING_EVENT_TYPES.CHAMPION_INTRUSION, label: "챔피언 난입" },
     { id: HUNTING_EVENT_TYPES.ELITE_MOB, label: "정예 몹 습격" }
 ]);
+
+function createHuntingDebugEliteCombinationOptions() {
+    const monsterNames = new Map(getHuntingMonsterDefinitions().map((monster) => [monster.type, monster.displayName]));
+    return ELITE_MOB_COMBINATIONS.map((combination) => ({
+        id: combination.id,
+        minimumFloor: combination.minimumFloor,
+        label: `${combination.minimumFloor}층 · ${combination.monsterTypes
+            .map((type) => monsterNames.get(type) ?? type)
+            .join(" + ")}`
+    }));
+}
 
 function getMonsterRarity(monster) {
     return monster.monsterTags.find((tag) => tag.startsWith("rarity:"))?.slice("rarity:".length) ?? "common";
@@ -377,7 +389,8 @@ export function createCollectionHubViewModel({
             currentCharacterId: currentPlayerFighterId,
             maxFloor: HUNTING_MAX_FLOOR,
             stages: HUNTING_STAGES.map((stage) => ({ id: stage.id, name: stage.name })),
-            events: HUNTING_DEBUG_EVENT_OPTIONS
+            events: HUNTING_DEBUG_EVENT_OPTIONS,
+            eliteCombinations: createHuntingDebugEliteCombinationOptions()
         }
     };
 }

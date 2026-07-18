@@ -9771,6 +9771,29 @@ async function testDebugHuntingEventPreviewUsesProductionEventFlow() {
         assert.equal(manager._run.phase, HUNTING_RUN_PHASES.AWAITING_CHOICE);
         assert.equal(overlayStates.at(-1).huntingChoiceVisible, true, "Portal should open its production choice UI");
 
+        const debugCombination = ELITE_MOB_COMBINATIONS.find((combination) => combination.minimumFloor === 80);
+        await manager.startDebugEventPreview(FIGHTER_IDS.RAGE, {
+            stageId: HUNTING_STAGE_IDS.FOREST,
+            encounterFloor: 1,
+            eventType: HUNTING_EVENT_TYPES.ELITE_MOB,
+            eliteCombinationId: debugCombination.id
+        });
+        assert.equal(
+            manager._run.floor,
+            debugCombination.minimumFloor,
+            "Elite combination previews should raise the debug floor to the combination minimum"
+        );
+        assert.equal(
+            manager._run.lastEvent.eliteCombinationId,
+            debugCombination.id,
+            "Elite combination previews should preserve the selected stable combination ID"
+        );
+        assert.deepEqual(
+            manager._run.lastEvent.monsterTypes,
+            debugCombination.monsterTypes,
+            "Elite combination previews should use the selected production monster roster"
+        );
+
         await manager.startDebugEventPreview(FIGHTER_IDS.RAGE, {
             stageId: "invalid-stage",
             encounterFloor: HUNTING_MAX_FLOOR + 1,
@@ -16403,6 +16426,15 @@ async function testCreateCollectionHubViewModel() {
         "Monster codex should keep unencountered monsters hidden by default"
     );
     assert.equal(vm.masteryItems.length, MASTERY_EFFECT_DEFS.length, "masteryItems should match definitions");
+    assert.deepEqual(
+        vm.developer.eliteCombinations.map(({ id, minimumFloor }) => ({ id, minimumFloor })),
+        ELITE_MOB_COMBINATIONS.map(({ id, minimumFloor }) => ({ id, minimumFloor })),
+        "Developer tools should expose every production elite combination in source order"
+    );
+    assert.ok(
+        vm.developer.eliteCombinations.every((combination) => combination.label.includes("층 · ")),
+        "Developer elite combination labels should show their minimum floor and monster roster"
+    );
 
     const allHaveIds = vm.rosterItems.every((item) => item.id);
     assert.ok(allHaveIds, "Every roster item should have an id");

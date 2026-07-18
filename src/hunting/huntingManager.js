@@ -34,6 +34,11 @@ import {
     createHuntingMobEncounter
 } from "./huntingMonsters.js";
 import { createEliteMobEncounter } from "./eliteMobEncounter.js";
+import {
+    ELITE_MOB_COMBINATIONS,
+    getEligibleEliteMobCombinations,
+    getEliteMobCombination
+} from "./eliteMobCombinations.js";
 import { placeEliteMobFormation } from "./eliteMobFormation.js";
 import { applyMerchantOffer, formatOfferResultToast } from "./huntingMerchant.js";
 import { formatPendingLootSummary, formatDefeatLossText } from "./huntingFormat.js";
@@ -227,7 +232,12 @@ export class HuntingManager {
 
     async startDebugEventPreview(
         characterId,
-        { stageId = HUNTING_STAGE_IDS.CAVE, encounterFloor = 1, eventType = HUNTING_EVENT_TYPES.PORTAL } = {}
+        {
+            stageId = HUNTING_STAGE_IDS.CAVE,
+            encounterFloor = 1,
+            eventType = HUNTING_EVENT_TYPES.PORTAL,
+            eliteCombinationId = null
+        } = {}
     ) {
         PopupService.close();
         const validStageId = HUNTING_STAGES.some((stage) => stage.id === stageId) ? stageId : HUNTING_STAGE_IDS.CAVE;
@@ -235,16 +245,25 @@ export class HuntingManager {
         const validEventType = Object.values(HUNTING_EVENT_TYPES).includes(eventType)
             ? eventType
             : HUNTING_EVENT_TYPES.PORTAL;
+        const eliteCombination =
+            validEventType === HUNTING_EVENT_TYPES.ELITE_MOB
+                ? (getEliteMobCombination(eliteCombinationId) ?? ELITE_MOB_COMBINATIONS[0])
+                : null;
+        const previewFloor = eliteCombination ? Math.max(validFloor, eliteCombination.minimumFloor) : validFloor;
         return this._startRun(characterId, {
             stageId: validStageId,
-            encounterFloor: validFloor,
-            displayFloor: validFloor,
+            encounterFloor: previewFloor,
+            displayFloor: previewFloor,
             debug: true,
-            debugEventType: validEventType
+            debugEventType: validEventType,
+            debugEliteCombinationId: eliteCombination?.id ?? null
         });
     }
 
-    async _startRun(characterId, { stageId, encounterFloor, displayFloor, debug, debugEventType = null }) {
+    async _startRun(
+        characterId,
+        { stageId, encounterFloor, displayFloor, debug, debugEventType = null, debugEliteCombinationId = null }
+    ) {
         this.app.playerProfile.hunting.stats = recordHuntingStageVisit(this.app.playerProfile.hunting.stats, stageId);
         savePlayerProfile(this.app.playerProfile);
         this.app._refreshCollectionHub();
@@ -261,12 +280,25 @@ export class HuntingManager {
         const stage = getHuntingStage(stageId);
         this.app.addLog(`[Hunting] ${stage.name} ${encounterFloor}층${debug ? " 디버그" : ""} 원정 시작`);
         this._showStartingMove(stage, displayFloor);
-        if (debugEventType) return this._showDebugEventPreview(debugEventType, encounterFloor);
+        if (debugEventType) {
+            return this._showDebugEventPreview(debugEventType, encounterFloor, debugEliteCombinationId);
+        }
         await this.advance({ waitForFirstMoveUi: true });
     }
 
-    _showDebugEventPreview(eventType, floor) {
-        const event = HuntingEvent.createPayload(eventType, floor);
+    _createDebugEventPayload(eventType, floor, eliteCombinationId) {
+        if (eventType !== HUNTING_EVENT_TYPES.ELITE_MOB || !eliteCombinationId) {
+            return HuntingEvent.createPayload(eventType, floor);
+        }
+        const candidates = getEligibleEliteMobCombinations(floor);
+        const selectedIndex = candidates.findIndex((combination) => combination.id === eliteCombinationId);
+        if (selectedIndex < 0) throw new Error(`Elite mob combination is unavailable: ${eliteCombinationId}`);
+        const selectedRoll = (selectedIndex + 0.5) / candidates.length;
+        return HuntingEvent.createPayload(eventType, floor, () => selectedRoll);
+    }
+
+    _showDebugEventPreview(eventType, floor, eliteCombinationId = null) {
+        const event = this._createDebugEventPayload(eventType, floor, eliteCombinationId);
         this._run = {
             ...this._run,
             floor,
