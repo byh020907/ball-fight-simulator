@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.31.4",
+        date: "2026-07-18",
+        title: "v0.31.4 낮은 층 원정 진행 수정",
+        changes: [
+            {
+                type: "fix",
+                text: "낮은 층 상자방에서 계속 전진한 뒤 정예 해금 오류로 원정이 멈추던 문제를 수정했습니다."
+            }
+        ]
+    },
+    {
         version: "0.31.3",
         date: "2026-07-18",
         title: "v0.31.3 장비 특수 옵션 툴팁",

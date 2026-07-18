@@ -17,6 +17,10 @@ export class HuntingEvent {
         return { type: this.type, floor: safeFloor(floor) };
     }
 
+    getBaseWeight() {
+        return 1.0;
+    }
+
     resolve() {
         throw new Error(`${this.type} must implement resolve()`);
     }

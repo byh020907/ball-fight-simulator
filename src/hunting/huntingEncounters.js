@@ -62,25 +62,23 @@ export function shouldRollHuntingEvent(floor, rng = DEFAULT_RNG) {
     return rng() < chance;
 }
 
-function rollIndex(length, rng = DEFAULT_RNG) {
-    return Math.floor(Math.max(0, Math.min(0.999999, rng())) * length);
-}
+function rollWeightedEventType(floor, rng, portalMultiplier = 1.0, mishapAllowed = true) {
+    const candidates = HuntingEvent.POOL.map((event) => {
+        let weight = event.getBaseWeight(floor);
+        if (event.type === HUNTING_EVENT_TYPES.PORTAL) weight *= portalMultiplier;
+        if (event.type === HUNTING_EVENT_TYPES.MISHAP && !mishapAllowed) weight = 0;
+        return { type: event.type, weight };
+    }).filter((candidate) => candidate.weight > 0);
+    const totalWeight = candidates.reduce((sum, candidate) => sum + candidate.weight, 0);
+    if (totalWeight <= 0) throw new Error("No hunting event is selectable");
 
-function rollWeightedEventType(rng, portalMultiplier = 1.0, mishapAllowed = true) {
-    const types = HuntingEvent.POOL.map((event) => event.type);
-    const weights = types.map((type) => {
-        if (type === HUNTING_EVENT_TYPES.PORTAL) return portalMultiplier;
-        if (type === HUNTING_EVENT_TYPES.MISHAP && !mishapAllowed) return 0;
-        return 1.0;
-    });
-    const totalWeight = weights.reduce((sum, w) => sum + w, 0);
-    const roll = rng() * totalWeight;
+    const roll = Math.max(0, Math.min(0.999999, rng())) * totalWeight;
     let cumulative = 0;
-    for (let i = 0; i < weights.length; i++) {
-        cumulative += weights[i];
-        if (roll < cumulative) return types[i];
+    for (const candidate of candidates) {
+        cumulative += candidate.weight;
+        if (roll < cumulative) return candidate.type;
     }
-    return types[types.length - 1];
+    return candidates.at(-1).type;
 }
 
 export function getHuntingPortalWeightMultiplier(hpRatio, portalDeclineFloors = 0) {
@@ -160,8 +158,8 @@ export function getHuntingCombatEnemyType(floor, rng = DEFAULT_RNG) {
 export function rollHuntingEvent(floor, rng = DEFAULT_RNG) {
     if (!shouldRollHuntingEvent(floor, rng)) return null;
     const safe = safeFloor(floor);
-    const event = HuntingEvent.POOL[rollIndex(HuntingEvent.POOL.length, rng)];
-    return createHuntingEvent(event.type, safe, rng);
+    const eventType = rollWeightedEventType(safe, rng);
+    return createHuntingEvent(eventType, safe, rng);
 }
 
 export function rollHuntingFloorOutcome(floor, rng = DEFAULT_RNG, combatReliefFloors = 0, context = {}) {
@@ -185,7 +183,7 @@ export function rollHuntingFloorOutcome(floor, rng = DEFAULT_RNG, combatReliefFl
     }
     if (roll < chances.combatChance + chances.eventChance) {
         const portalMult = getHuntingPortalWeightMultiplier(context.hpRatio ?? 1.0, context.portalDeclineFloors ?? 0);
-        const eventType = rollWeightedEventType(rng, portalMult, (context.hpRatio ?? 1) > 0.2);
+        const eventType = rollWeightedEventType(safe, rng, portalMult, (context.hpRatio ?? 1) > 0.2);
         const event = createHuntingEvent(eventType, safe, rng);
         return {
             type: HUNTING_FLOOR_OUTCOME_TYPES.EVENT,

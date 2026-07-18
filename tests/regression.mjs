@@ -112,6 +112,7 @@ import {
     recordHuntingFloorResult,
     rerollDailyShop,
     retreatHuntingRun,
+    rollHuntingEvent,
     setHuntingRunPhase,
     rollHuntingChestReward,
     rollHuntingFloorOutcome,
@@ -3804,7 +3805,7 @@ function testHuntingBossRolesAndEnhancementStoneDrops(app) {
         "A successful miniboss roll must reset the next chance to its initial value"
     );
 
-    const championEventRun = advanceHuntingRun({ ...run, minibossChance: 0.2 }, { rng: createSequenceRng([0.5, 0.8]) });
+    const championEventRun = advanceHuntingRun({ ...run, minibossChance: 0.2 }, { rng: createSequenceRng([0.5, 0.9]) });
     assert.equal(
         championEventRun.lastEvent.type,
         HUNTING_EVENT_TYPES.CHAMPION_INTRUSION,
@@ -4314,6 +4315,65 @@ function testEliteMobCombinationEvent(app) {
     console.log("[hunting-elite-mob-combination-event] ok");
 }
 
+function testEliteMobEventWeightFloorGate() {
+    const eliteEvent = HuntingEvent.get(HUNTING_EVENT_TYPES.ELITE_MOB);
+
+    for (const floor of Array.from({ length: 9 }, (_, index) => index + 1)) {
+        assert.equal(
+            eliteEvent.getBaseWeight(floor),
+            0,
+            `${floor}층에서는 정예 몹 이벤트의 기본 가중치가 정확히 0이어야 합니다.`
+        );
+
+        const directEvent = rollHuntingEvent(
+            floor,
+            (() => {
+                const values = [0, 0.95];
+                return () => values.shift() ?? 0;
+            })()
+        );
+        assert.notEqual(
+            directEvent?.type,
+            HUNTING_EVENT_TYPES.ELITE_MOB,
+            `${floor}층 rollHuntingEvent는 정예 몹 이벤트를 선택하면 안 됩니다.`
+        );
+
+        const outcome = rollHuntingFloorOutcome(
+            floor,
+            (() => {
+                const values = [0.5, 0.95];
+                return () => values.shift() ?? 0;
+            })(),
+            0,
+            { hpRatio: 1 }
+        );
+        assert.equal(outcome.type, HUNTING_FLOOR_OUTCOME_TYPES.EVENT, `${floor}층 경계 RNG는 이벤트 경로여야 합니다.`);
+        assert.notEqual(
+            outcome.event.type,
+            HUNTING_EVENT_TYPES.ELITE_MOB,
+            `${floor}층 rollHuntingFloorOutcome은 정예 몹 이벤트를 선택하면 안 됩니다.`
+        );
+    }
+
+    assert.equal(eliteEvent.getBaseWeight(10), 1, "첫 정예 조합이 열리는 10층부터 기본 가중치는 기존 1이어야 합니다.");
+    const floorTenOutcome = rollHuntingFloorOutcome(
+        10,
+        (() => {
+            const values = [0.5, 0.95, 0];
+            return () => values.shift() ?? 0;
+        })(),
+        0,
+        { hpRatio: 1 }
+    );
+    assert.equal(
+        floorTenOutcome.event.type,
+        HUNTING_EVENT_TYPES.ELITE_MOB,
+        "10층 경계 RNG는 정예 몹을 선택해야 합니다."
+    );
+    assert.ok(floorTenOutcome.event.eliteCombinationId, "10층 정예 몹 선택은 유효한 조합 payload를 만들어야 합니다.");
+    console.log("[hunting-elite-event-weight-floor-gate] ok");
+}
+
 function testHuntingLootItemsRotate() {
     const lootItems = [
         new ShardDrop({ position: new Vector2(200, 200), velocity: new Vector2(), collectorId: "collector" }),
@@ -4701,40 +4761,64 @@ function testHuntingCombatRewardChestFinalBossContinue() {
     console.log("[hunting-combat-reward-chest-finalboss-continue] ok");
 }
 
-function testHuntingChestRoomContinueStillWorks() {
+async function testHuntingChestRoomContinueStillWorks() {
     const overlayStates = [];
     const mockApp = {
         setHuntingOverlayState(data) {
             overlayStates.push({ ...data });
         },
         showOverlay() {},
+        waitForHuntingMoveUiPaint() {},
         addLog() {},
         roster: app.roster,
         playerProfile: createDefaultPlayerProfile()
     };
     const manager = new HuntingManager(mockApp);
-    manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE });
+    manager._run = {
+        ...createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE }),
+        maxFloor: 2
+    };
     manager._run = setHuntingRunPhase(manager._run, HUNTING_RUN_PHASES.AWAITING_CHEST);
 
-    // Spy on the advance method
-    let advancedCalled = false;
-    const originalAdvance = manager.advance;
-    manager.advance = () => {
-        advancedCalled = true;
+    const originalHandleAdvanceError = manager._handleAdvanceError;
+    const originalRandom = Math.random;
+    const originalSetTimeout = globalThis.setTimeout;
+    let advanceErrorCount = 0;
+    manager._handleAdvanceError = function (error) {
+        advanceErrorCount += 1;
+        return originalHandleAdvanceError.call(this, error);
+    };
+    Math.random = (() => {
+        const values = [0.5, 0.95, 0];
+        return () => values.shift() ?? 0;
+    })();
+    globalThis.setTimeout = (callback) => {
+        callback();
+        return 0;
     };
 
     try {
         overlayStates.length = 0;
         manager.chestContinue();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
     } finally {
-        manager.advance = originalAdvance;
+        manager._handleAdvanceError = originalHandleAdvanceError;
+        Math.random = originalRandom;
+        globalThis.setTimeout = originalSetTimeout;
     }
 
-    assert.ok(advancedCalled, "Chest room chestContinue must call advance()");
     assert.equal(
         manager._run.phase,
-        HUNTING_RUN_PHASES.AWAITING_CHEST,
-        "Chest room continue must not change phase (advance handles it)"
+        HUNTING_RUN_PHASES.AWAITING_BATTLE_PREPARATION,
+        "Chest room chestContinue must advance to the next low-floor encounter"
+    );
+    assert.equal(manager._run.floor, 2, "Chest room chestContinue must actually process the next floor");
+    assert.equal(
+        advanceErrorCount,
+        0,
+        "Chest room resume must not enter _handleAdvanceError on a low-floor event roll"
     );
     console.log("[hunting-chest-room-continue-still-works] ok");
 }
@@ -8482,10 +8566,10 @@ function testHuntingSystem() {
         "Non-combat event rewards should not consume temporary stat modifiers"
     );
 
-    // rng(1)=0.4→EVENT, rng(2)=0.8→CHAMPION_INTRUSION(idx7)
+    // rng(1)=0.4→EVENT, rng(2)=0.9→CHAMPION_INTRUSION(정예 0 가중치 제외 뒤 마지막 후보)
     const champion = advanceHuntingRun(afterFloor, {
         rng: (() => {
-            const rolls = [0.4, 0.8];
+            const rolls = [0.4, 0.9];
             return () => rolls.shift() ?? 0;
         })()
     });
@@ -21108,13 +21192,14 @@ testHuntingLootValueRadius();
 testHuntingNormalCombatWinUsesXpRewardPanel();
 testHuntingBossRolesAndEnhancementStoneDrops(app);
 testEliteMobCombinationEvent(app);
+testEliteMobEventWeightFloorGate();
 testHuntingLootSessionIsDiscardedOnDefeat(app);
 testHuntingCombatRewardChestUi();
 testHuntingCombatWithoutCollectedChestSkipsChestUi();
 testHuntingCombatRewardChestQueue();
 testHuntingCombatRewardChestNormalContinue();
 testHuntingCombatRewardChestFinalBossContinue();
-testHuntingChestRoomContinueStillWorks();
+await testHuntingChestRoomContinueStillWorks();
 await testNoGameBridgeInProduction();
 function testHuntingMishapAvoidsLowHpRuns() {
     const event = new MishapEvent(HUNTING_EVENT_TYPES.MISHAP);

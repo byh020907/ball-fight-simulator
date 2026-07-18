@@ -1,5 +1,5 @@
 import { HUNTING_ENEMY_TYPES } from "../huntingConfig.js";
-import { pickEliteMobCombination } from "../eliteMobCombinations.js";
+import { getEligibleEliteMobCombinations, pickEliteMobCombination } from "../eliteMobCombinations.js";
 import { getHuntingMonsterDefinition } from "../huntingMonsters.js";
 import { HUNTING_EVENT_TRANSITIONS, HuntingEvent } from "./huntingEvent.js";
 import { safeFloor } from "./eventHelpers.js";
@@ -10,9 +10,12 @@ function formatEliteMobNames(monsterTypes) {
 }
 
 export class EliteMobEvent extends HuntingEvent {
+    getBaseWeight(floor) {
+        return getEligibleEliteMobCombinations(safeFloor(floor)).length > 0 ? 1.0 : 0;
+    }
+
     createPayload(floor, rng = Math.random) {
         const safe = safeFloor(floor);
-        if (safe < 10) throw new Error("Elite mob events unlock at floor 10");
         const combination = pickEliteMobCombination(safe, rng);
         if (!combination) throw new Error("No elite mob combination is available");
         return {
