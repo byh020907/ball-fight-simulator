@@ -13,7 +13,46 @@
     <div class="bf-popup-card">
         <div class="bf-popup-scroll">
             <strong class="bf-popup-title" x-text="title"></strong>
-            <div class="bf-popup-body" x-html="bodyHtml"></div>
+            <div class="bf-popup-body" x-show="content === null" x-html="bodyHtml"></div>
+            <div class="hunting-stage-select" x-show="content?.type === 'hunting-stage-select'">
+                <span class="hunting-section-label">원정지 선택</span>
+                <div class="hunting-stage-grid">
+                    <template x-for="stage in content?.stages ?? []" :key="stage.id">
+                        <button
+                            type="button"
+                            class="hunting-stage-btn"
+                            :class="{ active: stage.active }"
+                            @click="selectHuntingStage(stage.id)"
+                        >
+                            <strong x-text="stage.name"></strong>
+                            <span x-text="`기준 ${stage.arenaWidth}×${stage.arenaHeight}`"></span>
+                        </button>
+                    </template>
+                </div>
+                <p class="hunting-stage-desc" x-show="content?.selectedStage">
+                    <span x-text="content?.selectedStage?.description"></span><br />
+                    <span
+                        x-text="`기준 전장 ${content?.selectedStage?.arenaWidth}×${content?.selectedStage?.arenaHeight} · 적 수에 따라 확장`"
+                    ></span>
+                </p>
+            </div>
+            <div class="hunting-checkpoint-select" x-show="content?.type === 'hunting-checkpoint-select'">
+                <span class="hunting-section-label">첫 조우 층 선택</span>
+                <p class="hunting-checkpoint-desc">도달한 층까지의 체크포인트만 선택할 수 있습니다.</p>
+                <div class="hunting-checkpoint-grid">
+                    <template x-for="checkpoint in content?.checkpoints ?? []" :key="checkpoint.floor">
+                        <button
+                            type="button"
+                            class="hunting-checkpoint-btn"
+                            :disabled="!checkpoint.available"
+                            @click="selectHuntingCheckpoint(checkpoint.floor)"
+                        >
+                            <strong x-text="checkpoint.floor"></strong>
+                            <span x-text="`${checkpoint.floor}층 첫 조우`"></span>
+                        </button>
+                    </template>
+                </div>
+            </div>
         </div>
         <div class="bf-popup-footer" x-show="buttons.length">
             <template x-for="btn in buttons" :key="btn.value">
@@ -53,6 +92,7 @@
             visible: false,
             title: "",
             bodyHtml: "",
+            content: null,
             buttons: [],
             closeOnOutside: true,
             init() {
@@ -69,6 +109,7 @@
                     _resolve = resolve;
                     this.title = options.title ?? "";
                     this.bodyHtml = options.bodyHtml ?? "";
+                    this.content = options.content ?? null;
                     this.buttons = options.buttons ?? [{ text: "닫기", value: "ok", primary: true }];
                     this.closeOnOutside = options.closeOnOutside !== false;
                     this.visible = true;
@@ -77,6 +118,12 @@
             },
             close() {
                 closePopup.call(this, "close");
+            },
+            selectHuntingStage(stageId) {
+                return Alpine.store("uiManager").invokeGameAction("selectHuntingStage", stageId);
+            },
+            selectHuntingCheckpoint(encounterFloor) {
+                return Alpine.store("uiManager").invokeGameAction("selectHuntingCheckpoint", encounterFloor);
             },
             resolve(value) {
                 if (_resolve) {
@@ -90,87 +137,92 @@
 </script>
 
 <style scoped>
-:scope {
-    position: fixed;
-    inset: 0;
-    z-index: 10002;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.45);
-    backdrop-filter: blur(2px);
-}
+    :scope {
+        position: fixed;
+        inset: 0;
+        z-index: 10002;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.45);
+        backdrop-filter: blur(2px);
+    }
 
-.bf-popup-card {
-    background: #ffffff;
-    border-radius: 16px;
-    padding: 28px 32px 24px;
-    max-width: 500px;
-    width: 90vw;
-    max-height: 85vh;
-    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.25);
-    color: #222222;
-    display: flex;
-    flex-direction: column;
-}
+    .bf-popup-card {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 28px 32px 24px;
+        max-width: 500px;
+        width: 90vw;
+        max-height: 85vh;
+        box-shadow: 0 8px 40px rgba(0, 0, 0, 0.25);
+        color: #222222;
+        display: flex;
+        flex-direction: column;
+    }
 
-.bf-popup-scroll {
-    flex: 1;
-    overflow-y: auto;
-    min-height: 0;
-}
+    .bf-popup-scroll {
+        flex: 1;
+        overflow-y: auto;
+        min-height: 0;
+    }
 
-.bf-popup-title {
-    display: block;
-    font-size: 1.2rem;
-    font-weight: 900;
-    margin-bottom: 14px;
-}
+    .bf-popup-title {
+        display: block;
+        font-size: 1.2rem;
+        font-weight: 900;
+        margin-bottom: 14px;
+    }
 
-.bf-popup-body {
-    font-size: 0.88rem;
-    line-height: 1.6;
-}
+    .bf-popup-body {
+        font-size: 0.88rem;
+        line-height: 1.6;
+    }
 
-.bf-popup-body ul {
-    padding-left: 18px;
-    margin: 6px 0;
-}
+    .bf-popup-body ul {
+        padding-left: 18px;
+        margin: 6px 0;
+    }
 
-.bf-popup-body li {
-    margin-bottom: 3px;
-}
+    .bf-popup-body li {
+        margin-bottom: 3px;
+    }
 
-.bf-popup-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 16px;
-    flex-shrink: 0;
-}
+    .bf-popup-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 16px;
+        flex-shrink: 0;
+    }
 
-.bf-popup-btn {
-    padding: 8px 28px;
-    border: 2px solid #202020;
-    border-radius: 8px;
-    background: none;
-    color: #202020;
-    font: 700 0.85rem "Bahnschrift", "Segoe UI", sans-serif;
-    cursor: pointer;
-    transition: background 0.12s, color 0.12s;
-}
+    .bf-popup-btn {
+        padding: 8px 28px;
+        border: 2px solid #202020;
+        border-radius: 8px;
+        background: none;
+        color: #202020;
+        font:
+            700 0.85rem "Bahnschrift",
+            "Segoe UI",
+            sans-serif;
+        cursor: pointer;
+        transition:
+            background 0.12s,
+            color 0.12s;
+    }
 
-.bf-popup-btn:hover {
-    background: #202020;
-    color: #ffffff;
-}
+    .bf-popup-btn:hover {
+        background: #202020;
+        color: #ffffff;
+    }
 
-.bf-popup-btn--primary {
-    background: #202020;
-    color: #ffffff;
-}
+    .bf-popup-btn--primary {
+        background: #202020;
+        color: #ffffff;
+    }
 
-.bf-popup-btn--primary:hover {
-    opacity: 0.8;
-}
+    .bf-popup-btn--primary:hover {
+        opacity: 0.8;
+    }
 </style>

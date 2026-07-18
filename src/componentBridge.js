@@ -91,6 +91,12 @@ export function createComponentBridge(app) {
         openHuntingStageSelect() {
             return app.hunting.showStageSelect();
         },
+        selectHuntingStage(stageId) {
+            return app.hunting.selectStage(stageId);
+        },
+        selectHuntingCheckpoint(encounterFloor) {
+            return app.hunting.startRun(app.playerFighterId, { encounterFloor });
+        },
         huntingRetreat() {
             return app.hunting.retreat();
         },

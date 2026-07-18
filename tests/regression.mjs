@@ -2399,12 +2399,16 @@ function testStatAllocationRules(app) {
 function testComponentBridgeCallsGameHandlers(app) {
     let started = false;
     let openedStageSelect = false;
+    let selectedStageId = null;
+    let selectedCheckpoint = null;
     let retreated = false;
     let advanced = false;
     let advanceOptions = null;
     let chestContinued = false;
     const originalStartTournament = app.startTournament;
     const originalShowStageSelect = app.hunting.showStageSelect;
+    const originalSelectStage = app.hunting.selectStage;
+    const originalStartRun = app.hunting.startRun;
     const originalRetreat = app.hunting.retreat;
     const originalAdvance = app.hunting.advance;
     const originalChestContinue = app.hunting.chestContinue;
@@ -2415,6 +2419,12 @@ function testComponentBridgeCallsGameHandlers(app) {
         };
         app.hunting.showStageSelect = () => {
             openedStageSelect = true;
+        };
+        app.hunting.selectStage = (stageId) => {
+            selectedStageId = stageId;
+        };
+        app.hunting.startRun = (characterId, options) => {
+            selectedCheckpoint = { characterId, ...options };
         };
         app.hunting.retreat = () => {
             retreated = true;
@@ -2430,12 +2440,16 @@ function testComponentBridgeCallsGameHandlers(app) {
 
         bridge.startTournament();
         bridge.openHuntingStageSelect();
+        bridge.selectHuntingStage(HUNTING_STAGE_IDS.CAVE);
+        bridge.selectHuntingCheckpoint(40);
         bridge.huntingRetreat();
         bridge.huntingAdvance();
         bridge.huntingChestContinue();
     } finally {
         app.startTournament = originalStartTournament;
         app.hunting.showStageSelect = originalShowStageSelect;
+        app.hunting.selectStage = originalSelectStage;
+        app.hunting.startRun = originalStartRun;
         app.hunting.retreat = originalRetreat;
         app.hunting.advance = originalAdvance;
         app.hunting.chestContinue = originalChestContinue;
@@ -2443,6 +2457,16 @@ function testComponentBridgeCallsGameHandlers(app) {
 
     assert.equal(started, true, "Start button bridge action should call BattleApp.startTournament");
     assert.equal(openedStageSelect, true, "Hunting button bridge action should open stage selection");
+    assert.equal(
+        selectedStageId,
+        HUNTING_STAGE_IDS.CAVE,
+        "Stage selection should reach HuntingManager through the bridge"
+    );
+    assert.deepEqual(
+        selectedCheckpoint,
+        { characterId: app.playerFighterId, encounterFloor: 40 },
+        "Checkpoint selection should preserve the preview character and requested start floor"
+    );
     assert.equal(retreated, true, "Overlay retreat action should call HuntingManager.retreat");
     assert.equal(advanced, true, "Overlay advance action should call HuntingManager.advance");
     assert.deepEqual(
@@ -9840,10 +9864,7 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
     const manager = new HuntingManager(app);
     const popupOptions = [];
     let advanced = false;
-    let selectStage = null;
-    let selectCheckpoint = null;
     const originalDialog = PopupService._testDialog;
-    const originalQuerySelectorAll = document.querySelectorAll;
 
     PopupService.setTestDialog({
         show(options) {
@@ -9852,29 +9873,6 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
         },
         close() {}
     });
-    document.querySelectorAll = (selector) => {
-        if (selector === ".hunting-stage-btn") {
-            return [
-                {
-                    dataset: { stage: HUNTING_STAGE_IDS.CAVE },
-                    addEventListener(_type, handler) {
-                        selectStage = handler;
-                    }
-                }
-            ];
-        }
-        if (selector === ".hunting-checkpoint-btn") {
-            return [
-                {
-                    dataset: { checkpoint: "1" },
-                    addEventListener(_type, handler) {
-                        selectCheckpoint = handler;
-                    }
-                }
-            ];
-        }
-        return [];
-    };
     manager.advance = async ({ waitForFirstMoveUi } = {}) => {
         assert.equal(waitForFirstMoveUi, true, "Run start should require the first move UI paint before advancing");
         await app.waitForHuntingMoveUiPaint();
@@ -9883,36 +9881,39 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
 
     try {
         manager.showStageSelect();
-        await new Promise((resolve) => setTimeout(resolve, 60));
-
-        assert.ok(popupOptions[0].bodyHtml.includes("hunting-stage-btn"), "Stage selection should render map cards");
         assert.equal(
-            popupOptions[0].bodyHtml.includes("hunting-char-btn"),
-            false,
-            "Stage selection should not render character selection cards"
+            popupOptions[0].content.type,
+            "hunting-stage-select",
+            "Stage selection should use structured popup content"
+        );
+        assert.equal(
+            popupOptions[0].content.stages.some((stage) => stage.id === HUNTING_STAGE_IDS.CAVE),
+            true,
+            "Stage selection should expose the unlocked map card data"
         );
         assert.deepEqual(popupOptions[0].buttons, [], "Stage selection should not require a second start action");
-        selectStage();
-        await new Promise((resolve) => setTimeout(resolve, 60));
+        manager.selectStage(HUNTING_STAGE_IDS.CAVE);
         assert.ok(
-            popupOptions[1].bodyHtml.includes("hunting-checkpoint-btn"),
-            "Selecting a stage should present explicit start checkpoints"
+            popupOptions[1].content.type === "hunting-checkpoint-select",
+            "Selecting a stage should present structured start checkpoints"
         );
         assert.ok(
-            popupOptions[1].bodyHtml.includes("1층 첫 조우"),
-            "Checkpoint copy must identify its real first encounter"
+            popupOptions[1].content.checkpoints.some((checkpoint) => checkpoint.floor === 1 && checkpoint.available),
+            "Checkpoint data must preserve the first encounter"
         );
         assert.equal(
-            (popupOptions[1].bodyHtml.match(/hunting-checkpoint-btn/g) ?? []).length,
+            popupOptions[1].content.checkpoints.length,
             5,
             "Checkpoint selection must always render all five requested start floors"
         );
         assert.ok(
-            popupOptions[1].bodyHtml.includes('data-checkpoint="40"') &&
-                popupOptions[1].bodyHtml.includes('data-checkpoint="60" disabled'),
+            popupOptions[1].content.checkpoints.some((checkpoint) => checkpoint.floor === 40 && checkpoint.available) &&
+                popupOptions[1].content.checkpoints.some(
+                    (checkpoint) => checkpoint.floor === 60 && !checkpoint.available
+                ),
             "A floor-47 record should unlock 40 but keep 60 and 80 disabled"
         );
-        const startPromise = selectCheckpoint();
+        const startPromise = manager.startRun(FIGHTER_IDS.RAGE, { encounterFloor: 1 });
         await Promise.resolve();
         assert.equal(manager._run.characterId, FIGHTER_IDS.RAGE, "Run should use the current preview character");
         assert.deepEqual(
@@ -9944,7 +9945,6 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
         assert.equal(advanced, true, "Checkpoint selection should advance only after the first move UI is painted");
     } finally {
         PopupService.setTestDialog(originalDialog);
-        document.querySelectorAll = originalQuerySelectorAll;
     }
 
     console.log("[hunting-stage-select-preview-character] ok");

@@ -136,73 +136,51 @@ export class HuntingManager {
         const stages = unlockedIds.map((id) => getHuntingStage(id)).filter(Boolean);
         const selectedStage = getHuntingStage(selectedId);
 
-        const stageButtons = stages
-            .map(
-                (stage) => `
-                <button class="hunting-stage-btn${stage.id === selectedId ? " active" : ""}" data-stage="${stage.id}">
-                    <strong>${stage.name}</strong>
-                    <span>기준 ${stage.arena.WIDTH}×${stage.arena.HEIGHT}</span>
-                </button>`
-            )
-            .join("");
-
-        const stageDesc = selectedStage
-            ? `<p class="hunting-stage-desc">${selectedStage.description}<br>기준 전장 ${selectedStage.arena.WIDTH}×${selectedStage.arena.HEIGHT} · 적 수에 따라 확장</p>`
-            : "";
-
-        const bodyHtml = `
-            <div class="hunting-stage-select">
-                <span class="hunting-section-label">원정지 선택</span>
-                <div class="hunting-stage-grid">${stageButtons}</div>
-                ${stageDesc}
-            </div>
-        `;
-
         PopupService.show({
             title: "사냥터 — 맵 선택",
-            bodyHtml,
+            content: {
+                type: "hunting-stage-select",
+                stages: stages.map((stage) => ({
+                    id: stage.id,
+                    name: stage.name,
+                    arenaWidth: stage.arena.WIDTH,
+                    arenaHeight: stage.arena.HEIGHT,
+                    active: stage.id === selectedId
+                })),
+                selectedStage: selectedStage
+                    ? {
+                          description: selectedStage.description,
+                          arenaWidth: selectedStage.arena.WIDTH,
+                          arenaHeight: selectedStage.arena.HEIGHT
+                      }
+                    : null
+            },
             buttons: []
         });
+    }
 
-        setTimeout(() => {
-            document.querySelectorAll(".hunting-stage-btn").forEach((btn) => {
-                btn.addEventListener("click", () => {
-                    const stageId = btn.dataset.stage;
-                    app.playerProfile.hunting.selectedStageId = stageId;
-                    savePlayerProfile(app.playerProfile);
-                    return this.showCheckpointSelect(characterId, stageId);
-                });
-            });
-        }, 50);
+    selectStage(stageId) {
+        const unlockedIds = getUnlockedHuntingStageIds(this.app.playerProfile);
+        if (!unlockedIds.includes(stageId)) return;
+        this.app.playerProfile.hunting.selectedStageId = stageId;
+        savePlayerProfile(this.app.playerProfile);
+        return this.showCheckpointSelect(this.app.playerFighterId, stageId);
     }
 
     showCheckpointSelect(characterId, stageId = getSelectedHuntingStageId(this.app.playerProfile)) {
         const stage = getHuntingStage(stageId);
         const availableCheckpoints = getHuntingAvailableStartFloors(this.app.playerProfile.hunting.stats, stageId);
-        const checkpointButtons = HUNTING_START_CHECKPOINTS.map((checkpoint) => {
-            const available = availableCheckpoints.includes(checkpoint);
-            return `<button class="hunting-checkpoint-btn" data-checkpoint="${checkpoint}" ${available ? "" : "disabled"}>
-                <strong>${checkpoint}</strong><span>${checkpoint}층 첫 조우</span>
-            </button>`;
-        }).join("");
         PopupService.show({
             title: `사냥터 — ${stage.name} 시작 층`,
-            bodyHtml: `<div class="hunting-checkpoint-select">
-                <span class="hunting-section-label">첫 조우 층 선택</span>
-                <p class="hunting-checkpoint-desc">도달한 층까지의 체크포인트만 선택할 수 있습니다.</p>
-                <div class="hunting-checkpoint-grid">${checkpointButtons}</div>
-            </div>`,
+            content: {
+                type: "hunting-checkpoint-select",
+                checkpoints: HUNTING_START_CHECKPOINTS.map((checkpoint) => ({
+                    floor: checkpoint,
+                    available: availableCheckpoints.includes(checkpoint)
+                }))
+            },
             buttons: []
         });
-        setTimeout(() => {
-            document.querySelectorAll(".hunting-checkpoint-btn").forEach((btn) => {
-                btn.addEventListener("click", () => {
-                    const encounterFloor = Number(btn.dataset.checkpoint);
-                    if (!availableCheckpoints.includes(encounterFloor)) return;
-                    return this.startRun(characterId, { encounterFloor });
-                });
-            });
-        }, 50);
     }
 
     async startRun(characterId, { encounterFloor = 1 } = {}) {

@@ -810,6 +810,41 @@ function testHuntingOverlayActionContracts() {
     console.log("[hunting-overlay-action-contracts] ok");
 }
 
+function testHuntingStartPopupOwnershipContract() {
+    const manager = readSource("src/hunting/huntingManager.js");
+    const popup = readSource("src/components/popup-dialog.html");
+    const bridge = readSource("src/componentBridge.js");
+    const stageSelect = manager.match(/showStageSelect\(\)[\s\S]*?\n    }\n\n    selectStage/s)?.[0] ?? "";
+    const checkpointSelect = manager.match(/showCheckpointSelect\([\s\S]*?\n    }\n\n    async startRun/s)?.[0] ?? "";
+
+    assert.ok(
+        manager.includes('type: "hunting-stage-select"') && manager.includes('type: "hunting-checkpoint-select"'),
+        "HuntingManager should pass structured stage and checkpoint content to the popup"
+    );
+    assert.equal(
+        /(setTimeout|document\.querySelectorAll|addEventListener)/.test(stageSelect),
+        false,
+        "Production stage selection must not attach delayed DOM listeners"
+    );
+    assert.equal(
+        /(setTimeout|document\.querySelectorAll|addEventListener)/.test(checkpointSelect),
+        false,
+        "Production checkpoint selection must not attach delayed DOM listeners"
+    );
+    assert.ok(
+        popup.includes('@click="selectHuntingStage(stage.id)"') &&
+            popup.includes('@click="selectHuntingCheckpoint(checkpoint.floor)"') &&
+            popup.includes('invokeGameAction("selectHuntingStage", stageId)') &&
+            popup.includes('invokeGameAction("selectHuntingCheckpoint", encounterFloor)'),
+        "Popup component should own declarative selection handlers and route them through uiManager"
+    );
+    assert.ok(
+        bridge.includes("selectHuntingStage(stageId)") && bridge.includes("selectHuntingCheckpoint(encounterFloor)"),
+        "Component bridge should expose the two hunting start actions"
+    );
+    console.log("[hunting-start-popup-ownership] ok");
+}
+
 function testResultOverlayLayoutContract() {
     const overlay = readSource("src/components/game-overlay.html");
     const huntingOverlay = readSource("src/components/hunting-overlay.html");
@@ -1343,6 +1378,7 @@ testGameplayUiResetContracts();
 testNoWindowUiManagerInProduction();
 testAlpineTemplateUiManagerContracts();
 testHuntingOverlayActionContracts();
+testHuntingStartPopupOwnershipContract();
 testResultOverlayLayoutContract();
 testFluidModalLayoutContracts();
 testCollectionRebirthAndDeveloperContracts();
