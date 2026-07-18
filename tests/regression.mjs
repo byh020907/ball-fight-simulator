@@ -79,6 +79,7 @@ import { RestSiteEvent } from "../src/hunting/events/restSiteEvent.js";
 import {
     getEliteFormationFrame,
     getEliteFormationImpulse,
+    getEliteFormationMemberTarget,
     getEliteFormationMembers,
     getEliteFormationTarget,
     placeEliteMobFormation
@@ -4205,6 +4206,33 @@ function testEliteMobCombinationEvent(app) {
         getEliteFormationTarget(sharedPlayer, rotatedBackline, rotatedFrame, 1_000, 960),
         rotatedBackline.position,
         "The backline slot should preserve its row order on the shared frame"
+    );
+    assert.deepEqual(
+        getEliteFormationMemberTarget(exactBackline, sharedPlayer, exactMembers, 1_000, 960),
+        exactBackline.position,
+        "Elite members should expose the shared slot target used by their default steering"
+    );
+    const healerFormationSpecs = createEliteMobEncounter({
+        floor: 20,
+        stageId: HUNTING_STAGE_IDS.CAVE,
+        combinationId: "elite-20-barrier-pursuer-healer-shooter",
+        monsterTypes: ["barrier", "pursuer", "healer", "shooter"],
+        rng: () => 0
+    });
+    const healerFormationSimulation = new BattleSimulation([playerSpec, ...healerFormationSpecs], {
+        onLog() {},
+        onSound() {}
+    });
+    const healerFormationPlayer = healerFormationSimulation.fighters.find((fighter) => fighter.id === playerSpec.id);
+    const healerFormationEnemies = healerFormationSimulation.getEnemiesOf(healerFormationPlayer);
+    healerFormationPlayer.position = new Vector2(500, 500);
+    placeEliteMobFormation(healerFormationPlayer, healerFormationEnemies);
+    const formationHealer = healerFormationEnemies.find((fighter) => fighter.hunting.monsterType === "healer");
+    formationHealer.position.add(new Vector2(0, 120));
+    formationHealer.abilities.update(1 / 60, healerFormationPlayer);
+    assert.ok(
+        formationHealer.state.forcedHeading,
+        "Elite healers should steer back toward their formation slot instead of remaining directionless"
     );
     const excludedMembers = [
         exactFrontLeft,

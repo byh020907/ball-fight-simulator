@@ -63,11 +63,16 @@ export function getEliteFormationTarget(player, owner, frame, arenaWidth, arenaH
     return Vector2.add(target, boundaryCorrection);
 }
 
+export function getEliteFormationMemberTarget(owner, player, allies, arenaWidth, arenaHeight) {
+    const members = getEliteFormationMembers(allies);
+    if (!members.includes(owner)) return null;
+    const frame = getEliteFormationFrame(player, members);
+    return getEliteFormationTarget(player, owner, frame, arenaWidth, arenaHeight);
+}
+
 export function getEliteFormationImpulse(owner, player, allies, arenaWidth, arenaHeight) {
     const members = getEliteFormationMembers(allies);
-    if (!members.includes(owner)) return new Vector2();
-    const frame = getEliteFormationFrame(player, members);
-    const desired = getEliteFormationTarget(player, owner, frame, arenaWidth, arenaHeight);
+    const desired = getEliteFormationMemberTarget(owner, player, members, arenaWidth, arenaHeight);
     if (!desired) return new Vector2();
     const correction = Vector2.subtract(desired, owner.position);
     members.forEach((ally) => {
@@ -76,5 +81,5 @@ export function getEliteFormationImpulse(owner, player, allies, arenaWidth, aren
         if (ally !== owner && distance > 0.001 && distance < owner.radius + ally.radius + 24)
             correction.add(offset.normalize().scale(55));
     });
-    return correction.scale(0.008 * owner.mass);
+    return correction.scale(0.02 * owner.mass);
 }
