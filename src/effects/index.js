@@ -23,7 +23,6 @@ export {
     BloodTetherEffect
 } from "./vampireEffects.js";
 export {
-    CrossOverloadEffect,
     DASH_LASER_CASTER_RENDERER,
     LaserCasterDissipateEffect,
     LaserBeamEffect,

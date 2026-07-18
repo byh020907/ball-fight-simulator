@@ -1,6 +1,6 @@
 import { steerBallToward, Vector2 } from "../core.js";
 import { DashEffect } from "../combatEffects.js";
-import { CrossOverloadEffect, LaserBeamEffect, circleIntersectsLaserSegment } from "../effects/index.js";
+import { LaserBeamEffect, applyBurningEffect, circleIntersectsLaserSegment } from "../effects/index.js";
 import { Ability } from "./ability.js";
 
 const INITIAL_COOLDOWN_LEVEL = 0;
@@ -10,6 +10,13 @@ const DASH_SOUND_PITCH = 1.15;
 const SLASH_LENGTH = 120;
 const LASER_DAMAGE_TICK = 0.05;
 const LASER_TICK_EPSILON = 1e-9;
+const DASH_LEVEL9_IGNITION_CONFIG = Object.freeze({
+    duration: 1,
+    tickInterval: 0.1,
+    maximumTicks: 10,
+    totalDamageMultiplier: 1,
+    exactTotalDamage: true
+});
 
 export class DashAbility extends Ability {
     constructor(owner, simulation) {
@@ -102,24 +109,19 @@ export class DashAbility extends Ability {
     }
 
     finishDashLaserCombat(laser) {
-        if (laser.maxWallBounces > 0 && this.owner.progression?.abilityTier >= 3) {
-            for (const [target, segments] of laser.getHitSegmentsByTarget()) {
-                if (segments.size < 2 || target.flags.defeated) continue;
-                this._triggerDashLaserOverload(target);
+        if (this.owner.progression?.abilityTier >= 3) {
+            for (const target of laser.getHitSegmentsByTarget().keys()) {
+                if (target.flags.defeated) continue;
+                applyBurningEffect({
+                    source: this.owner,
+                    target,
+                    simulation: this.simulation,
+                    label: "Dash Ignition",
+                    config: DASH_LEVEL9_IGNITION_CONFIG
+                });
             }
         }
         this.laserCombatStates.delete(laser);
-    }
-
-    _triggerDashLaserOverload(target) {
-        const center = target.position.clone();
-        for (const enemy of this.simulation.getEnemiesOf(this.owner)) {
-            if (Vector2.subtract(enemy.position, center).length() > 100) continue;
-            enemy.takeDamage(this.owner.stats.baseDamage, this.owner, "Cross Overload");
-        }
-        this.simulation.spawnExplosion(center, "#ff8b2f");
-        this.simulation.spawnPulse(center, "#ffffff");
-        this.simulation.entities.push(new CrossOverloadEffect(center, 100));
     }
 
     onDashWall() {

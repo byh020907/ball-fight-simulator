@@ -146,7 +146,7 @@ export const REWARD_BALANCE = deepFreeze({
                 {
                     level: 9,
                     abilityTier: 3,
-                    gameText: "교차 적중 과부하 · 100px ×1.00"
+                    gameText: "레이저 적중 점화 · 1초 10틱 ×0.10"
                 },
                 { level: 10 }
             ],

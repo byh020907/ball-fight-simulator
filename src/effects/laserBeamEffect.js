@@ -298,35 +298,3 @@ export class LaserCasterDissipateEffect extends CombatEntity {
         DASH_LASER_CASTER_RENDERER(ctx, this.getCasterVisualState());
     }
 }
-
-export class CrossOverloadEffect extends CombatEntity {
-    static renderLayer = RENDER_LAYERS.FOREGROUND;
-
-    constructor(center, radius) {
-        super(center.clone(), new Vector2(), 0);
-        this.maxRadius = radius;
-        this.life = 0.32;
-        this.maxLife = this.life;
-    }
-
-    update(delta) {
-        this.tickLife(delta);
-    }
-
-    draw(ctx) {
-        const progress = 1 - this.life / this.maxLife;
-        const radius = this.maxRadius * (0.25 + progress * 0.75);
-        ctx.save();
-        ctx.globalAlpha = 1 - progress;
-        ctx.strokeStyle = "#ff8b2f";
-        ctx.lineWidth = getVisibleLineWidth(ctx, "emphasis", 6);
-        ctx.beginPath();
-        ctx.arc(this.position.x, this.position.y, radius, 0, Math.PI * 2);
-        ctx.moveTo(this.position.x - radius * 0.7, this.position.y - radius * 0.7);
-        ctx.lineTo(this.position.x + radius * 0.7, this.position.y + radius * 0.7);
-        ctx.moveTo(this.position.x + radius * 0.7, this.position.y - radius * 0.7);
-        ctx.lineTo(this.position.x - radius * 0.7, this.position.y + radius * 0.7);
-        ctx.stroke();
-        ctx.restore();
-    }
-}

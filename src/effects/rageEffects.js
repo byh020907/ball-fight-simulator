@@ -14,20 +14,34 @@ export const BURNING_EFFECT_CONFIG = Object.freeze({
     totalDamageMultiplier: 0.5
 });
 
-export function applyBurningEffect({ source, target, simulation, label = "Burning" }) {
-    const damagePerTick =
-        (source.stats.baseDamage * BURNING_EFFECT_CONFIG.totalDamageMultiplier) / BURNING_EFFECT_CONFIG.maximumTicks;
+export function applyBurningEffect({ source, target, simulation, label = "Burning", config = BURNING_EFFECT_CONFIG }) {
+    const duration = config.duration ?? BURNING_EFFECT_CONFIG.duration;
+    const tickInterval = config.tickInterval ?? BURNING_EFFECT_CONFIG.tickInterval;
+    const maximumTicks = config.maximumTicks ?? BURNING_EFFECT_CONFIG.maximumTicks;
+    const totalDamageMultiplier = config.totalDamageMultiplier ?? BURNING_EFFECT_CONFIG.totalDamageMultiplier;
+    const totalDamage = source.stats.baseDamage * totalDamageMultiplier;
+    const damagePerTick = totalDamage / maximumTicks;
+    const exactTotalDamage = config.exactTotalDamage ? totalDamage : null;
     if (target._igniteState instanceof BurningEffect && !target._igniteState.isExpired) {
-        target._igniteState.refresh({ source, damagePerTick, label });
+        target._igniteState.refresh({
+            source,
+            duration,
+            tickInterval,
+            maximumTicks,
+            damagePerTick,
+            exactTotalDamage,
+            label
+        });
         return target._igniteState;
     }
     const effect = new BurningEffect({
         source,
         target,
-        duration: BURNING_EFFECT_CONFIG.duration,
-        tickInterval: BURNING_EFFECT_CONFIG.tickInterval,
-        maximumTicks: BURNING_EFFECT_CONFIG.maximumTicks,
+        duration,
+        tickInterval,
+        maximumTicks,
         damagePerTick,
+        exactTotalDamage,
         label
     });
     target._igniteState = effect;
@@ -118,7 +132,16 @@ export class RageFlameRing extends CombatEntity {
 export class BurningEffect extends CombatEntity {
     static renderLayer = RENDER_LAYERS.FOREGROUND;
 
-    constructor({ source, target, duration, tickInterval, maximumTicks, damagePerTick, label = "Ignite" }) {
+    constructor({
+        source,
+        target,
+        duration,
+        tickInterval,
+        maximumTicks,
+        damagePerTick,
+        exactTotalDamage = null,
+        label = "Ignite"
+    }) {
         super(target.position.clone(), new Vector2(), target.radius);
         this.source = source;
         this.target = target;
@@ -128,6 +151,7 @@ export class BurningEffect extends CombatEntity {
         this.tickInterval = tickInterval;
         this.maximumTicks = maximumTicks;
         this.damagePerTick = damagePerTick;
+        this.exactTotalDamage = exactTotalDamage;
         this.label = label;
         this.damageLife = duration;
         this.tickTimer = 0;
@@ -136,13 +160,25 @@ export class BurningEffect extends CombatEntity {
         this.rebirthVisual = getRebirthVisualProfile(10);
     }
 
-    refresh({ source = this.source, damagePerTick = this.damagePerTick, label = this.label } = {}) {
+    refresh({
+        source = this.source,
+        duration = this.duration,
+        tickInterval = this.tickInterval,
+        maximumTicks = this.maximumTicks,
+        damagePerTick = this.damagePerTick,
+        exactTotalDamage = this.exactTotalDamage,
+        label = this.label
+    } = {}) {
         this.source = source;
+        this.duration = duration;
+        this.tickInterval = tickInterval;
+        this.maximumTicks = maximumTicks;
         this.damagePerTick = damagePerTick;
+        this.exactTotalDamage = exactTotalDamage;
         this.label = label;
-        this.life = this.duration;
-        this.maxLife = this.duration;
-        this.damageLife = this.duration;
+        this.life = duration;
+        this.maxLife = duration;
+        this.damageLife = duration;
         this.tickTimer = 0;
         this.tickCount = 0;
         this.damageComplete = false;
@@ -166,11 +202,18 @@ export class BurningEffect extends CombatEntity {
             this.tickTimer -= this.tickInterval;
             this.tickCount += 1;
             if (!this.source?.flags?.defeated) {
-                this.target.takeDamage(this.damagePerTick, this.source, this.label);
+                this.target.takeDamage(this._getTickDamage(this.tickCount), this.source, this.label);
             }
         }
         this.damageComplete = this.damageLife <= 1e-9 || this.tickCount >= this.maximumTicks;
         if (this.life <= 1e-9) this._finish();
+    }
+
+    _getTickDamage(tickNumber) {
+        if (!Number.isFinite(this.exactTotalDamage)) return this.damagePerTick;
+        const previousDamage = Math.round((this.exactTotalDamage * (tickNumber - 1)) / this.maximumTicks);
+        const currentDamage = Math.round((this.exactTotalDamage * tickNumber) / this.maximumTicks);
+        return currentDamage - previousDamage;
     }
 
     _finish() {

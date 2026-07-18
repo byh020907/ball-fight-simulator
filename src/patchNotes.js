@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.31.7",
+        date: "2026-07-18",
+        title: "v0.31.7 Dash Lv.9 레이저 점화",
+        changes: [
+            {
+                type: "feature",
+                text: "Dash Ball Lv.9 레이저는 교차 적중을 요구하지 않고, 실제 적중한 상대를 1초 동안 점화해 총공격력 ×1.0 피해를 줍니다."
+            }
+        ]
+    },
+    {
         version: "0.31.6",
         date: "2026-07-18",
         title: "v0.31.6 사냥터 패배 층 표시",

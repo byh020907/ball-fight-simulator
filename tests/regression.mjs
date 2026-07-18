@@ -277,7 +277,6 @@ import { ArenaRenderer } from "../src/ui.js";
 import { ArenaCamera } from "../src/camera.js";
 import { BurningEffect } from "../src/effects/rageEffects.js";
 import {
-    CrossOverloadEffect,
     DASH_LASER_CASTER_RENDERER,
     HeroResonanceEffect,
     LaserCasterDissipateEffect,
@@ -6077,7 +6076,11 @@ function testFiveBallLevelRewardContracts(app) {
         const laser = new LaserBeamEffect(run.owner, run.target, { maxWallBounces: 1 });
         const hpBefore = run.target.hp;
         for (const delta of steps) laser.update(delta, run.simulation);
-        return { run, laser, damage: hpBefore - run.target.hp };
+        const laserDamage = hpBefore - run.target.hp;
+        const ignition = run.simulation.entities.find(
+            (entity) => entity instanceof BurningEffect && entity.target === run.target
+        );
+        return { run, laser, ignition, hpBefore, laserDamage };
     };
     const ownershipRun = createRun(FIGHTER_IDS.DASH);
     ownershipRun.owner.position = new Vector2(100, 300);
@@ -6118,9 +6121,20 @@ function testFiveBallLevelRewardContracts(app) {
     const steppedDash = runReflectedLaser([0.35, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05]);
     const largeDeltaDash = runReflectedLaser([0.65]);
     assert.deepEqual(
-        [steppedDash.damage, largeDeltaDash.damage],
+        [steppedDash.laserDamage, largeDeltaDash.laserDamage],
+        [120, 120],
+        "Dash should keep both x0.60 laser segments independent of phase-sized or large delta updates"
+    );
+    assert.ok(steppedDash.ignition && largeDeltaDash.ignition, "Dash Lv9 should ignite any target hit by its laser");
+    assertForegroundEffectRenders(steppedDash.ignition, "Dash laser ignition", (primitives) => {
+        assertEffectArcAt(primitives, steppedDash.run.target.position, "Dash laser ignition");
+    });
+    steppedDash.ignition.update(1, steppedDash.run.simulation);
+    largeDeltaDash.ignition.update(1, largeDeltaDash.run.simulation);
+    assert.deepEqual(
+        [steppedDash.hpBefore - steppedDash.run.target.hp, largeDeltaDash.hpBefore - largeDeltaDash.run.target.hp],
         [220, 220],
-        "Dash should apply two x0.60 segments and one x1.00 overload independent of phase-sized or large delta updates"
+        "Dash Lv9 ignition should add exactly x1.00 total damage across ten ticks"
     );
     assert.equal(steppedDash.laser.isExpired, true, "Dash laser should expire only after 0.35s charge plus 0.30s fire");
     assertForegroundEffectRenders(steppedDash.laser, "Dash reflected laser", (primitives) => {
@@ -6138,19 +6152,29 @@ function testFiveBallLevelRewardContracts(app) {
             "Dash reflected laser should keep its reflected segment visible against the bright arena"
         );
     });
-    const overloadEffect = steppedDash.run.simulation.entities.find((entity) => entity instanceof CrossOverloadEffect);
-    assertForegroundEffectRenders(overloadEffect, "Dash cross overload", (primitives) => {
-        assertEffectArcAt(
-            primitives,
-            steppedDash.run.target.position,
-            "Dash cross overload",
-            (radius) => radius <= 100
-        );
-        assert.ok(
-            primitives.filter((primitive) => primitive.method === "lineTo").length >= 2,
-            "Dash cross overload should persist its crossed warning above fighters"
-        );
+    const singleSegmentRun = createRun(FIGHTER_IDS.DASH);
+    singleSegmentRun.owner.position = new Vector2(100, 100);
+    singleSegmentRun.target.position = new Vector2(300, 200);
+    const singleSegmentLaser = new LaserBeamEffect(singleSegmentRun.owner, singleSegmentRun.target, {
+        maxWallBounces: 1
     });
+    const singleSegmentHpBefore = singleSegmentRun.target.hp;
+    singleSegmentLaser.update(0.65, singleSegmentRun.simulation);
+    assert.equal(
+        singleSegmentLaser.getHitSegmentsByTarget().get(singleSegmentRun.target)?.size,
+        1,
+        "Dash Lv9 setup should hit the target with only one laser segment"
+    );
+    const singleSegmentIgnition = singleSegmentRun.simulation.entities.find(
+        (entity) => entity instanceof BurningEffect && entity.target === singleSegmentRun.target
+    );
+    assert.ok(singleSegmentIgnition, "Dash Lv9 should no longer require incident and reflected segments to both hit");
+    singleSegmentIgnition.update(1, singleSegmentRun.simulation);
+    assert.equal(
+        singleSegmentHpBefore - singleSegmentRun.target.hp,
+        160,
+        "One x0.60 segment plus the x1.00 ignition should deal x1.60 total raw damage"
+    );
 
     const stickyRun = createRun(FIGHTER_IDS.GRENADE);
     stickyRun.owner.position = new Vector2(180, 300);
