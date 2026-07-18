@@ -158,9 +158,15 @@ function testEquipmentSpecialOptionTooltipContract() {
             equipmentPanel.includes('@mouseleave="closeSpecialTooltip()"') &&
             equipmentPanel.includes('@blur="closeSpecialTooltip()"') &&
             equipmentPanel.includes('@keydown.escape.window="closeSpecialTooltip()"') &&
-            equipmentPanel.includes('@scroll="closeSpecialTooltip()"') &&
-            equipmentPanel.includes('@click.outside="closeSpecialTooltip()"'),
+            equipmentPanel.includes('@scroll="closeSpecialTooltip()"'),
         "Special option tooltips should open for pointer, keyboard, and touch then close on leave, blur, outside tap, Escape, or list scroll"
+    );
+    const panelRoot = equipmentPanel.match(/^<div\s+[^>]*>/)?.[0] ?? "";
+    const specialOptionOpenTag = equipmentPanel.match(/<span\s+class="ch-equip-special-option"[\s\S]*?>/)?.[0] ?? "";
+    assert.ok(
+        panelRoot.includes('@click.outside="closeSpecialTooltip()"') &&
+            !specialOptionOpenTag.includes("@click.outside"),
+        "Only the panel root should close on an outside tap, so tapping one option cannot be cancelled by sibling options"
     );
     assert.ok(
         equipmentPanel.includes("position: fixed") &&
@@ -335,6 +341,72 @@ function loadCollectionComponentFactory(path, expectedName, factories) {
 function restoreGlobalProperty(name, descriptor) {
     if (descriptor) Object.defineProperty(globalThis, name, descriptor);
     else delete globalThis[name];
+}
+
+function testEquipmentSpecialTooltipInteractionContract() {
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+    const originalAlpine = Object.getOwnPropertyDescriptor(globalThis, "Alpine");
+    const originalDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
+    const factories = {};
+
+    try {
+        Object.defineProperty(globalThis, "window", {
+            configurable: true,
+            value: {
+                createGameUI(name, factory) {
+                    factories[name] = factory;
+                }
+            }
+        });
+        Object.defineProperty(globalThis, "Alpine", {
+            configurable: true,
+            value: { store() {} }
+        });
+        Object.defineProperty(globalThis, "document", {
+            configurable: true,
+            value: { documentElement: { clientWidth: 360, clientHeight: 800 } }
+        });
+
+        const createEquipmentPanel = loadCollectionComponentFactory(
+            "src/components/collection-equipment-panel.html",
+            "collectionEquipmentPanel",
+            factories
+        );
+        const panel = createEquipmentPanel();
+        panel.$refs = {
+            specialTooltip: {
+                getBoundingClientRect() {
+                    return { width: 220, height: 64 };
+                }
+            }
+        };
+        panel.$nextTick = (callback) => callback();
+        const anchor = {
+            getBoundingClientRect() {
+                return { left: 320, top: 700, bottom: 724 };
+            }
+        };
+        const item = { instanceId: "mobile-tooltip" };
+        const option = { type: "hpSteal", description: "긴 갈망 설명" };
+
+        panel.openSpecialTooltip(item, option, anchor);
+        assert.equal(panel.specialTooltip.visible, true, "One tap should leave its tooltip open");
+        assert.equal(panel.specialTooltip.placement, "above", "A bottom-edge anchor should place the tooltip above");
+        assert.match(panel.specialTooltip.style, /left:\s*132px/, "A right-edge anchor should clamp tooltip placement");
+
+        panel.closeSpecialTooltip();
+        assert.equal(
+            panel.specialTooltip.visible,
+            false,
+            "Blur or an outside panel tap should close the visible tooltip"
+        );
+    } finally {
+        restoreGlobalProperty("window", originalWindow);
+        restoreGlobalProperty("Alpine", originalAlpine);
+        restoreGlobalProperty("document", originalDocument);
+    }
+
+    console.log("[equipment-special-option-tooltip-interaction] ok");
 }
 
 function testCollectionEquipmentPanelsShareHubState() {
@@ -1234,6 +1306,7 @@ testHuntingMerchantMobileScrollContract();
 testHuntingChestIconReuseContract();
 testCollectionEquipmentPanelsOwnTheirFlows();
 testEquipmentSpecialOptionTooltipContract();
+testEquipmentSpecialTooltipInteractionContract();
 testDailyShopPopupContract();
 testFusionEquippedLabelTypographyContract();
 testCollectionEquipmentPanelsShareHubState();
