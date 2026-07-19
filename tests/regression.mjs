@@ -23978,6 +23978,19 @@ function testElementalistChannelVisualGrammar() {
     const source = { position: new Vector2(120, 180), radius: 24, flags: { defeated: false } };
     const target = { position: new Vector2(520, 180), radius: 30, flags: { defeated: false } };
     const travellingElements = new Set(["frost", "wind", "earth"]);
+    const minimumTravelDensity = {
+        fire: { single: 60, composite: 40 },
+        frost: { single: 30, composite: 18 },
+        wind: { single: 24, composite: 15 },
+        earth: { single: 28, composite: 16 }
+    };
+    Object.entries(minimumTravelDensity).forEach(([element, minimum]) => {
+        const config = ELEMENTAL_CHANNEL_VISUAL_CONFIG[element];
+        const singleCount = config.singleTrailParticleCount ?? config.singleTravelCount;
+        const compositeCount = config.compositeTrailParticleCount ?? config.compositeTravelCount;
+        assert.ok(singleCount >= minimum.single, `${element} single channel must retain its in-game particle density`);
+        assert.ok(compositeCount >= minimum.composite, `${element} fusion channel must retain its particle density`);
+    });
     const renderSignatures = {
         fire: (context) =>
             context.calls.filter(([method]) => method === "fillRect").length >=

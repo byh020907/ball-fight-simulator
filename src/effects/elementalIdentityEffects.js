@@ -9,8 +9,8 @@ export const ELEMENTAL_CHANNEL_VISUAL_CONFIG = Object.freeze({
     fire: Object.freeze({
         singleParticleCount: 26,
         compositeParticleCount: 16,
-        singleTrailParticleCount: 30,
-        compositeTrailParticleCount: 20,
+        singleTrailParticleCount: 60,
+        compositeTrailParticleCount: 40,
         trailCycleSpeed: 0.82,
         trailWidth: 18,
         trailParticleSize: 5.5
@@ -20,8 +20,8 @@ export const ELEMENTAL_CHANNEL_VISUAL_CONFIG = Object.freeze({
         shardCount: 7,
         outerDistance: 64,
         innerDistance: 12,
-        singleTravelCount: 13,
-        compositeTravelCount: 8,
+        singleTravelCount: 30,
+        compositeTravelCount: 18,
         travelCycleSpeed: 0.92,
         travelWidth: 18,
         travelShardSize: 4.5
@@ -39,8 +39,8 @@ export const ELEMENTAL_CHANNEL_VISUAL_CONFIG = Object.freeze({
         innerSpeedBoost: 2.8,
         rotationSpeed: 1.4,
         shadowColor: "#257750",
-        singleTravelCount: 16,
-        compositeTravelCount: 10,
+        singleTravelCount: 24,
+        compositeTravelCount: 15,
         travelCycleSpeed: 1.08,
         travelWidth: 25,
         travelWispLength: 12
@@ -50,8 +50,8 @@ export const ELEMENTAL_CHANNEL_VISUAL_CONFIG = Object.freeze({
         dustCount: 6,
         outerDistance: 58,
         innerDistance: 14,
-        singleTravelCount: 12,
-        compositeTravelCount: 7,
+        singleTravelCount: 28,
+        compositeTravelCount: 16,
         travelCycleSpeed: 0.76,
         travelWidth: 14,
         travelRockSize: 4.5
