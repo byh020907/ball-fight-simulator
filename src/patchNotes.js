@@ -19,6 +19,25 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.35.0",
+        date: "2026-07-19",
+        title: "v0.35.0 Elementalist 마력 도약",
+        changes: [
+            {
+                type: "balance",
+                text: "Elementalist의 오브 자성이 기본 2배, Lv.3에서 3배 반경으로 적용됩니다."
+            },
+            {
+                type: "feature",
+                text: "Lv.6부터 오브를 회수하면 적 반대 방향으로 짧게 마력 도약합니다."
+            },
+            {
+                type: "balance",
+                text: "원소 주문의 최대 채널 사거리가 600으로 조정됩니다."
+            }
+        ]
+    },
+    {
         version: "0.34.4",
         date: "2026-07-19",
         title: "v0.34.4 Hero 보호막 비율과 감쇠",

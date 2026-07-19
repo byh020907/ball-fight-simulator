@@ -18,14 +18,20 @@ import {
 } from "./elementalistRecipes.js";
 
 const ELEMENTALIST_CONFIG = Object.freeze({
-    channelRange: 850,
+    channelRange: 600,
     channelDuration: 2,
     channelTickInterval: 0.08,
     maximumOrbs: 4,
     boltSpeedMultiplier: 2.2,
     orbReleaseSpeed: 165,
-    ownerMagnet: { radiusMultiplier: 2, responseRate: 9, attractionSpeed: 900 },
+    ownerMagnet: { responseRate: 9, attractionSpeed: 900 },
     orbMagnet: { radius: 145, responseRate: 3.8, attractionSpeed: 120 },
+    manaLeap: {
+        maximumDistanceRadiusMultiplier: 2.5,
+        rangeBufferRadiusMultiplier: 0.25,
+        duration: 0.22,
+        retriggerCooldown: 0.4
+    },
     wetDuration: 2.5
 });
 
@@ -83,6 +89,7 @@ export class ElementalistAbility extends Ability {
         this.activeChannels = [];
         this.activeOrbs = [];
         this.rng = simulation.rng ?? Math.random;
+        this.nextManaLeapAt = 0;
     }
 
     update(delta, target) {
@@ -147,6 +154,7 @@ export class ElementalistAbility extends Ability {
         const elements = [...orb.elements];
         const recipe = orb.recipe;
         const wetSnapshot = this._consumeWet(target);
+        this._tryManaLeap(target);
         const channel = this._createChannel({ elements, recipe, target, wetSnapshot });
         this.activeChannels.push(channel);
         this.simulation.entities.push(
@@ -160,6 +168,41 @@ export class ElementalistAbility extends Ability {
             })
         );
         this.simulation.playSound("charge", 0.7);
+    }
+
+    _tryManaLeap(target) {
+        if (!this.getLevelUpgrade().manaLeap || this.owner.state.movement) return false;
+        if (this.simulation.elapsed < this.nextManaLeapAt) return false;
+
+        const away = Vector2.subtract(this.owner.position, target.position);
+        const targetDistance = away.length();
+        if (targetDistance <= 0.001) return false;
+
+        const config = ELEMENTALIST_CONFIG.manaLeap;
+        const rangeBuffer = this.owner.radius * config.rangeBufferRadiusMultiplier;
+        const availableDistance = Math.max(0, ELEMENTALIST_CONFIG.channelRange - targetDistance - rangeBuffer);
+        const maximumDistance = this.owner.radius * config.maximumDistanceRadiusMultiplier;
+        const leapDistance = Math.min(maximumDistance, availableDistance);
+        if (leapDistance <= 0) return false;
+
+        this.owner.initiateDash(away.normalize(), {
+            duration: config.duration,
+            multiplier: 1,
+            speedOverride: leapDistance / config.duration,
+            color: "#8fdcff",
+            collisionDamage: 0,
+            collisionLabel: "Mana Leap",
+            showRing: false
+        });
+        this.nextManaLeapAt = this.simulation.elapsed + config.retriggerCooldown;
+        this.simulation.spawnParticleBurst(this.owner.position.clone(), "#8fdcff", {
+            count: 10,
+            speed: 135,
+            radiusMin: 2,
+            radiusMax: 4
+        });
+        this.simulation.playSound("dash", 0.85);
+        return true;
     }
 
     _createChannel({ elements, recipe, target, wetSnapshot }) {
@@ -435,10 +478,11 @@ export class ElementalistAbility extends Ability {
     }
 
     applyOwnerMagnet(orb, delta, graceActive) {
-        if (!this.getLevelUpgrade().orbitalFusion || graceActive) return;
+        const radiusMultiplier = this.getLevelUpgrade().ownerMagnetRadiusMultiplier;
+        if (!radiusMultiplier || graceActive) return;
         const config = ELEMENTALIST_CONFIG.ownerMagnet;
         applyMagneticAttraction(orb, this.owner, delta, {
-            radius: this.owner.radius * config.radiusMultiplier,
+            radius: this.owner.radius * radiusMultiplier,
             responseRate: config.responseRate,
             attractionSpeed: config.attractionSpeed
         });

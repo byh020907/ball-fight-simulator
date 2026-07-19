@@ -22875,8 +22875,10 @@ function testElementalistRebirthSubActionLoop() {
     assert.equal(subAbility.abilityTier, 3);
     assert.equal(subAbility.cooldown, 1.5);
     assert.deepEqual(subAbility.getLevelUpgrade(), {
+        ownerMagnetRadiusMultiplier: 3,
         wetDuration: 2.5,
         dualOrbChance: 0.3,
+        manaLeap: true,
         orbitalFusion: true
     });
     const sibling = simulation.createAbility(FIGHTER_IDS.ELEMENTALIST, owner, {
@@ -24362,15 +24364,15 @@ function testElementalistFusionChannelsAndCleanup() {
     const magnetOrb = new ElementalOrb({
         owner,
         element: "earth",
-        position: new Vector2(owner.position.x + owner.radius * 2 + 1, owner.position.y),
+        position: new Vector2(owner.position.x + owner.radius * 3 + 1, owner.position.y),
         targetMemory: enemy,
         ability
     });
     ability.applyOwnerMagnet(magnetOrb, 1 / 60, false);
-    assert.equal(magnetOrb.velocity.length(), 0, "Owner magnet must stop beyond twice the caster radius");
-    magnetOrb.position.x = owner.position.x + owner.radius * 2 - 1;
+    assert.equal(magnetOrb.velocity.length(), 0, "Lv.3+ owner magnet must stop beyond three caster radii");
+    magnetOrb.position.x = owner.position.x + owner.radius * 3 - 1;
     ability.applyOwnerMagnet(magnetOrb, 1 / 60, false);
-    assert.ok(magnetOrb.velocity.length() > 0, "Owner magnet must pull inside twice the caster radius");
+    assert.ok(magnetOrb.velocity.length() > 0, "Lv.3+ owner magnet must pull inside three caster radii");
     const expires = simulation.elapsed + 4;
     const first = new ElementalOrb({
         owner,
@@ -24434,6 +24436,68 @@ function testElementalistFusionChannelsAndCleanup() {
 }
 
 testElementalistFusionChannelsAndCleanup();
+
+function testElementalistOwnerMagnetAndManaLeapProgression() {
+    for (const tier of [0, 1]) {
+        const { owner, ability, enemies } = createElementalistSimulation({ tier });
+        const radiusMultiplier = tier === 0 ? 2 : 3;
+        const orb = new ElementalOrb({
+            owner,
+            element: "earth",
+            position: new Vector2(owner.position.x + owner.radius * radiusMultiplier - 1, owner.position.y),
+            targetMemory: enemies[0],
+            ability
+        });
+        orb.collectionGraceRemaining = 0;
+        ability.applyOwnerMagnet(orb, 1 / 60, false);
+        assert.ok(orb.velocity.length() > 0, `Tier ${tier} must pull within its owner magnet radius`);
+
+        orb.applyImpulse(orb.velocity.clone().scale(-1));
+        orb.position.x = owner.position.x + owner.radius * radiusMultiplier + 1;
+        ability.applyOwnerMagnet(orb, 1 / 60, false);
+        assert.equal(orb.velocity.length(), 0, `Tier ${tier} must stop pulling beyond its owner magnet radius`);
+    }
+
+    const { simulation, owner, ability, enemies } = createElementalistSimulation({ tier: 2 });
+    const [target] = enemies;
+    owner.position = new Vector2(300, 300);
+    target.position = new Vector2(500, 300);
+    owner.applyImpulse(owner.velocity.clone().scale(-1));
+    const orb = new ElementalOrb({
+        owner,
+        element: "wind",
+        position: owner.position.clone(),
+        targetMemory: target,
+        ability
+    });
+    ability.activeOrbs.push(orb);
+    simulation.entities.push(orb);
+    ability.consumeOrbByOwner(orb);
+    assert.ok(owner.velocity.x < 0, "Lv.6 mana leap must move directly away from the selected channel target");
+    assert.ok(owner.state.movement, "Lv.6 mana leap must use the shared movement effect path");
+    assert.equal(ability.activeChannels.length, 1, "Mana leap must preserve the recovered orb channel");
+
+    owner.clearDash();
+    owner.applyImpulse(owner.velocity.clone().scale(-1));
+    const secondOrb = new ElementalOrb({
+        owner,
+        element: "fire",
+        position: owner.position.clone(),
+        targetMemory: target,
+        ability
+    });
+    ability.activeOrbs.push(secondOrb);
+    simulation.entities.push(secondOrb);
+    ability.consumeOrbByOwner(secondOrb);
+    assert.equal(owner.state.movement, null, "Simultaneous orb pickups must not stack mana leaps");
+    assert.equal(ability.activeChannels.length, 2, "Leap retrigger protection must not suppress the second channel");
+
+    target.position = new Vector2(owner.position.x + ELEMENTALIST_CONFIG.channelRange + 1, owner.position.y);
+    assert.equal(ability._isValidTarget(target), false, "Elementalist channels must end beyond the reduced range");
+    console.log("[elementalist-owner-magnet-mana-leap-progression] ok");
+}
+
+testElementalistOwnerMagnetAndManaLeapProgression();
 
 function testElementalistOwnerMagnetLiveUpdate() {
     const { simulation, owner, ability, enemies } = createElementalistSimulation({ tier: 3 });

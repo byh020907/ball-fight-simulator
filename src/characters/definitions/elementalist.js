@@ -7,7 +7,7 @@ export default createCharacterDefinition({
     name: "Elementalist Ball",
     title: "Elemental Confluence",
     description:
-        "물 에너지 볼이 적중한 자리에서 원소 오브를 방출합니다. 회수한 오브의 원소와 젖음 상태에 따라 단일 대상 주문을 완성합니다.",
+        "물 에너지 볼이 적중한 자리에서 원소 오브를 방출합니다. 가까운 오브를 끌어당겨 회수하고 원소와 젖음 상태에 따라 단일 대상 주문을 완성합니다.",
     color: "#34425f",
     abilityDisplayName: "Elementalist",
     abilityClass: ElementalistAbility,
@@ -18,7 +18,7 @@ export default createCharacterDefinition({
         {
             level: 3,
             abilityTier: 1,
-            gameText: "젖음 2.5초 · 원 피격자 우선 원소 반응"
+            gameText: "젖음 2.5초 · 원 피격자 우선 · 오브 자성 3배"
         },
         {
             level: 4
@@ -29,7 +29,7 @@ export default createCharacterDefinition({
         {
             level: 6,
             abilityTier: 2,
-            gameText: "30% 확률로 서로 다른 원소 오브 2개"
+            gameText: "30% 이중 오브 · 회수 시 마력 도약"
         },
         {
             level: 7
@@ -40,20 +40,25 @@ export default createCharacterDefinition({
         {
             level: 9,
             abilityTier: 3,
-            gameText: "같은 시전자 오브 자성 · 10종 원소 융합"
+            gameText: "서로 다른 오브 간 자성 · 10종 원소 융합"
         },
         {
             level: 10
         }
     ],
     abilityUpgrade: {
+        base: {
+            ownerMagnetRadiusMultiplier: 2
+        },
         tiers: [
             {},
             {
-                wetDuration: 2.5
+                wetDuration: 2.5,
+                ownerMagnetRadiusMultiplier: 3
             },
             {
-                dualOrbChance: 0.3
+                dualOrbChance: 0.3,
+                manaLeap: true
             },
             {
                 orbitalFusion: true
