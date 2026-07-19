@@ -773,6 +773,7 @@ export class BattleApp {
                 hpPct: 100,
                 shield: 0,
                 shieldPct: 0,
+                lifeSlots: [],
                 statLine: isHero
                     ? formatHeroStatLine(fighter.stats.allocation ?? {})
                     : formatStatAllocation(fighter.stats.allocation ?? {}),
@@ -818,6 +819,7 @@ export class BattleApp {
                 shield,
                 maximumShield: shieldState.maximum
             });
+            const lifeState = this.simulation?.getCombatLifeState(fighter.id);
             return {
                 ...card,
                 hp: Math.ceil(fighter.hp),
@@ -825,6 +827,9 @@ export class BattleApp {
                 hpPct: healthBar.hpPct,
                 shield: Math.ceil(shield),
                 shieldPct: healthBar.shieldPct,
+                lifeSlots: lifeState
+                    ? Array.from({ length: lifeState.total }, (_, index) => index < lifeState.remaining)
+                    : [],
                 defeated: fighter.flags.defeated,
                 mergedBonuses: bonuses,
                 statLine: isHero
@@ -1154,6 +1159,10 @@ export class BattleApp {
                 },
                 onResultResolved: (winner, context) => {
                     options.onResultResolved?.(winner, context);
+                },
+                onPlayerRevived: (fighter, context) => {
+                    this.showTransientOverlay(context.remaining === 1 ? "마지막 부활" : "부활 · 1회 남음", "", 900);
+                    options.onPlayerRevived?.(fighter, context);
                 }
             },
             null,
@@ -1165,6 +1174,7 @@ export class BattleApp {
                 hostileAbsenceGraceTeamId: options.hostileAbsenceGraceTeamId,
                 arenaTheme: options.arenaTheme ?? null,
                 terrain: options.terrain ?? [],
+                playerLives: options.playerLives ?? null,
                 tournamentAngledBounceRamps: this.currentTournamentMatch
                     ? {
                           enabled: true,

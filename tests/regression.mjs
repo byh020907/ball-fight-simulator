@@ -86,7 +86,8 @@ import {
     predictNextWallCollision,
     TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS
 } from "../src/tournament/angledBounceRamps.js";
-import { Ability, AbilitySet, ElementalistAbility } from "../src/abilities/index.js";
+import { Ability, AbilitySet, DeepCoreBossAbility, ElementalistAbility } from "../src/abilities/index.js";
+import { DEEP_CORE_CONFIG } from "../src/abilities/deepCoreBossAbility.js";
 import {
     ELEMENTALIST_CONFIG,
     ELEMENTAL_COMPOSITE_RECIPES,
@@ -194,6 +195,8 @@ import {
     createHuntingBossMobSpec,
     createHuntingMobSpec,
     createHuntingMobEncounter,
+    createHuntingFinalBossSpec,
+    hasDedicatedHuntingFinalBoss,
     applyHuntingRunAchievementProgress,
     recordHuntingBattleStart,
     recordHuntingBattleVictory,
@@ -17100,7 +17103,11 @@ async function testCreateCollectionHubViewModel() {
 
     assert.equal(vm.rosterSize, roster.length, "rosterSize should match");
     assert.equal(vm.rosterItems.length, roster.length, "rosterItems should include all characters");
-    assert.equal(vm.monsterCodexItems.length, 14, "Monster codex should include every defined monster type");
+    assert.equal(
+        vm.monsterCodexItems.length,
+        Object.keys(HUNTING_MONSTER_BASE_SPECS).length + 1,
+        "Monster codex should include normal monsters and the dedicated cave boss"
+    );
     assert.ok(
         vm.monsterCodexItems.every((item) => !item.isDiscovered),
         "Monster codex should keep unencountered monsters hidden by default"
@@ -24978,5 +24985,123 @@ function testReusableCapabilityContracts() {
 }
 
 testReusableCapabilityContracts();
+
+function createDeepCoreTestPlayer() {
+    return {
+        id: "deep-core-test-player",
+        name: "Test Player",
+        title: "",
+        color: "#55aaff",
+        face: "default",
+        ability: "none",
+        teamId: HUNTING_TEAMS.PLAYER,
+        stats: { hp: 300, damage: 35, speed: 320, radius: 34, mass: 1, defense: 0, skill: 0 }
+    };
+}
+
+function testDeepCoreFinalBossContracts() {
+    assert.equal(hasDedicatedHuntingFinalBoss(HUNTING_STAGE_IDS.CAVE), true);
+    assert.equal(hasDedicatedHuntingFinalBoss(HUNTING_STAGE_IDS.FOREST), false);
+    assert.equal(createHuntingFinalBossSpec({ stageId: HUNTING_STAGE_IDS.FOREST, floor: 100 }), null);
+    const bossSpec = createHuntingFinalBossSpec({ stageId: HUNTING_STAGE_IDS.CAVE, floor: 100 });
+    assert.equal(bossSpec.name, "심층의 핵");
+    assert.equal(bossSpec.ability, "deep_core_boss");
+
+    const revivals = [];
+    const simulation = new BattleSimulation(
+        [createDeepCoreTestPlayer(), bossSpec],
+        {
+            onLog() {},
+            onSound() {},
+            onPlayerRevived(_fighter, state) {
+                revivals.push(state.remaining);
+            }
+        },
+        null,
+        { playerLives: { playerId: "deep-core-test-player", total: 3 } }
+    );
+    const player = simulation.fighters[0];
+    const boss = simulation.fighters[1];
+    const bossAbility = boss.ability;
+    assert.ok(bossAbility instanceof DeepCoreBossAbility);
+    const bossHp = boss.hp;
+
+    player.takeDamage(player.maxHp * 2, boss, "Life Probe", { ignoreDefense: true, suppressDamageNumber: true });
+    assert.equal(player.hp, player.maxHp);
+    assert.equal(simulation.finished, false);
+    assert.equal(boss.hp, bossHp, "Player revival must not reset or mutate boss health");
+    simulation.update(0.55, 0.55);
+    simulation.update(0.81, 0.81);
+    player.takeDamage(player.maxHp * 2, boss, "Life Probe", { ignoreDefense: true, suppressDamageNumber: true });
+    assert.deepEqual(revivals, [2, 1]);
+    simulation.update(0.55, 0.55);
+    simulation.update(0.81, 0.81);
+    player.takeDamage(player.maxHp * 2, boss, "Life Probe", { ignoreDefense: true, suppressDamageNumber: true });
+    simulation.checkResult();
+    assert.equal(simulation.finished, true, "Third lethal hit must resolve the normal defeat flow");
+
+    const armorSimulation = new BattleSimulation(
+        [createDeepCoreTestPlayer(), createHuntingFinalBossSpec({ stageId: HUNTING_STAGE_IDS.CAVE, floor: 100 })],
+        { onLog() {}, onSound() {} }
+    );
+    const armorBoss = armorSimulation.fighters[1];
+    const armorAbility = armorBoss.ability;
+    const source = armorSimulation.fighters[0];
+    armorBoss.applyImpulse(new Vector2(120, 0));
+    armorAbility.onFighterStaticCollision(armorBoss, {
+        wall: true,
+        contactPoint: Vector2.add(armorBoss.position, new Vector2(armorBoss.radius, 0))
+    });
+    assert.equal(armorBoss.velocity.length(), 0, "Wall stun must stop the boss through the physics API");
+    assert.equal(armorAbility.state.wallStunRemaining, DEEP_CORE_CONFIG.wallStunDuration);
+    armorAbility.update(DEEP_CORE_CONFIG.wallStunDuration, source);
+    assert.equal(armorAbility.state.wallStunRemaining, 0);
+    const armorDistance = armorBoss.radius * 3;
+    for (const angle of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
+        source.position = Vector2.add(armorBoss.position, Vector2.fromAngle(angle, armorDistance));
+        armorAbility.absorbIncomingDamage(armorAbility.state.armorHp, source);
+    }
+    assert.ok(armorAbility.state.armor.every((hp) => hp <= 0));
+    assert.equal(armorAbility.state.vulnerableRemaining, DEEP_CORE_CONFIG.vulnerableDuration);
+    armorAbility.update(DEEP_CORE_CONFIG.vulnerableDuration, source);
+    assert.equal(
+        armorAbility.state.armor.filter((hp) => hp > 0).length,
+        1,
+        "Vulnerability completion must restore exactly one armor piece"
+    );
+
+    const repairArmorIndex = armorAbility.state.armor.findIndex((hp) => hp > 0);
+    armorAbility.state.armor[repairArmorIndex] = 0;
+    armorAbility.cooldowns.clear("summon");
+    armorAbility.update(0, source);
+    const summons = armorSimulation.fighters.filter((fighter) => fighter.hunting?.isDeepCoreSummon);
+    assert.equal(summons.length, DEEP_CORE_CONFIG.summonBatch);
+    assert.ok(summons.every((summon) => summon.hunting.suppressLootDrop && summon.hunting.lootMultiplier === 0));
+    summons[0].position = Vector2.add(armorBoss.position, new Vector2(armorBoss.radius + summons[0].radius, 0));
+    armorAbility.update(0, source);
+    armorAbility.update(DEEP_CORE_CONFIG.repairAbsorbDuration, source);
+    assert.equal(armorAbility.state.armor.filter((hp) => hp > 0).length, 1);
+    assert.equal(armorSimulation.fighters.includes(summons[0]), false, "Absorbed summon must leave combat collections");
+
+    const lootSession = new HuntingBattleLootSession({ playerId: source.id, floor: 100 });
+    const lootController = new HuntingLootDropController({ session: lootSession, rng: () => 0 });
+    armorBoss.hunting.experienceReward = 100;
+    lootController.onFighterDefeated(armorBoss, { simulation: armorSimulation });
+    assert.ok(
+        armorSimulation.entities.some((entity) => entity.chest),
+        "Final boss must always create one high-grade chest drop"
+    );
+
+    const fighterStrip = readFileSync(new URL("../src/components/fighter-strip.html", import.meta.url), "utf8");
+    assert.match(fighterStrip, /combat-life-dots/);
+    assert.doesNotMatch(
+        fighterStrip.match(/\.combat-life-dots\s*\{[\s\S]*?\}/)?.[0] ?? "",
+        /width:\s*\d+px/,
+        "Life HUD must not add a fixed-width container"
+    );
+    console.log("[deep-core-final-boss-contracts] ok");
+}
+
+testDeepCoreFinalBossContracts();
 
 console.log("regression tests ok");

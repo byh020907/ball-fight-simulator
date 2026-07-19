@@ -34,6 +34,7 @@ import {
     createHuntingMinibossSpec,
     createHuntingMobEncounter
 } from "./huntingMonsters.js";
+import { createHuntingFinalBossSpec } from "./huntingFinalBossRegistry.js";
 import { createEliteMobEncounter } from "./eliteMobEncounter.js";
 import {
     ELITE_MOB_COMBINATIONS,
@@ -454,8 +455,11 @@ export class HuntingManager {
                   monsterTypes: run.lastEvent.monsterTypes
               })
             : createHuntingMobEncounter({ floor: run.floor, stageId: run.stageId });
+        const dedicatedFinalBoss = isFinalBoss
+            ? createHuntingFinalBossSpec({ stageId: run.stageId, floor: run.floor })
+            : null;
         const rosterMiniboss =
-            isFinalBoss || isChampion
+            (isFinalBoss && !dedicatedFinalBoss) || isChampion
                 ? createHuntingMinibossSpec({
                       roster: getEligibleRoster(
                           app.playerProfile,
@@ -475,8 +479,12 @@ export class HuntingManager {
         const monsterMiniboss = run.lastEncounter?.isMiniboss
             ? createHuntingBossMobSpec({ floor: run.floor, stageId: run.stageId })
             : null;
-        const miniboss = rosterMiniboss ?? monsterMiniboss;
-        const enemySpecs = miniboss ? [miniboss, ...mobSpecs.slice(0, Math.max(1, mobSpecs.length - 1))] : mobSpecs;
+        const miniboss = dedicatedFinalBoss ?? rosterMiniboss ?? monsterMiniboss;
+        const enemySpecs = dedicatedFinalBoss
+            ? [dedicatedFinalBoss]
+            : miniboss
+              ? [miniboss, ...mobSpecs.slice(0, Math.max(1, mobSpecs.length - 1))]
+              : mobSpecs;
         this._run = {
             ...recordHuntingBattleStart(run, {
                 enemySpecs,
@@ -525,6 +533,7 @@ export class HuntingManager {
             terrain,
             experienceProgressionByFighter: new Map([[run.characterId, playerProgression]]),
             rebirthLoadoutByFighter: new Map([[run.characterId, rebirthLoadout]]),
+            playerLives: isFinalBoss ? { playerId: run.characterId, total: 3 } : null,
             onFighterDefeated: (fighter, context) => lootDropController.onFighterDefeated(fighter, context),
             onResultResolved: (winner, context) =>
                 this._handleHuntingResultResolved(lootDropController, winner, context)
@@ -863,9 +872,13 @@ export class HuntingManager {
     }
 
     _handleFinalBossFloor({ app, floor }) {
-        const message = this._withFloorRecoveryFeedback(`${floor}층 — 최종 보스!`);
-        app.addLog(`[사냥터] ${message}`);
-        this._stopHuntingMoveForBattle(app, message);
+        const bossName = createHuntingFinalBossSpec({ stageId: this._run?.stageId, floor })?.name;
+        const message = this._withFloorRecoveryFeedback(bossName ?? `${floor}층 — 최종 보스!`);
+        app.addLog(`[사냥터] ${floor}층 · 최종보스${bossName ? ` · ${bossName}` : ""}`);
+        this._stopHuntingMoveForBattle(app, message, {
+            label: bossName ? `${floor}층 · 최종보스` : "전투 준비",
+            subtext: "물약을 준비하거나 전투를 시작하세요."
+        });
         return HUNTING_ROUTE_ACTIONS.STOP;
     }
 
@@ -1408,7 +1421,7 @@ export class HuntingManager {
             {
                 id: "summary",
                 label: "스테이지 클리어",
-                text: `${stage.name} 보스 격파`,
+                text: `${stage.name} 정복`,
                 subtext: stageResult.unlockedStageId
                     ? `${getHuntingStage(nextStageId).name} 해금 · 파편 ${securedShards} 확보`
                     : `파편 ${securedShards} 확보`

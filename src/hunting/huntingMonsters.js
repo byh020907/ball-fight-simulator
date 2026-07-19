@@ -456,3 +456,19 @@ export function createHuntingMinibossSpec({
         { enemyType }
     );
 }
+
+export function createCaveFinalBossSpec({ floor = 100 } = {}) {
+    return {
+        id: `cave-deep-core-f${safeFloor(floor)}`,
+        name: "심층의 핵",
+        title: "심층의 핵",
+        description: "암석 갑각으로 핵을 보호하는 동굴의 최종보스입니다.",
+        color: "#f0a34a",
+        face: "angry",
+        ability: "deep_core_boss",
+        teamId: HUNTING_TEAMS.ENEMY,
+        stats: { hp: 1450, damage: 19, speed: 185, radius: 58, mass: 2.8, defense: 3, skill: 0 },
+        appearance: { sides: 0, face: "angry" },
+        hunting: { isMiniboss: true, isFinalBoss: true, stageSkin: HUNTING_STAGE_IDS.CAVE, lootMultiplier: 0 }
+    };
+}

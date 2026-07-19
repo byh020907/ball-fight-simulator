@@ -130,6 +130,7 @@ this.debug = {
 | `Cooldown`                        | 쿨다운이 있다 (`tickCooldown`, `cooldownReady`, `cooldownRemaining`)                                      | 모든 Ability, AIActionController                                             |
 | `CooldownBank` (composition)      | 한 소유자의 이름 기반 복수 쿨타임을 독립 관리한다 (`tick`, `reset`, `consume`)                           | 복수 제한 시간을 가진 Ability/BattleBall                                    |
 | `TimedKeyMap` (composition)       | 대상별로 동적 생성되는 제한 시간을 관리하고 만료 키를 제거한다 (`start`, `has`, `tick`)                 | 대상별 재타격·재발동 제한                                                    |
+| `CombatLifePool` (composition)    | 한 전투에서 특정 전투원의 총 생명·남은 생명과 치명 피해 소비 여부를 관리한다                           | 최종보스처럼 전투 종료 전에 추가 생명을 소비하는 규칙                       |
 | `ProjectileBehavior`              | 발사체다 (owner, updateProjectile, hit 판정)                                                              | Arrow/Bat/Bullet/Orbit/ElementalWaterBolt/HeroShieldShard                    |
 | `BurstSequencer`                  | 연발 발사한다 (`startBurst`, `tickBurst`, `BURST_RESULTS`)                                                | GrenadeAbility, GunnerAbility                                                |
 | `EntityAttachment`                | 다른 엔티티의 위치를 값 복사로 추적한다 (`attachToEntity`, `syncAttachedPosition`)                        | 대상·시전자에 붙는 전투 VFX                                                  |

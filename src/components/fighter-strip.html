@@ -7,6 +7,11 @@
                     <span class="fighter-title" x-text="fighter.title"></span>
                     <span x-text="fighter.isPlayer ? '내 배분' : 'AI 배분'"></span>
                 </div>
+                <div class="combat-life-dots" x-show="fighter.lifeSlots?.length" aria-label="남은 생명">
+                    <template x-for="(filled, index) in fighter.lifeSlots" :key="index">
+                        <span class="combat-life-dot" x-bind:class="{ filled }"></span>
+                    </template>
+                </div>
             </div>
             <div class="hp-bar">
                 <div
@@ -94,9 +99,28 @@
 
     .fighter-head {
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
+        gap: 0.2em;
         min-width: 0;
+    }
+
+    .combat-life-dots {
+        display: flex;
+        gap: 0.2em;
+    }
+
+    .combat-life-dot {
+        inline-size: 0.5em;
+        aspect-ratio: 1;
+        border: 1px solid #202020;
+        border-radius: 50%;
+        background: #ffffff;
+    }
+
+    .combat-life-dot.filled {
+        background: #ff5a4f;
     }
 
     .fighter-meta {

@@ -14,6 +14,7 @@ import {
     getDailyShop,
     HUNTING_DEBUG_ENCOUNTER_TYPES,
     getHuntingMonsterDefinitions,
+    getHuntingFinalBossCodexDefinitions,
     previewHuntingChest
 } from "../hunting/index.js";
 import { HUNTING_EVENT_TYPES, HUNTING_MAX_FLOOR, HUNTING_STAGES } from "../hunting/huntingConfig.js";
@@ -103,7 +104,7 @@ function createMonsterCodexItems(hunting) {
     const visitedStageIds = new Set(hunting.stats?.visitedStageIds ?? []);
     const baseDefinitions = getHuntingMonsterDefinitions();
 
-    return baseDefinitions.map((base) => {
+    const monsterItems = baseDefinitions.map((base) => {
         const record = monsterCodexByType[base.type] ?? null;
         const rarity = getMonsterRarity(base);
         const regions = HUNTING_STAGES.filter((stage) => visitedStageIds.has(stage.id)).map((stage) => {
@@ -140,6 +141,39 @@ function createMonsterCodexItems(hunting) {
             regions
         };
     });
+    const clearedStageIds = new Set(hunting.stats?.clearedStageIds ?? []);
+    const bossItems = getHuntingFinalBossCodexDefinitions().map((boss) => {
+        const isDiscovered = clearedStageIds.has(boss.stageId);
+        const stage = HUNTING_STAGES.find((candidate) => candidate.id === boss.stageId);
+        return {
+            id: boss.id,
+            type: boss.type,
+            name: boss.name,
+            color: boss.color,
+            faceLabel: MONSTER_FACE_LABELS[boss.face] ?? "o",
+            rarity: boss.rarity,
+            rarityLabel: getRarityLabel(boss.rarity),
+            isDiscovered,
+            kills: isDiscovered ? 1 : 0,
+            firstEncounterFloor: isDiscovered ? HUNTING_MAX_FLOOR : null,
+            lastEncounterFloor: isDiscovered ? HUNTING_MAX_FLOOR : null,
+            regions: [
+                {
+                    id: boss.stageId,
+                    name: stage?.name ?? boss.stageId,
+                    isDiscovered,
+                    color: boss.color,
+                    faceLabel: MONSTER_FACE_LABELS[boss.face] ?? "o",
+                    behaviorDescription: boss.behaviorDescription,
+                    stats: boss.stats,
+                    kills: isDiscovered ? 1 : 0,
+                    firstEncounterFloor: isDiscovered ? HUNTING_MAX_FLOOR : null,
+                    lastEncounterFloor: isDiscovered ? HUNTING_MAX_FLOOR : null
+                }
+            ]
+        };
+    });
+    return [...monsterItems, ...bossItems];
 }
 
 /**

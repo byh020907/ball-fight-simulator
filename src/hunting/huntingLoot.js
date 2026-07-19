@@ -293,7 +293,10 @@ export class HuntingLootDropController {
         if (bonusType) this._spawnLootItem(bonusType, fighter, collector, rarity, lootMultiplier, simulation);
         const experience = this._spawnExperienceDrops(fighter, collector, simulation);
         const enhancementStones = isMiniboss ? this._spawnEnhancementStoneDrops(fighter, collector, simulation) : [];
-        return shards[0] ?? experience[0] ?? enhancementStones[0] ?? null;
+        const finalBossChest = fighter.hunting.isFinalBoss
+            ? this._spawnLootItem(HUNTING_LOOT_ITEM_TYPES.HIGH_CHEST, fighter, collector, "epic", 1, simulation)
+            : null;
+        return shards[0] ?? experience[0] ?? enhancementStones[0] ?? finalBossChest ?? null;
     }
 
     _spawnGuaranteedShardDrops(fighter, collector, rarity, lootMultiplier, simulation) {

@@ -515,6 +515,9 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
 
     takeDamage(amount, source, label = "Hit", options = {}) {
         if (this.flags.defeated) return { actualDamage: 0, absorbedDamage: 0, isCritical: false };
+        if (this.state.damageImmunityUntil && this.simulation?.elapsed < this.state.damageImmunityUntil) {
+            return { actualDamage: 0, absorbedDamage: 0, isCritical: false };
+        }
         const isCritical = source && source !== this && this.rollCritical(source);
         if (isCritical) {
             amount = Math.round(amount * 2);
@@ -558,6 +561,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         }
         if (this.hp <= 0) {
             const s = source?.simulation ?? this.simulation;
+            if (s?.tryConsumePlayerLife?.(this)) return { actualDamage, absorbedDamage, isCritical };
             const defeatContext = { source, label, simulation: s };
             const suppressLootDrop = this.abilities.onOwnerDefeated(defeatContext);
             this.flags.defeated = true;

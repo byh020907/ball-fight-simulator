@@ -177,6 +177,10 @@ export class HuntingMobAbility extends Ability {
 
     update(delta, target) {
         this._clearInvalidConnectionTargets();
+        if (this.owner.hunting?.isReturning) {
+            this.state.link = null;
+            return;
+        }
         if (!this._isActiveConnectionTarget(target)) {
             if (this.behavior === "boomerang" && this.state.boomerang) this._tickBoomerang(delta, null);
             return;

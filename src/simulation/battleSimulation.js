@@ -1,11 +1,18 @@
 import { Vector2 } from "../core.js";
 import { getAbilityDisplayName } from "../abilities/abilityMetadata.js";
 import { getContactDamageSpeed } from "../physics/contactDamage.js";
-import { Ability, AbilitySet, HuntingMeleeAbility, HuntingMobAbility } from "../abilities/index.js";
+import {
+    Ability,
+    AbilitySet,
+    DeepCoreBossAbility,
+    HuntingMeleeAbility,
+    HuntingMobAbility
+} from "../abilities/index.js";
 import { BattleBall } from "../entities/index.js";
 import { GravityParticle } from "../effects/index.js";
 import { FighterPhysicsSimulation } from "./fighterPhysicsSimulation.js";
 import { AIActionController } from "./aiActionController.js";
+import { CombatLifePool } from "./combatLifePool.js";
 import {
     createTournamentAngledBounceRampPolicy,
     TournamentAngledBounceRampSystem
@@ -14,7 +21,8 @@ import {
 const NON_CHARACTER_ABILITY_TYPES = Object.freeze({
     none: Ability,
     hunting_melee: HuntingMeleeAbility,
-    hunting_mob: HuntingMobAbility
+    hunting_mob: HuntingMobAbility,
+    deep_core_boss: DeepCoreBossAbility
 });
 
 const ANTI_STALL_INTERVAL = 8;
@@ -56,6 +64,13 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         this.hostileAbsenceGraceDuration = Math.max(0, options.hostileAbsenceGraceDuration ?? 0);
         this.hostileAbsenceGraceTeamId = options.hostileAbsenceGraceTeamId ?? null;
         this._hostileAbsenceElapsed = 0;
+        this.combatLifePool = options.playerLives
+            ? new CombatLifePool({
+                  fighterId: options.playerLives.playerId,
+                  total: options.playerLives.total ?? options.playerLives.remaining
+              })
+            : null;
+        this.revivePauseRemaining = 0;
         this._tournamentAngledBounceRampSystem = this._createTournamentAngledBounceRampSystem(options);
 
         // ── 클릭 액션 시스템 ──
@@ -227,6 +242,16 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         return replacements.map(({ spec, position }) => this.spawnFighter(spec, position));
     }
 
+    despawnFighter(fighter) {
+        const fighterIndex = this.fighters.indexOf(fighter);
+        if (fighterIndex < 0) return false;
+        fighter.flags.defeated = true;
+        fighter.flags.destroyed = true;
+        fighter.isExpired = true;
+        this.fighters.splice(fighterIndex, 1);
+        return true;
+    }
+
     isOvertime() {
         return this.elapsed >= this.overtimeStartsAt;
     }
@@ -270,6 +295,10 @@ export class BattleSimulation extends FighterPhysicsSimulation {
     update(delta, realDelta = delta) {
         if (this.finished) {
             this.updateResultEffects(delta);
+            return;
+        }
+        if (this.revivePauseRemaining > 0) {
+            this.revivePauseRemaining = Math.max(0, this.revivePauseRemaining - realDelta);
             return;
         }
 
@@ -714,6 +743,26 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         }
         this._hostileAbsenceElapsed += Math.max(0, delta);
         if (this._hostileAbsenceElapsed >= this.hostileAbsenceGraceDuration) this.resolveResult(alive[0]);
+    }
+
+    tryConsumePlayerLife(fighter) {
+        const lifeState = this.combatLifePool?.consume(fighter);
+        if (!lifeState) return false;
+        fighter.hp = fighter.maxHp;
+        fighter.flags.defeated = false;
+        fighter.flags.destroyed = false;
+        fighter.freezeForResult();
+        fighter.position = this.createSpawnPoints(2)[0];
+        fighter.state.damageImmunityUntil = this.elapsed + 0.8;
+        this.revivePauseRemaining = 0.55;
+        this.spawnPulse(fighter.position.clone(), fighter.color);
+        this.hooks.onHpChanged?.(fighter.id, fighter.hp, fighter.maxHp);
+        this.hooks.onPlayerRevived?.(fighter, { ...lifeState, simulation: this });
+        return true;
+    }
+
+    getCombatLifeState(fighterId) {
+        return this.combatLifePool?.getState(fighterId) ?? null;
     }
 
     resolveResult(winner) {

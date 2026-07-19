@@ -16,6 +16,7 @@ export { PhantomAbility } from "./phantomAbility.js";
 export { ElementalistAbility } from "./elementalistAbility.js";
 export { HuntingMeleeAbility } from "./huntingMeleeAbility.js";
 export { HuntingMobAbility } from "./huntingMobAbility.js";
+export { DeepCoreBossAbility } from "./deepCoreBossAbility.js";
 
 import { Ability } from "./ability.js";
 import { CHARACTER_DEFINITIONS } from "../characters/characterRegistry.js";
