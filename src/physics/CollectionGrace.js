@@ -9,8 +9,12 @@ export default function CollectionGrace(Base) {
             this.collectionGraceRemaining = Math.max(0, Number.isFinite(duration) ? duration : 0);
         }
 
+        isCollectionGraceActive() {
+            return this.collectionGraceRemaining > 0;
+        }
+
         tickCollectionGrace(delta) {
-            if (this.collectionGraceRemaining <= 0) return false;
+            if (!this.isCollectionGraceActive()) return false;
             this.collectionGraceRemaining = Math.max(
                 0,
                 this.collectionGraceRemaining - (Number.isFinite(delta) ? Math.max(0, delta) : 0)

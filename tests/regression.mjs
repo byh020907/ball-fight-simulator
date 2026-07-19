@@ -23889,6 +23889,11 @@ function testElementalistFusionChannelsAndCleanup() {
     ability.activeOrbs.push(differentElementFirst, differentElementSecond);
     simulation.entities.push(differentElementFirst, differentElementSecond);
     ability._processOrbInteractions(1 / 60);
+    assert.equal(differentElementFirst.velocity.length(), 0, "Freshly released orbs must ignore fusion magnetism");
+    assert.equal(differentElementSecond.velocity.length(), 0, "Collection grace must also be pair-magnet grace");
+    differentElementFirst.collectionGraceRemaining = 0;
+    differentElementSecond.collectionGraceRemaining = 0;
+    ability._processOrbInteractions(1 / 60);
     assert.ok(differentElementFirst.velocity.length() > 0, "Different-element orbs must keep fusion magnetism");
     assert.ok(differentElementSecond.velocity.length() > 0, "Fusion partners must keep mutual attraction");
     differentElementFirst.expire();

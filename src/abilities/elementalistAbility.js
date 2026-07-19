@@ -348,7 +348,8 @@ export class ElementalistAbility extends Ability {
         for (const [index, orb] of normals.entries()) {
             for (const other of normals.slice(index + 1)) {
                 if (orb.isExpired || other.isExpired) continue;
-                if (orb.element !== other.element) this._applyOrbPairMagnet(orb, other, delta);
+                const magnetGraceActive = orb.isCollectionGraceActive() || other.isCollectionGraceActive();
+                if (orb.element !== other.element && !magnetGraceActive) this._applyOrbPairMagnet(orb, other, delta);
                 this._resolveOrbPairContact(orb, other);
             }
         }
