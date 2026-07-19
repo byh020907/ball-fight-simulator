@@ -75,8 +75,7 @@ import {
     BloodTetherEffect,
     ELEMENTAL_CHANNEL_VISUAL_CONFIG,
     ElementalChannelEffect,
-    ElementalWetEffect,
-    shouldDrawElementalChannelPath
+    ElementalWetEffect
 } from "../src/effects/index.js";
 import { shuffled } from "../src/random.js";
 import { BattleSimulation } from "../src/simulation/battleSimulation.js";
@@ -23929,15 +23928,6 @@ function testElementalistFusionChannelsAndCleanup() {
 testElementalistFusionChannelsAndCleanup();
 
 function testElementalistChannelVisualGrammar() {
-    assert.equal(shouldDrawElementalChannelPath(["electric"]), true);
-    assert.equal(shouldDrawElementalChannelPath(["fire", "electric"]), true);
-    ["fire", "frost", "wind", "earth"].forEach((element) => {
-        assert.equal(
-            shouldDrawElementalChannelPath([element]),
-            false,
-            `${element} should rely on its elemental VFX without a shared channel path`
-        );
-    });
     const source = { position: new Vector2(120, 180), radius: 24, flags: { defeated: false } };
     const target = { position: new Vector2(280, 180), radius: 30, flags: { defeated: false } };
     const renderSignatures = {
@@ -23979,6 +23969,16 @@ function testElementalistChannelVisualGrammar() {
         const recording = makeRecordingCanvasContext();
         assert.doesNotThrow(() => effect.draw(recording), `${element} channel VFX must render safely`);
         assert.equal(hasSignature(recording), true, `${element} channel VFX must keep its elemental render grammar`);
+        const hasStraightChannelLine = recording.calls.some(
+            ([method, x, y], index, calls) =>
+                method === "moveTo" &&
+                x === source.position.x &&
+                y === source.position.y &&
+                calls[index + 1]?.[0] === "lineTo" &&
+                calls[index + 1]?.[1] === target.position.x &&
+                calls[index + 1]?.[2] === target.position.y
+        );
+        assert.equal(hasStraightChannelLine, false, `${element} should render without the shared channel line`);
         if (element === "fire") {
             const expectedParticleCount =
                 ELEMENTAL_CHANNEL_VISUAL_CONFIG.fire.singleParticleCount +

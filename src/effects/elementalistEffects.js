@@ -1,5 +1,4 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
-import { createWaveringPath } from "./waveringPath.js";
 import { getVisibleLineWidth } from "./effectVisibility.js";
 import { ELEMENTAL_PALETTE } from "../abilities/elementalistRecipes.js";
 import {
@@ -178,52 +177,6 @@ export function drawMultiShapeMotion(ctx, channel, progress) {
     ctx.restore();
 }
 
-export function drawPathFlow(ctx, channel, progress) {
-    const target = channel.target;
-    if (!target) return;
-    const origin = channel.source?.position ?? target.position;
-    const path = channel.recipe?.path ?? "focus";
-    const perpendicular = new Vector2(-(target.position.y - origin.y), target.position.x - origin.x).normalize();
-    const points = createWaveringPath(origin, target.position, {
-        time: progress * 3,
-        maxSegments: 12,
-        offsetAt: ({ index, time }) => {
-            const amplitude = path === "wave" ? 6 : path === "fracture" ? 4 : path === "tangent" ? 3 : 0.8;
-            return Math.sin(index * (path === "fracture" ? 2.8 : 1.7) + time) * amplitude;
-        }
-    });
-    ctx.save();
-    ctx.strokeStyle = channel.colors[0];
-    ctx.lineWidth = getVisibleLineWidth(ctx, "standard", 3);
-    ctx.globalAlpha = channel.pathAlpha ?? 0.72;
-    ctx.beginPath();
-    if (path === "arc" || path === "lob") {
-        const bend = path === "lob" ? 70 : 34;
-        const middle = Vector2.add(origin, target.position).scale(0.5).add(perpendicular.scale(bend));
-        ctx.moveTo(origin.x, origin.y);
-        ctx.quadraticCurveTo(middle.x, middle.y, target.position.x, target.position.y);
-    } else if (path === "spiral") {
-        ctx.arc(
-            target.position.x,
-            target.position.y,
-            target.radius + 12 + progress * 14,
-            progress * Math.PI * 2,
-            progress * Math.PI * 2 + Math.PI * 1.65
-        );
-    } else if (path === "line" || path === "focus") {
-        ctx.moveTo(origin.x, origin.y);
-        ctx.lineTo(target.position.x, target.position.y);
-    } else {
-        points.forEach((point, index) => (index === 0 ? ctx.moveTo(point.x, point.y) : ctx.lineTo(point.x, point.y)));
-    }
-    ctx.stroke();
-    ctx.restore();
-}
-
-export function shouldDrawElementalChannelPath(elements) {
-    return elements?.includes("electric") ?? false;
-}
-
 export function drawAttachedMarker(ctx, channel, progress) {
     const target = channel.target;
     if (!target) return;
@@ -340,7 +293,6 @@ export class ElementalChannelEffect extends CombatEntity {
             shapeAlpha: isSingleFire ? 0.28 : 1
         };
         drawTargetChannelTimeline(ctx, view, progress);
-        if (shouldDrawElementalChannelPath(this.elements)) drawPathFlow(ctx, view, progress);
         drawElementalChannelIdentity(ctx, view, progress, this.visualState);
         drawMultiShapeMotion(ctx, view, progress);
         drawAttachedMarker(ctx, view, progress);
