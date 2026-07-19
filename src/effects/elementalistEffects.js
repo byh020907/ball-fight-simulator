@@ -220,6 +220,10 @@ export function drawPathFlow(ctx, channel, progress) {
     ctx.restore();
 }
 
+export function shouldDrawElementalChannelPath(elements) {
+    return elements?.includes("electric") ?? false;
+}
+
 export function drawAttachedMarker(ctx, channel, progress) {
     const target = channel.target;
     if (!target) return;
@@ -333,11 +337,10 @@ export class ElementalChannelEffect extends CombatEntity {
             colors: this.colors,
             elements: this.elements,
             recipe: this.recipe,
-            pathAlpha: isSingleFire ? 0.24 : 0.72,
             shapeAlpha: isSingleFire ? 0.28 : 1
         };
         drawTargetChannelTimeline(ctx, view, progress);
-        drawPathFlow(ctx, view, progress);
+        if (shouldDrawElementalChannelPath(this.elements)) drawPathFlow(ctx, view, progress);
         drawElementalChannelIdentity(ctx, view, progress, this.visualState);
         drawMultiShapeMotion(ctx, view, progress);
         drawAttachedMarker(ctx, view, progress);

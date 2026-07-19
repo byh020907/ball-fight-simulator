@@ -48,7 +48,8 @@ export {
     drawFinishImpact,
     drawMultiShapeMotion,
     drawPathFlow,
-    drawTargetChannelTimeline
+    drawTargetChannelTimeline,
+    shouldDrawElementalChannelPath
 } from "./elementalistEffects.js";
 export {
     ELEMENTAL_CHANNEL_VISUAL_CONFIG,
