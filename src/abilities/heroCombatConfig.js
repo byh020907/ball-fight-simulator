@@ -6,7 +6,7 @@ export const HERO_COMBAT_CONFIG = Object.freeze({
         releaseFlashDuration: 0.28
     }),
     core: Object.freeze({
-        maximumActivePerOwner: 5,
+        maximumActivePerOwner: 10,
         lifetime: 8,
         speedMinMultiplier: 0.72,
         speedMaxMultiplier: 0.96,

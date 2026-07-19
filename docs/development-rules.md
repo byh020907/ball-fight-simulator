@@ -416,7 +416,7 @@ HeroAbility:               1초 성장 스택 충전(최대 5),
                            완충 뒤 0.5초 간격 무피해 접근 대시,
                            실제 적대 충돌의 스택 소비와 코어 방출,
                            owner 전투 속도 ×0.72~0.96 방출 속도 계산,
-                           owner별 활성 코어 제한(5개), 자석·보호막·반격 상태 소유
+                           owner별 활성 코어 제한(10개), 자석·보호막·반격 상태 소유
 HeroOrb entity:            이동, 충돌 대상 판정, owner/상대 구분,
                            0.16초 직접 회수 유예와 8초 수명,
                            apply() 반환값 기반 획득 텍스트 피드백(spawnActionText)
@@ -449,8 +449,8 @@ BattleBall:                heroOrbBonuses 누적값 보유, 직접적인 Hero Ba
 - 새 effect type을 추가하려면 `HERO_ORB_EFFECTS`에 `{ color, label, apply(owner, context) }`만 등록하면 됩니다.
 - `apply()`는 반드시 `{ applied: boolean, amount: number }`를 반환해야 합니다.
 - `HERO_ORB_STAT_CAP = -1` (기본값, 무한 성장). 0 이상이면 해당 스탯 보너스 상한 도달 시 증가 중단.
-- `HERO_ORB_MAX_ACTIVE_PER_OWNER = 5` — owner 1개체당 성장 코어 최대 5개. 새 코어를 만들기 전에 가장 오래된 활성 코어를 만료한다.
-- 성장 코어 기본 수명은 8초이며 직접 회수·수명 종료·owner별 5개 제한으로 사라집니다.
+- `HERO_ORB_MAX_ACTIVE_PER_OWNER = 10` — owner 1개체당 성장 코어 최대 10개. 새 코어를 만들기 전에 가장 오래된 활성 코어를 만료한다.
+- 성장 코어 기본 수명은 8초이며 직접 회수·수명 종료·owner별 10개 제한으로 사라집니다.
 - 성장 코어 방출 속도: `computeOwnerCombatSpeed()`로 구한 owner 실제 전투 속도 ×0.72~0.96 랜덤 배율.
 - 기본 자석은 `Hero 반지름 ×2 + 코어 반지름`, Lv.3 강화 자석은 `Hero 반지름 ×3 + 코어 반지름`이다. 순간 이동이나 전역 회수로 바꾸지 않는다.
 - Lv.3 보호막은 실제 스탯 적용 성공 때만 최대 HP 5%를 더하고 최대 HP 50%에서 제한한다. 방어 계산 뒤 HP 피해 직전에 흡수한다.

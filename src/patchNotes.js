@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.34.2",
+        date: "2026-07-19",
+        title: "v0.34.2 성장 코어 필드 확장",
+        changes: [
+            {
+                type: "balance",
+                text: "Hero Ball이 전장에 동시에 유지할 수 있는 성장 코어가 소유자당 5개에서 10개로 증가했습니다."
+            }
+        ]
+    },
+    {
         version: "0.34.1",
         date: "2026-07-19",
         title: "v0.34.1 보호막 체력 바",

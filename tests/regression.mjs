@@ -5907,6 +5907,25 @@ function testAbilityLevelUpgrades(app) {
         heroDrawWithoutShield.calls,
         "Active Hero shield should not add persistent world-space decorations"
     );
+    const coreLimitRun = createTierSimulation(FIGHTER_IDS.HERO);
+    for (const index of Array.from({ length: 12 }, (_, value) => value)) {
+        coreLimitRun.ball.ability._spawnCore(
+            "hp",
+            coreLimitRun.ball.position,
+            Vector2.fromAngle((Math.PI * 2 * index) / 12, 1)
+        );
+    }
+    const spawnedCores = coreLimitRun.sim.entities.filter((entity) => entity.constructor?.name === "HeroOrb");
+    assert.equal(
+        spawnedCores.filter((core) => !core.isExpired).length,
+        10,
+        "Hero should retain up to ten active growth cores per owner"
+    );
+    assert.equal(
+        spawnedCores.filter((core) => core.isExpired).length,
+        2,
+        "The oldest growth cores should expire only after the ten-core owner limit is exceeded"
+    );
     console.log("[ability-level-upgrades] ok");
 }
 
@@ -6819,8 +6838,12 @@ function testFiveBallLevelRewardContracts(app) {
         "Hero growth core launch speeds should stay inside the owner combat-speed range"
     );
     const oldestCore = growthCores[0];
+    for (const _ of Array.from({ length: 5 })) {
+        heroAbility._spawnCore("hp", heroRun.owner.position, new Vector2(1, 0));
+    }
+    assert.equal(oldestCore.isExpired, false, "Hero should retain the oldest core while the ten-core limit is full");
     heroAbility._spawnCore("hp", heroRun.owner.position, new Vector2(1, 0));
-    assert.equal(oldestCore.isExpired, true, "Hero should expire the oldest core before exceeding five active cores");
+    assert.equal(oldestCore.isExpired, true, "Hero should expire the oldest core before exceeding ten active cores");
 
     const criticalCore = heroRun.simulation.entities.find(
         (entity) => entity.constructor?.name === "HeroOrb" && !entity.isExpired
