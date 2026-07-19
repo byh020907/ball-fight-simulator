@@ -23881,46 +23881,73 @@ function testElementalistChannelDurationAndDamageCadence() {
         2,
         "Elemental spell channels must remain visible for two seconds"
     );
+    assert.equal(ELEMENTALIST_CONFIG.channelTickInterval, 0.08, "Elemental channels must tick every 0.08 seconds");
+    const maximumTicks = Math.round(ELEMENTALIST_CONFIG.channelDuration / ELEMENTALIST_CONFIG.channelTickInterval);
+    assert.equal(maximumTicks, 25, "A full elemental channel must schedule twenty-five damage ticks");
 
-    const damageTicks = [];
-    enemy.takeDamage = (damage) => damageTicks.push(damage);
-    ability.activeChannels = [
-        ability._createChannel({ elements: ["frost"], recipe: null, target: enemy, wetSnapshot: false })
+    const spells = [
+        ...Object.entries(SINGLE_SPELLS).map(([element, spell]) => ({
+            id: element,
+            elements: [element],
+            recipe: null,
+            multiplier: spell.damageMultiplier
+        })),
+        ...Object.values(ELEMENTAL_COMPOSITE_RECIPES).map((recipe) => ({
+            id: recipe.id,
+            elements: recipe.elements,
+            recipe,
+            multiplier: recipe.damageMultiplier
+        }))
     ];
-    ability._updateChannels(0.01);
-    assert.deepEqual(damageTicks, [], "Frost must no longer front-load its full damage on channel start");
-    ability._updateChannels(0.49);
-    assert.equal(damageTicks.length, 1, "Frost damage must begin as a distributed channel tick");
-    ability._updateChannels(1.5);
-    assert.equal(damageTicks.length, SINGLE_SPELLS.frost.ticks, "Frost must distribute damage across the full channel");
-    assert.equal(
-        damageTicks.reduce((total, damage) => total + damage, 0),
-        Math.round(owner.stats.baseDamage * SINGLE_SPELLS.frost.damageMultiplier),
-        "Longer frost presentation must preserve its approved total damage"
-    );
+    for (const spell of spells) {
+        const damageTicks = [];
+        const channel = ability._createChannel({
+            elements: spell.elements,
+            recipe: spell.recipe,
+            target: enemy,
+            wetSnapshot: false
+        });
+        enemy.takeDamage = (damage) => damageTicks.push({ damage, elapsed: channel.elapsed });
+        ability.activeChannels = [channel];
+        while (ability.activeChannels.length > 0) ability._updateChannels(0.016);
+        assert.equal(damageTicks.length, maximumTicks, `${spell.id} must complete all 0.08-second damage ticks`);
+        assert.ok(
+            Math.abs(damageTicks[0].elapsed - 0.08) < 1e-9,
+            `${spell.id} must start damage at the first tick boundary`
+        );
+        assert.ok(Math.abs(damageTicks.at(-1).elapsed - 2) < 1e-9, `${spell.id} must retain its final channel tick`);
+        assert.equal(
+            damageTicks.reduce((total, { damage }) => total + damage, 0),
+            Math.round(owner.stats.baseDamage * spell.multiplier),
+            `${spell.id} must preserve its raw damage budget across twenty-five ticks`
+        );
+    }
 
-    damageTicks.length = 0;
-    const pursuit = ELEMENTAL_COMPOSITE_RECIPES["electric:wind"];
-    const pursuitChannel = ability._createChannel({
-        elements: pursuit.elements,
-        recipe: pursuit,
-        target: enemy,
+    const actualRun = createElementalistSimulation({ tier: 3 });
+    const [actualEnemy] = actualRun.enemies;
+    actualEnemy.rollCritical = () => false;
+    actualEnemy.hp = 1000;
+    actualEnemy.maxHp = 1000;
+    const actualDamageTicks = [];
+    const takeDamage = actualEnemy.takeDamage.bind(actualEnemy);
+    const actualChannel = actualRun.ability._createChannel({
+        elements: ["frost"],
+        recipe: null,
+        target: actualEnemy,
         wetSnapshot: false
     });
-    pursuitChannel.displacement = enemy.radius * 20;
-    pursuitChannel.elapsed = 0.4;
-    ability._updateThunderPursuit(pursuitChannel);
-    assert.equal(damageTicks.length, 0, "Thunder pursuit must not front-load movement ticks at channel start");
-    pursuitChannel.elapsed = 0.8;
-    ability._updateThunderPursuit(pursuitChannel);
-    assert.equal(damageTicks.length, 1, "Thunder pursuit must unlock its first tick along the channel timeline");
-    pursuitChannel.elapsed = 1.6;
-    ability._updateThunderPursuit(pursuitChannel);
-    assert.equal(damageTicks.length, 3, "Thunder pursuit must distribute all movement ticks through the channel");
+    actualEnemy.takeDamage = (damage, source, label, options) => {
+        const result = takeDamage(damage, source, label, options);
+        actualDamageTicks.push(result.actualDamage);
+        return result;
+    };
+    actualRun.ability.activeChannels = [actualChannel];
+    while (actualRun.ability.activeChannels.length > 0) actualRun.ability._updateChannels(0.016);
+    assert.equal(actualDamageTicks.length, maximumTicks, "Minimum damage must apply on every frost channel tick");
     assert.equal(
-        damageTicks.reduce((total, damage) => total + damage, 0),
-        Math.round(owner.stats.baseDamage * pursuit.damageMultiplier),
-        "Longer thunder pursuit must preserve its maximum total damage"
+        actualDamageTicks.reduce((total, damage) => total + damage, 0),
+        maximumTicks,
+        "The approved minimum-one rule must raise base frost damage to twenty-five actual damage"
     );
     console.log("[elementalist-channel-duration-damage-cadence] ok");
 }

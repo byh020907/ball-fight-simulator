@@ -13,6 +13,7 @@ import {
 const ELEMENTALIST_CONFIG = Object.freeze({
     channelRange: 850,
     channelDuration: 2,
+    channelTickInterval: 0.08,
     maximumOrbs: 4,
     boltSpeedMultiplier: 2.2,
     orbReleaseSpeed: 165,
@@ -22,14 +23,15 @@ const ELEMENTALIST_CONFIG = Object.freeze({
 });
 
 const SINGLE_SPELLS = Object.freeze({
-    fire: { damageMultiplier: 1.52, ticks: 5 },
-    electric: { damageMultiplier: 1.38, ticks: 5 },
-    frost: { damageMultiplier: 1, ticks: 4, slow: { duration: 1.2, amount: 0.55 } },
-    wind: { damageMultiplier: 1.14, ticks: 4, tangentImpulse: 0.16 },
-    earth: { damageMultiplier: 1.48, ticks: 5 }
+    fire: { damageMultiplier: 1.52 },
+    electric: { damageMultiplier: 1.38 },
+    frost: { damageMultiplier: 1, slow: { duration: 1.2, amount: 0.55 } },
+    wind: { damageMultiplier: 1.14, tangentImpulse: 0.16 },
+    earth: { damageMultiplier: 1.48 }
 });
 
 let nextChannelId = 1;
+const TICK_BOUNDARY_EPSILON = 1e-9;
 
 function channelProgress(channel) {
     return Math.max(0, Math.min(1, channel.elapsed / channel.duration));
@@ -136,9 +138,6 @@ export class ElementalistAbility extends Ability {
             elapsed: 0,
             wetSnapshot,
             tickCount: 0,
-            tickAccumulator: 0,
-            displacement: 0,
-            lastTargetPosition: target.position.clone(),
             started: false,
             finished: false,
             cancelled: false
@@ -171,7 +170,7 @@ export class ElementalistAbility extends Ability {
             this._applyWetReaction(channel.target, channel.elements, channel.wetSnapshot, 1);
         }
         if (element === "wind") this._applyTangentImpulse(channel.target, spell.tangentImpulse, delta);
-        this._applyScheduledTicks(channel, spell.damageMultiplier, spell.ticks);
+        this._applyChannelDamageTicks(channel, spell.damageMultiplier);
     }
 
     _updateCompositeChannel(channel, delta) {
@@ -182,37 +181,18 @@ export class ElementalistAbility extends Ability {
             if (recipe.slow) channel.target.applySlow?.(recipe.slow.duration, recipe.slow.amount);
         }
         const progress = channelProgress(channel);
-        if (progress >= 0.2 && progress <= 0.8) {
-            if (recipe.tangentImpulse) this._applyTangentImpulse(channel.target, recipe.tangentImpulse, delta);
-            if (recipe.displacementTicks) this._updateThunderPursuit(channel);
-            else this._applyScheduledTicks(channel, recipe.damageMultiplier, 4, 0.2, 0.8);
+        if (recipe.tangentImpulse && progress >= 0.2 && progress <= 0.8) {
+            this._applyTangentImpulse(channel.target, recipe.tangentImpulse, delta);
         }
+        this._applyChannelDamageTicks(channel, recipe.damageMultiplier);
     }
 
-    _updateThunderPursuit(channel) {
-        const movement = Vector2.subtract(channel.target.position, channel.lastTargetPosition).length();
-        channel.lastTargetPosition = channel.target.position.clone();
-        channel.displacement += movement;
-        const threshold = Math.max(1, channel.target.radius * 2);
-        const timelineProgress = Math.max(0, Math.min(1, (channelProgress(channel) - 0.2) / 0.6));
-        const availableTicks = Math.min(3, Math.floor(timelineProgress * 3 + 1e-9));
-        while (channel.displacement >= threshold && channel.tickCount < availableTicks) {
-            channel.displacement -= threshold;
-            channel.tickCount += 1;
-            this._dealExactTick(
-                channel.target,
-                channel.recipe.damageMultiplier,
-                channel.tickCount,
-                3,
-                channel.recipe.name
-            );
-        }
-    }
-
-    _applyScheduledTicks(channel, multiplier, maximumTicks, start = 0, end = 1) {
-        const progress = channelProgress(channel);
-        const normalized = Math.max(0, Math.min(1, (progress - start) / Math.max(0.001, end - start)));
-        const expectedTicks = Math.min(maximumTicks, Math.floor(normalized * maximumTicks + 1e-9));
+    _applyChannelDamageTicks(channel, multiplier) {
+        const maximumTicks = Math.round(channel.duration / ELEMENTALIST_CONFIG.channelTickInterval);
+        const expectedTicks = Math.min(
+            maximumTicks,
+            Math.floor(channel.elapsed / ELEMENTALIST_CONFIG.channelTickInterval + TICK_BOUNDARY_EPSILON)
+        );
         while (channel.tickCount < expectedTicks) {
             channel.tickCount += 1;
             this._dealExactTick(
@@ -227,7 +207,7 @@ export class ElementalistAbility extends Ability {
 
     _finishChannel(channel) {
         if (channel.cancelled || channel.target.flags.defeated) return;
-        if (channel.recipe?.displacementTicks) {
+        if (channel.recipe?.finishBurst) {
             this.simulation.entities.push(
                 new VisualBurst(channel.target.position.clone(), this.getElementColor(channel.elements[0]), 70, 0.2)
             );

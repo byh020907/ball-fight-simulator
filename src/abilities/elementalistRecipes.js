@@ -62,7 +62,7 @@ export const ELEMENTAL_COMPOSITE_RECIPES = Object.freeze({
         path: "tangent",
         marker: "travel",
         finish: "shock",
-        displacementTicks: true,
+        finishBurst: true,
         tangentImpulse: 0.18
     }),
     "earth:electric": recipe("magnetic_railgun", "자력 레일포", ["electric", "earth"], {

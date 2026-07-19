@@ -34,6 +34,10 @@ export const PATCH_NOTES = [
             {
                 type: "ui",
                 text: "최대 단계 카드는 보상 후보에서 빠지며, 환생 카드에서 현재 단계·다음 성장·MAX 효과를 확인할 수 있습니다."
+            },
+            {
+                type: "balance",
+                text: "Elementalist의 단일·융합 주문이 2초 동안 0.08초마다 피해를 주어 원소 채널의 연속 타격이 더 선명해집니다."
             }
         ]
     },
