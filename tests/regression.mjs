@@ -17093,7 +17093,7 @@ function testRosterBaseSpeedMultiplier() {
         gunner: 278,
         phantom: 305,
         hero: 286,
-        elementalist: 295
+        elementalist: 225
     });
 
     for (const fighter of createRoster()) {
@@ -17103,6 +17103,15 @@ function testRosterBaseSpeedMultiplier() {
             `${fighter.name} should preserve its relative base speed at the common multiplier`
         );
     }
+    const roster = createRoster();
+    const elementalist = roster.find(({ id }) => id === FIGHTER_IDS.ELEMENTALIST);
+    const slowestOtherSpeed = Math.min(
+        ...roster.filter(({ id }) => id !== FIGHTER_IDS.ELEMENTALIST).map(({ stats }) => stats.speed)
+    );
+    assert.ok(
+        elementalist.stats.speed < slowestOtherSpeed,
+        "Elementalist should remain the slowest playable character"
+    );
     console.log("[roster-base-speed-multiplier] ok");
 }
 
@@ -22084,7 +22093,7 @@ function testRosterCombatBaselineAndCooldowns() {
         gunner: 417,
         phantom: 457.5,
         hero: 429,
-        elementalist: 442.5
+        elementalist: 337.5
     };
     const expectedCooldown = {
         archer: 2.5,
