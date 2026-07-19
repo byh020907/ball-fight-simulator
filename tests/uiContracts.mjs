@@ -666,6 +666,11 @@ function testGameplayUiResetContracts() {
     components.forEach(([path, name]) => {
         assert.ok(readSource(path).includes("reset()"), `${name} should expose an explicit reset interface`);
     });
+    const fighterStrip = readSource("src/components/fighter-strip.html");
+    assert.ok(
+        fighterStrip.includes("max-width: 100%") && fighterStrip.includes("text-overflow: ellipsis"),
+        "Fighter cards should constrain long mobile labels inside their fluid grid cell"
+    );
     const huntingOverlay = readSource("src/components/hunting-overlay.html");
     assert.ok(
         huntingOverlay.includes("resetHuntingState()"),
