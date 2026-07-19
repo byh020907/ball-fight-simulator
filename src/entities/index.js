@@ -11,6 +11,7 @@ export { BatProjectile } from "./batProjectile.js";
 export { BulletProjectile } from "./bulletProjectile.js";
 export { ElementalWaterBolt } from "./elementalWaterBolt.js";
 export { ElementalOrb } from "./elementalOrb.js";
+export { HeroShieldShard } from "./heroShieldShard.js";
 export {
     HeroOrb,
     HERO_ORB_STAT_CAP,

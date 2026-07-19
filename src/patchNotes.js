@@ -19,6 +19,25 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.34.0",
+        date: "2026-07-19",
+        title: "v0.34.0 Hero Ball 영웅 갑옷",
+        changes: [
+            {
+                type: "feature",
+                text: "Hero Ball이 성장 코어로 보호막을 쌓고 피격 반격과 보호막 파괴 충격파를 사용하는 근접 탱커로 개편됩니다."
+            },
+            {
+                type: "balance",
+                text: "완충 Hero는 0.5초마다 짧게 접근하고, 코어는 기본 자성과 Lv.3 강화 자성으로 더 쉽게 회수됩니다."
+            },
+            {
+                type: "style",
+                text: "코어 연결선과 공명 별 연출 대신 금빛 육각 갑옷·직선 방패 파편·갑옷 파쇄 충격파가 표시됩니다."
+            }
+        ]
+    },
+    {
         version: "0.33.1",
         date: "2026-07-19",
         title: "v0.33.1 젖음 원소 반응",

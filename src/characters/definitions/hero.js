@@ -6,8 +6,7 @@ export default createCharacterDefinition({
     id: "hero",
     name: "Hero Ball",
     title: "Hero Orb",
-    description:
-        "성장 스택을 충전하고 적과 충돌할 때 같은 수의 성장 코어를 방출합니다. 직접 회수하면 무작위 스탯이 증가합니다.",
+    description: "성장 스택을 충전해 적에게 접근하고, 충돌에서 방출한 성장 코어로 스탯과 방어 능력을 강화합니다.",
     color: "#ffcc00",
     abilityDisplayName: "Hero Orb",
     abilityClass: HeroAbility,
@@ -18,7 +17,7 @@ export default createCharacterDefinition({
         {
             level: 3,
             abilityTier: 1,
-            gameText: "성장 코어 근거리 자석 회수"
+            gameText: "코어 자성 강화 · 코어당 최대 체력 5% 보호막"
         },
         {
             level: 4
@@ -29,7 +28,7 @@ export default createCharacterDefinition({
         {
             level: 6,
             abilityTier: 2,
-            gameText: "회수 코어 공명 조각 · 순차 ×0.20"
+            gameText: "코어당 체력 1% 회복 · 보호막 피격 직선 반격"
         },
         {
             level: 7
@@ -40,7 +39,7 @@ export default createCharacterDefinition({
         {
             level: 9,
             abilityTier: 3,
-            gameText: "조각 5개 Heroic Burst · 90px ×0.75"
+            gameText: "보호막 파괴 시 금빛 충격파"
         },
         {
             level: 10
@@ -50,13 +49,15 @@ export default createCharacterDefinition({
         tiers: [
             {},
             {
-                magneticCoreCollection: true
+                fortifiedCoreMagnet: true,
+                heroArmor: true
             },
             {
-                resonanceFragments: true
+                coreRecovery: true,
+                shieldCounter: true
             },
             {
-                heroicBurst: true
+                shieldBreakShockwave: true
             }
         ]
     },

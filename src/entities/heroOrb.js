@@ -299,7 +299,7 @@ export class HeroOrb extends CollectionGrace(CombatEntity) {
         applyMagneticAttraction(this, this.owner, delta, {
             radius: attraction.radius,
             responseRate: attraction.responseRate,
-            attractionSpeed: computeOwnerCombatSpeed(this.owner) * 1.35
+            attractionSpeed: computeOwnerCombatSpeed(this.owner) * attraction.attractionSpeedMultiplier
         });
     }
 
@@ -330,12 +330,6 @@ export class HeroOrb extends CollectionGrace(CombatEntity) {
         ctx.beginPath();
         ctx.arc(this.position.x, this.position.y, r * 0.72, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = "rgba(255, 232, 154, 0.68)";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(this.position.x, this.position.y);
-        ctx.lineTo(this.owner.position.x, this.owner.position.y);
-        ctx.stroke();
         ctx.fillStyle = "#ffffff";
         ctx.font = `900 ${Math.round(r * 0.9)}px Bahnschrift, "Segoe UI", sans-serif`;
         ctx.textAlign = "center";

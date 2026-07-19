@@ -314,7 +314,7 @@ import { ArenaCamera } from "../src/camera.js";
 import { BurningEffect } from "../src/effects/rageEffects.js";
 import {
     DASH_LASER_CASTER_RENDERER,
-    HeroResonanceEffect,
+    HeroShieldBreakEffect,
     LaserCasterDissipateEffect,
     LaserBeamEffect,
     traceArenaLaserSegments
@@ -348,6 +348,7 @@ import {
     ExperienceDrop,
     HERO_ORB_EFFECTS,
     HeroOrb,
+    HeroShieldShard,
     GunnerTurret,
     ShardDrop,
     ShardBundleDrop,
@@ -5857,9 +5858,21 @@ function testAbilityLevelUpgrades(app) {
         { stacks: 5, stackCap: 5, progress: 1 },
         "Hero should charge exactly five growth stacks in five seconds"
     );
+    const baseHeroRun = createTierSimulation(FIGHTER_IDS.HERO, 0);
+    const baseAttractionOrb = new HeroOrb(baseHeroRun.ball, baseHeroRun.ball.position.clone(), new Vector2(0, 0), "hp");
+    assert.equal(
+        baseHeroRun.ball.ability.getOrbAttraction(baseAttractionOrb).radius,
+        baseHeroRun.ball.radius * 2 + baseAttractionOrb.radius,
+        "Base Hero should magnetize cores within two owner radii plus the core radius"
+    );
     const attractionOrb = new HeroOrb(heroRun.ball, heroRun.ball.position.clone(), new Vector2(0, 0), "hp");
     const heroAttraction = heroAbility.getOrbAttraction(attractionOrb);
-    assert.ok(heroAttraction.radius > heroRun.ball.radius, "Hero tier 1 should magnetize growth cores only nearby");
+    assert.equal(
+        heroAttraction.radius,
+        heroRun.ball.radius * 3 + attractionOrb.radius,
+        "Hero tier 1 should strengthen core magnet range to three owner radii plus the core radius"
+    );
+    assert.equal(heroRun.ball.state.movement?.collisionDamage, 0, "Hero pursuit should not add dash contact damage");
     heroAbility.onFighterCollisionDamageResolved(heroRun.target, 1, { contactPoint: heroRun.target.position });
     assert.equal(heroAbility.state.growthStacks, 0, "Hero should consume every growth stack on one real collision");
     assert.ok(heroAbility.state.stackReleaseFlash > 0, "Hero stack consumption should trigger a visible release flash");
@@ -5868,10 +5881,18 @@ function testAbilityLevelUpgrades(app) {
         5,
         "Five consumed growth stacks should create exactly five eight-second cores"
     );
-    heroAbility.state.resonanceFragments = Array.from({ length: 5 }, () => ({ color: "#ffd84d" }));
-    heroAbility.onFighterCollisionDamageResolved(heroRun.target, 1, { contactPoint: heroRun.target.position });
-    const resonance = heroRun.sim.entities.find((entity) => entity instanceof HeroResonanceEffect);
-    assert.ok(resonance?.heroicBurst, "Five stored fragments at tier three should arm Heroic Burst");
+    const hpBeforeCore = (heroRun.ball.hp = Math.floor(heroRun.ball.maxHp * 0.5));
+    heroAbility.onOrbCollected(attractionOrb, { applied: true });
+    assert.equal(
+        heroAbility.getShieldState().current,
+        heroRun.ball.maxHp * 0.05,
+        "Hero tier 1 should gain five-percent maximum-HP shield per collected core"
+    );
+    assert.equal(
+        heroRun.ball.hp - hpBeforeCore,
+        Math.round(heroRun.ball.maxHp * 0.01),
+        "Hero tier 2 should restore one-percent maximum HP per collected core"
+    );
     console.log("[ability-level-upgrades] ok");
 }
 
@@ -6774,7 +6795,9 @@ function testFiveBallLevelRewardContracts(app) {
         growthCores.every((core) => core.life === 8),
         "Every Hero growth core should use the fixed eight-second life"
     );
-    const combatSpeed = heroRun.owner.stats.baseSpeed * heroRun.owner.getStatModifiers().speed;
+    const combatSpeed =
+        heroRun.owner.state.movement?.getSpeed?.(heroRun.owner) ??
+        heroRun.owner.stats.baseSpeed * heroRun.owner.getStatModifiers().speed;
     assert.ok(
         growthCores.every(
             (core) => core.velocity.length() >= combatSpeed * 0.72 && core.velocity.length() <= combatSpeed * 0.96
@@ -6853,64 +6876,67 @@ function testFiveBallLevelRewardContracts(app) {
 
     heroRun.owner.stats.baseDamage = 100;
     heroRun.owner.stats.criticalChance = 0;
-    heroRun.target.position = new Vector2(520, 300);
-    heroRun.nearby.position = new Vector2(580, 300);
-    const resonance = new HeroResonanceEffect(
-        heroRun.owner,
-        heroRun.target,
-        Array.from({ length: 5 }, (_, index) => ({
-            color: ["#44dd44", "#ff4444", "#4488ff", "#bb66ff", "#ff7bd5"][index]
-        })),
-        { heroicBurst: true }
+    heroRun.target.stats.criticalChance = 0;
+    heroRun.owner.maxHp = 200;
+    heroRun.owner.hp = 100;
+    heroRun.owner.position = new Vector2(300, 300);
+    heroRun.target.position = new Vector2(420, 300);
+    heroRun.nearby.position = new Vector2(430, 340);
+    heroAbility.state.shield = 90;
+    heroAbility.onOrbCollected({ color: "#ffd84d" }, { applied: true });
+    assert.deepEqual(
+        [heroAbility.getShieldState().current, heroRun.owner.hp],
+        [100, 102],
+        "Hero core collection should cap armor at 50% maximum HP and restore 1% maximum HP"
     );
-    assertForegroundEffectRenders(resonance, "Hero resonance launch", (primitives) => {
-        assert.ok(
-            findEffectPrimitive(primitives, "quadraticCurveTo"),
-            "Hero resonance should draw its curved flight path"
-        );
-    });
-    const heroTargetHpBefore = heroRun.target.hp;
-    const heroNearbyHpBefore = heroRun.nearby.hp;
-    resonance.update(0.2, heroRun.simulation);
-    assert.equal(resonance.hitCount, 2, "Hero resonance mid-frame should retain two actual surface anchors");
-    assertForegroundEffectRenders(resonance, "Hero resonance mid", (primitives) => {
-        assert.ok(
-            primitives.filter((primitive) => primitive.method === "lineTo").length >= 1,
-            "Hero resonance mid-frame should connect its first anchored star vertices"
-        );
-    });
-    resonance.update(0.3, heroRun.simulation);
+
+    const ownerHpBeforeCounter = heroRun.owner.hp;
+    const firstDamage = heroRun.owner.takeDamage(20, heroRun.target, "Hero Armor Test", { ignoreDefense: true });
+    assert.deepEqual(
+        [firstDamage.actualDamage, firstDamage.absorbedDamage, heroRun.owner.hp, heroAbility.state.shield],
+        [0, 20, ownerHpBeforeCounter, 80],
+        "Hero armor should absorb post-defense damage before HP"
+    );
+    const counterShards = heroRun.simulation.entities.filter((entity) => entity instanceof HeroShieldShard);
+    assert.equal(counterShards.length, 1, "Hero shield damage should launch one counter shard when ready");
+    const counterVelocity = counterShards[0].velocity.clone();
+    heroRun.target.applyPositionCorrection(new Vector2(0, 120));
+    counterShards[0].update(0.05, heroRun.simulation);
+    assert.deepEqual(
+        [counterShards[0].velocity.x, counterShards[0].velocity.y],
+        [counterVelocity.x, counterVelocity.y],
+        "Hero counter shard should preserve its launch direction instead of homing"
+    );
+    heroRun.owner.takeDamage(10, heroRun.target, "Hero Armor Cooldown Test", { ignoreDefense: true });
     assert.equal(
-        heroTargetHpBefore - heroRun.target.hp,
-        175,
-        "Five Hero resonance hits and one Heroic Burst should total x1.75 on the primary target"
+        heroRun.simulation.entities.filter((entity) => entity instanceof HeroShieldShard).length,
+        1,
+        "Hero counter should respect its 0.5-second internal cooldown"
     );
-    assert.equal(heroNearbyHpBefore - heroRun.nearby.hp, 75, "Heroic Burst should deal x0.75 once to a nearby hostile");
-    const firstAnchor = resonance.starAnchors[0];
-    heroRun.target.applyPositionCorrection(new Vector2(45, 30));
-    heroRun.target.angle = Math.PI / 2;
-    const expectedAnchor = Vector2.add(
-        heroRun.target.position,
-        new Vector2(-firstAnchor.localOffset.y, firstAnchor.localOffset.x)
+
+    heroAbility.state.shield = 10;
+    heroRun.target.position = new Vector2(420, 300);
+    const targetHpBeforeBreak = heroRun.target.hp;
+    const nearbyHpBeforeBreak = heroRun.nearby.hp;
+    const breakDamage = heroRun.owner.takeDamage(20, heroRun.target, "Hero Armor Break Test", {
+        ignoreDefense: true
+    });
+    assert.deepEqual(
+        [breakDamage.actualDamage, breakDamage.absorbedDamage, heroAbility.state.shield],
+        [10, 10, 0],
+        "Hero shield break should pass only overflow damage through to HP"
     );
-    const movedAnchor = resonance.getStarAnchorPosition(0);
-    assert.ok(
-        Vector2.subtract(movedAnchor, expectedAnchor).length() < 1e-6,
-        "Hero star vertices should follow target translation and rotation from their stored local surface offsets"
+    assert.equal(
+        targetHpBeforeBreak - heroRun.target.hp,
+        75,
+        "Hero shield break should deal x0.75 attack damage to its hostile source"
     );
-    assertForegroundEffectRenders(resonance, "Heroic Burst star", (primitives) => {
-        const visibleAnchor = resonance.getStarAnchorPosition(0, 7);
+    assert.equal(nearbyHpBeforeBreak - heroRun.nearby.hp, 75, "Hero shield break should damage another nearby hostile");
+    const shieldBreak = heroRun.simulation.entities.find((entity) => entity instanceof HeroShieldBreakEffect);
+    assertForegroundEffectRenders(shieldBreak, "Hero shield break", (primitives) => {
         assert.ok(
-            findEffectPrimitive(
-                primitives,
-                "moveTo",
-                ([x, y]) => Math.abs(x - visibleAnchor.x) < 1e-6 && Math.abs(y - visibleAnchor.y) < 1e-6
-            ),
-            "ArenaRenderer should draw the completed star from the moved target's local surface anchor"
-        );
-        assert.ok(
-            primitives.filter((primitive) => primitive.method === "lineTo").length >= 4,
-            "Heroic Burst should draw the completed five-point star"
+            primitives.filter((primitive) => primitive.method === "arc").length >= 2,
+            "Hero shield break should draw layered expanding shockwave rings"
         );
     });
 
@@ -8680,7 +8706,7 @@ function testMultiAbilityFoundation(app) {
         "Each ability UI row should retain its own cooldown state"
     );
     assert.equal(
-        subProbe.getLevelUpgrade().heroicBurst,
+        subProbe.getLevelUpgrade().shieldBreakShockwave,
         true,
         "A Hero sub ability must read its own id and tier upgrade data"
     );
@@ -8738,11 +8764,7 @@ function testMultiAbilityFoundation(app) {
     orb.position = gunnerOwner.position.clone();
     orb.velocity = new Vector2(0, 0);
     orb.update(0, sourceSimulation);
-    assert.equal(
-        heroSub.state.resonanceFragments.length,
-        1,
-        "A Hero sub ability should retain its own collected resonance fragment"
-    );
+    assert.ok(heroSub.getShieldState().current > 0, "A Hero sub ability should retain its own collected core armor");
     assert.equal(gunner.timer, 3 - gunner.cooldown / 2 / 12, "Hero core effects must not mutate the Gunner cooldown");
 
     const fighterStrip = readFileSync("src/components/fighter-strip.html", "utf8");

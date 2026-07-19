@@ -21,7 +21,7 @@ export { DamageNumber, CriticalNumber, ActionText } from "./floatingText.js";
 export { ActionWindowEffect, ActionSuccessEffect, ActionWhiffEffect } from "./actionEffects.js";
 export { EFFECT_VISIBILITY_TOKENS, getVisibleCombatTextSize, getVisibleLineWidth } from "./effectVisibility.js";
 export { BURNING_EFFECT_CONFIG, BurningEffect, RageFlameRing, applyBurningEffect } from "./rageEffects.js";
-export { HeroResonanceEffect } from "./heroEffects.js";
+export { HeroShieldBreakEffect } from "./heroEffects.js";
 export {
     BloodBatBurstEffect,
     BloodBiteEffect,

@@ -116,6 +116,20 @@ export class AbilitySet {
         return this._primary?.modifyOutgoingFighterCollisionDamage?.(damage, target, context) ?? damage;
     }
 
+    absorbIncomingDamage(damage, source, label, options) {
+        return this.all.reduce(
+            (result, ability) => {
+                const next = ability.absorbIncomingDamage?.(result.remainingDamage, source, label, options);
+                if (!next) return result;
+                return {
+                    remainingDamage: next.remainingDamage ?? result.remainingDamage,
+                    absorbedDamage: result.absorbedDamage + (next.absorbedDamage ?? 0)
+                };
+            },
+            { remainingDamage: damage, absorbedDamage: 0 }
+        );
+    }
+
     beforeFighterCollision(target, context) {
         return this._primary?.beforeFighterCollision?.(target, context) ?? null;
     }

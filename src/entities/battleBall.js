@@ -507,7 +507,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
     }
 
     takeDamage(amount, source, label = "Hit", options = {}) {
-        if (this.flags.defeated) return { actualDamage: 0, isCritical: false };
+        if (this.flags.defeated) return { actualDamage: 0, absorbedDamage: 0, isCritical: false };
         const isCritical = source && source !== this && this.rollCritical(source);
         if (isCritical) {
             amount = Math.round(amount * 2);
@@ -520,7 +520,9 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         const totalDefense = options.ignoreDefense ? 0 : Math.round(this.stats.baseDefense * abilityDefMult);
         const hpBefore = this.hp;
         const rawActual = Math.max(1, Math.round(amount - totalDefense));
-        const actual = Math.min(rawActual, hpBefore);
+        const absorption = this.abilities.absorbIncomingDamage(rawActual, source, label, options);
+        const absorbedDamage = Math.max(0, Math.min(rawActual, absorption.absorbedDamage ?? 0));
+        const actual = Math.min(Math.max(0, absorption.remainingDamage ?? rawActual), hpBefore);
         this.hp = Math.max(0, this.hp - actual);
         const actualDamage = hpBefore - this.hp;
         if (sim && actualDamage > 0) {
@@ -559,7 +561,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
                 s.hooks?.onFighterDefeated?.(this, { ...defeatContext, suppressLootDrop });
             }
         }
-        return { actualDamage, isCritical };
+        return { actualDamage, absorbedDamage, isCritical };
     }
 
     draw(ctx) {
