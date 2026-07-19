@@ -74,8 +74,10 @@ import {
     BloodRuptureEffect,
     BloodTetherEffect,
     ELEMENTAL_CHANNEL_VISUAL_CONFIG,
+    ELEMENTAL_ORB_IDENTITY_CONFIG,
     ElementalChannelEffect,
-    ElementalWetEffect
+    ElementalWetEffect,
+    drawElementalOrb
 } from "../src/effects/index.js";
 import { shuffled } from "../src/random.js";
 import { BattleSimulation } from "../src/simulation/battleSimulation.js";
@@ -24084,6 +24086,58 @@ function testElementalistChannelVisualGrammar() {
 }
 
 testElementalistChannelVisualGrammar();
+
+function testElementalistOrbIdentityGrammar() {
+    const singleSignatures = {
+        fire: (context) => context.calls.filter(([method]) => method === "fillRect").length >= 10,
+        electric: (context) => context.calls.filter(([method]) => method === "lineTo").length >= 15,
+        frost: (context) => context.calls.filter(([method]) => method === "lineTo").length >= 25,
+        wind: (context) => context.calls.filter(([method]) => method === "quadraticCurveTo").length >= 5,
+        earth: (context) => context.calls.filter(([method]) => method === "lineTo").length >= 25
+    };
+
+    Object.entries(singleSignatures).forEach(([element, hasSignature]) => {
+        const recording = makeRecordingCanvasContext();
+        drawElementalOrb(
+            recording,
+            {
+                position: new Vector2(320, 280),
+                radius: 13,
+                element,
+                elements: [element],
+                createdAt: 0
+            },
+            0.4
+        );
+        assert.equal(hasSignature(recording), true, `${element} orb should carry its orbiting elemental glyphs`);
+    });
+
+    const compositeRecording = makeRecordingCanvasContext();
+    drawElementalOrb(
+        compositeRecording,
+        {
+            position: new Vector2(320, 280),
+            radius: 13,
+            element: "fire",
+            elements: ["fire", "frost"],
+            createdAt: 0
+        },
+        0.4
+    );
+    assert.ok(
+        compositeRecording.calls.filter(([method]) => method === "fillRect").length >=
+            ELEMENTAL_ORB_IDENTITY_CONFIG.compositeCountPerElement * 2,
+        "Composite orb should retain the fire ember glyphs"
+    );
+    assert.ok(
+        compositeRecording.calls.filter(([method]) => method === "lineTo").length >=
+            ELEMENTAL_ORB_IDENTITY_CONFIG.compositeCountPerElement * 5,
+        "Composite orb should retain the frost shard glyphs"
+    );
+    console.log("[elementalist-orb-identity-grammar] ok");
+}
+
+testElementalistOrbIdentityGrammar();
 
 function testElementalistVfxPreviewCatalog() {
     const options = getElementalistVfxPreviewOptions();

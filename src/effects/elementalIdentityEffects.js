@@ -58,6 +58,15 @@ export const ELEMENTAL_CHANNEL_VISUAL_CONFIG = Object.freeze({
     })
 });
 
+export const ELEMENTAL_ORB_IDENTITY_CONFIG = Object.freeze({
+    singleCount: 5,
+    compositeCountPerElement: 3,
+    orbitPadding: 9,
+    compositeOrbitSpacing: 4,
+    rotationSpeed: 2.4,
+    glyphSize: 3.8
+});
+
 function clamp01(value) {
     return Math.max(0, Math.min(1, value));
 }
@@ -322,6 +331,68 @@ function drawRock(ctx, size, seed) {
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
+}
+
+function drawFireOrbGlyph(ctx, size) {
+    ctx.rotate(Math.PI / 4);
+    ctx.fillRect(-size * 0.72, -size * 0.72, size * 1.44, size * 1.44);
+    ctx.fillRect(-size * 0.34, -size * 1.32, size * 0.68, size * 0.68);
+}
+
+function drawElectricOrbGlyph(ctx, size) {
+    ctx.beginPath();
+    ctx.moveTo(-size, -size * 0.92);
+    ctx.lineTo(size * 0.12, -size * 0.18);
+    ctx.lineTo(-size * 0.18, size * 0.12);
+    ctx.lineTo(size, size * 0.92);
+    ctx.stroke();
+}
+
+function drawWindOrbGlyph(ctx, size) {
+    ctx.beginPath();
+    ctx.moveTo(-size * 1.25, 0);
+    ctx.quadraticCurveTo(0, -size, size * 1.25, 0);
+    ctx.stroke();
+}
+
+const ELEMENTAL_ORB_IDENTITY_DRAWERS = Object.freeze({
+    fire: drawFireOrbGlyph,
+    electric: drawElectricOrbGlyph,
+    frost: (ctx, size) => drawFrostShard(ctx, size * 0.82),
+    wind: drawWindOrbGlyph,
+    earth: (ctx, size, index) => drawRock(ctx, size, index)
+});
+
+export function drawElementalOrbIdentities(ctx, orb, time = 0) {
+    const elements = orb.elements ?? [orb.element];
+    const config = ELEMENTAL_ORB_IDENTITY_CONFIG;
+    const glyphCount = elements.length > 1 ? config.compositeCountPerElement : config.singleCount;
+    ctx.save();
+    ctx.translate(orb.position.x, orb.position.y);
+    ctx.lineCap = "round";
+    elements.forEach((element, elementIndex) => {
+        const drawGlyph = ELEMENTAL_ORB_IDENTITY_DRAWERS[element];
+        if (!drawGlyph) return;
+        const direction = elementIndex % 2 === 0 ? 1 : -1;
+        const orbitRadius = orb.radius + config.orbitPadding + elementIndex * config.compositeOrbitSpacing;
+        Array.from({ length: glyphCount }, (_, index) => index).forEach((index) => {
+            const angle =
+                time * config.rotationSpeed * direction +
+                (Math.PI * 2 * index) / glyphCount +
+                (Math.PI * elementIndex) / elements.length;
+            const size = config.glyphSize * (0.88 + (index % 2) * 0.18);
+            ctx.save();
+            ctx.globalAlpha = elements.length > 1 ? 0.78 : 0.88;
+            ctx.fillStyle = ELEMENTAL_PALETTE[element];
+            ctx.strokeStyle = element === "frost" ? "#edf3ff" : ELEMENTAL_PALETTE[element];
+            ctx.lineWidth = getVisibleLineWidth(ctx, "hairline", 1.6);
+            ctx.translate(Math.cos(angle) * orbitRadius, Math.sin(angle) * orbitRadius);
+            ctx.rotate(angle + time * 1.8 * direction);
+            drawGlyph(ctx, size, index);
+            ctx.restore();
+        });
+    });
+    ctx.restore();
 }
 
 function drawEarthTravel(ctx, channel, elapsed, intensity, isComposite) {

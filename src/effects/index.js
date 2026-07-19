@@ -51,8 +51,10 @@ export {
 } from "./elementalistEffects.js";
 export {
     ELEMENTAL_CHANNEL_VISUAL_CONFIG,
+    ELEMENTAL_ORB_IDENTITY_CONFIG,
     createElementalChannelVisualState,
     drawElementalChannelIdentity,
+    drawElementalOrbIdentities,
     updateElementalChannelVisualState
 } from "./elementalIdentityEffects.js";
 export {

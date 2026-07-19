@@ -4,6 +4,7 @@ import { ELEMENTAL_PALETTE } from "../abilities/elementalistRecipes.js";
 import {
     createElementalChannelVisualState,
     drawElementalChannelIdentity,
+    drawElementalOrbIdentities,
     updateElementalChannelVisualState
 } from "./elementalIdentityEffects.js";
 
@@ -110,6 +111,7 @@ export function drawElementalOrb(ctx, orb, time = 0) {
     const elements = orb.elements ?? [orb.element];
     const colors = elements.map((element) => ELEMENTAL_PALETTE[element] ?? "#ffffff");
     const pulse = 1 + Math.sin(time * 8 + orb.createdAt * 3) * 0.08;
+    drawElementalOrbIdentities(ctx, orb, time);
     ctx.save();
     ctx.translate(orb.position.x, orb.position.y);
     ctx.rotate(time * 1.8);
