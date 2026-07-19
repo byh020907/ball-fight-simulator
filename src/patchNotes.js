@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.35.2",
+        date: "2026-07-19",
+        title: "v0.35.2 원소 주문 감지",
+        changes: [
+            {
+                type: "balance",
+                text: "오브 회수 뒤 2초 안에 적이 범위로 들어오면 남은 시간 동안 원소 주문을 사용합니다."
+            }
+        ]
+    },
+    {
         version: "0.35.1",
         date: "2026-07-19",
         title: "v0.35.1 원소 오브 필드 유지",

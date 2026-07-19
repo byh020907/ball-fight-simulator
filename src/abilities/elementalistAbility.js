@@ -146,25 +146,37 @@ export class ElementalistAbility extends Ability {
 
     consumeOrbByOwner(orb) {
         if (orb.isExpired) return;
-        const target = orb.isComposite
-            ? this.selectCompositeMemoryTarget(orb.materialMemories)
-            : this._selectSingleChannelTarget(orb);
-        orb.expire();
-        if (!target) return;
         const elements = [...orb.elements];
         const recipe = orb.recipe;
-        const wetSnapshot = this._consumeWet(target);
-        this._tryManaLeap(target);
-        const channel = this._createChannel({ elements, recipe, target, wetSnapshot });
+        const channel = this._createChannel({
+            elements,
+            recipe,
+            target: null,
+            wetSnapshot: false,
+            targetMemory: orb.targetMemory,
+            materialMemories: orb.isComposite ? [...orb.materialMemories] : null
+        });
+        orb.expire();
         this.activeChannels.push(channel);
+        const target = this._selectChannelTarget(channel);
+        if (target) this._activateChannel(channel, target);
+    }
+
+    _activateChannel(channel, target) {
+        channel.target = target;
+        channel.wetSnapshot = this._consumeWet(target);
+        channel.tickCount = Math.floor(
+            channel.elapsed / ELEMENTALIST_CONFIG.channelTickInterval + TICK_BOUNDARY_EPSILON
+        );
+        this._tryManaLeap(target);
         this.simulation.entities.push(
             new ElementalChannelEffect({
                 channel,
                 source: this.owner,
                 target,
-                elements,
-                recipe,
-                duration: channel.duration
+                elements: channel.elements,
+                recipe: channel.recipe,
+                duration: channel.duration - channel.elapsed
             })
         );
         this.simulation.playSound("charge", 0.7);
@@ -205,12 +217,14 @@ export class ElementalistAbility extends Ability {
         return true;
     }
 
-    _createChannel({ elements, recipe, target, wetSnapshot }) {
+    _createChannel({ elements, recipe, target, wetSnapshot, targetMemory = null, materialMemories = null }) {
         return {
             id: nextChannelId++,
             elements,
             recipe,
             target,
+            targetMemory,
+            materialMemories,
             duration: ELEMENTALIST_CONFIG.channelDuration,
             elapsed: 0,
             wetSnapshot,
@@ -226,11 +240,20 @@ export class ElementalistAbility extends Ability {
 
     _updateChannels(delta) {
         for (const channel of this.activeChannels) {
-            if (!this._isValidTarget(channel.target)) {
+            if (channel.target && !this._isValidTarget(channel.target)) {
                 this._cancelChannel(channel);
                 continue;
             }
             channel.elapsed = Math.min(channel.duration, channel.elapsed + delta);
+            if (!channel.target) {
+                if (channel.elapsed >= channel.duration) {
+                    channel.finished = true;
+                    continue;
+                }
+                const target = this._selectChannelTarget(channel);
+                if (!target) continue;
+                this._activateChannel(channel, target);
+            }
             this._updateChannel(channel, delta);
             if (channel.elapsed >= channel.duration) {
                 this._finishChannel(channel);
@@ -389,12 +412,16 @@ export class ElementalistAbility extends Ability {
         return true;
     }
 
-    _selectSingleChannelTarget(orb) {
-        const remembered = orb.targetMemory;
+    _selectSingleChannelTarget(remembered) {
         if (this.getLevelUpgrade().wetDuration && this._isValidTarget(remembered) && this._hasWet(remembered)) {
             return remembered;
         }
         return this._nearestValidEnemy();
+    }
+
+    _selectChannelTarget(channel) {
+        if (channel.materialMemories) return this.selectCompositeMemoryTarget(channel.materialMemories);
+        return this._selectSingleChannelTarget(channel.targetMemory);
     }
 
     selectCompositeMemoryTarget(memories) {

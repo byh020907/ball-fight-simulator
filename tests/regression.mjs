@@ -23995,6 +23995,70 @@ function testElementalistOrbProgressionAndOwnership() {
 
 testElementalistOrbProgressionAndOwnership();
 
+function testElementalistChannelDetectionWindow() {
+    const { simulation, owner, ability, enemies } = createElementalistSimulation({ tier: 2 });
+    const [target] = enemies;
+    owner.position = new Vector2(200, 300);
+    target.position = new Vector2(900, 300);
+    target.hp = 5000;
+    target.maxHp = 5000;
+    const damageEvents = [];
+    target.takeDamage = (damage) => {
+        damageEvents.push(damage);
+        return { actualDamage: damage };
+    };
+    const orb = new ElementalOrb({
+        owner,
+        element: "electric",
+        position: owner.position.clone(),
+        targetMemory: target,
+        ability
+    });
+    ability.activeOrbs.push(orb);
+    simulation.entities.push(orb);
+    ability.consumeOrbByOwner(orb);
+    assert.equal(ability.activeChannels.length, 1, "Out-of-range pickup must preserve a two-second detection window");
+    assert.equal(ability.activeChannels[0].target, null, "Detection must remain pending without a target in range");
+    assert.equal(
+        simulation.entities.some((entity) => entity.channel === ability.activeChannels[0]),
+        false,
+        "Pending detection must not create a target channel visual"
+    );
+
+    ability._updateChannels(1.2);
+    assert.equal(ability.activeChannels[0].elapsed, 1.2, "Pending detection must spend the shared channel time");
+    target.position = new Vector2(500, 300);
+    ability._updateChannels(0.01);
+    assert.equal(ability.activeChannels[0].target, target, "A target entering range must start the remaining channel");
+    assert.equal(damageEvents.length, 0, "Target acquisition must not replay damage ticks spent while detecting");
+    ability._updateChannels(0.08);
+    assert.equal(damageEvents.length, 1, "Only post-acquisition channel ticks may deal damage");
+
+    target.position = new Vector2(900, 300);
+    ability._updateChannels(0.01);
+    assert.equal(ability.activeChannels.length, 0, "Leaving range after acquisition must cancel the channel");
+
+    const expiredRun = createElementalistSimulation({ tier: 0 });
+    const expiredTarget = expiredRun.enemies[0];
+    expiredRun.owner.position = new Vector2(200, 300);
+    expiredTarget.position = new Vector2(900, 300);
+    const expiredOrb = new ElementalOrb({
+        owner: expiredRun.owner,
+        element: "earth",
+        position: expiredRun.owner.position.clone(),
+        targetMemory: expiredTarget,
+        ability: expiredRun.ability
+    });
+    expiredRun.ability.activeOrbs.push(expiredOrb);
+    expiredRun.simulation.entities.push(expiredOrb);
+    expiredRun.ability.consumeOrbByOwner(expiredOrb);
+    expiredRun.ability._updateChannels(ELEMENTALIST_CONFIG.channelDuration);
+    assert.equal(expiredRun.ability.activeChannels.length, 0, "Detection must expire when its two seconds end");
+    console.log("[elementalist-channel-detection-window] ok");
+}
+
+testElementalistChannelDetectionWindow();
+
 function testElementalistChannelDurationAndDamageCadence() {
     const { owner, ability, enemies } = createElementalistSimulation({ tier: 3 });
     const [enemy] = enemies;
@@ -24006,8 +24070,8 @@ function testElementalistChannelDurationAndDamageCadence() {
     const abilitySource = readFileSync("src/abilities/elementalistAbility.js", "utf8");
     assert.match(
         abilitySource,
-        /channel\.elapsed = Math\.min\(channel\.duration, channel\.elapsed \+ delta\);\s*this\._updateChannel\(channel, delta\);/,
-        "Single and composite channels must enter the shared update path after elapsed time advances"
+        /channel\.elapsed = Math\.min\(channel\.duration, channel\.elapsed \+ delta\);\s*if \(!channel\.target\)[\s\S]*?this\._activateChannel\(channel, target\);\s*}\s*this\._updateChannel\(channel, delta\);/,
+        "Single and composite channels must spend detection time before entering the shared attack path"
     );
     assert.doesNotMatch(
         abilitySource,
