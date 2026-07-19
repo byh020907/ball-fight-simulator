@@ -20,6 +20,7 @@ import { pickRandomActions, findActionById, showActionFailure } from "./clickAct
 import { BattleBall } from "./entities/index.js";
 import { drawEquipmentItems, getCharacterOutlineWidth } from "./entities/equipmentVisuals.js";
 import { PreviewReselectSimulation } from "./preview/previewReselectSimulation.js";
+import { getCombinedHealthBarPercentages } from "./fighterHealthBar.js";
 import {
     beginDebugProfileSession,
     endDebugProfileSession,
@@ -811,13 +812,19 @@ export class BattleApp {
             }));
             const shieldState = fighter.getShieldState();
             const shield = Math.max(0, shieldState.current);
+            const healthBar = getCombinedHealthBarPercentages({
+                hp: fighter.hp,
+                maxHp: fighter.maxHp,
+                shield,
+                maximumShield: shieldState.maximum
+            });
             return {
                 ...card,
                 hp: Math.ceil(fighter.hp),
                 maxHp: Math.ceil(fighter.maxHp),
-                hpPct: Math.max(0, (fighter.hp / fighter.maxHp) * 100),
+                hpPct: healthBar.hpPct,
                 shield: Math.ceil(shield),
-                shieldPct: Math.min(100, (shield / fighter.maxHp) * 100),
+                shieldPct: healthBar.shieldPct,
                 defeated: fighter.flags.defeated,
                 mergedBonuses: bonuses,
                 statLine: isHero

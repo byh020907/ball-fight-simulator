@@ -28,6 +28,7 @@ export class HeroAbility extends Ability {
             chargeTimer: 0,
             pursuitTimer: 0,
             shield: 0,
+            shieldDecayTimer: 0,
             counterCooldown: 0,
             stackGainFlash: 0,
             stackReleaseFlash: 0
@@ -37,6 +38,7 @@ export class HeroAbility extends Ability {
     update(delta, target) {
         this._tickTransientState(delta);
         this._clampShield();
+        this._decayShield(delta);
         this._chargeGrowthStacks(delta);
         this._updatePursuit(delta, target);
     }
@@ -208,6 +210,21 @@ export class HeroAbility extends Ability {
         this.state.shield = Math.min(Math.max(0, this.state.shield), this.getMaximumShield());
     }
 
+    _decayShield(delta) {
+        if (this.state.shield <= 0) {
+            this.state.shieldDecayTimer = 0;
+            return;
+        }
+        const config = HERO_COMBAT_CONFIG.armor;
+        this.state.shieldDecayTimer += Math.max(0, delta);
+        const tickCount = Math.floor((this.state.shieldDecayTimer + Number.EPSILON) / config.decayInterval);
+        if (tickCount <= 0) return;
+        this.state.shieldDecayTimer -= tickCount * config.decayInterval;
+        const decayPerTick = this.owner.maxHp * config.decayMaxHpRatioPerSecond * config.decayInterval;
+        this.state.shield = Math.max(0, this.state.shield - decayPerTick * tickCount);
+        if (this.state.shield <= 0) this.state.shieldDecayTimer = 0;
+    }
+
     absorbIncomingDamage(damage, source, label, options = {}) {
         if (!this.getLevelUpgrade().heroArmor || this.state.shield <= 0 || damage <= 0) {
             return { remainingDamage: damage, absorbedDamage: 0 };
@@ -281,7 +298,7 @@ export class HeroAbility extends Ability {
             if (direction.length() > config.radius + enemy.radius) continue;
             enemy.takeDamage(damage, this.owner, "Hero Shield Break", { suppressReactiveEffects: true });
             if (direction.length() <= 0.001) direction.x = 1;
-            enemy.applyKnockback(direction.normalize().scale(config.knockbackSpeed), config.knockbackDuration);
+            enemy.applyKnockback?.(direction.normalize().scale(config.knockbackSpeed), config.knockbackDuration);
         }
         this.simulation.entities.push(new HeroShieldBreakEffect(center, config.radius, config.visualDuration));
         this.simulation.spawnParticleBurst(center, "#ffd84d", {

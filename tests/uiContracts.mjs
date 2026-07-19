@@ -8,6 +8,7 @@ import { createCollectionHubViewModel } from "../src/collection/collectionViewMo
 import { createDefaultPlayerProfile } from "../src/playerProfile.js";
 import { createRoster } from "../src/roster.js";
 import { MASTERY_EFFECT_DEFS } from "../src/character-mastery/masteryDefinitions.js";
+import { getCombinedHealthBarPercentages } from "../src/fighterHealthBar.js";
 
 function readSource(path) {
     return readFileSync(path, "utf8");
@@ -702,6 +703,17 @@ function testGameplayUiResetContracts() {
         "BattleApp should own the result-confirmation UI reset entry point"
     );
     console.log("[gameplay-ui-reset-contract] ok");
+}
+
+function testCombinedHealthBarProportions() {
+    const fullArmor = getCombinedHealthBarPercentages({ hp: 100, maxHp: 100, shield: 50, maximumShield: 50 });
+    assert.ok(Math.abs(fullArmor.hpPct - 100 / 1.5) < 1e-9, "Full HP should occupy two thirds of Hero capacity");
+    assert.ok(
+        Math.abs(fullArmor.shieldPct - 50 / 1.5) < 1e-9,
+        "A half-max-HP shield should occupy one third of combined capacity"
+    );
+    assert.ok(Math.abs(fullArmor.hpPct + fullArmor.shieldPct - 100) < 1e-9, "Full HP and shield should fill one bar");
+    console.log("[combined-health-bar-proportions] ok");
 }
 
 function testNoWindowUiManagerInProduction() {
@@ -1438,6 +1450,7 @@ testCollectionEquipmentPanelsShareHubState();
 testCollectionDetailContracts();
 testPopupCloseOwnershipContract();
 testGameplayUiResetContracts();
+testCombinedHealthBarProportions();
 testNoWindowUiManagerInProduction();
 testAlpineTemplateUiManagerContracts();
 testHuntingOverlayActionContracts();

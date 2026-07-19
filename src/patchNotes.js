@@ -19,6 +19,25 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.34.4",
+        date: "2026-07-19",
+        title: "v0.34.4 Hero 보호막 비율과 감쇠",
+        changes: [
+            {
+                type: "ui",
+                text: "Hero Ball의 체력과 보호막이 합산 최대 용량에 맞는 실제 비율로 한 체력 바에 표시됩니다."
+            },
+            {
+                type: "balance",
+                text: "Hero Ball의 보호막이 0.1초마다 최대 체력의 0.2%, 초당 2%씩 자연 감소합니다."
+            },
+            {
+                type: "fix",
+                text: "보호막 파괴 충격파가 고정 포탑에 닿아도 전투가 중단되지 않고 피해를 적용합니다."
+            }
+        ]
+    },
+    {
         version: "0.34.3",
         date: "2026-07-19",
         title: "v0.34.3 금빛 바람 칼날 반격 가시성",

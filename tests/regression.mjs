@@ -5913,6 +5913,36 @@ function testAbilityLevelUpgrades(app) {
         heroDrawWithoutShield.calls,
         "Active Hero shield should not add persistent world-space decorations"
     );
+    const maximumShield = heroAbility.getMaximumShield();
+    const decayPerTick =
+        heroRun.ball.maxHp * HERO_COMBAT_CONFIG.armor.decayMaxHpRatioPerSecond * HERO_COMBAT_CONFIG.armor.decayInterval;
+    heroAbility.state.shield = maximumShield;
+    heroAbility.state.shieldDecayTimer = 0;
+    heroAbility.update(HERO_COMBAT_CONFIG.armor.decayInterval - 0.01, heroRun.target);
+    assert.equal(heroAbility.state.shield, maximumShield, "Hero shield should not decay before the 0.1-second tick");
+    heroAbility.update(0.01, heroRun.target);
+    assert.ok(
+        Math.abs(heroAbility.state.shield - (maximumShield - decayPerTick)) < 1e-9,
+        "Hero shield should lose 0.2% maximum HP on each 0.1-second tick"
+    );
+    heroAbility.update(0.9, heroRun.target);
+    assert.ok(
+        Math.abs(
+            heroAbility.state.shield -
+                (maximumShield - heroRun.ball.maxHp * HERO_COMBAT_CONFIG.armor.decayMaxHpRatioPerSecond)
+        ) < 1e-9,
+        "Ten shield ticks should lose exactly two-percent maximum HP over one second"
+    );
+    const breakEffectsBeforeDecay = heroRun.sim.entities.filter(
+        (entity) => entity instanceof HeroShieldBreakEffect
+    ).length;
+    heroAbility.update(30, heroRun.target);
+    assert.equal(heroAbility.state.shield, 0, "Passive shield decay should stop at zero");
+    assert.equal(
+        heroRun.sim.entities.filter((entity) => entity instanceof HeroShieldBreakEffect).length,
+        breakEffectsBeforeDecay,
+        "Passive shield decay should not trigger the hostile shield-break reward"
+    );
     const coreLimitRun = createTierSimulation(FIGHTER_IDS.HERO);
     for (const index of Array.from({ length: 12 }, (_, value) => value)) {
         coreLimitRun.ball.ability._spawnCore(
@@ -6980,6 +7010,7 @@ function testFiveBallLevelRewardContracts(app) {
     heroAbility.state.shield = 10;
     heroRun.target.position = new Vector2(420, 300);
     heroRun.nearby.position = new Vector2(430, 340);
+    heroRun.nearby.applyKnockback = undefined;
     const targetHpBeforeBreak = heroRun.target.hp;
     const nearbyHpBeforeBreak = heroRun.nearby.hp;
     const breakDamage = heroRun.owner.takeDamage(20, heroRun.target, "Hero Armor Break Test", {
@@ -6995,7 +7026,11 @@ function testFiveBallLevelRewardContracts(app) {
         75,
         "Hero shield break should deal x0.75 attack damage to its hostile source"
     );
-    assert.equal(nearbyHpBeforeBreak - heroRun.nearby.hp, 75, "Hero shield break should damage another nearby hostile");
+    assert.equal(
+        nearbyHpBeforeBreak - heroRun.nearby.hp,
+        75,
+        "Hero shield break should damage a nearby hostile even when it does not support knockback"
+    );
     const shieldBreak = heroRun.simulation.entities.find((entity) => entity instanceof HeroShieldBreakEffect);
     assertForegroundEffectRenders(shieldBreak, "Hero shield break", (primitives) => {
         assert.ok(
