@@ -7,6 +7,7 @@ import {
     drawElementalOrbIdentities,
     updateElementalChannelVisualState
 } from "./elementalIdentityEffects.js";
+import { drawElementalWetChannelBuildUp } from "./elementalWetReactionEffect.js";
 
 const SHAPE_COUNT = 8;
 
@@ -296,6 +297,7 @@ export class ElementalChannelEffect extends CombatEntity {
         };
         drawTargetChannelTimeline(ctx, view, progress);
         drawElementalChannelIdentity(ctx, view, progress, this.visualState);
+        drawElementalWetChannelBuildUp(ctx, view, progress);
         drawMultiShapeMotion(ctx, view, progress);
         drawAttachedMarker(ctx, view, progress);
         drawFinishImpact(ctx, view, progress);

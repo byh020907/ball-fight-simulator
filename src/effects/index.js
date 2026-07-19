@@ -11,6 +11,11 @@ export { GravityParticle } from "./gravityParticle.js";
 export { SlashTrail } from "./slashTrail.js";
 export { createElectricArcPath, drawElectricArc } from "./electricArc.js";
 export { ELEMENTAL_WET_VISUAL_CONFIG, ElementalWetEffect, applyElementalWet } from "./elementalWetEffect.js";
+export {
+    ELEMENTAL_WET_REACTION_VISUAL_CONFIG,
+    ElementalWetReactionEffect,
+    drawElementalWetChannelBuildUp
+} from "./elementalWetReactionEffect.js";
 export { createFlowFieldVisual, drawFlowFieldVisual, updateFlowFieldVisual } from "./flowFieldVisual.js";
 export { DamageNumber, CriticalNumber, ActionText } from "./floatingText.js";
 export { ActionWindowEffect, ActionSuccessEffect, ActionWhiffEffect } from "./actionEffects.js";

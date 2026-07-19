@@ -14,14 +14,23 @@ export const BURNING_EFFECT_CONFIG = Object.freeze({
     totalDamageMultiplier: 0.5
 });
 
-export function applyBurningEffect({ source, target, simulation, label = "Burning", config = BURNING_EFFECT_CONFIG }) {
+export function applyBurningEffect({
+    source,
+    target,
+    simulation,
+    label = "Burning",
+    config = BURNING_EFFECT_CONFIG,
+    totalDamage = null
+}) {
     const duration = config.duration ?? BURNING_EFFECT_CONFIG.duration;
     const tickInterval = config.tickInterval ?? BURNING_EFFECT_CONFIG.tickInterval;
     const maximumTicks = config.maximumTicks ?? BURNING_EFFECT_CONFIG.maximumTicks;
     const totalDamageMultiplier = config.totalDamageMultiplier ?? BURNING_EFFECT_CONFIG.totalDamageMultiplier;
-    const totalDamage = source.stats.baseDamage * totalDamageMultiplier;
-    const damagePerTick = totalDamage / maximumTicks;
-    const exactTotalDamage = config.exactTotalDamage ? totalDamage : null;
+    const resolvedTotalDamage = Number.isFinite(totalDamage)
+        ? totalDamage
+        : source.stats.baseDamage * totalDamageMultiplier;
+    const damagePerTick = resolvedTotalDamage / maximumTicks;
+    const exactTotalDamage = config.exactTotalDamage || Number.isFinite(totalDamage) ? resolvedTotalDamage : null;
     if (target._igniteState instanceof BurningEffect && !target._igniteState.isExpired) {
         target._igniteState.refresh({
             source,

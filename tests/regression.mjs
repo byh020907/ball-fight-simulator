@@ -76,6 +76,7 @@ import {
     ELEMENTAL_CHANNEL_VISUAL_CONFIG,
     ELEMENTAL_ORB_IDENTITY_CONFIG,
     ElementalChannelEffect,
+    ElementalWetReactionEffect,
     ElementalWetEffect,
     drawElementalOrb
 } from "../src/effects/index.js";
@@ -23955,6 +23956,195 @@ function testElementalistChannelDurationAndDamageCadence() {
 
 testElementalistChannelDurationAndDamageCadence();
 
+function testElementalistWetReactionLifecycle() {
+    const fireRun = createElementalistSimulation({ tier: 3 });
+    const [fireTarget] = fireRun.enemies;
+    fireTarget.rollCritical = () => false;
+    fireTarget.hp = 5000;
+    fireTarget.maxHp = 5000;
+    const fireDamageEvents = [];
+    const takeFireDamage = fireTarget.takeDamage.bind(fireTarget);
+    fireTarget.takeDamage = (damage, source, label, options) => {
+        const result = takeFireDamage(damage, source, label, options);
+        fireDamageEvents.push({ requestedDamage: damage, actualDamage: result.actualDamage, label });
+        return result;
+    };
+    const fireChannel = fireRun.ability._createChannel({
+        elements: ["fire"],
+        recipe: null,
+        target: fireTarget,
+        wetSnapshot: false
+    });
+    fireRun.ability.activeChannels = [fireChannel];
+    fireRun.ability._updateChannels(ELEMENTALIST_CONFIG.channelTickInterval);
+    assert.ok(fireTarget._igniteState, "Fire must ignite on its first real channel damage tick");
+    assert.equal(fireTarget._igniteState.tickCount, 0, "Ignition must not front-load its periodic damage");
+    fireTarget._igniteState.update(0.5);
+    while (fireRun.ability.activeChannels.length > 0) {
+        fireRun.ability._updateChannels(ELEMENTALIST_CONFIG.channelTickInterval);
+    }
+    assert.equal(
+        fireDamageEvents
+            .filter(({ label }) => label === "원소 주문")
+            .reduce((total, { requestedDamage }) => total + requestedDamage, 0),
+        Math.round(fireRun.owner.stats.baseDamage * 1),
+        "Fire direct channel requests must use x1.00 before the shared minimum-one rule"
+    );
+    assert.equal(
+        fireDamageEvents
+            .filter(({ label }) => label === "원소 주문")
+            .reduce((total, { actualDamage }) => total + actualDamage, 0),
+        25,
+        "Fire must retain the approved minimum-one damage on all twenty-five ticks"
+    );
+    assert.equal(
+        fireDamageEvents
+            .filter(({ label }) => label === "원소 점화")
+            .reduce((total, { requestedDamage }) => total + requestedDamage, 0),
+        Math.round(fireRun.owner.stats.baseDamage * 0.5),
+        "Fire ignition must add one shared x0.50 damage cycle"
+    );
+
+    const electricRun = createElementalistSimulation({ tier: 3 });
+    const [electricTarget] = electricRun.enemies;
+    electricTarget.rollCritical = () => false;
+    electricTarget.hp = 5000;
+    electricTarget.maxHp = 5000;
+    const electricReactionEvents = [];
+    const takeElectricDamage = electricTarget.takeDamage.bind(electricTarget);
+    electricTarget.takeDamage = (damage, source, label, options) => {
+        const result = takeElectricDamage(damage, source, label, options);
+        if (label === "과전류") electricReactionEvents.push(damage);
+        return result;
+    };
+    const electricChannel = electricRun.ability._createChannel({
+        elements: ["electric"],
+        recipe: null,
+        target: electricTarget,
+        wetSnapshot: true
+    });
+    electricRun.ability.activeChannels = [electricChannel];
+    while (electricRun.ability.activeChannels.length > 0) {
+        electricRun.ability._updateChannels(ELEMENTALIST_CONFIG.channelTickInterval);
+    }
+    assert.deepEqual(
+        electricReactionEvents,
+        [Math.round(electricRun.owner.stats.baseDamage * 0.5)],
+        "Wet electric must settle once for x0.50 after the channel"
+    );
+    assert.ok(
+        electricRun.simulation.entities.some((entity) => entity instanceof ElementalWetReactionEffect),
+        "Settled wet damage must emit its reusable reaction VFX"
+    );
+    for (const element of ["fire", "electric", "frost", "wind", "earth"]) {
+        const reactionEffect = new ElementalWetReactionEffect({ target: electricTarget, elements: [element] });
+        const recording = makeRecordingCanvasContext();
+        assert.doesNotThrow(() => reactionEffect.draw(recording), `${element} wet reaction VFX must render safely`);
+        assert.ok(recording.calls.length > 0, `${element} wet reaction VFX must emit visible canvas primitives`);
+    }
+    electricRun.ability._updateChannels(0.2);
+    assert.equal(electricReactionEvents.length, 1, "Completed channels must not settle wet damage twice");
+
+    const windRun = createElementalistSimulation({ tier: 3 });
+    const [windTarget] = windRun.enemies;
+    windRun.owner.position = new Vector2(200, 300);
+    windTarget.position = new Vector2(300, 300);
+    windTarget.velocity = new Vector2();
+    windTarget.hp = 5000;
+    windTarget.maxHp = 5000;
+    windTarget.rollCritical = () => false;
+    const windReactionEvents = [];
+    const takeWindDamage = windTarget.takeDamage.bind(windTarget);
+    windTarget.takeDamage = (damage, source, label, options) => {
+        const result = takeWindDamage(damage, source, label, options);
+        if (label === "물회오리") windReactionEvents.push(damage);
+        return result;
+    };
+    const windChannel = windRun.ability._createChannel({
+        elements: ["wind"],
+        recipe: null,
+        target: windTarget,
+        wetSnapshot: true
+    });
+    windRun.ability.activeChannels = [windChannel];
+    windRun.ability._updateChannels(0.1);
+    assert.ok(windTarget.velocity.x > 0, "Wind must continuously push directly away from the caster");
+    assert.ok(Math.abs(windTarget.velocity.y) < 1e-9, "Wind must not apply the removed tangential orbit impulse");
+    windTarget.position = new Vector2(1200, 300);
+    windRun.ability._updateChannels(0.01);
+    assert.equal(windRun.ability.activeChannels.length, 0, "Leaving channel range must cancel the wind channel");
+    assert.deepEqual(
+        windReactionEvents,
+        [Math.round(windRun.owner.stats.baseDamage * 0.15)],
+        "Early cancellation must still settle wet wind exactly once"
+    );
+    windRun.ability._updateChannels(0.1);
+    assert.equal(windReactionEvents.length, 1, "Cancelled channels must not repeat their wet reaction");
+
+    const controlRun = createElementalistSimulation({ tier: 3 });
+    const [controlTarget] = controlRun.enemies;
+    const earthChannel = controlRun.ability._createChannel({
+        elements: ["earth"],
+        recipe: null,
+        target: controlTarget,
+        wetSnapshot: true
+    });
+    controlRun.ability.activeChannels = [earthChannel];
+    controlRun.ability._updateChannels(0.05);
+    assert.equal(
+        controlTarget.state.slow.amount,
+        0,
+        "Wet earth must bind immediately instead of waiting for channel end"
+    );
+    assert.equal(controlTarget.state.slow.duration, 0.35, "Wet earth must keep its short immediate bind duration");
+
+    const compositeControlRun = createElementalistSimulation({ tier: 3 });
+    const [compositeControlTarget] = compositeControlRun.enemies;
+    const earthFrostRecipe = ELEMENTAL_COMPOSITE_RECIPES["earth:frost"];
+    const earthFrostChannel = compositeControlRun.ability._createChannel({
+        elements: earthFrostRecipe.elements,
+        recipe: earthFrostRecipe,
+        target: compositeControlTarget,
+        wetSnapshot: true
+    });
+    compositeControlRun.ability.activeChannels = [earthFrostChannel];
+    compositeControlRun.ability._updateChannels(0.05);
+    assert.equal(
+        compositeControlTarget.state.slow.amount,
+        0,
+        "Earth-frost fusion must preserve earth's immediate bind before progressive frost takes over"
+    );
+    compositeControlRun.ability._updateChannels(0.35);
+    assert.ok(
+        compositeControlTarget.state.slow.amount > 0,
+        "Earth-frost fusion may continue with progressive frost after the immediate earth bind"
+    );
+
+    const frostRun = createElementalistSimulation({ tier: 3 });
+    const [frostTarget] = frostRun.enemies;
+    const frostChannel = frostRun.ability._createChannel({
+        elements: ["frost"],
+        recipe: null,
+        target: frostTarget,
+        wetSnapshot: true
+    });
+    frostRun.ability.activeChannels = [frostChannel];
+    frostRun.ability._updateChannels(0.4);
+    const earlyFrostMovement = frostTarget.state.slow.amount;
+    frostRun.ability._updateChannels(0.8);
+    assert.ok(
+        frostTarget.state.slow.amount < earlyFrostMovement,
+        "Wet frost must progressively reduce movement throughout the channel"
+    );
+    frostTarget.position = new Vector2(1200, 300);
+    frostRun.ability._updateChannels(0.01);
+    assert.equal(frostTarget.state.slow.amount, 0, "Cancelling wet frost must complete the freeze reaction");
+    assert.equal(frostTarget.state.slow.duration, 0.45, "Completed wet frost must keep the configured stop duration");
+    console.log("[elementalist-wet-reaction-lifecycle] ok");
+}
+
+testElementalistWetReactionLifecycle();
+
 function testElementalistFusionChannelsAndCleanup() {
     assert.equal(Object.keys(ELEMENTAL_COMPOSITE_RECIPES).length, 10, "All ten unordered pairs need recipes");
     assert.equal(
@@ -24296,9 +24486,9 @@ function testElementalistVfxPreviewCatalog() {
     );
     assert.equal(options.find(({ id }) => id === "wet")?.damageComparison, null);
     assert.deepEqual(getElementalistWetDamageComparison(["fire"]), {
-        baseMultiplier: 1.52,
+        baseMultiplier: 1.5,
         wetBonusMultiplier: 0.2,
-        wetTotalMultiplier: 1.72,
+        wetTotalMultiplier: 1.7,
         increasePercent: 13,
         damageReactionLabels: ["증기 충격"],
         rootDuration: 0
@@ -24306,9 +24496,9 @@ function testElementalistVfxPreviewCatalog() {
     assert.deepEqual(
         getElementalistWetDamageComparison(["frost", "earth"], ELEMENTAL_COMPOSITE_RECIPES["earth:frost"]),
         {
-            baseMultiplier: 2.47,
+            baseMultiplier: 2.45,
             wetBonusMultiplier: 0,
-            wetTotalMultiplier: 2.47,
+            wetTotalMultiplier: 2.45,
             increasePercent: 0,
             damageReactionLabels: [],
             rootDuration: 0.45
@@ -24359,6 +24549,11 @@ function testElementalistVfxPreviewCatalog() {
     );
     assert.equal(wetReactionScene.effect.channel.wetSnapshot, true);
     assert.equal(wetReactionScene.target.state.elementalWetUntil, 0, "Wet replay should consume the preview state");
+    for (let step = 0; step < 40; step += 1) wetReactionScene.update(0.05);
+    assert.ok(
+        wetReactionScene.effect instanceof ElementalWetReactionEffect,
+        "Wet replay should show the reusable reaction effect after its channel"
+    );
     console.log("[elementalist-vfx-preview-catalog] ok");
 }
 

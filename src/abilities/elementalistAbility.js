@@ -1,6 +1,13 @@
 import { applyCollisionImpulse, Vector2 } from "../core.js";
 import { ElementalOrb, ElementalWaterBolt } from "../entities/index.js";
-import { ElementalChannelEffect, VisualBurst, applyElementalWet } from "../effects/index.js";
+import {
+    BURNING_EFFECT_CONFIG,
+    ElementalChannelEffect,
+    ElementalWetReactionEffect,
+    VisualBurst,
+    applyBurningEffect,
+    applyElementalWet
+} from "../effects/index.js";
 import { applyMagneticAttraction } from "../physics/index.js";
 import { Ability } from "./ability.js";
 import {
@@ -23,19 +30,19 @@ const ELEMENTALIST_CONFIG = Object.freeze({
 });
 
 const SINGLE_SPELLS = Object.freeze({
-    fire: { damageMultiplier: 1.52 },
-    electric: { damageMultiplier: 1.38 },
+    fire: { damageMultiplier: 1, ignitionDamageMultiplier: 0.5 },
+    electric: { damageMultiplier: 1.5 },
     frost: { damageMultiplier: 1, slow: { duration: 1.2, amount: 0.55 } },
-    wind: { damageMultiplier: 1.14, tangentImpulse: 0.16 },
-    earth: { damageMultiplier: 1.48 }
+    wind: { damageMultiplier: 1.15, pushImpulse: 0.15 },
+    earth: { damageMultiplier: 1.5 }
 });
 
 const WET_REACTION_CONFIG = Object.freeze({
-    fire: Object.freeze({ damageMultiplier: 0.2, label: "증기 충격", impulseScale: 0.16 }),
-    electric: Object.freeze({ damageMultiplier: 0.18, label: "과전류" }),
-    frost: Object.freeze({ rootDuration: 0.45, label: "냉기 속박" }),
+    fire: Object.freeze({ damageMultiplier: 0.2, label: "증기 충격", impulseScale: 0.15 }),
+    electric: Object.freeze({ damageMultiplier: 0.5, label: "과전류" }),
+    frost: Object.freeze({ rootDuration: 0.45, progressiveSlowStart: 0.55, label: "냉기 속박" }),
     wind: Object.freeze({ damageMultiplier: 0.15, label: "물회오리" }),
-    earth: Object.freeze({ rootDuration: 0.35, label: "대지 속박" })
+    earth: Object.freeze({ rootDuration: 0.35, immediate: true, label: "대지 속박" })
 });
 
 let nextChannelId = 1;
@@ -52,14 +59,16 @@ function exactTickDamage(totalDamage, tickNumber, maximumTicks) {
 }
 
 export function getElementalistWetDamageComparison(elements, recipe = null) {
-    const baseMultiplier = recipe?.damageMultiplier ?? SINGLE_SPELLS[elements[0]]?.damageMultiplier ?? 0;
+    const directDamageMultiplier = recipe?.damageMultiplier ?? SINGLE_SPELLS[elements[0]]?.damageMultiplier ?? 0;
+    const ignitionDamageMultiplier = elements.includes("fire") ? SINGLE_SPELLS.fire.ignitionDamageMultiplier : 0;
+    const baseMultiplier = directDamageMultiplier + ignitionDamageMultiplier;
     const reactions = elements.map((element) => WET_REACTION_CONFIG[element]).filter(Boolean);
     const wetBonusMultiplier = reactions.reduce((total, reaction) => total + (reaction.damageMultiplier ?? 0), 0);
     const rootDuration = reactions.reduce((longest, reaction) => Math.max(longest, reaction.rootDuration ?? 0), 0);
     return {
         baseMultiplier,
         wetBonusMultiplier,
-        wetTotalMultiplier: baseMultiplier + wetBonusMultiplier,
+        wetTotalMultiplier: Math.round((baseMultiplier + wetBonusMultiplier) * 100) / 100,
         increasePercent: baseMultiplier > 0 ? Math.round((wetBonusMultiplier / baseMultiplier) * 100) : 0,
         damageReactionLabels: reactions
             .filter((reaction) => reaction.damageMultiplier)
@@ -164,6 +173,9 @@ export class ElementalistAbility extends Ability {
             wetSnapshot,
             tickCount: 0,
             started: false,
+            fireIgnited: false,
+            wetReactionStarted: false,
+            wetReactionSettled: false,
             finished: false,
             cancelled: false
         };
@@ -172,7 +184,7 @@ export class ElementalistAbility extends Ability {
     _updateChannels(delta) {
         for (const channel of this.activeChannels) {
             if (!this._isValidTarget(channel.target)) {
-                channel.cancelled = true;
+                this._cancelChannel(channel);
                 continue;
             }
             channel.elapsed = Math.min(channel.duration, channel.elapsed + delta);
@@ -192,9 +204,10 @@ export class ElementalistAbility extends Ability {
         if (!channel.started) {
             channel.started = true;
             if (spell.slow) channel.target.applySlow?.(spell.slow.duration, spell.slow.amount);
-            this._applyWetReaction(channel.target, channel.elements, channel.wetSnapshot, 1);
+            this._startWetReaction(channel);
         }
-        if (element === "wind") this._applyTangentImpulse(channel.target, spell.tangentImpulse, delta);
+        this._updateWetReaction(channel, delta);
+        if (element === "wind") this._applyAwayImpulse(channel.target, spell.pushImpulse, delta);
         this._applyChannelDamageTicks(channel, spell.damageMultiplier);
     }
 
@@ -202,12 +215,12 @@ export class ElementalistAbility extends Ability {
         const recipe = channel.recipe;
         if (!channel.started) {
             channel.started = true;
-            this._applyWetReaction(channel.target, channel.elements, channel.wetSnapshot, 1);
             if (recipe.slow) channel.target.applySlow?.(recipe.slow.duration, recipe.slow.amount);
+            this._startWetReaction(channel);
         }
-        const progress = channelProgress(channel);
-        if (recipe.tangentImpulse && progress >= 0.2 && progress <= 0.8) {
-            this._applyTangentImpulse(channel.target, recipe.tangentImpulse, delta);
+        this._updateWetReaction(channel, delta);
+        if (channel.elements.includes("wind")) {
+            this._applyAwayImpulse(channel.target, recipe.pushImpulse ?? SINGLE_SPELLS.wind.pushImpulse, delta);
         }
         this._applyChannelDamageTicks(channel, recipe.damageMultiplier);
     }
@@ -218,6 +231,17 @@ export class ElementalistAbility extends Ability {
             maximumTicks,
             Math.floor(channel.elapsed / ELEMENTALIST_CONFIG.channelTickInterval + TICK_BOUNDARY_EPSILON)
         );
+        if (!channel.fireIgnited && channel.elements.includes("fire") && expectedTicks > channel.tickCount) {
+            channel.fireIgnited = true;
+            applyBurningEffect({
+                source: this.owner,
+                target: channel.target,
+                simulation: this.simulation,
+                label: "원소 점화",
+                config: BURNING_EFFECT_CONFIG,
+                totalDamage: this._getTotalAttack() * SINGLE_SPELLS.fire.ignitionDamageMultiplier
+            });
+        }
         while (channel.tickCount < expectedTicks) {
             channel.tickCount += 1;
             this._dealExactTick(
@@ -232,6 +256,7 @@ export class ElementalistAbility extends Ability {
 
     _finishChannel(channel) {
         if (channel.cancelled || channel.target.flags.defeated) return;
+        this._settleWetReaction(channel);
         if (channel.recipe?.finishBurst) {
             this.simulation.entities.push(
                 new VisualBurst(channel.target.position.clone(), this.getElementColor(channel.elements[0]), 70, 0.2)
@@ -239,27 +264,72 @@ export class ElementalistAbility extends Ability {
         }
     }
 
-    _applyWetReaction(target, elements, wetSnapshot, ratio) {
-        if (!wetSnapshot) return;
-        const reactions = elements.map((element) => WET_REACTION_CONFIG[element]).filter(Boolean);
-        for (const reaction of reactions) {
-            if (reaction.damageMultiplier) {
-                this._dealDamage(target, reaction.damageMultiplier * ratio, reaction.label);
-            }
-            if (reaction.impulseScale) {
-                const away = Vector2.subtract(target.position, this.owner.position).normalize();
-                target.applyImpulse(away.scale(target.stats.baseSpeed * reaction.impulseScale * ratio));
-            }
-        }
-        const rootDuration = reactions.reduce((longest, reaction) => Math.max(longest, reaction.rootDuration ?? 0), 0);
-        if (rootDuration > 0) target.applySlow?.(rootDuration * ratio, 0);
+    _startWetReaction(channel) {
+        if (!channel.wetSnapshot || channel.wetReactionStarted) return;
+        channel.wetReactionStarted = true;
+        const immediateElements = channel.elements.filter((element) => WET_REACTION_CONFIG[element]?.immediate);
+        if (immediateElements.length === 0) return;
+        const rootDuration = immediateElements.reduce(
+            (longest, element) => Math.max(longest, WET_REACTION_CONFIG[element].rootDuration ?? 0),
+            0
+        );
+        if (rootDuration > 0) channel.target.applySlow?.(rootDuration, 0);
+        this._spawnWetReactionEffect(channel.target, immediateElements);
     }
 
-    _applyTangentImpulse(target, strength, delta) {
-        const radial = Vector2.subtract(target.position, this.owner.position);
-        if (radial.length() <= 0.001) return;
-        const tangent = new Vector2(-radial.y, radial.x).normalize();
-        target.applyImpulse(tangent.scale((target.stats?.baseSpeed ?? 100) * strength * Math.max(0, delta)));
+    _updateWetReaction(channel, delta) {
+        if (!channel.wetSnapshot || !channel.elements.includes("frost")) return;
+        const immediateEarthRoot = channel.elements.includes("earth") ? WET_REACTION_CONFIG.earth.rootDuration : 0;
+        if (channel.elapsed <= immediateEarthRoot) return;
+        const reaction = WET_REACTION_CONFIG.frost;
+        const remainingMovement = reaction.progressiveSlowStart * (1 - channelProgress(channel));
+        channel.target.applySlow?.(Math.max(0.1, delta + 0.05), remainingMovement);
+    }
+
+    _cancelChannel(channel) {
+        if (channel.cancelled || channel.finished) return;
+        this._startWetReaction(channel);
+        this._settleWetReaction(channel);
+        channel.cancelled = true;
+    }
+
+    _settleWetReaction(channel) {
+        if (!channel.wetSnapshot || channel.wetReactionSettled) return;
+        channel.wetReactionSettled = true;
+        const settledElements = channel.elements.filter((element) => !WET_REACTION_CONFIG[element]?.immediate);
+        if (settledElements.length === 0) return;
+        const reactions = settledElements.map((element) => WET_REACTION_CONFIG[element]).filter(Boolean);
+        if (!channel.target.flags.defeated) {
+            const damageMultiplier = reactions.reduce((total, reaction) => total + (reaction.damageMultiplier ?? 0), 0);
+            if (damageMultiplier > 0) {
+                const labels = reactions
+                    .filter((reaction) => reaction.damageMultiplier)
+                    .map((reaction) => reaction.label)
+                    .join(" + ");
+                this._dealDamage(channel.target, damageMultiplier, labels);
+            }
+            const impulseScale = reactions.reduce((total, reaction) => total + (reaction.impulseScale ?? 0), 0);
+            if (impulseScale > 0) {
+                const away = Vector2.subtract(channel.target.position, this.owner.position).normalize();
+                channel.target.applyImpulse(away.scale(channel.target.stats.baseSpeed * impulseScale));
+            }
+            const rootDuration = reactions.reduce(
+                (longest, reaction) => Math.max(longest, reaction.rootDuration ?? 0),
+                0
+            );
+            if (rootDuration > 0) channel.target.applySlow?.(rootDuration, 0);
+        }
+        this._spawnWetReactionEffect(channel.target, settledElements);
+    }
+
+    _spawnWetReactionEffect(target, elements) {
+        this.simulation.entities.push(new ElementalWetReactionEffect({ target, elements }));
+    }
+
+    _applyAwayImpulse(target, strength, delta) {
+        const away = Vector2.subtract(target.position, this.owner.position);
+        if (away.length() <= 0.001) return;
+        target.applyImpulse(away.normalize().scale((target.stats?.baseSpeed ?? 100) * strength * Math.max(0, delta)));
     }
 
     _dealExactTick(target, multiplier, tickNumber, maximumTicks, label) {

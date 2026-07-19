@@ -2,6 +2,7 @@ import { Vector2 } from "../core.js";
 import { ELEMENTALIST_CONFIG, getElementalistWetDamageComparison } from "../abilities/elementalistAbility.js";
 import { ELEMENTAL_COMPOSITE_RECIPES, ELEMENTAL_PALETTE, ELEMENTAL_TYPES } from "../abilities/elementalistRecipes.js";
 import { ElementalChannelEffect, drawElementalOrb } from "../effects/elementalistEffects.js";
+import { ElementalWetReactionEffect } from "../effects/elementalWetReactionEffect.js";
 import { applyElementalWet } from "../effects/elementalWetEffect.js";
 
 const ELEMENT_LABELS = Object.freeze({
@@ -137,6 +138,8 @@ export class ElementalistVfxPreviewScene {
         this.target.state.elementalWetEffect = null;
         this.phaseElapsed = 0;
         this.wetReactionLeadIn = false;
+        this.wetReactionLeadOut = false;
+        this.reactionEffects = [];
         if (this.option.id === "wet") {
             this.effect = null;
             return true;
@@ -157,6 +160,7 @@ export class ElementalistVfxPreviewScene {
         this.target.state.elementalWetEffect = null;
         this.phaseElapsed = 0;
         this.wetReactionLeadIn = false;
+        this.wetReactionLeadOut = false;
         this.effect = new ElementalChannelEffect({
             channel: { cancelled: false, finished: false, wetSnapshot },
             source: this.source,
@@ -165,6 +169,9 @@ export class ElementalistVfxPreviewScene {
             recipe: this.option.recipe,
             duration: ELEMENTALIST_CONFIG.channelDuration
         });
+        if (wetSnapshot && this.option.elements.includes("earth")) {
+            this.reactionEffects.push(new ElementalWetReactionEffect({ target: this.target, elements: ["earth"] }));
+        }
     }
 
     triggerWet() {
@@ -179,6 +186,8 @@ export class ElementalistVfxPreviewScene {
         this.elapsed += boundedDelta;
         this.phaseElapsed += boundedDelta;
         this.simulation.elapsed = this.elapsed;
+        this.reactionEffects.forEach((effect) => effect.update(boundedDelta));
+        this.reactionEffects = this.reactionEffects.filter((effect) => !effect.isExpired);
         if (!this.effect) return;
         this.effect.update(boundedDelta);
         if (this.option.id === "wet") {
@@ -189,7 +198,23 @@ export class ElementalistVfxPreviewScene {
             if (this.phaseElapsed >= PREVIEW_CONFIG.wetReactionLeadIn) this._createChannelEffect(true);
             return;
         }
+        if (this.wetReactionLeadOut) {
+            if (this.effect.isExpired) this.replay(this.previewMode);
+            return;
+        }
         if (this.effect.isExpired || this.phaseElapsed >= ELEMENTALIST_CONFIG.channelDuration) {
+            if (this.previewMode === "wet") {
+                const settledElements = this.option.elements.filter((element) => element !== "earth");
+                if (settledElements.length > 0) {
+                    this.effect = new ElementalWetReactionEffect({
+                        target: this.target,
+                        elements: settledElements
+                    });
+                    this.wetReactionLeadOut = true;
+                    this.phaseElapsed = 0;
+                    return;
+                }
+            }
             this.replay(this.previewMode);
         }
     }
@@ -200,6 +225,7 @@ export class ElementalistVfxPreviewScene {
         drawPreviewFighter(ctx, this.target);
         this.orbs.forEach((orb) => drawElementalOrb(ctx, orb, this.elapsed));
         this.effect?.draw(ctx);
+        this.reactionEffects.forEach((effect) => effect.draw(ctx));
     }
 }
 

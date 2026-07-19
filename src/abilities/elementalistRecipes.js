@@ -13,7 +13,7 @@ const recipe = (id, name, elements, options) => Object.freeze({ id, name, elemen
 
 export const ELEMENTAL_COMPOSITE_RECIPES = Object.freeze({
     "electric:fire": recipe("plasma_drill", "플라즈마 송곳", ["fire", "electric"], {
-        damageMultiplier: 2.38,
+        damageMultiplier: 2.4,
         shape: "drill",
         motion: "spin",
         path: "focus",
@@ -21,7 +21,7 @@ export const ELEMENTAL_COMPOSITE_RECIPES = Object.freeze({
         finish: "pierce"
     }),
     "fire:frost": recipe("thermal_fracture", "열충격 파쇄", ["fire", "frost"], {
-        damageMultiplier: 2.18,
+        damageMultiplier: 2.2,
         shape: "crack",
         motion: "alternate",
         path: "fracture",
@@ -36,10 +36,10 @@ export const ELEMENTAL_COMPOSITE_RECIPES = Object.freeze({
         path: "spiral",
         marker: "burn",
         finish: "burst",
-        tangentImpulse: 0.2
+        pushImpulse: 0.2
     }),
     "earth:fire": recipe("lava_shards", "용암 파편", ["fire", "earth"], {
-        damageMultiplier: 2.28,
+        damageMultiplier: 2.3,
         shape: "shard",
         motion: "volley",
         path: "lob",
@@ -47,7 +47,7 @@ export const ELEMENTAL_COMPOSITE_RECIPES = Object.freeze({
         finish: "burst"
     }),
     "electric:frost": recipe("polar_ice_crystals", "극성 빙정", ["electric", "frost"], {
-        damageMultiplier: 2.18,
+        damageMultiplier: 2.2,
         shape: "crystal",
         motion: "converge",
         path: "arc",
@@ -63,10 +63,10 @@ export const ELEMENTAL_COMPOSITE_RECIPES = Object.freeze({
         marker: "travel",
         finish: "shock",
         finishBurst: true,
-        tangentImpulse: 0.18
+        pushImpulse: 0.2
     }),
     "earth:electric": recipe("magnetic_railgun", "자력 레일포", ["electric", "earth"], {
-        damageMultiplier: 2.42,
+        damageMultiplier: 2.4,
         shape: "rock",
         motion: "rail",
         path: "line",
@@ -83,7 +83,7 @@ export const ELEMENTAL_COMPOSITE_RECIPES = Object.freeze({
         slow: { duration: 0.65, amount: 0.7 }
     }),
     "earth:frost": recipe("glacial_crush", "빙하 압쇄", ["frost", "earth"], {
-        damageMultiplier: 2.47,
+        damageMultiplier: 2.45,
         shape: "boulder",
         motion: "pinch",
         path: "line",
@@ -92,7 +92,7 @@ export const ELEMENTAL_COMPOSITE_RECIPES = Object.freeze({
         slow: { duration: 0.55, amount: 0.65 }
     }),
     "earth:wind": recipe("sandstone_cutting", "사암 절삭", ["wind", "earth"], {
-        damageMultiplier: 2.18,
+        damageMultiplier: 2.2,
         shape: "sand",
         motion: "flow",
         path: "wave",
