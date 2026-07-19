@@ -671,6 +671,12 @@ function testGameplayUiResetContracts() {
         fighterStrip.includes("max-width: 100%") && fighterStrip.includes("text-overflow: ellipsis"),
         "Fighter cards should constrain long mobile labels inside their fluid grid cell"
     );
+    assert.ok(
+        fighterStrip.includes("grid-template: 1fr / 1fr") &&
+            fighterStrip.includes('class="shield-fill"') &&
+            !fighterStrip.includes('class="shield-bar"'),
+        "Shield UI should share the existing health bar instead of adding a second bar"
+    );
     const huntingOverlay = readSource("src/components/hunting-overlay.html");
     assert.ok(
         huntingOverlay.includes("resetHuntingState()"),

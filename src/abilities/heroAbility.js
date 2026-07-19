@@ -203,6 +203,7 @@ export class HeroAbility extends Ability {
     }
 
     getShieldState() {
+        if (!this.getLevelUpgrade().heroArmor) return { current: 0, maximum: 0 };
         return {
             current: this.state.shield,
             maximum: this.getMaximumShield()
@@ -384,11 +385,8 @@ export class HeroAbility extends Ability {
     }
 
     getUiState() {
-        const shield = Math.ceil(this.state.shield);
         return {
-            label: this.getLevelUpgrade().heroArmor
-                ? `Core ${this.state.growthStacks}/5 · Shield ${shield}`
-                : `Core ${this.state.growthStacks}/5`,
+            label: `Core ${this.state.growthStacks}/5`,
             progress:
                 this.state.growthStacks >= HERO_COMBAT_CONFIG.growth.stackCap
                     ? 1

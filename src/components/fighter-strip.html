@@ -13,9 +13,16 @@
                     class="hp-fill"
                     x-bind:style="'background:' + fighter.color + ';width:' + fighter.hpPct + '%' + (fighter.defeated ? ';opacity:0.3' : '')"
                 ></div>
+                <div
+                    class="shield-fill"
+                    x-show="fighter.shield > 0"
+                    x-bind:style="'width:' + fighter.shieldPct + '%' + (fighter.defeated ? ';opacity:0.3' : '')"
+                ></div>
             </div>
             <div class="fighter-hp-text">
-                <span x-text="fighter.hp + ' / ' + fighter.maxHp"></span>
+                <span
+                    x-text="fighter.hp + (fighter.shield > 0 ? '(' + fighter.shield + ')' : '') + ' / ' + fighter.maxHp"
+                ></span>
             </div>
             <div class="fighter-stat-line" x-bind:class="{ 'hero-stat-line': fighter.isHero }">
                 <span x-show="!fighter.isHero" x-text="fighter.statLine"></span>
@@ -146,16 +153,31 @@
     }
 
     .hp-bar {
-        height: 10px;
+        display: grid;
+        grid-template: 1fr / 1fr;
+        height: 0.625rem;
         border-radius: 0;
         background: #e0e0e0;
         overflow: hidden;
     }
 
-    .hp-fill {
+    .hp-fill,
+    .shield-fill {
+        grid-area: 1 / 1;
         height: 100%;
         border-radius: 0;
         transition: width 180ms ease;
+    }
+
+    .hp-fill {
+        justify-self: start;
+    }
+
+    .shield-fill {
+        justify-self: end;
+        background: repeating-linear-gradient(135deg, #7bdff2 0 5px, #45b8d1 5px 10px);
+        border-left: 2px solid #ffffff;
+        box-sizing: border-box;
     }
 
     .fighter-hp-text {

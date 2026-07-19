@@ -770,6 +770,8 @@ export class BattleApp {
                 hp: Math.ceil(hp),
                 maxHp: Math.ceil(maxHp),
                 hpPct: 100,
+                shield: 0,
+                shieldPct: 0,
                 statLine: isHero
                     ? formatHeroStatLine(fighter.stats.allocation ?? {})
                     : formatStatAllocation(fighter.stats.allocation ?? {}),
@@ -807,11 +809,15 @@ export class BattleApp {
                 progress: Math.max(0, Math.min(1, state.progress)),
                 text: state.text ?? (state.progress >= 0.995 ? "Ready" : `${Math.round(state.progress * 100)}%`)
             }));
+            const shieldState = fighter.getShieldState();
+            const shield = Math.max(0, shieldState.current);
             return {
                 ...card,
                 hp: Math.ceil(fighter.hp),
                 maxHp: Math.ceil(fighter.maxHp),
                 hpPct: Math.max(0, (fighter.hp / fighter.maxHp) * 100),
+                shield: Math.ceil(shield),
+                shieldPct: Math.min(100, (shield / fighter.maxHp) * 100),
                 defeated: fighter.flags.defeated,
                 mergedBonuses: bonuses,
                 statLine: isHero

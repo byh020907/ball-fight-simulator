@@ -367,6 +367,10 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         return this.abilities.getUiStates();
     }
 
+    getShieldState() {
+        return this.abilities.getShieldState();
+    }
+
     initState() {
         this.bounced = false;
     }

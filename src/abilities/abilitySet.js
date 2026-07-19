@@ -112,6 +112,20 @@ export class AbilitySet {
         });
     }
 
+    getShieldState() {
+        return this.all.reduce(
+            (total, ability) => {
+                const state = ability.getShieldState?.();
+                if (!state) return total;
+                return {
+                    current: total.current + Math.max(0, Number(state.current) || 0),
+                    maximum: total.maximum + Math.max(0, Number(state.maximum) || 0)
+                };
+            },
+            { current: 0, maximum: 0 }
+        );
+    }
+
     modifyOutgoingFighterCollisionDamage(damage, target, context) {
         return this._primary?.modifyOutgoingFighterCollisionDamage?.(damage, target, context) ?? damage;
     }

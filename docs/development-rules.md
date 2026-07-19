@@ -444,6 +444,8 @@ BattleBall:                heroOrbBonuses 누적값 보유, 직접적인 Hero Ba
 - `app.js`는 Hero 전용 스탯별 계산(Math.floor, hp/damage/speed/defense/skill/critical 반영)을 직접 하지 않는다.
 - 다른 캐릭터와 달리 Hero Ball 고유 로직은 `HeroAbility`, `HeroOrb`, `HERO_ORB_EFFECTS`에 완전히 캡슐화됩니다.
 - `BattleSimulation`이나 `BattleBall`에 Hero Ball 전용 조건문이 추가되지 않도록 합니다.
+- 보호막 UI는 캐릭터별 필드를 직접 읽지 않는다. 각 능력은 선택적으로 `getShieldState()`를 제공하고, `AbilitySet`이 모든 주·서브 능력의 `current`/`maximum`을 합산해 `BattleBall`과 fighter card에 전달한다.
+- fighter card 보호막은 별도 높이의 바를 만들지 않고 기존 HP 바의 동일 grid cell에 오른쪽 정렬로 겹친다. 활성 보호막 수치는 `HP(보호막) / 최대 HP` 형식을 사용한다.
 - 새 effect type을 추가하려면 `HERO_ORB_EFFECTS`에 `{ color, label, apply(owner, context) }`만 등록하면 됩니다.
 - `apply()`는 반드시 `{ applied: boolean, amount: number }`를 반환해야 합니다.
 - `HERO_ORB_STAT_CAP = -1` (기본값, 무한 성장). 0 이상이면 해당 스탯 보너스 상한 도달 시 증가 중단.

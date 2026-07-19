@@ -5859,6 +5859,11 @@ function testAbilityLevelUpgrades(app) {
         "Hero should charge exactly five growth stacks in five seconds"
     );
     const baseHeroRun = createTierSimulation(FIGHTER_IDS.HERO, 0);
+    assert.deepEqual(
+        baseHeroRun.ball.getShieldState(),
+        { current: 0, maximum: 0 },
+        "Hero should not expose a shield UI resource before the armor reward unlocks"
+    );
     const baseAttractionOrb = new HeroOrb(baseHeroRun.ball, baseHeroRun.ball.position.clone(), new Vector2(0, 0), "hp");
     assert.equal(
         baseHeroRun.ball.ability.getOrbAttraction(baseAttractionOrb).radius,
@@ -8765,11 +8770,22 @@ function testMultiAbilityFoundation(app) {
     orb.velocity = new Vector2(0, 0);
     orb.update(0, sourceSimulation);
     assert.ok(heroSub.getShieldState().current > 0, "A Hero sub ability should retain its own collected core armor");
+    assert.deepEqual(
+        gunnerOwner.getShieldState(),
+        heroSub.getShieldState(),
+        "A fighter should aggregate shield resources from registered abilities for the shared UI"
+    );
     assert.equal(gunner.timer, 3 - gunner.cooldown / 2 / 12, "Hero core effects must not mutate the Gunner cooldown");
 
     const fighterStrip = readFileSync("src/components/fighter-strip.html", "utf8");
     assert.ok(fighterStrip.includes("fighter.abilityStates"), "Fighter cards should render the ability state list");
     assert.ok(fighterStrip.includes("abilityState.role === 'sub'"), "Fighter cards should identify sub ability rows");
+    assert.ok(
+        fighterStrip.includes('class="shield-fill"') &&
+            fighterStrip.includes("fighter.shieldPct") &&
+            fighterStrip.includes("fighter.hp + (fighter.shield > 0 ? '(' + fighter.shield + ')' : '')"),
+        "Fighter cards should overlay shield inside the health bar and use HP(shield) text"
+    );
     const styles = readFileSync("src/styles.css", "utf8");
     assert.ok(
         styles.includes(".battle-stage") && styles.includes("overflow-y: auto"),

@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.34.1",
+        date: "2026-07-19",
+        title: "v0.34.1 보호막 체력 바",
+        changes: [
+            {
+                type: "ui",
+                text: "전투 카드의 체력 바 안에 현재 보호막 영역이 함께 표시되고, 체력 수치는 HP(보호막) 형식으로 표시됩니다."
+            }
+        ]
+    },
+    {
         version: "0.34.0",
         date: "2026-07-19",
         title: "v0.34.0 Hero Ball 영웅 갑옷",
