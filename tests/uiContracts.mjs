@@ -1266,6 +1266,12 @@ function testCollectionRebirthAndDeveloperContracts() {
             template.includes("ch-elementalist-damage-grid"),
         "Elementalist spell previews should expose a responsive dry-versus-wet damage comparison"
     );
+    assert.ok(
+        template.includes("마른 대상 재생") &&
+            template.includes("젖은 대상 재생") &&
+            template.includes("ch-elementalist-preview-mode-buttons"),
+        "Elementalist spell previews should expose responsive dry and wet visual replay buttons"
+    );
     assert.ok(template.includes("정예 조합"), "Developer tools should expose the elite combination selector");
     assert.ok(
         template.includes("state.developer.huntingEventType === 'elite_mob'"),

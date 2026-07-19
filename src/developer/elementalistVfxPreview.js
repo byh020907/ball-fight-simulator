@@ -20,7 +20,8 @@ const PREVIEW_CONFIG = Object.freeze({
     target: Object.freeze({ x: 515, y: 180, radius: 34 }),
     orbRadius: 13,
     maximumPixelRatio: 2,
-    maximumFrameDelta: 1 / 20
+    maximumFrameDelta: 1 / 20,
+    wetReactionLeadIn: 0.6
 });
 
 const SINGLE_PREVIEWS = ELEMENTAL_TYPES.map((element) =>
@@ -115,35 +116,49 @@ function createPreviewOrbs(option, source) {
 }
 
 export class ElementalistVfxPreviewScene {
-    constructor(previewId = "single:fire") {
+    constructor(previewId = "single:fire", previewMode = "dry") {
         this.elapsed = 0;
         this.simulation = { elapsed: 0, entities: [] };
         this.source = createPreviewFighter(PREVIEW_CONFIG.source, "#8f6ee8");
         this.target = createPreviewFighter(PREVIEW_CONFIG.target, "#d06b5e");
-        this.setPreview(previewId);
+        this.setPreview(previewId, previewMode);
     }
 
-    setPreview(previewId) {
+    setPreview(previewId, previewMode = "dry") {
         this.effect?.consume?.();
         this.option = getPreviewOption(previewId);
-        this.phaseElapsed = 0;
         this.orbs = createPreviewOrbs(this.option, this.source);
-        this._createEffect();
+        this.replay(previewMode);
     }
 
-    _createEffect() {
-        this.phaseElapsed = 0;
-        if (this.option.id === "wet") {
-            this.target.state.elementalWetUntil = 0;
-            this.target.state.elementalWetEffect = null;
-            this.effect = null;
-            return;
-        }
-
+    replay(previewMode = "dry") {
+        this.effect?.consume?.();
         this.target.state.elementalWetUntil = 0;
         this.target.state.elementalWetEffect = null;
+        this.phaseElapsed = 0;
+        this.wetReactionLeadIn = false;
+        if (this.option.id === "wet") {
+            this.effect = null;
+            return true;
+        }
+        this.previewMode = previewMode === "wet" ? "wet" : "dry";
+        if (this.previewMode === "wet") {
+            this.wetReactionLeadIn = true;
+            this.effect = applyElementalWet(this.target, this.simulation, PREVIEW_CONFIG.wetDuration);
+            return true;
+        }
+        this._createChannelEffect(false);
+        return true;
+    }
+
+    _createChannelEffect(wetSnapshot) {
+        this.effect?.consume?.();
+        this.target.state.elementalWetUntil = 0;
+        this.target.state.elementalWetEffect = null;
+        this.phaseElapsed = 0;
+        this.wetReactionLeadIn = false;
         this.effect = new ElementalChannelEffect({
-            channel: { cancelled: false, finished: false },
+            channel: { cancelled: false, finished: false, wetSnapshot },
             source: this.source,
             target: this.target,
             elements: this.option.elements,
@@ -170,7 +185,13 @@ export class ElementalistVfxPreviewScene {
             if (this.effect.isExpired) this.effect = null;
             return;
         }
-        if (this.effect.isExpired || this.phaseElapsed >= ELEMENTALIST_CONFIG.channelDuration) this._createEffect();
+        if (this.wetReactionLeadIn) {
+            if (this.phaseElapsed >= PREVIEW_CONFIG.wetReactionLeadIn) this._createChannelEffect(true);
+            return;
+        }
+        if (this.effect.isExpired || this.phaseElapsed >= ELEMENTALIST_CONFIG.channelDuration) {
+            this.replay(this.previewMode);
+        }
     }
 
     draw(ctx) {
@@ -198,11 +219,11 @@ export class ElementalistVfxPreviewController {
         this.resizeObserver = null;
     }
 
-    start(canvas, previewId) {
+    start(canvas, previewId, previewMode = "dry") {
         if (!canvas?.getContext || !this.requestFrame) return { ok: false, error: "preview_unavailable" };
         this.stop();
         this.canvas = canvas;
-        this.scene = new ElementalistVfxPreviewScene(previewId);
+        this.scene = new ElementalistVfxPreviewScene(previewId, previewMode);
         this.resizeObserver = this.ResizeObserverClass ? new this.ResizeObserverClass(() => this._resize()) : null;
         this.resizeObserver?.observe(canvas);
         this._resize();

@@ -24343,6 +24343,22 @@ function testElementalistVfxPreviewCatalog() {
     assert.equal(wetScene.triggerWet(), true, "Wet preview should support repeated activation");
     assert.equal(wetScene.effect, firstWetEffect, "Repeated wet activation should refresh the production effect");
     assert.ok(wetScene.effect.expiresAt > firstWetExpiry, "Repeated wet activation should extend its expiry");
+
+    const dryReactionScene = new ElementalistVfxPreviewScene("single:fire", "dry");
+    assert.equal(dryReactionScene.effect.channel.wetSnapshot, false);
+    const wetReactionScene = new ElementalistVfxPreviewScene("single:fire", "wet");
+    assert.ok(
+        wetReactionScene.effect instanceof ElementalWetEffect,
+        "Wet replay should show the production wet state before the channel consumes it"
+    );
+    assert.equal(wetReactionScene.wetReactionLeadIn, true);
+    for (let step = 0; step < 12; step += 1) wetReactionScene.update(0.05);
+    assert.ok(
+        wetReactionScene.effect instanceof ElementalChannelEffect,
+        "Wet replay should transition from wet status into the selected channel"
+    );
+    assert.equal(wetReactionScene.effect.channel.wetSnapshot, true);
+    assert.equal(wetReactionScene.target.state.elementalWetUntil, 0, "Wet replay should consume the preview state");
     console.log("[elementalist-vfx-preview-catalog] ok");
 }
 

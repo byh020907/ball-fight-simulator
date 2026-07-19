@@ -252,9 +252,9 @@ export function createComponentBridge(app) {
             if (!app.isDebugModeActive()) return [];
             return getElementalistVfxPreviewOptions();
         },
-        startDebugElementalistVfxPreview(canvas, previewId) {
+        startDebugElementalistVfxPreview(canvas, previewId, previewMode = "dry") {
             if (!app.isDebugModeActive()) return { ok: false, error: "debug_disabled" };
-            return elementalistVfxPreview.start(canvas, previewId);
+            return elementalistVfxPreview.start(canvas, previewId, previewMode);
         },
         stopDebugElementalistVfxPreview() {
             return elementalistVfxPreview.stop();

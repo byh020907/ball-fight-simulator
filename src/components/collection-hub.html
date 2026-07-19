@@ -538,31 +538,52 @@
                     <div class="ch-elementalist-preview">
                         <div class="ch-developer-field">
                             <span>연출 선택</span>
-                            <div class="ch-developer-control-row">
-                                <select
-                                    class="ch-select"
-                                    x-model="state.developer.elementalistPreviewId"
-                                    x-effect="$el.value = state.developer.elementalistPreviewId"
-                                    @change="restartElementalistVfxPreview()"
+                            <select
+                                class="ch-select"
+                                x-model="state.developer.elementalistPreviewId"
+                                x-effect="$el.value = state.developer.elementalistPreviewId"
+                                @change="restartElementalistVfxPreview('dry')"
+                            >
+                                <template
+                                    x-for="option in state.developer.elementalistPreviewOptions"
+                                    :key="option.id"
                                 >
-                                    <template
-                                        x-for="option in state.developer.elementalistPreviewOptions"
-                                        :key="option.id"
-                                    >
-                                        <option
-                                            x-bind:value="option.id"
-                                            x-bind:selected="option.id === state.developer.elementalistPreviewId"
-                                            x-text="option.label"
-                                        ></option>
-                                    </template>
-                                </select>
+                                    <option
+                                        x-bind:value="option.id"
+                                        x-bind:selected="option.id === state.developer.elementalistPreviewId"
+                                        x-text="option.label"
+                                    ></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div class="ch-elementalist-preview-actions">
+                            <template x-if="state.developer.elementalistPreviewId === 'wet'">
                                 <button
                                     class="ch-btn"
                                     type="button"
-                                    @click="triggerOrRestartElementalistVfxPreview()"
-                                    x-text="state.developer.elementalistPreviewId === 'wet' ? '젖음 발동' : '다시 재생'"
-                                ></button>
-                            </div>
+                                    @click="triggerOrRestartElementalistVfxPreview('wet')"
+                                >
+                                    젖음 발동
+                                </button>
+                            </template>
+                            <template x-if="state.developer.elementalistPreviewId !== 'wet'">
+                                <div class="ch-elementalist-preview-mode-buttons">
+                                    <button
+                                        class="ch-btn"
+                                        type="button"
+                                        @click="triggerOrRestartElementalistVfxPreview('dry')"
+                                    >
+                                        마른 대상 재생
+                                    </button>
+                                    <button
+                                        class="ch-btn ch-elementalist-wet-replay"
+                                        type="button"
+                                        @click="triggerOrRestartElementalistVfxPreview('wet')"
+                                    >
+                                        젖은 대상 재생
+                                    </button>
+                                </div>
+                            </template>
                         </div>
                         <div class="ch-elementalist-preview-stage">
                             <canvas
@@ -1065,24 +1086,25 @@
             getGameActionBridge()?.stopDebugElementalistVfxPreview?.();
         }
 
-        function restartElementalistVfxPreview() {
+        function restartElementalistVfxPreview(previewMode = "dry") {
             requestAnimationFrame(() => {
                 if (!state.visible || state.activeTab !== "developer" || !state.developer.active) return;
                 const canvas = dialogElement?.querySelector("[data-elementalist-vfx-preview]");
                 if (!canvas) return;
                 getGameActionBridge()?.startDebugElementalistVfxPreview?.(
                     canvas,
-                    state.developer.elementalistPreviewId
+                    state.developer.elementalistPreviewId,
+                    previewMode
                 );
             });
         }
 
-        function triggerOrRestartElementalistVfxPreview() {
+        function triggerOrRestartElementalistVfxPreview(previewMode = "dry") {
             if (state.developer.elementalistPreviewId === "wet") {
                 getGameActionBridge()?.triggerDebugElementalistWetPreview?.();
                 return;
             }
-            restartElementalistVfxPreview();
+            restartElementalistVfxPreview(previewMode);
         }
 
         function formatElementalistWetDamageComparison() {
@@ -1651,6 +1673,23 @@
         display: block;
         width: 100%;
         height: 100%;
+    }
+
+    .ch-elementalist-preview-actions,
+    .ch-elementalist-preview-mode-buttons {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+        gap: 0.5rem;
+        min-width: 0;
+    }
+
+    .ch-elementalist-preview-actions .ch-btn {
+        width: 100%;
+    }
+
+    .ch-elementalist-wet-replay {
+        border-color: #4f9fbd;
+        background: #effaff;
     }
 
     .ch-elementalist-preview-description {
