@@ -23971,7 +23971,8 @@ testElementalistFusionChannelsAndCleanup();
 
 function testElementalistChannelVisualGrammar() {
     const source = { position: new Vector2(120, 180), radius: 24, flags: { defeated: false } };
-    const target = { position: new Vector2(280, 180), radius: 30, flags: { defeated: false } };
+    const target = { position: new Vector2(520, 180), radius: 30, flags: { defeated: false } };
+    const travellingElements = new Set(["frost", "wind", "earth"]);
     const renderSignatures = {
         fire: (context) =>
             context.calls.filter(([method]) => method === "fillRect").length >=
@@ -24021,6 +24022,15 @@ function testElementalistChannelVisualGrammar() {
                 calls[index + 1]?.[2] === target.position.y
         );
         assert.equal(hasStraightChannelLine, false, `${element} should render without the shared channel line`);
+        if (travellingElements.has(element)) {
+            const middleTravelPrimitives = recording.calls.filter(
+                ([method, x]) => method === "translate" && x > source.position.x + 140 && x < target.position.x - 140
+            );
+            assert.ok(
+                middleTravelPrimitives.length >= 3,
+                `${element} should carry its own particles from caster to target`
+            );
+        }
         if (element === "fire") {
             const expectedParticleCount =
                 ELEMENTAL_CHANNEL_VISUAL_CONFIG.fire.singleParticleCount +

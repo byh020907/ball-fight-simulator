@@ -16,7 +16,16 @@ export const ELEMENTAL_CHANNEL_VISUAL_CONFIG = Object.freeze({
         trailParticleSize: 5.5
     }),
     electric: Object.freeze({ branchCount: 3, branchRadius: 42 }),
-    frost: Object.freeze({ shardCount: 7, outerDistance: 64, innerDistance: 12 }),
+    frost: Object.freeze({
+        shardCount: 7,
+        outerDistance: 64,
+        innerDistance: 12,
+        singleTravelCount: 13,
+        compositeTravelCount: 8,
+        travelCycleSpeed: 0.92,
+        travelWidth: 18,
+        travelShardSize: 4.5
+    }),
     wind: Object.freeze({
         singleStreamCount: 16,
         compositeStreamCount: 11,
@@ -29,9 +38,24 @@ export const ELEMENTAL_CHANNEL_VISUAL_CONFIG = Object.freeze({
         baseSpeedBoost: 1.9,
         innerSpeedBoost: 2.8,
         rotationSpeed: 1.4,
-        shadowColor: "#257750"
+        shadowColor: "#257750",
+        singleTravelCount: 16,
+        compositeTravelCount: 10,
+        travelCycleSpeed: 1.08,
+        travelWidth: 25,
+        travelWispLength: 12
     }),
-    earth: Object.freeze({ rockCount: 7, dustCount: 6, outerDistance: 58, innerDistance: 14 })
+    earth: Object.freeze({
+        rockCount: 7,
+        dustCount: 6,
+        outerDistance: 58,
+        innerDistance: 14,
+        singleTravelCount: 12,
+        compositeTravelCount: 7,
+        travelCycleSpeed: 0.76,
+        travelWidth: 14,
+        travelRockSize: 4.5
+    })
 });
 
 function clamp01(value) {
@@ -41,6 +65,33 @@ function clamp01(value) {
 function getElementIntensity(elementCount, index) {
     if (elementCount === 1) return 1;
     return index === 0 ? 0.86 : 0.72;
+}
+
+function getTravelBasis(channel) {
+    const source = channel.source?.position;
+    const target = channel.target?.position;
+    if (!source || !target) return null;
+    const path = Vector2.subtract(target, source);
+    if (path.length() <= 1e-9) return null;
+    const direction = path.clone().normalize();
+    return {
+        source,
+        path,
+        direction,
+        perpendicular: new Vector2(-direction.y, direction.x),
+        angle: Math.atan2(direction.y, direction.x)
+    };
+}
+
+function getTravelProgress(elapsed, speed, index, count) {
+    return (elapsed * speed + (index + 0.35) / count) % 1;
+}
+
+function getTravelPoint(basis, progress, lane, wave) {
+    const center = basis.source.clone().add(basis.path.clone().scale(progress));
+    const widthEnvelope = Math.sin(progress * Math.PI);
+    const offset = (lane + Math.sin(progress * Math.PI * 2 + wave) * Math.abs(lane) * 0.32) * widthEnvelope;
+    return center.add(basis.perpendicular.clone().scale(offset));
 }
 
 function createFlameVisual(particleCount) {
@@ -197,6 +248,29 @@ function drawFrostShard(ctx, size) {
     ctx.stroke();
 }
 
+function drawFrostTravel(ctx, channel, elapsed, intensity, isComposite) {
+    const basis = getTravelBasis(channel);
+    if (!basis) return;
+    const config = ELEMENTAL_CHANNEL_VISUAL_CONFIG.frost;
+    const count = isComposite ? config.compositeTravelCount : config.singleTravelCount;
+    ctx.save();
+    ctx.fillStyle = ELEMENTAL_PALETTE.frost;
+    ctx.strokeStyle = "#edf3ff";
+    ctx.lineWidth = getVisibleLineWidth(ctx, "hairline", 1.2);
+    Array.from({ length: count }, (_, index) => index).forEach((index) => {
+        const travelProgress = getTravelProgress(elapsed, config.travelCycleSpeed, index, count);
+        const lane = (((index * 5) % 7) / 6 - 0.5) * config.travelWidth;
+        const point = getTravelPoint(basis, travelProgress, lane, index * 1.73);
+        ctx.save();
+        ctx.globalAlpha = intensity * (0.48 + Math.sin(travelProgress * Math.PI) * 0.42);
+        ctx.translate(point.x, point.y);
+        ctx.rotate(basis.angle + Math.PI / 2 + Math.sin(index + elapsed * 7) * 0.24);
+        drawFrostShard(ctx, config.travelShardSize * (0.82 + (index % 3) * 0.12));
+        ctx.restore();
+    });
+    ctx.restore();
+}
+
 function drawFrostIdentity(ctx, channel, progress, intensity, phaseOffset) {
     const target = channel.target;
     const config = ELEMENTAL_CHANNEL_VISUAL_CONFIG.frost;
@@ -248,6 +322,42 @@ function drawRock(ctx, size, seed) {
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
+}
+
+function drawEarthTravel(ctx, channel, elapsed, intensity, isComposite) {
+    const basis = getTravelBasis(channel);
+    if (!basis) return;
+    const config = ELEMENTAL_CHANNEL_VISUAL_CONFIG.earth;
+    const count = isComposite ? config.compositeTravelCount : config.singleTravelCount;
+    ctx.save();
+    ctx.fillStyle = "#9b7044";
+    ctx.strokeStyle = "#4c3525";
+    ctx.lineWidth = getVisibleLineWidth(ctx, "hairline", 1.4);
+    Array.from({ length: count }, (_, index) => index).forEach((index) => {
+        const travelProgress = getTravelProgress(elapsed, config.travelCycleSpeed, index, count);
+        const lane = (((index * 3) % 5) / 4 - 0.5) * config.travelWidth;
+        const point = getTravelPoint(basis, travelProgress, lane, index * 2.1);
+        const hop = Math.sin(travelProgress * Math.PI * 3 + index * 0.8);
+        ctx.save();
+        ctx.globalAlpha = intensity * (0.42 + Math.sin(travelProgress * Math.PI) * 0.5);
+        ctx.translate(point.x, point.y + hop * config.travelWidth * 0.28);
+        ctx.rotate(basis.angle + elapsed * 1.8 + index);
+        drawRock(ctx, config.travelRockSize * (0.78 + (index % 3) * 0.16), index);
+        ctx.restore();
+
+        ctx.fillStyle = "rgba(197, 155, 97, 0.38)";
+        ctx.beginPath();
+        ctx.arc(
+            point.x - basis.direction.x * 8,
+            point.y - basis.direction.y * 8,
+            2.2 + (index % 3) * 0.7,
+            0,
+            Math.PI * 2
+        );
+        ctx.fill();
+        ctx.fillStyle = "#9b7044";
+    });
+    ctx.restore();
 }
 
 function drawEarthIdentity(ctx, channel, progress, intensity, phaseOffset) {
@@ -314,7 +424,35 @@ function drawWindIdentity(ctx, channel, state, intensity) {
     ctx.restore();
 }
 
+function drawWindTravel(ctx, channel, elapsed, intensity, isComposite) {
+    const basis = getTravelBasis(channel);
+    if (!basis) return;
+    const config = ELEMENTAL_CHANNEL_VISUAL_CONFIG.wind;
+    const count = isComposite ? config.compositeTravelCount : config.singleTravelCount;
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.strokeStyle = ELEMENTAL_PALETTE.wind;
+    ctx.lineWidth = getVisibleLineWidth(ctx, "standard", 2.4);
+    Array.from({ length: count }, (_, index) => index).forEach((index) => {
+        const travelProgress = getTravelProgress(elapsed, config.travelCycleSpeed, index, count);
+        const lane = (((index * 7) % 9) / 8 - 0.5) * config.travelWidth;
+        const point = getTravelPoint(basis, travelProgress, lane, index * 1.37);
+        const curl = Math.sin(elapsed * 8 + index * 1.9) * config.travelWispLength * 0.55;
+        ctx.save();
+        ctx.globalAlpha = intensity * (0.34 + Math.sin(travelProgress * Math.PI) * 0.5);
+        ctx.translate(point.x, point.y);
+        ctx.rotate(basis.angle);
+        ctx.beginPath();
+        ctx.moveTo(-config.travelWispLength, 0);
+        ctx.quadraticCurveTo(0, curl, config.travelWispLength, 0);
+        ctx.stroke();
+        ctx.restore();
+    });
+    ctx.restore();
+}
+
 export function drawElementalChannelIdentity(ctx, channel, progress, state) {
+    const isComposite = channel.elements.length > 1;
     channel.elements.forEach((element, index) => {
         const intensity = getElementIntensity(channel.elements.length, index);
         if (element === "fire") {
@@ -325,10 +463,13 @@ export function drawElementalChannelIdentity(ctx, channel, progress, state) {
         } else if (element === "electric") {
             drawElectricIdentity(ctx, channel, progress, intensity);
         } else if (element === "frost") {
+            drawFrostTravel(ctx, channel, state.elapsed, intensity, isComposite);
             drawFrostIdentity(ctx, channel, progress, intensity, index);
         } else if (element === "wind") {
+            drawWindTravel(ctx, channel, state.elapsed, intensity, isComposite);
             drawWindIdentity(ctx, channel, state, intensity);
         } else if (element === "earth") {
+            drawEarthTravel(ctx, channel, state.elapsed, intensity, isComposite);
             drawEarthIdentity(ctx, channel, progress, intensity, index);
         }
     });
