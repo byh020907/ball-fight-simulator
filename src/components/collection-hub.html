@@ -556,9 +556,12 @@
                                         ></option>
                                     </template>
                                 </select>
-                                <button class="ch-btn" type="button" @click="restartElementalistVfxPreview()">
-                                    다시 재생
-                                </button>
+                                <button
+                                    class="ch-btn"
+                                    type="button"
+                                    @click="triggerOrRestartElementalistVfxPreview()"
+                                    x-text="state.developer.elementalistPreviewId === 'wet' ? '젖음 발동' : '다시 재생'"
+                                ></button>
                             </div>
                         </div>
                         <div class="ch-elementalist-preview-stage">
@@ -1046,6 +1049,14 @@
             });
         }
 
+        function triggerOrRestartElementalistVfxPreview() {
+            if (state.developer.elementalistPreviewId === "wet") {
+                getGameActionBridge()?.triggerDebugElementalistWetPreview?.();
+                return;
+            }
+            restartElementalistVfxPreview();
+        }
+
         function observeTabLayout() {
             tabResizeObserver = new ResizeObserver(revealActiveTab);
             tabResizeObserver.observe(dialogElement);
@@ -1120,6 +1131,7 @@
             syncDeveloperTarget,
             syncDeveloperEventSelection,
             restartElementalistVfxPreview,
+            triggerOrRestartElementalistVfxPreview,
             revealActiveTab,
             startDebugModeHold,
             cancelDebugModeHold,

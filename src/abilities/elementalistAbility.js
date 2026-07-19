@@ -1,6 +1,6 @@
 import { applyCollisionImpulse, Vector2 } from "../core.js";
 import { ElementalOrb, ElementalWaterBolt } from "../entities/index.js";
-import { ElementalChannelEffect, ElementalWetEffect, VisualBurst } from "../effects/index.js";
+import { ElementalChannelEffect, VisualBurst, applyElementalWet } from "../effects/index.js";
 import { applyMagneticAttraction } from "../physics/index.js";
 import { Ability } from "./ability.js";
 import {
@@ -274,21 +274,7 @@ export class ElementalistAbility extends Ability {
     }
 
     _applyWet(target) {
-        target.state ||= {};
-        const wetUntil = this.simulation.elapsed + ELEMENTALIST_CONFIG.wetDuration;
-        target.state.elementalWetUntil = wetUntil;
-        const currentEffect = target.state.elementalWetEffect;
-        if (currentEffect instanceof ElementalWetEffect && !currentEffect.isExpired) {
-            currentEffect.refresh(wetUntil);
-            return;
-        }
-        const effect = new ElementalWetEffect({
-            target,
-            simulation: this.simulation,
-            expiresAt: wetUntil
-        });
-        target.state.elementalWetEffect = effect;
-        this.simulation.entities.push(effect);
+        applyElementalWet(target, this.simulation, ELEMENTALIST_CONFIG.wetDuration);
     }
 
     _hasWet(target) {

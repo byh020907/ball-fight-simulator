@@ -1251,6 +1251,10 @@ function testCollectionRebirthAndDeveloperContracts() {
             template.includes("aspect-ratio: 16 / 9"),
         "Elementalist preview should use the debug bridge and a fluid canvas frame"
     );
+    assert.ok(
+        template.includes("triggerDebugElementalistWetPreview") && template.includes("젖음 발동"),
+        "Elementalist wet preview should expose an explicit production-state trigger"
+    );
     assert.ok(template.includes("정예 조합"), "Developer tools should expose the elite combination selector");
     assert.ok(
         template.includes("state.developer.huntingEventType === 'elite_mob'"),

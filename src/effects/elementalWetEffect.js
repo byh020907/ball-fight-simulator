@@ -114,3 +114,18 @@ export class ElementalWetEffect extends CombatEntity {
         ctx.restore();
     }
 }
+
+export function applyElementalWet(target, simulation, duration) {
+    target.state ||= {};
+    const expiresAt = simulation.elapsed + duration;
+    target.state.elementalWetUntil = expiresAt;
+    const currentEffect = target.state.elementalWetEffect;
+    if (currentEffect instanceof ElementalWetEffect && !currentEffect.isExpired) {
+        currentEffect.refresh(expiresAt);
+        return currentEffect;
+    }
+    const effect = new ElementalWetEffect({ target, simulation, expiresAt });
+    target.state.elementalWetEffect = effect;
+    simulation.entities.push(effect);
+    return effect;
+}

@@ -1,7 +1,7 @@
 import { Vector2 } from "../core.js";
 import { ELEMENTAL_COMPOSITE_RECIPES, ELEMENTAL_PALETTE, ELEMENTAL_TYPES } from "../abilities/elementalistRecipes.js";
 import { ElementalChannelEffect, drawElementalOrb } from "../effects/elementalistEffects.js";
-import { ElementalWetEffect } from "../effects/elementalWetEffect.js";
+import { applyElementalWet } from "../effects/elementalWetEffect.js";
 
 const ELEMENT_LABELS = Object.freeze({
     fire: "화염",
@@ -117,13 +117,14 @@ function createPreviewOrbs(option, source) {
 export class ElementalistVfxPreviewScene {
     constructor(previewId = "single:fire") {
         this.elapsed = 0;
-        this.simulation = { elapsed: 0 };
+        this.simulation = { elapsed: 0, entities: [] };
         this.source = createPreviewFighter(PREVIEW_CONFIG.source, "#8f6ee8");
         this.target = createPreviewFighter(PREVIEW_CONFIG.target, "#d06b5e");
         this.setPreview(previewId);
     }
 
     setPreview(previewId) {
+        this.effect?.consume?.();
         this.option = getPreviewOption(previewId);
         this.phaseElapsed = 0;
         this.orbs = createPreviewOrbs(this.option, this.source);
@@ -133,14 +134,9 @@ export class ElementalistVfxPreviewScene {
     _createEffect() {
         this.phaseElapsed = 0;
         if (this.option.id === "wet") {
-            const expiresAt = this.elapsed + PREVIEW_CONFIG.wetDuration;
-            this.target.state.elementalWetUntil = expiresAt;
-            this.effect = new ElementalWetEffect({
-                target: this.target,
-                simulation: this.simulation,
-                expiresAt
-            });
-            this.target.state.elementalWetEffect = this.effect;
+            this.target.state.elementalWetUntil = 0;
+            this.target.state.elementalWetEffect = null;
+            this.effect = null;
             return;
         }
 
@@ -156,14 +152,25 @@ export class ElementalistVfxPreviewScene {
         });
     }
 
+    triggerWet() {
+        if (this.option.id !== "wet") return false;
+        this.phaseElapsed = 0;
+        this.effect = applyElementalWet(this.target, this.simulation, PREVIEW_CONFIG.wetDuration);
+        return true;
+    }
+
     update(delta) {
         const boundedDelta = Math.min(PREVIEW_CONFIG.maximumFrameDelta, Math.max(0, delta));
         this.elapsed += boundedDelta;
         this.phaseElapsed += boundedDelta;
         this.simulation.elapsed = this.elapsed;
+        if (!this.effect) return;
         this.effect.update(boundedDelta);
-        const cycleDuration = this.option.id === "wet" ? PREVIEW_CONFIG.wetDuration : PREVIEW_CONFIG.channelDuration;
-        if (this.effect.isExpired || this.phaseElapsed >= cycleDuration) this._createEffect();
+        if (this.option.id === "wet") {
+            if (this.effect.isExpired) this.effect = null;
+            return;
+        }
+        if (this.effect.isExpired || this.phaseElapsed >= PREVIEW_CONFIG.channelDuration) this._createEffect();
     }
 
     draw(ctx) {
@@ -171,7 +178,7 @@ export class ElementalistVfxPreviewScene {
         drawPreviewFighter(ctx, this.source);
         drawPreviewFighter(ctx, this.target);
         this.orbs.forEach((orb) => drawElementalOrb(ctx, orb, this.elapsed));
-        this.effect.draw(ctx);
+        this.effect?.draw(ctx);
     }
 }
 
@@ -211,6 +218,12 @@ export class ElementalistVfxPreviewController {
         this.canvas = null;
         this.scene = null;
         this.resizeObserver = null;
+        return { ok: true };
+    }
+
+    triggerWet() {
+        if (!this.scene || !this.canvas) return { ok: false, error: "preview_unavailable" };
+        if (!this.scene.triggerWet()) return { ok: false, error: "wet_preview_inactive" };
         return { ok: true };
     }
 

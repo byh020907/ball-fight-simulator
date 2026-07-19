@@ -23985,6 +23985,26 @@ function testElementalistFusionChannelsAndCleanup() {
 
 testElementalistFusionChannelsAndCleanup();
 
+function testElementalistOwnerMagnetLiveUpdate() {
+    const { simulation, owner, ability, enemies } = createElementalistSimulation({ tier: 3 });
+    const orb = new ElementalOrb({
+        owner,
+        element: "earth",
+        position: new Vector2(owner.position.x + owner.radius * 2 - 1, owner.position.y),
+        targetMemory: enemies[0],
+        ability
+    });
+    orb.collectionGraceRemaining = 0;
+    ability.activeOrbs.push(orb);
+    simulation.entities.push(orb);
+    Array.from({ length: 12 }).forEach(() => orb.update(1 / 60, simulation));
+    assert.equal(orb.isExpired, true, "The live orb update path must pull and collect an orb near its owner");
+    assert.equal(ability.activeChannels.length, 1, "Live owner collection should continue into the spell channel");
+    console.log("[elementalist-owner-magnet-live-update] ok");
+}
+
+testElementalistOwnerMagnetLiveUpdate();
+
 function testElementalistChannelVisualGrammar() {
     const source = { position: new Vector2(120, 180), radius: 24, flags: { defeated: false } };
     const target = { position: new Vector2(520, 180), radius: 30, flags: { defeated: false } };
@@ -24169,6 +24189,16 @@ function testElementalistVfxPreviewCatalog() {
         const recording = makeRecordingCanvasContext();
         assert.doesNotThrow(() => scene.draw(recording), `${id} should render through the production VFX preview`);
     });
+    const wetScene = new ElementalistVfxPreviewScene("wet");
+    assert.equal(wetScene.effect, null, "Wet preview should start dry until the user triggers it");
+    assert.equal(wetScene.triggerWet(), true, "Wet preview should expose an explicit activation action");
+    const firstWetEffect = wetScene.effect;
+    const firstWetExpiry = firstWetEffect.expiresAt;
+    assert.equal(wetScene.target.state.elementalWetEffect, firstWetEffect);
+    wetScene.update(0.4);
+    assert.equal(wetScene.triggerWet(), true, "Wet preview should support repeated activation");
+    assert.equal(wetScene.effect, firstWetEffect, "Repeated wet activation should refresh the production effect");
+    assert.ok(wetScene.effect.expiresAt > firstWetExpiry, "Repeated wet activation should extend its expiry");
     console.log("[elementalist-vfx-preview-catalog] ok");
 }
 

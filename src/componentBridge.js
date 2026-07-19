@@ -259,6 +259,10 @@ export function createComponentBridge(app) {
         stopDebugElementalistVfxPreview() {
             return elementalistVfxPreview.stop();
         },
+        triggerDebugElementalistWetPreview() {
+            if (!app.isDebugModeActive()) return { ok: false, error: "debug_disabled" };
+            return elementalistVfxPreview.triggerWet();
+        },
         setDebugCharacterToMaxLevel(characterId) {
             if (!app.isDebugModeActive()) return { ok: false, error: "debug_disabled" };
             const result = setDeveloperCharacterToMaxLevel(app.playerProfile, characterId);
