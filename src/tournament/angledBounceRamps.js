@@ -1,5 +1,6 @@
 import { Vector2 } from "../core.js";
 import { polygonBoundingRadius } from "../physics/CollisionShape.js";
+import { tickTimedMap } from "../physics/index.js";
 import { TERRAIN_SHAPES, TERRAIN_TYPES } from "../terrain/terrainConfig.js";
 
 const EPSILON = 0.0001;
@@ -241,14 +242,7 @@ export class TournamentAngledBounceRampSystem {
     }
 
     _updateCooldowns(delta) {
-        for (const [fighterId, remaining] of this._cooldownByFighterId) {
-            const nextRemaining = remaining - delta;
-            if (nextRemaining <= 0) {
-                this._cooldownByFighterId.delete(fighterId);
-            } else {
-                this._cooldownByFighterId.set(fighterId, nextRemaining);
-            }
-        }
+        tickTimedMap(this._cooldownByFighterId, delta);
     }
 
     _expireRamp(delta) {

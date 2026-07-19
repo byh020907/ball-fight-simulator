@@ -2,6 +2,7 @@ import { Vector2 } from "../core.js";
 import { HeroShieldShard } from "../entities/heroShieldShard.js";
 import { enforceActiveEntityLimit } from "../entities/activeEntityLimit.js";
 import { HeroShieldBreakEffect } from "../effects/heroEffects.js";
+import { CooldownBank } from "../physics/index.js";
 import { Ability } from "./ability.js";
 import { HERO_COMBAT_CONFIG } from "./heroCombatConfig.js";
 import { EnergyShieldVisual } from "./mixins/energyShieldVisual.js";
@@ -9,6 +10,7 @@ import { EnergyShieldVisual } from "./mixins/energyShieldVisual.js";
 export const HERO_ORB_STAT_CAP = -1;
 export const HERO_ORB_MAX_ACTIVE_PER_OWNER = HERO_COMBAT_CONFIG.core.maximumActivePerOwner;
 const STAT_EFFECT_TYPES = ["hp", "damage", "speed", "defense", "skill", "critical"];
+const HERO_COOLDOWN_KEYS = Object.freeze({ pursuit: "pursuit", counter: "counter" });
 
 export function pickHeroOrbEffectType(rng = Math.random) {
     return STAT_EFFECT_TYPES[Math.min(STAT_EFFECT_TYPES.length - 1, Math.floor(rng() * STAT_EFFECT_TYPES.length))];
@@ -25,13 +27,15 @@ export function computeOwnerCombatSpeed(owner) {
 export class HeroAbility extends EnergyShieldVisual(Ability) {
     constructor(owner, simulation) {
         super(owner, simulation, HERO_COMBAT_CONFIG.growth.stackInterval);
+        this.cooldowns = new CooldownBank({
+            [HERO_COOLDOWN_KEYS.pursuit]: HERO_COMBAT_CONFIG.pursuit.interval,
+            [HERO_COOLDOWN_KEYS.counter]: HERO_COMBAT_CONFIG.counter.cooldown
+        });
         this.state = {
             growthStacks: 0,
             chargeTimer: 0,
-            pursuitTimer: 0,
             shield: 0,
             shieldDecayTimer: 0,
-            counterCooldown: 0,
             stackGainFlash: 0,
             stackReleaseFlash: 0
         };
@@ -46,9 +50,9 @@ export class HeroAbility extends EnergyShieldVisual(Ability) {
     }
 
     _tickTransientState(delta) {
+        this.cooldowns.tick(delta);
         this.state.stackGainFlash = Math.max(0, this.state.stackGainFlash - delta);
         this.state.stackReleaseFlash = Math.max(0, this.state.stackReleaseFlash - delta);
-        this.state.counterCooldown = Math.max(0, this.state.counterCooldown - delta);
     }
 
     _chargeGrowthStacks(delta) {
@@ -61,17 +65,17 @@ export class HeroAbility extends EnergyShieldVisual(Ability) {
             this.state.chargeTimer -= HERO_COMBAT_CONFIG.growth.stackInterval;
             this.state.growthStacks += 1;
             this.state.stackGainFlash = HERO_COMBAT_CONFIG.growth.gainFlashDuration;
-            if (this.state.growthStacks === HERO_COMBAT_CONFIG.growth.stackCap) this.state.pursuitTimer = 0;
+            if (this.state.growthStacks === HERO_COMBAT_CONFIG.growth.stackCap)
+                this.cooldowns.clear(HERO_COOLDOWN_KEYS.pursuit);
         }
     }
 
     _updatePursuit(delta, fallbackTarget) {
         if (this.state.growthStacks < HERO_COMBAT_CONFIG.growth.stackCap) {
-            this.state.pursuitTimer = 0;
+            this.cooldowns.clear(HERO_COOLDOWN_KEYS.pursuit);
             return;
         }
-        this.state.pursuitTimer = Math.max(0, this.state.pursuitTimer - delta);
-        if (this.state.pursuitTimer > 0 || this.owner.state.movement) return;
+        if (!this.cooldowns.isReady(HERO_COOLDOWN_KEYS.pursuit) || this.owner.state.movement) return;
 
         const target = this._resolvePursuitTarget(fallbackTarget);
         if (!target) return;
@@ -85,7 +89,7 @@ export class HeroAbility extends EnergyShieldVisual(Ability) {
             collisionDamage: 0,
             collisionLabel: "Hero Pursuit"
         });
-        this.state.pursuitTimer = HERO_COMBAT_CONFIG.pursuit.interval;
+        this.cooldowns.reset(HERO_COOLDOWN_KEYS.pursuit);
         this.simulation.spawnParticleBurst(this.owner.position.clone(), "#ffd84d", {
             count: 10,
             speed: 140,
@@ -112,7 +116,7 @@ export class HeroAbility extends EnergyShieldVisual(Ability) {
         if (stackCount <= 0) return;
         this.state.growthStacks = 0;
         this.state.chargeTimer = 0;
-        this.state.pursuitTimer = 0;
+        this.cooldowns.clear(HERO_COOLDOWN_KEYS.pursuit);
         this.state.stackReleaseFlash = HERO_COMBAT_CONFIG.growth.releaseFlashDuration;
         for (const _ of Array.from({ length: stackCount })) {
             const direction = Vector2.fromAngle(Math.random() * Math.PI * 2, 1);
@@ -258,7 +262,7 @@ export class HeroAbility extends EnergyShieldVisual(Ability) {
     }
 
     _tryLaunchCounter(source) {
-        if (this.state.counterCooldown > 0) return;
+        if (!this.cooldowns.isReady(HERO_COOLDOWN_KEYS.counter)) return;
         const direction = Vector2.subtract(source.position, this.owner.position);
         if (direction.length() <= 0.001) return;
         direction.normalize();
@@ -268,7 +272,7 @@ export class HeroAbility extends EnergyShieldVisual(Ability) {
         );
         const damage = this.owner.getTotalAttackDamage() * HERO_COMBAT_CONFIG.counter.damageMultiplier;
         this.simulation.entities.push(new HeroShieldShard(this.owner, spawnPosition, direction, damage));
-        this.state.counterCooldown = HERO_COMBAT_CONFIG.counter.cooldown;
+        this.cooldowns.reset(HERO_COOLDOWN_KEYS.counter);
         this.simulation.spawnParticleBurst(spawnPosition, "#ffd84d", {
             count: 8,
             speed: 120,

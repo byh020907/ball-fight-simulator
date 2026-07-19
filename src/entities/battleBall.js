@@ -1,7 +1,7 @@
 import { RENDER_LAYERS, TimedEffect, Vector2, randomSpin } from "../core.js";
 import { ActionContext } from "../clickActions.js";
 import { DashEffect } from "../combatEffects.js";
-import { mixins, PhysicsBody, RotationalBody, PhysicsMaterialBody } from "../physics/index.js";
+import { CooldownBank, mixins, PhysicsBody, RotationalBody, PhysicsMaterialBody } from "../physics/index.js";
 import { computeRegularPolygonLocalPoints } from "../physics/CollisionShape.js";
 import {
     PhysicsDebugRingBuffer,
@@ -18,6 +18,8 @@ import {
     drawRebirthVisualUnderlay,
     getRebirthVisualProfile
 } from "../rebirth/rebirthVisuals.js";
+
+const EQUIPMENT_EFFECT_COOLDOWN_KEYS = Object.freeze({ hpSteal: "hpSteal" });
 
 export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMaterialBody]) {
     constructor(spec, position) {
@@ -100,7 +102,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         this.equipmentEffects = createEquipmentCombatEffects(this.equipment.items);
         this.mass *= this.equipmentEffects.massMultiplier;
         this.stats.mass = this.mass;
-        this._equipmentEffectCooldowns = { hpSteal: 0 };
+        this._equipmentEffectCooldowns = new CooldownBank({ [EQUIPMENT_EFFECT_COOLDOWN_KEYS.hpSteal]: 0 });
         this._igniteState = null;
         this._tempCritMultiplier = null;
         this.mastery = {
@@ -116,6 +118,9 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             passives: spec.mastery?.passives ?? [],
             _states: null
         };
+        this._masteryCooldowns = new CooldownBank(
+            Object.fromEntries(this.mastery.passives.map((effect) => [effect.id, effect.cooldown ?? 0]))
+        );
         this.rebirthEffects = {
             abilityCooldownMultiplier: 1
         };
@@ -337,11 +342,11 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
     }
 
     isEquipmentEffectReady(type) {
-        return (this._equipmentEffectCooldowns[type] ?? 0) <= 0;
+        return this._equipmentEffectCooldowns.isReady(type);
     }
 
     triggerEquipmentEffectCooldown(type, duration) {
-        this._equipmentEffectCooldowns[type] = Math.max(0, duration);
+        this._equipmentEffectCooldowns.reset(type, duration);
     }
 
     applyWallBounceBoost(xNormal, yNormal) {
@@ -429,12 +434,14 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
     }
 
     _tickMasteryPassives(delta) {
-        for (const state of this._getMasteryPassiveStates()) {
+        const states = this._getMasteryPassiveStates();
+        const inactiveIds = states.filter((state) => !state.active).map((state) => state.id);
+        this._masteryCooldowns.tick(delta, inactiveIds);
+        for (const state of states) {
             if (state.active) continue;
-            state.cooldownRemaining -= delta;
-            if (state.cooldownRemaining <= 0) {
+            if (this._masteryCooldowns.isReady(state.id)) {
                 state.active = true;
-                state.cooldownRemaining = state.cooldownDuration;
+                this._masteryCooldowns.reset(state.id);
             }
         }
     }
@@ -443,8 +450,6 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         if (!this.mastery._states) {
             this.mastery._states = this.mastery.passives.map((effect) => ({
                 ...effect,
-                cooldownRemaining: 0,
-                cooldownDuration: effect.cooldown ?? 0,
                 active: false
             }));
         }
@@ -477,9 +482,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
                 this.state.wallSlam = null;
             }
         }
-        for (const type of Object.keys(this._equipmentEffectCooldowns)) {
-            this._equipmentEffectCooldowns[type] = Math.max(0, this._equipmentEffectCooldowns[type] - delta);
-        }
+        this._equipmentEffectCooldowns.tick(delta);
         for (const effect of this.state.periodicDamage) {
             effect.tick(this, delta);
         }

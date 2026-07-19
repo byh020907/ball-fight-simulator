@@ -1,5 +1,6 @@
 import { Vector2 } from "../core.js";
 import { OrbitCatchEffect } from "../effects/orbitHitEffect.js";
+import { CooldownBank } from "../physics/index.js";
 import { Ability } from "./ability.js";
 
 const VOLLEY_COOLDOWN = 3.0;
@@ -7,10 +8,15 @@ const VOLLEY_DELAY = 0.18;
 const VOLLEY_MIN_RANGE = 200;
 const VOLLEY_MAX_RANGE = 500;
 const SHARD_SIZE = 16;
+export const ORBIT_COOLDOWN_KEYS = Object.freeze({ hit: "hit", volley: "volley" });
 
 export class OrbitAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation);
+        this.cooldowns = new CooldownBank({
+            [ORBIT_COOLDOWN_KEYS.hit]: 0.32,
+            [ORBIT_COOLDOWN_KEYS.volley]: VOLLEY_COOLDOWN
+        });
         this.shardCount = 5;
         this.orbitRadius = 44;
         this.shardRadius = 11;
@@ -21,7 +27,6 @@ export class OrbitAbility extends Ability {
         this.rechargeGap = 0.16;
         this.state = {
             angle: Math.random() * Math.PI * 2,
-            hitCooldown: 0,
             shards: Array.from({ length: this.shardCount }, () => ({
                 active: true,
                 refilling: false,
@@ -30,7 +35,6 @@ export class OrbitAbility extends Ability {
             spinBurst: 0,
             rechargeDelay: 0,
             rechargeGapTimer: 0,
-            volleyTimer: 0,
             volleyIndex: 0,
             volleyActive: false,
             volleyStartTime: 0,
@@ -48,13 +52,13 @@ export class OrbitAbility extends Ability {
 
     update(delta, target) {
         this._syncShardCount();
+        this.cooldowns.tick(delta);
         if (this.state.spinBurst > 0) {
             this.state.spinBurst = Math.max(0, this.state.spinBurst - delta);
         }
 
         const spinMultiplier = this.state.spinBurst > 0 ? this.spinBurstMultiplier : 1;
         this.state.angle += delta * this.baseSpinSpeed * spinMultiplier;
-        this.state.hitCooldown = Math.max(0, this.state.hitCooldown - delta);
         this.updateRecharge(delta);
         this.updateVolley(delta, target);
         this._pruneSynchronizedVolleys();
@@ -66,12 +70,12 @@ export class OrbitAbility extends Ability {
         const hitShard = this.getActiveShardEntries().find(
             ({ position }) => Vector2.subtract(position, target.position).length() <= target.radius + this.shardRadius
         );
-        if (hitShard && this.state.hitCooldown <= 0) {
+        if (hitShard && this.cooldowns.isReady(ORBIT_COOLDOWN_KEYS.hit)) {
             const repelDirection = Vector2.subtract(target.position, hitShard.position).normalize();
             target.takeDamage(Math.round(this.owner.stats.baseDamage * 0.8), this.owner, "Orbit Shard");
             target.applyKnockback(repelDirection.scale(target.stats.baseSpeed * 2.5), 0.3);
             this.consumeShard(hitShard.index);
-            this.state.hitCooldown = 0.32;
+            this.cooldowns.reset(ORBIT_COOLDOWN_KEYS.hit);
             this.simulation.spawnOrbitHit(hitShard.position.clone(), target.position.clone(), this.owner.color);
             this.simulation.playSound("orbit");
             this.simulation.addSparkBurst(target.position.clone(), this.owner.color);
@@ -173,13 +177,11 @@ export class OrbitAbility extends Ability {
 
     /** Launch a shard volley at the target when all shards are full. */
     updateVolley(delta, target) {
-        this.state.volleyTimer -= delta;
-
         if (this.state.volleyActive) {
             if (!target || target.flags.defeated) {
                 this.state.volleyActive = false;
                 this.state.volleyIndex = 0;
-                this.state.volleyTimer = VOLLEY_COOLDOWN;
+                this.cooldowns.reset(ORBIT_COOLDOWN_KEYS.volley);
                 this.state.currentVolleyId = null;
                 return;
             }
@@ -192,14 +194,14 @@ export class OrbitAbility extends Ability {
             if (this.state.volleyIndex >= this.shardCount) {
                 this.state.volleyActive = false;
                 this.state.volleyIndex = 0;
-                this.state.volleyTimer = VOLLEY_COOLDOWN;
+                this.cooldowns.reset(ORBIT_COOLDOWN_KEYS.volley);
                 this.state.currentVolleyId = null;
             }
             return;
         }
 
         if (
-            this.state.volleyTimer <= 0 &&
+            this.cooldowns.isReady(ORBIT_COOLDOWN_KEYS.volley) &&
             target &&
             !target.flags.defeated &&
             this.getActiveShardCount() === this.shardCount
@@ -409,8 +411,11 @@ export class OrbitAbility extends Ability {
                 progress: this.getActiveShardCount() / this.shardCount
             };
         }
-        if (this.state.volleyTimer > 0) {
-            return { label: "Orbit Ready", progress: Math.max(0.08, 1 - this.state.volleyTimer / VOLLEY_COOLDOWN) };
+        if (!this.cooldowns.isReady(ORBIT_COOLDOWN_KEYS.volley)) {
+            return {
+                label: "Orbit Ready",
+                progress: Math.max(0.08, 1 - this.cooldowns.getRemaining(ORBIT_COOLDOWN_KEYS.volley) / VOLLEY_COOLDOWN)
+            };
         }
         return { label: "Orbit Ready", progress: 1 };
     }

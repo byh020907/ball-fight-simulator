@@ -241,6 +241,7 @@ import { Grenade } from "../src/entities/grenade.js";
 import {
     getArenaWallRay,
     getHuntingLaserCasterVisualState,
+    HUNTING_COOLDOWN_KEYS,
     HUNTING_LASER_CASTER_RENDERER,
     HUNTING_LINK_CHANNEL_CONFIG,
     LASER_CHARGE_TURN_RATE
@@ -299,9 +300,17 @@ import {
     calculateStaticCollisionDamage
 } from "../src/physics/contactDamage.js";
 import RotationalBody from "../src/physics/RotationalBody.js";
-import { BURST_RESULTS, BurstSequencer, Cooldown, EntityAttachment, tickTimedMap } from "../src/physics/index.js";
+import {
+    BURST_RESULTS,
+    BurstSequencer,
+    Cooldown,
+    CooldownBank,
+    EntityAttachment,
+    tickTimedMap
+} from "../src/physics/index.js";
 import { enforceActiveEntityLimit } from "../src/entities/activeEntityLimit.js";
 import { AIActionController } from "../src/simulation/aiActionController.js";
+import { ORBIT_COOLDOWN_KEYS } from "../src/abilities/orbitAbility.js";
 import {
     drawEquipmentItems,
     getCharacterOutlineWidth,
@@ -11383,7 +11392,11 @@ function testEquipmentSpecialCombatEffects() {
         logs.some((message) => message.includes("갈망")),
         "갈망 should restore after a hostile collision transaction"
     );
-    assert.equal(attacker._equipmentEffectCooldowns.hpSteal, 2.5, "갈망 should enter its own cooldown after restoring");
+    assert.equal(
+        attacker._equipmentEffectCooldowns.getRemaining("hpSteal"),
+        2.5,
+        "갈망 should enter its own cooldown after restoring"
+    );
     console.log("[equipment-special-combat-effects] ok");
 }
 
@@ -13260,7 +13273,7 @@ function testHuntingAdaptiveRangedReposition() {
         positiveSide.owner.velocity.y < 0,
         "An ally on one side should push the shooter toward the open opposite side"
     );
-    const cooldown = positiveSide.owner.ability.state.repositionCooldown;
+    const cooldown = positiveSide.owner.ability.cooldowns.getRemaining(HUNTING_COOLDOWN_KEYS.reposition);
     const velocityAfterFirstReposition = positiveSide.owner.velocity.length();
     assert.equal(
         velocityAfterFirstReposition,
@@ -13361,7 +13374,7 @@ function testHuntingLaserReachesArenaWall(app) {
     assert.ok(Math.abs(diagonalRay.end.x - 1060) < 0.001, "Diagonal laser should stop where it first meets a wall");
     assert.ok(Math.abs(diagonalRay.end.y - 960) < 0.001, "Diagonal laser should reach the bottom arena wall");
 
-    laserBall.ability.state.timer = laserBall.ability.cooldown;
+    laserBall.ability.setCooldownRemaining(0);
     laserBall.ability._tickLaser(0, target);
     const hpBefore = target.hp;
     laserBall.ability._tickLaser(0.76, target);
@@ -13370,7 +13383,7 @@ function testHuntingLaserReachesArenaWall(app) {
     const startCharge = (position) => {
         target.position = position;
         laserBall.ability.state.laser = null;
-        laserBall.ability.state.timer = laserBall.ability.cooldown;
+        laserBall.ability.setCooldownRemaining(0);
         laserBall.ability._tickLaser(0, target);
         return laserBall.ability.state.laser;
     };
@@ -13523,7 +13536,7 @@ function testHuntingBoomerangReachAndReturnArc(app) {
         owner.velocity = new Vector2();
         target.position = new Vector2(targetX, 480);
         target.velocity = new Vector2();
-        owner.ability.state.timer = owner.ability.cooldown;
+        owner.ability.setCooldownRemaining(0);
 
         const damageCalls = [];
         const takeDamage = target.takeDamage.bind(target);
@@ -13687,7 +13700,7 @@ function testHuntingSplitterDeathFragmentsAndResultGrace(app) {
 
     const { simulation, splitter, player, defeatEvents } = createScenario();
     const originalMaxHp = splitter.maxHp;
-    splitter.ability.state.timer = splitter.ability.cooldown;
+    splitter.ability.setCooldownRemaining(0);
     splitter.ability.update(0, player);
     assert.equal(splitter.hunting.splitLevel, 2, "Splitter definitions should expose an extensible split level");
     assert.equal(splitter.hunting.splitCount, 2, "Splitter definitions should expose an extensible split count");
@@ -14046,7 +14059,7 @@ function testHuntingElectricChannelCooldown(app) {
         "A large update should still clear the link after channel completion"
     );
     assert.ok(
-        Math.abs(largeDeltaScenario.caster.ability.state.electric.cooldownRemaining - 2.9) < 1e-9,
+        Math.abs(largeDeltaScenario.caster.ability.cooldowns.getRemaining(HUNTING_COOLDOWN_KEYS.electric) - 2.9) < 1e-9,
         "Time beyond a completed channel should count toward electric cooldown"
     );
     console.log("[hunting-electric-channel-cooldown] ok");
@@ -14153,8 +14166,10 @@ function testHuntingLinkCooldowns(app) {
             `${name} should hide its link as the active window ends`
         );
         assert.ok(
-            Math.abs(lifecycleScenario.caster.ability.state.linkChannel.cooldownRemaining - config.cooldownDuration) <
-                1e-9,
+            Math.abs(
+                lifecycleScenario.caster.ability.cooldowns.getRemaining(HUNTING_COOLDOWN_KEYS.linkChannel) -
+                    config.cooldownDuration
+            ) < 1e-9,
             `${name} should begin its full cooldown after the active window`
         );
         if (type === HUNTING_MONSTER_TYPES.SIPHON) {
@@ -14200,8 +14215,10 @@ function testHuntingLinkCooldowns(app) {
             `${name} should immediately hide its link on range exit`
         );
         assert.ok(
-            Math.abs(rangeExitScenario.caster.ability.state.linkChannel.cooldownRemaining - config.cooldownDuration) <
-                1e-9,
+            Math.abs(
+                rangeExitScenario.caster.ability.cooldowns.getRemaining(HUNTING_COOLDOWN_KEYS.linkChannel) -
+                    config.cooldownDuration
+            ) < 1e-9,
             `${name} should start a full cooldown when its active link breaks`
         );
         rangeExitScenario.target.position.x = rangeExitScenario.caster.position.x + 160;
@@ -14219,11 +14236,11 @@ function testHuntingLinkCooldowns(app) {
         updateFrames(firstScenario, 1);
         updateFrames(secondScenario, 1);
         assert.ok(
-            firstScenario.caster.ability.state.linkChannel.cooldownRemaining > 0,
+            firstScenario.caster.ability.cooldowns.getRemaining(HUNTING_COOLDOWN_KEYS.linkChannel) > 0,
             `${name} first monster should be on its own cooldown`
         );
         assert.equal(
-            secondScenario.caster.ability.state.linkChannel.cooldownRemaining,
+            secondScenario.caster.ability.cooldowns.getRemaining(HUNTING_COOLDOWN_KEYS.linkChannel),
             0,
             `${name} second monster should not inherit another monster's cooldown`
         );
@@ -21948,7 +21965,7 @@ function testHuntingBarrierSwapsOnlyBlockingFrontlineAlly() {
     barrier.position = new Vector2(180, 500);
     frontline.position = new Vector2(230, 500);
     player.position = new Vector2(820, 500);
-    barrier.ability.state.timer = barrier.ability.cooldown;
+    barrier.ability.setCooldownRemaining(0);
     barrier.ability.update(0, player);
 
     assert.equal(barrier.position.x, 180, "Barrier activation alone should not move through an ally");
@@ -21975,7 +21992,7 @@ function testHuntingBarrierSwapsOnlyBlockingFrontlineAlly() {
 
     barrier.position = new Vector2(180, 500);
     frontline.position = new Vector2(230, 500);
-    barrier.ability.state.timer = barrier.ability.cooldown;
+    barrier.ability.setCooldownRemaining(0);
     barrier.ability.update(0, player);
     simulation.handleCollision();
     assert.ok(
@@ -21995,7 +22012,7 @@ function testHuntingBarrierSwapsOnlyBlockingFrontlineAlly() {
     rearAllyBarrier.position = new Vector2(250, 500);
     rearAlly.position = new Vector2(200, 500);
     rearAllyPlayer.position = new Vector2(820, 500);
-    rearAllyBarrier.ability.state.timer = rearAllyBarrier.ability.cooldown;
+    rearAllyBarrier.ability.setCooldownRemaining(0);
     rearAllyBarrier.ability.update(0, rearAllyPlayer);
     rearAllySimulation.handleCollision();
     assert.ok(rearAllyBarrier.position.x > rearAlly.position.x, "An ally behind the barrier should not trigger a swap");
@@ -22018,7 +22035,7 @@ function testHuntingBarrierSwapsOnlyBlockingFrontlineAlly() {
     firstBarrier.position = new Vector2(180, 500);
     secondBarrier.position = new Vector2(230, 500);
     barrierAllyPlayer.position = new Vector2(820, 500);
-    firstBarrier.ability.state.timer = firstBarrier.ability.cooldown;
+    firstBarrier.ability.setCooldownRemaining(0);
     firstBarrier.ability.update(0, barrierAllyPlayer);
     barrierAllySimulation.handleCollision();
     assert.ok(firstBarrier.position.x < secondBarrier.position.x, "Barrier balls should not swap with each other");
@@ -22339,8 +22356,12 @@ function testRosterCombatBaselineAndCooldowns() {
     const spin = new BattleSimulation([roster[6], roster[0]], { onLog() {}, onSound() {} }).fighters[0].ability;
     const hero = new BattleSimulation([roster[12], roster[0]], { onLog() {}, onSound() {} }).fighters[0].ability;
     assert.equal(orbit._baseRechargeDuration, 1, "Orbit satellite recharge should remain one second");
-    orbit.state.volleyTimer = 3;
-    assert.equal(orbit.state.volleyTimer, 3, "Orbit volley cooldown should be three seconds");
+    orbit.cooldowns.reset(ORBIT_COOLDOWN_KEYS.volley);
+    assert.equal(
+        orbit.cooldowns.getRemaining(ORBIT_COOLDOWN_KEYS.volley),
+        3,
+        "Orbit volley cooldown should be three seconds"
+    );
     assert.equal(rage.getMaxChargeTime(), 10.5, "Rage max charge should be 10.5 seconds");
     assert.equal(spin.getMaxChargeTime(), 3.5, "Spin max charge should be 3.5 seconds");
     assert.equal(hero._baseCooldown, 1, "Hero growth stack interval should remain one second");
@@ -24875,6 +24896,17 @@ function testElementalistVfxPreviewCatalog() {
 testElementalistVfxPreviewCatalog();
 
 function testReusableCapabilityContracts() {
+    const cooldowns = new CooldownBank({ primary: 2, reaction: 0.5 });
+    assert.equal(cooldowns.isReady("primary"), true);
+    cooldowns.reset("primary");
+    cooldowns.reset("reaction");
+    cooldowns.tick(0.25, ["primary"]);
+    assert.equal(cooldowns.getRemaining("primary"), 1.75);
+    assert.equal(cooldowns.getRemaining("reaction"), 0.5, "Selected cooldown ticking must not affect siblings");
+    assert.equal(cooldowns.consume("reaction", 0.75), 0.25, "Consumed cooldown time must return frame remainder");
+    assert.equal(cooldowns.isReady("reaction"), true);
+    assert.throws(() => cooldowns.reset("unknown"), /Unknown cooldown key/);
+
     class CooldownProbe extends Cooldown(class {}) {}
     const cooldown = new CooldownProbe();
     cooldown.resetCooldown(2);

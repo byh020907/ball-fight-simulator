@@ -167,6 +167,7 @@ class DashAbility extends Ability {
 - Grenade/Gunner 연발 상태를 `BurstSequencer`로 통일하고 중지·대기·발사 결과를 `BURST_RESULTS`로 고정했습니다.
 - 대상이나 시전자 위치를 따라가는 전투 VFX는 `EntityAttachment`를 조합합니다.
 - 시간값 Map과 활성 엔티티 수 제한은 각각 `tickTimedMap()`, `enforceActiveEntityLimit()` 순수 함수로 분리했습니다.
+- 한 소유자의 Bat reset, Elementalist 도약, Hero 추격·반격, Orbit 적중·연사, 장비·숙련도, 사냥터 몬스터 내부 제한 시간은 `CooldownBank` 컴포지션으로 정합했습니다.
 - 대상 고유 종료 조건, 정확한 누적 피해 정산, 궤적·유체장 계산은 공통 capability로 억지 통합하지 않고 각 소유자에 남겼습니다.
 
 ### Step 4. Swallow/Hold effect 분리

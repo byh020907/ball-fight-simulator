@@ -3670,3 +3670,8 @@
 - 맥락: Hero 보호막과 Archer 회피를 믹스인으로 분리한 뒤 전체 코드를 감사한 결과, 연속 발사·부착형 이펙트·쿨다운·수명 관리가 기존 공용 capability를 우회해 중복 구현되어 있었고 deprecated 호환 API와 잘못된 상속·직접 속도 대입도 남아 있었다.
 - 결정: 확인된 믹스인 대상은 모두 공용 계약으로 적용하고, 믹스인이 부적합한 필드 엔티티 제한·주기 처리·대상별 상태·궤적 등은 순수 함수 또는 명시적 상태 객체로 분리한다. deprecated API와 호환 테스트를 제거하고 모든 호출자를 정식 API로 이전하며, Phantom 직접 velocity 대입과 EnhancementStoneDrop의 잘못된 ShardDrop 상속을 함께 바로잡는다.
 - 영향: physics/ability/effect/entity 공용 계약, Grenade·Gunner·AIActionController·부착형 이펙트·드롭 계층·관련 회귀 테스트와 개발 설계 문서.
+
+## [L1] 2026-07-19 — 한 소유자의 복수 쿨타임은 컴포지션으로 관리한다
+- 맥락: 단일 기본 쿨타임은 `Cooldown` 믹스인으로 정합했지만, Bat reset·Elementalist 도약·장비 효과·사냥터 몬스터 내부 쿨타임은 서로 다른 필드와 상태 객체에서 수동 감소하고 있었다.
+- 결정: 고정된 이름을 가진 복수 쿨타임은 공용 `CooldownBank` 조합 객체가 소유한다. 대상별로 동적으로 생기는 쿨타임은 기존 `tickTimedMap()` 계약을 유지하고 두 개념을 섞지 않는다.
+- 영향: physics 공용 쿨타임 계약, BatBall·Elementalist·BattleBall 장비 효과·HuntingMobAbility와 관련 회귀 테스트·개발 문서.

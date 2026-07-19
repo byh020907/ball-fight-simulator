@@ -9,7 +9,7 @@ import {
     applyBurningEffect,
     applyElementalWet
 } from "../effects/index.js";
-import { applyMagneticAttraction } from "../physics/index.js";
+import { applyMagneticAttraction, CooldownBank } from "../physics/index.js";
 import { Ability } from "./ability.js";
 import {
     ELEMENTAL_COMPOSITE_RECIPES,
@@ -35,6 +35,8 @@ const ELEMENTALIST_CONFIG = Object.freeze({
     },
     wetDuration: 2.5
 });
+
+const ELEMENTALIST_COOLDOWN_KEYS = Object.freeze({ manaLeap: "manaLeap" });
 
 const SINGLE_SPELLS = Object.freeze({
     fire: { damageMultiplier: 1, ignitionDamageMultiplier: 0.5 },
@@ -90,7 +92,9 @@ export class ElementalistAbility extends Ability {
         this.activeChannels = [];
         this.activeOrbs = [];
         this.rng = simulation.rng ?? Math.random;
-        this.nextManaLeapAt = 0;
+        this.cooldowns = new CooldownBank({
+            [ELEMENTALIST_COOLDOWN_KEYS.manaLeap]: ELEMENTALIST_CONFIG.manaLeap.retriggerCooldown
+        });
     }
 
     update(delta, target) {
@@ -99,6 +103,7 @@ export class ElementalistAbility extends Ability {
             return;
         }
         this.tickCooldown(delta);
+        this.cooldowns.tick(delta);
         this._updateChannels(delta);
         this._pruneOrbs();
         if (this.getLevelUpgrade().orbitalFusion) this._processOrbInteractions(delta);
@@ -187,7 +192,7 @@ export class ElementalistAbility extends Ability {
 
     _tryManaLeap(target) {
         if (!this.getLevelUpgrade().manaLeap || this.owner.state.movement) return false;
-        if (this.simulation.elapsed < this.nextManaLeapAt) return false;
+        if (!this.cooldowns.isReady(ELEMENTALIST_COOLDOWN_KEYS.manaLeap)) return false;
 
         const away = Vector2.subtract(this.owner.position, target.position);
         const targetDistance = away.length();
@@ -209,7 +214,7 @@ export class ElementalistAbility extends Ability {
             collisionLabel: "Mana Leap",
             showRing: false
         });
-        this.nextManaLeapAt = this.simulation.elapsed + config.retriggerCooldown;
+        this.cooldowns.reset(ELEMENTALIST_COOLDOWN_KEYS.manaLeap, config.retriggerCooldown);
         this.simulation.spawnParticleBurst(this.owner.position.clone(), "#8fdcff", {
             count: 10,
             speed: 135,

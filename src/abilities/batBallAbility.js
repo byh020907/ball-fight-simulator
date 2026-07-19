@@ -1,6 +1,7 @@
 import { calculateWallSlamAngularImpulse, WallSlamEffect } from "../combatEffects.js";
 import { Vector2 } from "../core.js";
 import { getVisibleLineWidth } from "../effects/effectVisibility.js";
+import { CooldownBank } from "../physics/index.js";
 import { Ability } from "./ability.js";
 
 const ARC_ANGLE = (Math.PI * 2) / 3; // 120도
@@ -23,6 +24,7 @@ const KNOCKBACK_DURATION = 0.85;
 const WALL_SLAM_EFFECT_DURATION = 0.85;
 const RESET_COOLDOWN = 0.5;
 const RESET_FLASH_DURATION = 0.25;
+const BAT_COOLDOWN_KEYS = Object.freeze({ wallReset: "wallReset" });
 const FACING_SMOOTH_RATE = 8;
 const SWEEP_AMPLITUDE = 0.45;
 const VISION_ARC_RADIUS_SCALE = 0.55;
@@ -30,12 +32,12 @@ const VISION_ARC_RADIUS_SCALE = 0.55;
 export class BatBallAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation, 2.5);
+        this.cooldowns = new CooldownBank({ [BAT_COOLDOWN_KEYS.wallReset]: RESET_COOLDOWN });
         this.state = {
             arcAngle: 0,
             slashTimer: 0,
             slashStartAngle: 0,
             slashEndAngle: 0,
-            resetCooldown: 0,
             resetFlash: 0,
             _facingAngle: 0,
             sweepDirection: 1
@@ -44,13 +46,13 @@ export class BatBallAbility extends Ability {
 
     update(delta, target) {
         this.tickCooldown(delta);
+        this.cooldowns.tick(delta);
 
         // Slash 애니메이션 타이머
         if (this.state.slashTimer > 0) {
             this.state.slashTimer -= delta;
             if (this.state.slashTimer < 0) this.state.slashTimer = 0;
         }
-        this.state.resetCooldown = Math.max(0, this.state.resetCooldown - delta);
         this.state.resetFlash = Math.max(0, this.state.resetFlash - delta);
 
         // 시야 범위가 좌우로 자유롭게 스윕 (벽 반동 시 부드럽게 회전)
@@ -137,9 +139,14 @@ export class BatBallAbility extends Ability {
     }
 
     _handleWallSlamImpact({ actualDamage }) {
-        if (!this.getLevelUpgrade().wallReset || actualDamage <= 0 || this.state.resetCooldown > 0) return;
+        if (
+            !this.getLevelUpgrade().wallReset ||
+            actualDamage <= 0 ||
+            !this.cooldowns.isReady(BAT_COOLDOWN_KEYS.wallReset)
+        )
+            return;
         this.setCooldownRemaining(0);
-        this.state.resetCooldown = RESET_COOLDOWN;
+        this.cooldowns.reset(BAT_COOLDOWN_KEYS.wallReset);
         this.state.resetFlash = RESET_FLASH_DURATION;
         const resetText = this.simulation.spawnActionText(this.owner.position.clone(), "RESET!", "#ffffff");
         if (resetText) resetText.visibilityToken = "combatText";

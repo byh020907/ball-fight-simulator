@@ -20,6 +20,7 @@ import {
     LASER_CASTER_PALETTE,
     LASER_CASTER_PHASES
 } from "../effects/laserCasterVisual.js";
+import { CooldownBank } from "../physics/index.js";
 import { Ability } from "./ability.js";
 
 const BARRIER_DURATION = 1.5;
@@ -31,6 +32,11 @@ const ELECTRIC_DAMAGE_PER_TICK = 8;
 const ELECTRIC_COLOR = "#a8e6ff";
 const ELECTRIC_TIMING_EPSILON = 1e-9;
 const LINK_TIMING_EPSILON = 1e-9;
+export const HUNTING_COOLDOWN_KEYS = Object.freeze({
+    reposition: "reposition",
+    electric: "electric",
+    linkChannel: "linkChannel"
+});
 export const HUNTING_LINK_CHANNEL_CONFIG = Object.freeze({
     chain: Object.freeze({
         activeDuration: 0.5,
@@ -145,10 +151,14 @@ export class HuntingMobAbility extends Ability {
         const behavior = owner.hunting?.behavior ?? "pursuer";
         super(owner, simulation, BEHAVIOR_CONFIG[behavior]?.cooldown ?? 0);
         this.behavior = behavior;
+        this.cooldowns = new CooldownBank({
+            [HUNTING_COOLDOWN_KEYS.reposition]: 0,
+            [HUNTING_COOLDOWN_KEYS.electric]: ELECTRIC_COOLDOWN_DURATION,
+            [HUNTING_COOLDOWN_KEYS.linkChannel]: HUNTING_LINK_CHANNEL_CONFIG[behavior]?.cooldownDuration ?? 0
+        });
         this.formationConfig = createEliteMobFormationConfig(owner.hunting?.eliteFormationConfig);
         this.formationSortieConfig = createEliteFormationSortieConfig(owner.hunting?.eliteFormationSortieConfig);
         this.state = {
-            timer: 0,
             link: null,
             linkTime: 0,
             ring: 0,
@@ -158,10 +168,9 @@ export class HuntingMobAbility extends Ability {
             barrierSwapTime: 0,
             laser: null,
             boomerang: null,
-            electric: { channelRemaining: 0, cooldownRemaining: 0 },
-            linkChannel: { activeRemaining: 0, cooldownRemaining: 0 },
+            electric: { channelRemaining: 0 },
+            linkChannel: { activeRemaining: 0 },
             jump: 0,
-            repositionCooldown: 0,
             formationSortie: createEliteFormationSortieState(this.formationSortieConfig)
         };
     }
@@ -172,14 +181,14 @@ export class HuntingMobAbility extends Ability {
             if (this.behavior === "boomerang" && this.state.boomerang) this._tickBoomerang(delta, null);
             return;
         }
-        this.state.timer += delta;
+        this.tickCooldown(delta);
+        this.cooldowns.tick(delta, [HUNTING_COOLDOWN_KEYS.reposition]);
         this.state.linkTime += delta;
         this.state.ring = Math.max(0, this.state.ring - delta);
         this.state.barrier = Math.max(0, this.state.barrier - delta);
         this.state.barrierSwapTime = Math.max(0, this.state.barrierSwapTime - delta);
         if (this.state.barrierSwapTime <= 0) this.state.barrierSwapTarget = null;
         this.state.jump = Math.max(0, this.state.jump - delta);
-        this.state.repositionCooldown = Math.max(0, this.state.repositionCooldown - delta);
         const formationSteering = this._getEliteFormationSteering(delta, target);
         this._steer(delta, formationSteering?.target ?? target, Boolean(formationSteering?.isFormationTarget));
         this._tickProximityReposition(target);
@@ -238,7 +247,8 @@ export class HuntingMobAbility extends Ability {
 
     _tickProximityReposition(target) {
         const config = this.owner.hunting?.reposition;
-        if (!config || this.state.repositionCooldown > 0 || this._hasRepositionBlocker()) return false;
+        if (!config || !this.cooldowns.isReady(HUNTING_COOLDOWN_KEYS.reposition) || this._hasRepositionBlocker())
+            return false;
         const directionToTarget = this._directionTo(target);
         if (!directionToTarget) return false;
         const distance = Vector2.subtract(target.position, this.owner.position).length();
@@ -247,7 +257,7 @@ export class HuntingMobAbility extends Ability {
 
         const direction = this._getAdaptiveRepositionDirection(directionToTarget, config);
         this.owner.applyImpulse(direction.scale(config.impulse));
-        this.state.repositionCooldown = config.cooldown;
+        this.cooldowns.reset(HUNTING_COOLDOWN_KEYS.reposition, config.cooldown);
         this.simulation.spawnPulse(this.owner.position.clone(), this.owner.color);
         return true;
     }
@@ -288,10 +298,10 @@ export class HuntingMobAbility extends Ability {
         if (this.behavior === "laser") return this._tickLaser(delta, target);
         if (this.behavior === "boomerang") return this._tickBoomerang(delta, target);
         if (this.behavior === "splitter") return;
-        if (this.state.timer < this.cooldown) return;
+        if (!this.cooldownReady) return;
         const behaviorRange = BEHAVIOR_CONFIG[this.behavior]?.range;
         if (behaviorRange && Vector2.subtract(target.position, this.owner.position).length() > behaviorRange) return;
-        this.state.timer = 0;
+        this.resetCooldown(this.cooldown);
         if (this.behavior === "charger") this._charge(target);
         else if (this.behavior === "shooter") this._shoot(target);
         else if (this.behavior === "shockwave") this._shockwave();
@@ -302,11 +312,11 @@ export class HuntingMobAbility extends Ability {
 
     _tickElectric(delta, target) {
         const electric = this.state.electric;
-        if (electric.cooldownRemaining > ELECTRIC_TIMING_EPSILON) {
-            electric.cooldownRemaining = Math.max(0, electric.cooldownRemaining - delta);
+        if (!this.cooldowns.isReady(HUNTING_COOLDOWN_KEYS.electric)) {
+            this.cooldowns.tick(delta, [HUNTING_COOLDOWN_KEYS.electric]);
             this.state.link = null;
-            if (electric.cooldownRemaining > ELECTRIC_TIMING_EPSILON) return;
-            electric.cooldownRemaining = 0;
+            if (this.cooldowns.getRemaining(HUNTING_COOLDOWN_KEYS.electric) > ELECTRIC_TIMING_EPSILON) return;
+            this.cooldowns.clear(HUNTING_COOLDOWN_KEYS.electric);
         }
 
         const distance = Vector2.subtract(target.position, this.owner.position).length();
@@ -327,7 +337,8 @@ export class HuntingMobAbility extends Ability {
 
     _startElectricCooldown(elapsed = 0) {
         this.state.electric.channelRemaining = 0;
-        this.state.electric.cooldownRemaining = Math.max(0, ELECTRIC_COOLDOWN_DURATION - elapsed);
+        this.cooldowns.reset(HUNTING_COOLDOWN_KEYS.electric);
+        this.cooldowns.tick(elapsed, [HUNTING_COOLDOWN_KEYS.electric]);
         this.state.link = null;
     }
 
@@ -366,13 +377,11 @@ export class HuntingMobAbility extends Ability {
     _tickLinkChannel(delta, target, config) {
         const channel = this.state.linkChannel;
         let remainingDelta = delta;
-        if (channel.cooldownRemaining > LINK_TIMING_EPSILON) {
-            const cooldownDelta = Math.min(remainingDelta, channel.cooldownRemaining);
-            channel.cooldownRemaining = Math.max(0, channel.cooldownRemaining - cooldownDelta);
-            remainingDelta -= cooldownDelta;
+        if (!this.cooldowns.isReady(HUNTING_COOLDOWN_KEYS.linkChannel)) {
+            remainingDelta = this.cooldowns.consume(HUNTING_COOLDOWN_KEYS.linkChannel, remainingDelta);
             this.state.link = null;
-            if (channel.cooldownRemaining > LINK_TIMING_EPSILON || remainingDelta <= LINK_TIMING_EPSILON) return 0;
-            channel.cooldownRemaining = 0;
+            if (!this.cooldowns.isReady(HUNTING_COOLDOWN_KEYS.linkChannel) || remainingDelta <= LINK_TIMING_EPSILON)
+                return 0;
         }
 
         const distance = Vector2.subtract(target.position, this.owner.position).length();
@@ -394,7 +403,8 @@ export class HuntingMobAbility extends Ability {
 
     _startLinkCooldown(config, elapsed = 0) {
         this.state.linkChannel.activeRemaining = 0;
-        this.state.linkChannel.cooldownRemaining = Math.max(0, config.cooldownDuration - elapsed);
+        this.cooldowns.reset(HUNTING_COOLDOWN_KEYS.linkChannel, config.cooldownDuration);
+        this.cooldowns.tick(elapsed, [HUNTING_COOLDOWN_KEYS.linkChannel]);
         this.state.link = null;
     }
 
@@ -607,8 +617,8 @@ export class HuntingMobAbility extends Ability {
 
     _tickLaser(delta, target) {
         if (!this.state.laser) {
-            if (this.state.timer < this.cooldown) return;
-            this.state.timer = 0;
+            if (!this.cooldownReady) return;
+            this.resetCooldown(this.cooldown);
             this.state.laser = {
                 angle: Math.atan2(target.position.y - this.owner.position.y, target.position.x - this.owner.position.x),
                 charge: HUNTING_LASER_CHARGE_DURATION,
@@ -651,8 +661,8 @@ export class HuntingMobAbility extends Ability {
     }
 
     _tickBoomerang(delta, target) {
-        if (!this.state.boomerang && this.state.timer >= this.cooldown && target) {
-            this.state.timer = 0;
+        if (!this.state.boomerang && this.cooldownReady && target) {
+            this.resetCooldown(this.cooldown);
             this.state.boomerang = this._createBoomerang(target);
         }
         const boom = this.state.boomerang;
