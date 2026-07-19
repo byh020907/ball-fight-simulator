@@ -7,7 +7,6 @@ import { HERO_COMBAT_CONFIG } from "./heroCombatConfig.js";
 export const HERO_ORB_STAT_CAP = -1;
 export const HERO_ORB_MAX_ACTIVE_PER_OWNER = HERO_COMBAT_CONFIG.core.maximumActivePerOwner;
 const STAT_EFFECT_TYPES = ["hp", "damage", "speed", "defense", "skill", "critical"];
-const ARMOR_PLATE_COUNT = 10;
 
 export function pickHeroOrbEffectType(rng = Math.random) {
     return STAT_EFFECT_TYPES[Math.min(STAT_EFFECT_TYPES.length - 1, Math.floor(rng() * STAT_EFFECT_TYPES.length))];
@@ -31,9 +30,7 @@ export class HeroAbility extends Ability {
             shield: 0,
             counterCooldown: 0,
             stackGainFlash: 0,
-            stackReleaseFlash: 0,
-            armorGainFlash: 0,
-            armorHitFlash: 0
+            stackReleaseFlash: 0
         };
     }
 
@@ -47,8 +44,6 @@ export class HeroAbility extends Ability {
     _tickTransientState(delta) {
         this.state.stackGainFlash = Math.max(0, this.state.stackGainFlash - delta);
         this.state.stackReleaseFlash = Math.max(0, this.state.stackReleaseFlash - delta);
-        this.state.armorGainFlash = Math.max(0, this.state.armorGainFlash - delta);
-        this.state.armorHitFlash = Math.max(0, this.state.armorHitFlash - delta);
         this.state.counterCooldown = Math.max(0, this.state.counterCooldown - delta);
     }
 
@@ -181,7 +176,6 @@ export class HeroAbility extends Ability {
         const previous = this.state.shield;
         this.state.shield = Math.min(this.getMaximumShield(), previous + gained);
         if (this.state.shield <= previous) return;
-        this.state.armorGainFlash = HERO_COMBAT_CONFIG.armor.hitFlashDuration;
         this.simulation.spawnParticleBurst(this.owner.position.clone(), "#ffe66b", {
             count: 8,
             speed: 90,
@@ -222,7 +216,6 @@ export class HeroAbility extends Ability {
         const shieldBefore = this.state.shield;
         const absorbedDamage = Math.min(shieldBefore, damage);
         this.state.shield = Math.max(0, shieldBefore - absorbedDamage);
-        this.state.armorHitFlash = HERO_COMBAT_CONFIG.armor.hitFlashDuration;
         this._showShieldHit(absorbedDamage);
 
         const hostileSource = this._isHostileSource(source);
@@ -311,7 +304,6 @@ export class HeroAbility extends Ability {
 
     draw(ctx) {
         this._drawStackReleaseFlash(ctx);
-        this._drawHeroArmor(ctx);
         this._drawGrowthStacks(ctx);
     }
 
@@ -325,44 +317,6 @@ export class HeroAbility extends Ability {
         ctx.beginPath();
         ctx.arc(this.owner.position.x, this.owner.position.y, this.owner.radius + 12 + progress * 28, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.restore();
-    }
-
-    _drawHeroArmor(ctx) {
-        if (this.state.shield <= 0) return;
-        const shieldProgress = Math.min(1, this.state.shield / this.getMaximumShield());
-        const visiblePlates = Math.ceil(shieldProgress * ARMOR_PLATE_COUNT);
-        const flash =
-            Math.max(this.state.armorGainFlash, this.state.armorHitFlash) / HERO_COMBAT_CONFIG.armor.hitFlashDuration;
-        const orbitRadius = this.owner.radius + 15 + flash * 3;
-
-        ctx.save();
-        ctx.strokeStyle = `rgba(255, 232, 154, ${0.38 + shieldProgress * 0.42})`;
-        ctx.lineWidth = 3 + flash * 2;
-        ctx.beginPath();
-        ctx.arc(this.owner.position.x, this.owner.position.y, this.owner.radius + 7, 0, Math.PI * 2);
-        ctx.stroke();
-
-        for (const index of Array.from({ length: visiblePlates }, (_, value) => value)) {
-            const angle = -Math.PI / 2 + (Math.PI * 2 * index) / ARMOR_PLATE_COUNT;
-            const x = this.owner.position.x + Math.cos(angle) * orbitRadius;
-            const y = this.owner.position.y + Math.sin(angle) * orbitRadius;
-            const size = 5.5 + flash * 1.5;
-            ctx.fillStyle = this.state.armorHitFlash > 0 ? "#fff4b8" : "#ffd84d";
-            ctx.strokeStyle = "#8f6200";
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            for (let side = 0; side < 6; side += 1) {
-                const pointAngle = angle + (Math.PI * 2 * side) / 6;
-                const px = x + Math.cos(pointAngle) * size;
-                const py = y + Math.sin(pointAngle) * size;
-                if (side === 0) ctx.moveTo(px, py);
-                else ctx.lineTo(px, py);
-            }
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-        }
         ctx.restore();
     }
 

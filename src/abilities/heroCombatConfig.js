@@ -26,8 +26,7 @@ export const HERO_COMBAT_CONFIG = Object.freeze({
     }),
     armor: Object.freeze({
         shieldPerCoreMaxHpRatio: 0.05,
-        maximumShieldMaxHpRatio: 0.5,
-        hitFlashDuration: 0.2
+        maximumShieldMaxHpRatio: 0.5
     }),
     counter: Object.freeze({
         cooldown: 0.5,

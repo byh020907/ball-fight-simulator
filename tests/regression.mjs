@@ -5887,6 +5887,8 @@ function testAbilityLevelUpgrades(app) {
         "Five consumed growth stacks should create exactly five eight-second cores"
     );
     const hpBeforeCore = (heroRun.ball.hp = Math.floor(heroRun.ball.maxHp * 0.5));
+    const heroDrawWithoutShield = makeRecordingCanvasContext();
+    heroAbility.draw(heroDrawWithoutShield);
     heroAbility.onOrbCollected(attractionOrb, { applied: true });
     assert.equal(
         heroAbility.getShieldState().current,
@@ -5897,6 +5899,13 @@ function testAbilityLevelUpgrades(app) {
         heroRun.ball.hp - hpBeforeCore,
         Math.round(heroRun.ball.maxHp * 0.01),
         "Hero tier 2 should restore one-percent maximum HP per collected core"
+    );
+    const heroDrawWithShield = makeRecordingCanvasContext();
+    heroAbility.draw(heroDrawWithShield);
+    assert.deepEqual(
+        heroDrawWithShield.calls,
+        heroDrawWithoutShield.calls,
+        "Active Hero shield should not add persistent world-space decorations"
     );
     console.log("[ability-level-upgrades] ok");
 }
