@@ -396,6 +396,20 @@ Ability / Action / Effect: 목표 방향, 목표 속도, movementEffect, forceHe
 - 예외적으로 삼킴, 프리뷰 정지처럼 이동 자체를 멈춰야 하는 상태도 `velocity`를 직접 초기화하지 않고, 현재 속도의 반대 impulse를 넣어 정지시킵니다.
 - 생성자에서 초기 `velocity` 필드를 만드는 것은 예외입니다. 아직 물리 상태가 존재하지 않는 객체의 초기 상태 정의이기 때문입니다.
 
+### PassiveEvasion 믹스인
+
+```
+PassiveEvasion:            근접 대상·접근 방향·거리 판정,
+                           상대 진행 방향 기준 측면 회피 벡터 계산,
+                           applyImpulse()와 짧은 forceHeading() 적용
+ArcherAbility:             회피 설정(range 320, strength 0.7)과 발동 시점 소유
+```
+
+- 자동 측면 회피를 사용하는 Ability는 `PassiveEvasion(Ability)`를 조합하고 `getPassiveEvasionConfig()`로 캐릭터별 설정을 제공한다.
+- 공용 믹스인은 `velocity`를 직접 수정하지 않고 `applyImpulse()`를 사용하며, 삼킴·벽 충돌·패배 대상에서는 발동하지 않는다.
+- 클릭 액션의 수동 회피와 사냥터 원거리 몬스터 재배치는 발동 주체와 행동 계약이 다르므로 이 믹스인에 합치지 않는다.
+- 현재 플레이어 로스터에서는 Archer만 자동 측면 회피를 사용한다. 과거 Grenade 회피 패치 이력을 근거로 현재 Grenade에 회피를 다시 추가하지 않는다.
+
 ### TricksterAbility / Seed 로직 소유권
 
 ```

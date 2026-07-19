@@ -1,17 +1,21 @@
-import { calculateInterceptPoint, Vector2, evadeTarget } from "../core.js";
+import { calculateInterceptPoint, Vector2 } from "../core.js";
 import { ArcherPredictionEffect } from "../effects/archerPredictionEffect.js";
 import { Ability } from "./ability.js";
+import { PassiveEvasion, PASSIVE_EVASION_DEFAULTS } from "./mixins/passiveEvasion.js";
 
 const WINDUP = 0.4;
-const EVADE_RANGE = 320;
-const EVADE_STRENGTH = 0.7;
+const ARCHER_EVASION_CONFIG = Object.freeze({
+    ...PASSIVE_EVASION_DEFAULTS,
+    range: 320,
+    strength: 0.7
+});
 const ARROW_SPEED_MULT = 2;
 const ARROW_START_OFFSET = 24;
 const DOUBLE_SHOT_DELAY = 0.12;
 const CRIT_BOOST_CHANCE = 0.5;
 const CRIT_BOOST_MULT = 2;
 
-export class ArcherAbility extends Ability {
+export class ArcherAbility extends PassiveEvasion(Ability) {
     constructor(owner, simulation) {
         super(owner, simulation, 2.5);
         this.state = {
@@ -27,7 +31,7 @@ export class ArcherAbility extends Ability {
     }
 
     update(delta, target) {
-        this._evade(target);
+        this.tryPassiveEvasion(target);
         if (this._updateSecondShot(delta)) return;
         if (this._updateWindUp(delta, target)) return;
         this._updateCooldown(delta, target);
@@ -133,8 +137,8 @@ export class ArcherAbility extends Ability {
         this.simulation.spawnSlash(this.owner.position.clone(), start.clone(), this.owner.color);
     }
 
-    _evade(target) {
-        evadeTarget(this.owner, target, EVADE_RANGE, EVADE_STRENGTH);
+    getPassiveEvasionConfig() {
+        return ARCHER_EVASION_CONFIG;
     }
 
     getStatModifiers() {

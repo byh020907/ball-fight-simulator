@@ -14498,7 +14498,7 @@ function testProjectileIgnoresAllies(app) {
     assert.ok(enemy.hp < enemy.maxHp, "Projectile should damage a hostile fighter");
 }
 
-function assertPassiveEvasionAppliesImpulse(app, fighterId, label) {
+function createPassiveEvasionRun(app, fighterId) {
     const sim = new BattleSimulation(
         [
             app.roster.find((fighter) => fighter.id === fighterId),
@@ -14512,6 +14512,11 @@ function assertPassiveEvasionAppliesImpulse(app, fighterId, label) {
     const [evader, target] = sim.fighters;
     evader.position = new Vector2(300, 480);
     target.position = new Vector2(380, 480);
+    return { evader, target };
+}
+
+function assertPassiveEvasionAppliesImpulse(app, fighterId, label) {
+    const { evader, target } = createPassiveEvasionRun(app, fighterId);
     evader.applyImpulse(Vector2.subtract(new Vector2(180, 0), evader.velocity));
     target.applyImpulse(Vector2.subtract(new Vector2(180, 0), target.velocity));
 
@@ -14522,10 +14527,32 @@ function assertPassiveEvasionAppliesImpulse(app, fighterId, label) {
         Math.abs(evader.velocity.y) > 20,
         `${label} passive evasion should apply immediate lateral impulse after velocity became impulse-based`
     );
+
+    return { evader, target };
 }
 
 function testPassiveEvasionAppliesImpulse(app) {
-    assertPassiveEvasionAppliesImpulse(app, FIGHTER_IDS.ARCHER, "Archer");
+    const archer = assertPassiveEvasionAppliesImpulse(app, FIGHTER_IDS.ARCHER, "Archer");
+    assert.equal(
+        typeof archer.evader.ability.tryPassiveEvasion,
+        "function",
+        "Archer should compose the reusable passive evasion mixin"
+    );
+
+    const movingAway = createPassiveEvasionRun(app, FIGHTER_IDS.ARCHER);
+    movingAway.evader.applyImpulse(Vector2.subtract(new Vector2(-180, 0), movingAway.evader.velocity));
+    movingAway.target.applyImpulse(Vector2.subtract(new Vector2(180, 0), movingAway.target.velocity));
+    movingAway.evader.ability.update(0.016, movingAway.target);
+    assert.equal(movingAway.evader.state.forcedHeading, null, "Passive evasion should not trigger while moving away");
+    assert.equal(movingAway.evader.velocity.y, 0, "Moving away should not receive a lateral evasion impulse");
+
+    const outOfRange = createPassiveEvasionRun(app, FIGHTER_IDS.ARCHER);
+    outOfRange.target.position = new Vector2(700, 480);
+    outOfRange.evader.applyImpulse(Vector2.subtract(new Vector2(180, 0), outOfRange.evader.velocity));
+    outOfRange.target.applyImpulse(Vector2.subtract(new Vector2(180, 0), outOfRange.target.velocity));
+    outOfRange.evader.ability.update(0.016, outOfRange.target);
+    assert.equal(outOfRange.evader.state.forcedHeading, null, "Passive evasion should respect its configured range");
+    assert.equal(outOfRange.evader.velocity.y, 0, "Out-of-range targets should not add lateral impulse");
 }
 
 function testClickActionEffectOwnership(app) {
