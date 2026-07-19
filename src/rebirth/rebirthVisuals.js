@@ -275,7 +275,7 @@ function getFlameParticleStyle(particle, visual) {
     };
 }
 
-function drawFlameQuadParticles(ctx, particles, visual) {
+export function drawFlameQuadParticles(ctx, particles, visual) {
     ctx.save();
     ctx.globalCompositeOperation = "source-over";
     [...particles]

@@ -1,0 +1,246 @@
+import { Vector2 } from "../core.js";
+import { ELEMENTAL_COMPOSITE_RECIPES, ELEMENTAL_PALETTE, ELEMENTAL_TYPES } from "../abilities/elementalistRecipes.js";
+import { ElementalChannelEffect, drawElementalOrb } from "../effects/elementalistEffects.js";
+import { ElementalWetEffect } from "../effects/elementalWetEffect.js";
+
+const ELEMENT_LABELS = Object.freeze({
+    fire: "화염",
+    electric: "전기",
+    frost: "냉기",
+    wind: "바람",
+    earth: "대지"
+});
+
+const PREVIEW_CONFIG = Object.freeze({
+    width: 640,
+    height: 360,
+    channelDuration: 1.35,
+    wetDuration: 2.5,
+    source: Object.freeze({ x: 120, y: 180, radius: 28 }),
+    target: Object.freeze({ x: 515, y: 180, radius: 34 }),
+    orbRadius: 13,
+    maximumPixelRatio: 2,
+    maximumFrameDelta: 1 / 20
+});
+
+const SINGLE_PREVIEWS = ELEMENTAL_TYPES.map((element) =>
+    Object.freeze({
+        id: `single:${element}`,
+        label: `단일 · ${ELEMENT_LABELS[element]}`,
+        description: `${ELEMENT_LABELS[element]} 원소 채널의 실제 전투 연출`,
+        elements: Object.freeze([element]),
+        recipe: null
+    })
+);
+
+const COMPOSITE_PREVIEWS = Object.values(ELEMENTAL_COMPOSITE_RECIPES).map((recipe) =>
+    Object.freeze({
+        id: `composite:${recipe.id}`,
+        label: `융합 · ${recipe.name}`,
+        description: `${recipe.elements.map((element) => ELEMENT_LABELS[element]).join(" + ")} 조합의 실제 전투 연출`,
+        elements: recipe.elements,
+        recipe
+    })
+);
+
+export const ELEMENTALIST_VFX_PREVIEW_OPTIONS = Object.freeze([
+    Object.freeze({
+        id: "wet",
+        label: "상태 · 젖음",
+        description: "원소 반응이 가능한 젖음 상태의 실제 추적 연출",
+        elements: Object.freeze(["water"]),
+        recipe: null
+    }),
+    ...SINGLE_PREVIEWS,
+    ...COMPOSITE_PREVIEWS
+]);
+
+function getPreviewOption(previewId) {
+    return (
+        ELEMENTALIST_VFX_PREVIEW_OPTIONS.find((option) => option.id === previewId) ??
+        ELEMENTALIST_VFX_PREVIEW_OPTIONS.find((option) => option.id === "single:fire")
+    );
+}
+
+function createPreviewFighter(config, color) {
+    return {
+        id: `elementalist-preview-${color}`,
+        position: new Vector2(config.x, config.y),
+        velocity: new Vector2(),
+        radius: config.radius,
+        color,
+        flags: { defeated: false },
+        state: { elementalWetUntil: 0, elementalWetEffect: null },
+        stats: { baseSpeed: 300 }
+    };
+}
+
+function drawPreviewFighter(ctx, fighter) {
+    ctx.save();
+    ctx.fillStyle = fighter.color;
+    ctx.strokeStyle = "#202020";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(fighter.position.x, fighter.position.y, fighter.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+}
+
+function drawPreviewArena(ctx) {
+    const { width, height } = PREVIEW_CONFIG;
+    ctx.fillStyle = "#e6e4df";
+    ctx.fillRect(0, 0, width, height);
+    ctx.strokeStyle = "#202020";
+    ctx.lineWidth = 4;
+    ctx.strokeRect(2, 2, width - 4, height - 4);
+    ctx.fillStyle = "rgba(32, 32, 32, 0.12)";
+    [0.18, 0.38, 0.62, 0.82].forEach((ratio, index) => {
+        ctx.beginPath();
+        ctx.arc(width * ratio, height * (index % 2 === 0 ? 0.22 : 0.78), 3, 0, Math.PI * 2);
+        ctx.fill();
+    });
+}
+
+function createPreviewOrbs(option, source) {
+    const elements = option.elements.filter((element) => element !== "water");
+    const centerOffset = (elements.length - 1) / 2;
+    return elements.map((element, index) => ({
+        element,
+        elements: [element],
+        position: new Vector2(source.position.x + 62, source.position.y + (index - centerOffset) * 58),
+        radius: PREVIEW_CONFIG.orbRadius,
+        createdAt: index * 0.17
+    }));
+}
+
+export class ElementalistVfxPreviewScene {
+    constructor(previewId = "single:fire") {
+        this.elapsed = 0;
+        this.simulation = { elapsed: 0 };
+        this.source = createPreviewFighter(PREVIEW_CONFIG.source, "#8f6ee8");
+        this.target = createPreviewFighter(PREVIEW_CONFIG.target, "#d06b5e");
+        this.setPreview(previewId);
+    }
+
+    setPreview(previewId) {
+        this.option = getPreviewOption(previewId);
+        this.phaseElapsed = 0;
+        this.orbs = createPreviewOrbs(this.option, this.source);
+        this._createEffect();
+    }
+
+    _createEffect() {
+        this.phaseElapsed = 0;
+        if (this.option.id === "wet") {
+            const expiresAt = this.elapsed + PREVIEW_CONFIG.wetDuration;
+            this.target.state.elementalWetUntil = expiresAt;
+            this.effect = new ElementalWetEffect({
+                target: this.target,
+                simulation: this.simulation,
+                expiresAt
+            });
+            this.target.state.elementalWetEffect = this.effect;
+            return;
+        }
+
+        this.target.state.elementalWetUntil = 0;
+        this.target.state.elementalWetEffect = null;
+        this.effect = new ElementalChannelEffect({
+            channel: { cancelled: false, finished: false },
+            source: this.source,
+            target: this.target,
+            elements: this.option.elements,
+            recipe: this.option.recipe,
+            duration: PREVIEW_CONFIG.channelDuration
+        });
+    }
+
+    update(delta) {
+        const boundedDelta = Math.min(PREVIEW_CONFIG.maximumFrameDelta, Math.max(0, delta));
+        this.elapsed += boundedDelta;
+        this.phaseElapsed += boundedDelta;
+        this.simulation.elapsed = this.elapsed;
+        this.effect.update(boundedDelta);
+        const cycleDuration = this.option.id === "wet" ? PREVIEW_CONFIG.wetDuration : PREVIEW_CONFIG.channelDuration;
+        if (this.effect.isExpired || this.phaseElapsed >= cycleDuration) this._createEffect();
+    }
+
+    draw(ctx) {
+        drawPreviewArena(ctx);
+        drawPreviewFighter(ctx, this.source);
+        drawPreviewFighter(ctx, this.target);
+        this.orbs.forEach((orb) => drawElementalOrb(ctx, orb, this.elapsed));
+        this.effect.draw(ctx);
+    }
+}
+
+export class ElementalistVfxPreviewController {
+    constructor({
+        requestFrame = globalThis.requestAnimationFrame?.bind(globalThis),
+        cancelFrame = globalThis.cancelAnimationFrame?.bind(globalThis),
+        ResizeObserverClass = globalThis.ResizeObserver
+    } = {}) {
+        this.requestFrame = requestFrame;
+        this.cancelFrame = cancelFrame;
+        this.ResizeObserverClass = ResizeObserverClass;
+        this.frameId = null;
+        this.lastFrameTime = null;
+        this.canvas = null;
+        this.scene = null;
+        this.resizeObserver = null;
+    }
+
+    start(canvas, previewId) {
+        if (!canvas?.getContext || !this.requestFrame) return { ok: false, error: "preview_unavailable" };
+        this.stop();
+        this.canvas = canvas;
+        this.scene = new ElementalistVfxPreviewScene(previewId);
+        this.resizeObserver = this.ResizeObserverClass ? new this.ResizeObserverClass(() => this._resize()) : null;
+        this.resizeObserver?.observe(canvas);
+        this._resize();
+        this.frameId = this.requestFrame((time) => this._renderFrame(time));
+        return { ok: true };
+    }
+
+    stop() {
+        if (this.frameId !== null) this.cancelFrame?.(this.frameId);
+        this.resizeObserver?.disconnect();
+        this.frameId = null;
+        this.lastFrameTime = null;
+        this.canvas = null;
+        this.scene = null;
+        this.resizeObserver = null;
+        return { ok: true };
+    }
+
+    _resize() {
+        if (!this.canvas) return;
+        const bounds = this.canvas.getBoundingClientRect();
+        const pixelRatio = Math.min(PREVIEW_CONFIG.maximumPixelRatio, globalThis.devicePixelRatio || 1);
+        const width = Math.max(1, Math.round(bounds.width * pixelRatio));
+        const height = Math.max(1, Math.round(bounds.height * pixelRatio));
+        if (this.canvas.width !== width) this.canvas.width = width;
+        if (this.canvas.height !== height) this.canvas.height = height;
+    }
+
+    _renderFrame(time) {
+        if (!this.canvas || !this.scene) return;
+        const delta = this.lastFrameTime === null ? 0 : (time - this.lastFrameTime) / 1000;
+        this.lastFrameTime = time;
+        this.scene.update(delta);
+        const context = this.canvas.getContext("2d");
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        const scale = Math.min(this.canvas.width / PREVIEW_CONFIG.width, this.canvas.height / PREVIEW_CONFIG.height);
+        const offsetX = (this.canvas.width - PREVIEW_CONFIG.width * scale) / 2;
+        const offsetY = (this.canvas.height - PREVIEW_CONFIG.height * scale) / 2;
+        context.setTransform(scale, 0, 0, scale, offsetX, offsetY);
+        this.scene.draw(context);
+        this.frameId = this.requestFrame((nextTime) => this._renderFrame(nextTime));
+    }
+}
+
+export function getElementalistVfxPreviewOptions() {
+    return ELEMENTALIST_VFX_PREVIEW_OPTIONS.map(({ id, label, description }) => ({ id, label, description }));
+}

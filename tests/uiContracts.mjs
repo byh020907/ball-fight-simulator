@@ -1239,6 +1239,18 @@ function testCollectionRebirthAndDeveloperContracts() {
         template.includes("캐릭터 설정") && template.includes("사냥터 테스트"),
         "Developer controls should be grouped by the context they affect"
     );
+    assert.ok(
+        template.includes("Elementalist VFX") &&
+            template.includes("state.developer.elementalistPreviewOptions") &&
+            template.includes("data-elementalist-vfx-preview"),
+        "Developer tools should expose the dedicated Elementalist VFX preview"
+    );
+    assert.ok(
+        template.includes("startDebugElementalistVfxPreview") &&
+            template.includes("stopDebugElementalistVfxPreview") &&
+            template.includes("aspect-ratio: 16 / 9"),
+        "Elementalist preview should use the debug bridge and a fluid canvas frame"
+    );
     assert.ok(template.includes("정예 조합"), "Developer tools should expose the elite combination selector");
     assert.ok(
         template.includes("state.developer.huntingEventType === 'elite_mob'"),

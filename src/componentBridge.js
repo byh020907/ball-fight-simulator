@@ -30,8 +30,14 @@ import {
     setDeveloperRebirthCount,
     setDeveloperHiddenCharacterUnlocked
 } from "./developer/developerTools.js";
+import {
+    ElementalistVfxPreviewController,
+    getElementalistVfxPreviewOptions
+} from "./developer/elementalistVfxPreview.js";
 
 export function createComponentBridge(app) {
+    const elementalistVfxPreview = new ElementalistVfxPreviewController();
+
     function showLevelLockPopup(item) {
         const requiredLevel = getEquipmentRequiredLevel(item);
         const charLevel = getCharacterEquipmentLevel(app.playerProfile, app.playerFighterId);
@@ -238,8 +244,20 @@ export function createComponentBridge(app) {
             return { ok: true };
         },
         exitDebugMode() {
+            elementalistVfxPreview.stop();
             if (!app.disableDebugMode()) return { ok: false, error: "debug_disabled" };
             return { ok: true };
+        },
+        getDebugElementalistVfxPreviewOptions() {
+            if (!app.isDebugModeActive()) return [];
+            return getElementalistVfxPreviewOptions();
+        },
+        startDebugElementalistVfxPreview(canvas, previewId) {
+            if (!app.isDebugModeActive()) return { ok: false, error: "debug_disabled" };
+            return elementalistVfxPreview.start(canvas, previewId);
+        },
+        stopDebugElementalistVfxPreview() {
+            return elementalistVfxPreview.stop();
         },
         setDebugCharacterToMaxLevel(characterId) {
             if (!app.isDebugModeActive()) return { ok: false, error: "debug_disabled" };

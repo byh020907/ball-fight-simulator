@@ -161,6 +161,7 @@ export function drawMultiShapeMotion(ctx, channel, progress) {
     if (!channel.target) return;
     const shape = channel.recipe?.shape ?? "spark";
     ctx.save();
+    ctx.globalAlpha = channel.shapeAlpha ?? 1;
     Array.from({ length: SHAPE_COUNT }, (_, index) => index).forEach((index) => {
         const point = getMotionPoint(channel, index, progress);
         const side = index % channel.colors.length;
@@ -194,7 +195,7 @@ export function drawPathFlow(ctx, channel, progress) {
     ctx.save();
     ctx.strokeStyle = channel.colors[0];
     ctx.lineWidth = getVisibleLineWidth(ctx, "standard", 3);
-    ctx.globalAlpha = 0.72;
+    ctx.globalAlpha = channel.pathAlpha ?? 0.72;
     ctx.beginPath();
     if (path === "arc" || path === "lob") {
         const bend = path === "lob" ? 70 : 34;
@@ -309,7 +310,7 @@ export class ElementalChannelEffect extends CombatEntity {
         this.duration = duration;
         this.life = duration;
         this.maxLife = duration;
-        this.visualState = createElementalChannelVisualState(target, elements);
+        this.visualState = createElementalChannelVisualState(source, target, elements);
     }
 
     update(delta) {
@@ -318,19 +319,22 @@ export class ElementalChannelEffect extends CombatEntity {
             return;
         }
         this.pos = this.target.position.clone();
-        updateElementalChannelVisualState(this.visualState, this.target, delta);
+        updateElementalChannelVisualState(this.visualState, this.source, this.target, delta);
         this.tickLife(delta);
     }
 
     draw(ctx) {
         const progress = clamp01(this.lifeProgress);
+        const isSingleFire = this.elements.length === 1 && this.elements[0] === "fire";
         const view = {
             ...this,
             target: this.target,
             source: this.source,
             colors: this.colors,
             elements: this.elements,
-            recipe: this.recipe
+            recipe: this.recipe,
+            pathAlpha: isSingleFire ? 0.24 : 0.72,
+            shapeAlpha: isSingleFire ? 0.28 : 1
         };
         drawTargetChannelTimeline(ctx, view, progress);
         drawPathFlow(ctx, view, progress);

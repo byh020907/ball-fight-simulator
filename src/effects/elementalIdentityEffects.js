@@ -1,12 +1,20 @@
 import { Vector2 } from "../core.js";
 import { ELEMENTAL_PALETTE } from "../abilities/elementalistRecipes.js";
-import { drawFlameParticlePlume, getRebirthVisualProfile } from "../rebirth/rebirthVisuals.js";
+import { drawFlameParticlePlume, drawFlameQuadParticles, getRebirthVisualProfile } from "../rebirth/rebirthVisuals.js";
 import { drawElectricArc } from "./electricArc.js";
 import { getVisibleLineWidth } from "./effectVisibility.js";
 import { createFlowFieldVisual, drawFlowFieldVisual, updateFlowFieldVisual } from "./flowFieldVisual.js";
 
 export const ELEMENTAL_CHANNEL_VISUAL_CONFIG = Object.freeze({
-    fire: Object.freeze({ singleParticleCount: 22, compositeParticleCount: 14 }),
+    fire: Object.freeze({
+        singleParticleCount: 26,
+        compositeParticleCount: 16,
+        singleTrailParticleCount: 30,
+        compositeTrailParticleCount: 20,
+        trailCycleSpeed: 0.82,
+        trailWidth: 18,
+        trailParticleSize: 5.5
+    }),
     electric: Object.freeze({ branchCount: 3, branchRadius: 42 }),
     frost: Object.freeze({ shardCount: 7, outerDistance: 64, innerDistance: 12 }),
     wind: Object.freeze({
@@ -35,16 +43,62 @@ function getElementIntensity(elementCount, index) {
     return index === 0 ? 0.86 : 0.72;
 }
 
+function createFlameVisual(particleCount) {
+    return Object.freeze({
+        ...getRebirthVisualProfile(1),
+        particleCount
+    });
+}
+
+function createFireTrailParticle(index, particleCount) {
+    const config = ELEMENTAL_CHANNEL_VISUAL_CONFIG.fire;
+    const progress = (index + 0.35) / particleCount;
+    return {
+        x: 0,
+        y: 0,
+        velocityX: 0,
+        velocityY: 0,
+        size: config.trailParticleSize * (0.82 + (index % 4) * 0.08),
+        rotation: 0,
+        age: progress,
+        lifetime: 1,
+        seed: 173 + index * 19,
+        index,
+        lane: (((index * 37) % 11) / 10) * 2 - 1,
+        speedScale: 0.86 + (index % 5) * 0.035
+    };
+}
+
 function createFireState(isComposite) {
+    const config = ELEMENTAL_CHANNEL_VISUAL_CONFIG.fire;
+    const trailParticleCount = isComposite ? config.compositeTrailParticleCount : config.singleTrailParticleCount;
     return {
         stateOwner: {},
-        visual: Object.freeze({
-            ...getRebirthVisualProfile(1),
-            particleCount: isComposite
-                ? ELEMENTAL_CHANNEL_VISUAL_CONFIG.fire.compositeParticleCount
-                : ELEMENTAL_CHANNEL_VISUAL_CONFIG.fire.singleParticleCount
-        })
+        visual: createFlameVisual(isComposite ? config.compositeParticleCount : config.singleParticleCount),
+        trailParticles: Array.from({ length: trailParticleCount }, (_, index) =>
+            createFireTrailParticle(index, trailParticleCount)
+        )
     };
+}
+
+function updateFireTrailParticles(fire, source, target, delta) {
+    if (!source?.position || !target?.position) return;
+    const config = ELEMENTAL_CHANNEL_VISUAL_CONFIG.fire;
+    const path = Vector2.subtract(target.position, source.position);
+    const direction = path.clone().normalize();
+    const perpendicular = new Vector2(-direction.y, direction.x);
+    const pathAngle = Math.atan2(path.y, path.x);
+    fire.trailParticles.forEach((particle) => {
+        particle.age = (particle.age + delta * config.trailCycleSpeed * particle.speedScale) % particle.lifetime;
+        const progress = particle.age / particle.lifetime;
+        const center = source.position.clone().add(path.clone().scale(progress));
+        const widthEnvelope = Math.sin(progress * Math.PI);
+        const flicker = Math.sin(progress * Math.PI * 5 + particle.index * 1.7) * config.trailWidth * 0.22;
+        const offset = (particle.lane * config.trailWidth + flicker) * widthEnvelope;
+        particle.x = center.x + perpendicular.x * offset;
+        particle.y = center.y + perpendicular.y * offset;
+        particle.rotation = pathAngle + Math.PI / 4 + Math.sin(particle.index + progress * 8) * 0.3;
+    });
 }
 
 function createWindState(target, isComposite) {
@@ -62,13 +116,15 @@ function createWindState(target, isComposite) {
     };
 }
 
-export function createElementalChannelVisualState(target, elements) {
+export function createElementalChannelVisualState(source, target, elements) {
     const isComposite = elements.length > 1;
-    return {
+    const state = {
         elapsed: 0,
         fire: elements.includes("fire") ? createFireState(isComposite) : null,
         wind: elements.includes("wind") ? createWindState(target, isComposite) : null
     };
+    if (state.fire) updateFireTrailParticles(state.fire, source, target, 0);
+    return state;
 }
 
 function getWindAccelerationAt(center, position, radius) {
@@ -84,8 +140,9 @@ function getWindAccelerationAt(center, position, radius) {
     return direction.scale(config.maximumAcceleration * ratio * ratio);
 }
 
-export function updateElementalChannelVisualState(state, target, delta) {
+export function updateElementalChannelVisualState(state, source, target, delta) {
     state.elapsed += delta;
+    if (state.fire) updateFireTrailParticles(state.fire, source, target, delta);
     if (!state.wind) return;
     const field = state.wind.flowField;
     const config = ELEMENTAL_CHANNEL_VISUAL_CONFIG.wind;
@@ -261,6 +318,7 @@ export function drawElementalChannelIdentity(ctx, channel, progress, state) {
     channel.elements.forEach((element, index) => {
         const intensity = getElementIntensity(channel.elements.length, index);
         if (element === "fire") {
+            drawFlameQuadParticles(ctx, state.fire.trailParticles, state.fire.visual);
             drawFlameParticlePlume(ctx, channel.target, state.fire.visual, state.elapsed, {
                 stateOwner: state.fire.stateOwner
             });

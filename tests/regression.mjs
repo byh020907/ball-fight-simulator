@@ -86,6 +86,11 @@ import {
 import { Ability, AbilitySet, ElementalistAbility } from "../src/abilities/index.js";
 import { ELEMENTALIST_CONFIG, ELEMENTAL_COMPOSITE_RECIPES } from "../src/abilities/elementalistAbility.js";
 import { ElementalOrb } from "../src/entities/elementalOrb.js";
+import {
+    ELEMENTALIST_VFX_PREVIEW_OPTIONS,
+    ElementalistVfxPreviewScene,
+    getElementalistVfxPreviewOptions
+} from "../src/developer/elementalistVfxPreview.js";
 import { findGunnerTurretPlacement } from "../src/abilities/gunnerTurretPlacement.js";
 import { FighterPhysicsSimulation } from "../src/simulation/fighterPhysicsSimulation.js";
 import { PreviewReselectSimulation } from "../src/preview/previewReselectSimulation.js";
@@ -23964,6 +23969,15 @@ function testElementalistChannelVisualGrammar() {
         const recording = makeRecordingCanvasContext();
         assert.doesNotThrow(() => effect.draw(recording), `${element} channel VFX must render safely`);
         assert.equal(hasSignature(recording), true, `${element} channel VFX must keep its elemental render grammar`);
+        if (element === "fire") {
+            const expectedParticleCount =
+                ELEMENTAL_CHANNEL_VISUAL_CONFIG.fire.singleParticleCount +
+                ELEMENTAL_CHANNEL_VISUAL_CONFIG.fire.singleTrailParticleCount;
+            assert.ok(
+                recording.calls.filter(([method]) => method === "fillRect").length >= expectedParticleCount,
+                "Single fire should combine target embers with travelling flame particles"
+            );
+        }
     });
 
     Object.values(ELEMENTAL_COMPOSITE_RECIPES).forEach((recipe) => {
@@ -23990,5 +24004,31 @@ function testElementalistChannelVisualGrammar() {
 }
 
 testElementalistChannelVisualGrammar();
+
+function testElementalistVfxPreviewCatalog() {
+    const options = getElementalistVfxPreviewOptions();
+    assert.equal(options.length, 16, "Preview menu should include wet, five single elements, and ten fusions");
+    assert.equal(new Set(options.map(({ id }) => id)).size, options.length, "Preview ids must remain unique");
+    assert.equal(
+        options.filter(({ id }) => id.startsWith("single:")).length,
+        5,
+        "Preview menu should expose every single element"
+    );
+    assert.equal(
+        options.filter(({ id }) => id.startsWith("composite:")).length,
+        10,
+        "Preview menu should expose every composite recipe"
+    );
+
+    ELEMENTALIST_VFX_PREVIEW_OPTIONS.forEach(({ id }) => {
+        const scene = new ElementalistVfxPreviewScene(id);
+        scene.update(0.4);
+        const recording = makeRecordingCanvasContext();
+        assert.doesNotThrow(() => scene.draw(recording), `${id} should render through the production VFX preview`);
+    });
+    console.log("[elementalist-vfx-preview-catalog] ok");
+}
+
+testElementalistVfxPreviewCatalog();
 
 console.log("regression tests ok");
