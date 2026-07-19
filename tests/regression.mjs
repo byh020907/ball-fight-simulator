@@ -1560,15 +1560,27 @@ async function testDashBallCooldownDash(app) {
     dashBall.position.y = 480;
     target.position.x = 480 + dashBall.radius + target.radius - 2;
     target.position.y = 480;
+    dashBall.angularVelocity = 0;
+    target.rollCritical = () => false;
+    const damageEvents = [];
+    const takeDamage = target.takeDamage.bind(target);
+    target.takeDamage = (amount, source, label, options) => {
+        const result = takeDamage(amount, source, label, options);
+        damageEvents.push({ amount, label, actualDamage: result.actualDamage });
+        return result;
+    };
     const hpBefore = target.hp;
     const baseCooldown = dashBall.ability.baseCooldown;
     app.simulation.handleCollision();
     assert.ok(target.hp < hpBefore, "Dash Ball collision should damage target");
+    const dashContactEvents = damageEvents.filter(({ label }) => label === "Dash Contact");
+    assert.equal(dashContactEvents.length, 1, "Dash Ball dash should apply one separate contact damage event");
     assert.equal(
-        app.ui.logItems.some((item) => item.includes("Dash Contact lands")),
-        false,
-        "Dash Ball dash should not add separate collision damage"
+        dashContactEvents[0].amount,
+        Math.round(dashBall.stats.baseDamage * 0.4),
+        "Dash Ball dash should preserve its approved base-damage x0.4 contact bonus"
     );
+    assert.ok(dashContactEvents[0].actualDamage > 0, "Dash Ball contact bonus should deal actual damage");
     assert.equal(target.state.slow, null, "Dash Ball collision should not slow target");
     assert.equal(baseCooldown, 2.5, "Dash Ball base cooldown should be 2.5 seconds");
     assert.equal(dashBall.ability.state.cooldownLevel, 1, "First dash hit should add one cooldown stack");
