@@ -16,14 +16,18 @@
  */
 export default function Cooldown(Base) {
     return class extends Base {
-        constructor() {
-            super();
+        constructor(...args) {
+            super(...args);
             this._cooldownDuration = 0;
             this._cooldownRemaining = 0;
         }
 
         get cooldownReady() {
             return this._cooldownRemaining <= 0;
+        }
+
+        get cooldownRemaining() {
+            return this._cooldownRemaining;
         }
 
         get cooldownProgress() {
@@ -33,9 +37,17 @@ export default function Cooldown(Base) {
         }
 
         tickCooldown(delta) {
-            if (this._cooldownRemaining > 0) {
-                this._cooldownRemaining -= delta;
-            }
+            this.reduceCooldown(delta);
+        }
+
+        reduceCooldown(amount) {
+            this._cooldownRemaining = Math.max(0, this._cooldownRemaining - Math.max(0, amount));
+            return this._cooldownRemaining;
+        }
+
+        setCooldownRemaining(remaining) {
+            this._cooldownRemaining = Math.max(0, Number(remaining) || 0);
+            return this._cooldownRemaining;
         }
 
         resetCooldown(duration) {

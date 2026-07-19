@@ -1,5 +1,6 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
 import { getVisibleLineWidth } from "./effectVisibility.js";
+import { EntityAttachment } from "../physics/index.js";
 
 export class BloodTetherEffect extends CombatEntity {
     constructor(contactPoint, owner) {
@@ -39,10 +40,11 @@ export class BloodTetherEffect extends CombatEntity {
     }
 }
 
-export class BloodMarkEffect extends CombatEntity {
+export class BloodMarkEffect extends EntityAttachment(CombatEntity) {
     constructor(target, duration) {
         super(target.position.clone(), new Vector2(), target.radius + 7);
         this.target = target;
+        this.attachToEntity(target);
         this.life = duration;
         this.maxLife = this.life;
     }
@@ -54,7 +56,7 @@ export class BloodMarkEffect extends CombatEntity {
             this.isExpired = true;
             return;
         }
-        this.position = this.target.position.clone();
+        this.syncAttachedPosition();
     }
 
     draw(ctx) {

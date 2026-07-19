@@ -1,15 +1,17 @@
 import { pickRandomActions } from "../clickActions.js";
 import { RLPolicy } from "../ai/rlPolicy.js";
+import { Cooldown } from "../physics/index.js";
 
 const AI_MIN_INTERVAL = 0.5; // 액션 사용 후 최소 대기 (훈련 기준 30프레임과 동일)
 const AI_ACTION_THRESHOLD = 0.5; // 이 확률 이상이면 액션 사용 (모델이 전략적으로 학습되었으므로 0.5로 충분)
 const AI_CONSECUTIVE_REQUIRED = 3; // 연속 몇 프레임 확신해야 실제 발동 (노이즈 필터)
 const RL_MODEL_BASE = "/models"; // 서버에서 모델 디렉토리 경로
 
-export class AIActionController {
+export class AIActionController extends Cooldown(class {}) {
     constructor(rng = Math.random) {
+        super();
         this.actions = pickRandomActions(3);
-        this._nextAvailableAt = 2 + rng() * 2; // 초기 지연 (쿨다운 아님)
+        this.resetCooldown(2 + rng() * 2);
         this._chosenAction = null;
         this._consecutiveYes = 0; // 연속 "써" 카운터
         this.usageCount = {};
@@ -82,9 +84,7 @@ export class AIActionController {
 
     evaluate(sim, fighter, delta) {
         // 쿨다운 감소 (액션 사용 후 대기)
-        if (this._nextAvailableAt > 0) {
-            this._nextAvailableAt -= delta;
-        }
+        this.tickCooldown(delta);
 
         const action = this._chosenAction;
         if (!action) return null;
@@ -99,7 +99,7 @@ export class AIActionController {
 
         // 매 틱 모델 호출 — 타이밍 맞는 순간을 놓치지 않음
         const prob = this.rlPolicy.getProbability(fighter, opponent, sim);
-        const canAct = this._nextAvailableAt <= 0;
+        const canAct = this.cooldownReady;
 
         // 쿨다운 중이면 카운터 초기화 (쿨다운 끝나자마자 발동 방지)
         if (!canAct) {
@@ -139,7 +139,7 @@ export class AIActionController {
             return null;
         }
 
-        this._nextAvailableAt = AI_MIN_INTERVAL;
+        this.resetCooldown(AI_MIN_INTERVAL);
         this._consecutiveYes = 0; // 발동 후 리셋
         this.usageCount[action.id] = (this.usageCount[action.id] ?? 0) + 1;
         return { action, fighter, paidCost };

@@ -107,7 +107,6 @@ getTimeSlowRemaining() { return this._timeSlowRemaining; }
 /** @param {number} v */
 setTimeSlowRemaining(v) { this._timeSlowRemaining = v; }
 
-// [DEPRECATED] getIncomingProjectile — ProjectileGuardAction은 더 이상 투사체 사전 탐색을 하지 않는다.
 // 투사체 방어는 무조건 HP 소모 후 0.3초 onProjectileDamage window를 등록한다.
 // 참고: src/click-actions.js ProjectileGuardAction + ActionContext.onProjectileDamage()
 ```

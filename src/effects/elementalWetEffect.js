@@ -1,4 +1,5 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
+import { EntityAttachment } from "../physics/index.js";
 import { ELEMENTAL_PALETTE } from "../abilities/elementalistRecipes.js";
 import { getVisibleLineWidth } from "./effectVisibility.js";
 
@@ -69,12 +70,13 @@ function drawFallingDroplets(ctx, target, time, fade) {
     ctx.restore();
 }
 
-export class ElementalWetEffect extends CombatEntity {
+export class ElementalWetEffect extends EntityAttachment(CombatEntity) {
     static renderLayer = RENDER_LAYERS.FOREGROUND;
 
     constructor({ target, simulation, expiresAt }) {
         super(target.position.clone(), new Vector2(), target.radius);
         this.target = target;
+        this.attachToEntity(target);
         this.simulation = simulation;
         this.expiresAt = expiresAt;
     }
@@ -95,7 +97,7 @@ export class ElementalWetEffect extends CombatEntity {
             this.consume();
             return;
         }
-        this.position = this.target.position.clone();
+        this.syncAttachedPosition();
     }
 
     draw(ctx) {

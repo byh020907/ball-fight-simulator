@@ -15,10 +15,19 @@
  *   startBurst(count, interval) — 버스트 시작
  *   tickBurst(delta, onFire)    — delta만큼 진행, 발사 시 onFire(index) 호출
  */
+export const BURST_RESULTS = Object.freeze({
+    FIRED: "fired",
+    PAUSED: "paused",
+    CANCELLED: "cancelled",
+    WAITING: "waiting"
+});
+
+const BURST_CALLBACK_RESULTS = new Set([BURST_RESULTS.FIRED, BURST_RESULTS.PAUSED, BURST_RESULTS.CANCELLED]);
+
 export default function BurstSequencer(Base) {
     return class extends Base {
-        constructor() {
-            super();
+        constructor(...args) {
+            super(...args);
             this._burstRemaining = 0;
             this._burstTotal = 0;
             this._burstTimer = 0;
@@ -46,13 +55,26 @@ export default function BurstSequencer(Base) {
          * @param {(index: number) => void} onFire — 발사할 때 호출 (현재 인덱스 전달)
          */
         tickBurst(delta, onFire) {
-            if (!this.isBursting) return;
+            if (!this.isBursting) return BURST_RESULTS.CANCELLED;
             this._burstTimer -= delta;
-            if (this._burstTimer <= 0) {
-                onFire(this._burstTotal - this._burstRemaining);
+            if (this._burstTimer > 0) return BURST_RESULTS.WAITING;
+
+            const result = onFire(this._burstTotal - this._burstRemaining) ?? BURST_RESULTS.FIRED;
+            if (!BURST_CALLBACK_RESULTS.has(result)) {
+                throw new TypeError(`Unknown burst callback result: ${String(result)}`);
+            }
+            if (result === BURST_RESULTS.CANCELLED) {
+                this._burstRemaining = 0;
+                return result;
+            }
+            if (result === BURST_RESULTS.PAUSED) {
+                return result;
+            }
+            if (result === BURST_RESULTS.FIRED) {
                 this._burstRemaining--;
                 this._burstTimer = this._burstInterval;
             }
+            return result;
         }
     };
 }

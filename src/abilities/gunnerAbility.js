@@ -1,6 +1,8 @@
 import { Vector2 } from "../core.js";
+import { BURST_RESULTS, BurstSequencer } from "../physics/index.js";
 import { Ability } from "./ability.js";
 import { BulletProjectile, GunnerTurret } from "../entities/index.js";
+import { enforceActiveEntityLimit } from "../entities/activeEntityLimit.js";
 import { findGunnerTurretPlacement } from "./gunnerTurretPlacement.js";
 
 const GUNNER_COOLDOWN = 4;
@@ -14,11 +16,9 @@ const KNOCKBACK_DURATION = 0.15;
 const FINISHER_CHARGE_DURATION = 0.16;
 const TURRET_STACK_REQUIREMENT = 20;
 
-export class GunnerAbility extends Ability {
+export class GunnerAbility extends BurstSequencer(Ability) {
     constructor(owner, simulation) {
         super(owner, simulation, GUNNER_COOLDOWN);
-        this._burstRemaining = 0;
-        this._burstTimer = 0;
         this.state = {
             burstBulletCount: 0,
             burstIndex: 0,
@@ -36,18 +36,15 @@ export class GunnerAbility extends Ability {
         const time = performance.now() / 1000;
         this.state.spinAngle = Math.sin(time * 4) * 0.5;
 
-        if (this._burstRemaining > 0) {
+        if (this.isBursting) {
             this.state.spinAngle = time * 12;
-            this._burstTimer -= delta;
-            if (this._burstTimer <= 0) {
-                this._fireBurstBullet();
-            }
+            this.tickBurst(delta, () => this._fireBurstBullet());
             return;
         }
 
-        this.timer -= delta;
-        if (this.timer <= 0 && target) {
-            this.timer = this.cooldown;
+        this.tickCooldown(delta);
+        if (this.cooldownReady && target) {
+            this.resetCooldown(this.cooldown);
             this._startBurst();
         }
     }
@@ -56,8 +53,7 @@ export class GunnerAbility extends Ability {
         this.state.burstBulletCount = MIN_BULLETS + Math.floor(Math.random() * (MAX_BULLETS - MIN_BULLETS + 1));
         this.state.burstIndex = 0;
         this.state.gunHand = 0;
-        this._burstRemaining = this.state.burstBulletCount;
-        this._burstTimer = 0;
+        this.startBurst(this.state.burstBulletCount, BULLET_INTERVAL);
         this.simulation.spawnPulse(this.owner.position.clone(), "#ffee88");
         this.simulation.addLog(
             `${this.owner.name} fires ${this.state.burstBulletCount} bullet${this.state.burstBulletCount > 1 ? "s" : ""}!`
@@ -66,7 +62,7 @@ export class GunnerAbility extends Ability {
     }
 
     _fireBurstBullet() {
-        if (this._burstRemaining <= 0) return;
+        if (!this.isBursting) return BURST_RESULTS.CANCELLED;
 
         const owner = this.owner;
         const bulletCount = this.state.burstBulletCount;
@@ -77,7 +73,7 @@ export class GunnerAbility extends Ability {
         const finalMult = isFinisher ? dmgMult * 2 : dmgMult;
         if (isFinisher && !this.finisherCharge) {
             this._beginFinisherCharge();
-            return;
+            return BURST_RESULTS.PAUSED;
         }
 
         const hand = isFinisher ? this.finisherCharge.hand : this.state.gunHand;
@@ -100,10 +96,7 @@ export class GunnerAbility extends Ability {
         );
         this.state.activeBullets = this.state.activeBullets.filter((b) => !b.isExpired);
         this.state.activeBullets.push(bullet);
-        while (this.state.activeBullets.length > MAX_FIELD_BULLETS) {
-            const oldest = this.state.activeBullets.shift();
-            oldest.isExpired = true;
-        }
+        this.state.activeBullets = enforceActiveEntityLimit(this.state.activeBullets, MAX_FIELD_BULLETS);
         this.simulation.entities.push(bullet);
 
         this.simulation.spawnSlash(
@@ -120,14 +113,13 @@ export class GunnerAbility extends Ability {
             life: isFinisher ? 0.3 : 0.15
         });
 
-        this._burstRemaining--;
         this.state.burstIndex++;
-        this._burstTimer = BULLET_INTERVAL;
         this.state.gunHand = 1 - this.state.gunHand;
 
         if (isFinisher) {
             this.simulation.addLog(`${owner.name} lands a full burst!`);
         }
+        return BURST_RESULTS.FIRED;
     }
 
     _getGunPosition(hand) {
@@ -236,7 +228,7 @@ export class GunnerAbility extends Ability {
         const time = performance.now() / 1000;
 
         ctx.save();
-        if (this._burstRemaining > 0) {
+        if (this.isBursting) {
             const flash = Math.sin(time * 40) * 0.3 + 0.7;
             ctx.fillStyle = `rgba(255, 238, 136, ${flash * 0.15})`;
             ctx.beginPath();
@@ -317,7 +309,7 @@ export class GunnerAbility extends Ability {
     }
 
     getUiState() {
-        if (this._burstRemaining > 0) {
+        if (this.isBursting) {
             return {
                 label: `${this.state.burstBulletCount}B x${this.state.burstBulletCount - this.state.burstIndex}`,
                 progress: 1 - (this.state.burstIndex % this.state.burstBulletCount) / this.state.burstBulletCount
@@ -325,7 +317,7 @@ export class GunnerAbility extends Ability {
         }
         return {
             label: this.getLevelUpgrade().collectionTurret ? `${this.state.collectionStacks}/20` : "RNG",
-            progress: Math.max(0, Math.min(1, 1 - this.timer / this.cooldown))
+            progress: this.cooldownProgress
         };
     }
 }

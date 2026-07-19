@@ -1,12 +1,12 @@
-import { ShardDrop } from "./shardDrop.js";
+import { HuntingLootItem } from "./huntingLootItem.js";
 
 const ENHANCEMENT_STONE_COLOR = "#54d6be";
 
-export class EnhancementStoneDrop extends ShardDrop {
+export class EnhancementStoneDrop extends HuntingLootItem {
     static lootType = "enhancement_stone";
 
     constructor(options = {}) {
-        super({ ...options, amount: 1, radius: 18, valueRadiusType: null });
+        super({ ...options, radius: 18 });
         this.amount = 1;
     }
 

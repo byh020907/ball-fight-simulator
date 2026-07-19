@@ -1,4 +1,5 @@
 import { Vector2 } from "../core.js";
+import { BURST_RESULTS, BurstSequencer } from "../physics/index.js";
 import { Ability } from "./ability.js";
 
 const GRENADE_COOLDOWN = 3.0;
@@ -9,41 +10,34 @@ const BASE_GRENADE_SPEED = 290;
 const PROJECTILE_SPEED_MULTIPLIER = 1.1;
 const FIRST_FUSE_COOLDOWN_RATIO = 0.2;
 
-export class GrenadeAbility extends Ability {
+export class GrenadeAbility extends BurstSequencer(Ability) {
     constructor(owner, simulation) {
         super(owner, simulation, GRENADE_COOLDOWN);
-        this._burstRemaining = 0;
-        this._burstTotal = 0;
-        this._burstTimer = 0;
     }
 
     update(delta, target) {
-        if (this._burstRemaining > 0) {
-            this._burstTimer -= delta;
-            if (this._burstTimer <= 0) {
-                this._fireNext(target);
-            }
+        if (this.isBursting) {
+            this.tickBurst(delta, () => this._fireNext(target));
             return;
         }
 
-        this.timer -= delta;
-        if (this.timer > 0 || !target) {
+        this.tickCooldown(delta);
+        if (!this.cooldownReady || !target) {
             return;
         }
 
-        this.timer = this.cooldown;
+        this.resetCooldown(this.cooldown);
         this._startBurst(target);
     }
 
     _startBurst(target) {
-        this._burstTotal = BURST_COUNT_MIN + Math.floor(Math.random() * (BURST_COUNT_MAX - BURST_COUNT_MIN + 1));
-        this._burstRemaining = this._burstTotal;
-        this._burstTimer = BURST_INTERVAL;
-        this._fireNext(target);
+        const count = BURST_COUNT_MIN + Math.floor(Math.random() * (BURST_COUNT_MAX - BURST_COUNT_MIN + 1));
+        this.startBurst(count, BURST_INTERVAL);
+        this.tickBurst(0, () => this._fireNext(target));
     }
 
     _fireNext(target) {
-        if (this._burstRemaining <= 0 || !target) return;
+        if (!target) return BURST_RESULTS.PAUSED;
 
         const shotIndex = this._burstTotal - this._burstRemaining;
         const progress = this._burstTotal > 1 ? shotIndex / (this._burstTotal - 1) : 0.5;
@@ -62,8 +56,7 @@ export class GrenadeAbility extends Ability {
             stickyHoming: Boolean(this.getLevelUpgrade().stickyHoming)
         });
 
-        this._burstRemaining--;
-        this._burstTimer = BURST_INTERVAL;
+        return BURST_RESULTS.FIRED;
     }
 
     drawFace(ctx, rotation, ball) {
@@ -87,7 +80,7 @@ export class GrenadeAbility extends Ability {
     }
 
     getUiState() {
-        if (this._burstRemaining > 0) {
+        if (this.isBursting) {
             const fired = this._burstTotal - this._burstRemaining;
             return {
                 label: `${fired + 1}/${this._burstTotal}`,
@@ -96,7 +89,7 @@ export class GrenadeAbility extends Ability {
         }
         return {
             label: "Scatter",
-            progress: Math.max(0, Math.min(1, 1 - this.timer / this.cooldown))
+            progress: this.cooldownProgress
         };
     }
 }

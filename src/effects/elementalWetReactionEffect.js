@@ -1,4 +1,5 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
+import { EntityAttachment } from "../physics/index.js";
 import { ELEMENTAL_PALETTE } from "../abilities/elementalistRecipes.js";
 import { drawElectricArc } from "./electricArc.js";
 import { getVisibleLineWidth } from "./effectVisibility.js";
@@ -168,12 +169,13 @@ export function drawElementalWetChannelBuildUp(ctx, channel, progress) {
     }
 }
 
-export class ElementalWetReactionEffect extends CombatEntity {
+export class ElementalWetReactionEffect extends EntityAttachment(CombatEntity) {
     static renderLayer = RENDER_LAYERS.FOREGROUND;
 
     constructor({ target, elements, duration = ELEMENTAL_WET_REACTION_VISUAL_CONFIG.duration }) {
         super(target.position.clone(), new Vector2(), target.radius);
         this.target = target;
+        this.attachToEntity(target);
         this.elements = [...new Set(elements)].filter((element) => REACTION_DRAWERS[element]);
         this.duration = duration;
         this.life = duration;
@@ -181,7 +183,7 @@ export class ElementalWetReactionEffect extends CombatEntity {
     }
 
     update(delta) {
-        if (this.target?.position) this.pos = this.target.position.clone();
+        this.syncAttachedPosition();
         this.tickLife(delta);
     }
 

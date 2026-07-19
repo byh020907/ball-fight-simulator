@@ -1,4 +1,5 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
+import { EntityAttachment } from "../physics/index.js";
 import { getVisibleLineWidth } from "./effectVisibility.js";
 import { ELEMENTAL_PALETTE } from "../abilities/elementalistRecipes.js";
 import {
@@ -256,7 +257,7 @@ export function drawFinishImpact(ctx, channel, progress) {
     ctx.restore();
 }
 
-export class ElementalChannelEffect extends CombatEntity {
+export class ElementalChannelEffect extends EntityAttachment(CombatEntity) {
     static renderLayer = RENDER_LAYERS.FOREGROUND;
 
     constructor({ channel, source, target, elements, recipe = null, duration = 1 }) {
@@ -264,6 +265,7 @@ export class ElementalChannelEffect extends CombatEntity {
         this.channel = channel;
         this.source = source;
         this.target = target;
+        this.attachToEntity(target);
         this.elements = elements;
         this.recipe = recipe;
         this.colors = elements.map((element) => ELEMENTAL_PALETTE[element]);
@@ -278,7 +280,7 @@ export class ElementalChannelEffect extends CombatEntity {
             this.isExpired = true;
             return;
         }
-        this.pos = this.target.position.clone();
+        this.syncAttachedPosition();
         updateElementalChannelVisualState(this.visualState, this.source, this.target, delta);
         this.tickLife(delta);
     }

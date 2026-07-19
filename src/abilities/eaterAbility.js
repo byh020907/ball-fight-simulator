@@ -83,11 +83,11 @@ export class EaterAbility extends Ability {
         }
 
         if (!this.state.swallowedTarget) {
-            this.timer -= delta;
+            this.tickCooldown(delta);
         }
 
-        if (this.timer <= 0 && target) {
-            this.timer = this.cooldown;
+        if (this.cooldownReady && target) {
+            this.resetCooldown(this.cooldown);
             this.state.feastTimer = this.feastDuration;
             this.state.feastElapsed = 0;
             this.state.hasEatenThisFeast = false;
@@ -166,7 +166,7 @@ export class EaterAbility extends Ability {
         const target = this.state.swallowedTarget;
         if (!target) return;
 
-        this.timer = this.cooldown;
+        this.resetCooldown(this.cooldown);
 
         if (target.flags.defeated) {
             target.state.swallowed = null;
@@ -327,6 +327,6 @@ export class EaterAbility extends Ability {
         if (this.state.feastTimer > 0) {
             return { label: "Feast", progress: Math.max(0, Math.min(1, this.state.feastTimer / this.feastDuration)) };
         }
-        return { label: "Feast", progress: Math.max(0, Math.min(1, 1 - this.timer / this.cooldown)) };
+        return { label: "Feast", progress: this.cooldownProgress };
     }
 }

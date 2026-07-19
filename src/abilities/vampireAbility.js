@@ -2,6 +2,7 @@ import { Vector2 } from "../core.js";
 import { BatProjectile } from "../entities/index.js";
 import { BloodMarkEffect, BloodRuptureEffect, BloodTetherEffect } from "../effects/index.js";
 import { applyRotationalContactDamage } from "../physics/contactDamage.js";
+import { tickTimedMap } from "../physics/index.js";
 import { Ability } from "./ability.js";
 
 const LIFESTEAL_RATE_NORMAL = 0.35;
@@ -28,19 +29,15 @@ export class VampireAbility extends Ability {
 
     update(delta, target) {
         this._tickRewardState(delta);
-        this.timer -= delta;
-        if (this.timer <= 0 && target) {
-            this.timer = this.cooldown;
+        this.tickCooldown(delta);
+        if (this.cooldownReady && target) {
+            this.resetCooldown(this.cooldown);
             this._spawnBats(target);
         }
     }
 
     _tickRewardState(delta) {
-        for (const [target, remaining] of this._bloodPullCooldowns) {
-            const next = remaining - delta;
-            if (next <= 0 || target.flags.defeated) this._bloodPullCooldowns.delete(target);
-            else this._bloodPullCooldowns.set(target, next);
-        }
+        tickTimedMap(this._bloodPullCooldowns, delta, { isInvalid: (target) => target.flags.defeated });
         for (const [target, mark] of this._bloodMarks) {
             mark.remaining -= delta;
             if (mark.remaining <= 0 || target.flags.defeated) {
@@ -220,7 +217,7 @@ export class VampireAbility extends Ability {
     getUiState() {
         return {
             label: "Bats",
-            progress: Math.max(0, Math.min(1, 1 - this.timer / this.cooldown))
+            progress: this.cooldownProgress
         };
     }
 }

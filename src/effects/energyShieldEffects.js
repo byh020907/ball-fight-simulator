@@ -1,4 +1,5 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
+import { EntityAttachment } from "../physics/index.js";
 
 export const ENERGY_SHIELD_VISUAL_CONFIG = Object.freeze({
     shellPadding: 7,
@@ -62,12 +63,13 @@ export function drawEnergyShieldField(ctx, owner, shieldRatio) {
     ctx.restore();
 }
 
-export class EnergyShieldHitEffect extends CombatEntity {
+export class EnergyShieldHitEffect extends EntityAttachment(CombatEntity) {
     static renderLayer = RENDER_LAYERS.FOREGROUND;
 
     constructor(target, impactDirection, absorbedDamage = 0) {
         super(target.position.clone(), new Vector2(), 0);
         this.target = target;
+        this.attachToEntity(target);
         this.direction = impactDirection.clone();
         if (this.direction.length() <= 0.001) this.direction.x = 1;
         this.direction.normalize();
@@ -77,9 +79,8 @@ export class EnergyShieldHitEffect extends CombatEntity {
     }
 
     update(delta) {
-        this.life -= delta;
-        if (this.target?.position) this.position = this.target.position.clone();
-        if (this.life <= 0) this.isExpired = true;
+        this.syncAttachedPosition();
+        this.tickLife(delta);
     }
 
     draw(ctx) {

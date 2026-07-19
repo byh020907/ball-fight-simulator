@@ -290,11 +290,7 @@ import { TERRAIN_SHAPES } from "../src/terrain/terrainConfig.js";
 import { resolveTerrainCollision, resolveTerrainCollisions } from "../src/terrain/terrainCollision.js";
 import { drawTerrain } from "../src/terrain/terrainRenderer.js";
 import { getWorldPolygonPoints } from "../src/physics/CollisionShape.js";
-import {
-    applyCollisionAngularImpulse,
-    applyCollisionResponse,
-    applyDynamicCollisionResponse
-} from "../src/physics/collisionResponse.js";
+import { applyCollisionResponse, applyDynamicCollisionResponse } from "../src/physics/collisionResponse.js";
 import {
     getContactPointVelocity,
     getContactDamageSpeed,
@@ -303,6 +299,9 @@ import {
     calculateStaticCollisionDamage
 } from "../src/physics/contactDamage.js";
 import RotationalBody from "../src/physics/RotationalBody.js";
+import { BURST_RESULTS, BurstSequencer, Cooldown, EntityAttachment, tickTimedMap } from "../src/physics/index.js";
+import { enforceActiveEntityLimit } from "../src/entities/activeEntityLimit.js";
+import { AIActionController } from "../src/simulation/aiActionController.js";
 import {
     drawEquipmentItems,
     getCharacterOutlineWidth,
@@ -1406,7 +1405,7 @@ async function testCloneSeedDash(app) {
     opponent.position.x = 640;
     opponent.position.y = 480;
     app.simulation.entities = [];
-    trickster.ability.timer = 0;
+    trickster.ability.setCooldownRemaining(0);
     trickster.ability.update(0.016, opponent);
     const seeds = app.simulation.entities.filter((entity) => entity.constructor.name === "SeedOrb");
     assert.equal(seeds.length, 3, "Clone should launch three seeds");
@@ -1526,7 +1525,7 @@ async function testDashBallCooldownDash(app) {
     dashBall.position.y = 480;
     target.position.x = 620;
     target.position.y = 480;
-    dashBall.ability.timer = 0;
+    dashBall.ability.setCooldownRemaining(0);
     dashBall.ability.update(0.016, target);
     assert.ok(dashBall.state.movement, "Dash Ball should enter dash state");
     assert.ok(
@@ -1592,7 +1591,7 @@ async function testDashBallCooldownDash(app) {
     assert.equal(dashBall.ability.cooldown, baseCooldown * 0.5, "First dash hit should halve future cooldown");
     assert.equal(dashBall.ability.maxCooldownLevel, 2, "Dash should have max 2 cooldown stacks");
     assert.equal(
-        dashBall.ability.timer,
+        dashBall.ability.cooldownRemaining,
         dashBall.ability.cooldown,
         "Dash hit should clamp timer to the shorter cooldown"
     );
@@ -1615,7 +1614,7 @@ async function testDashBallCooldownDash(app) {
     target.position.y = 760;
     dashBall.ability.state.cooldownLevel = 2;
     dashBall.ability.cooldown = dashBall.ability.getCooldownForLevel();
-    dashBall.ability.timer = dashBall.ability.cooldown;
+    dashBall.ability.resetCooldown(dashBall.ability.cooldown);
     dashBall.setMovementEffect(
         new DashEffect({
             duration: 1.4,
@@ -1632,7 +1631,7 @@ async function testDashBallCooldownDash(app) {
     assert.equal(dashBall.state.movement, null, "Dash Ball dash should clear on wall contact");
     assert.equal(dashBall.ability.state.cooldownLevel, 0, "Wall contact should reset cooldown stacks");
     assert.equal(dashBall.ability.cooldown, baseCooldown, "Wall contact should restore full cooldown");
-    assert.equal(dashBall.ability.timer, baseCooldown, "Wall contact should restart from full cooldown");
+    assert.equal(dashBall.ability.cooldownRemaining, baseCooldown, "Wall contact should restart from full cooldown");
 }
 
 async function testCollisionImpulsePersists(app) {
@@ -1685,7 +1684,7 @@ async function testGrenadeScatterShot(app) {
     target.position.x = 500;
     target.position.y = 480;
     sim.entities = sim.fighters.slice();
-    grenadeFighter.ability.timer = 0;
+    grenadeFighter.ability.setCooldownRemaining(0);
     grenadeFighter.ability.update(0.016, target);
     const allGrenades = () => sim.entities.filter((e) => e.constructor?.name === "Grenade");
     const firstCount = allGrenades().length;
@@ -1818,16 +1817,16 @@ async function testArcherPredictiveBurst(app) {
 
     // Tier 0: direct aim (no predictive)
     ability.setContext({ abilityTier: 0 });
-    ability.timer = 0;
+    ability.setCooldownRemaining(0);
     ability.update(0.016, target);
     assert.ok(ability.state.aimPoint !== null, "Archer should enter aim state");
 
     // Tier 1+ should use predictive aim
     ability.setContext({ abilityTier: 1 });
-    ability.timer = 0;
+    ability.setCooldownRemaining(0);
     ability.state.aimPoint = null;
     // trigger cooldown to start aim
-    ability.timer = 0;
+    ability.setCooldownRemaining(0);
     ability.update(0.016, target);
     assert.ok(ability.state.aimPoint !== null, "Archer tier 1+ should set predictive aim point");
 
@@ -5618,7 +5617,7 @@ function testAbilityLevelUpgrades(app) {
     );
 
     const tricksterRun = createTierSimulation(FIGHTER_IDS.TRICKSTER);
-    tricksterRun.ball.ability.timer = 0;
+    tricksterRun.ball.ability.setCooldownRemaining(0);
     tricksterRun.ball.ability.update(0.01, tricksterRun.target);
     const tierSeeds = tricksterRun.sim.entities.filter((entity) => entity.constructor?.name === "SeedOrb");
     assert.equal(tierSeeds.length, 3, "Trickster level rewards should keep the base three seeds");
@@ -5798,7 +5797,9 @@ function testAbilityLevelUpgrades(app) {
         Math.random = originalRandom;
     }
     assert.equal(gunnerRun.ball.ability.state.burstBulletCount, 6, "Gunner rewards should preserve the 6-shot minimum");
-    while (gunnerRun.ball.ability._burstRemaining > 0) gunnerRun.ball.ability._fireBurstBullet();
+    while (gunnerRun.ball.ability.isBursting) {
+        gunnerRun.ball.ability.tickBurst(1, () => gunnerRun.ball.ability._fireBurstBullet());
+    }
     const bullets = gunnerRun.sim.entities.filter((entity) => entity.constructor?.name === "BulletProjectile");
     const bullet = bullets[0];
     assertClose(
@@ -6597,7 +6598,7 @@ function testFiveBallLevelRewardContracts(app) {
     Math.random = () => 0;
     try {
         gunnerAbility._startBurst();
-        gunnerAbility._fireBurstBullet();
+        gunnerAbility.tickBurst(0, () => gunnerAbility._fireBurstBullet());
     } finally {
         Math.random = originalRandom;
     }
@@ -6633,11 +6634,13 @@ function testFiveBallLevelRewardContracts(app) {
     refire.applyImpulse(Vector2.subtract(new Vector2(300, 0), refire.velocity));
     refire.update(0.02, gunnerRun.simulation);
     assert.equal(refire.isExpired, true, "Gunner refire should expire instead of bouncing a second time");
-    while (gunnerAbility._burstRemaining > 1) gunnerAbility._fireBurstBullet();
+    while (gunnerAbility._burstRemaining > 1) {
+        gunnerAbility.tickBurst(1, () => gunnerAbility._fireBurstBullet());
+    }
     const bulletCountBeforeCharge = gunnerRun.simulation.entities.filter(
         (entity) => entity.constructor?.name === "BulletProjectile"
     ).length;
-    gunnerAbility._fireBurstBullet();
+    gunnerAbility.tickBurst(1, () => gunnerAbility._fireBurstBullet());
     assert.ok(gunnerAbility.finisherCharge, "Gunner should visibly charge before every eligible last bullet");
     assert.equal(
         gunnerRun.simulation.entities.filter((entity) => entity.constructor?.name === "BulletProjectile").length,
@@ -6650,7 +6653,7 @@ function testFiveBallLevelRewardContracts(app) {
         findEffectPrimitive(chargeCtx.primitives, "arc", (args, primitive) => primitive.strokeStyle === "#ff4488"),
         "Gunner finisher charge should draw a dedicated pink muzzle ring"
     );
-    gunnerAbility._fireBurstBullet();
+    gunnerAbility.tickBurst(1, () => gunnerAbility._fireBurstBullet());
     const chargedFinisher = gunnerRun.simulation.entities
         .filter((entity) => entity.constructor?.name === "BulletProjectile")
         .at(-1);
@@ -8302,7 +8305,7 @@ function testBatBallWallSlamContracts(app) {
     const resetRun = createRun(3);
     resetRun.owner.ability.performSlash(resetRun.target);
     const resetEffect = resetRun.target.state.wallSlam;
-    resetRun.owner.ability.timer = 2;
+    resetRun.owner.ability.setCooldownRemaining(2);
     resetEffect.onWallBounce(
         resetRun.target,
         new Vector2(-1, 0),
@@ -8310,7 +8313,7 @@ function testBatBallWallSlamContracts(app) {
         resetRun.target.position.clone(),
         new Vector2(400, 0)
     );
-    assert.equal(resetRun.owner.ability.timer, 0, "Lv9 valid Wall Slam should reset Bat cooldown");
+    assert.equal(resetRun.owner.ability.cooldownRemaining, 0, "Lv9 valid Wall Slam should reset Bat cooldown");
     assert.ok(resetRun.owner.ability.state.resetFlash > 0, "Lv9 reset should activate the bat flash state");
     const resetText = resetRun.simulation.entities.find(
         (entity) => entity.constructor?.name === "ActionText" && entity.displayText === "RESET!"
@@ -8340,7 +8343,7 @@ function testBatBallWallSlamContracts(app) {
     );
     resetText.update(0.151);
     assert.equal(resetText.isExpired, true, "RESET combat text should expire after its 1.1s lifetime");
-    resetRun.owner.ability.timer = 2;
+    resetRun.owner.ability.setCooldownRemaining(2);
     resetEffect.tick(resetRun.target, 0.2);
     resetEffect.onWallBounce(
         resetRun.target,
@@ -8349,9 +8352,9 @@ function testBatBallWallSlamContracts(app) {
         resetRun.target.position.clone(),
         new Vector2(400, 0)
     );
-    assert.equal(resetRun.owner.ability.timer, 2, "Lv9 reset should retain its owner-level 0.50s cooldown");
+    assert.equal(resetRun.owner.ability.cooldownRemaining, 2, "Lv9 reset should retain its owner-level 0.50s cooldown");
     resetRun.owner.ability.update(0.5, null);
-    resetRun.owner.ability.timer = 2;
+    resetRun.owner.ability.setCooldownRemaining(2);
     resetEffect.tick(resetRun.target, 0.3);
     resetEffect.onWallBounce(
         resetRun.target,
@@ -8360,7 +8363,11 @@ function testBatBallWallSlamContracts(app) {
         resetRun.target.position.clone(),
         new Vector2(400, 0)
     );
-    assert.equal(resetRun.owner.ability.timer, 0, "Lv9 reset should reactivate after 0.50s without a target lock");
+    assert.equal(
+        resetRun.owner.ability.cooldownRemaining,
+        0,
+        "Lv9 reset should reactivate after 0.50s without a target lock"
+    );
     console.log("[bat-ball-wall-slam-contracts] ok");
 }
 
@@ -8764,7 +8771,7 @@ function testMultiAbilityFoundation(app) {
         }
 
         getUiState() {
-            return { label: this.displayName, progress: this.timer / this.cooldown };
+            return { label: this.displayName, progress: this.cooldownProgress };
         }
     }
 
@@ -8803,8 +8810,8 @@ function testMultiAbilityFoundation(app) {
         instanceKey: "sub:probe",
         displayName: "Sub Probe"
     });
-    primaryProbe.timer = 3;
-    subProbe.timer = 1;
+    primaryProbe.setCooldownRemaining(3);
+    subProbe.setCooldownRemaining(1);
     probeOwner.bindAbilitySet(new AbilitySet(probeOwner, { primary: primaryProbe, subAbilities: [subProbe] }));
 
     probeOwner.abilities.update(0.1, probeTarget);
@@ -8871,16 +8878,16 @@ function testMultiAbilityFoundation(app) {
     });
     gunnerOwner.abilities.addSubAbility(heroSub);
 
-    gunner.timer = 3;
-    heroSub.timer = 3;
+    gunner.setCooldownRemaining(3);
+    heroSub.setCooldownRemaining(3);
     gunner._startBurst();
-    gunner._fireBurstBullet();
+    gunner.tickBurst(0, () => gunner._fireBurstBullet());
     const bullet = sourceSimulation.entities.find((entity) => entity.constructor?.name === "BulletProjectile");
     assert.equal(bullet.sourceAbility, gunner, "Bullets should retain the ability instance that spawned them");
     bullet.position = gunnerOwner.position.clone();
     bullet._ownerCollectCheck(sourceSimulation);
-    assert.ok(gunner.timer < 3, "A returned bullet should reduce only the Gunner source cooldown");
-    assert.equal(heroSub.timer, 3, "A returned bullet must not reduce a different sub ability cooldown");
+    assert.ok(gunner.cooldownRemaining < 3, "A returned bullet should reduce only the Gunner source cooldown");
+    assert.equal(heroSub.cooldownRemaining, 3, "A returned bullet must not reduce a different sub ability cooldown");
 
     heroSub._spawnCore("critical", gunnerOwner.position, new Vector2(1, 0));
     const orb = sourceSimulation.entities.find((entity) => entity.constructor?.name === "HeroOrb" && !entity.isExpired);
@@ -8895,7 +8902,11 @@ function testMultiAbilityFoundation(app) {
         heroSub.getShieldState(),
         "A fighter should aggregate shield resources from registered abilities for the shared UI"
     );
-    assert.equal(gunner.timer, 3 - gunner.cooldown / 2 / 12, "Hero core effects must not mutate the Gunner cooldown");
+    assert.equal(
+        gunner.cooldownRemaining,
+        3 - gunner.cooldown / 2 / 12,
+        "Hero core effects must not mutate the Gunner cooldown"
+    );
 
     const fighterStrip = readFileSync("src/components/fighter-strip.html", "utf8");
     assert.ok(fighterStrip.includes("fighter.abilityStates"), "Fighter cards should render the ability state list");
@@ -14692,7 +14703,7 @@ async function testHeroAbilitySpawnsOrb(app) {
     sim.entities = sim.fighters.slice();
 
     // Trigger ability cooldown
-    heroFighter.ability.timer = 0;
+    heroFighter.ability.setCooldownRemaining(0);
     heroFighter.ability.update(0.016, target);
     const orbs = sim.entities.filter((e) => e.constructor?.name === "HeroOrb");
     assert.equal(orbs.length, 1, "HeroAbility should spawn one Hero Orb when cooldown triggers");
@@ -14712,7 +14723,7 @@ async function testHeroOrbEffectType(app) {
     const seen = new Set();
     for (let i = 0; i < 100; i++) {
         sim.entities = sim.fighters.slice();
-        heroFighter.ability.timer = 0;
+        heroFighter.ability.setCooldownRemaining(0);
         heroFighter.ability.update(0.016, target);
         const orb = sim.entities.find((e) => e.constructor?.name === "HeroOrb");
         assert.ok(orb, "HeroAbility should spawn an orb");
@@ -14827,7 +14838,7 @@ async function testHeroOrbMaxActivePerOwner(app) {
     }
 
     // Now enforce via ability's max active check
-    heroFighter.ability.timer = 0;
+    heroFighter.ability.setCooldownRemaining(0);
     heroFighter.ability.update(0.016, target);
 
     const activeOrbs = sim.entities.filter((e) => e.constructor?.name === "HeroOrb" && !e.isExpired);
@@ -14852,7 +14863,7 @@ async function testHeroOrbDoesNotExpireFromCooldown(app) {
 
     sim.entities = sim.fighters.slice();
     for (let i = 0; i < 6; i++) {
-        heroFighter.ability.timer = 0;
+        heroFighter.ability.setCooldownRemaining(0);
         heroFighter.ability.update(0.016, target);
     }
 
@@ -14885,7 +14896,7 @@ async function testHeroOrbLimitIgnoresCollectedOrbs(app) {
         sim.entities.push(orb);
     }
 
-    heroFighter.ability.timer = 0;
+    heroFighter.ability.setCooldownRemaining(0);
     heroFighter.ability.update(0.016, target);
 
     const activeOrbs = sim.entities.filter((e) => e.constructor?.name === "HeroOrb" && !e.isExpired);
@@ -15011,7 +15022,7 @@ async function testHeroOrbSpeedMinMax(app) {
     // Check multiple spawns
     for (let i = 0; i < 20; i++) {
         sim.entities = sim.fighters.slice();
-        heroFighter.ability.timer = 0;
+        heroFighter.ability.setCooldownRemaining(0);
         heroFighter.ability.update(0.016, target);
         const orb = sim.entities.find((e) => e.constructor?.name === "HeroOrb");
         assert.ok(orb, `Orb should be spawned (iteration ${i})`);
@@ -15043,7 +15054,7 @@ async function testHeroOrbSpeedScalesWithOwner(app) {
 
     // Spawn orb at normal speed
     sim.entities = sim.fighters.slice();
-    heroFighter.ability.timer = 0;
+    heroFighter.ability.setCooldownRemaining(0);
     heroFighter.ability.update(0.016, target);
     const orb1 = sim.entities.find((e) => e.constructor?.name === "HeroOrb");
     const speed1 = orb1.velocity.length();
@@ -15051,7 +15062,7 @@ async function testHeroOrbSpeedScalesWithOwner(app) {
     // Increase owner baseSpeed and spawn again
     heroFighter.stats.baseSpeed *= 2;
     sim.entities = sim.fighters.slice();
-    heroFighter.ability.timer = 0;
+    heroFighter.ability.setCooldownRemaining(0);
     heroFighter.ability.update(0.016, target);
     const orb2 = sim.entities.find((e) => e.constructor?.name === "HeroOrb");
     const speed2 = orb2.velocity.length();
@@ -15214,7 +15225,7 @@ async function testHeroExistingRulesNotBroken(app) {
     for (let i = 0; i < 12; i++) {
         sim.entities.push(new HeroOrbClass(heroFighter, new Vector2(100, 100), new Vector2(0, 0), "hp", 10));
     }
-    heroFighter.ability.timer = 0;
+    heroFighter.ability.setCooldownRemaining(0);
     heroFighter.ability.update(0.016, target);
     const activeOrbs = sim.entities.filter((e) => e.constructor?.name === "HeroOrb" && !e.isExpired);
     assert.ok(activeOrbs.length <= 10, `Max 10 active orbs per owner, got ${activeOrbs.length}`);
@@ -15449,7 +15460,7 @@ async function testSpecialOrbCountsTowardMaxActive(app) {
         sim.entities.push(new HeroOrb(heroFighter, new Vector2(100, 100), new Vector2(0, 0), "dash", 10));
     }
 
-    heroFighter.ability.timer = 0;
+    heroFighter.ability.setCooldownRemaining(0);
     heroFighter.ability.update(0.016, target);
 
     const activeOrbs = sim.entities.filter((e) => e.constructor?.name === "HeroOrb" && !e.isExpired);
@@ -15810,7 +15821,7 @@ async function testTricksterSeedSpeedBuff(app) {
     opponent.position.x = 640;
     opponent.position.y = 480;
     app.simulation.entities = [];
-    trickster.ability.timer = 0;
+    trickster.ability.setCooldownRemaining(0);
     trickster.ability.update(0.016, opponent);
     const seeds = app.simulation.entities.filter((entity) => entity.constructor.name === "SeedOrb");
     assert.equal(seeds.length, 3, "Trickster should still launch three seeds");
@@ -15839,7 +15850,7 @@ async function testTricksterSeedLifeBuff(app) {
     ]);
     const [trickster, opponent] = app.simulation.fighters;
     app.simulation.entities = [];
-    trickster.ability.timer = 0;
+    trickster.ability.setCooldownRemaining(0);
     trickster.ability.update(0.016, opponent);
     const seeds = app.simulation.entities.filter((entity) => entity.constructor.name === "SeedOrb");
     assert.equal(seeds.length, 3, "Trickster should launch three seeds");
@@ -15868,7 +15879,7 @@ async function testTricksterSeedSpeedScalesWithOwner(app) {
 
     // First batch
     app.simulation.entities = [];
-    trickster.ability.timer = 0;
+    trickster.ability.setCooldownRemaining(0);
     trickster.ability.update(0.016, opponent);
     const seeds1 = app.simulation.entities.filter((e) => e.constructor.name === "SeedOrb");
     const speed1 = seeds1[0].velocity.length();
@@ -15876,7 +15887,7 @@ async function testTricksterSeedSpeedScalesWithOwner(app) {
     // Double baseSpeed
     trickster.stats.baseSpeed *= 2;
     app.simulation.entities = [];
-    trickster.ability.timer = 0;
+    trickster.ability.setCooldownRemaining(0);
     trickster.ability.update(0.016, opponent);
     const seeds2 = app.simulation.entities.filter((e) => e.constructor.name === "SeedOrb");
     const speed2 = seeds2[0].velocity.length();
@@ -17499,7 +17510,7 @@ async function testVampireBatsSpawn(app) {
     const target = sim.fighters.find((f) => f.id !== FIGHTER_IDS.VAMPIRE);
 
     sim.entities = sim.fighters.slice();
-    vampireFighter.ability.timer = 0;
+    vampireFighter.ability.setCooldownRemaining(0);
     vampireFighter.ability.update(0.016, target);
     const bats = sim.entities.filter((e) => e.constructor?.name === "BatProjectile");
     assert.equal(bats.length, 7, "Vampire should spawn 7 bats when cooldown triggers");
@@ -17533,7 +17544,7 @@ async function testGunnerBulletsSpawn(app) {
     const target = sim.fighters.find((f) => f.id !== FIGHTER_IDS.GUNNER);
 
     sim.entities = sim.fighters.slice();
-    gunnerFighter.ability.timer = 0;
+    gunnerFighter.ability.setCooldownRemaining(0);
     gunnerFighter.ability.update(0.016, target); // starts burst
     gunnerFighter.ability.update(0.016, target); // fires first bullet
     const bullets = sim.entities.filter((e) => e.constructor?.name === "BulletProjectile");
@@ -17560,13 +17571,13 @@ async function testPhantomShadowStrike(app) {
     phantomFighter.position.y = 480;
     target.position.x = 250;
     target.position.y = 480;
-    phantomFighter.ability.timer = 0;
+    phantomFighter.ability.setCooldownRemaining(0);
     phantomFighter.ability.state.primed = true;
     phantomFighter.ability.state.primedTimer = 99;
 
     const posBefore = phantomFighter.position.clone();
     phantomFighter.ability.onCollision(target);
-    assert.ok(phantomFighter.ability.timer > 0, "Phantom should set cooldown after shadow strike");
+    assert.ok(phantomFighter.ability.cooldownRemaining > 0, "Phantom should set cooldown after shadow strike");
     // During vanish phase, position hasn't changed yet
     const distBefore = Vector2.subtract(phantomFighter.position, posBefore).length();
     assert.ok(distBefore < 1, "Phantom should not teleport yet during vanish phase");
@@ -17811,30 +17822,6 @@ testDebugBufferDoesNotThrowOnPushFailure();
 
 // ── Unified collision response module tests ──────────────────────────────
 
-function testCollisionResponseHelperAngularImpulse() {
-    const body = {
-        position: { x: 400, y: 300 },
-        angularVelocity: 0,
-        applyAngularImpulse(value) {
-            this.angularVelocity += value;
-        }
-    };
-    applyCollisionAngularImpulse(body, { x: 1, y: 0 }, { x: 380, y: 330 }, 100, 0.15);
-    assert.ok(body.angularVelocity !== 0, "applyCollisionAngularImpulse should modify angularVelocity via duck typing");
-    assert.ok(Number.isFinite(body.angularVelocity), "applyCollisionAngularImpulse should produce finite value");
-    console.log("[collision-response-angular-impulse] ok");
-}
-
-function testCollisionResponseNoApplyAngularImpulse() {
-    const body = {
-        position: { x: 400, y: 300 },
-        applyAngularImpulse: undefined
-    };
-    const result = applyCollisionAngularImpulse(body, { x: 0, y: -1 }, { x: 400, y: 340 }, 100, 0.15);
-    assert.equal(result, 0, "applyCollisionAngularImpulse should return 0 when body has no applyAngularImpulse");
-    console.log("[collision-response-no-angular] ok");
-}
-
 function testCollisionAppliesLinearImpulse() {
     const body = {
         position: { x: 500, y: 500 },
@@ -18003,8 +17990,6 @@ function testApplyCollisionResponseWallReflects() {
     console.log("[collision-response-wall-reflect] ok");
 }
 
-testCollisionResponseHelperAngularImpulse();
-testCollisionResponseNoApplyAngularImpulse();
 testCollisionAppliesLinearImpulse();
 testCollisionResponseDuckTypingDetection();
 testDynamicCollisionResponsePair();
@@ -22942,13 +22927,17 @@ function testElementalistRebirthSubActionLoop() {
     assert.notEqual(subAbility.activeChannels, sibling.activeChannels);
     assert.notEqual(subAbility.activeOrbs, sibling.activeOrbs);
 
-    const primaryTimerBefore = primary.timer;
+    const primaryTimerBefore = primary.cooldownRemaining;
     subAbility.update(1.51, target);
     const waterBolt = simulation.entities.find(
         (entity) => entity.constructor.name === "ElementalWaterBolt" && entity.ability === subAbility
     );
     assert.ok(waterBolt, "The sub action must fire its own water bolt after the independent 1.5 second cooldown");
-    assert.equal(primary.timer, primaryTimerBefore, "The sub action cooldown must not advance the primary ability");
+    assert.equal(
+        primary.cooldownRemaining,
+        primaryTimerBefore,
+        "The sub action cooldown must not advance the primary ability"
+    );
     assert.equal(waterBolt.owner, owner, "The sub action projectile must retain the equipped character as owner");
     assert.equal(waterBolt.owner.teamId, owner.teamId, "The sub action projectile must retain the equipped team");
     assert.equal(
@@ -23263,7 +23252,7 @@ function testArcherAbilityTierBehavior() {
         opponent.velocity = new Vector2(0, 0);
         sim.entities = sim.fighters.slice();
         archer.ability.setContext({ abilityTier });
-        archer.ability.timer = 0;
+        archer.ability.setCooldownRemaining(0);
         return { sim, archer, opponent, ability: archer.ability };
     };
 
@@ -23361,7 +23350,7 @@ function testArcherAbilityTierBehavior() {
 
     const doubleShot = createAimSimulation(2);
     assert.ok(Math.abs(doubleShot.ability._getWindupDuration() - 0.32) < 1e-9, "Archer Lv6 should have 0.32s windup");
-    doubleShot.ability.timer = 10;
+    doubleShot.ability.setCooldownRemaining(10);
     doubleShot.ability.state.pendingSecondShot = true;
     doubleShot.ability.state.secondShotTimer = 0.01;
     doubleShot.ability.state.secondShotTargetCache = doubleShot.opponent;
@@ -24884,5 +24873,69 @@ function testElementalistVfxPreviewCatalog() {
 }
 
 testElementalistVfxPreviewCatalog();
+
+function testReusableCapabilityContracts() {
+    class CooldownProbe extends Cooldown(class {}) {}
+    const cooldown = new CooldownProbe();
+    cooldown.resetCooldown(2);
+    cooldown.tickCooldown(0.5);
+    cooldown.reduceCooldown(0.25);
+    cooldown.setCooldownRemaining(1.75);
+    assert.equal(cooldown.cooldownRemaining, 1.75);
+    cooldown.setCooldownRemaining(0);
+    assert.equal(cooldown.cooldownReady, true);
+
+    class BurstProbe extends BurstSequencer(class {}) {}
+    const burst = new BurstProbe();
+    const fired = [];
+    burst.startBurst(2, 0.1);
+    assert.equal(
+        burst.tickBurst(0, (index) => (fired.push(index), BURST_RESULTS.PAUSED)),
+        BURST_RESULTS.PAUSED
+    );
+    assert.equal(burst._burstRemaining, 2, "Paused burst callbacks must not consume a shot");
+    burst.tickBurst(0, (index) => (fired.push(index), BURST_RESULTS.FIRED));
+    burst.tickBurst(0.1, (index) => (fired.push(index), BURST_RESULTS.FIRED));
+    assert.deepEqual(fired, [0, 0, 1]);
+    assert.equal(burst.isBursting, false);
+
+    class AttachmentProbe extends EntityAttachment(
+        class {
+            constructor() {
+                this.position = new Vector2();
+            }
+        }
+    ) {}
+    const anchor = { position: new Vector2(12, 34) };
+    const attachment = new AttachmentProbe();
+    attachment.attachToEntity(anchor);
+    anchor.position = new Vector2(56, 78);
+    assert.equal(attachment.syncAttachedPosition(), true);
+    assert.deepEqual(attachment.position, anchor.position);
+    assert.notEqual(attachment.position, anchor.position, "Attached positions must be copied by value");
+
+    const entries = new Map([
+        ["keep", 1],
+        ["drop", 0.1]
+    ]);
+    tickTimedMap(entries, 0.2);
+    assert.deepEqual([...entries], [["keep", 0.8]]);
+
+    const active = [{ order: 3 }, { order: 1 }, { order: 2 }];
+    const limited = enforceActiveEntityLimit(active, 3, { reserveSlots: 1, getOrder: (entry) => entry.order });
+    assert.equal(active.find((entry) => entry.order === 1).isExpired, true);
+    assert.deepEqual(
+        limited.map((entry) => entry.order),
+        [2, 3]
+    );
+
+    const ai = new AIActionController(() => 0);
+    assert.equal(ai.cooldownRemaining, 2, "AI action controller should use the shared initial cooldown");
+    ai.tickCooldown(2);
+    assert.equal(ai.cooldownReady, true);
+    console.log("[reusable-capability-contracts] ok");
+}
+
+testReusableCapabilityContracts();
 
 console.log("regression tests ok");

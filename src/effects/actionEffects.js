@@ -1,6 +1,7 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
+import { EntityAttachment } from "../physics/index.js";
 
-export class ActionWindowEffect extends CombatEntity {
+export class ActionWindowEffect extends EntityAttachment(CombatEntity) {
     static COLORS = {
         counter: "#ff8844",
         projectile_guard: "#44ddff",
@@ -14,16 +15,15 @@ export class ActionWindowEffect extends CombatEntity {
     constructor(ball, actionId, duration) {
         super(ball.position.clone(), new Vector2(), 0);
         this.ball = ball;
+        this.attachToEntity(ball);
         this.color = ActionWindowEffect.COLORS[actionId] ?? "#ffffff";
         this.life = duration;
         this.maxLife = this.life;
     }
 
     update(delta) {
-        this.life -= delta;
-        this.position.x = this.ball.position.x;
-        this.position.y = this.ball.position.y;
-        if (this.life <= 0) this.isExpired = true;
+        this.syncAttachedPosition();
+        this.tickLife(delta);
     }
 
     draw(ctx) {
@@ -97,9 +97,8 @@ export class ActionWhiffEffect extends CombatEntity {
     }
 
     update(delta) {
-        this.life -= delta;
         this.integrate(delta);
-        if (this.life <= 0) this.isExpired = true;
+        this.tickLife(delta);
     }
 
     draw(ctx) {

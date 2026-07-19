@@ -1,5 +1,6 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
 import { getVisibleLineWidth } from "../effects/effectVisibility.js";
+import { tickTimedMap } from "../physics/index.js";
 import { BulletProjectile } from "./bulletProjectile.js";
 
 const TURRET_LIFETIME = 8;
@@ -58,11 +59,7 @@ export class GunnerTurret extends CombatEntity {
     }
 
     _tickCollisionCooldowns(delta) {
-        for (const [targetId, remaining] of this.collisionCooldowns) {
-            const next = remaining - delta;
-            if (next <= 0) this.collisionCooldowns.delete(targetId);
-            else this.collisionCooldowns.set(targetId, next);
-        }
+        tickTimedMap(this.collisionCooldowns, delta);
     }
 
     _handleFighterContacts(simulation) {

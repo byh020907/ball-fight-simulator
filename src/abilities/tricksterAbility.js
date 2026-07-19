@@ -22,12 +22,12 @@ export class TricksterAbility extends Ability {
 
     update(delta, target) {
         this._updateMarks(delta);
-        this.timer -= delta;
-        if (this.timer > 0 || !target) {
+        this.tickCooldown(delta);
+        if (!this.cooldownReady || !target) {
             return;
         }
 
-        this.timer = this.cooldown;
+        this.resetCooldown(this.cooldown);
         const upgrade = this.getLevelUpgrade();
         const seedCount = SEED_COUNT;
         const baseAngle = Math.random() * Math.PI * 2;
@@ -130,6 +130,6 @@ export class TricksterAbility extends Ability {
     }
 
     getUiState() {
-        return { label: "Seeds", progress: Math.max(0, Math.min(1, 1 - this.timer / this.cooldown)) };
+        return { label: "Seeds", progress: this.cooldownProgress };
     }
 }

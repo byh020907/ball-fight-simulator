@@ -30,7 +30,7 @@ export class PhantomAbility extends Ability {
             terminalAvailable: false,
             skipMarkedCollisionTargetId: null
         };
-        this.timer = this.cooldown;
+        this.resetCooldown(this.cooldown);
     }
 
     update(delta, target) {
@@ -52,15 +52,15 @@ export class PhantomAbility extends Ability {
             if (this.state.primedTimer <= 0) {
                 this.state.primed = false;
                 this._randomTeleport();
-                this.timer = this.cooldown * RANDOM_MISS_COOLDOWN_FACTOR;
+                this.setCooldownDuration(this.cooldown);
+                this.setCooldownRemaining(this.cooldown * RANDOM_MISS_COOLDOWN_FACTOR);
             }
             return;
         }
 
         // normal cooldown countdown
-        this.timer -= delta;
-        if (this.timer <= 0) {
-            this.timer = 0;
+        this.tickCooldown(delta);
+        if (this.cooldownReady) {
             this.state.primed = true;
             this.state.primedTimer = PRIMED_DURATION;
         }
@@ -134,7 +134,7 @@ export class PhantomAbility extends Ability {
         const owner = this.owner;
         const sim = this.simulation;
         if (stage === "base") {
-            this.timer = this.cooldown;
+            this.resetCooldown(this.cooldown);
         }
 
         this.state.vanishPos = owner.position.clone();
@@ -232,7 +232,7 @@ export class PhantomAbility extends Ability {
 
         const randomAngle = Math.random() * Math.PI * 2;
         const speed = owner.stats.baseSpeed * (0.7 + Math.random() * 0.6);
-        owner.velocity = Vector2.fromAngle(randomAngle, speed);
+        owner.applyImpulse(Vector2.subtract(Vector2.fromAngle(randomAngle, speed), owner.velocity));
         owner.clearDash();
 
         sim.spawnParticleBurst(oldPos, "#55bbdd", { count: 15, speed: 200, radiusMin: 2, radiusMax: 5, gravity: 400 });
@@ -392,8 +392,8 @@ export class PhantomAbility extends Ability {
             };
         }
         return {
-            label: this.timer <= 0 ? "Ready" : `${Math.max(0, this.timer).toFixed(1)}s`,
-            progress: this.timer <= 0 ? 1 : Math.max(0, Math.min(1, 1 - this.timer / this.cooldown))
+            label: this.cooldownReady ? "Ready" : `${this.cooldownRemaining.toFixed(1)}s`,
+            progress: this.cooldownProgress
         };
     }
 }

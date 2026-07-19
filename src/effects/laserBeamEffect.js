@@ -1,4 +1,5 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
+import { EntityAttachment } from "../physics/index.js";
 import { getVisibleLineWidth } from "./effectVisibility.js";
 import {
     createLaserCasterVisualState,
@@ -106,7 +107,7 @@ export function drawLaserSegments(ctx, segments, { alpha = 1, color = "#ff5656" 
     ctx.restore();
 }
 
-export class LaserBeamEffect extends CombatEntity {
+export class LaserBeamEffect extends EntityAttachment(CombatEntity) {
     static renderLayer = RENDER_LAYERS.FOREGROUND;
 
     constructor(
@@ -116,6 +117,7 @@ export class LaserBeamEffect extends CombatEntity {
     ) {
         super(source.position.clone(), new Vector2(), 0);
         this.source = source;
+        this.attachToEntity(source);
         this.target = target;
         this.chargeDuration = chargeDuration;
         this.fireDuration = fireDuration;
@@ -136,7 +138,7 @@ export class LaserBeamEffect extends CombatEntity {
             this.isExpired = true;
             return;
         }
-        this.pos = this.source.position.clone();
+        this.syncAttachedPosition();
         let remainingDelta = Math.max(0, delta);
         while (remainingDelta > PHASE_EPSILON && !this.isExpired) {
             if (this.phase === "charge") {
@@ -260,12 +262,13 @@ export class LaserBeamEffect extends CombatEntity {
     }
 }
 
-export class LaserCasterDissipateEffect extends CombatEntity {
+export class LaserCasterDissipateEffect extends EntityAttachment(CombatEntity) {
     static renderLayer = RENDER_LAYERS.FOREGROUND;
 
     constructor(source, { angle, scale, palette }) {
         super(source.position.clone(), new Vector2(), 0);
         this.source = source;
+        this.attachToEntity(source);
         this.angle = angle;
         this.scale = scale;
         this.palette = palette;
@@ -278,7 +281,7 @@ export class LaserCasterDissipateEffect extends CombatEntity {
             this.isExpired = true;
             return;
         }
-        this.pos = this.source.position.clone();
+        this.syncAttachedPosition();
         this.tickLife(delta);
     }
 

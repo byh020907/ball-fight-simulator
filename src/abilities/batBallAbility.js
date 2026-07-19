@@ -43,7 +43,7 @@ export class BatBallAbility extends Ability {
     }
 
     update(delta, target) {
-        this.timer -= delta;
+        this.tickCooldown(delta);
 
         // Slash 애니메이션 타이머
         if (this.state.slashTimer > 0) {
@@ -69,7 +69,7 @@ export class BatBallAbility extends Ability {
         if (Math.abs(sweepDelta) > 1e-4) this.state.sweepDirection = Math.sign(sweepDelta);
         this.state.arcAngle = nextArcAngle;
 
-        if (!target || this.timer > 0) return;
+        if (!target || !this.cooldownReady) return;
 
         const toTarget = Vector2.subtract(target.position, this.owner.position);
         const dist = toTarget.length();
@@ -82,7 +82,7 @@ export class BatBallAbility extends Ability {
 
         // 범위 안에 들어왔다 — 휘두르기!
         this.performSlash(target);
-        this.timer = this.cooldown;
+        this.resetCooldown(this.cooldown);
     }
 
     performSlash(target) {
@@ -138,7 +138,7 @@ export class BatBallAbility extends Ability {
 
     _handleWallSlamImpact({ actualDamage }) {
         if (!this.getLevelUpgrade().wallReset || actualDamage <= 0 || this.state.resetCooldown > 0) return;
-        this.timer = 0;
+        this.setCooldownRemaining(0);
         this.state.resetCooldown = RESET_COOLDOWN;
         this.state.resetFlash = RESET_FLASH_DURATION;
         const resetText = this.simulation.spawnActionText(this.owner.position.clone(), "RESET!", "#ffffff");
@@ -425,8 +425,8 @@ export class BatBallAbility extends Ability {
 
     getUiState() {
         return {
-            label: this.timer > 0 ? "Slash" : "Ready",
-            progress: Math.max(0, Math.min(1, 1 - this.timer / this.cooldown))
+            label: this.cooldownReady ? "Ready" : "Slash",
+            progress: this.cooldownProgress
         };
     }
 }

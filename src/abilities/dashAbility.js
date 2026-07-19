@@ -25,7 +25,7 @@ export class DashAbility extends Ability {
         this.baseCooldown = 2.5;
         this.maxCooldownLevel = 2;
         this._baseCooldown = this.getCooldownForLevel();
-        this.timer = this.cooldown;
+        this.resetCooldown(this.cooldown);
         this.dashMultiplier = 2.15;
         this.homingTurnRate = 2.4;
         this.laserCombatStates = new WeakMap();
@@ -39,12 +39,12 @@ export class DashAbility extends Ability {
             }
         }
 
-        this.timer -= delta;
-        if (this.owner.state.movement || this.timer > 0 || !target) {
+        this.tickCooldown(delta);
+        if (this.owner.state.movement || !this.cooldownReady || !target) {
             return;
         }
 
-        this.timer = this.cooldown;
+        this.resetCooldown(this.cooldown);
         const direction = Vector2.subtract(target.position, this.owner.position).normalize();
         this.owner.initiateDash(direction, {
             duration: MAX_DASH_DURATION,
@@ -68,7 +68,7 @@ export class DashAbility extends Ability {
     onDashHit(target) {
         this.state.cooldownLevel = Math.min(this.maxCooldownLevel, this.state.cooldownLevel + 1);
         this.cooldown = this.getCooldownForLevel();
-        this.timer = Math.min(this.timer, this.cooldown);
+        this.setCooldownDuration(this.cooldown);
         this.simulation.addLog(`${this.owner.name} lands a dash and shortens future cooldowns.`);
         if (this.getLevelUpgrade().laserStrike && target && !target.flags.defeated) {
             this.simulation.entities.push(
@@ -130,7 +130,7 @@ export class DashAbility extends Ability {
         const previousLevel = this.state.cooldownLevel;
         this.state.cooldownLevel = 0;
         this._baseCooldown = this.getCooldownForLevel();
-        this.timer = this.cooldown;
+        this.resetCooldown(this.cooldown);
         this.simulation.addLog(
             `${this.owner.name} hits a wall and ${this.state.cooldownLevel < previousLevel ? "drops" : "keeps"} dash cooldown stage.`
         );
@@ -170,6 +170,6 @@ export class DashAbility extends Ability {
         if (this.owner.state.movement) {
             return { label: "Dash", progress: 1 };
         }
-        return { label: "Dash", progress: Math.max(0, Math.min(1, 1 - this.timer / this.cooldown)) };
+        return { label: "Dash", progress: this.cooldownProgress };
     }
 }

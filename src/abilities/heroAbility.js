@@ -1,5 +1,6 @@
 import { Vector2 } from "../core.js";
 import { HeroShieldShard } from "../entities/heroShieldShard.js";
+import { enforceActiveEntityLimit } from "../entities/activeEntityLimit.js";
 import { HeroShieldBreakEffect } from "../effects/heroEffects.js";
 import { Ability } from "./ability.js";
 import { HERO_COMBAT_CONFIG } from "./heroCombatConfig.js";
@@ -147,10 +148,7 @@ export class HeroAbility extends EnergyShieldVisual(Ability) {
     }
 
     _enforceOwnerCoreLimit() {
-        const activeCores = this._getActiveOwnerCores();
-        while (activeCores.length >= HERO_ORB_MAX_ACTIVE_PER_OWNER) {
-            activeCores.shift().isExpired = true;
-        }
+        enforceActiveEntityLimit(this._getActiveOwnerCores(), HERO_ORB_MAX_ACTIVE_PER_OWNER, { reserveSlots: 1 });
     }
 
     getOrbAttraction(orb) {

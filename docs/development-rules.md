@@ -127,9 +127,10 @@ this.debug = {
 | `PhysicsBody`                     | 움직일 수 있다 (pos, velocity, mass, radius, integrate, applyImpulse)                                     | BattleBall, 모든 CombatEntity                                                |
 | `LifeSpan`                        | 시간이 지나면 사라진다 (life, tickLife, lifeProgress)                                                     | 모든 이펙트, 모든 투사체                                                     |
 | `CollectionGrace`                 | 생성 직후 자석·직접 회수를 유예한다 (collectionGraceRemaining, tickCollectionGrace)                       | HeroOrb, HuntingLootItem                                                     |
-| `Cooldown`                        | 쿨다운이 있다 (tickCooldown, cooldownReady)                                                               | 모든 Ability, AIActionController                                             |
-| `ProjectileBehavior`              | 발사체다 (owner, updateProjectile, hit 판정)                                                              | Arrow/Bat/Bullet/Orbit/Grenade/Seed                                          |
-| `BurstSequencer`                  | 연발 발사한다 (startBurst, tickBurst)                                                                     | 필요 시 선택 적용                                                            |
+| `Cooldown`                        | 쿨다운이 있다 (`tickCooldown`, `cooldownReady`, `cooldownRemaining`)                                      | 모든 Ability, AIActionController                                             |
+| `ProjectileBehavior`              | 발사체다 (owner, updateProjectile, hit 판정)                                                              | Arrow/Bat/Bullet/Orbit/ElementalWaterBolt/HeroShieldShard                    |
+| `BurstSequencer`                  | 연발 발사한다 (`startBurst`, `tickBurst`, `BURST_RESULTS`)                                                | GrenadeAbility, GunnerAbility                                                |
+| `EntityAttachment`                | 다른 엔티티의 위치를 값 복사로 추적한다 (`attachToEntity`, `syncAttachedPosition`)                        | 대상·시전자에 붙는 전투 VFX                                                  |
 | `RotationalBody`                  | 회전한다 (angle, angularVelocity, applyAngularImpulse, integrateRotation)                                 | BattleBall (전체), 모든 사냥터 전리품, 회전 가능한 지형/캐릭터/투사체 확장용 |
 | `PhysicsMaterialBody`             | 물리 재질을 소유한다 (physicsMaterial, setPhysicsMaterial, getResolvedPhysicsMaterial)                    | 물리 재질이 필요한 모든 body                                                 |
 | `CollisionShape` (helper)         | polygon world points 변환, SAT 기반 circle-polygon/polygon-polygon 충돌, fighter shape collision resolver | terrain collision, fighter-vs-fighter 충돌                                   |
@@ -156,6 +157,11 @@ this.debug = {
 2. **능력(capability)은 믹스인으로 제공합니다.** `움직일 수 있다`, `시간 제한이 있다`, `쿨다운이 있다`는 능력이지 본질이 아닙니다.
 3. **`mixins()` 합성으로 필요한 능력만 조합합니다.** `mixins([PhysicsBody, LifeSpan, ProjectileBehavior])` — 세 능력을 가진 클래스가 됩니다.
 4. **믹스인은 `(Base) => class extends Base` 함수 형태로 작성합니다.** RTS 레포(`C:\projects\rts`) 패턴을 따릅니다.
+
+공용 capability의 상태는 우회 필드로 조작하지 않습니다. 쿨다운은 `timer` 별칭 없이 `tickCooldown()`,
+`resetCooldown()`, `setCooldownRemaining()`을 사용하고, 연발 콜백 결과는 문자열 대신 `BURST_RESULTS`를 사용합니다.
+상속이 부적절한 컬렉션 정책은 순수 함수로 둡니다. 시간값 `Map`은 `tickTimedMap()`, 활성 엔티티 상한은
+`enforceActiveEntityLimit()`을 사용하며 대상별 만료 방식은 콜백으로 주입합니다.
 
 ### 기능 단위 코드 분리 (함수/모듈화)
 

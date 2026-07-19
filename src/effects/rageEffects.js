@@ -1,4 +1,5 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
+import { EntityAttachment } from "../physics/index.js";
 import {
     drawRebirthVisualOverlay,
     drawRebirthVisualUnderlay,
@@ -138,7 +139,7 @@ export class RageFlameRing extends CombatEntity {
     }
 }
 
-export class BurningEffect extends CombatEntity {
+export class BurningEffect extends EntityAttachment(CombatEntity) {
     static renderLayer = RENDER_LAYERS.FOREGROUND;
 
     constructor({
@@ -154,6 +155,7 @@ export class BurningEffect extends CombatEntity {
         super(target.position.clone(), new Vector2(), target.radius);
         this.source = source;
         this.target = target;
+        this.attachToEntity(target);
         this.duration = duration;
         this.life = duration;
         this.maxLife = duration;
@@ -202,7 +204,7 @@ export class BurningEffect extends CombatEntity {
             this._finish();
             return;
         }
-        this.pos = this.target.position.clone();
+        this.syncAttachedPosition();
         this.life = Math.max(0, this.life - delta);
         const damageDelta = Math.min(delta, Math.max(0, this.damageLife));
         this.damageLife = Math.max(0, this.damageLife - damageDelta);

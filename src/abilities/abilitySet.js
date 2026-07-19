@@ -93,7 +93,7 @@ export class AbilitySet {
         return this.all.map((ability) => {
             const state = ability.getUiState?.() ?? {};
             const progress = clampProgress(state.progress ?? 1);
-            const cooldownRemaining = Math.max(0, Number(ability.timer) || 0);
+            const cooldownRemaining = ability.cooldownRemaining;
             const cooldownDuration = Math.max(0, Number(ability.cooldown) || 0);
             const status = state.status ?? (progress >= 1 ? "ready" : "charging");
 

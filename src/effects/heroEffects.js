@@ -18,8 +18,7 @@ export class HeroShieldBreakEffect extends CombatEntity {
     }
 
     update(delta) {
-        this.life -= delta;
-        if (this.life <= 0) this.isExpired = true;
+        this.tickLife(delta);
     }
 
     draw(ctx) {

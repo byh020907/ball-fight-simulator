@@ -1,19 +1,21 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
+import { EntityAttachment } from "../physics/index.js";
 import { getVisibleLineWidth } from "./effectVisibility.js";
 
-export class VineSnareVisualEffect extends CombatEntity {
+export class VineSnareVisualEffect extends EntityAttachment(CombatEntity) {
     static renderLayer = RENDER_LAYERS.FOREGROUND;
 
     constructor(target, periodicEffect) {
         super(target.position.clone(), new Vector2(), target.radius);
         this.target = target;
+        this.attachToEntity(target);
         this.periodicEffect = periodicEffect;
         this.life = periodicEffect.duration;
         this.maxLife = periodicEffect.duration;
     }
 
     update() {
-        this.pos = this.target.position.clone();
+        this.syncAttachedPosition();
         this.life = Math.max(0, this.periodicEffect.duration - this.periodicEffect.elapsed);
         if (this.target.flags.defeated || this.periodicEffect.finished) this.isExpired = true;
     }
@@ -57,12 +59,13 @@ export class VineSnareVisualEffect extends CombatEntity {
     }
 }
 
-export class TricksterSeedMarkEffect extends CombatEntity {
+export class TricksterSeedMarkEffect extends EntityAttachment(CombatEntity) {
     static renderLayer = RENDER_LAYERS.FOREGROUND;
 
     constructor(target, color, duration) {
         super(target.position.clone(), new Vector2(), target.radius);
         this.target = target;
+        this.attachToEntity(target);
         this.color = color;
         this.duration = duration;
         this.life = duration;
@@ -74,7 +77,7 @@ export class TricksterSeedMarkEffect extends CombatEntity {
     }
 
     update(delta) {
-        this.pos = this.target.position.clone();
+        this.syncAttachedPosition();
         this.tickLife(delta);
         if (this.target.flags.defeated) this.isExpired = true;
     }
@@ -145,18 +148,19 @@ export class TricksterSeedBurstEffect extends CombatEntity {
     }
 }
 
-export class SeedActivationEffect extends CombatEntity {
+export class SeedActivationEffect extends EntityAttachment(CombatEntity) {
     static renderLayer = RENDER_LAYERS.FOREGROUND;
 
     constructor(seed) {
         super(seed.position.clone(), new Vector2(), seed.radius);
         this.seed = seed;
+        this.attachToEntity(seed);
         this.life = 0.24;
         this.maxLife = 0.24;
     }
 
     update(delta) {
-        this.pos = this.seed.position.clone();
+        this.syncAttachedPosition();
         this.tickLife(delta);
     }
 

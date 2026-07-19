@@ -1,4 +1,5 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
+import { EntityAttachment } from "../physics/index.js";
 import { getVisibleLineWidth } from "./effectVisibility.js";
 
 function clamp01(value) {
@@ -14,12 +15,13 @@ function drawTriangle(ctx, tip, left, right) {
     ctx.fill();
 }
 
-export class EaterDigestEffect extends CombatEntity {
+export class EaterDigestEffect extends EntityAttachment(CombatEntity) {
     static renderLayer = RENDER_LAYERS.FOREGROUND;
 
     constructor(owner, target) {
         super(owner.position.clone(), new Vector2(), owner.radius);
         this.owner = owner;
+        this.attachToEntity(owner);
         this.target = target;
         this.life = 0.72;
         this.maxLife = 0.72;
@@ -37,8 +39,8 @@ export class EaterDigestEffect extends CombatEntity {
     }
 
     update(delta) {
-        this.pos = this.owner.position.clone();
-        this.life = Math.max(0, this.life - delta);
+        this.syncAttachedPosition();
+        this.tickLife(delta);
         this.tickPulse = Math.max(0, this.tickPulse - delta);
         if (this.life <= 0 || this.target.flags.defeated || this.target.state.swallowed?.owner !== this.owner) {
             this.isExpired = true;

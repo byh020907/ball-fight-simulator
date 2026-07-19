@@ -84,8 +84,8 @@ export class BulletProjectile extends Projectile {
             return;
         }
         const ability = this.sourceAbility;
-        if (ability && typeof ability.timer === "number") {
-            ability.timer = Math.max(0, ability.timer - this.cdReduction);
+        if (ability && typeof ability.reduceCooldown === "function") {
+            ability.reduceCooldown(this.cdReduction);
             simulation.spawnActionText(this.owner.position.clone(), `CD -${this.cdReduction.toFixed(3)}s`, "#44ddff");
             simulation.addSparkBurst(this.position.clone(), "#44ddff");
             simulation.playSound("shoot", 0.4);

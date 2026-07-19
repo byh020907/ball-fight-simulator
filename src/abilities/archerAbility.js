@@ -69,9 +69,10 @@ export class ArcherAbility extends PassiveEvasion(Ability) {
     }
 
     _updateCooldown(delta, target) {
-        this.timer -= delta;
-        if (this.timer <= 0 && target) {
-            this.timer = this.cooldown * (0.7 + Math.random() * 0.6);
+        this.tickCooldown(delta);
+        if (this.cooldownReady && target) {
+            this.setCooldownDuration(this.cooldown);
+            this.setCooldownRemaining(this.cooldown * (0.7 + Math.random() * 0.6));
             this._updateAim(target);
             this.state.windUp = this._getWindupDuration();
             this._ensurePredictionEffect();
@@ -209,7 +210,7 @@ export class ArcherAbility extends PassiveEvasion(Ability) {
         }
         return {
             label: "Arrow",
-            progress: Math.max(0, Math.min(1, 1 - this.timer / this.cooldown))
+            progress: this.cooldownProgress
         };
     }
 }

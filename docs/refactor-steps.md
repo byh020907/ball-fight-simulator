@@ -118,6 +118,7 @@ class DashAbility extends Ability {
 - `BattleSimulation.getSpeedMultiplier(ball)`은 대상 Ball의 action effect만 조회합니다.
 
 검증 체크리스트:
+
 - Rush는 발동한 Ball에만 속도 배율을 적용해야 합니다.
 - Rush 재발동 시 남은 시간이 있으면 지속시간이 연장되어야 합니다.
 - Rush effect 만료 후 속도 배율이 1로 돌아와야 합니다.
@@ -134,6 +135,7 @@ class DashAbility extends Ability {
 - `BattleBall`은 effect tick만 호출합니다.
 
 검증 체크리스트:
+
 - Eater가 뱉은 대상은 벽 충돌 시 wall slam 피해를 받아야 합니다.
 - wall slam 피해는 방어력 적용 후 기존 수치와 같아야 합니다.
 - wall slam 반복 피해 쿨다운 동안 같은 벽 접촉으로 중복 피해가 들어가면 안 됩니다.
@@ -150,6 +152,7 @@ class DashAbility extends Ability {
 - `BattleBall`은 `movementEffect` 저장, tick, expired 시 해제만 담당합니다.
 
 검증 체크리스트:
+
 - Dash Ball은 충돌 자체의 추가 피해 없이 일반 충돌 피해만 줘야 합니다. ✅
 - Dash Ball은 쿨다운 100% 상태에서만 대시 보정을 받아야 합니다. ✅
 - Dash Ball은 적중 시 쿨다운 스택이 증가하고, 벽 접촉 시 규칙대로 스택이 감소/초기화되어야 합니다. ✅
@@ -158,17 +161,28 @@ class DashAbility extends Ability {
 
 ## 다음 후보 스텝
 
+### 완료: 공통 capability와 순수 정책 정합
+
+- Ability와 AI 액션의 쿨다운을 `Cooldown` 계약으로 통일하고 기존 `timer` 우회 계약을 제거했습니다.
+- Grenade/Gunner 연발 상태를 `BurstSequencer`로 통일하고 중지·대기·발사 결과를 `BURST_RESULTS`로 고정했습니다.
+- 대상이나 시전자 위치를 따라가는 전투 VFX는 `EntityAttachment`를 조합합니다.
+- 시간값 Map과 활성 엔티티 수 제한은 각각 `tickTimedMap()`, `enforceActiveEntityLimit()` 순수 함수로 분리했습니다.
+- 대상 고유 종료 조건, 정확한 누적 피해 정산, 궤적·유체장 계산은 공통 capability로 억지 통합하지 않고 각 소유자에 남겼습니다.
+
 ### Step 4. Swallow/Hold effect 분리
 
 현재 문제:
+
 - `EaterAbility`가 `target.swallowedState`를 직접 쓰고, `BattleBall.update()`가 삼켜진 대상의 위치 고정과 이동 정지를 처리합니다.
 
 목표:
+
 - `SwallowedEffect`가 대상 위치 고정, 해제 조건, 이동 정지를 소유합니다.
 - `EaterAbility`는 swallow effect를 생성하고 release 시점만 관리합니다.
 - `BattleBall`은 effect tick/상태 조회만 수행합니다.
 
 검증 체크리스트:
+
 - Eater가 feast 중 충돌한 대상만 삼켜야 합니다.
 - 삼켜진 대상은 Eater 위치에 고정되어야 합니다.
 - 삼켜진 동안 대상은 별도 이동/대시가 없어야 합니다.
@@ -177,13 +191,16 @@ class DashAbility extends Ability {
 ### Step 5. Projectile hit behavior 정리
 
 현재 문제:
+
 - `Projectile` 공통 hit flow와 개별 Projectile의 `_onHitEffects()`가 섞여 있고, 일부 결과 콜백은 owner ability에 직접 호출됩니다.
 
 목표:
+
 - 공통 hit 판정은 `Projectile`이 유지하되, 피해량/넉백/결과 콜백은 각 Projectile 또는 생성한 Ability가 소유합니다.
 - Ability가 알아야 하는 결과는 명시적 callback으로만 전달합니다.
 
 검증 체크리스트:
+
 - Archer 화살은 벽 반사 후 방향 표시가 속도 벡터와 일치해야 합니다.
 - Archer 화살 명중/빗나감 결과가 보정 로직에 정확히 반영되어야 합니다.
 - Grenade 명중/빗나감 결과가 fuse 보정 로직에 정확히 반영되어야 합니다.

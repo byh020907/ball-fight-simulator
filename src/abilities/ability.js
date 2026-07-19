@@ -19,7 +19,7 @@ export class Ability extends mixins([Cooldown]) {
         };
         this._baseCooldown = baseCooldown;
         this._cooldownDuration = baseCooldown;
-        this._cooldownRemaining = this.cooldown;
+        this.resetCooldown(this.cooldown);
     }
 
     /** Effective cooldown after stat, mastery, and equipment reductions. */
@@ -66,14 +66,6 @@ export class Ability extends mixins([Cooldown]) {
 
     set cooldown(val) {
         this._baseCooldown = val;
-    }
-
-    /** @deprecated — use cooldownReady / tickCooldown() instead */
-    get timer() {
-        return this._cooldownRemaining;
-    }
-    set timer(v) {
-        this._cooldownRemaining = v;
     }
 
     update() {}

@@ -1,4 +1,5 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
+import { EntityAttachment } from "../physics/index.js";
 import { getVisibleLineWidth } from "./effectVisibility.js";
 import { SPIN_VORTEX_CONFIG } from "../abilities/spinConfig.js";
 import { createFlowFieldVisual, drawFlowFieldVisual, updateFlowFieldVisual } from "./flowFieldVisual.js";
@@ -75,18 +76,19 @@ export class SpinCutEffect extends CombatEntity {
     }
 }
 
-export class SpinVortexEffect extends CombatEntity {
+export class SpinVortexEffect extends EntityAttachment(CombatEntity) {
     static renderLayer = RENDER_LAYERS.FOREGROUND;
 
     constructor(ability) {
         super(ability.owner.position.clone(), new Vector2(), 0);
         this.ability = ability;
+        this.attachToEntity(ability.owner);
         this.flowField = createFlowFieldVisual(this.position, { radius: SPIN_VORTEX_CONFIG.radius });
         this.streams = this.flowField.streams;
     }
 
     update(delta) {
-        this.position = this.ability.owner.position.clone();
+        this.syncAttachedPosition();
         if (!this.ability.getLevelUpgrade().piercingVortex || !this.ability.isFullyCharged()) {
             this.isExpired = true;
             return;

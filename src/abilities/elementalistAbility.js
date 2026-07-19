@@ -1,5 +1,6 @@
 import { applyCollisionImpulse, Vector2 } from "../core.js";
 import { ELEMENTAL_ORB_CONFIG, ElementalOrb, ElementalWaterBolt } from "../entities/index.js";
+import { enforceActiveEntityLimit } from "../entities/activeEntityLimit.js";
 import {
     BURNING_EFFECT_CONFIG,
     ElementalChannelEffect,
@@ -125,10 +126,12 @@ export class ElementalistAbility extends Ability {
 
     _spawnOrb(element, targetMemory, position, index, count) {
         this._pruneOrbs();
-        while (this.activeOrbs.length >= ELEMENTALIST_CONFIG.maximumOrbs) {
-            this.activeOrbs.sort((left, right) => left.createdAt - right.createdAt)[0].expire();
-            this._pruneOrbs();
-        }
+        enforceActiveEntityLimit(this.activeOrbs, ELEMENTALIST_CONFIG.maximumOrbs, {
+            reserveSlots: 1,
+            getOrder: (orb) => orb.createdAt,
+            expire: (orb) => orb.expire()
+        });
+        this._pruneOrbs();
         const spread = count === 1 ? 0 : (index - (count - 1) / 2) * 0.7;
         const angle = this.rng() * Math.PI * 2 + spread;
         const orb = new ElementalOrb({
