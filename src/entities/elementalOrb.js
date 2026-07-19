@@ -88,10 +88,6 @@ export class ElementalOrb extends CollectionGrace(CombatEntity) {
                 this.ability.consumeOrbByOwner(this);
                 return;
             }
-            if (simulation.isHostile(this.owner, fighter)) {
-                this.ability.consumeOrbByEnemy(this, fighter);
-                return;
-            }
 
             this.applyPositionCorrection(normal.clone().scale(overlap + 0.6));
             applyCollisionImpulse(this, fighter, normal, 0.42, { impactA: 0, minApproachSpeed: 60 });

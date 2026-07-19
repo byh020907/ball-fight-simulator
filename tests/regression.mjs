@@ -23760,6 +23760,12 @@ function testElementalistOrbProgressionAndOwnership() {
     assert.equal(ability.activeChannels[0].target, primaryEnemy, "Wet remembered target should win target selection");
     assert.equal(ability.activeChannels[0].wetSnapshot, true);
     assert.equal(primaryEnemy.state.elementalWetUntil, 0, "The first compatible channel must consume all wet state");
+    const channelEffect = simulation.entities.find((entity) => entity.channel === ability.activeChannels[0]);
+    assert.ok(channelEffect, "Owner pickup must add its channel timeline");
+    assert.doesNotThrow(
+        () => channelEffect.draw(makeCanvasContext()),
+        "Owner pickup timeline must render without terminating the battle loop"
+    );
 
     for (const step of [0, 1, 2, 3, 4]) {
         simulation.elapsed += 0.01;
@@ -23776,14 +23782,15 @@ function testElementalistOrbProgressionAndOwnership() {
     });
     ability.activeOrbs.push(enemyOrb);
     simulation.entities.push(enemyOrb);
+    ability._applyWet(primaryEnemy);
     const hpBeforePickup = primaryEnemy.hp;
-    ability.consumeOrbByEnemy(enemyOrb, primaryEnemy);
-    assert.ok(primaryEnemy.hp < hpBeforePickup, "Enemy direct pickup must apply the owner's spell to the enemy");
-    const pickupEffect = simulation.entities.find((entity) => entity.visualOnly === true && entity.source === owner);
-    assert.ok(pickupEffect, "Enemy pickup must add a visual-only compressed timeline");
-    assert.doesNotThrow(
-        () => pickupEffect.draw(makeCanvasContext()),
-        "Enemy pickup timeline must render without terminating the battle loop"
+    enemyOrb._resolveFighterContacts(simulation, false);
+    assert.equal(enemyOrb.isExpired, false, "Enemy contact must not consume the elemental orb");
+    assert.equal(primaryEnemy.hp, hpBeforePickup, "Enemy contact must not apply the orb spell");
+    assert.ok(ability.activeOrbs.includes(enemyOrb), "Enemy contact must keep the orb active for its owner");
+    assert.ok(
+        primaryEnemy.state.elementalWetUntil > simulation.elapsed,
+        "Enemy contact must not consume the target's wet state"
     );
     console.log("[elementalist-orb-progression-ownership] ok");
 }

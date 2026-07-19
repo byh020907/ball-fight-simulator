@@ -1,6 +1,6 @@
 import { applyCollisionImpulse, Vector2 } from "../core.js";
 import { ElementalOrb, ElementalWaterBolt } from "../entities/index.js";
-import { ElementalChannelEffect, VisualBurst, applyBurningEffect } from "../effects/index.js";
+import { ElementalChannelEffect, VisualBurst } from "../effects/index.js";
 import { applyMagneticAttraction } from "../physics/index.js";
 import { Ability } from "./ability.js";
 import {
@@ -17,8 +17,7 @@ const ELEMENTALIST_CONFIG = Object.freeze({
     orbReleaseSpeed: 165,
     ownerMagnet: { radiusMultiplier: 2, responseRate: 9, attractionSpeed: 900 },
     orbMagnet: { radius: 145, responseRate: 3.8, attractionSpeed: 120 },
-    wetDuration: 2.5,
-    enemyPickupEffectRatio: 0.7
+    wetDuration: 2.5
 });
 
 const SINGLE_SPELLS = Object.freeze({
@@ -124,26 +123,6 @@ export class ElementalistAbility extends Ability {
             })
         );
         this.simulation.playSound("charge", 0.7);
-    }
-
-    consumeOrbByEnemy(orb, enemy) {
-        if (orb.isExpired) return;
-        const elements = [...orb.elements];
-        const recipe = orb.recipe;
-        const wetSnapshot = this._consumeWet(enemy);
-        orb.expire();
-        this._applyImmediateSpell(elements, recipe, enemy, ELEMENTALIST_CONFIG.enemyPickupEffectRatio, wetSnapshot);
-        this.simulation.entities.push(
-            new ElementalChannelEffect({
-                source: this.owner,
-                target: enemy,
-                elements,
-                recipe,
-                duration: 0.6,
-                visualOnly: true
-            })
-        );
-        this.simulation.spawnExplosion(enemy.position.clone(), this.getElementColor(elements[0]));
     }
 
     _createChannel({ elements, recipe, target, wetSnapshot }) {
@@ -259,35 +238,6 @@ export class ElementalistAbility extends Ability {
                 new VisualBurst(channel.target.position.clone(), this.getElementColor(channel.elements[0]), 70, 0.2)
             );
         }
-    }
-
-    _applyImmediateSpell(elements, recipe, target, ratio, wetSnapshot) {
-        if (recipe) {
-            this._dealDamage(target, recipe.damageMultiplier * ratio, recipe.name);
-            if (recipe.slow) target.applySlow?.(recipe.slow.duration * ratio, recipe.slow.amount);
-            if (recipe.tangentImpulse) this._applyTangentImpulse(target, recipe.tangentImpulse * ratio, 1);
-        } else {
-            const spell = SINGLE_SPELLS[elements[0]];
-            if (elements[0] === "fire") {
-                applyBurningEffect({
-                    source: this.owner,
-                    target,
-                    simulation: this.simulation,
-                    label: "원소 화염",
-                    config: {
-                        duration: spell.duration,
-                        tickInterval: spell.duration / spell.ticks,
-                        maximumTicks: spell.ticks,
-                        totalDamageMultiplier: spell.damageMultiplier * ratio
-                    }
-                });
-            } else {
-                this._dealDamage(target, spell.damageMultiplier * ratio, `${elements[0]} 오브`);
-                if (spell.slow) target.applySlow?.(spell.slow.duration * ratio, spell.slow.amount);
-                if (spell.tangentImpulse) this._applyTangentImpulse(target, spell.tangentImpulse * ratio, 1);
-            }
-        }
-        this._applyWetReaction(target, elements, wetSnapshot, ratio);
     }
 
     _applyWetReaction(target, elements, wetSnapshot, ratio) {

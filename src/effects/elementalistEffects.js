@@ -297,7 +297,7 @@ export function drawFinishImpact(ctx, channel, progress) {
 export class ElementalChannelEffect extends CombatEntity {
     static renderLayer = RENDER_LAYERS.FOREGROUND;
 
-    constructor({ channel = null, source, target, elements, recipe = null, duration = 1, visualOnly = false }) {
+    constructor({ channel, source, target, elements, recipe = null, duration = 1 }) {
         super(target.position.clone(), new Vector2(), target.radius);
         this.channel = channel;
         this.source = source;
@@ -308,11 +308,10 @@ export class ElementalChannelEffect extends CombatEntity {
         this.duration = duration;
         this.life = duration;
         this.maxLife = duration;
-        this.visualOnly = visualOnly;
     }
 
     update(delta) {
-        if (this.target.flags?.defeated || (this.channel && (this.channel.cancelled || this.channel.finished))) {
+        if (this.target.flags?.defeated || this.channel.cancelled || this.channel.finished) {
             this.isExpired = true;
             return;
         }
