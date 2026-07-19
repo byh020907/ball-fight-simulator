@@ -15,7 +15,7 @@ const ELEMENTALIST_CONFIG = Object.freeze({
     maximumOrbs: 4,
     boltSpeedMultiplier: 2.2,
     orbReleaseSpeed: 165,
-    ownerMagnet: { radius: 2_000, responseRate: 9, attractionSpeed: 900 },
+    ownerMagnet: { radiusMultiplier: 2, responseRate: 9, attractionSpeed: 900 },
     orbMagnet: { radius: 145, responseRate: 3.8, attractionSpeed: 120 },
     wetDuration: 2.5,
     enemyPickupEffectRatio: 0.7
@@ -427,7 +427,12 @@ export class ElementalistAbility extends Ability {
 
     applyOwnerMagnet(orb, delta, graceActive) {
         if (!this.getLevelUpgrade().orbitalFusion || graceActive) return;
-        applyMagneticAttraction(orb, this.owner, delta, ELEMENTALIST_CONFIG.ownerMagnet);
+        const config = ELEMENTALIST_CONFIG.ownerMagnet;
+        applyMagneticAttraction(orb, this.owner, delta, {
+            radius: this.owner.radius * config.radiusMultiplier,
+            responseRate: config.responseRate,
+            attractionSpeed: config.attractionSpeed
+        });
     }
 
     onOrbExpired(orb) {

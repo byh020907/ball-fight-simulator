@@ -23809,6 +23809,18 @@ function testElementalistFusionChannelsAndCleanup() {
     const { simulation, owner, ability, enemies } = createElementalistSimulation({ tier: 3, enemyCount: 2 });
     const [enemy, secondaryEnemy] = enemies;
     enemy.rollCritical = () => false;
+    const magnetOrb = new ElementalOrb({
+        owner,
+        element: "earth",
+        position: new Vector2(owner.position.x + owner.radius * 2 + 1, owner.position.y),
+        targetMemory: enemy,
+        ability
+    });
+    ability.applyOwnerMagnet(magnetOrb, 1 / 60, false);
+    assert.equal(magnetOrb.velocity.length(), 0, "Owner magnet must stop beyond twice the caster radius");
+    magnetOrb.position.x = owner.position.x + owner.radius * 2 - 1;
+    ability.applyOwnerMagnet(magnetOrb, 1 / 60, false);
+    assert.ok(magnetOrb.velocity.length() > 0, "Owner magnet must pull inside twice the caster radius");
     const expires = simulation.elapsed + 4;
     const first = new ElementalOrb({
         owner,
