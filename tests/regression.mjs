@@ -93,6 +93,7 @@ import {
     getElementalistWetDamageComparison,
     SINGLE_SPELLS
 } from "../src/abilities/elementalistAbility.js";
+import { HERO_COMBAT_CONFIG } from "../src/abilities/heroCombatConfig.js";
 import { ElementalOrb } from "../src/entities/elementalOrb.js";
 import {
     ELEMENTALIST_VFX_PREVIEW_OPTIONS,
@@ -5858,6 +5859,11 @@ function testAbilityLevelUpgrades(app) {
         { stacks: 5, stackCap: 5, progress: 1 },
         "Hero should charge exactly five growth stacks in five seconds"
     );
+    assert.equal(
+        heroAbility.getUiState().label,
+        `Core 5/${HERO_COMBAT_CONFIG.growth.stackCap}`,
+        "Hero UI must display the configured growth stack cap"
+    );
     const baseHeroRun = createTierSimulation(FIGHTER_IDS.HERO, 0);
     assert.deepEqual(
         baseHeroRun.ball.getShieldState(),
@@ -5897,8 +5903,8 @@ function testAbilityLevelUpgrades(app) {
     );
     assert.equal(
         heroRun.ball.hp - hpBeforeCore,
-        Math.round(heroRun.ball.maxHp * 0.01),
-        "Hero tier 2 should restore one-percent maximum HP per collected core"
+        Math.round(heroRun.ball.maxHp * HERO_COMBAT_CONFIG.core.recoveryPerCoreMaxHpRatio),
+        "Hero tier 2 should restore the configured maximum-HP ratio per collected core"
     );
     const heroDrawWithShield = makeRecordingCanvasContext();
     heroAbility.draw(heroDrawWithShield);
@@ -23955,6 +23961,22 @@ testElementalistOrbProgressionAndOwnership();
 function testElementalistChannelDurationAndDamageCadence() {
     const { owner, ability, enemies } = createElementalistSimulation({ tier: 3 });
     const [enemy] = enemies;
+    assert.equal(
+        ability.getUiState().label,
+        `원소 오브 0/${ELEMENTALIST_CONFIG.maximumOrbs}`,
+        "Elementalist UI must display the configured orb cap"
+    );
+    const abilitySource = readFileSync("src/abilities/elementalistAbility.js", "utf8");
+    assert.match(
+        abilitySource,
+        /channel\.elapsed = Math\.min\(channel\.duration, channel\.elapsed \+ delta\);\s*this\._updateChannel\(channel, delta\);/,
+        "Single and composite channels must enter the shared update path after elapsed time advances"
+    );
+    assert.doesNotMatch(
+        abilitySource,
+        /_updateSingleChannel|_updateCompositeChannel/,
+        "Single and composite channel state transitions must not be duplicated"
+    );
     const channels = [
         ...Object.keys(SINGLE_SPELLS).map((element) =>
             ability._createChannel({ elements: [element], recipe: null, target: enemy, wetSnapshot: false })

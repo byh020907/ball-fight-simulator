@@ -21,7 +21,7 @@ export const PATCH_NOTES = [
     {
         version: "0.34.3",
         date: "2026-07-19",
-        title: "v0.34.3 방패 반격 가시성",
+        title: "v0.34.3 금빛 바람 칼날 반격 가시성",
         changes: [
             {
                 type: "fix",

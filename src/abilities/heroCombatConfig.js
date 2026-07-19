@@ -10,7 +10,8 @@ export const HERO_COMBAT_CONFIG = Object.freeze({
         lifetime: 8,
         speedMinMultiplier: 0.72,
         speedMaxMultiplier: 0.96,
-        collectionGraceDuration: 0.16
+        collectionGraceDuration: 0.16,
+        recoveryPerCoreMaxHpRatio: 0.01
     }),
     magnet: Object.freeze({
         baseRadiusMultiplier: 2,

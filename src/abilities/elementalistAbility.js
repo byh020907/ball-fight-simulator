@@ -188,8 +188,7 @@ export class ElementalistAbility extends Ability {
                 continue;
             }
             channel.elapsed = Math.min(channel.duration, channel.elapsed + delta);
-            if (channel.recipe) this._updateCompositeChannel(channel, delta);
-            else this._updateSingleChannel(channel, delta);
+            this._updateChannel(channel, delta);
             if (channel.elapsed >= channel.duration) {
                 this._finishChannel(channel);
                 channel.finished = true;
@@ -198,31 +197,18 @@ export class ElementalistAbility extends Ability {
         this.activeChannels = this.activeChannels.filter((channel) => !channel.finished && !channel.cancelled);
     }
 
-    _updateSingleChannel(channel, delta) {
-        const element = channel.elements[0];
-        const spell = SINGLE_SPELLS[element];
+    _updateChannel(channel, delta) {
+        const spell = channel.recipe ?? SINGLE_SPELLS[channel.elements[0]];
         if (!channel.started) {
             channel.started = true;
             if (spell.slow) channel.target.applySlow?.(spell.slow.duration, spell.slow.amount);
             this._startWetReaction(channel);
         }
         this._updateWetReaction(channel, delta);
-        if (element === "wind") this._applyAwayImpulse(channel.target, spell.pushImpulse, delta);
-        this._applyChannelDamageTicks(channel, spell.damageMultiplier);
-    }
-
-    _updateCompositeChannel(channel, delta) {
-        const recipe = channel.recipe;
-        if (!channel.started) {
-            channel.started = true;
-            if (recipe.slow) channel.target.applySlow?.(recipe.slow.duration, recipe.slow.amount);
-            this._startWetReaction(channel);
-        }
-        this._updateWetReaction(channel, delta);
         if (channel.elements.includes("wind")) {
-            this._applyAwayImpulse(channel.target, recipe.pushImpulse ?? SINGLE_SPELLS.wind.pushImpulse, delta);
+            this._applyAwayImpulse(channel.target, spell.pushImpulse ?? SINGLE_SPELLS.wind.pushImpulse, delta);
         }
-        this._applyChannelDamageTicks(channel, recipe.damageMultiplier);
+        this._applyChannelDamageTicks(channel, spell.damageMultiplier);
     }
 
     _applyChannelDamageTicks(channel, multiplier) {
@@ -542,7 +528,7 @@ export class ElementalistAbility extends Ability {
     getUiState() {
         const channels = this.activeChannels.length;
         return {
-            label: `원소 오브 ${this.activeOrbs.length}/4`,
+            label: `원소 오브 ${this.activeOrbs.length}/${ELEMENTALIST_CONFIG.maximumOrbs}`,
             text: channels > 0 ? `채널 ${channels}` : null,
             progress: this.cooldownProgress
         };

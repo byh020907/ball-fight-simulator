@@ -186,7 +186,7 @@ export class HeroAbility extends Ability {
     }
 
     _healFromCore() {
-        const restored = this.owner.heal(this.owner.maxHp * 0.01);
+        const restored = this.owner.heal(this.owner.maxHp * HERO_COMBAT_CONFIG.core.recoveryPerCoreMaxHpRatio);
         if (restored <= 0) return;
         this.simulation.spawnActionText(this.owner.position.clone(), `회복 +${restored}`, "#55cc77");
         this.simulation.playSound("powerup", 1.05);
@@ -340,7 +340,7 @@ export class HeroAbility extends Ability {
 
     getUiState() {
         return {
-            label: `Core ${this.state.growthStacks}/5`,
+            label: `Core ${this.state.growthStacks}/${HERO_COMBAT_CONFIG.growth.stackCap}`,
             progress:
                 this.state.growthStacks >= HERO_COMBAT_CONFIG.growth.stackCap
                     ? 1
