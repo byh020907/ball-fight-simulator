@@ -74,7 +74,8 @@ import {
     BloodRuptureEffect,
     BloodTetherEffect,
     ELEMENTAL_CHANNEL_VISUAL_CONFIG,
-    ElementalChannelEffect
+    ElementalChannelEffect,
+    ElementalWetEffect
 } from "../src/effects/index.js";
 import { shuffled } from "../src/random.js";
 import { BattleSimulation } from "../src/simulation/battleSimulation.js";
@@ -23754,6 +23755,30 @@ function testElementalistOrbProgressionAndOwnership() {
     primaryEnemy.rollCritical = () => false;
     ability.onWaterBoltHit(primaryEnemy, primaryEnemy.position.clone());
     assert.equal(primaryEnemy.state.elementalWetUntil, ELEMENTALIST_CONFIG.wetDuration);
+    const wetEffects = simulation.entities.filter((entity) => entity instanceof ElementalWetEffect);
+    assert.equal(wetEffects.length, 1, "Wet application must create one target-following visual");
+    const wetContext = makeRecordingCanvasContext();
+    assert.doesNotThrow(() => wetEffects[0].draw(wetContext), "Wet visual must render without interrupting combat");
+    assert.equal(
+        wetContext.calls.some(
+            ([method, property, value]) =>
+                method === "set" && property === "fillStyle" && value === "rgba(119, 223, 255, 0.16)"
+        ),
+        true,
+        "Wet visual must include the water film"
+    );
+    simulation.elapsed = 0.4;
+    ability._applyWet(primaryEnemy);
+    assert.equal(
+        simulation.entities.filter((entity) => entity instanceof ElementalWetEffect).length,
+        1,
+        "Wet refresh must reuse the existing visual"
+    );
+    assert.equal(
+        wetEffects[0].expiresAt,
+        simulation.elapsed + ELEMENTALIST_CONFIG.wetDuration,
+        "Wet refresh must extend the existing visual to the gameplay expiry"
+    );
     assert.equal(ability.activeOrbs.length, 2, "Lv.6 proc must emit exactly two orbs");
     assert.notEqual(ability.activeOrbs[0].element, ability.activeOrbs[1].element);
 
@@ -23763,6 +23788,8 @@ function testElementalistOrbProgressionAndOwnership() {
     assert.equal(ability.activeChannels[0].target, primaryEnemy, "Wet remembered target should win target selection");
     assert.equal(ability.activeChannels[0].wetSnapshot, true);
     assert.equal(primaryEnemy.state.elementalWetUntil, 0, "The first compatible channel must consume all wet state");
+    assert.equal(wetEffects[0].isExpired, true, "Consuming wet must remove its visual immediately");
+    assert.equal(primaryEnemy.state.elementalWetEffect, null, "Consuming wet must clear the target visual reference");
     const channelEffect = simulation.entities.find((entity) => entity.channel === ability.activeChannels[0]);
     assert.ok(channelEffect, "Owner pickup must add its channel timeline");
     assert.doesNotThrow(

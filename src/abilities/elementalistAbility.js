@@ -1,6 +1,6 @@
 import { applyCollisionImpulse, Vector2 } from "../core.js";
 import { ElementalOrb, ElementalWaterBolt } from "../entities/index.js";
-import { ElementalChannelEffect, VisualBurst } from "../effects/index.js";
+import { ElementalChannelEffect, ElementalWetEffect, VisualBurst } from "../effects/index.js";
 import { applyMagneticAttraction } from "../physics/index.js";
 import { Ability } from "./ability.js";
 import {
@@ -275,7 +275,20 @@ export class ElementalistAbility extends Ability {
 
     _applyWet(target) {
         target.state ||= {};
-        target.state.elementalWetUntil = this.simulation.elapsed + ELEMENTALIST_CONFIG.wetDuration;
+        const wetUntil = this.simulation.elapsed + ELEMENTALIST_CONFIG.wetDuration;
+        target.state.elementalWetUntil = wetUntil;
+        const currentEffect = target.state.elementalWetEffect;
+        if (currentEffect instanceof ElementalWetEffect && !currentEffect.isExpired) {
+            currentEffect.refresh(wetUntil);
+            return;
+        }
+        const effect = new ElementalWetEffect({
+            target,
+            simulation: this.simulation,
+            expiresAt: wetUntil
+        });
+        target.state.elementalWetEffect = effect;
+        this.simulation.entities.push(effect);
     }
 
     _hasWet(target) {
@@ -285,6 +298,7 @@ export class ElementalistAbility extends Ability {
     _consumeWet(target) {
         if (!this._hasWet(target)) return false;
         target.state.elementalWetUntil = 0;
+        target.state.elementalWetEffect?.consume?.();
         return true;
     }
 
@@ -407,7 +421,9 @@ export class ElementalistAbility extends Ability {
         for (const channel of this.activeChannels) channel.cancelled = true;
         this.activeChannels = [];
         for (const entity of this.simulation.entities) {
-            if (entity.state) entity.state.elementalWetUntil = 0;
+            if (!entity.state) continue;
+            entity.state.elementalWetUntil = 0;
+            entity.state.elementalWetEffect?.consume?.();
         }
         for (const entity of this.simulation.entities) {
             if (entity instanceof ElementalChannelEffect && entity.source === this.owner) entity.isExpired = true;
