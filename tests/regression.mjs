@@ -89,6 +89,7 @@ import { Ability, AbilitySet, ElementalistAbility } from "../src/abilities/index
 import {
     ELEMENTALIST_CONFIG,
     ELEMENTAL_COMPOSITE_RECIPES,
+    getElementalistWetDamageComparison,
     SINGLE_SPELLS
 } from "../src/abilities/elementalistAbility.js";
 import { ElementalOrb } from "../src/entities/elementalOrb.js";
@@ -24292,6 +24293,31 @@ function testElementalistVfxPreviewCatalog() {
         options.filter(({ id }) => id.startsWith("composite:")).length,
         10,
         "Preview menu should expose every composite recipe"
+    );
+    assert.equal(options.find(({ id }) => id === "wet")?.damageComparison, null);
+    assert.deepEqual(getElementalistWetDamageComparison(["fire"]), {
+        baseMultiplier: 1.52,
+        wetBonusMultiplier: 0.2,
+        wetTotalMultiplier: 1.72,
+        increasePercent: 13,
+        damageReactionLabels: ["증기 충격"],
+        rootDuration: 0
+    });
+    assert.deepEqual(
+        getElementalistWetDamageComparison(["frost", "earth"], ELEMENTAL_COMPOSITE_RECIPES["earth:frost"]),
+        {
+            baseMultiplier: 2.47,
+            wetBonusMultiplier: 0,
+            wetTotalMultiplier: 2.47,
+            increasePercent: 0,
+            damageReactionLabels: [],
+            rootDuration: 0.45
+        }
+    );
+    assert.equal(
+        options.filter(({ id }) => id !== "wet").every(({ damageComparison }) => damageComparison?.baseMultiplier > 0),
+        true,
+        "Every spell preview should expose its dry and wet damage comparison"
     );
 
     ELEMENTALIST_VFX_PREVIEW_OPTIONS.forEach(({ id }) => {

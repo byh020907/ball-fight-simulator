@@ -1260,6 +1260,12 @@ function testCollectionRebirthAndDeveloperContracts() {
         template.includes("triggerDebugElementalistWetPreview") && template.includes("젖음 발동"),
         "Elementalist wet preview should expose an explicit production-state trigger"
     );
+    assert.ok(
+        template.includes("젖음 피해 비교") &&
+            template.includes("formatElementalistWetDamageComparison") &&
+            template.includes("ch-elementalist-damage-grid"),
+        "Elementalist spell previews should expose a responsive dry-versus-wet damage comparison"
+    );
     assert.ok(template.includes("정예 조합"), "Developer tools should expose the elite combination selector");
     assert.ok(
         template.includes("state.developer.huntingEventType === 'elite_mob'"),

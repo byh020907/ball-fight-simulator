@@ -30,6 +30,14 @@ const SINGLE_SPELLS = Object.freeze({
     earth: { damageMultiplier: 1.48 }
 });
 
+const WET_REACTION_CONFIG = Object.freeze({
+    fire: Object.freeze({ damageMultiplier: 0.2, label: "증기 충격", impulseScale: 0.16 }),
+    electric: Object.freeze({ damageMultiplier: 0.18, label: "과전류" }),
+    frost: Object.freeze({ rootDuration: 0.45, label: "냉기 속박" }),
+    wind: Object.freeze({ damageMultiplier: 0.15, label: "물회오리" }),
+    earth: Object.freeze({ rootDuration: 0.35, label: "대지 속박" })
+});
+
 let nextChannelId = 1;
 const TICK_BOUNDARY_EPSILON = 1e-9;
 
@@ -41,6 +49,23 @@ function exactTickDamage(totalDamage, tickNumber, maximumTicks) {
     const previous = Math.round((totalDamage * (tickNumber - 1)) / maximumTicks);
     const current = Math.round((totalDamage * tickNumber) / maximumTicks);
     return current - previous;
+}
+
+export function getElementalistWetDamageComparison(elements, recipe = null) {
+    const baseMultiplier = recipe?.damageMultiplier ?? SINGLE_SPELLS[elements[0]]?.damageMultiplier ?? 0;
+    const reactions = elements.map((element) => WET_REACTION_CONFIG[element]).filter(Boolean);
+    const wetBonusMultiplier = reactions.reduce((total, reaction) => total + (reaction.damageMultiplier ?? 0), 0);
+    const rootDuration = reactions.reduce((longest, reaction) => Math.max(longest, reaction.rootDuration ?? 0), 0);
+    return {
+        baseMultiplier,
+        wetBonusMultiplier,
+        wetTotalMultiplier: baseMultiplier + wetBonusMultiplier,
+        increasePercent: baseMultiplier > 0 ? Math.round((wetBonusMultiplier / baseMultiplier) * 100) : 0,
+        damageReactionLabels: reactions
+            .filter((reaction) => reaction.damageMultiplier)
+            .map((reaction) => reaction.label),
+        rootDuration
+    };
 }
 
 export class ElementalistAbility extends Ability {
@@ -216,14 +241,17 @@ export class ElementalistAbility extends Ability {
 
     _applyWetReaction(target, elements, wetSnapshot, ratio) {
         if (!wetSnapshot) return;
-        if (elements.includes("fire")) {
-            this._dealDamage(target, 0.2 * ratio, "증기 충격");
-            const away = Vector2.subtract(target.position, this.owner.position).normalize();
-            target.applyImpulse(away.scale(target.stats.baseSpeed * 0.16 * ratio));
+        const reactions = elements.map((element) => WET_REACTION_CONFIG[element]).filter(Boolean);
+        for (const reaction of reactions) {
+            if (reaction.damageMultiplier) {
+                this._dealDamage(target, reaction.damageMultiplier * ratio, reaction.label);
+            }
+            if (reaction.impulseScale) {
+                const away = Vector2.subtract(target.position, this.owner.position).normalize();
+                target.applyImpulse(away.scale(target.stats.baseSpeed * reaction.impulseScale * ratio));
+            }
         }
-        if (elements.includes("electric")) this._dealDamage(target, 0.18 * ratio, "과전류");
-        if (elements.includes("wind")) this._dealDamage(target, 0.15 * ratio, "물회오리");
-        const rootDuration = Math.max(elements.includes("frost") ? 0.45 : 0, elements.includes("earth") ? 0.35 : 0);
+        const rootDuration = reactions.reduce((longest, reaction) => Math.max(longest, reaction.rootDuration ?? 0), 0);
         if (rootDuration > 0) target.applySlow?.(rootDuration * ratio, 0);
     }
 
@@ -451,4 +479,4 @@ export class ElementalistAbility extends Ability {
     }
 }
 
-export { ELEMENTALIST_CONFIG, ELEMENTAL_COMPOSITE_RECIPES, SINGLE_SPELLS };
+export { ELEMENTALIST_CONFIG, ELEMENTAL_COMPOSITE_RECIPES, SINGLE_SPELLS, WET_REACTION_CONFIG };

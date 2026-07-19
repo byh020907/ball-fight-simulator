@@ -1,5 +1,5 @@
 import { Vector2 } from "../core.js";
-import { ELEMENTALIST_CONFIG } from "../abilities/elementalistAbility.js";
+import { ELEMENTALIST_CONFIG, getElementalistWetDamageComparison } from "../abilities/elementalistAbility.js";
 import { ELEMENTAL_COMPOSITE_RECIPES, ELEMENTAL_PALETTE, ELEMENTAL_TYPES } from "../abilities/elementalistRecipes.js";
 import { ElementalChannelEffect, drawElementalOrb } from "../effects/elementalistEffects.js";
 import { applyElementalWet } from "../effects/elementalWetEffect.js";
@@ -255,5 +255,10 @@ export class ElementalistVfxPreviewController {
 }
 
 export function getElementalistVfxPreviewOptions() {
-    return ELEMENTALIST_VFX_PREVIEW_OPTIONS.map(({ id, label, description }) => ({ id, label, description }));
+    return ELEMENTALIST_VFX_PREVIEW_OPTIONS.map(({ id, label, description, elements, recipe }) => ({
+        id,
+        label,
+        description,
+        damageComparison: id === "wet" ? null : getElementalistWetDamageComparison(elements, recipe)
+    }));
 }

@@ -575,6 +575,34 @@
                             class="ch-elementalist-preview-description"
                             x-text="state.developer.elementalistPreviewOptions.find(option => option.id === state.developer.elementalistPreviewId)?.description"
                         ></p>
+                        <template
+                            x-if="state.developer.elementalistPreviewOptions.find(option => option.id === state.developer.elementalistPreviewId)?.damageComparison"
+                        >
+                            <div class="ch-elementalist-damage-comparison">
+                                <div class="ch-elementalist-damage-heading">
+                                    <strong>젖음 피해 비교</strong>
+                                    <span>총공격력 배율 · 방어 적용 전</span>
+                                </div>
+                                <div class="ch-elementalist-damage-grid">
+                                    <div class="ch-elementalist-damage-card">
+                                        <span>마른 대상</span>
+                                        <strong
+                                            x-text="'×' + state.developer.elementalistPreviewOptions.find(option => option.id === state.developer.elementalistPreviewId).damageComparison.baseMultiplier.toFixed(2)"
+                                        ></strong>
+                                    </div>
+                                    <div class="ch-elementalist-damage-card ch-elementalist-damage-card--wet">
+                                        <span>젖은 대상</span>
+                                        <strong
+                                            x-text="'×' + state.developer.elementalistPreviewOptions.find(option => option.id === state.developer.elementalistPreviewId).damageComparison.wetTotalMultiplier.toFixed(2)"
+                                        ></strong>
+                                    </div>
+                                </div>
+                                <p
+                                    class="ch-elementalist-damage-detail"
+                                    x-text="formatElementalistWetDamageComparison()"
+                                ></p>
+                            </div>
+                        </template>
                     </div>
                 </section>
 
@@ -1057,6 +1085,21 @@
             restartElementalistVfxPreview();
         }
 
+        function formatElementalistWetDamageComparison() {
+            const option = state.developer.elementalistPreviewOptions.find(
+                (candidate) => candidate.id === state.developer.elementalistPreviewId
+            );
+            const comparison = option?.damageComparison;
+            if (!comparison) return "";
+            const damageText = comparison.wetBonusMultiplier
+                ? `추가 ×${comparison.wetBonusMultiplier.toFixed(2)} (+${comparison.increasePercent}%) · ${comparison.damageReactionLabels.join(" + ")}`
+                : "추가 피해 없음";
+            const controlText = comparison.rootDuration
+                ? `속박 ${comparison.rootDuration.toFixed(2)}초`
+                : "추가 제어 없음";
+            return `${damageText} · ${controlText}`;
+        }
+
         function observeTabLayout() {
             tabResizeObserver = new ResizeObserver(revealActiveTab);
             tabResizeObserver.observe(dialogElement);
@@ -1134,6 +1177,7 @@
             triggerOrRestartElementalistVfxPreview,
             revealActiveTab,
             startDebugModeHold,
+            formatElementalistWetDamageComparison,
             cancelDebugModeHold,
             get bridge() {
                 return Alpine.store("uiManager").requireGameActionBridge();
@@ -1615,6 +1659,65 @@
         font-size: 0.72rem;
         line-height: 1.35;
         color: #555555;
+    }
+
+    .ch-elementalist-damage-comparison {
+        display: grid;
+        gap: 0.5rem;
+        min-width: 0;
+        padding: 0.625rem;
+        border: 2px solid #202020;
+        border-radius: 0.375rem;
+        background: #ffffff;
+    }
+
+    .ch-elementalist-damage-heading {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 0.25rem 0.75rem;
+        font-size: 0.75rem;
+    }
+
+    .ch-elementalist-damage-heading span,
+    .ch-elementalist-damage-detail {
+        color: #555555;
+        font-size: 0.68rem;
+    }
+
+    .ch-elementalist-damage-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+        gap: 0.5rem;
+    }
+
+    .ch-elementalist-damage-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        min-width: 0;
+        padding: 0.5rem 0.625rem;
+        border: 1px solid #bcbcbc;
+        border-radius: 0.25rem;
+        font-size: 0.72rem;
+    }
+
+    .ch-elementalist-damage-card--wet {
+        border-color: #4f9fbd;
+        background: #effaff;
+    }
+
+    .ch-elementalist-damage-card strong {
+        font-size: 0.9rem;
+        white-space: nowrap;
+    }
+
+    .ch-elementalist-damage-detail {
+        margin: 0;
+        line-height: 1.4;
+        overflow-wrap: anywhere;
     }
 
     .ch-codex-panel {
