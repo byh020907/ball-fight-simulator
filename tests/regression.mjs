@@ -23851,6 +23851,48 @@ function testElementalistFusionChannelsAndCleanup() {
     const { simulation, owner, ability, enemies } = createElementalistSimulation({ tier: 3, enemyCount: 2 });
     const [enemy, secondaryEnemy] = enemies;
     enemy.rollCritical = () => false;
+    const sameElementFirst = new ElementalOrb({
+        owner,
+        element: "frost",
+        position: new Vector2(260, 300),
+        targetMemory: enemy,
+        ability
+    });
+    const sameElementSecond = new ElementalOrb({
+        owner,
+        element: "frost",
+        position: new Vector2(340, 300),
+        targetMemory: enemy,
+        ability
+    });
+    ability.activeOrbs.push(sameElementFirst, sameElementSecond);
+    simulation.entities.push(sameElementFirst, sameElementSecond);
+    ability._processOrbInteractions(1 / 60);
+    assert.equal(sameElementFirst.velocity.length(), 0, "Same-element orbs must not attract each other");
+    assert.equal(sameElementSecond.velocity.length(), 0, "Same-element orbs must stay outside the magnet target set");
+    sameElementFirst.expire();
+    sameElementSecond.expire();
+    const differentElementFirst = new ElementalOrb({
+        owner,
+        element: "frost",
+        position: new Vector2(260, 300),
+        targetMemory: enemy,
+        ability
+    });
+    const differentElementSecond = new ElementalOrb({
+        owner,
+        element: "wind",
+        position: new Vector2(340, 300),
+        targetMemory: enemy,
+        ability
+    });
+    ability.activeOrbs.push(differentElementFirst, differentElementSecond);
+    simulation.entities.push(differentElementFirst, differentElementSecond);
+    ability._processOrbInteractions(1 / 60);
+    assert.ok(differentElementFirst.velocity.length() > 0, "Different-element orbs must keep fusion magnetism");
+    assert.ok(differentElementSecond.velocity.length() > 0, "Fusion partners must keep mutual attraction");
+    differentElementFirst.expire();
+    differentElementSecond.expire();
     const magnetOrb = new ElementalOrb({
         owner,
         element: "earth",
@@ -23942,7 +23984,7 @@ function testElementalistChannelVisualGrammar() {
         frost: (context) =>
             context.calls.some(
                 ([method, property, value]) =>
-                    method === "set" && property === "fillStyle" && value === "rgba(157, 232, 255, 0.76)"
+                    method === "set" && property === "fillStyle" && value === "rgba(132, 176, 255, 0.78)"
             ),
         wind: (context) =>
             context.calls.some(

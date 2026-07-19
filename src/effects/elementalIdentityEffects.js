@@ -29,7 +29,7 @@ export const ELEMENTAL_CHANNEL_VISUAL_CONFIG = Object.freeze({
         baseSpeedBoost: 1.9,
         innerSpeedBoost: 2.8,
         rotationSpeed: 1.4,
-        shadowColor: "#3e9f89"
+        shadowColor: "#257750"
     }),
     earth: Object.freeze({ rockCount: 7, dustCount: 6, outerDistance: 58, innerDistance: 14 })
 });
@@ -203,8 +203,8 @@ function drawFrostIdentity(ctx, channel, progress, intensity, phaseOffset) {
     const convergence = 1 - Math.sin(progress * Math.PI * 0.5) * 0.82;
     const distance = target.radius + config.innerDistance + config.outerDistance * convergence;
     ctx.save();
-    ctx.fillStyle = "rgba(157, 232, 255, 0.76)";
-    ctx.strokeStyle = "#eaffff";
+    ctx.fillStyle = "rgba(132, 176, 255, 0.78)";
+    ctx.strokeStyle = "#edf3ff";
     ctx.lineWidth = getVisibleLineWidth(ctx, "hairline", 1.5);
     ctx.globalAlpha = intensity;
     Array.from({ length: config.shardCount }, (_, index) => index).forEach((index) => {

@@ -4,8 +4,8 @@ export const ELEMENTAL_PALETTE = Object.freeze({
     water: "#77dfff",
     fire: "#ff7043",
     electric: "#ffe066",
-    frost: "#9de8ff",
-    wind: "#c9ffe9",
+    frost: "#6f9fff",
+    wind: "#57d985",
     earth: "#c59b61"
 });
 
