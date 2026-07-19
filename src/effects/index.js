@@ -21,6 +21,7 @@ export { DamageNumber, CriticalNumber, ActionText } from "./floatingText.js";
 export { ActionWindowEffect, ActionSuccessEffect, ActionWhiffEffect } from "./actionEffects.js";
 export { EFFECT_VISIBILITY_TOKENS, getVisibleCombatTextSize, getVisibleLineWidth } from "./effectVisibility.js";
 export { BURNING_EFFECT_CONFIG, BurningEffect, RageFlameRing, applyBurningEffect } from "./rageEffects.js";
+export { drawEnergyShieldField, ENERGY_SHIELD_VISUAL_CONFIG, EnergyShieldHitEffect } from "./energyShieldEffects.js";
 export { HeroShieldBreakEffect } from "./heroEffects.js";
 export { drawProjectileSlashVisual, PROJECTILE_SLASH_VISUAL_DEFAULTS } from "./projectileSlashVisual.js";
 export {

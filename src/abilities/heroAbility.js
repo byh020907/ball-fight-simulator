@@ -3,6 +3,7 @@ import { HeroShieldShard } from "../entities/heroShieldShard.js";
 import { HeroShieldBreakEffect } from "../effects/heroEffects.js";
 import { Ability } from "./ability.js";
 import { HERO_COMBAT_CONFIG } from "./heroCombatConfig.js";
+import { EnergyShieldVisual } from "./mixins/energyShieldVisual.js";
 
 export const HERO_ORB_STAT_CAP = -1;
 export const HERO_ORB_MAX_ACTIVE_PER_OWNER = HERO_COMBAT_CONFIG.core.maximumActivePerOwner;
@@ -20,7 +21,7 @@ export function computeOwnerCombatSpeed(owner) {
     return movementSpeed ?? owner.stats.baseSpeed * modifiers.speed * slowMultiplier * boostMultiplier;
 }
 
-export class HeroAbility extends Ability {
+export class HeroAbility extends EnergyShieldVisual(Ability) {
     constructor(owner, simulation) {
         super(owner, simulation, HERO_COMBAT_CONFIG.growth.stackInterval);
         this.state = {
@@ -233,7 +234,7 @@ export class HeroAbility extends Ability {
         const shieldBefore = this.state.shield;
         const absorbedDamage = Math.min(shieldBefore, damage);
         this.state.shield = Math.max(0, shieldBefore - absorbedDamage);
-        this._showShieldHit(absorbedDamage);
+        this.showEnergyShieldHit(absorbedDamage, source);
 
         const hostileSource = this._isHostileSource(source);
         if (hostileSource && this.getLevelUpgrade().shieldCounter && !options.suppressReactiveEffects) {
@@ -256,17 +257,6 @@ export class HeroAbility extends Ability {
 
     _isHostileSource(source) {
         return Boolean(source && !source.flags?.defeated && this.simulation.isHostile(this.owner, source));
-    }
-
-    _showShieldHit(absorbedDamage) {
-        this.simulation.spawnActionText(this.owner.position.clone(), `방어 ${Math.round(absorbedDamage)}`, "#ffd84d");
-        this.simulation.spawnParticleBurst(this.owner.position.clone(), "#fff4b8", {
-            count: 10,
-            speed: 130,
-            radiusMin: 2,
-            radiusMax: 4
-        });
-        this.simulation.playSound("bounce", 0.78);
     }
 
     _tryLaunchCounter(source) {
@@ -320,6 +310,7 @@ export class HeroAbility extends Ability {
     }
 
     draw(ctx) {
+        this.drawEnergyShield(ctx);
         this._drawStackReleaseFlash(ctx);
         this._drawGrowthStacks(ctx);
     }

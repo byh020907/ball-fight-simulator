@@ -315,6 +315,7 @@ import { ArenaCamera } from "../src/camera.js";
 import { BurningEffect } from "../src/effects/rageEffects.js";
 import {
     DASH_LASER_CASTER_RENDERER,
+    EnergyShieldHitEffect,
     HeroShieldBreakEffect,
     LaserCasterDissipateEffect,
     LaserBeamEffect,
@@ -5908,10 +5909,23 @@ function testAbilityLevelUpgrades(app) {
     );
     const heroDrawWithShield = makeRecordingCanvasContext();
     heroAbility.draw(heroDrawWithShield);
-    assert.deepEqual(
-        heroDrawWithShield.calls,
-        heroDrawWithoutShield.calls,
-        "Active Hero shield should not add persistent world-space decorations"
+    assert.equal(
+        typeof heroAbility.drawEnergyShield,
+        "function",
+        "Hero should compose the reusable energy shield mixin"
+    );
+    assert.ok(
+        heroDrawWithShield.calls.length > heroDrawWithoutShield.calls.length &&
+            heroDrawWithShield.primitives.some(
+                (primitive) => primitive.method === "arc" && primitive.strokeStyle === "#65e7ff"
+            ),
+        "Active Hero shield should draw a subtle cyan world-space energy shell"
+    );
+    assert.ok(
+        heroDrawWithShield.primitives.some(
+            (primitive) => primitive.method === "fill" && primitive.fillStyle === "#2879d8"
+        ),
+        "Active energy shield should include a translucent blue field instead of only a thin ring"
     );
     const maximumShield = heroAbility.getMaximumShield();
     const decayPerTick =
@@ -6970,6 +6984,18 @@ function testFiveBallLevelRewardContracts(app) {
         [0, 20, ownerHpBeforeCounter, 80],
         "Hero armor should absorb post-defense damage before HP"
     );
+    const shieldHit = heroRun.simulation.entities.find((entity) => entity instanceof EnergyShieldHitEffect);
+    assertForegroundEffectRenders(shieldHit, "Hero shield impact", (primitives) => {
+        assert.ok(
+            primitives.filter((primitive) => primitive.method === "arc").length >= 2,
+            "Hero shield impact should draw a full ripple and a bright source-facing arc"
+        );
+        assert.ok(
+            primitives.filter((primitive) => primitive.method === "closePath").length >= 7,
+            "Hero shield impact should draw a readable cluster of hexagonal energy cells"
+        );
+    });
+    assert.ok(shieldHit.direction.x > 0, "Hero shield impact should face the hostile source");
     const counterShards = heroRun.simulation.entities.filter((entity) => entity instanceof HeroShieldShard);
     assert.equal(counterShards.length, 1, "Hero shield damage should launch one counter shard when ready");
     const counterVelocity = counterShards[0].velocity.clone();

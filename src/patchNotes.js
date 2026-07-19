@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.35.4",
+        date: "2026-07-19",
+        title: "v0.35.4 Hero 에너지 보호막",
+        changes: [
+            {
+                type: "ui",
+                text: "Hero Ball의 보호막을 청록 에너지 막으로 표시하고, 피해 흡수 시 공격 방향에 육각 파문이 번지도록 개선했습니다."
+            }
+        ]
+    },
+    {
         version: "0.35.3",
         date: "2026-07-19",
         title: "v0.35.3 Hero 체력 바 표시",

@@ -425,6 +425,9 @@ HeroShieldShard:           피격 순간 공격자 방향으로 발사한 비유
                            재사용 가능한 projectileSlashVisual로 금빛 바람 칼날을 그림
 HeroShieldBreakEffect:     보호막 파괴 순간의 갑옷 파편·이중 충격 고리 시각,
                            피해·적대 필터·넉백 판정은 HeroAbility가 소유
+EnergyShieldVisual:        getShieldState() 계약을 조합해 보호막 필드·피격 피드백을 제공하는 공용 믹스인
+drawEnergyShieldField():   보호막 보유 중 얇은 청록 에너지 막을 그리는 순수 Canvas VFX
+EnergyShieldHitEffect:     실제 피해 흡수 순간 공격 방향에 청백색 호·육각 셀·파문을 표시
 rollHeroOrbStatGain():     성장 코어 amount 2~6 랜덤 roll (rng 제어 가능)
 clampStatGain():           cap clamp — bonus+roll이 cap을 넘지 않도록 실제 amount 조정
 HERO_ORB_EFFECTS:          effect type별 적용 로직 + label(표시명) + apply() 반환값
@@ -459,7 +462,7 @@ BattleBall:                heroOrbBonuses 누적값 보유, 직접적인 Hero Ba
 - 반격 슬래시는 생성 첫 업데이트에 적중하더라도 렌더 전에 만료하지 않는다. `impactVisualDuration` 동안 이동·중복 판정을 멈추고 슬래시와 입자 잔상만 유지한 뒤 만료한다.
 - `drawProjectileSlashVisual()`은 위치·방향·반경과 색상 옵션만 받아 곡선 2겹을 그리는 순수 Canvas VFX다. 다른 직선 투사체가 같은 바람 칼날 표현을 필요로 할 때 엔티티를 복제하지 말고 이 함수를 재사용한다.
 - Lv.9 충격파는 보호막이 양수에서 0으로 깨지는 순간 한 번 실행한다. 보호막 흡수와 HP 초과 피해를 분리해 반환한다.
-- 보호막 잔량은 fighter card의 공통 HP 바 UI만 소유한다. `HeroAbility.draw()`에는 잔량에 비례해 계속 남는 링·구체·갑옷 조각을 추가하지 않는다.
+- 보호막의 정확한 잔량은 fighter card의 공통 HP 바 UI만 소유한다. `EnergyShieldVisual` 믹스인은 `getShieldState()`를 제공하는 Ability에 조합해 보호막 존재 여부와 대략적인 충전 정도만 얇은 청록 에너지 막으로 표현한다. 실제 피해 흡수 때는 `EnergyShieldHitEffect`를 생성해 공격 방향의 표면만 밝게 반응시킨다. Hero는 이 믹스인을 조합하고 자신의 보호막 수치·반격·파괴 규칙만 소유한다.
 - Hero Ball 스탯 UI는 `+10%(+3)`처럼 공백 없이 표시하며, 괄호 안 오브 보너스만 해당 스탯 색상으로 표시합니다.
 
 #### 행동 규칙
