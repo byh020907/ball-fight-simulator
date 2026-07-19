@@ -4,6 +4,7 @@ const MAX_FLAME_COUNT = Math.max(...REWARD_BALANCE.rebirth.visualStages.map((sta
 const FLAME_MOVEMENT_THRESHOLD = 8;
 const MIN_FLAME_PARTICLE_COUNT = 56;
 const MAX_FLAME_PARTICLE_COUNT = 92;
+const MIN_CUSTOM_FLAME_PARTICLE_COUNT = 8;
 const MAX_FLAME_REBIRTH_COUNT = 10;
 const FLAME_PARTICLE_BUOYANCY_INITIAL = 180;
 const FLAME_PARTICLE_BUOYANCY_GROWTH = 1900;
@@ -69,6 +70,9 @@ function getFlameTargetDirection(ball) {
 }
 
 function getFlameParticleCount(visual) {
+    if (Number.isFinite(visual.particleCount)) {
+        return Math.round(clamp(visual.particleCount, MIN_CUSTOM_FLAME_PARTICLE_COUNT, MAX_FLAME_PARTICLE_COUNT));
+    }
     return Math.round(
         MIN_FLAME_PARTICLE_COUNT + (MAX_FLAME_PARTICLE_COUNT - MIN_FLAME_PARTICLE_COUNT) * getFlameGrowth(visual)
     );
@@ -209,12 +213,12 @@ function getFlamePlumeDirection(state, ball, fallbackDirection) {
     return normalizeDirection(flow);
 }
 
-function getRebirthFlamePlume(ball, visual, time) {
+function getRebirthFlamePlume(ball, visual, time, stateOwner = ball) {
     const direction = getFlameTargetDirection(ball);
-    const previousState = flamePlumeStates.get(ball);
+    const previousState = flamePlumeStates.get(stateOwner);
     if (!previousState || time < previousState.time) {
         const state = createFlamePlumeState(ball, visual, time);
-        flamePlumeStates.set(ball, state);
+        flamePlumeStates.set(stateOwner, state);
         return { direction: getFlamePlumeDirection(state, ball, direction), particles: state.particles };
     }
 
@@ -225,7 +229,7 @@ function getRebirthFlamePlume(ball, visual, time) {
     const ballShiftDistance = Math.hypot(ballShift.x, ballShift.y);
     if (ballShiftDistance > Math.max(1, ball.radius * 3)) {
         const resetState = createFlamePlumeState(ball, visual, time);
-        flamePlumeStates.set(ball, resetState);
+        flamePlumeStates.set(stateOwner, resetState);
         return { direction: getFlamePlumeDirection(resetState, ball, direction), particles: resetState.particles };
     }
 
@@ -290,6 +294,12 @@ function drawFlameQuadParticles(ctx, particles, visual) {
     ctx.restore();
 }
 
+export function drawFlameParticlePlume(ctx, ball, visual, time = performance.now() / 1000, { stateOwner = ball } = {}) {
+    if (!visual || visual.rebirthCount <= 0) return;
+    const plume = getRebirthFlamePlume(ball, visual, time, stateOwner);
+    drawFlameQuadParticles(ctx, plume.particles, visual);
+}
+
 export function getRebirthVisualProfile(rebirthCount = 0) {
     const normalizedCount = Math.max(0, Math.floor(Number.isFinite(rebirthCount) ? rebirthCount : 0));
     const stage = [...REWARD_BALANCE.rebirth.visualStages]
@@ -322,7 +332,6 @@ export function drawRebirthVisualUnderlay(ctx, ball, visual, time = performance.
 export function drawRebirthVisualOverlay(ctx, ball, visual, time = performance.now() / 1000) {
     if (!visual || visual.rebirthCount <= 0) return;
     const { x, y } = ball.position;
-    const plume = getRebirthFlamePlume(ball, visual, time);
     ctx.save();
     ctx.strokeStyle = visual.color;
     ctx.lineWidth = 1.5 + visual.outlineWidth;
@@ -332,7 +341,7 @@ export function drawRebirthVisualOverlay(ctx, ball, visual, time = performance.n
     ctx.stroke();
 
     ctx.globalCompositeOperation = "source-over";
-    drawFlameQuadParticles(ctx, plume.particles, visual);
+    drawFlameParticlePlume(ctx, ball, visual, time);
 
     ctx.globalAlpha = 0.94;
     ctx.fillStyle = visual.color;

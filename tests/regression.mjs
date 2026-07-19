@@ -72,7 +72,9 @@ import {
     BloodBiteEffect,
     BloodMarkEffect,
     BloodRuptureEffect,
-    BloodTetherEffect
+    BloodTetherEffect,
+    ELEMENTAL_CHANNEL_VISUAL_CONFIG,
+    ElementalChannelEffect
 } from "../src/effects/index.js";
 import { shuffled } from "../src/random.js";
 import { BattleSimulation } from "../src/simulation/battleSimulation.js";
@@ -422,6 +424,7 @@ function makeRecordingCanvasContext() {
         "fillRect",
         "strokeRect",
         "roundRect",
+        "rect",
         "moveTo",
         "lineTo",
         "quadraticCurveTo",
@@ -23891,5 +23894,74 @@ function testElementalistFusionChannelsAndCleanup() {
 }
 
 testElementalistFusionChannelsAndCleanup();
+
+function testElementalistChannelVisualGrammar() {
+    const source = { position: new Vector2(120, 180), radius: 24, flags: { defeated: false } };
+    const target = { position: new Vector2(280, 180), radius: 30, flags: { defeated: false } };
+    const renderSignatures = {
+        fire: (context) =>
+            context.calls.filter(([method]) => method === "fillRect").length >=
+            ELEMENTAL_CHANNEL_VISUAL_CONFIG.fire.compositeParticleCount,
+        electric: (context) =>
+            context.calls.some(
+                ([method, property, value]) =>
+                    method === "set" && property === "globalCompositeOperation" && value === "lighter"
+            ),
+        frost: (context) =>
+            context.calls.some(
+                ([method, property, value]) =>
+                    method === "set" && property === "fillStyle" && value === "rgba(157, 232, 255, 0.76)"
+            ),
+        wind: (context) =>
+            context.calls.some(
+                ([method, property, value]) =>
+                    method === "set" &&
+                    property === "strokeStyle" &&
+                    value === ELEMENTAL_CHANNEL_VISUAL_CONFIG.wind.shadowColor
+            ),
+        earth: (context) =>
+            context.calls.some(
+                ([method, property, value]) => method === "set" && property === "fillStyle" && value === "#9b7044"
+            )
+    };
+
+    Object.entries(renderSignatures).forEach(([element, hasSignature]) => {
+        const effect = new ElementalChannelEffect({
+            channel: { cancelled: false, finished: false },
+            source,
+            target,
+            elements: [element],
+            duration: 1
+        });
+        Array.from({ length: 24 }).forEach(() => effect.update(1 / 60));
+        const recording = makeRecordingCanvasContext();
+        assert.doesNotThrow(() => effect.draw(recording), `${element} channel VFX must render safely`);
+        assert.equal(hasSignature(recording), true, `${element} channel VFX must keep its elemental render grammar`);
+    });
+
+    Object.values(ELEMENTAL_COMPOSITE_RECIPES).forEach((recipe) => {
+        const effect = new ElementalChannelEffect({
+            channel: { cancelled: false, finished: false },
+            source,
+            target,
+            elements: recipe.elements,
+            recipe,
+            duration: 1
+        });
+        Array.from({ length: 24 }).forEach(() => effect.update(1 / 60));
+        const recording = makeRecordingCanvasContext();
+        effect.draw(recording);
+        recipe.elements.forEach((element) => {
+            assert.equal(
+                renderSignatures[element](recording),
+                true,
+                `${recipe.name} must preserve its ${element} render grammar`
+            );
+        });
+    });
+    console.log("[elementalist-channel-visual-grammar] ok");
+}
+
+testElementalistChannelVisualGrammar();
 
 console.log("regression tests ok");

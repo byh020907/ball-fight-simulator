@@ -1,0 +1,277 @@
+import { Vector2 } from "../core.js";
+import { ELEMENTAL_PALETTE } from "../abilities/elementalistRecipes.js";
+import { drawFlameParticlePlume, getRebirthVisualProfile } from "../rebirth/rebirthVisuals.js";
+import { drawElectricArc } from "./electricArc.js";
+import { getVisibleLineWidth } from "./effectVisibility.js";
+import { createFlowFieldVisual, drawFlowFieldVisual, updateFlowFieldVisual } from "./flowFieldVisual.js";
+
+export const ELEMENTAL_CHANNEL_VISUAL_CONFIG = Object.freeze({
+    fire: Object.freeze({ singleParticleCount: 22, compositeParticleCount: 14 }),
+    electric: Object.freeze({ branchCount: 3, branchRadius: 42 }),
+    frost: Object.freeze({ shardCount: 7, outerDistance: 64, innerDistance: 12 }),
+    wind: Object.freeze({
+        singleStreamCount: 16,
+        compositeStreamCount: 11,
+        radiusPadding: 58,
+        pointLimit: 9,
+        innerRadiusRatio: 0.72,
+        tangentWeight: 3,
+        inwardWeight: 1,
+        maximumAcceleration: 560,
+        baseSpeedBoost: 1.9,
+        innerSpeedBoost: 2.8,
+        rotationSpeed: 1.4,
+        shadowColor: "#3e9f89"
+    }),
+    earth: Object.freeze({ rockCount: 7, dustCount: 6, outerDistance: 58, innerDistance: 14 })
+});
+
+function clamp01(value) {
+    return Math.max(0, Math.min(1, value));
+}
+
+function getElementIntensity(elementCount, index) {
+    if (elementCount === 1) return 1;
+    return index === 0 ? 0.86 : 0.72;
+}
+
+function createFireState(isComposite) {
+    return {
+        stateOwner: {},
+        visual: Object.freeze({
+            ...getRebirthVisualProfile(1),
+            particleCount: isComposite
+                ? ELEMENTAL_CHANNEL_VISUAL_CONFIG.fire.compositeParticleCount
+                : ELEMENTAL_CHANNEL_VISUAL_CONFIG.fire.singleParticleCount
+        })
+    };
+}
+
+function createWindState(target, isComposite) {
+    const radius = target.radius + ELEMENTAL_CHANNEL_VISUAL_CONFIG.wind.radiusPadding;
+    const streamCount = isComposite
+        ? ELEMENTAL_CHANNEL_VISUAL_CONFIG.wind.compositeStreamCount
+        : ELEMENTAL_CHANNEL_VISUAL_CONFIG.wind.singleStreamCount;
+    return {
+        elapsed: 0,
+        flowField: createFlowFieldVisual(target.position, {
+            radius,
+            streamCount,
+            pointLimit: ELEMENTAL_CHANNEL_VISUAL_CONFIG.wind.pointLimit
+        })
+    };
+}
+
+export function createElementalChannelVisualState(target, elements) {
+    const isComposite = elements.length > 1;
+    return {
+        elapsed: 0,
+        fire: elements.includes("fire") ? createFireState(isComposite) : null,
+        wind: elements.includes("wind") ? createWindState(target, isComposite) : null
+    };
+}
+
+function getWindAccelerationAt(center, position, radius) {
+    const config = ELEMENTAL_CHANNEL_VISUAL_CONFIG.wind;
+    const inward = Vector2.subtract(center, position);
+    const distance = inward.length();
+    if (distance > radius) return new Vector2();
+    if (distance <= 1e-9) inward.add(new Vector2(1, 0));
+    inward.normalize();
+    const tangent = new Vector2(-inward.y, inward.x);
+    const direction = tangent.scale(config.tangentWeight).add(inward.scale(config.inwardWeight)).normalize();
+    const ratio = clamp01(1 - distance / radius);
+    return direction.scale(config.maximumAcceleration * ratio * ratio);
+}
+
+export function updateElementalChannelVisualState(state, target, delta) {
+    state.elapsed += delta;
+    if (!state.wind) return;
+    const field = state.wind.flowField;
+    const config = ELEMENTAL_CHANNEL_VISUAL_CONFIG.wind;
+    updateFlowFieldVisual(field, {
+        center: target.position,
+        delta,
+        innerRadius: target.radius * config.innerRadiusRatio,
+        rotation: state.elapsed * config.rotationSpeed,
+        outerPadding: target.radius,
+        getAccelerationAt: (position) => getWindAccelerationAt(target.position, position, field.radius),
+        getSpeedBoost: (distance) =>
+            config.baseSpeedBoost + clamp01(1 - distance / field.radius) * config.innerSpeedBoost
+    });
+}
+
+function drawElectricIdentity(ctx, channel, progress, intensity) {
+    const target = channel.target;
+    const origin = channel.source?.position ?? target.position;
+    ctx.save();
+    ctx.globalAlpha = intensity;
+    drawElectricArc(ctx, origin, target.position, {
+        time: progress * 2.8,
+        color: ELEMENTAL_PALETTE.electric
+    });
+    const config = ELEMENTAL_CHANNEL_VISUAL_CONFIG.electric;
+    Array.from({ length: config.branchCount }, (_, index) => index).forEach((index) => {
+        const angle = progress * Math.PI * 3 + (Math.PI * 2 * index) / config.branchCount;
+        const inner = Vector2.add(target.position, Vector2.fromAngle(angle, target.radius * 0.62));
+        const outer = Vector2.add(target.position, Vector2.fromAngle(angle + 0.38, config.branchRadius));
+        drawElectricArc(ctx, inner, outer, {
+            time: progress * 3.4 + index,
+            color: ELEMENTAL_PALETTE.electric
+        });
+    });
+    ctx.restore();
+}
+
+function drawFrostShard(ctx, size) {
+    ctx.beginPath();
+    ctx.moveTo(0, -size * 1.45);
+    ctx.lineTo(size * 0.72, 0);
+    ctx.lineTo(0, size * 1.45);
+    ctx.lineTo(-size * 0.72, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, -size);
+    ctx.lineTo(0, size);
+    ctx.moveTo(0, 0);
+    ctx.lineTo(size * 0.48, -size * 0.3);
+    ctx.stroke();
+}
+
+function drawFrostIdentity(ctx, channel, progress, intensity, phaseOffset) {
+    const target = channel.target;
+    const config = ELEMENTAL_CHANNEL_VISUAL_CONFIG.frost;
+    const convergence = 1 - Math.sin(progress * Math.PI * 0.5) * 0.82;
+    const distance = target.radius + config.innerDistance + config.outerDistance * convergence;
+    ctx.save();
+    ctx.fillStyle = "rgba(157, 232, 255, 0.76)";
+    ctx.strokeStyle = "#eaffff";
+    ctx.lineWidth = getVisibleLineWidth(ctx, "hairline", 1.5);
+    ctx.globalAlpha = intensity;
+    Array.from({ length: config.shardCount }, (_, index) => index).forEach((index) => {
+        const angle = (Math.PI * 2 * index) / config.shardCount - progress * Math.PI * 0.62 + phaseOffset * 0.35;
+        const stagger = 1 + ((index % 3) - 1) * 0.08;
+        ctx.save();
+        ctx.translate(
+            target.position.x + Math.cos(angle) * distance * stagger,
+            target.position.y + Math.sin(angle) * distance * stagger
+        );
+        ctx.rotate(angle + Math.PI / 2);
+        drawFrostShard(ctx, 6 + (index % 2) * 2);
+        ctx.restore();
+    });
+    ctx.strokeStyle = ELEMENTAL_PALETTE.frost;
+    ctx.lineWidth = getVisibleLineWidth(ctx, "standard", 3);
+    ctx.beginPath();
+    Array.from({ length: config.shardCount }, (_, index) => index).forEach((index) => {
+        const angle = (Math.PI * 2 * index) / config.shardCount - Math.PI / 2;
+        const radius = target.radius + 7 + (index % 2) * 4;
+        const x = target.position.x + Math.cos(angle) * radius;
+        const y = target.position.y + Math.sin(angle) * radius;
+        if (index === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    });
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+}
+
+function drawRock(ctx, size, seed) {
+    ctx.beginPath();
+    Array.from({ length: 6 }, (_, index) => index).forEach((index) => {
+        const angle = (Math.PI * 2 * index) / 6;
+        const radius = size * (0.74 + ((seed + index * 3) % 5) * 0.08);
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
+        if (index === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    });
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+}
+
+function drawEarthIdentity(ctx, channel, progress, intensity, phaseOffset) {
+    const target = channel.target;
+    const config = ELEMENTAL_CHANNEL_VISUAL_CONFIG.earth;
+    const impact = Math.sin(progress * Math.PI * 0.5);
+    const distance = target.radius + config.innerDistance + config.outerDistance * (1 - impact);
+    ctx.save();
+    ctx.globalAlpha = intensity;
+    ctx.fillStyle = "#9b7044";
+    ctx.strokeStyle = "#4c3525";
+    ctx.lineWidth = getVisibleLineWidth(ctx, "hairline", 1.7);
+    Array.from({ length: config.rockCount }, (_, index) => index).forEach((index) => {
+        const angle = (Math.PI * 2 * index) / config.rockCount + progress * 0.42 + phaseOffset * 0.28;
+        const lift = Math.sin(progress * Math.PI + index * 1.7) * 8;
+        ctx.save();
+        ctx.translate(
+            target.position.x + Math.cos(angle) * distance,
+            target.position.y + Math.sin(angle) * distance - lift
+        );
+        ctx.rotate(angle + progress * 1.3);
+        drawRock(ctx, 7 + (index % 3) * 1.5, index);
+        ctx.restore();
+    });
+    ctx.fillStyle = "rgba(197, 155, 97, 0.42)";
+    Array.from({ length: config.dustCount }, (_, index) => index).forEach((index) => {
+        const angle = (Math.PI * 2 * index) / config.dustCount - progress * 0.9;
+        const dustDistance = target.radius + 12 + impact * (18 + (index % 2) * 7);
+        ctx.beginPath();
+        ctx.arc(
+            target.position.x + Math.cos(angle) * dustDistance,
+            target.position.y + Math.sin(angle) * dustDistance,
+            3 + (index % 3),
+            0,
+            Math.PI * 2
+        );
+        ctx.fill();
+    });
+    ctx.strokeStyle = ELEMENTAL_PALETTE.earth;
+    ctx.lineWidth = getVisibleLineWidth(ctx, "emphasis", 4);
+    ctx.beginPath();
+    ctx.arc(target.position.x, target.position.y, target.radius + 10, Math.PI * 0.05, Math.PI * 0.95);
+    ctx.stroke();
+    ctx.restore();
+}
+
+function drawWindIdentity(ctx, channel, state, intensity) {
+    const config = ELEMENTAL_CHANNEL_VISUAL_CONFIG.wind;
+    ctx.save();
+    drawFlowFieldVisual(ctx, state.wind.flowField, {
+        center: channel.target.position,
+        color: config.shadowColor,
+        lineWidth: 4.8,
+        baseAlpha: 0.38 * intensity,
+        innerAlpha: 0.34 * intensity
+    });
+    drawFlowFieldVisual(ctx, state.wind.flowField, {
+        center: channel.target.position,
+        color: ELEMENTAL_PALETTE.wind,
+        lineWidth: 2,
+        baseAlpha: 0.74 * intensity,
+        innerAlpha: 0.24 * intensity
+    });
+    ctx.restore();
+}
+
+export function drawElementalChannelIdentity(ctx, channel, progress, state) {
+    channel.elements.forEach((element, index) => {
+        const intensity = getElementIntensity(channel.elements.length, index);
+        if (element === "fire") {
+            drawFlameParticlePlume(ctx, channel.target, state.fire.visual, state.elapsed, {
+                stateOwner: state.fire.stateOwner
+            });
+        } else if (element === "electric") {
+            drawElectricIdentity(ctx, channel, progress, intensity);
+        } else if (element === "frost") {
+            drawFrostIdentity(ctx, channel, progress, intensity, index);
+        } else if (element === "wind") {
+            drawWindIdentity(ctx, channel, state, intensity);
+        } else if (element === "earth") {
+            drawEarthIdentity(ctx, channel, progress, intensity, index);
+        }
+    });
+}

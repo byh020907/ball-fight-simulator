@@ -1,6 +1,7 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
 import { getVisibleLineWidth } from "./effectVisibility.js";
 import { SPIN_VORTEX_CONFIG } from "../abilities/spinConfig.js";
+import { createFlowFieldVisual, drawFlowFieldVisual, updateFlowFieldVisual } from "./flowFieldVisual.js";
 
 const CUT_DURATION = 0.6;
 
@@ -80,17 +81,8 @@ export class SpinVortexEffect extends CombatEntity {
     constructor(ability) {
         super(ability.owner.position.clone(), new Vector2(), 0);
         this.ability = ability;
-        this.streams = Array.from({ length: 26 }, (_, index) => this._createStream(index));
-    }
-
-    _createStream(index) {
-        const angle = (Math.PI * 2 * index) / 26;
-        const radialRatio = 0.18 + ((index * 11) % 23) / 27;
-        const position = Vector2.add(
-            this.ability.owner.position,
-            Vector2.fromAngle(angle, SPIN_VORTEX_CONFIG.radius * radialRatio)
-        );
-        return { position, points: [position.clone()], seed: index };
+        this.flowField = createFlowFieldVisual(this.position, { radius: SPIN_VORTEX_CONFIG.radius });
+        this.streams = this.flowField.streams;
     }
 
     update(delta) {
@@ -100,46 +92,21 @@ export class SpinVortexEffect extends CombatEntity {
             return;
         }
 
-        for (const stream of this.streams) {
-            const acceleration = this.ability.getVortexAccelerationAt(stream.position);
-            const distance = Vector2.subtract(stream.position, this.position).length();
-            const speedBoost = 1.25 + Math.max(0, 1 - distance / SPIN_VORTEX_CONFIG.radius) * 2.2;
-            stream.position.add(acceleration.scale(delta * speedBoost));
-            stream.points.push(stream.position.clone());
-            if (stream.points.length > 7) stream.points.shift();
-            if (distance < this.ability.owner.radius * 0.8 || distance > SPIN_VORTEX_CONFIG.radius + 20) {
-                const angle = (stream.seed * 2.399 + this.ability.owner.angle) % (Math.PI * 2);
-                stream.position = Vector2.add(
-                    this.position,
-                    Vector2.fromAngle(angle, SPIN_VORTEX_CONFIG.radius * 0.94)
-                );
-                stream.points = [stream.position.clone()];
-            }
-        }
+        updateFlowFieldVisual(this.flowField, {
+            center: this.position,
+            delta,
+            innerRadius: this.ability.owner.radius * 0.8,
+            rotation: this.ability.owner.angle,
+            getAccelerationAt: (position) => this.ability.getVortexAccelerationAt(position),
+            getSpeedBoost: (distance) => 1.25 + Math.max(0, 1 - distance / SPIN_VORTEX_CONFIG.radius) * 2.2
+        });
     }
 
     draw(ctx) {
-        ctx.save();
-        ctx.lineCap = "round";
-        ctx.strokeStyle = "#ffe36d";
-        ctx.lineWidth = getVisibleLineWidth(ctx, "standard", 2);
-        for (const stream of this.streams) {
-            if (stream.points.length < 2) continue;
-            const distance = Vector2.subtract(stream.position, this.position).length();
-            ctx.globalAlpha = 0.35 + Math.max(0, 1 - distance / SPIN_VORTEX_CONFIG.radius) * 0.6;
-            ctx.beginPath();
-            stream.points.forEach((point, index) => {
-                if (index === 0) ctx.moveTo(point.x, point.y);
-                else ctx.lineTo(point.x, point.y);
-            });
-            ctx.stroke();
-        }
-        ctx.globalAlpha = 0.72;
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = getVisibleLineWidth(ctx, "hairline", 1.5);
-        ctx.beginPath();
-        ctx.arc(this.position.x, this.position.y, SPIN_VORTEX_CONFIG.radius, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
+        drawFlowFieldVisual(ctx, this.flowField, {
+            center: this.position,
+            color: "#ffe36d",
+            boundaryColor: "#ffffff"
+        });
     }
 }

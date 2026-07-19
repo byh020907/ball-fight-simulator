@@ -10,6 +10,7 @@ export { DeathBurstEffect } from "./deathBurstEffect.js";
 export { GravityParticle } from "./gravityParticle.js";
 export { SlashTrail } from "./slashTrail.js";
 export { createElectricArcPath, drawElectricArc } from "./electricArc.js";
+export { createFlowFieldVisual, drawFlowFieldVisual, updateFlowFieldVisual } from "./flowFieldVisual.js";
 export { DamageNumber, CriticalNumber, ActionText } from "./floatingText.js";
 export { ActionWindowEffect, ActionSuccessEffect, ActionWhiffEffect } from "./actionEffects.js";
 export { EFFECT_VISIBILITY_TOKENS, getVisibleCombatTextSize, getVisibleLineWidth } from "./effectVisibility.js";
@@ -48,6 +49,12 @@ export {
     drawPathFlow,
     drawTargetChannelTimeline
 } from "./elementalistEffects.js";
+export {
+    ELEMENTAL_CHANNEL_VISUAL_CONFIG,
+    createElementalChannelVisualState,
+    drawElementalChannelIdentity,
+    updateElementalChannelVisualState
+} from "./elementalIdentityEffects.js";
 export {
     SeedActivationEffect,
     TricksterSeedBurstEffect,

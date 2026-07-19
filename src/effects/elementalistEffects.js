@@ -1,8 +1,12 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
 import { createWaveringPath } from "./waveringPath.js";
-import { drawElectricArc } from "./electricArc.js";
 import { getVisibleLineWidth } from "./effectVisibility.js";
 import { ELEMENTAL_PALETTE } from "../abilities/elementalistRecipes.js";
+import {
+    createElementalChannelVisualState,
+    drawElementalChannelIdentity,
+    updateElementalChannelVisualState
+} from "./elementalIdentityEffects.js";
 
 const SHAPE_COUNT = 8;
 
@@ -212,9 +216,6 @@ export function drawPathFlow(ctx, channel, progress) {
         points.forEach((point, index) => (index === 0 ? ctx.moveTo(point.x, point.y) : ctx.lineTo(point.x, point.y)));
     }
     ctx.stroke();
-    if (channel.elements.includes("electric")) {
-        drawElectricArc(ctx, origin, target.position, { time: progress * 2, color: ELEMENTAL_PALETTE.electric });
-    }
     ctx.restore();
 }
 
@@ -308,6 +309,7 @@ export class ElementalChannelEffect extends CombatEntity {
         this.duration = duration;
         this.life = duration;
         this.maxLife = duration;
+        this.visualState = createElementalChannelVisualState(target, elements);
     }
 
     update(delta) {
@@ -316,6 +318,7 @@ export class ElementalChannelEffect extends CombatEntity {
             return;
         }
         this.pos = this.target.position.clone();
+        updateElementalChannelVisualState(this.visualState, this.target, delta);
         this.tickLife(delta);
     }
 
@@ -331,6 +334,7 @@ export class ElementalChannelEffect extends CombatEntity {
         };
         drawTargetChannelTimeline(ctx, view, progress);
         drawPathFlow(ctx, view, progress);
+        drawElementalChannelIdentity(ctx, view, progress, this.visualState);
         drawMultiShapeMotion(ctx, view, progress);
         drawAttachedMarker(ctx, view, progress);
         drawFinishImpact(ctx, view, progress);
