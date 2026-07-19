@@ -2,6 +2,7 @@ import { Vector2 } from "../core.js";
 import { ArrowProjectile, Grenade, HeroOrb, OrbitProjectile, SeedOrb } from "../entities/index.js";
 import {
     DeathBurstEffect,
+    RevivalEffect,
     GravityParticle,
     OrbitHitEffect,
     SlashTrail,
@@ -262,6 +263,22 @@ export class Simulation {
     spawnPulse(position, color) {
         this.entities.push(new VisualBurst(position, color, 180, 0.34));
         this.spawnParticleBurst(position, color, { count: 16, speed: 200, radiusMin: 2, radiusMax: 4 });
+    }
+
+    spawnRevival(position, color, radius) {
+        this.entities.push(new RevivalEffect(position.clone(), color, radius));
+        this.entities.push(new VisualBurst(position.clone(), "#ffffff", radius * 5.4, 0.38));
+        this.spawnParticleBurst(position, color, {
+            count: 28,
+            speed: radius * 6.2,
+            radiusMin: 2,
+            radiusMax: 5,
+            gravity: 260,
+            life: 0.82,
+            bounce: 0,
+            settleDelay: 0.82,
+            upBias: radius * 1.8
+        });
     }
 
     spawnLootCollection(position, color, label) {

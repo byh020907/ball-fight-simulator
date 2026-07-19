@@ -78,6 +78,8 @@ import {
     ElementalChannelEffect,
     ElementalWetReactionEffect,
     ElementalWetEffect,
+    REVIVAL_EFFECT_CONFIG,
+    RevivalEffect,
     drawElementalOrb
 } from "../src/effects/index.js";
 import { shuffled } from "../src/random.js";
@@ -25030,11 +25032,21 @@ function testDeepCoreFinalBossContracts() {
     assert.equal(player.hp, player.maxHp);
     assert.equal(simulation.finished, false);
     assert.equal(boss.hp, bossHp, "Player revival must not reset or mutate boss health");
-    simulation.update(0.55, 0.55);
+    const revivalEffect = simulation.entities.find((entity) => entity instanceof RevivalEffect);
+    const pausedBurst = simulation.entities.find(
+        (entity) => entity !== revivalEffect && Number.isFinite(entity.life) && entity.life > 0
+    );
+    assert.ok(revivalEffect, "Revival must create the reusable staged visual effect");
+    const revivalLife = revivalEffect.life;
+    const pausedBurstLife = pausedBurst.life;
+    simulation.update(0.2, 0.2);
+    assert.ok(revivalEffect.life < revivalLife, "Revival visual must advance while combat is paused");
+    assert.equal(pausedBurst.life, pausedBurstLife, "Unrelated effects must remain paused during revival");
+    simulation.update(REVIVAL_EFFECT_CONFIG.pauseDuration, REVIVAL_EFFECT_CONFIG.pauseDuration);
     simulation.update(0.81, 0.81);
     player.takeDamage(player.maxHp * 2, boss, "Life Probe", { ignoreDefense: true, suppressDamageNumber: true });
     assert.deepEqual(revivals, [2, 1]);
-    simulation.update(0.55, 0.55);
+    simulation.update(REVIVAL_EFFECT_CONFIG.pauseDuration, REVIVAL_EFFECT_CONFIG.pauseDuration);
     simulation.update(0.81, 0.81);
     player.takeDamage(player.maxHp * 2, boss, "Life Probe", { ignoreDefense: true, suppressDamageNumber: true });
     simulation.checkResult();

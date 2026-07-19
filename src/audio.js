@@ -74,6 +74,10 @@ export class AudioEngine {
             },
             start: () => this.playSweep(260, 760, 0.22, 0.045),
             overtime: () => this.playSweep(620, 180, 0.28, 0.055),
+            revive: () => {
+                this.playSweep(180, 920, 0.42, 0.065 * safeIntensity);
+                this.playZap(1080, 0.18, 0.042 * safeIntensity);
+            },
             arrow: () => this.playZap(640, 0.08, 0.05 * safeIntensity),
             counter: () => this.playZap(880, 0.1, 0.07 * safeIntensity),
             projectile_guard: () => this.playZap(1100, 0.12, 0.06 * safeIntensity),

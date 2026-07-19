@@ -7,6 +7,7 @@ export { OrbitCatchEffect, OrbitHitEffect } from "./orbitHitEffect.js";
 export { SpinCutEffect, SpinVortexEffect } from "./spinEffects.js";
 export { ArcherPredictionEffect } from "./archerPredictionEffect.js";
 export { DeathBurstEffect } from "./deathBurstEffect.js";
+export { REVIVAL_EFFECT_CONFIG, RevivalEffect } from "./revivalEffect.js";
 export { GravityParticle } from "./gravityParticle.js";
 export { SlashTrail } from "./slashTrail.js";
 export { createElectricArcPath, drawElectricArc } from "./electricArc.js";

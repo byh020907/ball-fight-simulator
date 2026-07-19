@@ -13,6 +13,7 @@ import { GravityParticle } from "../effects/index.js";
 import { FighterPhysicsSimulation } from "./fighterPhysicsSimulation.js";
 import { AIActionController } from "./aiActionController.js";
 import { CombatLifePool } from "./combatLifePool.js";
+import { REVIVAL_EFFECT_CONFIG } from "../effects/index.js";
 import {
     createTournamentAngledBounceRampPolicy,
     TournamentAngledBounceRampSystem
@@ -299,6 +300,10 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         }
         if (this.revivePauseRemaining > 0) {
             this.revivePauseRemaining = Math.max(0, this.revivePauseRemaining - realDelta);
+            for (const entity of this.entities.filter((candidate) => candidate.updatesDuringRevivePause)) {
+                entity.update(realDelta, this);
+            }
+            this.entities = this.entities.filter((entity) => !entity.isExpired);
             return;
         }
 
@@ -754,8 +759,9 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         fighter.freezeForResult();
         fighter.position = this.createSpawnPoints(2)[0];
         fighter.state.damageImmunityUntil = this.elapsed + 0.8;
-        this.revivePauseRemaining = 0.55;
-        this.spawnPulse(fighter.position.clone(), fighter.color);
+        this.revivePauseRemaining = REVIVAL_EFFECT_CONFIG.pauseDuration;
+        this.spawnRevival(fighter.position, fighter.color, fighter.radius);
+        this.playSound("revive", 1.15);
         this.hooks.onHpChanged?.(fighter.id, fighter.hp, fighter.maxHp);
         this.hooks.onPlayerRevived?.(fighter, { ...lifeState, simulation: this });
         return true;
