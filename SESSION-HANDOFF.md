@@ -3675,3 +3675,8 @@
 - 맥락: 단일 기본 쿨타임은 `Cooldown` 믹스인으로 정합했지만, Bat reset·Elementalist 도약·장비 효과·사냥터 몬스터 내부 쿨타임은 서로 다른 필드와 상태 객체에서 수동 감소하고 있었다.
 - 결정: 고정된 이름을 가진 복수 쿨타임은 공용 `CooldownBank` 조합 객체가 소유한다. 대상별로 동적으로 생기는 쿨타임은 기존 `tickTimedMap()` 계약을 유지하고 두 개념을 섞지 않는다.
 - 영향: physics 공용 쿨타임 계약, BatBall·Elementalist·BattleBall 장비 효과·HuntingMobAbility와 관련 회귀 테스트·개발 문서.
+
+## [L2] 2026-07-19 — 대상별 동적 제한 시간도 조합 클래스로 제공한다
+- 배경: `tickTimedMap()` 순수 함수는 용도상 맞지만 호출자가 원시 `Map`과 감소 함수를 직접 조립해야 해, 다음 개발자가 공용 계약을 발견하거나 일관되게 사용하기 어렵다.
+- 결정: 대상별로 동적으로 생성·만료되는 제한 시간은 `TimedKeyMap` 조합 클래스가 소유하고, 시작·조회·감소·무효 대상 제거를 하나의 API로 제공한다. 기존 함수 호환층은 남기지 않는다.
+- 영향: physics 동적 시간 컬렉션 계약, Vampire·GunnerTurret·TournamentAngledBounceRampSystem, 회귀 테스트와 개발 문서.

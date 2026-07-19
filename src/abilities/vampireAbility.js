@@ -2,7 +2,7 @@ import { Vector2 } from "../core.js";
 import { BatProjectile } from "../entities/index.js";
 import { BloodMarkEffect, BloodRuptureEffect, BloodTetherEffect } from "../effects/index.js";
 import { applyRotationalContactDamage } from "../physics/contactDamage.js";
-import { tickTimedMap } from "../physics/index.js";
+import { TimedKeyMap } from "../physics/index.js";
 import { Ability } from "./ability.js";
 
 const LIFESTEAL_RATE_NORMAL = 0.35;
@@ -23,7 +23,7 @@ const BLOOD_RUPTURE_DAMAGE_MULTIPLIER = 0.15;
 export class VampireAbility extends Ability {
     constructor(owner, simulation) {
         super(owner, simulation, BAT_COOLDOWN);
-        this._bloodPullCooldowns = new Map();
+        this._bloodPullCooldowns = new TimedKeyMap({ isInvalid: (target) => target.flags.defeated });
         this._bloodMarks = new Map();
     }
 
@@ -37,7 +37,7 @@ export class VampireAbility extends Ability {
     }
 
     _tickRewardState(delta) {
-        tickTimedMap(this._bloodPullCooldowns, delta, { isInvalid: (target) => target.flags.defeated });
+        this._bloodPullCooldowns.tick(delta);
         for (const [target, mark] of this._bloodMarks) {
             mark.remaining -= delta;
             if (mark.remaining <= 0 || target.flags.defeated) {
@@ -107,13 +107,13 @@ export class VampireAbility extends Ability {
 
     onBatBite(target, contactPoint) {
         if (!this.getLevelUpgrade().bloodPull || target.flags.defeated) return false;
-        if ((this._bloodPullCooldowns.get(target) ?? 0) > 0) return false;
+        if (this._bloodPullCooldowns.has(target)) return false;
 
         const pullDirection = Vector2.subtract(this.owner.position, target.position);
         if (pullDirection.length() > 0) {
             target.applyImpulse(pullDirection.normalize().scale(BLOOD_PULL_SPEED));
         }
-        this._bloodPullCooldowns.set(target, BLOOD_PULL_COOLDOWN);
+        this._bloodPullCooldowns.start(target, BLOOD_PULL_COOLDOWN);
         this._setBloodMark(target);
         this.simulation.entities.push(new BloodTetherEffect(contactPoint, this.owner));
         return true;

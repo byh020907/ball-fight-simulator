@@ -1,6 +1,6 @@
 import { Vector2 } from "../core.js";
 import { polygonBoundingRadius } from "../physics/CollisionShape.js";
-import { tickTimedMap } from "../physics/index.js";
+import { TimedKeyMap } from "../physics/index.js";
 import { TERRAIN_SHAPES, TERRAIN_TYPES } from "../terrain/terrainConfig.js";
 
 const EPSILON = 0.0001;
@@ -228,7 +228,7 @@ export class TournamentAngledBounceRampSystem {
         this.activeRamp = null;
         this.events = [];
         this._serial = 0;
-        this._cooldownByFighterId = new Map();
+        this._cooldownByFighterId = new TimedKeyMap();
         this._random = createSeededRandom(policy.seed);
     }
 
@@ -242,7 +242,7 @@ export class TournamentAngledBounceRampSystem {
     }
 
     _updateCooldowns(delta) {
-        tickTimedMap(this._cooldownByFighterId, delta);
+        this._cooldownByFighterId.tick(delta);
     }
 
     _expireRamp(delta) {
@@ -265,7 +265,7 @@ export class TournamentAngledBounceRampSystem {
         if (!prediction || prediction.time > this.policy.leadTime) return false;
         if (prediction.incidenceDegrees > this.policy.incidenceThresholdDegrees) return false;
         if (!isClearOfCorner(this.simulation, prediction, fighter, this.policy)) return false;
-        return (this._cooldownByFighterId.get(fighter.id) ?? 0) <= 0;
+        return !this._cooldownByFighterId.has(fighter.id);
     }
 
     _createRamp(candidate) {
@@ -279,7 +279,7 @@ export class TournamentAngledBounceRampSystem {
             prediction: candidate.prediction,
             remaining: this.policy.lifetime
         };
-        this._cooldownByFighterId.set(candidate.fighter.id, this.policy.cooldown);
+        this._cooldownByFighterId.start(candidate.fighter.id, this.policy.cooldown);
         this.events.push({ type: "created", fighterId: candidate.fighter.id, wall: candidate.prediction.wall });
         this._emitRampParticles(this.activeRamp, "created");
     }

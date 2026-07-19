@@ -306,7 +306,7 @@ import {
     Cooldown,
     CooldownBank,
     EntityAttachment,
-    tickTimedMap
+    TimedKeyMap
 } from "../src/physics/index.js";
 import { enforceActiveEntityLimit } from "../src/entities/activeEntityLimit.js";
 import { AIActionController } from "../src/simulation/aiActionController.js";
@@ -24896,6 +24896,15 @@ function testElementalistVfxPreviewCatalog() {
 testElementalistVfxPreviewCatalog();
 
 function testReusableCapabilityContracts() {
+    const timedKeys = new TimedKeyMap({ isInvalid: (key) => key === "removed" });
+    timedKeys.start("target-a", 0.5);
+    timedKeys.start("removed", 1);
+    timedKeys.tick(0.2);
+    assert.equal(timedKeys.getRemaining("target-a"), 0.3);
+    assert.equal(timedKeys.has("removed"), false, "Invalid timed keys must be removed during ticking");
+    timedKeys.tick(0.3);
+    assert.equal(timedKeys.has("target-a"), false, "Expired timed keys must be removed automatically");
+
     const cooldowns = new CooldownBank({ primary: 2, reaction: 0.5 });
     assert.equal(cooldowns.isReady("primary"), true);
     cooldowns.reset("primary");
@@ -24946,12 +24955,12 @@ function testReusableCapabilityContracts() {
     assert.deepEqual(attachment.position, anchor.position);
     assert.notEqual(attachment.position, anchor.position, "Attached positions must be copied by value");
 
-    const entries = new Map([
-        ["keep", 1],
-        ["drop", 0.1]
-    ]);
-    tickTimedMap(entries, 0.2);
-    assert.deepEqual([...entries], [["keep", 0.8]]);
+    const entries = new TimedKeyMap();
+    entries.start("keep", 1);
+    entries.start("drop", 0.1);
+    entries.tick(0.2);
+    assert.equal(entries.getRemaining("keep"), 0.8);
+    assert.equal(entries.has("drop"), false);
 
     const active = [{ order: 3 }, { order: 1 }, { order: 2 }];
     const limited = enforceActiveEntityLimit(active, 3, { reserveSlots: 1, getOrder: (entry) => entry.order });

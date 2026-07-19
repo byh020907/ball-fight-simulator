@@ -1,6 +1,6 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
 import { getVisibleLineWidth } from "../effects/effectVisibility.js";
-import { tickTimedMap } from "../physics/index.js";
+import { TimedKeyMap } from "../physics/index.js";
 import { BulletProjectile } from "./bulletProjectile.js";
 
 const TURRET_LIFETIME = 8;
@@ -35,7 +35,7 @@ export class GunnerTurret extends CombatEntity {
         this.aimTimer = 0;
         this.aimTarget = null;
         this.deployElapsed = 0;
-        this.collisionCooldowns = new Map();
+        this.collisionCooldowns = new TimedKeyMap();
     }
 
     update(delta, simulation) {
@@ -59,7 +59,7 @@ export class GunnerTurret extends CombatEntity {
     }
 
     _tickCollisionCooldowns(delta) {
-        tickTimedMap(this.collisionCooldowns, delta);
+        this.collisionCooldowns.tick(delta);
     }
 
     _handleFighterContacts(simulation) {
@@ -72,7 +72,7 @@ export class GunnerTurret extends CombatEntity {
             const normal = distance > 0 ? offset.normalize() : new Vector2(1, 0);
             fighter.applyPositionCorrection(normal.clone().scale(overlap + 0.5));
             if (!this.collisionCooldowns.has(fighter.id)) {
-                this.collisionCooldowns.set(fighter.id, 0.25);
+                this.collisionCooldowns.start(fighter.id, 0.25);
                 this.takeDamage(fighter.stats.baseDamage, fighter, "Turret Collision");
             }
             if (this.movementMode === "mobile") {

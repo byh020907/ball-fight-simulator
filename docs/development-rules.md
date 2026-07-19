@@ -129,6 +129,7 @@ this.debug = {
 | `CollectionGrace`                 | 생성 직후 자석·직접 회수를 유예한다 (collectionGraceRemaining, tickCollectionGrace)                       | HeroOrb, HuntingLootItem                                                     |
 | `Cooldown`                        | 쿨다운이 있다 (`tickCooldown`, `cooldownReady`, `cooldownRemaining`)                                      | 모든 Ability, AIActionController                                             |
 | `CooldownBank` (composition)      | 한 소유자의 이름 기반 복수 쿨타임을 독립 관리한다 (`tick`, `reset`, `consume`)                           | 복수 제한 시간을 가진 Ability/BattleBall                                    |
+| `TimedKeyMap` (composition)       | 대상별로 동적 생성되는 제한 시간을 관리하고 만료 키를 제거한다 (`start`, `has`, `tick`)                 | 대상별 재타격·재발동 제한                                                    |
 | `ProjectileBehavior`              | 발사체다 (owner, updateProjectile, hit 판정)                                                              | Arrow/Bat/Bullet/Orbit/ElementalWaterBolt/HeroShieldShard                    |
 | `BurstSequencer`                  | 연발 발사한다 (`startBurst`, `tickBurst`, `BURST_RESULTS`)                                                | GrenadeAbility, GunnerAbility                                                |
 | `EntityAttachment`                | 다른 엔티티의 위치를 값 복사로 추적한다 (`attachToEntity`, `syncAttachedPosition`)                        | 대상·시전자에 붙는 전투 VFX                                                  |
@@ -162,10 +163,10 @@ this.debug = {
 공용 capability의 상태는 우회 필드로 조작하지 않습니다. 쿨다운은 `timer` 별칭 없이 `tickCooldown()`,
 `resetCooldown()`, `setCooldownRemaining()`을 사용하고, 연발 콜백 결과는 문자열 대신 `BURST_RESULTS`를 사용합니다.
 기본 쿨타임 하나는 `Cooldown` 믹스인을 사용하고, 같은 객체 안의 고정된 이름 기반 복수 쿨타임은
-`CooldownBank`를 필드로 조합합니다. 대상별로 동적으로 생기는 쿨타임은 `tickTimedMap()`을 사용하며,
+`CooldownBank`를 필드로 조합합니다. 대상별로 동적으로 생기는 쿨타임은 `TimedKeyMap`을 필드로 조합하며,
 수명·채널 지속·연출 프레임 같은 일반 타이머를 쿨타임 저장소에 섞지 않습니다.
-상속이 부적절한 컬렉션 정책은 순수 함수로 둡니다. 시간값 `Map`은 `tickTimedMap()`, 활성 엔티티 상한은
-`enforceActiveEntityLimit()`을 사용하며 대상별 만료 방식은 콜백으로 주입합니다.
+상속이 부적절한 컬렉션 정책은 조합 객체 또는 순수 함수로 둡니다. 대상별 무효화 방식은 `TimedKeyMap`
+생성자 콜백으로 주입하고, 활성 엔티티 상한은 `enforceActiveEntityLimit()`을 사용합니다.
 
 ### 기능 단위 코드 분리 (함수/모듈화)
 
