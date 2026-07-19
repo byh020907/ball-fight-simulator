@@ -86,7 +86,11 @@ import {
     TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS
 } from "../src/tournament/angledBounceRamps.js";
 import { Ability, AbilitySet, ElementalistAbility } from "../src/abilities/index.js";
-import { ELEMENTALIST_CONFIG, ELEMENTAL_COMPOSITE_RECIPES } from "../src/abilities/elementalistAbility.js";
+import {
+    ELEMENTALIST_CONFIG,
+    ELEMENTAL_COMPOSITE_RECIPES,
+    SINGLE_SPELLS
+} from "../src/abilities/elementalistAbility.js";
 import { ElementalOrb } from "../src/entities/elementalOrb.js";
 import {
     ELEMENTALIST_VFX_PREVIEW_OPTIONS,
@@ -23843,6 +23847,74 @@ function testElementalistOrbProgressionAndOwnership() {
 
 testElementalistOrbProgressionAndOwnership();
 
+function testElementalistChannelDurationAndDamageCadence() {
+    const { owner, ability, enemies } = createElementalistSimulation({ tier: 3 });
+    const [enemy] = enemies;
+    const channels = [
+        ...Object.keys(SINGLE_SPELLS).map((element) =>
+            ability._createChannel({ elements: [element], recipe: null, target: enemy, wetSnapshot: false })
+        ),
+        ...Object.values(ELEMENTAL_COMPOSITE_RECIPES).map((recipe) =>
+            ability._createChannel({ elements: recipe.elements, recipe, target: enemy, wetSnapshot: false })
+        )
+    ];
+    assert.equal(channels.length, 15, "All five single and ten composite spells must share the channel contract");
+    assert.equal(
+        channels.every(({ duration }) => duration === ELEMENTALIST_CONFIG.channelDuration),
+        true,
+        "Every non-projectile elemental spell must use the common channel duration"
+    );
+    assert.equal(
+        ELEMENTALIST_CONFIG.channelDuration,
+        2,
+        "Elemental spell channels must remain visible for two seconds"
+    );
+
+    const damageTicks = [];
+    enemy.takeDamage = (damage) => damageTicks.push(damage);
+    ability.activeChannels = [
+        ability._createChannel({ elements: ["frost"], recipe: null, target: enemy, wetSnapshot: false })
+    ];
+    ability._updateChannels(0.01);
+    assert.deepEqual(damageTicks, [], "Frost must no longer front-load its full damage on channel start");
+    ability._updateChannels(0.49);
+    assert.equal(damageTicks.length, 1, "Frost damage must begin as a distributed channel tick");
+    ability._updateChannels(1.5);
+    assert.equal(damageTicks.length, SINGLE_SPELLS.frost.ticks, "Frost must distribute damage across the full channel");
+    assert.equal(
+        damageTicks.reduce((total, damage) => total + damage, 0),
+        Math.round(owner.stats.baseDamage * SINGLE_SPELLS.frost.damageMultiplier),
+        "Longer frost presentation must preserve its approved total damage"
+    );
+
+    damageTicks.length = 0;
+    const pursuit = ELEMENTAL_COMPOSITE_RECIPES["electric:wind"];
+    const pursuitChannel = ability._createChannel({
+        elements: pursuit.elements,
+        recipe: pursuit,
+        target: enemy,
+        wetSnapshot: false
+    });
+    pursuitChannel.displacement = enemy.radius * 20;
+    pursuitChannel.elapsed = 0.4;
+    ability._updateThunderPursuit(pursuitChannel);
+    assert.equal(damageTicks.length, 0, "Thunder pursuit must not front-load movement ticks at channel start");
+    pursuitChannel.elapsed = 0.8;
+    ability._updateThunderPursuit(pursuitChannel);
+    assert.equal(damageTicks.length, 1, "Thunder pursuit must unlock its first tick along the channel timeline");
+    pursuitChannel.elapsed = 1.6;
+    ability._updateThunderPursuit(pursuitChannel);
+    assert.equal(damageTicks.length, 3, "Thunder pursuit must distribute all movement ticks through the channel");
+    assert.equal(
+        damageTicks.reduce((total, damage) => total + damage, 0),
+        Math.round(owner.stats.baseDamage * pursuit.damageMultiplier),
+        "Longer thunder pursuit must preserve its maximum total damage"
+    );
+    console.log("[elementalist-channel-duration-damage-cadence] ok");
+}
+
+testElementalistChannelDurationAndDamageCadence();
+
 function testElementalistFusionChannelsAndCleanup() {
     assert.equal(Object.keys(ELEMENTAL_COMPOSITE_RECIPES).length, 10, "All ten unordered pairs need recipes");
     assert.equal(
@@ -24185,6 +24257,13 @@ function testElementalistVfxPreviewCatalog() {
 
     ELEMENTALIST_VFX_PREVIEW_OPTIONS.forEach(({ id }) => {
         const scene = new ElementalistVfxPreviewScene(id);
+        if (id !== "wet") {
+            assert.equal(
+                scene.effect.duration,
+                ELEMENTALIST_CONFIG.channelDuration,
+                `${id} preview must use the live two-second channel duration`
+            );
+        }
         scene.update(0.4);
         const recording = makeRecordingCanvasContext();
         assert.doesNotThrow(() => scene.draw(recording), `${id} should render through the production VFX preview`);

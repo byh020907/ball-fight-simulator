@@ -1,4 +1,5 @@
 import { Vector2 } from "../core.js";
+import { ELEMENTALIST_CONFIG } from "../abilities/elementalistAbility.js";
 import { ELEMENTAL_COMPOSITE_RECIPES, ELEMENTAL_PALETTE, ELEMENTAL_TYPES } from "../abilities/elementalistRecipes.js";
 import { ElementalChannelEffect, drawElementalOrb } from "../effects/elementalistEffects.js";
 import { applyElementalWet } from "../effects/elementalWetEffect.js";
@@ -14,7 +15,6 @@ const ELEMENT_LABELS = Object.freeze({
 const PREVIEW_CONFIG = Object.freeze({
     width: 640,
     height: 360,
-    channelDuration: 1.35,
     wetDuration: 2.5,
     source: Object.freeze({ x: 120, y: 180, radius: 28 }),
     target: Object.freeze({ x: 515, y: 180, radius: 34 }),
@@ -148,7 +148,7 @@ export class ElementalistVfxPreviewScene {
             target: this.target,
             elements: this.option.elements,
             recipe: this.option.recipe,
-            duration: PREVIEW_CONFIG.channelDuration
+            duration: ELEMENTALIST_CONFIG.channelDuration
         });
     }
 
@@ -170,7 +170,7 @@ export class ElementalistVfxPreviewScene {
             if (this.effect.isExpired) this.effect = null;
             return;
         }
-        if (this.effect.isExpired || this.phaseElapsed >= PREVIEW_CONFIG.channelDuration) this._createEffect();
+        if (this.effect.isExpired || this.phaseElapsed >= ELEMENTALIST_CONFIG.channelDuration) this._createEffect();
     }
 
     draw(ctx) {

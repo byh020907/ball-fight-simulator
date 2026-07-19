@@ -12,6 +12,7 @@ import {
 
 const ELEMENTALIST_CONFIG = Object.freeze({
     channelRange: 850,
+    channelDuration: 2,
     maximumOrbs: 4,
     boltSpeedMultiplier: 2.2,
     orbReleaseSpeed: 165,
@@ -21,11 +22,11 @@ const ELEMENTALIST_CONFIG = Object.freeze({
 });
 
 const SINGLE_SPELLS = Object.freeze({
-    fire: { duration: 0.5, damageMultiplier: 1.52, ticks: 5 },
-    electric: { duration: 0.5, damageMultiplier: 1.38, ticks: 5 },
-    frost: { duration: 0.7, damageMultiplier: 1, ticks: 1, slow: { duration: 1.2, amount: 0.55 } },
-    wind: { duration: 0.8, damageMultiplier: 1.14, ticks: 4, tangentImpulse: 0.16 },
-    earth: { duration: 0.6, damageMultiplier: 1.48, ticks: 5 }
+    fire: { damageMultiplier: 1.52, ticks: 5 },
+    electric: { damageMultiplier: 1.38, ticks: 5 },
+    frost: { damageMultiplier: 1, ticks: 4, slow: { duration: 1.2, amount: 0.55 } },
+    wind: { damageMultiplier: 1.14, ticks: 4, tangentImpulse: 0.16 },
+    earth: { damageMultiplier: 1.48, ticks: 5 }
 });
 
 let nextChannelId = 1;
@@ -126,19 +127,17 @@ export class ElementalistAbility extends Ability {
     }
 
     _createChannel({ elements, recipe, target, wetSnapshot }) {
-        const spell = recipe ?? SINGLE_SPELLS[elements[0]];
         return {
             id: nextChannelId++,
             elements,
             recipe,
             target,
-            duration: recipe ? 1 : spell.duration,
+            duration: ELEMENTALIST_CONFIG.channelDuration,
             elapsed: 0,
             wetSnapshot,
             tickCount: 0,
             tickAccumulator: 0,
             displacement: 0,
-            lastTickAt: -Infinity,
             lastTargetPosition: target.position.clone(),
             started: false,
             finished: false,
@@ -172,9 +171,7 @@ export class ElementalistAbility extends Ability {
             this._applyWetReaction(channel.target, channel.elements, channel.wetSnapshot, 1);
         }
         if (element === "wind") this._applyTangentImpulse(channel.target, spell.tangentImpulse, delta);
-        if (element !== "frost") this._applyScheduledTicks(channel, spell.damageMultiplier, spell.ticks);
-        if (element === "frost" && channel.tickCount === 0)
-            this._dealDamage(channel.target, spell.damageMultiplier, "냉기");
+        this._applyScheduledTicks(channel, spell.damageMultiplier, spell.ticks);
     }
 
     _updateCompositeChannel(channel, delta) {
@@ -197,13 +194,10 @@ export class ElementalistAbility extends Ability {
         channel.lastTargetPosition = channel.target.position.clone();
         channel.displacement += movement;
         const threshold = Math.max(1, channel.target.radius * 2);
-        while (
-            channel.displacement >= threshold &&
-            channel.tickCount < 3 &&
-            channel.elapsed - channel.lastTickAt >= 0.15
-        ) {
+        const timelineProgress = Math.max(0, Math.min(1, (channelProgress(channel) - 0.2) / 0.6));
+        const availableTicks = Math.min(3, Math.floor(timelineProgress * 3 + 1e-9));
+        while (channel.displacement >= threshold && channel.tickCount < availableTicks) {
             channel.displacement -= threshold;
-            channel.lastTickAt = channel.elapsed;
             channel.tickCount += 1;
             this._dealExactTick(
                 channel.target,
