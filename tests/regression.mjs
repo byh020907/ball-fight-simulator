@@ -6938,11 +6938,31 @@ function testFiveBallLevelRewardContracts(app) {
     assert.equal(counterShards.length, 1, "Hero shield damage should launch one counter shard when ready");
     const counterVelocity = counterShards[0].velocity.clone();
     heroRun.target.applyPositionCorrection(new Vector2(0, 120));
+    heroRun.nearby.position = new Vector2(700, 500);
     counterShards[0].update(0.05, heroRun.simulation);
     assert.deepEqual(
         [counterShards[0].velocity.x, counterShards[0].velocity.y],
         [counterVelocity.x, counterVelocity.y],
         "Hero counter shard should preserve its launch direction instead of homing"
+    );
+    heroRun.target.position = counterShards[0].position.clone();
+    counterShards[0].update(0, heroRun.simulation);
+    assert.equal(counterShards[0].isExpired, false, "An immediate Hero counter hit should remain renderable");
+    assert.ok(
+        counterShards[0].impactRemaining > 0 && counterShards[0].trail.length >= 7,
+        "An immediate Hero counter hit should retain a short straight particle trail"
+    );
+    const counterSlashContext = makeRecordingCanvasContext();
+    counterShards[0].draw(counterSlashContext);
+    assert.equal(
+        counterSlashContext.calls.filter(([name]) => name === "quadraticCurveTo").length,
+        2,
+        "Hero counter should render a reusable layered wind-slash visual instead of a shield polygon"
+    );
+    assert.equal(
+        counterSlashContext.calls.filter(([name]) => name === "closePath").length,
+        0,
+        "Hero counter should not retain the old closed shield-shard silhouette"
     );
     heroRun.owner.takeDamage(10, heroRun.target, "Hero Armor Cooldown Test", { ignoreDefense: true });
     assert.equal(
@@ -6953,6 +6973,7 @@ function testFiveBallLevelRewardContracts(app) {
 
     heroAbility.state.shield = 10;
     heroRun.target.position = new Vector2(420, 300);
+    heroRun.nearby.position = new Vector2(430, 340);
     const targetHpBeforeBreak = heroRun.target.hp;
     const nearbyHpBeforeBreak = heroRun.nearby.hp;
     const breakDamage = heroRun.owner.takeDamage(20, heroRun.target, "Hero Armor Break Test", {

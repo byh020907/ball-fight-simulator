@@ -22,6 +22,7 @@ export { ActionWindowEffect, ActionSuccessEffect, ActionWhiffEffect } from "./ac
 export { EFFECT_VISIBILITY_TOKENS, getVisibleCombatTextSize, getVisibleLineWidth } from "./effectVisibility.js";
 export { BURNING_EFFECT_CONFIG, BurningEffect, RageFlameRing, applyBurningEffect } from "./rageEffects.js";
 export { HeroShieldBreakEffect } from "./heroEffects.js";
+export { drawProjectileSlashVisual, PROJECTILE_SLASH_VISUAL_DEFAULTS } from "./projectileSlashVisual.js";
 export {
     BloodBatBurstEffect,
     BloodBiteEffect,

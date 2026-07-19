@@ -33,7 +33,8 @@ export const HERO_COMBAT_CONFIG = Object.freeze({
         damageMultiplier: 0.5,
         speedMultiplier: 1.5,
         lifetime: 1.2,
-        radius: 9
+        radius: 9,
+        impactVisualDuration: 0.14
     }),
     shieldBreak: Object.freeze({
         damageMultiplier: 0.75,

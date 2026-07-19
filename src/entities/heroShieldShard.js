@@ -1,8 +1,10 @@
 import { Projectile, RENDER_LAYERS, Vector2 } from "../core.js";
 import { HERO_COMBAT_CONFIG } from "../abilities/heroCombatConfig.js";
+import { drawProjectileSlashVisual } from "../effects/projectileSlashVisual.js";
 
 const TRAIL_SAMPLE_INTERVAL = 0.04;
 const TRAIL_SAMPLE_LIFETIME = 0.18;
+const IMPACT_TRAIL_SAMPLE_COUNT = 7;
 
 export class HeroShieldShard extends Projectile {
     static renderLayer = RENDER_LAYERS.FOREGROUND;
@@ -18,6 +20,7 @@ export class HeroShieldShard extends Projectile {
         this.angle = Math.atan2(velocity.y, velocity.x);
         this.trail = [];
         this.trailTimer = 0;
+        this.impactRemaining = 0;
         this._staticCollisionOptions = {
             onStaticCollision: () => {
                 this.isExpired = true;
@@ -30,7 +33,14 @@ export class HeroShieldShard extends Projectile {
     }
 
     update(delta, simulation) {
+        if (this.impactRemaining > 0) {
+            this.impactRemaining = Math.max(0, this.impactRemaining - delta);
+            this._updateTrail(delta);
+            if (this.impactRemaining <= 0) this.isExpired = true;
+            return;
+        }
         this.updateProjectile(delta, simulation);
+        if (this.impactRemaining > 0) this.isExpired = false;
         this._updateTrail(delta);
     }
 
@@ -65,6 +75,9 @@ export class HeroShieldShard extends Projectile {
     }
 
     _onHitEffects(target, simulation) {
+        this.impactRemaining = HERO_COMBAT_CONFIG.counter.impactVisualDuration;
+        this.applyImpulse(this.velocity.clone().scale(-1));
+        this._seedImpactTrail();
         simulation.spawnParticleBurst(this.position.clone(), "#ffd84d", {
             count: 14,
             speed: 180,
@@ -73,6 +86,16 @@ export class HeroShieldShard extends Projectile {
         });
         simulation.addSparkBurst(this.position.clone(), "#fff4b8");
         simulation.playSound("hit", 1.15);
+    }
+
+    _seedImpactTrail() {
+        const direction = Vector2.fromAngle(this.angle, 1);
+        for (const index of Array.from({ length: IMPACT_TRAIL_SAMPLE_COUNT }, (_, value) => value)) {
+            this.trail.push({
+                position: Vector2.subtract(this.position, direction.clone().scale(index * this.radius * 0.85)),
+                life: TRAIL_SAMPLE_LIFETIME * (1 - index / (IMPACT_TRAIL_SAMPLE_COUNT * 1.5))
+            });
+        }
     }
 
     draw(ctx) {
@@ -86,21 +109,17 @@ export class HeroShieldShard extends Projectile {
             ctx.arc(sample.position.x, sample.position.y, size, 0, Math.PI * 2);
             ctx.fill();
         });
-        ctx.globalAlpha = 1;
-        ctx.translate(this.position.x, this.position.y);
-        ctx.rotate(this.angle);
-        ctx.fillStyle = "#ffe66b";
-        ctx.strokeStyle = "#8f6200";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(this.radius * 1.35, 0);
-        ctx.lineTo(this.radius * 0.35, -this.radius);
-        ctx.lineTo(-this.radius, -this.radius * 0.62);
-        ctx.lineTo(-this.radius, this.radius * 0.62);
-        ctx.lineTo(this.radius * 0.35, this.radius);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
+        let slashAlpha = 1;
+        let slashScale = 1;
+        if (this.impactRemaining > 0) {
+            const impactProgress = this.impactRemaining / HERO_COMBAT_CONFIG.counter.impactVisualDuration;
+            slashAlpha = impactProgress;
+            slashScale = 1 + (1 - impactProgress) * 0.65;
+        }
         ctx.restore();
+        drawProjectileSlashVisual(ctx, this.position, this.angle, this.radius, {
+            alpha: slashAlpha,
+            scale: slashScale
+        });
     }
 }
