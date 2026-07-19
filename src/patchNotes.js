@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.35.1",
+        date: "2026-07-19",
+        title: "v0.35.1 원소 오브 필드 유지",
+        changes: [
+            {
+                type: "balance",
+                text: "원소 오브가 시간으로 사라지지 않고 시전자당 최대 8개까지 필드에 유지됩니다."
+            }
+        ]
+    },
+    {
         version: "0.35.0",
         date: "2026-07-19",
         title: "v0.35.0 Elementalist 마력 도약",

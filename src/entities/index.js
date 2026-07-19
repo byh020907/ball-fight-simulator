@@ -10,7 +10,7 @@ export { GunnerTurret } from "./gunnerTurret.js";
 export { BatProjectile } from "./batProjectile.js";
 export { BulletProjectile } from "./bulletProjectile.js";
 export { ElementalWaterBolt } from "./elementalWaterBolt.js";
-export { ElementalOrb } from "./elementalOrb.js";
+export { ELEMENTAL_ORB_CONFIG, ElementalOrb } from "./elementalOrb.js";
 export { HeroShieldShard } from "./heroShieldShard.js";
 export {
     HeroOrb,

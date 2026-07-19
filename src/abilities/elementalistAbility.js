@@ -1,5 +1,5 @@
 import { applyCollisionImpulse, Vector2 } from "../core.js";
-import { ElementalOrb, ElementalWaterBolt } from "../entities/index.js";
+import { ELEMENTAL_ORB_CONFIG, ElementalOrb, ElementalWaterBolt } from "../entities/index.js";
 import {
     BURNING_EFFECT_CONFIG,
     ElementalChannelEffect,
@@ -21,7 +21,7 @@ const ELEMENTALIST_CONFIG = Object.freeze({
     channelRange: 600,
     channelDuration: 2,
     channelTickInterval: 0.08,
-    maximumOrbs: 4,
+    maximumOrbs: ELEMENTAL_ORB_CONFIG.maximumActivePerCaster,
     boltSpeedMultiplier: 2.2,
     orbReleaseSpeed: 165,
     ownerMagnet: { responseRate: 9, attractionSpeed: 900 },
@@ -467,8 +467,7 @@ export class ElementalistAbility extends Ability {
         if (!recipe) return;
         const position = Vector2.add(first.position, second.position).scale(0.5);
         const velocity = Vector2.add(first.velocity, second.velocity).scale(0.5);
-        const expiresAt = Math.max(first.expiresAt, second.expiresAt);
-        const composite = first.makeComposite(second, recipe, position, new Vector2(), expiresAt);
+        const composite = first.makeComposite(second, recipe, position, new Vector2());
         composite.applyImpulse(velocity);
         first.expire();
         second.expire();

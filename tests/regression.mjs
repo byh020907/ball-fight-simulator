@@ -23965,11 +23965,11 @@ function testElementalistOrbProgressionAndOwnership() {
         "Owner pickup timeline must render without terminating the battle loop"
     );
 
-    for (const step of [0, 1, 2, 3, 4]) {
+    for (const step of Array.from({ length: ELEMENTALIST_CONFIG.maximumOrbs + 1 }, (_, index) => index)) {
         simulation.elapsed += 0.01;
         ability._spawnOrb("fire", primaryEnemy, primaryEnemy.position.clone(), step, 1);
     }
-    assert.equal(ability.activeOrbs.length, 4, "Oldest overflow must keep the per-caster cap at four");
+    assert.equal(ability.activeOrbs.length, 8, "Oldest overflow must keep the per-caster cap at eight");
 
     const enemyOrb = new ElementalOrb({
         owner,
@@ -24373,22 +24373,19 @@ function testElementalistFusionChannelsAndCleanup() {
     magnetOrb.position.x = owner.position.x + owner.radius * 3 - 1;
     ability.applyOwnerMagnet(magnetOrb, 1 / 60, false);
     assert.ok(magnetOrb.velocity.length() > 0, "Lv.3+ owner magnet must pull inside three caster radii");
-    const expires = simulation.elapsed + 4;
     const first = new ElementalOrb({
         owner,
         element: "fire",
         position: enemy.position.clone(),
         targetMemory: enemy,
-        ability,
-        expiresAt: simulation.elapsed + 2
+        ability
     });
     const second = new ElementalOrb({
         owner,
         element: "electric",
         position: enemy.position.clone(),
         targetMemory: enemy,
-        ability,
-        expiresAt: expires
+        ability
     });
     ability.activeOrbs.push(first, second);
     simulation.entities.push(first, second);
@@ -24397,7 +24394,7 @@ function testElementalistFusionChannelsAndCleanup() {
     const composite = ability.activeOrbs[0];
     assert.equal(composite.isComposite, true);
     assert.equal(composite.recipe.name, "플라즈마 송곳");
-    assert.equal(composite.expiresAt, expires, "Fusion must inherit the later material expiry");
+    assert.equal("expiresAt" in composite, false, "Fused elemental orbs must remain free of lifetime expiry state");
 
     ability._applyWet(enemy);
     ability.consumeOrbByOwner(composite);

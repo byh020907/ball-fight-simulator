@@ -3,22 +3,14 @@ import { CollectionGrace } from "../physics/index.js";
 import { drawElementalOrb } from "../effects/elementalistEffects.js";
 
 const ORB_RADIUS = 13;
-const ORB_LIFETIME = 6;
 const ORB_COLLECTION_GRACE = 0.42;
+const ORB_MAXIMUM_ACTIVE_PER_CASTER = 8;
 let nextOrbSerial = 1;
 
 export class ElementalOrb extends CollectionGrace(CombatEntity) {
     static renderLayer = RENDER_LAYERS.FOREGROUND;
 
-    constructor({
-        owner,
-        element,
-        position,
-        velocity = new Vector2(),
-        targetMemory = null,
-        ability,
-        expiresAt = null
-    }) {
+    constructor({ owner, element, position, velocity = new Vector2(), targetMemory = null, ability }) {
         super(position, velocity, ORB_RADIUS);
         this.owner = owner;
         this.serial = nextOrbSerial++;
@@ -29,9 +21,6 @@ export class ElementalOrb extends CollectionGrace(CombatEntity) {
         this.targetMemory = targetMemory;
         this.ability = ability;
         this.createdAt = ability.simulation.elapsed;
-        this.expiresAt = expiresAt ?? this.createdAt + ORB_LIFETIME;
-        this.life = Math.max(0, this.expiresAt - this.createdAt);
-        this.maxLife = this.life;
         this.isComposite = false;
         this.recipe = null;
         this.materialMemories = [{ target: targetMemory, createdAt: this.createdAt }];
@@ -41,8 +30,7 @@ export class ElementalOrb extends CollectionGrace(CombatEntity) {
 
     update(delta, simulation) {
         const graceActive = this.tickCollectionGrace(delta);
-        this.life = Math.max(0, this.expiresAt - simulation.elapsed);
-        if (this.life <= 0 || this.owner.flags.defeated || simulation.finished) {
+        if (this.owner.flags.defeated || simulation.finished) {
             this.expire();
             return;
         }
@@ -96,15 +84,14 @@ export class ElementalOrb extends CollectionGrace(CombatEntity) {
         }
     }
 
-    makeComposite(other, recipe, position, velocity, expiresAt) {
+    makeComposite(other, recipe, position, velocity) {
         const composite = new ElementalOrb({
             owner: this.owner,
             element: recipe.elements[0],
             position,
             velocity,
             targetMemory: null,
-            ability: this.ability,
-            expiresAt
+            ability: this.ability
         });
         composite.elements = [...recipe.elements];
         composite.isComposite = true;
@@ -129,7 +116,6 @@ export class ElementalOrb extends CollectionGrace(CombatEntity) {
 
 export const ELEMENTAL_ORB_CONFIG = Object.freeze({
     radius: ORB_RADIUS,
-    lifetime: ORB_LIFETIME,
     collectionGrace: ORB_COLLECTION_GRACE,
-    maximumActivePerCaster: 4
+    maximumActivePerCaster: ORB_MAXIMUM_ACTIVE_PER_CASTER
 });
