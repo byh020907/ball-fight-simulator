@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.35.3",
+        date: "2026-07-19",
+        title: "v0.35.3 Hero 체력 바 표시",
+        changes: [
+            {
+                type: "fix",
+                text: "보호막이 없는 Hero Ball의 최대 체력이 체력 바를 가득 채우도록 수정했습니다."
+            }
+        ]
+    },
+    {
         version: "0.35.2",
         date: "2026-07-19",
         title: "v0.35.2 원소 주문 감지",

@@ -706,6 +706,14 @@ function testGameplayUiResetContracts() {
 }
 
 function testCombinedHealthBarProportions() {
+    const fullHealth = getCombinedHealthBarPercentages({ hp: 100, maxHp: 100, shield: 0, maximumShield: 50 });
+    assert.equal(fullHealth.hpPct, 100, "Full HP without an active shield must fill the health bar");
+    assert.equal(fullHealth.shieldPct, 0, "Inactive shield capacity must not reserve empty bar space");
+
+    const partialArmor = getCombinedHealthBarPercentages({ hp: 100, maxHp: 100, shield: 25, maximumShield: 50 });
+    assert.equal(partialArmor.hpPct, 80, "Full HP should use its real share of current combined health");
+    assert.equal(partialArmor.shieldPct, 20, "Current shield should use its real share of current combined health");
+
     const fullArmor = getCombinedHealthBarPercentages({ hp: 100, maxHp: 100, shield: 50, maximumShield: 50 });
     assert.ok(Math.abs(fullArmor.hpPct - 100 / 1.5) < 1e-9, "Full HP should occupy two thirds of Hero capacity");
     assert.ok(
