@@ -18,6 +18,7 @@ import {
     createTournamentAngledBounceRampPolicy,
     TournamentAngledBounceRampSystem
 } from "../tournament/angledBounceRamps.js";
+import { COMBAT_PARTICIPATION_MODES } from "./combatParticipation.js";
 
 const NON_CHARACTER_ABILITY_TYPES = Object.freeze({
     none: Ability,
@@ -37,17 +38,14 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         super(options);
         this.hooks = hooks;
         this.rng = options.rng ?? Math.random;
+        this.standbyFighters = [];
         const spawnPoints = this.createSpawnPoints(fighterSpecs.length);
         this.fighters = fighterSpecs.map((spec, index) => {
             const fighterSpec = {
                 ...spec,
                 teamId: spec.teamId ?? spec.team ?? `fighter-${index}`
             };
-            const fighter = new BattleBall(fighterSpec, spawnPoints[index]);
-            fighter.simulation = this;
-            fighter.bindAbilitySet(this.createAbilitySet(fighterSpec.ability, fighter));
-            this.hooks.onBattleBallReady?.(fighter, fighterSpec, this);
-            return fighter;
+            return this._createFighterInstance(fighterSpec, spawnPoints[index]);
         });
         this.entities = [...this.fighters];
         this.elapsed = 0;
@@ -222,13 +220,52 @@ export class BattleSimulation extends FighterPhysicsSimulation {
     }
 
     spawnFighter(spec, position) {
+        const fighter = this._createFighterInstance(spec, position);
+        this.fighters.push(fighter);
+        this.entities.push(fighter);
+        return fighter;
+    }
+
+    _createFighterInstance(spec, position) {
         const fighter = new BattleBall(spec, position.clone());
         fighter.simulation = this;
         fighter.bindAbilitySet(this.createAbilitySet(spec.ability, fighter));
         this.hooks.onBattleBallReady?.(fighter, spec, this);
-        this.fighters.push(fighter);
-        this.entities.push(fighter);
         return fighter;
+    }
+
+    createStandbyFighter(spec) {
+        const fighter = this._createFighterInstance(
+            {
+                ...spec,
+                combatParticipation: { mode: COMBAT_PARTICIPATION_MODES.STANDBY }
+            },
+            new Vector2(this.width / 2, this.height / 2)
+        );
+        this.standbyFighters.push(fighter);
+        return fighter;
+    }
+
+    swapActiveWithStandby(activeFighter, standbyFighter) {
+        if (!this.fighters.includes(activeFighter) || !this.standbyFighters.includes(standbyFighter)) return null;
+        if (activeFighter.flags.defeated || standbyFighter.flags.defeated) return null;
+
+        const activePosition = activeFighter.position.clone();
+        this.fighters = this.fighters.filter((fighter) => fighter !== activeFighter);
+        this.entities = this.entities.filter((entity) => entity !== activeFighter);
+        this.standbyFighters = this.standbyFighters.filter((fighter) => fighter !== standbyFighter);
+
+        activeFighter.participation.setMode(COMBAT_PARTICIPATION_MODES.STANDBY);
+        standbyFighter.participation.setMode(COMBAT_PARTICIPATION_MODES.ACTIVE);
+        standbyFighter.position = activePosition;
+        this.standbyFighters.push(activeFighter);
+        this.fighters.push(standbyFighter);
+        this.entities.push(standbyFighter);
+        return { active: standbyFighter, standby: activeFighter };
+    }
+
+    _tickStandbyFighters(delta) {
+        for (const fighter of this.standbyFighters) fighter.abilities.tickStandby(delta);
     }
 
     replaceFighter(fighter, replacements) {
@@ -312,6 +349,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
 
         this.elapsed += delta;
         this.updateScreenShake(delta);
+        this._tickStandbyFighters(delta);
 
         if (this.isOvertime()) {
             if (!this.overtimeAnnounced) {

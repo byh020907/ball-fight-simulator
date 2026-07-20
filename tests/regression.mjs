@@ -25214,6 +25214,32 @@ function testCombatParticipationContracts() {
     assert.equal(standbySimulation.getEnemiesOf(active).length, 0, "Standby fighters must not be combat targets");
     standbySimulation.checkResult();
     assert.equal(standbySimulation.winner, active, "A standby fighter must not block result resolution");
+
+    const swapSimulation = new BattleSimulation(
+        [createSpec("swap-leader", "player"), createSpec("swap-enemy", "enemy")],
+        { onLog() {}, onSound() {} },
+        null,
+        { assignActions: false }
+    );
+    const outgoing = swapSimulation.fighters.find((fighter) => fighter.id === "swap-leader");
+    const incoming = swapSimulation.createStandbyFighter({
+        ...createSpec("swap-reserve", "player"),
+        ability: "dash"
+    });
+    incoming.ability.setCooldownRemaining(1);
+    swapSimulation.update(0.25);
+    assert.equal(incoming.ability.cooldownRemaining, 0.75, "Standby ability readiness should continue off-field");
+    outgoing.position = new Vector2(321, 456);
+    const swapped = swapSimulation.swapActiveWithStandby(outgoing, incoming);
+    assert.equal(swapped.active, incoming);
+    assert.equal(swapped.standby, outgoing);
+    assert.deepEqual(
+        incoming.position,
+        new Vector2(321, 456),
+        "Incoming fighter should take the active field position"
+    );
+    assert.ok(!swapSimulation.entities.includes(outgoing), "Outgoing fighter should leave physics and rendering");
+    assert.ok(swapSimulation.entities.includes(incoming), "Incoming fighter should join physics and rendering");
     console.log("[combat-participation-contracts] ok");
 }
 
