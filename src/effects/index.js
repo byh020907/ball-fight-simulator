@@ -13,6 +13,14 @@ export { SlashTrail } from "./slashTrail.js";
 export { createElectricArcPath, drawElectricArc } from "./electricArc.js";
 export { ELEMENTAL_WET_VISUAL_CONFIG, ElementalWetEffect, applyElementalWet } from "./elementalWetEffect.js";
 export {
+    ELEMENTAL_WET_STATUS_CONFIG,
+    addElementalWetStack,
+    clearElementalWetStacks,
+    getActiveElementalWetStackCount,
+    getElementalWetDefenseReduction,
+    pruneElementalWetStacks
+} from "./elementalWetState.js";
+export {
     ELEMENTAL_WET_REACTION_VISUAL_CONFIG,
     ElementalWetReactionEffect,
     drawElementalWetChannelBuildUp

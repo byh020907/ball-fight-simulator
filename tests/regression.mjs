@@ -78,10 +78,13 @@ import {
     ElementalChannelEffect,
     ElementalWetReactionEffect,
     ElementalWetEffect,
+    ELEMENTAL_WET_STATUS_CONFIG,
     REVIVAL_EFFECT_CONFIG,
     RevivalEffect,
+    applyElementalWet,
     drawElementalOrb
 } from "../src/effects/index.js";
+import { getActiveElementalWetStackCount, getElementalWetDefenseReduction } from "../src/effects/elementalWetState.js";
 import { shuffled } from "../src/random.js";
 import { BattleSimulation } from "../src/simulation/battleSimulation.js";
 import {
@@ -24027,9 +24030,12 @@ function testElementalistOrbProgressionAndOwnership() {
     assert.equal(ability.activeChannels.length, 1);
     assert.equal(ability.activeChannels[0].target, primaryEnemy, "Wet remembered target should win target selection");
     assert.equal(ability.activeChannels[0].wetSnapshot, true);
-    assert.equal(primaryEnemy.state.elementalWetUntil, 0, "The first compatible channel must consume all wet state");
-    assert.equal(wetEffects[0].isExpired, true, "Consuming wet must remove its visual immediately");
-    assert.equal(primaryEnemy.state.elementalWetEffect, null, "Consuming wet must clear the target visual reference");
+    assert.ok(
+        primaryEnemy.state.elementalWetUntil > simulation.elapsed,
+        "Starting a compatible channel must preserve the timed wet status"
+    );
+    assert.equal(wetEffects[0].isExpired, false, "Wet visuals must remain attached until the status expires");
+    assert.equal(primaryEnemy.state.elementalWetEffect, wetEffects[0], "Wet status must retain its visual reference");
     const channelEffect = simulation.entities.find((entity) => entity.channel === ability.activeChannels[0]);
     assert.ok(channelEffect, "Owner pickup must add its channel timeline");
     assert.doesNotThrow(
@@ -24060,7 +24066,7 @@ function testElementalistOrbProgressionAndOwnership() {
     assert.ok(ability.activeOrbs.includes(enemyOrb), "Enemy contact must keep the orb active for its owner");
     assert.ok(
         primaryEnemy.state.elementalWetUntil > simulation.elapsed,
-        "Enemy contact must not consume the target's wet state"
+        "Enemy contact must not clear the target's wet state"
     );
     console.log("[elementalist-orb-progression-ownership] ok");
 }
@@ -24430,6 +24436,58 @@ function testElementalistWetReactionLifecycle() {
 }
 
 testElementalistWetReactionLifecycle();
+
+function testElementalWetIndependentStacksAndDefenseReduction() {
+    const { simulation, owner, enemies } = createElementalistSimulation({ tier: 3 });
+    const [target] = enemies;
+    target.rollCritical = () => false;
+    target.hp = 5000;
+    target.maxHp = 5000;
+    target.stats.baseDefense = 10;
+
+    simulation.elapsed = 0;
+    const wetEffect = applyElementalWet(target, simulation, 2.5);
+    simulation.elapsed = 0.5;
+    assert.equal(applyElementalWet(target, simulation, 2.5), wetEffect, "Wet stacks must reuse one visual effect");
+    simulation.elapsed = 1;
+    applyElementalWet(target, simulation, 2.5);
+    assert.deepEqual(target.state.elementalWetStackExpiries, [2.5, 3, 3.5]);
+    assert.equal(getActiveElementalWetStackCount(target, simulation.elapsed), 3);
+    assert.equal(ELEMENTAL_WET_STATUS_CONFIG.maximumStacks, 3);
+    assert.equal(getElementalWetDefenseReduction(target, 10, simulation.elapsed), 6);
+    assert.equal(target.takeDamage(20, owner, "Wet Defense Probe").actualDamage, 16);
+
+    simulation.elapsed = 2.6;
+    assert.equal(getActiveElementalWetStackCount(target, simulation.elapsed), 2);
+    assert.deepEqual(target.state.elementalWetStackExpiries, [3, 3.5]);
+    assert.equal(getElementalWetDefenseReduction(target, 10, simulation.elapsed), 4);
+
+    simulation.elapsed = 3.1;
+    assert.equal(getActiveElementalWetStackCount(target, simulation.elapsed), 1);
+    assert.equal(getElementalWetDefenseReduction(target, 10, simulation.elapsed), 2);
+
+    simulation.elapsed = 4;
+    target.stats.baseDefense = 3;
+    applyElementalWet(target, simulation, 2.5);
+    assert.equal(getElementalWetDefenseReduction(target, 3, simulation.elapsed), 1);
+    assert.equal(target.takeDamage(10, owner, "Minimum Wet Defense Probe").actualDamage, 8);
+
+    simulation.elapsed = 4.5;
+    applyElementalWet(target, simulation, 2.5);
+    simulation.elapsed = 5;
+    applyElementalWet(target, simulation, 2.5);
+    simulation.elapsed = 5.5;
+    applyElementalWet(target, simulation, 2.5);
+    assert.equal(getActiveElementalWetStackCount(target, simulation.elapsed), 3);
+    assert.deepEqual(
+        target.state.elementalWetStackExpiries,
+        [7, 7.5, 8],
+        "A fourth hit at the cap must replace only the earliest-expiring stack"
+    );
+    console.log("[elementalist-wet-independent-stacks] ok");
+}
+
+testElementalWetIndependentStacksAndDefenseReduction();
 
 function testElementalistFusionChannelsAndCleanup() {
     assert.equal(Object.keys(ELEMENTAL_COMPOSITE_RECIPES).length, 10, "All ten unordered pairs need recipes");
@@ -24884,7 +24942,7 @@ function testElementalistVfxPreviewCatalog() {
     const wetReactionScene = new ElementalistVfxPreviewScene("single:fire", "wet");
     assert.ok(
         wetReactionScene.effect instanceof ElementalWetEffect,
-        "Wet replay should show the production wet state before the channel consumes it"
+        "Wet replay should show the production wet state before the channel starts"
     );
     assert.equal(wetReactionScene.wetReactionLeadIn, true);
     for (let step = 0; step < 12; step += 1) wetReactionScene.update(0.05);
@@ -24893,7 +24951,10 @@ function testElementalistVfxPreviewCatalog() {
         "Wet replay should transition from wet status into the selected channel"
     );
     assert.equal(wetReactionScene.effect.channel.wetSnapshot, true);
-    assert.equal(wetReactionScene.target.state.elementalWetUntil, 0, "Wet replay should consume the preview state");
+    assert.ok(
+        wetReactionScene.target.state.elementalWetUntil > wetReactionScene.simulation.elapsed,
+        "Wet replay should preserve the preview status during its channel"
+    );
     for (let step = 0; step < 40; step += 1) wetReactionScene.update(0.05);
     assert.ok(
         wetReactionScene.effect instanceof ElementalWetReactionEffect,

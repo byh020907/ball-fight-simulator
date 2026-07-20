@@ -7,7 +7,9 @@ import {
     ElementalWetReactionEffect,
     VisualBurst,
     applyBurningEffect,
-    applyElementalWet
+    applyElementalWet,
+    clearElementalWetStacks,
+    getActiveElementalWetStackCount
 } from "../effects/index.js";
 import { applyMagneticAttraction, CooldownBank } from "../physics/index.js";
 import { Ability } from "./ability.js";
@@ -172,7 +174,7 @@ export class ElementalistAbility extends Ability {
 
     _activateChannel(channel, target) {
         channel.target = target;
-        channel.wetSnapshot = this._consumeWet(target);
+        channel.wetSnapshot = this._hasWet(target);
         channel.tickCount = Math.floor(
             channel.elapsed / ELEMENTALIST_CONFIG.channelTickInterval + TICK_BOUNDARY_EPSILON
         );
@@ -410,14 +412,7 @@ export class ElementalistAbility extends Ability {
     }
 
     _hasWet(target) {
-        return (target?.state?.elementalWetUntil ?? 0) > this.simulation.elapsed;
-    }
-
-    _consumeWet(target) {
-        if (!this._hasWet(target)) return false;
-        target.state.elementalWetUntil = 0;
-        target.state.elementalWetEffect?.consume?.();
-        return true;
+        return getActiveElementalWetStackCount(target, this.simulation.elapsed) > 0;
     }
 
     _selectSingleChannelTarget(remembered) {
@@ -545,7 +540,7 @@ export class ElementalistAbility extends Ability {
         this.activeChannels = [];
         for (const entity of this.simulation.entities) {
             if (!entity.state) continue;
-            entity.state.elementalWetUntil = 0;
+            clearElementalWetStacks(entity);
             entity.state.elementalWetEffect?.consume?.();
         }
         for (const entity of this.simulation.entities) {

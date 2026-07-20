@@ -12,6 +12,7 @@ import { MobAppearance } from "./mobAppearance.js";
 import { drawEquipmentItems, getCharacterOutlineWidth } from "./equipmentVisuals.js";
 import { applyHeroOrbCarryoverToBattleBall, mergeHeroOrbCarryover, HERO_ORB_CARRYOVER_RATE } from "./heroOrb.js";
 import { createEquipmentCombatEffects } from "../hunting/equipmentEffects.js";
+import { getElementalWetDefenseReduction } from "../effects/elementalWetState.js";
 import { AbilitySet } from "../abilities/abilitySet.js";
 import {
     drawRebirthVisualOverlay,
@@ -527,7 +528,11 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         amount = this.actionContext.onDamageTaken(amount, source, label);
         amount = sim?.modifyIncomingFighterCollisionDamage?.(amount, source, this, label) ?? amount;
         const abilityDefMult = this.getStatModifiers().defense;
-        const totalDefense = options.ignoreDefense ? 0 : Math.round(this.stats.baseDefense * abilityDefMult);
+        const defenseBeforeWet = options.ignoreDefense ? 0 : Math.round(this.stats.baseDefense * abilityDefMult);
+        const wetDefenseReduction = options.ignoreDefense
+            ? 0
+            : getElementalWetDefenseReduction(this, defenseBeforeWet, this.simulation?.elapsed ?? 0);
+        const totalDefense = Math.max(0, defenseBeforeWet - wetDefenseReduction);
         const hpBefore = this.hp;
         const rawActual = Math.max(1, Math.round(amount - totalDefense));
         const absorption = this.abilities.absorbIncomingDamage(rawActual, source, label, options);

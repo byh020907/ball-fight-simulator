@@ -2,6 +2,7 @@ import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
 import { EntityAttachment } from "../physics/index.js";
 import { ELEMENTAL_PALETTE } from "../abilities/elementalistRecipes.js";
 import { getVisibleLineWidth } from "./effectVisibility.js";
+import { addElementalWetStack, getActiveElementalWetStackCount, pruneElementalWetStacks } from "./elementalWetState.js";
 
 export const ELEMENTAL_WET_VISUAL_CONFIG = Object.freeze({
     rimPadding: 5,
@@ -49,15 +50,16 @@ function drawWetRims(ctx, target, time) {
     ctx.restore();
 }
 
-function drawFallingDroplets(ctx, target, time, fade) {
+function drawFallingDroplets(ctx, target, time, fade, stackCount) {
     const config = ELEMENTAL_WET_VISUAL_CONFIG;
+    const dropletCount = config.dropletCount + Math.max(0, stackCount - 1) * 3;
     const travel = target.radius * 2 + config.dropletTravelPadding * 2;
     ctx.save();
     ctx.fillStyle = ELEMENTAL_PALETTE.water;
     ctx.strokeStyle = "#e8fbff";
     ctx.lineWidth = getVisibleLineWidth(ctx, "hairline", 1.5);
-    Array.from({ length: config.dropletCount }, (_, index) => index).forEach((index) => {
-        const progress = (time * config.dropletSpeed + index / config.dropletCount) % 1;
+    Array.from({ length: dropletCount }, (_, index) => index).forEach((index) => {
+        const progress = (time * config.dropletSpeed + index / dropletCount) % 1;
         const side = index % 2 === 0 ? -1 : 1;
         const lane = 0.58 + (index % 3) * 0.15;
         const x = target.position.x + side * target.radius * lane;
@@ -73,16 +75,18 @@ function drawFallingDroplets(ctx, target, time, fade) {
 export class ElementalWetEffect extends EntityAttachment(CombatEntity) {
     static renderLayer = RENDER_LAYERS.FOREGROUND;
 
-    constructor({ target, simulation, expiresAt }) {
+    constructor({ target, simulation }) {
         super(target.position.clone(), new Vector2(), target.radius);
         this.target = target;
         this.attachToEntity(target);
         this.simulation = simulation;
-        this.expiresAt = expiresAt;
+        this.expiresAt = target.state.elementalWetUntil;
+        this.stackCount = getActiveElementalWetStackCount(target, simulation.elapsed);
     }
 
-    refresh(expiresAt) {
-        this.expiresAt = expiresAt;
+    refresh() {
+        this.stackCount = getActiveElementalWetStackCount(this.target, this.simulation.elapsed);
+        this.expiresAt = this.target.state.elementalWetUntil;
         this.isExpired = false;
     }
 
@@ -92,11 +96,13 @@ export class ElementalWetEffect extends EntityAttachment(CombatEntity) {
     }
 
     update() {
-        const wetUntil = this.target?.state?.elementalWetUntil ?? 0;
-        if (this.target?.flags?.defeated || wetUntil <= this.simulation.elapsed || wetUntil !== this.expiresAt) {
+        const activeExpiries = pruneElementalWetStacks(this.target, this.simulation.elapsed);
+        if (this.target?.flags?.defeated || activeExpiries.length === 0) {
             this.consume();
             return;
         }
+        this.stackCount = activeExpiries.length;
+        this.expiresAt = activeExpiries.at(-1);
         this.syncAttachedPosition();
     }
 
@@ -107,26 +113,24 @@ export class ElementalWetEffect extends EntityAttachment(CombatEntity) {
         const time = this.simulation.elapsed;
         ctx.save();
         ctx.globalAlpha = fade;
-        ctx.fillStyle = "rgba(119, 223, 255, 0.16)";
+        ctx.fillStyle = `rgba(119, 223, 255, ${0.1 + this.stackCount * 0.06})`;
         ctx.beginPath();
         ctx.arc(this.target.position.x, this.target.position.y, this.target.radius + 2, 0, Math.PI * 2);
         ctx.fill();
         drawWetRims(ctx, this.target, time);
-        drawFallingDroplets(ctx, this.target, time, fade);
+        drawFallingDroplets(ctx, this.target, time, fade, this.stackCount);
         ctx.restore();
     }
 }
 
 export function applyElementalWet(target, simulation, duration) {
-    target.state ||= {};
-    const expiresAt = simulation.elapsed + duration;
-    target.state.elementalWetUntil = expiresAt;
+    addElementalWetStack(target, simulation.elapsed, duration);
     const currentEffect = target.state.elementalWetEffect;
     if (currentEffect instanceof ElementalWetEffect && !currentEffect.isExpired) {
-        currentEffect.refresh(expiresAt);
+        currentEffect.refresh();
         return currentEffect;
     }
-    const effect = new ElementalWetEffect({ target, simulation, expiresAt });
+    const effect = new ElementalWetEffect({ target, simulation });
     target.state.elementalWetEffect = effect;
     simulation.entities.push(effect);
     return effect;

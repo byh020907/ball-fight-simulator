@@ -72,7 +72,7 @@ function createPreviewFighter(config, color) {
         radius: config.radius,
         color,
         flags: { defeated: false },
-        state: { elementalWetUntil: 0, elementalWetEffect: null },
+        state: { elementalWetUntil: 0, elementalWetStackExpiries: [], elementalWetEffect: null },
         stats: { baseSpeed: 300 }
     };
 }
@@ -135,6 +135,7 @@ export class ElementalistVfxPreviewScene {
     replay(previewMode = "dry") {
         this.effect?.consume?.();
         this.target.state.elementalWetUntil = 0;
+        this.target.state.elementalWetStackExpiries = [];
         this.target.state.elementalWetEffect = null;
         this.phaseElapsed = 0;
         this.wetReactionLeadIn = false;
@@ -157,6 +158,7 @@ export class ElementalistVfxPreviewScene {
     _createChannelEffect(wetSnapshot) {
         this.effect?.consume?.();
         this.target.state.elementalWetUntil = 0;
+        this.target.state.elementalWetStackExpiries = [];
         this.target.state.elementalWetEffect = null;
         this.phaseElapsed = 0;
         this.wetReactionLeadIn = false;
