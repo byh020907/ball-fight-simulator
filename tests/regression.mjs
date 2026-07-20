@@ -295,7 +295,12 @@ import { createEquipmentCombatEffects } from "../src/hunting/equipmentEffects.js
 import { EQUIPMENT } from "../src/hunting/equipmentData.js";
 import { createEquipmentName, getDominantEquipmentStat } from "../src/hunting/equipmentNaming.js";
 import { createHuntingTerrain } from "../src/terrain/terrainFactory.js";
-import { TERRAIN_SHAPES } from "../src/terrain/terrainConfig.js";
+import {
+    FOREST_TERRAIN_DEFAULTS,
+    TERRAIN_INTERACTIONS,
+    TERRAIN_SHAPES,
+    TERRAIN_TYPES
+} from "../src/terrain/terrainConfig.js";
 import { resolveTerrainCollision, resolveTerrainCollisions } from "../src/terrain/terrainCollision.js";
 import { drawTerrain } from "../src/terrain/terrainRenderer.js";
 import { getWorldPolygonPoints } from "../src/physics/CollisionShape.js";
@@ -10652,12 +10657,114 @@ function testHuntingTerrain() {
         assert.deepEqual(wp1, wp2, "Polygon world points should be deterministic");
     }
 
-    // ── forest/desert produce no terrain ──
-    assert.deepEqual(
-        createHuntingTerrain({ stageId: HUNTING_STAGE_IDS.FOREST, floor: 1, width: 1280, height: 1280 }),
-        [],
-        "Forest should produce no terrain"
+    // ── forest keeps a stage/floor pattern while its density follows arena area ──
+    const forestBase = createHuntingTerrain({
+        stageId: HUNTING_STAGE_IDS.FOREST,
+        floor: 23,
+        width: 1280,
+        height: 1280
+    });
+    const forestRepeat = createHuntingTerrain({
+        stageId: HUNTING_STAGE_IDS.FOREST,
+        floor: 23,
+        width: 1280,
+        height: 1280
+    });
+    const forestExpanded = createHuntingTerrain({
+        stageId: HUNTING_STAGE_IDS.FOREST,
+        floor: 23,
+        width: 1810,
+        height: 1810
+    });
+    assert.deepEqual(forestRepeat, forestBase, "The same forest floor and arena must reproduce exactly");
+    assert.equal(
+        forestBase.filter((terrain) => terrain.type === TERRAIN_TYPES.ROOT).length,
+        3,
+        "The base forest arena should create three low roots"
     );
+    assert.equal(
+        forestBase.filter((terrain) => terrain.type === TERRAIN_TYPES.BOUNCE_MUSHROOM).length,
+        1,
+        "The base forest arena should create one bounce mushroom"
+    );
+    assert.ok(forestExpanded.length > forestBase.length, "A larger forest arena should add terrain to retain density");
+    const forestSpawnAnchors = [
+        { x: 0.28, y: 0.5 },
+        ...Array.from({ length: 9 }, (_, countOffset) => countOffset + 2).flatMap((enemyCount) =>
+            Array.from({ length: enemyCount }, (_, index) => {
+                const ratio = index / (enemyCount - 1);
+                const angle = -Math.PI * 0.64 + Math.PI * 1.28 * ratio;
+                return {
+                    x: 0.68 + Math.cos(angle) * 0.12,
+                    y: 0.5 + Math.sin(angle) * 0.31
+                };
+            })
+        )
+    ];
+    for (const floor of Array.from({ length: 100 }, (_, index) => index + 1)) {
+        const floorTerrain = createHuntingTerrain({
+            stageId: HUNTING_STAGE_IDS.FOREST,
+            floor,
+            width: 1810,
+            height: 1810
+        });
+        assert.equal(floorTerrain.length, 8, `Forest floor ${floor} should fill every expanded terrain slot`);
+        for (const terrain of floorTerrain) {
+            assert.ok(
+                forestSpawnAnchors.every(
+                    (spawn) =>
+                        Math.hypot(terrain.x / 1810 - spawn.x, terrain.y / 1810 - spawn.y) >=
+                        FOREST_TERRAIN_DEFAULTS.NORMALIZED_SPAWN_CLEARANCE
+                ),
+                `Forest floor ${floor} terrain should keep every possible fighter spawn clear`
+            );
+        }
+    }
+    for (const terrain of forestBase) {
+        assert.equal(terrain.shape, TERRAIN_SHAPES.POLYGON, "Forest terrain should remain polygon based");
+        const expandedMatch = forestExpanded.find((candidate) => candidate.id === terrain.id);
+        assert.ok(expandedMatch, "Expanded arenas should preserve the base pattern entries");
+        assert.equal(expandedMatch.angle, terrain.angle, "Expanded arenas should preserve terrain orientation");
+        assert.deepEqual(expandedMatch.points, terrain.points, "Expanded arenas should preserve terrain shape");
+        assert.ok(
+            Math.abs(expandedMatch.x / 1810 - terrain.x / 1280) < 1e-9 &&
+                Math.abs(expandedMatch.y / 1810 - terrain.y / 1280) < 1e-9,
+            "Expanded arenas should scale the same normalized anchors"
+        );
+    }
+    const mushroom = forestBase.find((terrain) => terrain.type === TERRAIN_TYPES.BOUNCE_MUSHROOM);
+    assert.equal(mushroom.interaction?.type, TERRAIN_INTERACTIONS.CENTER_BOUNCE);
+    const mushroomFighter = {
+        position: { x: mushroom.x, y: mushroom.y },
+        velocity: new Vector2(180, 0),
+        radius: 24,
+        stats: { baseSpeed: 320 },
+        applyImpulse(impulse) {
+            this.velocity.add(impulse);
+        },
+        applyPositionCorrection(correction) {
+            this.position.x += correction.x;
+            this.position.y += correction.y;
+        }
+    };
+    assert.ok(resolveTerrainCollision(mushroomFighter, mushroom), "Bounce mushrooms should use terrain collision");
+    const towardArenaCenter = new Vector2(640 - mushroomFighter.position.x, 640 - mushroomFighter.position.y);
+    assert.ok(
+        mushroomFighter.velocity.dot(towardArenaCenter) > 0,
+        "Bounce mushrooms should redirect fighters toward the arena center"
+    );
+    const forestContext = makeRecordingCanvasContext();
+    drawTerrain(forestContext, forestBase, 1.25);
+    assert.ok(
+        forestContext.calls.some((call) => call[0] === "ellipse"),
+        "Forest roots should render animated leaf litter"
+    );
+    assert.ok(
+        forestContext.calls.filter((call) => call[0] === "arc").length >= 3,
+        "Bounce mushrooms should render cap spots and drifting spores"
+    );
+
+    // ── desert still has no terrain ──
     assert.deepEqual(
         createHuntingTerrain({ stageId: HUNTING_STAGE_IDS.DESERT, floor: 1, width: 1440, height: 1280 }),
         [],
