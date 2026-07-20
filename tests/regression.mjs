@@ -153,6 +153,8 @@ import {
     applyHuntingCursedAltar,
     applyHuntingStatModifiersToSpec,
     getHuntingAvailableStartFloors,
+    getHuntingRunCharacterId,
+    getHuntingRunHealth,
     getEligibleHuntingCharacters,
     selectHuntingModeCharacterId,
     getEnemyPowerMultiplier,
@@ -173,6 +175,8 @@ import {
     retreatHuntingRun,
     rollHuntingEvent,
     setHuntingRunPhase,
+    setHuntingRunActiveHealth,
+    setHuntingRunMemberHeroCarryover,
     rollHuntingChestReward,
     rollHuntingFloorOutcome,
     scaleEnemySpecForHunting,
@@ -2865,9 +2869,13 @@ function testHuntingEventHealthInitialization() {
 
     manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE });
     const restResolution = manager._resolveHuntingEvent(restEvent, mockApp);
-    const maxHp = restResolution.run.carriedMaxHp;
+    const maxHp = getHuntingRunHealth(restResolution.run).maxHp;
     assert.ok(maxHp > 0, "A first hunting event should initialize the player's actual maximum HP");
-    assert.equal(restResolution.run.carriedHp, maxHp, "A rest site should not turn a fresh run into low HP");
+    assert.equal(
+        getHuntingRunHealth(restResolution.run).hp,
+        maxHp,
+        "A rest site should not turn a fresh run into low HP"
+    );
     assert.ok(
         !restResolution.presentation.detail.includes("undefined"),
         "Rest site UI should always show a maximum HP"
@@ -2876,22 +2884,23 @@ function testHuntingEventHealthInitialization() {
     manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE });
     const mishapResolution = manager._resolveHuntingEvent(mishapEvent, mockApp);
     assert.equal(
-        mishapResolution.run.carriedMaxHp,
+        getHuntingRunHealth(mishapResolution.run).maxHp,
         maxHp,
         "Mishaps should use the same initialized maximum HP as rest sites"
     );
     assert.ok(
-        mishapResolution.run.carriedHp > 0 && mishapResolution.run.carriedHp < maxHp,
+        getHuntingRunHealth(mishapResolution.run).hp > 0 && getHuntingRunHealth(mishapResolution.run).hp < maxHp,
         "A first mishap should deal damage from the player's actual HP without causing defeat"
     );
 
     manager._run = createHuntingRun({ characterId: FIGHTER_IDS.HERO, stageId: HUNTING_STAGE_IDS.CAVE });
-    const heroBase = manager._resolveHuntingEvent(restEvent, mockApp).run.carriedMaxHp;
-    manager._run = {
-        ...createHuntingRun({ characterId: FIGHTER_IDS.HERO, stageId: HUNTING_STAGE_IDS.CAVE }),
-        hero: { bonuses: {}, carryover: { hp: 3, damage: 0, speed: 0, defense: 0, skill: 0 } }
-    };
-    const heroCarryover = manager._resolveHuntingEvent(restEvent, mockApp).run.carriedMaxHp;
+    const heroBase = getHuntingRunHealth(manager._resolveHuntingEvent(restEvent, mockApp).run).maxHp;
+    manager._run = setHuntingRunMemberHeroCarryover(
+        createHuntingRun({ characterId: FIGHTER_IDS.HERO, stageId: HUNTING_STAGE_IDS.CAVE }),
+        HUNTING_PARTY_ROLES.LEADER,
+        { hp: 3, damage: 0, speed: 0, defense: 0, skill: 0 }
+    );
+    const heroCarryover = getHuntingRunHealth(manager._resolveHuntingEvent(restEvent, mockApp).run).maxHp;
     assert.equal(heroCarryover - heroBase, 15, "Event HP should include Hero Ball's carried HP bonuses");
     console.log("[hunting-event-health-initialization] ok");
 }
@@ -3032,18 +3041,17 @@ function testHuntingConsumableInventoryAndUseLimits() {
         "Potion use limit should cap at five per hunting run"
     );
 
-    const run = {
-        ...createHuntingRun({ characterId: FIGHTER_IDS.ARCHER }),
-        carriedHp: 56,
-        carriedMaxHp: 224
-    };
+    const run = setHuntingRunActiveHealth(createHuntingRun({ characterId: FIGHTER_IDS.ARCHER }), {
+        hp: 56,
+        maxHp: 224
+    });
     const preparationItems = getHuntingPreparationConsumables(profile, run);
     assert.equal(preparationItems[0].healAmount, 56, "Potion healing should be 25% of the actual run maximum HP");
     assert.equal(preparationItems[0].canUse, true, "A wounded player with stock and run allowance should use a potion");
 
     const firstUse = useHuntingPreparationConsumable(profile, run, CONSUMABLE_IDS.HP_POTION);
     assert.ok(firstUse, "The first potion use should succeed");
-    assert.equal(firstUse.run.carriedHp, 112, "Potion use should restore 25% of maximum HP");
+    assert.equal(getHuntingRunHealth(firstUse.run).hp, 112, "Potion use should restore 25% of maximum HP");
     assert.equal(firstUse.run.consumableUses[CONSUMABLE_IDS.HP_POTION], 1, "Run should record only used potions");
     assert.equal(profile.consumables.owned[CONSUMABLE_IDS.HP_POTION], 9, "Potion stock should decrease only when used");
     assert.equal(
@@ -3055,7 +3063,11 @@ function testHuntingConsumableInventoryAndUseLimits() {
     const nextBattleRun = { ...firstUse.run, battleConsumableUses: {} };
     const secondUse = useHuntingPreparationConsumable(profile, nextBattleRun, CONSUMABLE_IDS.HP_POTION);
     assert.ok(secondUse, "A later battle should allow another potion while the run allowance remains");
-    const fullHpRun = { ...secondUse.run, carriedHp: secondUse.run.carriedMaxHp, battleConsumableUses: {} };
+    const secondUseHealth = getHuntingRunHealth(secondUse.run);
+    const fullHpRun = {
+        ...setHuntingRunActiveHealth(secondUse.run, { hp: secondUseHealth.maxHp, maxHp: secondUseHealth.maxHp }),
+        battleConsumableUses: {}
+    };
     assert.equal(
         useHuntingPreparationConsumable(profile, fullHpRun, CONSUMABLE_IDS.HP_POTION),
         null,
@@ -3085,8 +3097,10 @@ function testHuntingBattlePreparationUsesActualBattleHp() {
     };
     const manager = new HuntingManager(mockApp);
     manager._run = {
-        ...createHuntingRun({ characterId: FIGHTER_IDS.ARCHER }),
-        carriedHp: 28.4,
+        ...setHuntingRunActiveHealth(createHuntingRun({ characterId: FIGHTER_IDS.ARCHER }), {
+            hp: 28.4,
+            maxHp: 168
+        }),
         lastEncounter: { type: HUNTING_FLOOR_OUTCOME_TYPES.COMBAT }
     };
 
@@ -3120,7 +3134,11 @@ function testHuntingBattlePreparationUsesActualBattleHp() {
 
     const useResult = manager.usePreparationConsumable(CONSUMABLE_IDS.HP_POTION);
     assert.ok(Math.abs(useResult.healed - 42) < 1e-9, "Preparation potion use should report the actual healed amount");
-    assert.equal(manager._run.carriedHp, 70.4, "Preparation potion use should preserve raw HP before battle start");
+    assert.equal(
+        getHuntingRunHealth(manager._run).hp,
+        70.4,
+        "Preparation potion use should preserve raw HP before battle start"
+    );
     assert.equal(
         overlayStates.at(-1).huntingBattlePreparationHp,
         71,
@@ -3145,11 +3163,10 @@ function testHuntingBattlePreparationUsesActualBattleHp() {
 }
 
 function testHuntingHealthDisplayUsesSharedIntegerGetter() {
-    const run = {
-        ...createHuntingRun({ characterId: FIGHTER_IDS.DASH }),
-        carriedHp: 42.1,
-        carriedMaxHp: 101.5
-    };
+    const run = setHuntingRunActiveHealth(createHuntingRun({ characterId: FIGHTER_IDS.DASH }), {
+        hp: 42.1,
+        maxHp: 101.5
+    });
     assert.deepEqual(
         getHuntingDisplayHealth(run),
         { hp: 43, maxHp: 102 },
@@ -3191,7 +3208,11 @@ function testHuntingHealthDisplayUsesSharedIntegerGetter() {
     )[0];
     assert.match(repairOffer.description, /102\)$/, "Merchant repair offer should display an integer maximum HP");
     const repair = applyMerchantOffer(run, profile, repairOffer);
-    assert.equal(repair.run.carriedHp, 77.1, "Merchant repair should preserve the raw fractional HP state");
+    assert.equal(
+        getHuntingRunHealth(repair.run).hp,
+        77.1,
+        "Merchant repair should preserve the raw fractional HP state"
+    );
     assert.match(
         formatOfferResultToast(repair.result),
         /\(78\)$/,
@@ -9171,7 +9192,7 @@ function testHuntingSystem() {
         maxHp: 100,
         loot: { shards: 100, chests: [common, uncommon, rare] }
     });
-    assert.equal(afterFloor.carriedHp, 55, "Hunting run should carry HP between floors");
+    assert.equal(getHuntingRunHealth(afterFloor).hp, 55, "Hunting run should carry HP between floors");
     assert.equal(afterFloor.pendingLoot.chests.length, 3, "Floor rewards should stay pending");
 
     // rng(1)=0.4→EVENT, rng(2)=0.5→CHEST_ROOM(idx4), rng(3)=0→uncommon
@@ -9981,21 +10002,20 @@ function testHuntingMovementRecovery() {
         return () => values[index++] ?? values.at(-1) ?? 0;
     };
 
-    let lowHpRun = {
-        ...createHuntingRun({ characterId: FIGHTER_IDS.ARCHER, now: 0 }),
-        carriedHp: 1,
-        carriedMaxHp: 100
-    };
+    let lowHpRun = setHuntingRunActiveHealth(createHuntingRun({ characterId: FIGHTER_IDS.ARCHER, now: 0 }), {
+        hp: 1,
+        maxHp: 100
+    });
     for (let step = 0; step < 10; step += 1) {
         lowHpRun = advanceHuntingRun(lowHpRun, { rng: () => 0.9 });
     }
     const expectedTenFloorHp = 100 - 99 * Math.pow(0.9, 10);
     assert.ok(
-        Math.abs(lowHpRun.carriedHp - expectedTenFloorHp) < 1e-6,
+        Math.abs(getHuntingRunHealth(lowHpRun).hp - expectedTenFloorHp) < 1e-6,
         "Ten floor recoveries should preserve raw fractional HP"
     );
     assert.equal(
-        getHuntingDisplayHp(lowHpRun.carriedHp),
+        getHuntingDisplayHp(getHuntingRunHealth(lowHpRun).hp),
         66,
         "Hunting HP display should keep its existing ceiling rule"
     );
@@ -10006,10 +10026,13 @@ function testHuntingMovementRecovery() {
     );
 
     const fullHpRun = advanceHuntingRun(
-        { ...createHuntingRun({ characterId: FIGHTER_IDS.ARCHER, now: 0 }), carriedHp: 100, carriedMaxHp: 100 },
+        setHuntingRunActiveHealth(createHuntingRun({ characterId: FIGHTER_IDS.ARCHER, now: 0 }), {
+            hp: 100,
+            maxHp: 100
+        }),
         { rng: () => 0.9 }
     );
-    assert.equal(fullHpRun.carriedHp, 100, "Full HP should remain capped without changing its raw value");
+    assert.equal(getHuntingRunHealth(fullHpRun).hp, 100, "Full HP should remain capped without changing its raw value");
     assert.equal(
         fullHpRun.history.some((entry) => entry.type === "floor_recovery"),
         false,
@@ -10018,7 +10041,10 @@ function testHuntingMovementRecovery() {
 
     const portalRolls = [0.5, 0.15, 0.999999];
     const recoveredPortalRun = advanceHuntingRun(
-        { ...createHuntingRun({ characterId: FIGHTER_IDS.ARCHER, now: 0 }), carriedHp: 49, carriedMaxHp: 100 },
+        setHuntingRunActiveHealth(createHuntingRun({ characterId: FIGHTER_IDS.ARCHER, now: 0 }), {
+            hp: 49,
+            maxHp: 100
+        }),
         { rng: createSequenceRng(portalRolls) }
     );
     const recoveredHpRatio = 54.1 / 100;
@@ -10031,7 +10057,7 @@ function testHuntingMovementRecovery() {
         portalDeclineFloors: 0
     });
     assert.equal(
-        recoveredPortalRun.carriedHp,
+        getHuntingRunHealth(recoveredPortalRun).hp,
         54.1,
         "Recovery must happen after floor advancement and before encounter rolls"
     );
@@ -10257,7 +10283,11 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
         );
         const startPromise = manager.startRun(FIGHTER_IDS.RAGE, { encounterFloor: 1 });
         await Promise.resolve();
-        assert.equal(manager._run.characterId, FIGHTER_IDS.RAGE, "Run should use the current preview character");
+        assert.equal(
+            getHuntingRunCharacterId(manager._run),
+            FIGHTER_IDS.RAGE,
+            "Run should use the current preview character"
+        );
         assert.deepEqual(
             profile.hunting.stats.visitedStageIds,
             [HUNTING_STAGE_IDS.CAVE],
@@ -19391,10 +19421,8 @@ testAntiStallProjectileHitDoesNotResetTimer();
 function testHuntingMerchantOffers() {
     const run = createHuntingRun({ characterId: FIGHTER_IDS.DASH });
     const runWithHp = {
-        ...run,
+        ...setHuntingRunActiveHealth(run, { hp: 50, maxHp: 100 }),
         floor: 10,
-        carriedHp: 50,
-        carriedMaxHp: 100,
         pendingLoot: {
             shards: 25,
             chests: [
@@ -19465,7 +19493,10 @@ function testHuntingMerchantOffers() {
     const repairResult = applyMerchantOffer(runWithHp, profile, offers[0]);
     assert.ok(repairResult !== null, "Repair offer should apply");
     assert.equal(profile.hunting.shards, 200 - offers[0].cost, "Repair should spend permanent shards");
-    assert.ok(repairResult.run.carriedHp > runWithHp.carriedHp, "Repair should increase carried HP");
+    assert.ok(
+        getHuntingRunHealth(repairResult.run).hp > getHuntingRunHealth(runWithHp).hp,
+        "Repair should increase carried HP"
+    );
     assert.equal(repairResult.result.type, "repair", "Result type should be repair");
     assert.ok(repairResult.result.healed > 0, "Should have healed positive amount");
     const toastMsg = formatOfferResultToast(repairResult.result);
@@ -19509,7 +19540,7 @@ function testHuntingMerchantOffers() {
         "Purchased offer should return null"
     );
     assert.equal(
-        applyMerchantOffer({ ...runWithHp, carriedHp: runWithHp.carriedMaxHp }, profile, offers[0]),
+        applyMerchantOffer(setHuntingRunActiveHealth(runWithHp, { hp: 100, maxHp: 100 }), profile, offers[0]),
         null,
         "Repair should return null when current run HP is already full"
     );
@@ -20244,10 +20275,8 @@ function testHuntingLootHud() {
 function testHuntingDefeatChestLoss() {
     const run = createHuntingRun({ characterId: FIGHTER_IDS.DASH });
     const runWithChests = {
-        ...run,
+        ...setHuntingRunActiveHealth(run, { hp: 30, maxHp: 100 }),
         floor: 5,
-        carriedHp: 30,
-        carriedMaxHp: 100,
         status: "active",
         pendingLoot: {
             shards: 100,
@@ -20386,9 +20415,11 @@ function testHuntingHeroCarryoverInStartFloorBattle(app) {
 
     // Hero Ball should receive carryover injection
     capturedSpecs.length = 0;
-    const runHero = createHuntingRun({ characterId: FIGHTER_IDS.HERO, stageId: HUNTING_STAGE_IDS.CAVE });
-    runHero.hero.carryover.hp = 2;
-    runHero.hero.carryover.damage = 1;
+    const runHero = setHuntingRunMemberHeroCarryover(
+        createHuntingRun({ characterId: FIGHTER_IDS.HERO, stageId: HUNTING_STAGE_IDS.CAVE }),
+        HUNTING_PARTY_ROLES.LEADER,
+        { hp: 2, damage: 1 }
+    );
     manager._run = runHero;
     manager._startFloorBattle();
 
@@ -20398,8 +20429,11 @@ function testHuntingHeroCarryoverInStartFloorBattle(app) {
 
     // Non-Hero should NOT receive carryover injection
     capturedSpecs.length = 0;
-    const runArcher = createHuntingRun({ characterId: FIGHTER_IDS.ARCHER, stageId: HUNTING_STAGE_IDS.CAVE });
-    runArcher.hero.carryover.hp = 2;
+    const runArcher = setHuntingRunMemberHeroCarryover(
+        createHuntingRun({ characterId: FIGHTER_IDS.ARCHER, stageId: HUNTING_STAGE_IDS.CAVE }),
+        HUNTING_PARTY_ROLES.LEADER,
+        { hp: 2 }
+    );
     manager._run = runArcher;
     manager._startFloorBattle();
 
@@ -20416,17 +20450,20 @@ function testHuntingHeroCarryoverInHandleFinish(app) {
     ball.hero.bonuses.hp = 5;
     ball.hero.bonuses.damage = 3;
 
-    const run = createHuntingRun({ characterId: FIGHTER_IDS.HERO, stageId: HUNTING_STAGE_IDS.CAVE });
+    let run = createHuntingRun({ characterId: FIGHTER_IDS.HERO, stageId: HUNTING_STAGE_IDS.CAVE });
+    let carryoverTarget = { hero: { carryover: { ...run.party.members.leader.hero.carryover } } };
+    ball.mergeHeroOrbCarryoverInto(carryoverTarget);
+    run = setHuntingRunMemberHeroCarryover(run, HUNTING_PARTY_ROLES.LEADER, carryoverTarget.hero.carryover);
 
-    ball.mergeHeroOrbCarryoverInto(run);
-
-    assert.equal(run.hero.carryover.hp, 2, "hp: floor(5*0.5)=2");
-    assert.equal(run.hero.carryover.damage, 1, "damage: floor(3*0.5)=1");
-    assert.equal(run.hero.carryover.speed, 0, "speed should remain 0");
+    assert.equal(run.party.members.leader.hero.carryover.hp, 2, "hp: floor(5*0.5)=2");
+    assert.equal(run.party.members.leader.hero.carryover.damage, 1, "damage: floor(3*0.5)=1");
+    assert.equal(run.party.members.leader.hero.carryover.speed, 0, "speed should remain 0");
 
     ball.hero.bonuses.hp = 3;
-    ball.mergeHeroOrbCarryoverInto(run);
-    assert.equal(run.hero.carryover.hp, 2 + 1, "second merge: floor(3*0.5)=1, total 3");
+    carryoverTarget = { hero: { carryover: { ...run.party.members.leader.hero.carryover } } };
+    ball.mergeHeroOrbCarryoverInto(carryoverTarget);
+    run = setHuntingRunMemberHeroCarryover(run, HUNTING_PARTY_ROLES.LEADER, carryoverTarget.hero.carryover);
+    assert.equal(run.party.members.leader.hero.carryover.hp, 2 + 1, "second merge: floor(3*0.5)=1, total 3");
 
     console.log("[hunting-hero-carryover-handle-finish] ok");
 }
@@ -21661,7 +21698,7 @@ async function testHuntingEndToEnd() {
     const run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, now: 1000 });
     assert.equal(run.floor, 1, "Run starts at floor 1");
     assert.equal(run.status, "active", "New run should be active");
-    assert.equal(run.characterId, FIGHTER_IDS.DASH, "Run should use correct character");
+    assert.equal(getHuntingRunCharacterId(run), FIGHTER_IDS.DASH, "Run should use correct character");
 
     // Advance floor 1→2: empty outcome (rng=0.9 > 0.7 combat+event threshold)
     const f1 = advanceHuntingRun(run, { rng: () => 0.9 });
@@ -21679,7 +21716,7 @@ async function testHuntingEndToEnd() {
         maxHp: 100,
         loot: { shards: 20, chests: [commonChest] }
     });
-    assert.equal(f2Done.carriedHp, 80, "HP carryover after combat");
+    assert.equal(getHuntingRunHealth(f2Done).hp, 80, "HP carryover after combat");
     assert.equal(f2Done.pendingLoot.shards, 20, "Shards should be pending");
     assert.equal(f2Done.pendingLoot.chests.length, 1, "Chests should be pending");
 
@@ -22036,13 +22073,14 @@ await testNoGameBridgeInProduction();
 function testHuntingMishapAvoidsLowHpRuns() {
     const event = new MishapEvent(HUNTING_EVENT_TYPES.MISHAP);
     const run = {
-        ...createHuntingRun({ characterId: FIGHTER_IDS.DASH }),
-        floor: 70,
-        carriedHp: 100,
-        carriedMaxHp: 100
+        ...setHuntingRunActiveHealth(createHuntingRun({ characterId: FIGHTER_IDS.DASH }), {
+            hp: 100,
+            maxHp: 100
+        }),
+        floor: 70
     };
     const result = event.resolve(event.createPayload(70), { run });
-    assert.equal(result.run.carriedHp, 90, "Deep mishaps should remove 10% of current HP");
+    assert.equal(getHuntingRunHealth(result.run).hp, 90, "Deep mishaps should remove 10% of current HP");
     const highHp = rollHuntingFloorOutcome(
         10,
         (() => {

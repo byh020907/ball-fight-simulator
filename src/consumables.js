@@ -164,8 +164,9 @@ export function getHuntingPreparationConsumables(profile, run) {
     const runUses = run?.consumableUses ?? {};
     const battleUses = run?.battleConsumableUses ?? {};
     const useLimit = getHuntingConsumableUseLimit(profile);
-    const currentHp = Math.max(0, run?.carriedHp ?? 0);
-    const maxHp = Math.max(0, run?.carriedMaxHp ?? 0);
+    const health = getHuntingRunHealth(run);
+    const currentHp = Math.max(0, health.hp ?? 0);
+    const maxHp = Math.max(0, health.maxHp ?? 0);
     const preparationDefinitions = Object.values(CONSUMABLE_DEFINITIONS).filter(
         (definition) => definition.useContext === "hunting_battle_preparation"
     );
@@ -217,12 +218,12 @@ export function useHuntingPreparationConsumable(profile, run, consumableId) {
     if (!consumable || !consumable.canUse) return null;
 
     const consumables = ensureConsumables(profile);
-    const nextHp = Math.min(run.carriedMaxHp, run.carriedHp + consumable.healAmount);
+    const health = getHuntingRunHealth(run);
+    const nextHp = Math.min(health.maxHp, health.hp + consumable.healAmount);
     consumables.owned[consumableId] -= 1;
     return {
         run: {
-            ...run,
-            carriedHp: nextHp,
+            ...setHuntingRunActiveHealth(run, { hp: nextHp, maxHp: health.maxHp }),
             consumableUses: {
                 ...(run.consumableUses ?? {}),
                 [consumableId]: Math.max(0, Math.floor(run.consumableUses?.[consumableId] ?? 0)) + 1
@@ -237,7 +238,7 @@ export function useHuntingPreparationConsumable(profile, run, consumableId) {
                     type: "consumable_use",
                     consumableId,
                     floor: run.floor,
-                    healed: nextHp - run.carriedHp,
+                    healed: nextHp - health.hp,
                     hpRemain: nextHp
                 }
             ]
@@ -245,12 +246,13 @@ export function useHuntingPreparationConsumable(profile, run, consumableId) {
         result: {
             consumableId,
             label: consumable.label,
-            healed: nextHp - run.carriedHp,
+            healed: nextHp - health.hp,
             hpRemain: nextHp,
-            maxHp: run.carriedMaxHp,
+            maxHp: health.maxHp,
             owned: consumables.owned[consumableId],
             usedInRun: consumable.usedInRun + 1,
             useLimit: consumable.useLimit
         }
     };
 }
+import { getHuntingRunHealth, setHuntingRunActiveHealth } from "./hunting/huntingState.js";

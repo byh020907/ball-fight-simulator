@@ -11,6 +11,16 @@ import { applyDefeatPreservation, createEmptyHuntingLoot, mergeHuntingLoot } fro
 import { HUNTING_EVENT_TYPES } from "./huntingConfig.js";
 import { createHuntingAchievementProgress } from "./huntingAchievementProgress.js";
 import { isCharacterUnlocked } from "../playerProfile.js";
+import {
+    HUNTING_PARTY_ROLES,
+    advanceHuntingSupportCharges,
+    applyHuntingPartyFloorRecovery,
+    createHuntingPartyState,
+    getActiveHuntingPartyMember,
+    getHuntingPartyMember,
+    setHuntingPartyMemberHealth,
+    setHuntingPartyMemberHeroCarryover
+} from "./huntingPartyState.js";
 
 export const HUNTING_RUN_PHASES = Object.freeze({
     READY: "ready",
@@ -55,6 +65,9 @@ export function selectHuntingModeCharacterId(profile, roster = [], currentCharac
 
 export function createHuntingRun({
     characterId,
+    companionId = null,
+    swapId = null,
+    supportIds = [],
     stageId = HUNTING_STAGE_IDS.CAVE,
     now = Date.now(),
     maxFloor = HUNTING_MAX_FLOOR
@@ -68,16 +81,10 @@ export function createHuntingRun({
         mode: "hunting",
         status: "active",
         phase: HUNTING_RUN_PHASES.READY,
-        characterId,
+        party: createHuntingPartyState({ leaderId: characterId, companionId, swapId, supportIds }),
         stageId,
-        hero: {
-            bonuses: { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 },
-            carryover: { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 }
-        },
         floor: 1,
         maxFloor,
-        carriedHp: null,
-        carriedMaxHp: null,
         consumableUses: {},
         battleConsumableUses: {},
         statModifiers: [],
@@ -95,6 +102,33 @@ export function createHuntingRun({
         endedAt: null,
         endedReason: null
     };
+}
+
+export function getHuntingRunActiveMember(run) {
+    return getActiveHuntingPartyMember(run?.party);
+}
+
+export function getHuntingRunCharacterId(run) {
+    return getHuntingRunActiveMember(run)?.characterId ?? null;
+}
+
+export function getHuntingRunHealth(run, role = run?.party?.activeRole) {
+    const member = getHuntingPartyMember(run?.party, role);
+    return { hp: member?.hp ?? null, maxHp: member?.maxHp ?? null };
+}
+
+export function setHuntingRunMemberHealth(run, role, health) {
+    if (!run?.party) return run;
+    return { ...run, party: setHuntingPartyMemberHealth(run.party, role, health) };
+}
+
+export function setHuntingRunActiveHealth(run, health) {
+    return setHuntingRunMemberHealth(run, run?.party?.activeRole, health);
+}
+
+export function setHuntingRunMemberHeroCarryover(run, role, carryover) {
+    if (!run?.party) return run;
+    return { ...run, party: setHuntingPartyMemberHeroCarryover(run.party, role, carryover) };
 }
 
 export function getHuntingAvailableStartFloors(stats, stageId) {
@@ -206,8 +240,13 @@ export function recordHuntingFloorResult(
         ...run,
         statModifiers: consumed.statModifiers,
         combatReliefFloors,
-        carriedHp: hpRemain === null ? run.carriedHp : Math.max(0, hpRemain),
-        carriedMaxHp: maxHp === null ? run.carriedMaxHp : Math.max(0, maxHp),
+        party:
+            hpRemain === null && maxHp === null
+                ? run.party
+                : setHuntingPartyMemberHealth(run.party, run.party.activeRole, {
+                      hp: hpRemain === null ? getHuntingRunHealth(run).hp : Math.max(0, hpRemain),
+                      maxHp: maxHp === null ? getHuntingRunHealth(run).maxHp : Math.max(0, maxHp)
+                  }),
         pendingLoot: mergeHuntingLoot(run.pendingLoot, loot),
         history: [
             ...run.history,
@@ -224,12 +263,12 @@ export function recordHuntingFloorResult(
 
 export function applyHuntingEventRecovery(run, { amount = 0 } = {}) {
     if (!run || run.status !== "active") return run;
-    const maxHp = Number.isFinite(run.carriedMaxHp) && run.carriedMaxHp > 0 ? run.carriedMaxHp : null;
+    const { hp, maxHp: rawMaxHp } = getHuntingRunHealth(run);
+    const maxHp = Number.isFinite(rawMaxHp) && rawMaxHp > 0 ? rawMaxHp : null;
     if (maxHp === null) return run;
-    const recoveredHp = Math.min(maxHp, Math.max(0, (run.carriedHp ?? maxHp) + Math.max(0, amount)));
+    const recoveredHp = Math.min(maxHp, Math.max(0, (hp ?? maxHp) + Math.max(0, amount)));
     return {
-        ...run,
-        carriedHp: recoveredHp,
+        ...setHuntingRunActiveHealth(run, { hp: recoveredHp, maxHp }),
         history: [
             ...run.history,
             {
@@ -244,24 +283,23 @@ export function applyHuntingEventRecovery(run, { amount = 0 } = {}) {
 
 export function applyHuntingFloorRecovery(run) {
     if (!run || run.status !== "active") return run;
-    const maxHp = Number.isFinite(run.carriedMaxHp) && run.carriedMaxHp > 0 ? run.carriedMaxHp : null;
-    if (maxHp === null) return run;
-
-    const currentHp = Math.min(maxHp, Math.max(0, run.carriedHp ?? maxHp));
-    const recoveredAmount = (maxHp - currentHp) * 0.1;
-    if (recoveredAmount <= 0) return run;
-
-    const recoveredHp = Math.min(maxHp, currentHp + recoveredAmount);
+    const recoveredParty = applyHuntingPartyFloorRecovery(run.party);
+    const recoveries = Object.values(HUNTING_PARTY_ROLES).flatMap((role) => {
+        const before = getHuntingPartyMember(run.party, role);
+        const after = getHuntingPartyMember(recoveredParty, role);
+        const amount = (after?.hp ?? 0) - (before?.hp ?? 0);
+        return amount > 0 ? [{ role, amount, hpRemain: after.hp }] : [];
+    });
+    if (recoveries.length === 0) return { ...run, party: advanceHuntingSupportCharges(recoveredParty) };
     return {
         ...run,
-        carriedHp: recoveredHp,
+        party: advanceHuntingSupportCharges(recoveredParty),
         history: [
             ...run.history,
             {
                 type: "floor_recovery",
                 floor: run.floor,
-                amount: recoveredAmount,
-                hpRemain: recoveredHp
+                recoveries
             }
         ]
     };

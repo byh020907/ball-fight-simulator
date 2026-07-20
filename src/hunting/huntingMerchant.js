@@ -3,6 +3,7 @@ import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 import { buyConsumable, getConsumableDefinition, getConsumableOwnedCount } from "../consumables.js";
 import { getHuntingDisplayHealth, getHuntingDisplayHp } from "./huntingHealth.js";
 import { getRarityLabel } from "./rarityPresentation.js";
+import { getHuntingRunHealth, setHuntingRunActiveHealth } from "./huntingState.js";
 
 export const MERCHANT_OFFER_TYPES = Object.freeze({
     REPAIR: "repair",
@@ -25,8 +26,9 @@ export function createMerchantOffers(run, event, profile) {
 }
 
 function _createRepairOffer(run, discount) {
-    const maxHp = run.carriedMaxHp ?? 100;
-    const currentHp = run.carriedHp ?? maxHp;
+    const health = getHuntingRunHealth(run);
+    const maxHp = health.maxHp ?? 100;
+    const currentHp = health.hp ?? maxHp;
     const displayHealth = getHuntingDisplayHealth(run);
     const healPct = REWARD_BALANCE.hunting.events.merchant.repair.recoveryRatio;
     const healAmount = Math.max(1, Math.floor(maxHp * healPct));
@@ -108,10 +110,8 @@ export function applyMerchantOffer(run, profile, offer) {
         const purchase = buyConsumable(profile, offer.consumableId, { cost: offer.cost });
         return purchase ? { run: { ...run }, result: { type: "consumable", purchase } } : null;
     }
-    if (
-        offer.type === MERCHANT_OFFER_TYPES.REPAIR &&
-        (run.carriedHp ?? run.carriedMaxHp ?? 100) >= (run.carriedMaxHp ?? 100)
-    ) {
+    const health = getHuntingRunHealth(run);
+    if (offer.type === MERCHANT_OFFER_TYPES.REPAIR && (health.hp ?? health.maxHp ?? 100) >= (health.maxHp ?? 100)) {
         return null;
     }
     if (offer.type === MERCHANT_OFFER_TYPES.SECURE_TRANSPORT && (run.pendingLoot?.chests ?? []).length === 0) {
@@ -126,11 +126,12 @@ export function applyMerchantOffer(run, profile, offer) {
     let result = null;
 
     if (offer.type === MERCHANT_OFFER_TYPES.REPAIR) {
-        const maxHp = newRun.carriedMaxHp ?? newRun.carriedHp ?? 100;
-        const currentHp = newRun.carriedHp ?? maxHp;
+        const currentHealth = getHuntingRunHealth(newRun);
+        const maxHp = currentHealth.maxHp ?? currentHealth.hp ?? 100;
+        const currentHp = currentHealth.hp ?? maxHp;
         const healed = Math.min(offer.healAmount, maxHp - currentHp);
-        newRun.carriedHp = currentHp + healed;
-        result = { type: "repair", healed, newHp: newRun.carriedHp };
+        newRun = setHuntingRunActiveHealth(newRun, { hp: currentHp + healed, maxHp });
+        result = { type: "repair", healed, newHp: currentHp + healed };
     } else if (offer.type === MERCHANT_OFFER_TYPES.BUY_LOOT) {
         const chest = createHuntingChest({ rarity: "common" });
         newRun.pendingLoot = {

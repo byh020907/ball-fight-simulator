@@ -1,7 +1,7 @@
 import { REWARD_BALANCE } from "../../rewardBalanceConfig.js";
 import { HUNTING_EVENT_TRANSITIONS, HuntingEvent } from "./huntingEvent.js";
 import { rollIndex, safeFloor } from "./eventHelpers.js";
-import { recordHuntingFloorResult } from "../huntingState.js";
+import { getHuntingRunHealth, recordHuntingFloorResult } from "../huntingState.js";
 
 function rollBoonShards(floor, rng) {
     const boon = REWARD_BALANCE.hunting.events.boon;
@@ -24,10 +24,11 @@ export class BoonEvent extends HuntingEvent {
 
     resolve(event, { run }) {
         const shards = event.shards ?? 8;
+        const health = getHuntingRunHealth(run);
         return {
             run: recordHuntingFloorResult(run, {
-                hpRemain: run.carriedHp,
-                maxHp: run.carriedMaxHp,
+                hpRemain: health.hp,
+                maxHp: health.maxHp,
                 loot: { shards, chests: [] },
                 consumeStatModifiers: false
             }),

@@ -21,11 +21,13 @@ export function getHuntingDisplayHp(value, fallback = 0) {
 }
 
 export function getHuntingDisplayHealth(run) {
-    const rawMaxHp = getFiniteHp(run?.carriedMaxHp, run?.carriedHp);
-    const rawHp = getFiniteHp(run?.carriedHp, rawMaxHp);
+    const health = getHuntingRunHealth(run);
+    const rawMaxHp = getFiniteHp(health.maxHp, health.hp);
+    const rawHp = getFiniteHp(health.hp, rawMaxHp);
     const maxHp = getHuntingDisplayHp(rawMaxHp);
     return {
         hp: Math.min(maxHp, getHuntingDisplayHp(rawHp)),
         maxHp
     };
 }
+import { getHuntingRunHealth } from "./huntingState.js";

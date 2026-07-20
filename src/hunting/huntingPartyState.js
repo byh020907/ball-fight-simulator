@@ -107,6 +107,21 @@ export function setHuntingPartyMemberHealth(party, role, { hp, maxHp } = {}) {
     });
 }
 
+export function setHuntingPartyMemberHeroCarryover(party, role, carryover = {}) {
+    return updateMember(party, role, (member) => ({
+        ...member,
+        hero: {
+            ...member.hero,
+            carryover: Object.fromEntries(
+                HERO_CARRYOVER_KEYS.map((key) => [
+                    key,
+                    Math.max(0, Number.isFinite(carryover[key]) ? Math.floor(carryover[key]) : 0)
+                ])
+            )
+        }
+    }));
+}
+
 export function setActiveHuntingPartyRole(party, role) {
     if (role !== HUNTING_PARTY_ROLES.LEADER && role !== HUNTING_PARTY_ROLES.SWAP) return party;
     if (!getHuntingPartyMember(party, role)) return party;

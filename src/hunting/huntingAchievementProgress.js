@@ -1,4 +1,5 @@
 import { HUNTING_EVENT_TYPES, HUNTING_MAX_FLOOR, HUNTING_MONSTER_TYPES, HUNTING_STAGE_IDS } from "./huntingConfig.js";
+import { getHuntingRunHealth } from "./huntingState.js";
 
 const HUNTING_STAT_TAG_PATTERN = /^[a-z][a-z0-9:_-]{0,63}$/;
 const MAX_TRACKED_MONSTER_TAGS = 64;
@@ -283,8 +284,9 @@ export function recordHuntingBattleStart(
 ) {
     if (!run || run.status !== "active") return run;
 
-    const safeMaxHp = Number.isFinite(maxHp) && maxHp > 0 ? maxHp : run.carriedMaxHp;
-    const safeHpRemain = Number.isFinite(hpRemain) ? hpRemain : run.carriedHp;
+    const runHealth = getHuntingRunHealth(run);
+    const safeMaxHp = Number.isFinite(maxHp) && maxHp > 0 ? maxHp : runHealth.maxHp;
+    const safeHpRemain = Number.isFinite(hpRemain) ? hpRemain : runHealth.hp;
     const startHpRatio =
         safeMaxHp > 0 && Number.isFinite(safeHpRemain) ? Math.max(0, Math.min(1, safeHpRemain / safeMaxHp)) : 1;
 

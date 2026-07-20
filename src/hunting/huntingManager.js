@@ -9,6 +9,11 @@ import {
     getSelectedHuntingStageId,
     getUnlockedHuntingStageIds,
     applyHuntingStatModifiersToSpec,
+    getHuntingRunActiveMember,
+    getHuntingRunCharacterId,
+    getHuntingRunHealth,
+    setHuntingRunActiveHealth,
+    setHuntingRunMemberHeroCarryover,
     setHuntingRunPhase,
     HUNTING_RUN_PHASES
 } from "./huntingState.js";
@@ -393,22 +398,24 @@ export class HuntingManager {
 
     _createPlayerHuntingSpec(run) {
         const app = this.app;
-        const playerSpec = app.roster.find((fighter) => fighter.id === run.characterId);
+        const characterId = getHuntingRunCharacterId(run);
+        const playerSpec = app.roster.find((fighter) => fighter.id === characterId);
         if (!playerSpec) return null;
 
-        const playerProgression = collectActiveExperienceProgression(app.playerProfile, run.characterId);
-        const rebirthLoadout = getRebirthLoadout(app.playerProfile, run.characterId);
-        const masteryCtx = collectActiveEffects(app.playerProfile, run.characterId);
+        const playerProgression = collectActiveExperienceProgression(app.playerProfile, characterId);
+        const rebirthLoadout = getRebirthLoadout(app.playerProfile, characterId);
+        const masteryCtx = collectActiveEffects(app.playerProfile, characterId);
         const baseSpec = applyExperienceProgressionToBaseSpec(playerSpec, playerProgression);
         const rebornSpec = applyRebirthLoadoutToBaseSpec(baseSpec, rebirthLoadout);
         const allocatedSpec = applyStatAllocation(rebornSpec, app.playerStatAllocation ?? {}, true);
         const equippedSpec = applyEquipmentStats({ ...allocatedSpec, teamId: HUNTING_TEAMS.PLAYER }, app.playerProfile);
         const huntingSpec = applyHuntingStatModifiersToSpec(equippedSpec, run.statModifiers);
         const appliedSpec = applyMasteryEffectsToFighterSpec(huntingSpec, masteryCtx);
-        if (playerSpec.ability === "hero" && run.hero?.carryover) {
+        const member = getHuntingRunActiveMember(run);
+        if (playerSpec.ability === "hero" && member?.hero?.carryover) {
             appliedSpec.hero = {
                 ...(appliedSpec.hero || {}),
-                carryover: { ...run.hero.carryover }
+                carryover: { ...member.hero.carryover }
             };
         }
 
@@ -425,12 +432,9 @@ export class HuntingManager {
     _syncRunHealth(run, spec) {
         const maxHp = this._getHuntingMaxHp(spec);
         if (maxHp === null) return run;
-        const carriedHp = Number.isFinite(run.carriedHp) ? run.carriedHp : maxHp;
-        return {
-            ...run,
-            carriedHp: Math.min(maxHp, Math.max(1, carriedHp)),
-            carriedMaxHp: maxHp
-        };
+        const health = getHuntingRunHealth(run);
+        const carriedHp = Number.isFinite(health.hp) ? health.hp : maxHp;
+        return setHuntingRunActiveHealth(run, { hp: Math.min(maxHp, Math.max(1, carriedHp)), maxHp });
     }
 
     _startFloorBattle() {
@@ -470,7 +474,7 @@ export class HuntingManager {
                       ).map((fighter) =>
                           isChampion ? getEncounterFighterIdentity(app.playerProfile, fighter) : fighter
                       ),
-                      characterId: run.characterId,
+                      characterId: getHuntingRunCharacterId(run),
                       floor: run.floor,
                       enemyType: HUNTING_ENEMY_TYPES.CHAMPION,
                       rng: app.simulationRng ?? Math.random
@@ -488,16 +492,17 @@ export class HuntingManager {
         this._run = {
             ...recordHuntingBattleStart(run, {
                 enemySpecs,
-                hpRemain: run.carriedHp,
-                maxHp: run.carriedMaxHp,
+                hpRemain: getHuntingRunHealth(run).hp,
+                maxHp: getHuntingRunHealth(run).maxHp,
                 isChampion
             }),
             currentChampionCharacterId: isChampion ? (miniboss?.hunting?.sourceFighterId ?? null) : null,
             currentChampionHiddenIdentity: Boolean(isChampion && miniboss?.hunting?.hiddenIdentity)
         };
         run = this._run;
+        const characterId = getHuntingRunCharacterId(run);
         const matchSpecs = [appliedSpec, ...enemySpecs];
-        const battleLootSession = new HuntingBattleLootSession({ playerId: run.characterId, floor: run.floor });
+        const battleLootSession = new HuntingBattleLootSession({ playerId: characterId, floor: run.floor });
         const lootDropController = new HuntingLootDropController({
             session: battleLootSession,
             onExperienceCollected: (reward) => this._awardHuntingExperience(reward)
@@ -507,11 +512,11 @@ export class HuntingManager {
         this._lastBattleExperienceResult = null;
         this._combatRewardChestQueue = [];
         app._currentMatchReport = createMatchReport();
-        app._currentMatchReport.playerFighterId = run.characterId;
+        app._currentMatchReport.playerFighterId = characterId;
 
         app._onSimulationResult = (a) => this._handleFinish(a);
 
-        app.playerFighterId = run.characterId;
+        app.playerFighterId = characterId;
 
         const arena = getHuntingBattleArena(run.stageId, enemySpecs.length);
         const stageTheme = getHuntingStage(run.stageId).theme;
@@ -531,23 +536,24 @@ export class HuntingManager {
             hostileAbsenceGraceTeamId: HUNTING_TEAMS.PLAYER,
             arenaTheme: stageTheme,
             terrain,
-            experienceProgressionByFighter: new Map([[run.characterId, playerProgression]]),
-            rebirthLoadoutByFighter: new Map([[run.characterId, rebirthLoadout]]),
-            playerLives: isFinalBoss ? { playerId: run.characterId, total: 3 } : null,
+            experienceProgressionByFighter: new Map([[characterId, playerProgression]]),
+            rebirthLoadoutByFighter: new Map([[characterId, rebirthLoadout]]),
+            playerLives: isFinalBoss ? { playerId: characterId, total: 3 } : null,
             onFighterDefeated: (fighter, context) => lootDropController.onFighterDefeated(fighter, context),
             onResultResolved: (winner, context) =>
                 this._handleHuntingResultResolved(lootDropController, winner, context)
         });
 
-        const playerBall = app.simulation?.fighters?.find((fighter) => fighter.id === run.characterId);
+        const playerBall = app.simulation?.fighters?.find((fighter) => fighter.id === characterId);
         const enemies = playerBall ? app.simulation.getEnemiesOf(playerBall) : [];
         if (isEliteMobEvent && playerBall) placeEliteMobFormation(playerBall, enemies);
         lootDropController.prepareExperienceDrops(enemies);
 
-        if (Number.isFinite(run.carriedHp)) {
-            const ball = app.simulation?.fighters?.find((f) => f.id === run.characterId);
+        const health = getHuntingRunHealth(run);
+        if (Number.isFinite(health.hp)) {
+            const ball = app.simulation?.fighters?.find((f) => f.id === characterId);
             if (ball) {
-                ball.hp = Math.min(ball.maxHp, Math.max(1, run.carriedHp));
+                ball.hp = Math.min(ball.maxHp, Math.max(1, health.hp));
             }
         }
     }
@@ -557,7 +563,7 @@ export class HuntingManager {
         app.matchFinalized = true;
         app._onSimulationResult = null;
 
-        const run = this._run;
+        let run = this._run;
         if (!run) return;
 
         const battleResult = this._getHuntingBattleResult(app.simulation);
@@ -595,14 +601,19 @@ export class HuntingManager {
             const floorLoot = collectedBattleLoot;
 
             // Hero Orb carryover — Hero Ball만 전투 중 획득한 bonuses를 run에 반영
-            const playerSpec = app.roster.find((f) => f.id === run.characterId);
+            const characterId = getHuntingRunCharacterId(run);
+            const playerSpec = app.roster.find((f) => f.id === characterId);
             if (playerSpec?.ability === "hero" && playerBall?.hero?.bonuses) {
-                playerBall.mergeHeroOrbCarryoverInto(run);
+                const member = getHuntingRunActiveMember(run);
+                const carryoverTarget = { hero: { carryover: { ...member.hero.carryover } } };
+                playerBall.mergeHeroOrbCarryoverInto(carryoverTarget);
+                run = setHuntingRunMemberHeroCarryover(run, run.party.activeRole, carryoverTarget.hero.carryover);
             }
 
+            const runHealth = getHuntingRunHealth(run);
             this._run = recordHuntingFloorResult(recordHuntingBattleVictory(run), {
-                hpRemain: playerBall?.hp ?? run.carriedHp ?? 0,
-                maxHp: playerBall?.maxHp ?? run.carriedMaxHp,
+                hpRemain: playerBall?.hp ?? runHealth.hp ?? 0,
+                maxHp: playerBall?.maxHp ?? runHealth.maxHp,
                 loot: floorLoot,
                 combatCleared: true
             });
@@ -612,7 +623,7 @@ export class HuntingManager {
                 this._combatRewardChestQueue = [...floorLoot.chests];
                 if (this._lastBattleCharacterUnlock) {
                     this._pendingUnlockResultChest = true;
-                    this._presentNormalCombatWin(app, playerBall?.name ?? run.characterId, xpResult);
+                    this._presentNormalCombatWin(app, playerBall?.name ?? characterId, xpResult);
                     savePlayerProfile(app.playerProfile);
                     return;
                 }
@@ -626,13 +637,13 @@ export class HuntingManager {
                 return;
             }
 
-            this._presentNormalCombatWin(app, playerBall?.name ?? run.characterId, xpResult);
+            this._presentNormalCombatWin(app, playerBall?.name ?? characterId, xpResult);
             savePlayerProfile(app.playerProfile);
         } else {
             this._battleLootSession = null;
             this._combatRewardChestQueue = [];
             this._run = defeatHuntingRun(run);
-            const name = playerBall?.name ?? run.characterId;
+            const name = playerBall?.name ?? getHuntingRunCharacterId(run);
             const securedShards = this._run.securedLoot?.shards ?? 0;
             const lostShards = this._run.defeatLosses?.shards ?? 0;
             const defeatLossText = formatDefeatLossText(this._run.defeatLosses);
@@ -666,7 +677,8 @@ export class HuntingManager {
 
     _getHuntingBattleResult(simulation) {
         const run = this._run;
-        const playerBall = simulation?.fighters?.find((fighter) => fighter.id === run?.characterId) ?? null;
+        const characterId = getHuntingRunCharacterId(run);
+        const playerBall = simulation?.fighters?.find((fighter) => fighter.id === characterId) ?? null;
         const winner = simulation?.winner ?? null;
         const playerWon = Boolean(
             playerBall &&
@@ -702,7 +714,7 @@ export class HuntingManager {
     }
 
     _awardHuntingExperience(reward) {
-        const characterId = this._run?.characterId;
+        const characterId = getHuntingRunCharacterId(this._run);
         const amount = Math.max(0, Math.floor(reward?.amount ?? 0));
         if (!characterId || amount <= 0) return null;
 
@@ -846,7 +858,9 @@ export class HuntingManager {
         const recovery = this._run.history.at(-2);
         if (recovery?.type !== "floor_recovery" || recovery.floor !== this._run.floor) return "";
 
-        const healed = getHuntingDisplayHp(recovery.amount);
+        const activeRecovery = recovery.recoveries?.find((entry) => entry.role === this._run.party.activeRole);
+        if (!activeRecovery) return "";
+        const healed = getHuntingDisplayHp(activeRecovery.amount);
         const health = getHuntingDisplayHealth(this._run);
         const feedback = `HP +${healed} 회복 (${health.hp}/${health.maxHp})`;
         app.addLog(`[사냥터] ${this._run.floor}층 이동 · ${feedback}`);
@@ -1220,8 +1234,9 @@ export class HuntingManager {
             this._presentCombatRewardChest(app, this._combatRewardChestQueue[0]);
             return;
         }
-        const playerSpec = app.roster.find((f) => f.id === run.characterId);
-        const name = playerSpec?.name ?? run.characterId;
+        const characterId = getHuntingRunCharacterId(run);
+        const playerSpec = app.roster.find((f) => f.id === characterId);
+        const name = playerSpec?.name ?? characterId;
         const isFinalBoss = run.lastEncounter?.type === HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS;
         if (isFinalBoss) {
             this._presentFinalBossClear(app, this._lastBattleExperienceResult);

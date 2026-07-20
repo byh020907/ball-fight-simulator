@@ -2,7 +2,12 @@ import { createHuntingChest } from "../huntingRewards.js";
 import { HUNTING_EVENT_TRANSITIONS, HuntingEvent } from "./huntingEvent.js";
 import { safeFloor } from "./eventHelpers.js";
 import { getRarityLabel } from "../rarityPresentation.js";
-import { HUNTING_RUN_PHASES, recordHuntingFloorResult, setHuntingRunPhase } from "../huntingState.js";
+import {
+    HUNTING_RUN_PHASES,
+    getHuntingRunHealth,
+    recordHuntingFloorResult,
+    setHuntingRunPhase
+} from "../huntingState.js";
 import { REWARD_BALANCE } from "../../rewardBalanceConfig.js";
 
 function rollChestRarity(floor, rng) {
@@ -22,9 +27,10 @@ export class ChestRoomEvent extends HuntingEvent {
 
     resolve(event, { run }) {
         const chest = createHuntingChest({ rarity: event.chestRarity ?? "common" });
+        const health = getHuntingRunHealth(run);
         const nextRun = recordHuntingFloorResult(run, {
-            hpRemain: run.carriedHp,
-            maxHp: run.carriedMaxHp,
+            hpRemain: health.hp,
+            maxHp: health.maxHp,
             loot: { shards: 0, chests: [chest] },
             consumeStatModifiers: false
         });

@@ -1,6 +1,11 @@
 import { HUNTING_FLOOR_OUTCOME_TYPES, HUNTING_MINIBOSS, HUNTING_STAGE_IDS } from "./huntingConfig.js";
 import { getNextHuntingStageId, rollHuntingFloorOutcome } from "./huntingEncounters.js";
-import { applyHuntingFloorRecovery, getUnlockedHuntingStageIds, retreatHuntingRun } from "./huntingState.js";
+import {
+    applyHuntingFloorRecovery,
+    getHuntingRunHealth,
+    getUnlockedHuntingStageIds,
+    retreatHuntingRun
+} from "./huntingState.js";
 
 function normalizeMinibossChance(value) {
     return Number(Math.max(HUNTING_MINIBOSS.INITIAL_CHANCE, Math.min(HUNTING_MINIBOSS.MAX_CHANCE, value)).toFixed(3));
@@ -51,10 +56,8 @@ export function advanceHuntingRun(run, { rng = Math.random } = {}) {
     const advancedRun = applyHuntingFloorRecovery({ ...run, floor: nextFloor });
     const combatReliefFloors = Math.max(0, advancedRun.combatReliefFloors ?? 0);
     const portalDeclineFloors = Math.max(0, advancedRun.portalDeclineFloors ?? 0);
-    const hpRatio =
-        advancedRun.carriedMaxHp > 0
-            ? (advancedRun.carriedHp ?? advancedRun.carriedMaxHp) / advancedRun.carriedMaxHp
-            : 1.0;
+    const health = getHuntingRunHealth(advancedRun);
+    const hpRatio = health.maxHp > 0 ? (health.hp ?? health.maxHp) / health.maxHp : 1.0;
     const rolledEncounter = rollHuntingFloorOutcome(nextFloor, rng, combatReliefFloors, {
         hpRatio,
         portalDeclineFloors
