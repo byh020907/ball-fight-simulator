@@ -162,7 +162,9 @@ hunting-overlay:has(~ start-button #startButton:not(.hidden)) #huntingOverlay {
 }
 
 game-overlay:has(~ start-button #startButton:not(.hidden)) #overlay .overlay-card,
-hunting-overlay:not(.hunting-combat-result-active):has(~ start-button #startButton:not(.hidden)) #huntingOverlay .hunting-overlay-card {
+hunting-overlay:not(.hunting-combat-result-active):has(~ start-button #startButton:not(.hidden))
+    #huntingOverlay
+    .hunting-overlay-card {
     margin: auto 0;
     max-height: 100%;
     min-height: 0;
@@ -430,6 +432,43 @@ game-overlay:has(~ start-button #startButton:not(.hidden)) #overlay .overlay-car
 .hunting-checkpoint-select {
     display: grid;
     gap: 8px;
+}
+
+.hunting-party-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.hunting-party-slot {
+    display: grid;
+    min-width: 0;
+    gap: 4px;
+    padding: 8px;
+    border: 2px solid #d7d7d7;
+    border-radius: 8px;
+    background: #fafafa;
+}
+
+.hunting-party-slot span {
+    overflow: hidden;
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.hunting-party-slot select {
+    min-width: 0;
+    width: 100%;
+    padding: 6px;
+    border: 1px solid #999;
+    border-radius: 5px;
+    background: #fff;
+    color: #222;
+    font: inherit;
+    font-size: 0.72rem;
 }
 
 .hunting-checkpoint-desc {

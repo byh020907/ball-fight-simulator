@@ -5,6 +5,7 @@ import {
     defeatHuntingRun,
     canRetreatFromHuntingRun,
     canEnterHunting,
+    getEligibleHuntingCharacters,
     getHuntingAvailableStartFloors,
     getSelectedHuntingStageId,
     getUnlockedHuntingStageIds,
@@ -183,10 +184,25 @@ export class HuntingManager {
     showCheckpointSelect(characterId, stageId = getSelectedHuntingStageId(this.app.playerProfile)) {
         const stage = getHuntingStage(stageId);
         const availableCheckpoints = getHuntingAvailableStartFloors(this.app.playerProfile.hunting.stats, stageId);
+        const leadIds = new Set(
+            getEligibleHuntingCharacters(this.app.playerProfile, this.app.roster).map((fighter) => fighter.id)
+        );
+        const characters = getEligibleRoster(this.app.playerProfile, this.app.roster).map((fighter) => ({
+            id: fighter.id,
+            name: fighter.name,
+            canLead: leadIds.has(fighter.id)
+        }));
         PopupService.show({
             title: `사냥터 — ${stage.name} 시작 층`,
             content: {
                 type: "hunting-checkpoint-select",
+                characters,
+                party: {
+                    leaderId: characterId,
+                    companionId: null,
+                    swapId: null,
+                    supportIds: [null, null, null]
+                },
                 checkpoints: HUNTING_START_CHECKPOINTS.map((checkpoint) => ({
                     floor: checkpoint,
                     available: availableCheckpoints.includes(checkpoint)
@@ -199,6 +215,12 @@ export class HuntingManager {
     async startRun(characterId, { encounterFloor = 1, party = {} } = {}) {
         PopupService.close();
         if (!canEnterHunting(this.app.playerProfile, characterId)) return;
+        const selectedIds = [characterId, party.companionId, party.swapId, ...(party.supportIds ?? [])].filter(Boolean);
+        if (new Set(selectedIds).size !== selectedIds.length) return;
+        const selectableIds = new Set(
+            getEligibleRoster(this.app.playerProfile, this.app.roster).map((fighter) => fighter.id)
+        );
+        if (selectedIds.some((selectedId) => !selectableIds.has(selectedId))) return;
         const stageId = getSelectedHuntingStageId(this.app.playerProfile);
         const availableCheckpoints = getHuntingAvailableStartFloors(this.app.playerProfile.hunting.stats, stageId);
         const selectedCheckpoint = availableCheckpoints.includes(encounterFloor) ? encounterFloor : 1;

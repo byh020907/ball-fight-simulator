@@ -37,6 +37,24 @@
                 </p>
             </div>
             <div class="hunting-checkpoint-select" x-show="content?.type === 'hunting-checkpoint-select'">
+                <span class="hunting-section-label">원정 편성</span>
+                <div class="hunting-party-grid">
+                    <template x-for="slot in getHuntingPartySlots()" :key="slot.key">
+                        <label class="hunting-party-slot">
+                            <span x-text="slot.label"></span>
+                            <select :value="slot.value ?? ''" @change="setHuntingPartySlot(slot.key, $el.value)">
+                                <option x-show="!slot.required" value="">없음</option>
+                                <template x-for="character in getHuntingPartyCharacters(slot)" :key="character.id">
+                                    <option
+                                        :value="character.id"
+                                        :disabled="isHuntingPartyCharacterUsed(character.id, slot.key)"
+                                        x-text="character.name"
+                                    ></option>
+                                </template>
+                            </select>
+                        </label>
+                    </template>
+                </div>
                 <span class="hunting-section-label">첫 조우 층 선택</span>
                 <p class="hunting-checkpoint-desc">도달한 층까지의 체크포인트만 선택할 수 있습니다.</p>
                 <div class="hunting-checkpoint-grid">
@@ -44,8 +62,8 @@
                         <button
                             type="button"
                             class="hunting-checkpoint-btn"
-                            :disabled="!checkpoint.available"
-                            @click="selectHuntingCheckpoint(checkpoint.floor)"
+                            :disabled="!checkpoint.available || !isHuntingPartyValid()"
+                            @click="selectHuntingCheckpoint(checkpoint.floor, getHuntingPartySelection())"
                         >
                             <strong x-text="checkpoint.floor"></strong>
                             <span x-text="`${checkpoint.floor}층 첫 조우`"></span>
@@ -122,8 +140,54 @@
             selectHuntingStage(stageId) {
                 return Alpine.store("uiManager").invokeGameAction("selectHuntingStage", stageId);
             },
-            selectHuntingCheckpoint(encounterFloor) {
-                return Alpine.store("uiManager").invokeGameAction("selectHuntingCheckpoint", encounterFloor);
+            getHuntingPartySelection() {
+                const party = this.content?.party ?? {};
+                const normalize = (value) => value || null;
+                return {
+                    leaderId: normalize(party.leaderId),
+                    companionId: normalize(party.companionId),
+                    swapId: normalize(party.swapId),
+                    supportIds: (party.supportIds ?? []).map(normalize)
+                };
+            },
+            getHuntingPartySlots() {
+                const party = this.getHuntingPartySelection();
+                return [
+                    { key: "leader", label: "주 캐릭터", value: party.leaderId, required: true, leadOnly: true },
+                    { key: "companion", label: "동료 · 장비 없음", value: party.companionId },
+                    { key: "swap", label: "교대 · 장비 공유", value: party.swapId },
+                    ...party.supportIds.map((value, index) => ({
+                        key: `support-${index}`,
+                        label: `지원 ${index + 1}`,
+                        value
+                    }))
+                ];
+            },
+            getHuntingPartyCharacters(slot) {
+                const characters = this.content?.characters ?? [];
+                return slot.leadOnly ? characters.filter((character) => character.canLead) : characters;
+            },
+            setHuntingPartySlot(slotKey, value) {
+                const normalized = value || null;
+                if (slotKey === "leader") this.content.party.leaderId = normalized;
+                else if (slotKey === "companion") this.content.party.companionId = normalized;
+                else if (slotKey === "swap") this.content.party.swapId = normalized;
+                else this.content.party.supportIds[Number(slotKey.split("-")[1])] = normalized;
+            },
+            isHuntingPartyValid() {
+                const party = this.getHuntingPartySelection();
+                const selectedIds = [party.leaderId, party.companionId, party.swapId, ...party.supportIds].filter(
+                    Boolean
+                );
+                return Boolean(party.leaderId) && new Set(selectedIds).size === selectedIds.length;
+            },
+            isHuntingPartyCharacterUsed(characterId, currentSlot) {
+                return this.getHuntingPartySlots().some(
+                    (slot) => slot.key !== currentSlot && slot.value === characterId
+                );
+            },
+            selectHuntingCheckpoint(encounterFloor, party) {
+                return Alpine.store("uiManager").invokeGameAction("selectHuntingCheckpoint", encounterFloor, party);
             },
             resolve(value) {
                 if (_resolve) {

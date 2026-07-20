@@ -101,8 +101,10 @@ export function createComponentBridge(app) {
         selectHuntingStage(stageId) {
             return app.hunting.selectStage(stageId);
         },
-        selectHuntingCheckpoint(encounterFloor) {
-            return app.hunting.startRun(app.playerFighterId, { encounterFloor });
+        selectHuntingCheckpoint(encounterFloor, party = {}) {
+            const characterId = party.leaderId ?? app.playerFighterId;
+            const options = party.leaderId ? { encounterFloor, party } : { encounterFloor };
+            return app.hunting.startRun(characterId, options);
         },
         huntingRetreat() {
             return app.hunting.retreat();

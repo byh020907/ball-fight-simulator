@@ -875,13 +875,14 @@ function testHuntingStartPopupOwnershipContract() {
     );
     assert.ok(
         popup.includes('@click="selectHuntingStage(stage.id)"') &&
-            popup.includes('@click="selectHuntingCheckpoint(checkpoint.floor)"') &&
+            popup.includes('@click="selectHuntingCheckpoint(checkpoint.floor, getHuntingPartySelection())"') &&
             popup.includes('invokeGameAction("selectHuntingStage", stageId)') &&
-            popup.includes('invokeGameAction("selectHuntingCheckpoint", encounterFloor)'),
+            popup.includes('invokeGameAction("selectHuntingCheckpoint", encounterFloor, party)'),
         "Popup component should own declarative selection handlers and route them through uiManager"
     );
     assert.ok(
-        bridge.includes("selectHuntingStage(stageId)") && bridge.includes("selectHuntingCheckpoint(encounterFloor)"),
+        bridge.includes("selectHuntingStage(stageId)") &&
+            bridge.includes("selectHuntingCheckpoint(encounterFloor, party = {})"),
         "Component bridge should expose the two hunting start actions"
     );
     console.log("[hunting-start-popup-ownership] ok");
