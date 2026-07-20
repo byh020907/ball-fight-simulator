@@ -19,9 +19,10 @@ export class CombatLifePool {
     }
 
     consume(fighter) {
-        if (!this.canRevive(fighter)) return null;
+        if (!this.belongsTo(fighter) || this.remaining <= 0) return null;
+        const canRevive = this.canRevive(fighter);
         this.remaining -= 1;
-        return this.getState();
+        return { ...this.getState(), canRevive };
     }
 
     getState(fighterId = this.fighterId) {

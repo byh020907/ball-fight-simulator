@@ -157,9 +157,6 @@ export class ElementalistVfxPreviewScene {
 
     _createChannelEffect(wetSnapshot) {
         this.effect?.consume?.();
-        this.target.state.elementalWetUntil = 0;
-        this.target.state.elementalWetStackExpiries = [];
-        this.target.state.elementalWetEffect = null;
         this.phaseElapsed = 0;
         this.wetReactionLeadIn = false;
         this.wetReactionLeadOut = false;

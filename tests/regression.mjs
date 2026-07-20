@@ -25112,6 +25112,11 @@ function testDeepCoreFinalBossContracts() {
     player.takeDamage(player.maxHp * 2, boss, "Life Probe", { ignoreDefense: true, suppressDamageNumber: true });
     simulation.checkResult();
     assert.equal(simulation.finished, true, "Third lethal hit must resolve the normal defeat flow");
+    assert.equal(
+        simulation.getCombatLifeState(player.id).remaining,
+        0,
+        "The final lethal hit must empty the life UI even when no revival occurs"
+    );
 
     const armorSimulation = new BattleSimulation(
         [createDeepCoreTestPlayer(), createHuntingFinalBossSpec({ stageId: HUNTING_STAGE_IDS.CAVE, floor: 100 })],

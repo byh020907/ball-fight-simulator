@@ -752,7 +752,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
 
     tryConsumePlayerLife(fighter) {
         const lifeState = this.combatLifePool?.consume(fighter);
-        if (!lifeState) return false;
+        if (!lifeState?.canRevive) return false;
         fighter.hp = fighter.maxHp;
         fighter.flags.defeated = false;
         fighter.flags.destroyed = false;
