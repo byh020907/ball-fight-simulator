@@ -725,10 +725,12 @@ export class BattleSimulation extends FighterPhysicsSimulation {
     }
 
     checkResult(delta = 0) {
-        const alive = this.fighters.filter((f) => !f.flags.defeated);
+        const resultFighters = this.fighters.filter((fighter) => fighter.participation.countsForResult);
+        const alive = resultFighters.filter((fighter) => !fighter.flags.defeated);
         const aliveTeams = new Set(alive.map((fighter) => fighter.teamId));
         if (alive.length === 0) {
-            this.resolveResult(this.fighters.reduce((best, current) => (current.hp > best.hp ? current : best)));
+            if (resultFighters.length === 0) return;
+            this.resolveResult(resultFighters.reduce((best, current) => (current.hp > best.hp ? current : best)));
             return;
         }
         if (aliveTeams.size > 1) {
@@ -775,14 +777,18 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         if (this.finished) return;
         this.finished = true;
         this.winner = winner;
-        this.loser = this.fighters.find((fighter) => this.isHostile(winner, fighter)) ?? null;
+        this.loser =
+            this.fighters.find((fighter) => fighter.participation.countsForResult && this.isHostile(winner, fighter)) ??
+            null;
         this.resultAnimationTime = 0;
         this.resultReady = false;
         for (const fighter of this.fighters) {
             fighter.abilities.onBattleEnded?.({ winner, simulation: this });
             fighter.freezeForResult();
         }
-        for (const loser of this.fighters.filter((fighter) => this.isHostile(winner, fighter))) {
+        for (const loser of this.fighters.filter(
+            (fighter) => fighter.participation.countsForResult && this.isHostile(winner, fighter)
+        )) {
             if (loser.flags.destroyed) continue;
             const pos = loser.position.clone();
             const color = loser.color;

@@ -87,6 +87,7 @@ import {
 import { getActiveElementalWetStackCount, getElementalWetDefenseReduction } from "../src/effects/elementalWetState.js";
 import { shuffled } from "../src/random.js";
 import { BattleSimulation } from "../src/simulation/battleSimulation.js";
+import { COMBAT_PARTICIPATION_MODES } from "../src/simulation/combatParticipation.js";
 import {
     predictNextWallCollision,
     TOURNAMENT_ANGLED_BOUNCE_RAMP_DEFAULTS
@@ -25174,6 +25175,49 @@ function testHuntingPartyStateContracts() {
 }
 
 testHuntingPartyStateContracts();
+
+function testCombatParticipationContracts() {
+    const createSpec = (id, teamId, mode = COMBAT_PARTICIPATION_MODES.ACTIVE) => ({
+        id,
+        name: id,
+        teamId,
+        ability: "none",
+        color: "#ffffff",
+        combatParticipation: { mode },
+        stats: { hp: 100, damage: 10, defense: 0, speed: 100, radius: 20, mass: 1 }
+    });
+    const simulation = new BattleSimulation(
+        [
+            createSpec("leader", "player"),
+            createSpec("support", "player", COMBAT_PARTICIPATION_MODES.SUPPORT),
+            createSpec("enemy", "enemy")
+        ],
+        { onLog() {}, onSound() {} },
+        null,
+        { assignActions: false }
+    );
+    const leader = simulation.fighters.find((fighter) => fighter.id === "leader");
+    const support = simulation.fighters.find((fighter) => fighter.id === "support");
+    const enemy = simulation.fighters.find((fighter) => fighter.id === "enemy");
+    enemy.flags.defeated = true;
+    simulation.checkResult();
+    assert.equal(simulation.winner, leader, "A support fighter must not delay victory after all result enemies fall");
+    assert.equal(support.participation.countsForResult, false);
+
+    const standbySimulation = new BattleSimulation(
+        [createSpec("active", "player"), createSpec("standby", "enemy", COMBAT_PARTICIPATION_MODES.STANDBY)],
+        { onLog() {}, onSound() {} },
+        null,
+        { assignActions: false }
+    );
+    const active = standbySimulation.fighters.find((fighter) => fighter.id === "active");
+    assert.equal(standbySimulation.getEnemiesOf(active).length, 0, "Standby fighters must not be combat targets");
+    standbySimulation.checkResult();
+    assert.equal(standbySimulation.winner, active, "A standby fighter must not block result resolution");
+    console.log("[combat-participation-contracts] ok");
+}
+
+testCombatParticipationContracts();
 
 function testReusableCapabilityContracts() {
     const timedKeys = new TimedKeyMap({ isInvalid: (key) => key === "removed" });

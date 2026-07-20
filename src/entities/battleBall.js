@@ -19,6 +19,7 @@ import {
     drawRebirthVisualUnderlay,
     getRebirthVisualProfile
 } from "../rebirth/rebirthVisuals.js";
+import { CombatParticipation } from "../simulation/combatParticipation.js";
 
 const EQUIPMENT_EFFECT_COOLDOWN_KEYS = Object.freeze({ hpSteal: "hpSteal" });
 
@@ -84,6 +85,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         };
         this.applyHeroOrbCarryover(spec.hero?.carryover);
         this.hunting = spec.hunting ?? null;
+        this.participation = new CombatParticipation(spec.combatParticipation);
         this.appearance = spec.appearance ?? { sides: 0, face: "default" };
         // RotationalBody 초기화: angle 기본값 0 (대기화면 upright), 회전은 runtime angularVelocity/integrateRotation로 동작
         this.rotationEnabled = spec.rotationEnabled !== false;
@@ -394,9 +396,10 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         const target = simulation.getOpponent(this);
         this._tickTimers(delta);
         this._tickMasteryPassives(delta);
-        this.abilities.update(delta, target);
+        if (this.participation.canAct) this.abilities.update(delta, target);
+        else this.abilities.tickStandby(delta);
 
-        if (this.aiController) {
+        if (this.participation.canAct && this.aiController) {
             try {
                 const result = this.aiController.evaluate(simulation, this, delta);
                 if (result) {

@@ -61,7 +61,11 @@ export class Simulation {
             ...this.entities.filter((entity) => entity.isCombatTarget && !this.fighters.includes(entity))
         ];
         return combatTargets.filter(
-            (fighter) => this.isHostile(ball, fighter) && !fighter.flags.defeated && !fighter.state?.swallowed
+            (fighter) =>
+                this.isHostile(ball, fighter) &&
+                fighter.participation?.canBeTargeted !== false &&
+                !fighter.flags.defeated &&
+                !fighter.state?.swallowed
         );
     }
 
@@ -69,6 +73,7 @@ export class Simulation {
         return this.fighters.filter(
             (fighter) =>
                 !this.isHostile(ball, fighter) &&
+                fighter.participation?.canBeTargeted !== false &&
                 !fighter.flags.defeated &&
                 !fighter.flags.destroyed &&
                 !fighter.state?.swallowed

@@ -69,6 +69,10 @@ export class AbilitySet {
         this._forEach("update", delta, target);
     }
 
+    tickStandby(delta) {
+        this._forEach("tickStandby", delta);
+    }
+
     draw(ctx) {
         this._forEach("draw", ctx);
     }
@@ -124,6 +128,10 @@ export class AbilitySet {
             },
             { current: 0, maximum: 0 }
         );
+    }
+
+    canSafelyDeactivate() {
+        return this.all.every((ability) => ability.canSafelyDeactivate?.() !== false);
     }
 
     modifyOutgoingFighterCollisionDamage(damage, target, context) {

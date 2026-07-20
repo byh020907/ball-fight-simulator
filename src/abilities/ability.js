@@ -80,6 +80,12 @@ export class Ability extends mixins([Cooldown]) {
     getUiState() {
         return { label: "Passive", progress: 1 };
     }
+    canSafelyDeactivate() {
+        return true;
+    }
+    tickStandby(delta) {
+        this.tickCooldown(delta);
+    }
 
     /** Override to draw character-specific effects around/on top of the ball. */
     draw(ctx) {}
