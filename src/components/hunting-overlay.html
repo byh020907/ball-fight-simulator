@@ -605,6 +605,7 @@
         padding: 7px;
         border: 2px solid #333;
         background: #fff;
+        color: #222;
     }
 
     .hunting-party-experience-card span,
@@ -1299,6 +1300,15 @@
     }
 
     @media (max-width: 600px) {
+        .hunting-party-action-bar {
+            display: flex;
+        }
+
+        .hunting-party-action {
+            flex: 1 1 0;
+            padding: 6px 4px;
+        }
+
         :scope.hunting-moving .hunting-overlay-frame {
             width: 100%;
             height: 100%;

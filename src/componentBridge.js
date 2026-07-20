@@ -308,13 +308,14 @@ export function createComponentBridge(app) {
             if (!app.isDebugModeActive() || !app.lifecycle.isSetup) return { ok: false, error: "debug_disabled" };
             app.setGameMode("hunting");
             CollectionHubService.close();
-            return app.hunting.startDebugRun(characterId, { stageId, encounterFloor });
+            return app.hunting.showDebugPartySelect(characterId, { kind: "run", stageId, encounterFloor });
         },
         startDebugHuntingEvent(characterId, stageId, encounterFloor, eventType, eliteCombinationId) {
             if (!app.isDebugModeActive() || !app.lifecycle.isSetup) return { ok: false, error: "debug_disabled" };
             app.setGameMode("hunting");
             CollectionHubService.close();
-            return app.hunting.startDebugEventPreview(characterId, {
+            return app.hunting.showDebugPartySelect(characterId, {
+                kind: "event",
                 stageId,
                 encounterFloor,
                 eventType,
@@ -325,12 +326,21 @@ export function createComponentBridge(app) {
             if (!app.isDebugModeActive() || !app.lifecycle.isSetup) return { ok: false, error: "debug_disabled" };
             app.setGameMode("hunting");
             CollectionHubService.close();
-            return app.hunting.startDebugCombatPreview(characterId, {
+            return app.hunting.showDebugPartySelect(characterId, {
+                kind: "encounter",
                 stageId,
                 encounterFloor,
                 encounterType,
                 eliteCombinationId
             });
+        },
+        startDebugHuntingWithParty(encounterFloor, party, context = {}) {
+            if (!app.isDebugModeActive() || !app.lifecycle.isSetup) return { ok: false, error: "debug_disabled" };
+            const characterId = party?.leaderId ?? app.playerFighterId;
+            const options = { ...context, encounterFloor, party };
+            if (context.kind === "event") return app.hunting.startDebugEventPreview(characterId, options);
+            if (context.kind === "encounter") return app.hunting.startDebugCombatPreview(characterId, options);
+            return app.hunting.startDebugRun(characterId, options);
         },
         beginRebirth(characterId) {
             if (!app.lifecycle.isSetup) {

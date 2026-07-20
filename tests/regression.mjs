@@ -10299,6 +10299,17 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
                 ),
             "A floor-47 record should unlock 40 but keep 60 and 80 disabled"
         );
+        manager.showDebugPartySelect(FIGHTER_IDS.RAGE, {
+            kind: "encounter",
+            stageId: HUNTING_STAGE_IDS.CAVE,
+            encounterFloor: 1,
+            encounterType: HUNTING_DEBUG_ENCOUNTER_TYPES.FINAL_BOSS
+        });
+        assert.equal(
+            popupOptions[2].content.checkpoints[0].floor,
+            HUNTING_MAX_FLOOR,
+            "The shared debug party popup must display the same normalized floor that the final boss run starts"
+        );
         const startPromise = manager.startRun(FIGHTER_IDS.RAGE, { encounterFloor: 1 });
         await Promise.resolve();
         assert.equal(
@@ -25304,7 +25315,9 @@ function testHuntingPartyBattleComposition() {
         setHuntingOverlayState(state) {
             this.huntingOverlayState = { ...(this.huntingOverlayState ?? {}), ...state };
         },
-        _renderRoster() {},
+        _renderRoster(activeIds) {
+            this.renderedRosterIds = activeIds;
+        },
         startMatch(specs, options) {
             this.simulation = new BattleSimulation(specs, { onLog() {}, onSound() {} }, null, options);
         }
@@ -25346,24 +25359,36 @@ function testHuntingPartyBattleComposition() {
 
     manager._run = createHuntingRun({
         characterId: leaderId,
-        supportIds: [FIGHTER_IDS.EATER],
+        supportIds: [FIGHTER_IDS.EATER, FIGHTER_IDS.SPIN],
         stageId: HUNTING_STAGE_IDS.CAVE
     });
     manager._run = setHuntingRunPhase(manager._run, HUNTING_RUN_PHASES.COMBAT);
     manager._startFloorBattle();
     const support = manager.deploySupport(0);
     assert.equal(support.id, FIGHTER_IDS.EATER);
+    assert.ok(
+        mockApp.renderedRosterIds.includes(FIGHTER_IDS.EATER),
+        "A deployed support card should appear immediately"
+    );
     assert.equal(support.participation.mode, COMBAT_PARTICIPATION_MODES.SUPPORT);
     assert.equal(support.participation.abilityTimeScale, HUNTING_SUPPORT_DEPLOYMENT_CONFIG.abilityTimeScale);
     assert.equal(support.participation.countsForResult, false, "Support must not become a victory condition");
     assert.equal(manager._run.party.supports[0].ready, false);
     assert.equal(manager._run.party.supports[0].floorsRemaining, HUNTING_SUPPORT_RECHARGE_FLOORS);
     assert.equal(mockApp.huntingOverlayState.huntingSupports[0].active, true);
+    const secondSupport = manager.deploySupport(1);
+    assert.equal(secondSupport.id, FIGHTER_IDS.SPIN, "Different support slots may deploy together");
+    assert.equal(manager._supportDeployments.length, 2);
     manager.updateCombat(HUNTING_SUPPORT_DEPLOYMENT_CONFIG.duration);
     assert.equal(
         mockApp.simulation.fighters.includes(support),
         false,
         "Support should safely leave combat when its shared deployment duration ends"
+    );
+    assert.equal(mockApp.simulation.fighters.includes(secondSupport), false);
+    assert.ok(
+        !mockApp.renderedRosterIds.includes(FIGHTER_IDS.EATER) && !mockApp.renderedRosterIds.includes(FIGHTER_IDS.SPIN),
+        "Support cards should leave the fighter strip after safe withdrawal"
     );
     console.log("[hunting-party-battle-composition] ok");
 }

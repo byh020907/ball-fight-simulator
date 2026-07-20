@@ -128,6 +128,31 @@ const HUNTING_EVENT_PRESENTATION_HANDLERS = Object.freeze({
     [HUNTING_EVENT_TRANSITIONS.BATTLE]: "_presentBattleEvent"
 });
 
+function isValidHuntingPartySelection(characterId, party, selectableCharacterIds) {
+    const supportIds = Array.isArray(party?.supportIds) ? party.supportIds : [];
+    const selectedIds = [characterId, party?.companionId, party?.swapId, ...supportIds].filter(Boolean);
+    return (
+        selectedIds.length > 0 &&
+        new Set(selectedIds).size === selectedIds.length &&
+        selectedIds.every((selectedId) => selectableCharacterIds.has(selectedId))
+    );
+}
+
+function getDebugPartyEncounterFloor(context) {
+    const requestedFloor = Math.max(1, Math.min(HUNTING_MAX_FLOOR, Math.floor(context.encounterFloor) || 1));
+    if (context.kind === "encounter" && context.encounterType === HUNTING_DEBUG_ENCOUNTER_TYPES.FINAL_BOSS) {
+        return HUNTING_MAX_FLOOR;
+    }
+
+    const isEliteEncounter =
+        context.kind === "encounter" && context.encounterType === HUNTING_DEBUG_ENCOUNTER_TYPES.ELITE;
+    const isEliteEvent = context.kind === "event" && context.eventType === HUNTING_EVENT_TYPES.ELITE_MOB;
+    if (!isEliteEncounter && !isEliteEvent) return requestedFloor;
+
+    const eliteCombination = getEliteMobCombination(context.eliteCombinationId) ?? ELITE_MOB_COMBINATIONS[0];
+    return Math.max(requestedFloor, eliteCombination.minimumFloor);
+}
+
 export class HuntingManager {
     constructor(app) {
         this.app = app;
@@ -210,21 +235,57 @@ export class HuntingManager {
             name: fighter.name,
             canLead: leadIds.has(fighter.id)
         }));
-        PopupService.show({
+        return this._showPartySelection({
             title: `사냥터 — ${stage.name} 시작 층`,
+            characterId,
+            characters,
+            checkpoints: HUNTING_START_CHECKPOINTS.map((checkpoint) => ({
+                floor: checkpoint,
+                available: availableCheckpoints.includes(checkpoint)
+            }))
+        });
+    }
+
+    showDebugPartySelect(characterId, context = {}) {
+        const stageId = HUNTING_STAGES.some((stage) => stage.id === context.stageId)
+            ? context.stageId
+            : HUNTING_STAGE_IDS.CAVE;
+        const encounterFloor = getDebugPartyEncounterFloor(context);
+        return this._showPartySelection({
+            title: `디버그 — ${getHuntingStage(stageId).name} ${encounterFloor}층 편성`,
+            characterId,
+            characters: this.app.roster.map((fighter) => ({ id: fighter.id, name: fighter.name, canLead: true })),
+            checkpoints: [{ floor: encounterFloor, available: true }],
+            startAction: "startDebugHuntingWithParty",
+            startContext: { ...context, stageId, encounterFloor }
+        });
+    }
+
+    _showPartySelection({
+        title,
+        characterId,
+        characters,
+        checkpoints,
+        startAction = "selectHuntingCheckpoint",
+        startContext = null
+    }) {
+        const leaderId = characters.some((character) => character.id === characterId)
+            ? characterId
+            : (characters.find((character) => character.canLead)?.id ?? null);
+        return PopupService.show({
+            title,
             content: {
                 type: "hunting-checkpoint-select",
                 characters,
                 party: {
-                    leaderId: characterId,
+                    leaderId,
                     companionId: null,
                     swapId: null,
                     supportIds: [null, null, null]
                 },
-                checkpoints: HUNTING_START_CHECKPOINTS.map((checkpoint) => ({
-                    floor: checkpoint,
-                    available: availableCheckpoints.includes(checkpoint)
-                }))
+                checkpoints,
+                startAction,
+                startContext
             },
             buttons: []
         });
@@ -233,12 +294,6 @@ export class HuntingManager {
     async startRun(characterId, { encounterFloor = 1, party = {} } = {}) {
         PopupService.close();
         if (!canEnterHunting(this.app.playerProfile, characterId)) return;
-        const selectedIds = [characterId, party.companionId, party.swapId, ...(party.supportIds ?? [])].filter(Boolean);
-        if (new Set(selectedIds).size !== selectedIds.length) return;
-        const selectableIds = new Set(
-            getEligibleRoster(this.app.playerProfile, this.app.roster).map((fighter) => fighter.id)
-        );
-        if (selectedIds.some((selectedId) => !selectableIds.has(selectedId))) return;
         const stageId = getSelectedHuntingStageId(this.app.playerProfile);
         const availableCheckpoints = getHuntingAvailableStartFloors(this.app.playerProfile.hunting.stats, stageId);
         const selectedCheckpoint = availableCheckpoints.includes(encounterFloor) ? encounterFloor : 1;
@@ -251,7 +306,7 @@ export class HuntingManager {
         });
     }
 
-    async startDebugRun(characterId, { stageId = HUNTING_STAGE_IDS.CAVE, encounterFloor = 1 } = {}) {
+    async startDebugRun(characterId, { stageId = HUNTING_STAGE_IDS.CAVE, encounterFloor = 1, party = {} } = {}) {
         PopupService.close();
         const validStageId = HUNTING_STAGES.some((stage) => stage.id === stageId) ? stageId : HUNTING_STAGE_IDS.CAVE;
         const validFloor = Math.max(1, Math.min(HUNTING_MAX_FLOOR, Math.floor(encounterFloor) || 1));
@@ -259,6 +314,7 @@ export class HuntingManager {
             stageId: validStageId,
             encounterFloor: validFloor,
             displayFloor: validFloor,
+            party,
             debug: true
         });
     }
@@ -269,7 +325,8 @@ export class HuntingManager {
             stageId = HUNTING_STAGE_IDS.CAVE,
             encounterFloor = 1,
             eventType = HUNTING_EVENT_TYPES.PORTAL,
-            eliteCombinationId = null
+            eliteCombinationId = null,
+            party = {}
         } = {}
     ) {
         PopupService.close();
@@ -287,6 +344,7 @@ export class HuntingManager {
             stageId: validStageId,
             encounterFloor: previewFloor,
             displayFloor: previewFloor,
+            party,
             debug: true,
             debugEventType: validEventType,
             debugEliteCombinationId: eliteCombination?.id ?? null
@@ -299,7 +357,8 @@ export class HuntingManager {
             stageId = HUNTING_STAGE_IDS.CAVE,
             encounterFloor = 1,
             encounterType = HUNTING_DEBUG_ENCOUNTER_TYPES.NORMAL,
-            eliteCombinationId = null
+            eliteCombinationId = null,
+            party = {}
         } = {}
     ) {
         PopupService.close();
@@ -322,6 +381,7 @@ export class HuntingManager {
             stageId: validStageId,
             encounterFloor: previewFloor,
             displayFloor: previewFloor,
+            party,
             debug: true,
             debugEncounterType: validEncounterType,
             debugEliteCombinationId: eliteCombination?.id ?? null
@@ -341,6 +401,10 @@ export class HuntingManager {
             debugEliteCombinationId = null
         }
     ) {
+        const selectableFighters = debug ? this.app.roster : getEligibleRoster(this.app.playerProfile, this.app.roster);
+        const selectableCharacterIds = new Set(selectableFighters.map((fighter) => fighter.id));
+        if (!isValidHuntingPartySelection(characterId, party, selectableCharacterIds)) return;
+
         this.app.playerProfile.hunting.stats = recordHuntingStageVisit(this.app.playerProfile.hunting.stats, stageId);
         savePlayerProfile(this.app.playerProfile);
         this.app._refreshCollectionHub();
@@ -860,10 +924,7 @@ export class HuntingManager {
             if (entity.collectorId === swapped.standby.id) entity.collectorId = swapped.active.id;
         }
         if (this.app._currentMatchReport) this.app._currentMatchReport.playerFighterId = swapped.active.id;
-        this.app._renderRoster(
-            simulation.fighters.map((fighter) => fighter.id),
-            simulation.fighters
-        );
+        this._renderCombatRoster(simulation);
         this._syncCombatPartyUi();
         return swapped;
     }
@@ -901,6 +962,7 @@ export class HuntingManager {
             party: consumeHuntingSupportCharge(run.party, normalizedIndex),
             history: [...run.history, { type: "support_deployed", floor: run.floor, slotIndex: normalizedIndex }]
         };
+        this._renderCombatRoster(simulation);
         this._syncCombatPartyUi();
         return fighter;
     }
@@ -936,6 +998,7 @@ export class HuntingManager {
     _updateSupportDeployments(delta) {
         const simulation = this.app.simulation;
         if (!simulation || this._supportDeployments.length === 0) return;
+        const fighterCountBeforeUpdate = simulation.fighters.length;
 
         this._supportDeployments = this._supportDeployments
             .map((deployment) => {
@@ -951,6 +1014,14 @@ export class HuntingManager {
                 if (!deployment.withdrawing) return true;
                 return !simulation.finishFighterWithdrawal(deployment.fighter);
             });
+        if (simulation.fighters.length !== fighterCountBeforeUpdate) this._renderCombatRoster(simulation);
+    }
+
+    _renderCombatRoster(simulation) {
+        this.app._renderRoster(
+            simulation.fighters.map((fighter) => fighter.id),
+            simulation.fighters
+        );
     }
 
     _syncCombatPartyUi() {

@@ -63,7 +63,7 @@
                             type="button"
                             class="hunting-checkpoint-btn"
                             :disabled="!checkpoint.available || !isHuntingPartyValid()"
-                            @click="selectHuntingCheckpoint(checkpoint.floor, getHuntingPartySelection())"
+                            @click="startHuntingParty(checkpoint.floor)"
                         >
                             <strong x-text="checkpoint.floor"></strong>
                             <span x-text="`${checkpoint.floor}층 첫 조우`"></span>
@@ -186,8 +186,13 @@
                     (slot) => slot.key !== currentSlot && slot.value === characterId
                 );
             },
-            selectHuntingCheckpoint(encounterFloor, party) {
-                return Alpine.store("uiManager").invokeGameAction("selectHuntingCheckpoint", encounterFloor, party);
+            startHuntingParty(encounterFloor) {
+                return Alpine.store("uiManager").invokeGameAction(
+                    this.content?.startAction ?? "selectHuntingCheckpoint",
+                    encounterFloor,
+                    this.getHuntingPartySelection(),
+                    this.content?.startContext ?? null
+                );
             },
             resolve(value) {
                 if (_resolve) {

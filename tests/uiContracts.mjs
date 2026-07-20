@@ -849,6 +849,16 @@ function testHuntingOverlayActionContracts() {
             overlay.includes("huntingCombatResultTotal"),
         "The first hidden champion victory must prepend a compact unlock card without replacing XP and summary cards"
     );
+    assert.ok(
+        overlay.includes('class="hunting-party-action-bar"') &&
+            overlay.includes('@click="huntingSwapActiveCharacter()"') &&
+            overlay.includes('@click="huntingDeploySupport(index)"'),
+        "The real hunting overlay must own manual swap and support deployment controls"
+    );
+    assert.ok(
+        bridge.includes("huntingSwapActiveCharacter()") && bridge.includes("huntingDeploySupport(slotIndex)"),
+        "Party battle controls must route through the component bridge"
+    );
     console.log("[hunting-overlay-action-contracts] ok");
 }
 
@@ -857,7 +867,8 @@ function testHuntingStartPopupOwnershipContract() {
     const popup = readSource("src/components/popup-dialog.html");
     const bridge = readSource("src/componentBridge.js");
     const stageSelect = manager.match(/showStageSelect\(\)[\s\S]*?\n    }\n\n    selectStage/s)?.[0] ?? "";
-    const checkpointSelect = manager.match(/showCheckpointSelect\([\s\S]*?\n    }\n\n    async startRun/s)?.[0] ?? "";
+    const checkpointSelect =
+        manager.match(/showCheckpointSelect\([\s\S]*?\n    }\n\n    showDebugPartySelect/s)?.[0] ?? "";
 
     assert.ok(
         manager.includes('type: "hunting-stage-select"') && manager.includes('type: "hunting-checkpoint-select"'),
@@ -875,15 +886,21 @@ function testHuntingStartPopupOwnershipContract() {
     );
     assert.ok(
         popup.includes('@click="selectHuntingStage(stage.id)"') &&
-            popup.includes('@click="selectHuntingCheckpoint(checkpoint.floor, getHuntingPartySelection())"') &&
+            popup.includes('@click="startHuntingParty(checkpoint.floor)"') &&
             popup.includes('invokeGameAction("selectHuntingStage", stageId)') &&
-            popup.includes('invokeGameAction("selectHuntingCheckpoint", encounterFloor, party)'),
+            popup.includes('this.content?.startAction ?? "selectHuntingCheckpoint"'),
         "Popup component should own declarative selection handlers and route them through uiManager"
     );
     assert.ok(
         bridge.includes("selectHuntingStage(stageId)") &&
-            bridge.includes("selectHuntingCheckpoint(encounterFloor, party = {})"),
+            bridge.includes("selectHuntingCheckpoint(encounterFloor, party = {})") &&
+            bridge.includes("startDebugHuntingWithParty(encounterFloor, party, context = {})"),
         "Component bridge should expose the two hunting start actions"
+    );
+    assert.ok(
+        manager.includes("showDebugPartySelect(characterId, context = {})") &&
+            manager.includes("_showPartySelection({"),
+        "Debug hunting must reuse the production party selection component instead of duplicating role inputs"
     );
     console.log("[hunting-start-popup-ownership] ok");
 }
