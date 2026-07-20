@@ -25245,6 +25245,42 @@ function testCombatParticipationContracts() {
 
 testCombatParticipationContracts();
 
+function testHuntingPartyBattleComposition() {
+    const leaderId = FIGHTER_IDS.ARCHER;
+    const companionId = FIGHTER_IDS.RAGE;
+    const swapId = FIGHTER_IDS.DASH;
+    const mockApp = {
+        roster: app.roster,
+        playerProfile: createDefaultPlayerProfile(),
+        playerStatAllocation: {},
+        simulationRng: () => 0.5,
+        startMatch(specs, options) {
+            this.simulation = new BattleSimulation(specs, { onLog() {}, onSound() {} }, null, options);
+        }
+    };
+    const manager = new HuntingManager(mockApp);
+    manager._run = createHuntingRun({
+        characterId: leaderId,
+        companionId,
+        swapId,
+        stageId: HUNTING_STAGE_IDS.CAVE
+    });
+    manager._startFloorBattle();
+
+    const alliedFighters = mockApp.simulation.fighters.filter((fighter) => fighter.teamId === HUNTING_TEAMS.PLAYER);
+    assert.deepEqual(
+        new Set(alliedFighters.map((fighter) => fighter.id)),
+        new Set([leaderId, companionId]),
+        "Leader and companion should enter the battlefield together"
+    );
+    assert.equal(mockApp.simulation.standbyFighters.length, 1);
+    assert.equal(mockApp.simulation.standbyFighters[0].id, swapId, "Swap character should wait off-field");
+    assert.equal(mockApp.simulation.standbyFighters[0].participation.canBeTargeted, false);
+    console.log("[hunting-party-battle-composition] ok");
+}
+
+testHuntingPartyBattleComposition();
+
 function testReusableCapabilityContracts() {
     const timedKeys = new TimedKeyMap({ isInvalid: (key) => key === "removed" });
     timedKeys.start("target-a", 0.5);

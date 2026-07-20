@@ -9,9 +9,9 @@ import {
     getSelectedHuntingStageId,
     getUnlockedHuntingStageIds,
     applyHuntingStatModifiersToSpec,
-    getHuntingRunActiveMember,
     getHuntingRunCharacterId,
     getHuntingRunHealth,
+    setHuntingRunMemberHealth,
     setHuntingRunActiveHealth,
     setHuntingRunMemberHeroCarryover,
     setHuntingRunPhase,
@@ -74,6 +74,7 @@ import {
 import { HuntingBattleLootSession, HuntingLootDropController } from "./huntingLoot.js";
 import { getHuntingCompletionExperience } from "./huntingExperience.js";
 import { getRarityLabel } from "./rarityPresentation.js";
+import { HUNTING_PARTY_ROLES, getHuntingPartyMember, reviveDefeatedHuntingPartyMembers } from "./huntingPartyState.js";
 
 const HUNTING_ROUTE_ACTIONS = Object.freeze({
     CONTINUE: "continue",
@@ -190,7 +191,7 @@ export class HuntingManager {
         });
     }
 
-    async startRun(characterId, { encounterFloor = 1 } = {}) {
+    async startRun(characterId, { encounterFloor = 1, party = {} } = {}) {
         PopupService.close();
         if (!canEnterHunting(this.app.playerProfile, characterId)) return;
         const stageId = getSelectedHuntingStageId(this.app.playerProfile);
@@ -200,6 +201,7 @@ export class HuntingManager {
             stageId,
             encounterFloor: selectedCheckpoint,
             displayFloor: selectedCheckpoint,
+            party,
             debug: false
         });
     }
@@ -288,6 +290,7 @@ export class HuntingManager {
             encounterFloor,
             displayFloor,
             debug,
+            party = {},
             debugEventType = null,
             debugEncounterType = null,
             debugEliteCombinationId = null
@@ -297,7 +300,13 @@ export class HuntingManager {
         savePlayerProfile(this.app.playerProfile);
         this.app._refreshCollectionHub();
         this._run = {
-            ...createHuntingRun({ characterId, stageId }),
+            ...createHuntingRun({
+                characterId,
+                stageId,
+                companionId: party.companionId,
+                swapId: party.swapId,
+                supportIds: party.supportIds
+            }),
             floor: Math.max(0, encounterFloor - 1)
         };
         this.app.playerFighterId = characterId;
@@ -396,9 +405,10 @@ export class HuntingManager {
         });
     }
 
-    _createPlayerHuntingSpec(run) {
+    _createHuntingPartyMemberSpec(run, role, { useEquipment = false, useAllocation = false } = {}) {
         const app = this.app;
-        const characterId = getHuntingRunCharacterId(run);
+        const member = getHuntingPartyMember(run.party, role);
+        const characterId = member?.characterId;
         const playerSpec = app.roster.find((fighter) => fighter.id === characterId);
         if (!playerSpec) return null;
 
@@ -407,11 +417,13 @@ export class HuntingManager {
         const masteryCtx = collectActiveEffects(app.playerProfile, characterId);
         const baseSpec = applyExperienceProgressionToBaseSpec(playerSpec, playerProgression);
         const rebornSpec = applyRebirthLoadoutToBaseSpec(baseSpec, rebirthLoadout);
-        const allocatedSpec = applyStatAllocation(rebornSpec, app.playerStatAllocation ?? {}, true);
-        const equippedSpec = applyEquipmentStats({ ...allocatedSpec, teamId: HUNTING_TEAMS.PLAYER }, app.playerProfile);
+        const allocatedSpec = useAllocation
+            ? applyStatAllocation(rebornSpec, app.playerStatAllocation ?? {}, true)
+            : rebornSpec;
+        const teamSpec = { ...allocatedSpec, teamId: HUNTING_TEAMS.PLAYER };
+        const equippedSpec = useEquipment ? applyEquipmentStats(teamSpec, app.playerProfile) : teamSpec;
         const huntingSpec = applyHuntingStatModifiersToSpec(equippedSpec, run.statModifiers);
         const appliedSpec = applyMasteryEffectsToFighterSpec(huntingSpec, masteryCtx);
-        const member = getHuntingRunActiveMember(run);
         if (playerSpec.ability === "hero" && member?.hero?.carryover) {
             appliedSpec.hero = {
                 ...(appliedSpec.hero || {}),
@@ -419,7 +431,29 @@ export class HuntingManager {
             };
         }
 
-        return { playerSpec, playerProgression, rebirthLoadout, appliedSpec };
+        appliedSpec.hunting = { ...(appliedSpec.hunting ?? {}), partyRole: role };
+
+        return { role, member, playerSpec, playerProgression, rebirthLoadout, appliedSpec };
+    }
+
+    _createPlayerHuntingSpec(run) {
+        return this._createHuntingPartyMemberSpec(run, run.party.activeRole, {
+            useEquipment: true,
+            useAllocation: true
+        });
+    }
+
+    _createCompanionHuntingSpec(run) {
+        return this._createHuntingPartyMemberSpec(run, HUNTING_PARTY_ROLES.COMPANION);
+    }
+
+    _createSwapHuntingSpec(run) {
+        const inactiveRole =
+            run.party.activeRole === HUNTING_PARTY_ROLES.LEADER ? HUNTING_PARTY_ROLES.SWAP : HUNTING_PARTY_ROLES.LEADER;
+        return this._createHuntingPartyMemberSpec(run, inactiveRole, {
+            useEquipment: true,
+            useAllocation: true
+        });
     }
 
     _getHuntingMaxHp(spec) {
@@ -429,12 +463,19 @@ export class HuntingManager {
         return baseHp + heroHp * HERO_ORB_HP_PER_POINT;
     }
 
-    _syncRunHealth(run, spec) {
+    _syncRunMemberHealth(run, role, spec) {
         const maxHp = this._getHuntingMaxHp(spec);
         if (maxHp === null) return run;
-        const health = getHuntingRunHealth(run);
+        const health = getHuntingRunHealth(run, role);
         const carriedHp = Number.isFinite(health.hp) ? health.hp : maxHp;
-        return setHuntingRunActiveHealth(run, { hp: Math.min(maxHp, Math.max(1, carriedHp)), maxHp });
+        return setHuntingRunMemberHealth(run, role, {
+            hp: Math.min(maxHp, Math.max(1, carriedHp)),
+            maxHp
+        });
+    }
+
+    _syncRunHealth(run, spec) {
+        return this._syncRunMemberHealth(run, run.party.activeRole, spec);
     }
 
     _startFloorBattle() {
@@ -444,9 +485,14 @@ export class HuntingManager {
 
         const player = this._createPlayerHuntingSpec(run);
         if (!player) return;
-        this._run = this._syncRunHealth(run, player.appliedSpec);
+        const companion = this._createCompanionHuntingSpec(run);
+        const swap = this._createSwapHuntingSpec(run);
+        let syncedRun = this._syncRunHealth(run, player.appliedSpec);
+        if (companion) syncedRun = this._syncRunMemberHealth(syncedRun, companion.role, companion.appliedSpec);
+        if (swap) syncedRun = this._syncRunMemberHealth(syncedRun, swap.role, swap.appliedSpec);
+        this._run = syncedRun;
         run = this._run;
-        const { playerProgression, rebirthLoadout, appliedSpec } = player;
+        const { appliedSpec } = player;
 
         const isFinalBoss = run.lastEncounter?.type === HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS;
         const isChampion = !isFinalBoss && run.lastEvent?.enemyType === HUNTING_ENEMY_TYPES.CHAMPION;
@@ -501,7 +547,8 @@ export class HuntingManager {
         };
         run = this._run;
         const characterId = getHuntingRunCharacterId(run);
-        const matchSpecs = [appliedSpec, ...enemySpecs];
+        const directCombatants = [player, companion].filter(Boolean);
+        const matchSpecs = [...directCombatants.map((entry) => entry.appliedSpec), ...enemySpecs];
         const battleLootSession = new HuntingBattleLootSession({ playerId: characterId, floor: run.floor });
         const lootDropController = new HuntingLootDropController({
             session: battleLootSession,
@@ -536,8 +583,12 @@ export class HuntingManager {
             hostileAbsenceGraceTeamId: HUNTING_TEAMS.PLAYER,
             arenaTheme: stageTheme,
             terrain,
-            experienceProgressionByFighter: new Map([[characterId, playerProgression]]),
-            rebirthLoadoutByFighter: new Map([[characterId, rebirthLoadout]]),
+            experienceProgressionByFighter: new Map(
+                directCombatants.map((entry) => [entry.member.characterId, entry.playerProgression])
+            ),
+            rebirthLoadoutByFighter: new Map(
+                directCombatants.map((entry) => [entry.member.characterId, entry.rebirthLoadout])
+            ),
             playerLives: isFinalBoss ? { playerId: characterId, total: 3 } : null,
             onFighterDefeated: (fighter, context) => lootDropController.onFighterDefeated(fighter, context),
             onResultResolved: (winner, context) =>
@@ -555,6 +606,18 @@ export class HuntingManager {
             if (ball) {
                 ball.hp = Math.min(ball.maxHp, Math.max(1, health.hp));
             }
+        }
+        for (const entry of [companion].filter(Boolean)) {
+            const memberHealth = getHuntingRunHealth(run, entry.role);
+            const ball = app.simulation?.fighters?.find((fighter) => fighter.id === entry.member.characterId);
+            if (ball && Number.isFinite(memberHealth.hp)) {
+                ball.hp = Math.min(ball.maxHp, Math.max(1, memberHealth.hp));
+            }
+        }
+        if (swap) {
+            const standby = app.simulation.createStandbyFighter(swap.appliedSpec);
+            const memberHealth = getHuntingRunHealth(run, swap.role);
+            if (Number.isFinite(memberHealth.hp)) standby.hp = Math.min(standby.maxHp, Math.max(1, memberHealth.hp));
         }
     }
 
@@ -602,18 +665,9 @@ export class HuntingManager {
 
             // Hero Orb carryover — Hero Ball만 전투 중 획득한 bonuses를 run에 반영
             const characterId = getHuntingRunCharacterId(run);
-            const playerSpec = app.roster.find((f) => f.id === characterId);
-            if (playerSpec?.ability === "hero" && playerBall?.hero?.bonuses) {
-                const member = getHuntingRunActiveMember(run);
-                const carryoverTarget = { hero: { carryover: { ...member.hero.carryover } } };
-                playerBall.mergeHeroOrbCarryoverInto(carryoverTarget);
-                run = setHuntingRunMemberHeroCarryover(run, run.party.activeRole, carryoverTarget.hero.carryover);
-            }
-
-            const runHealth = getHuntingRunHealth(run);
+            run = this._captureDirectPartyBattleState(run, app.simulation);
+            run = { ...run, party: reviveDefeatedHuntingPartyMembers(run.party) };
             this._run = recordHuntingFloorResult(recordHuntingBattleVictory(run), {
-                hpRemain: playerBall?.hp ?? runHealth.hp ?? 0,
-                maxHp: playerBall?.maxHp ?? runHealth.maxHp,
                 loot: floorLoot,
                 combatCleared: true
             });
@@ -642,6 +696,7 @@ export class HuntingManager {
         } else {
             this._battleLootSession = null;
             this._combatRewardChestQueue = [];
+            run = this._captureDirectPartyBattleState(run, app.simulation);
             this._run = defeatHuntingRun(run);
             const name = playerBall?.name ?? getHuntingRunCharacterId(run);
             const securedShards = this._run.securedLoot?.shards ?? 0;
@@ -673,6 +728,21 @@ export class HuntingManager {
             });
             this._run = null;
         }
+    }
+
+    _captureDirectPartyBattleState(run, simulation) {
+        let nextRun = run;
+        for (const fighter of simulation?.fighters ?? []) {
+            const role = fighter.hunting?.partyRole;
+            if (!Object.values(HUNTING_PARTY_ROLES).includes(role)) continue;
+            nextRun = setHuntingRunMemberHealth(nextRun, role, { hp: fighter.hp, maxHp: fighter.maxHp });
+            if (fighter.abilityId !== "hero" || !fighter.hero?.bonuses) continue;
+            const member = getHuntingPartyMember(nextRun.party, role);
+            const carryoverTarget = { hero: { carryover: { ...member.hero.carryover } } };
+            fighter.mergeHeroOrbCarryoverInto(carryoverTarget);
+            nextRun = setHuntingRunMemberHeroCarryover(nextRun, role, carryoverTarget.hero.carryover);
+        }
+        return nextRun;
     }
 
     _getHuntingBattleResult(simulation) {
