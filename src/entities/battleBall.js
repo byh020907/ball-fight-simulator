@@ -396,7 +396,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         const target = simulation.getOpponent(this);
         this._tickTimers(delta);
         this._tickMasteryPassives(delta);
-        if (this.participation.canAct) this.abilities.update(delta, target);
+        if (this.participation.canAct) this.abilities.update(delta * this.participation.abilityTimeScale, target);
         else this.abilities.tickStandby(delta);
 
         if (this.participation.canAct && this.aiController) {

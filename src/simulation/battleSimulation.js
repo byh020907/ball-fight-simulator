@@ -290,6 +290,17 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         return true;
     }
 
+    withdrawFighter(fighter) {
+        if (!this.fighters.includes(fighter)) return false;
+        fighter.participation.requestWithdrawal();
+        return true;
+    }
+
+    finishFighterWithdrawal(fighter) {
+        if (!fighter?.participation.canLeave(fighter.abilities)) return false;
+        return this.despawnFighter(fighter);
+    }
+
     isOvertime() {
         return this.elapsed >= this.overtimeStartsAt;
     }

@@ -29,7 +29,7 @@ function isBoss(fighter) {
     return Boolean(fighter?.hunting?.isMiniboss || fighter?.hunting?.bossKind);
 }
 
-function distributeIntegerTotal(total, weights) {
+export function distributeIntegerTotal(total, weights) {
     const safeTotal = Math.max(0, Math.floor(total));
     const safeWeights = weights.map((weight) => Math.max(0, Number(weight) || 0));
     const weightTotal = safeWeights.reduce((sum, weight) => sum + weight, 0);
@@ -46,6 +46,48 @@ function distributeIntegerTotal(total, weights) {
             remainder -= 1;
         });
     return amounts;
+}
+
+export const HUNTING_PARTY_EXPERIENCE_CONFIG = Object.freeze({
+    companionWeight: 20,
+    supportWeight: 5,
+    maximumSwapShareOfDirectPool: 0.65
+});
+
+export function createHuntingPartyExperienceAllocation(
+    totalXp,
+    party,
+    participation = {},
+    config = HUNTING_PARTY_EXPERIENCE_CONFIG
+) {
+    const members = party?.members ?? {};
+    const timing = participation ?? {};
+    const deployedSupports = (party?.supports ?? [])
+        .map((slot, index) => ({ ...slot, index, seconds: Math.max(0, timing.supports?.[index] ?? 0) }))
+        .filter((slot) => slot.characterId && slot.seconds > 0);
+    const companionWeight = members.companion ? config.companionWeight : 0;
+    const supportWeightTotal = deployedSupports.length * config.supportWeight;
+    const directWeight = Math.max(0, 100 - companionWeight - supportWeightTotal);
+    const leaderSeconds = Math.max(0, timing.leader ?? 0);
+    const swapSeconds = members.swap ? Math.max(0, timing.swap ?? 0) : 0;
+    const directSeconds = leaderSeconds + swapSeconds;
+    const rawSwapShare = directSeconds > 0 ? swapSeconds / directSeconds : 0;
+    const swapShare = members.swap ? Math.min(config.maximumSwapShareOfDirectPool, rawSwapShare) : 0;
+    const recipients = [
+        { role: "leader", characterId: members.leader?.characterId, weight: directWeight * (1 - swapShare) },
+        { role: "swap", characterId: members.swap?.characterId, weight: directWeight * swapShare },
+        { role: "companion", characterId: members.companion?.characterId, weight: companionWeight },
+        ...deployedSupports.map((slot) => ({
+            role: `support-${slot.index}`,
+            characterId: slot.characterId,
+            weight: config.supportWeight
+        }))
+    ].filter((recipient) => recipient.characterId && recipient.weight > 0);
+    const amounts = distributeIntegerTotal(
+        totalXp,
+        recipients.map((recipient) => recipient.weight)
+    );
+    return recipients.map((recipient, index) => ({ ...recipient, amount: amounts[index] }));
 }
 
 export function getHuntingExperienceRarity(fighter) {

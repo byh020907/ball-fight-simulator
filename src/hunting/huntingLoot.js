@@ -206,8 +206,9 @@ function createHuntingLootEntity({
 }
 
 export class HuntingBattleLootSession {
-    constructor({ playerId, floor }) {
+    constructor({ playerId, playerTeamId = null, floor }) {
         this.playerId = playerId;
+        this.playerTeamId = playerTeamId;
         this.floor = floor;
         this._collectedLoot = createEmptyHuntingLoot();
         this._collectedExperience = 0;
@@ -241,6 +242,12 @@ export class HuntingBattleLootSession {
     getCollectedExperience() {
         return this._collectedExperience;
     }
+
+    isPlayerSide(fighter) {
+        if (!fighter) return false;
+        if (this.playerTeamId !== null) return fighter.teamId === this.playerTeamId;
+        return fighter.id === this.playerId;
+    }
 }
 
 export class HuntingLootDropController {
@@ -270,9 +277,14 @@ export class HuntingLootDropController {
         const isMiniboss = Boolean(fighter.hunting.isMiniboss);
         if (!isMob && !isMiniboss) return null;
 
-        const collector = simulation.fighters.find(
-            (candidate) => candidate.id === this.session.playerId && !candidate.flags.defeated
+        const eligibleCollectors = simulation.fighters.filter(
+            (candidate) =>
+                this.session.isPlayerSide(candidate) &&
+                candidate.participation?.countsForResult !== false &&
+                !candidate.flags.defeated
         );
+        const collector =
+            eligibleCollectors.find((candidate) => candidate.id === this.session.playerId) ?? eligibleCollectors[0];
         if (!collector) return null;
 
         const rarity = getLootRarity(fighter);
@@ -382,7 +394,7 @@ export class HuntingLootDropController {
     }
 
     onResultResolved(winner, { simulation, completionExperience = 0 } = {}) {
-        if (!simulation || winner?.id !== this.session?.playerId) return;
+        if (!simulation || !this.session?.isPlayerSide(winner)) return;
         const source =
             this._lastExperienceDropSource ??
             simulation.fighters.find(
@@ -391,6 +403,7 @@ export class HuntingLootDropController {
             winner;
         this._spawnCompletionExperience(source, winner, completionExperience, simulation);
         for (const entity of simulation.entities) {
+            if (entity.collectorId && this.session.isPlayerSide(winner)) entity.collectorId = winner.id;
             entity.beginVictoryCollection?.(LOOT_CONFIG.victoryCollection);
         }
     }

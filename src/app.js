@@ -1495,6 +1495,7 @@ export class BattleApp {
         }
 
         this.simulation.update(speedDelta, delta);
+        if (this._gameMode === "hunting") this.hunting.updateCombat(speedDelta);
         this.renderer.render(this.simulation);
         this._renderSpeedIndicator();
         this._updateLiveCards(this.simulation.fighters);

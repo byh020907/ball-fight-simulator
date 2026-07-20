@@ -33,8 +33,9 @@ function normalizeMode(mode) {
 }
 
 export class CombatParticipation {
-    constructor({ mode = COMBAT_PARTICIPATION_MODES.ACTIVE } = {}) {
+    constructor({ mode = COMBAT_PARTICIPATION_MODES.ACTIVE, abilityTimeScale = 1 } = {}) {
         this.mode = normalizeMode(mode);
+        this.abilityTimeScale = Number.isFinite(abilityTimeScale) ? Math.max(0, abilityTimeScale) : 1;
     }
 
     get policy() {

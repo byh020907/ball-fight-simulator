@@ -2,7 +2,7 @@
     class="hunting-overlay"
     id="huntingOverlay"
     x-data="huntingOverlay"
-    x-show="visible"
+    x-show="visible || huntingPartyHudVisible"
     x-transition:enter="hunting-overlay-enter"
     x-transition:enter-start="hunting-overlay-enter-start"
     x-transition:enter-end="hunting-overlay-enter-end"
@@ -15,10 +15,11 @@
         'hunting-event-active': huntingEventActive,
         'hunting-battle-preparation-active': huntingBattlePreparationActive,
         'hunting-moving': huntingMoving,
-        'hunting-combat-result-active': huntingCombatResultActive
+        'hunting-combat-result-active': huntingCombatResultActive,
+        'hunting-party-hud-active': huntingPartyHudVisible && !visible
     }"
 >
-    <div class="hunting-overlay-frame">
+    <div class="hunting-overlay-frame" x-show="visible">
         <div
             class="hunting-combat-unlock-card"
             x-show="huntingCombatResultActive && huntingCombatResultStep === 'unlock'"
@@ -42,6 +43,19 @@
                 <p x-show="subtext && !huntingCombatResultActive" x-text="subtext"></p>
             </div>
             <xp-reward-panel data-component-id="huntingXpRewardPanel"></xp-reward-panel>
+            <div
+                class="hunting-party-experience-grid"
+                x-show="huntingCombatResultActive && huntingPartyExperienceRewards.length > 1"
+            >
+                <template x-for="reward in huntingPartyExperienceRewards" :key="reward.role">
+                    <div class="hunting-party-experience-card">
+                        <span x-text="reward.roleLabel"></span>
+                        <strong x-text="reward.name"></strong>
+                        <b x-text="'+' + reward.xpGained + ' XP'"></b>
+                        <small x-text="reward.levelUp ? reward.levelLabel + ' 승급' : reward.levelLabel"></small>
+                    </div>
+                </template>
+            </div>
 
             <div class="hunting-route" x-show="huntingMoving">
                 <div class="hunting-route-head">
@@ -248,6 +262,34 @@
             <span x-show="huntingLootHudChests > 0" x-text="' · 상자 ' + huntingLootHudChests"></span>
         </span>
     </div>
+
+    <div class="hunting-party-action-bar" x-show="huntingPartyHudVisible">
+        <button
+            class="hunting-party-action swap"
+            type="button"
+            x-show="huntingSwapCharacter"
+            :disabled="!huntingSwapCharacter?.available"
+            @click="huntingSwapActiveCharacter()"
+        >
+            <span>교대</span>
+            <strong x-text="huntingSwapCharacter?.name || ''"></strong>
+            <small x-text="formatHuntingPartyHealth(huntingSwapCharacter)"></small>
+        </button>
+        <template x-for="(support, index) in huntingSupports" :key="support.slot">
+            <button
+                class="hunting-party-action support"
+                type="button"
+                :disabled="!support.ready"
+                @click="huntingDeploySupport(index)"
+            >
+                <span x-text="'지원 ' + (index + 1)"></span>
+                <strong x-text="support.name"></strong>
+                <small
+                    x-text="support.ready ? '출격 가능' : (support.active ? '출격 중' : support.floorsRemaining + '층 후 충전')"
+                ></small>
+            </button>
+        </template>
+    </div>
 </div>
 <script>
     window.createGameUI("huntingOverlay", () => ({
@@ -293,6 +335,10 @@
         huntingLootHudShards: 0,
         huntingLootHudEnhancementStones: 0,
         huntingLootHudChests: 0,
+        huntingPartyHudVisible: false,
+        huntingSwapCharacter: null,
+        huntingSupports: [],
+        huntingPartyExperienceRewards: [],
 
         huntingRetreat() {
             this.resetHuntingCombatResult();
@@ -340,6 +386,16 @@
         },
         huntingStartPreparedBattle() {
             Alpine.store("uiManager").invokeGameAction("huntingStartPreparedBattle");
+        },
+        huntingSwapActiveCharacter() {
+            Alpine.store("uiManager").invokeGameAction("huntingSwapActiveCharacter");
+        },
+        huntingDeploySupport(slotIndex) {
+            Alpine.store("uiManager").invokeGameAction("huntingDeploySupport", slotIndex);
+        },
+        formatHuntingPartyHealth(character) {
+            if (!character || !Number.isFinite(character.hp) || !Number.isFinite(character.maxHp)) return "";
+            return `${Math.ceil(character.hp)} / ${Math.ceil(character.maxHp)}`;
         },
         show({ label, text, subtext = "", xpReward = null } = {}) {
             this.visible = true;
@@ -397,6 +453,10 @@
             this.huntingLootHudShards = 0;
             this.huntingLootHudEnhancementStones = 0;
             this.huntingLootHudChests = 0;
+            this.huntingPartyHudVisible = false;
+            this.huntingSwapCharacter = null;
+            this.huntingSupports = [];
+            this.huntingPartyExperienceRewards = [];
         },
         setHuntingState(data) {
             if (data.visible !== undefined) this.visible = data.visible;
@@ -454,6 +514,11 @@
             if (data.huntingLootHudEnhancementStones !== undefined)
                 this.huntingLootHudEnhancementStones = data.huntingLootHudEnhancementStones;
             if (data.huntingLootHudChests !== undefined) this.huntingLootHudChests = data.huntingLootHudChests;
+            if (data.huntingPartyHudVisible !== undefined) this.huntingPartyHudVisible = data.huntingPartyHudVisible;
+            if (data.huntingSwapCharacter !== undefined) this.huntingSwapCharacter = data.huntingSwapCharacter;
+            if (data.huntingSupports !== undefined) this.huntingSupports = data.huntingSupports;
+            if (data.huntingPartyExperienceRewards !== undefined)
+                this.huntingPartyExperienceRewards = data.huntingPartyExperienceRewards;
         }
     }));
 </script>
@@ -466,6 +531,101 @@
         justify-content: center;
         pointer-events: none;
         background: #eeeeee;
+    }
+
+    :scope.hunting-party-hud-active {
+        background: transparent;
+    }
+
+    .hunting-party-action-bar {
+        position: absolute;
+        right: clamp(6px, 2%, 18px);
+        bottom: clamp(6px, 2%, 18px);
+        left: clamp(6px, 2%, 18px);
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr));
+        gap: 6px;
+        pointer-events: auto;
+    }
+
+    .hunting-party-action {
+        display: grid;
+        min-width: 0;
+        gap: 2px;
+        padding: 7px 9px;
+        border: 3px solid #222;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.94);
+        color: #222;
+        font-family: inherit;
+        text-align: left;
+        box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.8);
+    }
+
+    .hunting-party-action.swap {
+        border-color: #3477a5;
+    }
+
+    .hunting-party-action.support {
+        border-color: #d4a017;
+    }
+
+    .hunting-party-action:disabled {
+        border-color: #999;
+        background: rgba(225, 225, 225, 0.9);
+        color: #777;
+        box-shadow: none;
+    }
+
+    .hunting-party-action span,
+    .hunting-party-action small {
+        overflow: hidden;
+        font-size: 0.62rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .hunting-party-action strong {
+        overflow: hidden;
+        font-size: 0.75rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .hunting-party-experience-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 7.5rem), 1fr));
+        gap: 6px;
+    }
+
+    .hunting-party-experience-card {
+        display: grid;
+        min-width: 0;
+        gap: 2px;
+        padding: 7px;
+        border: 2px solid #333;
+        background: #fff;
+    }
+
+    .hunting-party-experience-card span,
+    .hunting-party-experience-card small {
+        overflow: hidden;
+        color: #666;
+        font-size: 0.58rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .hunting-party-experience-card strong,
+    .hunting-party-experience-card b {
+        overflow: hidden;
+        font-size: 0.68rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .hunting-party-experience-card b {
+        color: #2d8a3d;
     }
 
     .hunting-overlay-enter {

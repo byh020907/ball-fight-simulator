@@ -250,10 +250,12 @@ import {
     rollHuntingShardBundleAmount,
     scaleHuntingLootAmount,
     HUNTING_PARTY_ROLES,
+    HUNTING_SUPPORT_DEPLOYMENT_CONFIG,
     HUNTING_SUPPORT_RECHARGE_FLOORS,
     advanceHuntingSupportCharges,
     applyHuntingPartyFloorRecovery,
     consumeHuntingSupportCharge,
+    createHuntingPartyExperienceAllocation,
     createHuntingPartyState,
     getActiveHuntingPartyMember,
     isHuntingPartyBattleDefeated,
@@ -3889,37 +3891,52 @@ function testHuntingExperienceBalance() {
     console.log("[hunting-experience-balance] ok");
 }
 
-function testHuntingExperienceGrantsImmediately() {
+function testHuntingExperienceGrantsByPartyParticipation() {
     const profile = createDefaultPlayerProfile();
     const awardCalls = [];
     const manager = new HuntingManager({
+        roster: app.roster,
         awardExperience(characterId, amount, options) {
             awardCalls.push({ characterId, amount, options });
             return grantCharacterExperience(profile, characterId, amount);
         }
     });
-    manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH });
+    manager._run = createHuntingRun({
+        characterId: FIGHTER_IDS.ARCHER,
+        companionId: FIGHTER_IDS.HERO,
+        swapId: FIGHTER_IDS.DASH
+    });
+    manager._partyBattleParticipation = { leader: 2, companion: 10, swap: 8, supports: [0, 0, 0] };
 
-    const result = manager._awardHuntingExperience({ amount: 7 });
+    const results = manager._grantPartyBattleExperience(100);
 
-    assert.equal(result.xpGained, 7, "XP orb collection must grant its exact value immediately");
     assert.equal(
-        profile.experience.byCharacter[FIGHTER_IDS.DASH].currentXp,
-        7,
-        "Collected hunting XP must update the character profile before the battle ends"
+        results.reduce((total, entry) => total + entry.result.xpGained, 0),
+        100,
+        "Battle settlement must preserve the exact collected XP total across the party"
     );
-    assert.deepEqual(
-        awardCalls[0].options,
-        { persist: false, refresh: false, log: false, notifyLevelUp: true },
-        "The manager must batch persistence and UI refresh until the current battle settles"
+    assert.ok(
+        profile.experience.byCharacter[FIGHTER_IDS.ARCHER].currentXp >
+            profile.experience.byCharacter[FIGHTER_IDS.HERO].currentXp,
+        "The leader must keep a meaningful anti-abuse share"
     );
-    assert.equal(
-        manager._battleExperienceGrants.length,
-        1,
-        "The battle result must retain one aggregated XP grant record"
+    assert.ok(
+        profile.experience.byCharacter[FIGHTER_IDS.DASH].currentXp >
+            profile.experience.byCharacter[FIGHTER_IDS.HERO].currentXp,
+        "A heavily deployed swap must earn more XP than the fixed companion share"
     );
-    assert.equal(manager._run.pendingLoot.xp, undefined, "Immediate XP must never enter pending hunting loot");
-    console.log("[hunting-experience-immediate-grant] ok");
+    assert.ok(
+        awardCalls.every(
+            (call) =>
+                call.options.persist === false &&
+                call.options.refresh === false &&
+                call.options.log === false &&
+                call.options.notifyLevelUp === true
+        ),
+        "Party XP grants must batch persistence and UI refresh until battle settlement"
+    );
+    assert.equal(manager._run.pendingLoot.xp, undefined, "Party XP must never enter pending hunting loot");
+    console.log("[hunting-experience-party-grant] ok");
 }
 
 function testHuntingBossRolesAndEnhancementStoneDrops(app) {
@@ -22057,7 +22074,7 @@ testHuntingSplitterDeathFragmentsAndResultGrace(app);
 testHuntingLootItemsRotate();
 testHuntingLootItemsAndDropController(app);
 testHuntingExperienceBalance();
-testHuntingExperienceGrantsImmediately();
+testHuntingExperienceGrantsByPartyParticipation();
 testHuntingLootValueRadius();
 testHuntingNormalCombatWinUsesXpRewardPanel();
 testHuntingBossRolesAndEnhancementStoneDrops(app);
@@ -25176,6 +25193,36 @@ function testHuntingPartyStateContracts() {
 
 testHuntingPartyStateContracts();
 
+function testHuntingPartyExperienceAllocation() {
+    const party = createHuntingPartyState({
+        leaderId: FIGHTER_IDS.ARCHER,
+        companionId: FIGHTER_IDS.HERO,
+        swapId: FIGHTER_IDS.DASH,
+        supportIds: [FIGHTER_IDS.EATER, FIGHTER_IDS.SPIN, FIGHTER_IDS.ELEMENTALIST]
+    });
+    const allocation = createHuntingPartyExperienceAllocation(100, party, {
+        leader: 1,
+        companion: 10,
+        swap: 9,
+        supports: [4, 0, 4]
+    });
+    const byRole = new Map(allocation.map((entry) => [entry.role, entry.amount]));
+    assert.equal(
+        allocation.reduce((total, entry) => total + entry.amount, 0),
+        100,
+        "Party experience allocation must preserve the collected XP total"
+    );
+    assert.equal(byRole.get("companion"), 20, "Companion should keep its fixed battle share");
+    assert.equal(byRole.get("support-0"), 5);
+    assert.equal(byRole.has("support-1"), false, "Undeployed support should not receive battle XP");
+    assert.equal(byRole.get("support-2"), 5);
+    assert.ok(byRole.get("leader") >= 25, "Leader must retain a meaningful share even after an immediate swap");
+    assert.ok(byRole.get("swap") > byRole.get("companion"), "A heavily used swap should earn more than a companion");
+    console.log("[hunting-party-experience-allocation] ok");
+}
+
+testHuntingPartyExperienceAllocation();
+
 function testCombatParticipationContracts() {
     const createSpec = (id, teamId, mode = COMBAT_PARTICIPATION_MODES.ACTIVE) => ({
         id,
@@ -25254,6 +25301,10 @@ function testHuntingPartyBattleComposition() {
         playerProfile: createDefaultPlayerProfile(),
         playerStatAllocation: {},
         simulationRng: () => 0.5,
+        setHuntingOverlayState(state) {
+            this.huntingOverlayState = { ...(this.huntingOverlayState ?? {}), ...state };
+        },
+        _renderRoster() {},
         startMatch(specs, options) {
             this.simulation = new BattleSimulation(specs, { onLog() {}, onSound() {} }, null, options);
         }
@@ -25278,6 +25329,8 @@ function testHuntingPartyBattleComposition() {
     assert.equal(mockApp.simulation.standbyFighters[0].participation.canBeTargeted, false);
     const leader = alliedFighters.find((fighter) => fighter.id === leaderId);
     leader.hp = 42;
+    const pendingOrb = { collectorId: leaderId, isExpired: false, update() {} };
+    mockApp.simulation.entities.push(pendingOrb);
     manager._run = setHuntingRunPhase(manager._run, HUNTING_RUN_PHASES.COMBAT);
     const swapped = manager.swapActiveCharacter();
     assert.equal(swapped.active.id, swapId, "Manual swap should activate the waiting character instance");
@@ -25288,6 +25341,30 @@ function testHuntingPartyBattleComposition() {
         "Outgoing HP should be captured before leaving the field"
     );
     assert.equal(mockApp.playerFighterId, swapId);
+    assert.equal(manager._battleLootSession.playerId, swapId, "Future loot should follow the newly active character");
+    assert.equal(pendingOrb.collectorId, swapId, "Already dropped loot should retarget on manual swap");
+
+    manager._run = createHuntingRun({
+        characterId: leaderId,
+        supportIds: [FIGHTER_IDS.EATER],
+        stageId: HUNTING_STAGE_IDS.CAVE
+    });
+    manager._run = setHuntingRunPhase(manager._run, HUNTING_RUN_PHASES.COMBAT);
+    manager._startFloorBattle();
+    const support = manager.deploySupport(0);
+    assert.equal(support.id, FIGHTER_IDS.EATER);
+    assert.equal(support.participation.mode, COMBAT_PARTICIPATION_MODES.SUPPORT);
+    assert.equal(support.participation.abilityTimeScale, HUNTING_SUPPORT_DEPLOYMENT_CONFIG.abilityTimeScale);
+    assert.equal(support.participation.countsForResult, false, "Support must not become a victory condition");
+    assert.equal(manager._run.party.supports[0].ready, false);
+    assert.equal(manager._run.party.supports[0].floorsRemaining, HUNTING_SUPPORT_RECHARGE_FLOORS);
+    assert.equal(mockApp.huntingOverlayState.huntingSupports[0].active, true);
+    manager.updateCombat(HUNTING_SUPPORT_DEPLOYMENT_CONFIG.duration);
+    assert.equal(
+        mockApp.simulation.fighters.includes(support),
+        false,
+        "Support should safely leave combat when its shared deployment duration ends"
+    );
     console.log("[hunting-party-battle-composition] ok");
 }
 

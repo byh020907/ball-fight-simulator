@@ -133,6 +133,12 @@ export function createComponentBridge(app) {
         huntingStartPreparedBattle() {
             return app.hunting.startPreparedBattle();
         },
+        huntingSwapActiveCharacter() {
+            return app.hunting.swapActiveCharacter();
+        },
+        huntingDeploySupport(slotIndex) {
+            return app.hunting.deploySupport(slotIndex);
+        },
 
         // ── Help action ──
         openHelp() {
