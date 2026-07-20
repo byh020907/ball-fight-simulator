@@ -243,7 +243,19 @@ import {
     rollHuntingBattleExperienceVariance,
     rollHuntingBonusLootItemType,
     rollHuntingShardBundleAmount,
-    scaleHuntingLootAmount
+    scaleHuntingLootAmount,
+    HUNTING_PARTY_ROLES,
+    HUNTING_SUPPORT_RECHARGE_FLOORS,
+    advanceHuntingSupportCharges,
+    applyHuntingPartyFloorRecovery,
+    consumeHuntingSupportCharge,
+    createHuntingPartyState,
+    getActiveHuntingPartyMember,
+    isHuntingPartyBattleDefeated,
+    markHuntingPartyMemberDefeated,
+    reviveDefeatedHuntingPartyMembers,
+    setActiveHuntingPartyRole,
+    setHuntingPartyMemberHealth
 } from "../src/hunting/index.js";
 import { Grenade } from "../src/entities/grenade.js";
 import {
@@ -25071,6 +25083,59 @@ function testElementalistVfxPreviewCatalog() {
 }
 
 testElementalistVfxPreviewCatalog();
+
+function testHuntingPartyStateContracts() {
+    let party = createHuntingPartyState({
+        leaderId: FIGHTER_IDS.ARCHER,
+        companionId: FIGHTER_IDS.HERO,
+        swapId: FIGHTER_IDS.DASH,
+        supportIds: [FIGHTER_IDS.EATER, FIGHTER_IDS.SPIN, FIGHTER_IDS.ELEMENTALIST]
+    });
+
+    assert.equal(getActiveHuntingPartyMember(party).characterId, FIGHTER_IDS.ARCHER);
+    assert.ok(
+        party.supports.every((slot) => slot.ready),
+        "Hunting supports should start fully charged"
+    );
+
+    party = setHuntingPartyMemberHealth(party, HUNTING_PARTY_ROLES.LEADER, { hp: 40, maxHp: 100 });
+    party = setHuntingPartyMemberHealth(party, HUNTING_PARTY_ROLES.COMPANION, { hp: 80, maxHp: 200 });
+    party = setHuntingPartyMemberHealth(party, HUNTING_PARTY_ROLES.SWAP, { hp: 10, maxHp: 50 });
+    party = applyHuntingPartyFloorRecovery(party);
+    assert.equal(party.members.leader.hp, 46, "Leader should recover 10% of missing HP per floor");
+    assert.equal(party.members.companion.hp, 92, "Companion should recover independently per floor");
+    assert.equal(party.members.swap.hp, 14, "Swap character should recover independently while waiting");
+
+    party = setActiveHuntingPartyRole(party, HUNTING_PARTY_ROLES.SWAP);
+    assert.equal(getActiveHuntingPartyMember(party).characterId, FIGHTER_IDS.DASH);
+    party = markHuntingPartyMemberDefeated(party, HUNTING_PARTY_ROLES.SWAP);
+    assert.equal(isHuntingPartyBattleDefeated(party), false, "A living companion should continue the battle alone");
+    assert.equal(party.activeRole, HUNTING_PARTY_ROLES.SWAP, "Defeat must not auto-deploy the waiting leader");
+    party = markHuntingPartyMemberDefeated(party, HUNTING_PARTY_ROLES.COMPANION);
+    assert.equal(
+        isHuntingPartyBattleDefeated(party),
+        true,
+        "Active fighter and companion defeat should end combat even with a living reserve"
+    );
+
+    party = reviveDefeatedHuntingPartyMembers(party);
+    assert.equal(party.members.swap.hp, 1);
+    assert.equal(party.members.companion.hp, 1);
+    assert.equal(party.members.leader.hp, 46, "A surviving waiting character should preserve HP after victory");
+
+    party = consumeHuntingSupportCharge(party, 0);
+    assert.equal(party.supports[0].ready, false);
+    assert.equal(party.supports[0].floorsRemaining, HUNTING_SUPPORT_RECHARGE_FLOORS);
+    for (const _ of Array.from({ length: HUNTING_SUPPORT_RECHARGE_FLOORS - 1 })) {
+        party = advanceHuntingSupportCharges(party);
+    }
+    assert.equal(party.supports[0].ready, false, "Support should remain unavailable before the tenth floor move");
+    party = advanceHuntingSupportCharges(party);
+    assert.equal(party.supports[0].ready, true, "Support should recharge on the tenth actual floor move");
+    console.log("[hunting-party-state-contracts] ok");
+}
+
+testHuntingPartyStateContracts();
 
 function testReusableCapabilityContracts() {
     const timedKeys = new TimedKeyMap({ isInvalid: (key) => key === "removed" });
