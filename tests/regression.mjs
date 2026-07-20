@@ -25276,6 +25276,18 @@ function testHuntingPartyBattleComposition() {
     assert.equal(mockApp.simulation.standbyFighters.length, 1);
     assert.equal(mockApp.simulation.standbyFighters[0].id, swapId, "Swap character should wait off-field");
     assert.equal(mockApp.simulation.standbyFighters[0].participation.canBeTargeted, false);
+    const leader = alliedFighters.find((fighter) => fighter.id === leaderId);
+    leader.hp = 42;
+    manager._run = setHuntingRunPhase(manager._run, HUNTING_RUN_PHASES.COMBAT);
+    const swapped = manager.swapActiveCharacter();
+    assert.equal(swapped.active.id, swapId, "Manual swap should activate the waiting character instance");
+    assert.equal(getHuntingRunCharacterId(manager._run), swapId);
+    assert.equal(
+        getHuntingRunHealth(manager._run, HUNTING_PARTY_ROLES.LEADER).hp,
+        42,
+        "Outgoing HP should be captured before leaving the field"
+    );
+    assert.equal(mockApp.playerFighterId, swapId);
     console.log("[hunting-party-battle-composition] ok");
 }
 

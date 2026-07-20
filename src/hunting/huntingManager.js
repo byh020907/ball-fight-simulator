@@ -74,7 +74,12 @@ import {
 import { HuntingBattleLootSession, HuntingLootDropController } from "./huntingLoot.js";
 import { getHuntingCompletionExperience } from "./huntingExperience.js";
 import { getRarityLabel } from "./rarityPresentation.js";
-import { HUNTING_PARTY_ROLES, getHuntingPartyMember, reviveDefeatedHuntingPartyMembers } from "./huntingPartyState.js";
+import {
+    HUNTING_PARTY_ROLES,
+    getHuntingPartyMember,
+    reviveDefeatedHuntingPartyMembers,
+    setActiveHuntingPartyRole
+} from "./huntingPartyState.js";
 
 const HUNTING_ROUTE_ACTIONS = Object.freeze({
     CONTINUE: "continue",
@@ -743,6 +748,40 @@ export class HuntingManager {
             nextRun = setHuntingRunMemberHeroCarryover(nextRun, role, carryoverTarget.hero.carryover);
         }
         return nextRun;
+    }
+
+    swapActiveCharacter() {
+        const run = this._run;
+        const simulation = this.app.simulation;
+        if (!run || run.phase !== HUNTING_RUN_PHASES.COMBAT || !simulation) return null;
+
+        const activeRole = run.party.activeRole;
+        const standbyRole =
+            activeRole === HUNTING_PARTY_ROLES.LEADER ? HUNTING_PARTY_ROLES.SWAP : HUNTING_PARTY_ROLES.LEADER;
+        const active = simulation.fighters.find((fighter) => fighter.hunting?.partyRole === activeRole);
+        const standby = simulation.standbyFighters.find((fighter) => fighter.hunting?.partyRole === standbyRole);
+        if (!active || !standby || active.flags.defeated || standby.flags.defeated) return null;
+
+        const capturedRun = this._captureDirectPartyBattleState(run, simulation);
+        const swapped = simulation.swapActiveWithStandby(active, standby);
+        if (!swapped) return null;
+
+        this._run = {
+            ...capturedRun,
+            party: setActiveHuntingPartyRole(capturedRun.party, standbyRole),
+            history: [
+                ...capturedRun.history,
+                {
+                    type: "party_swap",
+                    floor: capturedRun.floor,
+                    outgoingRole: activeRole,
+                    incomingRole: standbyRole
+                }
+            ]
+        };
+        this.app.playerFighterId = swapped.active.id;
+        if (this.app._currentMatchReport) this.app._currentMatchReport.playerFighterId = swapped.active.id;
+        return swapped;
     }
 
     _getHuntingBattleResult(simulation) {
