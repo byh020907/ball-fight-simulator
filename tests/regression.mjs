@@ -157,6 +157,7 @@ import {
     getHuntingRunCharacterId,
     getHuntingRunHealth,
     getEligibleHuntingCharacters,
+    isHuntingPartySelectionEligible,
     selectHuntingModeCharacterId,
     getEnemyPowerMultiplier,
     getHuntingFloorChances,
@@ -9020,6 +9021,24 @@ function testHuntingSystem() {
         eligible.map((fighter) => fighter.id),
         [FIGHTER_IDS.DASH],
         "Only tournament winners should be listed as hunting candidates"
+    );
+    assert.equal(
+        isHuntingPartySelectionEligible(profile, [{ id: FIGHTER_IDS.DASH }, { id: FIGHTER_IDS.ARCHER }], {
+            leaderId: FIGHTER_IDS.DASH,
+            companionIds: [null, null],
+            swapId: null
+        }),
+        true,
+        "A solo hunting party should remain valid when its leader has won a tournament"
+    );
+    assert.equal(
+        isHuntingPartySelectionEligible(profile, [{ id: FIGHTER_IDS.DASH }, { id: FIGHTER_IDS.ARCHER }], {
+            leaderId: FIGHTER_IDS.DASH,
+            companionIds: [FIGHTER_IDS.ARCHER, null],
+            swapId: null
+        }),
+        false,
+        "Every selected hunting party member must have their own tournament victory"
     );
 
     assert.equal(getEnemyPowerMultiplier(1), 1, "Floor 1 normal enemy power should be base");

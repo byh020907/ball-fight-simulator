@@ -6,6 +6,7 @@ import {
     canRetreatFromHuntingRun,
     canEnterHunting,
     getEligibleHuntingCharacters,
+    isHuntingPartySelectionEligible,
     getHuntingAvailableStartFloors,
     getSelectedHuntingStageId,
     getUnlockedHuntingStageIds,
@@ -237,11 +238,8 @@ export class HuntingManager {
     showCheckpointSelect(characterId, stageId = getSelectedHuntingStageId(this.app.playerProfile)) {
         const stage = getHuntingStage(stageId);
         const availableCheckpoints = getHuntingAvailableStartFloors(this.app.playerProfile.hunting.stats, stageId);
-        const leadIds = new Set(
-            getEligibleHuntingCharacters(this.app.playerProfile, this.app.roster).map((fighter) => fighter.id)
-        );
-        const characters = getEligibleRoster(this.app.playerProfile, this.app.roster).map((fighter) =>
-            createHuntingPartyCharacterOption(this.app.playerProfile, fighter, leadIds.has(fighter.id))
+        const characters = getEligibleHuntingCharacters(this.app.playerProfile, this.app.roster).map((fighter) =>
+            createHuntingPartyCharacterOption(this.app.playerProfile, fighter)
         );
         return this._showPartySelection({
             title: `사냥터 — ${stage.name} 시작 층`,
@@ -410,9 +408,13 @@ export class HuntingManager {
             debugEliteCombinationId = null
         }
     ) {
-        const selectableFighters = debug ? this.app.roster : getEligibleRoster(this.app.playerProfile, this.app.roster);
-        const selectableCharacterIds = new Set(selectableFighters.map((fighter) => fighter.id));
-        if (!isValidHuntingPartySelection(characterId, party, selectableCharacterIds)) return;
+        const selection = { leaderId: characterId, companionIds: party.companionIds, swapId: party.swapId };
+        if (debug) {
+            const selectableCharacterIds = new Set(this.app.roster.map((fighter) => fighter.id));
+            if (!isValidHuntingPartySelection(characterId, party, selectableCharacterIds)) return;
+        } else if (!isHuntingPartySelectionEligible(this.app.playerProfile, this.app.roster, selection)) {
+            return;
+        }
 
         this.app.playerProfile.hunting.stats = recordHuntingStageVisit(this.app.playerProfile.hunting.stats, stageId);
         savePlayerProfile(this.app.playerProfile);

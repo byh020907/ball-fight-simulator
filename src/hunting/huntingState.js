@@ -55,6 +55,17 @@ export function getEligibleHuntingCharacters(profile, roster = []) {
     return roster.filter((fighter) => isCharacterUnlocked(profile, fighter.id) && canEnterHunting(profile, fighter.id));
 }
 
+export function isHuntingPartySelectionEligible(profile, roster = [], party = {}) {
+    const companionIds = Array.isArray(party.companionIds) ? party.companionIds : [];
+    const selectedIds = [party.leaderId, ...companionIds, party.swapId].filter(Boolean);
+    const eligibleIds = new Set(getEligibleHuntingCharacters(profile, roster).map((fighter) => fighter.id));
+    return (
+        Boolean(party.leaderId) &&
+        new Set(selectedIds).size === selectedIds.length &&
+        selectedIds.every((characterId) => eligibleIds.has(characterId))
+    );
+}
+
 export function selectHuntingModeCharacterId(profile, roster = [], currentCharacterId = null, rng = Math.random) {
     const eligible = getEligibleHuntingCharacters(profile, roster);
     if (eligible.some((fighter) => fighter.id === currentCharacterId)) return currentCharacterId;

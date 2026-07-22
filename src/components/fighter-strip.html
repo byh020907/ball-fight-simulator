@@ -82,8 +82,12 @@
 <style scoped>
     :scope {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: minmax(0, 1fr);
         gap: 4px;
+    }
+
+    :scope:has(.fighter-card:nth-of-type(2)) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     :scope:has(.fighter-card:nth-of-type(3)) {
@@ -332,7 +336,7 @@
     }
 
     @media (max-width: 760px) {
-        :scope,
+        :scope:has(.fighter-card:nth-of-type(2)),
         :scope:has(.fighter-card:nth-of-type(3)) {
             grid-template-columns: repeat(2, minmax(0, 1fr));
             min-height: 0;
