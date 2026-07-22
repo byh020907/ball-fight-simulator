@@ -300,26 +300,33 @@
                                     환생 보상 선택
                                 </button>
                                 <div class="ch-rebirth-offers" x-show="item.rebirth.pendingOfferCards.length">
-                                    <span class="ch-rebirth-label">진행 중인 보상 후보</span>
-                                    <template x-for="card in item.rebirth.pendingOfferCards" :key="card.id">
-                                        <div class="ch-rebirth-card ch-rebirth-offer">
-                                            <span class="ch-rebirth-kind" x-text="card.categoryLabel"></span>
-                                            <strong x-text="card.name"></strong>
-                                            <span x-text="formatRebirthCardEffect(card)"></span>
-                                            <span
-                                                class="ch-rebirth-rank"
-                                                x-show="card.type !== 'statReward'"
-                                                x-text="card.rankLabel"
-                                            ></span>
+                                    <span class="ch-rebirth-label">하나의 보상을 선택하세요</span>
+                                    <div class="ch-rebirth-choice-grid">
+                                        <template x-for="card in item.rebirth.pendingOfferCards" :key="card.id">
                                             <button
-                                                class="ch-btn"
+                                                class="ch-rebirth-choice"
+                                                x-bind:class="'type-' + card.type"
                                                 type="button"
+                                                x-bind:aria-label="card.name + ' 보상 선택'"
                                                 @click="completeRebirth(item.id, card.id)"
                                             >
-                                                선택
+                                                <span class="ch-rebirth-choice-head">
+                                                    <span class="ch-rebirth-kind" x-text="card.categoryLabel"></span>
+                                                    <span
+                                                        class="ch-rebirth-rank"
+                                                        x-show="card.type !== 'statReward'"
+                                                        x-text="card.rankLabel"
+                                                    ></span>
+                                                </span>
+                                                <strong x-text="card.name"></strong>
+                                                <span
+                                                    class="ch-rebirth-choice-effect"
+                                                    x-text="formatRebirthCardEffect(card)"
+                                                ></span>
+                                                <span class="ch-rebirth-choice-action">이 보상 선택</span>
                                             </button>
-                                        </div>
-                                    </template>
+                                        </template>
+                                    </div>
                                 </div>
                                 <div class="ch-rebirth-stats">
                                     <span class="ch-rebirth-label">누적 기초 수치</span>
@@ -2036,6 +2043,87 @@
     .ch-rebirth-owned {
         display: grid;
         gap: 6px;
+    }
+
+    .ch-rebirth-choice-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .ch-rebirth-choice {
+        --rebirth-choice-color: #c55615;
+        min-width: 0;
+        padding: 10px;
+        border: 2px solid #202020;
+        border-top: 6px solid var(--rebirth-choice-color);
+        border-radius: 8px;
+        background: #fffaf3;
+        color: #202020;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        box-shadow: 3px 3px 0 rgba(32, 32, 32, 0.18);
+        transition:
+            transform 0.12s,
+            box-shadow 0.12s,
+            background 0.12s;
+    }
+
+    .ch-rebirth-choice.type-action {
+        --rebirth-choice-color: #006bb8;
+        background: #f3f9ff;
+    }
+
+    .ch-rebirth-choice.type-passive {
+        --rebirth-choice-color: #7d52b8;
+        background: #faf6ff;
+    }
+
+    .ch-rebirth-choice:hover,
+    .ch-rebirth-choice:focus-visible {
+        transform: translateY(-2px);
+        box-shadow: 4px 5px 0 rgba(32, 32, 32, 0.22);
+        outline: none;
+    }
+
+    .ch-rebirth-choice:active {
+        transform: translateY(0);
+        box-shadow: 1px 1px 0 rgba(32, 32, 32, 0.2);
+    }
+
+    .ch-rebirth-choice-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+        min-width: 0;
+    }
+
+    .ch-rebirth-choice > strong {
+        font-size: 0.88rem;
+        line-height: 1.25;
+    }
+
+    .ch-rebirth-choice-effect {
+        flex: 1;
+        color: #555555;
+        font-size: 0.72rem;
+        line-height: 1.4;
+        overflow-wrap: anywhere;
+    }
+
+    .ch-rebirth-choice-action {
+        padding-top: 7px;
+        border-top: 1px solid color-mix(in srgb, var(--rebirth-choice-color) 45%, transparent);
+        color: var(--rebirth-choice-color);
+        font-size: 0.72rem;
+        font-weight: 900;
+        text-align: center;
     }
 
     .ch-rebirth-stats {

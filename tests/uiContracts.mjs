@@ -1363,6 +1363,18 @@ function testCollectionRebirthAndDeveloperContracts() {
         template.includes("completeRebirth(item.id, card.id)"),
         "Candidate selection must use the guarded rebirth completion bridge"
     );
+    assert.ok(
+        template.includes('class="ch-rebirth-choice"') &&
+            template.includes('@click="completeRebirth(item.id, card.id)"') &&
+            template.includes('class="ch-rebirth-choice-action"'),
+        "Each pending reward should be one directly selectable card instead of a list row with a detached button"
+    );
+    const rebirthChoiceGridRule = template.match(/\.ch-rebirth-choice-grid\s*\{([^}]*)\}/s)?.[1] ?? "";
+    assert.match(
+        rebirthChoiceGridRule,
+        /display:\s*grid;[\s\S]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(min\(100%,\s*[^)]+\),\s*1fr\)\);/,
+        "Rebirth choices should use a fluid card grid rather than fixed viewport columns"
+    );
     assert.ok(template.includes("toggleRebirthCardEquip"), "Character detail should expose card equip controls");
     assert.ok(template.includes("maxEquippedCards"), "Character detail should display the three-card loadout limit");
     assert.ok(
