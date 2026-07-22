@@ -668,9 +668,23 @@ function testGameplayUiResetContracts() {
         assert.ok(readSource(path).includes("reset()"), `${name} should expose an explicit reset interface`);
     });
     const fighterStrip = readSource("src/components/fighter-strip.html");
+    const layoutStyles = readSource("src/styles.css");
+    const index = readSource("index.html");
     assert.ok(
         fighterStrip.includes("max-width: 100%") && fighterStrip.includes("text-overflow: ellipsis"),
         "Fighter cards should constrain long mobile labels inside their fluid grid cell"
+    );
+    assert.ok(
+        index.includes('class="arena-slot"') &&
+            layoutStyles.includes("grid-template-rows: minmax(0, 1fr) auto") &&
+            layoutStyles.includes("container-type: size") &&
+            !layoutStyles.includes("calc(100vh - 208px)"),
+        "Desktop battle layout should size the arena from its remaining grid row instead of a fixed viewport deduction"
+    );
+    assert.ok(
+        fighterStrip.includes(":scope:has(.fighter-card:nth-child(3))") &&
+            fighterStrip.includes("grid-template-columns: repeat(3, minmax(0, 1fr))"),
+        "Three-member hunting parties should remain in one fluid desktop row"
     );
     assert.ok(
         fighterStrip.includes("grid-template: 1fr / 1fr") &&

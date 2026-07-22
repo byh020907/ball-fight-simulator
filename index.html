@@ -78,19 +78,21 @@
         <main class="app" x-data="appRoot" x-cloak>
             <section class="game-frame">
                 <section class="battle-stage">
-                    <section class="arena-shell">
-                        <canvas class="arena" id="arenaCanvas" width="960" height="960"></canvas>
+                    <div class="arena-slot">
+                        <section class="arena-shell">
+                            <canvas class="arena" id="arenaCanvas" width="960" height="960"></canvas>
 
-                        <!-- 토스트 알림 -->
-                        <toast-notification></toast-notification>
+                            <!-- 토스트 알림 -->
+                            <toast-notification></toast-notification>
 
-                        <game-overlay></game-overlay>
-                        <hunting-overlay></hunting-overlay>
+                            <game-overlay></game-overlay>
+                            <hunting-overlay></hunting-overlay>
 
-                        <mode-segment></mode-segment>
+                            <mode-segment></mode-segment>
 
-                        <start-button></start-button>
-                    </section>
+                            <start-button></start-button>
+                        </section>
+                    </div>
 
                     <fighter-strip></fighter-strip>
 
@@ -126,7 +128,7 @@
             import Alpine from "https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/module.esm.js";
 
             // GitHub Pages 캐시 방지용 버전 파라미터
-            const V = "0.36.5";
+            const V = "0.36.6";
 
             window.BFS_ASSET_VERSION = V;
             window.Alpine = Alpine;
