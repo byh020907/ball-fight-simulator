@@ -55,7 +55,8 @@ import { HERO_ORB_HP_PER_POINT } from "../entities/heroOrb.js";
 import {
     applyExperienceProgressionToBaseSpec,
     applyExperienceProgressionToBall,
-    collectActiveExperienceProgression
+    collectActiveExperienceProgression,
+    getCharacterExperienceSummary
 } from "../experience/experienceService.js";
 import { applyRebirthLoadoutToBaseSpec, applyRebirthLoadoutToBattleBall, getRebirthLoadout } from "../rebirth/index.js";
 import { applyStatAllocation } from "../statAllocation.js";
@@ -93,6 +94,16 @@ const HUNTING_PARTY_EXPERIENCE_ROLE_LABELS = Object.freeze({
     companion: "동료",
     swap: "교대"
 });
+
+function createHuntingPartyCharacterOption(profile, fighter, canLead = true) {
+    return {
+        id: fighter.id,
+        name: fighter.name,
+        color: fighter.color,
+        level: getCharacterExperienceSummary(profile, fighter.id).level,
+        canLead
+    };
+}
 
 const HUNTING_FLOOR_OUTCOME_HANDLERS = Object.freeze({
     [HUNTING_FLOOR_OUTCOME_TYPES.EMPTY]: "_handleEmptyFloor",
@@ -228,11 +239,9 @@ export class HuntingManager {
         const leadIds = new Set(
             getEligibleHuntingCharacters(this.app.playerProfile, this.app.roster).map((fighter) => fighter.id)
         );
-        const characters = getEligibleRoster(this.app.playerProfile, this.app.roster).map((fighter) => ({
-            id: fighter.id,
-            name: fighter.name,
-            canLead: leadIds.has(fighter.id)
-        }));
+        const characters = getEligibleRoster(this.app.playerProfile, this.app.roster).map((fighter) =>
+            createHuntingPartyCharacterOption(this.app.playerProfile, fighter, leadIds.has(fighter.id))
+        );
         return this._showPartySelection({
             title: `사냥터 — ${stage.name} 시작 층`,
             characterId,
@@ -252,7 +261,9 @@ export class HuntingManager {
         return this._showPartySelection({
             title: `디버그 — ${getHuntingStage(stageId).name} ${encounterFloor}층 편성`,
             characterId,
-            characters: this.app.roster.map((fighter) => ({ id: fighter.id, name: fighter.name, canLead: true })),
+            characters: this.app.roster.map((fighter) =>
+                createHuntingPartyCharacterOption(this.app.playerProfile, fighter)
+            ),
             checkpoints: [{ floor: encounterFloor, available: true }],
             startAction: "startDebugHuntingWithParty",
             startContext: { ...context, stageId, encounterFloor }

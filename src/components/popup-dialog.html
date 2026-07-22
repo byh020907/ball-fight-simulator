@@ -37,38 +37,106 @@
                 </p>
             </div>
             <div class="hunting-checkpoint-select" x-show="content?.type === 'hunting-checkpoint-select'">
-                <span class="hunting-section-label">원정 편성</span>
-                <div class="hunting-party-grid">
+                <span class="hunting-section-label" x-show="!huntingPartyPickerSlotKey">원정 편성</span>
+                <div class="hunting-party-grid" x-show="!huntingPartyPickerSlotKey">
                     <template x-for="slot in getHuntingPartySlots()" :key="slot.key">
-                        <label class="hunting-party-slot">
-                            <span x-text="slot.label"></span>
-                            <select :value="slot.value ?? ''" @change="setHuntingPartySlot(slot.key, $el.value)">
-                                <option x-show="!slot.required" value="">없음</option>
-                                <template x-for="character in getHuntingPartyCharacters(slot)" :key="character.id">
-                                    <option
-                                        :value="character.id"
-                                        :disabled="isHuntingPartyCharacterUsed(character.id, slot.key)"
-                                        x-text="character.name"
-                                    ></option>
-                                </template>
-                            </select>
-                        </label>
-                    </template>
-                </div>
-                <span class="hunting-section-label">첫 조우 층 선택</span>
-                <p class="hunting-checkpoint-desc">도달한 층까지의 체크포인트만 선택할 수 있습니다.</p>
-                <div class="hunting-checkpoint-grid">
-                    <template x-for="checkpoint in content?.checkpoints ?? []" :key="checkpoint.floor">
                         <button
                             type="button"
-                            class="hunting-checkpoint-btn"
-                            :disabled="!checkpoint.available || !isHuntingPartyValid()"
-                            @click="startHuntingParty(checkpoint.floor)"
+                            class="hunting-party-slot"
+                            :class="[`role-${slot.role}`, { empty: !slot.value }]"
+                            :aria-label="`${slot.label} 선택`"
+                            @click="openHuntingPartyPicker(slot.key)"
                         >
-                            <strong x-text="checkpoint.floor"></strong>
-                            <span x-text="`${checkpoint.floor}층 첫 조우`"></span>
+                            <span class="hunting-party-slot-heading">
+                                <strong x-text="slot.label"></strong>
+                                <small x-text="slot.detail"></small>
+                            </span>
+                            <template x-if="slot.value">
+                                <span class="hunting-party-slot-character">
+                                    <i
+                                        class="hunting-character-orb"
+                                        :style="`--character-color: ${getHuntingPartyCharacter(slot.value).color}`"
+                                        x-text="getHuntingPartyCharacter(slot.value).initial"
+                                    ></i>
+                                    <span>
+                                        <strong x-text="getHuntingPartyCharacter(slot.value).name"></strong>
+                                        <small x-text="`Lv.${getHuntingPartyCharacter(slot.value).level}`"></small>
+                                    </span>
+                                    <b aria-hidden="true">›</b>
+                                </span>
+                            </template>
+                            <span class="hunting-party-slot-empty" x-show="!slot.value">＋ 캐릭터 선택</span>
                         </button>
                     </template>
+                </div>
+
+                <div class="hunting-party-picker" x-show="huntingPartyPickerSlotKey">
+                    <div class="hunting-party-picker-heading">
+                        <button
+                            type="button"
+                            class="hunting-party-picker-back"
+                            aria-label="편성으로 돌아가기"
+                            @click="closeHuntingPartyPicker()"
+                        >
+                            ←
+                        </button>
+                        <span>
+                            <strong x-text="getActiveHuntingPartySlot()?.label"></strong>
+                            <small>캐릭터 선택</small>
+                        </span>
+                    </div>
+                    <div class="hunting-party-character-grid">
+                        <button
+                            type="button"
+                            class="hunting-party-character-card empty"
+                            x-show="!getActiveHuntingPartySlot()?.required"
+                            @click="clearHuntingPartySlot()"
+                        >
+                            <i class="hunting-character-orb empty">＋</i>
+                            <span><strong>없음</strong><small>슬롯 비우기</small></span>
+                        </button>
+                        <template
+                            x-for="character in getHuntingPartyCharacters(getActiveHuntingPartySlot())"
+                            :key="character.id"
+                        >
+                            <button
+                                type="button"
+                                class="hunting-party-character-card"
+                                :class="{ active: getActiveHuntingPartySlot()?.value === character.id }"
+                                :disabled="isHuntingPartyCharacterUsed(character.id, huntingPartyPickerSlotKey)"
+                                @click="selectHuntingPartyCharacter(character.id)"
+                            >
+                                <i
+                                    class="hunting-character-orb"
+                                    :style="`--character-color: ${character.color}`"
+                                    x-text="character.initial"
+                                ></i>
+                                <span>
+                                    <strong x-text="character.name"></strong>
+                                    <small x-text="`Lv.${character.level}`"></small>
+                                </span>
+                                <b x-show="getActiveHuntingPartySlot()?.value === character.id">✓</b>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="hunting-checkpoint-section" x-show="!huntingPartyPickerSlotKey">
+                    <span class="hunting-section-label">첫 조우 층 선택</span>
+                    <p class="hunting-checkpoint-desc">도달한 층까지의 체크포인트만 선택할 수 있습니다.</p>
+                    <div class="hunting-checkpoint-grid">
+                        <template x-for="checkpoint in content?.checkpoints ?? []" :key="checkpoint.floor">
+                            <button
+                                type="button"
+                                class="hunting-checkpoint-btn"
+                                :disabled="!checkpoint.available || !isHuntingPartyValid()"
+                                @click="startHuntingParty(checkpoint.floor)"
+                            >
+                                <strong x-text="checkpoint.floor"></strong>
+                                <span x-text="`${checkpoint.floor}층 첫 조우`"></span>
+                            </button>
+                        </template>
+                    </div>
                 </div>
             </div>
         </div>
@@ -113,6 +181,7 @@
             content: null,
             buttons: [],
             closeOnOutside: true,
+            huntingPartyPickerSlotKey: null,
             init() {
                 dialogElement = this.$root;
             },
@@ -130,6 +199,7 @@
                     this.content = options.content ?? null;
                     this.buttons = options.buttons ?? [{ text: "닫기", value: "ok", primary: true }];
                     this.closeOnOutside = options.closeOnOutside !== false;
+                    this.huntingPartyPickerSlotKey = null;
                     this.visible = true;
                     focusDialog();
                 });
@@ -152,18 +222,61 @@
             getHuntingPartySlots() {
                 const party = this.getHuntingPartySelection();
                 return [
-                    { key: "leader", label: "주 캐릭터", value: party.leaderId, required: true, leadOnly: true },
+                    {
+                        key: "leader",
+                        role: "leader",
+                        label: "주 캐릭터",
+                        detail: "장비 적용",
+                        value: party.leaderId,
+                        required: true,
+                        leadOnly: true
+                    },
                     ...party.companionIds.map((value, index) => ({
                         key: `companion-${index}`,
-                        label: `동료 ${index + 1} · 장비 없음`,
+                        role: "companion",
+                        label: `동료 ${index + 1}`,
+                        detail: "장비 없음",
                         value
                     })),
-                    { key: "swap", label: "교대 · 장비 공유", value: party.swapId }
+                    { key: "swap", role: "swap", label: "교대", detail: "장비 공유", value: party.swapId }
                 ];
             },
             getHuntingPartyCharacters(slot) {
                 const characters = this.content?.characters ?? [];
-                return slot.leadOnly ? characters.filter((character) => character.canLead) : characters;
+                const available = slot?.leadOnly ? characters.filter((character) => character.canLead) : characters;
+                return available.map((character) => ({
+                    ...character,
+                    initial: character.name?.trim()?.charAt(0)?.toUpperCase() ?? "?"
+                }));
+            },
+            getHuntingPartyCharacter(characterId) {
+                return (
+                    this.getHuntingPartyCharacters().find((character) => character.id === characterId) ?? {
+                        id: null,
+                        name: "선택",
+                        initial: "?",
+                        color: "#e0e0e0",
+                        level: 1
+                    }
+                );
+            },
+            getActiveHuntingPartySlot() {
+                return this.getHuntingPartySlots().find((slot) => slot.key === this.huntingPartyPickerSlotKey) ?? null;
+            },
+            openHuntingPartyPicker(slotKey) {
+                this.huntingPartyPickerSlotKey = slotKey;
+            },
+            closeHuntingPartyPicker() {
+                this.huntingPartyPickerSlotKey = null;
+            },
+            selectHuntingPartyCharacter(characterId) {
+                this.setHuntingPartySlot(this.huntingPartyPickerSlotKey, characterId);
+                this.closeHuntingPartyPicker();
+            },
+            clearHuntingPartySlot() {
+                const slot = this.getActiveHuntingPartySlot();
+                if (!slot?.required) this.setHuntingPartySlot(slot.key, null);
+                this.closeHuntingPartyPicker();
             },
             setHuntingPartySlot(slotKey, value) {
                 const normalized = value || null;
@@ -288,5 +401,249 @@
 
     .bf-popup-btn--primary:hover {
         opacity: 0.8;
+    }
+
+    .bf-popup-card:has(.hunting-checkpoint-select) {
+        width: min(94vw, 48rem);
+        max-width: none;
+        padding: clamp(0.9rem, 3vw, 1.5rem);
+    }
+
+    .hunting-checkpoint-select,
+    .hunting-checkpoint-section,
+    .hunting-party-picker {
+        display: grid;
+        gap: 0.75rem;
+        min-width: 0;
+    }
+
+    .hunting-section-label {
+        font-size: 0.78rem;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        color: #555555;
+    }
+
+    .hunting-party-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: clamp(0.45rem, 2vw, 0.75rem);
+    }
+
+    .hunting-party-slot {
+        min-width: 0;
+        padding: clamp(0.65rem, 2vw, 0.9rem);
+        border: 2px solid #202020;
+        border-radius: 0;
+        background: #ffffff;
+        color: #202020;
+        display: grid;
+        gap: 0.65rem;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .hunting-party-slot.role-leader,
+    .hunting-party-slot.role-swap {
+        grid-column: 1 / -1;
+    }
+
+    .hunting-party-slot.role-leader {
+        border-width: 3px;
+        background: #f7f7f7;
+    }
+
+    .hunting-party-slot.empty {
+        border-style: dashed;
+        color: #666666;
+    }
+
+    .hunting-party-slot-heading,
+    .hunting-party-slot-character,
+    .hunting-party-character-card,
+    .hunting-party-picker-heading {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+    }
+
+    .hunting-party-slot-heading {
+        justify-content: space-between;
+        gap: 0.5rem;
+        font-size: 0.76rem;
+    }
+
+    .hunting-party-slot-heading small {
+        color: #666666;
+        font-size: 0.68rem;
+        white-space: nowrap;
+    }
+
+    .hunting-party-slot-character {
+        gap: 0.65rem;
+    }
+
+    .hunting-party-slot-character > span,
+    .hunting-party-character-card > span {
+        flex: 1;
+        min-width: 0;
+        display: grid;
+        gap: 0.1rem;
+    }
+
+    .hunting-party-slot-character strong {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .hunting-party-character-card strong {
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        line-height: 1.05;
+    }
+
+    .hunting-party-slot-character small,
+    .hunting-party-character-card small {
+        color: #666666;
+        font-size: 0.68rem;
+    }
+
+    .hunting-party-slot-character > b {
+        font-size: 1.4rem;
+    }
+
+    .hunting-party-slot-empty {
+        padding-block: 0.6rem;
+        text-align: center;
+        font-size: 0.75rem;
+        font-weight: 800;
+    }
+
+    .hunting-character-orb {
+        flex: 0 0 auto;
+        inline-size: clamp(2.25rem, 8vw, 3rem);
+        aspect-ratio: 1;
+        border: 2px solid #202020;
+        border-radius: 50%;
+        background: var(--character-color, #e0e0e0);
+        display: grid;
+        place-items: center;
+        color: #202020;
+        font-size: 0.78rem;
+        font-style: normal;
+        font-weight: 900;
+    }
+
+    .hunting-character-orb.empty {
+        border-style: dashed;
+        background: #ffffff;
+        color: #777777;
+    }
+
+    .hunting-party-picker-heading {
+        gap: 0.75rem;
+        padding-bottom: 0.65rem;
+        border-bottom: 2px solid #202020;
+    }
+
+    .hunting-party-picker-heading > span {
+        display: grid;
+        gap: 0.1rem;
+    }
+
+    .hunting-party-picker-heading small {
+        color: #666666;
+        font-size: 0.68rem;
+    }
+
+    .hunting-party-picker-back {
+        inline-size: 2.5rem;
+        aspect-ratio: 1;
+        border: 2px solid #202020;
+        border-radius: 0;
+        background: #ffffff;
+        color: #202020;
+        font-weight: 900;
+        cursor: pointer;
+    }
+
+    .hunting-party-character-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, clamp(8rem, 22vw, 10rem)), 1fr));
+        gap: 0.45rem;
+        max-height: min(52dvh, 24rem);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    .hunting-party-character-card {
+        gap: 0.55rem;
+        min-width: 0;
+        padding: 0.55rem;
+        border: 2px solid #b8b8b8;
+        border-radius: 0;
+        background: #ffffff;
+        color: #202020;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .hunting-party-character-card.active {
+        border-color: #202020;
+        box-shadow: inset 0 0 0 1px #202020;
+    }
+
+    .hunting-party-character-card:disabled {
+        opacity: 0.32;
+        cursor: not-allowed;
+    }
+
+    .hunting-party-character-card > b {
+        flex: 0 0 auto;
+    }
+
+    .hunting-checkpoint-section {
+        padding-top: 0.75rem;
+        border-top: 1px solid #d0d0d0;
+    }
+
+    .hunting-checkpoint-desc {
+        margin: 0;
+        color: #666666;
+        font-size: 0.72rem;
+    }
+
+    .hunting-checkpoint-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 6rem), 1fr));
+        gap: 0.45rem;
+    }
+
+    .hunting-checkpoint-btn {
+        padding: 0.6rem;
+        border: 2px solid #202020;
+        border-radius: 0;
+        background: #ffffff;
+        color: #202020;
+        display: grid;
+        gap: 0.15rem;
+        cursor: pointer;
+    }
+
+    .hunting-checkpoint-btn strong {
+        font-size: 1rem;
+    }
+
+    .hunting-checkpoint-btn span {
+        font-size: 0.65rem;
+    }
+
+    .hunting-checkpoint-btn:disabled {
+        border-color: #c8c8c8;
+        color: #999999;
+        cursor: not-allowed;
     }
 </style>

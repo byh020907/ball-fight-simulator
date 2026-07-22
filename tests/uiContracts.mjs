@@ -923,6 +923,25 @@ function testHuntingStartPopupOwnershipContract() {
         "The shared party popup should expose two companion slots without removed support slots"
     );
     assert.ok(
+        popup.includes('class="hunting-party-slot"') &&
+            popup.includes('@click="openHuntingPartyPicker(slot.key)"') &&
+            popup.includes('class="hunting-party-character-grid"') &&
+            popup.includes('@click="selectHuntingPartyCharacter(character.id)"') &&
+            !popup.includes("<select :value=\"slot.value ?? ''\""),
+        "Party formation should use visible role cards and one shared character picker instead of stacked native selects"
+    );
+    assert.ok(
+        popup.includes("grid-template-columns: repeat(2, minmax(0, 1fr))") &&
+            popup.includes("grid-template-columns: repeat(auto-fit, minmax(min(100%, clamp(8rem, 22vw, 10rem)), 1fr))"),
+        "Party slots and character choices should keep a fluid grid contract"
+    );
+    assert.ok(
+        manager.includes("createHuntingPartyCharacterOption") &&
+            manager.includes("color: fighter.color") &&
+            manager.includes("getCharacterExperienceSummary(profile, fighter.id).level"),
+        "Party character cards should receive shared visual identity and current level data from HuntingManager"
+    );
+    assert.ok(
         fighterStrip.includes("fighter.partyLabel") && app.includes('partyRole?.startsWith("companion-") ? "동료"'),
         "Hunting companion cards should identify themselves as companions instead of AI fighters"
     );
