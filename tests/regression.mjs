@@ -252,6 +252,7 @@ import {
     HUNTING_PARTY_ROLES,
     HUNTING_COMPANION_CONFIG,
     applyHuntingCompanionScale,
+    getHuntingCompanionCohesionImpulse,
     applyHuntingPartyFloorRecovery,
     createHuntingPartyExperienceAllocation,
     createHuntingPartyState,
@@ -25257,6 +25258,39 @@ function testHuntingCompanionPresentationAndFormation() {
     assert.ok(allies.every((fighter) => fighter.position.x < simulation.width / 2));
     assert.ok(enemies.every((fighter) => fighter.position.x > simulation.width / 2));
     assert.equal(new Set(allies.map((fighter) => fighter.position.y)).size, 3, "Allies need distinct formation slots");
+
+    const [leader, companion] = allies;
+    leader.position = new Vector2(300, 300);
+    leader.velocity = new Vector2(0, 0);
+    companion.position = new Vector2(700, 300);
+    companion.velocity = new Vector2(100, 0);
+    const returnImpulse = getHuntingCompanionCohesionImpulse(companion, leader, 1 / 60);
+    assert.ok(returnImpulse.x < 0, "A roaming companion should turn back toward the active character");
+
+    companion.state.movement = {};
+    assert.equal(
+        getHuntingCompanionCohesionImpulse(companion, leader, 1 / 60),
+        null,
+        "Companion cohesion must never alter an active dash or movement skill"
+    );
+    companion.state.movement = null;
+    companion.state.forcedHeading = { direction: new Vector2(1, 0) };
+    assert.equal(
+        getHuntingCompanionCohesionImpulse(companion, leader, 1 / 60),
+        null,
+        "Companion cohesion must never alter forced skill heading"
+    );
+    companion.state.forcedHeading = null;
+    const distanceBeforeReturn = Vector2.subtract(companion.position, leader.position).length();
+    for (let step = 0; step < 120; step += 1) {
+        const impulse = getHuntingCompanionCohesionImpulse(companion, leader, 1 / 60);
+        if (impulse) companion.applyImpulse(impulse);
+        companion.integrate(1 / 60);
+    }
+    assert.ok(
+        Vector2.subtract(companion.position, leader.position).length() < distanceBeforeReturn,
+        "A companion should physically return toward the active character after its skill ends"
+    );
     console.log("[hunting-companion-presentation-and-formation] ok");
 }
 
