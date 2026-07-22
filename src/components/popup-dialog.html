@@ -145,22 +145,20 @@
                 const normalize = (value) => value || null;
                 return {
                     leaderId: normalize(party.leaderId),
-                    companionId: normalize(party.companionId),
-                    swapId: normalize(party.swapId),
-                    supportIds: (party.supportIds ?? []).map(normalize)
+                    companionIds: (party.companionIds ?? []).map(normalize),
+                    swapId: normalize(party.swapId)
                 };
             },
             getHuntingPartySlots() {
                 const party = this.getHuntingPartySelection();
                 return [
                     { key: "leader", label: "주 캐릭터", value: party.leaderId, required: true, leadOnly: true },
-                    { key: "companion", label: "동료 · 장비 없음", value: party.companionId },
-                    { key: "swap", label: "교대 · 장비 공유", value: party.swapId },
-                    ...party.supportIds.map((value, index) => ({
-                        key: `support-${index}`,
-                        label: `지원 ${index + 1}`,
+                    ...party.companionIds.map((value, index) => ({
+                        key: `companion-${index}`,
+                        label: `동료 ${index + 1} · 장비 없음`,
                         value
-                    }))
+                    })),
+                    { key: "swap", label: "교대 · 장비 공유", value: party.swapId }
                 ];
             },
             getHuntingPartyCharacters(slot) {
@@ -170,15 +168,12 @@
             setHuntingPartySlot(slotKey, value) {
                 const normalized = value || null;
                 if (slotKey === "leader") this.content.party.leaderId = normalized;
-                else if (slotKey === "companion") this.content.party.companionId = normalized;
                 else if (slotKey === "swap") this.content.party.swapId = normalized;
-                else this.content.party.supportIds[Number(slotKey.split("-")[1])] = normalized;
+                else this.content.party.companionIds[Number(slotKey.split("-")[1])] = normalized;
             },
             isHuntingPartyValid() {
                 const party = this.getHuntingPartySelection();
-                const selectedIds = [party.leaderId, party.companionId, party.swapId, ...party.supportIds].filter(
-                    Boolean
-                );
+                const selectedIds = [party.leaderId, ...party.companionIds, party.swapId].filter(Boolean);
                 return Boolean(party.leaderId) && new Set(selectedIds).size === selectedIds.length;
             },
             isHuntingPartyCharacterUsed(characterId, currentSlot) {

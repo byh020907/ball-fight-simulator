@@ -130,10 +130,6 @@ export class AbilitySet {
         );
     }
 
-    canSafelyDeactivate() {
-        return this.all.every((ability) => ability.canSafelyDeactivate?.() !== false);
-    }
-
     modifyOutgoingFighterCollisionDamage(damage, target, context) {
         return this._primary?.modifyOutgoingFighterCollisionDamage?.(damage, target, context) ?? damage;
     }

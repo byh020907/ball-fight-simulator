@@ -77,18 +77,11 @@ import { createHuntingPartyExperienceAllocation, getHuntingCompletionExperience 
 import { getRarityLabel } from "./rarityPresentation.js";
 import {
     HUNTING_PARTY_ROLES,
-    consumeHuntingSupportCharge,
     getHuntingPartyMember,
     reviveDefeatedHuntingPartyMembers,
     setActiveHuntingPartyRole
 } from "./huntingPartyState.js";
-import {
-    HUNTING_SUPPORT_DEPLOYMENT_CONFIG,
-    advanceHuntingSupportDeployment,
-    createHuntingSupportCombatSpec,
-    createHuntingSupportDeployment
-} from "./huntingSupportDeployment.js";
-import { Vector2 } from "../core.js";
+import { applyHuntingCompanionScale } from "./huntingCompanion.js";
 
 const HUNTING_ROUTE_ACTIONS = Object.freeze({
     CONTINUE: "continue",
@@ -129,8 +122,8 @@ const HUNTING_EVENT_PRESENTATION_HANDLERS = Object.freeze({
 });
 
 function isValidHuntingPartySelection(characterId, party, selectableCharacterIds) {
-    const supportIds = Array.isArray(party?.supportIds) ? party.supportIds : [];
-    const selectedIds = [characterId, party?.companionId, party?.swapId, ...supportIds].filter(Boolean);
+    const companionIds = Array.isArray(party?.companionIds) ? party.companionIds : [];
+    const selectedIds = [characterId, ...companionIds, party?.swapId].filter(Boolean);
     return (
         selectedIds.length > 0 &&
         new Set(selectedIds).size === selectedIds.length &&
@@ -153,6 +146,12 @@ function getDebugPartyEncounterFloor(context) {
     return Math.max(requestedFloor, eliteCombination.minimumFloor);
 }
 
+function getHuntingPartyExperienceRoleLabel(role) {
+    if (role === HUNTING_PARTY_ROLES.COMPANION_ONE) return "동료 1";
+    if (role === HUNTING_PARTY_ROLES.COMPANION_TWO) return "동료 2";
+    return HUNTING_PARTY_EXPERIENCE_ROLE_LABELS[role] ?? role;
+}
+
 export class HuntingManager {
     constructor(app) {
         this.app = app;
@@ -163,7 +162,6 @@ export class HuntingManager {
         this._lastBattleExperienceResult = null;
         this._combatRewardChestQueue = [];
         this._combatUiSyncRemaining = 0;
-        this._supportDeployments = [];
         this._partyBattleParticipation = null;
         this._lastBattlePartyExperienceResults = [];
     }
@@ -279,9 +277,8 @@ export class HuntingManager {
                 characters,
                 party: {
                     leaderId,
-                    companionId: null,
-                    swapId: null,
-                    supportIds: [null, null, null]
+                    companionIds: [null, null],
+                    swapId: null
                 },
                 checkpoints,
                 startAction,
@@ -412,9 +409,8 @@ export class HuntingManager {
             ...createHuntingRun({
                 characterId,
                 stageId,
-                companionId: party.companionId,
-                swapId: party.swapId,
-                supportIds: party.supportIds
+                companionIds: party.companionIds,
+                swapId: party.swapId
             }),
             floor: Math.max(0, encounterFloor - 1)
         };
@@ -566,8 +562,11 @@ export class HuntingManager {
         });
     }
 
-    _createCompanionHuntingSpec(run) {
-        return this._createHuntingPartyMemberSpec(run, HUNTING_PARTY_ROLES.COMPANION);
+    _createCompanionHuntingSpecs(run) {
+        return [HUNTING_PARTY_ROLES.COMPANION_ONE, HUNTING_PARTY_ROLES.COMPANION_TWO]
+            .map((role) => this._createHuntingPartyMemberSpec(run, role))
+            .filter(Boolean)
+            .map((entry) => ({ ...entry, appliedSpec: applyHuntingCompanionScale(entry.appliedSpec) }));
     }
 
     _createSwapHuntingSpec(run) {
@@ -577,19 +576,6 @@ export class HuntingManager {
             useEquipment: true,
             useAllocation: true
         });
-    }
-
-    _createHuntingSupportSpec(run, slotIndex) {
-        const slot = run.party.supports[slotIndex];
-        if (!slot?.characterId) return null;
-        const build = this._createHuntingCharacterBuild(run, slot.characterId);
-        if (!build) return null;
-        return {
-            slot,
-            slotIndex,
-            ...build,
-            appliedSpec: createHuntingSupportCombatSpec(build.appliedSpec, slotIndex)
-        };
     }
 
     _getHuntingMaxHp(spec) {
@@ -621,10 +607,12 @@ export class HuntingManager {
 
         const player = this._createPlayerHuntingSpec(run);
         if (!player) return;
-        const companion = this._createCompanionHuntingSpec(run);
+        const companions = this._createCompanionHuntingSpecs(run);
         const swap = this._createSwapHuntingSpec(run);
         let syncedRun = this._syncRunHealth(run, player.appliedSpec);
-        if (companion) syncedRun = this._syncRunMemberHealth(syncedRun, companion.role, companion.appliedSpec);
+        for (const companion of companions) {
+            syncedRun = this._syncRunMemberHealth(syncedRun, companion.role, companion.appliedSpec);
+        }
         if (swap) syncedRun = this._syncRunMemberHealth(syncedRun, swap.role, swap.appliedSpec);
         this._run = syncedRun;
         run = this._run;
@@ -683,7 +671,7 @@ export class HuntingManager {
         };
         run = this._run;
         const characterId = getHuntingRunCharacterId(run);
-        const directCombatants = [player, companion].filter(Boolean);
+        const directCombatants = [player, ...companions];
         const matchSpecs = [...directCombatants.map((entry) => entry.appliedSpec), ...enemySpecs];
         const battleLootSession = new HuntingBattleLootSession({
             playerId: characterId,
@@ -695,8 +683,12 @@ export class HuntingManager {
         this._lastBattleExperienceResult = null;
         this._lastBattlePartyExperienceResults = [];
         this._combatRewardChestQueue = [];
-        this._supportDeployments = [];
-        this._partyBattleParticipation = { leader: 0, companion: 0, swap: 0, supports: [0, 0, 0] };
+        this._partyBattleParticipation = {
+            [HUNTING_PARTY_ROLES.LEADER]: 0,
+            [HUNTING_PARTY_ROLES.COMPANION_ONE]: 0,
+            [HUNTING_PARTY_ROLES.COMPANION_TWO]: 0,
+            [HUNTING_PARTY_ROLES.SWAP]: 0
+        };
         app._currentMatchReport = createMatchReport();
         app._currentMatchReport.playerFighterId = characterId;
 
@@ -746,7 +738,7 @@ export class HuntingManager {
                 ball.hp = Math.min(ball.maxHp, Math.max(1, health.hp));
             }
         }
-        for (const entry of [companion].filter(Boolean)) {
+        for (const entry of companions) {
             const memberHealth = getHuntingRunHealth(run, entry.role);
             const ball = app.simulation?.fighters?.find((fighter) => fighter.id === entry.member.characterId);
             if (ball && Number.isFinite(memberHealth.hp)) {
@@ -929,48 +921,9 @@ export class HuntingManager {
         return swapped;
     }
 
-    deploySupport(slotIndex) {
-        const run = this._run;
-        const simulation = this.app.simulation;
-        const normalizedIndex = Number.isInteger(slotIndex) ? slotIndex : Number(slotIndex);
-        const slot = run?.party?.supports?.[normalizedIndex];
-        if (!run || run.phase !== HUNTING_RUN_PHASES.COMBAT || !simulation || !slot?.ready) return null;
-
-        const support = this._createHuntingSupportSpec(run, normalizedIndex);
-        const active = simulation.fighters.find(
-            (fighter) => fighter.hunting?.partyRole === run.party.activeRole && !fighter.flags.defeated
-        );
-        if (!support || !active) return null;
-
-        const spawnDistance =
-            (active.radius + (support.appliedSpec.stats?.radius ?? active.radius)) *
-            HUNTING_SUPPORT_DEPLOYMENT_CONFIG.spawnOffsetRadiusMultiplier;
-        const spawnAngle = Math.PI + normalizedIndex * ((Math.PI * 2) / Math.max(1, run.party.supports.length));
-        const position = active.position.clone().add(Vector2.fromAngle(spawnAngle, spawnDistance));
-        const fighter = simulation.spawnFighter(support.appliedSpec, position);
-        simulation.keepInsideArena(fighter);
-        applyExperienceProgressionToBall(fighter, support.playerProgression);
-        applyRebirthLoadoutToBattleBall(fighter, simulation, support.rebirthLoadout);
-        simulation.spawnPulse(fighter.position.clone(), fighter.color);
-        simulation.spawnActionText(fighter.position.clone(), "지원 출격", fighter.color);
-        this._supportDeployments = [
-            ...this._supportDeployments,
-            createHuntingSupportDeployment(fighter, normalizedIndex)
-        ];
-        this._run = {
-            ...run,
-            party: consumeHuntingSupportCharge(run.party, normalizedIndex),
-            history: [...run.history, { type: "support_deployed", floor: run.floor, slotIndex: normalizedIndex }]
-        };
-        this._renderCombatRoster(simulation);
-        this._syncCombatPartyUi();
-        return fighter;
-    }
-
     updateCombat(delta) {
         if (this._run?.phase !== HUNTING_RUN_PHASES.COMBAT) return;
         this._recordPartyBattleParticipation(delta);
-        this._updateSupportDeployments(delta);
         this._combatUiSyncRemaining -= Math.max(0, delta);
         if (this._combatUiSyncRemaining > 0) return;
         this._combatUiSyncRemaining = 0.1;
@@ -989,32 +942,6 @@ export class HuntingManager {
             );
             if (fighter) participation[role] += elapsed;
         }
-        for (const deployment of this._supportDeployments) {
-            if (deployment.withdrawing || deployment.fighter.flags.defeated) continue;
-            participation.supports[deployment.slotIndex] += elapsed;
-        }
-    }
-
-    _updateSupportDeployments(delta) {
-        const simulation = this.app.simulation;
-        if (!simulation || this._supportDeployments.length === 0) return;
-        const fighterCountBeforeUpdate = simulation.fighters.length;
-
-        this._supportDeployments = this._supportDeployments
-            .map((deployment) => {
-                const next = advanceHuntingSupportDeployment(deployment, delta);
-                if (next.withdrawing && !deployment.withdrawing) {
-                    simulation.withdrawFighter(next.fighter);
-                    simulation.spawnPulse(next.fighter.position.clone(), next.fighter.color);
-                    simulation.spawnActionText(next.fighter.position.clone(), "지원 복귀", next.fighter.color);
-                }
-                return next;
-            })
-            .filter((deployment) => {
-                if (!deployment.withdrawing) return true;
-                return !simulation.finishFighterWithdrawal(deployment.fighter);
-            });
-        if (simulation.fighters.length !== fighterCountBeforeUpdate) this._renderCombatRoster(simulation);
     }
 
     _renderCombatRoster(simulation) {
@@ -1038,21 +965,9 @@ export class HuntingManager {
         const standbyMember = getHuntingPartyMember(run.party, standbyRole);
         const standbyFighter = simulation.standbyFighters.find((fighter) => fighter.hunting?.partyRole === standbyRole);
         const rosterNames = new Map(this.app.roster.map((fighter) => [fighter.id, fighter.name]));
-        const supports = run.party.supports
-            .map((slot, index) => ({
-                slot: index,
-                characterId: slot.characterId,
-                name: rosterNames.get(slot.characterId) ?? slot.characterId,
-                ready: slot.ready,
-                floorsRemaining: slot.floorsRemaining,
-                active: this._supportDeployments.some(
-                    (deployment) => deployment.slotIndex === index && !deployment.withdrawing
-                )
-            }))
-            .filter((slot) => slot.characterId);
 
         this.app.setHuntingOverlayState?.({
-            huntingPartyHudVisible: Boolean(standbyMember || supports.length > 0),
+            huntingPartyHudVisible: Boolean(standbyMember),
             huntingSwapCharacter: standbyMember
                 ? {
                       characterId: standbyMember.characterId,
@@ -1061,8 +976,7 @@ export class HuntingManager {
                       maxHp: standbyFighter?.maxHp ?? standbyMember.maxHp,
                       available: Boolean(standbyFighter && !standbyFighter.flags.defeated)
                   }
-                : null,
-            huntingSupports: supports
+                : null
         });
     }
 
@@ -1778,9 +1692,7 @@ export class HuntingManager {
     _getPartyExperienceRewards() {
         return this._lastBattlePartyExperienceResults.map((entry) => ({
             role: entry.role,
-            roleLabel: entry.role.startsWith("support-")
-                ? `지원 ${Number(entry.role.split("-")[1]) + 1}`
-                : (HUNTING_PARTY_EXPERIENCE_ROLE_LABELS[entry.role] ?? entry.role),
+            roleLabel: getHuntingPartyExperienceRoleLabel(entry.role),
             name: entry.name,
             xpGained: entry.result.xpGained,
             levelLabel: entry.result.levelLabel ?? `Lv.${entry.result.level}`,

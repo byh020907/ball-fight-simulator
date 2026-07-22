@@ -136,9 +136,6 @@ export function createComponentBridge(app) {
         huntingSwapActiveCharacter() {
             return app.hunting.swapActiveCharacter();
         },
-        huntingDeploySupport(slotIndex) {
-            return app.hunting.deploySupport(slotIndex);
-        },
 
         // ── Help action ──
         openHelp() {

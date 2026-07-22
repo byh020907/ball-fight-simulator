@@ -250,11 +250,9 @@ import {
     rollHuntingShardBundleAmount,
     scaleHuntingLootAmount,
     HUNTING_PARTY_ROLES,
-    HUNTING_SUPPORT_DEPLOYMENT_CONFIG,
-    HUNTING_SUPPORT_RECHARGE_FLOORS,
-    advanceHuntingSupportCharges,
+    HUNTING_COMPANION_CONFIG,
+    applyHuntingCompanionScale,
     applyHuntingPartyFloorRecovery,
-    consumeHuntingSupportCharge,
     createHuntingPartyExperienceAllocation,
     createHuntingPartyState,
     getActiveHuntingPartyMember,
@@ -3903,10 +3901,10 @@ function testHuntingExperienceGrantsByPartyParticipation() {
     });
     manager._run = createHuntingRun({
         characterId: FIGHTER_IDS.ARCHER,
-        companionId: FIGHTER_IDS.HERO,
+        companionIds: [FIGHTER_IDS.HERO, FIGHTER_IDS.EATER],
         swapId: FIGHTER_IDS.DASH
     });
-    manager._partyBattleParticipation = { leader: 2, companion: 10, swap: 8, supports: [0, 0, 0] };
+    manager._partyBattleParticipation = { leader: 2, "companion-1": 10, "companion-2": 10, swap: 8 };
 
     const results = manager._grantPartyBattleExperience(100);
 
@@ -3924,6 +3922,11 @@ function testHuntingExperienceGrantsByPartyParticipation() {
         profile.experience.byCharacter[FIGHTER_IDS.DASH].currentXp >
             profile.experience.byCharacter[FIGHTER_IDS.HERO].currentXp,
         "A heavily deployed swap must earn more XP than the fixed companion share"
+    );
+    assert.equal(
+        profile.experience.byCharacter[FIGHTER_IDS.HERO].currentXp,
+        profile.experience.byCharacter[FIGHTER_IDS.EATER].currentXp,
+        "Both companions must receive the same fixed share"
     );
     assert.ok(
         awardCalls.every(
@@ -25154,51 +25157,41 @@ testElementalistVfxPreviewCatalog();
 function testHuntingPartyStateContracts() {
     let party = createHuntingPartyState({
         leaderId: FIGHTER_IDS.ARCHER,
-        companionId: FIGHTER_IDS.HERO,
-        swapId: FIGHTER_IDS.DASH,
-        supportIds: [FIGHTER_IDS.EATER, FIGHTER_IDS.SPIN, FIGHTER_IDS.ELEMENTALIST]
+        companionIds: [FIGHTER_IDS.HERO, FIGHTER_IDS.EATER],
+        swapId: FIGHTER_IDS.DASH
     });
 
     assert.equal(getActiveHuntingPartyMember(party).characterId, FIGHTER_IDS.ARCHER);
-    assert.ok(
-        party.supports.every((slot) => slot.ready),
-        "Hunting supports should start fully charged"
-    );
 
     party = setHuntingPartyMemberHealth(party, HUNTING_PARTY_ROLES.LEADER, { hp: 40, maxHp: 100 });
-    party = setHuntingPartyMemberHealth(party, HUNTING_PARTY_ROLES.COMPANION, { hp: 80, maxHp: 200 });
+    party = setHuntingPartyMemberHealth(party, HUNTING_PARTY_ROLES.COMPANION_ONE, { hp: 80, maxHp: 200 });
+    party = setHuntingPartyMemberHealth(party, HUNTING_PARTY_ROLES.COMPANION_TWO, { hp: 50, maxHp: 100 });
     party = setHuntingPartyMemberHealth(party, HUNTING_PARTY_ROLES.SWAP, { hp: 10, maxHp: 50 });
     party = applyHuntingPartyFloorRecovery(party);
     assert.equal(party.members.leader.hp, 46, "Leader should recover 10% of missing HP per floor");
-    assert.equal(party.members.companion.hp, 92, "Companion should recover independently per floor");
+    assert.equal(party.members["companion-1"].hp, 92, "First companion should recover independently per floor");
+    assert.equal(party.members["companion-2"].hp, 55, "Second companion should recover independently per floor");
     assert.equal(party.members.swap.hp, 14, "Swap character should recover independently while waiting");
 
     party = setActiveHuntingPartyRole(party, HUNTING_PARTY_ROLES.SWAP);
     assert.equal(getActiveHuntingPartyMember(party).characterId, FIGHTER_IDS.DASH);
     party = markHuntingPartyMemberDefeated(party, HUNTING_PARTY_ROLES.SWAP);
-    assert.equal(isHuntingPartyBattleDefeated(party), false, "A living companion should continue the battle alone");
+    assert.equal(isHuntingPartyBattleDefeated(party), false, "Living companions should continue the battle alone");
     assert.equal(party.activeRole, HUNTING_PARTY_ROLES.SWAP, "Defeat must not auto-deploy the waiting leader");
-    party = markHuntingPartyMemberDefeated(party, HUNTING_PARTY_ROLES.COMPANION);
+    party = markHuntingPartyMemberDefeated(party, HUNTING_PARTY_ROLES.COMPANION_ONE);
+    assert.equal(isHuntingPartyBattleDefeated(party), false, "Either living companion should keep combat active");
+    party = markHuntingPartyMemberDefeated(party, HUNTING_PARTY_ROLES.COMPANION_TWO);
     assert.equal(
         isHuntingPartyBattleDefeated(party),
         true,
-        "Active fighter and companion defeat should end combat even with a living reserve"
+        "Active fighter and both companion defeats should end combat even with a living reserve"
     );
 
     party = reviveDefeatedHuntingPartyMembers(party);
     assert.equal(party.members.swap.hp, 1);
-    assert.equal(party.members.companion.hp, 1);
+    assert.equal(party.members["companion-1"].hp, 1);
+    assert.equal(party.members["companion-2"].hp, 1);
     assert.equal(party.members.leader.hp, 46, "A surviving waiting character should preserve HP after victory");
-
-    party = consumeHuntingSupportCharge(party, 0);
-    assert.equal(party.supports[0].ready, false);
-    assert.equal(party.supports[0].floorsRemaining, HUNTING_SUPPORT_RECHARGE_FLOORS);
-    for (const _ of Array.from({ length: HUNTING_SUPPORT_RECHARGE_FLOORS - 1 })) {
-        party = advanceHuntingSupportCharges(party);
-    }
-    assert.equal(party.supports[0].ready, false, "Support should remain unavailable before the tenth floor move");
-    party = advanceHuntingSupportCharges(party);
-    assert.equal(party.supports[0].ready, true, "Support should recharge on the tenth actual floor move");
     console.log("[hunting-party-state-contracts] ok");
 }
 
@@ -25207,15 +25200,12 @@ testHuntingPartyStateContracts();
 function testHuntingPartyExperienceAllocation() {
     const party = createHuntingPartyState({
         leaderId: FIGHTER_IDS.ARCHER,
-        companionId: FIGHTER_IDS.HERO,
-        swapId: FIGHTER_IDS.DASH,
-        supportIds: [FIGHTER_IDS.EATER, FIGHTER_IDS.SPIN, FIGHTER_IDS.ELEMENTALIST]
+        companionIds: [FIGHTER_IDS.HERO, FIGHTER_IDS.EATER],
+        swapId: FIGHTER_IDS.DASH
     });
     const allocation = createHuntingPartyExperienceAllocation(100, party, {
         leader: 1,
-        companion: 10,
-        swap: 9,
-        supports: [4, 0, 4]
+        swap: 9
     });
     const byRole = new Map(allocation.map((entry) => [entry.role, entry.amount]));
     assert.equal(
@@ -25223,16 +25213,54 @@ function testHuntingPartyExperienceAllocation() {
         100,
         "Party experience allocation must preserve the collected XP total"
     );
-    assert.equal(byRole.get("companion"), 20, "Companion should keep its fixed battle share");
-    assert.equal(byRole.get("support-0"), 5);
-    assert.equal(byRole.has("support-1"), false, "Undeployed support should not receive battle XP");
-    assert.equal(byRole.get("support-2"), 5);
-    assert.ok(byRole.get("leader") >= 25, "Leader must retain a meaningful share even after an immediate swap");
-    assert.ok(byRole.get("swap") > byRole.get("companion"), "A heavily used swap should earn more than a companion");
+    assert.equal(byRole.get("companion-1"), 20, "First companion should keep its fixed battle share");
+    assert.equal(byRole.get("companion-2"), 20, "Second companion should keep its fixed battle share");
+    assert.ok(byRole.get("leader") >= 20, "Leader must retain at least one companion-sized share after an early swap");
+    assert.ok(byRole.get("swap") > byRole.get("companion-1"), "A heavily used swap should earn more than a companion");
     console.log("[hunting-party-experience-allocation] ok");
 }
 
 testHuntingPartyExperienceAllocation();
+
+function testHuntingCompanionPresentationAndFormation() {
+    const baseSpec = {
+        id: "companion-base",
+        name: "companion-base",
+        ability: "none",
+        color: "#ffffff",
+        teamId: "player",
+        stats: { hp: 100, damage: 10, defense: 0, speed: 100, radius: 50, mass: 1.2 }
+    };
+    const companionSpec = applyHuntingCompanionScale(baseSpec);
+    assert.equal(companionSpec.stats.radius, 50 * HUNTING_COMPANION_CONFIG.radiusScale);
+    assert.equal(
+        companionSpec.stats.mass,
+        1.2 * HUNTING_COMPANION_CONFIG.radiusScale ** 2,
+        "Companion physics mass should scale with its visible area"
+    );
+
+    const createSpec = (id, teamId) => ({ ...baseSpec, id, name: id, teamId });
+    const simulation = new BattleSimulation(
+        [
+            createSpec("leader", "player"),
+            createSpec("companion-1", "player"),
+            createSpec("companion-2", "player"),
+            createSpec("enemy-1", "enemy"),
+            createSpec("enemy-2", "enemy")
+        ],
+        { onLog() {}, onSound() {} },
+        null,
+        { assignActions: false }
+    );
+    const allies = simulation.fighters.filter((fighter) => fighter.teamId === "player");
+    const enemies = simulation.fighters.filter((fighter) => fighter.teamId === "enemy");
+    assert.ok(allies.every((fighter) => fighter.position.x < simulation.width / 2));
+    assert.ok(enemies.every((fighter) => fighter.position.x > simulation.width / 2));
+    assert.equal(new Set(allies.map((fighter) => fighter.position.y)).size, 3, "Allies need distinct formation slots");
+    console.log("[hunting-companion-presentation-and-formation] ok");
+}
+
+testHuntingCompanionPresentationAndFormation();
 
 function testCombatParticipationContracts() {
     const createSpec = (id, teamId, mode = COMBAT_PARTICIPATION_MODES.ACTIVE) => ({
@@ -25245,22 +25273,16 @@ function testCombatParticipationContracts() {
         stats: { hp: 100, damage: 10, defense: 0, speed: 100, radius: 20, mass: 1 }
     });
     const simulation = new BattleSimulation(
-        [
-            createSpec("leader", "player"),
-            createSpec("support", "player", COMBAT_PARTICIPATION_MODES.SUPPORT),
-            createSpec("enemy", "enemy")
-        ],
+        [createSpec("leader", "player"), createSpec("enemy", "enemy")],
         { onLog() {}, onSound() {} },
         null,
         { assignActions: false }
     );
     const leader = simulation.fighters.find((fighter) => fighter.id === "leader");
-    const support = simulation.fighters.find((fighter) => fighter.id === "support");
     const enemy = simulation.fighters.find((fighter) => fighter.id === "enemy");
     enemy.flags.defeated = true;
     simulation.checkResult();
-    assert.equal(simulation.winner, leader, "A support fighter must not delay victory after all result enemies fall");
-    assert.equal(support.participation.countsForResult, false);
+    assert.equal(simulation.winner, leader);
 
     const standbySimulation = new BattleSimulation(
         [createSpec("active", "player"), createSpec("standby", "enemy", COMBAT_PARTICIPATION_MODES.STANDBY)],
@@ -25305,7 +25327,7 @@ testCombatParticipationContracts();
 
 function testHuntingPartyBattleComposition() {
     const leaderId = FIGHTER_IDS.ARCHER;
-    const companionId = FIGHTER_IDS.RAGE;
+    const companionIds = [FIGHTER_IDS.RAGE, FIGHTER_IDS.HERO];
     const swapId = FIGHTER_IDS.DASH;
     const mockApp = {
         roster: app.roster,
@@ -25325,7 +25347,7 @@ function testHuntingPartyBattleComposition() {
     const manager = new HuntingManager(mockApp);
     manager._run = createHuntingRun({
         characterId: leaderId,
-        companionId,
+        companionIds,
         swapId,
         stageId: HUNTING_STAGE_IDS.CAVE
     });
@@ -25334,8 +25356,17 @@ function testHuntingPartyBattleComposition() {
     const alliedFighters = mockApp.simulation.fighters.filter((fighter) => fighter.teamId === HUNTING_TEAMS.PLAYER);
     assert.deepEqual(
         new Set(alliedFighters.map((fighter) => fighter.id)),
-        new Set([leaderId, companionId]),
-        "Leader and companion should enter the battlefield together"
+        new Set([leaderId, ...companionIds]),
+        "Leader and both companions should enter the battlefield together"
+    );
+    const companionFighters = alliedFighters.filter((fighter) => companionIds.includes(fighter.id));
+    assert.ok(
+        companionFighters.every((fighter) => fighter.radius < alliedFighters[0].radius),
+        "Companions should be visibly smaller than the active character"
+    );
+    assert.ok(
+        alliedFighters.every((fighter) => fighter.position.x < mockApp.simulation.width / 2),
+        "Every allied party member should spawn on the player side"
     );
     assert.equal(mockApp.simulation.standbyFighters.length, 1);
     assert.equal(mockApp.simulation.standbyFighters[0].id, swapId, "Swap character should wait off-field");
@@ -25357,39 +25388,6 @@ function testHuntingPartyBattleComposition() {
     assert.equal(manager._battleLootSession.playerId, swapId, "Future loot should follow the newly active character");
     assert.equal(pendingOrb.collectorId, swapId, "Already dropped loot should retarget on manual swap");
 
-    manager._run = createHuntingRun({
-        characterId: leaderId,
-        supportIds: [FIGHTER_IDS.EATER, FIGHTER_IDS.SPIN],
-        stageId: HUNTING_STAGE_IDS.CAVE
-    });
-    manager._run = setHuntingRunPhase(manager._run, HUNTING_RUN_PHASES.COMBAT);
-    manager._startFloorBattle();
-    const support = manager.deploySupport(0);
-    assert.equal(support.id, FIGHTER_IDS.EATER);
-    assert.ok(
-        mockApp.renderedRosterIds.includes(FIGHTER_IDS.EATER),
-        "A deployed support card should appear immediately"
-    );
-    assert.equal(support.participation.mode, COMBAT_PARTICIPATION_MODES.SUPPORT);
-    assert.equal(support.participation.abilityTimeScale, HUNTING_SUPPORT_DEPLOYMENT_CONFIG.abilityTimeScale);
-    assert.equal(support.participation.countsForResult, false, "Support must not become a victory condition");
-    assert.equal(manager._run.party.supports[0].ready, false);
-    assert.equal(manager._run.party.supports[0].floorsRemaining, HUNTING_SUPPORT_RECHARGE_FLOORS);
-    assert.equal(mockApp.huntingOverlayState.huntingSupports[0].active, true);
-    const secondSupport = manager.deploySupport(1);
-    assert.equal(secondSupport.id, FIGHTER_IDS.SPIN, "Different support slots may deploy together");
-    assert.equal(manager._supportDeployments.length, 2);
-    manager.updateCombat(HUNTING_SUPPORT_DEPLOYMENT_CONFIG.duration);
-    assert.equal(
-        mockApp.simulation.fighters.includes(support),
-        false,
-        "Support should safely leave combat when its shared deployment duration ends"
-    );
-    assert.equal(mockApp.simulation.fighters.includes(secondSupport), false);
-    assert.ok(
-        !mockApp.renderedRosterIds.includes(FIGHTER_IDS.EATER) && !mockApp.renderedRosterIds.includes(FIGHTER_IDS.SPIN),
-        "Support cards should leave the fighter strip after safe withdrawal"
-    );
     console.log("[hunting-party-battle-composition] ok");
 }
 

@@ -13,7 +13,6 @@ import { createHuntingAchievementProgress } from "./huntingAchievementProgress.j
 import { isCharacterUnlocked } from "../playerProfile.js";
 import {
     HUNTING_PARTY_ROLES,
-    advanceHuntingSupportCharges,
     applyHuntingPartyFloorRecovery,
     createHuntingPartyState,
     getActiveHuntingPartyMember,
@@ -65,9 +64,8 @@ export function selectHuntingModeCharacterId(profile, roster = [], currentCharac
 
 export function createHuntingRun({
     characterId,
-    companionId = null,
+    companionIds = [],
     swapId = null,
-    supportIds = [],
     stageId = HUNTING_STAGE_IDS.CAVE,
     now = Date.now(),
     maxFloor = HUNTING_MAX_FLOOR
@@ -81,7 +79,7 @@ export function createHuntingRun({
         mode: "hunting",
         status: "active",
         phase: HUNTING_RUN_PHASES.READY,
-        party: createHuntingPartyState({ leaderId: characterId, companionId, swapId, supportIds }),
+        party: createHuntingPartyState({ leaderId: characterId, companionIds, swapId }),
         stageId,
         floor: 1,
         maxFloor,
@@ -290,10 +288,10 @@ export function applyHuntingFloorRecovery(run) {
         const amount = (after?.hp ?? 0) - (before?.hp ?? 0);
         return amount > 0 ? [{ role, amount, hpRemain: after.hp }] : [];
     });
-    if (recoveries.length === 0) return { ...run, party: advanceHuntingSupportCharges(recoveredParty) };
+    if (recoveries.length === 0) return { ...run, party: recoveredParty };
     return {
         ...run,
-        party: advanceHuntingSupportCharges(recoveredParty),
+        party: recoveredParty,
         history: [
             ...run.history,
             {

@@ -50,7 +50,6 @@ export function distributeIntegerTotal(total, weights) {
 
 export const HUNTING_PARTY_EXPERIENCE_CONFIG = Object.freeze({
     companionWeight: 20,
-    supportWeight: 5,
     maximumSwapShareOfDirectPool: 0.65
 });
 
@@ -62,12 +61,8 @@ export function createHuntingPartyExperienceAllocation(
 ) {
     const members = party?.members ?? {};
     const timing = participation ?? {};
-    const deployedSupports = (party?.supports ?? [])
-        .map((slot, index) => ({ ...slot, index, seconds: Math.max(0, timing.supports?.[index] ?? 0) }))
-        .filter((slot) => slot.characterId && slot.seconds > 0);
-    const companionWeight = members.companion ? config.companionWeight : 0;
-    const supportWeightTotal = deployedSupports.length * config.supportWeight;
-    const directWeight = Math.max(0, 100 - companionWeight - supportWeightTotal);
+    const companions = [members["companion-1"], members["companion-2"]].filter(Boolean);
+    const directWeight = Math.max(0, 100 - companions.length * config.companionWeight);
     const leaderSeconds = Math.max(0, timing.leader ?? 0);
     const swapSeconds = members.swap ? Math.max(0, timing.swap ?? 0) : 0;
     const directSeconds = leaderSeconds + swapSeconds;
@@ -76,11 +71,10 @@ export function createHuntingPartyExperienceAllocation(
     const recipients = [
         { role: "leader", characterId: members.leader?.characterId, weight: directWeight * (1 - swapShare) },
         { role: "swap", characterId: members.swap?.characterId, weight: directWeight * swapShare },
-        { role: "companion", characterId: members.companion?.characterId, weight: companionWeight },
-        ...deployedSupports.map((slot) => ({
-            role: `support-${slot.index}`,
-            characterId: slot.characterId,
-            weight: config.supportWeight
+        ...companions.map((member) => ({
+            role: member.role,
+            characterId: member.characterId,
+            weight: config.companionWeight
         }))
     ].filter((recipient) => recipient.characterId && recipient.weight > 0);
     const amounts = distributeIntegerTotal(

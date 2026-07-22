@@ -5,7 +5,7 @@
                 <div class="fighter-meta">
                     <strong x-text="fighter.isPlayer ? '내 캐릭터 · ' + fighter.name : fighter.name"></strong>
                     <span class="fighter-title" x-text="fighter.title"></span>
-                    <span x-text="fighter.isPlayer ? '내 배분' : 'AI 배분'"></span>
+                    <span x-text="fighter.partyLabel || (fighter.isPlayer ? '내 배분' : 'AI 배분')"></span>
                 </div>
                 <div class="combat-life-dots" x-show="fighter.lifeSlots?.length" aria-label="남은 생명">
                     <template x-for="(filled, index) in fighter.lifeSlots" :key="index">

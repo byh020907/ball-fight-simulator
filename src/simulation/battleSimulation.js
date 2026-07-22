@@ -20,6 +20,13 @@ import {
 } from "../tournament/angledBounceRamps.js";
 import { COMBAT_PARTICIPATION_MODES } from "./combatParticipation.js";
 
+const TEAM_FORMATION_CONFIG = Object.freeze({
+    leftHorizontalRatio: 0.28,
+    rightHorizontalRatio: 0.72,
+    verticalSpanRatio: 0.42,
+    arenaMargin: 120
+});
+
 const NON_CHARACTER_ABILITY_TYPES = Object.freeze({
     none: Ability,
     hunting_melee: HuntingMeleeAbility,
@@ -39,12 +46,12 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         this.hooks = hooks;
         this.rng = options.rng ?? Math.random;
         this.standbyFighters = [];
-        const spawnPoints = this.createSpawnPoints(fighterSpecs.length);
-        this.fighters = fighterSpecs.map((spec, index) => {
-            const fighterSpec = {
-                ...spec,
-                teamId: spec.teamId ?? spec.team ?? `fighter-${index}`
-            };
+        const normalizedFighterSpecs = fighterSpecs.map((spec, index) => ({
+            ...spec,
+            teamId: spec.teamId ?? spec.team ?? `fighter-${index}`
+        }));
+        const spawnPoints = this.createFighterSpawnPoints(normalizedFighterSpecs);
+        this.fighters = normalizedFighterSpecs.map((fighterSpec, index) => {
             return this._createFighterInstance(fighterSpec, spawnPoints[index]);
         });
         this.entities = [...this.fighters];
@@ -196,6 +203,57 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         return points;
     }
 
+    createFighterSpawnPoints(fighterSpecs) {
+        const teamMembers = new Map();
+        for (const spec of fighterSpecs) {
+            const members = teamMembers.get(spec.teamId) ?? [];
+            members.push(spec);
+            teamMembers.set(spec.teamId, members);
+        }
+        if (teamMembers.size !== 2 || [...teamMembers.values()].every((members) => members.length === 1)) {
+            return this.createSpawnPoints(fighterSpecs.length);
+        }
+
+        const [leftTeamId, rightTeamId] = teamMembers.keys();
+        const formationPointsByTeam = new Map([
+            [
+                leftTeamId,
+                this._createTeamFormationPoints(
+                    teamMembers.get(leftTeamId).length,
+                    TEAM_FORMATION_CONFIG.leftHorizontalRatio
+                )
+            ],
+            [
+                rightTeamId,
+                this._createTeamFormationPoints(
+                    teamMembers.get(rightTeamId).length,
+                    TEAM_FORMATION_CONFIG.rightHorizontalRatio
+                )
+            ]
+        ]);
+        const nextIndexByTeam = new Map([
+            [leftTeamId, 0],
+            [rightTeamId, 0]
+        ]);
+        return fighterSpecs.map((spec) => {
+            const index = nextIndexByTeam.get(spec.teamId);
+            nextIndexByTeam.set(spec.teamId, index + 1);
+            return formationPointsByTeam.get(spec.teamId)[index];
+        });
+    }
+
+    _createTeamFormationPoints(count, horizontalRatio) {
+        const { arenaMargin, verticalSpanRatio } = TEAM_FORMATION_CONFIG;
+        return Array.from({ length: count }, (_, index) => {
+            const ratio = count === 1 ? 0.5 : index / (count - 1);
+            const verticalRatio = 0.5 - verticalSpanRatio / 2 + verticalSpanRatio * ratio;
+            return new Vector2(
+                Math.max(arenaMargin, Math.min(this.width - arenaMargin, this.width * horizontalRatio)),
+                Math.max(arenaMargin, Math.min(this.height - arenaMargin, this.height * verticalRatio))
+            );
+        });
+    }
+
     createAbility(type, owner, context = {}) {
         const AbilityType = Ability.MAP[type] ?? NON_CHARACTER_ABILITY_TYPES[type];
         if (!AbilityType) {
@@ -288,17 +346,6 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         fighter.isExpired = true;
         this.fighters.splice(fighterIndex, 1);
         return true;
-    }
-
-    withdrawFighter(fighter) {
-        if (!this.fighters.includes(fighter)) return false;
-        fighter.participation.requestWithdrawal();
-        return true;
-    }
-
-    finishFighterWithdrawal(fighter) {
-        if (!fighter?.participation.canLeave(fighter.abilities)) return false;
-        return this.despawnFighter(fighter);
     }
 
     isOvertime() {

@@ -1,11 +1,9 @@
 export const HUNTING_PARTY_ROLES = Object.freeze({
     LEADER: "leader",
-    COMPANION: "companion",
+    COMPANION_ONE: "companion-1",
+    COMPANION_TWO: "companion-2",
     SWAP: "swap"
 });
-
-export const HUNTING_SUPPORT_SLOT_COUNT = 3;
-export const HUNTING_SUPPORT_RECHARGE_FLOORS = 10;
 
 const DIRECT_PARTY_ROLES = Object.freeze(Object.values(HUNTING_PARTY_ROLES));
 const HERO_CARRYOVER_KEYS = Object.freeze(["hp", "damage", "speed", "defense", "skill", "critical"]);
@@ -26,18 +24,6 @@ function createPartyMember(role, characterId) {
             carryover: createEmptyHeroCarryover()
         }
     };
-}
-
-function createSupportSlot(characterId = null) {
-    return {
-        characterId,
-        ready: Boolean(characterId),
-        floorsRemaining: 0
-    };
-}
-
-function normalizeSupportIds(supportIds) {
-    return Array.from({ length: HUNTING_SUPPORT_SLOT_COUNT }, (_, index) => supportIds[index] ?? null);
 }
 
 function updateMember(party, role, updater) {
@@ -69,17 +55,23 @@ function isAlive(member) {
     return !Number.isFinite(member.hp) || member.hp > 0;
 }
 
-export function createHuntingPartyState({ leaderId, companionId = null, swapId = null, supportIds = [] } = {}) {
+export function createHuntingPartyState({ leaderId, companionIds = [], swapId = null } = {}) {
     if (!leaderId) throw new Error("leaderId is required to create a hunting party");
-    const normalizedSupportIds = normalizeSupportIds(Array.isArray(supportIds) ? supportIds : []);
+    const normalizedCompanionIds = Array.isArray(companionIds) ? companionIds : [];
     return {
         activeRole: HUNTING_PARTY_ROLES.LEADER,
         members: {
             [HUNTING_PARTY_ROLES.LEADER]: createPartyMember(HUNTING_PARTY_ROLES.LEADER, leaderId),
-            [HUNTING_PARTY_ROLES.COMPANION]: createPartyMember(HUNTING_PARTY_ROLES.COMPANION, companionId),
+            [HUNTING_PARTY_ROLES.COMPANION_ONE]: createPartyMember(
+                HUNTING_PARTY_ROLES.COMPANION_ONE,
+                normalizedCompanionIds[0]
+            ),
+            [HUNTING_PARTY_ROLES.COMPANION_TWO]: createPartyMember(
+                HUNTING_PARTY_ROLES.COMPANION_TWO,
+                normalizedCompanionIds[1]
+            ),
             [HUNTING_PARTY_ROLES.SWAP]: createPartyMember(HUNTING_PARTY_ROLES.SWAP, swapId)
-        },
-        supports: normalizedSupportIds.map(createSupportSlot)
+        }
     };
 }
 
@@ -149,30 +141,7 @@ export function applyHuntingPartyFloorRecovery(party, recoveryRatio = 0.1) {
 export function isHuntingPartyBattleDefeated(party) {
     return (
         !isAlive(getActiveHuntingPartyMember(party)) &&
-        !isAlive(getHuntingPartyMember(party, HUNTING_PARTY_ROLES.COMPANION))
+        !isAlive(getHuntingPartyMember(party, HUNTING_PARTY_ROLES.COMPANION_ONE)) &&
+        !isAlive(getHuntingPartyMember(party, HUNTING_PARTY_ROLES.COMPANION_TWO))
     );
-}
-
-export function consumeHuntingSupportCharge(party, slotIndex) {
-    const slot = party?.supports?.[slotIndex];
-    if (!slot?.characterId || !slot.ready) return party;
-    return {
-        ...party,
-        supports: party.supports.map((current, index) =>
-            index === slotIndex
-                ? { ...current, ready: false, floorsRemaining: HUNTING_SUPPORT_RECHARGE_FLOORS }
-                : current
-        )
-    };
-}
-
-export function advanceHuntingSupportCharges(party) {
-    return {
-        ...party,
-        supports: party.supports.map((slot) => {
-            if (!slot.characterId || slot.ready) return slot;
-            const floorsRemaining = Math.max(0, slot.floorsRemaining - 1);
-            return { ...slot, floorsRemaining, ready: floorsRemaining === 0 };
-        })
-    };
 }

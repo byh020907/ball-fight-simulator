@@ -852,17 +852,19 @@ function testHuntingOverlayActionContracts() {
     assert.ok(
         overlay.includes('class="hunting-party-action-bar"') &&
             overlay.includes('@click="huntingSwapActiveCharacter()"') &&
-            overlay.includes('@click="huntingDeploySupport(index)"'),
-        "The real hunting overlay must own manual swap and support deployment controls"
+            !overlay.includes("huntingDeploySupport"),
+        "The real hunting overlay should expose only the manual swap control"
     );
     assert.ok(
-        bridge.includes("huntingSwapActiveCharacter()") && bridge.includes("huntingDeploySupport(slotIndex)"),
-        "Party battle controls must route through the component bridge"
+        bridge.includes("huntingSwapActiveCharacter()") && !bridge.includes("huntingDeploySupport(slotIndex)"),
+        "The remaining swap control must route through the component bridge without support actions"
     );
     console.log("[hunting-overlay-action-contracts] ok");
 }
 
 function testHuntingStartPopupOwnershipContract() {
+    const app = readSource("src/app.js");
+    const fighterStrip = readSource("src/components/fighter-strip.html");
     const manager = readSource("src/hunting/huntingManager.js");
     const popup = readSource("src/components/popup-dialog.html");
     const bridge = readSource("src/componentBridge.js");
@@ -901,6 +903,14 @@ function testHuntingStartPopupOwnershipContract() {
         manager.includes("showDebugPartySelect(characterId, context = {})") &&
             manager.includes("_showPartySelection({"),
         "Debug hunting must reuse the production party selection component instead of duplicating role inputs"
+    );
+    assert.ok(
+        popup.includes("companionIds") && !popup.includes("supportIds"),
+        "The shared party popup should expose two companion slots without removed support slots"
+    );
+    assert.ok(
+        fighterStrip.includes("fighter.partyLabel") && app.includes('partyRole?.startsWith("companion-") ? "동료"'),
+        "Hunting companion cards should identify themselves as companions instead of AI fighters"
     );
     console.log("[hunting-start-popup-ownership] ok");
 }

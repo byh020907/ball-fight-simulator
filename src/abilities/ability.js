@@ -80,9 +80,6 @@ export class Ability extends mixins([Cooldown]) {
     getUiState() {
         return { label: "Passive", progress: 1 };
     }
-    canSafelyDeactivate() {
-        return true;
-    }
     tickStandby(delta) {
         this.tickCooldown(delta);
     }

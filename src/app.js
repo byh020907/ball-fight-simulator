@@ -767,6 +767,7 @@ export class BattleApp {
                 title: fighter.title,
                 color: fighter.color,
                 isPlayer: fighter.isPlayer,
+                partyLabel: fighter.hunting?.partyRole?.startsWith("companion-") ? "동료" : null,
                 defeated: false,
                 hp: Math.ceil(hp),
                 maxHp: Math.ceil(maxHp),
