@@ -83,7 +83,7 @@ import {
     reviveDefeatedHuntingPartyMembers,
     setActiveHuntingPartyRole
 } from "./huntingPartyState.js";
-import { applyHuntingCompanionScale, getHuntingCompanionCohesionImpulse } from "./huntingCompanion.js";
+import { applyHuntingCompanionScale, placeHuntingCompanionsNearLeader } from "./huntingCompanion.js";
 
 const HUNTING_ROUTE_ACTIONS = Object.freeze({
     CONTINUE: "continue",
@@ -741,6 +741,10 @@ export class HuntingManager {
         });
 
         const playerBall = app.simulation?.fighters?.find((fighter) => fighter.id === characterId);
+        const companionBalls = companions
+            .map((entry) => app.simulation?.fighters?.find((fighter) => fighter.hunting?.partyRole === entry.role))
+            .filter(Boolean);
+        placeHuntingCompanionsNearLeader(playerBall, companionBalls, app.simulation);
         const enemies = playerBall ? app.simulation.getEnemiesOf(playerBall) : [];
         if (isEliteMobEvent && playerBall) placeEliteMobFormation(playerBall, enemies);
         lootDropController.prepareExperienceDrops(enemies);
@@ -937,24 +941,11 @@ export class HuntingManager {
 
     updateCombat(delta) {
         if (this._run?.phase !== HUNTING_RUN_PHASES.COMBAT) return;
-        this._applyCompanionCohesion(delta);
         this._recordPartyBattleParticipation(delta);
         this._combatUiSyncRemaining -= Math.max(0, delta);
         if (this._combatUiSyncRemaining > 0) return;
         this._combatUiSyncRemaining = 0.1;
         this._syncCombatPartyUi();
-    }
-
-    _applyCompanionCohesion(delta) {
-        const simulation = this.app.simulation;
-        const leader = simulation?.playerBall;
-        if (!simulation || !leader || simulation.finished) return;
-
-        for (const companionRole of [HUNTING_PARTY_ROLES.COMPANION_ONE, HUNTING_PARTY_ROLES.COMPANION_TWO]) {
-            const companion = simulation.fighters.find((fighter) => fighter.hunting?.partyRole === companionRole);
-            const impulse = getHuntingCompanionCohesionImpulse(companion, leader, delta);
-            if (impulse) companion.applyImpulse(impulse);
-        }
     }
 
     _recordPartyBattleParticipation(delta) {

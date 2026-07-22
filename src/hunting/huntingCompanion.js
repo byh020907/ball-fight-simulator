@@ -1,11 +1,13 @@
 import { Vector2 } from "../core.js";
 
+const COMPANION_SPAWN_ANGLES = Object.freeze([Math.PI * 0.75, Math.PI * 1.25]);
+
 export const HUNTING_COMPANION_CONFIG = Object.freeze({
-    radiusScale: 0.82,
-    roamRadiusMultiplier: 2.2,
-    returnSpeedPerDistance: 3,
-    maximumReturnSpeedMultiplier: 1.2,
-    turningRate: 7
+    radiusScale: 0.7,
+    spawnDistanceMultiplier: 1.15,
+    soloSpawnAngle: Math.PI,
+    spawnAngles: COMPANION_SPAWN_ANGLES,
+    arenaPaddingMultiplier: 1.05
 });
 
 export function applyHuntingCompanionScale(spec, config = HUNTING_COMPANION_CONFIG) {
@@ -21,34 +23,29 @@ export function applyHuntingCompanionScale(spec, config = HUNTING_COMPANION_CONF
     };
 }
 
-export function canApplyHuntingCompanionCohesion(companion, leader) {
-    return Boolean(
-        companion &&
-        leader &&
-        companion !== leader &&
-        !companion.flags?.defeated &&
-        !companion.flags?.destroyed &&
-        !companion.state?.swallowed &&
-        !companion.state?.movement &&
-        !companion.state?.forcedHeading &&
-        !leader.flags?.defeated &&
-        !leader.flags?.destroyed
-    );
+function getCompanionSpawnAngle(index, companionCount, config) {
+    if (companionCount === 1) return config.soloSpawnAngle;
+    return config.spawnAngles[index % config.spawnAngles.length];
 }
 
-export function getHuntingCompanionCohesionImpulse(companion, leader, delta, config = HUNTING_COMPANION_CONFIG) {
-    if (!canApplyHuntingCompanionCohesion(companion, leader) || !Number.isFinite(delta) || delta <= 0) return null;
+function clampToArena(value, radius, arenaLength, paddingMultiplier) {
+    const padding = radius * paddingMultiplier;
+    return Math.max(padding, Math.min(arenaLength - padding, value));
+}
 
-    const offsetToLeader = Vector2.subtract(leader.position, companion.position);
-    const distance = offsetToLeader.length();
-    const combinedRadius = Math.max(0, leader.radius) + Math.max(0, companion.radius);
-    const roamRadius = combinedRadius * config.roamRadiusMultiplier;
-    if (distance <= roamRadius || distance <= 0.001) return null;
+export function placeHuntingCompanionsNearLeader(leader, companions = [], arena, config = HUNTING_COMPANION_CONFIG) {
+    if (!leader?.position || !Number.isFinite(arena?.width) || !Number.isFinite(arena?.height)) return [];
 
-    const excessDistance = distance - roamRadius;
-    const maximumReturnSpeed = companion.stats.baseSpeed * config.maximumReturnSpeedMultiplier;
-    const returnSpeed = Math.min(maximumReturnSpeed, excessDistance * config.returnSpeedPerDistance);
-    const desiredVelocity = leader.velocity.clone().add(offsetToLeader.normalize().scale(returnSpeed));
-    const correctionRatio = 1 - Math.exp(-config.turningRate * delta);
-    return Vector2.subtract(desiredVelocity, companion.velocity).scale(correctionRatio);
+    const activeCompanions = companions.filter((companion) => companion?.position);
+    for (const [index, companion] of activeCompanions.entries()) {
+        const angle = getCompanionSpawnAngle(index, activeCompanions.length, config);
+        const distance = (leader.radius + companion.radius) * config.spawnDistanceMultiplier;
+        const position = leader.position.clone().add(Vector2.fromAngle(angle, distance));
+        companion.position = new Vector2(
+            clampToArena(position.x, companion.radius, arena.width, config.arenaPaddingMultiplier),
+            clampToArena(position.y, companion.radius, arena.height, config.arenaPaddingMultiplier)
+        );
+    }
+
+    return activeCompanions;
 }

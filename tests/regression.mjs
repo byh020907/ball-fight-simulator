@@ -253,7 +253,7 @@ import {
     HUNTING_PARTY_ROLES,
     HUNTING_COMPANION_CONFIG,
     applyHuntingCompanionScale,
-    getHuntingCompanionCohesionImpulse,
+    placeHuntingCompanionsNearLeader,
     applyHuntingPartyFloorRecovery,
     createHuntingPartyExperienceAllocation,
     createHuntingPartyState,
@@ -25243,7 +25243,7 @@ function testHuntingPartyExperienceAllocation() {
 
 testHuntingPartyExperienceAllocation();
 
-function testHuntingCompanionPresentationAndFormation() {
+function testHuntingCompanionPresentationAndSpawn() {
     const baseSpec = {
         id: "companion-base",
         name: "companion-base",
@@ -25253,6 +25253,7 @@ function testHuntingCompanionPresentationAndFormation() {
         stats: { hp: 100, damage: 10, defense: 0, speed: 100, radius: 50, mass: 1.2 }
     };
     const companionSpec = applyHuntingCompanionScale(baseSpec);
+    assert.equal(HUNTING_COMPANION_CONFIG.radiusScale, 0.7, "Companions should use the regular mob size band");
     assert.equal(companionSpec.stats.radius, 50 * HUNTING_COMPANION_CONFIG.radiusScale);
     assert.equal(
         companionSpec.stats.mass,
@@ -25279,42 +25280,39 @@ function testHuntingCompanionPresentationAndFormation() {
     assert.ok(enemies.every((fighter) => fighter.position.x > simulation.width / 2));
     assert.equal(new Set(allies.map((fighter) => fighter.position.y)).size, 3, "Allies need distinct formation slots");
 
-    const [leader, companion] = allies;
+    const [leader, firstCompanion, secondCompanion] = allies;
     leader.position = new Vector2(300, 300);
-    leader.velocity = new Vector2(0, 0);
-    companion.position = new Vector2(700, 300);
-    companion.velocity = new Vector2(100, 0);
-    const returnImpulse = getHuntingCompanionCohesionImpulse(companion, leader, 1 / 60);
-    assert.ok(returnImpulse.x < 0, "A roaming companion should turn back toward the active character");
-
-    companion.state.movement = {};
-    assert.equal(
-        getHuntingCompanionCohesionImpulse(companion, leader, 1 / 60),
-        null,
-        "Companion cohesion must never alter an active dash or movement skill"
-    );
-    companion.state.movement = null;
-    companion.state.forcedHeading = { direction: new Vector2(1, 0) };
-    assert.equal(
-        getHuntingCompanionCohesionImpulse(companion, leader, 1 / 60),
-        null,
-        "Companion cohesion must never alter forced skill heading"
-    );
-    companion.state.forcedHeading = null;
-    const distanceBeforeReturn = Vector2.subtract(companion.position, leader.position).length();
-    for (let step = 0; step < 120; step += 1) {
-        const impulse = getHuntingCompanionCohesionImpulse(companion, leader, 1 / 60);
-        if (impulse) companion.applyImpulse(impulse);
-        companion.integrate(1 / 60);
-    }
+    firstCompanion.position = new Vector2(700, 300);
+    secondCompanion.position = new Vector2(700, 500);
+    placeHuntingCompanionsNearLeader(leader, [firstCompanion, secondCompanion], simulation);
     assert.ok(
-        Vector2.subtract(companion.position, leader.position).length() < distanceBeforeReturn,
-        "A companion should physically return toward the active character after its skill ends"
+        [firstCompanion, secondCompanion].every((companion) => {
+            const distance = Vector2.subtract(companion.position, leader.position).length();
+            const expectedDistance =
+                (leader.radius + companion.radius) * HUNTING_COMPANION_CONFIG.spawnDistanceMultiplier;
+            return Math.abs(distance - expectedDistance) < 0.001;
+        }),
+        "Companions should begin close to the active character"
     );
-    console.log("[hunting-companion-presentation-and-formation] ok");
+    let appliedImpulseCount = 0;
+    firstCompanion.hunting = { partyRole: HUNTING_PARTY_ROLES.COMPANION_ONE };
+    firstCompanion.applyImpulse = () => {
+        appliedImpulseCount += 1;
+    };
+    leader.hunting = { partyRole: HUNTING_PARTY_ROLES.LEADER };
+    firstCompanion.position = new Vector2(800, 300);
+    const manager = new HuntingManager({
+        simulation: { fighters: [leader, firstCompanion], playerBall: leader, finished: false }
+    });
+    manager._run = { phase: HUNTING_RUN_PHASES.COMBAT };
+    manager._partyBattleParticipation = Object.fromEntries(Object.values(HUNTING_PARTY_ROLES).map((role) => [role, 0]));
+    manager._combatUiSyncRemaining = 1;
+    manager.updateCombat(1 / 60);
+    assert.equal(appliedImpulseCount, 0, "Hunting combat updates must not steer companions back into formation");
+    console.log("[hunting-companion-presentation-and-spawn] ok");
 }
 
-testHuntingCompanionPresentationAndFormation();
+testHuntingCompanionPresentationAndSpawn();
 
 function testCombatParticipationContracts() {
     const createSpec = (id, teamId, mode = COMBAT_PARTICIPATION_MODES.ACTIVE) => ({
@@ -25414,9 +25412,19 @@ function testHuntingPartyBattleComposition() {
         "Leader and both companions should enter the battlefield together"
     );
     const companionFighters = alliedFighters.filter((fighter) => companionIds.includes(fighter.id));
+    const leaderAtBattleStart = alliedFighters.find((fighter) => fighter.id === leaderId);
     assert.ok(
         companionFighters.every((fighter) => fighter.radius < alliedFighters[0].radius),
         "Companions should be visibly smaller than the active character"
+    );
+    assert.ok(
+        companionFighters.every((fighter) => {
+            const distance = Vector2.subtract(fighter.position, leaderAtBattleStart.position).length();
+            const expectedDistance =
+                (leaderAtBattleStart.radius + fighter.radius) * HUNTING_COMPANION_CONFIG.spawnDistanceMultiplier;
+            return Math.abs(distance - expectedDistance) < 0.001;
+        }),
+        "HuntingManager should place companions next to the active character before combat"
     );
     assert.ok(
         alliedFighters.every((fighter) => fighter.position.x < mockApp.simulation.width / 2),
