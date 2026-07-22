@@ -86,7 +86,7 @@
         gap: 4px;
     }
 
-    :scope:has(.fighter-card:nth-child(3)) {
+    :scope:has(.fighter-card:nth-of-type(3)) {
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
@@ -333,7 +333,7 @@
 
     @media (max-width: 760px) {
         :scope,
-        :scope:has(.fighter-card:nth-child(3)) {
+        :scope:has(.fighter-card:nth-of-type(3)) {
             grid-template-columns: repeat(2, minmax(0, 1fr));
             min-height: 0;
         }

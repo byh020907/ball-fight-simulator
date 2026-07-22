@@ -232,11 +232,28 @@ game-overlay:has(~ start-button #startButton:not(.hidden)) #overlay .overlay-car
 }
 
 @media (min-width: 761px) {
+    .game-frame {
+        --desktop-side-rail: min(26vw, 340px);
+        width: 100%;
+        max-width: none;
+        display: grid;
+        grid-template-columns: minmax(var(--desktop-side-rail), 1fr) minmax(0, 852px) minmax(
+                var(--desktop-side-rail),
+                1fr
+            );
+    }
+
     .battle-stage {
-        flex: 1 1 0;
+        grid-column: 2;
         width: 100%;
         max-width: 852px;
         height: 100%;
+    }
+
+    .tournament-panel {
+        grid-column: 3;
+        width: min(100%, 340px);
+        justify-self: start;
     }
 
     .arena-slot {

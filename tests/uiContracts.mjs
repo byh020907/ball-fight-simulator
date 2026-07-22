@@ -676,6 +676,11 @@ function testGameplayUiResetContracts() {
         "Fighter cards should constrain long mobile labels inside their fluid grid cell"
     );
     assert.ok(
+        fighterStrip.includes(":scope:has(.fighter-card:nth-of-type(3))") &&
+            !fighterStrip.includes(":scope:has(.fighter-card:nth-child(3))"),
+        "The three-column fighter layout should count fighter articles without treating the Alpine template as a card"
+    );
+    assert.ok(
         index.includes('class="arena-slot"') &&
             layoutStyles.includes("grid-template-rows: minmax(0, 1fr) auto") &&
             layoutStyles.includes("container-type: size") &&
@@ -683,7 +688,17 @@ function testGameplayUiResetContracts() {
         "Desktop battle layout should size the arena from its remaining grid row instead of a fixed viewport deduction"
     );
     assert.ok(
-        fighterStrip.includes(":scope:has(.fighter-card:nth-child(3))") &&
+        layoutStyles.includes("--desktop-side-rail:") &&
+            /grid-template-columns:\s*minmax\(var\(--desktop-side-rail\),\s*1fr\)\s*minmax\(0,\s*852px\)\s*minmax\(\s*var\(--desktop-side-rail\),\s*1fr\s*\)/s.test(
+                layoutStyles
+            ) &&
+            layoutStyles.includes("grid-column: 2") &&
+            layoutStyles.includes("grid-column: 3") &&
+            layoutStyles.includes("justify-self: start"),
+        "Desktop tournament layout should center the arena and keep the bracket beside it, clear of the outer battle log"
+    );
+    assert.ok(
+        fighterStrip.includes(":scope:has(.fighter-card:nth-of-type(3))") &&
             fighterStrip.includes("grid-template-columns: repeat(3, minmax(0, 1fr))"),
         "Three-member hunting parties should remain in one fluid desktop row"
     );
