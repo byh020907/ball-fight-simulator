@@ -53,11 +53,10 @@
                             </span>
                             <template x-if="slot.value">
                                 <span class="hunting-party-slot-character">
-                                    <i
-                                        class="hunting-character-orb"
-                                        :style="`--character-color: ${getHuntingPartyCharacter(slot.value).color}`"
-                                        x-text="getHuntingPartyCharacter(slot.value).initial"
-                                    ></i>
+                                    <canvas
+                                        class="character-portrait hunting-character-portrait"
+                                        x-character-portrait="getHuntingPartyCharacter(slot.value).portrait"
+                                    ></canvas>
                                     <span>
                                         <strong x-text="getHuntingPartyCharacter(slot.value).name"></strong>
                                         <small x-text="`Lv.${getHuntingPartyCharacter(slot.value).level}`"></small>
@@ -106,11 +105,10 @@
                                 :disabled="isHuntingPartyCharacterUsed(character.id, huntingPartyPickerSlotKey)"
                                 @click="selectHuntingPartyCharacter(character.id)"
                             >
-                                <i
-                                    class="hunting-character-orb"
-                                    :style="`--character-color: ${character.color}`"
-                                    x-text="character.initial"
-                                ></i>
+                                <canvas
+                                    class="character-portrait hunting-character-portrait"
+                                    x-character-portrait="character.portrait"
+                                ></canvas>
                                 <span>
                                     <strong x-text="character.name"></strong>
                                     <small x-text="`Lv.${character.level}`"></small>
@@ -243,18 +241,13 @@
             },
             getHuntingPartyCharacters(slot) {
                 const characters = this.content?.characters ?? [];
-                const available = slot?.leadOnly ? characters.filter((character) => character.canLead) : characters;
-                return available.map((character) => ({
-                    ...character,
-                    initial: character.name?.trim()?.charAt(0)?.toUpperCase() ?? "?"
-                }));
+                return slot?.leadOnly ? characters.filter((character) => character.canLead) : characters;
             },
             getHuntingPartyCharacter(characterId) {
                 return (
                     this.getHuntingPartyCharacters().find((character) => character.id === characterId) ?? {
                         id: null,
                         name: "선택",
-                        initial: "?",
                         color: "#e0e0e0",
                         level: 1
                     }
@@ -522,10 +515,14 @@
         font-weight: 800;
     }
 
-    .hunting-character-orb {
+    .hunting-character-orb,
+    .hunting-character-portrait {
         flex: 0 0 auto;
         inline-size: clamp(2.25rem, 8vw, 3rem);
-        aspect-ratio: 1;
+        block-size: clamp(2.25rem, 8vw, 3rem);
+    }
+
+    .hunting-character-orb {
         border: 2px solid #202020;
         border-radius: 50%;
         background: var(--character-color, #e0e0e0);

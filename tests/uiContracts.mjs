@@ -9,6 +9,7 @@ import { createDefaultPlayerProfile } from "../src/playerProfile.js";
 import { createRoster } from "../src/roster.js";
 import { MASTERY_EFFECT_DEFS } from "../src/character-mastery/masteryDefinitions.js";
 import { getCombinedHealthBarPercentages } from "../src/fighterHealthBar.js";
+import { renderCharacterPortrait } from "../src/characterPortrait.js";
 
 function readSource(path) {
     return readFileSync(path, "utf8");
@@ -948,6 +949,91 @@ function testHuntingStartPopupOwnershipContract() {
     console.log("[hunting-start-popup-ownership] ok");
 }
 
+function testSharedCharacterPortraitContract() {
+    const index = readSource("index.html");
+    const app = readSource("src/app.js");
+    const battleBall = readSource("src/entities/battleBall.js");
+    const popup = readSource("src/components/popup-dialog.html");
+    const playerPanel = readSource("src/components/player-panel.html");
+    const collectionHub = readSource("src/components/collection-hub.html");
+    const manager = readSource("src/hunting/huntingManager.js");
+
+    assert.ok(
+        index.includes("registerCharacterPortraitDirective") &&
+            index.includes("registerCharacterPortraitDirective(Alpine)"),
+        "The shared Canvas portrait directive should be registered before Alpine starts"
+    );
+    assert.ok(
+        battleBall.includes("drawPortrait(ctx)") && battleBall.includes("this._drawCharacterBody(ctx)"),
+        "BattleBall should expose its real body rendering for UI portraits"
+    );
+    assert.ok(
+        playerPanel.includes('x-character-portrait="portrait"') && popup.match(/x-character-portrait=/g)?.length >= 2,
+        "The player panel and both party-selection surfaces should reuse the Canvas portrait directive"
+    );
+    assert.ok(
+        collectionHub.includes('x-character-portrait="item.portrait"'),
+        "Unlocked collection cards should reuse the same Canvas portrait system"
+    );
+    assert.ok(
+        manager.includes("portrait: fighter") &&
+            app.includes("this._panel.portrait") &&
+            !app.includes("_drawPlayerFace(fighter)"),
+        "UI view models should provide fighter definitions instead of maintaining a bespoke fake-ball renderer"
+    );
+    assert.equal(
+        popup.includes('class="hunting-character-orb"\n') && popup.includes("character.initial"),
+        false,
+        "Character choices should not fall back to initial-letter portraits"
+    );
+    console.log("[shared-character-portrait] ok");
+}
+
+function testSharedCharacterPortraitUsesBattleBallRendering() {
+    const operations = [];
+    const context = new Proxy(
+        {
+            setTransform(...args) {
+                operations.push(["setTransform", ...args]);
+            },
+            clearRect(...args) {
+                operations.push(["clearRect", ...args]);
+            },
+            arc(...args) {
+                operations.push(["arc", ...args]);
+            },
+            measureText() {
+                return { width: 0 };
+            }
+        },
+        {
+            get(target, property) {
+                if (property in target) return target[property];
+                return () => {};
+            }
+        }
+    );
+    const canvas = {
+        width: 0,
+        height: 0,
+        getBoundingClientRect: () => ({ width: 80, height: 80 }),
+        getContext: () => context
+    };
+
+    for (const fighter of createRoster()) {
+        const rendered = renderCharacterPortrait(canvas, { fighter, equipmentItems: [] });
+        assert.equal(rendered, true, `${fighter.id} should render through the shared portrait system`);
+    }
+
+    assert.equal(canvas.width, 80, "Canvas backing width should follow its rendered CSS width");
+    assert.equal(canvas.height, 80, "Canvas backing height should follow its rendered CSS height");
+    assert.ok(
+        operations.some(([operation]) => operation === "arc"),
+        "The real BattleBall body should be drawn"
+    );
+    console.log("[shared-character-portrait-rendering] ok");
+}
+
 function testResultOverlayLayoutContract() {
     const overlay = readSource("src/components/game-overlay.html");
     const huntingOverlay = readSource("src/components/hunting-overlay.html");
@@ -1498,12 +1584,14 @@ function testHiddenCharacterCollectionMasking() {
     assert.equal(locked.experienceLevelLabel, "미해금");
     assert.deepEqual(locked.levelRewards, []);
     assert.equal(locked.rebirth.visible, false);
+    assert.equal(locked.portrait, null);
     const mastery = viewModel.masteryItems.find((item) => item.sourceFighterId === "elementalist");
     assert.equal(mastery.sourceName, "???");
     assert.equal(mastery.name, "???");
-    assert.equal(
-        readSource("src/components/collection-hub.html").includes("item.isLocked ? '?' : item.name.charAt(0)"),
-        true
+    const collectionHub = readSource("src/components/collection-hub.html");
+    assert.ok(
+        collectionHub.includes('x-if="!item.isLocked"') && collectionHub.includes('x-show="item.isLocked">?</span>'),
+        "Locked hidden characters should keep the question-mark mask without creating a portrait"
     );
     console.log("[hidden-character-collection-masking] ok");
 }
@@ -1524,6 +1612,8 @@ testNoWindowUiManagerInProduction();
 testAlpineTemplateUiManagerContracts();
 testHuntingOverlayActionContracts();
 testHuntingStartPopupOwnershipContract();
+testSharedCharacterPortraitContract();
+testSharedCharacterPortraitUsesBattleBallRendering();
 testResultOverlayLayoutContract();
 testFluidModalLayoutContracts();
 testCollectionRebirthAndDeveloperContracts();

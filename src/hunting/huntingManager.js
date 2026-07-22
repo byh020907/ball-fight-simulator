@@ -100,6 +100,7 @@ function createHuntingPartyCharacterOption(profile, fighter, canLead = true) {
         id: fighter.id,
         name: fighter.name,
         color: fighter.color,
+        portrait: fighter,
         level: getCharacterExperienceSummary(profile, fighter.id).level,
         canLead
     };

@@ -18,7 +18,6 @@ import { CollectionHubService } from "./collectionHubService.js";
 import { PopupService } from "./popup.js";
 import { pickRandomActions, findActionById, showActionFailure } from "./clickActions.js";
 import { BattleBall } from "./entities/index.js";
-import { drawEquipmentItems, getCharacterOutlineWidth } from "./entities/equipmentVisuals.js";
 import { PreviewReselectSimulation } from "./preview/previewReselectSimulation.js";
 import { getCombinedHealthBarPercentages } from "./fighterHealthBar.js";
 import {
@@ -654,6 +653,9 @@ export class BattleApp {
         const equipmentSummary = this._getPlayerEquipmentSummary(this.playerFighterId);
         const tournamentChallenge = this._getTournamentChallengePresentation();
         this._panel.fighter = player ? { name: player.name, title: player.title, color: player.color } : null;
+        this._panel.portrait = player
+            ? { fighter: player, equipmentItems: getEquippedItems(this.playerProfile, player.id) }
+            : null;
         this._panel.tournamentTierLabel = tournamentChallenge.tierLabel;
         this._panel.tournamentOpponentLevel = tournamentChallenge.opponentLevel;
         this._panel.allocation = { ...this.playerStatAllocation };
@@ -669,7 +671,6 @@ export class BattleApp {
         this._panel.experience = { ...experienceSummary };
         this._panel.equipmentSummary = { ...equipmentSummary };
         this._updatePlayerPanelSummary();
-        this._drawPlayerFace(player);
 
         // 모드 세그먼트 동기화
         const canHunt = getEligibleHuntingCharacters(this.playerProfile, this.roster).length > 0;
@@ -683,52 +684,6 @@ export class BattleApp {
             this._syncStartButton();
             this.startPlayerPreviewLoop();
         }
-    }
-
-    _drawPlayerFace(fighter) {
-        if (!fighter) return;
-        const canvas = document.getElementById("playerFaceCanvas");
-        if (!canvas) return;
-        const ctx = canvas.getContext("2d");
-        const size = 50;
-        ctx.clearRect(0, 0, size, size);
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
-        ctx.clip();
-        ctx.fillStyle = fighter.color;
-        ctx.fillRect(0, 0, size, size);
-        const fakeBall = { radius: size / 2 - 2, position: { x: size / 2, y: size / 2 } };
-        const outlineWidth = getCharacterOutlineWidth(fakeBall.radius);
-        drawEquipmentItems(ctx, fakeBall, getEquippedItems(this.playerProfile, fighter.id), outlineWidth);
-        const AbilityClass = Ability.MAP[fighter.ability];
-        if (AbilityClass) {
-            const fakeOwner = {
-                color: fighter.color,
-                position: { x: size / 2, y: size / 2 },
-                radius: size / 2 - 2,
-                velocity: { x: 0, y: 0 }
-            };
-            const ability = new AbilityClass(fakeOwner, {});
-            ctx.save();
-            ctx.strokeStyle = "#202020";
-            ctx.fillStyle = "#202020";
-            ctx.lineWidth = Math.max(3, fakeBall.radius * 0.075);
-            ctx.lineCap = "round";
-            ctx.lineJoin = "round";
-            ctx.translate(size / 2, size / 2);
-            ability.drawFace(ctx, 0, fakeBall);
-            ctx.restore();
-        }
-        ctx.restore();
-        ctx.beginPath();
-        ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
-        ctx.strokeStyle = "#202020";
-        ctx.lineWidth = outlineWidth;
-        ctx.stroke();
-        canvas.classList.remove("face-pop");
-        void canvas.offsetWidth;
-        canvas.classList.add("face-pop");
     }
 
     _updateStatus(text, badge) {

@@ -113,7 +113,13 @@
                                     x-bind:style="'background:' + item.color"
                                     x-bind:class="{ unplayed: !item.hasRecord }"
                                 >
-                                    <span class="ch-card-icon" x-text="item.isLocked ? '?' : item.name.charAt(0)"></span>
+                                    <template x-if="!item.isLocked">
+                                        <canvas
+                                            class="character-portrait ch-character-portrait"
+                                            x-character-portrait="item.portrait"
+                                        ></canvas>
+                                    </template>
+                                    <span class="ch-card-icon" x-show="item.isLocked">?</span>
                                     <div class="ch-card-head-text">
                                         <span class="ch-card-name" x-text="item.name"></span>
                                         <span
@@ -124,8 +130,12 @@
                                 </div>
                                 <div class="ch-card-body" x-bind:class="{ unplayed: !item.hasRecord }">
                                     <span x-show="item.isLocked" class="ch-empty-badge">미해금</span>
-                                    <span x-show="!item.isLocked && !item.hasRecord" class="ch-empty-badge">미기록</span>
-                                    <span x-show="!item.isLocked && item.hasRecord">우승 <b x-text="item.tournamentWins"></b>회</span>
+                                    <span x-show="!item.isLocked && !item.hasRecord" class="ch-empty-badge"
+                                        >미기록</span
+                                    >
+                                    <span x-show="!item.isLocked && item.hasRecord"
+                                        >우승 <b x-text="item.tournamentWins"></b>회</span
+                                    >
                                     <span
                                         class="ch-xp-chip"
                                         x-show="!item.isLocked"
@@ -134,7 +144,9 @@
                                     <span x-show="!item.isLocked && item.bestPlacement"
                                         >최고 <b x-text="item.bestPlacement + '위'"></b
                                     ></span>
-                                    <span x-show="!item.isLocked && item.masteryUnlocked" class="ch-mast-badge">숙련도 ✓</span>
+                                    <span x-show="!item.isLocked && item.masteryUnlocked" class="ch-mast-badge"
+                                        >숙련도 ✓</span
+                                    >
                                     <span x-show="item.isCurrent" class="ch-current-badge">현재</span>
                                 </div>
                             </div>
@@ -201,47 +213,47 @@
                                     <p x-text="item.unlockHint"></p>
                                 </div>
                                 <div class="ch-unlocked-detail" x-show="!item.isLocked">
-                                <div class="ch-detail-xp">
-                                    <div class="ch-detail-xp-head">
-                                        <strong x-text="item.experienceLevelLabel"></strong>
-                                        <span
-                                            x-text="Number(item.experienceTotalXp || 0).toLocaleString() + ' XP'"
-                                        ></span>
-                                    </div>
-                                    <div class="ch-detail-xp-bar" aria-hidden="true">
+                                    <div class="ch-detail-xp">
+                                        <div class="ch-detail-xp-head">
+                                            <strong x-text="item.experienceLevelLabel"></strong>
+                                            <span
+                                                x-text="Number(item.experienceTotalXp || 0).toLocaleString() + ' XP'"
+                                            ></span>
+                                        </div>
+                                        <div class="ch-detail-xp-bar" aria-hidden="true">
+                                            <div
+                                                class="ch-detail-xp-fill"
+                                                x-bind:style="'width:' + item.experienceProgressPct + '%; background:' + item.color"
+                                            ></div>
+                                        </div>
+                                        <div class="ch-detail-xp-foot">
+                                            <span x-text="item.experienceProgressText"></span>
+                                            <span x-text="item.experienceNextText"></span>
+                                        </div>
                                         <div
-                                            class="ch-detail-xp-fill"
-                                            x-bind:style="'width:' + item.experienceProgressPct + '%; background:' + item.color"
+                                            class="ch-detail-xp-reward"
+                                            x-text="'다음 보상 · ' + item.experienceNextRewardText"
                                         ></div>
                                     </div>
-                                    <div class="ch-detail-xp-foot">
-                                        <span x-text="item.experienceProgressText"></span>
-                                        <span x-text="item.experienceNextText"></span>
-                                    </div>
-                                    <div
-                                        class="ch-detail-xp-reward"
-                                        x-text="'다음 보상 · ' + item.experienceNextRewardText"
-                                    ></div>
-                                </div>
-                                <span>토너먼트 완료 <b x-text="item.tournamentsCompleted"></b></span>
-                                <span>토너먼트 우승 <b x-text="item.tournamentWins"></b></span>
-                                <span>매치 승리 <b x-text="item.matchWins"></b></span>
-                                <span x-show="item.bestPlacement"
-                                    >최고 등수 <b x-text="item.bestPlacement + '위'"></b
-                                ></span>
-                                <span
-                                    >누적 피해 <b x-text="Number(item.totalDamageDealt || 0).toLocaleString()"></b
-                                ></span>
-                                <span x-show="item.comebackMatchWins"
-                                    >역전승 <b x-text="item.comebackMatchWins"></b
-                                ></span>
-                                <span>
-                                    숙련도 <b x-text="['미해금','BRONZE','SILVER','GOLD'][item.masteryLevel]"></b>
-                                    <span x-show="item.masteryLevel === 0">· 이 캐릭터로 우승</span>
-                                    <span x-show="item.masteryLevel === 1">· 다음: SILVER (난도 1)</span>
-                                    <span x-show="item.masteryLevel === 2">· 다음: GOLD (난도 2)</span>
-                                    <span x-show="item.masteryLevel === 3">· MAX</span>
-                                </span>
+                                    <span>토너먼트 완료 <b x-text="item.tournamentsCompleted"></b></span>
+                                    <span>토너먼트 우승 <b x-text="item.tournamentWins"></b></span>
+                                    <span>매치 승리 <b x-text="item.matchWins"></b></span>
+                                    <span x-show="item.bestPlacement"
+                                        >최고 등수 <b x-text="item.bestPlacement + '위'"></b
+                                    ></span>
+                                    <span
+                                        >누적 피해 <b x-text="Number(item.totalDamageDealt || 0).toLocaleString()"></b
+                                    ></span>
+                                    <span x-show="item.comebackMatchWins"
+                                        >역전승 <b x-text="item.comebackMatchWins"></b
+                                    ></span>
+                                    <span>
+                                        숙련도 <b x-text="['미해금','BRONZE','SILVER','GOLD'][item.masteryLevel]"></b>
+                                        <span x-show="item.masteryLevel === 0">· 이 캐릭터로 우승</span>
+                                        <span x-show="item.masteryLevel === 1">· 다음: SILVER (난도 1)</span>
+                                        <span x-show="item.masteryLevel === 2">· 다음: GOLD (난도 2)</span>
+                                        <span x-show="item.masteryLevel === 3">· MAX</span>
+                                    </span>
                                 </div>
                             </div>
                             <div
@@ -503,8 +515,12 @@
                         >
                             <span>히든 캐릭터</span>
                             <div class="ch-developer-control-row">
-                                <button class="ch-btn" type="button" @click="setDebugHiddenCharacterUnlocked(true)">해금</button>
-                                <button class="ch-btn" type="button" @click="setDebugHiddenCharacterUnlocked(false)">잠금</button>
+                                <button class="ch-btn" type="button" @click="setDebugHiddenCharacterUnlocked(true)">
+                                    해금
+                                </button>
+                                <button class="ch-btn" type="button" @click="setDebugHiddenCharacterUnlocked(false)">
+                                    잠금
+                                </button>
                             </div>
                         </div>
                         <div class="ch-developer-field ch-developer-field--action">
@@ -544,10 +560,7 @@
                                 x-effect="$el.value = state.developer.elementalistPreviewId"
                                 @change="restartElementalistVfxPreview('dry')"
                             >
-                                <template
-                                    x-for="option in state.developer.elementalistPreviewOptions"
-                                    :key="option.id"
-                                >
+                                <template x-for="option in state.developer.elementalistPreviewOptions" :key="option.id">
                                     <option
                                         x-bind:value="option.id"
                                         x-bind:selected="option.id === state.developer.elementalistPreviewId"
@@ -1828,8 +1841,8 @@
     }
 
     .ch-card-icon {
-        width: 28px;
-        height: 28px;
+        inline-size: 1.75rem;
+        block-size: 1.75rem;
         border-radius: 50%;
         background: rgba(0, 0, 0, 0.2);
         display: flex;
@@ -1838,6 +1851,14 @@
         flex-shrink: 0;
         font-size: 0.85rem;
         font-weight: 900;
+    }
+
+    .ch-character-portrait {
+        inline-size: 2rem;
+        block-size: 2rem;
+        flex: 0 0 auto;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.35);
     }
 
     .ch-card-head-text {

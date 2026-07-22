@@ -595,33 +595,9 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             ctx.translate(-this.position.x, -this.position.y);
             ctx.globalAlpha *= scale;
         }
-        ctx.fillStyle = this.color;
-        if (this.appearance.sides > 0) {
-            this._drawPolygonBody(ctx);
-        } else {
-            ctx.beginPath();
-            ctx.arc(this.position.x, this.position.y, this.radius, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = "#202020";
-            ctx.lineWidth = getCharacterOutlineWidth(this.radius);
-            ctx.stroke();
-        }
-        const outlineWidth = getCharacterOutlineWidth(this.radius);
-        // 장비 회전: 원형 + rotationEnabled 시 body angle 기준
-        if (this.appearance.sides === 0 && this.rotationEnabled) {
-            ctx.save();
-            ctx.translate(this.position.x, this.position.y);
-            ctx.rotate(this.angle);
-            const rotatedBall = Object.create(this);
-            rotatedBall.position = new Vector2(0, 0);
-            drawEquipmentItems(ctx, rotatedBall, this.equipment.items, outlineWidth);
-            ctx.restore();
-        } else {
-            drawEquipmentItems(ctx, this, this.equipment.items, outlineWidth);
-        }
-        // 얼굴 회전: polygon은 항상 this.angle, 원형은 rotationEnabled에 따라 적용
-        const faceRotation = this.appearance.sides > 0 ? this.angle : this.rotationEnabled ? this.angle : 0;
-        this.drawFace(ctx, faceRotation);
+        this._drawCharacterBody(ctx);
+        this._drawCharacterEquipment(ctx);
+        this._drawCharacterFace(ctx);
         this.abilities.draw(ctx);
         for (const effect of this.state.periodicDamage) {
             if (effect.renderInFighter !== false) effect.draw?.(ctx, this);
@@ -639,6 +615,54 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         }
         this._drawNameplate(ctx);
         ctx.restore();
+    }
+
+    drawPortrait(ctx) {
+        if (this.flags.destroyed || this.state.swallowed) return;
+        ctx.save();
+        const rebirthVisual = getRebirthVisualProfile(this.rebirthCount);
+        drawRebirthVisualUnderlay(ctx, this, rebirthVisual);
+        this._drawCharacterBody(ctx);
+        this._drawCharacterEquipment(ctx);
+        this._drawCharacterFace(ctx);
+        drawRebirthVisualOverlay(ctx, this, rebirthVisual);
+        ctx.restore();
+    }
+
+    _drawCharacterBody(ctx) {
+        ctx.fillStyle = this.color;
+        if (this.appearance.sides > 0) {
+            this._drawPolygonBody(ctx);
+            return;
+        }
+
+        ctx.beginPath();
+        ctx.arc(this.position.x, this.position.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#202020";
+        ctx.lineWidth = getCharacterOutlineWidth(this.radius);
+        ctx.stroke();
+    }
+
+    _drawCharacterEquipment(ctx) {
+        const outlineWidth = getCharacterOutlineWidth(this.radius);
+        if (this.appearance.sides === 0 && this.rotationEnabled) {
+            ctx.save();
+            ctx.translate(this.position.x, this.position.y);
+            ctx.rotate(this.angle);
+            const rotatedBall = Object.create(this);
+            rotatedBall.position = new Vector2(0, 0);
+            drawEquipmentItems(ctx, rotatedBall, this.equipment.items, outlineWidth);
+            ctx.restore();
+            return;
+        }
+
+        drawEquipmentItems(ctx, this, this.equipment.items, outlineWidth);
+    }
+
+    _drawCharacterFace(ctx) {
+        const faceRotation = this.appearance.sides > 0 ? this.angle : this.rotationEnabled ? this.angle : 0;
+        this.drawFace(ctx, faceRotation);
     }
 
     _drawNameplate(ctx) {

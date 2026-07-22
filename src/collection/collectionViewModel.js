@@ -220,6 +220,7 @@ export function createCollectionHubViewModel({
             developerName: fighter.name,
             color: publicFighter.color,
             ability: isLocked ? "?" : fighter.ability,
+            portrait: isLocked ? null : fighter,
             isLocked,
             isHidden: isHiddenCharacterId(fighter.id),
             unlockHint: isLocked ? publicFighter.description : "",

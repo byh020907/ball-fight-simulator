@@ -11851,11 +11851,12 @@ function testEquipmentDraw() {
     );
 
     const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
+    const portraitSource = readFileSync(new URL("../src/characterPortrait.js", import.meta.url), "utf8");
     assert.ok(
-        appSource.includes(
-            "drawEquipmentItems(ctx, fakeBall, getEquippedItems(this.playerProfile, fighter.id), outlineWidth);"
-        ),
-        "The setup face preview should use the shared renderer with the matching outline width"
+        appSource.includes("equipmentItems: getEquippedItems(this.playerProfile, player.id)") &&
+            portraitSource.includes("const ball = new BattleBall(") &&
+            portraitSource.includes("ball.drawPortrait(context)"),
+        "The setup portrait should pass active equipment through the real BattleBall renderer"
     );
 }
 
