@@ -6,6 +6,7 @@ export const HUNTING_PARTY_ROLES = Object.freeze({
 });
 
 const DIRECT_PARTY_ROLES = Object.freeze(Object.values(HUNTING_PARTY_ROLES));
+const COMPANION_PARTY_ROLES = Object.freeze([HUNTING_PARTY_ROLES.COMPANION_ONE, HUNTING_PARTY_ROLES.COMPANION_TWO]);
 const HERO_CARRYOVER_KEYS = Object.freeze(["hp", "damage", "speed", "defense", "skill", "critical"]);
 
 function createEmptyHeroCarryover() {
@@ -20,6 +21,7 @@ function createPartyMember(role, characterId) {
         hp: null,
         maxHp: null,
         defeated: false,
+        revivalBattlesRemaining: 0,
         hero: {
             carryover: createEmptyHeroCarryover()
         }
@@ -124,8 +126,30 @@ export function markHuntingPartyMemberDefeated(party, role) {
     return updateMember(party, role, (member) => ({ ...member, hp: 0, defeated: true }));
 }
 
-export function reviveDefeatedHuntingPartyMembers(party) {
-    return mapMembers(party, (member) => (member.defeated ? { ...member, hp: 1, defeated: false } : member));
+export function isHuntingPartyMemberBattleReady(member) {
+    return Boolean(member && !member.defeated);
+}
+
+export function resolveHuntingPartyBattleDefeats(party, { defeatedRoles = [], companionDefeatBattleCount = 1 } = {}) {
+    const restBattleCount = Math.max(0, Math.floor(companionDefeatBattleCount) || 0);
+    const resolvedRoles = new Set(defeatedRoles);
+    return mapMembers(party, (member) => {
+        if (!member.defeated || !resolvedRoles.has(member.role)) return member;
+        if (COMPANION_PARTY_ROLES.includes(member.role)) {
+            return { ...member, hp: 0, revivalBattlesRemaining: restBattleCount };
+        }
+        return { ...member, hp: 1, defeated: false, revivalBattlesRemaining: 0 };
+    });
+}
+
+export function prepareHuntingPartyForBattle(party) {
+    return mapMembers(party, (member) => {
+        if (!member.defeated || !COMPANION_PARTY_ROLES.includes(member.role)) return member;
+        const remaining = Math.max(0, Math.floor(member.revivalBattlesRemaining) || 0);
+        if (remaining > 0) return { ...member, revivalBattlesRemaining: remaining - 1 };
+        const revivedHp = Number.isFinite(member.maxHp) && member.maxHp > 0 ? member.maxHp : 1;
+        return { ...member, hp: revivedHp, defeated: false, revivalBattlesRemaining: 0 };
+    });
 }
 
 export function applyHuntingPartyFloorRecovery(party, recoveryRatio = 0.1) {

@@ -260,8 +260,10 @@ import {
     createHuntingPartyState,
     getActiveHuntingPartyMember,
     isHuntingPartyBattleDefeated,
+    isHuntingPartyMemberBattleReady,
     markHuntingPartyMemberDefeated,
-    reviveDefeatedHuntingPartyMembers,
+    prepareHuntingPartyForBattle,
+    resolveHuntingPartyBattleDefeats,
     setActiveHuntingPartyRole,
     setHuntingPartyMemberHealth
 } from "../src/hunting/index.js";
@@ -25085,11 +25087,46 @@ function testHuntingPartyStateContracts() {
         "Active fighter and both companion defeats should end combat even with a living reserve"
     );
 
-    party = reviveDefeatedHuntingPartyMembers(party);
+    party = resolveHuntingPartyBattleDefeats(party, {
+        defeatedRoles: [HUNTING_PARTY_ROLES.SWAP, HUNTING_PARTY_ROLES.COMPANION_ONE, HUNTING_PARTY_ROLES.COMPANION_TWO],
+        companionDefeatBattleCount: HUNTING_FLOW_CONFIG.companionDefeatBattleCount
+    });
     assert.equal(party.members.swap.hp, 1);
-    assert.equal(party.members["companion-1"].hp, 1);
-    assert.equal(party.members["companion-2"].hp, 1);
+    assert.equal(party.members["companion-1"].hp, 0, "Defeated companions should remain down after battle");
+    assert.equal(party.members["companion-1"].revivalBattlesRemaining, 1);
+    assert.equal(isHuntingPartyMemberBattleReady(party.members["companion-1"]), false);
+    party = prepareHuntingPartyForBattle(party);
+    assert.equal(party.members["companion-1"].hp, 0, "A companion should miss the configured next battle");
+    assert.equal(party.members["companion-1"].revivalBattlesRemaining, 0);
+    assert.equal(isHuntingPartyMemberBattleReady(party.members["companion-1"]), false);
+    party = resolveHuntingPartyBattleDefeats(party, {
+        defeatedRoles: [],
+        companionDefeatBattleCount: HUNTING_FLOW_CONFIG.companionDefeatBattleCount
+    });
+    party = prepareHuntingPartyForBattle(party);
+    assert.equal(party.members["companion-1"].hp, 200, "A companion should return at full HP after resting");
+    assert.equal(party.members["companion-2"].hp, 100, "Each defeated companion should recover independently");
+    assert.equal(isHuntingPartyMemberBattleReady(party.members["companion-1"]), true);
     assert.equal(party.members.leader.hp, 46, "A surviving waiting character should preserve HP after victory");
+
+    let adjustableParty = createHuntingPartyState({
+        leaderId: FIGHTER_IDS.ARCHER,
+        companionIds: [FIGHTER_IDS.HERO]
+    });
+    adjustableParty = setHuntingPartyMemberHealth(adjustableParty, HUNTING_PARTY_ROLES.COMPANION_ONE, {
+        hp: 0,
+        maxHp: 75
+    });
+    adjustableParty = resolveHuntingPartyBattleDefeats(adjustableParty, {
+        defeatedRoles: [HUNTING_PARTY_ROLES.COMPANION_ONE],
+        companionDefeatBattleCount: 2
+    });
+    adjustableParty = prepareHuntingPartyForBattle(adjustableParty);
+    assert.equal(adjustableParty.members["companion-1"].revivalBattlesRemaining, 1);
+    adjustableParty = prepareHuntingPartyForBattle(adjustableParty);
+    assert.equal(adjustableParty.members["companion-1"].revivalBattlesRemaining, 0);
+    adjustableParty = prepareHuntingPartyForBattle(adjustableParty);
+    assert.equal(adjustableParty.members["companion-1"].hp, 75, "The configured rest battle count must be adjustable");
     console.log("[hunting-party-state-contracts] ok");
 }
 

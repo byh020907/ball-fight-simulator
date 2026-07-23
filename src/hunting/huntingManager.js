@@ -81,7 +81,9 @@ import { getRarityLabel } from "./rarityPresentation.js";
 import {
     HUNTING_PARTY_ROLES,
     getHuntingPartyMember,
-    reviveDefeatedHuntingPartyMembers,
+    isHuntingPartyMemberBattleReady,
+    prepareHuntingPartyForBattle,
+    resolveHuntingPartyBattleDefeats,
     setActiveHuntingPartyRole
 } from "./huntingPartyState.js";
 import { applyHuntingCompanionScale, placeHuntingCompanionsNearLeader } from "./huntingCompanion.js";
@@ -619,6 +621,7 @@ export class HuntingManager {
 
     _createCompanionHuntingSpecs(run) {
         return [HUNTING_PARTY_ROLES.COMPANION_ONE, HUNTING_PARTY_ROLES.COMPANION_TWO]
+            .filter((role) => isHuntingPartyMemberBattleReady(getHuntingPartyMember(run.party, role)))
             .map((role) => this._createHuntingPartyMemberSpec(run, role))
             .filter(Boolean)
             .map((entry) => ({ ...entry, appliedSpec: applyHuntingCompanionScale(entry.appliedSpec) }));
@@ -661,6 +664,8 @@ export class HuntingManager {
         let run = this._run;
         if (!run || run.status !== "active") return;
         this._resetCombatInteractionState();
+        run = { ...run, party: prepareHuntingPartyForBattle(run.party) };
+        this._run = run;
 
         const player = this._createPlayerHuntingSpec(run);
         if (!player) return;
@@ -866,8 +871,15 @@ export class HuntingManager {
 
             // Hero Orb carryover — Hero Ball만 전투 중 획득한 bonuses를 run에 반영
             const characterId = getHuntingRunCharacterId(run);
+            const defeatedPartyRoles = this._getDefeatedDirectPartyRoles(app.simulation);
             run = this._captureDirectPartyBattleState(run, app.simulation);
-            run = { ...run, party: reviveDefeatedHuntingPartyMembers(run.party) };
+            run = {
+                ...run,
+                party: resolveHuntingPartyBattleDefeats(run.party, {
+                    defeatedRoles: defeatedPartyRoles,
+                    companionDefeatBattleCount: HUNTING_FLOW_CONFIG.companionDefeatBattleCount
+                })
+            };
             this._run = recordHuntingFloorResult(recordHuntingBattleVictory(run), {
                 loot: floorLoot,
                 combatCleared: true
@@ -944,6 +956,13 @@ export class HuntingManager {
             nextRun = setHuntingRunMemberHeroCarryover(nextRun, role, carryoverTarget.hero.carryover);
         }
         return nextRun;
+    }
+
+    _getDefeatedDirectPartyRoles(simulation) {
+        return (simulation?.fighters ?? [])
+            .filter((fighter) => Number.isFinite(fighter.hp) && fighter.hp <= 0)
+            .map((fighter) => fighter.hunting?.partyRole)
+            .filter((role) => Object.values(HUNTING_PARTY_ROLES).includes(role));
     }
 
     swapActiveCharacter() {
