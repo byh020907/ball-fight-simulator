@@ -1062,6 +1062,8 @@ function testSharedCharacterPortraitUsesBattleBallRendering() {
 function testResultOverlayLayoutContract() {
     const overlay = readSource("src/components/game-overlay.html");
     const huntingOverlay = readSource("src/components/hunting-overlay.html");
+    const xpRewardPanel = readSource("src/components/xp-reward-panel.html");
+    const globalStyles = readSource("src/styles.css");
     const bridge = readSource("src/componentBridge.js");
     assert.ok(
         overlay.includes('class="result-sequence-frame"') &&
@@ -1211,7 +1213,7 @@ function testResultOverlayLayoutContract() {
         )?.[1] ?? "";
     assert.match(
         huntingCombatCardRule,
-        /grid-column:\s*2;[\s\S]*width:\s*100%;[\s\S]*max-height:\s*100%;[\s\S]*box-sizing:\s*border-box;/,
+        /grid-column:\s*2;[\s\S]*width:\s*100%;[\s\S]*max-height:\s*100%;[\s\S]*min-height:\s*0;[\s\S]*box-sizing:\s*border-box;[\s\S]*overflow-y:\s*auto;/,
         "Both normal combat result cards must fit inside the centered fluid track"
     );
     assert.doesNotMatch(
@@ -1239,8 +1241,29 @@ function testResultOverlayLayoutContract() {
     const resultCardRule = overlay.match(/:scope\.result-sequence-active \.overlay-card\s*\{([^}]*)\}/s)?.[1] ?? "";
     assert.match(
         resultCardRule,
-        /width:\s*100%;[\s\S]*box-sizing:\s*border-box;[\s\S]*max-height:\s*100%;/,
+        /width:\s*100%;[\s\S]*box-sizing:\s*border-box;[\s\S]*max-height:\s*100%;[\s\S]*min-height:\s*0;[\s\S]*overflow-y:\s*auto;/,
         "Result card border and padding must stay inside the shared frame"
+    );
+    const xpRewardRootRule = xpRewardPanel.match(/:scope\s*\{([^}]*)\}/s)?.[1] ?? "";
+    assert.match(
+        xpRewardRootRule,
+        /width:\s*100%;[\s\S]*max-width:\s*100%;[\s\S]*min-width:\s*0;[\s\S]*box-sizing:\s*border-box;/,
+        "Shared XP reward cards must include padding and borders inside their fluid parent width"
+    );
+    assert.doesNotMatch(
+        xpRewardRootRule,
+        /width:\s*(?:\d+px|min\()/,
+        "Shared XP reward cards must not depend on a fixed container width"
+    );
+    assert.ok(
+        xpRewardPanel.includes("flex-wrap: wrap;") && xpRewardPanel.includes("overflow-wrap: anywhere;"),
+        "XP reward rows and long level reward copy must wrap without pushing the card boundary"
+    );
+    const globalXpRewardRule = globalStyles.match(/\.xp-reward\s*\{([^}]*)\}/s)?.[1] ?? "";
+    assert.match(
+        globalXpRewardRule,
+        /width:\s*100%;[\s\S]*max-width:\s*100%;[\s\S]*min-width:\s*0;[\s\S]*box-sizing:\s*border-box;/,
+        "Global XP reward defaults must preserve the shared fluid card contract"
     );
     assert.ok(
         overlay.includes("padding: 10px 12px;") &&

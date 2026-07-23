@@ -114,7 +114,10 @@
 </script>
 <style scoped>
 :scope {
-    width: min(420px, 78vw);
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
     display: grid;
     gap: 8px;
     margin: 18px auto 0;
@@ -130,6 +133,7 @@
 .xp-reward-level,
 .xp-reward-foot {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 10px;
@@ -143,6 +147,13 @@
     font-size: 0.76rem;
     font-weight: 800;
     color: #555555;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.xp-reward-head span,
+.xp-reward-foot span {
+    flex: 1 1 auto;
 }
 
 .xp-reward-earned {

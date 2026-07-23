@@ -62,7 +62,10 @@ body {
 }
 
 .xp-reward {
-    width: min(420px, 78vw);
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
     margin: 18px auto 0;
     display: grid;
     gap: 8px;
@@ -183,7 +186,7 @@ hunting-overlay:not(.hunting-combat-result-active):has(~ start-button #startButt
 }
 
 game-overlay:has(~ start-button #startButton:not(.hidden)) #overlay .overlay-card .xp-reward {
-    width: min(420px, 100%);
+    width: 100%;
 }
 
 .player-panel .control-button {
