@@ -15,33 +15,21 @@ function readSource(path) {
     return readFileSync(path, "utf8");
 }
 
-function testHuntingMerchantMobileScrollContract() {
+function testDisabledHuntingUiIsNotMounted() {
     const content = readSource("src/components/hunting-overlay.html");
-    assert.ok(
-        content.includes("'hunting-merchant-active': huntingMerchantActive"),
-        "Overlay should expose a merchant-active class for the compact mobile layout"
+    const manager = readSource("src/hunting/huntingManager.js");
+    assert.equal(/huntingMerchant|hunting-merchant/.test(content), false, "Disabled merchant UI must not stay mounted");
+    assert.equal(
+        /huntingSwapCharacter|hunting-party-action|formatHuntingPartyHealth/.test(content),
+        false,
+        "Disabled swap controls must not leave unused component state or styles"
     );
-    assert.ok(
-        content.includes(":scope.hunting-merchant-active .hunting-overlay-card") &&
-            content.includes("width: fit-content;") &&
-            content.includes("max-width: 100%;"),
-        "Merchant overlay card should use content width inside the shared fluid frame"
+    assert.equal(
+        /huntingPartyHudVisible|_syncCombatPartyUi/.test(`${content}\n${manager}`),
+        false,
+        "Combat must not keep syncing an empty party HUD after swap controls are disabled"
     );
-    assert.ok(
-        content.includes(".hunting-merchant-offers") && content.includes("overflow-y: auto"),
-        "Merchant offers should scroll when their choices exceed arena height"
-    );
-    assert.ok(content.includes("touch-action: pan-y"), "Merchant overlay should accept vertical touch scrolling");
-    assert.ok(
-        content.includes(".hunting-merchant-offer") && content.includes("flex: 0 0 auto"),
-        "Merchant offers should not shrink their contents before the list scrolls"
-    );
-    assert.ok(content.includes("min-height: 76px"), "Merchant offers should retain a readable minimum height");
-    assert.ok(
-        content.includes(".hunting-merchant-pass") && content.includes("flex: 0 0 auto"),
-        "Advance button should stay fixed"
-    );
-    console.log("[hunting-merchant-mobile-scroll] ok");
+    console.log("[disabled-hunting-ui-not-mounted] ok");
 }
 
 function testHuntingChestIconReuseContract() {
@@ -932,6 +920,19 @@ function testHuntingStartPopupOwnershipContract() {
             bridge.includes("startDebugHuntingWithParty(encounterFloor, party, context = {})"),
         "Component bridge should expose the two hunting start actions"
     );
+    const debugPartyOpeners = ["startDebugHunting", "startDebugHuntingEvent", "startDebugHuntingEncounter"].map(
+        (methodName) => bridge.match(new RegExp(`${methodName}\\([^]*?\\n        },`))?.[0] ?? ""
+    );
+    assert.equal(
+        debugPartyOpeners.some((method) => method.includes('setGameMode("hunting")')),
+        false,
+        "Opening a debug party popup must not switch modes before the party is confirmed"
+    );
+    assert.ok(
+        manager.includes('this.app.setGameMode("hunting")') &&
+            manager.indexOf('this.app.setGameMode("hunting")') < manager.indexOf("this.app.beginGameSession()"),
+        "HuntingManager should switch modes only after validating and creating a run"
+    );
     assert.ok(
         manager.includes("showDebugPartySelect(characterId, context = {})") &&
             manager.includes("_showPartySelection({"),
@@ -1125,7 +1126,7 @@ function testResultOverlayLayoutContract() {
     }
     const huntingFrameRule =
         huntingOverlay.match(
-            /:scope\.hunting-merchant-active \.hunting-overlay-frame,\s*:scope\.hunting-chest-active \.hunting-overlay-frame,\s*:scope\.hunting-event-active \.hunting-overlay-frame,\s*:scope\.hunting-battle-preparation-active \.hunting-overlay-frame\s*\{([^}]*)\}/s
+            /:scope\.hunting-chest-active \.hunting-overlay-frame,\s*:scope\.hunting-event-active \.hunting-overlay-frame,\s*:scope\.hunting-battle-preparation-active \.hunting-overlay-frame\s*\{([^}]*)\}/s
         )?.[1] ?? "";
     assert.match(
         huntingFrameRule,
@@ -1139,7 +1140,7 @@ function testResultOverlayLayoutContract() {
     );
     const huntingCardRule =
         huntingOverlay.match(
-            /:scope\.hunting-merchant-active \.hunting-overlay-card,\s*:scope\.hunting-chest-active \.hunting-overlay-card,\s*:scope\.hunting-event-active \.hunting-overlay-card,\s*:scope\.hunting-battle-preparation-active \.hunting-overlay-card\s*\{([^}]*)\}/s
+            /:scope\.hunting-chest-active \.hunting-overlay-card,\s*:scope\.hunting-event-active \.hunting-overlay-card,\s*:scope\.hunting-battle-preparation-active \.hunting-overlay-card\s*\{([^}]*)\}/s
         )?.[1] ?? "";
     assert.match(
         huntingCardRule,
@@ -1283,7 +1284,7 @@ function testFluidModalLayoutContracts() {
 
     const huntingCardRule =
         huntingOverlay.match(
-            /:scope\.hunting-merchant-active \.hunting-overlay-card,\s*:scope\.hunting-chest-active \.hunting-overlay-card,\s*:scope\.hunting-event-active \.hunting-overlay-card,\s*:scope\.hunting-battle-preparation-active \.hunting-overlay-card\s*\{([^}]*)\}/s
+            /:scope\.hunting-chest-active \.hunting-overlay-card,\s*:scope\.hunting-event-active \.hunting-overlay-card,\s*:scope\.hunting-battle-preparation-active \.hunting-overlay-card\s*\{([^}]*)\}/s
         )?.[1] ?? "";
     assert.match(
         huntingCardRule,
@@ -1427,6 +1428,16 @@ function testCollectionRebirthAndDeveloperContracts() {
     assert.ok(
         template.includes("new ResizeObserver(revealActiveTab)"),
         "Collection tab visibility should be refreshed when the modal layout changes"
+    );
+    const collectionTabsRule = template.match(/\.ch-tabs\s*\{([^}]*)\}/s)?.[1] ?? "";
+    assert.match(
+        collectionTabsRule,
+        /overflow-x:\s*auto;[\s\S]*scrollbar-width:\s*none;/,
+        "Collection tabs should keep touch scrolling without exposing a native mobile scrollbar"
+    );
+    assert.ok(
+        template.includes(".ch-tabs::-webkit-scrollbar") && template.includes("display: none;"),
+        "Collection tabs should hide the WebKit scrollbar without clipping overflow"
     );
     assert.ok(template.includes("이벤트 미리보기"), "Developer tools should expose hunting event previews");
     assert.ok(template.includes("전투 조우 테스트"), "Developer tools should expose direct combat encounter previews");
@@ -1626,7 +1637,7 @@ function testHiddenCharacterCollectionMasking() {
     console.log("[hidden-character-collection-masking] ok");
 }
 
-testHuntingMerchantMobileScrollContract();
+testDisabledHuntingUiIsNotMounted();
 testHuntingChestIconReuseContract();
 testCollectionEquipmentPanelsOwnTheirFlows();
 testEquipmentSpecialOptionTooltipContract();

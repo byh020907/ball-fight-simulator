@@ -10133,6 +10133,9 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
         renderer: { clear() {} },
         stopPlayerPreviewLoop() {},
         beginGameSession() {},
+        setGameMode(mode) {
+            this.gameMode = mode;
+        },
         _refreshCollectionHub() {
             this.collectionRefreshCount += 1;
         },
@@ -10224,6 +10227,7 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
             FIGHTER_IDS.RAGE,
             "Run should use the current preview character"
         );
+        assert.equal(app.gameMode, "hunting", "A confirmed hunting run should switch to hunting mode");
         assert.deepEqual(
             profile.hunting.stats.visitedStageIds,
             [HUNTING_STAGE_IDS.CAVE],
@@ -10271,6 +10275,7 @@ async function testDebugHuntingStartsRequestedFloor() {
         renderer: { clear() {} },
         stopPlayerPreviewLoop() {},
         beginGameSession() {},
+        setGameMode() {},
         _refreshCollectionHub() {},
         _syncPlayerStatAllocationFromUi() {},
         refreshPlayerSetup() {},
@@ -10329,6 +10334,7 @@ async function testDebugHuntingEventPreviewUsesProductionEventFlow() {
         renderer: { clear() {} },
         stopPlayerPreviewLoop() {},
         beginGameSession() {},
+        setGameMode() {},
         _refreshCollectionHub() {},
         _syncPlayerStatAllocationFromUi() {},
         refreshPlayerSetup() {},
@@ -10495,6 +10501,7 @@ async function testHuntingCheckpointStartsAtSelectedFloor() {
         renderer: { clear() {} },
         stopPlayerPreviewLoop() {},
         beginGameSession() {},
+        setGameMode() {},
         _refreshCollectionHub() {},
         _syncPlayerStatAllocationFromUi() {},
         refreshPlayerSetup() {},

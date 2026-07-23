@@ -1496,7 +1496,13 @@
         display: flex;
         border-bottom: 2px solid #202020;
         overflow-x: auto;
+        scrollbar-width: none;
+        overscroll-behavior-inline: contain;
         flex-shrink: 0;
+    }
+
+    .ch-tabs::-webkit-scrollbar {
+        display: none;
     }
 
     .ch-tab {

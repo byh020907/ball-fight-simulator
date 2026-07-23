@@ -293,13 +293,11 @@ export function createComponentBridge(app) {
         },
         startDebugHunting(characterId, stageId, encounterFloor) {
             if (!app.isDebugModeActive() || !app.lifecycle.isSetup) return { ok: false, error: "debug_disabled" };
-            app.setGameMode("hunting");
             CollectionHubService.close();
             return app.hunting.showDebugPartySelect(characterId, { kind: "run", stageId, encounterFloor });
         },
         startDebugHuntingEvent(characterId, stageId, encounterFloor, eventType, eliteCombinationId) {
             if (!app.isDebugModeActive() || !app.lifecycle.isSetup) return { ok: false, error: "debug_disabled" };
-            app.setGameMode("hunting");
             CollectionHubService.close();
             return app.hunting.showDebugPartySelect(characterId, {
                 kind: "event",
@@ -311,7 +309,6 @@ export function createComponentBridge(app) {
         },
         startDebugHuntingEncounter(characterId, stageId, encounterFloor, encounterType, eliteCombinationId) {
             if (!app.isDebugModeActive() || !app.lifecycle.isSetup) return { ok: false, error: "debug_disabled" };
-            app.setGameMode("hunting");
             CollectionHubService.close();
             return app.hunting.showDebugPartySelect(characterId, {
                 kind: "encounter",

@@ -457,6 +457,7 @@ export class HuntingManager {
             return;
         }
 
+        this.app.setGameMode("hunting");
         this.app.playerProfile.hunting.stats = recordHuntingStageVisit(this.app.playerProfile.hunting.stats, stageId);
         savePlayerProfile(this.app.playerProfile);
         this.app._refreshCollectionHub();
@@ -811,7 +812,6 @@ export class HuntingManager {
             const memberHealth = getHuntingRunHealth(run, swap.role);
             if (Number.isFinite(memberHealth.hp)) standby.hp = Math.min(standby.maxHp, Math.max(1, memberHealth.hp));
         }
-        this._syncCombatPartyUi();
     }
 
     _resetCombatInteractionState() {
@@ -972,7 +972,6 @@ export class HuntingManager {
         active.actionContext.setEffect(config.effectId, effect);
         simulation.spawnActionWindow(active, "counter", config.windowSeconds);
         simulation.playSound("counter");
-        this._syncCombatPartyUi();
         return { active, standby, windowSeconds: config.windowSeconds };
     }
 
@@ -995,7 +994,6 @@ export class HuntingManager {
         simulation.spawnActionSuccess(swapped.active.position.clone(), "counter");
         simulation.spawnActionText(swapped.active.position.clone(), "퍼펙트 교대!", "#44ddff");
         simulation.playSound("counter", 1.2);
-        this._syncCombatPartyUi();
         return swapped;
     }
 
@@ -1006,7 +1004,6 @@ export class HuntingManager {
         const simulation = this.app.simulation;
         simulation?.spawnActionWhiff(active.position.clone());
         simulation?.playSound("whiff");
-        this._syncCombatPartyUi();
     }
 
     _performActiveCharacterSwap(active, standby, { transferVelocity = false } = {}) {
@@ -1041,7 +1038,6 @@ export class HuntingManager {
         }
         if (this.app._currentMatchReport) this.app._currentMatchReport.playerFighterId = swapped.active.id;
         this._renderCombatRoster(simulation);
-        this._syncCombatPartyUi();
         return swapped;
     }
 
@@ -1074,7 +1070,6 @@ export class HuntingManager {
         this._combatUiSyncRemaining -= Math.max(0, delta);
         if (this._combatUiSyncRemaining > 0) return;
         this._combatUiSyncRemaining = 0.1;
-        this._syncCombatPartyUi();
     }
 
     _recordPartyBattleParticipation(delta) {
@@ -1096,45 +1091,6 @@ export class HuntingManager {
             simulation.fighters.map((fighter) => fighter.id),
             simulation.fighters
         );
-    }
-
-    _syncCombatPartyUi() {
-        const run = this._run;
-        const simulation = this.app.simulation;
-        if (!run || run.phase !== HUNTING_RUN_PHASES.COMBAT || !simulation) {
-            this.app.setHuntingOverlayState?.({ huntingPartyHudVisible: false });
-            return;
-        }
-
-        const activeRole = run.party.activeRole;
-        const standbyRole =
-            activeRole === HUNTING_PARTY_ROLES.LEADER ? HUNTING_PARTY_ROLES.SWAP : HUNTING_PARTY_ROLES.LEADER;
-        const standbyMember = getHuntingPartyMember(run.party, standbyRole);
-        const standbyFighter = simulation.standbyFighters.find((fighter) => fighter.hunting?.partyRole === standbyRole);
-        const rosterNames = new Map(this.app.roster.map((fighter) => [fighter.id, fighter.name]));
-        const swapAttemptActive = Boolean(this._perfectSwapAttempt);
-        const swapCooldownActive = this._perfectSwapCooldownRemaining > 0;
-        const swapStatus = swapAttemptActive
-            ? "충돌 대기"
-            : swapCooldownActive
-              ? `${this._perfectSwapCooldownRemaining.toFixed(1)}초`
-              : "0.2초 카운터";
-
-        this.app.setHuntingOverlayState?.({
-            huntingPartyHudVisible: Boolean(standbyMember),
-            huntingSwapCharacter: standbyMember
-                ? {
-                      characterId: standbyMember.characterId,
-                      name: rosterNames.get(standbyMember.characterId) ?? standbyMember.characterId,
-                      hp: standbyFighter?.hp ?? standbyMember.hp,
-                      maxHp: standbyFighter?.maxHp ?? standbyMember.maxHp,
-                      available: Boolean(
-                          standbyFighter && !standbyFighter.flags.defeated && !swapAttemptActive && !swapCooldownActive
-                      ),
-                      status: swapStatus
-                  }
-                : null
-        });
     }
 
     _getHuntingBattleResult(simulation) {
