@@ -25339,11 +25339,12 @@ function testHuntingPartyBattleComposition() {
         assertForegroundEffectRenders(firstAccelerationEffect, "Hunting tap acceleration", (primitives) => {
             assert.ok(
                 primitives.filter((primitive) => primitive.method === "lineTo").length >= 4,
-                "Tap acceleration should render a tapered ribbon along sampled movement"
+                "Tap acceleration should render rounded trail strokes along sampled movement"
             );
-            assert.ok(
-                primitives.some((primitive) => primitive.method === "fill"),
-                "Tap acceleration should fill the movement ribbon instead of drawing a rigid line comb"
+            assert.equal(
+                primitives.filter((primitive) => primitive.method === "fill").length,
+                0,
+                "Tap acceleration should avoid a sharp filled wedge behind the fighter"
             );
             assert.ok(
                 primitives.some((primitive) => primitive.method === "arc"),

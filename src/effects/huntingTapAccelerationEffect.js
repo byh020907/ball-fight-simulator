@@ -10,7 +10,9 @@ export const HUNTING_TAP_ACCELERATION_VISUAL_CONFIG = Object.freeze({
     minimumSampleDistanceRadiusRatio: 0.18,
     maximumTrailPointCount: 14,
     trailAnchorRadiusRatio: 0.78,
-    seedLengthRadiusRatio: 0.72,
+    seedLengthRadiusRatio: 0.9,
+    seedPointCount: 4,
+    seedMaximumAgeRatio: 0.42,
     minimumTrailWidthRadiusRatio: 0.16,
     maximumTrailWidthRadiusRatio: 0.44,
     trailWidthTaperExponent: 0.72,
@@ -46,13 +48,6 @@ function getTrailAnchor(fighter, config) {
         .subtract(getTravelDirection(fighter).scale(fighter.radius * config.trailAnchorRadiusRatio));
 }
 
-function getTrailNormal(points, index) {
-    const previous = points[Math.max(0, index - 1)].position;
-    const next = points[Math.min(points.length - 1, index + 1)].position;
-    const tangent = Vector2.subtract(next, previous).normalize();
-    return new Vector2(-tangent.y, tangent.x);
-}
-
 export class HuntingTapAccelerationEffect extends EntityAttachment(CombatEntity) {
     static renderLayer = RENDER_LAYERS.FOREGROUND;
 
@@ -80,11 +75,18 @@ export class HuntingTapAccelerationEffect extends EntityAttachment(CombatEntity)
     _seedTrail() {
         const direction = getTravelDirection(this.fighter);
         const anchor = getTrailAnchor(this.fighter, this.config);
-        this.samples.push({
-            position: anchor.clone().subtract(direction.scale(this.fighter.radius * this.config.seedLengthRadiusRatio)),
-            age: this.config.trailPointLifetimeSeconds * 0.45
+        const pointCount = Math.max(2, this.config.seedPointCount);
+        this.samples = Array.from({ length: pointCount }, (_, index) => {
+            const tailProgress = 1 - index / (pointCount - 1);
+            return {
+                position: anchor
+                    .clone()
+                    .subtract(
+                        direction.clone().scale(this.fighter.radius * this.config.seedLengthRadiusRatio * tailProgress)
+                    ),
+                age: this.config.trailPointLifetimeSeconds * this.config.seedMaximumAgeRatio * tailProgress
+            };
         });
-        this.samples.push({ position: anchor, age: 0 });
     }
 
     _recordTrailSample(delta) {
@@ -115,7 +117,7 @@ export class HuntingTapAccelerationEffect extends EntityAttachment(CombatEntity)
         if (this.life === 0 && this.samples.length < 2) this.isExpired = true;
     }
 
-    _drawTrailRibbon(ctx, points, widthScale, color, alpha) {
+    _drawTrailStroke(ctx, points, widthScale, color, alphaScale) {
         const maximumWidth =
             this.fighter.radius *
             interpolate(
@@ -123,33 +125,26 @@ export class HuntingTapAccelerationEffect extends EntityAttachment(CombatEntity)
                 this.config.maximumTrailWidthRadiusRatio,
                 this.intensity
             );
-        const edges = points.map((sample, index) => {
-            const pathProgress = index / Math.max(1, points.length - 1);
-            const lifeProgress = 1 - sample.age / this.config.trailPointLifetimeSeconds;
-            const width =
-                maximumWidth *
-                Math.pow(pathProgress, this.config.trailWidthTaperExponent) *
-                Math.max(0, lifeProgress) *
-                widthScale;
-            const normal = getTrailNormal(points, index).scale(width);
-            const local = Vector2.subtract(sample.position, this.position);
-            return {
-                left: Vector2.add(local, normal),
-                right: Vector2.subtract(local, normal)
-            };
-        });
+        ctx.strokeStyle = color;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        points.slice(1).forEach((sample, index) => {
+            const previous = points[index];
+            const pathProgress = (index + 1) / Math.max(1, points.length - 1);
+            const averageAge = (previous.age + sample.age) * 0.5;
+            const lifeProgress = Math.max(0, 1 - averageAge / this.config.trailPointLifetimeSeconds);
+            const segmentWidth =
+                maximumWidth * Math.pow(pathProgress, this.config.trailWidthTaperExponent) * lifeProgress * widthScale;
+            const start = Vector2.subtract(previous.position, this.position);
+            const end = Vector2.subtract(sample.position, this.position);
 
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.moveTo(edges[0].left.x, edges[0].left.y);
-        edges.slice(1).forEach((edge) => ctx.lineTo(edge.left.x, edge.left.y));
-        edges
-            .slice()
-            .reverse()
-            .forEach((edge) => ctx.lineTo(edge.right.x, edge.right.y));
-        ctx.closePath();
-        ctx.fill();
+            ctx.globalAlpha = alphaScale * lifeProgress * interpolate(0.36, 1, pathProgress);
+            ctx.lineWidth = getVisibleLineWidth(ctx, "standard", segmentWidth);
+            ctx.beginPath();
+            ctx.moveTo(start.x, start.y);
+            ctx.lineTo(end.x, end.y);
+            ctx.stroke();
+        });
     }
 
     draw(ctx) {
@@ -158,8 +153,8 @@ export class HuntingTapAccelerationEffect extends EntityAttachment(CombatEntity)
         ctx.save();
         ctx.translate(this.position.x, this.position.y);
         if (points.length >= 2) {
-            this._drawTrailRibbon(ctx, points, this.config.outlineWidthScale, "#ffffff", this.config.outlineAlpha);
-            this._drawTrailRibbon(
+            this._drawTrailStroke(ctx, points, this.config.outlineWidthScale, "#ffffff", this.config.outlineAlpha);
+            this._drawTrailStroke(
                 ctx,
                 points,
                 1,
