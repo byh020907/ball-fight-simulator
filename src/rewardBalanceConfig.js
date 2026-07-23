@@ -9,6 +9,12 @@ const REBIRTH_PASSIVE_RANK_MULTIPLIERS = Object.freeze([1, 4 / 3, 5 / 3, 2]);
 // Shared source of truth for cross-character reward and progression numbers.
 // Character-specific progression belongs to each static character definition.
 export const REWARD_BALANCE = deepFreeze({
+    combat: {
+        defense: {
+            ratingScale: 50,
+            minimumDamage: 1
+        }
+    },
     rebirth: {
         offerSize: 3,
         maxEquippedCards: 3,
@@ -207,6 +213,7 @@ export const REWARD_BALANCE = deepFreeze({
     equipment: {
         levelRequirements: { common: 1, uncommon: 3, rare: 5, epic: 8, legendary: 10 },
         inventory: { defaultSlots: 5, expandCost: 100, expandGain: 3, maxSlots: 100 },
+        speed: { maximumBaseMultiplier: 2 },
         enhance: {
             maxLevel: 5,
             maxLevelByRarity: { common: 1, uncommon: 2, rare: 3, epic: 4, legendary: 5 },

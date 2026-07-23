@@ -362,7 +362,7 @@ simulation.recordActionSuccess(playerBall, actionId);
 ```
 
 - 이미 패배한 대상에게 호출되면 `actualDamage: 0`인 결과를 반환합니다.
-- `requestedAmount`는 ActionContext 경감과 방어력 차감 전 입력값입니다.
+- `requestedAmount`는 ActionContext 경감과 방어 비율 감소 전 입력값입니다.
 - `actualDamage`는 `hpBefore - hpAfter`입니다. 남은 HP보다 큰 공격도 초과 피해를 누적하지 않습니다.
 - 기록기는 `actualDamage`를 다시 계산하지 않습니다.
 

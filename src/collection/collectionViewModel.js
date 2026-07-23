@@ -47,6 +47,13 @@ import { isCharacterUnlocked } from "../playerProfile.js";
 import { getPublicFighterIdentity } from "../characterRosterPolicy.js";
 import { isHiddenCharacterId } from "../characterAvailability.js";
 
+const EQUIPMENT_STAT_LABELS = Object.freeze({
+    hp: "HP",
+    damage: "공격",
+    defense: "방어",
+    speed: "속도 점수"
+});
+
 export const COLLECTION_HUB_TABS = Object.freeze([
     { id: "roster", label: "도감" },
     { id: "mastery", label: "숙련도" },
@@ -325,6 +332,7 @@ export function createCollectionHubViewModel({
             description: item.description,
             stats: (item.stats ?? []).map((stat) => ({
                 ...stat,
+                label: EQUIPMENT_STAT_LABELS[stat.type] ?? stat.type,
                 enhancedValue: Math.round((stat.value ?? 0) * enhanceMultiplier)
             })),
             specialOptions: (item.specialOptions ?? []).map((option) => ({

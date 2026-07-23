@@ -545,7 +545,7 @@ export class BattleApp {
             ["hp", "HP"],
             ["damage", "공격"],
             ["defense", "방어"],
-            ["speed", "속도"]
+            ["speed", "속도 점수"]
         ]
             .filter(([key]) => activeBonuses[key] > 0)
             .map(([key, label]) => `${label} +${activeBonuses[key]}`);

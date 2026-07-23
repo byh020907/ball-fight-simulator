@@ -19,6 +19,11 @@ import {
 } from "../src/statAllocation.js";
 import { calculateInterceptPoint, Projectile, RENDER_LAYERS, Vector2, randomSpin } from "../src/core.js";
 import {
+    applyDefenseToDamage,
+    getDefenseDamageMultiplier,
+    getDiminishingEquipmentSpeed
+} from "../src/combatStatScaling.js";
+import {
     CHARACTER_DEFINITIONS,
     FIGHTER_IDS,
     getCharacterDefinition,
@@ -306,6 +311,7 @@ import {
     getEquipmentRequiredLevel,
     getEquipmentEnhanceMultiplier,
     getEquipmentMaxEnhanceLevel,
+    getEquipmentAdjustedSpeed,
     EQUIPMENT_STAT_VALUE_RATIOS,
     EQUIPMENT_NAME_PREFIXES,
     EQUIPMENT_SPECIAL_OPTION_SUFFIXES,
@@ -11234,6 +11240,13 @@ function testEquipmentEnhancement() {
     const profile = createDefaultPlayerProfile();
 
     // 기본값 확인
+    assert.equal(getDefenseDamageMultiplier(50), 0.5, "Defense 50 should halve incoming damage");
+    assert.equal(applyDefenseToDamage(20, 50), 10, "Proportional defense should apply through the common helper");
+    assert.equal(
+        getDiminishingEquipmentSpeed(600, 600, 2),
+        900,
+        "Shared equipment speed scaling should grant half of an equal-sized bonus"
+    );
     assert.equal(profile.equipment.enhancementStones, 0, "New profiles should start with 0 enhancement stones");
     assert.equal(profile.equipment.maxInventorySlots, 5, "New profiles should start with default inventory slots");
     assert.deepEqual(
@@ -11246,6 +11259,27 @@ function testEquipmentEnhancement() {
         [1, 2, 4, 8, 16, 32],
         "Enhancement should double base stats at every level"
     );
+    assert.equal(getEquipmentAdjustedSpeed(600, 0), 600, "No equipment speed should preserve base speed");
+    assert.equal(getEquipmentAdjustedSpeed(600, 600), 900, "A base-speed-sized bonus should grant half its value");
+    assert.ok(
+        getEquipmentAdjustedSpeed(600, 100_000) < 1200,
+        "Equipment speed should approach but never reach twice the pre-equipment speed"
+    );
+
+    const speedItem = createEquipmentInstance({ rarity: "common", slot: "weapon", rng: () => 0.5 });
+    speedItem.stats = [{ type: "speed", value: 600 }];
+    profile.equipment.inventory.push(speedItem);
+    profile.equipment.equipped.weapon = speedItem.instanceId;
+    const speedAdjustedSpec = applyEquipmentStats(
+        {
+            id: "archer",
+            stats: { hp: 100, damage: 10, defense: 2, speed: 600, radius: 40, mass: 1 }
+        },
+        profile
+    );
+    assert.equal(speedAdjustedSpec.stats.speed, 900, "Equipped speed should use diminishing scaling in combat specs");
+    profile.equipment.inventory.length = 0;
+    profile.equipment.equipped.weapon = null;
 
     // 강화 재화 준비
     profile.equipment.enhancementStones = 100;
@@ -14484,14 +14518,14 @@ function testHuntingLinkCooldowns(app) {
             `${name} should begin its full cooldown after the active window`
         );
         if (type === HUNTING_MONSTER_TYPES.SIPHON) {
-            assert.equal(
-                targetHpBefore - lifecycleScenario.target.hp,
-                activeFrames,
-                "Siphon should preserve its actual minimum-damage hits during the active window"
+            const healedDamage = healingRequests.reduce((sum, amount) => sum + amount, 0) / 0.8;
+            assert.ok(
+                Math.abs(targetHpBefore - lifecycleScenario.target.hp - healedDamage) < 1e-9,
+                "Siphon healing should remain tied to the actual damage dealt during the active window"
             );
             assert.ok(
-                Math.abs(healingRequests.reduce((sum, amount) => sum + amount, 0) - activeFrames * 0.8) < 1e-9,
-                "Siphon should heal for 80% of the actual damage dealt"
+                healedDamage <= activeFrames,
+                "Siphon should not deal more than one minimum-damage hit per active frame"
             );
         }
 
@@ -23528,10 +23562,10 @@ function testCriticalRollAndDamage() {
     const baseDamage = 20;
     const defenseVal = b.stats.baseDefense;
     const rawBefore = baseDamage;
-    // critical: rawBefore * 2 = 40, then - defense
-    const expectedCrit = Math.max(1, rawBefore * 2 - Math.round(defenseVal));
-    // non-critical: rawBefore - defense
-    const expectedNormal = Math.max(1, rawBefore - Math.round(defenseVal));
+    // critical: rawBefore * 2 = 40, then proportional defense
+    const expectedCrit = applyDefenseToDamage(rawBefore * 2, Math.round(defenseVal));
+    // non-critical: rawBefore, then proportional defense
+    const expectedNormal = applyDefenseToDamage(rawBefore, Math.round(defenseVal));
     // force a crit roll by temporarily storing the result
     let critRolled = false;
     const originalSpawn = sim.spawnCriticalNumber;
@@ -23833,9 +23867,9 @@ function testRageIgniteRefreshSeparatesDamageFromVisualLifetime() {
     const ignite = opponent._igniteState;
     const hpBefore = opponent.hp;
     const damagePerTick = rage.stats.baseDamage * 0.1;
-    const actualDamagePerTick = Math.max(
-        1,
-        Math.round(damagePerTick - Math.round(opponent.stats.baseDefense * opponent.getStatModifiers().defense))
+    const actualDamagePerTick = applyDefenseToDamage(
+        damagePerTick,
+        Math.round(opponent.stats.baseDefense * opponent.getStatModifiers().defense)
     );
     const assertIgniteFrame = (label) => {
         assertForegroundEffectRenders(ignite, label, (primitives) => {
@@ -24782,7 +24816,7 @@ function testElementalWetIndependentStacksAndDefenseReduction() {
     assert.equal(getActiveElementalWetStackCount(target, simulation.elapsed), 3);
     assert.equal(ELEMENTAL_WET_STATUS_CONFIG.maximumStacks, 3);
     assert.equal(getElementalWetDefenseReduction(target, 10, simulation.elapsed), 6);
-    assert.equal(target.takeDamage(20, owner, "Wet Defense Probe").actualDamage, 16);
+    assert.equal(target.takeDamage(20, owner, "Wet Defense Probe").actualDamage, applyDefenseToDamage(20, 4));
 
     simulation.elapsed = 2.6;
     assert.equal(getActiveElementalWetStackCount(target, simulation.elapsed), 2);
@@ -24797,7 +24831,7 @@ function testElementalWetIndependentStacksAndDefenseReduction() {
     target.stats.baseDefense = 3;
     applyElementalWet(target, simulation, 2.5);
     assert.equal(getElementalWetDefenseReduction(target, 3, simulation.elapsed), 1);
-    assert.equal(target.takeDamage(10, owner, "Minimum Wet Defense Probe").actualDamage, 8);
+    assert.equal(target.takeDamage(10, owner, "Minimum Wet Defense Probe").actualDamage, applyDefenseToDamage(10, 2));
 
     simulation.elapsed = 4.5;
     applyElementalWet(target, simulation, 2.5);

@@ -1,6 +1,7 @@
 import { EQUIPMENT } from "./equipmentData.js";
 import { getLevelFromXp } from "../experience/experienceState.js";
 import { createEquipmentName, formatEquipmentSpecialName } from "./equipmentNaming.js";
+import { getDiminishingEquipmentSpeed } from "../combatStatScaling.js";
 
 const EQUIPPED_SLOT_KEYS = Object.freeze(["weapon", "armor", "accessory1", "accessory2"]);
 
@@ -43,6 +44,7 @@ export const INVENTORY_DEFAULT_SLOTS = EQUIPMENT.INVENTORY.DEFAULT_SLOTS;
 export const INVENTORY_EXPAND_COST = EQUIPMENT.INVENTORY.EXPAND_COST;
 export const INVENTORY_EXPAND_GAIN = EQUIPMENT.INVENTORY.EXPAND_GAIN;
 export const INVENTORY_MAX_SLOTS = EQUIPMENT.INVENTORY.MAX_SLOTS;
+export const EQUIPMENT_SPEED_MAXIMUM_BASE_MULTIPLIER = EQUIPMENT.SPEED.MAXIMUM_BASE_MULTIPLIER;
 export const ENHANCE_MAX_LEVEL = EQUIPMENT.ENHANCE.MAX_LEVEL;
 export const ENHANCE_MAX_LEVEL_BY_RARITY = EQUIPMENT.ENHANCE.MAX_LEVEL_BY_RARITY;
 export const ENHANCE_MAX_FAILURE_RATE = EQUIPMENT.ENHANCE.MAX_FAILURE_RATE;
@@ -239,6 +241,10 @@ export function getEquipmentEnhanceMultiplier(level) {
     return ENHANCE_STAT_MULTIPLIER_PER_LEVEL ** normalizedLevel;
 }
 
+export function getEquipmentAdjustedSpeed(baseSpeed, equipmentSpeedBonus) {
+    return getDiminishingEquipmentSpeed(baseSpeed, equipmentSpeedBonus, EQUIPMENT_SPEED_MAXIMUM_BASE_MULTIPLIER);
+}
+
 function getEquipmentEffectVector(item) {
     const vector = new Map();
     const enhanceMultiplier = getEquipmentEnhanceMultiplier(item?.enhanceLevel);
@@ -361,7 +367,9 @@ export function applyEquipmentStats(spec, profile) {
     const stats = { ...visualSpec.stats };
     for (const [key, value] of Object.entries(bonuses)) {
         if (value !== 0 && key in stats) {
-            stats[key] = Number((stats[key] + value).toFixed(3));
+            stats[key] = Number(
+                (key === "speed" ? getEquipmentAdjustedSpeed(stats[key], value) : stats[key] + value).toFixed(3)
+            );
         }
     }
     return {

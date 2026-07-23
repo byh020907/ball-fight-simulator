@@ -58,7 +58,7 @@
                     </div>
                     <div class="ch-equip-card-stats">
                         <template x-for="stat in item.stats">
-                            <span class="ch-equip-stat" x-text="stat.type + ' +' + stat.enhancedValue"></span>
+                            <span class="ch-equip-stat" x-text="stat.label + ' +' + stat.enhancedValue"></span>
                         </template>
                         <template x-if="item.specialOptions.length > 0">
                             <div class="ch-equip-special-list">

@@ -22,6 +22,9 @@ export const EQUIPMENT = Object.freeze({
         EXPAND_GAIN: EQUIPMENT_BALANCE.inventory.expandGain,
         MAX_SLOTS: EQUIPMENT_BALANCE.inventory.maxSlots
     }),
+    SPEED: Object.freeze({
+        MAXIMUM_BASE_MULTIPLIER: EQUIPMENT_BALANCE.speed.maximumBaseMultiplier
+    }),
     ENHANCE: Object.freeze({
         MAX_LEVEL: EQUIPMENT_BALANCE.enhance.maxLevel,
         MAX_LEVEL_BY_RARITY: EQUIPMENT_BALANCE.enhance.maxLevelByRarity,
