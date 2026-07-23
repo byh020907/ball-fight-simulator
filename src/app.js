@@ -694,7 +694,7 @@ export class BattleApp {
         this._root.statusBadge = badge;
     }
 
-    _renderRoster(activeIds = [], activeSpecs = []) {
+    _renderRoster(activeIds = [], activeSpecs = [], cardStateById = new Map()) {
         const activeSpecById = new Map(activeSpecs.map((f) => [f.id, f]));
         const visibleRoster = activeIds.length
             ? activeIds
@@ -703,9 +703,12 @@ export class BattleApp {
                   .filter((f) => !f.hunting?.isMob)
             : [];
         this._strip.fighters = visibleRoster.map((fighter) => {
+            const cardState = cardStateById.get(fighter.id) ?? {};
             const isHero = fighter.id === FIGHTER_IDS.HERO;
-            const maxHp = fighter.maxHp ?? fighter.stats?.hp ?? 0;
-            const hp = fighter.hp ?? maxHp;
+            const maxHp = cardState.maxHp ?? fighter.maxHp ?? fighter.stats?.hp ?? 0;
+            const hp = cardState.hp ?? fighter.hp ?? maxHp;
+            const defeated = Boolean(cardState.defeated);
+            const revivalBattlesUntilReturn = Math.max(0, Math.floor(cardState.revivalBattlesUntilReturn) || 0);
             const rebirthLoadout = this._rebirthLoadoutByFighter?.get(fighter.id);
             const subAbilityStates = (rebirthLoadout?.subAbilities ?? []).map((subAbility) => ({
                 key: `rebirth:${subAbility.cardId}`,
@@ -726,12 +729,14 @@ export class BattleApp {
                 color: fighter.color,
                 isPlayer: fighter.isPlayer,
                 partyLabel: fighter.hunting?.partyRole?.startsWith("companion-") ? "동료" : null,
-                defeated: false,
+                defeated,
                 hp: Math.ceil(hp),
                 maxHp: Math.ceil(maxHp),
-                hpPct: 100,
+                hpPct: defeated ? 0 : 100,
                 shield: 0,
                 shieldPct: 0,
+                revivalBattlesUntilReturn,
+                revivalLabel: revivalBattlesUntilReturn > 0 ? `${revivalBattlesUntilReturn}전투 뒤 부활` : "",
                 lifeSlots: [],
                 statLine: isHero
                     ? formatHeroStatLine(fighter.stats.allocation ?? {})
@@ -1058,9 +1063,17 @@ export class BattleApp {
             Boolean(this.currentTournamentMatch) &&
             !this._action.skipPick &&
             (!this._action.selectedId || this._action.pickEveryMatch);
+        const fighterCards = Array.isArray(options.fighterCards)
+            ? options.fighterCards
+            : match.map((fighter) => ({ fighter }));
+        const fighterCardSpecs = fighterCards.map((entry) => entry.fighter).filter(Boolean);
+        const fighterCardStateById = new Map(
+            fighterCards.filter((entry) => entry.fighter?.id).map((entry) => [entry.fighter.id, entry])
+        );
         this._renderRoster(
-            match.map((fighter) => fighter.id),
-            match
+            fighterCardSpecs.map((fighter) => fighter.id),
+            fighterCardSpecs,
+            fighterCardStateById
         );
         this._updateStatus(label, "Drawing");
         this._log.add(`대진 확정: ${label}`);

@@ -698,6 +698,12 @@ function testGameplayUiResetContracts() {
             !fighterStrip.includes('class="shield-bar"'),
         "Shield UI should share the existing health bar instead of adding a second bar"
     );
+    assert.ok(
+        fighterStrip.includes("fighter.revivalBattlesUntilReturn > 0") &&
+            fighterStrip.includes("fighter.revivalLabel") &&
+            fighterStrip.includes("companion-revival-state"),
+        "Resting companion cards should remain visible with a battle-count revival state"
+    );
     const huntingOverlay = readSource("src/components/hunting-overlay.html");
     assert.ok(
         huntingOverlay.includes("resetHuntingState()"),

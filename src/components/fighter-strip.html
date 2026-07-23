@@ -1,6 +1,10 @@
 <footer class="fighter-strip" id="fighterCards" x-data="fighterStrip">
     <template x-for="fighter in fighters" :key="fighter.id">
-        <article class="fighter-card" x-bind:class="{ active: !fighter.defeated }" x-bind:data-fighter-id="fighter.id">
+        <article
+            class="fighter-card"
+            x-bind:class="{ active: !fighter.defeated, resting: fighter.revivalBattlesUntilReturn > 0 }"
+            x-bind:data-fighter-id="fighter.id"
+        >
             <div class="fighter-head">
                 <div class="fighter-meta">
                     <strong x-text="fighter.isPlayer ? '내 캐릭터 · ' + fighter.name : fighter.name"></strong>
@@ -13,7 +17,11 @@
                     </template>
                 </div>
             </div>
-            <div class="hp-bar">
+            <div class="companion-revival-state" x-show="fighter.revivalBattlesUntilReturn > 0">
+                <strong x-text="fighter.revivalLabel"></strong>
+                <span>회복을 위해 이번 전투는 쉽니다</span>
+            </div>
+            <div class="hp-bar" x-show="fighter.revivalBattlesUntilReturn === 0">
                 <div
                     class="hp-fill"
                     x-bind:style="'background:' + fighter.color + ';width:' + fighter.hpPct + '%' + (fighter.defeated ? ';opacity:0.3' : '')"
@@ -24,12 +32,16 @@
                     x-bind:style="'width:' + fighter.shieldPct + '%' + (fighter.defeated ? ';opacity:0.3' : '')"
                 ></div>
             </div>
-            <div class="fighter-hp-text">
+            <div class="fighter-hp-text" x-show="fighter.revivalBattlesUntilReturn === 0">
                 <span
                     x-text="fighter.hp + (fighter.shield > 0 ? '(' + fighter.shield + ')' : '') + ' / ' + fighter.maxHp"
                 ></span>
             </div>
-            <div class="fighter-stat-line" x-bind:class="{ 'hero-stat-line': fighter.isHero }">
+            <div
+                class="fighter-stat-line"
+                x-show="fighter.revivalBattlesUntilReturn === 0"
+                x-bind:class="{ 'hero-stat-line': fighter.isHero }"
+            >
                 <span x-show="!fighter.isHero" x-text="fighter.statLine"></span>
                 <span class="hero-stat-parts" x-show="fighter.isHero">
                     <template x-for="part in fighter.heroStatParts" :key="part.key">
@@ -45,7 +57,7 @@
                     </template>
                 </span>
             </div>
-            <div class="ability-state-list">
+            <div class="ability-state-list" x-show="fighter.revivalBattlesUntilReturn === 0">
                 <template x-for="(abilityState, index) in fighter.abilityStates" :key="abilityState.key">
                     <div class="cooldown-wrap" x-bind:data-ability-role="abilityState.role">
                         <div class="cooldown-meta">
@@ -103,6 +115,38 @@
         grid-template-columns: 1fr;
         gap: 4px;
         min-width: 0;
+    }
+
+    .fighter-card.resting {
+        border-color: #6b6b6b;
+        background: #f2f2f2;
+    }
+
+    .fighter-card.resting .fighter-head {
+        opacity: 0.62;
+    }
+
+    .companion-revival-state {
+        min-block-size: 3.6rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.3rem;
+        border-block: 1px solid #b7b7b7;
+        text-align: center;
+    }
+
+    .companion-revival-state strong {
+        color: #202020;
+        font-size: 0.82rem;
+        line-height: 1.1;
+    }
+
+    .companion-revival-state span {
+        color: #666666;
+        font-size: 0.62rem;
+        line-height: 1.2;
     }
 
     .fighter-head {

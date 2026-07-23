@@ -25400,6 +25400,7 @@ function testHuntingPartyBattleComposition() {
             this.renderedRosterIds = activeIds;
         },
         startMatch(specs, options) {
+            this.lastMatchOptions = options;
             this.simulation = new BattleSimulation(specs, { onLog() {}, onSound() {} }, null, options);
         }
     };
@@ -25437,6 +25438,55 @@ function testHuntingPartyBattleComposition() {
         alliedFighters.every((fighter) => fighter.position.x < mockApp.simulation.width / 2),
         "Every allied party member should spawn on the player side"
     );
+    assert.deepEqual(
+        mockApp.lastMatchOptions.fighterCards.map((entry) => entry.fighter.id),
+        [leaderId, ...companionIds],
+        "Fighter cards should preserve the leader and companion slot order"
+    );
+
+    let restingParty = createHuntingPartyState({ leaderId, companionIds });
+    restingParty = setHuntingPartyMemberHealth(restingParty, HUNTING_PARTY_ROLES.COMPANION_ONE, {
+        hp: 0,
+        maxHp: 200
+    });
+    restingParty = resolveHuntingPartyBattleDefeats(restingParty, {
+        defeatedRoles: [HUNTING_PARTY_ROLES.COMPANION_ONE],
+        companionDefeatBattleCount: HUNTING_FLOW_CONFIG.companionDefeatBattleCount
+    });
+    const restingManager = new HuntingManager(mockApp);
+    restingManager._run = {
+        ...createHuntingRun({ characterId: leaderId, companionIds, stageId: HUNTING_STAGE_IDS.CAVE }),
+        party: restingParty
+    };
+    restingManager._startFloorBattle();
+    const restingAllies = mockApp.simulation.fighters.filter((fighter) => fighter.teamId === HUNTING_TEAMS.PLAYER);
+    const restingCard = mockApp.lastMatchOptions.fighterCards.find((entry) => entry.fighter.id === companionIds[0]);
+    assert.equal(
+        restingAllies.some((fighter) => fighter.id === companionIds[0]),
+        false,
+        "A resting companion must remain absent from battle physics"
+    );
+    assert.equal(restingCard.defeated, true, "A resting companion should keep a disabled fighter card");
+    assert.equal(restingCard.hp, 0, "A resting companion card should retain its defeated HP state");
+    assert.equal(
+        restingCard.revivalBattlesUntilReturn,
+        1,
+        "The default rest rule should show that the companion returns one battle later"
+    );
+    assert.deepEqual(
+        mockApp.lastMatchOptions.fighterCards.map((entry) => entry.fighter.id),
+        [leaderId, ...companionIds],
+        "A resting card should stay in its original party slot"
+    );
+    app._renderRoster(
+        [restingCard.fighter.id],
+        [restingCard.fighter],
+        new Map([[restingCard.fighter.id, restingCard]])
+    );
+    const restingCardView = app._strip.fighters.find((fighter) => fighter.id === restingCard.fighter.id);
+    assert.equal(restingCardView.defeated, true, "The shared fighter card view should stay inactive while resting");
+    assert.equal(restingCardView.hpPct, 0, "The resting card should not show a stale health fill");
+    assert.equal(restingCardView.revivalLabel, "1전투 뒤 부활", "The resting card should format the return countdown");
     if (!HUNTING_FLOW_CONFIG.swapEnabled) {
         assert.equal(mockApp.simulation.standbyFighters.length, 0, "Disabled swaps must not create a standby fighter");
         assert.equal(manager.swapActiveCharacter(), null, "Disabled swaps must reject combat input");

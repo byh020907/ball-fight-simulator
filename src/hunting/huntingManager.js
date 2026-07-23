@@ -635,12 +635,25 @@ export class HuntingManager {
         });
     }
 
-    _createCompanionHuntingSpecs(run) {
+    _createCompanionHuntingEntries(run) {
         return [HUNTING_PARTY_ROLES.COMPANION_ONE, HUNTING_PARTY_ROLES.COMPANION_TWO]
-            .filter((role) => isHuntingPartyMemberBattleReady(getHuntingPartyMember(run.party, role)))
             .map((role) => this._createHuntingPartyMemberSpec(run, role))
             .filter(Boolean)
             .map((entry) => ({ ...entry, appliedSpec: applyHuntingCompanionScale(entry.appliedSpec) }));
+    }
+
+    _createHuntingFighterCards(player, companionEntries) {
+        return [player, ...companionEntries].map((entry) => {
+            const resting = !isHuntingPartyMemberBattleReady(entry.member);
+            const remainingRestBattles = Math.max(0, Math.floor(entry.member?.revivalBattlesRemaining) || 0);
+            return {
+                fighter: entry.appliedSpec,
+                defeated: resting,
+                hp: resting ? 0 : entry.member?.hp,
+                maxHp: entry.member?.maxHp,
+                revivalBattlesUntilReturn: resting ? remainingRestBattles + 1 : 0
+            };
+        });
     }
 
     _createSwapHuntingSpec(run) {
@@ -685,7 +698,8 @@ export class HuntingManager {
 
         const player = this._createPlayerHuntingSpec(run);
         if (!player) return;
-        const companions = this._createCompanionHuntingSpecs(run);
+        const companionEntries = this._createCompanionHuntingEntries(run);
+        const companions = companionEntries.filter((entry) => isHuntingPartyMemberBattleReady(entry.member));
         const swap = this._createSwapHuntingSpec(run);
         let syncedRun = this._syncRunHealth(run, player.appliedSpec);
         for (const companion of companions) {
@@ -799,6 +813,7 @@ export class HuntingManager {
                 directCombatants.map((entry) => [entry.member.characterId, entry.rebirthLoadout])
             ),
             playerLives: isFinalBoss ? { playerId: characterId, total: 3 } : null,
+            fighterCards: this._createHuntingFighterCards(player, companionEntries),
             onFighterDefeated: (fighter, context) => lootDropController.onFighterDefeated(fighter, context),
             onResultResolved: (winner, context) =>
                 this._handleHuntingResultResolved(lootDropController, winner, context)
