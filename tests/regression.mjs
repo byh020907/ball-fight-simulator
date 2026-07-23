@@ -25327,10 +25327,23 @@ function testHuntingPartyBattleComposition() {
         const firstAccelerationEffect = mockApp.simulation.entities.find(
             (entity) => entity.constructor.name === "HuntingTapAccelerationEffect"
         );
+        const firstTrailPoint = firstAccelerationEffect.samples[0].position.clone();
+        leaderAtBattleStart.position.add(new Vector2(leaderAtBattleStart.radius, leaderAtBattleStart.radius * 0.25));
+        firstAccelerationEffect.update(0.03);
+        assert.ok(firstAccelerationEffect.samples.length >= 3, "Acceleration trail should sample the movement path");
+        assert.deepEqual(
+            firstAccelerationEffect.samples[0].position,
+            firstTrailPoint,
+            "Existing trail points should remain in world space instead of following the fighter"
+        );
         assertForegroundEffectRenders(firstAccelerationEffect, "Hunting tap acceleration", (primitives) => {
             assert.ok(
-                primitives.filter((primitive) => primitive.method === "lineTo").length >= 3,
-                "Tap acceleration should render multiple directional speed streaks"
+                primitives.filter((primitive) => primitive.method === "lineTo").length >= 4,
+                "Tap acceleration should render a tapered ribbon along sampled movement"
+            );
+            assert.ok(
+                primitives.some((primitive) => primitive.method === "fill"),
+                "Tap acceleration should fill the movement ribbon instead of drawing a rigid line comb"
             );
             assert.ok(
                 primitives.some((primitive) => primitive.method === "arc"),

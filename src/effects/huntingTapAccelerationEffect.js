@@ -3,13 +3,21 @@ import { EntityAttachment } from "../physics/index.js";
 import { getVisibleLineWidth } from "./effectVisibility.js";
 
 export const HUNTING_TAP_ACCELERATION_VISUAL_CONFIG = Object.freeze({
-    durationSeconds: 0.34,
+    durationSeconds: 0.28,
     ignitionRatio: 0.48,
-    minimumStreakCount: 4,
-    maximumStreakCount: 9,
-    minimumLengthRadiusRatio: 1.5,
-    maximumLengthRadiusRatio: 3.8,
-    lateralSpreadRadiusRatio: 1.25,
+    trailPointLifetimeSeconds: 0.26,
+    trailSampleIntervalSeconds: 0.025,
+    minimumSampleDistanceRadiusRatio: 0.18,
+    maximumTrailPointCount: 14,
+    trailAnchorRadiusRatio: 0.78,
+    seedLengthRadiusRatio: 0.72,
+    minimumTrailWidthRadiusRatio: 0.16,
+    maximumTrailWidthRadiusRatio: 0.44,
+    trailWidthTaperExponent: 0.72,
+    outlineWidthScale: 1.45,
+    outlineAlpha: 0.18,
+    minimumTrailAlpha: 0.34,
+    maximumTrailAlpha: 0.68,
     minimumParticleCount: 5,
     maximumParticleCount: 12,
     minimumParticleSpeed: 120,
@@ -27,7 +35,22 @@ function interpolate(minimum, maximum, progress) {
 }
 
 function getTravelDirection(fighter) {
-    return fighter.velocity.length() > 0 ? fighter.velocity.clone().normalize() : Vector2.fromAngle(fighter.angle ?? 0);
+    return fighter.velocity.length() > 0
+        ? fighter.velocity.clone().normalize()
+        : Vector2.fromAngle(fighter.angle ?? 0, 1);
+}
+
+function getTrailAnchor(fighter, config) {
+    return fighter.position
+        .clone()
+        .subtract(getTravelDirection(fighter).scale(fighter.radius * config.trailAnchorRadiusRatio));
+}
+
+function getTrailNormal(points, index) {
+    const previous = points[Math.max(0, index - 1)].position;
+    const next = points[Math.min(points.length - 1, index + 1)].position;
+    const tangent = Vector2.subtract(next, previous).normalize();
+    return new Vector2(-tangent.y, tangent.x);
 }
 
 export class HuntingTapAccelerationEffect extends EntityAttachment(CombatEntity) {
@@ -41,7 +64,10 @@ export class HuntingTapAccelerationEffect extends EntityAttachment(CombatEntity)
         this.intensity = 0;
         this.life = 0;
         this.ignitionLife = 0;
+        this.samples = [];
+        this.sampleElapsed = 0;
         this.refresh(intensity);
+        this._seedTrail();
     }
 
     refresh(intensity) {
@@ -51,6 +77,29 @@ export class HuntingTapAccelerationEffect extends EntityAttachment(CombatEntity)
         this.isExpired = false;
     }
 
+    _seedTrail() {
+        const direction = getTravelDirection(this.fighter);
+        const anchor = getTrailAnchor(this.fighter, this.config);
+        this.samples.push({
+            position: anchor.clone().subtract(direction.scale(this.fighter.radius * this.config.seedLengthRadiusRatio)),
+            age: this.config.trailPointLifetimeSeconds * 0.45
+        });
+        this.samples.push({ position: anchor, age: 0 });
+    }
+
+    _recordTrailSample(delta) {
+        this.sampleElapsed += delta;
+        const anchor = getTrailAnchor(this.fighter, this.config);
+        const latest = this.samples.at(-1);
+        const minimumDistance = this.fighter.radius * this.config.minimumSampleDistanceRadiusRatio;
+        const movedEnough = !latest || Vector2.subtract(anchor, latest.position).length() >= minimumDistance;
+        if (!movedEnough && this.sampleElapsed < this.config.trailSampleIntervalSeconds) return;
+
+        this.samples.push({ position: anchor, age: 0 });
+        this.samples = this.samples.slice(-this.config.maximumTrailPointCount);
+        this.sampleElapsed = 0;
+    }
+
     update(delta) {
         if (!this.syncAttachedPosition() || this.fighter.flags.defeated || this.fighter.flags.destroyed) {
             this.isExpired = true;
@@ -58,46 +107,65 @@ export class HuntingTapAccelerationEffect extends EntityAttachment(CombatEntity)
         }
         this.life = Math.max(0, this.life - delta);
         this.ignitionLife = Math.max(0, this.ignitionLife - delta);
-        if (this.life === 0) this.isExpired = true;
+        this.samples.forEach((sample) => {
+            sample.age += delta;
+        });
+        this.samples = this.samples.filter((sample) => sample.age < this.config.trailPointLifetimeSeconds);
+        if (this.life > 0) this._recordTrailSample(delta);
+        if (this.life === 0 && this.samples.length < 2) this.isExpired = true;
+    }
+
+    _drawTrailRibbon(ctx, points, widthScale, color, alpha) {
+        const maximumWidth =
+            this.fighter.radius *
+            interpolate(
+                this.config.minimumTrailWidthRadiusRatio,
+                this.config.maximumTrailWidthRadiusRatio,
+                this.intensity
+            );
+        const edges = points.map((sample, index) => {
+            const pathProgress = index / Math.max(1, points.length - 1);
+            const lifeProgress = 1 - sample.age / this.config.trailPointLifetimeSeconds;
+            const width =
+                maximumWidth *
+                Math.pow(pathProgress, this.config.trailWidthTaperExponent) *
+                Math.max(0, lifeProgress) *
+                widthScale;
+            const normal = getTrailNormal(points, index).scale(width);
+            const local = Vector2.subtract(sample.position, this.position);
+            return {
+                left: Vector2.add(local, normal),
+                right: Vector2.subtract(local, normal)
+            };
+        });
+
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(edges[0].left.x, edges[0].left.y);
+        edges.slice(1).forEach((edge) => ctx.lineTo(edge.left.x, edge.left.y));
+        edges
+            .slice()
+            .reverse()
+            .forEach((edge) => ctx.lineTo(edge.right.x, edge.right.y));
+        ctx.closePath();
+        ctx.fill();
     }
 
     draw(ctx) {
-        const direction = getTravelDirection(this.fighter);
-        const fade = Math.min(1, this.life / (this.config.durationSeconds * 0.45));
-        const streakCount = Math.round(
-            interpolate(this.config.minimumStreakCount, this.config.maximumStreakCount, this.intensity)
-        );
-        const streakLength =
-            this.fighter.radius *
-            interpolate(this.config.minimumLengthRadiusRatio, this.config.maximumLengthRadiusRatio, this.intensity);
-        const spread = this.fighter.radius * this.config.lateralSpreadRadiusRatio;
+        const points = this.samples.filter((sample) => sample.age < this.config.trailPointLifetimeSeconds);
 
         ctx.save();
         ctx.translate(this.position.x, this.position.y);
-        ctx.rotate(Math.atan2(direction.y, direction.x));
-        ctx.lineCap = "round";
-        for (let index = 0; index < streakCount; index += 1) {
-            const lane = streakCount === 1 ? 0 : index / (streakCount - 1) - 0.5;
-            const laneEnvelope = 1 - Math.abs(lane) * 0.34;
-            const startX = -this.fighter.radius * (0.76 + (index % 2) * 0.12);
-            const endX = startX - streakLength * laneEnvelope;
-            const y = lane * spread * 2;
-
-            ctx.globalAlpha = fade * (0.32 + this.intensity * 0.24);
-            ctx.strokeStyle = "#ffffff";
-            ctx.lineWidth = getVisibleLineWidth(ctx, "standard", 4.2);
-            ctx.beginPath();
-            ctx.moveTo(startX, y);
-            ctx.lineTo(endX, y);
-            ctx.stroke();
-
-            ctx.globalAlpha = fade * (0.68 + this.intensity * 0.28);
-            ctx.strokeStyle = this.fighter.color;
-            ctx.lineWidth = getVisibleLineWidth(ctx, "standard", 2.3);
-            ctx.beginPath();
-            ctx.moveTo(startX, y);
-            ctx.lineTo(endX, y);
-            ctx.stroke();
+        if (points.length >= 2) {
+            this._drawTrailRibbon(ctx, points, this.config.outlineWidthScale, "#ffffff", this.config.outlineAlpha);
+            this._drawTrailRibbon(
+                ctx,
+                points,
+                1,
+                this.fighter.color,
+                interpolate(this.config.minimumTrailAlpha, this.config.maximumTrailAlpha, this.intensity)
+            );
         }
 
         if (this.ignitionLife > 0) {
