@@ -1,5 +1,9 @@
 import { createHuntingChest } from "../hunting/huntingRewards.js";
-import { createGuaranteedEquipmentInstance, isInventoryFull } from "../hunting/equipmentConfig.js";
+import {
+    autoEquipEquipmentUpgrade,
+    createGuaranteedEquipmentInstance,
+    isInventoryFull
+} from "../hunting/equipmentConfig.js";
 import { getRarityLabel } from "../hunting/rarityPresentation.js";
 
 export const ACHIEVEMENT_REWARD_TYPES = Object.freeze({
@@ -14,9 +18,10 @@ function getSafeAmount(value) {
 }
 
 export class AchievementRewardHandler {
-    constructor(profile, { rng = Math.random } = {}) {
+    constructor(profile, { rng = Math.random, characterId = null } = {}) {
         this.profile = profile;
         this.rng = rng;
+        this.characterId = characterId;
     }
 
     shards(amount) {
@@ -44,7 +49,8 @@ export class AchievementRewardHandler {
             return { applied: true, type: ACHIEVEMENT_REWARD_TYPES.EQUIPMENT, chest, convertedToChest: true };
         }
         this.profile.equipment.inventory.push(equipment);
-        return { applied: true, type: ACHIEVEMENT_REWARD_TYPES.EQUIPMENT, equipment };
+        const autoEquip = autoEquipEquipmentUpgrade(this.profile, equipment.instanceId, this.characterId);
+        return { applied: true, type: ACHIEVEMENT_REWARD_TYPES.EQUIPMENT, equipment, autoEquip };
     }
 
     unlockFeature(feature) {

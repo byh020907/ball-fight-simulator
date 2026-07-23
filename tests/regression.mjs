@@ -298,6 +298,8 @@ import {
     getEquippedItems,
     canCharacterEquipItem,
     equipEquipmentItem,
+    autoEquipEquipmentUpgrade,
+    doesEquipmentStrictlyDominate,
     getEquipmentRequiredLevel,
     EQUIPMENT_STAT_VALUE_RATIOS,
     EQUIPMENT_NAME_PREFIXES,
@@ -9255,12 +9257,18 @@ function testHuntingSystem() {
 
     profile.hunting.shards = 50;
     profile.hunting.chests = [uncommon];
+    profile.experience.byCharacter[FIGHTER_IDS.ARCHER] = { currentXp: getLevelRequirement(10) };
     assert.equal(getChestOpenCost("uncommon"), 50, "Uncommon chest open cost should match design");
-    const opened = openHuntingChest(profile, "u1", { rng: () => 0 });
+    const opened = openHuntingChest(profile, "u1", { rng: () => 0, characterId: FIGHTER_IDS.ARCHER });
     assert.equal(opened.opened, true, "Chest should open when enough key shards are available");
     assert.equal(opened.reward.type, "equipment", "Uncommon chests should guarantee equipment rewards");
     assert.equal(profile.hunting.shards, 0, "Opening a guaranteed equipment chest should only spend its cost");
     assert.equal(profile.equipment.inventory.length, 1, "Guaranteed equipment rewards should enter the inventory");
+    assert.equal(
+        opened.applied.autoEquip.equipped,
+        true,
+        "An empty eligible slot should equip a chest reward automatically"
+    );
     assert.equal(profile.hunting.chests.length, 0, "Opened chest should leave storage");
 
     const sanitized = sanitizePlayerProfile({
@@ -11421,6 +11429,75 @@ function testEquipmentEnhancement() {
     assert.equal(sellProfile.equipment.equipped.weapon, null, "Selling an equipped item should unequip it");
 
     console.log("[equipment] ok");
+}
+
+function testEquipmentSafeAutoEquip() {
+    const profile = createDefaultPlayerProfile();
+    const characterId = FIGHTER_IDS.ARCHER;
+    profile.experience.byCharacter[characterId] = { currentXp: getLevelRequirement(10) };
+
+    const weapon = createEquipmentInstance({ rarity: "common", slot: "weapon", rng: () => 0.5 });
+    weapon.stats = [{ type: "damage", value: 5 }];
+    profile.equipment.inventory.push(weapon);
+    assert.deepEqual(
+        autoEquipEquipmentUpgrade(profile, weapon.instanceId, characterId),
+        { equipped: true, slot: "weapon", replacedItem: null, item: weapon },
+        "An eligible item should fill an empty equipment slot automatically"
+    );
+
+    const clearUpgrade = createEquipmentInstance({ rarity: "uncommon", slot: "weapon", rng: () => 0.6 });
+    clearUpgrade.stats = [{ type: "damage", value: 6 }];
+    profile.equipment.inventory.push(clearUpgrade);
+    const upgraded = autoEquipEquipmentUpgrade(profile, clearUpgrade.instanceId, characterId);
+    assert.equal(upgraded.equipped, true, "A strictly stronger item should auto-equip");
+    assert.equal(upgraded.replacedItem.instanceId, weapon.instanceId, "Auto-equip should report the replaced item");
+    assert.equal(
+        profile.equipment.equipped.weapon,
+        clearUpgrade.instanceId,
+        "The stronger weapon should occupy the slot"
+    );
+
+    const tradeoff = createEquipmentInstance({ rarity: "rare", slot: "weapon", rng: () => 0.7 });
+    tradeoff.stats = [{ type: "hp", value: 100 }];
+    profile.equipment.inventory.push(tradeoff);
+    assert.equal(
+        doesEquipmentStrictlyDominate(tradeoff, clearUpgrade),
+        false,
+        "A different-stat tradeoff must not be treated as an objective upgrade"
+    );
+    assert.equal(
+        autoEquipEquipmentUpgrade(profile, tradeoff.instanceId, characterId).equipped,
+        false,
+        "Auto-equip must preserve the current build when the new item has a tradeoff"
+    );
+
+    const accessoryA = createEquipmentInstance({ rarity: "common", slot: "accessory", rng: () => 0.2 });
+    accessoryA.stats = [{ type: "hp", value: 20 }];
+    const accessoryB = createEquipmentInstance({ rarity: "common", slot: "accessory", rng: () => 0.3 });
+    accessoryB.stats = [{ type: "damage", value: 3 }];
+    const accessoryUpgrade = createEquipmentInstance({ rarity: "uncommon", slot: "accessory", rng: () => 0.4 });
+    accessoryUpgrade.stats = [{ type: "hp", value: 30 }];
+    profile.equipment.inventory.push(accessoryA, accessoryB, accessoryUpgrade);
+    profile.equipment.equipped.accessory1 = accessoryA.instanceId;
+    profile.equipment.equipped.accessory2 = accessoryB.instanceId;
+    const accessoryResult = autoEquipEquipmentUpgrade(profile, accessoryUpgrade.instanceId, characterId);
+    assert.equal(accessoryResult.slot, "accessory1", "Accessory auto-equip should replace only the dominated slot");
+    assert.equal(
+        profile.equipment.equipped.accessory2,
+        accessoryB.instanceId,
+        "An incomparable accessory should remain equipped"
+    );
+
+    const lockedProfile = createDefaultPlayerProfile();
+    const lockedItem = createEquipmentInstance({ rarity: "rare", slot: "armor", rng: () => 0.8 });
+    lockedProfile.equipment.inventory.push(lockedItem);
+    assert.equal(
+        autoEquipEquipmentUpgrade(lockedProfile, lockedItem.instanceId, characterId).reason,
+        "level",
+        "Auto-equip must respect the current character's equipment level requirement"
+    );
+
+    console.log("[equipment-safe-auto-equip] ok");
 }
 
 function testEquipmentStatValueRatios() {
@@ -17626,6 +17703,7 @@ await testHuntingCheckpointStartsAtSelectedFloor();
 testHuntingTerrain();
 testTournamentAngledBounceRamps();
 testEquipmentEnhancement();
+testEquipmentSafeAutoEquip();
 testEquipmentStatValueRatios();
 testEquipmentNaming();
 testEquipmentSpecialCombatEffects();

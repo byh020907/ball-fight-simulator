@@ -6,6 +6,7 @@ import {
     rollHuntingChestReward
 } from "./huntingRewards.js";
 import {
+    autoEquipEquipmentUpgrade,
     generateEquipmentFromRarity,
     isInventoryFull,
     getInventorySlots,
@@ -41,8 +42,8 @@ export function previewHuntingChest(chest) {
     };
 }
 
-export function applyHuntingChestReward(profile, reward, { rng = Math.random } = {}) {
-    const applied = { shards: 0, equipment: null };
+export function applyHuntingChestReward(profile, reward, { rng = Math.random, characterId = null } = {}) {
+    const applied = { shards: 0, equipment: null, autoEquip: null };
 
     if (!profile?.hunting || !reward) return applied;
 
@@ -61,13 +62,14 @@ export function applyHuntingChestReward(profile, reward, { rng = Math.random } =
         const equipment = reward.equipment ?? generateEquipmentFromRarity(reward.rarity ?? "common", rng);
         profile.equipment.inventory.push(equipment);
         applied.equipment = equipment;
+        applied.autoEquip = autoEquipEquipmentUpgrade(profile, equipment.instanceId, characterId);
         return applied;
     }
 
     return applied;
 }
 
-export function openHuntingChest(profile, chestId, { rng = Math.random } = {}) {
+export function openHuntingChest(profile, chestId, { rng = Math.random, characterId = null } = {}) {
     const chests = profile?.hunting?.chests;
     if (!Array.isArray(chests)) {
         return { opened: false, reason: "missing_storage" };
@@ -99,7 +101,7 @@ export function openHuntingChest(profile, chestId, { rng = Math.random } = {}) {
     if (reward.type === HUNTING_CHEST_REWARD_TYPES.EQUIPMENT) {
         reward.rarity = chest.rarity;
     }
-    const applied = applyHuntingChestReward(profile, reward, { rng });
+    const applied = applyHuntingChestReward(profile, reward, { rng, characterId });
     return {
         opened: true,
         chest,

@@ -228,6 +228,71 @@ export function canCharacterEquipItem(profile, itemOrRarity, characterId) {
     return getCharacterEquipmentLevel(profile, characterId) >= getEquipmentRequiredLevel(itemOrRarity);
 }
 
+function getEquipmentEffectVector(item) {
+    const vector = new Map();
+    const enhanceMultiplier = 1 + (item?.enhanceLevel ?? 0) * ENHANCE_STAT_BONUS_PER_LEVEL;
+    for (const stat of item?.stats ?? []) {
+        const key = `stat:${stat.type}`;
+        vector.set(key, (vector.get(key) ?? 0) + Math.round((stat.value ?? 0) * enhanceMultiplier));
+    }
+    for (const option of item?.specialOptions ?? []) {
+        const key = `special:${option.type}`;
+        vector.set(key, Math.max(vector.get(key) ?? 0, option.value ?? 0));
+    }
+    return vector;
+}
+
+export function doesEquipmentStrictlyDominate(candidate, current) {
+    if (!candidate || !current || candidate.slot !== current.slot) return false;
+    const candidateEffects = getEquipmentEffectVector(candidate);
+    const currentEffects = getEquipmentEffectVector(current);
+    const effectKeys = new Set([...candidateEffects.keys(), ...currentEffects.keys()]);
+    let hasImprovement = false;
+
+    for (const key of effectKeys) {
+        const candidateValue = candidateEffects.get(key) ?? 0;
+        const currentValue = currentEffects.get(key) ?? 0;
+        if (candidateValue < currentValue) return false;
+        if (candidateValue > currentValue) hasImprovement = true;
+    }
+    return hasImprovement;
+}
+
+export function autoEquipEquipmentUpgrade(profile, instanceId, characterId = null) {
+    const equipment = profile?.equipment;
+    if (!equipment || !Array.isArray(equipment.inventory)) return { equipped: false, reason: "profile" };
+    const item = equipment.inventory.find((candidate) => candidate.instanceId === instanceId);
+    if (!item) return { equipped: false, reason: "item" };
+    if (!canCharacterEquipItem(profile, item, characterId)) return { equipped: false, reason: "level", item };
+
+    equipment.equipped ||= { weapon: null, armor: null, accessory1: null, accessory2: null };
+    const slotKeys = item.slot === "accessory" ? ["accessory1", "accessory2"] : [item.slot];
+    if (slotKeys.some((slotKey) => equipment.equipped[slotKey] === item.instanceId)) {
+        return { equipped: false, reason: "already_equipped", item };
+    }
+
+    for (const slotKey of slotKeys) {
+        const equippedItem = equipment.inventory.find(
+            (candidate) => candidate.instanceId === equipment.equipped[slotKey]
+        );
+        if (!equippedItem) {
+            equipment.equipped[slotKey] = item.instanceId;
+            return { equipped: true, slot: slotKey, replacedItem: null, item };
+        }
+    }
+
+    for (const slotKey of slotKeys) {
+        const equippedItem = equipment.inventory.find(
+            (candidate) => candidate.instanceId === equipment.equipped[slotKey]
+        );
+        if (!doesEquipmentStrictlyDominate(item, equippedItem)) continue;
+        equipment.equipped[slotKey] = item.instanceId;
+        return { equipped: true, slot: slotKey, replacedItem: equippedItem, item };
+    }
+
+    return { equipped: false, reason: "tradeoff", item };
+}
+
 export function getEquippedStatBonuses(profile, characterId = null) {
     const bonuses = { hp: 0, damage: 0, defense: 0, speed: 0 };
     const equipment = profile?.equipment;

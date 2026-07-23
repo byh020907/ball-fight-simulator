@@ -84,6 +84,9 @@ function createChestPopup(result) {
     if (result.applied?.equipment) {
         rewardLines.push(formatEquipmentReward(result.applied.equipment));
     }
+    if (result.applied?.autoEquip?.equipped) {
+        rewardLines.push("<p><strong>현재 캐릭터에게 자동 장착했습니다.</strong></p>");
+    }
     if (rewardLines.length === 0) {
         rewardLines.push("<p>상자를 열었습니다.</p>");
     }

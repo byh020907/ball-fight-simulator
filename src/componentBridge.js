@@ -370,7 +370,7 @@ export function createComponentBridge(app) {
             const profile = app.playerProfile;
             if (!profile?.hunting) return false;
 
-            const result = openHuntingChest(profile, chestId);
+            const result = openHuntingChest(profile, chestId, { characterId: app.playerFighterId });
             if (result.opened) {
                 refreshCollectionAndProfile();
             }
