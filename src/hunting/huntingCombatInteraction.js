@@ -1,5 +1,3 @@
-import { Vector2 } from "../core.js";
-
 export const HUNTING_COMBAT_INTERACTION_CONFIG = Object.freeze({
     perfectSwap: Object.freeze({
         enabled: false,
@@ -12,8 +10,7 @@ export const HUNTING_COMBAT_INTERACTION_CONFIG = Object.freeze({
         enabled: true,
         impulseBaseSpeedRatio: 0.2,
         maximumSpeedMultiplier: 1.6,
-        minimumDirectionSpeed: 5,
-        particleCount: 3
+        minimumDirectionSpeed: 5
     })
 });
 
@@ -65,7 +62,7 @@ export function applyHuntingTapAcceleration(
     const baseSpeed = getTapAccelerationBaseSpeed(fighter, simulation);
     const maximumSpeed = baseSpeed * config.maximumSpeedMultiplier;
     if (baseSpeed <= 0 || currentSpeed >= maximumSpeed) {
-        return { applied: false, reason: "maximum_speed", speed: currentSpeed, maximumSpeed };
+        return { applied: false, reason: "maximum_speed", speed: currentSpeed, maximumSpeed, progress: 1 };
     }
 
     const nextSpeed = Math.min(maximumSpeed, currentSpeed + baseSpeed * config.impulseBaseSpeedRatio);
@@ -81,9 +78,4 @@ export function applyHuntingTapAcceleration(
             Math.min(1, (fighter.velocity.length() - baseSpeed) / Math.max(1, maximumSpeed - baseSpeed))
         )
     };
-}
-
-export function getTapAccelerationTrailOrigin(fighter) {
-    const direction = fighter.velocity.length() > 0 ? fighter.velocity.clone().normalize() : new Vector2(1, 0);
-    return fighter.position.clone().subtract(direction.scale(fighter.radius * 0.85));
 }

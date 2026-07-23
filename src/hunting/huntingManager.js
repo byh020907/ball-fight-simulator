@@ -88,9 +88,9 @@ import { applyHuntingCompanionScale, placeHuntingCompanionsNearLeader } from "./
 import {
     HUNTING_COMBAT_INTERACTION_CONFIG,
     applyHuntingTapAcceleration,
-    createPerfectSwapAttempt,
-    getTapAccelerationTrailOrigin
+    createPerfectSwapAttempt
 } from "./huntingCombatInteraction.js";
+import { spawnHuntingTapAccelerationFeedback } from "../effects/huntingTapAccelerationEffect.js";
 
 const HUNTING_ROUTE_ACTIONS = Object.freeze({
     CONTINUE: "continue",
@@ -1046,20 +1046,8 @@ export class HuntingManager {
         if (this._run?.phase !== HUNTING_RUN_PHASES.COMBAT || !simulation) return { applied: false };
         const fighter = simulation.playerBall;
         const result = applyHuntingTapAcceleration(fighter, simulation);
-        if (!result.applied) return result;
-
-        const config = HUNTING_COMBAT_INTERACTION_CONFIG.tapAcceleration;
-        simulation.spawnParticleBurst(getTapAccelerationTrailOrigin(fighter), fighter.color, {
-            count: config.particleCount,
-            speed: 85,
-            radiusMin: 1,
-            radiusMax: 2.5,
-            life: 0.28,
-            gravity: 0,
-            upBias: 0,
-            direction: fighter.velocity.clone().normalize().scale(-1),
-            spread: Math.PI * 0.5
-        });
+        if (!result.applied && result.reason !== "maximum_speed") return result;
+        spawnHuntingTapAccelerationFeedback(simulation, fighter, result.progress);
         return result;
     }
 

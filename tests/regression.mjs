@@ -25320,8 +25320,39 @@ function testHuntingPartyBattleComposition() {
         leaderAtBattleStart.applyImpulse(
             new Vector2(leaderAtBattleStart.stats.baseSpeed, 0).subtract(leaderAtBattleStart.velocity)
         );
-        const acceleration = applyHuntingTapAcceleration(leaderAtBattleStart, mockApp.simulation);
+        mockApp.simulation.playerBall = leaderAtBattleStart;
+        manager._run = setHuntingRunPhase(manager._run, HUNTING_RUN_PHASES.COMBAT);
+        const acceleration = manager.accelerateActiveCharacter();
         assert.equal(acceleration.applied, true, "Tap acceleration must remain active while swaps are disabled");
+        const firstAccelerationEffect = mockApp.simulation.entities.find(
+            (entity) => entity.constructor.name === "HuntingTapAccelerationEffect"
+        );
+        assertForegroundEffectRenders(firstAccelerationEffect, "Hunting tap acceleration", (primitives) => {
+            assert.ok(
+                primitives.filter((primitive) => primitive.method === "lineTo").length >= 3,
+                "Tap acceleration should render multiple directional speed streaks"
+            );
+            assert.ok(
+                primitives.some((primitive) => primitive.method === "arc"),
+                "Tap acceleration should render an ignition ring around the active character"
+            );
+        });
+        const firstIntensity = firstAccelerationEffect.intensity;
+        manager.accelerateActiveCharacter();
+        assert.equal(
+            mockApp.simulation.entities.filter((entity) => entity.constructor.name === "HuntingTapAccelerationEffect")
+                .length,
+            1,
+            "Repeated taps should refresh one attached acceleration effect instead of stacking copies"
+        );
+        assert.ok(
+            firstAccelerationEffect.intensity > firstIntensity,
+            "Speed streak intensity should increase with the actual acceleration progress"
+        );
+        for (let tap = 0; tap < 10; tap += 1) manager.accelerateActiveCharacter();
+        const maximumTap = manager.accelerateActiveCharacter();
+        assert.equal(maximumTap.reason, "maximum_speed");
+        assert.equal(firstAccelerationEffect.intensity, 1, "Maximum-speed taps should keep full visual feedback");
         console.log("[hunting-party-battle-composition] ok");
         return;
     }
