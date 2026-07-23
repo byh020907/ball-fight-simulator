@@ -37,7 +37,7 @@
                             </div>
                             <span
                                 class="ch-fusion-cost"
-                                x-text="'파편 ' + selectedRecipe().cost.shards"
+                                x-text="selectedRecipe().cost.shards > 0 ? '파편 ' + selectedRecipe().cost.shards : '추가 파편 없음'"
                             ></span>
                         </div>
                         <div class="ch-fusion-source-slots" aria-label="추천 합성 재료">

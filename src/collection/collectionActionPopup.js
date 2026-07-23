@@ -119,9 +119,10 @@ function createFusionPopup(result) {
 
     const consumedNames = (result?.consumed ?? []).map(formatEquipmentName).join(" · ");
     const cost = result?.cost ?? {};
+    const costText = (cost.shards ?? 0) > 0 ? `<p>소모: 파편 ${cost.shards}</p>` : "<p>추가 파편 소모 없음</p>";
     return createPopup(
         "장비 합성 완료",
-        `<p>소모 장비: ${consumedNames}</p><p>소모: 파편 ${cost.shards ?? 0}</p>${formatEquipmentReward(result?.item)}`
+        `<p>소모 장비: ${consumedNames}</p>${costText}${formatEquipmentReward(result?.item)}`
     );
 }
 

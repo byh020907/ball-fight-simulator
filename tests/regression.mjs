@@ -11237,7 +11237,7 @@ function testEquipmentEnhancement() {
 
     // 강화 재화 준비
     profile.equipment.enhancementStones = 100;
-    profile.hunting.shards = 200;
+    profile.hunting.shards = 5000;
 
     // 장비 생성
     const item = createEquipmentInstance({ rarity: "common", slot: "weapon", rng: () => 0.5 });
@@ -11246,7 +11246,7 @@ function testEquipmentEnhancement() {
     // 강화 비용 계산
     const cost0 = calculateEnhanceCost(0);
     assert.equal(cost0.stones, undefined, "Enhance should not require stones before attempting");
-    assert.equal(cost0.shards, 50, "Enhance +0→+1 should cost 50 shards");
+    assert.equal(cost0.shards, 200, "Enhance +0→+1 should cost 200 shards");
 
     // 실패율 계산
     const failRate0 = calculateEnhanceFailureRate(0);
@@ -11269,10 +11269,10 @@ function testEquipmentEnhancement() {
     assert.equal(resultSuccess.newLevel, 1, "New level should be 1 after success");
     assert.equal(item.enhanceLevel, 1, "Item enhance level should be updated to 1");
     assert.equal(profile.equipment.enhancementStones, 100, "Enhance should preserve recovery stones on success");
-    assert.equal(profile.hunting.shards, 150, "Enhance should deduct 50 shards");
+    assert.equal(profile.hunting.shards, 4800, "Enhance should deduct 200 shards");
 
     // 강화 실패 테스트 (rng=0, failRate=0.32 → 실패)
-    profile.hunting.shards = 200;
+    profile.hunting.shards = 5000;
     profile.equipment.enhancementStones = 100;
     const item2 = createEquipmentInstance({ rarity: "uncommon", slot: "armor", rng: () => 0.5 });
     item2.enhanceLevel = 1;
@@ -11311,7 +11311,7 @@ function testEquipmentEnhancement() {
 
     // 파편 부족 시 오류 반환; 강화석이 없어도 시도 가능
     profile.equipment.enhancementStones = 0;
-    profile.hunting.shards = 100;
+    profile.hunting.shards = 500;
     const item4 = createEquipmentInstance({ rarity: "common", slot: "weapon", rng: () => 0.5 });
     profile.equipment.inventory.push(item4);
     const resultNoStones = enhanceEquipment(profile, item4.instanceId, () => 0.5);
@@ -11323,7 +11323,7 @@ function testEquipmentEnhancement() {
 
     // 장착된 장비 강화 + 스탯 반영 확인
     profile.equipment.enhancementStones = 100;
-    profile.hunting.shards = 200;
+    profile.hunting.shards = 5000;
     const item5 = createEquipmentInstance({ rarity: "rare", slot: "weapon", rng: () => 0.5 });
     item5.stats = [{ type: "damage", value: 6, min: 4, max: 8 }];
     profile.equipment.inventory.push(item5);
@@ -11350,7 +11350,7 @@ function testEquipmentEnhancement() {
 
     // 장착된 상태로 한 번 더 강화 (+1→+2, 실패 → +1→+0)
     profile.equipment.enhancementStones = 100;
-    profile.hunting.shards = 200;
+    profile.hunting.shards = 5000;
     const enhanceEquippedFail = enhanceEquipment(profile, item5.instanceId, () => 0);
     assert.equal(enhanceEquippedFail.success, false, "Equipped item enhance should fail with low RNG");
     assert.equal(enhanceEquippedFail.newLevel, 0, "Level should drop from +1 to +0 on fail");
@@ -11398,10 +11398,10 @@ function testEquipmentEnhancement() {
         true,
         "Fusion should accept exactly three same-rarity selected sources"
     );
-    assert.deepEqual(fusionCost, { shards: 250 }, "Fusion cost should only use shards");
-    assert.deepEqual(getFusionCost("uncommon"), { shards: 600 }, "Uncommon fusion should only use shards");
-    assert.deepEqual(getFusionCost("rare"), { shards: 1500 }, "Rare fusion should only use shards");
-    assert.deepEqual(getFusionCost("epic"), { shards: 4000 }, "Epic fusion should only use shards");
+    assert.deepEqual(fusionCost, { shards: 0 }, "Fusion should not add a shard cost to its three items");
+    assert.deepEqual(getFusionCost("uncommon"), { shards: 0 }, "Uncommon fusion should only consume equipment");
+    assert.deepEqual(getFusionCost("rare"), { shards: 0 }, "Rare fusion should only consume equipment");
+    assert.deepEqual(getFusionCost("epic"), { shards: 0 }, "Epic fusion should only consume equipment");
     assert.equal(getFusionCost("legendary"), null, "Legendary should not have a fusion recipe");
     const fused = fuseEquipment(craftProfile, fusionSourceIds, () => 0.5);
     assert.equal(fused.toRarity, "uncommon", "Fusion should upgrade common equipment to uncommon");
@@ -11411,7 +11411,7 @@ function testEquipmentEnhancement() {
     assert.equal(fused.item.enhanceLevel, 0, "Fusion should create a fresh +0 item");
     assert.equal(craftProfile.equipment.equipped.weapon, fuseA.instanceId, "Fusion should preserve equipped items");
     assert.equal(craftProfile.equipment.enhancementStones, 100, "Fusion should not deduct recovery stones");
-    assert.equal(craftProfile.hunting.shards, 500 - fusionCost.shards, "Fusion should deduct key shards");
+    assert.equal(craftProfile.hunting.shards, 500, "Fusion should not deduct shards in addition to its items");
 
     const lonely = createEquipmentInstance({ rarity: "rare", slot: "weapon", rng: () => 0.5 });
     craftProfile.equipment.inventory.push(lonely);
@@ -17495,7 +17495,7 @@ async function testCreateCollectionHubViewModel() {
     const commonFusionRecipe = fusionVm.equipment.fusion.recipes.find((recipe) => recipe.rarity === "common");
     assert.equal(fusionVm.equipment.fusion.sourceItemCount, 3, "Fusion UI should require three recommended sources");
     assert.equal(commonFusionRecipe.recommendedItems.length, 3, "Fusion UI should expose the recommended sources");
-    assert.deepEqual(commonFusionRecipe.cost, { shards: 250 }, "Fusion UI should display the derived material cost");
+    assert.deepEqual(commonFusionRecipe.cost, { shards: 0 }, "Fusion UI should expose its zero shard cost");
     assert.equal(commonFusionRecipe.rarityLabel, "common", "Fusion UI should use the canonical rarity label");
     assert.equal(vm2.storage.chests[0].rarityLabel, "uncommon", "Storage UI should use the canonical rarity label");
 
