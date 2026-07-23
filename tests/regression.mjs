@@ -24022,6 +24022,43 @@ function testEaterOrbitDigestionLifecycleKeepsBattleProgressing() {
 
 testEaterOrbitDigestionLifecycleKeepsBattleProgressing();
 
+function testEaterDefeatReleasesSwallowedTarget() {
+    const roster = createRoster();
+    const sim = new BattleSimulation(
+        [
+            { ...roster.find((fighter) => fighter.id === FIGHTER_IDS.EATER), teamId: "player" },
+            { ...roster.find((fighter) => fighter.id === FIGHTER_IDS.RAGE), teamId: "player" },
+            { ...roster.find((fighter) => fighter.id === FIGHTER_IDS.ORBIT), teamId: "enemy" }
+        ],
+        { onLog() {}, onSound() {}, onDamageTaken() {}, onDamageDealt() {}, onHpChanged() {} },
+        null,
+        {
+            assignActions: false,
+            hostileAbsenceGraceDuration: 1,
+            hostileAbsenceGraceTeamId: "player"
+        }
+    );
+    const [eater, ally, target] = sim.fighters;
+    eater.ability.state.feastTimer = 1;
+    eater.ability.onCollision(target);
+    assert.equal(target.state.swallowed?.owner, eater, "Eater should hold the target before being defeated");
+
+    eater.takeDamage(eater.maxHp * 100, target, "Regression");
+
+    assert.equal(eater.flags.defeated, true, "The swallowing Eater should be defeated");
+    assert.equal(ally.flags.defeated, false, "A surviving ally should keep the player team active");
+    assert.equal(target.state.swallowed, null, "Defeating Eater must immediately release its living swallowed target");
+    assert.equal(eater.ability.state.swallowedTarget, null, "Eater must not retain a swallowed target after defeat");
+    assert.equal(
+        sim.finished,
+        false,
+        "Releasing the target should resume the active battle instead of resolving either team early"
+    );
+    console.log("[eater-defeat-release] ok");
+}
+
+testEaterDefeatReleasesSwallowedTarget();
+
 function testTerrainCollisionReturnsResult() {
     const entity = {
         position: { x: 200, y: 200 },

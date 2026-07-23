@@ -169,21 +169,11 @@ export class EaterAbility extends Ability {
         this.resetCooldown(this.cooldown);
 
         if (target.flags.defeated) {
-            target.state.swallowed = null;
-            this.state.digestionEffect?.finish();
-            this.state.digestionEffect = null;
-            this.state.swallowedTarget = null;
+            this._detachSwallowedTarget();
             return;
         }
 
-        const direction = this.state.spitDirection.clone().normalize();
-        target.state.swallowed = null;
-        this.state.digestionEffect?.finish();
-        this.state.digestionEffect = null;
-        target.position = Vector2.add(
-            this.owner.position,
-            direction.clone().scale(this.owner.radius + target.radius + 10)
-        );
+        const { direction } = this._detachSwallowedTarget({ reposition: true });
 
         let spitSpeedMult = SPIT_SPEED_MULTIPLIER;
         if (this.abilityTier >= 2) {
@@ -213,7 +203,41 @@ export class EaterAbility extends Ability {
         this.simulation.spawnSlash(this.owner.position.clone(), target.position.clone(), this.owner.color);
         this.simulation.addSparkBurst(target.position.clone(), this.owner.color);
         this.simulation.addLog(`${this.owner.name} spits ${target.name} into the walls.`);
+    }
+
+    onOwnerDefeated() {
+        const released = this._detachSwallowedTarget({ reposition: true });
+        if (released?.target && !released.target.flags.defeated) {
+            this.simulation.addLog(`${this.owner.name} drops ${released.target.name}.`);
+        }
+        return false;
+    }
+
+    onBattleEnded() {
+        this._detachSwallowedTarget();
+    }
+
+    _detachSwallowedTarget({ reposition = false } = {}) {
+        const target = this.state.swallowedTarget;
+        if (!target) return null;
+
+        const direction = this.state.spitDirection.clone().normalize();
+        if (direction.length() === 0) direction.x = 1;
+        target.state.swallowed = null;
+        this.state.digestionEffect?.finish();
+        this.state.digestionEffect = null;
         this.state.swallowedTarget = null;
+        this.state.swallowTimer = 0;
+
+        if (reposition && !target.flags.defeated) {
+            target.position = Vector2.add(
+                this.owner.position,
+                direction.clone().scale(this.owner.radius + target.radius + 10)
+            );
+            this.simulation.keepInsideArena(target);
+        }
+
+        return { target, direction };
     }
 
     _onWallRupture(target, collisionCtx) {

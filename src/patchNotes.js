@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.36.22",
+        date: "2026-07-23",
+        title: "v0.36.22 삼켜진 적 때문에 전투가 멈추지 않습니다",
+        changes: [
+            {
+                type: "fix",
+                text: "Eater Ball이 상대를 삼킨 채 쓰러져도 상대가 즉시 전장으로 돌아와 전투가 정상적으로 이어집니다."
+            }
+        ]
+    },
+    {
         version: "0.36.21",
         date: "2026-07-23",
         title: "v0.36.21 포탈 선택과 원정 편성이 편해집니다",
