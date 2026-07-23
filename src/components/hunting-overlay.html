@@ -271,9 +271,11 @@
             :disabled="!huntingSwapCharacter?.available"
             @click="huntingSwapActiveCharacter()"
         >
-            <span>교대</span>
+            <span>카운터 교대</span>
             <strong x-text="huntingSwapCharacter?.name || ''"></strong>
-            <small x-text="formatHuntingPartyHealth(huntingSwapCharacter)"></small>
+            <small
+                x-text="formatHuntingPartyHealth(huntingSwapCharacter) + ' · ' + (huntingSwapCharacter?.status || '')"
+            ></small>
         </button>
     </div>
 </div>

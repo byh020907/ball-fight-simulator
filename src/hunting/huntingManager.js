@@ -84,6 +84,12 @@ import {
     setActiveHuntingPartyRole
 } from "./huntingPartyState.js";
 import { applyHuntingCompanionScale, placeHuntingCompanionsNearLeader } from "./huntingCompanion.js";
+import {
+    HUNTING_COMBAT_INTERACTION_CONFIG,
+    applyHuntingTapAcceleration,
+    createPerfectSwapAttempt,
+    getTapAccelerationTrailOrigin
+} from "./huntingCombatInteraction.js";
 
 const HUNTING_ROUTE_ACTIONS = Object.freeze({
     CONTINUE: "continue",
@@ -177,6 +183,8 @@ export class HuntingManager {
         this._combatUiSyncRemaining = 0;
         this._partyBattleParticipation = null;
         this._lastBattlePartyExperienceResults = [];
+        this._perfectSwapAttempt = null;
+        this._perfectSwapCooldownRemaining = 0;
     }
 
     get isActive() {
@@ -618,6 +626,7 @@ export class HuntingManager {
         const app = this.app;
         let run = this._run;
         if (!run || run.status !== "active") return;
+        this._resetCombatInteractionState();
 
         const player = this._createPlayerHuntingSpec(run);
         if (!player) return;
@@ -771,6 +780,11 @@ export class HuntingManager {
         this._syncCombatPartyUi();
     }
 
+    _resetCombatInteractionState() {
+        this._perfectSwapAttempt = null;
+        this._perfectSwapCooldownRemaining = 0;
+    }
+
     _handleFinish(app) {
         app._cleanupMatch();
         app.matchFinalized = true;
@@ -902,6 +916,8 @@ export class HuntingManager {
         const run = this._run;
         const simulation = this.app.simulation;
         if (!run || run.phase !== HUNTING_RUN_PHASES.COMBAT || !simulation) return null;
+        const config = HUNTING_COMBAT_INTERACTION_CONFIG.perfectSwap;
+        if (!config.enabled || this._perfectSwapAttempt || this._perfectSwapCooldownRemaining > 0) return null;
 
         const activeRole = run.party.activeRole;
         const standbyRole =
@@ -910,8 +926,63 @@ export class HuntingManager {
         const standby = simulation.standbyFighters.find((fighter) => fighter.hunting?.partyRole === standbyRole);
         if (!active || !standby || active.flags.defeated || standby.flags.defeated) return null;
 
+        const effect = createPerfectSwapAttempt({
+            config,
+            onSuccess: () => {
+                simulation.schedulePostCollisionTask(() => this._completePerfectSwap(active, standby));
+            },
+            onMiss: () => this._handlePerfectSwapMiss(active)
+        });
+        this._perfectSwapAttempt = { active, standby };
+        active.actionContext.setEffect(config.effectId, effect);
+        simulation.spawnActionWindow(active, "counter", config.windowSeconds);
+        simulation.playSound("counter");
+        this._syncCombatPartyUi();
+        return { active, standby, windowSeconds: config.windowSeconds };
+    }
+
+    _completePerfectSwap(active, standby) {
+        const simulation = this.app.simulation;
+        if (
+            !simulation ||
+            this._perfectSwapAttempt?.active !== active ||
+            this._perfectSwapAttempt?.standby !== standby
+        ) {
+            return null;
+        }
+        this._perfectSwapAttempt = null;
+        this._perfectSwapCooldownRemaining =
+            HUNTING_COMBAT_INTERACTION_CONFIG.perfectSwap.successfulSwapCooldownSeconds;
+        const swapped = this._performActiveCharacterSwap(active, standby, { transferVelocity: true });
+        if (!swapped) return null;
+
+        swapped.active.abilities.preparePrimaryAbility();
+        simulation.spawnActionSuccess(swapped.active.position.clone(), "counter");
+        simulation.spawnActionText(swapped.active.position.clone(), "퍼펙트 교대!", "#44ddff");
+        simulation.playSound("counter", 1.2);
+        this._syncCombatPartyUi();
+        return swapped;
+    }
+
+    _handlePerfectSwapMiss(active) {
+        if (this._perfectSwapAttempt?.active !== active) return;
+        this._perfectSwapAttempt = null;
+        this._perfectSwapCooldownRemaining = HUNTING_COMBAT_INTERACTION_CONFIG.perfectSwap.missedAttemptCooldownSeconds;
+        const simulation = this.app.simulation;
+        simulation?.spawnActionWhiff(active.position.clone());
+        simulation?.playSound("whiff");
+        this._syncCombatPartyUi();
+    }
+
+    _performActiveCharacterSwap(active, standby, { transferVelocity = false } = {}) {
+        const run = this._run;
+        const simulation = this.app.simulation;
+        if (!run || !simulation) return null;
+        const activeRole = active.hunting?.partyRole;
+        const standbyRole = standby.hunting?.partyRole;
+
         const capturedRun = this._captureDirectPartyBattleState(run, simulation);
-        const swapped = simulation.swapActiveWithStandby(active, standby);
+        const swapped = simulation.swapActiveWithStandby(active, standby, { transferVelocity });
         if (!swapped) return null;
 
         this._run = {
@@ -939,8 +1010,31 @@ export class HuntingManager {
         return swapped;
     }
 
+    accelerateActiveCharacter() {
+        const simulation = this.app.simulation;
+        if (this._run?.phase !== HUNTING_RUN_PHASES.COMBAT || !simulation) return { applied: false };
+        const fighter = simulation.playerBall;
+        const result = applyHuntingTapAcceleration(fighter, simulation);
+        if (!result.applied) return result;
+
+        const config = HUNTING_COMBAT_INTERACTION_CONFIG.tapAcceleration;
+        simulation.spawnParticleBurst(getTapAccelerationTrailOrigin(fighter), fighter.color, {
+            count: config.particleCount,
+            speed: 85,
+            radiusMin: 1,
+            radiusMax: 2.5,
+            life: 0.28,
+            gravity: 0,
+            upBias: 0,
+            direction: fighter.velocity.clone().normalize().scale(-1),
+            spread: Math.PI * 0.5
+        });
+        return result;
+    }
+
     updateCombat(delta) {
         if (this._run?.phase !== HUNTING_RUN_PHASES.COMBAT) return;
+        this._perfectSwapCooldownRemaining = Math.max(0, this._perfectSwapCooldownRemaining - Math.max(0, delta));
         this._recordPartyBattleParticipation(delta);
         this._combatUiSyncRemaining -= Math.max(0, delta);
         if (this._combatUiSyncRemaining > 0) return;
@@ -983,6 +1077,13 @@ export class HuntingManager {
         const standbyMember = getHuntingPartyMember(run.party, standbyRole);
         const standbyFighter = simulation.standbyFighters.find((fighter) => fighter.hunting?.partyRole === standbyRole);
         const rosterNames = new Map(this.app.roster.map((fighter) => [fighter.id, fighter.name]));
+        const swapAttemptActive = Boolean(this._perfectSwapAttempt);
+        const swapCooldownActive = this._perfectSwapCooldownRemaining > 0;
+        const swapStatus = swapAttemptActive
+            ? "충돌 대기"
+            : swapCooldownActive
+              ? `${this._perfectSwapCooldownRemaining.toFixed(1)}초`
+              : "0.2초 카운터";
 
         this.app.setHuntingOverlayState?.({
             huntingPartyHudVisible: Boolean(standbyMember),
@@ -992,7 +1093,10 @@ export class HuntingManager {
                       name: rosterNames.get(standbyMember.characterId) ?? standbyMember.characterId,
                       hp: standbyFighter?.hp ?? standbyMember.hp,
                       maxHp: standbyFighter?.maxHp ?? standbyMember.maxHp,
-                      available: Boolean(standbyFighter && !standbyFighter.flags.defeated)
+                      available: Boolean(
+                          standbyFighter && !standbyFighter.flags.defeated && !swapAttemptActive && !swapCooldownActive
+                      ),
+                      status: swapStatus
                   }
                 : null
         });

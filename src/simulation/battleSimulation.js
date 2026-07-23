@@ -77,6 +77,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
               })
             : null;
         this.revivePauseRemaining = 0;
+        this._postCollisionTasks = [];
         this._tournamentAngledBounceRampSystem = this._createTournamentAngledBounceRampSystem(options);
 
         // ── 클릭 액션 시스템 ──
@@ -304,11 +305,12 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         return fighter;
     }
 
-    swapActiveWithStandby(activeFighter, standbyFighter) {
+    swapActiveWithStandby(activeFighter, standbyFighter, { transferVelocity = false } = {}) {
         if (!this.fighters.includes(activeFighter) || !this.standbyFighters.includes(standbyFighter)) return null;
         if (activeFighter.flags.defeated || standbyFighter.flags.defeated) return null;
 
         const activePosition = activeFighter.position.clone();
+        const activeVelocity = activeFighter.velocity.clone();
         this.fighters = this.fighters.filter((fighter) => fighter !== activeFighter);
         this.entities = this.entities.filter((entity) => entity !== activeFighter);
         this.standbyFighters = this.standbyFighters.filter((fighter) => fighter !== standbyFighter);
@@ -316,10 +318,25 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         activeFighter.participation.setMode(COMBAT_PARTICIPATION_MODES.STANDBY);
         standbyFighter.participation.setMode(COMBAT_PARTICIPATION_MODES.ACTIVE);
         standbyFighter.position = activePosition;
+        if (transferVelocity) {
+            standbyFighter.applyImpulse(Vector2.subtract(activeVelocity, standbyFighter.velocity));
+        }
         this.standbyFighters.push(activeFighter);
         this.fighters.push(standbyFighter);
         this.entities.push(standbyFighter);
         return { active: standbyFighter, standby: activeFighter };
+    }
+
+    schedulePostCollisionTask(task) {
+        if (typeof task !== "function") return false;
+        this._postCollisionTasks.push(task);
+        return true;
+    }
+
+    handleCollision() {
+        super.handleCollision();
+        const tasks = this._postCollisionTasks.splice(0);
+        for (const task of tasks) task();
     }
 
     _tickStandbyFighters(delta) {

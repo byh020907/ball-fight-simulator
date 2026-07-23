@@ -252,6 +252,8 @@ import {
     scaleHuntingLootAmount,
     HUNTING_PARTY_ROLES,
     HUNTING_COMPANION_CONFIG,
+    HUNTING_COMBAT_INTERACTION_CONFIG,
+    applyHuntingTapAcceleration,
     applyHuntingCompanionScale,
     placeHuntingCompanionsNearLeader,
     applyHuntingPartyFloorRecovery,
@@ -25362,13 +25364,19 @@ function testCombatParticipationContracts() {
     swapSimulation.update(0.25);
     assert.equal(incoming.ability.cooldownRemaining, 0.75, "Standby ability readiness should continue off-field");
     outgoing.position = new Vector2(321, 456);
-    const swapped = swapSimulation.swapActiveWithStandby(outgoing, incoming);
+    outgoing.applyImpulse(new Vector2(240, -80).subtract(outgoing.velocity));
+    const outgoingVelocity = outgoing.velocity.clone();
+    const swapped = swapSimulation.swapActiveWithStandby(outgoing, incoming, { transferVelocity: true });
     assert.equal(swapped.active, incoming);
     assert.equal(swapped.standby, outgoing);
     assert.deepEqual(
         incoming.position,
         new Vector2(321, 456),
         "Incoming fighter should take the active field position"
+    );
+    assert.ok(
+        Vector2.subtract(incoming.velocity, outgoingVelocity).length() < 1e-9,
+        "A counter swap should preserve post-collision momentum"
     );
     assert.ok(!swapSimulation.entities.includes(outgoing), "Outgoing fighter should leave physics and rendering");
     assert.ok(swapSimulation.entities.includes(incoming), "Incoming fighter should join physics and rendering");
@@ -25438,8 +25446,27 @@ function testHuntingPartyBattleComposition() {
     const pendingOrb = { collectorId: leaderId, isExpired: false, update() {} };
     mockApp.simulation.entities.push(pendingOrb);
     manager._run = setHuntingRunPhase(manager._run, HUNTING_RUN_PHASES.COMBAT);
-    const swapped = manager.swapActiveCharacter();
-    assert.equal(swapped.active.id, swapId, "Manual swap should activate the waiting character instance");
+    leader.applyImpulse(new Vector2(240, -80).subtract(leader.velocity));
+    const incoming = mockApp.simulation.standbyFighters[0];
+    incoming.ability.setCooldownRemaining(incoming.ability.cooldown);
+    const attempt = manager.swapActiveCharacter();
+    assert.equal(
+        attempt.active.id,
+        leaderId,
+        "A swap press should arm the active character without swapping immediately"
+    );
+    assert.equal(getHuntingRunCharacterId(manager._run), leaderId, "A swap must not happen before a hostile collision");
+    const enemy = mockApp.simulation.getEnemiesOf(leader)[0];
+    const collisionDamage = leader.actionContext.onFighterCollision(leader, enemy, 10, 25, mockApp.simulation);
+    assert.equal(collisionDamage.incomingDamage, 0, "The collision that confirms a perfect swap should be guarded");
+    mockApp.simulation.handleCollision();
+    assert.equal(getHuntingRunCharacterId(manager._run), swapId, "A hostile collision inside the window should swap");
+    assert.equal(incoming.ability.cooldownRemaining, 0, "A perfect swap should prepare the incoming primary ability");
+    assert.equal(
+        mockApp.simulation.playerBall,
+        incoming,
+        "Perfect swap should activate the waiting character instance"
+    );
     assert.equal(getHuntingRunCharacterId(manager._run), swapId);
     assert.equal(
         getHuntingRunHealth(manager._run, HUNTING_PARTY_ROLES.LEADER).hp,
@@ -25449,6 +25476,39 @@ function testHuntingPartyBattleComposition() {
     assert.equal(mockApp.playerFighterId, swapId);
     assert.equal(manager._battleLootSession.playerId, swapId, "Future loot should follow the newly active character");
     assert.equal(pendingOrb.collectorId, swapId, "Already dropped loot should retarget on manual swap");
+
+    manager._perfectSwapCooldownRemaining = 0;
+    const missedAttempt = manager.swapActiveCharacter();
+    assert.ok(missedAttempt, "A new swap window should be armable after cooldown");
+    incoming.actionContext.tickTimers(incoming, HUNTING_COMBAT_INTERACTION_CONFIG.perfectSwap.windowSeconds + 0.01);
+    assert.equal(
+        getHuntingRunCharacterId(manager._run),
+        swapId,
+        "A missed collision window should not swap characters"
+    );
+    assert.equal(
+        manager._perfectSwapCooldownRemaining,
+        HUNTING_COMBAT_INTERACTION_CONFIG.perfectSwap.missedAttemptCooldownSeconds
+    );
+
+    incoming.state.movement = null;
+    incoming.applyImpulse(new Vector2(incoming.stats.baseSpeed, 0).subtract(incoming.velocity));
+    const baseSpeed = incoming.velocity.length();
+    const acceleration = applyHuntingTapAcceleration(incoming, mockApp.simulation);
+    assert.equal(acceleration.applied, true, "A hunting tap should accelerate the active character");
+    assert.ok(incoming.velocity.length() > baseSpeed);
+    for (let index = 0; index < 20; index += 1) applyHuntingTapAcceleration(incoming, mockApp.simulation);
+    assert.ok(
+        incoming.velocity.length() <=
+            incoming.stats.baseSpeed * HUNTING_COMBAT_INTERACTION_CONFIG.tapAcceleration.maximumSpeedMultiplier + 0.001,
+        "Repeated taps should respect the configured speed cap"
+    );
+    incoming.state.movement = { getSpeed: () => incoming.stats.baseSpeed * 2 };
+    assert.equal(
+        applyHuntingTapAcceleration(incoming, mockApp.simulation).reason,
+        "ability_movement",
+        "Tap acceleration must not alter ability-owned movement"
+    );
 
     console.log("[hunting-party-battle-composition] ok");
 }

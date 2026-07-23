@@ -1209,6 +1209,10 @@ export class BattleApp {
 
         this._pointerHandler = () => {
             if (this.simulation?.finished) return;
+            if (this._gameMode === "hunting") {
+                this.hunting.accelerateActiveCharacter();
+                return;
+            }
             this._action.ctx.action = this._action.current;
             this._action.ctx.sim = this.simulation;
             this._action.ctx.player = this.simulation?.playerBall ?? null;
@@ -1218,6 +1222,7 @@ export class BattleApp {
         };
 
         this._pointerUpHandler = () => {
+            if (this._gameMode === "hunting") return;
             this._action.ctx.trigger?.onPointerUp(this._action.ctx);
         };
 

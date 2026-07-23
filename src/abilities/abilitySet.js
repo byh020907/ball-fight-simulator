@@ -93,6 +93,12 @@ export class AbilitySet {
         return this._primary?.getUiState?.() ?? { label: "Passive", progress: 1 };
     }
 
+    preparePrimaryAbility() {
+        if (typeof this._primary?.setCooldownRemaining !== "function") return false;
+        this._primary.setCooldownRemaining(0);
+        return true;
+    }
+
     getUiStates() {
         return this.all.map((ability) => {
             const state = ability.getUiState?.() ?? {};

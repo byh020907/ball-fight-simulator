@@ -11,6 +11,7 @@ export * from "./huntingAchievementProgress.js";
 export * from "./huntingState.js";
 export * from "./huntingPartyState.js";
 export * from "./huntingCompanion.js";
+export * from "./huntingCombatInteraction.js";
 export * from "./huntingHealth.js";
 export * from "./huntingRunProgression.js";
 export * from "./huntingEvents.js";
