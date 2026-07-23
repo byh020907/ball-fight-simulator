@@ -14,15 +14,15 @@
             </div>
             <div class="ch-fusion-body">
                 <p class="ch-fusion-description">
-                    같은 등급 장비 3개를 선택하면 다음 등급의 새 장비 1개로 재탄생합니다.
+                    능력치 가치가 가장 낮은 비장착 장비 3개를 자동으로 추천합니다.
                 </p>
                 <div class="ch-fusion-tier-tabs" role="tablist" aria-label="합성 등급 선택">
                     <template x-for="recipe in state.equipment.fusion.recipes" :key="recipe.rarity">
                         <button
                             class="ch-fusion-tier"
                             type="button"
-                            x-bind:class="{ 'is-selected': state.selection.rarity === recipe.rarity }"
-                            x-bind:aria-pressed="state.selection.rarity === recipe.rarity"
+                            x-bind:class="{ 'is-selected': state.rarity === recipe.rarity }"
+                            x-bind:aria-pressed="state.rarity === recipe.rarity"
                             @click="selectRarity(recipe.rarity)"
                             x-text="recipe.rarityLabel + ' → ' + recipe.nextRarityLabel"
                         ></button>
@@ -37,61 +37,37 @@
                             </div>
                             <span
                                 class="ch-fusion-cost"
-                                x-text="'강화석 ' + selectedRecipe().cost.stones + ' · 파편 ' + selectedRecipe().cost.shards"
+                                x-text="'파편 ' + selectedRecipe().cost.shards"
                             ></span>
                         </div>
-                        <div class="ch-fusion-source-slots" aria-label="선택한 합성 재료">
+                        <div class="ch-fusion-source-slots" aria-label="추천 합성 재료">
                             <template x-for="index in state.equipment.fusion.sourceItemCount" :key="index">
                                 <div class="ch-fusion-source-slot">
-                                    <template x-if="selectedItems()[index - 1]">
+                                    <template x-if="recommendedItems()[index - 1]">
                                         <div>
                                             <span x-text="'재료 ' + index"></span>
-                                            <strong x-text="selectedItems()[index - 1].name"></strong>
+                                            <strong x-text="recommendedItems()[index - 1].name"></strong>
                                             <small
-                                                x-text="selectedItems()[index - 1].isEquipped ? '장착 중 · 합성 시 해제' : '선택됨'"
+                                                x-text="recommendedItems()[index - 1].stats.map(stat => stat.type + ' +' + stat.value).join(' · ')"
                                             ></small>
                                         </div>
                                     </template>
-                                    <template x-if="!selectedItems()[index - 1]">
-                                        <span x-text="'재료 ' + index + ' 선택'"></span>
+                                    <template x-if="!recommendedItems()[index - 1]">
+                                        <span x-text="'추천 재료 부족'"></span>
                                     </template>
                                 </div>
                             </template>
                         </div>
-                        <div class="ch-fusion-candidates" aria-label="합성 재료 후보">
-                            <template x-for="item in selectedRecipe().items" :key="item.instanceId">
-                                <button
-                                    class="ch-fusion-candidate"
-                                    type="button"
-                                    x-bind:class="{ 'is-selected': isItemSelected(item.instanceId) }"
-                                    x-bind:aria-pressed="isItemSelected(item.instanceId)"
-                                    x-bind:disabled="isSelectionFull() && !isItemSelected(item.instanceId)"
-                                    @click="toggleItem(item.instanceId)"
-                                >
-                                    <strong x-text="item.name"></strong>
-                                    <span
-                                        x-text="item.stats.map(stat => stat.type + ' +' + stat.value).join(' · ')"
-                                    ></span>
-                                    <span
-                                        class="ch-fusion-equipment-state"
-                                        x-text="item.isEquipped ? '장착 중' : '보관 중'"
-                                    ></span>
-                                </button>
-                            </template>
-                            <div class="ch-empty" x-show="selectedRecipe().items.length === 0">
-                                선택할 장비가 없습니다
-                            </div>
-                        </div>
                         <p class="ch-fusion-note">
-                            선택한 장비는 모두 사라지며, 강화 단계와 장착 상태는 이어지지 않습니다.
+                            위 장비는 모두 사라지며 강화 단계는 이어지지 않습니다. 합성 후 다음 추천이 자동으로 갱신됩니다.
                         </p>
                         <p class="ch-fusion-warning" x-show="resourceWarning()" x-text="resourceWarning()"></p>
                         <button
                             class="ch-btn ch-fusion-submit"
                             type="button"
                             x-bind:disabled="!canFuseSelectedItems()"
-                            @click="fuseSelectedItems()"
-                            x-text="'선택한 ' + state.equipment.fusion.sourceItemCount + '개 합성'"
+                            @click="fuseRecommendedItems()"
+                            x-text="'추천 장비 ' + state.equipment.fusion.sourceItemCount + '개 합성'"
                         ></button>
                     </div>
                 </template>
@@ -108,7 +84,7 @@
 
         const state = Alpine.reactive({
             visible: false,
-            selection: { rarity: null, itemIds: [] },
+            rarity: null,
             get equipment() {
                 return getCollectionHubState().equipment;
             },
@@ -118,74 +94,57 @@
         });
 
         function selectedRecipe() {
-            return (state.equipment.fusion?.recipes ?? []).find((recipe) => recipe.rarity === state.selection.rarity);
+            return (state.equipment.fusion?.recipes ?? []).find((recipe) => recipe.rarity === state.rarity);
         }
 
         function selectRarity(rarity) {
-            state.selection = { rarity, itemIds: [] };
+            state.rarity = rarity;
         }
 
-        function selectedItems() {
-            const items = selectedRecipe()?.items ?? [];
-            return state.selection.itemIds
-                .map((itemId) => items.find((item) => item.instanceId === itemId))
-                .filter(Boolean);
-        }
-
-        function isItemSelected(instanceId) {
-            return state.selection.itemIds.includes(instanceId);
-        }
-
-        function isSelectionFull() {
-            return state.selection.itemIds.length >= (state.equipment.fusion?.sourceItemCount ?? 3);
-        }
-
-        function toggleItem(instanceId) {
-            if (isItemSelected(instanceId)) {
-                state.selection.itemIds = state.selection.itemIds.filter((itemId) => itemId !== instanceId);
-                return;
-            }
-            if (!isSelectionFull()) state.selection.itemIds.push(instanceId);
+        function recommendedItems() {
+            return selectedRecipe()?.recommendedItems ?? [];
         }
 
         function resourceWarning() {
             const recipe = selectedRecipe();
             if (!recipe) return "";
-            if (state.equipment.enhancementStones < recipe.cost.stones) return "강화석이 부족합니다.";
+            if (recommendedItems().length < (state.equipment.fusion?.sourceItemCount ?? 3)) {
+                return "합성할 비장착 장비가 부족합니다.";
+            }
             if (state.storage.shards < recipe.cost.shards) return "파편이 부족합니다.";
             return "";
         }
 
         function canFuseSelectedItems() {
             return (
-                state.selection.itemIds.length === (state.equipment.fusion?.sourceItemCount ?? 3) && !resourceWarning()
+                recommendedItems().length === (state.equipment.fusion?.sourceItemCount ?? 3) && !resourceWarning()
             );
         }
 
         function hide() {
             state.visible = false;
-            state.selection = { rarity: null, itemIds: [] };
+            state.rarity = null;
         }
 
         return {
             state,
             show() {
                 state.visible = true;
-                selectRarity(state.equipment.fusion?.recipes?.[0]?.rarity ?? null);
+                const recipes = state.equipment.fusion?.recipes ?? [];
+                const availableRecipe = recipes.find(
+                    (recipe) => recipe.recommendedItems.length === (state.equipment.fusion?.sourceItemCount ?? 3)
+                );
+                selectRarity(availableRecipe?.rarity ?? recipes[0]?.rarity ?? null);
             },
             hide,
             selectedRecipe,
             selectRarity,
-            selectedItems,
-            isItemSelected,
-            isSelectionFull,
-            toggleItem,
+            recommendedItems,
             resourceWarning,
             canFuseSelectedItems,
-            fuseSelectedItems() {
+            fuseRecommendedItems() {
                 if (!canFuseSelectedItems()) return null;
-                const sourceInstanceIds = [...state.selection.itemIds];
-                hide();
+                const sourceInstanceIds = recommendedItems().map((item) => item.instanceId);
                 return Alpine.store("uiManager").invokeGameAction("fuseEquipmentItems", sourceInstanceIds);
             }
         };
@@ -246,8 +205,7 @@
         gap: 6px;
     }
 
-    .ch-fusion-tier,
-    .ch-fusion-candidate {
+    .ch-fusion-tier {
         border: 2px solid #202020;
         border-radius: 6px;
         background: #ffffff;
@@ -265,8 +223,7 @@
         text-align: center;
     }
 
-    .ch-fusion-tier.is-selected,
-    .ch-fusion-candidate.is-selected {
+    .ch-fusion-tier.is-selected {
         border-color: #0f766e;
         background: #ecfdf5;
         box-shadow: inset 0 0 0 1px #0f766e;
@@ -293,9 +250,7 @@
 
     .ch-fusion-summary span,
     .ch-fusion-source-slot span,
-    .ch-fusion-source-slot small,
-    .ch-fusion-candidate span,
-    .ch-fusion-equipment-state {
+    .ch-fusion-source-slot small {
         color: #555555;
         font-size: 0.72rem;
     }
@@ -335,46 +290,8 @@
         font-size: 0.75rem;
     }
 
-    .ch-fusion-candidates {
-        display: grid;
-        gap: 6px;
-        max-height: 220px;
-        overflow-y: auto;
-        overscroll-behavior: contain;
-    }
-
-    .ch-fusion-candidate {
-        display: grid;
-        grid-template-rows: auto auto minmax(0.9rem, auto);
-        align-content: start;
-        gap: 2px;
-        min-height: 58px;
-        padding: 8px 10px;
-        font: inherit;
-    }
-
-    .ch-fusion-equipment-state {
-        display: inline-block;
-        min-height: 0.9rem;
-        align-self: start;
-        line-height: 1.2;
-        white-space: nowrap;
-    }
-
-    .ch-fusion-candidate:disabled {
-        border-color: #d1d5db;
-        color: #9ca3af;
-        cursor: not-allowed;
-    }
-
     .ch-fusion-submit {
         justify-self: end;
-    }
-
-    @media (max-width: 600px) {
-        .ch-fusion-candidate {
-            min-height: 72px;
-        }
     }
 
     @media (max-width: 380px) {

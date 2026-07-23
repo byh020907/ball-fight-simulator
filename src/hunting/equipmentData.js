@@ -28,19 +28,19 @@ export const EQUIPMENT = Object.freeze({
         STAT_BONUS_PER_LEVEL: EQUIPMENT_BALANCE.enhance.statBonusPerLevel,
         COST: EQUIPMENT_BALANCE.enhance.costs
     }),
-    DISASSEMBLE: Object.freeze({
-        COMMON: EQUIPMENT_BALANCE.disassembleRewards.common,
-        UNCOMMON: EQUIPMENT_BALANCE.disassembleRewards.uncommon,
-        RARE: EQUIPMENT_BALANCE.disassembleRewards.rare,
-        EPIC: EQUIPMENT_BALANCE.disassembleRewards.epic,
-        LEGENDARY: EQUIPMENT_BALANCE.disassembleRewards.legendary
-    }),
     SELL: Object.freeze({
         COMMON: EQUIPMENT_BALANCE.sellRewards.common,
         UNCOMMON: EQUIPMENT_BALANCE.sellRewards.uncommon,
         RARE: EQUIPMENT_BALANCE.sellRewards.rare,
         EPIC: EQUIPMENT_BALANCE.sellRewards.epic,
         LEGENDARY: EQUIPMENT_BALANCE.sellRewards.legendary
+    }),
+    SELL_ENHANCEMENT_STONES: Object.freeze({
+        COMMON: EQUIPMENT_BALANCE.sellEnhancementStoneRewards.common,
+        UNCOMMON: EQUIPMENT_BALANCE.sellEnhancementStoneRewards.uncommon,
+        RARE: EQUIPMENT_BALANCE.sellEnhancementStoneRewards.rare,
+        EPIC: EQUIPMENT_BALANCE.sellEnhancementStoneRewards.epic,
+        LEGENDARY: EQUIPMENT_BALANCE.sellEnhancementStoneRewards.legendary
     }),
     FUSION: Object.freeze({
         SOURCE_ITEM_COUNT: EQUIPMENT_BALANCE.fusion.sourceItemCount,

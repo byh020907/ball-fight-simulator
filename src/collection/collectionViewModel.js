@@ -25,9 +25,10 @@ import {
     canExpandInventory,
     INVENTORY_EXPAND_COST,
     INVENTORY_EXPAND_GAIN,
-    getDisassembleReward,
     getSellReward,
+    getSellEnhancementStoneReward,
     getFusionCost,
+    getRecommendedFusionSources,
     getNextEquipmentRarity,
     EQUIPMENT_RARITIES,
     FUSION_SOURCE_ITEM_COUNT,
@@ -309,7 +310,6 @@ export function createCollectionHubViewModel({
     const equipmentItems = inventory.map((item) => {
         const level = item.enhanceLevel ?? 0;
         const cost = calculateEnhanceCost(level);
-        const stones = equipment.enhancementStones ?? 0;
         const shards = profile.hunting?.shards ?? 0;
         const requiredLevel = getEquipmentRequiredLevel(item);
         const canEquip = canCharacterEquipItem(profile, item, currentPlayerFighterId);
@@ -332,9 +332,9 @@ export function createCollectionHubViewModel({
             characterLevel: currentEquipmentLevel,
             levelLocked: !canEquip,
             canEquip,
-            disassembleReward: getDisassembleReward(item.rarity),
             sellReward: getSellReward(item.rarity),
-            canEnhance: level < ENHANCE_MAX_LEVEL && stones >= cost.stones && shards >= cost.shards,
+            sellStoneReward: getSellEnhancementStoneReward(item.rarity),
+            canEnhance: level < ENHANCE_MAX_LEVEL && shards >= cost.shards,
             enhanceCost: cost,
             enhanceFailureRate: calculateEnhanceFailureRate(level)
         };
@@ -343,6 +343,7 @@ export function createCollectionHubViewModel({
         const nextRarity = getNextEquipmentRarity(rarity);
         const cost = getFusionCost(rarity);
         if (!nextRarity || !cost) return [];
+        const recommendedIds = getRecommendedFusionSources(profile, rarity).map((item) => item.instanceId);
 
         return [
             {
@@ -351,7 +352,9 @@ export function createCollectionHubViewModel({
                 nextRarity,
                 nextRarityLabel: getRarityLabel(nextRarity),
                 cost,
-                items: equipmentItems.filter((item) => item.rarity === rarity)
+                recommendedItems: recommendedIds
+                    .map((instanceId) => equipmentItems.find((item) => item.instanceId === instanceId))
+                    .filter(Boolean)
             }
         ];
     });

@@ -47,11 +47,11 @@ export const ENHANCE_MAX_LEVEL = EQUIPMENT.ENHANCE.MAX_LEVEL;
 export const ENHANCE_MAX_FAILURE_RATE = EQUIPMENT.ENHANCE.MAX_FAILURE_RATE;
 export const ENHANCE_STAT_BONUS_PER_LEVEL = EQUIPMENT.ENHANCE.STAT_BONUS_PER_LEVEL;
 export const ENHANCE_COST_TABLE = EQUIPMENT.ENHANCE.COST;
-export const DISASSEMBLE_REWARDS = Object.freeze(
-    Object.fromEntries(Object.entries(EQUIPMENT.DISASSEMBLE).map(([key, val]) => [key.toLowerCase(), val]))
-);
 export const SELL_REWARDS = Object.freeze(
     Object.fromEntries(Object.entries(EQUIPMENT.SELL).map(([key, val]) => [key.toLowerCase(), val]))
+);
+export const SELL_ENHANCEMENT_STONE_REWARDS = Object.freeze(
+    Object.fromEntries(Object.entries(EQUIPMENT.SELL_ENHANCEMENT_STONES).map(([key, val]) => [key.toLowerCase(), val]))
 );
 export const FUSION_SOURCE_ITEM_COUNT = EQUIPMENT.FUSION.SOURCE_ITEM_COUNT;
 export const FUSION_COST_MULTIPLIER = EQUIPMENT.FUSION.COST_MULTIPLIER;
@@ -414,18 +414,17 @@ export function expandInventory(profile) {
     return true;
 }
 
-export function getDisassembleReward(rarity) {
-    return DISASSEMBLE_REWARDS[rarity] ?? 0;
-}
-
 export function getSellReward(rarity) {
     return SELL_REWARDS[rarity] ?? 0;
+}
+
+export function getSellEnhancementStoneReward(rarity) {
+    return SELL_ENHANCEMENT_STONE_REWARDS[rarity] ?? { chance: 0, count: 0 };
 }
 
 export function getFusionCost(rarity) {
     if (!getNextEquipmentRarity(rarity)) return null;
     return {
-        stones: getDisassembleReward(rarity) * FUSION_COST_MULTIPLIER,
         shards: getSellReward(rarity) * FUSION_COST_MULTIPLIER
     };
 }
@@ -457,30 +456,47 @@ function removeEquipmentItem(eq, instanceId) {
     return item;
 }
 
-export function disassembleEquipment(profile, instanceId) {
-    const eq = profile?.equipment;
-    if (!eq || !Array.isArray(eq.inventory)) return null;
-
-    const item = removeEquipmentItem(eq, instanceId);
-    if (!item) return null;
-    const baseStones = getDisassembleReward(item.rarity);
-    const enhanceBonus = (item.enhanceLevel ?? 0) * 0.5;
-    const totalStones = Math.floor(baseStones * (1 + enhanceBonus));
-    eq.enhancementStones = (eq.enhancementStones ?? 0) + totalStones;
-
-    return { item, stones: totalStones };
-}
-
-export function sellEquipment(profile, instanceId) {
+export function sellEquipment(profile, instanceId, rng = defaultRng) {
     const eq = profile?.equipment;
     if (!eq || !Array.isArray(eq.inventory) || !profile?.hunting) return null;
 
     const item = removeEquipmentItem(eq, instanceId);
     if (!item) return null;
     const shards = getSellReward(item.rarity);
+    const stoneReward = getSellEnhancementStoneReward(item.rarity);
+    const stones = rng() < stoneReward.chance ? stoneReward.count : 0;
     profile.hunting.shards = (profile.hunting.shards ?? 0) + shards;
+    eq.enhancementStones = (eq.enhancementStones ?? 0) + stones;
 
-    return { item, shards };
+    return { item, shards, stones, stoneReward };
+}
+
+export function getEquipmentStatValue(item) {
+    const enhanceMultiplier = 1 + (item?.enhanceLevel ?? 0) * ENHANCE_STAT_BONUS_PER_LEVEL;
+    return (item?.stats ?? []).reduce((total, stat) => {
+        const ratio = EQUIPMENT_STAT_VALUE_RATIOS[stat.type];
+        if (!Number.isFinite(ratio) || ratio <= 0) return total;
+        return total + ((stat.value ?? 0) * enhanceMultiplier) / ratio;
+    }, 0);
+}
+
+export function getRecommendedFusionSources(profile, rarity) {
+    const equipment = profile?.equipment;
+    if (!equipment || !Array.isArray(equipment.inventory)) return [];
+    const equippedIds = new Set(Object.values(equipment.equipped ?? {}).filter(Boolean));
+
+    return equipment.inventory
+        .map((item, inventoryIndex) => ({ item, inventoryIndex, value: getEquipmentStatValue(item) }))
+        .filter(({ item }) => item.rarity === rarity && !equippedIds.has(item.instanceId))
+        .sort((left, right) => {
+            const valueDifference = left.value - right.value;
+            if (valueDifference !== 0) return valueDifference;
+            const indexDifference = left.inventoryIndex - right.inventoryIndex;
+            if (indexDifference !== 0) return indexDifference;
+            return String(left.item.instanceId).localeCompare(String(right.item.instanceId));
+        })
+        .slice(0, FUSION_SOURCE_ITEM_COUNT)
+        .map(({ item }) => item);
 }
 
 function validateFusionSources(profile, sourceInstanceIds) {
@@ -495,6 +511,8 @@ function validateFusionSources(profile, sourceInstanceIds) {
 
     const sources = sourceInstanceIds.map((instanceId) => eq.inventory.find((item) => item.instanceId === instanceId));
     if (sources.some((item) => !item)) return { error: "sources" };
+    const equippedIds = new Set(Object.values(eq.equipped ?? {}).filter(Boolean));
+    if (sources.some((item) => equippedIds.has(item.instanceId))) return { error: "equipped" };
 
     const fromRarity = sources[0].rarity;
     if (sources.some((item) => item.rarity !== fromRarity)) return { error: "rarity" };
@@ -504,7 +522,6 @@ function validateFusionSources(profile, sourceInstanceIds) {
 
     const cost = getFusionCost(fromRarity);
     if (!cost) return { error: "cost" };
-    if ((eq.enhancementStones ?? 0) < cost.stones) return { error: "stones" };
     if ((profile.hunting.shards ?? 0) < cost.shards) return { error: "shards" };
 
     return { sources, fromRarity, toRarity, cost };
@@ -520,7 +537,6 @@ export function fuseEquipment(profile, sourceInstanceIds, rng = defaultRng) {
     if (validation.error) return { error: validation.error };
     if (!eq) return null;
 
-    eq.enhancementStones -= validation.cost.stones;
     profile.hunting.shards -= validation.cost.shards;
     for (const source of validation.sources) {
         removeEquipmentItem(eq, source.instanceId);
@@ -559,11 +575,8 @@ export function enhanceEquipment(profile, instanceId, rng = defaultRng) {
     if (currentLevel >= ENHANCE_MAX_LEVEL) return null;
 
     const cost = calculateEnhanceCost(currentLevel);
-    if ((eq.enhancementStones ?? 0) < cost.stones) return { error: "stones" };
     if ((profile.hunting?.shards ?? 0) < cost.shards) return { error: "shards" };
 
-    // 비용 차감
-    eq.enhancementStones -= cost.stones;
     profile.hunting.shards -= cost.shards;
 
     const failureRate = calculateEnhanceFailureRate(currentLevel);
@@ -582,6 +595,28 @@ export function enhanceEquipment(profile, instanceId, rng = defaultRng) {
         oldLevel: currentLevel,
         newLevel: item.enhanceLevel,
         cost,
-        failureRate
+        failureRate,
+        recoverable: !success && item.enhanceLevel < currentLevel,
+        recovery: !success
+            ? {
+                  instanceId: item.instanceId,
+                  failedLevel: item.enhanceLevel,
+                  restoredLevel: currentLevel
+              }
+            : null
     };
+}
+
+export function recoverEquipmentEnhancement(profile, recovery) {
+    const equipment = profile?.equipment;
+    if (!equipment || !Array.isArray(equipment.inventory) || !recovery) return { error: "profile" };
+    const item = equipment.inventory.find((candidate) => candidate.instanceId === recovery.instanceId);
+    if (!item || item.enhanceLevel !== recovery.failedLevel || recovery.restoredLevel <= recovery.failedLevel) {
+        return { error: "stale" };
+    }
+    if ((equipment.enhancementStones ?? 0) < 1) return { error: "stones" };
+
+    equipment.enhancementStones -= 1;
+    item.enhanceLevel = recovery.restoredLevel;
+    return { restored: true, item, oldLevel: recovery.failedLevel, newLevel: recovery.restoredLevel, stones: 1 };
 }

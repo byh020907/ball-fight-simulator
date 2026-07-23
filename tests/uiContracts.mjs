@@ -94,9 +94,9 @@ function testCollectionEquipmentPanelsOwnTheirFlows() {
     assert.ok(
         fusionDialog.includes('window.createGameUI("collectionFusionDialog"') &&
             fusionDialog.includes('invokeGameAction("fuseEquipmentItems", sourceInstanceIds)') &&
-            fusionDialog.includes("selection: { rarity: null, itemIds: [] }") &&
+            fusionDialog.includes("function recommendedItems()") &&
             fusionDialog.includes("function hide()"),
-        "Fusion dialog should own its visibility and material-selection lifecycle"
+        "Fusion dialog should own its visibility and recommended-material lifecycle"
     );
     assert.ok(
         shopPanel.includes('window.createGameUI("collectionShopPanel"') &&
@@ -272,51 +272,24 @@ function testDailyShopPopupContract() {
 
 function testFusionEquippedLabelTypographyContract() {
     const template = readSource("src/components/collection-fusion-dialog.html");
-    const candidateRule =
-        [...template.matchAll(/\.ch-fusion-candidate\s*\{([^}]*)\}/gs)]
-            .map((match) => match[1])
-            .find((rule) => /display:\s*grid;/.test(rule)) ?? "";
-    const stateRule =
-        [...template.matchAll(/\.ch-fusion-equipment-state\s*\{([^}]*)\}/gs)]
-            .map((match) => match[1])
-            .find((rule) => /display:\s*inline-block;/.test(rule)) ?? "";
-    const mobileCandidateRule = template.match(
-        /@media\s*\(max-width:\s*600px\)\s*\{\s*\.ch-fusion-candidate\s*\{([^}]*)\}/s
-    )?.[1];
     assert.ok(
-        template.includes('class="ch-fusion-equipment-state"'),
-        "Fusion candidates should give the equipped-state text a dedicated typography class"
+        template.includes('aria-label="추천 합성 재료"') && template.includes("recommendedItems()[index - 1]"),
+        "Fusion should present the exact recommended source items before execution"
     );
     assert.ok(
-        /\.ch-fusion-candidate\s*\{[^}]*font:\s*inherit;/s.test(template),
-        "Fusion candidates should inherit the app font instead of the desktop browser button font"
+        template.includes("능력치 가치가 가장 낮은 비장착 장비 3개"),
+        "Fusion should explain its deterministic low-value recommendation rule"
     );
     assert.ok(
-        /\.ch-fusion-equipment-state\s*\{[^}]*display:\s*inline-block;[^}]*line-height:\s*1\.2;[^}]*white-space:\s*nowrap;/s.test(
-            template
-        ),
-        "Fusion equipped-state text should remain on one readable line"
+        !template.includes("toggleItem(") && !template.includes("ch-fusion-candidate"),
+        "Fusion should not retain manual material-selection controls"
     );
     assert.match(
-        candidateRule,
-        /grid-template-rows:\s*auto\s+auto\s+minmax\(/,
-        "Fusion candidates should reserve a dedicated third grid row for the equipped-state text"
+        template,
+        /\.ch-fusion-source-slots\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/s,
+        "Recommended fusion sources should use a fluid three-column grid"
     );
-    assert.match(
-        stateRule,
-        /min-height:\s*[\d.]+rem;/,
-        "Fusion equipped-state text should reserve its own readable line height"
-    );
-    assert.ok(
-        mobileCandidateRule,
-        "Fusion candidates should define a mobile layout rule instead of relying on implicit grid sizing"
-    );
-    const mobileCandidateMinHeight = Number(mobileCandidateRule.match(/min-height:\s*(\d+)px;/)?.[1]);
-    assert.ok(
-        mobileCandidateMinHeight >= 68,
-        "Mobile fusion candidates should reserve enough height for name, stats, state, padding, and a 40px touch target"
-    );
-    console.log("[fusion-equipped-label-typography] ok");
+    console.log("[fusion-recommended-source-layout] ok");
 }
 
 function loadCollectionComponentFactory(path, expectedName, factories) {
@@ -472,8 +445,8 @@ function testCollectionEquipmentPanelsShareHubState() {
                     recipes: [
                         {
                             rarity: "common",
-                            items: [{ instanceId: "source-1", isEquipped: false }],
-                            cost: { stones: 10, shards: 20 }
+                            recommendedItems: [{ instanceId: "source-1", isEquipped: false }],
+                            cost: { shards: 20 }
                         }
                     ]
                 }
@@ -506,12 +479,11 @@ function testCollectionEquipmentPanelsShareHubState() {
                 "Equipment panel should open the fusion dialog"
             );
             assert.equal(
-                components.collectionFusionDialog.state.selection.rarity,
+                components.collectionFusionDialog.state.rarity,
                 "common",
                 "Fusion should select its first recipe"
             );
-            components.collectionFusionDialog.toggleItem("source-1");
-            components.collectionFusionDialog.fuseSelectedItems();
+            components.collectionFusionDialog.fuseRecommendedItems();
             assert.deepEqual(
                 calls.at(-1),
                 ["fuseEquipmentItems", [["source-1"]]],
@@ -519,8 +491,8 @@ function testCollectionEquipmentPanelsShareHubState() {
             );
             assert.equal(
                 components.collectionFusionDialog.state.visible,
-                false,
-                "Fusion should hide after a submitted selection"
+                true,
+                "Fusion should remain open so the next recommendation can appear after one fusion"
             );
 
             components.collectionEquipmentPanel.openShop();

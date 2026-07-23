@@ -450,8 +450,8 @@ player profile + roster + definitions
 
 컬렉션 허브의 공통 ViewModel, 현재 탭, 도감 선택 상태는 `collection-hub`이 계속 소유합니다. 같은 화면에서 그 상태를 읽어야 하는 하위 UI는 `uiManager.requireComponent("collectionHub")`의 공개 `state`만 읽고, 도메인 변경은 반드시 `uiManager.invokeGameAction()`으로 요청합니다.
 
-- `collection-equipment-panel`은 장비 탭 렌더링과 장착·강화·분해·판매 액션을 소유한다.
-- `collection-fusion-dialog`은 합성 모달의 표시 여부와 재료 선택을 소유한다. 허브를 닫으면 선택을 즉시 비운다.
+- `collection-equipment-panel`은 장비 탭 렌더링과 장착·강화·판매 액션을 소유한다.
+- `collection-fusion-dialog`은 합성 모달의 표시 여부와 능력치 가치가 가장 낮은 비장착 재료 3개의 추천·실행을 소유한다. 합성 뒤에는 같은 화면에서 다음 추천을 갱신하고, 허브를 닫으면 선택 등급을 비운다.
 - `collection-shop-panel`은 상점 모달의 표시 여부, 1초 갱신 시계, 상자 교체 애니메이션을 소유한다. 구매·리롤 성공 때만 애니메이션을 재생한다.
 - 허브는 닫힐 때 두 하위 모달을 `uiManager`로 닫아, 이전 화면의 모달·선택 상태가 다음 진입에 남지 않게 한다.
 

@@ -283,12 +283,15 @@ import { HUNTING_FLOW_CONFIG, isHuntingEventEnabled } from "../src/hunting/hunti
 import {
     createEquipmentInstance,
     enhanceEquipment,
+    recoverEquipmentEnhancement,
     fuseEquipment,
     sellEquipment,
-    disassembleEquipment,
     expandInventory,
     canFuseEquipment,
     getFusionCost,
+    getRecommendedFusionSources,
+    getEquipmentStatValue,
+    getSellEnhancementStoneReward,
     getSellReward,
     calculateEnhanceCost,
     calculateEnhanceFailureRate,
@@ -5187,7 +5190,6 @@ function testComponentBridgeEquipmentFunctions() {
         "unequipItem",
         "enhanceItem",
         "fuseEquipmentItems",
-        "disassembleItem",
         "sellItem",
         "expandInventory"
     ];
@@ -11233,7 +11235,7 @@ function testEquipmentEnhancement() {
     assert.equal(profile.equipment.enhancementStones, 0, "New profiles should start with 0 enhancement stones");
     assert.equal(profile.equipment.maxInventorySlots, 5, "New profiles should start with default inventory slots");
 
-    // 강화석 추가 (분해 시뮬레이션)
+    // 강화 재화 준비
     profile.equipment.enhancementStones = 100;
     profile.hunting.shards = 200;
 
@@ -11243,7 +11245,7 @@ function testEquipmentEnhancement() {
 
     // 강화 비용 계산
     const cost0 = calculateEnhanceCost(0);
-    assert.equal(cost0.stones, 2, "Enhance +0→+1 should cost 2 stones");
+    assert.equal(cost0.stones, undefined, "Enhance should not require stones before attempting");
     assert.equal(cost0.shards, 10, "Enhance +0→+1 should cost 10 shards");
 
     // 실패율 계산
@@ -11266,7 +11268,7 @@ function testEquipmentEnhancement() {
     assert.equal(resultSuccess.oldLevel, 0, "Previous level should be 0");
     assert.equal(resultSuccess.newLevel, 1, "New level should be 1 after success");
     assert.equal(item.enhanceLevel, 1, "Item enhance level should be updated to 1");
-    assert.equal(profile.equipment.enhancementStones, 98, "Enhance should deduct 2 stones");
+    assert.equal(profile.equipment.enhancementStones, 100, "Enhance should preserve recovery stones on success");
     assert.equal(profile.hunting.shards, 190, "Enhance should deduct 10 shards");
 
     // 강화 실패 테스트 (rng=0, failRate=0.32 → 실패)
@@ -11281,6 +11283,16 @@ function testEquipmentEnhancement() {
     assert.equal(resultFail.success, false, "Enhance should fail with low RNG roll");
     assert.equal(resultFail.oldLevel, 1, "Previous level should be 1");
     assert.equal(resultFail.newLevel, 0, "Level should drop to 0 after failure");
+    assert.equal(resultFail.recoverable, true, "A dropped enhancement level should be recoverable");
+    const recovered = recoverEquipmentEnhancement(profile, resultFail.recovery);
+    assert.equal(recovered.restored, true, "A failure recovery should restore the dropped level");
+    assert.equal(item2.enhanceLevel, 1, "Recovery should restore the previous enhancement level");
+    assert.equal(profile.equipment.enhancementStones, 99, "Recovery should consume exactly one stone");
+    assert.equal(
+        recoverEquipmentEnhancement(profile, resultFail.recovery).error,
+        "stale",
+        "The same failure recovery must not apply twice"
+    );
 
     // 0 레벨에서 실패 시 0 유지
     const item3 = createEquipmentInstance({ rarity: "common", slot: "accessory", rng: () => 0.5 });
@@ -11288,6 +11300,7 @@ function testEquipmentEnhancement() {
     const resultFail0 = enhanceEquipment(profile, item3.instanceId, () => 0);
     assert.equal(resultFail0.success, false, "Enhance at +0 should fail with low RNG");
     assert.equal(resultFail0.newLevel, 0, "Level should not drop below 0");
+    assert.equal(resultFail0.recoverable, false, "A +0 failure should not offer a no-op recovery");
 
     // 최대 레벨 도달 시 강화 불가
     const itemMax = createEquipmentInstance({ rarity: "legendary", slot: "weapon", rng: () => 0.5 });
@@ -11296,15 +11309,14 @@ function testEquipmentEnhancement() {
     const resultMax = enhanceEquipment(profile, itemMax.instanceId, () => 0);
     assert.equal(resultMax, null, "Max level equipment should not be enhanceable");
 
-    // 재료 부족 시 오류 반환
+    // 파편 부족 시 오류 반환; 강화석이 없어도 시도 가능
     profile.equipment.enhancementStones = 0;
-    profile.hunting.shards = 0;
+    profile.hunting.shards = 100;
     const item4 = createEquipmentInstance({ rarity: "common", slot: "weapon", rng: () => 0.5 });
     profile.equipment.inventory.push(item4);
-    const resultNoStones = enhanceEquipment(profile, item4.instanceId, () => 0);
-    assert.equal(resultNoStones.error, "stones", "Enhance with no stones should return stones error");
+    const resultNoStones = enhanceEquipment(profile, item4.instanceId, () => 0.5);
+    assert.equal(resultNoStones.success, true, "Enhance should not require a recovery stone");
 
-    profile.equipment.enhancementStones = 100;
     profile.hunting.shards = 0;
     const resultNoShards = enhanceEquipment(profile, item4.instanceId, () => 0);
     assert.equal(resultNoShards.error, "shards", "Enhance with no shards should return shards error");
@@ -11357,42 +11369,48 @@ function testEquipmentEnhancement() {
     const fuseA = createEquipmentInstance({ rarity: "common", slot: "weapon", rng: () => 0.5 });
     const fuseB = createEquipmentInstance({ rarity: "common", slot: "armor", rng: () => 0.5 });
     const fuseC = createEquipmentInstance({ rarity: "common", slot: "accessory", rng: () => 0.5 });
+    const fuseD = createEquipmentInstance({ rarity: "common", slot: "weapon", rng: () => 0.5 });
+    fuseA.stats = [{ type: "damage", value: 8 }];
+    fuseB.stats = [{ type: "hp", value: 10 }];
+    fuseC.stats = [{ type: "speed", value: 10 }];
+    fuseD.stats = [{ type: "defense", value: 2 }];
     fuseA.enhanceLevel = 5;
-    craftProfile.equipment.inventory.push(fuseA, fuseB, fuseC);
+    craftProfile.equipment.inventory.push(fuseA, fuseB, fuseC, fuseD);
     craftProfile.equipment.equipped.weapon = fuseA.instanceId;
 
     const fusionCost = getFusionCost("common");
-    const fusionSourceIds = [fuseA.instanceId, fuseB.instanceId, fuseC.instanceId];
+    assert.equal(getEquipmentStatValue(fuseB), 1, "HP should use the shared stat-value ratio");
+    assert.equal(getEquipmentStatValue(fuseC), 2, "Speed should use the shared stat-value ratio");
+    const recommendedSources = getRecommendedFusionSources(craftProfile, "common");
+    const fusionSourceIds = recommendedSources.map((source) => source.instanceId);
+    assert.deepEqual(
+        fusionSourceIds,
+        [fuseB.instanceId, fuseC.instanceId, fuseD.instanceId],
+        "Fusion should recommend the three lowest-value unequipped items"
+    );
+    assert.equal(
+        recommendedSources.some((source) => source.instanceId === fuseA.instanceId),
+        false,
+        "Fusion recommendations must exclude equipped items"
+    );
     assert.equal(
         canFuseEquipment(craftProfile, fusionSourceIds),
         true,
         "Fusion should accept exactly three same-rarity selected sources"
     );
-    assert.deepEqual(
-        fusionCost,
-        { stones: 10, shards: 50 },
-        "Fusion cost should be 10 times the source rarity disassembly and sale rewards"
-    );
-    assert.deepEqual(
-        getFusionCost("uncommon"),
-        { stones: 30, shards: 120 },
-        "Uncommon fusion cost should use 10x rewards"
-    );
-    assert.deepEqual(getFusionCost("rare"), { stones: 80, shards: 300 }, "Rare fusion cost should use 10x rewards");
-    assert.deepEqual(getFusionCost("epic"), { stones: 200, shards: 800 }, "Epic fusion cost should use 10x rewards");
+    assert.deepEqual(fusionCost, { shards: 50 }, "Fusion cost should only use shards");
+    assert.deepEqual(getFusionCost("uncommon"), { shards: 120 }, "Uncommon fusion should only use shards");
+    assert.deepEqual(getFusionCost("rare"), { shards: 300 }, "Rare fusion should only use shards");
+    assert.deepEqual(getFusionCost("epic"), { shards: 800 }, "Epic fusion should only use shards");
     assert.equal(getFusionCost("legendary"), null, "Legendary should not have a fusion recipe");
     const fused = fuseEquipment(craftProfile, fusionSourceIds, () => 0.5);
     assert.equal(fused.toRarity, "uncommon", "Fusion should upgrade common equipment to uncommon");
     assert.equal(fused.consumed.length, 3, "Fusion should consume three selected source items");
-    assert.equal(craftProfile.equipment.inventory.length, 1, "Fusion should replace three items with one item");
-    assert.equal(craftProfile.equipment.inventory[0].rarity, "uncommon", "Fusion result should be the next rarity");
-    assert.equal(craftProfile.equipment.inventory[0].enhanceLevel, 0, "Fusion should create a fresh +0 item");
-    assert.equal(craftProfile.equipment.equipped.weapon, null, "Fusing an equipped item should unequip it");
-    assert.equal(
-        craftProfile.equipment.enhancementStones,
-        100 - fusionCost.stones,
-        "Fusion should deduct enhancement stones"
-    );
+    assert.equal(craftProfile.equipment.inventory.length, 2, "Fusion should replace three of four items with one item");
+    assert.equal(fused.item.rarity, "uncommon", "Fusion result should be the next rarity");
+    assert.equal(fused.item.enhanceLevel, 0, "Fusion should create a fresh +0 item");
+    assert.equal(craftProfile.equipment.equipped.weapon, fuseA.instanceId, "Fusion should preserve equipped items");
+    assert.equal(craftProfile.equipment.enhancementStones, 100, "Fusion should not deduct recovery stones");
     assert.equal(craftProfile.hunting.shards, 500 - fusionCost.shards, "Fusion should deduct key shards");
 
     const lonely = createEquipmentInstance({ rarity: "rare", slot: "weapon", rng: () => 0.5 });
@@ -11422,11 +11440,36 @@ function testEquipmentEnhancement() {
     const sellItem = createEquipmentInstance({ rarity: "rare", slot: "weapon", rng: () => 0.5 });
     sellProfile.equipment.inventory.push(sellItem);
     sellProfile.equipment.equipped.weapon = sellItem.instanceId;
-    const sold = sellEquipment(sellProfile, sellItem.instanceId);
+    const sold = sellEquipment(sellProfile, sellItem.instanceId, () => 0);
     assert.equal(sold.shards, getSellReward("rare"), "Selling should return rarity-based key shards");
+    assert.equal(
+        sold.stones,
+        getSellEnhancementStoneReward("rare").count,
+        "A successful rarity roll should grant its configured recovery stones"
+    );
     assert.equal(sellProfile.hunting.shards, getSellReward("rare"), "Selling should add shards to profile");
+    assert.equal(sellProfile.equipment.enhancementStones, sold.stones, "Selling should add rolled stones to profile");
     assert.equal(sellProfile.equipment.inventory.length, 0, "Sold equipment should leave inventory");
     assert.equal(sellProfile.equipment.equipped.weapon, null, "Selling an equipped item should unequip it");
+
+    const noStoneItem = createEquipmentInstance({ rarity: "common", slot: "armor", rng: () => 0.5 });
+    sellProfile.equipment.inventory.push(noStoneItem);
+    const soldWithoutStone = sellEquipment(sellProfile, noStoneItem.instanceId, () => 1);
+    assert.equal(soldWithoutStone.stones, 0, "A failed sale bonus roll should only grant shards");
+
+    const saleStoneRewards = ["common", "uncommon", "rare", "epic", "legendary"].map((rarity) =>
+        getSellEnhancementStoneReward(rarity)
+    );
+    for (let index = 1; index < saleStoneRewards.length; index += 1) {
+        assert.ok(
+            saleStoneRewards[index].chance >= saleStoneRewards[index - 1].chance,
+            "Higher equipment rarities must not reduce the stone-drop chance"
+        );
+        assert.ok(
+            saleStoneRewards[index].count >= saleStoneRewards[index - 1].count,
+            "Higher equipment rarities must not reduce the stone-drop count"
+        );
+    }
 
     console.log("[equipment] ok");
 }
@@ -17450,13 +17493,9 @@ async function testCreateCollectionHubViewModel() {
         currentPlayerFighterId: "archer"
     });
     const commonFusionRecipe = fusionVm.equipment.fusion.recipes.find((recipe) => recipe.rarity === "common");
-    assert.equal(fusionVm.equipment.fusion.sourceItemCount, 3, "Fusion UI should require three selected sources");
-    assert.equal(commonFusionRecipe.items.length, 3, "Fusion UI should expose every selectable same-rarity item");
-    assert.deepEqual(
-        commonFusionRecipe.cost,
-        { stones: 10, shards: 50 },
-        "Fusion UI should display the derived material cost"
-    );
+    assert.equal(fusionVm.equipment.fusion.sourceItemCount, 3, "Fusion UI should require three recommended sources");
+    assert.equal(commonFusionRecipe.recommendedItems.length, 3, "Fusion UI should expose the recommended sources");
+    assert.deepEqual(commonFusionRecipe.cost, { shards: 50 }, "Fusion UI should display the derived material cost");
     assert.equal(commonFusionRecipe.rarityLabel, "common", "Fusion UI should use the canonical rarity label");
     assert.equal(vm2.storage.chests[0].rarityLabel, "uncommon", "Storage UI should use the canonical rarity label");
 
@@ -21031,7 +21070,7 @@ function testComponentBridgeEquipmentActionsReachProfile() {
     assert.ok(typeof bridge.unequipItem === "function", "bridge.unequipItem should be a function");
     assert.ok(typeof bridge.enhanceItem === "function", "bridge.enhanceItem should be a function");
     assert.ok(typeof bridge.fuseEquipmentItems === "function", "bridge.fuseEquipmentItems should be a function");
-    assert.ok(typeof bridge.disassembleItem === "function", "bridge.disassembleItem should be a function");
+    assert.equal(bridge.disassembleItem, undefined, "The removed disassemble action should not remain on the bridge");
     assert.ok(typeof bridge.sellItem === "function", "bridge.sellItem should be a function");
     assert.ok(typeof bridge.expandInventory === "function", "bridge.expandInventory should be a function");
 
@@ -21053,13 +21092,6 @@ function testComponentBridgeEquipmentActionsReachProfile() {
     bridge.expandInventory();
     assert.ok(profile.equipment.maxInventorySlots > prevSlots, "expandInventory should increase max slots");
 
-    // Test: disassemble adds enhancement stones
-    profile.equipment.enhancementStones = 0;
-    const item2 = createEquipmentInstance({ rarity: "common", rng: () => 0.5 });
-    profile.equipment.inventory.push(item2);
-    bridge.disassembleItem(item2.instanceId);
-    assert.ok(profile.equipment.enhancementStones > 0, "disassemble should add enhancement stones");
-
     console.log("[component-bridge-equipment-actions] ok");
 }
 
@@ -21078,7 +21110,7 @@ function testCollectionActionPopupOptions() {
         item,
         oldLevel: 2,
         newLevel: 3,
-        cost: { stones: 4, shards: 30 },
+        cost: { shards: 30 },
         failureRate: 0.48
     });
     assert.equal(enhanceSuccess.title, "강화 성공", "Successful enhancement should use the shared result popup");
@@ -21091,29 +21123,33 @@ function testCollectionActionPopupOptions() {
         item,
         oldLevel: 3,
         newLevel: 2,
-        cost: { stones: 6, shards: 40 },
-        failureRate: 0.64
+        cost: { shards: 40 },
+        failureRate: 0.64,
+        recoverable: true,
+        canRecover: true
     });
     assert.equal(enhanceFailure.title, "강화 실패", "Failed enhancement should still describe the applied outcome");
     assert.ok(enhanceFailure.bodyHtml.includes("+3 → +2"), "Failure popup should show the decreased level");
+    assert.ok(
+        enhanceFailure.buttons.some((button) => button.value === "recover"),
+        "A recoverable failure should offer the stone recovery action"
+    );
 
-    const disassemble = createCollectionActionPopupOptions("disassemble", { item, stones: 12 });
-    assert.equal(disassemble.title, "장비 분해 완료", "Disassembly should use the shared result popup");
-    assert.ok(disassemble.bodyHtml.includes("강화석 +12"), "Disassembly popup should show the gained stones");
-
-    const sale = createCollectionActionPopupOptions("sell", { item, shards: 30 });
+    const sale = createCollectionActionPopupOptions("sell", { item, shards: 30, stones: 2 });
     assert.equal(sale.title, "장비 판매 완료", "Sale should use the shared result popup");
     assert.ok(sale.bodyHtml.includes("파편 +30"), "Sale popup should show the gained shards");
+    assert.ok(sale.bodyHtml.includes("강화석 +2"), "Sale popup should show a rolled stone reward");
 
     const fusion = createCollectionActionPopupOptions("fusion", {
         item: { ...item, name: "새 장비", rarity: "epic", enhanceLevel: 0 },
         consumed: [item, { ...item, name: "재료 방패" }, { ...item, name: "재료 반지" }],
-        cost: { stones: 80, shards: 300 }
+        cost: { shards: 300 }
     });
     assert.equal(fusion.title, "장비 합성 완료", "Fusion should use the shared result popup");
     assert.ok(fusion.bodyHtml.includes("테스트 검"), "Fusion popup should list consumed equipment");
     assert.ok(fusion.bodyHtml.includes("새 장비"), "Fusion popup should identify the new equipment");
-    assert.ok(fusion.bodyHtml.includes("강화석 80"), "Fusion popup should show the consumed materials");
+    assert.ok(fusion.bodyHtml.includes("파편 300"), "Fusion popup should show the consumed shards");
+    assert.equal(fusion.bodyHtml.includes("강화석"), false, "Fusion popup should not mention recovery stones");
 
     const chest = createCollectionActionPopupOptions("chest", {
         opened: true,
@@ -21152,17 +21188,16 @@ function testRarityPresentation() {
 
 testRarityPresentation();
 
-function testComponentBridgeCollectionActionResultsUsePopupService() {
+async function testComponentBridgeCollectionActionResultsUsePopupService() {
     const profile = createDefaultPlayerProfile();
     profile.hunting.shards = 999;
     profile.equipment.enhancementStones = 999;
     const enhanceTarget = createEquipmentInstance({ rarity: "common", rng: () => 0.5 });
-    const disassembleTarget = createEquipmentInstance({ rarity: "common", rng: () => 0.5 });
     const saleTarget = createEquipmentInstance({ rarity: "common", rng: () => 0.5 });
     const fusionTargets = ["weapon", "armor", "accessory"].map((slot) =>
         createEquipmentInstance({ rarity: "common", slot, rng: () => 0.5 })
     );
-    profile.equipment.inventory.push(enhanceTarget, disassembleTarget, saleTarget, ...fusionTargets);
+    profile.equipment.inventory.push(enhanceTarget, saleTarget, ...fusionTargets);
 
     let refreshCount = 0;
     const app = {
@@ -21185,24 +21220,22 @@ function testComponentBridgeCollectionActionResultsUsePopupService() {
 
     try {
         const bridge = createAppComponentBridge(app);
-        bridge.enhanceItem(enhanceTarget.instanceId);
-        bridge.disassembleItem(disassembleTarget.instanceId);
+        await bridge.enhanceItem(enhanceTarget.instanceId);
         bridge.sellItem(saleTarget.instanceId);
         bridge.fuseEquipmentItems(fusionTargets.map((item) => item.instanceId));
 
-        assert.equal(popupCalls.length, 4, "Each completed collection action should present one result popup");
+        assert.equal(popupCalls.length, 3, "Each completed collection action should present one result popup");
         assert.ok(
             popupCalls[0].title.startsWith("강화"),
             "Enhancement should report success or failure through PopupService"
         );
-        assert.equal(popupCalls[1].title, "장비 분해 완료", "Disassembly should report through PopupService");
-        assert.equal(popupCalls[2].title, "장비 판매 완료", "Sale should report through PopupService");
-        assert.equal(popupCalls[3].title, "장비 합성 완료", "Fusion should report through PopupService");
+        assert.equal(popupCalls[1].title, "장비 판매 완료", "Sale should report through PopupService");
+        assert.equal(popupCalls[2].title, "장비 합성 완료", "Fusion should report through PopupService");
         assert.ok(
             popupCalls.every((options) => options.buttons?.[0]?.text === "확인"),
             "Collection action result popups should use an explicit confirmation button"
         );
-        assert.equal(refreshCount, 4, "Completed collection actions should refresh the open collection hub");
+        assert.equal(refreshCount, 3, "Completed collection actions should refresh the open collection hub");
     } finally {
         PopupService.setTestDialog(originalDialog);
     }
@@ -21439,7 +21472,7 @@ async function runNewBridgeTests() {
     testHuntingManagerNoAppUiMethods(app);
     testComponentBridgeEquipmentActionsReachProfile();
     testCollectionActionPopupOptions();
-    testComponentBridgeCollectionActionResultsUsePopupService();
+    await testComponentBridgeCollectionActionResultsUsePopupService();
     testCollectionHubServiceNoBlacklistedRefs();
     testComponentBridgeOpenChestExists();
     testComponentBridgeOpenChestFailure();

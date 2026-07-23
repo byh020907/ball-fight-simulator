@@ -33,7 +33,7 @@
                 <span
                     x-show="!state.equipment.canExpand && state.equipment.inventoryUsed >= state.equipment.inventorySlots"
                     class="ch-equip-inventory-full"
-                    >가득 참 — 장비를 분해하거나 확장하세요</span
+                    >가득 참 — 장비를 판매하거나 확장하세요</span
                 >
             </div>
         </div>
@@ -98,17 +98,12 @@
                             class="ch-btn"
                             x-show="item.canEnhance"
                             @click="enhanceItem(item.instanceId)"
-                            x-text="`강화 (+${item.enhanceLevel}→+${item.enhanceLevel + 1}, ${Math.round(item.enhanceFailureRate * 100)}%실패)`"
-                        ></button>
-                        <button
-                            class="ch-btn ch-btn--danger"
-                            @click="disassembleItem(item.instanceId)"
-                            x-text="`분해 (+${item.disassembleReward}강화석)`"
+                            x-text="`강화 +${item.enhanceLevel}→+${item.enhanceLevel + 1} · 파편 ${item.enhanceCost.shards} · 실패 ${Math.round(item.enhanceFailureRate * 100)}%`"
                         ></button>
                         <button
                             class="ch-btn"
                             @click="sellItem(item.instanceId)"
-                            x-text="`판매 (+${item.sellReward}파편)`"
+                            x-text="`판매 · 파편 +${item.sellReward} · 강화석 ${Math.round(item.sellStoneReward.chance * 100)}%${item.sellStoneReward.count > 1 ? ' ×' + item.sellStoneReward.count : ''}`"
                         ></button>
                     </div>
                 </div>
@@ -213,9 +208,6 @@
             },
             enhanceItem(instanceId) {
                 return invokeGameAction("enhanceItem", instanceId);
-            },
-            disassembleItem(instanceId) {
-                return invokeGameAction("disassembleItem", instanceId);
             },
             sellItem(instanceId) {
                 return invokeGameAction("sellItem", instanceId);

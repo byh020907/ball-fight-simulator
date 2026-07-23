@@ -1,10 +1,10 @@
 import {
     equipEquipmentItem,
     expandInventory as expandEquipmentInventory,
-    disassembleEquipment,
     sellEquipment,
     fuseEquipment,
     enhanceEquipment,
+    recoverEquipmentEnhancement,
     getCharacterEquipmentLevel,
     getEquipmentRequiredLevel
 } from "./hunting/equipmentConfig.js";
@@ -184,14 +184,22 @@ export function createComponentBridge(app) {
             }
         },
 
-        enhanceItem(instanceId) {
+        async enhanceItem(instanceId) {
             const profile = app.playerProfile;
             const result = enhanceEquipment(profile, instanceId);
             if (!result) return;
             if (!result.error) {
                 refreshCollectionAndProfile();
             }
-            PopupService.show(createCollectionActionPopupOptions("enhance", result));
+            result.canRecover = result.recoverable && (profile.equipment?.enhancementStones ?? 0) > 0;
+            const choice = await PopupService.show(createCollectionActionPopupOptions("enhance", result));
+            if (choice === "recover") {
+                const recoveryResult = recoverEquipmentEnhancement(profile, result.recovery);
+                if (recoveryResult?.restored) {
+                    refreshCollectionAndProfile();
+                    await PopupService.show(createCollectionActionPopupOptions("enhanceRecovery", recoveryResult));
+                }
+            }
             return result;
         },
 
@@ -203,16 +211,6 @@ export function createComponentBridge(app) {
             }
             if (result) {
                 PopupService.show(createCollectionActionPopupOptions("fusion", result));
-            }
-            return result;
-        },
-
-        disassembleItem(instanceId) {
-            const profile = app.playerProfile;
-            const result = disassembleEquipment(profile, instanceId);
-            if (result) {
-                refreshCollectionAndProfile();
-                PopupService.show(createCollectionActionPopupOptions("disassemble", result));
             }
             return result;
         },
