@@ -1668,6 +1668,18 @@
     .ch-developer-control-row .ch-btn {
         width: auto;
         white-space: nowrap;
+        min-width: 0;
+    }
+
+    @media (max-width: 520px) {
+        .ch-developer-control-row {
+            grid-template-columns: 1fr;
+        }
+
+        .ch-developer-control-row .ch-btn {
+            width: 100%;
+            white-space: normal;
+        }
     }
 
     .ch-developer-actions {
