@@ -132,6 +132,25 @@ assert.equal(
     "v10 hidden unlock normalization must preserve mastery progress"
 );
 
+const enhancementCapProfile = createDefaultPlayerProfile();
+enhancementCapProfile.equipment.inventory = [
+    {
+        instanceId: "common-over-cap",
+        rarity: "common",
+        slot: "weapon",
+        name: "강화 상한 검증 무기",
+        description: "등급별 강화 상한을 검증합니다.",
+        stats: [{ type: "damage", value: 3 }],
+        specialOptions: [],
+        enhanceLevel: 5
+    }
+];
+assert.equal(
+    migratePlayerProfile(enhancementCapProfile).equipment.inventory[0].enhanceLevel,
+    1,
+    "Current profiles should clamp equipment enhancement to the item's rarity cap"
+);
+
 const companionPreferenceProfile = createDefaultPlayerProfile();
 companionPreferenceProfile.hunting.lastCompanionIds = ["hero", "hero", "unknown", "eater", "dash"];
 assert.deepEqual(

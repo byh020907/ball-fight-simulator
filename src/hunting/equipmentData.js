@@ -24,8 +24,9 @@ export const EQUIPMENT = Object.freeze({
     }),
     ENHANCE: Object.freeze({
         MAX_LEVEL: EQUIPMENT_BALANCE.enhance.maxLevel,
+        MAX_LEVEL_BY_RARITY: EQUIPMENT_BALANCE.enhance.maxLevelByRarity,
         MAX_FAILURE_RATE: EQUIPMENT_BALANCE.enhance.maxFailureRate,
-        STAT_BONUS_PER_LEVEL: EQUIPMENT_BALANCE.enhance.statBonusPerLevel,
+        STAT_MULTIPLIER_PER_LEVEL: EQUIPMENT_BALANCE.enhance.statMultiplierPerLevel,
         COST: EQUIPMENT_BALANCE.enhance.costs
     }),
     SELL: Object.freeze({

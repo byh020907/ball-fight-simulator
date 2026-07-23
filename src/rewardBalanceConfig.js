@@ -209,8 +209,9 @@ export const REWARD_BALANCE = deepFreeze({
         inventory: { defaultSlots: 5, expandCost: 100, expandGain: 3, maxSlots: 100 },
         enhance: {
             maxLevel: 5,
+            maxLevelByRarity: { common: 1, uncommon: 2, rare: 3, epic: 4, legendary: 5 },
             maxFailureRate: 0.8,
-            statBonusPerLevel: 0.2,
+            statMultiplierPerLevel: 2,
             costs: [{ shards: 200 }, { shards: 300 }, { shards: 500 }, { shards: 800 }, { shards: 1200 }]
         },
         sellRewards: { common: 5, uncommon: 12, rare: 30, epic: 80, legendary: 200 },

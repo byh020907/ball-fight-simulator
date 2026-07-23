@@ -44,8 +44,9 @@ export const INVENTORY_EXPAND_COST = EQUIPMENT.INVENTORY.EXPAND_COST;
 export const INVENTORY_EXPAND_GAIN = EQUIPMENT.INVENTORY.EXPAND_GAIN;
 export const INVENTORY_MAX_SLOTS = EQUIPMENT.INVENTORY.MAX_SLOTS;
 export const ENHANCE_MAX_LEVEL = EQUIPMENT.ENHANCE.MAX_LEVEL;
+export const ENHANCE_MAX_LEVEL_BY_RARITY = EQUIPMENT.ENHANCE.MAX_LEVEL_BY_RARITY;
 export const ENHANCE_MAX_FAILURE_RATE = EQUIPMENT.ENHANCE.MAX_FAILURE_RATE;
-export const ENHANCE_STAT_BONUS_PER_LEVEL = EQUIPMENT.ENHANCE.STAT_BONUS_PER_LEVEL;
+export const ENHANCE_STAT_MULTIPLIER_PER_LEVEL = EQUIPMENT.ENHANCE.STAT_MULTIPLIER_PER_LEVEL;
 export const ENHANCE_COST_TABLE = EQUIPMENT.ENHANCE.COST;
 export const SELL_REWARDS = Object.freeze(
     Object.fromEntries(Object.entries(EQUIPMENT.SELL).map(([key, val]) => [key.toLowerCase(), val]))
@@ -228,9 +229,19 @@ export function canCharacterEquipItem(profile, itemOrRarity, characterId) {
     return getCharacterEquipmentLevel(profile, characterId) >= getEquipmentRequiredLevel(itemOrRarity);
 }
 
+export function getEquipmentMaxEnhanceLevel(itemOrRarity) {
+    const rarity = typeof itemOrRarity === "string" ? itemOrRarity : itemOrRarity?.rarity;
+    return ENHANCE_MAX_LEVEL_BY_RARITY[rarity] ?? 0;
+}
+
+export function getEquipmentEnhanceMultiplier(level) {
+    const normalizedLevel = Math.min(ENHANCE_MAX_LEVEL, Math.max(0, Math.floor(Number(level) || 0)));
+    return ENHANCE_STAT_MULTIPLIER_PER_LEVEL ** normalizedLevel;
+}
+
 function getEquipmentEffectVector(item) {
     const vector = new Map();
-    const enhanceMultiplier = 1 + (item?.enhanceLevel ?? 0) * ENHANCE_STAT_BONUS_PER_LEVEL;
+    const enhanceMultiplier = getEquipmentEnhanceMultiplier(item?.enhanceLevel);
     for (const stat of item?.stats ?? []) {
         const key = `stat:${stat.type}`;
         vector.set(key, (vector.get(key) ?? 0) + Math.round((stat.value ?? 0) * enhanceMultiplier));
@@ -305,7 +316,7 @@ export function getEquippedStatBonuses(profile, characterId = null) {
         if (!equippedIds.includes(item.instanceId)) continue;
         if (!canCharacterEquipItem(profile, item, characterId)) continue;
         if (!Array.isArray(item.stats)) continue;
-        const enhanceMult = 1 + (item.enhanceLevel ?? 0) * ENHANCE_STAT_BONUS_PER_LEVEL;
+        const enhanceMult = getEquipmentEnhanceMultiplier(item.enhanceLevel);
         for (const stat of item.stats) {
             if (stat.type in bonuses) {
                 bonuses[stat.type] += Math.round(stat.value * enhanceMult);
@@ -472,7 +483,7 @@ export function sellEquipment(profile, instanceId, rng = defaultRng) {
 }
 
 export function getEquipmentStatValue(item) {
-    const enhanceMultiplier = 1 + (item?.enhanceLevel ?? 0) * ENHANCE_STAT_BONUS_PER_LEVEL;
+    const enhanceMultiplier = getEquipmentEnhanceMultiplier(item?.enhanceLevel);
     return (item?.stats ?? []).reduce((total, stat) => {
         const ratio = EQUIPMENT_STAT_VALUE_RATIOS[stat.type];
         if (!Number.isFinite(ratio) || ratio <= 0) return total;
@@ -572,7 +583,7 @@ export function enhanceEquipment(profile, instanceId, rng = defaultRng) {
     if (!item) return null;
 
     const currentLevel = item.enhanceLevel ?? 0;
-    if (currentLevel >= ENHANCE_MAX_LEVEL) return null;
+    if (currentLevel >= getEquipmentMaxEnhanceLevel(item)) return null;
 
     const cost = calculateEnhanceCost(currentLevel);
     if ((profile.hunting?.shards ?? 0) < cost.shards) return { error: "shards" };

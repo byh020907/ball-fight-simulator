@@ -1,4 +1,8 @@
-<div x-data="collectionEquipmentPanel" @keydown.escape.window="closeSpecialTooltip()" @click.outside="closeSpecialTooltip()">
+<div
+    x-data="collectionEquipmentPanel"
+    @keydown.escape.window="closeSpecialTooltip()"
+    @click.outside="closeSpecialTooltip()"
+>
     <div class="ch-content" x-show="state.activeTab === 'equipment'" role="tabpanel">
         <div class="ch-toolbar">
             <span class="ch-toolbar-title">장비 인벤토리</span>
@@ -49,12 +53,12 @@
                         <span
                             class="ch-equip-enhance"
                             x-show="item.enhanceLevel > 0"
-                            x-text="'+' + item.enhanceLevel"
+                            x-text="`+${item.enhanceLevel}${item.enhanceLevel >= item.maxEnhanceLevel ? ' MAX' : ''} · ×${item.enhanceMultiplier}`"
                         ></span>
                     </div>
                     <div class="ch-equip-card-stats">
                         <template x-for="stat in item.stats">
-                            <span class="ch-equip-stat" x-text="stat.type + ' +' + stat.value"></span>
+                            <span class="ch-equip-stat" x-text="stat.type + ' +' + stat.enhancedValue"></span>
                         </template>
                         <template x-if="item.specialOptions.length > 0">
                             <div class="ch-equip-special-list">
@@ -401,5 +405,4 @@
         pointer-events: none;
         transform: translateY(0);
     }
-
 </style>

@@ -304,6 +304,8 @@ import {
     autoEquipEquipmentUpgrade,
     doesEquipmentStrictlyDominate,
     getEquipmentRequiredLevel,
+    getEquipmentEnhanceMultiplier,
+    getEquipmentMaxEnhanceLevel,
     EQUIPMENT_STAT_VALUE_RATIOS,
     EQUIPMENT_NAME_PREFIXES,
     EQUIPMENT_SPECIAL_OPTION_SUFFIXES,
@@ -11234,6 +11236,16 @@ function testEquipmentEnhancement() {
     // 기본값 확인
     assert.equal(profile.equipment.enhancementStones, 0, "New profiles should start with 0 enhancement stones");
     assert.equal(profile.equipment.maxInventorySlots, 5, "New profiles should start with default inventory slots");
+    assert.deepEqual(
+        ["common", "uncommon", "rare", "epic", "legendary"].map(getEquipmentMaxEnhanceLevel),
+        [1, 2, 3, 4, 5],
+        "Each rarity should unlock exactly one additional enhancement level"
+    );
+    assert.deepEqual(
+        Array.from({ length: ENHANCE_MAX_LEVEL + 1 }, (_, level) => getEquipmentEnhanceMultiplier(level)),
+        [1, 2, 4, 8, 16, 32],
+        "Enhancement should double base stats at every level"
+    );
 
     // 강화 재화 준비
     profile.equipment.enhancementStones = 100;
@@ -11270,6 +11282,11 @@ function testEquipmentEnhancement() {
     assert.equal(item.enhanceLevel, 1, "Item enhance level should be updated to 1");
     assert.equal(profile.equipment.enhancementStones, 100, "Enhance should preserve recovery stones on success");
     assert.equal(profile.hunting.shards, 4800, "Enhance should deduct 200 shards");
+    assert.equal(
+        enhanceEquipment(profile, item.instanceId, () => 0.99),
+        null,
+        "Common equipment should stop at its +1 rarity cap"
+    );
 
     // 강화 실패 테스트 (rng=0, failRate=0.32 → 실패)
     profile.hunting.shards = 5000;
@@ -11312,7 +11329,7 @@ function testEquipmentEnhancement() {
     // 파편 부족 시 오류 반환; 강화석이 없어도 시도 가능
     profile.equipment.enhancementStones = 0;
     profile.hunting.shards = 500;
-    const item4 = createEquipmentInstance({ rarity: "common", slot: "weapon", rng: () => 0.5 });
+    const item4 = createEquipmentInstance({ rarity: "uncommon", slot: "weapon", rng: () => 0.5 });
     profile.equipment.inventory.push(item4);
     const resultNoStones = enhanceEquipment(profile, item4.instanceId, () => 0.5);
     assert.equal(resultNoStones.success, true, "Enhance should not require a recovery stone");
@@ -11340,13 +11357,9 @@ function testEquipmentEnhancement() {
     assert.equal(enhanceEquipped.success, true, "Equipped item should be enhanceable");
     assert.equal(enhanceEquipped.newLevel, 1, "Equipped item should reach level 1");
 
-    // 강화 후 스탯 반영 확인 (레벨 1 → 1.2배, 6*1.2=7.2 → round=7)
+    // 강화 후 스탯 반영 확인 (레벨 1 → 2배)
     const bonusesAfter = getEquippedStatBonuses(profile);
-    assert.equal(
-        bonusesAfter.damage,
-        7,
-        `After +1 enhance, stat should be 7 (6*1.2=7.2→round), got ${bonusesAfter.damage}`
-    );
+    assert.equal(bonusesAfter.damage, 12, `After +1 enhance, stat should be 12 (6*2), got ${bonusesAfter.damage}`);
 
     // 장착된 상태로 한 번 더 강화 (+1→+2, 실패 → +1→+0)
     profile.equipment.enhancementStones = 100;

@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.36.30",
+        date: "2026-07-24",
+        title: "v0.36.30 강화가 장비 등급에 맞는 성장 목표가 됩니다",
+        changes: [
+            {
+                type: "balance",
+                text: "강화할 때마다 기본 스탯이 2배가 되며, common +1부터 legendary +5까지 등급별 강화 상한을 적용했습니다. 특수 옵션 수치는 그대로 유지됩니다."
+            }
+        ]
+    },
+    {
         version: "0.36.29",
         date: "2026-07-24",
         title: "v0.36.29 합성은 장비로, 강화는 파편으로 성장합니다",

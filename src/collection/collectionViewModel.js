@@ -39,7 +39,8 @@ import {
     getEquipmentSpecialOptionDescription,
     calculateEnhanceCost,
     calculateEnhanceFailureRate,
-    ENHANCE_MAX_LEVEL
+    getEquipmentEnhanceMultiplier,
+    getEquipmentMaxEnhanceLevel
 } from "../hunting/equipmentConfig.js";
 import { getRebirthPresentation } from "../rebirth/rebirthService.js";
 import { isCharacterUnlocked } from "../playerProfile.js";
@@ -309,6 +310,8 @@ export function createCollectionHubViewModel({
 
     const equipmentItems = inventory.map((item) => {
         const level = item.enhanceLevel ?? 0;
+        const maxEnhanceLevel = getEquipmentMaxEnhanceLevel(item);
+        const enhanceMultiplier = getEquipmentEnhanceMultiplier(level);
         const cost = calculateEnhanceCost(level);
         const shards = profile.hunting?.shards ?? 0;
         const requiredLevel = getEquipmentRequiredLevel(item);
@@ -320,13 +323,18 @@ export function createCollectionHubViewModel({
             slot: item.slot,
             name: item.name,
             description: item.description,
-            stats: item.stats ?? [],
+            stats: (item.stats ?? []).map((stat) => ({
+                ...stat,
+                enhancedValue: Math.round((stat.value ?? 0) * enhanceMultiplier)
+            })),
             specialOptions: (item.specialOptions ?? []).map((option) => ({
                 ...option,
                 label: getEquipmentSpecialOptionLabel(option.type),
                 description: getEquipmentSpecialOptionDescription(option.type)
             })),
             enhanceLevel: level,
+            maxEnhanceLevel,
+            enhanceMultiplier,
             isEquipped: equippedIdSet.has(item.instanceId),
             requiredLevel,
             characterLevel: currentEquipmentLevel,
@@ -334,7 +342,7 @@ export function createCollectionHubViewModel({
             canEquip,
             sellReward: getSellReward(item.rarity),
             sellStoneReward: getSellEnhancementStoneReward(item.rarity),
-            canEnhance: level < ENHANCE_MAX_LEVEL && shards >= cost.shards,
+            canEnhance: level < maxEnhanceLevel && shards >= cost.shards,
             enhanceCost: cost,
             enhanceFailureRate: calculateEnhanceFailureRate(level)
         };

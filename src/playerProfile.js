@@ -9,7 +9,7 @@ import { HUNTING_STAGES } from "./hunting/huntingConfig.js";
 import { createDefaultHuntingStats, sanitizeHuntingStats } from "./hunting/huntingAchievementProgress.js";
 import { FIGHTER_IDS } from "./characters/characterRegistry.js";
 import { getHiddenCharacterIds } from "./characterAvailability.js";
-import { EQUIPMENT_SPECIAL_OPTION_SUFFIXES } from "./hunting/equipmentConfig.js";
+import { EQUIPMENT_SPECIAL_OPTION_SUFFIXES, getEquipmentMaxEnhanceLevel } from "./hunting/equipmentConfig.js";
 import { formatEquipmentSpecialName } from "./hunting/equipmentNaming.js";
 import {
     REBIRTH_BASE_STAT_KEYS,
@@ -28,7 +28,7 @@ export const PROFILE_LIMITS = Object.freeze({
     MAX_TIMESTAMP: 8_640_000_000_000_000
 });
 
-export const PROFILE_VERSION = 10;
+export const PROFILE_VERSION = 11;
 
 const debugProfileSession = {
     active: false,
@@ -257,7 +257,7 @@ function sanitizeGuaranteedEquipment(item) {
         description,
         stats,
         specialOptions,
-        enhanceLevel: Math.min(5, sanitizeNumber(item.enhanceLevel)),
+        enhanceLevel: Math.min(getEquipmentMaxEnhanceLevel(rarity), sanitizeNumber(item.enhanceLevel)),
         draw: typeof item.draw === "string" ? item.draw : slot,
         isGuaranteed: true
     };
@@ -428,6 +428,7 @@ function sanitizeEquipment(obj) {
               .slice(-100)
               .map((item) => ({
                   ...item,
+                  enhanceLevel: Math.min(getEquipmentMaxEnhanceLevel(item.rarity), sanitizeNumber(item.enhanceLevel)),
                   name: formatEquipmentSpecialName(
                       item.name,
                       item.specialOptions ?? [],
