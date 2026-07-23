@@ -799,6 +799,7 @@ export class HuntingManager {
         app.startMatch(matchSpecs, {
             keepLog: false,
             skipActionPick: true,
+            clickActionsEnabled: false,
             arenaWidth: arena.WIDTH,
             arenaHeight: arena.HEIGHT,
             cameraZoom: 1,

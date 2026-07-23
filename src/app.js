@@ -1052,7 +1052,8 @@ export class BattleApp {
         this.resultSequenceAnnounced = false;
         this.matchFinalized = false;
         this._lastMatchXpResult = null;
-        this._action.skipPick = options.skipActionPick ?? false;
+        const clickActionsEnabled = options.clickActionsEnabled ?? true;
+        this._action.skipPick = !clickActionsEnabled || (options.skipActionPick ?? false);
         if (!options.keepLog) {
             this._log.reset();
         }
@@ -1094,7 +1095,8 @@ export class BattleApp {
             match,
             {
                 assignActions:
-                    this.debug.aiEnabled || getCharacterChallengeLevel(this.playerProfile, this.playerFighterId) > 0,
+                    clickActionsEnabled &&
+                    (this.debug.aiEnabled || getCharacterChallengeLevel(this.playerProfile, this.playerFighterId) > 0),
                 onLog: (message) => this._log.add(message),
                 onOvertime: () => {
                     this._updateStatus(label, "Overtime");

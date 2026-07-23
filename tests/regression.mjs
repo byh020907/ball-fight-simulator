@@ -2243,6 +2243,32 @@ async function testActionSelectionShowsTournamentChallengeBeforeMatchup() {
     console.log("[tournament-action-selection-challenge-intro] ok");
 }
 
+async function testHuntingMatchDisablesClickActions() {
+    const app = await loadModuleApp();
+    const player = app.roster.find((fighter) => fighter.id === app.playerFighterId);
+    const opponent = app.roster.find((fighter) => fighter.id !== app.playerFighterId);
+    const originalWait = app.wait;
+
+    app.debug.aiEnabled = true;
+    app._gameMode = "hunting";
+    app.wait = async () => {};
+
+    try {
+        await app.startMatch([player, opponent], {
+            skipActionPick: true,
+            clickActionsEnabled: false
+        });
+        assert.ok(
+            app.simulation.fighters.every((fighter) => fighter.aiController === null),
+            "Hunting combat must not assign tournament click actions to any fighter"
+        );
+        assert.equal(app._action.current, null, "Hunting combat must not retain a playable click action");
+    } finally {
+        app.wait = originalWait;
+    }
+    console.log("[hunting-click-actions-disabled] ok");
+}
+
 async function testTournamentWinDisplaysMasteryReward() {
     const app = await loadModuleApp();
     app.playerFighterId = FIGHTER_IDS.ARCHER;
@@ -17617,6 +17643,7 @@ await testTournamentOpponentProgressionByChallenge(app);
 await testRebirthResetsTournamentChallengePresentation();
 await testTournamentWinAdvancesChallengeAfterMasteryCheck();
 await testActionSelectionShowsTournamentChallengeBeforeMatchup();
+await testHuntingMatchDisablesClickActions();
 await testTournamentWinDisplaysMasteryReward();
 testResultSequenceProgression();
 await testTournamentEliminationAwaitsConfirmation(app);
@@ -25413,6 +25440,11 @@ function testHuntingPartyBattleComposition() {
     });
     manager._startFloorBattle();
 
+    assert.equal(
+        mockApp.lastMatchOptions.clickActionsEnabled,
+        false,
+        "HuntingManager must disable the tournament click-action system for hunting combat"
+    );
     const alliedFighters = mockApp.simulation.fighters.filter((fighter) => fighter.teamId === HUNTING_TEAMS.PLAYER);
     assert.deepEqual(
         new Set(alliedFighters.map((fighter) => fighter.id)),
