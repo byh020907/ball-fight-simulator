@@ -11246,7 +11246,7 @@ function testEquipmentEnhancement() {
     // 강화 비용 계산
     const cost0 = calculateEnhanceCost(0);
     assert.equal(cost0.stones, undefined, "Enhance should not require stones before attempting");
-    assert.equal(cost0.shards, 10, "Enhance +0→+1 should cost 10 shards");
+    assert.equal(cost0.shards, 50, "Enhance +0→+1 should cost 50 shards");
 
     // 실패율 계산
     const failRate0 = calculateEnhanceFailureRate(0);
@@ -11269,7 +11269,7 @@ function testEquipmentEnhancement() {
     assert.equal(resultSuccess.newLevel, 1, "New level should be 1 after success");
     assert.equal(item.enhanceLevel, 1, "Item enhance level should be updated to 1");
     assert.equal(profile.equipment.enhancementStones, 100, "Enhance should preserve recovery stones on success");
-    assert.equal(profile.hunting.shards, 190, "Enhance should deduct 10 shards");
+    assert.equal(profile.hunting.shards, 150, "Enhance should deduct 50 shards");
 
     // 강화 실패 테스트 (rng=0, failRate=0.32 → 실패)
     profile.hunting.shards = 200;
@@ -11398,10 +11398,10 @@ function testEquipmentEnhancement() {
         true,
         "Fusion should accept exactly three same-rarity selected sources"
     );
-    assert.deepEqual(fusionCost, { shards: 50 }, "Fusion cost should only use shards");
-    assert.deepEqual(getFusionCost("uncommon"), { shards: 120 }, "Uncommon fusion should only use shards");
-    assert.deepEqual(getFusionCost("rare"), { shards: 300 }, "Rare fusion should only use shards");
-    assert.deepEqual(getFusionCost("epic"), { shards: 800 }, "Epic fusion should only use shards");
+    assert.deepEqual(fusionCost, { shards: 250 }, "Fusion cost should only use shards");
+    assert.deepEqual(getFusionCost("uncommon"), { shards: 600 }, "Uncommon fusion should only use shards");
+    assert.deepEqual(getFusionCost("rare"), { shards: 1500 }, "Rare fusion should only use shards");
+    assert.deepEqual(getFusionCost("epic"), { shards: 4000 }, "Epic fusion should only use shards");
     assert.equal(getFusionCost("legendary"), null, "Legendary should not have a fusion recipe");
     const fused = fuseEquipment(craftProfile, fusionSourceIds, () => 0.5);
     assert.equal(fused.toRarity, "uncommon", "Fusion should upgrade common equipment to uncommon");
@@ -17495,7 +17495,7 @@ async function testCreateCollectionHubViewModel() {
     const commonFusionRecipe = fusionVm.equipment.fusion.recipes.find((recipe) => recipe.rarity === "common");
     assert.equal(fusionVm.equipment.fusion.sourceItemCount, 3, "Fusion UI should require three recommended sources");
     assert.equal(commonFusionRecipe.recommendedItems.length, 3, "Fusion UI should expose the recommended sources");
-    assert.deepEqual(commonFusionRecipe.cost, { shards: 50 }, "Fusion UI should display the derived material cost");
+    assert.deepEqual(commonFusionRecipe.cost, { shards: 250 }, "Fusion UI should display the derived material cost");
     assert.equal(commonFusionRecipe.rarityLabel, "common", "Fusion UI should use the canonical rarity label");
     assert.equal(vm2.storage.chests[0].rarityLabel, "uncommon", "Storage UI should use the canonical rarity label");
 

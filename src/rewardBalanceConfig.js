@@ -211,7 +211,7 @@ export const REWARD_BALANCE = deepFreeze({
             maxLevel: 5,
             maxFailureRate: 0.8,
             statBonusPerLevel: 0.2,
-            costs: [{ shards: 10 }, { shards: 15 }, { shards: 25 }, { shards: 40 }, { shards: 60 }]
+            costs: [{ shards: 50 }, { shards: 75 }, { shards: 125 }, { shards: 200 }, { shards: 300 }]
         },
         sellRewards: { common: 5, uncommon: 12, rare: 30, epic: 80, legendary: 200 },
         sellEnhancementStoneRewards: {
@@ -223,7 +223,7 @@ export const REWARD_BALANCE = deepFreeze({
         },
         fusion: {
             sourceItemCount: 3,
-            costMultiplier: 10
+            costMultiplier: 50
         },
         statRanges: {
             common: { min: 1, max: 3, statCount: { min: 1, max: 1 } },
