@@ -3056,6 +3056,28 @@ function testHuntingAutoAdvanceTimerAndSkip() {
     console.log("[hunting-auto-advance] ok");
 }
 
+function testHuntingPortalAutoAdvanceDelay() {
+    const scheduled = [];
+    const mockApp = {
+        setHuntingOverlayState() {},
+        setHuntingAutoAdvanceState() {}
+    };
+    const manager = new HuntingManager(mockApp);
+    manager._run = createHuntingRun({ characterId: FIGHTER_IDS.RAGE });
+    manager._autoAdvance.start = (_action, options) => scheduled.push(options);
+
+    manager._stopHuntingMoveForChoice(mockApp, { message: "일반 진행", canRetreat: false, floor: 2 });
+    assert.equal(scheduled.at(-1).delayMs, HUNTING_FLOW_CONFIG.autoAdvanceDelayMs);
+    manager._stopHuntingMoveForChoice(mockApp, { message: "포탈 발견", canRetreat: true, floor: 3 });
+    assert.equal(
+        scheduled.at(-1).delayMs,
+        HUNTING_FLOW_CONFIG.portalAutoAdvanceDelayMs,
+        "Return portals should keep their choice open for five seconds"
+    );
+    assert.equal(HUNTING_FLOW_CONFIG.portalAutoAdvanceDelayMs, 5000);
+    console.log("[hunting-portal-auto-advance-delay] ok");
+}
+
 function testHuntingHealthDisplayUsesSharedIntegerGetter() {
     const run = setHuntingRunActiveHealth(createHuntingRun({ characterId: FIGHTER_IDS.DASH }), {
         hp: 42.1,
@@ -10127,11 +10149,18 @@ function testHuntingStageSelectionAndArenaTheme() {
 async function testHuntingStageSelectUsesPreviewCharacter() {
     const profile = createDefaultPlayerProfile();
     profile.collection.characters[FIGHTER_IDS.RAGE] = { tournamentWins: 1 };
+    profile.collection.characters[FIGHTER_IDS.HERO] = { tournamentWins: 1 };
+    profile.collection.characters[FIGHTER_IDS.EATER] = { tournamentWins: 1 };
+    profile.hunting.lastCompanionIds = [FIGHTER_IDS.HERO, FIGHTER_IDS.EATER];
     profile.hunting.stats.lastReachedFloorByStage = { [HUNTING_STAGE_IDS.CAVE]: 47 };
     const app = {
         playerProfile: profile,
         playerFighterId: FIGHTER_IDS.RAGE,
-        roster: [{ id: FIGHTER_IDS.RAGE, name: "Rage", title: "Test", color: "#f00" }],
+        roster: [
+            { id: FIGHTER_IDS.RAGE, name: "Rage", title: "Test", color: "#f00" },
+            { id: FIGHTER_IDS.HERO, name: "Hero", title: "Test", color: "#0f0" },
+            { id: FIGHTER_IDS.EATER, name: "Eater", title: "Test", color: "#00f" }
+        ],
         renderer: { clear() {} },
         stopPlayerPreviewLoop() {},
         beginGameSession() {},
@@ -10195,6 +10224,18 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
             popupOptions[1].content.type === "hunting-checkpoint-select",
             "Selecting a stage should present structured start checkpoints"
         );
+        assert.deepEqual(
+            popupOptions[1].content.party.companionIds,
+            [FIGHTER_IDS.HERO, FIGHTER_IDS.EATER],
+            "Party selection should restore the last eligible companion pair"
+        );
+        profile.hunting.lastCompanionIds = [FIGHTER_IDS.RAGE, FIGHTER_IDS.ARCHER];
+        manager.showCheckpointSelect(FIGHTER_IDS.RAGE, HUNTING_STAGE_IDS.CAVE);
+        assert.deepEqual(
+            popupOptions[2].content.party.companionIds,
+            [null, null],
+            "Remembered companions must exclude the current leader and unavailable characters"
+        );
         assert.ok(
             popupOptions[1].content.checkpoints.some((checkpoint) => checkpoint.floor === 1 && checkpoint.available),
             "Checkpoint data must preserve the first encounter"
@@ -10218,11 +10259,14 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
             encounterType: HUNTING_DEBUG_ENCOUNTER_TYPES.FINAL_BOSS
         });
         assert.equal(
-            popupOptions[2].content.checkpoints[0].floor,
+            popupOptions[3].content.checkpoints[0].floor,
             HUNTING_MAX_FLOOR,
             "The shared debug party popup must display the same normalized floor that the final boss run starts"
         );
-        const startPromise = manager.startRun(FIGHTER_IDS.RAGE, { encounterFloor: 1 });
+        const startPromise = manager.startRun(FIGHTER_IDS.RAGE, {
+            encounterFloor: 1,
+            party: { companionIds: [FIGHTER_IDS.EATER, FIGHTER_IDS.HERO] }
+        });
         await Promise.resolve();
         assert.equal(
             getHuntingRunCharacterId(manager._run),
@@ -10230,6 +10274,11 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
             "Run should use the current preview character"
         );
         assert.equal(app.gameMode, "hunting", "A confirmed hunting run should switch to hunting mode");
+        assert.deepEqual(
+            profile.hunting.lastCompanionIds,
+            [FIGHTER_IDS.EATER, FIGHTER_IDS.HERO],
+            "Starting a production run should remember the confirmed companion order"
+        );
         assert.deepEqual(
             profile.hunting.stats.visitedStageIds,
             [HUNTING_STAGE_IDS.CAVE],
@@ -17496,6 +17545,7 @@ testHuntingEventHealthInitialization();
 testHuntingAutoEventRequiresConfirmation();
 testHuntingChampionEventRequiresBattleConfirmation();
 testHuntingAutoAdvanceTimerAndSkip();
+testHuntingPortalAutoAdvanceDelay();
 testHuntingHealthDisplayUsesSharedIntegerGetter();
 await testHuntingChestEventStopsAdvanceLoop();
 testHuntingAdvanceDispatchContract();

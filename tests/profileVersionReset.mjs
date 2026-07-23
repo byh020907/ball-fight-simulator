@@ -132,6 +132,14 @@ assert.equal(
     "v10 hidden unlock normalization must preserve mastery progress"
 );
 
+const companionPreferenceProfile = createDefaultPlayerProfile();
+companionPreferenceProfile.hunting.lastCompanionIds = ["hero", "hero", "unknown", "eater", "dash"];
+assert.deepEqual(
+    migratePlayerProfile(companionPreferenceProfile).hunting.lastCompanionIds,
+    ["hero", "eater"],
+    "Saved companion preferences should keep at most two unique known characters"
+);
+
 const legacyRebirthProfile = createDefaultPlayerProfile();
 delete legacyRebirthProfile.rebirth.schemaVersion;
 legacyRebirthProfile.hunting.shards = 417;

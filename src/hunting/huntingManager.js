@@ -155,6 +155,19 @@ function isValidHuntingPartySelection(characterId, party, selectableCharacterIds
     );
 }
 
+function normalizeHuntingCompanionIds(companionIds) {
+    return Array.isArray(companionIds) ? companionIds.filter(Boolean).slice(0, 2) : [];
+}
+
+function getRememberedHuntingCompanionIds(profile, characters, leaderId) {
+    const selectableIds = new Set(characters.map((character) => character.id));
+    const remembered = normalizeHuntingCompanionIds(profile?.hunting?.lastCompanionIds).filter(
+        (characterId, index, ids) =>
+            characterId !== leaderId && selectableIds.has(characterId) && ids.indexOf(characterId) === index
+    );
+    return [remembered[0] ?? null, remembered[1] ?? null];
+}
+
 function getDebugPartyEncounterFloor(context) {
     const requestedFloor = Math.max(1, Math.min(HUNTING_MAX_FLOOR, Math.floor(context.encounterFloor) || 1));
     if (context.kind === "encounter" && context.encounterType === HUNTING_DEBUG_ENCOUNTER_TYPES.FINAL_BOSS) {
@@ -208,9 +221,9 @@ export class HuntingManager {
         return this._run?.status === "active";
     }
 
-    _scheduleAutoAdvance(action, label = "계속 진행") {
+    _scheduleAutoAdvance(action, label = "계속 진행", delayMs = HUNTING_FLOW_CONFIG.autoAdvanceDelayMs) {
         if (!this._autoAdvanceEnabled) return false;
-        this._autoAdvance.start(action, { label });
+        this._autoAdvance.start(action, { label, delayMs });
         return true;
     }
 
@@ -319,6 +332,7 @@ export class HuntingManager {
         const leaderId = characters.some((character) => character.id === characterId)
             ? characterId
             : (characters.find((character) => character.canLead)?.id ?? null);
+        const companionIds = getRememberedHuntingCompanionIds(this.app.playerProfile, characters, leaderId);
         return PopupService.show({
             title,
             content: {
@@ -326,7 +340,7 @@ export class HuntingManager {
                 characters,
                 party: {
                     leaderId,
-                    companionIds: [null, null],
+                    companionIds,
                     swapId: null
                 },
                 swapEnabled: HUNTING_FLOW_CONFIG.swapEnabled,
@@ -451,7 +465,8 @@ export class HuntingManager {
     ) {
         this._cancelAutoAdvance();
         const swapId = HUNTING_FLOW_CONFIG.swapEnabled ? party.swapId : null;
-        const selection = { leaderId: characterId, companionIds: party.companionIds, swapId };
+        const companionIds = normalizeHuntingCompanionIds(party.companionIds);
+        const selection = { leaderId: characterId, companionIds, swapId };
         if (debug) {
             const selectableCharacterIds = new Set(this.app.roster.map((fighter) => fighter.id));
             if (!isValidHuntingPartySelection(characterId, party, selectableCharacterIds)) return;
@@ -460,6 +475,7 @@ export class HuntingManager {
         }
 
         this.app.setGameMode("hunting");
+        if (!debug) this.app.playerProfile.hunting.lastCompanionIds = companionIds;
         this.app.playerProfile.hunting.stats = recordHuntingStageVisit(this.app.playerProfile.hunting.stats, stageId);
         savePlayerProfile(this.app.playerProfile);
         this.app._refreshCollectionHub();
@@ -467,7 +483,7 @@ export class HuntingManager {
             ...createHuntingRun({
                 characterId,
                 stageId,
-                companionIds: party.companionIds,
+                companionIds,
                 swapId
             }),
             floor: Math.max(0, encounterFloor - 1)
@@ -1445,7 +1461,10 @@ export class HuntingManager {
             ...hud
         });
         this._moving = false;
-        this._scheduleAutoAdvance(() => this.advance({ waitForFirstMoveUi: true }), "계속 전진");
+        const delayMs = canRetreat
+            ? HUNTING_FLOW_CONFIG.portalAutoAdvanceDelayMs
+            : HUNTING_FLOW_CONFIG.autoAdvanceDelayMs;
+        this._scheduleAutoAdvance(() => this.advance({ waitForFirstMoveUi: true }), "계속 전진", delayMs);
     }
 
     _stopHuntingMoveForMerchant(app, { message, floor, offers, summary }) {
