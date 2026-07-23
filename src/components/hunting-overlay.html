@@ -10,6 +10,7 @@
     x-transition:leave-start="hunting-overlay-leave-start"
     x-transition:leave-end="hunting-overlay-leave-end"
     x-bind:class="{
+        'hunting-choice-active': huntingChoiceVisible && !huntingCombatResultActive && !huntingMoving,
         'hunting-chest-active': huntingChestEventActive,
         'hunting-event-active': huntingEventActive,
         'hunting-battle-preparation-active': huntingBattlePreparationActive,
@@ -95,7 +96,6 @@
                 <div class="hunting-event-scroll-body">
                     <chest-icon class="hunting-chest-token" x-bind:data-rarity="huntingChestRarity"></chest-icon>
                     <strong x-text="huntingChestTitle"></strong>
-                    <span x-text="huntingChestSubtext"></span>
                     <span class="hunting-chest-loot" x-text="huntingLootSummary"></span>
                 </div>
                 <div class="hunting-event-actions">
@@ -124,11 +124,6 @@
             </div>
 
             <div class="hunting-battle-preparation" x-show="huntingBattlePreparationActive">
-                <div class="hunting-event-scroll-body">
-                    <span>전투 준비</span>
-                    <strong x-text="huntingMoveMessage"></strong>
-                    <p>잠시 후 전투가 자동으로 시작됩니다.</p>
-                </div>
                 <div class="hunting-event-actions">
                     <button
                         class="hunting-btn advance hunting-battle-start"
@@ -239,7 +234,6 @@
         huntingChestEventActive: false,
         huntingChestRarity: "common",
         huntingChestTitle: "",
-        huntingChestSubtext: "",
         huntingChestConfirmLabel: "",
         huntingEventActive: false,
         huntingEventDetail: "",
@@ -334,7 +328,6 @@
             this.huntingChestEventActive = false;
             this.huntingChestRarity = "common";
             this.huntingChestTitle = "";
-            this.huntingChestSubtext = "";
             this.huntingChestConfirmLabel = "";
             this.huntingEventActive = false;
             this.huntingEventDetail = "";
@@ -381,7 +374,6 @@
             if (data.huntingChestEventActive !== undefined) this.huntingChestEventActive = data.huntingChestEventActive;
             if (data.huntingChestRarity !== undefined) this.huntingChestRarity = data.huntingChestRarity;
             if (data.huntingChestTitle !== undefined) this.huntingChestTitle = data.huntingChestTitle;
-            if (data.huntingChestSubtext !== undefined) this.huntingChestSubtext = data.huntingChestSubtext;
             if (data.huntingChestConfirmLabel !== undefined)
                 this.huntingChestConfirmLabel = data.huntingChestConfirmLabel;
             if (data.huntingEventActive !== undefined) this.huntingEventActive = data.huntingEventActive;
@@ -672,8 +664,11 @@
     .hunting-overlay-heading > strong {
         display: block;
         color: #111111;
-        font-size: clamp(2rem, 8vw, 3.4rem);
+        font-size: clamp(1.8rem, 6vw, 2.8rem);
+        line-height: 1.15;
         letter-spacing: -0.05em;
+        overflow-wrap: anywhere;
+        text-wrap: balance;
     }
 
     .hunting-overlay-heading > p {
@@ -785,17 +780,18 @@
     }
 
     .hunting-choice-buttons {
-        display: flex;
-        justify-content: center;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
         gap: 8px;
         pointer-events: auto;
     }
 
     .hunting-choice-buttons button {
-        flex: 1;
-        max-width: 140px;
+        width: 100%;
+        min-width: 0;
     }
 
+    :scope.hunting-choice-active .hunting-overlay-frame,
     :scope.hunting-chest-active .hunting-overlay-frame,
     :scope.hunting-event-active .hunting-overlay-frame,
     :scope.hunting-battle-preparation-active .hunting-overlay-frame {
@@ -804,23 +800,31 @@
         min-width: 0;
         min-height: 0;
         display: grid;
-        place-items: center;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 6fr) minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr) auto;
+        align-items: center;
         overflow: hidden;
     }
 
+    :scope.hunting-choice-active .hunting-overlay-card,
     :scope.hunting-chest-active .hunting-overlay-card,
     :scope.hunting-event-active .hunting-overlay-card,
     :scope.hunting-battle-preparation-active .hunting-overlay-card {
-        width: fit-content;
-        max-width: 100%;
+        grid-column: 2;
+        grid-row: 1;
+        width: 100%;
         max-height: 100%;
         box-sizing: border-box;
         min-height: 0;
         display: flex;
         flex-direction: column;
         overflow: hidden;
+        border: 3px solid #202020;
+        background: #f6f6f6;
+        box-shadow: 3px 3px 0 #202020;
     }
 
+    :scope.hunting-choice-active .hunting-overlay-card,
     :scope.hunting-chest-active .hunting-overlay-card,
     :scope.hunting-event-active .hunting-overlay-card,
     :scope.hunting-battle-preparation-active .hunting-overlay-card {
@@ -828,9 +832,19 @@
         pointer-events: auto;
     }
 
+    :scope.hunting-choice-active .hunting-auto-advance,
+    :scope.hunting-chest-active .hunting-auto-advance,
+    :scope.hunting-event-active .hunting-auto-advance,
+    :scope.hunting-battle-preparation-active .hunting-auto-advance {
+        position: static;
+        grid-column: 1 / -1;
+        grid-row: 2;
+        align-self: end;
+        box-sizing: border-box;
+    }
+
     .hunting-chest-event,
-    .hunting-event-result,
-    .hunting-battle-preparation {
+    .hunting-event-result {
         display: grid;
         grid-template-rows: minmax(0, 1fr) auto;
         flex: 1 1 auto;
@@ -841,6 +855,7 @@
     .hunting-event-scroll-body {
         min-height: 0;
         overflow-y: auto;
+        overflow-wrap: anywhere;
         overscroll-behavior: contain;
         -webkit-overflow-scrolling: touch;
         touch-action: pan-y;
@@ -849,6 +864,10 @@
     .hunting-event-actions {
         padding-top: 8px;
         text-align: center;
+    }
+
+    .hunting-event-actions .hunting-btn {
+        width: 100%;
     }
 
     .hunting-chest-event {
@@ -905,16 +924,9 @@
     }
 
     .hunting-battle-preparation {
-        gap: 10px;
         margin-top: 14px;
         padding-top: 14px;
         border-top: 1px solid #e0e0e0;
-    }
-
-    .hunting-battle-preparation .hunting-event-scroll-body {
-        display: grid;
-        align-content: start;
-        gap: 10px;
     }
 
     .hunting-battle-start {
@@ -976,6 +988,13 @@
     }
 
     @media (max-width: 600px) {
+        :scope.hunting-choice-active .hunting-overlay-frame,
+        :scope.hunting-chest-active .hunting-overlay-frame,
+        :scope.hunting-event-active .hunting-overlay-frame,
+        :scope.hunting-battle-preparation-active .hunting-overlay-frame {
+            grid-template-columns: minmax(0, 1fr) minmax(0, 10fr) minmax(0, 1fr);
+        }
+
         :scope.hunting-moving .hunting-overlay-frame {
             width: 100%;
             height: 100%;
@@ -1099,11 +1118,14 @@
         .hunting-loot-hud .hud-body {
             font-size: 0.65rem;
         }
-        :scope.hunting-chest-active .hunting-overlay-card {
+        :scope.hunting-choice-active .hunting-overlay-card,
+        :scope.hunting-chest-active .hunting-overlay-card,
+        :scope.hunting-event-active .hunting-overlay-card,
+        :scope.hunting-battle-preparation-active .hunting-overlay-card {
             padding: 14px 16px;
         }
         .hunting-chest-token {
-            --chest-icon-scale: 0.9;
+            --chest-icon-scale: 0.8;
             margin: -2px 0 0;
         }
     }

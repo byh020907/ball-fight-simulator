@@ -1126,12 +1126,12 @@ function testResultOverlayLayoutContract() {
     }
     const huntingFrameRule =
         huntingOverlay.match(
-            /:scope\.hunting-chest-active \.hunting-overlay-frame,\s*:scope\.hunting-event-active \.hunting-overlay-frame,\s*:scope\.hunting-battle-preparation-active \.hunting-overlay-frame\s*\{([^}]*)\}/s
+            /:scope\.hunting-choice-active \.hunting-overlay-frame,\s*:scope\.hunting-chest-active \.hunting-overlay-frame,\s*:scope\.hunting-event-active \.hunting-overlay-frame,\s*:scope\.hunting-battle-preparation-active \.hunting-overlay-frame\s*\{([^}]*)\}/s
         )?.[1] ?? "";
     assert.match(
         huntingFrameRule,
-        /width:\s*100%;[\s\S]*height:\s*100%;[\s\S]*display:\s*grid;[\s\S]*place-items:\s*center;/,
-        "Standalone hunting overlays must use the full available area before centering their card"
+        /width:\s*100%;[\s\S]*height:\s*100%;[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 6fr\) minmax\(0, 1fr\);[\s\S]*grid-template-rows:\s*minmax\(0, 1fr\) auto;/,
+        "Standalone hunting overlays must reserve a fluid center card track and a separate timer row"
     );
     assert.doesNotMatch(
         huntingFrameRule,
@@ -1140,16 +1140,16 @@ function testResultOverlayLayoutContract() {
     );
     const huntingCardRule =
         huntingOverlay.match(
-            /:scope\.hunting-chest-active \.hunting-overlay-card,\s*:scope\.hunting-event-active \.hunting-overlay-card,\s*:scope\.hunting-battle-preparation-active \.hunting-overlay-card\s*\{([^}]*)\}/s
+            /:scope\.hunting-choice-active \.hunting-overlay-card,\s*:scope\.hunting-chest-active \.hunting-overlay-card,\s*:scope\.hunting-event-active \.hunting-overlay-card,\s*:scope\.hunting-battle-preparation-active \.hunting-overlay-card\s*\{([^}]*)\}/s
         )?.[1] ?? "";
     assert.match(
         huntingCardRule,
-        /width:\s*fit-content;[\s\S]*max-width:\s*100%;[\s\S]*max-height:\s*100%;[\s\S]*box-sizing:\s*border-box;/,
-        "Standalone hunting cards must size to their content while staying inside the fluid shared frame"
+        /grid-column:\s*2;[\s\S]*grid-row:\s*1;[\s\S]*width:\s*100%;[\s\S]*max-height:\s*100%;[\s\S]*box-sizing:\s*border-box;/,
+        "Standalone hunting cards must use the shared fluid center track instead of changing width with copy length"
     );
     assert.doesNotMatch(
         huntingCardRule,
-        /(?:\b\d+px\b|calc\()/,
+        /(?:^|\s)(?:width|height|max-width|max-height):\s*(?:\d+px|calc\()/,
         "Standalone hunting cards must not use fixed container dimensions"
     );
     assert.ok(
@@ -1279,12 +1279,13 @@ function testResultOverlayLayoutContract() {
 
 function testFluidModalLayoutContracts() {
     const huntingOverlay = readSource("src/components/hunting-overlay.html");
+    const huntingManager = readSource("src/hunting/huntingManager.js");
     const collectionHub = readSource("src/components/collection-hub.html");
     const equipmentPanel = readSource("src/components/collection-equipment-panel.html");
 
     const huntingCardRule =
         huntingOverlay.match(
-            /:scope\.hunting-chest-active \.hunting-overlay-card,\s*:scope\.hunting-event-active \.hunting-overlay-card,\s*:scope\.hunting-battle-preparation-active \.hunting-overlay-card\s*\{([^}]*)\}/s
+            /:scope\.hunting-choice-active \.hunting-overlay-card,\s*:scope\.hunting-chest-active \.hunting-overlay-card,\s*:scope\.hunting-event-active \.hunting-overlay-card,\s*:scope\.hunting-battle-preparation-active \.hunting-overlay-card\s*\{([^}]*)\}/s
         )?.[1] ?? "";
     assert.match(
         huntingCardRule,
@@ -1292,9 +1293,7 @@ function testFluidModalLayoutContracts() {
         "Hunting event cards must pass their available height to internal content instead of relying on a viewport-specific card size"
     );
     const eventLayoutRule =
-        huntingOverlay.match(
-            /\.hunting-chest-event,\s*\.hunting-event-result,\s*\.hunting-battle-preparation\s*\{([^}]*)\}/s
-        )?.[1] ?? "";
+        huntingOverlay.match(/\.hunting-chest-event,\s*\.hunting-event-result\s*\{([^}]*)\}/s)?.[1] ?? "";
     assert.match(
         eventLayoutRule,
         /display:\s*grid;[\s\S]*grid-template-rows:\s*minmax\(0, 1fr\) auto;[\s\S]*min-height:\s*0;/,
@@ -1310,6 +1309,38 @@ function testFluidModalLayoutContracts() {
         huntingOverlay.includes('class="hunting-event-scroll-body"') &&
             huntingOverlay.includes('class="hunting-event-actions"'),
         "Hunting event markup must keep the scroll body and action footer as reusable siblings"
+    );
+    const eventActionRule = huntingOverlay.match(/\.hunting-event-actions \.hunting-btn\s*\{([^}]*)\}/s)?.[1] ?? "";
+    assert.match(eventActionRule, /width:\s*100%;/, "Every hunting event action must use the shared card width");
+    assert.equal(
+        huntingOverlay.includes('<strong x-text="huntingMoveMessage"></strong>'),
+        false,
+        "Battle preparation must not repeat the title already rendered by the shared heading"
+    );
+    assert.equal(
+        huntingOverlay.includes("잠시 후 전투가 자동으로 시작됩니다.</p>"),
+        false,
+        "Battle preparation must not repeat the automatic-start guidance already visible in the heading and timer"
+    );
+    const eventHeadingTitleRule = huntingOverlay.match(/\.hunting-overlay-heading > strong\s*\{([^}]*)\}/s)?.[1] ?? "";
+    assert.match(
+        eventHeadingTitleRule,
+        /text-wrap:\s*balance;/,
+        "Long hunting event titles must balance their lines instead of leaving a one-character orphan"
+    );
+    assert.equal(
+        huntingOverlay.includes("huntingChestSubtext") || huntingManager.includes("huntingChestSubtext"),
+        false,
+        "The removed duplicate chest storage copy must not leave dead overlay state behind"
+    );
+    const autoAdvanceInFrameRule =
+        huntingOverlay.match(
+            /:scope\.hunting-choice-active \.hunting-auto-advance,\s*:scope\.hunting-chest-active \.hunting-auto-advance,\s*:scope\.hunting-event-active \.hunting-auto-advance,\s*:scope\.hunting-battle-preparation-active \.hunting-auto-advance\s*\{([^}]*)\}/s
+        )?.[1] ?? "";
+    assert.match(
+        autoAdvanceInFrameRule,
+        /position:\s*static;[\s\S]*grid-column:\s*1 \/ -1;[\s\S]*grid-row:\s*2;/,
+        "Automatic progress must occupy a reserved frame row instead of covering event actions"
     );
 
     const collectionScopeRule = collectionHub.match(/:scope\s*\{([^}]*)\}/s)?.[1] ?? "";

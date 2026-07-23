@@ -550,7 +550,6 @@ export class HuntingManager {
             huntingChestEventActive: false,
             huntingChestRarity: "common",
             huntingChestTitle: "",
-            huntingChestSubtext: "",
             huntingChestConfirmLabel: "",
             huntingBattlePreparationActive: false,
             huntingAutoAdvanceActive: false,
@@ -1476,7 +1475,6 @@ export class HuntingManager {
             huntingChestEventActive: true,
             huntingChestRarity: chest.rarity,
             huntingChestTitle: `${rarityLabel} 상자 확보`,
-            huntingChestSubtext: "미확보 전리품에 보관됩니다",
             huntingChestConfirmLabel: confirmLabel,
             ...hud
         });
@@ -1571,7 +1569,6 @@ export class HuntingManager {
             huntingChestEventActive: false,
             huntingChestRarity: "common",
             huntingChestTitle: "",
-            huntingChestSubtext: "",
             huntingChestConfirmLabel: ""
         });
         return this[handlerName]();
@@ -1744,7 +1741,6 @@ export class HuntingManager {
             huntingChestEventActive: true,
             huntingChestRarity: chest.rarity,
             huntingChestTitle: `${rarityLabel} 상자 확보`,
-            huntingChestSubtext: "전투 보상 · 미확보 전리품에 보관됩니다",
             huntingChestConfirmLabel: "확인",
             ...hud
         });
