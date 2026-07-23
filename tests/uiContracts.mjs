@@ -883,6 +883,7 @@ function testHuntingOverlayActionContracts() {
     assert.ok(
         !overlay.includes('@click="huntingSwapActiveCharacter()"') &&
             overlay.includes('class="hunting-auto-advance"') &&
+            overlay.includes('class="hunting-auto-advance-track"') &&
             overlay.includes("'자동 진행 · '") &&
             overlay.includes('@click="huntingSkipAutoAdvance()"'),
         "The hunting overlay should replace swap input with one visible automatic-progress control"

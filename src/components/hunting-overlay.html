@@ -196,9 +196,12 @@
             @click="huntingSkipAutoAdvance()"
         >
             <span
+                class="hunting-auto-advance-label"
                 x-text="'자동 진행 · ' + Math.max(0, huntingAutoAdvanceRemainingMs / 1000).toFixed(1) + '초'"
             ></span>
-            <i aria-hidden="true" x-bind:style="'transform:scaleX(' + huntingAutoAdvanceProgress + ')'" ></i>
+            <span class="hunting-auto-advance-track" aria-hidden="true">
+                <i x-bind:style="'transform:scaleX(' + huntingAutoAdvanceProgress + ')'" ></i>
+            </span>
         </button>
     </div>
 
@@ -690,30 +693,45 @@
 
     .hunting-auto-advance {
         position: absolute;
-        bottom: clamp(0.5rem, 3%, 1.25rem);
-        left: 50%;
+        right: 0;
+        bottom: 0;
+        left: 0;
         display: grid;
-        inline-size: max-content;
-        max-inline-size: calc(100% - clamp(1rem, 6%, 2.5rem));
+        inline-size: 100%;
         min-width: 0;
-        overflow: hidden;
-        padding: 0.55rem 0.8rem 0.45rem;
-        border: 3px solid #202020;
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.94);
+        gap: 0.25rem;
+        padding: 0.3rem clamp(0.5rem, 3%, 1.25rem) 0.2rem;
+        border: 0;
+        border-top: 2px solid #202020;
+        background: rgba(255, 255, 255, 0.96);
         color: #202020;
         font-family: inherit;
-        font-size: 0.72rem;
         font-weight: 900;
         pointer-events: auto;
         cursor: pointer;
-        transform: translateX(-50%);
         z-index: 4;
     }
 
-    .hunting-auto-advance i {
-        height: 0.22rem;
-        margin-top: 0.3rem;
+    .hunting-auto-advance-label {
+        overflow: hidden;
+        font-size: 0.66rem;
+        line-height: 1;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .hunting-auto-advance-track {
+        display: block;
+        inline-size: 100%;
+        block-size: 0.32rem;
+        overflow: hidden;
+        background: #d7d7d7;
+    }
+
+    .hunting-auto-advance-track i {
+        display: block;
+        inline-size: 100%;
+        block-size: 100%;
         background: #202020;
         transform-origin: left center;
     }
