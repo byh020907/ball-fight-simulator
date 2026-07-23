@@ -204,6 +204,9 @@ export class BattleApp {
     setHuntingOverlayState(data) {
         this._huntingOverlay.setHuntingState(data);
     }
+    setHuntingAutoAdvanceState(data) {
+        this._huntingOverlay.setHuntingState(data);
+    }
     resetHuntingUiState() {
         this._huntingOverlay.reset();
     }

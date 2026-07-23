@@ -2,7 +2,7 @@ import { Vector2 } from "../core.js";
 
 export const HUNTING_COMBAT_INTERACTION_CONFIG = Object.freeze({
     perfectSwap: Object.freeze({
-        enabled: true,
+        enabled: false,
         effectId: "hunting_perfect_swap",
         windowSeconds: 0.2,
         missedAttemptCooldownSeconds: 1.5,

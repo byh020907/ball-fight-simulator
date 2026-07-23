@@ -909,7 +909,7 @@
             monsterCodexItems: [],
             masteryItems: [],
             achievementItems: [],
-            storage: { shards: 0, chests: [], stats: {}, consumables: [], huntingConsumableUseLimitUpgrade: null },
+            storage: { shards: 0, chests: [], stats: {} },
             equipment: {
                 items: [],
                 enhancementStones: 0,
@@ -1316,9 +1316,7 @@
                 state.storage = vm.storage ?? {
                     shards: 0,
                     chests: [],
-                    stats: {},
-                    consumables: [],
-                    huntingConsumableUseLimitUpgrade: null
+                    stats: {}
                 };
                 state.summary = vm.summary ?? {};
                 const developer = vm.developer ?? {};

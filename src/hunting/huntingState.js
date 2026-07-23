@@ -9,6 +9,7 @@ import {
 } from "./huntingConfig.js";
 import { applyDefeatPreservation, createEmptyHuntingLoot, mergeHuntingLoot } from "./huntingRewards.js";
 import { HUNTING_EVENT_TYPES } from "./huntingConfig.js";
+import { HUNTING_FLOW_CONFIG } from "./huntingFlowConfig.js";
 import { createHuntingAchievementProgress } from "./huntingAchievementProgress.js";
 import { isCharacterUnlocked } from "../playerProfile.js";
 import {
@@ -57,7 +58,9 @@ export function getEligibleHuntingCharacters(profile, roster = []) {
 
 export function isHuntingPartySelectionEligible(profile, roster = [], party = {}) {
     const companionIds = Array.isArray(party.companionIds) ? party.companionIds : [];
-    const selectedIds = [party.leaderId, ...companionIds, party.swapId].filter(Boolean);
+    const selectedIds = [party.leaderId, ...companionIds, HUNTING_FLOW_CONFIG.swapEnabled ? party.swapId : null].filter(
+        Boolean
+    );
     const eligibleIds = new Set(getEligibleHuntingCharacters(profile, roster).map((fighter) => fighter.id));
     return (
         Boolean(party.leaderId) &&
@@ -94,8 +97,6 @@ export function createHuntingRun({
         stageId,
         floor: 1,
         maxFloor,
-        consumableUses: {},
-        battleConsumableUses: {},
         statModifiers: [],
         pendingLoot: createEmptyHuntingLoot(),
         securedLoot: createEmptyHuntingLoot(),

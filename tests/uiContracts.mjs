@@ -271,11 +271,9 @@ function testDailyShopPopupContract() {
         /rerollDailyShop\(\)\s*\{\s*const result = Alpine\.store\("uiManager"\)\.invokeGameAction\("rerollDailyShop"\);\s*if \(!result\) return result;\s*playOfferSwapAnimation\(\);\s*return result;\s*\}/s,
         "A successful manual reroll should use the shared offer replacement animation, while failures should not"
     );
-    assert.ok(shopPanel.includes("state.storage.consumables"), "Shop should render definition-driven consumable rows");
-    assert.ok(shopPanel.includes("buyConsumable(item.id)"), "Consumable rows should purchase the selected definition");
     assert.ok(
-        shopPanel.includes("upgradeHuntingConsumableUseLimit"),
-        "Shop should expose the permanent hunting consumable use-limit upgrade"
+        !shopPanel.includes("consumable") && !shopPanel.includes("물약"),
+        "Removed consumables must not leave shop controls behind"
     );
     assert.ok(
         !collectionHub.includes('class="ch-daily-shop"'),
@@ -852,14 +850,12 @@ function testHuntingOverlayActionContracts() {
     assert.ok(
         overlay.includes("huntingBattlePreparationActive: false") &&
             overlay.includes('class="hunting-battle-preparation"') &&
-            overlay.includes('@click="huntingUsePreparationConsumable(item.id)"') &&
             overlay.includes('@click="huntingStartPreparedBattle()"'),
-        "Battle preparation must remain inside the hunting overlay"
+        "Automatic battle start feedback must remain inside the hunting overlay"
     );
     assert.ok(
-        bridge.includes("huntingUsePreparationConsumable(consumableId)") &&
-            bridge.includes("huntingStartPreparedBattle()"),
-        "Component bridge must expose preparation actions"
+        !bridge.includes("huntingUsePreparationConsumable") && bridge.includes("huntingStartPreparedBattle()"),
+        "Component bridge must remove potion actions and expose battle start"
     );
     assert.ok(
         overlay.includes('data-component-id="huntingXpRewardPanel"') &&
@@ -874,8 +870,9 @@ function testHuntingOverlayActionContracts() {
         "Hunting wins must advance reusable local result cards"
     );
     assert.ok(
-        overlay.includes("this.resetHuntingCombatResult();") && overlay.includes('? "experience" : "summary"'),
-        "Advancing or leaving the post-combat cards must reset their display-only state before hunting continues"
+        bridge.includes("huntingAdvanceCombatResult()") &&
+            overlay.includes('invokeGameAction("huntingAdvanceCombatResult")'),
+        "Post-combat cards must use the manager-owned automatic result flow"
     );
     assert.ok(
         overlay.includes('class="hunting-combat-unlock-card"') &&
@@ -884,14 +881,15 @@ function testHuntingOverlayActionContracts() {
         "The first hidden champion victory must prepend a compact unlock card without replacing XP and summary cards"
     );
     assert.ok(
-        overlay.includes('class="hunting-party-action-bar"') &&
-            overlay.includes('@click="huntingSwapActiveCharacter()"') &&
-            !overlay.includes("huntingDeploySupport"),
-        "The real hunting overlay should expose only the manual swap control"
+        !overlay.includes('@click="huntingSwapActiveCharacter()"') &&
+            overlay.includes('class="hunting-auto-advance"') &&
+            overlay.includes("'자동 진행 · '") &&
+            overlay.includes('@click="huntingSkipAutoAdvance()"'),
+        "The hunting overlay should replace swap input with one visible automatic-progress control"
     );
     assert.ok(
-        bridge.includes("huntingSwapActiveCharacter()") && !bridge.includes("huntingDeploySupport(slotIndex)"),
-        "The remaining swap control must route through the component bridge without support actions"
+        !bridge.includes("huntingSwapActiveCharacter()") && bridge.includes("huntingSkipAutoAdvance()"),
+        "The bridge must disable swap input and expose early automatic-progress confirmation"
     );
     console.log("[hunting-overlay-action-contracts] ok");
 }

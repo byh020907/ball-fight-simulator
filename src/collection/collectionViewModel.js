@@ -18,7 +18,6 @@ import {
     previewHuntingChest
 } from "../hunting/index.js";
 import { HUNTING_EVENT_TYPES, HUNTING_MAX_FLOOR, HUNTING_STAGES } from "../hunting/huntingConfig.js";
-import { getConsumableShopItems, getHuntingConsumableUseLimitUpgrade } from "../consumables.js";
 import { getRarityLabel } from "../hunting/rarityPresentation.js";
 import {
     getInventorySlots,
@@ -66,7 +65,6 @@ const MONSTER_FACE_LABELS = Object.freeze({
 
 const HUNTING_DEBUG_EVENT_OPTIONS = Object.freeze([
     { id: HUNTING_EVENT_TYPES.PORTAL, label: "귀환 포탈" },
-    { id: HUNTING_EVENT_TYPES.WANDERING_MERCHANT, label: "방랑 상인" },
     { id: HUNTING_EVENT_TYPES.BOON, label: "축복" },
     { id: HUNTING_EVENT_TYPES.MISHAP, label: "함정" },
     { id: HUNTING_EVENT_TYPES.CHEST_ROOM, label: "상자방" },
@@ -370,9 +368,6 @@ export function createCollectionHubViewModel({
             canOpen: canOpenHuntingChest(profile, chest)
         };
     });
-    const consumableShopItems = getConsumableShopItems(profile);
-    const huntingConsumableUseLimitUpgrade = getHuntingConsumableUseLimitUpgrade(profile);
-
     // 요약
     const playedCharacters = rosterItems.filter((item) => item.hasRecord).length;
     const cumulativeLevels = rosterItems.reduce((sum, item) => sum + item.masteryLevel, 0);
@@ -429,8 +424,6 @@ export function createCollectionHubViewModel({
         storage: {
             shards: hunting.shards ?? 0,
             dailyShop: getDailyShop(profile),
-            consumables: consumableShopItems,
-            huntingConsumableUseLimitUpgrade,
             chests: storageItems,
             stats: {
                 runsStarted: hunting.stats?.runsStarted ?? 0,

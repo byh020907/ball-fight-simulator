@@ -67,7 +67,8 @@ import { PopupService } from "../popup.js";
 import { advanceHuntingRun, completeHuntingStage } from "./huntingRunProgression.js";
 import { HUNTING_EVENT_TRANSITIONS, HuntingEvent } from "./huntingEvents.js";
 import { getHuntingDisplayHealth, getHuntingDisplayHp } from "./huntingHealth.js";
-import { getHuntingPreparationConsumables, useHuntingPreparationConsumable } from "../consumables.js";
+import { HuntingAutoAdvance } from "./huntingAutoAdvance.js";
+import { HUNTING_FLOW_CONFIG, isHuntingEventEnabled } from "./huntingFlowConfig.js";
 import {
     applyHuntingRunAchievementProgress,
     recordHuntingBattleStart,
@@ -142,7 +143,9 @@ const HUNTING_EVENT_PRESENTATION_HANDLERS = Object.freeze({
 
 function isValidHuntingPartySelection(characterId, party, selectableCharacterIds) {
     const companionIds = Array.isArray(party?.companionIds) ? party.companionIds : [];
-    const selectedIds = [characterId, ...companionIds, party?.swapId].filter(Boolean);
+    const selectedIds = [characterId, ...companionIds, HUNTING_FLOW_CONFIG.swapEnabled ? party?.swapId : null].filter(
+        Boolean
+    );
     return (
         selectedIds.length > 0 &&
         new Set(selectedIds).size === selectedIds.length &&
@@ -185,10 +188,36 @@ export class HuntingManager {
         this._lastBattlePartyExperienceResults = [];
         this._perfectSwapAttempt = null;
         this._perfectSwapCooldownRemaining = 0;
+        this._combatResultSteps = [];
+        this._combatResultStepIndex = 0;
+        this._autoAdvanceEnabled = typeof this.app.setHuntingAutoAdvanceState === "function";
+        this._autoAdvance = new HuntingAutoAdvance({
+            onStateChange: (state) =>
+                this.app.setHuntingAutoAdvanceState?.({
+                    huntingAutoAdvanceActive: state.active,
+                    huntingAutoAdvanceLabel: state.label,
+                    huntingAutoAdvanceRemainingMs: state.remainingMs,
+                    huntingAutoAdvanceProgress: state.progress
+                })
+        });
     }
 
     get isActive() {
         return this._run?.status === "active";
+    }
+
+    _scheduleAutoAdvance(action, label = "계속 진행") {
+        if (!this._autoAdvanceEnabled) return false;
+        this._autoAdvance.start(action, { label });
+        return true;
+    }
+
+    _cancelAutoAdvance() {
+        this._autoAdvance.cancel();
+    }
+
+    skipAutoAdvance() {
+        return this._autoAdvance.skip();
     }
 
     showStageSelect() {
@@ -298,6 +327,7 @@ export class HuntingManager {
                     companionIds: [null, null],
                     swapId: null
                 },
+                swapEnabled: HUNTING_FLOW_CONFIG.swapEnabled,
                 checkpoints,
                 startAction,
                 startContext
@@ -347,9 +377,10 @@ export class HuntingManager {
         PopupService.close();
         const validStageId = HUNTING_STAGES.some((stage) => stage.id === stageId) ? stageId : HUNTING_STAGE_IDS.CAVE;
         const validFloor = Math.max(1, Math.min(HUNTING_MAX_FLOOR, Math.floor(encounterFloor) || 1));
-        const validEventType = Object.values(HUNTING_EVENT_TYPES).includes(eventType)
-            ? eventType
-            : HUNTING_EVENT_TYPES.PORTAL;
+        const validEventType =
+            Object.values(HUNTING_EVENT_TYPES).includes(eventType) && isHuntingEventEnabled(eventType)
+                ? eventType
+                : HUNTING_EVENT_TYPES.PORTAL;
         const eliteCombination =
             validEventType === HUNTING_EVENT_TYPES.ELITE_MOB
                 ? (getEliteMobCombination(eliteCombinationId) ?? ELITE_MOB_COMBINATIONS[0])
@@ -416,7 +447,9 @@ export class HuntingManager {
             debugEliteCombinationId = null
         }
     ) {
-        const selection = { leaderId: characterId, companionIds: party.companionIds, swapId: party.swapId };
+        this._cancelAutoAdvance();
+        const swapId = HUNTING_FLOW_CONFIG.swapEnabled ? party.swapId : null;
+        const selection = { leaderId: characterId, companionIds: party.companionIds, swapId };
         if (debug) {
             const selectableCharacterIds = new Set(this.app.roster.map((fighter) => fighter.id));
             if (!isValidHuntingPartySelection(characterId, party, selectableCharacterIds)) return;
@@ -432,7 +465,7 @@ export class HuntingManager {
                 characterId,
                 stageId,
                 companionIds: party.companionIds,
-                swapId: party.swapId
+                swapId
             }),
             floor: Math.max(0, encounterFloor - 1)
         };
@@ -519,10 +552,10 @@ export class HuntingManager {
             huntingChestSubtext: "",
             huntingChestConfirmLabel: "",
             huntingBattlePreparationActive: false,
-            huntingBattlePreparationItems: [],
-            huntingBattlePreparationHp: 0,
-            huntingBattlePreparationMaxHp: 0,
-            huntingBattlePreparationNotice: "",
+            huntingAutoAdvanceActive: false,
+            huntingAutoAdvanceLabel: "",
+            huntingAutoAdvanceRemainingMs: 0,
+            huntingAutoAdvanceProgress: 0,
             huntingMoving: false,
             huntingMoveFrom: 0,
             huntingMoveTo: 0,
@@ -592,6 +625,7 @@ export class HuntingManager {
     }
 
     _createSwapHuntingSpec(run) {
+        if (!HUNTING_FLOW_CONFIG.swapEnabled) return null;
         const inactiveRole =
             run.party.activeRole === HUNTING_PARTY_ROLES.LEADER ? HUNTING_PARTY_ROLES.SWAP : HUNTING_PARTY_ROLES.LEADER;
         return this._createHuntingPartyMemberSpec(run, inactiveRole, {
@@ -786,6 +820,7 @@ export class HuntingManager {
     }
 
     _handleFinish(app) {
+        this._cancelAutoAdvance();
         app._cleanupMatch();
         app.matchFinalized = true;
         app._onSimulationResult = null;
@@ -1158,6 +1193,7 @@ export class HuntingManager {
     }
 
     retreat() {
+        this._cancelAutoAdvance();
         const app = this.app;
         const run = this._run;
         if (!run || run.status !== "active") return;
@@ -1195,6 +1231,7 @@ export class HuntingManager {
     }
 
     async advance({ waitForFirstMoveUi = false } = {}) {
+        this._cancelAutoAdvance();
         const app = this.app;
         const run = this._run;
         if (!run || run.status !== "active" || this._moving) return;
@@ -1320,7 +1357,7 @@ export class HuntingManager {
         app.addLog(`[사냥터] ${floor}층 · 최종보스${bossName ? ` · ${bossName}` : ""}`);
         this._stopHuntingMoveForBattle(app, message, {
             label: bossName ? `${floor}층 · 최종보스` : "전투 준비",
-            subtext: "물약을 준비하거나 전투를 시작하세요."
+            subtext: "잠시 후 전투가 자동으로 시작됩니다."
         });
         return HUNTING_ROUTE_ACTIONS.STOP;
     }
@@ -1389,18 +1426,14 @@ export class HuntingManager {
     _stopHuntingMoveForBattle(
         app,
         message,
-        { label = "전투 준비", subtext = "물약을 준비하거나 전투를 시작하세요." } = {}
+        { label = "전투 준비", subtext = "잠시 후 전투가 자동으로 시작됩니다." } = {}
     ) {
         const player = this._createPlayerHuntingSpec(this._run);
         if (player) {
             this._run = this._syncRunHealth(this._run, player.appliedSpec);
         }
-        this._run = {
-            ...setHuntingRunPhase(this._run, HUNTING_RUN_PHASES.AWAITING_BATTLE_PREPARATION),
-            battleConsumableUses: {}
-        };
+        this._run = setHuntingRunPhase(this._run, HUNTING_RUN_PHASES.AWAITING_BATTLE_PREPARATION);
         const hud = this._getLootHudState();
-        const preparation = this._getBattlePreparationState();
         app.showOverlay(label, message, subtext);
         app.setHuntingOverlayState({
             huntingMoving: false,
@@ -1409,56 +1442,22 @@ export class HuntingManager {
             huntingMerchantActive: false,
             huntingChestEventActive: false,
             huntingMoveMessage: message,
-            ...preparation,
+            huntingBattlePreparationActive: true,
             ...hud
         });
         this._moving = false;
-    }
-
-    _getBattlePreparationState(notice = "") {
-        const run = this._run;
-        const health = getHuntingDisplayHealth(run);
-        return {
-            huntingBattlePreparationActive: true,
-            huntingBattlePreparationItems: getHuntingPreparationConsumables(this.app.playerProfile, run),
-            huntingBattlePreparationHp: health.hp,
-            huntingBattlePreparationMaxHp: health.maxHp,
-            huntingBattlePreparationNotice: notice
-        };
-    }
-
-    usePreparationConsumable(consumableId) {
-        const app = this.app;
-        const run = this._run;
-        if (!run || run.status !== "active" || run.phase !== HUNTING_RUN_PHASES.AWAITING_BATTLE_PREPARATION)
-            return null;
-
-        const applied = useHuntingPreparationConsumable(app.playerProfile, run, consumableId);
-        if (!applied) return null;
-
-        this._run = applied.run;
-        savePlayerProfile(app.playerProfile);
-        const health = getHuntingDisplayHealth(this._run);
-        app.setHuntingOverlayState(
-            this._getBattlePreparationState(
-                `${applied.result.label} +${getHuntingDisplayHp(applied.result.healed)} HP · ${health.hp}/${health.maxHp}`
-            )
-        );
-        return applied.result;
+        this._scheduleAutoAdvance(() => this.startPreparedBattle(), "전투 시작");
     }
 
     startPreparedBattle() {
+        this._cancelAutoAdvance();
         const app = this.app;
         const run = this._run;
         if (!run || run.status !== "active" || run.phase !== HUNTING_RUN_PHASES.AWAITING_BATTLE_PREPARATION) return;
 
         this._run = setHuntingRunPhase(run, HUNTING_RUN_PHASES.COMBAT);
         app.setHuntingOverlayState({
-            huntingBattlePreparationActive: false,
-            huntingBattlePreparationItems: [],
-            huntingBattlePreparationHp: 0,
-            huntingBattlePreparationMaxHp: 0,
-            huntingBattlePreparationNotice: ""
+            huntingBattlePreparationActive: false
         });
         this._startFloorBattle();
     }
@@ -1484,6 +1483,7 @@ export class HuntingManager {
             ...hud
         });
         this._moving = false;
+        this._scheduleAutoAdvance(() => this.advance({ waitForFirstMoveUi: true }), "계속 전진");
     }
 
     _stopHuntingMoveForMerchant(app, { message, floor, offers, summary }) {
@@ -1537,6 +1537,7 @@ export class HuntingManager {
             ...hud
         });
         this._moving = false;
+        this._scheduleAutoAdvance(() => this.chestContinue(), confirmLabel);
     }
 
     _stopHuntingMoveForEvent(app, presentation, confirmLabel = "계속 전진") {
@@ -1563,6 +1564,7 @@ export class HuntingManager {
             ...hud
         });
         this._moving = false;
+        this._scheduleAutoAdvance(() => this.eventContinue(), confirmLabel);
     }
 
     merchantChoose(offerIndex) {
@@ -1613,6 +1615,7 @@ export class HuntingManager {
     }
 
     chestContinue() {
+        this._cancelAutoAdvance();
         const app = this.app;
         const run = this._run;
         if (!run || run.status !== "active") return;
@@ -1631,6 +1634,7 @@ export class HuntingManager {
     }
 
     eventContinue() {
+        this._cancelAutoAdvance();
         const app = this.app;
         const run = this._run;
         if (!run || run.status !== "active" || run.phase !== HUNTING_RUN_PHASES.AWAITING_EVENT) return;
@@ -1675,9 +1679,11 @@ export class HuntingManager {
     }
 
     continueCharacterUnlockResult() {
+        this._cancelAutoAdvance();
         if (!this._pendingUnlockResultChest || this._combatRewardChestQueue.length === 0) return false;
         this._pendingUnlockResultChest = false;
         this._lastBattleCharacterUnlock = null;
+        this.app.setHuntingOverlayState({ huntingCombatResultActive: false });
         this._presentCombatRewardChest(this.app, this._combatRewardChestQueue[0]);
         return true;
     }
@@ -1798,6 +1804,7 @@ export class HuntingManager {
             huntingChestConfirmLabel: "확인",
             ...hud
         });
+        this._scheduleAutoAdvance(() => this.chestContinue(), "확인");
     }
 
     _createHuntingExperienceResultStep(app, xpResult) {
@@ -1855,7 +1862,32 @@ export class HuntingManager {
             ...hud
         });
         app.setStartButton({ hidden: true, disabled: true, text: "" });
+        this._combatResultSteps = this._lastBattleCharacterUnlock
+            ? ["unlock", "experience", "summary"]
+            : ["experience", "summary"];
+        this._combatResultStepIndex = 0;
+        this._scheduleAutoAdvance(() => this.advanceCombatResult(), "다음 결과");
         if (!this._pendingUnlockResultChest) this._lastBattleCharacterUnlock = null;
+    }
+
+    advanceCombatResult() {
+        this._cancelAutoAdvance();
+        if (!this._run || this._combatResultSteps.length === 0) return false;
+
+        if (this._combatResultStepIndex < this._combatResultSteps.length - 1) {
+            this._combatResultStepIndex += 1;
+            const step = this._combatResultSteps[this._combatResultStepIndex];
+            this.app.setHuntingOverlayState({ huntingCombatResultStep: step });
+            this._scheduleAutoAdvance(() => this.advanceCombatResult(), step === "summary" ? "계속 전진" : "다음 결과");
+            return true;
+        }
+
+        this._combatResultSteps = [];
+        this._combatResultStepIndex = 0;
+        this.app.setHuntingOverlayState({ huntingCombatResultActive: false });
+        if (this._pendingUnlockResultChest) return this.continueCharacterUnlockResult();
+        this.advance({ waitForFirstMoveUi: true });
+        return true;
     }
 
     _presentFinalBossClear(app, xpResult = this._lastBattleExperienceResult) {

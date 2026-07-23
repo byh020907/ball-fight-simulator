@@ -214,12 +214,12 @@
                 return {
                     leaderId: normalize(party.leaderId),
                     companionIds: (party.companionIds ?? []).map(normalize),
-                    swapId: normalize(party.swapId)
+                    swapId: this.content?.swapEnabled ? normalize(party.swapId) : null
                 };
             },
             getHuntingPartySlots() {
                 const party = this.getHuntingPartySelection();
-                return [
+                const slots = [
                     {
                         key: "leader",
                         role: "leader",
@@ -235,9 +235,12 @@
                         label: `동료 ${index + 1}`,
                         detail: "장비 없음",
                         value
-                    })),
-                    { key: "swap", role: "swap", label: "교대", detail: "장비 공유", value: party.swapId }
+                    }))
                 ];
+                if (this.content?.swapEnabled) {
+                    slots.push({ key: "swap", role: "swap", label: "교대", detail: "장비 공유", value: party.swapId });
+                }
+                return slots;
             },
             getHuntingPartyCharacters(slot) {
                 const characters = this.content?.characters ?? [];

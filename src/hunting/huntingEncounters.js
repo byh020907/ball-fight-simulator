@@ -12,6 +12,7 @@ import {
     HUNTING_PORTAL_DECLINE
 } from "./huntingConfig.js";
 import { createHuntingEvent, HuntingEvent } from "./huntingEvents.js";
+import { isHuntingEventEnabled } from "./huntingFlowConfig.js";
 
 const DEFAULT_RNG = () => Math.random();
 
@@ -63,12 +64,14 @@ export function shouldRollHuntingEvent(floor, rng = DEFAULT_RNG) {
 }
 
 function rollWeightedEventType(floor, rng, portalMultiplier = 1.0, mishapAllowed = true) {
-    const candidates = HuntingEvent.POOL.map((event) => {
-        let weight = event.getBaseWeight(floor);
-        if (event.type === HUNTING_EVENT_TYPES.PORTAL) weight *= portalMultiplier;
-        if (event.type === HUNTING_EVENT_TYPES.MISHAP && !mishapAllowed) weight = 0;
-        return { type: event.type, weight };
-    }).filter((candidate) => candidate.weight > 0);
+    const candidates = HuntingEvent.POOL.filter((event) => isHuntingEventEnabled(event.type))
+        .map((event) => {
+            let weight = event.getBaseWeight(floor);
+            if (event.type === HUNTING_EVENT_TYPES.PORTAL) weight *= portalMultiplier;
+            if (event.type === HUNTING_EVENT_TYPES.MISHAP && !mishapAllowed) weight = 0;
+            return { type: event.type, weight };
+        })
+        .filter((candidate) => candidate.weight > 0);
     const totalWeight = candidates.reduce((sum, candidate) => sum + candidate.weight, 0);
     if (totalWeight <= 0) throw new Error("No hunting event is selectable");
 

@@ -221,7 +221,6 @@ import {
     getHuntingMonsterPool,
     BOSS_MOB_MULTIPLIERS,
     createMerchantOffers,
-    createConsumableMerchantOffer,
     applyMerchantOffer,
     formatOfferResultToast,
     canAffordOffer,
@@ -277,17 +276,8 @@ import {
 } from "../src/abilities/huntingMobAbility.js";
 import { createElectricArcPath } from "../src/effects/electricArc.js";
 import { getVisibleCombatTextSize, getVisibleLineWidth } from "../src/effects/effectVisibility.js";
-import {
-    CONSUMABLE_IDS,
-    HUNTING_CONSUMABLE_USE_LIMIT,
-    buyConsumable,
-    getConsumableShopItems,
-    getHuntingConsumableUseLimit,
-    getHuntingConsumableUseLimitUpgrade,
-    getHuntingPreparationConsumables,
-    upgradeHuntingConsumableUseLimit,
-    useHuntingPreparationConsumable
-} from "../src/consumables.js";
+import { HuntingAutoAdvance } from "../src/hunting/huntingAutoAdvance.js";
+import { HUNTING_FLOW_CONFIG, isHuntingEventEnabled } from "../src/hunting/huntingFlowConfig.js";
 import {
     createEquipmentInstance,
     enhanceEquipment,
@@ -874,10 +864,10 @@ function createHuntingOverlayMock() {
         huntingEventDetail: "",
         huntingEventConfirmLabel: "",
         huntingBattlePreparationActive: false,
-        huntingBattlePreparationItems: [],
-        huntingBattlePreparationHp: 0,
-        huntingBattlePreparationMaxHp: 0,
-        huntingBattlePreparationNotice: "",
+        huntingAutoAdvanceActive: false,
+        huntingAutoAdvanceLabel: "",
+        huntingAutoAdvanceRemainingMs: 0,
+        huntingAutoAdvanceProgress: 0,
         huntingLootHudVisible: false,
         huntingLootHudShards: 0,
         huntingLootHudEnhancementStones: 0,
@@ -934,10 +924,10 @@ function createHuntingOverlayMock() {
             this.huntingEventDetail = "";
             this.huntingEventConfirmLabel = "";
             this.huntingBattlePreparationActive = false;
-            this.huntingBattlePreparationItems = [];
-            this.huntingBattlePreparationHp = 0;
-            this.huntingBattlePreparationMaxHp = 0;
-            this.huntingBattlePreparationNotice = "";
+            this.huntingAutoAdvanceActive = false;
+            this.huntingAutoAdvanceLabel = "";
+            this.huntingAutoAdvanceRemainingMs = 0;
+            this.huntingAutoAdvanceProgress = 0;
             this.huntingLootHudVisible = false;
             this.huntingLootHudShards = 0;
             this.huntingLootHudEnhancementStones = 0;
@@ -3015,156 +3005,53 @@ function testHuntingChampionEventRequiresBattleConfirmation() {
     console.log("[hunting-champion-event-requires-confirmation] ok");
 }
 
-function testHuntingConsumableInventoryAndUseLimits() {
-    const profile = createDefaultPlayerProfile();
-    profile.hunting.shards = 10_000;
-
-    const initialShopItem = getConsumableShopItems(profile).find((item) => item.id === CONSUMABLE_IDS.HP_POTION);
-    assert.equal(initialShopItem.owned, 0, "New profiles should start with no HP potions");
-    assert.equal(initialShopItem.cost, 100, "HP potion price should remain 100 shards");
-    assert.equal(initialShopItem.maxOwned, 10, "HP potion inventory should cap at ten");
-
-    for (let count = 0; count < 10; count += 1) {
-        assert.ok(
-            buyConsumable(profile, CONSUMABLE_IDS.HP_POTION),
-            "A funded potion purchase below the cap should succeed"
-        );
-    }
-    assert.equal(getConsumableShopItems(profile)[0].owned, 10, "Potion purchases should reach the owned cap");
-    assert.equal(buyConsumable(profile, CONSUMABLE_IDS.HP_POTION), null, "Potion purchases must stop at the owned cap");
-    assert.equal(profile.hunting.shards, 9_000, "Ten potions should cost exactly 1,000 shards");
-
-    const upgradeCosts = [];
-    while (getHuntingConsumableUseLimitUpgrade(profile).canUpgrade) {
-        const result = upgradeHuntingConsumableUseLimit(profile);
-        upgradeCosts.push(result.cost);
-    }
-    assert.deepEqual(upgradeCosts, [100, 200, 400, 800], "Potion use limit upgrades should double from 100 shards");
-    assert.equal(
-        getHuntingConsumableUseLimit(profile),
-        HUNTING_CONSUMABLE_USE_LIMIT.max,
-        "Potion use limit should cap at five per hunting run"
-    );
-
-    const run = setHuntingRunActiveHealth(createHuntingRun({ characterId: FIGHTER_IDS.ARCHER }), {
-        hp: 56,
-        maxHp: 224
-    });
-    const preparationItems = getHuntingPreparationConsumables(profile, run);
-    assert.equal(preparationItems[0].healAmount, 56, "Potion healing should be 25% of the actual run maximum HP");
-    assert.equal(preparationItems[0].canUse, true, "A wounded player with stock and run allowance should use a potion");
-
-    const firstUse = useHuntingPreparationConsumable(profile, run, CONSUMABLE_IDS.HP_POTION);
-    assert.ok(firstUse, "The first potion use should succeed");
-    assert.equal(getHuntingRunHealth(firstUse.run).hp, 112, "Potion use should restore 25% of maximum HP");
-    assert.equal(firstUse.run.consumableUses[CONSUMABLE_IDS.HP_POTION], 1, "Run should record only used potions");
-    assert.equal(profile.consumables.owned[CONSUMABLE_IDS.HP_POTION], 9, "Potion stock should decrease only when used");
-    assert.equal(
-        useHuntingPreparationConsumable(profile, firstUse.run, CONSUMABLE_IDS.HP_POTION),
-        null,
-        "A battle should allow only one potion even when the run allowance remains"
-    );
-
-    const nextBattleRun = { ...firstUse.run, battleConsumableUses: {} };
-    const secondUse = useHuntingPreparationConsumable(profile, nextBattleRun, CONSUMABLE_IDS.HP_POTION);
-    assert.ok(secondUse, "A later battle should allow another potion while the run allowance remains");
-    const secondUseHealth = getHuntingRunHealth(secondUse.run);
-    const fullHpRun = {
-        ...setHuntingRunActiveHealth(secondUse.run, { hp: secondUseHealth.maxHp, maxHp: secondUseHealth.maxHp }),
-        battleConsumableUses: {}
-    };
-    assert.equal(
-        useHuntingPreparationConsumable(profile, fullHpRun, CONSUMABLE_IDS.HP_POTION),
-        null,
-        "A full-HP player should not consume a potion"
-    );
-    console.log("[hunting-consumable-inventory-and-use-limits] ok");
-}
-
-function testHuntingBattlePreparationUsesActualBattleHp() {
-    const profile = createDefaultPlayerProfile();
-    profile.consumables.owned[CONSUMABLE_IDS.HP_POTION] = 1;
-    const overlayStates = [];
-    let startedMatches = 0;
-    const mockApp = {
-        roster: app.roster,
-        playerProfile: profile,
-        playerStatAllocation: {},
-        setHuntingOverlayState(data) {
-            overlayStates.push({ ...data });
+function testHuntingAutoAdvanceTimerAndSkip() {
+    let now = 100;
+    let tick = null;
+    let completed = 0;
+    const states = [];
+    const scheduler = {
+        now: () => now,
+        setInterval(callback) {
+            tick = callback;
+            return 1;
         },
-        showOverlay() {},
-        addLog() {},
-        startMatch(specs, options) {
-            startedMatches += 1;
-            this.simulation = new BattleSimulation(specs, { onLog() {}, onSound() {} }, null, options);
+        clearInterval() {
+            tick = null;
         }
     };
-    const manager = new HuntingManager(mockApp);
-    manager._run = {
-        ...setHuntingRunActiveHealth(createHuntingRun({ characterId: FIGHTER_IDS.ARCHER }), {
-            hp: 28.4,
-            maxHp: 168
-        }),
-        lastEncounter: { type: HUNTING_FLOOR_OUTCOME_TYPES.COMBAT }
-    };
+    const autoAdvance = new HuntingAutoAdvance({ scheduler, onStateChange: (state) => states.push(state) });
 
-    manager._stopHuntingMoveForBattle(mockApp, "1층 — 전투 발생");
+    autoAdvance.start(() => (completed += 1), { label: "계속 전진", delayMs: 1000 });
+    assert.equal(states.at(-1).active, true, "Auto advance should publish a visible countdown");
+    assert.equal(states.at(-1).remainingMs, 1000, "Auto advance should begin at the configured one second delay");
+    now = 600;
+    tick();
+    assert.equal(states.at(-1).remainingMs, 500, "Countdown state should expose its remaining time");
+    assert.equal(autoAdvance.skip(), true, "Confirm should complete the pending action immediately");
+    assert.equal(completed, 1, "Skipping should complete the action exactly once");
+    assert.equal(states.at(-1).active, false, "Completed countdowns should leave no active timer UI");
 
+    autoAdvance.start(() => (completed += 1));
+    now = 1700;
+    tick();
+    assert.equal(completed, 2, "Expired countdowns should complete without user input");
+    assert.equal(HUNTING_FLOW_CONFIG.swapEnabled, false, "Hunting swap should remain feature-disabled");
+    assert.equal(HUNTING_FLOW_CONFIG.merchantEnabled, false, "Wandering merchants should remain feature-disabled");
     assert.equal(
-        startedMatches,
-        0,
-        "Normal combat should wait in battle preparation before constructing BattleSimulation"
+        isHuntingEventEnabled(HUNTING_EVENT_TYPES.WANDERING_MERCHANT),
+        false,
+        "Disabled merchants must be excluded from production event rolls"
     );
+    const profile = createDefaultPlayerProfile();
+    assert.equal("consumables" in profile, false, "New profiles must not retain removed potion storage");
+    const sanitizedLegacyProfile = sanitizePlayerProfile({ ...profile, consumables: { owned: { hp_potion: 9 } } });
     assert.equal(
-        manager._run.phase,
-        HUNTING_RUN_PHASES.AWAITING_BATTLE_PREPARATION,
-        "Normal combat should enter the dedicated preparation phase"
+        "consumables" in sanitizedLegacyProfile,
+        false,
+        "Loading an old save must drop the removed potion storage property"
     );
-    assert.equal(
-        overlayStates.at(-1).huntingBattlePreparationItems[0].healAmount,
-        42,
-        "Preparation UI should calculate healing from the actual 168 maximum HP"
-    );
-    assert.equal(
-        overlayStates.at(-1).huntingBattlePreparationHp,
-        29,
-        "Preparation UI should show a fractional current HP as an integer"
-    );
-    assert.equal(
-        overlayStates.at(-1).huntingBattlePreparationMaxHp,
-        168,
-        "Preparation UI should expose an integer maximum HP"
-    );
-
-    const useResult = manager.usePreparationConsumable(CONSUMABLE_IDS.HP_POTION);
-    assert.ok(Math.abs(useResult.healed - 42) < 1e-9, "Preparation potion use should report the actual healed amount");
-    assert.equal(
-        getHuntingRunHealth(manager._run).hp,
-        70.4,
-        "Preparation potion use should preserve raw HP before battle start"
-    );
-    assert.equal(
-        overlayStates.at(-1).huntingBattlePreparationHp,
-        71,
-        "Potion feedback should refresh the displayed HP through the shared integer getter"
-    );
-    assert.match(
-        overlayStates.at(-1).huntingBattlePreparationNotice,
-        /71\/168$/,
-        "Potion feedback should not expose a fractional current HP"
-    );
-    assert.equal(
-        profile.consumables.owned[CONSUMABLE_IDS.HP_POTION],
-        0,
-        "Preparation potion use should consume the persistent stock"
-    );
-
-    manager.startPreparedBattle();
-    const player = mockApp.simulation.fighters.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
-    assert.equal(startedMatches, 1, "BattleSimulation should start only after the preparation start action");
-    assert.equal(player.hp, 70.4, "BattleSimulation should receive the raw potion-adjusted carried HP");
-    console.log("[hunting-battle-preparation-actual-hp] ok");
+    console.log("[hunting-auto-advance] ok");
 }
 
 function testHuntingHealthDisplayUsesSharedIntegerGetter() {
@@ -9956,11 +9843,10 @@ function testHuntingPortalDecline() {
     assert.equal(getHuntingPortalWeightMultiplier(NaN, 0), 1.0, "NaN HP should use base weight");
 
     // ── low HP makes portal more likely in weighted selection ──
-    // 8 event types, base portal weight = 1/8. low-HP: portal mult=3 →
-    // portal weight=3, others=1, total=10, portal prob=3/10=0.3
+    // Production event pool excludes the disabled merchant. Low HP still raises the portal share.
     // rng seq [0.5, 0.2]: 0.5→EVENT, 0.2 picks:
-    //   base (mult=1): 0.2*8=1.6 → index 1 = WANDERING_MERCHANT
-    //   high (mult=3): 0.2*10=2.0 → index 0 = PORTAL
+    //   base: rng 0.2 reaches BOON after the portal slot
+    //   high: the expanded portal slot still contains rng 0.2
 
     const outcomeBase = rollHuntingFloorOutcome(
         1,
@@ -9973,11 +9859,7 @@ function testHuntingPortalDecline() {
         { hpRatio: 0.6, portalDeclineFloors: 0 }
     );
     assert.equal(outcomeBase.type, HUNTING_FLOOR_OUTCOME_TYPES.EVENT, "Should be event");
-    assert.equal(
-        outcomeBase.event.type,
-        HUNTING_EVENT_TYPES.WANDERING_MERCHANT,
-        "Base HP should give non-portal event at rng=0.2"
-    );
+    assert.equal(outcomeBase.event.type, HUNTING_EVENT_TYPES.BOON, "Base HP should give non-portal event at rng=0.2");
 
     const outcomeLowHp = rollHuntingFloorOutcome(
         1,
@@ -10006,7 +9888,7 @@ function testHuntingPortalDecline() {
     assert.equal(outcomeDeclined.type, HUNTING_FLOOR_OUTCOME_TYPES.EVENT, "Should be event");
     assert.equal(
         outcomeDeclined.event.type,
-        HUNTING_EVENT_TYPES.WANDERING_MERCHANT,
+        HUNTING_EVENT_TYPES.BOON,
         "Portal decline should suppress low-HP portal boost"
     );
 
@@ -17604,8 +17486,7 @@ testHuntingBoonShardRewardsScaleWithFloor();
 testHuntingEventHealthInitialization();
 testHuntingAutoEventRequiresConfirmation();
 testHuntingChampionEventRequiresBattleConfirmation();
-testHuntingConsumableInventoryAndUseLimits();
-testHuntingBattlePreparationUsesActualBattleHp();
+testHuntingAutoAdvanceTimerAndSkip();
 testHuntingHealthDisplayUsesSharedIntegerGetter();
 await testHuntingChestEventStopsAdvanceLoop();
 testHuntingAdvanceDispatchContract();
@@ -19518,19 +19399,6 @@ function testHuntingMerchantOffers() {
     const eventDiscounted = { ...event, discountRatio: 0.2 };
     const discountedOffers = createMerchantOffers(runWithHp, eventDiscounted, profile);
     assert.ok(discountedOffers[0].cost <= offers[0].cost, "Discount should reduce prices");
-
-    // ── Future consumable merchant offer reuses the persistent inventory definition ──
-    const potionOffer = createConsumableMerchantOffer(CONSUMABLE_IDS.HP_POTION, profile, 0.2);
-    assert.equal(potionOffer.type, "consumable", "Consumables should use a distinct merchant offer type");
-    assert.equal(potionOffer.cost, 80, "Consumable merchant discounts should reuse the definition purchase cost");
-    const potionPurchase = applyMerchantOffer(runWithHp, profile, potionOffer);
-    assert.ok(potionPurchase, "A future consumable merchant offer should be purchasable through the shared path");
-    assert.equal(
-        profile.consumables.owned[CONSUMABLE_IDS.HP_POTION],
-        1,
-        "Merchant purchase should add persistent stock"
-    );
-    assert.equal(potionPurchase.result.type, "consumable", "Merchant result should retain the consumable type");
 
     // ── Secure transport disabled when no pending chests ──
     const runNoPending = { ...runWithHp, pendingLoot: { shards: 0, enhancementStones: 0, chests: [] } };
@@ -22139,7 +22007,7 @@ function testHuntingMishapAvoidsLowHpRuns() {
     const highHp = rollHuntingFloorOutcome(
         10,
         (() => {
-            const rolls = [0.5, 0.4];
+            const rolls = [0.5, 0.3];
             return () => rolls.shift() ?? 0;
         })(),
         0,
@@ -22148,7 +22016,7 @@ function testHuntingMishapAvoidsLowHpRuns() {
     const lowHp = rollHuntingFloorOutcome(
         10,
         (() => {
-            const rolls = [0.5, 0.4];
+            const rolls = [0.5, 0.3];
             return () => rolls.shift() ?? 0;
         })(),
         0,
@@ -25438,6 +25306,18 @@ function testHuntingPartyBattleComposition() {
         alliedFighters.every((fighter) => fighter.position.x < mockApp.simulation.width / 2),
         "Every allied party member should spawn on the player side"
     );
+    if (!HUNTING_FLOW_CONFIG.swapEnabled) {
+        assert.equal(mockApp.simulation.standbyFighters.length, 0, "Disabled swaps must not create a standby fighter");
+        assert.equal(manager.swapActiveCharacter(), null, "Disabled swaps must reject combat input");
+        leaderAtBattleStart.state.movement = null;
+        leaderAtBattleStart.applyImpulse(
+            new Vector2(leaderAtBattleStart.stats.baseSpeed, 0).subtract(leaderAtBattleStart.velocity)
+        );
+        const acceleration = applyHuntingTapAcceleration(leaderAtBattleStart, mockApp.simulation);
+        assert.equal(acceleration.applied, true, "Tap acceleration must remain active while swaps are disabled");
+        console.log("[hunting-party-battle-composition] ok");
+        return;
+    }
     assert.equal(mockApp.simulation.standbyFighters.length, 1);
     assert.equal(mockApp.simulation.standbyFighters[0].id, swapId, "Swap character should wait off-field");
     assert.equal(mockApp.simulation.standbyFighters[0].participation.canBeTargeted, false);

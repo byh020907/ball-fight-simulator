@@ -13,10 +13,6 @@ import {
     buyDailyShopChest as purchaseDailyShopChest,
     rerollDailyShop as refreshDailyShopOffer
 } from "./hunting/dailyShop.js";
-import {
-    buyConsumable as purchaseConsumable,
-    upgradeHuntingConsumableUseLimit as upgradeConsumableUseLimit
-} from "./consumables.js";
 import { savePlayerProfile } from "./playerProfile.js";
 import { PopupService } from "./popup.js";
 import { HELP_TITLE, HELP_CONTENT } from "./helpContent.js";
@@ -112,12 +108,6 @@ export function createComponentBridge(app) {
         huntingAdvance() {
             return app.hunting.advance({ waitForFirstMoveUi: true });
         },
-        huntingMerchantChoose(idx) {
-            return app.hunting.merchantChoose(idx);
-        },
-        huntingMerchantPass() {
-            return app.hunting.merchantPass();
-        },
         huntingChestContinue() {
             return app.hunting.chestContinue();
         },
@@ -127,14 +117,14 @@ export function createComponentBridge(app) {
         huntingEventContinue() {
             return app.hunting.eventContinue();
         },
-        huntingUsePreparationConsumable(consumableId) {
-            return app.hunting.usePreparationConsumable(consumableId);
-        },
         huntingStartPreparedBattle() {
             return app.hunting.startPreparedBattle();
         },
-        huntingSwapActiveCharacter() {
-            return app.hunting.swapActiveCharacter();
+        huntingAdvanceCombatResult() {
+            return app.hunting.advanceCombatResult();
+        },
+        huntingSkipAutoAdvance() {
+            return app.hunting.skipAutoAdvance();
         },
 
         // ── Help action ──
@@ -401,16 +391,6 @@ export function createComponentBridge(app) {
                 app.audio.play("shop_reroll");
                 refreshCollectionAndProfile();
             }
-            return result;
-        },
-        buyConsumable(consumableId) {
-            const result = purchaseConsumable(app.playerProfile, consumableId);
-            if (result) refreshCollectionAndProfile();
-            return result;
-        },
-        upgradeHuntingConsumableUseLimit() {
-            const result = upgradeConsumableUseLimit(app.playerProfile);
-            if (result) refreshCollectionAndProfile();
             return result;
         }
     };
