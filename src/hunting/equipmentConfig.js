@@ -254,6 +254,52 @@ export function getEquipmentAdjustedSpeed(baseSpeed, equipmentSpeedBonus) {
     return getDiminishingEquipmentSpeed(baseSpeed, equipmentSpeedBonus, EQUIPMENT_SPEED_MAXIMUM_BASE_MULTIPLIER);
 }
 
+export function getEquipmentMassEffectiveBonus(rawValue) {
+    const raw = Math.max(0, Number(rawValue) || 0);
+    return raw / (100 + raw);
+}
+
+export function getEquipmentWallBounceEffectiveBonus(rawValue) {
+    const raw = Math.max(0, Number(rawValue) || 0);
+    return (0.6 * raw) / (60 + raw);
+}
+
+export function getEquipmentAngularImpulseEffectiveBonus(rawValue) {
+    return getEquipmentMassEffectiveBonus(rawValue);
+}
+
+export function createQuantityEquipmentCombatSnapshot(baseStats = {}, bonuses = {}) {
+    const baseSpeed = Math.max(0, Number(baseStats.speed) || 0);
+    const rawSpeed = Math.max(0, Number(bonuses.speed) || 0);
+    const adjustedSpeed = Number(getEquipmentAdjustedSpeed(baseSpeed, rawSpeed).toFixed(3));
+    const speedIncreaseRatio = baseSpeed > 0 ? adjustedSpeed / baseSpeed - 1 : 0;
+    const rawMass = Math.max(0, Number(bonuses.mass) || 0);
+    const rawWallBounce = Math.max(0, Number(bonuses.wallBounce) || 0);
+    const rawAngularImpulse = Math.max(0, Number(bonuses.angularImpulse) || 0);
+    return Object.freeze({
+        hp: Number(bonuses.hp) || 0,
+        damage: Number(bonuses.damage) || 0,
+        defense: Number(bonuses.defense) || 0,
+        skill: Number(bonuses.skill) || 0,
+        criticalChance: Number(bonuses.criticalChance) || 0,
+        speed: Object.freeze({
+            beforeEquipment: baseSpeed,
+            rawBonus: rawSpeed,
+            afterEquipment: adjustedSpeed,
+            increaseRatio: speedIncreaseRatio
+        }),
+        mass: Object.freeze({ raw: rawMass, effectiveBonus: getEquipmentMassEffectiveBonus(rawMass) }),
+        wallBounce: Object.freeze({
+            raw: rawWallBounce,
+            effectiveBonus: getEquipmentWallBounceEffectiveBonus(rawWallBounce)
+        }),
+        angularImpulse: Object.freeze({
+            raw: rawAngularImpulse,
+            effectiveBonus: getEquipmentAngularImpulseEffectiveBonus(rawAngularImpulse)
+        })
+    });
+}
+
 function getEquipmentEffectVector(item) {
     const vector = new Map();
     const enhanceMultiplier = getEquipmentEnhanceMultiplier(item?.enhanceLevel);
@@ -386,6 +432,26 @@ export function applyEquipmentStats(spec, profile) {
     const characterId = spec?.id ?? null;
     const bonuses = getEquippedStatBonuses(profile, characterId);
     const visualSpec = applyEquipmentVisuals(spec, profile);
+    if (isQuantityEquipmentInventory(profile)) {
+        const combatStats = createQuantityEquipmentCombatSnapshot(visualSpec.stats, bonuses);
+        const baseCriticalChance = Math.max(0, Number(visualSpec.stats.criticalChance) || 5);
+        return {
+            ...visualSpec,
+            equipment: {
+                ...visualSpec.equipment,
+                combatStats
+            },
+            stats: {
+                ...visualSpec.stats,
+                hp: Number((visualSpec.stats.hp + combatStats.hp).toFixed(3)),
+                damage: Number((visualSpec.stats.damage + combatStats.damage).toFixed(3)),
+                defense: Number((visualSpec.stats.defense + combatStats.defense).toFixed(3)),
+                skill: Number(((visualSpec.stats.skill ?? 0) + combatStats.skill).toFixed(3)),
+                criticalChance: Math.min(100, Number((baseCriticalChance + combatStats.criticalChance).toFixed(3))),
+                speed: Number(combatStats.speed.afterEquipment.toFixed(3))
+            }
+        };
+    }
     const stats = { ...visualSpec.stats };
     for (const [key, value] of Object.entries(bonuses)) {
         if (value !== 0 && key in stats) {

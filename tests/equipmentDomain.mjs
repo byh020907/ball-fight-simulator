@@ -25,7 +25,12 @@ import {
 } from "../src/hunting/equipmentRuntime.js";
 import { Ability } from "../src/abilities/ability.js";
 import { AbilitySet } from "../src/abilities/abilitySet.js";
-import { applyEquipmentStats } from "../src/hunting/equipmentConfig.js";
+import {
+    applyEquipmentStats,
+    getEquipmentAngularImpulseEffectiveBonus,
+    getEquipmentMassEffectiveBonus,
+    getEquipmentWallBounceEffectiveBonus
+} from "../src/hunting/equipmentConfig.js";
 import { createRoster } from "../src/roster.js";
 import { BattleBall } from "../src/entities/battleBall.js";
 import { Vector2 } from "../src/core.js";
@@ -188,6 +193,79 @@ const secondBattleBall = new BattleBall(combatSpec, new Vector2(0, 0));
 assert.equal(firstBattleBall.combatEquipment.activeRuntimes.length, 2);
 assert.notEqual(firstBattleBall.combatEquipment.runtimes[0], firstBattleBall.combatEquipment.runtimes[1]);
 assert.notEqual(firstBattleBall.combatEquipment.runtimes[0], secondBattleBall.combatEquipment.runtimes[0]);
+
+const baseCombatSpec = createRoster()[0];
+const statProfile = createDefaultPlayerProfile();
+const statTemplateIds = [
+    "health_crystal",
+    "attack_sword",
+    "defense_leather",
+    "haste_mote",
+    "speed_boots",
+    "crit_cloak"
+];
+for (const [slotIndex, templateId] of statTemplateIds.entries()) {
+    addEquipmentQuantity(statProfile, templateId);
+    equipEquipmentTemplate(statProfile, templateId, slotIndex);
+}
+const statSpec = applyEquipmentStats(baseCombatSpec, statProfile);
+const statSnapshot = statSpec.equipment.combatStats;
+assert.equal(statSpec.stats.hp, baseCombatSpec.stats.hp + getEquipmentTemplate("health_crystal").stats.hp);
+assert.equal(statSpec.stats.damage, baseCombatSpec.stats.damage + getEquipmentTemplate("attack_sword").stats.damage);
+assert.equal(
+    statSpec.stats.defense,
+    baseCombatSpec.stats.defense + getEquipmentTemplate("defense_leather").stats.defense
+);
+assert.equal(statSpec.stats.skill, (baseCombatSpec.stats.skill ?? 0) + getEquipmentTemplate("haste_mote").stats.skill);
+assert.equal(statSpec.stats.criticalChance, 5 + getEquipmentTemplate("crit_cloak").stats.criticalChance);
+assert.equal(statSnapshot.speed.beforeEquipment, baseCombatSpec.stats.speed);
+assert.equal(statSnapshot.speed.afterEquipment, statSpec.stats.speed);
+assert.ok(statSnapshot.speed.increaseRatio > 0);
+assert.equal(Object.isFrozen(statSnapshot), true);
+assert.equal(Object.isFrozen(statSnapshot.speed), true);
+const skillBall = new BattleBall(statSpec, new Vector2(0, 0));
+assert.equal(skillBall.getSkillPoints(), statSpec.stats.skill);
+assert.equal(new Ability(skillBall, null, 100).cooldown, (100 * 100) / (100 + statSpec.stats.skill));
+assert.equal(skillBall.getEquipmentCombatStats(), statSnapshot);
+assert.equal(skillBall.combatEquipment.getCombatStats(), statSnapshot);
+
+const completedProfile = createDefaultPlayerProfile();
+addEquipmentQuantity(completedProfile, "completed_ability_crit");
+equipEquipmentTemplate(completedProfile, "completed_ability_crit", 0);
+const completedSpec = applyEquipmentStats(baseCombatSpec, completedProfile);
+const completedTemplate = getEquipmentTemplate("completed_ability_crit");
+assert.equal(completedSpec.stats.damage, baseCombatSpec.stats.damage + (completedTemplate.stats.damage ?? 0));
+assert.equal(completedSpec.stats.criticalChance, 5 + completedTemplate.stats.criticalChance);
+
+const cappedCriticalProfile = createDefaultPlayerProfile();
+addEquipmentQuantity(cappedCriticalProfile, "crit_twin_blades", 6);
+for (const slotIndex of [0, 1, 2, 3, 4, 5])
+    equipEquipmentTemplate(cappedCriticalProfile, "crit_twin_blades", slotIndex);
+assert.equal(applyEquipmentStats(baseCombatSpec, cappedCriticalProfile).stats.criticalChance, 100);
+
+const physicsProfile = createDefaultPlayerProfile();
+const physicsTemplateIds = ["mass_weight", "wall_spring", "collision_gyro"];
+for (const [slotIndex, templateId] of physicsTemplateIds.entries()) {
+    addEquipmentQuantity(physicsProfile, templateId);
+    equipEquipmentTemplate(physicsProfile, templateId, slotIndex);
+}
+const physicsSpec = applyEquipmentStats(baseCombatSpec, physicsProfile);
+const physicsSnapshot = physicsSpec.equipment.combatStats;
+assert.equal(physicsSnapshot.mass.effectiveBonus, getEquipmentMassEffectiveBonus(14));
+assert.equal(physicsSnapshot.wallBounce.effectiveBonus, getEquipmentWallBounceEffectiveBonus(14));
+assert.equal(physicsSnapshot.angularImpulse.effectiveBonus, getEquipmentAngularImpulseEffectiveBonus(14));
+assert.ok(physicsSnapshot.mass.effectiveBonus < 1);
+assert.ok(physicsSnapshot.wallBounce.effectiveBonus < 0.6);
+const physicsBall = new BattleBall(physicsSpec, new Vector2(0, 0));
+assert.equal(physicsBall.mass, baseCombatSpec.stats.mass * (1 + physicsSnapshot.mass.effectiveBonus));
+assert.equal(physicsBall.equipmentEffects.wallBounceMultiplier, 1 + physicsSnapshot.wallBounce.effectiveBonus);
+assert.equal(
+    physicsBall.equipmentEffects.collisionAngularMultiplier,
+    1 + physicsSnapshot.angularImpulse.effectiveBonus
+);
+
+const legacyEquipmentSpec = applyEquipmentStats(baseCombatSpec, { equipment: { inventory: [], equipped: {} } });
+assert.equal(legacyEquipmentSpec.equipment.combatStats, undefined);
 
 firstBattleBall.stats.criticalChance = 1;
 const equipmentDamageTarget = new BattleBall(combatSpec, new Vector2(0, 0));

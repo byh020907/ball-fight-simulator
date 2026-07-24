@@ -48,7 +48,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             baseSkill: spec.stats.skill ?? 0,
             baseRadius: spec.stats.radius,
             mass: spec.stats.mass,
-            criticalChance: 5,
+            criticalChance: Math.min(100, Math.max(0, Number(spec.stats.criticalChance) || 5)),
             allocation: spec.statAllocation ?? null
         };
         // PhysicsBody 프로퍼티 초기화
@@ -105,6 +105,20 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             items: Array.isArray(spec.equipment?.equippedItems) ? spec.equipment.equippedItems : []
         };
         this.equipmentEffects = createEquipmentCombatEffects(this.equipment.items);
+        this.equipmentCombatStats = spec.equipment?.combatStats ?? null;
+        if (this.equipmentCombatStats) {
+            this.equipmentEffects = Object.freeze({
+                ...this.equipmentEffects,
+                massMultiplier:
+                    this.equipmentEffects.massMultiplier * (1 + this.equipmentCombatStats.mass.effectiveBonus),
+                wallBounceMultiplier:
+                    this.equipmentEffects.wallBounceMultiplier *
+                    (1 + this.equipmentCombatStats.wallBounce.effectiveBonus),
+                collisionAngularMultiplier:
+                    this.equipmentEffects.collisionAngularMultiplier *
+                    (1 + this.equipmentCombatStats.angularImpulse.effectiveBonus)
+            });
+        }
         this.combatEquipment = createCombatEquipmentSet(this, spec.equipment?.equippedTemplateIds);
         this.mass *= this.equipmentEffects.massMultiplier;
         this.stats.mass = this.mass;
@@ -190,6 +204,10 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
 
     getTotalAttackDamage() {
         return this.stats.baseDamage;
+    }
+
+    getEquipmentCombatStats() {
+        return this.equipmentCombatStats;
     }
 
     // ── 물리 디버그 래퍼 (원본 믹스인 메서드를 보존하고 기록 추가) ──

@@ -125,6 +125,10 @@ export class EquipmentRuntime {
     notify(eventName, context) {
         this.passive[eventName]?.({ ...context, runtime: this, owner: this.owner });
     }
+
+    getCombatStats() {
+        return this.owner.getEquipmentCombatStats?.() ?? null;
+    }
 }
 
 export class CombatEquipmentSet {
@@ -138,6 +142,10 @@ export class CombatEquipmentSet {
 
     get activeRuntimes() {
         return this.runtimes.filter(Boolean);
+    }
+
+    getCombatStats() {
+        return this.owner.getEquipmentCombatStats?.() ?? null;
     }
 
     notify(eventName, context = {}) {
