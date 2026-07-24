@@ -1784,13 +1784,27 @@ function testIconTagCountAndUniqueness() {
     metadata.forEach((entry) => {
         assert.ok(typeof entry.id === "string" && entry.id.length > 0, "Each metadata entry must have an id");
         assert.ok(typeof entry.label === "string" && entry.label.length > 0, "Each metadata entry must have a label");
-        assert.ok(entry.label.endsWith("(가칭)"), `Prototype label ${entry.id} must remain explicitly provisional`);
     });
-    assert.equal(
-        getTagLabel("health_belt"),
-        "높은 HP · 맥동 허리띠 (가칭)",
-        "health_belt provisional label must be the new 맥동 허리띠 name"
-    );
+    const LABEL_MAP = {
+        attack_sword: "공격 · 금 간 장검",
+        attack_greatsword: "높은 공격 · 무거운 대검",
+        health_crystal: "HP · 생명 수정",
+        health_belt: "높은 HP · 맥동 허리띠",
+        defense_leather: "방어 · 가죽 갑옷",
+        defense_chain: "높은 방어 · 쇠사슬 조끼",
+        speed_boots: "속도 · 가벼운 장화",
+        speed_wing: "높은 속도 · 날개깃",
+        haste_mote: "스킬 가속 · 마력 구슬",
+        haste_kindlegem: "높은 스킬 가속 · 점화석",
+        crit_cloak: "치명타 · 행운 망토",
+        crit_twin_blades: "높은 치명타 · 쌍날 부적",
+        mass_weight: "질량 · 무쇠 추",
+        wall_spring: "벽 반사 속도 · 압축 스프링",
+        collision_gyro: "충돌 · 충격 자이로"
+    };
+    metadata.forEach((entry) => {
+        assert.equal(entry.label, LABEL_MAP[entry.id], `Label for ${entry.id} must match the confirmed equipment name`);
+    });
     const unknownMeta = getUnknownTagMetadata();
     assert.equal(unknownMeta.id, "unknown", "Unknown metadata id must be 'unknown'");
     assert.ok(

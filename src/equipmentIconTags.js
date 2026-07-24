@@ -131,7 +131,7 @@ registerTag("unknown", "알 수 없음", (ctx, cx, cy) => {
     sf(ctx, "#555555", null, 0.06);
 });
 
-registerTag("attack_sword", "공격 · 금 간 장검 (가칭)", (ctx, cx, cy) => {
+registerTag("attack_sword", "공격 · 금 간 장검", (ctx, cx, cy) => {
     const S = 0.06;
     const pBlade = [
         [cx + S * 0.5, cy + S * 1.2],
@@ -162,7 +162,7 @@ registerTag("attack_sword", "공격 · 금 간 장검 (가칭)", (ctx, cx, cy) =
     sf(ctx, "#4a2a1a", "#7a5a3a", 0.03);
 });
 
-registerTag("attack_greatsword", "높은 공격 · 중대검 (가칭)", (ctx, cx, cy) => {
+registerTag("attack_greatsword", "높은 공격 · 무거운 대검", (ctx, cx, cy) => {
     const S = 0.06;
     drawClosedPath(
         ctx,
@@ -193,7 +193,7 @@ registerTag("attack_greatsword", "높은 공격 · 중대검 (가칭)", (ctx, cx
     ctx.stroke();
 });
 
-registerTag("health_crystal", "HP · 생명 수정 (가칭)", (ctx, cx, cy) => {
+registerTag("health_crystal", "HP · 생명 수정", (ctx, cx, cy) => {
     const S = 0.06;
     drawClosedPath(
         ctx,
@@ -232,7 +232,7 @@ registerTag("health_crystal", "HP · 생명 수정 (가칭)", (ctx, cx, cy) => {
     );
 });
 
-registerTag("health_belt", "높은 HP · 맥동 허리띠 (가칭)", (ctx, cx, cy) => {
+registerTag("health_belt", "높은 HP · 맥동 허리띠", (ctx, cx, cy) => {
     const S = 0.06;
 
     const leftBand = [
@@ -295,7 +295,7 @@ registerTag("health_belt", "높은 HP · 맥동 허리띠 (가칭)", (ctx, cx, c
     );
 });
 
-registerTag("defense_leather", "방어 · 가죽 갑옷 (가칭)", (ctx, cx, cy) => {
+registerTag("defense_leather", "방어 · 가죽 갑옷", (ctx, cx, cy) => {
     const S = 0.06;
     drawClosedPath(
         ctx,
@@ -354,7 +354,7 @@ registerTag("defense_leather", "방어 · 가죽 갑옷 (가칭)", (ctx, cx, cy)
     );
 });
 
-registerTag("defense_chain", "높은 방어 · 쇠사슬 조끼 (가칭)", (ctx, cx, cy) => {
+registerTag("defense_chain", "높은 방어 · 쇠사슬 조끼", (ctx, cx, cy) => {
     const S = 0.06;
     drawClosedPath(
         ctx,
@@ -403,7 +403,7 @@ registerTag("defense_chain", "높은 방어 · 쇠사슬 조끼 (가칭)", (ctx,
     });
 });
 
-registerTag("speed_boots", "속도 · 가벼운 장화 (가칭)", (ctx, cx, cy) => {
+registerTag("speed_boots", "속도 · 가벼운 장화", (ctx, cx, cy) => {
     const S = 0.06;
     drawClosedPath(
         ctx,
@@ -452,7 +452,7 @@ registerTag("speed_boots", "속도 · 가벼운 장화 (가칭)", (ctx, cx, cy) 
     );
 });
 
-registerTag("speed_wing", "높은 속도 · 날개 장식 (가칭)", (ctx, cx, cy) => {
+registerTag("speed_wing", "높은 속도 · 날개깃", (ctx, cx, cy) => {
     const S = 0.06;
     drawClosedPath(
         ctx,
@@ -507,7 +507,7 @@ registerTag("speed_wing", "높은 속도 · 날개 장식 (가칭)", (ctx, cx, c
     );
 });
 
-registerTag("haste_mote", "스킬 가속 · 마력 티끌 (가칭)", (ctx, cx, cy) => {
+registerTag("haste_mote", "스킬 가속 · 마력 구슬", (ctx, cx, cy) => {
     const S = 0.06;
     const ringR = S * 6.0;
     ctx.beginPath();
@@ -528,7 +528,7 @@ registerTag("haste_mote", "스킬 가속 · 마력 티끌 (가칭)", (ctx, cx, c
     sf(ctx, "#7733aa", "#dd77ff", 0.04);
 });
 
-registerTag("haste_kindlegem", "높은 스킬 가속 · 점화석 (가칭)", (ctx, cx, cy) => {
+registerTag("haste_kindlegem", "높은 스킬 가속 · 점화석", (ctx, cx, cy) => {
     const S = 0.06;
     drawClosedPath(
         ctx,
@@ -561,7 +561,7 @@ registerTag("haste_kindlegem", "높은 스킬 가속 · 점화석 (가칭)", (ct
     sf(ctx, "#cc5511", "#ff8844", 0.035);
 });
 
-registerTag("crit_cloak", "치명타 · 명중 망토 (가칭)", (ctx, cx, cy) => {
+registerTag("crit_cloak", "치명타 · 행운 망토", (ctx, cx, cy) => {
     const S = 0.06;
     drawClosedPath(
         ctx,
@@ -616,7 +616,7 @@ registerTag("crit_cloak", "치명타 · 명중 망토 (가칭)", (ctx, cx, cy) =
     );
 });
 
-registerTag("crit_twin_blades", "높은 치명타 · 쌍날 부적 (가칭)", (ctx, cx, cy) => {
+registerTag("crit_twin_blades", "높은 치명타 · 쌍날 부적", (ctx, cx, cy) => {
     const S = 0.06;
     const a1 = -0.55;
     const a2 = 0.55;
@@ -634,7 +634,7 @@ registerTag("crit_twin_blades", "높은 치명타 · 쌍날 부적 (가칭)", (c
     sf(ctx, "#ffcc44", "#ffcc44", 0.025);
 });
 
-registerTag("mass_weight", "질량 · 무거운 추 (가칭)", (ctx, cx, cy) => {
+registerTag("mass_weight", "질량 · 무쇠 추", (ctx, cx, cy) => {
     const S = 0.06;
     drawClosedPath(
         ctx,
@@ -667,7 +667,7 @@ registerTag("mass_weight", "질량 · 무거운 추 (가칭)", (ctx, cx, cy) => 
     sf(ctx, "#555555", "#777777", 0.025);
 });
 
-registerTag("wall_spring", "벽 반사 속도 · 압축 스프링 (가칭)", (ctx, cx, cy) => {
+registerTag("wall_spring", "벽 반사 속도 · 압축 스프링", (ctx, cx, cy) => {
     const S = 0.06;
     ctx.beginPath();
     ctx.rect(cx - S * 6.0, cy - S * 7.5, S * 12.0, S * 2.0);
@@ -694,7 +694,7 @@ registerTag("wall_spring", "벽 반사 속도 · 압축 스프링 (가칭)", (ct
     });
 });
 
-registerTag("collision_gyro", "충돌 · 충격 자이로 (가칭)", (ctx, cx, cy) => {
+registerTag("collision_gyro", "충돌 · 충격 자이로", (ctx, cx, cy) => {
     const S = 0.06;
     const ringR = S * 5.5;
     [1, -1].forEach((sign) => {
