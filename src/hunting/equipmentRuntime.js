@@ -1,4 +1,5 @@
 import { getEquipmentTemplate } from "./equipmentTemplates.js";
+import { EQUIPMENT_PASSIVE_FACTORIES } from "./equipmentPassives.js";
 
 function finiteNonNegative(value) {
     return Math.max(0, Number(value) || 0);
@@ -106,8 +107,6 @@ class NullEquipmentPassive {
     battleEnded() {}
 }
 
-const PASSIVE_FACTORIES = Object.freeze({});
-
 export class EquipmentRuntime {
     constructor(slotIndex, templateId, owner) {
         this.slotIndex = slotIndex;
@@ -118,7 +117,7 @@ export class EquipmentRuntime {
         this.cooldown = new EquipmentCooldown();
         this.window = new EquipmentTimedWindow();
         this.distance = new EquipmentMovementDistanceTracker();
-        const Factory = PASSIVE_FACTORIES[this.template?.passiveId] ?? NullEquipmentPassive;
+        const Factory = EQUIPMENT_PASSIVE_FACTORIES[this.template?.passiveId] ?? NullEquipmentPassive;
         this.passive = new Factory(this);
     }
 
@@ -146,6 +145,13 @@ export class CombatEquipmentSet {
 
     getCombatStats() {
         return this.owner.getEquipmentCombatStats?.() ?? null;
+    }
+
+    getAttackDamageBonus() {
+        return this.activeRuntimes.reduce(
+            (total, runtime) => total + (runtime.passive.getAttackDamageBonus?.() ?? 0),
+            0
+        );
     }
 
     notify(eventName, context = {}) {

@@ -120,6 +120,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             });
         }
         this.combatEquipment = createCombatEquipmentSet(this, spec.equipment?.equippedTemplateIds);
+        this.stats.baseDamage += this.combatEquipment.getAttackDamageBonus();
         this.mass *= this.equipmentEffects.massMultiplier;
         this.stats.mass = this.mass;
         this._equipmentEffectCooldowns = new CooldownBank({ [EQUIPMENT_EFFECT_COOLDOWN_KEYS.hpSteal]: 0 });

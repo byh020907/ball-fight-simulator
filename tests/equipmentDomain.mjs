@@ -23,6 +23,12 @@ import {
     EquipmentMovementDistanceTracker,
     EquipmentTimedWindow
 } from "../src/hunting/equipmentRuntime.js";
+import {
+    calculateDefenseConversionAttackBonus,
+    calculateMassExecutionDamage,
+    calculateSpeedAngularDamage,
+    calculateVitalOverwhelmDamage
+} from "../src/hunting/equipmentPassives.js";
 import { Ability } from "../src/abilities/ability.js";
 import { AbilitySet } from "../src/abilities/abilitySet.js";
 import {
@@ -278,6 +284,99 @@ try {
     Math.random = originalRandom;
 }
 assert.equal(equipmentDamageResult.isCritical, false);
+
+assert.deepEqual([0, 12, 24, 36].map(calculateDefenseConversionAttackBonus), [0, 0.5, 1, 1.5]);
+assert.equal(calculateMassExecutionDamage(40, 0.25), 30);
+assert.equal(calculateSpeedAngularDamage(40, 0.5), 7);
+assert.deepEqual(
+    [100, 50, 0].map((hp) => calculateVitalOverwhelmDamage(100, hp, 100)),
+    [2.5, 1.75, 1]
+);
+
+const passiveCombatStats = Object.freeze({
+    hp: 100,
+    defense: 36,
+    speed: Object.freeze({ increaseRatio: 0.5 }),
+    mass: Object.freeze({ effectiveBonus: 0.25 })
+});
+const passiveOwner = {
+    hp: 100,
+    maxHp: 100,
+    getEquipmentCombatStats: () => passiveCombatStats,
+    getTotalAttackDamage: () => 40
+};
+const passiveEvents = [];
+const passiveTarget = {
+    takeDamage(amount, source, label, options) {
+        passiveEvents.push({ amount, source, label, options });
+        source.combatEquipment.enemyCollisionResolved({ damage: options.equipmentDamage });
+        return { actualDamage: amount, absorbedDamage: 0, isCritical: false };
+    }
+};
+const defenseConversionSet = new CombatEquipmentSet(passiveOwner, ["completed_defense_conversion"]);
+assert.equal(defenseConversionSet.getAttackDamageBonus(), 1.5);
+assert.equal(defenseConversionSet.getAttackDamageBonus(), 1.5);
+
+const executionSet = new CombatEquipmentSet(passiveOwner, ["completed_mass_execution"]);
+passiveOwner.combatEquipment = executionSet;
+executionSet.enemyCollisionResolved({ target: passiveTarget, targetHpRatioBefore: 0.35, isCritical: true });
+executionSet.enemyCollisionResolved({ target: passiveTarget, targetHpRatioBefore: 0.351, isCritical: true });
+executionSet.enemyCollisionResolved({ target: passiveTarget, targetHpRatioBefore: 0.35, isCritical: false });
+assert.deepEqual(
+    passiveEvents.map(({ amount, label, options }) => [amount, label, options.equipmentDamage.sourceTemplateId]),
+    [[30, "종언의 추락", "completed_mass_execution"]]
+);
+const defendedTarget = new BattleBall(
+    { ...baseCombatSpec, stats: { ...baseCombatSpec.stats, hp: 100, defense: 100 } },
+    new Vector2(0, 0)
+);
+const defendedHpBefore = defendedTarget.hp;
+executionSet.enemyCollisionResolved({ target: defendedTarget, targetHpRatioBefore: 0.35, isCritical: true });
+assert.equal(defendedHpBefore - defendedTarget.hp, 15);
+
+passiveEvents.length = 0;
+const speedAngularSet = new CombatEquipmentSet(passiveOwner, ["completed_speed_angular"]);
+passiveOwner.combatEquipment = speedAngularSet;
+passiveOwner.velocity = new Vector2(1, 0);
+speedAngularSet.enemyCollisionResolved({ target: passiveTarget });
+passiveOwner.velocity = new Vector2(9_999, 0);
+speedAngularSet.enemyCollisionResolved({ target: passiveTarget });
+assert.deepEqual(
+    passiveEvents.map(({ amount, label }) => [amount, label]),
+    [
+        [7, "천공의 나선"],
+        [7, "천공의 나선"]
+    ]
+);
+
+passiveEvents.length = 0;
+const vitalOverwhelmSet = new CombatEquipmentSet(passiveOwner, ["completed_vital_overwhelm"]);
+passiveOwner.combatEquipment = vitalOverwhelmSet;
+for (const hp of [100, 50, 0]) {
+    passiveOwner.hp = hp;
+    vitalOverwhelmSet.enemyCollisionResolved({ target: passiveTarget });
+}
+assert.deepEqual(
+    passiveEvents.map(({ amount, label }) => [amount, label]),
+    [
+        [2.5, "적룡의 심갑"],
+        [1.75, "적룡의 심갑"],
+        [1, "적룡의 심갑"]
+    ]
+);
+
+const defenseConversionProfile = createDefaultPlayerProfile();
+for (const [slotIndex, templateId] of ["completed_defense_conversion", "defense_chain", "defense_leather"].entries()) {
+    addEquipmentQuantity(defenseConversionProfile, templateId);
+    equipEquipmentTemplate(defenseConversionProfile, templateId, slotIndex);
+}
+const defenseConversionSpec = applyEquipmentStats(baseCombatSpec, defenseConversionProfile);
+const defenseConversionBall = new BattleBall(defenseConversionSpec, new Vector2(0, 0));
+const defenseConversionBonus = calculateDefenseConversionAttackBonus(
+    defenseConversionSpec.equipment.combatStats.defense
+);
+assert.equal(defenseConversionBall.getTotalAttackDamage(), defenseConversionSpec.stats.damage + defenseConversionBonus);
+assert.equal(defenseConversionBall.stats.baseDamage, defenseConversionBall.getTotalAttackDamage());
 
 const movementEvents = [];
 const movementBall = new BattleBall(combatSpec, new Vector2(0, 0));
