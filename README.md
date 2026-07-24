@@ -40,6 +40,8 @@ http://127.0.0.1:4173/
 - `src/characters/definitions/`: 캐릭터별 메타데이터와 기본 스탯
 - `src/roster.js`: 중앙 캐릭터 정의를 화면용 로스터로 투영
 - `src/statAllocation.js`: 스탯 배분 로직
+- `SESSION-HANDOFF.md`: 새 대화에 필요한 현재 계약, 열린 리스크, 활성 결정
+- `docs/decision-history.md`: 현행 문서에 흡수된 전체 결정 이력
 - `docs/game-rules.md`: 게임 흐름, 스탯 배분, 등수 규칙
 - `docs/design.md`: 시각 방향과 캐릭터 표현 규칙
 - `docs/development-rules.md`: 개발, 문서, Git 운영 규칙
