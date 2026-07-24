@@ -1774,15 +1774,27 @@ function testIconTagCountAndUniqueness() {
             "intermediate_speed_wall",
             "intermediate_speed_angular",
             "intermediate_haste_angular",
-            "intermediate_crit_mass"
+            "intermediate_crit_mass",
+            "completed_ability_crit",
+            "completed_pursuit_flurry",
+            "completed_mass_execution",
+            "completed_vital_heat",
+            "completed_defense_conversion",
+            "completed_mass_shockwave",
+            "completed_wall_ricochet",
+            "completed_wall_heat",
+            "completed_speed_angular",
+            "completed_ability_echo",
+            "completed_vortex_charge",
+            "completed_vital_overwhelm"
         ],
-        "The prototype registry should expose the approved 15 basic and 12 intermediate tags in gallery order"
+        "The prototype registry should expose the approved 15 basic, 12 intermediate, and 12 completed tags in gallery order"
     );
     const unknownTag = resolveTagDraw("unknown");
     assert.ok(typeof unknownTag === "function", "Unknown fallback should resolve to a draw function");
     const nonExistentTag = resolveTagDraw("does_not_exist");
     assert.equal(nonExistentTag, unknownTag, "Non-existent tag should fall back to unknown draw function");
-    assert.equal(tags.length, 27, "There should be exactly 27 registered non-unknown tags");
+    assert.equal(tags.length, 39, "There should be exactly 39 registered non-unknown tags");
     const unique = new Set(tags);
     assert.equal(unique.size, tags.length, "All tag IDs must be unique");
     tags.forEach((id) => {
@@ -1792,7 +1804,7 @@ function testIconTagCountAndUniqueness() {
         );
     });
     const metadata = getRegisteredTagMetadata();
-    assert.equal(metadata.length, 27, "getRegisteredTagMetadata should return exactly 27 entries");
+    assert.equal(metadata.length, 39, "getRegisteredTagMetadata should return exactly 39 entries");
     metadata.forEach((entry) => {
         assert.ok(typeof entry.id === "string" && entry.id.length > 0, "Each metadata entry must have an id");
         assert.ok(typeof entry.label === "string" && entry.label.length > 0, "Each metadata entry must have a label");
@@ -1824,7 +1836,19 @@ function testIconTagCountAndUniqueness() {
         intermediate_speed_wall: "중간 · 속도·벽 반사 속도 · 스프링 도약화",
         intermediate_speed_angular: "중간 · 속도·회전 충격 · 날개 자이로 안정기",
         intermediate_haste_angular: "중간 · 스킬 가속·회전 충격 · 점화 자이로 코어",
-        intermediate_crit_mass: "중간 · 치명타·질량 · 쌍날 충격두"
+        intermediate_crit_mass: "중간 · 치명타·질량 · 쌍날 충격두",
+        completed_ability_crit: "완성 · 스킬·치명타 폭발 · 명칭 미정",
+        completed_pursuit_flurry: "완성 · 추격·연타 · 명칭 미정",
+        completed_mass_execution: "완성 · 질량·치명타 처형 · 명칭 미정",
+        completed_vital_heat: "완성 · HP·열기 지속 공격 · 명칭 미정",
+        completed_defense_conversion: "완성 · 방어·공격 전환 · 명칭 미정",
+        completed_mass_shockwave: "완성 · 질량·광역 충격파 · 명칭 미정",
+        completed_wall_ricochet: "완성 · 벽 반사·도탄 공격 · 명칭 미정",
+        completed_wall_heat: "완성 · 벽 반사·열기 파동 · 명칭 미정",
+        completed_speed_angular: "완성 · 속도·회전 충격 · 명칭 미정",
+        completed_ability_echo: "완성 · 스킬·충돌 메아리 · 명칭 미정",
+        completed_vortex_charge: "완성 · 이동·광역 회전 · 명칭 미정",
+        completed_vital_overwhelm: "완성 · HP·충돌 압도 · 명칭 미정"
     };
     metadata.forEach((entry) => {
         assert.equal(entry.label, LABEL_MAP[entry.id], `Label for ${entry.id} must match the confirmed equipment name`);

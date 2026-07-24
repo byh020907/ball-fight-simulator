@@ -1324,6 +1324,445 @@ registerTag("intermediate_crit_mass", "중간 · 치명타·질량 · 쌍날 충
     sf(ctx, "#303038", null, 0.055);
 });
 
+registerTag("completed_ability_crit", "완성 · 스킬·치명타 폭발 · 명칭 미정", (ctx, cx, cy) => {
+    const S = 0.06;
+    drawClosedPath(
+        ctx,
+        [
+            [cx, cy - S * 7.4],
+            [cx + S * 1.4, cy - S * 2.1],
+            [cx + S * 0.9, cy + S * 0.6],
+            [cx - S * 0.9, cy + S * 0.6],
+            [cx - S * 1.4, cy - S * 2.1]
+        ],
+        "#33384a",
+        "#b7c3d3",
+        0.06
+    );
+    ctx.beginPath();
+    ctx.rect(cx - S * 4.5, cy + S * 0.5, S * 9.0, S * 1.1);
+    sf(ctx, "#4a3821", "#c2a14d", 0.045);
+    ctx.beginPath();
+    ctx.arc(cx, cy + S * 1.05, S * 1.25, 0, Math.PI * 2);
+    sf(ctx, "#3d245e", "#a847d4", 0.045);
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 0.85, cy + S * 1.7],
+            [cx + S * 0.85, cy + S * 1.7],
+            [cx + S * 0.7, cy + S * 6.1],
+            [cx - S * 0.7, cy + S * 6.1]
+        ],
+        "#3b2925",
+        "#704346",
+        0.045
+    );
+    ctx.beginPath();
+    ctx.arc(cx, cy + S * 6.8, S * 1.05, 0, Math.PI * 2);
+    sf(ctx, "#3b2925", "#d2b354", 0.035);
+});
+
+registerTag("completed_pursuit_flurry", "완성 · 추격·연타 · 명칭 미정", (ctx, cx, cy) => {
+    const S = 0.06;
+    [-1, 1].forEach((side) => {
+        drawClosedPath(
+            ctx,
+            [
+                [cx + S * side * 3.4, cy - S * 7.1],
+                [cx + S * side * 4.8, cy - S * 2.0],
+                [cx + S * side * 3.8, cy - S * 0.7],
+                [cx + S * side * 2.5, cy - S * 2.0]
+            ],
+            "#37425d",
+            "#c4d4e6",
+            0.055
+        );
+        ctx.beginPath();
+        ctx.rect(cx + S * side * 5.2, cy - S * 0.9, S * side * -3.5, S * 0.85);
+        sf(ctx, "#4c3922", "#c69f3a", 0.035);
+        drawOpenPath(
+            ctx,
+            [
+                [cx + S * side * 3.9, cy],
+                [cx + S * side * 4.0, cy + S * 5.1]
+            ],
+            "#5a3834",
+            0.075
+        );
+        ctx.beginPath();
+        ctx.arc(cx + S * side * 5.5, cy + S * 5.5, S * 1.0, 0, Math.PI * 2);
+        sf(ctx, "#485a7d", "#cbd9e7", 0.035);
+    });
+});
+
+registerTag("completed_mass_execution", "완성 · 질량·치명타 처형 · 명칭 미정", (ctx, cx, cy) => {
+    const S = 0.06;
+    drawClosedPath(
+        ctx,
+        [
+            [cx, cy - S * 7.7],
+            [cx + S * 2.4, cy - S * 1.5],
+            [cx + S * 1.6, cy + S * 2.2],
+            [cx - S * 1.6, cy + S * 2.2],
+            [cx - S * 2.4, cy - S * 1.5]
+        ],
+        "#30323b",
+        "#a6aab3",
+        0.065
+    );
+    [-1, 1].forEach((side) => {
+        drawClosedPath(
+            ctx,
+            [
+                [cx + S * side * 1.2, cy - S * 1.9],
+                [cx + S * side * 6.4, cy - S * 0.6],
+                [cx + S * side * 2.3, cy + S * 1.9]
+            ],
+            "#3f3030",
+            "#7d5550",
+            0.055
+        );
+    });
+    ctx.beginPath();
+    ctx.arc(cx, cy + S * 0.4, S * 2.1, 0, Math.PI * 2);
+    sf(ctx, "#3b2020", "#9d3033", 0.055);
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 0.95, cy + S * 2.3],
+            [cx + S * 0.95, cy + S * 2.3],
+            [cx + S * 0.75, cy + S * 6.9],
+            [cx - S * 0.75, cy + S * 6.9]
+        ],
+        "#34261c",
+        "#61413b",
+        0.055
+    );
+});
+
+registerTag("completed_vital_heat", "완성 · HP·열기 지속 공격 · 명칭 미정", (ctx, cx, cy) => {
+    const S = 0.06;
+    drawClosedPath(
+        ctx,
+        [
+            [cx, cy - S * 7.6],
+            [cx + S * 2.2, cy - S * 1.5],
+            [cx + S * 1.3, cy + S * 1.5],
+            [cx - S * 1.3, cy + S * 1.5],
+            [cx - S * 2.2, cy - S * 1.5]
+        ],
+        "#552719",
+        "#a7654a",
+        0.065
+    );
+    drawOpenPath(
+        ctx,
+        [
+            [cx, cy - S * 5.8],
+            [cx, cy - S * 0.2]
+        ],
+        "#f04c35",
+        0.08
+    );
+    ctx.beginPath();
+    ctx.rect(cx - S * 4.5, cy + S * 1.4, S * 9.0, S * 1.05);
+    sf(ctx, "#4d3020", "#d5953f", 0.045);
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 0.85, cy + S * 2.5],
+            [cx + S * 0.85, cy + S * 2.5],
+            [cx + S * 0.7, cy + S * 6.8],
+            [cx - S * 0.7, cy + S * 6.8]
+        ],
+        "#3b2925",
+        "#733a2f",
+        0.045
+    );
+});
+
+registerTag("completed_defense_conversion", "완성 · 방어·공격 전환 · 명칭 미정", (ctx, cx, cy) => {
+    const S = 0.06;
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 6.4, cy - S * 4.9],
+            [cx - S * 1.1, cy - S * 6.8],
+            [cx + S * 2.4, cy - S * 3.8],
+            [cx + S * 7.1, cy + S * 4.5],
+            [cx + S * 1.0, cy + S * 6.0],
+            [cx - S * 5.2, cy + S * 4.2]
+        ],
+        "#31445d",
+        "#7894ab",
+        0.065
+    );
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 1.2, cy - S * 7.4],
+            [cx + S * 2.1, cy - S * 5.1],
+            [cx + S * 0.4, cy + S * 2.6],
+            [cx - S * 1.8, cy + S * 2.1]
+        ],
+        "#3f4552",
+        "#d2d7dd",
+        0.055
+    );
+    ctx.beginPath();
+    ctx.arc(cx - S * 1.0, cy + S * 0.5, S * 1.6, 0, Math.PI * 2);
+    sf(ctx, "#8d6a2a", "#e0bb4e", 0.04);
+    drawOpenPath(
+        ctx,
+        [
+            [cx - S * 4.5, cy - S * 1.2],
+            [cx + S * 4.6, cy + S * 3.1]
+        ],
+        "#c9dfed",
+        0.035
+    );
+});
+
+registerTag("completed_mass_shockwave", "완성 · 질량·광역 충격파 · 명칭 미정", (ctx, cx, cy) => {
+    const S = 0.06;
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 1.0, cy + S * 1.2],
+            [cx + S * 1.0, cy + S * 1.2],
+            [cx + S * 0.75, cy + S * 7.2],
+            [cx - S * 0.75, cy + S * 7.2]
+        ],
+        "#3a2b29",
+        "#6f4b3c",
+        0.06
+    );
+    ctx.beginPath();
+    ctx.arc(cx, cy - S * 1.3, S * 3.2, 0, Math.PI * 2);
+    sf(ctx, "#3a3030", "#9e7564", 0.06);
+    [-1, 1].forEach((side) => {
+        drawClosedPath(
+            ctx,
+            [
+                [cx + S * side * 2.0, cy - S * 3.6],
+                [cx + S * side * 6.6, cy - S * 1.4],
+                [cx + S * side * 2.2, cy + S * 0.6]
+            ],
+            "#392c2c",
+            "#bc7d57",
+            0.055
+        );
+    });
+    ctx.beginPath();
+    ctx.arc(cx, cy - S * 1.3, S * 1.2, 0, Math.PI * 2);
+    sf(ctx, "#5d302d", "#e0824d", 0.035);
+});
+
+registerTag("completed_wall_ricochet", "완성 · 벽 반사·도탄 공격 · 명칭 미정", (ctx, cx, cy) => {
+    const S = 0.06;
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 6.8, cy - S * 5.7],
+            [cx + S * 3.3, cy - S * 6.8],
+            [cx + S * 6.7, cy - S * 1.4],
+            [cx + S * 4.2, cy + S * 6.3],
+            [cx - S * 4.4, cy + S * 6.2],
+            [cx - S * 6.9, cy + S * 1.7]
+        ],
+        "#355263",
+        "#88aeb7",
+        0.065
+    );
+    [-3.8, 3.8].forEach((x) => {
+        drawOpenPath(
+            ctx,
+            [
+                [cx + S * x, cy - S * 4.2],
+                [cx + S * (x + 1.2), cy - S * 1.8],
+                [cx + S * x, cy + S * 0.8]
+            ],
+            "#d9eff0",
+            0.055
+        );
+    });
+    drawOpenPath(
+        ctx,
+        [
+            [cx - S * 2.5, cy + S * 3.5],
+            [cx, cy + S * 1.4],
+            [cx + S * 2.5, cy + S * 3.5]
+        ],
+        "#336d80",
+        0.07
+    );
+});
+
+registerTag("completed_wall_heat", "완성 · 벽 반사·열기 파동 · 명칭 미정", (ctx, cx, cy) => {
+    const S = 0.06;
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 5.2, cy - S * 5.4],
+            [cx + S * 5.2, cy - S * 5.4],
+            [cx + S * 6.2, cy + S * 5.4],
+            [cx - S * 6.2, cy + S * 5.4]
+        ],
+        "#4b3028",
+        "#865143",
+        0.065
+    );
+    [-3.5, 0, 3.5].forEach((x) => {
+        ctx.beginPath();
+        ctx.arc(cx + S * x, cy - S * 0.7, S * 1.25, 0, Math.PI * 2);
+        sf(ctx, "#6b2d22", "#ee7d3a", 0.035);
+        drawOpenPath(
+            ctx,
+            [
+                [cx + S * x, cy + S * 0.6],
+                [cx + S * x, cy + S * 3.8]
+            ],
+            "#f4b455",
+            0.045
+        );
+    });
+    drawOpenPath(
+        ctx,
+        [
+            [cx - S * 5.0, cy + S * 5.5],
+            [cx + S * 5.0, cy + S * 5.5]
+        ],
+        "#2d4c58",
+        0.07
+    );
+});
+
+registerTag("completed_speed_angular", "완성 · 속도·회전 충격 · 명칭 미정", (ctx, cx, cy) => {
+    const S = 0.06;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, S * 7.0, S * 2.4, -0.58, 0, Math.PI * 2);
+    sf(ctx, "#3d5573", "#8fb5d6", 0.065);
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, S * 2.5, S * 7.0, -0.58, 0, Math.PI * 2);
+    sf(ctx, "#3d5573", null, 0.055);
+    ctx.beginPath();
+    ctx.arc(cx, cy, S * 2.1, 0, Math.PI * 2);
+    sf(ctx, "#35506b", "#d4a248", 0.055);
+    drawClosedPath(
+        ctx,
+        [
+            [cx + S * 3.6, cy - S * 6.7],
+            [cx + S * 6.8, cy - S * 5.0],
+            [cx + S * 3.1, cy - S * 2.4]
+        ],
+        "#4d5b83",
+        "#d5dde8",
+        0.045
+    );
+});
+
+registerTag("completed_ability_echo", "완성 · 스킬·충돌 메아리 · 명칭 미정", (ctx, cx, cy) => {
+    const S = 0.06;
+    [S * 6.6, S * 4.8].forEach((r) => {
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, -2.35, 1.15);
+        sf(ctx, "#574078", null, 0.06);
+    });
+    [
+        [0, -2.2, "#a552cc"],
+        [0, 2.2, "#6f9ae0"]
+    ].forEach(([x, y, color]) => {
+        ctx.beginPath();
+        ctx.arc(cx + S * x, cy + S * y, S * 2.45, 0, Math.PI * 2);
+        sf(ctx, "#41315b", color, 0.055);
+    });
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 2.1, cy - S * 1.0],
+            [cx + S * 2.1, cy - S * 1.0],
+            [cx + S * 1.1, cy + S * 1.0],
+            [cx - S * 1.1, cy + S * 1.0]
+        ],
+        "#303344",
+        "#d4cae8",
+        0.04
+    );
+});
+
+registerTag("completed_vortex_charge", "완성 · 이동·광역 회전 · 명칭 미정", (ctx, cx, cy) => {
+    const S = 0.06;
+    ctx.beginPath();
+    ctx.arc(cx, cy, S * 7.0, 0.4, Math.PI * 2.25);
+    sf(ctx, "#3c5874", null, 0.07);
+    ctx.beginPath();
+    ctx.arc(cx, cy, S * 4.6, 0.8, Math.PI * 2.4);
+    sf(ctx, "#5889ad", null, 0.06);
+    ctx.beginPath();
+    ctx.arc(cx, cy, S * 2.0, 0, Math.PI * 2);
+    sf(ctx, "#3f4c62", "#d3a44d", 0.055);
+    [0.15, 2.25, 4.35].forEach((angle) => {
+        const x = cx + Math.cos(angle) * S * 6.3;
+        const y = cy + Math.sin(angle) * S * 6.3;
+        drawClosedPath(
+            ctx,
+            [
+                [x, y],
+                [x - S * 1.5, y + S * 1.2],
+                [x + S * 1.6, y + S * 1.0]
+            ],
+            "#4a5d7c",
+            "#c7d7e5",
+            0.035
+        );
+    });
+});
+
+registerTag("completed_vital_overwhelm", "완성 · HP·충돌 압도 · 명칭 미정", (ctx, cx, cy) => {
+    const S = 0.06;
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 4.4, cy - S * 6.4],
+            [cx, cy - S * 7.7],
+            [cx + S * 4.4, cy - S * 6.4],
+            [cx + S * 6.4, cy - S * 0.8],
+            [cx + S * 4.3, cy + S * 6.7],
+            [cx, cy + S * 7.5],
+            [cx - S * 4.3, cy + S * 6.7],
+            [cx - S * 6.4, cy - S * 0.8]
+        ],
+        "#4c3434",
+        "#92545c",
+        0.065
+    );
+    [-1, 1].forEach((side) => {
+        drawClosedPath(
+            ctx,
+            [
+                [cx + S * side * 2.0, cy - S * 6.0],
+                [cx + S * side * 5.0, cy - S * 7.9],
+                [cx + S * side * 4.4, cy - S * 3.7]
+            ],
+            "#4a3030",
+            "#d9b2a9",
+            0.045
+        );
+    });
+    ctx.beginPath();
+    ctx.arc(cx, cy, S * 2.5, 0, Math.PI * 2);
+    sf(ctx, "#772d3b", "#e05d76", 0.055);
+    drawOpenPath(
+        ctx,
+        [
+            [cx, cy - S * 1.6],
+            [cx, cy + S * 1.6]
+        ],
+        "#ffe1d9",
+        0.04
+    );
+});
+
 export function getRegisteredTags() {
     return Array.from(TAG_REGISTRY.keys()).filter((id) => id !== "unknown");
 }
