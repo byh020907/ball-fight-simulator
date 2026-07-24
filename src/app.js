@@ -90,6 +90,13 @@ import { ScreenWakeLock } from "./screenWakeLock.js";
 import { applyRebirthLoadoutToBaseSpec, applyRebirthLoadoutToBattleBall, getRebirthLoadout } from "./rebirth/index.js";
 import { advanceResultSequence, createResultSequence, getResultSequencePresentation } from "./resultSequence.js";
 import { CHARACTER_ROSTER_CONTEXTS, getEligibleRoster } from "./characterRosterPolicy.js";
+import {
+    COMBAT_CONTROL_CONFIG,
+    createCombatControlState,
+    resetCombatControlState,
+    updateCombatControlState,
+    useNearestEnemyCombatControl
+} from "./combatControls.js";
 
 const TOURNAMENT_CHALLENGE_INTRO_DURATION = 1000;
 
@@ -136,6 +143,11 @@ export class BattleApp {
         this._root = Alpine.store("uiManager").requireComponent("appRoot");
         this._toast = Alpine.store("uiManager").requireComponent("toastNotification");
         this._modeSegment = Alpine.store("uiManager").requireComponent("modeSegment");
+        try {
+            this._combatControls = Alpine.store("uiManager").requireComponent("combatControls");
+        } catch {
+            this._combatControls = null;
+        }
         this._gameMode = "tournament";
         this.ui = {
             get logItems() {
@@ -186,6 +198,7 @@ export class BattleApp {
 
         /** @type {{ level: number, indicatorTimer: number, indicatorText: string }} */
         this._speed = { level: 1, indicatorTimer: 0, indicatorText: "" };
+        this._combatControlState = createCombatControlState();
 
         this._syncPlayerStatAllocationFromUi();
         this.refreshPlayerSetup();
@@ -1051,6 +1064,7 @@ export class BattleApp {
         this._speed.indicatorText = "";
         this.resultSequenceAnnounced = false;
         this.matchFinalized = false;
+        resetCombatControlState(this._combatControlState);
         this._lastMatchXpResult = null;
         const clickActionsEnabled = options.clickActionsEnabled ?? true;
         this._action.skipPick = !clickActionsEnabled || (options.skipActionPick ?? false);
@@ -1190,6 +1204,7 @@ export class BattleApp {
 
         // 클릭 핸들러 바인딩
         this._bindClickHandler();
+        this._syncCombatControlUi();
 
         this.renderer.render(this.simulation);
         this.showOverlay("Matchup", label);
@@ -1227,10 +1242,7 @@ export class BattleApp {
 
         this._pointerHandler = () => {
             if (this.simulation?.finished) return;
-            if (this._gameMode === "hunting") {
-                this.hunting.accelerateActiveCharacter();
-                return;
-            }
+            if (this._gameMode === "hunting") return;
             this._action.ctx.action = this._action.current;
             this._action.ctx.sim = this.simulation;
             this._action.ctx.player = this.simulation?.playerBall ?? null;
@@ -1316,6 +1328,37 @@ export class BattleApp {
     _cleanupMatch() {
         this._unbindClickHandler();
         this._action.current = null;
+        resetCombatControlState(this._combatControlState);
+        this._syncCombatControlUi();
+    }
+
+    useCombatControl(type) {
+        const player = this.simulation?.playerBall;
+        const result = useNearestEnemyCombatControl(this._combatControlState, type, player, this.simulation);
+        this._syncCombatControlUi();
+        return result;
+    }
+
+    _syncCombatControlUi() {
+        const player = this.simulation?.playerBall;
+        const active = Boolean(
+            player &&
+            !this.simulation?.finished &&
+            !player.flags?.defeated &&
+            !player.flags?.destroyed &&
+            !player.state?.swallowed &&
+            !player.state?.movement
+        );
+        const state = this._combatControlState;
+        const progressFor = (control) =>
+            control.cooldownRemaining > 0 ? control.cooldownRemaining / COMBAT_CONTROL_CONFIG.cooldownSteps.at(-1) : 0;
+        this._combatControls?.setState({
+            visible: active,
+            pressureProgress: progressFor(state.pressure),
+            retreatProgress: progressFor(state.retreat),
+            pressureDisabled: !active || state.sharedLockRemaining > 0 || state.pressure.cooldownRemaining > 0,
+            retreatDisabled: !active || state.sharedLockRemaining > 0 || state.retreat.cooldownRemaining > 0
+        });
     }
 
     _formatXpResult(result) {
@@ -1474,6 +1517,8 @@ export class BattleApp {
         }
 
         this.simulation.update(speedDelta, delta);
+        updateCombatControlState(this._combatControlState, speedDelta);
+        this._syncCombatControlUi();
         if (this._gameMode === "hunting") this.hunting.updateCombat(speedDelta);
         this.renderer.render(this.simulation);
         this._renderSpeedIndicator();

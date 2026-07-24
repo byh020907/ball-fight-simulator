@@ -5,12 +5,6 @@ export const HUNTING_COMBAT_INTERACTION_CONFIG = Object.freeze({
         windowSeconds: 0.2,
         missedAttemptCooldownSeconds: 1.5,
         successfulSwapCooldownSeconds: 5
-    }),
-    tapAcceleration: Object.freeze({
-        enabled: true,
-        impulseBaseSpeedRatio: 0.2,
-        maximumSpeedMultiplier: 1.6,
-        minimumDirectionSpeed: 5
     })
 });
 
@@ -36,46 +30,4 @@ export function createPerfectSwapAttempt({
         }
     };
     return effect;
-}
-
-function getTapAccelerationBaseSpeed(fighter, simulation) {
-    const modifiers = fighter.getStatModifiers?.() ?? { speed: 1 };
-    const slowMultiplier = fighter.state?.slow?.amount ?? 1;
-    const simulationMultiplier = simulation.getSpeedMultiplier?.(fighter) ?? 1;
-    return Math.max(0, fighter.stats.baseSpeed * (modifiers.speed ?? 1) * slowMultiplier * simulationMultiplier);
-}
-
-export function applyHuntingTapAcceleration(
-    fighter,
-    simulation,
-    config = HUNTING_COMBAT_INTERACTION_CONFIG.tapAcceleration
-) {
-    if (!config.enabled || !fighter || !simulation) return { applied: false, reason: "unavailable" };
-    if (fighter.flags.defeated || fighter.state.swallowed || fighter.participation?.canAct === false) {
-        return { applied: false, reason: "inactive" };
-    }
-    if (fighter.state.movement) return { applied: false, reason: "ability_movement" };
-
-    const currentSpeed = fighter.velocity.length();
-    if (currentSpeed < config.minimumDirectionSpeed) return { applied: false, reason: "no_direction" };
-
-    const baseSpeed = getTapAccelerationBaseSpeed(fighter, simulation);
-    const maximumSpeed = baseSpeed * config.maximumSpeedMultiplier;
-    if (baseSpeed <= 0 || currentSpeed >= maximumSpeed) {
-        return { applied: false, reason: "maximum_speed", speed: currentSpeed, maximumSpeed, progress: 1 };
-    }
-
-    const nextSpeed = Math.min(maximumSpeed, currentSpeed + baseSpeed * config.impulseBaseSpeedRatio);
-    const direction = fighter.velocity.clone().normalize();
-    fighter.applyImpulse(direction.scale(nextSpeed).subtract(fighter.velocity));
-
-    return {
-        applied: true,
-        speed: fighter.velocity.length(),
-        maximumSpeed,
-        progress: Math.max(
-            0,
-            Math.min(1, (fighter.velocity.length() - baseSpeed) / Math.max(1, maximumSpeed - baseSpeed))
-        )
-    };
 }

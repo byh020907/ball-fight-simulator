@@ -1,0 +1,25 @@
+<div class="combat-controls" x-data="combatControls" x-show="visible" x-cloak>
+    <button class="combat-control combat-control--retreat" type="button" aria-label="이탈" :disabled="retreatDisabled" @click.stop="useControl('retreat')">
+        <span>이탈</span><i :style="'transform:scaleX(' + retreatProgress + ')'" aria-hidden="true"></i>
+    </button>
+    <button class="combat-control combat-control--pressure" type="button" aria-label="압박" :disabled="pressureDisabled" @click.stop="useControl('pressure')">
+        <span>압박</span><i :style="'transform:scaleX(' + pressureProgress + ')'" aria-hidden="true"></i>
+    </button>
+</div>
+<style global>
+.combat-controls { position:absolute; inset:0; z-index:5; pointer-events:none; }
+.combat-control { position:absolute; bottom:12px; min-width:48px; min-height:48px; padding:8px 12px; border:2px solid #202020; background:#fff; color:#202020; font:700 .78rem/1 sans-serif; pointer-events:auto; touch-action:manipulation; }
+.combat-control--retreat { left:12px; } .combat-control--pressure { right:12px; }
+.combat-control:focus-visible { outline:3px solid #ffcb3d; outline-offset:2px; }
+.combat-control:active:not(:disabled) { transform:translateY(2px); }
+.combat-control:disabled { opacity:.52; }
+.combat-control i { display:block; height:3px; margin-top:5px; background:#ff8a3d; transform-origin:left; transition:transform .08s linear; }
+@media (max-width:760px) { .combat-control { bottom:10px; min-width:54px; min-height:48px; } .combat-control--retreat { left:10px; } .combat-control--pressure { right:10px; } }
+</style>
+<script>
+window.createGameUI("combatControls", () => ({
+    visible: false, pressureProgress: 0, retreatProgress: 0, pressureDisabled: true, retreatDisabled: true,
+    setState(state = {}) { Object.assign(this, state); },
+    useControl(type) { return Alpine.store("uiManager").invokeGameAction("useCombatControl", type); }
+}));
+</script>

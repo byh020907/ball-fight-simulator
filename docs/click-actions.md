@@ -1,5 +1,7 @@
 # 클릭 액션 시스템
 
+> 토너먼트의 선택형 클릭 액션은 유지한다. 공통 `압박`·`이탈`은 별도 전장 가장자리 버튼이며 HP를 소모하지 않아 캔버스 클릭 액션과 중복 발동하지 않는다.
+
 > **구현 상태**: 구현 완료 (v0.9.0)
 > **과거 구현 계획**: [`.legacy/docs/implementation-plan.md`](../.legacy/docs/implementation-plan.md) — 참고 기록이며 현행 계약이 아님
 > **관련 문서**: [`docs/design.md`](design.md) (시각 방향), [`docs/game-rules.md`](game-rules.md) (게임 규칙)

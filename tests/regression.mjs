@@ -257,7 +257,6 @@ import {
     HUNTING_PARTY_ROLES,
     HUNTING_COMPANION_CONFIG,
     HUNTING_COMBAT_INTERACTION_CONFIG,
-    applyHuntingTapAcceleration,
     applyHuntingCompanionScale,
     placeHuntingCompanionsNearLeader,
     applyHuntingPartyFloorRecovery,
@@ -272,6 +271,12 @@ import {
     setActiveHuntingPartyRole,
     setHuntingPartyMemberHealth
 } from "../src/hunting/index.js";
+import {
+    createCombatControlState,
+    resetCombatControlState,
+    updateCombatControlState,
+    useNearestEnemyCombatControl
+} from "../src/combatControls.js";
 import { Grenade } from "../src/entities/grenade.js";
 import {
     getArenaWallRay,
@@ -25689,57 +25694,6 @@ function testHuntingPartyBattleComposition() {
     if (!HUNTING_FLOW_CONFIG.swapEnabled) {
         assert.equal(mockApp.simulation.standbyFighters.length, 0, "Disabled swaps must not create a standby fighter");
         assert.equal(manager.swapActiveCharacter(), null, "Disabled swaps must reject combat input");
-        leaderAtBattleStart.state.movement = null;
-        leaderAtBattleStart.applyImpulse(
-            new Vector2(leaderAtBattleStart.stats.baseSpeed, 0).subtract(leaderAtBattleStart.velocity)
-        );
-        mockApp.simulation.playerBall = leaderAtBattleStart;
-        manager._run = setHuntingRunPhase(manager._run, HUNTING_RUN_PHASES.COMBAT);
-        const acceleration = manager.accelerateActiveCharacter();
-        assert.equal(acceleration.applied, true, "Tap acceleration must remain active while swaps are disabled");
-        const firstAccelerationEffect = mockApp.simulation.entities.find(
-            (entity) => entity.constructor.name === "HuntingTapAccelerationEffect"
-        );
-        const firstTrailPoint = firstAccelerationEffect.samples[0].position.clone();
-        leaderAtBattleStart.position.add(new Vector2(leaderAtBattleStart.radius, leaderAtBattleStart.radius * 0.25));
-        firstAccelerationEffect.update(0.03);
-        assert.ok(firstAccelerationEffect.samples.length >= 3, "Acceleration trail should sample the movement path");
-        assert.deepEqual(
-            firstAccelerationEffect.samples[0].position,
-            firstTrailPoint,
-            "Existing trail points should remain in world space instead of following the fighter"
-        );
-        assertForegroundEffectRenders(firstAccelerationEffect, "Hunting tap acceleration", (primitives) => {
-            assert.ok(
-                primitives.filter((primitive) => primitive.method === "lineTo").length >= 4,
-                "Tap acceleration should render rounded trail strokes along sampled movement"
-            );
-            assert.equal(
-                primitives.filter((primitive) => primitive.method === "fill").length,
-                0,
-                "Tap acceleration should avoid a sharp filled wedge behind the fighter"
-            );
-            assert.ok(
-                primitives.some((primitive) => primitive.method === "arc"),
-                "Tap acceleration should render an ignition ring around the active character"
-            );
-        });
-        const firstIntensity = firstAccelerationEffect.intensity;
-        manager.accelerateActiveCharacter();
-        assert.equal(
-            mockApp.simulation.entities.filter((entity) => entity.constructor.name === "HuntingTapAccelerationEffect")
-                .length,
-            1,
-            "Repeated taps should refresh one attached acceleration effect instead of stacking copies"
-        );
-        assert.ok(
-            firstAccelerationEffect.intensity > firstIntensity,
-            "Speed streak intensity should increase with the actual acceleration progress"
-        );
-        for (let tap = 0; tap < 10; tap += 1) manager.accelerateActiveCharacter();
-        const maximumTap = manager.accelerateActiveCharacter();
-        assert.equal(maximumTap.reason, "maximum_speed");
-        assert.equal(firstAccelerationEffect.intensity, 1, "Maximum-speed taps should keep full visual feedback");
         console.log("[hunting-party-battle-composition] ok");
         return;
     }
@@ -25796,29 +25750,44 @@ function testHuntingPartyBattleComposition() {
         HUNTING_COMBAT_INTERACTION_CONFIG.perfectSwap.missedAttemptCooldownSeconds
     );
 
-    incoming.state.movement = null;
-    incoming.applyImpulse(new Vector2(incoming.stats.baseSpeed, 0).subtract(incoming.velocity));
-    const baseSpeed = incoming.velocity.length();
-    const acceleration = applyHuntingTapAcceleration(incoming, mockApp.simulation);
-    assert.equal(acceleration.applied, true, "A hunting tap should accelerate the active character");
-    assert.ok(incoming.velocity.length() > baseSpeed);
-    for (let index = 0; index < 20; index += 1) applyHuntingTapAcceleration(incoming, mockApp.simulation);
-    assert.ok(
-        incoming.velocity.length() <=
-            incoming.stats.baseSpeed * HUNTING_COMBAT_INTERACTION_CONFIG.tapAcceleration.maximumSpeedMultiplier + 0.001,
-        "Repeated taps should respect the configured speed cap"
-    );
-    incoming.state.movement = { getSpeed: () => incoming.stats.baseSpeed * 2 };
-    assert.equal(
-        applyHuntingTapAcceleration(incoming, mockApp.simulation).reason,
-        "ability_movement",
-        "Tap acceleration must not alter ability-owned movement"
-    );
-
     console.log("[hunting-party-battle-composition] ok");
 }
 
 testHuntingPartyBattleComposition();
+
+function testNearestEnemyCombatControls() {
+    const [playerSpec, enemySpec] = createRoster()
+        .slice(0, 2)
+        .map((spec, index) => ({
+            ...spec,
+            id: index === 0 ? "control-player" : "control-enemy",
+            teamId: index === 0 ? "player" : "enemy"
+        }));
+    const simulation = new BattleSimulation([playerSpec, enemySpec], {});
+    const player = simulation.fighters.find((fighter) => fighter.id === "control-player");
+    const enemy = simulation.fighters.find((fighter) => fighter.id === "control-enemy");
+    player.position = new Vector2(200, 480);
+    enemy.position = new Vector2(700, 480);
+    const controls = createCombatControlState();
+    const pressure = useNearestEnemyCombatControl(controls, "pressure", player, simulation);
+    assert.equal(pressure.applied, true, "Pressure should snapshot and move toward the nearest enemy");
+    assert.ok(player.velocity.x > 0 && Math.abs(player.velocity.y) < 0.001);
+    assert.equal(useNearestEnemyCombatControl(controls, "retreat", player, simulation).reason, "shared_lock");
+    updateCombatControlState(controls, 0.12);
+    const retreat = useNearestEnemyCombatControl(controls, "retreat", player, simulation);
+    assert.equal(retreat.applied, true, "Retreat should use its own cooldown after the shared lock");
+    assert.ok(player.velocity.x < 0, "Retreat should reverse away from the same nearest enemy");
+    updateCombatControlState(controls, 0.12);
+    assert.equal(useNearestEnemyCombatControl(controls, "pressure", player, simulation).reason, "cooldown");
+    updateCombatControlState(controls, 1.2);
+    assert.equal(controls.pressure.step, 0, "Each control step should reset after its own idle timeout");
+    resetCombatControlState(controls);
+    enemy.flags.defeated = true;
+    assert.equal(useNearestEnemyCombatControl(controls, "pressure", player, simulation).reason, "no_target");
+    console.log("[nearest-enemy-combat-controls] ok");
+}
+
+testNearestEnemyCombatControls();
 
 function testReusableCapabilityContracts() {
     const timedKeys = new TimedKeyMap({ isInvalid: (key) => key === "removed" });

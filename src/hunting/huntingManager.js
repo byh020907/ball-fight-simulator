@@ -87,12 +87,7 @@ import {
     setActiveHuntingPartyRole
 } from "./huntingPartyState.js";
 import { applyHuntingCompanionScale, placeHuntingCompanionsNearLeader } from "./huntingCompanion.js";
-import {
-    HUNTING_COMBAT_INTERACTION_CONFIG,
-    applyHuntingTapAcceleration,
-    createPerfectSwapAttempt
-} from "./huntingCombatInteraction.js";
-import { spawnHuntingTapAccelerationFeedback } from "../effects/huntingTapAccelerationEffect.js";
+import { HUNTING_COMBAT_INTERACTION_CONFIG, createPerfectSwapAttempt } from "./huntingCombatInteraction.js";
 
 const HUNTING_ROUTE_ACTIONS = Object.freeze({
     CONTINUE: "continue",
@@ -1089,16 +1084,6 @@ export class HuntingManager {
         if (this.app._currentMatchReport) this.app._currentMatchReport.playerFighterId = swapped.active.id;
         this._renderCombatRoster(simulation);
         return swapped;
-    }
-
-    accelerateActiveCharacter() {
-        const simulation = this.app.simulation;
-        if (this._run?.phase !== HUNTING_RUN_PHASES.COMBAT || !simulation) return { applied: false };
-        const fighter = simulation.playerBall;
-        const result = applyHuntingTapAcceleration(fighter, simulation);
-        if (!result.applied && result.reason !== "maximum_speed") return result;
-        spawnHuntingTapAccelerationFeedback(simulation, fighter, result.progress);
-        return result;
     }
 
     updateCombat(delta) {

@@ -28,11 +28,6 @@ export {
 export { createFlowFieldVisual, drawFlowFieldVisual, updateFlowFieldVisual } from "./flowFieldVisual.js";
 export { DamageNumber, CriticalNumber, ActionText } from "./floatingText.js";
 export { ActionWindowEffect, ActionSuccessEffect, ActionWhiffEffect } from "./actionEffects.js";
-export {
-    HUNTING_TAP_ACCELERATION_VISUAL_CONFIG,
-    HuntingTapAccelerationEffect,
-    spawnHuntingTapAccelerationFeedback
-} from "./huntingTapAccelerationEffect.js";
 export { EFFECT_VISIBILITY_TOKENS, getVisibleCombatTextSize, getVisibleLineWidth } from "./effectVisibility.js";
 export { BURNING_EFFECT_CONFIG, BurningEffect, RageFlameRing, applyBurningEffect } from "./rageEffects.js";
 export { drawEnergyShieldField, ENERGY_SHIELD_VISUAL_CONFIG, EnergyShieldHitEffect } from "./energyShieldEffects.js";

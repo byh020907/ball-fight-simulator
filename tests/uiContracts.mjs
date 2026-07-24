@@ -1694,6 +1694,19 @@ function testHiddenCharacterCollectionMasking() {
     console.log("[hidden-character-collection-masking] ok");
 }
 
+function testNearestEnemyCombatControlUiContract() {
+    const template = readSource("src/components/combat-controls.html");
+    const app = readSource("src/app.js");
+    const bridge = readSource("src/componentBridge.js");
+    assert.ok(template.includes('aria-label="이탈"') && template.includes('aria-label="압박"'));
+    assert.ok(template.includes('invokeGameAction("useCombatControl", type)'));
+    assert.ok(template.includes("min-height:48px") && template.includes("combat-control--retreat"));
+    assert.ok(app.includes("_syncCombatControlUi") && app.includes("useNearestEnemyCombatControl"));
+    assert.ok(bridge.includes("useCombatControl(type)"));
+    assert.equal(app.includes("accelerateActiveCharacter"), false, "Canvas taps must not retain hunting acceleration");
+    console.log("[nearest-enemy-combat-control-ui] ok");
+}
+
 testDisabledHuntingUiIsNotMounted();
 testHuntingChestIconReuseContract();
 testCollectionEquipmentPanelsOwnTheirFlows();
@@ -1719,5 +1732,6 @@ testFluidModalLayoutContracts();
 testCollectionRebirthAndDeveloperContracts();
 testCollectionTitleLongPressDebugEntry();
 testHiddenCharacterCollectionMasking();
+testNearestEnemyCombatControlUiContract();
 
 console.log("ui contract tests ok");
