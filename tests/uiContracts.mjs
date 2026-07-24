@@ -1786,6 +1786,11 @@ function testIconTagCountAndUniqueness() {
         assert.ok(typeof entry.label === "string" && entry.label.length > 0, "Each metadata entry must have a label");
         assert.ok(entry.label.endsWith("(가칭)"), `Prototype label ${entry.id} must remain explicitly provisional`);
     });
+    assert.equal(
+        getTagLabel("health_belt"),
+        "높은 HP · 맥동 허리띠 (가칭)",
+        "health_belt provisional label must be the new 맥동 허리띠 name"
+    );
     const unknownMeta = getUnknownTagMetadata();
     assert.equal(unknownMeta.id, "unknown", "Unknown metadata id must be 'unknown'");
     assert.ok(

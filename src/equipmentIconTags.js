@@ -232,19 +232,67 @@ registerTag("health_crystal", "HP · 생명 수정 (가칭)", (ctx, cx, cy) => {
     );
 });
 
-registerTag("health_belt", "높은 HP · 거인의 허리띠 (가칭)", (ctx, cx, cy) => {
+registerTag("health_belt", "높은 HP · 맥동 허리띠 (가칭)", (ctx, cx, cy) => {
     const S = 0.06;
-    ctx.beginPath();
-    ctx.rect(cx - S * 8.0, cy - S * 3.0, S * 16.0, S * 6.0);
-    sf(ctx, "#553322", "#885533", 0.05);
+
+    const leftBand = [
+        [cx + S * -7.0, cy + S * -3.5],
+        [cx + S * -4.0, cy + S * -1.8],
+        [cx + S * -1.0, cy + S * -0.2],
+        [cx + S * -1.0, cy + S * 2.0],
+        [cx + S * -4.0, cy + S * 1.6],
+        [cx + S * -7.0, cy + S * 1.2]
+    ];
+    drawClosedPath(ctx, leftBand, "#1a0808", "#4a1818", 0.06);
+
+    const rightBand = [
+        [cx + S * 7.0, cy + S * -3.5],
+        [cx + S * 4.0, cy + S * -1.8],
+        [cx + S * 1.0, cy + S * -0.2],
+        [cx + S * 1.0, cy + S * 2.0],
+        [cx + S * 4.0, cy + S * 1.6],
+        [cx + S * 7.0, cy + S * 1.2]
+    ];
+    drawClosedPath(ctx, rightBand, "#1a0808", "#4a1818", 0.06);
+
+    const leftBronze = [
+        [cx + S * -5.5, cy + S * -2.5],
+        [cx + S * -3.0, cy + S * -1.2],
+        [cx + S * -1.8, cy + S * -0.1],
+        [cx + S * -1.8, cy + S * 1.5],
+        [cx + S * -3.5, cy + S * 1.2],
+        [cx + S * -5.5, cy + S * 0.6]
+    ];
+    drawClosedPath(ctx, leftBronze, "#1a0808", "#7a6a3a", 0.05);
+
+    const rightBronze = [
+        [cx + S * 5.5, cy + S * -2.5],
+        [cx + S * 3.0, cy + S * -1.2],
+        [cx + S * 1.8, cy + S * -0.1],
+        [cx + S * 1.8, cy + S * 1.5],
+        [cx + S * 3.5, cy + S * 1.2],
+        [cx + S * 5.5, cy + S * 0.6]
+    ];
+    drawClosedPath(ctx, rightBronze, "#1a0808", "#7a6a3a", 0.05);
 
     ctx.beginPath();
-    ctx.rect(cx - S * 3.5, cy - S * 5.0, S * 7.0, S * 10.0);
-    sf(ctx, "#886622", "#bb9944", 0.04);
+    ctx.arc(cx, cy + S * 0.8, S * 2.8, 0, Math.PI * 2);
+    sf(ctx, "#1a0808", "#9a8a5a", 0.06);
 
     ctx.beginPath();
-    ctx.rect(cx - S * 1.5, cy - S * 2.5, S * 3.0, S * 5.0);
-    sf(ctx, "#881111", "#cc3333", 0.03);
+    ctx.arc(cx, cy + S * 0.8, S * 1.6, 0, Math.PI * 2);
+    sf(ctx, "#1a0808", "#cc2222", 0.05);
+
+    drawOpenPath(
+        ctx,
+        [
+            [cx + S * -0.8, cy + S * 0.1],
+            [cx, cy + S * 0.6],
+            [cx + S * 0.8, cy + S * 0.1]
+        ],
+        "#ff6666",
+        0.04
+    );
 });
 
 registerTag("defense_leather", "방어 · 가죽 갑옷 (가칭)", (ctx, cx, cy) => {
