@@ -2,6 +2,14 @@ import { EQUIPMENT } from "./equipmentData.js";
 import { getLevelFromXp } from "../experience/experienceState.js";
 import { createEquipmentName, formatEquipmentSpecialName } from "./equipmentNaming.js";
 import { getDiminishingEquipmentSpeed } from "../combatStatScaling.js";
+import {
+    equipEquipmentTemplate,
+    getEquippedEquipmentStats,
+    getEquippedEquipmentTemplates,
+    getEquipmentCount,
+    unequipEquipmentTemplate
+} from "./equipmentInventory.js";
+import { isQuantityEquipmentInventory, presentEquipmentTemplate } from "./equipmentLegacyAdapter.js";
 
 const EQUIPPED_SLOT_KEYS = Object.freeze(["weapon", "armor", "accessory1", "accessory2"]);
 
@@ -277,6 +285,15 @@ export function doesEquipmentStrictlyDominate(candidate, current) {
 
 export function autoEquipEquipmentUpgrade(profile, instanceId, characterId = null) {
     const equipment = profile?.equipment;
+    if (isQuantityEquipmentInventory(profile)) {
+        const result = equipEquipmentTemplate(profile, instanceId);
+        return {
+            equipped: result.ok,
+            reason: result.reason ?? null,
+            slot: result.slotIndex ?? null,
+            item: presentEquipmentTemplate(instanceId)
+        };
+    }
     if (!equipment || !Array.isArray(equipment.inventory)) return { equipped: false, reason: "profile" };
     const item = equipment.inventory.find((candidate) => candidate.instanceId === instanceId);
     if (!item) return { equipped: false, reason: "item" };
@@ -313,6 +330,7 @@ export function autoEquipEquipmentUpgrade(profile, instanceId, characterId = nul
 export function getEquippedStatBonuses(profile, characterId = null) {
     const bonuses = { hp: 0, damage: 0, defense: 0, speed: 0 };
     const equipment = profile?.equipment;
+    if (isQuantityEquipmentInventory(profile)) return getEquippedEquipmentStats(profile);
     if (!equipment || !Array.isArray(equipment.inventory)) return bonuses;
 
     const equippedIds = Object.values(equipment.equipped ?? {}).filter(Boolean);
@@ -334,6 +352,8 @@ export function getEquippedStatBonuses(profile, characterId = null) {
 
 export function getEquippedItems(profile, characterId = null) {
     const equipment = profile?.equipment;
+    if (isQuantityEquipmentInventory(profile))
+        return getEquippedEquipmentTemplates(profile).map((template) => presentEquipmentTemplate(template.id));
     if (!equipment || !Array.isArray(equipment.inventory)) return [];
 
     const equippedIds = EQUIPPED_SLOT_KEYS.map((slotKey) => equipment.equipped?.[slotKey]).filter(Boolean);
@@ -380,6 +400,11 @@ export function applyEquipmentStats(spec, profile) {
 
 export function equipEquipmentItem(profile, instanceId, characterId = null) {
     const eq = profile?.equipment;
+    if (isQuantityEquipmentInventory(profile)) {
+        const result = equipEquipmentTemplate(profile, instanceId);
+        if (!result.ok) return { error: result.reason, item: presentEquipmentTemplate(instanceId) };
+        return { item: presentEquipmentTemplate(instanceId), slot: result.slotIndex };
+    }
     if (!eq || !Array.isArray(eq.inventory)) return null;
     eq.equipped ||= { weapon: null, armor: null, accessory1: null, accessory2: null };
     const item = eq.inventory.find((i) => i.instanceId === instanceId);
@@ -408,14 +433,17 @@ export function equipEquipmentItem(profile, instanceId, characterId = null) {
 }
 
 export function getInventorySlots(profile) {
+    if (isQuantityEquipmentInventory(profile)) return 100;
     return Math.max(INVENTORY_DEFAULT_SLOTS, profile?.equipment?.maxInventorySlots ?? INVENTORY_DEFAULT_SLOTS);
 }
 
 export function getInventoryUsed(profile) {
+    if (isQuantityEquipmentInventory(profile)) return Object.keys(profile.equipment.inventory).length;
     return profile?.equipment?.inventory?.length ?? 0;
 }
 
 export function isInventoryFull(profile) {
+    if (isQuantityEquipmentInventory(profile)) return false;
     return getInventoryUsed(profile) >= getInventorySlots(profile);
 }
 

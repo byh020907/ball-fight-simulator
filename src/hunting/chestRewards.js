@@ -5,13 +5,8 @@ import {
     getHuntingChestRewardTable,
     rollHuntingChestReward
 } from "./huntingRewards.js";
-import {
-    autoEquipEquipmentUpgrade,
-    generateEquipmentFromRarity,
-    isInventoryFull,
-    getInventorySlots,
-    getInventoryUsed
-} from "./equipmentConfig.js";
+import { generateEquipmentFromRarity } from "./equipmentConfig.js";
+import { grantLegacyEquipmentReward } from "./equipmentLegacyAdapter.js";
 
 export function canOpenHuntingChest(profile, chest) {
     if (!profile?.hunting || !chest) return false;
@@ -55,14 +50,10 @@ export function applyHuntingChestReward(profile, reward, { rng = Math.random, ch
     }
 
     if (reward.type === HUNTING_CHEST_REWARD_TYPES.EQUIPMENT) {
-        if (!Array.isArray(profile.equipment?.inventory)) {
-            profile.equipment = profile.equipment || {};
-            profile.equipment.inventory = [];
-        }
         const equipment = reward.equipment ?? generateEquipmentFromRarity(reward.rarity ?? "common", rng);
-        profile.equipment.inventory.push(equipment);
-        applied.equipment = equipment;
-        applied.autoEquip = autoEquipEquipmentUpgrade(profile, equipment.instanceId, characterId);
+        const adapter = grantLegacyEquipmentReward(profile, equipment, characterId);
+        applied.equipment = adapter;
+        applied.autoEquip = adapter.autoEquip;
         return applied;
     }
 
@@ -84,12 +75,6 @@ export function openHuntingChest(profile, chestId, { rng = Math.random, characte
     const cost = getChestOpenCostForChest(chest);
     if ((profile.hunting.shards ?? 0) < cost) {
         return { opened: false, reason: "not_enough_shards", cost };
-    }
-
-    // 용량 확인: 장비 보상이 나올 수 있는데 인벤토리가 가득 찼으면 차단
-    const inventoryFull = isInventoryFull(profile);
-    if (inventoryFull) {
-        return { opened: false, reason: "inventory_full" };
     }
 
     profile.hunting.shards -= cost;

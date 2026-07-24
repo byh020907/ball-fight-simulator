@@ -46,6 +46,7 @@ import { getRebirthPresentation } from "../rebirth/rebirthService.js";
 import { isCharacterUnlocked } from "../playerProfile.js";
 import { getPublicFighterIdentity } from "../characterRosterPolicy.js";
 import { isHiddenCharacterId } from "../characterAvailability.js";
+import { getEquipmentTemplate } from "../hunting/equipmentTemplates.js";
 
 const EQUIPMENT_STAT_LABELS = Object.freeze({
     hp: "HP",
@@ -310,7 +311,25 @@ export function createCollectionHubViewModel({
     const monsterCodexItems = createMonsterCodexItems(hunting);
 
     const equipment = profile?.equipment ?? {};
-    const inventory = equipment.inventory ?? [];
+    const inventory = Array.isArray(equipment.inventory)
+        ? equipment.inventory
+        : Object.entries(equipment.inventory ?? {}).flatMap(([templateId, count]) => {
+              const template = getEquipmentTemplate(templateId);
+              if (!template) return [];
+              return [
+                  {
+                      instanceId: template.id,
+                      rarity: template.tier,
+                      slot: null,
+                      name: template.name,
+                      description: "고정 성능 조합 장비",
+                      stats: Object.entries(template.stats).map(([type, value]) => ({ type, value })),
+                      specialOptions: [],
+                      enhanceLevel: 0,
+                      count
+                  }
+              ];
+          });
     const equipped = equipment.equipped ?? {};
     const equippedIdSet = new Set(Object.values(equipped).filter(Boolean));
     const currentEquipmentLevel = getCharacterEquipmentLevel(profile, currentPlayerFighterId);

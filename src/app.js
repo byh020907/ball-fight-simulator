@@ -80,6 +80,7 @@ import {
     getInventorySlots,
     getInventoryUsed
 } from "./hunting/equipmentConfig.js";
+import { getEquippedEquipmentStats, getEquippedEquipmentTemplates } from "./hunting/equipmentInventory.js";
 import { Vector2 } from "./core.js";
 import { FIGHTER_IDS } from "./characters/characterRegistry.js";
 import { formatHeroStatLine, formatHeroStatParts, mergeOrbBonuses } from "./entities/heroOrb.js";
@@ -522,6 +523,49 @@ export class BattleApp {
     _getPlayerEquipmentSummary(characterId = this.playerFighterId) {
         const equipment = this.playerProfile?.equipment ?? {};
         const inventory = equipment.inventory ?? [];
+        if (!Array.isArray(inventory)) {
+            const activeTemplates = getEquippedEquipmentTemplates(this.playerProfile);
+            const activeBonuses = getEquippedEquipmentStats(this.playerProfile);
+            const slots = (equipment.equipped ?? []).map((templateId, index) => {
+                const template = activeTemplates.find((candidate) => candidate.id === templateId) ?? null;
+                return template
+                    ? {
+                          id: `slot-${index + 1}`,
+                          label: `장비 ${index + 1}`,
+                          empty: false,
+                          name: template.name,
+                          rarity: template.tier,
+                          locked: false,
+                          requiredLevel: 1
+                      }
+                    : {
+                          id: `slot-${index + 1}`,
+                          label: `장비 ${index + 1}`,
+                          empty: true,
+                          name: "비어 있음",
+                          rarity: "",
+                          locked: false,
+                          requiredLevel: 1
+                      };
+            });
+            const statParts = [
+                ["hp", "HP"],
+                ["damage", "공격"],
+                ["defense", "방어"],
+                ["speed", "속도 점수"]
+            ]
+                .filter(([key]) => activeBonuses[key] > 0)
+                .map(([key, label]) => `${label} +${activeBonuses[key]}`);
+            return {
+                characterLevel: 1,
+                inventoryUsed: Object.keys(inventory).length,
+                inventorySlots: 100,
+                equippedCount: slots.filter((slot) => !slot.empty).length,
+                activeCount: slots.filter((slot) => !slot.empty).length,
+                slots,
+                statLine: statParts.length > 0 ? statParts.join(" · ") : "적용 중인 장비 스탯 없음"
+            };
+        }
         const equipped = equipment.equipped ?? {};
         const slotLabels = {
             weapon: "무기",

@@ -113,7 +113,7 @@ assert.equal(resetStaleSessionStorage(staleStorage), false);
 
 const staleProfile = { ...createDefaultPlayerProfile(), version: PROFILE_VERSION - 1 };
 assert.equal(migratePlayerProfile(staleProfile).version, PROFILE_VERSION);
-assert.deepEqual(migratePlayerProfile(staleProfile).equipment.inventory, []);
+assert.deepEqual(migratePlayerProfile(staleProfile).equipment.inventory, {});
 
 const currentHiddenProfile = createDefaultPlayerProfile();
 currentHiddenProfile.unlockedCharacterIds = ["elementalist", "elementalist", "unknown-hidden"];
@@ -145,10 +145,10 @@ enhancementCapProfile.equipment.inventory = [
         enhanceLevel: 5
     }
 ];
-assert.equal(
-    migratePlayerProfile(enhancementCapProfile).equipment.inventory[0].enhanceLevel,
-    1,
-    "Current profiles should clamp equipment enhancement to the item's rarity cap"
+assert.deepEqual(
+    migratePlayerProfile(enhancementCapProfile).equipment.inventory,
+    {},
+    "Legacy instance arrays must reset instead of entering the v12 quantity inventory"
 );
 
 const companionPreferenceProfile = createDefaultPlayerProfile();
@@ -250,11 +250,10 @@ versionEightProfile.rebirth.byCharacter.archer = {
 };
 const migratedVersionEightProfile = migratePlayerProfile(versionEightProfile);
 assert.equal(migratedVersionEightProfile.version, PROFILE_VERSION);
-assert.equal(migratedVersionEightProfile.equipment.inventory[0].instanceId, "preserved-version-eight-equipment");
 assert.deepEqual(
-    migratedVersionEightProfile.rebirth.byCharacter.archer.pendingOfferCards,
-    versionEightProfile.rebirth.byCharacter.archer.pendingOfferCards,
-    "Profile migration must preserve a pending rebirth reward's exact material"
+    migratedVersionEightProfile,
+    createDefaultPlayerProfile(),
+    "v8 profiles must reset at the v12 boundary"
 );
 
 const legacyFixedStatOfferProfile = createDefaultPlayerProfile();
@@ -267,9 +266,9 @@ legacyFixedStatOfferProfile.rebirth.byCharacter.archer = {
     pendingOfferCardIds: ["rebirth-stat:archer:balanced"]
 };
 assert.deepEqual(
-    migratePlayerProfile(legacyFixedStatOfferProfile).rebirth.byCharacter.archer.pendingOfferCards,
-    [],
-    "Legacy fixed-stat offers must be discarded instead of applying stale values"
+    migratePlayerProfile(legacyFixedStatOfferProfile),
+    createDefaultPlayerProfile(),
+    "Legacy fixed-stat offer profiles must reset at the v12 boundary"
 );
 
 const versionSevenProfile = createDefaultPlayerProfile();
@@ -290,11 +289,11 @@ versionSevenProfile.collection.characters.archer = {
 };
 const migratedVersionSevenProfile = migratePlayerProfile(versionSevenProfile);
 assert.equal(migratedVersionSevenProfile.version, PROFILE_VERSION);
-assert.equal(migratedVersionSevenProfile.experience.byCharacter.archer.currentXp, getLevelRequirement(10));
-assert.equal(migratedVersionSevenProfile.characterMastery.levels.rage, 2);
-assert.equal(migratedVersionSevenProfile.equipment.inventory[0].instanceId, "preserved-equipment");
-assert.equal(migratedVersionSevenProfile.collection.characters.archer.tournamentWins, 2);
-assert.deepEqual(migratedVersionSevenProfile.rebirth, { schemaVersion: 1, byCharacter: {} });
+assert.deepEqual(
+    migratedVersionSevenProfile,
+    createDefaultPlayerProfile(),
+    "v7 profiles must reset at the v12 boundary"
+);
 
 const rewardProfile = createDefaultPlayerProfile();
 const shardReward = grantAchievementReward(rewardProfile, {
@@ -317,84 +316,33 @@ assert.equal(rewardProfile.hunting.chests.length, 1);
 
 const flawlessAchievement = ACHIEVEMENT_DEFINITIONS.find((achievement) => achievement.id === "flawless_tournament");
 const equipmentReward = grantAchievementReward(rewardProfile, flawlessAchievement);
-assert.equal(equipmentReward.equipment.rarity, "rare");
-assert.equal(equipmentReward.equipment.name, `무결점의 수정 방패 • ${EQUIPMENT_SPECIAL_OPTION_SUFFIXES.wallBounce}`);
-assert.deepEqual(equipmentReward.equipment.stats, [
-    { type: "defense", value: 2, min: 2, max: 2 },
-    { type: "hp", value: 20, min: 20, max: 20 }
-]);
-assert.deepEqual(equipmentReward.equipment.specialOptions, [{ type: "wallBounce", value: 15 }]);
-assert.equal(rewardProfile.equipment.inventory.length, 1);
+assert.equal(equipmentReward.equipment.templateId, "defense_leather");
+assert.equal(equipmentReward.equipment.count, 1);
+assert.equal(rewardProfile.equipment.inventory.defense_leather, 1);
 
-rewardProfile.equipment.inventory = Array.from({ length: rewardProfile.equipment.maxInventorySlots }, (_, index) => ({
-    instanceId: `full-${index}`
-}));
+rewardProfile.equipment.inventory.attack_sword = 100;
 const rosterChampion = ACHIEVEMENT_DEFINITIONS.find((achievement) => achievement.id === "roster_champion");
 const overflowReward = grantAchievementReward(rewardProfile, rosterChampion);
-assert.equal(overflowReward.convertedToChest, true);
-assert.equal(overflowReward.chest.rarity, "epic");
-assert.equal(overflowReward.chest.openCost, 0);
-assert.equal(
-    overflowReward.chest.guaranteedEquipment.name,
-    `개척자의 룬 귀걸이 • ${EQUIPMENT_SPECIAL_OPTION_SUFFIXES.cooldown}`
-);
-assert.deepEqual(overflowReward.chest.guaranteedEquipment.specialOptions, [
-    { type: "cooldown", value: 10 },
-    { type: "hpSteal", value: 8 }
-]);
-
-rewardProfile.equipment.inventory = [];
-const openedGuaranteedChest = openHuntingChest(rewardProfile, overflowReward.chest.id);
-assert.equal(openedGuaranteedChest.opened, true);
-assert.equal(openedGuaranteedChest.cost, 0);
-assert.equal(
-    openedGuaranteedChest.applied.equipment.name,
-    `개척자의 룬 귀걸이 • ${EQUIPMENT_SPECIAL_OPTION_SUFFIXES.cooldown}`
-);
-assert.deepEqual(openedGuaranteedChest.applied.equipment.specialOptions, [
-    { type: "cooldown", value: 10 },
-    { type: "hpSteal", value: 8 }
-]);
+assert.equal(overflowReward.applied, false);
+assert.equal(overflowReward.equipment.templateId, "attack_sword");
+assert.equal(rewardProfile.equipment.inventory.attack_sword, 100);
 
 const guaranteedEquipmentExpectations = [
     {
         achievementId: "flawless_tournament",
-        name: "무결점의 수정 방패",
-        stats: [
-            { type: "defense", value: 2, min: 2, max: 2 },
-            { type: "hp", value: 20, min: 20, max: 20 }
-        ],
-        specialOptions: [{ type: "wallBounce", value: 15 }]
+        templateId: "defense_leather"
     },
     {
         achievementId: "roster_champion",
-        name: "개척자의 룬 귀걸이",
-        stats: [
-            { type: "damage", value: 3, min: 3, max: 3 },
-            { type: "speed", value: 15, min: 15, max: 15 }
-        ],
-        specialOptions: [
-            { type: "cooldown", value: 10 },
-            { type: "hpSteal", value: 8 }
-        ]
+        templateId: "attack_sword"
     },
     {
         achievementId: "mastery_complete",
-        name: "도감 완성의 영원한 망토",
-        stats: [
-            { type: "hp", value: 40, min: 40, max: 40 },
-            { type: "defense", value: 4, min: 4, max: 4 }
-        ],
-        specialOptions: [{ type: "angularImpulse", value: 15 }]
+        templateId: "health_crystal"
     },
     {
         achievementId: "single_hit_monster",
-        name: "단죄의 수정 단검",
-        stats: [
-            { type: "damage", value: 3, min: 3, max: 3 },
-            { type: "speed", value: 10, min: 10, max: 10 }
-        ],
-        specialOptions: [{ type: "crashDamage", value: 15 }]
+        templateId: "attack_sword"
     }
 ];
 
@@ -402,12 +350,8 @@ for (const expectation of guaranteedEquipmentExpectations) {
     const profile = createDefaultPlayerProfile();
     const achievement = ACHIEVEMENT_DEFINITIONS.find(({ id }) => id === expectation.achievementId);
     const granted = grantAchievementReward(profile, achievement);
-    assert.equal(
-        granted.equipment.name,
-        `${expectation.name} • ${EQUIPMENT_SPECIAL_OPTION_SUFFIXES[expectation.specialOptions[0].type]}`
-    );
-    assert.deepEqual(granted.equipment.stats, expectation.stats);
-    assert.deepEqual(granted.equipment.specialOptions, expectation.specialOptions);
+    assert.equal(granted.equipment.templateId, expectation.templateId);
+    assert.equal(profile.equipment.inventory[expectation.templateId], 1);
 }
 
 const legacySpecialEquipmentProfile = migratePlayerProfile({
@@ -430,11 +374,7 @@ const legacySpecialEquipmentProfile = migratePlayerProfile({
         maxInventorySlots: 5
     }
 });
-assert.equal(
-    legacySpecialEquipmentProfile.equipment.inventory[0].name,
-    "질풍의 철검 • 반향",
-    "Existing special equipment should normalize its legacy name during profile migration"
-);
+assert.deepEqual(legacySpecialEquipmentProfile.equipment, createDefaultPlayerProfile().equipment);
 
 assert.ok(ACHIEVEMENT_DEFINITIONS.every((achievement) => typeof achievement.grant === "function"));
 

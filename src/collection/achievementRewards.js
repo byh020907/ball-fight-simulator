@@ -1,10 +1,7 @@
 import { createHuntingChest } from "../hunting/huntingRewards.js";
-import {
-    autoEquipEquipmentUpgrade,
-    createGuaranteedEquipmentInstance,
-    isInventoryFull
-} from "../hunting/equipmentConfig.js";
+import { createGuaranteedEquipmentInstance } from "../hunting/equipmentConfig.js";
 import { getRarityLabel } from "../hunting/rarityPresentation.js";
+import { grantLegacyEquipmentReward } from "../hunting/equipmentLegacyAdapter.js";
 
 export const ACHIEVEMENT_REWARD_TYPES = Object.freeze({
     SHARDS: "SHARDS",
@@ -38,19 +35,13 @@ export class AchievementRewardHandler {
 
     equipment(specification) {
         const equipment = createGuaranteedEquipmentInstance(specification);
-        if (isInventoryFull(this.profile)) {
-            const chest = createHuntingChest({
-                rarity: equipment.rarity,
-                guaranteedEquipment: equipment,
-                openCost: 0,
-                rewardPreview: equipment.name
-            });
-            this.profile.hunting.chests.push(chest);
-            return { applied: true, type: ACHIEVEMENT_REWARD_TYPES.EQUIPMENT, chest, convertedToChest: true };
-        }
-        this.profile.equipment.inventory.push(equipment);
-        const autoEquip = autoEquipEquipmentUpgrade(this.profile, equipment.instanceId, this.characterId);
-        return { applied: true, type: ACHIEVEMENT_REWARD_TYPES.EQUIPMENT, equipment, autoEquip };
+        const adapter = grantLegacyEquipmentReward(this.profile, equipment, this.characterId);
+        return {
+            applied: adapter.added,
+            type: ACHIEVEMENT_REWARD_TYPES.EQUIPMENT,
+            equipment: adapter,
+            autoEquip: adapter.autoEquip
+        };
     }
 
     unlockFeature(feature) {

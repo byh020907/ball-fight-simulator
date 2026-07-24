@@ -14,6 +14,7 @@ import {
     rerollDailyShop as refreshDailyShopOffer
 } from "./hunting/dailyShop.js";
 import { savePlayerProfile } from "./playerProfile.js";
+import { unequipEquipmentTemplate } from "./hunting/equipmentInventory.js";
 import { PopupService } from "./popup.js";
 import { HELP_TITLE, HELP_CONTENT } from "./helpContent.js";
 import { CollectionHubService } from "./collectionHubService.js";
@@ -176,7 +177,13 @@ export function createComponentBridge(app) {
         unequipItem(instanceId) {
             const profile = app.playerProfile;
             const eq = profile?.equipment;
-            if (!eq || !Array.isArray(eq.inventory)) return;
+            if (!eq) return;
+            if (!Array.isArray(eq.inventory)) {
+                const slotIndex = eq.equipped?.findIndex((templateId) => templateId === instanceId) ?? -1;
+                const result = unequipEquipmentTemplate(profile, slotIndex);
+                if (result.ok) refreshCollectionAndProfile();
+                return result;
+            }
             const equipped = eq.equipped ?? {};
             for (const slot of Object.keys(equipped)) {
                 if (equipped[slot] === instanceId) {

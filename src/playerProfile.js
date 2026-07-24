@@ -9,8 +9,7 @@ import { HUNTING_STAGES } from "./hunting/huntingConfig.js";
 import { createDefaultHuntingStats, sanitizeHuntingStats } from "./hunting/huntingAchievementProgress.js";
 import { FIGHTER_IDS } from "./characters/characterRegistry.js";
 import { getHiddenCharacterIds } from "./characterAvailability.js";
-import { EQUIPMENT_SPECIAL_OPTION_SUFFIXES, getEquipmentMaxEnhanceLevel } from "./hunting/equipmentConfig.js";
-import { formatEquipmentSpecialName } from "./hunting/equipmentNaming.js";
+import { createDefaultEquipmentInventory, sanitizeEquipmentInventory } from "./hunting/equipmentInventory.js";
 import {
     REBIRTH_BASE_STAT_KEYS,
     isValidRebirthCardId,
@@ -28,7 +27,7 @@ export const PROFILE_LIMITS = Object.freeze({
     MAX_TIMESTAMP: 8_640_000_000_000_000
 });
 
-export const PROFILE_VERSION = 11;
+export const PROFILE_VERSION = 12;
 
 const debugProfileSession = {
     active: false,
@@ -96,10 +95,7 @@ export function createDefaultPlayerProfile() {
             byCharacter: {}
         },
         equipment: {
-            inventory: [],
-            equipped: { weapon: null, armor: null, accessory1: null, accessory2: null },
-            enhancementStones: 0,
-            maxInventorySlots: 5
+            ...createDefaultEquipmentInventory()
         },
         hunting: {
             shards: 0,
@@ -421,33 +417,7 @@ function sanitizeTournamentChallenge(obj) {
 }
 
 function sanitizeEquipment(obj) {
-    if (!obj || typeof obj !== "object") return createDefaultPlayerProfile().equipment;
-    const inventory = Array.isArray(obj.inventory)
-        ? obj.inventory
-              .filter((item) => item && typeof item.instanceId === "string")
-              .slice(-100)
-              .map((item) => ({
-                  ...item,
-                  enhanceLevel: Math.min(getEquipmentMaxEnhanceLevel(item.rarity), sanitizeNumber(item.enhanceLevel)),
-                  name: formatEquipmentSpecialName(
-                      item.name,
-                      item.specialOptions ?? [],
-                      EQUIPMENT_SPECIAL_OPTION_SUFFIXES
-                  )
-              }))
-        : [];
-    const equipped = obj.equipped && typeof obj.equipped === "object" ? obj.equipped : {};
-    return {
-        inventory,
-        equipped: {
-            weapon: typeof equipped.weapon === "string" ? equipped.weapon : null,
-            armor: typeof equipped.armor === "string" ? equipped.armor : null,
-            accessory1: typeof equipped.accessory1 === "string" ? equipped.accessory1 : null,
-            accessory2: typeof equipped.accessory2 === "string" ? equipped.accessory2 : null
-        },
-        enhancementStones: sanitizeNumber(obj.enhancementStones),
-        maxInventorySlots: Math.max(5, sanitizeNumber(obj.maxInventorySlots) || 5)
-    };
+    return sanitizeEquipmentInventory(obj);
 }
 
 function sanitizeRebirthCharacterState(characterId, value) {
@@ -516,7 +486,7 @@ export function sanitizePlayerProfile(raw) {
 
 export function migratePlayerProfile(raw) {
     if (!raw || typeof raw !== "object") return createDefaultPlayerProfile();
-    if (![7, 8, 9, PROFILE_VERSION].includes(raw.version)) return createDefaultPlayerProfile();
+    if (raw.version !== PROFILE_VERSION) return createDefaultPlayerProfile();
     return sanitizePlayerProfile(raw);
 }
 

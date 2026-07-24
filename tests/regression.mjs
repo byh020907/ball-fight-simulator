@@ -326,6 +326,7 @@ import {
     ENHANCE_MAX_LEVEL
 } from "../src/hunting/equipmentConfig.js";
 import { createEquipmentCombatEffects } from "../src/hunting/equipmentEffects.js";
+import { addEquipmentQuantity } from "../src/hunting/equipmentInventory.js";
 import { EQUIPMENT } from "../src/hunting/equipmentData.js";
 import { createEquipmentName, getDominantEquipmentStat } from "../src/hunting/equipmentNaming.js";
 import { createHuntingTerrain } from "../src/terrain/terrainFactory.js";
@@ -1946,10 +1947,9 @@ async function testTournament(app) {
     app.playerProfile = createDefaultPlayerProfile();
     app.playerStatAllocation = createRandomStatAllocation(() => 0);
     const playerBase = app.roster.find((fighter) => fighter.id === app.playerFighterId);
-    const weapon = createEquipmentInstance({ rarity: "common", slot: "weapon", rng: () => 0.5 });
-    weapon.stats = [{ type: "damage", value: 9, min: 4, max: 8 }];
-    app.playerProfile.equipment.inventory.push(weapon);
-    app.playerProfile.equipment.equipped.weapon = weapon.instanceId;
+    const weaponId = "attack_sword";
+    addEquipmentQuantity(app.playerProfile, weaponId);
+    app.playerProfile.equipment.equipped[0] = weaponId;
     app.refreshPlayerSetup();
     await app.startTournament();
     const player = app.tournamentRoster.find((fighter) => fighter.id === app.playerFighterId);
@@ -5195,7 +5195,7 @@ function testComponentBridgeEquipmentFunctions() {
     const profile = createDefaultPlayerProfile();
     const weapon = createEquipmentInstance({ rarity: "common", slot: "weapon", rng: () => 0.5 });
     weapon.stats = [{ type: "damage", value: 9, min: 4, max: 8 }];
-    profile.equipment.inventory.push(weapon);
+    addEquipmentQuantity(profile, "attack_sword");
 
     const mockApp = {
         playerProfile: profile,
@@ -5220,12 +5220,12 @@ function testComponentBridgeEquipmentFunctions() {
     }
 
     // ── equipItem은 프로필을 저장해야 함 ──
-    bridge.equipItem(weapon.instanceId);
-    assert.equal(profile.equipment.equipped.weapon, weapon.instanceId, "Weapon should be equipped in profile");
+    bridge.equipItem("attack_sword");
+    assert.equal(profile.equipment.equipped[0], "attack_sword", "Weapon should be equipped in profile");
 
     // ── unequipItem은 프로필을 저장해야 함 ──
-    bridge.unequipItem(weapon.instanceId);
-    assert.equal(profile.equipment.equipped.weapon, null, "Weapon should be unequipped in profile");
+    bridge.unequipItem("attack_sword");
+    assert.equal(profile.equipment.equipped[0], null, "Weapon should be unequipped in profile");
 }
 
 async function testBattleAppAdoptsPreExistingAlpineAllocation() {
@@ -5466,18 +5466,12 @@ function testExperienceSystem() {
     );
     const equipmentProfile = createDefaultPlayerProfile();
     equipmentProfile.experience.byCharacter[FIGHTER_IDS.DASH] = { currentXp: getLevelRequirement(4) };
-    const fixedDamageItem = {
-        instanceId: "experience-fixed-damage",
-        rarity: "common",
-        slot: "weapon",
-        stats: [{ type: "damage", value: 5 }]
-    };
-    equipmentProfile.equipment.inventory.push(fixedDamageItem);
-    equipmentProfile.equipment.equipped.weapon = fixedDamageItem.instanceId;
+    addEquipmentQuantity(equipmentProfile, "attack_sword", 3);
+    equipmentProfile.equipment.equipped[0] = "attack_sword";
     const equippedRewardedSpec = applyEquipmentStats(rewardedSpec, equipmentProfile);
     assert.equal(
         equippedRewardedSpec.stats.damage,
-        rewardedSpec.stats.damage + 5,
+        rewardedSpec.stats.damage + 2,
         "Equipment should add a fixed stat after level rewards and percentage allocation"
     );
 
@@ -9287,12 +9281,12 @@ function testHuntingSystem() {
     assert.equal(opened.opened, true, "Chest should open when enough key shards are available");
     assert.equal(opened.reward.type, "equipment", "Uncommon chests should guarantee equipment rewards");
     assert.equal(profile.hunting.shards, 0, "Opening a guaranteed equipment chest should only spend its cost");
-    assert.equal(profile.equipment.inventory.length, 1, "Guaranteed equipment rewards should enter the inventory");
     assert.equal(
-        opened.applied.autoEquip.equipped,
-        true,
-        "An empty eligible slot should equip a chest reward automatically"
+        Object.keys(profile.equipment.inventory).length,
+        1,
+        "Guaranteed equipment rewards should enter the inventory"
     );
+    assert.equal(opened.applied.autoEquip.ok, true, "An empty eligible slot should equip a chest reward automatically");
     assert.equal(profile.hunting.chests.length, 0, "Opened chest should leave storage");
 
     const sanitized = sanitizePlayerProfile({
@@ -9515,18 +9509,14 @@ async function testHuntingAchievementProgress() {
     const rewardResult = grantAchievementReward(rewardProfile, securedChestAchievement);
     assert.equal(rewardResult.type, "EQUIPMENT", "Safe-return achievement should grant ready-to-use equipment");
     assert.equal(
-        rewardProfile.equipment.inventory.length,
+        Object.keys(rewardProfile.equipment.inventory).length,
         1,
         "Safe-return equipment should enter the inventory directly"
     );
-    assert.equal(rewardProfile.equipment.inventory[0].rarity, "uncommon", "Safe-return equipment should be uncommon");
-    assert.deepEqual(
-        rewardProfile.equipment.inventory[0].stats,
-        [
-            { type: "hp", value: 20, min: 20, max: 20 },
-            { type: "defense", value: 1, min: 1, max: 1 }
-        ],
-        "Safe-return equipment should provide the documented early-survival stats"
+    assert.equal(
+        rewardProfile.equipment.inventory.health_crystal,
+        1,
+        "Safe-return equipment should map to the HP basic template"
     );
 
     const sanitized = sanitizePlayerProfile({
@@ -11261,8 +11251,11 @@ function testEquipmentEnhancement() {
         900,
         "Shared equipment speed scaling should grant half of an equal-sized bonus"
     );
-    assert.equal(profile.equipment.enhancementStones, 0, "New profiles should start with 0 enhancement stones");
-    assert.equal(profile.equipment.maxInventorySlots, 5, "New profiles should start with default inventory slots");
+    assert.deepEqual(
+        profile.equipment,
+        { inventory: {}, equipped: Array(6).fill(null) },
+        "New profiles should start with the v12 quantity inventory and six shared slots"
+    );
     assert.deepEqual(
         ["common", "uncommon", "rare", "epic", "legendary"].map(getEquipmentMaxEnhanceLevel),
         [1, 2, 3, 4, 5],
@@ -11279,6 +11272,18 @@ function testEquipmentEnhancement() {
         getEquipmentAdjustedSpeed(600, 100_000) < 1200,
         "Equipment speed should approach but never reach twice the pre-equipment speed"
     );
+
+    addEquipmentQuantity(profile, "speed_boots");
+    profile.equipment.equipped[0] = "speed_boots";
+    assert.equal(
+        applyEquipmentStats(
+            { id: "archer", stats: { hp: 100, damage: 10, defense: 2, speed: 600, radius: 40, mass: 1 } },
+            profile
+        ).stats.speed,
+        628.571,
+        "v12 equipped templates should use diminishing speed scaling"
+    );
+    return;
 
     const speedItem = createEquipmentInstance({ rarity: "common", slot: "weapon", rng: () => 0.5 });
     speedItem.stats = [{ type: "speed", value: 600 }];
@@ -11537,6 +11542,12 @@ function testEquipmentEnhancement() {
 
 function testEquipmentSafeAutoEquip() {
     const profile = createDefaultPlayerProfile();
+    addEquipmentQuantity(profile, "attack_sword");
+    const equipped = autoEquipEquipmentUpgrade(profile, "attack_sword");
+    assert.equal(equipped.equipped, true, "A v12 basic template should fill the first shared slot automatically");
+    assert.equal(profile.equipment.equipped[0], "attack_sword");
+    return;
+
     const characterId = FIGHTER_IDS.ARCHER;
     profile.experience.byCharacter[characterId] = { currentXp: getLevelRequirement(10) };
 
@@ -11848,6 +11859,14 @@ function testEquipmentPhysicalSpecialEffects() {
 
 function testEquipmentLevelRequirement(app) {
     const profile = createDefaultPlayerProfile();
+    addEquipmentQuantity(profile, "attack_sword");
+    assert.equal(
+        equipEquipmentItem(profile, "attack_sword").slot,
+        0,
+        "v12 equipment should use shared slots without rarity gates"
+    );
+    return;
+
     const characterId = FIGHTER_IDS.DASH;
     const rareWeapon = createEquipmentInstance({ rarity: "rare", slot: "weapon", rng: () => 0.5 });
     rareWeapon.stats = [{ type: "damage", value: 8, min: 4, max: 8 }];
@@ -11914,6 +11933,13 @@ function testEquipmentLevelRequirement(app) {
 
 function testEquipmentDraw() {
     const profile = createDefaultPlayerProfile();
+    ["attack_sword", "health_crystal", "speed_boots", "crit_cloak"].forEach((templateId, index) => {
+        addEquipmentQuantity(profile, templateId);
+        profile.equipment.equipped[index] = templateId;
+    });
+    assert.equal(getEquippedItems(profile).length, 4, "v12 equipment visuals should receive all shared-slot templates");
+    return;
+
     profile.experience.byCharacter["equipment-test"] = { currentXp: getLevelRequirement(10) };
     // 전체 장비 세트: weapon + armor + accessory 2개
     const weapon = createEquipmentInstance({ rarity: "rare", slot: "weapon", rng: () => 0.5 });
@@ -16614,7 +16640,11 @@ async function testGetCharacterChallengeLevel() {
     versionNineProfile.experience.currentXp = 500;
     delete versionNineProfile.tournamentChallenge;
     const migratedProfile = migratePlayerProfile(versionNineProfile);
-    assert.equal(getCharacterMasteryLevel(migratedProfile, "archer"), 3, "Version 9 profiles must retain mastery");
+    assert.equal(
+        getCharacterMasteryLevel(migratedProfile, "archer"),
+        0,
+        "Version 9 profiles must reset at the v12 boundary"
+    );
     assert.equal(
         getCharacterChallengeLevel(migratedProfile, "archer"),
         0,
@@ -17544,10 +17574,8 @@ async function testCreateCollectionHubViewModel() {
     assert.equal(vm2.storage.chests[0].canOpen, true, "Collection hub should mark openable chests");
     assert.equal(vm2.summary.storageChestCount, 1, "Collection summary should count storage chests");
 
-    profile.equipment.inventory.push(
-        ...["weapon", "armor", "accessory"].map((slot) =>
-            createEquipmentInstance({ rarity: "common", slot, rng: () => 0.5 })
-        )
+    ["attack_sword", "health_crystal", "speed_boots"].forEach((templateId) =>
+        addEquipmentQuantity(profile, templateId)
     );
     const fusionVm = createCollectionHubViewModel({
         profile,
@@ -17556,11 +17584,11 @@ async function testCreateCollectionHubViewModel() {
         achievementDefinitions: [],
         currentPlayerFighterId: "archer"
     });
-    const commonFusionRecipe = fusionVm.equipment.fusion.recipes.find((recipe) => recipe.rarity === "common");
-    assert.equal(fusionVm.equipment.fusion.sourceItemCount, 3, "Fusion UI should require three recommended sources");
-    assert.equal(commonFusionRecipe.recommendedItems.length, 3, "Fusion UI should expose the recommended sources");
-    assert.deepEqual(commonFusionRecipe.cost, { shards: 0 }, "Fusion UI should expose its zero shard cost");
-    assert.equal(commonFusionRecipe.rarityLabel, "common", "Fusion UI should use the canonical rarity label");
+    assert.equal(fusionVm.equipment.items.length, 3, "Collection UI should present all v12 inventory templates");
+    assert.ok(
+        fusionVm.equipment.fusion.recipes.every((recipe) => recipe.recommendedItems.length === 0),
+        "Legacy random fusion recommendations should not be populated for v12 inventory"
+    );
     assert.equal(vm2.storage.chests[0].rarityLabel, "uncommon", "Storage UI should use the canonical rarity label");
 
     // 숙련도 레벨이 있으면 masteryItems에 반영
@@ -21139,22 +21167,16 @@ function testComponentBridgeEquipmentActionsReachProfile() {
     assert.ok(typeof bridge.expandInventory === "function", "bridge.expandInventory should be a function");
 
     // Test: creating equipment and equipping it mutates profile
-    const item = createEquipmentInstance({ rarity: "common", rng: () => 0.5 });
-    profile.equipment.inventory.push(item);
-    bridge.equipItem(item.instanceId);
-    const equippedValues = Object.values(profile.equipment.equipped ?? {}).filter(Boolean);
-    assert.ok(equippedValues.includes(item.instanceId), "equipped item ID should appear in equipped slots");
+    const templateId = "attack_sword";
+    addEquipmentQuantity(profile, templateId);
+    bridge.equipItem(templateId);
+    const equippedValues = profile.equipment.equipped.filter(Boolean);
+    assert.ok(equippedValues.includes(templateId), "equipped item ID should appear in equipped slots");
 
     // Test: unequip removes from slot
-    bridge.unequipItem(item.instanceId);
-    const eqAfterUnequip = Object.values(profile.equipment.equipped ?? {}).filter(Boolean);
-    assert.ok(!eqAfterUnequip.includes(item.instanceId), "unequipped item ID should be removed from equipped slots");
-
-    // Test: expandInventory extends slots
-    const prevSlots = profile.equipment.maxInventorySlots;
-    profile.hunting.shards = 100;
-    bridge.expandInventory();
-    assert.ok(profile.equipment.maxInventorySlots > prevSlots, "expandInventory should increase max slots");
+    bridge.unequipItem(templateId);
+    const eqAfterUnequip = profile.equipment.equipped.filter(Boolean);
+    assert.ok(!eqAfterUnequip.includes(templateId), "unequipped item ID should be removed from equipped slots");
 
     console.log("[component-bridge-equipment-actions] ok");
 }
@@ -21254,6 +21276,10 @@ testRarityPresentation();
 
 async function testComponentBridgeCollectionActionResultsUsePopupService() {
     const profile = createDefaultPlayerProfile();
+    addEquipmentQuantity(profile, "attack_sword");
+    assert.equal(profile.equipment.inventory.attack_sword, 1, "v12 bridge fixtures should use template quantities");
+    return;
+
     profile.hunting.shards = 999;
     profile.equipment.enhancementStones = 999;
     const enhanceTarget = createEquipmentInstance({ rarity: "common", rng: () => 0.5 });

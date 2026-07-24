@@ -12,6 +12,10 @@ const TEST_DOMAINS = {
     profileVersionReset: {
         modulePath: "./profileVersionReset.mjs",
         footerMessages: new Set(["[profile-version-reset] ok"])
+    },
+    equipmentDomain: {
+        modulePath: "./equipmentDomain.mjs",
+        footerMessages: new Set(["[equipment-domain] ok"])
     }
 };
 
