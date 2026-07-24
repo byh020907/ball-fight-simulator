@@ -62,17 +62,21 @@ function testCollectionEquipmentPanelsOwnTheirFlows() {
         "Collection hub should compose the equipment tab"
     );
     const parentRule = collectionHub.match(/collection-equipment-panel\s*\{([^}]*)\}/s)?.[1] ?? "";
-    assert.match(parentRule, /display:\s*flex;[\s\S]*min-height:\s*0;/);
+    assert.match(
+        parentRule,
+        /display:\s*flex;[\s\S]*flex:\s*1 1 0;[\s\S]*min-width:\s*0;[\s\S]*min-height:\s*0;[\s\S]*width:\s*100%;/
+    );
     assert.equal(
         collectionHub.includes("collection-equipment-panel > div"),
         false,
         "The hub must not override the panel's grid display through a child selector"
     );
     assert.match(
-        equipmentPanel.match(/\.ch-equipment-panel\s*\{([^}]*)\}/s)?.[1] ?? "",
-        /display:\s*grid;/,
+        equipmentPanel.match(/:scope\s*\{([^}]*)\}/s)?.[1] ?? "",
+        /width:\s*100%;[\s\S]*display:\s*grid;/,
         "The equipment panel root must own its grid display"
     );
+    assert.match(equipmentPanel, /@media \(max-width: 700px\)\s*\{\s*:scope\s*\{/s);
     assert.ok(
         equipmentPanel.includes("<button") &&
             equipmentPanel.includes('class="ch-equipment-card"') &&

@@ -150,12 +150,13 @@
 </script>
 
 <style scoped>
-    .ch-equipment-panel {
+    :scope {
         min-width: 0;
         min-height: 0;
+        width: 100%;
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(16rem, 0.7fr);
-        grid-template-rows: auto minmax(0, 1fr);
+        grid-template-rows: auto auto minmax(0, 1fr);
         gap: 12px;
         padding: 8px;
     }
@@ -172,7 +173,7 @@
     .ch-equipment-slot-grid,
     .ch-equipment-card-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr));
         gap: 8px;
     }
     .ch-equipment-slot,
@@ -199,6 +200,7 @@
     }
     .ch-equipment-catalog {
         min-width: 0;
+        min-height: 0;
         overflow-y: auto;
         overscroll-behavior: contain;
     }
@@ -265,7 +267,7 @@
         font-weight: 700;
     }
     @media (max-width: 700px) {
-        .ch-equipment-panel {
+        :scope {
             grid-template-columns: minmax(0, 1fr);
             grid-template-rows: auto auto minmax(0, 1fr) auto;
         }
