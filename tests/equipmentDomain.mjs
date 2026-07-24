@@ -189,4 +189,31 @@ assert.equal(firstBattleBall.combatEquipment.activeRuntimes.length, 2);
 assert.notEqual(firstBattleBall.combatEquipment.runtimes[0], firstBattleBall.combatEquipment.runtimes[1]);
 assert.notEqual(firstBattleBall.combatEquipment.runtimes[0], secondBattleBall.combatEquipment.runtimes[0]);
 
+firstBattleBall.stats.criticalChance = 1;
+const equipmentDamageTarget = new BattleBall(combatSpec, new Vector2(0, 0));
+const originalRandom = Math.random;
+let equipmentDamageResult;
+try {
+    Math.random = () => 0;
+    equipmentDamageResult = firstBattleBall.combatEquipment.dealEquipmentDamage(equipmentDamageTarget, 10);
+} finally {
+    Math.random = originalRandom;
+}
+assert.equal(equipmentDamageResult.isCritical, false);
+
+const movementEvents = [];
+const movementBall = new BattleBall(combatSpec, new Vector2(0, 0));
+movementBall.velocity = new Vector2(12, 0);
+movementBall.combatEquipment.validMovement = (context) => movementEvents.push(context);
+movementBall.update(1, {
+    elapsed: 0,
+    getOpponent: () => null,
+    keepInsideArena: (fighter) => {
+        fighter.position = new Vector2(0, 0);
+    }
+});
+assert.equal(movementEvents.length, 1);
+assert.ok(movementEvents[0].distance > 0);
+assert.equal(movementBall.position.x, 0);
+
 console.log("[equipment-domain] ok");

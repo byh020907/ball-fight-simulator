@@ -176,6 +176,7 @@ export class CombatEquipmentSet {
         try {
             return target.takeDamage(amount, this.owner, label, {
                 ...options,
+                allowCritical: options.allowCritical ?? false,
                 equipmentDamage: { origin: "equipment", sourceTemplateId: options.sourceTemplateId ?? null },
                 suppressEquipmentEvents: true
             });

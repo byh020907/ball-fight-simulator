@@ -417,11 +417,11 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         const positionBeforeMovement = this.position.clone();
         this._applyVelocityCorrection(simulation, delta);
         this.integrate(delta);
-        simulation.keepInsideArena(this);
         const movementDistance = this.position.clone().subtract(positionBeforeMovement).length();
         if (movementDistance > 0) {
             this.combatEquipment.validMovement({ distance: movementDistance, source: "physics", simulation });
         }
+        simulation.keepInsideArena(this);
         this.combatEquipment.update(delta, { simulation });
         if (this.bounced) this.state.forcedHeading = null;
         if (this.rotationEnabled) {
@@ -531,7 +531,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         if (this.state.damageImmunityUntil && this.simulation?.elapsed < this.state.damageImmunityUntil) {
             return { actualDamage: 0, absorbedDamage: 0, isCritical: false };
         }
-        const isCritical = source && source !== this && this.rollCritical(source);
+        const isCritical = options.allowCritical !== false && source && source !== this && this.rollCritical(source);
         if (isCritical) {
             amount = Math.round(amount * 2);
         }
