@@ -1,5 +1,6 @@
 import { EQUIPMENT_TEMPLATE_TIERS, EQUIPMENT_TEMPLATES } from "../hunting/equipmentTemplates.js";
 import { getEquipmentCount, getEquipmentRecipePreview } from "../hunting/equipmentInventory.js";
+import { getEquipmentPassivePresentation } from "./equipmentPassivePresentation.js";
 
 const TIER_LABELS = Object.freeze({ basic: "기초", intermediate: "중간", completed: "완성" });
 const STAT_LABELS = Object.freeze({
@@ -29,6 +30,7 @@ function presentTemplate(profile, template) {
         count: getEquipmentCount(profile, template.id),
         stats: presentStats(template.stats),
         passiveId: template.passiveId,
+        passive: getEquipmentPassivePresentation(template.passiveId),
         recipe: recipe
             ? {
                   cost: recipe.combineCost,
@@ -57,7 +59,13 @@ export function createEquipmentPresentation(profile) {
         slots: Array.from({ length: 6 }, (_, index) => {
             const templateId = equipped[index];
             const template = templateId ? EQUIPMENT_TEMPLATES.find((item) => item.id === templateId) : null;
-            return { index, templateId, name: template?.name ?? null, iconTag: template?.iconTag ?? null };
+            return {
+                index,
+                templateId,
+                name: template?.name ?? null,
+                iconTag: template?.iconTag ?? null,
+                stats: template ? presentStats(template.stats).slice(0, 2) : []
+            };
         }),
         tiers: EQUIPMENT_TEMPLATE_TIERS.map((tier) => ({
             id: tier,

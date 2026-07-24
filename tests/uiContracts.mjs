@@ -61,6 +61,25 @@ function testCollectionEquipmentPanelsOwnTheirFlows() {
         ),
         "Collection hub should compose the equipment tab"
     );
+    const parentRule = collectionHub.match(/collection-equipment-panel\s*\{([^}]*)\}/s)?.[1] ?? "";
+    assert.match(parentRule, /display:\s*flex;[\s\S]*min-height:\s*0;/);
+    assert.equal(
+        collectionHub.includes("collection-equipment-panel > div"),
+        false,
+        "The hub must not override the panel's grid display through a child selector"
+    );
+    assert.match(
+        equipmentPanel.match(/\.ch-equipment-panel\s*\{([^}]*)\}/s)?.[1] ?? "",
+        /display:\s*grid;/,
+        "The equipment panel root must own its grid display"
+    );
+    assert.ok(
+        equipmentPanel.includes("<button") &&
+            equipmentPanel.includes('class="ch-equipment-card"') &&
+            equipmentPanel.includes("selected.passive?.description") &&
+            equipmentPanel.includes("slot.stats.map"),
+        "Cards must be keyboard buttons and surface passive and slot-stat presentation"
+    );
     assert.equal(
         collectionHub.includes("collection-fusion-dialog") || collectionHub.includes("collection-shop-panel"),
         false,
@@ -92,6 +111,11 @@ function testEquipmentCheckpointPresentation() {
     assert.equal(sword.iconTag, "attack_sword", "Presentation should pass the registered icon tag through");
     const crafted = presentation.tiers[1].templates[0];
     assert.equal(crafted.recipe.missingReason, "missing ingredients", "Recipe failure should be presentation data");
+    const completed = presentation.tiers[2].templates[0];
+    assert.ok(
+        completed.passive?.name && completed.passive?.description,
+        "Completed templates should expose passive copy"
+    );
     console.log("[equipment-checkpoint-presentation] ok");
 }
 
@@ -1389,16 +1413,15 @@ function testFluidModalLayoutContracts() {
         "Collection layout must not restore legacy fixed content-height fallbacks"
     );
     const equipmentHostRule = collectionHub.match(/collection-equipment-panel\s*\{([^}]*)\}/s)?.[1] ?? "";
-    const equipmentRootRule = collectionHub.match(/collection-equipment-panel\s*>\s*div\s*\{([^}]*)\}/s)?.[1] ?? "";
     assert.match(
         equipmentHostRule,
         /display:\s*flex;[\s\S]*flex:\s*1 1 0;[\s\S]*min-height:\s*0;/,
         "Equipment host must preserve the collection frame's available height through its component boundary"
     );
-    assert.match(
-        equipmentRootRule,
-        /display:\s*flex;[\s\S]*flex:\s*1 1 0;[\s\S]*min-height:\s*0;/,
-        "Equipment root must preserve the host height for its internal list"
+    assert.equal(
+        collectionHub.includes("collection-equipment-panel > div"),
+        false,
+        "Equipment root must retain its own grid display"
     );
     const equipmentListRule = equipmentPanel.match(/\.ch-equip-list\s*\{([^}]*)\}/s)?.[1] ?? "";
     assert.match(

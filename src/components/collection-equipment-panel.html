@@ -1,12 +1,23 @@
 <div x-data="collectionEquipmentPanel" class="ch-equipment-panel">
-    <div class="ch-equipment-toolbar"><strong>장비</strong><span>파편 <b x-text="state.summary.shards"></b></span></div>
+    <div class="ch-equipment-toolbar">
+        <strong>장비</strong><span>파편 <b x-text="state.summary.shards"></b></span>
+    </div>
     <section class="ch-equipment-slots" aria-label="장착 슬롯">
         <h4>공용 장착 슬롯</h4>
         <div class="ch-equipment-slot-grid">
             <template x-for="slot in state.equipment.slots" :key="slot.index">
-                <button class="ch-equipment-slot" type="button" @click="unequip(slot.index)" :disabled="!slot.templateId">
+                <button
+                    class="ch-equipment-slot"
+                    type="button"
+                    @click="unequip(slot.index)"
+                    :disabled="!slot.templateId"
+                >
                     <canvas x-show="slot.iconTag" x-equipment-icon-tag="slot.iconTag" aria-hidden="true"></canvas>
                     <span x-text="slot.name || '빈 슬롯'"></span>
+                    <small
+                        x-show="slot.stats.length"
+                        x-text="slot.stats.map((stat) => `${stat.label} +${stat.value}`).join(' · ')"
+                    ></small>
                 </button>
             </template>
         </div>
@@ -17,24 +28,76 @@
                 <h4 x-text="tier.label"></h4>
                 <div class="ch-equipment-card-grid">
                     <template x-for="item in tier.templates" :key="item.id">
-                        <article class="ch-equipment-card" :class="{ 'is-selected': selectedId === item.id }" @click="select(item.id)">
+                        <button
+                            class="ch-equipment-card"
+                            type="button"
+                            :class="{ 'is-selected': selectedId === item.id }"
+                            @click="select(item.id)"
+                        >
                             <canvas x-equipment-icon-tag="item.iconTag" aria-hidden="true"></canvas>
-                            <div class="ch-equipment-card-copy"><strong x-text="item.name"></strong><span x-text="`보유 ${item.count}`"></span></div>
-                            <div class="ch-equipment-stats"><template x-for="stat in item.stats" :key="stat.id"><span x-text="`${stat.label} +${stat.value}`"></span></template></div>
-                        </article>
+                            <div class="ch-equipment-card-copy">
+                                <strong x-text="item.name"></strong><span x-text="`보유 ${item.count}`"></span>
+                            </div>
+                            <div class="ch-equipment-stats">
+                                <template x-for="stat in item.stats" :key="stat.id"
+                                    ><span x-text="`${stat.label} +${stat.value}`"></span
+                                ></template>
+                            </div>
+                            <p class="ch-equipment-passive" x-show="item.passive" x-text="item.passive?.name"></p>
+                        </button>
                     </template>
                 </div>
             </section>
         </template>
     </div>
     <aside class="ch-equipment-detail" x-show="selected" x-cloak>
-        <template x-if="selected"><div>
-            <div class="ch-equipment-detail-heading"><canvas x-equipment-icon-tag="selected.iconTag" aria-hidden="true"></canvas><div><h4 x-text="selected.name"></h4><span x-text="selected.tierLabel"></span></div></div>
-            <p><template x-for="stat in selected.stats" :key="stat.id"><span class="ch-equipment-stat" x-text="`${stat.label} +${stat.value}`"></span></template></p>
-            <template x-if="selected.recipe"><div class="ch-equipment-recipe"><p x-text="`조합 비용: 파편 ${selected.recipe.cost}`"></p><template x-for="ingredient in selected.recipe.ingredients" :key="ingredient.id"><span x-text="`${ingredient.name} ${ingredient.owned}/${ingredient.required}`"></span></template><p class="ch-equipment-missing" x-show="selected.recipe.missingReason" x-text="craftMessage(selected.recipe.missingReason)"></p><button class="ch-btn" type="button" :disabled="!selected.recipe.canCraft" @click="craft(selected.id)">조합</button></div></template>
-            <template x-if="!selected.recipe"><button class="ch-btn" type="button" :disabled="selected.count === 0 || slotsFull" @click="equip(selected.id)">장착</button></template>
-            <p class="ch-equipment-feedback" x-show="feedback" x-text="feedback"></p>
-        </div></template>
+        <template x-if="selected"
+            ><div>
+                <div class="ch-equipment-detail-heading">
+                    <canvas x-equipment-icon-tag="selected.iconTag" aria-hidden="true"></canvas>
+                    <div>
+                        <h4 x-text="selected.name"></h4>
+                        <span x-text="selected.tierLabel"></span>
+                    </div>
+                </div>
+                <p>
+                    <template x-for="stat in selected.stats" :key="stat.id"
+                        ><span class="ch-equipment-stat" x-text="`${stat.label} +${stat.value}`"></span
+                    ></template>
+                </p>
+                <p class="ch-equipment-passive" x-show="selected.passive" x-text="selected.passive?.name"></p>
+                <p x-show="selected.passive" x-text="selected.passive?.description"></p>
+                <template x-if="selected.recipe"
+                    ><div class="ch-equipment-recipe">
+                        <p x-text="`조합 비용: 파편 ${selected.recipe.cost}`"></p>
+                        <template x-for="ingredient in selected.recipe.ingredients" :key="ingredient.id"
+                            ><span x-text="`${ingredient.name} ${ingredient.owned}/${ingredient.required}`"></span
+                        ></template>
+                        <p
+                            class="ch-equipment-missing"
+                            x-show="selected.recipe.missingReason"
+                            x-text="craftMessage(selected.recipe.missingReason)"
+                        ></p>
+                        <button
+                            class="ch-btn"
+                            type="button"
+                            :disabled="!selected.recipe.canCraft"
+                            @click="craft(selected.id)"
+                        >
+                            조합
+                        </button>
+                    </div></template
+                >
+                <button
+                    class="ch-btn"
+                    type="button"
+                    :disabled="selected.count === 0 || slotsFull"
+                    @click="equip(selected.id)"
+                >
+                    장착
+                </button>
+                <p class="ch-equipment-feedback" x-show="feedback" x-text="feedback"></p></div
+        ></template>
     </aside>
 </div>
 
@@ -42,22 +105,181 @@
     window.createGameUI("collectionEquipmentPanel", () => ({
         selectedId: null,
         feedback: "",
-        get state() { return Alpine.store("uiManager").requireComponent("collectionHub").state; },
-        get selected() { return this.state.equipment.tiers.flatMap((tier) => tier.templates).find((item) => item.id === this.selectedId) ?? null; },
-        get slotsFull() { return this.state.equipment.slots.every((slot) => slot.templateId); },
-        select(id) { this.selectedId = id; this.feedback = ""; },
-        craftMessage(reason) { return ({ "missing ingredients": "재료가 부족합니다.", "missing shards": "파편이 부족합니다.", capacity: "보유 한도에 도달했습니다.", recipe: "조합법이 없습니다." })[reason] ?? "조합할 수 없습니다."; },
-        equip(templateId) { const result = Alpine.store("uiManager").invokeGameAction("equipEquipmentTemplate", templateId); this.feedback = result.ok ? "장착했습니다." : "장착할 수 없습니다. 빈 슬롯 또는 보유 수량을 확인하세요."; },
-        unequip(slotIndex) { const result = Alpine.store("uiManager").invokeGameAction("unequipEquipmentSlot", slotIndex); if (result.ok) this.feedback = "장착을 해제했습니다."; },
-        craft(templateId) { const result = Alpine.store("uiManager").invokeGameAction("craftEquipmentTemplate", templateId); this.feedback = result.ok ? "조합했습니다." : this.craftMessage(result.reason ?? result.preview?.missingReason); }
+        get state() {
+            return Alpine.store("uiManager").requireComponent("collectionHub").state;
+        },
+        get selected() {
+            return (
+                this.state.equipment.tiers
+                    .flatMap((tier) => tier.templates)
+                    .find((item) => item.id === this.selectedId) ?? null
+            );
+        },
+        get slotsFull() {
+            return this.state.equipment.slots.every((slot) => slot.templateId);
+        },
+        select(id) {
+            this.selectedId = id;
+            this.feedback = "";
+        },
+        craftMessage(reason) {
+            return (
+                {
+                    "missing ingredients": "재료가 부족합니다.",
+                    "missing shards": "파편이 부족합니다.",
+                    capacity: "보유 한도에 도달했습니다.",
+                    recipe: "조합법이 없습니다."
+                }[reason] ?? "조합할 수 없습니다."
+            );
+        },
+        equip(templateId) {
+            const result = Alpine.store("uiManager").invokeGameAction("equipEquipmentTemplate", templateId);
+            this.feedback = result.ok ? "장착했습니다." : "장착할 수 없습니다. 빈 슬롯 또는 보유 수량을 확인하세요.";
+        },
+        unequip(slotIndex) {
+            const result = Alpine.store("uiManager").invokeGameAction("unequipEquipmentSlot", slotIndex);
+            if (result.ok) this.feedback = "장착을 해제했습니다.";
+        },
+        craft(templateId) {
+            const result = Alpine.store("uiManager").invokeGameAction("craftEquipmentTemplate", templateId);
+            this.feedback = result.ok
+                ? "조합했습니다."
+                : this.craftMessage(result.reason ?? result.preview?.missingReason);
+        }
     }));
 </script>
 
 <style scoped>
-    .ch-equipment-panel { min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(16rem, 0.7fr); grid-template-rows: auto minmax(0, 1fr); gap: 12px; padding: 8px; }
-    .ch-equipment-toolbar { grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; }
-    .ch-equipment-slots { grid-column: 1 / -1; min-width: 0; }.ch-equipment-slot-grid,.ch-equipment-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: 8px; }.ch-equipment-slot,.ch-equipment-card { min-width: 0; border: 2px solid #202020; border-radius: 8px; background: #fff; padding: 8px; text-align: left; }.ch-equipment-slot canvas,.ch-equipment-card canvas,.ch-equipment-detail canvas { width: 36px; height: 36px; vertical-align: middle; }.ch-equipment-slot:focus-visible,.ch-equipment-card:focus-visible,.ch-btn:focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }.ch-equipment-catalog { min-width: 0; overflow-y: auto; overscroll-behavior: contain; }.ch-equipment-tier { margin-bottom: 12px; }.ch-equipment-card { cursor: pointer; }.ch-equipment-card.is-selected { border-color: #2563eb; background: #eff6ff; }.ch-equipment-card-copy { min-width: 0; display: inline-flex; flex-direction: column; max-width: calc(100% - 44px); vertical-align: middle; }.ch-equipment-card-copy strong,.ch-equipment-card-copy span,.ch-equipment-recipe span { overflow-wrap: anywhere; }.ch-equipment-stats { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; font-size: .75rem; }.ch-equipment-stat { display: inline-block; margin: 2px; }.ch-equipment-detail { min-width: 0; border: 2px solid #202020; border-radius: 8px; padding: 10px; overflow-y: auto; }.ch-equipment-detail-heading { display: flex; align-items: center; gap: 8px; min-width: 0; }.ch-equipment-detail-heading h4 { overflow-wrap: anywhere; }.ch-equipment-recipe { display: flex; flex-wrap: wrap; gap: 6px; }.ch-equipment-missing { color: #b91c1c; width: 100%; }.ch-equipment-feedback { color: #166534; font-weight: 700; }
-    @media (max-width: 700px) { .ch-equipment-panel { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; }.ch-equipment-toolbar,.ch-equipment-slots { grid-column: auto; }.ch-equipment-detail { max-height: 15rem; }.ch-equipment-card-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); } }
+    .ch-equipment-panel {
+        min-width: 0;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(16rem, 0.7fr);
+        grid-template-rows: auto minmax(0, 1fr);
+        gap: 12px;
+        padding: 8px;
+    }
+    .ch-equipment-toolbar {
+        grid-column: 1 / -1;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+    }
+    .ch-equipment-slots {
+        grid-column: 1 / -1;
+        min-width: 0;
+    }
+    .ch-equipment-slot-grid,
+    .ch-equipment-card-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+        gap: 8px;
+    }
+    .ch-equipment-slot,
+    .ch-equipment-card {
+        min-width: 0;
+        border: 2px solid #202020;
+        border-radius: 8px;
+        background: #fff;
+        padding: 8px;
+        text-align: left;
+    }
+    .ch-equipment-slot canvas,
+    .ch-equipment-card canvas,
+    .ch-equipment-detail canvas {
+        width: 36px;
+        height: 36px;
+        vertical-align: middle;
+    }
+    .ch-equipment-slot:focus-visible,
+    .ch-equipment-card:focus-visible,
+    .ch-btn:focus-visible {
+        outline: 3px solid #2563eb;
+        outline-offset: 2px;
+    }
+    .ch-equipment-catalog {
+        min-width: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+    .ch-equipment-tier {
+        margin-bottom: 12px;
+    }
+    .ch-equipment-card {
+        cursor: pointer;
+    }
+    .ch-equipment-card.is-selected {
+        border-color: #2563eb;
+        background: #eff6ff;
+    }
+    .ch-equipment-card-copy {
+        min-width: 0;
+        display: inline-flex;
+        flex-direction: column;
+        max-width: calc(100% - 44px);
+        vertical-align: middle;
+    }
+    .ch-equipment-card-copy strong,
+    .ch-equipment-card-copy span,
+    .ch-equipment-recipe span {
+        overflow-wrap: anywhere;
+    }
+    .ch-equipment-stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-top: 6px;
+        font-size: 0.75rem;
+    }
+    .ch-equipment-stat {
+        display: inline-block;
+        margin: 2px;
+    }
+    .ch-equipment-detail {
+        min-width: 0;
+        border: 2px solid #202020;
+        border-radius: 8px;
+        padding: 10px;
+        overflow-y: auto;
+    }
+    .ch-equipment-detail-heading {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+    }
+    .ch-equipment-detail-heading h4 {
+        overflow-wrap: anywhere;
+    }
+    .ch-equipment-recipe {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+    .ch-equipment-missing {
+        color: #b91c1c;
+        width: 100%;
+    }
+    .ch-equipment-feedback {
+        color: #166534;
+        font-weight: 700;
+    }
+    @media (max-width: 700px) {
+        .ch-equipment-panel {
+            grid-template-columns: minmax(0, 1fr);
+            grid-template-rows: auto auto minmax(0, 1fr) auto;
+        }
+        .ch-equipment-toolbar,
+        .ch-equipment-slots {
+            grid-column: auto;
+        }
+        .ch-equipment-detail {
+            max-height: 15rem;
+        }
+        .ch-equipment-card-grid {
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+        }
+    }
 </style>
 
 <style scoped>
@@ -67,5 +289,15 @@
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
         touch-action: pan-y;
+    }
+
+    .ch-equipment-slot small {
+        display: block;
+        overflow-wrap: anywhere;
+    }
+
+    .ch-equipment-passive {
+        font-size: 0.75rem;
+        font-weight: 700;
     }
 </style>

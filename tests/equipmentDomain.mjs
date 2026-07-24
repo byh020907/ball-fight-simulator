@@ -61,5 +61,20 @@ assert.deepEqual(migratePlayerProfile(v11).equipment, createDefaultPlayerProfile
 const roundTrip = migratePlayerProfile(createDefaultPlayerProfile());
 assert.equal(roundTrip.version, PROFILE_VERSION);
 assert.deepEqual(roundTrip.equipment, createDefaultPlayerProfile().equipment);
+const persistedEquipment = migratePlayerProfile({
+    ...createDefaultPlayerProfile(),
+    equipment: {
+        inventory: { attack_sword: 1 },
+        equipped: ["attack_sword", null, null, null, null, null],
+        stats: { damage: 999 },
+        recipe: ["attack_sword"],
+        passive: { id: "ability_crit" }
+    }
+}).equipment;
+assert.deepEqual(persistedEquipment, {
+    inventory: { attack_sword: 1 },
+    equipped: ["attack_sword", null, null, null, null, null]
+});
+assert.equal(/"(stats|recipe|passive)"/.test(JSON.stringify(persistedEquipment)), false);
 
 console.log("[equipment-domain] ok");
