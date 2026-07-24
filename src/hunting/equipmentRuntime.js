@@ -75,6 +75,31 @@ export class EquipmentTimedWindow {
     }
 }
 
+export class EquipmentDelayedActionQueue {
+    constructor() {
+        this.entries = [];
+    }
+
+    schedule(delay, payload) {
+        this.entries.push({ remaining: finiteNonNegative(delay), payload });
+    }
+
+    tick(delta, onReady) {
+        const elapsed = finiteNonNegative(delta);
+        const pending = [];
+        for (const entry of this.entries) {
+            entry.remaining -= elapsed;
+            if (entry.remaining <= 1e-9) onReady(entry.payload);
+            else pending.push(entry);
+        }
+        this.entries = pending;
+    }
+
+    clear() {
+        this.entries = [];
+    }
+}
+
 export class EquipmentMovementDistanceTracker {
     constructor(threshold = Infinity) {
         this.threshold = finiteNonNegative(threshold);
@@ -117,6 +142,7 @@ export class EquipmentRuntime {
         this.cooldown = new EquipmentCooldown();
         this.window = new EquipmentTimedWindow();
         this.distance = new EquipmentMovementDistanceTracker();
+        this.delayedActions = new EquipmentDelayedActionQueue();
         const Factory = EQUIPMENT_PASSIVE_FACTORIES[this.template?.passiveId] ?? NullEquipmentPassive;
         this.passive = new Factory(this);
     }

@@ -25,7 +25,11 @@ import {
 } from "../src/hunting/equipmentRuntime.js";
 import {
     calculateDefenseConversionAttackBonus,
+    calculateAbilityCritDamage,
+    calculateAbilityEchoDamage,
     calculateMassExecutionDamage,
+    calculateMassShockwaveDamage,
+    calculatePursuitFlurryDamage,
     calculateSpeedAngularDamage,
     calculateVitalOverwhelmDamage
 } from "../src/hunting/equipmentPassives.js";
@@ -287,6 +291,10 @@ assert.equal(equipmentDamageResult.isCritical, false);
 
 assert.deepEqual([0, 12, 24, 36].map(calculateDefenseConversionAttackBonus), [0, 0.5, 1, 1.5]);
 assert.equal(calculateMassExecutionDamage(40, 0.25), 30);
+assert.equal(calculateAbilityCritDamage(40, 45.5), 19.1);
+assert.equal(calculatePursuitFlurryDamage(40), 10);
+assert.equal(calculateMassShockwaveDamage(40, 0.25), 18);
+assert.equal(calculateAbilityEchoDamage(40), 20);
 assert.equal(calculateSpeedAngularDamage(40, 0.5), 7);
 assert.deepEqual(
     [100, 50, 0].map((hp) => calculateVitalOverwhelmDamage(100, hp, 100)),
@@ -297,7 +305,8 @@ const passiveCombatStats = Object.freeze({
     hp: 100,
     defense: 36,
     speed: Object.freeze({ increaseRatio: 0.5 }),
-    mass: Object.freeze({ effectiveBonus: 0.25 })
+    mass: Object.freeze({ effectiveBonus: 0.25 }),
+    criticalChance: 45.5
 });
 const passiveOwner = {
     hp: 100,
@@ -306,6 +315,122 @@ const passiveOwner = {
     getTotalAttackDamage: () => 40
 };
 const passiveEvents = [];
+
+const collisionSimulation = {
+    getEnemiesOf: () => collisionTargets,
+    isHostile: (attacker, target) => attacker !== target && target.hostile !== false
+};
+const collisionTargets = [
+    { position: { x: 0, y: 0 }, flags: {}, state: {} },
+    { position: { x: 100, y: 0 }, flags: {}, state: {} },
+    { position: { x: 181, y: 0 }, flags: {}, state: {} }
+];
+for (const target of collisionTargets) {
+    target.takeDamage = (amount, source, label, options) => {
+        passiveEvents.push({ amount, source, label, options, target });
+        source.combatEquipment.enemyCollisionResolved({ damage: options.equipmentDamage });
+        return { actualDamage: amount, absorbedDamage: 0, isCritical: false };
+    };
+}
+
+passiveEvents.length = 0;
+const abilityCritSet = new CombatEquipmentSet(passiveOwner, ["completed_ability_crit"]);
+passiveOwner.combatEquipment = abilityCritSet;
+abilityCritSet.abilityUsed({});
+abilityCritSet.update(3.999, { simulation: collisionSimulation });
+abilityCritSet.enemyCollisionResolved({
+    target: collisionTargets[0],
+    contactPoint: { x: 0, y: 0 },
+    simulation: collisionSimulation
+});
+abilityCritSet.enemyCollisionResolved({
+    target: collisionTargets[0],
+    contactPoint: { x: 0, y: 0 },
+    simulation: collisionSimulation
+});
+assert.deepEqual(
+    passiveEvents.map(({ amount, label, target }) => [amount, label, target]),
+    [
+        [19.1, "별을 꿰는 서약", collisionTargets[0]],
+        [19.1, "별을 꿰는 서약", collisionTargets[1]]
+    ]
+);
+abilityCritSet.abilityUsed({});
+abilityCritSet.update(4, { simulation: collisionSimulation });
+abilityCritSet.enemyCollisionResolved({
+    target: collisionTargets[0],
+    contactPoint: { x: 0, y: 0 },
+    simulation: collisionSimulation
+});
+assert.equal(passiveEvents.length, 2);
+
+passiveEvents.length = 0;
+const flurrySet = new CombatEquipmentSet(passiveOwner, ["completed_pursuit_flurry"]);
+passiveOwner.combatEquipment = flurrySet;
+flurrySet.enemyCollisionResolved({ target: collisionTargets[0] });
+assert.equal(passiveEvents.length, 0);
+flurrySet.enemyCollisionResolved({ target: collisionTargets[1] });
+assert.deepEqual(
+    passiveEvents.map(({ amount, label }) => [amount, label]),
+    [
+        [10, "쌍익의 질풍 좌참격"],
+        [10, "쌍익의 질풍 우참격"]
+    ]
+);
+flurrySet.enemyCollisionResolved({ target: collisionTargets[0] });
+assert.equal(passiveEvents.length, 2);
+flurrySet.update(1.5, { simulation: collisionSimulation });
+flurrySet.enemyCollisionResolved({ target: collisionTargets[0] });
+flurrySet.enemyCollisionResolved({ target: collisionTargets[0] });
+assert.equal(passiveEvents.length, 4);
+
+passiveEvents.length = 0;
+const shockwaveSet = new CombatEquipmentSet(passiveOwner, ["completed_mass_shockwave"]);
+passiveOwner.combatEquipment = shockwaveSet;
+shockwaveSet.enemyCollisionResolved({
+    isCritical: false,
+    contactPoint: { x: 0, y: 0 },
+    simulation: collisionSimulation
+});
+shockwaveSet.enemyCollisionResolved({
+    isCritical: true,
+    contactPoint: { x: 0, y: 0 },
+    simulation: collisionSimulation
+});
+assert.deepEqual(
+    passiveEvents.map(({ amount, target }) => [amount, target]),
+    [
+        [18, collisionTargets[0]],
+        [18, collisionTargets[1]]
+    ]
+);
+shockwaveSet.enemyCollisionResolved({
+    isCritical: true,
+    contactPoint: { x: 0, y: 0 },
+    simulation: collisionSimulation
+});
+assert.equal(passiveEvents.length, 2);
+
+passiveEvents.length = 0;
+const echoSet = new CombatEquipmentSet(passiveOwner, ["completed_ability_echo"]);
+passiveOwner.combatEquipment = echoSet;
+echoSet.abilityUsed({});
+echoSet.abilityUsed({});
+echoSet.enemyCollisionResolved({ target: collisionTargets[0] });
+echoSet.abilityUsed({});
+echoSet.update(0.119, { simulation: collisionSimulation });
+assert.equal(passiveEvents.length, 0);
+echoSet.update(0.001, { simulation: collisionSimulation });
+assert.deepEqual(
+    passiveEvents.map(({ amount, label, target }) => [amount, label, target]),
+    [[20, "쌍성의 메아리", collisionTargets[0]]]
+);
+echoSet.enemyCollisionResolved({ target: collisionTargets[1] });
+collisionTargets[1].flags.defeated = true;
+echoSet.update(0.12, { simulation: collisionSimulation });
+assert.equal(passiveEvents.length, 1);
+collisionTargets[1].flags.defeated = false;
+
 const passiveTarget = {
     takeDamage(amount, source, label, options) {
         passiveEvents.push({ amount, source, label, options });
@@ -313,6 +438,7 @@ const passiveTarget = {
         return { actualDamage: amount, absorbedDamage: 0, isCritical: false };
     }
 };
+passiveEvents.length = 0;
 const defenseConversionSet = new CombatEquipmentSet(passiveOwner, ["completed_defense_conversion"]);
 assert.equal(defenseConversionSet.getAttackDamageBonus(), 1.5);
 assert.equal(defenseConversionSet.getAttackDamageBonus(), 1.5);
