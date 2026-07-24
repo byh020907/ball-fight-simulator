@@ -246,10 +246,18 @@
             const { loadTemplates } = await import(`./src/componentLoader.js?v=${V}`);
             const { registerAlpineComponentSystem } = await import(`./src/alpineTemplateComponents.js?v=${V}`);
             const { registerCharacterPortraitDirective } = await import(`./src/characterPortrait.js?v=${V}`);
+            const { registerEquipmentIconTagDirective, getRegisteredTagMetadata, getUnknownTagMetadata } = await import(
+                `./src/equipmentIconTags.js?v=${V}`
+            );
+
+            window.__equipmentIconTagList = Object.freeze(
+                [...getRegisteredTagMetadata(), getUnknownTagMetadata()].map((metadata) => Object.freeze(metadata))
+            );
 
             await loadTemplates();
             registerAlpineComponentSystem(Alpine);
             registerCharacterPortraitDirective(Alpine);
+            registerEquipmentIconTagDirective(Alpine);
 
             Alpine.start();
             await Promise.resolve();

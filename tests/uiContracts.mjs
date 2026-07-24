@@ -10,6 +10,15 @@ import { createRoster } from "../src/roster.js";
 import { MASTERY_EFFECT_DEFS } from "../src/character-mastery/masteryDefinitions.js";
 import { getCombinedHealthBarPercentages } from "../src/fighterHealthBar.js";
 import { renderCharacterPortrait } from "../src/characterPortrait.js";
+import {
+    getRegisteredTags,
+    getRegisteredTagMetadata,
+    getUnknownTagMetadata,
+    getTagLabel,
+    resolveTagDraw,
+    renderIconTag,
+    EquipmentIconTagController
+} from "../src/equipmentIconTags.js";
 
 function readSource(path) {
     return readFileSync(path, "utf8");
@@ -1733,5 +1742,249 @@ testCollectionRebirthAndDeveloperContracts();
 testCollectionTitleLongPressDebugEntry();
 testHiddenCharacterCollectionMasking();
 testNearestEnemyCombatControlUiContract();
+
+function testIconTagCountAndUniqueness() {
+    const tags = getRegisteredTags();
+    const unknownTag = resolveTagDraw("unknown");
+    assert.ok(typeof unknownTag === "function", "Unknown fallback should resolve to a draw function");
+    const nonExistentTag = resolveTagDraw("does_not_exist");
+    assert.equal(nonExistentTag, unknownTag, "Non-existent tag should fall back to unknown draw function");
+    assert.equal(tags.length, 15, "There should be exactly 15 registered non-unknown tags");
+    const unique = new Set(tags);
+    assert.equal(unique.size, tags.length, "All tag IDs must be unique");
+    tags.forEach((id) => {
+        assert.ok(
+            typeof getTagLabel(id) === "string" && getTagLabel(id).length > 0,
+            `Tag ${id} must have a non-empty label`
+        );
+    });
+    const metadata = getRegisteredTagMetadata();
+    assert.equal(metadata.length, 15, "getRegisteredTagMetadata should return exactly 15 entries");
+    metadata.forEach((entry) => {
+        assert.ok(typeof entry.id === "string" && entry.id.length > 0, "Each metadata entry must have an id");
+        assert.ok(typeof entry.label === "string" && entry.label.length > 0, "Each metadata entry must have a label");
+    });
+    const unknownMeta = getUnknownTagMetadata();
+    assert.equal(unknownMeta.id, "unknown", "Unknown metadata id must be 'unknown'");
+    assert.ok(
+        typeof unknownMeta.label === "string" && unknownMeta.label.length > 0,
+        "Unknown metadata must have a label"
+    );
+    console.log("[icon-tag-count-and-uniqueness] ok");
+}
+
+function testIconTagDrawAll() {
+    const tags = getRegisteredTags().concat(["unknown"]);
+    const canvas = {
+        width: 0,
+        height: 0,
+        getBoundingClientRect: () => ({ width: 64, height: 64 }),
+        getContext: () => {
+            const ctx = {
+                _calls: [],
+                save() {
+                    this._calls.push("save");
+                },
+                restore() {
+                    this._calls.push("restore");
+                },
+                setTransform() {
+                    this._calls.push("setTransform");
+                },
+                clearRect() {
+                    this._calls.push("clearRect");
+                },
+                beginPath() {
+                    this._calls.push("beginPath");
+                },
+                closePath() {
+                    this._calls.push("closePath");
+                },
+                moveTo() {
+                    this._calls.push("moveTo");
+                },
+                lineTo() {
+                    this._calls.push("lineTo");
+                },
+                quadraticCurveTo() {
+                    this._calls.push("quadraticCurveTo");
+                },
+                arc() {
+                    this._calls.push("arc");
+                },
+                ellipse() {
+                    this._calls.push("ellipse");
+                },
+                roundRect() {
+                    this._calls.push("roundRect");
+                },
+                fill() {
+                    this._calls.push("fill");
+                },
+                stroke() {
+                    this._calls.push("stroke");
+                },
+                fillRect() {
+                    this._calls.push("fillRect");
+                },
+                translate() {
+                    this._calls.push("translate");
+                },
+                scale() {
+                    this._calls.push("scale");
+                }
+            };
+            Object.defineProperty(ctx, "fillStyle", {
+                get() {
+                    return this._fillStyle;
+                },
+                set(v) {
+                    this._fillStyle = v;
+                    this._calls.push("fillStyle");
+                }
+            });
+            Object.defineProperty(ctx, "strokeStyle", {
+                get() {
+                    return this._strokeStyle;
+                },
+                set(v) {
+                    this._strokeStyle = v;
+                    this._calls.push("strokeStyle");
+                }
+            });
+            Object.defineProperty(ctx, "lineWidth", {
+                get() {
+                    return this._lineWidth;
+                },
+                set(v) {
+                    this._lineWidth = v;
+                    this._calls.push("lineWidth");
+                }
+            });
+            Object.defineProperty(ctx, "lineJoin", {
+                get() {
+                    return this._lineJoin;
+                },
+                set(v) {
+                    this._lineJoin = v;
+                    this._calls.push("lineJoin");
+                }
+            });
+            Object.defineProperty(ctx, "lineCap", {
+                get() {
+                    return this._lineCap;
+                },
+                set(v) {
+                    this._lineCap = v;
+                    this._calls.push("lineCap");
+                }
+            });
+            return ctx;
+        }
+    };
+
+    tags.forEach((id) => {
+        const ctx = canvas.getContext();
+        ctx._calls = [];
+        const origGetContext = canvas.getContext;
+        canvas.getContext = () => ctx;
+        const result = renderIconTag(canvas, id);
+        canvas.getContext = origGetContext;
+        assert.equal(result, true, `renderIconTag for ${id} should return true`);
+        assert.ok(ctx._calls.includes("beginPath"), `Tag ${id} draw should produce canvas path calls`);
+    });
+    console.log("[icon-tag-draw-all] ok");
+}
+
+function testIconTagDprBackingSize() {
+    const canvas = {
+        width: 0,
+        height: 0,
+        getBoundingClientRect: () => ({ width: 48, height: 48 }),
+        getContext: () => ({
+            save() {},
+            restore() {},
+            setTransform() {},
+            clearRect() {},
+            beginPath() {},
+            closePath() {},
+            moveTo() {},
+            lineTo() {},
+            quadraticCurveTo() {},
+            arc() {},
+            ellipse() {},
+            roundRect() {},
+            fill() {},
+            stroke() {},
+            fillRect() {},
+            translate() {},
+            scale() {}
+        })
+    };
+    renderIconTag(canvas, "atk_small", { pixelRatio: 2 });
+    assert.equal(canvas.width, 96, "48 CSS px at DPR 2 should produce 96 backing px");
+    assert.equal(canvas.height, 96, "48 CSS px at DPR 2 should produce 96 backing px");
+    console.log("[icon-tag-dpr-backing-size] ok");
+}
+
+function testIconTagControllerResizeObserverCleanup() {
+    let disconnectCount = 0;
+    const FakeResizeObserver = class {
+        observe() {}
+        disconnect() {
+            disconnectCount += 1;
+        }
+    };
+    const canvas = {};
+    const controller = new EquipmentIconTagController(canvas, {
+        ResizeObserverClass: FakeResizeObserver,
+        requestFrame: (callback) => callback()
+    });
+    controller.destroy();
+    assert.equal(disconnectCount, 1, "Controller destroy should disconnect the ResizeObserver");
+    console.log("[icon-tag-controller-resize-observer-cleanup] ok");
+}
+
+function testDeveloperGalleryTemplateContracts() {
+    const template = readSource("src/components/collection-hub.html");
+    assert.ok(template.includes("장비 아이콘 갤러리"), "Developer tab should contain icon gallery section");
+    assert.ok(template.includes("[32, 48, 64]"), "Gallery should render 32/48/64 size variants");
+    assert.ok(
+        template.includes("background:#ffffff") && template.includes("background:#333333"),
+        "Gallery should have both light and dark background canvases"
+    );
+    assert.ok(
+        template.includes('x-show="state.showIconLabels"'),
+        "Gallery should support toggling icon label visibility"
+    );
+    assert.ok(template.includes('x-for="tag in iconTagList"'), "Gallery should iterate over iconTagList");
+    assert.ok(template.includes("window.__equipmentIconTagList"), "Component should use the global metadata array");
+    console.log("[developer-gallery-template-contracts] ok");
+}
+
+function testIconTagDirectiveRegistration() {
+    const indexHtml = readSource("index.html");
+    assert.ok(
+        indexHtml.includes("registerEquipmentIconTagDirective"),
+        "index.html should import and register the equipment icon tag directive"
+    );
+    assert.ok(indexHtml.includes("equipmentIconTags.js"), "index.html should import the equipmentIconTags module");
+    assert.ok(
+        indexHtml.includes("getRegisteredTagMetadata") && indexHtml.includes("getUnknownTagMetadata"),
+        "index.html should import the metadata accessors"
+    );
+    assert.ok(
+        indexHtml.includes("window.__equipmentIconTagList"),
+        "index.html should set window.__equipmentIconTagList from module metadata"
+    );
+    console.log("[icon-tag-directive-registration] ok");
+}
+
+testIconTagCountAndUniqueness();
+testIconTagDrawAll();
+testIconTagDprBackingSize();
+testIconTagControllerResizeObserverCleanup();
+testDeveloperGalleryTemplateContracts();
+testIconTagDirectiveRegistration();
 
 console.log("ui contract tests ok");
