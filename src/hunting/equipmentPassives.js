@@ -87,6 +87,10 @@ class DefenseConversionPassive {
     getAttackDamageBonus() {
         return calculateDefenseConversionAttackBonus(this.runtime.getCombatStats()?.defense);
     }
+
+    enemyCollisionResolved({ target, contactPoint, simulation, actualDamage }) {
+        this.runtime.emitFeedback({ target, contactPoint, simulation, actualDamage });
+    }
 }
 
 class CollisionDamagePassive {
@@ -100,9 +104,27 @@ class CollisionDamagePassive {
 
     dealDamage(target, amount, label) {
         if (amount <= 0) return null;
-        return this.owner.combatEquipment?.dealEquipmentDamage(target, amount, label, {
+        const result = this.owner.combatEquipment?.dealEquipmentDamage(target, amount, label, {
             sourceTemplateId: this.runtime.templateId
         });
+        this.feedbackResults?.push(result);
+        return result;
+    }
+
+    beginFeedback(context) {
+        this.feedbackContext = context;
+        this.feedbackResults = [];
+    }
+
+    flushFeedback() {
+        const actualDamage = (this.feedbackResults ?? []).reduce(
+            (total, result) => total + (result?.actualDamage ?? 0),
+            0
+        );
+        const effect = this.runtime.emitFeedback({ ...this.feedbackContext, actualDamage });
+        this.feedbackContext = null;
+        this.feedbackResults = null;
+        return effect;
     }
 }
 
@@ -122,9 +144,11 @@ class AbilityCritPassive extends CollisionDamagePassive {
             this.owner.getTotalAttackDamage(),
             this.runtime.getCombatStats()?.criticalChance
         );
+        this.beginFeedback({ target, contactPoint, simulation });
         for (const enemy of getEnemiesAtContactPoint(simulation, this.owner, contactPoint, 120)) {
             this.dealDamage(enemy, amount, "별을 꿰는 서약");
         }
+        this.flushFeedback();
     }
 }
 
@@ -134,7 +158,7 @@ class PursuitFlurryPassive extends CollisionDamagePassive {
         this.runtime.cooldown.tick(delta);
     }
 
-    enemyCollisionResolved({ target }) {
+    enemyCollisionResolved({ target, contactPoint, simulation }) {
         if (!target || !this.runtime.cooldown.ready) return;
         if (!this.runtime.window.active) {
             this.runtime.window.open(1.5);
@@ -142,9 +166,11 @@ class PursuitFlurryPassive extends CollisionDamagePassive {
         }
         this.runtime.window.close();
         this.runtime.cooldown.trigger(1.5);
+        this.beginFeedback({ target, contactPoint, simulation });
         const amount = calculatePursuitFlurryDamage(this.owner.getTotalAttackDamage());
         this.dealDamage(target, amount, "쌍익의 질풍 좌참격");
         this.dealDamage(target, amount, "쌍익의 질풍 우참격");
+        this.flushFeedback();
     }
 }
 
@@ -160,9 +186,11 @@ class MassShockwavePassive extends CollisionDamagePassive {
             this.owner.getTotalAttackDamage(),
             this.runtime.getCombatStats()?.mass?.effectiveBonus
         );
+        this.beginFeedback({ contactPoint, simulation });
         for (const enemy of getEnemiesAtContactPoint(simulation, this.owner, contactPoint, 180)) {
             this.dealDamage(enemy, amount, "낙성의 파문");
         }
+        this.flushFeedback();
     }
 }
 
@@ -174,7 +202,9 @@ class AbilityEchoPassive extends CollisionDamagePassive {
     update({ delta, simulation }) {
         this.runtime.delayedActions.tick(delta, ({ target }) => {
             if (!isActiveHostileTarget(simulation, this.owner, target)) return;
+            this.beginFeedback({ target, simulation });
             this.dealDamage(target, calculateAbilityEchoDamage(this.owner.getTotalAttackDamage()), "쌍성의 메아리");
+            this.flushFeedback();
         });
     }
 
@@ -185,34 +215,45 @@ class AbilityEchoPassive extends CollisionDamagePassive {
 }
 
 class MassExecutionPassive extends CollisionDamagePassive {
-    enemyCollisionResolved({ target, targetHpRatioBefore, isCritical }) {
+    enemyCollisionResolved({ target, contactPoint, simulation, targetHpRatioBefore, isCritical }) {
         if (!isCritical || targetHpRatioBefore > 0.35) return;
+        this.beginFeedback({ target, contactPoint, simulation });
         const amount = calculateMassExecutionDamage(
             this.owner.getTotalAttackDamage(),
             this.runtime.getCombatStats()?.mass?.effectiveBonus
         );
         this.dealDamage(target, amount, "종언의 추락");
+        this.flushFeedback();
     }
 }
 
 class SpeedAngularPassive extends CollisionDamagePassive {
-    enemyCollisionResolved({ target }) {
+    enemyCollisionResolved({ target, contactPoint, simulation }) {
+        this.beginFeedback({ target, contactPoint, simulation });
         const amount = calculateSpeedAngularDamage(
             this.owner.getTotalAttackDamage(),
             this.runtime.getCombatStats()?.speed?.increaseRatio
         );
         this.dealDamage(target, amount, "천공의 나선");
+        this.flushFeedback();
     }
 }
 
 class VitalOverwhelmPassive extends CollisionDamagePassive {
-    enemyCollisionResolved({ target }) {
+    enemyCollisionResolved({ target, contactPoint, simulation }) {
+        this.beginFeedback({
+            target,
+            contactPoint,
+            simulation,
+            intensity: this.owner.maxHp > 0 ? this.owner.hp / this.owner.maxHp : 0
+        });
         const amount = calculateVitalOverwhelmDamage(
             this.runtime.getCombatStats()?.hp,
             this.owner.hp,
             this.owner.maxHp
         );
         this.dealDamage(target, amount, "적룡의 심갑");
+        this.flushFeedback();
     }
 }
 
@@ -265,7 +306,9 @@ class VitalHeatPassive extends CollisionDamagePassive {
 
     _dealTick(simulation) {
         const amount = calculateVitalHeatTickDamage(this.runtime.getCombatStats()?.hp);
+        this.beginFeedback({ simulation, anchor: this.owner.position });
         for (const enemy of this._getEnemies(simulation)) this.dealDamage(enemy, amount, "홍련의 맥동");
+        this.flushFeedback();
     }
 
     _getEnemies(simulation) {
@@ -291,8 +334,9 @@ class WallRicochetPassive extends CollisionDamagePassive {
         this.runtime.charge.gain();
     }
 
-    enemyCollisionResolved({ target }) {
+    enemyCollisionResolved({ target, contactPoint, simulation }) {
         if (!target || !this.runtime.charge.consume()) return;
+        this.beginFeedback({ target, contactPoint, simulation });
         this.dealDamage(
             target,
             calculateWallRicochetDamage(
@@ -301,6 +345,7 @@ class WallRicochetPassive extends CollisionDamagePassive {
             ),
             "되튀는 초승달"
         );
+        this.flushFeedback();
     }
 }
 
@@ -322,7 +367,9 @@ class WallHeatPassive extends CollisionDamagePassive {
             this.owner.getTotalAttackDamage(),
             this.runtime.getCombatStats()?.wallBounce?.effectiveBonus
         );
+        this.beginFeedback({ simulation, anchor: this.owner.position });
         for (const enemy of enemies) this.dealDamage(enemy, amount, "화염심장 성채");
+        this.flushFeedback();
     }
 
     staticBounce() {
@@ -348,9 +395,11 @@ class VortexChargePassive extends CollisionDamagePassive {
             this.owner.getTotalAttackDamage(),
             this.runtime.getCombatStats()?.angularImpulse?.effectiveBonus
         );
+        this.beginFeedback({ target, contactPoint, simulation });
         for (const enemy of getEnemiesAtContactPoint(simulation, this.owner, contactPoint, 180)) {
             this.dealDamage(enemy, amount, "폭풍의 윤환");
         }
+        this.flushFeedback();
     }
 }
 

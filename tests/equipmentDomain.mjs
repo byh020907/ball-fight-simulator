@@ -48,6 +48,11 @@ import {
 import { createRoster } from "../src/roster.js";
 import { BattleBall } from "../src/entities/battleBall.js";
 import { Vector2 } from "../src/core.js";
+import {
+    EQUIPMENT_PASSIVE_EFFECT_CONFIG,
+    EquipmentPassiveEffect,
+    spawnEquipmentPassiveEffect
+} from "../src/effects/equipmentPassiveEffects.js";
 
 assert.equal(EQUIPMENT_TEMPLATES.length, 39);
 assert.deepEqual(
@@ -324,6 +329,7 @@ const passiveOwner = {
 const passiveEvents = [];
 
 const collisionSimulation = {
+    entities: [],
     getEnemiesOf: () => collisionTargets,
     isHostile: (attacker, target) => attacker !== target && target.hostile !== false
 };
@@ -616,5 +622,24 @@ assert.deepEqual(
         [19, "폭풍의 윤환", collisionTargets[1]]
     ]
 );
+
+const completedPassiveIds = EQUIPMENT_TEMPLATES.filter((template) => template.tier === "completed").map(
+    (template) => template.passiveId
+);
+assert.deepEqual(Object.keys(EQUIPMENT_PASSIVE_EFFECT_CONFIG).sort(), [...completedPassiveIds].sort());
+for (const passiveId of completedPassiveIds) {
+    const effectSimulation = { entities: [] };
+    const effect = spawnEquipmentPassiveEffect({
+        passiveId,
+        templateId: `test-${passiveId}`,
+        simulation: effectSimulation,
+        owner: { velocity: new Vector2(1, 0) },
+        anchor: new Vector2(100, 100)
+    });
+    assert.ok(effect instanceof EquipmentPassiveEffect);
+    assert.equal(effect.passiveId, passiveId);
+    effect.update(effect.maxLife + 0.01);
+    assert.equal(effect.isExpired, true);
+}
 
 console.log("[equipment-domain] ok");

@@ -3,6 +3,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export { VisualBurst } from "./visualBurst.js";
+export {
+    EQUIPMENT_PASSIVE_EFFECT_CONFIG,
+    EquipmentPassiveEffect,
+    spawnEquipmentPassiveEffect
+} from "./equipmentPassiveEffects.js";
 export { OrbitCatchEffect, OrbitHitEffect } from "./orbitHitEffect.js";
 export { SpinCutEffect, SpinVortexEffect } from "./spinEffects.js";
 export { ArcherPredictionEffect } from "./archerPredictionEffect.js";

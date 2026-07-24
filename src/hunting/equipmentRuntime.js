@@ -1,5 +1,6 @@
 import { getEquipmentTemplate } from "./equipmentTemplates.js";
 import { EQUIPMENT_PASSIVE_FACTORIES } from "./equipmentPassives.js";
+import { spawnEquipmentPassiveEffect } from "../effects/equipmentPassiveEffects.js";
 
 function finiteNonNegative(value) {
     return Math.max(0, Number(value) || 0);
@@ -155,6 +156,19 @@ export class EquipmentRuntime {
 
     getCombatStats() {
         return this.owner.getEquipmentCombatStats?.() ?? null;
+    }
+
+    emitFeedback({ simulation, target = null, contactPoint = null, anchor = null, actualDamage = 0, ...payload } = {}) {
+        if (!(actualDamage > 0)) return null;
+        return spawnEquipmentPassiveEffect({
+            ...payload,
+            simulation,
+            owner: this.owner,
+            target,
+            anchor: (anchor ?? contactPoint ?? target?.position ?? this.owner?.position)?.clone?.(),
+            passiveId: this.template?.passiveId,
+            templateId: this.templateId
+        });
     }
 }
 
