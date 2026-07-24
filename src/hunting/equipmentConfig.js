@@ -5,6 +5,7 @@ import { getDiminishingEquipmentSpeed } from "../combatStatScaling.js";
 import {
     equipEquipmentTemplate,
     getEquippedEquipmentStats,
+    getEquippedEquipmentTemplateIds,
     getEquippedEquipmentTemplates,
     getEquipmentCount,
     unequipEquipmentTemplate
@@ -375,7 +376,8 @@ export function applyEquipmentVisuals(spec, profile) {
         ...spec,
         equipment: {
             ...(spec.equipment ?? {}),
-            equippedItems: getEquippedItems(profile, characterId)
+            equippedItems: getEquippedItems(profile, characterId),
+            equippedTemplateIds: isQuantityEquipmentInventory(profile) ? getEquippedEquipmentTemplateIds(profile) : []
         }
     };
 }

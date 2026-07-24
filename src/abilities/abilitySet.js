@@ -203,6 +203,7 @@ export class AbilitySet {
         }
 
         ability.setContext?.({ role });
+        ability._equipmentUsageEventsEnabled = true;
     }
 
     _forEach(method, ...args) {

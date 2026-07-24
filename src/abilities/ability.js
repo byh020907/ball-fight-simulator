@@ -68,6 +68,14 @@ export class Ability extends mixins([Cooldown]) {
         this._baseCooldown = val;
     }
 
+    resetCooldown(duration) {
+        const wasReady = this.cooldownReady;
+        super.resetCooldown(duration);
+        if (this._equipmentUsageEventsEnabled && wasReady) {
+            this.owner?.combatEquipment?.abilityUsed({ ability: this, simulation: this.simulation });
+        }
+    }
+
     update() {}
     onCollision() {}
     onDamageTaken() {}

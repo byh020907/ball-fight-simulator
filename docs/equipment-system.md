@@ -59,4 +59,22 @@ equipment: {
 - 조합 실패는 `missing ingredients`, `missing shards`, `capacity`, `recipe` 도메인 이유를 화면 문구로만 변환한다. UI는 재료·수량·파편을 직접 변경하지 않는다.
 - `BallFightComponentBridge`의 공개 경계는 `equipEquipmentTemplate(templateId, slotIndex?)`, `unequipEquipmentSlot(slotIndex)`, `craftEquipmentTemplate(templateId)` 세 명령이다.
 
-강화, 판매, 랜덤 합성, 상점, 인벤토리 확장과 등급/장비 유형 전용 슬롯은 이 화면에 제공하지 않는다. 전투 스탯 적용과 12종 완성 패시브 런타임도 후속 체크포인트 범위다.
+강화, 판매, 랜덤 합성, 상점, 인벤토리 확장과 등급/장비 유형 전용 슬롯은 이 화면에 제공하지 않는다.
+
+## 전투 런타임 경계
+
+수량형 프로필은 계속 장착 ID만 보관한다. 전투 스펙을 만들 때 `equipped`의 6개 슬롯 ID를 정적
+`equipmentTemplates`에서 다시 해석하고, `BattleBall`은 `CombatEquipmentSet` 하나만 생성한다.
+
+- 각 장착 슬롯은 같은 템플릿 ID여도 별도의 `EquipmentRuntime` 인스턴스를 받는다. 충전, 내부 쿨다운,
+  시간 창, 유효 이동 거리는 그 인스턴스 안의 `EquipmentChargeStore`, `EquipmentCooldown`,
+  `EquipmentTimedWindow`, `EquipmentMovementDistanceTracker`가 소유한다.
+- 전투가 끝나거나 새 `BattleBall`을 만들면 이 런타임도 새로 만들어진다. 프로필 JSON에는 템플릿 스탯,
+  레시피, 패시브 정의나 어떤 런타임 상태도 저장하지 않는다.
+- `BattleBall`은 능력 실제 사용, 물리 적분으로 생긴 유효 이동을 장비 세트에 전달한다. `BattleSimulation`은
+  ID를 해석하지 않고 적 충돌 피해 해석 완료, 정적 반사, 전투 종료의 공통 문맥만 전달한다.
+- 아직 구현되지 않은 12종 패시브는 안전한 무효 런타임으로 존재한다. 후속 패시브는 슬롯 런타임의
+  `update`, `abilityUsed`, `enemyCollisionResolved`, `staticBounce`, `validMovement`, `battleEnded`를 구현한다.
+  추가 피해는 `dealEquipmentDamage` 경계를 사용해 장비 발생 메타데이터를 남기며 장비 사건을 재귀 전달하지 않는다.
+
+완성 장비 12종의 실제 패시브 계산과 VFX는 후속 체크포인트가 소유한다.

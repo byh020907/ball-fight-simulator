@@ -12,6 +12,7 @@ import { MobAppearance } from "./mobAppearance.js";
 import { drawEquipmentItems, getCharacterOutlineWidth } from "./equipmentVisuals.js";
 import { applyHeroOrbCarryoverToBattleBall, mergeHeroOrbCarryover, HERO_ORB_CARRYOVER_RATE } from "./heroOrb.js";
 import { createEquipmentCombatEffects } from "../hunting/equipmentEffects.js";
+import { createCombatEquipmentSet } from "../hunting/equipmentRuntime.js";
 import { getElementalWetDefenseReduction } from "../effects/elementalWetState.js";
 import { applyDefenseToDamage } from "../combatStatScaling.js";
 import { AbilitySet } from "../abilities/abilitySet.js";
@@ -104,6 +105,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             items: Array.isArray(spec.equipment?.equippedItems) ? spec.equipment.equippedItems : []
         };
         this.equipmentEffects = createEquipmentCombatEffects(this.equipment.items);
+        this.combatEquipment = createCombatEquipmentSet(this, spec.equipment?.equippedTemplateIds);
         this.mass *= this.equipmentEffects.massMultiplier;
         this.stats.mass = this.mass;
         this._equipmentEffectCooldowns = new CooldownBank({ [EQUIPMENT_EFFECT_COOLDOWN_KEYS.hpSteal]: 0 });
@@ -412,9 +414,15 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
         }
 
         this.radius = this.stats.baseRadius * this.abilities.getRadiusScale();
+        const positionBeforeMovement = this.position.clone();
         this._applyVelocityCorrection(simulation, delta);
         this.integrate(delta);
         simulation.keepInsideArena(this);
+        const movementDistance = this.position.clone().subtract(positionBeforeMovement).length();
+        if (movementDistance > 0) {
+            this.combatEquipment.validMovement({ distance: movementDistance, source: "physics", simulation });
+        }
+        this.combatEquipment.update(delta, { simulation });
         if (this.bounced) this.state.forcedHeading = null;
         if (this.rotationEnabled) {
             this.integrateRotation(delta);

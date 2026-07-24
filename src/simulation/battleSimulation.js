@@ -515,8 +515,12 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         damageFromAToB = a.abilities.modifyOutgoingFighterCollisionDamage(damageFromAToB, b, context);
         damageFromBToA = b.abilities.modifyOutgoingFighterCollisionDamage(damageFromBToA, a, context);
 
-        const damageToA = damageFromBToA > 0 ? a.takeDamage(damageFromBToA, b, "Crash").actualDamage : 0;
-        const damageToB = damageFromAToB > 0 ? b.takeDamage(damageFromAToB, a, "Crash").actualDamage : 0;
+        context.targetHpRatioBeforeA = a.maxHp > 0 ? a.hp / a.maxHp : 0;
+        context.targetHpRatioBeforeB = b.maxHp > 0 ? b.hp / b.maxHp : 0;
+        context.damageResultToA = damageFromBToA > 0 ? a.takeDamage(damageFromBToA, b, "Crash") : null;
+        context.damageResultToB = damageFromAToB > 0 ? b.takeDamage(damageFromAToB, a, "Crash") : null;
+        const damageToA = context.damageResultToA?.actualDamage ?? 0;
+        const damageToB = context.damageResultToB?.actualDamage ?? 0;
 
         context.damageFromAToB = damageToB;
         context.damageFromBToA = damageToA;
@@ -612,6 +616,24 @@ export class BattleSimulation extends FighterPhysicsSimulation {
 
         a.abilities.onFighterCollisionDamageResolved(b, context.damageFromAToB, context);
         b.abilities.onFighterCollisionDamageResolved(a, context.damageFromBToA, context);
+        a.combatEquipment?.enemyCollisionResolved({
+            attacker: a,
+            target: b,
+            contactPoint,
+            actualDamage: context.damageFromAToB,
+            isCritical: context.damageResultToB?.isCritical ?? false,
+            targetHpRatioBefore: context.targetHpRatioBeforeB,
+            simulation: this
+        });
+        b.combatEquipment?.enemyCollisionResolved({
+            attacker: b,
+            target: a,
+            contactPoint,
+            actualDamage: context.damageFromBToA,
+            isCritical: context.damageResultToA?.isCritical ?? false,
+            targetHpRatioBefore: context.targetHpRatioBeforeA,
+            simulation: this
+        });
         this._handleDashCollisions(a, b, contactPoint);
 
         a.abilities.onCollision(b, { contactPoint });
@@ -625,6 +647,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
     }
 
     notifyFighterStaticCollision(fighter, context) {
+        fighter.combatEquipment?.staticBounce({ fighter, ...context, simulation: this });
         for (const observer of this.fighters) {
             observer.abilities.onFighterStaticCollision(fighter, context);
         }
@@ -897,6 +920,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         this.resultReady = false;
         for (const fighter of this.fighters) {
             fighter.abilities.onBattleEnded?.({ winner, simulation: this });
+            fighter.combatEquipment?.battleEnded({ winner, simulation: this });
             fighter.freezeForResult();
         }
         for (const loser of this.fighters.filter(

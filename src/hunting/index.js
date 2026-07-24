@@ -18,6 +18,7 @@ export * from "./huntingEvents.js";
 export * from "./chestRewards.js";
 export * from "./equipmentConfig.js";
 export * from "./equipmentEffects.js";
+export * from "./equipmentRuntime.js";
 export * from "./huntingMerchant.js";
 export * from "./huntingFormat.js";
 export * from "./huntingLoot.js";

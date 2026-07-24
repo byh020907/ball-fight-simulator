@@ -155,6 +155,13 @@ export function getEquippedEquipmentTemplates(profile) {
     return (getEquipped(profile) ?? []).map((templateId) => getEquipmentTemplate(templateId)).filter(Boolean);
 }
 
+export function getEquippedEquipmentTemplateIds(profile) {
+    return Array.from({ length: EQUIPMENT_SLOT_COUNT }, (_, slotIndex) => {
+        const templateId = getEquipped(profile)?.[slotIndex];
+        return getEquipmentTemplate(templateId) ? templateId : null;
+    });
+}
+
 export function getEquippedEquipmentStats(profile) {
     return getEquippedEquipmentTemplates(profile).reduce((stats, template) => {
         for (const [stat, value] of Object.entries(template.stats)) stats[stat] = (stats[stat] ?? 0) + value;

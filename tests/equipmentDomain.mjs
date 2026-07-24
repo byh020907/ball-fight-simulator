@@ -11,10 +11,24 @@ import {
     craftEquipmentTemplate,
     equipEquipmentTemplate,
     getEquipmentRecipePreview,
+    getEquippedEquipmentTemplateIds,
     getEquippedEquipmentStats,
     removeEquipmentQuantity,
     sortEquipmentInventory
 } from "../src/hunting/equipmentInventory.js";
+import {
+    CombatEquipmentSet,
+    EquipmentChargeStore,
+    EquipmentCooldown,
+    EquipmentMovementDistanceTracker,
+    EquipmentTimedWindow
+} from "../src/hunting/equipmentRuntime.js";
+import { Ability } from "../src/abilities/ability.js";
+import { AbilitySet } from "../src/abilities/abilitySet.js";
+import { applyEquipmentStats } from "../src/hunting/equipmentConfig.js";
+import { createRoster } from "../src/roster.js";
+import { BattleBall } from "../src/entities/battleBall.js";
+import { Vector2 } from "../src/core.js";
 
 assert.equal(EQUIPMENT_TEMPLATES.length, 39);
 assert.deepEqual(
@@ -76,5 +90,103 @@ assert.deepEqual(persistedEquipment, {
     equipped: ["attack_sword", null, null, null, null, null]
 });
 assert.equal(/"(stats|recipe|passive)"/.test(JSON.stringify(persistedEquipment)), false);
+
+const runtimeOwner = { id: "runtime-owner" };
+const duplicateRuntimeSet = new CombatEquipmentSet(runtimeOwner, ["attack_sword", "attack_sword"]);
+assert.equal(duplicateRuntimeSet.activeRuntimes.length, 2);
+assert.notEqual(duplicateRuntimeSet.runtimes[0], duplicateRuntimeSet.runtimes[1]);
+assert.notEqual(duplicateRuntimeSet.runtimes[0].charge, duplicateRuntimeSet.runtimes[1].charge);
+duplicateRuntimeSet.runtimes[0].charge.gain();
+assert.equal(duplicateRuntimeSet.runtimes[0].charge.current, 1);
+assert.equal(duplicateRuntimeSet.runtimes[1].charge.current, 0);
+
+const completedRuntimeSet = new CombatEquipmentSet(runtimeOwner, ["completed_ability_crit", "completed_vital_heat"]);
+assert.notEqual(completedRuntimeSet.runtimes[0].cooldown, completedRuntimeSet.runtimes[1].cooldown);
+assert.equal(completedRuntimeSet.runtimes[0].template, getEquipmentTemplate("completed_ability_crit"));
+
+const charge = new EquipmentChargeStore({ maximum: 2, initial: 1 });
+assert.equal(charge.gain(3), 1);
+assert.equal(charge.consume(2), true);
+const cooldown = new EquipmentCooldown(2);
+assert.equal(cooldown.ready, true);
+cooldown.trigger();
+cooldown.tick(2);
+assert.equal(cooldown.ready, true);
+const window = new EquipmentTimedWindow();
+window.open(1);
+window.tick(1);
+assert.equal(window.active, false);
+const distance = new EquipmentMovementDistanceTracker(10);
+assert.equal(distance.add(12, "teleport"), false);
+assert.equal(distance.distance, 0);
+assert.equal(distance.add(10, "dash"), true);
+assert.equal(distance.consumeThreshold(), true);
+
+const observedEvents = [];
+const observedRuntime = completedRuntimeSet.runtimes[0];
+observedRuntime.passive = Object.fromEntries(
+    ["update", "abilityUsed", "enemyCollisionResolved", "staticBounce", "validMovement", "battleEnded"].map(
+        (eventName) => [eventName, () => observedEvents.push(eventName)]
+    )
+);
+completedRuntimeSet.update(0.1, {});
+completedRuntimeSet.abilityUsed({});
+completedRuntimeSet.enemyCollisionResolved({});
+completedRuntimeSet.staticBounce({});
+completedRuntimeSet.validMovement({});
+completedRuntimeSet.battleEnded({});
+assert.deepEqual(observedEvents, [
+    "update",
+    "abilityUsed",
+    "enemyCollisionResolved",
+    "staticBounce",
+    "validMovement",
+    "battleEnded"
+]);
+
+let equipmentDamageOptions = null;
+const damageTarget = {
+    takeDamage(_amount, _source, _label, options) {
+        equipmentDamageOptions = options;
+        completedRuntimeSet.enemyCollisionResolved({ damage: options.equipmentDamage });
+        return { actualDamage: 3, absorbedDamage: 0, isCritical: false };
+    }
+};
+assert.equal(completedRuntimeSet.dealEquipmentDamage(damageTarget, 3).actualDamage, 3);
+assert.equal(equipmentDamageOptions.equipmentDamage.origin, "equipment");
+assert.equal(observedEvents.filter((eventName) => eventName === "enemyCollisionResolved").length, 1);
+
+const abilityOwner = { combatEquipment: { abilityUsed: () => observedEvents.push("ability-used-once") } };
+const ability = new Ability(abilityOwner, {}, 1);
+new AbilitySet(abilityOwner, { primary: ability });
+ability.setCooldownRemaining(0);
+ability.resetCooldown();
+ability.setCooldownRemaining(0);
+ability.tickStandby(0.1);
+assert.equal(observedEvents.filter((eventName) => eventName === "ability-used-once").length, 1);
+
+assert.deepEqual(getEquippedEquipmentTemplateIds({ equipment: persistedEquipment }), [
+    "attack_sword",
+    null,
+    null,
+    null,
+    null,
+    null
+]);
+assert.equal(
+    /"(stats|recipe|passive(Id)?|cooldown|charge|timer|distance)"/.test(JSON.stringify(persistedEquipment)),
+    false
+);
+
+const combatProfile = createDefaultPlayerProfile();
+addEquipmentQuantity(combatProfile, "attack_sword", 2);
+equipEquipmentTemplate(combatProfile, "attack_sword", 0);
+equipEquipmentTemplate(combatProfile, "attack_sword", 1);
+const combatSpec = applyEquipmentStats(createRoster()[0], combatProfile);
+const firstBattleBall = new BattleBall(combatSpec, new Vector2(0, 0));
+const secondBattleBall = new BattleBall(combatSpec, new Vector2(0, 0));
+assert.equal(firstBattleBall.combatEquipment.activeRuntimes.length, 2);
+assert.notEqual(firstBattleBall.combatEquipment.runtimes[0], firstBattleBall.combatEquipment.runtimes[1]);
+assert.notEqual(firstBattleBall.combatEquipment.runtimes[0], secondBattleBall.combatEquipment.runtimes[0]);
 
 console.log("[equipment-domain] ok");
