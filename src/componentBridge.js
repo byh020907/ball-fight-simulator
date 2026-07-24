@@ -1,20 +1,14 @@
-import {
-    equipEquipmentItem,
-    expandInventory as expandEquipmentInventory,
-    sellEquipment,
-    fuseEquipment,
-    enhanceEquipment,
-    recoverEquipmentEnhancement,
-    getCharacterEquipmentLevel,
-    getEquipmentRequiredLevel
-} from "./hunting/equipmentConfig.js";
 import { openHuntingChest } from "./hunting/chestRewards.js";
 import {
     buyDailyShopChest as purchaseDailyShopChest,
     rerollDailyShop as refreshDailyShopOffer
 } from "./hunting/dailyShop.js";
 import { savePlayerProfile } from "./playerProfile.js";
-import { unequipEquipmentTemplate } from "./hunting/equipmentInventory.js";
+import {
+    craftEquipmentTemplate,
+    equipEquipmentTemplate,
+    unequipEquipmentTemplate
+} from "./hunting/equipmentInventory.js";
 import { PopupService } from "./popup.js";
 import { HELP_TITLE, HELP_CONTENT } from "./helpContent.js";
 import { CollectionHubService } from "./collectionHubService.js";
@@ -34,16 +28,6 @@ import {
 
 export function createComponentBridge(app) {
     const elementalistVfxPreview = new ElementalistVfxPreviewController();
-
-    function showLevelLockPopup(item) {
-        const requiredLevel = getEquipmentRequiredLevel(item);
-        const charLevel = getCharacterEquipmentLevel(app.playerProfile, app.playerFighterId);
-        PopupService.show({
-            title: "레벨 부족",
-            bodyHtml: `<p>요구 레벨: ${requiredLevel}<br>현재 레벨: ${charLevel}</p>`,
-            buttons: [{ text: "확인", value: "ok", primary: true }]
-        });
-    }
 
     function refreshCollectionAndProfile() {
         app._refreshCollectionHub();
@@ -140,98 +124,21 @@ export function createComponentBridge(app) {
         },
 
         // ── Equipment actions ──
-        expandInventory() {
-            const profile = app.playerProfile;
-            const result = expandEquipmentInventory(profile);
-            if (result) {
-                refreshCollectionAndProfile();
-            } else {
-                PopupService.show({
-                    title: "확장 불가",
-                    bodyHtml: `<p>파편이 부족하거나 최대 인벤토리입니다.</p>`,
-                    buttons: [{ text: "확인", value: "ok", primary: true }]
-                });
-            }
+        equipEquipmentTemplate(templateId, slotIndex = null) {
+            const result = equipEquipmentTemplate(app.playerProfile, templateId, slotIndex);
+            if (result.ok) refreshCollectionAndProfile();
             return result;
         },
 
-        equipItem(instanceId) {
-            const profile = app.playerProfile;
-            const result = equipEquipmentItem(profile, instanceId, app.playerFighterId);
-            if (!result) return;
-            if (result.error === "level") {
-                showLevelLockPopup(result.item);
-                return;
-            }
-            if (result.error === "slot_full") {
-                PopupService.show({
-                    title: "슬롯 부족",
-                    bodyHtml: `<p>해당 슬롯이 이미 찼습니다.</p>`,
-                    buttons: [{ text: "확인", value: "ok", primary: true }]
-                });
-                return;
-            }
-            refreshCollectionAndProfile();
-        },
-
-        unequipItem(instanceId) {
-            const profile = app.playerProfile;
-            const eq = profile?.equipment;
-            if (!eq) return;
-            if (!Array.isArray(eq.inventory)) {
-                const slotIndex = eq.equipped?.findIndex((templateId) => templateId === instanceId) ?? -1;
-                const result = unequipEquipmentTemplate(profile, slotIndex);
-                if (result.ok) refreshCollectionAndProfile();
-                return result;
-            }
-            const equipped = eq.equipped ?? {};
-            for (const slot of Object.keys(equipped)) {
-                if (equipped[slot] === instanceId) {
-                    equipped[slot] = null;
-                    refreshCollectionAndProfile();
-                    return;
-                }
-            }
-        },
-
-        async enhanceItem(instanceId) {
-            const profile = app.playerProfile;
-            const result = enhanceEquipment(profile, instanceId);
-            if (!result) return;
-            if (!result.error) {
-                refreshCollectionAndProfile();
-            }
-            result.canRecover = result.recoverable && (profile.equipment?.enhancementStones ?? 0) > 0;
-            const choice = await PopupService.show(createCollectionActionPopupOptions("enhance", result));
-            if (choice === "recover") {
-                const recoveryResult = recoverEquipmentEnhancement(profile, result.recovery);
-                if (recoveryResult?.restored) {
-                    refreshCollectionAndProfile();
-                    await PopupService.show(createCollectionActionPopupOptions("enhanceRecovery", recoveryResult));
-                }
-            }
+        unequipEquipmentSlot(slotIndex) {
+            const result = unequipEquipmentTemplate(app.playerProfile, slotIndex);
+            if (result.ok) refreshCollectionAndProfile();
             return result;
         },
 
-        fuseEquipmentItems(sourceInstanceIds) {
-            const profile = app.playerProfile;
-            const result = fuseEquipment(profile, sourceInstanceIds);
-            if (result && !result.error) {
-                refreshCollectionAndProfile();
-            }
-            if (result) {
-                PopupService.show(createCollectionActionPopupOptions("fusion", result));
-            }
-            return result;
-        },
-
-        sellItem(instanceId) {
-            const profile = app.playerProfile;
-            const result = sellEquipment(profile, instanceId);
-            if (result) {
-                refreshCollectionAndProfile();
-                PopupService.show(createCollectionActionPopupOptions("sell", result));
-            }
+        craftEquipmentTemplate(templateId) {
+            const result = craftEquipmentTemplate(app.playerProfile, templateId);
+            if (result.ok) refreshCollectionAndProfile();
             return result;
         },
 

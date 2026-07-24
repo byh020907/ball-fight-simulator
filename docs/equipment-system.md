@@ -49,6 +49,14 @@ equipment: {
 
 기존 상자·업적 보상이 새 UI로 옮겨가기 전에는 `src/hunting/equipmentLegacyAdapter.js`가 레거시 보상 객체를 기초 템플릿 수량으로 한 번 변환한다. 이 adapter는 레거시 인스턴스나 무작위 장비를 새 인벤토리에 만들지 않는다.
 
-## 범위 경계
+## 컬렉션 장비 화면
 
-이번 단계는 장비 카드·인벤토리 화면·전투 스탯 적용·12종 패시브 런타임을 구현하지 않는다. 완료 장비의 `passiveId`와 원시 스탯 합계만 다음 단계의 UI 및 `CombatEquipmentSet` 경계에 제공한다.
+컬렉션 허브의 `장비` 탭은 수량형 인벤토리를 직접 조작하지 않는 presentation 화면이다.
+
+- 공용 장착 슬롯 6개와 39종 카탈로그를 기초·중간·완성 순서로 표시한다.
+- 카드에는 Canvas `x-equipment-icon-tag`, 정식명, 보유 수량, 원시 스탯을 보이고, 선택한 카드의 상세 영역에서 재료 `보유/필요`, 조합 비용과 결과 스탯을 확인한다.
+- 기초 장비는 보유 수량과 빈 슬롯이 있을 때 장착한다. 중간·완성 장비는 재료와 파편이 모두 있을 때 같은 상세 영역의 `조합`으로 만든 뒤 즉시 수량을 갱신한다.
+- 조합 실패는 `missing ingredients`, `missing shards`, `capacity`, `recipe` 도메인 이유를 화면 문구로만 변환한다. UI는 재료·수량·파편을 직접 변경하지 않는다.
+- `BallFightComponentBridge`의 공개 경계는 `equipEquipmentTemplate(templateId, slotIndex?)`, `unequipEquipmentSlot(slotIndex)`, `craftEquipmentTemplate(templateId)` 세 명령이다.
+
+강화, 판매, 랜덤 합성, 상점, 인벤토리 확장과 등급/장비 유형 전용 슬롯은 이 화면에 제공하지 않는다. 전투 스탯 적용과 12종 완성 패시브 런타임도 후속 체크포인트 범위다.

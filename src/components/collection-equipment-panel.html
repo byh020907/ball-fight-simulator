@@ -1,409 +1,71 @@
-<div
-    x-data="collectionEquipmentPanel"
-    @keydown.escape.window="closeSpecialTooltip()"
-    @click.outside="closeSpecialTooltip()"
->
-    <div class="ch-content" x-show="state.activeTab === 'equipment'" role="tabpanel">
-        <div class="ch-toolbar">
-            <span class="ch-toolbar-title">장비 인벤토리</span>
-            <span class="ch-storage-currency">파편 <b x-text="state.equipment.shards"></b></span>
-            <span class="ch-storage-currency">강화석 <b x-text="state.equipment.enhancementStones"></b></span>
-            <button class="ch-btn" type="button" @click="openFusion()">합성</button>
-            <button class="ch-btn ch-shop-button" type="button" @click="openShop()">상점</button>
-        </div>
-        <div class="ch-equip-slots">
-            <h4>장착 슬롯</h4>
-            <div class="ch-equip-slot-grid">
-                <template
-                    x-for="(slotName, slotId) in { weapon: '무기', armor: '방어구', accessory1: '장신구1', accessory2: '장신구2' }"
-                >
-                    <div class="ch-equip-slot-card">
-                        <div class="ch-equip-slot-label" x-text="slotName"></div>
-                        <div class="ch-equip-slot-item" x-text="state.equipment.equippedSlots[slotId] || '—'"></div>
-                    </div>
-                </template>
-            </div>
-            <div class="ch-equip-inventory-summary">
-                <span
-                    >인벤토리 <b x-text="state.equipment.inventoryUsed"></b>/<b
-                        x-text="state.equipment.inventorySlots"
-                    ></b
-                ></span>
-                <button
-                    class="ch-btn"
-                    x-show="state.equipment.canExpand"
-                    @click="expandInventory()"
-                    x-text="`확장 (파편 ${state.equipment.expandCost} · +${state.equipment.expandGain}칸)`"
-                ></button>
-                <span
-                    x-show="!state.equipment.canExpand && state.equipment.inventoryUsed >= state.equipment.inventorySlots"
-                    class="ch-equip-inventory-full"
-                    >가득 참 — 장비를 판매하거나 확장하세요</span
-                >
-            </div>
-        </div>
-        <div class="ch-equip-list" @scroll="closeSpecialTooltip()">
-            <h4>보유 장비</h4>
-            <template x-for="item in state.equipment.items" :key="item.instanceId">
-                <div class="ch-equip-card" x-bind:class="'ch-equip--' + item.rarity">
-                    <div class="ch-equip-card-header">
-                        <strong x-text="item.name"></strong>
-                        <span class="ch-equip-rarity" x-text="item.rarityLabel"></span>
-                        <span class="ch-equip-slot-badge" x-text="'Lv.' + item.requiredLevel"></span>
-                        <span class="ch-equip-slot-badge" x-text="item.slot"></span>
-                        <span
-                            class="ch-equip-enhance"
-                            x-show="item.enhanceLevel > 0"
-                            x-text="`+${item.enhanceLevel}${item.enhanceLevel >= item.maxEnhanceLevel ? ' MAX' : ''} · ×${item.enhanceMultiplier}`"
-                        ></span>
-                    </div>
-                    <div class="ch-equip-card-stats">
-                        <template x-for="stat in item.stats">
-                            <span class="ch-equip-stat" x-text="stat.label + ' +' + stat.enhancedValue"></span>
-                        </template>
-                        <template x-if="item.specialOptions.length > 0">
-                            <div class="ch-equip-special-list">
-                                <span class="ch-equip-special-prefix">특수:</span>
-                                <template x-for="option in item.specialOptions" :key="option.type">
-                                    <span
-                                        class="ch-equip-special-option"
-                                        tabindex="0"
-                                        x-bind:aria-label="`${option.label} +${option.value}%. ${option.description}`"
-                                        x-bind:aria-describedby="specialTooltip.id === specialTooltipId(item, option) ? specialTooltip.id : null"
-                                        @mouseenter="openSpecialTooltip(item, option, $el)"
-                                        @mouseleave="closeSpecialTooltip()"
-                                        @focus="openSpecialTooltip(item, option, $el)"
-                                        @blur="closeSpecialTooltip()"
-                                        @click="openSpecialTooltip(item, option, $el)"
-                                    >
-                                        <span
-                                            class="ch-equip-stat ch-equip-stat--special"
-                                            x-text="option.label + ' +' + option.value + '%'"
-                                        ></span>
-                                    </span>
-                                </template>
-                            </div>
-                        </template>
-                    </div>
-                    <div class="ch-equip-card-actions">
-                        <button
-                            x-show="!item.isEquipped"
-                            class="ch-btn"
-                            x-bind:disabled="!item.canEquip"
-                            @click="equipItem(item.instanceId)"
-                            x-text="item.canEquip ? '장착' : `잠김 Lv.${item.requiredLevel}`"
-                        ></button>
-                        <button
-                            x-show="item.isEquipped"
-                            class="ch-btn ch-btn--danger"
-                            @click="unequipItem(item.instanceId)"
-                            x-text="'해제'"
-                        ></button>
-                        <button
-                            class="ch-btn"
-                            x-show="item.canEnhance"
-                            @click="enhanceItem(item.instanceId)"
-                            x-text="`강화 +${item.enhanceLevel}→+${item.enhanceLevel + 1} · 파편 ${item.enhanceCost.shards} · 실패 ${Math.round(item.enhanceFailureRate * 100)}%`"
-                        ></button>
-                        <button
-                            class="ch-btn"
-                            @click="sellItem(item.instanceId)"
-                            x-text="`판매 · 파편 +${item.sellReward} · 강화석 ${Math.round(item.sellStoneReward.chance * 100)}%${item.sellStoneReward.count > 1 ? ' ×' + item.sellStoneReward.count : ''}`"
-                        ></button>
-                    </div>
-                </div>
+<div x-data="collectionEquipmentPanel" class="ch-equipment-panel">
+    <div class="ch-equipment-toolbar"><strong>장비</strong><span>파편 <b x-text="state.summary.shards"></b></span></div>
+    <section class="ch-equipment-slots" aria-label="장착 슬롯">
+        <h4>공용 장착 슬롯</h4>
+        <div class="ch-equipment-slot-grid">
+            <template x-for="slot in state.equipment.slots" :key="slot.index">
+                <button class="ch-equipment-slot" type="button" @click="unequip(slot.index)" :disabled="!slot.templateId">
+                    <canvas x-show="slot.iconTag" x-equipment-icon-tag="slot.iconTag" aria-hidden="true"></canvas>
+                    <span x-text="slot.name || '빈 슬롯'"></span>
+                </button>
             </template>
-            <div class="ch-empty" x-show="state.equipment.items.length === 0">보유한 장비가 없습니다</div>
         </div>
+    </section>
+    <div class="ch-equipment-catalog" role="region" aria-label="장비 목록">
+        <template x-for="tier in state.equipment.tiers" :key="tier.id">
+            <section class="ch-equipment-tier">
+                <h4 x-text="tier.label"></h4>
+                <div class="ch-equipment-card-grid">
+                    <template x-for="item in tier.templates" :key="item.id">
+                        <article class="ch-equipment-card" :class="{ 'is-selected': selectedId === item.id }" @click="select(item.id)">
+                            <canvas x-equipment-icon-tag="item.iconTag" aria-hidden="true"></canvas>
+                            <div class="ch-equipment-card-copy"><strong x-text="item.name"></strong><span x-text="`보유 ${item.count}`"></span></div>
+                            <div class="ch-equipment-stats"><template x-for="stat in item.stats" :key="stat.id"><span x-text="`${stat.label} +${stat.value}`"></span></template></div>
+                        </article>
+                    </template>
+                </div>
+            </section>
+        </template>
     </div>
-    <template x-teleport="body">
-        <div
-            class="ch-equip-special-tooltip"
-            x-cloak
-            x-show="specialTooltip.visible"
-            x-ref="specialTooltip"
-            x-bind:id="specialTooltip.id"
-            x-bind:style="specialTooltip.style"
-            x-text="specialTooltip.description"
-            role="tooltip"
-        ></div>
-    </template>
+    <aside class="ch-equipment-detail" x-show="selected" x-cloak>
+        <template x-if="selected"><div>
+            <div class="ch-equipment-detail-heading"><canvas x-equipment-icon-tag="selected.iconTag" aria-hidden="true"></canvas><div><h4 x-text="selected.name"></h4><span x-text="selected.tierLabel"></span></div></div>
+            <p><template x-for="stat in selected.stats" :key="stat.id"><span class="ch-equipment-stat" x-text="`${stat.label} +${stat.value}`"></span></template></p>
+            <template x-if="selected.recipe"><div class="ch-equipment-recipe"><p x-text="`조합 비용: 파편 ${selected.recipe.cost}`"></p><template x-for="ingredient in selected.recipe.ingredients" :key="ingredient.id"><span x-text="`${ingredient.name} ${ingredient.owned}/${ingredient.required}`"></span></template><p class="ch-equipment-missing" x-show="selected.recipe.missingReason" x-text="craftMessage(selected.recipe.missingReason)"></p><button class="ch-btn" type="button" :disabled="!selected.recipe.canCraft" @click="craft(selected.id)">조합</button></div></template>
+            <template x-if="!selected.recipe"><button class="ch-btn" type="button" :disabled="selected.count === 0 || slotsFull" @click="equip(selected.id)">장착</button></template>
+            <p class="ch-equipment-feedback" x-show="feedback" x-text="feedback"></p>
+        </div></template>
+    </aside>
 </div>
 
 <script>
-    window.createGameUI("collectionEquipmentPanel", () => {
-        function getCollectionHub() {
-            return Alpine.store("uiManager").requireComponent("collectionHub");
-        }
-
-        function invokeGameAction(actionName, ...args) {
-            return Alpine.store("uiManager").invokeGameAction(actionName, ...args);
-        }
-
-        return {
-            specialTooltip: {
-                visible: false,
-                id: "",
-                description: "",
-                placement: "below",
-                style: ""
-            },
-            get state() {
-                return getCollectionHub().state;
-            },
-            specialTooltipId(item, option) {
-                return `equipment-special-tooltip-${item.instanceId}-${option.type}`;
-            },
-            openSpecialTooltip(item, option, anchor) {
-                const rect = anchor.getBoundingClientRect();
-                const viewportMargin = 8;
-                const tooltipId = this.specialTooltipId(item, option);
-
-                this.specialTooltip = {
-                    visible: true,
-                    id: tooltipId,
-                    description: option.description,
-                    placement: "below",
-                    style: `left: ${viewportMargin}px; top: ${rect.bottom + 6}px; visibility: hidden;`
-                };
-
-                this.$nextTick(() => {
-                    if (!this.specialTooltip.visible || this.specialTooltip.id !== tooltipId) return;
-
-                    const tooltip = this.$refs.specialTooltip;
-                    if (!tooltip) return;
-
-                    const tooltipRect = tooltip.getBoundingClientRect();
-                    const viewportWidth = document.documentElement.clientWidth;
-                    const viewportHeight = document.documentElement.clientHeight;
-                    const maxLeft = Math.max(viewportMargin, viewportWidth - tooltipRect.width - viewportMargin);
-                    const maxTop = Math.max(viewportMargin, viewportHeight - tooltipRect.height - viewportMargin);
-                    const canFitBelow = rect.bottom + 6 + tooltipRect.height <= viewportHeight - viewportMargin;
-                    const canFitAbove = rect.top - 6 - tooltipRect.height >= viewportMargin;
-                    const placement = canFitBelow || !canFitAbove ? "below" : "above";
-                    const top = placement === "below" ? rect.bottom + 6 : rect.top - 6 - tooltipRect.height;
-
-                    this.specialTooltip = {
-                        ...this.specialTooltip,
-                        placement,
-                        style: `left: ${Math.min(Math.max(viewportMargin, rect.left), maxLeft)}px; top: ${Math.min(
-                            Math.max(viewportMargin, top),
-                            maxTop
-                        )}px;`
-                    };
-                });
-            },
-            closeSpecialTooltip() {
-                this.specialTooltip.visible = false;
-            },
-            openFusion() {
-                return Alpine.store("uiManager").requireComponent("collectionFusionDialog").show();
-            },
-            openShop() {
-                return Alpine.store("uiManager").requireComponent("collectionShopPanel").show();
-            },
-            expandInventory() {
-                return invokeGameAction("expandInventory");
-            },
-            equipItem(instanceId) {
-                return invokeGameAction("equipItem", instanceId);
-            },
-            unequipItem(instanceId) {
-                return invokeGameAction("unequipItem", instanceId);
-            },
-            enhanceItem(instanceId) {
-                return invokeGameAction("enhanceItem", instanceId);
-            },
-            sellItem(instanceId) {
-                return invokeGameAction("sellItem", instanceId);
-            }
-        };
-    });
+    window.createGameUI("collectionEquipmentPanel", () => ({
+        selectedId: null,
+        feedback: "",
+        get state() { return Alpine.store("uiManager").requireComponent("collectionHub").state; },
+        get selected() { return this.state.equipment.tiers.flatMap((tier) => tier.templates).find((item) => item.id === this.selectedId) ?? null; },
+        get slotsFull() { return this.state.equipment.slots.every((slot) => slot.templateId); },
+        select(id) { this.selectedId = id; this.feedback = ""; },
+        craftMessage(reason) { return ({ "missing ingredients": "재료가 부족합니다.", "missing shards": "파편이 부족합니다.", capacity: "보유 한도에 도달했습니다.", recipe: "조합법이 없습니다." })[reason] ?? "조합할 수 없습니다."; },
+        equip(templateId) { const result = Alpine.store("uiManager").invokeGameAction("equipEquipmentTemplate", templateId); this.feedback = result.ok ? "장착했습니다." : "장착할 수 없습니다. 빈 슬롯 또는 보유 수량을 확인하세요."; },
+        unequip(slotIndex) { const result = Alpine.store("uiManager").invokeGameAction("unequipEquipmentSlot", slotIndex); if (result.ok) this.feedback = "장착을 해제했습니다."; },
+        craft(templateId) { const result = Alpine.store("uiManager").invokeGameAction("craftEquipmentTemplate", templateId); this.feedback = result.ok ? "조합했습니다." : this.craftMessage(result.reason ?? result.preview?.missingReason); }
+    }));
 </script>
 
 <style scoped>
-    .ch-equip-slots {
-        margin-bottom: 16px;
-        padding: 8px 8px 0;
-        flex-shrink: 0;
-    }
+    .ch-equipment-panel { min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(16rem, 0.7fr); grid-template-rows: auto minmax(0, 1fr); gap: 12px; padding: 8px; }
+    .ch-equipment-toolbar { grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; }
+    .ch-equipment-slots { grid-column: 1 / -1; min-width: 0; }.ch-equipment-slot-grid,.ch-equipment-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: 8px; }.ch-equipment-slot,.ch-equipment-card { min-width: 0; border: 2px solid #202020; border-radius: 8px; background: #fff; padding: 8px; text-align: left; }.ch-equipment-slot canvas,.ch-equipment-card canvas,.ch-equipment-detail canvas { width: 36px; height: 36px; vertical-align: middle; }.ch-equipment-slot:focus-visible,.ch-equipment-card:focus-visible,.ch-btn:focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }.ch-equipment-catalog { min-width: 0; overflow-y: auto; overscroll-behavior: contain; }.ch-equipment-tier { margin-bottom: 12px; }.ch-equipment-card { cursor: pointer; }.ch-equipment-card.is-selected { border-color: #2563eb; background: #eff6ff; }.ch-equipment-card-copy { min-width: 0; display: inline-flex; flex-direction: column; max-width: calc(100% - 44px); vertical-align: middle; }.ch-equipment-card-copy strong,.ch-equipment-card-copy span,.ch-equipment-recipe span { overflow-wrap: anywhere; }.ch-equipment-stats { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; font-size: .75rem; }.ch-equipment-stat { display: inline-block; margin: 2px; }.ch-equipment-detail { min-width: 0; border: 2px solid #202020; border-radius: 8px; padding: 10px; overflow-y: auto; }.ch-equipment-detail-heading { display: flex; align-items: center; gap: 8px; min-width: 0; }.ch-equipment-detail-heading h4 { overflow-wrap: anywhere; }.ch-equipment-recipe { display: flex; flex-wrap: wrap; gap: 6px; }.ch-equipment-missing { color: #b91c1c; width: 100%; }.ch-equipment-feedback { color: #166534; font-weight: 700; }
+    @media (max-width: 700px) { .ch-equipment-panel { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; }.ch-equipment-toolbar,.ch-equipment-slots { grid-column: auto; }.ch-equipment-detail { max-height: 15rem; }.ch-equipment-card-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); } }
+</style>
 
+<style scoped>
     .ch-equip-list {
         flex: 1;
         min-height: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        padding: 0 8px 8px;
         overflow-y: auto;
-        overscroll-behavior: contain;
         -webkit-overflow-scrolling: touch;
         touch-action: pan-y;
-    }
-
-    .ch-equip-slot-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
-        gap: 8px;
-    }
-
-    .ch-equip-slot-card {
-        border: 2px solid #202020;
-        border-radius: 8px;
-        padding: 8px 10px;
-        background: #fafafa;
-    }
-
-    .ch-equip-slot-label {
-        font-size: 0.7rem;
-        color: #777777;
-        margin-bottom: 2px;
-    }
-
-    .ch-equip-inventory-summary {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-top: 10px;
-        font-size: 0.8rem;
-    }
-
-    .ch-equip-inventory-full {
-        color: #dc2626;
-        font-size: 0.72rem;
-    }
-
-    .ch-equip-card {
-        border: 2px solid #202020;
-        border-radius: 8px;
-        padding: 10px 12px;
-        background: #ffffff;
-    }
-
-    .ch-equip-card-header {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        margin-bottom: 6px;
-    }
-
-    .ch-equip-rarity {
-        font-size: 0.65rem;
-        padding: 1px 6px;
-        border-radius: 4px;
-        background: #eeeeee;
-        color: #555555;
-    }
-
-    .ch-equip-slot-badge {
-        font-size: 0.65rem;
-        padding: 1px 6px;
-        border-radius: 4px;
-        background: #e0e0e0;
-        color: #555555;
-    }
-
-    .ch-equip-card-stats {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px;
-        margin-bottom: 6px;
-    }
-
-    .ch-equip-stat {
-        font-size: 0.72rem;
-        padding: 2px 6px;
-        border-radius: 4px;
-        background: #eef2ff;
-        color: #4338ca;
-    }
-
-    .ch-equip-stat--special {
-        background: #fef3c7;
-        color: #92400e;
-    }
-
-    .ch-equip-special-list {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 4px;
-    }
-
-    .ch-equip-special-prefix {
-        font-size: 0.72rem;
-        color: #92400e;
-    }
-
-    .ch-equip-special-option {
-        display: inline-flex;
-        border-radius: 4px;
-        cursor: help;
-    }
-
-    .ch-equip-special-option:focus-visible {
-        outline: 2px solid #d97706;
-        outline-offset: 2px;
-    }
-
-    .ch-equip-enhance {
-        font-size: 0.7rem;
-        padding: 1px 6px;
-        border-radius: 4px;
-        background: #fbbf24;
-        color: #92400e;
-        font-weight: 800;
-        margin-left: auto;
-    }
-
-    .ch-equip-card-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-    }
-
-    .ch-shop-button {
-        margin-left: auto;
-    }
-
-    .ch-equip--common {
-        border-left: 4px solid #9ca3af;
-    }
-
-    .ch-equip--uncommon {
-        border-left: 4px solid #28a447;
-    }
-
-    .ch-equip--rare {
-        border-left: 4px solid #d4a017;
-    }
-
-    .ch-equip--epic {
-        border-left: 4px solid #a855f7;
-    }
-
-    .ch-equip--legendary {
-        border-left: 4px solid #f59e0b;
-        box-shadow: 0 0 6px rgba(245, 158, 11, 0.3);
-    }
-</style>
-
-<style global>
-    .ch-equip-special-tooltip {
-        position: fixed;
-        z-index: 1000;
-        max-width: min(15rem, calc(100vw - 1rem));
-        max-height: calc(100vh - 1rem);
-        overflow-y: auto;
-        padding: 0.3125rem 0.4375rem;
-        border-radius: 0.3125rem;
-        background: #202020;
-        color: #ffffff;
-        font-size: 0.65rem;
-        font-weight: 500;
-        line-height: 1.35;
-        box-shadow: 0 0.1875rem 0.5rem rgba(0, 0, 0, 0.24);
-        pointer-events: none;
-        transform: translateY(0);
     }
 </style>

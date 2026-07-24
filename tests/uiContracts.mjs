@@ -5,6 +5,8 @@ import {
     getEquipmentSpecialOptionDescription
 } from "../src/hunting/equipmentConfig.js";
 import { createCollectionHubViewModel } from "../src/collection/collectionViewModel.js";
+import { createEquipmentPresentation } from "../src/collection/equipmentPresentation.js";
+import { addEquipmentQuantity } from "../src/hunting/equipmentInventory.js";
 import { createDefaultPlayerProfile } from "../src/playerProfile.js";
 import { createRoster } from "../src/roster.js";
 import { MASTERY_EFFECT_DEFS } from "../src/character-mastery/masteryDefinitions.js";
@@ -44,78 +46,53 @@ function testDisabledHuntingUiIsNotMounted() {
 function testHuntingChestIconReuseContract() {
     const chestIcon = readSource("src/components/chest-icon.html");
     const overlay = readSource("src/components/hunting-overlay.html");
-    const collectionShopPanel = readSource("src/components/collection-shop-panel.html");
     assert.ok(chestIcon.includes('chest-icon[data-rarity="rare"]'), "Chest icon should own rarity color variants");
     assert.ok(overlay.includes("<chest-icon"), "Hunting chest event should render the shared chest icon");
-    assert.ok(
-        collectionShopPanel.includes("ch-shop-chest"),
-        "The shop should render the shared chest icon for its chest offer"
-    );
     console.log("[hunting-chest-icon-reuse] ok");
 }
 
 function testCollectionEquipmentPanelsOwnTheirFlows() {
     const collectionHub = readSource("src/components/collection-hub.html");
     const equipmentPanel = readSource("src/components/collection-equipment-panel.html");
-    const fusionDialog = readSource("src/components/collection-fusion-dialog.html");
-    const shopPanel = readSource("src/components/collection-shop-panel.html");
 
     assert.ok(
         collectionHub.includes(
             "<collection-equipment-panel x-show=\"state.activeTab === 'equipment'\"></collection-equipment-panel>"
-        ) &&
-            collectionHub.includes("<collection-fusion-dialog>") &&
-            collectionHub.includes("<collection-shop-panel>"),
-        "Collection hub should compose the equipment tab, fusion dialog, and shop from dedicated components"
+        ),
+        "Collection hub should compose the equipment tab"
     );
     assert.equal(
-        collectionHub.includes("ch-fusion-modal") || collectionHub.includes("ch-shop-modal"),
+        collectionHub.includes("collection-fusion-dialog") || collectionHub.includes("collection-shop-panel"),
         false,
-        "Collection hub must not retain modal markup after moving it to its owner components"
-    );
-    const equipmentHostRule = collectionHub.match(/collection-equipment-panel\s*\{([^}]*)\}/s)?.[1] ?? "";
-    const equipmentRootRule = collectionHub.match(/collection-equipment-panel\s*>\s*div\s*\{([^}]*)\}/s)?.[1] ?? "";
-    const overlayPanelHostRule =
-        collectionHub.match(/collection-fusion-dialog,\s*collection-shop-panel\s*\{([^}]*)\}/s)?.[1] ?? "";
-    assert.match(
-        equipmentHostRule,
-        /display:\s*flex;[\s\S]*flex:\s*1\s+1\s+0;[\s\S]*min-height:\s*0;/,
-        "The active equipment host must own a shrinkable flex boundary inside the collection frame"
-    );
-    assert.match(
-        equipmentRootRule,
-        /display:\s*flex;[\s\S]*flex:\s*1\s+1\s+0;[\s\S]*min-height:\s*0;/,
-        "The equipment panel root must pass the available height to its scrollable content"
-    );
-    assert.match(
-        overlayPanelHostRule,
-        /display:\s*contents;/,
-        "Overlay-only panel hosts must remain outside the collection frame layout"
+        "Collection hub must not retain legacy equipment-only popup registration"
     );
     assert.ok(
         equipmentPanel.includes('window.createGameUI("collectionEquipmentPanel"') &&
             equipmentPanel.includes('requireComponent("collectionHub")') &&
-            equipmentPanel.includes('invokeGameAction("equipItem", instanceId)') &&
-            equipmentPanel.includes('requireComponent("collectionFusionDialog").show()') &&
-            equipmentPanel.includes('requireComponent("collectionShopPanel").show()'),
-        "Equipment panel should render shared hub state and route its own equipment actions through uiManager"
-    );
-    assert.ok(
-        fusionDialog.includes('window.createGameUI("collectionFusionDialog"') &&
-            fusionDialog.includes('invokeGameAction("fuseEquipmentItems", sourceInstanceIds)') &&
-            fusionDialog.includes("function recommendedItems()") &&
-            fusionDialog.includes("function hide()"),
-        "Fusion dialog should own its visibility and recommended-material lifecycle"
-    );
-    assert.ok(
-        shopPanel.includes('window.createGameUI("collectionShopPanel"') &&
-            shopPanel.includes("rerolling: false") &&
-            shopPanel.includes('invokeGameAction("buyDailyShopChest")') &&
-            shopPanel.includes('invokeGameAction("rerollDailyShop")') &&
-            shopPanel.includes("function playOfferSwapAnimation()"),
-        "Shop panel should own its visibility, countdown, and reroll animation lifecycle"
+            equipmentPanel.includes('invokeGameAction("equipEquipmentTemplate", templateId)') &&
+            equipmentPanel.includes('invokeGameAction("unequipEquipmentSlot", slotIndex)') &&
+            equipmentPanel.includes('invokeGameAction("craftEquipmentTemplate", templateId)'),
+        "Equipment panel should route template actions through uiManager"
     );
     console.log("[collection-equipment-panel-ownership] ok");
+}
+
+function testEquipmentCheckpointPresentation() {
+    const profile = createDefaultPlayerProfile();
+    profile.hunting.shards = 100;
+    addEquipmentQuantity(profile, "attack_sword");
+    const presentation = createEquipmentPresentation(profile);
+    assert.deepEqual(
+        presentation.tiers.map((tier) => tier.templates.length),
+        [15, 12, 12]
+    );
+    assert.equal(presentation.slots.length, 6, "Equipment presentation should expose six shared slots");
+    const sword = presentation.tiers[0].templates.find((template) => template.id === "attack_sword");
+    assert.equal(sword.count, 1, "Presentation should expose owned template counts");
+    assert.equal(sword.iconTag, "attack_sword", "Presentation should pass the registered icon tag through");
+    const crafted = presentation.tiers[1].templates[0];
+    assert.equal(crafted.recipe.missingReason, "missing ingredients", "Recipe failure should be presentation data");
+    console.log("[equipment-checkpoint-presentation] ok");
 }
 
 function testEquipmentSpecialOptionTooltipContract() {
@@ -1719,12 +1696,7 @@ function testNearestEnemyCombatControlUiContract() {
 testDisabledHuntingUiIsNotMounted();
 testHuntingChestIconReuseContract();
 testCollectionEquipmentPanelsOwnTheirFlows();
-testEquipmentSpecialOptionTooltipContract();
-testEquipmentSpecialTooltipInteractionContract();
-testDailyShopPopupContract();
-testFusionEquippedLabelTypographyContract();
-testCollectionEquipmentPanelsShareHubState();
-testEquipmentCurrencyContract();
+testEquipmentCheckpointPresentation();
 testDefenseHelpCopyContract();
 testCollectionDetailContracts();
 testPopupCloseOwnershipContract();

@@ -912,8 +912,6 @@
         </div>
 
         <collection-equipment-panel x-show="state.activeTab === 'equipment'"></collection-equipment-panel>
-        <collection-fusion-dialog></collection-fusion-dialog>
-        <collection-shop-panel></collection-shop-panel>
     </div>
 </div>
 
@@ -947,16 +945,8 @@
             achievementItems: [],
             storage: { shards: 0, chests: [], stats: {} },
             equipment: {
-                items: [],
-                shards: 0,
-                enhancementStones: 0,
-                inventoryUsed: 0,
-                inventorySlots: 5,
-                canExpand: false,
-                expandCost: 0,
-                expandGain: 0,
-                fusion: { sourceItemCount: 3, recipes: [] },
-                equippedSlots: {}
+                slots: [],
+                tiers: []
             },
             showIconLabels: false,
             developer: {
@@ -1046,8 +1036,6 @@
             state.selectedCharacterId = null;
             state.selectedMonsterId = null;
             state.selectedMonsterRegionId = null;
-            Alpine.store("uiManager").requireComponent("collectionFusionDialog").hide();
-            Alpine.store("uiManager").requireComponent("collectionShopPanel").hide();
         }
 
         function setCollectionTab(tabId) {
@@ -1345,13 +1333,8 @@
                 state.masteryItems = vm.masteryItems ?? [];
                 state.achievementItems = vm.achievementItems ?? [];
                 state.equipment = vm.equipment ?? {
-                    items: [],
-                    shards: 0,
-                    enhancementStones: 0,
-                    inventoryUsed: 0,
-                    inventorySlots: 5,
-                    fusion: { sourceItemCount: 3, recipes: [] },
-                    equippedSlots: {}
+                    slots: [],
+                    tiers: []
                 };
                 state.storage = vm.storage ?? {
                     shards: 0,
@@ -1450,9 +1433,16 @@
         overflow: hidden;
     }
 
-    collection-fusion-dialog,
-    collection-shop-panel {
-        display: contents;
+    collection-equipment-panel {
+        display: flex;
+        flex: 1 1 0;
+        min-height: 0;
+    }
+
+    collection-equipment-panel > div {
+        display: flex;
+        flex: 1 1 0;
+        min-height: 0;
     }
 
     collection-equipment-panel {

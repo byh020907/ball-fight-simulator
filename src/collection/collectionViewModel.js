@@ -19,34 +19,11 @@ import {
 } from "../hunting/index.js";
 import { HUNTING_EVENT_TYPES, HUNTING_MAX_FLOOR, HUNTING_STAGES } from "../hunting/huntingConfig.js";
 import { getRarityLabel } from "../hunting/rarityPresentation.js";
-import {
-    getInventorySlots,
-    getInventoryUsed,
-    canExpandInventory,
-    INVENTORY_EXPAND_COST,
-    INVENTORY_EXPAND_GAIN,
-    getSellReward,
-    getSellEnhancementStoneReward,
-    getFusionCost,
-    getRecommendedFusionSources,
-    getNextEquipmentRarity,
-    EQUIPMENT_RARITIES,
-    FUSION_SOURCE_ITEM_COUNT,
-    canCharacterEquipItem,
-    getCharacterEquipmentLevel,
-    getEquipmentRequiredLevel,
-    getEquipmentSpecialOptionLabel,
-    getEquipmentSpecialOptionDescription,
-    calculateEnhanceCost,
-    calculateEnhanceFailureRate,
-    getEquipmentEnhanceMultiplier,
-    getEquipmentMaxEnhanceLevel
-} from "../hunting/equipmentConfig.js";
 import { getRebirthPresentation } from "../rebirth/rebirthService.js";
 import { isCharacterUnlocked } from "../playerProfile.js";
 import { getPublicFighterIdentity } from "../characterRosterPolicy.js";
 import { isHiddenCharacterId } from "../characterAvailability.js";
-import { getEquipmentTemplate } from "../hunting/equipmentTemplates.js";
+import { createEquipmentPresentation } from "./equipmentPresentation.js";
 
 const EQUIPMENT_STAT_LABELS = Object.freeze({
     hp: "HP",
@@ -310,89 +287,7 @@ export function createCollectionHubViewModel({
 
     const monsterCodexItems = createMonsterCodexItems(hunting);
 
-    const equipment = profile?.equipment ?? {};
-    const inventory = Array.isArray(equipment.inventory)
-        ? equipment.inventory
-        : Object.entries(equipment.inventory ?? {}).flatMap(([templateId, count]) => {
-              const template = getEquipmentTemplate(templateId);
-              if (!template) return [];
-              return [
-                  {
-                      instanceId: template.id,
-                      rarity: template.tier,
-                      slot: null,
-                      name: template.name,
-                      description: "고정 성능 조합 장비",
-                      stats: Object.entries(template.stats).map(([type, value]) => ({ type, value })),
-                      specialOptions: [],
-                      enhanceLevel: 0,
-                      count
-                  }
-              ];
-          });
-    const equipped = equipment.equipped ?? {};
-    const equippedIdSet = new Set(Object.values(equipped).filter(Boolean));
-    const currentEquipmentLevel = getCharacterEquipmentLevel(profile, currentPlayerFighterId);
-
-    const equipmentItems = inventory.map((item) => {
-        const level = item.enhanceLevel ?? 0;
-        const maxEnhanceLevel = getEquipmentMaxEnhanceLevel(item);
-        const enhanceMultiplier = getEquipmentEnhanceMultiplier(level);
-        const cost = calculateEnhanceCost(level);
-        const shards = profile.hunting?.shards ?? 0;
-        const requiredLevel = getEquipmentRequiredLevel(item);
-        const canEquip = canCharacterEquipItem(profile, item, currentPlayerFighterId);
-        return {
-            instanceId: item.instanceId,
-            rarity: item.rarity,
-            rarityLabel: getRarityLabel(item.rarity),
-            slot: item.slot,
-            name: item.name,
-            description: item.description,
-            stats: (item.stats ?? []).map((stat) => ({
-                ...stat,
-                label: EQUIPMENT_STAT_LABELS[stat.type] ?? stat.type,
-                enhancedValue: Math.round((stat.value ?? 0) * enhanceMultiplier)
-            })),
-            specialOptions: (item.specialOptions ?? []).map((option) => ({
-                ...option,
-                label: getEquipmentSpecialOptionLabel(option.type),
-                description: getEquipmentSpecialOptionDescription(option.type)
-            })),
-            enhanceLevel: level,
-            maxEnhanceLevel,
-            enhanceMultiplier,
-            isEquipped: equippedIdSet.has(item.instanceId),
-            requiredLevel,
-            characterLevel: currentEquipmentLevel,
-            levelLocked: !canEquip,
-            canEquip,
-            sellReward: getSellReward(item.rarity),
-            sellStoneReward: getSellEnhancementStoneReward(item.rarity),
-            canEnhance: level < maxEnhanceLevel && shards >= cost.shards,
-            enhanceCost: cost,
-            enhanceFailureRate: calculateEnhanceFailureRate(level)
-        };
-    });
-    const fusionRecipes = EQUIPMENT_RARITIES.flatMap((rarity) => {
-        const nextRarity = getNextEquipmentRarity(rarity);
-        const cost = getFusionCost(rarity);
-        if (!nextRarity || !cost) return [];
-        const recommendedIds = getRecommendedFusionSources(profile, rarity).map((item) => item.instanceId);
-
-        return [
-            {
-                rarity,
-                rarityLabel: getRarityLabel(rarity),
-                nextRarity,
-                nextRarityLabel: getRarityLabel(nextRarity),
-                cost,
-                recommendedItems: recommendedIds
-                    .map((instanceId) => equipmentItems.find((item) => item.instanceId === instanceId))
-                    .filter(Boolean)
-            }
-        ];
-    });
+    const equipmentPresentation = createEquipmentPresentation(profile);
 
     const storageItems = (hunting.chests ?? []).map((chest) => {
         const preview = previewHuntingChest(chest);
@@ -436,30 +331,7 @@ export function createCollectionHubViewModel({
             shards: hunting.shards ?? 0,
             storageChestCount: storageItems.length
         },
-        equipment: {
-            items: equipmentItems,
-            shards: hunting.shards ?? 0,
-            enhancementStones: equipment.enhancementStones ?? 0,
-            inventoryUsed: getInventoryUsed(profile),
-            inventorySlots: getInventorySlots(profile),
-            canExpand: canExpandInventory(profile),
-            expandCost: INVENTORY_EXPAND_COST,
-            expandGain: INVENTORY_EXPAND_GAIN,
-            fusion: {
-                sourceItemCount: FUSION_SOURCE_ITEM_COUNT,
-                recipes: fusionRecipes
-            },
-            equippedSlots: {
-                weapon: equipped.weapon ? (inventory.find((i) => i.instanceId === equipped.weapon)?.name ?? "—") : "—",
-                armor: equipped.armor ? (inventory.find((i) => i.instanceId === equipped.armor)?.name ?? "—") : "—",
-                accessory1: equipped.accessory1
-                    ? (inventory.find((i) => i.instanceId === equipped.accessory1)?.name ?? "—")
-                    : "—",
-                accessory2: equipped.accessory2
-                    ? (inventory.find((i) => i.instanceId === equipped.accessory2)?.name ?? "—")
-                    : "—"
-            }
-        },
+        equipment: equipmentPresentation,
         storage: {
             shards: hunting.shards ?? 0,
             dailyShop: getDailyShop(profile),

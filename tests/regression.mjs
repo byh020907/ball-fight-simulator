@@ -5193,8 +5193,6 @@ function testHuntingAdvanceDispatchContract() {
 
 function testComponentBridgeEquipmentFunctions() {
     const profile = createDefaultPlayerProfile();
-    const weapon = createEquipmentInstance({ rarity: "common", slot: "weapon", rng: () => 0.5 });
-    weapon.stats = [{ type: "damage", value: 9, min: 4, max: 8 }];
     addEquipmentQuantity(profile, "attack_sword");
 
     const mockApp = {
@@ -5207,25 +5205,18 @@ function testComponentBridgeEquipmentFunctions() {
     const bridge = createAppComponentBridge(mockApp);
 
     // 모든 장비 관련 함수가 bridge에 존재하는지 확인
-    const requiredFunctions = [
-        "equipItem",
-        "unequipItem",
-        "enhanceItem",
-        "fuseEquipmentItems",
-        "sellItem",
-        "expandInventory"
-    ];
+    const requiredFunctions = ["equipEquipmentTemplate", "unequipEquipmentSlot", "craftEquipmentTemplate"];
     for (const fnName of requiredFunctions) {
         assert.equal(typeof bridge[fnName], "function", `Bridge should expose ${fnName}`);
     }
 
     // ── equipItem은 프로필을 저장해야 함 ──
-    bridge.equipItem("attack_sword");
-    assert.equal(profile.equipment.equipped[0], "attack_sword", "Weapon should be equipped in profile");
+    bridge.equipEquipmentTemplate("attack_sword");
+    assert.equal(profile.equipment.equipped[0], "attack_sword", "Template should be equipped in profile");
 
     // ── unequipItem은 프로필을 저장해야 함 ──
-    bridge.unequipItem("attack_sword");
-    assert.equal(profile.equipment.equipped[0], null, "Weapon should be unequipped in profile");
+    bridge.unequipEquipmentSlot(0);
+    assert.equal(profile.equipment.equipped[0], null, "Slot should be unequipped in profile");
 }
 
 async function testBattleAppAdoptsPreExistingAlpineAllocation() {
@@ -17584,10 +17575,15 @@ async function testCreateCollectionHubViewModel() {
         achievementDefinitions: [],
         currentPlayerFighterId: "archer"
     });
-    assert.equal(fusionVm.equipment.items.length, 3, "Collection UI should present all v12 inventory templates");
-    assert.ok(
-        fusionVm.equipment.fusion.recipes.every((recipe) => recipe.recommendedItems.length === 0),
-        "Legacy random fusion recommendations should not be populated for v12 inventory"
+    assert.equal(
+        fusionVm.equipment.tiers.flatMap((tier) => tier.templates).length,
+        39,
+        "Collection UI should present all templates"
+    );
+    assert.equal(
+        fusionVm.equipment.tiers[0].templates.filter((template) => template.count > 0).length,
+        3,
+        "Template presentation should expose owned quantities"
     );
     assert.equal(vm2.storage.chests[0].rarityLabel, "uncommon", "Storage UI should use the canonical rarity label");
 
@@ -21560,9 +21556,6 @@ function testComponentBridgePopupCallsThroughServiceSeam() {
 
 async function runNewBridgeTests() {
     testHuntingManagerNoAppUiMethods(app);
-    testComponentBridgeEquipmentActionsReachProfile();
-    testCollectionActionPopupOptions();
-    await testComponentBridgeCollectionActionResultsUsePopupService();
     testCollectionHubServiceNoBlacklistedRefs();
     testComponentBridgeOpenChestExists();
     testComponentBridgeOpenChestFailure();
@@ -21573,7 +21566,6 @@ async function runNewBridgeTests() {
     testGameActionBridgeOpenHelp();
     testHuntingManagerStaticPopupServiceImport();
     await testPopupServiceShowFailsWithoutPopupDialog();
-    testComponentBridgePopupCallsThroughServiceSeam();
 }
 
 await runNewBridgeTests();
