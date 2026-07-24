@@ -1813,18 +1813,18 @@ function testIconTagCountAndUniqueness() {
         mass_weight: "질량 · 무쇠 추",
         wall_spring: "벽 반사 속도 · 압축 스프링",
         collision_gyro: "충돌 · 충격 자이로",
-        intermediate_attack_crit: "중간 · 공격·치명타 · 명칭 미정",
-        intermediate_attack_haste: "중간 · 공격·스킬 가속 · 명칭 미정",
-        intermediate_attack_speed: "중간 · 공격·속도 · 명칭 미정",
-        intermediate_attack_health: "중간 · 공격·HP · 명칭 미정",
-        intermediate_health_defense: "중간 · HP·방어 · 명칭 미정",
-        intermediate_health_haste: "중간 · HP·스킬 가속 · 명칭 미정",
-        intermediate_defense_wall: "중간 · 방어·벽 반사 속도 · 명칭 미정",
-        intermediate_defense_mass: "중간 · 방어·질량 · 명칭 미정",
-        intermediate_speed_wall: "중간 · 속도·벽 반사 속도 · 명칭 미정",
-        intermediate_speed_angular: "중간 · 속도·회전 충격 · 명칭 미정",
-        intermediate_haste_angular: "중간 · 스킬 가속·회전 충격 · 명칭 미정",
-        intermediate_crit_mass: "중간 · 치명타·질량 · 명칭 미정"
+        intermediate_attack_crit: "중간 · 공격·치명타 · 정밀 보강검",
+        intermediate_attack_haste: "중간 · 공격·스킬 가속 · 마력 동력검",
+        intermediate_attack_speed: "중간 · 공격·속도 · 경량 날개검",
+        intermediate_attack_health: "중간 · 공격·HP · 생명 수정 절단구",
+        intermediate_health_defense: "중간 · HP·방어 · 수정 가죽흉갑",
+        intermediate_health_haste: "중간 · HP·스킬 가속 · 열맥동 허리장치",
+        intermediate_defense_wall: "중간 · 방어·벽 반사 속도 · 스프링 완충판",
+        intermediate_defense_mass: "중간 · 방어·질량 · 중량 사슬조끼",
+        intermediate_speed_wall: "중간 · 속도·벽 반사 속도 · 스프링 도약화",
+        intermediate_speed_angular: "중간 · 속도·회전 충격 · 날개 자이로 안정기",
+        intermediate_haste_angular: "중간 · 스킬 가속·회전 충격 · 점화 자이로 코어",
+        intermediate_crit_mass: "중간 · 치명타·질량 · 쌍날 충격두"
     };
     metadata.forEach((entry) => {
         assert.equal(entry.label, LABEL_MAP[entry.id], `Label for ${entry.id} must match the confirmed equipment name`);
