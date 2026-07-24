@@ -1837,18 +1837,18 @@ function testIconTagCountAndUniqueness() {
         intermediate_speed_angular: "중간 · 속도·회전 충격 · 날개 자이로 안정기",
         intermediate_haste_angular: "중간 · 스킬 가속·회전 충격 · 점화 자이로 코어",
         intermediate_crit_mass: "중간 · 치명타·질량 · 쌍날 충격두",
-        completed_ability_crit: "완성 · 스킬·치명타 폭발 · 명칭 미정",
-        completed_pursuit_flurry: "완성 · 추격·연타 · 명칭 미정",
-        completed_mass_execution: "완성 · 질량·치명타 처형 · 명칭 미정",
-        completed_vital_heat: "완성 · HP·열기 지속 공격 · 명칭 미정",
-        completed_defense_conversion: "완성 · 방어·공격 전환 · 명칭 미정",
-        completed_mass_shockwave: "완성 · 질량·광역 충격파 · 명칭 미정",
-        completed_wall_ricochet: "완성 · 벽 반사·도탄 공격 · 명칭 미정",
-        completed_wall_heat: "완성 · 벽 반사·열기 파동 · 명칭 미정",
-        completed_speed_angular: "완성 · 속도·회전 충격 · 명칭 미정",
-        completed_ability_echo: "완성 · 스킬·충돌 메아리 · 명칭 미정",
-        completed_vortex_charge: "완성 · 이동·광역 회전 · 명칭 미정",
-        completed_vital_overwhelm: "완성 · HP·충돌 압도 · 명칭 미정"
+        completed_ability_crit: "완성 · 스킬·치명타 폭발 · 별을 꿰는 서약",
+        completed_pursuit_flurry: "완성 · 추격·연타 · 쌍익의 질풍",
+        completed_mass_execution: "완성 · 질량·치명타 처형 · 종언의 추락",
+        completed_vital_heat: "완성 · HP·열기 지속 공격 · 홍련의 맥동",
+        completed_defense_conversion: "완성 · 방어·공격 전환 · 철혈의 송곳니",
+        completed_mass_shockwave: "완성 · 질량·광역 충격파 · 낙성의 파문",
+        completed_wall_ricochet: "완성 · 벽 반사·도탄 공격 · 되튀는 초승달",
+        completed_wall_heat: "완성 · 벽 반사·열기 파동 · 화염심장 성채",
+        completed_speed_angular: "완성 · 속도·회전 충격 · 천공의 나선",
+        completed_ability_echo: "완성 · 스킬·충돌 메아리 · 쌍성의 메아리",
+        completed_vortex_charge: "완성 · 이동·광역 회전 · 폭풍의 윤환",
+        completed_vital_overwhelm: "완성 · HP·충돌 압도 · 적룡의 심갑"
     };
     metadata.forEach((entry) => {
         assert.equal(entry.label, LABEL_MAP[entry.id], `Label for ${entry.id} must match the confirmed equipment name`);
