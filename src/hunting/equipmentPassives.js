@@ -42,6 +42,22 @@ export function calculateAbilityEchoDamage(baseAttackDamage) {
     return finiteNonNegative(baseAttackDamage) * 0.5;
 }
 
+export function calculateVitalHeatTickDamage(equipmentHp) {
+    return finiteNonNegative(equipmentHp) * 0.015;
+}
+
+export function calculateWallRicochetDamage(baseAttackDamage, effectiveWallBounceBonus) {
+    return finiteNonNegative(baseAttackDamage) * (0.25 + finiteNonNegative(effectiveWallBounceBonus));
+}
+
+export function calculateWallHeatDamage(baseAttackDamage, effectiveWallBounceBonus) {
+    return finiteNonNegative(baseAttackDamage) * (0.25 + finiteNonNegative(effectiveWallBounceBonus) * 0.5);
+}
+
+export function calculateVortexChargeDamage(baseAttackDamage, effectiveAngularImpulseBonus) {
+    return finiteNonNegative(baseAttackDamage) * (0.35 + finiteNonNegative(effectiveAngularImpulseBonus) * 0.5);
+}
+
 export function getEnemiesAtContactPoint(simulation, owner, contactPoint, radius) {
     if (!simulation?.getEnemiesOf || !contactPoint) return [];
     const radiusSquared = finiteNonNegative(radius) ** 2;
@@ -200,6 +216,144 @@ class VitalOverwhelmPassive extends CollisionDamagePassive {
     }
 }
 
+class VitalHeatPassive extends CollisionDamagePassive {
+    constructor(runtime) {
+        super(runtime);
+        runtime.charge.maximum = 3;
+        runtime.charge.current = 1;
+        this.rechargeElapsed = 0;
+        this.active = false;
+        this.ticksRemaining = 0;
+        this.nextTickRemaining = 0;
+    }
+
+    update({ delta, simulation }) {
+        const elapsed = finiteNonNegative(delta);
+        this.rechargeElapsed += elapsed;
+        while (this.rechargeElapsed >= 3) {
+            this.rechargeElapsed -= 3;
+            this.runtime.charge.gain();
+        }
+
+        let remaining = elapsed;
+        let starts = this._startHeatField(simulation) ? 1 : 0;
+        while (this.active && remaining > 0) {
+            const step = Math.min(remaining, this.nextTickRemaining);
+            remaining -= step;
+            this.nextTickRemaining -= step;
+            if (this.nextTickRemaining > 1e-9) break;
+            this._dealTick(simulation);
+            this.ticksRemaining -= 1;
+            if (this.ticksRemaining > 0) {
+                this.nextTickRemaining = 0.2;
+                continue;
+            }
+            this.active = false;
+            if (starts >= 2 || !this._startHeatField(simulation)) break;
+            starts += 1;
+        }
+    }
+
+    _startHeatField(simulation) {
+        if (this.active || !this.runtime.charge.current || this._getEnemies(simulation).length === 0) return false;
+        this.runtime.charge.consume();
+        this.active = true;
+        this.ticksRemaining = 4;
+        this.nextTickRemaining = 0.2;
+        return true;
+    }
+
+    _dealTick(simulation) {
+        const amount = calculateVitalHeatTickDamage(this.runtime.getCombatStats()?.hp);
+        for (const enemy of this._getEnemies(simulation)) this.dealDamage(enemy, amount, "홍련의 맥동");
+    }
+
+    _getEnemies(simulation) {
+        return getEnemiesAtContactPoint(simulation, this.owner, this.owner.position, 150);
+    }
+}
+
+class WallRicochetPassive extends CollisionDamagePassive {
+    constructor(runtime) {
+        super(runtime);
+        runtime.charge.maximum = 2;
+        this.elapsed = 0;
+        this.lastBounceAt = null;
+    }
+
+    update({ delta }) {
+        this.elapsed += finiteNonNegative(delta);
+    }
+
+    staticBounce() {
+        if (this.lastBounceAt !== null && this.elapsed - this.lastBounceAt < 0.4) return;
+        this.lastBounceAt = this.elapsed;
+        this.runtime.charge.gain();
+    }
+
+    enemyCollisionResolved({ target }) {
+        if (!target || !this.runtime.charge.consume()) return;
+        this.dealDamage(
+            target,
+            calculateWallRicochetDamage(
+                this.owner.getTotalAttackDamage(),
+                this.runtime.getCombatStats()?.wallBounce?.effectiveBonus
+            ),
+            "되튀는 초승달"
+        );
+    }
+}
+
+class WallHeatPassive extends CollisionDamagePassive {
+    constructor(runtime) {
+        super(runtime);
+        runtime.charge.maximum = 3;
+        this.acquireCooldown = new runtime.cooldown.constructor(1);
+    }
+
+    update({ delta, simulation }) {
+        this.acquireCooldown.tick(delta);
+        this.runtime.cooldown.tick(delta);
+        if (!this.runtime.cooldown.ready || !this.runtime.charge.current) return;
+        const enemies = getEnemiesAtContactPoint(simulation, this.owner, this.owner.position, 260);
+        if (enemies.length === 0 || !this.runtime.charge.consume()) return;
+        this.runtime.cooldown.trigger(1);
+        const amount = calculateWallHeatDamage(
+            this.owner.getTotalAttackDamage(),
+            this.runtime.getCombatStats()?.wallBounce?.effectiveBonus
+        );
+        for (const enemy of enemies) this.dealDamage(enemy, amount, "화염심장 성채");
+    }
+
+    staticBounce() {
+        if (!this.acquireCooldown.ready) return;
+        this.runtime.charge.gain();
+        this.acquireCooldown.trigger(1);
+    }
+}
+
+class VortexChargePassive extends CollisionDamagePassive {
+    constructor(runtime) {
+        super(runtime);
+        runtime.distance = new runtime.distance.constructor(1200);
+    }
+
+    validMovement({ distance, source }) {
+        this.runtime.distance.add(distance, source);
+    }
+
+    enemyCollisionResolved({ target, contactPoint, simulation }) {
+        if (!target || !this.runtime.distance.consumeThreshold()) return;
+        const amount = calculateVortexChargeDamage(
+            this.owner.getTotalAttackDamage(),
+            this.runtime.getCombatStats()?.angularImpulse?.effectiveBonus
+        );
+        for (const enemy of getEnemiesAtContactPoint(simulation, this.owner, contactPoint, 180)) {
+            this.dealDamage(enemy, amount, "폭풍의 윤환");
+        }
+    }
+}
+
 export const EQUIPMENT_PASSIVE_FACTORIES = Object.freeze({
     ability_crit: AbilityCritPassive,
     pursuit_flurry: PursuitFlurryPassive,
@@ -208,5 +362,9 @@ export const EQUIPMENT_PASSIVE_FACTORIES = Object.freeze({
     mass_shockwave: MassShockwavePassive,
     speed_angular: SpeedAngularPassive,
     ability_echo: AbilityEchoPassive,
-    vital_overwhelm: VitalOverwhelmPassive
+    vital_overwhelm: VitalOverwhelmPassive,
+    vital_heat: VitalHeatPassive,
+    wall_ricochet: WallRicochetPassive,
+    wall_heat: WallHeatPassive,
+    vortex_charge: VortexChargePassive
 });

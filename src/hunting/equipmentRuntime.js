@@ -108,7 +108,9 @@ export class EquipmentMovementDistanceTracker {
 
     add(distance, source = "physics") {
         if (source !== "physics" && source !== "dash" && source !== "knockback" && source !== "pressure") return false;
+        if (this.distance >= this.threshold) return true;
         this.distance += finiteNonNegative(distance);
+        if (this.distance >= this.threshold) this.distance = this.threshold;
         return this.distance >= this.threshold;
     }
 

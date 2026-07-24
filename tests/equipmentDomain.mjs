@@ -31,7 +31,11 @@ import {
     calculateMassShockwaveDamage,
     calculatePursuitFlurryDamage,
     calculateSpeedAngularDamage,
-    calculateVitalOverwhelmDamage
+    calculateVitalOverwhelmDamage,
+    calculateVitalHeatTickDamage,
+    calculateWallRicochetDamage,
+    calculateWallHeatDamage,
+    calculateVortexChargeDamage
 } from "../src/hunting/equipmentPassives.js";
 import { Ability } from "../src/abilities/ability.js";
 import { AbilitySet } from "../src/abilities/abilitySet.js";
@@ -306,11 +310,14 @@ const passiveCombatStats = Object.freeze({
     defense: 36,
     speed: Object.freeze({ increaseRatio: 0.5 }),
     mass: Object.freeze({ effectiveBonus: 0.25 }),
+    wallBounce: Object.freeze({ effectiveBonus: 0.25 }),
+    angularImpulse: Object.freeze({ effectiveBonus: 0.25 }),
     criticalChance: 45.5
 });
 const passiveOwner = {
     hp: 100,
     maxHp: 100,
+    position: { x: 0, y: 0 },
     getEquipmentCombatStats: () => passiveCombatStats,
     getTotalAttackDamage: () => 40
 };
@@ -518,5 +525,96 @@ movementBall.update(1, {
 assert.equal(movementEvents.length, 1);
 assert.ok(movementEvents[0].distance > 0);
 assert.equal(movementBall.position.x, 0);
+
+assert.equal(calculateVitalHeatTickDamage(100), 1.5);
+assert.equal(calculateWallRicochetDamage(40, 0.25), 20);
+assert.equal(calculateWallHeatDamage(40, 0.25), 15);
+assert.equal(calculateVortexChargeDamage(40, 0.25), 19);
+
+const chargeTracker = new EquipmentMovementDistanceTracker(1200);
+assert.equal(chargeTracker.add(1199, "physics"), false);
+assert.equal(chargeTracker.distance, 1199);
+assert.equal(chargeTracker.add(1, "dash"), true);
+assert.equal(chargeTracker.distance, 1200);
+assert.equal(chargeTracker.add(500, "pressure"), true);
+assert.equal(chargeTracker.distance, 1200);
+assert.equal(chargeTracker.consumeThreshold(), true);
+assert.equal(chargeTracker.distance, 0);
+assert.equal(chargeTracker.add(1200, "teleport"), false);
+
+passiveEvents.length = 0;
+const vitalHeatSet = new CombatEquipmentSet(passiveOwner, ["completed_vital_heat"]);
+passiveOwner.combatEquipment = vitalHeatSet;
+vitalHeatSet.update(0.8, { simulation: collisionSimulation });
+assert.deepEqual(
+    passiveEvents.map(({ amount, label, target }) => [amount, label, target]),
+    [
+        [1.5, "홍련의 맥동", collisionTargets[0]],
+        [1.5, "홍련의 맥동", collisionTargets[1]],
+        [1.5, "홍련의 맥동", collisionTargets[0]],
+        [1.5, "홍련의 맥동", collisionTargets[1]],
+        [1.5, "홍련의 맥동", collisionTargets[0]],
+        [1.5, "홍련의 맥동", collisionTargets[1]],
+        [1.5, "홍련의 맥동", collisionTargets[0]],
+        [1.5, "홍련의 맥동", collisionTargets[1]]
+    ]
+);
+
+passiveEvents.length = 0;
+const ricochetSet = new CombatEquipmentSet(passiveOwner, ["completed_wall_ricochet"]);
+passiveOwner.combatEquipment = ricochetSet;
+ricochetSet.staticBounce({});
+ricochetSet.staticBounce({});
+ricochetSet.update(0.4, { simulation: collisionSimulation });
+ricochetSet.staticBounce({});
+ricochetSet.enemyCollisionResolved({ target: passiveTarget });
+ricochetSet.enemyCollisionResolved({ target: passiveTarget });
+assert.deepEqual(
+    passiveEvents.map(({ amount, label }) => [amount, label]),
+    [
+        [20, "되튀는 초승달"],
+        [20, "되튀는 초승달"]
+    ]
+);
+
+passiveEvents.length = 0;
+const wallHeatSet = new CombatEquipmentSet(passiveOwner, ["completed_wall_heat"]);
+passiveOwner.combatEquipment = wallHeatSet;
+wallHeatSet.staticBounce({});
+wallHeatSet.staticBounce({});
+wallHeatSet.update(1, { simulation: collisionSimulation });
+wallHeatSet.staticBounce({});
+wallHeatSet.update(0, { simulation: collisionSimulation });
+wallHeatSet.update(1, { simulation: collisionSimulation });
+assert.deepEqual(
+    passiveEvents.map(({ amount, label, target }) => [amount, label, target.position.x]),
+    [
+        [15, "화염심장 성채", 0],
+        [15, "화염심장 성채", 100],
+        [15, "화염심장 성채", 181],
+        [15, "화염심장 성채", 0],
+        [15, "화염심장 성채", 100],
+        [15, "화염심장 성채", 181]
+    ]
+);
+
+passiveEvents.length = 0;
+const vortexSet = new CombatEquipmentSet(passiveOwner, ["completed_vortex_charge"]);
+passiveOwner.combatEquipment = vortexSet;
+vortexSet.validMovement({ distance: 1199, source: "physics" });
+vortexSet.validMovement({ distance: 1, source: "pressure" });
+vortexSet.validMovement({ distance: 500, source: "physics" });
+vortexSet.enemyCollisionResolved({
+    target: collisionTargets[0],
+    contactPoint: { x: 0, y: 0 },
+    simulation: collisionSimulation
+});
+assert.deepEqual(
+    passiveEvents.map(({ amount, label, target }) => [amount, label, target]),
+    [
+        [19, "폭풍의 윤환", collisionTargets[0]],
+        [19, "폭풍의 윤환", collisionTargets[1]]
+    ]
+);
 
 console.log("[equipment-domain] ok");
