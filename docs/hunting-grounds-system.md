@@ -702,7 +702,7 @@ src/
 - `HuntingManager`가 원정 애플리케이션 흐름을 조정하고 전투 규칙은 `BattleSimulation`과 각 사냥터 모듈에 위임합니다.
 - 상태 전이·보상·파티·이벤트·조우 계산은 각각의 순수 모듈이 소유하며 UI가 프로필을 직접 변경하지 않습니다.
 - 사냥터 화면은 `src/components/hunting-overlay.html`, 컬렉션 보관함·장비 화면은 각 컬렉션 컴포넌트가 소유합니다.
-- 실제 지원 범위는 코드와 회귀 테스트를 기준으로 하며 과거 전환 기록은 `.legacy/docs/hunting-grounds-combat-update.md`에 보관합니다.
+- 실제 지원 범위는 코드와 회귀 테스트를 기준으로 하며 전투 구조 요약은 `docs/hunting-grounds-combat-update.md`에서 함께 유지합니다.
 
 ## 20. 2026-07-16 추가 구현 — 전장 XP 오브
 

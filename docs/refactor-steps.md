@@ -1,6 +1,6 @@
 # 책임 분리 리팩토링 진행 문서
 
-> **레거시 문서**: 과거 단계별 리팩토링 기록입니다. 완료 여부와 다음 후보는 현재 코드의 상태를 나타내지 않습니다.
+> **상태**: 진행 중. Step 1~3과 공통 capability 정합은 완료됐고 Step 4~5는 현재 코드에 남은 후보입니다.
 
 이 문서는 게임 오브젝트와 액션의 로직 책임을 단계별로 정리하기 위한 작업 문서입니다.
 
@@ -42,8 +42,8 @@ if (attacker.dashState.untilImpact) {
 
 ```js
 class DashEffect {
-    constructor({ source, multiplier, collisionDamage = 0, untilImpact = false }) {
-        this.source = source;
+    constructor({ duration, multiplier, collisionDamage = 0, untilImpact = false }) {
+        this.effect = new TimedEffect(duration);
         this.multiplier = multiplier;
         this.collisionDamage = collisionDamage;
         this.untilImpact = untilImpact;
@@ -51,33 +51,33 @@ class DashEffect {
     }
 
     getSpeed(ball) {
-        return ball.baseSpeed * this.multiplier;
+        return ball.stats.baseSpeed * this.multiplier;
     }
 
     onCollision(attacker, defender, simulation) {
         if (this.collisionDamage > 0) {
             defender.takeDamage(this.collisionDamage, attacker, "Dash");
         }
-        attacker.ability?.onDashHit?.(defender, this);
+        attacker.abilities.onDashHit(defender, this);
         if (this.untilImpact) {
             this.expired = true;
         }
     }
 
-    onWallBounce(ball, normal, simulation) {
-        ball.ability?.onDashWall?.(this);
+    onWallBounce(ball, simulation) {
+        ball.abilities.onDashWall(this);
         this.expired = true;
     }
 }
 
 // BattleBall은 저장과 위임만 담당
 setMovementEffect(effect) {
-    this.movementEffect = effect;
+    this.state.movement = effect;
 }
 
 // Simulation은 충돌 이벤트만 전달
-attacker.movementEffect?.onCollision?.(attacker, defender, this);
-if (attacker.movementEffect?.expired) {
+attacker.state.movement?.onCollision?.(attacker, defender, this);
+if (attacker.state.movement?.expired) {
     attacker.clearMovementEffect();
 }
 ```
@@ -88,15 +88,11 @@ if (attacker.movementEffect?.expired) {
 class DashAbility extends Ability {
     startDash(target) {
         const direction = Vector2.subtract(target.position, this.owner.position).normalize();
-        this.owner.setMovementEffect(
-            new DashEffect({
-                source: this.owner,
-                multiplier: 2.15,
-                collisionDamage: 0,
-                untilImpact: true
-            })
-        );
-        this.owner.forceHeading(direction, 1.4);
+        this.owner.initiateDash(direction, {
+            duration: 1.4,
+            multiplier: 2.15,
+            collisionDamage: 0
+        });
     }
 }
 ```
@@ -146,12 +142,12 @@ class DashAbility extends Ability {
 
 ### Step 3. Dash runtime effect 분리 ✅
 
-커밋: `724c426` (ActionContext) + 현재 작업
+커밋: `724c426`, `0dd650e`
 
 - `DashEffect` 클래스가 dash 지속시간, 충돌 이벤트, 벽 이벤트, 속도 계산, speed ring 표시 여부를 소유합니다.
 - `DashAbility`, Trickster seed, Eater spit가 각자의 규칙으로 `DashEffect`를 생성합니다.
 - `Simulation`은 충돌/벽 이벤트를 `DashEffect.onCollision()` / `.onWallBounce()`에 전달만 합니다.
-- `BattleBall`은 `movementEffect` 저장, tick, expired 시 해제만 담당합니다.
+- `BattleBall`은 `state.movement` 저장, tick, expired 시 해제만 담당합니다.
 
 검증 체크리스트:
 
@@ -176,7 +172,7 @@ class DashAbility extends Ability {
 
 현재 문제:
 
-- `EaterAbility`가 `target.swallowedState`를 직접 쓰고, `BattleBall.update()`가 삼켜진 대상의 위치 고정과 이동 정지를 처리합니다.
+- `EaterAbility`가 `target.state.swallowed`를 직접 쓰고, `EaterAbility.update()`와 `BattleBall.update()`가 위치 고정과 이동 정지를 나눠 처리합니다.
 
 목표:
 

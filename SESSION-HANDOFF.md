@@ -2991,7 +2991,7 @@
 - 맥락: 사용자가 현재 사냥터가 의도와 다르게 로스터 캐릭터 1대1 반복처럼 구성되어 있다고 지적. 사냥터는 기본적으로 플레이어 1명 대 다수 몹 전투여야 하고, 기존 기본 캐릭터들은 일반 적이 아니라 중간 보스 정도로 사용해야 함.
 - 결정: 사냥터 전용 몹 스펙을 `melee`/`ranged` 2종으로 추가하고, 일반 층은 다수 몹 팩으로 구성. 3층 단위 또는 `champion_intrusion` 이벤트에서는 로스터 캐릭터를 중간 보스로 변환해 몹과 함께 등장. 플레이어/적은 `hunting-player`/`hunting-enemy` 팀으로 구분해 같은 팀 피해를 방지.
 - 결정: 물리 경기장 크기는 유지하고 `ArenaCamera` 렌더 줌으로 사냥터 다수전 시야만 `0.78`로 축소. 일반 1대1은 기본 `1.0` 시야 유지.
-- 영향: `src/hunting/huntingMonsters.js`, `src/hunting/huntingManager.js`, `src/simulation/battleSimulation.js`, `src/camera.js`, `src/ui.js`, `src/app.js`, `tests/regression.mjs`, `.legacy/docs/hunting-grounds-combat-update.md`
+- 영향: `src/hunting/huntingMonsters.js`, `src/hunting/huntingManager.js`, `src/simulation/battleSimulation.js`, `src/camera.js`, `src/ui.js`, `src/app.js`, `tests/regression.mjs`, `docs/hunting-grounds-combat-update.md`
 
 ## [L1] 2026-07-04 — 사냥터 버튼은 우승 캐릭터가 있을 때만 노출
 - 맥락: 사용자가 사냥터는 기본적으로 한 번이라도 우승해서 사용 가능한 캐릭터가 존재할 때 버튼이 생성되어야 한다고 요청.
@@ -3008,7 +3008,7 @@
 - 맥락: 사용자가 기존 구현은 카메라 줌만 바뀌고 실질 맵 크기가 커지지 않았다고 지적. 카메라는 기본적으로 전체 맵을 보이게 하고, 사냥터는 실제 맵 크기를 더 크게 조절해야 함.
 - 결정: `BattleSimulation`이 `arenaWidth`/`arenaHeight` 옵션을 받아 실제 `Simulation.width/height`를 바꾸도록 변경. 사냥터는 `HUNTING_ARENA` 1280×1280을 사용. `ArenaCamera`는 전투원 수 기반 자동 줌아웃을 제거하고 현재 시뮬레이션 맵 전체를 캔버스에 fit-to-map으로 맞춤.
 - 검증: 수치 시뮬레이션에서 사냥터 arena `[1280,1280]`, 960 캔버스 cameraScale `0.75` 확인. `npm test`, `npm run check`, `npm run format:check` 통과.
-- 영향: `src/hunting/huntingConfig.js`, `src/hunting/huntingManager.js`, `src/simulation/battleSimulation.js`, `src/camera.js`, `src/ui.js`, `src/app.js`, `tests/regression.mjs`, `.legacy/docs/hunting-grounds-combat-update.md`
+- 영향: `src/hunting/huntingConfig.js`, `src/hunting/huntingManager.js`, `src/simulation/battleSimulation.js`, `src/camera.js`, `src/ui.js`, `src/app.js`, `tests/regression.mjs`, `docs/hunting-grounds-combat-update.md`
 
 ## [L1] 2026-07-05 — player-panel $dispatch → $store._actions 전환 (버튼 무반응 디버깅 중)
 - 맥락: `@click="$dispatch(...)"` 이벤트가 `template.cloneNode(true)`로 복제된 컴포넌트 내부에서 `document` 리스너까지 전파되지 않는 문제. `_listenComponentEvents()`를 appStore.init()에서 등록해 document가 이벤트를 수신하게 했으나, 실제 브라우저에서 버튼이 여전히 무반응.
@@ -3909,3 +3909,8 @@
 - 맥락: 이전 대화가 로드되지 않는 상황에서 문서가 다음 작업의 핵심 인계 수단인데, 완료된 구현 계획과 오래된 파일 경로가 현행 규칙처럼 남아 있어 작업 방향을 오도할 수 있다. 핸드오프에는 커밋 시점부터 `?`로 저장된 손상 항목도 있다.
 - 결정: 현재 코드와 최근 L1/L2 결정을 기준으로 문서를 감사한다. 현행 규칙·설계 문서는 실제 경로와 상태에 맞게 고치고, 완료되었거나 다른 문서에 흡수되어 현재 구현과 맞지 않는 작업 문서는 `.legacy/docs/`로 이동한다. 레거시 문서는 참고 기록일 뿐 현행 계약으로 사용하지 않는다.
 - 영향: `SESSION-HANDOFF.md`, `README.md`, 현행 `docs/` 문서, `.legacy/docs/` 문서 보관 구조.
+
+## [L1] 2026-07-24 — 레거시는 전면 재작성해야 하는 문서로 제한한다
+- 맥락: 초기 구성과 달라졌다는 이유만으로 문서를 레거시로 옮기면, 일부 문구와 경로만 고쳐 계속 사용할 수 있는 설계·진행 문서까지 현행 문서에서 사라진다.
+- 결정: 현재 코드와의 차이가 작아 부분 수정으로 정합할 수 있는 문서는 `docs/`에 유지한다. 문서의 목적·구조·내용 대부분을 다시 써야 현행 계약이 되는 경우에만 `.legacy/docs/`로 이동한다. 이 기준으로 사냥터 전투 구조 요약과 책임 분리 진행 문서를 현행 문서로 복귀한다.
+- 영향: `docs/hunting-grounds-combat-update.md`, `docs/refactor-steps.md`, `.legacy/docs/implementation-plan.md`, 문서 분류 기준.
