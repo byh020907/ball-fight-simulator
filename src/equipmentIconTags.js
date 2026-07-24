@@ -743,6 +743,587 @@ registerTag("collision_gyro", "충돌 · 충격 자이로", (ctx, cx, cy) => {
     );
 });
 
+registerTag("intermediate_attack_crit", "중간 · 공격·치명타 · 명칭 미정", (ctx, cx, cy) => {
+    const S = 0.06;
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 4.8, cy + S * 4.8],
+            [cx - S * 1.6, cy - S * 5.8],
+            [cx + S * 3.5, cy - S * 2.4],
+            [cx + S * 1.1, cy + S * 5.4]
+        ],
+        "#272039",
+        "#c1c7d5",
+        0.06
+    );
+    drawOpenPath(
+        ctx,
+        [
+            [cx - S * 2.2, cy - S * 1.3],
+            [cx - S * 0.7, cy - S * 0.1],
+            [cx - S * 1.7, cy + S * 1.6]
+        ],
+        "#555b6d",
+        0.035
+    );
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 5.7, cy + S * 2.1],
+            [cx + S * 3.1, cy + S * 5.0],
+            [cx + S * 3.7, cy + S * 6.9],
+            [cx - S * 5.1, cy + S * 4.0]
+        ],
+        "#3c2359",
+        "#76509d",
+        0.05
+    );
+    [-3.4, -0.4, 2.5].forEach((x) => {
+        ctx.beginPath();
+        ctx.arc(cx + S * x, cy + S * 4.1, S * 0.8, 0, Math.PI * 2);
+        sf(ctx, "#24202d", "#c3a64a", 0.03);
+    });
+    drawClosedPath(
+        ctx,
+        [
+            [cx + S * 2.3, cy + S * 2.4],
+            [cx + S * 4.7, cy + S * 4.6],
+            [cx + S * 3.5, cy + S * 6.7],
+            [cx + S * 1.3, cy + S * 4.4]
+        ],
+        "#342344",
+        "#a843b2",
+        0.04
+    );
+});
+
+registerTag("intermediate_attack_haste", "중간 · 공격·스킬 가속 · 명칭 미정", (ctx, cx, cy) => {
+    const S = 0.06;
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 5.8, cy + S * 2.0],
+            [cx + S * 5.7, cy - S * 6.2],
+            [cx + S * 4.4, cy - S * 1.3],
+            [cx - S * 3.4, cy + S * 5.0]
+        ],
+        "#2d3040",
+        "#9ca7ba",
+        0.065
+    );
+    drawOpenPath(
+        ctx,
+        [
+            [cx - S * 3.8, cy + S * 1.4],
+            [cx + S * 3.4, cy - S * 3.8]
+        ],
+        "#596274",
+        0.04
+    );
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 4.4, cy + S * 3.3],
+            [cx - S * 1.9, cy + S * 5.8],
+            [cx - S * 3.6, cy + S * 7.0],
+            [cx - S * 6.0, cy + S * 4.5]
+        ],
+        "#2a1b22",
+        "#70435d",
+        0.05
+    );
+    drawOpenPath(
+        ctx,
+        [
+            [cx - S * 4.8, cy + S * 2.2],
+            [cx - S * 1.6, cy + S * 5.7]
+        ],
+        "#d0af51",
+        0.07
+    );
+    ctx.beginPath();
+    ctx.arc(cx - S * 1.9, cy + S * 3.9, S * 1.7, 0, Math.PI * 2);
+    sf(ctx, "#382054", "#bb63df", 0.045);
+    ctx.beginPath();
+    ctx.arc(cx - S * 1.9, cy + S * 3.9, S * 0.65, 0, Math.PI * 2);
+    sf(ctx, "#6d3693", "#e19aff", 0.025);
+});
+
+registerTag("intermediate_attack_speed", "중간 · 공격·속도 · 명칭 미정", (ctx, cx, cy) => {
+    const S = 0.06;
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 3.8, cy + S * 5.8],
+            [cx - S * 1.6, cy - S * 6.2],
+            [cx + S * 2.3, cy - S * 2.5],
+            [cx + S * 0.9, cy + S * 5.4]
+        ],
+        "#283041",
+        "#bdc8d4",
+        0.055
+    );
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 0.9, cy + S * 0.3],
+            [cx + S * 2.6, cy + S * 0.9],
+            [cx + S * 6.4, cy + S * 5.8],
+            [cx + S * 1.2, cy + S * 4.3]
+        ],
+        "#4b3d5c",
+        "#d2d6df",
+        0.05
+    );
+    drawOpenPath(
+        ctx,
+        [
+            [cx + S * 1.0, cy + S * 1.3],
+            [cx + S * 5.1, cy + S * 5.0]
+        ],
+        "#777f97",
+        0.03
+    );
+    [1.5, 4.0].forEach((x, i) => {
+        ctx.beginPath();
+        ctx.arc(cx + S * x, cy + S * (2.0 + i * 2.1), S * 0.75, 0, Math.PI * 2);
+        sf(ctx, "#34313e", "#c69b40", 0.025);
+    });
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 4.7, cy + S * 3.7],
+            [cx - S * 1.5, cy + S * 4.0],
+            [cx - S * 1.8, cy + S * 5.8],
+            [cx - S * 5.2, cy + S * 5.3]
+        ],
+        "#2a2432",
+        "#67504a",
+        0.04
+    );
+});
+
+registerTag("intermediate_attack_health", "중간 · 공격·HP · 명칭 미정", (ctx, cx, cy) => {
+    const S = 0.06;
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 6.8, cy + S * 2.8],
+            [cx + S * 4.8, cy - S * 5.0],
+            [cx + S * 6.4, cy - S * 2.4],
+            [cx - S * 4.2, cy + S * 5.5]
+        ],
+        "#34313a",
+        "#a7afbb",
+        0.06
+    );
+    drawOpenPath(
+        ctx,
+        [
+            [cx - S * 3.5, cy + S * 2.0],
+            [cx + S * 3.7, cy - S * 2.7]
+        ],
+        "#575d6b",
+        0.04
+    );
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 6.8, cy + S * 1.3],
+            [cx - S * 3.7, cy + S * 4.5],
+            [cx - S * 5.2, cy + S * 6.3],
+            [cx - S * 7.5, cy + S * 3.8]
+        ],
+        "#422d25",
+        "#795343",
+        0.05
+    );
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 0.8, cy - S * 3.3],
+            [cx + S * 1.7, cy - S * 3.0],
+            [cx + S * 2.2, cy - S * 0.3],
+            [cx - S * 0.3, cy + S * 0.1]
+        ],
+        "#60402a",
+        "#b9915d",
+        0.045
+    );
+    drawClosedPath(
+        ctx,
+        [
+            [cx + S * 0.4, cy - S * 3.1],
+            [cx + S * 2.0, cy - S * 1.5],
+            [cx + S * 0.4, cy + S * 0.1],
+            [cx - S * 1.1, cy - S * 1.5]
+        ],
+        "#651b26",
+        "#dc4e57",
+        0.04
+    );
+});
+
+registerTag("intermediate_health_defense", "중간 · HP·방어 · 명칭 미정", (ctx, cx, cy) => {
+    const S = 0.06;
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 2.1, cy - S * 6.3],
+            [cx - S * 5.6, cy - S * 4.1],
+            [cx - S * 4.2, cy + S * 5.2],
+            [cx, cy + S * 6.7],
+            [cx + S * 4.2, cy + S * 5.2],
+            [cx + S * 5.6, cy - S * 4.1],
+            [cx + S * 2.1, cy - S * 6.3]
+        ],
+        "#4d301e",
+        "#b88b58",
+        0.06
+    );
+    drawClosedPath(
+        ctx,
+        [
+            [cx, cy - S * 4.8],
+            [cx + S * 2.0, cy - S * 2.2],
+            [cx + S * 1.4, cy + S * 2.1],
+            [cx, cy + S * 3.6],
+            [cx - S * 1.4, cy + S * 2.1],
+            [cx - S * 2.0, cy - S * 2.2]
+        ],
+        "#661c26",
+        "#d54853",
+        0.045
+    );
+    [-3.4, 3.4].forEach((x) =>
+        drawOpenPath(
+            ctx,
+            [
+                [cx + S * x, cy - S * 2.0],
+                [cx + S * (x * 0.75), cy + S * 3.7]
+            ],
+            "#e0b67b",
+            0.035
+        )
+    );
+});
+
+registerTag("intermediate_health_haste", "중간 · HP·스킬 가속 · 명칭 미정", (ctx, cx, cy) => {
+    const S = 0.06;
+    drawOpenPath(
+        ctx,
+        [
+            [cx - S * 6.5, cy - S * 2.2],
+            [cx - S * 3.0, cy - S * 3.0],
+            [cx, cy - S * 0.8],
+            [cx + S * 3.0, cy - S * 3.0],
+            [cx + S * 6.5, cy - S * 2.2]
+        ],
+        "#6b2c32",
+        0.15
+    );
+    drawOpenPath(
+        ctx,
+        [
+            [cx - S * 6.5, cy - S * 2.2],
+            [cx - S * 3.0, cy - S * 3.0],
+            [cx, cy - S * 0.8],
+            [cx + S * 3.0, cy - S * 3.0],
+            [cx + S * 6.5, cy - S * 2.2]
+        ],
+        "#9b4544",
+        0.09
+    );
+    ctx.beginPath();
+    ctx.arc(cx, cy - S * 0.6, S * 2.3, 0, Math.PI * 2);
+    sf(ctx, "#3a1f29", "#d55352", 0.045);
+    drawClosedPath(
+        ctx,
+        [
+            [cx + S * 3.0, cy - S * 6.2],
+            [cx + S * 5.6, cy - S * 4.5],
+            [cx + S * 4.5, cy - S * 1.5],
+            [cx + S * 1.9, cy - S * 3.2]
+        ],
+        "#63341f",
+        "#e07535",
+        0.045
+    );
+    [3.2, 4.8].forEach((x) =>
+        drawOpenPath(
+            ctx,
+            [
+                [cx + S * x, cy - S * 1.4],
+                [cx + S * x, cy + S * 4.8]
+            ],
+            "#443442",
+            0.055
+        )
+    );
+    drawOpenPath(
+        ctx,
+        [
+            [cx + S * 2.4, cy + S * 4.8],
+            [cx + S * 3.2, cy + S * 5.8],
+            [cx + S * 4.0, cy + S * 4.8],
+            [cx + S * 4.8, cy + S * 5.8]
+        ],
+        "#c56930",
+        0.045
+    );
+});
+
+registerTag("intermediate_defense_wall", "중간 · 방어·벽 반사 속도 · 명칭 미정", (ctx, cx, cy) => {
+    const S = 0.06;
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 5.8, cy - S * 5.6],
+            [cx + S * 2.5, cy - S * 4.7],
+            [cx + S * 4.6, cy + S * 4.8],
+            [cx - S * 4.6, cy + S * 6.0]
+        ],
+        "#4d321e",
+        "#b68c5a",
+        0.065
+    );
+    [-2.6, 1.2].forEach((x) => {
+        const coil = Array.from({ length: 6 }, (_, i) => [
+            cx + S * (x + (i % 2 ? 1.4 : 0)),
+            cy - S * 3.0 + S * i * 1.6
+        ]);
+        drawOpenPath(ctx, coil, "#2f8692", 0.06);
+    });
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 6.7, cy - S * 4.0],
+            [cx - S * 4.9, cy - S * 4.0],
+            [cx - S * 4.5, cy + S * 5.1],
+            [cx - S * 6.2, cy + S * 5.2]
+        ],
+        "#303b40",
+        "#69767a",
+        0.04
+    );
+});
+
+registerTag("intermediate_defense_mass", "중간 · 방어·질량 · 명칭 미정", (ctx, cx, cy) => {
+    const S = 0.06;
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 2.0, cy - S * 6.2],
+            [cx - S * 5.1, cy - S * 3.5],
+            [cx - S * 4.1, cy + S * 5.7],
+            [cx, cy + S * 6.6],
+            [cx + S * 4.1, cy + S * 5.7],
+            [cx + S * 5.1, cy - S * 3.5],
+            [cx + S * 2.0, cy - S * 6.2]
+        ],
+        "#35435b",
+        "#7e8da5",
+        0.055
+    );
+    [
+        [-2.5, -1.6],
+        [2.5, -1.6],
+        [-2.2, 2.0],
+        [2.2, 2.0]
+    ].forEach(([x, y]) => {
+        ctx.beginPath();
+        ctx.arc(cx + S * x, cy + S * y, S * 1.2, 0, Math.PI * 2);
+        sf(ctx, "#35435b", null, 0.035);
+    });
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 3.6, cy - S * 0.7],
+            [cx + S * 3.6, cy - S * 0.7],
+            [cx + S * 3.2, cy + S * 4.6],
+            [cx - S * 3.2, cy + S * 4.6]
+        ],
+        "#30343c",
+        "#6c7078",
+        0.045
+    );
+    ctx.beginPath();
+    ctx.arc(cx, cy + S * 1.7, S * 2.5, 0, Math.PI * 2);
+    sf(ctx, "#292b31", "#484b50", 0.045);
+    [-2.4, 2.4].forEach((x) => {
+        ctx.beginPath();
+        ctx.arc(cx + S * x, cy + S * 2.0, S * 0.65, 0, Math.PI * 2);
+        sf(ctx, "#282a2e", "#b5a65a", 0.025);
+    });
+});
+
+registerTag("intermediate_speed_wall", "중간 · 속도·벽 반사 속도 · 명칭 미정", (ctx, cx, cy) => {
+    const S = 0.06;
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 2.7, cy - S * 6.6],
+            [cx + S * 2.7, cy - S * 6.6],
+            [cx + S * 3.5, cy + S * 0.7],
+            [cx + S * 6.5, cy + S * 3.3],
+            [cx + S * 5.0, cy + S * 5.8],
+            [cx - S * 4.8, cy + S * 6.2],
+            [cx - S * 4.0, cy + S * 1.7]
+        ],
+        "#30343a",
+        "#747980",
+        0.06
+    );
+    const coils = Array.from({ length: 7 }, (_, i) => [cx - S * 2.1 + S * i * 0.75, cy + S * (i % 2 ? -0.5 : 1.8)]);
+    drawOpenPath(ctx, coils, "#3ca3a3", 0.07);
+    drawOpenPath(
+        ctx,
+        [
+            [cx - S * 3.0, cy - S * 1.0],
+            [cx + S * 2.4, cy - S * 1.0]
+        ],
+        "#a77d4c",
+        0.055
+    );
+    [-2.5, 2.0].forEach((x) => {
+        ctx.beginPath();
+        ctx.arc(cx + S * x, cy - S * 1.0, S * 0.55, 0, Math.PI * 2);
+        sf(ctx, "#342a25", "#d0a958", 0.025);
+    });
+});
+
+registerTag("intermediate_speed_angular", "중간 · 속도·회전 충격 · 명칭 미정", (ctx, cx, cy) => {
+    const S = 0.06;
+    ctx.beginPath();
+    ctx.ellipse(cx - S * 0.6, cy, S * 5.8, S * 2.4, -0.35, 0.15, Math.PI * 1.85);
+    sf(ctx, "#c56b29", null, 0.065);
+    ctx.beginPath();
+    ctx.ellipse(cx - S * 0.6, cy, S * 4.5, S * 1.8, -0.35, 0.1, Math.PI * 1.9);
+    sf(ctx, "#8d4824", null, 0.045);
+    drawClosedPath(
+        ctx,
+        [
+            [cx + S * 1.8, cy - S * 5.2],
+            [cx + S * 5.6, cy - S * 1.6],
+            [cx + S * 3.6, cy + S * 0.1],
+            [cx + S * 0.6, cy - S * 2.6]
+        ],
+        "#5a6275",
+        "#d0d6df",
+        0.045
+    );
+    drawOpenPath(
+        ctx,
+        [
+            [cx + S * 1.5, cy - S * 3.4],
+            [cx + S * 4.3, cy - S * 1.5]
+        ],
+        "#7f8799",
+        0.03
+    );
+    ctx.beginPath();
+    ctx.arc(cx - S * 0.6, cy, S * 1.4, 0, Math.PI * 2);
+    sf(ctx, "#3c3434", "#e37b31", 0.04);
+    ctx.beginPath();
+    ctx.arc(cx + S * 2.3, cy - S * 1.2, S * 0.65, 0, Math.PI * 2);
+    sf(ctx, "#33343d", "#c29e4e", 0.025);
+});
+
+registerTag("intermediate_haste_angular", "중간 · 스킬 가속·회전 충격 · 명칭 미정", (ctx, cx, cy) => {
+    const S = 0.06;
+    [
+        [S * 5.8, S * 2.5, 0.45],
+        [S * 4.2, S * 1.7, -0.45]
+    ].forEach(([rx, ry, rot]) => {
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, rx, ry, rot, 0.2, Math.PI * 1.8);
+        sf(ctx, "#a94f29", null, 0.06);
+    });
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 1.7, cy - S * 1.7],
+            [cx + S * 1.7, cy - S * 1.7],
+            [cx + S * 1.7, cy + S * 1.7],
+            [cx - S * 1.7, cy + S * 1.7]
+        ],
+        "#393b42",
+        "#666a73",
+        0.04
+    );
+    drawClosedPath(
+        ctx,
+        [
+            [cx, cy + S * 1.7],
+            [cx + S * 2.4, cy + S * 4.8],
+            [cx, cy + S * 6.3],
+            [cx - S * 2.4, cy + S * 4.8]
+        ],
+        "#71311e",
+        "#df6a2c",
+        0.045
+    );
+    drawOpenPath(
+        ctx,
+        [
+            [cx - S * 4.2, cy + S * 2.6],
+            [cx, cy + S * 5.8],
+            [cx + S * 4.2, cy + S * 2.6]
+        ],
+        "#4b4052",
+        0.045
+    );
+});
+
+registerTag("intermediate_crit_mass", "중간 · 치명타·질량 · 명칭 미정", (ctx, cx, cy) => {
+    const S = 0.06;
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 4.6, cy - S * 2.8],
+            [cx + S * 3.6, cy - S * 4.2],
+            [cx + S * 5.3, cy + S * 1.8],
+            [cx - S * 2.8, cy + S * 4.1]
+        ],
+        "#2d3036",
+        "#565961",
+        0.06
+    );
+    drawClosedPath(
+        ctx,
+        [
+            [cx - S * 3.5, cy - S * 1.0],
+            [cx - S * 7.2, cy - S * 5.6],
+            [cx - S * 5.8, cy + S * 1.7],
+            [cx - S * 3.1, cy + S * 2.4]
+        ],
+        "#74500f",
+        "#d5a12e",
+        0.05
+    );
+    drawClosedPath(
+        ctx,
+        [
+            [cx + S * 2.8, cy - S * 1.8],
+            [cx + S * 6.7, cy + S * 3.2],
+            [cx + S * 4.7, cy + S * 4.5],
+            [cx + S * 1.8, cy + S * 1.2]
+        ],
+        "#74500f",
+        "#d5a12e",
+        0.05
+    );
+    [-3.0, 1.7, 4.0].forEach((x, index) => {
+        ctx.beginPath();
+        ctx.arc(cx + S * x, cy + S * (index === 0 ? 0.1 : -0.2), S * 0.72, 0, Math.PI * 2);
+        sf(ctx, "#292a2e", "#c7a142", 0.025);
+    });
+    ctx.beginPath();
+    ctx.arc(cx + S * 4.6, cy + S * 4.5, S * 1.5, 0, Math.PI * 2);
+    sf(ctx, "#303038", null, 0.055);
+});
+
 export function getRegisteredTags() {
     return Array.from(TAG_REGISTRY.keys()).filter((id) => id !== "unknown");
 }

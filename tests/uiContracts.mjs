@@ -1762,15 +1762,27 @@ function testIconTagCountAndUniqueness() {
             "crit_twin_blades",
             "mass_weight",
             "wall_spring",
-            "collision_gyro"
+            "collision_gyro",
+            "intermediate_attack_crit",
+            "intermediate_attack_haste",
+            "intermediate_attack_speed",
+            "intermediate_attack_health",
+            "intermediate_health_defense",
+            "intermediate_health_haste",
+            "intermediate_defense_wall",
+            "intermediate_defense_mass",
+            "intermediate_speed_wall",
+            "intermediate_speed_angular",
+            "intermediate_haste_angular",
+            "intermediate_crit_mass"
         ],
-        "The prototype registry should expose the approved 15 concrete-object tags in gallery order"
+        "The prototype registry should expose the approved 15 basic and 12 intermediate tags in gallery order"
     );
     const unknownTag = resolveTagDraw("unknown");
     assert.ok(typeof unknownTag === "function", "Unknown fallback should resolve to a draw function");
     const nonExistentTag = resolveTagDraw("does_not_exist");
     assert.equal(nonExistentTag, unknownTag, "Non-existent tag should fall back to unknown draw function");
-    assert.equal(tags.length, 15, "There should be exactly 15 registered non-unknown tags");
+    assert.equal(tags.length, 27, "There should be exactly 27 registered non-unknown tags");
     const unique = new Set(tags);
     assert.equal(unique.size, tags.length, "All tag IDs must be unique");
     tags.forEach((id) => {
@@ -1780,7 +1792,7 @@ function testIconTagCountAndUniqueness() {
         );
     });
     const metadata = getRegisteredTagMetadata();
-    assert.equal(metadata.length, 15, "getRegisteredTagMetadata should return exactly 15 entries");
+    assert.equal(metadata.length, 27, "getRegisteredTagMetadata should return exactly 27 entries");
     metadata.forEach((entry) => {
         assert.ok(typeof entry.id === "string" && entry.id.length > 0, "Each metadata entry must have an id");
         assert.ok(typeof entry.label === "string" && entry.label.length > 0, "Each metadata entry must have a label");
@@ -1800,7 +1812,19 @@ function testIconTagCountAndUniqueness() {
         crit_twin_blades: "높은 치명타 · 쌍날 부적",
         mass_weight: "질량 · 무쇠 추",
         wall_spring: "벽 반사 속도 · 압축 스프링",
-        collision_gyro: "충돌 · 충격 자이로"
+        collision_gyro: "충돌 · 충격 자이로",
+        intermediate_attack_crit: "중간 · 공격·치명타 · 명칭 미정",
+        intermediate_attack_haste: "중간 · 공격·스킬 가속 · 명칭 미정",
+        intermediate_attack_speed: "중간 · 공격·속도 · 명칭 미정",
+        intermediate_attack_health: "중간 · 공격·HP · 명칭 미정",
+        intermediate_health_defense: "중간 · HP·방어 · 명칭 미정",
+        intermediate_health_haste: "중간 · HP·스킬 가속 · 명칭 미정",
+        intermediate_defense_wall: "중간 · 방어·벽 반사 속도 · 명칭 미정",
+        intermediate_defense_mass: "중간 · 방어·질량 · 명칭 미정",
+        intermediate_speed_wall: "중간 · 속도·벽 반사 속도 · 명칭 미정",
+        intermediate_speed_angular: "중간 · 속도·회전 충격 · 명칭 미정",
+        intermediate_haste_angular: "중간 · 스킬 가속·회전 충격 · 명칭 미정",
+        intermediate_crit_mass: "중간 · 치명타·질량 · 명칭 미정"
     };
     metadata.forEach((entry) => {
         assert.equal(entry.label, LABEL_MAP[entry.id], `Label for ${entry.id} must match the confirmed equipment name`);
