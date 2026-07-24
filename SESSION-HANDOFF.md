@@ -2991,7 +2991,7 @@
 - 맥락: 사용자가 현재 사냥터가 의도와 다르게 로스터 캐릭터 1대1 반복처럼 구성되어 있다고 지적. 사냥터는 기본적으로 플레이어 1명 대 다수 몹 전투여야 하고, 기존 기본 캐릭터들은 일반 적이 아니라 중간 보스 정도로 사용해야 함.
 - 결정: 사냥터 전용 몹 스펙을 `melee`/`ranged` 2종으로 추가하고, 일반 층은 다수 몹 팩으로 구성. 3층 단위 또는 `champion_intrusion` 이벤트에서는 로스터 캐릭터를 중간 보스로 변환해 몹과 함께 등장. 플레이어/적은 `hunting-player`/`hunting-enemy` 팀으로 구분해 같은 팀 피해를 방지.
 - 결정: 물리 경기장 크기는 유지하고 `ArenaCamera` 렌더 줌으로 사냥터 다수전 시야만 `0.78`로 축소. 일반 1대1은 기본 `1.0` 시야 유지.
-- 영향: `src/hunting/huntingMonsters.js`, `src/hunting/huntingManager.js`, `src/simulation/battleSimulation.js`, `src/camera.js`, `src/ui.js`, `src/app.js`, `tests/regression.mjs`, `docs/hunting-grounds-combat-update.md`
+- 영향: `src/hunting/huntingMonsters.js`, `src/hunting/huntingManager.js`, `src/simulation/battleSimulation.js`, `src/camera.js`, `src/ui.js`, `src/app.js`, `tests/regression.mjs`, `.legacy/docs/hunting-grounds-combat-update.md`
 
 ## [L1] 2026-07-04 — 사냥터 버튼은 우승 캐릭터가 있을 때만 노출
 - 맥락: 사용자가 사냥터는 기본적으로 한 번이라도 우승해서 사용 가능한 캐릭터가 존재할 때 버튼이 생성되어야 한다고 요청.
@@ -3008,7 +3008,7 @@
 - 맥락: 사용자가 기존 구현은 카메라 줌만 바뀌고 실질 맵 크기가 커지지 않았다고 지적. 카메라는 기본적으로 전체 맵을 보이게 하고, 사냥터는 실제 맵 크기를 더 크게 조절해야 함.
 - 결정: `BattleSimulation`이 `arenaWidth`/`arenaHeight` 옵션을 받아 실제 `Simulation.width/height`를 바꾸도록 변경. 사냥터는 `HUNTING_ARENA` 1280×1280을 사용. `ArenaCamera`는 전투원 수 기반 자동 줌아웃을 제거하고 현재 시뮬레이션 맵 전체를 캔버스에 fit-to-map으로 맞춤.
 - 검증: 수치 시뮬레이션에서 사냥터 arena `[1280,1280]`, 960 캔버스 cameraScale `0.75` 확인. `npm test`, `npm run check`, `npm run format:check` 통과.
-- 영향: `src/hunting/huntingConfig.js`, `src/hunting/huntingManager.js`, `src/simulation/battleSimulation.js`, `src/camera.js`, `src/ui.js`, `src/app.js`, `tests/regression.mjs`, `docs/hunting-grounds-combat-update.md`
+- 영향: `src/hunting/huntingConfig.js`, `src/hunting/huntingManager.js`, `src/simulation/battleSimulation.js`, `src/camera.js`, `src/ui.js`, `src/app.js`, `tests/regression.mjs`, `.legacy/docs/hunting-grounds-combat-update.md`
 
 ## [L1] 2026-07-05 — player-panel $dispatch → $store._actions 전환 (버튼 무반응 디버깅 중)
 - 맥락: `@click="$dispatch(...)"` 이벤트가 `template.cloneNode(true)`로 복제된 컴포넌트 내부에서 `document` 리스너까지 전파되지 않는 문제. `_listenComponentEvents()`를 appStore.init()에서 등록해 document가 이벤트를 수신하게 했으나, 실제 브라우저에서 버튼이 여전히 무반응.
@@ -3864,10 +3864,10 @@
 - 결정: 기존 인라인 환생 흐름과 저장·확정 로직은 유지하되 후보 영역을 보유 카드 목록과 분리한 유동 카드 그리드로 만든다. 각 후보의 종류·이름·현재 획득 효과·단계를 카드 안에서 비교하고 카드 전체를 눌러 선택한다.
 - 영향: 도감 환생 탭 후보 마크업·반응형 CSS, UI 계약, 게임 규칙·패치노트.
 
-## [L1] 2026-07-23 - ??? ?? ??? ??? ??? ?? UI ?? ??
-- ??: ??? ??? ??? ?? ??? ????? ??? ?? ????? ?? ??? ???, ???? ??? ??? ?? UI ??? ?? ?????? ????.
-- ??: ??? ???? ??? ?? ?? ??? 1?? ????, ??? ??? ??? ???/?? ?? ??? ??? ????? ?? ??? ??? ?? ??? ????? ????.
-- ??: `src/components/collection-hub.html`, `src/components/hunting-overlay.html`, `tests/uiContracts.mjs`
+## [L1] 2026-07-23 — 모바일 디버그 진입과 사냥터 재현 줄의 밀림을 줄인다
+- 맥락: 디버그 진입 홀드가 0ms로 풀린 회귀와 작은 화면에서 사냥터 테스트 조작 줄이 가로로 밀리는 문제가 확인됐다.
+- 결정: 디버그 진입은 기존 홀드 시간을 복구하고, 사냥터 테스트 섹션의 개발자 조작 줄은 작은 화면에서 세로로 쌓이게 한다. 기존 사냥터 이벤트·결과 오버레이의 유동형 계약과 카드 폭은 바꾸지 않는다.
+- 영향: `src/components/collection-hub.html`, 모바일 디버그 진입·사냥터 재현 UI 계약.
 
 ## [L1] 2026-07-23 — 디버그 재현으로 사냥터 이벤트 UI를 전수 정비한다
 - 맥락: 포탈·축복·함정·상자·휴식·저주받은 제단·챔피언·정예 및 직접 전투 조우를 PC와 모바일에서 재현한 결과, 내용 길이에 따라 카드 폭이 달라지고 모바일 행동 버튼이 자동 진행 바와 겹치며 전투 준비 글자가 사라지거나 중복되는 문제가 확인됐다.
@@ -3904,3 +3904,8 @@
 - 배경: 강화 장비의 큰 방어 보너스가 기존 정수 차감식에서 모든 공격을 최소 1 피해로 만들고, 큰 속도 보너스는 이동과 충돌 피해를 함께 과도하게 키워 사냥터 적 수치만으로 균형을 맞추기 어려웠다.
 - 결정: 방어 점수는 `피해 × 50 / (50 + 방어)`의 비율 감소로 전투 전체에 적용하고 최소 1 피해 계약은 유지한다. 장비 속도 보너스는 캐릭터의 장비 적용 전 속도를 기준으로 효율이 점차 줄어 최종 기본 속도가 약 2배에 수렴하게 한다. 능력 고유 속도 배율과 사냥터 탭 가속은 이 장비 변환 이후에 기존대로 적용한다.
 - 영향: 공용 피해 계산, 젖음 방어 감소, 장비 속도 적용·표시, 전투 및 장비 회귀 테스트, 전투·장비·사냥터 밸런스 문서와 패치노트.
+
+## [L1] 2026-07-24 — 현재 코드와 어긋난 문서는 현행 문서에서 분리한다
+- 맥락: 이전 대화가 로드되지 않는 상황에서 문서가 다음 작업의 핵심 인계 수단인데, 완료된 구현 계획과 오래된 파일 경로가 현행 규칙처럼 남아 있어 작업 방향을 오도할 수 있다. 핸드오프에는 커밋 시점부터 `?`로 저장된 손상 항목도 있다.
+- 결정: 현재 코드와 최근 L1/L2 결정을 기준으로 문서를 감사한다. 현행 규칙·설계 문서는 실제 경로와 상태에 맞게 고치고, 완료되었거나 다른 문서에 흡수되어 현재 구현과 맞지 않는 작업 문서는 `.legacy/docs/`로 이동한다. 레거시 문서는 참고 기록일 뿐 현행 계약으로 사용하지 않는다.
+- 영향: `SESSION-HANDOFF.md`, `README.md`, 현행 `docs/` 문서, `.legacy/docs/` 문서 보관 구조.

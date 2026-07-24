@@ -597,6 +597,7 @@ PC:
 ```text
 src/
   hunting/
+    huntingManager.js
     huntingFlowConfig.js
     huntingAutoAdvance.js
     huntingConfig.js
@@ -604,22 +605,31 @@ src/
     huntingEncounters.js
     huntingRewards.js
     huntingLoot.js
+    huntingPartyState.js
+    huntingFinalBossRegistry.js
+    dailyShop.js
+    events/
     chestRewards.js
     index.js
 ```
 
 | 파일 | 책임 |
 | --- | --- |
+| `huntingManager.js` | 원정 화면·전투·이벤트·결과 시퀀스의 애플리케이션 흐름 |
 | `huntingConfig.js` | 층 난이도, 이벤트 확률, 상자 등급, 비용 |
-| `huntingFlowConfig.js` | 교대·상인 기능 플래그와 공통 자동 진행 시간 |
-| `huntingAutoAdvance.js` | 1초 카운트다운, 즉시 넘기기, 중복 실행 방지 |
+| `huntingFlowConfig.js` | 파티·상인 기능 플래그와 화면별 자동 진행 시간 |
+| `huntingAutoAdvance.js` | 카운트다운, 즉시 넘기기, 중복 실행 방지 |
 | `huntingState.js` | 사냥터 런 상태, 귀환/전진/패배 처리 |
 | `huntingEncounters.js` | 전투/이벤트/상자방 조우 생성 |
 | `huntingRewards.js` | 이벤트·상자 보상, pending/secured 계산 |
 | `huntingLoot.js` | 등급별 전장 루팅 확률, 5단위 파편 계산, 전투 임시 루팅 세션, 드롭 controller |
 | `chestRewards.js` | 상자 개봉, 설계도 발견/해금 |
-| `playerProfile.js` | 보관함/재화/설계도 저장과 마이그레이션 |
-| `collectionViewModel.js` | 보관함 탭 ViewModel |
+| `huntingPartyState.js` | 주 캐릭터·교대·동료·지원 파티 상태와 전투 참가자 구성 |
+| `huntingFinalBossRegistry.js` | 지역별 전용 최종 보스 등록과 폴백 정책 |
+| `dailyShop.js` | 일일 상점 상자·리롤 상태와 구매 처리 |
+| `events/` | 이벤트별 선택지와 결과 소유권 |
+| `src/playerProfile.js` | 보관함·재화·설계도 저장과 정규화 |
+| `src/collection/collectionViewModel.js` | 보관함·장비 탭 ViewModel |
 
 ## 15. 플레이어 프로필
 
@@ -652,27 +662,13 @@ src/
 
 상자 ID는 중복 개봉 방지를 위해 필요합니다.
 
-## 16. MVP 구현 범위
+## 16. 현재 제공 범위
 
-1. 사냥터 입장 버튼 (메인 메뉴)
-2. 캐릭터 선택 UI (한 번이라도 우승한 캐릭터만 표시)
-3. 최대 5층 1v1 연속 전투, HP 층간 누적과 층 이동 결손 HP 10% 자연 회복
-4. 승리 후 귀환/전진 선택
-5. 층별 적 강화
-6. 랜덤 이벤트 3종: 상자방, 휴식지, 저주받은 제단
-7. 열쇠 조각 지급과 보관 (패배 시 50% 보존)
-8. 상자 3등급: common/uncommon/rare
-9. 상자 파손 연쇄 확률 (100%→50%→25%→...)
-10. 보관함 탭에서 상자 개봉
-11. 사냥터 XP 오브 회수와 결과 XP 진행 패널 (stageMultiplier=1.0 고정)
-
-**MVP 제외** (별도 문서, 이후 구현):
-- 장비 시스템 ([`docs/equipment-system.md`](equipment-system.md))
-- 사냥터 전용 임시 아이템
-- 동시 다수 전투 / n 대 n
-- 방랑 상인 이벤트(현재 비활성화)
-- 설계도 시스템
-- 챔피언 난입
+- 100층 원정, 다수 몬스터 전투, 층간 HP 누적·자연 회복, 귀환·패배 정산을 제공합니다.
+- 주 캐릭터와 동료·교대·지원으로 원정 파티를 구성하며 역할별 전투 참가와 XP 정산 규칙을 적용합니다.
+- 상자·휴식·제단·포탈·상인·정예·챔피언 이벤트와 지역별 최종 보스 흐름을 제공합니다.
+- 전장 XP·파편·강화석·상자 회수, 보관함, 장비·상점 흐름을 현재 프로필에 저장합니다.
+- 세부 수치와 화면 계약은 이 문서의 각 절 및 `equipment-system.md`, `reward-balance.md`를 기준으로 합니다.
 
 ## 17. 필수 회귀 조건
 
@@ -696,36 +692,17 @@ src/
 - 승리 전장 전체 자석이 남은 XP 오브를 회수한 뒤에만 전투 결과 XP를 표시해야 합니다.
 - 모바일 보관함 UI에서 상자 카드와 개봉 버튼이 화면 밖으로 잘리지 않아야 합니다.
 
-## 18. 후속 결정
+## 18. 남은 밸런스 검증
 
 - 상자 등급별 실제 보상 확률은 balanceSim과 플레이 테스트 후 확정합니다.
-- 동시 다수 전투를 언제 MVP에 포함할지 결정해야 합니다.
-- 설계도 보상이 토너먼트에도 영향을 줄지, 사냥터 전용으로 제한할지 결정해야 합니다.
 - 패배 손실률 50%가 너무 가혹하거나 너무 약한지 플레이 테스트로 조정합니다.
 
-## 19. 구현 현황
+## 19. 구현 소유권
 
-2026-07-04 기준으로 전투 UI에 사냥터 런을 붙이기 전 단계의 기반 코드가 구현되었습니다.
-
-구현됨:
-
-- `src/hunting/huntingConfig.js`: 최대 5층, 이벤트 확률, 상자 등급/개봉 비용, 파손 가중치, 해조각 범위, 패배 보존율 정의
-- `src/hunting/huntingRewards.js`: 상자 생성, pending/secured loot 병합, 패배 시 상자 연쇄 파손과 파편·강화석 50% 보존
-- `src/hunting/huntingLoot.js`: 몬스터 처치 시 전장에 남는 루팅 아이템의 확률, 체력 연동 보상값, 회수 세션과 드롭 controller
-- `src/hunting/huntingEncounters.js`: 층별 적 스케일링, 이벤트 발생/선택
-- `src/hunting/huntingState.js`: 우승 캐릭터 입장 조건, 사냥터 런 생성, 층 클리어, 자연·이벤트 회복, 귀환, 패배 처리
-- `src/hunting/chestRewards.js`: 보관함 상자 개봉 가능 여부, 개봉 비용, 임시 보상 미리보기, 상자 제거/해조각 차감
-- `src/playerProfile.js`: `hunting.keyShards`, `hunting.chests`, `hunting.blueprints`, `hunting.stats` 저장/정리
-- `src/collection/collectionViewModel.js`, `src/ui.js`, `index.html`: 컬렉션 허브 보관함 탭 데이터와 최소 UI 노출
-- `tests/regression.mjs`: 입장 조건, 스케일링, HP carried state, 귀환, 패배 파손/보존, 상자 개봉, 프로필 sanitize, 보관함 ViewModel 검증
-
-아직 구현 전:
-
-- 메인 화면 사냥터 입장 버튼
-- 우승 경험 캐릭터 선택 UI
-- 실제 `BattleSimulation`을 이어 붙이는 층별 1v1 런
-- 승리 후 자동 흐름을 해치지 않는 귀환/전진 선택 UI
-- 상자 개봉의 실제 외형/설계도 보상 지급
+- `HuntingManager`가 원정 애플리케이션 흐름을 조정하고 전투 규칙은 `BattleSimulation`과 각 사냥터 모듈에 위임합니다.
+- 상태 전이·보상·파티·이벤트·조우 계산은 각각의 순수 모듈이 소유하며 UI가 프로필을 직접 변경하지 않습니다.
+- 사냥터 화면은 `src/components/hunting-overlay.html`, 컬렉션 보관함·장비 화면은 각 컬렉션 컴포넌트가 소유합니다.
+- 실제 지원 범위는 코드와 회귀 테스트를 기준으로 하며 과거 전환 기록은 `.legacy/docs/hunting-grounds-combat-update.md`에 보관합니다.
 
 ## 20. 2026-07-16 추가 구현 — 전장 XP 오브
 

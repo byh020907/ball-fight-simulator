@@ -33,15 +33,17 @@ http://127.0.0.1:4173/
 - `src/main.js`: 앱 진입점
 - `src/app.js`: `BattleApp`
 - `src/abilities/`: 캐릭터별 능력
-- `src/entities.js`: 공, 투사체, 수류탄 등 엔티티
-- `src/simulation.js`: 전투 루프, 충돌, 이펙트, 사운드 훅
+- `src/entities/`: 공, 투사체, 수류탄 등 전투 엔티티
+- `src/simulation/`: 전투 루프, 충돌, 참여·종료 판정
 - `src/ui.js`: Alpine.js 컴포넌트 (UI 상태 관리) + `ArenaRenderer` (캔버스 렌더링)
 - `src/tournament.js`: 자동 토너먼트 진행
-- `src/roster.js`: 캐릭터 스탯과 정보
-- `src/stat-allocation.js`: 스탯 배분 로직
+- `src/characters/definitions/`: 캐릭터별 메타데이터와 기본 스탯
+- `src/roster.js`: 중앙 캐릭터 정의를 화면용 로스터로 투영
+- `src/statAllocation.js`: 스탯 배분 로직
 - `docs/game-rules.md`: 게임 흐름, 스탯 배분, 등수 규칙
 - `docs/design.md`: 시각 방향과 캐릭터 표현 규칙
 - `docs/development-rules.md`: 개발, 문서, Git 운영 규칙
+- `.legacy/docs/`: 구현 완료·폐기·통합으로 현행 계약에서 제외된 과거 작업 문서
 
 UI는 **Alpine.js**를 통해 컴포넌트 기반으로 관리되며, 문자열 결합(`innerHTML`) 대신 Alpine의 반응형 데이터 바인딩(`x-text`, `x-for`, `x-bind`)을 사용합니다. CSS는 `src/styles.css`로 분리되어 있습니다.
 

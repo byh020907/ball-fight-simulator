@@ -1,5 +1,7 @@
 # 사냥터 전투 컨셉 업데이트
 
+> **레거시 문서**: 초기 전투 전환 기록입니다. 현재 사냥터 계약은 [`docs/hunting-grounds-system.md`](../../docs/hunting-grounds-system.md)를 기준으로 합니다.
+
 작성일: 2026-07-04
 
 ## 핵심 결정

@@ -1,7 +1,7 @@
 # 클릭 액션 시스템
 
 > **구현 상태**: 구현 완료 (v0.9.0)
-> **구현 계획**: [`docs/implementation-plan.md`](implementation-plan.md)
+> **과거 구현 계획**: [`.legacy/docs/implementation-plan.md`](../.legacy/docs/implementation-plan.md) — 참고 기록이며 현행 계약이 아님
 > **관련 문서**: [`docs/design.md`](design.md) (시각 방향), [`docs/game-rules.md`](game-rules.md) (게임 규칙)
 
 ## 한 줄 요약
@@ -77,7 +77,7 @@
 ### 액션 정의 형식 (클래스 기반)
 
 ```js
-// src/click-actions.js — Strategy Pattern
+// src/clickActions.js — Strategy Pattern
 
 // ── Trigger Strategy ─────────────────────────────────────────────
 // Action의 "어떻게 발동되는지"를 캡슐화한다.
@@ -422,24 +422,23 @@ const ACTION_DEFS = Object.freeze([
 
 ---
 
-## 6. 구현 힌트
+## 6. 구현 소유권
 
 ### 신규 파일
 
 | 파일                   | 역할                                                                                           |
 | ---------------------- | ---------------------------------------------------------------------------------------------- |
-| `src/click-actions.js` | 액션 정의 모음 (각 액션은 `{ id, name, description, hpCostPercent, getFailureReason, apply }` 형태) |
+| `src/clickActions.js` | 액션 정의와 `ActionContext` |
 
 ### 기존 파일 변경
 
 | 파일                                 | 변경                                                                |
 | ------------------------------------ | ------------------------------------------------------------------- |
-| `src/ui.js`                          | `waitForActionPick(cards)` — 카드 선택 UI 비동기 메서드 추가        |
-| `src/app.js`                         | `startMatch()`에서 카드 선택 단계 추가, `currentMatchAction` 관리   |
-| `src/simulation/BattleSimulation.js` | 생성자에 `playerFighterId`, `matchAction` 인자 추가, 시간 왜곡 구현 |
-| `src/entities.js`                    | `BattleBall.actionContext` 보유, 투사체에 `ownerId` 참조 확인       |
-| `src/click-actions.js`               | 액션 정의, 실패 피드백, `ActionContext` effect 저장소 보유          |
-| `ArenaRenderer`                      | 캔버스 `pointerdown` 이벤트 바인딩                                  |
+| `src/actionPicker.js`                | 전투 전 액션 카드 선택 상태와 확정                                 |
+| `src/app.js`                         | 액션 선택·입력 수명주기와 캔버스 `pointerdown` 연결                 |
+| `src/simulation/battleSimulation.js` | 액션 효과를 반영하는 전투 계산 경계                                |
+| `src/entities/battleBall.js`         | 각 전투원의 `ActionContext` 보유와 갱신                             |
+| `src/clickActions.js`                | 액션 정의, 실패 피드백, `ActionContext` 효과 저장소                 |
 
 ### 카운터 판정
 
@@ -474,7 +473,7 @@ for (const entity of this.entities) {
 **효과값은 0.05(5%) 단위, HP 코스트는 0.5%p 단위**로 정렬한다. 이유:
 1. **정수비 직관성** — 0.05 단위(5%, 10%, 25%, 50%)는 플레이어가 체감하고 비교하기 쉽다. 12%나 22%는 즉각적인 가치 판단이 어렵다.
 2. **확장 일관성** — 새 액션을 추가할 때도 같은 단위를 강제하면 과도하게 미세한 값(1.08% 같은)이 들어가는 것을 방지한다.
-3. **코드 정합성** — 상수 하나로 `description`과 `apply()`가 동시에 갱신되므로, 문서와 구현이 자동으로 일치한다. (src/click-actions.js 상단 모듈 상수 참고)
+3. **코드 정합성** — 상수 하나로 `description`과 `apply()`가 동시에 갱신되므로, 문서와 구현이 자동으로 일치한다. (`src/clickActions.js` 상단 모듈 상수 참고)
 
 | 액션 | 코스트 | 효과 |
 |------|--------|------|

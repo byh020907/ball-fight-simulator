@@ -1,7 +1,9 @@
 # 클릭 액션 시스템 — 구현 계획
 
-> **상태**: 구현 완료 (v0.8.0, [`src/click-actions.js`](../src/click-actions.js))
-> **설계 문서**: [`docs/click-actions.md`](click-actions.md)
+> **레거시 문서**: 구현 당시의 계획과 경로를 보존한 기록입니다. 현재 계약은 [`docs/click-actions.md`](../../docs/click-actions.md)와 코드를 기준으로 합니다.
+
+> **상태**: 구현 완료 (v0.8.0, 현행 코드는 [`src/clickActions.js`](../../src/clickActions.js))
+> **설계 문서**: [`docs/click-actions.md`](../../docs/click-actions.md)
 
 ---
 

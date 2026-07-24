@@ -632,24 +632,25 @@ src/
   experience/
     experienceConfig.js
     experienceState.js
-    experienceRewards.js
-    experienceScaling.js
-    championState.js
+    experienceService.js
+    abilityUpgradeConfig.js
+    characterLevelProgression.js
+    reward-effects/
+      effectRegistry.js
     index.js
 ```
 
 | 파일 | 책임 |
 | --- | --- |
 | `experienceConfig.js` | XP 지급량, 레벨 곡선, 대표 행동 정의 |
-| `experienceState.js` | XP 지급, 중복 처리 방지, 레벨 계산 |
-| `experienceRewards.js` | 레벨 보상 파생 계산 |
-| `experienceScaling.js` | 플레이어 레벨 기반 상대 성장 보정 계산 |
-| `championState.js` | 디펜딩 챔피언 등록, 현상금, 1회성 챔피언 버프 계산 |
-| `ui.js` | 챔피언 배너, strip, 결과 XP 패널/캐릭터 XP 미터 상태 연결 |
-| `styles.css` | PC/모바일 챔피언 표시 반응형 스타일 |
-| `playerProfile.js` | 기본값과 마이그레이션 |
-| `collectionViewModel.js` | 컬렉션 허브용 레벨/진행도 표시 데이터 |
-| `app.js` | 매치 종료 직후 XP 지급 및 결과 오버레이 UI 연결 |
+| `experienceState.js` | 매치·토너먼트 XP 계산과 레벨 곡선 조회 |
+| `experienceService.js` | 캐릭터 XP 지급, 결과 합산, 전투 적용용 성장 데이터 구성 |
+| `characterLevelProgression.js` | 캐릭터 정의에서 레벨 보상과 다음 보상을 파생 |
+| `abilityUpgradeConfig.js` | 레벨 보상으로 열린 능력 단계 조회 |
+| `src/experience/reward-effects/effectRegistry.js` | 레벨 보상 효과의 표시와 전투 적용 |
+| `src/playerProfile.js` | 경험치 기본값, 정규화, 마이그레이션 |
+| `src/collection/collectionViewModel.js` | 컬렉션 허브용 레벨·진행도 표시 데이터 |
+| `src/app.js` | 매치 종료 직후 XP 지급과 결과 시퀀스 연결 |
 
 전투 중 엔티티나 Ability가 직접 `profile.experience`를 수정하지 않습니다. 토너먼트·일반 매치는 `BattleApp.finishMatch()`가 `MatchReport`를 완성한 뒤 지급하고, 사냥터는 `HuntingManager`만 `BattleApp.awardExperience()`를 호출해 수집된 XP 오브를 즉시 지급합니다.
 

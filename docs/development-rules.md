@@ -549,10 +549,10 @@ npm run format:check
 
 | 파일 성격          | 분리 기준                                           | 분리 방향                                      | 예시                                                  |
 | ------------------ | --------------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------- |
-| **데이터/설정**    | 1000줄 넘어도 분리 불필요                           | 값 추가만으로 유지보수에 지장 없으면 그대로 둠 | `roster.js`, `stat-allocation.js`                     |
+| **데이터/설정**    | 1000줄 넘어도 분리 불필요                           | 값 추가만으로 유지보수에 지장 없으면 그대로 둠 | `roster.js`, `statAllocation.js`                      |
 | **게임 로직/상태** | 700~1000줄에서 분리 검토                            | 책임별로 클래스/모듈 분리                      | `simulation.js`, `entities.js`                        |
 | **UI/렌더링**      | 700~1000줄에서 분리 검토                            | 컴포넌트나 역할 단위로 분리                    | `ui.js` (Alpine store / UIController / ArenaRenderer) |
-| **능력(Ability)**  | 각 Ability 파일은 개별 클래스이므로 1000줄까지 허용 | 능력 하나가 1000줄 넘으면 내부 책임 분리       | `OrbitAbility.js`, `RageAbility.js`                   |
+| **능력(Ability)**  | 각 Ability 파일은 개별 클래스이므로 1000줄까지 허용 | 능력 하나가 1000줄 넘으면 내부 책임 분리       | `orbitAbility.js`, `rageAbility.js`                   |
 | **유틸리티**       | 500줄 이상이면 분리 검토                            | 함수 성격별 파일 분리                          | `core.js`, `effects.js`                               |
 
 분리할 때는 아래 원칙을 따릅니다.
@@ -695,7 +695,7 @@ npm run check
 
 도감, 업적, 캐릭터 연계, 메타 성장처럼 브라우저를 닫은 뒤에도 유지되어야 하는 데이터는 [`player-data-storage-security.md`](player-data-storage-security.md)를 기준으로 구현합니다.
 
-- 현재 GitHub Pages 단계에서는 `src/player-profile.js`만 `localStorage`에 직접 접근합니다.
+- 현재 GitHub Pages 단계에서는 `src/playerProfile.js`만 `localStorage`에 직접 접근합니다.
 - 저장 키는 `bfs:player-profile:v1`을 사용하고 모든 영구 시스템이 하나의 버전 프로필을 공유합니다.
 - 다른 모듈은 저장소 API가 아니라 프로필 도메인 함수만 호출합니다.
 - 로드한 데이터는 신뢰하지 않고 ID, 숫자 상한, 배열 중복, 스키마 버전을 항상 검증합니다.
@@ -731,11 +731,10 @@ Tested: npm test, npm run check
 - `README.md`는 처음 보는 사람이 실행, 구조, 검증 방법을 바로 알 수 있게 유지합니다.
 - `docs/game-rules.md`는 게임 흐름, 스탯, 토너먼트 규칙을 기록합니다.
 - `docs/design.md`는 시각 스타일과 캐릭터 표현 규칙을 기록합니다.
-- `docs/click-actions.md`는 클릭 액션 시스템의 전체 설계를 기록합니다. (구현 전 설계 단계)
-- `docs/implementation-plan.md`는 기능 단위 구현 계획과 단계별 작업 내용을 기록합니다.
-- `docs/refactor-steps.md`는 책임 분리 리팩토링 스텝과 외부 검증 체크리스트를 기록합니다.
+- `docs/click-actions.md`는 구현된 클릭 액션 시스템의 현재 계약을 기록합니다.
 - `docs/development-rules.md`는 개발, 검증, Git 운영 규칙의 기준 문서입니다.
 - 구현과 문서가 어긋나면 구현을 확인한 뒤 문서를 즉시 갱신합니다.
+- 구현 완료·폐기·통합으로 현재 코드와 맞지 않는 작업 문서는 `.legacy/docs/`로 이동합니다. `.legacy/` 문서는 결정 배경을 보존하는 참고 기록이며 현행 구현 계약으로 인용하지 않습니다.
 
 ## 배포 메모
 
@@ -762,7 +761,7 @@ Tested: npm test, npm run check
 
 ### 회귀 테스트 실행 파일 보호
 
-`tests/regression.mjs`는 실제 게임 상태·시뮬레이션 회귀를, `tests/uiContracts.mjs`는 템플릿·브리지·반응형 CSS와 가벼운 컴포넌트 상태 전이 계약을 소유합니다. 두 파일은 `npm test`에서 함께 실행됩니다. `tests/regression.mjs`는 `src/simulation.js`와 import 경로가 유사해 실수로 덮어쓰기 쉽습니다. 특히 `single_find_and_replace`가 파일 경로를 잘못 지정하면 파일 전체가 다른 내용으로 대체될 수 있습니다.
+`tests/regression.mjs`는 실제 게임 상태·시뮬레이션 회귀를, `tests/uiContracts.mjs`는 템플릿·브리지·반응형 CSS와 가벼운 컴포넌트 상태 전이 계약을 소유합니다. 두 파일은 `npm test`에서 함께 실행됩니다. `tests/regression.mjs`는 `src/simulation/` 모듈과 이름이 비슷해 실수로 대상을 혼동하기 쉽습니다. 특히 일괄 치환 도구의 파일 경로가 틀리면 파일 전체가 다른 내용으로 대체될 수 있습니다.
 
 - `tests/regression.mjs` 수정 시 대상 경로를 다시 확인합니다.
 - 화면 구조만 읽거나 UI 컴포넌트의 격리된 상태 전이만 만드는 테스트는 `tests/uiContracts.mjs`에 추가하고, 실제 도메인 상태·전투 진행을 만드는 테스트는 `tests/regression.mjs`에 둡니다.
@@ -778,9 +777,10 @@ Tested: npm test, npm run check
 1. **새 파일 먼저 생성** — 기존 파일을 지우기 전에 새 파일을 만듭니다.
 2. **`src/abilities/index.js` 갱신** — 바로 새 파일을 export합니다.
 3. **참조하는 모든 파일 업데이트** — 아래를 빠짐없이 확인합니다.
-    - `src/simulation.js` — import 구문, `createAbility` 테이블
-    - `src/entities.js` — `this.id` 할당
-    - `src/roster.js` — `id`, `face`, `ability` 필드
+    - `src/abilities/index.js` — Ability export와 중앙 매핑
+    - `src/entities/battleBall.js` — 전투원 ID와 Ability 연결
+    - `src/characters/definitions/` — `id`, 외형, Ability, 성장 메타데이터
+    - `src/roster.js` — 중앙 정의의 로스터 투영
     - 그 외 해당 클래스를 import/참조하는 모든 파일
 4. **함수/클래스 선언을 실수로 지우지 않도록 `git diff`로 확인**
     - `roster.js`는 전체 배열을 `export function createRoster()`로 감싸고 있습니다. `return [` 앞의 함수 선언과 끝의 `}`를 유지해야 합니다.

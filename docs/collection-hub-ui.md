@@ -309,21 +309,21 @@ clearCollectionSearch(tabId);
 [SILVER] 반격 전문가
 카운터 성공 10회
 [███████░░░] 7 / 10
-보상: 빌드 유연성 +5
+보상: 고급 상자
 ```
 
 - 진행도를 계산할 수 없는 일회성 조건은 `달성 전`으로 표시합니다.
 - 달성 후에도 조건과 보상을 숨기지 않습니다.
 - 수령 버튼은 만들지 않습니다. 보상은 업적 해금 시 자동 지급합니다.
-- `rewardClaimed`는 중복 방지를 위한 내부 상태일 뿐 사용자 조작 UI가 아닙니다.
+- `unlockedAt`이 있는 업적은 다시 판정·지급하지 않으며 별도 수령 상태를 저장하지 않습니다.
 
-## 9. 미래 탭
+## 9. 확장 탭
 
 ### 장비
 
 - 장비만 슬롯, 장착, 해제, 비교 UI를 가집니다.
 - 연계 탭과 시각적으로 구분합니다.
-- 장비 미구현 상태에서는 탭 자체를 등록하지 않습니다.
+- 장비 탭은 `collection-equipment-panel`이 목록·장착·강화 액션을 소유하고 허브 ViewModel의 장비 데이터를 사용합니다.
 
 ### 파편 상점
 
@@ -460,7 +460,11 @@ player profile + roster + definitions
 ```text
 src/
   collection/
-    collection-view-model.js
+    collectionViewModel.js
+  components/
+    collection-hub.html
+    collection-equipment-panel.html
+    collection-shop-panel.html
   ui.js
   styles.css
 index.html
@@ -468,10 +472,12 @@ index.html
 
 | 파일 | 책임 |
 | --- | --- |
-| `collection-view-model.js` | 프로필과 정의를 화면용 데이터로 변환, 검색·필터·정렬 |
-| `ui.js` | Alpine 컬렉션 상태와 열기/닫기/탭 액션 연결 |
-| `index.html` | 전용 Alpine 탭 및 카드 템플릿 |
-| `styles.css` | 팝업, 탭, 그리드, 목록, 모바일 반응형 스타일 |
+| `src/collection/collectionViewModel.js` | 프로필과 정의를 화면용 데이터로 변환하고 검색·필터·정렬 데이터를 제공 |
+| `src/components/collection-hub.html` | 허브 탭, 도감·업적·보관함 화면과 하위 컴포넌트 연결 |
+| `src/components/collection-equipment-panel.html` | 장비 목록·슬롯·강화·판매 UI |
+| `src/components/collection-shop-panel.html` | 상자 구매와 상점 리롤 UI |
+| `src/ui.js` | 공통 Alpine 상태와 `ArenaRenderer` |
+| `src/styles.css` | 전역 팝업·그리드·모바일 반응형 스타일 |
 
 ## 15. 빈 상태와 오류 상태
 
@@ -484,18 +490,11 @@ index.html
 
 로딩은 localStorage 기반이라 일반적으로 즉시 끝나지만, 향후 서버 저장 전환을 위해 `loading`, `error` 상태를 둡니다.
 
-## 16. 구현 순서
+## 16. 구현 소유권
 
-1. 컬렉션 view-model 순수 함수 구현
-2. `appStore.collectionHub` 상태와 액션 추가
-3. 컬렉션 진입 버튼 추가
-4. 전용 Alpine 팝업과 탭 템플릿 구현
-5. 도감 grid와 캐릭터 상세 구현
-6. 연계 목록 구현
-7. 업적 목록과 진행도 구현
-8. 데스크톱과 모바일 스타일 구현
-9. 키보드 및 포커스 처리
-10. 빈 상태와 오류 상태 구현
+- 새 탭의 데이터는 `collectionViewModel.js`, 화면은 해당 `src/components/` 템플릿이 소유합니다.
+- 허브 공통 열기·닫기와 하위 팝업 정리는 컴포넌트 브리지를 통해 앱 공개 API로 연결합니다.
+- 탭별 상태를 허브 루트에 무분별하게 추가하지 않고, 독립 동작은 해당 태그 컴포넌트의 `Alpine.data()`에 둡니다.
 
 ## 17. 필수 회귀 조건
 
