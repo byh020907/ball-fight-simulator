@@ -1745,6 +1745,27 @@ testNearestEnemyCombatControlUiContract();
 
 function testIconTagCountAndUniqueness() {
     const tags = getRegisteredTags();
+    assert.deepEqual(
+        tags,
+        [
+            "attack_sword",
+            "attack_greatsword",
+            "health_crystal",
+            "health_belt",
+            "defense_leather",
+            "defense_chain",
+            "speed_boots",
+            "speed_wing",
+            "haste_mote",
+            "haste_kindlegem",
+            "crit_cloak",
+            "crit_twin_blades",
+            "mass_weight",
+            "wall_spring",
+            "collision_gyro"
+        ],
+        "The prototype registry should expose the approved 15 concrete-object tags in gallery order"
+    );
     const unknownTag = resolveTagDraw("unknown");
     assert.ok(typeof unknownTag === "function", "Unknown fallback should resolve to a draw function");
     const nonExistentTag = resolveTagDraw("does_not_exist");
@@ -1763,6 +1784,7 @@ function testIconTagCountAndUniqueness() {
     metadata.forEach((entry) => {
         assert.ok(typeof entry.id === "string" && entry.id.length > 0, "Each metadata entry must have an id");
         assert.ok(typeof entry.label === "string" && entry.label.length > 0, "Each metadata entry must have a label");
+        assert.ok(entry.label.endsWith("(가칭)"), `Prototype label ${entry.id} must remain explicitly provisional`);
     });
     const unknownMeta = getUnknownTagMetadata();
     assert.equal(unknownMeta.id, "unknown", "Unknown metadata id must be 'unknown'");
@@ -1817,6 +1839,9 @@ function testIconTagDrawAll() {
                 },
                 roundRect() {
                     this._calls.push("roundRect");
+                },
+                rect() {
+                    this._calls.push("rect");
                 },
                 fill() {
                     this._calls.push("fill");
@@ -1914,6 +1939,7 @@ function testIconTagDprBackingSize() {
             arc() {},
             ellipse() {},
             roundRect() {},
+            rect() {},
             fill() {},
             stroke() {},
             fillRect() {},
@@ -1921,7 +1947,7 @@ function testIconTagDprBackingSize() {
             scale() {}
         })
     };
-    renderIconTag(canvas, "atk_small", { pixelRatio: 2 });
+    renderIconTag(canvas, "attack_sword", { pixelRatio: 2 });
     assert.equal(canvas.width, 96, "48 CSS px at DPR 2 should produce 96 backing px");
     assert.equal(canvas.height, 96, "48 CSS px at DPR 2 should produce 96 backing px");
     console.log("[icon-tag-dpr-backing-size] ok");
