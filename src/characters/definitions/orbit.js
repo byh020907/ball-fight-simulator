@@ -60,7 +60,7 @@ export default createCharacterDefinition({
             }
         ]
     },
-    stats: { hp: 153, damage: 15, speed: 308, radius: 48, mass: 1.1, defense: 1.5 },
+    stats: { hp: 153, damage: 15, speed: 308, radius: 48, mass: 1.1, defense: 10 },
     mastery: {
         id: "orbit_reflective_orbit",
         name: "반사 궤도",

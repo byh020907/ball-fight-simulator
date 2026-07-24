@@ -59,7 +59,7 @@ export default createCharacterDefinition({
             }
         ]
     },
-    stats: { hp: 159, damage: 15, speed: 280, radius: 48, mass: 1.14, defense: 1.5 },
+    stats: { hp: 159, damage: 15, speed: 280, radius: 48, mass: 1.14, defense: 10 },
     mastery: {
         id: "bat_ball_frugal_swing",
         name: "아껴 휘두르기",

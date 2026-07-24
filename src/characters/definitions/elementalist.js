@@ -65,7 +65,7 @@ export default createCharacterDefinition({
             }
         ]
     },
-    stats: { hp: 165, damage: 15, speed: 225, radius: 50, mass: 1.1, defense: 2 },
+    stats: { hp: 165, damage: 15, speed: 225, radius: 50, mass: 1.1, defense: 15 },
     mastery: {
         id: "elementalist_elemental_blessing",
         name: "원소 가호",

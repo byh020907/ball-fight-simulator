@@ -30,7 +30,7 @@ export const ALLOCATABLE_STATS = [
         key: "defense",
         label: "방어력",
         shortLabel: "DEF",
-        description: "종족값 방어력을 포인트당 1% 올립니다."
+        description: "1포인트당 방어력 1 증가. 방어 100이면 받는 피해가 50% 줄어듭니다."
     },
     {
         key: "criticalChance",
@@ -91,6 +91,8 @@ export function applyStatAllocation(fighter, allocation, isPlayer = false) {
             stats[stat.key] = stats[stat.key] ?? 0;
         } else if (stat.key === "criticalChance") {
             stats[stat.key] = Math.max(0, Math.min(100, (stats[stat.key] ?? 5) + pts));
+        } else if (stat.key === "defense") {
+            stats[stat.key] = Number(((stats[stat.key] ?? 0) + pts).toFixed(3));
         } else {
             stats[stat.key] = Number((stats[stat.key] * (1 + pts / 100)).toFixed(3));
         }
@@ -105,7 +107,10 @@ export function applyStatAllocation(fighter, allocation, isPlayer = false) {
 }
 
 export function formatStatAllocation(allocation) {
-    return ALLOCATABLE_STATS.map((stat) => `${stat.label} +${allocation[stat.key] ?? 0}%`).join(" · ");
+    return ALLOCATABLE_STATS.map((stat) => {
+        const suffix = stat.key === "defense" ? "" : "%";
+        return `${stat.label} +${allocation[stat.key] ?? 0}${suffix}`;
+    }).join(" · ");
 }
 
 /**

@@ -59,7 +59,7 @@ export default createCharacterDefinition({
             }
         ]
     },
-    stats: { hp: 165, damage: 15, speed: 320, radius: 46, mass: 1.02, defense: 1.5 },
+    stats: { hp: 165, damage: 15, speed: 320, radius: 46, mass: 1.02, defense: 10 },
     mastery: {
         id: "trickster_versatility",
         name: "다재다능",

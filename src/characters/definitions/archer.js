@@ -58,7 +58,7 @@ export default createCharacterDefinition({
             {}
         ]
     },
-    stats: { hp: 168, damage: 15, speed: 270, radius: 50, mass: 1.2, defense: 1.5 },
+    stats: { hp: 168, damage: 15, speed: 270, radius: 50, mass: 1.2, defense: 10 },
     mastery: {
         id: "archer_precision_training",
         name: "정밀 훈련",

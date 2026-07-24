@@ -60,7 +60,7 @@ export default createCharacterDefinition({
             }
         ]
     },
-    stats: { hp: 150, damage: 16.5, speed: 282, radius: 47, mass: 1.05, defense: 1.5 },
+    stats: { hp: 150, damage: 16.5, speed: 282, radius: 47, mass: 1.05, defense: 10 },
     mastery: {
         id: "vampire_blood_thirst",
         name: "갈증",

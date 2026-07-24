@@ -60,7 +60,7 @@ export default createCharacterDefinition({
             }
         ]
     },
-    stats: { hp: 165, damage: 15, speed: 294, radius: 49, mass: 1.16, defense: 1.5 },
+    stats: { hp: 165, damage: 15, speed: 294, radius: 49, mass: 1.16, defense: 10 },
     mastery: {
         id: "dash_propulsion",
         name: "추진력",

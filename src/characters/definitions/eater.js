@@ -49,7 +49,7 @@ export default createCharacterDefinition({
     abilityUpgrade: {
         tiers: [{}, {}, {}, {}]
     },
-    stats: { hp: 177, damage: 15, speed: 268, radius: 52, mass: 1.34, defense: 3 },
+    stats: { hp: 177, damage: 15, speed: 268, radius: 52, mass: 1.34, defense: 20 },
     mastery: {
         id: "eater_robust_digestion",
         name: "강한 소화력",

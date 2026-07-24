@@ -61,7 +61,7 @@ export default createCharacterDefinition({
             }
         ]
     },
-    stats: { hp: 162, damage: 15, speed: 286, radius: 49, mass: 1.2, defense: 1.5 },
+    stats: { hp: 162, damage: 15, speed: 286, radius: 49, mass: 1.2, defense: 10 },
     mastery: {
         id: "hero_inspiring_presence",
         name: "고무적인 존재감",

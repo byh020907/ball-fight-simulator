@@ -68,7 +68,7 @@ export default createCharacterDefinition({
             }
         ]
     },
-    stats: { hp: 165, damage: 15, speed: 305, radius: 47, mass: 1, defense: 1.5 },
+    stats: { hp: 165, damage: 15, speed: 305, radius: 47, mass: 1, defense: 10 },
     mastery: {
         id: "phantom_shadow_weave",
         name: "그림자 직조",

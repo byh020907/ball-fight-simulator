@@ -11,7 +11,7 @@ const REBIRTH_PASSIVE_RANK_MULTIPLIERS = Object.freeze([1, 4 / 3, 5 / 3, 2]);
 export const REWARD_BALANCE = deepFreeze({
     combat: {
         defense: {
-            ratingScale: 50,
+            ratingScale: 100,
             minimumDamage: 1
         }
     },

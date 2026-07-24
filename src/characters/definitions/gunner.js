@@ -61,7 +61,7 @@ export default createCharacterDefinition({
             }
         ]
     },
-    stats: { hp: 150, damage: 16.5, speed: 278, radius: 48, mass: 1.1, defense: 1.5 },
+    stats: { hp: 150, damage: 16.5, speed: 278, radius: 48, mass: 1.1, defense: 10 },
     mastery: {
         id: "gunner_mass_loading",
         name: "중량 장전",

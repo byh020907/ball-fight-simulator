@@ -1487,7 +1487,7 @@ async function testEaterFeast(app) {
         app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER)
     ]);
     const [eater, target] = app.simulation.fighters;
-    assert.equal(eater.stats.baseDefense, 3, "Eater base defense should use the approved combat baseline");
+    assert.equal(eater.stats.baseDefense, 20, "Eater base defense should use the high defense rating tier");
     eater.position.x = 300;
     eater.position.y = 480;
     target.position.x = 360;
@@ -2496,7 +2496,13 @@ function testStatAllocationRules(app) {
         true
     );
     assert.equal(directAllocation.statAllocation.skill, 20, "Skill points should keep the cooldown formula input");
-    assert.equal(directAllocation.stats.defense, Number((archer.stats.defense * 1.5).toFixed(3)));
+    assert.equal(directAllocation.stats.defense, archer.stats.defense + 50);
+    const defenseStatDefinition = ALLOCATABLE_STATS.find((stat) => stat.key === "defense");
+    assert.match(
+        defenseStatDefinition.description,
+        /1포인트.*방어력 1.*방어 100.*50%/,
+        "Defense allocation copy should explain direct rating growth and the 100-rating half-damage point"
+    );
     assert.equal(
         directAllocation.stats.criticalChance,
         55,
@@ -2505,8 +2511,8 @@ function testStatAllocationRules(app) {
     assert.equal("force" in boosted.stats, false, "Force should not exist as an unused gameplay stat");
     assert.equal(
         formatStatAllocation(allocation),
-        "체력 +30% · 공격 +40% · 속도 +30% · 쿨타임 +0% · 방어력 +0% · 크리티컬 +0%",
-        "Allocation summary should show percentages instead of raw stats"
+        "체력 +30% · 공격 +40% · 속도 +30% · 쿨타임 +0% · 방어력 +0 · 크리티컬 +0%",
+        "Allocation summary should show defense as a direct rating and other stats as percentages"
     );
     assert.equal(boosted.stats.radius, archer.stats.radius, "Radius should stay character-specific");
     assert.equal(boosted.stats.mass, archer.stats.mass, "Mass should stay character-specific");
@@ -7927,7 +7933,7 @@ function testSpinLevelRewardContracts(app) {
     piercingRun.target.takeDamage(100, piercingRun.owner, "Post-cut hit");
     assert.equal(
         hpBeforeOrdinaryDamage - piercingRun.target.hp,
-        50,
+        applyDefenseToDamage(100, 50),
         "Defense ignore must not leak beyond the cut ticks"
     );
 
@@ -11240,8 +11246,8 @@ function testEquipmentEnhancement() {
     const profile = createDefaultPlayerProfile();
 
     // 기본값 확인
-    assert.equal(getDefenseDamageMultiplier(50), 0.5, "Defense 50 should halve incoming damage");
-    assert.equal(applyDefenseToDamage(20, 50), 10, "Proportional defense should apply through the common helper");
+    assert.equal(getDefenseDamageMultiplier(100), 0.5, "Defense 100 should halve incoming damage");
+    assert.equal(applyDefenseToDamage(20, 100), 10, "Proportional defense should apply through the common helper");
     assert.equal(
         getDiminishingEquipmentSpeed(600, 600, 2),
         900,
@@ -15565,6 +15571,8 @@ async function testHeroOrbBonusUiOnlyForHero(app) {
     const heroLine = formatHeroStatLine(heroFighter.stats.allocation, heroFighter.hero.bonuses);
     const normalLine = formatStatAllocation(heroFighter.stats.allocation);
     assert.ok(heroLine.includes("체력 +12%(+3)"), "Hero's stat line should show base allocation plus orb bonuses");
+    assert.ok(heroLine.includes("방어 +20"), "Hero's defense allocation should be shown as a direct rating");
+    assert.ok(!heroLine.includes("방어 +20%"), "Hero's defense allocation should not be shown as a percentage");
     assert.ok(!normalLine.includes("+12%(+3)"), "Normal stat formatter should not include Hero Orb bonuses");
     assert.deepEqual(archerFighter.hero.bonuses, { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 });
 }
@@ -22606,20 +22614,20 @@ testLevelTenBaseStatTarget();
 
 function testRosterCombatBaselineAndCooldowns() {
     const expectedStats = {
-        archer: { hp: 168, damage: 15, defense: 1.5 },
-        orbit: { hp: 153, damage: 15, defense: 1.5 },
-        trickster: { hp: 165, damage: 15, defense: 1.5 },
-        grenade: { hp: 162, damage: 16.5, defense: 3 },
-        dash: { hp: 165, damage: 15, defense: 1.5 },
-        rage: { hp: 186, damage: 15, defense: 3 },
-        spin: { hp: 174, damage: 15, defense: 1.5 },
-        eater: { hp: 177, damage: 15, defense: 3 },
-        bat_ball: { hp: 159, damage: 15, defense: 1.5 },
-        vampire: { hp: 150, damage: 16.5, defense: 1.5 },
-        gunner: { hp: 150, damage: 16.5, defense: 1.5 },
-        phantom: { hp: 165, damage: 15, defense: 1.5 },
-        hero: { hp: 162, damage: 15, defense: 1.5 },
-        elementalist: { hp: 165, damage: 15, defense: 2 }
+        archer: { hp: 168, damage: 15, defense: 10 },
+        orbit: { hp: 153, damage: 15, defense: 10 },
+        trickster: { hp: 165, damage: 15, defense: 10 },
+        grenade: { hp: 162, damage: 16.5, defense: 20 },
+        dash: { hp: 165, damage: 15, defense: 10 },
+        rage: { hp: 186, damage: 15, defense: 20 },
+        spin: { hp: 174, damage: 15, defense: 10 },
+        eater: { hp: 177, damage: 15, defense: 20 },
+        bat_ball: { hp: 159, damage: 15, defense: 10 },
+        vampire: { hp: 150, damage: 16.5, defense: 10 },
+        gunner: { hp: 150, damage: 16.5, defense: 10 },
+        phantom: { hp: 165, damage: 15, defense: 10 },
+        hero: { hp: 162, damage: 15, defense: 10 },
+        elementalist: { hp: 165, damage: 15, defense: 15 }
     };
     const expectedSpeed = {
         archer: 405,

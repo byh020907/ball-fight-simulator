@@ -93,7 +93,7 @@
                 >
                     -
                 </button>
-                <em x-text="(allocation[stat.key] ?? 0) + '%'"></em>
+                <em x-text="(allocation[stat.key] ?? 0) + (stat.key === 'defense' ? '' : '%')"></em>
                 <button type="button" @click="adjustStat(stat.key, 1)" x-bind:disabled="locked || remainingPoints <= 0">
                     +
                 </button>

@@ -61,7 +61,7 @@ export default createCharacterDefinition({
         ]
     },
     physicsMaterial: "spinGrip",
-    stats: { hp: 174, damage: 15, speed: 276, radius: 50, mass: 1.22, defense: 1.5 },
+    stats: { hp: 174, damage: 15, speed: 276, radius: 50, mass: 1.22, defense: 10 },
     mastery: {
         id: "spin_gyroscopic_transfer",
         name: "자이로 전달",

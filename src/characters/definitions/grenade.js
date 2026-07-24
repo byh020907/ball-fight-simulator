@@ -60,7 +60,7 @@ export default createCharacterDefinition({
             }
         ]
     },
-    stats: { hp: 162, damage: 16.5, speed: 290, radius: 49, mass: 1.18, defense: 3 },
+    stats: { hp: 162, damage: 16.5, speed: 290, radius: 49, mass: 1.18, defense: 20 },
     mastery: {
         id: "grenade_heavy_impact",
         name: "중량 충격",

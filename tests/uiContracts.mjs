@@ -569,6 +569,21 @@ function testEquipmentCurrencyContract() {
     console.log("[collection-equipment-currency] ok");
 }
 
+function testDefenseHelpCopyContract() {
+    const helpContent = readSource("src/helpContent.js");
+    const playerPanel = readSource("src/components/player-panel.html");
+    assert.match(
+        helpContent,
+        /방어력 \(DEF\).*1포인트당 방어력이 1 증가.*방어 100.*50%/,
+        "Help should explain direct defense rating points and the 100-rating half-damage point"
+    );
+    assert.ok(
+        playerPanel.includes("stat.key === 'defense' ? '' : '%'"),
+        "Player panel should omit the percent suffix only for direct defense allocation"
+    );
+    console.log("[defense-help-copy] ok");
+}
+
 function testPopupCloseOwnershipContract() {
     const collectionHub = readSource("src/components/collection-hub.html");
     const popupDialog = readSource("src/components/popup-dialog.html");
@@ -1688,6 +1703,7 @@ testDailyShopPopupContract();
 testFusionEquippedLabelTypographyContract();
 testCollectionEquipmentPanelsShareHubState();
 testEquipmentCurrencyContract();
+testDefenseHelpCopyContract();
 testCollectionDetailContracts();
 testPopupCloseOwnershipContract();
 testGameplayUiResetContracts();

@@ -48,7 +48,7 @@ export default createCharacterDefinition({
     abilityUpgrade: {
         tiers: [{}, {}, {}, {}]
     },
-    stats: { hp: 186, damage: 15, speed: 238, radius: 51, mass: 1.28, defense: 3 },
+    stats: { hp: 186, damage: 15, speed: 238, radius: 51, mass: 1.28, defense: 20 },
     mastery: {
         id: "rage_bloodlust",
         name: "전투 욕구",

@@ -136,9 +136,10 @@ export function formatHeroStatParts(allocation = {}, bonuses = {}) {
         const label = effect?.label ?? key;
         const base = allocation[key] ?? 0;
         const bonus = bonuses[key] ?? 0;
+        const baseSuffix = key === "defense" ? "" : "%";
         return {
             key,
-            baseText: `${label} +${base}%`,
+            baseText: `${label} +${base}${baseSuffix}`,
             bonusText: bonus > 0 ? `(+${bonus})` : "",
             color: effect?.color ?? "#ffffff"
         };
