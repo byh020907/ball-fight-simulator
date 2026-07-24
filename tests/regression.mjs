@@ -17523,6 +17523,7 @@ async function testCreateCollectionHubViewModel() {
     );
     assert.equal(archerItem.masteryLevel, 0, "Tournament wins alone should not advance mastery UI progress");
     assert.equal(vm2.storage.shards, 50, "Collection hub should expose hunting key shards");
+    assert.equal(vm2.equipment.shards, 50, "Equipment hub should expose the shard balance used by its actions");
     assert.equal(vm2.storage.chests.length, 1, "Collection hub should expose hunting chests");
     assert.equal(vm2.storage.chests[0].canOpen, true, "Collection hub should mark openable chests");
     assert.equal(vm2.summary.storageChestCount, 1, "Collection summary should count storage chests");

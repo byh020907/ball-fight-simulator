@@ -6,6 +6,7 @@
     <div class="ch-content" x-show="state.activeTab === 'equipment'" role="tabpanel">
         <div class="ch-toolbar">
             <span class="ch-toolbar-title">장비 인벤토리</span>
+            <span class="ch-storage-currency">파편 <b x-text="state.equipment.shards"></b></span>
             <span class="ch-storage-currency">강화석 <b x-text="state.equipment.enhancementStones"></b></span>
             <button class="ch-btn" type="button" @click="openFusion()">합성</button>
             <button class="ch-btn ch-shop-button" type="button" @click="openShop()">상점</button>

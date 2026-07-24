@@ -419,6 +419,7 @@ export function createCollectionHubViewModel({
         },
         equipment: {
             items: equipmentItems,
+            shards: hunting.shards ?? 0,
             enhancementStones: equipment.enhancementStones ?? 0,
             inventoryUsed: getInventoryUsed(profile),
             inventorySlots: getInventorySlots(profile),

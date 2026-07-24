@@ -559,6 +559,16 @@ function testCollectionDetailContracts() {
     console.log("[collection-detail-contracts] ok");
 }
 
+function testEquipmentCurrencyContract() {
+    const equipmentPanel = readSource("src/components/collection-equipment-panel.html");
+    assert.ok(
+        equipmentPanel.includes('x-text="state.equipment.shards"') &&
+            equipmentPanel.includes('x-text="state.equipment.enhancementStones"'),
+        "Equipment toolbar should show both shards spent by equipment actions and enhancement recovery stones"
+    );
+    console.log("[collection-equipment-currency] ok");
+}
+
 function testPopupCloseOwnershipContract() {
     const collectionHub = readSource("src/components/collection-hub.html");
     const popupDialog = readSource("src/components/popup-dialog.html");
@@ -1677,6 +1687,7 @@ testEquipmentSpecialTooltipInteractionContract();
 testDailyShopPopupContract();
 testFusionEquippedLabelTypographyContract();
 testCollectionEquipmentPanelsShareHubState();
+testEquipmentCurrencyContract();
 testCollectionDetailContracts();
 testPopupCloseOwnershipContract();
 testGameplayUiResetContracts();
