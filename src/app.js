@@ -97,6 +97,7 @@ import {
     updateCombatControlState,
     useNearestEnemyCombatControl
 } from "./combatControls.js";
+import { spawnHuntingCombatControlFeedback } from "./effects/index.js";
 
 const TOURNAMENT_CHALLENGE_INTRO_DURATION = 1000;
 
@@ -1333,22 +1334,35 @@ export class BattleApp {
     }
 
     useCombatControl(type) {
+        if (this._gameMode !== "hunting") {
+            return { applied: false, reason: "tournament" };
+        }
         const player = this.simulation?.playerBall;
         const result = useNearestEnemyCombatControl(this._combatControlState, type, player, this.simulation);
+        if (result.applied && this.simulation) {
+            const direction = result.direction ?? player?.velocity?.clone()?.normalize();
+            spawnHuntingCombatControlFeedback(this.simulation, player, direction);
+        }
         this._syncCombatControlUi();
         return result;
     }
 
     _syncCombatControlUi() {
         const player = this.simulation?.playerBall;
-        const active = Boolean(
-            player &&
-            !this.simulation?.finished &&
-            !player.flags?.defeated &&
-            !player.flags?.destroyed &&
-            !player.state?.swallowed &&
-            !player.state?.movement
-        );
+        const huntingOnly = this._gameMode === "hunting";
+        const active =
+            huntingOnly &&
+            Boolean(
+                player &&
+                !this.simulation?.finished &&
+                !player.flags?.defeated &&
+                !player.flags?.destroyed &&
+                !player.state?.swallowed &&
+                !player.state?.movement &&
+                player.participation?.canAct !== false &&
+                !(this.simulation?.revivePauseRemaining > 0) &&
+                !(this._overlay.visible && !this._overlay.transient)
+            );
         const state = this._combatControlState;
         const progressFor = (control) =>
             control.cooldownRemaining > 0 ? control.cooldownRemaining / COMBAT_CONTROL_CONFIG.cooldownSteps.at(-1) : 0;

@@ -79,3 +79,8 @@ export {
     TricksterSeedMarkEffect,
     VineSnareVisualEffect
 } from "./tricksterEffects.js";
+export {
+    HUNTING_COMBAT_CONTROL_VISUAL_CONFIG,
+    HuntingCombatControlEffect,
+    spawnHuntingCombatControlFeedback
+} from "./huntingCombatControlEffect.js";

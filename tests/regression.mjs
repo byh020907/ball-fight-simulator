@@ -84,10 +84,13 @@ import {
     ElementalWetReactionEffect,
     ElementalWetEffect,
     ELEMENTAL_WET_STATUS_CONFIG,
+    HUNTING_COMBAT_CONTROL_VISUAL_CONFIG,
+    HuntingCombatControlEffect,
     REVIVAL_EFFECT_CONFIG,
     RevivalEffect,
     applyElementalWet,
-    drawElementalOrb
+    drawElementalOrb,
+    spawnHuntingCombatControlFeedback
 } from "../src/effects/index.js";
 import { getActiveElementalWetStackCount, getElementalWetDefenseReduction } from "../src/effects/elementalWetState.js";
 import { shuffled } from "../src/random.js";
@@ -26005,5 +26008,173 @@ function testDeepCoreFinalBossContracts() {
 }
 
 testDeepCoreFinalBossContracts();
+
+async function testCombatControlModeRestriction() {
+    const app = await loadModuleApp();
+    const [playerSpec, enemySpec] = createRoster()
+        .slice(0, 2)
+        .map((spec, index) => ({
+            ...spec,
+            id: index === 0 ? "cc-mode-player" : "cc-mode-enemy",
+            teamId: index === 0 ? "player" : "enemy"
+        }));
+    const simulation = new BattleSimulation([playerSpec, enemySpec], {});
+    const player = simulation.fighters.find((fighter) => fighter.id === "cc-mode-player");
+    const enemy = simulation.fighters.find((fighter) => fighter.id === "cc-mode-enemy");
+    player.position = new Vector2(200, 480);
+    enemy.position = new Vector2(700, 480);
+    simulation.playerBall = player;
+    app.simulation = simulation;
+    app._gameMode = "tournament";
+
+    const velocityBefore = player.velocity.clone();
+    const stateBefore = structuredClone(app._combatControlState);
+    const entitiesBefore = simulation.entities.length;
+    const tournamentResult = app.useCombatControl("pressure");
+    assert.deepEqual(tournamentResult, { applied: false, reason: "tournament" });
+    assert.deepEqual(player.velocity, velocityBefore, "Tournament rejection must not change velocity");
+    assert.deepEqual(app._combatControlState, stateBefore, "Tournament rejection must not consume cooldown state");
+    assert.equal(simulation.entities.length, entitiesBefore, "Tournament rejection must not create feedback entities");
+
+    const controlUi = {
+        lastState: null,
+        setState(state) {
+            this.lastState = state;
+        }
+    };
+    app._combatControls = controlUi;
+    app._syncCombatControlUi();
+    assert.equal(controlUi.lastState.visible, false, "Tournament must hide combat controls");
+
+    app._gameMode = "hunting";
+    resetCombatControlState(app._combatControlState);
+    const huntingResult = app.useCombatControl("pressure");
+    assert.equal(huntingResult.applied, true, "Hunting mode must allow pressure control");
+    assert.equal(
+        simulation.entities.filter((entity) => entity instanceof HuntingCombatControlEffect).length,
+        1,
+        "Successful hunting input must create the reused feedback"
+    );
+    assert.equal(controlUi.lastState.visible, true, "Valid hunting combat must show controls");
+
+    const effectCountBeforeFailure = simulation.entities.filter(
+        (entity) => entity instanceof HuntingCombatControlEffect
+    ).length;
+    const failedResult = app.useCombatControl("retreat");
+    assert.equal(failedResult.applied, false, "Shared lock must reject an immediate second input");
+    assert.equal(
+        simulation.entities.filter((entity) => entity instanceof HuntingCombatControlEffect).length,
+        effectCountBeforeFailure,
+        "Failed input must not create another feedback effect"
+    );
+
+    player.participation.setMode("standby");
+    app._syncCombatControlUi();
+    assert.equal(controlUi.lastState.visible, false, "Standby or inactive participants must hide controls");
+    player.participation.setMode("active");
+    simulation.revivePauseRemaining = 0.2;
+    app._syncCombatControlUi();
+    assert.equal(controlUi.lastState.visible, false, "Revive pause must hide controls");
+    simulation.revivePauseRemaining = 0;
+    app._overlay.visible = true;
+    app._overlay.transient = false;
+    app._syncCombatControlUi();
+    assert.equal(controlUi.lastState.visible, false, "Matchup and result overlays must hide controls");
+    app._overlay.transient = true;
+    app._syncCombatControlUi();
+    assert.equal(controlUi.lastState.visible, true, "Transient combat notices must keep controls available");
+    app._overlay.visible = false;
+
+    const bossSpec = { ...enemySpec, id: "cc-mode-boss", teamId: "enemy", isBoss: true };
+    const bossSimulation = new BattleSimulation([playerSpec, bossSpec], {});
+    const bossPlayer = bossSimulation.fighters.find((fighter) => fighter.id === "cc-mode-player");
+    const boss = bossSimulation.fighters.find((fighter) => fighter.id === "cc-mode-boss");
+    bossPlayer.position = new Vector2(200, 480);
+    boss.position = new Vector2(700, 480);
+    bossSimulation.playerBall = bossPlayer;
+    app.simulation = bossSimulation;
+    resetCombatControlState(app._combatControlState);
+    const bossResult = app.useCombatControl("retreat");
+    assert.equal(bossResult.applied, true, "Hunting boss combat must allow retreat control");
+    assert.equal(
+        bossSimulation.entities.filter((entity) => entity instanceof HuntingCombatControlEffect).length,
+        1,
+        "Hunting boss input must create the reused feedback"
+    );
+
+    console.log("[combat-control-mode-restriction] ok");
+}
+
+await testCombatControlModeRestriction();
+
+function testCombatControlEffectSpawn() {
+    const [playerSpec, enemySpec] = createRoster()
+        .slice(0, 2)
+        .map((spec, index) => ({
+            ...spec,
+            id: index === 0 ? "cc-effect-player" : "cc-effect-enemy",
+            teamId: index === 0 ? "player" : "enemy"
+        }));
+    const sim = new BattleSimulation([playerSpec, enemySpec], {});
+    const player = sim.fighters.find((f) => f.id === "cc-effect-player");
+    const enemy = sim.fighters.find((f) => f.id === "cc-effect-enemy");
+    player.position = new Vector2(200, 480);
+    enemy.position = new Vector2(700, 480);
+
+    const state = createCombatControlState();
+    const result = useNearestEnemyCombatControl(state, "pressure", player, sim);
+    assert.equal(result.applied, true, "Control must apply before effect spawn");
+
+    const direction = result.direction ?? player.velocity.clone().normalize();
+    const effect = spawnHuntingCombatControlFeedback(sim, player, direction);
+    assert.ok(
+        effect instanceof HuntingCombatControlEffect,
+        "spawnHuntingCombatControlFeedback must return a HuntingCombatControlEffect"
+    );
+    assert.ok(sim.entities.includes(effect), "Effect must be added to simulation entities");
+    assert.equal(effect.fighter, player, "Effect must reference the correct fighter");
+    assert.equal(effect.isExpired, false, "Fresh effect must not be expired");
+
+    refreshCombatControlEffect: {
+        const refreshed = spawnHuntingCombatControlFeedback(sim, player, direction);
+        assert.equal(refreshed.isExpired, false, "Refreshed effect must be revived on same active effect");
+        assert.equal(refreshed, effect, "Spawn must reuse existing active effect");
+    }
+
+    noDirectionEffect: {
+        const noDirEffect = spawnHuntingCombatControlFeedback(sim, player, null);
+        assert.ok(noDirEffect instanceof HuntingCombatControlEffect, "Null direction must still create effect");
+    }
+
+    console.log("[combat-control-effect-spawn] ok");
+}
+
+testCombatControlEffectSpawn();
+
+function testNoOldAccelerationSymbols() {
+    const source = readFileSync(new URL("../src/effects/huntingCombatControlEffect.js", import.meta.url), "utf8");
+    assert.doesNotMatch(source, /HuntingTapAcceleration/i, "New file must not reference old HuntingTapAcceleration");
+    assert.doesNotMatch(
+        source,
+        /huntingTapAcceleration/i,
+        "New file must not reference old huntingTapAcceleration symbol"
+    );
+
+    const indexSource = readFileSync(new URL("../src/effects/index.js", import.meta.url), "utf8");
+    assert.doesNotMatch(indexSource, /HuntingTapAcceleration/i, "Index must not export old HuntingTapAcceleration");
+    assert.doesNotMatch(indexSource, /huntingTapAcceleration/i, "Index must not reference old huntingTapAcceleration");
+
+    const appSource = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
+    assert.doesNotMatch(
+        appSource,
+        /accelerateActiveCharacter/i,
+        "App must not reference old accelerateActiveCharacter"
+    );
+    assert.doesNotMatch(appSource, /huntingTapAcceleration/i, "App must not reference old huntingTapAcceleration");
+
+    console.log("[no-old-acceleration-symbols] ok");
+}
+
+testNoOldAccelerationSymbols();
 
 console.log("regression tests ok");
