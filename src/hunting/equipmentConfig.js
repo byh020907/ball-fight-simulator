@@ -434,7 +434,7 @@ export function applyEquipmentStats(spec, profile) {
     const visualSpec = applyEquipmentVisuals(spec, profile);
     if (isQuantityEquipmentInventory(profile)) {
         const combatStats = createQuantityEquipmentCombatSnapshot(visualSpec.stats, bonuses);
-        const baseCriticalChance = Math.max(0, Number(visualSpec.stats.criticalChance) || 5);
+        const baseCriticalChance = Math.max(0, Number(visualSpec.stats.criticalChance) || 0);
         return {
             ...visualSpec,
             equipment: {

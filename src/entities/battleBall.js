@@ -48,7 +48,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             baseSkill: spec.stats.skill ?? 0,
             baseRadius: spec.stats.radius,
             mass: spec.stats.mass,
-            criticalChance: Math.min(100, Math.max(0, Number(spec.stats.criticalChance) || 5)),
+            criticalChance: Math.min(100, Math.max(0, Number(spec.stats.criticalChance) || 0)),
             allocation: spec.statAllocation ?? null
         };
         // PhysicsBody 프로퍼티 초기화
@@ -533,12 +533,12 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
     }
 
     getCriticalChance() {
-        return Math.max(0, Math.min(100, this.stats.criticalChance ?? 5));
+        return Math.max(0, Math.min(100, this.stats.criticalChance ?? 0));
     }
 
     rollCritical(attacker, critChanceOverride) {
         if (!attacker || attacker === this) return false;
-        let critChance = critChanceOverride ?? attacker.getCriticalChance?.() ?? attacker.stats?.criticalChance ?? 5;
+        let critChance = critChanceOverride ?? attacker.getCriticalChance?.() ?? attacker.stats?.criticalChance ?? 0;
         if (attacker._tempCritMultiplier) {
             critChance = Math.min(100, critChance * attacker._tempCritMultiplier);
         }

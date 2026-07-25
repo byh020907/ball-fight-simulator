@@ -2479,7 +2479,7 @@ function testStatAllocationRules(app) {
     stepped = adjustStatAllocation(stepped, "damage", -10);
     assert.equal(stepped.damage, 40, "Large negative stat steps should subtract multiple points");
 
-    const allocation = { hp: 30, damage: 40, speed: 30, skill: 0, defense: 0, criticalChance: 0 };
+    const allocation = { hp: 30, damage: 40, speed: 30, skill: 0, defense: 0 };
     const boosted = applyStatAllocation(archer, allocation, true);
     assert.equal(
         boosted.stats.hp,
@@ -2497,7 +2497,7 @@ function testStatAllocationRules(app) {
         "Speed points should multiply only base speed"
     );
     assert.equal(boosted.stats.skill, 0, "Skill base stats should remain independent from allocation points");
-    assert.equal(boosted.stats.criticalChance, 5, "Critical chance should preserve its 5% base chance");
+    assert.equal(boosted.stats.criticalChance, 0, "Critical chance should default to zero without equipment");
     const directAllocation = applyStatAllocation(
         archer,
         { hp: 0, damage: 0, speed: 0, skill: 20, defense: 50, criticalChance: 50 },
@@ -2511,15 +2511,16 @@ function testStatAllocationRules(app) {
         /1포인트.*방어력 1.*방어 100.*50%/,
         "Defense allocation copy should explain direct rating growth and the 100-rating half-damage point"
     );
+    assert.equal(directAllocation.stats.criticalChance, 0, "Legacy critical allocation should no longer affect stats");
     assert.equal(
-        directAllocation.stats.criticalChance,
-        55,
-        "Critical points should add directly to the 5% base chance"
+        "criticalChance" in directAllocation.statAllocation,
+        false,
+        "Legacy critical points should be discarded"
     );
     assert.equal("force" in boosted.stats, false, "Force should not exist as an unused gameplay stat");
     assert.equal(
         formatStatAllocation(allocation),
-        "체력 +30% · 공격 +40% · 속도 +30% · 쿨타임 +0% · 방어력 +0 · 크리티컬 +0%",
+        "체력 +30% · 공격 +40% · 속도 +30% · 쿨타임 +0% · 방어력 +0",
         "Allocation summary should show defense as a direct rating and other stats as percentages"
     );
     assert.equal(boosted.stats.radius, archer.stats.radius, "Radius should stay character-specific");
@@ -23552,36 +23553,32 @@ function testAbilitySetForwardsDashEffect() {
 
 testAbilitySetForwardsDashEffect();
 
-function testCriticalChanceInAllocatableStats() {
+function testCriticalChanceIsEquipmentOnly() {
     const criticalStat = ALLOCATABLE_STATS.find((stat) => stat.key === "criticalChance");
-    assert.ok(criticalStat, "criticalChance should be in ALLOCATABLE_STATS");
-    assert.equal(
-        criticalStat.description.includes("분산"),
-        false,
-        "criticalChance should not use the dispersion multiplier"
-    );
-    console.log("[critical-stat-allocation] ok");
+    assert.equal(criticalStat, undefined, "criticalChance should not be in ALLOCATABLE_STATS");
+    assert.equal("criticalChance" in createEmptyStatAllocation(), false);
+    console.log("[equipment-only-critical-stat] ok");
 }
 
-testCriticalChanceInAllocatableStats();
+testCriticalChanceIsEquipmentOnly();
 
-function testCriticalChanceAppliedToStats() {
+function testCriticalChanceDefaultsToZero() {
     const baseFighter = createRoster().find((f) => f.id === FIGHTER_IDS.ARCHER);
     const allocation = createEmptyStatAllocation();
     allocation.criticalChance = 20;
     const applied = applyStatAllocation(baseFighter, allocation, false);
-    assert.equal(applied.stats.criticalChance, 25, "criticalChance should be 5 base + 20 stat = 25");
-    const zeroAlloc = createEmptyStatAllocation();
-    const zeroApplied = applyStatAllocation(baseFighter, zeroAlloc, false);
-    assert.equal(zeroApplied.stats.criticalChance, 5, "criticalChance should default to 5 base");
-    const cappedAlloc = createEmptyStatAllocation();
-    cappedAlloc.criticalChance = 100;
-    const cappedApplied = applyStatAllocation(baseFighter, cappedAlloc, false);
-    assert.equal(cappedApplied.stats.criticalChance, 100, "criticalChance should cap at 100");
-    console.log("[critical-stat-application] ok");
+    assert.equal(applied.stats.criticalChance, 0, "criticalChance should ignore removed allocation points");
+    assert.equal("criticalChance" in applied.statAllocation, false);
+    const simulation = new BattleSimulation([applied, createRoster()[1]], { onLog() {} });
+    assert.equal(
+        simulation.fighters[0].getCriticalChance(),
+        0,
+        "BattleBall should keep an absent critical stat at zero"
+    );
+    console.log("[zero-base-critical-stat] ok");
 }
 
-testCriticalChanceAppliedToStats();
+testCriticalChanceDefaultsToZero();
 
 function testCriticalRollAndDamage() {
     const sim = new BattleSimulation(

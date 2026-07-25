@@ -31,12 +31,6 @@ export const ALLOCATABLE_STATS = [
         label: "방어력",
         shortLabel: "DEF",
         description: "1포인트당 방어력 1 증가. 방어 100이면 받는 피해가 50% 줄어듭니다."
-    },
-    {
-        key: "criticalChance",
-        label: "크리티컬",
-        shortLabel: "CRT",
-        description: "크리티컬 확률을 포인트당 1%p 올립니다. 기본 5%"
     }
 ];
 
@@ -84,13 +78,12 @@ export function createRandomStatAllocation(rng = Math.random, total = PLAYER_STA
 
 export function applyStatAllocation(fighter, allocation, isPlayer = false) {
     const stats = { ...fighter.stats };
+    stats.criticalChance = Math.max(0, Math.min(100, Number(stats.criticalChance) || 0));
     for (const stat of ALLOCATABLE_STATS) {
         const pts = allocation[stat.key] ?? 0;
         if (!Number.isFinite(pts)) continue;
         if (stat.key === "skill") {
             stats[stat.key] = stats[stat.key] ?? 0;
-        } else if (stat.key === "criticalChance") {
-            stats[stat.key] = Math.max(0, Math.min(100, (stats[stat.key] ?? 5) + pts));
         } else if (stat.key === "defense") {
             stats[stat.key] = Number(((stats[stat.key] ?? 0) + pts).toFixed(3));
         } else {
@@ -101,7 +94,7 @@ export function applyStatAllocation(fighter, allocation, isPlayer = false) {
     return {
         ...fighter,
         stats,
-        statAllocation: { ...allocation },
+        statAllocation: Object.fromEntries(STAT_KEYS.map((key) => [key, allocation[key] ?? 0])),
         isPlayer
     };
 }

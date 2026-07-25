@@ -250,7 +250,7 @@ assert.equal(
     baseCombatSpec.stats.defense + getEquipmentTemplate("defense_leather").stats.defense
 );
 assert.equal(statSpec.stats.skill, (baseCombatSpec.stats.skill ?? 0) + getEquipmentTemplate("haste_mote").stats.skill);
-assert.equal(statSpec.stats.criticalChance, 5 + getEquipmentTemplate("crit_cloak").stats.criticalChance);
+assert.equal(statSpec.stats.criticalChance, getEquipmentTemplate("crit_cloak").stats.criticalChance);
 assert.equal(statSnapshot.speed.beforeEquipment, baseCombatSpec.stats.speed);
 assert.equal(statSnapshot.speed.afterEquipment, statSpec.stats.speed);
 assert.ok(statSnapshot.speed.increaseRatio > 0);
@@ -268,7 +268,7 @@ equipEquipmentTemplate(completedProfile, "completed_ability_crit", 0);
 const completedSpec = applyEquipmentStats(baseCombatSpec, completedProfile);
 const completedTemplate = getEquipmentTemplate("completed_ability_crit");
 assert.equal(completedSpec.stats.damage, baseCombatSpec.stats.damage + (completedTemplate.stats.damage ?? 0));
-assert.equal(completedSpec.stats.criticalChance, 5 + completedTemplate.stats.criticalChance);
+assert.equal(completedSpec.stats.criticalChance, completedTemplate.stats.criticalChance);
 
 const cappedCriticalProfile = createDefaultPlayerProfile();
 addEquipmentQuantity(cappedCriticalProfile, "crit_twin_blades", 6);
