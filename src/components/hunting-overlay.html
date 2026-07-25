@@ -204,6 +204,7 @@
                 x-text="' · 강화석 ' + huntingLootHudEnhancementStones"
             ></span>
             <span x-show="huntingLootHudChests > 0" x-text="' · 상자 ' + huntingLootHudChests"></span>
+            <span x-show="huntingLootHudEquipment > 0" x-text="' · 장비 ' + huntingLootHudEquipment"></span>
         </span>
     </div>
 </div>
@@ -247,6 +248,7 @@
         huntingLootHudShards: 0,
         huntingLootHudEnhancementStones: 0,
         huntingLootHudChests: 0,
+        huntingLootHudEquipment: 0,
         huntingPartyExperienceRewards: [],
 
         huntingRetreat() {
@@ -341,6 +343,7 @@
             this.huntingLootHudShards = 0;
             this.huntingLootHudEnhancementStones = 0;
             this.huntingLootHudChests = 0;
+            this.huntingLootHudEquipment = 0;
             this.huntingPartyExperienceRewards = [];
         },
         setHuntingState(data) {
@@ -394,6 +397,7 @@
             if (data.huntingLootHudEnhancementStones !== undefined)
                 this.huntingLootHudEnhancementStones = data.huntingLootHudEnhancementStones;
             if (data.huntingLootHudChests !== undefined) this.huntingLootHudChests = data.huntingLootHudChests;
+            if (data.huntingLootHudEquipment !== undefined) this.huntingLootHudEquipment = data.huntingLootHudEquipment;
             if (data.huntingPartyExperienceRewards !== undefined)
                 this.huntingPartyExperienceRewards = data.huntingPartyExperienceRewards;
         }

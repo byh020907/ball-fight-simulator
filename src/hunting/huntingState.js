@@ -36,10 +36,12 @@ export const HUNTING_RUN_PHASES = Object.freeze({
 });
 
 function cloneLoot(loot = createEmptyHuntingLoot()) {
+    const normalized = mergeHuntingLoot(loot, createEmptyHuntingLoot());
     return {
-        shards: Math.max(0, Math.floor(loot.shards ?? 0)),
-        enhancementStones: Math.max(0, Math.floor(loot.enhancementStones ?? 0)),
-        chests: [...(loot.chests ?? [])]
+        shards: normalized.shards,
+        enhancementStones: normalized.enhancementStones,
+        chests: normalized.chests,
+        equipment: { ...normalized.equipment }
     };
 }
 

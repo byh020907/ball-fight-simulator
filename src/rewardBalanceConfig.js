@@ -105,6 +105,7 @@ export const REWARD_BALANCE = deepFreeze({
         },
         loot: {
             baseDropChance: 0.15,
+            equipmentDropChance: 0.015,
             missingHpMaxMultiplier: 2,
             valueStep: 5,
             itemLife: 18,

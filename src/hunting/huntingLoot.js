@@ -4,6 +4,7 @@ import { getCombatMovementSpeed } from "../physics/magneticAttraction.js";
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 import { createEmptyHuntingLoot, createHuntingChest } from "./huntingRewards.js";
 import { HUNTING_MAX_FLOOR } from "./huntingConfig.js";
+import { EQUIPMENT_TEMPLATES } from "./equipmentTemplates.js";
 import {
     createHuntingExperienceAllocation,
     getHuntingCompletionExperienceDropCount,
@@ -20,7 +21,8 @@ export const HUNTING_LOOT_ITEM_TYPES = Object.freeze({
     CHEST: "chest",
     HIGH_CHEST: "high_chest",
     ENHANCEMENT_STONE: "enhancement_stone",
-    EXPERIENCE: "experience"
+    EXPERIENCE: "experience",
+    EQUIPMENT: "equipment"
 });
 
 export const HUNTING_LOOT_RARITIES = Object.freeze(["common", "uncommon", "rare", "epic"]);
@@ -166,6 +168,18 @@ export function rollHuntingBonusLootItemType({
     return rollWeightedType(getHuntingBonusLootWeights({ collector, rarity }), rng);
 }
 
+const BASIC_EQUIPMENT_IDS = Object.freeze(
+    EQUIPMENT_TEMPLATES.filter((template) => template.tier === "basic").map((template) => template.id)
+);
+
+export function rollHuntingEquipmentDrop({ rng = Math.random, chanceMultiplier = 1 } = {}) {
+    const multiplier = normalizeLootMultiplier(chanceMultiplier);
+    if (multiplier <= 0 || BASIC_EQUIPMENT_IDS.length === 0) return null;
+    if (rng() >= LOOT_CONFIG.equipmentDropChance * multiplier) return null;
+    const index = Math.floor(clamp(rng(), 0, 0.999999) * BASIC_EQUIPMENT_IDS.length);
+    return BASIC_EQUIPMENT_IDS[index] ?? null;
+}
+
 function getLootAmount(type, { collector, floor, rarity, rng, lootMultiplier }) {
     if (type === HUNTING_LOOT_ITEM_TYPES.SMALL_HEAL_PACK) return getSmallHealPackAmount(collector);
     if (type === HUNTING_LOOT_ITEM_TYPES.SHARD_BUNDLE)
@@ -187,6 +201,7 @@ function createHuntingLootEntity({
     rarity,
     rng,
     amount,
+    templateId,
     lootMultiplier,
     onCollected
 }) {
@@ -201,6 +216,7 @@ function createHuntingLootEntity({
         life: LOOT_CONFIG.itemLife,
         amount: amount ?? getLootAmount(type, { collector, floor, rarity, rng, lootMultiplier }),
         chest: createLootChest(type, rarity, rng),
+        templateId,
         onCollected
     });
 }
@@ -228,6 +244,11 @@ export class HuntingBattleLootSession {
         if (reward.type === HUNTING_LOOT_ITEM_TYPES.CHEST && reward.chest) {
             this._collectedLoot.chests.push(reward.chest);
         }
+        if (reward.type === HUNTING_LOOT_ITEM_TYPES.EQUIPMENT && reward.templateId) {
+            const id = reward.templateId;
+            const current = this._collectedLoot.equipment[id] ?? 0;
+            this._collectedLoot.equipment[id] = current + 1;
+        }
         return this.getCollectedLoot();
     }
 
@@ -235,7 +256,8 @@ export class HuntingBattleLootSession {
         return {
             shards: this._collectedLoot.shards,
             enhancementStones: this._collectedLoot.enhancementStones,
-            chests: [...this._collectedLoot.chests]
+            chests: [...this._collectedLoot.chests],
+            equipment: { ...this._collectedLoot.equipment }
         };
     }
 
@@ -305,6 +327,24 @@ export class HuntingLootDropController {
         if (bonusType) this._spawnLootItem(bonusType, fighter, collector, rarity, lootMultiplier, simulation);
         const experience = this._spawnExperienceDrops(fighter, collector, simulation);
         const enhancementStones = isMiniboss ? this._spawnEnhancementStoneDrops(fighter, collector, simulation) : [];
+        const equipmentDrop =
+            (isMob || isMiniboss) && lootMultiplier > 0
+                ? rollHuntingEquipmentDrop({
+                      rng: this.rng,
+                      chanceMultiplier: lootMultiplier
+                  })
+                : null;
+        if (equipmentDrop) {
+            this._spawnLootItem(
+                HUNTING_LOOT_ITEM_TYPES.EQUIPMENT,
+                fighter,
+                collector,
+                "common",
+                lootMultiplier,
+                simulation,
+                { templateId: equipmentDrop }
+            );
+        }
         const finalBossChest = fighter.hunting.isFinalBoss
             ? this._spawnLootItem(HUNTING_LOOT_ITEM_TYPES.HIGH_CHEST, fighter, collector, "epic", 1, simulation)
             : null;
@@ -374,7 +414,7 @@ export class HuntingLootDropController {
         return Math.max(0, getHuntingExperienceDropLimit() - this._experiencePhysicalDropCount);
     }
 
-    _spawnLootItem(type, fighter, collector, rarity, lootMultiplier, simulation, { amount } = {}) {
+    _spawnLootItem(type, fighter, collector, rarity, lootMultiplier, simulation, { amount, templateId } = {}) {
         const item = createHuntingLootEntity({
             type,
             fighter,
@@ -383,6 +423,7 @@ export class HuntingLootDropController {
             rarity,
             rng: this.rng,
             amount,
+            templateId,
             lootMultiplier,
             onCollected: (reward) => {
                 this.session.recordCollection(reward);

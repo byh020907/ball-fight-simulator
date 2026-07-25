@@ -1,5 +1,6 @@
 import { ChestDrop } from "./chestDrop.js";
 import { EnhancementStoneDrop } from "./enhancementStoneDrop.js";
+import { EquipmentDrop } from "./equipmentDrop.js";
 import { ExperienceDrop } from "./experienceDrop.js";
 import { ShardDrop } from "./shardDrop.js";
 import { ShardBundleDrop } from "./shardBundleDrop.js";
@@ -12,7 +13,8 @@ const HUNTING_LOOT_ITEM_CLASSES = Object.freeze({
     [ChestDrop.lootType]: ChestDrop,
     [ChestDrop.highLootType]: ChestDrop,
     [ExperienceDrop.lootType]: ExperienceDrop,
-    [EnhancementStoneDrop.lootType]: EnhancementStoneDrop
+    [EnhancementStoneDrop.lootType]: EnhancementStoneDrop,
+    [EquipmentDrop.lootType]: EquipmentDrop
 });
 
 export function createHuntingLootItem(type, options) {

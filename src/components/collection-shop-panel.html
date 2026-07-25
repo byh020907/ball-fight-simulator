@@ -9,42 +9,46 @@
     >
         <section class="ch-shop-dialog" role="dialog" aria-modal="true" aria-label="파편 상점">
             <div class="ch-shop-header">
-                <strong>파편 상점</strong>
+                <strong>파편 상점 · 장비</strong>
                 <button class="ch-close" type="button" aria-label="닫기" @click="hide()">×</button>
             </div>
             <template x-if="state.storage.dailyShop">
                 <div class="ch-shop-body">
-                    <div class="ch-shop-offer">
-                        <chest-icon
-                            class="ch-shop-chest"
-                            x-component="'chest-icon'"
-                            x-bind:data-rarity="state.storage.dailyShop.rarity"
-                            x-bind:class="{ 'is-rerolling': state.rerolling }"
-                        ></chest-icon>
-                        <div class="ch-shop-offer-info">
-                            <strong>상점 상자</strong>
-                            <span
-                                x-text="'구매 ' + getShopPurchaseCount(state.storage.dailyShop) + '/' + state.storage.dailyShop.purchaseLimit"
-                            ></span>
-                        </div>
-                        <button
-                            class="ch-btn"
-                            type="button"
-                            x-bind:disabled="getShopPurchaseCount(state.storage.dailyShop) >= state.storage.dailyShop.purchaseLimit || state.storage.shards < state.storage.dailyShop.chestCost"
-                            @click="buyDailyShopChest()"
-                            x-text="'구매 ' + state.storage.dailyShop.chestCost"
-                        ></button>
+                    <div class="ch-shop-offers">
+                        <template x-for="(offer, index) in state.storage.dailyShop.offers" :key="offer.templateId">
+                            <div
+                                class="ch-shop-card"
+                                x-bind:class="{ 'is-rerolling': state.rerolling, 'is-purchased': getOfferPurchased(state.storage.dailyShop, index) }"
+                            >
+                                <canvas
+                                    class="ch-shop-icon"
+                                    x-equipment-icon-tag="offer.iconTag"
+                                    aria-hidden="true"
+                                ></canvas>
+                                <div class="ch-shop-card-info">
+                                    <strong x-text="offer.name"></strong>
+                                    <span x-text="'보유 ' + offer.ownedCount"></span>
+                                </div>
+                                <button
+                                    class="ch-btn"
+                                    type="button"
+                                    x-bind:disabled="getOfferPurchased(state.storage.dailyShop, index) || state.storage.shards < offer.price || !canPurchase()"
+                                    @click="buyDailyShopEquipment(offer.templateId)"
+                                    x-text="'구매 ' + offer.price"
+                                ></button>
+                            </div>
+                        </template>
                     </div>
                     <div class="ch-shop-meta">
                         <span x-text="'보유 파편 ' + Number(state.storage.shards || 0).toLocaleString()"></span>
                         <span
                             x-show="isShopResetPending(state.storage.dailyShop.purchaseResetAt)"
-                            x-text="'구매 초기화 ' + formatShopTime(state.storage.dailyShop.purchaseResetAt)"
+                            x-text="'구매 ' + getShopPurchaseCount(state.storage.dailyShop) + '/' + state.storage.dailyShop.purchaseLimit + ' · 초기화 ' + formatShopTime(state.storage.dailyShop.purchaseResetAt)"
                         ></span>
                     </div>
                     <div class="ch-shop-reroll">
                         <div>
-                            <strong>상자 리롤</strong>
+                            <strong>장비 리롤</strong>
                             <span
                                 x-show="isShopResetPending(state.storage.dailyShop.rerollResetAt)"
                                 x-text="'리롤 초기화 ' + formatShopTime(state.storage.dailyShop.rerollResetAt)"
@@ -111,10 +115,17 @@
             getShopRerollCost(shop) {
                 return this.isShopResetPending(shop.rerollResetAt) ? shop.rerollCost : shop.rerollBaseCost;
             },
-            buyDailyShopChest() {
-                const chest = Alpine.store("uiManager").invokeGameAction("buyDailyShopChest");
-                if (chest) playOfferSwapAnimation();
-                return chest;
+            canPurchase() {
+                const shop = state.storage.dailyShop;
+                return this.getShopPurchaseCount(shop) < shop.purchaseLimit;
+            },
+            getOfferPurchased(shop, index) {
+                return this.getShopPurchaseCount(shop) >= shop.purchaseLimit;
+            },
+            buyDailyShopEquipment(templateId) {
+                const result = Alpine.store("uiManager").invokeGameAction("buyDailyShopEquipment", templateId);
+                if (result.ok) playOfferSwapAnimation();
+                return result;
             },
             rerollDailyShop() {
                 const result = Alpine.store("uiManager").invokeGameAction("rerollDailyShop");
@@ -139,7 +150,7 @@
     }
 
     .ch-shop-dialog {
-        width: min(420px, 100%);
+        width: min(520px, 100%);
         border: 2px solid #202020;
         border-radius: 8px;
         background: #ffffff;
@@ -159,7 +170,71 @@
         padding: 12px;
     }
 
-    .ch-shop-offer,
+    .ch-shop-offers {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
+        gap: 10px;
+    }
+
+    .ch-shop-card {
+        display: grid;
+        gap: 6px;
+        justify-items: center;
+        text-align: center;
+        border: 2px solid #202020;
+        border-radius: 8px;
+        padding: 10px;
+    }
+
+    .ch-shop-card.is-rerolling {
+        animation: ch-shop-card-reroll 650ms cubic-bezier(0.22, 0.8, 0.28, 1);
+    }
+
+    .ch-shop-card.is-purchased {
+        opacity: 0.5;
+    }
+
+    @keyframes ch-shop-card-reroll {
+        0% {
+            transform: translateY(0) rotate(0deg) scale(1);
+        }
+        35% {
+            transform: translateY(-8px) rotate(-8deg) scale(1.08);
+        }
+        65% {
+            transform: translateY(2px) rotate(6deg) scale(1.04);
+        }
+        100% {
+            transform: translateY(0) rotate(0deg) scale(1);
+        }
+    }
+
+    .ch-shop-icon {
+        --equipment-icon-scale: 0.55;
+        width: 56px;
+        height: 56px;
+        flex: 0 0 auto;
+    }
+
+    .ch-shop-card-info {
+        display: grid;
+        gap: 2px;
+    }
+
+    .ch-shop-card-info strong {
+        font-size: 0.78rem;
+        line-height: 1.2;
+    }
+
+    .ch-shop-card-info span {
+        font-size: 0.68rem;
+        color: #555555;
+    }
+
+    .ch-shop-card .ch-btn {
+        width: 100%;
+    }
+
     .ch-shop-reroll {
         display: flex;
         align-items: center;
@@ -170,66 +245,22 @@
         padding: 10px;
     }
 
-    .ch-shop-offer-info,
     .ch-shop-reroll > div,
     .ch-shop-meta {
         display: grid;
         gap: 3px;
     }
 
-    .ch-shop-offer {
-        position: relative;
-    }
-
-    .ch-shop-chest {
-        --chest-icon-scale: 0.55;
-        flex: 0 0 auto;
-        transform-origin: center;
-    }
-
-    .ch-shop-chest.is-rerolling {
-        animation: ch-shop-chest-reroll 650ms cubic-bezier(0.22, 0.8, 0.28, 1);
-    }
-
-    .ch-shop-chest.is-rerolling .bfs-chest-icon__lid {
-        animation: ch-shop-chest-lid 650ms cubic-bezier(0.22, 0.8, 0.28, 1);
-        transform-origin: center bottom;
-    }
-
-    @keyframes ch-shop-chest-reroll {
-        0% {
-            transform: translateY(0) rotate(0deg) scale(1);
-        }
-        35% {
-            transform: translateY(-12px) rotate(-12deg) scale(1.12);
-        }
-        65% {
-            transform: translateY(2px) rotate(10deg) scale(1.08);
-        }
-        100% {
-            transform: translateY(0) rotate(0deg) scale(1);
-        }
-    }
-
-    @keyframes ch-shop-chest-lid {
-        0%,
-        100% {
-            transform: rotateX(0deg);
-        }
-        45% {
-            transform: rotateX(-55deg) translateY(-7px);
-        }
-    }
-
-    .ch-shop-offer span,
-    .ch-shop-reroll span,
     .ch-shop-meta {
+        grid-template-columns: 1fr 1fr;
+        padding: 0 2px;
         font-size: 0.72rem;
         color: #555555;
     }
 
+    .ch-shop-reroll span,
     .ch-shop-meta {
-        grid-template-columns: 1fr 1fr;
-        padding: 0 2px;
+        font-size: 0.72rem;
+        color: #555555;
     }
 </style>

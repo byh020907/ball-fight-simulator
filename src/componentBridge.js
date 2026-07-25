@@ -1,6 +1,6 @@
 import { openHuntingChest } from "./hunting/chestRewards.js";
 import {
-    buyDailyShopChest as purchaseDailyShopChest,
+    buyDailyShopEquipment as purchaseDailyShopEquipment,
     rerollDailyShop as refreshDailyShopOffer
 } from "./hunting/dailyShop.js";
 import { savePlayerProfile } from "./playerProfile.js";
@@ -313,10 +313,10 @@ export function createComponentBridge(app) {
             PopupService.show(createCollectionActionPopupOptions("chest", result));
             return result.opened;
         },
-        buyDailyShopChest() {
-            const chest = purchaseDailyShopChest(app.playerProfile);
-            if (chest) refreshCollectionAndProfile();
-            return chest;
+        buyDailyShopEquipment(templateId) {
+            const result = purchaseDailyShopEquipment(app.playerProfile, templateId);
+            if (result.ok) refreshCollectionAndProfile();
+            return result;
         },
         rerollDailyShop() {
             const result = refreshDailyShopOffer(app.playerProfile);

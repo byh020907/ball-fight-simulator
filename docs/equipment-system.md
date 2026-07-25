@@ -24,6 +24,15 @@
 
 `calculateEquipmentValuePoints`, `calculateCombinationCost`, `calculateCombinedStats`, `roundEquipmentStat`은 순수 함수다.
 
+## 기초 장비 공급
+
+기초 장비는 두 경로로 공급된다.
+
+1. **전투 드롭**: 몬스터 처치 시 `hunting.loot.equipmentDropChance`(기본 1.5%) 확률로 기초 장비 1종을 드롭한다. 일반 몹과 중간 보스 모두 드롭하며, 중간·완성 장비는 드롭되지 않는다.
+2. **일일 상점**: `DAILY_SHOP.priceMultiplier`(×3)의 파편 고가로 기초 장비 3종을 진열한다. 6시간 구매 주기당 2회, 90분 리롤 쿨다운, 리롤 비용 30파편부터 시작한다. 구매한 슬롯은 즉시 다른 기초 장비로 교체된다.
+
+개발 시 임시 시뮬레이션으로 드롭율과 상점 가격의 균형을 검증한다. 66.7킬당 1드롭, 1층 기준 약 24~54킬이 최저~최고가 장비 가격에 해당한다.
+
 ## 프로필과 인벤토리
 
 프로필 버전은 12다. v11 이하의 저장은 장비를 포함한 베타 프로필 전체를 기본값으로 초기화한다. v12 저장은 sanitize 후 round-trip한다.

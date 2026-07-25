@@ -19,6 +19,7 @@ import {
 } from "../hunting/index.js";
 import { HUNTING_EVENT_TYPES, HUNTING_MAX_FLOOR, HUNTING_STAGES } from "../hunting/huntingConfig.js";
 import { getRarityLabel } from "../hunting/rarityPresentation.js";
+import { normalizeHuntingChests } from "../hunting/huntingRewards.js";
 import { getRebirthPresentation } from "../rebirth/rebirthService.js";
 import { isCharacterUnlocked } from "../playerProfile.js";
 import { getPublicFighterIdentity } from "../characterRosterPolicy.js";
@@ -289,7 +290,7 @@ export function createCollectionHubViewModel({
 
     const equipmentPresentation = createEquipmentPresentation(profile);
 
-    const storageItems = (hunting.chests ?? []).map((chest) => {
+    const storageItems = normalizeHuntingChests(hunting.chests, { dedupe: true, maxCount: 200 }).map((chest) => {
         const preview = previewHuntingChest(chest);
         return {
             id: chest.id,

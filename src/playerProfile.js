@@ -10,6 +10,7 @@ import { createDefaultHuntingStats, sanitizeHuntingStats } from "./hunting/hunti
 import { FIGHTER_IDS } from "./characters/characterRegistry.js";
 import { getHiddenCharacterIds } from "./characterAvailability.js";
 import { createDefaultEquipmentInventory, sanitizeEquipmentInventory } from "./hunting/equipmentInventory.js";
+import { normalizeHuntingChests } from "./hunting/huntingRewards.js";
 import {
     REBIRTH_BASE_STAT_KEYS,
     isValidRebirthCardId,
@@ -217,65 +218,6 @@ function sanitizeCharacterExperienceMap(obj) {
     return result;
 }
 
-function sanitizeGuaranteedEquipment(item) {
-    if (!item || typeof item !== "object" || typeof item.instanceId !== "string" || item.instanceId.length === 0) {
-        return null;
-    }
-    const rarity = ["common", "uncommon", "rare", "epic", "legendary"].includes(item.rarity) ? item.rarity : null;
-    const slot = ["weapon", "armor", "accessory"].includes(item.slot) ? item.slot : null;
-    const name = typeof item.name === "string" && item.name.length > 0 ? item.name : null;
-    const description = typeof item.description === "string" ? item.description : "";
-    const stats = Array.isArray(item.stats)
-        ? item.stats
-              .filter((stat) => ["hp", "damage", "defense", "speed"].includes(stat?.type))
-              .map((stat) => ({
-                  type: stat.type,
-                  value: sanitizeNumber(stat.value),
-                  min: sanitizeNumber(stat.min ?? stat.value),
-                  max: sanitizeNumber(stat.max ?? stat.value)
-              }))
-              .filter((stat) => stat.value > 0)
-        : [];
-    if (!rarity || !slot || !name || stats.length === 0) return null;
-    const specialOptions = Array.isArray(item.specialOptions)
-        ? item.specialOptions
-              .filter((option) => typeof option?.type === "string" && sanitizeNumber(option.value) > 0)
-              .map((option) => ({ type: option.type, value: sanitizeNumber(option.value) }))
-        : null;
-    const formattedName = formatEquipmentSpecialName(name, specialOptions ?? [], EQUIPMENT_SPECIAL_OPTION_SUFFIXES);
-    return {
-        instanceId: item.instanceId,
-        rarity,
-        slot,
-        name: formattedName,
-        baseName: typeof item.baseName === "string" ? item.baseName : name,
-        primaryStatType: stats[0].type,
-        specialOptionType: specialOptions?.[0]?.type ?? null,
-        description,
-        stats,
-        specialOptions,
-        enhanceLevel: Math.min(getEquipmentMaxEnhanceLevel(rarity), sanitizeNumber(item.enhanceLevel)),
-        draw: typeof item.draw === "string" ? item.draw : slot,
-        isGuaranteed: true
-    };
-}
-
-function sanitizeHuntingChest(chest) {
-    if (!chest || typeof chest !== "object") return null;
-    const rarity = ["common", "uncommon", "rare", "epic", "legendary"].includes(chest.rarity) ? chest.rarity : "common";
-    const id = typeof chest.id === "string" && chest.id.length > 0 ? chest.id : null;
-    if (!id) return null;
-    const guaranteedEquipment = sanitizeGuaranteedEquipment(chest.guaranteedEquipment);
-    return {
-        id,
-        rarity,
-        acquiredAt: sanitizeTimestamp(chest.acquiredAt) ?? Date.now(),
-        openCost: Number.isFinite(chest.openCost) && chest.openCost >= 0 ? sanitizeNumber(chest.openCost) : null,
-        rewardPreview: typeof chest.rewardPreview === "string" ? chest.rewardPreview : null,
-        guaranteedEquipment
-    };
-}
-
 function sanitizeHuntingBlueprints(obj) {
     if (!obj || typeof obj !== "object") return {};
     return Object.fromEntries(
@@ -318,18 +260,7 @@ function sanitizeHuntingCompanionIds(value) {
 function sanitizeHunting(obj) {
     const defaults = createDefaultPlayerProfile().hunting;
     if (!obj || typeof obj !== "object") return defaults;
-    const seen = new Set();
-    const chests = Array.isArray(obj.chests)
-        ? obj.chests
-              .map(sanitizeHuntingChest)
-              .filter(Boolean)
-              .filter((chest) => {
-                  if (seen.has(chest.id)) return false;
-                  seen.add(chest.id);
-                  return true;
-              })
-              .slice(-200)
-        : [];
+    const chests = normalizeHuntingChests(obj.chests, { dedupe: true, maxCount: 200 });
     const unlockedStageIds = sanitizeHuntingStageIds(obj.unlockedStageIds);
     const selectedStageId = unlockedStageIds.includes(obj.selectedStageId)
         ? obj.selectedStageId

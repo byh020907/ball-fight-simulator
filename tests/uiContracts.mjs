@@ -361,7 +361,7 @@ function testDailyShopPopupContract() {
         "Danger buttons should retain their red hover feedback"
     );
     assert.ok(shopPanel.includes("rerolling"), "Shop rerolls should trigger a visible transition state");
-    assert.ok(shopPanel.includes("ch-shop-chest"), "Shop offers should reuse the chest icon component");
+    assert.ok(shopPanel.includes("ch-shop-card"), "Shop offers should display equipment in card components");
     assert.ok(
         shopPanel.includes("isShopResetPending"),
         "Shop reset timers should be shown only while a reset is pending"
@@ -374,14 +374,8 @@ function testDailyShopPopupContract() {
         shopPanel.includes("getShopRerollCost"),
         "Expired rerolls should return to their base cost without reopening the shop"
     );
-    assert.ok(
-        shopPanel.includes("x-component=\"'chest-icon'\""),
-        "Dynamically shown shop chest must mount its template"
-    );
-    assert.ok(
-        shopPanel.includes("ch-shop-chest-reroll"),
-        "Shop rerolls should animate the chest even at the same rarity"
-    );
+    assert.ok(shopPanel.includes("x-equipment-icon-tag"), "Shop offers should use equipment icon tag directives");
+    assert.ok(shopPanel.includes("is-rerolling"), "Shop rerolls should animate the offer cards");
     assert.match(
         shopPanel,
         /function playOfferSwapAnimation\(\)\s*\{\s*state\.rerolling = false;\s*requestAnimationFrame\(\(\) => requestAnimationFrame\(\(\) => \(state\.rerolling = true\)\)\);\s*setTimeout\(\(\) => \(state\.rerolling = false\), 650\);\s*\}/s,
@@ -389,8 +383,8 @@ function testDailyShopPopupContract() {
     );
     assert.match(
         shopPanel,
-        /buyDailyShopChest\(\)\s*\{\s*const chest = Alpine\.store\("uiManager"\)\.invokeGameAction\("buyDailyShopChest"\);\s*if \(chest\) playOfferSwapAnimation\(\);\s*return chest;\s*\}/s,
-        "A successful chest purchase should use the shared offer replacement animation, while failures should not"
+        /buyDailyShopEquipment\(templateId\)\s*\{\s*const result = Alpine\.store\("uiManager"\)\.invokeGameAction\("buyDailyShopEquipment", templateId\);\s*if \(result\.ok\) playOfferSwapAnimation\(\);\s*return result;\s*\}/s,
+        "buyDailyShopEquipment must gate playOfferSwapAnimation behind result.ok"
     );
     assert.match(
         shopPanel,
@@ -401,9 +395,11 @@ function testDailyShopPopupContract() {
         !shopPanel.includes("consumable") && !shopPanel.includes("물약"),
         "Removed consumables must not leave shop controls behind"
     );
+    assert.ok(!shopPanel.includes("chest-icon"), "Equipment shop must not reference the chest icon component");
+    assert.ok(!shopPanel.includes("buyDailyShopChest"), "Equipment shop must not reference buyDailyShopChest");
     assert.ok(
-        !collectionHub.includes('class="ch-daily-shop"'),
-        "Shard shop must not appear in an unrelated collection tab"
+        equipmentPanel.includes("<collection-shop-panel></collection-shop-panel>"),
+        "Equipment tab must mount the separately managed shop panel"
     );
     console.log("[daily-shop-popup-contract] ok");
 }
@@ -1844,6 +1840,7 @@ function testNearestEnemyCombatControlUiContract() {
     console.log("[nearest-enemy-combat-control-ui] ok");
 }
 
+testDailyShopPopupContract();
 testDisabledHuntingUiIsNotMounted();
 testHuntingChestIconReuseContract();
 testCollectionEquipmentPanelsOwnTheirFlows();

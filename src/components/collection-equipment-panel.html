@@ -1,6 +1,7 @@
 <div x-data="collectionEquipmentPanel" class="ch-equipment-panel">
     <div class="ch-equipment-toolbar">
         <strong>장비</strong><span>파편 <b x-text="state.summary.shards"></b></span>
+        <button class="ch-btn" type="button" @click="openShop()">상점</button>
     </div>
     <section class="ch-equipment-slots" aria-label="장착 슬롯">
         <h4>공용 장착 슬롯</h4>
@@ -102,6 +103,7 @@
                 <p class="ch-equipment-feedback" x-show="feedback" x-text="feedback"></p></div
         ></template>
     </aside>
+    <collection-shop-panel></collection-shop-panel>
 </div>
 
 <script>
@@ -142,6 +144,9 @@
         unequip(slotIndex) {
             const result = Alpine.store("uiManager").invokeGameAction("unequipEquipmentSlot", slotIndex);
             if (result.ok) this.feedback = "장착을 해제했습니다.";
+        },
+        openShop() {
+            Alpine.store("uiManager").getComponent("collectionShopPanel")?.show?.();
         },
         craft(templateId) {
             const result = Alpine.store("uiManager").invokeGameAction("craftEquipmentTemplate", templateId);

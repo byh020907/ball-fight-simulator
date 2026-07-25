@@ -18,7 +18,7 @@ import {
     setHuntingRunPhase,
     HUNTING_RUN_PHASES
 } from "./huntingState.js";
-import { createEmptyHuntingLoot } from "./huntingRewards.js";
+import { createEmptyHuntingLoot, normalizeHuntingChests } from "./huntingRewards.js";
 import {
     HUNTING_ADVANCE_STEPS,
     HUNTING_DEBUG_ENCOUNTER_TYPES,
@@ -88,6 +88,7 @@ import {
 } from "./huntingPartyState.js";
 import { applyHuntingCompanionScale, placeHuntingCompanionsNearLeader } from "./huntingCompanion.js";
 import { HUNTING_COMBAT_INTERACTION_CONFIG, createPerfectSwapAttempt } from "./huntingCombatInteraction.js";
+import { addEquipmentQuantity } from "./equipmentInventory.js";
 
 const HUNTING_ROUTE_ACTIONS = Object.freeze({
     CONTINUE: "continue",
@@ -980,7 +981,8 @@ export class HuntingManager {
                 huntingLootHudVisible: false,
                 huntingLootHudShards: 0,
                 huntingLootHudEnhancementStones: 0,
-                huntingLootHudChests: 0
+                huntingLootHudChests: 0,
+                huntingLootHudEquipment: 0
             });
             this._run = null;
         }
@@ -1211,7 +1213,8 @@ export class HuntingManager {
             huntingLootHudVisible: false,
             huntingLootHudShards: 0,
             huntingLootHudEnhancementStones: 0,
-            huntingLootHudChests: 0
+            huntingLootHudChests: 0,
+            huntingLootHudEquipment: 0
         });
 
         app.presentResultSequence([
@@ -1402,19 +1405,23 @@ export class HuntingManager {
                 huntingLootHudVisible: false,
                 huntingLootHudShards: 0,
                 huntingLootHudEnhancementStones: 0,
-                huntingLootHudChests: 0
+                huntingLootHudChests: 0,
+                huntingLootHudEquipment: 0
             };
         }
         const pending = run.pendingLoot;
         const shards = pending?.shards ?? 0;
         const enhancementStones = pending?.enhancementStones ?? 0;
         const chests = pending?.chests ?? [];
-        const visible = shards > 0 || enhancementStones > 0 || chests.length > 0;
+        const equipmentEntries = Object.entries(pending?.equipment ?? {});
+        const equipmentCount = equipmentEntries.reduce((sum, [, count]) => sum + count, 0);
+        const visible = shards > 0 || enhancementStones > 0 || chests.length > 0 || equipmentCount > 0;
         return {
             huntingLootHudVisible: visible,
             huntingLootHudShards: shards,
             huntingLootHudEnhancementStones: enhancementStones,
-            huntingLootHudChests: chests.length
+            huntingLootHudChests: chests.length,
+            huntingLootHudEquipment: equipmentCount
         };
     }
 
@@ -1904,7 +1911,8 @@ export class HuntingManager {
             huntingLootHudVisible: false,
             huntingLootHudShards: 0,
             huntingLootHudEnhancementStones: 0,
-            huntingLootHudChests: 0
+            huntingLootHudChests: 0,
+            huntingLootHudEquipment: 0
         });
         app.presentResultSequence([
             this._createHuntingExperienceResultStep(app, xpResult),
@@ -1926,11 +1934,22 @@ export class HuntingManager {
         const profile = app.playerProfile;
         if (profile.hunting) {
             profile.hunting.shards = (profile.hunting.shards ?? 0) + (run.securedLoot?.shards ?? 0);
-            if (run.securedLoot?.chests?.length > 0) {
-                profile.hunting.chests.push(...run.securedLoot.chests);
+            const securedChests = normalizeHuntingChests(run.securedLoot?.chests);
+            const profileChests = normalizeHuntingChests(profile.hunting.chests, { dedupe: true, maxCount: 200 });
+            if (securedChests.length > 0) {
+                profile.hunting.chests = normalizeHuntingChests([...profileChests, ...securedChests], {
+                    dedupe: true,
+                    maxCount: 200
+                });
             }
             profile.equipment.enhancementStones =
                 (profile.equipment.enhancementStones ?? 0) + (run.securedLoot?.enhancementStones ?? 0);
+            const securedEquipment = run.securedLoot?.equipment ?? {};
+            for (const [templateId, count] of Object.entries(securedEquipment)) {
+                if (count > 0) {
+                    addEquipmentQuantity(profile, templateId, count);
+                }
+            }
             const stats = applyHuntingRunAchievementProgress(profile.hunting.stats, run);
             const completedFloor = Math.max(1, Math.min(HUNTING_MAX_FLOOR, Math.floor(run.floor ?? 1)));
             const hasKnownStage = HUNTING_STAGES.some((stage) => stage.id === run.stageId);

@@ -125,7 +125,8 @@ import {
     migrateLegacyExperienceToCharacter,
     migratePlayerProfile,
     sanitizePlayerProfile,
-    unlockHiddenCharacter
+    unlockHiddenCharacter,
+    PLAYER_PROFILE_STORAGE_KEY
 } from "../src/playerProfile.js";
 import {
     CHARACTER_ROSTER_CONTEXTS,
@@ -154,7 +155,7 @@ import {
     advanceHuntingRun,
     canEnterHunting,
     canRetreatFromHuntingRun,
-    buyDailyShopChest,
+    buyDailyShopEquipment,
     completeHuntingStage,
     createHuntingChest,
     createHuntingRun,
@@ -272,7 +273,9 @@ import {
     prepareHuntingPartyForBattle,
     resolveHuntingPartyBattleDefeats,
     setActiveHuntingPartyRole,
-    setHuntingPartyMemberHealth
+    setHuntingPartyMemberHealth,
+    normalizeHuntingChests,
+    normalizeHuntingLoot
 } from "../src/hunting/index.js";
 import {
     createCombatControlState,
@@ -326,7 +329,12 @@ import {
     ENHANCE_MAX_LEVEL
 } from "../src/hunting/equipmentConfig.js";
 import { createEquipmentCombatEffects } from "../src/hunting/equipmentEffects.js";
-import { addEquipmentQuantity } from "../src/hunting/equipmentInventory.js";
+import { addEquipmentQuantity, getEquipmentCount } from "../src/hunting/equipmentInventory.js";
+import { getEquipmentTemplate, EQUIPMENT_MAX_STACK } from "../src/hunting/equipmentTemplates.js";
+import { createComponentBridge } from "../src/componentBridge.js";
+import { rollHuntingEquipmentDrop } from "../src/hunting/huntingLoot.js";
+import { resolveTagDraw } from "../src/equipmentIconTags.js";
+import { mergeHuntingLoot, applyDefeatPreservation, sanitizeEquipmentMap } from "../src/hunting/huntingRewards.js";
 import { EQUIPMENT } from "../src/hunting/equipmentData.js";
 import { createEquipmentName, getDominantEquipmentStat } from "../src/hunting/equipmentNaming.js";
 import { createHuntingTerrain } from "../src/terrain/terrainFactory.js";
@@ -413,6 +421,7 @@ import {
     SmallHealPack,
     STAT_ORB_KEYS
 } from "../src/entities/index.js";
+import { EquipmentDrop } from "../src/entities/equipmentDrop.js";
 import { MobAppearance } from "../src/entities/mobAppearance.js";
 import { PHYSICS_MATERIALS, resolvePhysicsMaterial, combinePhysicsMaterials } from "../src/physics/PhysicsMaterial.js";
 import PhysicsMaterialBody from "../src/physics/PhysicsMaterialBody.js";
@@ -9286,6 +9295,69 @@ function testHuntingSystem() {
     assert.equal(sanitized.hunting.shards, 12, "Sanitized profile should keep hunting key shards");
     assert.equal(sanitized.hunting.chests.length, 1, "Sanitized profile should dedupe and discard invalid chests");
     assert.equal(sanitized.hunting.stats.deepestFloor, 4, "Sanitized profile should keep hunting stats");
+
+    const normalizedChests = normalizeHuntingChests(
+        [
+            {
+                id: "legacy",
+                rarity: "legendary",
+                acquiredAt: "invalid",
+                openCost: -8,
+                guaranteedEquipment: {
+                    rarity: "legendary",
+                    slot: "weapon",
+                    name: "구형 장비",
+                    baseName: "구형 장비",
+                    description: "전설급 유물",
+                    instanceId: "eq-legacy",
+                    stats: [{ type: "damage", value: 42, min: 38, max: 64 }],
+                    specialOptions: [{ type: "critChance", value: 5 }]
+                }
+            },
+            {
+                id: "legacy",
+                rarity: "rare",
+                acquiredAt: Date.now(),
+                guaranteedEquipment: {
+                    rarity: "epic",
+                    slot: "armor",
+                    name: "중고 갑옷",
+                    baseName: "중고 갑옷",
+                    description: "유효하지 않은 희귀 등급에서 정규화",
+                    instanceId: "eq-legacy2",
+                    stats: [{ type: "defense", value: 20, min: 18, max: 28 }]
+                }
+            },
+            { id: "good", acquiredAt: 1200, guaranteedEquipment: null },
+            null,
+            { id: "too-old", acquiredAt: Date.now() + 1, rarity: "mythic" }
+        ],
+        { dedupe: true, maxCount: 3 }
+    );
+    assert.equal(normalizedChests.length, 3, "normalizeHuntingChests should keep only limited valid chests");
+    assert.equal(normalizedChests[0].id, "legacy", "normalizeHuntingChests should retain the first valid legacy id");
+    assert.equal(normalizedChests[1].id, "good", "normalizeHuntingChests should keep all valid unique ids");
+    assert.equal(normalizedChests[2].id, "too-old", "normalizeHuntingChests should coerce legacy rarity when unknown");
+
+    const normalizedLoot = normalizeHuntingLoot({ shards: "x", enhancementStones: 3.6, chests: normalizedChests });
+    assert.equal(normalizedLoot.shards, 0, "normalizeHuntingLoot should sanitize invalid key shard count");
+    assert.equal(normalizedLoot.enhancementStones, 3, "normalizeHuntingLoot should sanitize enhancement stone count");
+    assert.equal(normalizedLoot.chests.length, 3, "normalizeHuntingLoot should normalize nested chests");
+
+    const legacyChestProfile = createDefaultPlayerProfile();
+    legacyChestProfile.hunting.shards = 70;
+    legacyChestProfile.hunting.chests = [
+        { id: 1, rarity: "uncommon", openCost: "bad" },
+        "bad",
+        { id: "u1", rarity: "uncommon" }
+    ];
+    const openedLegacy = openHuntingChest(legacyChestProfile, "u1", { rng: () => 0, characterId: FIGHTER_IDS.ARCHER });
+    assert.equal(openedLegacy.opened, true, "openHuntingChest should sanitize legacy storage before resolving");
+    assert.equal(
+        legacyChestProfile.hunting.chests.length,
+        0,
+        "openHuntingChest should keep only remaining valid entries after opening"
+    );
     console.log("[hunting] ok");
 }
 
@@ -22438,6 +22510,162 @@ function testHuntingMobActionsKeepPhysicsFinite() {
 
 testHuntingMobActionsKeepPhysicsFinite();
 
+function testEquipmentDropRollBoundary() {
+    const basicIds = [];
+    const rngSeen = [];
+    const mockRng = () => {
+        const v = 0.014 / 0.015;
+        rngSeen.push(v);
+        return v;
+    };
+    const result = rollHuntingEquipmentDrop({ rng: mockRng, chanceMultiplier: 1 });
+    assert.ok(
+        result === null || (typeof result === "string" && result.length > 0),
+        "Drop roll should return null or a valid template ID"
+    );
+    const zeroMultiplier = rollHuntingEquipmentDrop({ rng: Math.random, chanceMultiplier: 0 });
+    assert.equal(zeroMultiplier, null, "Zero chanceMultiplier should always suppress drops");
+    const negativeMultiplier = rollHuntingEquipmentDrop({ rng: Math.random, chanceMultiplier: -1 });
+    assert.equal(negativeMultiplier, null, "Negative chanceMultiplier should always suppress drops");
+    console.log("[equipment-drop-roll-boundary] ok");
+}
+
+testEquipmentDropRollBoundary();
+
+function testEquipmentDropBasicTemplatesOnly() {
+    const basicEquipmentTemplates = [
+        "attack_sword",
+        "attack_greatsword",
+        "health_crystal",
+        "health_belt",
+        "defense_leather",
+        "defense_chain",
+        "speed_boots",
+        "speed_wing",
+        "haste_mote",
+        "haste_kindlegem",
+        "crit_cloak",
+        "crit_twin_blades",
+        "mass_weight",
+        "wall_spring",
+        "collision_gyro"
+    ];
+    let rollCount = 0;
+    let totalRolls = 0;
+    const mockRng = () => {
+        totalRolls += 1;
+        if (rollCount < 1000) {
+            rollCount += 1;
+            return 0;
+        }
+        return 1;
+    };
+    for (let i = 0; i < 200; i++) {
+        const id = rollHuntingEquipmentDrop({ rng: mockRng, chanceMultiplier: 1 });
+        if (id) {
+            assert.ok(basicEquipmentTemplates.includes(id), `Dropped ID ${id} must be a basic template`);
+        }
+    }
+    assert.ok(totalRolls > 0, "The mock RNG should have been called");
+    console.log("[equipment-drop-basic-templates-only] ok");
+}
+
+testEquipmentDropBasicTemplatesOnly();
+
+function testEquipmentNormalizeMerge() {
+    const raw = {
+        shards: 100,
+        enhancementStones: 5,
+        chests: [],
+        equipment: { attack_sword: 2, unknown_invalid: 3, health_crystal: -1 }
+    };
+    const normalized = normalizeHuntingLoot(raw);
+    assert.equal(normalized.shards, 100, "Shards should pass through");
+    assert.equal(normalized.equipment.attack_sword, 2, "Valid basic equipment ID should be preserved");
+    assert.equal(normalized.equipment.unknown_invalid, undefined, "Invalid equipment ID should be removed");
+    assert.equal(normalized.equipment.health_crystal, undefined, "Non-positive count should be removed");
+
+    const base = normalizeHuntingLoot({ equipment: { attack_sword: 1 } });
+    const addition = normalizeHuntingLoot({ equipment: { attack_sword: 2, defense_leather: 1 } });
+    const merged = mergeHuntingLoot(base, addition);
+    assert.equal(merged.equipment.attack_sword, 3, "Merge should sum counts for same ID");
+    assert.equal(merged.equipment.defense_leather, 1, "Merge should include new IDs");
+
+    const spread = mergeHuntingLoot(
+        normalizeHuntingLoot({ equipment: { attack_sword: 1 } }),
+        normalizeHuntingLoot({ equipment: { attack_sword: 1 } })
+    );
+    assert.notEqual(spread.equipment, base.equipment, "Merge should not alias the source object");
+    console.log("[equipment-normalize-merge] ok");
+}
+
+testEquipmentNormalizeMerge();
+
+function testEquipmentDefeatPreservation() {
+    const pending = normalizeHuntingLoot({
+        shards: 100,
+        enhancementStones: 10,
+        equipment: { attack_sword: 3, health_crystal: 1 }
+    });
+    const deterministicRng = () => 0.99;
+    const result = applyDefeatPreservation(pending, deterministicRng);
+    assert.ok(result.preservedLoot.equipment.attack_sword === 3, "Equipment should be fully preserved on defeat");
+    assert.ok(result.preservedLoot.equipment.health_crystal === 1, "All equipment should be preserved");
+    assert.equal(Object.keys(result.lostLoot.equipment).length, 0, "No equipment should be lost on defeat");
+    assert.ok(result.preservedLoot.shards < 100, "Shards should be partially lost on defeat");
+    console.log("[equipment-defeat-preservation] ok");
+}
+
+testEquipmentDefeatPreservation();
+
+function testDailyShopGeneratesThreeUniqueBasics() {
+    const profile = createDefaultPlayerProfile();
+    const rng = createSeededRandom(42);
+    profile.hunting.shards = 10_000;
+    const firstView = getDailyShop(profile, 0, rng);
+    assert.equal(firstView.offers.length, 3, "Daily shop should always have exactly 3 offers");
+    const ids = firstView.offers.map((o) => o.templateId);
+    assert.equal(new Set(ids).size, 3, "All three offers must be unique");
+    for (const id of ids) {
+        const t = getEquipmentTemplate(id);
+        assert.ok(t && t.tier === "basic", `Each offer ${id} must be a valid basic template`);
+    }
+    for (const offer of firstView.offers) {
+        assert.ok(offer.price >= 600, `Basic equipment shop price should be at least 600`);
+        assert.ok(offer.price <= 1350, `Basic equipment shop price should be at most 1350`);
+        assert.equal(offer.price, getEquipmentTemplate(offer.templateId).shopCost * 3, "Price should be 3x shopCost");
+        assert.ok(typeof offer.ownedCount === "number", "Owned count should be a number");
+    }
+    console.log("[daily-shop-three-unique-basics] ok");
+}
+
+testDailyShopGeneratesThreeUniqueBasics();
+
+function testDailyShopLegacyRarityRemoval() {
+    const profile = createDefaultPlayerProfile();
+    profile.hunting.shards = 10_000;
+    profile.hunting.dailyShop = {
+        rarity: "rare",
+        chestCost: 150,
+        purchases: 0,
+        lastPurchaseAt: null,
+        rerolls: 1,
+        lastRerollAt: null
+    };
+    const view = getDailyShop(profile, 0);
+    assert.equal(
+        "rarity" in profile.hunting.dailyShop,
+        false,
+        "Obsolete rarity field should be removed after normalization"
+    );
+    assert.equal("chestCost" in profile.hunting.dailyShop, false, "Obsolete chestCost field should be removed");
+    assert.ok(Array.isArray(profile.hunting.dailyShop.offerIds), "offerIds should replace rarity");
+    assert.equal(profile.hunting.dailyShop.offerIds.length, 3, "Three offer IDs should be generated");
+    console.log("[daily-shop-legacy-rarity-removal] ok");
+}
+
+testDailyShopLegacyRarityRemoval();
+
 function testDailyShopPurchaseAndRerollCycles() {
     const profile = createDefaultPlayerProfile();
     profile.hunting.shards = 10_000;
@@ -22447,102 +22675,60 @@ function testDailyShopPurchaseAndRerollCycles() {
     assert.equal(firstOffer.purchaseResetAt, null, "Unused purchase limits should not start a reset timer");
     assert.equal(firstOffer.rerollResetAt, null, "Unused rerolls should not start a reset timer");
 
-    const autoRerollProfile = createDefaultPlayerProfile();
-    autoRerollProfile.hunting.shards = 500;
-    autoRerollProfile.hunting.dailyShop = {
-        rarity: "rare",
-        purchases: 0,
-        lastPurchaseAt: null,
-        rerolls: 2,
-        lastRerollAt: 40
-    };
-    const rareChest = buyDailyShopChest(autoRerollProfile, { now: 100, rng: () => 0.71 });
-    assert.equal(rareChest.rarity, "rare", "Buying should grant the rarity that was displayed before the refresh");
-    assert.equal(
-        autoRerollProfile.hunting.dailyShop.rarity,
-        "uncommon",
-        "Buying should immediately roll the next offer"
-    );
-    assert.equal(autoRerollProfile.hunting.shards, 350, "Buying should deduct only the chest price");
-    assert.equal(autoRerollProfile.hunting.dailyShop.rerolls, 2, "Buying must not consume a manual reroll");
-    assert.equal(autoRerollProfile.hunting.dailyShop.lastRerollAt, 40, "Buying must not change manual reroll timing");
+    const templateId = firstOffer.offers[0].templateId;
+    const price = firstOffer.offers[0].price;
+    const buyResult = buyDailyShopEquipment(profile, templateId, { now: 1, rng: () => 0.5 });
+    assert.ok(buyResult.ok, "First purchase should succeed");
+    assert.equal(buyResult.templateId, templateId, "Purchase result should contain the bought template ID");
+    assert.equal(buyResult.price, price, "Purchase should deduct the offer price");
+    assert.equal(profile.hunting.shards, 10_000 - price, "Shards should be deducted by the price");
+    assert.equal(profile.hunting.dailyShop.purchases, 1, "Purchase count should increment");
+    assert.equal(profile.hunting.dailyShop.lastPurchaseAt, 1, "Purchase should save its timestamp");
 
-    const uncommonChest = buyDailyShopChest(autoRerollProfile, { now: 101, rng: () => 0.01 });
-    assert.equal(uncommonChest.rarity, "uncommon", "The second purchase should use the rerolled offer");
-    assert.equal(
-        autoRerollProfile.hunting.dailyShop.rarity,
-        "common",
-        "Each successful purchase should prepare one next offer"
-    );
-    assert.equal(autoRerollProfile.hunting.dailyShop.purchases, 2, "Auto rerolls must preserve the purchase limit");
-    assert.equal(
-        autoRerollProfile.hunting.dailyShop.lastPurchaseAt,
-        101,
-        "The second purchase should refresh only its timer"
-    );
+    const secondView = getDailyShop(profile, 1);
+    const secondTemplateId = secondView.offers[0].templateId;
+    assert.notEqual(secondTemplateId, templateId, "Purchased slot should be replaced with a different offer");
+    const allIds = secondView.offers.map((o) => o.templateId);
+    assert.equal(new Set(allIds).size, 3, "All offers should remain unique after purchase replacement");
 
-    const blockedAutoReroll = buyDailyShopChest(autoRerollProfile, { now: 102, rng: () => 0.96 });
-    assert.equal(blockedAutoReroll, null, "A capped purchase must fail");
-    assert.equal(autoRerollProfile.hunting.dailyShop.rarity, "common", "A failed purchase must not replace the offer");
-    assert.equal(autoRerollProfile.hunting.shards, 200, "A failed purchase must not deduct shards");
-    assert.equal(autoRerollProfile.hunting.dailyShop.rerolls, 2, "A failed purchase must preserve manual rerolls");
-    assert.equal(autoRerollProfile.hunting.dailyShop.lastRerollAt, 40, "A failed purchase must preserve reroll timing");
+    const secondBuyResult = buyDailyShopEquipment(profile, secondTemplateId, { now: 4, rng: () => 0.5 });
+    assert.ok(secondBuyResult.ok, "Second purchase within limit should succeed");
+    assert.equal(profile.hunting.dailyShop.purchases, 2, "Purchase count should be 2 after second buy");
 
-    const firstChest = buyDailyShopChest(profile, { now: 1, rng: () => 0.01 });
-    const secondChest = buyDailyShopChest(profile, { now: 4, rng: () => 0.01 });
-    const blockedChest = buyDailyShopChest(profile, { now: 4, rng: () => 0.01 });
-    assert.ok(firstChest && secondChest, "The shop should sell two chests per purchase cycle");
-    assert.equal(blockedChest, null, "The shop must enforce its purchase limit");
-    assert.equal(profile.hunting.shards, 9_700, "Two shop chests should cost 300 shards");
-    assert.equal(profile.hunting.dailyShop.lastPurchaseAt, 4, "Purchases should save their latest successful time");
+    const thirdView = getDailyShop(profile, 4);
+    const anyOfferId = thirdView.offers[0].templateId;
+    const blockedResult = buyDailyShopEquipment(profile, anyOfferId, { now: 4, rng: () => 0.5 });
+    assert.equal(blockedResult.ok, false, "Purchase beyond limit should be blocked");
+    assert.equal(blockedResult.reason, "purchase_limit", "Blocked purchase should report purchase_limit reason");
+
+    const insufficientShardsProfile = createDefaultPlayerProfile();
+    insufficientShardsProfile.hunting.shards = 0;
+    const shopView = getDailyShop(insufficientShardsProfile, 0);
+    const cheapId = shopView.offers.reduce((a, b) => (a.price < b.price ? a : b)).templateId;
+    const insufficientResult = buyDailyShopEquipment(insufficientShardsProfile, cheapId, { now: 1, rng: () => 0.5 });
+    assert.equal(insufficientResult.ok, false, "Purchase with insufficient shards should fail");
+    assert.equal(insufficientResult.reason, "insufficient_shards", "Failed purchase should report reason");
+
+    const invalidIdResult = buyDailyShopEquipment(profile, "nonexistent_id", { now: 5, rng: () => 0.5 });
+    assert.equal(invalidIdResult.ok, false, "Non-offer ID purchase should fail");
+
+    const intermediateId = "intermediate_attack_crit";
+    const intermediateResult = buyDailyShopEquipment(profile, intermediateId, { now: 5, rng: () => 0.5 });
+    assert.equal(intermediateResult.ok, false, "Intermediate template purchase should fail");
+
+    const rerolledView = rerollDailyShop(profile, { now: 5, rng: () => 0.5 });
+    assert.ok(rerolledView, "Reroll should succeed when funded");
+    assert.equal(rerolledView.offers.length, 3, "Rerolled shop should have 3 offers");
+    const rerollIds = rerolledView.offers.map((o) => o.templateId);
+    assert.equal(new Set(rerollIds).size, 3, "Rerolled offers must be unique");
     assert.equal(
-        getDailyShop(profile, 4).purchaseResetAt,
-        DAILY_SHOP.purchaseResetMs + 4,
-        "Purchase reset should count from the latest successful purchase"
-    );
-
-    const rerolledOffer = rerollDailyShop(profile, { now: 5, rng: () => 0.96 });
-    assert.equal(rerolledOffer.rarity, "rare", "Rerolling should replace the offered chest rarity");
-    assert.equal(profile.hunting.shards, 9_670, "The first reroll should cost 30 shards");
-    assert.equal(profile.hunting.dailyShop.lastRerollAt, 5, "Rerolls should save their latest successful time");
-    assert.equal(
-        rerolledOffer.rerollResetAt,
-        DAILY_SHOP.rerollResetMs + 5,
-        "Reroll reset should count from the latest successful reroll"
-    );
-    rerollDailyShop(profile, { now: 8, rng: () => 0.01 });
-    assert.equal(profile.hunting.dailyShop.lastRerollAt, 8, "Later rerolls should refresh their reset time");
-    assert.equal(profile.hunting.shards, 9_610, "The second reroll should cost 60 shards");
-    for (let attempt = 0; attempt < 8; attempt += 1) rerollDailyShop(profile, { now: 8, rng: () => 0.01 });
-    assert.equal(profile.hunting.shards, 8_050, "Reroll costs should continue rising through 300 shards");
-    const cappedOffer = rerollDailyShop(profile, { now: 8, rng: () => 0.01 });
-    assert.equal(cappedOffer.rerollCost, 300, "Reroll cost should stop at ten times the base price");
-    assert.equal(profile.hunting.shards, 7_750, "The capped reroll should still cost 300 shards");
-
-    const nextRerollCycle = getDailyShop(profile, DAILY_SHOP.rerollResetMs + 9);
-    assert.equal(nextRerollCycle.rerolls, 0, "The reroll count should reset independently");
-    assert.equal(nextRerollCycle.rerollResetAt, null, "Reset rerolls should stop their countdown");
-    const nextPurchaseCycle = getDailyShop(profile, DAILY_SHOP.purchaseResetMs + 5);
-    assert.equal(nextPurchaseCycle.purchases, 0, "The purchase count should reset independently");
-    assert.equal(nextPurchaseCycle.purchaseResetAt, null, "Reset purchases should stop their countdown");
-
-    const legacyUnusedProfile = createDefaultPlayerProfile();
-    legacyUnusedProfile.hunting.dailyShop = {
-        purchases: 0,
-        rerolls: 0,
-        purchaseResetAt: DAILY_SHOP.purchaseResetMs,
-        rerollResetAt: DAILY_SHOP.rerollResetMs
-    };
-    const migratedView = getDailyShop(legacyUnusedProfile, 1);
-    assert.equal(migratedView.purchaseResetAt, null, "Legacy unused purchase timers should be removed");
-    assert.equal(migratedView.rerollResetAt, null, "Legacy unused reroll timers should be removed");
-    assert.equal(
-        "purchaseResetAt" in legacyUnusedProfile.hunting.dailyShop,
-        false,
-        "Legacy reset timestamps should not remain persisted"
+        profile.hunting.shards,
+        10_000 - price - secondBuyResult.price - 30,
+        "First reroll should cost 30 shards"
     );
 
     const legacyActiveProfile = createDefaultPlayerProfile();
+    legacyActiveProfile.hunting.shards = 10_000;
     legacyActiveProfile.hunting.dailyShop = {
         purchases: 1,
         rerolls: 2,
@@ -22589,6 +22775,123 @@ function testDailyShopBridgeOnlySoundsOnSuccessfulReroll() {
 }
 
 testDailyShopBridgeOnlySoundsOnSuccessfulReroll();
+
+function testEquipmentDropChanceFromConfig() {
+    const configChance = REWARD_BALANCE.hunting.loot.equipmentDropChance;
+    assert.equal(typeof configChance, "number", "equipmentDropChance must be a number");
+    assert.ok(configChance > 0 && configChance < 1, "equipmentDropChance must be between 0 and 1");
+    const mockRng = () => configChance * 0.999;
+    const result = rollHuntingEquipmentDrop({ rng: mockRng, chanceMultiplier: 1 });
+    assert.ok(result !== null, "Should drop when rng < equipmentDropChance");
+    const mockRngFail = () => configChance;
+    const resultFail = rollHuntingEquipmentDrop({ rng: mockRngFail, chanceMultiplier: 1 });
+    assert.equal(resultFail, null, "Should not drop when rng >= equipmentDropChance");
+    console.log("[equipment-drop-chance-from-config] ok");
+}
+
+testEquipmentDropChanceFromConfig();
+
+function testEquipmentDropMinibossCondition() {
+    const source = readFileSync(new URL("../src/hunting/huntingLoot.js", import.meta.url), "utf8");
+    assert.ok(/\(isMob\s*\|\|\s*isMiniboss\)/.test(source), "Equipment drop condition must include isMiniboss");
+    console.log("[equipment-drop-miniboss-condition] ok");
+}
+
+testEquipmentDropMinibossCondition();
+
+function testEquipmentDropScale() {
+    const source = readFileSync(new URL("../src/entities/equipmentDrop.js", import.meta.url), "utf8");
+    assert.ok(source.includes("const scale = r * 2"), "resolveTagDraw scale must be r * 2 without divisor");
+    assert.ok(!source.includes("/ 36"), "resolveTagDraw scale must not contain / 36 divisor");
+    console.log("[equipment-drop-scale] ok");
+}
+
+testEquipmentDropScale();
+
+function testEquipmentDropCollectRewardInvalid() {
+    const invalidDrop = new EquipmentDrop({
+        templateId: "nonexistent_id",
+        position: { x: 0, y: 0 },
+        radius: 18
+    });
+    const fakeCollector = { name: "Test" };
+    const result = invalidDrop.collectReward(fakeCollector);
+    assert.equal(result, null, "collectReward should return null for invalid template");
+
+    const intermediateDrop = new EquipmentDrop({
+        templateId: "intermediate_attack_crit",
+        position: { x: 0, y: 0 },
+        radius: 18
+    });
+    const result2 = intermediateDrop.collectReward(fakeCollector);
+    assert.equal(result2, null, "collectReward should return null for non-basic template");
+
+    console.log("[equipment-drop-collect-reward-invalid] ok");
+}
+
+testEquipmentDropCollectRewardInvalid();
+
+function testDailyShopPriceMultiplier() {
+    const profile = createDefaultPlayerProfile();
+    profile.hunting.shards = 10_000;
+    const rng = createSeededRandom(42);
+    const view = getDailyShop(profile, 0, rng);
+    for (const offer of view.offers) {
+        const template = getEquipmentTemplate(offer.templateId);
+        assert.equal(
+            offer.price,
+            template.shopCost * DAILY_SHOP.priceMultiplier,
+            "Price must use DAILY_SHOP.priceMultiplier"
+        );
+    }
+    console.log("[daily-shop-price-multiplier] ok");
+}
+
+testDailyShopPriceMultiplier();
+
+function testDailyShopRerollExcludesOldOffers() {
+    const profile = createDefaultPlayerProfile();
+    profile.hunting.shards = 10_000;
+    getDailyShop(profile, 0, createSeededRandom(42));
+    const oldIds = [...profile.hunting.dailyShop.offerIds];
+    rerollDailyShop(profile, { now: 1, rng: createSeededRandom(99) });
+    const newIds = profile.hunting.dailyShop.offerIds;
+    for (const oldId of oldIds) {
+        assert.ok(!newIds.includes(oldId), "Reroll should exclude all three old offers");
+    }
+    assert.equal(new Set(newIds).size, 3, "Rerolled offers must remain unique");
+    console.log("[daily-shop-reroll-excludes-old] ok");
+}
+
+testDailyShopRerollExcludesOldOffers();
+
+function testSanitizeEquipmentMapBasicOnly() {
+    const raw = {
+        attack_sword: 2,
+        intermediate_attack_crit: 1,
+        completed_ability_crit: 1,
+        unknown_invalid: 3
+    };
+    const result = sanitizeEquipmentMap(raw);
+    const keys = Object.keys(result);
+    assert.deepEqual(keys, ["attack_sword"], "Only basic-tier entries should survive sanitization");
+    assert.equal(result.attack_sword, 2, "Basic count should be preserved");
+    console.log("[sanitize-equipment-map-basic-only] ok");
+}
+
+testSanitizeEquipmentMapBasicOnly();
+
+function testNormalizeTimedCounterNoLastActionAtKey() {
+    const source = readFileSync(new URL("../src/hunting/dailyShop.js", import.meta.url), "utf8");
+    const match = source.match(/function normalizeTimedCounter\(([^)]+)\)/);
+    assert.ok(match, "normalizeTimedCounter should exist");
+    const params = match[1].split(",").map((p) => p.trim());
+    assert.ok(!params.includes("lastActionAtKey"), "lastActionAtKey parameter must be removed");
+    assert.equal(params.length, 3, "normalizeTimedCounter should have exactly 3 parameters");
+    console.log("[normalize-timed-counter-no-lastActionAtKey] ok");
+}
+
+testNormalizeTimedCounterNoLastActionAtKey();
 
 function createSeededRandom(seed) {
     let state = seed >>> 0;
@@ -26184,5 +26487,229 @@ function testNoOldAccelerationSymbols() {
 }
 
 testNoOldAccelerationSymbols();
+
+function testGetDailyShopIdenticalRng() {
+    const now = Date.now();
+    function makeSeq(values) {
+        let i = 0;
+        return () => values[i++ % values.length];
+    }
+    const rng1 = makeSeq([0.1, 0.3, 0.5, 0.7, 0.9]);
+    const rng2 = makeSeq([0.1, 0.3, 0.5, 0.7, 0.9]);
+    const profile1 = createDefaultPlayerProfile();
+    profile1.hunting.shards = 1000;
+    const profile2 = createDefaultPlayerProfile();
+    profile2.hunting.shards = 1000;
+    const result1 = getDailyShop(profile1, now, rng1);
+    const result2 = getDailyShop(profile2, now, rng2);
+    assert.equal(result1.offers.length, 3, "First profile should receive three offers");
+    assert.equal(result2.offers.length, 3, "Second profile should receive three offers");
+    assert.deepEqual(
+        result1.offers.map((o) => o.templateId),
+        result2.offers.map((o) => o.templateId),
+        "Identical injected RNG should produce identical offers on two fresh profiles"
+    );
+    console.log("[daily-shop-identical-rng] ok");
+}
+
+testGetDailyShopIdenticalRng();
+
+function testDailyShopOfferNormalization() {
+    const now = Date.now();
+    function makeRng() {
+        const values = [0.1, 0.3, 0.5, 0.7, 0.9];
+        let i = 0;
+        return () => values[i++ % values.length];
+    }
+    const cases = [
+        { name: "empty", offerIds: [] },
+        { name: "duplicate", offerIds: ["attack_sword", "attack_sword"] },
+        { name: "invalid", offerIds: ["nonexistent_id"] },
+        { name: "partial", offerIds: ["attack_sword"] },
+        { name: "intermediate", offerIds: ["intermediate_attack_crit"] }
+    ];
+    for (const { name, offerIds } of cases) {
+        const profile = createDefaultPlayerProfile();
+        profile.hunting.dailyShop = { offerIds };
+        const result = getDailyShop(profile, now, makeRng());
+        assert.equal(result.offers.length, 3, `${name} should normalize to exactly three offers`);
+        const ids = result.offers.map((o) => o.templateId);
+        assert.equal(new Set(ids).size, 3, `${name} should produce unique basic IDs`);
+        for (const id of ids) {
+            const template = getEquipmentTemplate(id);
+            assert.equal(template.tier, "basic", `${name} should only contain basic-tier offers`);
+        }
+    }
+    const validProfile = createDefaultPlayerProfile();
+    validProfile.hunting.dailyShop = { offerIds: ["attack_sword", "health_crystal", "speed_boots"] };
+    const validResult = getDailyShop(validProfile, now, makeRng());
+    assert.deepEqual(
+        validResult.offers.map((o) => o.templateId),
+        ["attack_sword", "health_crystal", "speed_boots"],
+        "Three valid basic offers must not be regenerated"
+    );
+    console.log("[daily-shop-offer-normalization] ok");
+}
+
+testDailyShopOfferNormalization();
+
+function testDailyShopLegacyMigration() {
+    const now = Date.now();
+    const purchaseResetAt = now + DAILY_SHOP.purchaseResetMs;
+    const rerollResetAt = now + DAILY_SHOP.rerollResetMs;
+    const profile = createDefaultPlayerProfile();
+    profile.hunting.shards = 1000;
+    profile.hunting.dailyShop = {
+        purchases: 1,
+        rerolls: 1,
+        purchaseResetAt,
+        rerollResetAt
+    };
+    getDailyShop(profile, now, () => 0.5);
+    const shop = profile.hunting.dailyShop;
+    assert.equal(shop.purchaseResetAt, undefined, "purchaseResetAt must be deleted after migration");
+    assert.equal(shop.rerollResetAt, undefined, "rerollResetAt must be deleted after migration");
+    const expectedLastPurchase = purchaseResetAt - DAILY_SHOP.purchaseResetMs;
+    const expectedLastReroll = rerollResetAt - DAILY_SHOP.rerollResetMs;
+    assert.equal(
+        shop.lastPurchaseAt,
+        expectedLastPurchase,
+        "lastPurchaseAt must be derived from legacy purchaseResetAt"
+    );
+    assert.equal(shop.lastRerollAt, expectedLastReroll, "lastRerollAt must be derived from legacy rerollResetAt");
+    console.log("[daily-shop-legacy-migration] ok");
+}
+
+testDailyShopLegacyMigration();
+
+function testDailyShopFailedPurchaseStateIsolation() {
+    const now = Date.now();
+    function seedProfile() {
+        const profile = createDefaultPlayerProfile();
+        profile.hunting.shards = 10000;
+        profile.equipment.inventory = {};
+        getDailyShop(profile, now, () => 0.5);
+        return profile;
+    }
+    function snapshot(profile) {
+        const shop = profile.hunting.dailyShop;
+        return {
+            shards: profile.hunting.shards,
+            inventory: { ...profile.equipment.inventory },
+            purchases: shop.purchases,
+            lastPurchaseAt: shop.lastPurchaseAt,
+            offerIds: [...shop.offerIds]
+        };
+    }
+    function assertUnchanged(profile, before) {
+        const shop = profile.hunting.dailyShop;
+        assert.equal(profile.hunting.shards, before.shards, "shards unchanged");
+        assert.deepEqual(profile.equipment.inventory, before.inventory, "inventory unchanged");
+        assert.equal(shop.purchases, before.purchases, "purchases unchanged");
+        assert.equal(shop.lastPurchaseAt, before.lastPurchaseAt, "lastPurchaseAt unchanged");
+        assert.deepEqual(shop.offerIds, before.offerIds, "offerIds unchanged");
+    }
+    function getFirstOfferId(profile) {
+        return profile.hunting.dailyShop.offerIds[0];
+    }
+    const rng = () => 0.5;
+
+    {
+        const profile = seedProfile();
+        const offerId = getFirstOfferId(profile);
+        profile.hunting.shards = 0;
+        const before = snapshot(profile);
+        const result = buyDailyShopEquipment(profile, offerId, { now, rng });
+        assert.equal(result.ok, false, "insufficient_shards should fail");
+        assert.equal(result.reason, "insufficient_shards");
+        assertUnchanged(profile, before);
+    }
+    {
+        const profile = seedProfile();
+        const before = snapshot(profile);
+        const result = buyDailyShopEquipment(profile, "nonexistent_id", { now, rng });
+        assert.equal(result.ok, false, "non-offer ID should fail");
+        assert.equal(result.reason, "not_in_shop");
+        assertUnchanged(profile, before);
+    }
+    {
+        const profile = seedProfile();
+        const offerId = getFirstOfferId(profile);
+        profile.hunting.dailyShop.purchases = DAILY_SHOP.purchaseLimit;
+        profile.hunting.dailyShop.lastPurchaseAt = now;
+        const before = snapshot(profile);
+        const result = buyDailyShopEquipment(profile, offerId, { now, rng });
+        assert.equal(result.ok, false, "purchase cap should fail");
+        assert.equal(result.reason, "purchase_limit");
+        assertUnchanged(profile, before);
+    }
+    {
+        const profile = seedProfile();
+        const offerId = getFirstOfferId(profile);
+        profile.equipment.inventory[offerId] = EQUIPMENT_MAX_STACK;
+        const before = snapshot(profile);
+        const result = buyDailyShopEquipment(profile, offerId, { now, rng });
+        assert.equal(result.ok, false, "stack capacity should fail");
+        assert.equal(result.reason, "capacity");
+        assertUnchanged(profile, before);
+    }
+    console.log("[daily-shop-failed-purchase-isolation] ok");
+}
+
+testDailyShopFailedPurchaseStateIsolation();
+
+function testComponentBridgeBuyDailyShopEquipment() {
+    const now = Date.now();
+    const profile = createDefaultPlayerProfile();
+    profile.hunting.shards = 10000;
+    profile.equipment.inventory = {};
+    getDailyShop(profile, now, () => 0.5);
+    const refreshCalls = [];
+    const mockApp = {
+        playerProfile: profile,
+        _refreshCollectionHub() {
+            refreshCalls.push("hub");
+        },
+        refreshPlayerSetup() {
+            refreshCalls.push("setup");
+        },
+        audio: { play() {} }
+    };
+    const origLocalStorage = globalThis.localStorage;
+    const fakeStore = {};
+    globalThis.localStorage = {
+        getItem(key) {
+            return fakeStore[key] ?? null;
+        },
+        setItem(key, value) {
+            fakeStore[key] = value;
+        }
+    };
+    try {
+        const bridge = createComponentBridge(mockApp);
+        const offerId = profile.hunting.dailyShop.offerIds[0];
+        refreshCalls.length = 0;
+        const failResult = bridge.buyDailyShopEquipment("nonexistent");
+        assert.equal(failResult.ok, false, "bridge must propagate failure");
+        assert.deepEqual(refreshCalls, [], "bridge must not refresh or save after failed purchase");
+        refreshCalls.length = 0;
+        const okResult = bridge.buyDailyShopEquipment(offerId);
+        assert.equal(okResult.ok, true, "bridge must propagate success");
+        assert.deepEqual(
+            refreshCalls,
+            ["hub", "setup"],
+            "bridge must call _refreshCollectionHub and refreshPlayerSetup after success"
+        );
+        assert.ok(
+            fakeStore[PLAYER_PROFILE_STORAGE_KEY],
+            "bridge must save the player profile after a successful purchase"
+        );
+    } finally {
+        globalThis.localStorage = origLocalStorage;
+    }
+    console.log("[component-bridge-buy-daily-shop] ok");
+}
+
+testComponentBridgeBuyDailyShopEquipment();
 
 console.log("regression tests ok");

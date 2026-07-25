@@ -2,6 +2,7 @@ import { HUNTING_CHEST_RARITIES, HUNTING_CHEST_REWARD_TYPES } from "./huntingCon
 import {
     describeHuntingChestRewards,
     getChestOpenCost,
+    normalizeHuntingChests,
     getHuntingChestRewardTable,
     rollHuntingChestReward
 } from "./huntingRewards.js";
@@ -61,10 +62,9 @@ export function applyHuntingChestReward(profile, reward, { rng = Math.random, ch
 }
 
 export function openHuntingChest(profile, chestId, { rng = Math.random, characterId = null } = {}) {
-    const chests = profile?.hunting?.chests;
-    if (!Array.isArray(chests)) {
-        return { opened: false, reason: "missing_storage" };
-    }
+    if (!profile?.hunting) return { opened: false, reason: "missing_storage" };
+    const chests = normalizeHuntingChests(profile.hunting.chests, { dedupe: true });
+    profile.hunting.chests = chests;
 
     const index = chests.findIndex((chest) => chest.id === chestId);
     if (index < 0) {

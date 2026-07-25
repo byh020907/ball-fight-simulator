@@ -1,4 +1,4 @@
-import { createHuntingChest } from "./huntingRewards.js";
+import { createHuntingChest, normalizeHuntingChests } from "./huntingRewards.js";
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 import { getHuntingDisplayHealth, getHuntingDisplayHp } from "./huntingHealth.js";
 import { getRarityLabel } from "./rarityPresentation.js";
@@ -62,7 +62,7 @@ function _createBuyLootOffer(discount) {
 }
 
 function _createSecureTransportOffer(run, discount) {
-    const pendingChests = run.pendingLoot?.chests ?? [];
+    const pendingChests = normalizeHuntingChests(run?.pendingLoot?.chests);
     const cost = calcDiscount(REWARD_BALANCE.hunting.events.merchant.secureTransportCost, discount);
     const hasPending = pendingChests.length > 0;
     return {
@@ -89,7 +89,8 @@ export function applyMerchantOffer(run, profile, offer) {
     if (offer.type === MERCHANT_OFFER_TYPES.REPAIR && (health.hp ?? health.maxHp ?? 100) >= (health.maxHp ?? 100)) {
         return null;
     }
-    if (offer.type === MERCHANT_OFFER_TYPES.SECURE_TRANSPORT && (run.pendingLoot?.chests ?? []).length === 0) {
+    const normalizedPendingChests = normalizeHuntingChests(run?.pendingLoot?.chests);
+    if (offer.type === MERCHANT_OFFER_TYPES.SECURE_TRANSPORT && normalizedPendingChests.length === 0) {
         return null;
     }
     const shards = profile.hunting?.shards ?? 0;
@@ -111,11 +112,11 @@ export function applyMerchantOffer(run, profile, offer) {
         const chest = createHuntingChest({ rarity: "common" });
         newRun.pendingLoot = {
             ...newRun.pendingLoot,
-            chests: [...(newRun.pendingLoot?.chests ?? []), chest]
+            chests: [...normalizeHuntingChests(newRun.pendingLoot?.chests), chest]
         };
         result = { type: "buy_loot", chest };
     } else if (offer.type === MERCHANT_OFFER_TYPES.SECURE_TRANSPORT) {
-        const pendingChests = [...(newRun.pendingLoot?.chests ?? [])];
+        const pendingChests = normalizeHuntingChests(newRun.pendingLoot?.chests);
         if (pendingChests.length === 0) return null;
         const movedChest = pendingChests.shift();
         newRun.pendingLoot = {
@@ -125,7 +126,7 @@ export function applyMerchantOffer(run, profile, offer) {
         newRun.securedLoot = {
             shards: newRun.securedLoot?.shards ?? 0,
             enhancementStones: newRun.securedLoot?.enhancementStones ?? 0,
-            chests: [...(newRun.securedLoot?.chests ?? []), movedChest]
+            chests: [...normalizeHuntingChests(newRun.securedLoot?.chests), movedChest]
         };
         result = { type: "secure_transport", chest: movedChest };
     }
