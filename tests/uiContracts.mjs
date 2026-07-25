@@ -190,6 +190,7 @@ function testRecipeTreePresentation() {
 function testRecipeTreeUiContract() {
     const panel = readSource("src/components/collection-equipment-panel.html");
     const tree = readSource("src/components/recipe-tree.html");
+    const node = readSource("src/components/recipe-tree-node.html");
     assert.ok(
         panel.includes('x-data="{ get tree() { return selected.recipe.tree; } }"') &&
             panel.includes("<recipe-tree x-component=\"'recipe-tree'\"></recipe-tree>"),
@@ -202,35 +203,39 @@ function testRecipeTreeUiContract() {
     );
     assert.ok(panel.includes('@click="craft(selected.id)"'), "Craft action must remain beside the tree");
     assert.equal(tree.includes("Alpine.store"), false, "Reusable tree must not read parent stores directly");
+    assert.equal(node.includes("Alpine.store"), false, "Reusable tree nodes must not read parent stores directly");
     assert.equal(
-        tree.includes("`부족 ${node.required - node.owned}`"),
+        node.includes("`부족 ${node.required - node.owned}`"),
         false,
         "ARIA labels must not nest template literals"
     );
     assert.match(
-        tree.match(/:aria-label="([^"]*)"/)?.[1] ?? "",
+        node.match(/:aria-label="([^"]*)"/)?.[1] ?? "",
         /^node\.name \+ /,
         "ARIA labels must use one valid Alpine concatenation expression"
     );
     assert.equal(
-        /(?:λ퉬|蹂댁쑀|異⑹”|�)/.test(tree),
+        /(?:λ퉬|蹂댁쑀|異⑹”|�)/.test(tree + node),
         false,
         "Recipe tree copy must remain normal UTF-8 Korean instead of mojibake"
     );
     assert.ok(
         tree.includes('role="tree"') &&
-            tree.includes('role="treeitem"') &&
-            tree.includes(":aria-label") &&
-            tree.includes("x-equipment-icon-tag") &&
-            tree.includes("ch-recipe-tree-status"),
+            node.includes('role="treeitem"') &&
+            node.includes(":aria-label") &&
+            node.includes("x-equipment-icon-tag") &&
+            node.includes("ch-recipe-meta"),
         "Tree must expose icon, textual status, and accessible node semantics"
     );
     assert.ok(
         tree.includes("overflow-x: auto") &&
-            tree.includes("ch-recipe-tree-level:not(:first-child)") &&
-            tree.includes("::before"),
-        "Tree must own mobile horizontal scrolling and CSS connectors"
+            tree.includes("x-component=\"'recipe-tree-node'\"") &&
+            node.includes("node.children") &&
+            node.includes("ch-recipe-children") &&
+            node.includes("> recipe-tree-node::before"),
+        "Tree must own mobile scrolling and render connectors inside each parent branch"
     );
+    assert.equal(node.includes("ch-recipe-tree-level"), false, "Nodes must not flatten unrelated parents by depth");
     const recipeStyles = panel.match(/\.ch-equipment-recipe\s*\{([^}]*)\}/s)?.[1] ?? "";
     const wrapperStyles =
         panel.match(/\.ch-equipment-recipe-tree,\s*\.ch-equipment-recipe-tree recipe-tree\s*\{([^}]*)\}/s)?.[1] ?? "";
