@@ -25,9 +25,14 @@ import {
     ElementalistVfxPreviewController,
     getElementalistVfxPreviewOptions
 } from "./developer/elementalistVfxPreview.js";
+import {
+    EquipmentPassiveVfxPreviewController,
+    getEquipmentPassiveVfxPreviewOptions
+} from "./developer/equipmentPassiveVfxPreview.js";
 
 export function createComponentBridge(app) {
     const elementalistVfxPreview = new ElementalistVfxPreviewController();
+    const equipmentPassiveVfxPreview = new EquipmentPassiveVfxPreviewController();
 
     function refreshCollectionAndProfile() {
         app._refreshCollectionHub();
@@ -155,6 +160,7 @@ export function createComponentBridge(app) {
         },
         exitDebugMode() {
             elementalistVfxPreview.stop();
+            equipmentPassiveVfxPreview.stop();
             if (!app.disableDebugMode()) return { ok: false, error: "debug_disabled" };
             return { ok: true };
         },
@@ -172,6 +178,21 @@ export function createComponentBridge(app) {
         triggerDebugElementalistWetPreview() {
             if (!app.isDebugModeActive()) return { ok: false, error: "debug_disabled" };
             return elementalistVfxPreview.triggerWet();
+        },
+        getDebugEquipmentPassiveVfxPreviewOptions() {
+            if (!app.isDebugModeActive()) return [];
+            return getEquipmentPassiveVfxPreviewOptions();
+        },
+        startDebugEquipmentPassiveVfxPreview(canvas, previewId) {
+            if (!app.isDebugModeActive()) return { ok: false, error: "debug_disabled" };
+            return equipmentPassiveVfxPreview.start(canvas, previewId);
+        },
+        replayDebugEquipmentPassiveVfxPreview() {
+            if (!app.isDebugModeActive()) return { ok: false, error: "debug_disabled" };
+            return equipmentPassiveVfxPreview.replay();
+        },
+        stopDebugEquipmentPassiveVfxPreview() {
+            return equipmentPassiveVfxPreview.stop();
         },
         setDebugCharacterToMaxLevel(characterId) {
             if (!app.isDebugModeActive()) return { ok: false, error: "debug_disabled" };

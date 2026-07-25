@@ -53,6 +53,10 @@ import {
     EquipmentPassiveEffect,
     spawnEquipmentPassiveEffect
 } from "../src/effects/equipmentPassiveEffects.js";
+import {
+    EQUIPMENT_PASSIVE_VFX_PREVIEW_OPTIONS,
+    EquipmentPassiveVfxPreviewScene
+} from "../src/developer/equipmentPassiveVfxPreview.js";
 
 assert.equal(EQUIPMENT_TEMPLATES.length, 39);
 assert.deepEqual(
@@ -63,6 +67,16 @@ assert.deepEqual(
     { basic: 15, intermediate: 12, completed: 12 }
 );
 assert.equal(validateEquipmentTemplateRegistry().valid, true);
+assert.equal(EQUIPMENT_PASSIVE_VFX_PREVIEW_OPTIONS.length, 12);
+for (const option of EQUIPMENT_PASSIVE_VFX_PREVIEW_OPTIONS) {
+    const scene = new EquipmentPassiveVfxPreviewScene(option.id);
+    let maximumEffects = 0;
+    for (let step = 0; step < 32; step += 1) {
+        scene.update(0.05);
+        maximumEffects = Math.max(maximumEffects, scene.simulation.entities.length);
+    }
+    assert.ok(maximumEffects > 0, `${option.id} preview must emit its actual runtime effect`);
+}
 assert.ok(EQUIPMENT_TEMPLATES.every((template) => template.recipe.length <= 3));
 assert.equal(calculateCombinationCost([getEquipmentTemplate("attack_sword"), getEquipmentTemplate("crit_cloak")]), 100);
 
