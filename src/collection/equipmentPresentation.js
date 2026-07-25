@@ -1,6 +1,7 @@
 import { EQUIPMENT_TEMPLATE_TIERS, EQUIPMENT_TEMPLATES } from "../hunting/equipmentTemplates.js";
 import { getEquipmentCount, getEquipmentRecipePreview } from "../hunting/equipmentInventory.js";
 import { getEquipmentPassivePresentation } from "./equipmentPassivePresentation.js";
+import { createRecipeTreePresentation } from "./recipeTreePresentation.js";
 
 const TIER_LABELS = Object.freeze({ basic: "기초", intermediate: "중간", completed: "완성" });
 const STAT_LABELS = Object.freeze({
@@ -45,7 +46,12 @@ function presentTemplate(profile, template) {
                       name: ingredient.template.name,
                       owned: ingredient.ownedCount,
                       required: ingredient.requiredCount
-                  }))
+                  })),
+                  tree: createRecipeTreePresentation({
+                      rootId: template.id,
+                      getNode: (id) => EQUIPMENT_TEMPLATES.find((item) => item.id === id) ?? null,
+                      getOwnedCount: (id) => getEquipmentCount(profile, id)
+                  })
               }
             : null
     };

@@ -70,9 +70,12 @@
                 <template x-if="selected.recipe"
                     ><div class="ch-equipment-recipe">
                         <p x-text="`조합 비용: 파편 ${selected.recipe.cost}`"></p>
-                        <template x-for="ingredient in selected.recipe.ingredients" :key="ingredient.id"
-                            ><span x-text="`${ingredient.name} ${ingredient.owned}/${ingredient.required}`"></span
-                        ></template>
+                        <div
+                            class="ch-equipment-recipe-tree"
+                            x-data="{ get tree() { return selected.recipe.tree; } }"
+                        >
+                            <recipe-tree x-component="'recipe-tree'"></recipe-tree>
+                        </div>
                         <p
                             class="ch-equipment-missing"
                             x-show="selected.recipe.missingReason"
@@ -257,6 +260,14 @@
         display: flex;
         flex-wrap: wrap;
         gap: 6px;
+        width: 100%;
+        min-width: 0;
+    }
+    .ch-equipment-recipe-tree,
+    .ch-equipment-recipe-tree recipe-tree {
+        display: block;
+        width: 100%;
+        min-width: 0;
     }
     .ch-equipment-missing {
         color: #b91c1c;

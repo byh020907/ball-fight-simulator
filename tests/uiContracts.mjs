@@ -6,6 +6,7 @@ import {
 } from "../src/hunting/equipmentConfig.js";
 import { createCollectionHubViewModel } from "../src/collection/collectionViewModel.js";
 import { createEquipmentPresentation } from "../src/collection/equipmentPresentation.js";
+import { createRecipeTreePresentation } from "../src/collection/recipeTreePresentation.js";
 import { addEquipmentQuantity } from "../src/hunting/equipmentInventory.js";
 import { createDefaultPlayerProfile } from "../src/playerProfile.js";
 import { createRoster } from "../src/roster.js";
@@ -121,6 +122,124 @@ function testEquipmentCheckpointPresentation() {
         "Completed templates should expose passive copy"
     );
     console.log("[equipment-checkpoint-presentation] ok");
+}
+
+function testRecipeTreePresentation() {
+    const nodes = new Map([
+        ["root", { id: "root", name: "결과", iconTag: "root", combineCost: 50, recipe: ["mid", "mid", "basic"] }],
+        ["mid", { id: "mid", name: "중간", iconTag: "mid", combineCost: 25, recipe: ["basic", "basic"] }],
+        ["basic", { id: "basic", name: "기초", iconTag: "basic", combineCost: 0, recipe: [] }]
+    ]);
+    const owned = new Map([
+        ["root", 1],
+        ["mid", 2],
+        ["basic", 3]
+    ]);
+    const tree = createRecipeTreePresentation({
+        rootId: "root",
+        getNode: (id) => nodes.get(id) ?? null,
+        getOwnedCount: (id) => owned.get(id) ?? 0
+    });
+    assert.equal(tree.levels.length, 3, "Completed recipes should include every descendant level");
+    assert.deepEqual(
+        tree.levels[1].map(({ id, required }) => [id, required]),
+        [
+            ["mid", 2],
+            ["basic", 1]
+        ]
+    );
+    assert.deepEqual(
+        tree.levels[2].map(({ id, required }) => [id, required]),
+        [["basic", 4]]
+    );
+    assert.equal(tree.levels[1][0].satisfied, true, "Owned ingredients should report a satisfied state");
+    assert.equal(tree.levels[2][0].satisfied, false, "Insufficient multiplied descendants should report missing state");
+    assert.deepEqual(
+        nodes.get("root").recipe,
+        ["mid", "mid", "basic"],
+        "Tree presentation must not mutate input recipes"
+    );
+
+    const sharedLeafNodes = new Map([
+        ["shared-root", { id: "shared-root", name: "공유 결과", iconTag: "root", recipe: ["left", "right"] }],
+        ["left", { id: "left", name: "왼쪽", iconTag: "left", recipe: ["shared-basic"] }],
+        ["right", { id: "right", name: "오른쪽", iconTag: "right", recipe: ["shared-basic"] }],
+        ["shared-basic", { id: "shared-basic", name: "공유 기초", iconTag: "basic", recipe: [] }]
+    ]);
+    const sharedLeafTree = createRecipeTreePresentation({
+        rootId: "shared-root",
+        getNode: (id) => sharedLeafNodes.get(id) ?? null
+    });
+    assert.deepEqual(
+        sharedLeafTree.levels[2].map(({ id, required }) => [id, required]),
+        [
+            ["shared-basic", 1],
+            ["shared-basic", 1]
+        ],
+        "The same ingredient under different parents must keep both edges"
+    );
+    assert.equal(
+        new Set(sharedLeafTree.levels[2].map(({ key }) => key)).size,
+        2,
+        "Separate parent paths need stable unique render keys"
+    );
+    assert.equal(createRecipeTreePresentation({ rootId: "missing", getNode: () => null }), null);
+    console.log("[recipe-tree-presentation] ok");
+}
+
+function testRecipeTreeUiContract() {
+    const panel = readSource("src/components/collection-equipment-panel.html");
+    const tree = readSource("src/components/recipe-tree.html");
+    assert.ok(
+        panel.includes('x-data="{ get tree() { return selected.recipe.tree; } }"') &&
+            panel.includes("<recipe-tree x-component=\"'recipe-tree'\"></recipe-tree>"),
+        "The parent must initialize tree data before the nested template component mounts"
+    );
+    assert.equal(
+        panel.includes("selected.recipe.ingredients"),
+        false,
+        "Detail must replace direct ingredient text with the tree"
+    );
+    assert.ok(panel.includes('@click="craft(selected.id)"'), "Craft action must remain beside the tree");
+    assert.equal(tree.includes("Alpine.store"), false, "Reusable tree must not read parent stores directly");
+    assert.equal(
+        tree.includes("`부족 ${node.required - node.owned}`"),
+        false,
+        "ARIA labels must not nest template literals"
+    );
+    assert.match(
+        tree.match(/:aria-label="([^"]*)"/)?.[1] ?? "",
+        /^node\.name \+ /,
+        "ARIA labels must use one valid Alpine concatenation expression"
+    );
+    assert.equal(
+        /(?:λ퉬|蹂댁쑀|異⑹”|�)/.test(tree),
+        false,
+        "Recipe tree copy must remain normal UTF-8 Korean instead of mojibake"
+    );
+    assert.ok(
+        tree.includes('role="tree"') &&
+            tree.includes('role="treeitem"') &&
+            tree.includes(":aria-label") &&
+            tree.includes("x-equipment-icon-tag") &&
+            tree.includes("ch-recipe-tree-status"),
+        "Tree must expose icon, textual status, and accessible node semantics"
+    );
+    assert.ok(
+        tree.includes("overflow-x: auto") &&
+            tree.includes("ch-recipe-tree-level:not(:first-child)") &&
+            tree.includes("::before"),
+        "Tree must own mobile horizontal scrolling and CSS connectors"
+    );
+    const recipeStyles = panel.match(/\.ch-equipment-recipe\s*\{([^}]*)\}/s)?.[1] ?? "";
+    const wrapperStyles =
+        panel.match(/\.ch-equipment-recipe-tree,\s*\.ch-equipment-recipe-tree recipe-tree\s*\{([^}]*)\}/s)?.[1] ?? "";
+    const treeRootStyles = tree.match(/:scope\s*\{([^}]*)\}/s)?.[1] ?? "";
+    assert.match(recipeStyles, /width:\s*100%;[\s\S]*min-width:\s*0;/);
+    assert.match(wrapperStyles, /display:\s*block;[\s\S]*width:\s*100%;[\s\S]*min-width:\s*0;/);
+    assert.match(treeRootStyles, /width:\s*100%;[\s\S]*min-width:\s*0;[\s\S]*overflow-x:\s*auto;/);
+    assert.equal(wrapperStyles.includes("overflow-x"), false, "Only the recipe-tree root may own horizontal scrolling");
+    console.log("[recipe-tree-ui-contract] ok");
 }
 
 function testEquipmentSpecialOptionTooltipContract() {
@@ -1724,6 +1843,8 @@ testDisabledHuntingUiIsNotMounted();
 testHuntingChestIconReuseContract();
 testCollectionEquipmentPanelsOwnTheirFlows();
 testEquipmentCheckpointPresentation();
+testRecipeTreePresentation();
+testRecipeTreeUiContract();
 testDefenseHelpCopyContract();
 testCollectionDetailContracts();
 testPopupCloseOwnershipContract();
