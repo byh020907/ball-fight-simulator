@@ -9,17 +9,14 @@ import { getCharacterMasteryLevel } from "../character-mastery/index.js";
 import { getCharacterExperienceSummary } from "../experience/experienceService.js";
 import { getCharacterLevelRewards } from "../experience/characterLevelProgression.js";
 import {
-    canOpenHuntingChest,
     ELITE_MOB_COMBINATIONS,
     getDailyShop,
     HUNTING_DEBUG_ENCOUNTER_TYPES,
     getHuntingMonsterDefinitions,
-    getHuntingFinalBossCodexDefinitions,
-    previewHuntingChest
+    getHuntingFinalBossCodexDefinitions
 } from "../hunting/index.js";
 import { HUNTING_EVENT_TYPES, HUNTING_MAX_FLOOR, HUNTING_STAGES } from "../hunting/huntingConfig.js";
 import { getRarityLabel } from "../hunting/rarityPresentation.js";
-import { normalizeHuntingChests } from "../hunting/huntingRewards.js";
 import { getRebirthPresentation } from "../rebirth/rebirthService.js";
 import { isCharacterUnlocked } from "../playerProfile.js";
 import { getPublicFighterIdentity } from "../characterRosterPolicy.js";
@@ -37,7 +34,6 @@ export const COLLECTION_HUB_TABS = Object.freeze([
     { id: "roster", label: "도감" },
     { id: "mastery", label: "숙련도" },
     { id: "achievements", label: "업적" },
-    { id: "storage", label: "보관함" },
     { id: "equipment", label: "장비" }
 ]);
 
@@ -55,7 +51,7 @@ const HUNTING_DEBUG_EVENT_OPTIONS = Object.freeze([
     { id: HUNTING_EVENT_TYPES.PORTAL, label: "귀환 포탈" },
     { id: HUNTING_EVENT_TYPES.BOON, label: "축복" },
     { id: HUNTING_EVENT_TYPES.MISHAP, label: "함정" },
-    { id: HUNTING_EVENT_TYPES.CHEST_ROOM, label: "상자방" },
+    { id: HUNTING_EVENT_TYPES.SHARD_CACHE, label: "파편 보급" },
     { id: HUNTING_EVENT_TYPES.REST_SITE, label: "휴식지" },
     { id: HUNTING_EVENT_TYPES.CURSED_ALTAR, label: "저주받은 제단" },
     { id: HUNTING_EVENT_TYPES.CHAMPION_INTRUSION, label: "챔피언 난입" },
@@ -290,18 +286,6 @@ export function createCollectionHubViewModel({
 
     const equipmentPresentation = createEquipmentPresentation(profile);
 
-    const storageItems = normalizeHuntingChests(hunting.chests, { dedupe: true, maxCount: 200 }).map((chest) => {
-        const preview = previewHuntingChest(chest);
-        return {
-            id: chest.id,
-            rarity: preview.rarity,
-            rarityLabel: getRarityLabel(preview.rarity),
-            acquiredAt: chest.acquiredAt ?? null,
-            openCost: preview.cost,
-            rewardText: preview.rewardText,
-            canOpen: canOpenHuntingChest(profile, chest)
-        };
-    });
     // 요약
     const playedCharacters = rosterItems.filter((item) => item.hasRecord).length;
     const cumulativeLevels = rosterItems.reduce((sum, item) => sum + item.masteryLevel, 0);
@@ -329,14 +313,12 @@ export function createCollectionHubViewModel({
             masteryTotal,
             discoveredMonsterCount,
             totalMonsterCount: monsterCodexItems.length,
-            shards: hunting.shards ?? 0,
-            storageChestCount: storageItems.length
+            shards: hunting.shards ?? 0
         },
         equipment: equipmentPresentation,
         storage: {
             shards: hunting.shards ?? 0,
             dailyShop: getDailyShop(profile),
-            chests: storageItems,
             stats: {
                 runsStarted: hunting.stats?.runsStarted ?? 0,
                 runsRetreated: hunting.stats?.runsRetreated ?? 0,

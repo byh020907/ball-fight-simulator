@@ -897,57 +897,6 @@
             </div>
         </div>
 
-        <div class="ch-content" x-show="state.activeTab === 'storage'" role="tabpanel">
-            <div class="ch-toolbar">
-                <input
-                    class="ch-search"
-                    type="search"
-                    placeholder="상자 등급 검색..."
-                    x-model="state.searchQueries.storage"
-                />
-                <select class="ch-select" x-model="state.filters.storage" @change="setCollectionFilter($el.value)">
-                    <option value="all">전체</option>
-                    <option value="openable">개봉 가능</option>
-                    <option value="common">common</option>
-                    <option value="uncommon">uncommon</option>
-                    <option value="rare">rare</option>
-                    <option value="epic">epic</option>
-                    <option value="legendary">legendary</option>
-                </select>
-                <span class="ch-storage-currency">
-                    파편 <b x-text="Number(state.storage.shards || 0).toLocaleString()"></b>
-                </span>
-            </div>
-            <div class="ch-scroll-region">
-                <div class="ch-list">
-                    <template x-for="item in state.filteredStorageItems" :key="item.id">
-                        <div
-                            class="ch-ach-card"
-                            x-bind:class="'ch-chest--' + item.rarity"
-                            x-bind:style="item.canOpen ? 'cursor:pointer' : ''"
-                            @click="item.canOpen && openChest(item)"
-                        >
-                            <div class="ch-ach-info">
-                                <strong x-text="item.rarityLabel + ' 상자'"></strong>
-                                <span class="ch-ach-desc" x-text="item.rewardText"></span>
-                                <span class="ch-ach-reward" x-text="'개봉 비용: 파편 ' + item.openCost"></span>
-                            </div>
-                            <div class="ch-ach-status">
-                                <span
-                                    class="ch-ach-tier-label"
-                                    x-bind:class="{ unlocked: item.canOpen }"
-                                    x-text="item.canOpen ? '개봉 가능' : '잠김'"
-                                ></span>
-                            </div>
-                        </div>
-                    </template>
-                    <div class="ch-empty" x-show="state.filteredStorageItems.length === 0">
-                        보관 중인 상자가 없습니다
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <collection-equipment-panel x-show="state.activeTab === 'equipment'"></collection-equipment-panel>
     </div>
 </div>
@@ -968,8 +917,8 @@
             activeTab: "roster",
             codexSection: "characters",
             tabs: [],
-            filters: { roster: "all", monsters: "all", mastery: "all", achievements: "all", storage: "all" },
-            searchQueries: { roster: "", monsters: "", mastery: "", achievements: "", storage: "" },
+            filters: { roster: "all", monsters: "all", mastery: "all", achievements: "all" },
+            searchQueries: { roster: "", monsters: "", mastery: "", achievements: "" },
             sortModes: { roster: "roster", monsters: "codex", achievements: "default" },
             selectedCharacterId: null,
             characterDetailTab: "overview",
@@ -980,7 +929,7 @@
             monsterCodexItems: [],
             masteryItems: [],
             achievementItems: [],
-            storage: { shards: 0, chests: [], stats: {} },
+            storage: { shards: 0, stats: {} },
             equipment: {
                 slots: [],
                 tiers: []
@@ -1057,15 +1006,6 @@
                 return items;
             },
 
-            get filteredStorageItems() {
-                const query = (this.searchQueries.storage || "").toLowerCase();
-                const filter = this.filters.storage || "all";
-                let items = [...(this.storage.chests || [])];
-                if (query) items = items.filter((i) => i.rarity.toLowerCase().includes(query));
-                if (filter === "openable") items = items.filter((i) => i.canOpen);
-                else if (filter !== "all") items = items.filter((i) => i.rarity === filter);
-                return items;
-            }
         });
 
         function closeCollectionHub() {
@@ -1320,11 +1260,6 @@
             get bridge() {
                 return Alpine.store("uiManager").requireGameActionBridge();
             },
-            async openChest(item) {
-                if (item.canOpen) {
-                    await Alpine.store("uiManager").invokeGameAction("openChest", item.id);
-                }
-            },
             beginRebirth(characterId) {
                 return this.bridge.beginRebirth(characterId);
             },
@@ -1408,7 +1343,6 @@
                 };
                 state.storage = vm.storage ?? {
                     shards: 0,
-                    chests: [],
                     stats: {}
                 };
                 state.summary = vm.summary ?? {};
@@ -1676,18 +1610,6 @@
         min-height: 36px;
         background: #ffffff;
         font-family: inherit;
-    }
-
-    .ch-storage-currency {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        padding: 4px 10px;
-        border: 2px solid #202020;
-        border-radius: 6px;
-        font-size: 0.75rem;
-        font-weight: 700;
-        background: #ffffff;
     }
 
     .ch-content {
@@ -2783,27 +2705,6 @@
 
     .ch-ach-tier--gold.unlocked {
         border-color: #d4a017;
-    }
-
-    .ch-chest--common {
-        border-left: 4px solid #9ca3af;
-    }
-
-    .ch-chest--uncommon {
-        border-left: 4px solid #28a447;
-    }
-
-    .ch-chest--rare {
-        border-left: 4px solid #d4a017;
-    }
-
-    .ch-chest--epic {
-        border-left: 4px solid #a855f7;
-    }
-
-    .ch-chest--legendary {
-        border-left: 4px solid #f59e0b;
-        box-shadow: 0 0 6px rgba(245, 158, 11, 0.3);
     }
 
     .ch-btn {

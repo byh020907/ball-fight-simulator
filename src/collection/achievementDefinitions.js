@@ -40,7 +40,7 @@ function createHuntingCounterAchievement({ id, name, description, tier, target, 
         grant(handler) {
             if (reward.type === "SHARDS") return handler.shards(reward.amount);
             if (reward.type === "EQUIPMENT") return handler.equipment({ rarity: reward.rarity, ...reward.equipment });
-            return handler.chest(reward.rarity);
+            return { applied: false, type: null };
         }
     };
 }
@@ -109,7 +109,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
             ...ACHIEVEMENT_REWARDS.comebackMatchWin
         },
         grant(handler) {
-            return handler.chest(ACHIEVEMENT_REWARDS.comebackMatchWin.rarity);
+            return handler.shards(ACHIEVEMENT_REWARDS.comebackMatchWin.amount);
         }
     },
     {
@@ -125,7 +125,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
             ...ACHIEVEMENT_REWARDS.counterExpert
         },
         grant(handler) {
-            return handler.chest(ACHIEVEMENT_REWARDS.counterExpert.rarity);
+            return handler.shards(ACHIEVEMENT_REWARDS.counterExpert.amount);
         }
     },
     {
@@ -142,7 +142,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
             ...ACHIEVEMENT_REWARDS.allActionsUsed
         },
         grant(handler) {
-            return handler.chest(ACHIEVEMENT_REWARDS.allActionsUsed.rarity);
+            return handler.shards(ACHIEVEMENT_REWARDS.allActionsUsed.amount);
         }
     },
     {
@@ -195,7 +195,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
             ...ACHIEVEMENT_REWARDS.marathon50
         },
         grant(handler) {
-            return handler.chest(ACHIEVEMENT_REWARDS.marathon50.rarity);
+            return handler.shards(ACHIEVEMENT_REWARDS.marathon50.amount);
         }
     },
     {
@@ -229,7 +229,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
             ...ACHIEVEMENT_REWARDS.tournamentStreak3
         },
         grant(handler) {
-            return handler.chest(ACHIEVEMENT_REWARDS.tournamentStreak3.rarity);
+            return handler.shards(ACHIEVEMENT_REWARDS.tournamentStreak3.amount);
         }
     },
     {
@@ -301,15 +301,6 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         target: 1,
         rewardKey: "huntingChampionVictory",
         getCurrent: (context) => getHuntingStats(context).championVictories ?? 0
-    }),
-    createHuntingCounterAchievement({
-        id: "hunting_secured_chests_10",
-        name: "전리품 회수",
-        description: "사냥터에서 얻은 상자 2개를 보관함으로 무사히 가져오세요.",
-        tier: "silver",
-        target: 2,
-        rewardKey: "huntingSecuredChests",
-        getCurrent: (context) => getHuntingStats(context).securedChestCount ?? 0
     }),
     createHuntingCounterAchievement({
         id: "hunting_all_stages_clear",

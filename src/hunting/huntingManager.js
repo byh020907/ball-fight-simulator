@@ -18,7 +18,7 @@ import {
     setHuntingRunPhase,
     HUNTING_RUN_PHASES
 } from "./huntingState.js";
-import { createEmptyHuntingLoot, normalizeHuntingChests } from "./huntingRewards.js";
+import { createEmptyHuntingLoot } from "./huntingRewards.js";
 import {
     HUNTING_ADVANCE_STEPS,
     HUNTING_DEBUG_ENCOUNTER_TYPES,
@@ -119,11 +119,6 @@ const HUNTING_FLOOR_OUTCOME_HANDLERS = Object.freeze({
     [HUNTING_FLOOR_OUTCOME_TYPES.EVENT]: "_handleEventFloor"
 });
 
-const HUNTING_CHEST_CONTINUE_HANDLERS = Object.freeze({
-    [HUNTING_RUN_PHASES.AWAITING_CHEST]: "_continueChestRoom",
-    [HUNTING_RUN_PHASES.AWAITING_COMBAT_REWARD_CHEST]: "_continueCombatRewardChest"
-});
-
 const HUNTING_EVENT_CONTINUE_HANDLERS = Object.freeze({
     [HUNTING_EVENT_TYPES.BOON]: "_continueEventAdvance",
     [HUNTING_EVENT_TYPES.MISHAP]: "_continueEventAdvance",
@@ -135,7 +130,6 @@ const HUNTING_EVENT_PRESENTATION_HANDLERS = Object.freeze({
     [HUNTING_EVENT_TRANSITIONS.CONTINUE]: "_presentContinueEvent",
     [HUNTING_EVENT_TRANSITIONS.CHOICE]: "_presentChoiceEvent",
     [HUNTING_EVENT_TRANSITIONS.MERCHANT]: "_presentMerchantEvent",
-    [HUNTING_EVENT_TRANSITIONS.CHEST]: "_presentChestEvent",
     [HUNTING_EVENT_TRANSITIONS.BATTLE]: "_presentBattleEvent"
 });
 
@@ -193,7 +187,6 @@ export class HuntingManager {
         this._battleLootSession = null;
         this._battleExperienceGrants = [];
         this._lastBattleExperienceResult = null;
-        this._combatRewardChestQueue = [];
         this._combatUiSyncRemaining = 0;
         this._partyBattleParticipation = null;
         this._lastBattlePartyExperienceResults = [];
@@ -577,10 +570,6 @@ export class HuntingManager {
             huntingChoiceVisible: false,
             huntingMerchantActive: false,
             huntingMerchantOffers: null,
-            huntingChestEventActive: false,
-            huntingChestRarity: "common",
-            huntingChestTitle: "",
-            huntingChestConfirmLabel: "",
             huntingBattlePreparationActive: false,
             huntingAutoAdvanceActive: false,
             huntingAutoAdvanceLabel: "",
@@ -786,7 +775,6 @@ export class HuntingManager {
         this._battleLootSession = battleLootSession;
         this._lastBattleExperienceResult = null;
         this._lastBattlePartyExperienceResults = [];
-        this._combatRewardChestQueue = [];
         this._partyBattleParticipation = {
             [HUNTING_PARTY_ROLES.LEADER]: 0,
             [HUNTING_PARTY_ROLES.COMPANION_ONE]: 0,
@@ -929,20 +917,6 @@ export class HuntingManager {
                 combatCleared: true
             });
 
-            // 전투 승리로 상자가 드롭되면 상자 UI를 먼저 표시
-            if (floorLoot.chests.length > 0) {
-                this._combatRewardChestQueue = [...floorLoot.chests];
-                if (this._lastBattleCharacterUnlock) {
-                    this._pendingUnlockResultChest = true;
-                    this._presentNormalCombatWin(app, playerBall?.name ?? characterId, xpResult);
-                    savePlayerProfile(app.playerProfile);
-                    return;
-                }
-                this._presentCombatRewardChest(app, this._combatRewardChestQueue[0]);
-                savePlayerProfile(app.playerProfile);
-                return;
-            }
-
             if (isFinalBoss) {
                 this._presentFinalBossClear(app, xpResult);
                 return;
@@ -952,7 +926,6 @@ export class HuntingManager {
             savePlayerProfile(app.playerProfile);
         } else {
             this._battleLootSession = null;
-            this._combatRewardChestQueue = [];
             run = this._captureDirectPartyBattleState(run, app.simulation);
             this._run = defeatHuntingRun(run);
             const name = playerBall?.name ?? getHuntingRunCharacterId(run);
@@ -981,7 +954,6 @@ export class HuntingManager {
                 huntingLootHudVisible: false,
                 huntingLootHudShards: 0,
                 huntingLootHudEnhancementStones: 0,
-                huntingLootHudChests: 0,
                 huntingLootHudEquipment: 0
             });
             this._run = null;
@@ -1213,7 +1185,6 @@ export class HuntingManager {
             huntingLootHudVisible: false,
             huntingLootHudShards: 0,
             huntingLootHudEnhancementStones: 0,
-            huntingLootHudChests: 0,
             huntingLootHudEquipment: 0
         });
 
@@ -1405,22 +1376,19 @@ export class HuntingManager {
                 huntingLootHudVisible: false,
                 huntingLootHudShards: 0,
                 huntingLootHudEnhancementStones: 0,
-                huntingLootHudChests: 0,
                 huntingLootHudEquipment: 0
             };
         }
         const pending = run.pendingLoot;
         const shards = pending?.shards ?? 0;
         const enhancementStones = pending?.enhancementStones ?? 0;
-        const chests = pending?.chests ?? [];
         const equipmentEntries = Object.entries(pending?.equipment ?? {});
         const equipmentCount = equipmentEntries.reduce((sum, [, count]) => sum + count, 0);
-        const visible = shards > 0 || enhancementStones > 0 || chests.length > 0 || equipmentCount > 0;
+        const visible = shards > 0 || enhancementStones > 0 || equipmentCount > 0;
         return {
             huntingLootHudVisible: visible,
             huntingLootHudShards: shards,
             huntingLootHudEnhancementStones: enhancementStones,
-            huntingLootHudChests: chests.length,
             huntingLootHudEquipment: equipmentCount
         };
     }
@@ -1442,7 +1410,6 @@ export class HuntingManager {
             huntingEventActive: false,
             huntingChoiceVisible: false,
             huntingMerchantActive: false,
-            huntingChestEventActive: false,
             huntingMoveMessage: message,
             huntingBattlePreparationActive: true,
             ...hud
@@ -1509,39 +1476,9 @@ export class HuntingManager {
             huntingMerchantActive: true,
             huntingMerchantOffers: offers,
             huntingMerchantResult: "",
-            huntingChestEventActive: false,
             ...hud
         });
         this._moving = false;
-    }
-
-    _stopHuntingMoveForChest(app, { chest, floor, confirmLabel = "계속 전진", message = "" }) {
-        this._run = setHuntingRunPhase(this._run, HUNTING_RUN_PHASES.AWAITING_CHEST);
-        const pendingText = formatPendingLootSummary(this._run?.pendingLoot);
-        const rarityLabel = getRarityLabel(chest.rarity);
-        const hud = this._getLootHudState();
-        app.setHuntingOverlayState({
-            huntingMoving: false,
-            huntingEventActive: false,
-            huntingChoiceVisible: false,
-            huntingCanRetreat: false,
-            huntingFloor: floor,
-            huntingMoveFrom: 0,
-            huntingMoveTo: 0,
-            huntingMoveStep: 0,
-            huntingMoveMax: HUNTING_ADVANCE_STEPS,
-            huntingMoveMessage: message || `${floor}층 — ${rarityLabel} 상자 확보`,
-            huntingLootSummary: pendingText,
-            huntingMerchantActive: false,
-            huntingMerchantOffers: null,
-            huntingChestEventActive: true,
-            huntingChestRarity: chest.rarity,
-            huntingChestTitle: `${rarityLabel} 상자 확보`,
-            huntingChestConfirmLabel: confirmLabel,
-            ...hud
-        });
-        this._moving = false;
-        this._scheduleAutoAdvance(() => this.chestContinue(), confirmLabel);
     }
 
     _stopHuntingMoveForEvent(app, presentation, confirmLabel = "계속 전진") {
@@ -1561,7 +1498,6 @@ export class HuntingManager {
             huntingMerchantActive: false,
             huntingMerchantOffers: null,
             huntingMerchantResult: "",
-            huntingChestEventActive: false,
             huntingEventActive: true,
             huntingEventDetail: presentation.detail,
             huntingEventConfirmLabel: confirmLabel,
@@ -1618,24 +1554,6 @@ export class HuntingManager {
         this.advance({ waitForFirstMoveUi: true });
     }
 
-    chestContinue() {
-        this._cancelAutoAdvance();
-        const app = this.app;
-        const run = this._run;
-        if (!run || run.status !== "active") return;
-        const handlerName = HUNTING_CHEST_CONTINUE_HANDLERS[run.phase];
-        if (!handlerName || typeof this[handlerName] !== "function") {
-            throw new Error(`Unsupported hunting chest continue phase: ${run.phase}`);
-        }
-        app.setHuntingOverlayState({
-            huntingChestEventActive: false,
-            huntingChestRarity: "common",
-            huntingChestTitle: "",
-            huntingChestConfirmLabel: ""
-        });
-        return this[handlerName]();
-    }
-
     eventContinue() {
         this._cancelAutoAdvance();
         const app = this.app;
@@ -1656,39 +1574,6 @@ export class HuntingManager {
     _continueEventAdvance() {
         this._run = setHuntingRunPhase(this._run, HUNTING_RUN_PHASES.READY);
         this.advance({ waitForFirstMoveUi: true });
-    }
-
-    _continueChestRoom() {
-        this.advance({ waitForFirstMoveUi: true });
-    }
-
-    _continueCombatRewardChest() {
-        const app = this.app;
-        const run = this._run;
-        this._combatRewardChestQueue.shift();
-        if (this._combatRewardChestQueue.length > 0) {
-            this._presentCombatRewardChest(app, this._combatRewardChestQueue[0]);
-            return;
-        }
-        const characterId = getHuntingRunCharacterId(run);
-        const playerSpec = app.roster.find((f) => f.id === characterId);
-        const name = playerSpec?.name ?? characterId;
-        const isFinalBoss = run.lastEncounter?.type === HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS;
-        if (isFinalBoss) {
-            this._presentFinalBossClear(app, this._lastBattleExperienceResult);
-        } else {
-            this._presentNormalCombatWin(app, name, this._lastBattleExperienceResult);
-        }
-    }
-
-    continueCharacterUnlockResult() {
-        this._cancelAutoAdvance();
-        if (!this._pendingUnlockResultChest || this._combatRewardChestQueue.length === 0) return false;
-        this._pendingUnlockResultChest = false;
-        this._lastBattleCharacterUnlock = null;
-        this.app.setHuntingOverlayState({ huntingCombatResultActive: false });
-        this._presentCombatRewardChest(this.app, this._combatRewardChestQueue[0]);
-        return true;
     }
 
     _resolveHuntingEvent(event, app) {
@@ -1752,21 +1637,6 @@ export class HuntingManager {
         return HUNTING_ROUTE_ACTIONS.STOP;
     }
 
-    _presentChestEvent(app, resolution) {
-        if (resolution.logMessage) app.addLog(resolution.logMessage);
-        app.showOverlay(
-            "사냥터 이벤트",
-            this._withFloorRecoveryFeedback(resolution.presentation.title),
-            resolution.presentation.subtext
-        );
-        this._stopHuntingMoveForChest(app, {
-            chest: resolution.chest,
-            floor: this._run.floor,
-            message: this._withFloorRecoveryFeedback(`${this._run.floor}층 — ${resolution.presentation.title}`)
-        });
-        return HUNTING_ROUTE_ACTIONS.STOP;
-    }
-
     _presentBattleEvent(app, resolution) {
         if (resolution.logMessage) app.addLog(resolution.logMessage);
         this._stopHuntingMoveForBattle(
@@ -1778,35 +1648,6 @@ export class HuntingManager {
             }
         );
         return HUNTING_ROUTE_ACTIONS.STOP;
-    }
-
-    _presentCombatRewardChest(app, chest) {
-        const run = this._run;
-        this._run = setHuntingRunPhase(run, HUNTING_RUN_PHASES.AWAITING_COMBAT_REWARD_CHEST);
-        const rarityLabel = getRarityLabel(chest.rarity);
-        const pendingText = formatPendingLootSummary(run.pendingLoot);
-        const hud = this._getLootHudState();
-        app.showOverlay("사냥터", `${rarityLabel} 상자 확보`, "전투 보상 상자입니다");
-        app.setHuntingOverlayState({
-            huntingChoiceVisible: false,
-            huntingCanRetreat: false,
-            huntingMoving: false,
-            huntingFloor: run.floor,
-            huntingMoveFrom: 0,
-            huntingMoveTo: 0,
-            huntingMoveStep: 0,
-            huntingMoveMax: HUNTING_ADVANCE_STEPS,
-            huntingMoveMessage: `${run.floor}층 — ${rarityLabel} 상자 확보`,
-            huntingLootSummary: pendingText,
-            huntingMerchantActive: false,
-            huntingMerchantOffers: null,
-            huntingChestEventActive: true,
-            huntingChestRarity: chest.rarity,
-            huntingChestTitle: `${rarityLabel} 상자 확보`,
-            huntingChestConfirmLabel: "확인",
-            ...hud
-        });
-        this._scheduleAutoAdvance(() => this.chestContinue(), "확인");
     }
 
     _createHuntingExperienceResultStep(app, xpResult) {
@@ -1846,7 +1687,7 @@ export class HuntingManager {
         app.refreshPlayerSetup();
         app.showOverlay("사냥터", `${name} 승리!`, `층 ${run.floor} 완료`, { xpReward });
         app.setHuntingOverlayState({
-            huntingChoiceVisible: !this._pendingUnlockResultChest,
+            huntingChoiceVisible: true,
             huntingCanRetreat: false,
             huntingMoving: false,
             huntingFloor: run.floor,
@@ -1857,7 +1698,7 @@ export class HuntingManager {
             huntingCombatResultStep: this._lastBattleCharacterUnlock ? "unlock" : "experience",
             huntingCombatResultTotal: this._lastBattleCharacterUnlock ? 3 : 2,
             huntingCharacterUnlock: this._lastBattleCharacterUnlock,
-            huntingResultContinueVisible: Boolean(this._pendingUnlockResultChest),
+            huntingResultContinueVisible: false,
             huntingCombatResultTitle: `${run.floor}층 전투 완료`,
             huntingCombatResultSummary: pendingText,
             huntingPartyExperienceRewards: this._getPartyExperienceRewards(),
@@ -1869,7 +1710,7 @@ export class HuntingManager {
             : ["experience", "summary"];
         this._combatResultStepIndex = 0;
         this._scheduleAutoAdvance(() => this.advanceCombatResult(), "다음 결과");
-        if (!this._pendingUnlockResultChest) this._lastBattleCharacterUnlock = null;
+        this._lastBattleCharacterUnlock = null;
     }
 
     advanceCombatResult() {
@@ -1887,7 +1728,6 @@ export class HuntingManager {
         this._combatResultSteps = [];
         this._combatResultStepIndex = 0;
         this.app.setHuntingOverlayState({ huntingCombatResultActive: false });
-        if (this._pendingUnlockResultChest) return this.continueCharacterUnlockResult();
         this.advance({ waitForFirstMoveUi: true });
         return true;
     }
@@ -1911,7 +1751,6 @@ export class HuntingManager {
             huntingLootHudVisible: false,
             huntingLootHudShards: 0,
             huntingLootHudEnhancementStones: 0,
-            huntingLootHudChests: 0,
             huntingLootHudEquipment: 0
         });
         app.presentResultSequence([
@@ -1934,14 +1773,6 @@ export class HuntingManager {
         const profile = app.playerProfile;
         if (profile.hunting) {
             profile.hunting.shards = (profile.hunting.shards ?? 0) + (run.securedLoot?.shards ?? 0);
-            const securedChests = normalizeHuntingChests(run.securedLoot?.chests);
-            const profileChests = normalizeHuntingChests(profile.hunting.chests, { dedupe: true, maxCount: 200 });
-            if (securedChests.length > 0) {
-                profile.hunting.chests = normalizeHuntingChests([...profileChests, ...securedChests], {
-                    dedupe: true,
-                    maxCount: 200
-                });
-            }
             profile.equipment.enhancementStones =
                 (profile.equipment.enhancementStones ?? 0) + (run.securedLoot?.enhancementStones ?? 0);
             const securedEquipment = run.securedLoot?.equipment ?? {};

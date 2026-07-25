@@ -122,18 +122,12 @@ export const HUNTING_EVENT_TYPES = Object.freeze({
     WANDERING_MERCHANT: "wandering_merchant",
     BOON: "boon",
     MISHAP: "mishap",
-    CHEST_ROOM: "chest_room",
+    SHARD_CACHE: "shard_cache",
     REST_SITE: "rest_site",
     CURSED_ALTAR: "cursed_altar",
     CHAMPION_INTRUSION: "champion_intrusion",
     ELITE_MOB: "elite_mob"
 });
-
-export const HUNTING_CHEST_RARITIES = Object.freeze(["common", "uncommon", "rare", "epic", "legendary"]);
-
-export const HUNTING_CHEST_OPEN_COSTS = HUNTING_REWARDS.chest.openCosts;
-
-export const HUNTING_CHEST_BREAK_WEIGHTS = HUNTING_REWARDS.chest.breakWeights;
 
 export const HUNTING_DEFEAT_PRESERVE = Object.freeze({
     SHARDS: HUNTING_REWARDS.shards.defeatPreserve.shards
@@ -144,11 +138,6 @@ export const HUNTING_SCALING = Object.freeze({
     ELITE_POWER_BONUS: 0.12,
     CHAMPION_POWER_BONUS: 0.25,
     MAX_POWER_MULTIPLIER: 2
-});
-
-export const HUNTING_CHEST_REWARD_TYPES = Object.freeze({
-    SHARDS: "SHARDS",
-    EQUIPMENT: "equipment"
 });
 
 export const HUNTING_STAT_KEYS = Object.freeze(["hp", "damage", "defense", "speed", "skill"]);

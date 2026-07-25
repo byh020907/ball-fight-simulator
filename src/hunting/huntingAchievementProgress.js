@@ -230,7 +230,6 @@ export function createDefaultHuntingStats() {
         monsterCodexByType: {},
         criticalHpCombatWins: 0,
         championVictories: 0,
-        securedChestCount: 0,
         bestPortalRetreatFloor: 0,
         clearedStageIds: []
     };
@@ -252,7 +251,6 @@ export function sanitizeHuntingStats(value) {
         monsterCodexByType: sanitizeMonsterCodexByType(value.monsterCodexByType),
         criticalHpCombatWins: sanitizeCounter(value.criticalHpCombatWins),
         championVictories: sanitizeCounter(value.championVictories),
-        securedChestCount: sanitizeCounter(value.securedChestCount),
         bestPortalRetreatFloor: sanitizeCounter(value.bestPortalRetreatFloor),
         clearedStageIds: Array.isArray(value.clearedStageIds)
             ? [...new Set(value.clearedStageIds.filter((stageId) => validStageIds.has(stageId)))]
@@ -340,7 +338,6 @@ export function applyHuntingRunAchievementProgress(stats, run) {
         monsterCodexByType: mergeMonsterCodexRecords(current.monsterCodexByType, progress.monsterCodexByType),
         criticalHpCombatWins: current.criticalHpCombatWins + sanitizeCounter(progress.criticalHpCombatWins),
         championVictories: current.championVictories + sanitizeCounter(progress.championVictories),
-        securedChestCount: current.securedChestCount + Math.max(0, run?.securedLoot?.chests?.length ?? 0),
         bestPortalRetreatFloor: isPortalRetreat
             ? Math.max(current.bestPortalRetreatFloor, sanitizeCounter(run.floor))
             : current.bestPortalRetreatFloor,

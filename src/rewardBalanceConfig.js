@@ -85,21 +85,6 @@ export const REWARD_BALANCE = deepFreeze({
         levelCost: { first: 100, multiplier: 1.35 }
     },
     hunting: {
-        chest: {
-            openCosts: { common: 20, uncommon: 50, rare: 120, epic: 250, legendary: 500 },
-            breakWeights: { common: 1, uncommon: 2, rare: 3, epic: 4, legendary: 5 },
-            rewardTableVersion: 1,
-            rewardTables: {
-                common: [
-                    { id: "common-key-shards", weight: 55, type: "SHARDS", amount: 18, text: "파편 +18" },
-                    { id: "common-equipment", weight: 45, type: "equipment", text: "common 장비" }
-                ],
-                uncommon: [{ id: "uncommon-equipment", weight: 100, type: "equipment", text: "uncommon 장비" }],
-                rare: [{ id: "rare-equipment", weight: 100, type: "equipment", text: "rare 장비" }],
-                epic: [{ id: "epic-equipment", weight: 100, type: "equipment", text: "epic 장비" }],
-                legendary: [{ id: "legendary-equipment", weight: 100, type: "equipment", text: "legendary 장비" }]
-            }
-        },
         shards: {
             defeatPreserve: { shards: 0.5 }
         },
@@ -139,12 +124,12 @@ export const REWARD_BALANCE = deepFreeze({
             },
             smallHealPack: { missingHpRecoveryRatio: 0.25 },
             shard: { baseAmount: 5, floorStep: 25, maximumAmount: 20, physicalDropCount: { minimum: 3, maximum: 7 } },
-            normalWeights: { small_heal_pack: { minimum: 20, maximum: 40 }, chest: 10 },
+            normalWeights: { small_heal_pack: { minimum: 20, maximum: 40 } },
             rarityRewards: {
-                common: { shard_bundle: 0, high_chest: 0 },
-                uncommon: { shard_bundle: 15, high_chest: 5 },
-                rare: { shard_bundle: 30, high_chest: 10 },
-                epic: { shard_bundle: 45, high_chest: 20 }
+                common: { shard_bundle: 0 },
+                uncommon: { shard_bundle: 15 },
+                rare: { shard_bundle: 30 },
+                epic: { shard_bundle: 45 }
             },
             shardBundle: {
                 multipliers: {
@@ -168,36 +153,22 @@ export const REWARD_BALANCE = deepFreeze({
                         { value: 3.5, weight: 5 }
                     ]
                 }
-            },
-            highChest: {
-                rarities: {
-                    uncommon: [{ rarity: "uncommon", weight: 100 }],
-                    rare: [
-                        { rarity: "uncommon", weight: 70 },
-                        { rarity: "rare", weight: 30 }
-                    ],
-                    epic: [
-                        { rarity: "rare", weight: 70 },
-                        { rarity: "epic", weight: 30 }
-                    ]
-                }
             }
         },
         events: {
             boon: { baseShards: 8, baseShardVariance: 2, maxMultiplier: 5, maxMultiplierFloor: 100 },
             merchant: {
                 discount: { default: 0.1, deepFloor: 70, deepFloorValue: 0.15 },
-                repair: { cost: 50, recoveryRatio: 0.35 },
-                commonChestCost: 40,
-                secureTransportCost: 30
+                repair: { cost: 50, recoveryRatio: 0.35 }
             },
             mishap: { defaultDamageRatio: 0.05, deepFloor: 70, deepFloorDamageRatio: 0.1 },
             restRecoveryRatio: 0.25,
-            chestRoom: {
-                legendary: { minimumFloor: 5, chance: 0.03 },
-                epic: { minimumFloor: 4, chance: 0.12 },
-                rare: { minimumFloor: 3, chance: 0.3 },
-                uncommonChance: 0.55
+            shardCache: {
+                baseShards: 8,
+                floorStep: 10,
+                bonusPerStep: 3,
+                variance: 2,
+                minimum: 3
             },
             cursedAltar: {
                 maxDurationFloors: 3,
@@ -271,9 +242,9 @@ export const REWARD_BALANCE = deepFreeze({
                     specialOptions: [{ type: "wallBounce", value: 15 }]
                 }
             },
-            comebackMatchWin: { type: "CHEST", rarity: "uncommon" },
-            counterExpert: { type: "CHEST", rarity: "uncommon" },
-            allActionsUsed: { type: "CHEST", rarity: "common" },
+            comebackMatchWin: { type: "SHARDS", amount: 30 },
+            counterExpert: { type: "SHARDS", amount: 30 },
+            allActionsUsed: { type: "SHARDS", amount: 15 },
             rosterChampion: {
                 type: "EQUIPMENT",
                 rarity: "epic",
@@ -305,31 +276,17 @@ export const REWARD_BALANCE = deepFreeze({
                     specialOptions: [{ type: "angularImpulse", value: 15 }]
                 }
             },
-            marathon50: { type: "CHEST", rarity: "common" },
-            huntingDepth30: { type: "CHEST", rarity: "common" },
-            huntingCriticalHpWin: { type: "CHEST", rarity: "uncommon" },
-            huntingPortalRetreat40: { type: "CHEST", rarity: "uncommon" },
-            huntingChampionVictory: { type: "CHEST", rarity: "common" },
-            huntingSecuredChests: {
-                type: "EQUIPMENT",
-                rarity: "uncommon",
-                equipment: {
-                    slot: "armor",
-                    name: "귀환자의 완충 갑옷",
-                    description: "전리품을 지키고 돌아온 탐사자에게 주어지는 실용적인 방어구.",
-                    stats: [
-                        { type: "hp", value: 20 },
-                        { type: "defense", value: 1 }
-                    ],
-                    specialOptions: []
-                }
-            },
-            huntingAllStagesClear: { type: "CHEST", rarity: "epic" },
-            huntingMonsterCodexComplete: { type: "CHEST", rarity: "rare" },
-            huntingMonsterSlayer: { type: "CHEST", rarity: "common" },
-            huntingRareMonsterSlayer: { type: "CHEST", rarity: "uncommon" },
-            huntingUniqueMonsterSlayer: { type: "CHEST", rarity: "rare" },
-            huntingEpicMonsterSlayer: { type: "CHEST", rarity: "epic" },
+            marathon50: { type: "SHARDS", amount: 20 },
+            huntingDepth30: { type: "SHARDS", amount: 20 },
+            huntingCriticalHpWin: { type: "SHARDS", amount: 30 },
+            huntingPortalRetreat40: { type: "SHARDS", amount: 30 },
+            huntingChampionVictory: { type: "SHARDS", amount: 15 },
+            huntingAllStagesClear: { type: "SHARDS", amount: 80 },
+            huntingMonsterCodexComplete: { type: "SHARDS", amount: 50 },
+            huntingMonsterSlayer: { type: "SHARDS", amount: 15 },
+            huntingRareMonsterSlayer: { type: "SHARDS", amount: 25 },
+            huntingUniqueMonsterSlayer: { type: "SHARDS", amount: 40 },
+            huntingEpicMonsterSlayer: { type: "SHARDS", amount: 60 },
             singleHitMonster: {
                 type: "EQUIPMENT",
                 rarity: "rare",
@@ -344,7 +301,7 @@ export const REWARD_BALANCE = deepFreeze({
                     specialOptions: [{ type: "crashDamage", value: 15 }]
                 }
             },
-            tournamentStreak3: { type: "CHEST", rarity: "uncommon" }
+            tournamentStreak3: { type: "SHARDS", amount: 30 }
         },
         masteryTiers: {
             defense: [0, 0.02, 0.04, 0.06],

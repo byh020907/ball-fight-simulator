@@ -1,13 +1,9 @@
-import { createHuntingChest, normalizeHuntingChests } from "./huntingRewards.js";
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 import { getHuntingDisplayHealth, getHuntingDisplayHp } from "./huntingHealth.js";
-import { getRarityLabel } from "./rarityPresentation.js";
 import { getHuntingRunHealth, setHuntingRunActiveHealth } from "./huntingState.js";
 
 export const MERCHANT_OFFER_TYPES = Object.freeze({
-    REPAIR: "repair",
-    BUY_LOOT: "buy_loot",
-    SECURE_TRANSPORT: "secure_transport"
+    REPAIR: "repair"
 });
 
 function calcDiscount(cost, discountRatio) {
@@ -16,11 +12,12 @@ function calcDiscount(cost, discountRatio) {
 
 export function createMerchantOffers(run, event, profile) {
     const discount = event?.discountRatio ?? 0;
-    return [
-        _createRepairOffer(run, discount),
-        _createBuyLootOffer(discount),
-        _createSecureTransportOffer(run, discount)
-    ];
+    return [_createRepairOffer(run, discount)];
+}
+
+export function canAffordOffer(offer, profile) {
+    if (offer.purchased || offer.disabled) return false;
+    return (profile.hunting?.shards ?? 0) >= offer.cost;
 }
 
 function _createRepairOffer(run, discount) {
@@ -46,51 +43,10 @@ function _createRepairOffer(run, discount) {
     };
 }
 
-function _createBuyLootOffer(discount) {
-    const cost = calcDiscount(REWARD_BALANCE.hunting.events.merchant.commonChestCost, discount);
-    return {
-        id: "buy_loot",
-        type: MERCHANT_OFFER_TYPES.BUY_LOOT,
-        label: "상자 구매",
-        description: "미확보 상자 1개 추가",
-        detail: `${getRarityLabel("common")} 등급`,
-        cost,
-        disabled: false,
-        disabledReason: "",
-        purchased: false
-    };
-}
-
-function _createSecureTransportOffer(run, discount) {
-    const pendingChests = normalizeHuntingChests(run?.pendingLoot?.chests);
-    const cost = calcDiscount(REWARD_BALANCE.hunting.events.merchant.secureTransportCost, discount);
-    const hasPending = pendingChests.length > 0;
-    return {
-        id: "secure_transport",
-        type: MERCHANT_OFFER_TYPES.SECURE_TRANSPORT,
-        label: "안전 운송",
-        description: hasPending ? "미확보 상자 1개를 안전하게 확보" : "운송할 상자 없음",
-        detail: hasPending ? "" : "미확보 상자가 없습니다",
-        cost,
-        disabled: !hasPending,
-        disabledReason: !hasPending ? "안전하게 옮길 미확보 상자가 없습니다" : "",
-        purchased: false
-    };
-}
-
-export function canAffordOffer(offer, profile) {
-    if (offer.purchased || offer.disabled) return false;
-    return (profile.hunting?.shards ?? 0) >= offer.cost;
-}
-
 export function applyMerchantOffer(run, profile, offer) {
     if (offer.purchased || offer.disabled) return null;
     const health = getHuntingRunHealth(run);
     if (offer.type === MERCHANT_OFFER_TYPES.REPAIR && (health.hp ?? health.maxHp ?? 100) >= (health.maxHp ?? 100)) {
-        return null;
-    }
-    const normalizedPendingChests = normalizeHuntingChests(run?.pendingLoot?.chests);
-    if (offer.type === MERCHANT_OFFER_TYPES.SECURE_TRANSPORT && normalizedPendingChests.length === 0) {
         return null;
     }
     const shards = profile.hunting?.shards ?? 0;
@@ -108,27 +64,6 @@ export function applyMerchantOffer(run, profile, offer) {
         const healed = Math.min(offer.healAmount, maxHp - currentHp);
         newRun = setHuntingRunActiveHealth(newRun, { hp: currentHp + healed, maxHp });
         result = { type: "repair", healed, newHp: currentHp + healed };
-    } else if (offer.type === MERCHANT_OFFER_TYPES.BUY_LOOT) {
-        const chest = createHuntingChest({ rarity: "common" });
-        newRun.pendingLoot = {
-            ...newRun.pendingLoot,
-            chests: [...normalizeHuntingChests(newRun.pendingLoot?.chests), chest]
-        };
-        result = { type: "buy_loot", chest };
-    } else if (offer.type === MERCHANT_OFFER_TYPES.SECURE_TRANSPORT) {
-        const pendingChests = normalizeHuntingChests(newRun.pendingLoot?.chests);
-        if (pendingChests.length === 0) return null;
-        const movedChest = pendingChests.shift();
-        newRun.pendingLoot = {
-            ...newRun.pendingLoot,
-            chests: pendingChests
-        };
-        newRun.securedLoot = {
-            shards: newRun.securedLoot?.shards ?? 0,
-            enhancementStones: newRun.securedLoot?.enhancementStones ?? 0,
-            chests: [...normalizeHuntingChests(newRun.securedLoot?.chests), movedChest]
-        };
-        result = { type: "secure_transport", chest: movedChest };
     }
 
     return { run: newRun, result };
@@ -139,7 +74,5 @@ export function formatOfferResultToast(result) {
     if (result.type === "repair") {
         return `HP +${getHuntingDisplayHp(result.healed)} 회복 (${getHuntingDisplayHp(result.newHp)})`;
     }
-    if (result.type === "buy_loot") return `${getRarityLabel(result.chest.rarity)} 상자 1개 구매 (미확보)`;
-    if (result.type === "secure_transport") return `${getRarityLabel(result.chest.rarity)} 상자 1개 안전 확보`;
     return "";
 }

@@ -15,7 +15,6 @@ export * from "./huntingCombatInteraction.js";
 export * from "./huntingHealth.js";
 export * from "./huntingRunProgression.js";
 export * from "./huntingEvents.js";
-export * from "./chestRewards.js";
 export * from "./equipmentConfig.js";
 export * from "./equipmentEffects.js";
 export * from "./equipmentRuntime.js";

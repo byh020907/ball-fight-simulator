@@ -157,7 +157,6 @@ import {
     canRetreatFromHuntingRun,
     buyDailyShopEquipment,
     completeHuntingStage,
-    createHuntingChest,
     createHuntingRun,
     defeatHuntingRun,
     applyHuntingCursedAltar,
@@ -175,12 +174,9 @@ import {
     getHuntingStage,
     getHuntingStageArena,
     getNextHuntingStageId,
-    getChestOpenCost,
     getDailyShop,
     getSelectedHuntingStageId,
     getUnlockedHuntingStageIds,
-    previewHuntingChest,
-    openHuntingChest,
     recordHuntingFloorResult,
     rerollDailyShop,
     retreatHuntingRun,
@@ -188,7 +184,6 @@ import {
     setHuntingRunPhase,
     setHuntingRunActiveHealth,
     setHuntingRunMemberHeroCarryover,
-    rollHuntingChestReward,
     rollHuntingFloorOutcome,
     scaleEnemySpecForHunting,
     HUNTING_ARENA,
@@ -233,7 +228,6 @@ import {
     applyMerchantOffer,
     formatOfferResultToast,
     canAffordOffer,
-    formatChestRarityCounts,
     formatPendingLootSummary,
     formatDefeatLossText,
     getRarityLabel,
@@ -253,7 +247,6 @@ import {
     createHuntingExperienceAllocation,
     getHuntingShardPhysicalDropCount,
     getSmallHealPackAmount,
-    rollHighChestRarity,
     rollHuntingBattleExperienceVariance,
     rollHuntingBonusLootItemType,
     rollHuntingShardBundleAmount,
@@ -274,7 +267,6 @@ import {
     resolveHuntingPartyBattleDefeats,
     setActiveHuntingPartyRole,
     setHuntingPartyMemberHealth,
-    normalizeHuntingChests,
     normalizeHuntingLoot
 } from "../src/hunting/index.js";
 import {
@@ -407,7 +399,6 @@ import {
 } from "../src/alpineTemplateComponents.js";
 import {
     BattleBall,
-    ChestDrop,
     computeHeroOrbCarryover,
     createHuntingLootItem,
     EnhancementStoneDrop,
@@ -888,11 +879,6 @@ function createHuntingOverlayMock() {
         huntingMerchantActive: false,
         huntingMerchantOffers: null,
         huntingMerchantResult: "",
-        huntingChestEventActive: false,
-        huntingChestRarity: "common",
-        huntingChestTitle: "",
-        huntingChestSubtext: "",
-        huntingChestConfirmLabel: "",
         huntingEventActive: false,
         huntingEventDetail: "",
         huntingEventConfirmLabel: "",
@@ -904,7 +890,6 @@ function createHuntingOverlayMock() {
         huntingLootHudVisible: false,
         huntingLootHudShards: 0,
         huntingLootHudEnhancementStones: 0,
-        huntingLootHudChests: 0,
         show({ label, text, subtext, xpReward } = {}) {
             if (label !== undefined) this.label = label;
             if (text !== undefined) this.text = text;
@@ -948,11 +933,6 @@ function createHuntingOverlayMock() {
             this.huntingMerchantActive = false;
             this.huntingMerchantOffers = null;
             this.huntingMerchantResult = "";
-            this.huntingChestEventActive = false;
-            this.huntingChestRarity = "common";
-            this.huntingChestTitle = "";
-            this.huntingChestSubtext = "";
-            this.huntingChestConfirmLabel = "";
             this.huntingEventActive = false;
             this.huntingEventDetail = "";
             this.huntingEventConfirmLabel = "";
@@ -964,7 +944,6 @@ function createHuntingOverlayMock() {
             this.huntingLootHudVisible = false;
             this.huntingLootHudShards = 0;
             this.huntingLootHudEnhancementStones = 0;
-            this.huntingLootHudChests = 0;
         },
         setHuntingState(data) {
             if (data) Object.assign(this, data);
@@ -1006,7 +985,6 @@ async function loadModuleApp() {
         huntingMerchantOffers: null,
         huntingLootHudVisible: false,
         huntingLootHudShards: 0,
-        huntingLootHudChests: 0,
         show({ label, text, subtext: st, xpReward } = {}) {
             if (label !== undefined) this.label = label;
             if (text !== undefined) this.text = text;
@@ -1249,7 +1227,6 @@ async function loadModuleAppWithInitialAlpineAllocation(allocation) {
         huntingMerchantOffers: null,
         huntingLootHudVisible: false,
         huntingLootHudShards: 0,
-        huntingLootHudChests: 0,
         show({ label, text, subtext: st, xpReward } = {}) {
             if (label !== undefined) this.label = label;
             if (text !== undefined) this.text = text;
@@ -2552,14 +2529,12 @@ function testComponentBridgeCallsGameHandlers(app) {
     let retreated = false;
     let advanced = false;
     let advanceOptions = null;
-    let chestContinued = false;
     const originalStartTournament = app.startTournament;
     const originalShowStageSelect = app.hunting.showStageSelect;
     const originalSelectStage = app.hunting.selectStage;
     const originalStartRun = app.hunting.startRun;
     const originalRetreat = app.hunting.retreat;
     const originalAdvance = app.hunting.advance;
-    const originalChestContinue = app.hunting.chestContinue;
 
     try {
         app.startTournament = () => {
@@ -2581,9 +2556,6 @@ function testComponentBridgeCallsGameHandlers(app) {
             advanced = true;
             advanceOptions = options;
         };
-        app.hunting.chestContinue = () => {
-            chestContinued = true;
-        };
         const bridge = createAppComponentBridge(app);
 
         bridge.startTournament();
@@ -2592,7 +2564,6 @@ function testComponentBridgeCallsGameHandlers(app) {
         bridge.selectHuntingCheckpoint(40);
         bridge.huntingRetreat();
         bridge.huntingAdvance();
-        bridge.huntingChestContinue();
     } finally {
         app.startTournament = originalStartTournament;
         app.hunting.showStageSelect = originalShowStageSelect;
@@ -2600,7 +2571,6 @@ function testComponentBridgeCallsGameHandlers(app) {
         app.hunting.startRun = originalStartRun;
         app.hunting.retreat = originalRetreat;
         app.hunting.advance = originalAdvance;
-        app.hunting.chestContinue = originalChestContinue;
     }
 
     assert.equal(started, true, "Start button bridge action should call BattleApp.startTournament");
@@ -2622,7 +2592,6 @@ function testComponentBridgeCallsGameHandlers(app) {
         { waitForFirstMoveUi: true },
         "Player-triggered hunting advance must wait for the movement card to paint"
     );
-    assert.equal(chestContinued, true, "Chest reward action should call HuntingManager.chestContinue");
 }
 
 function testStartButtonReceivesRemainingStatPoints(app) {
@@ -2804,74 +2773,15 @@ async function testHuntingFirstMoveUiPaintGate() {
     console.log("[hunting-first-move-ui-paint-gate] ok");
 }
 
-function testHuntingChestEventStopsAndResumes() {
-    const overlayCalls = [];
-    const overlayMessages = [];
-    const mockApp = {
-        setHuntingOverlayState(data) {
-            overlayCalls.push({ ...data });
-        },
-        showOverlay(label, text, subtext) {
-            overlayMessages.push({ label, text, subtext });
-        },
-        addLog() {},
-        roster: app.roster,
-        playerProfile: createDefaultPlayerProfile()
-    };
-    const manager = new HuntingManager(mockApp);
-    manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE });
-    const chestEvent = { type: HUNTING_EVENT_TYPES.CHEST_ROOM, chestRarity: "rare" };
-    manager._run = { ...manager._run, lastEvent: chestEvent };
-    manager._handleEventFloor({ app: mockApp, event: chestEvent });
-
-    const chestState = overlayCalls.at(-1);
-    assert.equal(manager._moving, false, "Chest event should stop the auto-advance loop");
-    assert.deepEqual(
-        overlayMessages.at(-1),
-        { label: "사냥터 이벤트", text: "상자방 발견", subtext: "상자를 미확보 전리품에 보관했습니다." },
-        "Chest event should show its own event title and concrete result"
-    );
-    assert.equal(
-        manager._run.phase,
-        HUNTING_RUN_PHASES.AWAITING_CHEST,
-        "Chest event should enter its explicit waiting phase"
-    );
-    assert.equal(chestState.huntingChestEventActive, true, "Chest event should open the chest reward UI");
-    assert.equal(chestState.huntingChestRarity, "rare", "Chest event should pass its rarity to the UI");
-    assert.equal(chestState.huntingChestTitle, "rare 상자 확보", "Chest event should use the canonical rarity title");
-    assert.equal(
-        manager._run.pendingLoot.chests.length,
-        1,
-        "Chest event should add one unsecured chest before display"
-    );
-
-    let advanceCalls = 0;
-    let advanceOptions = null;
-    manager.advance = (options) => {
-        advanceCalls += 1;
-        advanceOptions = options;
-    };
-    manager.chestContinue();
-
-    assert.equal(advanceCalls, 1, "Chest continue should resume the advance loop");
-    assert.deepEqual(
-        advanceOptions,
-        { waitForFirstMoveUi: true },
-        "Chest continue must paint the resumed movement card before advancing"
-    );
-    assert.equal(overlayCalls.at(-1).huntingChestEventActive, false, "Chest continue should close the chest reward UI");
-    console.log("[hunting-chest-event] ok");
-}
-
 function testHuntingEventPresentationContracts() {
     const profile = createDefaultPlayerProfile();
     const run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE });
     const expectedTitles = {
+        [HUNTING_EVENT_TYPES.SHARD_CACHE]: "파편 캐시 발견",
         [HUNTING_EVENT_TYPES.PORTAL]: "귀환 포탈 발견",
         [HUNTING_EVENT_TYPES.WANDERING_MERCHANT]: "방랑 상인 발견",
         [HUNTING_EVENT_TYPES.BOON]: "축복",
         [HUNTING_EVENT_TYPES.MISHAP]: "함정 발동",
-        [HUNTING_EVENT_TYPES.CHEST_ROOM]: "상자방 발견",
         [HUNTING_EVENT_TYPES.REST_SITE]: "휴식지",
         [HUNTING_EVENT_TYPES.CURSED_ALTAR]: "저주받은 제단",
         [HUNTING_EVENT_TYPES.CHAMPION_INTRUSION]: "챔피언 난입",
@@ -3200,75 +3110,6 @@ function testHuntingHealthDisplayUsesSharedIntegerGetter() {
     console.log("[hunting-health-display-integers] ok");
 }
 
-async function testHuntingChestEventStopsAdvanceLoop() {
-    const overlayCalls = [];
-    const mockApp = {
-        setHuntingOverlayState(data) {
-            overlayCalls.push({ ...data });
-        },
-        showOverlay() {},
-        addLog() {},
-        roster: app.roster,
-        playerProfile: createDefaultPlayerProfile()
-    };
-    const manager = new HuntingManager(mockApp);
-    manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE });
-    const originalRandom = Math.random;
-    const originalSetTimeout = globalThis.setTimeout;
-    const rolls = [0.5, 0.5, 0];
-    Math.random = () => rolls.shift() ?? 0;
-    globalThis.setTimeout = (callback, delay) => {
-        if (delay === 350) callback();
-        return 0;
-    };
-
-    try {
-        await manager.advance();
-    } finally {
-        Math.random = originalRandom;
-        globalThis.setTimeout = originalSetTimeout;
-    }
-
-    assert.equal(manager._run.floor, 2, "Chest room should stop on the floor where it was found");
-    assert.equal(manager._moving, false, "Chest room should release the movement lock");
-    assert.equal(
-        overlayCalls.at(-1).huntingChestEventActive,
-        true,
-        "Chest room should remain visible after advance returns"
-    );
-    console.log("[hunting-chest-event-stops-advance] ok");
-}
-
-function testHuntingChestContinueHandlersContract() {
-    const managerSource = readFileSync(new URL("../src/hunting/huntingManager.js", import.meta.url), "utf8");
-    const handlerDefStart = managerSource.indexOf("HUNTING_CHEST_CONTINUE_HANDLERS");
-    const handlerDefEnd = managerSource.indexOf("});", handlerDefStart);
-    const defBlock = managerSource.slice(handlerDefStart, handlerDefEnd);
-    assert.ok(defBlock.includes("AWAITING_CHEST"), "Chest room phase must have a handler");
-    assert.ok(defBlock.includes("AWAITING_COMBAT_REWARD_CHEST"), "Combat reward chest phase must have a handler");
-    const handledPhases = [...defBlock.matchAll(/AWAITING_\w+/g)].map((m) => m[0]);
-    const knownChestPhases = ["AWAITING_CHEST", "AWAITING_COMBAT_REWARD_CHEST"];
-    assert.equal(
-        handledPhases.length,
-        knownChestPhases.length,
-        "HUNTING_CHEST_CONTINUE_HANDLERS should cover exactly 2 phases: chest room and combat reward"
-    );
-    assert.ok(
-        managerSource.includes('"_continueChestRoom"'),
-        "HUNTING_CHEST_CONTINUE_HANDLERS must dispatch chest room to _continueChestRoom"
-    );
-    assert.ok(
-        managerSource.includes('"_continueCombatRewardChest"'),
-        "HUNTING_CHEST_CONTINUE_HANDLERS must dispatch combat reward to _continueCombatRewardChest"
-    );
-    assert.ok(managerSource.includes("_continueChestRoom()"), "_continueChestRoom must be implemented as a method");
-    assert.ok(
-        managerSource.includes("_continueCombatRewardChest()"),
-        "_continueCombatRewardChest must be implemented as a method"
-    );
-    console.log("[hunting-chest-continue-handlers] ok");
-}
-
 function testHuntingLootBalanceRules() {
     const fullHp = { hp: 100, maxHp: 100 };
     const halfHp = { hp: 50, maxHp: 100 };
@@ -3291,7 +3132,7 @@ function testHuntingLootBalanceRules() {
                 return () => rolls.shift() ?? 0;
             })()
         }),
-        HUNTING_LOOT_ITEM_TYPES.CHEST,
+        HUNTING_LOOT_ITEM_TYPES.SMALL_HEAL_PACK,
         "A full-HP bonus roll below 15% must create an additional loot item"
     );
     assert.equal(
@@ -3365,18 +3206,18 @@ function testHuntingLootBalanceRules() {
     );
     assert.deepEqual(
         getHuntingBonusLootWeights({ collector: fullHp, rarity: "common" }),
-        { small_heal_pack: 20, chest: 10, shard_bundle: 0, high_chest: 0 },
-        "Common monsters should use only the ordinary bonus-loot table"
+        { small_heal_pack: 20, shard_bundle: 0 },
+        "Common monsters should use the active bonus-loot table"
     );
     assert.deepEqual(
         getHuntingBonusLootWeights({ collector: halfHp, rarity: "uncommon" }),
-        { small_heal_pack: 24, chest: 8, shard_bundle: 15, high_chest: 5 },
-        "Uncommon monsters should preserve the former rare special-reward table"
+        { small_heal_pack: 30, shard_bundle: 15 },
+        "Uncommon monsters should combine healing and shard-bundle weights"
     );
     assert.equal(
         getHuntingBonusLootWeights({ collector: emptyHp, rarity: "epic" }).small_heal_pack,
-        14,
-        "Missing HP should raise the heal-pack weight before rarity rewards reserve their share"
+        40,
+        "Missing HP should raise the heal-pack weight to its configured maximum"
     );
     assert.equal(
         rollHuntingBonusLootItemType({
@@ -3409,16 +3250,6 @@ function testHuntingLootBalanceRules() {
         rollHuntingShardBundleAmount({ floor: 100, rarity: "epic", rng: () => 0.99 }),
         70,
         "Epic bundles should retain the 3.5x high-end roll on the deep-floor base amount"
-    );
-    assert.equal(
-        rollHighChestRarity({ rarity: "uncommon", rng: () => 0.99 }),
-        "uncommon",
-        "Uncommon monsters should always produce an uncommon high chest"
-    );
-    assert.equal(
-        rollHighChestRarity({ rarity: "rare", rng: () => 0.8 }),
-        "rare",
-        "Rare high chests should retain the former unique 30% rare branch"
     );
     console.log("[hunting-loot-balance-rules] ok");
 }
@@ -3565,9 +3396,9 @@ function testHuntingLootItemsAndDropController(app) {
         "A successful bonus roll must not replace the guaranteed physical shard drops"
     );
     assert.equal(
-        bonusDrops.filter((entity) => entity instanceof ChestDrop).length,
+        bonusDrops.filter((entity) => entity instanceof SmallHealPack).length,
         1,
-        "A successful common bonus roll must add its chest beside the guaranteed shard"
+        "A successful common bonus roll must add its heal pack beside the guaranteed shard"
     );
     assert.equal(
         controller.onFighterDefeated({ hunting: null }, { simulation }),
@@ -3667,40 +3498,7 @@ function testHuntingLootItemsAndDropController(app) {
         "Heal-pack feedback must identify the item"
     );
 
-    const chest = createHuntingChest({ id: "loot-test-chest", rarity: "common" });
-    const chestDrop = new ChestDrop({
-        position: player.position,
-        velocity: new Vector2(),
-        collectorId: player.id,
-        chest,
-        onCollected: (reward) => session.recordCollection(reward)
-    });
-    assert.equal(chestDrop.radius, 20, "Chest drops should use the enlarged loot size");
-    chestDrop.collectionGraceRemaining = 0;
-    chestDrop.update(1 / 60, simulation);
-    assert.equal(
-        session.getCollectedLoot().chests[0]?.id,
-        chest.id,
-        "Collected chest drops must enter the battle loot session"
-    );
-    assert.ok(
-        createHuntingLootItem(HUNTING_LOOT_ITEM_TYPES.CHEST, {
-            position: player.position,
-            velocity: new Vector2(),
-            collectorId: player.id,
-            chest
-        }) instanceof ChestDrop,
-        "The loot registry must construct the subclass registered for each item type"
-    );
-    assert.ok(
-        createHuntingLootItem(HUNTING_LOOT_ITEM_TYPES.HIGH_CHEST, {
-            position: player.position,
-            velocity: new Vector2(),
-            collectorId: player.id,
-            chest: createHuntingChest({ id: "loot-test-high-chest", rarity: "rare" })
-        }) instanceof ChestDrop,
-        "High-chest rolls should reuse the chest drop renderer with their rolled rarity"
-    );
+    assert.equal("chests" in session.getCollectedLoot(), false, "Battle loot sessions must not expose chest storage");
     assert.equal(
         createHuntingLootItem(HUNTING_LOOT_ITEM_TYPES.SHARD_BUNDLE, {
             position: player.position,
@@ -4114,7 +3912,7 @@ function testHuntingBossRolesAndEnhancementStoneDrops(app) {
     const runWithStones = recordHuntingFloorResult(createHuntingRun({ characterId: player.id, now: 0 }), {
         hpRemain: 80,
         maxHp: 100,
-        loot: { shards: 0, enhancementStones: 5, chests: [] }
+        loot: { shards: 0, enhancementStones: 5, equipment: {} }
     });
     const retreated = retreatHuntingRun(runWithStones, { now: 1 });
     assert.equal(retreated.securedLoot.enhancementStones, 5, "Retreat must secure collected enhancement stones");
@@ -4699,8 +4497,7 @@ function testHuntingLootItemsRotate() {
     const lootItems = [
         new ShardDrop({ position: new Vector2(200, 200), velocity: new Vector2(), collectorId: "collector" }),
         new ShardBundleDrop({ position: new Vector2(240, 200), velocity: new Vector2(), collectorId: "collector" }),
-        new SmallHealPack({ position: new Vector2(280, 200), velocity: new Vector2(), collectorId: "collector" }),
-        new ChestDrop({ position: new Vector2(320, 200), velocity: new Vector2(), collectorId: "collector" })
+        new SmallHealPack({ position: new Vector2(280, 200), velocity: new Vector2(), collectorId: "collector" })
     ];
     const simulation = { fighters: [], keepEntityInsideArena() {} };
     const initialAngularVelocities = lootItems.map((item) => item.angularVelocity);
@@ -4784,14 +4581,14 @@ function testHuntingLootSessionIsDiscardedOnDefeat(app) {
     manager._battleLootSession = new HuntingBattleLootSession({ playerId: FIGHTER_IDS.DASH, floor: 37 });
     manager._battleLootSession.recordCollection({ type: HUNTING_LOOT_ITEM_TYPES.SHARD, amount: 20 });
     manager._battleLootSession.recordCollection({
-        type: HUNTING_LOOT_ITEM_TYPES.CHEST,
-        chest: createHuntingChest({ id: "defeat-discard-chest", rarity: "common" })
+        type: HUNTING_LOOT_ITEM_TYPES.EQUIPMENT,
+        templateId: "attack_sword"
     });
 
     manager._handleFinish(mockApp);
 
     assert.equal(profile.hunting.shards, 0, "Collected battle loot must not be secured after a defeat");
-    assert.equal(profile.hunting.chests.length, 0, "Collected battle chests must not be secured after a defeat");
+    assert.equal(profile.equipment.inventory.attack_sword ?? 0, 0, "Failed battle equipment must not be secured");
     assert.equal(manager._battleLootSession, null, "Defeat must discard the transient battle loot session");
     assert.equal(
         resultSequenceSteps?.find((step) => step.id === "summary")?.text,
@@ -4799,360 +4596,6 @@ function testHuntingLootSessionIsDiscardedOnDefeat(app) {
         "Defeat summary must show the floor where the character fell"
     );
     console.log("[hunting-loot-defeat-discard] ok");
-}
-
-function testHuntingCombatRewardChestUi() {
-    const overlayCalls = [];
-    const mockApp = {
-        setHuntingOverlayState(data) {
-            overlayCalls.push({ ...data });
-        },
-        showOverlay() {},
-        addLog() {},
-        roster: app.roster,
-        playerProfile: createDefaultPlayerProfile()
-    };
-    const manager = new HuntingManager(mockApp);
-    const chest = createHuntingChest({ rarity: "common" });
-    manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE });
-    manager._run = recordHuntingFloorResult(manager._run, {
-        hpRemain: 80,
-        maxHp: 100,
-        loot: { shards: 15, chests: [chest] },
-        combatCleared: true
-    });
-    manager._presentCombatRewardChest(mockApp, chest);
-
-    const last = overlayCalls.at(-1);
-    assert.ok(last, "Combat reward chest must call setHuntingOverlayState");
-    assert.equal(last.huntingChestEventActive, true, "Combat reward chest must show chest UI");
-    assert.equal(last.huntingChestRarity, "common", "Combat reward chest must pass chest rarity");
-    assert.equal(last.huntingChestConfirmLabel, "확인", "Combat reward chest button must say '확인'");
-    assert.equal(
-        manager._run.phase,
-        HUNTING_RUN_PHASES.AWAITING_COMBAT_REWARD_CHEST,
-        "Combat reward chest must set phase to AWAITING_COMBAT_REWARD_CHEST"
-    );
-    console.log("[hunting-combat-reward-chest-ui] ok");
-}
-
-function createCombatRewardChestTestEnv({ isFinalBoss = false, collectedChestCount = 1 } = {}) {
-    const overlayStates = [];
-    const showOverlayCalls = [];
-    const resultSequenceCalls = [];
-    const playerBall = { id: FIGHTER_IDS.DASH, name: "Dash Ball", hp: 80, maxHp: 100 };
-    const mockApp = {
-        _cleanupMatch() {},
-        matchFinalized: false,
-        _onSimulationResult: null,
-        simulation: {
-            fighters: [playerBall, { id: "enemy", name: "Enemy", hp: 0, maxHp: 100 }],
-            winner: playerBall,
-            isHostile() {
-                return true;
-            },
-            getEnemiesOf(fighter) {
-                return this.fighters.filter((candidate) => candidate.id !== fighter.id);
-            }
-        },
-        _currentMatchReport: null,
-        _formatXpResult() {
-            return "";
-        },
-        _createXpRewardView() {
-            return null;
-        },
-        setHuntingOverlayState(data) {
-            overlayStates.push({ ...data });
-        },
-        showOverlay(label, text, subtext) {
-            showOverlayCalls.push({ label, text, subtext });
-        },
-        presentResultSequence(steps) {
-            resultSequenceCalls.push(steps);
-        },
-        refreshPlayerSetup() {},
-        setStartButton() {},
-        addLog() {},
-        _settleHuntingAchievements() {},
-        roster: app.roster,
-        playerProfile: createDefaultPlayerProfile()
-    };
-    if (isFinalBoss) {
-        mockApp.beginResultConfirmation = () => {};
-        mockApp._refreshCollectionHub = () => {};
-        mockApp.setHuntingActive = () => {};
-    }
-    const manager = new HuntingManager(mockApp);
-    const run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE });
-    manager._run = isFinalBoss
-        ? { ...run, floor: 100, lastEncounter: { type: HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS } }
-        : run;
-    manager._battleLootSession = new HuntingBattleLootSession({
-        playerId: FIGHTER_IDS.DASH,
-        floor: manager._run.floor
-    });
-    Array.from({ length: collectedChestCount }).forEach((_, index) => {
-        manager._battleLootSession.recordCollection({
-            type: HUNTING_LOOT_ITEM_TYPES.CHEST,
-            chest: createHuntingChest({
-                id: `combat-reward-chest-${isFinalBoss ? "boss" : "normal"}-${index}`,
-                rarity: "common"
-            })
-        });
-    });
-    return { overlayStates, showOverlayCalls, resultSequenceCalls, playerBall, mockApp, manager };
-}
-
-function testHuntingCombatWithoutCollectedChestSkipsChestUi() {
-    const { overlayStates, mockApp, manager } = createCombatRewardChestTestEnv({ collectedChestCount: 0 });
-    const originalRandom = Math.random;
-    try {
-        Math.random = () => 0;
-        manager._handleFinish(mockApp);
-    } finally {
-        Math.random = originalRandom;
-    }
-
-    assert.equal(
-        manager._run.phase,
-        HUNTING_RUN_PHASES.AWAITING_CHOICE,
-        "A monster defeat roll must not synthesize an uncollected chest after combat"
-    );
-    assert.equal(
-        overlayStates.some((state) => state.huntingChestEventActive === true),
-        false,
-        "Only chests collected on the battlefield may open the combat chest UI"
-    );
-    assert.equal(
-        manager._run.pendingLoot.shards,
-        0,
-        "Winning without collected drops must not synthesize the former static combat shard reward"
-    );
-    console.log("[hunting-combat-uncollected-chest-skipped] ok");
-}
-
-function testHuntingCombatRewardChestQueue() {
-    const { overlayStates, mockApp, manager } = createCombatRewardChestTestEnv({ collectedChestCount: 2 });
-    manager._handleFinish(mockApp);
-
-    manager.chestContinue();
-    assert.equal(
-        manager._run.phase,
-        HUNTING_RUN_PHASES.AWAITING_COMBAT_REWARD_CHEST,
-        "A second collected chest must remain in the combat chest flow"
-    );
-    assert.equal(
-        overlayStates.filter((state) => state.huntingChestEventActive === true).length,
-        2,
-        "Each collected chest must present its own confirmation UI"
-    );
-
-    manager.chestContinue();
-    assert.equal(
-        manager._run.phase,
-        HUNTING_RUN_PHASES.AWAITING_CHOICE,
-        "Combat victory UI must appear after the final collected chest"
-    );
-    console.log("[hunting-combat-reward-chest-queue] ok");
-}
-
-function testHuntingCombatRewardChestNormalContinue() {
-    const { overlayStates, showOverlayCalls, mockApp, manager } = createCombatRewardChestTestEnv();
-
-    // Spy on advance() to prove it is never called implicitly
-    let advanceCallCount = 0;
-    const originalAdvance = manager.advance;
-    manager.advance = () => {
-        advanceCallCount++;
-    };
-
-    const originalRandom = Math.random;
-    try {
-        Math.random = () => 0.0;
-
-        manager._handleFinish(mockApp);
-
-        // Phase must be AWAITING_COMBAT_REWARD_CHEST (chest intercepted)
-        assert.equal(
-            manager._run.phase,
-            HUNTING_RUN_PHASES.AWAITING_COMBAT_REWARD_CHEST,
-            "Phase must be combat reward chest after _handleFinish with chest drop"
-        );
-
-        // Chest UI must be active with confirm label '확인'
-        const lastChest = overlayStates.at(-1);
-        assert.ok(lastChest, "_handleFinish must call setHuntingOverlayState");
-        assert.equal(lastChest.huntingChestEventActive, true, "Chest UI must be active");
-        assert.equal(lastChest.huntingChestConfirmLabel, "확인", "Combat reward chest button must say '확인'");
-
-        // Victory overlay must NOT have appeared yet
-        const victoryBefore = showOverlayCalls.find((c) => c.label === "사냥터" && c.text.includes("승리"));
-        assert.equal(victoryBefore, undefined, "Victory overlay must NOT appear before chest confirm");
-
-        // Reset tracking for chestContinue
-        overlayStates.length = 0;
-        showOverlayCalls.length = 0;
-        advanceCallCount = 0;
-
-        manager.chestContinue();
-
-        // Chest UI must close
-        const chestClose = overlayStates.find((s) => s.huntingChestEventActive === false);
-        assert.ok(chestClose, "chestContinue must close chest UI");
-
-        // Phase must be AWAITING_CHOICE (normal combat victory)
-        assert.equal(
-            manager._run.phase,
-            HUNTING_RUN_PHASES.AWAITING_CHOICE,
-            "Normal combat reward chest continue must transition to AWAITING_CHOICE"
-        );
-
-        // Victory overlay must appear
-        const victoryAfter = showOverlayCalls.find((c) => c.label === "사냥터" && c.text.includes("승리"));
-        assert.ok(victoryAfter, "After combat reward chest confirm, victory overlay must appear");
-
-        // advance() must NOT have been called implicitly
-        assert.equal(advanceCallCount, 0, "chestContinue must NOT implicitly call advance()");
-        assert.equal(manager._moving, false, "Combat reward chest continue must not trigger advance automatically");
-    } finally {
-        Math.random = originalRandom;
-        manager.advance = originalAdvance;
-    }
-
-    console.log("[hunting-combat-reward-chest-normal-continue] ok");
-}
-
-function testHuntingCombatRewardChestFinalBossContinue() {
-    const { overlayStates, resultSequenceCalls, mockApp, manager } = createCombatRewardChestTestEnv({
-        isFinalBoss: true
-    });
-
-    // Spy on beginResultConfirmation() to prove lifecycle
-    let beginResultConfirmationCallCount = 0;
-    const originalBeginResultConfirmation = mockApp.beginResultConfirmation;
-    mockApp.beginResultConfirmation = () => {
-        beginResultConfirmationCallCount++;
-    };
-
-    const originalRandom = Math.random;
-    try {
-        Math.random = () => 0.0;
-
-        manager._handleFinish(mockApp);
-
-        // Phase must be AWAITING_COMBAT_REWARD_CHEST (chest intercepted)
-        assert.equal(
-            manager._run.phase,
-            HUNTING_RUN_PHASES.AWAITING_COMBAT_REWARD_CHEST,
-            "Final boss: phase must be combat reward chest after _handleFinish"
-        );
-
-        // Chest UI must be visible with confirm label '확인'
-        const chestState = overlayStates.find((s) => s.huntingChestEventActive === true);
-        assert.ok(chestState, "Chest UI must be visible after _handleFinish");
-        assert.equal(chestState.huntingChestConfirmLabel, "확인", "Chest confirm button must be '확인'");
-
-        // beginResultConfirmation must NOT be called before chest confirm
-        assert.equal(
-            beginResultConfirmationCallCount,
-            0,
-            "beginResultConfirmation must NOT be called before chest confirm"
-        );
-
-        // Stage clear must NOT have appeared yet
-        const clearBefore = resultSequenceCalls.find((steps) => steps[0]?.label === "스테이지 클리어");
-        assert.equal(clearBefore, undefined, "Stage clear must NOT appear before chest confirm");
-
-        // Reset tracking for chestContinue
-        overlayStates.length = 0;
-        resultSequenceCalls.length = 0;
-        beginResultConfirmationCallCount = 0;
-
-        manager.chestContinue();
-
-        // After chest confirm: run must be null (stage clear)
-        assert.equal(manager._run, null, "Final boss combat reward chest continue must set run to null (stage clear)");
-
-        // Stage clear overlay must appear
-        const clearAfter = resultSequenceCalls.find((steps) => steps.some((step) => step.label === "스테이지 클리어"));
-        assert.ok(clearAfter, "After final boss chest confirm, stage clear overlay must appear");
-        assert.equal(clearAfter[0]?.label, "경험치", "Stage clear results must show collected XP before the summary");
-
-        // beginResultConfirmation must be called exactly once after chest confirm
-        assert.equal(
-            beginResultConfirmationCallCount,
-            1,
-            "beginResultConfirmation must be called exactly once after chest confirm"
-        );
-    } finally {
-        Math.random = originalRandom;
-        mockApp.beginResultConfirmation = originalBeginResultConfirmation;
-    }
-
-    console.log("[hunting-combat-reward-chest-finalboss-continue] ok");
-}
-
-async function testHuntingChestRoomContinueStillWorks() {
-    const overlayStates = [];
-    const mockApp = {
-        setHuntingOverlayState(data) {
-            overlayStates.push({ ...data });
-        },
-        showOverlay() {},
-        waitForHuntingMoveUiPaint() {},
-        addLog() {},
-        roster: app.roster,
-        playerProfile: createDefaultPlayerProfile()
-    };
-    const manager = new HuntingManager(mockApp);
-    manager._run = {
-        ...createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE }),
-        maxFloor: 2
-    };
-    manager._run = setHuntingRunPhase(manager._run, HUNTING_RUN_PHASES.AWAITING_CHEST);
-
-    const originalHandleAdvanceError = manager._handleAdvanceError;
-    const originalRandom = Math.random;
-    const originalSetTimeout = globalThis.setTimeout;
-    let advanceErrorCount = 0;
-    manager._handleAdvanceError = function (error) {
-        advanceErrorCount += 1;
-        return originalHandleAdvanceError.call(this, error);
-    };
-    Math.random = (() => {
-        const values = [0.5, 0.95, 0];
-        return () => values.shift() ?? 0;
-    })();
-    globalThis.setTimeout = (callback) => {
-        callback();
-        return 0;
-    };
-
-    try {
-        overlayStates.length = 0;
-        manager.chestContinue();
-        await Promise.resolve();
-        await Promise.resolve();
-        await Promise.resolve();
-    } finally {
-        manager._handleAdvanceError = originalHandleAdvanceError;
-        Math.random = originalRandom;
-        globalThis.setTimeout = originalSetTimeout;
-    }
-
-    assert.equal(
-        manager._run.phase,
-        HUNTING_RUN_PHASES.AWAITING_BATTLE_PREPARATION,
-        "Chest room chestContinue must advance to the next low-floor encounter"
-    );
-    assert.equal(manager._run.floor, 2, "Chest room chestContinue must actually process the next floor");
-    assert.equal(
-        advanceErrorCount,
-        0,
-        "Chest room resume must not enter _handleAdvanceError on a low-floor event roll"
-    );
-    console.log("[hunting-chest-room-continue-still-works] ok");
 }
 
 function testHuntingAdvanceDispatchContract() {
@@ -5171,8 +4614,8 @@ function testHuntingAdvanceDispatchContract() {
     );
     assert.equal(
         Object.values(HUNTING_EVENT_TRANSITIONS).length,
-        5,
-        "Event transitions should explicitly cover continue, choice, merchant, chest, and battle"
+        4,
+        "Event transitions should explicitly cover continue, choice, merchant, and battle"
     );
 
     const source = readFileSync(new URL("../src/hunting/huntingManager.js", import.meta.url), "utf8");
@@ -9165,42 +8608,31 @@ function testHuntingSystem() {
     const run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, now: 1000 });
     assert.equal(run.floor, 1, "Hunting run should start at floor 1");
     assert.equal(run.stageId, HUNTING_STAGE_IDS.CAVE, "Default stage should be cave");
-    const common = createHuntingChest({ id: "c1", rarity: "common", acquiredAt: 1000 });
-    const uncommon = createHuntingChest({ id: "u1", rarity: "uncommon", acquiredAt: 1000 });
-    const rare = createHuntingChest({ id: "r1", rarity: "rare", acquiredAt: 1000 });
-    assert.equal(common.openCost, 20, "Chest instances should expose their open cost");
-    assert.ok(common.rewardPreview.includes("파편"), "Chest instances should expose reward table preview text");
-    assert.equal(
-        rollHuntingChestReward(common, { rng: () => 0 }).type,
-        "SHARDS",
-        "Chest rewards should roll from the rarity reward table"
-    );
-    assert.ok(
-        previewHuntingChest(rare).rewardTable.every((reward) => reward.type === "equipment"),
-        "Rare and higher chests should guarantee equipment rewards"
-    );
     const afterFloor = recordHuntingFloorResult(run, {
         hpRemain: 55,
         maxHp: 100,
-        loot: { shards: 100, chests: [common, uncommon, rare] }
+        loot: { shards: 100, enhancementStones: 2 }
     });
     assert.equal(getHuntingRunHealth(afterFloor).hp, 55, "Hunting run should carry HP between floors");
-    assert.equal(afterFloor.pendingLoot.chests.length, 3, "Floor rewards should stay pending");
+    assert.deepEqual(
+        afterFloor.pendingLoot,
+        { shards: 100, enhancementStones: 2, equipment: {} },
+        "Floor rewards should remain pending without a chest field"
+    );
 
-    // rng(1)=0.4→EVENT, rng(2)=0.5→CHEST_ROOM(idx4), rng(3)=0→uncommon
-    const advanced = advanceHuntingRun(afterFloor, {
-        rng: (() => {
-            const rolls = [0.4, 0.5, 0];
-            return () => rolls.shift() ?? 0;
-        })()
+    const shardCachePayload = HuntingEvent.createPayload(HUNTING_EVENT_TYPES.SHARD_CACHE, 12, () => 0.5);
+    const shardCacheResolution = HuntingEvent.resolve(shardCachePayload, {
+        run: afterFloor,
+        playerProfile: profile,
+        roster: app.roster
     });
-    assert.equal(advanced.floor, 2, "Advance should move from floor 1 to 2");
-    assert.equal(advanced.lastEncounter.type, HUNTING_FLOOR_OUTCOME_TYPES.EVENT, "Should produce an event encounter");
-    assert.ok(advanced.lastEvent, "Event encounter should set lastEvent");
-    assert.equal(advanced.lastEvent.type, HUNTING_EVENT_TYPES.CHEST_ROOM, "Event rolls should include chest rooms");
-    assert.equal(advanced.lastEvent.chestRarity, "uncommon", "Chest room events should carry a concrete rarity");
+    assert.equal(shardCacheResolution.transition, HUNTING_EVENT_TRANSITIONS.CONTINUE);
+    assert.ok(
+        shardCacheResolution.run.pendingLoot.shards > afterFloor.pendingLoot.shards,
+        "Shard cache events should immediately add shards to pending loot"
+    );
+    assert.equal("chests" in shardCacheResolution.run.pendingLoot, false, "Shard cache loot must not recreate chests");
 
-    // rng(1)=0.4→EVENT, rng(2)=0.75→CURSED_ALTAR(idx6), rng(3)=0→first trade
     const cursed = advanceHuntingRun(afterFloor, {
         rng: (() => {
             const rolls = [0.4, 0.75, 0];
@@ -9219,145 +8651,37 @@ function testHuntingSystem() {
     assert.equal(altarSpec.stats.defense, 1.8, "Cursed altar loss should modify the traded-away stat");
     const consumedCursed = recordHuntingFloorResult(cursedApplied, { hpRemain: 50, maxHp: 100 });
     assert.equal(consumedCursed.statModifiers.length, 0, "One-floor altar modifiers should expire after a floor");
-    const preservedEventBuff = recordHuntingFloorResult(cursedApplied, {
-        loot: { shards: 0, chests: [common] },
-        consumeStatModifiers: false
-    });
-    assert.equal(
-        preservedEventBuff.statModifiers.length,
-        2,
-        "Non-combat event rewards should not consume temporary stat modifiers"
-    );
-
-    // rng(1)=0.4→EVENT, rng(2)=0.9→CHAMPION_INTRUSION(정예 0 가중치 제외 뒤 마지막 후보)
-    const champion = advanceHuntingRun(afterFloor, {
-        rng: (() => {
-            const rolls = [0.4, 0.9];
-            return () => rolls.shift() ?? 0;
-        })()
-    });
-    assert.equal(champion.lastEncounter.type, HUNTING_FLOOR_OUTCOME_TYPES.EVENT, "Should produce an event encounter");
-    assert.equal(
-        champion.lastEvent.type,
-        HUNTING_EVENT_TYPES.CHAMPION_INTRUSION,
-        "Event pool should include champion intrusions"
-    );
-    assert.equal(champion.lastEvent.enemyType, "champion", "Champion events should mark the next enemy type");
 
     const retreated = retreatHuntingRun(afterFloor, { now: 2000 });
     assert.equal(retreated.status, "retreated", "Retreat should end the run safely");
-    assert.equal(retreated.securedLoot.shards, 100, "Retreat should secure pending key shards");
-    assert.equal(retreated.pendingLoot.chests.length, 0, "Retreat should clear pending loot");
+    assert.equal(retreated.securedLoot.shards, 100, "Retreat should secure pending shards");
+    assert.equal("chests" in retreated.securedLoot, false, "Secured loot must not contain chests");
 
-    const defeated = defeatHuntingRun(afterFloor, {
-        rng: (() => {
-            const rolls = [0.1, 0.2, 0.3, 0.4, 0.4, 0.6];
-            return () => rolls.shift() ?? 0.6;
-        })(),
-        now: 3000
-    });
+    const defeated = defeatHuntingRun(afterFloor, { rng: () => 0.6, now: 3000 });
     assert.equal(defeated.status, "defeated", "Defeat should end the run");
-    assert.equal(defeated.securedLoot.shards, 50, "Defeat should preserve half of key shards");
-    assert.equal(defeated.securedLoot.xp, undefined, "XP must not become defeatable hunting loot");
-    assert.deepEqual(
-        defeated.defeatLosses.chests.map((chest) => chest.id),
-        ["r1", "u1"],
-        "Defeat should break higher-rarity chests first with chain probability"
-    );
-
-    profile.hunting.shards = 50;
-    profile.hunting.chests = [uncommon];
-    profile.experience.byCharacter[FIGHTER_IDS.ARCHER] = { currentXp: getLevelRequirement(10) };
-    assert.equal(getChestOpenCost("uncommon"), 50, "Uncommon chest open cost should match design");
-    const opened = openHuntingChest(profile, "u1", { rng: () => 0, characterId: FIGHTER_IDS.ARCHER });
-    assert.equal(opened.opened, true, "Chest should open when enough key shards are available");
-    assert.equal(opened.reward.type, "equipment", "Uncommon chests should guarantee equipment rewards");
-    assert.equal(profile.hunting.shards, 0, "Opening a guaranteed equipment chest should only spend its cost");
-    assert.equal(
-        Object.keys(profile.equipment.inventory).length,
-        1,
-        "Guaranteed equipment rewards should enter the inventory"
-    );
-    assert.equal(opened.applied.autoEquip.ok, true, "An empty eligible slot should equip a chest reward automatically");
-    assert.equal(profile.hunting.chests.length, 0, "Opened chest should leave storage");
+    assert.equal(defeated.securedLoot.shards, 50, "Defeat should preserve half of shards");
+    assert.equal(defeated.securedLoot.enhancementStones, 1, "Defeat should preserve half of enhancement stones");
+    assert.equal("chests" in defeated.defeatLosses, false, "Defeat losses must not contain chests");
 
     const sanitized = sanitizePlayerProfile({
         hunting: {
             shards: 12,
-            chests: [
-                { id: "safe", rarity: "rare", acquiredAt: 1000 },
-                { id: "safe", rarity: "common", acquiredAt: 2000 },
-                { id: "", rarity: "legendary", acquiredAt: 3000 }
-            ],
+            chests: [{ id: "legacy", rarity: "rare" }],
             stats: { runsStarted: 2, runsRetreated: 1, runsDefeated: 1, deepestFloor: 4 }
         }
     });
-    assert.equal(sanitized.hunting.shards, 12, "Sanitized profile should keep hunting key shards");
-    assert.equal(sanitized.hunting.chests.length, 1, "Sanitized profile should dedupe and discard invalid chests");
+    assert.equal(sanitized.hunting.shards, 12, "Sanitized profile should keep hunting shards");
+    assert.equal("chests" in sanitized.hunting, false, "Sanitized profiles should discard legacy chest storage");
     assert.equal(sanitized.hunting.stats.deepestFloor, 4, "Sanitized profile should keep hunting stats");
 
-    const normalizedChests = normalizeHuntingChests(
-        [
-            {
-                id: "legacy",
-                rarity: "legendary",
-                acquiredAt: "invalid",
-                openCost: -8,
-                guaranteedEquipment: {
-                    rarity: "legendary",
-                    slot: "weapon",
-                    name: "구형 장비",
-                    baseName: "구형 장비",
-                    description: "전설급 유물",
-                    instanceId: "eq-legacy",
-                    stats: [{ type: "damage", value: 42, min: 38, max: 64 }],
-                    specialOptions: [{ type: "critChance", value: 5 }]
-                }
-            },
-            {
-                id: "legacy",
-                rarity: "rare",
-                acquiredAt: Date.now(),
-                guaranteedEquipment: {
-                    rarity: "epic",
-                    slot: "armor",
-                    name: "중고 갑옷",
-                    baseName: "중고 갑옷",
-                    description: "유효하지 않은 희귀 등급에서 정규화",
-                    instanceId: "eq-legacy2",
-                    stats: [{ type: "defense", value: 20, min: 18, max: 28 }]
-                }
-            },
-            { id: "good", acquiredAt: 1200, guaranteedEquipment: null },
-            null,
-            { id: "too-old", acquiredAt: Date.now() + 1, rarity: "mythic" }
-        ],
-        { dedupe: true, maxCount: 3 }
-    );
-    assert.equal(normalizedChests.length, 3, "normalizeHuntingChests should keep only limited valid chests");
-    assert.equal(normalizedChests[0].id, "legacy", "normalizeHuntingChests should retain the first valid legacy id");
-    assert.equal(normalizedChests[1].id, "good", "normalizeHuntingChests should keep all valid unique ids");
-    assert.equal(normalizedChests[2].id, "too-old", "normalizeHuntingChests should coerce legacy rarity when unknown");
-
-    const normalizedLoot = normalizeHuntingLoot({ shards: "x", enhancementStones: 3.6, chests: normalizedChests });
-    assert.equal(normalizedLoot.shards, 0, "normalizeHuntingLoot should sanitize invalid key shard count");
-    assert.equal(normalizedLoot.enhancementStones, 3, "normalizeHuntingLoot should sanitize enhancement stone count");
-    assert.equal(normalizedLoot.chests.length, 3, "normalizeHuntingLoot should normalize nested chests");
-
-    const legacyChestProfile = createDefaultPlayerProfile();
-    legacyChestProfile.hunting.shards = 70;
-    legacyChestProfile.hunting.chests = [
-        { id: 1, rarity: "uncommon", openCost: "bad" },
-        "bad",
-        { id: "u1", rarity: "uncommon" }
-    ];
-    const openedLegacy = openHuntingChest(legacyChestProfile, "u1", { rng: () => 0, characterId: FIGHTER_IDS.ARCHER });
-    assert.equal(openedLegacy.opened, true, "openHuntingChest should sanitize legacy storage before resolving");
-    assert.equal(
-        legacyChestProfile.hunting.chests.length,
-        0,
-        "openHuntingChest should keep only remaining valid entries after opening"
-    );
+    const normalizedLoot = normalizeHuntingLoot({
+        shards: "x",
+        enhancementStones: 3.6,
+        chests: [{ id: "legacy" }]
+    });
+    assert.equal(normalizedLoot.shards, 0, "normalizeHuntingLoot should sanitize invalid shard count");
+    assert.equal(normalizedLoot.enhancementStones, 3, "normalizeHuntingLoot should sanitize enhancement stones");
+    assert.equal("chests" in normalizedLoot, false, "normalizeHuntingLoot should discard legacy chest fields");
     console.log("[hunting] ok");
 }
 
@@ -9440,7 +8764,7 @@ async function testHuntingAchievementProgress() {
             ...repeatedVictory,
             floor: 45,
             lastEvent: { type: HUNTING_EVENT_TYPES.PORTAL },
-            pendingLoot: { shards: 0, chests: [createHuntingChest({ rarity: "common" })] }
+            pendingLoot: { shards: 10, enhancementStones: 0, equipment: {} }
         },
         { reason: "retreat" }
     );
@@ -9448,7 +8772,6 @@ async function testHuntingAchievementProgress() {
     assert.equal(stats.monsterKillsByTag[HUNTING_MONSTER_TAGS.MONSTER], 2, "Normal monster kills should persist");
     assert.equal(stats.criticalHpCombatWins, 1, "A battle won from 20% starting HP should persist");
     assert.equal(stats.championVictories, 1, "Champion intrusion victories should persist separately");
-    assert.equal(stats.securedChestCount, 1, "Only secured run chests should count toward the storage achievement");
     assert.equal(stats.bestPortalRetreatFloor, 45, "Portal retreats should keep their highest floor");
     assert.deepEqual(
         stats.visitedStageIds,
@@ -9481,7 +8804,6 @@ async function testHuntingAchievementProgress() {
     profile.hunting.stats = {
         ...stageClearStats,
         deepestFloor: 30,
-        securedChestCount: 2,
         clearedStageIds: Object.values(HUNTING_STAGE_IDS),
         monsterKillsByTag: {
             [HUNTING_MONSTER_TAGS.MONSTER]: 300,
@@ -9514,7 +8836,6 @@ async function testHuntingAchievementProgress() {
             "hunting_critical_hp_win",
             "hunting_portal_retreat_40",
             "hunting_champion_victory",
-            "hunting_secured_chests_10",
             "hunting_all_stages_clear",
             "hunting_monster_codex_complete",
             "hunting_monster_slayer",
@@ -9528,50 +8849,23 @@ async function testHuntingAchievementProgress() {
         (achievement) => achievement.id === "hunting_champion_victory"
     );
     assert.equal(championAchievement.tier, "bronze", "Champion intrusion should remain an introductory achievement");
-    assert.equal(
-        championAchievement.reward.rarity,
-        "common",
-        "Champion intrusion should not bypass its existing shard multiplier with a high-rarity chest"
+    assert.deepEqual(
+        championAchievement.reward,
+        { type: "SHARDS", amount: 15 },
+        "Champion intrusion should grant immediate shards"
     );
     const monsterCodexAchievement = ACHIEVEMENT_DEFINITIONS.find(
         (achievement) => achievement.id === "hunting_monster_codex_complete"
     );
-    assert.equal(monsterCodexAchievement.reward.rarity, "rare", "Monster codex completion should grant a rare chest");
+    assert.deepEqual(
+        monsterCodexAchievement.reward,
+        { type: "SHARDS", amount: 50 },
+        "Monster codex completion should grant immediate shards"
+    );
     assert.deepEqual(
         monsterCodexAchievement.getProgress({ profile, roster: [] }),
         { current: 14, target: 14 },
         "Monster codex achievement should use the count of encountered monster types"
-    );
-    const securedChestAchievement = ACHIEVEMENT_DEFINITIONS.find(
-        (achievement) => achievement.id === "hunting_secured_chests_10"
-    );
-    assert.equal(
-        securedChestAchievement.name,
-        "전리품 회수",
-        "The achievement name should explain its safe-return goal"
-    );
-    assert.equal(
-        securedChestAchievement.description,
-        "사냥터에서 얻은 상자 2개를 보관함으로 무사히 가져오세요.",
-        "The achievement description should say that chests must reach storage"
-    );
-    assert.deepEqual(
-        securedChestAchievement.getProgress({ profile, roster: [] }),
-        { current: 2, target: 2 },
-        "Two secured chests should complete the early safe-return milestone"
-    );
-    const rewardProfile = createDefaultPlayerProfile();
-    const rewardResult = grantAchievementReward(rewardProfile, securedChestAchievement);
-    assert.equal(rewardResult.type, "EQUIPMENT", "Safe-return achievement should grant ready-to-use equipment");
-    assert.equal(
-        Object.keys(rewardProfile.equipment.inventory).length,
-        1,
-        "Safe-return equipment should enter the inventory directly"
-    );
-    assert.equal(
-        rewardProfile.equipment.inventory.health_crystal,
-        1,
-        "Safe-return equipment should map to the HP basic template"
     );
 
     const sanitized = sanitizePlayerProfile({
@@ -9874,7 +9168,7 @@ function testHuntingCombatRelief() {
     const afterCombat = recordHuntingFloorResult(run, {
         hpRemain: 50,
         maxHp: 100,
-        loot: { shards: 0, chests: [] },
+        loot: { shards: 0, equipment: {} },
         combatCleared: true
     });
     assert.equal(
@@ -9887,7 +9181,7 @@ function testHuntingCombatRelief() {
     const afterEvent = recordHuntingFloorResult(afterCombat, {
         hpRemain: 50,
         maxHp: 100,
-        loot: { shards: 10, chests: [] },
+        loot: { shards: 10, equipment: {} },
         consumeStatModifiers: false
     });
     assert.equal(
@@ -16873,15 +16167,10 @@ function testDeveloperCollectionSampleTool() {
 
     assert.equal(result.ok, true, "Collection sample should be created for a valid profile");
     assert.equal(result.itemCount, 6, "Collection sample should provide equipment management coverage");
-    assert.equal(result.chestCount, 3, "Collection sample should provide storage coverage");
     assert.equal(profile.hunting.shards, 800, "Collection sample should fund shop and equipment actions");
     assert.equal(profile.equipment.enhancementStones, 99, "Collection sample should fund enhancement actions");
     assert.equal(profile.equipment.maxInventorySlots, 12, "Collection sample should leave room for fusion output");
-    assert.deepEqual(
-        profile.hunting.chests.map((chest) => chest.rarity),
-        ["common", "rare", "epic"],
-        "Collection sample should use real chest rarity definitions"
-    );
+    assert.equal("chests" in profile.hunting, false, "Collection sample must not recreate chest storage");
     assert.equal(commonItems.length, 3, "Collection sample should provide one complete fusion recipe");
     assert.equal(
         canFuseEquipment(
@@ -17627,9 +16916,8 @@ async function testCreateCollectionHubViewModel() {
     assert.equal(archerItem.masteryLevel, 0, "Tournament wins alone should not advance mastery UI progress");
     assert.equal(vm2.storage.shards, 50, "Collection hub should expose hunting key shards");
     assert.equal(vm2.equipment.shards, 50, "Equipment hub should expose the shard balance used by its actions");
-    assert.equal(vm2.storage.chests.length, 1, "Collection hub should expose hunting chests");
-    assert.equal(vm2.storage.chests[0].canOpen, true, "Collection hub should mark openable chests");
-    assert.equal(vm2.summary.storageChestCount, 1, "Collection summary should count storage chests");
+    assert.equal("chests" in vm2.storage, false, "Collection hub should ignore legacy chest storage");
+    assert.equal("storageChestCount" in vm2.summary, false, "Collection summary should not expose chest counts");
 
     ["attack_sword", "health_crystal", "speed_boots"].forEach((templateId) =>
         addEquipmentQuantity(profile, templateId)
@@ -17651,7 +16939,6 @@ async function testCreateCollectionHubViewModel() {
         3,
         "Template presentation should expose owned quantities"
     );
-    assert.equal(vm2.storage.chests[0].rarityLabel, "uncommon", "Storage UI should use the canonical rarity label");
 
     // 숙련도 레벨이 있으면 masteryItems에 반영
     profile.characterMastery.levels = { archer: 1, orbit: 2, eater: 3 };
@@ -17722,15 +17009,11 @@ function testRewardBalanceConfig() {
         Object.isFrozen(balance.experience.characterLevelProgressions),
         "Character level progressions must come from immutable reward balance"
     );
+    assert.equal("chest" in balance.hunting, false, "Removed chest rewards must not remain in reward balance");
     assert.equal(
-        getChestOpenCost("epic"),
-        balance.hunting.chest.openCosts.epic,
-        "Chest cost must come from reward balance"
-    );
-    assert.equal(
-        balance.hunting.loot.rarityRewards.epic.high_chest,
-        20,
-        "Epic monster special-reward weight must come from centralized reward balance"
+        balance.hunting.loot.equipmentDropChance,
+        0.015,
+        "Basic equipment drop chance must remain in centralized reward balance"
     );
     assert.equal(
         getSellReward("legendary"),
@@ -17834,7 +17117,6 @@ testStartButtonReceivesRemainingStatPoints(app);
 testHuntingUiRouteDisplay();
 await testHuntingEarlyEventUi();
 await testHuntingFirstMoveUiPaintGate();
-testHuntingChestEventStopsAndResumes();
 testHuntingEventPresentationContracts();
 testHuntingBoonShardRewardsScaleWithFloor();
 testHuntingEventHealthInitialization();
@@ -17843,7 +17125,6 @@ testHuntingChampionEventRequiresBattleConfirmation();
 testHuntingAutoAdvanceTimerAndSkip();
 testHuntingPortalAutoAdvanceDelay();
 testHuntingHealthDisplayUsesSharedIntegerGetter();
-await testHuntingChestEventStopsAdvanceLoop();
 testHuntingAdvanceDispatchContract();
 testComponentBridgeEquipmentFunctions();
 await testBattleAppAdoptsPreExistingAlpineAllocation();
@@ -19712,131 +18993,21 @@ testAntiStallFriendlyOnlyNoBurst();
 testAntiStallProjectileHitDoesNotResetTimer();
 
 function testHuntingMerchantOffers() {
-    const run = createHuntingRun({ characterId: FIGHTER_IDS.DASH });
-    const runWithHp = {
-        ...setHuntingRunActiveHealth(run, { hp: 50, maxHp: 100 }),
-        floor: 10,
-        pendingLoot: {
-            shards: 25,
-            chests: [
-                createHuntingChest({ rarity: "common", id: "p1" }),
-                createHuntingChest({ rarity: "rare", id: "p2" })
-            ],
-            enhancementStones: 0
-        },
-        securedLoot: { shards: 0, enhancementStones: 0, chests: [] }
-    };
-
-    const event = { type: HUNTING_EVENT_TYPES.WANDERING_MERCHANT, floor: 10, discountRatio: 0 };
-
-    // Profile with permanent hunting shards
     const profile = createDefaultPlayerProfile();
-    profile.hunting.shards = 200;
+    profile.hunting.shards = 100;
+    const run = setHuntingRunActiveHealth(createHuntingRun({ characterId: FIGHTER_IDS.DASH }), { hp: 40, maxHp: 100 });
+    const event = { type: HUNTING_EVENT_TYPES.WANDERING_MERCHANT, discountRatio: 0.1 };
+    const offers = createMerchantOffers(run, event, profile);
 
-    // ── Generate offers ──
-    const offers = createMerchantOffers(runWithHp, event, profile);
-    assert.equal(offers.length, 3, "Should generate exactly 3 offers");
-    assert.equal(offers[0].type, "repair", "First offer should be repair");
-    assert.equal(offers[1].type, "buy_loot", "Second offer should be buy_loot");
-    assert.equal(offers[2].type, "secure_transport", "Third offer should be secure_transport");
+    assert.equal(offers.length, 1, "Merchant should expose only the repair offer after chest removal");
+    assert.equal(offers[0].type, "repair", "Remaining merchant offer should repair the active hunter");
+    assert.equal(canAffordOffer(offers[0], profile), true, "Repair affordability should use hunting shards");
 
-    // Repair offer details
-    assert.equal(offers[0].disabled, false, "Repair should not be disabled when HP < max");
-    assert.ok(offers[0].cost > 0, "Repair should have a cost");
-    assert.ok(offers[0].healAmount > 0, "Repair should have a heal amount");
-
-    // Buy loot offer
-    assert.equal(offers[1].disabled, false, "Buy loot should not be disabled");
-    assert.ok(offers[1].cost > 0, "Buy loot should have a cost");
-
-    // Secure transport offer - has pending chests
-    assert.equal(offers[2].disabled, false, "Secure transport should be enabled when pending chests exist");
-
-    // ── Discount applies ──
-    const eventDiscounted = { ...event, discountRatio: 0.2 };
-    const discountedOffers = createMerchantOffers(runWithHp, eventDiscounted, profile);
-    assert.ok(discountedOffers[0].cost <= offers[0].cost, "Discount should reduce prices");
-
-    // ── Secure transport disabled when no pending chests ──
-    const runNoPending = { ...runWithHp, pendingLoot: { shards: 0, enhancementStones: 0, chests: [] } };
-    const noChestOffers = createMerchantOffers(runNoPending, event, profile);
-    assert.equal(noChestOffers[2].disabled, true, "Secure transport should be disabled with no pending chests");
-    assert.ok(noChestOffers[2].disabledReason.length > 0, "Disabled offer should have a reason");
-
-    // ── canAffordOffer ──
-    profile.hunting.shards = 0;
-    assert.equal(canAffordOffer(offers[0], profile), false, "Cannot afford with 0 shards");
-    profile.hunting.shards = 200;
-    assert.equal(canAffordOffer(offers[0], profile), true, "Can afford with enough shards");
-
-    // ── Repair offer: spends permanent shards, heals carried HP ──
-    const repairResult = applyMerchantOffer(runWithHp, profile, offers[0]);
-    assert.ok(repairResult !== null, "Repair offer should apply");
-    assert.equal(profile.hunting.shards, 200 - offers[0].cost, "Repair should spend permanent shards");
-    assert.ok(
-        getHuntingRunHealth(repairResult.run).hp > getHuntingRunHealth(runWithHp).hp,
-        "Repair should increase carried HP"
-    );
-    assert.equal(repairResult.result.type, "repair", "Result type should be repair");
-    assert.ok(repairResult.result.healed > 0, "Should have healed positive amount");
-    const toastMsg = formatOfferResultToast(repairResult.result);
-    assert.ok(toastMsg.includes("HP"), "Repair toast should mention HP");
-
-    // ── Buy loot offer: adds unsecured chest ──
-    profile.hunting.shards = 200;
-    const buyResult = applyMerchantOffer(runWithHp, profile, offers[1]);
-    assert.ok(buyResult !== null, "Buy loot offer should apply");
-    assert.equal(profile.hunting.shards, 200 - offers[1].cost, "Buy loot should spend permanent shards");
-    assert.equal(
-        buyResult.run.pendingLoot.chests.length,
-        runWithHp.pendingLoot.chests.length + 1,
-        "Buy loot should add a chest to pendingLoot"
-    );
-    const buyToast = formatOfferResultToast(buyResult.result);
-    assert.ok(buyToast.includes("미확보"), "Buy loot toast should mention 미확보");
-
-    // ── Secure transport offer: moves pending chest to secured loot ──
-    profile.hunting.shards = 200;
-    const secureResult = applyMerchantOffer(runWithHp, profile, offers[2]);
-    assert.ok(secureResult !== null, "Secure transport offer should apply");
-    assert.equal(profile.hunting.shards, 200 - offers[2].cost, "Secure transport should spend permanent shards");
-    assert.equal(
-        secureResult.run.pendingLoot.chests.length,
-        runWithHp.pendingLoot.chests.length - 1,
-        "Secure transport should remove a chest from pendingLoot"
-    );
-    assert.equal(
-        secureResult.run.securedLoot.chests.length,
-        (runWithHp.securedLoot?.chests?.length ?? 0) + 1,
-        "Secure transport should add a chest to securedLoot"
-    );
-    const secureToast = formatOfferResultToast(secureResult.result);
-    assert.ok(secureToast.includes("안전"), "Secure transport toast should mention 안전");
-
-    // ── Purchased offer cannot be applied again ──
-    assert.equal(
-        applyMerchantOffer(runWithHp, profile, { ...offers[0], purchased: true }),
-        null,
-        "Purchased offer should return null"
-    );
-    assert.equal(
-        applyMerchantOffer(setHuntingRunActiveHealth(runWithHp, { hp: 100, maxHp: 100 }), profile, offers[0]),
-        null,
-        "Repair should return null when current run HP is already full"
-    );
-
-    // ── Insufficient shards ──
-    profile.hunting.shards = 1;
-    assert.equal(applyMerchantOffer(runWithHp, profile, offers[1]), null, "Insufficient shards should return null");
-
-    // ── Disabled offer cannot be applied ──
-    profile.hunting.shards = 200;
-    assert.equal(
-        applyMerchantOffer(runNoPending, profile, noChestOffers[2]),
-        null,
-        "Disabled offer should return null"
-    );
-
+    const applied = applyMerchantOffer(run, profile, offers[0]);
+    assert.ok(applied, "Affordable repair offers should apply");
+    assert.ok(getHuntingRunHealth(applied.run).hp > 40, "Repair should restore active hunting HP");
+    assert.ok(formatOfferResultToast(applied.result).length > 0, "Repair should provide a result toast");
+    assert.equal("chest" in applied.result, false, "Merchant results must not recreate chest data");
     console.log("[hunting-merchant] ok");
 }
 
@@ -19855,24 +19026,23 @@ function testHuntingMerchantPurchaseRefreshesUiState() {
         }
     };
     const manager = new HuntingManager(app);
-    const run = createHuntingRun({ characterId: FIGHTER_IDS.RAGE, stageId: HUNTING_STAGE_IDS.CAVE });
+    const run = setHuntingRunActiveHealth(
+        createHuntingRun({ characterId: FIGHTER_IDS.RAGE, stageId: HUNTING_STAGE_IDS.CAVE }),
+        { hp: 40, maxHp: 100 }
+    );
     const offers = createMerchantOffers(run, { type: HUNTING_EVENT_TYPES.WANDERING_MERCHANT }, profile);
     manager._run = { ...run, merchantOffers: offers };
 
-    manager.merchantChoose(1);
+    manager.merchantChoose(0);
 
     assert.notEqual(manager._run.merchantOffers, offers, "Purchased merchant offers should use a new array reference");
-    assert.equal(manager._run.merchantOffers[1].purchased, true, "Purchased merchant offer should be marked complete");
+    assert.equal(manager._run.merchantOffers[0].purchased, true, "Purchased merchant offer should be marked complete");
     assert.equal(
-        overlayStates.at(-1).huntingMerchantOffers[1].purchased,
+        overlayStates.at(-1).huntingMerchantOffers[0].purchased,
         true,
         "Merchant overlay should receive the purchased state for immediate button refresh"
     );
-    assert.equal(
-        manager._run.pendingLoot.chests.length,
-        1,
-        "Merchant chest purchase should still add exactly one unsecured chest"
-    );
+    assert.equal("chests" in manager._run.pendingLoot, false, "Merchant purchases must not recreate chest loot");
     assert.equal(toastCalls, 0, "Merchant purchases should report their result in the merchant screen, not a toast");
     assert.ok(
         overlayStates.at(-1).huntingMerchantResult,
@@ -20310,56 +19480,28 @@ function testHuntingRetreatAwaitsResultConfirmation() {
 }
 
 function testHuntingFormatHelpers() {
-    // ── formatChestRarityCounts ──
-    assert.equal(formatChestRarityCounts([]), "", "Empty chests should produce empty string");
-    assert.equal(formatChestRarityCounts(null), "", "Null chests should produce empty string");
-
-    const chests = [
-        createHuntingChest({ rarity: "common", id: "c1" }),
-        createHuntingChest({ rarity: "rare", id: "r1" }),
-        createHuntingChest({ rarity: "common", id: "c2" })
-    ];
-    const formatted = formatChestRarityCounts(chests);
-    assert.ok(formatted.includes("common 2개"), "Should count common chests");
-    assert.ok(formatted.includes("rare 1개"), "Should count rare chests");
-
-    // ── formatPendingLootSummary ──
-    const summary = formatPendingLootSummary({ shards: 50, chests: [createHuntingChest({ rarity: "common" })], xp: 0 });
-    assert.ok(summary.includes("보유 파편 50"), "Should show shard count");
-    assert.ok(summary.includes("미확보 상자 1개"), "Should show unsecured chest count");
-
-    const noChestSummary = formatPendingLootSummary({ shards: 30, chests: [], xp: 0 });
-    assert.ok(noChestSummary.includes("보유 파편 30"), "Should show shard count without chests");
-    assert.ok(!noChestSummary.includes("미확보"), "Should not mention chests when none exist");
-
-    const stoneSummary = formatPendingLootSummary({ shards: 0, enhancementStones: 2, chests: [], xp: 0 });
-    assert.ok(stoneSummary.includes("2"), "Pending loot summaries must include enhancement stones");
+    const summary = formatPendingLootSummary({
+        shards: 50,
+        enhancementStones: 2,
+        equipment: { attack_sword: 1 }
+    });
+    assert.ok(summary.includes("보유 파편 50"), "Pending loot summary should show shards");
+    assert.ok(summary.includes("2"), "Pending loot summary should show enhancement stones");
+    assert.ok(summary.includes("장비 1개"), "Pending loot summary should show equipment count");
+    assert.equal(summary.includes("상자"), false, "Pending loot summary must not mention chests");
 
     assert.equal(formatPendingLootSummary(null), "", "Null input should return empty");
     assert.equal(
-        formatPendingLootSummary({ shards: 0, chests: [], xp: 0 }),
+        formatPendingLootSummary({ shards: 0, enhancementStones: 0, equipment: {} }),
         "",
-        "Empty pending loot should not hide contextual choice summary"
+        "Empty pending loot should return an empty summary"
     );
 
-    // ── formatDefeatLossText ──
-    const lossText = formatDefeatLossText({
-        shards: 10,
-        chests: [createHuntingChest({ rarity: "common", id: "l1" }), createHuntingChest({ rarity: "rare", id: "l2" })],
-        xp: 0
-    });
-    assert.ok(lossText.includes("파편 10"), "Should show lost shards");
-    assert.ok(lossText.includes("common 1개"), "Should show common chest destroyed");
-    assert.ok(lossText.includes("rare 1개"), "Should show rare chest destroyed");
-
-    const shardOnlyLoss = formatDefeatLossText({ shards: 5, chests: [], xp: 0 });
-    assert.equal(shardOnlyLoss, "파편 5 손실", "Should only mention shards when no chests destroyed");
-
-    const stoneLoss = formatDefeatLossText({ shards: 0, enhancementStones: 2, chests: [], xp: 0 });
-    assert.ok(stoneLoss.includes("2"), "Defeat loss text must include lost enhancement stones");
-
+    const lossText = formatDefeatLossText({ shards: 10, enhancementStones: 2, equipment: {} });
+    assert.ok(lossText.includes("파편 10"), "Defeat loss text should show lost shards");
+    assert.ok(lossText.includes("2"), "Defeat loss text should show lost enhancement stones");
+    assert.equal(lossText.includes("상자"), false, "Defeat loss text must not mention chests");
     assert.equal(formatDefeatLossText(null), "", "Null defeat losses should return empty");
-
     console.log("[hunting-format] ok");
 }
 
@@ -20429,172 +19571,32 @@ function testHuntingCombatText() {
 
 function testHuntingLootHud() {
     const app = {
-        ui: {
-            lastOverlayState: null
-        },
+        ui: { lastOverlayState: null },
         setHuntingOverlayState(data) {
             this.ui.lastOverlayState = data;
         }
     };
-
-    // ── HUD hidden when no run ──
     const manager = new HuntingManager(app);
-    const stateNoRun = manager._getLootHudState();
-    assert.equal(stateNoRun.huntingLootHudVisible, false, "No run: HUD should be hidden");
-    assert.equal(stateNoRun.huntingLootHudShards, 0, "No run: shards should be 0");
-    assert.equal(stateNoRun.huntingLootHudEnhancementStones, 0, "No run: enhancement stones should be 0");
-    assert.equal(stateNoRun.huntingLootHudChests, 0, "No run: chests should be 0");
 
-    // ── HUD hidden when pending loot is empty ──
+    const stateNoRun = manager._getLootHudState();
+    assert.equal(stateNoRun.huntingLootHudVisible, false, "No run should hide the loot HUD");
+    assert.equal("huntingLootHudChests" in stateNoRun, false, "Loot HUD must not expose chest state");
+
     manager._run = createHuntingRun({ characterId: FIGHTER_IDS.DASH });
     const stateEmpty = manager._getLootHudState();
-    assert.equal(stateEmpty.huntingLootHudVisible, false, "Empty pending loot: HUD should be hidden");
-    assert.equal(stateEmpty.huntingLootHudShards, 0, "Empty pending loot: shards should be 0");
-    assert.equal(stateEmpty.huntingLootHudEnhancementStones, 0, "Empty pending loot: enhancement stones should be 0");
-    assert.equal(stateEmpty.huntingLootHudChests, 0, "Empty pending loot: chests should be 0");
+    assert.equal(stateEmpty.huntingLootHudVisible, false, "Empty pending loot should hide the HUD");
 
     manager._run = {
         ...manager._run,
-        pendingLoot: { shards: 0, enhancementStones: 3, chests: [] }
+        pendingLoot: { shards: 12, enhancementStones: 3, equipment: { attack_sword: 1 } }
     };
-    const stateStones = manager._getLootHudState();
-    assert.equal(stateStones.huntingLootHudVisible, true, "Enhancement stones alone must keep the loot HUD visible");
-    assert.equal(
-        stateStones.huntingLootHudEnhancementStones,
-        3,
-        "The loot HUD must display pending enhancement stones"
-    );
-
-    // ── HUD visible with shards only ──
-    manager._run = {
-        ...manager._run,
-        pendingLoot: { shards: 30, enhancementStones: 0, chests: [] }
-    };
-    const stateShards = manager._getLootHudState();
-    assert.equal(stateShards.huntingLootHudVisible, true, "Shards only: HUD should be visible");
-    assert.equal(stateShards.huntingLootHudShards, 30, "Shards only: shards should be 30");
-    assert.equal(stateShards.huntingLootHudChests, 0, "Shards only: chests should be 0");
-
-    // ── HUD visible with shards and chests ──
-    manager._run = {
-        ...manager._run,
-        pendingLoot: {
-            shards: 45,
-            enhancementStones: 4,
-            chests: [
-                createHuntingChest({ rarity: "common", id: "h1" }),
-                createHuntingChest({ rarity: "rare", id: "h2" })
-            ],
-            xp: 0
-        }
-    };
-    const stateBoth = manager._getLootHudState();
-    assert.equal(stateBoth.huntingLootHudVisible, true, "Both: HUD should be visible");
-    assert.equal(stateBoth.huntingLootHudShards, 45, "Both: shards should be 45");
-    assert.equal(stateBoth.huntingLootHudEnhancementStones, 4, "Both: enhancement stones should be 4");
-    assert.equal(stateBoth.huntingLootHudChests, 2, "Both: chests should be 2");
-
-    // ── _setHuntingMoveState includes HUD data ──
-    manager._run = {
-        ...manager._run,
-        pendingLoot: { shards: 12, enhancementStones: 0, chests: [createHuntingChest({ rarity: "common" })] }
-    };
-    manager._setHuntingMoveState({
-        moving: true,
-        step: 1,
-        maxSteps: 5,
-        routeStartFloor: 5,
-        routeEndFloor: 10,
-        message: "이동 중..."
-    });
-    assert.equal(app.ui.lastOverlayState.huntingLootHudVisible, true, "Movement: HUD should be visible");
-    assert.equal(app.ui.lastOverlayState.huntingLootHudShards, 12, "Movement: shards should be 12");
-    assert.equal(app.ui.lastOverlayState.huntingLootHudChests, 1, "Movement: chests should be 1");
-    assert.equal(app.ui.lastOverlayState.huntingMoving, true, "Movement: huntingMoving should be true");
-
-    // ── _stopHuntingMoveForChoice includes HUD data ──
-    manager._stopHuntingMoveForChoice(app, {
-        message: "5층 — 포탈 발견!",
-        canRetreat: true,
-        floor: 5,
-        summary: "포탈 발견 · 현재 5층 · 귀환 또는 10층 전진"
-    });
-    assert.equal(app.ui.lastOverlayState.huntingLootHudVisible, true, "Choice: HUD should be visible");
-    assert.equal(app.ui.lastOverlayState.huntingLootHudShards, 12, "Choice: shards should be 12");
-    assert.equal(app.ui.lastOverlayState.huntingChoiceVisible, true, "Choice: huntingChoiceVisible should be true");
-
-    // ── _stopHuntingMoveForMerchant includes HUD data ──
-    manager._stopHuntingMoveForMerchant(app, {
-        message: "5층 — 떠돌이 상인",
-        floor: 5,
-        offers: [],
-        summary: ""
-    });
-    assert.equal(app.ui.lastOverlayState.huntingLootHudVisible, true, "Merchant: HUD should be visible");
-    assert.equal(app.ui.lastOverlayState.huntingLootHudShards, 12, "Merchant: shards should be 12");
-    assert.equal(app.ui.lastOverlayState.huntingMerchantActive, true, "Merchant: huntingMerchantActive should be true");
-
-    // ── HUD clears when pending loot becomes empty ──
-    manager._run = {
-        ...manager._run,
-        pendingLoot: { shards: 0, enhancementStones: 0, chests: [] }
-    };
-    const stateEmpty2 = manager._getLootHudState();
-    assert.equal(stateEmpty2.huntingLootHudVisible, false, "Empty after having loot: HUD should hide");
-    assert.equal(stateEmpty2.huntingLootHudShards, 0, "Empty after having loot: shards should be 0");
-    assert.equal(
-        stateEmpty2.huntingLootHudEnhancementStones,
-        0,
-        "Empty after having loot: enhancement stones should be 0"
-    );
-    assert.equal(stateEmpty2.huntingLootHudChests, 0, "Empty after having loot: chests should be 0");
-
+    const stateLoot = manager._getLootHudState();
+    assert.equal(stateLoot.huntingLootHudVisible, true, "Current loot should show the HUD");
+    assert.equal(stateLoot.huntingLootHudShards, 12, "HUD should expose pending shards");
+    assert.equal(stateLoot.huntingLootHudEnhancementStones, 3, "HUD should expose pending stones");
+    assert.equal(stateLoot.huntingLootHudEquipment, 1, "HUD should expose pending equipment");
+    assert.equal("huntingLootHudChests" in stateLoot, false, "Visible HUD state must not recreate chest counters");
     console.log("[hunting-loot-hud] ok");
-}
-
-function testHuntingDefeatChestLoss() {
-    const run = createHuntingRun({ characterId: FIGHTER_IDS.DASH });
-    const runWithChests = {
-        ...setHuntingRunActiveHealth(run, { hp: 30, maxHp: 100 }),
-        floor: 5,
-        status: "active",
-        pendingLoot: {
-            shards: 100,
-            chests: [
-                createHuntingChest({ rarity: "common", id: "d1" }),
-                createHuntingChest({ rarity: "rare", id: "d2" })
-            ],
-            xp: 100
-        }
-    };
-
-    // Controlled RNG: probability chain ensures both chests are destroyed
-    const defeated = defeatHuntingRun(runWithChests, {
-        rng: (() => {
-            const seq = [0.01, 0.01, 0.01, 0.01];
-            let i = 0;
-            return () => seq[i++] ?? 0.01;
-        })()
-    });
-
-    assert.equal(defeated.status, "defeated", "Defeat should end the run");
-
-    // Both chests should be in defeatLosses (with high probability rng)
-    if (defeated.defeatLosses.chests.length > 0) {
-        const lossText = formatDefeatLossText(defeated.defeatLosses);
-        assert.ok(typeof lossText === "string" && lossText.length > 0, "Defeat loss text should be non-empty");
-        // Check that text mentions destruction
-        // The text should have 파괴 when chests are destroyed
-        const hasDestroyed = lossText.includes("파괴");
-        const hasShards = lossText.includes("파편");
-        assert.ok(hasShards, "Defeat loss text should mention shard loss");
-        // If chests were destroyed, should mention 파괴
-        if (defeated.defeatLosses.chests.length > 0) {
-            assert.ok(hasDestroyed, "Defeat loss text should mention chest destruction when chests lost");
-        }
-    }
-
-    console.log("[hunting-defeat-chest-loss] ok");
 }
 
 function testHuntingChoiceSummaryKeepsContextWithPendingLoot() {
@@ -20610,7 +19612,8 @@ function testHuntingChoiceSummaryKeepsContextWithPendingLoot() {
     manager._run = {
         pendingLoot: {
             shards: 12,
-            chests: [createHuntingChest({ rarity: "common" })],
+            enhancementStones: 1,
+            equipment: { attack_sword: 1 },
             xp: 0
         }
     };
@@ -20627,8 +19630,8 @@ function testHuntingChoiceSummaryKeepsContextWithPendingLoot() {
         "Choice summary should keep event context"
     );
     assert.ok(
-        app.ui.lastOverlayState.huntingLootSummary.includes("미확보 상자 1개"),
-        "Choice summary should include pending chests"
+        app.ui.lastOverlayState.huntingLootSummary.includes("장비 1개"),
+        "Choice summary should include pending equipment"
     );
 
     console.log("[hunting-choice-summary-context] ok");
@@ -21171,7 +20174,6 @@ testHuntingRetreatAwaitsResultConfirmation();
 testHuntingFormatHelpers();
 testHuntingCombatText();
 testHuntingLootHud();
-testHuntingDefeatChestLoss();
 testHuntingChoiceSummaryKeepsContextWithPendingLoot();
 testBattleBallAppliesSpecHeroCarryover(app);
 testBattleBallMergeHeroOrbCarryoverInto(app);
@@ -21209,7 +20211,7 @@ function testComponentBridgeEquipmentActionsReachProfile() {
     const profile = createDefaultPlayerProfile();
     if (!profile.equipment)
         profile.equipment = { inventory: [], equipped: {}, maxInventorySlots: 5, enhancementStones: 10 };
-    if (!profile.hunting) profile.hunting = { shards: 100, chests: [], stats: {} };
+    if (!profile.hunting) profile.hunting = { shards: 100, stats: {} };
     const app = {
         playerProfile: profile,
         playerFighterId: "archer",
@@ -21299,22 +20301,6 @@ function testCollectionActionPopupOptions() {
     assert.ok(fusion.bodyHtml.includes("파편 300"), "Fusion popup should show the consumed shards");
     assert.equal(fusion.bodyHtml.includes("강화석"), false, "Fusion popup should not mention recovery stones");
 
-    const chest = createCollectionActionPopupOptions("chest", {
-        opened: true,
-        applied: { shards: 0, equipment: item },
-        currentShards: 70
-    });
-    assert.equal(chest.title, "상자 개봉 결과", "Chest reward should use the shared result popup");
-    assert.ok(chest.bodyHtml.includes("테스트 검"), "Chest popup should identify awarded equipment");
-    assert.ok(chest.bodyHtml.includes("(rare)"), "Chest popup should use the canonical rarity label");
-
-    const chestFailure = createCollectionActionPopupOptions("chest", {
-        opened: false,
-        reason: "not_enough_shards",
-        cost: 80
-    });
-    assert.equal(chestFailure.title, "개봉 실패", "Chest failure should use the shared result popup");
-    assert.ok(chestFailure.bodyHtml.includes("80"), "Chest failure should include the required cost when known");
     console.log("[collection-action-popup-options] ok");
 }
 
@@ -21580,69 +20566,12 @@ async function testPopupServiceShowFailsWithoutPopupDialog() {
     }
 }
 
-function testComponentBridgePopupCallsThroughServiceSeam() {
-    const profile = createDefaultPlayerProfile();
-    profile.hunting.shards = 0;
-    profile.hunting.chests = [{ id: "t_chest", rarity: "common", count: 1 }];
-    if (!profile.equipment)
-        profile.equipment = { inventory: [], equipped: {}, maxInventorySlots: 5, enhancementStones: 0 };
-    const app = {
-        playerProfile: profile,
-        playerFighterId: "archer",
-        roster: [{ id: "archer", name: "Archer", title: "Test", color: "#f00" }],
-        _refreshCollectionHub() {},
-        refreshPlayerSetup() {}
-    };
-
-    let popupCalls = [];
-    const origDialog = PopupService._testDialog;
-    PopupService.setTestDialog({
-        show(opts) {
-            popupCalls.push(opts);
-            return Promise.resolve("ok");
-        }
-    });
-
-    try {
-        const bridge = createAppComponentBridge(app);
-        // Failure case - triggers popup
-        bridge.openChest("t_chest");
-        assert.equal(popupCalls.length, 1, "openChest failure should call PopupService.show");
-        assert.ok(popupCalls[0].title.includes("실패"), "failure popup title should indicate failure");
-
-        // expandInventory when already max (typically fails if no shards)
-        const expandResult = bridge.expandInventory();
-        assert.equal(expandResult, false, "expandInventory should fail with no shards");
-        assert.ok(popupCalls.length >= 2, "expandInventory failure should call PopupService.show");
-    } finally {
-        PopupService.setTestDialog(origDialog);
-    }
-    console.log("[component-bridge-popup-service-seam] ok");
-}
-
-async function runNewBridgeTests() {
-    testHuntingManagerNoAppUiMethods(app);
-    testCollectionHubServiceNoBlacklistedRefs();
-    testComponentBridgeOpenChestExists();
-    testComponentBridgeOpenChestFailure();
-    testComponentBridgeOpenChestSuccess();
-    await testActionPickerServiceIdAndConcurrency();
-    await testActionPickerConcurrency();
-    testNoWindowPopupServiceInProductionSource();
-    testGameActionBridgeOpenHelp();
-    testHuntingManagerStaticPopupServiceImport();
-    await testPopupServiceShowFailsWithoutPopupDialog();
-}
-
-await runNewBridgeTests();
-
-// ── CollectionHubService + bridge.openChest regression ─────────────────────
-
 function testCollectionHubServiceNoBlacklistedRefs() {
     const src = readFileSync("src/collectionHubService.js", "utf8");
     const blacklisted = [
         "ballFightApp",
         "openHuntingChest",
+        "openChest",
         "savePlayerProfile",
         "gameBridge",
         "requireGameUIComponent"
@@ -21653,92 +20582,32 @@ function testCollectionHubServiceNoBlacklistedRefs() {
     console.log("[collection-hub-service-no-blacklisted-refs] ok");
 }
 
-function testComponentBridgeOpenChestExists() {
-    const profile = createDefaultPlayerProfile();
-    profile.hunting.chests = [{ id: "test_chest", rarity: "common", count: 1 }];
-    const app = {
-        playerProfile: profile,
+function testComponentBridgeHasNoChestAction() {
+    const bridge = createAppComponentBridge({
+        playerProfile: createDefaultPlayerProfile(),
         playerFighterId: "archer",
         roster: [{ id: "archer", name: "Archer", title: "Test", color: "#f00" }],
         _refreshCollectionHub() {},
         refreshPlayerSetup() {}
-    };
-    const bridge = createAppComponentBridge(app);
-    assert.ok(typeof bridge.openChest === "function", "bridge.openChest should be a function");
-    console.log("[component-bridge-open-chest-exists] ok");
-}
-
-function testComponentBridgeOpenChestFailure() {
-    const profile = createDefaultPlayerProfile();
-    profile.hunting.shards = 0;
-    profile.hunting.chests = [{ id: "test_chest", rarity: "common", count: 1 }];
-    const app = {
-        playerProfile: profile,
-        playerFighterId: "archer",
-        roster: [{ id: "archer", name: "Archer", title: "Test", color: "#f00" }],
-        _refreshCollectionHub() {},
-        refreshPlayerSetup() {}
-    };
-
-    let lastPopup = null;
-    const origDialog = PopupService._testDialog;
-    PopupService.setTestDialog({
-        show(opts) {
-            lastPopup = opts;
-            return Promise.resolve("ok");
-        }
     });
-
-    const bridge = createAppComponentBridge(app);
-    try {
-        const result = bridge.openChest("test_chest");
-        assert.equal(result, false, "openChest should return false when shards insufficient");
-        assert.ok(lastPopup !== null, "openChest failure should show a popup");
-        assert.ok(lastPopup.title.includes("실패"), "failure popup title should indicate failure");
-    } finally {
-        PopupService.setTestDialog(origDialog);
-    }
-    console.log("[component-bridge-open-chest-failure] ok");
+    assert.equal("openChest" in bridge, false, "Component bridge must not expose a chest action");
+    assert.equal("huntingChestContinue" in bridge, false, "Component bridge must not expose chest continuation");
+    console.log("[component-bridge-no-chest-actions] ok");
 }
 
-function testComponentBridgeOpenChestSuccess() {
-    const profile = createDefaultPlayerProfile();
-    profile.hunting.shards = 9999;
-    profile.hunting.chests = [{ id: "test_chest", rarity: "common", count: 1 }];
-    if (!profile.equipment)
-        profile.equipment = { inventory: [], equipped: {}, maxInventorySlots: 5, enhancementStones: 0 };
-    let refreshed = false;
-    const app = {
-        playerProfile: profile,
-        playerFighterId: "archer",
-        roster: [{ id: "archer", name: "Archer", title: "Test", color: "#f00" }],
-        _refreshCollectionHub() {
-            refreshed = true;
-        },
-        refreshPlayerSetup() {}
-    };
-
-    let lastPopup = null;
-    const origDialog = PopupService._testDialog;
-    PopupService.setTestDialog({
-        show(opts) {
-            lastPopup = opts;
-            return Promise.resolve("ok");
-        }
-    });
-
-    const bridge = createAppComponentBridge(app);
-    try {
-        const result = bridge.openChest("test_chest");
-        assert.equal(result, true, "openChest should return true on success");
-        assert.ok(refreshed, "openChest should trigger _refreshCollectionHub");
-        assert.ok(lastPopup !== null, "openChest success should show a popup");
-        assert.ok(lastPopup.title.includes("결과"), "success popup title should indicate result");
-    } finally {
-        PopupService.setTestDialog(origDialog);
-    }
-    console.log("[component-bridge-open-chest-success] ok");
+async function runNewBridgeTests() {
+    testHuntingManagerNoAppUiMethods(app);
+    testCollectionHubServiceNoBlacklistedRefs();
+    testComponentBridgeHasNoChestAction();
+    await testActionPickerServiceIdAndConcurrency();
+    await testActionPickerConcurrency();
+    testNoWindowPopupServiceInProductionSource();
+    testGameActionBridgeOpenHelp();
+    testHuntingManagerStaticPopupServiceImport();
+    await testPopupServiceShowFailsWithoutPopupDialog();
 }
+
+await runNewBridgeTests();
 
 // ── Popup dialog resolver capture regression ─────────────────────────────────
 
@@ -21958,9 +20827,6 @@ async function testHuntingEndToEnd() {
         firstTournamentAt: 100,
         lastTournamentAt: 200
     };
-    const commonChest = createHuntingChest({ id: "c1", rarity: "common", acquiredAt: 1000 });
-    const uncommonChest = createHuntingChest({ id: "u1", rarity: "uncommon", acquiredAt: 1000 });
-    const rareChest = createHuntingChest({ id: "r1", rarity: "rare", acquiredAt: 1000 });
 
     // Start run
     const run = createHuntingRun({ characterId: FIGHTER_IDS.DASH, now: 1000 });
@@ -21982,11 +20848,11 @@ async function testHuntingEndToEnd() {
     const f2Done = recordHuntingFloorResult(f2, {
         hpRemain: 80,
         maxHp: 100,
-        loot: { shards: 20, chests: [commonChest] }
+        loot: { shards: 20, equipment: { attack_sword: 1 } }
     });
     assert.equal(getHuntingRunHealth(f2Done).hp, 80, "HP carryover after combat");
     assert.equal(f2Done.pendingLoot.shards, 20, "Shards should be pending");
-    assert.equal(f2Done.pendingLoot.chests.length, 1, "Chests should be pending");
+    assert.equal(f2Done.pendingLoot.equipment.attack_sword, 1, "Basic equipment should be pending");
 
     // Advance floor 3→4: event outcome (rng=0.5 → splits by event weights)
     const f3 = advanceHuntingRun(f2Done, { rng: () => 0.5 });
@@ -22003,16 +20869,23 @@ async function testHuntingEndToEnd() {
     const f4Done = recordHuntingFloorResult(f4, {
         hpRemain: 60,
         maxHp: 100,
-        loot: { shards: 35, chests: [uncommonChest, rareChest] }
+        loot: { shards: 35, equipment: { health_crystal: 1, speed_boots: 1 } }
     });
     assert.equal(f4Done.pendingLoot.shards, 55, "Shards should accumulate: 20+35=55");
-    assert.equal(f4Done.pendingLoot.chests.length, 3, "3 chests total pending");
+    assert.equal(
+        Object.values(f4Done.pendingLoot.equipment).reduce((sum, count) => sum + count, 0),
+        3
+    );
 
     // Retreat
     const retreated = retreatHuntingRun(f4Done, { now: 2000 });
     assert.equal(retreated.status, "retreated", "Retreat should end run safely");
     assert.equal(retreated.securedLoot.shards, 55, "Retreat secures all pending shards");
-    assert.equal(retreated.securedLoot.chests.length, 3, "Retreat secures all pending chests");
+    assert.equal(
+        Object.values(retreated.securedLoot.equipment).reduce((sum, count) => sum + count, 0),
+        3
+    );
+    assert.equal("chests" in retreated.securedLoot, false, "Retreat must not recreate chest loot");
     assert.equal(retreated.securedLoot.xp, undefined, "XP must be granted at pickup rather than retreat");
 
     console.log("[hunting-end-to-end] ok");
@@ -22318,7 +21191,6 @@ await testPlayerPanelAllocationContractBoundary(app);
 await testActionGateway();
 testUiManagerGameActionBridgeContract();
 await testHuntingEndToEnd();
-await testHuntingChestContinueHandlersContract();
 testHuntingLootBalanceRules();
 testHuntingSplitterDeathFragmentsAndResultGrace(app);
 testHuntingLootItemsRotate();
@@ -22331,12 +21203,6 @@ testHuntingBossRolesAndEnhancementStoneDrops(app);
 testEliteMobCombinationEvent(app);
 testEliteMobEventWeightFloorGate();
 testHuntingLootSessionIsDiscardedOnDefeat(app);
-testHuntingCombatRewardChestUi();
-testHuntingCombatWithoutCollectedChestSkipsChestUi();
-testHuntingCombatRewardChestQueue();
-testHuntingCombatRewardChestNormalContinue();
-testHuntingCombatRewardChestFinalBossContinue();
-await testHuntingChestRoomContinueStillWorks();
 await testNoGameBridgeInProduction();
 function testHuntingMishapAvoidsLowHpRuns() {
     const event = new MishapEvent(HUNTING_EVENT_TYPES.MISHAP);
@@ -26304,8 +25170,13 @@ function testDeepCoreFinalBossContracts() {
     armorBoss.hunting.experienceReward = 100;
     lootController.onFighterDefeated(armorBoss, { simulation: armorSimulation });
     assert.ok(
-        armorSimulation.entities.some((entity) => entity.chest),
-        "Final boss must always create one high-grade chest drop"
+        armorSimulation.entities.some((entity) => entity instanceof EnhancementStoneDrop),
+        "Final boss must create immediate enhancement-stone rewards"
+    );
+    assert.equal(
+        armorSimulation.entities.some((entity) => "chest" in entity),
+        false,
+        "Final boss rewards must not recreate chest entities"
     );
 
     const fighterStrip = readFileSync(new URL("../src/components/fighter-strip.html", import.meta.url), "utf8");

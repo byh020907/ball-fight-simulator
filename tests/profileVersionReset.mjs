@@ -14,7 +14,6 @@ import {
 } from "../src/playerProfile.js";
 import { grantAchievementReward } from "../src/collection/achievementRewards.js";
 import { ACHIEVEMENT_DEFINITIONS } from "../src/collection/achievementDefinitions.js";
-import { openHuntingChest } from "../src/hunting/chestRewards.js";
 import { EQUIPMENT_SPECIAL_OPTION_SUFFIXES } from "../src/hunting/equipmentConfig.js";
 import { getLevelRequirement } from "../src/experience/experienceConfig.js";
 import { getCharacterExperienceSummary } from "../src/experience/experienceService.js";
@@ -296,23 +295,23 @@ assert.deepEqual(
 );
 
 const rewardProfile = createDefaultPlayerProfile();
-const shardReward = grantAchievementReward(rewardProfile, {
+const huntingShardReward = grantAchievementReward(rewardProfile, {
     id: "first_tournament_win",
     grant(handler) {
         return handler.shards(30);
     }
 });
-assert.equal(shardReward.shards, 30);
+assert.equal(huntingShardReward.shards, 30);
 assert.equal(rewardProfile.hunting.shards, 30);
 
-const chestReward = grantAchievementReward(rewardProfile, {
+const shardReward = grantAchievementReward(rewardProfile, {
     id: "comeback_match_win",
     grant(handler) {
-        return handler.chest("uncommon");
+        return handler.shards(30);
     }
 });
-assert.equal(chestReward.chest.rarity, "uncommon");
-assert.equal(rewardProfile.hunting.chests.length, 1);
+assert.equal(shardReward.shards, 30);
+assert.equal(rewardProfile.hunting.shards, 60);
 
 const flawlessAchievement = ACHIEVEMENT_DEFINITIONS.find((achievement) => achievement.id === "flawless_tournament");
 const equipmentReward = grantAchievementReward(rewardProfile, flawlessAchievement);

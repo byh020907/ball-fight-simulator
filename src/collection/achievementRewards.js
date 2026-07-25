@@ -1,11 +1,9 @@
-import { createHuntingChest } from "../hunting/huntingRewards.js";
 import { createGuaranteedEquipmentInstance } from "../hunting/equipmentConfig.js";
 import { getRarityLabel } from "../hunting/rarityPresentation.js";
 import { grantLegacyEquipmentReward } from "../hunting/equipmentLegacyAdapter.js";
 
 export const ACHIEVEMENT_REWARD_TYPES = Object.freeze({
     SHARDS: "SHARDS",
-    CHEST: "CHEST",
     EQUIPMENT: "EQUIPMENT",
     FEATURE_UNLOCK: "FEATURE_UNLOCK"
 });
@@ -25,12 +23,6 @@ export class AchievementRewardHandler {
         const granted = getSafeAmount(amount);
         this.profile.hunting.shards = (this.profile.hunting.shards ?? 0) + granted;
         return { applied: granted > 0, type: ACHIEVEMENT_REWARD_TYPES.SHARDS, shards: granted };
-    }
-
-    chest(rarity = "common") {
-        const chest = createHuntingChest({ rarity });
-        this.profile.hunting.chests.push(chest);
-        return { applied: true, type: ACHIEVEMENT_REWARD_TYPES.CHEST, chest };
     }
 
     equipment(specification) {
@@ -59,7 +51,6 @@ export function grantAchievementReward(profile, achievement, options) {
 export function formatAchievementReward(reward) {
     if (!reward) return "";
     if (reward.type === ACHIEVEMENT_REWARD_TYPES.SHARDS) return `파편 +${getSafeAmount(reward.amount)}`;
-    if (reward.type === ACHIEVEMENT_REWARD_TYPES.CHEST) return `${getRarityLabel(reward.rarity)} 상자`;
     if (reward.type === ACHIEVEMENT_REWARD_TYPES.EQUIPMENT) return `${getRarityLabel(reward.rarity)} 확정 장비`;
     if (reward.type === ACHIEVEMENT_REWARD_TYPES.FEATURE_UNLOCK) return reward.payload?.description ?? "";
     return "";

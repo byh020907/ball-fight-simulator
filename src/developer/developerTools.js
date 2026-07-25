@@ -1,7 +1,6 @@
 import { getLevelRequirement } from "../experience/experienceConfig.js";
 import { getCharacterExperienceSummary } from "../experience/experienceService.js";
 import { applyTournamentReport, createTournamentReport } from "../collection/index.js";
-import { createHuntingChest } from "../hunting/huntingRewards.js";
 import { createEquipmentInstance, equipEquipmentItem } from "../hunting/equipmentConfig.js";
 import { CHARACTER_DEFINITIONS } from "../characters/characterRegistry.js";
 import { isHiddenCharacterId } from "../characterAvailability.js";
@@ -17,7 +16,6 @@ const DEBUG_COLLECTION_SAMPLE_ITEMS = Object.freeze([
     { rarity: "epic", slot: "accessory" },
     { rarity: "legendary", slot: "accessory" }
 ]);
-const DEBUG_COLLECTION_SAMPLE_CHESTS = Object.freeze(["common", "rare", "epic"]);
 const DEBUG_COLLECTION_SAMPLE_SHARDS = 800;
 const DEBUG_COLLECTION_SAMPLE_STONES = 99;
 const DEBUG_COLLECTION_SAMPLE_INVENTORY_SLOTS = 12;
@@ -32,7 +30,6 @@ function createDebugSampleRng(seed) {
 
 function ensureCollectionStorage(profile) {
     if (!profile?.hunting || !profile?.equipment) return null;
-    profile.hunting.chests ||= [];
     profile.equipment.inventory ||= [];
     profile.equipment.equipped ||= { weapon: null, armor: null, accessory1: null, accessory2: null };
     return { hunting: profile.hunting, equipment: profile.equipment };
@@ -119,11 +116,7 @@ export function seedDeveloperCollectionSample(profile, characterId) {
     const items = DEBUG_COLLECTION_SAMPLE_ITEMS.map((definition, index) =>
         createEquipmentInstance({ ...definition, rng: createDebugSampleRng(index + 1) })
     );
-    const chests = DEBUG_COLLECTION_SAMPLE_CHESTS.map((rarity, index) =>
-        createHuntingChest({ rarity, id: `debug-collection-${rarity}-${index}` })
-    );
     storage.hunting.shards = DEBUG_COLLECTION_SAMPLE_SHARDS;
-    storage.hunting.chests = chests;
     storage.equipment.inventory = items;
     storage.equipment.equipped = {
         weapon: null,
@@ -141,7 +134,6 @@ export function seedDeveloperCollectionSample(profile, characterId) {
         ok: true,
         characterId,
         itemCount: items.length,
-        chestCount: chests.length,
         shards: storage.hunting.shards,
         enhancementStones: storage.equipment.enhancementStones
     };

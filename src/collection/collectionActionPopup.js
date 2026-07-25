@@ -73,36 +73,6 @@ function createEnhancePopup(result) {
     );
 }
 
-function createChestPopup(result) {
-    if (!result?.opened) {
-        const failureMessages = {
-            not_enough_shards: `파편이 부족합니다. (필요: ${result?.cost ?? 0})`,
-            inventory_full: "장비 인벤토리가 가득 찼습니다. 장비를 판매하거나 인벤토리를 확장해 주세요.",
-            not_found: "상자를 찾을 수 없습니다.",
-            missing_storage: "보관함 정보를 불러올 수 없습니다."
-        };
-        return createPopup(
-            "개봉 실패",
-            `<p>${failureMessages[result?.reason] ?? "알 수 없는 오류가 발생했습니다."}</p>`
-        );
-    }
-
-    const rewardLines = [];
-    if ((result.applied?.shards ?? 0) > 0) {
-        rewardLines.push(`<p>파편 +${result.applied.shards} (보유: ${result.currentShards ?? 0})</p>`);
-    }
-    if (result.applied?.equipment) {
-        rewardLines.push(formatEquipmentReward(result.applied.equipment));
-    }
-    if (result.applied?.autoEquip?.equipped) {
-        rewardLines.push("<p><strong>현재 캐릭터에게 자동 장착했습니다.</strong></p>");
-    }
-    if (rewardLines.length === 0) {
-        rewardLines.push("<p>상자를 열었습니다.</p>");
-    }
-    return createPopup("상자 개봉 결과", rewardLines.join(""));
-}
-
 function createFusionPopup(result) {
     if (result?.error) {
         const failureMessages = {
@@ -142,9 +112,6 @@ export function createCollectionActionPopupOptions(action, result) {
             "강화 단계 복구",
             `<p><strong>${formatEquipmentName(result?.item)}</strong>을 +${result?.newLevel ?? 0} 단계로 복구했습니다.</p><p>강화석 -${result?.stones ?? 0}</p>`
         );
-    }
-    if (action === "chest") {
-        return createChestPopup(result);
     }
     if (action === "fusion") {
         return createFusionPopup(result);

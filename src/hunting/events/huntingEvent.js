@@ -4,7 +4,6 @@ export const HUNTING_EVENT_TRANSITIONS = Object.freeze({
     CONTINUE: "continue",
     CHOICE: "choice",
     MERCHANT: "merchant",
-    CHEST: "chest",
     BATTLE: "battle"
 });
 

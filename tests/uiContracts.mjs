@@ -44,14 +44,6 @@ function testDisabledHuntingUiIsNotMounted() {
     console.log("[disabled-hunting-ui-not-mounted] ok");
 }
 
-function testHuntingChestIconReuseContract() {
-    const chestIcon = readSource("src/components/chest-icon.html");
-    const overlay = readSource("src/components/hunting-overlay.html");
-    assert.ok(chestIcon.includes('chest-icon[data-rarity="rare"]'), "Chest icon should own rarity color variants");
-    assert.ok(overlay.includes("<chest-icon"), "Hunting chest event should render the shared chest icon");
-    console.log("[hunting-chest-icon-reuse] ok");
-}
-
 function testCollectionEquipmentPanelsOwnTheirFlows() {
     const collectionHub = readSource("src/components/collection-hub.html");
     const equipmentPanel = readSource("src/components/collection-equipment-panel.html");
@@ -941,26 +933,8 @@ function testAlpineTemplateUiManagerContracts() {
 function testHuntingOverlayActionContracts() {
     const overlay = readSource("src/components/hunting-overlay.html");
     const bridge = readSource("src/componentBridge.js");
-    assert.ok(
-        overlay.includes("huntingChestConfirmLabel"),
-        "Hunting chest confirmation label must remain local overlay state"
-    );
-    assert.ok(
-        overlay.includes('huntingChestConfirmLabel: ""'),
-        "Hunting chest confirmation label must initialize empty"
-    );
-    assert.ok(
-        overlay.includes('this.huntingChestConfirmLabel = ""'),
-        "Hunting reset must clear the chest confirmation label"
-    );
-    assert.ok(
-        overlay.includes("data.huntingChestConfirmLabel !== undefined"),
-        "Hunting state updates must accept the chest confirmation label"
-    );
-    assert.ok(
-        overlay.includes("huntingChestConfirmLabel || '계속 전진'"),
-        "Chest button must retain its fallback label"
-    );
+    assert.equal(overlay.toLowerCase().includes("chest"), false, "Hunting overlay must not expose chest state");
+    assert.equal(bridge.includes("huntingChestContinue"), false, "Component bridge must not expose chest continuation");
     assert.ok(overlay.includes("huntingEventActive: false"), "Hunting event result must initialize its local state");
     assert.ok(overlay.includes("this.huntingEventActive = false"), "Hunting reset must clear the event result state");
     assert.ok(
@@ -1265,7 +1239,7 @@ function testResultOverlayLayoutContract() {
     }
     const huntingFrameRule =
         huntingOverlay.match(
-            /:scope\.hunting-choice-active \.hunting-overlay-frame,\s*:scope\.hunting-chest-active \.hunting-overlay-frame,\s*:scope\.hunting-event-active \.hunting-overlay-frame,\s*:scope\.hunting-battle-preparation-active \.hunting-overlay-frame\s*\{([^}]*)\}/s
+            /:scope\.hunting-choice-active \.hunting-overlay-frame,\s*:scope\.hunting-event-active \.hunting-overlay-frame,\s*:scope\.hunting-battle-preparation-active \.hunting-overlay-frame\s*\{([^}]*)\}/s
         )?.[1] ?? "";
     assert.match(
         huntingFrameRule,
@@ -1279,7 +1253,7 @@ function testResultOverlayLayoutContract() {
     );
     const huntingCardRule =
         huntingOverlay.match(
-            /:scope\.hunting-choice-active \.hunting-overlay-card,\s*:scope\.hunting-chest-active \.hunting-overlay-card,\s*:scope\.hunting-event-active \.hunting-overlay-card,\s*:scope\.hunting-battle-preparation-active \.hunting-overlay-card\s*\{([^}]*)\}/s
+            /:scope\.hunting-choice-active \.hunting-overlay-card,\s*:scope\.hunting-event-active \.hunting-overlay-card,\s*:scope\.hunting-battle-preparation-active \.hunting-overlay-card\s*\{([^}]*)\}/s
         )?.[1] ?? "";
     assert.match(
         huntingCardRule,
@@ -1445,15 +1419,14 @@ function testFluidModalLayoutContracts() {
 
     const huntingCardRule =
         huntingOverlay.match(
-            /:scope\.hunting-choice-active \.hunting-overlay-card,\s*:scope\.hunting-chest-active \.hunting-overlay-card,\s*:scope\.hunting-event-active \.hunting-overlay-card,\s*:scope\.hunting-battle-preparation-active \.hunting-overlay-card\s*\{([^}]*)\}/s
+            /:scope\.hunting-choice-active \.hunting-overlay-card,\s*:scope\.hunting-event-active \.hunting-overlay-card,\s*:scope\.hunting-battle-preparation-active \.hunting-overlay-card\s*\{([^}]*)\}/s
         )?.[1] ?? "";
     assert.match(
         huntingCardRule,
         /min-height:\s*0;[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;[\s\S]*overflow:\s*hidden;/,
         "Hunting event cards must pass their available height to internal content instead of relying on a viewport-specific card size"
     );
-    const eventLayoutRule =
-        huntingOverlay.match(/\.hunting-chest-event,\s*\.hunting-event-result\s*\{([^}]*)\}/s)?.[1] ?? "";
+    const eventLayoutRule = huntingOverlay.match(/\.hunting-event-result\s*\{([^}]*)\}/s)?.[1] ?? "";
     assert.match(
         eventLayoutRule,
         /display:\s*grid;[\s\S]*grid-template-rows:\s*minmax\(0, 1fr\) auto;[\s\S]*min-height:\s*0;/,
@@ -1495,7 +1468,7 @@ function testFluidModalLayoutContracts() {
     );
     const autoAdvanceInFrameRule =
         huntingOverlay.match(
-            /:scope\.hunting-choice-active \.hunting-auto-advance,\s*:scope\.hunting-chest-active \.hunting-auto-advance,\s*:scope\.hunting-event-active \.hunting-auto-advance,\s*:scope\.hunting-battle-preparation-active \.hunting-auto-advance\s*\{([^}]*)\}/s
+            /:scope\.hunting-choice-active \.hunting-auto-advance,\s*:scope\.hunting-event-active \.hunting-auto-advance,\s*:scope\.hunting-battle-preparation-active \.hunting-auto-advance\s*\{([^}]*)\}/s
         )?.[1] ?? "";
     assert.match(
         autoAdvanceInFrameRule,
@@ -1842,7 +1815,6 @@ function testNearestEnemyCombatControlUiContract() {
 
 testDailyShopPopupContract();
 testDisabledHuntingUiIsNotMounted();
-testHuntingChestIconReuseContract();
 testCollectionEquipmentPanelsOwnTheirFlows();
 testEquipmentCheckpointPresentation();
 testRecipeTreePresentation();

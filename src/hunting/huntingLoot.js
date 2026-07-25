@@ -2,7 +2,7 @@ import { Vector2 } from "../core.js";
 import { createHuntingLootItem } from "../entities/huntingLootRegistry.js";
 import { getCombatMovementSpeed } from "../physics/magneticAttraction.js";
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
-import { createEmptyHuntingLoot, createHuntingChest } from "./huntingRewards.js";
+import { createEmptyHuntingLoot } from "./huntingRewards.js";
 import { HUNTING_MAX_FLOOR } from "./huntingConfig.js";
 import { EQUIPMENT_TEMPLATES } from "./equipmentTemplates.js";
 import {
@@ -18,8 +18,6 @@ export const HUNTING_LOOT_ITEM_TYPES = Object.freeze({
     SMALL_HEAL_PACK: "small_heal_pack",
     SHARD: "shard",
     SHARD_BUNDLE: "shard_bundle",
-    CHEST: "chest",
-    HIGH_CHEST: "high_chest",
     ENHANCEMENT_STONE: "enhancement_stone",
     EXPERIENCE: "experience",
     EQUIPMENT: "equipment"
@@ -129,14 +127,10 @@ export function getHuntingBonusLootWeights({ collector, rarity = "common" } = {}
     const healWeight =
         normalWeights.small_heal_pack.minimum +
         (normalWeights.small_heal_pack.maximum - normalWeights.small_heal_pack.minimum) * missingHpRatio;
-    const chestWeight = normalWeights.chest;
     const rewardWeights = LOOT_CONFIG.rarityRewards[rarity] ?? LOOT_CONFIG.rarityRewards.common;
-    const remainingWeight = 100 - rewardWeights.shard_bundle - rewardWeights.high_chest;
     return {
-        [HUNTING_LOOT_ITEM_TYPES.SMALL_HEAL_PACK]: (healWeight * remainingWeight) / 100,
-        [HUNTING_LOOT_ITEM_TYPES.CHEST]: (chestWeight * remainingWeight) / 100,
-        [HUNTING_LOOT_ITEM_TYPES.SHARD_BUNDLE]: rewardWeights.shard_bundle,
-        [HUNTING_LOOT_ITEM_TYPES.HIGH_CHEST]: rewardWeights.high_chest
+        [HUNTING_LOOT_ITEM_TYPES.SMALL_HEAL_PACK]: healWeight,
+        [HUNTING_LOOT_ITEM_TYPES.SHARD_BUNDLE]: rewardWeights.shard_bundle
     };
 }
 
@@ -147,14 +141,6 @@ export function rollHuntingShardBundleAmount({ floor = 1, rarity = "rare", rng =
         rng
     );
     return roundHuntingLootValue(getHuntingShardBaseAmount(floor) * Number(multiplier));
-}
-
-export function rollHighChestRarity({ rarity = "rare", rng = Math.random } = {}) {
-    const rarities = LOOT_CONFIG.highChest.rarities[rarity] ?? LOOT_CONFIG.highChest.rarities.rare;
-    return rollWeightedEntries(
-        rarities.map(({ rarity: chestRarity, weight }) => [chestRarity, weight]),
-        rng
-    );
 }
 
 export function rollHuntingBonusLootItemType({
@@ -187,12 +173,6 @@ function getLootAmount(type, { collector, floor, rarity, rng, lootMultiplier }) 
     return undefined;
 }
 
-function createLootChest(type, rarity, rng) {
-    if (type !== HUNTING_LOOT_ITEM_TYPES.CHEST && type !== HUNTING_LOOT_ITEM_TYPES.HIGH_CHEST) return null;
-    const chestRarity = type === HUNTING_LOOT_ITEM_TYPES.HIGH_CHEST ? rollHighChestRarity({ rarity, rng }) : "common";
-    return createHuntingChest({ rarity: chestRarity });
-}
-
 function createHuntingLootEntity({
     type,
     fighter,
@@ -215,7 +195,6 @@ function createHuntingLootEntity({
         collectionGraceDuration: LOOT_CONFIG.magnet.collectionGraceDuration,
         life: LOOT_CONFIG.itemLife,
         amount: amount ?? getLootAmount(type, { collector, floor, rarity, rng, lootMultiplier }),
-        chest: createLootChest(type, rarity, rng),
         templateId,
         onCollected
     });
@@ -241,9 +220,6 @@ export class HuntingBattleLootSession {
         if (reward.type === HUNTING_LOOT_ITEM_TYPES.EXPERIENCE) {
             this._collectedExperience += Math.max(0, Math.round(reward.amount ?? 0));
         }
-        if (reward.type === HUNTING_LOOT_ITEM_TYPES.CHEST && reward.chest) {
-            this._collectedLoot.chests.push(reward.chest);
-        }
         if (reward.type === HUNTING_LOOT_ITEM_TYPES.EQUIPMENT && reward.templateId) {
             const id = reward.templateId;
             const current = this._collectedLoot.equipment[id] ?? 0;
@@ -256,7 +232,6 @@ export class HuntingBattleLootSession {
         return {
             shards: this._collectedLoot.shards,
             enhancementStones: this._collectedLoot.enhancementStones,
-            chests: [...this._collectedLoot.chests],
             equipment: { ...this._collectedLoot.equipment }
         };
     }
@@ -345,10 +320,7 @@ export class HuntingLootDropController {
                 { templateId: equipmentDrop }
             );
         }
-        const finalBossChest = fighter.hunting.isFinalBoss
-            ? this._spawnLootItem(HUNTING_LOOT_ITEM_TYPES.HIGH_CHEST, fighter, collector, "epic", 1, simulation)
-            : null;
-        return shards[0] ?? experience[0] ?? enhancementStones[0] ?? finalBossChest ?? null;
+        return shards[0] ?? experience[0] ?? enhancementStones[0] ?? null;
     }
 
     _spawnGuaranteedShardDrops(fighter, collector, rarity, lootMultiplier, simulation) {

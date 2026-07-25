@@ -56,7 +56,7 @@ equipment: {
 - `getEquipmentRecipePreview(profile, templateId)` / `craftEquipmentTemplate(profile, templateId)`
 - `sortEquipmentInventory(profile)`, `getEquippedEquipmentTemplates(profile)`, `getEquippedEquipmentStats(profile)`
 
-기존 상자·업적 보상이 새 UI로 옮겨가기 전에는 `src/hunting/equipmentLegacyAdapter.js`가 레거시 보상 객체를 기초 템플릿 수량으로 한 번 변환한다. 이 adapter는 레거시 인스턴스나 무작위 장비를 새 인벤토리에 만들지 않는다.
+기존 업적 보상이 새 UI로 옮겨가기 전에는 `src/hunting/equipmentLegacyAdapter.js`가 레거시 보상 객체를 기초 템플릿 수량으로 한 번 변환한다. 이 adapter는 레거시 인스턴스나 무작위 장비를 새 인벤토리에 만들지 않는다.
 
 ## 컬렉션 장비 화면
 

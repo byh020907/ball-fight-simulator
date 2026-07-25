@@ -1,6 +1,6 @@
 # 도감 및 업적 시스템
 
-> 보상 정책: 업적은 파편, 상자, 확정 장비, 기능 해금 같은 수집 보상만 제공한다. `extraStatPoints`, `balanceTolerance`, `perStatCapBonus` 같은 직접 전투 스탯 보상은 제공하지 않는다. 상세 기준은 [성장 책임 기준](progression-responsibilities.md)을 따른다.
+> 보상 정책: 업적은 파편, 확정 기초 장비, 기능 해금 같은 수집 보상만 제공한다. `extraStatPoints`, `balanceTolerance`, `perStatCapBonus` 같은 직접 전투 스탯 보상은 제공하지 않는다. 상세 기준은 [성장 책임 기준](progression-responsibilities.md)을 따른다.
 
 > 상태: 구현 완료 (`v0.12.0`)
 > 기준 코드: 현재 `main`
@@ -156,7 +156,6 @@ Hero Orb의 체력 증가처럼 전투 중 `maxHp`가 바뀔 수 있으므로 �
     },
     hunting: {
         shards: 0,
-        chests: [],
         unlockedStageIds: ["cave"],
         selectedStageId: "cave",
         stats: {}
@@ -375,9 +374,9 @@ simulation.recordActionSuccess(playerBall, actionId);
 
 업적 보상은 선택 사항입니다. 보상이 없는 업적도 허용합니다.
 
-- 현재 보상 타입은 파편, 상자, 확정 장비, 기능 해금입니다.
+- 현재 보상 타입은 파편, 확정 기초 장비, 기능 해금입니다.
 - 보상 적용은 업적 판정 함수가 직접 수행하지 않습니다.
-- 확정 장비 지급 시 인벤토리가 가득 차 있으면 개봉 비용 0인 상자로 변환합니다.
+- 확정 장비는 인벤토리에 즉시 추가하며, 중간·완성 장비는 업적 보상으로 지급하지 않습니다.
 - 직접 전투 스탯, 스탯 배분 상한, 밸런스 허용치를 업적 보상으로 지급하지 않습니다.
 
 ## 11. UI
@@ -443,22 +442,19 @@ simulation.recordActionSuccess(playerBall, actionId);
 
 | ID | 게임용 문구 | 조건 | 보상 |
 | --- | --- | --- | --- |
-| `hunting_depth_30` | 심층 탐사자 | 사냥터 30층 도달 | common 상자 |
-| `hunting_critical_hp_win` | 위기 돌파 | 전투 시작 시 HP 20% 이하로 승리 | uncommon 상자 |
-| `hunting_portal_retreat_40` | 무사 귀환 | 40층 이상에서 포탈 귀환 | uncommon 상자 |
-| `hunting_champion_victory` | 난입 저지 | 챔피언 난입 전투 승리 | common 상자 |
-| `hunting_secured_chests_10` | 전리품 회수 | 사냥터에서 얻은 상자 2개를 보관함으로 무사히 가져오기 | uncommon 고정 방어구 |
-| `hunting_all_stages_clear` | 전 지역 제패 | 동굴·숲·사막 최종 보스 모두 처치 | epic 상자 |
-| `hunting_monster_slayer` | 몹 학살자 | 사냥터 몬스터 300마리 처치 | common 상자 |
-| `hunting_rare_monster_slayer` | uncommon 몹 학살자 | uncommon 몬스터 100마리 처치 | uncommon 상자 |
-| `hunting_unique_monster_slayer` | rare 몹 학살자 | rare 몬스터 75마리 처치 | rare 상자 |
-| `hunting_epic_monster_slayer` | epic 몹 학살자 | epic 몬스터 50마리 처치 | epic 상자 |
+| `hunting_depth_30` | 심층 탐사자 | 사냥터 30층 도달 | 파편 20 |
+| `hunting_critical_hp_win` | 위기 돌파 | 전투 시작 시 HP 20% 이하로 승리 | 파편 30 |
+| `hunting_portal_retreat_40` | 무사 귀환 | 40층 이상에서 포탈 귀환 | 파편 30 |
+| `hunting_champion_victory` | 난입 저지 | 챔피언 난입 전투 승리 | 파편 15 |
+| `hunting_all_stages_clear` | 전 지역 제패 | 동굴·숲·사막 최종 보스 모두 처치 | 파편 80 |
+| `hunting_monster_slayer` | 몹 학살자 | 사냥터 몬스터 300마리 처치 | 파편 15 |
+| `hunting_rare_monster_slayer` | uncommon 몹 학살자 | uncommon 몬스터 100마리 처치 | 파편 25 |
+| `hunting_unique_monster_slayer` | rare 몹 학살자 | rare 몬스터 75마리 처치 | 파편 40 |
+| `hunting_epic_monster_slayer` | epic 몹 학살자 | epic 몬스터 50마리 처치 | 파편 60 |
 
 희귀도별 업적 ID는 기존 저장 프로필과의 호환을 위해 유지하지만, 사용자 문구와 판정 태그는 장비 체계와 같은 `uncommon`·`rare`·`epic`을 사용합니다. 프로필 정리 시 기존 `rarity:unique` 진행은 새 `rarity:rare`로 옮기고, 기존 `rarity:rare` 진행은 새 `rarity:uncommon`에도 보존해 업데이트로 처치 기록을 잃지 않습니다.
 
-챔피언 난입은 100층 조우 생성기 1,000회 측정에서 원정당 평균 약 3.42회 발생하고, 전투 보상도 파편 1.5배를 이미 제공합니다. 그래서 첫 난입 승리 업적은 `bronze` 등급의 common 상자로 두어 난입을 이기는 재미는 남기되 고등급 장비 상자를 우회 지급하지 않습니다.
-
-전리품 회수는 상자를 발견하는 것만으로는 달성되지 않고, 포탈 귀환이나 스테이지 클리어 뒤 상자가 실제 보관함에 들어와야 누적됩니다. 10층·20층·30층까지의 상자 확보 기회는 평균 약 0.99·1.99·3.03개라서 목표를 2개로 두고, 개봉비가 필요한 상자나 소량 파편 대신 `귀환자의 완충 갑옷`을 즉시 인벤토리에 지급합니다. 이 장비는 HP +20, 방어 +1의 uncommon 고정 방어구로 다음 원정의 생존을 돕습니다.
+사냥터 업적은 조건 달성 즉시 정해진 파편을 지급합니다. 보상 컨테이너나 별도 개봉 단계는 만들지 않으며, 장비 성장의 중간·완성 단계는 조합 트리만 담당합니다.
 
 ## 15. 후속 결정
 

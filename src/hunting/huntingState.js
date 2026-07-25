@@ -28,8 +28,6 @@ export const HUNTING_RUN_PHASES = Object.freeze({
     AWAITING_EVENT: "awaiting_event",
     AWAITING_CHOICE: "awaiting_choice",
     AWAITING_MERCHANT: "awaiting_merchant",
-    AWAITING_CHEST: "awaiting_chest",
-    AWAITING_COMBAT_REWARD_CHEST: "awaiting_combat_reward_chest",
     AWAITING_BATTLE_PREPARATION: "awaiting_battle_preparation",
     COMBAT: "combat",
     FINISHED: "finished"
@@ -40,7 +38,6 @@ function cloneLoot(loot = createEmptyHuntingLoot()) {
     return {
         shards: normalized.shards,
         enhancementStones: normalized.enhancementStones,
-        chests: normalized.chests,
         equipment: { ...normalized.equipment }
     };
 }
@@ -101,6 +98,7 @@ export function createHuntingRun({
         statModifiers: [],
         pendingLoot: createEmptyHuntingLoot(),
         securedLoot: createEmptyHuntingLoot(),
+        defeatLosses: null,
         lastEvent: null,
         lastEncounter: null,
         combatReliefFloors: 0,

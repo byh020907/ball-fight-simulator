@@ -1,4 +1,3 @@
-import { openHuntingChest } from "./hunting/chestRewards.js";
 import {
     buyDailyShopEquipment as purchaseDailyShopEquipment,
     rerollDailyShop as refreshDailyShopOffer
@@ -12,7 +11,6 @@ import {
 import { PopupService } from "./popup.js";
 import { HELP_TITLE, HELP_CONTENT } from "./helpContent.js";
 import { CollectionHubService } from "./collectionHubService.js";
-import { createCollectionActionPopupOptions } from "./collection/collectionActionPopup.js";
 import { beginRebirth, completeRebirth, toggleRebirthCardEquip } from "./rebirth/rebirthService.js";
 import {
     recordDeveloperTournamentWin,
@@ -100,12 +98,6 @@ export function createComponentBridge(app) {
         },
         huntingAdvance() {
             return app.hunting.advance({ waitForFirstMoveUi: true });
-        },
-        huntingChestContinue() {
-            return app.hunting.chestContinue();
-        },
-        huntingContinueCharacterUnlockResult() {
-            return app.hunting.continueCharacterUnlockResult();
         },
         huntingEventContinue() {
             return app.hunting.eventContinue();
@@ -301,18 +293,6 @@ export function createComponentBridge(app) {
             return result;
         },
 
-        // ── Chest actions ──
-        openChest(chestId) {
-            const profile = app.playerProfile;
-            if (!profile?.hunting) return false;
-
-            const result = openHuntingChest(profile, chestId, { characterId: app.playerFighterId });
-            if (result.opened) {
-                refreshCollectionAndProfile();
-            }
-            PopupService.show(createCollectionActionPopupOptions("chest", result));
-            return result.opened;
-        },
         buyDailyShopEquipment(templateId) {
             const result = purchaseDailyShopEquipment(app.playerProfile, templateId);
             if (result.ok) refreshCollectionAndProfile();

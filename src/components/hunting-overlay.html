@@ -11,7 +11,6 @@
     x-transition:leave-end="hunting-overlay-leave-end"
     x-bind:class="{
         'hunting-choice-active': huntingChoiceVisible && !huntingCombatResultActive && !huntingMoving,
-        'hunting-chest-active': huntingChestEventActive,
         'hunting-event-active': huntingEventActive,
         'hunting-battle-preparation-active': huntingBattlePreparationActive,
         'hunting-moving': huntingMoving,
@@ -89,22 +88,6 @@
                         포탈 귀환
                     </button>
                     <button class="hunting-btn advance" type="button" @click="huntingAdvance()">10층 전진</button>
-                </div>
-            </div>
-
-            <div class="hunting-chest-event" x-show="huntingChestEventActive">
-                <div class="hunting-event-scroll-body">
-                    <chest-icon class="hunting-chest-token" x-bind:data-rarity="huntingChestRarity"></chest-icon>
-                    <strong x-text="huntingChestTitle"></strong>
-                    <span class="hunting-chest-loot" x-text="huntingLootSummary"></span>
-                </div>
-                <div class="hunting-event-actions">
-                    <button
-                        class="hunting-btn advance"
-                        type="button"
-                        @click="huntingChestContinue()"
-                        x-text="huntingChestConfirmLabel || '계속 전진'"
-                    ></button>
                 </div>
             </div>
 
@@ -203,7 +186,6 @@
                 x-show="huntingLootHudEnhancementStones > 0"
                 x-text="' · 강화석 ' + huntingLootHudEnhancementStones"
             ></span>
-            <span x-show="huntingLootHudChests > 0" x-text="' · 상자 ' + huntingLootHudChests"></span>
             <span x-show="huntingLootHudEquipment > 0" x-text="' · 장비 ' + huntingLootHudEquipment"></span>
         </span>
     </div>
@@ -232,10 +214,6 @@
         huntingCombatResultTotal: 2,
         huntingCharacterUnlock: null,
         huntingResultContinueVisible: false,
-        huntingChestEventActive: false,
-        huntingChestRarity: "common",
-        huntingChestTitle: "",
-        huntingChestConfirmLabel: "",
         huntingEventActive: false,
         huntingEventDetail: "",
         huntingEventConfirmLabel: "",
@@ -247,7 +225,6 @@
         huntingLootHudVisible: false,
         huntingLootHudShards: 0,
         huntingLootHudEnhancementStones: 0,
-        huntingLootHudChests: 0,
         huntingLootHudEquipment: 0,
         huntingPartyExperienceRewards: [],
 
@@ -278,9 +255,6 @@
             this.huntingCombatResultTotal = 2;
             this.huntingCharacterUnlock = null;
             this.huntingResultContinueVisible = false;
-        },
-        huntingChestContinue() {
-            Alpine.store("uiManager").invokeGameAction("huntingChestContinue");
         },
         huntingEventContinue() {
             Alpine.store("uiManager").invokeGameAction("huntingEventContinue");
@@ -327,10 +301,6 @@
             this.huntingMoveMax = 10;
             this.huntingMoveMessage = "";
             this.resetHuntingCombatResult();
-            this.huntingChestEventActive = false;
-            this.huntingChestRarity = "common";
-            this.huntingChestTitle = "";
-            this.huntingChestConfirmLabel = "";
             this.huntingEventActive = false;
             this.huntingEventDetail = "";
             this.huntingEventConfirmLabel = "";
@@ -342,7 +312,6 @@
             this.huntingLootHudVisible = false;
             this.huntingLootHudShards = 0;
             this.huntingLootHudEnhancementStones = 0;
-            this.huntingLootHudChests = 0;
             this.huntingLootHudEquipment = 0;
             this.huntingPartyExperienceRewards = [];
         },
@@ -374,11 +343,6 @@
             if (data.huntingCharacterUnlock !== undefined) this.huntingCharacterUnlock = data.huntingCharacterUnlock;
             if (data.huntingResultContinueVisible !== undefined)
                 this.huntingResultContinueVisible = data.huntingResultContinueVisible;
-            if (data.huntingChestEventActive !== undefined) this.huntingChestEventActive = data.huntingChestEventActive;
-            if (data.huntingChestRarity !== undefined) this.huntingChestRarity = data.huntingChestRarity;
-            if (data.huntingChestTitle !== undefined) this.huntingChestTitle = data.huntingChestTitle;
-            if (data.huntingChestConfirmLabel !== undefined)
-                this.huntingChestConfirmLabel = data.huntingChestConfirmLabel;
             if (data.huntingEventActive !== undefined) this.huntingEventActive = data.huntingEventActive;
             if (data.huntingEventDetail !== undefined) this.huntingEventDetail = data.huntingEventDetail;
             if (data.huntingEventConfirmLabel !== undefined)
@@ -396,7 +360,6 @@
             if (data.huntingLootHudShards !== undefined) this.huntingLootHudShards = data.huntingLootHudShards;
             if (data.huntingLootHudEnhancementStones !== undefined)
                 this.huntingLootHudEnhancementStones = data.huntingLootHudEnhancementStones;
-            if (data.huntingLootHudChests !== undefined) this.huntingLootHudChests = data.huntingLootHudChests;
             if (data.huntingLootHudEquipment !== undefined) this.huntingLootHudEquipment = data.huntingLootHudEquipment;
             if (data.huntingPartyExperienceRewards !== undefined)
                 this.huntingPartyExperienceRewards = data.huntingPartyExperienceRewards;
@@ -799,7 +762,6 @@
     }
 
     :scope.hunting-choice-active .hunting-overlay-frame,
-    :scope.hunting-chest-active .hunting-overlay-frame,
     :scope.hunting-event-active .hunting-overlay-frame,
     :scope.hunting-battle-preparation-active .hunting-overlay-frame {
         width: 100%;
@@ -814,7 +776,6 @@
     }
 
     :scope.hunting-choice-active .hunting-overlay-card,
-    :scope.hunting-chest-active .hunting-overlay-card,
     :scope.hunting-event-active .hunting-overlay-card,
     :scope.hunting-battle-preparation-active .hunting-overlay-card {
         grid-column: 2;
@@ -832,7 +793,6 @@
     }
 
     :scope.hunting-choice-active .hunting-overlay-card,
-    :scope.hunting-chest-active .hunting-overlay-card,
     :scope.hunting-event-active .hunting-overlay-card,
     :scope.hunting-battle-preparation-active .hunting-overlay-card {
         padding: 18px 22px;
@@ -840,7 +800,6 @@
     }
 
     :scope.hunting-choice-active .hunting-auto-advance,
-    :scope.hunting-chest-active .hunting-auto-advance,
     :scope.hunting-event-active .hunting-auto-advance,
     :scope.hunting-battle-preparation-active .hunting-auto-advance {
         position: static;
@@ -850,7 +809,6 @@
         box-sizing: border-box;
     }
 
-    .hunting-chest-event,
     .hunting-event-result {
         display: grid;
         grid-template-rows: minmax(0, 1fr) auto;
@@ -877,38 +835,12 @@
         width: 100%;
     }
 
-    .hunting-chest-event {
-        margin-top: 12px;
-    }
-
-    .hunting-chest-event .hunting-event-scroll-body,
     .hunting-event-result .hunting-event-scroll-body {
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         gap: 8px;
-    }
-
-    .hunting-chest-event .hunting-event-scroll-body > strong {
-        color: #202020;
-        font-size: 1.2rem;
-        letter-spacing: 0;
-    }
-
-    .hunting-chest-event .hunting-event-scroll-body > span {
-        color: #555555;
-        font-size: 0.76rem;
-        text-align: center;
-    }
-
-    .hunting-chest-event .hunting-chest-loot {
-        color: #8a6500;
-        font-weight: 700;
-    }
-
-    .hunting-chest-event .hunting-btn {
-        margin-top: 4px;
     }
 
     .hunting-event-result {
@@ -938,25 +870,6 @@
 
     .hunting-battle-start {
         width: 100%;
-    }
-
-    .hunting-chest-token {
-        margin: 4px 0 8px;
-        animation: hunting-chest-land 340ms cubic-bezier(0.2, 0.85, 0.35, 1.25) both;
-    }
-
-    @keyframes hunting-chest-land {
-        from {
-            opacity: 0;
-            transform: translateY(-20px) scale(0.82);
-        }
-        70% {
-            transform: translateY(3px) scale(1.06);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-        }
     }
 
     .hunting-loot-hud {
@@ -996,7 +909,6 @@
 
     @media (max-width: 600px) {
         :scope.hunting-choice-active .hunting-overlay-frame,
-        :scope.hunting-chest-active .hunting-overlay-frame,
         :scope.hunting-event-active .hunting-overlay-frame,
         :scope.hunting-battle-preparation-active .hunting-overlay-frame {
             grid-template-columns: minmax(0, 1fr) minmax(0, 10fr) minmax(0, 1fr);
@@ -1126,20 +1038,9 @@
             font-size: 0.65rem;
         }
         :scope.hunting-choice-active .hunting-overlay-card,
-        :scope.hunting-chest-active .hunting-overlay-card,
         :scope.hunting-event-active .hunting-overlay-card,
         :scope.hunting-battle-preparation-active .hunting-overlay-card {
             padding: 14px 16px;
-        }
-        .hunting-chest-token {
-            --chest-icon-scale: 0.8;
-            margin: -2px 0 0;
-        }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-        .hunting-chest-token {
-            animation: none;
         }
     }
 </style>

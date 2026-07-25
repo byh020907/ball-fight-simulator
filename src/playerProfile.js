@@ -10,7 +10,6 @@ import { createDefaultHuntingStats, sanitizeHuntingStats } from "./hunting/hunti
 import { FIGHTER_IDS } from "./characters/characterRegistry.js";
 import { getHiddenCharacterIds } from "./characterAvailability.js";
 import { createDefaultEquipmentInventory, sanitizeEquipmentInventory } from "./hunting/equipmentInventory.js";
-import { normalizeHuntingChests } from "./hunting/huntingRewards.js";
 import {
     REBIRTH_BASE_STAT_KEYS,
     isValidRebirthCardId,
@@ -100,7 +99,6 @@ export function createDefaultPlayerProfile() {
         },
         hunting: {
             shards: 0,
-            chests: [],
             blueprints: {},
             unlockedStageIds: ["cave"],
             selectedStageId: "cave",
@@ -260,14 +258,12 @@ function sanitizeHuntingCompanionIds(value) {
 function sanitizeHunting(obj) {
     const defaults = createDefaultPlayerProfile().hunting;
     if (!obj || typeof obj !== "object") return defaults;
-    const chests = normalizeHuntingChests(obj.chests, { dedupe: true, maxCount: 200 });
     const unlockedStageIds = sanitizeHuntingStageIds(obj.unlockedStageIds);
     const selectedStageId = unlockedStageIds.includes(obj.selectedStageId)
         ? obj.selectedStageId
         : unlockedStageIds[unlockedStageIds.length - 1];
     return {
         shards: sanitizeNumber(obj.shards),
-        chests,
         blueprints: sanitizeHuntingBlueprints(obj.blueprints),
         unlockedStageIds,
         selectedStageId,
