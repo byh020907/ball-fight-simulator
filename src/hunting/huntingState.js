@@ -48,8 +48,7 @@ function createRunId(characterId, now) {
 }
 
 export function canEnterHunting(profile, characterId) {
-    const wins = profile?.collection?.characters?.[characterId]?.tournamentWins ?? 0;
-    return wins > 0;
+    return profile?.hunting?.unlockedCharacterIds?.includes(characterId) ?? false;
 }
 
 export function getEligibleHuntingCharacters(profile, roster = []) {

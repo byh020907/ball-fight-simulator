@@ -8956,22 +8956,13 @@ function testMultiAbilityFoundation(app) {
 
 function testHuntingSystem() {
     const profile = createDefaultPlayerProfile();
-    assert.equal(canEnterHunting(profile, FIGHTER_IDS.DASH), false, "Characters need one tournament win to enter");
-    profile.collection.characters[FIGHTER_IDS.DASH] = {
-        tournamentsCompleted: 1,
-        tournamentWins: 1,
-        matchWins: 3,
-        bestPlacement: 1,
-        totalDamageDealt: 1200,
-        comebackMatchWins: 0,
-        firstTournamentAt: 100,
-        lastTournamentAt: 200
-    };
+    assert.equal(canEnterHunting(profile, FIGHTER_IDS.DASH), false, "Characters need hunting unlock to enter");
+    profile.hunting.unlockedCharacterIds = [FIGHTER_IDS.DASH];
     const eligible = getEligibleHuntingCharacters(profile, [{ id: FIGHTER_IDS.DASH }, { id: FIGHTER_IDS.ARCHER }]);
     assert.deepEqual(
         eligible.map((fighter) => fighter.id),
         [FIGHTER_IDS.DASH],
-        "Only tournament winners should be listed as hunting candidates"
+        "Only unlocked characters should be listed as hunting candidates"
     );
     assert.equal(
         isHuntingPartySelectionEligible(profile, [{ id: FIGHTER_IDS.DASH }, { id: FIGHTER_IDS.ARCHER }], {
@@ -10191,6 +10182,7 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
     profile.collection.characters[FIGHTER_IDS.RAGE] = { tournamentWins: 1 };
     profile.collection.characters[FIGHTER_IDS.HERO] = { tournamentWins: 1 };
     profile.collection.characters[FIGHTER_IDS.EATER] = { tournamentWins: 1 };
+    profile.hunting.unlockedCharacterIds = [FIGHTER_IDS.RAGE, FIGHTER_IDS.HERO, FIGHTER_IDS.EATER];
     profile.hunting.lastCompanionIds = [FIGHTER_IDS.HERO, FIGHTER_IDS.EATER];
     profile.hunting.stats.lastReachedFloorByStage = { [HUNTING_STAGE_IDS.CAVE]: 47 };
     const app = {
@@ -10576,6 +10568,7 @@ async function testHuntingCheckpointStartsAtSelectedFloor() {
 
     const profile = createDefaultPlayerProfile();
     profile.collection.characters[FIGHTER_IDS.RAGE] = { tournamentWins: 1 };
+    profile.hunting.unlockedCharacterIds = [FIGHTER_IDS.RAGE];
     profile.hunting.unlockedStageIds = [HUNTING_STAGE_IDS.CAVE, HUNTING_STAGE_IDS.FOREST, HUNTING_STAGE_IDS.DESERT];
     profile.hunting.selectedStageId = HUNTING_STAGE_IDS.FOREST;
     profile.hunting.stats.lastReachedFloorByStage = {

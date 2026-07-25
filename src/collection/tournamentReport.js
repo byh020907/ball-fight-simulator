@@ -49,6 +49,11 @@ export function applyTournamentReport(profile, report) {
     // 우승 처리
     if (report.playerWon) {
         charRecord.tournamentWins += 1;
+        profile.hunting = profile.hunting || {};
+        profile.hunting.unlockedCharacterIds = profile.hunting.unlockedCharacterIds || [];
+        if (!profile.hunting.unlockedCharacterIds.includes(charId)) {
+            profile.hunting.unlockedCharacterIds.push(charId);
+        }
         profile.collection.careerStats.currentTournamentWinStreak += 1;
         if (
             profile.collection.careerStats.currentTournamentWinStreak >

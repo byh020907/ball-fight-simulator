@@ -105,7 +105,8 @@ export function createDefaultPlayerProfile() {
             selectedStageId: "cave",
             lastCompanionIds: [],
             dailyShop: {},
-            stats: createDefaultHuntingStats()
+            stats: createDefaultHuntingStats(),
+            unlockedCharacterIds: []
         },
         collection: {
             characters: {},
@@ -296,6 +297,11 @@ function sanitizeHuntingStageIds(value) {
     return ids.length > 0 ? [...new Set(ids)] : [validIds[0]];
 }
 
+function sanitizeHuntingUnlockedCharacterIds(value) {
+    if (!Array.isArray(value)) return [];
+    return [...new Set(value)].filter((id) => VALID_CHARACTER_IDS.includes(id));
+}
+
 function sanitizeHuntingCompanionIds(value) {
     if (!Array.isArray(value)) return [];
     const seen = new Set();
@@ -336,7 +342,8 @@ function sanitizeHunting(obj) {
         selectedStageId,
         lastCompanionIds: sanitizeHuntingCompanionIds(obj.lastCompanionIds),
         dailyShop: typeof obj.dailyShop === "object" && obj.dailyShop ? obj.dailyShop : {},
-        stats: sanitizeHuntingStats(obj.stats)
+        stats: sanitizeHuntingStats(obj.stats),
+        unlockedCharacterIds: sanitizeHuntingUnlockedCharacterIds(obj.unlockedCharacterIds)
     };
 }
 

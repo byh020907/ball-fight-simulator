@@ -4,7 +4,6 @@ import {
     retreatHuntingRun,
     defeatHuntingRun,
     canRetreatFromHuntingRun,
-    canEnterHunting,
     getEligibleHuntingCharacters,
     isHuntingPartySelectionEligible,
     getHuntingAvailableStartFloors,
@@ -236,14 +235,29 @@ export class HuntingManager {
         app.stopPlayerPreviewLoop();
         app.renderer.clear();
 
-        const characterId = app.playerFighterId;
-        if (!canEnterHunting(app.playerProfile, characterId)) {
+        let eligible = getEligibleHuntingCharacters(app.playerProfile, app.roster);
+        if (eligible.length === 0) {
+            // 초기유저: 숨김 캐릭터를 제외한 일반 캐릭터 중 랜덤 1명 지급
+            const pool = app.roster.filter((fighter) => !fighter.hiddenIdentity);
+            if (pool.length > 0) {
+                const starter = pool[Math.floor(Math.random() * pool.length)];
+                app.playerProfile.hunting.unlockedCharacterIds = [starter.id];
+                savePlayerProfile(app.playerProfile);
+                eligible = getEligibleHuntingCharacters(app.playerProfile, app.roster);
+            }
+        }
+
+        if (eligible.length === 0) {
             PopupService.show({
                 title: "사냥터",
                 bodyHtml:
                     '<p style="padding:12px 0">사냥터에 입장하려면 먼저 토너먼트에서 우승한 캐릭터가 필요합니다.</p>'
             });
             return;
+        }
+
+        if (!eligible.some((f) => f.id === app.playerFighterId)) {
+            app.playerFighterId = eligible[0].id;
         }
 
         const unlockedIds = getUnlockedHuntingStageIds(app.playerProfile);
@@ -349,7 +363,8 @@ export class HuntingManager {
 
     async startRun(characterId, { encounterFloor = 1, party = {} } = {}) {
         PopupService.close();
-        if (!canEnterHunting(this.app.playerProfile, characterId)) return;
+        const eligible = getEligibleHuntingCharacters(this.app.playerProfile, this.app.roster);
+        if (!eligible.some((f) => f.id === characterId)) return;
         const stageId = getSelectedHuntingStageId(this.app.playerProfile);
         const availableCheckpoints = getHuntingAvailableStartFloors(this.app.playerProfile.hunting.stats, stageId);
         const selectedCheckpoint = availableCheckpoints.includes(encounterFloor) ? encounterFloor : 1;
