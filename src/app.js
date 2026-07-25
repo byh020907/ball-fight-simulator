@@ -734,7 +734,7 @@ export class BattleApp {
         this._updatePlayerPanelSummary();
 
         // 모드 세그먼트 동기화
-        const canHunt = getEligibleHuntingCharacters(this.playerProfile, this.roster).length > 0;
+        const canHunt = this.roster.length > 0;
         this._modeSegment.visible = !setupLocked;
         this._modeSegment.mode = this._gameMode;
         this._modeSegment.canHunt = canHunt;

@@ -60,6 +60,7 @@ import {
 } from "../experience/experienceService.js";
 import { applyRebirthLoadoutToBaseSpec, applyRebirthLoadoutToBattleBall, getRebirthLoadout } from "../rebirth/index.js";
 import { applyStatAllocation } from "../statAllocation.js";
+import { isHiddenCharacterId } from "../characterAvailability.js";
 import { savePlayerProfile, unlockHiddenCharacter } from "../playerProfile.js";
 import { CHARACTER_ROSTER_CONTEXTS, getEligibleRoster, getEncounterFighterIdentity } from "../characterRosterPolicy.js";
 import { PopupService } from "../popup.js";
@@ -238,7 +239,7 @@ export class HuntingManager {
         let eligible = getEligibleHuntingCharacters(app.playerProfile, app.roster);
         if (eligible.length === 0) {
             // 초기유저: 숨김 캐릭터를 제외한 일반 캐릭터 중 랜덤 1명 지급
-            const pool = app.roster.filter((fighter) => !fighter.hiddenIdentity);
+            const pool = app.roster.filter((fighter) => !isHiddenCharacterId(fighter.id));
             if (pool.length > 0) {
                 const starter = pool[Math.floor(Math.random() * pool.length)];
                 app.playerProfile.hunting.unlockedCharacterIds = [starter.id];
