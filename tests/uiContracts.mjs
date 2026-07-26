@@ -77,6 +77,17 @@ function testCollectionEquipmentPanelsOwnTheirFlows() {
             equipmentPanel.includes("slot.stats.map"),
         "Cards must be keyboard buttons and surface passive and slot-stat presentation"
     );
+    assert.ok(
+        equipmentPanel.includes("'is-unowned': item.count === 0") &&
+            equipmentPanel.includes(".ch-equipment-card.is-unowned") &&
+            equipmentPanel.includes(".ch-equipment-card.is-unowned canvas"),
+        "Unowned equipment cards should expose a muted visual state without removing their detail action"
+    );
+    assert.equal(
+        equipmentPanel.includes(':disabled="item.count === 0"'),
+        false,
+        "Unowned equipment must remain selectable so players can inspect recipes"
+    );
     assert.equal(
         collectionHub.includes("collection-fusion-dialog") || collectionHub.includes("collection-shop-panel"),
         false,

@@ -64,6 +64,7 @@ equipment: {
 
 - 공용 장착 슬롯 6개와 39종 카탈로그를 기초·중간·완성 순서로 표시한다.
 - 카드에는 Canvas `x-equipment-icon-tag`, 정식명, 보유 수량, 원시 스탯을 보이고, 선택한 카드의 상세 영역에서 결과에서 재료로 내려가는 아이콘 조합 트리, 재료 `보유/필요`, 조합 비용과 결과 스탯을 확인한다. 트리는 정적 레시피 조회와 보유 수량 조회만 받는 읽기 전용 presentation으로, 실제 조합 판단·저장·재료 소비를 바꾸지 않는다.
+- 보유 수량이 0인 카드는 회색 배경·옅은 테두리·저채도 아이콘으로 비활성 상태처럼 구분한다. 조합법과 상세를 미리 볼 수 있도록 선택 동작은 유지한다.
 - 기초 장비는 보유 수량과 빈 슬롯이 있을 때 장착한다. 중간·완성 장비는 재료와 파편이 모두 있을 때 같은 상세 영역의 `조합`으로 만든 뒤 즉시 수량을 갱신한다.
 - 조합 실패는 `missing ingredients`, `missing shards`, `capacity`, `recipe` 도메인 이유를 화면 문구로만 변환한다. UI는 재료·수량·파편을 직접 변경하지 않는다.
 - `BallFightComponentBridge`의 공개 경계는 `equipEquipmentTemplate(templateId, slotIndex?)`, `unequipEquipmentSlot(slotIndex)`, `craftEquipmentTemplate(templateId)` 세 명령이다.

@@ -32,7 +32,7 @@
                         <button
                             class="ch-equipment-card"
                             type="button"
-                            :class="{ 'is-selected': selectedId === item.id }"
+                            :class="{ 'is-selected': selectedId === item.id, 'is-unowned': item.count === 0 }"
                             @click="select(item.id)"
                         >
                             <canvas x-equipment-icon-tag="item.iconTag" aria-hidden="true"></canvas>
@@ -217,6 +217,20 @@
     }
     .ch-equipment-card {
         cursor: pointer;
+    }
+    .ch-equipment-card.is-unowned {
+        border-color: #a3a3a3;
+        background: #f0f0ee;
+        color: #737373;
+    }
+    .ch-equipment-card.is-unowned canvas {
+        filter: grayscale(1);
+        opacity: 0.42;
+    }
+    .ch-equipment-card.is-unowned .ch-equipment-card-copy,
+    .ch-equipment-card.is-unowned .ch-equipment-stats,
+    .ch-equipment-card.is-unowned .ch-equipment-passive {
+        opacity: 0.62;
     }
     .ch-equipment-card.is-selected {
         border-color: #2563eb;
