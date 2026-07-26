@@ -326,6 +326,7 @@ import { getEquipmentTemplate, EQUIPMENT_MAX_STACK } from "../src/hunting/equipm
 import { createComponentBridge } from "../src/componentBridge.js";
 import { rollHuntingEquipmentDrop } from "../src/hunting/huntingLoot.js";
 import { EquipmentIconTagController, resolveTagDraw } from "../src/equipmentIconTags.js";
+import { renderCharacterPortrait } from "../src/characterPortrait.js";
 import { mergeHuntingLoot, applyDefeatPreservation, sanitizeEquipmentMap } from "../src/hunting/huntingRewards.js";
 import { EQUIPMENT } from "../src/hunting/equipmentData.js";
 import { createEquipmentName, getDominantEquipmentStat } from "../src/hunting/equipmentNaming.js";
@@ -25717,6 +25718,46 @@ function testHiddenEquipmentIconCanvasReleasesBackingStore() {
 }
 
 testHiddenEquipmentIconCanvasReleasesBackingStore();
+
+function testHiddenCharacterPortraitCanvasDoesNotAmplifyBackingStore() {
+    const originalPixelRatioDescriptor = Object.getOwnPropertyDescriptor(globalThis, "devicePixelRatio");
+    let contextRequestCount = 0;
+    const canvas = {
+        width: 300,
+        height: 150,
+        clientWidth: 0,
+        clientHeight: 0,
+        getBoundingClientRect() {
+            return { width: 0, height: 0 };
+        },
+        getContext() {
+            contextRequestCount += 1;
+            return {
+                setTransform() {},
+                clearRect() {}
+            };
+        }
+    };
+
+    Object.defineProperty(globalThis, "devicePixelRatio", { configurable: true, value: 2 });
+    try {
+        for (let refresh = 0; refresh < 7; refresh += 1) {
+            assert.equal(renderCharacterPortrait(canvas, null), false);
+            assert.equal(canvas.width, 1, "hidden character portrait canvas must keep a 1px backing width");
+            assert.equal(canvas.height, 1, "hidden character portrait canvas must keep a 1px backing height");
+        }
+        assert.equal(contextRequestCount, 0, "hidden character portraits should not allocate a drawing context");
+    } finally {
+        if (originalPixelRatioDescriptor) {
+            Object.defineProperty(globalThis, "devicePixelRatio", originalPixelRatioDescriptor);
+        } else {
+            delete globalThis.devicePixelRatio;
+        }
+    }
+    console.log("[hidden-character-portrait-canvas-backing-store] ok");
+}
+
+testHiddenCharacterPortraitCanvasDoesNotAmplifyBackingStore();
 
 async function testFloorSevenHuntingDefeatCompletesWithRealApp(app) {
     app.returnToInitialState();
