@@ -9,6 +9,16 @@ export class ShardBundleDrop extends ShardDrop {
         super({ ...options, radius: 22, valueRadiusType: ShardBundleDrop.lootType });
     }
 
+    getFeedbackProfile() {
+        return {
+            color: SHARD_BUNDLE_COLOR,
+            intensity: 1.1,
+            label: "",
+            dropSound: "loot_drop",
+            pickupSound: "loot_pickup"
+        };
+    }
+
     collectReward(collector) {
         return {
             ...super.collectReward(collector),

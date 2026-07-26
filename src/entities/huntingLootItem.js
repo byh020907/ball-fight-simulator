@@ -49,6 +49,9 @@ export class HuntingLootItem extends RotationalBody(CollectionGrace(CombatEntity
         this.onCollected = onCollected;
         this.victoryCollectionRemaining = 0;
         this.victoryCollectionResponseRate = 0;
+        this.hasLanded = false;
+        this.landingPulse = 0;
+        this.magnetTrail = 0;
     }
 
     update(delta, simulation) {
@@ -71,6 +74,14 @@ export class HuntingLootItem extends RotationalBody(CollectionGrace(CombatEntity
 
         const canCollectNow = canCollect && (this.victoryCollectionRemaining > 0 || !isCollectionGraceActive);
         if (canCollectNow && this._tryCollect(collector, simulation)) return;
+        if (!this.hasLanded && !isCollectionGraceActive && this.velocity.length() < 42) {
+            this.hasLanded = true;
+            this.landingPulse = 0.34;
+            simulation.playSound(this.getFeedbackProfile().dropSound, 0.55);
+        }
+        this.landingPulse = Math.max(0, this.landingPulse - delta);
+        this.magnetTrail =
+            canCollectNow && (this.victoryCollectionRemaining > 0 || this.velocity.length() > 36) ? 0.16 : 0;
         this._resolveFighterCollision(simulation, collector?.id);
         this.victoryCollectionRemaining = Math.max(0, this.victoryCollectionRemaining - delta);
     }
@@ -84,6 +95,9 @@ export class HuntingLootItem extends RotationalBody(CollectionGrace(CombatEntity
     }
 
     draw(ctx) {
+        const profile = this.getFeedbackProfile();
+        if (this.hasLanded) this._drawWorldMarker(ctx, profile);
+        if (this.magnetTrail > 0) this._drawMagnetTrail(ctx, profile);
         ctx.save();
         ctx.translate(this.position.x, this.position.y);
         ctx.rotate(this.angle);
@@ -93,6 +107,42 @@ export class HuntingLootItem extends RotationalBody(CollectionGrace(CombatEntity
     }
 
     drawItem() {}
+
+    getFeedbackProfile() {
+        return { color: "#d8f0ff", intensity: 1, label: "", dropSound: "loot_drop", pickupSound: "loot_pickup" };
+    }
+
+    _drawWorldMarker(ctx, profile) {
+        const pulse = this.landingPulse / 0.34;
+        const radius = this.radius * (1.35 + profile.intensity * 0.35 + (1 - pulse) * 0.35);
+        ctx.save();
+        ctx.globalAlpha = 0.26 + pulse * 0.42;
+        ctx.strokeStyle = profile.color;
+        ctx.lineWidth = 1.5 + profile.intensity;
+        ctx.beginPath();
+        ctx.arc(this.position.x, this.position.y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        if (profile.label) {
+            ctx.globalAlpha = 0.92;
+            ctx.fillStyle = profile.color;
+            ctx.font = "bold 12px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText(profile.label, this.position.x, this.position.y - this.radius - 12);
+        }
+        ctx.restore();
+    }
+
+    _drawMagnetTrail(ctx, profile) {
+        ctx.save();
+        ctx.globalAlpha = 0.36 + profile.intensity * 0.12;
+        ctx.strokeStyle = profile.color;
+        ctx.lineWidth = Math.max(2, this.radius * 0.18 + profile.intensity);
+        ctx.beginPath();
+        ctx.moveTo(this.position.x - this.velocity.x * 0.055, this.position.y - this.velocity.y * 0.055);
+        ctx.lineTo(this.position.x, this.position.y);
+        ctx.stroke();
+        ctx.restore();
+    }
 
     beginVictoryCollection({ duration = 1, responseRate = 180 } = {}) {
         this.victoryCollectionRemaining = Math.max(this.victoryCollectionRemaining, duration);
@@ -135,12 +185,13 @@ export class HuntingLootItem extends RotationalBody(CollectionGrace(CombatEntity
         if (!reward) return false;
 
         this.onCollected?.(reward, this, collector, simulation);
+        const arrivalPosition = collector.position.clone();
         if (reward.collectionEffect === "experience" && typeof simulation.spawnExperienceCollection === "function") {
-            simulation.spawnExperienceCollection(this.position.clone(), reward.color);
+            simulation.spawnExperienceCollection(arrivalPosition, reward.color);
         } else {
-            simulation.spawnLootCollection(this.position.clone(), reward.color, reward.label);
+            simulation.spawnLootCollection(arrivalPosition, reward.color, reward.label);
         }
-        simulation.playSound(reward.sound ?? "loot", reward.soundIntensity ?? 1);
+        simulation.playSound(reward.sound ?? this.getFeedbackProfile().pickupSound, reward.soundIntensity ?? 1);
         if (reward.logMessage) simulation.addLog(reward.logMessage);
         this.isExpired = true;
         return true;

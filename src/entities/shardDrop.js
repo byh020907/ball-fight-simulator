@@ -11,6 +11,10 @@ export class ShardDrop extends HuntingLootItem {
         this.amount = safeAmount;
     }
 
+    getFeedbackProfile() {
+        return { color: SHARD_COLOR, intensity: 0.85, label: "", dropSound: "loot_drop", pickupSound: "loot_pickup" };
+    }
+
     collectReward(collector) {
         return {
             type: ShardDrop.lootType,

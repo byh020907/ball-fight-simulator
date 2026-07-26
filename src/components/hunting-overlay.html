@@ -2,7 +2,7 @@
     class="hunting-overlay"
     id="huntingOverlay"
     x-data="huntingOverlay"
-    x-show="visible"
+    x-show="visible || huntingLootHudVisible || huntingLootReceipt"
     x-transition:enter="hunting-overlay-enter"
     x-transition:enter-start="hunting-overlay-enter-start"
     x-transition:enter-end="hunting-overlay-enter-end"
@@ -14,7 +14,8 @@
         'hunting-event-active': huntingEventActive,
         'hunting-battle-preparation-active': huntingBattlePreparationActive,
         'hunting-moving': huntingMoving,
-        'hunting-combat-result-active': huntingCombatResultActive
+        'hunting-combat-result-active': huntingCombatResultActive,
+        'hunting-loot-feedback-active': !visible && (huntingLootHudVisible || huntingLootReceipt)
     }"
 >
     <div class="hunting-overlay-frame" x-show="visible">
@@ -185,6 +186,7 @@
             <span x-show="huntingLootHudEquipment > 0" x-text="' · 장비 ' + huntingLootHudEquipment"></span>
         </span>
     </div>
+    <div class="hunting-loot-receipt" x-show="huntingLootReceipt" role="status" aria-live="polite" x-text="huntingLootReceipt"></div>
 </div>
 <script>
     window.createGameUI("huntingOverlay", () => ({
@@ -221,6 +223,7 @@
         huntingLootHudVisible: false,
         huntingLootHudShards: 0,
         huntingLootHudEquipment: 0,
+        huntingLootReceipt: "",
         huntingPartyExperienceRewards: [],
 
         huntingRetreat() {
@@ -307,6 +310,7 @@
             this.huntingLootHudVisible = false;
             this.huntingLootHudShards = 0;
             this.huntingLootHudEquipment = 0;
+            this.huntingLootReceipt = "";
             this.huntingPartyExperienceRewards = [];
         },
         setHuntingState(data) {
@@ -353,6 +357,7 @@
             if (data.huntingLootHudVisible !== undefined) this.huntingLootHudVisible = data.huntingLootHudVisible;
             if (data.huntingLootHudShards !== undefined) this.huntingLootHudShards = data.huntingLootHudShards;
             if (data.huntingLootHudEquipment !== undefined) this.huntingLootHudEquipment = data.huntingLootHudEquipment;
+            if (data.huntingLootReceipt !== undefined) this.huntingLootReceipt = data.huntingLootReceipt;
             if (data.huntingPartyExperienceRewards !== undefined)
                 this.huntingPartyExperienceRewards = data.huntingPartyExperienceRewards;
         }
@@ -367,6 +372,10 @@
         justify-content: center;
         pointer-events: none;
         background: #eeeeee;
+    }
+
+    :scope.hunting-loot-feedback-active {
+        background: transparent;
     }
 
     .hunting-party-experience-grid {
@@ -867,11 +876,11 @@
     .hunting-loot-hud {
         position: absolute;
         top: 8px;
-        right: 8px;
+        left: 8px;
         z-index: 10;
         display: flex;
         flex-direction: column;
-        align-items: flex-end;
+        align-items: flex-start;
         gap: 2px;
         max-width: min(200px, 40vw);
         padding: 6px 10px;
@@ -897,6 +906,23 @@
         font-weight: 700;
         text-overflow: ellipsis;
         white-space: nowrap;
+    }
+
+    .hunting-loot-receipt {
+        position: absolute;
+        top: 72px;
+        left: 8px;
+        z-index: 11;
+        max-width: min(240px, 46vw);
+        padding: 6px 10px;
+        border: 1px solid rgba(129, 82, 220, 0.65);
+        border-radius: 8px;
+        background: rgba(31, 20, 48, 0.88);
+        color: #f0ddff;
+        font-size: 0.74rem;
+        font-weight: 800;
+        overflow-wrap: anywhere;
+        pointer-events: none;
     }
 
     @media (max-width: 600px) {
@@ -1019,7 +1045,7 @@
 
         .hunting-loot-hud {
             top: 4px;
-            right: 4px;
+            left: 4px;
             max-width: min(160px, 36vw);
             padding: 4px 8px;
         }
@@ -1028,6 +1054,12 @@
         }
         .hunting-loot-hud .hud-body {
             font-size: 0.65rem;
+        }
+        .hunting-loot-receipt {
+            top: 62px;
+            left: 4px;
+            max-width: min(170px, 44vw);
+            font-size: 0.68rem;
         }
         :scope.hunting-choice-active .hunting-overlay-card,
         :scope.hunting-event-active .hunting-overlay-card,

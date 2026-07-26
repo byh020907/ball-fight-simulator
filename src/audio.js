@@ -38,7 +38,10 @@ export class AudioEngine {
         const now = this.context.currentTime;
         const throttleKey = type;
         const last = this.lastPlayed.get(throttleKey) ?? -1;
-        const throttle = type === "hit" || type === "crash" || type === "loot" ? 0.055 : 0.025;
+        const throttle =
+            type === "hit" || type === "crash" || type === "loot" || type === "loot_drop" || type === "loot_pickup"
+                ? 0.11
+                : 0.025;
         if (now - last < throttle) {
             return;
         }
@@ -84,6 +87,10 @@ export class AudioEngine {
             guard: () => this.playThud(320, 0.08, 0.05 * safeIntensity),
             whiff: () => this.playThud(180, 0.04, 0.025 * safeIntensity),
             loot: () => this.playLootCollect(safeIntensity),
+            loot_drop: () => this.playZap(430, 0.07, 0.025 * safeIntensity),
+            loot_pickup: () => this.playLootCollect(safeIntensity),
+            equipment_drop: () => this.playSweep(300, 620, 0.16, 0.05 * safeIntensity),
+            equipment_pickup: () => this.playSweep(520, 1040, 0.2, 0.065 * safeIntensity),
             shop_reroll: () => this.playShopReroll(safeIntensity)
         };
 

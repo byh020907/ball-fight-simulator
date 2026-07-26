@@ -1045,6 +1045,24 @@ function testHuntingOverlayActionContracts() {
         "The bridge must disable swap input and expose early automatic-progress confirmation"
     );
     console.log("[hunting-overlay-action-contracts] ok");
+
+    const huntingLootFeedbackOverlay = readSource("src/components/hunting-overlay.html");
+    assert.match(
+        huntingLootFeedbackOverlay,
+        /x-show="visible \|\| huntingLootHudVisible \|\| huntingLootReceipt"/,
+        "Hunting loot feedback must remain mounted while the result overlay itself is hidden"
+    );
+    assert.match(
+        huntingLootFeedbackOverlay,
+        /'hunting-loot-feedback-active': !visible && \(huntingLootHudVisible \|\| huntingLootReceipt\)/,
+        "Combat-only loot feedback must use its transparent overlay state"
+    );
+    assert.match(
+        huntingLootFeedbackOverlay,
+        /:scope\.hunting-loot-feedback-active\s*\{\s*background:\s*transparent;/s,
+        "Combat-only loot feedback must not cover the arena"
+    );
+    console.log("[hunting-loot-feedback-overlay-visibility] ok");
 }
 
 function testHuntingStartPopupOwnershipContract() {

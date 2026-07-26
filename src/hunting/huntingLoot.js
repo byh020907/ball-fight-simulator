@@ -234,10 +234,11 @@ export class HuntingBattleLootSession {
 }
 
 export class HuntingLootDropController {
-    constructor({ session, rng = Math.random, onExperienceCollected = null } = {}) {
+    constructor({ session, rng = Math.random, onExperienceCollected = null, onLootCollected = null } = {}) {
         this.session = session;
         this.rng = rng;
         this.onExperienceCollected = onExperienceCollected;
+        this.onLootCollected = onLootCollected;
         this._experiencePhysicalDropCount = 0;
         this._lastExperienceDropSource = null;
     }
@@ -368,6 +369,7 @@ export class HuntingLootDropController {
             onCollected: (reward) => {
                 this.session.recordCollection(reward);
                 if (reward.type === HUNTING_LOOT_ITEM_TYPES.EXPERIENCE) this.onExperienceCollected?.(reward);
+                this.onLootCollected?.(reward);
             }
         });
         simulation.entities.push(item);

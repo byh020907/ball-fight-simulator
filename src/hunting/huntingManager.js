@@ -181,6 +181,10 @@ export class HuntingManager {
         this._battleExperienceGrants = [];
         this._lastBattleExperienceResult = null;
         this._combatUiSyncRemaining = 0;
+        this._lootReceipt = null;
+        this._lootReceiptEntry = null;
+        this._lootReceiptRemaining = 0;
+        this._lootReceiptQueue = [];
         this._partyBattleParticipation = null;
         this._lastBattlePartyExperienceResults = [];
         this._perfectSwapAttempt = null;
@@ -686,6 +690,7 @@ export class HuntingManager {
         const app = this.app;
         let run = this._run;
         if (!run || run.status !== "active") return;
+        this._clearLootReceipts();
         this._resetCombatInteractionState();
         run = { ...run, party: prepareHuntingPartyForBattle(run.party) };
         this._run = run;
@@ -764,7 +769,10 @@ export class HuntingManager {
             playerTeamId: HUNTING_TEAMS.PLAYER,
             floor: run.floor
         });
-        const lootDropController = new HuntingLootDropController({ session: battleLootSession });
+        const lootDropController = new HuntingLootDropController({
+            session: battleLootSession,
+            onLootCollected: (reward) => this._presentLootReceipt(reward)
+        });
         this._battleLootSession = battleLootSession;
         this._lastBattleExperienceResult = null;
         this._lastBattlePartyExperienceResults = [];
@@ -1069,6 +1077,8 @@ export class HuntingManager {
     }
 
     updateCombat(delta) {
+        this._lootReceiptRemaining = Math.max(0, this._lootReceiptRemaining - Math.max(0, delta));
+        if (this._lootReceipt && this._lootReceiptRemaining === 0) this._showNextLootReceipt();
         if (this._run?.phase !== HUNTING_RUN_PHASES.COMBAT) return;
         this._perfectSwapCooldownRemaining = Math.max(0, this._perfectSwapCooldownRemaining - Math.max(0, delta));
         this._recordPartyBattleParticipation(delta);
@@ -1366,7 +1376,8 @@ export class HuntingManager {
             return {
                 huntingLootHudVisible: false,
                 huntingLootHudShards: 0,
-                huntingLootHudEquipment: 0
+                huntingLootHudEquipment: 0,
+                huntingLootReceipt: ""
             };
         }
         const pending = run.pendingLoot;
@@ -1377,8 +1388,59 @@ export class HuntingManager {
         return {
             huntingLootHudVisible: visible,
             huntingLootHudShards: shards,
-            huntingLootHudEquipment: equipmentCount
+            huntingLootHudEquipment: equipmentCount,
+            huntingLootReceipt: this._lootReceipt ?? ""
         };
+    }
+
+    _presentLootReceipt(reward) {
+        if (!reward) return;
+        const isCommon = reward.type === "experience" || reward.type === "shard";
+        const existing = isCommon
+            ? this._lootReceiptEntry?.type === reward.type
+                ? this._lootReceiptEntry
+                : this._lootReceiptQueue.find((entry) => entry.type === reward.type)
+            : null;
+        if (existing) {
+            existing.amount += Math.max(0, reward.amount ?? 0);
+            existing.text = this._formatLootReceipt(existing);
+            if (existing === this._lootReceiptEntry) {
+                this._lootReceipt = existing.text;
+                this.app.setHuntingOverlayState({ huntingLootReceipt: this._lootReceipt });
+            }
+            return;
+        }
+        const entry = {
+            type: reward.type,
+            amount: Math.max(0, reward.amount ?? 0),
+            text: reward.label ?? "획득",
+            duration: reward.type === "equipment" ? 2.4 : 1.1
+        };
+        entry.text = this._formatLootReceipt(entry);
+        this._lootReceiptQueue.push(entry);
+        if (!this._lootReceipt) this._showNextLootReceipt();
+    }
+
+    _formatLootReceipt(entry) {
+        if (entry.type === "experience") return `XP +${entry.amount}`;
+        if (entry.type === "shard") return `파편 +${entry.amount}`;
+        return entry.text;
+    }
+
+    _showNextLootReceipt() {
+        const next = this._lootReceiptQueue.shift();
+        this._lootReceiptEntry = next ?? null;
+        this._lootReceipt = next?.text ?? null;
+        this._lootReceiptRemaining = next?.duration ?? 0;
+        this.app.setHuntingOverlayState({ huntingLootReceipt: this._lootReceipt ?? "" });
+    }
+
+    _clearLootReceipts() {
+        this._lootReceipt = null;
+        this._lootReceiptEntry = null;
+        this._lootReceiptRemaining = 0;
+        this._lootReceiptQueue = [];
+        this.app.setHuntingOverlayState?.({ huntingLootReceipt: "" });
     }
 
     _stopHuntingMoveForBattle(

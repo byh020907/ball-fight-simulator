@@ -11,6 +11,10 @@ export class SmallHealPack extends HuntingLootItem {
         this.amount = safeAmount;
     }
 
+    getFeedbackProfile() {
+        return { color: HEAL_COLOR, intensity: 1.2, label: "", dropSound: "loot_drop", pickupSound: "loot_pickup" };
+    }
+
     canCollect(collector) {
         return collector.hp < collector.maxHp;
     }

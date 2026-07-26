@@ -3348,7 +3348,7 @@ function testHuntingLootItemsAndDropController(app) {
     );
     assert.deepEqual(
         soundCalls.at(-1),
-        { type: "loot", intensity: 1 },
+        { type: "loot_pickup", intensity: 1 },
         "Loot collection should request its audible collect chime"
     );
 
@@ -3369,7 +3369,7 @@ function testHuntingLootItemsAndDropController(app) {
     );
     assert.deepEqual(
         soundCalls.at(-1),
-        { type: "loot", intensity: 0.72 },
+        { type: "loot_pickup", intensity: 0.72 },
         "XP orb collection must use the lighter pickup chime"
     );
 
@@ -25997,5 +25997,71 @@ function testUnusedEnhancementStonesStayOutOfActiveHuntingRewards(app) {
 }
 
 testUnusedEnhancementStonesStayOutOfActiveHuntingRewards(app);
+
+function testHuntingLootReceiptQueueAndStressBound() {
+    const overlayUpdates = [];
+    const manager = new HuntingManager({ setHuntingOverlayState: (state) => overlayUpdates.push(state) });
+    manager._presentLootReceipt({ type: "equipment", label: "공격 검 획득" });
+    manager._presentLootReceipt({ type: "equipment", label: "방어 방패 획득" });
+    Array.from({ length: 120 }, () => manager._presentLootReceipt({ type: "shard", amount: 1 }));
+    assert.equal(manager._lootReceipt, "공격 검 획득", "First equipment receipt should display immediately");
+    assert.equal(
+        manager._lootReceiptQueue.length,
+        2,
+        "Common rewards should remain bounded by reward type, not pickup count"
+    );
+    const shardReceipt = manager._lootReceiptQueue.find((entry) => entry.type === "shard");
+    assert.equal(shardReceipt.amount, 120, "Common reward receipt aggregation must preserve the full amount");
+    manager._lootReceiptRemaining = 0;
+    manager._showNextLootReceipt();
+    assert.equal(manager._lootReceipt, "방어 방패 획득", "Equipment receipts should preserve collection order");
+    manager._lootReceiptRemaining = 0;
+    manager._showNextLootReceipt();
+    assert.equal(manager._lootReceipt, "파편 +120", "Aggregated common receipts should show their preserved total");
+    manager._lootReceiptRemaining = 0;
+    manager._showNextLootReceipt();
+    assert.equal(manager._lootReceipt, null, "Drained receipt queues should clear the HUD state");
+    assert.equal(overlayUpdates.at(-1).huntingLootReceipt, "", "Drained receipt queues must hide their UI value");
+    manager._presentLootReceipt({ type: "experience", amount: 9 });
+    manager._clearLootReceipts();
+    assert.equal(manager._lootReceiptQueue.length, 0, "Battle cleanup must discard pending receipts");
+    assert.equal(manager._lootReceipt, null, "Battle cleanup must clear the visible receipt");
+    manager._presentLootReceipt({ type: "equipment", label: "first equipment" });
+    manager._presentLootReceipt({ type: "equipment", label: "second equipment" });
+    manager.updateCombat(2.4);
+    assert.equal(
+        manager._lootReceipt,
+        "second equipment",
+        "Receipt queues should continue advancing after combat enters its result phase"
+    );
+    manager.updateCombat(2.4);
+    assert.equal(manager._lootReceipt, null, "Post-combat receipt queues should fully drain without another battle");
+
+    const [playerSpec, enemySpec] = createRoster();
+    const simulation = new BattleSimulation([playerSpec, enemySpec], { onLog() {}, onSound() {} }, null, {
+        assignActions: false
+    });
+    const collector = simulation.fighters[0];
+    const drops = Array.from(
+        { length: 120 },
+        (_, index) =>
+            new ShardDrop({
+                position: new Vector2(120 + (index % 12) * 52, 120 + Math.floor(index / 12) * 52),
+                velocity: new Vector2(),
+                collectorId: collector.id,
+                amount: 1,
+                collectionGraceDuration: 99
+            })
+    );
+    drops.forEach((drop) => drop.update(0.016, simulation));
+    assert.equal(
+        simulation.entities.filter((entity) => entity.constructor?.name?.includes("LootFeedback")).length,
+        0,
+        "Loot feedback must remain draw-state only and not create unbounded effect entities"
+    );
+    console.log("[hunting-loot-receipt-queue-and-stress-bound] ok");
+}
+
+testHuntingLootReceiptQueueAndStressBound();
 
 console.log("regression tests ok");

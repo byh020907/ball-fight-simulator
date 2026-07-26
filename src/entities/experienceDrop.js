@@ -18,8 +18,18 @@ export class ExperienceDrop extends HuntingLootItem {
             amount: this.amount,
             color: getHuntingExperienceDropColor(),
             collectionEffect: "experience",
-            sound: "loot",
+            sound: "loot_pickup",
             soundIntensity: 0.72
+        };
+    }
+
+    getFeedbackProfile() {
+        return {
+            color: getHuntingExperienceDropColor(),
+            intensity: 0.55,
+            label: "",
+            dropSound: "loot_drop",
+            pickupSound: "loot_pickup"
         };
     }
 

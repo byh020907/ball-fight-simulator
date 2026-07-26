@@ -13,6 +13,16 @@ export class EquipmentDrop extends HuntingLootItem {
         this._template = template;
     }
 
+    getFeedbackProfile() {
+        return {
+            color: "#c084fc",
+            intensity: 1.8,
+            label: this._template?.name ?? "장비",
+            dropSound: "equipment_drop",
+            pickupSound: "equipment_pickup"
+        };
+    }
+
     collectReward(collector) {
         const template = this._template || getEquipmentTemplate(this.templateId);
         if (!template || template.tier !== "basic") return null;
