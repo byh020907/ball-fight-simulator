@@ -1,3 +1,5 @@
+import { renderCachedCanvasImage } from "./staticCanvasImageCache.js";
+
 const MAXIMUM_PIXEL_RATIO = 2;
 
 function getCanvasDisplaySize(canvas) {
@@ -1787,7 +1789,11 @@ export function getUnknownTagMetadata() {
     return { id: "unknown", label: entry ? entry.label : "알 수 없음" };
 }
 
-export function renderIconTag(canvas, tagId, { pixelRatio: injectedPixelRatio } = {}) {
+export function renderIconTag(
+    canvas,
+    tagId,
+    { pixelRatio: injectedPixelRatio, cache, createSurface, finalizeImage } = {}
+) {
     if (!canvas) return false;
     const displaySize = getCanvasDisplaySize(canvas);
     if (!displaySize) {
@@ -1802,22 +1808,40 @@ export function renderIconTag(canvas, tagId, { pixelRatio: injectedPixelRatio } 
     const pixelRatio = Math.min(MAXIMUM_PIXEL_RATIO, injectedPixelRatio ?? (globalThis.devicePixelRatio || 1));
     canvas.width = Math.max(1, Math.round(width * pixelRatio));
     canvas.height = Math.max(1, Math.round(height * pixelRatio));
-    context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-    context.clearRect(0, 0, width, height);
-
     const entry = resolveTag(tagId);
     if (!entry) return false;
-
-    const norm = Math.min(width, height);
-    const cx = width / 2;
-    const cy = height / 2;
-
-    context.save();
-    context.translate(cx, cy);
-    context.scale(norm, norm);
-    context.translate(-cx, -cy);
-    entry.draw(context, cx, cy);
-    context.restore();
+    const normalizedTagId = TAG_REGISTRY.has(tagId) ? tagId : "unknown";
+    const backingWidth = canvas.width;
+    const backingHeight = canvas.height;
+    const drawVector = (targetContext) => {
+        targetContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+        targetContext.clearRect(0, 0, width, height);
+        const norm = Math.min(width, height);
+        const cx = width / 2;
+        const cy = height / 2;
+        targetContext.save();
+        targetContext.translate(cx, cy);
+        targetContext.scale(norm, norm);
+        targetContext.translate(-cx, -cy);
+        entry.draw(targetContext, cx, cy);
+        targetContext.restore();
+    };
+    const cached = renderCachedCanvasImage({
+        cache,
+        key: `equipment-icon:${normalizedTagId}:${backingWidth}x${backingHeight}:${pixelRatio}`,
+        width: backingWidth,
+        height: backingHeight,
+        render: drawVector,
+        createSurface,
+        finalizeImage
+    });
+    if (cached) {
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        context.clearRect(0, 0, backingWidth, backingHeight);
+        context.drawImage(cached.image, 0, 0);
+    } else {
+        drawVector(context);
+    }
     return true;
 }
 

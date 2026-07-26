@@ -12,7 +12,8 @@ import { createDefaultPlayerProfile } from "../src/playerProfile.js";
 import { createRoster } from "../src/roster.js";
 import { MASTERY_EFFECT_DEFS } from "../src/character-mastery/masteryDefinitions.js";
 import { getCombinedHealthBarPercentages } from "../src/fighterHealthBar.js";
-import { renderCharacterPortrait } from "../src/characterPortrait.js";
+import { getPortraitVisualKey, renderCharacterPortrait } from "../src/characterPortrait.js";
+import { renderCachedCanvasImage, StaticCanvasImageCache } from "../src/staticCanvasImageCache.js";
 import {
     getRegisteredTags,
     getRegisteredTagMetadata,
@@ -2172,6 +2173,212 @@ function testIconTagControllerResizeObserverCleanup() {
     console.log("[icon-tag-controller-resize-observer-cleanup] ok");
 }
 
+function testStaticCanvasImageCacheLruAndResourceRelease() {
+    const cache = new StaticCanvasImageCache({ pixelBudget: 8 });
+    const released = [];
+    const image = (id) => ({ close: () => released.push(id) });
+    cache.set("first", image("first"), 2, 2);
+    cache.set("second", image("second"), 2, 2);
+    cache.get("first");
+    cache.set("third", image("third"), 2, 2);
+    assert.equal(cache.entries.has("second"), false, "least recently used image should be evicted first");
+    assert.equal(cache.pixelCount, 8, "cache pixel budget should remain bounded");
+    assert.deepEqual(released, ["second"], "eviction should release closable image resources");
+    cache.clear();
+    assert.deepEqual(released.sort(), ["first", "second", "third"], "clear should release every cached image");
+    console.log("[static-canvas-image-cache-lru] ok");
+}
+
+function testStaticCanvasImageCacheFinalizesOffscreenBitmaps() {
+    const cache = new StaticCanvasImageCache({ pixelBudget: 16 });
+    let closed = 0;
+    const bitmap = { close: () => (closed += 1) };
+    renderCachedCanvasImage({
+        cache,
+        key: "bitmap",
+        width: 4,
+        height: 4,
+        createSurface: () => ({ getContext: () => createCanvasContext(), transferToImageBitmap: () => bitmap }),
+        render() {}
+    });
+    assert.equal(cache.get("bitmap"), bitmap, "OffscreenCanvas bitmap should be retained as the cache image");
+    cache.clear();
+    assert.equal(closed, 1, "clearing bitmap cache should call ImageBitmap.close");
+    console.log("[static-canvas-image-bitmap-finalize] ok");
+}
+
+function createCanvasContext() {
+    return new Proxy(
+        {
+            drawImageCalls: 0,
+            drawImage() {
+                this.drawImageCalls += 1;
+            },
+            measureText() {
+                return { width: 0 };
+            }
+        },
+        { get: (target, property) => (property in target ? target[property] : () => {}) }
+    );
+}
+
+function createVisibleCanvas(width = 64, height = 64) {
+    const context = createCanvasContext();
+    return {
+        width: 0,
+        height: 0,
+        context,
+        getBoundingClientRect: () => ({ width, height }),
+        getContext: () => context
+    };
+}
+
+function testStaticCanvasRenderersReuseCachedImages() {
+    const cache = new StaticCanvasImageCache({ pixelBudget: 100_000 });
+    let iconSurfaceCount = 0;
+    const createIconSurface = (width, height) => ({
+        width,
+        height,
+        getContext: () => {
+            iconSurfaceCount += 1;
+            return createCanvasContext();
+        }
+    });
+    Array.from({ length: 10 }, () => createVisibleCanvas()).forEach((canvas) =>
+        renderIconTag(canvas, "attack_sword", { cache, createSurface: createIconSurface })
+    );
+    assert.equal(iconSurfaceCount, 1, "ten identical icon canvases should produce one vector raster surface");
+
+    let portraitSurfaceCount = 0;
+    const createPortraitSurface = (width, height) => ({
+        width,
+        height,
+        getContext: () => {
+            portraitSurfaceCount += 1;
+            return createCanvasContext();
+        }
+    });
+    const portrait = { fighter: createRoster()[0], equipmentItems: [] };
+    const portraitCanvases = Array.from({ length: 10 }, () => createVisibleCanvas());
+    portraitCanvases.forEach((canvas) =>
+        renderCharacterPortrait(canvas, portrait, { cache, createSurface: createPortraitSurface })
+    );
+    assert.equal(portraitSurfaceCount, 1, "ten identical portraits should produce one BattleBall raster surface");
+    assert.ok(
+        portraitCanvases.every((canvas) => canvas.context.drawImageCalls === 1),
+        "portrait hits should draw cached images"
+    );
+
+    renderIconTag(createVisibleCanvas(80, 64), "attack_sword", { cache, createSurface: createIconSurface });
+    renderIconTag(createVisibleCanvas(), "attack_sword", { cache, createSurface: createIconSurface, pixelRatio: 2 });
+    renderIconTag(createVisibleCanvas(), "health_crystal", { cache, createSurface: createIconSurface });
+    assert.equal(iconSurfaceCount, 4, "size, DPR, and visual key changes should each create distinct icon images");
+    console.log("[static-canvas-renderer-cache-reuse] ok");
+}
+
+function testPortraitVisualKeyUsesOnlyVisualState() {
+    const fighter = createRoster()[0];
+    const base = {
+        fighter,
+        equipmentItems: [
+            { instanceId: "a", rarity: "rare", enhanceLevel: 1 },
+            { instanceId: "b", rarity: "epic", enhanceLevel: 2 }
+        ]
+    };
+    const unchangedLiveValues = {
+        fighter: { ...fighter, stats: { ...fighter.stats, hp: 1 }, position: { x: 9, y: 3 }, velocity: { x: 1, y: 2 } },
+        equipmentItems: base.equipmentItems
+    };
+    assert.equal(
+        getPortraitVisualKey(base),
+        getPortraitVisualKey(unchangedLiveValues),
+        "live combat values must not split portraits"
+    );
+    assert.notEqual(
+        getPortraitVisualKey(base),
+        getPortraitVisualKey({ ...base, fighter: { ...fighter, color: "#000000" } })
+    );
+    assert.notEqual(
+        getPortraitVisualKey(base),
+        getPortraitVisualKey({ ...base, fighter: { ...fighter, ability: "none" } })
+    );
+    assert.notEqual(
+        getPortraitVisualKey(base),
+        getPortraitVisualKey({ ...base, fighter: { ...fighter, appearance: { ...fighter.appearance, sides: 3 } } })
+    );
+    assert.notEqual(
+        getPortraitVisualKey(base),
+        getPortraitVisualKey({ ...base, fighter: { ...fighter, rebirthCount: 1 } })
+    );
+    assert.notEqual(
+        getPortraitVisualKey(base),
+        getPortraitVisualKey({ ...base, equipmentItems: [...base.equipmentItems].reverse() })
+    );
+    assert.equal(
+        getPortraitVisualKey(base),
+        getPortraitVisualKey({
+            ...base,
+            equipmentItems: base.equipmentItems.map((item, index) => ({
+                ...item,
+                instanceId: `replacement-${index}`,
+                templateId: "different-template",
+                iconTag: "unused",
+                visualId: "unused",
+                specialOptions: [{ type: "unused" }]
+            }))
+        }),
+        "non-visual equipment identifiers must not split portraits"
+    );
+    assert.notEqual(
+        getPortraitVisualKey(base),
+        getPortraitVisualKey({
+            ...base,
+            equipmentItems: [{ ...base.equipmentItems[0], rarity: "legendary" }, base.equipmentItems[1]]
+        }),
+        "rarity changes must split portraits"
+    );
+    assert.notEqual(
+        getPortraitVisualKey(base),
+        getPortraitVisualKey({
+            ...base,
+            equipmentItems: [{ ...base.equipmentItems[0], enhanceLevel: 3 }, base.equipmentItems[1]]
+        }),
+        "enhancement changes must split portraits"
+    );
+    assert.notEqual(
+        getPortraitVisualKey(base),
+        getPortraitVisualKey({ ...base, equipmentItems: base.equipmentItems.slice(0, 1) }),
+        "equipment count changes must split portraits"
+    );
+    console.log("[portrait-visual-cache-key] ok");
+}
+
+function testHiddenCanvasesDoNotCreateCacheSurfaces() {
+    const cache = new StaticCanvasImageCache({ pixelBudget: 100_000 });
+    let surfaceCount = 0;
+    const hidden = {
+        width: 9,
+        height: 9,
+        getBoundingClientRect: () => ({ width: 0, height: 0 }),
+        getContext: () => null
+    };
+    Array.from({ length: 7 }, () =>
+        renderIconTag(hidden, "attack_sword", { cache, createSurface: () => (surfaceCount += 1) })
+    );
+    Array.from({ length: 7 }, () =>
+        renderCharacterPortrait(
+            hidden,
+            { fighter: createRoster()[0] },
+            { cache, createSurface: () => (surfaceCount += 1) }
+        )
+    );
+    assert.equal(surfaceCount, 0, "hidden canvases must not create raster surfaces");
+    assert.equal(cache.entries.size, 0, "hidden canvases must not create cache entries");
+    assert.equal(hidden.width, 1, "hidden canvases must retain a 1px backing width");
+    assert.equal(hidden.height, 1, "hidden canvases must retain a 1px backing height");
+    console.log("[hidden-static-canvas-cache] ok");
+}
+
 function testDeveloperGalleryTemplateContracts() {
     const template = readSource("src/components/collection-hub.html");
     assert.ok(template.includes("장비 아이콘 갤러리"), "Developer tab should contain icon gallery section");
@@ -2211,6 +2418,11 @@ testIconTagCountAndUniqueness();
 testIconTagDrawAll();
 testIconTagDprBackingSize();
 testIconTagControllerResizeObserverCleanup();
+testStaticCanvasImageCacheLruAndResourceRelease();
+testStaticCanvasImageCacheFinalizesOffscreenBitmaps();
+testStaticCanvasRenderersReuseCachedImages();
+testPortraitVisualKeyUsesOnlyVisualState();
+testHiddenCanvasesDoNotCreateCacheSurfaces();
 testDeveloperGalleryTemplateContracts();
 testIconTagDirectiveRegistration();
 

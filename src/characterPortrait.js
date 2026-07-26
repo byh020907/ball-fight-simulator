@@ -1,6 +1,7 @@
 import { getCharacterDefinitionByAbility } from "./characters/characterRegistry.js";
 import { Vector2 } from "./core.js";
 import { BattleBall } from "./entities/battleBall.js";
+import { renderCachedCanvasImage } from "./staticCanvasImageCache.js";
 
 const MAXIMUM_PIXEL_RATIO = 2;
 const PORTRAIT_RADIUS_RATIO = 0.36;
@@ -36,7 +37,21 @@ function createPortraitBall(fighter, equipmentItems, center, radius) {
     return ball;
 }
 
-export function renderCharacterPortrait(canvas, portrait) {
+export function getPortraitVisualKey(portrait) {
+    const fighter = portrait?.fighter ?? portrait;
+    const equipmentItems = portrait?.equipmentItems ?? [];
+    return JSON.stringify({
+        id: fighter?.id,
+        ability: fighter?.ability,
+        color: fighter?.color,
+        face: fighter?.face,
+        appearance: fighter?.appearance,
+        rebirthCount: fighter?.rebirthCount,
+        equipment: equipmentItems.map((item) => ({ rarity: item.rarity, enhanceLevel: item.enhanceLevel }))
+    });
+}
+
+export function renderCharacterPortrait(canvas, portrait, { cache, createSurface, finalizeImage } = {}) {
     if (!canvas) return false;
     const displaySize = getCanvasDisplaySize(canvas);
     if (!displaySize) {
@@ -52,16 +67,34 @@ export function renderCharacterPortrait(canvas, portrait) {
     const pixelRatio = Math.min(MAXIMUM_PIXEL_RATIO, globalThis.devicePixelRatio || 1);
     canvas.width = Math.max(1, Math.round(width * pixelRatio));
     canvas.height = Math.max(1, Math.round(height * pixelRatio));
-    context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-    context.clearRect(0, 0, width, height);
-
     const fighter = portrait?.fighter ?? portrait;
     if (!fighter?.stats || !fighter?.ability) return false;
-
-    const center = new Vector2(width / 2, height / 2);
-    const radius = Math.min(width, height) * PORTRAIT_RADIUS_RATIO;
-    const ball = createPortraitBall(fighter, portrait?.equipmentItems, center, radius);
-    ball.drawPortrait(context);
+    const backingWidth = canvas.width;
+    const backingHeight = canvas.height;
+    const drawVector = (targetContext) => {
+        targetContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+        targetContext.clearRect(0, 0, width, height);
+        const center = new Vector2(width / 2, height / 2);
+        const radius = Math.min(width, height) * PORTRAIT_RADIUS_RATIO;
+        const ball = createPortraitBall(fighter, portrait?.equipmentItems, center, radius);
+        ball.drawPortrait(targetContext);
+    };
+    const cached = renderCachedCanvasImage({
+        cache,
+        key: `character-portrait:${getPortraitVisualKey(portrait)}:${backingWidth}x${backingHeight}:${pixelRatio}`,
+        width: backingWidth,
+        height: backingHeight,
+        render: drawVector,
+        createSurface,
+        finalizeImage
+    });
+    if (cached) {
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        context.clearRect(0, 0, backingWidth, backingHeight);
+        context.drawImage(cached.image, 0, 0);
+    } else {
+        drawVector(context);
+    }
     return true;
 }
 
@@ -82,6 +115,7 @@ export class CharacterPortraitController {
     }
 
     setPortrait(portrait) {
+        if (getPortraitVisualKey(this.portrait) === getPortraitVisualKey(portrait)) return;
         this.portrait = portrait;
         this.scheduleRender();
     }
