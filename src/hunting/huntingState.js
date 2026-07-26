@@ -5,7 +5,8 @@ import {
     HUNTING_STAGES,
     HUNTING_STAT_KEYS,
     HUNTING_COMBAT_RELIEF,
-    HUNTING_MINIBOSS
+    HUNTING_MINIBOSS,
+    normalizeHuntingStageUnlockIds
 } from "./huntingConfig.js";
 import { applyDefeatPreservation, createEmptyHuntingLoot, mergeHuntingLoot } from "./huntingRewards.js";
 import { HUNTING_EVENT_TYPES } from "./huntingConfig.js";
@@ -151,11 +152,7 @@ export function getHuntingAvailableStartFloors(stats, stageId) {
 }
 
 export function getUnlockedHuntingStageIds(profile) {
-    const knownIds = new Set(HUNTING_STAGES.map((stage) => stage.id));
-    const unlocked = Array.isArray(profile?.hunting?.unlockedStageIds)
-        ? profile.hunting.unlockedStageIds.filter((id) => knownIds.has(id))
-        : [];
-    return unlocked.length > 0 ? [...new Set(unlocked)] : [HUNTING_STAGE_IDS.CAVE];
+    return normalizeHuntingStageUnlockIds(profile?.hunting?.unlockedStageIds);
 }
 
 export function getSelectedHuntingStageId(profile) {

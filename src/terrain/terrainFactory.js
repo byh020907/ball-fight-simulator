@@ -158,11 +158,11 @@ function createForestAnchors(rng, count) {
     return anchors;
 }
 
-function createForestPattern(floor) {
+function createForestPattern(floor, seedStageId) {
     const config = FOREST_TERRAIN_DEFAULTS;
     const maximumRootCount = Math.round(config.BASE_ROOT_COUNT * config.MAX_AREA_MULTIPLIER);
     const maximumMushroomCount = Math.round(config.BASE_MUSHROOM_COUNT * config.MAX_AREA_MULTIPLIER);
-    const rng = pseudoRandom(deterministicSeed(HUNTING_STAGE_IDS.FOREST, floor, 0, 0));
+    const rng = pseudoRandom(deterministicSeed(seedStageId, floor, 0, 0));
     const anchors = createForestAnchors(rng, maximumRootCount + maximumMushroomCount);
     const roots = Array.from({ length: maximumRootCount }, (_, index) => {
         const length = config.ROOT_LENGTH.min + rng() * (config.ROOT_LENGTH.max - config.ROOT_LENGTH.min);
@@ -188,13 +188,13 @@ function createForestPattern(floor) {
     return { roots, mushrooms };
 }
 
-function createForestTerrain({ floor = 1, width = 1280, height = 1280 }) {
+function createForestTerrain({ floor = 1, width = 1280, height = 1280, seedStageId = HUNTING_STAGE_IDS.FOREST }) {
     const config = FOREST_TERRAIN_DEFAULTS;
     const baseArea = config.BASE_WIDTH * config.BASE_HEIGHT;
     const areaMultiplier = Math.min(config.MAX_AREA_MULTIPLIER, Math.max(1, (width * height) / baseArea));
     const rootCount = Math.round(config.BASE_ROOT_COUNT * areaMultiplier);
     const mushroomCount = Math.round(config.BASE_MUSHROOM_COUNT * areaMultiplier);
-    const pattern = createForestPattern(floor);
+    const pattern = createForestPattern(floor, seedStageId);
     const toTerrain = (descriptor, type, interaction = null) => ({
         id: descriptor.id,
         type,
@@ -224,19 +224,19 @@ export function createHuntingTerrain({ stageId, floor = 1, width = 960, height =
     const stage = HUNTING_STAGES.find((s) => s.id === stageId);
     if (!stage) return [];
 
-    if (stageId === HUNTING_STAGE_IDS.CAVE) {
-        return createCaveTerrain({ floor, width, height });
+    if (stage.theme === "cave") {
+        return createCaveTerrain({ floor, width, height, seedStageId: stage.id });
     }
 
-    if (stageId === HUNTING_STAGE_IDS.FOREST) {
-        return createForestTerrain({ floor, width, height });
+    if (stage.theme === "forest") {
+        return createForestTerrain({ floor, width, height, seedStageId: stage.id });
     }
 
     return [];
 }
 
-function createCaveTerrain({ floor = 1, width = 960, height = 960 }) {
-    const seed = deterministicSeed(HUNTING_STAGE_IDS.CAVE, floor, width, height);
+function createCaveTerrain({ floor = 1, width = 960, height = 960, seedStageId = HUNTING_STAGE_IDS.CAVE }) {
+    const seed = deterministicSeed(seedStageId, floor, width, height);
     const rng = pseudoRandom(seed);
 
     const totalCount = 3 + (floor % 3);

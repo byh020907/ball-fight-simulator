@@ -156,12 +156,12 @@ export const REWARD_BALANCE = deepFreeze({
             }
         },
         events: {
-            boon: { baseShards: 8, baseShardVariance: 2, maxMultiplier: 5, maxMultiplierFloor: 100 },
+            boon: { baseShards: 8, baseShardVariance: 2, maxMultiplier: 5, maxMultiplierFloor: 50 },
             merchant: {
-                discount: { default: 0.1, deepFloor: 70, deepFloorValue: 0.15 },
+                discount: { default: 0.1, deepFloor: 35, deepFloorValue: 0.15 },
                 repair: { cost: 50, recoveryRatio: 0.35 }
             },
-            mishap: { defaultDamageRatio: 0.05, deepFloor: 70, deepFloorDamageRatio: 0.1 },
+            mishap: { defaultDamageRatio: 0.05, deepFloor: 35, deepFloorDamageRatio: 0.1 },
             restRecoveryRatio: 0.25,
             shardCache: {
                 baseShards: 8,

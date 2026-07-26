@@ -35,10 +35,11 @@ export function completeHuntingStage(profile, stageId = HUNTING_STAGE_IDS.CAVE) 
     const unlocked = getUnlockedHuntingStageIds(profile);
     const nextStageId = getNextHuntingStageId(stageId);
 
-    if (nextStageId && !unlocked.includes(nextStageId)) {
-        profile.hunting.unlockedStageIds = [...unlocked, nextStageId];
+    if (nextStageId) {
+        const unlockedStageId = unlocked.includes(nextStageId) ? null : nextStageId;
+        profile.hunting.unlockedStageIds = unlockedStageId ? [...unlocked, unlockedStageId] : unlocked;
         profile.hunting.selectedStageId = nextStageId;
-        return { unlockedStageId: nextStageId };
+        return { unlockedStageId };
     }
 
     profile.hunting.unlockedStageIds = unlocked;

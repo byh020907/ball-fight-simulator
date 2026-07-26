@@ -1,6 +1,7 @@
 import {
     HUNTING_ENEMY_TYPES,
     HUNTING_MOB_COMPOSITION,
+    HUNTING_MAX_FLOOR,
     HUNTING_MONSTER_TYPES,
     HUNTING_STAGE_IDS,
     HUNTING_STAGES
@@ -92,7 +93,7 @@ const CAVE_MONSTERS = Object.freeze(
         [
             "shooter",
             "사수 볼",
-            10,
+            5,
             1.7,
             "#426f9e",
             "cyclops",
@@ -102,7 +103,7 @@ const CAVE_MONSTERS = Object.freeze(
         [
             "electric",
             "전기 마법사",
-            30,
+            15,
             1.8,
             "#5e8ee6",
             "ooo",
@@ -112,7 +113,7 @@ const CAVE_MONSTERS = Object.freeze(
         [
             "healer",
             "힐러 볼",
-            20,
+            10,
             1.8,
             "#65b87a",
             "happy",
@@ -122,7 +123,7 @@ const CAVE_MONSTERS = Object.freeze(
         [
             "chain",
             "사슬 볼",
-            40,
+            20,
             1.9,
             "#b85065",
             "angry",
@@ -132,7 +133,7 @@ const CAVE_MONSTERS = Object.freeze(
         [
             "shockwave",
             "충격파 볼",
-            30,
+            15,
             1.9,
             "#e1a94e",
             "ooo",
@@ -142,7 +143,7 @@ const CAVE_MONSTERS = Object.freeze(
         [
             "barrier",
             "방벽 볼",
-            20,
+            10,
             2.0,
             "#5dbaeb",
             "default",
@@ -152,7 +153,7 @@ const CAVE_MONSTERS = Object.freeze(
         [
             "siphon",
             "흡수 볼",
-            40,
+            20,
             2.0,
             "#9b69be",
             "xeye",
@@ -162,7 +163,7 @@ const CAVE_MONSTERS = Object.freeze(
         [
             "shard",
             "파편 볼",
-            40,
+            20,
             2.1,
             "#e0d05b",
             "cyclops",
@@ -172,7 +173,7 @@ const CAVE_MONSTERS = Object.freeze(
         [
             "boomerang",
             "부메랑 볼",
-            50,
+            25,
             2.1,
             "#e58a52",
             "happy",
@@ -182,7 +183,7 @@ const CAVE_MONSTERS = Object.freeze(
         [
             "splitter",
             "분열 볼",
-            50,
+            25,
             2.2,
             "#c56bd5",
             "ooo",
@@ -192,7 +193,7 @@ const CAVE_MONSTERS = Object.freeze(
         [
             "jumper",
             "도약 볼",
-            50,
+            25,
             2.2,
             "#e9c45d",
             "dash",
@@ -202,7 +203,7 @@ const CAVE_MONSTERS = Object.freeze(
         [
             "laser",
             "레이저 볼",
-            50,
+            25,
             2.3,
             "#ef5b5b",
             "cyclops",
@@ -317,7 +318,7 @@ function ensurePressureBehavior(monsterTypes, floor, stageId, rng) {
 }
 
 export function getHuntingMobCountWeights(floor) {
-    const depth = Math.min(1, (safeFloor(floor) - 1) / 99);
+    const depth = Math.min(1, (safeFloor(floor) - 1) / (HUNTING_MAX_FLOOR - 1));
     const target =
         HUNTING_MOB_COMPOSITION.MIN_COUNT +
         (HUNTING_MOB_COMPOSITION.MAX_COUNT - HUNTING_MOB_COMPOSITION.MIN_COUNT) *
@@ -457,7 +458,7 @@ export function createHuntingMinibossSpec({
     );
 }
 
-export function createCaveFinalBossSpec({ floor = 100 } = {}) {
+export function createCaveFinalBossSpec({ floor = HUNTING_MAX_FLOOR } = {}) {
     return {
         id: `cave-deep-core-f${safeFloor(floor)}`,
         name: "심층의 핵",

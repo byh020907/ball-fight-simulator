@@ -305,7 +305,7 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
     createHuntingCounterAchievement({
         id: "hunting_all_stages_clear",
         name: "전 지역 제패",
-        description: "동굴, 숲, 사막의 최종 보스를 모두 처치하세요.",
+        description: "6개 사냥터의 최종 보스를 모두 처치하세요.",
         tier: "gold",
         target: Object.values(HUNTING_STAGE_IDS).length,
         rewardKey: "huntingAllStagesClear",

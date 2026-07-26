@@ -1,11 +1,11 @@
 const DEFINITIONS = [
-    ["elite-10-pursuer-charger-shooter", 10, ["pursuer", "charger", "shooter"]],
-    ["elite-20-barrier-pursuer-healer-shooter", 20, ["barrier", "pursuer", "healer", "shooter"]],
-    ["elite-40-barrier-chain-healer-shard", 40, ["barrier", "chain", "healer", "shard"]],
-    ["elite-80-barrier-chain-healer-boomerang-laser", 80, ["barrier", "chain", "healer", "boomerang", "laser"]],
-    ["elite-20-healer-healer-healer-electric", 20, ["healer", "healer", "healer", "electric"]],
-    ["elite-20-barrier-barrier-barrier-healer-healer", 20, ["barrier", "barrier", "barrier", "healer", "healer"]],
-    ["elite-40-splitter-splitter-splitter-healer-healer", 40, ["splitter", "splitter", "splitter", "healer", "healer"]]
+    ["elite-5-pursuer-charger-shooter", 5, ["pursuer", "charger", "shooter"]],
+    ["elite-10-barrier-pursuer-healer-shooter", 10, ["barrier", "pursuer", "healer", "shooter"]],
+    ["elite-20-barrier-chain-healer-shard", 20, ["barrier", "chain", "healer", "shard"]],
+    ["elite-40-barrier-chain-healer-boomerang-laser", 40, ["barrier", "chain", "healer", "boomerang", "laser"]],
+    ["elite-10-healer-healer-healer-electric", 10, ["healer", "healer", "healer", "electric"]],
+    ["elite-10-barrier-barrier-barrier-healer-healer", 10, ["barrier", "barrier", "barrier", "healer", "healer"]],
+    ["elite-20-splitter-splitter-splitter-healer-healer", 20, ["splitter", "splitter", "splitter", "healer", "healer"]]
 ];
 
 export const ELITE_MOB_COMBINATIONS = Object.freeze(

@@ -2627,7 +2627,7 @@ function testHuntingUiRouteDisplay() {
     const hunting = app.hunting;
 
     // 7층에서 시작하는 10층 전진 시뮬레이션
-    app.hunting._run = { floor: 7, maxFloor: 100 };
+    app.hunting._run = { floor: 7, maxFloor: 50 };
     try {
         hunting._setHuntingMoveState({
             moving: true,
@@ -2645,22 +2645,22 @@ function testHuntingUiRouteDisplay() {
         assert.equal(state.huntingMoveMax, 10, "Max steps should be 10");
         assert.equal(state.huntingMoveMessage, "8층으로 이동 중…", "Message should show current floor");
 
-        // 95층에서 전진: routeMaxSteps가 5로 clamp
+        // 45층에서 전진: routeMaxSteps가 5로 clamp
         recorded.calls = [];
-        app.hunting._run = { floor: 95, maxFloor: 100 };
+        app.hunting._run = { floor: 45, maxFloor: 50 };
         hunting._setHuntingMoveState({
             moving: true,
             step: 1,
             maxSteps: 5,
-            routeStartFloor: 95,
-            routeEndFloor: 100,
-            message: "96층으로 이동 중…"
+            routeStartFloor: 45,
+            routeEndFloor: 50,
+            message: "46층으로 이동 중…"
         });
 
         const state2 = recorded.calls[recorded.calls.length - 1];
-        assert.equal(state2.huntingMoveFrom, 95, "95층 route start");
-        assert.equal(state2.huntingMoveTo, 100, "100층 route end (clamped)");
-        assert.equal(state2.huntingMoveMax, 5, "95→100 is 5 steps");
+        assert.equal(state2.huntingMoveFrom, 45, "45층 route start");
+        assert.equal(state2.huntingMoveTo, 50, "50층 route end (clamped)");
+        assert.equal(state2.huntingMoveMax, 5, "45→50 is 5 steps");
 
         // 중간 단계에서도 route 표시는 변하지 않아야 함
         recorded.calls = [];
@@ -2814,18 +2814,14 @@ function testHuntingEventPresentationContracts() {
 function testHuntingBoonShardRewardsScaleWithFloor() {
     const floorOneLow = HuntingEvent.createPayload(HUNTING_EVENT_TYPES.BOON, 1, () => 0);
     const floorOneHigh = HuntingEvent.createPayload(HUNTING_EVENT_TYPES.BOON, 1, () => 0.999999);
-    const floorHundredLow = HuntingEvent.createPayload(HUNTING_EVENT_TYPES.BOON, 100, () => 0);
-    const floorHundredHigh = HuntingEvent.createPayload(HUNTING_EVENT_TYPES.BOON, 100, () => 0.999999);
+    const floorFiftyLow = HuntingEvent.createPayload(HUNTING_EVENT_TYPES.BOON, 50, () => 0);
+    const floorFiftyHigh = HuntingEvent.createPayload(HUNTING_EVENT_TYPES.BOON, 50, () => 0.999999);
     const floorBeyondCap = HuntingEvent.createPayload(HUNTING_EVENT_TYPES.BOON, 500, () => 0.999999);
 
     assert.equal(floorOneLow.shards, 6, "Floor 1 boon rewards should start at 6 shards");
     assert.equal(floorOneHigh.shards, 10, "Floor 1 boon rewards should reach 10 shards");
-    assert.equal(floorHundredLow.shards, 30, "Floor 100 boon rewards should scale the low roll to five times its base");
-    assert.equal(
-        floorHundredHigh.shards,
-        50,
-        "Floor 100 boon rewards should scale the high roll to five times its base"
-    );
+    assert.equal(floorFiftyLow.shards, 30, "Floor 50 boon rewards should scale the low roll to five times its base");
+    assert.equal(floorFiftyHigh.shards, 50, "Floor 50 boon rewards should scale the high roll to five times its base");
     assert.equal(floorBeyondCap.shards, 50, "Boon rewards should stop scaling beyond the five-times cap");
     console.log("[hunting-boon-shard-scaling] ok");
 }
@@ -2916,7 +2912,7 @@ function testHuntingAutoEventRequiresConfirmation() {
         true,
         "Event result UI should stay visible until confirmation"
     );
-    assert.equal(overlayCalls.at(-1).huntingEventDetail, "파편 +8", "Event result UI should show the concrete gain");
+    assert.equal(overlayCalls.at(-1).huntingEventDetail, "파편 +9", "Event result UI should show the concrete gain");
 
     let advanceCalls = 0;
     let advanceOptions = null;
@@ -3730,7 +3726,7 @@ function testHuntingBossRolesAndRewards(app) {
         "A successful miniboss roll must reset the next chance to its initial value"
     );
 
-    const championEventRun = advanceHuntingRun({ ...run, minibossChance: 0.2 }, { rng: createSequenceRng([0.5, 0.9]) });
+    const championEventRun = advanceHuntingRun({ ...run, minibossChance: 0.2 }, { rng: createSequenceRng([0.5, 0.8]) });
     assert.equal(
         championEventRun.lastEvent.type,
         HUNTING_EVENT_TYPES.CHAMPION_INTRUSION,
@@ -3741,11 +3737,11 @@ function testHuntingBossRolesAndRewards(app) {
         0.2,
         "Non-combat events must not advance the normal-combat miniboss chance"
     );
-    const finalBossRun = advanceHuntingRun({ ...run, floor: 99, minibossChance: 0.25 }, { rng: () => 0 });
+    const finalBossRun = advanceHuntingRun({ ...run, floor: 49, minibossChance: 0.25 }, { rng: () => 0 });
     assert.equal(
         finalBossRun.lastEncounter.type,
         HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS,
-        "Floor 100 must remain a final boss"
+        "Floor 50 must remain a final boss"
     );
     assert.equal(finalBossRun.minibossChance, 0.25, "The final boss must not consume the normal-combat miniboss roll");
 
@@ -3984,7 +3980,7 @@ function testEliteMobCombinationEvent(app) {
         );
         assert.deepEqual(
             ELITE_MOB_COMBINATIONS.map((combination) => combination.minimumFloor),
-            [10, 20, 40, 80, 20, 20, 40],
+            [5, 10, 20, 40, 10, 10, 20],
             "Elite encounters should use the approved manual floor-gated roster"
         );
         ELITE_MOB_COMBINATIONS.forEach((combination) => {
@@ -4118,7 +4114,7 @@ function testEliteMobCombinationEvent(app) {
         const fixedFormationSpecs = createEliteMobEncounter({
             floor: 10,
             stageId: HUNTING_STAGE_IDS.CAVE,
-            combinationId: "elite-10-pursuer-charger-shooter",
+            combinationId: "elite-5-pursuer-charger-shooter",
             monsterTypes: ["pursuer", "charger", "shooter"],
             rng: () => 0
         });
@@ -4212,7 +4208,7 @@ function testEliteMobCombinationEvent(app) {
         const healerFormationSpecs = createEliteMobEncounter({
             floor: 20,
             stageId: HUNTING_STAGE_IDS.CAVE,
-            combinationId: "elite-20-barrier-pursuer-healer-shooter",
+            combinationId: "elite-10-barrier-pursuer-healer-shooter",
             monsterTypes: ["barrier", "pursuer", "healer", "shooter"],
             rng: () => 0
         });
@@ -4357,7 +4353,7 @@ function testEliteMobCombinationEvent(app) {
 function testEliteMobEventWeightFloorGate() {
     const eliteEvent = HuntingEvent.get(HUNTING_EVENT_TYPES.ELITE_MOB);
 
-    for (const floor of Array.from({ length: 9 }, (_, index) => index + 1)) {
+    for (const floor of Array.from({ length: 4 }, (_, index) => index + 1)) {
         assert.equal(
             eliteEvent.getBaseWeight(floor),
             0,
@@ -4394,9 +4390,9 @@ function testEliteMobEventWeightFloorGate() {
         );
     }
 
-    assert.equal(eliteEvent.getBaseWeight(10), 1, "첫 정예 조합이 열리는 10층부터 기본 가중치는 기존 1이어야 합니다.");
-    const floorTenOutcome = rollHuntingFloorOutcome(
-        10,
+    assert.equal(eliteEvent.getBaseWeight(5), 1, "첫 정예 조합이 열리는 5층부터 기본 가중치는 기존 1이어야 합니다.");
+    const floorFiveOutcome = rollHuntingFloorOutcome(
+        5,
         (() => {
             const values = [0.5, 0.95, 0];
             return () => values.shift() ?? 0;
@@ -4405,11 +4401,11 @@ function testEliteMobEventWeightFloorGate() {
         { hpRatio: 1 }
     );
     assert.equal(
-        floorTenOutcome.event.type,
+        floorFiveOutcome.event.type,
         HUNTING_EVENT_TYPES.ELITE_MOB,
-        "10층 경계 RNG는 정예 몹을 선택해야 합니다."
+        "5층 경계 RNG는 정예 몹을 선택해야 합니다."
     );
-    assert.ok(floorTenOutcome.event.eliteCombinationId, "10층 정예 몹 선택은 유효한 조합 payload를 만들어야 합니다.");
+    assert.ok(floorFiveOutcome.event.eliteCombinationId, "5층 정예 몹 선택은 유효한 조합 payload를 만들어야 합니다.");
     console.log("[hunting-elite-event-weight-floor-gate] ok");
 }
 
@@ -8483,14 +8479,14 @@ function testHuntingSystem() {
     );
 
     assert.equal(getEnemyPowerMultiplier(1), 1, "Floor 1 normal enemy power should be base");
-    assert.equal(getEnemyPowerMultiplier(100), 1.7, "Floor 100 normal power should remain on the capped curve");
+    assert.equal(getEnemyPowerMultiplier(50), 1.7, "Floor 50 normal power should remain on the capped curve");
     assert.equal(
-        getEnemyPowerMultiplier(100, { enemyType: HUNTING_ENEMY_TYPES.ELITE }),
+        getEnemyPowerMultiplier(50, { enemyType: HUNTING_ENEMY_TYPES.ELITE }),
         1.82,
         "Elite role bonus must remain inside the cap"
     );
     assert.equal(
-        getEnemyPowerMultiplier(100, { enemyType: HUNTING_ENEMY_TYPES.CHAMPION }),
+        getEnemyPowerMultiplier(50, { enemyType: HUNTING_ENEMY_TYPES.CHAMPION }),
         1.95,
         "Champion role bonus must remain inside the cap"
     );
@@ -8507,8 +8503,8 @@ function testHuntingSystem() {
         stats: { hp: 100, damage: 10, defense: 2, speed: 300, skill: 4, radius: 24 }
     };
     const scaled = scaleEnemySpecForHunting(baseSpec, 3);
-    assert.equal(scaled.stats.hp, 101.5, "Hunting scaling should affect HP in half-stat units");
-    assert.equal(scaled.stats.damage, 10, "Hunting scaling should affect damage in half-stat units");
+    assert.equal(scaled.stats.hp, 103, "Hunting scaling should affect HP in half-stat units");
+    assert.equal(scaled.stats.damage, 10.5, "Hunting scaling should affect damage in half-stat units");
     assert.equal(scaled.stats.defense, 2, "Hunting scaling should affect defense in half-stat units");
     for (const value of [scaled.stats.hp, scaled.stats.damage, scaled.stats.defense]) {
         assert.equal(value * 2, Math.round(value * 2), "Scaled combat stats must use 0.5 units");
@@ -8517,7 +8513,7 @@ function testHuntingSystem() {
     assert.equal(scaled.stats.skill, 4, "Hunting scaling should not affect skill");
 
     const floor1MobWeights = getHuntingMobCountWeights(1);
-    const floor100MobWeights = getHuntingMobCountWeights(100);
+    const floor50MobWeights = getHuntingMobCountWeights(50);
     assert.equal(
         getHuntingMobCount(1, () => 0),
         2,
@@ -8534,8 +8530,8 @@ function testHuntingSystem() {
         "Early floors should weight small encounters more heavily"
     );
     assert.ok(
-        floor100MobWeights.find((entry) => entry.count === 10).weight >
-            floor100MobWeights.find((entry) => entry.count === 2).weight,
+        floor50MobWeights.find((entry) => entry.count === 10).weight >
+            floor50MobWeights.find((entry) => entry.count === 2).weight,
         "Deep floors should weight large encounters more heavily"
     );
     const mobs = createHuntingMobEncounter({
@@ -8970,11 +8966,11 @@ async function testHuntingAchievementProgress() {
     console.log("[hunting-achievement-progress] ok");
 }
 
-function testHunting100FloorStructure() {
+function testHunting50FloorStructure() {
     // ── Run starts at floor 1 ──
     const run0 = createHuntingRun({ characterId: FIGHTER_IDS.DASH, now: 1000 });
     assert.equal(run0.floor, 1, "Hunting run should start at floor 1");
-    assert.equal(run0.maxFloor, 100, "Default max floor should be 100");
+    assert.equal(run0.maxFloor, 50, "Default max floor should be 50");
     assert.equal(run0.stageId, HUNTING_STAGE_IDS.CAVE, "Default stage should be cave");
     assert.equal(run0.lastEncounter, null, "New run should have no last encounter");
 
@@ -8984,28 +8980,27 @@ function testHunting100FloorStructure() {
     assert.equal(advanced1.floor, 2, "First advance should move from floor 1 to 2");
     assert.equal(advanced1.lastEncounter.type, HUNTING_FLOOR_OUTCOME_TYPES.EMPTY, "Empty outcome with high rng");
 
-    // ── 100층에서 final_boss 고정 ──
-    const run99 = { ...run0, floor: 99 };
-    const bossEncounter = rollHuntingFloorOutcome(100, () => 0);
-    assert.equal(bossEncounter.type, HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS, "Floor 100 should always be final_boss");
-    assert.equal(bossEncounter.floor, 100, "Final boss floor should be exactly 100");
+    // ── 50층에서 final_boss 고정 ──
+    const bossEncounter = rollHuntingFloorOutcome(50, () => 0);
+    assert.equal(bossEncounter.type, HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS, "Floor 50 should always be final_boss");
+    assert.equal(bossEncounter.floor, 50, "Final boss floor should be exactly 50");
     assert.equal(bossEncounter.enemyType, HUNTING_ENEMY_TYPES.CHAMPION, "Final boss should be champion type");
 
     // floor >= maxFloor → retreat
-    const runAtMax = { ...run0, floor: 100, status: "active", maxFloor: 100 };
+    const runAtMax = { ...run0, floor: 50, status: "active", maxFloor: 50 };
     const retreatedAtMax = advanceHuntingRun(runAtMax, { rng: () => 0 });
     assert.equal(retreatedAtMax.status, "retreated", "Floor >= maxFloor should auto-retreat with max_floor_clear");
 
-    // advanceHuntingRun from 99 → 100 should set final_boss encounter
-    const run98 = { ...run0, floor: 98, status: "active", maxFloor: 100 };
-    const to99 = advanceHuntingRun(run98, { rng: () => 0.9 });
-    assert.equal(to99.floor, 99, "Advance from 98 should go to 99");
-    const to100 = advanceHuntingRun(to99, { rng: () => 0.9 });
-    assert.equal(to100.floor, 100, "Advance from 99 should go to 100");
+    // advanceHuntingRun from 49 → 50 should set final_boss encounter
+    const run48 = { ...run0, floor: 48, status: "active", maxFloor: 50 };
+    const to49 = advanceHuntingRun(run48, { rng: () => 0.9 });
+    assert.equal(to49.floor, 49, "Advance from 48 should go to 49");
+    const to50 = advanceHuntingRun(to49, { rng: () => 0.9 });
+    assert.equal(to50.floor, 50, "Advance from 49 should go to 50");
     assert.equal(
-        to100.lastEncounter.type,
+        to50.lastEncounter.type,
         HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS,
-        "Floor 100 encounter should be final_boss"
+        "Floor 50 encounter should be final_boss"
     );
 
     // ── canRetreatFromHuntingRun: portal only ──
@@ -9057,7 +9052,7 @@ function testHunting100FloorStructure() {
         "Floor chances should sum to ~1"
     );
 
-    const lateChances = getHuntingFloorChances(99);
+    const lateChances = getHuntingFloorChances(49);
     assert.ok(lateChances.combatChance > earlyChances.combatChance, "Deep floor should have higher combat chance");
 
     // ── completeHuntingStage ──
@@ -9069,28 +9064,100 @@ function testHunting100FloorStructure() {
     );
     assert.equal(getSelectedHuntingStageId(profile), HUNTING_STAGE_IDS.CAVE, "Default selected stage should be cave");
 
-    // Clear cave → unlock forest
+    assert.equal(HUNTING_STAGES.length, 6, "Hunting should expose six fifty-floor regions");
+    assert.ok(
+        getHuntingMonsterDefinitions().every((monster) => monster.unlockFloor < 50),
+        "Every normal monster should unlock before the floor-50 boss"
+    );
+    assert.ok(
+        ELITE_MOB_COMBINATIONS.every((combination) => combination.minimumFloor < 50),
+        "Every elite combination should unlock before the floor-50 boss"
+    );
+    assert.deepEqual(
+        HUNTING_STAGES.map((stage) => stage.id),
+        [
+            HUNTING_STAGE_IDS.CAVE,
+            HUNTING_STAGE_IDS.DEEP_CAVE,
+            HUNTING_STAGE_IDS.FOREST,
+            HUNTING_STAGE_IDS.ANCIENT_FOREST,
+            HUNTING_STAGE_IDS.DESERT,
+            HUNTING_STAGE_IDS.SANDSTORM
+        ],
+        "Hunting regions should follow the intended six-stage progression"
+    );
+
+    const migratedForestProfile = sanitizePlayerProfile({
+        ...createDefaultPlayerProfile(),
+        hunting: {
+            ...createDefaultPlayerProfile().hunting,
+            unlockedStageIds: [HUNTING_STAGE_IDS.CAVE, HUNTING_STAGE_IDS.FOREST],
+            selectedStageId: HUNTING_STAGE_IDS.FOREST
+        }
+    });
+    assert.deepEqual(
+        migratedForestProfile.hunting.unlockedStageIds,
+        [HUNTING_STAGE_IDS.CAVE, HUNTING_STAGE_IDS.DEEP_CAVE, HUNTING_STAGE_IDS.FOREST],
+        "Legacy forest saves should also unlock the inserted deep cave"
+    );
+
+    const migratedDesertProfile = sanitizePlayerProfile({
+        ...createDefaultPlayerProfile(),
+        hunting: {
+            ...createDefaultPlayerProfile().hunting,
+            unlockedStageIds: [HUNTING_STAGE_IDS.CAVE, HUNTING_STAGE_IDS.FOREST, HUNTING_STAGE_IDS.DESERT],
+            selectedStageId: HUNTING_STAGE_IDS.DESERT
+        }
+    });
+    assert.deepEqual(
+        migratedDesertProfile.hunting.unlockedStageIds,
+        [
+            HUNTING_STAGE_IDS.CAVE,
+            HUNTING_STAGE_IDS.DEEP_CAVE,
+            HUNTING_STAGE_IDS.FOREST,
+            HUNTING_STAGE_IDS.ANCIENT_FOREST,
+            HUNTING_STAGE_IDS.DESERT
+        ],
+        "Legacy desert saves should retain equivalent progress through every inserted region"
+    );
+    assert.equal(
+        completeHuntingStage(migratedDesertProfile, HUNTING_STAGE_IDS.ANCIENT_FOREST).unlockedStageId,
+        null,
+        "Clearing before an already unlocked migrated stage should not report a new unlock"
+    );
+    assert.equal(
+        migratedDesertProfile.hunting.selectedStageId,
+        HUNTING_STAGE_IDS.DESERT,
+        "Clearing before an already unlocked migrated stage should still advance the selection"
+    );
+
+    // Clear cave → unlock deep cave
     const result1 = completeHuntingStage(profile, HUNTING_STAGE_IDS.CAVE);
-    assert.equal(result1.unlockedStageId, HUNTING_STAGE_IDS.FOREST, "Clearing cave should unlock forest");
+    assert.equal(result1.unlockedStageId, HUNTING_STAGE_IDS.DEEP_CAVE, "Clearing cave should unlock deep cave");
     assert.deepEqual(
         getUnlockedHuntingStageIds(profile),
-        [HUNTING_STAGE_IDS.CAVE, HUNTING_STAGE_IDS.FOREST],
-        "Profile should have cave + forest unlocked"
+        [HUNTING_STAGE_IDS.CAVE, HUNTING_STAGE_IDS.DEEP_CAVE],
+        "Profile should have cave + deep cave unlocked"
     );
-    assert.equal(getSelectedHuntingStageId(profile), HUNTING_STAGE_IDS.FOREST, "Selected stage should auto-advance");
+    assert.equal(getSelectedHuntingStageId(profile), HUNTING_STAGE_IDS.DEEP_CAVE, "Selected stage should auto-advance");
 
-    // Clear forest → unlock desert
-    const result2 = completeHuntingStage(profile, HUNTING_STAGE_IDS.FOREST);
-    assert.equal(result2.unlockedStageId, HUNTING_STAGE_IDS.DESERT, "Clearing forest should unlock desert");
-    assert.deepEqual(
-        getUnlockedHuntingStageIds(profile),
-        [HUNTING_STAGE_IDS.CAVE, HUNTING_STAGE_IDS.FOREST, HUNTING_STAGE_IDS.DESERT],
-        "All three stages should be unlocked"
+    for (const [currentStageId, expectedStageId] of [
+        [HUNTING_STAGE_IDS.DEEP_CAVE, HUNTING_STAGE_IDS.FOREST],
+        [HUNTING_STAGE_IDS.FOREST, HUNTING_STAGE_IDS.ANCIENT_FOREST],
+        [HUNTING_STAGE_IDS.ANCIENT_FOREST, HUNTING_STAGE_IDS.DESERT],
+        [HUNTING_STAGE_IDS.DESERT, HUNTING_STAGE_IDS.SANDSTORM]
+    ]) {
+        assert.equal(
+            completeHuntingStage(profile, currentStageId).unlockedStageId,
+            expectedStageId,
+            `Clearing ${currentStageId} should unlock ${expectedStageId}`
+        );
+    }
+    assert.deepEqual(getUnlockedHuntingStageIds(profile), Object.values(HUNTING_STAGE_IDS));
+    assert.equal(
+        completeHuntingStage(profile, HUNTING_STAGE_IDS.SANDSTORM).unlockedStageId,
+        null,
+        "Clearing the sixth stage should unlock nothing"
     );
-
-    // Clear desert → no more stages
-    const result3 = completeHuntingStage(profile, HUNTING_STAGE_IDS.DESERT);
-    assert.equal(result3.unlockedStageId, null, "Clearing last stage should unlock nothing");
 
     // Invalid stage ID in profile
     profile.hunting.unlockedStageIds = ["cave", "invalid_id"];
@@ -9124,8 +9191,8 @@ function testHunting100FloorStructure() {
     );
 
     const nextAfterCave = getNextHuntingStageId(HUNTING_STAGE_IDS.CAVE);
-    assert.equal(nextAfterCave, HUNTING_STAGE_IDS.FOREST, "Next after cave should be forest");
-    assert.equal(getNextHuntingStageId(HUNTING_STAGE_IDS.DESERT), null, "Next after desert should be null");
+    assert.equal(nextAfterCave, HUNTING_STAGE_IDS.DEEP_CAVE, "Next after cave should be deep cave");
+    assert.equal(getNextHuntingStageId(HUNTING_STAGE_IDS.SANDSTORM), null, "Next after sandstorm should be null");
 
     // ── HUNTING_FLOOR_OUTCOME_TYPES completeness ──
     assert.equal(HUNTING_FLOOR_OUTCOME_TYPES.EMPTY, "empty");
@@ -9195,16 +9262,16 @@ function testHuntingCombatRelief() {
     assert.ok(relief2.combatChance < relief1.combatChance, "Less relief → higher combat chance (approaching base)");
 
     // deep floor에서도 완충 작동
-    const deepBase = getHuntingFloorChances(90, 0);
-    const deepRelief = getHuntingFloorChances(90, 3);
+    const deepBase = getHuntingFloorChances(45, 0);
+    const deepRelief = getHuntingFloorChances(45, 3);
     assert.ok(deepRelief.combatChance < deepBase.combatChance, "Deep floor relief should still reduce combat");
 
-    // ── 100층은 완충 무시하고 항상 final_boss ──
-    const bossOutcome = rollHuntingFloorOutcome(100, () => 0, 3);
+    // ── 50층은 완충 무시하고 항상 final_boss ──
+    const bossOutcome = rollHuntingFloorOutcome(50, () => 0, 3);
     assert.equal(
         bossOutcome.type,
         HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS,
-        "Floor 100 should be final_boss even with combat relief"
+        "Floor 50 should be final_boss even with combat relief"
     );
 
     // ── combatReliefFloors 설정/소비 ──
@@ -9360,12 +9427,12 @@ function testHuntingPortalDecline() {
         "Portal decline should suppress low-HP portal boost"
     );
 
-    // ── 100층 final_boss unaffected by portal weighting ──
-    const bossOutcome = rollHuntingFloorOutcome(100, () => 0, 0, { hpRatio: 0.1, portalDeclineFloors: 0 });
+    // ── 50층 final_boss unaffected by portal weighting ──
+    const bossOutcome = rollHuntingFloorOutcome(50, () => 0, 0, { hpRatio: 0.1, portalDeclineFloors: 0 });
     assert.equal(
         bossOutcome.type,
         HUNTING_FLOOR_OUTCOME_TYPES.FINAL_BOSS,
-        "Floor 100 should be final_boss even with low HP and high portal weight"
+        "Floor 50 should be final_boss even with low HP and high portal weight"
     );
 
     // ── portalDeclineFloors decrements in advanceHuntingRun ──
@@ -9597,7 +9664,7 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
     profile.collection.characters[FIGHTER_IDS.EATER] = { tournamentWins: 1 };
     profile.hunting.unlockedCharacterIds = [FIGHTER_IDS.RAGE, FIGHTER_IDS.HERO, FIGHTER_IDS.EATER];
     profile.hunting.lastCompanionIds = [FIGHTER_IDS.HERO, FIGHTER_IDS.EATER];
-    profile.hunting.stats.lastReachedFloorByStage = { [HUNTING_STAGE_IDS.CAVE]: 47 };
+    profile.hunting.stats.lastReachedFloorByStage = { [HUNTING_STAGE_IDS.CAVE]: 27 };
     const app = {
         playerProfile: profile,
         playerFighterId: FIGHTER_IDS.RAGE,
@@ -9687,15 +9754,15 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
         );
         assert.equal(
             popupOptions[1].content.checkpoints.length,
-            5,
-            "Checkpoint selection must always render all five requested start floors"
+            3,
+            "Checkpoint selection must render floor one plus the two requested checkpoints"
         );
         assert.ok(
-            popupOptions[1].content.checkpoints.some((checkpoint) => checkpoint.floor === 40 && checkpoint.available) &&
+            popupOptions[1].content.checkpoints.some((checkpoint) => checkpoint.floor === 20 && checkpoint.available) &&
                 popupOptions[1].content.checkpoints.some(
-                    (checkpoint) => checkpoint.floor === 60 && !checkpoint.available
+                    (checkpoint) => checkpoint.floor === 40 && !checkpoint.available
                 ),
-            "A floor-47 record should unlock 40 but keep 60 and 80 disabled"
+            "A floor-27 record should unlock 20 but keep 40 disabled"
         );
         manager.showDebugPartySelect(FIGHTER_IDS.RAGE, {
             kind: "encounter",
@@ -9865,7 +9932,7 @@ async function testDebugHuntingEventPreviewUsesProductionEventFlow() {
         assert.equal(manager._run.phase, HUNTING_RUN_PHASES.AWAITING_CHOICE);
         assert.equal(overlayStates.at(-1).huntingChoiceVisible, true, "Portal should open its production choice UI");
 
-        const debugCombination = ELITE_MOB_COMBINATIONS.find((combination) => combination.minimumFloor === 80);
+        const debugCombination = ELITE_MOB_COMBINATIONS.find((combination) => combination.minimumFloor === 40);
         await manager.startDebugEventPreview(FIGHTER_IDS.RAGE, {
             stageId: HUNTING_STAGE_IDS.FOREST,
             encounterFloor: 1,
@@ -9976,7 +10043,7 @@ async function testHuntingCheckpointStartsAtSelectedFloor() {
             HUNTING_STAGE_IDS.CAVE
         ),
         [1, 20, 40],
-        "A floor-47 record should unlock only the 1, 20, and 40 checkpoints"
+        "A floor-47 record should unlock every fifty-floor checkpoint"
     );
 
     const profile = createDefaultPlayerProfile();
@@ -10032,7 +10099,7 @@ async function testHuntingCheckpointStartsAtSelectedFloor() {
         assert.equal(overlayMessages.at(-1).text, "숲 · 20층", "Selected checkpoint display must remain exact");
 
         profile.hunting.stats.lastReachedFloorByStage[HUNTING_STAGE_IDS.FOREST] = HUNTING_MAX_FLOOR;
-        for (const checkpoint of [40, 60, 80]) {
+        for (const checkpoint of [40]) {
             await manager.startRun(FIGHTER_IDS.RAGE, { encounterFloor: checkpoint });
             assert.equal(
                 manager._run.floor + 1,
@@ -10074,7 +10141,7 @@ async function testHuntingCheckpointStartsAtSelectedFloor() {
             lastEvent: { type: HUNTING_EVENT_TYPES.PORTAL }
         }),
         retreatHuntingRun(
-            { ...createHuntingRun({ characterId: FIGHTER_IDS.RAGE, stageId: HUNTING_STAGE_IDS.DESERT }), floor: 100 },
+            { ...createHuntingRun({ characterId: FIGHTER_IDS.RAGE, stageId: HUNTING_STAGE_IDS.DESERT }), floor: 50 },
             { reason: "stage_clear" }
         )
     ];
@@ -10087,7 +10154,7 @@ async function testHuntingCheckpointStartsAtSelectedFloor() {
         {
             [HUNTING_STAGE_IDS.CAVE]: 47,
             [HUNTING_STAGE_IDS.FOREST]: 42,
-            [HUNTING_STAGE_IDS.DESERT]: 100
+            [HUNTING_STAGE_IDS.DESERT]: 50
         },
         "Defeat, portal retreat, and stage clear must each overwrite only their stage's latest floor"
     );
@@ -10131,6 +10198,21 @@ function testHuntingTerrain() {
     const cave1 = createHuntingTerrain({ stageId: CAVE, floor: 1, width: 1120, height: 1120 });
     const cave2 = createHuntingTerrain({ stageId: CAVE, floor: 1, width: 1120, height: 1120 });
     assert.deepEqual(cave1, cave2, "Same input should produce identical terrain");
+    const deepCave1 = createHuntingTerrain({
+        stageId: HUNTING_STAGE_IDS.DEEP_CAVE,
+        floor: 1,
+        width: 1120,
+        height: 1120
+    });
+    const deepCave2 = createHuntingTerrain({
+        stageId: HUNTING_STAGE_IDS.DEEP_CAVE,
+        floor: 1,
+        width: 1120,
+        height: 1120
+    });
+    assert.ok(deepCave1.length > 0, "Deep cave should reuse the cave terrain family");
+    assert.deepEqual(deepCave1, deepCave2, "Deep cave terrain should be deterministic");
+    assert.notDeepEqual(deepCave1, cave1, "Deep cave should use a distinct deterministic terrain seed");
 
     // ── polygon world points deterministic ──
     if (polygons.length > 0) {
@@ -10158,6 +10240,14 @@ function testHuntingTerrain() {
         width: 1810,
         height: 1810
     });
+    const ancientForest = createHuntingTerrain({
+        stageId: HUNTING_STAGE_IDS.ANCIENT_FOREST,
+        floor: 23,
+        width: 1280,
+        height: 1280
+    });
+    assert.ok(ancientForest.length > 0, "Ancient forest should reuse the forest terrain family");
+    assert.notDeepEqual(ancientForest, forestBase, "Ancient forest should use a distinct deterministic terrain seed");
     assert.deepEqual(forestRepeat, forestBase, "The same forest floor and arena must reproduce exactly");
     assert.equal(
         forestBase.filter((terrain) => terrain.type === TERRAIN_TYPES.ROOT).length,
@@ -17248,7 +17338,7 @@ testVampireLevelRewardContracts(app);
 testMultiAbilityFoundation(app);
 testHuntingSystem();
 await testHuntingAchievementProgress();
-testHunting100FloorStructure();
+testHunting50FloorStructure();
 testHuntingCombatRelief();
 testHuntingPortalDecline();
 testHuntingMovementRecovery();

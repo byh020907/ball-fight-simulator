@@ -2,14 +2,17 @@ import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 
 const HUNTING_REWARDS = REWARD_BALANCE.hunting;
 
-export const HUNTING_MAX_FLOOR = 100;
+export const HUNTING_MAX_FLOOR = 50;
 export const HUNTING_ADVANCE_STEPS = 10;
-export const HUNTING_START_CHECKPOINTS = Object.freeze([1, 20, 40, 60, 80]);
+export const HUNTING_START_CHECKPOINTS = Object.freeze([1, 20, 40]);
 
 export const HUNTING_STAGE_IDS = Object.freeze({
     CAVE: "cave",
+    DEEP_CAVE: "deep_cave",
     FOREST: "forest",
-    DESERT: "desert"
+    ANCIENT_FOREST: "ancient_forest",
+    DESERT: "desert",
+    SANDSTORM: "sandstorm"
 });
 
 export const HUNTING_MONSTER_TYPES = Object.freeze({
@@ -40,10 +43,24 @@ export const HUNTING_STAGES = Object.freeze([
         theme: "cave"
     }),
     Object.freeze({
+        id: HUNTING_STAGE_IDS.DEEP_CAVE,
+        name: "심층 동굴",
+        description: "거대한 암반과 깊은 균열이 길을 가르는 동굴 심부",
+        arena: Object.freeze({ WIDTH: 1120, HEIGHT: 1040 }),
+        theme: "cave"
+    }),
+    Object.freeze({
         id: HUNTING_STAGE_IDS.FOREST,
         name: "숲",
         description: "회복과 함정이 뒤섞인 깊은 숲",
         arena: Object.freeze({ WIDTH: 1280, HEIGHT: 1280 }),
+        theme: "forest"
+    }),
+    Object.freeze({
+        id: HUNTING_STAGE_IDS.ANCIENT_FOREST,
+        name: "고대 숲",
+        description: "거목의 뿌리와 거대 버섯이 뒤엉킨 오래된 수림",
+        arena: Object.freeze({ WIDTH: 1360, HEIGHT: 1280 }),
         theme: "forest"
     }),
     Object.freeze({
@@ -52,8 +69,28 @@ export const HUNTING_STAGES = Object.freeze([
         description: "넓은 전장과 거친 모래바람의 원정지",
         arena: Object.freeze({ WIDTH: 1440, HEIGHT: 1280 }),
         theme: "desert"
+    }),
+    Object.freeze({
+        id: HUNTING_STAGE_IDS.SANDSTORM,
+        name: "모래폭풍 지대",
+        description: "시야를 삼키는 모래폭풍이 몰아치는 최후의 원정지",
+        arena: Object.freeze({ WIDTH: 1520, HEIGHT: 1360 }),
+        theme: "desert"
     })
 ]);
+
+export function normalizeHuntingStageUnlockIds(stageIds) {
+    const requestedIds = Array.isArray(stageIds) ? stageIds : [];
+    const highestUnlockedIndex = requestedIds.reduce(
+        (highest, stageId) =>
+            Math.max(
+                highest,
+                HUNTING_STAGES.findIndex((stage) => stage.id === stageId)
+            ),
+        0
+    );
+    return HUNTING_STAGES.slice(0, highestUnlockedIndex + 1).map((stage) => stage.id);
+}
 
 export const HUNTING_ARENA = Object.freeze({
     WIDTH: 1280,

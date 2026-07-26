@@ -5,7 +5,7 @@
 // 다른 모듈은 loadPlayerProfile() / savePlayerProfile()을 호출합니다.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { HUNTING_STAGES } from "./hunting/huntingConfig.js";
+import { normalizeHuntingStageUnlockIds } from "./hunting/huntingConfig.js";
 import { createDefaultHuntingStats, sanitizeHuntingStats } from "./hunting/huntingAchievementProgress.js";
 import { FIGHTER_IDS } from "./characters/characterRegistry.js";
 import { getHiddenCharacterIds } from "./characterAvailability.js";
@@ -232,9 +232,7 @@ function sanitizeHuntingBlueprints(obj) {
 }
 
 function sanitizeHuntingStageIds(value) {
-    const validIds = HUNTING_STAGES.map((stage) => stage.id);
-    const ids = Array.isArray(value) ? value.filter((id) => validIds.includes(id)) : [];
-    return ids.length > 0 ? [...new Set(ids)] : [validIds[0]];
+    return normalizeHuntingStageUnlockIds(value);
 }
 
 function sanitizeHuntingUnlockedCharacterIds(value) {
