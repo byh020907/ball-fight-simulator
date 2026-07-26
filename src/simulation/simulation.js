@@ -19,6 +19,8 @@ import { applyCollisionResponse } from "../physics/collisionResponse.js";
 import { PeriodicDamageEffect } from "../combatEffects.js";
 import { StickyGrenadeRegistry } from "./stickyGrenadeRegistry.js";
 
+export const MAX_ACTIVE_GRAVITY_PARTICLES = 256;
+
 function createStaticCollisionContext(surface, collision, postCollisionVelocity) {
     return {
         wall: surface === "wall",
@@ -383,7 +385,12 @@ export class Simulation {
     }
 
     spawnParticleBurst(position, color, options = {}) {
-        const count = options.count ?? 12;
+        const requestedCount = Number.isFinite(options.count) ? Math.max(0, Math.floor(options.count)) : 12;
+        const activeParticleCount = this.entities.reduce(
+            (count, entity) => count + (entity instanceof GravityParticle && !entity.isExpired ? 1 : 0),
+            0
+        );
+        const count = Math.min(requestedCount, Math.max(0, MAX_ACTIVE_GRAVITY_PARTICLES - activeParticleCount));
         for (let index = 0; index < count; index += 1) {
             const spread = options.spread ?? Math.PI * 2;
             const baseAngle = options.direction

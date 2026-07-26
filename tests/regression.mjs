@@ -25601,4 +25601,26 @@ function testComponentBridgeBuyDailyShopEquipment() {
 
 testComponentBridgeBuyDailyShopEquipment();
 
+function testCombatParticleBudgetPreventsRendererOverload(app) {
+    const simulation = new BattleSimulation(app.roster.slice(0, 2), { onLog() {}, onSound() {} });
+    const position = new Vector2(simulation.width / 2, simulation.height / 2);
+
+    for (let index = 0; index < 120; index += 1) {
+        simulation.spawnExplosion(position.clone(), "#ffffff");
+    }
+
+    const particleCount = simulation.entities.filter(
+        (entity) => entity.constructor.name === "GravityParticle" && !entity.isExpired
+    ).length;
+    const burstCount = simulation.entities.filter((entity) => entity.constructor.name === "VisualBurst").length;
+    assert.ok(
+        particleCount <= 256,
+        `active particle count must stay within the renderer-safe budget: ${particleCount}`
+    );
+    assert.equal(burstCount, 120, "particle shedding must preserve the primary burst feedback");
+    console.log("[combat-particle-renderer-budget] ok");
+}
+
+testCombatParticleBudgetPreventsRendererOverload(app);
+
 console.log("regression tests ok");
