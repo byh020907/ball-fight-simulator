@@ -18,7 +18,7 @@ export default createCharacterDefinition({
         {
             level: 3,
             abilityTier: 1,
-            gameText: "표식 대상 자연 충돌 시 메아리 돌진"
+            gameText: "쿨타임 중 자연 충돌 메아리 스택 1"
         },
         {
             level: 4
@@ -29,7 +29,7 @@ export default createCharacterDefinition({
         {
             level: 6,
             abilityTier: 2,
-            gameText: "표식 대상 벽·지형 충돌에도 메아리 돌진"
+            gameText: "쿨타임 중 벽·지형 메아리 스택 1 추가"
         },
         {
             level: 7
@@ -40,7 +40,7 @@ export default createCharacterDefinition({
         {
             level: 9,
             abilityTier: 3,
-            gameText: "메아리 적중 시 종결 돌진 1회"
+            gameText: "쿨타임 중 메아리 적중 종결 스택 1 추가"
         },
         {
             level: 10
@@ -52,8 +52,7 @@ export default createCharacterDefinition({
             damageMultiplier: 1.1,
             defenseMultiplier: 1.5,
             impactMultiplier: 1.15,
-            bonusDamageMultiplier: 1.5,
-            markDuration: 2.5
+            bonusDamageMultiplier: 1.5
         },
         tiers: [
             {},

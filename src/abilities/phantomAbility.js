@@ -25,9 +25,9 @@ export class PhantomAbility extends Ability {
             pendingStrikeStage: null,
             activeDashStage: null,
             markedTargetId: null,
-            markTimer: 0,
-            echoAvailable: false,
-            terminalAvailable: false,
+            naturalEchoStacks: 0,
+            staticEchoStacks: 0,
+            terminalDashStacks: 0,
             skipMarkedCollisionTargetId: null
         };
         this.resetCooldown(this.cooldown);
@@ -35,7 +35,7 @@ export class PhantomAbility extends Ability {
 
     update(delta, target) {
         const owner = this.owner;
-        this._tickMark(delta);
+        this._clearExpiredChain();
         if (this.state.activeDashStage && !owner.state.movement) {
             this.state.activeDashStage = null;
         }
@@ -61,6 +61,7 @@ export class PhantomAbility extends Ability {
         // normal cooldown countdown
         this.tickCooldown(delta);
         if (this.cooldownReady) {
+            this._clearMark();
             this.state.primed = true;
             this.state.primedTimer = PRIMED_DURATION;
         }
@@ -114,20 +115,22 @@ export class PhantomAbility extends Ability {
             this.state.skipMarkedCollisionTargetId = null;
             return;
         }
-        if (this.state.activeDashStage || !this._isMarkedTarget(target) || !this.state.echoAvailable) return;
-        this._triggerEchoStrike(target);
+        if (this.state.activeDashStage || !this._isMarkedTarget(target) || this.state.naturalEchoStacks <= 0) return;
+        this._triggerEchoStrike(target, "naturalEchoStacks");
     }
 
     onFighterStaticCollision(fighter, context) {
         if (
             !this.getLevelUpgrade().echoOnStaticCollision ||
             !this._isMarkedTarget(fighter) ||
-            !this.state.echoAvailable
+            this.state.staticEchoStacks <= 0 ||
+            this.state.teleportPhase > 0 ||
+            this.state.activeDashStage
         ) {
             return;
         }
         if (!context.wall && !context.terrain) return;
-        this._triggerEchoStrike(fighter);
+        this._triggerEchoStrike(fighter, "staticEchoStacks");
     }
 
     _triggerShadowStrike(target, stage) {
@@ -254,45 +257,41 @@ export class PhantomAbility extends Ability {
             this.state.skipMarkedCollisionTargetId = target.id;
             return;
         }
-        if (stage === "echo" && this.getLevelUpgrade().terminalDash && this.state.terminalAvailable) {
-            this.state.terminalAvailable = false;
+        if (stage === "echo" && this.getLevelUpgrade().terminalDash && this.state.terminalDashStacks > 0) {
+            this.state.terminalDashStacks -= 1;
             this._triggerShadowStrike(target, "terminal");
-            return;
-        }
-        if (stage === "terminal") {
-            this._clearMark();
         }
     }
 
     _markTarget(target) {
+        const upgrade = this.getLevelUpgrade();
         this.state.markedTargetId = target.id;
-        this.state.markTimer = this.getLevelUpgrade().markDuration;
-        this.state.echoAvailable = true;
-        this.state.terminalAvailable = true;
+        this.state.naturalEchoStacks = upgrade.echoOnNaturalCollision ? 1 : 0;
+        this.state.staticEchoStacks = upgrade.echoOnStaticCollision ? 1 : 0;
+        this.state.terminalDashStacks = upgrade.terminalDash ? 1 : 0;
     }
 
-    _tickMark(delta) {
+    _clearExpiredChain() {
         if (!this.state.markedTargetId) return;
-        this.state.markTimer = Math.max(0, this.state.markTimer - delta);
-        if (this.state.markTimer <= 0) {
+        if (this.cooldownReady) {
             this._clearMark();
         }
     }
 
     _isMarkedTarget(target) {
-        return target?.id === this.state.markedTargetId && this.state.markTimer > 0;
+        return target?.id === this.state.markedTargetId && !this.cooldownReady;
     }
 
-    _triggerEchoStrike(target) {
-        this.state.echoAvailable = false;
+    _triggerEchoStrike(target, stackKey) {
+        this.state[stackKey] -= 1;
         this._triggerShadowStrike(target, "echo");
     }
 
     _clearMark() {
         this.state.markedTargetId = null;
-        this.state.markTimer = 0;
-        this.state.echoAvailable = false;
-        this.state.terminalAvailable = false;
+        this.state.naturalEchoStacks = 0;
+        this.state.staticEchoStacks = 0;
+        this.state.terminalDashStacks = 0;
         this.state.skipMarkedCollisionTargetId = null;
     }
 

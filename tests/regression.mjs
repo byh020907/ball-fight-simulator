@@ -5270,6 +5270,14 @@ function testAbilityLevelUpgrades(app) {
         phantomRun.target.id,
         "Phantom terminal hit should keep the chain open while another condition stack remains"
     );
+    phantomRun.ball.ability.state.teleportPhase = 0;
+    phantomRun.ball.ability.state.activeDashStage = null;
+    phantomRun.ball.ability.onCollision(phantomRun.target);
+    assert.deepEqual(
+        [phantomRun.ball.ability.state.pendingStrikeStage, phantomRun.ball.ability.state.naturalEchoStacks],
+        ["echo", 0],
+        "Phantom should still spend its preserved natural-collision stack after the terminal dash"
+    );
 
     const heroRun = createTierSimulation(FIGHTER_IDS.HERO);
     const heroAbility = heroRun.ball.ability;
