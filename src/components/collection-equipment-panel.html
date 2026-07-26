@@ -37,7 +37,11 @@
                         >
                             <canvas x-equipment-icon-tag="item.iconTag" aria-hidden="true"></canvas>
                             <div class="ch-equipment-card-copy">
-                                <strong x-text="item.name"></strong><span x-text="`보유 ${item.count}`"></span>
+                                <strong x-text="item.name"></strong
+                                ><span
+                                    class="ch-equipment-count"
+                                    x-text="item.count > 0 ? `보유 ${item.count}` : '미보유'"
+                                ></span>
                             </div>
                             <div class="ch-equipment-stats">
                                 <template x-for="stat in item.stats" :key="stat.id"
@@ -60,6 +64,14 @@
                         <h4 x-text="selected.name"></h4>
                         <span x-text="selected.tierLabel"></span>
                     </div>
+                    <button
+                        class="ch-equipment-detail-close"
+                        type="button"
+                        aria-label="장비 상세 닫기"
+                        @click="closeDetail()"
+                    >
+                        ×
+                    </button>
                 </div>
                 <p>
                     <template x-for="stat in selected.stats" :key="stat.id"
@@ -125,6 +137,10 @@
         },
         select(id) {
             this.selectedId = id;
+            this.feedback = "";
+        },
+        closeDetail() {
+            this.selectedId = null;
             this.feedback = "";
         },
         craftMessage(reason) {
@@ -219,22 +235,28 @@
         cursor: pointer;
     }
     .ch-equipment-card.is-unowned {
-        border-color: #a3a3a3;
-        background: #f0f0ee;
-        color: #737373;
+        border-color: #777773;
+        border-style: dashed;
+        background: #d2d2cd;
+        color: #505050;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
     }
     .ch-equipment-card.is-unowned canvas {
         filter: grayscale(1);
-        opacity: 0.42;
+        opacity: 0.28;
     }
     .ch-equipment-card.is-unowned .ch-equipment-card-copy,
     .ch-equipment-card.is-unowned .ch-equipment-stats,
     .ch-equipment-card.is-unowned .ch-equipment-passive {
-        opacity: 0.62;
+        opacity: 0.72;
     }
     .ch-equipment-card.is-selected {
         border-color: #2563eb;
         background: #eff6ff;
+    }
+    .ch-equipment-card.is-unowned.is-selected {
+        border-style: solid;
+        background: #dbe4ef;
     }
     .ch-equipment-card-copy {
         min-width: 0;
@@ -247,6 +269,9 @@
     .ch-equipment-card-copy span,
     .ch-equipment-recipe span {
         overflow-wrap: anywhere;
+    }
+    .ch-equipment-count {
+        font-weight: 700;
     }
     .ch-equipment-stats {
         display: flex;
@@ -271,6 +296,22 @@
         align-items: center;
         gap: 8px;
         min-width: 0;
+    }
+    .ch-equipment-detail-close {
+        display: none;
+        width: 36px;
+        height: 36px;
+        margin-left: auto;
+        flex: 0 0 auto;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid #202020;
+        border-radius: 8px;
+        background: #ffffff;
+        color: #202020;
+        font-size: 1.2rem;
+        line-height: 1;
+        cursor: pointer;
     }
     .ch-equipment-detail-heading h4 {
         overflow-wrap: anywhere;
@@ -307,6 +348,16 @@
         }
         .ch-equipment-detail {
             max-height: 15rem;
+        }
+        .ch-equipment-detail-heading {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            padding-bottom: 6px;
+            background: #ffffff;
+        }
+        .ch-equipment-detail-close {
+            display: inline-flex;
         }
         .ch-equipment-card-grid {
             grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));

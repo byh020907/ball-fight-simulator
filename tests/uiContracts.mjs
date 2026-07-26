@@ -88,6 +88,17 @@ function testCollectionEquipmentPanelsOwnTheirFlows() {
         false,
         "Unowned equipment must remain selectable so players can inspect recipes"
     );
+    assert.ok(
+        equipmentPanel.includes("border-style: dashed") &&
+            equipmentPanel.includes("item.count > 0 ? `보유 ${item.count}` : '미보유'"),
+        "Unowned cards should use an unmistakable disabled treatment and explicit label"
+    );
+    assert.ok(
+        equipmentPanel.includes('aria-label="장비 상세 닫기"') &&
+            equipmentPanel.includes('@click="closeDetail()"') &&
+            equipmentPanel.includes("closeDetail()"),
+        "Mobile equipment detail should expose a close control that clears only the selection"
+    );
     assert.equal(
         collectionHub.includes("collection-fusion-dialog") || collectionHub.includes("collection-shop-panel"),
         false,
