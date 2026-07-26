@@ -4915,7 +4915,7 @@ function testExperienceSystem() {
     const equippedRewardedSpec = applyEquipmentStats(rewardedSpec, equipmentProfile);
     assert.equal(
         equippedRewardedSpec.stats.damage,
-        rewardedSpec.stats.damage + 2,
+        rewardedSpec.stats.damage + getEquipmentTemplate("attack_sword").stats.damage,
         "Equipment should add a fixed stat after level rewards and percentage allocation"
     );
 

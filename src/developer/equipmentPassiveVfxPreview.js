@@ -71,7 +71,7 @@ function createOwner() {
         getEquipmentCombatStats: () => ({
             hp: 400,
             defense: 96,
-            criticalChance: 45.5,
+            criticalChance: getEquipmentTemplate("completed_ability_crit").stats.criticalChance,
             speed: { increaseRatio: 0.5 },
             mass: { effectiveBonus: 0.35 },
             wallBounce: { effectiveBonus: 0.35 },

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createDefaultPlayerProfile, migratePlayerProfile, PROFILE_VERSION } from "../src/playerProfile.js";
 import {
+    EQUIPMENT_STAT_VALUE_RATIOS,
     EQUIPMENT_TEMPLATES,
     calculateCombinationCost,
     getEquipmentTemplate,
@@ -59,6 +60,12 @@ import {
 } from "../src/developer/equipmentPassiveVfxPreview.js";
 
 assert.equal(EQUIPMENT_TEMPLATES.length, 39);
+assert.equal(EQUIPMENT_STAT_VALUE_RATIOS.damage, 1.5);
+assert.equal(EQUIPMENT_STAT_VALUE_RATIOS.criticalChance, 4);
+assert.deepEqual(getEquipmentTemplate("attack_sword").stats, { damage: 3 });
+assert.deepEqual(getEquipmentTemplate("attack_greatsword").stats, { damage: 6 });
+assert.deepEqual(getEquipmentTemplate("crit_cloak").stats, { criticalChance: 8 });
+assert.deepEqual(getEquipmentTemplate("crit_twin_blades").stats, { criticalChance: 16 });
 assert.deepEqual(
     EQUIPMENT_TEMPLATES.reduce(
         (counts, template) => ({ ...counts, [template.tier]: (counts[template.tier] ?? 0) + 1 }),
@@ -93,8 +100,8 @@ assert.equal(craftEquipmentTemplate(profile, "intermediate_attack_crit").ok, tru
 assert.equal(profile.equipment.inventory.intermediate_attack_crit, 1);
 assert.equal(profile.hunting.shards, 900);
 assert.equal(equipEquipmentTemplate(profile, "intermediate_attack_crit", 0).ok, true);
-assert.equal(getEquippedEquipmentStats(profile).damage, 2);
-assert.equal(getEquippedEquipmentStats(profile).criticalChance, 21);
+assert.equal(getEquippedEquipmentStats(profile).damage, 3);
+assert.equal(getEquippedEquipmentStats(profile).criticalChance, 12);
 sortEquipmentInventory(profile);
 
 for (const template of EQUIPMENT_TEMPLATES.filter((candidate) => candidate.tier === "basic").slice(0, 5)) {
@@ -274,7 +281,7 @@ const cappedCriticalProfile = createDefaultPlayerProfile();
 addEquipmentQuantity(cappedCriticalProfile, "crit_twin_blades", 6);
 for (const slotIndex of [0, 1, 2, 3, 4, 5])
     equipEquipmentTemplate(cappedCriticalProfile, "crit_twin_blades", slotIndex);
-assert.equal(applyEquipmentStats(baseCombatSpec, cappedCriticalProfile).stats.criticalChance, 100);
+assert.equal(applyEquipmentStats(baseCombatSpec, cappedCriticalProfile).stats.criticalChance, 96);
 
 const physicsProfile = createDefaultPlayerProfile();
 const physicsTemplateIds = ["mass_weight", "wall_spring", "collision_gyro"];

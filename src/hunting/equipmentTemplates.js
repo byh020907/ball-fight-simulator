@@ -1,10 +1,10 @@
 export const EQUIPMENT_STAT_VALUE_RATIOS = Object.freeze({
     hp: 10,
-    damage: 1,
+    damage: 1.5,
     defense: 6,
     speed: 15,
     skill: 6,
-    criticalChance: 7,
+    criticalChance: 4,
     mass: 7,
     wallBounce: 7,
     angularImpulse: 7
@@ -14,8 +14,8 @@ export const EQUIPMENT_TEMPLATE_TIERS = Object.freeze(["basic", "intermediate", 
 export const EQUIPMENT_MAX_STACK = 100;
 
 const basicDefinitions = [
-    ["attack_sword", "금 간 장검", "damage", 2, 200],
-    ["attack_greatsword", "무거운 대검", "damage", 4, 450],
+    ["attack_sword", "금 간 장검", "damage", 3, 200],
+    ["attack_greatsword", "무거운 대검", "damage", 6, 450],
     ["health_crystal", "생명 수정", "hp", 20, 200],
     ["health_belt", "맥동 허리띠", "hp", 40, 450],
     ["defense_leather", "가죽 갑옷", "defense", 12, 200],
@@ -24,8 +24,8 @@ const basicDefinitions = [
     ["speed_wing", "날개깃", "speed", 60, 450],
     ["haste_mote", "마력 구슬", "skill", 12, 200],
     ["haste_kindlegem", "점화석", "skill", 24, 450],
-    ["crit_cloak", "행운 망토", "criticalChance", 14, 200],
-    ["crit_twin_blades", "쌍날 부적", "criticalChance", 28, 450],
+    ["crit_cloak", "행운 망토", "criticalChance", 8, 200],
+    ["crit_twin_blades", "쌍날 부적", "criticalChance", 16, 450],
     ["mass_weight", "무쇠 추", "mass", 14, 300],
     ["wall_spring", "압축 스프링", "wallBounce", 14, 300],
     ["collision_gyro", "충격 자이로", "angularImpulse", 14, 300]
