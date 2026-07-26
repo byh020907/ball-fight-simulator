@@ -17321,6 +17321,41 @@ async function testPhantomShadowStrike(app) {
     // Position should have changed (teleported behind target)
     const distFromTarget = Vector2.subtract(phantomFighter.position, target.position).length();
     assert.ok(distFromTarget > 10, "Phantom should teleport away from target position");
+
+    const overlapSim = new BattleSimulation([phantom, opponent], { onLog() {}, onSound() {} });
+    const overlapPhantom = overlapSim.fighters.find((fighter) => fighter.id === FIGHTER_IDS.PHANTOM);
+    const overlapTarget = overlapSim.fighters.find((fighter) => fighter.id !== FIGHTER_IDS.PHANTOM);
+    overlapPhantom.position = new Vector2(overlapTarget.radius, 480);
+    overlapTarget.position = overlapPhantom.position.clone();
+    overlapPhantom.hp = 1;
+    overlapTarget.velocity = new Vector2(-900, 0);
+    overlapPhantom.ability.state.teleportPhase = 2;
+    overlapPhantom.ability.state.appearPos = overlapPhantom.position.clone();
+    const overlapHpBefore = overlapPhantom.hp;
+    const overlapContext = overlapSim.handleFighterCollision(overlapPhantom, overlapTarget);
+    assert.equal(overlapContext, null, "Phantom should be intangible while appearing before its dash starts");
+    assert.equal(overlapPhantom.hp, overlapHpBefore, "Phantom should not take overlap damage before its dash starts");
+
+    const edgeSim = new BattleSimulation([phantom, opponent], { onLog() {}, onSound() {} });
+    const edgePhantom = edgeSim.fighters.find((fighter) => fighter.id === FIGHTER_IDS.PHANTOM);
+    const edgeTarget = edgeSim.fighters.find((fighter) => fighter.id !== FIGHTER_IDS.PHANTOM);
+    edgePhantom.position = new Vector2(220, 480);
+    edgeTarget.position = new Vector2(edgeTarget.radius, 480);
+    edgePhantom.ability.state.primed = true;
+    edgePhantom.ability.state.primedTimer = 99;
+    const originalRandom = Math.random;
+    Math.random = () => 0.5;
+    try {
+        edgePhantom.ability.onCollision(edgeTarget);
+    } finally {
+        Math.random = originalRandom;
+    }
+    edgePhantom.ability.update(0.15, edgeTarget);
+    assert.ok(
+        Vector2.subtract(edgePhantom.position, edgeTarget.position).length() >=
+            edgePhantom.radius + edgeTarget.radius + 12,
+        "Phantom should choose a clear appearance point when the preferred point crosses the arena edge"
+    );
 }
 
 function testCompleteChallengeTournament() {

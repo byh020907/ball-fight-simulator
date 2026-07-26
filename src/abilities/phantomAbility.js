@@ -8,8 +8,12 @@ const RANDOM_MISS_COOLDOWN_FACTOR = 0.5;
 const DASH_DURATION = 0.8;
 const DASH_MULTIPLIER = 2.5;
 const TELEPORT_BEHIND_DIST = 250;
+const TELEPORT_CLEARANCE = 12;
 const VANISH_DURATION = 0.15;
 const APPEAR_DURATION = 0.4;
+const TELEPORT_DIRECTION_OFFSETS = [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8].map(
+    (step) => (step * Math.PI) / 8
+);
 
 export class PhantomAbility extends Ability {
     constructor(owner, simulation) {
@@ -119,6 +123,10 @@ export class PhantomAbility extends Ability {
         this._triggerEchoStrike(target, "naturalEchoStacks");
     }
 
+    shouldSkipFighterCollision() {
+        return this.state.teleportPhase > 0;
+    }
+
     onFighterStaticCollision(fighter, context) {
         if (
             !this.getLevelUpgrade().echoOnStaticCollision ||
@@ -149,13 +157,7 @@ export class PhantomAbility extends Ability {
         const cos = Math.cos(behindAngle);
         const sin = Math.sin(behindAngle);
         const rotatedDir = new Vector2(toTarget.x * cos - toTarget.y * sin, toTarget.x * sin + toTarget.y * cos);
-        let behindPos = Vector2.add(target.position, rotatedDir.scale(TELEPORT_BEHIND_DIST));
-
-        const r = owner.radius;
-        behindPos.x = Math.max(r, Math.min(sim.width - r, behindPos.x));
-        behindPos.y = Math.max(r, Math.min(sim.height - r, behindPos.y));
-
-        this.state.appearPos = behindPos;
+        this.state.appearPos = this._findSafeTeleportPosition(target, rotatedDir);
 
         sim.spawnParticleBurst(this.state.vanishPos, "#55bbdd", {
             count: 20,
@@ -168,6 +170,53 @@ export class PhantomAbility extends Ability {
 
         this.state.teleportPhase = 1;
         this.state.teleportTimer = 0;
+    }
+
+    _findSafeTeleportPosition(target, preferredDirection) {
+        const owner = this.owner;
+        const sim = this.simulation;
+        let bestCandidate = null;
+        let bestClearance = -Infinity;
+
+        for (const offset of TELEPORT_DIRECTION_OFFSETS) {
+            const cos = Math.cos(offset);
+            const sin = Math.sin(offset);
+            const direction = new Vector2(
+                preferredDirection.x * cos - preferredDirection.y * sin,
+                preferredDirection.x * sin + preferredDirection.y * cos
+            );
+            const candidate = Vector2.add(target.position, direction.scale(TELEPORT_BEHIND_DIST));
+            if (
+                candidate.x < owner.radius ||
+                candidate.x > sim.width - owner.radius ||
+                candidate.y < owner.radius ||
+                candidate.y > sim.height - owner.radius
+            ) {
+                continue;
+            }
+
+            const clearance = sim.fighters
+                .filter((fighter) => fighter !== owner && !fighter.flags.defeated)
+                .reduce(
+                    (minimum, fighter) =>
+                        Math.min(
+                            minimum,
+                            Vector2.subtract(candidate, fighter.position).length() - owner.radius - fighter.radius
+                        ),
+                    Infinity
+                );
+            if (clearance >= TELEPORT_CLEARANCE) return candidate;
+            if (clearance > bestClearance) {
+                bestCandidate = candidate;
+                bestClearance = clearance;
+            }
+        }
+
+        if (bestCandidate) return bestCandidate;
+        const fallback = Vector2.add(target.position, preferredDirection.scale(TELEPORT_BEHIND_DIST));
+        fallback.x = Math.max(owner.radius, Math.min(sim.width - owner.radius, fallback.x));
+        fallback.y = Math.max(owner.radius, Math.min(sim.height - owner.radius, fallback.y));
+        return fallback;
     }
 
     _doTeleport() {
