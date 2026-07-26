@@ -25,12 +25,12 @@ export class PhantomAbility extends Ability {
             vanishPos: null,
             appearPos: null,
             teleportTargetId: null,
-            pendingStrikeStage: null,
+            pendingShadowStage: null,
             activeDashStage: null,
             markedTargetId: null,
-            naturalEchoStacks: 0,
-            staticEchoStacks: 0,
-            terminalDashStacks: 0,
+            shadowPursuitStacks: 0,
+            shadowReboundStacks: 0,
+            shadowFinishStacks: 0,
             skipMarkedCollisionTargetId: null
         };
         this.resetCooldown(this.cooldown);
@@ -110,7 +110,7 @@ export class PhantomAbility extends Ability {
 
         if (this.state.primed) {
             this.state.primed = false;
-            this._triggerShadowStrike(target, "base");
+            this._triggerShadowDash(target, "base");
             return;
         }
 
@@ -118,8 +118,8 @@ export class PhantomAbility extends Ability {
             this.state.skipMarkedCollisionTargetId = null;
             return;
         }
-        if (this.state.activeDashStage || !this._isMarkedTarget(target) || this.state.naturalEchoStacks <= 0) return;
-        this._triggerEchoStrike(target, "naturalEchoStacks");
+        if (this.state.activeDashStage || !this._isMarkedTarget(target) || this.state.shadowPursuitStacks <= 0) return;
+        this._triggerShadowChain(target, "shadowPursuitStacks");
     }
 
     shouldSkipFighterCollision() {
@@ -128,19 +128,19 @@ export class PhantomAbility extends Ability {
 
     onFighterStaticCollision(fighter, context) {
         if (
-            !this.getLevelUpgrade().echoOnStaticCollision ||
+            !this.getLevelUpgrade().shadowReboundOnStaticCollision ||
             !this._isMarkedTarget(fighter) ||
-            this.state.staticEchoStacks <= 0 ||
+            this.state.shadowReboundStacks <= 0 ||
             this.state.teleportPhase > 0 ||
             this.state.activeDashStage
         ) {
             return;
         }
         if (!context.wall && !context.terrain) return;
-        this._triggerEchoStrike(fighter, "staticEchoStacks");
+        this._triggerShadowChain(fighter, "shadowReboundStacks");
     }
 
-    _triggerShadowStrike(target, stage) {
+    _triggerShadowDash(target, stage) {
         const owner = this.owner;
         const sim = this.simulation;
         if (stage === "base") {
@@ -149,7 +149,7 @@ export class PhantomAbility extends Ability {
 
         this.state.vanishPos = owner.position.clone();
         this.state.teleportTargetId = target.id;
-        this.state.pendingStrikeStage = stage;
+        this.state.pendingShadowStage = stage;
 
         const toTarget = Vector2.subtract(target.position, owner.position).normalize();
         const behindAngle = (Math.random() - 0.5) * Math.PI;
@@ -234,7 +234,7 @@ export class PhantomAbility extends Ability {
         const sim = this.simulation;
         const target = sim.fighters.find((f) => f.id === this.state.teleportTargetId);
         if (!target) return;
-        const stage = this.state.pendingStrikeStage ?? "base";
+        const stage = this.state.pendingShadowStage ?? "base";
 
         const dashDir = Vector2.subtract(target.position, owner.position).normalize();
         const trailEnd = Vector2.add(owner.position, dashDir.clone().scale(TELEPORT_BEHIND_DIST * 0.6));
@@ -248,41 +248,42 @@ export class PhantomAbility extends Ability {
                 stage === "base"
                     ? this.owner.stats.baseDamage * (this.getLevelUpgrade().bonusDamageMultiplier ?? 1.5)
                     : 0,
-            collisionLabel: stage === "base" ? "Shadow Strike" : "Shadow Echo",
+            collisionLabel: stage === "base" ? "그림자 돌진" : "그림자 연계",
             showRing: false
         });
         this.state.activeDashStage = stage;
-        this.state.pendingStrikeStage = null;
+        this.state.pendingShadowStage = null;
 
         sim.playSound("dash", 0.9);
-        sim.addLog(`${owner.name} vanishes for a ${stage} shadow strike.`);
+        const stageLabel = { base: "그림자 돌진", chain: "그림자 연계", finish: "그림자 종결" }[stage];
+        sim.addLog(`${owner.name}의 ${stageLabel ?? "그림자 돌진"} 발동.`);
     }
 
     onDashHit(target, effect) {
-        if (effect._phantomStrikeHandled) return;
-        effect._phantomStrikeHandled = true;
+        if (effect._phantomShadowDashHandled) return;
+        effect._phantomShadowDashHandled = true;
 
         const stage = this.state.activeDashStage;
         this.state.activeDashStage = null;
-        if (stage === "base" && this.getLevelUpgrade().echoOnNaturalCollision) {
+        if (stage === "base" && this.getLevelUpgrade().shadowPursuitOnNaturalCollision) {
             this._markTarget(target);
             this.state.skipMarkedCollisionTargetId = target.id;
             return;
         }
-        if (stage === "echo" && this.getLevelUpgrade().terminalDash && this.state.terminalDashStacks > 0) {
-            this.state.terminalDashStacks -= 1;
-            this._showChainText(target, "종결 돌진", "#ff88cc");
-            this._triggerShadowStrike(target, "terminal");
+        if (stage === "chain" && this.getLevelUpgrade().shadowFinish && this.state.shadowFinishStacks > 0) {
+            this.state.shadowFinishStacks -= 1;
+            this._showChainText(target, "그림자 종결", "#ff88cc");
+            this._triggerShadowDash(target, "finish");
         }
     }
 
     _markTarget(target) {
         const upgrade = this.getLevelUpgrade();
         this.state.markedTargetId = target.id;
-        this.state.naturalEchoStacks = upgrade.echoOnNaturalCollision ? 1 : 0;
-        this.state.staticEchoStacks = upgrade.echoOnStaticCollision ? 1 : 0;
-        this.state.terminalDashStacks = upgrade.terminalDash ? 1 : 0;
-        this._showChainText(target, "그림자 돌진", "#8eeeff");
+        this.state.shadowPursuitStacks = upgrade.shadowPursuitOnNaturalCollision ? 1 : 0;
+        this.state.shadowReboundStacks = upgrade.shadowReboundOnStaticCollision ? 1 : 0;
+        this.state.shadowFinishStacks = upgrade.shadowFinish ? 1 : 0;
+        this._showChainText(target, "그림자 각인", "#8eeeff");
     }
 
     _clearExpiredChain() {
@@ -296,11 +297,11 @@ export class PhantomAbility extends Ability {
         return target?.id === this.state.markedTargetId && !this.cooldownReady;
     }
 
-    _triggerEchoStrike(target, stackKey) {
+    _triggerShadowChain(target, stackKey) {
         this.state[stackKey] -= 1;
-        const label = stackKey === "naturalEchoStacks" ? "자연 메아리" : "벽 메아리";
+        const label = stackKey === "shadowPursuitStacks" ? "그림자 추격" : "그림자 반향";
         this._showChainText(target, label, "#8eeeff");
-        this._triggerShadowStrike(target, "echo");
+        this._triggerShadowDash(target, "chain");
     }
 
     _showChainText(target, text, color) {
@@ -308,28 +309,28 @@ export class PhantomAbility extends Ability {
         if (feedback) feedback.visibilityToken = "combatText";
     }
 
-    _getEchoStackUiState() {
+    _getShadowChainUiState() {
         const stacks = [
-            ["자연", this.state.naturalEchoStacks],
-            ["벽", this.state.staticEchoStacks],
-            ["종결", this.state.terminalDashStacks]
+            ["추격", this.state.shadowPursuitStacks],
+            ["반향", this.state.shadowReboundStacks],
+            ["종결", this.state.shadowFinishStacks]
         ].filter(([, count]) => count > 0);
         if (!this.state.markedTargetId || stacks.length === 0) return null;
         const total = stacks.reduce((sum, [, count]) => sum + count, 0);
         const summary = stacks.map(([label, count]) => `${label} ${count}`).join(" · ");
         return {
-            label: `Echo ${total}`,
+            label: `그림자 연계 ${total}`,
             progress: this.cooldownProgress,
             status: "charging",
-            text: `${summary} · ${this.cooldownRemaining.toFixed(1)}s`
+            text: `${summary} · ${this.cooldownRemaining.toFixed(1)}초`
         };
     }
 
     _clearMark() {
         this.state.markedTargetId = null;
-        this.state.naturalEchoStacks = 0;
-        this.state.staticEchoStacks = 0;
-        this.state.terminalDashStacks = 0;
+        this.state.shadowPursuitStacks = 0;
+        this.state.shadowReboundStacks = 0;
+        this.state.shadowFinishStacks = 0;
         this.state.skipMarkedCollisionTargetId = null;
     }
 
@@ -420,20 +421,20 @@ export class PhantomAbility extends Ability {
 
     getUiState() {
         if (this.state.teleportPhase > 0) {
-            return { label: "Strike", progress: 0, status: "active", text: "Active" };
+            return { label: "그림자 돌진", progress: 0, status: "active", text: "발동 중" };
         }
         if (this.state.primed) {
             return {
-                label: `Primed ${Math.max(0, this.state.primedTimer).toFixed(1)}s`,
+                label: `그림자 대기 ${Math.max(0, this.state.primedTimer).toFixed(1)}초`,
                 progress: 1,
                 status: "ready",
-                text: "Ready"
+                text: "충돌 대기"
             };
         }
-        const echoStackState = this._getEchoStackUiState();
-        if (echoStackState) return echoStackState;
+        const shadowChainState = this._getShadowChainUiState();
+        if (shadowChainState) return shadowChainState;
         return {
-            label: this.cooldownReady ? "Ready" : `${this.cooldownRemaining.toFixed(1)}s`,
+            label: this.cooldownReady ? "그림자 준비" : `${this.cooldownRemaining.toFixed(1)}초`,
             progress: this.cooldownProgress
         };
     }

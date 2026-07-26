@@ -5,11 +5,11 @@ export default createCharacterDefinition({
     key: "PHANTOM",
     id: "phantom",
     name: "Phantom Ball",
-    title: "Shadow Strike",
+    title: "그림자 돌진",
     description:
-        "충돌 시 사라졌다가 상대 뒤에서 나타나 총공격력에 비례한 추가 피해와 함께 돌진합니다. 쿨타임 동안 충돌은 일반 충돌로 처리됩니다.",
+        "충돌 시 사라졌다가 상대 뒤에서 나타나 총공격력에 비례한 추가 피해와 함께 그림자 돌진합니다. 쿨타임 동안 충돌은 일반 충돌로 처리됩니다.",
     color: "#55bbdd",
-    abilityDisplayName: "Phantom",
+    abilityDisplayName: "그림자 돌진",
     abilityClass: PhantomAbility,
     levelRewards: [
         {
@@ -18,7 +18,7 @@ export default createCharacterDefinition({
         {
             level: 3,
             abilityTier: 1,
-            gameText: "쿨타임 중 자연 충돌 메아리 스택 1"
+            gameText: "쿨타임 중 그림자 추격 스택 1"
         },
         {
             level: 4
@@ -29,7 +29,7 @@ export default createCharacterDefinition({
         {
             level: 6,
             abilityTier: 2,
-            gameText: "쿨타임 중 벽·지형 메아리 스택 1 추가"
+            gameText: "쿨타임 중 그림자 반향 스택 1 추가"
         },
         {
             level: 7
@@ -40,7 +40,7 @@ export default createCharacterDefinition({
         {
             level: 9,
             abilityTier: 3,
-            gameText: "쿨타임 중 메아리 적중 종결 스택 1 추가"
+            gameText: "그림자 연계 적중 시 그림자 종결 스택 1 추가"
         },
         {
             level: 10
@@ -57,13 +57,13 @@ export default createCharacterDefinition({
         tiers: [
             {},
             {
-                echoOnNaturalCollision: true
+                shadowPursuitOnNaturalCollision: true
             },
             {
-                echoOnStaticCollision: true
+                shadowReboundOnStaticCollision: true
             },
             {
-                terminalDash: true
+                shadowFinish: true
             }
         ]
     },

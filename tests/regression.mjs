@@ -5227,6 +5227,21 @@ function testAbilityLevelUpgrades(app) {
     );
 
     const phantomRun = createTierSimulation(FIGHTER_IDS.PHANTOM);
+    const phantomDefinition = getCharacterDefinition(FIGHTER_IDS.PHANTOM);
+    assert.deepEqual(
+        [phantomDefinition.title, phantomDefinition.abilityDisplayName],
+        ["그림자 돌진", "그림자 돌진"],
+        "Phantom should use one shadow-themed name for its title and ability display"
+    );
+    assert.deepEqual(
+        phantomDefinition.levelRewards.filter((reward) => reward.gameText).map((reward) => reward.gameText),
+        [
+            "쿨타임 중 그림자 추격 스택 1",
+            "쿨타임 중 그림자 반향 스택 1 추가",
+            "그림자 연계 적중 시 그림자 종결 스택 1 추가"
+        ],
+        "Phantom level rewards should use the shadow-chain terminology"
+    );
     assert.deepEqual(
         phantomRun.ball.ability.getStatModifiers(),
         { speed: 1.15, damage: 1.1, defense: 1.5, impact: 1.15 },
@@ -5234,45 +5249,45 @@ function testAbilityLevelUpgrades(app) {
     );
     const phantomUiRun = createTierSimulation(FIGHTER_IDS.PHANTOM, 1);
     phantomUiRun.ball.ability.state.teleportTargetId = phantomUiRun.target.id;
-    phantomUiRun.ball.ability._triggerShadowStrike(phantomUiRun.target, "base");
+    phantomUiRun.ball.ability._triggerShadowDash(phantomUiRun.target, "base");
     assert.deepEqual(
         phantomUiRun.ball.ability.getUiState(),
-        { label: "Strike", progress: 0, status: "active", text: "Active" },
-        "Phantom teleport should display an active strike instead of a falsely ready cooldown"
+        { label: "그림자 돌진", progress: 0, status: "active", text: "발동 중" },
+        "Phantom teleport should display an active shadow dash instead of a falsely ready cooldown"
     );
     phantomUiRun.ball.ability.state.teleportPhase = 0;
     phantomUiRun.ball.ability.state.primed = true;
     phantomUiRun.ball.ability.state.primedTimer = 2;
     assert.deepEqual(
         phantomUiRun.ball.ability.getUiState(),
-        { label: "Primed 2.0s", progress: 1, status: "ready", text: "Ready" },
-        "Phantom primed window should keep the cooldown bar ready instead of draining it backwards"
+        { label: "그림자 대기 2.0초", progress: 1, status: "ready", text: "충돌 대기" },
+        "Phantom shadow-ready window should keep the cooldown bar ready instead of draining it backwards"
     );
     phantomUiRun.ball.ability.state.primed = false;
     phantomUiRun.ball.ability._markTarget(phantomUiRun.target);
     const phantomLevelThreeUi = phantomUiRun.ball.ability.getUiState();
     assert.deepEqual(
         [phantomLevelThreeUi.label, phantomLevelThreeUi.text],
-        ["Echo 1", "자연 1 · 2.5s"],
-        "Phantom level three should expose its natural echo stack throughout the cooldown"
+        ["그림자 연계 1", "추격 1 · 2.5초"],
+        "Phantom level three should expose its shadow-pursuit stack throughout the cooldown"
     );
     assert.ok(
-        phantomUiRun.sim.entities.some((entity) => entity.displayText === "그림자 돌진"),
-        "Phantom level three mark should announce that its echo stack is ready"
+        phantomUiRun.sim.entities.some((entity) => entity.displayText === "그림자 각인"),
+        "Phantom level three mark should announce that its shadow pursuit is ready"
     );
     phantomUiRun.ball.ability.onCollision(phantomUiRun.target);
-    const naturalEchoText = phantomUiRun.sim.entities.find((entity) => entity.displayText === "자연 메아리");
+    const shadowPursuitText = phantomUiRun.sim.entities.find((entity) => entity.displayText === "그림자 추격");
     assert.deepEqual(
-        [naturalEchoText?.displayText, naturalEchoText?.visibilityToken],
-        ["자연 메아리", "combatText"],
-        "Phantom level three collision should announce a mobile-readable natural echo activation"
+        [shadowPursuitText?.displayText, shadowPursuitText?.visibilityToken],
+        ["그림자 추격", "combatText"],
+        "Phantom level three collision should announce a mobile-readable shadow-pursuit activation"
     );
     phantomRun.ball.ability._markTarget(phantomRun.target);
     assert.deepEqual(
         [
-            phantomRun.ball.ability.state.naturalEchoStacks,
-            phantomRun.ball.ability.state.staticEchoStacks,
-            phantomRun.ball.ability.state.terminalDashStacks
+            phantomRun.ball.ability.state.shadowPursuitStacks,
+            phantomRun.ball.ability.state.shadowReboundStacks,
+            phantomRun.ball.ability.state.shadowFinishStacks
         ],
         [1, 1, 1],
         "Phantom tier rewards should open one independent stack for every unlocked follow-up condition"
@@ -5280,38 +5295,38 @@ function testAbilityLevelUpgrades(app) {
     phantomRun.ball.ability.onFighterStaticCollision(phantomRun.target, { wall: true, terrain: false });
     assert.deepEqual(
         [
-            phantomRun.ball.ability.state.pendingStrikeStage,
-            phantomRun.ball.ability.state.naturalEchoStacks,
-            phantomRun.ball.ability.state.staticEchoStacks
+            phantomRun.ball.ability.state.pendingShadowStage,
+            phantomRun.ball.ability.state.shadowPursuitStacks,
+            phantomRun.ball.ability.state.shadowReboundStacks
         ],
-        ["echo", 1, 0],
-        "Phantom wall echo should spend only its own stack and preserve the natural-collision stack"
+        ["chain", 1, 0],
+        "Phantom shadow rebound should spend only its own stack and preserve the shadow-pursuit stack"
     );
-    phantomRun.ball.ability.state.activeDashStage = "echo";
+    phantomRun.ball.ability.state.activeDashStage = "chain";
     phantomRun.ball.ability.onDashHit(phantomRun.target, {});
     assert.deepEqual(
         [
-            phantomRun.ball.ability.state.pendingStrikeStage,
-            phantomRun.ball.ability.state.naturalEchoStacks,
-            phantomRun.ball.ability.state.terminalDashStacks
+            phantomRun.ball.ability.state.pendingShadowStage,
+            phantomRun.ball.ability.state.shadowPursuitStacks,
+            phantomRun.ball.ability.state.shadowFinishStacks
         ],
-        ["terminal", 1, 0],
-        "Phantom terminal dash should spend only its own stack and preserve unused echo conditions"
+        ["finish", 1, 0],
+        "Phantom shadow finish should spend only its own stack and preserve unused shadow-chain conditions"
     );
-    phantomRun.ball.ability.state.activeDashStage = "terminal";
+    phantomRun.ball.ability.state.activeDashStage = "finish";
     phantomRun.ball.ability.onDashHit(phantomRun.target, {});
     assert.equal(
         phantomRun.ball.ability.state.markedTargetId,
         phantomRun.target.id,
-        "Phantom terminal hit should keep the chain open while another condition stack remains"
+        "Phantom shadow finish should keep the chain open while another condition stack remains"
     );
     phantomRun.ball.ability.state.teleportPhase = 0;
     phantomRun.ball.ability.state.activeDashStage = null;
     phantomRun.ball.ability.onCollision(phantomRun.target);
     assert.deepEqual(
-        [phantomRun.ball.ability.state.pendingStrikeStage, phantomRun.ball.ability.state.naturalEchoStacks],
-        ["echo", 0],
-        "Phantom should still spend its preserved natural-collision stack after the terminal dash"
+        [phantomRun.ball.ability.state.pendingShadowStage, phantomRun.ball.ability.state.shadowPursuitStacks],
+        ["chain", 0],
+        "Phantom should still spend its preserved shadow-pursuit stack after the shadow finish"
     );
 
     const heroRun = createTierSimulation(FIGHTER_IDS.HERO);
@@ -6304,9 +6319,9 @@ function testFiveBallLevelRewardContracts(app) {
     phantomRun.owner.stats.criticalChance = 0;
     phantomRun.target.stats.criticalChance = 0;
     const approvedOptimalCollisionBaseline = 46.2;
-    const shadowStrikeDamage = 10 * 1.5;
+    const shadowDashDamage = 10 * 1.5;
     assert.equal(
-        approvedOptimalCollisionBaseline + shadowStrikeDamage,
+        approvedOptimalCollisionBaseline + shadowDashDamage,
         61.2,
         "Phantom attack 10 approved optimal Lv9 chain baseline should fall from 64.2 to 61.2"
     );
@@ -6315,13 +6330,13 @@ function testFiveBallLevelRewardContracts(app) {
         capturedDash = { direction, options };
     };
     phantomRun.owner.ability.state.teleportTargetId = phantomRun.target.id;
-    phantomRun.owner.ability.state.pendingStrikeStage = "base";
+    phantomRun.owner.ability.state.pendingShadowStage = "base";
     phantomRun.owner.stats.baseDamage = 40;
     phantomRun.owner.ability._startDashAfterTeleport();
     assert.equal(
         capturedDash.options.collisionDamage,
         60,
-        "Phantom base Shadow Strike should scale growth and equipment attack by x1.50 instead of fixed damage"
+        "Phantom base shadow dash should scale growth and equipment attack by x1.50 instead of fixed damage"
     );
 
     const heroRun = createRun(FIGHTER_IDS.HERO, { extraEnemy: true });
@@ -17292,7 +17307,7 @@ async function testPhantomRegistered(app) {
     assert.ok(phantomFighter.ability.constructor.name === "PhantomAbility", "Phantom should have PhantomAbility");
 }
 
-async function testPhantomShadowStrike(app) {
+async function testPhantomShadowDash(app) {
     const phantom = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.PHANTOM);
     const opponent = app.roster.find((f) => f.id !== FIGHTER_IDS.PHANTOM);
     const sim = new BattleSimulation([phantom, opponent], { onLog() {}, onSound() {} });
@@ -17562,7 +17577,7 @@ await testVampireBatsSpawn(app);
 await testVampireLifestealOnCollision(app);
 await testGunnerBulletsSpawn(app);
 await testPhantomRegistered(app);
-await testPhantomShadowStrike(app);
+await testPhantomShadowDash(app);
 testCircleVsCircleCollisionStillWorks(app);
 testPolygonVsPolygonCollisionSeparates();
 testCircleVsPolygonCollisionSeparates();
