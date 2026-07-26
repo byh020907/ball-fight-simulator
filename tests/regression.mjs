@@ -2508,7 +2508,7 @@ function testStatAllocationRules(app) {
     );
     assert.equal(
         formatCompactStatAllocation(allocation),
-        "HP30 공40 속30 쿨0 방0",
+        "HP 30 · 공 40 · 속 30 · 쿨 0 · 방 0",
         "Mobile allocation summary should keep all five stats in a compact single line"
     );
     assert.equal(boosted.stats.radius, archer.stats.radius, "Radius should stay character-specific");
@@ -14978,7 +14978,11 @@ async function testHeroOrbBonusUiOnlyForHero(app) {
     assert.ok(heroLine.includes("방어 +20"), "Hero's defense allocation should be shown as a direct rating");
     assert.ok(!heroLine.includes("방어 +20%"), "Hero's defense allocation should not be shown as a percentage");
     assert.ok(!normalLine.includes("+12%(+3)"), "Normal stat formatter should not include Hero Orb bonuses");
-    assert.equal(compactHeroLine, "HP12(+3) 공18 속22 쿨28 방20 치0", "Hero mobile stats should retain orb bonuses");
+    assert.equal(
+        compactHeroLine,
+        "HP 12(+3) · 공 18 · 속 22 · 쿨 28 · 방 20 · 치 0",
+        "Hero mobile stats should retain orb bonuses"
+    );
     assert.deepEqual(archerFighter.hero.bonuses, { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 });
 }
 

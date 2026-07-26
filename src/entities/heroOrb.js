@@ -135,8 +135,8 @@ export function formatCompactHeroStatLine(allocation = {}, bonuses = {}) {
     return STAT_ORB_KEYS.map((key) => {
         const base = allocation[key] ?? 0;
         const bonus = bonuses[key] ?? 0;
-        return `${COMPACT_HERO_STAT_LABELS[key]}${base}${bonus > 0 ? `(+${bonus})` : ""}`;
-    }).join(" ");
+        return `${COMPACT_HERO_STAT_LABELS[key]} ${base}${bonus > 0 ? `(+${bonus})` : ""}`;
+    }).join(" · ");
 }
 
 export function mergeOrbBonuses(current = {}, carry = {}) {

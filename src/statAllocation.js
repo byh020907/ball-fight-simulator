@@ -116,8 +116,8 @@ const COMPACT_STAT_LABELS = Object.freeze({
 
 export function formatCompactStatAllocation(allocation) {
     return ALLOCATABLE_STATS.map(
-        (stat) => `${COMPACT_STAT_LABELS[stat.key] ?? stat.shortLabel}${allocation[stat.key] ?? 0}`
-    ).join(" ");
+        (stat) => `${COMPACT_STAT_LABELS[stat.key] ?? stat.shortLabel} ${allocation[stat.key] ?? 0}`
+    ).join(" · ");
 }
 
 /**
