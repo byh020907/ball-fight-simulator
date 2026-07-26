@@ -4,7 +4,6 @@ import { Ability } from "./ability.js";
 
 const PHANTOM_COOLDOWN = 2.5;
 const PRIMED_DURATION = 2.5;
-const RANDOM_MISS_COOLDOWN_FACTOR = 0.5;
 const DASH_DURATION = 0.8;
 const DASH_MULTIPLIER = 2.5;
 const TELEPORT_BEHIND_DIST = 250;
@@ -55,9 +54,9 @@ export class PhantomAbility extends Ability {
             this.state.primedTimer -= delta;
             if (this.state.primedTimer <= 0) {
                 this.state.primed = false;
-                this._randomTeleport();
+                this.state.primedTimer = 0;
                 this.setCooldownDuration(this.cooldown);
-                this.setCooldownRemaining(this.cooldown * RANDOM_MISS_COOLDOWN_FACTOR);
+                this.setCooldownRemaining(this.cooldown);
             }
             return;
         }
@@ -257,42 +256,6 @@ export class PhantomAbility extends Ability {
 
         sim.playSound("dash", 0.9);
         sim.addLog(`${owner.name} vanishes for a ${stage} shadow strike.`);
-    }
-
-    _randomTeleport() {
-        const owner = this.owner;
-        const sim = this.simulation;
-        const target = sim.getOpponent(owner);
-
-        const r = owner.radius;
-        const margin = r + 30;
-        const minDistFromTarget = target ? target.radius + r + 60 : 100;
-
-        let pos;
-        let attempts = 0;
-        do {
-            pos = new Vector2(
-                margin + Math.random() * (sim.width - 2 * margin),
-                margin + Math.random() * (sim.height - 2 * margin)
-            );
-            attempts++;
-        } while (target && Vector2.subtract(pos, target.position).length() < minDistFromTarget && attempts < 30);
-
-        const oldPos = owner.position.clone();
-        owner.position.x = pos.x;
-        owner.position.y = pos.y;
-
-        const randomAngle = Math.random() * Math.PI * 2;
-        const speed = owner.stats.baseSpeed * (0.7 + Math.random() * 0.6);
-        owner.applyImpulse(Vector2.subtract(Vector2.fromAngle(randomAngle, speed), owner.velocity));
-        owner.clearDash();
-
-        sim.spawnParticleBurst(oldPos, "#55bbdd", { count: 15, speed: 200, radiusMin: 2, radiusMax: 5, gravity: 400 });
-        sim.spawnPulse(oldPos, "#55bbdd");
-        sim.spawnExplosion(pos, "#55bbdd");
-        sim.spawnPulse(pos.clone(), "#aaddff");
-        sim.playSound("dash", 0.6);
-        sim.addLog(`${owner.name} phases through the shadows and repositions.`);
     }
 
     onDashHit(target, effect) {

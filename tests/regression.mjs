@@ -17356,6 +17356,24 @@ async function testPhantomShadowStrike(app) {
             edgePhantom.radius + edgeTarget.radius + 12,
         "Phantom should choose a clear appearance point when the preferred point crosses the arena edge"
     );
+
+    const missSim = new BattleSimulation([phantom, opponent], { onLog() {}, onSound() {} });
+    const missPhantom = missSim.fighters.find((fighter) => fighter.id === FIGHTER_IDS.PHANTOM);
+    const missTarget = missSim.fighters.find((fighter) => fighter.id !== FIGHTER_IDS.PHANTOM);
+    missPhantom.ability.setCooldownRemaining(0);
+    missPhantom.ability.update(0.01, missTarget);
+    const missPosition = missPhantom.position.clone();
+    missPhantom.ability.update(2.51, missTarget);
+    assert.deepEqual(
+        missPhantom.position,
+        missPosition,
+        "Phantom should stay in place when its collision-ready window expires"
+    );
+    assert.equal(
+        missPhantom.ability.cooldownRemaining,
+        missPhantom.ability.cooldown,
+        "Phantom should restart its full cooldown after a missed collision-ready window"
+    );
 }
 
 function testCompleteChallengeTournament() {
