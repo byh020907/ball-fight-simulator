@@ -2934,6 +2934,24 @@ function testHuntingAutoEventRequiresConfirmation() {
         false,
         "Event confirmation should close only the event result UI"
     );
+    for (const eventType of [
+        HUNTING_EVENT_TYPES.MISHAP,
+        HUNTING_EVENT_TYPES.SHARD_CACHE,
+        HUNTING_EVENT_TYPES.REST_SITE,
+        HUNTING_EVENT_TYPES.CURSED_ALTAR,
+        "future_auto_event"
+    ]) {
+        manager._run = {
+            ...createHuntingRun({ characterId: FIGHTER_IDS.DASH, stageId: HUNTING_STAGE_IDS.CAVE }),
+            phase: HUNTING_RUN_PHASES.AWAITING_EVENT,
+            lastEvent: { type: eventType }
+        };
+        assert.doesNotThrow(
+            () => manager.eventContinue(),
+            `${eventType} result confirmation should resume the hunting route`
+        );
+    }
+    assert.equal(advanceCalls, 6, "Every awaiting event should resume the route exactly once");
     console.log("[hunting-auto-event-requires-confirmation] ok");
 }
 

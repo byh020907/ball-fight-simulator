@@ -119,13 +119,6 @@ const HUNTING_FLOOR_OUTCOME_HANDLERS = Object.freeze({
     [HUNTING_FLOOR_OUTCOME_TYPES.EVENT]: "_handleEventFloor"
 });
 
-const HUNTING_EVENT_CONTINUE_HANDLERS = Object.freeze({
-    [HUNTING_EVENT_TYPES.BOON]: "_continueEventAdvance",
-    [HUNTING_EVENT_TYPES.MISHAP]: "_continueEventAdvance",
-    [HUNTING_EVENT_TYPES.REST_SITE]: "_continueEventAdvance",
-    [HUNTING_EVENT_TYPES.CURSED_ALTAR]: "_continueEventAdvance"
-});
-
 const HUNTING_EVENT_PRESENTATION_HANDLERS = Object.freeze({
     [HUNTING_EVENT_TRANSITIONS.CONTINUE]: "_presentContinueEvent",
     [HUNTING_EVENT_TRANSITIONS.CHOICE]: "_presentChoiceEvent",
@@ -1559,16 +1552,12 @@ export class HuntingManager {
         const app = this.app;
         const run = this._run;
         if (!run || run.status !== "active" || run.phase !== HUNTING_RUN_PHASES.AWAITING_EVENT) return;
-        const handlerName = HUNTING_EVENT_CONTINUE_HANDLERS[run.lastEvent?.type];
-        if (!handlerName || typeof this[handlerName] !== "function") {
-            throw new Error(`Unsupported hunting event continue type: ${run.lastEvent?.type ?? "missing"}`);
-        }
         app.setHuntingOverlayState({
             huntingEventActive: false,
             huntingEventDetail: "",
             huntingEventConfirmLabel: ""
         });
-        return this[handlerName]();
+        return this._continueEventAdvance();
     }
 
     _continueEventAdvance() {
