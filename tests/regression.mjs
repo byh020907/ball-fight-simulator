@@ -5236,9 +5236,9 @@ function testAbilityLevelUpgrades(app) {
     assert.deepEqual(
         phantomDefinition.levelRewards.filter((reward) => reward.gameText).map((reward) => reward.gameText),
         [
-            "쿨타임 중 그림자 추격 스택 1",
-            "쿨타임 중 그림자 반향 스택 1 추가",
-            "그림자 연계 적중 시 그림자 종결 스택 1 추가"
+            "쿨타임 중 자연 충돌 그림자 돌진 1회",
+            "쿨타임 중 벽·지형 충돌 그림자 돌진 1회 추가",
+            "후속 그림자 돌진 적중 시 종결 그림자 돌진 1회 추가"
         ],
         "Phantom level rewards should use the shadow-chain terminology"
     );
@@ -5256,11 +5256,18 @@ function testAbilityLevelUpgrades(app) {
         "Phantom teleport should display an active shadow dash instead of a falsely ready cooldown"
     );
     phantomUiRun.ball.ability.state.teleportPhase = 0;
+    phantomUiRun.ball.ability.setCooldownRemaining(1.5);
+    assert.deepEqual(
+        phantomUiRun.ball.ability.getUiState(),
+        { label: "그림자 대기", progress: 0.4, status: "charging", text: "1.5초" },
+        "Phantom cooldown should use the unified shadow-waiting HUD label"
+    );
+    phantomUiRun.ball.ability.setCooldownRemaining(2.5);
     phantomUiRun.ball.ability.state.primed = true;
     phantomUiRun.ball.ability.state.primedTimer = 2;
     assert.deepEqual(
         phantomUiRun.ball.ability.getUiState(),
-        { label: "그림자 대기 2.0초", progress: 1, status: "ready", text: "충돌 대기" },
+        { label: "그림자 활성화", progress: 1, status: "ready", text: "2.0초" },
         "Phantom shadow-ready window should keep the cooldown bar ready instead of draining it backwards"
     );
     phantomUiRun.ball.ability.state.primed = false;
@@ -5268,18 +5275,18 @@ function testAbilityLevelUpgrades(app) {
     const phantomLevelThreeUi = phantomUiRun.ball.ability.getUiState();
     assert.deepEqual(
         [phantomLevelThreeUi.label, phantomLevelThreeUi.text],
-        ["그림자 연계 1", "추격 1 · 2.5초"],
+        ["그림자 활성화", "1회 · 2.5초"],
         "Phantom level three should expose its shadow-pursuit stack throughout the cooldown"
     );
     assert.ok(
-        phantomUiRun.sim.entities.some((entity) => entity.displayText === "그림자 각인"),
+        phantomUiRun.sim.entities.some((entity) => entity.displayText === "그림자 돌진"),
         "Phantom level three mark should announce that its shadow pursuit is ready"
     );
     phantomUiRun.ball.ability.onCollision(phantomUiRun.target);
-    const shadowPursuitText = phantomUiRun.sim.entities.find((entity) => entity.displayText === "그림자 추격");
+    const shadowPursuitText = phantomUiRun.sim.entities.find((entity) => entity.displayText === "그림자 돌진");
     assert.deepEqual(
         [shadowPursuitText?.displayText, shadowPursuitText?.visibilityToken],
-        ["그림자 추격", "combatText"],
+        ["그림자 돌진", "combatText"],
         "Phantom level three collision should announce a mobile-readable shadow-pursuit activation"
     );
     phantomRun.ball.ability._markTarget(phantomRun.target);
@@ -5293,6 +5300,11 @@ function testAbilityLevelUpgrades(app) {
         "Phantom tier rewards should open one independent stack for every unlocked follow-up condition"
     );
     phantomRun.ball.ability.onFighterStaticCollision(phantomRun.target, { wall: true, terrain: false });
+    assert.equal(
+        phantomRun.sim.entities.filter((entity) => entity.displayText).at(-1)?.displayText,
+        "그림자 돌진",
+        "Phantom wall follow-up should use the same shadow-dash combat text"
+    );
     assert.deepEqual(
         [
             phantomRun.ball.ability.state.pendingShadowStage,
@@ -5304,6 +5316,11 @@ function testAbilityLevelUpgrades(app) {
     );
     phantomRun.ball.ability.state.activeDashStage = "chain";
     phantomRun.ball.ability.onDashHit(phantomRun.target, {});
+    assert.equal(
+        phantomRun.sim.entities.filter((entity) => entity.displayText).at(-1)?.displayText,
+        "그림자 돌진",
+        "Phantom finishing follow-up should use the same shadow-dash combat text"
+    );
     assert.deepEqual(
         [
             phantomRun.ball.ability.state.pendingShadowStage,

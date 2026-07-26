@@ -248,15 +248,14 @@ export class PhantomAbility extends Ability {
                 stage === "base"
                     ? this.owner.stats.baseDamage * (this.getLevelUpgrade().bonusDamageMultiplier ?? 1.5)
                     : 0,
-            collisionLabel: stage === "base" ? "그림자 돌진" : "그림자 연계",
+            collisionLabel: "그림자 돌진",
             showRing: false
         });
         this.state.activeDashStage = stage;
         this.state.pendingShadowStage = null;
 
         sim.playSound("dash", 0.9);
-        const stageLabel = { base: "그림자 돌진", chain: "그림자 연계", finish: "그림자 종결" }[stage];
-        sim.addLog(`${owner.name}의 ${stageLabel ?? "그림자 돌진"} 발동.`);
+        sim.addLog(`${owner.name}의 그림자 돌진 발동.`);
     }
 
     onDashHit(target, effect) {
@@ -272,7 +271,7 @@ export class PhantomAbility extends Ability {
         }
         if (stage === "chain" && this.getLevelUpgrade().shadowFinish && this.state.shadowFinishStacks > 0) {
             this.state.shadowFinishStacks -= 1;
-            this._showChainText(target, "그림자 종결", "#ff88cc");
+            this._showChainText(target, "그림자 돌진", "#ff88cc");
             this._triggerShadowDash(target, "finish");
         }
     }
@@ -283,7 +282,7 @@ export class PhantomAbility extends Ability {
         this.state.shadowPursuitStacks = upgrade.shadowPursuitOnNaturalCollision ? 1 : 0;
         this.state.shadowReboundStacks = upgrade.shadowReboundOnStaticCollision ? 1 : 0;
         this.state.shadowFinishStacks = upgrade.shadowFinish ? 1 : 0;
-        this._showChainText(target, "그림자 각인", "#8eeeff");
+        this._showChainText(target, "그림자 돌진", "#8eeeff");
     }
 
     _clearExpiredChain() {
@@ -299,8 +298,7 @@ export class PhantomAbility extends Ability {
 
     _triggerShadowChain(target, stackKey) {
         this.state[stackKey] -= 1;
-        const label = stackKey === "shadowPursuitStacks" ? "그림자 추격" : "그림자 반향";
-        this._showChainText(target, label, "#8eeeff");
+        this._showChainText(target, "그림자 돌진", "#8eeeff");
         this._triggerShadowDash(target, "chain");
     }
 
@@ -310,19 +308,13 @@ export class PhantomAbility extends Ability {
     }
 
     _getShadowChainUiState() {
-        const stacks = [
-            ["추격", this.state.shadowPursuitStacks],
-            ["반향", this.state.shadowReboundStacks],
-            ["종결", this.state.shadowFinishStacks]
-        ].filter(([, count]) => count > 0);
-        if (!this.state.markedTargetId || stacks.length === 0) return null;
-        const total = stacks.reduce((sum, [, count]) => sum + count, 0);
-        const summary = stacks.map(([label, count]) => `${label} ${count}`).join(" · ");
+        const total = this.state.shadowPursuitStacks + this.state.shadowReboundStacks + this.state.shadowFinishStacks;
+        if (!this.state.markedTargetId || total === 0) return null;
         return {
-            label: `그림자 연계 ${total}`,
+            label: "그림자 활성화",
             progress: this.cooldownProgress,
             status: "charging",
-            text: `${summary} · ${this.cooldownRemaining.toFixed(1)}초`
+            text: `${total}회 · ${this.cooldownRemaining.toFixed(1)}초`
         };
     }
 
@@ -425,17 +417,19 @@ export class PhantomAbility extends Ability {
         }
         if (this.state.primed) {
             return {
-                label: `그림자 대기 ${Math.max(0, this.state.primedTimer).toFixed(1)}초`,
+                label: "그림자 활성화",
                 progress: 1,
                 status: "ready",
-                text: "충돌 대기"
+                text: `${Math.max(0, this.state.primedTimer).toFixed(1)}초`
             };
         }
         const shadowChainState = this._getShadowChainUiState();
         if (shadowChainState) return shadowChainState;
         return {
-            label: this.cooldownReady ? "그림자 준비" : `${this.cooldownRemaining.toFixed(1)}초`,
-            progress: this.cooldownProgress
+            label: this.cooldownReady ? "그림자 활성화" : "그림자 대기",
+            progress: this.cooldownProgress,
+            status: this.cooldownReady ? "ready" : "charging",
+            text: this.cooldownReady ? "충돌 대기" : `${this.cooldownRemaining.toFixed(1)}초`
         };
     }
 }

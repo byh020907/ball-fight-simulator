@@ -18,7 +18,7 @@ export default createCharacterDefinition({
         {
             level: 3,
             abilityTier: 1,
-            gameText: "쿨타임 중 그림자 추격 스택 1"
+            gameText: "쿨타임 중 자연 충돌 그림자 돌진 1회"
         },
         {
             level: 4
@@ -29,7 +29,7 @@ export default createCharacterDefinition({
         {
             level: 6,
             abilityTier: 2,
-            gameText: "쿨타임 중 그림자 반향 스택 1 추가"
+            gameText: "쿨타임 중 벽·지형 충돌 그림자 돌진 1회 추가"
         },
         {
             level: 7
@@ -40,7 +40,7 @@ export default createCharacterDefinition({
         {
             level: 9,
             abilityTier: 3,
-            gameText: "그림자 연계 적중 시 그림자 종결 스택 1 추가"
+            gameText: "후속 그림자 돌진 적중 시 종결 그림자 돌진 1회 추가"
         },
         {
             level: 10
