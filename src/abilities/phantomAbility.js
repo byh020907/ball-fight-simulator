@@ -259,6 +259,7 @@ export class PhantomAbility extends Ability {
         }
         if (stage === "echo" && this.getLevelUpgrade().terminalDash && this.state.terminalDashStacks > 0) {
             this.state.terminalDashStacks -= 1;
+            this._showChainText(target, "종결 돌진", "#ff88cc");
             this._triggerShadowStrike(target, "terminal");
         }
     }
@@ -269,6 +270,7 @@ export class PhantomAbility extends Ability {
         this.state.naturalEchoStacks = upgrade.echoOnNaturalCollision ? 1 : 0;
         this.state.staticEchoStacks = upgrade.echoOnStaticCollision ? 1 : 0;
         this.state.terminalDashStacks = upgrade.terminalDash ? 1 : 0;
+        this._showChainText(target, "메아리 준비", "#8eeeff");
     }
 
     _clearExpiredChain() {
@@ -284,7 +286,31 @@ export class PhantomAbility extends Ability {
 
     _triggerEchoStrike(target, stackKey) {
         this.state[stackKey] -= 1;
+        const label = stackKey === "naturalEchoStacks" ? "자연 메아리" : "벽 메아리";
+        this._showChainText(target, label, "#8eeeff");
         this._triggerShadowStrike(target, "echo");
+    }
+
+    _showChainText(target, text, color) {
+        const feedback = this.simulation.spawnActionText(target.position.clone(), text, color);
+        if (feedback) feedback.visibilityToken = "combatText";
+    }
+
+    _getEchoStackUiState() {
+        const stacks = [
+            ["자연", this.state.naturalEchoStacks],
+            ["벽", this.state.staticEchoStacks],
+            ["종결", this.state.terminalDashStacks]
+        ].filter(([, count]) => count > 0);
+        if (!this.state.markedTargetId || stacks.length === 0) return null;
+        const total = stacks.reduce((sum, [, count]) => sum + count, 0);
+        const summary = stacks.map(([label, count]) => `${label} ${count}`).join(" · ");
+        return {
+            label: `Echo ${total}`,
+            progress: this.cooldownProgress,
+            status: "charging",
+            text: `${summary} · ${this.cooldownRemaining.toFixed(1)}s`
+        };
     }
 
     _clearMark() {
@@ -382,14 +408,18 @@ export class PhantomAbility extends Ability {
 
     getUiState() {
         if (this.state.teleportPhase > 0) {
-            return { label: "Strike", progress: 1 };
+            return { label: "Strike", progress: 0, status: "active", text: "Active" };
         }
         if (this.state.primed) {
             return {
                 label: `Primed ${Math.max(0, this.state.primedTimer).toFixed(1)}s`,
-                progress: Math.max(0, Math.min(1, this.state.primedTimer / PRIMED_DURATION))
+                progress: 1,
+                status: "ready",
+                text: "Ready"
             };
         }
+        const echoStackState = this._getEchoStackUiState();
+        if (echoStackState) return echoStackState;
         return {
             label: this.cooldownReady ? "Ready" : `${this.cooldownRemaining.toFixed(1)}s`,
             progress: this.cooldownProgress

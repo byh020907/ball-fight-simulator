@@ -5232,6 +5232,41 @@ function testAbilityLevelUpgrades(app) {
         { speed: 1.15, damage: 1.1, defense: 1.5, impact: 1.15 },
         "Phantom should use its rebalanced base stats"
     );
+    const phantomUiRun = createTierSimulation(FIGHTER_IDS.PHANTOM, 1);
+    phantomUiRun.ball.ability.state.teleportTargetId = phantomUiRun.target.id;
+    phantomUiRun.ball.ability._triggerShadowStrike(phantomUiRun.target, "base");
+    assert.deepEqual(
+        phantomUiRun.ball.ability.getUiState(),
+        { label: "Strike", progress: 0, status: "active", text: "Active" },
+        "Phantom teleport should display an active strike instead of a falsely ready cooldown"
+    );
+    phantomUiRun.ball.ability.state.teleportPhase = 0;
+    phantomUiRun.ball.ability.state.primed = true;
+    phantomUiRun.ball.ability.state.primedTimer = 2;
+    assert.deepEqual(
+        phantomUiRun.ball.ability.getUiState(),
+        { label: "Primed 2.0s", progress: 1, status: "ready", text: "Ready" },
+        "Phantom primed window should keep the cooldown bar ready instead of draining it backwards"
+    );
+    phantomUiRun.ball.ability.state.primed = false;
+    phantomUiRun.ball.ability._markTarget(phantomUiRun.target);
+    const phantomLevelThreeUi = phantomUiRun.ball.ability.getUiState();
+    assert.deepEqual(
+        [phantomLevelThreeUi.label, phantomLevelThreeUi.text],
+        ["Echo 1", "자연 1 · 2.5s"],
+        "Phantom level three should expose its natural echo stack throughout the cooldown"
+    );
+    assert.ok(
+        phantomUiRun.sim.entities.some((entity) => entity.displayText === "메아리 준비"),
+        "Phantom level three mark should announce that its echo stack is ready"
+    );
+    phantomUiRun.ball.ability.onCollision(phantomUiRun.target);
+    const naturalEchoText = phantomUiRun.sim.entities.find((entity) => entity.displayText === "자연 메아리");
+    assert.deepEqual(
+        [naturalEchoText?.displayText, naturalEchoText?.visibilityToken],
+        ["자연 메아리", "combatText"],
+        "Phantom level three collision should announce a mobile-readable natural echo activation"
+    );
     phantomRun.ball.ability._markTarget(phantomRun.target);
     assert.deepEqual(
         [
