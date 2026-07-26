@@ -3,7 +3,6 @@ import { createHuntingLootItem } from "../entities/huntingLootRegistry.js";
 import { getCombatMovementSpeed } from "../physics/magneticAttraction.js";
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 import { createEmptyHuntingLoot } from "./huntingRewards.js";
-import { HUNTING_MAX_FLOOR } from "./huntingConfig.js";
 import { EQUIPMENT_TEMPLATES } from "./equipmentTemplates.js";
 import {
     createHuntingExperienceAllocation,
@@ -18,7 +17,6 @@ export const HUNTING_LOOT_ITEM_TYPES = Object.freeze({
     SMALL_HEAL_PACK: "small_heal_pack",
     SHARD: "shard",
     SHARD_BUNDLE: "shard_bundle",
-    ENHANCEMENT_STONE: "enhancement_stone",
     EXPERIENCE: "experience",
     EQUIPMENT: "equipment"
 });
@@ -103,14 +101,6 @@ export function getHuntingShardDropAmount(floor = 1, rng = Math.random) {
 
 export function getHuntingShardPhysicalDropCount(rng = Math.random) {
     const { minimum, maximum } = LOOT_CONFIG.shard.physicalDropCount;
-    return minimum + Math.floor(clamp(rng(), 0, 0.999999) * (maximum - minimum + 1));
-}
-
-export function getHuntingEnhancementStoneDropCount(floor = 1, rng = Math.random) {
-    const safeFloor = Math.max(1, Math.min(HUNTING_MAX_FLOOR, Math.floor(floor) || 1));
-    const progress = (safeFloor - 1) / (HUNTING_MAX_FLOOR - 1);
-    const minimum = Math.round(1 + 3 * progress);
-    const maximum = Math.round(3 + 9 * progress);
     return minimum + Math.floor(clamp(rng(), 0, 0.999999) * (maximum - minimum + 1));
 }
 
@@ -214,9 +204,6 @@ export class HuntingBattleLootSession {
         if (reward.type === HUNTING_LOOT_ITEM_TYPES.SHARD) {
             this._collectedLoot.shards += Math.max(0, Math.round(reward.amount ?? 0));
         }
-        if (reward.type === HUNTING_LOOT_ITEM_TYPES.ENHANCEMENT_STONE) {
-            this._collectedLoot.enhancementStones += Math.max(0, Math.round(reward.amount ?? 0));
-        }
         if (reward.type === HUNTING_LOOT_ITEM_TYPES.EXPERIENCE) {
             this._collectedExperience += Math.max(0, Math.round(reward.amount ?? 0));
         }
@@ -231,7 +218,6 @@ export class HuntingBattleLootSession {
     getCollectedLoot() {
         return {
             shards: this._collectedLoot.shards,
-            enhancementStones: this._collectedLoot.enhancementStones,
             equipment: { ...this._collectedLoot.equipment }
         };
     }
@@ -301,7 +287,6 @@ export class HuntingLootDropController {
                 : null;
         if (bonusType) this._spawnLootItem(bonusType, fighter, collector, rarity, lootMultiplier, simulation);
         const experience = this._spawnExperienceDrops(fighter, collector, simulation);
-        const enhancementStones = isMiniboss ? this._spawnEnhancementStoneDrops(fighter, collector, simulation) : [];
         const equipmentDrop =
             (isMob || isMiniboss) && lootMultiplier > 0
                 ? rollHuntingEquipmentDrop({
@@ -320,7 +305,7 @@ export class HuntingLootDropController {
                 { templateId: equipmentDrop }
             );
         }
-        return shards[0] ?? experience[0] ?? enhancementStones[0] ?? null;
+        return shards[0] ?? experience[0] ?? null;
     }
 
     _spawnGuaranteedShardDrops(fighter, collector, rarity, lootMultiplier, simulation) {
@@ -329,23 +314,6 @@ export class HuntingLootDropController {
             this._spawnLootItem(HUNTING_LOOT_ITEM_TYPES.SHARD, fighter, collector, rarity, lootMultiplier, simulation, {
                 amount: scaleHuntingLootAmount(getHuntingShardDropAmount(this.session.floor, this.rng), lootMultiplier)
             })
-        );
-    }
-
-    _spawnEnhancementStoneDrops(fighter, collector, simulation) {
-        const count = getHuntingEnhancementStoneDropCount(this.session.floor, this.rng);
-        return Array.from({ length: count }, () =>
-            this._spawnLootItem(
-                HUNTING_LOOT_ITEM_TYPES.ENHANCEMENT_STONE,
-                fighter,
-                collector,
-                "common",
-                1,
-                simulation,
-                {
-                    amount: 1
-                }
-            )
         );
     }
 

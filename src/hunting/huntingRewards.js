@@ -87,7 +87,6 @@ export function sanitizeEquipmentMap(raw = {}) {
 export function normalizeHuntingLoot(loot = {}) {
     return {
         shards: Math.max(0, sanitizeNumber(loot?.shards)),
-        enhancementStones: Math.max(0, sanitizeNumber(loot?.enhancementStones)),
         equipment: sanitizeEquipmentMap(loot?.equipment)
     };
 }
@@ -107,7 +106,6 @@ export function mergeHuntingLoot(base = createEmptyHuntingLoot(), addition = cre
 
     return {
         shards: Math.max(0, Math.floor(baseLoot.shards + additionLoot.shards)),
-        enhancementStones: Math.max(0, Math.floor(baseLoot.enhancementStones + additionLoot.enhancementStones)),
         equipment: mergedEquipment
     };
 }
@@ -117,12 +115,10 @@ export function applyDefeatPreservation(pendingLoot = createEmptyHuntingLoot(), 
     return {
         preservedLoot: {
             shards: Math.floor(normalizedLoot.shards * HUNTING_DEFEAT_PRESERVE.SHARDS),
-            enhancementStones: Math.floor(normalizedLoot.enhancementStones * HUNTING_DEFEAT_PRESERVE.SHARDS),
             equipment: { ...normalizedLoot.equipment }
         },
         lostLoot: {
             shards: Math.ceil(normalizedLoot.shards * (1 - HUNTING_DEFEAT_PRESERVE.SHARDS)),
-            enhancementStones: Math.ceil(normalizedLoot.enhancementStones * (1 - HUNTING_DEFEAT_PRESERVE.SHARDS)),
             equipment: {}
         }
     };

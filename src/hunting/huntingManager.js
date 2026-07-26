@@ -946,7 +946,6 @@ export class HuntingManager {
                 huntingChoiceVisible: false,
                 huntingLootHudVisible: false,
                 huntingLootHudShards: 0,
-                huntingLootHudEnhancementStones: 0,
                 huntingLootHudEquipment: 0
             });
             this._run = null;
@@ -1177,7 +1176,6 @@ export class HuntingManager {
             huntingChoiceVisible: false,
             huntingLootHudVisible: false,
             huntingLootHudShards: 0,
-            huntingLootHudEnhancementStones: 0,
             huntingLootHudEquipment: 0
         });
 
@@ -1368,20 +1366,17 @@ export class HuntingManager {
             return {
                 huntingLootHudVisible: false,
                 huntingLootHudShards: 0,
-                huntingLootHudEnhancementStones: 0,
                 huntingLootHudEquipment: 0
             };
         }
         const pending = run.pendingLoot;
         const shards = pending?.shards ?? 0;
-        const enhancementStones = pending?.enhancementStones ?? 0;
         const equipmentEntries = Object.entries(pending?.equipment ?? {});
         const equipmentCount = equipmentEntries.reduce((sum, [, count]) => sum + count, 0);
-        const visible = shards > 0 || enhancementStones > 0 || equipmentCount > 0;
+        const visible = shards > 0 || equipmentCount > 0;
         return {
             huntingLootHudVisible: visible,
             huntingLootHudShards: shards,
-            huntingLootHudEnhancementStones: enhancementStones,
             huntingLootHudEquipment: equipmentCount
         };
     }
@@ -1739,7 +1734,6 @@ export class HuntingManager {
             huntingMoving: false,
             huntingLootHudVisible: false,
             huntingLootHudShards: 0,
-            huntingLootHudEnhancementStones: 0,
             huntingLootHudEquipment: 0
         });
         app.presentResultSequence([
@@ -1762,8 +1756,6 @@ export class HuntingManager {
         const profile = app.playerProfile;
         if (profile.hunting) {
             profile.hunting.shards = (profile.hunting.shards ?? 0) + (run.securedLoot?.shards ?? 0);
-            profile.equipment.enhancementStones =
-                (profile.equipment.enhancementStones ?? 0) + (run.securedLoot?.enhancementStones ?? 0);
             const securedEquipment = run.securedLoot?.equipment ?? {};
             for (const [templateId, count] of Object.entries(securedEquipment)) {
                 if (count > 0) {

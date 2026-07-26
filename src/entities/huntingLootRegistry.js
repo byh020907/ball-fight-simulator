@@ -1,4 +1,3 @@
-import { EnhancementStoneDrop } from "./enhancementStoneDrop.js";
 import { EquipmentDrop } from "./equipmentDrop.js";
 import { ExperienceDrop } from "./experienceDrop.js";
 import { ShardDrop } from "./shardDrop.js";
@@ -10,7 +9,6 @@ const HUNTING_LOOT_ITEM_CLASSES = Object.freeze({
     [ShardDrop.lootType]: ShardDrop,
     [ShardBundleDrop.lootType]: ShardBundleDrop,
     [ExperienceDrop.lootType]: ExperienceDrop,
-    [EnhancementStoneDrop.lootType]: EnhancementStoneDrop,
     [EquipmentDrop.lootType]: EquipmentDrop
 });
 

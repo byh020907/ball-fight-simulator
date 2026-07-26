@@ -241,7 +241,6 @@ import {
     getHuntingLootDropChance,
     getHuntingLootMultiplier,
     getHuntingShardDropAmount,
-    getHuntingEnhancementStoneDropCount,
     getHuntingCompletionExperience,
     getHuntingExperienceDropLimit,
     createHuntingExperienceAllocation,
@@ -401,7 +400,6 @@ import {
     BattleBall,
     computeHeroOrbCarryover,
     createHuntingLootItem,
-    EnhancementStoneDrop,
     ExperienceDrop,
     HERO_ORB_EFFECTS,
     HeroOrb,
@@ -889,7 +887,6 @@ function createHuntingOverlayMock() {
         huntingAutoAdvanceProgress: 0,
         huntingLootHudVisible: false,
         huntingLootHudShards: 0,
-        huntingLootHudEnhancementStones: 0,
         show({ label, text, subtext, xpReward } = {}) {
             if (label !== undefined) this.label = label;
             if (text !== undefined) this.text = text;
@@ -943,7 +940,6 @@ function createHuntingOverlayMock() {
             this.huntingAutoAdvanceProgress = 0;
             this.huntingLootHudVisible = false;
             this.huntingLootHudShards = 0;
-            this.huntingLootHudEnhancementStones = 0;
         },
         setHuntingState(data) {
             if (data) Object.assign(this, data);
@@ -3202,26 +3198,6 @@ function testHuntingLootBalanceRules() {
         7,
         "Physical shard-drop count should reach seven regardless of the hunting floor"
     );
-    assert.equal(
-        getHuntingEnhancementStoneDropCount(1, () => 0),
-        1,
-        "Floor-one bosses should drop at least one enhancement stone"
-    );
-    assert.equal(
-        getHuntingEnhancementStoneDropCount(1, () => 0.999999),
-        3,
-        "Floor-one bosses should cap their enhancement stone roll at three"
-    );
-    assert.equal(
-        getHuntingEnhancementStoneDropCount(100, () => 0),
-        4,
-        "Floor-one-hundred bosses should raise the minimum enhancement stone roll to four"
-    );
-    assert.equal(
-        getHuntingEnhancementStoneDropCount(100, () => 0.999999),
-        12,
-        "Floor-one-hundred bosses should cap their enhancement stone roll at twelve"
-    );
     assert.deepEqual(
         getHuntingBonusLootWeights({ collector: fullHp, rarity: "common" }),
         { small_heal_pack: 20, shard_bundle: 0 },
@@ -3366,11 +3342,6 @@ function testHuntingLootItemsAndDropController(app) {
         simulation.entities.length - entitiesBeforeShardCollection,
         78,
         "Each collected physical shard should create its own burst, particles, and reward label"
-    );
-    assert.equal(
-        simulation.entities.filter((entity) => entity instanceof EnhancementStoneDrop).length,
-        0,
-        "Normal hunting monsters must not create enhancement stone drops"
     );
     assert.deepEqual(
         soundCalls.at(-1),
@@ -3527,15 +3498,6 @@ function testHuntingLootItemsAndDropController(app) {
         22,
         "Shard bundles should remain the largest standard loot item"
     );
-    assert.ok(
-        createHuntingLootItem(HUNTING_LOOT_ITEM_TYPES.ENHANCEMENT_STONE, {
-            position: player.position,
-            velocity: new Vector2(),
-            collectorId: player.id
-        }) instanceof EnhancementStoneDrop,
-        "The loot registry must construct physical enhancement stone drops"
-    );
-
     const victorySweepShard = new ShardDrop({
         position: new Vector2(player.position.x + 300, player.position.y),
         velocity: new Vector2(),
@@ -3562,11 +3524,6 @@ function testHuntingLootValueRadius() {
     [shard, bundle, heal, experience].forEach(([small, large]) => {
         assert.ok(large.radius > small.radius, "Every value-bearing loot type must grow with its individual amount");
     });
-    assert.equal(
-        new EnhancementStoneDrop().radius,
-        18,
-        "Fixed-value enhancement stones must keep their known silhouette"
-    );
     console.log("[hunting-loot-value-radius] ok");
 }
 
@@ -3736,7 +3693,7 @@ function testHuntingExperienceGrantsByPartyParticipation() {
     console.log("[hunting-experience-party-grant] ok");
 }
 
-function testHuntingBossRolesAndEnhancementStoneDrops(app) {
+function testHuntingBossRolesAndRewards(app) {
     const createSequenceRng = (values) => {
         let index = 0;
         return () => values[index++] ?? values.at(-1) ?? 0;
@@ -3876,81 +3833,19 @@ function testHuntingBossRolesAndEnhancementStoneDrops(app) {
     const bossSession = new HuntingBattleLootSession({ playerId: player.id, floor: 1 });
     const bossController = new HuntingLootDropController({ session: bossSession, rng: () => 0.999999 });
     bossController.onFighterDefeated(boss, { simulation: bossSimulation });
-    const bossShards = bossSimulation.entities.filter(
-        (entity) => entity instanceof ShardDrop && !(entity instanceof EnhancementStoneDrop)
-    );
-    const bossStones = bossSimulation.entities.filter((entity) => entity instanceof EnhancementStoneDrop);
+    const bossShards = bossSimulation.entities.filter((entity) => entity instanceof ShardDrop);
     assert.equal(bossShards.length, 7, "BossMob must retain the generic monster shard drops");
-    assert.equal(bossStones.length, 3, "A floor-one BossMob must create every rolled stone as a physical item");
-    assert.ok(
-        bossStones.every((stone) => stone.amount === 1),
-        "Every physical enhancement stone must be worth exactly one"
-    );
-    bossStones.forEach((stone) => {
-        stone.collectionGraceRemaining = 0;
-        stone.position = player.position.clone();
-        stone.velocity = new Vector2();
-        stone.update(1 / 60, bossSimulation);
-    });
     assert.equal(
-        bossSession.getCollectedLoot().enhancementStones,
-        3,
-        "Collected physical stones must enter the transient hunting battle loot session"
+        bossSimulation.entities.some((entity) => entity.constructor.name === "EnhancementStoneDrop"),
+        false,
+        "Boss rewards must not create unused enhancement stones"
     );
-
-    const createRosterBossStoneDrops = (floor) => {
-        const rosterBoss = createHuntingMinibossSpec({
-            roster: app.roster,
-            characterId: playerSpec.id,
-            floor,
-            enemyType: HUNTING_ENEMY_TYPES.CHAMPION,
-            rng: () => 0
-        });
-        const simulation = new BattleSimulation([playerSpec, rosterBoss], { onLog() {}, onSound() {} }, null, {
-            assignActions: false
-        });
-        const [, rosterBossBall] = simulation.fighters;
-        const session = new HuntingBattleLootSession({ playerId: playerSpec.id, floor });
-        new HuntingLootDropController({ session, rng: () => 0.999999 }).onFighterDefeated(rosterBossBall, {
-            simulation
-        });
-        return simulation.entities.filter((entity) => entity instanceof EnhancementStoneDrop);
-    };
-    assert.equal(
-        createRosterBossStoneDrops(1).length,
-        3,
-        "Champion intrusions must add their own individual enhancement stones"
+    assert.deepEqual(
+        bossSession.getCollectedLoot(),
+        { shards: 0, equipment: {} },
+        "Boss battle loot sessions must expose only active hunting reward resources"
     );
-    assert.equal(
-        createRosterBossStoneDrops(100).length,
-        12,
-        "Final bosses must use the floor-one-hundred enhancement stone range"
-    );
-
-    const runWithStones = recordHuntingFloorResult(createHuntingRun({ characterId: player.id, now: 0 }), {
-        hpRemain: 80,
-        maxHp: 100,
-        loot: { shards: 0, enhancementStones: 5, equipment: {} }
-    });
-    const retreated = retreatHuntingRun(runWithStones, { now: 1 });
-    assert.equal(retreated.securedLoot.enhancementStones, 5, "Retreat must secure collected enhancement stones");
-    const defeated = defeatHuntingRun(runWithStones, { rng: () => 0, now: 1 });
-    assert.equal(
-        defeated.securedLoot.enhancementStones + defeated.defeatLosses.enhancementStones,
-        5,
-        "Defeat preservation must account for every pending enhancement stone"
-    );
-    const profile = createDefaultPlayerProfile();
-    const settlementApp = { playerProfile: profile, _settleHuntingAchievements() {} };
-    const settlementManager = new HuntingManager(settlementApp);
-    settlementManager._run = retreated;
-    settlementManager._mergeIntoSecured(settlementApp);
-    assert.equal(
-        profile.equipment.enhancementStones,
-        5,
-        "Secured enhancement stones must settle into the persistent equipment resource"
-    );
-    console.log("[hunting-boss-roles-and-enhancement-stones] ok");
+    console.log("[hunting-boss-roles-and-rewards] ok");
 }
 
 function testEliteFormationSortieCombat(playerSpec, fixedFormationSpecs) {
@@ -5338,18 +5233,42 @@ function testAbilityLevelUpgrades(app) {
         "Phantom should use its rebalanced base stats"
     );
     phantomRun.ball.ability._markTarget(phantomRun.target);
+    assert.deepEqual(
+        [
+            phantomRun.ball.ability.state.naturalEchoStacks,
+            phantomRun.ball.ability.state.staticEchoStacks,
+            phantomRun.ball.ability.state.terminalDashStacks
+        ],
+        [1, 1, 1],
+        "Phantom tier rewards should open one independent stack for every unlocked follow-up condition"
+    );
     phantomRun.ball.ability.onFighterStaticCollision(phantomRun.target, { wall: true, terrain: false });
-    assert.equal(
-        phantomRun.ball.ability.state.pendingStrikeStage,
-        "echo",
-        "Phantom tier 2 should trigger echo from a wall collision"
+    assert.deepEqual(
+        [
+            phantomRun.ball.ability.state.pendingStrikeStage,
+            phantomRun.ball.ability.state.naturalEchoStacks,
+            phantomRun.ball.ability.state.staticEchoStacks
+        ],
+        ["echo", 1, 0],
+        "Phantom wall echo should spend only its own stack and preserve the natural-collision stack"
     );
     phantomRun.ball.ability.state.activeDashStage = "echo";
     phantomRun.ball.ability.onDashHit(phantomRun.target, {});
+    assert.deepEqual(
+        [
+            phantomRun.ball.ability.state.pendingStrikeStage,
+            phantomRun.ball.ability.state.naturalEchoStacks,
+            phantomRun.ball.ability.state.terminalDashStacks
+        ],
+        ["terminal", 1, 0],
+        "Phantom terminal dash should spend only its own stack and preserve unused echo conditions"
+    );
+    phantomRun.ball.ability.state.activeDashStage = "terminal";
+    phantomRun.ball.ability.onDashHit(phantomRun.target, {});
     assert.equal(
-        phantomRun.ball.ability.state.pendingStrikeStage,
-        "terminal",
-        "Phantom tier 3 should allow one terminal dash"
+        phantomRun.ball.ability.state.markedTargetId,
+        phantomRun.target.id,
+        "Phantom terminal hit should keep the chain open while another condition stack remains"
     );
 
     const heroRun = createTierSimulation(FIGHTER_IDS.HERO);
@@ -8634,8 +8553,8 @@ function testHuntingSystem() {
     assert.equal(getHuntingRunHealth(afterFloor).hp, 55, "Hunting run should carry HP between floors");
     assert.deepEqual(
         afterFloor.pendingLoot,
-        { shards: 100, enhancementStones: 2, equipment: {} },
-        "Floor rewards should remain pending without a chest field"
+        { shards: 100, equipment: {} },
+        "Floor rewards should discard legacy stones and remain pending without a chest field"
     );
 
     const shardCachePayload = HuntingEvent.createPayload(HUNTING_EVENT_TYPES.SHARD_CACHE, 12, () => 0.5);
@@ -8678,7 +8597,7 @@ function testHuntingSystem() {
     const defeated = defeatHuntingRun(afterFloor, { rng: () => 0.6, now: 3000 });
     assert.equal(defeated.status, "defeated", "Defeat should end the run");
     assert.equal(defeated.securedLoot.shards, 50, "Defeat should preserve half of shards");
-    assert.equal(defeated.securedLoot.enhancementStones, 1, "Defeat should preserve half of enhancement stones");
+    assert.equal("enhancementStones" in defeated.securedLoot, false, "Defeat should discard legacy enhancement stones");
     assert.equal("chests" in defeated.defeatLosses, false, "Defeat losses must not contain chests");
 
     const sanitized = sanitizePlayerProfile({
@@ -8698,7 +8617,7 @@ function testHuntingSystem() {
         chests: [{ id: "legacy" }]
     });
     assert.equal(normalizedLoot.shards, 0, "normalizeHuntingLoot should sanitize invalid shard count");
-    assert.equal(normalizedLoot.enhancementStones, 3, "normalizeHuntingLoot should sanitize enhancement stones");
+    assert.equal("enhancementStones" in normalizedLoot, false, "normalizeHuntingLoot should discard legacy stones");
     assert.equal("chests" in normalizedLoot, false, "normalizeHuntingLoot should discard legacy chest fields");
     console.log("[hunting] ok");
 }
@@ -19504,7 +19423,7 @@ function testHuntingFormatHelpers() {
         equipment: { attack_sword: 1 }
     });
     assert.ok(summary.includes("보유 파편 50"), "Pending loot summary should show shards");
-    assert.ok(summary.includes("2"), "Pending loot summary should show enhancement stones");
+    assert.equal(summary.includes("강화석"), false, "Pending loot summary should omit legacy enhancement stones");
     assert.ok(summary.includes("장비 1개"), "Pending loot summary should show equipment count");
     assert.equal(summary.includes("상자"), false, "Pending loot summary must not mention chests");
 
@@ -19517,7 +19436,7 @@ function testHuntingFormatHelpers() {
 
     const lossText = formatDefeatLossText({ shards: 10, enhancementStones: 2, equipment: {} });
     assert.ok(lossText.includes("파편 10"), "Defeat loss text should show lost shards");
-    assert.ok(lossText.includes("2"), "Defeat loss text should show lost enhancement stones");
+    assert.equal(lossText.includes("강화석"), false, "Defeat loss text should omit legacy enhancement stones");
     assert.equal(lossText.includes("상자"), false, "Defeat loss text must not mention chests");
     assert.equal(formatDefeatLossText(null), "", "Null defeat losses should return empty");
     console.log("[hunting-format] ok");
@@ -19611,7 +19530,7 @@ function testHuntingLootHud() {
     const stateLoot = manager._getLootHudState();
     assert.equal(stateLoot.huntingLootHudVisible, true, "Current loot should show the HUD");
     assert.equal(stateLoot.huntingLootHudShards, 12, "HUD should expose pending shards");
-    assert.equal(stateLoot.huntingLootHudEnhancementStones, 3, "HUD should expose pending stones");
+    assert.equal("huntingLootHudEnhancementStones" in stateLoot, false, "HUD should omit legacy enhancement stones");
     assert.equal(stateLoot.huntingLootHudEquipment, 1, "HUD should expose pending equipment");
     assert.equal("huntingLootHudChests" in stateLoot, false, "Visible HUD state must not recreate chest counters");
     console.log("[hunting-loot-hud] ok");
@@ -21217,7 +21136,7 @@ testHuntingExperienceBalance();
 testHuntingExperienceGrantsByPartyParticipation();
 testHuntingLootValueRadius();
 testHuntingNormalCombatWinUsesXpRewardPanel();
-testHuntingBossRolesAndEnhancementStoneDrops(app);
+testHuntingBossRolesAndRewards(app);
 testEliteMobCombinationEvent(app);
 testEliteMobEventWeightFloorGate();
 testHuntingLootSessionIsDiscardedOnDefeat(app);
@@ -25187,9 +25106,10 @@ function testDeepCoreFinalBossContracts() {
     const lootController = new HuntingLootDropController({ session: lootSession, rng: () => 0 });
     armorBoss.hunting.experienceReward = 100;
     lootController.onFighterDefeated(armorBoss, { simulation: armorSimulation });
-    assert.ok(
-        armorSimulation.entities.some((entity) => entity instanceof EnhancementStoneDrop),
-        "Final boss must create immediate enhancement-stone rewards"
+    assert.equal(
+        armorSimulation.entities.some((entity) => entity.constructor.name === "EnhancementStoneDrop"),
+        false,
+        "Final boss rewards must not create unused enhancement stones"
     );
     assert.equal(
         armorSimulation.entities.some((entity) => "chest" in entity),
@@ -25717,5 +25637,35 @@ function testMobileEquipmentDetailKeepsRecipeTreeBehindStickyHeader() {
 }
 
 testMobileEquipmentDetailKeepsRecipeTreeBehindStickyHeader();
+
+function testUnusedEnhancementStonesStayOutOfActiveHuntingRewards(app) {
+    const normalized = normalizeHuntingLoot({ shards: 4, enhancementStones: 9, equipment: {} });
+    assert.equal(
+        "enhancementStones" in normalized,
+        false,
+        "legacy enhancement stones should not survive active hunting-loot normalization"
+    );
+    assert.equal(
+        formatPendingLootSummary({ shards: 4, enhancementStones: 9, equipment: {} }),
+        "보유 파편 4",
+        "result summaries should omit unused enhancement stones"
+    );
+
+    const manager = new HuntingManager({ roster: app.roster });
+    manager._run = {
+        ...createHuntingRun({ characterId: FIGHTER_IDS.ARCHER }),
+        pendingLoot: { shards: 0, enhancementStones: 9, equipment: {} }
+    };
+    const hud = manager._getLootHudState();
+    assert.equal(hud.huntingLootHudVisible, false, "stone-only legacy loot should not open the active loot HUD");
+    assert.equal(
+        "huntingLootHudEnhancementStones" in hud,
+        false,
+        "active hunting HUD state should not expose unused enhancement stones"
+    );
+    console.log("[unused-enhancement-stones-excluded-from-active-hunting] ok");
+}
+
+testUnusedEnhancementStonesStayOutOfActiveHuntingRewards(app);
 
 console.log("regression tests ok");

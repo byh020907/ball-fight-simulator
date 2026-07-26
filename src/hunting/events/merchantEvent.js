@@ -27,7 +27,7 @@ export class MerchantEvent extends HuntingEvent {
             logMessage: `[사냥터] ${event.floor}층 — 방랑 상인 발견`,
             presentation: {
                 title: "방랑 상인 발견",
-                subtext: "파편으로 장비와 강화석을 교환할 수 있습니다.",
+                subtext: "파편으로 원정에 필요한 서비스를 이용할 수 있습니다.",
                 detail: `현재 ${event.floor}층 · 상품 ${offers.length}개`
             }
         };

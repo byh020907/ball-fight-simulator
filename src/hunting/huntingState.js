@@ -37,7 +37,6 @@ function cloneLoot(loot = createEmptyHuntingLoot()) {
     const normalized = mergeHuntingLoot(loot, createEmptyHuntingLoot());
     return {
         shards: normalized.shards,
-        enhancementStones: normalized.enhancementStones,
         equipment: { ...normalized.equipment }
     };
 }

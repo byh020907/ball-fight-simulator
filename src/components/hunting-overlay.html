@@ -182,10 +182,6 @@
         <span class="hud-head">미확보 파편</span>
         <span class="hud-body">
             <span x-text="'파편 ' + huntingLootHudShards"></span>
-            <span
-                x-show="huntingLootHudEnhancementStones > 0"
-                x-text="' · 강화석 ' + huntingLootHudEnhancementStones"
-            ></span>
             <span x-show="huntingLootHudEquipment > 0" x-text="' · 장비 ' + huntingLootHudEquipment"></span>
         </span>
     </div>
@@ -224,7 +220,6 @@
         huntingAutoAdvanceProgress: 0,
         huntingLootHudVisible: false,
         huntingLootHudShards: 0,
-        huntingLootHudEnhancementStones: 0,
         huntingLootHudEquipment: 0,
         huntingPartyExperienceRewards: [],
 
@@ -311,7 +306,6 @@
             this.huntingAutoAdvanceProgress = 0;
             this.huntingLootHudVisible = false;
             this.huntingLootHudShards = 0;
-            this.huntingLootHudEnhancementStones = 0;
             this.huntingLootHudEquipment = 0;
             this.huntingPartyExperienceRewards = [];
         },
@@ -358,8 +352,6 @@
                 this.huntingAutoAdvanceProgress = data.huntingAutoAdvanceProgress;
             if (data.huntingLootHudVisible !== undefined) this.huntingLootHudVisible = data.huntingLootHudVisible;
             if (data.huntingLootHudShards !== undefined) this.huntingLootHudShards = data.huntingLootHudShards;
-            if (data.huntingLootHudEnhancementStones !== undefined)
-                this.huntingLootHudEnhancementStones = data.huntingLootHudEnhancementStones;
             if (data.huntingLootHudEquipment !== undefined) this.huntingLootHudEquipment = data.huntingLootHudEquipment;
             if (data.huntingPartyExperienceRewards !== undefined)
                 this.huntingPartyExperienceRewards = data.huntingPartyExperienceRewards;
