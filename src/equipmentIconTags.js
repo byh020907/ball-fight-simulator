@@ -2,6 +2,7 @@ const MAXIMUM_PIXEL_RATIO = 2;
 
 function getCanvasDisplaySize(canvas) {
     const bounds = canvas.getBoundingClientRect?.();
+    if (bounds && (bounds.width <= 0 || bounds.height <= 0)) return null;
     return {
         width: Math.max(1, bounds?.width || canvas.clientWidth || canvas.width || 1),
         height: Math.max(1, bounds?.height || canvas.clientHeight || canvas.height || 1)
@@ -1788,10 +1789,16 @@ export function getUnknownTagMetadata() {
 
 export function renderIconTag(canvas, tagId, { pixelRatio: injectedPixelRatio } = {}) {
     if (!canvas) return false;
+    const displaySize = getCanvasDisplaySize(canvas);
+    if (!displaySize) {
+        canvas.width = 1;
+        canvas.height = 1;
+        return false;
+    }
     const context = canvas.getContext?.("2d");
     if (!context) return false;
 
-    const { width, height } = getCanvasDisplaySize(canvas);
+    const { width, height } = displaySize;
     const pixelRatio = Math.min(MAXIMUM_PIXEL_RATIO, injectedPixelRatio ?? (globalThis.devicePixelRatio || 1));
     canvas.width = Math.max(1, Math.round(width * pixelRatio));
     canvas.height = Math.max(1, Math.round(height * pixelRatio));
@@ -1831,6 +1838,7 @@ export class EquipmentIconTagController {
     }
 
     setTag(tagId) {
+        if (this.tagId === tagId) return;
         this.tagId = tagId;
         this.scheduleRender();
     }

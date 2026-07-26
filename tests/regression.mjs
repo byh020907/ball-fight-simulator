@@ -325,7 +325,7 @@ import { addEquipmentQuantity, getEquipmentCount } from "../src/hunting/equipmen
 import { getEquipmentTemplate, EQUIPMENT_MAX_STACK } from "../src/hunting/equipmentTemplates.js";
 import { createComponentBridge } from "../src/componentBridge.js";
 import { rollHuntingEquipmentDrop } from "../src/hunting/huntingLoot.js";
-import { resolveTagDraw } from "../src/equipmentIconTags.js";
+import { EquipmentIconTagController, resolveTagDraw } from "../src/equipmentIconTags.js";
 import { mergeHuntingLoot, applyDefeatPreservation, sanitizeEquipmentMap } from "../src/hunting/huntingRewards.js";
 import { EQUIPMENT } from "../src/hunting/equipmentData.js";
 import { createEquipmentName, getDominantEquipmentStat } from "../src/hunting/equipmentNaming.js";
@@ -25622,5 +25622,85 @@ function testCombatParticleBudgetPreventsRendererOverload(app) {
 }
 
 testCombatParticleBudgetPreventsRendererOverload(app);
+
+function testHiddenEquipmentIconCanvasReleasesBackingStore() {
+    const frames = [];
+    const canvas = {
+        width: 300,
+        height: 150,
+        clientWidth: 0,
+        clientHeight: 0,
+        getBoundingClientRect() {
+            return { width: 0, height: 0 };
+        },
+        getContext() {
+            return {};
+        }
+    };
+    const controller = new EquipmentIconTagController(canvas, {
+        ResizeObserverClass: null,
+        requestFrame(callback) {
+            frames.push(callback);
+        }
+    });
+
+    controller.setTag("weapon-sword");
+    frames.shift()();
+
+    assert.equal(canvas.width, 1, "hidden equipment icon canvas should release its default width backing store");
+    assert.equal(canvas.height, 1, "hidden equipment icon canvas should release its default height backing store");
+
+    controller.setTag("weapon-sword");
+    assert.equal(frames.length, 0, "setting the same icon tag again should not schedule another hidden redraw");
+    controller.destroy();
+    console.log("[hidden-equipment-icon-canvas-backing-store] ok");
+}
+
+testHiddenEquipmentIconCanvasReleasesBackingStore();
+
+async function testFloorSevenHuntingDefeatCompletesWithRealApp(app) {
+    app.returnToInitialState();
+    app.playerProfile = createDefaultPlayerProfile();
+    app.playerStatAllocation = createRandomStatAllocation(() => 0);
+    const characterId = FIGHTER_IDS.DASH;
+    app.playerProfile.hunting.unlockedCharacterIds = [characterId];
+    app.hunting._run = {
+        ...createHuntingRun({ characterId, stageId: HUNTING_STAGE_IDS.CAVE }),
+        floor: 7,
+        phase: HUNTING_RUN_PHASES.COMBAT,
+        lastEncounter: { type: HUNTING_FLOOR_OUTCOME_TYPES.COMBAT }
+    };
+    const originalWait = app.wait;
+    app.wait = async () => {};
+    try {
+        app.beginGameSession();
+        app.hunting._startFloorBattle();
+        await Promise.resolve();
+        await Promise.resolve();
+        const simulation = app.simulation;
+        const player = simulation.fighters.find((fighter) => fighter.teamId === HUNTING_TEAMS.PLAYER);
+        const enemy = simulation.fighters.find((fighter) => fighter.teamId !== HUNTING_TEAMS.PLAYER);
+        player.takeDamage(player.maxHp * 10, enemy, "Floor 7 Defeat Probe", {
+            ignoreDefense: true,
+            suppressDamageNumber: true
+        });
+        simulation.checkResult();
+        simulation.update(2.3, 2.3);
+        assert.equal(simulation.resultReady, true, "floor 7 defeat should finish its result animation");
+        app._onSimulationResult(app);
+        assert.equal(
+            app.lifecycle.isAwaitingResultConfirmation,
+            true,
+            "floor 7 defeat should enter result confirmation"
+        );
+        assert.equal(app.hunting._run, null, "floor 7 defeat should close the hunting run");
+    } finally {
+        app.wait = originalWait;
+        app.returnToInitialState();
+    }
+    console.log("[floor-seven-hunting-defeat-real-app] ok");
+}
+
+await testFloorSevenHuntingDefeatCompletesWithRealApp(app);
 
 console.log("regression tests ok");
