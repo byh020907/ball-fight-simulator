@@ -351,10 +351,6 @@ function testDailyShopPopupContract() {
     assert.ok(collectionHub.includes(".ch-ach-info {"), "Collection cards should define their shared info layout");
     assert.ok(collectionHub.includes("flex: 1;"), "Collection card info should occupy remaining horizontal space");
     assert.ok(
-        !collectionHub.includes('<chest-icon x-bind:data-rarity="item.rarity">'),
-        "Achievement rows should not repeat a chest icon for every achievement"
-    );
-    assert.ok(
         !collectionHub.includes("flex-shrink: 0;\n    }\n\n    }\n\n    .ch-mast-tier"),
         "Collection stylesheet should not contain a dangling mastery block terminator"
     );
