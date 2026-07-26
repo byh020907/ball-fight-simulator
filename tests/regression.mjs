@@ -25703,4 +25703,19 @@ async function testFloorSevenHuntingDefeatCompletesWithRealApp(app) {
 
 await testFloorSevenHuntingDefeatCompletesWithRealApp(app);
 
+function testMobileEquipmentDetailKeepsRecipeTreeBehindStickyHeader() {
+    const source = readFileSync("src/components/collection-equipment-panel.html", "utf8");
+    const detailRule = source.match(/\.ch-equipment-detail\s*\{(?<body>[^}]*)\}/)?.groups?.body ?? "";
+    const mobileBlock = source.match(/@media \(max-width: 700px\)\s*\{(?<body>[\s\S]*?)\n\s*\}\n<\/style>/)?.groups
+        ?.body;
+    const stickyHeadingRule =
+        mobileBlock?.match(/\.ch-equipment-detail-heading\s*\{(?<body>[^}]*)\}/)?.groups?.body ?? "";
+
+    assert.match(detailRule, /isolation:\s*isolate/, "equipment detail should isolate recipe-tree stacking");
+    assert.match(stickyHeadingRule, /z-index:\s*[3-9]\d*/, "sticky detail heading should stay above recipe nodes");
+    console.log("[mobile-equipment-detail-recipe-tree-stacking] ok");
+}
+
+testMobileEquipmentDetailKeepsRecipeTreeBehindStickyHeader();
+
 console.log("regression tests ok");
