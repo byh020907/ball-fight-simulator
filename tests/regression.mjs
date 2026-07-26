@@ -14954,6 +14954,36 @@ async function testHeroOrbBonusUiFormat(app) {
     assert.equal(hpPart.color, HERO_ORB_EFFECTS.hp.color, "Hero stat bonus should use the matching orb color");
 }
 
+async function testHeroGrowthStatLineFormat() {
+    const { formatHeroGrowthStatLine } = await import("../src/entities/heroOrb.js");
+    const bonuses = { hp: 3, damage: 2, speed: 0, skill: 0, defense: 0, critical: 0 };
+
+    assert.equal(
+        formatHeroGrowthStatLine(bonuses, 24),
+        "영웅 성장 · 체력 +3 · 공격 +2 · 보호막 24",
+        "Hero cards should describe only active growth and shield values on desktop"
+    );
+    assert.equal(
+        formatHeroGrowthStatLine(bonuses, 24, { compact: true }),
+        "영웅 성장 · HP +3 · 공 +2 · 보호막 24",
+        "Hero cards should use the compact growth copy on mobile"
+    );
+    assert.equal(formatHeroGrowthStatLine({}, 24), "영웅 성장 · 보호막 24");
+    assert.equal(
+        formatHeroGrowthStatLine({}, 2.4),
+        "영웅 성장 · 보호막 3",
+        "positive fractional shields should match the card's rounded-up shield value"
+    );
+    assert.equal(formatHeroGrowthStatLine({}, 0), "", "zero growth and shield should remove the Hero stat row");
+    assert.equal(
+        formatHeroGrowthStatLine({ hp: NaN, damage: 1.5, speed: -1 }, NaN),
+        "",
+        "non-finite and invalid orb values must not create a visible growth row"
+    );
+    assert.equal(formatHeroGrowthStatLine({}, -2.4), "", "negative shields must not create a visible growth row");
+    console.log("[hero-growth-stat-line-format] ok");
+}
+
 async function testHeroOrbBonusUiOnlyForHero(app) {
     const hero = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.HERO);
     const archer = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
@@ -25803,6 +25833,7 @@ async function testFloorSevenHuntingDefeatCompletesWithRealApp(app) {
 }
 
 await testFloorSevenHuntingDefeatCompletesWithRealApp(app);
+await testHeroGrowthStatLineFormat();
 
 function testMobileEquipmentDetailKeepsRecipeTreeBehindStickyHeader() {
     const source = readFileSync("src/components/collection-equipment-panel.html", "utf8");

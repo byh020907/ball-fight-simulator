@@ -826,6 +826,18 @@ function testGameplayUiResetContracts() {
         "Mobile fighter cards should use a dedicated compact stat summary without changing desktop copy"
     );
     assert.ok(
+        fighterStrip.includes("fighter.showStatLine") &&
+            fighterStrip.includes("fighter.revivalBattlesUntilReturn === 0 && fighter.showStatLine") &&
+            abilityAppSource.includes("showStatLine: isHero ? Boolean(heroStatLine) : !isHuntingCompanion"),
+        "Hunting cards should render a stat row only when the card view model explicitly marks it meaningful"
+    );
+    assert.ok(
+        abilityAppSource.includes("formatHeroGrowthStatLine(heroBonuses, 0)") &&
+            abilityAppSource.includes("formatHeroGrowthStatLine(bonuses, shield)") &&
+            !fighterStrip.includes("hero-stat-parts"),
+        "Hero cards should replace allocation rows with live growth or shield text instead of reserving empty stat markup"
+    );
+    assert.ok(
         fighterStrip.includes(":scope:has(.fighter-card:nth-of-type(2))") &&
             fighterStrip.includes(":scope:has(.fighter-card:nth-of-type(3))") &&
             !fighterStrip.includes(":scope:has(.fighter-card:nth-child(3))"),
@@ -1114,7 +1126,7 @@ function testHuntingStartPopupOwnershipContract() {
         "Party character cards should receive shared visual identity and current level data from HuntingManager"
     );
     assert.ok(
-        fighterStrip.includes("fighter.partyLabel") && app.includes('partyRole?.startsWith("companion-") ? "동료"'),
+        fighterStrip.includes("fighter.partyLabel") && app.includes('isHuntingCompanion ? "동료" : null'),
         "Hunting companion cards should identify themselves as companions instead of AI fighters"
     );
     console.log("[hunting-start-popup-ownership] ok");

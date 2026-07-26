@@ -139,6 +139,34 @@ export function formatCompactHeroStatLine(allocation = {}, bonuses = {}) {
     }).join(" · ");
 }
 
+const HERO_GROWTH_LABELS = Object.freeze({
+    hp: { desktop: "체력", mobile: "HP" },
+    damage: { desktop: "공격", mobile: "공" },
+    speed: { desktop: "속도", mobile: "속" },
+    skill: { desktop: "쿨타임", mobile: "쿨" },
+    defense: { desktop: "방어", mobile: "방" },
+    critical: { desktop: "치명타", mobile: "치" }
+});
+
+function getPositiveInteger(value) {
+    return Number.isInteger(value) && value > 0 ? value : 0;
+}
+
+function getVisibleShieldAmount(value) {
+    return Number.isFinite(value) && value > 0 ? Math.ceil(value) : 0;
+}
+
+export function formatHeroGrowthStatLine(bonuses = {}, shield = 0, { compact = false } = {}) {
+    const labelType = compact ? "mobile" : "desktop";
+    const parts = STAT_ORB_KEYS.flatMap((key) => {
+        const amount = getPositiveInteger(bonuses[key]);
+        return amount ? [`${HERO_GROWTH_LABELS[key][labelType]} +${amount}`] : [];
+    });
+    const visibleShield = getVisibleShieldAmount(shield);
+    if (visibleShield) parts.push(`보호막 ${visibleShield}`);
+    return parts.length ? `영웅 성장 · ${parts.join(" · ")}` : "";
+}
+
 export function mergeOrbBonuses(current = {}, carry = {}) {
     const result = {};
     for (const key of STAT_ORB_KEYS) {
