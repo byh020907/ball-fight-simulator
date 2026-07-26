@@ -5257,7 +5257,7 @@ function testAbilityLevelUpgrades(app) {
         "Phantom level three should expose its natural echo stack throughout the cooldown"
     );
     assert.ok(
-        phantomUiRun.sim.entities.some((entity) => entity.displayText === "메아리 준비"),
+        phantomUiRun.sim.entities.some((entity) => entity.displayText === "그림자 돌진"),
         "Phantom level three mark should announce that its echo stack is ready"
     );
     phantomUiRun.ball.ability.onCollision(phantomUiRun.target);

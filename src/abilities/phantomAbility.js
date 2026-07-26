@@ -270,7 +270,7 @@ export class PhantomAbility extends Ability {
         this.state.naturalEchoStacks = upgrade.echoOnNaturalCollision ? 1 : 0;
         this.state.staticEchoStacks = upgrade.echoOnStaticCollision ? 1 : 0;
         this.state.terminalDashStacks = upgrade.terminalDash ? 1 : 0;
-        this._showChainText(target, "메아리 준비", "#8eeeff");
+        this._showChainText(target, "그림자 돌진", "#8eeeff");
     }
 
     _clearExpiredChain() {
