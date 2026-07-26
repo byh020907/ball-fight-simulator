@@ -19,6 +19,7 @@ export {
     rollHeroOrbStatGain,
     HERO_ORB_EFFECTS,
     STAT_ORB_KEYS,
+    formatCompactHeroStatLine,
     formatHeroStatLine,
     mergeOrbBonuses,
     formatHeroStatParts,

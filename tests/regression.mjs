@@ -13,6 +13,7 @@ import {
     createEmptyStatAllocation,
     createRandomStatAllocation,
     createTournamentRoster,
+    formatCompactStatAllocation,
     formatStatAllocation,
     getRemainingStatPoints,
     getSpentStatPoints
@@ -2504,6 +2505,11 @@ function testStatAllocationRules(app) {
         formatStatAllocation(allocation),
         "체력 +30% · 공격 +40% · 속도 +30% · 쿨타임 +0% · 방어력 +0",
         "Allocation summary should show defense as a direct rating and other stats as percentages"
+    );
+    assert.equal(
+        formatCompactStatAllocation(allocation),
+        "HP30 공40 속30 쿨0 방0",
+        "Mobile allocation summary should keep all five stats in a compact single line"
     );
     assert.equal(boosted.stats.radius, archer.stats.radius, "Radius should stay character-specific");
     assert.equal(boosted.stats.mass, archer.stats.mass, "Mass should stay character-specific");
@@ -14964,13 +14970,15 @@ async function testHeroOrbBonusUiOnlyForHero(app) {
 
     heroFighter.hero.bonuses.hp = 3;
     heroFighter.stats.allocation = { hp: 12, damage: 18, speed: 22, skill: 28, defense: 20 };
-    const { formatHeroStatLine } = await import("../src/entities/index.js");
+    const { formatCompactHeroStatLine, formatHeroStatLine } = await import("../src/entities/index.js");
     const heroLine = formatHeroStatLine(heroFighter.stats.allocation, heroFighter.hero.bonuses);
+    const compactHeroLine = formatCompactHeroStatLine(heroFighter.stats.allocation, heroFighter.hero.bonuses);
     const normalLine = formatStatAllocation(heroFighter.stats.allocation);
     assert.ok(heroLine.includes("체력 +12%(+3)"), "Hero's stat line should show base allocation plus orb bonuses");
     assert.ok(heroLine.includes("방어 +20"), "Hero's defense allocation should be shown as a direct rating");
     assert.ok(!heroLine.includes("방어 +20%"), "Hero's defense allocation should not be shown as a percentage");
     assert.ok(!normalLine.includes("+12%(+3)"), "Normal stat formatter should not include Hero Orb bonuses");
+    assert.equal(compactHeroLine, "HP12(+3) 공18 속22 쿨28 방20 치0", "Hero mobile stats should retain orb bonuses");
     assert.deepEqual(archerFighter.hero.bonuses, { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 });
 }
 

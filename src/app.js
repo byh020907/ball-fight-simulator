@@ -11,6 +11,7 @@ import {
     createTournamentRoster,
     getRemainingStatPoints,
     adjustStatAllocation,
+    formatCompactStatAllocation,
     formatStatAllocation
 } from "./statAllocation.js";
 import { ActionPickerService } from "./actionPicker.js";
@@ -83,7 +84,12 @@ import {
 import { getEquippedEquipmentStats, getEquippedEquipmentTemplates } from "./hunting/equipmentInventory.js";
 import { Vector2 } from "./core.js";
 import { FIGHTER_IDS } from "./characters/characterRegistry.js";
-import { formatHeroStatLine, formatHeroStatParts, mergeOrbBonuses } from "./entities/heroOrb.js";
+import {
+    formatCompactHeroStatLine,
+    formatHeroStatLine,
+    formatHeroStatParts,
+    mergeOrbBonuses
+} from "./entities/heroOrb.js";
 import { Ability } from "./abilities/index.js";
 import { getAbilityDisplayName } from "./abilities/abilityMetadata.js";
 import { AppLifecycle } from "./appLifecycle.js";
@@ -778,7 +784,7 @@ export class BattleApp {
                 status: "ready",
                 cooldownRemaining: 0,
                 cooldownDuration: 0,
-                text: "Ready"
+                text: ""
             }));
             return {
                 id: fighter.id,
@@ -799,6 +805,9 @@ export class BattleApp {
                 statLine: isHero
                     ? formatHeroStatLine(fighter.stats.allocation ?? {})
                     : formatStatAllocation(fighter.stats.allocation ?? {}),
+                compactStatLine: isHero
+                    ? formatCompactHeroStatLine(fighter.stats.allocation ?? {})
+                    : formatCompactStatAllocation(fighter.stats.allocation ?? {}),
                 heroStatParts: isHero ? formatHeroStatParts(fighter.stats.allocation ?? {}) : [],
                 isHero,
                 abilityStates: [
@@ -812,7 +821,7 @@ export class BattleApp {
                         status: "ready",
                         cooldownRemaining: 0,
                         cooldownDuration: 0,
-                        text: "Ready"
+                        text: ""
                     },
                     ...subAbilityStates
                 ],
@@ -828,11 +837,15 @@ export class BattleApp {
             const alloc = fighter.stats.allocation ?? {};
             const isHero = fighter.id === FIGHTER_IDS.HERO;
             const bonuses = mergeOrbBonuses(fighter.hero.bonuses ?? {}, fighter.hero.carryover ?? {});
-            const abilityStates = fighter.getAbilityUiStates().map((state) => ({
-                ...state,
-                progress: Math.max(0, Math.min(1, state.progress)),
-                text: state.text ?? (state.progress >= 0.995 ? "Ready" : `${Math.round(state.progress * 100)}%`)
-            }));
+            const abilityStates = fighter.getAbilityUiStates().map((state) => {
+                const progress = Math.max(0, Math.min(1, state.progress));
+                const displayText = state.text ?? (progress >= 0.995 ? "Ready" : `${Math.round(progress * 100)}%`);
+                return {
+                    ...state,
+                    progress,
+                    text: displayText === state.label ? "" : displayText
+                };
+            });
             const shieldState = fighter.getShieldState();
             const shield = Math.max(0, shieldState.current);
             const healthBar = getCombinedHealthBarPercentages({
@@ -857,6 +870,9 @@ export class BattleApp {
                 statLine: isHero
                     ? formatHeroStatLine(fighter.stats.allocation ?? {}, bonuses)
                     : formatStatAllocation(fighter.stats.allocation ?? {}),
+                compactStatLine: isHero
+                    ? formatCompactHeroStatLine(fighter.stats.allocation ?? {}, bonuses)
+                    : formatCompactStatAllocation(fighter.stats.allocation ?? {}),
                 heroStatParts: isHero ? formatHeroStatParts(fighter.stats.allocation ?? {}, bonuses) : [],
                 abilityStates,
                 actionName: fighter.clickActionName ?? null

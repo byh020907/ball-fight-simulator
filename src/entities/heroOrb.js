@@ -122,6 +122,23 @@ export function formatHeroStatLine(allocation = {}, bonuses = {}) {
 
 export const STAT_ORB_KEYS = ["hp", "damage", "speed", "skill", "defense", "critical"];
 
+const COMPACT_HERO_STAT_LABELS = Object.freeze({
+    hp: "HP",
+    damage: "공",
+    speed: "속",
+    skill: "쿨",
+    defense: "방",
+    critical: "치"
+});
+
+export function formatCompactHeroStatLine(allocation = {}, bonuses = {}) {
+    return STAT_ORB_KEYS.map((key) => {
+        const base = allocation[key] ?? 0;
+        const bonus = bonuses[key] ?? 0;
+        return `${COMPACT_HERO_STAT_LABELS[key]}${base}${bonus > 0 ? `(+${bonus})` : ""}`;
+    }).join(" ");
+}
+
 export function mergeOrbBonuses(current = {}, carry = {}) {
     const result = {};
     for (const key of STAT_ORB_KEYS) {

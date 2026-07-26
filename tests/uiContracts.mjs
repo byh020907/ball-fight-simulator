@@ -803,6 +803,28 @@ function testGameplayUiResetContracts() {
         "Fighter cards should constrain long mobile labels inside their fluid grid cell"
     );
     assert.ok(
+        fighterStrip.includes('[data-ability-role="primary"] .cooldown-label') &&
+            fighterStrip.includes('[data-ability-role="sub"] .cooldown-state-label') &&
+            fighterStrip.includes("display: none"),
+        "Mobile fighter cards should remove duplicate primary names and sub-ability state labels"
+    );
+    assert.ok(
+        fighterStrip.includes(".cooldown-text:empty") && fighterStrip.includes("display: none"),
+        "Fighter cards should not reserve status-row space for empty secondary text"
+    );
+    const abilityAppSource = readSource("src/app.js");
+    assert.ok(
+        abilityAppSource.includes('displayText === state.label ? "" : displayText') &&
+            !abilityAppSource.includes('cooldownDuration: 0,\n                        text: "Ready"'),
+        "Ability status rows should suppress secondary text that exactly duplicates the state label"
+    );
+    assert.ok(
+        fighterStrip.includes('class="desktop-stat-line"') &&
+            fighterStrip.includes('class="mobile-stat-line"') &&
+            fighterStrip.includes("fighter.compactStatLine"),
+        "Mobile fighter cards should use a dedicated compact stat summary without changing desktop copy"
+    );
+    assert.ok(
         fighterStrip.includes(":scope:has(.fighter-card:nth-of-type(2))") &&
             fighterStrip.includes(":scope:has(.fighter-card:nth-of-type(3))") &&
             !fighterStrip.includes(":scope:has(.fighter-card:nth-child(3))"),

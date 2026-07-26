@@ -106,6 +106,20 @@ export function formatStatAllocation(allocation) {
     }).join(" · ");
 }
 
+const COMPACT_STAT_LABELS = Object.freeze({
+    hp: "HP",
+    damage: "공",
+    speed: "속",
+    skill: "쿨",
+    defense: "방"
+});
+
+export function formatCompactStatAllocation(allocation) {
+    return ALLOCATABLE_STATS.map(
+        (stat) => `${COMPACT_STAT_LABELS[stat.key] ?? stat.shortLabel}${allocation[stat.key] ?? 0}`
+    ).join(" ");
+}
+
 /**
  * 토너먼트 참가자 선발 규칙 (v0.10.0+):
  * - 전체 roster가 size(기본 8) 이상이면 → 유저 캐릭터 1명 + 유저 제외 랜덤(size-1)명 = 총 size명
