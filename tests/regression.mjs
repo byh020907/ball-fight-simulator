@@ -25953,20 +25953,29 @@ async function testFloorSevenHuntingDefeatCompletesWithRealApp(app) {
 await testFloorSevenHuntingDefeatCompletesWithRealApp(app);
 await testHeroGrowthStatLineFormat();
 
-function testMobileEquipmentDetailKeepsRecipeTreeBehindStickyHeader() {
+function testMobileEquipmentDetailUsesCodexStyleSplitScrolling() {
     const source = readFileSync("src/components/collection-equipment-panel.html", "utf8");
     const detailRule = source.match(/\.ch-equipment-detail\s*\{(?<body>[^}]*)\}/)?.groups?.body ?? "";
+    const detailBodyRule = source.match(/\.ch-equipment-detail-body\s*\{(?<body>[^}]*)\}/)?.groups?.body ?? "";
     const mobileBlock = source.match(/@media \(max-width: 700px\)\s*\{(?<body>[\s\S]*?)\n\s*\}\n<\/style>/)?.groups
         ?.body;
-    const stickyHeadingRule =
-        mobileBlock?.match(/\.ch-equipment-detail-heading\s*\{(?<body>[^}]*)\}/)?.groups?.body ?? "";
+    const browserRule = mobileBlock?.match(/\.ch-equipment-browser\s*\{(?<body>[^}]*)\}/)?.groups?.body ?? "";
+    const mobileDetailRule = mobileBlock?.match(/\.ch-equipment-detail\s*\{(?<body>[^}]*)\}/)?.groups?.body ?? "";
 
     assert.match(detailRule, /isolation:\s*isolate/, "equipment detail should isolate recipe-tree stacking");
-    assert.match(stickyHeadingRule, /z-index:\s*[3-9]\d*/, "sticky detail heading should stay above recipe nodes");
-    console.log("[mobile-equipment-detail-recipe-tree-stacking] ok");
+    assert.match(detailRule, /overflow:\s*hidden/, "detail chrome should not join the scrollable recipe content");
+    assert.match(detailBodyRule, /overflow-y:\s*auto/, "only the detail body should scroll vertically");
+    assert.match(
+        browserRule,
+        /overflow-y:\s*auto/,
+        "slots and equipment cards should share an independent list scroll"
+    );
+    assert.match(mobileDetailRule, /border-top:\s*2px solid #e0e0e0/, "mobile detail should use the codex divider");
+    assert.match(mobileDetailRule, /flex:\s*0 0 clamp\(/, "mobile detail should reserve a stable lower pane");
+    console.log("[mobile-equipment-detail-codex-layout] ok");
 }
 
-testMobileEquipmentDetailKeepsRecipeTreeBehindStickyHeader();
+testMobileEquipmentDetailUsesCodexStyleSplitScrolling();
 
 function testUnusedEnhancementStonesStayOutOfActiveHuntingRewards(app) {
     const normalized = normalizeHuntingLoot({ shards: 4, enhancementStones: 9, equipment: {} });

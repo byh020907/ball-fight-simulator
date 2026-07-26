@@ -100,6 +100,16 @@ function testCollectionEquipmentPanelsOwnTheirFlows() {
             equipmentPanel.includes("closeDetail()"),
         "Mobile equipment detail should expose a close control that clears only the selection"
     );
+    assert.ok(
+        equipmentPanel.includes('class="ch-equipment-browser"') &&
+            equipmentPanel.includes('class="ch-equipment-detail-body"') &&
+            equipmentPanel.includes('class="ch-equipment-detail-actions"'),
+        "Mobile equipment should separate the scrollable catalog, detail body, and persistent actions"
+    );
+    assert.ok(
+        equipmentPanel.includes("detailBody.scrollTop = 0") && equipmentPanel.includes("tree.scrollLeft = Math.max"),
+        "Selecting equipment should reset detail scrolling and center an overflowing recipe tree"
+    );
     assert.equal(
         collectionHub.includes("collection-fusion-dialog") || collectionHub.includes("collection-shop-panel"),
         false,
