@@ -29,7 +29,7 @@ export default createCharacterDefinition({
         {
             level: 6,
             abilityTier: 2,
-            gameText: "쿨타임 중 벽·지형 충돌 그림자 돌진 1회 추가"
+            gameText: "그림자 돌진으로 밀어 벽·지형 충돌 시 즉시 재돌진 1회"
         },
         {
             level: 7

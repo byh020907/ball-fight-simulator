@@ -5244,7 +5244,7 @@ function testAbilityLevelUpgrades(app) {
         phantomDefinition.levelRewards.filter((reward) => reward.gameText).map((reward) => reward.gameText),
         [
             "쿨타임 중 자연 충돌 그림자 돌진 1회",
-            "쿨타임 중 벽·지형 충돌 그림자 돌진 1회 추가",
+            "그림자 돌진으로 밀어 벽·지형 충돌 시 즉시 재돌진 1회",
             "후속 그림자 돌진 적중 시 종결 그림자 돌진 1회 추가"
         ],
         "Phantom level rewards should use the shadow-chain terminology"
@@ -5314,12 +5314,40 @@ function testAbilityLevelUpgrades(app) {
     );
     assert.deepEqual(
         [
-            phantomRun.ball.ability.state.pendingShadowStage,
+            phantomRun.ball.ability.state.activeDashStage,
+            phantomRun.ball.ability.state.teleportPhase,
+            Boolean(phantomRun.ball.state.movement),
             phantomRun.ball.ability.state.shadowPursuitStacks,
             phantomRun.ball.ability.state.shadowReboundStacks
         ],
-        ["chain", 1, 0],
-        "Phantom shadow rebound should spend only its own stack and preserve the shadow-pursuit stack"
+        ["chain", 0, true, 1, 0],
+        "Phantom shadow rebound should immediately dash into the wall-hit target while preserving shadow pursuit"
+    );
+    const phantomWallRun = createTierSimulation(FIGHTER_IDS.PHANTOM, 2);
+    phantomWallRun.target.position = new Vector2(phantomWallRun.target.radius + 24, phantomWallRun.sim.height / 2);
+    phantomWallRun.ball.position = new Vector2(
+        phantomWallRun.target.position.x + phantomWallRun.ball.radius + phantomWallRun.target.radius - 1,
+        phantomWallRun.target.position.y
+    );
+    phantomWallRun.ball.ability.resetCooldown(phantomWallRun.ball.ability.cooldown);
+    phantomWallRun.ball.ability.state.activeDashStage = "base";
+    phantomWallRun.ball.initiateDash(new Vector2(-1, 0), {
+        duration: 0.8,
+        multiplier: 2.5,
+        collisionDamage: phantomWallRun.ball.stats.baseDamage * 1.5,
+        collisionLabel: "그림자 돌진",
+        showRing: false
+    });
+    for (let frame = 0; frame < 3; frame += 1) phantomWallRun.sim.update(1 / 120, 1 / 120);
+    assert.deepEqual(
+        [
+            phantomWallRun.target.position.x,
+            phantomWallRun.ball.ability.state.shadowReboundStacks,
+            phantomWallRun.ball.ability.state.activeDashStage,
+            phantomWallRun.ball.ability.state.teleportPhase
+        ],
+        [phantomWallRun.target.radius, 0, "chain", 0],
+        "A target launched into the arena wall by Phantom should start the level-six redash in the wall frame"
     );
     phantomRun.ball.ability.state.activeDashStage = "chain";
     phantomRun.ball.ability.onDashHit(phantomRun.target, {});

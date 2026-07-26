@@ -230,11 +230,15 @@ export class PhantomAbility extends Ability {
     }
 
     _startDashAfterTeleport() {
-        const owner = this.owner;
-        const sim = this.simulation;
-        const target = sim.fighters.find((f) => f.id === this.state.teleportTargetId);
+        const target = this.simulation.fighters.find((fighter) => fighter.id === this.state.teleportTargetId);
         if (!target) return;
         const stage = this.state.pendingShadowStage ?? "base";
+        this._startShadowDash(target, stage);
+    }
+
+    _startShadowDash(target, stage) {
+        const owner = this.owner;
+        const sim = this.simulation;
 
         const dashDir = Vector2.subtract(target.position, owner.position).normalize();
         const trailEnd = Vector2.add(owner.position, dashDir.clone().scale(TELEPORT_BEHIND_DIST * 0.6));
@@ -299,6 +303,10 @@ export class PhantomAbility extends Ability {
     _triggerShadowChain(target, stackKey) {
         this.state[stackKey] -= 1;
         this._showChainText(target, "그림자 돌진", "#8eeeff");
+        if (stackKey === "shadowReboundStacks") {
+            this._startShadowDash(target, "chain");
+            return;
+        }
         this._triggerShadowDash(target, "chain");
     }
 
