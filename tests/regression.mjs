@@ -25274,14 +25274,17 @@ function testMobileEquipmentDetailUsesFullHeightNavigation() {
     assert.match(detailRule, /overflow:\s*hidden/, "detail chrome should not join the scrollable recipe content");
     assert.match(detailBodyRule, /overflow-y:\s*auto/, "only the detail body should scroll vertically");
     assert.ok(
-        /\.is-mobile-detail-open \.ch-equipment-toolbar,\s*\.is-mobile-detail-open \.ch-equipment-browser\s*\{\s*display:\s*none;\s*\}/.test(
+        /:scope\.is-mobile-detail-open > \.ch-equipment-toolbar,\s*:scope\.is-mobile-detail-open > \.ch-equipment-browser\s*\{\s*display:\s*none;\s*\}/.test(
             source
-        ) && /\.ch-equipment-detail\s*\{\s*flex:\s*1 1 auto;/.test(source),
+        ) && /:scope\.is-mobile-detail-open > \.ch-equipment-detail\s*\{\s*flex:\s*1 1 auto;/.test(source),
         "mobile selection should replace the list with a full-height detail instead of a split pane"
     );
     assert.ok(
-        /\.ch-equipment-browser\s*\{\s*display:\s*flex;[\s\S]*?overflow-y:\s*auto;/.test(source),
-        "the unselected mobile catalog must retain one vertical scroll owner"
+        /\.ch-equipment-browser\s*\{\s*display:\s*flex;[\s\S]*?overflow:\s*hidden;/.test(source) &&
+            /\.ch-equipment-catalog\s*\{\s*flex:\s*1 1 auto;[\s\S]*?min-height:\s*0;[\s\S]*?overflow-y:\s*auto;/.test(
+                source
+            ),
+        "mobile slots and filters must stay fixed while only the catalog owns vertical scrolling"
     );
     const upgradeRowRule = source.match(/\.ch-equipment-builds-into-list\s*\{(?<body>[^}]*)\}/)?.groups?.body ?? "";
     assert.match(upgradeRowRule, /overflow-x:\s*auto/, "direct upgrades should own their horizontal overflow");

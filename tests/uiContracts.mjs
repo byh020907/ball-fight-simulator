@@ -1717,10 +1717,18 @@ function testFluidModalLayoutContracts() {
     );
     assert.ok(
         equipmentPanel.includes(".ch-equipment-browser {") &&
-            equipmentPanel.includes("overflow-y: auto") &&
+            equipmentPanel.includes("overflow: hidden") &&
             equipmentPanel.includes("-webkit-overflow-scrolling: touch") &&
             equipmentPanel.includes("touch-action: pan-y"),
-        "Equipment inventory must own its single mobile scroll area and touch input"
+        "Equipment browser must contain mobile layout without becoming a second scroll owner"
+    );
+    assert.ok(
+        equipmentPanel.includes(":scope.is-mobile-detail-open > .ch-equipment-toolbar") &&
+            equipmentPanel.includes(":scope.is-mobile-detail-open > .ch-equipment-detail") &&
+            equipmentPanel.includes(".ch-equipment-catalog {") &&
+            equipmentPanel.includes("flex: 1 1 auto") &&
+            equipmentPanel.includes("overflow-y: auto"),
+        "Mobile detail must target its component root and catalog alone must own list scrolling"
     );
     assert.ok(
         equipmentPanel.includes("grid-template-columns: repeat(6, minmax(0, 1fr))"),

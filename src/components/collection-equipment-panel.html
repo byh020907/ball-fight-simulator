@@ -559,11 +559,8 @@
             flex: 1 1 auto;
             min-height: 0;
             flex-direction: column;
-            overflow-y: auto;
-            overscroll-behavior: contain;
+            overflow: hidden;
             padding: 8px 12px;
-            -webkit-overflow-scrolling: touch;
-            touch-action: pan-y;
         }
         .ch-equipment-slots {
             flex: 0 0 auto;
@@ -589,6 +586,7 @@
         }
         .ch-equipment-filter {
             display: grid;
+            flex: 0 0 auto;
             grid-template-columns: repeat(5, minmax(0, 1fr));
             gap: 4px;
             margin: 10px 0;
@@ -605,7 +603,12 @@
             background: #d8f4f5;
         }
         .ch-equipment-catalog {
-            overflow: visible;
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
+            touch-action: pan-y;
         }
         .ch-equipment-card-grid {
             display: none;
@@ -683,9 +686,12 @@
         .ch-equipment-mobile-builds .ch-equipment-final {
             white-space: nowrap;
         }
-        .is-mobile-detail-open .ch-equipment-toolbar,
-        .is-mobile-detail-open .ch-equipment-browser {
+        :scope.is-mobile-detail-open > .ch-equipment-toolbar,
+        :scope.is-mobile-detail-open > .ch-equipment-browser {
             display: none;
+        }
+        :scope.is-mobile-detail-open > .ch-equipment-detail {
+            flex: 1 1 auto;
         }
         .ch-equipment-detail {
             flex: 1 1 auto;
