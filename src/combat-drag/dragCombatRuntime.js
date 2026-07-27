@@ -1,5 +1,6 @@
 import { DragInputState } from "./dragInputState.js";
 import { PlayerShotState } from "./playerShotState.js";
+import { EnemyAttackQueue } from "./enemyAttackQueue.js";
 import { DRAG_COMBAT_CONFIG } from "./config.js";
 import { Vector2 } from "../core.js";
 
@@ -19,6 +20,10 @@ export class DragCombatRuntime {
         this.config = config;
         this.input = new DragInputState(config.input);
         this.shot = new PlayerShotState(config);
+        this.enemyQueue = new EnemyAttackQueue(config.enemy);
+        this.enemyDirections = new Map();
+        this.enemySlowElapsed = 0;
+        this.enemyDefenseCandidate = null;
         this.lastEvent = null;
         this.aimCaster = null;
         this.pendingWarpRemoval = false;
@@ -72,6 +77,34 @@ export class DragCombatRuntime {
         if (event) this.#record(event);
     }
 
+    tickEnemy(combatDelta) {
+        if (!this.#canAct()) return this.#resetEnemy();
+        const player = this.#player();
+        const eligible = this.#eligibleEnemies();
+        const effectiveDelta = combatDelta * (this.input.state === "aiming" ? 0.35 : 1);
+        if (this.enemyQueue.state === "flight") {
+            const attacker = this.#fighterById(this.enemyQueue.attackerId);
+            if (!attacker || !eligible.includes(attacker.id)) {
+                this.#resolveEnemyFlight("invalid", false, eligible);
+                return;
+            }
+            if (this.enemyQueue.elapsed + effectiveDelta >= this.config.enemy.flightMaxSeconds) {
+                this.#resolveEnemyFlight("timeout", false, eligible);
+                return;
+            }
+            this.enemySlowElapsed =
+                attacker.velocity.length() <= this.config.shot.shotSlowSpeed
+                    ? this.enemySlowElapsed + effectiveDelta
+                    : 0;
+            if (this.enemySlowElapsed >= this.config.shot.shotSlowSeconds) {
+                this.#resolveEnemyFlight("slow-stop", false, eligible);
+                return;
+            }
+        }
+        const event = this.enemyQueue.tick(effectiveDelta, eligible, this.input.realTime);
+        if (event) this.#handleEnemyEvent(event, player);
+    }
+
     onStaticCollision(fighter, context) {
         if (!this.shot.active || fighter !== this.#player()) return;
         const key = context.surfaceKey;
@@ -79,7 +112,8 @@ export class DragCombatRuntime {
     }
 
     resolveFighterCollision(context, damage = null) {
-        if (!this.shot.active) return null;
+        const enemyFlight = this.#resolveEnemyCharacterCollision(context);
+        if (!this.shot.active) return enemyFlight ? { enemyFlight } : null;
         const player = this.#player();
         if (!player || (context.a !== player && context.b !== player)) return null;
         const other = context.a === player ? context.b : context.a;
@@ -87,17 +121,26 @@ export class DragCombatRuntime {
         const contactPoint = copyPoint(context.contactPoint) ?? copyPoint(player.position) ?? { x: 0, y: 0 };
         const targetToContact = Vector2.subtract(contactPoint, other.position).normalize();
         const result = this.shot.collide({ fighterId: other.id, relation, targetToContact });
-        if (!result) return null;
+        if (!result) return enemyFlight ? { enemyFlight } : null;
         if (damage) this.#applyCollisionResult(context, player, other, result, damage);
         this.#record(result);
-        return result;
+        return { playerShot: result, enemyFlight };
     }
 
     applyResolvedFighterCollision(context, result, damage) {
         if (!result || !damage) return;
-        const player = this.#player();
-        const other = context.a === player ? context.b : context.a;
-        this.#applyCollisionResult(context, player, other, result, damage);
+        if (result.playerShot) {
+            const player = this.#player();
+            const other = context.a === player ? context.b : context.a;
+            this.#applyCollisionResult(context, player, other, result.playerShot, damage);
+        }
+        if (result.enemyFlight && !context.collisionReplaced) {
+            const { attacker } = result.enemyFlight;
+            if (context.a === attacker)
+                context.damageFromAToB = damage.damageFromAToB * this.config.enemy.attackDamageMultiplier;
+            else if (context.b === attacker)
+                context.damageFromBToA = damage.damageFromBToA * this.config.enemy.attackDamageMultiplier;
+        }
     }
 
     reset() {
@@ -105,6 +148,7 @@ export class DragCombatRuntime {
         this.pendingWarpRemoval = false;
         this.input.reset();
         this.shot.reset();
+        this.#resetEnemy();
         this.lastEvent = null;
     }
 
@@ -129,6 +173,15 @@ export class DragCombatRuntime {
                 })),
                 recentSurface: this.shot.recentSurface ? { ...this.shot.recentSurface } : null
             },
+            enemyQueue: {
+                phase: this.enemyQueue.state,
+                attackerId: this.enemyQueue.attackerId,
+                fixedWindupDirection: copyPoint(this.enemyDirections.get(this.enemyQueue.attackerId)),
+                elapsed: this.enemyQueue.elapsed,
+                protectedLaunchNotBefore: this.enemyQueue.protectedLaunchNotBefore,
+                defenseCandidate: this.enemyDefenseCandidate,
+                lastResolution: copyValue(this.enemyQueue.lastResult)
+            },
             lastEvent: copyValue(this.lastEvent)
         };
     }
@@ -151,6 +204,9 @@ export class DragCombatRuntime {
                     .map((fighter) => [fighter.id, Vector2.subtract(player.position, fighter.position).normalize()])
             );
             this.shot.begin(player.id, shields);
+            if (this.enemyQueue.state === "windup" || this.enemyQueue.state === "flight") {
+                this.enemyDefenseCandidate ??= result.cooldownReadyAt;
+            }
         }
         if (result.type === "launch" || result.type === "cancel") {
             if (result.source === "auto-launch") this.pendingWarpRemoval = true;
@@ -201,6 +257,81 @@ export class DragCombatRuntime {
             !player.state.swallowed &&
             player.participation?.canAct !== false
         );
+    }
+
+    #eligibleEnemies() {
+        const player = this.#player();
+        return this.simulation.fighters
+            .filter(
+                (fighter) =>
+                    fighter !== player &&
+                    this.simulation.isHostile(player, fighter) &&
+                    fighter.participation?.canAct !== false &&
+                    !fighter.flags.defeated &&
+                    !fighter.flags.destroyed &&
+                    !fighter.state.swallowed &&
+                    !fighter.state.movement
+            )
+            .map((fighter) => fighter.id);
+    }
+
+    #fighterById(id) {
+        return this.simulation.fighters.find((fighter) => fighter.id === id) ?? null;
+    }
+
+    #handleEnemyEvent(event, player) {
+        if (event.type === "windup") {
+            const attacker = this.#fighterById(event.attackerId);
+            const direction =
+                attacker && player
+                    ? Vector2.subtract(player.position, attacker.position).normalize()
+                    : new Vector2(0, 0);
+            this.enemyDirections.set(event.attackerId, copyPoint(direction) ?? { x: 0, y: 0 });
+            this.enemySlowElapsed = 0;
+        }
+        if (event.type === "launch") {
+            const attacker = this.#fighterById(event.attackerId);
+            const direction = this.enemyDirections.get(event.attackerId);
+            if (!attacker || !direction) return this.#resolveEnemyFlight("invalid", false, this.#eligibleEnemies());
+            attacker.applyImpulse(
+                new Vector2(direction.x, direction.y).scale(
+                    Math.max(
+                        this.config.enemy.attackSpeedMin,
+                        attacker.stats.baseSpeed * this.config.enemy.attackSpeedRatio
+                    )
+                )
+            );
+            this.enemySlowElapsed = 0;
+        }
+        this.#record({ type: `enemy-${event.type}`, ...copyValue(event) });
+    }
+
+    #resolveEnemyCharacterCollision(context) {
+        if (this.enemyQueue.state !== "flight") return null;
+        const attacker = this.#fighterById(this.enemyQueue.attackerId);
+        if (!attacker || (context.a !== attacker && context.b !== attacker)) return null;
+        const playerHit = context.a === this.#player() || context.b === this.#player();
+        this.#resolveEnemyFlight("character", playerHit, this.#eligibleEnemies());
+        return { attacker };
+    }
+
+    #resolveEnemyFlight(reason, playerHit, eligibleIds) {
+        const attackerId = this.enemyQueue.attackerId;
+        if (!playerHit && Number.isFinite(this.enemyDefenseCandidate))
+            this.enemyQueue.protectUntil(this.enemyDefenseCandidate);
+        this.enemyDirections.delete(attackerId);
+        this.enemySlowElapsed = 0;
+        this.enemyDefenseCandidate = null;
+        const next = this.enemyQueue.resolveFlight(reason, eligibleIds);
+        this.#record({ type: "enemy-flight-end", reason, attackerId, playerHit });
+        if (next) this.#handleEnemyEvent(next, this.#player());
+    }
+
+    #resetEnemy() {
+        this.enemyQueue.reset();
+        this.enemyDirections.clear();
+        this.enemySlowElapsed = 0;
+        this.enemyDefenseCandidate = null;
     }
 
     #player() {

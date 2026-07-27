@@ -448,6 +448,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
 
         // 지연 적용 패턴 — 클릭 핸들러가 예약한 액션을 충돌 전에 처리
         this.dragCombat?.tickInput(realDelta);
+        this.dragCombat?.tickEnemy(delta);
         this._consumePendingActions();
 
         this.elapsed += delta;
