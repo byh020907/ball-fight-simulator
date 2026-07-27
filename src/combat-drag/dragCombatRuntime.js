@@ -84,7 +84,8 @@ export class DragCombatRuntime {
         if (!player || (context.a !== player && context.b !== player)) return null;
         const other = context.a === player ? context.b : context.a;
         const relation = this.simulation.isHostile(player, other) ? "enemy" : "ally";
-        const targetToContact = Vector2.subtract(context.contactPoint, other.position).normalize();
+        const contactPoint = copyPoint(context.contactPoint) ?? copyPoint(player.position) ?? { x: 0, y: 0 };
+        const targetToContact = Vector2.subtract(contactPoint, other.position).normalize();
         const result = this.shot.collide({ fighterId: other.id, relation, targetToContact });
         if (!result) return null;
         if (damage) this.#applyCollisionResult(context, player, other, result, damage);

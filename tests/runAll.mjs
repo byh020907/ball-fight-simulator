@@ -24,6 +24,10 @@ const TEST_DOMAINS = {
     dragPlayerRuntime: {
         modulePath: "./dragPlayerRuntime.mjs",
         footerMessages: new Set(["[drag-player-runtime] ok"])
+    },
+    dragPlayerCollision: {
+        modulePath: "./dragPlayerCollision.mjs",
+        footerMessages: new Set(["[drag-player-collision] ok"])
     }
 };
 
