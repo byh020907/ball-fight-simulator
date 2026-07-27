@@ -1,5 +1,6 @@
 <div class="ch-recipe-branch" :class="{ 'is-root': node.isRoot, 'has-children': node.children.length > 0 }">
     <article
+        x-show="node.isRoot"
         class="ch-recipe-node"
         :class="{ 'is-root': node.isRoot, 'is-satisfied': !node.isRoot && node.satisfied, 'is-missing': !node.isRoot && !node.satisfied }"
         role="treeitem"
@@ -19,6 +20,27 @@
         ></span>
         <span class="ch-recipe-meta is-root" x-show="node.isRoot">완성 장비</span>
     </article>
+    <button
+        x-show="!node.isRoot"
+        class="ch-recipe-node"
+        :class="{ 'is-satisfied': node.satisfied, 'is-missing': !node.satisfied }"
+        type="button"
+        role="treeitem"
+        :aria-level="node.depth + 1"
+        :aria-label="node.name + ': 보유 ' + node.owned + ', 필요 ' + node.required + ', ' + (node.satisfied ? '충족' : '부족 ' + Math.max(0, node.required - node.owned)) + ', 장비 상세 보기'"
+        @click="$dispatch('equipment-select', { id: node.id })"
+    >
+        <div class="ch-recipe-icon">
+            <canvas x-equipment-icon-tag="node.iconTag" aria-hidden="true"></canvas>
+            <span class="ch-recipe-quantity" x-show="node.required >= 2" x-text="`×${node.required}`"></span>
+        </div>
+        <strong x-text="node.name"></strong>
+        <span
+            class="ch-recipe-meta"
+            :class="{ 'is-satisfied': node.satisfied }"
+            x-text="node.satisfied ? `보유 ${node.owned}/${node.required}` : `부족 ${Math.max(0, node.required - node.owned)} · ${node.owned}/${node.required}`"
+        ></span>
+    </button>
 
     <template x-if="node.children.length > 0">
         <div
@@ -58,6 +80,11 @@
         gap: 3px;
         color: #e5edf3;
         text-align: center;
+    }
+    :scope > button.ch-recipe-node {
+        border: 0;
+        background: transparent;
+        font: inherit;
     }
     :scope > .ch-recipe-node > .ch-recipe-icon {
         position: relative;
@@ -166,5 +193,70 @@
         background: var(--recipe-line);
         content: "";
         transform: translateX(-50%);
+    }
+    @media (max-width: 700px) {
+        :scope {
+            --recipe-gap: 10px;
+            display: block;
+            min-width: 0;
+            padding-left: 0;
+        }
+        :scope > .ch-recipe-node {
+            width: 100%;
+            min-width: 0;
+            min-height: 48px;
+            flex-direction: row;
+            justify-content: flex-start;
+            padding: 5px 0;
+            text-align: left;
+        }
+        :scope > .ch-recipe-node > .ch-recipe-icon,
+        :scope > .ch-recipe-node.is-root > .ch-recipe-icon {
+            width: 42px;
+            height: 42px;
+            flex: 0 0 auto;
+        }
+        :scope > .ch-recipe-node canvas,
+        :scope > .ch-recipe-node.is-root canvas {
+            width: 36px;
+            height: 36px;
+        }
+        :scope > .ch-recipe-node strong {
+            min-height: 0;
+            max-width: none;
+            flex: 1 1 auto;
+            font-size: 0.78rem;
+        }
+        :scope > .ch-recipe-node > .ch-recipe-meta {
+            max-width: 6.5rem;
+            text-align: right;
+        }
+        :scope.has-children > .ch-recipe-node::after {
+            top: 100%;
+            bottom: auto;
+            left: 21px;
+            width: 2px;
+            height: var(--recipe-gap);
+            transform: none;
+        }
+        :scope > .ch-recipe-children {
+            display: block;
+            margin-left: 21px;
+            padding: var(--recipe-gap) 0 0 14px;
+            border-left: 2px solid var(--recipe-line);
+        }
+        :scope > .ch-recipe-children::before {
+            display: none;
+        }
+        :scope > .ch-recipe-children > recipe-tree-node::before {
+            top: 29px;
+            left: -14px;
+            width: 14px;
+            height: 2px;
+            transform: none;
+        }
+        :scope > .ch-recipe-children.is-single::before {
+            display: none;
+        }
     }
 </style>

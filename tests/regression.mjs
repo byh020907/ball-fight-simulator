@@ -25265,25 +25265,24 @@ async function testFloorSevenHuntingDefeatCompletesWithRealApp(app) {
 await testFloorSevenHuntingDefeatCompletesWithRealApp(app);
 await testHeroGrowthStatLineFormat();
 
-function testMobileEquipmentDetailUsesCodexStyleSplitScrolling() {
+function testMobileEquipmentDetailUsesFullHeightNavigation() {
     const source = readFileSync("src/components/collection-equipment-panel.html", "utf8");
     const detailRule = source.match(/\.ch-equipment-detail\s*\{(?<body>[^}]*)\}/)?.groups?.body ?? "";
     const detailBodyRule = source.match(/\.ch-equipment-detail-body\s*\{(?<body>[^}]*)\}/)?.groups?.body ?? "";
-    const mobileBlock = source.match(/@media \(max-width: 700px\)\s*\{(?<body>[\s\S]*?)\n\s*\}\n<\/style>/)?.groups
-        ?.body;
-    const browserRule = mobileBlock?.match(/\.ch-equipment-browser\s*\{(?<body>[^}]*)\}/)?.groups?.body ?? "";
-    const mobileDetailRule = mobileBlock?.match(/\.ch-equipment-detail\s*\{(?<body>[^}]*)\}/)?.groups?.body ?? "";
 
     assert.match(detailRule, /isolation:\s*isolate/, "equipment detail should isolate recipe-tree stacking");
     assert.match(detailRule, /overflow:\s*hidden/, "detail chrome should not join the scrollable recipe content");
     assert.match(detailBodyRule, /overflow-y:\s*auto/, "only the detail body should scroll vertically");
-    assert.match(
-        browserRule,
-        /overflow-y:\s*auto/,
-        "slots and equipment cards should share an independent list scroll"
+    assert.ok(
+        /\.is-mobile-detail-open \.ch-equipment-toolbar,\s*\.is-mobile-detail-open \.ch-equipment-browser\s*\{\s*display:\s*none;\s*\}/.test(
+            source
+        ) && /\.ch-equipment-detail\s*\{\s*flex:\s*1 1 auto;/.test(source),
+        "mobile selection should replace the list with a full-height detail instead of a split pane"
     );
-    assert.match(mobileDetailRule, /border-top:\s*2px solid #e0e0e0/, "mobile detail should use the codex divider");
-    assert.match(mobileDetailRule, /flex:\s*0 0 clamp\(/, "mobile detail should reserve a stable lower pane");
+    assert.ok(
+        /\.ch-equipment-browser\s*\{\s*display:\s*flex;[\s\S]*?overflow-y:\s*auto;/.test(source),
+        "the unselected mobile catalog must retain one vertical scroll owner"
+    );
     const upgradeRowRule = source.match(/\.ch-equipment-builds-into-list\s*\{(?<body>[^}]*)\}/)?.groups?.body ?? "";
     assert.match(upgradeRowRule, /overflow-x:\s*auto/, "direct upgrades should own their horizontal overflow");
     assert.match(upgradeRowRule, /flex-wrap:\s*nowrap/, "direct upgrades should remain on one scrollable row");
@@ -25292,10 +25291,10 @@ function testMobileEquipmentDetailUsesCodexStyleSplitScrolling() {
         "direct upgrades must reuse the existing detail selection flow"
     );
     assert.ok(source.includes("최종 장비"), "completed equipment should communicate its terminal state");
-    console.log("[mobile-equipment-detail-codex-layout] ok");
+    console.log("[mobile-equipment-full-height-navigation] ok");
 }
 
-testMobileEquipmentDetailUsesCodexStyleSplitScrolling();
+testMobileEquipmentDetailUsesFullHeightNavigation();
 
 function testUnusedEnhancementStonesStayOutOfActiveHuntingRewards(app) {
     const normalized = normalizeHuntingLoot({ shards: 4, enhancementStones: 9, equipment: {} });

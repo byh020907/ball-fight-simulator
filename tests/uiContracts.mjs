@@ -134,8 +134,8 @@ function testCollectionEquipmentPanelsOwnTheirFlows() {
     );
     assert.ok(
         equipmentPanel.includes("'is-unowned': item.count === 0") &&
-            equipmentPanel.includes(".ch-equipment-card.is-unowned") &&
-            equipmentPanel.includes(".ch-equipment-card.is-unowned canvas"),
+            equipmentPanel.includes("class=\"{ 'is-unowned': item.count === 0 }\"") &&
+            equipmentPanel.includes(".is-unowned canvas"),
         "Unowned equipment cards should expose a muted visual state without removing their detail action"
     );
     assert.equal(
@@ -149,20 +149,21 @@ function testCollectionEquipmentPanelsOwnTheirFlows() {
         "Unowned cards should use an unmistakable disabled treatment and explicit label"
     );
     assert.ok(
-        equipmentPanel.includes('aria-label="장비 상세 닫기"') &&
-            equipmentPanel.includes('@click="closeDetail()"') &&
-            equipmentPanel.includes("closeDetail()"),
-        "Mobile equipment detail should expose a close control that clears only the selection"
+        equipmentPanel.includes("장비 목록") &&
+            equipmentPanel.includes('aria-label="장비 목록으로 돌아가기"') &&
+            equipmentPanel.includes('@click="closeDetail()"'),
+        "Mobile equipment detail should expose a labelled back control that clears only the selection"
     );
     assert.ok(
         equipmentPanel.includes('class="ch-equipment-browser"') &&
             equipmentPanel.includes('class="ch-equipment-detail-body"') &&
-            equipmentPanel.includes('class="ch-equipment-detail-actions"'),
-        "Mobile equipment should separate the scrollable catalog, detail body, and persistent actions"
+            equipmentPanel.includes('class="ch-equipment-detail-actions"') &&
+            equipmentPanel.includes('class="ch-equipment-filter"'),
+        "Mobile equipment should separate the filtered catalog, detail body, and persistent actions"
     );
     assert.ok(
-        equipmentPanel.includes("detailBody.scrollTop = 0") && equipmentPanel.includes("tree.scrollLeft = Math.max"),
-        "Selecting equipment should reset detail scrolling and center an overflowing recipe tree"
+        equipmentPanel.includes("detailBody.scrollTop = 0") && equipmentPanel.includes('filter: "all"'),
+        "Selecting equipment should reset detail scrolling while filters stay component-local"
     );
     assert.equal(
         collectionHub.includes("collection-fusion-dialog") || collectionHub.includes("collection-shop-panel"),
@@ -298,6 +299,20 @@ function testRecipeTreeUiContract() {
             panel.includes("<recipe-tree x-component=\"'recipe-tree'\"></recipe-tree>"),
         "The parent must initialize tree data before the nested template component mounts"
     );
+    assert.ok(
+        panel.includes("filteredTiers") &&
+            panel.includes('this.filter === "owned"') &&
+            panel.includes("item.tier === this.filter") &&
+            panel.includes('aria-pressed="filter === option.id"'),
+        "Mobile catalog filters must retain all, owned, and tier-local state"
+    );
+    assert.ok(
+        panel.includes('class="ch-equipment-mobile-card"') &&
+            panel.includes('class="ch-equipment-mobile-builds"') &&
+            panel.includes('class="ch-equipment-mobile-select"') &&
+            !panel.includes('<button class="ch-equipment-card"'),
+        "Mobile catalog must use sibling detail and upgrade buttons without nested buttons"
+    );
     assert.equal(
         panel.includes("selected.recipe.ingredients"),
         false,
@@ -343,12 +358,13 @@ function testRecipeTreeUiContract() {
         "Tree must expose icon, textual status, and accessible node semantics"
     );
     assert.ok(
-        tree.includes("overflow-x: auto") &&
-            tree.includes("x-component=\"'recipe-tree-node'\"") &&
+        tree.includes("x-component=\"'recipe-tree-node'\"") &&
             node.includes("node.children") &&
             node.includes("ch-recipe-children") &&
-            node.includes("> recipe-tree-node::before"),
-        "Tree must own mobile scrolling and render connectors inside each parent branch"
+            node.includes("> recipe-tree-node::before") &&
+            tree.includes("overflow-x: visible") &&
+            node.includes("@media (max-width: 700px)"),
+        "Desktop tree must retain branches while mobile switches to a non-scrolling outline"
     );
     assert.equal(node.includes("ch-recipe-tree-level"), false, "Nodes must not flatten unrelated parents by depth");
     const recipeStyles = panel.match(/\.ch-equipment-recipe\s*\{([^}]*)\}/s)?.[1] ?? "";
@@ -358,7 +374,7 @@ function testRecipeTreeUiContract() {
     assert.match(recipeStyles, /width:\s*100%;[\s\S]*min-width:\s*0;/);
     assert.match(wrapperStyles, /display:\s*block;[\s\S]*width:\s*100%;[\s\S]*min-width:\s*0;/);
     assert.match(treeRootStyles, /width:\s*100%;[\s\S]*min-width:\s*0;[\s\S]*overflow-x:\s*auto;/);
-    assert.equal(wrapperStyles.includes("overflow-x"), false, "Only the recipe-tree root may own horizontal scrolling");
+    assert.equal(wrapperStyles.includes("overflow-x"), false, "The recipe wrapper must not add a second scroll owner");
     console.log("[recipe-tree-ui-contract] ok");
 }
 
@@ -1699,15 +1715,16 @@ function testFluidModalLayoutContracts() {
         false,
         "Equipment root must retain its own grid display"
     );
-    const equipmentListRule = equipmentPanel.match(/\.ch-equip-list\s*\{([^}]*)\}/s)?.[1] ?? "";
-    assert.match(
-        equipmentListRule,
-        /flex:\s*1;[\s\S]*min-height:\s*0;[\s\S]*overflow-y:\s*auto;[\s\S]*-webkit-overflow-scrolling:\s*touch;[\s\S]*touch-action:\s*pan-y;/,
-        "Equipment inventory must own both its scroll area and mobile vertical touch input"
+    assert.ok(
+        equipmentPanel.includes(".ch-equipment-browser {") &&
+            equipmentPanel.includes("overflow-y: auto") &&
+            equipmentPanel.includes("-webkit-overflow-scrolling: touch") &&
+            equipmentPanel.includes("touch-action: pan-y"),
+        "Equipment inventory must own its single mobile scroll area and touch input"
     );
     assert.ok(
-        equipmentPanel.includes("repeat(auto-fit, minmax(min(100%, 8rem), 1fr))"),
-        "Equipment slots must use a fluid grid instead of a viewport-specific column count"
+        equipmentPanel.includes("grid-template-columns: repeat(6, minmax(0, 1fr))"),
+        "Mobile equipment slots must retain one explicit six-slot row"
     );
     console.log("[fluid-modal-layout-contracts] ok");
 }

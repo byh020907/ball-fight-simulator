@@ -1,11 +1,16 @@
-<div x-data="collectionEquipmentPanel" class="ch-equipment-panel">
+<div
+    x-data="collectionEquipmentPanel"
+    class="ch-equipment-panel"
+    :class="{ 'is-mobile-detail-open': selected }"
+    @equipment-select="select($event.detail.id)"
+>
     <div class="ch-equipment-toolbar">
         <strong>장비</strong><span>파편 <b x-text="state.summary.shards"></b></span>
         <button class="ch-btn" type="button" @click="openShop()">상점</button>
     </div>
     <div class="ch-equipment-browser">
         <section class="ch-equipment-slots" aria-label="장착 슬롯">
-            <h4>공용 장착 슬롯</h4>
+            <h4 x-text="`공용 장착 슬롯 · 장착 ${equippedCount}/6`"></h4>
             <div class="ch-equipment-slot-grid">
                 <template x-for="slot in state.equipment.slots" :key="slot.index">
                     <button
@@ -13,9 +18,11 @@
                         type="button"
                         @click="unequip(slot.index)"
                         :disabled="!slot.templateId"
+                        :aria-label="slot.name ? `${slot.index + 1}번 슬롯 ${slot.name} 장착 해제` : `${slot.index + 1}번 빈 슬롯`"
                     >
                         <canvas x-show="slot.iconTag" x-equipment-icon-tag="slot.iconTag" aria-hidden="true"></canvas>
-                        <span x-text="slot.name || '빈 슬롯'"></span>
+                        <span x-show="!slot.name" aria-hidden="true">+</span>
+                        <span class="ch-equipment-slot-name" x-text="slot.name || '빈 슬롯'"></span>
                         <small
                             x-show="slot.stats.length"
                             x-text="slot.stats.map((stat) => `${stat.label} +${stat.value}`).join(' · ')"
@@ -24,8 +31,19 @@
                 </template>
             </div>
         </section>
+        <nav class="ch-equipment-filter" aria-label="장비 필터">
+            <template x-for="option in filterOptions" :key="option.id">
+                <button
+                    type="button"
+                    :class="{ 'is-active': filter === option.id }"
+                    :aria-pressed="filter === option.id"
+                    @click="filter = option.id"
+                    x-text="option.label"
+                ></button>
+            </template>
+        </nav>
         <div class="ch-equipment-catalog" role="region" aria-label="장비 목록">
-            <template x-for="tier in state.equipment.tiers" :key="tier.id">
+            <template x-for="tier in filteredTiers" :key="tier.id">
                 <section class="ch-equipment-tier">
                     <h4 x-text="tier.label"></h4>
                     <div class="ch-equipment-card-grid">
@@ -53,6 +71,43 @@
                             </button>
                         </template>
                     </div>
+                    <div class="ch-equipment-mobile-list">
+                        <template x-for="item in tier.templates" :key="item.id">
+                            <article class="ch-equipment-mobile-card" :class="{ 'is-unowned': item.count === 0 }">
+                                <button
+                                    class="ch-equipment-mobile-select"
+                                    type="button"
+                                    @click="select(item.id)"
+                                    :aria-label="`${item.name} ${item.tierLabel} 장비 상세 보기`"
+                                >
+                                    <canvas x-equipment-icon-tag="item.iconTag" aria-hidden="true"></canvas>
+                                    <span class="ch-equipment-mobile-copy"
+                                        ><strong x-text="item.name"></strong><small x-text="item.tierLabel"></small
+                                        ><span
+                                            x-text="item.stats.map((stat) => `${stat.label} +${stat.value}`).join(' · ')"
+                                        ></span
+                                        ><em x-text="item.count > 0 ? `보유 ${item.count}` : '미보유'"></em
+                                    ></span>
+                                </button>
+                                <div class="ch-equipment-mobile-builds" aria-label="상위 조합">
+                                    <template x-if="item.buildsInto.length"
+                                        ><template x-for="upgrade in item.buildsInto" :key="upgrade.id"
+                                            ><button
+                                                type="button"
+                                                @click="select(upgrade.id)"
+                                                :aria-label="`${upgrade.name} 상위 조합 장비 상세 보기`"
+                                            >
+                                                <canvas
+                                                    x-equipment-icon-tag="upgrade.iconTag"
+                                                    aria-hidden="true"
+                                                ></canvas
+                                                ><span x-text="upgrade.name"></span></button></template
+                                    ></template>
+                                    <span class="ch-equipment-final" x-show="!item.buildsInto.length">최종 장비</span>
+                                </div>
+                            </article>
+                        </template>
+                    </div>
                 </section>
             </template>
         </div>
@@ -61,19 +116,19 @@
         <template x-if="selected"
             ><div class="ch-equipment-detail-shell">
                 <div class="ch-equipment-detail-heading">
+                    <button
+                        class="ch-equipment-detail-back"
+                        type="button"
+                        aria-label="장비 목록으로 돌아가기"
+                        @click="closeDetail()"
+                    >
+                        장비 목록
+                    </button>
                     <canvas x-equipment-icon-tag="selected.iconTag" aria-hidden="true"></canvas>
                     <div>
                         <h4 x-text="selected.name"></h4>
                         <span x-text="selected.tierLabel"></span>
                     </div>
-                    <button
-                        class="ch-equipment-detail-close"
-                        type="button"
-                        aria-label="장비 상세 닫기"
-                        @click="closeDetail()"
-                    >
-                        ×
-                    </button>
                 </div>
                 <div class="ch-equipment-detail-body">
                     <p>
@@ -89,24 +144,25 @@
                             <section class="ch-equipment-builds-into" aria-label="상위 조합">
                                 <span class="ch-equipment-builds-into-label">상위 조합</span>
                                 <div class="ch-equipment-builds-into-list" x-show="selected.buildsInto.length">
-                                    <template x-for="item in selected.buildsInto" :key="item.id">
-                                        <button
+                                    <template x-for="item in selected.buildsInto" :key="item.id"
+                                        ><button
                                             class="ch-equipment-builds-into-item"
                                             type="button"
                                             :aria-label="`${item.name} ${item.tierLabel} 장비 상세 보기, ${item.count > 0 ? `보유 ${item.count}` : '미보유'}`"
                                             @click="select(item.id)"
                                         >
-                                            <canvas x-equipment-icon-tag="item.iconTag" aria-hidden="true"></canvas>
-                                            <span x-text="item.name"></span>
-                                            <small x-text="item.count > 0 ? `보유 ${item.count}` : '미보유'"></small>
-                                        </button>
-                                    </template>
+                                            <canvas x-equipment-icon-tag="item.iconTag" aria-hidden="true"></canvas
+                                            ><span x-text="item.name"></span
+                                            ><small
+                                                x-text="item.count > 0 ? `보유 ${item.count}` : '미보유'"
+                                            ></small></button
+                                    ></template>
                                 </div>
                                 <span class="ch-equipment-final" x-show="!selected.buildsInto.length">최종 장비</span>
                             </section>
                         </div>
-                        <template x-if="selected.recipe">
-                            <div
+                        <template x-if="selected.recipe"
+                            ><div
                                 class="ch-equipment-recipe-tree"
                                 x-data="{ get tree() { return selected.recipe.tree; } }"
                             >
@@ -116,8 +172,8 @@
                                 class="ch-equipment-missing"
                                 x-show="selected.recipe.missingReason"
                                 x-text="craftMessage(selected.recipe.missingReason)"
-                            ></p>
-                        </template>
+                            ></p
+                        ></template>
                     </div>
                     <p class="ch-equipment-feedback" x-show="feedback" x-text="feedback"></p>
                 </div>
@@ -129,9 +185,8 @@
                         :disabled="!selected.recipe?.canCraft"
                         @click="craft(selected.id)"
                     >
-                        조합
-                    </button>
-                    <button
+                        조합</button
+                    ><button
                         class="ch-btn"
                         type="button"
                         :disabled="selected.count === 0 || slotsFull"
@@ -149,7 +204,15 @@
 <script>
     window.createGameUI("collectionEquipmentPanel", () => ({
         selectedId: null,
+        filter: "all",
         feedback: "",
+        filterOptions: [
+            { id: "all", label: "전체" },
+            { id: "owned", label: "보유" },
+            { id: "basic", label: "기초" },
+            { id: "intermediate", label: "중간" },
+            { id: "completed", label: "완성" }
+        ],
         get state() {
             return Alpine.store("uiManager").requireComponent("collectionHub").state;
         },
@@ -163,16 +226,27 @@
         get slotsFull() {
             return this.state.equipment.slots.every((slot) => slot.templateId);
         },
+        get equippedCount() {
+            return this.state.equipment.slots.filter((slot) => slot.templateId).length;
+        },
+        get filteredTiers() {
+            return this.state.equipment.tiers
+                .map((tier) => ({
+                    ...tier,
+                    templates: tier.templates.filter(
+                        (item) =>
+                            this.filter === "all" ||
+                            (this.filter === "owned" ? item.count > 0 : item.tier === this.filter)
+                    )
+                }))
+                .filter((tier) => tier.templates.length);
+        },
         select(id) {
             this.selectedId = id;
             this.feedback = "";
             this.$nextTick(() => {
                 const detailBody = this.$root.querySelector(".ch-equipment-detail-body");
                 if (detailBody) detailBody.scrollTop = 0;
-                requestAnimationFrame(() => {
-                    const tree = this.$root.querySelector(".ch-equipment-recipe-tree recipe-tree");
-                    if (tree) tree.scrollLeft = Math.max(0, (tree.scrollWidth - tree.clientWidth) / 2);
-                });
             });
         },
         closeDetail() {
@@ -257,7 +331,8 @@
     }
     .ch-equipment-slot:focus-visible,
     .ch-equipment-card:focus-visible,
-    .ch-btn:focus-visible {
+    .ch-btn:focus-visible,
+    button:focus-visible {
         outline: 3px solid #2563eb;
         outline-offset: 2px;
     }
@@ -273,29 +348,19 @@
     .ch-equipment-card {
         cursor: pointer;
     }
-    .ch-equipment-card.is-unowned {
+    .is-unowned {
         border-color: #777773;
         border-style: dashed;
         background: #d2d2cd;
         color: #505050;
-        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
     }
-    .ch-equipment-card.is-unowned canvas {
+    .is-unowned canvas {
         filter: grayscale(1);
         opacity: 0.28;
-    }
-    .ch-equipment-card.is-unowned .ch-equipment-card-copy,
-    .ch-equipment-card.is-unowned .ch-equipment-stats,
-    .ch-equipment-card.is-unowned .ch-equipment-passive {
-        opacity: 0.72;
     }
     .ch-equipment-card.is-selected {
         border-color: #2563eb;
         background: #eff6ff;
-    }
-    .ch-equipment-card.is-unowned.is-selected {
-        border-style: solid;
-        background: #dbe4ef;
     }
     .ch-equipment-card-copy {
         min-width: 0;
@@ -347,21 +412,14 @@
         padding-bottom: 8px;
         border-bottom: 1px solid #d6d6d6;
     }
-    .ch-equipment-detail-close {
+    .ch-equipment-detail-back {
         display: none;
-        width: 36px;
-        height: 36px;
-        margin-left: auto;
-        flex: 0 0 auto;
-        align-items: center;
-        justify-content: center;
+        min-height: 48px;
+        padding: 0 12px;
         border: 2px solid #202020;
         border-radius: 8px;
-        background: #ffffff;
-        color: #202020;
-        font-size: 1.2rem;
-        line-height: 1;
-        cursor: pointer;
+        background: #fff;
+        font-weight: 800;
     }
     .ch-equipment-detail-heading h4 {
         overflow-wrap: anywhere;
@@ -381,10 +439,11 @@
         gap: 8px;
         padding-top: 8px;
         border-top: 1px solid #d6d6d6;
-        background: #ffffff;
+        background: #fff;
     }
     .ch-equipment-detail-actions .ch-btn {
         flex: 1 1 0;
+        min-height: 48px;
     }
     .ch-equipment-recipe {
         display: flex;
@@ -431,13 +490,14 @@
     }
     .ch-equipment-builds-into-item {
         display: grid;
-        min-width: 44px;
+        min-width: 48px;
+        min-height: 48px;
         flex: 0 0 auto;
         place-items: center;
         gap: 2px;
         border: 2px solid #202020;
         border-radius: 8px;
-        background: #ffffff;
+        background: #fff;
         padding: 4px;
         color: #202020;
         cursor: pointer;
@@ -455,10 +515,6 @@
     .ch-equipment-builds-into-item small {
         font-size: 0.61rem;
         font-weight: 700;
-    }
-    .ch-equipment-builds-into-item:focus-visible {
-        outline: 3px solid #2563eb;
-        outline-offset: 2px;
     }
     .ch-equipment-final {
         padding: 8px;
@@ -479,6 +535,10 @@
         color: #166534;
         font-weight: 700;
     }
+    .ch-equipment-filter,
+    .ch-equipment-mobile-list {
+        display: none;
+    }
     @media (max-width: 700px) {
         :scope {
             display: flex;
@@ -495,56 +555,172 @@
             border-bottom: 1px solid #d6d6d6;
         }
         .ch-equipment-browser {
-            display: block;
+            display: flex;
             flex: 1 1 auto;
             min-height: 0;
+            flex-direction: column;
             overflow-y: auto;
             overscroll-behavior: contain;
             padding: 8px 12px;
             -webkit-overflow-scrolling: touch;
             touch-action: pan-y;
         }
+        .ch-equipment-slots {
+            flex: 0 0 auto;
+        }
+        .ch-equipment-slot-grid {
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            gap: 4px;
+        }
+        .ch-equipment-slot {
+            display: grid;
+            min-width: 0;
+            min-height: 48px;
+            place-items: center;
+            padding: 2px;
+        }
+        .ch-equipment-slot canvas {
+            width: 32px;
+            height: 32px;
+        }
+        .ch-equipment-slot-name,
+        .ch-equipment-slot small {
+            display: none;
+        }
+        .ch-equipment-filter {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 4px;
+            margin: 10px 0;
+        }
+        .ch-equipment-filter button {
+            min-height: 48px;
+            border: 2px solid #202020;
+            border-radius: 7px;
+            background: #fff;
+            font-weight: 800;
+        }
+        .ch-equipment-filter button.is-active {
+            border-color: #0f8ea0;
+            background: #d8f4f5;
+        }
         .ch-equipment-catalog {
             overflow: visible;
         }
-        .ch-equipment-detail {
-            flex: 0 0 clamp(14rem, 46%, 23rem);
-            min-height: 0;
-            max-height: none;
+        .ch-equipment-card-grid {
+            display: none;
+        }
+        .ch-equipment-mobile-list {
+            display: grid;
+            gap: 8px;
+        }
+        .ch-equipment-mobile-card {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 6px;
+            min-width: 0;
+            border: 2px solid #202020;
+            border-radius: 8px;
+            background: #fff;
+            padding: 6px;
+        }
+        .ch-equipment-mobile-select {
+            display: flex;
+            min-width: 0;
+            align-items: center;
+            gap: 8px;
             border: 0;
-            border-top: 2px solid #e0e0e0;
+            background: transparent;
+            color: inherit;
+            text-align: left;
+        }
+        .ch-equipment-mobile-select canvas {
+            width: 40px;
+            height: 40px;
+            flex: 0 0 auto;
+        }
+        .ch-equipment-mobile-copy {
+            display: grid;
+            min-width: 0;
+            gap: 1px;
+        }
+        .ch-equipment-mobile-copy strong,
+        .ch-equipment-mobile-copy span {
+            overflow-wrap: anywhere;
+        }
+        .ch-equipment-mobile-copy small,
+        .ch-equipment-mobile-copy span,
+        .ch-equipment-mobile-copy em {
+            font-size: 0.72rem;
+            font-style: normal;
+        }
+        .ch-equipment-mobile-copy em {
+            font-weight: 800;
+        }
+        .ch-equipment-mobile-builds {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .ch-equipment-mobile-builds button {
+            display: grid;
+            width: 48px;
+            min-height: 48px;
+            place-items: center;
+            border: 2px solid #202020;
+            border-radius: 7px;
+            background: #fff;
+            padding: 2px;
+            color: #202020;
+        }
+        .ch-equipment-mobile-builds canvas {
+            width: 32px;
+            height: 32px;
+        }
+        .ch-equipment-mobile-builds button span {
+            display: none;
+        }
+        .ch-equipment-mobile-builds .ch-equipment-final {
+            white-space: nowrap;
+        }
+        .is-mobile-detail-open .ch-equipment-toolbar,
+        .is-mobile-detail-open .ch-equipment-browser {
+            display: none;
+        }
+        .ch-equipment-detail {
+            flex: 1 1 auto;
+            min-height: 0;
+            border: 0;
             border-radius: 0;
-            background: #ffffff;
             padding: 10px 12px;
         }
-        .ch-equipment-detail-heading {
-            padding-bottom: 8px;
-        }
-        .ch-equipment-detail-close {
+        .ch-equipment-detail-back {
             display: inline-flex;
+            align-items: center;
         }
-        .ch-equipment-card-grid {
-            grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+        .ch-equipment-detail-heading {
+            position: sticky;
+            top: 0;
+            background: #fff;
+            z-index: 2;
         }
-    }
-</style>
-
-<style scoped>
-    .ch-equip-list {
-        flex: 1;
-        min-height: 0;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-        touch-action: pan-y;
-    }
-
-    .ch-equipment-slot small {
-        display: block;
-        overflow-wrap: anywhere;
-    }
-
-    .ch-equipment-passive {
-        font-size: 0.75rem;
-        font-weight: 700;
+        .ch-equipment-recipe-heading {
+            flex-direction: column;
+        }
+        .ch-equipment-builds-into {
+            width: 100%;
+            align-items: flex-start;
+        }
+        .ch-equipment-builds-into-list {
+            justify-content: flex-start;
+        }
+        .ch-equipment-detail-actions {
+            position: sticky;
+            bottom: 0;
+            z-index: 2;
+        }
+        .ch-equipment-recipe-tree {
+            overflow: visible;
+        }
     }
 </style>
