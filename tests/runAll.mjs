@@ -20,6 +20,10 @@ const TEST_DOMAINS = {
     dragVectorCombat: {
         modulePath: "./dragVectorCombat.mjs",
         footerMessages: new Set(["[drag-vector-combat] ok"])
+    },
+    dragPlayerRuntime: {
+        modulePath: "./dragPlayerRuntime.mjs",
+        footerMessages: new Set(["[drag-player-runtime] ok"])
     }
 };
 

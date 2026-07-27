@@ -21,14 +21,15 @@ import { StickyGrenadeRegistry } from "./stickyGrenadeRegistry.js";
 
 export const MAX_ACTIVE_GRAVITY_PARTICLES = 256;
 
-function createStaticCollisionContext(surface, collision, postCollisionVelocity) {
+function createStaticCollisionContext(surface, collision, postCollisionVelocity, surfaceKey = null) {
     return {
         wall: surface === "wall",
         terrain: surface === "terrain",
         normal: collision.normal.clone(),
         contactPoint: collision.contactPoint.clone(),
         preCollisionVelocity: collision.preCollisionVelocity.clone(),
-        postCollisionVelocity: postCollisionVelocity.clone()
+        postCollisionVelocity: postCollisionVelocity.clone(),
+        surfaceKey
     };
 }
 
@@ -144,22 +145,27 @@ export class Simulation {
             terrain: Boolean(terrainResult),
             normal: primaryCollision?.normal ?? null,
             contactPoint: primaryCollision?.contactPoint ?? null,
-            preCollisionVelocity: primaryCollision?.preCollisionVelocity ?? null
+            preCollisionVelocity: primaryCollision?.preCollisionVelocity ?? null,
+            surfaceKey: xBounce
+                ? `wall:${xBounce.normal.x < 0 ? "right" : "left"}`
+                : yBounce
+                  ? `wall:${yBounce.normal.y < 0 ? "bottom" : "top"}`
+                  : (terrainResult?.surfaceKey ?? null)
         });
     }
 
     keepEntityInsideArena(entity, { resolveTerrain = false, onStaticCollision = null } = {}) {
-        const notifyStaticCollision = (surface, collision) => {
+        const notifyStaticCollision = (surface, collision, surfaceKey) => {
             if (!collision || typeof onStaticCollision !== "function") return;
-            onStaticCollision(createStaticCollisionContext(surface, collision, entity.velocity));
+            onStaticCollision(createStaticCollisionContext(surface, collision, entity.velocity, surfaceKey));
         };
 
         const xBounce = this._reflectX(entity);
-        notifyStaticCollision("wall", xBounce);
+        notifyStaticCollision("wall", xBounce, xBounce ? `wall:${xBounce.normal.x < 0 ? "right" : "left"}` : null);
         const yBounce = this._reflectY(entity);
-        notifyStaticCollision("wall", yBounce);
+        notifyStaticCollision("wall", yBounce, yBounce ? `wall:${yBounce.normal.y < 0 ? "bottom" : "top"}` : null);
         const terrainCollision = resolveTerrain ? resolveTerrainCollisions(entity, this.terrain) : null;
-        notifyStaticCollision("terrain", terrainCollision);
+        notifyStaticCollision("terrain", terrainCollision, terrainCollision?.surfaceKey ?? null);
     }
 
     /** X축 벽 반사. bounce 발생 시 normal 반환. */

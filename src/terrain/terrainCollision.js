@@ -3,6 +3,14 @@ import { applyCollisionResponse } from "../physics/collisionResponse.js";
 import { resolvePolygonTerrainCollision } from "../physics/CollisionShape.js";
 import { Vector2 } from "../core.js";
 
+function terrainSurfaceKey(terrain) {
+    if (terrain.id != null) return `terrain:${terrain.id}`;
+    const points = Array.isArray(terrain.points)
+        ? terrain.points.map((point) => `${point.x}:${point.y}`).join("|")
+        : "";
+    return `terrain:${terrain.shape}:${terrain.x}:${terrain.y}:${terrain.radius ?? ""}:${points}`;
+}
+
 function resolveCircleTerrainCollision(entity, terrain) {
     if (!Number.isFinite(terrain.x) || !Number.isFinite(terrain.y) || !Number.isFinite(terrain.radius)) return null;
 
@@ -31,7 +39,7 @@ function resolveCircleTerrainCollision(entity, terrain) {
         surfaceMaterial: "wood"
     });
 
-    return { normal, contactPoint, preCollisionVelocity: preVel };
+    return { normal, contactPoint, preCollisionVelocity: preVel, surfaceKey: terrainSurfaceKey(terrain) };
 }
 
 export function getTerrainInteractionImpulse(entity, terrain, collision) {
@@ -80,6 +88,7 @@ export function resolveTerrainCollision(entity, terrain) {
         result = resolvePolygonTerrainCollision(entity, terrain);
     }
     if (result) {
+        result.surfaceKey ??= terrainSurfaceKey(terrain);
         applyTerrainInteraction(entity, terrain, result);
         terrain.onTerrainCollision?.(entity);
     }

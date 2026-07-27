@@ -11,6 +11,7 @@ import {
 import { BattleBall } from "../entities/index.js";
 import { GravityParticle } from "../effects/index.js";
 import { FighterPhysicsSimulation } from "./fighterPhysicsSimulation.js";
+import { DragCombatRuntime } from "../combat-drag/index.js";
 import { AIActionController } from "./aiActionController.js";
 import { CombatLifePool } from "./combatLifePool.js";
 import { REVIVAL_EFFECT_CONFIG } from "../effects/index.js";
@@ -87,6 +88,10 @@ export class BattleSimulation extends FighterPhysicsSimulation {
             timeWarps: new Map(), // Map<ball, remainingSeconds> — 시전자별 독립 타이머
             timeSlowFactor: 0.35
         };
+        this.dragCombat =
+            options.dragCombatEnabled === true
+                ? new DragCombatRuntime(this, { onEvent: hooks.onDragCombatEvent })
+                : null;
 
         // ── Anti-stall ──
         this._antiStallTimer = 0;
@@ -153,6 +158,26 @@ export class BattleSimulation extends FighterPhysicsSimulation {
     addTimeWarp(caster, duration) {
         const current = this._clickActionContext.timeWarps.get(caster) ?? 0;
         this._clickActionContext.timeWarps.set(caster, Math.max(current, duration));
+    }
+
+    removeTimeWarp(caster) {
+        this._clickActionContext.timeWarps.delete(caster);
+    }
+
+    beginDragCombat(pointerId, cssPoint) {
+        return this.dragCombat?.begin(pointerId, cssPoint) ?? null;
+    }
+
+    moveDragCombat(pointerId, cssPoint) {
+        return this.dragCombat?.move(pointerId, cssPoint) ?? null;
+    }
+
+    releaseDragCombat(pointerId) {
+        return this.dragCombat?.release(pointerId) ?? null;
+    }
+
+    cancelDragCombat(pointerId) {
+        return this.dragCombat?.cancel(pointerId) ?? null;
     }
 
     /** 활성화된 Time Warp가 하나라도 있으면 true (getFailureReason 용) */
@@ -407,10 +432,12 @@ export class BattleSimulation extends FighterPhysicsSimulation {
      */
     update(delta, realDelta = delta) {
         if (this.finished) {
+            this.dragCombat?.reset();
             this.updateResultEffects(delta);
             return;
         }
         if (this.revivePauseRemaining > 0) {
+            this.dragCombat?.reset();
             this.revivePauseRemaining = Math.max(0, this.revivePauseRemaining - realDelta);
             for (const entity of this.entities.filter((candidate) => candidate.updatesDuringRevivePause)) {
                 entity.update(realDelta, this);
@@ -420,6 +447,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         }
 
         // 지연 적용 패턴 — 클릭 핸들러가 예약한 액션을 충돌 전에 처리
+        this.dragCombat?.tickInput(realDelta);
         this._consumePendingActions();
 
         this.elapsed += delta;
@@ -458,11 +486,17 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         }
         this.entities = this.entities.filter((entity) => !entity.isExpired);
 
+        this.dragCombat?.tickShot(realDelta);
+        this.dragCombat?.flushInputFrame();
+
         this.checkResult(delta);
     }
 
     beforeFighterPhysicsCollision(context) {
-        if (!context.hostile) return;
+        const dragResolution = this.dragCombat?.resolveFighterCollision(context);
+        if (!context.hostile) {
+            return;
+        }
 
         const { a, b, normal, contactPoint, aModifiers, bModifiers } = context;
         this._resetAntiStallTimerForFighterCollision();
@@ -514,6 +548,10 @@ export class BattleSimulation extends FighterPhysicsSimulation {
 
         damageFromAToB = a.abilities.modifyOutgoingFighterCollisionDamage(damageFromAToB, b, context);
         damageFromBToA = b.abilities.modifyOutgoingFighterCollisionDamage(damageFromBToA, a, context);
+
+        this.dragCombat?.applyResolvedFighterCollision(context, dragResolution, { damageFromAToB, damageFromBToA });
+        damageFromAToB = context.damageFromAToB ?? damageFromAToB;
+        damageFromBToA = context.damageFromBToA ?? damageFromBToA;
 
         context.targetHpRatioBeforeA = a.maxHp > 0 ? a.hp / a.maxHp : 0;
         context.targetHpRatioBeforeB = b.maxHp > 0 ? b.hp / b.maxHp : 0;
@@ -647,6 +685,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
     }
 
     notifyFighterStaticCollision(fighter, context) {
+        this.dragCombat?.onStaticCollision(fighter, context);
         fighter.combatEquipment?.staticBounce({ fighter, ...context, simulation: this });
         for (const observer of this.fighters) {
             observer.abilities.onFighterStaticCollision(fighter, context);
@@ -891,6 +930,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
     tryConsumePlayerLife(fighter) {
         const lifeState = this.combatLifePool?.consume(fighter);
         if (!lifeState?.canRevive) return false;
+        this.dragCombat?.reset();
         fighter.hp = fighter.maxHp;
         fighter.flags.defeated = false;
         fighter.flags.destroyed = false;
@@ -912,6 +952,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
     resolveResult(winner) {
         if (this.finished) return;
         this.finished = true;
+        this.dragCombat?.reset();
         this.winner = winner;
         this.loser =
             this.fighters.find((fighter) => fighter.participation.countsForResult && this.isHostile(winner, fighter)) ??
