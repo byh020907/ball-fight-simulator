@@ -92,6 +92,24 @@ import {
 import { spawnHuntingCombatControlFeedback } from "./effects/index.js";
 
 const TOURNAMENT_CHALLENGE_INTRO_DURATION = 1000;
+const EQUIPMENT_SUMMARY_STATS = Object.freeze([
+    ["hp", "HP"],
+    ["damage", "공격"],
+    ["defense", "방어"],
+    ["speed", "속도 점수"],
+    ["skill", "스킬 가속"],
+    ["criticalChance", "치명타"],
+    ["mass", "질량"],
+    ["wallBounce", "벽 반사"],
+    ["angularImpulse", "회전 충격"]
+]);
+
+function formatEquipmentSummaryStatLine(activeBonuses) {
+    const parts = EQUIPMENT_SUMMARY_STATS.filter(([key]) => activeBonuses[key] > 0).map(
+        ([key, label]) => `${label} +${activeBonuses[key]}`
+    );
+    return parts.length > 0 ? parts.join(" · ") : "적용 중인 장비 스탯 없음";
+}
 
 function createHeroStatPresentation(fighterId, bonuses, shield = 0) {
     if (fighterId !== FIGHTER_IDS.HERO) {
@@ -547,14 +565,6 @@ export class BattleApp {
                           requiredLevel: 1
                       };
             });
-            const statParts = [
-                ["hp", "HP"],
-                ["damage", "공격"],
-                ["defense", "방어"],
-                ["speed", "속도 점수"]
-            ]
-                .filter(([key]) => activeBonuses[key] > 0)
-                .map(([key, label]) => `${label} +${activeBonuses[key]}`);
             return {
                 characterLevel: 1,
                 inventoryUsed: Object.keys(inventory).length,
@@ -562,7 +572,7 @@ export class BattleApp {
                 equippedCount: slots.filter((slot) => !slot.empty).length,
                 activeCount: slots.filter((slot) => !slot.empty).length,
                 slots,
-                statLine: statParts.length > 0 ? statParts.join(" · ") : "적용 중인 장비 스탯 없음"
+                statLine: formatEquipmentSummaryStatLine(activeBonuses)
             };
         }
         const equipped = equipment.equipped ?? {};
@@ -598,15 +608,6 @@ export class BattleApp {
             };
         });
         const activeBonuses = getEquippedStatBonuses(this.playerProfile, characterId);
-        const statParts = [
-            ["hp", "HP"],
-            ["damage", "공격"],
-            ["defense", "방어"],
-            ["speed", "속도 점수"]
-        ]
-            .filter(([key]) => activeBonuses[key] > 0)
-            .map(([key, label]) => `${label} +${activeBonuses[key]}`);
-
         return {
             characterLevel: getCharacterEquipmentLevel(this.playerProfile, characterId),
             inventoryUsed: getInventoryUsed(this.playerProfile),
@@ -614,7 +615,7 @@ export class BattleApp {
             equippedCount: slots.filter((slot) => !slot.empty).length,
             activeCount: slots.filter((slot) => !slot.empty && !slot.locked).length,
             slots,
-            statLine: statParts.length > 0 ? statParts.join(" · ") : "적용 중인 장비 스탯 없음"
+            statLine: formatEquipmentSummaryStatLine(activeBonuses)
         };
     }
 

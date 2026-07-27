@@ -10919,11 +10919,30 @@ function testEquipmentPhysicalSpecialEffects() {
 
 function testEquipmentLevelRequirement(app) {
     const profile = createDefaultPlayerProfile();
-    addEquipmentQuantity(profile, "attack_sword");
+    const equippedTemplates = [
+        "attack_sword",
+        "haste_mote",
+        "crit_cloak",
+        "mass_weight",
+        "wall_spring",
+        "collision_gyro"
+    ];
+    equippedTemplates.forEach((templateId, slot) => {
+        addEquipmentQuantity(profile, templateId);
+        assert.equal(
+            equipEquipmentItem(profile, templateId).slot,
+            slot,
+            "v12 equipment should use shared slots without rarity gates"
+        );
+    });
+    const summary = app._getPlayerEquipmentSummary.call({
+        playerProfile: profile,
+        playerFighterId: FIGHTER_IDS.DASH
+    });
     assert.equal(
-        equipEquipmentItem(profile, "attack_sword").slot,
-        0,
-        "v12 equipment should use shared slots without rarity gates"
+        summary.statLine,
+        "공격 +3 · 스킬 가속 +12 · 치명타 +8 · 질량 +14 · 벽 반사 +14 · 회전 충격 +14",
+        "Setup equipment summary should show every equipped template stat"
     );
     return;
 
