@@ -82,7 +82,8 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         this._tournamentAngledBounceRampSystem = this._createTournamentAngledBounceRampSystem(options);
 
         // ── 클릭 액션 시스템 ──
-        this.playerBall = playerBall;
+        this.playerBall = null;
+        this._dragEnemyHealthBalanced = new WeakSet();
         this._clickActionContext = {
             pendingActions: [], // 큐: 여러 액션이 한 프레임에 예약되어도 안전
             timeWarps: new Map(), // Map<ball, remainingSeconds> — 시전자별 독립 타이머
@@ -92,6 +93,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
             options.dragCombatEnabled === true
                 ? new DragCombatRuntime(this, { onEvent: hooks.onDragCombatEvent })
                 : null;
+        this.setPlayerBall(playerBall);
 
         // ── Anti-stall ──
         this._antiStallTimer = 0;
@@ -166,6 +168,20 @@ export class BattleSimulation extends FighterPhysicsSimulation {
 
     beginDragCombat(pointerId, cssPoint) {
         return this.dragCombat?.begin(pointerId, cssPoint) ?? null;
+    }
+
+    setPlayerBall(playerBall) {
+        this.playerBall = playerBall ?? null;
+        if (!this.dragCombat || !this.playerBall) return this.playerBall;
+
+        for (const fighter of this.fighters) {
+            if (!this.isHostile(this.playerBall, fighter) || this._dragEnemyHealthBalanced.has(fighter)) continue;
+            const currentHpRatio = fighter.maxHp > 0 ? fighter.hp / fighter.maxHp : 0;
+            fighter.maxHp *= this.dragCombat.config.enemy.enemyHealthMultiplier;
+            fighter.hp = fighter.maxHp * currentHpRatio;
+            this._dragEnemyHealthBalanced.add(fighter);
+        }
+        return this.playerBall;
     }
 
     moveDragCombat(pointerId, cssPoint) {

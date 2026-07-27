@@ -22,6 +22,7 @@ export const DRAG_COMBAT_CONFIG = Object.freeze({
         flightMaxSeconds: 1.8,
         attackSpeedMin: 520,
         attackSpeedRatio: 1.8,
-        attackDamageMultiplier: 1.35
+        attackDamageMultiplier: 1.35,
+        enemyHealthMultiplier: 0.85
     })
 });

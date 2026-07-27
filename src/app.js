@@ -1088,7 +1088,7 @@ export class BattleApp {
 
         // 내 캐릭터 식별
         const playerBall = this.simulation.fighters.find((f) => f.id === this.playerFighterId) ?? null;
-        this.simulation.playerBall = playerBall;
+        this.simulation.setPlayerBall(playerBall);
 
         // ── AI 캐릭터 RL 모델 로드 ──
         for (const fighter of this.simulation.fighters) {

@@ -6,7 +6,6 @@
 // 각 정의의 evaluate()가 자신의 달성 조건을 판단한다.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { getActionPool } from "../clickActions.js";
 import { getCharacterMasteryLevel } from "../character-mastery/index.js";
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 import { HUNTING_MONSTER_BASE_SPECS, HUNTING_MONSTER_TAGS } from "../hunting/huntingMonsters.js";
@@ -126,23 +125,6 @@ export const ACHIEVEMENT_DEFINITIONS = Object.freeze([
         },
         grant(handler) {
             return handler.shards(ACHIEVEMENT_REWARDS.counterExpert.amount);
-        }
-    },
-    {
-        id: "all_actions_used",
-        name: "만능 플레이어",
-        description: "모든 액션을 1회 이상 사용하세요.",
-        tier: "bronze",
-        evaluate(context) {
-            const allActionIds = getActionPool().map((a) => a.id);
-            const usedIds = context.profile.collection.careerStats.usedActionIds ?? [];
-            return allActionIds.every((id) => usedIds.includes(id));
-        },
-        reward: {
-            ...ACHIEVEMENT_REWARDS.allActionsUsed
-        },
-        grant(handler) {
-            return handler.shards(ACHIEVEMENT_REWARDS.allActionsUsed.amount);
         }
     },
     {

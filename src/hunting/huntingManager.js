@@ -1053,7 +1053,7 @@ export class HuntingManager {
             ]
         };
         this.app.playerFighterId = swapped.active.id;
-        simulation.playerBall = swapped.active;
+        simulation.setPlayerBall(swapped.active);
         if (this._battleLootSession) this._battleLootSession.playerId = swapped.active.id;
         for (const entity of simulation.entities) {
             if (entity.collectorId === swapped.standby.id) entity.collectorId = swapped.active.id;
