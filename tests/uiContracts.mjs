@@ -920,6 +920,27 @@ function testPopupCloseOwnershipContract() {
     console.log("[popup-close-ownership-contract] ok");
 }
 
+function testStartMatchEnablesPlayerDragAcrossModes() {
+    const app = readSource("src/app.js");
+    const startMatch = app.slice(app.indexOf("async startMatch"), app.indexOf("_bindDragPointerHandler"));
+    assert.match(
+        startMatch,
+        /dragCombatEnabled:\s*match\.some\(\(fighter\) => fighter\.id === this\.playerFighterId\)/,
+        "The shared startMatch path must enable drag combat for any match containing the player"
+    );
+    assert.doesNotMatch(
+        startMatch,
+        /_gameMode === ["']hunting["']/,
+        "Drag runtime must not be limited to hunting matches"
+    );
+    assert.doesNotMatch(
+        startMatch,
+        /currentTournamentMatch.*dragCombatEnabled/s,
+        "Drag runtime must not be limited to tournament matches"
+    );
+    console.log("[start-match-player-drag-contract] ok");
+}
+
 function testGameplayUiResetContracts() {
     const components = [
         ["src/components/game-overlay.html", "game overlay"],
@@ -2038,6 +2059,7 @@ testRecipeTreeUiContract();
 testDefenseHelpCopyContract();
 testCollectionDetailContracts();
 testPopupCloseOwnershipContract();
+testStartMatchEnablesPlayerDragAcrossModes();
 testGameplayUiResetContracts();
 testCombinedHealthBarProportions();
 testNoWindowUiManagerInProduction();

@@ -86,6 +86,11 @@ function createApp(beginResult = {}) {
     const down = pointer(7);
     canvas.emit("pointerdown", down);
     canvas.emit("pointermove", pointer(7, { clientX: 130, clientY: 260 }));
+    canvas.emit("pointerleave", pointer(7, { clientX: 140, clientY: 280 }));
+    assert.deepEqual(calls, [
+        ["begin", 7, { x: 100, y: 200 }],
+        ["move", 7, { x: 120, y: 240 }]
+    ]);
     canvas.emit("pointerup", pointer(7));
     assert.deepEqual(calls, [
         ["begin", 7, { x: 100, y: 200 }],
