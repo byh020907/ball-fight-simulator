@@ -106,6 +106,9 @@ export class DragCombatRuntime {
     }
 
     onStaticCollision(fighter, context) {
+        if (fighter === this.#fighterById(this.enemyQueue.attackerId) && this.enemyQueue.state === "flight") {
+            this.enemySlowElapsed = 0;
+        }
         if (!this.shot.active || fighter !== this.#player()) return;
         const key = context.surfaceKey;
         if (this.shot.bounce(key, this.shot.elapsed)) this.#record({ type: "bounce", surfaceKey: key });
@@ -286,6 +289,7 @@ export class DragCombatRuntime {
                 attacker && player
                     ? Vector2.subtract(player.position, attacker.position).normalize()
                     : new Vector2(0, 0);
+            this.enemyDirections.clear();
             this.enemyDirections.set(event.attackerId, copyPoint(direction) ?? { x: 0, y: 0 });
             this.enemySlowElapsed = 0;
         }

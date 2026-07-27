@@ -102,6 +102,30 @@ function launchPlayer(simulation, pointerId) {
 
 {
     const simulation = createSimulation();
+    const runtime = simulation.dragCombat;
+    runtime.tickEnemy(0);
+    runtime.tickEnemy(1);
+    const attacker = simulation.fighters.find((fighter) => fighter.id === runtime.getSnapshot().enemyQueue.attackerId);
+    attacker.velocity = new Vector2();
+    runtime.tickEnemy(0.1);
+    assert.equal(runtime.enemySlowElapsed, 0.1);
+    simulation.notifyFighterStaticCollision(attacker, { surfaceKey: "wall:left" });
+    assert.equal(runtime.enemySlowElapsed, 0, "static bounce resets enemy slow accumulation");
+    runtime.tickEnemy(0.15);
+    assert.equal(runtime.getSnapshot().enemyQueue.phase, "flight");
+
+    runtime.enemyDirections.set("stale", { x: 1, y: 1 });
+    runtime.resolveFighterCollision({ a: attacker, b: simulation.playerBall, hostile: true });
+    assert.equal(runtime.enemyDirections.size, 1, "only the active windup direction survives");
+    const snapshot = runtime.getSnapshot();
+    snapshot.enemyQueue.fixedWindupDirection.x = 99;
+    snapshot.enemyQueue.lastResolution.attackerId = "mutated";
+    assert.notEqual(runtime.getSnapshot().enemyQueue.fixedWindupDirection.x, 99);
+    assert.notEqual(runtime.getSnapshot().enemyQueue.lastResolution.attackerId, "mutated");
+}
+
+{
+    const simulation = createSimulation();
     let maxOrder = 0;
     for (let iteration = 0; iteration < 1000; iteration += 1) {
         simulation.dragCombat.tickEnemy(0);
