@@ -25,6 +25,7 @@ export class DragCombatRuntime {
         this.enemySlowElapsed = 0;
         this.enemyDefenseCandidate = null;
         this.lastEvent = null;
+        this.eventSequence = 0;
         this.aimCaster = null;
         this.pendingWarpRemoval = false;
     }
@@ -112,7 +113,8 @@ export class DragCombatRuntime {
         }
         if (!this.shot.active || fighter !== this.#player()) return;
         const key = context.surfaceKey;
-        if (this.shot.bounce(key, this.shot.elapsed)) this.#record({ type: "bounce", surfaceKey: key });
+        if (this.shot.bounce(key, this.shot.elapsed))
+            this.#record({ type: "bounce", surfaceKey: key, bounceCount: this.shot.bounceCount });
     }
 
     resolveFighterCollision(context, damage = null) {
@@ -165,6 +167,8 @@ export class DragCombatRuntime {
                 start: copyPoint(this.input.start),
                 current: copyPoint(this.input.current),
                 vector: copyValue(this.input.lastSnapshot),
+                aimElapsed: this.input.aimElapsed,
+                maxAimSeconds: this.config.input.maxAimSeconds,
                 cooldownRemaining: this.input.cooldownRemaining,
                 inputLockRemaining: this.input.inputLockRemaining
             },
@@ -186,7 +190,8 @@ export class DragCombatRuntime {
                 defenseCandidate: this.enemyDefenseCandidate,
                 lastResolution: copyValue(this.enemyQueue.lastResult)
             },
-            lastEvent: copyValue(this.lastEvent)
+            lastEvent: copyValue(this.lastEvent),
+            eventSequence: this.eventSequence
         };
     }
 
@@ -344,7 +349,8 @@ export class DragCombatRuntime {
     }
 
     #record(event) {
-        this.lastEvent = copyValue(event);
+        this.eventSequence += 1;
+        this.lastEvent = { ...copyValue(event), sequence: this.eventSequence };
         this.onEvent?.(this.getSnapshot());
     }
 

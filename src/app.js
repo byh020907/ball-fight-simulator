@@ -1107,7 +1107,7 @@ export class BattleApp {
 
         this._bindDragPointerHandler();
 
-        this.renderer.render(this.simulation);
+        this.renderer.render(this.simulation, 0);
         this.showOverlay("Matchup", label);
         await this.wait(1350);
         if (!this.lifecycle.isCurrentRevision(lifecycleRevision)) return;
@@ -1346,7 +1346,7 @@ export class BattleApp {
 
         this.simulation.update(speedDelta, delta);
         if (this._gameMode === "hunting") this.hunting.updateCombat(speedDelta);
-        this.renderer.render(this.simulation);
+        this.renderer.render(this.simulation, delta);
         this._renderSpeedIndicator();
         this._updateLiveCards(this.simulation.fighters);
 

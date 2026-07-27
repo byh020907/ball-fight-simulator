@@ -96,6 +96,10 @@ function assertFiniteSnapshot(snapshot) {
     const enemy = simulation.getOpponent(player);
     assert.equal(simulation.dragCombat.getSnapshot().enabled, true);
     beginWithVector(simulation, 7);
+    simulation.dragCombat.tickInput(0.35);
+    const aimingSnapshot = simulation.dragCombat.getSnapshot();
+    assert.equal(aimingSnapshot.drag.aimElapsed, 0.35);
+    assert.equal(aimingSnapshot.drag.maxAimSeconds, 1.2);
     assert.equal(simulation._clickActionContext.timeWarps.get(player), Infinity);
     assert.equal(impulseCount(player), 0, "move must not apply an impulse");
     simulation.cancelDragCombat(7);

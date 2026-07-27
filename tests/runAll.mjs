@@ -40,6 +40,10 @@ const TEST_DOMAINS = {
     dragTrajectoryScene: {
         modulePath: "./dragTrajectoryScene.mjs",
         footerMessages: new Set(["[drag-trajectory-scene] ok"])
+    },
+    dragCombatRenderer: {
+        modulePath: "./dragCombatRenderer.mjs",
+        footerMessages: new Set(["[drag-combat-renderer] ok"])
     }
 };
 

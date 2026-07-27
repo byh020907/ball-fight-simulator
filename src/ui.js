@@ -1,6 +1,7 @@
 import { drawTerrain } from "./terrain/index.js";
 import { RENDER_LAYERS } from "./core.js";
 import { ArenaCamera } from "./camera.js";
+import { DragCombatRenderer } from "./combat-drag/index.js";
 
 const FOREST_BACKGROUND_CONFIG = Object.freeze({
     BASE_AREA: 1280 * 1280,
@@ -17,6 +18,7 @@ export class ArenaRenderer {
         this.canvas = canvas;
         this.ctx = canvas.getContext("2d");
         this.camera = new ArenaCamera();
+        this.dragCombatRenderer = new DragCombatRenderer(canvas);
     }
 
     clear() {
@@ -86,7 +88,7 @@ export class ArenaRenderer {
         ctx.restore();
     }
 
-    render(simulation) {
+    render(simulation, realDelta = 0) {
         this.clear();
 
         const ctx = this.ctx;
@@ -112,7 +114,10 @@ export class ArenaRenderer {
             }
         }
 
+        this.dragCombatRenderer.renderWorld(ctx, simulation, simulation.dragCombat?.getSnapshot(), realDelta);
+
         ctx.restore();
+        this.dragCombatRenderer.renderScreen(this.ctx, simulation, simulation.dragCombat?.getSnapshot());
     }
 
     _drawArenaBackground(ctx, simulation) {
