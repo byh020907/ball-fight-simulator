@@ -68,10 +68,6 @@ export function createComponentBridge(app) {
         adjustChallengeLevel(delta) {
             return app.adjustChallengeLevel(delta);
         },
-        useCombatControl(type) {
-            return app.useCombatControl(type);
-        },
-
         // ── Hunting actions ──
         openHuntingStageSelect() {
             return app.hunting.showStageSelect();

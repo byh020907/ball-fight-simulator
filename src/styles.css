@@ -562,3 +562,7 @@ game-overlay:has(~ start-button #startButton:not(.hidden)) #overlay .overlay-car
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
+/* 전투 중 손가락 드래그가 브라우저 스크롤 제스처로 해석되지 않게 한다. */
+#arenaCanvas {
+    touch-action: none;
+}

@@ -29,6 +29,10 @@ const TEST_DOMAINS = {
         modulePath: "./dragPlayerCollision.mjs",
         footerMessages: new Set(["[drag-player-collision] ok"])
     },
+    dragAppInput: {
+        modulePath: "./dragAppInput.mjs",
+        footerMessages: new Set(["[drag-app-input] ok"])
+    },
     dragEnemyRuntime: {
         modulePath: "./dragEnemyRuntime.mjs",
         footerMessages: new Set(["[drag-enemy-runtime] ok"])

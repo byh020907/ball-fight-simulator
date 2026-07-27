@@ -4,7 +4,6 @@ import { createComponentBridge as createAppComponentBridge } from "../src/compon
 import { PopupService } from "../src/popup.js";
 import { CollectionHubService } from "../src/collectionHubService.js";
 import { createCollectionActionPopupOptions } from "../src/collection/collectionActionPopup.js";
-import { ActionPickerService } from "../src/actionPicker.js";
 import { createTournamentRoster } from "../src/tournamentRoster.js";
 import { calculateInterceptPoint, Projectile, RENDER_LAYERS, Vector2, randomSpin } from "../src/core.js";
 import {
@@ -257,12 +256,6 @@ import {
     setHuntingPartyMemberHealth,
     normalizeHuntingLoot
 } from "../src/hunting/index.js";
-import {
-    createCombatControlState,
-    resetCombatControlState,
-    updateCombatControlState,
-    useNearestEnemyCombatControl
-} from "../src/combatControls.js";
 import { Grenade } from "../src/entities/grenade.js";
 import {
     getArenaWallRay,
@@ -1919,27 +1912,15 @@ async function testTournamentWinAdvancesChallengeAfterMasteryCheck() {
     }
 }
 
-async function testActionSelectionShowsTournamentChallengeBeforeMatchup() {
+async function testTournamentMatchStartsWithoutActionPicker() {
     const app = await loadModuleApp();
     const player = app.roster.find((fighter) => fighter.id === app.playerFighterId);
     const opponent = app.roster.find((fighter) => fighter.id !== app.playerFighterId);
     const events = [];
-    const originalResolveAction = app._resolveAction;
-    const originalPresentChallenge = app._presentTournamentChallengeIntro;
     const originalOverlayShow = app._overlay.show;
     const originalWait = app.wait;
 
     app.currentTournamentMatch = { roundIndex: 0 };
-    app._action = { selectedId: null, current: null, pickEveryMatch: false, ctx: null };
-    app._resolveAction = async () => {
-        events.push("action");
-        app._action.current = { name: "테스트 액션" };
-        return app._action.current;
-    };
-    app._presentTournamentChallengeIntro = async () => {
-        events.push("challenge");
-        return true;
-    };
     app._overlay.show = ({ label }) => events.push(`overlay:${label}`);
     app.wait = async () => {};
 
@@ -1947,19 +1928,19 @@ async function testActionSelectionShowsTournamentChallengeBeforeMatchup() {
         await app.startMatch([player, opponent]);
         assert.deepEqual(
             events,
-            ["action", "challenge", "overlay:Matchup"],
-            "The tournament challenge intro must appear after the first action selection and before the VS matchup"
+            ["overlay:Matchup"],
+            "The tournament match must enter its matchup presentation without a removed action picker"
         );
     } finally {
-        app._resolveAction = originalResolveAction;
-        app._presentTournamentChallengeIntro = originalPresentChallenge;
+        cancelAnimationFrame(app.rafId);
+        app._cleanupMatch();
         app._overlay.show = originalOverlayShow;
         app.wait = originalWait;
     }
-    console.log("[tournament-action-selection-challenge-intro] ok");
+    console.log("[tournament-match-without-action-picker] ok");
 }
 
-async function testHuntingMatchDisablesClickActions() {
+async function testHuntingMatchEnablesDragCombat() {
     const app = await loadModuleApp();
     const player = app.roster.find((fighter) => fighter.id === app.playerFighterId);
     const opponent = app.roster.find((fighter) => fighter.id !== app.playerFighterId);
@@ -1970,19 +1951,18 @@ async function testHuntingMatchDisablesClickActions() {
     app.wait = async () => {};
 
     try {
-        await app.startMatch([player, opponent], {
-            skipActionPick: true,
-            clickActionsEnabled: false
-        });
+        await app.startMatch([player, opponent]);
         assert.ok(
             app.simulation.fighters.every((fighter) => fighter.aiController === null),
             "Hunting combat must not assign tournament click actions to any fighter"
         );
-        assert.equal(app._action.current, null, "Hunting combat must not retain a playable click action");
+        assert.ok(app.simulation.dragCombat, "Hunting combat with a player must enable drag runtime");
     } finally {
+        cancelAnimationFrame(app.rafId);
+        app._cleanupMatch();
         app.wait = originalWait;
     }
-    console.log("[hunting-click-actions-disabled] ok");
+    console.log("[hunting-drag-combat-enabled] ok");
 }
 
 async function testTournamentWinDisplaysMasteryReward() {
@@ -16833,8 +16813,8 @@ await testTournament(app);
 await testTournamentOpponentProgressionByChallenge(app);
 await testRebirthResetsTournamentChallengePresentation();
 await testTournamentWinAdvancesChallengeAfterMasteryCheck();
-await testActionSelectionShowsTournamentChallengeBeforeMatchup();
-await testHuntingMatchDisablesClickActions();
+await testTournamentMatchStartsWithoutActionPicker();
+await testHuntingMatchEnablesDragCombat();
 await testTournamentWinDisplaysMasteryReward();
 testResultSequenceProgression();
 await testTournamentEliminationAwaitsConfirmation(app);
@@ -16873,7 +16853,6 @@ await testDashMasterySpeedApplied();
 await testOrbitWallBounceMultiplicative();
 await testGunnerMassMultiplicative();
 await testHuntingMasteryPlayerOnly(app);
-testZeroCostActionSchedulesWithoutHpSpend(app);
 // Dynamic bonus computation test
 // ── New character tests ──────────────────────────────────────────────────────
 
@@ -20262,8 +20241,6 @@ async function runNewBridgeTests() {
     testHuntingManagerNoAppUiMethods(app);
     testCollectionHubServiceNoBlacklistedRefs();
     testComponentBridgeHasNoChestAction();
-    await testActionPickerServiceIdAndConcurrency();
-    await testActionPickerConcurrency();
     testNoWindowPopupServiceInProductionSource();
     testGameActionBridgeOpenHelp();
     testHuntingManagerStaticPopupServiceImport();
@@ -24525,8 +24502,6 @@ function testNearestEnemyCombatControls() {
     console.log("[nearest-enemy-combat-controls] ok");
 }
 
-testNearestEnemyCombatControls();
-
 function testReusableCapabilityContracts() {
     const timedKeys = new TimedKeyMap({ isInvalid: (key) => key === "removed" });
     timedKeys.start("target-a", 0.5);
@@ -24846,8 +24821,6 @@ async function testCombatControlModeRestriction() {
     console.log("[combat-control-mode-restriction] ok");
 }
 
-await testCombatControlModeRestriction();
-
 function testCombatControlEffectSpawn() {
     const [playerSpec, enemySpec] = createRoster()
         .slice(0, 2)
@@ -24889,8 +24862,6 @@ function testCombatControlEffectSpawn() {
 
     console.log("[combat-control-effect-spawn] ok");
 }
-
-testCombatControlEffectSpawn();
 
 function testNoOldAccelerationSymbols() {
     const source = readFileSync(new URL("../src/effects/huntingCombatControlEffect.js", import.meta.url), "utf8");
@@ -25240,6 +25211,10 @@ function testHiddenCharacterPortraitCanvasDoesNotAmplifyBackingStore() {
 testHiddenCharacterPortraitCanvasDoesNotAmplifyBackingStore();
 
 async function testFloorSevenHuntingDefeatCompletesWithRealApp(app) {
+    const uiManager = Alpine.store("uiManager");
+    if (!uiManager.getComponent("collectionHub")) {
+        uiManager.register("collectionHub", { render() {} });
+    }
     app.returnToInitialState();
     app.playerProfile = createDefaultPlayerProfile();
     const characterId = FIGHTER_IDS.DASH;

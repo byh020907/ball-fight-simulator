@@ -4,10 +4,8 @@ import { ArenaRenderer } from "./ui.js";
 import { Matchmaker, TournamentManager } from "./tournament.js";
 import { createTournamentRoster } from "./tournamentRoster.js";
 import { createRoster } from "./roster.js";
-import { ActionPickerService } from "./actionPicker.js";
 import { CollectionHubService } from "./collectionHubService.js";
 import { PopupService } from "./popup.js";
-import { pickRandomActions, findActionById, showActionFailure } from "./clickActions.js";
 import { BattleBall } from "./entities/index.js";
 import { PreviewReselectSimulation } from "./preview/previewReselectSimulation.js";
 import { getCombinedHealthBarPercentages } from "./fighterHealthBar.js";
@@ -50,8 +48,6 @@ import {
     recordDamageTaken,
     recordDamageDealt,
     recordLowestHp,
-    recordActionUsed,
-    recordActionHpCost,
     recordActionSuccess,
     ACHIEVEMENT_DEFINITIONS,
     evaluateAchievements,
@@ -82,14 +78,6 @@ import { ScreenWakeLock } from "./screenWakeLock.js";
 import { applyRebirthLoadoutToBaseSpec, applyRebirthLoadoutToBattleBall, getRebirthLoadout } from "./rebirth/index.js";
 import { advanceResultSequence, createResultSequence, getResultSequencePresentation } from "./resultSequence.js";
 import { CHARACTER_ROSTER_CONTEXTS, getEligibleRoster } from "./characterRosterPolicy.js";
-import {
-    COMBAT_CONTROL_CONFIG,
-    createCombatControlState,
-    resetCombatControlState,
-    updateCombatControlState,
-    useNearestEnemyCombatControl
-} from "./combatControls.js";
-import { spawnHuntingCombatControlFeedback } from "./effects/index.js";
 
 const TOURNAMENT_CHALLENGE_INTRO_DURATION = 1000;
 const EQUIPMENT_SUMMARY_STATS = Object.freeze([
@@ -165,11 +153,6 @@ export class BattleApp {
         this._root = Alpine.store("uiManager").requireComponent("appRoot");
         this._toast = Alpine.store("uiManager").requireComponent("toastNotification");
         this._modeSegment = Alpine.store("uiManager").requireComponent("modeSegment");
-        try {
-            this._combatControls = Alpine.store("uiManager").requireComponent("combatControls");
-        } catch {
-            this._combatControls = null;
-        }
         this._gameMode = "tournament";
         this.ui = {
             get logItems() {
@@ -214,13 +197,10 @@ export class BattleApp {
         this._selectionAnimTime = 999;
         this._previewSim = null;
         this._queuedPreviewReselect = false;
-
-        /** @type {{ selectedId: string|null, current: object|null, pickEveryMatch: boolean, ctx: object|null }} */
-        this._action = { selectedId: null, current: null, pickEveryMatch: false, ctx: null };
+        this._activeDragPointerId = null;
 
         /** @type {{ level: number, indicatorTimer: number, indicatorText: string }} */
         this._speed = { level: 1, indicatorTimer: 0, indicatorText: "" };
-        this._combatControlState = createCombatControlState();
 
         this.refreshPlayerSetup();
         this._refreshCollectionHub();
@@ -281,7 +261,6 @@ export class BattleApp {
         this._lastXpResult = null;
         this._lastMatchXpResult = null;
         this._resultSequence = null;
-        this._action = { selectedId: null, current: null, pickEveryMatch: false, ctx: null };
         this._speed = { level: 1, indicatorTimer: 0, indicatorText: "" };
         this.ui.lastOverlayState = null;
         this.resetGameplayUiState();
@@ -963,7 +942,6 @@ export class BattleApp {
         this.tournament = new TournamentManager(this.tournamentRoster, this.playerFighterId);
         this._root.tournamentActive = true;
         this.currentTournamentMatch = null;
-        this._action.selectedId = null;
         this.refreshPlayerSetup();
         this._bracket.render(this.tournament);
         const player = this.tournamentRoster.find((fighter) => fighter.id === this.playerFighterId);
@@ -988,31 +966,6 @@ export class BattleApp {
         await this.startMatch([nextMatch.a, nextMatch.b], { keepLog: true });
     }
 
-    // ── 액션 선택 정책 ──
-    // true면 매 매치마다 선택, false면 토너먼트 첫 판만 선택
-    _pickActionEveryMatch = false;
-
-    async _resolveAction(playerBall) {
-        if (!playerBall) return null;
-
-        // 사냥터에서는 액션 선택 스킵
-        if (this._action.skipPick) return null;
-
-        // 첫 선택이거나 매판 선택 모드면 카드 띄움
-        if (!this._action.selectedId || this._action.pickEveryMatch) {
-            const cards = pickRandomActions(3);
-            const pickedId = await ActionPickerService.show(cards);
-            this._action.selectedId = pickedId;
-        }
-
-        this._action.current = findActionById(this._action.selectedId);
-        if (this._action.current) {
-            this._log.add(`[액션] ${this._action.current.name} 준비 완료.`);
-            playerBall.clickActionName = this._action.current.name;
-        }
-        return this._action.current;
-    }
-
     async _presentTournamentChallengeIntro(lifecycleRevision) {
         const challenge = this._getTournamentChallengePresentation();
         this._overlay.show({
@@ -1033,20 +986,13 @@ export class BattleApp {
         this._speed.indicatorText = "";
         this.resultSequenceAnnounced = false;
         this.matchFinalized = false;
-        resetCombatControlState(this._combatControlState);
         this._lastMatchXpResult = null;
-        const clickActionsEnabled = options.clickActionsEnabled ?? true;
-        this._action.skipPick = !clickActionsEnabled || (options.skipActionPick ?? false);
         if (!options.keepLog) {
             this._log.reset();
         }
 
         const match = customMatch ?? this.matchmaker.pick();
         const label = `${match[0].name} vs ${match[1].name}`;
-        const shouldPresentTournamentChallengeIntro =
-            Boolean(this.currentTournamentMatch) &&
-            !this._action.skipPick &&
-            (!this._action.selectedId || this._action.pickEveryMatch);
         const fighterCards = Array.isArray(options.fighterCards)
             ? options.fighterCards
             : match.map((fighter) => ({ fighter }));
@@ -1077,9 +1023,7 @@ export class BattleApp {
         this.simulation = new BattleSimulation(
             match,
             {
-                assignActions:
-                    clickActionsEnabled &&
-                    (this.debug.aiEnabled || getCharacterChallengeLevel(this.playerProfile, this.playerFighterId) > 0),
+                assignActions: false,
                 onLog: (message) => this._log.add(message),
                 onOvertime: () => {
                     this._updateStatus(label, "Overtime");
@@ -1131,6 +1075,7 @@ export class BattleApp {
                 hostileAbsenceGraceTeamId: options.hostileAbsenceGraceTeamId,
                 arenaTheme: options.arenaTheme ?? null,
                 terrain: options.terrain ?? [],
+                dragCombatEnabled: match.some((fighter) => fighter.id === this.playerFighterId),
                 playerLives: options.playerLives ?? null,
                 tournamentAngledBounceRamps: this.currentTournamentMatch
                     ? {
@@ -1160,20 +1105,7 @@ export class BattleApp {
             this._currentMatchReport.tournamentRoundIndex = this.currentTournamentMatch?.roundIndex ?? -1;
         }
 
-        // 클릭 액션 — 내 캐릭터가 있으면 카드 선택
-        this._action.current = null;
-        if (playerBall) {
-            await this._resolveAction(playerBall);
-            if (!this.lifecycle.isCurrentRevision(lifecycleRevision)) return;
-            if (shouldPresentTournamentChallengeIntro && this._action.current) {
-                const canStartMatch = await this._presentTournamentChallengeIntro(lifecycleRevision);
-                if (!canStartMatch) return;
-            }
-        }
-
-        // 클릭 핸들러 바인딩
-        this._bindClickHandler();
-        this._syncCombatControlUi();
+        this._bindDragPointerHandler();
 
         this.renderer.render(this.simulation);
         this.showOverlay("Matchup", label);
@@ -1189,158 +1121,79 @@ export class BattleApp {
         this.rafId = requestAnimationFrame((time) => this.loop(time));
     }
 
-    // ── 클릭 액션 핸들러 ──
-
-    _bindClickHandler() {
-        // 기존 핸들러 제거
-        this._unbindClickHandler();
-
+    _bindDragPointerHandler() {
+        this._unbindDragPointerHandler();
         const canvas = this.elements?.canvas;
         if (!canvas) return;
 
-        // ctx — TriggerStrategy에 전달
-        this._action.ctx = {
-            action: null,
-            sim: null,
-            player: null,
-            _holding: false,
-            _consumed: false,
-            _holdStarted: false,
-            fireAction: () => this._tryFireAction()
+        const cssPoint = (event) => {
+            const rect = canvas.getBoundingClientRect();
+            return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+        };
+        const finish = (event, method) => {
+            if (event.pointerId !== this._activeDragPointerId) return;
+            this.simulation?.[method](event.pointerId);
+            if (canvas.hasPointerCapture?.(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+            this._activeDragPointerId = null;
         };
 
-        this._pointerHandler = () => {
-            if (this.simulation?.finished) return;
-            if (this._gameMode === "hunting") return;
-            this._action.ctx.action = this._action.current;
-            this._action.ctx.sim = this.simulation;
-            this._action.ctx.player = this.simulation?.playerBall ?? null;
-            if (!this._action.ctx.action) return;
-            this._action.ctx.trigger = this._action.ctx.action.trigger;
-            this._action.ctx.trigger.onPointerDown(this._action.ctx);
-        };
-
-        this._pointerUpHandler = () => {
-            if (this._gameMode === "hunting") return;
-            this._action.ctx.trigger?.onPointerUp(this._action.ctx);
-        };
-
-        canvas.addEventListener("pointerdown", this._pointerHandler);
-        canvas.addEventListener("pointerup", this._pointerUpHandler);
-        canvas.addEventListener("pointerleave", this._pointerUpHandler);
-        // 배속 토글 (관전 중에만 동작, 전투 영역 전체)
-        this._speedToggleHandler = () => {
-            if (this.simulation?.finished) return;
-            if (this.simulation?.playerBall) return;
-            this._cycleBattleSpeed();
-        };
-        canvas.addEventListener("pointerdown", this._speedToggleHandler);
-    }
-
-    _unbindClickHandler() {
-        try {
-            const canvas = this.elements?.canvas;
-            if (!canvas || typeof canvas.removeEventListener !== "function") return;
-            if (this._pointerHandler) {
-                canvas.removeEventListener("pointerdown", this._pointerHandler);
-                canvas.removeEventListener("pointerup", this._pointerUpHandler);
-                canvas.removeEventListener("pointerleave", this._pointerUpHandler);
+        this._dragPointerDownHandler = (event) => {
+            const simulation = this.simulation;
+            if (!simulation?.playerBall) {
+                if (!simulation?.finished) this._cycleBattleSpeed();
+                return;
             }
-            if (this._speedToggleHandler) {
-                canvas.removeEventListener("pointerdown", this._speedToggleHandler);
-                this._speedToggleHandler = null;
-            }
-        } catch {
-            // no-op in non-browser environments
-        }
-        this._action.ctx = null;
+            if (!event.isPrimary || (event.pointerType === "mouse" && event.button !== 0)) return;
+            if (this._activeDragPointerId !== null) return;
+            const player = simulation.playerBall;
+            const blocked =
+                simulation.finished ||
+                simulation.revivePauseRemaining > 0 ||
+                (this._overlay.visible && !this._overlay.transient) ||
+                player.flags?.defeated ||
+                player.flags?.destroyed ||
+                player.state?.swallowed ||
+                player.state?.movement ||
+                player.participation?.canAct === false;
+            if (blocked) return;
+            const started = simulation.beginDragCombat(event.pointerId, cssPoint(event));
+            if (!started) return;
+            this._activeDragPointerId = event.pointerId;
+            event.preventDefault();
+            canvas.setPointerCapture?.(event.pointerId);
+        };
+        this._dragPointerMoveHandler = (event) => {
+            if (event.pointerId === this._activeDragPointerId)
+                this.simulation?.moveDragCombat(event.pointerId, cssPoint(event));
+        };
+        this._dragPointerUpHandler = (event) => finish(event, "releaseDragCombat");
+        this._dragPointerCancelHandler = (event) => finish(event, "cancelDragCombat");
+        this._dragLostCaptureHandler = (event) => finish(event, "cancelDragCombat");
+        canvas.addEventListener("pointerdown", this._dragPointerDownHandler);
+        canvas.addEventListener("pointermove", this._dragPointerMoveHandler);
+        canvas.addEventListener("pointerup", this._dragPointerUpHandler);
+        canvas.addEventListener("pointercancel", this._dragPointerCancelHandler);
+        canvas.addEventListener("lostpointercapture", this._dragLostCaptureHandler);
     }
 
-    /** TriggerStrategy.fireAction()에서 호출 — HP 소모 + 지연 예약 */
-    _tryFireAction() {
-        const { action, sim, player } = this._action.ctx ?? {};
-        if (!action || !sim || !player) {
-            return false;
+    _unbindDragPointerHandler() {
+        const canvas = this.elements?.canvas;
+        if (canvas && this._activeDragPointerId !== null) {
+            this.simulation?.cancelDragCombat(this._activeDragPointerId);
+            if (canvas.hasPointerCapture?.(this._activeDragPointerId))
+                canvas.releasePointerCapture(this._activeDragPointerId);
         }
-        if (player.flags.defeated) {
-            return false;
-        }
-        if (player.hp / player.maxHp < 0.05) {
-            return false;
-        }
-
-        // 조건 불충족 시 피드백 문구 표시 (HP 소모 없이 리턴)
-        if (action.getFailureReason(sim, player)) {
-            showActionFailure(action, sim, player);
-            return false;
-        }
-
-        const reduction = player.mastery.action?.hpCostPercentReduction ?? 0;
-        const effectivePct = Math.max(0, action.hpCostPercent - reduction * 100);
-        const cost = Math.ceil((player.maxHp * effectivePct) / 100);
-        const paidCost = player.actionContext.spendHpForAction(player, cost);
-        if (cost > 0 && paidCost <= 0) {
-            return false;
-        }
-
-        // 액션 사용 기록
-        if (this._currentMatchReport) {
-            recordActionUsed(this._currentMatchReport, action.id);
-            recordActionHpCost(this._currentMatchReport, paidCost);
-        }
-
-        sim.scheduleAction(action, player, paidCost);
-        return true;
+        this._activeDragPointerId = null;
+        if (!canvas || typeof canvas.removeEventListener !== "function") return;
+        canvas.removeEventListener("pointerdown", this._dragPointerDownHandler);
+        canvas.removeEventListener("pointermove", this._dragPointerMoveHandler);
+        canvas.removeEventListener("pointerup", this._dragPointerUpHandler);
+        canvas.removeEventListener("pointercancel", this._dragPointerCancelHandler);
+        canvas.removeEventListener("lostpointercapture", this._dragLostCaptureHandler);
     }
 
-    // Match end cleanup
     _cleanupMatch() {
-        this._unbindClickHandler();
-        this._action.current = null;
-        resetCombatControlState(this._combatControlState);
-        this._syncCombatControlUi();
-    }
-
-    useCombatControl(type) {
-        if (this._gameMode !== "hunting") {
-            return { applied: false, reason: "tournament" };
-        }
-        const player = this.simulation?.playerBall;
-        const result = useNearestEnemyCombatControl(this._combatControlState, type, player, this.simulation);
-        if (result.applied && this.simulation) {
-            const direction = result.direction ?? player?.velocity?.clone()?.normalize();
-            spawnHuntingCombatControlFeedback(this.simulation, player, direction);
-        }
-        this._syncCombatControlUi();
-        return result;
-    }
-
-    _syncCombatControlUi() {
-        const player = this.simulation?.playerBall;
-        const huntingOnly = this._gameMode === "hunting";
-        const active =
-            huntingOnly &&
-            Boolean(
-                player &&
-                !this.simulation?.finished &&
-                !player.flags?.defeated &&
-                !player.flags?.destroyed &&
-                !player.state?.swallowed &&
-                !player.state?.movement &&
-                player.participation?.canAct !== false &&
-                !(this.simulation?.revivePauseRemaining > 0) &&
-                !(this._overlay.visible && !this._overlay.transient)
-            );
-        const state = this._combatControlState;
-        const progressFor = (control) =>
-            control.cooldownRemaining > 0 ? control.cooldownRemaining / COMBAT_CONTROL_CONFIG.cooldownSteps.at(-1) : 0;
-        this._combatControls?.setState({
-            visible: active,
-            pressureProgress: progressFor(state.pressure),
-            retreatProgress: progressFor(state.retreat),
-            pressureDisabled: !active || state.sharedLockRemaining > 0 || state.pressure.cooldownRemaining > 0,
-            retreatDisabled: !active || state.sharedLockRemaining > 0 || state.retreat.cooldownRemaining > 0
-        });
+        this._unbindDragPointerHandler();
     }
 
     _formatXpResult(result) {
@@ -1491,16 +1344,7 @@ export class BattleApp {
         const speedDelta = delta * this._speed.level;
         if (this._speed.indicatorTimer > 0) this._speed.indicatorTimer -= delta;
 
-        // HoldTrigger tick
-
-        // HoldTrigger tick — 매 프레임 pointer down 상태 확인
-        if (this._action.ctx?.trigger?.type === "hold") {
-            this._action.ctx.trigger.onTick(this._action.ctx);
-        }
-
         this.simulation.update(speedDelta, delta);
-        updateCombatControlState(this._combatControlState, speedDelta);
-        this._syncCombatControlUi();
         if (this._gameMode === "hunting") this.hunting.updateCombat(speedDelta);
         this.renderer.render(this.simulation);
         this._renderSpeedIndicator();

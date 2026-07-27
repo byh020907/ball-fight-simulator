@@ -81,8 +81,6 @@
                         <section class="arena-shell">
                             <canvas class="arena" id="arenaCanvas" width="960" height="960"></canvas>
 
-                            <combat-controls></combat-controls>
-
                             <!-- 토스트 알림 -->
                             <toast-notification></toast-notification>
 
@@ -121,7 +119,6 @@
             <collection-hub></collection-hub>
 
             <!-- Action picker (component) -->
-            <action-picker></action-picker>
         </main>
 
         <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
@@ -262,8 +259,6 @@
             await Promise.resolve();
             await import(`./src/main.js?v=${V}`);
 
-            const { ActionPickerService } = await import(`./src/actionPicker.js?v=${V}`);
-            window.ActionPickerService = ActionPickerService;
             const { PatchNotesService } = await import(`./src/patchNotesService.js?v=${V}`);
             window.PatchNotesService = PatchNotesService;
             const { CollectionHubService } = await import(`./src/collectionHubService.js?v=${V}`);

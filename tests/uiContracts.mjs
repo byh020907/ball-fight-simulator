@@ -880,7 +880,6 @@ function testPopupCloseOwnershipContract() {
     const collectionHub = readSource("src/components/collection-hub.html");
     const popupDialog = readSource("src/components/popup-dialog.html");
     const patchNotes = readSource("src/components/patch-notes.html");
-    const actionPicker = readSource("src/components/action-picker.html");
 
     assert.ok(
         collectionHub.includes('@click.self="closeCollectionHub()"') &&
@@ -915,13 +914,7 @@ function testPopupCloseOwnershipContract() {
         "Patch notes should use the same backdrop-owned close and focus contract"
     );
     assert.ok(
-        actionPicker.includes("@keydown.escape.stop") &&
-            actionPicker.includes("dialogElement = this.$root") &&
-            actionPicker.includes("requestAnimationFrame(() => dialogElement.focus())"),
-        "Action picker should capture its root and consume Escape while a choice is required"
-    );
-    assert.ok(
-        [collectionHub, popupDialog, patchNotes, actionPicker].every((source) => !source.includes("@click.outside")),
+        [collectionHub, popupDialog, patchNotes].every((source) => !source.includes("@click.outside")),
         "Fullscreen overlays should never delegate their close behavior to a document-level outside listener"
     );
     console.log("[popup-close-ownership-contract] ok");
@@ -2036,19 +2029,6 @@ function testHiddenCharacterCollectionMasking() {
     console.log("[hidden-character-collection-masking] ok");
 }
 
-function testNearestEnemyCombatControlUiContract() {
-    const template = readSource("src/components/combat-controls.html");
-    const app = readSource("src/app.js");
-    const bridge = readSource("src/componentBridge.js");
-    assert.ok(template.includes('aria-label="이탈"') && template.includes('aria-label="압박"'));
-    assert.ok(template.includes('invokeGameAction("useCombatControl", type)'));
-    assert.ok(template.includes("min-height:48px") && template.includes("combat-control--retreat"));
-    assert.ok(app.includes("_syncCombatControlUi") && app.includes("useNearestEnemyCombatControl"));
-    assert.ok(bridge.includes("useCombatControl(type)"));
-    assert.equal(app.includes("accelerateActiveCharacter"), false, "Canvas taps must not retain hunting acceleration");
-    console.log("[nearest-enemy-combat-control-ui] ok");
-}
-
 testDailyShopPopupContract();
 testDisabledHuntingUiIsNotMounted();
 testCollectionEquipmentPanelsOwnTheirFlows();
@@ -2071,7 +2051,6 @@ testFluidModalLayoutContracts();
 testCollectionRebirthAndDeveloperContracts();
 testCollectionTitleLongPressDebugEntry();
 testHiddenCharacterCollectionMasking();
-testNearestEnemyCombatControlUiContract();
 
 function testIconTagCountAndUniqueness() {
     const tags = getRegisteredTags();
