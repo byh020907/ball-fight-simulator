@@ -51,6 +51,12 @@ assert.equal(
 );
 shot.begin("p");
 assert.equal(shot.tick(0.2, 80).type, "slow-stop");
+const reflectedSlowShot = new PlayerShotState();
+reflectedSlowShot.begin("p");
+assert.equal(reflectedSlowShot.tick(0.1, 80), null);
+assert.equal(reflectedSlowShot.bounce("wall", 0.1), true);
+assert.equal(reflectedSlowShot.tick(0.1, 80), null);
+assert.equal(reflectedSlowShot.tick(0.1, 80).type, "slow-stop");
 const trajectory = predictTrajectory({
     origin: { x: 0, y: 0 },
     direction: { x: 1, y: 0 },

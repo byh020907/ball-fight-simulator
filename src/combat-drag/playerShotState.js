@@ -31,6 +31,7 @@ export class PlayerShotState {
             return false;
         this.recentSurface = { key: surfaceKey, time: elapsed };
         this.bounceCount += 1;
+        this.slowElapsed = 0;
         return true;
     }
     collide({ fighterId, relation, targetToContact }) {
