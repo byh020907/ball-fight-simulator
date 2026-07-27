@@ -16,7 +16,7 @@ export class PlayerShotState {
         this.active = true;
     }
     bounce(surfaceKey, elapsed) {
-        if (!this.active || !surfaceKey) return false;
+        if (!this.active || !surfaceKey || !Number.isFinite(elapsed) || elapsed < 0) return false;
         if (
             this.recentSurface?.key === surfaceKey &&
             elapsed - this.recentSurface.time < this.config.shot.bounceDebounceSeconds
@@ -28,24 +28,23 @@ export class PlayerShotState {
     }
     collide({ fighterId, relation, targetToContact }) {
         if (!this.active) return null;
-        this.active = false;
-        if (relation === "ally") return { type: "ally-stop" };
+        if (relation === "ally") return this.#finish({ type: "ally-stop" });
         const forward = this.shieldForwards.get(fighterId);
         if (forward && isShieldFront(forward, targetToContact))
-            return {
+            return this.#finish({
                 type: "shield-counter",
                 outgoingMultiplier: 0,
                 incomingMultiplier: this.config.shield.frontIncomingMultiplier,
                 recoilSpeedRatio: this.config.shield.frontRecoilSpeedRatio,
                 inputLockSeconds: this.config.shield.frontInputLockSeconds
-            };
+            });
         if (relation === "enemy" && this.bounceCount >= 1)
-            return {
+            return this.#finish({
                 type: "rear-hit",
                 damageMultiplier: getRicochetDamageMultiplier(this.bounceCount),
                 staggerSeconds: this.bounceCount >= 3 ? this.config.shield.ricochetThreeOrMoreStaggerSeconds : 0
-            };
-        return { type: "plain-hit" };
+            });
+        return this.#finish({ type: "plain-hit" });
     }
     tick(realDelta, speed) {
         if (!this.active) return null;
@@ -58,8 +57,12 @@ export class PlayerShotState {
         return null;
     }
     #end(type) {
-        this.active = false;
-        return { type };
+        return this.#finish({ type });
+    }
+    #finish(result) {
+        const snapshot = { ...result, bounceCount: this.bounceCount };
+        this.reset();
+        return snapshot;
     }
     reset() {
         this.active = false;

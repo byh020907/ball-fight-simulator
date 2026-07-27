@@ -11,9 +11,11 @@ export class EnemyAttackQueue {
         this.cursor = 0;
         this.elapsed = 0;
         this.protectedLaunchNotBefore = 0;
+        this.nextProtectedLaunchNotBefore = 0;
+        this.lastResult = null;
     }
     protectUntil(timestamp) {
-        this.protectedLaunchNotBefore = Number.isFinite(timestamp) ? timestamp : 0;
+        this.nextProtectedLaunchNotBefore = Number.isFinite(timestamp) ? timestamp : 0;
     }
     tick(realDelta, eligibleIds, now = 0) {
         const ids = [...new Set((eligibleIds || []).filter(Boolean))];
@@ -35,7 +37,11 @@ export class EnemyAttackQueue {
         ) {
             this.state = "flight";
             this.elapsed = 0;
-            return { type: "launch", attackerId: this.attackerId };
+            return (this.lastResult = {
+                type: "launch",
+                attackerId: this.attackerId,
+                protectedLaunchNotBefore: this.protectedLaunchNotBefore
+            });
         }
         if (this.state === "flight" && this.elapsed >= this.config.flightMaxSeconds) {
             this.state = "idle";
@@ -55,6 +61,13 @@ export class EnemyAttackQueue {
         this.state = "windup";
         this.attackerId = attackerId;
         this.elapsed = 0;
-        return { type: "windup", attackerId, after };
+        this.protectedLaunchNotBefore = this.nextProtectedLaunchNotBefore;
+        this.nextProtectedLaunchNotBefore = 0;
+        return (this.lastResult = {
+            type: "windup",
+            attackerId,
+            after,
+            protectedLaunchNotBefore: this.protectedLaunchNotBefore
+        });
     }
 }

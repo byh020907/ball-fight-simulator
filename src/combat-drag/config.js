@@ -17,5 +17,11 @@ export const DRAG_COMBAT_CONFIG = Object.freeze({
         ricochetThreeOrMoreMultiplier: 1.9,
         ricochetThreeOrMoreStaggerSeconds: 0.45
     }),
-    enemy: Object.freeze({ windupSeconds: 1, flightMaxSeconds: 1.8, attackSpeedMin: 520, attackSpeedRatio: 1.8 })
+    enemy: Object.freeze({
+        windupSeconds: 1,
+        flightMaxSeconds: 1.8,
+        attackSpeedMin: 520,
+        attackSpeedRatio: 1.8,
+        attackDamageMultiplier: 1.35
+    })
 });

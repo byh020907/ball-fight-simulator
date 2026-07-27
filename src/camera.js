@@ -1,6 +1,10 @@
-import { screenToWorld } from "./combat-drag/vectorMath.js";
-
 const DEFAULT_ZOOM = 1;
+
+export function screenToWorld(point, view) {
+    if (!Number.isFinite(point?.x) || !Number.isFinite(point?.y) || !Number.isFinite(view?.scale) || view.scale <= 0)
+        return { x: 0, y: 0 };
+    return { x: (point.x - view.offsetX) / view.scale, y: (point.y - view.offsetY) / view.scale };
+}
 
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));

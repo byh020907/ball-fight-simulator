@@ -1,19 +1,12 @@
 import { Vector2 } from "../core.js";
+import { screenToWorld as cameraScreenToWorld } from "../camera.js";
 import { DRAG_COMBAT_CONFIG } from "./config.js";
 
 const finitePoint = (point) => Number.isFinite(point?.x) && Number.isFinite(point?.y);
 
 export function screenToWorld(point, view) {
-    if (
-        !finitePoint(point) ||
-        !Number.isFinite(view?.scale) ||
-        view.scale <= 0 ||
-        !Number.isFinite(view?.offsetX) ||
-        !Number.isFinite(view?.offsetY)
-    ) {
-        return new Vector2();
-    }
-    return new Vector2((point.x - view.offsetX) / view.scale, (point.y - view.offsetY) / view.scale);
+    const world = cameraScreenToWorld(point, view);
+    return new Vector2(world.x, world.y);
 }
 
 export function getSlingshotVector(start, current, config = DRAG_COMBAT_CONFIG.input) {
