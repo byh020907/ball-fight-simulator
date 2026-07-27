@@ -5,7 +5,7 @@ import { PopupService } from "../src/popup.js";
 import { CollectionHubService } from "../src/collectionHubService.js";
 import { createCollectionActionPopupOptions } from "../src/collection/collectionActionPopup.js";
 import { ActionPickerService } from "../src/actionPicker.js";
-import { createTournamentRoster } from "../src/tournament.js";
+import { createTournamentRoster } from "../src/tournamentRoster.js";
 import { calculateInterceptPoint, Projectile, RENDER_LAYERS, Vector2, randomSpin } from "../src/core.js";
 import {
     applyDefenseToDamage,

@@ -1,7 +1,8 @@
 ﻿import { AudioEngine } from "./audio.js";
 import { BattleSimulation } from "./simulation/battleSimulation.js";
 import { ArenaRenderer } from "./ui.js";
-import { createTournamentRoster, Matchmaker, TournamentManager } from "./tournament.js";
+import { Matchmaker, TournamentManager } from "./tournament.js";
+import { createTournamentRoster } from "./tournamentRoster.js";
 import { createRoster } from "./roster.js";
 import { ActionPickerService } from "./actionPicker.js";
 import { CollectionHubService } from "./collectionHubService.js";

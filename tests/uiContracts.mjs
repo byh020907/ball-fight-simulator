@@ -54,7 +54,27 @@ function testStatAllocationSystemIsRemoved() {
     console.log("[stat-allocation-system-removed] ok");
 }
 
+function testAppEntryUsesVersionedCacheBoundary() {
+    const main = readSource("src/main.js");
+    const app = readSource("src/app.js");
+
+    assert.equal(/from ["']\.\/app\.js["']/.test(main), false, "main should not statically reuse a stale app module");
+    assert.match(
+        main,
+        /import\(`\.\/app\.js\?v=\$\{version\}`\)/,
+        "main should load app.js through the active asset version"
+    );
+    assert.ok(existsSync("src/tournamentRoster.js"), "new app entry dependencies should use a fresh module URL");
+    assert.match(
+        app,
+        /from ["']\.\/tournamentRoster\.js["']/,
+        "app should not require a newly added export from a possibly stale tournament module"
+    );
+    console.log("[app-entry-versioned-cache-boundary] ok");
+}
+
 testStatAllocationSystemIsRemoved();
+testAppEntryUsesVersionedCacheBoundary();
 
 function testDisabledHuntingUiIsNotMounted() {
     const content = readSource("src/components/hunting-overlay.html");
