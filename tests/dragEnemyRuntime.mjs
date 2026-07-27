@@ -30,6 +30,33 @@ function launchPlayer(simulation, pointerId) {
     assert.equal(simulation.releaseDragCombat(pointerId).type, "launch");
 }
 
+function resolveActualEnemyCollision({ activeFlight }) {
+    const originalRandom = Math.random;
+    Math.random = () => 0.5;
+    let simulation;
+    try {
+        simulation = createSimulation();
+    } finally {
+        Math.random = originalRandom;
+    }
+    const runtime = simulation.dragCombat;
+    if (activeFlight) {
+        runtime.tickEnemy(0);
+        runtime.tickEnemy(1);
+    }
+    const attacker = activeFlight
+        ? simulation.fighters.find((fighter) => fighter.id === runtime.getSnapshot().enemyQueue.attackerId)
+        : simulation.fighters[1];
+    const player = simulation.playerBall;
+    attacker.position = new Vector2(450, 480);
+    player.position = new Vector2(500, 480);
+    attacker.velocity = new Vector2(300, 0);
+    player.velocity = new Vector2(-120, 0);
+    const hpBefore = player.hp;
+    const context = simulation.handleFighterCollision(attacker, player);
+    return { context, playerDamage: hpBefore - player.hp, runtime, attacker };
+}
+
 {
     const simulation = createSimulation();
     const runtime = simulation.dragCombat;
@@ -98,6 +125,26 @@ function launchPlayer(simulation, pointerId) {
     assert.equal(context.damageFromAToB, 13.5);
     assert.equal(context.damageFromBToA, 8);
     assert.equal(runtime.getSnapshot().enemyQueue.phase, "windup");
+}
+
+{
+    const natural = resolveActualEnemyCollision({ activeFlight: false });
+    const active = resolveActualEnemyCollision({ activeFlight: true });
+    assert.ok(natural.playerDamage > 0);
+    assert.equal(
+        active.context.damageFromBToA,
+        natural.context.damageFromBToA,
+        "player outgoing damage stays unchanged by enemy flight"
+    );
+    assert.ok(
+        active.context.damageFromAToB > natural.context.damageFromAToB,
+        "only the active attacker final HP damage receives the enemy-flight multiplier"
+    );
+    assert.equal(
+        active.runtime.getSnapshot().enemyQueue.phase,
+        "windup",
+        "first character collision immediately starts next windup"
+    );
 }
 
 {
