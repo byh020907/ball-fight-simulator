@@ -283,7 +283,8 @@ assert.deepEqual(DRAG_COMBAT_CONFIG.enemy, {
     attackSpeedMin: 520,
     attackSpeedRatio: 1.8,
     attackDamageMultiplier: 1.35,
-    enemyHealthMultiplier: 0.85
+    enemyHealthMultiplier: 0.5,
+    enemyGroupHealthExponent: 3
 });
 
 const immutableStart = Object.freeze({ x: 4, y: 5 });

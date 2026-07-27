@@ -131,6 +131,14 @@ assert.equal(
     "v10 hidden unlock normalization must preserve mastery progress"
 );
 
+const retiredAchievementProfile = createDefaultPlayerProfile();
+retiredAchievementProfile.collection.achievements.all_actions_used = { unlockedAt: 1_725_000_000_000 };
+assert.deepEqual(
+    migratePlayerProfile(retiredAchievementProfile).collection.achievements.all_actions_used,
+    { unlockedAt: 1_725_000_000_000 },
+    "Retired achievement completion IDs must survive current-profile loading"
+);
+
 const enhancementCapProfile = createDefaultPlayerProfile();
 enhancementCapProfile.equipment.inventory = [
     {

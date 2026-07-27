@@ -1,4 +1,4 @@
-export { DRAG_COMBAT_CONFIG } from "./config.js";
+export { DRAG_COMBAT_CONFIG, getDragEnemyHealthMultiplier } from "./config.js";
 export { DragInputState } from "./dragInputState.js";
 export { DragCombatRuntime } from "./dragCombatRuntime.js";
 export { EnemyAttackQueue } from "./enemyAttackQueue.js";

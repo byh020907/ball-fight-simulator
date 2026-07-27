@@ -3,11 +3,11 @@ import { BattleSimulation } from "../src/simulation/battleSimulation.js";
 import { Vector2 } from "../src/core.js";
 import { createRoster } from "../src/roster.js";
 
-function createSimulation() {
+function createSimulation(onDragCombatEvent) {
     const specs = createRoster()
         .slice(0, 4)
         .map((spec, index) => ({ ...spec, teamId: index === 0 ? "player" : "enemy" }));
-    const simulation = new BattleSimulation(specs, { onLog() {}, onSound() {} }, null, {
+    const simulation = new BattleSimulation(specs, { onLog() {}, onSound() {}, onDragCombatEvent }, null, {
         assignActions: false,
         dragCombatEnabled: true
     });
@@ -55,6 +55,14 @@ function resolveActualEnemyCollision({ activeFlight }) {
     const hpBefore = player.hp;
     const context = simulation.handleFighterCollision(attacker, player);
     return { context, playerDamage: hpBefore - player.hp, runtime, attacker };
+}
+
+{
+    const eventTypes = [];
+    const simulation = createSimulation((snapshot) => eventTypes.push(snapshot.lastEvent?.type));
+    simulation.dragCombat.tickEnemy(0);
+    simulation.dragCombat.tickEnemy(1);
+    assert.deepEqual(eventTypes.slice(0, 2), ["enemy-windup", "enemy-launch"]);
 }
 
 {

@@ -11,7 +11,7 @@ import {
 import { BattleBall } from "../entities/index.js";
 import { GravityParticle } from "../effects/index.js";
 import { FighterPhysicsSimulation } from "./fighterPhysicsSimulation.js";
-import { DragCombatRuntime } from "../combat-drag/index.js";
+import { DragCombatRuntime, getDragEnemyHealthMultiplier } from "../combat-drag/index.js";
 import { AIActionController } from "./aiActionController.js";
 import { CombatLifePool } from "./combatLifePool.js";
 import { REVIVAL_EFFECT_CONFIG } from "../effects/index.js";
@@ -174,10 +174,13 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         this.playerBall = playerBall ?? null;
         if (!this.dragCombat || !this.playerBall) return this.playerBall;
 
-        for (const fighter of this.fighters) {
-            if (!this.isHostile(this.playerBall, fighter) || this._dragEnemyHealthBalanced.has(fighter)) continue;
+        const hostileFighters = this.fighters.filter((fighter) => this.isHostile(this.playerBall, fighter));
+        const alliedCount = this.fighters.length - hostileFighters.length;
+        const healthMultiplier = getDragEnemyHealthMultiplier(alliedCount, hostileFighters.length);
+        for (const fighter of hostileFighters) {
+            if (this._dragEnemyHealthBalanced.has(fighter)) continue;
             const currentHpRatio = fighter.maxHp > 0 ? fighter.hp / fighter.maxHp : 0;
-            fighter.maxHp *= this.dragCombat.config.enemy.enemyHealthMultiplier;
+            fighter.maxHp *= healthMultiplier;
             fighter.hp = fighter.maxHp * currentHpRatio;
             this._dragEnemyHealthBalanced.add(fighter);
         }

@@ -23,6 +23,14 @@ export const DRAG_COMBAT_CONFIG = Object.freeze({
         attackSpeedMin: 520,
         attackSpeedRatio: 1.8,
         attackDamageMultiplier: 1.35,
-        enemyHealthMultiplier: 0.85
+        enemyHealthMultiplier: 0.5,
+        enemyGroupHealthExponent: 3
     })
 });
+
+export function getDragEnemyHealthMultiplier(alliedCount, hostileCount, config = DRAG_COMBAT_CONFIG.enemy) {
+    const allies = Math.max(1, Number.isFinite(alliedCount) ? alliedCount : 1);
+    const hostiles = Math.max(1, Number.isFinite(hostileCount) ? hostileCount : 1);
+    const teamRatio = Math.min(1, allies / hostiles);
+    return config.enemyHealthMultiplier * teamRatio ** config.enemyGroupHealthExponent;
+}

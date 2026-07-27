@@ -313,7 +313,7 @@ export class DragCombatRuntime {
             );
             this.enemySlowElapsed = 0;
         }
-        this.#record({ type: `enemy-${event.type}`, ...copyValue(event) });
+        this.#record({ ...copyValue(event), type: `enemy-${event.type}` });
     }
 
     #resolveEnemyCharacterCollision(context) {

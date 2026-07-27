@@ -1,16 +1,16 @@
 import assert from "node:assert/strict";
 import { BattleSimulation } from "../src/simulation/battleSimulation.js";
 import { createRoster } from "../src/roster.js";
-import { DRAG_COMBAT_CONFIG } from "../src/combat-drag/config.js";
+import { DRAG_COMBAT_CONFIG, getDragEnemyHealthMultiplier } from "../src/combat-drag/config.js";
 
-function createSpecs() {
+function createSpecs(enemyCount = 2) {
     return createRoster()
-        .slice(0, 3)
+        .slice(0, enemyCount + 1)
         .map((spec, index) => ({ ...spec, teamId: index === 0 ? "player" : "enemy" }));
 }
 
-function createSimulation({ enabled = true } = {}) {
-    return new BattleSimulation(createSpecs(), { onLog() {}, onSound() {} }, null, {
+function createSimulation({ enabled = true, enemyCount = 2 } = {}) {
+    return new BattleSimulation(createSpecs(enemyCount), { onLog() {}, onSound() {} }, null, {
         assignActions: false,
         dragCombatEnabled: enabled
     });
@@ -22,22 +22,15 @@ function createSimulation({ enabled = true } = {}) {
     const enemy = simulation.fighters[1];
     enemy.hp = enemy.maxHp * 0.4;
     const originalMaxHp = enemy.maxHp;
+    const expectedMultiplier = getDragEnemyHealthMultiplier(1, 2);
     simulation.setPlayerBall(player);
-    assert.equal(enemy.maxHp, originalMaxHp * DRAG_COMBAT_CONFIG.enemy.enemyHealthMultiplier);
-    assert.equal(enemy.hp / enemy.maxHp, 0.4, "current HP ratio stays intact");
+    assert.equal(enemy.maxHp, originalMaxHp * expectedMultiplier);
+    assert.ok(Math.abs(enemy.hp / enemy.maxHp - 0.4) < 1e-12, "current HP ratio stays intact");
     simulation.setPlayerBall(player);
-    assert.equal(
-        enemy.maxHp,
-        originalMaxHp * DRAG_COMBAT_CONFIG.enemy.enemyHealthMultiplier,
-        "same player is exact-once"
-    );
+    assert.equal(enemy.maxHp, originalMaxHp * expectedMultiplier, "same player is exact-once");
     enemy.hp = enemy.maxHp;
     simulation.setPlayerBall(player);
-    assert.equal(
-        enemy.maxHp,
-        originalMaxHp * DRAG_COMBAT_CONFIG.enemy.enemyHealthMultiplier,
-        "revive cannot rebalance"
-    );
+    assert.equal(enemy.maxHp, originalMaxHp * expectedMultiplier, "revive cannot rebalance");
 }
 
 {
@@ -57,7 +50,7 @@ function createSimulation({ enabled = true } = {}) {
     disabled.setPlayerBall(disabled.fighters[0]);
     assert.equal(enemy.maxHp, originalMaxHp, "disabled drag combat leaves baseline intact");
 
-    const fresh = createSimulation();
+    const fresh = createSimulation({ enemyCount: 1 });
     const freshEnemy = fresh.fighters[1];
     const freshOriginalMaxHp = freshEnemy.maxHp;
     fresh.setPlayerBall(fresh.fighters[0]);
@@ -67,5 +60,12 @@ function createSimulation({ enabled = true } = {}) {
         "a new hostile match receives one new adjustment"
     );
 }
+
+assert.equal(getDragEnemyHealthMultiplier(1, 1), 0.5, "one-on-one uses the base hostile HP multiplier");
+assert.equal(
+    getDragEnemyHealthMultiplier(1, 3),
+    0.5 * (1 / 3) ** 3,
+    "outnumbering cannot multiply the hostile team's HP burden linearly"
+);
 
 console.log("[drag-combat-balance] ok");

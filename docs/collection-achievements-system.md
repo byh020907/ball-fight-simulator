@@ -464,6 +464,7 @@ simulation.recordActionSuccess(playerBall, actionId);
 - `roster_champion`과 `mastery_complete`의 전체 로스터 조건은 잠긴 Elementalist도 요구한다.
 - 잠금 상태가 업적 진행 설명에서 실제 이름을 노출하지 않도록 공개 표시를 사용한다.
 - 이미 획득해 저장된 업적과 보상은 새 로스터 구성에 의해 회수하지 않는다.
-# 폐기된 액션 업적 호환
+
+## 폐기된 액션 업적 호환
 
 `all_actions_used`는 더 이상 활성 업적 정의에 포함하지 않는다. 기존 프로필에 이미 저장된 완료 ID는 보존하며, 업적 목록을 구성하거나 보상을 계산할 때 삭제·초기화하지 않는다.
