@@ -40,6 +40,9 @@ export class DragCombatRuntime {
     }
 
     release(pointerId) {
+        if (this.input.state === "aiming" && this.aimCaster !== this.#player()) {
+            return this.#resolveInputResult(this.input.cancel(pointerId));
+        }
         return this.#resolveInputResult(this.input.release(pointerId));
     }
 
@@ -97,8 +100,8 @@ export class DragCombatRuntime {
     }
 
     reset() {
-        const player = this.#player();
         this.#removeAimWarp();
+        this.pendingWarpRemoval = false;
         this.input.reset();
         this.shot.reset();
         this.lastEvent = null;
@@ -189,6 +192,7 @@ export class DragCombatRuntime {
         const player = this.#player();
         return Boolean(
             player &&
+            (this.input.state !== "aiming" || this.aimCaster === player) &&
             !this.simulation.finished &&
             this.simulation.revivePauseRemaining <= 0 &&
             !player.flags.defeated &&
