@@ -13,14 +13,18 @@ export class EnemyAttackQueue {
         this.elapsed = 0;
         this.protectedLaunchNotBefore = 0;
         this.nextProtectedLaunchNotBefore = 0;
+        this.nextProtectionCaptured = false;
         this.lastResult = null;
     }
     protectUntil(timestamp) {
-        this.nextProtectedLaunchNotBefore = Number.isFinite(timestamp) ? timestamp : 0;
+        if (this.state === "windup" || this.nextProtectionCaptured || !Number.isFinite(timestamp)) return false;
+        this.nextProtectedLaunchNotBefore = timestamp;
+        this.nextProtectionCaptured = true;
+        return true;
     }
     tick(realDelta, eligibleIds, now = 0) {
-        const ids = [...new Set((eligibleIds || []).filter(Boolean))];
-        this.idOrder = [...new Set([...this.idOrder, ...ids])].filter((id) => ids.includes(id));
+        const ids = [...new Set((eligibleIds || []).filter((id) => id !== null && id !== undefined))];
+        this.#syncIdOrder(ids);
         const delta = Math.max(0, Number.isFinite(realDelta) ? realDelta : 0);
         if (!ids.length) {
             this.reset();
@@ -58,19 +62,40 @@ export class EnemyAttackQueue {
     }
     #start(ids, after) {
         if (!ids.length) return null;
-        const order = this.idOrder.length ? this.idOrder : ids;
-        const attackerId = order[this.cursor % order.length];
-        this.cursor = (order.indexOf(attackerId) + 1) % order.length;
+        const attackerId = this.#nextEligibleId(ids);
+        if (attackerId === null) return null;
         this.state = "windup";
         this.attackerId = attackerId;
         this.elapsed = 0;
         this.protectedLaunchNotBefore = this.nextProtectedLaunchNotBefore;
         this.nextProtectedLaunchNotBefore = 0;
+        this.nextProtectionCaptured = false;
         return (this.lastResult = {
             type: "windup",
             attackerId,
             after,
             protectedLaunchNotBefore: this.protectedLaunchNotBefore
         });
+    }
+    #syncIdOrder(ids) {
+        if (!this.idOrder.length) {
+            this.idOrder = [...ids];
+            return;
+        }
+        for (const id of ids) {
+            if (!this.idOrder.includes(id)) this.idOrder.push(id);
+        }
+    }
+    #nextEligibleId(ids) {
+        const order = this.idOrder.length ? this.idOrder : ids;
+        for (let offset = 0; offset < order.length; offset += 1) {
+            const index = (this.cursor + offset) % order.length;
+            if (!ids.includes(order[index])) continue;
+            this.cursor = (index + 1) % order.length;
+            return order[index];
+        }
+        this.idOrder = [...ids];
+        this.cursor = ids.length > 1 ? 1 : 0;
+        return ids[0] ?? null;
     }
 }

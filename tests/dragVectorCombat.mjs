@@ -93,6 +93,11 @@ assert.equal(autoLaunch.type, "launch");
 const readyAt = autoLaunch.cooldownReadyAt;
 lockedDrag.tick(9);
 assert.equal(autoLaunch.cooldownReadyAt, readyAt);
+const invalidAutoDrag = new DragInputState();
+invalidAutoDrag.begin(1, { x: 0, y: 0 });
+assert.equal(invalidAutoDrag.tick(1.2).type, "cancel");
+assert.equal(invalidAutoDrag.tick(1.2), null);
+assert.equal(invalidAutoDrag.cooldownRemaining, 0);
 const cleanupShot = new PlayerShotState();
 cleanupShot.begin("p", new Map([["e", { x: 1, y: 0 }]]));
 cleanupShot.bounce("a", 2);
@@ -112,6 +117,16 @@ for (const count of [0, 1, 2, 3, 4]) {
     const result = rear.collide({ fighterId: "e", relation: "enemy", targetToContact: { x: -1, y: 0 } });
     assert.equal(result.type, count ? "rear-hit" : "plain-hit");
 }
+const counterShot = new PlayerShotState();
+counterShot.begin("p", new Map([["e", { x: 1, y: 0 }]]));
+assert.equal(
+    counterShot.collide({ fighterId: "e", relation: "enemy", targetToContact: { x: 1, y: 0 } }).type,
+    "shield-counter"
+);
+const timeoutShot = new PlayerShotState();
+timeoutShot.begin("p");
+assert.equal(timeoutShot.tick(2.4, 100).type, "timeout");
+assert.equal(timeoutShot.tick(1, 100), null);
 const noHit = predictTrajectory({
     origin: { x: 0, y: 0 },
     direction: { x: 1, y: 0 },
@@ -126,6 +141,39 @@ const fighterHit = predictTrajectory({
     castRay: () => ({ type: "fighter", point: { x: 1, y: 0 }, distance: 1, fighterId: "e" })
 });
 assert.equal(fighterHit.terminal.fighterId, "e");
+const immutableOrigin = Object.freeze({ x: 0, y: 0 });
+const immutableDirection = Object.freeze({ x: 1, y: 0 });
+const reflectedTrajectory = predictTrajectory({
+    origin: immutableOrigin,
+    direction: immutableDirection,
+    maxDistance: 10,
+    castRay: ({ origin, direction }) => ({
+        type: "static",
+        point: { x: origin.x + direction.x, y: origin.y + direction.y },
+        distance: 1,
+        normal: { x: -direction.x, y: -direction.y },
+        surfaceKey: `surface-${origin.x}`
+    })
+});
+assert.equal(reflectedTrajectory.bounces.length, 3);
+assert.equal(reflectedTrajectory.segments.length, 4);
+assert.deepEqual(immutableOrigin, { x: 0, y: 0 });
+assert.deepEqual(immutableDirection, { x: 1, y: 0 });
+const invalidTrajectory = predictTrajectory({
+    origin: { x: 0, y: 0 },
+    direction: { x: 1, y: 0 },
+    maxDistance: 3,
+    castRay: () => ({ type: "static", point: { x: Number.NaN, y: 0 }, distance: 1, normal: { x: -1, y: 0 } })
+});
+assert.equal(invalidTrajectory.segments.length, 1);
+const repeatedPointTrajectory = predictTrajectory({
+    origin: { x: 0, y: 0 },
+    direction: { x: 1, y: 0 },
+    maxDistance: 10,
+    castRay: () => ({ type: "static", point: { x: 1, y: 0 }, distance: 1, normal: { x: -1, y: 0 } })
+});
+assert.equal(repeatedPointTrajectory.segments.length <= 4, true);
+assert.equal(repeatedPointTrajectory.bounces.length <= 3, true);
 const protectedQueue = new EnemyAttackQueue();
 protectedQueue.protectUntil(10);
 assert.equal(protectedQueue.tick(0, ["a", "b"]).protectedLaunchNotBefore, 10);
@@ -134,6 +182,26 @@ assert.equal(protectedQueue.tick(1, ["a", "b"], 9), null);
 assert.equal(protectedQueue.tick(0, ["a", "b"], 10).type, "launch");
 assert.equal(protectedQueue.resolveFlight("hit", ["b", "c"]).attackerId, "b");
 assert.equal(protectedQueue.idOrder.length <= 2, true);
+const roundRobinQueue = new EnemyAttackQueue();
+assert.equal(roundRobinQueue.tick(0, ["a", "b", "c"]).attackerId, "a");
+assert.equal(roundRobinQueue.tick(0, ["b", "c"]).attackerId, "b");
+assert.equal(roundRobinQueue.tick(1, ["b", "c"], 1).type, "launch");
+assert.equal(roundRobinQueue.resolveFlight("hit", ["c"]).attackerId, "c");
+const snapshotQueue = new EnemyAttackQueue();
+assert.equal(snapshotQueue.protectUntil(10), true);
+assert.equal(snapshotQueue.tick(0, ["a"]).protectedLaunchNotBefore, 10);
+assert.equal(snapshotQueue.protectUntil(30), false);
+assert.equal(snapshotQueue.tick(1, ["a"], 10).protectedLaunchNotBefore, 10);
+assert.equal(snapshotQueue.resolveFlight("hit", ["a"]).protectedLaunchNotBefore, 0);
+const nextFlightProtectionQueue = new EnemyAttackQueue();
+assert.equal(nextFlightProtectionQueue.tick(0, ["a"]).attackerId, "a");
+assert.equal(nextFlightProtectionQueue.tick(1, ["a"], 1).type, "launch");
+assert.equal(nextFlightProtectionQueue.protectUntil(20), true);
+assert.equal(nextFlightProtectionQueue.protectUntil(30), false);
+assert.equal(nextFlightProtectionQueue.resolveFlight("hit", ["a"]).protectedLaunchNotBefore, 20);
+assert.equal(nextFlightProtectionQueue.tick(1, ["a"], 20).type, "launch");
+assert.equal(nextFlightProtectionQueue.protectUntil(40), true);
+assert.equal(nextFlightProtectionQueue.resolveFlight("hit", ["a"]).protectedLaunchNotBefore, 40);
 for (let index = 0; index < 10000; index += 1) {
     const probeDrag = new DragInputState();
     probeDrag.begin(index, { x: 0, y: 0 });
