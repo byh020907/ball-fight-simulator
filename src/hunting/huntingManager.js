@@ -491,8 +491,6 @@ export class HuntingManager {
         };
         this.app.playerFighterId = characterId;
         this.app.beginGameSession();
-        // UI에서 할당한 스탯을 게임 상태로 동기화 (토너먼트와 동일한 흐름)
-        this.app._syncPlayerStatAllocationFromUi();
         this.app.refreshPlayerSetup();
         this.app.setHuntingActive(true);
         const stage = getHuntingStage(stageId);

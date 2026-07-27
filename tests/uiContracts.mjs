@@ -30,6 +30,7 @@ function readSource(path) {
 
 function testStatAllocationSystemIsRemoved() {
     const app = readSource("src/app.js");
+    const huntingManager = readSource("src/hunting/huntingManager.js");
     const playerPanel = readSource("src/components/player-panel.html");
     const startButton = readSource("src/components/start-button.html");
     const fighterStrip = readSource("src/components/fighter-strip.html");
@@ -39,6 +40,11 @@ function testStatAllocationSystemIsRemoved() {
         /statAllocation|playerStatAllocation/.test(app),
         false,
         "BattleApp should not retain allocation state"
+    );
+    assert.equal(
+        /_syncPlayerStatAllocationFromUi/.test(huntingManager),
+        false,
+        "Hunting start should not call the removed stat-allocation synchronization hook"
     );
     assert.equal(
         /stat-board|point-meter|allocation-summary|자동 배분|@click="adjustStat/.test(playerPanel),

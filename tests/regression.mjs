@@ -9275,7 +9275,6 @@ async function testHuntingStageSelectUsesPreviewCharacter() {
         _refreshCollectionHub() {
             this.collectionRefreshCount += 1;
         },
-        _syncPlayerStatAllocationFromUi() {},
         refreshPlayerSetup() {},
         setHuntingActive() {},
         setHuntingOverlayState(data) {
@@ -9432,7 +9431,6 @@ async function testDebugHuntingStartsRequestedFloor() {
         beginGameSession() {},
         setGameMode() {},
         _refreshCollectionHub() {},
-        _syncPlayerStatAllocationFromUi() {},
         refreshPlayerSetup() {},
         setHuntingActive() {},
         setHuntingOverlayState(data) {
@@ -9490,7 +9488,6 @@ async function testDebugHuntingEventPreviewUsesProductionEventFlow() {
         beginGameSession() {},
         setGameMode() {},
         _refreshCollectionHub() {},
-        _syncPlayerStatAllocationFromUi() {},
         refreshPlayerSetup() {},
         setHuntingActive() {},
         setHuntingOverlayState(data) {
@@ -9657,7 +9654,6 @@ async function testHuntingCheckpointStartsAtSelectedFloor() {
         beginGameSession() {},
         setGameMode() {},
         _refreshCollectionHub() {},
-        _syncPlayerStatAllocationFromUi() {},
         refreshPlayerSetup() {},
         setHuntingActive() {},
         setHuntingOverlayState() {},

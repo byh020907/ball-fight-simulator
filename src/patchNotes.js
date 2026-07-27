@@ -19,6 +19,17 @@
  */
 export const PATCH_NOTES = [
     {
+        version: "0.38.29",
+        date: "2026-07-27",
+        title: "v0.38.29 사냥터 시작 복구",
+        changes: [
+            {
+                type: "fix",
+                text: "스탯 배분 제거 뒤 사냥터 편성을 확정하면 원정 시작이 멈추던 문제를 수정했습니다."
+            }
+        ]
+    },
+    {
         version: "0.38.28",
         date: "2026-07-27",
         title: "v0.38.28 게임 시작 복구",
