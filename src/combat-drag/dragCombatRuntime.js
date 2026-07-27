@@ -81,6 +81,7 @@ export class DragCombatRuntime {
         if (!this.#canAct()) return this.#resetEnemy();
         const player = this.#player();
         const eligible = this.#eligibleEnemies();
+        if (!eligible.length) return this.#resetEnemy();
         const effectiveDelta = combatDelta * (this.input.state === "aiming" ? 0.35 : 1);
         if (this.enemyQueue.state === "flight") {
             const attacker = this.#fighterById(this.enemyQueue.attackerId);

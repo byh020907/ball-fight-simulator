@@ -173,6 +173,101 @@ function resolveActualEnemyCollision({ activeFlight }) {
 
 {
     const simulation = createSimulation();
+    const runtime = simulation.dragCombat;
+    const attackers = [];
+    runtime.tickEnemy(0);
+    for (let index = 0; index < 3; index += 1) {
+        runtime.tickEnemy(1);
+        attackers.push(runtime.getSnapshot().enemyQueue.attackerId);
+        const attacker = simulation.fighters.find((fighter) => fighter.id === attackers.at(-1));
+        runtime.resolveFighterCollision({ a: attacker, b: simulation.playerBall, hostile: true });
+    }
+    assert.deepEqual(attackers, ["orbit", "trickster", "grenade"], "a→b→c flights remain round-robin");
+
+    for (const invalidate of [
+        (fighter) => (fighter.flags.defeated = true),
+        (fighter) => fighter.participation.setMode("standby"),
+        (fighter) => (fighter.state.swallowed = true),
+        (fighter) => (fighter.state.movement = {})
+    ]) {
+        const skipped = createSimulation();
+        const skippedRuntime = skipped.dragCombat;
+        invalidate(skipped.fighters[2]);
+        skippedRuntime.tickEnemy(0);
+        skippedRuntime.tickEnemy(1);
+        const first = skipped.fighters.find(
+            (fighter) => fighter.id === skippedRuntime.getSnapshot().enemyQueue.attackerId
+        );
+        skippedRuntime.resolveFighterCollision({ a: first, b: skipped.playerBall, hostile: true });
+        assert.notEqual(skippedRuntime.getSnapshot().enemyQueue.attackerId, skipped.fighters[2].id);
+    }
+}
+
+{
+    for (const [speed, delta] of [
+        [0, 0.2],
+        [100, 1.8]
+    ]) {
+        const simulation = createSimulation();
+        const runtime = simulation.dragCombat;
+        runtime.tickEnemy(0);
+        runtime.tickEnemy(1);
+        const attacker = simulation.fighters.find(
+            (fighter) => fighter.id === runtime.getSnapshot().enemyQueue.attackerId
+        );
+        attacker.velocity = new Vector2(speed, 0);
+        runtime.tickEnemy(delta);
+        assert.equal(
+            runtime.getSnapshot().enemyQueue.phase,
+            "windup",
+            "slow-stop/timeout immediately start next windup"
+        );
+    }
+}
+
+{
+    const simulation = createSimulation();
+    const runtime = simulation.dragCombat;
+    runtime.tickEnemy(0);
+    launchPlayer(simulation, 71);
+    runtime.tickInput(2);
+    launchPlayer(simulation, 72);
+    runtime.tickEnemy(1);
+    const attacker = simulation.fighters.find((fighter) => fighter.id === runtime.getSnapshot().enemyQueue.attackerId);
+    runtime.resolveFighterCollision({ a: attacker, b: simulation.fighters[2], hostile: false });
+    assert.equal(
+        runtime.getSnapshot().enemyQueue.protectedLaunchNotBefore,
+        2,
+        "later drag cannot extend captured protection"
+    );
+
+    const hit = createSimulation();
+    hit.dragCombat.tickEnemy(0);
+    launchPlayer(hit, 73);
+    hit.dragCombat.tickEnemy(1);
+    const hitAttacker = hit.fighters.find(
+        (fighter) => fighter.id === hit.dragCombat.getSnapshot().enemyQueue.attackerId
+    );
+    hit.dragCombat.resolveFighterCollision({ a: hitAttacker, b: hit.playerBall, hostile: true });
+    assert.equal(
+        hit.dragCombat.getSnapshot().enemyQueue.protectedLaunchNotBefore,
+        0,
+        "player hit never protects next launch"
+    );
+
+    const empty = createSimulation();
+    empty.dragCombat.tickEnemy(0);
+    launchPlayer(empty, 74);
+    empty.fighters.slice(1).forEach((fighter) => (fighter.flags.defeated = true));
+    empty.dragCombat.tickEnemy(0);
+    const snapshot = empty.dragCombat.getSnapshot().enemyQueue;
+    assert.equal(snapshot.phase, "idle");
+    assert.equal(snapshot.defenseCandidate, null);
+    assert.equal(empty.dragCombat.enemyDirections.size, 0);
+}
+
+{
+    const simulation = createSimulation();
     let maxOrder = 0;
     for (let iteration = 0; iteration < 1000; iteration += 1) {
         simulation.dragCombat.tickEnemy(0);
