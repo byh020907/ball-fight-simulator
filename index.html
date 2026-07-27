@@ -64,7 +64,6 @@
             }
         </style>
         <link rel="modulepreload" href="src/ui.js" />
-        <link rel="modulepreload" href="src/statAllocation.js" />
     </head>
     <body>
         <div id="app-loading" class="app-loading">
@@ -130,7 +129,7 @@
             import Alpine from "https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/module.esm.js";
 
             // GitHub Pages 캐시 방지용 버전 파라미터
-            const V = "0.38.26";
+            const V = "0.38.27";
 
             window.BFS_ASSET_VERSION = V;
             window.Alpine = Alpine;
@@ -223,12 +222,12 @@
             window.createGameUI("appRoot", () => ({
                 tournamentActive: false,
                 statusBadge: "Setup",
-                statusText: "내 캐릭터 스탯을 배분하세요",
+                statusText: "캐릭터와 장비를 확인하세요",
                 statusSubtext: "랜덤 대진과 전투 결과가 여기에 갱신됩니다.",
                 reset() {
                     this.tournamentActive = false;
                     this.statusBadge = "Setup";
-                    this.statusText = "내 캐릭터 스탯을 배분하세요";
+                    this.statusText = "캐릭터와 장비를 확인하세요";
                     this.statusSubtext = "랜덤 대진과 전투 결과가 여기에 갱신됩니다.";
                 }
             }));

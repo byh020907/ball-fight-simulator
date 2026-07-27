@@ -48,8 +48,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             baseSkill: spec.stats.skill ?? 0,
             baseRadius: spec.stats.radius,
             mass: spec.stats.mass,
-            criticalChance: Math.min(100, Math.max(0, Number(spec.stats.criticalChance) || 0)),
-            allocation: spec.statAllocation ?? null
+            criticalChance: Math.min(100, Math.max(0, Number(spec.stats.criticalChance) || 0))
         };
         // PhysicsBody 프로퍼티 초기화
         this.pos = position;
@@ -200,7 +199,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
     }
 
     getSkillPoints() {
-        return this.stats.baseSkill + (this.stats.allocation?.skill ?? 0) + (this.hero?.bonuses?.skill ?? 0);
+        return this.stats.baseSkill + (this.hero?.bonuses?.skill ?? 0);
     }
 
     getTotalAttackDamage() {

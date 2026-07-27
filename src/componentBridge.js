@@ -65,15 +65,6 @@ export function createComponentBridge(app) {
         setGameMode(mode) {
             return app.setGameMode(mode);
         },
-        adjustStat(key, delta) {
-            return app.adjustStat(key, delta);
-        },
-        randomAllocation() {
-            return app.randomAllocation();
-        },
-        resetAllocation() {
-            return app.resetAllocation();
-        },
         adjustChallengeLevel(delta) {
             return app.adjustChallengeLevel(delta);
         },

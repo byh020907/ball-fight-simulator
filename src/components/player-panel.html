@@ -20,7 +20,6 @@
     </div>
     <p class="player-note">
         <span x-text="fighter?.title || ''"></span>
-        <span x-show="!locked" x-text="' \u00B7 시작 전 ' + totalPoints + ' 포인트를 배분하세요.'"></span>
     </p>
     <div class="challenge-level-row" x-show="!locked">
         <span class="challenge-label">토너먼트 도전</span>
@@ -65,54 +64,6 @@
             <button type="button" @click="openEquipmentHub()">장비 화면</button>
         </div>
     </div>
-    <div class="point-meter">
-        <span x-text="'사용 ' + (totalPoints - remainingPoints) + '/' + totalPoints"></span>
-        <b x-text="remainingPoints > 0 ? remainingPoints + ' 남음' : '준비 완료'"></b>
-    </div>
-    <div class="allocation-summary">
-        <span x-text="allocationSummary"></span>
-    </div>
-    <div class="stat-board">
-        <template x-for="stat in statDefs" :key="stat.key">
-            <div class="stat-row">
-                <div class="stat-copy">
-                    <strong x-text="stat.label"></strong>
-                    <span x-text="stat.description"></span>
-                </div>
-                <button
-                    type="button"
-                    @click="adjustStat(stat.key, -10)"
-                    x-bind:disabled="locked || (allocation[stat.key] ?? 0) <= 0"
-                >
-                    -10
-                </button>
-                <button
-                    type="button"
-                    @click="adjustStat(stat.key, -1)"
-                    x-bind:disabled="locked || (allocation[stat.key] ?? 0) <= 0"
-                >
-                    -
-                </button>
-                <em x-text="(allocation[stat.key] ?? 0) + (stat.key === 'defense' ? '' : '%')"></em>
-                <button type="button" @click="adjustStat(stat.key, 1)" x-bind:disabled="locked || remainingPoints <= 0">
-                    +
-                </button>
-                <button
-                    type="button"
-                    @click="adjustStat(stat.key, 10)"
-                    x-bind:disabled="locked || remainingPoints <= 0"
-                >
-                    +10
-                </button>
-            </div>
-        </template>
-    </div>
-    <div class="player-actions" data-player-actions>
-        <button class="action-btn" type="button" @click="randomAllocation()" x-bind:disabled="locked">자동 배분</button>
-        <button class="action-btn reset" type="button" @click="resetAllocation()" x-bind:disabled="locked">
-            초기화
-        </button>
-    </div>
 </section>
 <script>
     window.createGameUI("playerPanel", () => ({
@@ -135,24 +86,9 @@
             slots: [],
             statLine: "적용 중인 장비 스탯 없음"
         },
-        allocation: {},
-        totalPoints: 0,
-        remainingPoints: 0,
         locked: false,
-        statDefs: [],
         tournamentTierLabel: "첫 도전",
         tournamentOpponentLevel: 1,
-        allocationSummary: "",
-
-        adjustStat(key, delta) {
-            Alpine.store("uiManager").invokeGameAction("adjustStat", key, delta);
-        },
-        randomAllocation() {
-            Alpine.store("uiManager").invokeGameAction("randomAllocation");
-        },
-        resetAllocation() {
-            Alpine.store("uiManager").invokeGameAction("resetAllocation");
-        },
         adjustChallengeLevel(delta) {
             Alpine.store("uiManager").invokeGameAction("adjustChallengeLevel", delta);
         },
@@ -185,14 +121,9 @@
                 slots: [],
                 statLine: "적용 중인 장비 스탯 없음"
             };
-            this.allocation = {};
-            this.totalPoints = 0;
-            this.remainingPoints = 0;
             this.locked = false;
-            this.statDefs = [];
             this.tournamentTierLabel = "첫 도전";
             this.tournamentOpponentLevel = 1;
-            this.allocationSummary = "";
         }
     }));
 </script>
@@ -266,8 +197,7 @@
         background: #202020;
         color: #ffffff;
     }
-    .player-title span,
-    .point-meter span {
+    .player-title span {
         font-size: 0.72rem;
         font-weight: 900;
         letter-spacing: 0.08em;
@@ -405,81 +335,6 @@
         width: 0;
         transition: width 260ms ease;
     }
-    .bonus-points-badge {
-        color: #d4a017;
-        font-weight: 700;
-    }
-    .point-meter {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 6px;
-        border-top: 2px solid #202020;
-        padding-top: 5px;
-    }
-    .point-meter b {
-        font-size: 0.78rem;
-        color: #0a8d32;
-    }
-    .allocation-summary {
-        border: 2px solid #202020;
-        background: #ffffff;
-        padding: 6px;
-        color: #202020;
-        font-size: 0.76rem;
-        font-weight: 900;
-        line-height: 1.25;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-    }
-    .stat-board {
-        display: grid;
-        gap: 4px;
-    }
-    .stat-row {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) 36px 30px 42px 30px 40px;
-        align-items: center;
-        gap: 4px;
-    }
-    .stat-copy {
-        min-width: 0;
-        display: grid;
-        gap: 1px;
-    }
-    .stat-copy strong {
-        font-size: 0.82rem;
-        line-height: 1;
-    }
-    .stat-copy span {
-        font-size: 0.66rem;
-        line-height: 1.2;
-        color: #333333;
-    }
-    .stat-row button {
-        border: 2px solid #202020;
-        background: #ffcb3d;
-        color: #202020;
-        font: inherit;
-        font-size: 0.74rem;
-        font-weight: 900;
-        cursor: pointer;
-        min-height: 30px;
-        padding: 0 3px;
-    }
-    .stat-row button:disabled,
-    .action-btn:disabled {
-        cursor: default;
-        opacity: 0.35;
-    }
-    .stat-row em {
-        font-style: normal;
-        font-size: 0.78rem;
-        font-weight: 900;
-        text-align: center;
-    }
     .challenge-level-row {
         display: flex;
         align-items: center;
@@ -522,44 +377,12 @@
         font-size: 0.75rem;
         white-space: nowrap;
     }
-    .bonus-summary {
-        font-size: 0.72rem;
-        color: #555;
-        padding: 2px 0 4px;
-    }
-    .player-actions {
-        display: flex;
-        gap: 6px;
-        padding-top: 6px;
-        background: #f8f8f8;
-    }
-    .action-btn {
-        flex: 1;
-        border: 2px solid #202020;
-        font: inherit;
-        font-size: 0.74rem;
-        font-weight: 900;
-        cursor: pointer;
-        min-height: 30px;
-        padding: 0 3px;
-        background: #59d6ff;
-        color: #202020;
-    }
-    .action-btn.reset {
-        background: #e74c3c;
-        color: #fff;
-    }
-    .action-btn:disabled {
-        cursor: default;
-        opacity: 0.35;
-    }
     @media (max-width: 760px) {
         :scope {
             padding: 8px;
             font-size: clamp(11px, 2.8vw, 13px);
         }
-        .player-title span,
-        .point-meter span {
+        .player-title span {
             font-size: 0.78em;
         }
         .player-title strong {
@@ -568,26 +391,8 @@
         .player-note {
             font-size: 0.84em;
         }
-        .point-meter b,
-        .stat-row em {
-            font-size: 0.86em;
-        }
-        .allocation-summary {
-            font-size: 0.84em;
-        }
-        .stat-row button,
-        .action-btn {
-            font-size: 0.82em;
-        }
         :scope .control-button {
             font-size: 1em;
-        }
-        .stat-row {
-            grid-template-columns: minmax(0, 1fr) 42px 34px 48px 34px 46px;
-            gap: 5px;
-        }
-        .stat-row button {
-            min-height: 36px;
         }
     }
     @media (max-width: 760px) and (orientation: portrait) {
@@ -605,15 +410,6 @@
         }
     }
     @media (max-width: 420px) {
-        .stat-row {
-            grid-template-columns: 1fr repeat(5, minmax(32px, auto));
-        }
-        .stat-copy span {
-            display: none;
-        }
-        .allocation-summary {
-            font-size: 0.8em;
-        }
         .player-equipment-slots {
             gap: 3px;
         }
@@ -623,13 +419,6 @@
         .player-equipment-foot button {
             min-height: 24px;
             font-size: 0.65rem;
-        }
-        .stat-row button {
-            min-height: 32px;
-            font-size: 0.76em;
-        }
-        .player-actions {
-            padding-bottom: max(6px, env(safe-area-inset-bottom, 6px));
         }
     }
 </style>

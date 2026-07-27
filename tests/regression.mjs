@@ -5,19 +5,7 @@ import { PopupService } from "../src/popup.js";
 import { CollectionHubService } from "../src/collectionHubService.js";
 import { createCollectionActionPopupOptions } from "../src/collection/collectionActionPopup.js";
 import { ActionPickerService } from "../src/actionPicker.js";
-import {
-    ALLOCATABLE_STATS,
-    PLAYER_STAT_POINTS,
-    adjustStatAllocation,
-    applyStatAllocation,
-    createEmptyStatAllocation,
-    createRandomStatAllocation,
-    createTournamentRoster,
-    formatCompactStatAllocation,
-    formatStatAllocation,
-    getRemainingStatPoints,
-    getSpentStatPoints
-} from "../src/statAllocation.js";
+import { createTournamentRoster } from "../src/tournament.js";
 import { calculateInterceptPoint, Projectile, RENDER_LAYERS, Vector2, randomSpin } from "../src/core.js";
 import {
     applyDefenseToDamage,
@@ -1190,251 +1178,6 @@ async function loadModuleApp() {
     return new BattleApp();
 }
 
-async function loadModuleAppWithInitialAlpineAllocation(allocation) {
-    const harness = makeHarness();
-    const appRoot = makeElement("app");
-    harness.context.document.querySelector = (selector) => (selector === ".app" ? appRoot : null);
-    const uiManager = harness.context.Alpine.store("uiManager");
-    uiManager.register("battleLog", {
-        items: [],
-        add(msg) {
-            this.items.push(msg);
-        },
-        reset() {
-            this.items = [];
-        }
-    });
-    const overlayMock2 = {
-        visible: false,
-        transient: false,
-        label: "",
-        text: "",
-        subtext: "",
-        huntingChoiceVisible: false,
-        huntingFloor: 1,
-        huntingCharacterName: "",
-        huntingLootSummary: "",
-        huntingCanRetreat: false,
-        huntingMoving: false,
-        huntingMoveFrom: 0,
-        huntingMoveTo: 0,
-        huntingMoveStep: 0,
-        huntingMoveMax: 10,
-        huntingMoveMessage: "",
-        huntingMerchantActive: false,
-        huntingMerchantOffers: null,
-        huntingLootHudVisible: false,
-        huntingLootHudShards: 0,
-        show({ label, text, subtext: st, xpReward } = {}) {
-            if (label !== undefined) this.label = label;
-            if (text !== undefined) this.text = text;
-            if (st !== undefined) this.subtext = st;
-            if (xpReward) {
-                this.xpReward = xpReward;
-                const rp = Alpine.store("uiManager").getComponent("xpRewardPanel");
-                if (rp) rp.animate(xpReward);
-            } else {
-                const rp = Alpine.store("uiManager").getComponent("xpRewardPanel");
-                if (rp) rp.hide();
-            }
-            this.visible = true;
-        },
-        hide() {
-            this.visible = false;
-            this.transient = false;
-        },
-        reset() {
-            this.visible = false;
-            this.transient = false;
-            this.label = "";
-            this.text = "";
-            this.subtext = "";
-            this.huntingChoiceVisible = false;
-            this.huntingMoving = false;
-            this.huntingMerchantActive = false;
-            this.huntingMerchantOffers = null;
-            this.huntingLootHudVisible = false;
-        },
-        showTransient(label, text) {
-            this.label = label;
-            this.text = text;
-            this.transient = true;
-            this.visible = true;
-        },
-        setHuntingState(data) {
-            if (data) Object.assign(this, data);
-        }
-    };
-    uiManager.register("gameOverlay", overlayMock2);
-    const huntingOverlayMock = createHuntingOverlayMock();
-    uiManager.register("huntingOverlay", huntingOverlayMock);
-    uiManager.register("startButton", {
-        hidden: true,
-        disabledOverride: null,
-        textOverride: null,
-        remainingPoints: 0,
-        locked: false,
-        setState() {},
-        reset() {
-            this.hidden = true;
-            this.disabledOverride = null;
-            this.textOverride = null;
-            this.remainingPoints = 0;
-            this.locked = false;
-        }
-    });
-    uiManager.register("fighterStrip", {
-        fighters: [],
-        reset() {
-            this.fighters = [];
-        }
-    });
-    uiManager.register("playerPanel", {
-        fighter: null,
-        experience: {},
-        equipmentSummary: { ...EMPTY_EQUIPMENT_SUMMARY },
-        allocation: { ...allocation },
-        totalPoints: 0,
-        bonusPoints: 0,
-        remainingPoints: 0,
-        locked: false,
-        statDefs: [],
-        challengeLevel: 0,
-        highestUnlockedLevel: 0,
-        tournamentTierLabel: "첫 도전",
-        tournamentOpponentLevel: 1,
-        progressionBonusSummary: "",
-        allocationSummary: "",
-        reset() {
-            this.fighter = null;
-            this.experience = {};
-            this.equipmentSummary = { ...EMPTY_EQUIPMENT_SUMMARY };
-            this.allocation = {};
-            this.totalPoints = 0;
-            this.remainingPoints = 0;
-            this.locked = false;
-            this.statDefs = [];
-            this.tournamentTierLabel = "첫 도전";
-            this.tournamentOpponentLevel = 1;
-            this.allocationSummary = "";
-        }
-    });
-    uiManager.register("tournamentBracket", {
-        visible: false,
-        phase: "Ready",
-        rounds: [],
-        render() {},
-        reset() {
-            this.visible = false;
-            this.phase = "Ready";
-            this.rounds = [];
-        }
-    });
-    uiManager.register("xpRewardPanel", {
-        visible: false,
-        characterName: "",
-        xpGained: 0,
-        previousLevelLabel: "Lv.1",
-        levelLabel: "Lv.1",
-        levelUp: false,
-        barResetting: false,
-        animatedProgressPct: 0,
-        progressText: "",
-        nextText: "",
-        earnedRewardText: "",
-        nextRewardText: "",
-        animate(val) {
-            if (!val) {
-                this.visible = false;
-                return;
-            }
-            this.characterName = val.characterName ?? "";
-            this.xpGained = val.xpGained ?? 0;
-            this.previousLevelLabel = val.previousLevelLabel ?? "Lv.1";
-            this.levelLabel = val.levelLabel ?? "Lv.1";
-            this.levelUp = Boolean(val.levelUp);
-            this.barResetting = false;
-            this.progressText = val.progressText ?? "";
-            this.nextText = val.nextText ?? "";
-            this.earnedRewardText = val.earnedRewardText ?? "";
-            this.nextRewardText = val.nextRewardText ?? "";
-            this.visible = true;
-        },
-        hide() {},
-        reset() {
-            this.visible = false;
-            this.characterName = "";
-            this.xpGained = 0;
-            this.previousLevelLabel = "Lv.1";
-            this.levelLabel = "Lv.1";
-            this.levelUp = false;
-            this.barResetting = false;
-            this.animatedProgressPct = 0;
-            this.progressText = "";
-            this.nextText = "";
-            this.earnedRewardText = "";
-            this.nextRewardText = "";
-        }
-    });
-    uiManager.register("appRoot", {
-        tournamentActive: false,
-        statusBadge: "Setup",
-        statusText: "",
-        statusSubtext: "",
-        reset() {
-            this.tournamentActive = false;
-            this.statusBadge = "Setup";
-            this.statusText = "내 캐릭터 스탯을 배분하세요";
-            this.statusSubtext = "랜덤 대진과 전투 결과가 여기에 갱신됩니다.";
-        }
-    });
-    uiManager.register("collectionHub", {
-        visible: false,
-        render() {},
-        open() {},
-        close() {},
-        show() {},
-        hide() {}
-    });
-    uiManager.register("toastNotification", {
-        show() {},
-        reset() {}
-    });
-    uiManager.register("modeSegment", {
-        visible: false,
-        mode: "tournament",
-        canHunt: false,
-        locked: false,
-        reset() {
-            this.visible = false;
-            this.mode = "tournament";
-            this.canHunt = false;
-            this.locked = false;
-        }
-    });
-    const alpineState = { allocation, remainingPoints: 0 };
-    alpineState.allocation = { ...allocation };
-    alpineState.remainingPoints = 0;
-    const baseAlpine = harness.context.Alpine;
-    const savedAlpine = globalThis.Alpine;
-    const savedUiManager = globalThis.uiManager;
-    const savedWindow = globalThis.window;
-    harness.context.Alpine = {
-        ...baseAlpine,
-        $data: (root) => (root === appRoot ? alpineState : null)
-    };
-    Object.assign(globalThis, harness.context);
-    globalThis.Alpine.store("gameOverlay", overlayMock2);
-    globalThis.Alpine.store("huntingOverlay", huntingOverlayMock);
-    const moduleUrl = new URL(`../src/app.js?test=${Date.now()}`, import.meta.url).href;
-    const { BattleApp } = await import(moduleUrl);
-    const app = new BattleApp();
-    globalThis.Alpine = savedAlpine;
-    globalThis.uiManager = savedUiManager;
-    globalThis.window = savedWindow;
-    return { app, alpineState };
-}
-
 async function testCloneSeedDash(app) {
     await app.startMatch([
         app.roster.find((fighter) => fighter.id === FIGHTER_IDS.TRICKSTER),
@@ -1712,8 +1455,7 @@ async function testGrenadeScatterShot(app) {
     const grenadeBase = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.GRENADE);
     const grenade = {
         ...grenadeBase,
-        stats: { ...grenadeBase.stats, speed: 580 },
-        statAllocation: { skill: 100 }
+        stats: { ...grenadeBase.stats, speed: 580 }
     };
     const opponent = app.roster.find((f) => f.id !== FIGHTER_IDS.GRENADE);
     const sim = new BattleSimulation([grenade, opponent], { onLog() {}, onSound() {} });
@@ -1929,7 +1671,6 @@ async function testOrbitShardRecharge(app) {
 
 async function testTournament(app) {
     app.playerProfile = createDefaultPlayerProfile();
-    app.playerStatAllocation = createRandomStatAllocation(() => 0);
     const playerBase = app.roster.find((fighter) => fighter.id === app.playerFighterId);
     const weaponId = "attack_sword";
     addEquipmentQuantity(app.playerProfile, weaponId);
@@ -1937,10 +1678,8 @@ async function testTournament(app) {
     app.refreshPlayerSetup();
     await app.startTournament();
     const player = app.tournamentRoster.find((fighter) => fighter.id === app.playerFighterId);
-    const baselineSpec = applyStatAllocation(playerBase, app.playerStatAllocation, true);
-    const equippedSpec = applyEquipmentStats(baselineSpec, app.playerProfile);
+    const equippedSpec = applyEquipmentStats(playerBase, app.playerProfile);
     assert.ok(player.isPlayer, "Tournament roster should mark the user's random fighter");
-    assert.equal(getSpentStatPoints(player.statAllocation), PLAYER_STAT_POINTS, "Player should spend all stat points");
     assert.equal(
         player.stats.damage,
         equippedSpec.stats.damage,
@@ -1970,7 +1709,7 @@ async function testTournament(app) {
         "Tournament completion should enter the shared result confirmation state"
     );
     assert.equal(app._modeSegment.visible, false, "Tournament result should keep the mode selector hidden");
-    assert.equal(app._panel.locked, true, "Tournament result should keep stat allocation locked");
+    assert.equal(app._panel.locked, true, "Tournament result should keep the setup panel locked");
     app.returnToInitialState();
 }
 
@@ -1990,7 +1729,6 @@ async function testTournamentOpponentProgressionByChallenge(app) {
         app.playerProfile.experience.byCharacter[playerId] = { currentXp: getLevelRequirement(4) };
         app.playerProfile.characterMastery.levels[playerId] = masteryLevel;
         if (challengeLevel > 0) app.playerProfile.tournamentChallenge.levels[playerId] = challengeLevel;
-        app.playerStatAllocation = createRandomStatAllocation(() => 0);
         app.refreshPlayerSetup();
 
         assert.equal(
@@ -2034,13 +1772,9 @@ async function testTournamentOpponentProgressionByChallenge(app) {
         const playerProgression = collectActiveExperienceProgression(app.playerProfile, playerId);
         const player = app.tournamentRoster.find((fighter) => fighter.id === playerId);
         const opponents = app.tournamentRoster.filter((fighter) => fighter.id !== playerId);
-        const expectedPlayerSpec = applyStatAllocation(
-            applyExperienceProgressionToBaseSpec(
-                app.roster.find((fighter) => fighter.id === playerId),
-                playerProgression
-            ),
-            app.playerStatAllocation,
-            true
+        const expectedPlayerSpec = applyExperienceProgressionToBaseSpec(
+            app.roster.find((fighter) => fighter.id === playerId),
+            playerProgression
         );
 
         assert.equal(playerProgression.level, 4, "Tournament player should keep the stored experience level");
@@ -2051,7 +1785,7 @@ async function testTournamentOpponentProgressionByChallenge(app) {
         );
         assert.deepEqual(
             player.stats,
-            expectedPlayerSpec.stats,
+            { ...expectedPlayerSpec.stats, skill: 0, criticalChance: 0 },
             "Player base stats should retain the stored XP progression"
         );
         assert.equal(
@@ -2064,21 +1798,12 @@ async function testTournamentOpponentProgressionByChallenge(app) {
             app.tournamentRoster.length,
             "Tournament selection should not duplicate fighters"
         );
-        assert.ok(
-            opponents.every((fighter) => getSpentStatPoints(fighter.statAllocation) === PLAYER_STAT_POINTS),
-            "Opponent random stat allocations should remain fully spent"
-        );
-
         for (const opponent of opponents) {
             const expectedProgression =
                 challengeLevel === 0 ? null : getCharacterLevelProgression(opponent.id, expectedOpponentLevel);
-            const expectedSpec = applyStatAllocation(
-                applyExperienceProgressionToBaseSpec(
-                    app.roster.find((fighter) => fighter.id === opponent.id),
-                    expectedProgression
-                ),
-                opponent.statAllocation,
-                false
+            const expectedSpec = applyExperienceProgressionToBaseSpec(
+                app.roster.find((fighter) => fighter.id === opponent.id),
+                expectedProgression
             );
 
             assert.deepEqual(
@@ -2386,7 +2111,6 @@ function testResultSequenceProgression() {
 
 async function testTournamentEliminationAwaitsConfirmation(app) {
     app.playerProfile = createDefaultPlayerProfile();
-    app.playerStatAllocation = createRandomStatAllocation(() => 0);
     const startButtonStates = [];
     const originalSetState = app._startBtn.setState;
     app._startBtn.setState = (state) => {
@@ -2449,79 +2173,23 @@ async function testTournamentEliminationAwaitsConfirmation(app) {
     console.log("[tournament-elimination-result-confirmation] ok");
 }
 
-function testStatAllocationRules(app) {
-    // Stat allocation logic is tested below via adjustStatAllocation / applyStatAllocation
+function testTournamentRosterPreservesBaseStats(app) {
     const archer = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
-    let stepped = { hp: 0, damage: 0, speed: 0, skill: 0 };
-    stepped = adjustStatAllocation(stepped, "hp", 10);
-    stepped = adjustStatAllocation(stepped, "damage", 95);
-    assert.deepEqual(
-        stepped,
-        { hp: 10, damage: 50, speed: 0, skill: 0 },
-        "Large stat steps should clamp to the per-stat cap of 50"
-    );
-    stepped = adjustStatAllocation(stepped, "damage", -10);
-    assert.equal(stepped.damage, 40, "Large negative stat steps should subtract multiple points");
-
-    const allocation = { hp: 30, damage: 40, speed: 30, skill: 0, defense: 0 };
-    const boosted = applyStatAllocation(archer, allocation, true);
-    assert.equal(
-        boosted.stats.hp,
-        Number((archer.stats.hp * 1.3).toFixed(3)),
-        "HP points should multiply only base health"
-    );
-    assert.equal(
-        boosted.stats.damage,
-        Number((archer.stats.damage * 1.4).toFixed(3)),
-        "Damage points should multiply only base damage"
-    );
-    assert.equal(
-        boosted.stats.speed,
-        Number((archer.stats.speed * 1.3).toFixed(3)),
-        "Speed points should multiply only base speed"
-    );
-    assert.equal(boosted.stats.skill, 0, "Skill base stats should remain independent from allocation points");
-    assert.equal(boosted.stats.criticalChance, 0, "Critical chance should default to zero without equipment");
-    const directAllocation = applyStatAllocation(
-        archer,
-        { hp: 0, damage: 0, speed: 0, skill: 20, defense: 50, criticalChance: 50 },
-        true
-    );
-    assert.equal(directAllocation.statAllocation.skill, 20, "Skill points should keep the cooldown formula input");
-    assert.equal(directAllocation.stats.defense, archer.stats.defense + 50);
-    const defenseStatDefinition = ALLOCATABLE_STATS.find((stat) => stat.key === "defense");
-    assert.match(
-        defenseStatDefinition.description,
-        /1포인트.*방어력 1.*방어 100.*50%/,
-        "Defense allocation copy should explain direct rating growth and the 100-rating half-damage point"
-    );
-    assert.equal(directAllocation.stats.criticalChance, 0, "Legacy critical allocation should no longer affect stats");
-    assert.equal(
-        "criticalChance" in directAllocation.statAllocation,
-        false,
-        "Legacy critical points should be discarded"
-    );
-    assert.equal("force" in boosted.stats, false, "Force should not exist as an unused gameplay stat");
-    assert.equal(
-        formatStatAllocation(allocation),
-        "체력 +30% · 공격 +40% · 속도 +30% · 쿨타임 +0% · 방어력 +0",
-        "Allocation summary should show defense as a direct rating and other stats as percentages"
-    );
-    assert.equal(
-        formatCompactStatAllocation(allocation),
-        "HP 30 · 공 40 · 속 30 · 쿨 0 · 방 0",
-        "Mobile allocation summary should keep all five stats in a compact single line"
-    );
-    assert.equal(boosted.stats.radius, archer.stats.radius, "Radius should stay character-specific");
-    assert.equal(boosted.stats.mass, archer.stats.mass, "Mass should stay character-specific");
-
     const rosterSize = Math.min(app.roster.length, 8);
-    const roster = createTournamentRoster(app.roster, archer.id, allocation, () => 0);
+    const roster = createTournamentRoster(app.roster, archer.id, () => 0);
     assert.equal(roster.length, rosterSize, "Tournament roster should cap at 8 (or all if under 8)");
+    assert.equal(roster[0].isPlayer, true, "The selected player should be marked in the tournament roster");
     assert.ok(
-        roster.every((fighter) => getSpentStatPoints(fighter.statAllocation) === PLAYER_STAT_POINTS),
-        "Every fighter should receive the same stat budget"
+        roster.slice(1).every((fighter) => !fighter.isPlayer),
+        "Non-player entrants should remain AI fighters"
     );
+    roster.forEach((fighter) => {
+        assert.deepEqual(
+            fighter.stats,
+            app.roster.find((candidate) => candidate.id === fighter.id).stats,
+            "Tournament selection should preserve each fighter's base stats"
+        );
+    });
 }
 
 function testComponentBridgeCallsGameHandlers(app) {
@@ -2595,26 +2263,6 @@ function testComponentBridgeCallsGameHandlers(app) {
         { waitForFirstMoveUi: true },
         "Player-triggered hunting advance must wait for the movement card to paint"
     );
-}
-
-function testStartButtonReceivesRemainingStatPoints(app) {
-    const previousRemaining = app._panel.remainingPoints;
-
-    try {
-        app._panel.remainingPoints = 100;
-        app._syncStartButton();
-
-        assert.equal(
-            app._startBtn.remainingPoints,
-            100,
-            "Start button should receive remaining points so its disabled state explains the requirement"
-        );
-    } finally {
-        app._panel.remainingPoints = previousRemaining;
-        app._syncStartButton();
-    }
-
-    console.log("[start-button-remaining-points] ok");
 }
 
 function testHuntingUiRouteDisplay() {
@@ -2829,8 +2477,7 @@ function testHuntingBoonShardRewardsScaleWithFloor() {
 function testHuntingEventHealthInitialization() {
     const mockApp = {
         roster: app.roster,
-        playerProfile: createDefaultPlayerProfile(),
-        playerStatAllocation: {}
+        playerProfile: createDefaultPlayerProfile()
     };
     const manager = new HuntingManager(mockApp);
     const restEvent = HuntingEvent.createPayload(HUNTING_EVENT_TYPES.REST_SITE, 2);
@@ -2963,8 +2610,7 @@ function testHuntingChampionEventRequiresBattleConfirmation() {
         showOverlay() {},
         addLog() {},
         roster: app.roster,
-        playerProfile: createDefaultPlayerProfile(),
-        playerStatAllocation: {}
+        playerProfile: createDefaultPlayerProfile()
     };
     const manager = new HuntingManager(mockApp);
     const championEvent = HuntingEvent.createPayload(HUNTING_EVENT_TYPES.CHAMPION_INTRUSION, 4);
@@ -3784,7 +3430,6 @@ function testHuntingBossRolesAndRewards(app) {
     const managerApp = {
         roster: app.roster,
         playerProfile: createDefaultPlayerProfile(),
-        playerStatAllocation: {},
         startMatch(specs, options) {
             capturedMatches.push(specs);
             this.simulation = new BattleSimulation(specs, { onLog() {}, onSound() {} }, null, options);
@@ -4294,7 +3939,6 @@ function testEliteMobCombinationEvent(app) {
         const managerApp = {
             roster: app.roster,
             playerProfile: createDefaultPlayerProfile(),
-            playerStatAllocation: {},
             startMatch(specs, options) {
                 capturedMatches.push(specs);
                 this.simulation = new BattleSimulation(specs, { onLog() {}, onSound() {} }, null, options);
@@ -4588,44 +4232,6 @@ function testComponentBridgeEquipmentFunctions() {
     assert.equal(profile.equipment.equipped[0], null, "Slot should be unequipped in profile");
 }
 
-async function testBattleAppAdoptsPreExistingAlpineAllocation() {
-    const initialAllocation = { hp: 20, damage: 20, speed: 20, skill: 20, defense: 20, criticalChance: 0 };
-    const { app } = await loadModuleAppWithInitialAlpineAllocation(initialAllocation);
-    assert.deepEqual(
-        app.playerStatAllocation,
-        initialAllocation,
-        "BattleApp should adopt Alpine allocation that changed before event listeners were attached"
-    );
-}
-
-async function testAdjustRandomResetSyncPlayerStatAllocation(app) {
-    const panel = app._panel;
-    app.resetAllocation();
-
-    // adjustStat
-    app.adjustStat("hp", 10);
-    assert.equal(app.playerStatAllocation.hp, 10, "adjustStat should sync playerStatAllocation.hp");
-    assert.deepEqual(app.playerStatAllocation, panel.allocation, "adjustStat should match panel.allocation");
-
-    app.adjustStat("damage", 15);
-    assert.equal(app.playerStatAllocation.damage, 15, "adjustStat should sync playerStatAllocation.damage");
-
-    // randomAllocation
-    app.randomAllocation();
-    assert.equal(
-        getSpentStatPoints(app.playerStatAllocation),
-        PLAYER_STAT_POINTS,
-        "randomAllocation should spend all points"
-    );
-    assert.deepEqual(app.playerStatAllocation, panel.allocation, "randomAllocation should match panel.allocation");
-
-    // resetAllocation
-    app.resetAllocation();
-    const empty = createEmptyStatAllocation();
-    assert.deepEqual(app.playerStatAllocation, empty, "resetAllocation should clear playerStatAllocation");
-    assert.deepEqual(app.playerStatAllocation, panel.allocation, "resetAllocation should match panel.allocation");
-}
-
 function testIndexCacheVersionMatchesLatestPatchNote() {
     const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
     const match = html.match(/const V = "([^"]+)";/);
@@ -4800,28 +4406,20 @@ function testExperienceSystem() {
         teamId: "xp-opponent"
     };
     const progression = collectActiveExperienceProgression(profile, playerSpec.id);
-    const allocation = { hp: 20, damage: 20, speed: 0, skill: 5, defense: 0 };
-    const baselineSpec = applyStatAllocation(playerSpec, allocation, true);
-    const rewardedSpec = applyStatAllocation(
-        applyExperienceProgressionToBaseSpec(playerSpec, progression),
-        allocation,
-        true
-    );
-    const expectedDamageMultiplier = 1 + allocation.damage / 100;
-    const expectedSpeedMultiplier = 1 + allocation.speed / 100;
+    const rewardedSpec = applyExperienceProgressionToBaseSpec(playerSpec, progression);
     assert.equal(
         rewardedSpec.stats.damage,
-        Number(((playerSpec.stats.damage + progression.baseStatBonuses.damage) * expectedDamageMultiplier).toFixed(3)),
-        "Level base damage should be increased before the percentage stat multiplier"
+        Number((playerSpec.stats.damage + progression.baseStatBonuses.damage).toFixed(3)),
+        "Level rewards should directly increase base damage"
     );
     assert.equal(
         rewardedSpec.stats.speed,
-        Number(((playerSpec.stats.speed + progression.baseStatBonuses.speed) * expectedSpeedMultiplier).toFixed(3)),
-        "Level base speed should be increased before the percentage stat multiplier"
+        Number((playerSpec.stats.speed + progression.baseStatBonuses.speed).toFixed(3)),
+        "Level rewards should directly increase base speed"
     );
     assert.equal(
         rewardedSpec.stats.skill,
-        baselineSpec.stats.skill,
+        playerSpec.stats.skill,
         "Level rewards must not add cooldown as a base stat"
     );
     const equipmentProfile = createDefaultPlayerProfile();
@@ -4832,7 +4430,7 @@ function testExperienceSystem() {
     assert.equal(
         equippedRewardedSpec.stats.damage,
         rewardedSpec.stats.damage + getEquipmentTemplate("attack_sword").stats.damage,
-        "Equipment should add a fixed stat after level rewards and percentage allocation"
+        "Equipment should add a fixed stat after level rewards"
     );
 
     let preparedPlayer = null;
@@ -4856,7 +4454,7 @@ function testExperienceSystem() {
     );
     assert.equal(
         preparedPlayer.getSkillPoints(),
-        allocation.skill,
+        playerSpec.stats.skill ?? 0,
         "Battle ball should keep cooldown points separate from level base-stat rewards"
     );
     assert.equal(
@@ -6441,7 +6039,7 @@ function testFiveBallLevelRewardContracts(app) {
     const skillRun = createRun(FIGHTER_IDS.HERO);
     const skillBefore = skillRun.owner.getSkillPoints();
     const cooldownBefore = skillRun.owner.ability.cooldown;
-    const allocationBefore = skillRun.owner.stats.allocation ? { ...skillRun.owner.stats.allocation } : null;
+    const baseSkillBefore = skillRun.owner.stats.baseSkill;
     Math.random = () => 0;
     try {
         HERO_ORB_EFFECTS.skill.apply(skillRun.owner);
@@ -6457,21 +6055,16 @@ function testFiveBallLevelRewardContracts(app) {
         skillRun.owner.ability.cooldown < cooldownBefore,
         "Hero skill cores should immediately reduce ability cooldown"
     );
-    assert.deepEqual(
-        skillRun.owner.stats.allocation,
-        allocationBefore,
-        "Current-match Hero skill cores should not mutate permanent or allocated skill ownership"
-    );
+    assert.equal(skillRun.owner.stats.baseSkill, baseSkillBefore, "Hero cores should not mutate base skill");
     const archerDefaults = createRun(FIGHTER_IDS.ARCHER).owner;
     assert.equal(
         archerDefaults.getSkillPoints(),
-        archerDefaults.stats.baseSkill + (archerDefaults.stats.allocation?.skill ?? 0),
+        archerDefaults.stats.baseSkill,
         "Non-Hero fighters should preserve their default skill-point calculation when Hero bonuses are zero"
     );
     const carryoverSpec = {
         ...app.roster.find((fighter) => fighter.id === FIGHTER_IDS.HERO),
         teamId: "hero-carryover-team",
-        statAllocation: { skill: 4 },
         hero: { carryover: { skill: 3 } }
     };
     const carryoverOpponent = {
@@ -6484,8 +6077,8 @@ function testFiveBallLevelRewardContracts(app) {
     });
     assert.deepEqual(
         [carryoverSimulation.fighters[0].getSkillPoints(), carryoverSimulation.fighters[0].hero.bonuses.skill],
-        [7, 0],
-        "Hunting carryover skill should remain in its existing carryover/allocation path without double counting bonuses"
+        [3, 3],
+        "Hunting carryover skill should feed the shared Hero skill bonus path once"
     );
 
     heroRun.owner.stats.baseDamage = 100;
@@ -9833,7 +9426,6 @@ async function testDebugHuntingStartsRequestedFloor() {
     const app = {
         playerProfile: profile,
         playerFighterId: FIGHTER_IDS.RAGE,
-        playerStatAllocation: createEmptyStatAllocation(),
         roster: createRoster(),
         renderer: { clear() {} },
         stopPlayerPreviewLoop() {},
@@ -9892,7 +9484,6 @@ async function testDebugHuntingEventPreviewUsesProductionEventFlow() {
     const app = {
         playerProfile: profile,
         playerFighterId: FIGHTER_IDS.RAGE,
-        playerStatAllocation: createEmptyStatAllocation(),
         roster: createRoster(),
         renderer: { clear() {} },
         stopPlayerPreviewLoop() {},
@@ -10060,7 +9651,6 @@ async function testHuntingCheckpointStartsAtSelectedFloor() {
     const app = {
         playerProfile: profile,
         playerFighterId: FIGHTER_IDS.RAGE,
-        playerStatAllocation: createEmptyStatAllocation(),
         roster: createRoster(),
         renderer: { clear() {} },
         stopPlayerPreviewLoop() {},
@@ -11446,8 +11036,7 @@ function testEquipmentDraw() {
         title: "테스트",
         color: "#80bfff",
         face: "default",
-        stats: { hp: 100, damage: 10, defense: 2, speed: 260, radius: 42, mass: 1 },
-        statAllocation: { hp: 0, damage: 0, speed: 0, skill: 0, defense: 0 }
+        stats: { hp: 100, damage: 10, defense: 2, speed: 260, radius: 42, mass: 1 }
     };
     const equippedItems = getEquippedItems(profile, baseSpec.id);
     assert.deepEqual(
@@ -15049,29 +14638,6 @@ async function testHeroOrbCapNoFeedback(app) {
     }
 }
 
-async function testHeroOrbBonusUiFormat(app) {
-    const { HERO_ORB_EFFECTS, formatHeroStatLine, formatHeroStatParts } = await import("../src/entities/index.js");
-
-    const baseAllocation = { hp: 30, damage: 20, speed: 10, skill: 25, defense: 15 };
-    assert.equal(
-        formatHeroStatLine(baseAllocation, { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 }),
-        "체력 +30% · 힘 +20% · 속도 +10% · 쿨타임 +25% · 방어 +15%",
-        "Hero stat line should show base allocation even before orb bonuses"
-    );
-
-    const result = formatHeroStatLine(baseAllocation, { hp: 3, damage: 1, speed: 0, defense: 0, skill: 2 });
-    assert.ok(result.includes("체력 +30%(+3)"), "Hero stat line should merge base HP and orb HP");
-    assert.ok(result.includes("힘 +20%(+1)"), "Hero stat line should merge base damage and orb damage");
-    assert.ok(result.includes("쿨타임 +25%(+2)"), "Hero stat line should merge base skill and orb skill");
-    assert.ok(result.includes("속도 +10%"), "Hero stat line should keep zero-bonus base stats");
-    assert.ok(!result.includes("속도 +10%(+0)"), "Hero stat line should not render +0 orb bonuses");
-
-    const parts = formatHeroStatParts(baseAllocation, { hp: 3, damage: 1, speed: 0, defense: 0, skill: 2 });
-    const hpPart = parts.find((part) => part.key === "hp");
-    assert.equal(hpPart.bonusText, "(+3)", "Hero stat bonus text should be compact and have no middle space");
-    assert.equal(hpPart.color, HERO_ORB_EFFECTS.hp.color, "Hero stat bonus should use the matching orb color");
-}
-
 async function testHeroGrowthStatLineFormat() {
     const { formatHeroGrowthStatLine } = await import("../src/entities/heroOrb.js");
     const bonuses = { hp: 3, damage: 2, speed: 0, skill: 0, defense: 0, critical: 0 };
@@ -15100,39 +14666,6 @@ async function testHeroGrowthStatLineFormat() {
     );
     assert.equal(formatHeroGrowthStatLine({}, -2.4), "", "negative shields must not create a visible growth row");
     console.log("[hero-growth-stat-line-format] ok");
-}
-
-async function testHeroOrbBonusUiOnlyForHero(app) {
-    const hero = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.HERO);
-    const archer = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.ARCHER);
-    const sim = new BattleSimulation([hero, archer], {
-        onLog() {},
-        onSound() {}
-    });
-    const heroFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.HERO);
-    const archerFighter = sim.fighters.find((f) => f.id === FIGHTER_IDS.ARCHER);
-
-    // Hero has hero.bonuses, Archer has it too (all BattleBalls have it initialized)
-    // But the display logic checks if bonuses are non-zero
-    assert.ok(heroFighter.hero.bonuses, "Hero should have hero.bonuses");
-    assert.ok(archerFighter.hero.bonuses, "All BattleBalls should have hero.bonuses (initialized to 0)");
-
-    heroFighter.hero.bonuses.hp = 3;
-    heroFighter.stats.allocation = { hp: 12, damage: 18, speed: 22, skill: 28, defense: 20 };
-    const { formatCompactHeroStatLine, formatHeroStatLine } = await import("../src/entities/index.js");
-    const heroLine = formatHeroStatLine(heroFighter.stats.allocation, heroFighter.hero.bonuses);
-    const compactHeroLine = formatCompactHeroStatLine(heroFighter.stats.allocation, heroFighter.hero.bonuses);
-    const normalLine = formatStatAllocation(heroFighter.stats.allocation);
-    assert.ok(heroLine.includes("체력 +12%(+3)"), "Hero's stat line should show base allocation plus orb bonuses");
-    assert.ok(heroLine.includes("방어 +20"), "Hero's defense allocation should be shown as a direct rating");
-    assert.ok(!heroLine.includes("방어 +20%"), "Hero's defense allocation should not be shown as a percentage");
-    assert.ok(!normalLine.includes("+12%(+3)"), "Normal stat formatter should not include Hero Orb bonuses");
-    assert.equal(
-        compactHeroLine,
-        "HP 12(+3) · 공 18 · 속 22 · 쿨 28 · 방 20 · 치 0",
-        "Hero mobile stats should retain orb bonuses"
-    );
-    assert.deepEqual(archerFighter.hero.bonuses, { hp: 0, damage: 0, speed: 0, defense: 0, skill: 0 });
 }
 
 async function testHeroExistingRulesNotBroken(app) {
@@ -15349,28 +14882,6 @@ async function testSpecialOrbOpponentCollects(app) {
     }
 }
 
-async function testSpecialOrbNotInStatBonuses(app) {
-    const hero = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.HERO);
-    const { formatHeroStatLine, formatHeroStatParts } = await import("../src/entities/index.js");
-    const allocation = { hp: 30, damage: 20, speed: 10, skill: 0, defense: 0 };
-    const bonuses = { hp: 3, damage: 1, speed: 0, defense: 0, skill: 2 };
-
-    // Stat orbs appear in format
-    const line = formatHeroStatLine(allocation, bonuses);
-    assert.ok(line.includes("체력 +30%(+3)"), "Format should include stat orb bonus");
-    assert.ok(line.includes("힘 +20%(+1)"), "Format should include damage stat bonus");
-    assert.ok(!line.includes("대시"), "Format should NOT include dash");
-    assert.ok(!line.includes("화살"), "Format should NOT include arrow");
-    assert.ok(!line.includes("버스트"), "Format should NOT include cooldown_burst");
-
-    // Parts should not contain special orb keys
-    const parts = formatHeroStatParts(allocation, bonuses);
-    const partKeys = parts.map((p) => p.key);
-    assert.ok(!partKeys.includes("dash"), "Stat parts should not include dash key");
-    assert.ok(!partKeys.includes("arrow"), "Stat parts should not include arrow key");
-    assert.ok(!partKeys.includes("cooldown_burst"), "Stat parts should not include cooldown_burst key");
-}
-
 async function testSpecialOrbCountsTowardMaxActive(app) {
     const hero = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.HERO);
     const opponent = app.roster.find((f) => f.id !== FIGHTER_IDS.HERO);
@@ -15570,9 +15081,8 @@ async function testHeroOrbStatGainSkill(app) {
     orb.update(0.016, sim);
     const gained = heroFighter.hero.bonuses.skill - skillBefore;
     assert.ok(gained >= 1 && gained <= 5, "Skill gain should be 1~5");
-    // Cooldown getter uses statAllocation.skill, not hero.bonuses.skill.
-    // hero.bonuses.skill is stored but cooldown getter doesn't read it yet.
     assert.ok(heroFighter.hero.bonuses.skill > skillBefore, "hero.bonuses.skill should increase");
+    assert.ok(heroFighter.ability.cooldown < cooldownBefore, "Hero skill growth should reduce cooldown immediately");
 }
 
 async function testHeroOrbStatGainCapClamp(app) {
@@ -15720,10 +15230,9 @@ async function testCarryoverSkillAffectsCooldown(app) {
     const hero = app.roster.find((fighter) => fighter.id === FIGHTER_IDS.HERO);
     const { BattleBall, applyHeroOrbStatAmount } = await import("../src/entities/index.js");
     const ball = new BattleBall(hero, { x: 480, y: 480 });
-    ball.stats.allocation = { hp: 0, damage: 0, speed: 0, skill: 0, defense: 0 };
-
     applyHeroOrbStatAmount(ball, "skill", 2, { countAsCurrentMatch: false });
-    assert.equal(ball.stats.allocation.skill, 2, "skill carryover should update statAllocation.skill");
+    assert.equal(ball.hero.bonuses.skill, 2, "skill carryover should update Hero skill growth");
+    assert.equal(ball.getSkillPoints(), 2, "skill carryover should affect the shared cooldown input");
 }
 
 async function testCarryoverDoesNotAffectSpecialOrbs(app) {
@@ -15832,9 +15341,7 @@ async function testTournamentRosterOverEight() {
     // Currently has 9 (8 old + Hero)
     if (app.roster.length < 9) return; // Skip if roster count changed
 
-    const { createEmptyStatAllocation } = await import("../src/statAllocation.js");
-    const playerAllocation = createEmptyStatAllocation();
-    const tournamentRoster = createTournamentRoster(app.roster, FIGHTER_IDS.ARCHER, playerAllocation, Math.random);
+    const tournamentRoster = createTournamentRoster(app.roster, FIGHTER_IDS.ARCHER, Math.random);
     assert.equal(tournamentRoster.length, 8, "Tournament roster should have exactly 8 participants when roster has 9+");
     const playerInRoster = tournamentRoster.find((f) => f.id === FIGHTER_IDS.ARCHER);
     assert.ok(playerInRoster, "Player fighter should be included in tournament roster");
@@ -15844,11 +15351,9 @@ async function testTournamentRosterOverEight() {
 }
 
 async function testTournamentRosterUnderEight() {
-    const { createEmptyStatAllocation } = await import("../src/statAllocation.js");
     // Use a subset of roster with fewer than 8 entries
     const smallRoster = app.roster.slice(0, 4);
-    const playerAllocation = createEmptyStatAllocation();
-    const tournamentRoster = createTournamentRoster(smallRoster, smallRoster[0].id, playerAllocation, Math.random);
+    const tournamentRoster = createTournamentRoster(smallRoster, smallRoster[0].id, Math.random);
     assert.equal(
         tournamentRoster.length,
         smallRoster.length,
@@ -15862,10 +15367,8 @@ async function testTournamentRosterUnderEight() {
 }
 
 async function testTournamentRosterNoExcessMultipleRuns() {
-    const { createEmptyStatAllocation } = await import("../src/statAllocation.js");
-    const playerAllocation = createEmptyStatAllocation();
     for (let run = 0; run < 20; run++) {
-        const roster = createTournamentRoster(app.roster, FIGHTER_IDS.HERO, playerAllocation, Math.random);
+        const roster = createTournamentRoster(app.roster, FIGHTER_IDS.HERO, Math.random);
         assert.ok(
             roster.length <= 8,
             `Tournament roster should never exceed 8 participants (run ${run}, got ${roster.length})`
@@ -16434,38 +15937,6 @@ async function testToastQueue() {
     assert.ok(!source.includes('x-show="visible"'), "Toast should not use a single visible flag for replacement");
 }
 
-// ── adjustStat with bonus total test ────────────────────────────────────────
-
-async function testAdjustStatWithBonusTotal() {
-    const { adjustStatAllocation, getRemainingStatPoints, PLAYER_STAT_POINTS, createEmptyStatAllocation } =
-        await import("../src/statAllocation.js");
-
-    const effectiveTotal = PLAYER_STAT_POINTS + 5; // +5 bonus
-    let allocation = createEmptyStatAllocation();
-
-    // Fill base 100 points (20 per stat, within 50 cap)
-    for (const key of ["hp", "damage", "speed", "skill", "defense"]) {
-        allocation = adjustStatAllocation(allocation, key, 20, effectiveTotal);
-    }
-    assert.equal(
-        getRemainingStatPoints(allocation, effectiveTotal),
-        5,
-        "After allocating 100/105 (20 each), remaining should be 5"
-    );
-
-    // Bonus points도 배분 가능해야 함
-    allocation = adjustStatAllocation(allocation, "hp", 5, effectiveTotal);
-    assert.equal(
-        getRemainingStatPoints(allocation, effectiveTotal),
-        0,
-        "After allocating 105/105, remaining should be 0"
-    );
-
-    // 초과 배분 불가
-    allocation = adjustStatAllocation(allocation, "speed", 1, effectiveTotal);
-    assert.equal(getRemainingStatPoints(allocation, effectiveTotal), 0, "Cannot allocate beyond effectiveTotal");
-}
-
 // ── Mastery modifier tests ─────────────────────────────────────────────────
 
 async function testMasteryModifiersStoredOnBattleBall(app) {
@@ -16481,7 +15952,6 @@ async function testMasteryModifiersStoredOnBattleBall(app) {
         color: "#ff0000",
         face: "archer",
         stats: { hp: 1000, damage: 50, speed: 200, defense: 5, radius: 16, mass: 10 },
-        statAllocation: null,
         mastery: {
             physics: { velocityRecoveryBonus: 0.02, wallBounce: 0.05 },
             combat: { incomingCollisionDamageReduce: 0.05, outgoingCollisionDamageBonus: 0.03 },
@@ -16809,8 +16279,7 @@ async function testGunnerMassMultiplicative() {
             combat: { incomingCollisionDamageReduce: 0, outgoingCollisionDamageBonus: 0 },
             action: { hpCostPercentReduction: 0, cooldownPercent: 0 },
             passives: []
-        },
-        statAllocation: null
+        }
     };
     const masteryCtx = {
         statModifiers: { hp: 0, damage: 0, defense: 0, speed: 0, mass: 0.06 },
@@ -16867,7 +16336,6 @@ async function testHuntingMasteryPlayerOnly(app) {
     const mockApp = {
         roster: [player, archer],
         playerProfile: createDefaultPlayerProfile(),
-        playerStatAllocation: createEmptyStatAllocation(),
         ui: { setHuntingActive() {}, setHuntingOverlayState() {}, addLog() {} },
         startMatch(specs) {
             capturedSpecs.push(specs);
@@ -17284,9 +16752,8 @@ testRosterLevelRewardDescriptions();
 testRosterBaseSpeedMultiplier();
 testNoAbilityStandardBallSupport();
 testShuffledUtility();
-testStatAllocationRules(app);
+testTournamentRosterPreservesBaseStats(app);
 testComponentBridgeCallsGameHandlers(app);
-testStartButtonReceivesRemainingStatPoints(app);
 testHuntingUiRouteDisplay();
 await testHuntingEarlyEventUi();
 await testHuntingFirstMoveUiPaintGate();
@@ -17300,8 +16767,6 @@ testHuntingPortalAutoAdvanceDelay();
 testHuntingHealthDisplayUsesSharedIntegerGetter();
 testHuntingAdvanceDispatchContract();
 testComponentBridgeEquipmentFunctions();
-await testBattleAppAdoptsPreExistingAlpineAllocation();
-await testAdjustRandomResetSyncPlayerStatAllocation(app);
 testIndexCacheVersionMatchesLatestPatchNote();
 testMultiFighterSimulationSetup(app);
 testArenaCameraZoom();
@@ -17395,7 +16860,6 @@ await testCreateCollectionHubViewModel();
 // Toast queue tests
 await testToastQueue();
 // adjustStat with bonus total test
-await testAdjustStatWithBonusTotal();
 // Mastery modifier tests
 await testMasteryModifiersStoredOnBattleBall(app);
 await testStatModifierDamageIndependentOfHp();
@@ -19914,7 +19378,6 @@ function testHuntingHeroCarryoverInStartFloorBattle(app) {
     const mockApp = {
         roster: [hero, archer],
         playerProfile: createDefaultPlayerProfile(),
-        playerStatAllocation: createRandomStatAllocation(() => 0),
         ui: { setHuntingActive() {}, setHuntingOverlayState() {}, addLog() {} },
         startMatch(specs) {
             capturedSpecs.push(specs);
@@ -19977,26 +19440,20 @@ function testHuntingHeroCarryoverInHandleFinish(app) {
     console.log("[hunting-hero-carryover-handle-finish] ok");
 }
 
-function testHuntingStartFloorBattleAppliesStatAllocation(app) {
+function testHuntingStartFloorBattleUsesProgressionWithoutAllocation(app) {
     const playerId = FIGHTER_IDS.DASH;
     const player = app.roster.find((f) => f.id === playerId);
     const opponent = app.roster.find((f) => f.id !== playerId);
 
-    const allocation = { hp: 20, damage: 10, speed: 5, skill: 0, defense: 0 };
     const profile = createDefaultPlayerProfile();
     profile.experience.byCharacter[playerId] = { currentXp: getLevelRequirement(3) };
     const progression = collectActiveExperienceProgression(profile, playerId);
-    const expectedSpec = applyStatAllocation(
-        applyExperienceProgressionToBaseSpec(player, progression),
-        allocation,
-        true
-    );
+    const expectedSpec = applyExperienceProgressionToBaseSpec(player, progression);
 
     const capturedMatches = [];
     const mockApp = {
         roster: [player, opponent],
         playerProfile: profile,
-        playerStatAllocation: { ...allocation },
         ui: { setHuntingActive() {}, setHuntingOverlayState() {}, addLog() {} },
         startMatch(specs, options) {
             capturedMatches.push({ specs, options });
@@ -20008,16 +19465,10 @@ function testHuntingStartFloorBattleAppliesStatAllocation(app) {
 
     const { specs, options } = capturedMatches[0];
     const playerSpec = specs[0];
-    assert.equal(playerSpec.stats.hp, expectedSpec.stats.hp, "Hunting spec hp should match applyStatAllocation");
-    assert.equal(
-        playerSpec.stats.damage,
-        expectedSpec.stats.damage,
-        "Hunting spec damage should match applyStatAllocation"
-    );
-    assert.equal(
-        playerSpec.stats.speed,
-        expectedSpec.stats.speed,
-        "Hunting spec speed should match applyStatAllocation"
+    assert.deepEqual(
+        playerSpec.stats,
+        { ...expectedSpec.stats, skill: 0, criticalChance: 0 },
+        "Hunting should use progression stats without allocation"
     );
     assert.equal(playerSpec.teamId, HUNTING_TEAMS.PLAYER, "Hunting spec should be on player team");
     assert.equal(
@@ -20028,7 +19479,7 @@ function testHuntingStartFloorBattleAppliesStatAllocation(app) {
     // 변경 전 roster와 공유되지 않아야 함 (spread clone)
     assert.notEqual(playerSpec, player, "Hunting spec should be a clone of the roster base spec");
 
-    console.log("[hunting-stat-allocation] ok");
+    console.log("[hunting-progression-without-allocation] ok");
 }
 
 function testHuntingActiveLocksSetupUi(app) {
@@ -20039,7 +19490,7 @@ function testHuntingActiveLocksSetupUi(app) {
 
         assert.equal(app._modeSegment.visible, false, "Gameplay should hide the mode selector");
         assert.equal(app._modeSegment.locked, true, "Gameplay should lock the mode selector");
-        assert.equal(app._panel.locked, true, "Gameplay should lock stat allocation");
+        assert.equal(app._panel.locked, true, "Gameplay should lock character setup");
         assert.equal(app._startBtn.hidden, true, "Gameplay should hide the start button");
 
         app.beginResultConfirmation();
@@ -20047,7 +19498,7 @@ function testHuntingActiveLocksSetupUi(app) {
         app.refreshPlayerSetup();
         assert.equal(app._modeSegment.visible, false, "Result confirmation should keep the mode selector hidden");
         assert.equal(app._modeSegment.locked, true, "Result confirmation should keep the mode selector locked");
-        assert.equal(app._panel.locked, true, "Result confirmation should keep stat allocation locked");
+        assert.equal(app._panel.locked, true, "Result confirmation should keep character setup locked");
         assert.equal(app._startBtn.hidden, false, "Result confirmation refresh should keep the confirm button visible");
     } finally {
         app.returnToInitialState();
@@ -20088,8 +19539,6 @@ function testFighterPhysicsSimulationHierarchy(app) {
 
 function testPreviewReselectChangesCharacter(app) {
     const initialId = app.playerFighterId;
-    const initialAllocation = { ...app.playerStatAllocation };
-    app.playerStatAllocation = { hp: 99, damage: 0, speed: 0, skill: 0, defense: 0 };
 
     // Mock canvas size for reselect method
     const originalWidth = app.renderer.canvas.width;
@@ -20110,13 +19559,6 @@ function testPreviewReselectChangesCharacter(app) {
     // playerFighterId should NOT change immediately — only after swap finalizes
     assert.equal(app.playerFighterId, initialId, "playerFighterId should NOT change immediately at swap start");
 
-    // Stat allocation should NOT be reset immediately
-    assert.deepEqual(
-        app.playerStatAllocation,
-        { hp: 99, damage: 0, speed: 0, skill: 0, defense: 0 },
-        "stat allocation should NOT be reset immediately at swap start"
-    );
-
     // Complete the swap
     const duration = app._previewSim.duration;
     const ticks = Math.ceil(duration / 0.016) + 5;
@@ -20128,14 +19570,9 @@ function testPreviewReselectChangesCharacter(app) {
     const newId = app.playerFighterId;
     assert.notEqual(newId, initialId, "playerFighterId should change after swap finalizes");
 
-    // Stat allocation should be reset after finalization
-    const empty = createEmptyStatAllocation();
-    assert.deepEqual(app.playerStatAllocation, empty, "Stat allocation should be reset to empty after swap finalizes");
-
     // Restore
     app.renderer.canvas.width = originalWidth;
     app.renderer.canvas.height = originalHeight;
-    app.playerStatAllocation = { ...initialAllocation };
 
     console.log("[preview-reselect-changes-character] ok");
 }
@@ -20405,7 +19842,7 @@ testBattleBallAppliesSpecHeroCarryover(app);
 testBattleBallMergeHeroOrbCarryoverInto(app);
 testHuntingHeroCarryoverInStartFloorBattle(app);
 testHuntingHeroCarryoverInHandleFinish(app);
-testHuntingStartFloorBattleAppliesStatAllocation(app);
+testHuntingStartFloorBattleUsesProgressionWithoutAllocation(app);
 testHuntingActiveLocksSetupUi(app);
 testFighterPhysicsSimulationHierarchy(app);
 testPreviewReselectChangesCharacter(app);
@@ -21294,86 +20731,6 @@ async function testPatchNotesServiceUsesUiManagerRequire() {
     console.log("[patchNotesService-uses-uiManager-require] ok");
 }
 
-async function testPlayerPanelAllocationContract(app) {
-    // 플레이어 패널 allocation은 필수이므로 _syncPlayerStatAllocationFromUi가
-    // 조용히 무시하지 않고 항상 동기화해야 함
-
-    // 1. 소스 코드에 silent guard가 남아 있는지 확인
-    const appJs = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
-    assert.ok(
-        !appJs.includes("!this._panel.allocation"),
-        "app.js must not contain silent `if (!this._panel.allocation) return` guard anywhere"
-    );
-
-    // 1b. 명시적 계약 위반 검증(throw Error)이 존재하는지 확인
-    assert.ok(
-        appJs.includes("Array.isArray(alloc)"),
-        "_syncPlayerStatAllocationFromUi must have explicit allocation type assertion"
-    );
-    assert.ok(appJs.includes("playerPanel.allocation"), "error message must name playerPanel.allocation");
-
-    // 2. 정상 경로: allocation이 {}일 때 동기화가 동작하는지 확인
-    const saved = { ...app.playerStatAllocation };
-    const testAlloc = { hp: 10, damage: 10, speed: 10, skill: 10, defense: 10 };
-    app._panel.allocation = { ...testAlloc };
-    app._syncPlayerStatAllocationFromUi();
-    assert.deepEqual(
-        app.playerStatAllocation,
-        { ...createEmptyStatAllocation(), ...testAlloc },
-        "playerStatAllocation should be synced from _panel.allocation"
-    );
-
-    // 3. 복원
-    app.playerStatAllocation = saved;
-    app._panel.allocation = {};
-
-    console.log("[player-panel-allocation-contract] ok");
-}
-
-async function testPlayerPanelAllocationContractBoundary(app) {
-    // 경계 검증: _panel.allocation이 null/undefined/비객체인 경우
-    // _syncPlayerStatAllocationFromUi가 명시적 Error를 throw해야 함
-
-    const savedAlloc = app._panel.allocation;
-    const savedPlayer = { ...app.playerStatAllocation };
-
-    function expectAllocationError(fn, label) {
-        try {
-            fn();
-            assert.fail(`${label}: Error가 발생하지 않음`);
-        } catch (e) {
-            assert.ok(e instanceof Error, `${label}: throw된 값은 Error여야 함`);
-            assert.ok(
-                e.message.includes("playerPanel.allocation"),
-                `${label}: 오류 메시지에 "playerPanel.allocation"이 포함되어야 함`
-            );
-            assert.ok(e.message.includes("객체"), `${label}: 오류 메시지에 "객체"가 포함되어야 함`);
-        }
-    }
-
-    // undefined 경로 → Error
-    app._panel.allocation = undefined;
-    expectAllocationError(() => app._syncPlayerStatAllocationFromUi(), "undefined allocation");
-
-    // null 경로 → Error
-    app._panel.allocation = null;
-    expectAllocationError(() => app._syncPlayerStatAllocationFromUi(), "null allocation");
-
-    // 비객체 타입(문자열) → Error
-    app._panel.allocation = "not-an-object";
-    expectAllocationError(() => app._syncPlayerStatAllocationFromUi(), "string allocation");
-
-    // 배열 → Error (배열은 객체 타입이지만 유효한 allocation이 아님)
-    app._panel.allocation = [];
-    expectAllocationError(() => app._syncPlayerStatAllocationFromUi(), "array allocation");
-
-    // 복원 — playerStatAllocation은 변경되지 않아야 함
-    assert.deepEqual(app.playerStatAllocation, savedPlayer, "호출 실패 후 playerStatAllocation이 변경되지 않아야 함");
-    app._panel.allocation = savedAlloc;
-
-    console.log("[player-panel-allocation-contract-boundary] ok");
-}
-
 function testNoGameBridgeInProduction() {
     // Prove that production source files no longer reference legacy gameBridge/requireGameUIComponent
     const srcDirs = ["src"];
@@ -21411,8 +20768,6 @@ await testUiManagerRequireComponentMissingFails();
 await testUiManagerRequireComponentNoRemainingGuards();
 await testCollectionHubServiceUsesUiManagerRequire();
 await testPatchNotesServiceUsesUiManagerRequire();
-await testPlayerPanelAllocationContract(app);
-await testPlayerPanelAllocationContractBoundary(app);
 
 await testActionGateway();
 testUiManagerGameActionBridgeContract();
@@ -22561,8 +21916,7 @@ function testHuntingRebirthLoadoutIntegration() {
     const statBonuses = { hp: 0, damage: 2, speed: 2, defense: 0 };
     const createHuntingTestApp = (profile) => ({
         roster: createRoster(),
-        playerProfile: profile,
-        playerStatAllocation: createEmptyStatAllocation()
+        playerProfile: profile
     });
     const baselineProfile = createDefaultPlayerProfile();
     const rebornProfile = createDefaultPlayerProfile();
@@ -22941,23 +22295,10 @@ function testAbilitySetForwardsDashEffect() {
 
 testAbilitySetForwardsDashEffect();
 
-function testCriticalChanceIsEquipmentOnly() {
-    const criticalStat = ALLOCATABLE_STATS.find((stat) => stat.key === "criticalChance");
-    assert.equal(criticalStat, undefined, "criticalChance should not be in ALLOCATABLE_STATS");
-    assert.equal("criticalChance" in createEmptyStatAllocation(), false);
-    console.log("[equipment-only-critical-stat] ok");
-}
-
-testCriticalChanceIsEquipmentOnly();
-
 function testCriticalChanceDefaultsToZero() {
     const baseFighter = createRoster().find((f) => f.id === FIGHTER_IDS.ARCHER);
-    const allocation = createEmptyStatAllocation();
-    allocation.criticalChance = 20;
-    const applied = applyStatAllocation(baseFighter, allocation, false);
-    assert.equal(applied.stats.criticalChance, 0, "criticalChance should ignore removed allocation points");
-    assert.equal("criticalChance" in applied.statAllocation, false);
-    const simulation = new BattleSimulation([applied, createRoster()[1]], { onLog() {} });
+    assert.equal(baseFighter.stats.criticalChance ?? 0, 0, "Base fighters should start with zero critical chance");
+    const simulation = new BattleSimulation([baseFighter, createRoster()[1]], { onLog() {} });
     assert.equal(
         simulation.fighters[0].getCriticalChance(),
         0,
@@ -24996,7 +24337,6 @@ function testHuntingPartyBattleComposition() {
     const mockApp = {
         roster: app.roster,
         playerProfile: createDefaultPlayerProfile(),
-        playerStatAllocation: {},
         simulationRng: () => 0.5,
         setHuntingOverlayState(state) {
             this.huntingOverlayState = { ...(this.huntingOverlayState ?? {}), ...state };
@@ -25910,7 +25250,6 @@ testHiddenCharacterPortraitCanvasDoesNotAmplifyBackingStore();
 async function testFloorSevenHuntingDefeatCompletesWithRealApp(app) {
     app.returnToInitialState();
     app.playerProfile = createDefaultPlayerProfile();
-    app.playerStatAllocation = createRandomStatAllocation(() => 0);
     const characterId = FIGHTER_IDS.DASH;
     app.playerProfile.hunting.unlockedCharacterIds = [characterId];
     app.hunting._run = {

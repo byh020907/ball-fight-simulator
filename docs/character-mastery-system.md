@@ -21,7 +21,7 @@
 {
     characterMastery: {
         levels: {
-            archer: 2
+            archer: 2;
         }
     }
 }
@@ -29,12 +29,12 @@
 
 `levels[id]`는 `0~3` 정수다. 우승 횟수에서 다시 계산하는 파생값이 아니다.
 
-| 현재 단계 | 승급에 필요한 관문 우승 | 승급 결과 |
-| --- | --- | --- |
-| 미해금 | 난도 0 | BRONZE (1) |
-| BRONZE | 난도 1 | SILVER (2) |
-| SILVER | 난도 2 | GOLD (3) |
-| GOLD | 없음 | 최대 단계 |
+| 현재 단계 | 승급에 필요한 관문 우승 | 승급 결과  |
+| --------- | ----------------------- | ---------- |
+| 미해금    | 난도 0                  | BRONZE (1) |
+| BRONZE    | 난도 1                  | SILVER (2) |
+| SILVER    | 난도 2                  | GOLD (3)   |
+| GOLD      | 없음                    | 최대 단계  |
 
 `advanceCharacterMastery()`가 이 규칙과 상태 변경을 소유한다. 도감 UI, 숙련도 합계, `도감 완성` 업적은 모두 이 저장된 단계를 조회한다.
 
@@ -48,12 +48,11 @@
 
 ```text
 캐릭터 기본 수치 + 레벨 보상
-  -> 스탯 배분 퍼센트 배율
   -> 장비 고정 추가 수치
   -> 숙련도 교차 지원 퍼센트
 ```
 
-`applyMasteryEffectsToFighterSpec()`가 마지막 단계를 소유한다. 같은 종류의 숙련도는 먼저 가산한 뒤 한 번만 곱한다. 상한이 없으므로 여러 캐릭터가 같은 효과를 중첩하면 제한 없이 누적된다. 장비의 고정 수치를 스탯 배분과 숙련도로 다시 혼합하지 않는다.
+`applyMasteryEffectsToFighterSpec()`가 마지막 단계를 소유한다. 같은 종류의 숙련도는 먼저 가산한 뒤 한 번만 곱한다. 상한이 없으므로 여러 캐릭터가 같은 효과를 중첩하면 제한 없이 누적된다. 장비의 고정 수치를 숙련도와 다시 혼합하지 않는다.
 
 충돌 관련 보정도 최종 단계에 적용한다.
 
@@ -69,21 +68,21 @@
 
 모든 수치는 퍼센트다. 액션 HP 비용의 `%p`는 원래 비용 비율에서 빼는 퍼센트포인트다.
 
-| 원본 캐릭터 | 효과 | BRONZE | SILVER | GOLD |
-| --- | --- | ---: | ---: | ---: |
-| Archer Ball | 다른 캐릭터 공격력 | 2% | 4% | 6% |
-| Orbit Ball | 벽 충돌 반사 속도 | 5% | 10% | 15% |
-| Trickster Ball | 기본 속도 복귀율 | 3% | 6% | 10% |
-| Grenade Ball | 가하는 충돌 피해 | 2% | 4% | 6% |
-| Dash Ball | 이동 속도 | 2% | 4% | 6% |
-| Rage Ball | 12초마다 다음 충돌 피해 | 3% | 6% | 9% |
-| Eater Ball | 최대 체력 | 2% | 4% | 6% |
-| Bat Ball | 클릭 액션 HP 비용 감소 | 0.03%p | 0.06%p | 0.10%p |
-| Hero Ball | 스킬 쿨다운 감소 | 2% | 4% | 6% |
-| Vampire Ball | 4초마다 다음 충돌 피해 회복 (결손 HP 비례 1~2배) | 3% | 6% | 9% |
-| Gunner Ball | 질량 증가 | 2% | 4% | 6% |
-| Phantom Ball | 받는 충돌 피해 감소 | 2% | 4% | 6% |
-| Spin Ball | 충돌 각충격 | 5% | 10% | 15% |
+| 원본 캐릭터    | 효과                                             | BRONZE | SILVER |   GOLD |
+| -------------- | ------------------------------------------------ | -----: | -----: | -----: |
+| Archer Ball    | 다른 캐릭터 공격력                               |     2% |     4% |     6% |
+| Orbit Ball     | 벽 충돌 반사 속도                                |     5% |    10% |    15% |
+| Trickster Ball | 기본 속도 복귀율                                 |     3% |     6% |    10% |
+| Grenade Ball   | 가하는 충돌 피해                                 |     2% |     4% |     6% |
+| Dash Ball      | 이동 속도                                        |     2% |     4% |     6% |
+| Rage Ball      | 12초마다 다음 충돌 피해                          |     3% |     6% |     9% |
+| Eater Ball     | 최대 체력                                        |     2% |     4% |     6% |
+| Bat Ball       | 클릭 액션 HP 비용 감소                           | 0.03%p | 0.06%p | 0.10%p |
+| Hero Ball      | 스킬 쿨다운 감소                                 |     2% |     4% |     6% |
+| Vampire Ball   | 4초마다 다음 충돌 피해 회복 (결손 HP 비례 1~2배) |     3% |     6% |     9% |
+| Gunner Ball    | 질량 증가                                        |     2% |     4% |     6% |
+| Phantom Ball   | 받는 충돌 피해 감소                              |     2% |     4% |     6% |
+| Spin Ball      | 충돌 각충격                                      |     5% |    10% |    15% |
 
 ## 5. 향상된 물리 효과
 
@@ -110,18 +109,18 @@ Spin의 **자이로 전달**은 충돌 solver가 각 전투원에게 전달하�
 
 ## 7. 코드 경계
 
-| 파일 | 책임 |
-| --- | --- |
-| `src/rewardBalanceConfig.js` | 등급 수치 (상한 없음) |
-| `src/characters/definitions/*.js` | 캐릭터별 숙련도 표시·tier key·적용 대상 메타데이터 |
-| `src/characters/characterRegistry.js` | 캐릭터 정의 수집·계약 검증·조회 |
+| 파일                                          | 책임                                                        |
+| --------------------------------------------- | ----------------------------------------------------------- |
+| `src/rewardBalanceConfig.js`                  | 등급 수치 (상한 없음)                                       |
+| `src/characters/definitions/*.js`             | 캐릭터별 숙련도 표시·tier key·적용 대상 메타데이터          |
+| `src/characters/characterRegistry.js`         | 캐릭터 정의 수집·계약 검증·조회                             |
 | `src/character-mastery/masteryDefinitions.js` | 레지스트리 메타데이터를 실제 적용 함수와 런타임 훅으로 변환 |
-| `src/character-mastery/masteryState.js` | 단계 조회와 관문 승급 |
-| `src/character-mastery/masteryModifiers.js` | 교차 효과 합산, fighter spec 적용 |
-| `src/entities/battleBall.js` | 런타임 패시브 준비 상태, 물리 보정 적용 |
-| `src/simulation/battleSimulation.js` | 충돌 전후 훅과 최종 충돌 피해 보정 전달, 각충격 배율 |
-| `src/hunting/huntingManager.js` | 사냥터 플레이어 스펙에 숙련도 최종 보정 적용 |
-| `src/collection/collectionViewModel.js` | 저장된 숙련도 단계의 도감 표시 |
+| `src/character-mastery/masteryState.js`       | 단계 조회와 관문 승급                                       |
+| `src/character-mastery/masteryModifiers.js`   | 교차 효과 합산, fighter spec 적용                           |
+| `src/entities/battleBall.js`                  | 런타임 패시브 준비 상태, 물리 보정 적용                     |
+| `src/simulation/battleSimulation.js`          | 충돌 전후 훅과 최종 충돌 피해 보정 전달, 각충격 배율        |
+| `src/hunting/huntingManager.js`               | 사냥터 플레이어 스펙에 숙련도 최종 보정 적용                |
+| `src/collection/collectionViewModel.js`       | 저장된 숙련도 단계의 도감 표시                              |
 
 ## 8. 검증 기준
 
@@ -131,6 +130,7 @@ Spin의 **자이로 전달**은 충돌 solver가 각 전투원에게 전달하�
 - 주기형 효과는 실제 적대 전투원 충돌에서만 소비된다.
 - Orbit의 반사 궤도는 장비 반향과 곱으로 결합된다. Gunner의 중량 장전은 장비 중량과 곱으로 결합하며, Dash의 추진력은 다른 스탯 계열 숙련도와 함께 최종 퍼센트로 적용된다.
 - 표준 무능력 볼 기준 GOLD 단일 효과의 승률 변화는 대체로 `+3~5%p` 범위이며, 속도 복귀와 쿨다운은 별도의 조작감·능력 회전율 보정으로 검증한다.
+
 ## Elementalist — 원소 가호
 
 - BRONZE/SILVER/GOLD에서 방어력 +2%/+4%/+6%를 제공한다.

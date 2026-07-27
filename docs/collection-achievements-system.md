@@ -19,12 +19,12 @@
 
 ## 2. 용어
 
-| UI 용어 | 코드 용어 | 의미 |
-| --- | --- | --- |
-| 도감 | `collection` | 캐릭터별 플레이 기록과 숙련도 |
-| 숙련도 | `characterMastery.levels[id]` | 관문 토너먼트 우승으로 저장되는 캐릭터별 단계 |
-| 업적 | `achievement` | 정의된 조건을 한 번 충족하면 영구 해금되는 목표 |
-| 커리어 기록 | `careerStats` | 모든 캐릭터에 걸친 누적 매치, 연승, 액션 사용 기록 |
+| UI 용어     | 코드 용어                     | 의미                                               |
+| ----------- | ----------------------------- | -------------------------------------------------- |
+| 도감        | `collection`                  | 캐릭터별 플레이 기록과 숙련도                      |
+| 숙련도      | `characterMastery.levels[id]` | 관문 토너먼트 우승으로 저장되는 캐릭터별 단계      |
+| 업적        | `achievement`                 | 정의된 조건을 한 번 충족하면 영구 해금되는 목표    |
+| 커리어 기록 | `careerStats`                 | 모든 캐릭터에 걸친 누적 매치, 연승, 액션 사용 기록 |
 
 숙련도 단계는 우승 횟수와 별개로 프로필에 저장합니다. 도감, 숙련도 탭, 도감 완성 업적은 모두 같은 저장된 단계를 조회합니다.
 
@@ -59,12 +59,12 @@ Hero Orb의 체력 증가처럼 전투 중 `maxHp`가 바뀔 수 있으므로 �
 
 ### 3.2 숙련도
 
-| 단계 | 조건 | 표시 |
-| --- | --- | --- |
-| 0 | 미해금 | 기본 카드 |
-| 1 | 난도 0 토너먼트 우승 | BRONZE |
-| 2 | 난도 1 토너먼트 우승 | SILVER |
-| 3 | 난도 2 토너먼트 우승 | GOLD |
+| 단계 | 조건                 | 표시      |
+| ---- | -------------------- | --------- |
+| 0    | 미해금               | 기본 카드 |
+| 1    | 난도 0 토너먼트 우승 | BRONZE    |
+| 2    | 난도 1 토너먼트 우승 | SILVER    |
+| 3    | 난도 2 토너먼트 우승 | GOLD      |
 
 현재 단계의 관문을 우승하면 한 단계만 승급합니다. 일반 토너먼트 우승 횟수는 도감 기록과 다른 업적 조건에만 사용하며, 숙련도 단계로 환산하지 않습니다.
 
@@ -96,18 +96,18 @@ Hero Orb의 체력 증가처럼 전투 중 `maxHp`가 바뀔 수 있으므로 �
 
 ### 4.1 초기 업적 목록
 
-| ID | 이름 | 조건 | 등급 |
-| --- | --- | --- | --- |
-| `first_tournament_win` | 첫 우승 | 플레이어 토너먼트 우승 1회 | bronze |
-| `flawless_tournament` | 무결점 우승 | 한 토너먼트의 플레이어 매치 전체에서 전투 피해 0으로 우승 | gold |
-| `comeback_match_win` | 대역전 | 매치 중 HP 15% 이하를 기록한 뒤 해당 매치 승리 | silver |
-| `counter_expert` | 반격 전문가 | 카운터 액션 성공 10회 | silver |
-| `all_actions_used` | 만능 플레이어 | 현재 `ACTION_POOL`의 모든 액션을 1회 이상 실제 발동 | bronze |
-| `roster_champion` | 전캐릭터 우승 | 현재 로스터의 모든 캐릭터로 토너먼트 1회 이상 우승 | gold |
-| `mastery_complete` | 도감 완성 | 현재 로스터의 모든 캐릭터 숙련도 3 달성 | gold |
-| `hunting_monster_codex_complete` | 몬스터 도감 완성 | 현재 등록된 사냥터 일반 몬스터 14종을 모두 조우 | gold |
-| `marathon_50` | 끈기 | 플레이어가 참가한 매치 50회 완료 | bronze |
-| `tournament_streak_3` | 연승 | 토너먼트 3회 연속 우승 | silver |
+| ID                               | 이름             | 조건                                                      | 등급   |
+| -------------------------------- | ---------------- | --------------------------------------------------------- | ------ |
+| `first_tournament_win`           | 첫 우승          | 플레이어 토너먼트 우승 1회                                | bronze |
+| `flawless_tournament`            | 무결점 우승      | 한 토너먼트의 플레이어 매치 전체에서 전투 피해 0으로 우승 | gold   |
+| `comeback_match_win`             | 대역전           | 매치 중 HP 15% 이하를 기록한 뒤 해당 매치 승리            | silver |
+| `counter_expert`                 | 반격 전문가      | 카운터 액션 성공 10회                                     | silver |
+| `all_actions_used`               | 만능 플레이어    | 현재 `ACTION_POOL`의 모든 액션을 1회 이상 실제 발동       | bronze |
+| `roster_champion`                | 전캐릭터 우승    | 현재 로스터의 모든 캐릭터로 토너먼트 1회 이상 우승        | gold   |
+| `mastery_complete`               | 도감 완성        | 현재 로스터의 모든 캐릭터 숙련도 3 달성                   | gold   |
+| `hunting_monster_codex_complete` | 몬스터 도감 완성 | 현재 등록된 사냥터 일반 몬스터 14종을 모두 조우           | gold   |
+| `marathon_50`                    | 끈기             | 플레이어가 참가한 매치 50회 완료                          | bronze |
+| `tournament_streak_3`            | 연승             | 토너먼트 3회 연속 우승                                    | silver |
 
 업적 조건은 현재 로스터와 액션 레지스트리를 조회합니다. `9개 캐릭터`, `5개 액션` 같은 숫자를 저장하거나 판정 코드에 넣지 않습니다.
 
@@ -205,15 +205,15 @@ src/
     achievementRewards.js
 ```
 
-| 파일 | 책임 |
-| --- | --- |
-| `src/playerProfile.js` | localStorage 입출력, 버전 관리, 전체 프로필 정규화·마이그레이션 |
-| `src/collection/matchReport.js` | 한 매치의 피해, HP 최저치, 액션 사용 및 성공 기록 |
-| `src/collection/tournamentReport.js` | 플레이어 매치 보고서를 모아 최종 등수와 토너먼트 결과를 프로필에 반영 |
-| `src/collection/collectionViewModel.js` | 프로필·캐릭터 정의·업적 정의를 UI 전용 ViewModel로 변환 |
-| `src/collection/achievementDefinitions.js` | 업적 ID, 이름, 설명, 등급, 판정 함수, 보상 정의 |
-| `src/collection/achievementRules.js` | 업적 판정 루프와 중복 해금 방지 |
-| `src/collection/achievementRewards.js` | 업적 보상 지급과 표시 문구 |
+| 파일                                       | 책임                                                                  |
+| ------------------------------------------ | --------------------------------------------------------------------- |
+| `src/playerProfile.js`                     | localStorage 입출력, 버전 관리, 전체 프로필 정규화·마이그레이션       |
+| `src/collection/matchReport.js`            | 한 매치의 피해, HP 최저치, 액션 사용 및 성공 기록                     |
+| `src/collection/tournamentReport.js`       | 플레이어 매치 보고서를 모아 최종 등수와 토너먼트 결과를 프로필에 반영 |
+| `src/collection/collectionViewModel.js`    | 프로필·캐릭터 정의·업적 정의를 UI 전용 ViewModel로 변환               |
+| `src/collection/achievementDefinitions.js` | 업적 ID, 이름, 설명, 등급, 판정 함수, 보상 정의                       |
+| `src/collection/achievementRules.js`       | 업적 판정 루프와 중복 해금 방지                                       |
+| `src/collection/achievementRewards.js`     | 업적 보상 지급과 표시 문구                                            |
 
 `collection.js` 하나에 저장, 런타임 기록, 업적 판정, UI 데이터를 모두 넣지 않습니다.
 
@@ -377,7 +377,7 @@ simulation.recordActionSuccess(playerBall, actionId);
 - 현재 보상 타입은 파편, 확정 기초 장비, 기능 해금입니다.
 - 보상 적용은 업적 판정 함수가 직접 수행하지 않습니다.
 - 확정 장비는 인벤토리에 즉시 추가하며, 중간·완성 장비는 업적 보상으로 지급하지 않습니다.
-- 직접 전투 스탯, 스탯 배분 상한, 밸런스 허용치를 업적 보상으로 지급하지 않습니다.
+- 직접 전투 스탯이나 제거된 배분·밸런스 보정을 업적 보상으로 지급하지 않습니다.
 
 ## 11. UI
 
@@ -440,17 +440,17 @@ simulation.recordActionSuccess(playerBall, actionId);
 
 ### 14.1 게임용 문구 표
 
-| ID | 게임용 문구 | 조건 | 보상 |
-| --- | --- | --- | --- |
-| `hunting_depth_30` | 심층 탐사자 | 사냥터 30층 도달 | 파편 20 |
-| `hunting_critical_hp_win` | 위기 돌파 | 전투 시작 시 HP 20% 이하로 승리 | 파편 30 |
-| `hunting_portal_retreat_40` | 무사 귀환 | 40층 이상에서 포탈 귀환 | 파편 30 |
-| `hunting_champion_victory` | 난입 저지 | 챔피언 난입 전투 승리 | 파편 15 |
-| `hunting_all_stages_clear` | 전 지역 제패 | 동굴·숲·사막 최종 보스 모두 처치 | 파편 80 |
-| `hunting_monster_slayer` | 몹 학살자 | 사냥터 몬스터 300마리 처치 | 파편 15 |
-| `hunting_rare_monster_slayer` | uncommon 몹 학살자 | uncommon 몬스터 100마리 처치 | 파편 25 |
-| `hunting_unique_monster_slayer` | rare 몹 학살자 | rare 몬스터 75마리 처치 | 파편 40 |
-| `hunting_epic_monster_slayer` | epic 몹 학살자 | epic 몬스터 50마리 처치 | 파편 60 |
+| ID                              | 게임용 문구        | 조건                             | 보상    |
+| ------------------------------- | ------------------ | -------------------------------- | ------- |
+| `hunting_depth_30`              | 심층 탐사자        | 사냥터 30층 도달                 | 파편 20 |
+| `hunting_critical_hp_win`       | 위기 돌파          | 전투 시작 시 HP 20% 이하로 승리  | 파편 30 |
+| `hunting_portal_retreat_40`     | 무사 귀환          | 40층 이상에서 포탈 귀환          | 파편 30 |
+| `hunting_champion_victory`      | 난입 저지          | 챔피언 난입 전투 승리            | 파편 15 |
+| `hunting_all_stages_clear`      | 전 지역 제패       | 동굴·숲·사막 최종 보스 모두 처치 | 파편 80 |
+| `hunting_monster_slayer`        | 몹 학살자          | 사냥터 몬스터 300마리 처치       | 파편 15 |
+| `hunting_rare_monster_slayer`   | uncommon 몹 학살자 | uncommon 몬스터 100마리 처치     | 파편 25 |
+| `hunting_unique_monster_slayer` | rare 몹 학살자     | rare 몬스터 75마리 처치          | 파편 40 |
+| `hunting_epic_monster_slayer`   | epic 몹 학살자     | epic 몬스터 50마리 처치          | 파편 60 |
 
 희귀도별 업적 ID는 기존 저장 프로필과의 호환을 위해 유지하지만, 사용자 문구와 판정 태그는 장비 체계와 같은 `uncommon`·`rare`·`epic`을 사용합니다. 프로필 정리 시 기존 `rarity:unique` 진행은 새 `rarity:rare`로 옮기고, 기존 `rarity:rare` 진행은 새 `rarity:uncommon`에도 보존해 업데이트로 처치 기록을 잃지 않습니다.
 
@@ -461,6 +461,7 @@ simulation.recordActionSuccess(playerBall, actionId);
 - 숙련도 2단계의 캐릭터별 칭호 문구는 별도 콘텐츠 작업에서 정합니다.
 - 업적별 성장 보상은 전체 상한과 획득 난이도를 함께 보고 확정합니다.
 - 도전 단계별 최초 클리어와 캐릭터별 최고 클리어 단계는 1차 도감 구현 후 확장합니다.
+
 ## 히든 캐릭터와 전체 로스터 업적
 
 - `roster_champion`과 `mastery_complete`의 전체 로스터 조건은 잠긴 Elementalist도 요구한다.

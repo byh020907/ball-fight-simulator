@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { createRandomStatAllocation, applyStatAllocation } from "../src/statAllocation.js";
 import { BattleSimulation } from "../src/simulation/battleSimulation.js";
 import { TournamentManager } from "../src/tournament.js";
 import { createRoster } from "../src/roster.js";
@@ -9,7 +8,6 @@ import { getRebirthCardCatalog, getRebirthCardDefinition } from "../src/rebirth/
 
 const roster = createRoster();
 const TOURNAMENT_COUNT = 200;
-const TOTAL_STAT_POINTS = 100;
 
 function verifyRebirthTierBalance() {
     for (const source of CHARACTER_DEFINITIONS) {
@@ -209,10 +207,7 @@ function runReport(label, assignActions, overrides) {
             const j = Math.floor(rng() * (i + 1));
             [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
         }
-        const entrants = shuffled.slice(0, 8).map((fighter) => {
-            const alloc = createRandomStatAllocation(rng, TOTAL_STAT_POINTS);
-            return applyStatAllocation(fighter, alloc, false);
-        });
+        const entrants = shuffled.slice(0, 8);
 
         const tourney = new TournamentManager(entrants);
         tourney.autoAdvanceByes();

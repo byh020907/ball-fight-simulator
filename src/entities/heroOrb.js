@@ -114,30 +114,7 @@ export const HERO_ORB_EFFECTS = {
 
 // ── Formatting helpers ───────────────────────────────────────────────────────
 
-export function formatHeroStatLine(allocation = {}, bonuses = {}) {
-    return formatHeroStatParts(allocation, bonuses)
-        .map((part) => `${part.baseText}${part.bonusText}`)
-        .join(" · ");
-}
-
 export const STAT_ORB_KEYS = ["hp", "damage", "speed", "skill", "defense", "critical"];
-
-const COMPACT_HERO_STAT_LABELS = Object.freeze({
-    hp: "HP",
-    damage: "공",
-    speed: "속",
-    skill: "쿨",
-    defense: "방",
-    critical: "치"
-});
-
-export function formatCompactHeroStatLine(allocation = {}, bonuses = {}) {
-    return STAT_ORB_KEYS.map((key) => {
-        const base = allocation[key] ?? 0;
-        const bonus = bonuses[key] ?? 0;
-        return `${COMPACT_HERO_STAT_LABELS[key]} ${base}${bonus > 0 ? `(+${bonus})` : ""}`;
-    }).join(" · ");
-}
 
 const HERO_GROWTH_LABELS = Object.freeze({
     hp: { desktop: "체력", mobile: "HP" },
@@ -175,22 +152,6 @@ export function mergeOrbBonuses(current = {}, carry = {}) {
     return result;
 }
 
-export function formatHeroStatParts(allocation = {}, bonuses = {}) {
-    return STAT_ORB_KEYS.map((key) => {
-        const effect = HERO_ORB_EFFECTS[key];
-        const label = effect?.label ?? key;
-        const base = allocation[key] ?? 0;
-        const bonus = bonuses[key] ?? 0;
-        const baseSuffix = key === "defense" ? "" : "%";
-        return {
-            key,
-            baseText: `${label} +${base}${baseSuffix}`,
-            bonusText: bonus > 0 ? `(+${bonus})` : "",
-            color: effect?.color ?? "#ffffff"
-        };
-    });
-}
-
 export function applyHeroOrbStatAmount(owner, statKey, amount, opts = {}) {
     const { countAsCurrentMatch = true } = opts;
     if (amount <= 0) return;
@@ -213,9 +174,7 @@ export function applyHeroOrbStatAmount(owner, statKey, amount, opts = {}) {
             owner.stats.baseDefense = Number((owner.stats.baseDefense + 0.33 * amount).toFixed(2));
             break;
         case "skill":
-            if (owner.stats?.allocation) {
-                owner.stats.allocation.skill = (owner.stats.allocation.skill ?? 0) + amount;
-            }
+            owner.hero.bonuses.skill = (owner.hero.bonuses.skill ?? 0) + amount;
             break;
         case "critical":
             owner.stats.criticalChance = Math.min(100, owner.stats.criticalChance + amount);

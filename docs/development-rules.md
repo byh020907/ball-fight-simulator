@@ -459,9 +459,8 @@ clampStatGain():           cap clamp — bonus+roll이 cap을 넘지 않도록 �
 HERO_ORB_EFFECTS:          effect type별 적용 로직 + label(표시명) + apply() 반환값
                            ({ applied, amount } — cap에서 실패 시 applied=false)
                            HP·공격·속도·방어·쿨타임·치명타 코어 적용
-formatHeroStatLine():      시작 전 statAllocation과 heroOrbBonuses를 한 줄에 합친 UI 문자열 포맷
-formatHeroStatParts():     `+10%(+3)` 중 `(+3)`만 스탯 색상으로 칠하기 위한 UI 조각 포맷
-UIController / Alpine.js:  Hero Ball만 fighter card의 statLine을 "기본 배분 + 오브 보너스" 형태로 표시
+formatHeroGrowthStatLine(): Hero의 현재 경기 성장과 보호막만 전투 카드에 표시
+UIController / Alpine.js:  Hero Ball만 fighter card의 statLine에 현재 경기 성장을 표시
 BattleSimulation:          HeroOrb를 entities 목록에 추가/제거 (spawnHeroOrb)
 BattleBall:                heroOrbBonuses 누적값 보유, 직접적인 Hero Ball 전용 if문 없음
 ```
@@ -549,7 +548,7 @@ npm run format:check
 
 | 파일 성격          | 분리 기준                                           | 분리 방향                                      | 예시                                                  |
 | ------------------ | --------------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------- |
-| **데이터/설정**    | 1000줄 넘어도 분리 불필요                           | 값 추가만으로 유지보수에 지장 없으면 그대로 둠 | `roster.js`, `statAllocation.js`                      |
+| **데이터/설정**    | 1000줄 넘어도 분리 불필요                           | 값 추가만으로 유지보수에 지장 없으면 그대로 둠 | `roster.js`, `rewardBalanceConfig.js`                 |
 | **게임 로직/상태** | 700~1000줄에서 분리 검토                            | 책임별로 클래스/모듈 분리                      | `simulation.js`, `entities.js`                        |
 | **UI/렌더링**      | 700~1000줄에서 분리 검토                            | 컴포넌트나 역할 단위로 분리                    | `ui.js` (Alpine store / UIController / ArenaRenderer) |
 | **능력(Ability)**  | 각 Ability 파일은 개별 클래스이므로 1000줄까지 허용 | 능력 하나가 1000줄 넘으면 내부 책임 분리       | `orbitAbility.js`, `rageAbility.js`                   |
@@ -612,7 +611,6 @@ app.js → UIController 메서드 호출
 | `x-bind:class="{ visible: overlayVisible }"`  | 오버레이 표시            | `UIController.showOverlay()` / `hideOverlay()`      |
 | `@click="startTournament()"`                  | 시작 버튼 클릭           | 컴포넌트 핸들러 → `BattleApp.startTournament()`     |
 | `x-for="fighter in fighters"`                 | 파이터 카드 목록         | `UIController.renderRoster()` / `updateLiveCards()` |
-| `x-for="stat in statDefs"`                    | 스탯 배분 버튼 그리드    | `appStore().adjustStat()`                           |
 | `x-for="(round, rIndex) in tournamentRounds"` | 토너먼트 대진표          | `UIController.renderTournament()`                   |
 | `x-text="item"` in `x-for`                    | 배틀 로그                | `UIController.addLog()`                             |
 

@@ -4,8 +4,8 @@
     type="button"
     x-data="startButton"
     x-bind:class="{ hidden: hidden }"
-    x-bind:disabled="disabledOverride !== null ? disabledOverride : (remainingPoints > 0 || locked)"
-    x-text="textOverride !== null ? textOverride : (remainingPoints > 0 ? '스탯 ' + remainingPoints + ' 남음' : '게임 시작')"
+    x-bind:disabled="disabledOverride !== null ? disabledOverride : locked"
+    x-text="textOverride !== null ? textOverride : '게임 시작'"
     @click="handleClick()"
 >
     게임 시작
@@ -15,7 +15,6 @@
         hidden: true,
         disabledOverride: null,
         textOverride: null,
-        remainingPoints: 0,
         locked: false,
         gameMode: "tournament",
         handleClick() {
@@ -37,7 +36,6 @@
             this.hidden = true;
             this.disabledOverride = null;
             this.textOverride = null;
-            this.remainingPoints = 0;
             this.locked = false;
             this.gameMode = "tournament";
         }

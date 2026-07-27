@@ -28,6 +28,34 @@ function readSource(path) {
     return readFileSync(path, "utf8");
 }
 
+function testStatAllocationSystemIsRemoved() {
+    const app = readSource("src/app.js");
+    const playerPanel = readSource("src/components/player-panel.html");
+    const startButton = readSource("src/components/start-button.html");
+    const fighterStrip = readSource("src/components/fighter-strip.html");
+
+    assert.equal(existsSync("src/statAllocation.js"), false, "The retired stat-allocation domain should be deleted");
+    assert.equal(
+        /statAllocation|playerStatAllocation/.test(app),
+        false,
+        "BattleApp should not retain allocation state"
+    );
+    assert.equal(
+        /stat-board|point-meter|allocation-summary|자동 배분|@click="adjustStat/.test(playerPanel),
+        false,
+        "The setup panel should not render stat-allocation controls"
+    );
+    assert.equal(
+        /remainingPoints|스탯 .* 남음/.test(startButton),
+        false,
+        "The start button should not gate play on allocation points"
+    );
+    assert.equal(/내 배분|AI 배분/.test(fighterStrip), false, "Combat cards should not label removed allocations");
+    console.log("[stat-allocation-system-removed] ok");
+}
+
+testStatAllocationSystemIsRemoved();
+
 function testDisabledHuntingUiIsNotMounted() {
     const content = readSource("src/components/hunting-overlay.html");
     const manager = readSource("src/hunting/huntingManager.js");
@@ -726,15 +754,10 @@ function testEquipmentCurrencyContract() {
 
 function testDefenseHelpCopyContract() {
     const helpContent = readSource("src/helpContent.js");
-    const playerPanel = readSource("src/components/player-panel.html");
     assert.match(
         helpContent,
-        /방어력 \(DEF\).*1포인트당 방어력이 1 증가.*방어 100.*50%/,
-        "Help should explain direct defense rating points and the 100-rating half-damage point"
-    );
-    assert.ok(
-        playerPanel.includes("stat.key === 'defense' ? '' : '%'"),
-        "Player panel should omit the percent suffix only for direct defense allocation"
+        /방어력 \(DEF\).*방어 100.*50%/,
+        "Help should explain the 100-rating half-damage point without allocation copy"
     );
     console.log("[defense-help-copy] ok");
 }
@@ -838,8 +861,8 @@ function testGameplayUiResetContracts() {
     assert.ok(
         fighterStrip.includes("fighter.showStatLine") &&
             fighterStrip.includes("fighter.revivalBattlesUntilReturn === 0 && fighter.showStatLine") &&
-            abilityAppSource.includes("showStatLine: isHero ? Boolean(heroStatLine) : !isHuntingCompanion"),
-        "Hunting cards should render a stat row only when the card view model explicitly marks it meaningful"
+            abilityAppSource.includes("showStatLine: Boolean(heroStatLine)"),
+        "Combat cards should reserve the stat row only for visible Hero growth"
     );
     assert.ok(
         abilityAppSource.includes("formatHeroGrowthStatLine(heroBonuses, 0)") &&

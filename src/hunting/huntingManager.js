@@ -59,7 +59,6 @@ import {
     getCharacterExperienceSummary
 } from "../experience/experienceService.js";
 import { applyRebirthLoadoutToBaseSpec, applyRebirthLoadoutToBattleBall, getRebirthLoadout } from "../rebirth/index.js";
-import { applyStatAllocation } from "../statAllocation.js";
 import { isHiddenCharacterId } from "../characterAvailability.js";
 import { savePlayerProfile, unlockHiddenCharacter } from "../playerProfile.js";
 import { CHARACTER_ROSTER_CONTEXTS, getEligibleRoster, getEncounterFighterIdentity } from "../characterRosterPolicy.js";
@@ -581,11 +580,7 @@ export class HuntingManager {
         });
     }
 
-    _createHuntingCharacterBuild(
-        run,
-        characterId,
-        { useEquipment = false, useAllocation = false, heroCarryover = null } = {}
-    ) {
+    _createHuntingCharacterBuild(run, characterId, { useEquipment = false, heroCarryover = null } = {}) {
         const app = this.app;
         const playerSpec = app.roster.find((fighter) => fighter.id === characterId);
         if (!playerSpec) return null;
@@ -595,10 +590,7 @@ export class HuntingManager {
         const masteryCtx = collectActiveEffects(app.playerProfile, characterId);
         const baseSpec = applyExperienceProgressionToBaseSpec(playerSpec, playerProgression);
         const rebornSpec = applyRebirthLoadoutToBaseSpec(baseSpec, rebirthLoadout);
-        const allocatedSpec = useAllocation
-            ? applyStatAllocation(rebornSpec, app.playerStatAllocation ?? {}, true)
-            : rebornSpec;
-        const teamSpec = { ...allocatedSpec, teamId: HUNTING_TEAMS.PLAYER };
+        const teamSpec = { ...rebornSpec, teamId: HUNTING_TEAMS.PLAYER };
         const equippedSpec = useEquipment ? applyEquipmentStats(teamSpec, app.playerProfile) : teamSpec;
         const huntingSpec = applyHuntingStatModifiersToSpec(equippedSpec, run.statModifiers);
         const appliedSpec = applyMasteryEffectsToFighterSpec(huntingSpec, masteryCtx);
@@ -612,11 +604,10 @@ export class HuntingManager {
         return { playerSpec, playerProgression, rebirthLoadout, appliedSpec };
     }
 
-    _createHuntingPartyMemberSpec(run, role, { useEquipment = false, useAllocation = false } = {}) {
+    _createHuntingPartyMemberSpec(run, role, { useEquipment = false } = {}) {
         const member = getHuntingPartyMember(run.party, role);
         const build = this._createHuntingCharacterBuild(run, member?.characterId, {
             useEquipment,
-            useAllocation,
             heroCarryover: member?.hero?.carryover
         });
         if (!build) return null;
@@ -628,8 +619,7 @@ export class HuntingManager {
 
     _createPlayerHuntingSpec(run) {
         return this._createHuntingPartyMemberSpec(run, run.party.activeRole, {
-            useEquipment: true,
-            useAllocation: true
+            useEquipment: true
         });
     }
 
@@ -659,8 +649,7 @@ export class HuntingManager {
         const inactiveRole =
             run.party.activeRole === HUNTING_PARTY_ROLES.LEADER ? HUNTING_PARTY_ROLES.SWAP : HUNTING_PARTY_ROLES.LEADER;
         return this._createHuntingPartyMemberSpec(run, inactiveRole, {
-            useEquipment: true,
-            useAllocation: true
+            useEquipment: true
         });
     }
 

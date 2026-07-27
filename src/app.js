@@ -1,19 +1,8 @@
 ﻿import { AudioEngine } from "./audio.js";
 import { BattleSimulation } from "./simulation/battleSimulation.js";
 import { ArenaRenderer } from "./ui.js";
-import { Matchmaker, TournamentManager } from "./tournament.js";
+import { createTournamentRoster, Matchmaker, TournamentManager } from "./tournament.js";
 import { createRoster } from "./roster.js";
-import {
-    ALLOCATABLE_STATS,
-    PLAYER_STAT_POINTS,
-    createEmptyStatAllocation,
-    createRandomStatAllocation,
-    createTournamentRoster,
-    getRemainingStatPoints,
-    adjustStatAllocation,
-    formatCompactStatAllocation,
-    formatStatAllocation
-} from "./statAllocation.js";
 import { ActionPickerService } from "./actionPicker.js";
 import { CollectionHubService } from "./collectionHubService.js";
 import { PopupService } from "./popup.js";
@@ -127,7 +116,6 @@ export class BattleApp {
         );
         this.playerFighterId = this.pickPlayerFighterId();
         migrateLegacyExperienceToCharacter(this.playerProfile, this.playerFighterId);
-        this.playerStatAllocation = createEmptyStatAllocation();
         this.playerResult = null;
         this._matchReports = [];
         this._currentTournamentReport = null;
@@ -203,10 +191,9 @@ export class BattleApp {
         this._speed = { level: 1, indicatorTimer: 0, indicatorText: "" };
         this._combatControlState = createCombatControlState();
 
-        this._syncPlayerStatAllocationFromUi();
         this.refreshPlayerSetup();
         this._refreshCollectionHub();
-        this._root.statusText = "내 캐릭터 스탯을 배분하세요";
+        this._root.statusText = "캐릭터와 장비를 확인하세요";
         this._root.statusBadge = "Setup";
         this.resetHuntingUiState();
         this.startPlayerPreviewLoop();
@@ -347,7 +334,6 @@ export class BattleApp {
                 this.playerFighterId = playableRoster[Math.floor(Math.random() * playableRoster.length)].id;
             }
         }
-        this.playerStatAllocation = createEmptyStatAllocation();
         this._previewBall = null;
         this._selectionAnimTime = 0;
         this.refreshPlayerSetup();
@@ -463,7 +449,6 @@ export class BattleApp {
 
         if (sim.finished) {
             this.playerFighterId = sim.pendingId;
-            this.playerStatAllocation = createEmptyStatAllocation();
             migrateLegacyExperienceToCharacter(this.playerProfile, this.playerFighterId);
 
             this._previewBall = sim.incoming;
@@ -620,62 +605,14 @@ export class BattleApp {
         };
     }
 
-    _syncPlayerStatAllocationFromUi() {
-        const alloc = this._panel.allocation;
-        if (alloc === null || typeof alloc !== "object" || Array.isArray(alloc)) {
-            throw new Error(
-                `[BattleApp] playerPanel.allocation(${typeof alloc})이(가) 유효하지 않습니다. playerPanel 컴포넌트는 반드시 객체 형태의 allocation을 초기 상태로 제공해야 합니다.`
-            );
-        }
-        this.playerStatAllocation = {
-            ...createEmptyStatAllocation(),
-            ...alloc
-        };
-    }
-
-    _updatePlayerPanelSummary() {
-        this._panel.allocationSummary = formatStatAllocation(this._panel.allocation);
-    }
-
     _syncStartButton() {
         if (!this.lifecycle.isSetup) return;
-        const remaining = this._panel.remainingPoints ?? 0;
-        this._startBtn.remainingPoints = remaining;
         this._startBtn.setState({
-            disabled: remaining > 0,
+            disabled: false,
             text: undefined,
             hidden: false
         });
         this._startBtn.gameMode = this._gameMode;
-    }
-
-    adjustStat(key, delta) {
-        if (this._panel.locked) return;
-        this._panel.allocation = {
-            ...adjustStatAllocation(this._panel.allocation, key, delta, this._panel.totalPoints)
-        };
-        this._panel.remainingPoints = getRemainingStatPoints(this._panel.allocation, this._panel.totalPoints);
-        this._updatePlayerPanelSummary();
-        this._syncStartButton();
-        this._syncPlayerStatAllocationFromUi();
-    }
-
-    randomAllocation() {
-        if (this._panel.locked) return;
-        this._panel.allocation = { ...createRandomStatAllocation(undefined, this._panel.totalPoints) };
-        this._panel.remainingPoints = getRemainingStatPoints(this._panel.allocation, this._panel.totalPoints);
-        this._updatePlayerPanelSummary();
-        this._syncStartButton();
-        this._syncPlayerStatAllocationFromUi();
-    }
-
-    resetAllocation() {
-        if (this._panel.locked) return;
-        this._panel.allocation = { ...createEmptyStatAllocation() };
-        this._panel.remainingPoints = getRemainingStatPoints(this._panel.allocation, this._panel.totalPoints);
-        this._updatePlayerPanelSummary();
-        this._syncStartButton();
-        this._syncPlayerStatAllocationFromUi();
     }
 
     _getTournamentChallengePresentation() {
@@ -709,7 +646,6 @@ export class BattleApp {
     }
 
     refreshPlayerSetup() {
-        const remaining = getRemainingStatPoints(this.playerStatAllocation);
         const player = this.roster.find((fighter) => fighter.id === this.playerFighterId);
         const experienceSummary = getCharacterExperienceSummary(this.playerProfile, this.playerFighterId);
         const equipmentSummary = this._getPlayerEquipmentSummary(this.playerFighterId);
@@ -720,19 +656,10 @@ export class BattleApp {
             : null;
         this._panel.tournamentTierLabel = tournamentChallenge.tierLabel;
         this._panel.tournamentOpponentLevel = tournamentChallenge.opponentLevel;
-        this._panel.allocation = { ...this.playerStatAllocation };
-        this._panel.totalPoints = PLAYER_STAT_POINTS;
-        this._panel.remainingPoints = remaining;
         const setupLocked = this.lifecycle.isSetupInteractionLocked;
         this._panel.locked = setupLocked;
-        this._panel.statDefs = ALLOCATABLE_STATS.map((s) => ({
-            key: s.key,
-            label: s.label,
-            description: s.description
-        }));
         this._panel.experience = { ...experienceSummary };
         this._panel.equipmentSummary = { ...equipmentSummary };
-        this._updatePlayerPanelSummary();
 
         // 모드 세그먼트 동기화
         const canHunt = this.roster.length > 0;
@@ -801,11 +728,9 @@ export class BattleApp {
                 revivalBattlesUntilReturn,
                 revivalLabel: revivalBattlesUntilReturn > 0 ? `${revivalBattlesUntilReturn}전투 뒤 부활` : "",
                 lifeSlots: [],
-                showStatLine: isHero ? Boolean(heroStatLine) : !isHuntingCompanion,
-                statLine: isHero ? heroStatLine : formatStatAllocation(fighter.stats.allocation ?? {}),
-                compactStatLine: isHero
-                    ? compactHeroStatLine
-                    : formatCompactStatAllocation(fighter.stats.allocation ?? {}),
+                showStatLine: Boolean(heroStatLine),
+                statLine: isHero ? heroStatLine : "",
+                compactStatLine: isHero ? compactHeroStatLine : "",
                 isHero,
                 abilityStates: [
                     {
@@ -831,7 +756,6 @@ export class BattleApp {
         this._strip.fighters = (this._strip.fighters || []).map((card) => {
             const fighter = fighters.find((f) => f.id === card.id || f.name === card.name);
             if (!fighter) return card;
-            const alloc = fighter.stats.allocation ?? {};
             const isHero = fighter.id === FIGHTER_IDS.HERO;
             const bonuses = mergeOrbBonuses(fighter.hero.bonuses ?? {}, fighter.hero.carryover ?? {});
             const abilityStates = fighter.getAbilityUiStates().map((state) => {
@@ -867,10 +791,8 @@ export class BattleApp {
                 defeated: fighter.flags.defeated,
                 mergedBonuses: bonuses,
                 showStatLine: isHero ? Boolean(heroStatLine) : card.showStatLine,
-                statLine: isHero ? heroStatLine : formatStatAllocation(fighter.stats.allocation ?? {}),
-                compactStatLine: isHero
-                    ? compactHeroStatLine
-                    : formatCompactStatAllocation(fighter.stats.allocation ?? {}),
+                statLine: isHero ? heroStatLine : "",
+                compactStatLine: isHero ? compactHeroStatLine : "",
                 abilityStates,
                 actionName: fighter.clickActionName ?? null
             };
@@ -927,7 +849,6 @@ export class BattleApp {
             const inEligible = eligible.find((c) => c.id === this.playerFighterId);
             if (!inEligible) {
                 this.playerFighterId = eligible[0].id;
-                this.playerStatAllocation = createEmptyStatAllocation();
                 this._previewBall = null;
                 this.refreshPlayerSetup();
                 return;
@@ -979,16 +900,6 @@ export class BattleApp {
             return;
         }
         if (!this.lifecycle.isSetup) return;
-        // Sync allocation from Alpine (user may have clicked +/- buttons there)
-        this._syncPlayerStatAllocationFromUi();
-
-        const baseRemaining = getRemainingStatPoints(this.playerStatAllocation);
-        if (baseRemaining > 0) {
-            this._overlay.show({ label: "스탯 배분 필요", text: `${baseRemaining} 포인트 남음` });
-            this._log.add(`토너먼트 시작 전 스탯 ${baseRemaining} 포인트를 더 배분해야 합니다.`);
-            this.refreshPlayerSetup();
-            return;
-        }
 
         this.audio.unlock();
         this.beginGameSession();
@@ -998,7 +909,6 @@ export class BattleApp {
         this._startBtn.setState({ disabled: true, hidden: true, text: "다시 시작" });
         // 연계 효과 계산: 해금된 ID 중 현재 캐릭터가 아닌 효과만 적용
         const masteryCtx = collectActiveEffects(this.playerProfile, this.playerFighterId);
-        const adjustedAllocation = { ...this.playerStatAllocation };
         const playerExperienceProgression = collectActiveExperienceProgression(
             this.playerProfile,
             this.playerFighterId
@@ -1027,13 +937,7 @@ export class BattleApp {
             return applyRebirthLoadoutToBaseSpec(withExperience, this._rebirthLoadoutByFighter.get(fighter.id));
         });
 
-        this.tournamentRoster = createTournamentRoster(
-            rosterWithExperienceProgression,
-            this.playerFighterId,
-            adjustedAllocation,
-            undefined,
-            undefined
-        );
+        this.tournamentRoster = createTournamentRoster(rosterWithExperienceProgression, this.playerFighterId);
         this._experienceProgressionByFighter = new Map(
             this.tournamentRoster
                 .map((fighter) => [fighter.id, candidateExperienceProgressionByFighter.get(fighter.id)])
@@ -1055,8 +959,7 @@ export class BattleApp {
         this.refreshPlayerSetup();
         this._bracket.render(this.tournament);
         const player = this.tournamentRoster.find((fighter) => fighter.id === this.playerFighterId);
-        this._log.add(`내 캐릭터는 ${player.name}. 배분한 스탯으로 토너먼트에 참가합니다.`);
-        this._log.add("다른 캐릭터들도 같은 포인트를 랜덤으로 받은 뒤 대진표가 확정되었습니다.");
+        this._log.add(`내 캐릭터는 ${player.name}. 대진표가 확정되었습니다.`);
         await this.runNextTournamentMatch();
     }
 
