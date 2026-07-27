@@ -14,6 +14,23 @@ assert.equal(scene({}, { drag: { state: "idle" } }).active, false);
 assert.deepEqual(scene().launchVelocity, { x: 220.00000000000003, y: 0 });
 assert.equal(scene({}, snapshot(0)).launchVelocity.x, 85);
 assert.equal(scene({}, snapshot(0.5)).launchVelocity.x, 152.5);
+const withVelocity = (velocity) => ({
+    ...player,
+    velocity,
+    position: { ...player.position },
+    stats: { ...player.stats }
+});
+const velocityScene = (velocity) => {
+    const movingPlayer = withVelocity(velocity);
+    return scene({ playerBall: movingPlayer, fighters: [movingPlayer] });
+};
+assert.deepEqual(velocityScene({ x: 0, y: 0 }).launchVelocity, { x: 220.00000000000003, y: 0 });
+assert.deepEqual(velocityScene({ x: 30, y: 0 }).launchVelocity, { x: 250.00000000000003, y: 0 });
+assert.deepEqual(velocityScene({ x: -30, y: 0 }).launchVelocity, { x: 190.00000000000003, y: 0 });
+assert.deepEqual(velocityScene({ x: 0, y: 40 }).launchVelocity, { x: 220.00000000000003, y: 40 });
+const cancelledVelocity = velocityScene({ x: -220.00000000000003, y: 0 });
+assert.deepEqual(cancelledVelocity.launchVelocity, { x: 0, y: 0 });
+assert.equal(cancelledVelocity.segments.length, 0);
 const wall = scene({ width: 150 });
 assert.equal(wall.bounces.length, 3);
 assert.equal(wall.segments.length, 4);
@@ -55,7 +72,11 @@ const ally = scene({ fighters: [player, { ...enemy, teamId: "a" }] });
 assert.equal(ally.terminal.relation, "ally");
 assert.equal(ally.terminal.shieldResult, "plain");
 const invalid = scene({
-    fighters: [player, { ...enemy, id: "x", canBeTargeted: false }, { ...enemy, id: "dead", flags: { defeated: true } }]
+    fighters: [
+        player,
+        { ...enemy, id: "x", participation: { canBeTargeted: false } },
+        { ...enemy, id: "dead", flags: { defeated: true } }
+    ]
 });
 assert.equal(invalid.terminal, null);
 const standby = scene({ fighters: [player, enemy], standbyFighters: [enemy] });

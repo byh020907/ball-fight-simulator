@@ -137,7 +137,7 @@ function validTarget(fighter, player, standby) {
         !fighter.flags?.defeated &&
         !fighter.flags?.destroyed &&
         !fighter.state?.swallowed &&
-        fighter.canBeTargeted !== false &&
+        fighter.participation?.canBeTargeted !== false &&
         finite(fighter.position) &&
         Number.isFinite(fighter.radius)
     );
@@ -178,15 +178,29 @@ export function createDragTrajectoryScene({ simulation, runtimeSnapshot } = {}) 
             bounces: [],
             terminal: null
         };
-    const speed =
+    const impulseSpeed =
         (player.stats?.baseSpeed ?? 0) *
         (DRAG_COMBAT_CONFIG.shot.minSpeedRatio +
             (DRAG_COMBAT_CONFIG.shot.maxSpeedRatio - DRAG_COMBAT_CONFIG.shot.minSpeedRatio) * strength);
-    const launchVelocity = { x: direction.x * speed, y: direction.y * speed };
+    const currentVelocity = finite(player.velocity) ? player.velocity : { x: 0, y: 0 };
+    const launchVelocity = {
+        x: currentVelocity.x + direction.x * impulseSpeed,
+        y: currentVelocity.y + direction.y * impulseSpeed
+    };
+    let heading = normalize(launchVelocity);
+    if (!heading)
+        return {
+            active: true,
+            origin: copy(player.position),
+            launchVelocity,
+            strength,
+            segments: [],
+            bounces: [],
+            terminal: null
+        };
     const radius = Math.max(0, player.radius ?? player.stats?.baseRadius ?? 0);
     let current = copy(player.position);
-    let heading = direction;
-    let remaining = Math.max(0, speed * DRAG_COMBAT_CONFIG.shot.shotMaxSeconds);
+    let remaining = Math.max(0, length(launchVelocity) * DRAG_COMBAT_CONFIG.shot.shotMaxSeconds);
     const segments = [];
     const bounces = [];
     let terminal = null;
