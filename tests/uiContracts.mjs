@@ -446,6 +446,10 @@ function testDailyShopPopupContract() {
         "Expired purchase limits should become available without reopening the shop"
     );
     assert.ok(
+        shopPanel.includes("isShopSoldOut(shop)") && !shopPanel.includes("getOfferPurchased"),
+        "Shop cards should expose the shared sold-out state without an unused offer index"
+    );
+    assert.ok(
         shopPanel.includes("getShopRerollCost"),
         "Expired rerolls should return to their base cost without reopening the shop"
     );
@@ -887,12 +891,13 @@ function testGameplayUiResetContracts() {
     assert.ok(
         fighterStrip.includes("fighter.showStatLine") &&
             fighterStrip.includes("fighter.revivalBattlesUntilReturn === 0 && fighter.showStatLine") &&
-            abilityAppSource.includes("showStatLine: Boolean(heroStatLine)"),
+            abilityAppSource.includes("function createHeroStatPresentation") &&
+            abilityAppSource.match(/\.\.\.heroStatPresentation/g)?.length === 2,
         "Combat cards should reserve the stat row only for visible Hero growth"
     );
     assert.ok(
-        abilityAppSource.includes("formatHeroGrowthStatLine(heroBonuses, 0)") &&
-            abilityAppSource.includes("formatHeroGrowthStatLine(bonuses, shield)") &&
+        abilityAppSource.includes("formatHeroGrowthStatLine(bonuses, shield)") &&
+            abilityAppSource.includes('return { showStatLine: false, statLine: "", compactStatLine: "" }') &&
             !fighterStrip.includes("hero-stat-parts"),
         "Hero cards should replace allocation rows with live growth or shield text instead of reserving empty stat markup"
     );
@@ -1045,6 +1050,7 @@ function testAlpineTemplateUiManagerContracts() {
 function testHuntingOverlayActionContracts() {
     const overlay = readSource("src/components/hunting-overlay.html");
     const bridge = readSource("src/componentBridge.js");
+    const manager = readSource("src/hunting/huntingManager.js");
     assert.equal(overlay.toLowerCase().includes("chest"), false, "Hunting overlay must not expose chest state");
     assert.equal(bridge.includes("huntingChestContinue"), false, "Component bridge must not expose chest continuation");
     assert.ok(overlay.includes("huntingEventActive: false"), "Hunting event result must initialize its local state");
@@ -1084,6 +1090,13 @@ function testHuntingOverlayActionContracts() {
         bridge.includes("huntingAdvanceCombatResult()") &&
             overlay.includes('invokeGameAction("huntingAdvanceCombatResult")'),
         "Post-combat cards must use the manager-owned automatic result flow"
+    );
+    assert.equal(
+        /huntingResultContinueVisible|continueCharacterUnlockResult|huntingContinueCharacterUnlockResult/.test(
+            `${overlay}\n${bridge}\n${manager}`
+        ),
+        false,
+        "Retired manual loot-result continuation state and actions must not remain mounted"
     );
     assert.ok(
         overlay.includes('class="hunting-combat-unlock-card"') &&

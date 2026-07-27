@@ -93,6 +93,18 @@ import { spawnHuntingCombatControlFeedback } from "./effects/index.js";
 
 const TOURNAMENT_CHALLENGE_INTRO_DURATION = 1000;
 
+function createHeroStatPresentation(fighterId, bonuses, shield = 0) {
+    if (fighterId !== FIGHTER_IDS.HERO) {
+        return { showStatLine: false, statLine: "", compactStatLine: "" };
+    }
+    const statLine = formatHeroGrowthStatLine(bonuses, shield);
+    return {
+        showStatLine: Boolean(statLine),
+        statLine,
+        compactStatLine: formatHeroGrowthStatLine(bonuses, shield, { compact: true })
+    };
+}
+
 export class BattleApp {
     constructor() {
         // ── 디버그 변수 (테스트 편의용) ──
@@ -694,8 +706,7 @@ export class BattleApp {
             const isHero = fighter.id === FIGHTER_IDS.HERO;
             const isHuntingCompanion = fighter.hunting?.partyRole?.startsWith("companion-");
             const heroBonuses = mergeOrbBonuses({}, fighter.hero?.carryover ?? {});
-            const heroStatLine = formatHeroGrowthStatLine(heroBonuses, 0);
-            const compactHeroStatLine = formatHeroGrowthStatLine(heroBonuses, 0, { compact: true });
+            const heroStatPresentation = createHeroStatPresentation(fighter.id, heroBonuses);
             const maxHp = cardState.maxHp ?? fighter.maxHp ?? fighter.stats?.hp ?? 0;
             const hp = cardState.hp ?? fighter.hp ?? maxHp;
             const defeated = Boolean(cardState.defeated);
@@ -729,9 +740,7 @@ export class BattleApp {
                 revivalBattlesUntilReturn,
                 revivalLabel: revivalBattlesUntilReturn > 0 ? `${revivalBattlesUntilReturn}전투 뒤 부활` : "",
                 lifeSlots: [],
-                showStatLine: Boolean(heroStatLine),
-                statLine: isHero ? heroStatLine : "",
-                compactStatLine: isHero ? compactHeroStatLine : "",
+                ...heroStatPresentation,
                 isHero,
                 abilityStates: [
                     {
@@ -770,8 +779,7 @@ export class BattleApp {
             });
             const shieldState = fighter.getShieldState();
             const shield = Math.max(0, shieldState.current);
-            const heroStatLine = formatHeroGrowthStatLine(bonuses, shield);
-            const compactHeroStatLine = formatHeroGrowthStatLine(bonuses, shield, { compact: true });
+            const heroStatPresentation = createHeroStatPresentation(fighter.id, bonuses, shield);
             const healthBar = getCombinedHealthBarPercentages({
                 hp: fighter.hp,
                 maxHp: fighter.maxHp,
@@ -791,9 +799,7 @@ export class BattleApp {
                     : [],
                 defeated: fighter.flags.defeated,
                 mergedBonuses: bonuses,
-                showStatLine: isHero ? Boolean(heroStatLine) : card.showStatLine,
-                statLine: isHero ? heroStatLine : "",
-                compactStatLine: isHero ? compactHeroStatLine : "",
+                ...heroStatPresentation,
                 abilityStates,
                 actionName: fighter.clickActionName ?? null
             };

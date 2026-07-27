@@ -1731,7 +1731,6 @@ export class HuntingManager {
             huntingCombatResultStep: this._lastBattleCharacterUnlock ? "unlock" : "experience",
             huntingCombatResultTotal: this._lastBattleCharacterUnlock ? 3 : 2,
             huntingCharacterUnlock: this._lastBattleCharacterUnlock,
-            huntingResultContinueVisible: false,
             huntingCombatResultTitle: `${run.floor}층 전투 완료`,
             huntingCombatResultSummary: pendingText,
             huntingPartyExperienceRewards: this._getPartyExperienceRewards(),

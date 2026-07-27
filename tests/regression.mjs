@@ -1072,14 +1072,12 @@ async function loadModuleApp() {
         hidden: true,
         disabledOverride: null,
         textOverride: null,
-        remainingPoints: 0,
         locked: false,
         setState() {},
         reset() {
             this.hidden = true;
             this.disabledOverride = null;
             this.textOverride = null;
-            this.remainingPoints = 0;
             this.locked = false;
         }
     });
@@ -1093,30 +1091,18 @@ async function loadModuleApp() {
         fighter: null,
         experience: {},
         equipmentSummary: { ...EMPTY_EQUIPMENT_SUMMARY },
-        allocation: {},
-        totalPoints: 0,
-        bonusPoints: 0,
-        remainingPoints: 0,
         locked: false,
-        statDefs: [],
         challengeLevel: 0,
         highestUnlockedLevel: 0,
         tournamentTierLabel: "첫 도전",
         tournamentOpponentLevel: 1,
-        progressionBonusSummary: "",
-        allocationSummary: "",
         reset() {
             this.fighter = null;
             this.experience = {};
             this.equipmentSummary = { ...EMPTY_EQUIPMENT_SUMMARY };
-            this.allocation = {};
-            this.totalPoints = 0;
-            this.remainingPoints = 0;
             this.locked = false;
-            this.statDefs = [];
             this.tournamentTierLabel = "첫 도전";
             this.tournamentOpponentLevel = 1;
-            this.allocationSummary = "";
         }
     };
     uiManager.register("playerPanel", playerPanelMock);
@@ -16855,7 +16841,6 @@ testDeveloperCollectionSampleTool();
 await testCreateCollectionHubViewModel();
 // Toast queue tests
 await testToastQueue();
-// adjustStat with bonus total test
 // Mastery modifier tests
 await testMasteryModifiersStoredOnBattleBall(app);
 await testStatModifierDamageIndependentOfHp();
@@ -20379,8 +20364,7 @@ async function testActionGateway() {
         startTournament() {
             called = true;
             return "started";
-        },
-        adjustStat() {}
+        }
     };
     registerGameActionBridge(mockBridge);
 
@@ -20647,16 +20631,9 @@ async function testUiManagerRequireComponentMissingFails() {
         fighter: null,
         experience: {},
         equipmentSummary: { slots: [], statLine: "" },
-        allocation: {},
-        totalPoints: 0,
-        bonusPoints: 0,
-        remainingPoints: 0,
         locked: false,
-        statDefs: [],
         challengeLevel: 0,
-        highestUnlockedLevel: 0,
-        progressionBonusSummary: "",
-        allocationSummary: ""
+        highestUnlockedLevel: 0
     });
 
     const moduleUrl = new URL(`../src/app.js?test=${Date.now()}`, import.meta.url).href;

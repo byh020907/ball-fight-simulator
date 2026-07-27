@@ -18,7 +18,7 @@
                         <template x-for="(offer, index) in state.storage.dailyShop.offers" :key="offer.templateId">
                             <div
                                 class="ch-shop-card"
-                                x-bind:class="{ 'is-rerolling': state.rerolling, 'is-purchased': getOfferPurchased(state.storage.dailyShop, index) }"
+                                x-bind:class="{ 'is-rerolling': state.rerolling, 'is-purchased': isShopSoldOut(state.storage.dailyShop) }"
                             >
                                 <canvas
                                     class="ch-shop-icon"
@@ -32,7 +32,7 @@
                                 <button
                                     class="ch-btn"
                                     type="button"
-                                    x-bind:disabled="getOfferPurchased(state.storage.dailyShop, index) || state.storage.shards < offer.price || !canPurchase()"
+                                    x-bind:disabled="isShopSoldOut(state.storage.dailyShop) || state.storage.shards < offer.price"
                                     @click="buyDailyShopEquipment(offer.templateId)"
                                     x-text="'구매 ' + offer.price"
                                 ></button>
@@ -115,11 +115,7 @@
             getShopRerollCost(shop) {
                 return this.isShopResetPending(shop.rerollResetAt) ? shop.rerollCost : shop.rerollBaseCost;
             },
-            canPurchase() {
-                const shop = state.storage.dailyShop;
-                return this.getShopPurchaseCount(shop) < shop.purchaseLimit;
-            },
-            getOfferPurchased(shop, index) {
+            isShopSoldOut(shop) {
                 return this.getShopPurchaseCount(shop) >= shop.purchaseLimit;
             },
             buyDailyShopEquipment(templateId) {

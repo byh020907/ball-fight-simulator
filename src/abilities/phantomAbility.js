@@ -10,6 +10,9 @@ const TELEPORT_BEHIND_DIST = 250;
 const TELEPORT_CLEARANCE = 12;
 const VANISH_DURATION = 0.15;
 const APPEAR_DURATION = 0.4;
+const SHADOW_DASH_LABEL = "그림자 돌진";
+const SHADOW_ACTIVE_LABEL = "그림자 활성화";
+const SHADOW_WAIT_LABEL = "그림자 대기";
 const TELEPORT_DIRECTION_OFFSETS = [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8].map(
     (step) => (step * Math.PI) / 8
 );
@@ -252,14 +255,14 @@ export class PhantomAbility extends Ability {
                 stage === "base"
                     ? this.owner.stats.baseDamage * (this.getLevelUpgrade().bonusDamageMultiplier ?? 1.5)
                     : 0,
-            collisionLabel: "그림자 돌진",
+            collisionLabel: SHADOW_DASH_LABEL,
             showRing: false
         });
         this.state.activeDashStage = stage;
         this.state.pendingShadowStage = null;
 
         sim.playSound("dash", 0.9);
-        sim.addLog(`${owner.name}의 그림자 돌진 발동.`);
+        sim.addLog(`${owner.name}의 ${SHADOW_DASH_LABEL} 발동.`);
     }
 
     onDashHit(target, effect) {
@@ -275,7 +278,7 @@ export class PhantomAbility extends Ability {
         }
         if (stage === "chain" && this.getLevelUpgrade().shadowFinish && this.state.shadowFinishStacks > 0) {
             this.state.shadowFinishStacks -= 1;
-            this._showChainText(target, "그림자 돌진", "#ff88cc");
+            this._showChainText(target, SHADOW_DASH_LABEL, "#ff88cc");
             this._triggerShadowDash(target, "finish");
         }
     }
@@ -286,7 +289,7 @@ export class PhantomAbility extends Ability {
         this.state.shadowPursuitStacks = upgrade.shadowPursuitOnNaturalCollision ? 1 : 0;
         this.state.shadowReboundStacks = upgrade.shadowReboundOnStaticCollision ? 1 : 0;
         this.state.shadowFinishStacks = upgrade.shadowFinish ? 1 : 0;
-        this._showChainText(target, "그림자 돌진", "#8eeeff");
+        this._showChainText(target, SHADOW_DASH_LABEL, "#8eeeff");
     }
 
     _clearExpiredChain() {
@@ -302,7 +305,7 @@ export class PhantomAbility extends Ability {
 
     _triggerShadowChain(target, stackKey) {
         this.state[stackKey] -= 1;
-        this._showChainText(target, "그림자 돌진", "#8eeeff");
+        this._showChainText(target, SHADOW_DASH_LABEL, "#8eeeff");
         if (stackKey === "shadowReboundStacks") {
             this._startShadowDash(target, "chain");
             return;
@@ -319,7 +322,7 @@ export class PhantomAbility extends Ability {
         const total = this.state.shadowPursuitStacks + this.state.shadowReboundStacks + this.state.shadowFinishStacks;
         if (!this.state.markedTargetId || total === 0) return null;
         return {
-            label: "그림자 활성화",
+            label: SHADOW_ACTIVE_LABEL,
             progress: this.cooldownProgress,
             status: "charging",
             text: `${total}회 · ${this.cooldownRemaining.toFixed(1)}초`
@@ -421,11 +424,11 @@ export class PhantomAbility extends Ability {
 
     getUiState() {
         if (this.state.teleportPhase > 0) {
-            return { label: "그림자 돌진", progress: 0, status: "active", text: "발동 중" };
+            return { label: SHADOW_DASH_LABEL, progress: 0, status: "active", text: "발동 중" };
         }
         if (this.state.primed) {
             return {
-                label: "그림자 활성화",
+                label: SHADOW_ACTIVE_LABEL,
                 progress: 1,
                 status: "ready",
                 text: `${Math.max(0, this.state.primedTimer).toFixed(1)}초`
@@ -434,7 +437,7 @@ export class PhantomAbility extends Ability {
         const shadowChainState = this._getShadowChainUiState();
         if (shadowChainState) return shadowChainState;
         return {
-            label: this.cooldownReady ? "그림자 활성화" : "그림자 대기",
+            label: this.cooldownReady ? SHADOW_ACTIVE_LABEL : SHADOW_WAIT_LABEL,
             progress: this.cooldownProgress,
             status: this.cooldownReady ? "ready" : "charging",
             text: this.cooldownReady ? "충돌 대기" : `${this.cooldownRemaining.toFixed(1)}초`

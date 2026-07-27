@@ -141,14 +141,6 @@
                     <button class="hunting-btn advance" type="button" @click="huntingAdvance()">10층 전진</button>
                 </div>
             </div>
-            <button
-                class="hunting-btn advance"
-                type="button"
-                x-show="huntingResultContinueVisible"
-                @click="continueCharacterUnlockResult()"
-            >
-                전리품 확인
-            </button>
         </div>
 
         <button
@@ -211,7 +203,6 @@
         huntingCombatResultSummary: "",
         huntingCombatResultTotal: 2,
         huntingCharacterUnlock: null,
-        huntingResultContinueVisible: false,
         huntingEventActive: false,
         huntingEventDetail: "",
         huntingEventConfirmLabel: "",
@@ -241,10 +232,6 @@
             if (this.huntingCombatResultStep === "unlock") return 1;
             return this.huntingCharacterUnlock ? 2 : 1;
         },
-        continueCharacterUnlockResult() {
-            this.resetHuntingCombatResult();
-            Alpine.store("uiManager").invokeGameAction("huntingContinueCharacterUnlockResult");
-        },
         resetHuntingCombatResult() {
             this.huntingCombatResultActive = false;
             this.huntingCombatResultStep = "experience";
@@ -252,7 +239,6 @@
             this.huntingCombatResultSummary = "";
             this.huntingCombatResultTotal = 2;
             this.huntingCharacterUnlock = null;
-            this.huntingResultContinueVisible = false;
         },
         huntingEventContinue() {
             Alpine.store("uiManager").invokeGameAction("huntingEventContinue");
@@ -339,8 +325,6 @@
             if (data.huntingCombatResultTotal !== undefined)
                 this.huntingCombatResultTotal = data.huntingCombatResultTotal;
             if (data.huntingCharacterUnlock !== undefined) this.huntingCharacterUnlock = data.huntingCharacterUnlock;
-            if (data.huntingResultContinueVisible !== undefined)
-                this.huntingResultContinueVisible = data.huntingResultContinueVisible;
             if (data.huntingEventActive !== undefined) this.huntingEventActive = data.huntingEventActive;
             if (data.huntingEventDetail !== undefined) this.huntingEventDetail = data.huntingEventDetail;
             if (data.huntingEventConfirmLabel !== undefined)
