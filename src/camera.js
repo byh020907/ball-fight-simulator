@@ -1,3 +1,5 @@
+import { screenToWorld } from "./combat-drag/vectorMath.js";
+
 const DEFAULT_ZOOM = 1;
 
 function clamp(value, min, max) {
@@ -32,6 +34,11 @@ export class ArenaCamera {
             worldWidth,
             worldHeight
         };
+    }
+
+    screenToWorld(point, canvas, simulation) {
+        const { scale, offsetX, offsetY } = this.getViewTransform(canvas, simulation);
+        return screenToWorld(point, { scale, offsetX, offsetY });
     }
 
     apply(ctx, canvas, simulation) {
