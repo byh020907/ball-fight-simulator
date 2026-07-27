@@ -20,6 +20,17 @@ function presentStats(stats) {
     return Object.entries(stats).map(([id, value]) => ({ id, label: STAT_LABELS[id] ?? id, value }));
 }
 
+function presentBuildsInto(profile, template) {
+    return EQUIPMENT_TEMPLATES.filter((candidate) => candidate.recipe.includes(template.id)).map((candidate) => ({
+        id: candidate.id,
+        name: candidate.name,
+        iconTag: candidate.iconTag,
+        tier: candidate.tier,
+        tierLabel: TIER_LABELS[candidate.tier],
+        count: getEquipmentCount(profile, candidate.id)
+    }));
+}
+
 function presentTemplate(profile, template) {
     const recipe = getEquipmentRecipePreview(profile, template.id);
     return {
@@ -29,6 +40,7 @@ function presentTemplate(profile, template) {
         tierLabel: TIER_LABELS[template.tier],
         iconTag: template.iconTag,
         count: getEquipmentCount(profile, template.id),
+        buildsInto: presentBuildsInto(profile, template),
         stats: presentStats(template.stats),
         passiveId: template.passiveId,
         passive: getEquipmentPassivePresentation(template.passiveId),

@@ -83,9 +83,29 @@
                     </p>
                     <p class="ch-equipment-passive" x-show="selected.passive" x-text="selected.passive?.name"></p>
                     <p x-show="selected.passive" x-text="selected.passive?.description"></p>
-                    <template x-if="selected.recipe"
-                        ><div class="ch-equipment-recipe">
-                            <p x-text="`조합 비용: 파편 ${selected.recipe.cost}`"></p>
+                    <div class="ch-equipment-recipe">
+                        <div class="ch-equipment-recipe-heading">
+                            <p x-show="selected.recipe" x-text="`조합 비용: 파편 ${selected.recipe?.cost}`"></p>
+                            <section class="ch-equipment-builds-into" aria-label="상위 조합">
+                                <span class="ch-equipment-builds-into-label">상위 조합</span>
+                                <div class="ch-equipment-builds-into-list" x-show="selected.buildsInto.length">
+                                    <template x-for="item in selected.buildsInto" :key="item.id">
+                                        <button
+                                            class="ch-equipment-builds-into-item"
+                                            type="button"
+                                            :aria-label="`${item.name} ${item.tierLabel} 장비 상세 보기, ${item.count > 0 ? `보유 ${item.count}` : '미보유'}`"
+                                            @click="select(item.id)"
+                                        >
+                                            <canvas x-equipment-icon-tag="item.iconTag" aria-hidden="true"></canvas>
+                                            <span x-text="item.name"></span>
+                                            <small x-text="item.count > 0 ? `보유 ${item.count}` : '미보유'"></small>
+                                        </button>
+                                    </template>
+                                </div>
+                                <span class="ch-equipment-final" x-show="!selected.buildsInto.length">최종 장비</span>
+                            </section>
+                        </div>
+                        <template x-if="selected.recipe">
                             <div
                                 class="ch-equipment-recipe-tree"
                                 x-data="{ get tree() { return selected.recipe.tree; } }"
@@ -96,8 +116,9 @@
                                 class="ch-equipment-missing"
                                 x-show="selected.recipe.missingReason"
                                 x-text="craftMessage(selected.recipe.missingReason)"
-                            ></p></div
-                    ></template>
+                            ></p>
+                        </template>
+                    </div>
                     <p class="ch-equipment-feedback" x-show="feedback" x-text="feedback"></p>
                 </div>
                 <div class="ch-equipment-detail-actions">
@@ -371,6 +392,78 @@
         gap: 6px;
         width: 100%;
         min-width: 0;
+    }
+    .ch-equipment-recipe-heading {
+        display: flex;
+        width: 100%;
+        min-width: 0;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 8px;
+    }
+    .ch-equipment-recipe-heading > p {
+        margin: 0;
+        padding-top: 8px;
+        white-space: nowrap;
+    }
+    .ch-equipment-builds-into {
+        display: flex;
+        min-width: 0;
+        flex: 1 1 auto;
+        flex-direction: column;
+        gap: 4px;
+        align-items: flex-end;
+    }
+    .ch-equipment-builds-into-label {
+        font-size: 0.75rem;
+        font-weight: 800;
+    }
+    .ch-equipment-builds-into-list {
+        display: flex;
+        width: 100%;
+        min-width: 0;
+        gap: 8px;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        justify-content: flex-end;
+        overscroll-behavior-x: contain;
+        scrollbar-width: thin;
+    }
+    .ch-equipment-builds-into-item {
+        display: grid;
+        min-width: 44px;
+        flex: 0 0 auto;
+        place-items: center;
+        gap: 2px;
+        border: 2px solid #202020;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 4px;
+        color: #202020;
+        cursor: pointer;
+    }
+    .ch-equipment-builds-into-item canvas {
+        width: 36px;
+        height: 36px;
+    }
+    .ch-equipment-builds-into-item span,
+    .ch-equipment-builds-into-item small {
+        max-width: 72px;
+        overflow-wrap: anywhere;
+        text-align: center;
+    }
+    .ch-equipment-builds-into-item small {
+        font-size: 0.61rem;
+        font-weight: 700;
+    }
+    .ch-equipment-builds-into-item:focus-visible {
+        outline: 3px solid #2563eb;
+        outline-offset: 2px;
+    }
+    .ch-equipment-final {
+        padding: 8px;
+        font-size: 0.75rem;
+        font-weight: 800;
     }
     .ch-equipment-recipe-tree,
     .ch-equipment-recipe-tree recipe-tree {

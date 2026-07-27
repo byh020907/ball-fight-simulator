@@ -25284,6 +25284,14 @@ function testMobileEquipmentDetailUsesCodexStyleSplitScrolling() {
     );
     assert.match(mobileDetailRule, /border-top:\s*2px solid #e0e0e0/, "mobile detail should use the codex divider");
     assert.match(mobileDetailRule, /flex:\s*0 0 clamp\(/, "mobile detail should reserve a stable lower pane");
+    const upgradeRowRule = source.match(/\.ch-equipment-builds-into-list\s*\{(?<body>[^}]*)\}/)?.groups?.body ?? "";
+    assert.match(upgradeRowRule, /overflow-x:\s*auto/, "direct upgrades should own their horizontal overflow");
+    assert.match(upgradeRowRule, /flex-wrap:\s*nowrap/, "direct upgrades should remain on one scrollable row");
+    assert.ok(
+        source.includes('@click="select(item.id)"'),
+        "direct upgrades must reuse the existing detail selection flow"
+    );
+    assert.ok(source.includes("최종 장비"), "completed equipment should communicate its terminal state");
     console.log("[mobile-equipment-detail-codex-layout] ok");
 }
 

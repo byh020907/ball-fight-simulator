@@ -193,9 +193,32 @@ function testEquipmentCheckpointPresentation() {
     const sword = presentation.tiers[0].templates.find((template) => template.id === "attack_sword");
     assert.equal(sword.count, 1, "Presentation should expose owned template counts");
     assert.equal(sword.iconTag, "attack_sword", "Presentation should pass the registered icon tag through");
+    assert.deepEqual(
+        sword.buildsInto.map((item) => item.id),
+        ["intermediate_attack_crit", "intermediate_attack_speed", "completed_defense_conversion"],
+        "Basic equipment should expose every direct, declaration-ordered upgrade without recursive expansion"
+    );
+    assert.deepEqual(
+        sword.buildsInto[0],
+        {
+            id: "intermediate_attack_crit",
+            name: "정밀 보강검",
+            iconTag: "intermediate_attack_crit",
+            tier: "intermediate",
+            tierLabel: "중간",
+            count: 0
+        },
+        "Build-into cards should provide reusable navigation and ownership presentation"
+    );
     const crafted = presentation.tiers[1].templates[0];
     assert.equal(crafted.recipe.missingReason, "missing ingredients", "Recipe failure should be presentation data");
+    assert.deepEqual(
+        crafted.buildsInto.map((item) => item.id),
+        ["completed_ability_crit", "completed_mass_execution"],
+        "Intermediate equipment should expose only its direct completed upgrades"
+    );
     const completed = presentation.tiers[2].templates[0];
+    assert.deepEqual(completed.buildsInto, [], "Completed equipment should explicitly expose no direct upgrades");
     assert.ok(
         completed.passive?.name && completed.passive?.description,
         "Completed templates should expose passive copy"
@@ -281,6 +304,19 @@ function testRecipeTreeUiContract() {
         "Detail must replace direct ingredient text with the tree"
     );
     assert.ok(panel.includes('@click="craft(selected.id)"'), "Craft action must remain beside the tree");
+    assert.ok(
+        panel.includes("상위 조합") &&
+            panel.includes("selected.buildsInto") &&
+            panel.includes('@click="select(item.id)"') &&
+            panel.includes("최종 장비"),
+        "The recipe header should render selectable direct upgrades or a final-equipment state"
+    );
+    assert.ok(
+        panel.includes("overflow-x: auto") &&
+            panel.includes("flex-wrap: nowrap") &&
+            panel.includes('aria-label="상위 조합"'),
+        "Only the direct-upgrade row should expose a labelled single-line horizontal scroll"
+    );
     assert.equal(tree.includes("Alpine.store"), false, "Reusable tree must not read parent stores directly");
     assert.equal(node.includes("Alpine.store"), false, "Reusable tree nodes must not read parent stores directly");
     assert.equal(
