@@ -95,14 +95,20 @@
                                         ><template x-for="upgrade in item.buildsInto" :key="upgrade.id"
                                             ><button
                                                 type="button"
+                                                :class="{ 'is-craftable': upgrade.canCraft, 'is-uncraftable': !upgrade.canCraft }"
                                                 @click="select(upgrade.id)"
-                                                :aria-label="`${upgrade.name} 상위 조합 장비 상세 보기`"
+                                                :aria-label="`${upgrade.name} 상위 조합, ${upgrade.canCraft ? '즉시 조합 가능' : '재료 부족'}, 장비 상세 보기`"
                                             >
                                                 <canvas
                                                     x-equipment-icon-tag="upgrade.iconTag"
                                                     aria-hidden="true"
                                                 ></canvas
-                                                ><span x-text="upgrade.name"></span></button></template
+                                                ><span x-text="upgrade.name"></span
+                                                ><small
+                                                    class="ch-equipment-build-state"
+                                                    aria-hidden="true"
+                                                    x-text="upgrade.canCraft ? '✓' : '×'"
+                                                ></small></button></template
                                     ></template>
                                     <span class="ch-equipment-final" x-show="!item.buildsInto.length">최종 장비</span>
                                 </div>
@@ -149,14 +155,13 @@
                                         ><button
                                             class="ch-equipment-builds-into-item"
                                             type="button"
-                                            :aria-label="`${item.name} ${item.tierLabel} 장비 상세 보기, ${item.count > 0 ? `보유 ${item.count}` : '미보유'}`"
+                                            :class="{ 'is-craftable': item.canCraft, 'is-uncraftable': !item.canCraft }"
+                                            :aria-label="`${item.name} ${item.tierLabel} 상위 조합, ${item.canCraft ? '즉시 조합 가능' : '재료 부족'}, 장비 상세 보기`"
                                             @click="select(item.id)"
                                         >
                                             <canvas x-equipment-icon-tag="item.iconTag" aria-hidden="true"></canvas
                                             ><span x-text="item.name"></span
-                                            ><small
-                                                x-text="item.count > 0 ? `보유 ${item.count}` : '미보유'"
-                                            ></small></button
+                                            ><small x-text="item.canCraft ? '조합 가능' : '재료 부족'"></small></button
                                     ></template>
                                 </div>
                                 <span class="ch-equipment-final" x-show="!selected.buildsInto.length">최종 장비</span>
@@ -506,6 +511,24 @@
         color: #202020;
         cursor: pointer;
     }
+    .ch-equipment-builds-into-item.is-craftable,
+    .ch-equipment-mobile-builds button.is-craftable {
+        border-color: #0f8ea0;
+        background: #e5fbfa;
+        color: #083d44;
+        box-shadow: inset 0 0 0 2px #64d8d6;
+    }
+    .ch-equipment-builds-into-item.is-uncraftable,
+    .ch-equipment-mobile-builds button.is-uncraftable {
+        border-color: #8d8d88;
+        background: #d2d2cd;
+        color: #555;
+    }
+    .ch-equipment-builds-into-item.is-uncraftable canvas,
+    .ch-equipment-mobile-builds button.is-uncraftable canvas {
+        filter: grayscale(1);
+        opacity: 0.3;
+    }
     .ch-equipment-builds-into-item canvas {
         width: 36px;
         height: 36px;
@@ -679,6 +702,7 @@
             gap: 4px;
         }
         .ch-equipment-mobile-builds button {
+            position: relative;
             display: grid;
             width: 48px;
             min-height: 48px;
@@ -695,6 +719,21 @@
         }
         .ch-equipment-mobile-builds button span {
             display: none;
+        }
+        .ch-equipment-mobile-builds .ch-equipment-build-state {
+            position: absolute;
+            right: -3px;
+            bottom: -3px;
+            display: grid;
+            width: 18px;
+            height: 18px;
+            place-items: center;
+            border: 2px solid currentColor;
+            border-radius: 50%;
+            background: inherit;
+            font-size: 0.7rem;
+            font-weight: 900;
+            line-height: 1;
         }
         .ch-equipment-mobile-builds .ch-equipment-final {
             white-space: nowrap;

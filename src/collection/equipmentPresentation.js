@@ -21,14 +21,18 @@ function presentStats(stats) {
 }
 
 function presentBuildsInto(profile, template) {
-    return EQUIPMENT_TEMPLATES.filter((candidate) => candidate.recipe.includes(template.id)).map((candidate) => ({
-        id: candidate.id,
-        name: candidate.name,
-        iconTag: candidate.iconTag,
-        tier: candidate.tier,
-        tierLabel: TIER_LABELS[candidate.tier],
-        count: getEquipmentCount(profile, candidate.id)
-    }));
+    return EQUIPMENT_TEMPLATES.filter((candidate) => candidate.recipe.includes(template.id)).map((candidate) => {
+        const recipe = getEquipmentRecipePreview(profile, candidate.id);
+        return {
+            id: candidate.id,
+            name: candidate.name,
+            iconTag: candidate.iconTag,
+            tier: candidate.tier,
+            tierLabel: TIER_LABELS[candidate.tier],
+            count: getEquipmentCount(profile, candidate.id),
+            canCraft: recipe?.canCraft ?? false
+        };
+    });
 }
 
 function presentTemplate(profile, template) {

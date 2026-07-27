@@ -207,9 +207,23 @@ function testEquipmentCheckpointPresentation() {
             iconTag: "intermediate_attack_crit",
             tier: "intermediate",
             tierLabel: "중간",
-            count: 0
+            count: 0,
+            canCraft: false
         },
-        "Build-into cards should provide reusable navigation and ownership presentation"
+        "Build-into cards should expose navigation, ownership, and live craftability"
+    );
+    assert.equal(sword.buildsInto[1].canCraft, false, "Missing ingredients should mute an unavailable direct upgrade");
+    const craftableProfile = createDefaultPlayerProfile();
+    craftableProfile.hunting.shards = 1000;
+    addEquipmentQuantity(craftableProfile, "attack_sword");
+    addEquipmentQuantity(craftableProfile, "crit_cloak");
+    const craftableSword = createEquipmentPresentation(craftableProfile).tiers[0].templates.find(
+        (template) => template.id === "attack_sword"
+    );
+    assert.equal(
+        craftableSword.buildsInto.find((item) => item.id === "intermediate_attack_crit").canCraft,
+        true,
+        "Owned ingredients and shards should activate the matching direct upgrade"
     );
     const crafted = presentation.tiers[1].templates[0];
     assert.equal(crafted.recipe.missingReason, "missing ingredients", "Recipe failure should be presentation data");
@@ -333,6 +347,16 @@ function testRecipeTreeUiContract() {
             panel.includes('@click="select(item.id)"') &&
             panel.includes("최종 장비"),
         "The recipe header should render selectable direct upgrades or a final-equipment state"
+    );
+    assert.ok(
+        panel.includes("'is-craftable': upgrade.canCraft") &&
+            panel.includes("'is-uncraftable': !upgrade.canCraft") &&
+            panel.includes("'is-craftable': item.canCraft") &&
+            panel.includes("즉시 조합 가능") &&
+            panel.includes("재료 부족") &&
+            !panel.includes(':disabled="!upgrade.canCraft"') &&
+            !panel.includes(':disabled="!item.canCraft"'),
+        "Direct upgrades should communicate live craftability without blocking recipe navigation"
     );
     assert.ok(
         panel.includes("overflow-x: auto") &&
