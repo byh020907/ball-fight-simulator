@@ -25286,6 +25286,12 @@ function testMobileEquipmentDetailUsesFullHeightNavigation() {
             ),
         "mobile slots and filters must stay fixed while only the catalog owns vertical scrolling"
     );
+    assert.ok(
+        /<p\s+class="ch-equipment-empty"\s+x-show="!filteredTiers\.length">\s*조건에 맞는 장비가 없습니다\.\s*<\/p>/.test(
+            source
+        ) && /@media \(max-width: 700px\)[\s\S]*?\.ch-equipment-empty\s*\{\s*display:\s*block;/.test(source),
+        "an empty mobile filter must explain the result inside the catalog while desktop stays unchanged"
+    );
     const upgradeRowRule = source.match(/\.ch-equipment-builds-into-list\s*\{(?<body>[^}]*)\}/)?.groups?.body ?? "";
     assert.match(upgradeRowRule, /overflow-x:\s*auto/, "direct upgrades should own their horizontal overflow");
     assert.match(upgradeRowRule, /flex-wrap:\s*nowrap/, "direct upgrades should remain on one scrollable row");

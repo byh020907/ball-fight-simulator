@@ -43,6 +43,7 @@
             </template>
         </nav>
         <div class="ch-equipment-catalog" role="region" aria-label="장비 목록">
+            <p class="ch-equipment-empty" x-show="!filteredTiers.length">조건에 맞는 장비가 없습니다.</p>
             <template x-for="tier in filteredTiers" :key="tier.id">
                 <section class="ch-equipment-tier">
                     <h4 x-text="tier.label"></h4>
@@ -345,6 +346,9 @@
     .ch-equipment-tier {
         margin-bottom: 12px;
     }
+    .ch-equipment-empty {
+        display: none;
+    }
     .ch-equipment-card {
         cursor: pointer;
     }
@@ -609,6 +613,15 @@
             overscroll-behavior: contain;
             -webkit-overflow-scrolling: touch;
             touch-action: pan-y;
+        }
+        .ch-equipment-empty {
+            display: block;
+            margin: 18px 0;
+            border: 2px dashed #777773;
+            border-radius: 8px;
+            padding: 14px;
+            color: #505050;
+            text-align: center;
         }
         .ch-equipment-card-grid {
             display: none;

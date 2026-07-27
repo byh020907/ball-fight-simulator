@@ -307,6 +307,14 @@ function testRecipeTreeUiContract() {
         "Mobile catalog filters must retain all, owned, and tier-local state"
     );
     assert.ok(
+        panel.includes('class="ch-equipment-empty"') &&
+            panel.includes('x-show="!filteredTiers.length"') &&
+            panel.includes("조건에 맞는 장비가 없습니다.") &&
+            panel.includes(".ch-equipment-empty {") &&
+            panel.includes("display: none"),
+        "Only the mobile catalog should explain an empty filter result without changing desktop cards"
+    );
+    assert.ok(
         panel.includes('class="ch-equipment-mobile-card"') &&
             panel.includes('class="ch-equipment-mobile-builds"') &&
             panel.includes('class="ch-equipment-mobile-select"') &&
