@@ -75,7 +75,10 @@ export class DragCombatRuntime {
     onStaticCollision(fighter, context) {
         if (!this.shot.active || fighter !== this.#player()) return;
         const key = context.surfaceKey;
-        if (this.shot.bounce(key, this.shot.elapsed)) this.#record({ type: "bounce", surfaceKey: key });
+        if (this.shot.bounce(key, this.shot.elapsed)) {
+            this.shot.slowElapsed = 0;
+            this.#record({ type: "bounce", surfaceKey: key });
+        }
     }
 
     resolveFighterCollision(context, damage = null) {

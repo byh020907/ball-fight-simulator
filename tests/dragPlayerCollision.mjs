@@ -87,6 +87,74 @@ function withFixedRandom(callback) {
 {
     const simulation = createSimulation();
     const [player, enemy] = simulation.fighters;
+    enemy.teamId = player.teamId;
+    launch(simulation, 40);
+    const hp = [player.hp, enemy.hp];
+    collide(simulation);
+    assert.deepEqual([player.hp, enemy.hp], hp, "ally collision adds no damage");
+    assert.equal(simulation.dragCombat.getSnapshot().playerShot.active, false, "ally is first-shot stop");
+}
+
+{
+    const simulation = createSimulation();
+    const player = simulation.playerBall;
+    launch(simulation, 41);
+    const keys = ["wall:left", "wall:right", "wall:top", "wall:bottom"];
+    for (const key of keys) simulation.notifyFighterStaticCollision(player, { surfaceKey: key });
+    assert.equal(simulation.dragCombat.getSnapshot().playerShot.bounceCount, 4);
+    simulation.dragCombat.reset();
+    launch(simulation, 42);
+    simulation.notifyFighterStaticCollision(player, { surfaceKey: "terrain:circle:1:2:3" });
+    simulation.notifyFighterStaticCollision(player, { surfaceKey: "terrain:circle:4:5:6" });
+    assert.equal(simulation.dragCombat.getSnapshot().playerShot.bounceCount, 2, "geometry keys stay distinct");
+    simulation.dragCombat.reset();
+    launch(simulation, 43);
+    simulation.notifyFighterStaticCollision(player, { surfaceKey: "wall:left" });
+    simulation.dragCombat.tickShot(0.04);
+    simulation.notifyFighterStaticCollision(player, { surfaceKey: "wall:left" });
+    simulation.notifyFighterStaticCollision(player, { surfaceKey: "wall:right" });
+    simulation.dragCombat.tickShot(0.04);
+    simulation.notifyFighterStaticCollision(player, { surfaceKey: "wall:left" });
+    assert.equal(simulation.dragCombat.getSnapshot().playerShot.bounceCount, 3, "debounce and re-entry");
+}
+
+{
+    const simulation = createSimulation();
+    const player = simulation.playerBall;
+    launch(simulation, 44);
+    player.velocity = new Vector2();
+    simulation.dragCombat.tickShot(0.1);
+    simulation.notifyFighterStaticCollision(player, { surfaceKey: "wall:left" });
+    simulation.dragCombat.tickShot(0.11);
+    assert.equal(simulation.dragCombat.getSnapshot().playerShot.active, true, "bounce resets slow timer");
+    simulation.dragCombat.tickShot(0.2);
+    assert.equal(simulation.dragCombat.getSnapshot().lastEvent.type, "slow-stop");
+    simulation.dragCombat.reset();
+    launch(simulation, 45);
+    player.velocity = new Vector2(200, 0);
+    simulation.dragCombat.tickShot(2.4);
+    assert.equal(simulation.dragCombat.getSnapshot().lastEvent.type, "timeout");
+}
+
+{
+    const simulation = createSimulation();
+    const [player, enemy] = simulation.fighters;
+    launch(simulation, 46);
+    player.position = enemy.position.clone();
+    player.velocity = new Vector2();
+    enemy.velocity = new Vector2();
+    assert.doesNotThrow(() => collide(simulation));
+    assert.equal(
+        Object.values(simulation.dragCombat.getSnapshot()).every((value) => value !== Infinity),
+        true
+    );
+    simulation.resolveResult(enemy);
+    assert.equal(simulation.dragCombat.getSnapshot().playerShot.active, false);
+}
+
+{
+    const simulation = createSimulation();
+    const [player, enemy] = simulation.fighters;
     launch(simulation);
     const baseline = naturalCollision(false);
     const impulsesBefore = player.physicsDebug.toArray().filter((entry) => entry.type === "impulse").length;
