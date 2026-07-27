@@ -36,6 +36,10 @@ const TEST_DOMAINS = {
     dragEnemyRuntime: {
         modulePath: "./dragEnemyRuntime.mjs",
         footerMessages: new Set(["[drag-enemy-runtime] ok"])
+    },
+    dragTrajectoryScene: {
+        modulePath: "./dragTrajectoryScene.mjs",
+        footerMessages: new Set(["[drag-trajectory-scene] ok"])
     }
 };
 

@@ -4,4 +4,5 @@ export { DragCombatRuntime } from "./dragCombatRuntime.js";
 export { EnemyAttackQueue } from "./enemyAttackQueue.js";
 export { PlayerShotState } from "./playerShotState.js";
 export { predictTrajectory } from "./trajectoryPredictor.js";
+export { createDragTrajectoryScene } from "./trajectoryScene.js";
 export * from "./vectorMath.js";
