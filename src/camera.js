@@ -1,7 +1,14 @@
 const DEFAULT_ZOOM = 1;
 
 export function screenToWorld(point, view) {
-    if (!Number.isFinite(point?.x) || !Number.isFinite(point?.y) || !Number.isFinite(view?.scale) || view.scale <= 0)
+    if (
+        !Number.isFinite(point?.x) ||
+        !Number.isFinite(point?.y) ||
+        !Number.isFinite(view?.scale) ||
+        view.scale <= 0 ||
+        !Number.isFinite(view?.offsetX) ||
+        !Number.isFinite(view?.offsetY)
+    )
         return { x: 0, y: 0 };
     return { x: (point.x - view.offsetX) / view.scale, y: (point.y - view.offsetY) / view.scale };
 }

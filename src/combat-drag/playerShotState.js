@@ -16,7 +16,14 @@ export class PlayerShotState {
         this.active = true;
     }
     bounce(surfaceKey, elapsed) {
-        if (!this.active || !surfaceKey || !Number.isFinite(elapsed) || elapsed < 0) return false;
+        if (
+            !this.active ||
+            !surfaceKey ||
+            !Number.isFinite(elapsed) ||
+            elapsed < 0 ||
+            (this.recentSurface && elapsed < this.recentSurface.time)
+        )
+            return false;
         if (
             this.recentSurface?.key === surfaceKey &&
             elapsed - this.recentSurface.time < this.config.shot.bounceDebounceSeconds

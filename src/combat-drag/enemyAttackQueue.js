@@ -9,6 +9,7 @@ export class EnemyAttackQueue {
         this.state = "idle";
         this.attackerId = null;
         this.cursor = 0;
+        this.idOrder = [];
         this.elapsed = 0;
         this.protectedLaunchNotBefore = 0;
         this.nextProtectedLaunchNotBefore = 0;
@@ -19,6 +20,7 @@ export class EnemyAttackQueue {
     }
     tick(realDelta, eligibleIds, now = 0) {
         const ids = [...new Set((eligibleIds || []).filter(Boolean))];
+        this.idOrder = [...new Set([...this.idOrder, ...ids])].filter((id) => ids.includes(id));
         const delta = Math.max(0, Number.isFinite(realDelta) ? realDelta : 0);
         if (!ids.length) {
             this.reset();
@@ -56,8 +58,9 @@ export class EnemyAttackQueue {
     }
     #start(ids, after) {
         if (!ids.length) return null;
-        const attackerId = ids[this.cursor % ids.length];
-        this.cursor = (ids.indexOf(attackerId) + 1) % ids.length;
+        const order = this.idOrder.length ? this.idOrder : ids;
+        const attackerId = order[this.cursor % order.length];
+        this.cursor = (order.indexOf(attackerId) + 1) % order.length;
         this.state = "windup";
         this.attackerId = attackerId;
         this.elapsed = 0;
