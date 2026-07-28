@@ -6,6 +6,7 @@ import { Vector2 } from "../core.js";
 import {
     advanceEnemyChargePlan,
     getChargeRatio,
+    getDashEndProgress,
     getEnemyChargePlan,
     getEnemyRequiredChargeRatio
 } from "./chargeMath.js";
@@ -238,6 +239,14 @@ export class DragCombatRuntime {
                     ? Math.max(0, this.config.shot.shotMaxSeconds - this.shot.elapsed)
                     : 0,
                 flightDuration: this.config.shot.shotMaxSeconds,
+                endProgress: this.shot.active
+                    ? getDashEndProgress(
+                          this.shot.elapsed,
+                          this.config.shot.shotMaxSeconds,
+                          this.shot.slowElapsed,
+                          this.config.shot.shotSlowSeconds
+                      )
+                    : 1,
                 shieldRemaining: this.shot.active
                     ? Math.max(0, this.config.shield.durationSeconds - this.shot.elapsed)
                     : 0,
@@ -260,6 +269,15 @@ export class DragCombatRuntime {
                 accelerating: this.enemyChargePlan?.accelerating === true,
                 plannedEndAt: this.enemyChargePlan?.plannedEndAt ?? null,
                 flightDuration: this.config.enemy.flightMaxSeconds,
+                endProgress:
+                    this.enemyQueue.state === "flight"
+                        ? getDashEndProgress(
+                              this.enemyQueue.elapsed,
+                              this.config.enemy.flightMaxSeconds,
+                              this.enemySlowElapsed,
+                              this.config.shot.shotSlowSeconds
+                          )
+                        : 1,
                 lastResolution: copyValue(this.enemyQueue.lastResult)
             },
             launch: {

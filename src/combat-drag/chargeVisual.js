@@ -2,12 +2,11 @@ function clampRatio(value) {
     return Math.max(0, Math.min(1, Number(value) || 0));
 }
 
-export function getChargeConvergenceStyle(fighterRadius, chargeRatio) {
+function getConvergenceStyle(fighterRadius, progressRatio, minimumOffset) {
     const radius = Math.max(0, Number(fighterRadius) || 0);
-    const progress = clampRatio(chargeRatio);
+    const progress = clampRatio(progressRatio);
     const easedProgress = 1 - (1 - progress) ** 2;
     const maximumOffset = Math.max(38, radius * 1.8);
-    const minimumOffset = 11;
     return {
         progress,
         radius: radius + minimumOffset + (maximumOffset - minimumOffset) * (1 - easedProgress),
@@ -17,11 +16,18 @@ export function getChargeConvergenceStyle(fighterRadius, chargeRatio) {
     };
 }
 
-export function drawChargeConvergence(ctx, fighter, chargeRatio, color) {
+export function getChargeConvergenceStyle(fighterRadius, chargeRatio) {
+    return getConvergenceStyle(fighterRadius, chargeRatio, 11);
+}
+
+export function getDashEndConvergenceStyle(fighterRadius, endProgress) {
+    return getConvergenceStyle(fighterRadius, endProgress, 3);
+}
+
+function drawConvergence(ctx, fighter, style, color) {
     if (!ctx || !fighter?.position || !Number.isFinite(fighter.position.x) || !Number.isFinite(fighter.position.y)) {
         return false;
     }
-    const style = getChargeConvergenceStyle(fighter.radius, chargeRatio);
     ctx.save();
     try {
         ctx.globalAlpha = style.alpha;
@@ -36,4 +42,12 @@ export function drawChargeConvergence(ctx, fighter, chargeRatio, color) {
         ctx.restore();
     }
     return true;
+}
+
+export function drawChargeConvergence(ctx, fighter, chargeRatio, color) {
+    return drawConvergence(ctx, fighter, getChargeConvergenceStyle(fighter?.radius, chargeRatio), color);
+}
+
+export function drawDashEndConvergence(ctx, fighter, endProgress, color) {
+    return drawConvergence(ctx, fighter, getDashEndConvergenceStyle(fighter?.radius, endProgress), color);
 }

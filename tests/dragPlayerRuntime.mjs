@@ -139,6 +139,7 @@ function assertFiniteSnapshot(snapshot) {
     assert.equal(shields.length, 1);
     assert.equal(releasedSnapshot.playerShot.flightRemaining, 2.4);
     assert.equal(releasedSnapshot.playerShot.flightDuration, 2.4);
+    assert.equal(releasedSnapshot.playerShot.endProgress, 0);
     assert.equal(releasedSnapshot.playerShot.shieldRemaining, 0.8);
     assert.equal(releasedSnapshot.playerShot.shieldDuration, 0.8);
     const forward = shields[0].forward;

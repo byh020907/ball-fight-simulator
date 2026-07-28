@@ -97,6 +97,7 @@ const idle = {
         active: false,
         flightRemaining: 0,
         flightDuration: 2.4,
+        endProgress: 1,
         shieldRemaining: 0,
         shieldDuration: 0.8,
         shields: []
@@ -165,6 +166,38 @@ assert.equal(
     ),
     true
 );
+const playerDashSnapshot = (endProgress) => ({
+    ...idle,
+    playerShot: {
+        ...idle.playerShot,
+        active: true,
+        flightRemaining: (1 - endProgress) * idle.playerShot.flightDuration,
+        endProgress
+    }
+});
+const earlyDashContext = new Context();
+const lateDashContext = new Context();
+renderer.renderWorld(earlyDashContext, simulation, playerDashSnapshot(0.1));
+renderer.renderWorld(lateDashContext, simulation, playerDashSnapshot(0.9));
+const playerDashArc = (context) =>
+    context.commands.find(
+        (command) =>
+            Array.isArray(command) &&
+            command[0] === "arc" &&
+            command[1] === player.position.x &&
+            command[2] === player.position.y
+    );
+assert.ok(playerDashArc(earlyDashContext)[3] > playerDashArc(lateDashContext)[3]);
+assert.ok(playerDashArc(lateDashContext)[3] > player.radius);
+assert.ok(
+    earlyDashContext.commands.find((command) => Array.isArray(command) && command[0] === "globalAlpha")[1] <
+        lateDashContext.commands.find((command) => Array.isArray(command) && command[0] === "globalAlpha")[1]
+);
+assert.equal(
+    earlyDashContext.commands.some((command) => Array.isArray(command) && command[0] === "text"),
+    false,
+    "player dash-end feedback should stay attached to the fighter without a moving label"
+);
 const automatedContext = new Context();
 const automatedSnapshot = {
     ...idle,
@@ -200,6 +233,7 @@ renderer.renderWorld(
             active: true,
             flightRemaining: 1.8,
             flightDuration: 2.4,
+            endProgress: 0.25,
             shieldRemaining: 0.6,
             shieldDuration: 0.8,
             shields: [{ fighterId: "enemy", forward: { x: -1, y: 0 } }]
@@ -230,6 +264,7 @@ renderer.renderWorld(
             active: true,
             flightRemaining: 0.3,
             flightDuration: 2.4,
+            endProgress: 0.875,
             shieldRemaining: 0.1,
             shieldDuration: 0.8,
             shields: [{ fighterId: "enemy", forward: { x: -1, y: 0 } }]
@@ -237,9 +272,11 @@ renderer.renderWorld(
     },
     0
 );
-const activeShieldArc = shieldContext.commands.find((command) => Array.isArray(command) && command[0] === "arc");
+const activeShieldArc = shieldContext.commands.find(
+    (command) => Array.isArray(command) && command[0] === "arc" && command[3] === enemy.radius + 20
+);
 const expiringShieldArc = expiringShieldContext.commands.find(
-    (command) => Array.isArray(command) && command[0] === "arc"
+    (command) => Array.isArray(command) && command[0] === "arc" && command[3] === enemy.radius + 20
 );
 assert.equal(expiringShieldArc[5] - expiringShieldArc[4] < activeShieldArc[5] - activeShieldArc[4], true);
 const readyContext = new Context();
@@ -316,11 +353,52 @@ const enemyFlightCommands = renderer.renderWorld(enemyFlightContext, simulation,
         windupDirection: { x: -1, y: 0 },
         elapsed: 0.2,
         windupDuration: 1,
-        flightDuration: 1.8
+        flightDuration: 1.8,
+        endProgress: 0.1
     }
 });
-assert.equal(enemyFlightCommands, 0, "released enemy dash uses movement only, like the player shot");
-assert.deepEqual(enemyFlightContext.commands, [], "enemy flight leaves no rear trail, tip, ring, or label");
+assert.equal(enemyFlightCommands, 1, "released enemy dash shows only its end convergence ring");
+assert.equal(
+    enemyFlightContext.commands.some(
+        (command) =>
+            Array.isArray(command) &&
+            command[0] === "arc" &&
+            command[1] === enemy.position.x &&
+            command[2] === enemy.position.y &&
+            command[3] > enemy.radius
+    ),
+    true
+);
+assert.equal(
+    enemyFlightContext.commands.some((command) => Array.isArray(command) && command[0] === "line"),
+    false,
+    "dash-end feedback does not restore the removed trail or direction tip"
+);
+assert.equal(
+    enemyFlightContext.commands.some((command) => Array.isArray(command) && command[0] === "text"),
+    false,
+    "dash-end feedback stays readable without a moving label"
+);
+const enemyLateFlightContext = new Context();
+renderer.renderWorld(enemyLateFlightContext, simulation, {
+    ...idle,
+    enemyQueue: {
+        phase: "flight",
+        attackerId: "enemy",
+        elapsed: 1.62,
+        flightDuration: 1.8,
+        endProgress: 0.9
+    }
+});
+const enemyFlightArc = (context) =>
+    context.commands.find(
+        (command) =>
+            Array.isArray(command) &&
+            command[0] === "arc" &&
+            command[1] === enemy.position.x &&
+            command[2] === enemy.position.y
+    );
+assert.ok(enemyFlightArc(enemyFlightContext)[3] > enemyFlightArc(enemyLateFlightContext)[3]);
 const countdownContext = new Context();
 renderer.renderScreen(countdownContext, simulation, aim);
 assert.equal(

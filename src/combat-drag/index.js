@@ -7,10 +7,16 @@ export {
     getDragLaunchSpeed
 } from "./config.js";
 export { DragInputState } from "./dragInputState.js";
-export { drawChargeConvergence, getChargeConvergenceStyle } from "./chargeVisual.js";
+export {
+    drawChargeConvergence,
+    drawDashEndConvergence,
+    getChargeConvergenceStyle,
+    getDashEndConvergenceStyle
+} from "./chargeVisual.js";
 export {
     advanceEnemyChargePlan,
     getChargeRatio,
+    getDashEndProgress,
     getEnemyChargePlan,
     getEnemyRequiredChargeRatio
 } from "./chargeMath.js";

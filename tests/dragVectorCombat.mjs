@@ -11,6 +11,8 @@ import {
     getEnemyChargePlan,
     getEnemyRequiredChargeRatio,
     getChargeConvergenceStyle,
+    getDashEndConvergenceStyle,
+    getDashEndProgress,
     getDragLaunchSpeed,
     PlayerShotState,
     predictTrajectory
@@ -290,6 +292,13 @@ assert.ok(acceleratedLater.naturalRatio < 1, "visual acceleration does not jump 
 const latePlan = advanceEnemyChargePlan(originalPlan, { now: 1, requiredChargeRatio: 0.35 });
 assert.equal(latePlan.accelerating, false);
 assert.equal(latePlan.plannedEndAt, 1.2, "the final 0.22 second visual window is not shortened");
+assert.equal(getDashEndProgress(1.2, 2.4), 0.5);
+assert.equal(
+    getDashEndProgress(0.6, 2.4, 0.16, 0.18),
+    0.16 / 0.18,
+    "slow-stop progress overtakes the timeout progress so the ring reaches the fighter at the actual stop"
+);
+assert.equal(getDashEndConvergenceStyle(20, 1).radius, 23);
 
 const previewFighter = {
     id: "preview-trickster",
@@ -322,9 +331,12 @@ assert.equal(
     getDragLaunchSpeed(previewFighter.baseSpeed, 1, createDragCombatConfig(1.8).shot)
 );
 const movingDrawLabels = [];
+const movingDrawArcs = [];
+const movingPreviewSnapshot = releasePreview.getSnapshot();
 const movingDrawContext = new Proxy(
     {
-        fillText: (label) => movingDrawLabels.push(label)
+        fillText: (label) => movingDrawLabels.push(label),
+        arc: (...args) => movingDrawArcs.push(args)
     },
     {
         get: (target, property) => target[property] ?? (() => {})
@@ -335,6 +347,16 @@ assert.equal(
     movingDrawLabels.some((label) => label.includes(previewFighter.name)),
     false,
     "moving preview ball should not be covered by its information panel"
+);
+assert.equal(
+    movingDrawArcs.some(
+        ([x, y, radius]) =>
+            x === releasePreview.ball.x &&
+            y === releasePreview.ball.y &&
+            radius === getDashEndConvergenceStyle(previewFighter.baseRadius, movingPreviewSnapshot.endProgress).radius
+    ),
+    true,
+    "moving preview ball should show the shared dash-end convergence ring"
 );
 releasePreview.reset();
 const idleDrawLabels = [];

@@ -2,7 +2,9 @@ import {
     createDragCombatConfig,
     DRAG_COMBAT_CONFIG,
     drawChargeConvergence,
+    drawDashEndConvergence,
     getChargeRatio,
+    getDashEndProgress,
     getDragLaunchSpeed,
     getSlingshotVector
 } from "../combat-drag/index.js";
@@ -261,6 +263,7 @@ export class DragReleasePreviewScene {
             totalHits: this.totalHits ?? 0,
             fighter: { ...this.fighter },
             chargeRatio: getChargeRatio(this.aimElapsed, this.config.input.maxAimSeconds),
+            endProgress: this.isMoving?.() ? getDashEndProgress(this.shotElapsed, this.config.shot.shotMaxSeconds) : 1,
             maxAimSeconds: this.config.input.maxAimSeconds,
             lastLaunch: this.lastLaunch ? { ...this.lastLaunch } : null
         };
@@ -339,6 +342,14 @@ export class DragReleasePreviewScene {
                 ctx,
                 { position: this.ball, radius: this.fighter.baseRadius },
                 getChargeRatio(this.aimElapsed, this.config.input.maxAimSeconds),
+                "#5ce1e6"
+            );
+        }
+        if (this.isMoving()) {
+            drawDashEndConvergence(
+                ctx,
+                { position: this.ball, radius: this.fighter.baseRadius },
+                getDashEndProgress(this.shotElapsed, this.config.shot.shotMaxSeconds),
                 "#5ce1e6"
             );
         }

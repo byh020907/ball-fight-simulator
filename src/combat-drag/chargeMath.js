@@ -7,6 +7,12 @@ function clamp(value, minimum, maximum) {
     return Math.min(maximum, Math.max(minimum, value));
 }
 
+export function getDashEndProgress(elapsed, duration, slowElapsed = 0, slowDuration = 0) {
+    const timeoutProgress = duration > 0 ? clamp((Number(elapsed) || 0) / duration, 0, 1) : 0;
+    const slowStopProgress = slowDuration > 0 ? clamp((Number(slowElapsed) || 0) / slowDuration, 0, 1) : 0;
+    return Math.max(timeoutProgress, slowStopProgress);
+}
+
 export function getChargeRatio(heldDuration, maxAimSeconds = DRAG_COMBAT_CONFIG.input.maxAimSeconds) {
     const duration = Number.isFinite(heldDuration) ? Math.max(0, heldDuration) : 0;
     const maximum = Number.isFinite(maxAimSeconds) && maxAimSeconds > 0 ? maxAimSeconds : 1;

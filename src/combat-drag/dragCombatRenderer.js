@@ -1,5 +1,5 @@
 import { createDragTrajectoryScene } from "./trajectoryScene.js";
-import { drawChargeConvergence } from "./chargeVisual.js";
+import { drawChargeConvergence, drawDashEndConvergence } from "./chargeVisual.js";
 
 const TIER_COLORS = ["#5ce1e6", "#ffd166", "#ff8c42", "#ff4db8"];
 const FRONT_COLOR = "#ff4d5a";
@@ -61,10 +61,30 @@ export class DragCombatRenderer {
             const scene = createDragTrajectoryScene({ simulation, runtimeSnapshot });
             commands += this.#drawAim(ctx, simulation, runtimeSnapshot, scene);
         }
+        commands += this.#drawDashEndConvergence(ctx, simulation, runtimeSnapshot, hasManualPlayer);
         if (hasManualPlayer) commands += this.#drawFixedShields(ctx, simulation, runtimeSnapshot);
         commands += this.#drawEnemyTelegraph(ctx, simulation, runtimeSnapshot);
         if (hasManualPlayer) commands += this.#drawEvent(ctx, simulation);
         return commands;
+    }
+
+    #drawDashEndConvergence(ctx, simulation, snapshot, hasManualPlayer) {
+        let commands = 0;
+        if (hasManualPlayer && snapshot.playerShot?.active) {
+            commands += drawDashEndConvergence(
+                ctx,
+                simulation.playerBall,
+                snapshot.playerShot.endProgress,
+                TIER_COLORS[0]
+            )
+                ? 1
+                : 0;
+        }
+        const queue = snapshot.enemyQueue;
+        if (queue?.phase !== "flight") return commands;
+        const attacker = fighterById(simulation, queue.attackerId);
+        if (!attacker) return commands;
+        return commands + (drawDashEndConvergence(ctx, attacker, queue.endProgress, "#ff5548") ? 1 : 0);
     }
 
     renderScreen(ctx, simulation, runtimeSnapshot) {
