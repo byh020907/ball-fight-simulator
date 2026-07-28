@@ -27,10 +27,12 @@ import {
     EquipmentPassiveVfxPreviewController,
     getEquipmentPassiveVfxPreviewOptions
 } from "./developer/equipmentPassiveVfxPreview.js";
+import { DragReleasePreviewController } from "./developer/dragReleasePreview.js";
 
 export function createComponentBridge(app) {
     const elementalistVfxPreview = new ElementalistVfxPreviewController();
     const equipmentPassiveVfxPreview = new EquipmentPassiveVfxPreviewController();
+    const dragReleasePreview = new DragReleasePreviewController();
 
     function refreshCollectionAndProfile() {
         app._refreshCollectionHub();
@@ -140,6 +142,7 @@ export function createComponentBridge(app) {
         exitDebugMode() {
             elementalistVfxPreview.stop();
             equipmentPassiveVfxPreview.stop();
+            dragReleasePreview.stop();
             if (!app.disableDebugMode()) return { ok: false, error: "debug_disabled" };
             return { ok: true };
         },
@@ -149,11 +152,26 @@ export function createComponentBridge(app) {
         },
         setDebugDragReleaseSpeedMultiplier(value) {
             if (!app.isDebugModeActive()) return { ok: false, error: "debug_disabled" };
-            return app.setDebugDragReleaseSpeedMultiplier(value);
+            const result = app.setDebugDragReleaseSpeedMultiplier(value);
+            if (result.ok) dragReleasePreview.setReleaseSpeedMultiplier(result.value);
+            return result;
         },
         resetDebugDragReleaseSpeedMultiplier() {
             if (!app.isDebugModeActive()) return { ok: false, error: "debug_disabled" };
-            return app.resetDebugDragReleaseSpeedMultiplier();
+            const result = app.resetDebugDragReleaseSpeedMultiplier();
+            if (result.ok) dragReleasePreview.setReleaseSpeedMultiplier(result.value);
+            return result;
+        },
+        startDebugDragReleasePreview(canvas) {
+            if (!app.isDebugModeActive()) return { ok: false, error: "debug_disabled" };
+            return dragReleasePreview.start(canvas, app.getDebugDragCombatTuning().value);
+        },
+        resetDebugDragReleasePreview() {
+            if (!app.isDebugModeActive()) return { ok: false, error: "debug_disabled" };
+            return dragReleasePreview.reset();
+        },
+        stopDebugDragReleasePreview() {
+            return dragReleasePreview.stop();
         },
         getDebugElementalistVfxPreviewOptions() {
             if (!app.isDebugModeActive()) return [];

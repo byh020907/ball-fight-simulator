@@ -1889,6 +1889,18 @@ function testCollectionRebirthAndDeveloperContracts() {
         "Drag tuning should use guarded bridge methods and expose an explicit reset"
     );
     assert.ok(
+        template.includes("data-drag-release-preview") &&
+            template.includes("테스트 공 다시 놓기") &&
+            template.includes("touch-action: none"),
+        "Drag tuning should include a touch-ready inline release test arena"
+    );
+    assert.ok(
+        template.includes("startDebugDragReleasePreview") &&
+            template.includes("stopDebugDragReleasePreview") &&
+            readSource("src/componentBridge.js").includes("DragReleasePreviewController"),
+        "Inline drag testing should start and stop through the guarded component bridge"
+    );
+    assert.ok(
         template.includes("Elementalist VFX") &&
             template.includes("state.developer.elementalistPreviewOptions") &&
             template.includes("data-elementalist-vfx-preview"),

@@ -583,9 +583,26 @@
                         <span x-text="'×' + state.developer.dragReleaseSpeedTuning.max.toFixed(2)"></span>
                     </div>
                     <p class="ch-developer-tuning-description" x-text="formatDebugDragReleaseSpeed()"></p>
-                    <button class="ch-btn" type="button" @click="resetDebugDragReleaseSpeedMultiplier()">
-                        기본 속도로 초기화
-                    </button>
+                    <div class="ch-drag-release-preview">
+                        <div class="ch-drag-release-preview-stage">
+                            <canvas
+                                class="ch-drag-release-preview-canvas"
+                                data-drag-release-preview
+                                aria-label="현재 릴리즈 속도로 공을 직접 당겼다 놓아 시험하는 미니 아레나"
+                            ></canvas>
+                        </div>
+                        <p class="ch-drag-release-preview-help">
+                            청록색 공을 당겼다 놓으세요. 배율 변경은 다음 릴리즈부터 바로 적용됩니다.
+                        </p>
+                    </div>
+                    <div class="ch-developer-tuning-actions">
+                        <button class="ch-btn" type="button" @click="resetDebugDragReleasePreview()">
+                            테스트 공 다시 놓기
+                        </button>
+                        <button class="ch-btn" type="button" @click="resetDebugDragReleaseSpeedMultiplier()">
+                            기본 속도로 초기화
+                        </button>
+                    </div>
                 </section>
 
                 <section class="ch-developer-group" aria-labelledby="ch-developer-elementalist-title">
@@ -1051,6 +1068,7 @@
 
         function closeCollectionHub() {
             cancelDebugModeHold();
+            stopDragReleasePreview();
             stopElementalistVfxPreview();
             stopEquipmentPassiveVfxPreview();
             state.visible = false;
@@ -1064,9 +1082,11 @@
             if (!validTabs.includes(tabId)) return;
             state.activeTab = tabId;
             if (tabId === "developer") {
+                restartDragReleasePreview();
                 restartElementalistVfxPreview();
                 restartEquipmentPassiveVfxPreview();
             } else {
+                stopDragReleasePreview();
                 stopElementalistVfxPreview();
                 stopEquipmentPassiveVfxPreview();
             }
@@ -1160,6 +1180,19 @@
 
         function stopEquipmentPassiveVfxPreview() {
             getGameActionBridge()?.stopDebugEquipmentPassiveVfxPreview?.();
+        }
+
+        function stopDragReleasePreview() {
+            getGameActionBridge()?.stopDebugDragReleasePreview?.();
+        }
+
+        function restartDragReleasePreview() {
+            requestAnimationFrame(() => {
+                if (!state.visible || state.activeTab !== "developer" || !state.developer.active) return;
+                const canvas = dialogElement?.querySelector("[data-drag-release-preview]");
+                if (!canvas) return;
+                getGameActionBridge()?.startDebugDragReleasePreview?.(canvas);
+            });
         }
 
         function restartElementalistVfxPreview(previewMode = "dry") {
@@ -1363,6 +1396,9 @@
                 }
                 return result;
             },
+            resetDebugDragReleasePreview() {
+                return this.bridge.resetDebugDragReleasePreview();
+            },
             startDebugHunting() {
                 return this.bridge.startDebugHunting(
                     state.developer.targetCharacterId,
@@ -1391,6 +1427,7 @@
                 );
             },
             exitDebugMode() {
+                stopDragReleasePreview();
                 stopElementalistVfxPreview();
                 stopEquipmentPassiveVfxPreview();
                 const result = this.bridge.exitDebugMode();
@@ -1484,6 +1521,7 @@
                 state.activeTab = tabId || "roster";
                 focusDialog();
                 if (state.activeTab === "developer") {
+                    restartDragReleasePreview();
                     restartElementalistVfxPreview();
                     restartEquipmentPassiveVfxPreview();
                 }
@@ -1759,6 +1797,46 @@
         color: #444444;
         font-size: 0.74rem;
         line-height: 1.45;
+    }
+
+    .ch-drag-release-preview {
+        display: grid;
+        gap: 0.4rem;
+    }
+
+    .ch-drag-release-preview-stage {
+        width: 100%;
+        overflow: hidden;
+        aspect-ratio: 16 / 9;
+        border: 2px solid #202020;
+        border-radius: 0.45rem;
+        background: #10212a;
+        box-sizing: border-box;
+    }
+
+    .ch-drag-release-preview-canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        cursor: grab;
+        touch-action: none;
+    }
+
+    .ch-drag-release-preview-canvas:active {
+        cursor: grabbing;
+    }
+
+    .ch-drag-release-preview-help {
+        margin: 0;
+        color: #555555;
+        font-size: 0.72rem;
+        line-height: 1.45;
+    }
+
+    .ch-developer-tuning-actions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+        gap: 0.5rem;
     }
 
     .ch-developer-grid {

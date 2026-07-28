@@ -12,6 +12,11 @@ import {
 } from "../src/combat-drag/index.js";
 import { DRAG_COMBAT_CONFIG } from "../src/combat-drag/config.js";
 import {
+    DRAG_RELEASE_PREVIEW_CONFIG,
+    DragReleasePreviewController,
+    DragReleasePreviewScene
+} from "../src/developer/dragReleasePreview.js";
+import {
     getRicochetDamageMultiplier,
     getSlingshotVector,
     isShieldFront,
@@ -291,6 +296,60 @@ assert.equal(createDragCombatConfig(1.45).shot.releaseSpeedMultiplier, 1.45);
 assert.equal(getDragLaunchSpeed(100, 0), 125);
 assert.equal(getDragLaunchSpeed(100, 1), 320);
 assert.equal(getDragLaunchSpeed(100, 0.5, createDragCombatConfig(1.4).shot), 311.5);
+
+const releasePreview = new DragReleasePreviewScene(1);
+const previewStart = { ...DRAG_RELEASE_PREVIEW_CONFIG.start };
+assert.equal(releasePreview.begin(31, previewStart).type, "begin");
+releasePreview.move(31, { x: previewStart.x - DRAG_COMBAT_CONFIG.input.maxPullPx, y: previewStart.y });
+const previewLaunch = releasePreview.release(31);
+assert.equal(previewLaunch.type, "launch");
+assert.equal(previewLaunch.speed, getDragLaunchSpeed(DRAG_RELEASE_PREVIEW_CONFIG.baseSpeed, 1));
+for (let step = 0; step < 12; step += 1) releasePreview.update(1 / 20);
+assert.ok(releasePreview.getSnapshot().bounceCount >= 1, "preview should expose wall-reflected release movement");
+releasePreview.setReleaseSpeedMultiplier(1.8);
+releasePreview.reset();
+assert.equal(releasePreview.begin(32, previewStart).type, "begin");
+releasePreview.move(32, { x: previewStart.x - DRAG_COMBAT_CONFIG.input.maxPullPx, y: previewStart.y });
+assert.equal(
+    releasePreview.release(32).speed,
+    getDragLaunchSpeed(DRAG_RELEASE_PREVIEW_CONFIG.baseSpeed, 1, createDragCombatConfig(1.8).shot)
+);
+
+const previewListeners = new Map();
+let cancelledPreviewFrame = null;
+let previewObserverDisconnected = false;
+class PreviewResizeObserver {
+    observe() {}
+    disconnect() {
+        previewObserverDisconnected = true;
+    }
+}
+const previewCanvas = {
+    width: 0,
+    height: 0,
+    getContext: () => ({}),
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 320, height: 180 }),
+    addEventListener: (type, handler) => previewListeners.set(type, handler),
+    removeEventListener: (type, handler) => {
+        if (previewListeners.get(type) === handler) previewListeners.delete(type);
+    }
+};
+const releasePreviewController = new DragReleasePreviewController({
+    requestFrame: () => 77,
+    cancelFrame: (frameId) => {
+        cancelledPreviewFrame = frameId;
+    },
+    ResizeObserverClass: PreviewResizeObserver
+});
+assert.equal(releasePreviewController.start(previewCanvas, 1.2).ok, true);
+assert.deepEqual(
+    [...previewListeners.keys()],
+    ["pointerdown", "pointermove", "pointerup", "pointercancel", "lostpointercapture"]
+);
+releasePreviewController.stop();
+assert.equal(previewListeners.size, 0);
+assert.equal(cancelledPreviewFrame, 77);
+assert.equal(previewObserverDisconnected, true);
 assert.deepEqual(DRAG_COMBAT_CONFIG.shield, {
     frontIncomingMultiplier: 1.5,
     frontRecoilSpeedRatio: 1.6,

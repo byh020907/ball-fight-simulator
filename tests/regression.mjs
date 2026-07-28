@@ -15812,10 +15812,16 @@ function testDeveloperTournamentWinTool() {
         "debug_disabled",
         "Bridge should reject drag tuning outside a development session"
     );
+    assert.equal(
+        bridge.startDebugDragReleasePreview(null).error,
+        "debug_disabled",
+        "Bridge should reject the inline drag preview outside a development session"
+    );
     app.debugActive = true;
     assert.equal(bridge.setDebugDragReleaseSpeedMultiplier(1.4).value, 1.4);
     assert.equal(bridge.getDebugDragCombatTuning().value, 1.4);
     assert.equal(bridge.resetDebugDragReleaseSpeedMultiplier().value, 1);
+    assert.equal(bridge.startDebugDragReleasePreview(null).error, "preview_unavailable");
     const bridgeResult = bridge.recordDebugTournamentWin(characterId);
     assert.equal(bridgeResult.ok, true, "Bridge should record the selected debug character victory");
     assert.equal(
