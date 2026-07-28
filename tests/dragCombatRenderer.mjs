@@ -297,6 +297,18 @@ const hudLabels = hudContext.commands
     .map((command) => command[1]);
 assert.equal(hudLabels.includes("드래그 돌진 중"), true);
 assert.equal(hudLabels.includes("돌진 종료 후 다시 조준"), true);
+const queuedHudContext = new Context();
+renderer.renderScreen(queuedHudContext, simulation, {
+    ...idle,
+    drag: { ...idle.drag, queued: true },
+    playerShot: { ...idle.playerShot, active: true, flightRemaining: 1.4 }
+});
+assert.equal(
+    queuedHudContext.commands.some(
+        (command) => Array.isArray(command) && command[0] === "text" && command[1] === "입력 예약 · 종료 즉시 조준"
+    ),
+    true
+);
 assert.equal(
     hudContext.commands
         .filter((command) => Array.isArray(command) && command[0] === "text")

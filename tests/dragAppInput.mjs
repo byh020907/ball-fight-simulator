@@ -102,6 +102,23 @@ function createApp(beginResult = {}) {
 }
 
 {
+    const { app, canvas, calls } = createApp({ type: "queued" });
+    app._bindDragPointerHandler();
+    const held = pointer(8, { pointerType: "touch" });
+    canvas.emit("pointerdown", held);
+    canvas.emit("pointermove", pointer(8, { pointerType: "touch", clientX: 150, clientY: 240 }));
+    assert.deepEqual(calls, [
+        ["begin", 8, { x: 100, y: 200 }],
+        ["move", 8, { x: 140, y: 220 }]
+    ]);
+    assert.equal(held.prevented, true);
+    assert.equal(canvas.captures.has(8), true, "queued touch keeps pointer capture until release");
+    canvas.emit("pointerup", pointer(8, { pointerType: "touch" }));
+    assert.equal(canvas.captures.size, 0);
+    assert.deepEqual(calls.at(-1), ["release", 8]);
+}
+
+{
     const { app, canvas, calls } = createApp();
     app._overlay.visible = true;
     app._bindDragPointerHandler();

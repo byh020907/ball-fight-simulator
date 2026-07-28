@@ -303,7 +303,9 @@ export class DragCombatRenderer {
         if (drag.inputLockRemaining > 0) {
             return {
                 label: "반격 경직",
-                detail: `${drag.inputLockRemaining.toFixed(1)}초 뒤 조작 가능`,
+                detail: drag.queued
+                    ? "입력 예약 · 경직 종료 즉시 조준"
+                    : `${drag.inputLockRemaining.toFixed(1)}초 뒤 조작 가능`,
                 icon: "!",
                 color: "#ff7b68",
                 iconFill: "rgba(255, 90, 70, 0.18)",
@@ -315,7 +317,7 @@ export class DragCombatRenderer {
             const remaining = Math.max(0, Number(snapshot.playerShot.flightRemaining) || 0);
             return {
                 label: "드래그 돌진 중",
-                detail: "돌진 종료 후 다시 조준",
+                detail: drag.queued ? "입력 예약 · 종료 즉시 조준" : "돌진 종료 후 다시 조준",
                 icon: "➜",
                 color: "#5ce1e6",
                 iconFill: "rgba(92, 225, 230, 0.14)",

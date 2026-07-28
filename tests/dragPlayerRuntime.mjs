@@ -155,7 +155,13 @@ function assertFiniteSnapshot(snapshot) {
     simulation.dragCombat.onStaticCollision(player, { surfaceKey: "wall:left" });
     simulation.dragCombat.onStaticCollision(player, { surfaceKey: "terrain:rock" });
     assert.equal(simulation.dragCombat.getSnapshot().playerShot.bounceCount, 2);
-    assert.equal(simulation.beginDragCombat(12, { x: 20, y: 20 }), null, "active shot blocks re-aiming");
+    assert.deepEqual(
+        simulation.beginDragCombat(12, { x: 20, y: 20 }),
+        { type: "queued" },
+        "holding during an active shot queues the next aim"
+    );
+    assert.deepEqual(simulation.moveDragCombat(12, { x: -120, y: 20 }), { type: "queued" });
+    assert.equal(simulation.dragCombat.getSnapshot().drag.queued, true);
     const context = {
         a: player,
         b: enemy,
@@ -166,8 +172,63 @@ function assertFiniteSnapshot(snapshot) {
     simulation.dragCombat.resolveFighterCollision(context, context);
     assert.equal(context.damageFromAToB, 14.5);
     assert.equal(simulation.dragCombat.shot.active, false);
+    simulation.dragCombat.flushInputFrame();
+    const resumedAim = simulation.dragCombat.getSnapshot();
+    assert.equal(resumedAim.drag.queued, false);
+    assert.equal(resumedAim.drag.state, "aiming");
+    assert.equal(resumedAim.drag.pointerId, 12);
+    assert.equal(resumedAim.drag.vector.active, true);
+    assert.equal(resumedAim.drag.chargeRatio, 0, "queued holding time does not count as charge time");
+    simulation.dragCombat.tickInput(0.3);
+    assert.equal(simulation.dragCombat.getSnapshot().drag.chargeRatio, 0.25);
+    assert.equal(simulation.cancelDragCombat(12).type, "cancel");
     assert.deepEqual(simulation.beginDragCombat(13, { x: 20, y: 20 }), { type: "begin" });
     assert.equal(simulation.cancelDragCombat(13).type, "cancel");
+}
+
+{
+    const simulation = createSimulation();
+    beginWithVector(simulation, 30);
+    simulation.releaseDragCombat(30);
+    assert.deepEqual(simulation.beginDragCombat(31, { x: 80, y: 80 }), { type: "queued" });
+    simulation.moveDragCombat(31, { x: 20, y: 80 });
+    assert.equal(simulation.releaseDragCombat(31).type, "cancel");
+    assert.equal(simulation.dragCombat.getSnapshot().drag.queued, false);
+    simulation.dragCombat.shot.reset();
+    simulation.dragCombat.flushInputFrame();
+    assert.equal(simulation.dragCombat.getSnapshot().drag.state, "idle", "released queued input never starts later");
+}
+
+{
+    const simulation = createSimulation();
+    beginWithVector(simulation, 40);
+    simulation.releaseDragCombat(40);
+    assert.deepEqual(simulation.beginDragCombat(41, { x: 80, y: 80 }), { type: "queued" });
+    simulation.moveDragCombat(41, { x: 20, y: 80 });
+    simulation.dragCombat.input.lock(0.27);
+    simulation.dragCombat.shot.reset();
+    simulation.dragCombat.flushInputFrame();
+    assert.equal(simulation.dragCombat.getSnapshot().drag.state, "idle");
+    assert.equal(simulation.dragCombat.getSnapshot().drag.queued, true);
+    simulation.dragCombat.tickInput(0.26);
+    assert.equal(simulation.dragCombat.getSnapshot().drag.queued, true);
+    simulation.dragCombat.tickInput(0.02);
+    const afterLock = simulation.dragCombat.getSnapshot();
+    assert.equal(afterLock.drag.state, "aiming");
+    assert.equal(afterLock.drag.queued, false);
+    assert.equal(afterLock.drag.vector.active, true);
+    simulation.cancelDragCombat(41);
+}
+
+{
+    const simulation = createSimulation();
+    beginWithVector(simulation, 50);
+    simulation.releaseDragCombat(50);
+    assert.deepEqual(simulation.beginDragCombat(51, { x: 80, y: 80 }), { type: "queued" });
+    simulation.playerBall = simulation.getOpponent(simulation.playerBall);
+    simulation.dragCombat.tickInput(0);
+    assert.equal(simulation.dragCombat.getSnapshot().drag.queued, false, "queued input cannot migrate to a new player");
+    assert.equal(simulation.dragCombat.getSnapshot().drag.state, "idle");
 }
 
 {

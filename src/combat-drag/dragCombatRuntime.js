@@ -40,13 +40,17 @@ export class DragCombatRuntime {
         this.playerWarpReleased = false;
         this.enemyChargePlan = null;
         this.enemyChargeElapsed = 0;
+        this.queuedInput = null;
     }
 
     begin(pointerId, cssPoint) {
-        if (this.automated || this.shot.active || !this.#canAct()) return null;
+        if (this.automated || !this.#canAct() || this.input.state !== "idle") return null;
+        const player = this.#player();
+        if (player?.state?.movement) return null;
+        if (this.shot.active || this.input.inputLockRemaining > 0) return this.#queueInput(pointerId, cssPoint);
         const result = this.input.begin(pointerId, cssPoint);
         if (result) {
-            this.aimOwner = this.#player();
+            this.aimOwner = player;
             this.playerWarpReleased = false;
         }
         return result;
@@ -54,6 +58,13 @@ export class DragCombatRuntime {
 
     move(pointerId, cssPoint) {
         if (this.automated || !this.#canAct()) return null;
+        if (this.queuedInput) {
+            if (pointerId !== this.queuedInput.pointerId) return null;
+            const current = copyPoint(cssPoint);
+            if (!current || this.queuedInput.owner !== this.#player()) return null;
+            this.queuedInput.current = current;
+            return { type: "queued" };
+        }
         const result = this.input.move(pointerId, cssPoint);
         if (result?.active && !this.playerWarpReleased && !this.aimCaster) {
             this.aimCaster = this.#player();
@@ -64,6 +75,10 @@ export class DragCombatRuntime {
 
     release(pointerId) {
         if (this.automated) return null;
+        if (pointerId === this.queuedInput?.pointerId) {
+            this.queuedInput = null;
+            return this.#resolveInputResult({ type: "cancel", source: "queued-release" });
+        }
         if (this.input.state === "aiming" && this.aimOwner !== this.#player()) {
             return this.#resolveInputResult(this.input.cancel(pointerId));
         }
@@ -72,6 +87,10 @@ export class DragCombatRuntime {
 
     cancel(pointerId) {
         if (this.automated) return null;
+        if (pointerId === this.queuedInput?.pointerId) {
+            this.queuedInput = null;
+            return this.#resolveInputResult({ type: "cancel", source: "queued-cancel" });
+        }
         return this.#resolveInputResult(this.input.cancel(pointerId));
     }
 
@@ -82,6 +101,7 @@ export class DragCombatRuntime {
             return;
         }
         this.#resolveInputResult(this.input.tick(realDelta));
+        this.#activateQueuedInput();
         if (
             this.aimCaster &&
             !this.playerWarpReleased &&
@@ -93,9 +113,11 @@ export class DragCombatRuntime {
     }
 
     flushInputFrame() {
-        if (!this.pendingWarpRemoval) return;
-        this.#removeAimWarp();
-        this.pendingWarpRemoval = false;
+        if (this.pendingWarpRemoval) {
+            this.#removeAimWarp();
+            this.pendingWarpRemoval = false;
+        }
+        this.#activateQueuedInput();
     }
 
     tickShot(realDelta) {
@@ -212,6 +234,7 @@ export class DragCombatRuntime {
         this.playerWarpReleased = false;
         this.input.reset();
         this.shot.reset();
+        this.queuedInput = null;
         this.#resetEnemy();
         this.lastEvent = null;
     }
@@ -229,7 +252,9 @@ export class DragCombatRuntime {
                 aimElapsed: this.input.aimElapsed,
                 chargeRatio: getChargeRatio(this.input.aimElapsed, this.config.input.maxAimSeconds),
                 maxAimSeconds: this.config.input.maxAimSeconds,
-                inputLockRemaining: this.input.inputLockRemaining
+                inputLockRemaining: this.input.inputLockRemaining,
+                queued: Boolean(this.queuedInput),
+                queuedPointerId: this.queuedInput?.pointerId ?? null
             },
             playerShot: {
                 active: this.shot.active,
@@ -315,6 +340,38 @@ export class DragCombatRuntime {
         }
         this.#record(result);
         return result;
+    }
+
+    #queueInput(pointerId, cssPoint) {
+        if (this.queuedInput) return null;
+        const point = copyPoint(cssPoint);
+        const owner = this.#player();
+        if (!point || !owner) return null;
+        this.queuedInput = {
+            pointerId,
+            start: point,
+            current: { ...point },
+            owner
+        };
+        return { type: "queued" };
+    }
+
+    #activateQueuedInput() {
+        const queued = this.queuedInput;
+        if (!queued) return null;
+        const player = this.#player();
+        if (!this.#canAct() || queued.owner !== player) {
+            this.queuedInput = null;
+            return null;
+        }
+        if (this.shot.active || this.input.inputLockRemaining > 0 || player.state?.movement) return null;
+        const result = this.input.begin(queued.pointerId, queued.start);
+        if (!result) return null;
+        this.queuedInput = null;
+        this.aimOwner = player;
+        this.playerWarpReleased = false;
+        this.move(queued.pointerId, queued.current);
+        return { ...result, source: "queued" };
     }
 
     #cancelLaunch() {
