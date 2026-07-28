@@ -4,6 +4,14 @@ const TIER_COLORS = ["#5ce1e6", "#ffd166", "#ff8c42", "#ff4db8"];
 const FRONT_COLOR = "#ff4d5a";
 const TAU = Math.PI * 2;
 
+function launchSpeedMultiplier(snapshot, chargeRatio) {
+    const launch = snapshot.launch ?? {};
+    const minimum = Math.max(0, Number(launch.minSpeedRatio) || 0);
+    const maximum = Math.max(minimum, Number(launch.maxSpeedRatio) || minimum);
+    const tuning = Math.max(0, Number(launch.releaseSpeedMultiplier) || 1);
+    return (minimum + (maximum - minimum) * chargeRatio) * tuning;
+}
+
 function finitePoint(point) {
     return Number.isFinite(point?.x) && Number.isFinite(point?.y);
 }
@@ -260,6 +268,10 @@ export class DragCombatRenderer {
         ctx.fillRect(trackX, trackY, trackWidth, 2 * scale);
         ctx.fillStyle = state.color;
         ctx.fillRect(trackX, trackY, trackWidth * state.progress, 2 * scale);
+        if (snapshot.drag.state === "aiming") {
+            ctx.fillStyle = "#d7ffff";
+            ctx.fillRect(trackX + trackWidth / 2 - scale, trackY - scale, 2 * scale, 4 * scale);
+        }
     }
 
     #dragHudState(snapshot) {
@@ -287,15 +299,14 @@ export class DragCombatRenderer {
             };
         }
         if (drag.state === "aiming") {
-            const remaining = Math.max(0, drag.maxAimSeconds - drag.aimElapsed);
-            const strength = Math.max(0, Math.min(1, Number(drag.vector?.strength) || 0));
+            const chargeRatio = Math.max(0, Math.min(1, Number(drag.chargeRatio) || 0));
             return {
-                label: `조준 출력 ${Math.round(strength * 100)}%`,
-                detail: `놓아서 발사 · ${remaining.toFixed(1)}초`,
+                label: `차징 ${Math.round(chargeRatio * 100)}%`,
+                detail: `예상 속도 ×${launchSpeedMultiplier(snapshot, chargeRatio).toFixed(2)}`,
                 icon: "➜",
-                color: tierColor(Math.max(0, Math.ceil(strength * 3))),
+                color: tierColor(Math.max(0, Math.ceil(chargeRatio * 3))),
                 iconFill: "rgba(92, 225, 230, 0.14)",
-                progress: Math.max(0, Math.min(1, drag.aimElapsed / Math.max(0.001, drag.maxAimSeconds)))
+                progress: chargeRatio
             };
         }
         return {
@@ -314,24 +325,33 @@ export class DragCombatRenderer {
         const attacker = fighterById(simulation, queue.attackerId);
         if (!attacker || !finitePoint(queue.windupDirection)) return 0;
         const angle = Math.atan2(queue.windupDirection.y, queue.windupDirection.x);
-        const duration = Math.max(0.001, Number(queue.windupDuration) || 1);
-        const progress = Math.max(0, Math.min(1, queue.elapsed / duration));
+        const progress = Math.max(0, Math.min(1, Number(queue.displayProgress) || 0));
+        const accelerating = queue.accelerating === true;
         ctx.save();
         try {
             ctx.translate(attacker.position.x, attacker.position.y);
             ctx.rotate(angle);
-            this.#drawEnemyWindupRail(ctx, attacker, progress);
+            this.#drawEnemyWindupRail(ctx, attacker, progress, accelerating);
         } finally {
             ctx.restore();
         }
-        this.#drawLabel(ctx, "돌진 조준", attacker.position.x, attacker.position.y - attacker.radius - 26, "#9b1d16");
+        this.#drawLabel(
+            ctx,
+            accelerating ? "돌진 가속" : "돌진 조준",
+            attacker.position.x,
+            attacker.position.y - attacker.radius - 26,
+            accelerating ? "#ffd166" : "#ff5548"
+        );
         return 1;
     }
 
-    #drawEnemyWindupRail(ctx, attacker, progress) {
+    #drawEnemyWindupRail(ctx, attacker, progress, accelerating) {
         const start = attacker.radius + 16;
         const end = start + 150;
         const pulse = 0.5 + 0.5 * Math.sin(this.visualElapsed * 12);
+        const coreColor = accelerating ? "#ffd166" : "#ff5548";
+        const brightColor = accelerating ? "#ffd166" : "#fff0e6";
+        const dashSpeed = accelerating ? 180 : 65;
         ctx.lineCap = "round";
 
         ctx.globalAlpha = 0.52 + progress * 0.18;
@@ -353,10 +373,10 @@ export class DragCombatRenderer {
         ctx.stroke();
 
         ctx.globalAlpha = 0.58 + progress * 0.3;
-        ctx.strokeStyle = "#ff5548";
+        ctx.strokeStyle = coreColor;
         ctx.lineWidth = 3;
         ctx.setLineDash([9, 7]);
-        ctx.lineDashOffset = -(this.visualElapsed * 65) % 16;
+        ctx.lineDashOffset = -(this.visualElapsed * dashSpeed) % 16;
         ctx.beginPath();
         ctx.moveTo(start, 0);
         ctx.lineTo(end - 14, 0);
@@ -377,13 +397,13 @@ export class DragCombatRenderer {
 
         const phase = this.visualElapsed * 2.8;
         ctx.globalAlpha = 0.64 + pulse * 0.22;
-        ctx.strokeStyle = "#fff0e6";
+        ctx.strokeStyle = brightColor;
         ctx.lineWidth = 2.5;
         ctx.beginPath();
         ctx.arc(end, 0, 10, phase, phase + Math.PI * 1.25);
         ctx.stroke();
         ctx.globalAlpha = 0.52 + progress * 0.38;
-        ctx.strokeStyle = "#ff5548";
+        ctx.strokeStyle = coreColor;
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(end, 0, 5, 0, TAU);
@@ -396,7 +416,7 @@ export class DragCombatRenderer {
         ctx.arc(0, 0, attacker.radius + 16, 0, TAU);
         ctx.stroke();
         ctx.globalAlpha = 0.82 + pulse * 0.12;
-        ctx.strokeStyle = "#ff5548";
+        ctx.strokeStyle = coreColor;
         ctx.lineWidth = 3.5;
         ctx.beginPath();
         ctx.arc(0, 0, attacker.radius + 16, -Math.PI / 2, -Math.PI / 2 + TAU * progress);

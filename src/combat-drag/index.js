@@ -7,6 +7,12 @@ export {
     getDragLaunchSpeed
 } from "./config.js";
 export { DragInputState } from "./dragInputState.js";
+export {
+    advanceEnemyChargePlan,
+    getChargeRatio,
+    getEnemyChargePlan,
+    getEnemyRequiredChargeRatio
+} from "./chargeMath.js";
 export { DragCombatRuntime } from "./dragCombatRuntime.js";
 export { EnemyAttackQueue } from "./enemyAttackQueue.js";
 export { PlayerShotState } from "./playerShotState.js";

@@ -55,16 +55,16 @@ export function createDragCombatConfig(releaseSpeedMultiplier = DRAG_RELEASE_SPE
     });
 }
 
-export function getDragLaunchSpeed(baseSpeed, strength, shotConfig = DRAG_COMBAT_CONFIG.shot) {
+export function getDragLaunchSpeed(baseSpeed, chargeRatio, shotConfig = DRAG_COMBAT_CONFIG.shot) {
     const safeBaseSpeed = Math.max(0, Number.isFinite(baseSpeed) ? baseSpeed : 0);
-    const safeStrength = Math.min(1, Math.max(0, Number.isFinite(strength) ? strength : 0));
+    const safeChargeRatio = Math.min(1, Math.max(0, Number.isFinite(chargeRatio) ? chargeRatio : 0));
     const minSpeedRatio = Math.max(0, Number.isFinite(shotConfig?.minSpeedRatio) ? shotConfig.minSpeedRatio : 0);
     const maxSpeedRatio = Math.max(
         minSpeedRatio,
         Number.isFinite(shotConfig?.maxSpeedRatio) ? shotConfig.maxSpeedRatio : minSpeedRatio
     );
     const releaseSpeedMultiplier = clampDragReleaseSpeedMultiplier(shotConfig?.releaseSpeedMultiplier);
-    return safeBaseSpeed * (minSpeedRatio + (maxSpeedRatio - minSpeedRatio) * safeStrength) * releaseSpeedMultiplier;
+    return safeBaseSpeed * (minSpeedRatio + (maxSpeedRatio - minSpeedRatio) * safeChargeRatio) * releaseSpeedMultiplier;
 }
 
 export function getDragEnemyHealthMultiplier(alliedCount, hostileCount, config = DRAG_COMBAT_CONFIG.enemy) {

@@ -101,7 +101,7 @@ function resolveActualEnemyCollision({ activeFlight }) {
 
     second.position.y += 180;
     const expected = Vector2.subtract(second.position, first.position).normalize();
-    runtime.tickEnemy(1);
+    runtime.tickEnemy(1.2);
     const firstImpulse = first.physicsDebug.toArray().find((event) => event.type === "impulse");
     const firstImpulseLength = Math.hypot(firstImpulse?.impulse.x ?? 0, firstImpulse?.impulse.y ?? 0);
     assert.ok(firstImpulse);
@@ -114,7 +114,7 @@ function resolveActualEnemyCollision({ activeFlight }) {
     assert.equal(nextWindup.attackerId, second.id, "the opposing character should aim immediately after contact");
     assert.equal(nextWindup.targetId, first.id);
 
-    runtime.tickEnemy(1);
+    runtime.tickEnemy(1.2);
     assert.ok(second.physicsDebug.toArray().some((event) => event.type === "impulse"));
 }
 
@@ -122,10 +122,11 @@ function resolveActualEnemyCollision({ activeFlight }) {
     const simulation = createSimulation();
     const runtime = simulation.dragCombat;
     const [player, firstEnemy] = simulation.fighters;
+    firstEnemy.position.x = player.position.x + 600;
     runtime.tickEnemy(0);
     const windupSnapshot = runtime.getSnapshot().enemyQueue;
     assert.equal(windupSnapshot.phase, "windup");
-    assert.equal(windupSnapshot.windupDuration, 1);
+    assert.equal(windupSnapshot.windupDuration, 1.2);
     assert.equal(windupSnapshot.flightDuration, 1.8);
     const initial = windupSnapshot.windupDirection;
     player.position.y += 150;
@@ -134,7 +135,7 @@ function resolveActualEnemyCollision({ activeFlight }) {
     assert.notDeepEqual(tracked, initial, "windup telegraph follows the current player position");
     player.position.y += 150;
     const expected = Vector2.subtract(player.position, firstEnemy.position).normalize();
-    runtime.tickEnemy(0.4);
+    runtime.tickEnemy(0.6);
     assert.equal(runtime.getSnapshot().enemyQueue.phase, "flight");
     const impulse = firstEnemy.physicsDebug.toArray().find((event) => event.type === "impulse");
     assert.ok(impulse);
@@ -154,15 +155,65 @@ function resolveActualEnemyCollision({ activeFlight }) {
     const runtime = simulation.dragCombat;
     runtime.tickEnemy(0);
     runtime.tickEnemy(1);
-    const attacker = simulation.fighters.find((fighter) => fighter.id === runtime.getSnapshot().enemyQueue.attackerId);
+    const queue = runtime.getSnapshot().enemyQueue;
+    const attacker = simulation.fighters.find((fighter) => fighter.id === queue.attackerId);
     const impulse = attacker.physicsDebug.toArray().find((event) => event.type === "impulse");
     assert.ok(
         Math.abs(
             Math.hypot(impulse.impulse.x, impulse.impulse.y) -
-                getDragLaunchSpeed(attacker.stats.baseSpeed, 1, config.shot)
+                getDragLaunchSpeed(attacker.stats.baseSpeed, queue.chargeRatio, config.shot)
         ) < 1e-8,
-        "enemy dash uses the same tuned maximum drag output as the player"
+        "enemy dash uses the same charge curve and tuning multiplier as the player"
     );
+}
+
+{
+    const simulation = createSimulation();
+    const runtime = simulation.dragCombat;
+    const [player, firstEnemy] = simulation.fighters;
+    firstEnemy.position.x = player.position.x + 600;
+    runtime.tickEnemy(0);
+    runtime.tickEnemy(0.5);
+    const before = runtime.getSnapshot().enemyQueue;
+    assert.equal(before.accelerating, false);
+    player.position.x = firstEnemy.position.x - 180;
+    runtime.tickEnemy(0.01);
+    const accelerated = runtime.getSnapshot().enemyQueue;
+    assert.equal(accelerated.accelerating, true);
+    assert.ok(Math.abs(accelerated.plannedEndAt - 0.73) < 1e-8);
+    assert.ok(accelerated.displayProgress >= before.displayProgress);
+    runtime.tickEnemy(0.22);
+    assert.equal(runtime.getSnapshot().enemyQueue.phase, "flight");
+}
+
+{
+    const simulation = createSimulation();
+    const runtime = simulation.dragCombat;
+    const [player, firstEnemy] = simulation.fighters;
+    firstEnemy.position.x = player.position.x + 300;
+    player.velocity.y = player.stats.baseSpeed;
+    runtime.tickEnemy(0);
+    assert.equal(
+        runtime.getSnapshot().enemyQueue.windupDuration,
+        0.78,
+        "the initial enemy plan includes the target's lateral movement"
+    );
+}
+
+{
+    const simulation = createSimulation();
+    const runtime = simulation.dragCombat;
+    const [player, firstEnemy] = simulation.fighters;
+    firstEnemy.position.x = player.position.x + 600;
+    runtime.tickEnemy(0);
+    runtime.tickEnemy(0.99);
+    player.position.x = firstEnemy.position.x - 180;
+    runtime.tickEnemy(0.01);
+    const late = runtime.getSnapshot().enemyQueue;
+    assert.equal(late.accelerating, false);
+    assert.equal(late.plannedEndAt, 1.2);
+    runtime.tickEnemy(0.2);
+    assert.equal(runtime.getSnapshot().enemyQueue.phase, "flight");
 }
 
 {

@@ -1,5 +1,6 @@
 import { DRAG_COMBAT_CONFIG } from "./config.js";
 import { getSlingshotVector } from "./vectorMath.js";
+import { getChargeRatio } from "./chargeMath.js";
 
 export class DragInputState {
     constructor(config = DRAG_COMBAT_CONFIG.input) {
@@ -12,6 +13,7 @@ export class DragInputState {
         this.start = null;
         this.current = null;
         this.aimElapsed = 0;
+        this.chargeStarted = false;
         this.inputLockRemaining = 0;
         this.lastSnapshot = null;
         this.realTime = 0;
@@ -29,6 +31,7 @@ export class DragInputState {
         this.start = { ...point };
         this.current = { ...point };
         this.aimElapsed = 0;
+        this.chargeStarted = false;
         return { type: "begin" };
     }
     move(pointerId, point) {
@@ -41,6 +44,7 @@ export class DragInputState {
             return null;
         this.current = { ...point };
         this.lastSnapshot = getSlingshotVector(this.start, this.current, this.config);
+        if (this.lastSnapshot.active) this.chargeStarted = true;
         return this.lastSnapshot;
     }
     release(pointerId) {
@@ -60,16 +64,17 @@ export class DragInputState {
         this.realTime += delta;
         this.inputLockRemaining = Math.max(0, this.inputLockRemaining - delta);
         if (this.state !== "aiming") return null;
-        this.aimElapsed += delta;
-        if (this.aimElapsed >= this.config.maxAimSeconds) return this.#finish("auto-launch");
+        if (this.chargeStarted) this.aimElapsed += delta;
+        if (this.chargeStarted && this.aimElapsed >= this.config.maxAimSeconds) return this.#finish("auto-launch");
         return null;
     }
     #finish(source) {
         const snapshot = getSlingshotVector(this.start, this.current, this.config);
+        const chargeRatio = getChargeRatio(this.aimElapsed, this.config.maxAimSeconds);
         this.lastSnapshot = snapshot;
         this.#idle();
         if (!snapshot.active) return { type: "cancel" };
-        return { type: "launch", source, snapshot };
+        return { type: "launch", source, snapshot: { ...snapshot, chargeRatio } };
     }
     #idle() {
         this.state = "idle";
@@ -77,5 +82,6 @@ export class DragInputState {
         this.start = null;
         this.current = null;
         this.aimElapsed = 0;
+        this.chargeStarted = false;
     }
 }

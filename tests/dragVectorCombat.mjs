@@ -6,6 +6,10 @@ import {
     DragInputState,
     DRAG_RELEASE_SPEED_TUNING,
     EnemyAttackQueue,
+    advanceEnemyChargePlan,
+    getChargeRatio,
+    getEnemyChargePlan,
+    getEnemyRequiredChargeRatio,
     getDragLaunchSpeed,
     PlayerShotState,
     predictTrajectory
@@ -112,7 +116,7 @@ assert.deepEqual(lockedDrag.begin(2, { x: 0, y: 0 }), { type: "begin" });
 assert.equal(lockedDrag.cancel(2).type, "cancel");
 const invalidAutoDrag = new DragInputState();
 invalidAutoDrag.begin(1, { x: 0, y: 0 });
-assert.equal(invalidAutoDrag.tick(1.2).type, "cancel");
+assert.equal(invalidAutoDrag.tick(1.2), null);
 assert.equal(invalidAutoDrag.tick(1.2), null);
 const cleanupShot = new PlayerShotState();
 cleanupShot.begin("p", new Map([["e", { x: 1, y: 0 }]]));
@@ -268,6 +272,23 @@ assert.equal(createDragCombatConfig(1.45).shot.releaseSpeedMultiplier, 1.45);
 assert.equal(getDragLaunchSpeed(100, 0), 165);
 assert.equal(getDragLaunchSpeed(100, 1), 480);
 assert.ok(Math.abs(getDragLaunchSpeed(100, 0.5, createDragCombatConfig(1.4).shot) - 451.5) < 1e-8);
+assert.equal(getChargeRatio(0.6), 0.5);
+assert.equal(getEnemyRequiredChargeRatio(600, 0, 400), 1);
+assert.equal(getEnemyRequiredChargeRatio(0, 0, 400), 0.35);
+assert.equal(getEnemyRequiredChargeRatio(300, 400, 400), 0.65);
+const originalPlan = getEnemyChargePlan({ requiredChargeRatio: 1 });
+const approachingPlan = advanceEnemyChargePlan(originalPlan, { now: 0.3, requiredChargeRatio: 0.35 });
+assert.equal(approachingPlan.plannedEndAt, 1.2, "lower requirement waits until natural charge is sufficient");
+const acceleratedPlan = advanceEnemyChargePlan(approachingPlan, { now: 0.42, requiredChargeRatio: 0.35 });
+assert.equal(acceleratedPlan.accelerating, true);
+assert.ok(Math.abs(acceleratedPlan.plannedEndAt - 0.64) < 1e-8);
+const acceleratedLater = advanceEnemyChargePlan(acceleratedPlan, { now: 0.53, requiredChargeRatio: 0.8 });
+assert.equal(acceleratedLater.plannedEndAt, acceleratedPlan.plannedEndAt, "planned end never moves later");
+assert.ok(acceleratedLater.displayProgress >= acceleratedPlan.displayProgress, "display progress never reverses");
+assert.ok(acceleratedLater.naturalRatio < 1, "visual acceleration does not jump actual charge to full");
+const latePlan = advanceEnemyChargePlan(originalPlan, { now: 1, requiredChargeRatio: 0.35 });
+assert.equal(latePlan.accelerating, false);
+assert.equal(latePlan.plannedEndAt, 1.2, "the final 0.22 second visual window is not shortened");
 
 const previewFighter = {
     id: "preview-trickster",
@@ -283,17 +304,20 @@ const previewStart = { ...DRAG_RELEASE_PREVIEW_CONFIG.start };
 assert.deepEqual(releasePreview.getSnapshot().fighter, previewFighter);
 assert.equal(releasePreview.begin(31, previewStart).type, "begin");
 releasePreview.move(31, { x: previewStart.x - DRAG_COMBAT_CONFIG.input.maxPullPx, y: previewStart.y });
+for (let step = 0; step < 12; step += 1) releasePreview.update(1 / 20);
 const previewLaunch = releasePreview.release(31);
 assert.equal(previewLaunch.type, "launch");
-assert.equal(previewLaunch.speed, getDragLaunchSpeed(previewFighter.baseSpeed, 1));
+assert.ok(Math.abs(previewLaunch.chargeRatio - 0.5) < 1e-8);
+assert.equal(previewLaunch.speed, getDragLaunchSpeed(previewFighter.baseSpeed, 0.5));
 for (let step = 0; step < 12; step += 1) releasePreview.update(1 / 20);
 assert.ok(releasePreview.getSnapshot().bounceCount >= 1, "preview should expose wall-reflected release movement");
 releasePreview.setReleaseSpeedMultiplier(1.8);
 releasePreview.reset();
 assert.equal(releasePreview.begin(32, previewStart).type, "begin");
 releasePreview.move(32, { x: previewStart.x - DRAG_COMBAT_CONFIG.input.maxPullPx, y: previewStart.y });
+for (let step = 0; step < 24; step += 1) releasePreview.update(1 / 20);
 assert.equal(
-    releasePreview.release(32).speed,
+    releasePreview.getSnapshot().lastLaunch.speed,
     getDragLaunchSpeed(previewFighter.baseSpeed, 1, createDragCombatConfig(1.8).shot)
 );
 const movingDrawLabels = [];

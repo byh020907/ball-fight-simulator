@@ -77,6 +77,7 @@ const simulation = {
 };
 const idle = {
     enabled: true,
+    launch: { minSpeedRatio: 1.65, maxSpeedRatio: 4.8, releaseSpeedMultiplier: 1 },
     drag: {
         state: "idle",
         inputLockRemaining: 0,
@@ -104,6 +105,7 @@ const aim = {
     drag: {
         state: "aiming",
         aimElapsed: 0.4,
+        chargeRatio: 1 / 3,
         maxAimSeconds: 1.2,
         inputLockRemaining: 0,
         vector: { active: true, strength: 1, vector: { x: 1, y: 0 } }
@@ -114,6 +116,8 @@ const aim = {
         windupDirection: { x: -1, y: 0 },
         elapsed: 0.5,
         windupDuration: 1,
+        displayProgress: 0.5,
+        accelerating: false,
         flightDuration: 1.8
     },
     lastEvent: { type: "bounce", bounceCount: 2, sequence: 1 }
@@ -272,13 +276,43 @@ const countdownContext = new Context();
 renderer.renderScreen(countdownContext, simulation, aim);
 assert.equal(
     countdownContext.commands.some(
-        (command) => Array.isArray(command) && command[0] === "text" && command[1] === "조준 출력 100%"
+        (command) => Array.isArray(command) && command[0] === "text" && command[1] === "차징 33%"
     ),
     true
 );
 assert.equal(
     countdownContext.commands.some(
-        (command) => Array.isArray(command) && command[0] === "text" && command[1] === "놓아서 발사 · 0.8초"
+        (command) => Array.isArray(command) && command[0] === "text" && command[1] === "예상 속도 ×2.70"
+    ),
+    true
+);
+const acceleratedContext = new Context();
+renderer.renderWorld(
+    acceleratedContext,
+    simulation,
+    {
+        ...idle,
+        enemyQueue: {
+            phase: "windup",
+            attackerId: "enemy",
+            windupDirection: { x: -1, y: 0 },
+            elapsed: 0.6,
+            windupDuration: 0.82,
+            displayProgress: 0.7,
+            accelerating: true
+        }
+    },
+    0.016
+);
+assert.equal(
+    acceleratedContext.commands.some(
+        (command) => Array.isArray(command) && command[0] === "strokeStyle" && command[1] === "#ffd166"
+    ),
+    true
+);
+assert.equal(
+    acceleratedContext.commands.some(
+        (command) => Array.isArray(command) && command[0] === "text" && command[1] === "돌진 가속"
     ),
     true
 );

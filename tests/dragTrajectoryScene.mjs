@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { createDragTrajectoryScene } from "../src/combat-drag/index.js";
 
 const player = { id: "p", teamId: "a", position: { x: 100, y: 100 }, radius: 10, stats: { baseSpeed: 100 } };
-const snapshot = (strength = 1, vector = { x: 1, y: 0 }) => ({
-    drag: { state: "aiming", vector: { active: true, strength, vector } }
+const snapshot = (chargeRatio = 1, vector = { x: 1, y: 0 }) => ({
+    drag: { state: "aiming", chargeRatio, vector: { active: true, strength: 0, vector } }
 });
 const scene = (extra = {}, runtimeSnapshot = snapshot()) =>
     createDragTrajectoryScene({

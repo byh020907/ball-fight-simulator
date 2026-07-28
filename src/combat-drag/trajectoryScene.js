@@ -167,7 +167,7 @@ export function createDragTrajectoryScene({ simulation, runtimeSnapshot } = {}) 
             terminal: null
         };
     const direction = normalize(vector.vector);
-    const strength = Math.max(0, Math.min(1, vector.strength));
+    const chargeRatio = Math.max(0, Math.min(1, Number(drag.chargeRatio) || 0));
     if (!direction)
         return {
             active: false,
@@ -179,7 +179,7 @@ export function createDragTrajectoryScene({ simulation, runtimeSnapshot } = {}) 
             terminal: null
         };
     const shotConfig = runtimeSnapshot?.launch ?? DRAG_COMBAT_CONFIG.shot;
-    const impulseSpeed = getDragLaunchSpeed(player.stats?.baseSpeed, strength, shotConfig);
+    const impulseSpeed = getDragLaunchSpeed(player.stats?.baseSpeed, chargeRatio, shotConfig);
     const currentVelocity = finite(player.velocity) ? player.velocity : { x: 0, y: 0 };
     const launchVelocity = {
         x: currentVelocity.x + direction.x * impulseSpeed,
@@ -191,7 +191,7 @@ export function createDragTrajectoryScene({ simulation, runtimeSnapshot } = {}) 
             active: true,
             origin: copy(player.position),
             launchVelocity,
-            strength,
+            strength: chargeRatio,
             segments: [],
             bounces: [],
             terminal: null
@@ -265,5 +265,13 @@ export function createDragTrajectoryScene({ simulation, runtimeSnapshot } = {}) 
         current = { x: hit.point.x + heading.x * EPSILON, y: hit.point.y + heading.y * EPSILON };
         remaining -= hit.distance + EPSILON;
     }
-    return { active: true, origin: copy(player.position), launchVelocity, strength, segments, bounces, terminal };
+    return {
+        active: true,
+        origin: copy(player.position),
+        launchVelocity,
+        strength: chargeRatio,
+        segments,
+        bounces,
+        terminal
+    };
 }

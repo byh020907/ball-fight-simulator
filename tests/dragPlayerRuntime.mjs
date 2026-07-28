@@ -118,9 +118,10 @@ function assertFiniteSnapshot(snapshot) {
     ]) {
         clearImpulseEvents(player);
         beginWithVector(simulation, pointerId, { x: 20, y: 20 }, current);
+        simulation.dragCombat.tickInput(0.3);
         const launch = simulation.releaseDragCombat(pointerId);
         const impulse = impulseEvents(player);
-        const expected = getDragLaunchSpeed(player.stats.baseSpeed, launch.snapshot.strength);
+        const expected = getDragLaunchSpeed(player.stats.baseSpeed, launch.snapshot.chargeRatio);
         assert.equal(launch.type, "launch");
         assert.equal(impulse.length, 1, "every valid release launches exactly once");
         assert.ok(Math.abs(Math.hypot(impulse[0].impulse.x, impulse[0].impulse.y) - expected) < 1e-8);
@@ -169,6 +170,18 @@ function assertFiniteSnapshot(snapshot) {
 }
 
 {
+    const simulation = createSimulation();
+    const player = simulation.playerBall;
+    beginWithVector(simulation, 17);
+    simulation.dragCombat.tickInput(0.6);
+    assert.equal(simulation._clickActionContext.timeWarps.size, 0, "time warp ends at half charge");
+    assert.equal(simulation.moveDragCombat(17, { x: -80, y: -80 }).active, true);
+    assert.equal(simulation._clickActionContext.timeWarps.size, 0, "later aim edits cannot restart time warp");
+    assert.equal(simulation.releaseDragCombat(17).type, "launch", "release remains valid after time warp ends");
+    assert.equal(impulseCount(player), 1);
+}
+
+{
     const config = createDragCombatConfig(1.5);
     const simulation = createSimulation(true, { dragCombatConfig: config });
     const player = simulation.playerBall;
@@ -176,7 +189,7 @@ function assertFiniteSnapshot(snapshot) {
     beginWithVector(simulation, 21);
     const launch = simulation.releaseDragCombat(21);
     const impulse = impulseEvents(player).at(-1);
-    const expected = getDragLaunchSpeed(player.stats.baseSpeed, launch.snapshot.strength, config.shot);
+    const expected = getDragLaunchSpeed(player.stats.baseSpeed, launch.snapshot.chargeRatio, config.shot);
     assert.ok(Math.abs(Math.hypot(impulse.impulse.x, impulse.impulse.y) - expected) < 1e-8);
     assert.equal(simulation.dragCombat.getSnapshot().launch.releaseSpeedMultiplier, 1.5);
 }
@@ -191,10 +204,12 @@ function assertFiniteSnapshot(snapshot) {
     }
     clearImpulseEvents(player);
     beginWithVector(simulation, 12);
-    simulation.update(1.2, 1.2);
+    simulation.update(0.59, 0.59);
+    simulation.update(0.01, 0.01);
+    simulation.update(0.6, 0.6);
     assert.equal(impulseCount(player), 1, "auto-launch must happen exactly once");
     assert.equal(deltas.get(player), 1.2);
-    assert.equal(deltas.get(enemy), 0.42);
+    assert.ok(Math.abs(deltas.get(enemy) - 0.8165) < 1e-8);
     assert.equal(simulation._clickActionContext.timeWarps.size, 0, "auto-launch removes its warp in the same frame");
     simulation.update(0.1, 0.1);
     assert.equal(impulseCount(player), 1, "later ticks must not create another auto-launch impulse");

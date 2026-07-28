@@ -3,6 +3,12 @@ import { PlayerShotState } from "./playerShotState.js";
 import { EnemyAttackQueue } from "./enemyAttackQueue.js";
 import { DRAG_COMBAT_CONFIG, getDragLaunchSpeed } from "./config.js";
 import { Vector2 } from "../core.js";
+import {
+    advanceEnemyChargePlan,
+    getChargeRatio,
+    getEnemyChargePlan,
+    getEnemyRequiredChargeRatio
+} from "./chargeMath.js";
 
 function copyPoint(point) {
     return Number.isFinite(point?.x) && Number.isFinite(point?.y) ? { x: point.x, y: point.y } : null;
@@ -27,28 +33,37 @@ export class DragCombatRuntime {
         this.enemySlowElapsed = 0;
         this.lastEvent = null;
         this.eventSequence = 0;
+        this.aimOwner = null;
         this.aimCaster = null;
         this.pendingWarpRemoval = false;
+        this.playerWarpReleased = false;
+        this.enemyChargePlan = null;
+        this.enemyChargeElapsed = 0;
     }
 
     begin(pointerId, cssPoint) {
         if (this.automated || this.shot.active || !this.#canAct()) return null;
         const result = this.input.begin(pointerId, cssPoint);
         if (result) {
-            this.aimCaster = this.#player();
-            this.simulation.addTimeWarp(this.aimCaster, Infinity);
+            this.aimOwner = this.#player();
+            this.playerWarpReleased = false;
         }
         return result;
     }
 
     move(pointerId, cssPoint) {
         if (this.automated || !this.#canAct()) return null;
-        return this.input.move(pointerId, cssPoint);
+        const result = this.input.move(pointerId, cssPoint);
+        if (result?.active && !this.playerWarpReleased && !this.aimCaster) {
+            this.aimCaster = this.#player();
+            this.simulation.addTimeWarp(this.aimCaster, Infinity);
+        }
+        return result;
     }
 
     release(pointerId) {
         if (this.automated) return null;
-        if (this.input.state === "aiming" && this.aimCaster !== this.#player()) {
+        if (this.input.state === "aiming" && this.aimOwner !== this.#player()) {
             return this.#resolveInputResult(this.input.cancel(pointerId));
         }
         return this.#resolveInputResult(this.input.release(pointerId));
@@ -66,6 +81,14 @@ export class DragCombatRuntime {
             return;
         }
         this.#resolveInputResult(this.input.tick(realDelta));
+        if (
+            this.aimCaster &&
+            !this.playerWarpReleased &&
+            getChargeRatio(this.input.aimElapsed, this.config.input.maxAimSeconds) >= 0.5
+        ) {
+            this.#removeAimWarp();
+            this.playerWarpReleased = true;
+        }
     }
 
     flushInputFrame() {
@@ -117,10 +140,22 @@ export class DragCombatRuntime {
             const attacker = this.#fighterById(this.enemyQueue.attackerId);
             const target = this.#targetForAttacker(attacker);
             if (attacker && target) {
-                this.enemyDirections.set(
-                    this.enemyQueue.attackerId,
-                    copyPoint(Vector2.subtract(target.position, attacker.position).normalize()) ?? { x: 0, y: 0 }
+                const direction = Vector2.subtract(target.position, attacker.position).normalize();
+                this.enemyDirections.set(this.enemyQueue.attackerId, copyPoint(direction) ?? { x: 0, y: 0 });
+                this.enemyChargeElapsed += effectiveDelta;
+                const relative = Vector2.subtract(target.velocity ?? new Vector2(), attacker.velocity ?? new Vector2());
+                const lateral = relative.x * -direction.y + relative.y * direction.x;
+                const required = getEnemyRequiredChargeRatio(
+                    Vector2.subtract(target.position, attacker.position).length(),
+                    lateral,
+                    target.stats?.baseSpeed ?? target.stats?.speed
                 );
+                this.enemyChargePlan = advanceEnemyChargePlan(this.enemyChargePlan, {
+                    now: this.enemyChargeElapsed,
+                    requiredChargeRatio: required,
+                    maxAimSeconds: this.config.input.maxAimSeconds
+                });
+                this.enemyQueue.setWindupDuration(this.enemyChargePlan.plannedEndAt);
             }
         }
         const event = this.enemyQueue.tick(effectiveDelta, eligible);
@@ -172,6 +207,8 @@ export class DragCombatRuntime {
     reset() {
         this.#removeAimWarp();
         this.pendingWarpRemoval = false;
+        this.aimOwner = null;
+        this.playerWarpReleased = false;
         this.input.reset();
         this.shot.reset();
         this.#resetEnemy();
@@ -189,6 +226,7 @@ export class DragCombatRuntime {
                 current: copyPoint(this.input.current),
                 vector: copyValue(this.input.lastSnapshot),
                 aimElapsed: this.input.aimElapsed,
+                chargeRatio: getChargeRatio(this.input.aimElapsed, this.config.input.maxAimSeconds),
                 maxAimSeconds: this.config.input.maxAimSeconds,
                 inputLockRemaining: this.input.inputLockRemaining
             },
@@ -216,7 +254,11 @@ export class DragCombatRuntime {
                 targetId: this.enemyTargets.get(this.enemyQueue.attackerId) ?? null,
                 windupDirection: copyPoint(this.enemyDirections.get(this.enemyQueue.attackerId)),
                 elapsed: this.enemyQueue.elapsed,
-                windupDuration: this.config.enemy.windupSeconds,
+                windupDuration: this.enemyQueue.windupDuration,
+                chargeRatio: this.enemyChargePlan?.naturalRatio ?? 0,
+                displayProgress: this.enemyChargePlan?.displayProgress ?? 0,
+                accelerating: this.enemyChargePlan?.accelerating === true,
+                plannedEndAt: this.enemyChargePlan?.plannedEndAt ?? null,
                 flightDuration: this.config.enemy.flightMaxSeconds,
                 lastResolution: copyValue(this.enemyQueue.lastResult)
             },
@@ -237,7 +279,7 @@ export class DragCombatRuntime {
             const player = this.#player();
             if (!this.#canAct() || !player) return this.#cancelLaunch();
             const direction = new Vector2(result.snapshot.vector.x, result.snapshot.vector.y);
-            const speed = getDragLaunchSpeed(player.stats.baseSpeed, result.snapshot.strength, this.config.shot);
+            const speed = getDragLaunchSpeed(player.stats.baseSpeed, result.snapshot.chargeRatio, this.config.shot);
             player.applyImpulse(direction.scale(speed));
             const shields = new Map(
                 this.simulation
@@ -248,8 +290,10 @@ export class DragCombatRuntime {
             this.shot.begin(player.id, shields);
         }
         if (result.type === "launch" || result.type === "cancel") {
-            if (result.source === "auto-launch") this.pendingWarpRemoval = true;
-            else this.#removeAimWarp();
+            this.#removeAimWarp();
+            this.pendingWarpRemoval = false;
+            this.aimOwner = null;
+            this.playerWarpReleased = false;
         }
         this.#record(result);
         return result;
@@ -257,6 +301,8 @@ export class DragCombatRuntime {
 
     #cancelLaunch() {
         this.#removeAimWarp();
+        this.aimOwner = null;
+        this.playerWarpReleased = false;
         return { type: "cancel" };
     }
 
@@ -289,7 +335,7 @@ export class DragCombatRuntime {
         const player = this.#player();
         return Boolean(
             player &&
-            (this.input.state !== "aiming" || this.aimCaster === player) &&
+            (this.input.state !== "aiming" || this.aimOwner === player) &&
             !this.simulation.finished &&
             this.simulation.revivePauseRemaining <= 0 &&
             !player.flags.defeated &&
@@ -335,12 +381,40 @@ export class DragCombatRuntime {
             if (target) this.enemyTargets.set(event.attackerId, target.id);
             if (direction) this.enemyDirections.set(event.attackerId, copyPoint(direction) ?? { x: 0, y: 0 });
             this.enemySlowElapsed = 0;
+            const relative =
+                direction && attacker && target
+                    ? Vector2.subtract(target.velocity ?? new Vector2(), attacker.velocity ?? new Vector2())
+                    : null;
+            const lateral = direction && relative ? relative.x * -direction.y + relative.y * direction.x : 0;
+            const required =
+                direction && attacker && target
+                    ? getEnemyRequiredChargeRatio(
+                          Vector2.subtract(target.position, attacker.position).length(),
+                          lateral,
+                          target.stats?.baseSpeed ?? target.stats?.speed
+                      )
+                    : 0.35;
+            this.enemyChargeElapsed = 0;
+            this.enemyChargePlan = getEnemyChargePlan({
+                requiredChargeRatio: required,
+                maxAimSeconds: this.config.input.maxAimSeconds
+            });
+            this.enemyQueue.setWindupDuration(this.enemyChargePlan.plannedEndAt);
         }
         if (event.type === "launch") {
             const attacker = this.#fighterById(event.attackerId);
             const direction = this.enemyDirections.get(event.attackerId);
             if (!attacker || !direction) return this.#resolveEnemyFlight("invalid", this.#eligibleAttackers());
-            const speed = getDragLaunchSpeed(attacker.stats.baseSpeed, 1, this.config.shot);
+            const releaseChargeRatio = this.enemyChargePlan
+                ? getChargeRatio(
+                      this.enemyChargePlan.plannedEndAt - this.enemyChargePlan.startTime,
+                      this.config.input.maxAimSeconds
+                  )
+                : 0;
+            this.enemyChargePlan = this.enemyChargePlan
+                ? { ...this.enemyChargePlan, naturalRatio: releaseChargeRatio, displayProgress: 1 }
+                : null;
+            const speed = getDragLaunchSpeed(attacker.stats.baseSpeed, releaseChargeRatio, this.config.shot);
             attacker.applyImpulse(new Vector2(direction.x, direction.y).scale(speed));
             this.enemySlowElapsed = 0;
         }
@@ -364,6 +438,8 @@ export class DragCombatRuntime {
         this.enemyDirections.delete(attackerId);
         this.enemyTargets.delete(attackerId);
         this.enemySlowElapsed = 0;
+        this.enemyChargePlan = null;
+        this.enemyChargeElapsed = 0;
         const next = this.enemyQueue.resolveFlight(reason, eligibleIds);
         this.#record({ type: "enemy-flight-end", reason, attackerId, playerHit, targetHit });
         if (next) this.#handleEnemyEvent(next);
@@ -374,6 +450,8 @@ export class DragCombatRuntime {
         this.enemyDirections.clear();
         this.enemyTargets.clear();
         this.enemySlowElapsed = 0;
+        this.enemyChargePlan = null;
+        this.enemyChargeElapsed = 0;
     }
 
     #targetForAttacker(attacker) {

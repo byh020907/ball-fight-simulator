@@ -1,6 +1,7 @@
 import {
     createDragCombatConfig,
     DRAG_COMBAT_CONFIG,
+    getChargeRatio,
     getDragLaunchSpeed,
     getSlingshotVector
 } from "../combat-drag/index.js";
@@ -107,6 +108,9 @@ export class DragReleasePreviewScene {
         this.hitPulse = 0;
         this.trail = [];
         this.lastLaunch = null;
+        this.aimElapsed = 0;
+        this.chargeStarted = false;
+        this.visualElapsed = 0;
         return this.getSnapshot();
     }
 
@@ -117,28 +121,36 @@ export class DragReleasePreviewScene {
         this.pointerId = pointerId;
         this.dragStart = { ...this.ball };
         this.dragCurrent = { ...point };
+        this.aimElapsed = 0;
+        this.chargeStarted = false;
         return { type: "begin" };
     }
 
     move(pointerId, point) {
         if (!this.dragging || pointerId !== this.pointerId || !finitePoint(point)) return null;
         this.dragCurrent = { ...point };
-        return getSlingshotVector(this.dragStart, this.dragCurrent, DRAG_COMBAT_CONFIG.input);
+        const drag = getSlingshotVector(this.dragStart, this.dragCurrent, DRAG_COMBAT_CONFIG.input);
+        if (drag.active) this.chargeStarted = true;
+        return drag;
     }
 
     release(pointerId) {
         if (!this.dragging || pointerId !== this.pointerId) return null;
         const drag = getSlingshotVector(this.dragStart, this.dragCurrent, DRAG_COMBAT_CONFIG.input);
+        return this._finishDrag(drag, "release");
+    }
+
+    _finishDrag(drag, source) {
+        const chargeRatio = getChargeRatio(this.aimElapsed, this.config.input.maxAimSeconds);
         this._clearPointer();
         if (!drag.active) return { type: "cancel" };
-
-        const speed = getDragLaunchSpeed(this.fighter.baseSpeed, drag.strength, this.config.shot);
+        const speed = getDragLaunchSpeed(this.fighter.baseSpeed, chargeRatio, this.config.shot);
         this.velocity = { x: drag.vector.x * speed, y: drag.vector.y * speed };
         this.shotElapsed = 0;
         this.bounceCount = 0;
         this.trail = [];
-        this.lastLaunch = { speed, strength: drag.strength };
-        return { type: "launch", speed, strength: drag.strength };
+        this.lastLaunch = { speed, chargeRatio, source };
+        return { type: "launch", speed, chargeRatio, source };
     }
 
     cancel(pointerId) {
@@ -156,7 +168,15 @@ export class DragReleasePreviewScene {
             DRAG_RELEASE_PREVIEW_CONFIG.maximumFrameDelta,
             Math.max(0, Number.isFinite(delta) ? delta : 0)
         );
+        this.visualElapsed += elapsed;
         this.hitPulse = Math.max(0, this.hitPulse - elapsed);
+        if (this.dragging && this.chargeStarted) {
+            this.aimElapsed = Math.min(this.config.input.maxAimSeconds, this.aimElapsed + elapsed);
+            if (this.aimElapsed >= this.config.input.maxAimSeconds) {
+                const drag = getSlingshotVector(this.dragStart, this.dragCurrent, DRAG_COMBAT_CONFIG.input);
+                this._finishDrag(drag, "auto-launch");
+            }
+        }
         if (!this.isMoving()) return;
 
         this._applyVelocityPolicy(elapsed);
@@ -225,6 +245,8 @@ export class DragReleasePreviewScene {
         this.pointerId = null;
         this.dragStart = null;
         this.dragCurrent = null;
+        this.aimElapsed = 0;
+        this.chargeStarted = false;
     }
 
     getSnapshot() {
@@ -237,6 +259,8 @@ export class DragReleasePreviewScene {
             bounceCount: this.bounceCount ?? 0,
             totalHits: this.totalHits ?? 0,
             fighter: { ...this.fighter },
+            chargeRatio: getChargeRatio(this.aimElapsed, this.config.input.maxAimSeconds),
+            maxAimSeconds: this.config.input.maxAimSeconds,
             lastLaunch: this.lastLaunch ? { ...this.lastLaunch } : null
         };
     }
@@ -303,10 +327,17 @@ export class DragReleasePreviewScene {
             if (drag.active) {
                 ctx.strokeStyle = "#fff6cc";
                 ctx.fillStyle = "#fff6cc";
-                drawArrow(ctx, this.ball, drag.vector, 68 + drag.strength * 48);
+                drawArrow(
+                    ctx,
+                    this.ball,
+                    drag.vector,
+                    68 + getChargeRatio(this.aimElapsed, this.config.input.maxAimSeconds) * 48
+                );
             }
             ctx.restore();
         }
+
+        this._drawTelegraphSamples(ctx);
 
         ctx.save();
         ctx.fillStyle = "rgba(0, 0, 0, 0.28)";
@@ -354,7 +385,47 @@ export class DragReleasePreviewScene {
             ctx.font = "700 20px sans-serif";
             ctx.textAlign = "center";
             ctx.fillText("공을 반대 방향으로 당겼다 놓으세요", preview.width / 2, 329);
+        } else if (this.dragging) {
+            const chargeRatio = getChargeRatio(this.aimElapsed, this.config.input.maxAimSeconds);
+            const speedRatio =
+                (this.config.shot.minSpeedRatio +
+                    (this.config.shot.maxSpeedRatio - this.config.shot.minSpeedRatio) * chargeRatio) *
+                this.config.shot.releaseSpeedMultiplier;
+            ctx.fillStyle = "rgba(5, 14, 18, 0.82)";
+            ctx.fillRect(145, 301, 350, 42);
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "700 19px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText(
+                `차징 ${Math.round(chargeRatio * 100)}% · 예상 속도 ×${speedRatio.toFixed(2)}`,
+                preview.width / 2,
+                329
+            );
         }
+    }
+
+    _drawTelegraphSamples(ctx) {
+        const samples = [
+            { y: 36, label: "적 조준", color: "#ff5548", speed: 65 },
+            { y: 68, label: "돌진 가속", color: "#ffd166", speed: 180 }
+        ];
+        ctx.save();
+        ctx.font = "800 15px sans-serif";
+        ctx.textAlign = "left";
+        for (const sample of samples) {
+            ctx.fillStyle = sample.color;
+            ctx.fillText(sample.label, 396, sample.y + 5);
+            ctx.strokeStyle = sample.color;
+            ctx.lineWidth = 3;
+            ctx.setLineDash([8, 6]);
+            ctx.lineDashOffset = -(this.visualElapsed * sample.speed) % 14;
+            ctx.beginPath();
+            ctx.moveTo(488, sample.y);
+            ctx.lineTo(612, sample.y);
+            ctx.stroke();
+        }
+        ctx.setLineDash([]);
+        ctx.restore();
     }
 }
 

@@ -12,6 +12,7 @@ export class EnemyAttackQueue {
         this.idOrder = [];
         this.elapsed = 0;
         this.lastResult = null;
+        this.windupDuration = this.config.windupSeconds;
     }
     tick(realDelta, eligibleIds) {
         const ids = [...new Set((eligibleIds || []).filter((id) => id !== null && id !== undefined))];
@@ -27,7 +28,7 @@ export class EnemyAttackQueue {
             return this.#start(ids);
         }
         this.elapsed += delta;
-        if (this.state === "windup" && this.elapsed >= this.config.windupSeconds) {
+        if (this.state === "windup" && this.elapsed >= this.windupDuration) {
             this.state = "flight";
             this.elapsed = 0;
             return (this.lastResult = {
@@ -46,6 +47,10 @@ export class EnemyAttackQueue {
         this.state = "idle";
         return this.#start(eligibleIds || [], reason);
     }
+    setWindupDuration(seconds) {
+        if (this.state !== "windup" || !Number.isFinite(seconds)) return;
+        this.windupDuration = Math.max(this.elapsed, seconds);
+    }
     #start(ids, after) {
         if (!ids.length) return null;
         const attackerId = this.#nextEligibleId(ids);
@@ -53,6 +58,7 @@ export class EnemyAttackQueue {
         this.state = "windup";
         this.attackerId = attackerId;
         this.elapsed = 0;
+        this.windupDuration = this.config.windupSeconds;
         return (this.lastResult = {
             type: "windup",
             attackerId,
