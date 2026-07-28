@@ -76,6 +76,13 @@ assert.equal(reflectedSlowShot.tick(0.1, 80), null);
 assert.equal(reflectedSlowShot.bounce("wall", 0.1), true);
 assert.equal(reflectedSlowShot.tick(0.1, 80), null);
 assert.equal(reflectedSlowShot.tick(0.1, 80).type, "slow-stop");
+const reusableSpeedShot = new PlayerShotState();
+reusableSpeedShot.begin("p");
+assert.equal(reusableSpeedShot.tick(0.17, 500, 400), null);
+assert.equal(reusableSpeedShot.tick(0.01, 500, 400).type, "slow-stop");
+const meaningfulDashShot = new PlayerShotState();
+meaningfulDashShot.begin("p");
+assert.equal(meaningfulDashShot.tick(0.5, 504, 400), null);
 const trajectory = predictTrajectory({
     origin: { x: 0, y: 0 },
     direction: { x: 1, y: 0 },
@@ -258,7 +265,7 @@ assert.deepEqual(DRAG_COMBAT_CONFIG.shot, {
     releaseSpeedMultiplier: 1,
     shotMaxSeconds: 2.4,
     shotSlowSpeed: 90,
-    shotSlowBaseSpeedRatio: 0.3,
+    shotSlowBaseSpeedRatio: 1.25,
     shotSlowSeconds: 0.18,
     bounceDebounceSeconds: 0.08
 });

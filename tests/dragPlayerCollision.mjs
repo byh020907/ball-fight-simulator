@@ -131,7 +131,7 @@ function withFixedRandom(callback) {
     assert.equal(simulation.dragCombat.getSnapshot().lastEvent.type, "slow-stop");
     simulation.dragCombat.reset();
     launch(simulation, 45);
-    player.velocity = new Vector2(200, 0);
+    player.velocity = new Vector2(player.stats.baseSpeed * 2, 0);
     simulation.dragCombat.tickShot(2.4);
     assert.equal(simulation.dragCombat.getSnapshot().lastEvent.type, "timeout");
 }

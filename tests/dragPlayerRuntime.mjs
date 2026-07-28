@@ -201,6 +201,23 @@ function assertFiniteSnapshot(snapshot) {
 
 {
     const simulation = createSimulation();
+    const player = simulation.playerBall;
+    beginWithVector(simulation, 32);
+    simulation.releaseDragCombat(32);
+    assert.deepEqual(simulation.beginDragCombat(33, { x: 80, y: 80 }), { type: "queued" });
+    simulation.moveDragCombat(33, { x: 20, y: 80 });
+    player.velocity = new Vector2(player.stats.baseSpeed * 1.25, 0);
+    simulation.dragCombat.tickShot(0.18);
+    assert.equal(simulation.dragCombat.getSnapshot().lastEvent.type, "slow-stop");
+    simulation.dragCombat.flushInputFrame();
+    const resumedAim = simulation.dragCombat.getSnapshot();
+    assert.equal(resumedAim.drag.state, "aiming");
+    assert.equal(resumedAim.drag.pointerId, 33);
+    simulation.cancelDragCombat(33);
+}
+
+{
+    const simulation = createSimulation();
     beginWithVector(simulation, 40);
     simulation.releaseDragCombat(40);
     assert.deepEqual(simulation.beginDragCombat(41, { x: 80, y: 80 }), { type: "queued" });

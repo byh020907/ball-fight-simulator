@@ -6,7 +6,7 @@ export const DRAG_COMBAT_CONFIG = Object.freeze({
         releaseSpeedMultiplier: 1,
         shotMaxSeconds: 2.4,
         shotSlowSpeed: 90,
-        shotSlowBaseSpeedRatio: 0.3,
+        shotSlowBaseSpeedRatio: 1.25,
         shotSlowSeconds: 0.18,
         bounceDebounceSeconds: 0.08
     }),
