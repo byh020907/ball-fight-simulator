@@ -23,8 +23,6 @@ export const DRAG_COMBAT_CONFIG = Object.freeze({
     enemy: Object.freeze({
         windupSeconds: 1,
         flightMaxSeconds: 1.8,
-        attackSpeedMin: 520,
-        attackSpeedRatio: 2.05,
         attackDamageMultiplier: 1.35,
         enemyHealthMultiplier: 0.88,
         enemyGroupHealthExponent: 3

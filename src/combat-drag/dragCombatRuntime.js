@@ -326,14 +326,8 @@ export class DragCombatRuntime {
             const attacker = this.#fighterById(event.attackerId);
             const direction = this.enemyDirections.get(event.attackerId);
             if (!attacker || !direction) return this.#resolveEnemyFlight("invalid", false, this.#eligibleEnemies());
-            attacker.applyImpulse(
-                new Vector2(direction.x, direction.y).scale(
-                    Math.max(
-                        this.config.enemy.attackSpeedMin,
-                        attacker.stats.baseSpeed * this.config.enemy.attackSpeedRatio
-                    )
-                )
-            );
+            const speed = getDragLaunchSpeed(attacker.stats.baseSpeed, 1, this.config.shot);
+            attacker.applyImpulse(new Vector2(direction.x, direction.y).scale(speed));
             this.enemySlowElapsed = 0;
         }
         this.#record({ ...copyValue(event), type: `enemy-${event.type}` });

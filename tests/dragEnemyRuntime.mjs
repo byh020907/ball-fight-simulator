@@ -1,15 +1,17 @@
 import assert from "node:assert/strict";
 import { BattleSimulation } from "../src/simulation/battleSimulation.js";
+import { createDragCombatConfig, getDragLaunchSpeed } from "../src/combat-drag/index.js";
 import { Vector2 } from "../src/core.js";
 import { createRoster } from "../src/roster.js";
 
-function createSimulation(onDragCombatEvent) {
+function createSimulation(onDragCombatEvent, options = {}) {
     const specs = createRoster()
         .slice(0, 4)
         .map((spec, index) => ({ ...spec, teamId: index === 0 ? "player" : "enemy" }));
     const simulation = new BattleSimulation(specs, { onLog() {}, onSound() {}, onDragCombatEvent }, null, {
         assignActions: false,
-        dragCombatEnabled: true
+        dragCombatEnabled: true,
+        ...options
     });
     simulation.playerBall = simulation.fighters[0];
     simulation.fighters.forEach((fighter, index) => {
@@ -86,11 +88,30 @@ function resolveActualEnemyCollision({ activeFlight }) {
     const impulse = firstEnemy.physicsDebug.toArray().find((event) => event.type === "impulse");
     assert.ok(impulse);
     assert.ok(
-        Math.abs(Math.hypot(impulse.impulse.x, impulse.impulse.y) - Math.max(520, firstEnemy.stats.baseSpeed * 2.05)) <
-            1e-8
+        Math.abs(
+            Math.hypot(impulse.impulse.x, impulse.impulse.y) -
+                getDragLaunchSpeed(firstEnemy.stats.baseSpeed, 1, runtime.config.shot)
+        ) < 1e-8
     );
     assert.ok(Math.abs(impulse.impulse.x / Math.hypot(impulse.impulse.x, impulse.impulse.y) - expected.x) < 1e-8);
     assert.ok(Math.abs(impulse.impulse.y / Math.hypot(impulse.impulse.x, impulse.impulse.y) - expected.y) < 1e-8);
+}
+
+{
+    const config = createDragCombatConfig(1.5);
+    const simulation = createSimulation(undefined, { dragCombatConfig: config });
+    const runtime = simulation.dragCombat;
+    runtime.tickEnemy(0);
+    runtime.tickEnemy(1);
+    const attacker = simulation.fighters.find((fighter) => fighter.id === runtime.getSnapshot().enemyQueue.attackerId);
+    const impulse = attacker.physicsDebug.toArray().find((event) => event.type === "impulse");
+    assert.ok(
+        Math.abs(
+            Math.hypot(impulse.impulse.x, impulse.impulse.y) -
+                getDragLaunchSpeed(attacker.stats.baseSpeed, 1, config.shot)
+        ) < 1e-8,
+        "enemy dash uses the same tuned maximum drag output as the player"
+    );
 }
 
 {

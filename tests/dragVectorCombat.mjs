@@ -376,8 +376,6 @@ assert.deepEqual(DRAG_COMBAT_CONFIG.shield, {
 assert.deepEqual(DRAG_COMBAT_CONFIG.enemy, {
     windupSeconds: 1,
     flightMaxSeconds: 1.8,
-    attackSpeedMin: 520,
-    attackSpeedRatio: 2.05,
     attackDamageMultiplier: 1.35,
     enemyHealthMultiplier: 0.88,
     enemyGroupHealthExponent: 3
