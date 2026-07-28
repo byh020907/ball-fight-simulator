@@ -172,8 +172,8 @@ export class DragCombatRenderer {
         const queue = snapshot.enemyQueue;
         if (!queue || (queue.phase !== "windup" && queue.phase !== "flight")) return 0;
         const attacker = fighterById(simulation, queue.attackerId);
-        if (!attacker || !finitePoint(queue.fixedWindupDirection)) return 0;
-        const angle = Math.atan2(queue.fixedWindupDirection.y, queue.fixedWindupDirection.x);
+        if (!attacker || !finitePoint(queue.windupDirection)) return 0;
+        const angle = Math.atan2(queue.windupDirection.y, queue.windupDirection.x);
         ctx.save();
         try {
             ctx.translate(attacker.position.x, attacker.position.y);

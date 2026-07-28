@@ -17,6 +17,18 @@ function createSimulation({ enabled = true, enemyCount = 2 } = {}) {
 }
 
 {
+    const tournament = new BattleSimulation(createSpecs(1), { onLog() {}, onSound() {} }, null, {
+        assignActions: false,
+        dragCombatEnabled: true,
+        dragEnemyHealthScalingEnabled: false
+    });
+    const enemy = tournament.fighters[1];
+    const originalMaxHp = enemy.maxHp;
+    tournament.setPlayerBall(tournament.fighters[0]);
+    assert.equal(enemy.maxHp, originalMaxHp, "tournament-style drag combat keeps the opponent's full HP");
+}
+
+{
     const simulation = createSimulation();
     const player = simulation.fighters[0];
     const enemy = simulation.fighters[1];
@@ -61,10 +73,10 @@ function createSimulation({ enabled = true, enemyCount = 2 } = {}) {
     );
 }
 
-assert.equal(getDragEnemyHealthMultiplier(1, 1), 0.5, "one-on-one uses the base hostile HP multiplier");
+assert.equal(getDragEnemyHealthMultiplier(1, 1), 0.88, "one-on-one uses the base hostile HP multiplier");
 assert.equal(
     getDragEnemyHealthMultiplier(1, 3),
-    0.5 * (1 / 3) ** 3,
+    0.88 * (1 / 3) ** 3,
     "outnumbering cannot multiply the hostile team's HP burden linearly"
 );
 

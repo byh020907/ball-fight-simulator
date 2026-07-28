@@ -74,7 +74,11 @@ export class DragCombatRuntime {
         if (!this.shot.active) return;
         const player = this.#player();
         if (!this.#canAct()) return this.reset();
-        const event = this.shot.tick(realDelta, player?.velocity?.length?.());
+        const event = this.shot.tick(
+            realDelta,
+            player?.velocity?.length?.(),
+            player?.stats?.baseSpeed ?? player?.stats?.speed
+        );
         if (event) this.#record(event);
     }
 
@@ -94,13 +98,25 @@ export class DragCombatRuntime {
                 this.#resolveEnemyFlight("timeout", false, eligible);
                 return;
             }
+            const referenceSpeed =
+                attacker?.stats?.baseSpeed ?? attacker?.stats?.speed ?? this.config.shot.shotSlowSpeed;
+            const speedThreshold = this.config.shot.shotSlowBaseSpeedRatio * Number(referenceSpeed);
+            const enemySlowThreshold =
+                Number.isFinite(speedThreshold) && speedThreshold > 0 ? speedThreshold : this.config.shot.shotSlowSpeed;
             this.enemySlowElapsed =
-                attacker.velocity.length() <= this.config.shot.shotSlowSpeed
-                    ? this.enemySlowElapsed + effectiveDelta
-                    : 0;
+                attacker.velocity.length() <= enemySlowThreshold ? this.enemySlowElapsed + effectiveDelta : 0;
             if (this.enemySlowElapsed >= this.config.shot.shotSlowSeconds) {
                 this.#resolveEnemyFlight("slow-stop", false, eligible);
                 return;
+            }
+        }
+        if (this.enemyQueue.state === "windup" && this.enemyQueue.attackerId) {
+            const attacker = this.#fighterById(this.enemyQueue.attackerId);
+            if (attacker && player) {
+                this.enemyDirections.set(
+                    this.enemyQueue.attackerId,
+                    copyPoint(Vector2.subtract(player.position, attacker.position).normalize()) ?? { x: 0, y: 0 }
+                );
             }
         }
         const event = this.enemyQueue.tick(effectiveDelta, eligible, this.input.realTime);
@@ -184,7 +200,7 @@ export class DragCombatRuntime {
             enemyQueue: {
                 phase: this.enemyQueue.state,
                 attackerId: this.enemyQueue.attackerId,
-                fixedWindupDirection: copyPoint(this.enemyDirections.get(this.enemyQueue.attackerId)),
+                windupDirection: copyPoint(this.enemyDirections.get(this.enemyQueue.attackerId)),
                 elapsed: this.enemyQueue.elapsed,
                 protectedLaunchNotBefore: this.enemyQueue.protectedLaunchNotBefore,
                 defenseCandidate: this.enemyDefenseCandidate,

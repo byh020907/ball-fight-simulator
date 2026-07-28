@@ -94,7 +94,7 @@ const aim = {
         inputLockRemaining: 0,
         vector: { active: true, strength: 1, vector: { x: 1, y: 0 } }
     },
-    enemyQueue: { phase: "windup", attackerId: "enemy", fixedWindupDirection: { x: -1, y: 0 }, elapsed: 0.5 },
+    enemyQueue: { phase: "windup", attackerId: "enemy", windupDirection: { x: -1, y: 0 }, elapsed: 0.5 },
     lastEvent: { type: "bounce", bounceCount: 2, sequence: 1 }
 };
 const aimContext = new Context();

@@ -168,7 +168,7 @@ function withFixedRandom(callback) {
         player.stats.baseSpeed * 1.6,
         "recoil"
     );
-    assertClose(simulation.dragCombat.getSnapshot().drag.inputLockRemaining, 0.45, "input lock");
+    assertClose(simulation.dragCombat.getSnapshot().drag.inputLockRemaining, 0.27, "input lock");
     assert.equal(simulation.dragCombat.getSnapshot().playerShot.active, false);
     assert.equal(simulation.dragCombat.getSnapshot().playerShot.shields.length, 0);
     assert.equal(enemy.hp < enemy.maxHp, false);

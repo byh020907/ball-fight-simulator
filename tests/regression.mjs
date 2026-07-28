@@ -1693,11 +1693,11 @@ async function testTournamentOpponentProgressionByChallenge(app) {
     const { getTournamentOpponentExperienceLevel } = await import("../src/character-mastery/index.js");
     const playerId = app.playerFighterId;
     const scenarios = [
-        { masteryLevel: 0, challengeLevel: 0, expectedTierLabel: "첫 도전", expectedOpponentLevel: 1 },
-        { masteryLevel: 1, challengeLevel: 1, expectedTierLabel: "BRONZE", expectedOpponentLevel: 3 },
+        { masteryLevel: 0, challengeLevel: 0, expectedTierLabel: "첫 도전", expectedOpponentLevel: 4 },
+        { masteryLevel: 1, challengeLevel: 1, expectedTierLabel: "BRONZE", expectedOpponentLevel: 4 },
         { masteryLevel: 2, challengeLevel: 2, expectedTierLabel: "SILVER", expectedOpponentLevel: 6 },
         { masteryLevel: 3, challengeLevel: 3, expectedTierLabel: "GOLD", expectedOpponentLevel: 9 },
-        { masteryLevel: 3, challengeLevel: 0, expectedTierLabel: "첫 도전", expectedOpponentLevel: 1 }
+        { masteryLevel: 3, challengeLevel: 0, expectedTierLabel: "첫 도전", expectedOpponentLevel: 4 }
     ];
 
     for (const { masteryLevel, challengeLevel, expectedTierLabel, expectedOpponentLevel } of scenarios) {
@@ -1719,8 +1719,8 @@ async function testTournamentOpponentProgressionByChallenge(app) {
         );
 
         assert.equal(
-            getTournamentOpponentExperienceLevel(app.playerProfile, playerId),
-            challengeLevel === 0 ? null : expectedOpponentLevel,
+            getTournamentOpponentExperienceLevel(app.playerProfile, playerId, 4),
+            expectedOpponentLevel,
             `Challenge ${challengeLevel} should resolve its tournament opponent starting level`
         );
 
@@ -1775,8 +1775,7 @@ async function testTournamentOpponentProgressionByChallenge(app) {
             "Tournament selection should not duplicate fighters"
         );
         for (const opponent of opponents) {
-            const expectedProgression =
-                challengeLevel === 0 ? null : getCharacterLevelProgression(opponent.id, expectedOpponentLevel);
+            const expectedProgression = getCharacterLevelProgression(opponent.id, expectedOpponentLevel);
             const expectedSpec = applyExperienceProgressionToBaseSpec(
                 app.roster.find((fighter) => fighter.id === opponent.id),
                 expectedProgression
@@ -1805,9 +1804,7 @@ async function testTournamentOpponentProgressionByChallenge(app) {
             const expectedProgression =
                 fighter.id === playerId
                     ? playerProgression
-                    : challengeLevel === 0
-                      ? null
-                      : getCharacterLevelProgression(fighter.id, expectedOpponentLevel);
+                    : getCharacterLevelProgression(fighter.id, expectedOpponentLevel);
 
             assert.equal(
                 ball.progression.level,
@@ -15621,12 +15618,22 @@ async function testGetCharacterChallengeLevel() {
     const profile = createDefaultPlayerProfile();
     profile.characterMastery.levels.archer = 3;
     assert.equal(getCharacterChallengeLevel(profile, "archer"), 0, "Mastery must not set the first challenge level");
-    assert.equal(getTournamentOpponentExperienceLevel(profile, "archer"), null, "First challenge should use Lv.1 AI");
+    assert.equal(getTournamentOpponentExperienceLevel(profile, "archer"), 1, "First challenge should use Lv.1 AI");
+    assert.equal(
+        getTournamentOpponentExperienceLevel(profile, "archer", 7),
+        7,
+        "Tournament AI must not start below the player's current experience level"
+    );
 
     const firstWin = advanceTournamentChallenge(profile, { characterId: "archer", playerWon: true });
     assert.ok(firstWin.changed, "Tournament win should advance the next challenge");
     assert.equal(getCharacterChallengeLevel(profile, "archer"), 1, "First win -> challenge 1");
     assert.equal(getTournamentOpponentExperienceLevel(profile, "archer"), 3, "Challenge 1 should use Lv.3 AI");
+    assert.equal(
+        getTournamentOpponentExperienceLevel(profile, "archer", 2),
+        3,
+        "Challenge floor must stay active above a lower player level"
+    );
 
     advanceTournamentChallenge(profile, { characterId: "archer", playerWon: true });
     advanceTournamentChallenge(profile, { characterId: "archer", playerWon: true });

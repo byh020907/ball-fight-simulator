@@ -275,12 +275,13 @@ assert.deepEqual(DRAG_COMBAT_CONFIG.input, {
     cooldownSeconds: 2
 });
 assert.deepEqual(DRAG_COMBAT_CONFIG.shot, {
-    minSpeedRatio: 1.25,
-    maxSpeedRatio: 3.2,
+    minSpeedRatio: 1.65,
+    maxSpeedRatio: 4.8,
     releaseSpeedMultiplier: 1,
     shotMaxSeconds: 2.4,
     shotSlowSpeed: 90,
-    shotSlowSeconds: 0.2,
+    shotSlowBaseSpeedRatio: 0.3,
+    shotSlowSeconds: 0.18,
     bounceDebounceSeconds: 0.08
 });
 assert.deepEqual(DRAG_RELEASE_SPEED_TUNING, {
@@ -293,9 +294,9 @@ assert.equal(clampDragReleaseSpeedMultiplier(Number.NaN), 1);
 assert.equal(clampDragReleaseSpeedMultiplier(0), 0.6);
 assert.equal(clampDragReleaseSpeedMultiplier(99), 1.8);
 assert.equal(createDragCombatConfig(1.45).shot.releaseSpeedMultiplier, 1.45);
-assert.equal(getDragLaunchSpeed(100, 0), 125);
-assert.equal(getDragLaunchSpeed(100, 1), 320);
-assert.equal(getDragLaunchSpeed(100, 0.5, createDragCombatConfig(1.4).shot), 311.5);
+assert.equal(getDragLaunchSpeed(100, 0), 165);
+assert.equal(getDragLaunchSpeed(100, 1), 480);
+assert.ok(Math.abs(getDragLaunchSpeed(100, 0.5, createDragCombatConfig(1.4).shot) - 451.5) < 1e-8);
 
 const previewFighter = {
     id: "preview-trickster",
@@ -392,9 +393,10 @@ assert.equal(previewListeners.size, 0);
 assert.equal(cancelledPreviewFrame, 77);
 assert.equal(previewObserverDisconnected, true);
 assert.deepEqual(DRAG_COMBAT_CONFIG.shield, {
+    durationSeconds: 0.8,
     frontIncomingMultiplier: 1.5,
     frontRecoilSpeedRatio: 1.6,
-    frontInputLockSeconds: 0.45,
+    frontInputLockSeconds: 0.27,
     ricochetOneMultiplier: 1,
     ricochetTwoMultiplier: 1.45,
     ricochetThreeOrMoreMultiplier: 1.9,
@@ -404,9 +406,9 @@ assert.deepEqual(DRAG_COMBAT_CONFIG.enemy, {
     windupSeconds: 1,
     flightMaxSeconds: 1.8,
     attackSpeedMin: 520,
-    attackSpeedRatio: 1.8,
+    attackSpeedRatio: 2.05,
     attackDamageMultiplier: 1.35,
-    enemyHealthMultiplier: 0.5,
+    enemyHealthMultiplier: 0.88,
     enemyGroupHealthExponent: 3
 });
 
@@ -479,11 +481,18 @@ assert.deepEqual(detailedCounterShot.collide({ fighterId: "e", relation: "enemy"
     outgoingMultiplier: 0,
     incomingMultiplier: 1.5,
     recoilSpeedRatio: 1.6,
-    inputLockSeconds: 0.45,
+    inputLockSeconds: 0.27,
     bounceCount: 0
 });
 assert.equal(detailedCounterShot.active, false);
 assert.equal(detailedCounterShot.shieldForwards.size, 0);
+const expiringShieldShot = new PlayerShotState();
+expiringShieldShot.begin("p", new Map([["e", { x: 1, y: 0 }]]));
+assert.equal(expiringShieldShot.tick(0.79, 200, 100), null);
+assert.equal(expiringShieldShot.shieldForwards.size, 1);
+assert.equal(expiringShieldShot.tick(0.01, 200, 100), null);
+assert.equal(expiringShieldShot.shieldForwards.size, 0);
+assert.equal(expiringShieldShot.active, true, "shield expiry must not end the player's shot");
 for (const [count, multiplier, stagger] of [
     [1, 1, 0],
     [2, 1.45, 0],

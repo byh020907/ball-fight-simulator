@@ -1,7 +1,8 @@
 import { VALID_CHARACTER_IDS } from "../playerProfile.js";
+import { MAX_LEVEL } from "../experience/experienceConfig.js";
 
 const MAX_TOURNAMENT_CHALLENGE_LEVEL = 3;
-const TOURNAMENT_OPPONENT_EXPERIENCE_LEVEL_BY_CHALLENGE = Object.freeze([null, 3, 6, 9]);
+const TOURNAMENT_OPPONENT_EXPERIENCE_LEVEL_BY_CHALLENGE = Object.freeze([1, 3, 6, 9]);
 
 function ensureTournamentChallengeState(profile) {
     profile.tournamentChallenge ||= { levels: {} };
@@ -17,9 +18,15 @@ export function getCharacterChallengeLevel(profile, characterId) {
     return Math.max(0, Math.min(MAX_TOURNAMENT_CHALLENGE_LEVEL, Math.floor(level)));
 }
 
-/** 현재 도전 단계에 맞는 토너먼트 AI 시작 경험치 레벨을 반환한다. */
-export function getTournamentOpponentExperienceLevel(profile, characterId) {
-    return TOURNAMENT_OPPONENT_EXPERIENCE_LEVEL_BY_CHALLENGE[getCharacterChallengeLevel(profile, characterId)] ?? null;
+/** 현재 도전 단계와 플레이어 레벨 중 높은 쪽을 토너먼트 AI 시작 레벨로 반환한다. */
+export function getTournamentOpponentExperienceLevel(profile, characterId, playerExperienceLevel = 1) {
+    const challengeFloor =
+        TOURNAMENT_OPPONENT_EXPERIENCE_LEVEL_BY_CHALLENGE[getCharacterChallengeLevel(profile, characterId)] ?? 1;
+    const playerFloor = Math.max(
+        1,
+        Math.min(MAX_LEVEL, Math.floor(Number.isFinite(playerExperienceLevel) ? playerExperienceLevel : 1))
+    );
+    return Math.max(challengeFloor, playerFloor);
 }
 
 /** 토너먼트 우승 뒤 다음 도전 단계를 올린다. */

@@ -11,18 +11,18 @@ const scene = (extra = {}, runtimeSnapshot = snapshot()) =>
         runtimeSnapshot
     });
 assert.equal(scene({}, { drag: { state: "idle" } }).active, false);
-assert.deepEqual(scene().launchVelocity, { x: 320, y: 0 });
-assert.equal(scene({}, snapshot(0)).launchVelocity.x, 125);
-assert.equal(scene({}, snapshot(0.5)).launchVelocity.x, 222.5);
+assert.deepEqual(scene().launchVelocity, { x: 480, y: 0 });
+assert.equal(scene({}, snapshot(0)).launchVelocity.x, 165);
+assert.ok(Math.abs(scene({}, snapshot(0.5)).launchVelocity.x - 322.5) < 1e-8);
 assert.equal(
     scene(
         {},
         {
             ...snapshot(1),
-            launch: { minSpeedRatio: 1.25, maxSpeedRatio: 3.2, releaseSpeedMultiplier: 1.5, shotMaxSeconds: 2.4 }
+            launch: { minSpeedRatio: 1.65, maxSpeedRatio: 4.8, releaseSpeedMultiplier: 1.5, shotMaxSeconds: 2.4 }
         }
     ).launchVelocity.x,
-    480
+    720
 );
 const withVelocity = (velocity) => ({
     ...player,
@@ -34,11 +34,11 @@ const velocityScene = (velocity) => {
     const movingPlayer = withVelocity(velocity);
     return scene({ playerBall: movingPlayer, fighters: [movingPlayer] });
 };
-assert.deepEqual(velocityScene({ x: 0, y: 0 }).launchVelocity, { x: 320, y: 0 });
-assert.deepEqual(velocityScene({ x: 30, y: 0 }).launchVelocity, { x: 350, y: 0 });
-assert.deepEqual(velocityScene({ x: -30, y: 0 }).launchVelocity, { x: 290, y: 0 });
-assert.deepEqual(velocityScene({ x: 0, y: 40 }).launchVelocity, { x: 320, y: 40 });
-const cancelledVelocity = velocityScene({ x: -320, y: 0 });
+assert.deepEqual(velocityScene({ x: 0, y: 0 }).launchVelocity, { x: 480, y: 0 });
+assert.deepEqual(velocityScene({ x: 30, y: 0 }).launchVelocity, { x: 510, y: 0 });
+assert.deepEqual(velocityScene({ x: -30, y: 0 }).launchVelocity, { x: 450, y: 0 });
+assert.deepEqual(velocityScene({ x: 0, y: 40 }).launchVelocity, { x: 480, y: 40 });
+const cancelledVelocity = velocityScene({ x: -480, y: 0 });
 assert.deepEqual(cancelledVelocity.launchVelocity, { x: 0, y: 0 });
 assert.equal(cancelledVelocity.segments.length, 0);
 const wall = scene({ width: 150 });
@@ -88,9 +88,17 @@ const invalid = scene({
         { ...enemy, id: "dead", flags: { defeated: true } }
     ]
 });
-assert.equal(invalid.terminal, null);
+assert.equal(
+    invalid.segments.some((segment) => segment.collision?.fighterId),
+    false,
+    "untargetable and defeated fighters must be absent from the preview path"
+);
 const standby = scene({ fighters: [player, enemy], standbyFighters: [enemy] });
-assert.equal(standby.terminal, null);
+assert.equal(
+    standby.segments.some((segment) => segment.collision?.fighterId),
+    false,
+    "standby fighters must be absent from the preview path"
+);
 for (const [name, position, vector, expectedKey] of [
     ["left", { x: 100, y: 100 }, { x: -1, y: 0 }, "wall:left"],
     ["right", { x: 100, y: 100 }, { x: 1, y: 0 }, "wall:right"],

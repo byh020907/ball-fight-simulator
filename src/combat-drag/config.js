@@ -1,18 +1,20 @@
 export const DRAG_COMBAT_CONFIG = Object.freeze({
     input: Object.freeze({ deadZonePx: 24, maxPullPx: 140, maxAimSeconds: 1.2, cooldownSeconds: 2 }),
     shot: Object.freeze({
-        minSpeedRatio: 1.25,
-        maxSpeedRatio: 3.2,
+        minSpeedRatio: 1.65,
+        maxSpeedRatio: 4.8,
         releaseSpeedMultiplier: 1,
         shotMaxSeconds: 2.4,
         shotSlowSpeed: 90,
-        shotSlowSeconds: 0.2,
+        shotSlowBaseSpeedRatio: 0.3,
+        shotSlowSeconds: 0.18,
         bounceDebounceSeconds: 0.08
     }),
     shield: Object.freeze({
+        durationSeconds: 0.8,
         frontIncomingMultiplier: 1.5,
         frontRecoilSpeedRatio: 1.6,
-        frontInputLockSeconds: 0.45,
+        frontInputLockSeconds: 0.27,
         ricochetOneMultiplier: 1,
         ricochetTwoMultiplier: 1.45,
         ricochetThreeOrMoreMultiplier: 1.9,
@@ -22,9 +24,9 @@ export const DRAG_COMBAT_CONFIG = Object.freeze({
         windupSeconds: 1,
         flightMaxSeconds: 1.8,
         attackSpeedMin: 520,
-        attackSpeedRatio: 1.8,
+        attackSpeedRatio: 2.05,
         attackDamageMultiplier: 1.35,
-        enemyHealthMultiplier: 0.5,
+        enemyHealthMultiplier: 0.88,
         enemyGroupHealthExponent: 3
     })
 });

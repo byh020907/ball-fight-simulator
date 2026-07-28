@@ -71,18 +71,23 @@ function resolveActualEnemyCollision({ activeFlight }) {
     const [player, firstEnemy] = simulation.fighters;
     runtime.tickEnemy(0);
     assert.equal(runtime.getSnapshot().enemyQueue.phase, "windup");
-    const fixed = runtime.getSnapshot().enemyQueue.fixedWindupDirection;
-    player.position.y += 300;
-    runtime.tickEnemy(1);
+    const initial = runtime.getSnapshot().enemyQueue.windupDirection;
+    player.position.y += 150;
+    runtime.tickEnemy(0.6);
+    const tracked = runtime.getSnapshot().enemyQueue.windupDirection;
+    assert.notDeepEqual(tracked, initial, "windup telegraph follows the current player position");
+    player.position.y += 150;
+    const expected = Vector2.subtract(player.position, firstEnemy.position).normalize();
+    runtime.tickEnemy(0.4);
     assert.equal(runtime.getSnapshot().enemyQueue.phase, "flight");
     const impulse = firstEnemy.physicsDebug.toArray().find((event) => event.type === "impulse");
     assert.ok(impulse);
     assert.ok(
-        Math.abs(Math.hypot(impulse.impulse.x, impulse.impulse.y) - Math.max(520, firstEnemy.stats.baseSpeed * 1.8)) <
+        Math.abs(Math.hypot(impulse.impulse.x, impulse.impulse.y) - Math.max(520, firstEnemy.stats.baseSpeed * 2.05)) <
             1e-8
     );
-    assert.ok(Math.abs(impulse.impulse.x / Math.hypot(impulse.impulse.x, impulse.impulse.y) - fixed.x) < 1e-8);
-    assert.ok(Math.abs(impulse.impulse.y / Math.hypot(impulse.impulse.x, impulse.impulse.y) - fixed.y) < 1e-8);
+    assert.ok(Math.abs(impulse.impulse.x / Math.hypot(impulse.impulse.x, impulse.impulse.y) - expected.x) < 1e-8);
+    assert.ok(Math.abs(impulse.impulse.y / Math.hypot(impulse.impulse.x, impulse.impulse.y) - expected.y) < 1e-8);
 }
 
 {
@@ -173,9 +178,9 @@ function resolveActualEnemyCollision({ activeFlight }) {
     runtime.resolveFighterCollision({ a: attacker, b: simulation.playerBall, hostile: true });
     assert.equal(runtime.enemyDirections.size, 1, "only the active windup direction survives");
     const snapshot = runtime.getSnapshot();
-    snapshot.enemyQueue.fixedWindupDirection.x = 99;
+    snapshot.enemyQueue.windupDirection.x = 99;
     snapshot.enemyQueue.lastResolution.attackerId = "mutated";
-    assert.notEqual(runtime.getSnapshot().enemyQueue.fixedWindupDirection.x, 99);
+    assert.notEqual(runtime.getSnapshot().enemyQueue.windupDirection.x, 99);
     assert.notEqual(runtime.getSnapshot().enemyQueue.lastResolution.attackerId, "mutated");
 }
 
@@ -231,6 +236,23 @@ function resolveActualEnemyCollision({ activeFlight }) {
             "slow-stop/timeout immediately start next windup"
         );
     }
+}
+
+{
+    const simulation = createSimulation();
+    const runtime = simulation.dragCombat;
+    runtime.tickEnemy(0);
+    runtime.tickEnemy(1);
+    const attacker = simulation.fighters.find((fighter) => fighter.id === runtime.getSnapshot().enemyQueue.attackerId);
+    simulation.playerBall.stats.baseSpeed = 1000;
+    attacker.stats.baseSpeed = 100;
+    attacker.velocity = new Vector2(200, 0);
+    runtime.tickEnemy(0.2);
+    assert.equal(
+        runtime.getSnapshot().enemyQueue.phase,
+        "flight",
+        "enemy slow-stop threshold must use the attacker's own base speed"
+    );
 }
 
 {

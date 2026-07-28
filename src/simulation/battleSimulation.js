@@ -84,6 +84,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         // ── 클릭 액션 시스템 ──
         this.playerBall = null;
         this._dragEnemyHealthBalanced = new WeakSet();
+        this._dragEnemyHealthScalingEnabled = options.dragEnemyHealthScalingEnabled !== false;
         this._clickActionContext = {
             pendingActions: [], // 큐: 여러 액션이 한 프레임에 예약되어도 안전
             timeWarps: new Map(), // Map<ball, remainingSeconds> — 시전자별 독립 타이머
@@ -175,7 +176,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
 
     setPlayerBall(playerBall) {
         this.playerBall = playerBall ?? null;
-        if (!this.dragCombat || !this.playerBall) return this.playerBall;
+        if (!this.dragCombat || !this.playerBall || !this._dragEnemyHealthScalingEnabled) return this.playerBall;
 
         const hostileFighters = this.fighters.filter((fighter) => this.isHostile(this.playerBall, fighter));
         const alliedCount = this.fighters.length - hostileFighters.length;

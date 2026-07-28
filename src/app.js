@@ -670,9 +670,10 @@ export class BattleApp {
 
     _getTournamentChallengePresentation() {
         const challengeLevel = getCharacterChallengeLevel(this.playerProfile, this.playerFighterId);
+        const playerLevel = getCharacterExperienceSummary(this.playerProfile, this.playerFighterId).level;
         return {
             tierLabel: challengeLevel > 0 ? getTierText(challengeLevel) : "첫 도전",
-            opponentLevel: getTournamentOpponentExperienceLevel(this.playerProfile, this.playerFighterId) ?? 1
+            opponentLevel: getTournamentOpponentExperienceLevel(this.playerProfile, this.playerFighterId, playerLevel)
         };
     }
 
@@ -688,13 +689,18 @@ export class BattleApp {
         const sourceName =
             this.roster.find((fighter) => fighter.id === masteryResult.characterId)?.name ?? masteryResult.characterId;
         const effectValue = effect.formatValue(effect.tierValues[masteryResult.newLevel]);
+        const playerLevel = getCharacterExperienceSummary(this.playerProfile, masteryResult.characterId).level;
         return {
             sourceName,
             tierLabel: masteryResult.newTier ?? getTierText(masteryResult.newLevel),
             effectName: effect.name,
             effectDescription: effect.description.replace("{value}", effectValue),
             scopeText: "다른 볼에 적용",
-            nextOpponentLevel: getTournamentOpponentExperienceLevel(this.playerProfile, masteryResult.characterId) ?? 1
+            nextOpponentLevel: getTournamentOpponentExperienceLevel(
+                this.playerProfile,
+                masteryResult.characterId,
+                playerLevel
+            )
         };
     }
 
@@ -960,7 +966,11 @@ export class BattleApp {
             this.playerProfile,
             this.playerFighterId
         );
-        const opponentExperienceLevel = getTournamentOpponentExperienceLevel(this.playerProfile, this.playerFighterId);
+        const opponentExperienceLevel = getTournamentOpponentExperienceLevel(
+            this.playerProfile,
+            this.playerFighterId,
+            playerExperienceProgression.level
+        );
         const playableRoster = getEligibleRoster(this.playerProfile, this.roster, CHARACTER_ROSTER_CONTEXTS.TOURNAMENT);
         const candidateExperienceProgressionByFighter = new Map(
             playableRoster.map((fighter) => {
@@ -1137,6 +1147,7 @@ export class BattleApp {
                 terrain: options.terrain ?? [],
                 dragCombatEnabled: match.some((fighter) => fighter.id === this.playerFighterId),
                 dragCombatConfig: this._createDragCombatConfig(),
+                dragEnemyHealthScalingEnabled: !this.currentTournamentMatch,
                 playerLives: options.playerLives ?? null,
                 tournamentAngledBounceRamps: this.currentTournamentMatch
                     ? {

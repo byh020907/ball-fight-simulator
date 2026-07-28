@@ -54,12 +54,15 @@ export class PlayerShotState {
             });
         return this.#finish({ type: "plain-hit" });
     }
-    tick(realDelta, speed) {
+    tick(realDelta, speed, referenceSpeed = null) {
         if (!this.active) return null;
         const delta = Math.max(0, Number.isFinite(realDelta) ? realDelta : 0);
         this.elapsed += delta;
-        this.slowElapsed =
-            Number.isFinite(speed) && speed <= this.config.shot.shotSlowSpeed ? this.slowElapsed + delta : 0;
+        if (this.elapsed >= this.config.shield.durationSeconds) this.shieldForwards.clear();
+        const speedThreshold = this.config.shot.shotSlowBaseSpeedRatio * Number(referenceSpeed);
+        const slowThreshold =
+            Number.isFinite(speedThreshold) && speedThreshold > 0 ? speedThreshold : this.config.shot.shotSlowSpeed;
+        this.slowElapsed = Number.isFinite(speed) && speed <= slowThreshold ? this.slowElapsed + delta : 0;
         if (this.slowElapsed >= this.config.shot.shotSlowSeconds) return this.#end("slow-stop");
         if (this.elapsed >= this.config.shot.shotMaxSeconds) return this.#end("timeout");
         return null;
