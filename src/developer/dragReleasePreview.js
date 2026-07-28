@@ -330,20 +330,22 @@ export class DragReleasePreviewScene {
         ctx.stroke();
         ctx.restore();
 
-        ctx.fillStyle = "rgba(5, 14, 18, 0.76)";
-        ctx.fillRect(20, 18, 340, 80);
-        ctx.fillStyle = "#effdff";
-        ctx.font = "800 23px sans-serif";
-        ctx.textAlign = "left";
-        ctx.fillText(`${this.fighter.name} · ×${this.releaseSpeedMultiplier.toFixed(2)}`, 34, 49);
-        ctx.fillStyle = "#a9dbe0";
-        ctx.font = "700 18px sans-serif";
-        const speed = this.lastLaunch?.speed ?? 0;
-        ctx.fillText(
-            `기준 ${Math.round(this.fighter.baseSpeed)} · R${Math.round(this.fighter.baseRadius)} · 최근 ${Math.round(speed)}`,
-            34,
-            80
-        );
+        if (!this.isMoving()) {
+            ctx.fillStyle = "rgba(5, 14, 18, 0.76)";
+            ctx.fillRect(20, 18, 340, 80);
+            ctx.fillStyle = "#effdff";
+            ctx.font = "800 23px sans-serif";
+            ctx.textAlign = "left";
+            ctx.fillText(`${this.fighter.name} · ×${this.releaseSpeedMultiplier.toFixed(2)}`, 34, 49);
+            ctx.fillStyle = "#a9dbe0";
+            ctx.font = "700 18px sans-serif";
+            const speed = this.lastLaunch?.speed ?? 0;
+            ctx.fillText(
+                `기준 ${Math.round(this.fighter.baseSpeed)} · R${Math.round(this.fighter.baseRadius)} · 최근 ${Math.round(speed)}`,
+                34,
+                80
+            );
+        }
 
         if (!this.dragging && !this.isMoving()) {
             ctx.fillStyle = "rgba(5, 14, 18, 0.82)";

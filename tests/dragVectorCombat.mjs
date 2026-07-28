@@ -324,6 +324,36 @@ assert.equal(
     releasePreview.release(32).speed,
     getDragLaunchSpeed(previewFighter.baseSpeed, 1, createDragCombatConfig(1.8).shot)
 );
+const movingDrawLabels = [];
+const movingDrawContext = new Proxy(
+    {
+        fillText: (label) => movingDrawLabels.push(label)
+    },
+    {
+        get: (target, property) => target[property] ?? (() => {})
+    }
+);
+releasePreview.draw(movingDrawContext);
+assert.equal(
+    movingDrawLabels.some((label) => label.includes(previewFighter.name)),
+    false,
+    "moving preview ball should not be covered by its information panel"
+);
+releasePreview.reset();
+const idleDrawLabels = [];
+const idleDrawContext = new Proxy(
+    {
+        fillText: (label) => idleDrawLabels.push(label)
+    },
+    {
+        get: (target, property) => target[property] ?? (() => {})
+    }
+);
+releasePreview.draw(idleDrawContext);
+assert.ok(
+    idleDrawLabels.some((label) => label.includes(previewFighter.name)),
+    "idle preview should restore the selected fighter information panel"
+);
 
 const previewListeners = new Map();
 let cancelledPreviewFrame = null;
