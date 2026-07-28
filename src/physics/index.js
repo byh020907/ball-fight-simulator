@@ -22,6 +22,7 @@ export { applyCollisionResponse, applyDynamicCollisionResponse } from "./collisi
 export { PHYSICS_MATERIALS, resolvePhysicsMaterial, combinePhysicsMaterials } from "./PhysicsMaterial.js";
 export { createSteeringRebaseState } from "./steeringRebase.js";
 export { steerProjectileVelocityToward } from "./projectileSteering.js";
+export { LINEAR_VELOCITY_POLICY, resolveLinearVelocityPolicy } from "./linearVelocityPolicy.js";
 export { TimedKeyMap } from "./TimedKeyMap.js";
 export {
     getContactPointVelocity,

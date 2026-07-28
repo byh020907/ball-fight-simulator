@@ -1,6 +1,5 @@
 import { Vector2 } from "../core.js";
-
-const BASE_VELOCITY_CORRECTION_RATE = 5.5;
+import { resolveLinearVelocityPolicy } from "./linearVelocityPolicy.js";
 
 /**
  * PhysicsBody 믹스인 — 물리 시뮬레이션에 필요한 상태와 연산을 제공합니다.
@@ -16,7 +15,7 @@ const BASE_VELOCITY_CORRECTION_RATE = 5.5;
  *   applyImpulse(vec)          — 순간 속도 변화 적용
  *   applyForce(vec)            — 지속 힘 누적
  *   integrate(delta)           — 속도 → 위치 적분
- *   _applyVelocityCorrection(sim, delta)  — 목표 속도로 지수 감쇠
+ *   _applyVelocityCorrection(sim, delta)  — 기준 이하 회복, 기준 이상 마찰 감쇠
  *   _computeDesiredVelocity(sim)         — 목표 속도 계산
  */
 export default function PhysicsBody(Base) {
@@ -63,14 +62,25 @@ export default function PhysicsBody(Base) {
             this.pos.add(this.velocity.clone().scale(delta));
         }
 
-        // ── 속도 보정 (목표 속도로 지수 감쇠) ──
+        // ── 속도 정책 (기준 이하 회복, 기준 이상 마찰 감쇠) ──
 
         _applyVelocityCorrection(simulation, delta) {
             const desired = this._computeDesiredVelocity(simulation);
             const recoBonus = 1 + (this.mastery?.physics?.velocityRecoveryBonus ?? 0);
-            const rate = BASE_VELOCITY_CORRECTION_RATE * recoBonus;
-            const correction = 1 - Math.exp(-rate * delta);
-            this.applyImpulse(Vector2.subtract(desired, this.velocity).scale(correction));
+            const currentSpeed = this.velocity.length();
+            const desiredSpeed = desired.length();
+            const transition = resolveLinearVelocityPolicy({
+                currentSpeed,
+                referenceSpeed: desiredSpeed,
+                delta,
+                recoveryBonus: recoBonus - 1
+            });
+            if (transition.mode === "recovery") {
+                this.applyImpulse(Vector2.subtract(desired, this.velocity).scale(transition.blend));
+                return;
+            }
+            if (currentSpeed <= 0) return;
+            this.applyImpulse(this.velocity.clone().scale(transition.nextSpeed / currentSpeed - 1));
         }
 
         /**

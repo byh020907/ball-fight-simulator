@@ -4,12 +4,11 @@ import {
     getDragLaunchSpeed,
     getSlingshotVector
 } from "../combat-drag/index.js";
+import { resolveLinearVelocityPolicy } from "../physics/linearVelocityPolicy.js";
 
 export const DRAG_RELEASE_PREVIEW_CONFIG = Object.freeze({
     width: 640,
     height: 360,
-    baseSpeed: 405,
-    ballRadius: 22,
     targetRadius: 26,
     maximumPixelRatio: 2,
     maximumFrameDelta: 1 / 20,
@@ -17,6 +16,42 @@ export const DRAG_RELEASE_PREVIEW_CONFIG = Object.freeze({
     start: Object.freeze({ x: 138, y: 250 }),
     target: Object.freeze({ x: 515, y: 105 })
 });
+
+const DEFAULT_PREVIEW_FIGHTER = Object.freeze({
+    id: "preview",
+    name: "테스트 공",
+    color: "#64deea",
+    baseSpeed: 405,
+    baseRadius: 50,
+    mass: 1,
+    level: 1
+});
+
+function normalizePreviewFighter(fighter) {
+    return {
+        id: fighter?.id ?? DEFAULT_PREVIEW_FIGHTER.id,
+        name: fighter?.name ?? DEFAULT_PREVIEW_FIGHTER.name,
+        color: /^#[0-9a-f]{6}$/i.test(fighter?.color) ? fighter.color : DEFAULT_PREVIEW_FIGHTER.color,
+        baseSpeed:
+            Number.isFinite(fighter?.baseSpeed) && fighter.baseSpeed > 0
+                ? fighter.baseSpeed
+                : DEFAULT_PREVIEW_FIGHTER.baseSpeed,
+        baseRadius:
+            Number.isFinite(fighter?.baseRadius) && fighter.baseRadius > 0
+                ? fighter.baseRadius
+                : DEFAULT_PREVIEW_FIGHTER.baseRadius,
+        mass: Number.isFinite(fighter?.mass) && fighter.mass > 0 ? fighter.mass : DEFAULT_PREVIEW_FIGHTER.mass,
+        level: Math.max(1, Math.floor(Number(fighter?.level) || DEFAULT_PREVIEW_FIGHTER.level))
+    };
+}
+
+function colorWithAlpha(hex, alpha) {
+    const value = Number.parseInt(hex.slice(1), 16);
+    const red = (value >> 16) & 255;
+    const green = (value >> 8) & 255;
+    const blue = value & 255;
+    return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
 
 function finitePoint(point) {
     return Number.isFinite(point?.x) && Number.isFinite(point?.y);
@@ -42,8 +77,9 @@ function drawArrow(ctx, origin, direction, length) {
 }
 
 export class DragReleasePreviewScene {
-    constructor(releaseSpeedMultiplier = 1) {
+    constructor(releaseSpeedMultiplier = 1, fighter = null) {
         this.totalHits = 0;
+        this.fighter = normalizePreviewFighter(fighter);
         this.setReleaseSpeedMultiplier(releaseSpeedMultiplier);
         this.reset();
     }
@@ -52,6 +88,11 @@ export class DragReleasePreviewScene {
         this.config = createDragCombatConfig(value);
         this.releaseSpeedMultiplier = this.config.shot.releaseSpeedMultiplier;
         return this.getSnapshot();
+    }
+
+    setFighter(fighter) {
+        this.fighter = normalizePreviewFighter(fighter);
+        return this.reset();
     }
 
     reset() {
@@ -71,7 +112,7 @@ export class DragReleasePreviewScene {
 
     begin(pointerId, point) {
         if (this.dragging || this.isMoving() || !finitePoint(point)) return null;
-        if (distanceBetween(point, this.ball) > DRAG_RELEASE_PREVIEW_CONFIG.ballRadius * 1.8) return null;
+        if (distanceBetween(point, this.ball) > this.fighter.baseRadius * 1.5) return null;
         this.dragging = true;
         this.pointerId = pointerId;
         this.dragStart = { ...this.ball };
@@ -91,7 +132,7 @@ export class DragReleasePreviewScene {
         this._clearPointer();
         if (!drag.active) return { type: "cancel" };
 
-        const speed = getDragLaunchSpeed(DRAG_RELEASE_PREVIEW_CONFIG.baseSpeed, drag.strength, this.config.shot);
+        const speed = getDragLaunchSpeed(this.fighter.baseSpeed, drag.strength, this.config.shot);
         this.velocity = { x: drag.vector.x * speed, y: drag.vector.y * speed };
         this.shotElapsed = 0;
         this.bounceCount = 0;
@@ -118,6 +159,7 @@ export class DragReleasePreviewScene {
         this.hitPulse = Math.max(0, this.hitPulse - elapsed);
         if (!this.isMoving()) return;
 
+        this._applyVelocityPolicy(elapsed);
         this.shotElapsed += elapsed;
         this.trail.push({ ...this.ball });
         if (this.trail.length > 18) this.trail.shift();
@@ -129,8 +171,21 @@ export class DragReleasePreviewScene {
         if (this.shotElapsed >= this.config.shot.shotMaxSeconds) this.reset();
     }
 
+    _applyVelocityPolicy(delta) {
+        const currentSpeed = Math.hypot(this.velocity.x, this.velocity.y);
+        if (currentSpeed <= 0) return;
+        const transition = resolveLinearVelocityPolicy({
+            currentSpeed,
+            referenceSpeed: this.fighter.baseSpeed,
+            delta
+        });
+        const scale = transition.nextSpeed / currentSpeed;
+        this.velocity.x *= scale;
+        this.velocity.y *= scale;
+    }
+
     _resolveWallBounces() {
-        const radius = DRAG_RELEASE_PREVIEW_CONFIG.ballRadius;
+        const radius = this.fighter.baseRadius;
         const min = DRAG_RELEASE_PREVIEW_CONFIG.wallInset + radius;
         const maxX = DRAG_RELEASE_PREVIEW_CONFIG.width - DRAG_RELEASE_PREVIEW_CONFIG.wallInset - radius;
         const maxY = DRAG_RELEASE_PREVIEW_CONFIG.height - DRAG_RELEASE_PREVIEW_CONFIG.wallInset - radius;
@@ -159,7 +214,7 @@ export class DragReleasePreviewScene {
     _resolveTargetHit() {
         if (this.hitPulse > 0) return;
         const target = DRAG_RELEASE_PREVIEW_CONFIG.target;
-        const hitDistance = DRAG_RELEASE_PREVIEW_CONFIG.ballRadius + DRAG_RELEASE_PREVIEW_CONFIG.targetRadius;
+        const hitDistance = this.fighter.baseRadius + DRAG_RELEASE_PREVIEW_CONFIG.targetRadius;
         if (distanceBetween(this.ball, target) > hitDistance) return;
         this.totalHits += 1;
         this.hitPulse = 0.45;
@@ -181,6 +236,7 @@ export class DragReleasePreviewScene {
             moving: this.isMoving?.() ?? false,
             bounceCount: this.bounceCount ?? 0,
             totalHits: this.totalHits ?? 0,
+            fighter: { ...this.fighter },
             lastLaunch: this.lastLaunch ? { ...this.lastLaunch } : null
         };
     }
@@ -223,9 +279,9 @@ export class DragReleasePreviewScene {
         ctx.restore();
 
         this.trail.forEach((point, index) => {
-            ctx.fillStyle = `rgba(100, 222, 234, ${((index + 1) / this.trail.length) * 0.2})`;
+            ctx.fillStyle = colorWithAlpha(this.fighter.color, ((index + 1) / this.trail.length) * 0.24);
             ctx.beginPath();
-            ctx.arc(point.x, point.y, preview.ballRadius * 0.72, 0, Math.PI * 2);
+            ctx.arc(point.x, point.y, this.fighter.baseRadius * 0.72, 0, Math.PI * 2);
             ctx.fill();
         });
 
@@ -255,27 +311,39 @@ export class DragReleasePreviewScene {
         ctx.save();
         ctx.fillStyle = "rgba(0, 0, 0, 0.28)";
         ctx.beginPath();
-        ctx.ellipse(this.ball.x + 5, this.ball.y + preview.ballRadius + 7, 25, 8, 0, 0, Math.PI * 2);
+        ctx.ellipse(
+            this.ball.x + 5,
+            this.ball.y + this.fighter.baseRadius + 7,
+            this.fighter.baseRadius * 1.05,
+            this.fighter.baseRadius * 0.32,
+            0,
+            0,
+            Math.PI * 2
+        );
         ctx.fill();
-        ctx.fillStyle = "#64deea";
+        ctx.fillStyle = this.fighter.color;
         ctx.strokeStyle = "#e4fdff";
         ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.arc(this.ball.x, this.ball.y, preview.ballRadius, 0, Math.PI * 2);
+        ctx.arc(this.ball.x, this.ball.y, this.fighter.baseRadius, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
         ctx.restore();
 
         ctx.fillStyle = "rgba(5, 14, 18, 0.76)";
-        ctx.fillRect(20, 18, 280, 80);
+        ctx.fillRect(20, 18, 340, 80);
         ctx.fillStyle = "#effdff";
-        ctx.font = "800 26px sans-serif";
+        ctx.font = "800 23px sans-serif";
         ctx.textAlign = "left";
-        ctx.fillText(`릴리즈 ×${this.releaseSpeedMultiplier.toFixed(2)}`, 34, 51);
+        ctx.fillText(`${this.fighter.name} · ×${this.releaseSpeedMultiplier.toFixed(2)}`, 34, 49);
         ctx.fillStyle = "#a9dbe0";
-        ctx.font = "700 19px sans-serif";
+        ctx.font = "700 18px sans-serif";
         const speed = this.lastLaunch?.speed ?? 0;
-        ctx.fillText(`최근 ${Math.round(speed)} · 반사 ${this.bounceCount} · 적중 ${this.totalHits}`, 34, 82);
+        ctx.fillText(
+            `기준 ${Math.round(this.fighter.baseSpeed)} · R${Math.round(this.fighter.baseRadius)} · 최근 ${Math.round(speed)}`,
+            34,
+            80
+        );
 
         if (!this.dragging && !this.isMoving()) {
             ctx.fillStyle = "rgba(5, 14, 18, 0.82)";
@@ -304,11 +372,13 @@ export class DragReleasePreviewController {
         this.resizeObserver = null;
     }
 
-    start(canvas, releaseSpeedMultiplier = 1) {
+    start(canvas, tuning = {}) {
         if (!canvas?.getContext || !this.requestFrame) return { ok: false, error: "preview_unavailable" };
         this.stop();
         this.canvas = canvas;
-        this.scene = new DragReleasePreviewScene(releaseSpeedMultiplier);
+        const releaseSpeedMultiplier = Number.isFinite(tuning) ? tuning : tuning?.value;
+        const fighter = Number.isFinite(tuning) ? null : tuning?.fighter;
+        this.scene = new DragReleasePreviewScene(releaseSpeedMultiplier, fighter);
         this.resizeObserver = this.ResizeObserverClass ? new this.ResizeObserverClass(() => this._resize()) : null;
         this.resizeObserver?.observe(canvas);
         this._bindPointerEvents();
@@ -332,6 +402,11 @@ export class DragReleasePreviewController {
     setReleaseSpeedMultiplier(value) {
         if (!this.scene) return { ok: false, error: "preview_unavailable" };
         return { ok: true, ...this.scene.setReleaseSpeedMultiplier(value) };
+    }
+
+    setFighter(fighter) {
+        if (!this.scene) return { ok: false, error: "preview_unavailable" };
+        return { ok: true, ...this.scene.setFighter(fighter) };
     }
 
     reset() {

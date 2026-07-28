@@ -48,6 +48,10 @@ const TEST_DOMAINS = {
     dragCombatRenderer: {
         modulePath: "./dragCombatRenderer.mjs",
         footerMessages: new Set(["[drag-combat-renderer] ok"])
+    },
+    physicsVelocity: {
+        modulePath: "./physicsVelocity.mjs",
+        footerMessages: new Set(["[physics-velocity-policy] ok"])
     }
 };
 

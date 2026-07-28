@@ -1901,6 +1901,12 @@ function testCollectionRebirthAndDeveloperContracts() {
         "Inline drag testing should start and stop through the guarded component bridge"
     );
     assert.ok(
+        template.includes("startDebugDragReleasePreview?.(canvas, state.developer.targetCharacterId)") &&
+            template.includes("getDebugDragCombatTuning?.(state.developer.targetCharacterId)") &&
+            template.includes("선택 캐릭터의 실제 전투 스펙입니다"),
+        "Inline drag testing should follow the selected character and disclose its production combat spec"
+    );
+    assert.ok(
         template.includes("Elementalist VFX") &&
             template.includes("state.developer.elementalistPreviewOptions") &&
             template.includes("data-elementalist-vfx-preview"),

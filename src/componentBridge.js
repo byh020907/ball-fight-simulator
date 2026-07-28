@@ -146,25 +146,25 @@ export function createComponentBridge(app) {
             if (!app.disableDebugMode()) return { ok: false, error: "debug_disabled" };
             return { ok: true };
         },
-        getDebugDragCombatTuning() {
+        getDebugDragCombatTuning(characterId) {
             if (!app.isDebugModeActive()) return null;
-            return app.getDebugDragCombatTuning();
+            return app.getDebugDragCombatTuning(characterId);
         },
-        setDebugDragReleaseSpeedMultiplier(value) {
+        setDebugDragReleaseSpeedMultiplier(value, characterId) {
             if (!app.isDebugModeActive()) return { ok: false, error: "debug_disabled" };
-            const result = app.setDebugDragReleaseSpeedMultiplier(value);
+            const result = app.setDebugDragReleaseSpeedMultiplier(value, characterId);
             if (result.ok) dragReleasePreview.setReleaseSpeedMultiplier(result.value);
             return result;
         },
-        resetDebugDragReleaseSpeedMultiplier() {
+        resetDebugDragReleaseSpeedMultiplier(characterId) {
             if (!app.isDebugModeActive()) return { ok: false, error: "debug_disabled" };
-            const result = app.resetDebugDragReleaseSpeedMultiplier();
+            const result = app.resetDebugDragReleaseSpeedMultiplier(characterId);
             if (result.ok) dragReleasePreview.setReleaseSpeedMultiplier(result.value);
             return result;
         },
-        startDebugDragReleasePreview(canvas) {
+        startDebugDragReleasePreview(canvas, characterId) {
             if (!app.isDebugModeActive()) return { ok: false, error: "debug_disabled" };
-            return dragReleasePreview.start(canvas, app.getDebugDragCombatTuning().value);
+            return dragReleasePreview.start(canvas, app.getDebugDragCombatTuning(characterId));
         },
         resetDebugDragReleasePreview() {
             if (!app.isDebugModeActive()) return { ok: false, error: "debug_disabled" };

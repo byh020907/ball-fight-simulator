@@ -507,7 +507,28 @@ export class BattleApp {
         return isDebugProfileSessionActive();
     }
 
-    getDebugDragCombatTuning() {
+    _createDebugDragPreviewFighter(characterId = this.playerFighterId) {
+        const fighter = this.roster.find((candidate) => candidate.id === characterId);
+        if (!fighter) return null;
+        const progression = collectActiveExperienceProgression(this.playerProfile, fighter.id);
+        const rebirthLoadout = getRebirthLoadout(this.playerProfile, fighter.id);
+        const mastery = collectActiveEffects(this.playerProfile, fighter.id);
+        const progressed = applyExperienceProgressionToBaseSpec(fighter, progression);
+        const reborn = applyRebirthLoadoutToBaseSpec(progressed, rebirthLoadout);
+        const equipped = applyEquipmentStats(reborn, this.playerProfile);
+        const applied = applyMasteryEffectsToFighterSpec(equipped, mastery);
+        return {
+            id: applied.id,
+            name: applied.name,
+            color: applied.color,
+            baseSpeed: applied.stats.speed,
+            baseRadius: applied.stats.radius,
+            mass: applied.stats.mass,
+            level: progression?.level ?? 1
+        };
+    }
+
+    getDebugDragCombatTuning(characterId = this.playerFighterId) {
         const value = clampDragReleaseSpeedMultiplier(this.debug.dragReleaseSpeedMultiplier);
         return {
             value,
@@ -516,18 +537,19 @@ export class BattleApp {
             max: DRAG_RELEASE_SPEED_TUNING.maxMultiplier,
             step: DRAG_RELEASE_SPEED_TUNING.step,
             baseMinSpeedRatio: DRAG_COMBAT_CONFIG.shot.minSpeedRatio,
-            baseMaxSpeedRatio: DRAG_COMBAT_CONFIG.shot.maxSpeedRatio
+            baseMaxSpeedRatio: DRAG_COMBAT_CONFIG.shot.maxSpeedRatio,
+            fighter: this._createDebugDragPreviewFighter(characterId)
         };
     }
 
-    setDebugDragReleaseSpeedMultiplier(value) {
+    setDebugDragReleaseSpeedMultiplier(value, characterId = this.playerFighterId) {
         if (!this.isDebugModeActive()) return { ok: false, error: "debug_disabled" };
         this.debug.dragReleaseSpeedMultiplier = clampDragReleaseSpeedMultiplier(value);
-        return { ok: true, ...this.getDebugDragCombatTuning() };
+        return { ok: true, ...this.getDebugDragCombatTuning(characterId) };
     }
 
-    resetDebugDragReleaseSpeedMultiplier() {
-        return this.setDebugDragReleaseSpeedMultiplier(DRAG_RELEASE_SPEED_TUNING.defaultMultiplier);
+    resetDebugDragReleaseSpeedMultiplier(characterId = this.playerFighterId) {
+        return this.setDebugDragReleaseSpeedMultiplier(DRAG_RELEASE_SPEED_TUNING.defaultMultiplier, characterId);
     }
 
     _createDragCombatConfig() {

@@ -15783,16 +15783,22 @@ function testDeveloperTournamentWinTool() {
         isDebugModeActive() {
             return this.debugActive;
         },
-        getDebugDragCombatTuning() {
-            return { value: this.dragReleaseSpeedMultiplier ?? 1 };
+        getDebugDragCombatTuning(characterId) {
+            this.lastDragPreviewCharacterId = characterId;
+            return {
+                value: this.dragReleaseSpeedMultiplier ?? 1,
+                fighter: { id: characterId ?? this.playerFighterId }
+            };
         },
-        setDebugDragReleaseSpeedMultiplier(value) {
+        setDebugDragReleaseSpeedMultiplier(value, characterId) {
             this.dragReleaseSpeedMultiplier = value;
-            return { ok: true, value };
+            this.lastDragTuningCharacterId = characterId;
+            return { ok: true, value, fighter: { id: characterId ?? this.playerFighterId } };
         },
-        resetDebugDragReleaseSpeedMultiplier() {
+        resetDebugDragReleaseSpeedMultiplier(characterId) {
             this.dragReleaseSpeedMultiplier = 1;
-            return { ok: true, value: 1 };
+            this.lastDragTuningCharacterId = characterId;
+            return { ok: true, value: 1, fighter: { id: characterId ?? this.playerFighterId } };
         },
         _refreshCollectionHub() {
             this.collectionRefreshCount = (this.collectionRefreshCount ?? 0) + 1;
@@ -15818,10 +15824,13 @@ function testDeveloperTournamentWinTool() {
         "Bridge should reject the inline drag preview outside a development session"
     );
     app.debugActive = true;
-    assert.equal(bridge.setDebugDragReleaseSpeedMultiplier(1.4).value, 1.4);
+    assert.equal(bridge.setDebugDragReleaseSpeedMultiplier(1.4, characterId).value, 1.4);
+    assert.equal(app.lastDragTuningCharacterId, characterId, "Bridge should tune the selected preview character");
     assert.equal(bridge.getDebugDragCombatTuning().value, 1.4);
-    assert.equal(bridge.resetDebugDragReleaseSpeedMultiplier().value, 1);
-    assert.equal(bridge.startDebugDragReleasePreview(null).error, "preview_unavailable");
+    assert.equal(bridge.resetDebugDragReleaseSpeedMultiplier(characterId).value, 1);
+    assert.equal(app.lastDragTuningCharacterId, characterId, "Bridge reset should keep the selected preview character");
+    assert.equal(bridge.startDebugDragReleasePreview(null, characterId).error, "preview_unavailable");
+    assert.equal(app.lastDragPreviewCharacterId, characterId, "Bridge should forward the selected preview character");
     const bridgeResult = bridge.recordDebugTournamentWin(characterId);
     assert.equal(bridgeResult.ok, true, "Bridge should record the selected debug character victory");
     assert.equal(
