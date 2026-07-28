@@ -11,18 +11,9 @@ export class EnemyAttackQueue {
         this.cursor = 0;
         this.idOrder = [];
         this.elapsed = 0;
-        this.protectedLaunchNotBefore = 0;
-        this.nextProtectedLaunchNotBefore = 0;
-        this.nextProtectionCaptured = false;
         this.lastResult = null;
     }
-    protectUntil(timestamp) {
-        if (this.state === "windup" || this.nextProtectionCaptured || !Number.isFinite(timestamp)) return false;
-        this.nextProtectedLaunchNotBefore = timestamp;
-        this.nextProtectionCaptured = true;
-        return true;
-    }
-    tick(realDelta, eligibleIds, now = 0) {
+    tick(realDelta, eligibleIds) {
         const ids = [...new Set((eligibleIds || []).filter((id) => id !== null && id !== undefined))];
         this.#syncIdOrder(ids);
         const delta = Math.max(0, Number.isFinite(realDelta) ? realDelta : 0);
@@ -36,17 +27,12 @@ export class EnemyAttackQueue {
             return this.#start(ids);
         }
         this.elapsed += delta;
-        if (
-            this.state === "windup" &&
-            this.elapsed >= this.config.windupSeconds &&
-            now >= this.protectedLaunchNotBefore
-        ) {
+        if (this.state === "windup" && this.elapsed >= this.config.windupSeconds) {
             this.state = "flight";
             this.elapsed = 0;
             return (this.lastResult = {
                 type: "launch",
-                attackerId: this.attackerId,
-                protectedLaunchNotBefore: this.protectedLaunchNotBefore
+                attackerId: this.attackerId
             });
         }
         if (this.state === "flight" && this.elapsed >= this.config.flightMaxSeconds) {
@@ -67,14 +53,10 @@ export class EnemyAttackQueue {
         this.state = "windup";
         this.attackerId = attackerId;
         this.elapsed = 0;
-        this.protectedLaunchNotBefore = this.nextProtectedLaunchNotBefore;
-        this.nextProtectedLaunchNotBefore = 0;
-        this.nextProtectionCaptured = false;
         return (this.lastResult = {
             type: "windup",
             attackerId,
-            after,
-            protectedLaunchNotBefore: this.protectedLaunchNotBefore
+            after
         });
     }
     #syncIdOrder(ids) {

@@ -264,15 +264,16 @@ export class DragCombatRenderer {
                 progress: Math.max(0, Math.min(1, 1 - drag.inputLockRemaining / 0.27))
             };
         }
-        if (drag.cooldownRemaining > 0) {
-            const cooldown = Math.max(0.001, Number(drag.cooldownSeconds) || 2);
+        if (snapshot.playerShot?.active) {
+            const duration = Math.max(0.001, Number(snapshot.playerShot.flightDuration) || 2.4);
+            const remaining = Math.max(0, Number(snapshot.playerShot.flightRemaining) || 0);
             return {
-                label: "드래그 재충전",
-                detail: `${drag.cooldownRemaining.toFixed(1)}초 뒤 준비`,
-                icon: "↻",
-                color: "#ffd166",
-                iconFill: "rgba(255, 209, 102, 0.14)",
-                progress: Math.max(0, Math.min(1, 1 - drag.cooldownRemaining / cooldown))
+                label: "드래그 돌진 중",
+                detail: "돌진 종료 후 다시 조준",
+                icon: "➜",
+                color: "#5ce1e6",
+                iconFill: "rgba(92, 225, 230, 0.14)",
+                progress: Math.max(0, Math.min(1, remaining / duration))
             };
         }
         if (drag.state === "aiming") {

@@ -51,9 +51,7 @@ assert.equal(drag.release(2), null);
 drag.move(1, { x: -140, y: 0 });
 const launch = drag.release(1);
 assert.equal(launch.type, "launch");
-assert.equal(drag.begin(2, { x: 0, y: 0 }), null);
-drag.tick(2);
-drag.begin(2, { x: 0, y: 0 });
+assert.deepEqual(drag.begin(2, { x: 0, y: 0 }), { type: "begin" });
 assert.equal(drag.cancel(2).type, "cancel");
 const shot = new PlayerShotState();
 shot.begin("p", new Map([["enemy", { x: 1, y: 0 }]]));
@@ -106,19 +104,16 @@ assert.equal(lockedDrag.begin(1, { x: 0, y: 0 }), null);
 lockedDrag.tick(1);
 lockedDrag.begin(1, { x: 0, y: 0 });
 assert.equal(lockedDrag.release(1).type, "cancel");
-assert.equal(lockedDrag.cooldownRemaining, 0);
 lockedDrag.begin(1, { x: 0, y: 0 });
 lockedDrag.move(1, { x: -140, y: 0 });
 const autoLaunch = lockedDrag.tick(1.2);
 assert.equal(autoLaunch.type, "launch");
-const readyAt = autoLaunch.cooldownReadyAt;
-lockedDrag.tick(9);
-assert.equal(autoLaunch.cooldownReadyAt, readyAt);
+assert.deepEqual(lockedDrag.begin(2, { x: 0, y: 0 }), { type: "begin" });
+assert.equal(lockedDrag.cancel(2).type, "cancel");
 const invalidAutoDrag = new DragInputState();
 invalidAutoDrag.begin(1, { x: 0, y: 0 });
 assert.equal(invalidAutoDrag.tick(1.2).type, "cancel");
 assert.equal(invalidAutoDrag.tick(1.2), null);
-assert.equal(invalidAutoDrag.cooldownRemaining, 0);
 const cleanupShot = new PlayerShotState();
 cleanupShot.begin("p", new Map([["e", { x: 1, y: 0 }]]));
 cleanupShot.bounce("a", 2);
@@ -195,34 +190,11 @@ const repeatedPointTrajectory = predictTrajectory({
 });
 assert.equal(repeatedPointTrajectory.segments.length <= 4, true);
 assert.equal(repeatedPointTrajectory.bounces.length <= 3, true);
-const protectedQueue = new EnemyAttackQueue();
-protectedQueue.protectUntil(10);
-assert.equal(protectedQueue.tick(0, ["a", "b"]).protectedLaunchNotBefore, 10);
-protectedQueue.protectUntil(20);
-assert.equal(protectedQueue.tick(1, ["a", "b"], 9), null);
-assert.equal(protectedQueue.tick(0, ["a", "b"], 10).type, "launch");
-assert.equal(protectedQueue.resolveFlight("hit", ["b", "c"]).attackerId, "b");
-assert.equal(protectedQueue.idOrder.length <= 2, true);
 const roundRobinQueue = new EnemyAttackQueue();
 assert.equal(roundRobinQueue.tick(0, ["a", "b", "c"]).attackerId, "a");
 assert.equal(roundRobinQueue.tick(0, ["b", "c"]).attackerId, "b");
 assert.equal(roundRobinQueue.tick(1, ["b", "c"], 1).type, "launch");
 assert.equal(roundRobinQueue.resolveFlight("hit", ["c"]).attackerId, "c");
-const snapshotQueue = new EnemyAttackQueue();
-assert.equal(snapshotQueue.protectUntil(10), true);
-assert.equal(snapshotQueue.tick(0, ["a"]).protectedLaunchNotBefore, 10);
-assert.equal(snapshotQueue.protectUntil(30), false);
-assert.equal(snapshotQueue.tick(1, ["a"], 10).protectedLaunchNotBefore, 10);
-assert.equal(snapshotQueue.resolveFlight("hit", ["a"]).protectedLaunchNotBefore, 0);
-const nextFlightProtectionQueue = new EnemyAttackQueue();
-assert.equal(nextFlightProtectionQueue.tick(0, ["a"]).attackerId, "a");
-assert.equal(nextFlightProtectionQueue.tick(1, ["a"], 1).type, "launch");
-assert.equal(nextFlightProtectionQueue.protectUntil(20), true);
-assert.equal(nextFlightProtectionQueue.protectUntil(30), false);
-assert.equal(nextFlightProtectionQueue.resolveFlight("hit", ["a"]).protectedLaunchNotBefore, 20);
-assert.equal(nextFlightProtectionQueue.tick(1, ["a"], 20).type, "launch");
-assert.equal(nextFlightProtectionQueue.protectUntil(40), true);
-assert.equal(nextFlightProtectionQueue.resolveFlight("hit", ["a"]).protectedLaunchNotBefore, 40);
 for (let index = 0; index < 10000; index += 1) {
     const probeDrag = new DragInputState();
     probeDrag.begin(index, { x: 0, y: 0 });
@@ -271,8 +243,7 @@ for (let index = 0; index < 10000; index += 1) {
 assert.deepEqual(DRAG_COMBAT_CONFIG.input, {
     deadZonePx: 24,
     maxPullPx: 140,
-    maxAimSeconds: 1.2,
-    cooldownSeconds: 2
+    maxAimSeconds: 1.2
 });
 assert.deepEqual(DRAG_COMBAT_CONFIG.shot, {
     minSpeedRatio: 1.65,
@@ -458,9 +429,8 @@ assert.deepEqual(stateDrag.begin(7, { x: 0, y: 0 }), { type: "begin" });
 assert.equal(stateDrag.move(8, { x: -140, y: 0 }), null);
 assert.equal(stateDrag.release(8), null);
 assert.equal(stateDrag.move(7, { x: -140, y: 0 }).active, true);
-assert.equal(stateDrag.release(7).cooldownReadyAt, 2);
-stateDrag.tick(2);
-stateDrag.begin(9, { x: 0, y: 0 });
+assert.equal(stateDrag.release(7).type, "launch");
+assert.deepEqual(stateDrag.begin(9, { x: 0, y: 0 }), { type: "begin" });
 assert.equal(stateDrag.cancel(9).type, "cancel");
 stateDrag.reset();
 assert.deepEqual(
@@ -468,10 +438,9 @@ assert.deepEqual(
         state: stateDrag.state,
         pointerId: stateDrag.pointerId,
         start: stateDrag.start,
-        current: stateDrag.current,
-        cooldown: stateDrag.cooldownRemaining
+        current: stateDrag.current
     },
-    { state: "idle", pointerId: null, start: null, current: null, cooldown: 0 }
+    { state: "idle", pointerId: null, start: null, current: null }
 );
 
 const detailedCounterShot = new PlayerShotState();
@@ -579,12 +548,10 @@ for (const reason of ["first-character", "slow", "timeout"]) {
     assert.deepEqual(reasonQueue.resolveFlight(reason, ["a", "b"]), {
         type: "windup",
         attackerId: "b",
-        after: reason,
-        protectedLaunchNotBefore: 0
+        after: reason
     });
 }
 const emptyQueue = new EnemyAttackQueue();
-emptyQueue.protectUntil(10);
 emptyQueue.tick(0, ["a"]);
 emptyQueue.tick(0, [], 0);
 assert.deepEqual(
@@ -594,9 +561,6 @@ assert.deepEqual(
         idOrder: emptyQueue.idOrder,
         cursor: emptyQueue.cursor,
         elapsed: emptyQueue.elapsed,
-        protection: emptyQueue.protectedLaunchNotBefore,
-        nextProtection: emptyQueue.nextProtectedLaunchNotBefore,
-        nextProtectionCaptured: emptyQueue.nextProtectionCaptured,
         lastResult: emptyQueue.lastResult
     },
     {
@@ -605,9 +569,6 @@ assert.deepEqual(
         idOrder: [],
         cursor: 0,
         elapsed: 0,
-        protection: 0,
-        nextProtection: 0,
-        nextProtectionCaptured: false,
         lastResult: null
     }
 );

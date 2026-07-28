@@ -12,7 +12,6 @@ export class DragInputState {
         this.start = null;
         this.current = null;
         this.aimElapsed = 0;
-        this.cooldownRemaining = 0;
         this.inputLockRemaining = 0;
         this.lastSnapshot = null;
         this.realTime = 0;
@@ -20,7 +19,6 @@ export class DragInputState {
     begin(pointerId, point) {
         if (
             this.state !== "idle" ||
-            this.cooldownRemaining > 0 ||
             this.inputLockRemaining > 0 ||
             !Number.isFinite(point?.x) ||
             !Number.isFinite(point?.y)
@@ -60,7 +58,6 @@ export class DragInputState {
     tick(realDelta) {
         const delta = Math.max(0, Number.isFinite(realDelta) ? realDelta : 0);
         this.realTime += delta;
-        this.cooldownRemaining = Math.max(0, this.cooldownRemaining - delta);
         this.inputLockRemaining = Math.max(0, this.inputLockRemaining - delta);
         if (this.state !== "aiming") return null;
         this.aimElapsed += delta;
@@ -72,8 +69,7 @@ export class DragInputState {
         this.lastSnapshot = snapshot;
         this.#idle();
         if (!snapshot.active) return { type: "cancel" };
-        this.cooldownRemaining = this.config.cooldownSeconds;
-        return { type: "launch", source, snapshot, cooldownReadyAt: this.realTime + this.config.cooldownSeconds };
+        return { type: "launch", source, snapshot };
     }
     #idle() {
         this.state = "idle";

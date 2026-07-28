@@ -101,7 +101,6 @@ function assertFiniteSnapshot(snapshot) {
     const aimingSnapshot = simulation.dragCombat.getSnapshot();
     assert.equal(aimingSnapshot.drag.aimElapsed, 0.35);
     assert.equal(aimingSnapshot.drag.maxAimSeconds, 1.2);
-    assert.equal(aimingSnapshot.drag.cooldownSeconds, 2);
     assert.equal(simulation._clickActionContext.timeWarps.get(player), Infinity);
     assert.equal(impulseCount(player), 0, "move must not apply an impulse");
     simulation.cancelDragCombat(7);
@@ -137,6 +136,8 @@ function assertFiniteSnapshot(snapshot) {
     const releasedSnapshot = simulation.dragCombat.getSnapshot();
     const shields = releasedSnapshot.playerShot.shields;
     assert.equal(shields.length, 1);
+    assert.equal(releasedSnapshot.playerShot.flightRemaining, 2.4);
+    assert.equal(releasedSnapshot.playerShot.flightDuration, 2.4);
     assert.equal(releasedSnapshot.playerShot.shieldRemaining, 0.8);
     assert.equal(releasedSnapshot.playerShot.shieldDuration, 0.8);
     const forward = shields[0].forward;
@@ -152,6 +153,7 @@ function assertFiniteSnapshot(snapshot) {
     simulation.dragCombat.onStaticCollision(player, { surfaceKey: "wall:left" });
     simulation.dragCombat.onStaticCollision(player, { surfaceKey: "terrain:rock" });
     assert.equal(simulation.dragCombat.getSnapshot().playerShot.bounceCount, 2);
+    assert.equal(simulation.beginDragCombat(12, { x: 20, y: 20 }), null, "active shot blocks re-aiming");
     const context = {
         a: player,
         b: enemy,
@@ -162,6 +164,8 @@ function assertFiniteSnapshot(snapshot) {
     simulation.dragCombat.resolveFighterCollision(context, context);
     assert.equal(context.damageFromAToB, 14.5);
     assert.equal(simulation.dragCombat.shot.active, false);
+    assert.deepEqual(simulation.beginDragCombat(13, { x: 20, y: 20 }), { type: "begin" });
+    assert.equal(simulation.cancelDragCombat(13).type, "cancel");
 }
 
 {

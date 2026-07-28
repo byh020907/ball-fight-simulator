@@ -79,13 +79,18 @@ const idle = {
     enabled: true,
     drag: {
         state: "idle",
-        cooldownRemaining: 0,
-        cooldownSeconds: 2,
         inputLockRemaining: 0,
         aimElapsed: 0,
         maxAimSeconds: 1.2
     },
-    playerShot: { active: false, shieldRemaining: 0, shieldDuration: 0.8, shields: [] },
+    playerShot: {
+        active: false,
+        flightRemaining: 0,
+        flightDuration: 2.4,
+        shieldRemaining: 0,
+        shieldDuration: 0.8,
+        shields: []
+    },
     enemyQueue: { phase: "idle" }
 };
 const renderer = new DragCombatRenderer(canvas);
@@ -100,7 +105,6 @@ const aim = {
         state: "aiming",
         aimElapsed: 0.4,
         maxAimSeconds: 1.2,
-        cooldownRemaining: 0,
         inputLockRemaining: 0,
         vector: { active: true, strength: 1, vector: { x: 1, y: 0 } }
     },
@@ -121,6 +125,8 @@ renderer.renderWorld(
         ...idle,
         playerShot: {
             active: true,
+            flightRemaining: 1.8,
+            flightDuration: 2.4,
             shieldRemaining: 0.6,
             shieldDuration: 0.8,
             shields: [{ fighterId: "enemy", forward: { x: -1, y: 0 } }]
@@ -149,6 +155,8 @@ renderer.renderWorld(
         ...idle,
         playerShot: {
             active: true,
+            flightRemaining: 0.3,
+            flightDuration: 2.4,
             shieldRemaining: 0.1,
             shieldDuration: 0.8,
             shields: [{ fighterId: "enemy", forward: { x: -1, y: 0 } }]
@@ -170,12 +178,15 @@ assert.equal(
     true
 );
 const hudContext = new Context();
-renderer.renderScreen(hudContext, simulation, { ...aim, drag: { ...aim.drag, cooldownRemaining: 1.4 } });
+renderer.renderScreen(hudContext, simulation, {
+    ...idle,
+    playerShot: { ...idle.playerShot, active: true, flightRemaining: 1.4 }
+});
 const hudLabels = hudContext.commands
     .filter((command) => Array.isArray(command) && command[0] === "text")
     .map((command) => command[1]);
-assert.equal(hudLabels.includes("드래그 재충전"), true);
-assert.equal(hudLabels.includes("1.4초 뒤 준비"), true);
+assert.equal(hudLabels.includes("드래그 돌진 중"), true);
+assert.equal(hudLabels.includes("돌진 종료 후 다시 조준"), true);
 assert.equal(
     hudContext.commands
         .filter((command) => Array.isArray(command) && command[0] === "text")
@@ -199,7 +210,7 @@ assert.equal(
     true
 );
 const countdownContext = new Context();
-renderer.renderScreen(countdownContext, simulation, { ...aim, drag: { ...aim.drag, cooldownRemaining: 0 } });
+renderer.renderScreen(countdownContext, simulation, aim);
 assert.equal(
     countdownContext.commands.some(
         (command) => Array.isArray(command) && command[0] === "text" && command[1] === "조준 출력 100%"

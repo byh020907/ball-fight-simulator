@@ -1,5 +1,5 @@
 export const DRAG_COMBAT_CONFIG = Object.freeze({
-    input: Object.freeze({ deadZonePx: 24, maxPullPx: 140, maxAimSeconds: 1.2, cooldownSeconds: 2 }),
+    input: Object.freeze({ deadZonePx: 24, maxPullPx: 140, maxAimSeconds: 1.2 }),
     shot: Object.freeze({
         minSpeedRatio: 1.65,
         maxSpeedRatio: 4.8,

@@ -23,7 +23,6 @@ export class DragCombatRuntime {
         this.enemyQueue = new EnemyAttackQueue(config.enemy);
         this.enemyDirections = new Map();
         this.enemySlowElapsed = 0;
-        this.enemyDefenseCandidate = null;
         this.lastEvent = null;
         this.eventSequence = 0;
         this.aimCaster = null;
@@ -31,7 +30,7 @@ export class DragCombatRuntime {
     }
 
     begin(pointerId, cssPoint) {
-        if (!this.#canAct()) return null;
+        if (this.shot.active || !this.#canAct()) return null;
         const result = this.input.begin(pointerId, cssPoint);
         if (result) {
             this.aimCaster = this.#player();
@@ -119,7 +118,7 @@ export class DragCombatRuntime {
                 );
             }
         }
-        const event = this.enemyQueue.tick(effectiveDelta, eligible, this.input.realTime);
+        const event = this.enemyQueue.tick(effectiveDelta, eligible);
         if (event) this.#handleEnemyEvent(event, player);
     }
 
@@ -185,13 +184,16 @@ export class DragCombatRuntime {
                 vector: copyValue(this.input.lastSnapshot),
                 aimElapsed: this.input.aimElapsed,
                 maxAimSeconds: this.config.input.maxAimSeconds,
-                cooldownRemaining: this.input.cooldownRemaining,
-                cooldownSeconds: this.config.input.cooldownSeconds,
                 inputLockRemaining: this.input.inputLockRemaining
             },
             playerShot: {
                 active: this.shot.active,
                 bounceCount: this.shot.bounceCount,
+                flightElapsed: this.shot.elapsed,
+                flightRemaining: this.shot.active
+                    ? Math.max(0, this.config.shot.shotMaxSeconds - this.shot.elapsed)
+                    : 0,
+                flightDuration: this.config.shot.shotMaxSeconds,
                 shieldRemaining: this.shot.active
                     ? Math.max(0, this.config.shield.durationSeconds - this.shot.elapsed)
                     : 0,
@@ -207,8 +209,6 @@ export class DragCombatRuntime {
                 attackerId: this.enemyQueue.attackerId,
                 windupDirection: copyPoint(this.enemyDirections.get(this.enemyQueue.attackerId)),
                 elapsed: this.enemyQueue.elapsed,
-                protectedLaunchNotBefore: this.enemyQueue.protectedLaunchNotBefore,
-                defenseCandidate: this.enemyDefenseCandidate,
                 lastResolution: copyValue(this.enemyQueue.lastResult)
             },
             launch: {
@@ -237,9 +237,6 @@ export class DragCombatRuntime {
                     .map((fighter) => [fighter.id, Vector2.subtract(player.position, fighter.position).normalize()])
             );
             this.shot.begin(player.id, shields);
-            if (this.enemyQueue.state === "windup" || this.enemyQueue.state === "flight") {
-                this.enemyDefenseCandidate ??= result.cooldownReadyAt;
-            }
         }
         if (result.type === "launch" || result.type === "cancel") {
             if (result.source === "auto-launch") this.pendingWarpRemoval = true;
@@ -351,11 +348,8 @@ export class DragCombatRuntime {
 
     #resolveEnemyFlight(reason, playerHit, eligibleIds) {
         const attackerId = this.enemyQueue.attackerId;
-        if (!playerHit && Number.isFinite(this.enemyDefenseCandidate))
-            this.enemyQueue.protectUntil(this.enemyDefenseCandidate);
         this.enemyDirections.delete(attackerId);
         this.enemySlowElapsed = 0;
-        this.enemyDefenseCandidate = null;
         const next = this.enemyQueue.resolveFlight(reason, eligibleIds);
         this.#record({ type: "enemy-flight-end", reason, attackerId, playerHit });
         if (next) this.#handleEnemyEvent(next, this.#player());
@@ -365,7 +359,6 @@ export class DragCombatRuntime {
         this.enemyQueue.reset();
         this.enemyDirections.clear();
         this.enemySlowElapsed = 0;
-        this.enemyDefenseCandidate = null;
     }
 
     #player() {

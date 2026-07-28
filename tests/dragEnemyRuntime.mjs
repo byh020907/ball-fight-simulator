@@ -101,16 +101,8 @@ function resolveActualEnemyCollision({ activeFlight }) {
     runtime.resolveFighterCollision({ a: attacker, b: otherEnemy, hostile: false });
     const afterMiss = runtime.getSnapshot().enemyQueue;
     assert.equal(afterMiss.phase, "windup");
-    assert.equal(afterMiss.protectedLaunchNotBefore, 2);
     runtime.tickEnemy(1.2);
-    assert.equal(
-        runtime.getSnapshot().enemyQueue.phase,
-        "windup",
-        "protection holds launch before real clock deadline"
-    );
-    runtime.tickInput(2);
-    runtime.tickEnemy(0);
-    assert.equal(runtime.getSnapshot().enemyQueue.phase, "flight");
+    assert.equal(runtime.getSnapshot().enemyQueue.phase, "flight", "next enemy launches after its own windup");
 }
 
 {
@@ -256,35 +248,6 @@ function resolveActualEnemyCollision({ activeFlight }) {
 }
 
 {
-    const simulation = createSimulation();
-    const runtime = simulation.dragCombat;
-    runtime.tickEnemy(0);
-    launchPlayer(simulation, 71);
-    runtime.tickInput(2);
-    launchPlayer(simulation, 72);
-    runtime.tickEnemy(1);
-    const attacker = simulation.fighters.find((fighter) => fighter.id === runtime.getSnapshot().enemyQueue.attackerId);
-    runtime.resolveFighterCollision({ a: attacker, b: simulation.fighters[2], hostile: false });
-    assert.equal(
-        runtime.getSnapshot().enemyQueue.protectedLaunchNotBefore,
-        2,
-        "later drag cannot extend captured protection"
-    );
-
-    const hit = createSimulation();
-    hit.dragCombat.tickEnemy(0);
-    launchPlayer(hit, 73);
-    hit.dragCombat.tickEnemy(1);
-    const hitAttacker = hit.fighters.find(
-        (fighter) => fighter.id === hit.dragCombat.getSnapshot().enemyQueue.attackerId
-    );
-    hit.dragCombat.resolveFighterCollision({ a: hitAttacker, b: hit.playerBall, hostile: true });
-    assert.equal(
-        hit.dragCombat.getSnapshot().enemyQueue.protectedLaunchNotBefore,
-        0,
-        "player hit never protects next launch"
-    );
-
     const empty = createSimulation();
     empty.dragCombat.tickEnemy(0);
     launchPlayer(empty, 74);
@@ -292,7 +255,6 @@ function resolveActualEnemyCollision({ activeFlight }) {
     empty.dragCombat.tickEnemy(0);
     const snapshot = empty.dragCombat.getSnapshot().enemyQueue;
     assert.equal(snapshot.phase, "idle");
-    assert.equal(snapshot.defenseCandidate, null);
     assert.equal(empty.dragCombat.enemyDirections.size, 0);
 }
 
@@ -306,7 +268,6 @@ function resolveActualEnemyCollision({ activeFlight }) {
         const snapshot = simulation.dragCombat.getSnapshot();
         assert.equal(snapshot.enemyQueue.phase, "idle");
         assert.equal(snapshot.enemyQueue.attackerId, null);
-        assert.equal(snapshot.enemyQueue.defenseCandidate, null);
     }
     assert.equal(maxOrder, 1);
     assert.equal(impulseCount(simulation.playerBall), 0);
