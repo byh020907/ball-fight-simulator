@@ -1,4 +1,5 @@
 import { createDragTrajectoryScene } from "./trajectoryScene.js";
+import { drawChargeConvergence } from "./chargeVisual.js";
 
 const TIER_COLORS = ["#5ce1e6", "#ffd166", "#ff8c42", "#ff4db8"];
 const FRONT_COLOR = "#ff4d5a";
@@ -49,6 +50,14 @@ export class DragCombatRenderer {
         this.#consumeEvent(runtimeSnapshot, delta);
         let commands = 0;
         if (hasManualPlayer && runtimeSnapshot.drag.state === "aiming") {
+            commands += drawChargeConvergence(
+                ctx,
+                simulation.playerBall,
+                runtimeSnapshot.drag.chargeRatio,
+                TIER_COLORS[0]
+            )
+                ? 1
+                : 0;
             const scene = createDragTrajectoryScene({ simulation, runtimeSnapshot });
             commands += this.#drawAim(ctx, simulation, runtimeSnapshot, scene);
         }
@@ -90,11 +99,6 @@ export class DragCombatRenderer {
         let commands = 0;
         ctx.save();
         try {
-            ctx.strokeStyle = "rgba(92, 225, 230, 0.72)";
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.arc(player.position.x, player.position.y, player.radius + 12, 0, TAU);
-            ctx.stroke();
             if (scene.segments.length === 0) {
                 this.#drawLabel(
                     ctx,
@@ -327,6 +331,8 @@ export class DragCombatRenderer {
         const angle = Math.atan2(queue.windupDirection.y, queue.windupDirection.x);
         const progress = Math.max(0, Math.min(1, Number(queue.displayProgress) || 0));
         const accelerating = queue.accelerating === true;
+        const coreColor = accelerating ? "#ffd166" : "#ff5548";
+        drawChargeConvergence(ctx, attacker, progress, coreColor);
         ctx.save();
         try {
             ctx.translate(attacker.position.x, attacker.position.y);
@@ -340,7 +346,7 @@ export class DragCombatRenderer {
             accelerating ? "돌진 가속" : "돌진 조준",
             attacker.position.x,
             attacker.position.y - attacker.radius - 26,
-            accelerating ? "#ffd166" : "#ff5548"
+            coreColor
         );
         return 1;
     }

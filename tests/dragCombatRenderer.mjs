@@ -62,6 +62,15 @@ class Context {
     set strokeStyle(value) {
         this.commands.push(["strokeStyle", value]);
     }
+    set globalAlpha(value) {
+        this.commands.push(["globalAlpha", value]);
+    }
+    set shadowColor(value) {
+        this.commands.push(["shadowColor", value]);
+    }
+    set shadowBlur(value) {
+        this.commands.push(["shadowBlur", value]);
+    }
 }
 
 const canvas = { width: 390, height: 844, getBoundingClientRect: () => ({ width: 390, height: 844 }) };
@@ -127,6 +136,34 @@ assert.equal(renderer.renderWorld(aimContext, simulation, aim, 0.016) > 0, true)
 assert.equal(
     aimContext.commands.filter((command) => command === "save").length,
     aimContext.commands.filter((command) => command === "restore").length
+);
+const playerChargeSnapshot = (chargeRatio) => ({
+    ...idle,
+    drag: { ...aim.drag, chargeRatio },
+    enemyQueue: { phase: "idle" }
+});
+const earlyChargeContext = new Context();
+const lateChargeContext = new Context();
+renderer.renderWorld(earlyChargeContext, simulation, playerChargeSnapshot(0.1));
+renderer.renderWorld(lateChargeContext, simulation, playerChargeSnapshot(0.8));
+const playerChargeArc = (context) =>
+    context.commands.find(
+        (command) =>
+            Array.isArray(command) &&
+            command[0] === "arc" &&
+            command[1] === player.position.x &&
+            command[2] === player.position.y
+    );
+assert.ok(playerChargeArc(earlyChargeContext)[3] > playerChargeArc(lateChargeContext)[3]);
+assert.ok(
+    earlyChargeContext.commands.find((command) => Array.isArray(command) && command[0] === "globalAlpha")[1] <
+        lateChargeContext.commands.find((command) => Array.isArray(command) && command[0] === "globalAlpha")[1]
+);
+assert.equal(
+    lateChargeContext.commands.some(
+        (command) => Array.isArray(command) && command[0] === "strokeStyle" && command[1] === "#5ce1e6"
+    ),
+    true
 );
 const automatedContext = new Context();
 const automatedSnapshot = {
@@ -245,6 +282,18 @@ assert.equal(
         (command) => Array.isArray(command) && command[0] === "strokeStyle" && command[1] === "#ff5548"
     ),
     true
+);
+assert.equal(
+    aimContext.commands.some(
+        (command) =>
+            Array.isArray(command) &&
+            command[0] === "arc" &&
+            command[1] === enemy.position.x &&
+            command[2] === enemy.position.y &&
+            command[3] > enemy.radius
+    ),
+    true,
+    "enemy windup should use the same converging charge circle as the player"
 );
 assert.equal(
     aimContext.commands.some(

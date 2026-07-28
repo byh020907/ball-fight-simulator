@@ -1,6 +1,7 @@
 import {
     createDragCombatConfig,
     DRAG_COMBAT_CONFIG,
+    drawChargeConvergence,
     getChargeRatio,
     getDragLaunchSpeed,
     getSlingshotVector
@@ -312,12 +313,6 @@ export class DragReleasePreviewScene {
         if (this.dragging) {
             const drag = getSlingshotVector(this.dragStart, this.dragCurrent, DRAG_COMBAT_CONFIG.input);
             ctx.save();
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.28)";
-            ctx.setLineDash([8, 8]);
-            ctx.beginPath();
-            ctx.arc(this.ball.x, this.ball.y, DRAG_COMBAT_CONFIG.input.maxPullPx, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.setLineDash([]);
             ctx.strokeStyle = "#ffe39a";
             ctx.lineWidth = 5;
             ctx.beginPath();
@@ -338,6 +333,15 @@ export class DragReleasePreviewScene {
         }
 
         this._drawTelegraphSamples(ctx);
+
+        if (this.dragging && this.chargeStarted) {
+            drawChargeConvergence(
+                ctx,
+                { position: this.ball, radius: this.fighter.baseRadius },
+                getChargeRatio(this.aimElapsed, this.config.input.maxAimSeconds),
+                "#5ce1e6"
+            );
+        }
 
         ctx.save();
         ctx.fillStyle = "rgba(0, 0, 0, 0.28)";

@@ -10,6 +10,7 @@ import {
     getChargeRatio,
     getEnemyChargePlan,
     getEnemyRequiredChargeRatio,
+    getChargeConvergenceStyle,
     getDragLaunchSpeed,
     PlayerShotState,
     predictTrajectory
@@ -350,6 +351,34 @@ assert.ok(
     idleDrawLabels.some((label) => label.includes(previewFighter.name)),
     "idle preview should restore the selected fighter information panel"
 );
+assert.equal(releasePreview.begin(33, previewStart).type, "begin");
+releasePreview.move(33, { x: previewStart.x - DRAG_COMBAT_CONFIG.input.deadZonePx - 20, y: previewStart.y });
+const previewDashPatterns = [];
+const previewAimArcs = [];
+const aimingDrawContext = new Proxy(
+    {
+        arc: (...args) => previewAimArcs.push(args),
+        setLineDash: (pattern) => previewDashPatterns.push(pattern)
+    },
+    {
+        get: (target, property) => target[property] ?? (() => {})
+    }
+);
+releasePreview.draw(aimingDrawContext);
+assert.equal(
+    previewDashPatterns.some((pattern) => pattern.length === 2 && pattern[0] === 8 && pattern[1] === 8),
+    false,
+    "time-based charge preview should not render the obsolete maximum-pull guide"
+);
+const expectedChargeRadius = getChargeConvergenceStyle(previewFighter.baseRadius, 0).radius;
+assert.equal(
+    previewAimArcs.some(
+        ([x, y, radius]) => x === previewStart.x && y === previewStart.y && radius === expectedChargeRadius
+    ),
+    true,
+    "developer preview should render the shared charge circle using the fighter's actual radius"
+);
+releasePreview.cancel(33);
 
 const previewListeners = new Map();
 let cancelledPreviewFrame = null;
