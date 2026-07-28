@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { BattleSimulation } from "../src/simulation/battleSimulation.js";
+import { createDragCombatConfig, getDragLaunchSpeed } from "../src/combat-drag/index.js";
 import { Vector2 } from "../src/core.js";
 import { createRoster } from "../src/roster.js";
 
@@ -119,7 +120,7 @@ function assertFiniteSnapshot(snapshot) {
         beginWithVector(simulation, pointerId, { x: 20, y: 20 }, current);
         const launch = simulation.releaseDragCombat(pointerId);
         const impulse = impulseEvents(player);
-        const expected = player.stats.baseSpeed * (0.85 + 1.35 * launch.snapshot.strength);
+        const expected = getDragLaunchSpeed(player.stats.baseSpeed, launch.snapshot.strength);
         assert.equal(launch.type, "launch");
         assert.equal(impulse.length, 1, "every valid release launches exactly once");
         assert.ok(Math.abs(Math.hypot(impulse[0].impulse.x, impulse[0].impulse.y) - expected) < 1e-8);
@@ -157,6 +158,19 @@ function assertFiniteSnapshot(snapshot) {
     simulation.dragCombat.resolveFighterCollision(context, context);
     assert.equal(context.damageFromAToB, 14.5);
     assert.equal(simulation.dragCombat.shot.active, false);
+}
+
+{
+    const config = createDragCombatConfig(1.5);
+    const simulation = createSimulation(true, { dragCombatConfig: config });
+    const player = simulation.playerBall;
+    clearImpulseEvents(player);
+    beginWithVector(simulation, 21);
+    const launch = simulation.releaseDragCombat(21);
+    const impulse = impulseEvents(player).at(-1);
+    const expected = getDragLaunchSpeed(player.stats.baseSpeed, launch.snapshot.strength, config.shot);
+    assert.ok(Math.abs(Math.hypot(impulse.impulse.x, impulse.impulse.y) - expected) < 1e-8);
+    assert.equal(simulation.dragCombat.getSnapshot().launch.releaseSpeedMultiplier, 1.5);
 }
 
 {

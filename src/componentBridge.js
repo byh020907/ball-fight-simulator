@@ -143,6 +143,18 @@ export function createComponentBridge(app) {
             if (!app.disableDebugMode()) return { ok: false, error: "debug_disabled" };
             return { ok: true };
         },
+        getDebugDragCombatTuning() {
+            if (!app.isDebugModeActive()) return null;
+            return app.getDebugDragCombatTuning();
+        },
+        setDebugDragReleaseSpeedMultiplier(value) {
+            if (!app.isDebugModeActive()) return { ok: false, error: "debug_disabled" };
+            return app.setDebugDragReleaseSpeedMultiplier(value);
+        },
+        resetDebugDragReleaseSpeedMultiplier() {
+            if (!app.isDebugModeActive()) return { ok: false, error: "debug_disabled" };
+            return app.resetDebugDragReleaseSpeedMultiplier();
+        },
         getDebugElementalistVfxPreviewOptions() {
             if (!app.isDebugModeActive()) return [];
             return getElementalistVfxPreviewOptions();

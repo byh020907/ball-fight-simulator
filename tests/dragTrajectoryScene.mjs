@@ -11,9 +11,19 @@ const scene = (extra = {}, runtimeSnapshot = snapshot()) =>
         runtimeSnapshot
     });
 assert.equal(scene({}, { drag: { state: "idle" } }).active, false);
-assert.deepEqual(scene().launchVelocity, { x: 220.00000000000003, y: 0 });
-assert.equal(scene({}, snapshot(0)).launchVelocity.x, 85);
-assert.equal(scene({}, snapshot(0.5)).launchVelocity.x, 152.5);
+assert.deepEqual(scene().launchVelocity, { x: 320, y: 0 });
+assert.equal(scene({}, snapshot(0)).launchVelocity.x, 125);
+assert.equal(scene({}, snapshot(0.5)).launchVelocity.x, 222.5);
+assert.equal(
+    scene(
+        {},
+        {
+            ...snapshot(1),
+            launch: { minSpeedRatio: 1.25, maxSpeedRatio: 3.2, releaseSpeedMultiplier: 1.5, shotMaxSeconds: 2.4 }
+        }
+    ).launchVelocity.x,
+    480
+);
 const withVelocity = (velocity) => ({
     ...player,
     velocity,
@@ -24,11 +34,11 @@ const velocityScene = (velocity) => {
     const movingPlayer = withVelocity(velocity);
     return scene({ playerBall: movingPlayer, fighters: [movingPlayer] });
 };
-assert.deepEqual(velocityScene({ x: 0, y: 0 }).launchVelocity, { x: 220.00000000000003, y: 0 });
-assert.deepEqual(velocityScene({ x: 30, y: 0 }).launchVelocity, { x: 250.00000000000003, y: 0 });
-assert.deepEqual(velocityScene({ x: -30, y: 0 }).launchVelocity, { x: 190.00000000000003, y: 0 });
-assert.deepEqual(velocityScene({ x: 0, y: 40 }).launchVelocity, { x: 220.00000000000003, y: 40 });
-const cancelledVelocity = velocityScene({ x: -220.00000000000003, y: 0 });
+assert.deepEqual(velocityScene({ x: 0, y: 0 }).launchVelocity, { x: 320, y: 0 });
+assert.deepEqual(velocityScene({ x: 30, y: 0 }).launchVelocity, { x: 350, y: 0 });
+assert.deepEqual(velocityScene({ x: -30, y: 0 }).launchVelocity, { x: 290, y: 0 });
+assert.deepEqual(velocityScene({ x: 0, y: 40 }).launchVelocity, { x: 320, y: 40 });
+const cancelledVelocity = velocityScene({ x: -320, y: 0 });
 assert.deepEqual(cancelledVelocity.launchVelocity, { x: 0, y: 0 });
 assert.equal(cancelledVelocity.segments.length, 0);
 const wall = scene({ width: 150 });

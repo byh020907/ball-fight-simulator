@@ -556,6 +556,38 @@
                     </div>
                 </section>
 
+                <section class="ch-developer-group" aria-labelledby="ch-developer-drag-title">
+                    <div class="ch-developer-tuning-heading">
+                        <h3 id="ch-developer-drag-title" class="ch-developer-group-title">드래그 전투 튜닝</h3>
+                        <strong
+                            class="ch-developer-tuning-value"
+                            x-text="'×' + Number(state.developer.dragReleaseSpeedMultiplier).toFixed(2)"
+                        ></strong>
+                    </div>
+                    <label class="ch-developer-field ch-developer-field--wide">
+                        <span>릴리즈 속도 배율</span>
+                        <input
+                            class="ch-developer-range"
+                            type="range"
+                            x-bind:min="state.developer.dragReleaseSpeedTuning.min"
+                            x-bind:max="state.developer.dragReleaseSpeedTuning.max"
+                            x-bind:step="state.developer.dragReleaseSpeedTuning.step"
+                            x-model.number="state.developer.dragReleaseSpeedMultiplier"
+                            x-bind:aria-valuetext="'릴리즈 속도 ' + Number(state.developer.dragReleaseSpeedMultiplier).toFixed(2) + '배'"
+                            @input="setDebugDragReleaseSpeedMultiplier()"
+                        />
+                    </label>
+                    <div class="ch-developer-range-labels" aria-hidden="true">
+                        <span x-text="'×' + state.developer.dragReleaseSpeedTuning.min.toFixed(2)"></span>
+                        <span>기본 ×1.00</span>
+                        <span x-text="'×' + state.developer.dragReleaseSpeedTuning.max.toFixed(2)"></span>
+                    </div>
+                    <p class="ch-developer-tuning-description" x-text="formatDebugDragReleaseSpeed()"></p>
+                    <button class="ch-btn" type="button" @click="resetDebugDragReleaseSpeedMultiplier()">
+                        기본 속도로 초기화
+                    </button>
+                </section>
+
                 <section class="ch-developer-group" aria-labelledby="ch-developer-elementalist-title">
                     <h3 id="ch-developer-elementalist-title" class="ch-developer-group-title">Elementalist VFX</h3>
                     <div class="ch-elementalist-preview">
@@ -953,7 +985,17 @@
                 elementalistPreviewId: "single:fire",
                 elementalistPreviewOptions: [],
                 equipmentPassivePreviewId: "completed_ability_crit",
-                equipmentPassivePreviewOptions: []
+                equipmentPassivePreviewOptions: [],
+                dragReleaseSpeedMultiplier: 1,
+                dragReleaseSpeedTuning: {
+                    value: 1,
+                    defaultValue: 1,
+                    min: 0.6,
+                    max: 1.8,
+                    step: 0.05,
+                    baseMinSpeedRatio: 1.25,
+                    baseMaxSpeedRatio: 3.2
+                }
             },
             summary: {},
 
@@ -1004,8 +1046,7 @@
                 if (filter === "unlocked") items = items.filter((i) => i.unlocked);
                 else if (filter === "locked") items = items.filter((i) => !i.unlocked);
                 return items;
-            },
-
+            }
         });
 
         function closeCollectionHub() {
@@ -1174,6 +1215,14 @@
             return `${damageText} · ${controlText}`;
         }
 
+        function formatDebugDragReleaseSpeed() {
+            const tuning = state.developer.dragReleaseSpeedTuning;
+            const multiplier = Number(state.developer.dragReleaseSpeedMultiplier);
+            return `전투 적용 최소 ×${(tuning.baseMinSpeedRatio * multiplier).toFixed(2)} · 최대 ×${(
+                tuning.baseMaxSpeedRatio * multiplier
+            ).toFixed(2)} · 다음 토너먼트와 사냥터부터 적용`;
+        }
+
         function observeTabLayout() {
             tabResizeObserver = new ResizeObserver(revealActiveTab);
             tabResizeObserver.observe(dialogElement);
@@ -1256,6 +1305,7 @@
             revealActiveTab,
             startDebugModeHold,
             formatElementalistWetDamageComparison,
+            formatDebugDragReleaseSpeed,
             cancelDebugModeHold,
             get bridge() {
                 return Alpine.store("uiManager").requireGameActionBridge();
@@ -1294,6 +1344,24 @@
             },
             seedDebugCollectionSample() {
                 return this.bridge.seedDebugCollectionSample(state.developer.targetCharacterId);
+            },
+            setDebugDragReleaseSpeedMultiplier() {
+                const result = this.bridge.setDebugDragReleaseSpeedMultiplier(
+                    state.developer.dragReleaseSpeedMultiplier
+                );
+                if (result?.ok) {
+                    state.developer.dragReleaseSpeedMultiplier = result.value;
+                    state.developer.dragReleaseSpeedTuning = result;
+                }
+                return result;
+            },
+            resetDebugDragReleaseSpeedMultiplier() {
+                const result = this.bridge.resetDebugDragReleaseSpeedMultiplier();
+                if (result?.ok) {
+                    state.developer.dragReleaseSpeedMultiplier = result.value;
+                    state.developer.dragReleaseSpeedTuning = result;
+                }
+                return result;
             },
             startDebugHunting() {
                 return this.bridge.startDebugHunting(
@@ -1381,6 +1449,9 @@
                 )
                     ? state.developer.equipmentPassivePreviewId
                     : "completed_ability_crit";
+                const dragReleaseSpeedTuning = developer.active
+                    ? (this.bridge.getDebugDragCombatTuning?.() ?? state.developer.dragReleaseSpeedTuning)
+                    : state.developer.dragReleaseSpeedTuning;
                 state.developer = {
                     active: Boolean(developer.active),
                     currentCharacterId: developer.currentCharacterId ?? null,
@@ -1399,7 +1470,10 @@
                     elementalistPreviewId,
                     elementalistPreviewOptions,
                     equipmentPassivePreviewId,
-                    equipmentPassivePreviewOptions
+                    equipmentPassivePreviewOptions,
+                    dragReleaseSpeedMultiplier:
+                        dragReleaseSpeedTuning?.value ?? state.developer.dragReleaseSpeedMultiplier ?? 1,
+                    dragReleaseSpeedTuning
                 };
                 syncDeveloperEventSelection();
                 state.tabs = vm.tabs ?? [];
@@ -1645,6 +1719,46 @@
     .ch-developer-group-title {
         margin: 0;
         font-size: 0.9rem;
+    }
+
+    .ch-developer-tuning-heading,
+    .ch-developer-range-labels {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+    }
+
+    .ch-developer-tuning-value {
+        padding: 0.2rem 0.5rem;
+        border: 1px solid #1f6f78;
+        border-radius: 999px;
+        color: #0f5961;
+        background: #e9fbfc;
+        font-size: 0.85rem;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .ch-developer-range {
+        width: 100%;
+        min-height: 2.75rem;
+        margin: 0;
+        accent-color: #16717a;
+        cursor: pointer;
+    }
+
+    .ch-developer-range-labels {
+        color: #606060;
+        font-size: 0.7rem;
+        font-weight: 700;
+    }
+
+    .ch-developer-tuning-description {
+        min-height: 2.3em;
+        margin: 0;
+        color: #444444;
+        font-size: 0.74rem;
+        line-height: 1.45;
     }
 
     .ch-developer-grid {

@@ -78,6 +78,12 @@ import { ScreenWakeLock } from "./screenWakeLock.js";
 import { applyRebirthLoadoutToBaseSpec, applyRebirthLoadoutToBattleBall, getRebirthLoadout } from "./rebirth/index.js";
 import { advanceResultSequence, createResultSequence, getResultSequencePresentation } from "./resultSequence.js";
 import { CHARACTER_ROSTER_CONTEXTS, getEligibleRoster } from "./characterRosterPolicy.js";
+import {
+    createDragCombatConfig,
+    DRAG_COMBAT_CONFIG,
+    DRAG_RELEASE_SPEED_TUNING,
+    clampDragReleaseSpeedMultiplier
+} from "./combat-drag/index.js";
 
 const TOURNAMENT_CHALLENGE_INTRO_DURATION = 1000;
 const EQUIPMENT_SUMMARY_STATS = Object.freeze([
@@ -114,11 +120,12 @@ function createHeroStatPresentation(fighterId, bonuses, shield = 0) {
 export class BattleApp {
     constructor() {
         // ── 디버그 변수 (테스트 편의용) ──
-        /** @type {{ startCharacter: string|null, aiEnabled: boolean }} */
+        /** @type {{ startCharacter: string|null, aiEnabled: boolean, dragReleaseSpeedMultiplier: number }} */
         this.debug = {
             startCharacter: null,
             // startCharacter: FIGHTER_IDS.GRENADE,
-            aiEnabled: false
+            aiEnabled: false,
+            dragReleaseSpeedMultiplier: DRAG_RELEASE_SPEED_TUNING.defaultMultiplier
         };
 
         this.elements = {
@@ -500,6 +507,36 @@ export class BattleApp {
         return isDebugProfileSessionActive();
     }
 
+    getDebugDragCombatTuning() {
+        const value = clampDragReleaseSpeedMultiplier(this.debug.dragReleaseSpeedMultiplier);
+        return {
+            value,
+            defaultValue: DRAG_RELEASE_SPEED_TUNING.defaultMultiplier,
+            min: DRAG_RELEASE_SPEED_TUNING.minMultiplier,
+            max: DRAG_RELEASE_SPEED_TUNING.maxMultiplier,
+            step: DRAG_RELEASE_SPEED_TUNING.step,
+            baseMinSpeedRatio: DRAG_COMBAT_CONFIG.shot.minSpeedRatio,
+            baseMaxSpeedRatio: DRAG_COMBAT_CONFIG.shot.maxSpeedRatio
+        };
+    }
+
+    setDebugDragReleaseSpeedMultiplier(value) {
+        if (!this.isDebugModeActive()) return { ok: false, error: "debug_disabled" };
+        this.debug.dragReleaseSpeedMultiplier = clampDragReleaseSpeedMultiplier(value);
+        return { ok: true, ...this.getDebugDragCombatTuning() };
+    }
+
+    resetDebugDragReleaseSpeedMultiplier() {
+        return this.setDebugDragReleaseSpeedMultiplier(DRAG_RELEASE_SPEED_TUNING.defaultMultiplier);
+    }
+
+    _createDragCombatConfig() {
+        const multiplier = this.isDebugModeActive()
+            ? this.debug.dragReleaseSpeedMultiplier
+            : DRAG_RELEASE_SPEED_TUNING.defaultMultiplier;
+        return createDragCombatConfig(multiplier);
+    }
+
     enableDebugMode() {
         if (!this.lifecycle.isSetup) return false;
         this.playerProfile = beginDebugProfileSession(this.playerProfile);
@@ -511,6 +548,7 @@ export class BattleApp {
     disableDebugMode() {
         if (!isDebugProfileSessionActive()) return false;
         this.playerProfile = endDebugProfileSession();
+        this.debug.dragReleaseSpeedMultiplier = DRAG_RELEASE_SPEED_TUNING.defaultMultiplier;
         this._refreshCollectionHub();
         this.refreshPlayerSetup();
         return true;
@@ -1076,6 +1114,7 @@ export class BattleApp {
                 arenaTheme: options.arenaTheme ?? null,
                 terrain: options.terrain ?? [],
                 dragCombatEnabled: match.some((fighter) => fighter.id === this.playerFighterId),
+                dragCombatConfig: this._createDragCombatConfig(),
                 playerLives: options.playerLives ?? null,
                 tournamentAngledBounceRamps: this.currentTournamentMatch
                     ? {

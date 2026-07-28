@@ -938,6 +938,11 @@ function testStartMatchEnablesPlayerDragAcrossModes() {
         /currentTournamentMatch.*dragCombatEnabled/s,
         "Drag runtime must not be limited to tournament matches"
     );
+    assert.match(
+        startMatch,
+        /dragCombatConfig:\s*this\._createDragCombatConfig\(\)/,
+        "Tournament and hunting matches should receive the same debug-tunable drag configuration"
+    );
     console.log("[start-match-player-drag-contract] ok");
 }
 
@@ -1870,6 +1875,18 @@ function testCollectionRebirthAndDeveloperContracts() {
     assert.ok(
         template.includes("캐릭터 설정") && template.includes("사냥터 테스트"),
         "Developer controls should be grouped by the context they affect"
+    );
+    assert.ok(
+        template.includes("드래그 전투 튜닝") &&
+            template.includes('type="range"') &&
+            template.includes("state.developer.dragReleaseSpeedMultiplier"),
+        "Developer tools should expose a touch-friendly drag release speed range"
+    );
+    assert.ok(
+        template.includes("setDebugDragReleaseSpeedMultiplier") &&
+            template.includes("resetDebugDragReleaseSpeedMultiplier") &&
+            readSource("src/componentBridge.js").includes("getDebugDragCombatTuning"),
+        "Drag tuning should use guarded bridge methods and expose an explicit reset"
     );
     assert.ok(
         template.includes("Elementalist VFX") &&

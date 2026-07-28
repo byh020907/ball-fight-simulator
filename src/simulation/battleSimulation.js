@@ -91,7 +91,10 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         };
         this.dragCombat =
             options.dragCombatEnabled === true
-                ? new DragCombatRuntime(this, { onEvent: hooks.onDragCombatEvent })
+                ? new DragCombatRuntime(this, {
+                      onEvent: hooks.onDragCombatEvent,
+                      config: options.dragCombatConfig
+                  })
                 : null;
         this.setPlayerBall(playerBall);
 

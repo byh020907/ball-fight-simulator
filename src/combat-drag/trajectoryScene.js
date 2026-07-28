@@ -1,4 +1,4 @@
-import { DRAG_COMBAT_CONFIG } from "./config.js";
+import { DRAG_COMBAT_CONFIG, getDragLaunchSpeed } from "./config.js";
 import { getRicochetDamageMultiplier, isShieldFront } from "./vectorMath.js";
 
 const EPSILON = 0.001;
@@ -178,10 +178,8 @@ export function createDragTrajectoryScene({ simulation, runtimeSnapshot } = {}) 
             bounces: [],
             terminal: null
         };
-    const impulseSpeed =
-        (player.stats?.baseSpeed ?? 0) *
-        (DRAG_COMBAT_CONFIG.shot.minSpeedRatio +
-            (DRAG_COMBAT_CONFIG.shot.maxSpeedRatio - DRAG_COMBAT_CONFIG.shot.minSpeedRatio) * strength);
+    const shotConfig = runtimeSnapshot?.launch ?? DRAG_COMBAT_CONFIG.shot;
+    const impulseSpeed = getDragLaunchSpeed(player.stats?.baseSpeed, strength, shotConfig);
     const currentVelocity = finite(player.velocity) ? player.velocity : { x: 0, y: 0 };
     const launchVelocity = {
         x: currentVelocity.x + direction.x * impulseSpeed,
@@ -200,7 +198,10 @@ export function createDragTrajectoryScene({ simulation, runtimeSnapshot } = {}) 
         };
     const radius = Math.max(0, player.radius ?? player.stats?.baseRadius ?? 0);
     let current = copy(player.position);
-    let remaining = Math.max(0, length(launchVelocity) * DRAG_COMBAT_CONFIG.shot.shotMaxSeconds);
+    const shotMaxSeconds = Number.isFinite(shotConfig.shotMaxSeconds)
+        ? Math.max(0, shotConfig.shotMaxSeconds)
+        : DRAG_COMBAT_CONFIG.shot.shotMaxSeconds;
+    let remaining = Math.max(0, length(launchVelocity) * shotMaxSeconds);
     const segments = [];
     const bounces = [];
     let terminal = null;

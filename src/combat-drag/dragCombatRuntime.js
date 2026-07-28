@@ -1,7 +1,7 @@
 import { DragInputState } from "./dragInputState.js";
 import { PlayerShotState } from "./playerShotState.js";
 import { EnemyAttackQueue } from "./enemyAttackQueue.js";
-import { DRAG_COMBAT_CONFIG } from "./config.js";
+import { DRAG_COMBAT_CONFIG, getDragLaunchSpeed } from "./config.js";
 import { Vector2 } from "../core.js";
 
 function copyPoint(point) {
@@ -190,6 +190,12 @@ export class DragCombatRuntime {
                 defenseCandidate: this.enemyDefenseCandidate,
                 lastResolution: copyValue(this.enemyQueue.lastResult)
             },
+            launch: {
+                minSpeedRatio: this.config.shot.minSpeedRatio,
+                maxSpeedRatio: this.config.shot.maxSpeedRatio,
+                releaseSpeedMultiplier: this.config.shot.releaseSpeedMultiplier,
+                shotMaxSeconds: this.config.shot.shotMaxSeconds
+            },
             lastEvent: copyValue(this.lastEvent),
             eventSequence: this.eventSequence
         };
@@ -201,10 +207,7 @@ export class DragCombatRuntime {
             const player = this.#player();
             if (!this.#canAct() || !player) return this.#cancelLaunch();
             const direction = new Vector2(result.snapshot.vector.x, result.snapshot.vector.y);
-            const speed =
-                player.stats.baseSpeed *
-                (this.config.shot.minSpeedRatio +
-                    (this.config.shot.maxSpeedRatio - this.config.shot.minSpeedRatio) * result.snapshot.strength);
+            const speed = getDragLaunchSpeed(player.stats.baseSpeed, result.snapshot.strength, this.config.shot);
             player.applyImpulse(direction.scale(speed));
             const shields = new Map(
                 this.simulation

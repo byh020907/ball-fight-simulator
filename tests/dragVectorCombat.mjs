@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import { ArenaCamera } from "../src/camera.js";
-import { DragInputState, EnemyAttackQueue, PlayerShotState, predictTrajectory } from "../src/combat-drag/index.js";
+import {
+    clampDragReleaseSpeedMultiplier,
+    createDragCombatConfig,
+    DragInputState,
+    DRAG_RELEASE_SPEED_TUNING,
+    EnemyAttackQueue,
+    getDragLaunchSpeed,
+    PlayerShotState,
+    predictTrajectory
+} from "../src/combat-drag/index.js";
 import { DRAG_COMBAT_CONFIG } from "../src/combat-drag/config.js";
 import {
     getRicochetDamageMultiplier,
@@ -261,13 +270,27 @@ assert.deepEqual(DRAG_COMBAT_CONFIG.input, {
     cooldownSeconds: 2
 });
 assert.deepEqual(DRAG_COMBAT_CONFIG.shot, {
-    minSpeedRatio: 0.85,
-    maxSpeedRatio: 2.2,
+    minSpeedRatio: 1.25,
+    maxSpeedRatio: 3.2,
+    releaseSpeedMultiplier: 1,
     shotMaxSeconds: 2.4,
     shotSlowSpeed: 90,
     shotSlowSeconds: 0.2,
     bounceDebounceSeconds: 0.08
 });
+assert.deepEqual(DRAG_RELEASE_SPEED_TUNING, {
+    defaultMultiplier: 1,
+    minMultiplier: 0.6,
+    maxMultiplier: 1.8,
+    step: 0.05
+});
+assert.equal(clampDragReleaseSpeedMultiplier(Number.NaN), 1);
+assert.equal(clampDragReleaseSpeedMultiplier(0), 0.6);
+assert.equal(clampDragReleaseSpeedMultiplier(99), 1.8);
+assert.equal(createDragCombatConfig(1.45).shot.releaseSpeedMultiplier, 1.45);
+assert.equal(getDragLaunchSpeed(100, 0), 125);
+assert.equal(getDragLaunchSpeed(100, 1), 320);
+assert.equal(getDragLaunchSpeed(100, 0.5, createDragCombatConfig(1.4).shot), 311.5);
 assert.deepEqual(DRAG_COMBAT_CONFIG.shield, {
     frontIncomingMultiplier: 1.5,
     frontRecoilSpeedRatio: 1.6,

@@ -15783,6 +15783,17 @@ function testDeveloperTournamentWinTool() {
         isDebugModeActive() {
             return this.debugActive;
         },
+        getDebugDragCombatTuning() {
+            return { value: this.dragReleaseSpeedMultiplier ?? 1 };
+        },
+        setDebugDragReleaseSpeedMultiplier(value) {
+            this.dragReleaseSpeedMultiplier = value;
+            return { ok: true, value };
+        },
+        resetDebugDragReleaseSpeedMultiplier() {
+            this.dragReleaseSpeedMultiplier = 1;
+            return { ok: true, value: 1 };
+        },
         _refreshCollectionHub() {
             this.collectionRefreshCount = (this.collectionRefreshCount ?? 0) + 1;
         },
@@ -15796,7 +15807,15 @@ function testDeveloperTournamentWinTool() {
         "debug_disabled",
         "Bridge should not allow tournament results outside a development session"
     );
+    assert.equal(
+        bridge.setDebugDragReleaseSpeedMultiplier(1.4).error,
+        "debug_disabled",
+        "Bridge should reject drag tuning outside a development session"
+    );
     app.debugActive = true;
+    assert.equal(bridge.setDebugDragReleaseSpeedMultiplier(1.4).value, 1.4);
+    assert.equal(bridge.getDebugDragCombatTuning().value, 1.4);
+    assert.equal(bridge.resetDebugDragReleaseSpeedMultiplier().value, 1);
     const bridgeResult = bridge.recordDebugTournamentWin(characterId);
     assert.equal(bridgeResult.ok, true, "Bridge should record the selected debug character victory");
     assert.equal(
