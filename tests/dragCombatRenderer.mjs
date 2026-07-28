@@ -108,7 +108,14 @@ const aim = {
         inputLockRemaining: 0,
         vector: { active: true, strength: 1, vector: { x: 1, y: 0 } }
     },
-    enemyQueue: { phase: "windup", attackerId: "enemy", windupDirection: { x: -1, y: 0 }, elapsed: 0.5 },
+    enemyQueue: {
+        phase: "windup",
+        attackerId: "enemy",
+        windupDirection: { x: -1, y: 0 },
+        elapsed: 0.5,
+        windupDuration: 1,
+        flightDuration: 1.8
+    },
     lastEvent: { type: "bounce", bounceCount: 2, sequence: 1 }
 };
 const aimContext = new Context();
@@ -202,12 +209,57 @@ assert.deepEqual(
         .filter((text) => ["반사 보상", "1", "2", "3"].includes(text)),
     ["반사 보상", "1", "2", "3"]
 );
-assert.equal(aimContext.commands.includes("close"), true);
+assert.equal(aimContext.commands.includes("close"), false, "windup rail does not cover the arena with a solid cone");
+assert.equal(aimContext.commands.includes("dash"), true);
+assert.equal(
+    aimContext.commands.some(
+        (command) => Array.isArray(command) && command[0] === "strokeStyle" && command[1] === "#ff5548"
+    ),
+    true
+);
+assert.equal(
+    aimContext.commands.some(
+        (command) => Array.isArray(command) && command[0] === "text" && command[1] === "돌진 조준"
+    ),
+    true
+);
 assert.equal(
     aimContext.commands.some(
         (command) => Array.isArray(command) && command[0] === "line" && command[1] - enemy.radius >= 150
     ),
     true
+);
+const enemyFlightContext = new Context();
+renderer.renderWorld(enemyFlightContext, simulation, {
+    ...idle,
+    enemyQueue: {
+        phase: "flight",
+        attackerId: "enemy",
+        windupDirection: { x: -1, y: 0 },
+        elapsed: 0.2,
+        windupDuration: 1,
+        flightDuration: 1.8
+    }
+});
+assert.equal(
+    enemyFlightContext.commands.some(
+        (command) => Array.isArray(command) && command[0] === "move" && command[1] < -enemy.radius - 40
+    ),
+    true,
+    "active dash uses a short rear trail"
+);
+assert.equal(
+    enemyFlightContext.commands.some(
+        (command) => Array.isArray(command) && command[0] === "text" && command[1] === "돌진"
+    ),
+    true
+);
+assert.equal(
+    enemyFlightContext.commands.some(
+        (command) => Array.isArray(command) && command[0] === "line" && command[1] - enemy.radius >= 100
+    ),
+    false,
+    "active dash removes the long forward cone"
 );
 const countdownContext = new Context();
 renderer.renderScreen(countdownContext, simulation, aim);

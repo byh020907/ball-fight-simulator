@@ -70,8 +70,11 @@ function resolveActualEnemyCollision({ activeFlight }) {
     const runtime = simulation.dragCombat;
     const [player, firstEnemy] = simulation.fighters;
     runtime.tickEnemy(0);
-    assert.equal(runtime.getSnapshot().enemyQueue.phase, "windup");
-    const initial = runtime.getSnapshot().enemyQueue.windupDirection;
+    const windupSnapshot = runtime.getSnapshot().enemyQueue;
+    assert.equal(windupSnapshot.phase, "windup");
+    assert.equal(windupSnapshot.windupDuration, 1);
+    assert.equal(windupSnapshot.flightDuration, 1.8);
+    const initial = windupSnapshot.windupDirection;
     player.position.y += 150;
     runtime.tickEnemy(0.6);
     const tracked = runtime.getSnapshot().enemyQueue.windupDirection;

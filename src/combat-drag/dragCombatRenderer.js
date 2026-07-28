@@ -1,7 +1,6 @@
 import { createDragTrajectoryScene } from "./trajectoryScene.js";
 
 const TIER_COLORS = ["#5ce1e6", "#ffd166", "#ff8c42", "#ff4db8"];
-const DANGER_COLOR = "#ff5a36";
 const FRONT_COLOR = "#ff4d5a";
 const TAU = Math.PI * 2;
 
@@ -304,55 +303,167 @@ export class DragCombatRenderer {
         const attacker = fighterById(simulation, queue.attackerId);
         if (!attacker || !finitePoint(queue.windupDirection)) return 0;
         const angle = Math.atan2(queue.windupDirection.y, queue.windupDirection.x);
+        const flight = queue.phase === "flight";
+        const duration = Math.max(
+            0.001,
+            Number(flight ? queue.flightDuration : queue.windupDuration) || (flight ? 1.8 : 1)
+        );
+        const progress = Math.max(0, Math.min(1, queue.elapsed / duration));
         ctx.save();
         try {
             ctx.translate(attacker.position.x, attacker.position.y);
             ctx.rotate(angle);
-            const progress = Math.max(0, Math.min(1, queue.elapsed / 1));
-            const flight = queue.phase === "flight";
-            const length = flight ? 190 : 170;
-            const nearWidth = flight ? 34 : 28;
-            const farWidth = flight ? 18 : 12;
-            ctx.globalAlpha = flight ? 0.42 : 0.2 + progress * 0.2;
-            ctx.fillStyle = flight ? "#ff3d2e" : DANGER_COLOR;
-            ctx.beginPath();
-            ctx.moveTo(attacker.radius + 12, -nearWidth);
-            ctx.lineTo(attacker.radius + length, -farWidth);
-            ctx.lineTo(attacker.radius + length, farWidth);
-            ctx.lineTo(attacker.radius + 12, nearWidth);
-            ctx.closePath();
-            ctx.fill();
-            ctx.globalAlpha = flight ? 1 : 0.78 + progress * 0.22;
-            ctx.strokeStyle = flight ? "#ff2720" : "#ff6b45";
-            ctx.lineWidth = flight ? 8 : 6;
-            ctx.beginPath();
-            ctx.moveTo(attacker.radius + 14, 0);
-            ctx.lineTo(attacker.radius + length, 0);
-            ctx.stroke();
-            ctx.strokeStyle = "#fff0d6";
-            ctx.lineWidth = flight ? 5 : 4;
-            ctx.beginPath();
-            ctx.moveTo(attacker.radius + length, 0);
-            ctx.lineTo(attacker.radius + length - 18, -12);
-            ctx.moveTo(attacker.radius + length, 0);
-            ctx.lineTo(attacker.radius + length - 18, 12);
-            ctx.stroke();
-            ctx.strokeStyle = flight ? "#ff2720" : DANGER_COLOR;
-            ctx.lineWidth = flight ? 7 : 5;
-            ctx.beginPath();
-            ctx.arc(0, 0, attacker.radius + 18, -Math.PI / 2, -Math.PI / 2 + TAU * progress);
-            ctx.stroke();
+            if (flight) this.#drawEnemyFlightTrail(ctx, attacker, progress);
+            else this.#drawEnemyWindupRail(ctx, attacker, progress);
         } finally {
             ctx.restore();
         }
         this.#drawLabel(
             ctx,
-            queue.phase === "flight" ? "돌진" : "돌진 예고",
+            flight ? "돌진" : "돌진 조준",
             attacker.position.x,
             attacker.position.y - attacker.radius - 26,
             "#9b1d16"
         );
         return 1;
+    }
+
+    #drawEnemyWindupRail(ctx, attacker, progress) {
+        const start = attacker.radius + 16;
+        const end = start + 150;
+        const pulse = 0.5 + 0.5 * Math.sin(this.visualElapsed * 12);
+        ctx.lineCap = "round";
+
+        ctx.globalAlpha = 0.52 + progress * 0.18;
+        ctx.strokeStyle = "#2d1115";
+        ctx.lineWidth = 10;
+        ctx.beginPath();
+        ctx.moveTo(start, 0);
+        ctx.lineTo(end - 12, 0);
+        ctx.stroke();
+
+        ctx.globalAlpha = 0.2 + progress * 0.22;
+        ctx.strokeStyle = "#ff806c";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(start + 4, -8);
+        ctx.lineTo(end - 18, -4);
+        ctx.moveTo(start + 4, 8);
+        ctx.lineTo(end - 18, 4);
+        ctx.stroke();
+
+        ctx.globalAlpha = 0.58 + progress * 0.3;
+        ctx.strokeStyle = "#ff5548";
+        ctx.lineWidth = 3;
+        ctx.setLineDash([9, 7]);
+        ctx.lineDashOffset = -(this.visualElapsed * 65) % 16;
+        ctx.beginPath();
+        ctx.moveTo(start, 0);
+        ctx.lineTo(end - 14, 0);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.globalAlpha = 0.44 + pulse * 0.18 + progress * 0.18;
+        ctx.strokeStyle = "#ffd2c3";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        for (const offset of [36, 76, 116]) {
+            const x = start + offset;
+            ctx.moveTo(x - 7, -6);
+            ctx.lineTo(x, 0);
+            ctx.lineTo(x - 7, 6);
+        }
+        ctx.stroke();
+
+        const phase = this.visualElapsed * 2.8;
+        ctx.globalAlpha = 0.64 + pulse * 0.22;
+        ctx.strokeStyle = "#fff0e6";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(end, 0, 10, phase, phase + Math.PI * 1.25);
+        ctx.stroke();
+        ctx.globalAlpha = 0.52 + progress * 0.38;
+        ctx.strokeStyle = "#ff5548";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(end, 0, 5, 0, TAU);
+        ctx.stroke();
+
+        ctx.globalAlpha = 0.38;
+        ctx.strokeStyle = "#2d1115";
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.arc(0, 0, attacker.radius + 16, 0, TAU);
+        ctx.stroke();
+        ctx.globalAlpha = 0.82 + pulse * 0.12;
+        ctx.strokeStyle = "#ff5548";
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, attacker.radius + 16, -Math.PI / 2, -Math.PI / 2 + TAU * progress);
+        ctx.stroke();
+    }
+
+    #drawEnemyFlightTrail(ctx, attacker, progress) {
+        const trailStart = -(attacker.radius + 76);
+        const trailEnd = -(attacker.radius + 8);
+        const pulse = 0.5 + 0.5 * Math.sin(this.visualElapsed * 16);
+        ctx.lineCap = "round";
+
+        ctx.globalAlpha = 0.48;
+        ctx.strokeStyle = "#2d1115";
+        ctx.lineWidth = 12;
+        ctx.beginPath();
+        ctx.moveTo(trailStart, 0);
+        ctx.lineTo(trailEnd, 0);
+        ctx.stroke();
+
+        ctx.shadowColor = "rgba(255, 72, 58, 0.68)";
+        ctx.shadowBlur = 6 + pulse * 5;
+        ctx.globalAlpha = 0.2 + (1 - progress) * 0.2;
+        ctx.strokeStyle = "#ff483a";
+        ctx.lineWidth = 8;
+        ctx.beginPath();
+        ctx.moveTo(trailStart + 8, 0);
+        ctx.lineTo(trailEnd, 0);
+        ctx.stroke();
+
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 0.84;
+        ctx.strokeStyle = "#ffd2c3";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(trailStart + 18, 0);
+        ctx.lineTo(trailEnd, 0);
+        ctx.stroke();
+
+        ctx.globalAlpha = 0.54;
+        ctx.strokeStyle = "#ff6b58";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(trailStart + 16, -10);
+        ctx.lineTo(trailEnd - 10, -5);
+        ctx.moveTo(trailStart + 16, 10);
+        ctx.lineTo(trailEnd - 10, 5);
+        ctx.stroke();
+
+        const tip = attacker.radius + 28;
+        ctx.globalAlpha = 0.92;
+        ctx.strokeStyle = "#fff0e6";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(attacker.radius + 8, 0);
+        ctx.lineTo(tip, 0);
+        ctx.moveTo(tip - 7, -6);
+        ctx.lineTo(tip, 0);
+        ctx.lineTo(tip - 7, 6);
+        ctx.stroke();
+
+        ctx.globalAlpha = 0.74 + pulse * 0.16;
+        ctx.strokeStyle = "#ff483a";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(0, 0, attacker.radius + 12, 0, TAU);
+        ctx.stroke();
     }
 
     #drawEvent(ctx, simulation) {

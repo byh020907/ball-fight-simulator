@@ -209,6 +209,8 @@ export class DragCombatRuntime {
                 attackerId: this.enemyQueue.attackerId,
                 windupDirection: copyPoint(this.enemyDirections.get(this.enemyQueue.attackerId)),
                 elapsed: this.enemyQueue.elapsed,
+                windupDuration: this.config.enemy.windupSeconds,
+                flightDuration: this.config.enemy.flightMaxSeconds,
                 lastResolution: copyValue(this.enemyQueue.lastResult)
             },
             launch: {
