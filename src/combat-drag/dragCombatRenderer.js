@@ -299,32 +299,21 @@ export class DragCombatRenderer {
 
     #drawEnemyTelegraph(ctx, simulation, snapshot) {
         const queue = snapshot.enemyQueue;
-        if (!queue || (queue.phase !== "windup" && queue.phase !== "flight")) return 0;
+        if (!queue || queue.phase !== "windup") return 0;
         const attacker = fighterById(simulation, queue.attackerId);
         if (!attacker || !finitePoint(queue.windupDirection)) return 0;
         const angle = Math.atan2(queue.windupDirection.y, queue.windupDirection.x);
-        const flight = queue.phase === "flight";
-        const duration = Math.max(
-            0.001,
-            Number(flight ? queue.flightDuration : queue.windupDuration) || (flight ? 1.8 : 1)
-        );
+        const duration = Math.max(0.001, Number(queue.windupDuration) || 1);
         const progress = Math.max(0, Math.min(1, queue.elapsed / duration));
         ctx.save();
         try {
             ctx.translate(attacker.position.x, attacker.position.y);
             ctx.rotate(angle);
-            if (flight) this.#drawEnemyFlightTrail(ctx, attacker, progress);
-            else this.#drawEnemyWindupRail(ctx, attacker, progress);
+            this.#drawEnemyWindupRail(ctx, attacker, progress);
         } finally {
             ctx.restore();
         }
-        this.#drawLabel(
-            ctx,
-            flight ? "돌진" : "돌진 조준",
-            attacker.position.x,
-            attacker.position.y - attacker.radius - 26,
-            "#9b1d16"
-        );
+        this.#drawLabel(ctx, "돌진 조준", attacker.position.x, attacker.position.y - attacker.radius - 26, "#9b1d16");
         return 1;
     }
 
@@ -400,69 +389,6 @@ export class DragCombatRenderer {
         ctx.lineWidth = 3.5;
         ctx.beginPath();
         ctx.arc(0, 0, attacker.radius + 16, -Math.PI / 2, -Math.PI / 2 + TAU * progress);
-        ctx.stroke();
-    }
-
-    #drawEnemyFlightTrail(ctx, attacker, progress) {
-        const trailStart = -(attacker.radius + 76);
-        const trailEnd = -(attacker.radius + 8);
-        const pulse = 0.5 + 0.5 * Math.sin(this.visualElapsed * 16);
-        ctx.lineCap = "round";
-
-        ctx.globalAlpha = 0.48;
-        ctx.strokeStyle = "#2d1115";
-        ctx.lineWidth = 12;
-        ctx.beginPath();
-        ctx.moveTo(trailStart, 0);
-        ctx.lineTo(trailEnd, 0);
-        ctx.stroke();
-
-        ctx.shadowColor = "rgba(255, 72, 58, 0.68)";
-        ctx.shadowBlur = 6 + pulse * 5;
-        ctx.globalAlpha = 0.2 + (1 - progress) * 0.2;
-        ctx.strokeStyle = "#ff483a";
-        ctx.lineWidth = 8;
-        ctx.beginPath();
-        ctx.moveTo(trailStart + 8, 0);
-        ctx.lineTo(trailEnd, 0);
-        ctx.stroke();
-
-        ctx.shadowBlur = 0;
-        ctx.globalAlpha = 0.84;
-        ctx.strokeStyle = "#ffd2c3";
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(trailStart + 18, 0);
-        ctx.lineTo(trailEnd, 0);
-        ctx.stroke();
-
-        ctx.globalAlpha = 0.54;
-        ctx.strokeStyle = "#ff6b58";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(trailStart + 16, -10);
-        ctx.lineTo(trailEnd - 10, -5);
-        ctx.moveTo(trailStart + 16, 10);
-        ctx.lineTo(trailEnd - 10, 5);
-        ctx.stroke();
-
-        const tip = attacker.radius + 28;
-        ctx.globalAlpha = 0.92;
-        ctx.strokeStyle = "#fff0e6";
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        ctx.moveTo(attacker.radius + 8, 0);
-        ctx.lineTo(tip, 0);
-        ctx.moveTo(tip - 7, -6);
-        ctx.lineTo(tip, 0);
-        ctx.lineTo(tip - 7, 6);
-        ctx.stroke();
-
-        ctx.globalAlpha = 0.74 + pulse * 0.16;
-        ctx.strokeStyle = "#ff483a";
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.arc(0, 0, attacker.radius + 12, 0, TAU);
         ctx.stroke();
     }
 

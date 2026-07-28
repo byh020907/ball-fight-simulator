@@ -230,7 +230,7 @@ assert.equal(
     true
 );
 const enemyFlightContext = new Context();
-renderer.renderWorld(enemyFlightContext, simulation, {
+const enemyFlightCommands = renderer.renderWorld(enemyFlightContext, simulation, {
     ...idle,
     enemyQueue: {
         phase: "flight",
@@ -241,26 +241,8 @@ renderer.renderWorld(enemyFlightContext, simulation, {
         flightDuration: 1.8
     }
 });
-assert.equal(
-    enemyFlightContext.commands.some(
-        (command) => Array.isArray(command) && command[0] === "move" && command[1] < -enemy.radius - 40
-    ),
-    true,
-    "active dash uses a short rear trail"
-);
-assert.equal(
-    enemyFlightContext.commands.some(
-        (command) => Array.isArray(command) && command[0] === "text" && command[1] === "돌진"
-    ),
-    true
-);
-assert.equal(
-    enemyFlightContext.commands.some(
-        (command) => Array.isArray(command) && command[0] === "line" && command[1] - enemy.radius >= 100
-    ),
-    false,
-    "active dash removes the long forward cone"
-);
+assert.equal(enemyFlightCommands, 0, "released enemy dash uses movement only, like the player shot");
+assert.deepEqual(enemyFlightContext.commands, [], "enemy flight leaves no rear trail, tip, ring, or label");
 const countdownContext = new Context();
 renderer.renderScreen(countdownContext, simulation, aim);
 assert.equal(
