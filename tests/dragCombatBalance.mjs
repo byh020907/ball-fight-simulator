@@ -22,6 +22,12 @@ function createSimulation({ enabled = true, enemyCount = 2 } = {}) {
         dragCombatEnabled: true,
         dragEnemyHealthScalingEnabled: false
     });
+    assert.equal(tournament.width, 1200, "drag combat should use the expanded default arena");
+    assert.deepEqual(
+        tournament.fighters.map((fighter) => fighter.position.x),
+        [300, 900],
+        "one-on-one fighters should start across half of the expanded arena"
+    );
     const enemy = tournament.fighters[1];
     const originalMaxHp = enemy.maxHp;
     tournament.setPlayerBall(tournament.fighters[0]);
@@ -30,6 +36,11 @@ function createSimulation({ enabled = true, enemyCount = 2 } = {}) {
 
 {
     const simulation = createSimulation();
+    assert.deepEqual(
+        simulation.fighters.map((fighter) => fighter.position.x),
+        [300, 900, 900],
+        "one-versus-many teams should retain the same widened horizontal formation"
+    );
     const player = simulation.fighters[0];
     const enemy = simulation.fighters[1];
     enemy.hp = enemy.maxHp * 0.4;

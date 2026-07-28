@@ -8,11 +8,12 @@ import {
 import { Simulation } from "./simulation.js";
 
 const COLLISION_SEPARATION_PADDING = 0.6;
-const DEFAULT_ARENA_SIZE = 960;
+const MINIMUM_ARENA_SIZE = 960;
+const DEFAULT_ARENA_SIZE = 1200;
 
 function normalizeArenaSize(value) {
     if (!Number.isFinite(value)) return DEFAULT_ARENA_SIZE;
-    return Math.max(DEFAULT_ARENA_SIZE, Math.round(value));
+    return Math.max(MINIMUM_ARENA_SIZE, Math.round(value));
 }
 
 export class FighterPhysicsSimulation extends Simulation {
@@ -34,8 +35,8 @@ export class FighterPhysicsSimulation extends Simulation {
         if (count === 1) return [center];
         if (count === 2) {
             return [
-                new Vector2(this.width * 0.32, this.height * 0.5),
-                new Vector2(this.width * 0.68, this.height * 0.5)
+                new Vector2(this.width * 0.25, this.height * 0.5),
+                new Vector2(this.width * 0.75, this.height * 0.5)
             ];
         }
 

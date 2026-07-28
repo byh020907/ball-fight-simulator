@@ -1090,6 +1090,9 @@ export class BattleApp {
         const rebirthLoadoutByFighter =
             options.rebirthLoadoutByFighter ??
             new Map([[this.playerFighterId, getRebirthLoadout(this.playerProfile, this.playerFighterId)]]);
+        const includesPlayer = match.some((fighter) => fighter.id === this.playerFighterId);
+        const automatedTournamentMatch = Boolean(this.currentTournamentMatch) && !includesPlayer;
+
         this.simulation = new BattleSimulation(
             match,
             {
@@ -1145,7 +1148,8 @@ export class BattleApp {
                 hostileAbsenceGraceTeamId: options.hostileAbsenceGraceTeamId,
                 arenaTheme: options.arenaTheme ?? null,
                 terrain: options.terrain ?? [],
-                dragCombatEnabled: match.some((fighter) => fighter.id === this.playerFighterId),
+                dragCombatEnabled: includesPlayer || automatedTournamentMatch,
+                dragCombatAutomated: automatedTournamentMatch,
                 dragCombatConfig: this._createDragCombatConfig(),
                 dragEnemyHealthScalingEnabled: !this.currentTournamentMatch,
                 playerLives: options.playerLives ?? null,

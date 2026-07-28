@@ -32,21 +32,32 @@ export class DragCombatRenderer {
     }
 
     renderWorld(ctx, simulation, runtimeSnapshot, delta = 0) {
-        if (!simulation?.playerBall || simulation.finished || !runtimeSnapshot?.enabled) return 0;
+        if (!simulation || simulation.finished || !runtimeSnapshot?.enabled) return 0;
+        const automated = runtimeSnapshot.automated === true;
+        if (!simulation.playerBall && !automated) return 0;
+        const hasManualPlayer = Boolean(simulation.playerBall) && !automated;
         if (this.simulation !== simulation) this.#resetForSimulation(simulation);
         this.visualElapsed += Math.max(0, Number.isFinite(delta) ? delta : 0);
         this.#consumeEvent(runtimeSnapshot, delta);
-        const scene = createDragTrajectoryScene({ simulation, runtimeSnapshot });
         let commands = 0;
-        if (runtimeSnapshot.drag.state === "aiming") commands += this.#drawAim(ctx, simulation, runtimeSnapshot, scene);
-        commands += this.#drawFixedShields(ctx, simulation, runtimeSnapshot);
+        if (hasManualPlayer && runtimeSnapshot.drag.state === "aiming") {
+            const scene = createDragTrajectoryScene({ simulation, runtimeSnapshot });
+            commands += this.#drawAim(ctx, simulation, runtimeSnapshot, scene);
+        }
+        if (hasManualPlayer) commands += this.#drawFixedShields(ctx, simulation, runtimeSnapshot);
         commands += this.#drawEnemyTelegraph(ctx, simulation, runtimeSnapshot);
-        commands += this.#drawEvent(ctx, simulation);
+        if (hasManualPlayer) commands += this.#drawEvent(ctx, simulation);
         return commands;
     }
 
     renderScreen(ctx, simulation, runtimeSnapshot) {
-        if (!simulation?.playerBall || simulation.finished || !runtimeSnapshot?.enabled) return 0;
+        if (
+            !simulation?.playerBall ||
+            simulation.finished ||
+            !runtimeSnapshot?.enabled ||
+            runtimeSnapshot.automated === true
+        )
+            return 0;
         const scale = getDeviceScale(this.canvas);
         ctx.save();
         try {

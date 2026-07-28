@@ -39,42 +39,42 @@ export const HUNTING_STAGES = Object.freeze([
         id: HUNTING_STAGE_IDS.CAVE,
         name: "동굴",
         description: "좁은 암벽 통로가 이어지는 첫 원정지",
-        arena: Object.freeze({ WIDTH: 1000, HEIGHT: 1000 }),
+        arena: Object.freeze({ WIDTH: 1200, HEIGHT: 1200 }),
         theme: "cave"
     }),
     Object.freeze({
         id: HUNTING_STAGE_IDS.DEEP_CAVE,
         name: "심층 동굴",
         description: "거대한 암반과 깊은 균열이 길을 가르는 동굴 심부",
-        arena: Object.freeze({ WIDTH: 1120, HEIGHT: 1040 }),
+        arena: Object.freeze({ WIDTH: 1320, HEIGHT: 1200 }),
         theme: "cave"
     }),
     Object.freeze({
         id: HUNTING_STAGE_IDS.FOREST,
         name: "숲",
         description: "회복과 함정이 뒤섞인 깊은 숲",
-        arena: Object.freeze({ WIDTH: 1280, HEIGHT: 1280 }),
+        arena: Object.freeze({ WIDTH: 1440, HEIGHT: 1440 }),
         theme: "forest"
     }),
     Object.freeze({
         id: HUNTING_STAGE_IDS.ANCIENT_FOREST,
         name: "고대 숲",
         description: "거목의 뿌리와 거대 버섯이 뒤엉킨 오래된 수림",
-        arena: Object.freeze({ WIDTH: 1360, HEIGHT: 1280 }),
+        arena: Object.freeze({ WIDTH: 1520, HEIGHT: 1440 }),
         theme: "forest"
     }),
     Object.freeze({
         id: HUNTING_STAGE_IDS.DESERT,
         name: "사막",
         description: "넓은 전장과 거친 모래바람의 원정지",
-        arena: Object.freeze({ WIDTH: 1440, HEIGHT: 1280 }),
+        arena: Object.freeze({ WIDTH: 1600, HEIGHT: 1440 }),
         theme: "desert"
     }),
     Object.freeze({
         id: HUNTING_STAGE_IDS.SANDSTORM,
         name: "모래폭풍 지대",
         description: "시야를 삼키는 모래폭풍이 몰아치는 최후의 원정지",
-        arena: Object.freeze({ WIDTH: 1520, HEIGHT: 1360 }),
+        arena: Object.freeze({ WIDTH: 1680, HEIGHT: 1520 }),
         theme: "desert"
     })
 ]);
@@ -93,8 +93,8 @@ export function normalizeHuntingStageUnlockIds(stageIds) {
 }
 
 export const HUNTING_ARENA = Object.freeze({
-    WIDTH: 1280,
-    HEIGHT: 1280
+    WIDTH: 1440,
+    HEIGHT: 1440
 });
 
 export const HUNTING_MOB_COMPOSITION = Object.freeze({

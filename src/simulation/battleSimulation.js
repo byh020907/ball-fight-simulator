@@ -22,8 +22,8 @@ import {
 import { COMBAT_PARTICIPATION_MODES } from "./combatParticipation.js";
 
 const TEAM_FORMATION_CONFIG = Object.freeze({
-    leftHorizontalRatio: 0.28,
-    rightHorizontalRatio: 0.72,
+    leftHorizontalRatio: 0.25,
+    rightHorizontalRatio: 0.75,
     verticalSpanRatio: 0.42,
     arenaMargin: 120
 });
@@ -94,7 +94,8 @@ export class BattleSimulation extends FighterPhysicsSimulation {
             options.dragCombatEnabled === true
                 ? new DragCombatRuntime(this, {
                       onEvent: hooks.onDragCombatEvent,
-                      config: options.dragCombatConfig
+                      config: options.dragCombatConfig,
+                      automated: options.dragCombatAutomated
                   })
                 : null;
         this.setPlayerBall(playerBall);
@@ -215,41 +216,6 @@ export class BattleSimulation extends FighterPhysicsSimulation {
 
     get timeSlowFactor() {
         return this._clickActionContext.timeSlowFactor;
-    }
-
-    createSpawnPoints(count) {
-        if (count <= 0) return [];
-
-        const points = [];
-        const margin = 120;
-        const center = new Vector2(this.width / 2, this.height / 2);
-
-        if (count === 1) return [center];
-        if (count === 2) {
-            return [
-                new Vector2(this.width * 0.32, this.height * 0.5),
-                new Vector2(this.width * 0.68, this.height * 0.5)
-            ];
-        }
-
-        points.push(new Vector2(this.width * 0.28, this.height * 0.5));
-        const enemyCount = count - 1;
-        const arcStart = -Math.PI * 0.64;
-        const arcEnd = Math.PI * 0.64;
-
-        for (let index = 0; index < enemyCount; index += 1) {
-            const ratio = enemyCount === 1 ? 0.5 : index / (enemyCount - 1);
-            const angle = arcStart + (arcEnd - arcStart) * ratio;
-            const candidate = new Vector2(
-                this.width * 0.68 + Math.cos(angle) * this.width * 0.12,
-                this.height * 0.5 + Math.sin(angle) * this.height * 0.31
-            );
-            candidate.x = Math.max(margin, Math.min(this.width - margin, candidate.x));
-            candidate.y = Math.max(margin, Math.min(this.height - margin, candidate.y));
-            points.push(candidate);
-        }
-
-        return points;
     }
 
     createFighterSpawnPoints(fighterSpecs) {

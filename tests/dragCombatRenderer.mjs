@@ -124,6 +124,31 @@ assert.equal(
     aimContext.commands.filter((command) => command === "save").length,
     aimContext.commands.filter((command) => command === "restore").length
 );
+const automatedContext = new Context();
+const automatedSnapshot = {
+    ...idle,
+    automated: true,
+    enemyQueue: {
+        phase: "windup",
+        attackerId: "player",
+        targetId: "enemy",
+        windupDirection: { x: 1, y: 0 },
+        elapsed: 0.5,
+        windupDuration: 1,
+        flightDuration: 1.8
+    }
+};
+const automatedRenderer = new DragCombatRenderer(canvas);
+assert.equal(
+    automatedRenderer.renderWorld(automatedContext, { ...simulation, playerBall: null }, automatedSnapshot, 0.016) > 0,
+    true,
+    "automated character matches should still render their charge telegraph"
+);
+assert.equal(
+    automatedRenderer.renderScreen(new Context(), { ...simulation, playerBall: null }, automatedSnapshot),
+    0,
+    "spectated automated matches should not render manual drag HUD"
+);
 const shieldContext = new Context();
 renderer.renderWorld(
     shieldContext,

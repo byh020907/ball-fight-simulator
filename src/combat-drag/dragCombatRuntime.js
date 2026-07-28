@@ -14,14 +14,16 @@ function copyValue(value) {
 }
 
 export class DragCombatRuntime {
-    constructor(simulation, { onEvent, config = DRAG_COMBAT_CONFIG } = {}) {
+    constructor(simulation, { onEvent, config = DRAG_COMBAT_CONFIG, automated = false } = {}) {
         this.simulation = simulation;
         this.onEvent = onEvent;
         this.config = config;
+        this.automated = automated === true;
         this.input = new DragInputState(config.input);
         this.shot = new PlayerShotState(config);
         this.enemyQueue = new EnemyAttackQueue(config.enemy);
         this.enemyDirections = new Map();
+        this.enemyTargets = new Map();
         this.enemySlowElapsed = 0;
         this.lastEvent = null;
         this.eventSequence = 0;
@@ -30,7 +32,7 @@ export class DragCombatRuntime {
     }
 
     begin(pointerId, cssPoint) {
-        if (this.shot.active || !this.#canAct()) return null;
+        if (this.automated || this.shot.active || !this.#canAct()) return null;
         const result = this.input.begin(pointerId, cssPoint);
         if (result) {
             this.aimCaster = this.#player();
@@ -40,11 +42,12 @@ export class DragCombatRuntime {
     }
 
     move(pointerId, cssPoint) {
-        if (!this.#canAct()) return null;
+        if (this.automated || !this.#canAct()) return null;
         return this.input.move(pointerId, cssPoint);
     }
 
     release(pointerId) {
+        if (this.automated) return null;
         if (this.input.state === "aiming" && this.aimCaster !== this.#player()) {
             return this.#resolveInputResult(this.input.cancel(pointerId));
         }
@@ -52,10 +55,12 @@ export class DragCombatRuntime {
     }
 
     cancel(pointerId) {
+        if (this.automated) return null;
         return this.#resolveInputResult(this.input.cancel(pointerId));
     }
 
     tickInput(realDelta) {
+        if (this.automated) return;
         if (!this.#canAct()) {
             this.reset();
             return;
@@ -82,19 +87,18 @@ export class DragCombatRuntime {
     }
 
     tickEnemy(combatDelta) {
-        if (!this.#canAct()) return this.#resetEnemy();
-        const player = this.#player();
-        const eligible = this.#eligibleEnemies();
+        if (!this.#canRunEnemyQueue()) return this.#resetEnemy();
+        const eligible = this.#eligibleAttackers();
         if (!eligible.length) return this.#resetEnemy();
-        const effectiveDelta = combatDelta * (this.input.state === "aiming" ? 0.35 : 1);
+        const effectiveDelta = combatDelta * (!this.automated && this.input.state === "aiming" ? 0.35 : 1);
         if (this.enemyQueue.state === "flight") {
             const attacker = this.#fighterById(this.enemyQueue.attackerId);
             if (!attacker || !eligible.includes(attacker.id)) {
-                this.#resolveEnemyFlight("invalid", false, eligible);
+                this.#resolveEnemyFlight("invalid", eligible);
                 return;
             }
             if (this.enemyQueue.elapsed + effectiveDelta >= this.config.enemy.flightMaxSeconds) {
-                this.#resolveEnemyFlight("timeout", false, eligible);
+                this.#resolveEnemyFlight("timeout", eligible);
                 return;
             }
             const referenceSpeed =
@@ -105,21 +109,22 @@ export class DragCombatRuntime {
             this.enemySlowElapsed =
                 attacker.velocity.length() <= enemySlowThreshold ? this.enemySlowElapsed + effectiveDelta : 0;
             if (this.enemySlowElapsed >= this.config.shot.shotSlowSeconds) {
-                this.#resolveEnemyFlight("slow-stop", false, eligible);
+                this.#resolveEnemyFlight("slow-stop", eligible);
                 return;
             }
         }
         if (this.enemyQueue.state === "windup" && this.enemyQueue.attackerId) {
             const attacker = this.#fighterById(this.enemyQueue.attackerId);
-            if (attacker && player) {
+            const target = this.#targetForAttacker(attacker);
+            if (attacker && target) {
                 this.enemyDirections.set(
                     this.enemyQueue.attackerId,
-                    copyPoint(Vector2.subtract(player.position, attacker.position).normalize()) ?? { x: 0, y: 0 }
+                    copyPoint(Vector2.subtract(target.position, attacker.position).normalize()) ?? { x: 0, y: 0 }
                 );
             }
         }
         const event = this.enemyQueue.tick(effectiveDelta, eligible);
-        if (event) this.#handleEnemyEvent(event, player);
+        if (event) this.#handleEnemyEvent(event);
     }
 
     onStaticCollision(fighter, context) {
@@ -176,6 +181,7 @@ export class DragCombatRuntime {
     getSnapshot() {
         return {
             enabled: true,
+            automated: this.automated,
             drag: {
                 state: this.input.state,
                 pointerId: this.input.pointerId,
@@ -207,6 +213,7 @@ export class DragCombatRuntime {
             enemyQueue: {
                 phase: this.enemyQueue.state,
                 attackerId: this.enemyQueue.attackerId,
+                targetId: this.enemyTargets.get(this.enemyQueue.attackerId) ?? null,
                 windupDirection: copyPoint(this.enemyDirections.get(this.enemyQueue.attackerId)),
                 elapsed: this.enemyQueue.elapsed,
                 windupDuration: this.config.enemy.windupSeconds,
@@ -278,6 +285,7 @@ export class DragCombatRuntime {
     }
 
     #canAct() {
+        if (this.automated) return false;
         const player = this.#player();
         return Boolean(
             player &&
@@ -291,18 +299,23 @@ export class DragCombatRuntime {
         );
     }
 
-    #eligibleEnemies() {
+    #canRunEnemyQueue() {
+        if (this.simulation.finished || this.simulation.revivePauseRemaining > 0) return false;
+        return this.automated || this.#canAct();
+    }
+
+    #eligibleAttackers() {
         const player = this.#player();
         return this.simulation.fighters
             .filter(
                 (fighter) =>
-                    fighter !== player &&
-                    this.simulation.isHostile(player, fighter) &&
+                    (this.automated || (fighter !== player && this.simulation.isHostile(player, fighter))) &&
                     fighter.participation?.canAct !== false &&
                     !fighter.flags.defeated &&
                     !fighter.flags.destroyed &&
                     !fighter.state.swallowed &&
-                    !fighter.state.movement
+                    !fighter.state.movement &&
+                    (!this.automated || this.#findAutomatedTarget(fighter))
             )
             .map((fighter) => fighter.id);
     }
@@ -311,21 +324,22 @@ export class DragCombatRuntime {
         return this.simulation.fighters.find((fighter) => fighter.id === id) ?? null;
     }
 
-    #handleEnemyEvent(event, player) {
+    #handleEnemyEvent(event) {
         if (event.type === "windup") {
             const attacker = this.#fighterById(event.attackerId);
+            const target = this.#targetForAttacker(attacker);
             const direction =
-                attacker && player
-                    ? Vector2.subtract(player.position, attacker.position).normalize()
-                    : new Vector2(0, 0);
+                attacker && target ? Vector2.subtract(target.position, attacker.position).normalize() : null;
             this.enemyDirections.clear();
-            this.enemyDirections.set(event.attackerId, copyPoint(direction) ?? { x: 0, y: 0 });
+            this.enemyTargets.clear();
+            if (target) this.enemyTargets.set(event.attackerId, target.id);
+            if (direction) this.enemyDirections.set(event.attackerId, copyPoint(direction) ?? { x: 0, y: 0 });
             this.enemySlowElapsed = 0;
         }
         if (event.type === "launch") {
             const attacker = this.#fighterById(event.attackerId);
             const direction = this.enemyDirections.get(event.attackerId);
-            if (!attacker || !direction) return this.#resolveEnemyFlight("invalid", false, this.#eligibleEnemies());
+            if (!attacker || !direction) return this.#resolveEnemyFlight("invalid", this.#eligibleAttackers());
             const speed = getDragLaunchSpeed(attacker.stats.baseSpeed, 1, this.config.shot);
             attacker.applyImpulse(new Vector2(direction.x, direction.y).scale(speed));
             this.enemySlowElapsed = 0;
@@ -337,24 +351,65 @@ export class DragCombatRuntime {
         if (this.enemyQueue.state !== "flight") return null;
         const attacker = this.#fighterById(this.enemyQueue.attackerId);
         if (!attacker || (context.a !== attacker && context.b !== attacker)) return null;
-        const playerHit = context.a === this.#player() || context.b === this.#player();
-        this.#resolveEnemyFlight("character", playerHit, this.#eligibleEnemies());
+        const other = context.a === attacker ? context.b : context.a;
+        const targetId = this.enemyTargets.get(attacker.id);
+        const playerHit = other === this.#player();
+        const targetHit = other?.id === targetId;
+        this.#resolveEnemyFlight("character", this.#eligibleAttackers(), { playerHit, targetHit });
         return { attacker };
     }
 
-    #resolveEnemyFlight(reason, playerHit, eligibleIds) {
+    #resolveEnemyFlight(reason, eligibleIds, { playerHit = false, targetHit = false } = {}) {
         const attackerId = this.enemyQueue.attackerId;
         this.enemyDirections.delete(attackerId);
+        this.enemyTargets.delete(attackerId);
         this.enemySlowElapsed = 0;
         const next = this.enemyQueue.resolveFlight(reason, eligibleIds);
-        this.#record({ type: "enemy-flight-end", reason, attackerId, playerHit });
-        if (next) this.#handleEnemyEvent(next, this.#player());
+        this.#record({ type: "enemy-flight-end", reason, attackerId, playerHit, targetHit });
+        if (next) this.#handleEnemyEvent(next);
     }
 
     #resetEnemy() {
         this.enemyQueue.reset();
         this.enemyDirections.clear();
+        this.enemyTargets.clear();
         this.enemySlowElapsed = 0;
+    }
+
+    #targetForAttacker(attacker) {
+        if (!attacker) return null;
+        if (!this.automated) {
+            const player = this.#player();
+            return this.#isValidTarget(attacker, player) ? player : null;
+        }
+        const current = this.#fighterById(this.enemyTargets.get(attacker.id));
+        if (this.#isValidTarget(attacker, current)) return current;
+        const next = this.#findAutomatedTarget(attacker);
+        if (next) this.enemyTargets.set(attacker.id, next.id);
+        else this.enemyTargets.delete(attacker.id);
+        return next;
+    }
+
+    #findAutomatedTarget(attacker) {
+        if (!attacker) return null;
+        const candidates = this.simulation.fighters.filter((fighter) => this.#isValidTarget(attacker, fighter));
+        if (!candidates.length) return null;
+        return candidates.reduce((nearest, fighter) => {
+            const nearestDistance = Vector2.subtract(nearest.position, attacker.position).length();
+            const fighterDistance = Vector2.subtract(fighter.position, attacker.position).length();
+            return fighterDistance < nearestDistance ? fighter : nearest;
+        });
+    }
+
+    #isValidTarget(attacker, target) {
+        return Boolean(
+            target &&
+            this.simulation.isHostile(attacker, target) &&
+            target.participation?.canBeTargeted !== false &&
+            !target.flags.defeated &&
+            !target.flags.destroyed &&
+            !target.state.swallowed
+        );
     }
 
     #player() {

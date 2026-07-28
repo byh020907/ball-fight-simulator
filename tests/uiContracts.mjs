@@ -920,23 +920,33 @@ function testPopupCloseOwnershipContract() {
     console.log("[popup-close-ownership-contract] ok");
 }
 
-function testStartMatchEnablesPlayerDragAcrossModes() {
+function testStartMatchEnablesDragAcrossCharacterMatches() {
     const app = readSource("src/app.js");
     const startMatch = app.slice(app.indexOf("async startMatch"), app.indexOf("_bindDragPointerHandler"));
     assert.match(
         startMatch,
-        /dragCombatEnabled:\s*match\.some\(\(fighter\) => fighter\.id === this\.playerFighterId\)/,
+        /const includesPlayer = match\.some\(\(fighter\) => fighter\.id === this\.playerFighterId\)/,
         "The shared startMatch path must enable drag combat for any match containing the player"
+    );
+    assert.match(
+        startMatch,
+        /const automatedTournamentMatch = Boolean\(this\.currentTournamentMatch\) && !includesPlayer/,
+        "A spectated tournament character match must select automated drag combat"
+    );
+    assert.match(
+        startMatch,
+        /dragCombatEnabled:\s*includesPlayer \|\| automatedTournamentMatch/,
+        "Player matches and spectated tournament matches must share the drag runtime"
+    );
+    assert.match(
+        startMatch,
+        /dragCombatAutomated:\s*automatedTournamentMatch/,
+        "Only spectated tournament matches should use automated drag input"
     );
     assert.doesNotMatch(
         startMatch,
         /_gameMode === ["']hunting["']/,
         "Drag runtime must not be limited to hunting matches"
-    );
-    assert.doesNotMatch(
-        startMatch,
-        /currentTournamentMatch.*dragCombatEnabled/s,
-        "Drag runtime must not be limited to tournament matches"
     );
     assert.match(
         startMatch,
@@ -2094,7 +2104,7 @@ testRecipeTreeUiContract();
 testDefenseHelpCopyContract();
 testCollectionDetailContracts();
 testPopupCloseOwnershipContract();
-testStartMatchEnablesPlayerDragAcrossModes();
+testStartMatchEnablesDragAcrossCharacterMatches();
 testGameplayUiResetContracts();
 testCombinedHealthBarProportions();
 testNoWindowUiManagerInProduction();

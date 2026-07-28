@@ -22,6 +22,23 @@ function createSimulation(onDragCombatEvent, options = {}) {
     return simulation;
 }
 
+function createAutomatedSimulation(onDragCombatEvent) {
+    const specs = createRoster()
+        .slice(0, 2)
+        .map((spec, index) => ({ ...spec, teamId: `team-${index}` }));
+    const simulation = new BattleSimulation(specs, { onLog() {}, onSound() {}, onDragCombatEvent }, null, {
+        assignActions: false,
+        dragCombatEnabled: true,
+        dragCombatAutomated: true
+    });
+    simulation.fighters.forEach((fighter, index) => {
+        fighter.position = new Vector2(240 + index * 480, 480);
+        fighter.velocity = new Vector2();
+        fighter.physicsDebug.clear();
+    });
+    return simulation;
+}
+
 function impulseCount(fighter) {
     return fighter.physicsDebug.toArray().filter((event) => event.type === "impulse").length;
 }
@@ -65,6 +82,40 @@ function resolveActualEnemyCollision({ activeFlight }) {
     simulation.dragCombat.tickEnemy(0);
     simulation.dragCombat.tickEnemy(1);
     assert.deepEqual(eventTypes.slice(0, 2), ["enemy-windup", "enemy-launch"]);
+}
+
+{
+    const simulation = createAutomatedSimulation();
+    const runtime = simulation.dragCombat;
+    const [first, second] = simulation.fighters;
+
+    assert.equal(simulation.playerBall, null, "automated character match must not need a fake player");
+    assert.equal(runtime.begin(91, { x: 0, y: 0 }), null, "spectated automated matches must reject manual drag input");
+
+    runtime.tickEnemy(0);
+    const windup = runtime.getSnapshot();
+    assert.equal(windup.automated, true);
+    assert.equal(windup.enemyQueue.phase, "windup");
+    assert.equal(windup.enemyQueue.attackerId, first.id);
+    assert.equal(windup.enemyQueue.targetId, second.id);
+
+    second.position.y += 180;
+    const expected = Vector2.subtract(second.position, first.position).normalize();
+    runtime.tickEnemy(1);
+    const firstImpulse = first.physicsDebug.toArray().find((event) => event.type === "impulse");
+    const firstImpulseLength = Math.hypot(firstImpulse?.impulse.x ?? 0, firstImpulse?.impulse.y ?? 0);
+    assert.ok(firstImpulse);
+    assert.ok(Math.abs(firstImpulse.impulse.x / firstImpulseLength - expected.x) < 1e-8);
+    assert.ok(Math.abs(firstImpulse.impulse.y / firstImpulseLength - expected.y) < 1e-8);
+
+    runtime.resolveFighterCollision({ a: first, b: second, hostile: true });
+    const nextWindup = runtime.getSnapshot().enemyQueue;
+    assert.equal(nextWindup.phase, "windup");
+    assert.equal(nextWindup.attackerId, second.id, "the opposing character should aim immediately after contact");
+    assert.equal(nextWindup.targetId, first.id);
+
+    runtime.tickEnemy(1);
+    assert.ok(second.physicsDebug.toArray().some((event) => event.type === "impulse"));
 }
 
 {

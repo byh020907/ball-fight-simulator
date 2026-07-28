@@ -1925,6 +1925,13 @@ async function testTournamentMatchStartsWithoutActionPicker() {
             ["overlay:Matchup"],
             "The tournament match must enter its matchup presentation without a removed action picker"
         );
+        assert.equal(app.simulation.width, 1200, "Character-versus-character matches should use the expanded arena");
+        assert.equal(app.simulation.height, 1200, "Character-versus-character matches should stay square");
+        assert.deepEqual(
+            app.simulation.fighters.map((fighter) => fighter.position.x),
+            [300, 900],
+            "Character-versus-character matches should use the widened quarter-point spawn positions"
+        );
     } finally {
         cancelAnimationFrame(app.rafId);
         app._cleanupMatch();
@@ -1932,6 +1939,36 @@ async function testTournamentMatchStartsWithoutActionPicker() {
         app.wait = originalWait;
     }
     console.log("[tournament-match-without-action-picker] ok");
+}
+
+async function testAutomatedTournamentMatchUsesDragCombat() {
+    const app = await loadModuleApp();
+    const match = app.roster.filter((fighter) => fighter.id !== app.playerFighterId).slice(0, 2);
+    const originalOverlayShow = app._overlay.show;
+    const originalWait = app.wait;
+
+    app.currentTournamentMatch = { id: "spectated-semifinal", roundIndex: 1 };
+    app._overlay.show = () => {};
+    app.wait = async () => {};
+
+    try {
+        await app.startMatch(match);
+        assert.equal(app.simulation.playerBall, null, "spectated tournament match should not create a fake player");
+        assert.ok(app.simulation.dragCombat, "spectated tournament match should enable drag combat");
+        assert.equal(app.simulation.dragCombat.getSnapshot().automated, true);
+        app.simulation.dragCombat.tickEnemy(0);
+        assert.equal(
+            app.simulation.dragCombat.getSnapshot().enemyQueue.phase,
+            "windup",
+            "the first character should begin aiming immediately"
+        );
+    } finally {
+        cancelAnimationFrame(app.rafId);
+        app._cleanupMatch();
+        app._overlay.show = originalOverlayShow;
+        app.wait = originalWait;
+    }
+    console.log("[automated-tournament-drag-combat] ok");
 }
 
 async function testHuntingMatchEnablesDragCombat() {
@@ -8731,15 +8768,15 @@ function testHunting50FloorStructure() {
     // ── Stage helpers ──
     const caveStage = getHuntingStage(HUNTING_STAGE_IDS.CAVE);
     assert.equal(caveStage.name, "동굴", "Cave stage should have correct name");
-    assert.equal(getHuntingStageArena(HUNTING_STAGE_IDS.CAVE).WIDTH, 1000, "Cave arena should start at 1000 wide");
+    assert.equal(getHuntingStageArena(HUNTING_STAGE_IDS.CAVE).WIDTH, 1200, "Cave arena should start at 1200 wide");
     assert.deepEqual(
         getHuntingBattleArena(HUNTING_STAGE_IDS.CAVE, 2),
-        { WIDTH: 1000, HEIGHT: 1000 },
+        { WIDTH: 1200, HEIGHT: 1200 },
         "Two-mob cave fights should use the initial arena size"
     );
     assert.deepEqual(
         getHuntingBattleArena(HUNTING_STAGE_IDS.CAVE, 10),
-        { WIDTH: 1414, HEIGHT: 1414 },
+        { WIDTH: 1697, HEIGHT: 1697 },
         "Ten enemies should cap arena area growth at twice the base"
     );
 
@@ -10111,7 +10148,7 @@ function createTournamentRampSimulation() {
         { assignActions: false, tournamentAngledBounceRamps: { enabled: true, seed: "regression-ramp" } }
     );
     const [fighter, opponent] = simulation.fighters;
-    fighter.position = new Vector2(780, 480);
+    fighter.position = new Vector2(simulation.width - 180, simulation.height / 2);
     fighter.velocity = new Vector2(600, 0);
     opponent.position = new Vector2(160, 160);
     opponent.velocity = new Vector2();
@@ -10203,7 +10240,7 @@ function testTournamentAngledBounceRamps() {
         "The 10-degree triangle should keep the axis trajectory visibly but gently angled"
     );
 
-    fighter.position = new Vector2(780, 480);
+    fighter.position = new Vector2(simulation.width - 180, simulation.height / 2);
     fighter.velocity = new Vector2(600, 0);
     simulation.fighters.find((candidate) => candidate !== fighter).velocity = new Vector2();
     ramps.update(0);
@@ -12601,7 +12638,11 @@ function testArenaCameraZoom() {
         { width: 960, height: 960 },
         { width: HUNTING_ARENA.WIDTH, height: HUNTING_ARENA.HEIGHT, camera: { zoom: 1 } }
     );
-    assert.equal(huntingView.scale, 0.75, "Larger hunting arena should fit fully into the same canvas");
+    assert.equal(
+        huntingView.scale,
+        960 / HUNTING_ARENA.WIDTH,
+        "Larger hunting arena should fit fully into the same canvas"
+    );
     assert.equal(huntingView.offsetX, 0, "Square hunting arena should stay centered horizontally");
     assert.equal(huntingView.offsetY, 0, "Square hunting arena should stay centered vertically");
 
@@ -12609,7 +12650,10 @@ function testArenaCameraZoom() {
         { width: 960, height: 960 },
         { width: HUNTING_ARENA.WIDTH, height: HUNTING_ARENA.HEIGHT, camera: { zoom: 1.2 } }
     );
-    assert.ok(Math.abs(closerView.scale - 0.9) < 0.001, "Camera zoom should be a multiplier on top of fit-to-map");
+    assert.ok(
+        Math.abs(closerView.scale - (960 / HUNTING_ARENA.WIDTH) * 1.2) < 0.001,
+        "Camera zoom should be a multiplier on top of fit-to-map"
+    );
 }
 
 function testHuntingMeleeMobChasesTarget(app) {
@@ -16852,6 +16896,7 @@ await testTournamentOpponentProgressionByChallenge(app);
 await testRebirthResetsTournamentChallengePresentation();
 await testTournamentWinAdvancesChallengeAfterMasteryCheck();
 await testTournamentMatchStartsWithoutActionPicker();
+await testAutomatedTournamentMatchUsesDragCombat();
 await testHuntingMatchEnablesDragCombat();
 await testTournamentWinDisplaysMasteryReward();
 testResultSequenceProgression();
