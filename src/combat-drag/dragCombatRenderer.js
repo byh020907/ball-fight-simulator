@@ -29,11 +29,13 @@ export class DragCombatRenderer {
         this.eventElapsed = Infinity;
         this.event = null;
         this.simulation = null;
+        this.visualElapsed = 0;
     }
 
     renderWorld(ctx, simulation, runtimeSnapshot, delta = 0) {
         if (!simulation?.playerBall || simulation.finished || !runtimeSnapshot?.enabled) return 0;
         if (this.simulation !== simulation) this.#resetForSimulation(simulation);
+        this.visualElapsed += Math.max(0, Number.isFinite(delta) ? delta : 0);
         this.#consumeEvent(runtimeSnapshot, delta);
         const scene = createDragTrajectoryScene({ simulation, runtimeSnapshot });
         let commands = 0;
@@ -47,7 +49,6 @@ export class DragCombatRenderer {
     renderScreen(ctx, simulation, runtimeSnapshot) {
         if (!simulation?.playerBall || simulation.finished || !runtimeSnapshot?.enabled) return 0;
         const scale = getDeviceScale(this.canvas);
-        const text = this.#hudText(runtimeSnapshot);
         ctx.save();
         try {
             if (runtimeSnapshot.drag.state === "aiming") {
@@ -58,22 +59,7 @@ export class DragCombatRenderer {
                 ctx.fillRect(0, 0, edge, this.canvas.height);
                 ctx.fillRect(this.canvas.width - edge, 0, edge, this.canvas.height);
             }
-            const padding = 10 * scale;
-            const fontSize = 13 * scale;
-            ctx.font = `800 ${fontSize}px Bahnschrift, Segoe UI, sans-serif`;
-            const width = ctx.measureText(text).width + padding * 2;
-            const height = 30 * scale;
-            const x = (this.canvas.width - width) / 2;
-            const y = this.canvas.height - height - 12 * scale;
-            ctx.fillStyle = "rgba(7, 17, 27, 0.88)";
-            ctx.beginPath();
-            if (ctx.roundRect) ctx.roundRect(x, y, width, height, height / 2);
-            else ctx.rect(x, y, width, height);
-            ctx.fill();
-            ctx.fillStyle = "#f7fbff";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText(text, this.canvas.width / 2, y + height / 2);
+            this.#drawDragStateHud(ctx, runtimeSnapshot, scale);
             if (runtimeSnapshot.drag.state === "aiming") this.#drawRewardLegend(ctx, scale);
         } finally {
             ctx.restore();
@@ -145,27 +131,170 @@ export class DragCombatRenderer {
 
     #drawFixedShields(ctx, simulation, snapshot) {
         if (!snapshot.playerShot?.active) return 0;
+        const duration = Math.max(0.001, Number(snapshot.playerShot.shieldDuration) || 0.8);
+        const remaining = Math.max(0, Number(snapshot.playerShot.shieldRemaining) || 0);
+        const remainingRatio = Math.max(0, Math.min(1, remaining / duration));
+        const pulse = 0.5 + 0.5 * Math.sin(this.visualElapsed * 13);
         let commands = 0;
         for (const shield of snapshot.playerShot.shields ?? []) {
             const fighter = fighterById(simulation, shield.fighterId);
             if (!fighter || !finitePoint(shield.forward)) continue;
             const angle = Math.atan2(shield.forward.y, shield.forward.x);
             ctx.save();
-            ctx.translate(fighter.position.x, fighter.position.y);
-            ctx.rotate(angle);
-            ctx.fillStyle = "rgba(255, 90, 54, 0.16)";
-            ctx.strokeStyle = "#ffb05a";
-            ctx.lineWidth = 11;
-            ctx.beginPath();
-            ctx.arc(0, 0, fighter.radius + 24, -Math.PI / 2, Math.PI / 2);
-            ctx.lineTo(0, 0);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-            ctx.restore();
+            try {
+                ctx.translate(fighter.position.x, fighter.position.y);
+                ctx.rotate(angle);
+                const radius = fighter.radius + 20;
+                const sweep = Math.PI * (0.25 + remainingRatio * 0.55);
+                const start = -sweep / 2;
+                const end = sweep / 2;
+                ctx.lineCap = "round";
+                ctx.globalAlpha = 0.45 + remainingRatio * 0.35;
+                ctx.strokeStyle = "#102535";
+                ctx.lineWidth = 13;
+                ctx.beginPath();
+                ctx.arc(0, 0, radius, start, end);
+                ctx.stroke();
+
+                ctx.shadowColor = "rgba(92, 225, 230, 0.72)";
+                ctx.shadowBlur = 7 + pulse * 4;
+                ctx.globalAlpha = 0.12 + remainingRatio * 0.18;
+                ctx.strokeStyle = "#5ce1e6";
+                ctx.lineWidth = 9;
+                ctx.beginPath();
+                ctx.arc(0, 0, radius, start, end);
+                ctx.stroke();
+
+                ctx.shadowBlur = 2;
+                ctx.globalAlpha = (0.55 + pulse * 0.12) * (0.45 + remainingRatio * 0.55);
+                ctx.strokeStyle = "#dcffff";
+                ctx.lineWidth = 3.5;
+                ctx.beginPath();
+                ctx.arc(0, 0, radius, start, end);
+                ctx.stroke();
+
+                ctx.shadowBlur = 0;
+                ctx.globalAlpha = 0.24 + remainingRatio * 0.56;
+                ctx.strokeStyle = "#5ce1e6";
+                ctx.lineWidth = 2;
+                ctx.setLineDash([6, 5]);
+                ctx.beginPath();
+                ctx.arc(0, 0, radius - 8, start + 0.08, end - 0.08);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                ctx.globalAlpha = 0.48 + remainingRatio * 0.44;
+                ctx.strokeStyle = "#f3ffff";
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(radius + 3, -7);
+                ctx.lineTo(radius + 11, 0);
+                ctx.lineTo(radius + 3, 7);
+                ctx.stroke();
+            } finally {
+                ctx.restore();
+            }
             commands += 1;
         }
         return commands;
+    }
+
+    #drawDragStateHud(ctx, snapshot, scale) {
+        const state = this.#dragHudState(snapshot);
+        const width = 214 * scale;
+        const height = 46 * scale;
+        const x = (this.canvas.width - width) / 2;
+        const y = this.canvas.height - height - 10 * scale;
+        const iconSize = 30 * scale;
+        const iconX = x + 8 * scale;
+        const iconY = y + 7 * scale;
+        const textX = x + 48 * scale;
+
+        ctx.fillStyle = "rgba(7, 17, 27, 0.91)";
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(x, y, width, height, 13 * scale);
+        else ctx.rect(x, y, width, height);
+        ctx.fill();
+        ctx.globalAlpha = 0.72;
+        ctx.strokeStyle = state.color;
+        ctx.lineWidth = 1.5 * scale;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+
+        ctx.fillStyle = state.iconFill;
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(iconX, iconY, iconSize, iconSize, 9 * scale);
+        else ctx.rect(iconX, iconY, iconSize, iconSize);
+        ctx.fill();
+        ctx.strokeStyle = state.color;
+        ctx.lineWidth = 2 * scale;
+        ctx.stroke();
+        ctx.font = `900 ${15 * scale}px Bahnschrift, Segoe UI, sans-serif`;
+        ctx.fillStyle = state.color;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(state.icon, iconX + iconSize / 2, iconY + iconSize / 2 + 0.5 * scale);
+
+        ctx.textAlign = "left";
+        ctx.font = `800 ${12 * scale}px Bahnschrift, Segoe UI, sans-serif`;
+        ctx.fillStyle = "#f7fbff";
+        ctx.fillText(state.label, textX, y + 15 * scale);
+        ctx.font = `700 ${10 * scale}px Bahnschrift, Segoe UI, sans-serif`;
+        ctx.fillStyle = "rgba(226, 239, 247, 0.78)";
+        ctx.fillText(state.detail, textX, y + 30 * scale);
+
+        const trackX = textX;
+        const trackY = y + height - 6 * scale;
+        const trackWidth = width - (textX - x) - 10 * scale;
+        ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
+        ctx.fillRect(trackX, trackY, trackWidth, 2 * scale);
+        ctx.fillStyle = state.color;
+        ctx.fillRect(trackX, trackY, trackWidth * state.progress, 2 * scale);
+    }
+
+    #dragHudState(snapshot) {
+        const drag = snapshot.drag;
+        if (drag.inputLockRemaining > 0) {
+            return {
+                label: "반격 경직",
+                detail: `${drag.inputLockRemaining.toFixed(1)}초 뒤 조작 가능`,
+                icon: "!",
+                color: "#ff7b68",
+                iconFill: "rgba(255, 90, 70, 0.18)",
+                progress: Math.max(0, Math.min(1, 1 - drag.inputLockRemaining / 0.27))
+            };
+        }
+        if (drag.cooldownRemaining > 0) {
+            const cooldown = Math.max(0.001, Number(drag.cooldownSeconds) || 2);
+            return {
+                label: "드래그 재충전",
+                detail: `${drag.cooldownRemaining.toFixed(1)}초 뒤 준비`,
+                icon: "↻",
+                color: "#ffd166",
+                iconFill: "rgba(255, 209, 102, 0.14)",
+                progress: Math.max(0, Math.min(1, 1 - drag.cooldownRemaining / cooldown))
+            };
+        }
+        if (drag.state === "aiming") {
+            const remaining = Math.max(0, drag.maxAimSeconds - drag.aimElapsed);
+            const strength = Math.max(0, Math.min(1, Number(drag.vector?.strength) || 0));
+            return {
+                label: `조준 출력 ${Math.round(strength * 100)}%`,
+                detail: `놓아서 발사 · ${remaining.toFixed(1)}초`,
+                icon: "➜",
+                color: tierColor(Math.max(0, Math.ceil(strength * 3))),
+                iconFill: "rgba(92, 225, 230, 0.14)",
+                progress: Math.max(0, Math.min(1, drag.aimElapsed / Math.max(0.001, drag.maxAimSeconds)))
+            };
+        }
+        return {
+            label: "드래그 준비",
+            detail: "당겼다 놓아 반사 발사",
+            icon: "➜",
+            color: TIER_COLORS[0],
+            iconFill: "rgba(92, 225, 230, 0.14)",
+            progress: 1
+        };
     }
 
     #drawEnemyTelegraph(ctx, simulation, snapshot) {
@@ -320,20 +449,11 @@ export class DragCombatRenderer {
         this.event = event;
     }
 
-    #hudText(snapshot) {
-        if (snapshot.drag.inputLockRemaining > 0) return `반격 경직 · ${snapshot.drag.inputLockRemaining.toFixed(1)}초`;
-        if (snapshot.drag.cooldownRemaining > 0) return `재사용 · ${snapshot.drag.cooldownRemaining.toFixed(1)}초`;
-        if (snapshot.drag.state === "aiming") {
-            const remaining = Math.max(0, snapshot.drag.maxAimSeconds - snapshot.drag.aimElapsed);
-            return `놓아 발사 · ${remaining.toFixed(1)}초`;
-        }
-        return "드래그 준비";
-    }
-
     #resetForSimulation(simulation) {
         this.simulation = simulation;
         this.eventSequence = 0;
         this.eventElapsed = Infinity;
         this.event = null;
+        this.visualElapsed = 0;
     }
 }

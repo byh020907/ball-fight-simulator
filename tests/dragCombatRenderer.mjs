@@ -59,6 +59,9 @@ class Context {
     set lineWidth(value) {
         this.commands.push(["lineWidth", value]);
     }
+    set strokeStyle(value) {
+        this.commands.push(["strokeStyle", value]);
+    }
 }
 
 const canvas = { width: 390, height: 844, getBoundingClientRect: () => ({ width: 390, height: 844 }) };
@@ -74,8 +77,15 @@ const simulation = {
 };
 const idle = {
     enabled: true,
-    drag: { state: "idle", cooldownRemaining: 0, inputLockRemaining: 0, aimElapsed: 0, maxAimSeconds: 1.2 },
-    playerShot: { active: false, shields: [] },
+    drag: {
+        state: "idle",
+        cooldownRemaining: 0,
+        cooldownSeconds: 2,
+        inputLockRemaining: 0,
+        aimElapsed: 0,
+        maxAimSeconds: 1.2
+    },
+    playerShot: { active: false, shieldRemaining: 0, shieldDuration: 0.8, shields: [] },
     enemyQueue: { phase: "idle" }
 };
 const renderer = new DragCombatRenderer(canvas);
@@ -107,24 +117,71 @@ const shieldContext = new Context();
 renderer.renderWorld(
     shieldContext,
     simulation,
-    { ...idle, playerShot: { active: true, shields: [{ fighterId: "enemy", forward: { x: -1, y: 0 } }] } },
+    {
+        ...idle,
+        playerShot: {
+            active: true,
+            shieldRemaining: 0.6,
+            shieldDuration: 0.8,
+            shields: [{ fighterId: "enemy", forward: { x: -1, y: 0 } }]
+        }
+    },
     0
 );
 assert.equal(
     shieldContext.commands.some(
-        (command) => Array.isArray(command) && command[0] === "arc" && command[3] === enemy.radius + 24
+        (command) => Array.isArray(command) && command[0] === "arc" && command[3] === enemy.radius + 20
     ),
     true
 );
 assert.equal(
-    shieldContext.commands.some((command) => Array.isArray(command) && command[0] === "lineWidth" && command[1] === 11),
+    shieldContext.commands.some(
+        (command) => Array.isArray(command) && command[0] === "strokeStyle" && command[1] === "#5ce1e6"
+    ),
+    true
+);
+assert.equal(shieldContext.commands.includes("fill"), false, "shield stays an open energy visor without a solid wedge");
+const expiringShieldContext = new Context();
+renderer.renderWorld(
+    expiringShieldContext,
+    simulation,
+    {
+        ...idle,
+        playerShot: {
+            active: true,
+            shieldRemaining: 0.1,
+            shieldDuration: 0.8,
+            shields: [{ fighterId: "enemy", forward: { x: -1, y: 0 } }]
+        }
+    },
+    0
+);
+const activeShieldArc = shieldContext.commands.find((command) => Array.isArray(command) && command[0] === "arc");
+const expiringShieldArc = expiringShieldContext.commands.find(
+    (command) => Array.isArray(command) && command[0] === "arc"
+);
+assert.equal(expiringShieldArc[5] - expiringShieldArc[4] < activeShieldArc[5] - activeShieldArc[4], true);
+const readyContext = new Context();
+renderer.renderScreen(readyContext, simulation, idle);
+assert.equal(
+    readyContext.commands.some(
+        (command) => Array.isArray(command) && command[0] === "text" && command[1] === "드래그 준비"
+    ),
     true
 );
 const hudContext = new Context();
 renderer.renderScreen(hudContext, simulation, { ...aim, drag: { ...aim.drag, cooldownRemaining: 1.4 } });
-const hud = hudContext.commands.find((command) => Array.isArray(command) && command[0] === "text");
-assert.equal(hud[1], "재사용 · 1.4초");
-assert.equal(hud[3] <= canvas.height - 12, true);
+const hudLabels = hudContext.commands
+    .filter((command) => Array.isArray(command) && command[0] === "text")
+    .map((command) => command[1]);
+assert.equal(hudLabels.includes("드래그 재충전"), true);
+assert.equal(hudLabels.includes("1.4초 뒤 준비"), true);
+assert.equal(
+    hudContext.commands
+        .filter((command) => Array.isArray(command) && command[0] === "text")
+        .every((command) => command[3] <= canvas.height - 10),
+    true
+);
 const legendContext = new Context();
 renderer.renderScreen(legendContext, simulation, aim);
 assert.deepEqual(
@@ -144,8 +201,27 @@ assert.equal(
 const countdownContext = new Context();
 renderer.renderScreen(countdownContext, simulation, { ...aim, drag: { ...aim.drag, cooldownRemaining: 0 } });
 assert.equal(
-    countdownContext.commands.find((command) => Array.isArray(command) && command[0] === "text")[1],
-    "놓아 발사 · 0.8초"
+    countdownContext.commands.some(
+        (command) => Array.isArray(command) && command[0] === "text" && command[1] === "조준 출력 100%"
+    ),
+    true
+);
+assert.equal(
+    countdownContext.commands.some(
+        (command) => Array.isArray(command) && command[0] === "text" && command[1] === "놓아서 발사 · 0.8초"
+    ),
+    true
+);
+const lockContext = new Context();
+renderer.renderScreen(lockContext, simulation, {
+    ...idle,
+    drag: { ...idle.drag, inputLockRemaining: 0.2 }
+});
+assert.equal(
+    lockContext.commands.some(
+        (command) => Array.isArray(command) && command[0] === "text" && command[1] === "반격 경직"
+    ),
+    true
 );
 assert.equal(
     aimContext.commands.some((command) => Array.isArray(command) && command[1] === "2 반사"),

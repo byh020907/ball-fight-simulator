@@ -186,11 +186,16 @@ export class DragCombatRuntime {
                 aimElapsed: this.input.aimElapsed,
                 maxAimSeconds: this.config.input.maxAimSeconds,
                 cooldownRemaining: this.input.cooldownRemaining,
+                cooldownSeconds: this.config.input.cooldownSeconds,
                 inputLockRemaining: this.input.inputLockRemaining
             },
             playerShot: {
                 active: this.shot.active,
                 bounceCount: this.shot.bounceCount,
+                shieldRemaining: this.shot.active
+                    ? Math.max(0, this.config.shield.durationSeconds - this.shot.elapsed)
+                    : 0,
+                shieldDuration: this.config.shield.durationSeconds,
                 shields: Array.from(this.shot.shieldForwards, ([fighterId, forward]) => ({
                     fighterId,
                     forward: copyPoint(forward)

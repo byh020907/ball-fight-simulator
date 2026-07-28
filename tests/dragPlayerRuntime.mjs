@@ -101,6 +101,7 @@ function assertFiniteSnapshot(snapshot) {
     const aimingSnapshot = simulation.dragCombat.getSnapshot();
     assert.equal(aimingSnapshot.drag.aimElapsed, 0.35);
     assert.equal(aimingSnapshot.drag.maxAimSeconds, 1.2);
+    assert.equal(aimingSnapshot.drag.cooldownSeconds, 2);
     assert.equal(simulation._clickActionContext.timeWarps.get(player), Infinity);
     assert.equal(impulseCount(player), 0, "move must not apply an impulse");
     simulation.cancelDragCombat(7);
@@ -133,8 +134,11 @@ function assertFiniteSnapshot(snapshot) {
     beginWithVector(simulation, 11);
     const beforeShield = simulation.dragCombat.getSnapshot().playerShot.shields;
     simulation.releaseDragCombat(11);
-    const shields = simulation.dragCombat.getSnapshot().playerShot.shields;
+    const releasedSnapshot = simulation.dragCombat.getSnapshot();
+    const shields = releasedSnapshot.playerShot.shields;
     assert.equal(shields.length, 1);
+    assert.equal(releasedSnapshot.playerShot.shieldRemaining, 0.8);
+    assert.equal(releasedSnapshot.playerShot.shieldDuration, 0.8);
     const forward = shields[0].forward;
     player.position.x += 100;
     enemy.position.y += 100;
