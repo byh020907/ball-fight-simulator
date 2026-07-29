@@ -3,7 +3,7 @@
  *
  * 모든 벡터 연산은 Vector2를 사용합니다.
  */
-import { Vector2 } from "../core.js";
+import { Vector2 } from "./vector2.js";
 import { applyCollisionResponse } from "./collisionResponse.js";
 
 /**

@@ -34,17 +34,18 @@ http://127.0.0.1:4173/
 - `src/app.js`: `BattleApp`
 - `src/abilities/`: 캐릭터별 능력
 - `src/entities/`: 공, 투사체, 수류탄 등 전투 엔티티
+- `src/physics/`: 다른 게임에도 폴더 단위로 이식할 수 있는 벡터·물리 capability·충돌 기반
 - `src/simulation/`: 전투 루프, 충돌, 참여·종료 판정
 - `src/ui.js`: Alpine.js 컴포넌트 (UI 상태 관리) + `ArenaRenderer` (캔버스 렌더링)
 - `src/tournament.js`: 자동 토너먼트 진행
 - `src/characters/definitions/`: 캐릭터별 메타데이터와 기본 스탯
 - `src/roster.js`: 중앙 캐릭터 정의를 화면용 로스터로 투영
-- `src/statAllocation.js`: 스탯 배분 로직
 - `SESSION-HANDOFF.md`: 새 대화에 필요한 현재 계약, 열린 리스크, 활성 결정
 - `docs/decision-history.md`: 현행 문서에 흡수된 전체 결정 이력
 - `docs/game-rules.md`: 게임 흐름, 스탯 배분, 등수 규칙
 - `docs/design.md`: 시각 방향과 캐릭터 표현 규칙
 - `docs/development-rules.md`: 개발, 문서, Git 운영 규칙
+- `docs/reusable-game-resources.md`: 교차 게임 재사용 공개 경계와 의존 방향
 - `.legacy/docs/`: 구현 완료·폐기·통합으로 현행 계약에서 제외된 과거 작업 문서
 
 UI는 **Alpine.js**를 통해 컴포넌트 기반으로 관리되며, 문자열 결합(`innerHTML`) 대신 Alpine의 반응형 데이터 바인딩(`x-text`, `x-for`, `x-bind`)을 사용합니다. CSS는 `src/styles.css`로 분리되어 있습니다.
@@ -68,7 +69,7 @@ npm run format   # Prettier 코드 포맷
 npm run format:check  # 포맷 상태 확인
 ```
 
-`npm test`는 세 도메인을 한 Node 프로세스에서 순서대로 실행합니다. 성공 시에는 도메인별 요약과 전체 시간을 출력하고, 실패 시에는 실패한 도메인을 먼저 표시한 뒤 기존 assertion stack을 그대로 보여 줍니다.
+`npm test`는 등록된 도메인을 한 Node 프로세스에서 순서대로 실행합니다. 성공 시에는 도메인별 요약과 전체 시간을 출력하고, 실패 시에는 실패한 도메인을 먼저 표시한 뒤 기존 assertion stack을 그대로 보여 줍니다.
 
 ## 라이선스
 

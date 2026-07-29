@@ -1,7 +1,18 @@
 import assert from "node:assert/strict";
-import { Vector2 } from "../src/core.js";
-import PhysicsBody from "../src/physics/PhysicsBody.js";
-import { LINEAR_VELOCITY_POLICY, resolveLinearVelocityPolicy } from "../src/physics/linearVelocityPolicy.js";
+import { readFileSync, readdirSync } from "node:fs";
+import { Vector2 as CoreVector2 } from "../src/core.js";
+import { LINEAR_VELOCITY_POLICY, PhysicsBody, resolveLinearVelocityPolicy, Vector2 } from "../src/physics/index.js";
+
+assert.equal(Vector2, CoreVector2, "core compatibility export must retain the shared Vector2 identity");
+const physicsDirectory = new URL("../src/physics/", import.meta.url);
+for (const moduleName of readdirSync(physicsDirectory).filter((name) => name.endsWith(".js"))) {
+    const source = readFileSync(new URL(moduleName, physicsDirectory), "utf8");
+    assert.equal(
+        /from\s+["']\.\.\//.test(source),
+        false,
+        `${moduleName} must not import a game-specific parent module`
+    );
+}
 
 class VelocityProbeBase {
     constructor() {

@@ -1,4 +1,4 @@
-import { Vector2 } from "../core.js";
+import { Vector2 } from "./vector2.js";
 
 export function getCombatMovementSpeed(entity) {
     const modifiers = entity.getStatModifiers?.() ?? { speed: 1 };

@@ -1,4 +1,4 @@
-import { Vector2 } from "../core.js";
+import { Vector2 } from "./vector2.js";
 import { resolveLinearVelocityPolicy } from "./linearVelocityPolicy.js";
 
 /**

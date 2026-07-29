@@ -1,4 +1,5 @@
 export { mixins } from "./mixins.js";
+export { Vector2 } from "./vector2.js";
 export { default as PhysicsBody } from "./PhysicsBody.js";
 export { default as LifeSpan } from "./LifeSpan.js";
 export { default as CollectionGrace } from "./CollectionGrace.js";

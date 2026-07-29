@@ -31,7 +31,7 @@
  */
 
 import { resolvePhysicsMaterial, combinePhysicsMaterials } from "./PhysicsMaterial.js";
-import { Vector2 } from "../core.js";
+import { Vector2 } from "./vector2.js";
 
 /**
  * 2D cross product: r × v = r.x * v.y - r.y * v.x (스칼라)

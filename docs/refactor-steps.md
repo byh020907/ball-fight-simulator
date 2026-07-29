@@ -168,6 +168,13 @@ class DashAbility extends Ability {
 - 한 소유자의 Bat reset, Elementalist 도약, Hero 추격·반격, Orbit 적중·연사, 장비·숙련도, 사냥터 몬스터 내부 제한 시간은 `CooldownBank` 컴포지션으로 정합했습니다.
 - 대상 고유 종료 조건, 정확한 누적 피해 정산, 궤적·유체장 계산은 공통 capability로 억지 통합하지 않고 각 소유자에 남겼습니다.
 
+### 완료: 교차 게임 재사용 물리 기반 분리
+
+- `Vector2`의 단일 구현을 `src/physics/vector2.js`로 이동하고 `src/physics/index.js`의 공개 계약에 포함했습니다.
+- `src/physics/` 내부의 `core.js` 역참조를 제거해 물리 기반만 다른 게임으로 이식할 수 있게 했습니다.
+- 기존 코드는 `src/core.js`의 호환 re-export를 통해 같은 `Vector2` 클래스 정체성을 유지합니다.
+- 구조 테스트는 물리 폴더의 상위 게임 모듈 import를 금지하고, 변경 전후 전투 시뮬레이션은 같은 10개 시점 해시를 유지합니다.
+
 ### Step 4. Swallow/Hold effect 분리
 
 현재 문제:
