@@ -1,5 +1,5 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
-import { getVisibleLineWidth } from "./effectVisibility.js";
+import { getVisibleLineWidth } from "../game-kit/canvas/effectVisibility.js";
 
 const EFFECT_CONFIG = Object.freeze({
     ability_crit: { color: "#ffd65a", life: 0.45, radius: 120, kind: "star" },

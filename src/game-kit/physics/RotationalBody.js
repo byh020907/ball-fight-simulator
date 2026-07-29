@@ -8,7 +8,7 @@
  * integrateRotation에서 Δω = L * I⁻¹ 로 angularVelocity에 반영됩니다.
  *
  * 사용법:
- *   import mixins, { RotationalBody } from "./physics/index.js";
+ *   import { mixins, RotationalBody } from "../index.js";
  *   class SpinningThing extends mixins(BaseClass, RotationalBody) { ... }
  *
  * 제공 필드/메서드:

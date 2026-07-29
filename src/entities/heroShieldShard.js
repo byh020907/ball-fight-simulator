@@ -1,6 +1,6 @@
 import { Projectile, RENDER_LAYERS, Vector2 } from "../core.js";
 import { HERO_COMBAT_CONFIG } from "../abilities/heroCombatConfig.js";
-import { drawProjectileSlashVisual } from "../effects/projectileSlashVisual.js";
+import { drawProjectileSlashVisual } from "../game-kit/canvas/projectileSlashVisual.js";
 
 const TRAIL_SAMPLE_INTERVAL = 0.04;
 const TRAIL_SAMPLE_LIFETIME = 0.18;

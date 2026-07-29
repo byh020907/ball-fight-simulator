@@ -1,4 +1,4 @@
-import { shuffled } from "./random.js";
+import { shuffled } from "./game-kit/collections/shuffled.js";
 
 export class Matchmaker {
     constructor(roster) {

@@ -1,8 +1,8 @@
 import { Vector2 } from "../core.js";
 import { BatProjectile } from "../entities/index.js";
 import { BloodMarkEffect, BloodRuptureEffect, BloodTetherEffect } from "../effects/index.js";
-import { applyRotationalContactDamage } from "../physics/contactDamage.js";
-import { TimedKeyMap } from "../physics/index.js";
+import { applyRotationalContactDamage } from "../game-kit/physics/contactDamage.js";
+import { TimedKeyMap } from "../game-kit/physics/index.js";
 import { Ability } from "./ability.js";
 
 const LIFESTEAL_RATE_NORMAL = 0.35;

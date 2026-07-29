@@ -1,6 +1,6 @@
 import { Projectile, RENDER_LAYERS, Vector2 } from "../core.js";
-import { getVisibleLineWidth } from "../effects/effectVisibility.js";
-import { createSteeringRebaseState } from "../physics/steeringRebase.js";
+import { getVisibleLineWidth } from "../game-kit/canvas/effectVisibility.js";
+import { createSteeringRebaseState } from "../game-kit/physics/steeringRebase.js";
 
 const CONVERGENCE_DURATION = 0.15;
 const EXPLOSION_RADIUS = 70;

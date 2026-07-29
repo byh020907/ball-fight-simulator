@@ -8,7 +8,7 @@ import {
     getDragLaunchSpeed,
     getSlingshotVector
 } from "../combat-drag/index.js";
-import { resolveLinearVelocityPolicy } from "../physics/linearVelocityPolicy.js";
+import { resolveLinearVelocityPolicy } from "../game-kit/physics/linearVelocityPolicy.js";
 
 export const DRAG_RELEASE_PREVIEW_CONFIG = Object.freeze({
     width: 640,

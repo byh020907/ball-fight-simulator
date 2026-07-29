@@ -1,4 +1,4 @@
-import { LifeSpan, mixins, PhysicsBody, Vector2 } from "./physics/index.js";
+import { LifeSpan, mixins, PhysicsBody, Vector2 } from "./game-kit/physics/index.js";
 
 export { Vector2 };
 

@@ -11,7 +11,7 @@ import {
     clearElementalWetStacks,
     getActiveElementalWetStackCount
 } from "../effects/index.js";
-import { applyMagneticAttraction, CooldownBank } from "../physics/index.js";
+import { applyMagneticAttraction, CooldownBank } from "../game-kit/physics/index.js";
 import { Ability } from "./ability.js";
 import {
     ELEMENTAL_COMPOSITE_RECIPES,

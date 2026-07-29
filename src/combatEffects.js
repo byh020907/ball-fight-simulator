@@ -1,5 +1,5 @@
 import { TimedEffect, Vector2 } from "./core.js";
-import { applyRotationalContactDamage, calculateStaticCollisionDamage } from "./physics/contactDamage.js";
+import { applyRotationalContactDamage, calculateStaticCollisionDamage } from "./game-kit/physics/contactDamage.js";
 
 export class DashEffect {
     constructor({

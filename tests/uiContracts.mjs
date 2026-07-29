@@ -13,7 +13,7 @@ import { createRoster } from "../src/roster.js";
 import { MASTERY_EFFECT_DEFS } from "../src/character-mastery/masteryDefinitions.js";
 import { getCombinedHealthBarPercentages } from "../src/fighterHealthBar.js";
 import { getPortraitVisualKey, renderCharacterPortrait } from "../src/characterPortrait.js";
-import { renderCachedCanvasImage, StaticCanvasImageCache } from "../src/staticCanvasImageCache.js";
+import { renderCachedCanvasImage, StaticCanvasImageCache } from "../src/game-kit/canvas/staticCanvasImageCache.js";
 import {
     getRegisteredTags,
     getRegisteredTagMetadata,

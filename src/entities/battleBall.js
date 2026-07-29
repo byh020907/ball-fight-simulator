@@ -1,13 +1,13 @@
 import { RENDER_LAYERS, TimedEffect, Vector2, randomSpin } from "../core.js";
 import { ActionContext } from "../clickActions.js";
 import { DashEffect } from "../combatEffects.js";
-import { CooldownBank, mixins, PhysicsBody, RotationalBody, PhysicsMaterialBody } from "../physics/index.js";
-import { computeRegularPolygonLocalPoints } from "../physics/CollisionShape.js";
+import { CooldownBank, mixins, PhysicsBody, RotationalBody, PhysicsMaterialBody } from "../game-kit/physics/index.js";
+import { computeRegularPolygonLocalPoints } from "../game-kit/physics/CollisionShape.js";
 import {
     PhysicsDebugRingBuffer,
     snapshotPhysicsState,
     validatePhysicsState
-} from "../physics/PhysicsDebugRingBuffer.js";
+} from "../game-kit/physics/PhysicsDebugRingBuffer.js";
 import { MobAppearance } from "./mobAppearance.js";
 import { drawEquipmentItems, getCharacterOutlineWidth } from "./equipmentVisuals.js";
 import { applyHeroOrbCarryoverToBattleBall, mergeHeroOrbCarryover, HERO_ORB_CARRYOVER_RATE } from "./heroOrb.js";

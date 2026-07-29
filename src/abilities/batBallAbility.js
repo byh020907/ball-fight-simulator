@@ -1,7 +1,7 @@
 import { calculateWallSlamAngularImpulse, WallSlamEffect } from "../combatEffects.js";
 import { Vector2 } from "../core.js";
-import { getVisibleLineWidth } from "../effects/effectVisibility.js";
-import { CooldownBank } from "../physics/index.js";
+import { getVisibleLineWidth } from "../game-kit/canvas/effectVisibility.js";
+import { CooldownBank } from "../game-kit/physics/index.js";
 import { Ability } from "./ability.js";
 
 const ARC_ANGLE = (Math.PI * 2) / 3; // 120도

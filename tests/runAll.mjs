@@ -49,6 +49,10 @@ const TEST_DOMAINS = {
         modulePath: "./dragCombatRenderer.mjs",
         footerMessages: new Set(["[drag-combat-renderer] ok"])
     },
+    gameKit: {
+        modulePath: "./gameKit.mjs",
+        footerMessages: new Set(["[game-kit] ok"])
+    },
     physicsVelocity: {
         modulePath: "./physicsVelocity.mjs",
         footerMessages: new Set(["[physics-velocity-policy] ok"])

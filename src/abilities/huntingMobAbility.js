@@ -7,7 +7,7 @@ import {
     finishEliteFormationSortie
 } from "../hunting/eliteMobFormationSortie.js";
 import { ArrowProjectile } from "../entities/arrowProjectile.js";
-import { drawElectricArc } from "../effects/electricArc.js";
+import { drawElectricArc } from "../game-kit/canvas/electricArc.js";
 import {
     circleIntersectsLaserSegment,
     drawLaserSegments,
@@ -20,7 +20,7 @@ import {
     LASER_CASTER_PALETTE,
     LASER_CASTER_PHASES
 } from "../effects/laserCasterVisual.js";
-import { CooldownBank } from "../physics/index.js";
+import { CooldownBank } from "../game-kit/physics/index.js";
 import { Ability } from "./ability.js";
 
 const BARRIER_DURATION = 1.5;

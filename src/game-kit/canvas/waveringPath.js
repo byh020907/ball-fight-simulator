@@ -1,4 +1,4 @@
-import { Vector2 } from "../core.js";
+import { Vector2 } from "../physics/index.js";
 
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));

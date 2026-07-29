@@ -15,7 +15,7 @@ import {
     ActionWhiffEffect
 } from "../effects/index.js";
 import { resolveTerrainCollisions } from "../terrain/terrainCollision.js";
-import { applyCollisionResponse } from "../physics/collisionResponse.js";
+import { applyCollisionResponse } from "../game-kit/physics/collisionResponse.js";
 import { PeriodicDamageEffect } from "../combatEffects.js";
 import { StickyGrenadeRegistry } from "./stickyGrenadeRegistry.js";
 

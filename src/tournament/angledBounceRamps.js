@@ -1,6 +1,6 @@
 import { Vector2 } from "../core.js";
-import { polygonBoundingRadius } from "../physics/CollisionShape.js";
-import { TimedKeyMap } from "../physics/index.js";
+import { polygonBoundingRadius } from "../game-kit/physics/CollisionShape.js";
+import { TimedKeyMap } from "../game-kit/physics/index.js";
 import { TERRAIN_SHAPES, TERRAIN_TYPES } from "../terrain/terrainConfig.js";
 
 const EPSILON = 0.0001;

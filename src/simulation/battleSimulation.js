@@ -1,6 +1,6 @@
 import { Vector2 } from "../core.js";
 import { getAbilityDisplayName } from "../abilities/abilityMetadata.js";
-import { getContactDamageSpeed } from "../physics/contactDamage.js";
+import { getContactDamageSpeed } from "../game-kit/physics/contactDamage.js";
 import {
     Ability,
     AbilitySet,

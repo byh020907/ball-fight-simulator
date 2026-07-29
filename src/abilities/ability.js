@@ -1,4 +1,4 @@
-import { mixins, Cooldown } from "../physics/index.js";
+import { mixins, Cooldown } from "../game-kit/physics/index.js";
 import { getAbilityUpgrade } from "../experience/abilityUpgradeConfig.js";
 
 export class Ability extends mixins([Cooldown]) {

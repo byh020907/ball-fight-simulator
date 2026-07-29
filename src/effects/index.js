@@ -15,7 +15,7 @@ export { DeathBurstEffect } from "./deathBurstEffect.js";
 export { REVIVAL_EFFECT_CONFIG, RevivalEffect } from "./revivalEffect.js";
 export { GravityParticle } from "./gravityParticle.js";
 export { SlashTrail } from "./slashTrail.js";
-export { createElectricArcPath, drawElectricArc } from "./electricArc.js";
+export { createElectricArcPath, drawElectricArc } from "../game-kit/canvas/electricArc.js";
 export { ELEMENTAL_WET_VISUAL_CONFIG, ElementalWetEffect, applyElementalWet } from "./elementalWetEffect.js";
 export {
     ELEMENTAL_WET_STATUS_CONFIG,
@@ -33,11 +33,18 @@ export {
 export { createFlowFieldVisual, drawFlowFieldVisual, updateFlowFieldVisual } from "./flowFieldVisual.js";
 export { DamageNumber, CriticalNumber, ActionText } from "./floatingText.js";
 export { ActionWindowEffect, ActionSuccessEffect, ActionWhiffEffect } from "./actionEffects.js";
-export { EFFECT_VISIBILITY_TOKENS, getVisibleCombatTextSize, getVisibleLineWidth } from "./effectVisibility.js";
+export {
+    EFFECT_VISIBILITY_TOKENS,
+    getVisibleCombatTextSize,
+    getVisibleLineWidth
+} from "../game-kit/canvas/effectVisibility.js";
 export { BURNING_EFFECT_CONFIG, BurningEffect, RageFlameRing, applyBurningEffect } from "./rageEffects.js";
 export { drawEnergyShieldField, ENERGY_SHIELD_VISUAL_CONFIG, EnergyShieldHitEffect } from "./energyShieldEffects.js";
 export { HeroShieldBreakEffect } from "./heroEffects.js";
-export { drawProjectileSlashVisual, PROJECTILE_SLASH_VISUAL_DEFAULTS } from "./projectileSlashVisual.js";
+export {
+    drawProjectileSlashVisual,
+    PROJECTILE_SLASH_VISUAL_DEFAULTS
+} from "../game-kit/canvas/projectileSlashVisual.js";
 export {
     BloodBatBurstEffect,
     BloodBiteEffect,

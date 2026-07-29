@@ -1,5 +1,5 @@
 import { TERRAIN_SHAPES, TERRAIN_TYPES } from "./terrainConfig.js";
-import { getWorldPolygonPoints } from "../physics/CollisionShape.js";
+import { getWorldPolygonPoints } from "../game-kit/physics/CollisionShape.js";
 
 const FOREST_TERRAIN_VISUALS = Object.freeze({
     rootFill: "#76512f",

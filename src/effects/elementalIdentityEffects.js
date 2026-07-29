@@ -1,8 +1,8 @@
 import { Vector2 } from "../core.js";
 import { ELEMENTAL_PALETTE } from "../abilities/elementalistRecipes.js";
 import { drawFlameParticlePlume, drawFlameQuadParticles, getRebirthVisualProfile } from "../rebirth/rebirthVisuals.js";
-import { drawElectricArc } from "./electricArc.js";
-import { getVisibleLineWidth } from "./effectVisibility.js";
+import { drawElectricArc } from "../game-kit/canvas/electricArc.js";
+import { getVisibleLineWidth } from "../game-kit/canvas/effectVisibility.js";
 import { createFlowFieldVisual, drawFlowFieldVisual, updateFlowFieldVisual } from "./flowFieldVisual.js";
 
 export const ELEMENTAL_CHANNEL_VISUAL_CONFIG = Object.freeze({

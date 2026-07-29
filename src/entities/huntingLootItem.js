@@ -1,7 +1,7 @@
 import { applyCollisionImpulse, CombatEntity, randomSpin, RENDER_LAYERS, Vector2 } from "../core.js";
-import CollectionGrace from "../physics/CollectionGrace.js";
-import { applyMagneticAttraction, getCombatMovementSpeed } from "../physics/magneticAttraction.js";
-import RotationalBody from "../physics/RotationalBody.js";
+import CollectionGrace from "../game-kit/physics/CollectionGrace.js";
+import { applyMagneticAttraction, getCombatMovementSpeed } from "../game-kit/physics/magneticAttraction.js";
+import RotationalBody from "../game-kit/physics/RotationalBody.js";
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 
 const DEFAULT_LIFE = 18;

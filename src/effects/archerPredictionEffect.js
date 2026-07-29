@@ -1,5 +1,5 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
-import { getVisibleLineWidth } from "./effectVisibility.js";
+import { getVisibleLineWidth } from "../game-kit/canvas/effectVisibility.js";
 
 export class ArcherPredictionEffect extends CombatEntity {
     static renderLayer = RENDER_LAYERS.FOREGROUND;

@@ -1,6 +1,6 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
-import { getVisibleLineWidth } from "../effects/effectVisibility.js";
-import { TimedKeyMap } from "../physics/index.js";
+import { getVisibleLineWidth } from "../game-kit/canvas/effectVisibility.js";
+import { TimedKeyMap } from "../game-kit/physics/index.js";
 import { BulletProjectile } from "./bulletProjectile.js";
 
 const TURRET_LIFETIME = 8;

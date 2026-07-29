@@ -1,6 +1,6 @@
 import { FOREST_TERRAIN_DEFAULTS, TERRAIN_INTERACTIONS, TERRAIN_SHAPES } from "./terrainConfig.js";
-import { applyCollisionResponse } from "../physics/collisionResponse.js";
-import { resolvePolygonTerrainCollision } from "../physics/CollisionShape.js";
+import { applyCollisionResponse } from "../game-kit/physics/collisionResponse.js";
+import { resolvePolygonTerrainCollision } from "../game-kit/physics/CollisionShape.js";
 import { Vector2 } from "../core.js";
 
 function terrainSurfaceKey(terrain) {

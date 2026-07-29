@@ -1,4 +1,4 @@
-import { renderCachedCanvasImage } from "./staticCanvasImageCache.js";
+import { renderCachedCanvasImage } from "./game-kit/canvas/staticCanvasImageCache.js";
 
 const MAXIMUM_PIXEL_RATIO = 2;
 

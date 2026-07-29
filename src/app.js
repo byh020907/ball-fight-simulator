@@ -74,7 +74,7 @@ import { formatHeroGrowthStatLine, mergeOrbBonuses } from "./entities/heroOrb.js
 import { Ability } from "./abilities/index.js";
 import { getAbilityDisplayName } from "./abilities/abilityMetadata.js";
 import { AppLifecycle } from "./appLifecycle.js";
-import { ScreenWakeLock } from "./screenWakeLock.js";
+import { ScreenWakeLock } from "./game-kit/platform/screenWakeLock.js";
 import { applyRebirthLoadoutToBaseSpec, applyRebirthLoadoutToBattleBall, getRebirthLoadout } from "./rebirth/index.js";
 import { advanceResultSequence, createResultSequence, getResultSequencePresentation } from "./resultSequence.js";
 import { CHARACTER_ROSTER_CONTEXTS, getEligibleRoster } from "./characterRosterPolicy.js";

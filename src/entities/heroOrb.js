@@ -1,7 +1,7 @@
 import { applyCollisionImpulse, CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
 import { computeOwnerCombatSpeed } from "../abilities/heroAbility.js";
-import CollectionGrace from "../physics/CollectionGrace.js";
-import { applyMagneticAttraction } from "../physics/magneticAttraction.js";
+import CollectionGrace from "../game-kit/physics/CollectionGrace.js";
+import { applyMagneticAttraction } from "../game-kit/physics/magneticAttraction.js";
 
 // ── Hero Orb stat cap ────────────────────────────────────────────────────────
 

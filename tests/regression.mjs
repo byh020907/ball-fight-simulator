@@ -78,7 +78,7 @@ import {
     drawElementalOrb
 } from "../src/effects/index.js";
 import { getActiveElementalWetStackCount, getElementalWetDefenseReduction } from "../src/effects/elementalWetState.js";
-import { shuffled } from "../src/random.js";
+import { shuffled } from "../src/game-kit/collections/shuffled.js";
 import { BattleSimulation } from "../src/simulation/battleSimulation.js";
 import { COMBAT_PARTICIPATION_MODES } from "../src/simulation/combatParticipation.js";
 import {
@@ -262,8 +262,8 @@ import {
     HUNTING_LINK_CHANNEL_CONFIG,
     LASER_CHARGE_TURN_RATE
 } from "../src/abilities/huntingMobAbility.js";
-import { createElectricArcPath } from "../src/effects/electricArc.js";
-import { getVisibleCombatTextSize, getVisibleLineWidth } from "../src/effects/effectVisibility.js";
+import { createElectricArcPath } from "../src/game-kit/canvas/electricArc.js";
+import { getVisibleCombatTextSize, getVisibleLineWidth } from "../src/game-kit/canvas/effectVisibility.js";
 import { HuntingAutoAdvance } from "../src/hunting/huntingAutoAdvance.js";
 import { HUNTING_FLOW_CONFIG, isHuntingEventEnabled } from "../src/hunting/huntingFlowConfig.js";
 import {
@@ -317,16 +317,16 @@ import {
 } from "../src/terrain/terrainConfig.js";
 import { resolveTerrainCollision, resolveTerrainCollisions } from "../src/terrain/terrainCollision.js";
 import { drawTerrain } from "../src/terrain/terrainRenderer.js";
-import { getWorldPolygonPoints } from "../src/physics/CollisionShape.js";
-import { applyCollisionResponse, applyDynamicCollisionResponse } from "../src/physics/collisionResponse.js";
+import { getWorldPolygonPoints } from "../src/game-kit/physics/CollisionShape.js";
+import { applyCollisionResponse, applyDynamicCollisionResponse } from "../src/game-kit/physics/collisionResponse.js";
 import {
     getContactPointVelocity,
     getContactDamageSpeed,
     calculateRotationalContactDamageBonus,
     applyRotationalContactDamage,
     calculateStaticCollisionDamage
-} from "../src/physics/contactDamage.js";
-import RotationalBody from "../src/physics/RotationalBody.js";
+} from "../src/game-kit/physics/contactDamage.js";
+import RotationalBody from "../src/game-kit/physics/RotationalBody.js";
 import {
     BURST_RESULTS,
     BurstSequencer,
@@ -334,7 +334,7 @@ import {
     CooldownBank,
     EntityAttachment,
     TimedKeyMap
-} from "../src/physics/index.js";
+} from "../src/game-kit/physics/index.js";
 import { enforceActiveEntityLimit } from "../src/entities/activeEntityLimit.js";
 import { AIActionController } from "../src/simulation/aiActionController.js";
 import { ORBIT_COOLDOWN_KEYS } from "../src/abilities/orbitAbility.js";
@@ -392,10 +392,14 @@ import {
 } from "../src/entities/index.js";
 import { EquipmentDrop } from "../src/entities/equipmentDrop.js";
 import { MobAppearance } from "../src/entities/mobAppearance.js";
-import { PHYSICS_MATERIALS, resolvePhysicsMaterial, combinePhysicsMaterials } from "../src/physics/PhysicsMaterial.js";
-import PhysicsMaterialBody from "../src/physics/PhysicsMaterialBody.js";
+import {
+    PHYSICS_MATERIALS,
+    resolvePhysicsMaterial,
+    combinePhysicsMaterials
+} from "../src/game-kit/physics/PhysicsMaterial.js";
+import PhysicsMaterialBody from "../src/game-kit/physics/PhysicsMaterialBody.js";
 import { AppLifecycle, APP_LIFECYCLE_STATES } from "../src/appLifecycle.js";
-import { ScreenWakeLock } from "../src/screenWakeLock.js";
+import { ScreenWakeLock } from "../src/game-kit/platform/screenWakeLock.js";
 import { recordDeveloperTournamentWin, seedDeveloperCollectionSample } from "../src/developer/developerTools.js";
 import { advanceResultSequence, createResultSequence, getResultSequencePresentation } from "../src/resultSequence.js";
 
@@ -11399,7 +11403,7 @@ import {
     getFighterCollisionShape,
     resolveFighterShapeCollision,
     computeRegularPolygonLocalPoints
-} from "../src/physics/CollisionShape.js";
+} from "../src/game-kit/physics/CollisionShape.js";
 
 async function testCircleVsCircleCollisionStillWorks(app) {
     const sim = new BattleSimulation(
@@ -12311,7 +12315,7 @@ import {
     PhysicsDebugRingBuffer,
     snapshotPhysicsState,
     validatePhysicsState
-} from "../src/physics/PhysicsDebugRingBuffer.js";
+} from "../src/game-kit/physics/PhysicsDebugRingBuffer.js";
 
 function testRingBufferPushAndOrder() {
     const buf = new PhysicsDebugRingBuffer(5);

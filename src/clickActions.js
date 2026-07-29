@@ -1,4 +1,4 @@
-import { shuffled } from "./random.js";
+import { shuffled } from "./game-kit/collections/shuffled.js";
 import { Vector2 } from "./core.js";
 import { WallSlamEffect } from "./combatEffects.js";
 

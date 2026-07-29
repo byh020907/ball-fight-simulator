@@ -1,6 +1,6 @@
 import { Vector2 } from "../core.js";
 import { createHuntingLootItem } from "../entities/huntingLootRegistry.js";
-import { getCombatMovementSpeed } from "../physics/magneticAttraction.js";
+import { getCombatMovementSpeed } from "../game-kit/physics/magneticAttraction.js";
 import { REWARD_BALANCE } from "../rewardBalanceConfig.js";
 import { createEmptyHuntingLoot } from "./huntingRewards.js";
 import { EQUIPMENT_TEMPLATES } from "./equipmentTemplates.js";

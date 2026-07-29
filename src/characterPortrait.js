@@ -1,7 +1,7 @@
 import { getCharacterDefinitionByAbility } from "./characters/characterRegistry.js";
 import { Vector2 } from "./core.js";
 import { BattleBall } from "./entities/battleBall.js";
-import { renderCachedCanvasImage } from "./staticCanvasImageCache.js";
+import { renderCachedCanvasImage } from "./game-kit/canvas/staticCanvasImageCache.js";
 
 const MAXIMUM_PIXEL_RATIO = 2;
 const PORTRAIT_RADIUS_RATIO = 0.36;

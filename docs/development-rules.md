@@ -95,8 +95,9 @@ Boids 알고리즘이 눈에 보이지 않는다는 피드백을 받았을 때:
 
 ### 교차 게임 재사용 경계
 
-- `src/physics/`는 다른 게임에서도 폴더 단위로 이식할 수 있는 독립 기반이다. 내부 모듈은 같은 폴더의 모듈과 플랫폼 기본 모듈만 import하며, `../core.js`, 캐릭터, 능력, 사냥터, UI 같은 게임 고유 상위 모듈을 import하지 않는다.
-- 다른 게임과 새 공용 코드는 `src/physics/index.js`를 공개 진입점으로 사용한다. `src/core.js`의 공용 타입 재export는 기존 Ball Fight Simulator 코드의 호환 파사드일 뿐 새 기반 코드의 의존 대상이 아니다.
+- `src/game-kit/`는 다른 게임에서도 폴더 단위로 이식할 수 있는 독립 소스 라이브러리다. 내부 상대 import는 반드시 같은 폴더 경계 안에서 끝나며 캐릭터, 능력, 사냥터, UI 같은 게임 고유 상위 모듈을 import하지 않는다.
+- 다른 게임과 새 공용 코드는 `src/game-kit/index.js`를 공개 진입점으로 사용한다. `src/core.js`와 `src/physics/index.js`는 기존 Ball Fight Simulator 코드의 호환 파사드일 뿐 새 기반 코드의 의존 대상이 아니다.
+- 범용 기반은 `physics`, `canvas`, `collections`, `platform`처럼 책임별 하위 폴더에 두되 실제 구현은 한 벌만 유지한다. 호환 경로에 구현을 복제하지 않는다.
 - 공용 타입과 계산을 게임별로 복제하지 않는다. 재사용 범위를 넓힐 때는 순수 계산·capability를 기반 폴더로 옮기고, 게임 규칙에서 기반 모듈로만 의존하게 한다.
 - 아직 하나의 저장소에서만 쓰는 기반은 새 패키지나 의존성을 만들지 않고 소스 폴더 단위 계약으로 유지한다. 실제 복수 저장소가 함께 변경을 받아야 할 때 패키지화를 별도 결정한다.
 - 재사용 경계를 바꿀 때는 상위 모듈 역참조를 막는 구조 테스트와 동일 시나리오의 변경 전후 시뮬레이션을 함께 추가한다. 세부 공개 범위는 `docs/reusable-game-resources.md`를 따른다.
@@ -128,7 +129,7 @@ this.debug = {
 ✅ 믹스인으로 능력을 추가하면 → 필요한 것만 골라 담음
 ```
 
-**프로젝트 믹스인 구성** (`src/physics/`):
+**프로젝트 믹스인 구성** (`src/game-kit/physics/`):
 
 | 믹스인                            | 제공 능력                                                                                                 | 사용 클래스                                                                  |
 | --------------------------------- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
@@ -319,7 +320,7 @@ damage = round(baseDamage × (1 + bonus))
     1. `BattleSimulation.calculateCollisionDamageWithContact()` — 충돌 대미지(Crash)
     2. `DashEffect.onCollision()` — 대시 접촉 대미지(Dash Contact)
     3. `VampireAbility._getCollisionDamage()` — 뱀파이어 접촉 힐/대미지
-- **헬퍼 함수** (`src/physics/contactDamage.js`):
+- **헬퍼 함수** (`src/game-kit/physics/contactDamage.js`):
     - `getContactPointVelocity(body, contactPoint)` → 접촉점 속도 벡터
     - `calculateRotationalContactDamageBonus(body, contactPoint, options)` → 0~0.6 보너스 계수
     - `applyRotationalContactDamage(baseDamage, body, contactPoint, options)` → 보너스 적용 최종 대미지
@@ -397,7 +398,7 @@ Ability / Action / Effect: 목표 방향, 목표 속도, movementEffect, forceHe
 
 - **볼-볼 충돌 impulse**는 `BattleSimulation._applyRigidBodyCollision()`이 소유합니다. 내부에서 `applyDynamicCollisionResponse(a, b, normal, contactPoint, approachSpeed, { restitution, tangentialFriction, impactA, impactB })`를 호출하며, normal impulse + tangent friction impulse를 BODY의 선형/각운동량에 통합 적용합니다. 선형 impulse와 angular impulse가 분리된 임시 공식이 아니라, 하나의 impulse vector J = jn·n + jt·t로 계산되어 각 body에 `-J·invMass`(선형) + `r × J`(angular)로 전달됩니다. `angularFactor` 기본값이 1이므로 angular impulse는 물리적으로 정확하게 적용되며, 시각적 튜닝이 필요하면 외부에서 별도로 처리해야 합니다. `_applyCollisionPhysics`(core.applyCollisionImpulse 사용)와 `_applyAngularCollisionResponse`는 제거되었습니다.
 - **impulse 계산 공식**: effective mass denominator `denom = invMassA + invMassB + (rA×d)²·invIA + (rB×d)²·invIB`를 사용합니다. normal impulse `jn = -(1+e)·vn / denom_n`, tangent impulse `jt = -vt / denom_t` (Coulomb clamp: |jt| ≤ μ·|jn|). 접촉점 속도는 선형 속도 + 각속도 ω×r 기여를 모두 포함합니다.
-- **물리 재질 시스템**: restitution과 friction은 더 이상 호출 사이트의 magic number가 아니라, 각 body/surface가 소유하는 material로부터 결정됩니다. `src/physics/PhysicsMaterial.js`는 카탈로그(`PHYSICS_MATERIALS`)와 두 헬퍼(`resolvePhysicsMaterial`, `combinePhysicsMaterials`)를 제공합니다. body의 material 소유권은 `PhysicsMaterialBody` 믹스인이 제공하며, 기본값은 `"wood"`입니다. 조합 규칙: `restitution = max(a.restitution, b.restitution)`, `friction = sqrt(a.friction * b.friction)`. restitution은 게임의 튀는 동작을 유지하고, friction은 낮은 마찰 표면도 실제로 낮은 조합값을 만들 수 있게 합니다. 현재 기본 rubberBall/wall/wood는 모두 friction=0.20이므로 나무 수준 마찰 체감은 유지됩니다.
+- **물리 재질 시스템**: restitution과 friction은 더 이상 호출 사이트의 magic number가 아니라, 각 body/surface가 소유하는 material로부터 결정됩니다. `src/game-kit/physics/PhysicsMaterial.js`는 카탈로그(`PHYSICS_MATERIALS`)와 두 헬퍼(`resolvePhysicsMaterial`, `combinePhysicsMaterials`)를 제공합니다. body의 material 소유권은 `PhysicsMaterialBody` 믹스인이 제공하며, 기본값은 `"wood"`입니다. 조합 규칙: `restitution = max(a.restitution, b.restitution)`, `friction = sqrt(a.friction * b.friction)`. restitution은 게임의 튀는 동작을 유지하고, friction은 낮은 마찰 표면도 실제로 낮은 조합값을 만들 수 있게 합니다. 현재 기본 rubberBall/wall/wood는 모두 friction=0.20이므로 나무 수준 마찰 체감은 유지됩니다.
 - **정적 표면(벽/terrain) 충돌**은 `applyCollisionResponse(body, normal, contactPoint, preCollisionVelocity, options)`를 통해 동일한 `_resolveContactImpulse` 공통 solver를 호출합니다. 구현에서는 `bodyA=null`을 정적 표면으로 두고 `bodyB=body`를 동적 body로 전달합니다. restitution/friction은 `body.physicsMaterial`과 `options.surfaceMaterial`의 조합(`combinePhysicsMaterials`)으로 결정됩니다. 명시적 `options.restitution`/`options.tangentialFriction`이 전달되면 재질 조합보다 우선합니다.
 - **벽 충돌**은 `simulation.js`의 `_reflectX`/`_reflectY`에서 위치 clamp 후 `applyCollisionResponse(entity, normal, contactPoint, preVel, { surfaceMaterial: "wall" })`를 호출합니다. wall material(restitution=1.0, friction=0.20)과 body의 physicsMaterial(기본 rubberBall: restitution=0.92, friction=0.20)의 조합으로 restitution=1.0, friction=0.20이 결정됩니다.
 - **terrain 충돌(circle/polygon)**은 `terrainCollision.js`/`CollisionShape.js`에서 위치 보정 후 `applyCollisionResponse(entity, normal, contactPoint, preVel, { surfaceMaterial: "wood" })`를 호출합니다.
@@ -572,7 +573,7 @@ npm run format:check
 
 - 다른 전투원이나 접점을 중심으로 보여야 하는 핵심 효과는 Ability의 `draw()`에 넣지 않고, 대상·수명주기를 소유한 `CombatEntity`로 분리합니다.
 - 대상 표식·접촉 섬광·궤적처럼 전투원에 가려지면 의미가 사라지는 효과는 `RENDER_LAYERS.FOREGROUND`를 명시합니다. 전투원 자체 장식만 `BattleBall`의 fighter pass에 둡니다.
-- 모바일에서 선과 전투 문구가 1 CSS px 미만으로 축소되지 않도록 `effectVisibility.js`의 `hairline`·`standard`·`emphasis`·`combatText` 의미 토큰을 사용합니다. 캐릭터마다 별도의 화면 고정 px 값을 만들지 않습니다.
+- 모바일에서 선과 전투 문구가 1 CSS px 미만으로 축소되지 않도록 `src/game-kit/canvas/effectVisibility.js`의 `hairline`·`standard`·`emphasis`·`combatText` 의미 토큰을 사용합니다. 캐릭터마다 별도의 화면 고정 px 값을 만들지 않습니다.
 - 가시성 계산은 현재 Canvas transform과 canvas intrinsic 크기 대비 CSS 표시 크기를 함께 반영합니다. 월드 크기와 게임 판정 반경은 이 보정으로 바꾸지 않습니다.
 - 핵심 효과 회귀는 엔티티의 `draw()` 직접 호출만으로 끝내지 않고, 실제 `ArenaRenderer.render()`의 레이어 패스를 통과하는지 검증합니다.
 

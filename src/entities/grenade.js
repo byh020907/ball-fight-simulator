@@ -1,7 +1,7 @@
 import { CombatEntity, Vector2 } from "../core.js";
-import { getVisibleLineWidth } from "../effects/effectVisibility.js";
+import { getVisibleLineWidth } from "../game-kit/canvas/effectVisibility.js";
 import { applyBurningEffect } from "../effects/index.js";
-import { steerProjectileVelocityToward } from "../physics/projectileSteering.js";
+import { steerProjectileVelocityToward } from "../game-kit/physics/projectileSteering.js";
 
 const PROXIMITY_FUSE_BASE_MULTIPLIER = 3;
 const PROXIMITY_FUSE_MAX_MULTIPLIER = 6;

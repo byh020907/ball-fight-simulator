@@ -1,4 +1,4 @@
-import { getVisibleLineWidth } from "./effectVisibility.js";
+import { getVisibleLineWidth } from "../game-kit/canvas/effectVisibility.js";
 
 const TAU = Math.PI * 2;
 

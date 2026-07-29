@@ -2,7 +2,7 @@ import { Vector2 } from "../core.js";
 import { HeroShieldShard } from "../entities/heroShieldShard.js";
 import { enforceActiveEntityLimit } from "../entities/activeEntityLimit.js";
 import { HeroShieldBreakEffect } from "../effects/heroEffects.js";
-import { CooldownBank } from "../physics/index.js";
+import { CooldownBank } from "../game-kit/physics/index.js";
 import { Ability } from "./ability.js";
 import { HERO_COMBAT_CONFIG } from "./heroCombatConfig.js";
 import { EnergyShieldVisual } from "./mixins/energyShieldVisual.js";

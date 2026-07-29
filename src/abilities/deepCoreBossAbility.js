@@ -1,6 +1,6 @@
 import { Ability } from "./ability.js";
 import { Vector2 } from "../core.js";
-import { CooldownBank } from "../physics/index.js";
+import { CooldownBank } from "../game-kit/physics/index.js";
 import { createHuntingMobSpec } from "../hunting/huntingMonsters.js";
 import { HUNTING_MONSTER_TYPES } from "../hunting/huntingConfig.js";
 

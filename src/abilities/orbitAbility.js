@@ -1,6 +1,6 @@
 import { Vector2 } from "../core.js";
 import { OrbitCatchEffect } from "../effects/orbitHitEffect.js";
-import { CooldownBank } from "../physics/index.js";
+import { CooldownBank } from "../game-kit/physics/index.js";
 import { Ability } from "./ability.js";
 
 const VOLLEY_COOLDOWN = 3.0;

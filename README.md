@@ -34,7 +34,7 @@ http://127.0.0.1:4173/
 - `src/app.js`: `BattleApp`
 - `src/abilities/`: 캐릭터별 능력
 - `src/entities/`: 공, 투사체, 수류탄 등 전투 엔티티
-- `src/physics/`: 다른 게임에도 폴더 단위로 이식할 수 있는 벡터·물리 capability·충돌 기반
+- `src/game-kit/`: 다른 게임에도 폴더 단위로 이식할 수 있는 물리·Canvas·컬렉션·플랫폼 기반 라이브러리
 - `src/simulation/`: 전투 루프, 충돌, 참여·종료 판정
 - `src/ui.js`: Alpine.js 컴포넌트 (UI 상태 관리) + `ArenaRenderer` (캔버스 렌더링)
 - `src/tournament.js`: 자동 토너먼트 진행

@@ -1,6 +1,6 @@
 import { pickRandomActions } from "../clickActions.js";
 import { RLPolicy } from "../ai/rlPolicy.js";
-import { Cooldown } from "../physics/index.js";
+import { Cooldown } from "../game-kit/physics/index.js";
 
 const AI_MIN_INTERVAL = 0.5; // 액션 사용 후 최소 대기 (훈련 기준 30프레임과 동일)
 const AI_ACTION_THRESHOLD = 0.5; // 이 확률 이상이면 액션 사용 (모델이 전략적으로 학습되었으므로 0.5로 충분)

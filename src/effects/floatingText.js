@@ -1,5 +1,5 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
-import { getVisibleCombatTextSize, getVisibleLineWidth } from "./effectVisibility.js";
+import { getVisibleCombatTextSize, getVisibleLineWidth } from "../game-kit/canvas/effectVisibility.js";
 
 class FloatingText extends CombatEntity {
     static renderLayer = RENDER_LAYERS.FOREGROUND;

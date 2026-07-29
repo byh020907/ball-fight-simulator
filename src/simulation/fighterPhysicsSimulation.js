@@ -1,10 +1,10 @@
 import { Vector2 } from "../core.js";
-import { resolveFighterShapeCollision } from "../physics/CollisionShape.js";
+import { resolveFighterShapeCollision } from "../game-kit/physics/CollisionShape.js";
 import {
     applyCapturedDynamicCollisionResponse,
     applyDynamicCollisionResponse,
     captureDynamicCollisionResponse
-} from "../physics/collisionResponse.js";
+} from "../game-kit/physics/collisionResponse.js";
 import { Simulation } from "./simulation.js";
 
 const COLLISION_SEPARATION_PADDING = 0.6;

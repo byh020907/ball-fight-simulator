@@ -1,5 +1,5 @@
 import { Vector2 } from "../core.js";
-import { BURST_RESULTS, BurstSequencer } from "../physics/index.js";
+import { BURST_RESULTS, BurstSequencer } from "../game-kit/physics/index.js";
 import { Ability } from "./ability.js";
 import { BulletProjectile, GunnerTurret } from "../entities/index.js";
 import { enforceActiveEntityLimit } from "../entities/activeEntityLimit.js";

@@ -1,11 +1,11 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
-import { EntityAttachment } from "../physics/index.js";
+import { EntityAttachment } from "../game-kit/physics/index.js";
 import {
     drawRebirthVisualOverlay,
     drawRebirthVisualUnderlay,
     getRebirthVisualProfile
 } from "../rebirth/rebirthVisuals.js";
-import { getVisibleLineWidth } from "./effectVisibility.js";
+import { getVisibleLineWidth } from "../game-kit/canvas/effectVisibility.js";
 
 const RAGE_FIRE_COLORS = Object.freeze(["#fff4bd", "#ff983d", "#e83f18"]);
 export const BURNING_EFFECT_CONFIG = Object.freeze({

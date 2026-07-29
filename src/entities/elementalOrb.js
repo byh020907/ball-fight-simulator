@@ -1,5 +1,5 @@
 import { applyCollisionImpulse, CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
-import { CollectionGrace } from "../physics/index.js";
+import { CollectionGrace } from "../game-kit/physics/index.js";
 import { drawElementalOrb } from "../effects/elementalistEffects.js";
 
 const ORB_RADIUS = 13;

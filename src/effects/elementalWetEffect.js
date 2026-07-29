@@ -1,7 +1,7 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
-import { EntityAttachment } from "../physics/index.js";
+import { EntityAttachment } from "../game-kit/physics/index.js";
 import { ELEMENTAL_PALETTE } from "../abilities/elementalistRecipes.js";
-import { getVisibleLineWidth } from "./effectVisibility.js";
+import { getVisibleLineWidth } from "../game-kit/canvas/effectVisibility.js";
 import { addElementalWetStack, getActiveElementalWetStackCount, pruneElementalWetStacks } from "./elementalWetState.js";
 
 export const ELEMENTAL_WET_VISUAL_CONFIG = Object.freeze({

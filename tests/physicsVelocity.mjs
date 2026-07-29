@@ -1,18 +1,10 @@
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
 import { Vector2 as CoreVector2 } from "../src/core.js";
-import { LINEAR_VELOCITY_POLICY, PhysicsBody, resolveLinearVelocityPolicy, Vector2 } from "../src/physics/index.js";
+import { Vector2 as CompatiblePhysicsVector2 } from "../src/physics/index.js";
+import { LINEAR_VELOCITY_POLICY, PhysicsBody, resolveLinearVelocityPolicy, Vector2 } from "../src/game-kit/index.js";
 
 assert.equal(Vector2, CoreVector2, "core compatibility export must retain the shared Vector2 identity");
-const physicsDirectory = new URL("../src/physics/", import.meta.url);
-for (const moduleName of readdirSync(physicsDirectory).filter((name) => name.endsWith(".js"))) {
-    const source = readFileSync(new URL(moduleName, physicsDirectory), "utf8");
-    assert.equal(
-        /from\s+["']\.\.\//.test(source),
-        false,
-        `${moduleName} must not import a game-specific parent module`
-    );
-}
+assert.equal(Vector2, CompatiblePhysicsVector2, "legacy physics barrel must preserve the shared Vector2 identity");
 
 class VelocityProbeBase {
     constructor() {

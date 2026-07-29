@@ -1,5 +1,5 @@
 import { Vector2 } from "../core.js";
-import { getVisibleLineWidth } from "./effectVisibility.js";
+import { getVisibleLineWidth } from "../game-kit/canvas/effectVisibility.js";
 
 const GOLDEN_ANGLE = 2.399;
 

@@ -1,6 +1,6 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
-import { getVisibleLineWidth } from "./effectVisibility.js";
-import { EntityAttachment } from "../physics/index.js";
+import { getVisibleLineWidth } from "../game-kit/canvas/effectVisibility.js";
+import { EntityAttachment } from "../game-kit/physics/index.js";
 
 export class BloodTetherEffect extends CombatEntity {
     constructor(contactPoint, owner) {

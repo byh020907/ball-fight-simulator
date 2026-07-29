@@ -1,8 +1,8 @@
 import { CombatEntity, RENDER_LAYERS, Vector2 } from "../core.js";
-import { EntityAttachment } from "../physics/index.js";
+import { EntityAttachment } from "../game-kit/physics/index.js";
 import { ELEMENTAL_PALETTE } from "../abilities/elementalistRecipes.js";
-import { drawElectricArc } from "./electricArc.js";
-import { getVisibleLineWidth } from "./effectVisibility.js";
+import { drawElectricArc } from "../game-kit/canvas/electricArc.js";
+import { getVisibleLineWidth } from "../game-kit/canvas/effectVisibility.js";
 
 export const ELEMENTAL_WET_REACTION_VISUAL_CONFIG = Object.freeze({
     duration: 0.45,
