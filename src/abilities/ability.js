@@ -74,6 +74,19 @@ export class Ability extends mixins([Cooldown]) {
         if (this._equipmentUsageEventsEnabled && wasReady) {
             this.owner?.combatEquipment?.abilityUsed({ ability: this, simulation: this.simulation });
         }
+        if (wasReady) this.recordUsageMetric();
+    }
+
+    recordUsageMetric() {
+        if (!this._equipmentUsageEventsEnabled || !this.owner?.id || !this.abilityId) return false;
+        this.simulation?.hooks?.onAbilityUsed?.({
+            ownerId: this.owner.id,
+            abilityId: this.abilityId,
+            instanceKey: this.instanceKey,
+            role: this.role,
+            elapsed: this.simulation?.elapsed ?? 0
+        });
+        return true;
     }
 
     update() {}

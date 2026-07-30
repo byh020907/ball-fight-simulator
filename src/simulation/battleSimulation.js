@@ -545,8 +545,10 @@ export class BattleSimulation extends FighterPhysicsSimulation {
 
         context.targetHpRatioBeforeA = a.maxHp > 0 ? a.hp / a.maxHp : 0;
         context.targetHpRatioBeforeB = b.maxHp > 0 ? b.hp / b.maxHp : 0;
-        context.damageResultToA = damageFromBToA > 0 ? a.takeDamage(damageFromBToA, b, "Crash") : null;
-        context.damageResultToB = damageFromAToB > 0 ? b.takeDamage(damageFromAToB, a, "Crash") : null;
+        context.damageResultToA =
+            damageFromBToA > 0 ? a.takeDamage(damageFromBToA, b, "Crash", { origin: context.originFromBToA }) : null;
+        context.damageResultToB =
+            damageFromAToB > 0 ? b.takeDamage(damageFromAToB, a, "Crash", { origin: context.originFromAToB }) : null;
         const damageToA = context.damageResultToA?.actualDamage ?? 0;
         const damageToB = context.damageResultToB?.actualDamage ?? 0;
 

@@ -34,4 +34,38 @@
 
 입력·입력 예약·릴리즈 속도·방패·반사·순차 돌진과 적 체력 설정은 `src/combat-drag/`가 소유하고, Canvas 포인터 계층은 런타임이 일반 시작 또는 예약 시작을 수락한 경우에만 해당 주 포인터를 캡처한다. 차징량·AI 요구량·조기 종료·실제 돌진 종료 진행률 계산은 순수 `chargeMath`가 맡는다. 기준 이하 회복·기준 이상 마찰은 `src/game-kit/physics/linearVelocityPolicy.js`, 궤적은 `trajectoryScene`, 화면 표현은 `DragCombatRenderer`가 맡는다. 런타임 스냅샷은 플레이어 실제 차징량·예약 여부와 적의 실제 차징량·예고 진행률·가속 여부·종료 진행률을 분리해 제공한다. `BattleSimulation.setPlayerBall()`은 플레이어 지정과 사냥터의 팀 인원수 기반 적 체력 조정을 한 곳에서 처리하며, 토너먼트는 이 조정을 명시적으로 끈다. 회귀 테스트는 차징 단조성, 예약 입력의 시작·이동·해제·경직 대기·플레이어 교체 폐기, 적 계획 종료 시각 비증가, 0.22초 가속 경계, 시간 왜곡 재진입 차단, 릴리즈 속도와 궤적의 동일 설정 사용, 최대 시간·저속 종료 원의 수렴, 교체·부활·새 매치를 확인한다.
 
+## 기준선 계측
+
+`npm run metrics:drag-ability`는 동일 시드 사냥터 전투에서 드래그 정책별 능력·드래그 사용을 계측한다.
+
+### 환경 변수
+
+| 변수 | 기본값 | 설명 |
+|---|---|---|
+| `METRICS_SEEDS` | 1 | 정책당 시드 수 |
+| `METRICS_MAX_SECONDS` | 75 | 경기당 최대 시간(초) |
+| `METRICS_SEED` | 20260730 | 기준 시드 |
+| `METRICS_CHARACTERS` | 전 캐릭터 | 쉼표 구분 ID 목록 |
+| `METRICS_STAGES` | `cave,forest,desert` | 스테이지 목록 |
+| `METRICS_FLOORS` | `6,20,36` | 층 목록 |
+
+### 관측 필드
+
+- **능력**: focal 플레이어만 대상, 첫 발동 시각(경기당 평균·중앙값), 발동 횟수(경기당), noUseRate(미발동 경기 비율). zero-use 능력은 `focalAbilityIds` 전체를 기준으로 누락 없이 표시한다. 이번 기준선은 공통 쿨다운 재시작, Archer 첫 화살 발사, Rage의 35% 이상 충전 충돌을 계측하며 다른 패시브형 능력의 고유 발동은 범위 밖이다.
+- **드래그 사건**: launch, bounce, plain-hit, rear-hit, shield-counter, ally-stop, slow-stop, timeout, enemy-flight-end, enemy-launch
+- **피해 출처**(origin): `combat`(자연 충돌), `drag`(플레이어 드래그 정면·후방·평타), `drag-counter`(방패 반격), `equipment`(장비 패시브)
+- **출처 집계**: `damageByOrigin`은 전체 전투의 origin별 damage·hits·absorbed·경기당·전체 대비 ratio. `focalDealtByOrigin`/`focalTakenByOrigin`은 focal 플레이어가 가한/받은 origin별 동일 구조
+- **focal 드래그 비율**: `focalDealtDragRatio` = focal drag dealt damage / focal total dealt damage. `drag-counter`는 별도로 `focalDealtDragCounterRatio`와 `focalTakenDragCounterRatio`로 분리 계측되며, 직접 drag 피해에 합산되지 않는다
+- **드래그 상세**: launchesPerMatch, averageLaunchChargeRatio, bouncesPerMatch, maxBounceTierDistribution, hitTypes(plain-hit/rear-hit/shield-counter 경기당), endReasons(slow-stop/timeout/ally-stop 경기당)
+
+### 자동 반사 탐색 한계
+
+`궤적 예측 기반 반사 탐색` 정책은 `createDragTrajectoryScene()`으로 후보 각도를 평가하지만, 실제 모바일 숙련 플레이와 다음 차이가 있다.
+
+- 평가 시점의 방패 방향은 고정되지만 실제 발사까지 0.3초 이상 차징하며 방패가 움직이거나 사라질 수 있다.
+- 현재 속도·상대 이동·돌진 중 상대와의 거리 변화를 고려하지 않는다.
+- 시드 재현성이 완벽하지 않아 동일 시드여도 정책 간 물리 상태가 갈리면 궤적 평가가 달라질 수 있다.
+- 궤적 탐색이 로컬 최적해(단순 정면 근처)에 머물 가능성이 있다.
+- 따라서 자동 반사 정책 수치(승률, duration, drag hits)는 숙련 플레이어의 실제 체감 이득보다 보수적인 하한으로 해석해야 한다.
+
 개발자 모드의 `드래그 전투 튜닝`은 릴리즈 속도를 기본값의 0.60~1.80배로 조절한다. 같은 카드의 인라인 테스트장은 현재 선택 캐릭터의 레벨·환생·장비·숙련도를 합친 실제 기준 속도·반경·색상을 사용하고, 실제 전투와 동일한 시간 차징·자동 발사·`getDragLaunchSpeed`·선형 속도 정책으로 공을 움직인다. 캔버스에는 일반 적 조준과 호박색 가속 레일, 움직이는 테스트 공의 종료 수렴 원도 함께 표시해 상태 색·점선 속도·재입력 시점을 바로 비교한다. 이 값은 저장 프로필에 기록하지 않는 현재 세션 전용이며, 디버그 모드를 종료하면 1.00배로 돌아가고 테스트 애니메이션과 포인터 리스너도 함께 정리된다.

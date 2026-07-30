@@ -13,6 +13,7 @@
     "train": "node scripts/rl/train.mjs",
     "benchmark": "node scripts/benchmark.mjs",
     "metrics:equipment": "node scripts/equipmentPassiveMetrics.mjs",
+    "metrics:drag-ability": "node scripts/dragAbilityMetrics.mjs",
     "format": "prettier --write \"src/**/*.js\" \"tests/**/*.mjs\" \"scripts/**/*.mjs\" \"*.html\"",
     "format:check": "prettier --check \"src/**/*.js\" \"tests/**/*.mjs\" \"scripts/**/*.mjs\" \"*.html\""
   },

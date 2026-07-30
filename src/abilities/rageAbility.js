@@ -104,6 +104,8 @@ export class RageAbility extends Ability {
         const charge = this.getChargeProgress();
         if (charge < 0.35) return;
 
+        this.recordUsageMetric();
+
         this.simulation.playSound("rage", 0.75);
         this.simulation.addLog(`${this.owner.name}'s momentum resets on impact.`);
 

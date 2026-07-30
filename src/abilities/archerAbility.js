@@ -112,6 +112,7 @@ export class ArcherAbility extends PassiveEvasion(Ability) {
 
     release(target) {
         this._expirePredictionEffect();
+        this.recordUsageMetric();
         this._fireArrowWithCrit(target, true);
         this.simulation.playSound("shoot");
         if (this.abilityTier >= 2) {

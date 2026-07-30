@@ -174,6 +174,46 @@ function withFixedRandom(callback) {
     assert.equal(enemy.hp < enemy.maxHp, false);
 }
 
+// 드래그 충돌의 피해 출처는 실제 충돌 훅에서 분리되어야 한다.
+{
+    const resolved = [];
+    const simulation = createSimulation();
+    simulation.hooks.onDamageResolved = (event) => resolved.push(event);
+    launch(simulation, 60);
+    collide(simulation);
+    assert.ok(
+        resolved.some((event) => event.origin === "drag-counter"),
+        "정면 방패 반격은 drag-counter여야 한다"
+    );
+}
+
+{
+    const resolved = [];
+    const simulation = createSimulation();
+    simulation.hooks.onDamageResolved = (event) => resolved.push(event);
+    launch(simulation, 61);
+    simulation.dragCombat.tickShot(0.9);
+    collide(simulation);
+    assert.ok(
+        resolved.some((event) => event.origin === "drag"),
+        "방패 만료 후 직선 충돌은 drag여야 한다"
+    );
+}
+
+{
+    const resolved = [];
+    const simulation = createSimulation({ playerX: 800, enemyX: 400 });
+    simulation.hooks.onDamageResolved = (event) => resolved.push(event);
+    const player = simulation.playerBall;
+    launch(simulation, 62);
+    simulation.dragCombat.onStaticCollision(player, { surfaceKey: "wall:left" });
+    collide(simulation);
+    assert.ok(
+        resolved.some((event) => event.origin === "drag"),
+        "반사 후 후면 충돌은 drag여야 한다"
+    );
+}
+
 for (const [bounceCount, multiplier] of [
     [1, 1],
     [2, 1.45],

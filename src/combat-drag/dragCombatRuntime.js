@@ -387,9 +387,11 @@ export class DragCombatRuntime {
             if (context.a === player) {
                 context.damageFromAToB = 0;
                 context.damageFromBToA = damage.damageFromBToA * result.incomingMultiplier;
+                context.originFromBToA = "drag-counter";
             } else {
                 context.damageFromBToA = 0;
                 context.damageFromAToB = damage.damageFromAToB * result.incomingMultiplier;
+                context.originFromAToB = "drag-counter";
             }
             const recoil = Vector2.subtract(player.position, other.position)
                 .normalize()
@@ -399,9 +401,21 @@ export class DragCombatRuntime {
             return;
         }
         if (result.type === "rear-hit") {
-            if (context.a === player) context.damageFromAToB = damage.damageFromAToB * result.damageMultiplier;
-            else context.damageFromBToA = damage.damageFromBToA * result.damageMultiplier;
+            if (context.a === player) {
+                context.damageFromAToB = damage.damageFromAToB * result.damageMultiplier;
+                context.originFromAToB = "drag";
+            } else {
+                context.damageFromBToA = damage.damageFromBToA * result.damageMultiplier;
+                context.originFromBToA = "drag";
+            }
             if (result.staggerSeconds > 0) other.applySlow(result.staggerSeconds, 0);
+        }
+        if (result.type === "plain-hit") {
+            if (context.a === player) {
+                context.originFromAToB = "drag";
+            } else {
+                context.originFromBToA = "drag";
+            }
         }
     }
 
@@ -572,6 +586,7 @@ export class DragCombatRuntime {
     #record(event) {
         this.eventSequence += 1;
         this.lastEvent = { ...copyValue(event), sequence: this.eventSequence };
+        this.simulation.hooks?.onDragCombatMetric?.({ ...this.lastEvent, elapsed: this.simulation.elapsed ?? 0 });
         this.onEvent?.(this.getSnapshot());
     }
 

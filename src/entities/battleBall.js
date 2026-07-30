@@ -583,7 +583,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             actualDamage,
             absorbedDamage,
             isCritical,
-            origin: options.equipmentDamage?.origin ?? "combat",
+            origin: options.origin ?? options.equipmentDamage?.origin ?? "combat",
             sourceTemplateId: options.equipmentDamage?.sourceTemplateId ?? null,
             elapsed: sim.elapsed ?? 0
         });
