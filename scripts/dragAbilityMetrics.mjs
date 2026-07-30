@@ -228,14 +228,14 @@ function main() {
                             `${id}: ${ability.usesPerMatch.toFixed(2)}회, 미사용 ${percent(ability.noUseRate)}`
                     )
                     .join("; ");
-                const directDamage = metrics.focalDealtByOrigin.drag?.damage ?? 0;
-                const counterTaken = metrics.focalTakenByOrigin["drag-counter"]?.damage ?? 0;
+                const directDamagePerMatch = metrics.focalDealtByOrigin.drag?.damagePerMatch ?? 0;
+                const counterTakenPerMatch = metrics.focalTakenByOrigin["drag-counter"]?.damagePerMatch ?? 0;
                 console.log(
                     `${characterId} | ${policy} | 승률 ${percent(metrics.winRate)} | ` +
                         `시간 중앙 ${metrics.duration.median.toFixed(2)}초 | 능력 ${abilityText || "없음"} | ` +
                         `발사 ${metrics.dragDetail.launchesPerMatch.toFixed(2)} | ` +
-                        `직접 드래그 피해 ${directDamage.toFixed(2)} (${percent(metrics.focalDealtDragRatio)}) | ` +
-                        `방패 반격 피격 ${counterTaken.toFixed(2)}`
+                        `경기당 직접 드래그 피해 ${directDamagePerMatch.toFixed(2)} (${percent(metrics.focalDealtDragRatio)}) | ` +
+                        `경기당 방패 반격 피격 ${counterTakenPerMatch.toFixed(2)}`
                 );
             }
         }
