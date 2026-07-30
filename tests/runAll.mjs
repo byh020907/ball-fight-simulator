@@ -17,6 +17,10 @@ const TEST_DOMAINS = {
         modulePath: "./equipmentDomain.mjs",
         footerMessages: new Set(["[equipment-domain] ok"])
     },
+    battleMetrics: {
+        modulePath: "./battleMetrics.mjs",
+        footerMessages: new Set(["[battle-metrics] ok"])
+    },
     dragVectorCombat: {
         modulePath: "./dragVectorCombat.mjs",
         footerMessages: new Set(["[drag-vector-combat] ok"])

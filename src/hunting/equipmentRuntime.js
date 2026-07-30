@@ -160,6 +160,14 @@ export class EquipmentRuntime {
 
     emitFeedback({ simulation, target = null, contactPoint = null, anchor = null, actualDamage = 0, ...payload } = {}) {
         if (!(actualDamage > 0)) return null;
+        simulation?.hooks?.onEquipmentPassiveTriggered?.({
+            ownerId: this.owner?.id ?? null,
+            targetId: target?.id ?? null,
+            templateId: this.templateId,
+            passiveId: this.template?.passiveId ?? null,
+            actualDamage,
+            elapsed: simulation.elapsed ?? 0
+        });
         return spawnEquipmentPassiveEffect({
             ...payload,
             simulation,

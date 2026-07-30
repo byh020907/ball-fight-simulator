@@ -147,6 +147,26 @@ Lv.9 능력까지 적용한 고정 시드 13개 상대·양쪽 시작 위치 312
 줄였다. 승인된 조건·계수는 이번 릴리스에서 유지한다. 특히 1개 결과가 목표보다 높으므로 다음 밸런스
 조정은 실제 사냥터 적 구성과 장기 플레이 표본을 추가한 뒤 별도 결정으로 다룬다.
 
+### 완성 장비 사냥터 메트릭
+
+`npm run metrics:equipment`는 실제 `BattleSimulation`에 `createHuntingMobEncounter()`의 일반 몬스터와
+사냥터 전장을 적용해, 무장 없음과 완성 장비 12종 단독을 같은 고정 시드로 비교한다. 기본 표본은
+Rage·Archer·Hero의 cave 4층·forest 18층·desert 34층을 2시드씩, 최대 75초로 실행한다. 더 큰 표본은
+PowerShell에서 `$env:METRICS_SEEDS=24; $env:METRICS_MAX_SECONDS=120; npm run metrics:equipment`처럼 실행하며,
+`METRICS_CHARACTERS`, `METRICS_STAGES`, `METRICS_FLOORS`, `METRICS_SEED`도 쉼표 목록 또는 수치로 바꿀 수 있다.
+
+출력은 장비별 승률 변화, 평균 전투시간 변화, 중앙값·p90, 경기당 유효 패시브 발동, 경기당 직접 장비
+피해, 소유자의 전체 실제 피해 대비 직접 피해 비율을 함께 보인다. 시간 제한 경기는 남은 HP 비율로 승패를
+결정해 표본에서 제외하지 않는다. 시각 효과는 no-op하지만 전투 로직은 그대로 두며, 각 경기의 `Math.random`
+교체는 원상복구한다.
+
+2026-07-30 기본 실행(6경기)에서는 `completed_vital_heat`가 +50.0%p, `completed_mass_execution`과
+`completed_vital_overwhelm`이 각각 +33.3%p 승률 변화를 보였다. 직접 피해 관측값은 wall heat 47.67/경기
+(소유자 실제 피해의 28.0%), wall ricochet 25.33(18.4%), mass shockwave 16.50(12.2%)였고, ability crit·mass
+execution·ability echo는 이 작은 표본에서 발동하지 않았다. 방어 전환처럼 직접 피해가 아닌 패시브는
+`직접 피해 외 효과`로 표시한다. 따라서 0 직접 피해는 0 기여가 아니며, 장기 표본에서 발동 수·승률·시간과
+함께 보고 나서만 계수 조정 후보로 분류한다. 이번 측정은 계수와 발동 조건을 바꾸지 않는다.
+
 새 장비명은 가장 높은 가치 단위의 기본 스탯 하나를 대표 접두사로 사용한다. HP는 `튼튼한` 계열, 공격은 `맹공의` 계열, 방어는 `수호자의` 계열, 속도는 `질풍의` 계열을 베이스 장비명 앞에 붙인다. 특수 옵션이 있으면 이름과 구분되는 점 접미사로 붙인다. 예: `질풍의 철검 • 갈망`.
 
 ## 장비 특수 옵션

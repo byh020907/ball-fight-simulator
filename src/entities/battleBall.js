@@ -576,6 +576,17 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             sim.hooks?.onHpChanged?.(this.id, this.hp, this.maxHp);
             sim.recordFighterCollisionDamage?.(source, this, actualDamage);
         }
+        sim?.hooks?.onDamageResolved?.({
+            sourceId: source?.id ?? null,
+            targetId: this.id,
+            label,
+            actualDamage,
+            absorbedDamage,
+            isCritical,
+            origin: options.equipmentDamage?.origin ?? "combat",
+            sourceTemplateId: options.equipmentDamage?.sourceTemplateId ?? null,
+            elapsed: sim.elapsed ?? 0
+        });
         if (label !== "Wall Slam") {
             sim?.shakeScreen?.(0.16, Math.min(18, 7 + actual * 0.55));
         }
