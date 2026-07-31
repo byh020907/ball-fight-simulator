@@ -115,18 +115,99 @@ this.debug = {
 
 적용 위치: `assignActions: this.debugAIEnabled || this._currentChallengeLevel > 0`
 
-### 믹스인 vs 상속 (Mixin Pattern)
+### Is-A / Has-A / Can-Do — 핵심 객체 설계 패턴
 
-**핵심 개념**:
+**이 세 규칙은 유지보수하기 좋은 구조화된 코드를 만드는 최우선 객체 설계 기준입니다.** 새 객체나 책임을
+설계할 때 먼저 그 관계가 정체성, 소유 상태, 독립 행위 중 무엇인지 판별하고 아래 한 가지 문장으로 설명할 수
+있어야 합니다.
 
-|            | 의미                                                  | 사용 시기                                                       |
-| ---------- | ----------------------------------------------------- | --------------------------------------------------------------- |
-| **믹스인** | 이 클래스가 **어떤 기능을 할 수 있는가** (capability) | 선택적 능력 조합, 여러 클래스가 공통 능력을 "골라 담을" 때      |
-| **상속**   | 이 클래스의 **본질이 무엇인가** (identity)            | 실제 공통된 기반을 가질 때, 부모의 모든 속성/메서드가 필요할 때 |
+| 규칙                         | 판별 문장                         | 구현 방식                                                                 | 사용 기준                                                                 |
+| ---------------------------- | --------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| **Is-A (상속 — 정체성)**     | "이 객체는 상위 객체의 일종이다" | 최상위 `GameObject`에서 의미 있는 정체성 계층을 `extends`로 내려 정의합니다. | 부모 계약 전체를 만족하고 부모 타입 대신 사용해도 의미가 바뀌지 않을 때 |
+| **Has-A (조합 — 소유물)**     | "이 객체는 이 상태를 가진다"     | 상태와 그 상태의 불변식을 별도 객체로 만들고 필드에 소유합니다.             | 수치, 저장소, 정책, 여러 상태 묶음처럼 독립 수명주기와 책임이 있을 때     |
+| **Can-Do (Mixin — 행위/능력)** | "이 객체는 이 행동을 할 수 있다" | 독립 capability를 객체의 prototype chain에 선택적으로 합성합니다.          | 정체성을 바꾸지 않는 재사용 행위를 여러 종류의 객체에 부여할 때          |
+
+#### Is-A: 상속으로 정체성을 정의
+
+최상위 `GameObject`는 모든 게임 객체가 공유해야 하는 최소 정체성 계약만 가집니다. 하위 클래스는 진짜
+종류 관계일 때만 상속합니다.
+
+```js
+class GameObject {}
+
+class Unit extends GameObject {}
+class Building extends GameObject {}
+```
+
+- `Unit is a GameObject`, `Building is a GameObject`처럼 자연스럽게 읽혀야 합니다.
+- 하위 객체를 부모 타입이 필요한 곳에 넣어도 부모 계약이 유지되어야 합니다.
+- 단지 코드를 재사용하거나 능력 하나를 얻기 위해 상속하지 않습니다. 그런 관계는 Has-A 또는 Can-Do로
+  분리합니다.
+
+#### Has-A: 조합으로 소유 상태를 정의
+
+객체가 가지는 속성 데이터와 그 데이터의 규칙은 별도 객체로 분리해 소유합니다. 소유자는 공개 API를 통해
+상태를 사용하고, 내부 필드를 우회해 불변식을 깨뜨리지 않습니다.
+
+```js
+class UnitStats {
+    constructor() {
+        this.health = 100;
+        this.attack = 10;
+    }
+}
+
+class Unit extends GameObject {
+    constructor() {
+        super();
+        this.stats = new UnitStats();
+    }
+}
+```
+
+- `Unit has stats`처럼 소유 관계로 읽히는 데이터는 상속이나 믹스인 대신 조합합니다.
+- 상태에 독립적인 갱신 규칙, 검증, 저장 형식, 수명주기가 생기면 조합 객체가 그 책임을 소유합니다.
+- 프로젝트 예시는 이름 기반 복수 쿨타임을 소유하는 `CooldownBank`, 대상별 제한 시간을 소유하는
+  `TimedKeyMap`, 전투 생명을 소유하는 `CombatLifePool`입니다.
+
+#### Can-Do: Mixin으로 행위와 능력을 주입
+
+`Movable`, `Combatant`, `ResourceGatherer`처럼 정체성과 독립적인 기능 단위는 Mixin으로 만들고 필요한
+객체에만 합성합니다. 프로젝트의 Mixin은 `(Base) => class extends Base` 형태이며, 합성된 메서드는 생성된
+클래스의 prototype chain에 바인딩됩니다.
+
+```js
+const Movable = (Base) =>
+    class extends Base {
+        move(direction) {
+            this.applyImpulse(direction);
+        }
+    };
+
+class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMaterialBody]) {}
+```
+
+- `BattleBall can move`, `BattleBall can rotate`처럼 행위 문장으로 읽혀야 합니다.
+- 여기서 동적 주입은 클래스 정의 시 필요한 capability를 선택적으로 합성한다는 뜻입니다. 실행 중 개별
+  인스턴스의 prototype을 임의로 교체하지 않습니다.
+- Mixin은 자신의 기능에 필요한 최소 상태와 메서드만 제공하며, 구체 클래스의 도메인 정체성이나 무관한
+  책임을 가져가지 않습니다.
+- Mixin 간 선행 조건이나 메서드 충돌이 있으면 암묵적인 합성 순서에 기대지 말고 계약을 문서화하거나 책임을
+  다시 분리합니다.
+
+#### 선택 순서와 경계
+
+1. 먼저 **무엇인가?**를 묻고 진짜 종류 관계만 Is-A로 둡니다.
+2. 다음으로 **무엇을 가지는가?**를 묻고 독립 상태와 정책은 Has-A로 둡니다.
+3. 마지막으로 **무엇을 할 수 있는가?**를 묻고 재사용 가능한 행위는 Can-Do로 둡니다.
+4. 한 객체는 세 패턴을 함께 사용할 수 있지만, 하나의 책임을 둘 이상의 패턴에 중복 구현하지 않습니다.
+5. 관계를 한 문장으로 명확히 설명할 수 없다면 상속 계층이나 Mixin을 먼저 추가하지 말고 책임과 수명주기를
+   다시 나눕니다.
 
 ```
-❌ 상속으로 능력을 추가하면 → 불필요한 메서드가 따라옴
-✅ 믹스인으로 능력을 추가하면 → 필요한 것만 골라 담음
+❌ 상속으로 상태나 능력을 추가하면 → 정체성과 무관한 계약이 따라옴
+❌ Mixin에 큰 상태 묶음을 넣으면 → 소유권과 수명주기가 흐려짐
+✅ Is-A는 정체성, Has-A는 소유 상태, Can-Do는 독립 행위만 담당
 ```
 
 **프로젝트 믹스인 구성** (`src/game-kit/physics/`):
@@ -154,7 +235,7 @@ this.debug = {
 - 이벤트 snapshot은 항상 값 복사로 저장한다 (Vector2 참조를 그대로 보관하지 않는다).
 - 기록 실패가 게임 로직을 깨지 않아야 한다.
 
-**클래스 본질 (상속)**:
+**현재 프로젝트의 객체 분류와 capability 구성**:
 
 | 클래스         | 본질            | 구성                                                                                                     |
 | -------------- | --------------- | -------------------------------------------------------------------------------------------------------- |
@@ -163,12 +244,18 @@ this.debug = {
 | `BattleBall`   | 전사다          | `PhysicsBody + RotationalBody + PhysicsMaterialBody` (기본 회전, `rotationEnabled: false`로 비활성 가능) |
 | `Ability`      | 능력이다        | `Cooldown`                                                                                               |
 
-**적용 원칙**:
+**프로젝트 적용 원칙**:
 
-1. **상속은 "is-a" 관계일 때만 사용합니다.** `Projectile is a CombatEntity` → 상속 OK. `GravityParticle is a Projectile` → 아님! 투사체 판정 로직이 불필요하게 따라옴.
-2. **능력(capability)은 믹스인으로 제공합니다.** `움직일 수 있다`, `시간 제한이 있다`, `쿨다운이 있다`는 능력이지 본질이 아닙니다.
-3. **`mixins()` 합성으로 필요한 능력만 조합합니다.** `mixins([PhysicsBody, LifeSpan, ProjectileBehavior])` — 세 능력을 가진 클래스가 됩니다.
-4. **믹스인은 `(Base) => class extends Base` 함수 형태로 작성합니다.** RTS 레포(`C:\projects\rts`) 패턴을 따릅니다.
+1. **상속은 Is-A 관계일 때만 사용합니다.** `Projectile is a CombatEntity`는 성립하지만,
+   `GravityParticle is a Projectile`은 성립하지 않습니다. 후자는 투사체 판정 로직이 불필요하게 따라옵니다.
+2. **독립 상태는 Has-A 조합으로 소유합니다.** 기본 쿨타임 하나는 `Cooldown` Mixin이 맡지만, 복수 쿨타임
+   저장소는 `CooldownBank`, 대상별 제한 시간 저장소는 `TimedKeyMap`을 필드로 소유합니다.
+3. **능력은 Can-Do Mixin으로 제공합니다.** `움직일 수 있다`, `시간 제한이 있다`, `쿨다운이 있다`는
+   능력이지 본질이 아닙니다.
+4. **`mixins()` 합성으로 필요한 능력만 조합합니다.** `mixins([PhysicsBody, LifeSpan, ProjectileBehavior])`는
+   세 capability를 가진 클래스를 만듭니다.
+5. **Mixin은 `(Base) => class extends Base` 함수 형태로 작성합니다.** RTS 레포(`C:\projects\rts`) 패턴을
+   따릅니다.
 
 공용 capability의 상태는 우회 필드로 조작하지 않습니다. 쿨다운은 `timer` 별칭 없이 `tickCooldown()`,
 `resetCooldown()`, `setCooldownRemaining()`을 사용하고, 연발 콜백 결과는 문자열 대신 `BURST_RESULTS`를 사용합니다.
