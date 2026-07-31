@@ -235,6 +235,16 @@ export class ArcherAbility extends PassiveEvasion(Ability) {
 
     onBattleEnded() {
         this.state.commandIntent = null;
+        this.state.pendingSecondShot = false;
+        this.state.secondShotTimer = 0;
+        this.state.secondShotTargetCache = null;
+        this.state.secondShotCommandSequence = null;
+        const pending = this.state.pendingCommandResult;
+        if (!pending) return;
+        pending.firstShotHit ??= false;
+        pending.secondShotExpected ??= false;
+        if (pending.secondShotExpected) pending.secondShotHit ??= false;
+        this._finalizeCommandArrowResult();
     }
 
     getPassiveEvasionConfig() {

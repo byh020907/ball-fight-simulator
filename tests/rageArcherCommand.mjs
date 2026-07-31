@@ -263,6 +263,74 @@ function createOwner(id) {
 
 {
     const results = [];
+    const arrows = [];
+    const owner = createOwner("archer");
+    const target = { flags: { defeated: false }, position: new Vector2(300, 100), velocity: new Vector2() };
+    const simulation = {
+        elapsed: 10,
+        recordAbilityResult: (event) => results.push(event),
+        spawnArrow: (_owner, _start, velocity, options) => arrows.push({ velocity, options }),
+        spawnSlash() {},
+        playSound() {}
+    };
+    const ability = new ArcherAbility(owner, simulation);
+    ability.setContext({ abilityTier: 2 });
+    ability.prepareCommand({
+        sequence: 15,
+        direction: { x: 1, y: 0 },
+        pathSegments: [],
+        bouncePoints: [],
+        createdAt: 8
+    });
+    const originalRandom = Math.random;
+    Math.random = () => 0.8;
+    try {
+        ability.release(target);
+    } finally {
+        Math.random = originalRandom;
+    }
+    arrows[0].options.onResult(true);
+    // BattleSimulation.update()의 finished 분기는 entity를 더 update하지 않으므로 예약 화살은 여기서 결산한다.
+    ability.onBattleEnded();
+    ability.onBattleEnded();
+    assert.equal(results.length, 1, "battle end must finalize an unspawned scheduled second shot once");
+    assert.equal(results[0].success, true);
+    assert.equal(results[0].value.secondShotHit, false);
+    assert.equal(ability.state.pendingSecondShot, false);
+    assert.equal(ability.state.secondShotCommandSequence, null);
+}
+
+{
+    const results = [];
+    const arrows = [];
+    const owner = createOwner("archer");
+    const target = { flags: { defeated: false }, position: new Vector2(300, 100), velocity: new Vector2() };
+    const simulation = {
+        elapsed: 10,
+        recordAbilityResult: (event) => results.push(event),
+        spawnArrow: (_owner, _start, velocity, options) => arrows.push({ velocity, options }),
+        spawnSlash() {},
+        playSound() {}
+    };
+    const ability = new ArcherAbility(owner, simulation);
+    ability.prepareCommand({
+        sequence: 16,
+        direction: { x: 1, y: 0 },
+        pathSegments: [],
+        bouncePoints: [],
+        createdAt: 8
+    });
+    ability.release(target);
+    ability.onBattleEnded();
+    ability.onBattleEnded();
+    assert.equal(results.length, 1, "battle end must settle an unresolved first arrow once");
+    assert.equal(results[0].success, false);
+    assert.equal(results[0].value.hit, false);
+    assert.equal(results[0].value.secondShotHit, null);
+}
+
+{
+    const results = [];
     const owner = createOwner("rage");
     const target = {
         id: "target",
