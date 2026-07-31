@@ -125,7 +125,10 @@ export class BatBallAbility extends Ability {
         const upgrade = this.getLevelUpgrade();
         const calledShotDirection = options.calledShotDirection?.clone?.() ?? null;
         const swingDirection = calledShotDirection ? 1 : this.state.sweepDirection || 1;
-        if (calledShotDirection) this.state.arcAngle = Math.atan2(calledShotDirection.y, calledShotDirection.x);
+        if (calledShotDirection) {
+            this.state.arcAngle = Math.atan2(calledShotDirection.y, calledShotDirection.x);
+            this.state.sweepDirection = swingDirection;
+        }
         this.state.slashTimer = SLASH_DURATION;
         this.state.slashStartAngle = this.state.arcAngle - (this.getArcAngle() / 2) * swingDirection;
         this.state.slashEndAngle = this.state.arcAngle + (this.getArcAngle() / 2) * swingDirection;

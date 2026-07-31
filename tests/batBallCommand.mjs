@@ -4,6 +4,38 @@ import { Vector2 } from "../src/core.js";
 import { createRoster } from "../src/roster.js";
 import { formatAbilityResult } from "../scripts/dragAbilityMetricFormatters.mjs";
 
+const originalPerformanceNow = performance.now;
+performance.now = () => 0;
+
+function createRecordingContext() {
+    const calls = [];
+    const methods = new Set([
+        "save",
+        "restore",
+        "beginPath",
+        "arc",
+        "stroke",
+        "moveTo",
+        "lineTo",
+        "fill",
+        "setLineDash"
+    ]);
+    return new Proxy(
+        { calls },
+        {
+            get(target, property) {
+                if (property in target) return target[property];
+                if (methods.has(property)) return (...args) => calls.push([property, ...args]);
+                return () => {};
+            },
+            set(target, property, value) {
+                target[property] = value;
+                return true;
+            }
+        }
+    );
+}
+
 function createSimulation(options = {}) {
     const results = [];
     const roster = createRoster();
@@ -42,7 +74,6 @@ function releaseCommand(simulation, pointerId = 1) {
 
 function openCommand(context) {
     context.ability.setCooldownRemaining(0);
-    context.ability.state._facingAngle = -Math.sin((performance.now() / 1000) * 2.5) * (Math.PI * 0.45);
     context.ability.update(0, context.target);
     assert.equal(context.ability.state.commandWindow?.remaining, 0.8);
 }
@@ -89,14 +120,71 @@ function openCommand(context) {
         createdAt: 0
     });
     let knockbackDirection = null;
+    let knockbackMagnitude = 0;
+    let knockbackDuration = 0;
+    let slashDamage = 0;
+    const takeDamage = context.target.takeDamage.bind(context.target);
+    context.target.takeDamage = (damage, source, label, options) => {
+        if (label === "Slash") slashDamage = damage;
+        return takeDamage(damage, source, label, options);
+    };
     const applyKnockback = context.target.applyKnockback.bind(context.target);
     context.target.applyKnockback = (impulse, duration) => {
         knockbackDirection = impulse.clone().normalize();
+        knockbackMagnitude = impulse.length();
+        knockbackDuration = duration;
         return applyKnockback(impulse, duration);
     };
     context.ability.resolveCommandLaunch({ sequence: 1 });
+    assert.equal(slashDamage, Math.round(context.owner.stats.baseDamage * 1.3), "tier 0 keeps 1.3x Slash damage");
+    assert.equal(knockbackMagnitude, 550, "tier 0 keeps 550 knockback");
+    assert.equal(knockbackDuration, 0.85, "tier 0 keeps 0.85 second knockback");
+    assert.equal(context.target.state.wallSlam.effect.duration, 0.85, "tier 0 keeps 0.85 second Wall Slam");
     assert.ok(knockbackDirection.y > 0.99, "actual target knockback follows the final segment");
     assert.ok(Math.abs(context.ability.state.arcAngle - Math.PI / 2) < 1e-6, "Slash arc centers on called direction");
+    assert.equal(context.ability.state.sweepDirection, 1, "called shot aligns arc winding with its Slash direction");
+
+    const startFrame = createRecordingContext();
+    context.ability.state.slashTimer = 0.3;
+    context.ability._drawSlashEffect(startFrame, context.owner.position);
+    const startArc = startFrame.calls.find(([method]) => method === "arc");
+    assert.equal(startArc.at(-1), false, "called shot starts with the short forward Slash winding");
+    assert.ok(Math.abs(startArc[4] - startArc[5]) < 1e-9, "called shot starts at the intended arc edge");
+
+    const middleFrame = createRecordingContext();
+    context.ability.state.slashTimer = 0.15;
+    context.ability._drawSlashEffect(middleFrame, context.owner.position);
+    const middleArc = middleFrame.calls.find(([method]) => method === "arc");
+    assert.equal(middleArc.at(-1), false, "called shot midpoint retains the short arc winding");
+    assert.ok(Math.abs(middleArc[5] - middleArc[4] - Math.PI / 3) < 1e-9, "midpoint arc remains half of 120 degrees");
+
+    const batFrame = createRecordingContext();
+    context.ability._drawBat(batFrame, 0);
+    const [move, line] = batFrame.calls.filter(([method]) => method === "moveTo" || method === "lineTo");
+    const batDirection = new Vector2(line[1] - move[1], line[2] - move[2]).normalize();
+    assert.ok(batDirection.y > 0.99, "midpoint bat direction matches called knockback direction");
+
+    const endFrame = createRecordingContext();
+    context.ability.state.slashTimer = 0;
+    context.ability._drawSlashEffect(endFrame, context.owner.position);
+    assert.equal(endFrame.calls.filter(([method]) => method === "arc").length, 0, "Slash effect ends at 0.30 seconds");
+}
+
+{
+    const context = createSimulation();
+    context.owner.progression.abilityTier = 1;
+    openCommand(context);
+    const impulses = [];
+    const applyAngularImpulse = context.target.applyAngularImpulse.bind(context.target);
+    context.target.applyAngularImpulse = (impulse) => {
+        impulses.push(impulse);
+        return applyAngularImpulse(impulse);
+    };
+    releaseCommand(context.simulation, 2);
+    assert.ok(
+        impulses.some((impulse) => Math.abs(impulse) > 0),
+        "tier 1 keeps the rotating-hit angular impulse"
+    );
 }
 
 for (const resolveFallback of ["timeout", "cancel"]) {
@@ -143,6 +231,14 @@ for (const options of [
 
 {
     const context = createSimulation();
+    context.simulation.playerBall = context.target;
+    context.ability.update(0, context.target);
+    assert.equal(context.ability.state.commandWindow, null, "non-focal Bat Ball keeps the immediate legacy Slash");
+    assert.ok(context.target.state.wallSlam, "non-focal Bat Ball does not defer its existing Slash");
+}
+
+{
+    const context = createSimulation();
     context.owner.progression.abilityTier = 3;
     openCommand(context);
     releaseCommand(context.simulation, 3);
@@ -168,6 +264,7 @@ for (const options of [
     ]);
     assert.equal(context.results[0].value.tier, 3);
     assert.ok(context.results[0].value.slashDamage > 0, "called shot stores actual Slash damage");
+    assert.ok(context.results[0].value.homeRunMultiplier > 1, "tier 2+ keeps the first-impact HOME RUN multiplier");
     assert.equal(context.results[0].value.resetTriggered, true, "tier 3 records only an actual reset");
 }
 
@@ -191,4 +288,5 @@ const emptyText = formatAbilityResult("bat-ball-command-called-shot", {
 });
 assert.doesNotMatch(emptyText, /NaN|Infinity/, "Bat Ball formatter keeps empty values finite");
 
+performance.now = originalPerformanceNow;
 console.log("[bat-ball-command] ok");
