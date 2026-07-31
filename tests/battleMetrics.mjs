@@ -13,6 +13,30 @@ assert.deepEqual(empty.duration, { average: 0, median: 0, p10: 0, p90: 0 });
 assert.equal(empty.winRate, 0);
 assert.equal(empty.equipmentDirectDamageRatio, 0);
 
+{
+    const resultRecorder = new BattleMetricsRecorder();
+    assert.equal(
+        resultRecorder.recordAbilityResult({
+            fighterId: "rage",
+            abilityId: "rage",
+            resultType: "rage-command-cashout",
+            commandSequence: 3,
+            success: true,
+            value: { chargeTier: 2 },
+            simulationTimeMs: 1500
+        }),
+        true
+    );
+    const resultSnapshot = resultRecorder.snapshot({
+        focalFighterId: "rage",
+        focalAbilityResultTypes: ["rage-command-cashout", "archer-command-shot"]
+    });
+    const resultMetrics = aggregateBattleMetrics([resultSnapshot]);
+    assert.equal(resultSnapshot.abilityResults[0].commandSequence, 3);
+    assert.equal(resultMetrics.abilityResults["rage-command-cashout"].successRate, 1);
+    assert.equal(resultMetrics.abilityResults["archer-command-shot"].attempts, 0);
+}
+
 const recorder = new BattleMetricsRecorder();
 recorder.trackEquipment("completed_ability_crit", "rage");
 recorder.recordDamage({

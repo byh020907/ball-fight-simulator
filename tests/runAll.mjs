@@ -25,6 +25,10 @@ const TEST_DOMAINS = {
         modulePath: "./commandResource.mjs",
         footerMessages: new Set(["[command-resource] ok"])
     },
+    abilityCommand: {
+        modulePath: "./abilityCommand.mjs",
+        footerMessages: new Set(["[ability-command] ok"])
+    },
     dragVectorCombat: {
         modulePath: "./dragVectorCombat.mjs",
         footerMessages: new Set(["[drag-vector-combat] ok"])

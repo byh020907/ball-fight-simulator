@@ -40,21 +40,32 @@
 
 ### 환경 변수
 
-| 변수 | 기본값 | 설명 |
-|---|---|---|
-| `METRICS_SEEDS` | 1 | 정책당 시드 수 |
-| `METRICS_MAX_SECONDS` | 75 | 경기당 최대 시간(초) |
-| `METRICS_SEED` | 20260730 | 기준 시드 |
-| `METRICS_CHARACTERS` | 전 캐릭터 | 쉼표 구분 ID 목록 |
-| `METRICS_STAGES` | `cave,forest,desert` | 스테이지 목록 |
-| `METRICS_FLOORS` | `6,20,36` | 층 목록 |
-| `METRICS_COMMAND_RESOURCE_PROTOTYPE` | unset | `1` 또는 `true`일 때만 커맨드 자원 프로토타입 적용 |
+| 변수                                 | 기본값               | 설명                                                     |
+| ------------------------------------ | -------------------- | -------------------------------------------------------- |
+| `METRICS_SEEDS`                      | 1                    | 정책당 시드 수                                           |
+| `METRICS_MAX_SECONDS`                | 75                   | 경기당 최대 시간(초)                                     |
+| `METRICS_SEED`                       | 20260730             | 기준 시드                                                |
+| `METRICS_CHARACTERS`                 | 전 캐릭터            | 쉼표 구분 ID 목록                                        |
+| `METRICS_STAGES`                     | `cave,forest,desert` | 스테이지 목록                                            |
+| `METRICS_FLOORS`                     | `6,20,36`            | 층 목록                                                  |
+| `METRICS_COMMAND_RESOURCE_PROTOTYPE` | unset                | `1` 또는 `true`일 때만 커맨드 자원 프로토타입 적용       |
+| `METRICS_ABILITY_COMMAND_PROTOTYPE`  | unset                | `1` 또는 `true`일 때만 능력 커맨드 공통 인프라를 함께 켬 |
 
 ### opt-in 커맨드 자원 프로토타입
 
 `METRICS_COMMAND_RESOURCE_PROTOTYPE=1 npm run metrics:drag-ability`는 개발자용 Node 시뮬레이션에서만 제한 자원을 켠다. 실제 앱·토너먼트·사냥터 기본 드래그, HUD와 현행 무제한 규칙은 바꾸지 않는다. 초기값은 최대 2, 시작 1, 8초마다 1의 연속 회복, focal 실제 능력 사용당 0.35, 유효 발사당 1 소비다. opt-in 모드의 player 직접 드래그 충돌 피해는 plain-hit과 rear-hit 모두 기존 계산에 0.65배를 적용한다.
 
 비교 목표는 일반 전투의 의미 있는 player launch 3~5회, focal 직접 드래그 피해 비중 15~30%, focal 능력 관측률 95% 이상이다. 이 값은 HUD·입력 가독성·캐릭터별 능력 연계가 확정되기 전의 측정용 후보이며, 목표 통과만으로 실게임 계약이 되지 않는다.
+
+### 숨김 능력 커맨드 인프라
+
+`BattleSimulation`의 `abilityCommandEnabled: true`와 `METRICS_ABILITY_COMMAND_PROTOTYPE=1`은 다음 능력 연계 실험 전용 플래그다. 기본값은 꺼짐이며, 현재 앱·HUD·토너먼트·사냥터의 드래그 발사 규칙을 바꾸지 않는다. 플래그가 켜져도 아직 능력별 구현이 없는 경우 `default-shot`으로 기존 `applyImpulse()`와 `PlayerShotState.begin()`을 정확히 한 번 실행한다.
+
+유효한 플레이어 발사에는 런타임 전용의 단조 증가 `commandSequence`가 배정된다. 이는 드래그 메트릭의 `eventSequence`와 별개다. primary ability는 `getCommandState`, `prepareCommand`, `resolveCommandLaunch`, `onCommandBounce`, `resolveCommandCollision`, `onCommandEnd` 훅으로만 커맨드에 관여한다. 발사 해석 모드는 `default-shot`, `replace-shot`, `payload-only`이며 뒤의 두 모드는 generic 이동 발사를 실행하지 않는다. 능력은 캐릭터 ID 분기 대신 훅으로 자기 payload를 소유한다.
+
+`CommandIntent`는 sequence, direction, chargeRatio, pathSegments, bouncePoints, predictedTerminal을 보관한다. 새 커맨드·다음 primary ability cycle·3초 경과·전투 종료 가운데 가장 이른 조건에서 한 번 정리되고 `onCommandEnd`가 호출된다. 커맨드 충돌은 `resolveCommandCollision`의 `{ handled, runDefaultOnCollision }`으로 기존 `onCollision()`의 실행 여부를 결정한다. no-op 또는 비커맨드 충돌은 기존 `onCollision()`을 한 번 실행한다.
+
+능력은 `recordAbilityResult()`로 `fighterId`, `abilityId`, `resultType`, `commandSequence`, success, 직렬화 가능한 value, simulationTimeMs를 기록한다. `BattleMetricsRecorder`는 기존 ability-use와 분리해 이를 보관하고 `focalAbilityResultTypes`에 선언한 결과 타입이 0회여도 집계에 남긴다. 능력 결과의 성공 판정과 value 의미는 각 Ability가 소유하며, 공통 메트릭은 이를 바꾸지 않는다.
 
 ### 관측 필드
 

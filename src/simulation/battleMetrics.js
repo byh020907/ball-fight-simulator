@@ -49,6 +49,7 @@ export class BattleMetricsRecorder {
         this.damageByOrigin = {};
         this.equipment = {};
         this.abilities = [];
+        this.abilityResults = [];
         this.dragEvents = [];
         this._dealtByOrigin = {};
         this._takenByOrigin = {};
@@ -124,6 +125,20 @@ export class BattleMetricsRecorder {
         });
     }
 
+    recordAbilityResult(event = {}) {
+        if (!event.fighterId || !event.abilityId || !event.resultType) return false;
+        this.abilityResults.push({
+            fighterId: event.fighterId,
+            abilityId: event.abilityId,
+            resultType: event.resultType,
+            commandSequence: Number.isFinite(event.commandSequence) ? event.commandSequence : null,
+            success: event.success === true,
+            value: structuredClone(event.value ?? {}),
+            simulationTimeMs: nonNegative(event.simulationTimeMs)
+        });
+        return true;
+    }
+
     recordDragEvent(event = {}) {
         if (!Number.isFinite(event.sequence) || this.dragEvents.some((entry) => entry.sequence === event.sequence))
             return;
@@ -144,7 +159,8 @@ export class BattleMetricsRecorder {
         fighters = [],
         timedOut = false,
         focalFighterId = null,
-        focalAbilityIds = []
+        focalAbilityIds = [],
+        focalAbilityResultTypes = []
     } = {}) {
         const fighterSnapshots = Object.fromEntries(
             fighters.map((fighter) => [
@@ -175,9 +191,11 @@ export class BattleMetricsRecorder {
                 ])
             ),
             abilities: structuredClone(this.abilities),
+            abilityResults: structuredClone(this.abilityResults),
             dragEvents: structuredClone(this.dragEvents),
             focalFighterId,
-            focalAbilityIds: [...focalAbilityIds]
+            focalAbilityIds: [...focalAbilityIds],
+            focalAbilityResultTypes: structuredClone(focalAbilityResultTypes)
         };
     }
 }
@@ -237,6 +255,7 @@ export function aggregateBattleMetrics(snapshots = []) {
         equipmentDamage: 0,
         equipment: {},
         abilities: {},
+        abilityResults: {},
         drag: {}
     };
     const focalDealtOriginTotals = {};
@@ -246,12 +265,14 @@ export function aggregateBattleMetrics(snapshots = []) {
     const dragBounceCounts = [];
     const maxBounceTiers = {};
     const allFocalAbilityIds = new Set();
+    const allFocalResultTypes = new Set();
     for (const snapshot of validSnapshots) {
         if (snapshot.timedOut) totals.timeouts += 1;
         const focalId = snapshot.focalFighterId;
         if (focalId && snapshot.focalAbilityIds?.length) {
             for (const aid of snapshot.focalAbilityIds) allFocalAbilityIds.add(aid);
         }
+        for (const resultType of snapshot.focalAbilityResultTypes ?? []) allFocalResultTypes.add(resultType);
         if (snapshot.winnerId && (!focalId || snapshot.winnerId === focalId)) totals.wins += 1;
         else if (snapshot.loserId && (!focalId || snapshot.loserId === focalId)) totals.losses += 1;
         else totals.draws += 1;
@@ -281,6 +302,20 @@ export function aggregateBattleMetrics(snapshots = []) {
                 record.matchesWithUse += 1;
                 record.firstElapsedSamples.push(Math.min(...events.map((event) => nonNegative(event.elapsed))));
             }
+        }
+        const focalResults = focalId
+            ? (snapshot.abilityResults ?? []).filter((result) => result.fighterId === focalId)
+            : (snapshot.abilityResults ?? []);
+        for (const result of focalResults) {
+            allFocalResultTypes.add(result.resultType);
+            const record = getRecord(totals.abilityResults, result.resultType, () => ({
+                attempts: 0,
+                successes: 0,
+                values: []
+            }));
+            increment(record, "attempts");
+            if (result.success) increment(record, "successes");
+            record.values.push(result.value ?? {});
         }
         for (const [templateId, entry] of Object.entries(snapshot.equipment ?? {})) {
             const equipment = getRecord(totals.equipment, templateId, () => ({
@@ -335,6 +370,18 @@ export function aggregateBattleMetrics(snapshots = []) {
             noUseRate: sampleCount ? 1 - entry.matchesWithUse / sampleCount : 1
         };
     }
+    const abilityResultEntries = {};
+    for (const resultType of allFocalResultTypes) {
+        const entry = totals.abilityResults[resultType] ?? { attempts: 0, successes: 0, values: [] };
+        abilityResultEntries[resultType] = {
+            attempts: entry.attempts,
+            attemptsPerMatch: sampleCount ? entry.attempts / sampleCount : 0,
+            successes: entry.successes,
+            successesPerMatch: sampleCount ? entry.successes / sampleCount : 0,
+            successRate: entry.attempts ? entry.successes / entry.attempts : 0,
+            values: structuredClone(entry.values)
+        };
+    }
     if (allFocalAbilityIds.size) {
         for (const abilityId of allFocalAbilityIds) {
             if (!abilityEntries[abilityId]) {
@@ -386,6 +433,7 @@ export function aggregateBattleMetrics(snapshots = []) {
         },
         equipment,
         abilities: abilityEntries,
+        abilityResults: abilityResultEntries,
         drag: Object.fromEntries(
             Object.entries(totals.drag).map(([type, count]) => [
                 type,

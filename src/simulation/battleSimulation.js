@@ -99,6 +99,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
                       automated: options.dragCombatAutomated
                   })
                 : null;
+        this.abilityCommandEnabled = options.abilityCommandEnabled === true;
         this.commandResource =
             options.commandResourceEnabled === true ||
             options.commandResource === true ||
@@ -212,6 +213,19 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         this.commandResource?.gainFromAbilityUse(event.ownerId);
         this.hooks?.onAbilityUsed?.(event);
         return true;
+    }
+
+    recordAbilityResult(event = {}) {
+        if (!event.fighterId || !event.abilityId || !event.resultType) return false;
+        this.hooks?.onAbilityResult?.({
+            ...event,
+            simulationTimeMs: Number.isFinite(event.simulationTimeMs) ? event.simulationTimeMs : this.elapsed * 1000
+        });
+        return true;
+    }
+
+    notifyPrimaryAbilityCycle(ability) {
+        this.dragCombat?.expireCommandForAbility?.(ability, "ability-cycle");
     }
 
     moveDragCombat(pointerId, cssPoint) {
@@ -689,8 +703,8 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         });
         this._handleDashCollisions(a, b, contactPoint);
 
-        a.abilities.onCollision(b, { contactPoint });
-        b.abilities.onCollision(a, { contactPoint });
+        if (context.commandCollisionDefaults?.get(a) !== false) a.abilities.onCollision(b, { contactPoint });
+        if (context.commandCollisionDefaults?.get(b) !== false) b.abilities.onCollision(a, { contactPoint });
         context.deferredSpinCut?.start(context);
         this._recordPhysicsDebugCollision(context);
     }

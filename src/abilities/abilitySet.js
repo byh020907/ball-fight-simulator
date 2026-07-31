@@ -170,6 +170,35 @@ export class AbilitySet {
         this._primary?.onDashWall?.();
     }
 
+    getPrimaryCommandState(context) {
+        return this._primary?.getCommandState?.(context) ?? { available: false };
+    }
+
+    preparePrimaryCommand(intent, context) {
+        return this._primary?.prepareCommand?.(intent, context) ?? intent;
+    }
+
+    resolvePrimaryCommandLaunch(intent, context) {
+        return this._primary?.resolveCommandLaunch?.(intent, context) ?? { mode: "default-shot" };
+    }
+
+    onPrimaryCommandBounce(event, context) {
+        this._primary?.onCommandBounce?.(event, context);
+    }
+
+    resolvePrimaryCommandCollision(event, context) {
+        return (
+            this._primary?.resolveCommandCollision?.(event, context) ?? {
+                handled: false,
+                runDefaultOnCollision: true
+            }
+        );
+    }
+
+    onPrimaryCommandEnd(event, context) {
+        this._primary?.onCommandEnd?.(event, context);
+    }
+
     onOwnerDefeated(context) {
         return this._forEach("onOwnerDefeated", context).some(Boolean);
     }

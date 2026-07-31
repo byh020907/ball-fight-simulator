@@ -75,6 +75,7 @@ export class Ability extends mixins([Cooldown]) {
             this.owner?.combatEquipment?.abilityUsed({ ability: this, simulation: this.simulation });
         }
         if (wasReady) this.recordUsageMetric();
+        if (wasReady && this.role === "primary") this.simulation?.notifyPrimaryAbilityCycle?.(this);
     }
 
     recordUsageMetric() {
@@ -89,6 +90,36 @@ export class Ability extends mixins([Cooldown]) {
         });
         return true;
     }
+
+    recordAbilityResult(result = {}) {
+        return (
+            this.simulation?.recordAbilityResult?.({
+                fighterId: this.owner?.id ?? null,
+                abilityId: this.abilityId,
+                ...result
+            }) ?? false
+        );
+    }
+
+    getCommandState() {
+        return { available: false };
+    }
+
+    prepareCommand(intent) {
+        return intent;
+    }
+
+    resolveCommandLaunch() {
+        return { mode: "default-shot" };
+    }
+
+    onCommandBounce() {}
+
+    resolveCommandCollision() {
+        return { handled: false, runDefaultOnCollision: true };
+    }
+
+    onCommandEnd() {}
 
     update() {}
     onCollision() {}

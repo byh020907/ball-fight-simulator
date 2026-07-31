@@ -38,7 +38,8 @@ const CONFIG = Object.freeze({
     candidateAngles: 12,
     holdSeconds: 0.35,
     pullPixels: 130,
-    commandResourcePrototype: readBoolean("METRICS_COMMAND_RESOURCE_PROTOTYPE")
+    commandResourcePrototype: readBoolean("METRICS_COMMAND_RESOURCE_PROTOTYPE"),
+    abilityCommandPrototype: readBoolean("METRICS_ABILITY_COMMAND_PROTOTYPE")
 });
 
 const POLICIES = ["무입력", "직선 반복", "궤적 예측 기반 반사 탐색"];
@@ -159,6 +160,7 @@ function runMatch({ seed, characterId, stageId, floor, policy }) {
                 onDamageResolved: (event) => recorder.recordDamage(event),
                 onEquipmentPassiveTriggered: (event) => recorder.recordEquipmentPassiveTrigger(event),
                 onAbilityUsed: (event) => recorder.recordAbilityUsed(event),
+                onAbilityResult: (event) => recorder.recordAbilityResult(event),
                 onDragCombatMetric: (event) => recorder.recordDragEvent(event)
             },
             null,
@@ -168,7 +170,8 @@ function runMatch({ seed, characterId, stageId, floor, policy }) {
                 width: arena.WIDTH,
                 height: arena.HEIGHT,
                 dragCombatEnabled: true,
-                commandResourceEnabled: CONFIG.commandResourcePrototype
+                commandResourceEnabled: CONFIG.commandResourcePrototype || CONFIG.abilityCommandPrototype,
+                abilityCommandEnabled: CONFIG.abilityCommandPrototype
             }
         );
         disableVisualEffects(simulation);
@@ -210,7 +213,8 @@ function runMatch({ seed, characterId, stageId, floor, policy }) {
             fighters: simulation.fighters,
             timedOut: !simulation.finished,
             focalFighterId: player.id,
-            focalAbilityIds: player.abilities.all.map((ability) => ability.abilityId).filter(Boolean)
+            focalAbilityIds: player.abilities.all.map((ability) => ability.abilityId).filter(Boolean),
+            focalAbilityResultTypes: []
         });
     } finally {
         Math.random = originalRandom;
@@ -230,7 +234,12 @@ function percent(value) {
 }
 
 function main() {
-    console.log(`=== 드래그·능력 계측 (${CONFIG.commandResourcePrototype ? "커맨드 자원 프로토타입" : "기준선"}) ===`);
+    const mode = CONFIG.abilityCommandPrototype
+        ? "능력 커맨드 인프라 프로토타입"
+        : CONFIG.commandResourcePrototype
+          ? "커맨드 자원 프로토타입"
+          : "기준선";
+    console.log(`=== 드래그·능력 계측 (${mode}) ===`);
     for (const [index, stageId] of CONFIG.stages.entries()) {
         const floor = CONFIG.floors[index % CONFIG.floors.length];
         console.log(`\n--- ${stageId} floor=${floor} ---`);

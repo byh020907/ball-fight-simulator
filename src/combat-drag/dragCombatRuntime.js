@@ -3,6 +3,7 @@ import { PlayerShotState } from "./playerShotState.js";
 import { EnemyAttackQueue } from "./enemyAttackQueue.js";
 import { DRAG_COMBAT_CONFIG, getDragLaunchSpeed } from "./config.js";
 import { Vector2 } from "../core.js";
+import { copyCommandIntent, createCommandIntent } from "../combat-command/index.js";
 import {
     advanceEnemyChargePlan,
     getChargeRatio,
@@ -34,6 +35,8 @@ export class DragCombatRuntime {
         this.enemySlowElapsed = 0;
         this.lastEvent = null;
         this.eventSequence = 0;
+        this.commandSequence = 0;
+        this.activeCommand = null;
         this.aimOwner = null;
         this.aimCaster = null;
         this.pendingWarpRemoval = false;
@@ -102,6 +105,7 @@ export class DragCombatRuntime {
             return;
         }
         this.#resolveInputResult(this.input.tick(realDelta));
+        this.#expireCommand();
         this.#activateQueuedInput();
         if (
             this.aimCaster &&
@@ -131,6 +135,7 @@ export class DragCombatRuntime {
             player?.stats?.baseSpeed ?? player?.stats?.speed
         );
         if (event) this.#record(event);
+        if (event) this.#endCommand(event.type);
     }
 
     tickEnemy(combatDelta) {
@@ -193,7 +198,11 @@ export class DragCombatRuntime {
         if (!this.shot.active || fighter !== this.#player()) return;
         const key = context.surfaceKey;
         if (this.shot.bounce(key, this.shot.elapsed))
-            this.#record({ type: "bounce", surfaceKey: key, bounceCount: this.shot.bounceCount });
+            this.#recordCommandBounce(
+                { type: "bounce", surfaceKey: key, bounceCount: this.shot.bounceCount },
+                fighter,
+                context
+            );
     }
 
     resolveFighterCollision(context, damage = null) {
@@ -218,6 +227,8 @@ export class DragCombatRuntime {
             const player = this.#player();
             const other = context.a === player ? context.b : context.a;
             this.#applyCollisionResult(context, player, other, result.playerShot, damage);
+            this.#resolveCommandCollision(context, player, other, result.playerShot);
+            this.#endCommand(result.playerShot.type);
         }
         if (result.enemyFlight && !context.collisionReplaced) {
             const { attacker } = result.enemyFlight;
@@ -229,6 +240,7 @@ export class DragCombatRuntime {
     }
 
     reset() {
+        this.#endCommand("reset");
         this.#removeAimWarp();
         this.pendingWarpRemoval = false;
         this.aimOwner = null;
@@ -314,6 +326,8 @@ export class DragCombatRuntime {
             },
             lastEvent: copyValue(this.lastEvent),
             eventSequence: this.eventSequence,
+            commandSequence: this.commandSequence,
+            activeCommand: copyCommandIntent(this.activeCommand?.intent),
             commandResource: this.simulation.commandResource?.snapshot() ?? null
         };
     }
@@ -325,15 +339,9 @@ export class DragCombatRuntime {
             if (!this.#canAct() || !player) return this.#cancelLaunch();
             if (!this.#spendCommand()) return this.#cancelLaunch();
             const direction = new Vector2(result.snapshot.vector.x, result.snapshot.vector.y);
-            const speed = getDragLaunchSpeed(player.stats.baseSpeed, result.snapshot.chargeRatio, this.config.shot);
-            player.applyImpulse(direction.scale(speed));
-            const shields = new Map(
-                this.simulation
-                    .getEnemiesOf(player)
-                    .filter((fighter) => !fighter.flags.defeated && !fighter.flags.destroyed)
-                    .map((fighter) => [fighter.id, Vector2.subtract(player.position, fighter.position).normalize()])
-            );
-            this.shot.begin(player.id, shields);
+            const command = this.#prepareCommand(player, direction, result.snapshot.chargeRatio);
+            const launch = this.#resolveCommandLaunch(player, command);
+            if (launch.mode === "default-shot") this.#launchDefaultShot(player, direction, result.snapshot.chargeRatio);
         }
         if (result.type === "launch" || result.type === "cancel") {
             this.#removeAimWarp();
@@ -383,6 +391,110 @@ export class DragCombatRuntime {
         this.aimOwner = null;
         this.playerWarpReleased = false;
         return { type: "cancel" };
+    }
+
+    expireCommandForAbility(ability, reason = "ability-cycle") {
+        if (
+            !this.activeCommand ||
+            this.activeCommand.owner !== ability?.owner ||
+            this.activeCommand.ability !== ability
+        )
+            return false;
+        this.#endCommand(reason);
+        return true;
+    }
+
+    #prepareCommand(player, direction, chargeRatio) {
+        if (!this.simulation.abilityCommandEnabled) return null;
+        this.#endCommand("replaced");
+        const ability = player.abilities.primary;
+        const intent = createCommandIntent({
+            sequence: this.commandSequence + 1,
+            direction,
+            chargeRatio,
+            predictedTerminal: null,
+            createdAt: this.simulation.elapsed
+        });
+        const prepared =
+            player.abilities.preparePrimaryCommand(intent, { simulation: this.simulation, player }) ?? intent;
+        this.commandSequence += 1;
+        this.activeCommand = {
+            owner: player,
+            ability,
+            intent: copyCommandIntent(prepared),
+            expiresAt: this.simulation.elapsed + 3
+        };
+        return this.activeCommand;
+    }
+
+    #resolveCommandLaunch(player, command) {
+        if (!command) return { mode: "default-shot" };
+        const result = player.abilities.resolvePrimaryCommandLaunch(copyCommandIntent(command.intent), {
+            simulation: this.simulation,
+            player,
+            commandSequence: command.intent.sequence
+        });
+        const mode = result?.mode;
+        if (["default-shot", "replace-shot", "payload-only"].includes(mode)) return { ...result, mode };
+        return { mode: "default-shot" };
+    }
+
+    #launchDefaultShot(player, direction, chargeRatio) {
+        const speed = getDragLaunchSpeed(player.stats.baseSpeed, chargeRatio, this.config.shot);
+        player.applyImpulse(direction.scale(speed));
+        const shields = new Map(
+            this.simulation
+                .getEnemiesOf(player)
+                .filter((fighter) => !fighter.flags.defeated && !fighter.flags.destroyed)
+                .map((fighter) => [fighter.id, Vector2.subtract(player.position, fighter.position).normalize()])
+        );
+        this.shot.begin(player.id, shields);
+    }
+
+    #recordCommandBounce(event, fighter, context) {
+        if (this.activeCommand?.owner === fighter) {
+            const point = copyPoint(context.contactPoint) ?? copyPoint(fighter.position);
+            if (point) this.activeCommand.intent.bouncePoints.push(point);
+            fighter.abilities.onPrimaryCommandBounce(
+                {
+                    ...event,
+                    commandSequence: this.activeCommand.intent.sequence,
+                    intent: copyCommandIntent(this.activeCommand.intent)
+                },
+                { simulation: this.simulation, fighter, context }
+            );
+        }
+        this.#record(event);
+    }
+
+    #resolveCommandCollision(context, player, other, result) {
+        if (this.activeCommand?.owner !== player) return;
+        const event = {
+            type: result.type,
+            commandSequence: this.activeCommand.intent.sequence,
+            intent: copyCommandIntent(this.activeCommand.intent),
+            target: other,
+            contactPoint: copyPoint(context.contactPoint)
+        };
+        const resolution =
+            player.abilities.resolvePrimaryCommandCollision(event, { simulation: this.simulation, player, context }) ??
+            {};
+        context.commandCollisionDefaults ??= new Map();
+        context.commandCollisionDefaults.set(player, resolution.runDefaultOnCollision !== false);
+    }
+
+    #expireCommand() {
+        if (this.activeCommand && this.simulation.elapsed >= this.activeCommand.expiresAt) this.#endCommand("expired");
+    }
+
+    #endCommand(reason) {
+        const command = this.activeCommand;
+        if (!command) return;
+        this.activeCommand = null;
+        command.owner?.abilities?.onPrimaryCommandEnd(
+            { reason, commandSequence: command.intent.sequence, intent: copyCommandIntent(command.intent) },
+            { simulation: this.simulation, player: command.owner }
+        );
     }
 
     #applyCollisionResult(context, player, other, result, damage) {
