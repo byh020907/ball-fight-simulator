@@ -23,7 +23,11 @@ export const HERO_COMBAT_CONFIG = Object.freeze({
     pursuit: Object.freeze({
         interval: 0.5,
         duration: 0.5,
-        speedMultiplier: 1.3
+        speedMultiplier: 1.3,
+        command: Object.freeze({
+            inputWindow: 0.8,
+            fanAngle: Math.PI / 3
+        })
     }),
     armor: Object.freeze({
         shieldPerCoreMaxHpRatio: 0.05,

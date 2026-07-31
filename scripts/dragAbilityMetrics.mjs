@@ -217,7 +217,8 @@ function runMatch({ seed, characterId, stageId, floor, policy }) {
             focalAbilityResultTypes: CONFIG.abilityCommandPrototype
                 ? ({
                       rage: ["rage-command-cashout"],
-                      archer: ["archer-command-shot"]
+                      archer: ["archer-command-shot"],
+                      hero: ["hero-command-core-cycle"]
                   }[characterId] ?? [])
                 : []
         });

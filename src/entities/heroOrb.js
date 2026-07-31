@@ -225,13 +225,16 @@ export class HeroOrb extends CollectionGrace(CombatEntity) {
         velocity,
         effectType,
         life,
-        { collectionGraceDuration = 0, sourceAbility = null } = {}
+        { collectionGraceDuration = 0, sourceAbility = null, commandSequence = null, onSettled = null } = {}
     ) {
         super(position, velocity, 12);
         this.owner = owner;
         this.ownerId = owner.id;
         this.effectType = effectType;
         this.sourceAbility = sourceAbility;
+        this.commandSequence = Number.isFinite(commandSequence) ? commandSequence : null;
+        this.onSettled = onSettled;
+        this.settled = false;
         this.life = life ?? Infinity;
         this.mass = 2;
         this.color = HERO_ORB_EFFECTS[effectType]?.color ?? "#ffffff";
@@ -249,7 +252,7 @@ export class HeroOrb extends CollectionGrace(CombatEntity) {
         this.integrate(delta);
         simulation.keepEntityInsideArena(this);
         if (Number.isFinite(this.life) && this.life <= 0) {
-            this.isExpired = true;
+            this.settle({ collected: false });
             return;
         }
 
@@ -265,9 +268,10 @@ export class HeroOrb extends CollectionGrace(CombatEntity) {
             if (fighter.id === this.ownerId) {
                 if (isCollectionGraceActive) continue;
                 const effectDef = HERO_ORB_EFFECTS[this.effectType];
+                let result = null;
                 if (effectDef) {
                     const sourceAbility = this._resolveSourceAbility();
-                    const result = effectDef.apply(fighter, {
+                    result = effectDef.apply(fighter, {
                         orb: this,
                         simulation,
                         effectType: this.effectType,
@@ -285,7 +289,7 @@ export class HeroOrb extends CollectionGrace(CombatEntity) {
                         simulation.addLog(`${fighter.name} collects a ${effectDef.label} orb!`);
                     }
                 }
-                this.isExpired = true;
+                this.settle({ collected: true, result });
                 return;
             }
 
@@ -295,6 +299,14 @@ export class HeroOrb extends CollectionGrace(CombatEntity) {
             simulation.playSound("bounce", 0.3);
             return;
         }
+    }
+
+    settle({ collected, result = null } = {}) {
+        if (this.settled) return false;
+        this.settled = true;
+        this.isExpired = true;
+        this.onSettled?.({ orb: this, collected: collected === true, result });
+        return true;
     }
 
     _applyOwnerMagnet(delta) {

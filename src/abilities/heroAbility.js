@@ -37,7 +37,12 @@ export class HeroAbility extends EnergyShieldVisual(Ability) {
             shield: 0,
             shieldDecayTimer: 0,
             stackGainFlash: 0,
-            stackReleaseFlash: 0
+            stackReleaseFlash: 0,
+            commandWindowRemaining: 0,
+            commandWasAiming: false,
+            preparedCommand: null,
+            commandCycles: new Map(),
+            collisionSequences: new Set()
         };
     }
 
@@ -67,15 +72,34 @@ export class HeroAbility extends EnergyShieldVisual(Ability) {
             this.state.stackGainFlash = HERO_COMBAT_CONFIG.growth.gainFlashDuration;
             if (this.state.growthStacks === HERO_COMBAT_CONFIG.growth.stackCap)
                 this.cooldowns.clear(HERO_COOLDOWN_KEYS.pursuit);
+            if (this.state.growthStacks === HERO_COMBAT_CONFIG.growth.stackCap) this._openCommandWindow();
         }
     }
 
     _updatePursuit(delta, fallbackTarget) {
         if (this.state.growthStacks < HERO_COMBAT_CONFIG.growth.stackCap) {
             this.cooldowns.clear(HERO_COOLDOWN_KEYS.pursuit);
+            this.state.commandWindowRemaining = 0;
+            this.state.commandWasAiming = false;
             return;
         }
         if (!this.cooldowns.isReady(HERO_COOLDOWN_KEYS.pursuit) || this.owner.state.movement) return;
+
+        if (this.state.preparedCommand) return;
+        if (this._hasCommandWindow()) {
+            const aiming = this.simulation.dragCombat?.input?.state === "aiming";
+            if (aiming) {
+                this.state.commandWasAiming = true;
+                return;
+            }
+            if (this.state.commandWasAiming) {
+                this.state.commandWindowRemaining = 0;
+                this.state.commandWasAiming = false;
+            } else {
+                this.state.commandWindowRemaining = Math.max(0, this.state.commandWindowRemaining - Math.max(0, delta));
+                if (this.state.commandWindowRemaining > 0) return;
+            }
+        }
 
         const target = this._resolvePursuitTarget(fallbackTarget);
         if (!target) return;
@@ -106,33 +130,114 @@ export class HeroAbility extends EnergyShieldVisual(Ability) {
         return this.simulation.getNearestEnemy(this.owner);
     }
 
+    _openCommandWindow() {
+        if (!this._canAcceptPlayerCommand()) return;
+        this.state.commandWindowRemaining = HERO_COMBAT_CONFIG.pursuit.command.inputWindow;
+        this.state.commandWasAiming = false;
+    }
+
+    _canAcceptPlayerCommand() {
+        const runtime = this.simulation.dragCombat;
+        return Boolean(
+            this.simulation.abilityCommandEnabled &&
+            this.simulation.playerBall === this.owner &&
+            runtime &&
+            !runtime.automated &&
+            this.simulation.commandResource?.canSpend?.()
+        );
+    }
+
+    _hasCommandWindow() {
+        return this._canAcceptPlayerCommand() && this.state.commandWindowRemaining > 0;
+    }
+
+    prepareCommand(intent) {
+        if (
+            this.state.growthStacks < HERO_COMBAT_CONFIG.growth.stackCap ||
+            (!this._hasCommandWindow() && !this.state.commandWasAiming)
+        )
+            return intent;
+        this.state.preparedCommand = { ...intent, direction: { ...intent.direction } };
+        this.state.commandWindowRemaining = 0;
+        this.state.commandWasAiming = false;
+        return this.state.preparedCommand;
+    }
+
+    resolveCommandCollision(event, { context } = {}) {
+        const intent = this.state.preparedCommand;
+        if (
+            !intent ||
+            intent.sequence !== event.commandSequence ||
+            !event.target ||
+            !this.simulation.isHostile(this.owner, event.target) ||
+            this.state.collisionSequences.has(event.commandSequence)
+        )
+            return { handled: false, runDefaultOnCollision: true };
+        this.state.collisionSequences.add(event.commandSequence);
+        context.heroCommandSequence = event.commandSequence;
+        context.heroCommandDirection = { ...intent.direction };
+        return { handled: true, runDefaultOnCollision: true };
+    }
+
     onFighterCollisionDamageResolved(target, actualDamage, context = {}) {
         if (!target) return;
+        const commandSequence = context.heroCommandSequence;
+        if (Number.isFinite(commandSequence)) {
+            const intent = this.state.preparedCommand;
+            if (intent?.sequence !== commandSequence) return;
+            this._releaseGrowthCores(context.contactPoint ?? target.position, {
+                direction: context.heroCommandDirection,
+                commandSequence
+            });
+            this.state.preparedCommand = null;
+            return;
+        }
         this._releaseGrowthCores(context.contactPoint ?? target.position);
     }
 
-    _releaseGrowthCores(contactPoint) {
+    _releaseGrowthCores(contactPoint, command = null) {
         const stackCount = this.state.growthStacks;
         if (stackCount <= 0) return;
         this.state.growthStacks = 0;
         this.state.chargeTimer = 0;
         this.cooldowns.clear(HERO_COOLDOWN_KEYS.pursuit);
         this.state.stackReleaseFlash = HERO_COMBAT_CONFIG.growth.releaseFlashDuration;
-        for (const _ of Array.from({ length: stackCount })) {
-            const direction = Vector2.fromAngle(Math.random() * Math.PI * 2, 1);
-            this._spawnCore(pickHeroOrbEffectType(), contactPoint, direction);
+        if (Number.isFinite(command?.commandSequence)) {
+            this.state.commandCycles.set(command.commandSequence, {
+                released: stackCount,
+                collected: 0,
+                shield: 0,
+                heal: 0,
+                settled: 0,
+                finalized: false
+            });
+        }
+        for (const [index] of Array.from({ length: stackCount }).entries()) {
+            const direction = command
+                ? this._getCommandCoreDirection(command.direction, index, stackCount)
+                : Vector2.fromAngle(Math.random() * Math.PI * 2, 1);
+            this._spawnCore(pickHeroOrbEffectType(), contactPoint, direction, command?.commandSequence ?? null);
         }
         this.simulation.spawnPulse(new Vector2(contactPoint.x, contactPoint.y), "#ffd85a");
         this.simulation.playSound("orb", 0.9);
     }
 
-    _spawnCore(effectType, contactPoint, direction) {
+    _getCommandCoreDirection(direction, index, count) {
+        const base = new Vector2(direction?.x ?? 1, direction?.y ?? 0);
+        if (base.length() <= 0.001) base.x = 1;
+        const center = Math.atan2(base.y, base.x);
+        const progress = count <= 1 ? 0.5 : index / (count - 1);
+        const angle = center + (progress - 0.5) * HERO_COMBAT_CONFIG.pursuit.command.fanAngle;
+        return Vector2.fromAngle(angle, 1);
+    }
+
+    _spawnCore(effectType, contactPoint, direction, commandSequence = null) {
         this._enforceOwnerCoreLimit();
         const speedMultiplier =
             HERO_COMBAT_CONFIG.core.speedMinMultiplier +
             Math.random() * (HERO_COMBAT_CONFIG.core.speedMaxMultiplier - HERO_COMBAT_CONFIG.core.speedMinMultiplier);
         const speed = computeOwnerCombatSpeed(this.owner) * speedMultiplier;
-        this.simulation.spawnHeroOrb(
+        return this.simulation.spawnHeroOrb(
             this.owner,
             new Vector2(contactPoint.x, contactPoint.y),
             direction.clone().scale(speed),
@@ -140,7 +245,9 @@ export class HeroAbility extends EnergyShieldVisual(Ability) {
             HERO_COMBAT_CONFIG.core.lifetime,
             {
                 collectionGraceDuration: HERO_COMBAT_CONFIG.core.collectionGraceDuration,
-                sourceAbility: this
+                sourceAbility: this,
+                commandSequence,
+                onSettled: (event) => this._settleCommandCore(commandSequence, event)
             }
         );
     }
@@ -152,7 +259,10 @@ export class HeroAbility extends EnergyShieldVisual(Ability) {
     }
 
     _enforceOwnerCoreLimit() {
-        enforceActiveEntityLimit(this._getActiveOwnerCores(), HERO_ORB_MAX_ACTIVE_PER_OWNER, { reserveSlots: 1 });
+        enforceActiveEntityLimit(this._getActiveOwnerCores(), HERO_ORB_MAX_ACTIVE_PER_OWNER, {
+            reserveSlots: 1,
+            expire: (orb) => orb.settle?.({ collected: false }) ?? (orb.isExpired = true)
+        });
     }
 
     getOrbAttraction(orb) {
@@ -170,17 +280,24 @@ export class HeroAbility extends EnergyShieldVisual(Ability) {
     }
 
     onOrbCollected(orb, result) {
-        if (!result?.applied) return;
+        const commandCycle = this.state.commandCycles.get(orb?.commandSequence);
+        if (commandCycle) commandCycle.collected += 1;
+        if (!result?.applied) return { shield: 0, heal: 0 };
         const upgrade = this.getLevelUpgrade();
-        if (upgrade.heroArmor) this._addShieldFromCore();
-        if (upgrade.coreRecovery) this._healFromCore();
+        const shield = upgrade.heroArmor ? this._addShieldFromCore() : 0;
+        const heal = upgrade.coreRecovery ? this._healFromCore() : 0;
+        if (commandCycle) {
+            commandCycle.shield += shield;
+            commandCycle.heal += heal;
+        }
+        return { shield, heal };
     }
 
     _addShieldFromCore() {
         const gained = this.owner.maxHp * HERO_COMBAT_CONFIG.armor.shieldPerCoreMaxHpRatio;
         const previous = this.state.shield;
         this.state.shield = Math.min(this.getMaximumShield(), previous + gained);
-        if (this.state.shield <= previous) return;
+        if (this.state.shield <= previous) return 0;
         this.simulation.spawnParticleBurst(this.owner.position.clone(), "#ffe66b", {
             count: 8,
             speed: 90,
@@ -188,13 +305,57 @@ export class HeroAbility extends EnergyShieldVisual(Ability) {
             radiusMax: 4,
             upBias: 12
         });
+        return this.state.shield - previous;
     }
 
     _healFromCore() {
         const restored = this.owner.heal(this.owner.maxHp * HERO_COMBAT_CONFIG.core.recoveryPerCoreMaxHpRatio);
-        if (restored <= 0) return;
+        if (restored <= 0) return 0;
         this.simulation.spawnActionText(this.owner.position.clone(), `회복 +${restored}`, "#55cc77");
         this.simulation.playSound("powerup", 1.05);
+        return restored;
+    }
+
+    _settleCommandCore(commandSequence, { collected } = {}) {
+        if (!Number.isFinite(commandSequence)) return;
+        const cycle = this.state.commandCycles.get(commandSequence);
+        if (!cycle || cycle.finalized) return;
+        cycle.settled += 1;
+        if (cycle.settled >= cycle.released) this._finalizeCommandCycle(commandSequence);
+    }
+
+    _finalizeCommandCycle(commandSequence) {
+        const cycle = this.state.commandCycles.get(commandSequence);
+        if (!cycle || cycle.finalized) return;
+        cycle.finalized = true;
+        this.recordAbilityResult({
+            commandSequence,
+            resultType: "hero-command-core-cycle",
+            success: cycle.collected > 0,
+            value: {
+                released: cycle.released,
+                collected: cycle.collected,
+                shield: cycle.shield,
+                heal: cycle.heal
+            }
+        });
+        this.state.commandCycles.delete(commandSequence);
+        this.state.collisionSequences.delete(commandSequence);
+    }
+
+    onCommandEnd(event) {
+        if (event.reason === "plain-hit" || event.reason === "rear-hit" || event.reason === "shield-counter") return;
+        if (this.state.preparedCommand?.sequence === event.commandSequence) this.state.preparedCommand = null;
+        this.state.collisionSequences.delete(event.commandSequence);
+    }
+
+    onBattleEnded() {
+        for (const orb of this._getActiveOwnerCores().filter((entity) => Number.isFinite(entity.commandSequence))) {
+            orb.settle?.({ collected: false });
+        }
+        for (const commandSequence of [...this.state.commandCycles.keys()]) this._finalizeCommandCycle(commandSequence);
+        this.state.preparedCommand = null;
+        this.state.commandWindowRemaining = 0;
     }
 
     getMaximumShield() {

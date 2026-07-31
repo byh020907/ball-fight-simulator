@@ -76,6 +76,12 @@
 
 `METRICS_ABILITY_COMMAND_PROTOTYPE=1`에서는 focal Rage/Archer의 result attempt/match와 성공률을 함께 출력한다. 무입력은 해당 result attempt가 0이어야 하며, 기본 UI·HUD·AI 경로는 이 실험의 영향을 받지 않는다.
 
+### Hero 실험 슬라이스
+
+Hero는 코어 5스택을 채운 focal 플레이어가 커맨드 자원을 보유했을 때만 0.8초 동안 자동 추격을 멈추고 드래그 입력을 기다린다. AI·자원 없음·플래그 off에서는 같은 프레임에 기존 자동 추격을 그대로 시작한다. 창 안에 aim이 시작되면 release 또는 cancel까지 기다리고, cancel·timeout은 기존 추격 대상으로 즉시 되돌아간다.
+
+유효 커맨드의 첫 적대 충돌은 기본 충돌 피해를 유지한 뒤, 저장된 드래그 방향 기준 60도 fan으로 기존 HeroOrb 5개를 방출한다. 각 orb는 `commandSequence`를 갖고 수집·수명 만료·active limit 만료·전투 종료 중 하나로 정확히 한 번 결산된다. `hero-command-core-cycle` 결과는 실제 방출·물리 수집·방패 증가·HP 회복량을 기록한다. 일반 HeroOrb와 자동 추격의 동작은 바꾸지 않는다.
+
 ### 관측 필드
 
 - **능력**: focal 플레이어만 대상, 첫 발동 시각(경기당 평균·중앙값), 발동 횟수(경기당), noUseRate(미발동 경기 비율). zero-use 능력은 `focalAbilityIds` 전체를 기준으로 누락 없이 표시한다. 이번 기준선은 공통 쿨다운 재시작, Archer 첫 화살 발사, Rage의 35% 이상 충전 충돌을 계측하며 다른 패시브형 능력의 고유 발동은 범위 밖이다.
