@@ -20,6 +20,7 @@ import {
     TournamentAngledBounceRampSystem
 } from "../tournament/angledBounceRamps.js";
 import { COMBAT_PARTICIPATION_MODES } from "./combatParticipation.js";
+import { CommandResource } from "../combat-command/index.js";
 
 const TEAM_FORMATION_CONFIG = Object.freeze({
     leftHorizontalRatio: 0.25,
@@ -97,6 +98,12 @@ export class BattleSimulation extends FighterPhysicsSimulation {
                       config: options.dragCombatConfig,
                       automated: options.dragCombatAutomated
                   })
+                : null;
+        this.commandResource =
+            options.commandResourceEnabled === true ||
+            options.commandResource === true ||
+            typeof options.commandResource === "object"
+                ? new CommandResource(typeof options.commandResource === "object" ? options.commandResource : undefined)
                 : null;
         this.setPlayerBall(playerBall);
 
@@ -177,6 +184,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
 
     setPlayerBall(playerBall) {
         this.playerBall = playerBall ?? null;
+        this.commandResource?.resetForOwner(this.playerBall);
         if (!this.dragCombat || !this.playerBall || !this._dragEnemyHealthScalingEnabled) return this.playerBall;
 
         const hostileFighters = this.fighters.filter((fighter) => this.isHostile(this.playerBall, fighter));
@@ -190,6 +198,20 @@ export class BattleSimulation extends FighterPhysicsSimulation {
             this._dragEnemyHealthBalanced.add(fighter);
         }
         return this.playerBall;
+    }
+
+    recordAbilityUse(ability) {
+        if (!ability?._equipmentUsageEventsEnabled || !ability.owner?.id || !ability.abilityId) return false;
+        const event = {
+            ownerId: ability.owner.id,
+            abilityId: ability.abilityId,
+            instanceKey: ability.instanceKey,
+            role: ability.role,
+            elapsed: this.elapsed ?? 0
+        };
+        this.commandResource?.gainFromAbilityUse(event.ownerId);
+        this.hooks?.onAbilityUsed?.(event);
+        return true;
     }
 
     moveDragCombat(pointerId, cssPoint) {
@@ -441,6 +463,7 @@ export class BattleSimulation extends FighterPhysicsSimulation {
         this._consumePendingActions();
 
         this.elapsed += delta;
+        this.commandResource?.tick(realDelta);
         this.updateScreenShake(delta);
         this._tickStandbyFighters(delta);
 

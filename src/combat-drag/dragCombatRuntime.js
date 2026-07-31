@@ -45,6 +45,7 @@ export class DragCombatRuntime {
 
     begin(pointerId, cssPoint) {
         if (this.automated || !this.#canAct() || this.input.state !== "idle") return null;
+        if (!this.#canSpendCommand()) return null;
         const player = this.#player();
         if (player?.state?.movement) return null;
         if (this.shot.active || this.input.inputLockRemaining > 0) return this.#queueInput(pointerId, cssPoint);
@@ -312,7 +313,8 @@ export class DragCombatRuntime {
                 shotMaxSeconds: this.config.shot.shotMaxSeconds
             },
             lastEvent: copyValue(this.lastEvent),
-            eventSequence: this.eventSequence
+            eventSequence: this.eventSequence,
+            commandResource: this.simulation.commandResource?.snapshot() ?? null
         };
     }
 
@@ -321,6 +323,7 @@ export class DragCombatRuntime {
         if (result.type === "launch") {
             const player = this.#player();
             if (!this.#canAct() || !player) return this.#cancelLaunch();
+            if (!this.#spendCommand()) return this.#cancelLaunch();
             const direction = new Vector2(result.snapshot.vector.x, result.snapshot.vector.y);
             const speed = getDragLaunchSpeed(player.stats.baseSpeed, result.snapshot.chargeRatio, this.config.shot);
             player.applyImpulse(direction.scale(speed));
@@ -344,6 +347,7 @@ export class DragCombatRuntime {
 
     #queueInput(pointerId, cssPoint) {
         if (this.queuedInput) return null;
+        if (!this.#canSpendCommand()) return null;
         const point = copyPoint(cssPoint);
         const owner = this.#player();
         if (!point || !owner) return null;
@@ -360,7 +364,7 @@ export class DragCombatRuntime {
         const queued = this.queuedInput;
         if (!queued) return null;
         const player = this.#player();
-        if (!this.#canAct() || queued.owner !== player) {
+        if (!this.#canAct() || !this.#canSpendCommand() || queued.owner !== player) {
             this.queuedInput = null;
             return null;
         }
@@ -402,18 +406,20 @@ export class DragCombatRuntime {
         }
         if (result.type === "rear-hit") {
             if (context.a === player) {
-                context.damageFromAToB = damage.damageFromAToB * result.damageMultiplier;
+                context.damageFromAToB = damage.damageFromAToB * result.damageMultiplier * this.#dragDamageMultiplier();
                 context.originFromAToB = "drag";
             } else {
-                context.damageFromBToA = damage.damageFromBToA * result.damageMultiplier;
+                context.damageFromBToA = damage.damageFromBToA * result.damageMultiplier * this.#dragDamageMultiplier();
                 context.originFromBToA = "drag";
             }
             if (result.staggerSeconds > 0) other.applySlow(result.staggerSeconds, 0);
         }
         if (result.type === "plain-hit") {
             if (context.a === player) {
+                context.damageFromAToB = damage.damageFromAToB * this.#dragDamageMultiplier();
                 context.originFromAToB = "drag";
             } else {
+                context.damageFromBToA = damage.damageFromBToA * this.#dragDamageMultiplier();
                 context.originFromBToA = "drag";
             }
         }
@@ -432,6 +438,18 @@ export class DragCombatRuntime {
             !player.state.swallowed &&
             player.participation?.canAct !== false
         );
+    }
+
+    #canSpendCommand() {
+        return !this.simulation.commandResource || this.simulation.commandResource.canSpend();
+    }
+
+    #spendCommand() {
+        return !this.simulation.commandResource || this.simulation.commandResource.spend();
+    }
+
+    #dragDamageMultiplier() {
+        return this.simulation.commandResource?.config.dragDamageMultiplier ?? 1;
     }
 
     #canRunEnemyQueue() {

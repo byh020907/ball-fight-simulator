@@ -78,6 +78,7 @@ export class Ability extends mixins([Cooldown]) {
     }
 
     recordUsageMetric() {
+        if (this.simulation?.recordAbilityUse) return this.simulation.recordAbilityUse(this);
         if (!this._equipmentUsageEventsEnabled || !this.owner?.id || !this.abilityId) return false;
         this.simulation?.hooks?.onAbilityUsed?.({
             ownerId: this.owner.id,

@@ -20,6 +20,10 @@ function readList(name, fallback) {
     ).filter(Boolean);
 }
 
+function readBoolean(name) {
+    return process.env[name] === "1" || process.env[name] === "true";
+}
+
 const CONFIG = Object.freeze({
     seeds: readNumber("METRICS_SEEDS", 1, 1),
     maxSeconds: readNumber("METRICS_MAX_SECONDS", 75, 1),
@@ -33,7 +37,8 @@ const CONFIG = Object.freeze({
     step: 1 / 60,
     candidateAngles: 12,
     holdSeconds: 0.35,
-    pullPixels: 130
+    pullPixels: 130,
+    commandResourcePrototype: readBoolean("METRICS_COMMAND_RESOURCE_PROTOTYPE")
 });
 
 const POLICIES = ["무입력", "직선 반복", "궤적 예측 기반 반사 탐색"];
@@ -130,8 +135,10 @@ function beginOrUpdateAim(simulation, pointerId, direction) {
         x: start.x - direction.x * CONFIG.pullPixels,
         y: start.y - direction.y * CONFIG.pullPixels
     };
-    if (simulation.dragCombat.getSnapshot().drag.state === "idle") simulation.beginDragCombat(pointerId, start);
+    if (simulation.dragCombat.getSnapshot().drag.state === "idle" && !simulation.beginDragCombat(pointerId, start))
+        return false;
     simulation.moveDragCombat(pointerId, current);
+    return true;
 }
 
 function runMatch({ seed, characterId, stageId, floor, policy }) {
@@ -155,7 +162,14 @@ function runMatch({ seed, characterId, stageId, floor, policy }) {
                 onDragCombatMetric: (event) => recorder.recordDragEvent(event)
             },
             null,
-            { assignActions: false, rng, width: arena.WIDTH, height: arena.HEIGHT, dragCombatEnabled: true }
+            {
+                assignActions: false,
+                rng,
+                width: arena.WIDTH,
+                height: arena.HEIGHT,
+                dragCombatEnabled: true,
+                commandResourceEnabled: CONFIG.commandResourcePrototype
+            }
         );
         disableVisualEffects(simulation);
         simulation.setPlayerBall(simulation.fighters[0]);
@@ -163,14 +177,18 @@ function runMatch({ seed, characterId, stageId, floor, policy }) {
         let pointerId = 0;
         let aimStartedAt = null;
         let activePointerId = null;
-        while (!simulation.finished && simulation.elapsed < CONFIG.maxSeconds) {
+        const tickCeiling = Math.ceil(CONFIG.maxSeconds / CONFIG.step);
+        let ticks = 0;
+        while (!simulation.finished && simulation.elapsed < CONFIG.maxSeconds && ticks < tickCeiling) {
             const snapshot = simulation.dragCombat.getSnapshot();
             if (policy !== "무입력" && snapshot.drag.state === "idle" && !snapshot.playerShot.active) {
                 const direction = chooseDirection(simulation, policy);
                 if (direction) {
-                    activePointerId = ++pointerId;
-                    beginOrUpdateAim(simulation, activePointerId, direction);
-                    aimStartedAt = simulation.elapsed;
+                    const nextPointerId = ++pointerId;
+                    if (beginOrUpdateAim(simulation, nextPointerId, direction)) {
+                        activePointerId = nextPointerId;
+                        aimStartedAt = simulation.elapsed;
+                    }
                 }
             } else if (activePointerId && snapshot.drag.state === "aiming") {
                 const direction = chooseDirection(simulation, policy);
@@ -182,6 +200,7 @@ function runMatch({ seed, characterId, stageId, floor, policy }) {
                 }
             }
             simulation.update(CONFIG.step, CONFIG.step);
+            ticks += 1;
         }
         const timeoutResult = simulation.finished ? null : decideTimedOutResult(player, simulation.fighters.slice(1));
         return recorder.snapshot({
@@ -211,7 +230,7 @@ function percent(value) {
 }
 
 function main() {
-    console.log("=== 드래그·능력 기준선 계측 ===");
+    console.log(`=== 드래그·능력 계측 (${CONFIG.commandResourcePrototype ? "커맨드 자원 프로토타입" : "기준선"}) ===`);
     for (const [index, stageId] of CONFIG.stages.entries()) {
         const floor = CONFIG.floors[index % CONFIG.floors.length];
         console.log(`\n--- ${stageId} floor=${floor} ---`);
