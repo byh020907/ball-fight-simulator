@@ -37,6 +37,10 @@ const TEST_DOMAINS = {
         modulePath: "./heroCommand.mjs",
         footerMessages: new Set(["[hero-command] ok"])
     },
+    phantomCommand: {
+        modulePath: "./phantomCommand.mjs",
+        footerMessages: new Set(["[phantom-command] ok"])
+    },
     dragVectorCombat: {
         modulePath: "./dragVectorCombat.mjs",
         footerMessages: new Set(["[drag-vector-combat] ok"])

@@ -226,7 +226,8 @@ function runMatch({ seed, characterId, stageId, floor, policy }) {
                 ? ({
                       rage: ["rage-command-cashout"],
                       archer: ["archer-command-shot"],
-                      hero: ["hero-command-core-cycle"]
+                      hero: ["hero-command-core-cycle"],
+                      phantom: ["phantom-command-chain"]
                   }[characterId] ?? [])
                 : []
         });
@@ -245,6 +246,22 @@ function finiteOrThrow(value, path = "metrics") {
 
 function percent(value) {
     return `${(value * 100).toFixed(1)}%`;
+}
+
+function average(values) {
+    return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+}
+
+function formatAbilityResult(type, result) {
+    const base = `${type}: ${result.attemptsPerMatch.toFixed(2)}회, 성공 ${percent(result.successRate)}`;
+    if (type !== "phantom-command-chain") return base;
+    const values = result.values ?? [];
+    return (
+        `${base}, 안전 출현 ${percent(average(values.map((value) => (value.safeAppear ? 1 : 0))))}, ` +
+        `기본 적중 ${percent(average(values.map((value) => (value.baseHit ? 1 : 0))))}, ` +
+        `연쇄 ${average(values.map((value) => Number(value.chainDepth) || 0)).toFixed(2)}, ` +
+        `종결 적중 ${percent(average(values.map((value) => (value.finishHit ? 1 : 0))))}`
+    );
 }
 
 function main() {
@@ -271,10 +288,7 @@ function main() {
                     )
                     .join("; ");
                 const resultText = Object.entries(metrics.abilityResults)
-                    .map(
-                        ([type, result]) =>
-                            `${type}: ${result.attemptsPerMatch.toFixed(2)}회, 성공 ${percent(result.successRate)}`
-                    )
+                    .map(([type, result]) => formatAbilityResult(type, result))
                     .join("; ");
                 const directDamagePerMatch = metrics.focalDealtByOrigin.drag?.damagePerMatch ?? 0;
                 const counterTakenPerMatch = metrics.focalTakenByOrigin["drag-counter"]?.damagePerMatch ?? 0;

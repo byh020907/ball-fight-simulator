@@ -34,7 +34,10 @@ export class PhantomAbility extends Ability {
             shadowPursuitStacks: 0,
             shadowReboundStacks: 0,
             shadowFinishStacks: 0,
-            skipMarkedCollisionTargetId: null
+            skipMarkedCollisionTargetId: null,
+            preparedCommand: null,
+            commandCycle: null,
+            commandCollisionSequences: new Set()
         };
         this.resetCooldown(this.cooldown);
     }
@@ -43,7 +46,9 @@ export class PhantomAbility extends Ability {
         const owner = this.owner;
         this._clearExpiredChain();
         if (this.state.activeDashStage && !owner.state.movement) {
+            const endedDashStage = this.state.activeDashStage;
             this.state.activeDashStage = null;
+            this._resolveCommandDashMiss(endedDashStage);
         }
 
         // animation phases
@@ -63,6 +68,8 @@ export class PhantomAbility extends Ability {
             }
             return;
         }
+
+        if (this.state.preparedCommand) return;
 
         // normal cooldown countdown
         this.tickCooldown(delta);
@@ -125,6 +132,65 @@ export class PhantomAbility extends Ability {
         this._triggerShadowChain(target, "shadowPursuitStacks");
     }
 
+    getCommandState() {
+        if (
+            !this.simulation.abilityCommandEnabled ||
+            this.simulation.playerBall !== this.owner ||
+            this.simulation.dragCombat?.automated
+        ) {
+            return { available: false, reserveResource: false };
+        }
+        return { available: this.state.primed, reserveResource: !this.state.primed };
+    }
+
+    prepareCommand(intent) {
+        if (!this.getCommandState().available || !intent?.direction) return intent;
+        this.state.primed = false;
+        this.state.primedTimer = 0;
+        this.state.preparedCommand = {
+            ...intent,
+            direction: { ...intent.direction },
+            pathSegments: intent.pathSegments?.map((point) => ({ ...point })) ?? [],
+            bouncePoints: intent.bouncePoints?.map((point) => ({ ...point })) ?? [],
+            predictedTerminal: intent.predictedTerminal ? { ...intent.predictedTerminal } : null
+        };
+        return this.state.preparedCommand;
+    }
+
+    resolveCommandCollision(event) {
+        const intent = this.state.preparedCommand;
+        if (
+            !intent ||
+            intent.sequence !== event.commandSequence ||
+            this.state.commandCollisionSequences.has(event.commandSequence) ||
+            !event.target ||
+            !this.simulation.isHostile(this.owner, event.target)
+        ) {
+            return { handled: false, runDefaultOnCollision: true };
+        }
+
+        this.state.commandCollisionSequences.add(event.commandSequence);
+        this.state.preparedCommand = null;
+        this._beginCommandCycle(event.commandSequence, intent.direction, event.target.id);
+        this._triggerShadowDash(event.target, "base", new Vector2(intent.direction.x, intent.direction.y).normalize());
+        return { handled: true, runDefaultOnCollision: false };
+    }
+
+    onCommandEnd(event) {
+        const cycle = this.state.commandCycle;
+        if (cycle?.commandSequence === event.commandSequence) return;
+        if (this.state.preparedCommand?.sequence !== event.commandSequence) return;
+        this.state.preparedCommand = null;
+        this.state.commandCollisionSequences.delete(event.commandSequence);
+        this._restartCooldownAfterCommandAbort();
+    }
+
+    onBattleEnded() {
+        if (this.state.commandCycle) this._finalizeCommandCycle();
+        this.state.preparedCommand = null;
+        this.state.commandCollisionSequences.clear();
+    }
+
     shouldSkipFighterCollision() {
         return this.state.teleportPhase > 0;
     }
@@ -143,7 +209,7 @@ export class PhantomAbility extends Ability {
         this._triggerShadowChain(fighter, "shadowReboundStacks");
     }
 
-    _triggerShadowDash(target, stage) {
+    _triggerShadowDash(target, stage, preferredDirection = null) {
         const owner = this.owner;
         const sim = this.simulation;
         if (stage === "base") {
@@ -154,12 +220,10 @@ export class PhantomAbility extends Ability {
         this.state.teleportTargetId = target.id;
         this.state.pendingShadowStage = stage;
 
-        const toTarget = Vector2.subtract(target.position, owner.position).normalize();
-        const behindAngle = (Math.random() - 0.5) * Math.PI;
-        const cos = Math.cos(behindAngle);
-        const sin = Math.sin(behindAngle);
-        const rotatedDir = new Vector2(toTarget.x * cos - toTarget.y * sin, toTarget.x * sin + toTarget.y * cos);
-        this.state.appearPos = this._findSafeTeleportPosition(target, rotatedDir);
+        const direction = preferredDirection ?? this._getRandomTeleportDirection(target);
+        const teleport = this._findTeleportPosition(target, direction);
+        this.state.appearPos = teleport.position;
+        if (stage === "base" && this.state.commandCycle) this.state.commandCycle.safeAppear = teleport.safeAppear;
 
         sim.spawnParticleBurst(this.state.vanishPos, "#55bbdd", {
             count: 20,
@@ -174,7 +238,19 @@ export class PhantomAbility extends Ability {
         this.state.teleportTimer = 0;
     }
 
+    _getRandomTeleportDirection(target) {
+        const toTarget = Vector2.subtract(target.position, this.owner.position).normalize();
+        const behindAngle = (Math.random() - 0.5) * Math.PI;
+        const cos = Math.cos(behindAngle);
+        const sin = Math.sin(behindAngle);
+        return new Vector2(toTarget.x * cos - toTarget.y * sin, toTarget.x * sin + toTarget.y * cos);
+    }
+
     _findSafeTeleportPosition(target, preferredDirection) {
+        return this._findTeleportPosition(target, preferredDirection).position;
+    }
+
+    _findTeleportPosition(target, preferredDirection) {
         const owner = this.owner;
         const sim = this.simulation;
         let bestCandidate = null;
@@ -207,18 +283,31 @@ export class PhantomAbility extends Ability {
                         ),
                     Infinity
                 );
-            if (clearance >= TELEPORT_CLEARANCE) return candidate;
+            if (clearance >= TELEPORT_CLEARANCE) return { position: candidate, safeAppear: true };
             if (clearance > bestClearance) {
                 bestCandidate = candidate;
                 bestClearance = clearance;
             }
         }
 
-        if (bestCandidate) return bestCandidate;
+        if (bestCandidate) return { position: bestCandidate, safeAppear: false };
         const fallback = Vector2.add(target.position, preferredDirection.scale(TELEPORT_BEHIND_DIST));
         fallback.x = Math.max(owner.radius, Math.min(sim.width - owner.radius, fallback.x));
         fallback.y = Math.max(owner.radius, Math.min(sim.height - owner.radius, fallback.y));
-        return fallback;
+        return { position: fallback, safeAppear: this._getTeleportClearance(fallback) >= TELEPORT_CLEARANCE };
+    }
+
+    _getTeleportClearance(position) {
+        return this.simulation.fighters
+            .filter((fighter) => fighter !== this.owner && !fighter.flags.defeated)
+            .reduce(
+                (minimum, fighter) =>
+                    Math.min(
+                        minimum,
+                        Vector2.subtract(position, fighter.position).length() - this.owner.radius - fighter.radius
+                    ),
+                Infinity
+            );
     }
 
     _doTeleport() {
@@ -271,6 +360,7 @@ export class PhantomAbility extends Ability {
 
         const stage = this.state.activeDashStage;
         this.state.activeDashStage = null;
+        this._recordCommandDashHit(stage, target);
         if (stage === "base" && this.getLevelUpgrade().shadowPursuitOnNaturalCollision) {
             this._markTarget(target);
             this.state.skipMarkedCollisionTargetId = target.id;
@@ -279,8 +369,13 @@ export class PhantomAbility extends Ability {
         if (stage === "chain" && this.getLevelUpgrade().shadowFinish && this.state.shadowFinishStacks > 0) {
             this.state.shadowFinishStacks -= 1;
             this._showChainText(target, SHADOW_DASH_LABEL, "#ff88cc");
-            this._triggerShadowDash(target, "finish");
+            const direction = this.state.commandCycle
+                ? new Vector2(this.state.commandCycle.direction.x, this.state.commandCycle.direction.y).normalize()
+                : null;
+            this._triggerShadowDash(target, "finish", direction);
+            return;
         }
+        this._finalizeCommandCycleIfComplete();
     }
 
     _markTarget(target) {
@@ -295,6 +390,7 @@ export class PhantomAbility extends Ability {
     _clearExpiredChain() {
         if (!this.state.markedTargetId) return;
         if (this.cooldownReady) {
+            this._finalizeCommandCycleIfComplete(true);
             this._clearMark();
         }
     }
@@ -310,7 +406,80 @@ export class PhantomAbility extends Ability {
             this._startShadowDash(target, "chain");
             return;
         }
-        this._triggerShadowDash(target, "chain");
+        const cycle = this.state.commandCycle;
+        const direction =
+            cycle && this._isMarkedTarget(target)
+                ? new Vector2(cycle.direction.x, cycle.direction.y).normalize()
+                : null;
+        this._triggerShadowDash(target, "chain", direction);
+    }
+
+    _beginCommandCycle(commandSequence, direction, targetId) {
+        this.state.commandCycle = {
+            commandSequence,
+            direction: { ...direction },
+            targetId,
+            safeAppear: false,
+            baseHit: false,
+            chainDepth: 0,
+            finishHit: false,
+            finalized: false
+        };
+    }
+
+    _recordCommandDashHit(stage, target) {
+        const cycle = this.state.commandCycle;
+        if (!cycle || !stage || !this._isMarkedOrCommandTarget(target, cycle)) return;
+        if (stage === "base") cycle.baseHit = true;
+        if (stage === "chain") cycle.chainDepth += 1;
+        if (stage === "finish") cycle.finishHit = true;
+    }
+
+    _isMarkedOrCommandTarget(target, cycle) {
+        return Boolean(target && target.id === cycle.targetId);
+    }
+
+    _resolveCommandDashMiss(endedDashStage) {
+        const cycle = this.state.commandCycle;
+        if (!cycle || !endedDashStage) return;
+        this._finalizeCommandCycleIfComplete(endedDashStage === "base");
+    }
+
+    _finalizeCommandCycleIfComplete(force = false) {
+        const cycle = this.state.commandCycle;
+        if (!cycle || cycle.finalized) return;
+        const hasPendingChain =
+            this.state.teleportPhase > 0 ||
+            this.state.activeDashStage ||
+            this.state.shadowPursuitStacks > 0 ||
+            this.state.shadowReboundStacks > 0 ||
+            this.state.shadowFinishStacks > 0;
+        if (!force && hasPendingChain) return;
+        this._finalizeCommandCycle();
+    }
+
+    _finalizeCommandCycle() {
+        const cycle = this.state.commandCycle;
+        if (!cycle || cycle.finalized) return;
+        cycle.finalized = true;
+        this.recordAbilityResult({
+            commandSequence: cycle.commandSequence,
+            resultType: "phantom-command-chain",
+            success: cycle.safeAppear && cycle.baseHit,
+            value: {
+                safeAppear: cycle.safeAppear,
+                baseHit: cycle.baseHit,
+                chainDepth: cycle.chainDepth,
+                finishHit: cycle.finishHit
+            }
+        });
+        this.state.commandCollisionSequences.delete(cycle.commandSequence);
+        this.state.commandCycle = null;
+    }
+
+    _restartCooldownAfterCommandAbort() {
+        this.setCooldownDuration(this.cooldown);
+        this.setCooldownRemaining(this.cooldown);
     }
 
     _showChainText(target, text, color) {

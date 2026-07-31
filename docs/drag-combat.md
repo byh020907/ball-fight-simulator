@@ -82,6 +82,12 @@ Hero는 코어 5스택을 채운 focal 플레이어가 커맨드 자원을 보�
 
 유효 커맨드의 첫 적대 충돌은 기본 충돌 피해를 유지한 뒤, 저장된 드래그 방향 기준 60도 fan으로 기존 HeroOrb 5개를 방출한다. 각 orb는 `commandSequence`를 갖고 수집·수명 만료·active limit 만료·전투 종료 중 하나로 정확히 한 번 결산된다. stat cap으로 효과 적용에 실패해도 owner가 물리적으로 수집한 orb는 collected로 센다. `hero-command-core-cycle` 결과는 실제 방출·물리 수집·방패 증가·HP 회복량을 기록한다. 일반 HeroOrb와 자동 추격의 동작은 바꾸지 않는다.
 
+### Phantom 실험 슬라이스
+
+Phantom은 primed 상태의 focal 수동 플레이어만 `그림자 출구 지정` 커맨드를 예약한다. 예약은 primed를 소비하지만 첫 적대 terminal collision 전까지 별도 pending으로 유지한다. 충돌 시 저장한 드래그 방향을 base 순간이동 출구와 marked target을 향한 pursuit·finish 순간이동의 우선 방향으로 사용하고, 기존 22.5도 fallback 탐색과 arena clamp는 그대로 유지한다. 일반 primed collision은 기존 난수 방향과 연쇄를 바꾸지 않는다.
+
+`phantom-command-chain`은 base 출구의 clearance, base 적중, 실제 pursuit chain 적중 수, finish 적중을 하나의 `commandSequence`에 한 번만 기록한다. base miss, 후속 stack 소진, cooldown 만료, 전투 종료에서 결산하며, command terminal 직후 런타임이 보내는 `onCommandEnd()`는 이미 시작된 연쇄를 취소하지 않는다. `METRICS_ABILITY_COMMAND_PROTOTYPE=1`의 Phantom 보고는 attempts/match·성공률과 안전 출현·base 적중·연쇄 깊이·finish 적중 평균을 함께 출력한다.
+
 ### 관측 필드
 
 - **능력**: focal 플레이어만 대상, 첫 발동 시각(경기당 평균·중앙값), 발동 횟수(경기당), noUseRate(미발동 경기 비율). zero-use 능력은 `focalAbilityIds` 전체를 기준으로 누락 없이 표시한다. 이번 기준선은 공통 쿨다운 재시작, Archer 첫 화살 발사, Rage의 35% 이상 충전 충돌을 계측하며 다른 패시브형 능력의 고유 발동은 범위 밖이다.
