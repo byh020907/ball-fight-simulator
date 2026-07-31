@@ -36,7 +36,10 @@ export class EaterAbility extends Ability {
             digestionTimer: 0,
             digestionTick: 0,
             digestionEffect: null,
-            lv9WallRuptureUsed: false
+            lv9WallRuptureUsed: false,
+            commandAiming: false,
+            preparedCommand: null,
+            commandCycles: new Map()
         };
         this.feastDuration = FEAST_DURATION;
     }
@@ -49,13 +52,22 @@ export class EaterAbility extends Ability {
         this.updateRadiusScale(delta);
 
         if (this.state.swallowedTarget) {
-            this.state.swallowTimer -= delta;
+            const aiming = this.simulation.dragCombat?.input?.state === "aiming";
+            if (aiming && this._canAcceptPlayerCommand()) this.state.commandAiming = true;
+            if (this.state.commandAiming && !aiming) {
+                this.state.commandAiming = false;
+                this.releaseSwallowed();
+                return;
+            }
+            if (!this.state.commandAiming) this.state.swallowTimer -= delta;
             this.state.swallowedTarget.position = this.owner.position.clone();
             this._tickDigestion(delta);
             if (this.state.swallowTimer <= 0 || this.state.swallowedTarget.flags.defeated) {
                 this.releaseSwallowed();
             }
         }
+
+        this._finalizeCommandCycles();
 
         if (this.isFeasting()) {
             this.state.feastTimer = Math.max(0, this.state.feastTimer - delta);
@@ -162,7 +174,59 @@ export class EaterAbility extends Ability {
         this.simulation.addLog(`${this.owner.name} swallows ${target.name}.`);
     }
 
-    releaseSwallowed() {
+    getCommandState() {
+        if (!this._canAcceptPlayerCommand() || !this._isValidTarget(this.state.swallowedTarget)) {
+            return { available: false, reserveResource: false };
+        }
+        return { available: true, reserveResource: false };
+    }
+
+    prepareCommand(intent) {
+        const target = this.state.swallowedTarget;
+        if (!this._canLaunchCommand(target)) return intent;
+        this.state.preparedCommand = {
+            ...intent,
+            direction: { ...intent.direction },
+            pathSegments: intent.pathSegments?.map((point) => ({ ...point })) ?? [],
+            bouncePoints: intent.bouncePoints?.map((point) => ({ ...point })) ?? [],
+            target
+        };
+        this.state.commandAiming = false;
+        return this.state.preparedCommand;
+    }
+
+    resolveCommandLaunch(intent) {
+        const command = this.state.preparedCommand;
+        if (!command || command.sequence !== intent?.sequence || !this._canLaunchCommand(command.target)) {
+            if (command?.sequence === intent?.sequence) this.state.preparedCommand = null;
+            return { mode: "default-shot" };
+        }
+        const direction = this._getCommandDirection(command);
+        const cycle = {
+            commandSequence: command.sequence,
+            tier: this.abilityTier,
+            target: command.target,
+            digestionTicksAtLaunch: this.state.digestionTick,
+            holdRemaining: Math.max(0, this.state.swallowTimer),
+            plannedSegments: command.pathSegments.length,
+            plannedBounces: command.bouncePoints.length,
+            wallHit: false,
+            wallSlamDamage: 0,
+            spitImpactDamage: 0,
+            ruptureTriggered: false,
+            ruptureTargetDamage: 0,
+            ruptureSplashHits: 0,
+            ruptureSplashDamage: 0,
+            createdAt: command.createdAt ?? this.simulation.elapsed,
+            finalized: false
+        };
+        this.state.commandCycles.set(command.sequence, cycle);
+        this.state.preparedCommand = null;
+        this.releaseSwallowed({ direction, commandSequence: command.sequence, cycle });
+        return { mode: "replace-shot" };
+    }
+
+    releaseSwallowed({ direction = null, commandSequence = null, cycle = null } = {}) {
         const target = this.state.swallowedTarget;
         if (!target) return;
 
@@ -173,30 +237,37 @@ export class EaterAbility extends Ability {
             return;
         }
 
-        const { direction } = this._detachSwallowedTarget({ reposition: true });
+        const spitDirection = direction?.clone?.().normalize?.() ?? this.state.spitDirection.clone().normalize();
+        if (spitDirection.length() <= 0.001) spitDirection.x = 1;
+        this.state.spitDirection = spitDirection.clone();
+        const { direction: releasedDirection } = this._detachSwallowedTarget({ reposition: true });
 
         let spitSpeedMult = SPIT_SPEED_MULTIPLIER;
         if (this.abilityTier >= 2) {
             spitSpeedMult = SPIT_LEVEL6_SPEED_MULT;
             const spitDmg = Math.round(this.owner.stats.baseDamage * SPIT_LEVEL6_DAMAGE_MULT);
-            target.takeDamage(spitDmg, this.owner, "Spit Impact");
-            const recoilDir = direction.clone().scale(-1);
+            const { actualDamage: spitImpactDamage = 0 } = target.takeDamage(spitDmg, this.owner, "Spit Impact") ?? {};
+            const recoilDir = releasedDirection.clone().scale(-1);
             this.owner.applyImpulse(recoilDir.scale(SPIT_LEVEL6_RECOIL));
-            this.simulation.entities.push(new EaterSpitEffect(this.owner, target, direction));
+            this.simulation.entities.push(new EaterSpitEffect(this.owner, target, releasedDirection));
+            if (cycle) cycle.spitImpactDamage = spitImpactDamage;
         }
 
-        target.initiateDash(direction, {
+        target.initiateDash(releasedDirection, {
             duration: SPIT_MAX_DURATION,
             multiplier: SPIT_DASH_MULTIPLIER,
             speedOverride: target.stats.baseSpeed * spitSpeedMult,
             collisionLabel: "Spit Dash",
             showRing: false,
-            noHeading: true
+            noHeading: true,
+            commandSequence
         });
         target.state.wallSlam = new WallSlamEffect({
             source: this.owner,
             duration: SPIT_MAX_DURATION,
-            onRupture: this.abilityTier >= 3 ? (collisionCtx) => this._onWallRupture(target, collisionCtx) : null
+            onRupture:
+                this.abilityTier >= 3 ? (collisionCtx) => this._onWallRupture(target, collisionCtx, cycle) : null,
+            onImpact: (collisionCtx) => this._onWallSlamImpact(collisionCtx, cycle)
         });
         this.simulation.keepInsideArena(target);
         this.simulation.playSound("spit", 1.2);
@@ -206,6 +277,7 @@ export class EaterAbility extends Ability {
     }
 
     onOwnerDefeated() {
+        this._finalizeAllCommandCycles();
         const released = this._detachSwallowedTarget({ reposition: true });
         if (released?.target && !released.target.flags.defeated) {
             this.simulation.addLog(`${this.owner.name} drops ${released.target.name}.`);
@@ -215,6 +287,7 @@ export class EaterAbility extends Ability {
 
     onBattleEnded() {
         this._detachSwallowedTarget();
+        this._finalizeAllCommandCycles();
     }
 
     _detachSwallowedTarget({ reposition = false } = {}) {
@@ -240,14 +313,25 @@ export class EaterAbility extends Ability {
         return { target, direction };
     }
 
-    _onWallRupture(target, collisionCtx) {
+    _onWallSlamImpact(collisionCtx, cycle) {
+        if (!cycle || cycle.finalized || collisionCtx.actualDamage <= 0) return;
+        cycle.wallHit = true;
+        cycle.wallSlamDamage += collisionCtx.actualDamage;
+        this._finalizeCommandCycle(cycle.commandSequence);
+    }
+
+    _onWallRupture(target, collisionCtx, cycle = null) {
         if (this.state.lv9WallRuptureUsed) return;
         this.state.lv9WallRuptureUsed = true;
 
         const contactPoint = collisionCtx?.contactPoint ?? target.position.clone();
         const normal = collisionCtx?.normal ?? null;
         const targetDmg = Math.round(this.owner.stats.baseDamage * WALL_RUPTURE_TARGET_MULT);
-        target.takeDamage(targetDmg, this.owner, "Wall Rupture");
+        const { actualDamage: targetActualDamage = 0 } = target.takeDamage(targetDmg, this.owner, "Wall Rupture") ?? {};
+        if (cycle) {
+            cycle.ruptureTriggered = true;
+            cycle.ruptureTargetDamage += targetActualDamage;
+        }
 
         const otherDmg = Math.round(this.owner.stats.baseDamage * WALL_RUPTURE_OTHER_MULT);
         const enemies = this.simulation.getEnemiesOf(this.owner);
@@ -255,7 +339,11 @@ export class EaterAbility extends Ability {
             if (enemy === target) continue;
             const dist = Vector2.subtract(enemy.position, contactPoint).length();
             if (dist <= WALL_RUPTURE_RADIUS) {
-                enemy.takeDamage(otherDmg, this.owner, "Wall Rupture");
+                const { actualDamage = 0 } = enemy.takeDamage(otherDmg, this.owner, "Wall Rupture") ?? {};
+                if (cycle && actualDamage > 0) {
+                    cycle.ruptureSplashHits += 1;
+                    cycle.ruptureSplashDamage += actualDamage;
+                }
             }
         }
 
@@ -344,7 +432,7 @@ export class EaterAbility extends Ability {
     getUiState() {
         if (this.state.swallowedTarget) {
             return {
-                label: "Eating",
+                label: this.getCommandState().available ? "Aim Spit" : "Eating",
                 progress: Math.max(0, Math.min(1, this.state.swallowTimer / this._getSwallowHoldDuration()))
             };
         }
@@ -352,5 +440,79 @@ export class EaterAbility extends Ability {
             return { label: "Feast", progress: Math.max(0, Math.min(1, this.state.feastTimer / this.feastDuration)) };
         }
         return { label: "Feast", progress: this.cooldownProgress };
+    }
+
+    _canAcceptPlayerCommand() {
+        return Boolean(
+            this.simulation.abilityCommandEnabled &&
+            this.simulation.playerBall === this.owner &&
+            this.simulation.dragCombat &&
+            !this.simulation.dragCombat.automated &&
+            this.simulation.commandResource?.canSpend?.()
+        );
+    }
+
+    _canLaunchCommand(target) {
+        return Boolean(
+            this.simulation.abilityCommandEnabled &&
+            this.simulation.playerBall === this.owner &&
+            this.simulation.dragCombat &&
+            !this.simulation.dragCombat.automated &&
+            this._isValidTarget(target) &&
+            target === this.state.swallowedTarget
+        );
+    }
+
+    _isValidTarget(target) {
+        return Boolean(target && !target.flags.defeated && !target.flags.destroyed);
+    }
+
+    _getCommandDirection(command) {
+        for (const point of command.pathSegments ?? []) {
+            const direction = new Vector2(point.x - this.owner.position.x, point.y - this.owner.position.y);
+            if (direction.length() > 0.001) return direction.normalize();
+        }
+        const direction = new Vector2(command.direction?.x ?? 0, command.direction?.y ?? 0);
+        if (direction.length() > 0.001) return direction.normalize();
+        return this.state.spitDirection.clone().normalize();
+    }
+
+    _finalizeCommandCycles() {
+        for (const [sequence, cycle] of this.state.commandCycles) {
+            if (!this._isValidTarget(cycle.target) || cycle.target.state.wallSlam?.source !== this.owner) {
+                this._finalizeCommandCycle(sequence);
+            }
+        }
+    }
+
+    _finalizeAllCommandCycles() {
+        for (const sequence of [...this.state.commandCycles.keys()]) this._finalizeCommandCycle(sequence);
+    }
+
+    _finalizeCommandCycle(sequence) {
+        const cycle = this.state.commandCycles.get(sequence);
+        if (!cycle || cycle.finalized) return;
+        cycle.finalized = true;
+        this.recordAbilityResult({
+            commandSequence: sequence,
+            resultType: "eater-command-spit-route",
+            success: cycle.wallHit,
+            value: {
+                tier: cycle.tier,
+                digestionTicksAtLaunch: cycle.digestionTicksAtLaunch,
+                holdRemaining: cycle.holdRemaining,
+                plannedSegments: cycle.plannedSegments,
+                plannedBounces: cycle.plannedBounces,
+                wallHit: cycle.wallHit,
+                wallSlamDamage: cycle.wallSlamDamage,
+                spitImpactDamage: cycle.spitImpactDamage,
+                ruptureTriggered: cycle.ruptureTriggered,
+                ruptureTargetDamage: cycle.ruptureTargetDamage,
+                ruptureSplashHits: cycle.ruptureSplashHits,
+                ruptureSplashDamage: cycle.ruptureSplashDamage,
+                elapsed: Math.max(0, this.simulation.elapsed - cycle.createdAt)
+            }
+        });
+        this.state.commandCycles.delete(sequence);
     }
 }

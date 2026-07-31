@@ -5,7 +5,7 @@ import { formatAbilityResult } from "../scripts/dragAbilityMetricFormatters.mjs"
 import { BattleSimulation } from "../src/simulation/battleSimulation.js";
 import { createRoster } from "../src/roster.js";
 
-const rosterIds = ["rage", "archer", "hero", "phantom", "trickster", "bat_ball"];
+const rosterIds = ["rage", "archer", "hero", "phantom", "trickster", "bat_ball", "eater"];
 
 {
     const config = createDragAbilityMetricsConfig({}, rosterIds);
@@ -125,6 +125,15 @@ const formatterCases = [
             ]
         },
         "Wall Slam 1.00회/15.00 피해"
+    ],
+    [
+        "eater-command-spit-route",
+        {
+            attemptsPerMatch: 1,
+            successRate: 1,
+            values: [{ digestionTicksAtLaunch: 2, wallSlamDamage: 15, spitImpactDamage: 10, ruptureTriggered: true }]
+        },
+        "Spit Impact 10.00 피해"
     ]
 ];
 

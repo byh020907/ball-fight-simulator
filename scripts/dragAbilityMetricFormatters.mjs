@@ -126,6 +126,16 @@ function formatDash(values) {
     );
 }
 
+function formatEater(values) {
+    const field = (key) => decimal(average(values.map((value) => finiteNumber(value[key]))));
+    return (
+        `소화 ${field("digestionTicksAtLaunch")}틱, Wall Slam ${field("wallSlamDamage")} 피해, ` +
+        `Spit Impact ${field("spitImpactDamage")} 피해, 파열 ${percent(booleanRate(values, "ruptureTriggered"))}, ` +
+        `파열 대상 ${field("ruptureTargetDamage")}, 주변 ${field("ruptureSplashHits")}회/${field("ruptureSplashDamage")} 피해, ` +
+        `계획 구간 ${field("plannedSegments")}, 계획 반사 ${field("plannedBounces")}, 경과 ${field("elapsed")}초`
+    );
+}
+
 export function formatAbilityResult(type, result) {
     const base = formatBase(type, result);
     const values = resultValues(result);
@@ -138,7 +148,8 @@ export function formatAbilityResult(type, result) {
         "spin-command-gyro-bank": formatSpin,
         "trickster-command-route": formatTrickster,
         "bat-ball-command-called-shot": formatBatBall,
-        "dash-command-manual-entry": formatDash
+        "dash-command-manual-entry": formatDash,
+        "eater-command-spit-route": formatEater
     }[type];
     return detail ? `${base}, ${detail(values)}` : base;
 }

@@ -203,7 +203,8 @@ function runMatch({ seed, characterId, stageId, floor, policy, abilityTier = 0 }
                       spin: ["spin-command-gyro-bank"],
                       trickster: ["trickster-command-route"],
                       bat_ball: ["bat-ball-command-called-shot"],
-                      dash: ["dash-command-manual-entry"]
+                      dash: ["dash-command-manual-entry"],
+                      eater: ["eater-command-spit-route"]
                   }[characterId] ?? [])
                 : []
         });

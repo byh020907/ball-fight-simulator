@@ -110,6 +110,12 @@ Dash는 cooldown이 준비된 focal·비자동 플레이어가 command resource�
 
 timeout·aim cancel·flag off·AI·non-focal·자원 없음은 같은 프레임의 기존 자동 Dash를 사용한다. target invalidation은 stale state만 지우고 cooldown·resource를 소비하지 않는다. command Dash는 기존 1.4초 duration, 2.15 multiplier, Dash Contact ×0.4, hit cooldown stage와 wall stage 0 reset을 그대로 쓴다. `dash-command-manual-entry`는 command-owned DashEffect와 그 레이저를 하나의 sequence로 묶어 실제 Dash hit만 성공으로 기록하며, tier·시작/종료 cooldown stage·계획 구간/반사·Dash hit·wall fail·실제 laser segment/damage·점화 대상·경과 시간을 한 번 보관한다.
 
+### Eater 실험 슬라이스
+
+Eater는 기존 Feast 진입과 삼키기를 자동으로 유지한다. `abilityCommandEnabled` opt-in의 focal·비자동 플레이어가 command resource를 보유하고 살아 있는 대상을 삼킨 동안만 기존 `0.72초` hold를 `Aim Spit` 조준 기회로 사용한다. 유효 release는 owner 몸체 impulse와 `playerShot` 없이 `replace-shot`으로 삼킨 대상만 기존 spit 체인으로 분리·재배치·발사한다. 첫 non-zero 절대 `pathSegments` endpoint가 spit 방향을 정하고, 없으면 intent 방향·기존 저장 방향 순으로 fallback한다. 이후 bounce는 예상 파열 접점 표시일 뿐 실제 multi-bounce나 추가 피해를 만들지 않는다.
+
+조준을 시작하지 않으면 기존 저장 방향으로 자동 spit하며, 조준 중에는 auto-release만 릴리스까지 잠시 보류한다. cancel·dead-zone·timeout·flag off·AI/automated·non-focal·자원 없음은 자원·result 없이 기존 자동 spit을 정확히 한 번 실행한다. tier 2 Spit Impact ×1.0, spit speed ×3, owner recoil 420과 target Spit Dash ×2·2.45초는 바꾸지 않는다. tier 3 Wall Rupture는 예측점이 아닌 실제 첫 `WallSlamEffect` contactPoint와 inward normal에서 한 번만 실행한다. `eater-command-spit-route`는 실제 첫 Wall Slam 피해를 성공으로 기록하고, 소화 tick·hold·계획 구간/반사·Wall Slam·Spit Impact·rupture·경과를 sequence별로 한 번 결산한다.
+
 ### Trickster 실험 슬라이스
 
 Trickster는 cooldown ready인 focal 수동 플레이어가 command resource를 보유할 때만 0.8초 동안 다음 세 씨앗의 노선을 기다린다. 창 전에는 generic drag resource를 보류하고, timeout·cancel·flag off·AI·non-focal은 기존 무작위 360도 세 씨앗을 정확히 한 번 발사한다. 유효 release는 resource를 한 번 소비하고 기존 ability 사용 회복을 받지만 body impulse와 `playerShot`은 시작하지 않는 payload-only다.
@@ -122,7 +128,7 @@ Trickster는 cooldown ready인 focal 수동 플레이어가 command resource를 
 
 `METRICS_ABILITY_TIERS`는 0~3 정수의 쉼표 목록이고 기본값은 `0`이다. 중복은 첫 등장 순서를 유지해 제거한다. 예를 들어 `METRICS_ABILITY_TIERS=0,3`과 두 prototype 플래그를 함께 지정하면 각 stage의 `ability tier=0`과 `ability tier=3` 블록을 모두 출력한다. focal player의 실제 `progression.abilityTier`만 첫 update 전에 설정하므로 상대와 roster 원본은 바꾸지 않는다.
 
-능력 result는 공통 attempts/match·성공률 뒤에 recorder가 기록한 value만 요약한다. Rage는 충전·피해·조기 초기화, Archer는 벽/계획 구간·경과·후속 화살 표본과 적중률, Hero는 방출/회수/방패/회복과 총 회수율, Phantom은 안전 출현/기본 적중/연쇄/종결 적중, Bat Ball은 Slash·Wall Slam·첫 벽 거리·HOME RUN·RESET을 표시한다. 빈 표본은 0으로 표시하며, 이 계측은 게임 판정이나 수치를 다시 계산하지 않는다.
+능력 result는 공통 attempts/match·성공률 뒤에 recorder가 기록한 value만 요약한다. Rage는 충전·피해·조기 초기화, Archer는 벽/계획 구간·경과·후속 화살 표본과 적중률, Hero는 방출/회수/방패/회복과 총 회수율, Phantom은 안전 출현/기본 적중/연쇄/종결 적중, Bat Ball은 Slash·Wall Slam·첫 벽 거리·HOME RUN·RESET, Eater는 소화·Spit Impact·Wall Slam·파열을 표시한다. 빈 표본은 0으로 표시하며, 이 계측은 게임 판정이나 수치를 다시 계산하지 않는다.
 
 ### 관측 필드
 

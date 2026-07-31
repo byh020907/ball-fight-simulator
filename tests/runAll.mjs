@@ -65,6 +65,10 @@ const TEST_DOMAINS = {
         modulePath: "./dashCommand.mjs",
         footerMessages: new Set(["[dash-command] ok"])
     },
+    eaterCommand: {
+        modulePath: "./eaterCommand.mjs",
+        footerMessages: new Set(["[eater-command] ok"])
+    },
     dragVectorCombat: {
         modulePath: "./dragVectorCombat.mjs",
         footerMessages: new Set(["[drag-vector-combat] ok"])

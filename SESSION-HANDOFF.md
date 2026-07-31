@@ -53,6 +53,12 @@
 - 결정: 고유 Dash가 준비된 모든 cooldown stage에서 focal·비자동·자원 보유 플레이어에게 0.8초 입력창을 열고, 유효 릴리스는 범용 몸통 발사 없이 첫 유효 예측 구간 방향으로 기존 Dash를 시작하는 `수동 대시`로 처리한다. command Dash는 입력선을 보존하도록 stage 0 자동 조향을 끄며, timeout·cancel·flag off·AI·non-focal·자원 없음은 현재 stage의 기존 자동 Dash와 stage 0 조향을 그대로 사용한다. 몸체가 벽에 닿으면 기존처럼 즉시 실패하고 cooldown stage를 0으로 초기화한다. 계획 반사는 몸체 반사나 추가 피해를 주지 않으며, tier 1 레이저의 0.35초 추적 조준·0.30초 ×0.60, tier 2 레이저 1회 반사, tier 3 1초 ×1.00 점화는 변경하지 않는다.
 - 영향: `DashAbility`의 command window·replace-shot·고정 진입선과 DashEffect hit/wall/laser 결과 수명주기, `dash-command-manual-entry` 계측·포맷·회귀, 숨김 opt-in 드래그 문서. 성공은 실제 Dash 적중이며 tier·시작 cooldown stage·계획 구간/반사·적중·벽 실패·레이저 적중 구간/피해·점화 대상·종료 stage·경과 시간을 sequence별로 한 번 기록한다. 기본 앱 플래그와 공개 도움말·패치노트는 아직 활성화하지 않는다.
 
+## [L2] 2026-08-01 — Eater 드래그를 삼킨 대상의 수동 뱉기 노선으로 연결한다
+
+- 배경: Eater는 자동 Feast 진입과 0.72초 소화 뒤 자동 뱉기가 이미 서로 다른 상태·대상·타이머를 사용하므로 두 입력을 한 번에 수동화하면 상태 복잡도가 먼저 커진다. BattleSimulation 통제 400회에서 기존 자동 방향과 벽 지정 방향 모두 첫 벽 도달률은 100%였지만, 벽 근처 보조 적에 대한 Lv.9 파열 적중률은 자동 5.0% 대비 수동 94.0%였다.
+- 결정: 첫 vertical slice는 빈 상태 Feast 진입을 건드리지 않고, 삼킨 대상이 살아 있는 동안 focal·비자동·자원 보유 플레이어에게만 기존 0.72초 hold를 뱉기 조준창으로 연다. 유효 release는 범용 몸통 발사 없이 첫 유효 예측 구간 방향으로 기존 spit·recoil·Spit Dash·Wall Slam을 실행하는 `replace-shot`이다. 첫 bounce는 예상 파열 접점으로만 보여 주고 실제 물리 반사나 연쇄 파열을 추가하지 않으며, 실제 Lv.9 파열은 기존처럼 대상의 첫 유효 정적 충돌 접점에서 한 번만 발생한다. timeout·cancel·flag off·AI·non-focal·자원 없음은 저장된 기존 방향으로 자동 뱉고, 삼키기 전에는 자원을 예약하지 않는다.
+- 영향: `EaterAbility`의 swallowed-state command·방향 지정·기존 spit/Wall Slam 결과 수명주기, `eater-command-spit-route` 계측·포맷·회귀·시각 검증, 숨김 opt-in 드래그 문서. 기본 앱 플래그와 공개 도움말·패치노트는 아직 활성화하지 않는다. 빈 상태 Feast 진입선, 실제 multi-bounce spit, AI 수동 정책은 후속 범위로 남긴다.
+
 ## [L2] 2026-07-31 — Bat Ball 드래그를 호출 타구 방향 지정으로 연결한다
 
 - 배경: Bat Ball의 기존 드래그는 Slash·Wall Slam과 무관한 몸통 이동만 수행하고, 10시드 long 표본의 직접 드래그 피해 비중도 0.6~15.4%로 흔들렸다. 고정 조건 400회 방향 비교에서 기존 자동 넉백의 Wall Slam 성공은 52.5%였지만 벽을 선택한 호출 방향은 100%였고, Lv.6 성공 피해는 가까운 벽 175.0 대비 도달 가능한 먼 벽 184.4로 측정됐다.
@@ -64,9 +70,9 @@
 - 배경: 전역 커맨드 자원 프로토타입은 5시드·동굴/숲/사막·직선/반사 정책 평균에서 경기당 드래그를 8.3회에서 2.3회, 직접 드래그 피해 비중을 22.6%에서 9.0%로 낮췄지만, Rage는 27.6%로 여전히 높고 Orbit은 1.0%에 그치는 등 캐릭터별 의미 편차가 남았다. Hero·Orbit·Spin 같은 지속형 능력은 기존 ability-use 계측에서 미사용 100%로 오인되는 구조도 확인됐다.
 - 결정: 자동 능력을 기본 정체성으로 유지하고 드래그는 능력의 조준·충전 캐시아웃·충돌 경로·설치/표식 결과를 결정하는 저빈도 커맨드 계층으로 개편한다. 범용 직접 피해보다 반사 경로·설치·회수·후속 순서를 보상하며, cooldown reset 일괄 계측 대신 캐릭터별 의미 있는 `ability-result`를 `commandSequence`와 연결한다. 구현은 공통 경계와 Rage/Archer를 먼저 검증·커밋한 뒤 Hero/Phantom을 순차 적용하고, 네 대표 vertical slice가 통과하기 전 나머지 10종과 HUD·기본 앱 활성화로 확장하지 않는다.
 - 영향: `BattleMetrics`, `Ability`/`AbilitySet`, 드래그 커맨드 수명주기, Rage·Archer·Hero·Phantom 능력, 동일 시드 비교 스크립트와 회귀 테스트. 전체 제안과 캐릭터별 후속안은 `.omx/plans/drag-ability-roster-redesign.md`에 유지한다.
-- 구현 상태: 공통 `ability-result` 계측, primary ability 커맨드 훅, 별도 `commandSequence`, 3초/능력 주기/전투 종료 정리, opt-in 플래그를 먼저 적용했다. Rage·Archer·Hero·Phantom·Orbit·Spin·Trickster·Bat Ball까지 8종을 순차 구현했다. Bat Ball은 자동 스캔 직후 0.8초 입력창을 열고, replace-shot 릴리스의 마지막 경로 구간으로 기존 Slash·넉백 방향만 바꾼다. timeout·cancel은 기존 자동 Slash를 한 번 실행하고 target 무효화는 cooldown·resource를 소비하지 않는다. 통제 시뮬레이션 400회에서 기존 자동 방향의 Wall Slam 성공률 52.5%가 벽 지정 방향에서 100%로 올랐으며, tier 2는 가까운 벽 평균 피해 175.0과 먼 벽 184.4의 선택 차이를 보였다. 일반 자동 정책 long 표본은 벽 선택을 학습하지 않아 성공 0%였으므로 숙련 조작의 상한을 대신하지 않는다.
+- 구현 상태: 공통 `ability-result` 계측, primary ability 커맨드 훅, 별도 `commandSequence`, 3초/능력 주기/전투 종료 정리, opt-in 플래그를 먼저 적용했다. Rage·Archer·Hero·Phantom·Orbit·Spin·Trickster·Bat Ball·Eater까지 9종을 순차 구현했다. Eater는 삼킨 대상의 기존 0.72초 hold 안에서만 `Aim Spit` 조준을 열고, replace-shot 릴리스의 첫 유효 절대 경로 endpoint로 기존 spit·Spit Dash·Wall Slam 방향만 바꾼다. timeout·cancel·비적격 경로는 기존 자동 spit을 한 번 실행하며, 실제 첫 Wall Slam 피해·tier 3 파열만 `eater-command-spit-route`로 결산한다.
 - 구현 상태 보강: 계측 스크립트는 `standard`/`long` profile과 `METRICS_ABILITY_TIERS`(0~3)를 순수 구성으로 해석하고, match 직후 focal `progression.abilityTier`만 설정한다. tier 0은 기존 시드·stage 순서를 유지하며, Rage·Archer·Hero·Phantom·Orbit result value를 재계산 없이 표시한다. Orbit은 전탄 입력창의 payload-only 고정 집결 volley와 sequence별 결과 결산을 숨김 opt-in으로 적용했다.
-- 열린 리스크/다음: Trickster tier 3의 표식→Seed Burst 연결은 10시드에서 9.1~26.7%로 낮고, Bat Ball 일반 자동 정책은 벽을 의도적으로 고르지 못해 호출 타구 Wall Slam 성공이 0%였다. 두 능력 모두 피해 수치를 올리기보다 실제 모바일 조작감과 능력별 목적을 이해하는 조작 정책으로 숙련 보상이 나타나는지 먼저 확인한다. 다음 vertical slice는 아직 미적용인 6종 중 계획 순서상 Dash이며, 이후 Eater·Elementalist·Grenade·Gunner·Vampire를 같은 시뮬레이션→단일 메커닉→독립 검증 순서로 진행한다.
+- 열린 리스크/다음: Trickster tier 3의 표식→Seed Burst 연결은 10시드에서 9.1~26.7%로 낮고, Bat Ball 일반 자동 정책은 벽을 의도적으로 고르지 못해 호출 타구 Wall Slam 성공이 0%였다. 두 능력 모두 피해 수치를 올리기보다 실제 모바일 조작감과 능력별 목적을 이해하는 조작 정책으로 숙련 보상이 나타나는지 먼저 확인한다. 다음 vertical slice는 아직 미적용인 5종 중 계획 순서상 Elementalist이며, 이후 Grenade·Gunner·Vampire를 같은 시뮬레이션→단일 메커닉→독립 검증 순서로 진행한다.
 
 ## [L2] 2026-07-30 — 드래그를 능력 연계형 커맨드로 재설계한다
 
