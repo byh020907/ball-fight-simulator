@@ -15,6 +15,8 @@ const RING_SEGMENT_COUNT = 12;
 const CUT_DURATION = 0.6;
 const CUT_INTERVAL = 0.05;
 const CUT_TICKS = 12;
+const COMMAND_RETENTION_PER_BOUNCE = 0.25;
+const COMMAND_RETENTION_MAX_BOUNCES = 2;
 
 function smoothstep(value) {
     const clamped = Math.max(0, Math.min(1, value));
@@ -50,7 +52,9 @@ export class SpinAbility extends Ability {
             dischargeFlash: 0,
             cutFlash: 0,
             cut: null,
-            vortexEffect: null
+            vortexEffect: null,
+            commandIntents: new Map(),
+            commandCycles: new Map()
         };
     }
 
@@ -121,6 +125,142 @@ export class SpinAbility extends Ability {
     onCollision() {
         if (this.state.cut) return;
         this._consumeCharge(this.getChargeProgress());
+    }
+
+    getCommandState() {
+        if (
+            !this.simulation.abilityCommandEnabled ||
+            this.simulation.playerBall !== this.owner ||
+            !this.simulation.dragCombat ||
+            this.simulation.dragCombat.automated
+        ) {
+            return { available: false, reserveResource: false };
+        }
+        const available = this.isFullyCharged() && !this.state.cut;
+        return { available, reserveResource: available };
+    }
+
+    prepareCommand(intent) {
+        if (!this.getCommandState().available || !intent?.direction) return intent;
+        const prepared = {
+            ...intent,
+            direction: { ...intent.direction },
+            pathSegments: intent.pathSegments?.map((point) => ({ ...point })) ?? [],
+            bouncePoints: intent.bouncePoints?.map((point) => ({ ...point })) ?? [],
+            predictedTerminal: intent.predictedTerminal ? { ...intent.predictedTerminal } : null,
+            tier: this.abilityTier,
+            chargeRatio: this.getChargeProgress(),
+            plannedSegments: intent.pathSegments?.length ?? 0,
+            createdAt: intent.createdAt ?? this.simulation.elapsed ?? 0,
+            bounces: 0
+        };
+        this.state.commandIntents.set(prepared.sequence, prepared);
+        return prepared;
+    }
+
+    resolveCommandLaunch(intent) {
+        const prepared = this.state.commandIntents.get(intent?.sequence);
+        if (!prepared || !this.isFullyCharged() || this.state.cut) {
+            if (intent?.sequence !== undefined) this.state.commandIntents.delete(intent.sequence);
+            return { mode: "default-shot" };
+        }
+        return { mode: "default-shot" };
+    }
+
+    onCommandBounce(event, { context } = {}) {
+        const prepared = this.state.commandIntents.get(event?.commandSequence);
+        if (!prepared || (!context?.wall && !context?.terrain)) return;
+        prepared.bounces += 1;
+    }
+
+    resolveCommandCollision(event, { context } = {}) {
+        const prepared = this.state.commandIntents.get(event?.commandSequence);
+        if (
+            !prepared ||
+            this.state.commandCycles.has(event.commandSequence) ||
+            !event.target ||
+            !this.simulation.isHostile(this.owner, event.target)
+        ) {
+            return { handled: false, runDefaultOnCollision: true };
+        }
+
+        const cycle = {
+            ...prepared,
+            target: event.target,
+            context,
+            terminalType: event.type,
+            bounces: prepared.bounces,
+            finalized: false
+        };
+        this.state.commandIntents.delete(event.commandSequence);
+        this.state.commandCycles.set(event.commandSequence, cycle);
+        this._consumeCommandCharge(prepared.chargeRatio * this._getCommandRetention(cycle.bounces));
+        this.recordUsageMetric();
+        return { handled: true, runDefaultOnCollision: false };
+    }
+
+    onFighterCollisionDamageResolved(target, directDamage, context = {}) {
+        for (const [sequence, cycle] of this.state.commandCycles) {
+            if (cycle.target !== target || cycle.context !== context) continue;
+            this._finalizeCommandCycle(sequence, cycle, directDamage);
+        }
+    }
+
+    onCommandEnd(event) {
+        const cycle = this.state.commandCycles.get(event?.commandSequence);
+        if (cycle) return;
+        const prepared = this.state.commandIntents.get(event?.commandSequence);
+        if (!prepared) return;
+        this.state.commandIntents.delete(event.commandSequence);
+        this._recordCommandResult(prepared, { bounces: 0, terminalType: null }, 0);
+    }
+
+    onBattleEnded() {
+        for (const [sequence, cycle] of this.state.commandCycles) this._finalizeCommandCycle(sequence, cycle, 0);
+        for (const [sequence, prepared] of this.state.commandIntents) {
+            this.state.commandIntents.delete(sequence);
+            this._recordCommandResult(prepared, { bounces: 0, terminalType: null }, 0);
+        }
+    }
+
+    _getCommandRetention(bounces) {
+        return Math.min(bounces, COMMAND_RETENTION_MAX_BOUNCES) * COMMAND_RETENTION_PER_BOUNCE;
+    }
+
+    _consumeCommandCharge(retainedCharge) {
+        this.state.timeWithoutCollision = this.getMaxChargeTime() * retainedCharge;
+        this.state.dischargeFlash = 0.34;
+        this._applySpinVelocity(this.getTargetSpinVelocity());
+        this._showChargeDischarge(retainedCharge);
+    }
+
+    _finalizeCommandCycle(sequence, cycle, directDamage) {
+        if (cycle.finalized) return;
+        cycle.finalized = true;
+        this.state.commandCycles.delete(sequence);
+        this._recordCommandResult(cycle, cycle, directDamage);
+    }
+
+    _recordCommandResult(prepared, cycle, directDamage) {
+        const bounces = cycle.bounces ?? 0;
+        const retainedCharge = prepared.chargeRatio * this._getCommandRetention(bounces);
+        this.recordAbilityResult({
+            commandSequence: prepared.sequence,
+            resultType: "spin-command-gyro-bank",
+            success: ["plain-hit", "rear-hit"].includes(cycle.terminalType),
+            value: {
+                tier: prepared.tier,
+                chargeRatio: prepared.chargeRatio,
+                plannedSegments: prepared.plannedSegments,
+                bounces,
+                retainedCharge,
+                directDamage: Number.isFinite(directDamage) ? directDamage : 0,
+                surfaceCut: Boolean(this.getLevelUpgrade().surfaceCut && prepared.chargeRatio >= FULL_CHARGE_THRESHOLD),
+                rearHit: cycle.terminalType === "rear-hit",
+                countered: cycle.terminalType === "shield-counter",
+                elapsed: Math.max(0, (this.simulation.elapsed ?? prepared.createdAt) - prepared.createdAt)
+            }
+        });
     }
 
     _startCut(target, context) {

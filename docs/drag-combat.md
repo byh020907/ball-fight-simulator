@@ -92,6 +92,12 @@ Phantom은 primed 상태의 focal 수동 플레이어만 `그림자 출구 지�
 
 Orbit은 전탄·사거리·cooldown 조건을 만족한 focal 수동 플레이어에게만 0.8초 입력창을 열어 고정 집결점을 예약한다. 유효 release는 몸체 발사 없이 기존 shard cadence·slot·피해로 payload-only volley를 시작하며, tier 1 이상은 각 projectile 생성 시 같은 집결점으로 동기화를 시작한다. `orbit-command-volley`는 방출·직접 적중·동기화 적중·tier 3 catch·계획 구간·경과 시간을 sequence별로 단일 결산한다.
 
+### Spin 실험 슬라이스
+
+Spin은 `abilityCommandEnabled` opt-in의 focal 수동 플레이어가 만충이고 절단 중이 아닐 때만 generic 발사 자원을 보류한다. 유효 release는 기존 `default-shot`을 그대로 사용하고, 첫 적대 terminal collision에서만 Spin charge를 실제 벽/terrain 반사당 25%, 최대 50%로 보존한다. 기본 충돌 소비는 억제하지만 tier 1 이상의 기존 deferred 표면 절단과 tier 2 가속 절삭·tier 3 관통 유체장은 바꾸지 않는다.
+
+`spin-command-gyro-bank`는 sequence별로 tier, 발사 충전, 계획 구간, 실제 반사, 보존 충전, 직접 피해, 표면 절단, 후면 적중, 방패 반격, 경과 시간을 단 한 번 기록한다. plain/rear hit만 성공이며 shield counter도 charge cashout과 사용 계측은 한 번 실행하지만 실패 결과로 남는다. ally-stop·miss·교체·만료·reset·전투 종료는 추가 charge 소비 없이 실패로 결산한다.
+
 ### 능력 티어 장기 계측
 
 `npm run metrics:drag-ability`는 `METRICS_PROFILE=standard`에서 기존 `1 seed / 75 seconds`, `METRICS_PROFILE=long`에서 `10 seeds / 120 seconds`를 기본으로 사용한다. `METRICS_SEEDS`와 `METRICS_MAX_SECONDS`를 지정하면 profile 기본값보다 우선하며, 알 수 없는 profile은 오류로 종료한다.

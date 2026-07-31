@@ -83,6 +83,18 @@ function formatOrbit(values) {
     );
 }
 
+function formatSpin(values) {
+    const field = (key) => decimal(average(values.map((value) => finiteNumber(value[key]))));
+    return (
+        `평균 충전 ${percent(average(values.map((value) => finiteNumber(value.chargeRatio))))}, ` +
+        `계획 구간 ${field("plannedSegments")}, 반사 ${field("bounces")}, 보존 충전 ${percent(
+            average(values.map((value) => finiteNumber(value.retainedCharge)))
+        )}, 직접 피해 ${field("directDamage")}, 경과 ${field("elapsed")}초, ` +
+        `표면 절단 ${percent(booleanRate(values, "surfaceCut"))}, 후면 적중 ${percent(booleanRate(values, "rearHit"))}, ` +
+        `방패 반격 ${percent(booleanRate(values, "countered"))}`
+    );
+}
+
 export function formatAbilityResult(type, result) {
     const base = formatBase(type, result);
     const values = resultValues(result);
@@ -91,7 +103,8 @@ export function formatAbilityResult(type, result) {
         "archer-command-shot": formatArcher,
         "hero-command-core-cycle": formatHero,
         "phantom-command-chain": formatPhantom,
-        "orbit-command-volley": formatOrbit
+        "orbit-command-volley": formatOrbit,
+        "spin-command-gyro-bank": formatSpin
     }[type];
     return detail ? `${base}, ${detail(values)}` : base;
 }
