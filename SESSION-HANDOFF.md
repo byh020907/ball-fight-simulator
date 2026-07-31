@@ -4,7 +4,7 @@
 
 ## 현재 기준
 
-- [L2] 2026-08-01 Eater 수동 드래그는 자동 Feast·삼키기를 유지한 채 삼킨 대상의 0.72초 hold 안에서만 뱉기 방향을 지정한다. focal·비자동·resource 보유 상태의 release는 replace-shot으로 대상 Spit Dash·기존 Wall Slam만 실행하며, `eater-command-spit-route`는 실제 첫 Wall Slam 피해와 tier 3 파열을 sequence별로 한 번만 계측한다.
+- [L2] 2026-08-01 Elementalist 수동 드래그는 자동 물 볼트·오브 생성·자성을 유지한 채 활성 오브를 주문으로 바꾸는 `원소 회수선`을 제공한다. focal·비자동·resource 보유 상태에서만 열리고, 28px 회수선의 첫 오브 하나 또는 tier 3의 서로 다른 일반 오브 한 쌍을 기존 단일/융합 채널로 즉시 전환한다. 성공 회수는 0.36초 전용 tether·bead·선택 ring 뒤 기존 채널 효과로 연결하며, 실제 Canvas 4프레임으로 조준→회수·융합→복합 채널→recall 종료를 확인했다.
 
 - 개발·검증·문서 수명주기: [`docs/development-rules.md`](docs/development-rules.md)
 - 게임 규칙: [`docs/game-rules.md`](docs/game-rules.md)
@@ -59,6 +59,12 @@
 - 결정: 첫 vertical slice는 빈 상태 Feast 진입을 건드리지 않고, 삼킨 대상이 살아 있는 동안 focal·비자동·자원 보유 플레이어에게만 기존 0.72초 hold를 뱉기 조준창으로 연다. 유효 release는 범용 몸통 발사 없이 첫 유효 예측 구간 방향으로 기존 spit·recoil·Spit Dash·Wall Slam을 실행하는 `replace-shot`이다. 첫 bounce는 예상 파열 접점으로만 보여 주고 실제 물리 반사나 연쇄 파열을 추가하지 않으며, 실제 Lv.9 파열은 기존처럼 대상의 첫 유효 정적 충돌 접점에서 한 번만 발생한다. timeout·cancel·flag off·AI·non-focal·자원 없음은 저장된 기존 방향으로 자동 뱉고, 삼키기 전에는 자원을 예약하지 않는다.
 - 영향: `EaterAbility`의 swallowed-state command·방향 지정·기존 spit/Wall Slam 결과 수명주기, `eater-command-spit-route` 계측·포맷·회귀·시각 검증, 숨김 opt-in 드래그 문서. 기본 앱 플래그와 공개 도움말·패치노트는 아직 활성화하지 않는다. 빈 상태 Feast 진입선, 실제 multi-bounce spit, AI 수동 정책은 후속 범위로 남긴다.
 
+## [L2] 2026-08-01 — Elementalist 드래그를 원소 오브 회수선으로 연결한다
+
+- 배경: BattleSimulation 기반 400회에서 현행 tier 3 오브 물리는 6초 안 복합 오브를 95.5% 생성했지만 실제 소유자 회수 뒤 복합 채널까지 이어진 비율은 2.0%였다. 실제 최대 3회 반사 궤적 180방향을 비교하면 28px 회수선은 단순 적 직선의 서로 다른 오브 쌍 선택률 1.0% 대비 의도 각도에서 89.5%, 실제 융합·채널 연결 90.5%를 기록했다.
+- 결정: 자동 물 볼트·오브 방출·자성·물리 융합은 그대로 두고, 활성 오브가 있는 focal·비자동·자원 보유 플레이어에게 `원소 회수선`을 연다. 유효 release는 범용 몸체 발사 없이 실제 예측 세그먼트 중심선 28px 안의 오브를 진행 순서로 읽어 첫 복합 오브 또는 첫 일반 오브를 회수하며, tier 3에서는 뒤이어 만난 서로 다른 일반 오브 하나와 기존 레시피로 융합한 뒤 정확히 한 채널만 시작한다. terminal에 실제 적 충돌이 예측되면 사거리 안에서 그 적을 채널 우선 대상으로 사용하고, 빗나간 유효 release도 자원을 소비한 실패 결과로 끝낸다.
+- 영향: `ElementalistAbility`의 payload-only 회수·기존 융합/채널 재사용·sequence별 `elementalist-command-recall-route` 결과, 0.36초 선택 오브 회수 확인 VFX, metrics/회귀/숨김 opt-in 문서. tier 0~2는 한 오브 단일 주문만 회수하고 tier 3만 두 일반 오브 융합을 허용한다. AI·비포컬·flag off·기본 앱·공개 도움말·패치노트는 바꾸지 않는다.
+
 ## [L2] 2026-07-31 — Bat Ball 드래그를 호출 타구 방향 지정으로 연결한다
 
 - 배경: Bat Ball의 기존 드래그는 Slash·Wall Slam과 무관한 몸통 이동만 수행하고, 10시드 long 표본의 직접 드래그 피해 비중도 0.6~15.4%로 흔들렸다. 고정 조건 400회 방향 비교에서 기존 자동 넉백의 Wall Slam 성공은 52.5%였지만 벽을 선택한 호출 방향은 100%였고, Lv.6 성공 피해는 가까운 벽 175.0 대비 도달 가능한 먼 벽 184.4로 측정됐다.
@@ -70,9 +76,9 @@
 - 배경: 전역 커맨드 자원 프로토타입은 5시드·동굴/숲/사막·직선/반사 정책 평균에서 경기당 드래그를 8.3회에서 2.3회, 직접 드래그 피해 비중을 22.6%에서 9.0%로 낮췄지만, Rage는 27.6%로 여전히 높고 Orbit은 1.0%에 그치는 등 캐릭터별 의미 편차가 남았다. Hero·Orbit·Spin 같은 지속형 능력은 기존 ability-use 계측에서 미사용 100%로 오인되는 구조도 확인됐다.
 - 결정: 자동 능력을 기본 정체성으로 유지하고 드래그는 능력의 조준·충전 캐시아웃·충돌 경로·설치/표식 결과를 결정하는 저빈도 커맨드 계층으로 개편한다. 범용 직접 피해보다 반사 경로·설치·회수·후속 순서를 보상하며, cooldown reset 일괄 계측 대신 캐릭터별 의미 있는 `ability-result`를 `commandSequence`와 연결한다. 구현은 공통 경계와 Rage/Archer를 먼저 검증·커밋한 뒤 Hero/Phantom을 순차 적용하고, 네 대표 vertical slice가 통과하기 전 나머지 10종과 HUD·기본 앱 활성화로 확장하지 않는다.
 - 영향: `BattleMetrics`, `Ability`/`AbilitySet`, 드래그 커맨드 수명주기, Rage·Archer·Hero·Phantom 능력, 동일 시드 비교 스크립트와 회귀 테스트. 전체 제안과 캐릭터별 후속안은 `.omx/plans/drag-ability-roster-redesign.md`에 유지한다.
-- 구현 상태: 공통 `ability-result` 계측, primary ability 커맨드 훅, 별도 `commandSequence`, 3초/능력 주기/전투 종료 정리, opt-in 플래그를 먼저 적용했다. Rage·Archer·Hero·Phantom·Orbit·Spin·Trickster·Bat Ball·Dash·Eater까지 10종을 순차 구현했다. Eater는 삼킨 대상의 기존 0.72초 hold 안에서만 `Aim Spit` 조준을 열고, replace-shot 릴리스의 첫 유효 절대 경로 endpoint로 기존 spit·Spit Dash·Wall Slam 방향만 바꾼다. timeout·cancel·비적격 경로는 기존 자동 spit을 한 번 실행하며, 실제 첫 Wall Slam 피해·tier 3 파열만 `eater-command-spit-route`로 결산한다.
+- 구현 상태: 공통 `ability-result` 계측, primary ability 커맨드 훅, 별도 `commandSequence`, 3초/능력 주기/전투 종료 정리, opt-in 플래그를 먼저 적용했다. Rage·Archer·Hero·Phantom·Orbit·Spin·Trickster·Bat Ball·Dash·Eater·Elementalist까지 11종을 순차 구현했다. Eater는 삼킨 대상의 기존 0.72초 hold 안에서만 `Aim Spit` 조준을 열고, replace-shot 릴리스의 첫 유효 절대 경로 endpoint로 기존 spit·Spit Dash·Wall Slam 방향만 바꾼다. timeout·cancel·비적격 경로는 기존 자동 spit을 한 번 실행하며, 실제 첫 Wall Slam 피해·tier 3 파열만 `eater-command-spit-route`로 결산한다.
 - 구현 상태 보강: 계측 스크립트는 `standard`/`long` profile과 `METRICS_ABILITY_TIERS`(0~3)를 순수 구성으로 해석하고, match 직후 focal `progression.abilityTier`만 설정한다. tier 0은 기존 시드·stage 순서를 유지하며, Rage·Archer·Hero·Phantom·Orbit result value를 재계산 없이 표시한다. Orbit은 전탄 입력창의 payload-only 고정 집결 volley와 sequence별 결과 결산을 숨김 opt-in으로 적용했다.
-- 열린 리스크/다음: Trickster tier 3의 표식→Seed Burst 연결은 10시드에서 9.1~26.7%로 낮고, Bat Ball 일반 자동 정책은 벽을 의도적으로 고르지 못해 호출 타구 Wall Slam 성공이 0%였다. 두 능력 모두 피해 수치를 올리기보다 실제 모바일 조작감과 능력별 목적을 이해하는 조작 정책으로 숙련 보상이 나타나는지 먼저 확인한다. 다음 vertical slice는 아직 미적용인 4종 중 계획 순서상 Elementalist이며, 이후 Grenade·Gunner·Vampire를 같은 시뮬레이션→단일 메커닉→독립 검증 순서로 진행한다.
+- 열린 리스크/다음: Trickster tier 3의 표식→Seed Burst 연결은 10시드에서 9.1~26.7%로 낮고, Bat Ball 일반 자동 정책은 벽을 의도적으로 고르지 못해 호출 타구 Wall Slam 성공이 0%였다. 두 능력 모두 피해 수치를 올리기보다 실제 모바일 조작감과 능력별 목적을 이해하는 조작 정책으로 숙련 보상이 나타나는지 먼저 확인한다. 남은 Grenade·Gunner·Vampire 3종은 같은 시뮬레이션→단일 메커닉→독립 검증 순서로 진행한다.
 
 ## [L2] 2026-07-30 — 드래그를 능력 연계형 커맨드로 재설계한다
 

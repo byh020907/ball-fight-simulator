@@ -4,6 +4,7 @@ import { enforceActiveEntityLimit } from "../entities/activeEntityLimit.js";
 import {
     BURNING_EFFECT_CONFIG,
     ElementalChannelEffect,
+    ElementalistRecallEffect,
     ElementalWetReactionEffect,
     VisualBurst,
     applyBurningEffect,
@@ -19,6 +20,7 @@ import {
     chooseElement,
     getElementalCompositeRecipe
 } from "./elementalistRecipes.js";
+import { selectRecallRoute, selectRecallTerminalTarget } from "./elementalistRecallRoute.js";
 
 const ELEMENTALIST_CONFIG = Object.freeze({
     channelRange: 600,
@@ -97,16 +99,20 @@ export class ElementalistAbility extends Ability {
         this.cooldowns = new CooldownBank({
             [ELEMENTALIST_COOLDOWN_KEYS.manaLeap]: ELEMENTALIST_CONFIG.manaLeap.retriggerCooldown
         });
+        this.commandCycles = new Map();
+        this.preparedCommand = null;
     }
 
     update(delta, target) {
         if (this.owner.flags.defeated || this.simulation.finished) {
+            this._finalizeAllCommandCycles(this.owner.flags.defeated ? "owner-defeat" : "battle-ended");
             this.cleanupElementalState();
             return;
         }
         this.tickCooldown(delta);
         this.cooldowns.tick(delta);
         this._updateChannels(delta);
+        this._finalizeCompletedCommandCycles();
         this._pruneOrbs();
         if (this.getLevelUpgrade().orbitalFusion) this._processOrbInteractions(delta);
         if (!this.cooldownReady || !this._isValidTarget(target, false)) return;
@@ -154,7 +160,7 @@ export class ElementalistAbility extends Ability {
         this.simulation.spawnExplosion(orb.position.clone(), this.getElementColor(element));
     }
 
-    consumeOrbByOwner(orb) {
+    consumeOrbByOwner(orb, { target = null, commandSequence = null } = {}) {
         if (orb.isExpired) return;
         const elements = [...orb.elements];
         const recipe = orb.recipe;
@@ -168,8 +174,10 @@ export class ElementalistAbility extends Ability {
         });
         orb.expire();
         this.activeChannels.push(channel);
-        const target = this._selectChannelTarget(channel);
-        if (target) this._activateChannel(channel, target);
+        const selectedTarget = target && this._isValidTarget(target) ? target : this._selectChannelTarget(channel);
+        if (selectedTarget) this._activateChannel(channel, selectedTarget);
+        if (commandSequence != null) this._attachCommandChannel(commandSequence, channel);
+        return channel;
     }
 
     _activateChannel(channel, target) {
@@ -306,13 +314,15 @@ export class ElementalistAbility extends Ability {
         }
         while (channel.tickCount < expectedTicks) {
             channel.tickCount += 1;
-            this._dealExactTick(
+            const result = this._dealExactTick(
                 channel.target,
                 multiplier,
                 channel.tickCount,
                 maximumTicks,
                 channel.recipe?.name ?? "원소 주문"
             );
+            const cycle = this.commandCycles.get(channel.commandSequence);
+            if (cycle) cycle.actualDamage += Number.isFinite(result?.actualDamage) ? result.actualDamage : 0;
         }
     }
 
@@ -368,7 +378,9 @@ export class ElementalistAbility extends Ability {
                     .filter((reaction) => reaction.damageMultiplier)
                     .map((reaction) => reaction.label)
                     .join(" + ");
-                this._dealDamage(channel.target, damageMultiplier, labels);
+                const result = this._dealDamage(channel.target, damageMultiplier, labels);
+                const cycle = this.commandCycles.get(channel.commandSequence);
+                if (cycle) cycle.actualDamage += Number.isFinite(result?.actualDamage) ? result.actualDamage : 0;
             }
             const impulseScale = reactions.reduce((total, reaction) => total + (reaction.impulseScale ?? 0), 0);
             if (impulseScale > 0) {
@@ -396,11 +408,12 @@ export class ElementalistAbility extends Ability {
 
     _dealExactTick(target, multiplier, tickNumber, maximumTicks, label) {
         const totalDamage = this._getTotalAttack() * multiplier;
-        target.takeDamage(exactTickDamage(totalDamage, tickNumber, maximumTicks), this.owner, label);
+        const result = target.takeDamage(exactTickDamage(totalDamage, tickNumber, maximumTicks), this.owner, label);
+        return result;
     }
 
     _dealDamage(target, multiplier, label) {
-        target.takeDamage(Math.round(this._getTotalAttack() * multiplier), this.owner, label);
+        return target.takeDamage(Math.round(this._getTotalAttack() * multiplier), this.owner, label);
     }
 
     _getTotalAttack() {
@@ -504,6 +517,7 @@ export class ElementalistAbility extends Ability {
         this.activeOrbs.push(composite);
         this.simulation.entities.push(composite);
         this.simulation.spawnPulse(position.clone(), "#ffffff");
+        return composite;
     }
 
     applyOwnerMagnet(orb, delta, graceActive) {
@@ -526,15 +540,18 @@ export class ElementalistAbility extends Ability {
     }
 
     onOwnerDefeated() {
+        this._finalizeAllCommandCycles("owner-defeat");
         this.cleanupElementalState();
         return false;
     }
 
     onBattleEnded() {
+        this._finalizeAllCommandCycles("battle-ended");
         this.cleanupElementalState();
     }
 
     cleanupElementalState() {
+        this.preparedCommand = null;
         for (const orb of [...this.activeOrbs]) orb.expire();
         for (const channel of this.activeChannels) channel.cancelled = true;
         this.activeChannels = [];
@@ -545,7 +562,172 @@ export class ElementalistAbility extends Ability {
         }
         for (const entity of this.simulation.entities) {
             if (entity instanceof ElementalChannelEffect && entity.source === this.owner) entity.isExpired = true;
+            if (entity instanceof ElementalistRecallEffect && entity.owner === this.owner) entity.isExpired = true;
         }
+    }
+
+    getCommandState() {
+        const eligible = this._isCommandPlayerEligible();
+        if (!eligible || !this.simulation.commandResource?.canSpend?.())
+            return { available: false, reserveResource: false };
+        return this.activeOrbs.some((orb) => !orb.isExpired)
+            ? { available: true, reserveResource: false }
+            : { available: false, reserveResource: true };
+    }
+
+    _isCommandPlayerEligible() {
+        return Boolean(
+            this.simulation.abilityCommandEnabled &&
+            this.simulation.playerBall === this.owner &&
+            this.simulation.dragCombat &&
+            !this.simulation.dragCombat.automated
+        );
+    }
+
+    prepareCommand(intent) {
+        if (!this._isCommandPlayerEligible() || !this.activeOrbs.some((orb) => !orb.isExpired)) {
+            this.preparedCommand = null;
+            return intent;
+        }
+        const route = selectRecallRoute({
+            ownerPosition: this.owner.position,
+            pathSegments: intent.pathSegments,
+            orbs: this.activeOrbs.filter((orb) => !orb.isExpired),
+            tier: this.abilityTier
+        });
+        this.preparedCommand = {
+            ...intent,
+            route,
+            target: selectRecallTerminalTarget({
+                owner: this.owner,
+                simulation: this.simulation,
+                predictedTerminal: intent.predictedTerminal
+            })
+        };
+        return this.preparedCommand;
+    }
+
+    resolveCommandLaunch(intent) {
+        const command = this.preparedCommand;
+        this.preparedCommand = null;
+        if (!command || command.sequence !== intent?.sequence) return { mode: "default-shot" };
+        const cycle = {
+            commandSequence: command.sequence,
+            tier: this.abilityTier,
+            routeCandidates: command.route.candidates.length,
+            selectedOrbs: command.route.selectedOrbs.length,
+            recipeBuilt: false,
+            recipeId: null,
+            preparedTarget: command.target,
+            targetLocked: false,
+            channelStarted: false,
+            channelCompleted: false,
+            actualDamage: 0,
+            plannedSegments: command.pathSegments.length,
+            plannedBounces: command.bouncePoints.length,
+            createdAt: command.createdAt ?? this.simulation.elapsed,
+            reason: "route-miss",
+            finalized: false,
+            channel: null
+        };
+        this.commandCycles.set(command.sequence, cycle);
+        const selected = command.route.selectedOrbs.filter((orb) => !orb.isExpired && this.activeOrbs.includes(orb));
+        cycle.selectedOrbs = selected.length;
+        if (!selected.length || selected.length !== command.route.selectedOrbs.length) {
+            return this._finalizeRouteMiss(command, cycle);
+        }
+        let orb = selected[0];
+        if (command.route.recipeBuilt) {
+            const composite = this._fuseOrbs(selected[0], selected[1]);
+            if (!composite) return this._finalizeRouteMiss(command, cycle);
+            orb = composite;
+            cycle.recipeBuilt = true;
+            cycle.recipeId = composite.recipe?.id ?? composite.recipe?.name ?? null;
+        }
+        this.simulation.entities.push(new ElementalistRecallEffect({ owner: this.owner, orbs: selected }));
+        const channel = this.consumeOrbByOwner(orb, { target: command.target, commandSequence: command.sequence });
+        cycle.channel = channel;
+        cycle.channelStarted = Boolean(channel?.target);
+        cycle.targetLocked = Boolean(command.target && channel?.target === command.target);
+        cycle.reason = channel?.target ? "completed" : "no-target";
+        return { mode: "payload-only" };
+    }
+
+    onCommandEnd(event) {
+        if (this.preparedCommand?.sequence === event.commandSequence) this.preparedCommand = null;
+        const cycle = this.commandCycles.get(event.commandSequence);
+        if (cycle && !cycle.channel) {
+            cycle.reason = event.reason;
+            this._finalizeCommandCycle(event.commandSequence);
+        }
+    }
+
+    _finalizeRouteMiss(command, cycle) {
+        cycle.selectedOrbs = 0;
+        cycle.reason = "route-miss";
+        const missPosition = command.predictedTerminal
+            ? new Vector2(command.predictedTerminal.x, command.predictedTerminal.y)
+            : this.owner.position.clone();
+        this.simulation.spawnPulse(missPosition, "#9aa0a6");
+        this._finalizeCommandCycle(command.sequence);
+        return { mode: "payload-only" };
+    }
+
+    _attachCommandChannel(sequence, channel) {
+        const cycle = this.commandCycles.get(sequence);
+        if (cycle) {
+            cycle.channel = channel;
+            channel.commandSequence = sequence;
+        }
+    }
+
+    _finalizeCompletedCommandCycles() {
+        for (const [sequence, cycle] of this.commandCycles) {
+            if (cycle.channel?.target) {
+                cycle.channelStarted = true;
+                cycle.targetLocked ||= cycle.preparedTarget === cycle.channel.target;
+            }
+            if (!cycle.channel || cycle.channel.finished || cycle.channel.cancelled) {
+                cycle.channelCompleted = Boolean(
+                    cycle.channelStarted && cycle.channel?.finished && !cycle.channel?.cancelled
+                );
+                if (cycle.channel?.cancelled) cycle.reason = "cancelled";
+                else if (cycle.channelCompleted) cycle.reason = "completed";
+                this._finalizeCommandCycle(sequence);
+            }
+        }
+    }
+
+    _finalizeAllCommandCycles(reason) {
+        for (const cycle of this.commandCycles.values()) cycle.reason = reason;
+        for (const sequence of [...this.commandCycles.keys()]) this._finalizeCommandCycle(sequence);
+    }
+
+    _finalizeCommandCycle(sequence) {
+        const cycle = this.commandCycles.get(sequence);
+        if (!cycle || cycle.finalized) return;
+        cycle.finalized = true;
+        this.recordAbilityResult({
+            commandSequence: sequence,
+            resultType: "elementalist-command-recall-route",
+            success: cycle.channelCompleted,
+            value: {
+                tier: cycle.tier,
+                routeCandidates: cycle.routeCandidates,
+                selectedOrbs: cycle.selectedOrbs,
+                recipeBuilt: cycle.recipeBuilt,
+                recipeId: cycle.recipeId,
+                targetLocked: cycle.targetLocked,
+                channelStarted: cycle.channelStarted,
+                channelCompleted: cycle.channelCompleted,
+                actualDamage: cycle.actualDamage,
+                plannedSegments: cycle.plannedSegments,
+                plannedBounces: cycle.plannedBounces,
+                elapsed: Math.max(0, this.simulation.elapsed - cycle.createdAt),
+                reason: cycle.reason
+            }
+        });
+        this.commandCycles.delete(sequence);
     }
 
     getCombinationRecipe(first, second) {
@@ -600,8 +782,16 @@ export class ElementalistAbility extends Ability {
 
     getUiState() {
         const channels = this.activeChannels.length;
+        const activeOrbCount = this.activeOrbs.filter((orb) => !orb.isExpired).length;
+        if (this.getCommandState().available) {
+            return {
+                label: "원소 회수선",
+                text: `오브 ${activeOrbCount}/${ELEMENTALIST_CONFIG.maximumOrbs} · 경로로 회수`,
+                progress: this.cooldownProgress
+            };
+        }
         return {
-            label: `원소 오브 ${this.activeOrbs.length}/${ELEMENTALIST_CONFIG.maximumOrbs}`,
+            label: `원소 오브 ${activeOrbCount}/${ELEMENTALIST_CONFIG.maximumOrbs}`,
             text: channels > 0 ? `채널 ${channels}` : null,
             progress: this.cooldownProgress
         };

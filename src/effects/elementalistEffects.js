@@ -12,6 +12,14 @@ import { drawElementalWetChannelBuildUp } from "./elementalWetReactionEffect.js"
 
 const SHAPE_COUNT = 8;
 
+export const ELEMENTALIST_RECALL_VISUAL_CONFIG = Object.freeze({
+    duration: 0.36,
+    tetherWidth: 3,
+    tetherDash: Object.freeze([5, 4]),
+    beadRadius: 4,
+    ringPadding: 10
+});
+
 function clamp01(value) {
     return Math.max(0, Math.min(1, value));
 }

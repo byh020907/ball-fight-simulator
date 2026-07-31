@@ -122,6 +122,12 @@ Trickster는 cooldown ready인 focal 수동 플레이어가 command resource를 
 
 명령 `pathSegments`의 절대 endpoint를 owner 위치부터 순서대로 복원해 중복 방향을 제거한다. 한 방향은 -24/0/+24도 fan, 두 방향은 실제 두 방향과 첫 방향의 비중복 ±24도 후보, 세 방향 이상은 앞 세 실제 방향을 쓴다. `trickster-command-route`는 tagged 씨앗 접촉과 그 Seed Dash의 mark burst를 같은 sequence로 묶어 tier, launched, plannedSegments, plannedBounces, enemySeedContacts, ownerSeedTriggers, seedBursts, followupSeeds, elapsed를 한 번 기록한다. tier 0~1은 적 접촉 또는 owner trigger, tier 2~3은 Seed Burst가 성공 조건이다. followup 씨앗은 기존 1개·14초·0.5초 grace만 유지하며 cycle 수명을 연장하지 않는다.
 
+### Elementalist 실험 슬라이스
+
+Elementalist는 `abilityCommandEnabled` opt-in의 focal·비자동 플레이어가 활성 원소 오브를 하나 이상 보유하고 command resource를 가질 때만 `원소 회수선`을 연다. 유효 release는 generic body impulse와 `playerShot` 없이 payload-only로 실제 예측 세그먼트 중심선 28px 안의 오브를 진행 순서로 선택한다. tier 0~2는 첫 오브 하나를 기존 단일 주문으로, tier 3은 첫 일반 오브와 뒤의 서로 다른 일반 오브를 기존 레시피로 융합해 정확히 하나의 채널로 전환한다. 복합 오브는 첫 선택만 회수한다.
+
+예측 terminal이 실제 적 중심 반경 안이고 owner 600px 안이면 그 적을 우선 채널 대상으로 고정하며, 아니면 기존 기억/wet/nearest 선택을 쓴다. route miss는 자원을 소비하고 generic shot 없이 `elementalist-command-recall-route` 실패 결과를 남긴다. cancel·dead-zone은 공통 무소비 규칙을 유지하고 AI·비포컬·flag off·자원 없음은 자동 오브/융합/소유자 회수를 바꾸지 않는다. 성공 회수는 0.36초 동안 선택 오브 위치에서 owner로 이어지는 3px 원소색 tether, 이동 bead와 orb 반경보다 10px 큰 선택 ring을 보인 뒤 기존 2초 채널 VFX를 시작한다.
+
 ### 능력 티어 장기 계측
 
 `npm run metrics:drag-ability`는 `METRICS_PROFILE=standard`에서 기존 `1 seed / 75 seconds`, `METRICS_PROFILE=long`에서 `10 seeds / 120 seconds`를 기본으로 사용한다. `METRICS_SEEDS`와 `METRICS_MAX_SECONDS`를 지정하면 profile 기본값보다 우선하며, 알 수 없는 profile은 오류로 종료한다.

@@ -134,6 +134,24 @@ const formatterCases = [
             values: [{ digestionTicksAtLaunch: 2, wallSlamDamage: 15, spitImpactDamage: 10, ruptureTriggered: true }]
         },
         "Spit Impact 10.00 피해"
+    ],
+    [
+        "elementalist-command-recall-route",
+        {
+            attemptsPerMatch: 1,
+            successRate: 1,
+            values: [
+                {
+                    selectedOrbs: 2,
+                    recipeBuilt: true,
+                    targetLocked: true,
+                    channelCompleted: true,
+                    actualDamage: 24,
+                    elapsed: 2
+                }
+            ]
+        },
+        "경과 2.00초"
     ]
 ];
 

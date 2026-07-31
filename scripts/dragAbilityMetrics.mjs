@@ -204,7 +204,8 @@ function runMatch({ seed, characterId, stageId, floor, policy, abilityTier = 0 }
                       trickster: ["trickster-command-route"],
                       bat_ball: ["bat-ball-command-called-shot"],
                       dash: ["dash-command-manual-entry"],
-                      eater: ["eater-command-spit-route"]
+                      eater: ["eater-command-spit-route"],
+                      elementalist: ["elementalist-command-recall-route"]
                   }[characterId] ?? [])
                 : []
         });

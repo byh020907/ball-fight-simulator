@@ -136,6 +136,15 @@ function formatEater(values) {
     );
 }
 
+function formatElementalist(values) {
+    const average = (key) =>
+        values.length ? values.reduce((sum, value) => sum + finiteNumber(value?.[key]), 0) / values.length : 0;
+    const recipes = values.length ? values.filter((value) => value?.recipeBuilt).length / values.length : 0;
+    const locks = values.length ? values.filter((value) => value?.targetLocked).length / values.length : 0;
+    const completed = values.length ? values.filter((value) => value?.channelCompleted).length / values.length : 0;
+    return `회수 ${average("selectedOrbs").toFixed(2)}개, 레시피 ${(recipes * 100).toFixed(1)}%, 대상 잠금 ${(locks * 100).toFixed(1)}%, 채널 완료 ${(completed * 100).toFixed(1)}%, 실제 피해 ${average("actualDamage").toFixed(2)}, 경과 ${average("elapsed").toFixed(2)}초`;
+}
+
 export function formatAbilityResult(type, result) {
     const base = formatBase(type, result);
     const values = resultValues(result);
@@ -149,7 +158,8 @@ export function formatAbilityResult(type, result) {
         "trickster-command-route": formatTrickster,
         "bat-ball-command-called-shot": formatBatBall,
         "dash-command-manual-entry": formatDash,
-        "eater-command-spit-route": formatEater
+        "eater-command-spit-route": formatEater,
+        "elementalist-command-recall-route": formatElementalist
     }[type];
     return detail ? `${base}, ${detail(values)}` : base;
 }

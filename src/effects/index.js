@@ -70,6 +70,7 @@ export {
 } from "./laserCasterVisual.js";
 export { EaterDigestEffect, EaterSpitEffect, EaterWallRuptureEffect } from "./eaterEffects.js";
 export {
+    ELEMENTALIST_RECALL_VISUAL_CONFIG,
     ElementalChannelEffect,
     drawAttachedMarker,
     drawElementalOrb,
@@ -77,6 +78,7 @@ export {
     drawMultiShapeMotion,
     drawTargetChannelTimeline
 } from "./elementalistEffects.js";
+export { ElementalistRecallEffect } from "./elementalistRecallEffect.js";
 export {
     ELEMENTAL_CHANNEL_VISUAL_CONFIG,
     ELEMENTAL_ORB_IDENTITY_CONFIG,
