@@ -31,6 +31,37 @@ function createSimulation(options = {}) {
     };
 }
 
+function releaseCommand(simulation, pointerId) {
+    const owner = simulation.playerBall;
+    simulation.beginDragCombat(pointerId, { x: owner.position.x, y: owner.position.y });
+    simulation.moveDragCombat(pointerId, { x: owner.position.x - 130, y: owner.position.y });
+    return simulation.releaseDragCombat(pointerId);
+}
+
+{
+    const { simulation, ability, target } = createSimulation();
+    ability.cooldowns.clear("volley");
+    ability.update(0, target);
+    const velocity = simulation.playerBall.velocity.clone();
+    assert.equal(simulation.commandResource.amount, 1);
+    releaseCommand(simulation, 90);
+    assert.equal(simulation.commandResource.amount, 0.35, "usage metric restores the configured 0.35 resource");
+    assert.equal(simulation.dragCombat.getSnapshot().playerShot.active, false, "valid Orbit release is payload-only");
+    assert.deepEqual(simulation.playerBall.velocity, velocity, "payload-only release preserves owner velocity");
+    assert.equal(ability.state.commandCycles.size, 1, "runtime release creates one command cycle");
+}
+
+{
+    const { simulation, ability, target } = createSimulation();
+    ability.cooldowns.clear("volley");
+    ability.update(0, target);
+    target.flags.defeated = true;
+    releaseCommand(simulation, 91);
+    assert.equal(ability.state.commandWindow, null, "invalid release clears the window");
+    assert.equal(ability.state.commandCycles.size, 0, "invalid release creates no command cycle");
+    assert.equal(simulation.dragCombat.getSnapshot().playerShot.active, true, "runtime runs one default shot fallback");
+}
+
 {
     const { simulation, ability, target } = createSimulation();
     ability.cooldowns.clear("volley");

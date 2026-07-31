@@ -272,7 +272,12 @@ export class OrbitAbility extends Ability {
 
     prepareCommand(intent) {
         const window = this.state.commandWindow;
-        if (!window || !this._canAcceptPlayerCommand() || !this._canStartVolley(window.target)) return intent;
+        if (!window) return intent;
+        if (!this._canStartVolley(window.target)) {
+            this.state.commandWindow = null;
+            this.state.preparedCommand = null;
+            return intent;
+        }
         const direction = new Vector2(intent.direction.x, intent.direction.y).normalize();
         const fixedPoint = intent.predictedTerminal
             ? new Vector2(intent.predictedTerminal.x, intent.predictedTerminal.y)
