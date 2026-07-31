@@ -21,6 +21,12 @@ function createSimulation({ abilityCommandEnabled = true, commandResource = true
     return { simulation, ability, target: simulation.fighters[1], results };
 }
 
+function releaseCommand(simulation, pointerId = 1) {
+    assert.deepEqual(simulation.beginDragCombat(pointerId, { x: 20, y: 20 }), { type: "begin" });
+    assert.equal(simulation.moveDragCombat(pointerId, { x: -120, y: 20 }).active, true);
+    return simulation.releaseDragCombat(pointerId);
+}
+
 {
     const { simulation, ability, target } = createSimulation();
     ability.state.growthStacks = 5;
@@ -41,6 +47,35 @@ function createSimulation({ abilityCommandEnabled = true, commandResource = true
     simulation.dragCombat.input.state = "idle";
     ability.update(0, target);
     assert.ok(simulation.playerBall.state.movement, "aim cancel should fall back to the existing pursuit immediately");
+}
+
+{
+    const { simulation, ability } = createSimulation();
+    ability.state.growthStacks = 5;
+    ability._openCommandWindow();
+    assert.deepEqual(ability.getCommandState(), { available: true, reserveResource: false });
+    releaseCommand(simulation, 31);
+    assert.equal(simulation.commandResource.amount, 0, "release spends the one available command resource");
+    assert.equal(
+        ability.state.preparedCommand?.sequence,
+        1,
+        "prepared Hero command must survive the post-spend resource state"
+    );
+}
+
+{
+    const { simulation, ability, target } = createSimulation();
+    ability.state.growthStacks = 5;
+    ability._openCommandWindow();
+    ability.update(0.81, target);
+    assert.ok(simulation.playerBall.state.movement, "no-aim command window timeout must immediately pursue");
+
+    simulation.playerBall.state.movement = null;
+    ability.state.growthStacks = 5;
+    ability.cooldowns.clear("pursuit");
+    simulation.dragCombat.automated = true;
+    ability.update(0, target);
+    assert.ok(simulation.playerBall.state.movement, "automated Hero must not reserve the player command window");
 }
 
 for (const options of [
@@ -80,6 +115,74 @@ for (const options of [
     assert.equal(results.length, 1, "all terminal paths settle one command result exactly once");
     assert.deepEqual(results[0].value, { released: 5, collected: 1, shield: 0, heal: 0 });
     assert.equal(results[0].success, true);
+}
+
+{
+    const { simulation, ability, target, results } = createSimulation();
+    const { setHeroOrbStatCap } = await import("../src/entities/heroOrb.js");
+    ability.state.growthStacks = 5;
+    ability._openCommandWindow();
+    ability.prepareCommand({ sequence: 10, direction: { x: 1, y: 0 } });
+    const context = { contactPoint: target.position.clone() };
+    ability.resolveCommandCollision(
+        { commandSequence: 10, target, contactPoint: target.position.clone() },
+        { context }
+    );
+    ability.onFighterCollisionDamageResolved(target, 1, context);
+    const [firstOrb, ...remainingOrbs] = simulation.entities.filter((entity) => entity.commandSequence === 10);
+    try {
+        setHeroOrbStatCap(0);
+        firstOrb.position = simulation.playerBall.position.clone();
+        firstOrb.velocity = new Vector2(0, 0);
+        firstOrb.update(0.2, simulation);
+        firstOrb.update(1 / 60, simulation);
+        assert.equal(firstOrb.isExpired, true, "owner overlap physically settles a capped orb");
+        for (const orb of remainingOrbs) orb.settle({ collected: false });
+        assert.equal(results.length, 1, "capped physical collection still produces one settled result");
+        assert.equal(results[0].value.collected, 1, "stat-cap failure is still a physical collection");
+    } finally {
+        setHeroOrbStatCap(-1);
+    }
+}
+
+{
+    const { simulation, ability, target, results } = createSimulation();
+    ability.state.growthStacks = 5;
+    ability._openCommandWindow();
+    ability.prepareCommand({ sequence: 11, direction: { x: 1, y: 0 } });
+    const context = { contactPoint: target.position.clone() };
+    ability.resolveCommandCollision(
+        { commandSequence: 11, target, contactPoint: target.position.clone() },
+        { context }
+    );
+    ability.onFighterCollisionDamageResolved(target, 1, context);
+    const orbs = simulation.entities.filter((entity) => entity.commandSequence === 11);
+    for (const orb of orbs) orb.settle({ collected: false });
+    assert.equal(results.length, 1, "command-sequenced cores settle their own cycle");
+    simulation.spawnHeroOrb(simulation.playerBall, simulation.playerBall.position.clone(), new Vector2(0, 0), "hp", 1);
+    assert.equal(results.length, 1, "ordinary HeroOrbs must not join a command result cycle");
+}
+
+{
+    const { simulation, ability, target } = createSimulation();
+    ability.state.growthStacks = 5;
+    ability._openCommandWindow();
+    ability._releaseGrowthCores(target.position, { direction: { x: 1, y: 0 }, commandSequence: 12 });
+    for (const _ of Array.from({ length: 6 })) {
+        simulation.spawnHeroOrb(simulation.playerBall, target.position.clone(), new Vector2(0, 0), "hp", 10);
+    }
+    ability._enforceOwnerCoreLimit();
+    const forcedExpired = simulation.entities.filter((entity) => entity.commandSequence === 12 && entity.isExpired);
+    assert.ok(forcedExpired.length > 0, "active core limit must settle displaced command cores");
+}
+
+{
+    const { ability } = createSimulation();
+    ability.state.growthStacks = 4;
+    ability.state.chargeTimer = 0.99;
+    ability._chargeGrowthStacks(0.02);
+    assert.equal(ability.state.growthStacks, 5, "a new full cycle reaches the stack cap again");
+    assert.ok(ability.state.commandWindowRemaining > 0, "a new full cycle resets the Hero command window");
 }
 
 {

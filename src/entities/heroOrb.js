@@ -269,8 +269,8 @@ export class HeroOrb extends CollectionGrace(CombatEntity) {
                 if (isCollectionGraceActive) continue;
                 const effectDef = HERO_ORB_EFFECTS[this.effectType];
                 let result = null;
+                const sourceAbility = this._resolveSourceAbility();
                 if (effectDef) {
-                    const sourceAbility = this._resolveSourceAbility();
                     result = effectDef.apply(fighter, {
                         orb: this,
                         simulation,
@@ -279,7 +279,6 @@ export class HeroOrb extends CollectionGrace(CombatEntity) {
                     });
                     simulation.spawnPulse(this.position.clone(), effectDef.color);
                     if (result?.applied) {
-                        sourceAbility?.onOrbCollected?.(this, result);
                         simulation.spawnActionText(
                             this.position.clone(),
                             `${effectDef.label} +${result.amount}`,
@@ -289,6 +288,7 @@ export class HeroOrb extends CollectionGrace(CombatEntity) {
                         simulation.addLog(`${fighter.name} collects a ${effectDef.label} orb!`);
                     }
                 }
+                sourceAbility?.onOrbCollected?.(this, result);
                 this.settle({ collected: true, result });
                 return;
             }

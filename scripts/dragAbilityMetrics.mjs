@@ -184,7 +184,15 @@ function runMatch({ seed, characterId, stageId, floor, policy }) {
         let ticks = 0;
         while (!simulation.finished && simulation.elapsed < CONFIG.maxSeconds && ticks < tickCeiling) {
             const snapshot = simulation.dragCombat.getSnapshot();
-            if (policy !== "무입력" && snapshot.drag.state === "idle" && !snapshot.playerShot.active) {
+            const commandState = player.abilities.getPrimaryCommandState?.({ simulation, player }) ?? {};
+            const reserveResource =
+                CONFIG.abilityCommandPrototype && commandState.reserveResource && !commandState.available;
+            if (
+                policy !== "무입력" &&
+                !reserveResource &&
+                snapshot.drag.state === "idle" &&
+                !snapshot.playerShot.active
+            ) {
                 const direction = chooseDirection(simulation, policy);
                 if (direction) {
                     const nextPointerId = ++pointerId;

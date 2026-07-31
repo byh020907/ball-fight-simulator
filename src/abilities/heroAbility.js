@@ -86,7 +86,7 @@ export class HeroAbility extends EnergyShieldVisual(Ability) {
         if (!this.cooldowns.isReady(HERO_COOLDOWN_KEYS.pursuit) || this.owner.state.movement) return;
 
         if (this.state.preparedCommand) return;
-        if (this._hasCommandWindow()) {
+        if (this._hasOpenCommandWindow()) {
             const aiming = this.simulation.dragCombat?.input?.state === "aiming";
             if (aiming) {
                 this.state.commandWasAiming = true;
@@ -148,13 +148,28 @@ export class HeroAbility extends EnergyShieldVisual(Ability) {
     }
 
     _hasCommandWindow() {
-        return this._canAcceptPlayerCommand() && this.state.commandWindowRemaining > 0;
+        return this._canAcceptPlayerCommand() && this._hasOpenCommandWindow();
+    }
+
+    _hasOpenCommandWindow() {
+        return this.state.commandWindowRemaining > 0;
+    }
+
+    getCommandState() {
+        if (!this.simulation.abilityCommandEnabled || this.simulation.playerBall !== this.owner) {
+            return { available: false, reserveResource: false };
+        }
+        const full = this.state.growthStacks >= HERO_COMBAT_CONFIG.growth.stackCap;
+        return {
+            available: full && this._hasOpenCommandWindow(),
+            reserveResource: !full || !this._hasOpenCommandWindow()
+        };
     }
 
     prepareCommand(intent) {
         if (
             this.state.growthStacks < HERO_COMBAT_CONFIG.growth.stackCap ||
-            (!this._hasCommandWindow() && !this.state.commandWasAiming)
+            (!this._hasOpenCommandWindow() && !this.state.commandWasAiming)
         )
             return intent;
         this.state.preparedCommand = { ...intent, direction: { ...intent.direction } };
@@ -316,7 +331,7 @@ export class HeroAbility extends EnergyShieldVisual(Ability) {
         return restored;
     }
 
-    _settleCommandCore(commandSequence, { collected } = {}) {
+    _settleCommandCore(commandSequence) {
         if (!Number.isFinite(commandSequence)) return;
         const cycle = this.state.commandCycles.get(commandSequence);
         if (!cycle || cycle.finalized) return;

@@ -78,9 +78,9 @@
 
 ### Hero 실험 슬라이스
 
-Hero는 코어 5스택을 채운 focal 플레이어가 커맨드 자원을 보유했을 때만 0.8초 동안 자동 추격을 멈추고 드래그 입력을 기다린다. AI·자원 없음·플래그 off에서는 같은 프레임에 기존 자동 추격을 그대로 시작한다. 창 안에 aim이 시작되면 release 또는 cancel까지 기다리고, cancel·timeout은 기존 추격 대상으로 즉시 되돌아간다.
+Hero는 코어 5스택을 채운 focal 플레이어가 커맨드 자원을 보유했을 때만 0.8초 동안 자동 추격을 멈추고 드래그 입력을 기다린다. full stack 전에는 `getCommandState().reserveResource`가 자동 정책의 generic 발사를 보류해 자원을 남긴다. 창 안에서는 `available: true`이고, release가 자원을 소비한 뒤에도 열린 window token으로 intent를 준비한다. AI·자원 없음·플래그 off에서는 같은 프레임에 기존 자동 추격을 그대로 시작한다. 창 안에 aim이 시작되면 release 또는 cancel까지 기다리고, cancel·timeout은 기존 추격 대상으로 즉시 되돌아간다.
 
-유효 커맨드의 첫 적대 충돌은 기본 충돌 피해를 유지한 뒤, 저장된 드래그 방향 기준 60도 fan으로 기존 HeroOrb 5개를 방출한다. 각 orb는 `commandSequence`를 갖고 수집·수명 만료·active limit 만료·전투 종료 중 하나로 정확히 한 번 결산된다. `hero-command-core-cycle` 결과는 실제 방출·물리 수집·방패 증가·HP 회복량을 기록한다. 일반 HeroOrb와 자동 추격의 동작은 바꾸지 않는다.
+유효 커맨드의 첫 적대 충돌은 기본 충돌 피해를 유지한 뒤, 저장된 드래그 방향 기준 60도 fan으로 기존 HeroOrb 5개를 방출한다. 각 orb는 `commandSequence`를 갖고 수집·수명 만료·active limit 만료·전투 종료 중 하나로 정확히 한 번 결산된다. stat cap으로 효과 적용에 실패해도 owner가 물리적으로 수집한 orb는 collected로 센다. `hero-command-core-cycle` 결과는 실제 방출·물리 수집·방패 증가·HP 회복량을 기록한다. 일반 HeroOrb와 자동 추격의 동작은 바꾸지 않는다.
 
 ### 관측 필드
 
