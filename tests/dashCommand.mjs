@@ -42,6 +42,45 @@ for (const level of [0, 1, 2]) {
     assert.deepEqual(context.ability.getCommandState(), { available: true, reserveResource: false });
 }
 
+for (const level of [0, 1, 2]) {
+    const context = createSimulation();
+    context.ability.state.cooldownLevel = level;
+    const slashes = [];
+    context.simulation.spawnSlash = (start, end) => slashes.push({ start, end });
+    openCommand(context);
+    const intent = context.ability.prepareCommand({
+        sequence: level + 20,
+        direction: { x: -1, y: 0 },
+        pathSegments: [
+            { x: 520, y: 520 },
+            { x: 700, y: 400 }
+        ],
+        bouncePoints: [],
+        createdAt: 0
+    });
+    const result = context.ability.resolveCommandLaunch(intent);
+    const effect = context.owner.state.movement;
+    const expected = new Vector2(120, 120).normalize();
+    assert.equal(result.mode, "replace-shot", `stage ${level} resolves as Dash replacement`);
+    assert.equal(effect.commandSequence, level + 20, `stage ${level} preserves command sequence`);
+    assert.ok(context.owner.state.forcedHeading.direction.dot(expected) > 0.999, `stage ${level} uses first endpoint`);
+    assert.ok(
+        context.owner.velocity.clone().normalize().dot(expected) > 0.999,
+        `stage ${level} velocity uses entry direction`
+    );
+    const slashDirection = Vector2.subtract(slashes[0].end, slashes[0].start).normalize();
+    assert.ok(slashDirection.dot(expected) > 0.999, `stage ${level} slash stays 120px on entry direction`);
+    if (level === 0) {
+        context.target.position = new Vector2(400, 800);
+        const before = context.owner.state.forcedHeading.direction.clone();
+        context.ability.update(0.2, context.target);
+        assert.ok(
+            context.owner.state.forcedHeading.direction.dot(before) > 0.999,
+            "stage 0 command Dash disables automatic homing"
+        );
+    }
+}
+
 {
     const context = createSimulation();
     openCommand(context);
@@ -50,6 +89,30 @@ for (const level of [0, 1, 2]) {
     context.ability.update(0, context.target);
     assert.equal(context.ability.state.commandWindow, null, "other movement clears the stale command window");
     assert.equal(context.owner.state.movement, foreignMovement, "other movement is never overwritten by fallback");
+}
+
+for (const terminal of ["expiry", "replacement", "owner defeat", "target defeat", "battle end"]) {
+    const context = createSimulation();
+    openCommand(context);
+    const intent = context.ability.prepareCommand({
+        sequence: 40,
+        direction: { x: 1, y: 0 },
+        pathSegments: [{ x: 600, y: 400 }],
+        bouncePoints: [],
+        createdAt: 0
+    });
+    context.ability.resolveCommandLaunch(intent);
+    const effect = context.owner.state.movement;
+    if (terminal === "expiry") effect.expired = true;
+    if (terminal === "replacement") context.owner.state.movement = { commandSequence: null };
+    if (terminal === "owner defeat") context.owner.flags.defeated = true;
+    if (terminal === "target defeat") context.target.flags.defeated = true;
+    if (terminal === "battle end") context.ability.onBattleEnded();
+    context.ability.update(0, context.target);
+    assert.equal(context.results.length, 1, `${terminal} finalizes once`);
+    context.ability.onBattleEnded();
+    context.ability.update(0, context.target);
+    assert.equal(context.results.length, 1, `${terminal} cannot double-finalize`);
 }
 
 {
