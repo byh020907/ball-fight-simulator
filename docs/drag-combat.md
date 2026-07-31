@@ -67,6 +67,15 @@
 
 능력은 `recordAbilityResult()`로 `fighterId`, `abilityId`, `resultType`, `commandSequence`, success, 직렬화 가능한 value, simulationTimeMs를 기록한다. `BattleMetricsRecorder`는 기존 ability-use와 분리해 이를 보관하고 `focalAbilityResultTypes`에 선언한 결과 타입이 0회여도 집계에 남긴다. 능력 결과의 성공 판정과 value 의미는 각 Ability가 소유하며, 공통 메트릭은 이를 바꾸지 않는다.
 
+### Rage·Archer 실험 슬라이스
+
+`abilityCommandEnabled` opt-in에서만 유효 릴리스 시점의 궤적 장면을 `CommandIntent`에 plain snapshot으로 저장한다. `pathSegments`는 각 예측 구간의 끝점, `bouncePoints`는 예측 반사점, `predictedTerminal`은 예측 종점이다. 이후 물리 상태가 변해도 저장값은 변하지 않는다.
+
+- Rage는 릴리스 순간의 충전 비율을 고정한다. 해당 커맨드가 첫 적대 전투원에 닿으면 고정된 35/70/100% 규칙으로 기존 효과를 정확히 한 번만 발동하고 기본 충돌 효과는 억제한다. 35% 미만은 충전을 초기화하지 않으며 `rage-command-cashout` 실패 결과만 남긴다.
+- Archer는 다음 첫 자동 화살 한 발만 저장된 발사 방향으로 보낸다. windup·cooldown·치명타·두 번째 화살은 기존 규칙을 유지한다. 첫 화살의 실제 정적 반사 수와 hit/expire 결과는 `archer-command-shot`에 기록한다.
+
+`METRICS_ABILITY_COMMAND_PROTOTYPE=1`에서는 focal Rage/Archer의 result attempt/match와 성공률을 함께 출력한다. 무입력은 해당 result attempt가 0이어야 하며, 기본 UI·HUD·AI 경로는 이 실험의 영향을 받지 않는다.
+
 ### 관측 필드
 
 - **능력**: focal 플레이어만 대상, 첫 발동 시각(경기당 평균·중앙값), 발동 횟수(경기당), noUseRate(미발동 경기 비율). zero-use 능력은 `focalAbilityIds` 전체를 기준으로 누락 없이 표시한다. 이번 기준선은 공통 쿨다운 재시작, Archer 첫 화살 발사, Rage의 35% 이상 충전 충돌을 계측하며 다른 패시브형 능력의 고유 발동은 범위 밖이다.

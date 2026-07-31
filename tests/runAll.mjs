@@ -29,6 +29,10 @@ const TEST_DOMAINS = {
         modulePath: "./abilityCommand.mjs",
         footerMessages: new Set(["[ability-command] ok"])
     },
+    rageArcherCommand: {
+        modulePath: "./rageArcherCommand.mjs",
+        footerMessages: new Set(["[rage-archer-command] ok"])
+    },
     dragVectorCombat: {
         modulePath: "./dragVectorCombat.mjs",
         footerMessages: new Set(["[drag-vector-combat] ok"])

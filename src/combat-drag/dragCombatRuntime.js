@@ -4,6 +4,7 @@ import { EnemyAttackQueue } from "./enemyAttackQueue.js";
 import { DRAG_COMBAT_CONFIG, getDragLaunchSpeed } from "./config.js";
 import { Vector2 } from "../core.js";
 import { copyCommandIntent, createCommandIntent } from "../combat-command/index.js";
+import { createDragTrajectoryScene } from "./trajectoryScene.js";
 import {
     advanceEnemyChargePlan,
     getChargeRatio,
@@ -339,7 +340,7 @@ export class DragCombatRuntime {
             if (!this.#canAct() || !player) return this.#cancelLaunch();
             if (!this.#spendCommand()) return this.#cancelLaunch();
             const direction = new Vector2(result.snapshot.vector.x, result.snapshot.vector.y);
-            const command = this.#prepareCommand(player, direction, result.snapshot.chargeRatio);
+            const command = this.#prepareCommand(player, direction, result.snapshot);
             const launch = this.#resolveCommandLaunch(player, command);
             if (launch.mode === "default-shot") this.#launchDefaultShot(player, direction, result.snapshot.chargeRatio);
         }
@@ -404,15 +405,18 @@ export class DragCombatRuntime {
         return true;
     }
 
-    #prepareCommand(player, direction, chargeRatio) {
+    #prepareCommand(player, direction, snapshot) {
         if (!this.simulation.abilityCommandEnabled) return null;
         this.#endCommand("replaced");
         const ability = player.abilities.primary;
+        const trajectory = this.#createCommandTrajectory(snapshot);
         const intent = createCommandIntent({
             sequence: this.commandSequence + 1,
-            direction,
-            chargeRatio,
-            predictedTerminal: null,
+            direction: snapshot.vector,
+            chargeRatio: snapshot.chargeRatio,
+            pathSegments: trajectory.segments.map((segment) => segment.end),
+            bouncePoints: trajectory.bounces.map((bounce) => bounce.point),
+            predictedTerminal: trajectory.terminal?.point ?? trajectory.segments.at(-1)?.end ?? null,
             createdAt: this.simulation.elapsed
         });
         const prepared =
@@ -425,6 +429,22 @@ export class DragCombatRuntime {
             expiresAt: this.simulation.elapsed + 3
         };
         return this.activeCommand;
+    }
+
+    #createCommandTrajectory(snapshot) {
+        const runtimeSnapshot = this.getSnapshot();
+        return createDragTrajectoryScene({
+            simulation: this.simulation,
+            runtimeSnapshot: {
+                ...runtimeSnapshot,
+                drag: {
+                    ...runtimeSnapshot.drag,
+                    state: "aiming",
+                    vector: { active: true, vector: copyPoint(snapshot.vector) ?? { x: 0, y: 0 } },
+                    chargeRatio: snapshot.chargeRatio
+                }
+            }
+        });
     }
 
     #resolveCommandLaunch(player, command) {

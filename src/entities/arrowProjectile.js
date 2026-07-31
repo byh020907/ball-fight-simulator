@@ -6,6 +6,7 @@ export class ArrowProjectile extends Projectile {
         this.life = 1.55;
         this.angle = 0;
         this.onResult = options.onResult ?? null;
+        this.onStaticCollision = options.onStaticCollision ?? null;
         this.critBoostOverride = options.critBoostOverride ?? null;
         this.syncFacingToVelocity();
     }
@@ -19,6 +20,11 @@ export class ArrowProjectile extends Projectile {
     update(delta, simulation) {
         this.updateProjectile(delta, simulation);
         this.syncFacingToVelocity();
+    }
+
+    getStaticCollisionOptions() {
+        if (!this.onStaticCollision) return null;
+        return { onStaticCollision: (context) => this.onStaticCollision(context) };
     }
 
     _getHitDamage() {

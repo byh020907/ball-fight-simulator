@@ -44,7 +44,7 @@
 - 배경: 전역 커맨드 자원 프로토타입은 5시드·동굴/숲/사막·직선/반사 정책 평균에서 경기당 드래그를 8.3회에서 2.3회, 직접 드래그 피해 비중을 22.6%에서 9.0%로 낮췄지만, Rage는 27.6%로 여전히 높고 Orbit은 1.0%에 그치는 등 캐릭터별 의미 편차가 남았다. Hero·Orbit·Spin 같은 지속형 능력은 기존 ability-use 계측에서 미사용 100%로 오인되는 구조도 확인됐다.
 - 결정: 자동 능력을 기본 정체성으로 유지하고 드래그는 능력의 조준·충전 캐시아웃·충돌 경로·설치/표식 결과를 결정하는 저빈도 커맨드 계층으로 개편한다. 범용 직접 피해보다 반사 경로·설치·회수·후속 순서를 보상하며, cooldown reset 일괄 계측 대신 캐릭터별 의미 있는 `ability-result`를 `commandSequence`와 연결한다. 구현은 공통 경계와 Rage/Archer를 먼저 검증·커밋한 뒤 Hero/Phantom을 순차 적용하고, 네 대표 vertical slice가 통과하기 전 나머지 10종과 HUD·기본 앱 활성화로 확장하지 않는다.
 - 영향: `BattleMetrics`, `Ability`/`AbilitySet`, 드래그 커맨드 수명주기, Rage·Archer·Hero·Phantom 능력, 동일 시드 비교 스크립트와 회귀 테스트. 전체 제안과 캐릭터별 후속안은 `.omx/plans/drag-ability-roster-redesign.md`에 유지한다.
-- 구현 상태: 공통 `ability-result` 계측, primary ability 커맨드 훅, 별도 `commandSequence`, 3초/능력 주기/전투 종료 정리, opt-in 플래그를 먼저 적용했다. 기본 경로는 no-op `default-shot`으로 보존하며 Rage·Archer와 Hero·Phantom의 실제 payload는 다음 두 슬라이스에서 검증한다.
+- 구현 상태: 공통 `ability-result` 계측, primary ability 커맨드 훅, 별도 `commandSequence`, 3초/능력 주기/전투 종료 정리, opt-in 플래그를 먼저 적용했다. Rage는 릴리스 충전값을 첫 적대 충돌에 정확히 한 번 cashout하고 Archer는 다음 첫 자동 화살의 발사 방향을 고정하며, 둘 다 결과 이벤트와 동일 시드 비교를 갖춘다. Hero·Phantom은 다음 슬라이스에서 검증한다.
 
 ## [L2] 2026-07-30 — 드래그를 능력 연계형 커맨드로 재설계한다
 

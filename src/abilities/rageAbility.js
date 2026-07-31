@@ -31,7 +31,9 @@ export class RageAbility extends Ability {
         this.state = {
             particleTimer: 0,
             timeWithoutCollision: 0,
-            aftershock: null
+            aftershock: null,
+            commandCharges: new Map(),
+            pendingCommandResults: new Map()
         };
         this._baseMaxChargeTime = 10.5;
     }
@@ -102,13 +104,65 @@ export class RageAbility extends Ability {
 
     onCollision(target, context) {
         const charge = this.getChargeProgress();
-        if (charge < 0.35) return;
+        this._cashout(target, context, charge);
+    }
+
+    prepareCommand(intent) {
+        this.state.commandCharges.set(intent.sequence, this.getChargeProgress());
+        return intent;
+    }
+
+    resolveCommandCollision(event, { context } = {}) {
+        if (!event.target || !this.simulation.isHostile(this.owner, event.target)) {
+            return { handled: false, runDefaultOnCollision: true };
+        }
+        const charge = this.state.commandCharges.get(event.commandSequence) ?? 0;
+        const cashout = this._cashout(event.target, { contactPoint: event.contactPoint }, charge);
+        this.state.pendingCommandResults.set(event.commandSequence, {
+            target: event.target,
+            success: cashout.success,
+            charge,
+            abilityDamage: cashout.abilityDamage,
+            context
+        });
+        return { handled: true, runDefaultOnCollision: false };
+    }
+
+    onFighterCollisionDamageResolved(target, directDamage, context = {}) {
+        for (const [commandSequence, pending] of this.state.pendingCommandResults) {
+            if (pending.target !== target) continue;
+            this.recordAbilityResult({
+                commandSequence,
+                resultType: "rage-command-cashout",
+                success: pending.success,
+                value: {
+                    chargeTier: this._getChargeTier(pending.charge),
+                    chargeRatio: pending.charge,
+                    abilityDamage: pending.abilityDamage,
+                    directDamage: Number.isFinite(directDamage) ? directDamage : 0,
+                    earlyReset: false
+                }
+            });
+            this.state.pendingCommandResults.delete(commandSequence);
+            this.state.commandCharges.delete(commandSequence);
+        }
+    }
+
+    onCommandEnd(event) {
+        if (["replaced", "expired", "ability-cycle", "reset"].includes(event.reason)) {
+            this.state.commandCharges.delete(event.commandSequence);
+        }
+    }
+
+    _cashout(target, context, charge) {
+        if (charge < 0.35) return { success: false, abilityDamage: 0 };
 
         this.recordUsageMetric();
 
         this.simulation.playSound("rage", 0.75);
         this.simulation.addLog(`${this.owner.name}'s momentum resets on impact.`);
 
+        let abilityDamage = 0;
         if (this.abilityTier >= 1) {
             if (this.abilityTier === 1) {
                 this._applyIgnite(target);
@@ -116,13 +170,13 @@ export class RageAbility extends Ability {
                 if (charge < 0.7) {
                     this._applyIgnite(target);
                 } else {
-                    this._applyExplosion(target, context);
+                    abilityDamage = this._applyExplosion(target, context);
                 }
             } else {
                 if (charge < 0.7) {
                     this._applyIgnite(target);
                 } else if (charge < 1.0) {
-                    this._applyExplosion(target, context);
+                    abilityDamage = this._applyExplosion(target, context);
                 } else {
                     this._applyAftershock(target, context);
                 }
@@ -130,6 +184,14 @@ export class RageAbility extends Ability {
         }
 
         this.state.timeWithoutCollision = 0;
+        return { success: true, abilityDamage };
+    }
+
+    _getChargeTier(charge) {
+        if (charge < 0.35) return "none";
+        if (charge < 0.7) return "ignite";
+        if (charge < 1) return "explosion";
+        return "aftershock";
     }
 
     _applyIgnite(target) {
@@ -148,10 +210,11 @@ export class RageAbility extends Ability {
         const center = new Vector2(contactPoint.x, contactPoint.y);
         const rawDamage = Math.round(this.owner.stats.baseDamage * EXPLOSION_DAMAGE_MULT);
         const enemies = this.simulation.getEnemiesOf(this.owner);
+        let abilityDamage = 0;
         for (const enemy of enemies) {
             const dist = Vector2.subtract(enemy.position, center).length();
             if (dist <= EXPLOSION_RADIUS) {
-                enemy.takeDamage(rawDamage, this.owner, "Rage Explosion");
+                abilityDamage += enemy.takeDamage(rawDamage, this.owner, "Rage Explosion")?.actualDamage ?? 0;
             }
         }
         this.simulation.spawnExplosion(center, "#ff7b32");
@@ -163,6 +226,7 @@ export class RageAbility extends Ability {
         });
         this.simulation.playSound("explosion", 1.35);
         this.simulation.addLog(`${this.owner.name} triggers explosion!`);
+        return abilityDamage;
     }
 
     _spawnFlameRing(center, radius, options) {

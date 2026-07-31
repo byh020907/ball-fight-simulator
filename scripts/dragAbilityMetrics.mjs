@@ -214,7 +214,12 @@ function runMatch({ seed, characterId, stageId, floor, policy }) {
             timedOut: !simulation.finished,
             focalFighterId: player.id,
             focalAbilityIds: player.abilities.all.map((ability) => ability.abilityId).filter(Boolean),
-            focalAbilityResultTypes: []
+            focalAbilityResultTypes: CONFIG.abilityCommandPrototype
+                ? ({
+                      rage: ["rage-command-cashout"],
+                      archer: ["archer-command-shot"]
+                  }[characterId] ?? [])
+                : []
         });
     } finally {
         Math.random = originalRandom;
@@ -256,12 +261,18 @@ function main() {
                             `${id}: ${ability.usesPerMatch.toFixed(2)}회, 미사용 ${percent(ability.noUseRate)}`
                     )
                     .join("; ");
+                const resultText = Object.entries(metrics.abilityResults)
+                    .map(
+                        ([type, result]) =>
+                            `${type}: ${result.attemptsPerMatch.toFixed(2)}회, 성공 ${percent(result.successRate)}`
+                    )
+                    .join("; ");
                 const directDamagePerMatch = metrics.focalDealtByOrigin.drag?.damagePerMatch ?? 0;
                 const counterTakenPerMatch = metrics.focalTakenByOrigin["drag-counter"]?.damagePerMatch ?? 0;
                 console.log(
                     `${characterId} | ${policy} | 승률 ${percent(metrics.winRate)} | ` +
                         `시간 중앙 ${metrics.duration.median.toFixed(2)}초 | 능력 ${abilityText || "없음"} | ` +
-                        `발사 ${metrics.dragDetail.launchesPerMatch.toFixed(2)} | ` +
+                        `결과 ${resultText || "없음"} | 발사 ${metrics.dragDetail.launchesPerMatch.toFixed(2)} | ` +
                         `경기당 직접 드래그 피해 ${directDamagePerMatch.toFixed(2)} (${percent(metrics.focalDealtDragRatio)}) | ` +
                         `경기당 방패 반격 피격 ${counterTakenPerMatch.toFixed(2)}`
                 );

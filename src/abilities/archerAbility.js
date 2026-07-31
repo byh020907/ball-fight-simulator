@@ -25,7 +25,9 @@ export class ArcherAbility extends PassiveEvasion(Ability) {
             pendingSecondShot: false,
             secondShotTimer: 0,
             secondShotTargetCache: null,
-            predictionEffect: null
+            predictionEffect: null,
+            commandIntent: null,
+            pendingCommandResult: null
         };
         this.arrowSpeedMult = ARROW_SPEED_MULT;
     }
@@ -113,7 +115,8 @@ export class ArcherAbility extends PassiveEvasion(Ability) {
     release(target) {
         this._expirePredictionEffect();
         this.recordUsageMetric();
-        this._fireArrowWithCrit(target, true);
+        const commandIntent = this._consumeCommandIntent();
+        this._fireArrowWithCrit(target, true, commandIntent);
         this.simulation.playSound("shoot");
         if (this.abilityTier >= 2) {
             const roll = Math.random();
@@ -125,18 +128,67 @@ export class ArcherAbility extends PassiveEvasion(Ability) {
         }
     }
 
-    _fireArrowWithCrit(target, countsForResult) {
-        const direction = this.state.lastAimDir.clone();
+    _fireArrowWithCrit(target, countsForResult, commandIntent = null) {
+        const direction = commandIntent
+            ? new Vector2(commandIntent.direction.x, commandIntent.direction.y).normalize()
+            : this.state.lastAimDir.clone();
         const start = Vector2.add(this.owner.position, direction.clone().scale(this.owner.radius + ARROW_START_OFFSET));
         const critBoosted = this.abilityTier >= 3 && Math.random() < CRIT_BOOST_CHANCE;
+        if (commandIntent) {
+            this.state.pendingCommandResult = {
+                commandSequence: commandIntent.sequence,
+                wallSegmentsFollowed: 0
+            };
+        }
         this.simulation.spawnArrow(this.owner, start, direction.clone().scale(this._getArrowSpeed()), {
-            onResult: (hit) => {
-                if (countsForResult && !hit) {
-                }
-            },
+            onResult: (hit) => this._resolveCommandArrowResult(commandIntent, hit),
+            onStaticCollision: commandIntent
+                ? () => {
+                      const pending = this.state.pendingCommandResult;
+                      if (pending?.commandSequence === commandIntent.sequence) pending.wallSegmentsFollowed += 1;
+                  }
+                : null,
             critBoostOverride: critBoosted ? CRIT_BOOST_MULT : null
         });
         this.simulation.spawnSlash(this.owner.position.clone(), start.clone(), this.owner.color);
+    }
+
+    prepareCommand(intent) {
+        this.state.commandIntent = {
+            ...intent,
+            direction: { ...intent.direction },
+            pathSegments: intent.pathSegments.map((point) => ({ ...point })),
+            bouncePoints: intent.bouncePoints.map((point) => ({ ...point })),
+            predictedTerminal: intent.predictedTerminal ? { ...intent.predictedTerminal } : null
+        };
+        return intent;
+    }
+
+    onCommandEnd(event) {
+        if (["replaced", "expired", "ability-cycle", "reset"].includes(event.reason)) this.state.commandIntent = null;
+    }
+
+    _consumeCommandIntent() {
+        const intent = this.state.commandIntent;
+        this.state.commandIntent = null;
+        return intent;
+    }
+
+    _resolveCommandArrowResult(intent, hit) {
+        if (!intent || this.state.pendingCommandResult?.commandSequence !== intent.sequence) return;
+        this.recordAbilityResult({
+            commandSequence: intent.sequence,
+            resultType: "archer-command-shot",
+            success: hit === true,
+            value: {
+                hit: hit === true,
+                wallSegmentsFollowed: this.state.pendingCommandResult.wallSegmentsFollowed,
+                plannedSegments: intent.pathSegments.length,
+                secondShotHit: null,
+                elapsed: Math.max(0, this.simulation.elapsed - intent.createdAt)
+            }
+        });
+        this.state.pendingCommandResult = null;
     }
 
     getPassiveEvasionConfig() {
