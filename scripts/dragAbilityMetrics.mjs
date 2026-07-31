@@ -5,46 +5,16 @@ import { getHuntingBattleArena } from "../src/hunting/huntingEncounters.js";
 import { createRoster } from "../src/roster.js";
 import { createDragTrajectoryScene } from "../src/combat-drag/trajectoryScene.js";
 import { Vector2 } from "../src/core.js";
-
-function readNumber(name, fallback, minimum = 0) {
-    const value = Number(process.env[name]);
-    return Number.isFinite(value) ? Math.max(minimum, Math.floor(value)) : fallback;
-}
-
-function readList(name, fallback) {
-    return (
-        process.env[name]
-            ?.split(",")
-            .map((value) => value.trim())
-            .filter(Boolean) ?? fallback
-    ).filter(Boolean);
-}
-
-function readBoolean(name) {
-    return process.env[name] === "1" || process.env[name] === "true";
-}
-
-const CONFIG = Object.freeze({
-    seeds: readNumber("METRICS_SEEDS", 1, 1),
-    maxSeconds: readNumber("METRICS_MAX_SECONDS", 75, 1),
-    seed: readNumber("METRICS_SEED", 20260730),
-    characters: readList(
-        "METRICS_CHARACTERS",
-        createRoster().map((fighter) => fighter.id)
-    ),
-    stages: readList("METRICS_STAGES", ["cave", "forest", "desert"]),
-    floors: readList("METRICS_FLOORS", ["6", "20", "36"]).map((value) => Math.max(1, Number(value) || 1)),
-    step: 1 / 60,
-    candidateAngles: 12,
-    holdSeconds: 0.35,
-    pullPixels: 130,
-    commandResourcePrototype: readBoolean("METRICS_COMMAND_RESOURCE_PROTOTYPE"),
-    abilityCommandPrototype: readBoolean("METRICS_ABILITY_COMMAND_PROTOTYPE")
-});
+import { createDragAbilityMetricsConfig } from "./dragAbilityMetricsConfig.mjs";
+import { formatAbilityResult } from "./dragAbilityMetricFormatters.mjs";
 
 const POLICIES = ["무입력", "직선 반복", "궤적 예측 기반 반사 탐색"];
 const ROSTER = createRoster();
 const ROSTER_MAP = Object.fromEntries(ROSTER.map((fighter) => [fighter.id, fighter]));
+const CONFIG = createDragAbilityMetricsConfig(
+    process.env,
+    ROSTER.map((fighter) => fighter.id)
+);
 
 function createSeededRng(seed) {
     let state = seed >>> 0;
@@ -142,7 +112,7 @@ function beginOrUpdateAim(simulation, pointerId, direction) {
     return true;
 }
 
-function runMatch({ seed, characterId, stageId, floor, policy }) {
+function runMatch({ seed, characterId, stageId, floor, policy, abilityTier = 0 }) {
     const originalRandom = Math.random;
     const rng = createSeededRng(seed);
     Math.random = rng;
@@ -177,6 +147,7 @@ function runMatch({ seed, characterId, stageId, floor, policy }) {
         disableVisualEffects(simulation);
         simulation.setPlayerBall(simulation.fighters[0]);
         const player = simulation.playerBall;
+        player.progression.abilityTier = abilityTier;
         let pointerId = 0;
         let aimStartedAt = null;
         let activePointerId = null;
@@ -248,22 +219,6 @@ function percent(value) {
     return `${(value * 100).toFixed(1)}%`;
 }
 
-function average(values) {
-    return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
-}
-
-function formatAbilityResult(type, result) {
-    const base = `${type}: ${result.attemptsPerMatch.toFixed(2)}회, 성공 ${percent(result.successRate)}`;
-    if (type !== "phantom-command-chain") return base;
-    const values = result.values ?? [];
-    return (
-        `${base}, 안전 출현 ${percent(average(values.map((value) => (value.safeAppear ? 1 : 0))))}, ` +
-        `기본 적중 ${percent(average(values.map((value) => (value.baseHit ? 1 : 0))))}, ` +
-        `연쇄 ${average(values.map((value) => Number(value.chainDepth) || 0)).toFixed(2)}, ` +
-        `종결 적중 ${percent(average(values.map((value) => (value.finishHit ? 1 : 0))))}`
-    );
-}
-
 function main() {
     const mode = CONFIG.abilityCommandPrototype
         ? "능력 커맨드 인프라 프로토타입"
@@ -271,34 +226,43 @@ function main() {
           ? "커맨드 자원 프로토타입"
           : "기준선";
     console.log(`=== 드래그·능력 계측 (${mode}) ===`);
-    for (const [index, stageId] of CONFIG.stages.entries()) {
-        const floor = CONFIG.floors[index % CONFIG.floors.length];
-        console.log(`\n--- ${stageId} floor=${floor} ---`);
-        for (const characterId of CONFIG.characters) {
-            for (const policy of POLICIES) {
-                const snapshots = Array.from({ length: CONFIG.seeds }, (_, seedIndex) =>
-                    runMatch({ seed: CONFIG.seed + index * 10000 + seedIndex, characterId, stageId, floor, policy })
-                );
-                const metrics = aggregateBattleMetrics(snapshots);
-                finiteOrThrow(metrics);
-                const abilityText = Object.entries(metrics.abilities)
-                    .map(
-                        ([id, ability]) =>
-                            `${id}: ${ability.usesPerMatch.toFixed(2)}회, 미사용 ${percent(ability.noUseRate)}`
-                    )
-                    .join("; ");
-                const resultText = Object.entries(metrics.abilityResults)
-                    .map(([type, result]) => formatAbilityResult(type, result))
-                    .join("; ");
-                const directDamagePerMatch = metrics.focalDealtByOrigin.drag?.damagePerMatch ?? 0;
-                const counterTakenPerMatch = metrics.focalTakenByOrigin["drag-counter"]?.damagePerMatch ?? 0;
-                console.log(
-                    `${characterId} | ${policy} | 승률 ${percent(metrics.winRate)} | ` +
-                        `시간 중앙 ${metrics.duration.median.toFixed(2)}초 | 능력 ${abilityText || "없음"} | ` +
-                        `결과 ${resultText || "없음"} | 발사 ${metrics.dragDetail.launchesPerMatch.toFixed(2)} | ` +
-                        `경기당 직접 드래그 피해 ${directDamagePerMatch.toFixed(2)} (${percent(metrics.focalDealtDragRatio)}) | ` +
-                        `경기당 방패 반격 피격 ${counterTakenPerMatch.toFixed(2)}`
-                );
+    for (const abilityTier of CONFIG.abilityTiers) {
+        for (const [index, stageId] of CONFIG.stages.entries()) {
+            const floor = CONFIG.floors[index % CONFIG.floors.length];
+            console.log(`\n--- ability tier=${abilityTier} | ${stageId} floor=${floor} ---`);
+            for (const characterId of CONFIG.characters) {
+                for (const policy of POLICIES) {
+                    const snapshots = Array.from({ length: CONFIG.seeds }, (_, seedIndex) =>
+                        runMatch({
+                            seed: CONFIG.seed + index * 10000 + seedIndex,
+                            characterId,
+                            stageId,
+                            floor,
+                            policy,
+                            abilityTier
+                        })
+                    );
+                    const metrics = aggregateBattleMetrics(snapshots);
+                    finiteOrThrow(metrics);
+                    const abilityText = Object.entries(metrics.abilities)
+                        .map(
+                            ([id, ability]) =>
+                                `${id}: ${ability.usesPerMatch.toFixed(2)}회, 미사용 ${percent(ability.noUseRate)}`
+                        )
+                        .join("; ");
+                    const resultText = Object.entries(metrics.abilityResults)
+                        .map(([type, result]) => formatAbilityResult(type, result))
+                        .join("; ");
+                    const directDamagePerMatch = metrics.focalDealtByOrigin.drag?.damagePerMatch ?? 0;
+                    const counterTakenPerMatch = metrics.focalTakenByOrigin["drag-counter"]?.damagePerMatch ?? 0;
+                    console.log(
+                        `${characterId} | ${policy} | 승률 ${percent(metrics.winRate)} | ` +
+                            `시간 중앙 ${metrics.duration.median.toFixed(2)}초 | 능력 ${abilityText || "없음"} | ` +
+                            `결과 ${resultText || "없음"} | 발사 ${metrics.dragDetail.launchesPerMatch.toFixed(2)} | ` +
+                            `경기당 직접 드래그 피해 ${directDamagePerMatch.toFixed(2)} (${percent(metrics.focalDealtDragRatio)}) | ` +
+                            `경기당 방패 반격 피격 ${counterTakenPerMatch.toFixed(2)}`
+                    );
+                }
             }
         }
     }

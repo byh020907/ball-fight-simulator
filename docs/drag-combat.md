@@ -88,6 +88,14 @@ Phantom은 primed 상태의 focal 수동 플레이어만 `그림자 출구 지�
 
 `phantom-command-chain`은 base 출구의 clearance, base 적중, 실제 pursuit chain 적중 수, finish 적중을 하나의 `commandSequence`에 한 번만 기록한다. base miss, 후속 stack 소진, cooldown 만료, 전투 종료에서 결산하며, command terminal 직후 런타임이 보내는 `onCommandEnd()`는 이미 시작된 연쇄를 취소하지 않는다. `METRICS_ABILITY_COMMAND_PROTOTYPE=1`의 Phantom 보고는 attempts/match·성공률과 안전 출현·base 적중·연쇄 깊이·finish 적중 평균을 함께 출력한다.
 
+### 능력 티어 장기 계측
+
+`npm run metrics:drag-ability`는 `METRICS_PROFILE=standard`에서 기존 `1 seed / 75 seconds`, `METRICS_PROFILE=long`에서 `10 seeds / 120 seconds`를 기본으로 사용한다. `METRICS_SEEDS`와 `METRICS_MAX_SECONDS`를 지정하면 profile 기본값보다 우선하며, 알 수 없는 profile은 오류로 종료한다.
+
+`METRICS_ABILITY_TIERS`는 0~3 정수의 쉼표 목록이고 기본값은 `0`이다. 중복은 첫 등장 순서를 유지해 제거한다. 예를 들어 `METRICS_ABILITY_TIERS=0,3`과 두 prototype 플래그를 함께 지정하면 각 stage의 `ability tier=0`과 `ability tier=3` 블록을 모두 출력한다. focal player의 실제 `progression.abilityTier`만 첫 update 전에 설정하므로 상대와 roster 원본은 바꾸지 않는다.
+
+능력 result는 공통 attempts/match·성공률 뒤에 recorder가 기록한 value만 요약한다. Rage는 충전·피해·조기 초기화, Archer는 벽/계획 구간·경과·후속 화살 표본과 적중률, Hero는 방출/회수/방패/회복과 총 회수율, Phantom은 안전 출현/기본 적중/연쇄/종결 적중을 표시한다. 빈 표본은 0으로 표시하며, 이 계측은 게임 판정이나 수치를 다시 계산하지 않는다.
+
 ### 관측 필드
 
 - **능력**: focal 플레이어만 대상, 첫 발동 시각(경기당 평균·중앙값), 발동 횟수(경기당), noUseRate(미발동 경기 비율). zero-use 능력은 `focalAbilityIds` 전체를 기준으로 누락 없이 표시한다. 이번 기준선은 공통 쿨다운 재시작, Archer 첫 화살 발사, Rage의 35% 이상 충전 충돌을 계측하며 다른 패시브형 능력의 고유 발동은 범위 밖이다.

@@ -21,6 +21,10 @@ const TEST_DOMAINS = {
         modulePath: "./battleMetrics.mjs",
         footerMessages: new Set(["[battle-metrics] ok"])
     },
+    dragAbilityMetrics: {
+        modulePath: "./dragAbilityMetrics.mjs",
+        footerMessages: new Set(["[drag-ability-metrics] ok"])
+    },
     commandResource: {
         modulePath: "./commandResource.mjs",
         footerMessages: new Set(["[command-resource] ok"])
