@@ -228,6 +228,7 @@ export class EaterAbility extends Ability {
 
     releaseSwallowed({ direction = null, commandSequence = null, cycle = null } = {}) {
         const target = this.state.swallowedTarget;
+        this._clearSwallowedCommandState();
         if (!target) return;
 
         this.resetCooldown(this.cooldown);
@@ -292,6 +293,7 @@ export class EaterAbility extends Ability {
 
     _detachSwallowedTarget({ reposition = false } = {}) {
         const target = this.state.swallowedTarget;
+        this._clearSwallowedCommandState();
         if (!target) return null;
 
         const direction = this.state.spitDirection.clone().normalize();
@@ -514,5 +516,10 @@ export class EaterAbility extends Ability {
             }
         });
         this.state.commandCycles.delete(sequence);
+    }
+
+    _clearSwallowedCommandState() {
+        this.state.commandAiming = false;
+        this.state.preparedCommand = null;
     }
 }

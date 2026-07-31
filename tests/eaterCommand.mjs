@@ -4,13 +4,14 @@ import { Vector2 } from "../src/core.js";
 import { createRoster } from "../src/roster.js";
 import { formatAbilityResult } from "../scripts/dragAbilityMetricFormatters.mjs";
 
-function createSimulation(options = {}) {
+function createSimulation(options = {}, support = false) {
     const results = [];
     const roster = createRoster();
     const eater = roster.find((fighter) => fighter.id === "eater");
     const opponent = roster.find((fighter) => fighter.id === "rage");
+    const fighters = support ? [eater, opponent, roster.find((fighter) => fighter.id === "archer")] : [eater, opponent];
     const simulation = new BattleSimulation(
-        [eater, opponent],
+        fighters,
         { onLog() {}, onSound() {}, onAbilityResult: (event) => results.push(event) },
         null,
         {
@@ -25,17 +26,41 @@ function createSimulation(options = {}) {
     const [owner, target] = simulation.fighters;
     owner.position = new Vector2(400, 400);
     target.position = new Vector2(500, 400);
+    if (support) {
+        simulation.fighters[2].teamId = target.teamId;
+        simulation.fighters[2].position = new Vector2(900, 400);
+    }
     const ability = owner.abilities.primary;
     ability.state.feastTimer = 1;
     ability.onCollision(target);
     return { simulation, owner, target, ability, results };
 }
 
-function releaseCommand(simulation, pointerId = 1) {
+function releaseCommand(simulation, pointerId = 1, offset = { x: -140, y: 0 }) {
     const { x, y } = simulation.playerBall.position;
     simulation.beginDragCombat(pointerId, { x, y });
-    simulation.moveDragCombat(pointerId, { x: x - 140, y });
+    simulation.moveDragCombat(pointerId, { x: x + offset.x, y: y + offset.y });
     return simulation.releaseDragCombat(pointerId);
+}
+
+{
+    const context = createSimulation();
+    context.owner.progression.abilityTier = 1;
+    context.simulation.dragCombat.input.state = "aiming";
+    context.ability.update(1, context.target);
+    assert.equal(
+        context.ability.state.swallowedTarget,
+        context.target,
+        "aiming holds automatic spit past 0.72 seconds"
+    );
+    assert.equal(context.ability.state.digestionTick, 6, "aiming digestion never exceeds six ticks");
+    context.simulation.dragCombat.input.state = "idle";
+    context.ability.update(0, context.target);
+    assert.ok(context.target.state.wallSlam, "cancel after held aim releases automatic spit once");
+    assert.equal(context.results.length, 0, "cancel after held aim records no result");
+    assert.equal(context.simulation.commandResource.amount, 1, "cancel after held aim preserves resource");
+    context.ability.update(0, context.target);
+    assert.equal(context.target.state.wallSlam.source, context.owner, "idle follow-up cannot release twice");
 }
 
 {
@@ -97,6 +122,23 @@ function releaseCommand(simulation, pointerId = 1) {
     assert.equal(context.ability._getCommandDirection({ direction: { x: 0, y: 0 }, pathSegments: [] }).x, -1);
 }
 
+{
+    const context = createSimulation();
+    context.ability.prepareCommand({
+        sequence: 7,
+        direction: { x: 1, y: 0 },
+        pathSegments: [
+            { x: 400, y: 650 },
+            { x: 850, y: 650 }
+        ],
+        bouncePoints: [],
+        createdAt: 0
+    });
+    context.ability.resolveCommandLaunch({ sequence: 7 });
+    const direction = context.target.velocity.clone().normalize();
+    assert.ok(direction.y > 0.99, "first absolute planned segment becomes the actual target Spit Dash direction");
+}
+
 for (const fallback of ["timeout", "cancel"]) {
     const context = createSimulation();
     if (fallback === "timeout") context.ability.update(0.73, context.target);
@@ -125,9 +167,19 @@ for (const options of [
 
 {
     const context = createSimulation();
+    context.simulation.playerBall = context.target;
+    assert.equal(context.ability.getCommandState().available, false, "non-focal Eater cannot command spit");
+    context.ability.update(0.73, context.target);
+    assert.ok(context.target.state.wallSlam, "non-focal Eater keeps the 0.72 second automatic spit");
+}
+
+{
+    const context = createSimulation({}, true);
     context.owner.progression.abilityTier = 3;
     releaseCommand(context.simulation);
     const effect = context.target.state.wallSlam;
+    const support = context.simulation.fighters[2];
+    support.position = new Vector2(900, 450);
     context.target.velocity = new Vector2(600, 0);
     effect.onWallBounce(
         context.target,
@@ -154,6 +206,20 @@ for (const options of [
         "wallSlamDamage"
     ]);
     assert.equal(context.results[0].value.ruptureTriggered, true, "tier 3 rupture follows the actual wall contact");
+    assert.equal(
+        context.results[0].value.ruptureSplashHits,
+        1,
+        "same-team support inside 150px gets one actual rupture splash"
+    );
+    assert.ok(context.results[0].value.ruptureSplashDamage > 0, "splash records takeDamage return value");
+    effect.onWallBounce(
+        context.target,
+        new Vector2(-1, 0),
+        context.simulation,
+        new Vector2(900, 400),
+        new Vector2(600, 0)
+    );
+    assert.equal(context.results.length, 1, "repeated Wall Slam callback cannot duplicate result or rupture");
 }
 
 for (const terminal of ["replaced", "defeated", "battle-ended"]) {
@@ -164,6 +230,26 @@ for (const terminal of ["replaced", "defeated", "battle-ended"]) {
     if (terminal === "battle-ended") context.ability.onBattleEnded();
     context.ability.update(0, context.target);
     assert.equal(context.results.length, 1, `${terminal} finalizes once`);
+}
+
+{
+    const context = createSimulation();
+    releaseCommand(context.simulation);
+    context.ability.onOwnerDefeated();
+    assert.equal(context.results.length, 1, "owner defeat finalizes active command cycle once");
+    assert.equal(context.results[0].success, false, "owner defeat records failed command result");
+    assert.equal(context.ability.state.commandAiming, false, "owner defeat clears stale aiming state");
+    assert.equal(context.ability.state.preparedCommand, null, "owner defeat clears stale prepared command");
+}
+
+{
+    const context = createSimulation();
+    context.ability.state.commandAiming = true;
+    context.ability.state.preparedCommand = { sequence: 99 };
+    context.target.flags.defeated = true;
+    context.ability.update(0, context.target);
+    assert.equal(context.ability.state.commandAiming, false, "defeat release clears aiming state");
+    assert.equal(context.ability.state.preparedCommand, null, "defeat release clears prepared command");
 }
 
 assert.doesNotMatch(
