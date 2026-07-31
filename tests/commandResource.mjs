@@ -26,20 +26,55 @@ function assertClose(actual, expected, message) {
     assert.equal(resource.snapshot().amount, 1, "owner 교체만 시작값으로 초기화");
 }
 
-function createSimulation() {
+function createSimulation({ observer = true, commandConfig = undefined } = {}) {
     const abilityEvents = [];
     const simulation = new BattleSimulation(
         createRoster().slice(0, 2),
-        { onLog() {}, onSound() {}, onAbilityUsed: (event) => abilityEvents.push(event) },
+        { onLog() {}, onSound() {}, ...(observer ? { onAbilityUsed: (event) => abilityEvents.push(event) } : {}) },
         null,
         {
             assignActions: false,
             dragCombatEnabled: true,
-            commandResourceEnabled: true
+            ...(commandConfig ? { commandResource: commandConfig } : { commandResourceEnabled: true })
         }
     );
     simulation.setPlayerBall(simulation.fighters[0]);
     return { simulation, abilityEvents };
+}
+
+{
+    const { simulation, abilityEvents } = createSimulation({ observer: false });
+    const resource = simulation.commandResource;
+    const player = simulation.playerBall;
+    const enemy = simulation.getOpponent(player);
+    assert.equal(resource.snapshot().amount, 1, "생성·bind는 능력 충전을 만들지 않음");
+    player.ability.setCooldownRemaining(0);
+    player.ability.resetCooldown(player.ability.cooldown);
+    assertClose(resource.snapshot().amount, 1.35, "observer 없이 실제 ready→cooldown 경계에서 focal 충전");
+    enemy.ability.setCooldownRemaining(0);
+    enemy.ability.resetCooldown(enemy.ability.cooldown);
+    assertClose(resource.snapshot().amount, 1.35, "적 실제 사용은 focal 자원을 충전하지 않음");
+    assert.equal(abilityEvents.length, 0, "observer 없는 simulation은 observer 없이도 규칙을 수행");
+}
+
+{
+    const { simulation } = createSimulation({ commandConfig: { initial: 2 } });
+    const resource = simulation.commandResource;
+    assert.equal(simulation.beginDragCombat(10, { x: 0, y: 0 }).type, "begin");
+    simulation.moveDragCombat(10, { x: -120, y: 0 });
+    assert.equal(simulation.releaseDragCombat(10).type, "launch");
+    assert.equal(resource.snapshot().amount, 1, "첫 launch만 1 소비");
+    assert.equal(simulation.beginDragCombat(11, { x: 0, y: 0 }).type, "queued");
+    assert.equal(simulation.cancelDragCombat(11).type, "cancel");
+    assert.equal(resource.snapshot().amount, 1, "queued cancel은 무소비");
+    assert.equal(simulation.beginDragCombat(12, { x: 0, y: 0 }).type, "queued");
+    simulation.dragCombat.tickShot(2.4);
+    simulation.dragCombat.tickInput(0);
+    assert.equal(simulation.dragCombat.getSnapshot().drag.state, "aiming", "shot 종료 뒤 queued 입력 활성화");
+    simulation.moveDragCombat(12, { x: -120, y: 0 });
+    assert.equal(simulation.releaseDragCombat(12).type, "launch");
+    assert.equal(resource.snapshot().amount, 0, "queued release만 남은 1을 소비");
+    assert.equal(simulation.beginDragCombat(13, { x: 0, y: 0 }), null, "0 자원에서는 shot 중 queued도 거절");
 }
 
 {

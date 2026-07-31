@@ -3,25 +3,46 @@ import { BattleSimulation } from "../src/simulation/battleSimulation.js";
 import { Vector2 } from "../src/core.js";
 import { createRoster } from "../src/roster.js";
 
-function createSimulation({ enabled = true, playerX = 240, enemyX = 720 } = {}) {
+function createSimulation({ enabled = true, playerX = 240, enemyX = 720, commandResource = null } = {}) {
     const originalRandom = Math.random;
     Math.random = () => 0.5;
     let simulation;
     try {
         simulation = new BattleSimulation(createRoster().slice(0, 2), { onLog() {}, onSound() {} }, null, {
             assignActions: false,
-            dragCombatEnabled: enabled
+            dragCombatEnabled: enabled,
+            ...(commandResource ? { commandResource } : {})
         });
     } finally {
         Math.random = originalRandom;
     }
-    simulation.playerBall = simulation.fighters[0];
+    if (commandResource) simulation.setPlayerBall(simulation.fighters[0]);
+    else simulation.playerBall = simulation.fighters[0];
     const [player, enemy] = simulation.fighters;
     player.position = new Vector2(playerX, 480);
     enemy.position = new Vector2(enemyX, 480);
     player.velocity = new Vector2(300, 0);
     enemy.velocity = new Vector2(-120, 0);
     return simulation;
+}
+
+function dragDamageArguments({ bounceCount = 0, commandResource = null } = {}) {
+    const simulation = createSimulation({
+        playerX: bounceCount ? 800 : 240,
+        enemyX: bounceCount ? 400 : 720,
+        commandResource
+    });
+    const player = simulation.playerBall;
+    launch(simulation, 200 + bounceCount);
+    if (bounceCount === 0) simulation.dragCombat.tickShot(0.9);
+    for (let index = 0; index < bounceCount; index += 1) {
+        simulation.dragCombat.onStaticCollision(player, { surfaceKey: `opt-in-wall:${index}` });
+    }
+    const { damageArguments } = collide(simulation);
+    return {
+        playerToEnemy: damageArguments.get(simulation.fighters[1]) ?? 0,
+        enemyToPlayer: damageArguments.get(simulation.fighters[0]) ?? 0
+    };
 }
 
 function launch(simulation, pointerId = 1) {
@@ -82,6 +103,48 @@ function withFixedRandom(callback) {
     const disabled = withFixedRandom(() => naturalCollision(false));
     const inactive = withFixedRandom(() => naturalCollision(true));
     assert.deepEqual(inactive, disabled, "disabled and inactive shots preserve natural collision");
+}
+
+{
+    const plainBaseline = withFixedRandom(() => dragDamageArguments());
+    const plainPrototype = withFixedRandom(() => dragDamageArguments({ commandResource: {} }));
+    assertClose(
+        plainPrototype.playerToEnemy,
+        plainBaseline.playerToEnemy * 0.65,
+        "opt-in plain-hit은 원시 전달 피해의 0.65배"
+    );
+    assertClose(
+        plainPrototype.enemyToPlayer,
+        plainBaseline.enemyToPlayer,
+        "plain-hit의 들어오는 자연 충돌 피해는 불변"
+    );
+    for (const [bounceCount, multiplier] of [
+        [1, 1],
+        [2, 1.45],
+        [3, 1.9]
+    ]) {
+        const baseline = withFixedRandom(() => dragDamageArguments({ bounceCount }));
+        const prototype = withFixedRandom(() => dragDamageArguments({ bounceCount, commandResource: {} }));
+        assertClose(
+            prototype.playerToEnemy,
+            baseline.playerToEnemy * 0.65,
+            `opt-in rear-hit ${bounceCount}회 반사는 기존 ${multiplier}배 뒤 0.65배`
+        );
+        assertClose(prototype.enemyToPlayer, baseline.enemyToPlayer, "rear-hit의 들어오는 자연 충돌 피해는 불변");
+    }
+}
+
+{
+    const baseline = withFixedRandom(() => naturalCollision(false));
+    const simulation = createSimulation({ commandResource: {} });
+    const [player] = simulation.fighters;
+    launch(simulation, 250);
+    const { context, damageArguments } = collide(simulation);
+    assert.equal(context.damageFromAToB, 0, "opt-in shield-counter도 player 직접 피해를 막음");
+    assertClose(damageArguments.get(player), baseline.enemyDamage * 1.5, "opt-in shield-counter incoming 배율은 불변");
+    simulation.dragCombat.reset();
+    const inactive = withFixedRandom(() => naturalCollision(true));
+    assert.deepEqual(inactive, baseline, "opt-out/inactive 자연 충돌은 커맨드 자원과 무관");
 }
 
 {

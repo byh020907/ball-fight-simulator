@@ -52,7 +52,7 @@
 
 ### opt-in 커맨드 자원 프로토타입
 
-`METRICS_COMMAND_RESOURCE_PROTOTYPE=1 npm run metrics:drag-ability`는 개발자용 Node 시뮬레이션에서만 제한 자원을 켠다. 실제 앱·토너먼트·사냥터 기본 드래그, HUD와 현행 무제한 규칙은 바꾸지 않는다. 초기값은 최대 2, 시작 1, 시간당 8초에 1의 연속 회복, focal 실제 능력 사용당 0.35, 유효 발사당 1 소비다. opt-in 모드의 player 직접 드래그 충돌 피해는 plain-hit과 rear-hit 모두 기존 계산에 0.65배를 적용한다.
+`METRICS_COMMAND_RESOURCE_PROTOTYPE=1 npm run metrics:drag-ability`는 개발자용 Node 시뮬레이션에서만 제한 자원을 켠다. 실제 앱·토너먼트·사냥터 기본 드래그, HUD와 현행 무제한 규칙은 바꾸지 않는다. 초기값은 최대 2, 시작 1, 8초마다 1의 연속 회복, focal 실제 능력 사용당 0.35, 유효 발사당 1 소비다. opt-in 모드의 player 직접 드래그 충돌 피해는 plain-hit과 rear-hit 모두 기존 계산에 0.65배를 적용한다.
 
 비교 목표는 일반 전투의 의미 있는 player launch 3~5회, focal 직접 드래그 피해 비중 15~30%, focal 능력 관측률 95% 이상이다. 이 값은 HUD·입력 가독성·캐릭터별 능력 연계가 확정되기 전의 측정용 후보이며, 목표 통과만으로 실게임 계약이 되지 않는다.
 
