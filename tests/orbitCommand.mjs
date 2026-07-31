@@ -51,6 +51,76 @@ function createSimulation(options = {}) {
 }
 
 {
+    const { simulation, ability, target } = createSimulation({ abilityCommandEnabled: false });
+    ability.cooldowns.clear("volley");
+    ability.update(0, target);
+    assert.equal(ability.state.volleyActive, true, "flag-off preserves automatic volley");
+    assert.equal(ability.state.commandWindow, null);
+    simulation.playerBall = target;
+    ability.cooldowns.clear("volley");
+    ability.state.volleyActive = false;
+    ability.update(0, target);
+    assert.equal(ability.state.commandWindow, null, "non-focal Orbit cannot reserve a command");
+}
+
+{
+    const { simulation, ability, target } = createSimulation();
+    ability.setContext({ abilityTier: 1 });
+    ability.cooldowns.clear("volley");
+    ability.update(0, target);
+    const intent = ability.prepareCommand({ sequence: 5, direction: { x: 1, y: 0 }, pathSegments: [] });
+    ability.resolveCommandLaunch(intent);
+    ability.update(0, target);
+    const projectile = simulation.entities.find((entity) => entity.commandSequence === 5);
+    assert.ok(projectile.convergence, "tier 1 command projectile starts synchronized convergence at spawn");
+    const convergence = projectile.convergence;
+    ability.registerProjectileHit(projectile, target, projectile.position.clone());
+    assert.equal(projectile.convergence, convergence, "first hit does not duplicate command convergence");
+}
+
+{
+    const { ability, target } = createSimulation();
+    ability.cooldowns.clear("volley");
+    ability.update(0, target);
+    const intent = ability.prepareCommand({ sequence: 6, direction: { x: 1, y: 0 }, pathSegments: [] });
+    target.flags.defeated = true;
+    assert.equal(ability.resolveCommandLaunch(intent).mode, "default-shot", "invalidated release falls back once");
+    assert.equal(ability.state.commandCycles.size, 0, "invalidated release leaves no empty cycle");
+}
+
+{
+    const { simulation, ability, target, results } = createSimulation();
+    ability.cooldowns.clear("volley");
+    ability.update(0, target);
+    simulation.dragCombat.input.state = "aiming";
+    ability.update(1, target);
+    simulation.dragCombat.input.state = "idle";
+    ability.update(0, target);
+    assert.equal(ability.state.volleyActive, true, "aim cancel immediately falls back to one auto volley");
+    assert.equal(results.length, 0, "cancel does not create a command result");
+}
+
+{
+    const { simulation, ability, target, results } = createSimulation();
+    ability.cooldowns.clear("volley");
+    ability.update(0, target);
+    const intent = ability.prepareCommand({ sequence: 4, direction: { x: 1, y: 0 }, pathSegments: [] });
+    ability.resolveCommandLaunch(intent);
+    ability.onBattleEnded();
+    ability.onBattleEnded();
+    assert.equal(results.length, 1, "battle end settles a launched command cycle once");
+    assert.deepEqual(Object.keys(results[0].value).sort(), [
+        "catches",
+        "elapsed",
+        "hits",
+        "plannedSegments",
+        "released",
+        "synchronizedHits",
+        "tier"
+    ]);
+}
+
+{
     const { simulation, ability, target } = createSimulation();
     ability.cooldowns.clear("volley");
     ability.update(0, target);

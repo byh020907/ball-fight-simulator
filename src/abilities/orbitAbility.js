@@ -211,6 +211,12 @@ export class OrbitAbility extends Ability {
         const window = this.state.commandWindow;
         if (window) {
             const aiming = this.simulation.dragCombat?.input?.state === "aiming";
+            if (aiming) window.wasAiming = true;
+            if (window.wasAiming && !aiming) {
+                this.state.commandWindow = null;
+                this._startAutoVolley(window.target);
+                return;
+            }
             if (!aiming) window.remaining = Math.max(0, window.remaining - Math.max(0, delta));
             if (window.remaining > 0 || aiming) return;
             this.state.commandWindow = null;
@@ -227,7 +233,7 @@ export class OrbitAbility extends Ability {
             const dist = Vector2.subtract(target.position, this.owner.position).length();
             if (dist >= VOLLEY_MIN_RANGE && dist <= VOLLEY_MAX_RANGE) {
                 if (this._canAcceptPlayerCommand()) {
-                    this.state.commandWindow = { target, remaining: COMMAND_WINDOW_DURATION };
+                    this.state.commandWindow = { target, remaining: COMMAND_WINDOW_DURATION, wasAiming: false };
                     return;
                 }
                 this._startAutoVolley(target);
@@ -292,6 +298,7 @@ export class OrbitAbility extends Ability {
             return { mode: "default-shot" };
         }
         command.launched = true;
+        this.recordUsageMetric();
         this._startAutoVolley(command.target);
         this.state.commandCycles.set(command.sequence, {
             commandSequence: command.sequence,
@@ -400,10 +407,12 @@ export class OrbitAbility extends Ability {
                 resultType: "orbit-command-volley",
                 success: cycle.hits > 0,
                 value: {
-                    ...cycle,
-                    fixedPoint: undefined,
-                    createdAt: undefined,
-                    releaseComplete: undefined,
+                    tier: cycle.tier,
+                    released: cycle.released,
+                    hits: cycle.hits,
+                    synchronizedHits: cycle.synchronizedHits,
+                    catches: cycle.catches,
+                    plannedSegments: cycle.plannedSegments,
                     elapsed: Math.max(0, this.simulation.elapsed - cycle.createdAt)
                 }
             });
