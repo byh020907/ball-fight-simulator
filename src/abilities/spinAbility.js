@@ -137,7 +137,7 @@ export class SpinAbility extends Ability {
             return { available: false, reserveResource: false };
         }
         const available = this.isFullyCharged() && !this.state.cut;
-        return { available, reserveResource: available };
+        return { available, reserveResource: !available };
     }
 
     prepareCommand(intent) {
@@ -190,11 +190,13 @@ export class SpinAbility extends Ability {
             context,
             terminalType: event.type,
             bounces: prepared.bounces,
+            retainedCharge: prepared.chargeRatio * this._getCommandRetention(prepared.bounces),
+            surfaceCut: Boolean(context?.deferredSpinCut),
             finalized: false
         };
         this.state.commandIntents.delete(event.commandSequence);
         this.state.commandCycles.set(event.commandSequence, cycle);
-        this._consumeCommandCharge(prepared.chargeRatio * this._getCommandRetention(cycle.bounces));
+        this._consumeCommandCharge(cycle.retainedCharge, prepared.chargeRatio);
         this.recordUsageMetric();
         return { handled: true, runDefaultOnCollision: false };
     }
@@ -212,14 +214,18 @@ export class SpinAbility extends Ability {
         const prepared = this.state.commandIntents.get(event?.commandSequence);
         if (!prepared) return;
         this.state.commandIntents.delete(event.commandSequence);
-        this._recordCommandResult(prepared, { bounces: 0, terminalType: null }, 0);
+        this._recordCommandResult(prepared, { bounces: prepared.bounces, terminalType: null, retainedCharge: 0 }, 0);
     }
 
     onBattleEnded() {
         for (const [sequence, cycle] of this.state.commandCycles) this._finalizeCommandCycle(sequence, cycle, 0);
         for (const [sequence, prepared] of this.state.commandIntents) {
             this.state.commandIntents.delete(sequence);
-            this._recordCommandResult(prepared, { bounces: 0, terminalType: null }, 0);
+            this._recordCommandResult(
+                prepared,
+                { bounces: prepared.bounces, terminalType: null, retainedCharge: 0 },
+                0
+            );
         }
     }
 
@@ -227,11 +233,11 @@ export class SpinAbility extends Ability {
         return Math.min(bounces, COMMAND_RETENTION_MAX_BOUNCES) * COMMAND_RETENTION_PER_BOUNCE;
     }
 
-    _consumeCommandCharge(retainedCharge) {
+    _consumeCommandCharge(retainedCharge, launchCharge) {
         this.state.timeWithoutCollision = this.getMaxChargeTime() * retainedCharge;
         this.state.dischargeFlash = 0.34;
         this._applySpinVelocity(this.getTargetSpinVelocity());
-        this._showChargeDischarge(retainedCharge);
+        this._showChargeDischarge(launchCharge);
     }
 
     _finalizeCommandCycle(sequence, cycle, directDamage) {
@@ -243,7 +249,6 @@ export class SpinAbility extends Ability {
 
     _recordCommandResult(prepared, cycle, directDamage) {
         const bounces = cycle.bounces ?? 0;
-        const retainedCharge = prepared.chargeRatio * this._getCommandRetention(bounces);
         this.recordAbilityResult({
             commandSequence: prepared.sequence,
             resultType: "spin-command-gyro-bank",
@@ -253,9 +258,9 @@ export class SpinAbility extends Ability {
                 chargeRatio: prepared.chargeRatio,
                 plannedSegments: prepared.plannedSegments,
                 bounces,
-                retainedCharge,
+                retainedCharge: cycle.retainedCharge ?? 0,
                 directDamage: Number.isFinite(directDamage) ? directDamage : 0,
-                surfaceCut: Boolean(this.getLevelUpgrade().surfaceCut && prepared.chargeRatio >= FULL_CHARGE_THRESHOLD),
+                surfaceCut: Boolean(cycle.surfaceCut),
                 rearHit: cycle.terminalType === "rear-hit",
                 countered: cycle.terminalType === "shield-counter",
                 elapsed: Math.max(0, (this.simulation.elapsed ?? prepared.createdAt) - prepared.createdAt)
