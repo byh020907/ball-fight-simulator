@@ -25,6 +25,7 @@ export class ArcherAbility extends PassiveEvasion(Ability) {
             pendingSecondShot: false,
             secondShotTimer: 0,
             secondShotTargetCache: null,
+            secondShotCommandSequence: null,
             predictionEffect: null,
             commandIntent: null,
             pendingCommandResult: null
@@ -33,6 +34,7 @@ export class ArcherAbility extends PassiveEvasion(Ability) {
     }
 
     update(delta, target) {
+        this._expireCommandIntent();
         this.tryPassiveEvasion(target);
         if (this._updateSecondShot(delta)) return;
         if (this._updateWindUp(delta, target)) return;
@@ -44,12 +46,16 @@ export class ArcherAbility extends PassiveEvasion(Ability) {
         this.state.secondShotTimer -= delta;
         if (this.state.secondShotTimer > 0) return true;
         const cached = this.state.secondShotTargetCache;
+        const commandSequence = this.state.secondShotCommandSequence;
         if (cached && !cached.flags.defeated) {
             this._updateAim(cached);
-            this._fireArrowWithCrit(cached, true);
+            this._fireArrowWithCrit(cached, true, null, commandSequence);
+        } else if (commandSequence != null) {
+            this._resolveSecondCommandArrowResult(commandSequence, false);
         }
         this.state.pendingSecondShot = false;
         this.state.secondShotTargetCache = null;
+        this.state.secondShotCommandSequence = null;
         return false;
     }
 
@@ -124,11 +130,13 @@ export class ArcherAbility extends PassiveEvasion(Ability) {
                 this.state.pendingSecondShot = true;
                 this.state.secondShotTimer = DOUBLE_SHOT_DELAY;
                 this.state.secondShotTargetCache = target;
+                this.state.secondShotCommandSequence = commandIntent?.sequence ?? null;
             }
         }
+        this._resolveSecondShotExpectation(commandIntent?.sequence ?? null, this.state.pendingSecondShot);
     }
 
-    _fireArrowWithCrit(target, countsForResult, commandIntent = null) {
+    _fireArrowWithCrit(target, countsForResult, commandIntent = null, secondShotCommandSequence = null) {
         const direction = commandIntent
             ? new Vector2(commandIntent.direction.x, commandIntent.direction.y).normalize()
             : this.state.lastAimDir.clone();
@@ -137,11 +145,19 @@ export class ArcherAbility extends PassiveEvasion(Ability) {
         if (commandIntent) {
             this.state.pendingCommandResult = {
                 commandSequence: commandIntent.sequence,
-                wallSegmentsFollowed: 0
+                intent: commandIntent,
+                wallSegmentsFollowed: 0,
+                firstShotHit: null,
+                secondShotExpected: null,
+                secondShotHit: null
             };
         }
         this.simulation.spawnArrow(this.owner, start, direction.clone().scale(this._getArrowSpeed()), {
-            onResult: (hit) => this._resolveCommandArrowResult(commandIntent, hit),
+            onResult: (hit) => {
+                if (commandIntent) this._resolveCommandArrowResult(commandIntent, hit);
+                else if (secondShotCommandSequence != null)
+                    this._resolveSecondCommandArrowResult(secondShotCommandSequence, hit);
+            },
             onStaticCollision: commandIntent
                 ? () => {
                       const pending = this.state.pendingCommandResult;
@@ -169,6 +185,7 @@ export class ArcherAbility extends PassiveEvasion(Ability) {
     }
 
     _consumeCommandIntent() {
+        this._expireCommandIntent();
         const intent = this.state.commandIntent;
         this.state.commandIntent = null;
         return intent;
@@ -176,19 +193,48 @@ export class ArcherAbility extends PassiveEvasion(Ability) {
 
     _resolveCommandArrowResult(intent, hit) {
         if (!intent || this.state.pendingCommandResult?.commandSequence !== intent.sequence) return;
+        this.state.pendingCommandResult.firstShotHit = hit === true;
+        this._finalizeCommandArrowResult();
+    }
+
+    _resolveSecondShotExpectation(commandSequence, expected) {
+        if (commandSequence == null || this.state.pendingCommandResult?.commandSequence !== commandSequence) return;
+        this.state.pendingCommandResult.secondShotExpected = expected === true;
+        this._finalizeCommandArrowResult();
+    }
+
+    _resolveSecondCommandArrowResult(commandSequence, hit) {
+        if (this.state.pendingCommandResult?.commandSequence !== commandSequence) return;
+        this.state.pendingCommandResult.secondShotHit = hit === true;
+        this._finalizeCommandArrowResult();
+    }
+
+    _finalizeCommandArrowResult() {
+        const pending = this.state.pendingCommandResult;
+        if (!pending || pending.firstShotHit == null || pending.secondShotExpected == null) return;
+        if (pending.secondShotExpected && pending.secondShotHit == null) return;
         this.recordAbilityResult({
-            commandSequence: intent.sequence,
+            commandSequence: pending.commandSequence,
             resultType: "archer-command-shot",
-            success: hit === true,
+            success: pending.firstShotHit,
             value: {
-                hit: hit === true,
-                wallSegmentsFollowed: this.state.pendingCommandResult.wallSegmentsFollowed,
-                plannedSegments: intent.pathSegments.length,
-                secondShotHit: null,
-                elapsed: Math.max(0, this.simulation.elapsed - intent.createdAt)
+                hit: pending.firstShotHit,
+                wallSegmentsFollowed: pending.wallSegmentsFollowed,
+                plannedSegments: pending.intent.pathSegments.length,
+                secondShotHit: pending.secondShotExpected ? pending.secondShotHit : null,
+                elapsed: Math.max(0, this.simulation.elapsed - pending.intent.createdAt)
             }
         });
         this.state.pendingCommandResult = null;
+    }
+
+    _expireCommandIntent() {
+        const intent = this.state.commandIntent;
+        if (intent && this.simulation.elapsed >= intent.createdAt + 3) this.state.commandIntent = null;
+    }
+
+    onBattleEnded() {
+        this.state.commandIntent = null;
     }
 
     getPassiveEvasionConfig() {

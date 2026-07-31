@@ -117,20 +117,23 @@ export class RageAbility extends Ability {
             return { handled: false, runDefaultOnCollision: true };
         }
         const charge = this.state.commandCharges.get(event.commandSequence) ?? 0;
+        const liveChargeBefore = this.getChargeProgress();
         const cashout = this._cashout(event.target, { contactPoint: event.contactPoint }, charge);
+        const liveChargeAfter = this.getChargeProgress();
         this.state.pendingCommandResults.set(event.commandSequence, {
             target: event.target,
             success: cashout.success,
             charge,
             abilityDamage: cashout.abilityDamage,
-            context
+            context,
+            earlyReset: charge < 0.35 && liveChargeAfter < liveChargeBefore
         });
         return { handled: true, runDefaultOnCollision: false };
     }
 
     onFighterCollisionDamageResolved(target, directDamage, context = {}) {
         for (const [commandSequence, pending] of this.state.pendingCommandResults) {
-            if (pending.target !== target) continue;
+            if (pending.target !== target || pending.context !== context) continue;
             this.recordAbilityResult({
                 commandSequence,
                 resultType: "rage-command-cashout",
@@ -140,7 +143,7 @@ export class RageAbility extends Ability {
                     chargeRatio: pending.charge,
                     abilityDamage: pending.abilityDamage,
                     directDamage: Number.isFinite(directDamage) ? directDamage : 0,
-                    earlyReset: false
+                    earlyReset: pending.earlyReset
                 }
             });
             this.state.pendingCommandResults.delete(commandSequence);

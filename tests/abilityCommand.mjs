@@ -34,6 +34,18 @@ class CommandTestAbility extends Ability {
     }
 }
 
+class TrajectoryCaptureAbility extends Ability {
+    constructor(owner, simulation) {
+        super(owner, simulation, 1, { abilityId: "trajectory_capture" });
+        this.prepared = null;
+    }
+
+    prepareCommand(intent) {
+        this.prepared = intent;
+        return intent;
+    }
+}
+
 function createSimulation({
     abilityCommandEnabled = true,
     mode = "default-shot",
@@ -69,6 +81,25 @@ function impulseCount(fighter) {
     launch(simulation);
     assert.equal(impulseCount(player), 1, "플래그 off는 기본 발사를 유지한다");
     assert.equal(simulation.dragCombat.getSnapshot().commandSequence, 0);
+}
+
+{
+    const { simulation } = createSimulation();
+    const ability = new TrajectoryCaptureAbility(simulation.playerBall, simulation);
+    simulation.playerBall.abilities.setPrimary(ability);
+    launch(simulation, 90);
+    const returned = simulation.dragCombat.getSnapshot().activeCommand;
+    assert.ok(returned.pathSegments.length > 0, "release trajectory must snapshot planned segments");
+    assert.ok(returned.predictedTerminal, "release trajectory must snapshot a terminal point");
+    returned.pathSegments[0].x = -999;
+    returned.bouncePoints.push({ x: -1, y: -1 });
+    returned.predictedTerminal.x = -999;
+    assert.notEqual(ability.prepared.pathSegments[0].x, -999, "returned command snapshot must not mutate intent");
+    assert.equal(
+        ability.prepared.bouncePoints.some((point) => point.x === -1),
+        false
+    );
+    assert.notEqual(ability.prepared.predictedTerminal.x, -999);
 }
 
 {
