@@ -29,18 +29,27 @@ export class TricksterAbility extends Ability {
         this._updateMarks(delta);
         this.tickCooldown(delta);
         this._finalizeCommandCycles();
-        if (!this.cooldownReady || !target || target.flags.defeated) {
-            return;
-        }
 
         if (this.state.commandWindow) {
             const aiming = this.simulation.dragCombat?.input?.state === "aiming";
             if (aiming) this.state.commandWindow.wasAiming = true;
-            if (!aiming) this.state.commandWindow.remaining = Math.max(0, this.state.commandWindow.remaining - delta);
-            if (aiming || this.state.commandWindow.remaining > 0) return;
             const window = this.state.commandWindow;
-            this.state.commandWindow = null;
-            this._launchAutomaticSeeds(window.target);
+            if (!window.target || window.target.flags.defeated) {
+                this._clearCommandState();
+            } else if (!aiming && window.wasAiming) {
+                this._clearCommandState();
+                this._launchAutomaticSeeds(window.target);
+                return;
+            } else {
+                if (!aiming) window.remaining = Math.max(0, window.remaining - delta);
+                if (aiming || window.remaining > 0) return;
+                this._clearCommandState();
+                this._launchAutomaticSeeds(window.target);
+                return;
+            }
+        }
+
+        if (!this.cooldownReady || !target || target.flags.defeated) {
             return;
         }
 
@@ -102,7 +111,11 @@ export class TricksterAbility extends Ability {
 
     prepareCommand(intent) {
         const window = this.state.commandWindow;
-        if (!window || !this._canLaunchCommand(window.target)) return intent;
+        if (!window) return intent;
+        if (!this._canLaunchCommand(window.target)) {
+            this._clearCommandState();
+            return intent;
+        }
         this.state.preparedCommand = {
             ...intent,
             direction: { ...intent.direction },
@@ -205,7 +218,7 @@ export class TricksterAbility extends Ability {
     }
 
     onSeedContact(target, seed) {
-        const cycle = this.state.commandCycles.get(seed.commandSequence);
+        const cycle = this.state.commandCycles.get(seed?.commandSequence);
         const hostileTarget = this.simulation.isHostile(this.owner, target);
         if (cycle) {
             if (hostileTarget) cycle.enemySeedContacts += 1;
@@ -239,6 +252,10 @@ export class TricksterAbility extends Ability {
                 this.simulation.entities.push(markEffect);
             }
         }
+    }
+
+    onEnemySeedContact(target) {
+        this.onSeedContact(target, null);
     }
 
     onDashHit(target, effect, context = {}) {
@@ -309,9 +326,13 @@ export class TricksterAbility extends Ability {
     }
 
     onBattleEnded() {
+        this._clearCommandState();
+        for (const sequence of [...this.state.commandCycles.keys()]) this._finalizeCommandCycle(sequence);
+    }
+
+    _clearCommandState() {
         this.state.commandWindow = null;
         this.state.preparedCommand = null;
-        for (const sequence of [...this.state.commandCycles.keys()]) this._finalizeCommandCycle(sequence);
     }
 
     _updateMarks(delta) {

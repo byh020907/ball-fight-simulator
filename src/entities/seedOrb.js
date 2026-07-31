@@ -50,7 +50,11 @@ export class SeedOrb extends CombatEntity {
     _onHitEffects(target, simulation) {
         const hostileTarget = simulation.isHostile(this.owner, target) ? target : null;
         const opponent = hostileTarget ?? simulation.getOpponent(this.owner);
-        this.owner.ability?.onSeedContact?.(target, this);
+        if (Number.isFinite(this.commandSequence) || target === this.owner) {
+            this.owner.ability?.onSeedContact?.(target, this);
+        } else if (hostileTarget) {
+            this.owner.ability?.onEnemySeedContact?.(target);
+        }
         const dashDirection = opponent
             ? Vector2.subtract(opponent.position, this.owner.position).normalize()
             : this.velocity.clone().normalize();
