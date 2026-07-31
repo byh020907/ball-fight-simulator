@@ -31,6 +31,7 @@ export class OrbitProjectile extends Projectile {
         this.maxSpeed = owner.stats.baseSpeed * 5;
         this.slotIndex = options.slotIndex ?? null;
         this.volleyId = options.volleyId ?? null;
+        this.commandSequence = Number.isFinite(options.commandSequence) ? options.commandSequence : null;
         this.hasHit = false;
         this.wasCaught = false;
         this.convergence = null;
@@ -114,6 +115,7 @@ export class OrbitProjectile extends Projectile {
         const rawDamage = this._getHitDamage();
         this.dealDamageToTarget(target, rawDamage, this.owner, this._getHitLabel(), simulation);
         this.owner.ability?.registerProjectileHit?.(this, target, contactPoint);
+        this.owner.ability?.registerCommandProjectileHit?.(this);
         this._onHitEffects(target, simulation);
         this._explodeOnHit(simulation, contactPoint);
         this.isExpired = true;
@@ -125,7 +127,8 @@ export class OrbitProjectile extends Projectile {
         if (distance > this.radius + this.owner.radius) return;
 
         this.wasCaught = true;
-        this.owner.ability.restoreShardFromCatch(this.slotIndex, this.position);
+        if (this.owner.ability.restoreShardFromCatch(this.slotIndex, this.position))
+            this.owner.ability.registerCommandProjectileCatch?.(this);
         simulation.spawnParticleBurst(this.position.clone(), this.owner.color, {
             count: 12,
             speed: 130,

@@ -7,6 +7,7 @@ const VOLLEY_COOLDOWN = 3.0;
 const VOLLEY_DELAY = 0.18;
 const VOLLEY_MIN_RANGE = 200;
 const VOLLEY_MAX_RANGE = 500;
+const COMMAND_WINDOW_DURATION = 0.8;
 const SHARD_SIZE = 16;
 export const ORBIT_COOLDOWN_KEYS = Object.freeze({ hit: "hit", volley: "volley" });
 
@@ -40,7 +41,10 @@ export class OrbitAbility extends Ability {
             volleyStartTime: 0,
             volleySerial: 0,
             currentVolleyId: null,
-            synchronizedVolleys: new Map()
+            synchronizedVolleys: new Map(),
+            commandWindow: null,
+            preparedCommand: null,
+            commandCycles: new Map()
         };
     }
 
@@ -61,6 +65,7 @@ export class OrbitAbility extends Ability {
         this.state.angle += delta * this.baseSpinSpeed * spinMultiplier;
         this.updateRecharge(delta);
         this.updateVolley(delta, target);
+        this._finalizeCommandCycles();
         this._pruneSynchronizedVolleys();
 
         if (!target) {
@@ -178,7 +183,7 @@ export class OrbitAbility extends Ability {
     /** Launch a shard volley at the target when all shards are full. */
     updateVolley(delta, target) {
         if (this.state.volleyActive) {
-            if (!target || target.flags.defeated) {
+            if ((!target || target.flags.defeated) && !this.state.preparedCommand?.launched) {
                 this.state.volleyActive = false;
                 this.state.volleyIndex = 0;
                 this.cooldowns.reset(ORBIT_COOLDOWN_KEYS.volley);
@@ -187,7 +192,9 @@ export class OrbitAbility extends Ability {
             }
             this.state.volleyStartTime -= delta;
             if (this.state.volleyStartTime <= 0 && this.state.volleyIndex < this.shardCount) {
-                this.fireShardAt(target);
+                this.state.preparedCommand?.launched
+                    ? this.fireCommandShard(this.state.preparedCommand)
+                    : this.fireShardAt(target);
                 this.state.volleyIndex++;
                 this.state.volleyStartTime = this.getVolleyDelay();
             }
@@ -196,7 +203,18 @@ export class OrbitAbility extends Ability {
                 this.state.volleyIndex = 0;
                 this.cooldowns.reset(ORBIT_COOLDOWN_KEYS.volley);
                 this.state.currentVolleyId = null;
+                if (this.state.preparedCommand?.launched) this.state.preparedCommand = null;
             }
+            return;
+        }
+
+        const window = this.state.commandWindow;
+        if (window) {
+            const aiming = this.simulation.dragCombat?.input?.state === "aiming";
+            if (!aiming) window.remaining = Math.max(0, window.remaining - Math.max(0, delta));
+            if (window.remaining > 0 || aiming) return;
+            this.state.commandWindow = null;
+            this._startAutoVolley(window.target);
             return;
         }
 
@@ -208,13 +226,93 @@ export class OrbitAbility extends Ability {
         ) {
             const dist = Vector2.subtract(target.position, this.owner.position).length();
             if (dist >= VOLLEY_MIN_RANGE && dist <= VOLLEY_MAX_RANGE) {
-                this.state.volleyActive = true;
-                this.state.volleyIndex = 0;
-                this.state.volleyStartTime = 0;
-                this.state.volleySerial += 1;
-                this.state.currentVolleyId = `${this.owner.id}:orbit:${this.state.volleySerial}`;
+                if (this._canAcceptPlayerCommand()) {
+                    this.state.commandWindow = { target, remaining: COMMAND_WINDOW_DURATION };
+                    return;
+                }
+                this._startAutoVolley(target);
             }
         }
+    }
+
+    _startAutoVolley(target) {
+        if (!target || target.flags.defeated) return;
+        this.state.volleyActive = true;
+        this.state.volleyIndex = 0;
+        this.state.volleyStartTime = 0;
+        this.state.volleySerial += 1;
+        this.state.currentVolleyId = `${this.owner.id}:orbit:${this.state.volleySerial}`;
+    }
+
+    _canAcceptPlayerCommand() {
+        return Boolean(
+            this.simulation.abilityCommandEnabled &&
+            this.simulation.playerBall === this.owner &&
+            this.simulation.dragCombat &&
+            !this.simulation.dragCombat.automated &&
+            this.simulation.commandResource?.canSpend?.()
+        );
+    }
+
+    getCommandState() {
+        if (
+            !this.simulation.abilityCommandEnabled ||
+            this.simulation.playerBall !== this.owner ||
+            this.simulation.dragCombat?.automated
+        )
+            return { available: false, reserveResource: false };
+        return { available: Boolean(this.state.commandWindow), reserveResource: !this.state.commandWindow };
+    }
+
+    prepareCommand(intent) {
+        const window = this.state.commandWindow;
+        if (!window || !this._canAcceptPlayerCommand() || !this._canStartVolley(window.target)) return intent;
+        const direction = new Vector2(intent.direction.x, intent.direction.y).normalize();
+        const fixedPoint = intent.predictedTerminal
+            ? new Vector2(intent.predictedTerminal.x, intent.predictedTerminal.y)
+            : Vector2.add(this.owner.position, direction.scale(VOLLEY_MAX_RANGE));
+        this.state.preparedCommand = {
+            ...intent,
+            direction: { ...intent.direction },
+            pathSegments: intent.pathSegments?.map((point) => ({ ...point })) ?? [],
+            bouncePoints: intent.bouncePoints?.map((point) => ({ ...point })) ?? [],
+            predictedTerminal: intent.predictedTerminal ? { ...intent.predictedTerminal } : null,
+            fixedPoint,
+            target: window.target,
+            launched: false
+        };
+        this.state.commandWindow = null;
+        return this.state.preparedCommand;
+    }
+
+    resolveCommandLaunch(intent) {
+        const command = this.state.preparedCommand;
+        if (!command || command.sequence !== intent?.sequence || !this._canStartVolley(command.target)) {
+            if (command?.sequence === intent?.sequence) this.state.preparedCommand = null;
+            return { mode: "default-shot" };
+        }
+        command.launched = true;
+        this._startAutoVolley(command.target);
+        this.state.commandCycles.set(command.sequence, {
+            commandSequence: command.sequence,
+            tier: this.abilityTier,
+            fixedPoint: command.fixedPoint.clone(),
+            released: 0,
+            hits: 0,
+            synchronizedHits: 0,
+            catches: 0,
+            plannedSegments: command.pathSegments.length,
+            createdAt: command.createdAt ?? this.simulation.elapsed,
+            releaseComplete: false
+        });
+        return { mode: "payload-only" };
+    }
+
+    _canStartVolley(target) {
+        if (!target || target.flags.defeated || !this.cooldowns.isReady(ORBIT_COOLDOWN_KEYS.volley)) return false;
+        if (this.getActiveShardCount() !== this.shardCount) return false;
+        const distance = Vector2.subtract(target.position, this.owner.position).length();
+        return distance >= VOLLEY_MIN_RANGE && distance <= VOLLEY_MAX_RANGE;
     }
 
     /** Fire one shard as a projectile toward the target. */
@@ -232,6 +330,85 @@ export class OrbitAbility extends Ability {
         });
         this.consumeShard(entry.index);
         this.simulation.playSound("shoot", 0.6);
+    }
+
+    fireCommandShard(command) {
+        const activeEntries = this.getActiveShardEntries();
+        if (!activeEntries.length) return;
+        const entry = activeEntries[0];
+        const direction = Vector2.subtract(command.fixedPoint, entry.position).normalize();
+        const projectile = this.simulation.spawnOrbitShot(this.owner, entry.position.clone(), direction, SHARD_SIZE, {
+            slotIndex: entry.index,
+            volleyId: this.state.currentVolleyId,
+            commandSequence: command.sequence
+        });
+        if (this.getLevelUpgrade().synchronizedVolley) projectile?.beginSynchronizedConvergence(command.fixedPoint);
+        const cycle = this.state.commandCycles.get(command.sequence);
+        if (cycle) cycle.released += 1;
+        this.consumeShard(entry.index);
+        this.simulation.playSound("shoot", 0.6);
+    }
+
+    registerCommandProjectileHit(projectile) {
+        const cycle = this.state.commandCycles.get(projectile.commandSequence);
+        if (!cycle) return;
+        cycle.hits += 1;
+        if (projectile.convergence) cycle.synchronizedHits += 1;
+    }
+
+    registerCommandProjectileCatch(projectile) {
+        const cycle = this.state.commandCycles.get(projectile.commandSequence);
+        if (cycle) cycle.catches += 1;
+    }
+
+    _finalizeCommandCycles() {
+        for (const [sequence, cycle] of this.state.commandCycles) {
+            const commandStillLaunching =
+                this.state.preparedCommand?.launched && this.state.preparedCommand.sequence === sequence;
+            if (commandStillLaunching && this.state.volleyActive) continue;
+            const activeProjectile = this.simulation.entities.some(
+                (entity) =>
+                    entity.constructor?.name === "OrbitProjectile" &&
+                    entity.commandSequence === sequence &&
+                    !entity.isExpired
+            );
+            if (activeProjectile) continue;
+            this.recordAbilityResult({
+                commandSequence: sequence,
+                resultType: "orbit-command-volley",
+                success: cycle.hits > 0,
+                value: {
+                    tier: cycle.tier,
+                    released: cycle.released,
+                    hits: cycle.hits,
+                    synchronizedHits: cycle.synchronizedHits,
+                    catches: cycle.catches,
+                    plannedSegments: cycle.plannedSegments,
+                    elapsed: Math.max(0, this.simulation.elapsed - cycle.createdAt)
+                }
+            });
+            this.state.commandCycles.delete(sequence);
+        }
+    }
+
+    onBattleEnded() {
+        this.state.commandWindow = null;
+        this.state.preparedCommand = null;
+        for (const cycle of this.state.commandCycles.values()) {
+            this.recordAbilityResult({
+                commandSequence: cycle.commandSequence,
+                resultType: "orbit-command-volley",
+                success: cycle.hits > 0,
+                value: {
+                    ...cycle,
+                    fixedPoint: undefined,
+                    createdAt: undefined,
+                    releaseComplete: undefined,
+                    elapsed: Math.max(0, this.simulation.elapsed - cycle.createdAt)
+                }
+            });
+        }
+        this.state.commandCycles.clear();
     }
 
     registerProjectileHit(projectile, target, contactPoint) {

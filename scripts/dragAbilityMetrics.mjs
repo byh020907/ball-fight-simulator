@@ -198,7 +198,8 @@ function runMatch({ seed, characterId, stageId, floor, policy, abilityTier = 0 }
                       rage: ["rage-command-cashout"],
                       archer: ["archer-command-shot"],
                       hero: ["hero-command-core-cycle"],
-                      phantom: ["phantom-command-chain"]
+                      phantom: ["phantom-command-chain"],
+                      orbit: ["orbit-command-volley"]
                   }[characterId] ?? [])
                 : []
         });

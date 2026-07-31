@@ -75,6 +75,14 @@ function formatPhantom(values) {
     );
 }
 
+function formatOrbit(values) {
+    const field = (key) => decimal(average(values.map((value) => finiteNumber(value[key]))));
+    return (
+        `평균 방출 ${field("released")}, 적중 ${field("hits")}, 동기화 적중 ${field("synchronizedHits")}, ` +
+        `회수 ${field("catches")}, 계획 구간 ${field("plannedSegments")}, 경과 ${field("elapsed")}초`
+    );
+}
+
 export function formatAbilityResult(type, result) {
     const base = formatBase(type, result);
     const values = resultValues(result);
@@ -82,7 +90,8 @@ export function formatAbilityResult(type, result) {
         "rage-command-cashout": formatRage,
         "archer-command-shot": formatArcher,
         "hero-command-core-cycle": formatHero,
-        "phantom-command-chain": formatPhantom
+        "phantom-command-chain": formatPhantom,
+        "orbit-command-volley": formatOrbit
     }[type];
     return detail ? `${base}, ${detail(values)}` : base;
 }

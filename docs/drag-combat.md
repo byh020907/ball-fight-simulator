@@ -88,6 +88,10 @@ Phantom은 primed 상태의 focal 수동 플레이어만 `그림자 출구 지�
 
 `phantom-command-chain`은 base 출구의 clearance, base 적중, 실제 pursuit chain 적중 수, finish 적중을 하나의 `commandSequence`에 한 번만 기록한다. base miss, 후속 stack 소진, cooldown 만료, 전투 종료에서 결산하며, command terminal 직후 런타임이 보내는 `onCommandEnd()`는 이미 시작된 연쇄를 취소하지 않는다. `METRICS_ABILITY_COMMAND_PROTOTYPE=1`의 Phantom 보고는 attempts/match·성공률과 안전 출현·base 적중·연쇄 깊이·finish 적중 평균을 함께 출력한다.
 
+### Orbit 실험 슬라이스
+
+Orbit은 전탄·사거리·cooldown 조건을 만족한 focal 수동 플레이어에게만 0.8초 입력창을 열어 고정 집결점을 예약한다. 유효 release는 몸체 발사 없이 기존 shard cadence·slot·피해로 payload-only volley를 시작하며, tier 1 이상은 각 projectile 생성 시 같은 집결점으로 동기화를 시작한다. `orbit-command-volley`는 방출·직접 적중·동기화 적중·tier 3 catch·계획 구간·경과 시간을 sequence별로 단일 결산한다.
+
 ### 능력 티어 장기 계측
 
 `npm run metrics:drag-ability`는 `METRICS_PROFILE=standard`에서 기존 `1 seed / 75 seconds`, `METRICS_PROFILE=long`에서 `10 seeds / 120 seconds`를 기본으로 사용한다. `METRICS_SEEDS`와 `METRICS_MAX_SECONDS`를 지정하면 profile 기본값보다 우선하며, 알 수 없는 profile은 오류로 종료한다.

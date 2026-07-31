@@ -45,6 +45,10 @@ const TEST_DOMAINS = {
         modulePath: "./phantomCommand.mjs",
         footerMessages: new Set(["[phantom-command] ok"])
     },
+    orbitCommand: {
+        modulePath: "./orbitCommand.mjs",
+        footerMessages: new Set(["[orbit-command] ok"])
+    },
     dragVectorCombat: {
         modulePath: "./dragVectorCombat.mjs",
         footerMessages: new Set(["[drag-vector-combat] ok"])
