@@ -98,6 +98,12 @@ Spin은 `abilityCommandEnabled` opt-in의 focal 수동 플레이어가 만충 �
 
 `spin-command-gyro-bank`는 sequence별로 tier, 발사 충전, 계획 구간, 실제 반사, 보존 충전, 직접 피해, 표면 절단, 후면 적중, 방패 반격, 경과 시간을 단 한 번 기록한다. plain/rear hit만 성공이며 shield counter도 charge cashout과 사용 계측은 한 번 실행하지만 실패 결과로 남는다. ally-stop·miss·교체·만료·reset·전투 종료는 추가 charge 소비 없이 실패로 결산한다.
 
+### Trickster 실험 슬라이스
+
+Trickster는 cooldown ready인 focal 수동 플레이어가 command resource를 보유할 때만 0.8초 동안 다음 세 씨앗의 노선을 기다린다. 창 전에는 generic drag resource를 보류하고, timeout·cancel·flag off·AI·non-focal은 기존 무작위 360도 세 씨앗을 정확히 한 번 발사한다. 유효 release는 resource를 한 번 소비하고 기존 ability 사용 회복을 받지만 body impulse와 `playerShot`은 시작하지 않는 payload-only다.
+
+명령 `pathSegments`의 절대 endpoint를 owner 위치부터 순서대로 복원해 중복 방향을 제거한다. 한 방향은 -24/0/+24도 fan, 두 방향은 실제 두 방향과 첫 방향의 비중복 ±24도 후보, 세 방향 이상은 앞 세 실제 방향을 쓴다. `trickster-command-route`는 tagged 씨앗 접촉과 그 Seed Dash의 mark burst를 같은 sequence로 묶어 tier, launched, plannedSegments, plannedBounces, enemySeedContacts, ownerSeedTriggers, seedBursts, followupSeeds, elapsed를 한 번 기록한다. tier 0~1은 적 접촉 또는 owner trigger, tier 2~3은 Seed Burst가 성공 조건이다. followup 씨앗은 기존 1개·14초·0.5초 grace만 유지하며 cycle 수명을 연장하지 않는다.
+
 ### 능력 티어 장기 계측
 
 `npm run metrics:drag-ability`는 `METRICS_PROFILE=standard`에서 기존 `1 seed / 75 seconds`, `METRICS_PROFILE=long`에서 `10 seeds / 120 seconds`를 기본으로 사용한다. `METRICS_SEEDS`와 `METRICS_MAX_SECONDS`를 지정하면 profile 기본값보다 우선하며, 알 수 없는 profile은 오류로 종료한다.

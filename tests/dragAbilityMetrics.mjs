@@ -5,7 +5,7 @@ import { formatAbilityResult } from "../scripts/dragAbilityMetricFormatters.mjs"
 import { BattleSimulation } from "../src/simulation/battleSimulation.js";
 import { createRoster } from "../src/roster.js";
 
-const rosterIds = ["rage", "archer", "hero", "phantom"];
+const rosterIds = ["rage", "archer", "hero", "phantom", "trickster"];
 
 {
     const config = createDragAbilityMetricsConfig({}, rosterIds);
@@ -84,6 +84,26 @@ const formatterCases = [
             values: [{ safeAppear: true, baseHit: true, chainDepth: 2, finishHit: true }]
         },
         "종결 적중 100.0%"
+    ],
+    [
+        "trickster-command-route",
+        {
+            attemptsPerMatch: 1,
+            successRate: 0.5,
+            values: [
+                {
+                    launched: 3,
+                    enemySeedContacts: 2,
+                    ownerSeedTriggers: 1,
+                    seedBursts: 1,
+                    followupSeeds: 1,
+                    plannedSegments: 2,
+                    plannedBounces: 1,
+                    elapsed: 1.2
+                }
+            ]
+        },
+        "적 접촉 2.00"
     ]
 ];
 

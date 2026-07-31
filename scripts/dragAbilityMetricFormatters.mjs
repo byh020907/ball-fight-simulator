@@ -95,6 +95,16 @@ function formatSpin(values) {
     );
 }
 
+function formatTrickster(values) {
+    const field = (key) => decimal(average(values.map((value) => finiteNumber(value[key]))));
+    return (
+        `평균 발사 ${field("launched")}, 적 접촉 ${field("enemySeedContacts")}, 본인 발동 ${field(
+            "ownerSeedTriggers"
+        )}, 폭발 ${field("seedBursts")}, 후속 씨앗 ${field("followupSeeds")}, ` +
+        `계획 구간 ${field("plannedSegments")}, 계획 반사 ${field("plannedBounces")}, 경과 ${field("elapsed")}초`
+    );
+}
+
 export function formatAbilityResult(type, result) {
     const base = formatBase(type, result);
     const values = resultValues(result);
@@ -104,7 +114,8 @@ export function formatAbilityResult(type, result) {
         "hero-command-core-cycle": formatHero,
         "phantom-command-chain": formatPhantom,
         "orbit-command-volley": formatOrbit,
-        "spin-command-gyro-bank": formatSpin
+        "spin-command-gyro-bank": formatSpin,
+        "trickster-command-route": formatTrickster
     }[type];
     return detail ? `${base}, ${detail(values)}` : base;
 }

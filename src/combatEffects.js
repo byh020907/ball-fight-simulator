@@ -12,7 +12,8 @@ export class DashEffect {
         collisionLabel = "Dash",
         collisionSlow = null,
         untilImpact = false,
-        untilWall = false
+        untilWall = false,
+        commandSequence = null
     }) {
         this.effect = new TimedEffect(duration);
         this.multiplier = multiplier;
@@ -24,6 +25,7 @@ export class DashEffect {
         this.collisionSlow = collisionSlow;
         this.untilImpact = untilImpact;
         this.untilWall = untilWall;
+        this.commandSequence = Number.isFinite(commandSequence) ? commandSequence : null;
         this.expired = false;
     }
 

@@ -308,7 +308,8 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
             collisionDamage = 0,
             collisionLabel = "Dash Contact",
             showRing = true,
-            noHeading = false
+            noHeading = false,
+            commandSequence = null
         } = opts;
         const speed = speedOverride ?? this.stats.baseSpeed * multiplier;
 
@@ -321,6 +322,7 @@ export class BattleBall extends mixins([PhysicsBody, RotationalBody, PhysicsMate
                 showRing,
                 collisionDamage,
                 collisionLabel,
+                commandSequence,
                 untilImpact: true,
                 untilWall: true
             })

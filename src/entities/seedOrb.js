@@ -13,13 +13,18 @@ export class SeedOrb extends CombatEntity {
         this.collisionGraceRemaining = Math.max(0, options.collisionGrace ?? 0);
         this.collisionGraceDuration = this.collisionGraceRemaining;
         this.activationEffectSpawned = this.collisionGraceRemaining <= 0;
+        this.commandSequence = Number.isFinite(options.commandSequence) ? options.commandSequence : null;
+        this.tracksCommandCycle = options.tracksCommandCycle !== false;
+        this.onSettled = options.onSettled ?? null;
+        this.settled = false;
     }
 
     update(delta, simulation) {
         if (this.tickLife(delta)) this.integrate(delta);
         simulation.keepEntityInsideArena(this);
         if (this.life <= 0) {
-            this.isExpired = true;
+            this.settle({ reason: "lifetime" });
+            return;
         }
 
         const graceBefore = this.collisionGraceRemaining;
@@ -37,7 +42,7 @@ export class SeedOrb extends CombatEntity {
             const distance = Vector2.subtract(this.position, fighter.position).length();
             if (distance > this.radius + fighter.radius) continue;
             this._onHitEffects(fighter, simulation);
-            this.isExpired = true;
+            this.settle({ reason: "contact", target: fighter });
             break;
         }
     }
@@ -45,9 +50,7 @@ export class SeedOrb extends CombatEntity {
     _onHitEffects(target, simulation) {
         const hostileTarget = simulation.isHostile(this.owner, target) ? target : null;
         const opponent = hostileTarget ?? simulation.getOpponent(this.owner);
-        if (hostileTarget) {
-            this.owner.ability?.onEnemySeedContact?.(hostileTarget);
-        }
+        this.owner.ability?.onSeedContact?.(target, this);
         const dashDirection = opponent
             ? Vector2.subtract(opponent.position, this.owner.position).normalize()
             : this.velocity.clone().normalize();
@@ -55,7 +58,8 @@ export class SeedOrb extends CombatEntity {
             duration: 1.55,
             multiplier: 2.05,
             collisionDamage: Math.round(this.owner.stats.baseDamage * 0.9),
-            collisionLabel: "Seed Dash"
+            collisionLabel: "Seed Dash",
+            commandSequence: this.commandSequence
         });
         simulation.spawnSlash(
             this.owner.position.clone(),
@@ -66,6 +70,14 @@ export class SeedOrb extends CombatEntity {
         simulation.playSound("dash");
         simulation.addLog(`${target?.name ?? "Someone"} catches a seed and triggers ${this.owner.name}'s dash.`);
         simulation.addSparkBurst(this.position.clone(), this.owner.color);
+    }
+
+    settle(event = {}) {
+        if (this.settled) return false;
+        this.settled = true;
+        this.isExpired = true;
+        this.onSettled?.(event);
+        return true;
     }
 
     draw(ctx) {

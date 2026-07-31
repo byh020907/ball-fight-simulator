@@ -4,6 +4,8 @@
 
 ## 현재 기준
 
+- [L2] 2026-07-31 Trickster 수동 드래그는 몸통 발사가 아니라 다음 세 씨앗의 노선을 지정한다. focal·비자동·resource 보유·cooldown ready에서만 0.8초 command window를 열고, release는 payload-only로 기존 Seed Dash/Vine Snare/Mark Burst/followup 수치와 수명을 보존한다. `trickster-command-route` 결과는 command seed 및 그 Seed Dash를 sequence로 묶어 접촉·burst·followup을 계측하며, 후속 씨앗은 cycle을 연장하지 않는다.
+
 - 개발·검증·문서 수명주기: [`docs/development-rules.md`](docs/development-rules.md)
 - 게임 규칙: [`docs/game-rules.md`](docs/game-rules.md)
 - 시각·UX 설계: [`docs/design.md`](docs/design.md)
