@@ -99,15 +99,46 @@ for (const mode of ["replace-shot", "payload-only"]) {
 
 {
     const { simulation, ability } = createSimulation();
-    launch(simulation, 2);
-    assert.equal(simulation.dragCombat.getSnapshot().commandSequence, 1);
+    assert.deepEqual(simulation.beginDragCombat(2, { x: 20, y: 20 }), { type: "begin" });
+    assert.equal(simulation.moveDragCombat(2, { x: 30, y: 20 }).active, false);
+    assert.equal(simulation.releaseDragCombat(2).type, "cancel", "dead-zone release는 발사가 아니다");
+    assert.equal(simulation.dragCombat.getSnapshot().commandSequence, 0, "dead-zone은 sequence를 증가시키지 않는다");
+    assert.deepEqual(simulation.beginDragCombat(3, { x: 20, y: 20 }), { type: "begin" });
+    assert.equal(simulation.cancelDragCombat(3).type, "cancel");
+    assert.equal(simulation.dragCombat.getSnapshot().commandSequence, 0, "취소는 sequence를 증가시키지 않는다");
     assert.equal(simulation.cancelDragCombat(99), null, "무효 pointer는 sequence를 증가시키지 않는다");
+    launch(simulation, 4);
+    assert.equal(simulation.dragCombat.getSnapshot().commandSequence, 1);
     simulation.elapsed = 3.1;
     simulation.dragCombat.tickInput(0);
     assert.equal(simulation.dragCombat.getSnapshot().activeCommand, null, "3초 뒤 intent가 만료된다");
-    assert.ok(ability.ends.includes("expired"));
+    assert.deepEqual(ability.ends, ["expired"]);
+}
+
+{
+    const { simulation, ability } = createSimulation({ mode: "payload-only" });
+    launch(simulation, 5);
+    assert.equal(simulation.dragCombat.getSnapshot().commandSequence, 1);
+    launch(simulation, 6);
+    assert.equal(simulation.dragCombat.getSnapshot().commandSequence, 2);
+    assert.deepEqual(ability.ends, ["replaced"], "새 유효 커맨드는 이전 intent를 한 번만 교체 종료한다");
+}
+
+{
+    const { simulation, ability } = createSimulation({ mode: "payload-only" });
+    launch(simulation, 7);
+    ability.setCooldownRemaining(0);
+    ability.resetCooldown();
+    assert.equal(simulation.dragCombat.getSnapshot().activeCommand, null, "primary ability cycle은 intent를 종료한다");
+    assert.deepEqual(ability.ends, ["ability-cycle"]);
+}
+
+{
+    const { simulation, ability } = createSimulation({ mode: "payload-only" });
+    launch(simulation, 8);
     simulation.dragCombat.reset();
-    assert.equal(simulation.dragCombat.getSnapshot().activeCommand, null, "전투 리셋은 intent를 정리한다");
+    assert.equal(simulation.dragCombat.getSnapshot().activeCommand, null, "리셋은 활성 intent를 정리한다");
+    assert.deepEqual(ability.ends, ["reset"]);
 }
 
 {
