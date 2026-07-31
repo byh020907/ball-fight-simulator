@@ -45,6 +45,16 @@ for (const level of [0, 1, 2]) {
 {
     const context = createSimulation();
     openCommand(context);
+    const foreignMovement = { commandSequence: null };
+    context.owner.state.movement = foreignMovement;
+    context.ability.update(0, context.target);
+    assert.equal(context.ability.state.commandWindow, null, "other movement clears the stale command window");
+    assert.equal(context.owner.state.movement, foreignMovement, "other movement is never overwritten by fallback");
+}
+
+{
+    const context = createSimulation();
+    openCommand(context);
     const start = context.owner.position;
     context.simulation.beginDragCombat(1, start);
     context.simulation.moveDragCombat(1, { x: start.x - 140, y: start.y });
@@ -77,6 +87,54 @@ for (const level of [0, 1, 2]) {
         "tier",
         "wallFailed"
     ]);
+}
+
+{
+    const context = createSimulation();
+    context.owner.progression.abilityTier = 3;
+    openCommand(context);
+    const start = context.owner.position;
+    context.simulation.beginDragCombat(8, start);
+    context.simulation.moveDragCombat(8, { x: start.x - 140, y: start.y });
+    context.simulation.releaseDragCombat(8);
+    const effect = context.owner.state.movement;
+    context.ability.onDashHit(context.target, effect);
+    const cycle = context.ability.state.commandCycles.get(effect.commandSequence);
+    const laser = cycle.laser;
+    assert.equal(context.ability.laserCombatStates.get(laser).commandSequence, effect.commandSequence);
+    laser.segments = [{ start: context.owner.position.clone(), end: context.target.position.clone() }];
+    context.ability._dealDashLaserTick(laser, laser.fireDuration);
+    context.ability._dealDashLaserTick(laser, laser.fireDuration);
+    assert.ok(cycle.laserDamage > 0, "tier laser accumulates actual tick damage on its command cycle");
+    assert.equal(cycle.ignitionTargetIds.size, 1, "tier 3 ignition targets remain unique");
+    context.owner.clearDash();
+    context.ability.update(0, context.target);
+    assert.equal(context.results.length, 0, "result waits for the command-owned laser to finish");
+    laser.isExpired = true;
+    context.ability.update(0, context.target);
+    assert.equal(context.results.length, 1, "laser finish finalizes the command cycle once");
+}
+
+{
+    const context = createSimulation();
+    openCommand(context);
+    const effect =
+        context.ability.resolveCommandLaunch(
+            context.ability.prepareCommand({
+                sequence: 9,
+                direction: { x: 1, y: 0 },
+                pathSegments: [{ x: 600, y: 400 }],
+                bouncePoints: [],
+                createdAt: 0
+            })
+        ) && context.owner.state.movement;
+    context.owner.abilities.onDashWall(effect);
+    assert.equal(context.ability.state.cooldownLevel, 0, "exact DashEffect wall forwarding resets stage zero");
+    assert.equal(
+        context.ability.state.commandCycles.get(9).cooldownLevelAfter,
+        0,
+        "wall snapshots full cooldown stage"
+    );
 }
 
 for (const fallback of ["timeout", "cancel"]) {

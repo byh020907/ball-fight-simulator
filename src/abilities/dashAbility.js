@@ -49,6 +49,10 @@ export class DashAbility extends Ability {
         this._finalizeCommandCycles();
         const window = this.state.commandWindow;
         if (window) {
+            if (this.owner.state.movement) {
+                this._clearCommandState();
+                return;
+            }
             const aiming = this.simulation.dragCombat?.input?.state === "aiming";
             if (aiming) window.wasAiming = true;
             if (!this._isValidTarget(window.target)) {
@@ -99,7 +103,7 @@ export class DashAbility extends Ability {
             });
             this.simulation.entities.push(laser);
             const cycle = this._getCommandCycle(effect);
-            if (cycle) cycle.laser = laser;
+            if (cycle) this._linkCommandLaser(cycle, laser);
         }
         const cycle = this._getCommandCycle(effect);
         if (cycle) {
@@ -157,6 +161,12 @@ export class DashAbility extends Ability {
 
     finishDashLaserCombat(laser) {
         this.laserCombatStates.delete(laser);
+    }
+
+    _linkCommandLaser(cycle, laser) {
+        cycle.laser = laser;
+        const state = this.laserCombatStates.get(laser);
+        if (state) state.commandSequence = cycle.commandSequence;
     }
 
     onDashWall(effect) {
