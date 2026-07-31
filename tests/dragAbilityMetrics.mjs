@@ -5,7 +5,7 @@ import { formatAbilityResult } from "../scripts/dragAbilityMetricFormatters.mjs"
 import { BattleSimulation } from "../src/simulation/battleSimulation.js";
 import { createRoster } from "../src/roster.js";
 
-const rosterIds = ["rage", "archer", "hero", "phantom", "trickster"];
+const rosterIds = ["rage", "archer", "hero", "phantom", "trickster", "bat_ball"];
 
 {
     const config = createDragAbilityMetricsConfig({}, rosterIds);
@@ -104,6 +104,27 @@ const formatterCases = [
             ]
         },
         "적 접촉 2.00"
+    ],
+    [
+        "bat-ball-command-called-shot",
+        {
+            attemptsPerMatch: 1,
+            successRate: 0.5,
+            values: [
+                {
+                    slashDamage: 20,
+                    wallSlamImpacts: 1,
+                    wallSlamDamage: 15,
+                    firstWallDistance: 300,
+                    homeRunMultiplier: 1.2,
+                    resetTriggered: true,
+                    plannedSegments: 2,
+                    plannedBounces: 1,
+                    elapsed: 0.85
+                }
+            ]
+        },
+        "Wall Slam 1.00회/15.00 피해"
     ]
 ];
 

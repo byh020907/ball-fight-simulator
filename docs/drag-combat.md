@@ -98,6 +98,12 @@ Spin은 `abilityCommandEnabled` opt-in의 focal 수동 플레이어가 만충 �
 
 `spin-command-gyro-bank`는 sequence별로 tier, 발사 충전, 계획 구간, 실제 반사, 보존 충전, 직접 피해, 표면 절단, 후면 적중, 방패 반격, 경과 시간을 단 한 번 기록한다. plain/rear hit만 성공이며 shield counter도 charge cashout과 사용 계측은 한 번 실행하지만 실패 결과로 남는다. ally-stop·miss·교체·만료·reset·전투 종료는 추가 charge 소비 없이 실패로 결산한다.
 
+### Bat Ball 실험 슬라이스
+
+Bat Ball은 기존 자동 스캔이 Slash 대상 하나를 확정한 순간, `abilityCommandEnabled` opt-in의 focal·비자동 플레이어가 command resource를 보유한 경우에만 0.8초 입력창을 연다. 유효 release는 몸체 impulse와 `playerShot` 없이 `replace-shot`으로 이미 확정한 Slash를 한 번 실행한다. 마지막 유효 `pathSegments` 구간을 owner 위치부터 복원한 방향(없으면 intent 방향)이 target 넉백과 Slash arc의 중심 방향이 된다. Slash 1.3배 피해, 550 넉백, 0.85초 Wall Slam, tier 1 회전 타구, tier 2 첫 HOME RUN, tier 3 실제 Wall Slam reset은 바꾸지 않는다.
+
+timeout·aim cancel은 자원을 쓰거나 result를 남기지 않고 같은 target에 기존 자동 Slash를 한 번 실행한다. target 무효화는 stale window를 지우며 cooldown·자원을 소비하지 않는다. flag off·AI/automated·non-focal·자원 없음은 즉시 기존 자동 Slash 경로를 유지한다. `bat-ball-command-called-shot`은 실제 연결된 Wall Slam effect가 끝나거나 교체되고, target defeat 또는 전투 종료가 오면 sequence별로 한 번 결산한다. 성공은 실제 `Wall Slam` 피해가 있을 때만 true이고, tier·계획 구간/반사·Slash 피해·Wall Slam 충돌/피해·첫 유효 벽 거리·HOME RUN 배율·실제 RESET·경과 시간을 보관한다.
+
 ### Trickster 실험 슬라이스
 
 Trickster는 cooldown ready인 focal 수동 플레이어가 command resource를 보유할 때만 0.8초 동안 다음 세 씨앗의 노선을 기다린다. 창 전에는 generic drag resource를 보류하고, timeout·cancel·flag off·AI·non-focal은 기존 무작위 360도 세 씨앗을 정확히 한 번 발사한다. 유효 release는 resource를 한 번 소비하고 기존 ability 사용 회복을 받지만 body impulse와 `playerShot`은 시작하지 않는 payload-only다.
@@ -110,7 +116,7 @@ Trickster는 cooldown ready인 focal 수동 플레이어가 command resource를 
 
 `METRICS_ABILITY_TIERS`는 0~3 정수의 쉼표 목록이고 기본값은 `0`이다. 중복은 첫 등장 순서를 유지해 제거한다. 예를 들어 `METRICS_ABILITY_TIERS=0,3`과 두 prototype 플래그를 함께 지정하면 각 stage의 `ability tier=0`과 `ability tier=3` 블록을 모두 출력한다. focal player의 실제 `progression.abilityTier`만 첫 update 전에 설정하므로 상대와 roster 원본은 바꾸지 않는다.
 
-능력 result는 공통 attempts/match·성공률 뒤에 recorder가 기록한 value만 요약한다. Rage는 충전·피해·조기 초기화, Archer는 벽/계획 구간·경과·후속 화살 표본과 적중률, Hero는 방출/회수/방패/회복과 총 회수율, Phantom은 안전 출현/기본 적중/연쇄/종결 적중을 표시한다. 빈 표본은 0으로 표시하며, 이 계측은 게임 판정이나 수치를 다시 계산하지 않는다.
+능력 result는 공통 attempts/match·성공률 뒤에 recorder가 기록한 value만 요약한다. Rage는 충전·피해·조기 초기화, Archer는 벽/계획 구간·경과·후속 화살 표본과 적중률, Hero는 방출/회수/방패/회복과 총 회수율, Phantom은 안전 출현/기본 적중/연쇄/종결 적중, Bat Ball은 Slash·Wall Slam·첫 벽 거리·HOME RUN·RESET을 표시한다. 빈 표본은 0으로 표시하며, 이 계측은 게임 판정이나 수치를 다시 계산하지 않는다.
 
 ### 관측 필드
 

@@ -28,6 +28,7 @@ const BAT_COOLDOWN_KEYS = Object.freeze({ wallReset: "wallReset" });
 const FACING_SMOOTH_RATE = 8;
 const SWEEP_AMPLITUDE = 0.45;
 const VISION_ARC_RADIUS_SCALE = 0.55;
+const COMMAND_WINDOW_DURATION = 0.8;
 
 export class BatBallAbility extends Ability {
     constructor(owner, simulation) {
@@ -40,7 +41,10 @@ export class BatBallAbility extends Ability {
             slashEndAngle: 0,
             resetFlash: 0,
             _facingAngle: 0,
-            sweepDirection: 1
+            sweepDirection: 1,
+            commandWindow: null,
+            preparedCommand: null,
+            commandCycles: new Map()
         };
     }
 
@@ -54,6 +58,7 @@ export class BatBallAbility extends Ability {
             if (this.state.slashTimer < 0) this.state.slashTimer = 0;
         }
         this.state.resetFlash = Math.max(0, this.state.resetFlash - delta);
+        this._finalizeCommandCycles();
 
         // 시야 범위가 좌우로 자유롭게 스윕 (벽 반동 시 부드럽게 회전)
         const time = performance.now() / 1000;
@@ -71,6 +76,30 @@ export class BatBallAbility extends Ability {
         if (Math.abs(sweepDelta) > 1e-4) this.state.sweepDirection = Math.sign(sweepDelta);
         this.state.arcAngle = nextArcAngle;
 
+        if (this.state.commandWindow) {
+            const aiming = this.simulation.dragCombat?.input?.state === "aiming";
+            const window = this.state.commandWindow;
+            if (aiming) window.wasAiming = true;
+            if (!this._isValidTarget(window.target)) {
+                this._clearCommandState();
+                return;
+            }
+            if (!aiming && window.wasAiming) {
+                this._clearCommandState();
+                this.performSlash(window.target);
+                this.resetCooldown(this.cooldown);
+                return;
+            }
+            if (aiming || window.remaining > 0) {
+                if (!aiming) window.remaining = Math.max(0, window.remaining - delta);
+                if (aiming || window.remaining > 0) return;
+            }
+            this._clearCommandState();
+            this.performSlash(window.target);
+            this.resetCooldown(this.cooldown);
+            return;
+        }
+
         if (!target || !this.cooldownReady) return;
 
         const toTarget = Vector2.subtract(target.position, this.owner.position);
@@ -82,22 +111,30 @@ export class BatBallAbility extends Ability {
         const diff = Math.abs(normalizeAngle(targetAngle - this.state.arcAngle));
         if (diff > this.getArcAngle() / 2) return;
 
+        if (this._canAcceptPlayerCommand()) {
+            this.state.commandWindow = { target, remaining: COMMAND_WINDOW_DURATION, wasAiming: false };
+            return;
+        }
+
         // 범위 안에 들어왔다 — 휘두르기!
         this.performSlash(target);
         this.resetCooldown(this.cooldown);
     }
 
-    performSlash(target) {
+    performSlash(target, options = {}) {
         const upgrade = this.getLevelUpgrade();
-        const swingDirection = this.state.sweepDirection || 1;
+        const calledShotDirection = options.calledShotDirection?.clone?.() ?? null;
+        const swingDirection = calledShotDirection ? 1 : this.state.sweepDirection || 1;
+        if (calledShotDirection) this.state.arcAngle = Math.atan2(calledShotDirection.y, calledShotDirection.x);
         this.state.slashTimer = SLASH_DURATION;
         this.state.slashStartAngle = this.state.arcAngle - (this.getArcAngle() / 2) * swingDirection;
         this.state.slashEndAngle = this.state.arcAngle + (this.getArcAngle() / 2) * swingDirection;
         const damage = Math.round(this.owner.stats.baseDamage * SLASH_DAMAGE_MULT);
-        target.takeDamage(damage, this.owner, "Slash");
+        const { actualDamage = damage } = target.takeDamage(damage, this.owner, "Slash") ?? {};
+        if (options.commandCycle) options.commandCycle.slashDamage = actualDamage;
 
         // 강한 넉백 + 벽 충돌 시 추가 데미지
-        const kbDir = Vector2.subtract(target.position, this.owner.position).normalize();
+        const kbDir = calledShotDirection ?? Vector2.subtract(target.position, this.owner.position).normalize();
         const hitContactPoint = Vector2.subtract(target.position, kbDir.clone().scale(target.radius));
         target.applyKnockback(kbDir.scale(KNOCKBACK_FORCE), KNOCKBACK_DURATION);
         let homeRunUsed = false;
@@ -123,7 +160,7 @@ export class BatBallAbility extends Ability {
                 if (homeRunText) homeRunText.visibilityToken = "combatText";
                 return multiplier;
             },
-            onImpact: (context) => this._handleWallSlamImpact(context)
+            onImpact: (context) => this._handleWallSlamImpact(context, options.commandCycle)
         });
         if (upgrade.rotatingHit) {
             target._computeMomentOfInertia();
@@ -138,7 +175,15 @@ export class BatBallAbility extends Ability {
         this.simulation.addLog(`${this.owner.name} swings the bat at ${target.name}!`);
     }
 
-    _handleWallSlamImpact({ actualDamage }) {
+    _handleWallSlamImpact({ actualDamage, contactPoint, damageMultiplier = 1 }, commandCycle = null) {
+        if (commandCycle && actualDamage > 0) {
+            commandCycle.wallSlamImpacts += 1;
+            commandCycle.wallSlamDamage += actualDamage;
+            if (commandCycle.firstWallDistance === null && contactPoint) {
+                commandCycle.firstWallDistance = Vector2.subtract(contactPoint, commandCycle.hitContactPoint).length();
+                commandCycle.homeRunMultiplier = damageMultiplier;
+            }
+        }
         if (
             !this.getLevelUpgrade().wallReset ||
             actualDamage <= 0 ||
@@ -152,6 +197,150 @@ export class BatBallAbility extends Ability {
         if (resetText) resetText.visibilityToken = "combatText";
         this.simulation.addSparkBurst(this.owner.position.clone(), this.owner.color);
         this.simulation.playSound("charge", 1.05);
+        if (commandCycle) commandCycle.resetTriggered = true;
+        return true;
+    }
+
+    _canAcceptPlayerCommand() {
+        return Boolean(
+            this.simulation.abilityCommandEnabled &&
+            this.simulation.playerBall === this.owner &&
+            this.simulation.dragCombat &&
+            !this.simulation.dragCombat.automated &&
+            this.simulation.commandResource?.canSpend?.()
+        );
+    }
+
+    _isValidTarget(target) {
+        return Boolean(target && !target.flags.defeated && !target.flags.destroyed);
+    }
+
+    getCommandState() {
+        if (!this._canAcceptPlayerCommand()) return { available: false, reserveResource: false };
+        return { available: Boolean(this.state.commandWindow), reserveResource: !this.state.commandWindow };
+    }
+
+    prepareCommand(intent) {
+        const window = this.state.commandWindow;
+        if (!window) return intent;
+        if (!this._canLaunchCommand(window.target)) {
+            this._clearCommandState();
+            return intent;
+        }
+        this.state.preparedCommand = {
+            ...intent,
+            direction: { ...intent.direction },
+            pathSegments: intent.pathSegments?.map((point) => ({ ...point })) ?? [],
+            bouncePoints: intent.bouncePoints?.map((point) => ({ ...point })) ?? [],
+            target: window.target
+        };
+        this.state.commandWindow = null;
+        return this.state.preparedCommand;
+    }
+
+    resolveCommandLaunch(intent) {
+        const command = this.state.preparedCommand;
+        if (!command || command.sequence !== intent?.sequence || !this._canLaunchCommand(command.target)) {
+            if (command?.sequence === intent?.sequence) this.state.preparedCommand = null;
+            return { mode: "default-shot" };
+        }
+        const direction = this._getCalledShotDirection(command);
+        const hitContactPoint = Vector2.subtract(
+            command.target.position,
+            direction.clone().scale(command.target.radius)
+        );
+        const cycle = {
+            commandSequence: command.sequence,
+            target: command.target,
+            tier: this.abilityTier,
+            plannedSegments: command.pathSegments.length,
+            plannedBounces: command.bouncePoints.length,
+            slashDamage: 0,
+            wallSlamImpacts: 0,
+            wallSlamDamage: 0,
+            firstWallDistance: null,
+            homeRunMultiplier: 1,
+            resetTriggered: false,
+            hitContactPoint,
+            createdAt: command.createdAt ?? this.simulation.elapsed,
+            finalized: false
+        };
+        this.state.commandCycles.set(command.sequence, cycle);
+        this.performSlash(command.target, { calledShotDirection: direction, commandCycle: cycle });
+        cycle.wallSlamEffect = command.target.state.wallSlam;
+        this.resetCooldown(this.cooldown);
+        this.state.preparedCommand = null;
+        return { mode: "replace-shot" };
+    }
+
+    _getCalledShotDirection(intent) {
+        let previous = this.owner.position;
+        let direction = null;
+        for (const point of intent.pathSegments ?? []) {
+            const segment = new Vector2(point.x - previous.x, point.y - previous.y);
+            previous = point;
+            if (segment.length() > 0.001) direction = segment.normalize();
+        }
+        if (!direction) direction = new Vector2(intent.direction?.x ?? 1, intent.direction?.y ?? 0);
+        if (direction.length() <= 0.001) direction = new Vector2(1, 0);
+        return direction.normalize();
+    }
+
+    _canLaunchCommand(target) {
+        return Boolean(
+            this._isValidTarget(target) &&
+            this.cooldownReady &&
+            this.simulation.abilityCommandEnabled &&
+            this.simulation.playerBall === this.owner &&
+            !this.simulation.dragCombat?.automated
+        );
+    }
+
+    _finalizeCommandCycles() {
+        for (const [sequence, cycle] of this.state.commandCycles) {
+            const activeEffect = cycle.target?.state?.wallSlam;
+            if (
+                this._isValidTarget(cycle.target) &&
+                activeEffect === cycle.wallSlamEffect &&
+                !activeEffect.effect?.finished
+            )
+                continue;
+            this._finalizeCommandCycle(sequence);
+        }
+    }
+
+    _finalizeCommandCycle(sequence) {
+        const cycle = this.state.commandCycles.get(sequence);
+        if (!cycle || cycle.finalized) return;
+        cycle.finalized = true;
+        this.recordAbilityResult({
+            commandSequence: sequence,
+            resultType: "bat-ball-command-called-shot",
+            success: cycle.wallSlamDamage > 0,
+            value: {
+                tier: cycle.tier,
+                plannedSegments: cycle.plannedSegments,
+                plannedBounces: cycle.plannedBounces,
+                slashDamage: cycle.slashDamage,
+                wallSlamImpacts: cycle.wallSlamImpacts,
+                wallSlamDamage: cycle.wallSlamDamage,
+                firstWallDistance: cycle.firstWallDistance ?? 0,
+                homeRunMultiplier: cycle.homeRunMultiplier,
+                resetTriggered: cycle.resetTriggered,
+                elapsed: Math.max(0, this.simulation.elapsed - cycle.createdAt)
+            }
+        });
+        this.state.commandCycles.delete(sequence);
+    }
+
+    onBattleEnded() {
+        this._clearCommandState();
+        for (const sequence of [...this.state.commandCycles.keys()]) this._finalizeCommandCycle(sequence);
+    }
+
+    _clearCommandState() {
+        this.state.commandWindow = null;
+        this.state.preparedCommand = null;
     }
 
     getStatModifiers() {

@@ -105,6 +105,16 @@ function formatTrickster(values) {
     );
 }
 
+function formatBatBall(values) {
+    const field = (key) => decimal(average(values.map((value) => finiteNumber(value[key]))));
+    return (
+        `Slash 피해 ${field("slashDamage")}, Wall Slam ${field("wallSlamImpacts")}회/${field("wallSlamDamage")} 피해, ` +
+        `첫 벽 거리 ${field("firstWallDistance")}, HOME RUN ${field("homeRunMultiplier")}배, ` +
+        `RESET ${percent(booleanRate(values, "resetTriggered"))}, 계획 구간 ${field("plannedSegments")}, ` +
+        `계획 반사 ${field("plannedBounces")}, 경과 ${field("elapsed")}초`
+    );
+}
+
 export function formatAbilityResult(type, result) {
     const base = formatBase(type, result);
     const values = resultValues(result);
@@ -115,7 +125,8 @@ export function formatAbilityResult(type, result) {
         "phantom-command-chain": formatPhantom,
         "orbit-command-volley": formatOrbit,
         "spin-command-gyro-bank": formatSpin,
-        "trickster-command-route": formatTrickster
+        "trickster-command-route": formatTrickster,
+        "bat-ball-command-called-shot": formatBatBall
     }[type];
     return detail ? `${base}, ${detail(values)}` : base;
 }
