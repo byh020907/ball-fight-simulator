@@ -104,6 +104,12 @@ Bat Ball은 기존 자동 스캔이 Slash 대상 하나를 확정한 순간, `ab
 
 timeout·aim cancel은 자원을 쓰거나 result를 남기지 않고 같은 target에 기존 자동 Slash를 한 번 실행한다. target 무효화는 stale window를 지우며 cooldown·자원을 소비하지 않는다. flag off·AI/automated·non-focal·자원 없음은 즉시 기존 자동 Slash 경로를 유지한다. `bat-ball-command-called-shot`은 실제 연결된 Wall Slam effect가 끝나거나 교체되고, target defeat 또는 전투 종료가 오면 sequence별로 한 번 결산한다. 성공은 실제 `Wall Slam` 피해가 있을 때만 true이고, tier·계획 구간/반사·Slash 피해·Wall Slam 충돌/피해·첫 유효 벽 거리·HOME RUN 배율·실제 RESET·경과 시간을 보관한다.
 
+### Dash 실험 슬라이스
+
+Dash는 cooldown이 준비된 focal·비자동 플레이어가 command resource를 보유하면 cooldown stage 0~2 모두에서 0.8초 입력창을 연다. 창 전에는 generic drag resource를 보류하고, 유효 release는 resource를 한 번 소비해 generic body impulse와 `playerShot` 없이 `replace-shot`으로 기존 Dash를 시작한다. 첫 non-zero absolute `pathSegments` endpoint가 시작 slash 120px와 forced heading을 함께 정하며, command Dash stage 0은 자동 homing을 적용하지 않는다.
+
+timeout·aim cancel·flag off·AI·non-focal·자원 없음은 같은 프레임의 기존 자동 Dash를 사용한다. target invalidation은 stale state만 지우고 cooldown·resource를 소비하지 않는다. command Dash는 기존 1.4초 duration, 2.15 multiplier, Dash Contact ×0.4, hit cooldown stage와 wall stage 0 reset을 그대로 쓴다. `dash-command-manual-entry`는 command-owned DashEffect와 그 레이저를 하나의 sequence로 묶어 실제 Dash hit만 성공으로 기록하며, tier·시작/종료 cooldown stage·계획 구간/반사·Dash hit·wall fail·실제 laser segment/damage·점화 대상·경과 시간을 한 번 보관한다.
+
 ### Trickster 실험 슬라이스
 
 Trickster는 cooldown ready인 focal 수동 플레이어가 command resource를 보유할 때만 0.8초 동안 다음 세 씨앗의 노선을 기다린다. 창 전에는 generic drag resource를 보류하고, timeout·cancel·flag off·AI·non-focal은 기존 무작위 360도 세 씨앗을 정확히 한 번 발사한다. 유효 release는 resource를 한 번 소비하고 기존 ability 사용 회복을 받지만 body impulse와 `playerShot`은 시작하지 않는 payload-only다.

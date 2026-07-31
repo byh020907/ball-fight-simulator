@@ -115,6 +115,17 @@ function formatBatBall(values) {
     );
 }
 
+function formatDash(values) {
+    const field = (key) => decimal(average(values.map((value) => finiteNumber(value[key]))));
+    return (
+        `시작 단계 ${field("cooldownLevelAtLaunch")}, 종료 단계 ${field("cooldownLevelAfter")}, ` +
+        `계획 구간 ${field("plannedSegments")}, 계획 반사 ${field("plannedBounces")}, ` +
+        `Dash 적중 ${percent(booleanRate(values, "dashHit"))}, 벽 실패 ${percent(booleanRate(values, "wallFailed"))}, ` +
+        `레이저 구간 ${field("laserHitSegments")}, 레이저 피해 ${field("laserDamage")}, ` +
+        `점화 ${field("ignitionTargets")}, 경과 ${field("elapsed")}초`
+    );
+}
+
 export function formatAbilityResult(type, result) {
     const base = formatBase(type, result);
     const values = resultValues(result);
@@ -126,7 +137,8 @@ export function formatAbilityResult(type, result) {
         "orbit-command-volley": formatOrbit,
         "spin-command-gyro-bank": formatSpin,
         "trickster-command-route": formatTrickster,
-        "bat-ball-command-called-shot": formatBatBall
+        "bat-ball-command-called-shot": formatBatBall,
+        "dash-command-manual-entry": formatDash
     }[type];
     return detail ? `${base}, ${detail(values)}` : base;
 }

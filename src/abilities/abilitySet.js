@@ -166,8 +166,8 @@ export class AbilitySet {
         this._primary?.onDashHit?.(target, effect, context);
     }
 
-    onDashWall() {
-        this._primary?.onDashWall?.();
+    onDashWall(effect, context) {
+        this._primary?.onDashWall?.(effect, context);
     }
 
     getPrimaryCommandState(context) {
