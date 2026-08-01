@@ -207,7 +207,8 @@ function runMatch({ seed, characterId, stageId, floor, policy, abilityTier = 0 }
                       eater: ["eater-command-spit-route"],
                       elementalist: ["elementalist-command-recall-route"],
                       grenade: ["grenade-command-bombing-line"],
-                      gunner: ["gunner-command-tracer-line"]
+                      gunner: ["gunner-command-tracer-line"],
+                      vampire: ["vampire-command-blood-route"]
                   }[characterId] ?? [])
                 : []
         });

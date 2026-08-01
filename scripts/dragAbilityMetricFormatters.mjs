@@ -164,6 +164,21 @@ function formatGunner(values) {
     return `유도 ${average("guidedLaunched").toFixed(2)}/${average("guidedPlanned").toFixed(2)}발, 전체 ${average("settledProjectiles").toFixed(2)}/${average("totalBullets").toFixed(2)}발, 성공 ${percent(hits)}, 첫 탄 ${percent(booleanRate(values, "firstShotHit"))}, 피니셔 ${percent(booleanRate(values, "finisherHit"))}, 재사격 ${average("refireHits").toFixed(2)}, 실제 피해 ${average("actualDamage").toFixed(2)}, 계획 반사 ${average("plannedBounces").toFixed(2)}, 경과 ${average("elapsed").toFixed(2)}초`;
 }
 
+function formatVampire(values) {
+    const average = (key) =>
+        values.length ? values.reduce((sum, value) => sum + finiteNumber(value?.[key]), 0) / values.length : 0;
+    const terminalRate = values.length
+        ? values.filter((value) => finiteNumber(value?.terminalBites) > 0).length / values.length
+        : 0;
+    return (
+        `선두 ${average("leadBites").toFixed(2)}회, terminal ${percent(terminalRate)}, ` +
+        `전체 물기 ${average("totalBites").toFixed(2)}, 표식 ${average("bloodMarks").toFixed(2)}, ` +
+        `파열 ${average("ruptures").toFixed(2)}, 실제 피해 ${average("actualDamage").toFixed(2)}, ` +
+        `실제 회복 ${average("actualHealing").toFixed(2)}, 계획 반사 ${average("plannedBounces").toFixed(2)}, ` +
+        `결과 ${average("elapsed").toFixed(2)}초`
+    );
+}
+
 export function formatAbilityResult(type, result) {
     const base = formatBase(type, result);
     const values = resultValues(result);
@@ -180,7 +195,8 @@ export function formatAbilityResult(type, result) {
         "eater-command-spit-route": formatEater,
         "elementalist-command-recall-route": formatElementalist,
         "grenade-command-bombing-line": formatGrenade,
-        "gunner-command-tracer-line": formatGunner
+        "gunner-command-tracer-line": formatGunner,
+        "vampire-command-blood-route": formatVampire
     }[type];
     return detail ? `${base}, ${detail(values)}` : base;
 }

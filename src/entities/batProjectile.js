@@ -13,6 +13,17 @@ const HOMING_LOCK_DURATION = 0.15;
 const LIFE_BURST_RADIUS = 65;
 const LIFE_BURST_DAMAGE_MULTIPLIER = 0.05;
 const EXPIRATION_WARNING_DURATION = 0.28;
+const COMMAND_WAYPOINT_RADIUS = 44;
+export const BAT_COMMAND_VISUAL_CONFIG = Object.freeze({
+    color: "#ff6f91",
+    outlineWidth: 2,
+    waypointRadius: 3,
+    trailLength: 14,
+    trailInterval: 0.04,
+    trailLifetime: 0.32,
+    lineWidth: 3,
+    dash: [6, 5]
+});
 
 // Boids weights (px/s/s accelerations, frame-rate independent)
 const COHESION_WEIGHT = 5;
@@ -39,6 +50,20 @@ export class BatProjectile extends Projectile {
         this._lastBiteAt = new WeakMap();
         this._homingLockedUntil = 0;
         this._lifetimeBurstTriggered = false;
+        this.commandGuided = Boolean(options.commandGuided);
+        this.commandRoute = this.commandGuided ? (options.commandRoute ?? []).map((point) => ({ ...point })) : [];
+        this.commandTerminalTargetId = options.commandTerminalTargetId ?? null;
+        this.commandCycle = options.commandCycle ?? null;
+        this.onSettled = typeof options.onSettled === "function" ? options.onSettled : null;
+        this.commandTrail = [];
+        this._commandRouteIndex = 0;
+        this._commandTrailElapsed = 0;
+        this._commandWaypointsReached = 0;
+        this._commandBites = 0;
+        this._commandTerminalBites = 0;
+        this._commandActualDamage = 0;
+        this._commandActualHealing = 0;
+        this._settled = false;
     }
 
     get isHomingLocked() {
@@ -48,12 +73,13 @@ export class BatProjectile extends Projectile {
     update(delta, simulation) {
         if (this.isExpired) return;
         this.time += delta;
-        const target = this._findTarget(simulation);
+        const target = this._getGuidanceTarget(simulation);
 
         if (!this.isHomingLocked) {
             this._applyGuidance(delta, target);
         }
         this._integrateFlutter(delta);
+        this._recordCommandTrail(delta);
         simulation.keepEntityInsideArena(this);
         if (!this._lifecycleCheck(delta, simulation)) {
             simulation.spawnParticleBurst(this.position.clone(), "#441122", {
@@ -78,6 +104,39 @@ export class BatProjectile extends Projectile {
         const maxSpeed = this.owner.stats.baseSpeed * MAX_SPEED_MULT;
         if (nextVelocity.length() > maxSpeed) nextVelocity.normalize().scale(maxSpeed);
         this.applyImpulse(Vector2.subtract(nextVelocity, this.velocity));
+    }
+
+    _getGuidanceTarget(simulation) {
+        if (this.commandGuided) {
+            const point = this.commandRoute[this._commandRouteIndex];
+            if (point) {
+                const distance = Vector2.subtract(new Vector2(point.x, point.y), this.position).length();
+                if (distance <= COMMAND_WAYPOINT_RADIUS) {
+                    simulation.spawnPulse(new Vector2(point.x, point.y), "#ff315f");
+                    this._commandWaypointsReached += 1;
+                    this._commandRouteIndex += 1;
+                }
+            }
+            const nextPoint = this.commandRoute[this._commandRouteIndex];
+            if (nextPoint) return { position: new Vector2(nextPoint.x, nextPoint.y), flags: { defeated: false } };
+            const terminal = simulation
+                .getEnemiesOf(this.owner)
+                .find((target) => target.id === this.commandTerminalTargetId && !target.flags.defeated);
+            if (terminal) return terminal;
+        }
+        return this._findTarget(simulation);
+    }
+
+    _recordCommandTrail(delta) {
+        if (!this.commandGuided) return;
+        this._commandTrailElapsed += delta;
+        for (const sample of this.commandTrail) sample.age += delta;
+        this.commandTrail = this.commandTrail.filter((sample) => sample.age < BAT_COMMAND_VISUAL_CONFIG.trailLifetime);
+        while (this._commandTrailElapsed >= BAT_COMMAND_VISUAL_CONFIG.trailInterval) {
+            this._commandTrailElapsed -= BAT_COMMAND_VISUAL_CONFIG.trailInterval;
+            this.commandTrail.push({ point: this.position.clone(), age: 0 });
+            if (this.commandTrail.length > BAT_COMMAND_VISUAL_CONFIG.trailLength) this.commandTrail.shift();
+        }
     }
 
     _integrateFlutter(delta) {
@@ -135,6 +194,7 @@ export class BatProjectile extends Projectile {
             this._bite(target, simulation);
             if (!this._repeatBite) {
                 this.isExpired = true;
+                this._settle();
                 return;
             }
         }
@@ -153,18 +213,24 @@ export class BatProjectile extends Projectile {
         const normal = this._getContactNormal(target);
         const contactPoint = Vector2.add(target.position, normal.clone().scale(target.radius));
         const damageResult = this._dealBiteDamage(target, simulation);
+        if (this.commandCycle) {
+            this._commandBites += 1;
+            this._commandTerminalBites += target.id === this.commandTerminalTargetId ? 1 : 0;
+            this._commandActualDamage += damageResult.actualDamage;
+            this._commandActualHealing += damageResult.healedAmount;
+        }
         this._spawnBiteFeedback(contactPoint, normal, simulation);
         simulation.playSound("hit");
         simulation.addLog(
             `${this.owner.name}'s bat drains ${target.name} for ${damageResult.actualDamage} and heals ${damageResult.healedAmount}.`
         );
 
+        if (damageResult.actualDamage > 0) {
+            this._ability?.onBatBite(target, contactPoint, this);
+        }
         if (!this._repeatBite) return;
         this.applyImpulse(normal.clone().scale(BITE_RECOIL_SPEED));
         this._homingLockedUntil = this.time + HOMING_LOCK_DURATION;
-        if (damageResult.actualDamage > 0) {
-            this._ability?.onBatBite(target, contactPoint);
-        }
     }
 
     _getContactNormal(target) {
@@ -216,31 +282,89 @@ export class BatProjectile extends Projectile {
     }
 
     _onExpired(simulation) {
-        if (!this._lifeBurst || this._lifetimeBurstTriggered) return;
-        this._lifetimeBurstTriggered = true;
-        const center = this.position.clone();
-        for (const target of simulation.getEnemiesOf(this.owner)) {
-            const distance = Vector2.subtract(target.position, center).length();
-            if (distance > LIFE_BURST_RADIUS + target.radius) continue;
-            this._ability?.dealVampireDamage(
-                target,
-                this.owner.stats.baseDamage * LIFE_BURST_DAMAGE_MULTIPLIER,
-                "Bat Life Burst"
-            );
+        if (this._lifeBurst && !this._lifetimeBurstTriggered) {
+            this._lifetimeBurstTriggered = true;
+            const center = this.position.clone();
+            for (const target of simulation.getEnemiesOf(this.owner)) {
+                const distance = Vector2.subtract(target.position, center).length();
+                if (distance > LIFE_BURST_RADIUS + target.radius) continue;
+                const result = this._ability?.dealVampireDamage(
+                    target,
+                    this.owner.stats.baseDamage * LIFE_BURST_DAMAGE_MULTIPLIER,
+                    "Bat Life Burst"
+                );
+                if (this.commandCycle && result) {
+                    this._commandActualDamage += result.actualDamage;
+                    this._commandActualHealing += result.healedAmount;
+                }
+            }
+            simulation.entities.push(new BloodBatBurstEffect(center, LIFE_BURST_RADIUS));
+            simulation.spawnParticleBurst(center, "#8d1235", {
+                count: 9,
+                speed: 125,
+                radiusMin: 1,
+                radiusMax: 3,
+                gravity: 180
+            });
         }
-        simulation.entities.push(new BloodBatBurstEffect(center, LIFE_BURST_RADIUS));
-        simulation.spawnParticleBurst(center, "#8d1235", {
-            count: 9,
-            speed: 125,
-            radiusMin: 1,
-            radiusMax: 3,
-            gravity: 180
+        this._settle();
+    }
+
+    _settle() {
+        if (this._settled) return;
+        this._settled = true;
+        this.onSettled?.({
+            commandGuided: this.commandGuided,
+            bites: this._commandBites,
+            terminalBites: this._commandTerminalBites,
+            actualDamage: this._commandActualDamage,
+            actualHealing: this._commandActualHealing,
+            waypointsReached: this._commandWaypointsReached
         });
     }
 
     draw(ctx) {
+        this._drawCommandTrail(ctx);
         this._drawRecoilTrail(ctx);
         this._drawBat(ctx);
+        this._drawCommandMarker(ctx);
+    }
+
+    _drawCommandTrail(ctx) {
+        if (!this.commandGuided) return;
+        const config = BAT_COMMAND_VISUAL_CONFIG;
+        ctx.save();
+        if (this.commandTrail.length > 1) {
+            ctx.strokeStyle = config.color;
+            ctx.lineWidth = config.lineWidth;
+            ctx.setLineDash(config.dash);
+            for (const [index, sample] of this.commandTrail.slice(1).entries()) {
+                const previous = this.commandTrail[index];
+                ctx.globalAlpha = Math.max(0, 1 - previous.age / config.trailLifetime);
+                ctx.beginPath();
+                ctx.moveTo(previous.point.x, previous.point.y);
+                ctx.lineTo(sample.point.x, sample.point.y);
+                ctx.stroke();
+            }
+        }
+        ctx.restore();
+    }
+
+    _drawCommandMarker(ctx) {
+        if (!this.commandGuided) return;
+        const config = BAT_COMMAND_VISUAL_CONFIG;
+        ctx.save();
+        ctx.setLineDash([]);
+        ctx.strokeStyle = config.color;
+        ctx.lineWidth = config.outlineWidth;
+        ctx.beginPath();
+        ctx.arc(this.position.x, this.position.y, this.radius + 2, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = config.color;
+        ctx.beginPath();
+        ctx.arc(this.position.x, this.position.y, config.waypointRadius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
     }
 
     _drawRecoilTrail(ctx) {

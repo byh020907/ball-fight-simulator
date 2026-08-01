@@ -142,7 +142,7 @@ Grenade는 cooldown ready인 `abilityCommandEnabled` opt-in의 focal·비자동 
 
 `METRICS_ABILITY_TIERS`는 0~3 정수의 쉼표 목록이고 기본값은 `0`이다. 중복은 첫 등장 순서를 유지해 제거한다. 예를 들어 `METRICS_ABILITY_TIERS=0,3`과 두 prototype 플래그를 함께 지정하면 각 stage의 `ability tier=0`과 `ability tier=3` 블록을 모두 출력한다. focal player의 실제 `progression.abilityTier`만 첫 update 전에 설정하므로 상대와 roster 원본은 바꾸지 않는다.
 
-능력 result는 공통 attempts/match·성공률 뒤에 recorder가 기록한 value만 요약한다. Rage는 충전·피해·조기 초기화, Archer는 벽/계획 구간·경과·후속 화살 표본과 적중률, Hero는 방출/회수/방패/회복과 총 회수율, Phantom은 안전 출현/기본 적중/연쇄/종결 적중, Bat Ball은 Slash·Wall Slam·첫 벽 거리·HOME RUN·RESET, Eater는 소화·Spit Impact·Wall Slam·파열, Elementalist는 회수·레시피·잠금·채널, Grenade는 유도·점착·homing·낭비 폭발·실제 피해를 표시한다. 빈 표본은 0으로 표시하며, 이 계측은 게임 판정이나 수치를 다시 계산하지 않는다.
+능력 result는 공통 attempts/match·성공률 뒤에 recorder가 기록한 value만 요약한다. Rage는 충전·피해·조기 초기화, Archer는 벽/계획 구간·경과·후속 화살 표본과 적중률, Hero는 방출/회수/방패/회복과 총 회수율, Phantom은 안전 출현/기본 적중/연쇄/종결 적중, Bat Ball은 Slash·Wall Slam·첫 벽 거리·HOME RUN·RESET, Eater는 소화·Spit Impact·Wall Slam·파열, Elementalist는 회수·레시피·잠금·채널, Grenade는 유도·점착·homing·낭비 폭발·실제 피해, Gunner는 첫 탄·피니셔·재사격, Vampire는 선두/전체/terminal 물기·혈흔·파열·실제 피해와 회복을 표시한다. 빈 표본은 0으로 표시하며, 이 계측은 게임 판정이나 수치를 다시 계산하지 않는다.
 
 ### 관측 필드
 
@@ -172,3 +172,11 @@ Gunner가 cooldown ready인 focal 수동 플레이어이고 command resource가 
 명령 burst에서는 첫 탄과 현재 tier에서 원래 성립하는 마지막 피니셔만 첫 예측 구간 방향을 따른다. 나머지 탄은 기존 360도 무작위 방향을 유지한다. Lv.6 이상에서 명령 burst의 탄을 회수한 경우, 계획 반사점이 있으면 그 첫 지점을 향해 재사격하고 실제 첫 반사 뒤 살아 있는 terminal 적을 우선 재조준한다. 반사점 또는 terminal 적이 없으면 기존 최근접 적 정책으로 돌아간다.
 
 유도탄에는 `#8df7ff` 3px 점선 trail과 projectile 중심 외곽 ring이 붙는다. 기본탄의 yellow core, 피니셔의 pink core, 재사격의 teal core는 유지하며, hit·회수·수명 만료·재사격 종료에서 tracer는 즉시 정산·제거된다. 일반 Bullet 및 turret shot은 명령 metadata가 없으므로 시각·수명주기 동작이 바뀌지 않는다.
+
+# Vampire: 혈로
+
+Vampire가 cooldown ready인 focal 수동 플레이어이고 command resource가 있으면 다음 자동 박쥐 떼 전에 0.8초의 `혈로` 입력창을 연다. 유효 release는 기존 7마리 박쥐를 즉시 발사하면서 `default-shot` 본체 이동도 그대로 실행한다. 가운데 선두 박쥐 한 마리만 예측 경로의 각 endpoint를 44px 합류점으로 순서대로 따라가고, 경로가 끝나면 예측 terminal에서 실제로 선택된 적을 우선 추적한다. terminal 적이 사라지면 기존 최근접 적 추적으로 돌아간다.
+
+나머지 6마리는 기존 40도 산개·Boids·최근접 적 추적을 유지한다. 계획 반사는 선두의 합류점만 늘리며 박쥐 7마리·발사 속도 ×0.5·수명 3.25~4.75초·최대 속도 ×1.5·물기/반동/수명 폭발/180 견인/0.6초 혈흔/×0.15 파열·흡혈 수치를 늘리지 않는다. timeout·cancel·dead-zone·flag off·AI/automated·비포컬·자원 없음은 자원과 command result 없이 기존 자동 박쥐 떼를 한 번 발사한다.
+
+선두만 `#ff6f91` 2px 외곽선과 중심점, 최근 14개 샘플의 3px 점선 `[6, 5]` trail을 사용한다. trail은 0.04초 간격으로 기록되고 각 구간은 0.32초 안에 사라진다. 합류점 진입은 `#ff315f` 공용 pulse로 한 번 표시하며 피해를 만들지 않는다. `vampire-command-blood-route`는 7마리가 정산된 뒤 tier, 전체/정산 박쥐, 선두/전체/terminal 물기, 혈흔, 본체 파열, 실제 피해·회복, 계획 구간·반사, 경과와 종료 이유를 한 번 기록한다. 선택 terminal에 실제 피해를 준 물기가 한 번 이상일 때 성공이다.

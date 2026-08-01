@@ -207,6 +207,27 @@ assert.match(
     /유도 2.00\/2.00발/
 );
 
+assert.match(
+    formatAbilityResult("vampire-command-blood-route", {
+        attemptsPerMatch: 1,
+        successRate: 1,
+        values: [
+            {
+                leadBites: 1,
+                terminalBites: 1,
+                totalBites: 2,
+                bloodMarks: 1,
+                ruptures: 1,
+                actualDamage: 10,
+                actualHealing: 7,
+                plannedBounces: 1,
+                elapsed: 2
+            }
+        ]
+    }),
+    /선두 1.00회/
+);
+
 assert.doesNotMatch(
     formatAbilityResult("unknown", { attemptsPerMatch: Infinity, successRate: NaN, values: [null] }),
     /NaN|Infinity/
