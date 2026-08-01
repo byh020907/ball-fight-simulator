@@ -1,4 +1,13 @@
 import { Projectile, Vector2 } from "../core.js";
+import { getVisibleLineWidth } from "../game-kit/canvas/effectVisibility.js";
+
+export const GUNNER_COMMAND_VISUAL_CONFIG = Object.freeze({
+    color: "#8df7ff",
+    trailLength: 12,
+    lineWidth: 3,
+    dash: Object.freeze([6, 4]),
+    ringPadding: 5
+});
 
 export class BulletProjectile extends Projectile {
     constructor(
@@ -26,6 +35,13 @@ export class BulletProjectile extends Projectile {
         this.retargetConsumed = false;
         this.isRefire = options.isRefire ?? false;
         this.turretShot = options.turretShot ?? false;
+        this.commandGuided = options.commandGuided === true;
+        this.commandCycle = options.commandCycle ?? null;
+        this.commandTerminalTargetId = options.commandTerminalTargetId ?? null;
+        this.commandShotIndex = options.commandShotIndex ?? null;
+        this.onSettled = typeof options.onSettled === "function" ? options.onSettled : null;
+        this.commandTrail = this.commandGuided ? [this.position.clone()] : [];
+        this._settled = false;
         this.age = 0;
         this._trail = [];
         this._bounceCount = 0;
@@ -41,6 +57,7 @@ export class BulletProjectile extends Projectile {
         if (bounced) {
             this._bounceCount++;
             if (!this.canBounce) {
+                this._settle({ collected: false, hit: false, targetId: null, actualDamage: 0 });
                 this.isExpired = true;
                 return;
             }
@@ -56,15 +73,21 @@ export class BulletProjectile extends Projectile {
         this.angle = Math.atan2(this.velocity.y, this.velocity.x);
         this._hitCheck(simulation);
         if (!this.isExpired && this.age >= 0.08) this._ownerCollectCheck(simulation);
+        if (this.commandGuided) this._recordCommandTrail();
     }
 
     _retargetAfterRicochet(simulation) {
-        const target = simulation.getEnemiesOf(this.owner).reduce((nearest, candidate) => {
-            if (!nearest) return candidate;
-            const candidateDistance = Vector2.subtract(candidate.position, this.position).length();
-            const nearestDistance = Vector2.subtract(nearest.position, this.position).length();
-            return candidateDistance < nearestDistance ? candidate : nearest;
-        }, null);
+        const terminal = simulation
+            .getEnemiesOf(this.owner)
+            .find((candidate) => candidate.id === this.commandTerminalTargetId && !candidate.flags.defeated);
+        const target =
+            terminal ??
+            simulation.getEnemiesOf(this.owner).reduce((nearest, candidate) => {
+                if (!nearest) return candidate;
+                const candidateDistance = Vector2.subtract(candidate.position, this.position).length();
+                const nearestDistance = Vector2.subtract(nearest.position, this.position).length();
+                return candidateDistance < nearestDistance ? candidate : nearest;
+            }, null);
         this.retargetConsumed = true;
         this.canBounce = false;
         if (!target) return;
@@ -80,6 +103,7 @@ export class BulletProjectile extends Projectile {
         const dist = Vector2.subtract(this.position, this.owner.position).length();
         if (dist > this.owner.radius + this.radius) return;
         if (!this.canCollect) {
+            this._settle({ collected: false, hit: false, targetId: null, actualDamage: 0 });
             this.isExpired = true;
             return;
         }
@@ -91,6 +115,7 @@ export class BulletProjectile extends Projectile {
             simulation.playSound("shoot", 0.4);
         }
         ability?.onBulletCollected?.(this, simulation);
+        this._settle({ collected: true, hit: false, targetId: null, actualDamage: 0 });
         this.isExpired = true;
     }
 
@@ -104,7 +129,19 @@ export class BulletProjectile extends Projectile {
         return this.isFinisher ? "Finisher" : "Bullet";
     }
 
-    _onHitEffects(target, simulation) {
+    _projectileHitCheck(simulation) {
+        const target = this._findTarget(simulation);
+        if (!target || target.flags.defeated) return;
+        const distance = Vector2.subtract(this.position, target.position).length();
+        if (distance > target.radius + this.radius) return;
+        const hpBefore = target.hp;
+        this.dealDamageToTarget(target, this._getHitDamage(), this.owner, this._getHitLabel(), simulation);
+        const actualDamage = Math.max(0, hpBefore - target.hp);
+        this._onHitEffects(target, simulation, actualDamage);
+        this.isExpired = true;
+    }
+
+    _onHitEffects(target, simulation, actualDamage) {
         simulation.spawnSlash(
             this.position.clone(),
             Vector2.add(
@@ -123,10 +160,33 @@ export class BulletProjectile extends Projectile {
         } else {
             simulation.spawnExplosion(this.position.clone(), "#ffdd44");
         }
+        if (this.commandGuided) simulation.spawnPulse(this.position.clone(), GUNNER_COMMAND_VISUAL_CONFIG.color);
         simulation.playSound("hit", this.isFinisher ? 0.9 : 0.5);
+        this._settle({ collected: false, hit: true, targetId: target.id, actualDamage });
+    }
+
+    _onExpired() {
+        this._settle({ collected: false, hit: false, targetId: null, actualDamage: 0 });
+    }
+
+    _recordCommandTrail() {
+        this.commandTrail.push(this.position.clone());
+        if (this.commandTrail.length > GUNNER_COMMAND_VISUAL_CONFIG.trailLength) this.commandTrail.shift();
+    }
+
+    _settle(outcome) {
+        if (this._settled) return;
+        this._settled = true;
+        this.onSettled?.({
+            ...outcome,
+            isFinisher: this.isFinisher,
+            isRefire: this.isRefire,
+            commandShotIndex: this.commandShotIndex
+        });
     }
 
     draw(ctx) {
+        if (this.commandGuided) this._drawCommandTracer(ctx);
         if (this._trail.length > 1) {
             const trailColor = this.isRefire ? "#66f2e2" : this.isFinisher ? "#ff4488" : "#ffdd44";
             for (let index = 0; index < this._trail.length - 1; index++) {
@@ -161,6 +221,30 @@ export class BulletProjectile extends Projectile {
         ctx.beginPath();
         ctx.arc(-1, -1, this.radius * 0.4, 0, Math.PI * 2);
         ctx.fill();
+        ctx.restore();
+    }
+
+    _drawCommandTracer(ctx) {
+        const config = GUNNER_COMMAND_VISUAL_CONFIG;
+        if (this.commandTrail.length > 1) {
+            ctx.save();
+            ctx.strokeStyle = config.color;
+            ctx.lineWidth = getVisibleLineWidth(ctx, "standard", config.lineWidth);
+            ctx.setLineDash(config.dash);
+            ctx.beginPath();
+            this.commandTrail.forEach((point, index) => {
+                if (index === 0) ctx.moveTo(point.x, point.y);
+                else ctx.lineTo(point.x, point.y);
+            });
+            ctx.stroke();
+            ctx.restore();
+        }
+        ctx.save();
+        ctx.strokeStyle = config.color;
+        ctx.lineWidth = getVisibleLineWidth(ctx, "standard", config.lineWidth);
+        ctx.beginPath();
+        ctx.arc(this.position.x, this.position.y, this.radius + config.ringPadding, 0, Math.PI * 2);
+        ctx.stroke();
         ctx.restore();
     }
 }

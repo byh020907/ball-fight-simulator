@@ -185,6 +185,28 @@ for (const [type, result, expected] of formatterCases) {
     assert.doesNotMatch(text, /NaN|Infinity/);
 }
 
+assert.match(
+    formatAbilityResult("gunner-command-tracer-line", {
+        attemptsPerMatch: 1,
+        successRate: 1,
+        values: [
+            {
+                guidedLaunched: 2,
+                guidedPlanned: 2,
+                settledProjectiles: 8,
+                totalBullets: 8,
+                firstShotHit: true,
+                finisherHit: true,
+                refireHits: 1,
+                actualDamage: 30,
+                plannedBounces: 1,
+                elapsed: 2
+            }
+        ]
+    }),
+    /유도 2.00\/2.00발/
+);
+
 assert.doesNotMatch(
     formatAbilityResult("unknown", { attemptsPerMatch: Infinity, successRate: NaN, values: [null] }),
     /NaN|Infinity/

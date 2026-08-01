@@ -15,6 +15,7 @@ const KNOCKBACK_STRENGTH = 0.25;
 const KNOCKBACK_DURATION = 0.15;
 const FINISHER_CHARGE_DURATION = 0.16;
 const TURRET_STACK_REQUIREMENT = 20;
+const COMMAND_WINDOW_DURATION = 0.8;
 
 export class GunnerAbility extends BurstSequencer(Ability) {
     constructor(owner, simulation) {
@@ -30,6 +31,10 @@ export class GunnerAbility extends BurstSequencer(Ability) {
         };
         this.turretMovementMode = "fixed";
         this.finisherCharge = null;
+        this.commandWindow = null;
+        this.preparedCommand = null;
+        this.commandCycles = new Map();
+        this.activeCommandCycle = null;
     }
 
     update(delta, target) {
@@ -39,11 +44,36 @@ export class GunnerAbility extends BurstSequencer(Ability) {
         if (this.isBursting) {
             this.state.spinAngle = time * 12;
             this.tickBurst(delta, () => this._fireBurstBullet());
+            this._finalizeCommandCycles();
             return;
         }
 
         this.tickCooldown(delta);
+        this._finalizeCommandCycles();
+        if (this.commandWindow) {
+            const aiming = this.simulation.dragCombat?.input?.state === "aiming";
+            if (aiming) this.commandWindow.wasAiming = true;
+            const fallbackTarget = this._getFallbackTarget(target);
+            if (!this._canAcceptPlayerCommand() || !fallbackTarget || (!aiming && this.commandWindow.wasAiming)) {
+                this.commandWindow = null;
+                if (fallbackTarget) {
+                    this.resetCooldown(this.cooldown);
+                    this._startBurst();
+                }
+                return;
+            }
+            if (!aiming) this.commandWindow.remaining = Math.max(0, this.commandWindow.remaining - delta);
+            if (aiming || this.commandWindow.remaining > 0) return;
+            this.commandWindow = null;
+            this.resetCooldown(this.cooldown);
+            this._startBurst();
+            return;
+        }
         if (this.cooldownReady && target) {
+            if (this._canAcceptPlayerCommand()) {
+                this.commandWindow = { target, remaining: COMMAND_WINDOW_DURATION, wasAiming: false };
+                return;
+            }
             this.resetCooldown(this.cooldown);
             this._startBurst();
         }
@@ -78,9 +108,13 @@ export class GunnerAbility extends BurstSequencer(Ability) {
 
         const hand = isFinisher ? this.finisherCharge.hand : this.state.gunHand;
         const muzzle = this._getGunPosition(hand);
-        const direction = isFinisher
-            ? this.finisherCharge.direction
-            : Vector2.fromAngle(Math.random() * Math.PI * 2, 1);
+        const cycle = this.activeCommandCycle;
+        const guided = Boolean(cycle && (this.state.burstIndex === 0 || isFinisher));
+        const direction = guided
+            ? cycle.direction.clone()
+            : isFinisher
+              ? this.finisherCharge.direction
+              : Vector2.fromAngle(Math.random() * Math.PI * 2, 1);
         if (isFinisher) this.finisherCharge = null;
 
         const speed = owner.stats.baseSpeed * BULLET_SPEED_MULT;
@@ -92,12 +126,23 @@ export class GunnerAbility extends BurstSequencer(Ability) {
             finalMult,
             isFinisher,
             cdReduction,
-            this
+            this,
+            {
+                commandGuided: guided,
+                commandCycle: cycle,
+                commandShotIndex: this.state.burstIndex,
+                commandTerminalTargetId: cycle?.targetId ?? null,
+                onSettled: cycle ? (outcome) => this._recordBulletOutcome(cycle, outcome) : null
+            }
         );
         this.state.activeBullets = this.state.activeBullets.filter((b) => !b.isExpired);
         this.state.activeBullets.push(bullet);
         this.state.activeBullets = enforceActiveEntityLimit(this.state.activeBullets, MAX_FIELD_BULLETS);
         this.simulation.entities.push(bullet);
+        if (guided) {
+            if (isFinisher) cycle.finisherEligible = true;
+            cycle.guidedLaunched += 1;
+        }
 
         this.simulation.spawnSlash(
             muzzle.clone(),
@@ -119,6 +164,10 @@ export class GunnerAbility extends BurstSequencer(Ability) {
         if (isFinisher) {
             this.simulation.addLog(`${owner.name} lands a full burst!`);
         }
+        if (this.state.burstIndex >= bulletCount && cycle) {
+            cycle.launchComplete = true;
+            if (this.activeCommandCycle === cycle) this.activeCommandCycle = null;
+        }
         return BURST_RESULTS.FIRED;
     }
 
@@ -132,7 +181,8 @@ export class GunnerAbility extends BurstSequencer(Ability) {
 
     _beginFinisherCharge() {
         const hand = this.state.gunHand;
-        const direction = Vector2.fromAngle(Math.random() * Math.PI * 2, 1);
+        const cycle = this.activeCommandCycle;
+        const direction = cycle?.direction?.clone() ?? Vector2.fromAngle(Math.random() * Math.PI * 2, 1);
         const muzzle = this._getGunPosition(hand);
         this.finisherCharge = { hand, direction };
         this._burstTimer = FINISHER_CHARGE_DURATION;
@@ -155,13 +205,17 @@ export class GunnerAbility extends BurstSequencer(Ability) {
         this.state.collectionStacks += 1;
         if (this.state.collectionStacks < TURRET_STACK_REQUIREMENT) return;
         this.state.collectionStacks = 0;
-        this._deployTurret(simulation);
+        this._deployTurret(simulation, bullet.commandCycle);
     }
 
     _spawnRefire(sourceBullet, simulation) {
-        const target = simulation.getNearestEnemy(this.owner);
+        const cycle = sourceBullet.commandCycle;
+        const target = cycle
+            ? this._getCommandRefireTarget(sourceBullet, simulation, cycle)
+            : simulation.getNearestEnemy(this.owner);
         if (!target) return;
-        const direction = Vector2.subtract(target.position, this.owner.position);
+        const anchor = cycle?.bouncePoints?.[0];
+        const direction = Vector2.subtract(anchor ?? target.position, this.owner.position);
         if (direction.length() <= 0.001) return;
         direction.normalize();
         const start = Vector2.add(this.owner.position, direction.clone().scale(this.owner.radius + 10));
@@ -179,16 +233,184 @@ export class GunnerAbility extends BurstSequencer(Ability) {
                 canRefire: false,
                 canStack: false,
                 isRefire: true,
-                retargetAfterBounce: Boolean(this.getLevelUpgrade().ricochetReload)
+                retargetAfterBounce: Boolean(this.getLevelUpgrade().ricochetReload),
+                commandGuided: Boolean(cycle),
+                commandCycle: cycle,
+                commandTerminalTargetId: cycle?.targetId ?? null,
+                onSettled: cycle ? (outcome) => this._recordBulletOutcome(cycle, outcome) : null
             }
         );
+        if (cycle) cycle.refiresLaunched += 1;
         this.state.activeBullets.push(bullet);
         simulation.entities.push(bullet);
         simulation.spawnPulse(this.owner.position.clone(), "#66f2e2");
         simulation.playSound("shoot", 0.65);
     }
 
-    _deployTurret(simulation) {
+    getCommandState() {
+        if (!this._canAcceptPlayerCommand()) return { available: false, reserveResource: false };
+        return { available: Boolean(this.commandWindow), reserveResource: !this.commandWindow };
+    }
+
+    prepareCommand(intent) {
+        if (!this.commandWindow || !this._isCommandEligible()) return intent;
+        const direction = this._getCommandDirection(intent);
+        this.preparedCommand = {
+            ...intent,
+            direction: { x: direction.x, y: direction.y },
+            pathSegments: intent.pathSegments ?? [],
+            bouncePoints: intent.bouncePoints ?? [],
+            target: this.commandWindow.target
+        };
+        this.commandWindow = null;
+        return this.preparedCommand;
+    }
+
+    resolveCommandLaunch(intent) {
+        const command = this.preparedCommand;
+        this.preparedCommand = null;
+        if (!command || command.sequence !== intent?.sequence) return { mode: "default-shot" };
+        const cycle = {
+            commandSequence: command.sequence,
+            direction: new Vector2(command.direction.x, command.direction.y),
+            targetId: command.target.id,
+            bouncePoints: command.bouncePoints.map((point) => ({ ...point })),
+            totalBullets: 0,
+            guidedPlanned: 0,
+            guidedLaunched: 0,
+            settledProjectiles: 0,
+            firstShotHit: false,
+            finisherEligible: false,
+            finisherHit: false,
+            refiresLaunched: 0,
+            refireHits: 0,
+            terminalTargetHits: 0,
+            collections: 0,
+            turretsDeployed: 0,
+            actualDamage: 0,
+            plannedSegments: command.pathSegments.length,
+            plannedBounces: command.bouncePoints.length,
+            createdAt: command.createdAt ?? this.simulation.elapsed,
+            reason: "pending",
+            launchComplete: false,
+            finalized: false
+        };
+        this.commandCycles.set(command.sequence, cycle);
+        this.activeCommandCycle = cycle;
+        this.resetCooldown(this.cooldown);
+        this._startBurst();
+        cycle.totalBullets = this.state.burstBulletCount;
+        const finisherMinimum = this.getLevelUpgrade().everyBurstFinisher ? MIN_BULLETS : MAX_BULLETS;
+        cycle.guidedPlanned = 1 + (cycle.totalBullets >= finisherMinimum ? 1 : 0);
+        return { mode: "payload-only" };
+    }
+
+    onCommandEnd(event) {
+        if (this.preparedCommand?.sequence === event.commandSequence) this.preparedCommand = null;
+    }
+    onOwnerDefeated() {
+        this._clearPendingCommand();
+        this._finalizeAllCommandCycles("owner-defeat");
+        return false;
+    }
+    onBattleEnded() {
+        this._clearPendingCommand();
+        this._finalizeAllCommandCycles("battle-ended");
+    }
+    _clearPendingCommand() {
+        this.commandWindow = null;
+        this.preparedCommand = null;
+        this.activeCommandCycle = null;
+        this._burstRemaining = 0;
+        this._burstTimer = 0;
+        this.finisherCharge = null;
+    }
+    _getFallbackTarget(target) {
+        return this.commandWindow?.target && !this.commandWindow.target.flags.defeated
+            ? this.commandWindow.target
+            : target && !target.flags.defeated
+              ? target
+              : this.simulation.getNearestEnemy(this.owner);
+    }
+    _canAcceptPlayerCommand() {
+        return Boolean(this._isCommandEligible() && this.simulation.commandResource?.canSpend?.());
+    }
+
+    _isCommandEligible() {
+        return Boolean(
+            this.simulation.abilityCommandEnabled &&
+            this.simulation.playerBall === this.owner &&
+            this.simulation.dragCombat &&
+            !this.simulation.dragCombat.automated
+        );
+    }
+    _getCommandDirection(intent) {
+        const point = intent.pathSegments?.[0];
+        const direction = point
+            ? new Vector2(point.x - this.owner.position.x, point.y - this.owner.position.y)
+            : new Vector2(intent.direction?.x ?? 1, intent.direction?.y ?? 0);
+        return direction.length() > 0.001 ? direction.normalize() : new Vector2(1, 0);
+    }
+    _getCommandRefireTarget(sourceBullet, simulation, cycle) {
+        const terminal = simulation
+            .getEnemiesOf(this.owner)
+            .find((target) => target.id === cycle.targetId && !target.flags.defeated);
+        return terminal ?? simulation.getNearestEnemy(this.owner);
+    }
+    _recordBulletOutcome(cycle, outcome) {
+        if (!cycle || cycle.finalized) return;
+        cycle.settledProjectiles += 1;
+        cycle.actualDamage += outcome.actualDamage;
+        cycle.firstShotHit ||= outcome.commandShotIndex === 0 && outcome.hit;
+        cycle.finisherHit ||= outcome.isFinisher && outcome.hit;
+        cycle.refireHits += outcome.isRefire && outcome.hit ? 1 : 0;
+        cycle.terminalTargetHits += outcome.targetId === cycle.targetId && outcome.hit ? 1 : 0;
+        cycle.collections += outcome.collected ? 1 : 0;
+    }
+    _finalizeCommandCycles() {
+        for (const [sequence, cycle] of this.commandCycles)
+            if (cycle.launchComplete && cycle.settledProjectiles >= cycle.totalBullets + cycle.refiresLaunched) {
+                cycle.reason =
+                    cycle.firstShotHit || cycle.finisherHit || cycle.refireHits ? "completed" : "no-guided-hit";
+                this._finalizeCommandCycle(sequence);
+            }
+    }
+    _finalizeAllCommandCycles(reason) {
+        for (const cycle of this.commandCycles.values()) cycle.reason = reason;
+        for (const sequence of [...this.commandCycles.keys()]) this._finalizeCommandCycle(sequence);
+    }
+    _finalizeCommandCycle(sequence) {
+        const cycle = this.commandCycles.get(sequence);
+        if (!cycle || cycle.finalized) return;
+        cycle.finalized = true;
+        this.recordAbilityResult({
+            commandSequence: sequence,
+            resultType: "gunner-command-tracer-line",
+            success: cycle.reason === "completed",
+            value: {
+                totalBullets: cycle.totalBullets,
+                guidedPlanned: cycle.guidedPlanned,
+                guidedLaunched: cycle.guidedLaunched,
+                settledProjectiles: cycle.settledProjectiles,
+                firstShotHit: cycle.firstShotHit,
+                finisherEligible: cycle.finisherEligible,
+                finisherHit: cycle.finisherHit,
+                refiresLaunched: cycle.refiresLaunched,
+                refireHits: cycle.refireHits,
+                terminalTargetHits: cycle.terminalTargetHits,
+                collections: cycle.collections,
+                turretsDeployed: cycle.turretsDeployed,
+                actualDamage: cycle.actualDamage,
+                plannedSegments: cycle.plannedSegments,
+                plannedBounces: cycle.plannedBounces,
+                elapsed: Math.max(0, this.simulation.elapsed - cycle.createdAt),
+                reason: cycle.reason
+            }
+        });
+        this.commandCycles.delete(sequence);
+    }
+
+    _deployTurret(simulation, cycle = null) {
         if (this.state.turret && !this.state.turret.isExpired) {
             this.state.turret.dismiss(simulation);
         }
@@ -206,6 +428,9 @@ export class GunnerAbility extends BurstSequencer(Ability) {
         this.state.turret = turret;
         simulation.entities.push(turret);
         simulation.spawnPulse(position, "#66f2e2");
+        if (cycle && !cycle.finalized && this.commandCycles.get(cycle.commandSequence) === cycle) {
+            cycle.turretsDeployed += 1;
+        }
     }
 
     _findTurretPlacement(direction, simulation) {

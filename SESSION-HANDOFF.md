@@ -4,6 +4,8 @@
 
 ## 현재 기준
 
+- [L2] 2026-08-01 Gunner 수동 드래그는 다음 자동 burst의 첫 탄과 현재 tier에서 성립하는 기존 피니셔만 `트레이서 라인`에 맞춘다. 나머지 탄의 360도 무작위 난사, 6~12발·0.05초 간격·탄속·피해·피니셔 배율·회수 쿨다운·재사격·20스택 포탑 수치는 유지한다. Lv.6 이상에서 이 burst의 탄을 실제 회수하면 계획 반사점이 있을 때 첫 반사점을 재사격 앵커로 쓰고, 첫 실제 벽 반사 뒤 살아 있는 terminal 적을 우선 재조준한다. 계획 반사는 유도탄 수나 피해를 늘리지 않는다. 실제 Canvas 4프레임에서 계획 반사 3회→guided 2/random 4→회수 refire의 실제 벽 재조준→projectile 0/result 1 정산을 확인했다.
+
 - [L2] 2026-08-01 Grenade 수동 드래그는 다음 자동 Scatter burst의 총 발수·퓨즈·피해를 유지한 채 `폭격선`을 지정한다. focal·비자동·resource 보유 상태에서 0.8초 입력창을 열고, 유효 release는 범용 몸체 발사 없이 첫 1발과 계획 반사 1회당 추가 1발(최대 burst 총 발수)만 같은 초기 방향으로 유도한다. 남은 탄은 기존 360도 무작위 살포를 유지하며, 유도탄은 실제 이동 경로에 금색 점선 잔상·외곽 링을 남긴다. 실제 Canvas 4프레임에서 계획 반사 2회→유도 3/무작위 2발→Arena 실제 벽 반사→금색 기폭 pulse와 entity 제거를 확인했다.
 
 - 개발·검증·문서 수명주기: [`docs/development-rules.md`](docs/development-rules.md)
@@ -40,6 +42,12 @@
 - `.codex-remote-attachments/`는 사용자 자료이므로 추적·삭제하지 않습니다.
 
 ## 활성 결정
+
+## [L2] 2026-08-01 — Gunner 드래그를 다음 burst의 트레이서 라인으로 연결한다
+
+- 배경: 실제 6~12발·0.05초 연사·현행 탄속/피해/회수/재사격 물리를 사용한 BattleSimulation 400회에서 tier 0 기존 360도 무작위 burst는 적중 성공률 68.0%·평균 1.09회 적중·평균 피해 12.2였다. 전탄을 ±45도 축에 모으면 성공률 91.0%·평균 피해 26.2로 과증폭됐지만, 첫 탄과 기존 피니셔만 경로에 고정하면 성공률 88.0%·평균 피해 19.3이었다. tier 3에서도 같은 제한안은 평균 8.87발 중 정확히 2발만 유도하면서 평균 피해 53.2→65.2, 실제 회수 스택 3.10→2.88로 난사 적중과 회수·포탑 루프 사이의 교환을 남겼다.
+- 결정: 자동 360도 난사·6~12발·0.05초 간격·탄속·발수 기반 피해·기존 피니셔 성립 조건/2배·회수 쿨다운·재사격·첫 반사 재조준·20스택 8초 포탑을 그대로 둔다. cooldown ready인 focal·비자동·자원 보유 플레이어에게만 0.8초 `트레이서 라인` 입력창을 열고, 유효 release는 payload-only로 다음 burst의 첫 탄과 현재 tier에서 성립하는 기존 피니셔만 첫 유효 예측 구간 방향에 맞춘다. 나머지 탄은 기존 360도 무작위 방향을 사용한다. Lv.6 이상에서 이 command burst의 탄을 회수하면 계획 반사점이 있을 때 첫 반사점을 재사격 앵커로 사용하고 첫 실제 벽 반사 뒤 살아 있는 terminal 적을 우선 재조준하며, 반사점이 없으면 terminal 적을 직접 우선한다. terminal 적이 없으면 현행 최근접 적 정책으로 돌아간다. 계획 반사는 초기 유도탄 수·총알 수·피해·반사 횟수를 늘리지 않으며 timeout·cancel·dead-zone·flag off·AI·비포컬·자원 없음은 기존 자동 burst를 한 번 실행한다.
+- 영향: `GunnerAbility`의 command window·payload-only burst 방향·회수탄 경로 intent·sequence별 `gunner-command-tracer-line` 결과, `BulletProjectile`의 opt-in 정산 콜백과 청록 tracer 외곽/점선 trail, metrics/회귀/숨김 opt-in 문서. 성공은 첫 탄·피니셔·해당 회수 재사격 중 하나가 실제 hostile에게 피해를 준 경우이며 총/유도/정산 탄수, 첫 탄·피니셔·재사격 적중, terminal 적중, 회수·포탑 배치, 계획 구간·반사, 실제 피해, 경과·종료 이유를 한 번 기록한다. `.handoffs/evidence/gunner-tracer-line/`의 actual-module Canvas 4프레임으로 계획 반사 3회, guided 2/random 4, refire 실제 벽 재조준, projectile 0/result 1 정산을 확인했다. 기본 앱·공개 도움말·패치노트는 바꾸지 않는다.
 
 ## [L1] 2026-07-31 — 객체 설계의 최우선 기준을 Is-A / Has-A / Can-Do로 고정한다
 
@@ -82,9 +90,9 @@
 - 배경: 전역 커맨드 자원 프로토타입은 5시드·동굴/숲/사막·직선/반사 정책 평균에서 경기당 드래그를 8.3회에서 2.3회, 직접 드래그 피해 비중을 22.6%에서 9.0%로 낮췄지만, Rage는 27.6%로 여전히 높고 Orbit은 1.0%에 그치는 등 캐릭터별 의미 편차가 남았다. Hero·Orbit·Spin 같은 지속형 능력은 기존 ability-use 계측에서 미사용 100%로 오인되는 구조도 확인됐다.
 - 결정: 자동 능력을 기본 정체성으로 유지하고 드래그는 능력의 조준·충전 캐시아웃·충돌 경로·설치/표식 결과를 결정하는 저빈도 커맨드 계층으로 개편한다. 범용 직접 피해보다 반사 경로·설치·회수·후속 순서를 보상하며, cooldown reset 일괄 계측 대신 캐릭터별 의미 있는 `ability-result`를 `commandSequence`와 연결한다. 구현은 공통 경계와 Rage/Archer를 먼저 검증·커밋한 뒤 Hero/Phantom을 순차 적용하고, 네 대표 vertical slice가 통과하기 전 나머지 10종과 HUD·기본 앱 활성화로 확장하지 않는다.
 - 영향: `BattleMetrics`, `Ability`/`AbilitySet`, 드래그 커맨드 수명주기, Rage·Archer·Hero·Phantom 능력, 동일 시드 비교 스크립트와 회귀 테스트. 전체 제안과 캐릭터별 후속안은 `.omx/plans/drag-ability-roster-redesign.md`에 유지한다.
-- 구현 상태: 공통 `ability-result` 계측, primary ability 커맨드 훅, 별도 `commandSequence`, 3초/능력 주기/전투 종료 정리, opt-in 플래그를 먼저 적용했다. Rage·Archer·Hero·Phantom·Orbit·Spin·Trickster·Bat Ball·Dash·Eater·Elementalist·Grenade까지 12종을 순차 구현했다. Grenade는 0.8초 `폭격선`에서 첫 1발+계획 반사당 1발만 유도하고 나머지 Scatter를 유지하며, 모든 command 수류탄 기폭과 종료 이유를 sequence별로 결산한다. Eater는 삼킨 대상의 기존 0.72초 hold 안에서만 `Aim Spit` 조준을 열고, replace-shot 릴리스의 첫 유효 절대 경로 endpoint로 기존 spit·Spit Dash·Wall Slam 방향만 바꾼다. timeout·cancel·비적격 경로는 기존 자동 spit을 한 번 실행하며, 실제 첫 Wall Slam 피해·tier 3 파열만 `eater-command-spit-route`로 결산한다.
+- 구현 상태: 공통 `ability-result` 계측, primary ability 커맨드 훅, 별도 `commandSequence`, 3초/능력 주기/전투 종료 정리, opt-in 플래그를 먼저 적용했다. Rage·Archer·Hero·Phantom·Orbit·Spin·Trickster·Bat Ball·Dash·Eater·Elementalist·Grenade·Gunner까지 13종을 순차 구현했다. Gunner는 0.8초 `트레이서 라인`에서 첫 탄과 기존 피니셔만 유도하고, command burst의 Lv.6 회수 재사격은 첫 계획 반사점과 살아 있는 terminal 적을 우선한다. 모든 command 탄과 파생 refire는 hit·회수·수명·반사 종료를 sequence별로 실제 피해와 함께 결산한다. Grenade는 첫 1발+계획 반사당 1발만 유도하고 나머지 Scatter를 유지한다. Eater는 삼킨 대상의 기존 0.72초 hold 안에서만 `Aim Spit` 조준을 열고 기존 spit·Spit Dash·Wall Slam 방향만 바꾼다.
 - 구현 상태 보강: 계측 스크립트는 `standard`/`long` profile과 `METRICS_ABILITY_TIERS`(0~3)를 순수 구성으로 해석하고, match 직후 focal `progression.abilityTier`만 설정한다. tier 0은 기존 시드·stage 순서를 유지하며, Rage·Archer·Hero·Phantom·Orbit result value를 재계산 없이 표시한다. Orbit은 전탄 입력창의 payload-only 고정 집결 volley와 sequence별 결과 결산을 숨김 opt-in으로 적용했다.
-- 열린 리스크/다음: Trickster tier 3의 표식→Seed Burst 연결은 10시드에서 9.1~26.7%로 낮고, Bat Ball 일반 자동 정책은 벽을 의도적으로 고르지 못해 호출 타구 Wall Slam 성공이 0%였다. 두 능력 모두 피해 수치를 올리기보다 실제 모바일 조작감과 능력별 목적을 이해하는 조작 정책으로 숙련 보상이 나타나는지 먼저 확인한다. 남은 Gunner·Vampire 2종은 같은 시뮬레이션→단일 메커닉→독립 검증 순서로 진행한다.
+- 열린 리스크/다음: Trickster tier 3의 표식→Seed Burst 연결은 10시드에서 9.1~26.7%로 낮고, Bat Ball 일반 자동 정책은 벽을 의도적으로 고르지 못해 호출 타구 Wall Slam 성공이 0%였다. 두 능력 모두 피해 수치를 올리기보다 실제 모바일 조작감과 능력별 목적을 이해하는 조작 정책으로 숙련 보상이 나타나는지 먼저 확인한다. 남은 Vampire 1종은 같은 시뮬레이션→단일 메커닉→독립 검증 순서로 진행한다.
 
 ## [L2] 2026-07-30 — 드래그를 능력 연계형 커맨드로 재설계한다
 

@@ -206,7 +206,8 @@ function runMatch({ seed, characterId, stageId, floor, policy, abilityTier = 0 }
                       dash: ["dash-command-manual-entry"],
                       eater: ["eater-command-spit-route"],
                       elementalist: ["elementalist-command-recall-route"],
-                      grenade: ["grenade-command-bombing-line"]
+                      grenade: ["grenade-command-bombing-line"],
+                      gunner: ["gunner-command-tracer-line"]
                   }[characterId] ?? [])
                 : []
         });
