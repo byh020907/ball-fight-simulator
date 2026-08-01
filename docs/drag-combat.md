@@ -128,13 +128,21 @@ Elementalist는 `abilityCommandEnabled` opt-in의 focal·비자동 플레이어�
 
 예측 terminal이 실제 적 중심 반경 안이고 owner 600px 안이면 그 적을 우선 채널 대상으로 고정하며, 아니면 기존 기억/wet/nearest 선택을 쓴다. route miss는 자원을 소비하고 generic shot 없이 `elementalist-command-recall-route` 실패 결과를 남긴다. cancel·dead-zone은 공통 무소비 규칙을 유지하고 AI·비포컬·flag off·자원 없음은 자동 오브/융합/소유자 회수를 바꾸지 않는다. 성공 회수는 0.36초 동안 선택 오브 위치에서 owner로 이어지는 3px 원소색 tether, 이동 bead와 orb 반경보다 10px 큰 선택 ring을 보인 뒤 기존 2초 채널 VFX를 시작한다.
 
+### Grenade 실험 슬라이스
+
+Grenade는 cooldown ready인 `abilityCommandEnabled` opt-in의 focal·비자동 플레이어가 command resource를 보유할 때만 0.8초 `폭격선` 입력창을 연다. 유효 release는 generic body impulse와 `playerShot` 없이 payload-only로 다음 Scatter burst를 시작한다. 기존 3~5발·0.12초 발사 간격·0.6~3초 순차 퓨즈·탄속·폭발 반경·피해·최대 4회 실제 벽 반사와 tier별 점착·화상·점착 표식 유도는 그대로 유지한다.
+
+첫 발과 계획 반사 1회당 추가 1발, 최대 4발까지만 드래그의 첫 진행 방향으로 발사하며 실제 burst 총 발수가 더 적으면 그 수를 상한으로 삼는다. 나머지는 기존 360도 무작위 살포다. timeout·cancel·dead-zone·flag off·AI/automated·비포컬·자원 없음은 자원과 result 없이 기존 자동 burst를 한 번 실행한다. 유도탄만 `#ffd166` 3px 점선 trail·반경보다 5px 큰 외곽 ring·기폭 pulse를 사용하며, tier 3의 owner 색 곡선 homing trail과 구분한다.
+
+`grenade-command-bombing-line`은 command burst의 모든 수류탄 기폭을 sequence별로 결산한다. 유도탄 폭발 하나 이상이 실제 hostile을 폭발 반경에 포함할 때만 성공이며, 총/계획/발사/정산 탄수, 유도 적중 폭발, 최초 대상 폭발, 점착 접촉, homing 활성, 낭비 폭발, 실제 피해, 계획 구간·반사, 경과와 종료 이유를 한 번 기록한다. owner defeat와 battle end는 이전 적중이 있어도 실패로 종료한다.
+
 ### 능력 티어 장기 계측
 
 `npm run metrics:drag-ability`는 `METRICS_PROFILE=standard`에서 기존 `1 seed / 75 seconds`, `METRICS_PROFILE=long`에서 `10 seeds / 120 seconds`를 기본으로 사용한다. `METRICS_SEEDS`와 `METRICS_MAX_SECONDS`를 지정하면 profile 기본값보다 우선하며, 알 수 없는 profile은 오류로 종료한다.
 
 `METRICS_ABILITY_TIERS`는 0~3 정수의 쉼표 목록이고 기본값은 `0`이다. 중복은 첫 등장 순서를 유지해 제거한다. 예를 들어 `METRICS_ABILITY_TIERS=0,3`과 두 prototype 플래그를 함께 지정하면 각 stage의 `ability tier=0`과 `ability tier=3` 블록을 모두 출력한다. focal player의 실제 `progression.abilityTier`만 첫 update 전에 설정하므로 상대와 roster 원본은 바꾸지 않는다.
 
-능력 result는 공통 attempts/match·성공률 뒤에 recorder가 기록한 value만 요약한다. Rage는 충전·피해·조기 초기화, Archer는 벽/계획 구간·경과·후속 화살 표본과 적중률, Hero는 방출/회수/방패/회복과 총 회수율, Phantom은 안전 출현/기본 적중/연쇄/종결 적중, Bat Ball은 Slash·Wall Slam·첫 벽 거리·HOME RUN·RESET, Eater는 소화·Spit Impact·Wall Slam·파열을 표시한다. 빈 표본은 0으로 표시하며, 이 계측은 게임 판정이나 수치를 다시 계산하지 않는다.
+능력 result는 공통 attempts/match·성공률 뒤에 recorder가 기록한 value만 요약한다. Rage는 충전·피해·조기 초기화, Archer는 벽/계획 구간·경과·후속 화살 표본과 적중률, Hero는 방출/회수/방패/회복과 총 회수율, Phantom은 안전 출현/기본 적중/연쇄/종결 적중, Bat Ball은 Slash·Wall Slam·첫 벽 거리·HOME RUN·RESET, Eater는 소화·Spit Impact·Wall Slam·파열, Elementalist는 회수·레시피·잠금·채널, Grenade는 유도·점착·homing·낭비 폭발·실제 피해를 표시한다. 빈 표본은 0으로 표시하며, 이 계측은 게임 판정이나 수치를 다시 계산하지 않는다.
 
 ### 관측 필드
 

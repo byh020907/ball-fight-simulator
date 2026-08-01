@@ -205,7 +205,8 @@ function runMatch({ seed, characterId, stageId, floor, policy, abilityTier = 0 }
                       bat_ball: ["bat-ball-command-called-shot"],
                       dash: ["dash-command-manual-entry"],
                       eater: ["eater-command-spit-route"],
-                      elementalist: ["elementalist-command-recall-route"]
+                      elementalist: ["elementalist-command-recall-route"],
+                      grenade: ["grenade-command-bombing-line"]
                   }[characterId] ?? [])
                 : []
         });

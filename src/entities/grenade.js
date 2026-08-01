@@ -10,6 +10,13 @@ const EXPLOSION_INNER_RADIUS = 72;
 const STICKY_HOMING_DELAY = 0.5;
 const STICKY_HOMING_TURN_RATE = 2;
 const STICKY_HOMING_TRAIL_LENGTH = 8;
+export const GRENADE_COMMAND_VISUAL_CONFIG = Object.freeze({
+    color: "#ffd166",
+    trailLength: 10,
+    lineWidth: 3,
+    dash: Object.freeze([4, 5]),
+    ringPadding: 5
+});
 
 export class Grenade extends CombatEntity {
     constructor(owner, targetPosition, fuseTime = 1.08, options = {}) {
@@ -40,6 +47,12 @@ export class Grenade extends CombatEntity {
         this.maxBounces = 4;
         this.launchElapsed = 0;
         this.homingTrail = [];
+        this.wasSticky = false;
+        this.homingActivated = false;
+        this.commandGuided = options.commandGuided === true;
+        this.commandTrail = this.commandGuided ? [this.position.clone()] : [];
+        this.onDetonate = typeof options.onDetonate === "function" ? options.onDetonate : null;
+        this._detonated = false;
     }
 
     update(delta, simulation) {
@@ -61,6 +74,7 @@ export class Grenade extends CombatEntity {
         const previousPosition = this.position.clone();
         const homingTarget = canHome ? this._getStickyHomingTarget(simulation) : null;
         if (homingTarget) {
+            this.homingActivated = true;
             steerProjectileVelocityToward(this, homingTarget.position, delta, STICKY_HOMING_TURN_RATE);
         } else {
             this.homingTrail = [];
@@ -71,6 +85,7 @@ export class Grenade extends CombatEntity {
         if (homingTarget) this._recordHomingTrail();
 
         if (this.stickyEnabled && this._tryStick(previousPosition, simulation)) {
+            if (this.commandGuided) this._recordCommandTrail();
             this.timer -= delta;
             if (this.timer <= 0) this._detonate(simulation);
             return true;
@@ -85,6 +100,7 @@ export class Grenade extends CombatEntity {
                 simulation.playSound("bounce", 0.5);
             }
         }
+        if (this.commandGuided) this._recordCommandTrail();
 
         // 이동 경로가 상대 폭발권을 스치면 탄속 비례로 퓨즈 소모 속도를 높인다.
         if (!this._proximityTriggered) {
@@ -131,6 +147,11 @@ export class Grenade extends CombatEntity {
     _recordHomingTrail() {
         this.homingTrail.push(this.position.clone());
         if (this.homingTrail.length > STICKY_HOMING_TRAIL_LENGTH) this.homingTrail.shift();
+    }
+
+    _recordCommandTrail() {
+        this.commandTrail.push(this.position.clone());
+        if (this.commandTrail.length > GRENADE_COMMAND_VISUAL_CONFIG.trailLength) this.commandTrail.shift();
     }
 
     _crossedExplosionRange(startPosition, targetPosition) {
@@ -211,6 +232,7 @@ export class Grenade extends CombatEntity {
         const cos = Math.cos(-targetAngle);
         const sin = Math.sin(-targetAngle);
         const toLocal = (offset) => new Vector2(offset.x * cos - offset.y * sin, offset.x * sin + offset.y * cos);
+        this.wasSticky = true;
         this.stickyTarget = contact.target;
         this.stickyLocalOffset = toLocal(contact.worldCenterOffset);
         this.stickyLocalSurfaceOffset = toLocal(contact.worldSurfaceOffset);
@@ -247,6 +269,10 @@ export class Grenade extends CombatEntity {
     }
 
     _detonate(simulation) {
+        if (this._detonated) return;
+        this._detonated = true;
+        const affectedTargetIds = [];
+        let actualDamage = 0;
         for (const target of simulation.getEnemiesOf(this.owner)) {
             const distance = Vector2.subtract(this.position, target.position).length();
             if (distance <= this.explosionRadius) {
@@ -258,8 +284,10 @@ export class Grenade extends CombatEntity {
                 const final =
                     target.actionContext?.onProjectileDamage?.(raw, this, this.owner, "Grenade", simulation, target) ??
                     raw;
-                const { actualDamage } = target.takeDamage(final, this.owner, "Grenade");
-                if (actualDamage <= 0) continue;
+                const damageResult = target.takeDamage(final, this.owner, "Grenade");
+                actualDamage += damageResult.actualDamage;
+                affectedTargetIds.push(target.id);
+                if (damageResult.actualDamage <= 0) continue;
                 const kbDir = Vector2.subtract(target.position, this.position).normalize();
                 target.applyKnockback(kbDir.scale(900), 1.3);
                 if (this.burningEnabled && !target.flags.defeated) {
@@ -274,15 +302,36 @@ export class Grenade extends CombatEntity {
         }
 
         simulation.spawnExplosion(this.position.clone(), this.owner.color);
+        if (this.commandGuided) simulation.spawnPulse(this.position.clone(), GRENADE_COMMAND_VISUAL_CONFIG.color);
         simulation.playSound("explosion");
         simulation.addLog(`${this.owner.name}'s grenade explodes.`);
         this._releaseStickyTarget(simulation);
         this.isExpired = true;
+        this.onDetonate?.({
+            affectedTargetIds,
+            actualDamage,
+            wasSticky: this.wasSticky,
+            homingActivated: this.homingActivated,
+            bounces: this.bounces,
+            proximityTriggered: Boolean(this._proximityTriggered),
+            commandGuided: this.commandGuided
+        });
     }
 
     draw(ctx) {
         const charge = 1 - Math.max(0, this.timer / this.maxTimer);
         ctx.save();
+
+        if (this.commandGuided && this.commandTrail.length > 1) {
+            ctx.strokeStyle = GRENADE_COMMAND_VISUAL_CONFIG.color;
+            ctx.lineWidth = getVisibleLineWidth(ctx, "standard", GRENADE_COMMAND_VISUAL_CONFIG.lineWidth);
+            ctx.setLineDash(GRENADE_COMMAND_VISUAL_CONFIG.dash);
+            ctx.beginPath();
+            ctx.moveTo(this.commandTrail[0].x, this.commandTrail[0].y);
+            this.commandTrail.slice(1).forEach((point) => ctx.lineTo(point.x, point.y));
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
 
         if (!this.stickyTarget && this.homingTrail.length > 1) {
             ctx.strokeStyle = this.owner.color;
@@ -346,6 +395,20 @@ export class Grenade extends CombatEntity {
         ctx.strokeStyle = "#ffffff";
         ctx.lineWidth = 2;
         ctx.stroke();
+
+        if (this.commandGuided) {
+            ctx.strokeStyle = GRENADE_COMMAND_VISUAL_CONFIG.color;
+            ctx.lineWidth = GRENADE_COMMAND_VISUAL_CONFIG.lineWidth;
+            ctx.beginPath();
+            ctx.arc(
+                this.position.x,
+                this.position.y,
+                this.radius + GRENADE_COMMAND_VISUAL_CONFIG.ringPadding,
+                0,
+                Math.PI * 2
+            );
+            ctx.stroke();
+        }
 
         ctx.restore();
     }

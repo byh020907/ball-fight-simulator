@@ -152,6 +152,30 @@ const formatterCases = [
             ]
         },
         "경과 2.00초"
+    ],
+    [
+        "grenade-command-bombing-line",
+        {
+            attemptsPerMatch: 1,
+            successRate: 1,
+            values: [
+                {
+                    guidedPlanned: 3,
+                    guidedLaunched: 3,
+                    totalGrenades: 5,
+                    settledGrenades: 5,
+                    guidedEnemyExplosions: 2,
+                    initialTargetExplosions: 2,
+                    stickyContacts: 1,
+                    homingActivations: 1,
+                    wastedExplosions: 1,
+                    actualDamage: 48,
+                    plannedBounces: 2,
+                    elapsed: 3
+                }
+            ]
+        },
+        "유도 3.00/3.00발"
     ]
 ];
 
